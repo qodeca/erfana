@@ -1,6 +1,13 @@
 # Windows build prerequisites
 
-**Status**: Build prerequisites for Windows hosts. Phases 0–2 + 4 of [Windows enablement](../windows/README.md) have shipped (v0.9.3 + v0.9.4); Phase 3 ([#164](https://github.com/qodeca/erfana/issues/164) — screenshots) + Phase 5 ([#166](https://github.com/qodeca/erfana/issues/166) — NSIS UX) + Phase 6 ([#167](https://github.com/qodeca/erfana/issues/167) — polish) remain open. See [`docs/windows/implementation-plan.md`](../windows/implementation-plan.md) for the canonical current status.
+**Status**: Build prerequisites for Windows hosts. Most of [Windows enablement](../windows/README.md) has shipped:
+
+- **Phases 0–2 + 4** (portable scripts, terminal parity, dependency detection, reserved-filename guard, local Whisper) — v0.9.3 and v0.9.4.
+- **Phase 3** (screenshot parity, issue #164) — v0.12.0.
+- **Phase 6** (polish, issue #167) — partially shipped in v0.13.0 (advisory Windows CI job, single-bridge renderer platform detection, PII log redaction, D5/D7), with further Windows-quality work through v0.14.0–v0.16.0: bundled Cascadia Mono terminal font, folder-name project-tree header, native-`git` status worker, and the Windows Claude Code context bar.
+- **Phase 5** (NSIS installer UX, issue #166) is the main phase still open.
+
+Issue references above are bare numbers on purpose — those issue links no longer resolve on the public repository. [`docs/windows/implementation-plan.md`](../windows/implementation-plan.md) is the canonical, dated status.
 
 > **Scope of this doc**: portable npm scripts and build prerequisites only. Runtime feature status for Windows is in [`implementation-plan.md`](../windows/implementation-plan.md) §"Feature status on Windows today".
 
@@ -123,7 +130,7 @@ npm run build:win
 
 This produces an NSIS installer in `release/{version}/`. The build runs `prebuild` (the aproba shim) and `electron-builder --win` automatically.
 
-> Phases 1–2 + 4 runtime features (terminal parity, dependency detection, reserved-filename guard, local Whisper) all shipped in v0.9.3 / v0.9.4; the installer produced here runs the full feature surface. Phase 3 screenshot capture ([#164](https://github.com/qodeca/erfana/issues/164)) is the only user-visible feature still gated off on Windows.
+> The installer produced here runs the full user-visible feature surface. Phases 1–2 + 4 (terminal parity, dependency detection, reserved-filename guard, local Whisper) shipped in v0.9.3 / v0.9.4, and Phase 3 screenshot capture shipped in v0.12.0 — no feature is gated off on Windows any more. What remains open is installer UX polish (Phase 5, issue #166). Per-feature status lives in [`implementation-plan.md`](../windows/implementation-plan.md) §"Feature status on Windows today".
 
 ---
 
@@ -159,15 +166,17 @@ A fresh `git clone && npm ci` on a default-hardened Windows 11 box previously fa
 
 ---
 
-## Contributor expectations (pre-CI)
+## Contributor expectations
 
-Windows-targeted CI is deferred to Phase 6. Until it lands, **contributors on Windows are responsible for running the main-process tests locally before merging any PR that touches `src/main/` or test configuration**:
+Windows CI **exists**: `.github/workflows/checks.yml` runs a `windows-checks` job on `windows-latest` for every push, executing `npm run typecheck` and `npm run test:main` under `shell: bash`.
+
+It is deliberately **advisory** — excluded from the branch-protection required-checks set until it proves stable, mirroring how `e2e` is kept out. A red `windows-checks` job therefore blocks nothing automatically, so **contributors are still responsible for running the main-process tests locally before merging any PR that touches `src/main/` or test configuration**:
 
 ```bash
 npm run test:main
 ```
 
-This is the same job the future CI guard will run. Catches the common regression class of hardcoded Unix paths (`/tmp/...`, `/path/to/...`) that the project's `PATH_TRAVERSAL` validator rejects on Windows. See [#157](https://github.com/qodeca/erfana/issues/157) for the original incident.
+This is the same command the CI job runs. It catches the common regression class of hardcoded Unix paths (`/tmp/...`, `/path/to/...`) that the project's `PATH_TRAVERSAL` validator rejects on Windows — the original incident was issue #157 (link no longer resolves; closed 2026-04-20).
 
 ---
 

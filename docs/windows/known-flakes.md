@@ -1,5 +1,7 @@
 # Windows test-flake register
 
+> **Note**: issue and PR numbers, commit SHAs, release tags and CI run links below predate the 2026-06 open-source migration and no longer resolve on `qodeca/erfana`; they are retained as provenance.
+
 Record of Windows-host-specific test flakes, their symptoms, status, and the
 commit or issue that remediated them. Seeded 2026-04-23 during the
 `feature/windows-flake-remediation` work (#172).
@@ -8,8 +10,12 @@ commit or issue that remediated them. Seeded 2026-04-23 during the
 list. Different tests trip on different runs depending on what Defender is
 scanning, NTFS contention, or V8 GC interaction. Without a register, every
 new flake gets re-triaged from scratch and historical context is lost. This
-index lets future contributors (starting with #167 Phase 6 `windows-latest`
-CI) recognise known patterns and apply proven remediations.
+index lets future contributors recognise known patterns and apply proven
+remediations. The `windows-latest` CI job (`windows-checks` in
+`.github/workflows/checks.yml`) is now live but **advisory** — it runs
+typecheck + `test:main` on every push and is deliberately excluded from the
+branch-protection required checks until it proves stable, so a flake here
+surfaces as a warning rather than a blocked merge.
 
 **Scope**: tests that pass on Linux / macOS CI but fail or flake on Windows
 specifically. Cross-platform flakes (e.g. network-dependent tests) go in
@@ -36,17 +42,19 @@ below until a dedicated macOS register exists — rows are marked in the
 | `src/renderer/src/utils/panelUtils.test.ts` (`waitForTerminalReady` custom interval) | 335 ms wall-clock on 2026-04-23 (prior run 151 ms) for a 100 ms timing test. Consistently above budget on Windows. | 2026-04-22 | 🔴 actively flaking | — | Same pattern as SettingsOverlay focus — worker pre-emption on tight timer. Apply fake-timer remediation. |
 | `src/renderer/src/components/Editor/MarkdownPreview.prompt.test.tsx` | 8.8 s timeout on "should handle very long content" (Windows local, 2026-04-23). | 2026-04-23 | 🟡 under observation | — | Large-content rendering test; likely Monaco / markdown-parse cost + Defender scanning. First occurrence — needs second observation before fix design. |
 | `src/renderer/src/components/Search/SearchBar.test.tsx` | 815 ms timeout on "auto-focuses input on mount" (Windows local, 2026-04-23). | 2026-04-23 | 🟡 under observation | — | Focus race matching SettingsOverlay (P4) pattern. Apply same `vi.useFakeTimers` + `act()` remediation if it reproduces. |
-| `src/main/services/DirectoryWatcherService.test.ts:25` (`ENOENT handling > sends project-deleted and remains recoverable (stopAll instead of dispose) after max restart attempts`) | 5000 ms testTimeout exceeded on Windows local (2026-04-23, commit `5769d49`). Passes clean on ubuntu CI (250/250 files, 7955 tests green). | 2026-04-23 | 🟡 under observation | — | Tight restart-attempt loop sensitive to worker pre-emption under Defender. Same family as SettingsOverlay (P4). Apply `vi.useFakeTimers` + `vi.advanceTimersByTime` for the restart-scheduler timer. |
+| `src/main/services/DirectoryWatcherService.test.ts:25` (`ENOENT handling > sends project-deleted and remains recoverable (stopAll instead of dispose) after max restart attempts`) | 5000 ms testTimeout exceeded on Windows local (2026-04-23, commit `5769d49`). Passes clean on ubuntu CI (at the time of writing; the workspace is 299 files / 8,768 tests as of v0.16.3). | 2026-04-23 | 🟡 under observation | — | Tight restart-attempt loop sensitive to worker pre-emption under Defender. Same family as SettingsOverlay (P4). Apply `vi.useFakeTimers` + `vi.advanceTimersByTime` for the restart-scheduler timer. |
 | `src/main/services/DirectoryWatcherService.test.ts:105` (`ENOENT handling > schedules restart on first transient error (ENOENT)`) | `expect(sends.some(s => s.channel === 'directory-watch:project-deleted')).toBe(false)` — got `true` (Windows local, 2026-04-23, commit `5769d49`). Passes clean on ubuntu CI. | 2026-04-23 | 🟡 under observation | — | Race: on Windows, the `project-deleted` broadcast fires before the assertion inspects the send buffer; on POSIX the restart scheduler pre-empts first. Pair-fix with the sibling row above using fake timers so scheduler order is deterministic. |
 | `e2e/third-party-components.e2e.ts:38` (`Monaco editor: Set content via keyboard and verify in preview`) | macOS CI (`macos-latest`) flake on 2026-04-23 (commit `5769d49`, run [24852814922](https://github.com/qodeca/erfana/actions/runs/24852814922)). Marked flaky by Playwright retry — passed on second attempt. Not observed on Windows local. | 2026-04-23 | 🟡 under observation | — | **macOS-host**, not Windows — recorded here because no macOS register exists yet. Likely Monaco keyboard-input focus race. Needs second CI observation before remediation; candidate fix is `MonacoPage.waitForReady()` before `page.keyboard.type()`. |
 | `e2e/fixture-smoke.e2e.ts` (whole worker) | `Worker teardown timeout of 60000ms exceeded` + `EBUSY: resource busy or locked, unlink/rmdir '.e2e-temp/worker-*'` on Windows; the app also flashed a main-process crash dialog (`TypeError: Cannot read properties of undefined (reading 'expiry')` from `node:internal/timers` via `FSWatcher._throttle`). Surfaced 2026-06-13 on the #217 branch's first push. | 2026-06-13 | ✅ resolved | [#217](https://github.com/qodeca/erfana/issues/217) / PR #245 | Root cause was the crash, not the EBUSY (one bug, two symptoms): a chokidar `awaitWriteFinish` throttle timer in `FileWatcherService` called `setTimeout` as Node's timer subsystem was being dismantled during shutdown, throwing an uncaught error that crashed the main process and left file handles locked. Fix (`e1142cd`): a shutdown-scoped `uncaughtException` guard in `index.ts` swallows exactly this benign timer race (`isBenignShutdownTimerError`) and lets the exit finish; normal-operation crashes still surface Electron's dialog. No file-watching behavior change. |
 | `scripts/fuses.test.mjs` (`chmodNodePtySpawnHelper`, `ensurePackedMediaBinaries`) | 5/9 cases fail on Windows host with `expected 420 to be 438` (decimal `0o644` vs `0o666`). Windows `fs.chmodSync` is effectively a no-op for POSIX modes; the suite is a pure POSIX-mode contract test. Workspace mode masked this (long-running `npm run test 2>&1 \| tail` returns tail's exit code, not vitest's). Discovered 2026-06-04 while attempting Phase C coverage measurement for the lens-review enhancement plan. | 2026-06-04 | ✅ resolved | — | `describe.skipIf(process.platform === 'win32')` added to both top-level describes (2026-06-04) — these exercise the `afterPack` macOS/Linux chmod helper, no Windows code path is tested. ubuntu CI still covers them. Unblocks `npm run test:cov` on Windows hosts. |
+| `src/main/ipc/file-handlers.test.ts:275,309` | Two `it.skipIf(process.platform === 'win32')` cases in the path-validation suite — POSIX-only path shapes that Windows rejects at a different layer. | 2026-08-07 | 🚫 wontfix | — | Platform-inherent: the assertions encode POSIX path semantics, so there is no Windows behaviour to assert. ubuntu CI covers them. Recorded here so a future reader does not mistake the skips for unremediated flakes. Note the deliberate scope boundary: `ProjectLockService.test.ts:252,1174` use `if (process.platform !== 'win32') return`-style early exits inside otherwise-running tests — those neither fail nor flake, so they are **not** register entries. |
 
 ## Follow-up audit candidates
 
-Areas likely to contain more Windows-host flakes. Scan once Phase 6 #167
-enables `windows-latest` CI (so we can attribute failures without needing
-local Windows hardware):
+Areas likely to contain more Windows-host flakes. The advisory
+`windows-latest` job now gives remote signal for the main-process suite
+(`test:main`); renderer, preload and e2e still need a local Windows host to
+attribute failures:
 
 - **`src/main/services/watcher/**`** — chokidar primitive shared with the
   directory-watcher e2e flake. More tests that assume inotify-class latency.

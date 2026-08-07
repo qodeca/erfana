@@ -1,6 +1,6 @@
 # Preload Script Bundling
 
-**Last Updated**: March 2026 (v0.9.0)
+**Last updated**: August 2026 (v0.16.3)
 
 This document explains why the preload script must be bundled for sandbox compatibility.
 
@@ -14,6 +14,12 @@ preload: {
   build: {
     externalizeDeps: false,  // Bundle all dependencies for sandbox compatibility
     rollupOptions: {
+      // Multi-entry preload: the main editor window loads `index.js`, while
+      // each per-display area-select overlay window loads `screenshotOverlay.js`.
+      input: {
+        index: resolve('src/preload/index.ts'),
+        screenshotOverlay: resolve('src/preload/screenshotOverlay.ts')
+      },
       output: {
         format: 'cjs'
       }
@@ -23,6 +29,8 @@ preload: {
 ```
 
 In electron-vite v5, dependency externalization is enabled by default for all targets. The preload must explicitly disable it with `externalizeDeps: false` to bundle dependencies inline.
+
+**Two entry points, not one.** The screenshot overlay windows get their own preload so the overlay-only IPC verbs stay out of the main renderer's bridge — a smaller attack surface on each side. Both entries are bundled the same way; both must stay sandbox-safe.
 
 ---
 
@@ -58,7 +66,8 @@ Set `build.externalizeDeps: false` in the preload config, allowing Vite to bundl
 
 ### Result
 
-- Preload script size: ~30 kB (bundled)
+- `out/preload/index.js`: ~38 kB bundled (38,119 bytes as built for v0.16.3)
+- `out/preload/screenshotOverlay.js`: ~1.3 kB bundled
 - No external dependency requires
 - Compatible with sandboxing
 
@@ -69,9 +78,11 @@ Set `build.externalizeDeps: false` in the preload config, allowing Vite to bundl
 To verify bundling works correctly:
 
 1. Build the app: `npm run build`
-2. Check preload script has no external requires for non-builtins:
+2. Check both preload bundles were emitted and neither has external requires for non-builtins:
    ```bash
-   grep 'require("@electron-toolkit' out/preload/index.js
+   ls -l out/preload/index.js out/preload/screenshotOverlay.js
+
+   grep 'require("@electron-toolkit' out/preload/index.js out/preload/screenshotOverlay.js
    # Should return nothing (all bundled inline)
    ```
 3. Install and launch app – no sandbox errors should appear

@@ -129,7 +129,7 @@ const config = PROMPT_REGISTRY['mermaid-bug-report']  // Returns undefined!
 
 **Problem**: Largest natural extraction candidate (`Release signing (v0.9.5+, #174)`, L490–L533) is structurally pinned. The pubkey block contains `<!-- minisign-pubkey-{primary,rotation}-{begin,end} -->` fence markers that are actively grepped by:
 
-- `.github/workflows/checks.yml:214–241` — release-pubkey drift detector (a required `Release readiness guards` status check on `main`)
+- `.github/workflows/checks.yml:214–241` — release-pubkey drift detector (the `Release readiness guards` job; it runs on every push but is **not** a required status check on `main` — the required set is `Lint`, `Typecheck`, `Unit tests`, `Build`, `License compliance`, `Secret scan`, per [`ci.md`](./ci.md))
 - `.claude/skills/releasing-erfana/phases/phase-4-verify.md:45` — operator-facing canonical-source note
 - `README.md:156` — direct `#release-signing-v095-174` anchor
 
@@ -181,7 +181,7 @@ After the heartbeat hardening (Phase A4 resume-refresh, B1 symlink defense, D3 H
 
 ---
 
-### 12. Claude status bar — Windows v1 limitations ([#217](https://github.com/qodeca/erfana/issues/217), 2026-06)
+### 12. Claude status bar — Windows v1 limitations (#217, 2026-06)
 
 **Severity**: Low
 **Impact**: The Windows Claude Code context status bar works but carries three known v1 gaps (parity-limited vs the macOS detector).
@@ -256,7 +256,7 @@ Ongoing effort to keep `docs/` concise and high-value for Claude Code.
 
 This doc covers project-wide non-Windows technical debt. For phase-structured deferred items with promotion criteria + risk-if-forgotten:
 
-- [`windows/deferred-work.md`](./windows/deferred-work.md) — D1-D8 (Phase 2 review aftermath, tracked in [#168](https://github.com/qodeca/erfana/issues/168))
+- [`windows/deferred-work.md`](./windows/deferred-work.md) — D1-D8 (Phase 2 review aftermath, tracked in #168)
 - [`windows/deferred-work-phase4.md`](./windows/deferred-work-phase4.md) — D9-D12 (Phase 4 audit aftermath; same issue)
 
 Amendment discipline + promotion-rule conventions in [`windows/contributing.md`](./windows/contributing.md) §"Amendment discipline".

@@ -1,6 +1,6 @@
 # Architecture Builds
 
-**Last updated**: June 2026 (v0.11.2)
+**Last updated**: August 2026 (re-verified against `electron-builder.yml` at v0.16.3; the arm64-only decision dates from v0.11.2 and is unchanged)
 
 This document explains why Erfana ships a single Apple Silicon (arm64) macOS binary.
 

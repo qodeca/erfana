@@ -1,8 +1,8 @@
 # Electron Fuses
 
-**Last Updated**: May 2026 (v0.9.6)
+**Last updated**: August 2026 (v0.16.3)
 
-This document explains the Electron fuses configuration and security decisions. The `scripts/fuses.js` `afterPack` hook also restores the executable bit on bundled `node-pty` `spawn-helper` binaries — see [afterPack also chmods node-pty spawn-helper](#afterpack-also-chmods-node-pty-spawn-helper).
+This document explains the Electron fuses configuration and security decisions. `scripts/fuses.js` is the single `afterPack` hook, so it also carries four non-fuse responsibilities: it restores the executable bit on bundled `node-pty` `spawn-helper` binaries (see [afterPack also chmods node-pty spawn-helper](#afterpack-also-chmods-node-pty-spawn-helper)), prunes foreign-arch native binaries, stages and re-verifies the per-arch `ffmpeg` binary, and renames the bundle for test builds.
 
 ---
 
@@ -12,18 +12,24 @@ This document explains the Electron fuses configuration and security decisions. 
 // scripts/fuses.js
 const { flipFuses, FuseVersion, FuseV1Options } = require('@electron/fuses');
 
+// Production builds leave the Node CLI inspector off. Only an explicit
+// ERFANA_TEST_BUILD=true build turns it on, for Playwright over CDP.
+const isTestBuild = process.env.ERFANA_TEST_BUILD === 'true';
+
 await flipFuses(electronBinaryPath, {
   version: FuseVersion.V1,
   resetAdHocDarwinSignature: context.electronPlatformName === 'darwin',
   [FuseV1Options.RunAsNode]: false,
   [FuseV1Options.EnableCookieEncryption]: false,
   [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,
-  [FuseV1Options.EnableNodeCliInspectArguments]: false,
+  [FuseV1Options.EnableNodeCliInspectArguments]: isTestBuild,
   // NOTE: ASAR integrity validation disabled because asar: false
   // - EnableEmbeddedAsarIntegrityValidation
   // - OnlyLoadAppFromAsar
 });
 ```
+
+`isTestBuild` is the only conditional fuse. Every other value is a hard-coded constant, so a production DMG always ships the same fuse set – see [test builds and the Node CLI inspector](#test-builds-and-the-node-cli-inspector).
 
 **Configured via**:
 ```yaml
@@ -32,13 +38,23 @@ afterPack: ./scripts/fuses.js
 afterSign: ./scripts/resign.js
 ```
 
-**Hook sequencing**: `afterPack` runs first (applies fuses, resets main binary signature, restores spawn-helper executable bit), then `afterSign` runs (deep re-signs the entire `.app` bundle). The `afterSign` step is critical because `flipFuses` modifies the main binary's code directory hash, creating a mismatch with helper processes. Without deep re-signing, macOS Sequoia+ rejects `@rpath` library loads. See [electron-builder.md](./electron-builder.md) for details.
+**Hook sequencing**: `beforePack` (`scripts/ensure-media-binaries.js`) runs first and caches each target arch's `ffmpeg` binary, then `afterPack` (`scripts/fuses.js`) runs once per packaged target, then electron-builder signs, then `afterSign` (`scripts/resign.js`) deep re-signs the entire `.app` bundle.
+
+`afterPack` does five things, in this order:
+
+1. Resolve the packed Electron binary – and, on a test build, rename it via `renameTestBuildApp` to `Erfana (TEST BUILD).app`.
+2. Prune foreign-platform/arch `ffprobe-static` binaries and `node-pty` prebuilds (plus a `.pdb` strip on `win32`).
+3. Restore the `node-pty` `spawn-helper` execute bit (`0755`, Unix only).
+4. `ensurePackedMediaBinaries` – copy this pack's cached `ffmpeg` into the bundle, re-verify its pinned SHA-256, and `chmod 0755` the packed `ffmpeg` + every `ffprobe`.
+5. Flip the Electron fuses and reset the ad-hoc Darwin signature on the main binary.
+
+Everything happens before signing so the signed tree is the final tree. The `afterSign` step is critical because `flipFuses` modifies the main binary's code directory hash, creating a mismatch with helper processes. Without deep re-signing, macOS Sequoia+ rejects `@rpath` library loads. See [electron-builder.md](./electron-builder.md) for details.
 
 ---
 
 ## afterPack also chmods node-pty spawn-helper
 
-Since v0.9.6 ([`ea3eaf1`](https://github.com/qodeca/erfana/commit/ea3eaf1)), the same `scripts/fuses.js` `afterPack` hook restores the executable bit (`0755`) on every node-pty `spawn-helper` binary under `node_modules/node-pty/prebuilds/<platform>-<arch>/Release/` before code-signing runs. **Without this step, terminal-spawn fails on every signed build** — see the regression history below.
+Since v0.9.6 (commit `ea3eaf1`, no longer resolvable – that history was rewritten), the same `scripts/fuses.js` `afterPack` hook restores the executable bit (`0755`) on every node-pty `spawn-helper` binary under `node_modules/node-pty/prebuilds/<platform>-<arch>/Release/` before code-signing runs. **Without this step, terminal-spawn fails on every signed build** — see the regression history below.
 
 ### Why this is needed
 
@@ -81,6 +97,45 @@ Test coverage: `scripts/fuses.test.mjs` (`pruneForeignFfprobeBinaries` / `pruneF
 
 ---
 
+## afterPack also stages and verifies the media binaries
+
+`ffmpeg-static` downloads a single host-arch binary in a postinstall step that CI skips (`npm ci --ignore-scripts`), so a packaged build could ship without `ffmpeg` at all (the v0.9.6 video-transcription ENOENT) or with the wrong architecture. The fix is split across the two hooks:
+
+- **`beforePack`** (`scripts/ensure-media-binaries.js`) downloads each targeted arch into a build cache at `release/.media-cache/<platform>-<arch>/` (overridable via `ERFANA_MEDIA_CACHE`), verified against a size floor and a pinned SHA-256 in `FFMPEG_SHA256`.
+- **`afterPack`** (`ensurePackedMediaBinaries` in `scripts/fuses.js`) copies the cached binary matching *this* pack over the bundle's `app/node_modules/ffmpeg-static/ffmpeg`, re-verifies the same SHA-256 pin at its packed location, then `chmod 0755`'s it plus every `ffprobe` under `app/node_modules/ffprobe-static/bin/` (skipping symlinks).
+
+Doing the copy in `afterPack` means each DMG carries exactly its own current, integrity-checked `ffmpeg` – no foreign-arch bloat, and no network I/O after `beforePack`. Re-hashing at the packed path, rather than trusting the `beforePack` check, closes the window between caching and packing. A missing or mismatched binary throws under `requireMatch` instead of shipping a `spawn … ffmpeg ENOENT` regression.
+
+Unsupported ffmpeg target arches (`universal`, `armv7l`, `ia32`) are skipped, or throw under `requireMatch`.
+
+---
+
+## Test builds and the Node CLI inspector
+
+`EnableNodeCliInspectArguments` is the one fuse whose value is not a constant:
+
+```javascript
+const isTestBuild = process.env.ERFANA_TEST_BUILD === 'true';
+```
+
+Playwright drives the packaged app over the Chrome DevTools Protocol, which needs `--inspect` to work – impossible with the fuse burned off. So the hook flips it on for, and only for, an opt-in test build:
+
+```bash
+npm run build:mac:test
+# expands to: npm run build && ERFANA_TEST_BUILD=true electron-builder --mac \
+#             -c.directories.output=release/test/${npm_package_version}
+```
+
+Three guardrails keep such a build from being mistaken for a release:
+
+1. **Separate output directory** – artifacts land in `release/test/{version}/`, not `release/{version}/`, so they can never be picked up by the release upload globs.
+2. **Renamed bundle** – `renameTestBuildApp` renames the packed app to `Erfana (TEST BUILD).app` (`.exe` on Windows) before fuses are applied, so the inspector-enabled build is visually distinct in Finder and in the DMG.
+3. **Loud build log** – `displayTestBuildWarning()` prints a boxed "DO NOT DISTRIBUTE THIS BUILD TO END USERS" banner twice, at the start and the end of the hook, and the closing summary reads `NodeCliInspect: ENABLED (test build)`.
+
+`npm run build:mac` (and `build:win`) leave `ERFANA_TEST_BUILD` unset, so every released artifact has the inspector fuse off. Nothing under `.github/workflows/` sets the variable (verified 2026-08-07).
+
+---
+
 ## Fuse decisions
 
 | Fuse | Value | Reason |
@@ -88,7 +143,7 @@ Test coverage: `scripts/fuses.test.mjs` (`pruneForeignFfprobeBinaries` / `pruneF
 | `RunAsNode` | `false` | **Critical**: Prevents `ELECTRON_RUN_AS_NODE` exploitation (CVE-2024-46992) |
 | `EnableCookieEncryption` | `false` | **UX**: Avoids confusing macOS keychain prompts without context |
 | `EnableNodeOptionsEnvironmentVariable` | `false` | **Critical**: Prevents command injection via `NODE_OPTIONS` |
-| `EnableNodeCliInspectArguments` | `false` | **Critical**: Prevents remote debugging access via `--inspect` |
+| `EnableNodeCliInspectArguments` | `isTestBuild` – `false` on every production build | **Critical**: Prevents remote debugging access via `--inspect`. Set to `true` only when `ERFANA_TEST_BUILD=true`, for Playwright E2E over CDP – see [test builds and the Node CLI inspector](#test-builds-and-the-node-cli-inspector) |
 | `EnableEmbeddedAsarIntegrityValidation` | N/A | **Unavailable**: Requires ASAR enabled (we have it disabled) |
 | `OnlyLoadAppFromAsar` | N/A | **Unavailable**: Requires ASAR enabled (we have it disabled) |
 
@@ -112,7 +167,7 @@ Test coverage: `scripts/fuses.test.mjs` (`pruneForeignFfprobeBinaries` / `pruneF
 
 **Risk**: Attacker could enable remote debugging via `--inspect` flag and connect to debug port.
 
-**Mitigation**: `EnableNodeCliInspectArguments: false` - disables `--inspect` flag.
+**Mitigation**: `EnableNodeCliInspectArguments: isTestBuild` – `false` for every production build, which disables the `--inspect` flag. The fuse is flipped on only by an opt-in `ERFANA_TEST_BUILD=true` build, whose bundle is renamed `Erfana (TEST BUILD).app` and is never distributed.
 
 ---
 
@@ -180,7 +235,7 @@ Disable cookie encryption to avoid user confusion, accept plaintext settings sto
 **Kept** (critical fuses):
 - ✅ RunAsNode protection
 - ✅ NodeOptions protection
-- ✅ Inspect arguments protection
+- ✅ Inspect arguments protection (production builds; test builds deliberately opt out)
 
 **Kept** (other security):
 - ✅ Process sandboxing

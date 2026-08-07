@@ -2,7 +2,7 @@
 
 Project-wide index of `ErrorCode` values in `src/shared/errors.ts`, grouped by category. For each code: the enum name, the user-facing message (from `ERROR_MESSAGES` map), and the primary throw site. For whisper + transcription codes, also the operator action on encounter.
 
-**Why this document exists**: Phase 4 introduced 6 new whisper codes (see [ADR 0001](./adrs/0001-self-host-whisper-binaries.md)); the full enum has grown to ~100 codes. A single mapping table saves every future maintainer a `grep -r ErrorCode` sweep.
+**Why this document exists**: Phase 4 introduced 6 new whisper codes (see [ADR 0001](./adrs/0001-self-host-whisper-binaries.md)); the full enum has grown to 104 codes. A single mapping table saves every future maintainer a `grep -r ErrorCode` sweep.
 
 **Source of truth**: `src/shared/errors.ts`. If this doc drifts, `errors.ts` wins — file an issue.
 
@@ -11,11 +11,13 @@ Project-wide index of `ErrorCode` values in `src/shared/errors.ts`, grouped by c
 throw new AppError('human-readable message', ErrorCode.XYZ, originalError?)
 ```
 
-IPC layer sanitises raw messages to prevent internal-detail leaks; user sees only the `ERROR_MESSAGES[code]` mapping. See `getUserFriendlyMessage()` in `errors.ts:374`.
+IPC layer sanitises raw messages to prevent internal-detail leaks; user sees only the `ERROR_MESSAGES[code]` mapping. See `getUserFriendlyMessage()` in `errors.ts:403`.
 
 ---
 
 ## Path validation (8 codes)
+
+8 path/filename codes in `src/shared/errors.ts`.
 
 | Code | User copy | Primary throw site |
 |------|-----------|--------------------|
@@ -30,7 +32,9 @@ IPC layer sanitises raw messages to prevent internal-detail leaks; user sees onl
 
 ---
 
-## Settings / persistence (9 codes)
+## Settings / persistence (12 codes)
+
+2 `SETTINGS_*` + 3 `PROJECT_*` + 3 `PROJECT_SETTINGS_*` + 4 `GLOBAL_SETTINGS_*` in `src/shared/errors.ts`.
 
 `SETTINGS_READ_FAILED`, `SETTINGS_WRITE_FAILED`, `PROJECT_NOT_FOUND`, `PROJECT_NOT_DIRECTORY`, `PROJECT_OPEN_FAILED`, `PROJECT_SETTINGS_READ_FAILED`, `PROJECT_SETTINGS_INVALID_JSON`, `PROJECT_SETTINGS_VALIDATION_FAILED`, plus `GLOBAL_SETTINGS_*` (4 codes for read/write/validation/dir-create).
 
@@ -38,7 +42,9 @@ See `src/main/services/SettingsService.ts`, `ProjectSettingsService.ts`, `Global
 
 ---
 
-## Import & export (28 codes)
+## Import & export (29 codes)
+
+5 `PDF_*` (legacy import) + 11 generic `IMPORT_*` + 5 document-import `IMPORT_*` + 4 `PDF_EXPORT_*` + 4 `DOCX_EXPORT_*` in `src/shared/errors.ts`.
 
 Grouped by pipeline stage. See `docs/api-services-features.md` §LiteParseConverter and §DocxService for full flows.
 
@@ -53,6 +59,8 @@ Grouped by pipeline stage. See `docs/api-services-features.md` §LiteParseConver
 ---
 
 ## Prompt execution (4 codes)
+
+4 `PROMPT_*` in `src/shared/errors.ts`.
 
 `PROMPT_NOT_FOUND`, `PROMPT_VALIDATION_FAILED`, `PROMPT_TERMINAL_TIMEOUT`, `PROMPT_SEND_FAILED`. See `src/renderer/src/prompts/`.
 
@@ -86,11 +94,15 @@ Grouped by pipeline stage. See `docs/api-services-features.md` §LiteParseConver
 
 ## Logging (3 codes)
 
+3 `LOGGING_*` in `src/shared/errors.ts`.
+
 `LOGGING_INIT_FAILED`, `LOGGING_WRITE_FAILED`, `LOGGING_CLEANUP_FAILED`. See `docs/logging.md`.
 
 ---
 
 ## External file drop (7 codes)
+
+7 `EXTERNAL_FILE_*` in `src/shared/errors.ts`.
 
 `EXTERNAL_FILE_NOT_FOUND`, `EXTERNAL_FILE_IS_DIRECTORY`, `EXTERNAL_FILE_NOT_REGULAR`, `EXTERNAL_FILE_SYMLINK_SYSTEM`, `EXTERNAL_FILE_COPY_FAILED`, `EXTERNAL_FILE_MOVE_FAILED`, `EXTERNAL_FILE_SOURCE_DELETED`. See `src/main/services/ExternalFileService.ts` + Spec #012.
 
@@ -98,13 +110,17 @@ Grouped by pipeline stage. See `docs/api-services-features.md` §LiteParseConver
 
 ## Transcription – OpenAI backend (10 codes)
 
+10 `TRANSCRIPTION_*` in `src/shared/errors.ts`.
+
 `TRANSCRIPTION_NO_API_KEY`, `TRANSCRIPTION_INVALID_API_KEY`, `TRANSCRIPTION_API_ERROR`, `TRANSCRIPTION_RATE_LIMITED`, `TRANSCRIPTION_NETWORK_ERROR`, `TRANSCRIPTION_CANCELLED`, `TRANSCRIPTION_INVALID_AUDIO`, `TRANSCRIPTION_CHUNK_FAILED`, `TRANSCRIPTION_TIMEOUT`, `TRANSCRIPTION_FAILED`.
 
 See `src/main/services/TranscriptionService.ts`. Retry semantics documented in `docs/api-services-features.md`.
 
 ---
 
-## Local Whisper (9 codes) — highest operator-visibility
+## Local Whisper (14 codes) — highest operator-visibility
+
+14 `WHISPER_*` in `src/shared/errors.ts`.
 
 Most Phase 4 / issue #165. See also [`docs/windows/whisper-support-runbook.md`](./windows/whisper-support-runbook.md) for diagnostic trail, log paths, and stuck-user procedures.
 
@@ -112,7 +128,8 @@ Most Phase 4 / issue #165. See also [`docs/windows/whisper-support-runbook.md`](
 |------|-----------|-----------|-----------------|
 | `WHISPER_BINARY_NOT_FOUND` | "Whisper binary not found. Please download it from Settings." | `WhisperModelManager.getBinaryPath()` when `isBinaryInstalled()` returns false | User: click Download in Settings |
 | `WHISPER_BINARY_DOWNLOAD_FAILED` | "Failed to download whisper binary..." | Generic fallback in `ensureBinary` catch; also: signal abort, network failures from `SecureDownloaderError` | Check network; retry |
-| `WHISPER_MODEL_NOT_FOUND` / `WHISPER_MODEL_DOWNLOAD_FAILED` | "...download it from Settings" / "Failed to download whisper model..." | `ensureModel()` | Retry; check huggingface.co reachability |
+| `WHISPER_MODEL_NOT_FOUND` | "Whisper model not found. Please download it from Settings." | `ensureModel()` when the model file is absent | User: click Download in Settings |
+| `WHISPER_MODEL_DOWNLOAD_FAILED` | "Failed to download whisper model. Please check your connection and try again." | `ensureModel()` download failure | Retry; check huggingface.co reachability |
 | `WHISPER_PROCESS_FAILED` | "Local transcription failed..." | `runWhisper()` non-zero exit, spawn error | Check stderr in logs |
 | `WHISPER_PROCESS_TIMEOUT` | "Local transcription timed out..." | Per-chunk timeout at `LOCAL_WHISPER.PROCESS_TIMEOUT` | Try smaller model / shorter file |
 | `WHISPER_OUTPUT_PARSE_FAILED` | "Failed to parse transcription output..." | Missing `${audio}.txt` after successful exit | Usually a whisper-cli bug; report upstream SHA |
@@ -128,11 +145,15 @@ Most Phase 4 / issue #165. See also [`docs/windows/whisper-support-runbook.md`](
 
 ## Video import (3 codes)
 
+3 `VIDEO_*` in `src/shared/errors.ts`.
+
 `VIDEO_NO_AUDIO_TRACK`, `VIDEO_EXTRACTION_FAILED`, `VIDEO_FFMPEG_UNAVAILABLE`. See `src/main/services/AudioExtractionService.ts`.
 
 ---
 
 ## Generic (1 code)
+
+1 code (`UNKNOWN_ERROR`) in `src/shared/errors.ts`.
 
 `UNKNOWN_ERROR` — fallback for anything unmapped. `getUserFriendlyMessage()` returns this for non-`AppError` errors at the IPC boundary to prevent internal-detail leaks.
 
