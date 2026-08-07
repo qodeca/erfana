@@ -1,12 +1,12 @@
 # Release pipeline
 
-This document is the operator reference for the Erfana multi-platform release pipeline introduced in [#174](https://github.com/qodeca/erfana/issues/174).
+This document is the operator reference for the Erfana multi-platform release pipeline introduced in #174.
 
 > **Service name note:** Microsoft has renamed "Azure Trusted Signing" to "Azure Artifact Signing". This doc uses the new name; the Azure CLI verb is still `az trustedsigning` and the electron-builder config key remains `win.azureSignOptions`. It covers topology, secrets, rotation calendar, end-user verification, failure recovery, and incident response.
 
 Design summary: one `v*.*.*` tag push from `main` produces one GitHub draft release containing signed, notarized artifacts for Windows + macOS (the Linux distribution target was dropped), plus a minisign-signed `SHA256SUMS`. The local [`releasing-erfana`](../../.claude/skills/releasing-erfana/SKILL.md) skill handles pre-tag sanity, tag push, CI polling, cryptographic verification, and human approval. CI owns build, sign, notarize, verify, and draft upload.
 
-> **SLSA Build L2 attestations are not used.** GitHub gates `actions/attest-build-provenance` to Enterprise Cloud for private repos. qodeca is on the **Team plan**, which still does not enable attestations for private repos (Enterprise required), so this layer is disabled. The minisign signature on the aggregate `SHA256SUMS` + per-platform OS signing (Developer ID notarization on macOS, Azure Artifact Signing Authenticode on Windows) are the authenticity anchors. The trust model is equivalent for end-user verification; attacker must compromise either the release-signing minisign key OR a platform signing credential to forge, independent of any GitHub-specific trust anchor. Trigger to re-enable: org upgrades to Enterprise Cloud, or the repo is made public.
+> **SLSA Build L2 attestations are not used — by choice, no longer by constraint.** `qodeca/erfana` has been a **public** repository since 2026-06-16, so the Enterprise-Cloud gate GitHub applies to `actions/attest-build-provenance` on *private* repos does not apply here. The re-enable trigger this document originally recorded ("repo is made public") has already fired; the obsolete Team-plan rationale is retired. Attestations stay off pending a deliberate pipeline change — turning them on means adding `attestations: id-token: write` permissions plus an attest step to both build legs and extending the skill's Phase 4 gate to check provenance, and that work has not been scoped. Until then the authenticity anchors remain the minisign signature over the aggregate `SHA256SUMS` plus per-platform OS signing (Developer ID notarization on macOS, Azure Artifact Signing Authenticode on Windows): an attacker must compromise either the release-signing minisign key OR a platform signing credential to forge, independent of any GitHub-specific trust anchor.
 
 ## Topology
 
@@ -17,11 +17,18 @@ Design summary: one `v*.*.*` tag push from `main` produces one GitHub draft rele
       │  push v*.*.*
       ├──────────────────►─┐
       │                    │
-      │                    │   on: push: tags: v*.*.*
+      │                    │   on: push: tags: v[0-9]+.[0-9]+.[0-9]+
+      │                    │   also: workflow_dispatch, input `dry-run`
+      │                    │         (default TRUE — skips draft + uploads)
+      │                    │   every job gated on
+      │                    │         if: github.repository == 'qodeca/erfana'
       │                    ├──────────────────────────► prepare
       │                    │                            │
       │                    │                            ├── assert release-notes file
       │                    │                            ├── assert checks.yml green for SHA
+      │                    │                            ├── assert package-lock.json is
+      │                    │                            │   byte-equal to that run's
+      │                    │                            │   package-lock-digest artifact
       │                    │                            └── gh release create --draft
       │                    │                            │
       │                    │                    ┌───────┴───────┐
@@ -40,7 +47,14 @@ Design summary: one `v*.*.*` tag push from `main` produces one GitHub draft rele
       │                    │              strip leaked latest*.yml
       │                    │              sha256sum *  →  SHA256SUMS
       │                    │              minisign sign  →  SHA256SUMS.minisig
-      │                    │              export sha256sums as workflow output
+      │                    │              upload `sha256sums-digest` artifact
+      │                    │
+      │                    │              ── any of prepare / build_mac / build_win
+      │                    │                 not `success` (incl. cancellation) ──►
+      │                    │                        cleanup
+      │                    │                            │
+      │                    │              delete the draft release, then exit 1
+      │                    │              so the whole run goes red
       │                    │
       │  gh run watch      │
       │◄───────────────────┤
@@ -51,7 +65,7 @@ Design summary: one `v*.*.*` tag push from `main` produces one GitHub draft rele
       │  local verify:
       │    minisign -V SHA256SUMS.minisig
       │    sha256sum each asset == SHA256SUMS entry
-      │    equality against workflow-output digest
+      │    equality against the `sha256sums-digest` artifact
       │
       │  operator approval
       │    gh release edit v{tag} --draft=false --latest
@@ -82,7 +96,7 @@ sequenceDiagram
   S-->>GH: gh run watch --exit-status
   GH-->>S: success
   S->>GH: download draft assets
-  S->>S: minisign -V, sha256 compare, workflow-output digest equality
+  S->>S: minisign -V, sha256 compare, sha256sums-digest artifact equality
   S->>O: AskUserQuestion: publish + mark latest?
   O-->>S: approve
   S->>GH: gh release edit v0.9.5 --draft=false --latest
@@ -99,7 +113,7 @@ All secrets live in the GitHub repo `qodeca/erfana` (Settings → Secrets and va
 | `APPLE_ID` | secret | Apple ID email that owns the app-specific password | Only on account rotation |
 | `APPLE_APP_SPECIFIC_PASSWORD` | secret | notarytool auth (user-auth mode, not altool) | Rotate at [appleid.apple.com](https://appleid.apple.com) when needed |
 | `APPLE_TEAM_ID` | secret | Team identifier | Never (account-level) |
-| `MAC_CERT_P12_BASE64` | secret | Developer ID Application cert, base64 | Before cert expiry (max 459 days since 2026-02-15) |
+| `MAC_CERT_P12_BASE64` | secret | Developer ID Application cert, base64 | Before cert expiry — the rotation calendar below holds the authoritative date |
 | `MAC_CERT_PASSWORD` | secret | `.p12` password | With the cert |
 | `AZURE_TENANT_ID` | secret | Qodeca tenant | Never |
 | `AZURE_CLIENT_ID` | secret | App-registration client ID (`erfana-github-ci`) | Only on SP rotation |
@@ -123,7 +137,7 @@ All secrets live in the GitHub repo `qodeca/erfana` (Settings → Secrets and va
 | Anchor | Source of truth | Calendar reminder | Next due |
 |---|---|---|---|
 | `APPLE_APP_SPECIFIC_PASSWORD` | appleid.apple.com | Event-driven (account compromise, key leak) — no fixed expiry | — |
-| `MAC_CERT_P12_BASE64` | Apple Developer | 60 days before cert expiry | **2027-04-15** (current cert expires 2027-06-14 — verify with `security find-certificate -c "Developer ID Application" -p \| openssl x509 -noout -enddate` and refresh this date when the cert is rotated) |
+| `MAC_CERT_P12_BASE64` | Apple Developer | 60 days before cert expiry | **2026-12-03** — the certificate expires **2027-02-01**, read from the live keychain on 2026-08-07 with `security find-certificate -c "Developer ID Application" -p \| openssl x509 -noout -enddate` (subject `Developer ID Application: QODECA sp. z o.o. (DZ477VK57L)`). This supersedes two earlier, mutually inconsistent estimates in this document (a "max 459 days since 2026-02-15" derivation implying 2027-05-20, and a stated 2027-06-14). Re-read the cert and refresh this row on every rotation. |
 | `AZURE_CLIENT_CERTIFICATE_BASE64` (auth cert — app registration credential) | `az ad app credential list --id $AZURE_CLIENT_ID --cert` | 60 days before cert expiry (currently 2028-06-15, rotated 2026-06-16) — i.e. **2028-04-16** | 2028-04-16 |
 | `AZURE_CERT_PROFILE_NAME` (signing cert — service-side, separate from auth cert above) | Azure Artifact Signing profile | 60 days before certificate-profile expiry — current cert profile rotation hooks into Azure portal alerts | **2027-08-22** (assumes 2-year cert profile from initial 2025-10-22 provisioning; verify in Azure portal Trusted Signing → Certificate profiles → expiry date and refresh) |
 | `MINISIGN_SECRET_KEY_BASE64` (primary) | Internal ops vault | Scheduled annually + event-driven (compromise); rotation key published alongside primary so end users can verify both | **2027-04-25** |
@@ -141,9 +155,22 @@ No self-hosted runners for release. Self-hosted Windows with a `.pfx` on disk is
 
 The Linux distribution target (AppImage/deb/rpm) was dropped — Erfana ships on macOS + Windows only. Linux remains a supported dev environment and CI test runner.
 
+## Artifact set coupling (change all four together)
+
+The release asset set is pinned in four places with no automated cross-check between them. Change one without the others and the `gh release upload` step fails on a glob that matches nothing — this burned **v0.11.1**.
+
+| Location | What it pins | Current value |
+|---|---|---|
+| `electron-builder.yml` | build targets + artifact names | `mac.target: dmg` (arm64 only) with `dmg.artifactName: ${name}-${version}-${arch}.${ext}`; `win.target: nsis` with `nsis.artifactName: ${name}-${version}-setup.${ext}` |
+| `.github/workflows/build_mac.yml` | upload glob | `gh release upload "$TAG" "$ART_DIR"/*.dmg` |
+| `.github/workflows/build_win.yml` | signtool-verify + upload globs | `*-setup.exe` in both the verify loop and `gh release upload` |
+| [`.claude/skills/releasing-erfana/SKILL.md`](../../.claude/skills/releasing-erfana/SKILL.md) § Constants | expected asset count | 2 binaries + `SHA256SUMS` + `SHA256SUMS.minisig`, i.e. `EXPECTED_ASSETS=4` (also asserted in §0.4 and `phase-4-verify.md` §4.5) |
+
+**Verified in agreement on 2026-08-07.** The published `v0.16.3` release carries exactly four assets — `erfana-0.16.3-arm64.dmg`, `erfana-0.16.3-setup.exe`, `SHA256SUMS`, `SHA256SUMS.minisig` — matching all four definitions above. Adding or removing a build target is therefore a four-file change plus a release-notes/verification-doc sweep, never a one-line `electron-builder.yml` edit.
+
 ## Hardened-runtime entitlements (known gap)
 
-The main app plist (`build/entitlements.mac.plist`) contains the strictly-required keys: `cs.allow-jit`, `cs.allow-unsigned-executable-memory` (V8 requirement), `device.camera`, `device.audio-input`. The CI guard at `checks.yml:136-144` fails the build if `cs.disable-library-validation` or `cs.allow-dyld-environment-variables` ever leak into either plist.
+The main app plist (`build/entitlements.mac.plist`) contains the strictly-required keys: `cs.allow-jit`, `cs.allow-unsigned-executable-memory` (V8 requirement), `device.camera`, `device.audio-input`. The CI guard fails the build if `cs.disable-library-validation` or `cs.allow-dyld-environment-variables` ever leak into either plist — it is Guard 2, the step named `Guard - no forbidden entitlements` in the `release-guards` job (`.github/workflows/checks.yml:243-251`, verified 2026-08-07).
 
 The inherit plist (`build/entitlements.mac.inherit.plist`) grants `cs.allow-jit` and `cs.allow-unsigned-executable-memory` to **all helper processes** (Renderer + GPU + Plugin), not just Renderer. This is an upstream-imposed over-grant: electron-builder 26.8.1's `mac.entitlementsInherit` field is a **single plist applied uniformly** to every helper bundle — there is no built-in per-helper-type configuration. The Renderer helper structurally requires both keys for V8 JIT to function; granting them to GPU and Plugin helpers is the unavoidable side-effect.
 
@@ -165,20 +192,51 @@ An end user downloading from the release page should run the following to confir
 
 ### 1. Integrity + aggregate signature (all platforms)
 
-```bash
-curl -LO https://github.com/qodeca/erfana/releases/download/v0.9.5/SHA256SUMS
-curl -LO https://github.com/qodeca/erfana/releases/download/v0.9.5/SHA256SUMS.minisig
+Substitute the version you downloaded for `{version}` throughout — the worked example below uses **v0.16.3**, the current public release. Run the whole block from the directory that holds the downloaded `.dmg` / `.exe`: `SHA256SUMS` lists **only the two binaries** by bare filename, so `sha256sum -c` reports `No such file or directory` if you run it anywhere else.
 
-# Fetch our release-signing public key (see docs/security.md §Release signing).
+```bash
+VERSION=0.16.3   # the v{version} you downloaded, without the leading "v"
+
+curl -LO "https://github.com/qodeca/erfana/releases/download/v${VERSION}/SHA256SUMS"
+curl -LO "https://github.com/qodeca/erfana/releases/download/v${VERSION}/SHA256SUMS.minisig"
+
+# Fetch our release-signing public keys (see docs/security.md § Release signing).
 curl -LO https://github.com/qodeca/erfana/raw/main/docs/release-pubkey.txt
 
-minisign -V -P "$(cat release-pubkey.txt)" -m SHA256SUMS -x SHA256SUMS.minisig
-sha256sum -c SHA256SUMS
+# release-pubkey.txt is a COMMENTED file publishing TWO keys (PRIMARY, the
+# active signer, and ROTATION, the standby successor). `minisign -P` takes a
+# single base64 key, so passing the whole file to -P cannot work. Extract
+# both keys and accept either — the same approach the release skill uses at
+# Phase 4.3. Minisign pubkey lines are 56 base64 chars starting with "RW".
+PUBKEYS=()
+while IFS= read -r line; do
+  PUBKEYS+=("$line")
+done < <(grep -E '^RW[A-Za-z0-9+/=]+$' release-pubkey.txt)
+
+VERIFIED=0
+for KEY in "${PUBKEYS[@]}"; do
+  if minisign -V -P "$KEY" -m SHA256SUMS -x SHA256SUMS.minisig; then
+    VERIFIED=1
+    break
+  fi
+done
+
+if [ "$VERIFIED" != "1" ]; then
+  echo "SIGNATURE VERIFICATION FAILED — do not run this download." >&2
+else
+  # Run from the directory containing erfana-${VERSION}-arm64.dmg and/or
+  # erfana-${VERSION}-setup.exe. SHA256SUMS names nothing else.
+  sha256sum -c SHA256SUMS
+fi
 ```
+
+> A signature that verifies under **either** published key is valid. Accepting both is what lets us promote ROTATION to PRIMARY without re-signing historical releases. Do **not** paste the key values into your own scripts from this page — `docs/release-pubkey.txt` is the canonical copy, and `checks.yml` Guard 5 enforces byte-equality across exactly three published locations (`docs/release-pubkey.txt`, `docs/security.md`, `README.md`). A fourth copy would be unguarded and could drift silently.
+
+> On macOS, `minisign` comes from `brew install minisign` and `sha256sum` may not exist — substitute `shasum -a 256 -c SHA256SUMS`.
 
 > The minisign release pubkey is a **dedicated release-signing key**, separate from the `whisper-binaries` key. Using a second key isolates blast radius — a compromise of one does not invalidate the other.
 
-### 2. Code signature (macOS DMG / ZIP)
+### 2. Code signature (macOS DMG)
 
 ```bash
 # 2a. Verify the .app bundle's Developer ID signature (after mounting + copying).
@@ -203,9 +261,23 @@ xcrun stapler validate /path/to/Erfana-*.dmg
 ### 3. Authenticode signature (Windows .exe)
 
 ```powershell
+# signtool ships with the Windows SDK. Resolve the newest installed 10.* SDK
+# bin directory instead of hardcoding a version — this mirrors what the
+# "Verify Authenticode signatures (signtool)" step in build_win.yml does.
+# Note the brace form ${env:ProgramFiles(x86)} — the parentheses belong
+# INSIDE the braces, as part of the variable name. Leaving them outside
+# (a common transcription of this path) resolves the 64-bit Program Files
+# variable and appends a stray literal, giving a path that never exists.
+$sdkRoot  = "${env:ProgramFiles(x86)}\Windows Kits\10\bin"
+$sdkBin   = Get-ChildItem $sdkRoot -Directory `
+  | Where-Object { $_.Name -match '^10\.' } `
+  | Sort-Object Name -Descending `
+  | Select-Object -First 1
+$signtool = Join-Path $sdkBin.FullName "x64\signtool.exe"
+if (-not (Test-Path $signtool)) { throw "signtool.exe not found under $sdkRoot" }
+
 # Both signatures must verify independently.
-& "$env:ProgramFiles (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe" `
-  verify /pa /all /tw C:\Path\To\erfana-0.9.5-setup.exe
+& $signtool verify /pa /all /tw C:\Path\To\erfana-0.16.3-setup.exe
 ```
 
 First-time Windows installs will see a SmartScreen warning on a newly provisioned Azure Artifact Signing identity. Reputation accrues organically regardless of EV/OV status — several successful installs will silence the warning. This is expected, not a defect.
@@ -277,19 +349,46 @@ The Azure auth cert private key (PFX + password) lives in 1Password / Bitwarden,
    openssl req -x509 -nodes -newkey rsa:2048 \
      -keyout private.key -out public.crt -days 730 \
      -subj "/CN=erfana-github-ci"
+   # AES (PBES2) encryption is MANDATORY. Without these three flags openssl
+   # writes a legacy RC2/3DES PKCS#12 container, which the CI runner's
+   # OpenSSL 3.x and @azure/identity both reject — the Windows leg dies at
+   # "Decode Azure signing certificate to PFX file" with "Decoded file is not
+   # a valid PKCS#12 envelope or password is wrong". Same flags as § B.3;
+   # omitting them burned v0.16.2.
    openssl pkcs12 -export -out azure-signing.pfx \
      -inkey private.key -in public.crt \
-     -passout "pass:$PFX_PW"
+     -passout "pass:$PFX_PW" \
+     -keypbe AES-256-CBC -certpbe AES-256-CBC -macalg sha256
+
+   # Verify it loads WITHOUT -legacy — exactly what CI does.
+   openssl pkcs12 -info -in azure-signing.pfx -noout -passin "pass:$PFX_PW"
    ```
+
+   This applies to **both** install paths in step 1. A legacy PFX produced under
+   Windows/winget and one produced under macOS/brew fail in CI identically; macOS
+   is merely the more dangerous of the two, because LibreSSL reads legacy
+   containers transparently, so a local `MAC verified OK` proves nothing about CI
+   compatibility. See § B.3 for the full rationale and the OpenSSL 3.x check.
 4. Upload public cert (preserves any other credentials on the app reg via `--append`):
    ```bash
    az ad app credential reset --id "$APP_ID" --cert "@public.crt" --append --years 2
    ```
-5. Replace GitHub Secrets:
+5. Replace GitHub Secrets — **both, atomically, in the same sitting**:
    ```bash
    openssl base64 -A -in azure-signing.pfx | gh secret set AZURE_CLIENT_CERTIFICATE_BASE64 --repo qodeca/erfana
    printf '%s' "$PFX_PW" | gh secret set AZURE_CLIENT_CERTIFICATE_PASSWORD --repo qodeca/erfana
    ```
+
+   `AZURE_CLIENT_CERTIFICATE_BASE64` and `AZURE_CLIENT_CERTIFICATE_PASSWORD` are a
+   **matched pair**. Refreshing the PFX and updating only one of the two produces a
+   secret set that passes the runner's size gate but fails the PKCS#12 envelope
+   check with `Decoded file is not a valid PKCS#12 envelope or password is wrong`
+   — the tag is burned and you bump to the next patch. This is exactly what
+   happened on **v0.16.1**; the full diagnosis, including how to tell a
+   password mismatch apart from a corrupted base64 payload, is in
+   [`docs/release-incidents/v0.16.1-attempt-1.md`](../release-incidents/v0.16.1-attempt-1.md).
+   Note that `gh secret set` from a file retains trailing CR/LF, so always pipe the
+   password with `printf '%s'` — never `echo`.
 6. Store the new PFX + password in 1Password (NOT on disk — see § Secret hygiene below).
 7. Dispatch a dry-run release to confirm signing still works.
 8. Once confirmed, remove the OLD certificate credential entry from the app registration via Portal or `az ad app credential delete` (otherwise both old + new accept tokens for the next 2 years until expiry).
@@ -315,7 +414,7 @@ The cert is short-lived (2 years) so this DR path is straightforward — the pro
 ### C. Minisign key compromise
 
 1. Immediately publish the successor pubkey alongside a revocation notice in `docs/security.md` and pinned in the repo README.
-2. Re-sign the `SHA256SUMS` of the last known-good release with the new key; upload as an additional asset with a versioned name (e.g., `SHA256SUMS.minisig.v2`).
+2. Cut a **fresh patch release** signed with the successor key rather than re-signing an existing one. Do not upload a versioned extra signature alongside the existing one: assets are never edited in place (see § Failure recovery), and the asset set is a fixed four (`EXPECTED_ASSETS=4` — see § Artifact set coupling), so any fifth asset fails the release gate. Both keys stay published in `docs/release-pubkey.txt`, so signatures made before the rotation keep verifying.
 3. Verify the old key has not been used to sign any unknown artifacts.
 
 ### D. Signed malware published (supply-chain attack)
@@ -324,21 +423,23 @@ This is A + C simultaneously. Trigger both. Additionally: open an urgent advisor
 
 ## Relationship to other workstreams
 
-- **[#166](https://github.com/qodeca/erfana/issues/166)** (Windows Phase 5 — distribution hygiene): this work supersedes the Windows signing + `example.com` updater-URL elements. Once this lands, narrow #166 to NSIS UX tweaks (`oneClick`, `perMachine`) or close it.
-- **[#165](https://github.com/qodeca/erfana/issues/165)** (Phase 4 whisper): shipped in v0.9.4. Its minisign dual-pubkey trust chain is a pattern reference, not a shared keypair.
+- **#166** (Windows Phase 5 — distribution hygiene): this work supersedes the Windows signing + `example.com` updater-URL elements. Once this lands, narrow #166 to NSIS UX tweaks (`oneClick`, `perMachine`) or close it.
+- **#165** (Phase 4 whisper): shipped in v0.9.4. Its minisign dual-pubkey trust chain is a pattern reference, not a shared keypair.
 - **`whisper-binaries.yml`**: template for keychain setup, minisign signing, and signed-artifact upload. We mine it; we do not reuse its signing key.
 
 ## Branch protection (Phase I — done 2026-04-25)
 
-Phase I configuration was applied after dry-run [`24925269258`](https://github.com/qodeca/erfana/actions/runs/24925269258) validated all 5 jobs end-to-end on the new pipeline.
+Phase I configuration was applied after dry-run `24925269258` validated all 5 jobs (`prepare`, `build_mac`, `build_win`, `finalize`, `cleanup`) end-to-end on the new pipeline. That run record is no longer retrievable through the Actions API, so the reference is kept as a plain identifier.
 
 **`main` branch protection** ([`gh api repos/qodeca/erfana/branches/main/protection`](https://api.github.com/repos/qodeca/erfana/branches/main/protection)):
 
-- Required status checks (strict mode — branch must be up to date before merge): `Lint`, `Typecheck`, `Unit tests`, `Build`, `npm audit signatures`, `Release readiness guards`.
+- Required status checks (strict mode — branch must be up to date before merge), read live from the API on **2026-08-07**: `Lint`, `Typecheck`, `Unit tests`, `Build`, `License compliance`, `Secret scan`. Six checks.
+  - `Secret scan` is **app-pinned** (`app_id: 15368`); the other five accept any app (`app_id: null`). This matters when editing the set — see the traps under § Deliberate exclusion below.
+  - `npm audit signatures` and `Release readiness guards` are **not** required checks, despite earlier revisions of this document claiming they were. Both jobs still run on every push via `checks.yml`; they simply do not gate merges to `main`. `Windows checks` is likewise advisory and not required.
 - **No PR review requirement** (`required_pull_request_reviews: null`) — direct push to `main` is the intended solo-developer workflow. The release skill verifies this at Phase 0.4.5 and aborts if the rule is reinstated.
 - `enforce_admins: true` — administrators included.
 - `allow_force_pushes: false`, `allow_deletions: false`.
-- Conversation resolution required.
+- `required_conversation_resolution: false` — **not** enforced. With no PR flow there are no review conversations to resolve, so the setting is off.
 
 > **Solo-dev calibration history (all on 2026-04-25):** Phase I initially shipped with `required_approving_review_count: 1`. That was reduced to `0` during v0.9.5 release prep because GitHub blocks self-approval and Copilot reviews are always `COMMENTED`, never `APPROVED`. After the v0.9.5 release actually shipped via PR #190, the friction was real — every release would re-pay the same PR detour — so `required_pull_request_reviews` was removed entirely the same day:
 >
@@ -354,21 +455,37 @@ Phase I configuration was applied after dry-run [`24925269258`](https://github.c
 >   -F 'required_pull_request_reviews[dismiss_stale_reviews]=true'
 > ```
 >
-> All other Phase I gates — signed-tag ruleset, 6 required status checks, `enforce_admins=true`, conversation resolution, no force pushes, no deletions — remain intact throughout.
+> All other Phase I gates — signed-tag ruleset, the 6 required status checks, `enforce_admins=true`, no force pushes, no deletions — remain intact throughout. Conversation resolution is **not** among them: `required_conversation_resolution` is `false`.
 
-**Protected tag ruleset** (id [`15540259`](https://github.com/qodeca/erfana/rules/15540259)):
+**Protected tag rulesets.** Two are active, both with `bypass_actors: []` (no exceptions), verified live on 2026-08-07:
 
-- Pattern: `refs/tags/v*.*.*`.
-- Rules: `deletion` blocked, `non_fast_forward` blocked, `required_signatures` enforced (SSH or GPG signed tags only).
-- `bypass_actors: []` — no exceptions.
+| id | Name | Tag pattern | Rules |
+|---|---|---|---|
+| [`17762300`](https://github.com/qodeca/erfana/rules/17762300) | Protected release tags (v*.*.*) | `refs/tags/v*.*.*` | `deletion` blocked, `non_fast_forward` blocked, `required_signatures` enforced (SSH or GPG signed tags only) |
+| [`17762301`](https://github.com/qodeca/erfana/rules/17762301) | protect-whisper-build-tags | `refs/tags/whisper-build-*` | `deletion` blocked, `non_fast_forward` blocked (no signature requirement — these tags are cut by `whisper-binaries.yml`, not by an operator) |
 
-**Deliberate exclusion: `e2e`** is **not** in the required-checks list. As of 2026-04-25 the `e2e` workflow has been red on develop for several consecutive runs; including it would green-lock the repo. Add it back once stable:
+Both rulesets were created on 2026-06-16, the day the repository was made public. The single ruleset id cited by earlier revisions of this document predates that and no longer resolves — always read ids from `gh api repos/qodeca/erfana/rulesets` rather than trusting a pasted one.
+
+### Deliberate exclusion: `e2e`
+
+`e2e` is **not** in the required-checks list. The workflow is currently `disabled_manually` (local-only until the `macos-latest` hang at `waitForLoadState('domcontentloaded')` is root-caused — see [docs/ci.md](../ci.md)), so requiring it would green-lock the repo.
+
+To add it back once stable, use a **read-then-append** PATCH that round-trips the live set. Do not hand-write the list.
 
 ```bash
-gh api -X PATCH repos/qodeca/erfana/branches/main/protection/required_status_checks \
-  -F 'contexts[]=Lint' -F 'contexts[]=Typecheck' -F 'contexts[]=Unit tests' \
-  -F 'contexts[]=Build' -F 'contexts[]=npm audit signatures' \
-  -F 'contexts[]=Release readiness guards' -F 'contexts[]=e2e'
+# Documentation only — read the traps below before running this.
+gh api repos/qodeca/erfana/branches/main/protection/required_status_checks \
+  | jq '{strict: .strict, checks: (.checks + [{context: "e2e", app_id: null}] | unique_by(.context))}' \
+  | gh api -X PATCH repos/qodeca/erfana/branches/main/protection/required_status_checks --input -
 ```
+
+Traps this form exists to avoid:
+
+- **`--input -` defaults to POST.** `gh api` only switches verb when you say so, so `-X PATCH` is mandatory. Omit it and you are issuing a POST against a PATCH-only endpoint.
+- **Round-trip `checks`, never `contexts`.** The flat `contexts[]` array is the deprecated representation. PATCHing it resets every entry's `app_id` to `null` — and `Secret scan` is app-pinned to `app_id: 15368`, so a `contexts` PATCH would silently un-pin it and let a status from any GitHub App satisfy that gate.
+- **Never send both keys.** `checks` and `contexts` in the same payload is a `422`.
+- **Echo `strict` back explicitly.** A PATCH that omits `strict` does not preserve it; losing it turns off "branch must be up to date before merge".
+- **The context string is the check-run name, not the workflow name.** For `e2e.yml` the check run is named after the job id — `e2e` — while the workflow's display name is `E2E Tests`. Requiring `E2E Tests` would wait forever on a status that is never reported.
+- **Hardcoded lists rot.** The snippet this replaced pinned six contexts: two that were never actually required (`npm audit signatures`, `Release readiness guards`) and, by omission, it would have deleted the two that are (`License compliance`, `Secret scan`).
 
 Rationale (kept for archaeology): flipping branch protection before the new `checks.yml` guards landed green on `develop` would have green-locked the repo. The dry-run gate above served as that validation.
