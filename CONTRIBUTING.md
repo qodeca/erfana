@@ -33,7 +33,9 @@ npm install
 npm run dev                   # start the development app
 ```
 
-`main` is the stable release branch; `develop` is the integration branch. Cut your `feature/...` branch from `develop` and open your PR against `develop`.
+`main` is the stable release branch. Most work goes through `develop`, the day-to-day integration branch: cut your `feature/...` branch from `develop` and open your PR against `develop`.
+
+The one exception is the **graph engine** (spec 004 and the [#21](https://github.com/qodeca/erfana/issues/21) contract chain). That work lives on the `graph` branch, which acts as "develop for the graph engine" and already carries frozen schema, database and interface contracts that are deliberately absent from `develop`. If your change touches the graph engine, branch from `graph` and target `graph` — starting from `develop` means re-implementing contracts that already exist.
 
 ## Quality gates
 
@@ -75,7 +77,7 @@ Never commit a real secret, even to history — rewrite it out and rotate the cr
 
 ## Pull-request checklist
 
-- [ ] Work is on a `feature/...` branch cut from `develop`, and the PR targets `develop` (not `main`).
+- [ ] Work is on a `feature/...` branch cut from the right integration branch, and the PR targets that same branch (not `main`) — `develop` for general work, `graph` for graph-engine work.
 - [ ] Commits follow [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `docs:`, `chore:`).
 - [ ] All quality gates pass locally (lint, typecheck, test:ci, build, check:headers, reuse lint).
 - [ ] No secrets introduced — `gitleaks` and `trufflehog` are clean locally.
