@@ -103,8 +103,8 @@ These are the three load-bearing features `resolvePlatformBinary` was designed f
 **Source:** Architecture — "MAX_FILENAME_LENGTH in three places with three values"
 **Files:**
 - `src/main/utils/validateFilename.ts:71` → `255` (filesystem byte/char limit)
-- `src/main/services/DocxService.ts:97` → `200` (`.docx` extension headroom)
-- `src/main/services/PdfService.ts:628` → `200` (`.pdf` extension headroom)
+- `src/main/services/DocxService.ts:100` → `200` (`.docx` extension headroom)
+- `src/main/services/PdfService.ts:631` → `200` (`.pdf` extension headroom)
 
 ### What
 
@@ -140,8 +140,8 @@ NIL — pure cleanup.
 **Severity:** LOW (architecture-reviewer L)
 **Source:** Architecture — "`ExportLock` duplicated verbatim across PdfService + DocxService"
 **Files:**
-- `src/main/services/PdfService.ts:411-438`
-- `src/main/services/DocxService.ts:20-48`
+- `src/main/services/PdfService.ts:413-441`
+- `src/main/services/DocxService.ts:22-50`
 
 ### What
 
@@ -291,7 +291,7 @@ Audit log calls that propagate `AppError` objects derived from user input. Add a
 
 **Severity:** LOW (security-auditor + solution-reviewer)
 **Source:** Security + solution — "Cache is permanent for the session"
-**File:** `src/main/services/import/DependencyDetector.ts:38-60` (`cachedResult` field + `detectDependencies` cache check)
+**File:** `src/main/services/import/DependencyDetector.ts:40,53` (`cachedResult` field at `:40`; the cache check is in `detect()` at `:53` — there is no `detectDependencies` method)
 
 ### What
 

@@ -167,7 +167,7 @@ Pipeline contributors on Windows:
 
 **Workaround (historical)**: None for end-users — upgrade to v0.9.6 or later. Manual `chmod 755 <app>.app/Contents/Resources/app.asar.unpacked/node_modules/node-pty/prebuilds/darwin-*/Release/spawn-helper` also worked but invalidated the codesign envelope.
 
-**Fix**: [`ea3eaf1`](https://github.com/qodeca/erfana/commit/ea3eaf1) — `scripts/fuses.js` `afterPack` hook now `chmod 0755`'s every `spawn-helper` under `node-pty/prebuilds/*/` before code-signing. `requireMatch: true` on platform-host match fails the build if zero helpers are found, blocking ship of a broken DMG. Documented in [`docs/build/fuses.md`](./build/fuses.md#afterpack-also-chmods-node-pty-spawn-helper).
+**Fix**: commit `ea3eaf1` (no longer resolvable — that history was rewritten at the 2026-06 migration) — `scripts/fuses.js` `afterPack` hook now `chmod 0755`'s every `spawn-helper` under `node-pty/prebuilds/*/` before code-signing. `requireMatch: true` on platform-host match fails the build if zero helpers are found, blocking ship of a broken DMG. Documented in [`docs/build/fuses.md`](./build/fuses.md#afterpack-also-chmods-node-pty-spawn-helper).
 
 ---
 

@@ -17,10 +17,13 @@
 #            -m SHA256SUMS -x SHA256SUMS.minisig \
 #     || minisign -V -P RWTxkJcmBbLk6J2eWEDWHYcAmgpKfRqO5PR8oRRLUpgn5rgCaWmTvd9w \
 #                 -m SHA256SUMS -x SHA256SUMS.minisig
-#   sha256sum -c SHA256SUMS
+#   sha256sum --ignore-missing -c SHA256SUMS   # --ignore-missing: SHA256SUMS
+#                                              # lists both platform binaries
 #
 # Full verification guide: docs/build/release.md § End-user verification.
-# Mirrored copies: docs/security.md § Release signing, README.md § Release verification.
+# Mirrored copy (byte-equality enforced by checks.yml Guard 5): docs/security.md
+# § Release signing. README.md § Release verification links here rather than
+# mirroring the key values.
 #
 # These keys are DEDICATED to release signing. They are SEPARATE from the
 # whisper-binaries minisign key (ADR 0003 blast-radius isolation — a

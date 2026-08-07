@@ -11,7 +11,7 @@ Erfana follows **2025 Electron security best practices** with comprehensive hard
 | Context Isolation | ✅ Enabled | v0.1.0 |
 | Node Integration | ✅ Disabled | v0.1.0 |
 | Process Sandboxing | ✅ Enabled (default) | v0.6.0 |
-| Electron Fuses | ⚠️ 3 of 6 critical fuses | v0.6.0 |
+| Electron Fuses | ⚠️ 4 of 6 configured (2 need ASAR) | v0.6.0 |
 | ASAR Packaging | ❌ Disabled | v0.6.0 |
 | ASAR Integrity | ❌ N/A (requires ASAR) | N/A |
 | Cookie Encryption | ❌ Disabled | v0.6.0 |
@@ -20,7 +20,7 @@ Erfana follows **2025 Electron security best practices** with comprehensive hard
 **Notes**:
 - ASAR is currently disabled due to runtime dependency loading issues with isomorphic-git (2 fuses unavailable)
 - Cookie encryption disabled to avoid macOS keychain prompts (settings stored in plaintext)
-- 3 critical fuses remain active: RunAsNode, NodeOptions, NodeCliInspect
+- `scripts/fuses.js` sets 4 of the 6 fuses. Three of them harden the build — RunAsNode, NodeOptions and NodeCliInspect (the last one only in production builds; see below) — while the fourth, EnableCookieEncryption, is deliberately set to `false`
 - Test builds (`ERFANA_TEST_BUILD=true`) enable NodeCliInspect for Playwright E2E testing - see [Test Builds](#test-builds-erfana_test_build)
 
 ---
@@ -68,7 +68,7 @@ The `sandbox: false` pattern is **3+ year old outdated information**. Modern Ele
 
 ## Electron Fuses (2025 Critical Security)
 
-**Status**: ✅ 4 of 6 critical fuses configured (2 ASAR-dependent fuses unavailable)
+**Status**: ✅ 4 of 6 critical fuses configured (2 ASAR-dependent fuses unavailable); 3 of the 4 are hardening fuses
 
 Fuses are **compile-time feature toggles** that disable unused Electron features to prevent "Living Off The Land" (LOTL) attacks.
 
@@ -83,7 +83,7 @@ Attackers exploit legitimate Electron features (like `ELECTRON_RUN_AS_NODE`) to 
 | `RunAsNode` | `false` | Disables `ELECTRON_RUN_AS_NODE` env var (prevents arbitrary code execution) |
 | `EnableCookieEncryption` | `false` | Disabled to avoid keychain prompts (settings stored in plaintext) |
 | `EnableNodeOptionsEnvironmentVariable` | `false` | Disables `NODE_OPTIONS` env var (prevents command injection) |
-| `EnableNodeCliInspectArguments` | `false` | Disables `--inspect` CLI args (prevents remote debugging) |
+| `EnableNodeCliInspectArguments` | `isTestBuild` – `false` on every production build | Disables `--inspect` CLI args (prevents remote debugging). `true` only under `ERFANA_TEST_BUILD=true` — see [Test Builds](#test-builds-erfana_test_build) |
 | `EnableEmbeddedAsarIntegrityValidation` | ❌ N/A | Requires ASAR enabled (see ASAR Configuration below) |
 | `OnlyLoadAppFromAsar` | ❌ N/A | Requires ASAR enabled (see ASAR Configuration below) |
 
@@ -94,13 +94,16 @@ Attackers exploit legitimate Electron features (like `ELECTRON_RUN_AS_NODE`) to 
 ```javascript
 const { flipFuses, FuseVersion, FuseV1Options } = require('@electron/fuses');
 
+// Test builds enable the Node CLI inspector; production builds never do.
+const isTestBuild = process.env.ERFANA_TEST_BUILD === 'true';
+
 await flipFuses(electronBinaryPath, {
   version: FuseVersion.V1,
   resetAdHocDarwinSignature: context.electronPlatformName === 'darwin',
   [FuseV1Options.RunAsNode]: false,
   [FuseV1Options.EnableCookieEncryption]: false,  // Disabled to avoid keychain prompts
   [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,
-  [FuseV1Options.EnableNodeCliInspectArguments]: false,
+  [FuseV1Options.EnableNodeCliInspectArguments]: isTestBuild,  // false in production
   // NOTE: ASAR integrity validation disabled because asar: false
   // When ASAR is disabled, these fuses cannot be used:
   // - EnableEmbeddedAsarIntegrityValidation
@@ -113,7 +116,7 @@ await flipFuses(electronBinaryPath, {
 Build logs show fuses applied during `npm run build:mac`:
 
 ```
-🔒 Applying Electron fuses to: release/{version}/mac/Erfana.app
+🔒 Applying Electron fuses to: release/{version}/mac-arm64/Erfana.app
 ✅ Electron fuses applied successfully
    - RunAsNode: disabled
    - CookieEncryption: disabled (no keychain prompt)
@@ -231,7 +234,7 @@ With ASAR disabled:
 - ❌ Protection against post-installation code injection
 
 **Remaining Security**:
-- ✅ 3 critical fuses still active (RunAsNode, NodeOptions, NodeCliInspect)
+- ✅ 3 of the 4 configured fuses still harden the build (RunAsNode, NodeOptions, NodeCliInspect)
 - ✅ Process sandboxing enabled
 - ✅ Context isolation enabled
 - ✅ CSP enforced
@@ -469,7 +472,7 @@ The overlay windows have their own, tighter channel path: `screenshot:areaSelect
 
 Run `npm audit` to check. **Policy**: zero high/critical production advisories at release. Pre-release: `npm audit --omit=dev --json` and diff against the table below.
 
-**Current state** (audited 2026-06-04, re-verified during the v0.12.0 release): production **0 vulnerabilities** (`npm audit --omit=dev`). The former `mermaid → langium → chevrotain` moderate advisories no longer count against production because Monaco and Mermaid moved to `devDependencies` in v0.11.0 ([#206](https://github.com/qodeca/erfana/pull/206)); `axios` and `fast-uri` high-severity advisories were patched in v0.11.2. Dev-only advisories remain (notably a `vitest` UI-server critical that needs a breaking 3→4 bump) but do not ship in production builds.
+**Current state** (audited 2026-06-04, re-verified during the v0.12.0 release): production **0 vulnerabilities** (`npm audit --omit=dev`). The former `mermaid → langium → chevrotain` moderate advisories no longer count against production because Monaco and Mermaid moved to `devDependencies` in v0.11.0 (#206 — pre-migration PR, no longer resolves on the public repo); `axios` and `fast-uri` high-severity advisories were patched in v0.11.2. Dev-only advisories remain (notably a `vitest` UI-server critical that needs a breaking 3→4 bump) but do not ship in production builds.
 
 ### Dependency overrides (package.json)
 
@@ -591,16 +594,25 @@ RWTxkJcmBbLk6J2eWEDWHYcAmgpKfRqO5PR8oRRLUpgn5rgCaWmTvd9w
 ```
 <!-- minisign-pubkey-rotation-end -->
 
-The fence markers above are load-bearing — `.github/workflows/checks.yml` **Guard 5** (release-pubkey drift detector) `awk`s every key out from between them and asserts byte-equality against `docs/release-pubkey.txt` and `README.md`. The `releasing-erfana` skill does **not** read this file: Phase 4.3 reads the canonical `docs/release-pubkey.txt` directly (`phases/phase-4-verify.md` §4.3). Do NOT remove or rename the markers without updating Guard 5 accordingly.
+The fence markers above are load-bearing — `.github/workflows/checks.yml` **Guard 5** (release-pubkey drift detector) `awk`s every key out from between them and asserts byte-equality against `docs/release-pubkey.txt`. That is the only comparison Guard 5 actually enforces today: it has a third leg for `README.md`, but the leg is wrapped in `if [ -n "$README" ]` and `README.md` contains no `RW…` key lines (it links to `docs/release-pubkey.txt` instead of mirroring the values), so the leg silently no-ops. **Two** copies are enforced — `docs/release-pubkey.txt` and this file. The `releasing-erfana` skill does **not** read this file: Phase 4.3 reads the canonical `docs/release-pubkey.txt` directly (`phases/phase-4-verify.md` §4.3). Do NOT remove or rename the markers without updating Guard 5 accordingly.
 
-Mirrored copies for offline retrieval: `README.md` § Release verification, `docs/release-pubkey.txt`. These keys are **separate** from the whisper-binaries minisign key — a compromise of one does not invalidate the other.
+Canonical copy for offline retrieval: `docs/release-pubkey.txt` (the fenced blocks above are the second enforced copy). `README.md` § Release verification only *links* to that file — it does not mirror the key values, so there is no third copy to keep in sync. These keys are **separate** from the whisper-binaries minisign key — a compromise of one does not invalidate the other.
 
 ### End-user verification
 
 ```bash
-# Integrity + aggregate signature (all platforms)
-minisign -V -P "$(cat docs/release-pubkey.txt)" -m SHA256SUMS -x SHA256SUMS.minisig
-sha256sum -c SHA256SUMS
+# Integrity + aggregate signature (all platforms). `minisign -P` takes ONE
+# base64 key and docs/release-pubkey.txt is a COMMENTED file publishing two,
+# so extract the keys instead of cat-ing the file into -P. Either key is valid.
+PRIMARY=$(grep -m1 -E '^RW[A-Za-z0-9+/=]+$' docs/release-pubkey.txt)
+ROTATION=$(grep -E '^RW[A-Za-z0-9+/=]+$' docs/release-pubkey.txt | sed -n 2p)
+minisign -V -P "$PRIMARY" -m SHA256SUMS -x SHA256SUMS.minisig \
+  || minisign -V -P "$ROTATION" -m SHA256SUMS -x SHA256SUMS.minisig \
+  || { echo "SIGNATURE VERIFICATION FAILED — do not run this download." >&2; exit 1; }
+
+# --ignore-missing: SHA256SUMS lists BOTH platform binaries and you probably
+# downloaded one. macOS without coreutils: shasum -a 256 --ignore-missing -c.
+sha256sum --ignore-missing -c SHA256SUMS
 ```
 
 Full verification recipes (macOS `codesign`, Windows `signtool`) are in [`build/release.md` § End-user verification](./build/release.md#end-user-verification).

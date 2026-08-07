@@ -133,7 +133,7 @@ Node.js REPL (or embedded in dev tools):
 | Brand string | Action |
 |--------------|--------|
 | Matches denylist, CPU confirmed pre-2013 | Expected behaviour. User → OpenAI API backend. Document in support ticket. |
-| Matches denylist, user insists CPU is modern | Collect the exact `os.cpus()[0].model` string. File an issue citing `LocalWhisperService.ts:125` (the `CPU_MODEL_DENYLIST` regex table; `:109-122` is its JSDoc). Refine the regex to exclude the false-positive. Workaround for user: OpenAI backend until fix ships. |
+| Matches denylist, user insists CPU is modern | Collect the exact `os.cpus()[0].model` string. File an issue citing `LocalWhisperService.ts:125` (the `CPU_MODEL_DENYLIST` regex table; `:106-122` is its JSDoc). Refine the regex to exclude the false-positive. Workaround for user: OpenAI backend until fix ships. |
 | Does NOT match denylist but user hit runtime SIGILL | CPU genuinely lacks SSE4.2 but has a modern brand string. Add the brand to denylist for cleaner UX. User action same as above. |
 
 The denylist is intentionally conservative — it's better to reject a supported CPU we don't recognise (one user uses OpenAI API instead) than to let an unsupported CPU through (full ~200 MB download + crash).

@@ -27,7 +27,7 @@ files:
 | `node_modules/canvas/**` | **No** | No-op |
 | `node_modules/@mapbox/node-pre-gyp/**` | **No** | No-op |
 
-Only `jsdom` is installed. It is the DOM environment for the Vitest renderer project (`vitest.renderer.ts`) and is never imported by `src/main/`, `src/preload/`, or `src/renderer/` at runtime, so excluding it is safe.
+Only `jsdom` is installed. It is the DOM environment for two Vitest projects — renderer and preload (`vitest.renderer.ts` and `vitest.preload.ts` both set `environment: 'jsdom'`; `vitest.main.ts` uses `node`) — and is never imported by `src/main/`, `src/preload/`, or `src/renderer/` at runtime, so excluding it is safe.
 
 `canvas` and `@mapbox/node-pre-gyp` appear in neither `package.json` nor `node_modules`. jsdom 25 no longer pulls `canvas` in (it is an optional peer, not a dependency), and with `canvas` gone its `@mapbox/node-pre-gyp` installer went too. Their globs are inert.
 
@@ -65,8 +65,8 @@ Because `electron-builder.yml` sets **`npmRebuild: false`**, the packager does *
 
 Both are runtime `dependencies` and both are large: `ffmpeg-static` ~44 MB, `ffprobe-static` ~335 MB installed (it vendors a binary for every platform/arch).
 
-- `beforePack` (`scripts/ensure-media-binaries.js`) downloads each *target* arch's `ffmpeg` into `release/.media-cache/`, verified against a size floor and a pinned SHA-256. CI runs `npm ci --ignore-scripts`, so `ffmpeg-static`'s own postinstall download never happens.
-- `afterPack` copies the matching arch into the bundle, re-verifies the hash, chmods it and every `ffprobe`, then prunes the foreign-platform/arch `ffprobe-static` trees — roughly 260 MB off a macOS build.
+- `beforePack` (`scripts/ensure-media-binaries.js`) downloads a hardcoded per-platform arch set of `ffmpeg` into `release/.media-cache/` — `x64` **and** `arm64` on macOS, the host arch elsewhere. The set does not follow the configured build target, so a mac build caches an x64 `ffmpeg` that `electron-builder.yml` (arm64-only dmg) never packs. Each is verified against a ~1 MB size floor and, on the arches listed in `FFMPEG_SHA256`, a pinned SHA-256 — currently `darwin-x64` and `darwin-arm64` only, so Windows is size-floor-only until `win32-x64` is pinned. CI runs `npm ci --ignore-scripts`, so `ffmpeg-static`'s own postinstall download never happens.
+- `afterPack` copies the matching arch into the bundle, re-runs that same verification at the packed path, chmods it and every `ffprobe`, then prunes the foreign-platform/arch `ffprobe-static` trees — roughly 260 MB off a macOS build.
 
 Full detail in [fuses.md](./fuses.md#afterpack-also-prunes-foreign-arch-native-binaries).
 
@@ -115,7 +115,10 @@ These are **CVE pins**, forced onto transitive consumers. 4.18.1 is a real publi
 
 ### Other overrides
 
-`@electron/rebuild` is pinned to `3.7.1` and `dompurify` floored at `^3.4.1`; both are forced through the tree for the same reason — a transitive consumer would otherwise resolve something the build or the sanitizer contract cannot accept.
+`@electron/rebuild` is pinned to `3.7.1` and `dompurify` floored at `^3.4.1`, both forced through the tree.
+
+- **`@electron/rebuild`** — the pin was added in v0.8.0 to fix a CI build failure ([changelog](../archive/changelog-v08.md)); [security.md](../security.md#dependency-overrides-packagejson) records the reason as node-pty toolchain compatibility.
+- **`dompurify`** — nothing in the repo records why. What is verifiable from `package-lock.json`: `dompurify` is not a direct dependency; `monaco-editor` requests exactly `3.2.7` and `mermaid` requests `^3.3.1`, and the override lifts both to the installed `3.4.10`. **The rationale is unverified** — treat the floor as load-bearing until someone confirms it, and record the reason here when they do.
 
 ---
 

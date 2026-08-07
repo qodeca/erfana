@@ -94,12 +94,12 @@ npm install
    - Worker thread: ~7.5 kB, `out/main/git-status.worker.js` (separate entry via `rollupOptions.input`)
    - Preload: ~38 kB `out/preload/index.js` plus ~1.3 kB `out/preload/screenshotOverlay.js` (two entries, both bundled — see [preload.md](./preload.md))
    - Renderer: ~35 MB across `out/renderer/` (Monaco, Mermaid, xterm.js included)
-4. **beforePack hook (v0.10.0)**: `scripts/ensure-media-binaries.js` downloads each target architecture's `ffmpeg-static` binary into a build cache at `release/.media-cache/<platform>-<arch>/`, verified against a size floor and a pinned SHA-256. This replaces the single-arch download-at-install pattern that produced the v0.9.6 video-transcription ENOENT. The cache is **not** `extraResources` — the copy into the bundle happens later, in `afterPack`.
+4. **beforePack hook (v0.10.0)**: `scripts/ensure-media-binaries.js` downloads a hardcoded per-platform arch set of `ffmpeg-static` binaries — `x64` **and** `arm64` on macOS, `process.arch` on every other platform, independent of the configured build target — into a build cache at `release/.media-cache/<platform>-<arch>/`. Each is verified against a ~1 MB size floor and, where `FFMPEG_SHA256` carries a pin, a SHA-256. Only `darwin-x64` and `darwin-arm64` are pinned today; `win32-x64` falls back to size-only verification (see [fuses.md](./fuses.md#afterpack-also-stages-and-verifies-the-media-binaries)). This replaces the single-arch download-at-install pattern that produced the v0.9.6 video-transcription ENOENT. The cache is **not** `extraResources` — the copy into the bundle happens later, in `afterPack`.
 5. **electron-builder Package**: Create platform packages. `extraResources` holds exactly three things: `resources/tessdata` (offline OCR language data), `LICENSE`, and `THIRD-PARTY-LICENSES.md` (shipped to meet the GPL-3.0-only and third-party attribution obligations)
 6. **afterPack Hook** (`scripts/fuses.js`, before signing):
    - Apply Electron security fuses
    - Restore node-pty `spawn-helper` executable bit (`0755`)
-   - Copy this pack's cached `ffmpeg` into `app/node_modules/ffmpeg-static/`, re-verify its pinned SHA-256, and chmod it plus every bundled `ffprobe`
+   - Copy this pack's cached `ffmpeg` into `app/node_modules/ffmpeg-static/`, re-run the same verification at the packed path (size floor always; SHA-256 only on pinned arches — macOS today, not Windows), and chmod it plus every bundled `ffprobe`
    - Prune foreign-platform/arch `ffprobe-static` binaries (keeps only the target, ~260 MB saved on mac)
    - Prune foreign node-pty prebuilds, and strip `.pdb` debug symbols from the kept Windows prebuild
    - Each prune is keep-then-verify (fails the build rather than shipping a binary-less bundle)

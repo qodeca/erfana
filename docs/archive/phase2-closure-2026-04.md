@@ -4,7 +4,7 @@ Historical closure plan for Phase 2 of the Windows enablement roadmap (v0.9.3, A
 
 > **Lifecycle**: Write-once-archive. **Archived 2026-08-07** from `docs/windows/phase2-closure.md`. Retained as a template for future phase closures — do not delete.
 
-> **Note**: issue and PR numbers, commit SHAs, release tags and CI run links below predate the 2026-06 open-source migration and no longer resolve on `qodeca/erfana`; they are retained as provenance.
+> **Note**: this file contains no GitHub links. The bare issue numbers (#153–#169) and commit SHAs (`c1e085d`, `0b593a1`, and the rest) cited below predate the 2026-06 open-source migration — the issues live in the private archive and that history was rewritten, so none of them resolve on `qodeca/erfana`. They are retained as provenance.
 
 ## Context
 

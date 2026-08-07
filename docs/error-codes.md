@@ -126,9 +126,9 @@ Most Phase 4 / issue #165. See also [`docs/windows/whisper-support-runbook.md`](
 
 | Code | User copy | Thrown at | Operator action |
 |------|-----------|-----------|-----------------|
-| `WHISPER_BINARY_NOT_FOUND` | "Whisper binary not found. Please download it from Settings." | `WhisperModelManager.getBinaryPath()` when `isBinaryInstalled()` returns false | User: click Download in Settings |
+| `WHISPER_BINARY_NOT_FOUND` | "Whisper binary not found. Please download it from Settings." | Enum-only – never emitted by the main process. `getBinaryPath()` calls `getSpecOrThrow()` then `join()`, so the only code it can raise is `WHISPER_UNSUPPORTED_PLATFORM`; a missing binary is handled by `ensureBinary()`, which downloads rather than throwing | None – no user-reachable path. If it ever surfaces, a new throw site was added without updating this table |
 | `WHISPER_BINARY_DOWNLOAD_FAILED` | "Failed to download whisper binary..." | Generic fallback in `ensureBinary` catch; also: signal abort, network failures from `SecureDownloaderError` | Check network; retry |
-| `WHISPER_MODEL_NOT_FOUND` | "Whisper model not found. Please download it from Settings." | `ensureModel()` when the model file is absent | User: click Download in Settings |
+| `WHISPER_MODEL_NOT_FOUND` | "Whisper model not found. Please download it from Settings." | `WhisperModelManager.deleteModel()` only — `unlink()` rejects with `ENOENT` (or any other error) for the model being removed. `ensureModel()` never throws it: an absent model is exactly the case it downloads | Operator: benign — the model was already gone, so the delete is a no-op. Refresh the Settings model list; if it persists, the installed-model cache is out of sync with `{userData}/whisper/models/` |
 | `WHISPER_MODEL_DOWNLOAD_FAILED` | "Failed to download whisper model. Please check your connection and try again." | `ensureModel()` download failure | Retry; check huggingface.co reachability |
 | `WHISPER_PROCESS_FAILED` | "Local transcription failed..." | `runWhisper()` non-zero exit, spawn error | Check stderr in logs |
 | `WHISPER_PROCESS_TIMEOUT` | "Local transcription timed out..." | Per-chunk timeout at `LOCAL_WHISPER.PROCESS_TIMEOUT` | Try smaller model / shorter file |

@@ -21,9 +21,18 @@ _Released: {YYYY-MM-DD}_
 ## Verification
 
 ```bash
-# Aggregate integrity: minisign signature over the SHA256SUMS hash list (all platforms)
-minisign -V -P "$(cat docs/release-pubkey.txt)" -m SHA256SUMS -x SHA256SUMS.minisig
-sha256sum -c SHA256SUMS
+# Aggregate integrity: minisign signature over the SHA256SUMS hash list (all platforms).
+# `minisign -P` takes ONE base64 key; release-pubkey.txt publishes two (primary +
+# rotation) with comments, so extract them rather than cat-ing the file into -P.
+curl -LO https://github.com/qodeca/erfana/raw/main/docs/release-pubkey.txt
+PRIMARY=$(grep -m1 -E '^RW[A-Za-z0-9+/=]+$' release-pubkey.txt)
+ROTATION=$(grep -E '^RW[A-Za-z0-9+/=]+$' release-pubkey.txt | sed -n 2p)
+minisign -V -P "$PRIMARY" -m SHA256SUMS -x SHA256SUMS.minisig \
+  || minisign -V -P "$ROTATION" -m SHA256SUMS -x SHA256SUMS.minisig \
+  || { echo "SIGNATURE VERIFICATION FAILED — do not run this download." >&2; exit 1; }
+
+# --ignore-missing: SHA256SUMS lists both platform binaries, you downloaded one.
+sha256sum --ignore-missing -c SHA256SUMS
 
 # macOS: codesign + stapled notarization ticket
 codesign --verify --deep --strict --verbose=2 /Applications/Erfana.app
@@ -33,7 +42,7 @@ xcrun stapler validate /path/to/Erfana-*.dmg
 signtool verify /pa /all /tw C:\Path\To\erfana-{version}-setup.exe
 ```
 
-Full verification recipe: [docs/build/release.md § End-user verification](../../../../docs/build/release.md#end-user-verification).
+Full verification recipe: [docs/build/release.md § End-user verification](https://github.com/qodeca/erfana/blob/main/docs/build/release.md#end-user-verification) (absolute URL — these notes are rendered on the GitHub release page, where a repo-relative link is dead).
 
 <!--
 Template guidance for the operator (delete in final notes):

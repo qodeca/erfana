@@ -1,4 +1,4 @@
-# Electron Fuses
+# Electron fuses
 
 **Last updated**: August 2026 (v0.16.3)
 
@@ -6,7 +6,7 @@ This document explains the Electron fuses configuration and security decisions. 
 
 ---
 
-## Current Configuration
+## Current configuration
 
 ```javascript
 // scripts/fuses.js
@@ -38,14 +38,14 @@ afterPack: ./scripts/fuses.js
 afterSign: ./scripts/resign.js
 ```
 
-**Hook sequencing**: `beforePack` (`scripts/ensure-media-binaries.js`) runs first and caches each target arch's `ffmpeg` binary, then `afterPack` (`scripts/fuses.js`) runs once per packaged target, then electron-builder signs, then `afterSign` (`scripts/resign.js`) deep re-signs the entire `.app` bundle.
+**Hook sequencing**: `beforePack` (`scripts/ensure-media-binaries.js`) runs first and caches the platform's `ffmpeg` binaries (a hardcoded set: `x64` **and** `arm64` on macOS, `process.arch` elsewhere — not the configured build target), then `afterPack` (`scripts/fuses.js`) runs once per packaged target, then electron-builder signs, then `afterSign` (`scripts/resign.js`) deep re-signs the entire `.app` bundle.
 
 `afterPack` does five things, in this order:
 
 1. Resolve the packed Electron binary – and, on a test build, rename it via `renameTestBuildApp` to `Erfana (TEST BUILD).app`.
 2. Prune foreign-platform/arch `ffprobe-static` binaries and `node-pty` prebuilds (plus a `.pdb` strip on `win32`).
 3. Restore the `node-pty` `spawn-helper` execute bit (`0755`, Unix only).
-4. `ensurePackedMediaBinaries` – copy this pack's cached `ffmpeg` into the bundle, re-verify its pinned SHA-256, and `chmod 0755` the packed `ffmpeg` + every `ffprobe`.
+4. `ensurePackedMediaBinaries` – copy this pack's cached `ffmpeg` into the bundle, re-verify it (size floor always, SHA-256 only on pinned arches), and `chmod 0755` the packed `ffmpeg` + every `ffprobe`.
 5. Flip the Electron fuses and reset the ad-hoc Darwin signature on the main binary.
 
 Everything happens before signing so the signed tree is the final tree. The `afterSign` step is critical because `flipFuses` modifies the main binary's code directory hash, creating a mismatch with helper processes. Without deep re-signing, macOS Sequoia+ rejects `@rpath` library loads. See [electron-builder.md](./electron-builder.md) for details.
@@ -54,7 +54,7 @@ Everything happens before signing so the signed tree is the final tree. The `aft
 
 ## afterPack also chmods node-pty spawn-helper
 
-Since v0.9.6 (commit `ea3eaf1`, no longer resolvable – that history was rewritten), the same `scripts/fuses.js` `afterPack` hook restores the executable bit (`0755`) on every node-pty `spawn-helper` binary under `node_modules/node-pty/prebuilds/<platform>-<arch>/Release/` before code-signing runs. **Without this step, terminal-spawn fails on every signed build** — see the regression history below.
+Since v0.9.6 (commit `ea3eaf1`, no longer resolvable – that history was rewritten), the same `scripts/fuses.js` `afterPack` hook restores the executable bit (`0755`) on every node-pty `spawn-helper` binary under `node_modules/node-pty/prebuilds/<platform>-<arch>/` before code-signing runs. **Without this step, terminal-spawn fails on every signed build** — see the regression history below.
 
 ### Why this is needed
 
@@ -64,7 +64,7 @@ Dev builds were unaffected because `electron-vite`'s rebuild path runs `node-gyp
 
 ### Implementation
 
-The helper is dispatched by platform — Darwin and Linux both have node-pty prebuilds with the same `prebuilds/<platform>-<arch>/Release/spawn-helper` layout. Windows uses `winpty-agent.exe` (which IS already `0755`-equivalent on NTFS) so no action there.
+The helper is dispatched by platform — Darwin and Linux both have node-pty prebuilds with the same `prebuilds/<platform>-<arch>/spawn-helper` layout (no `Release/` level — that path only exists for the `node-gyp` dev build under `build/Release/`). Windows uses `winpty-agent.exe` (which IS already `0755`-equivalent on NTFS) so no action there.
 
 Hardening — three guarantees baked into the helper:
 
@@ -101,10 +101,15 @@ Test coverage: `scripts/fuses.test.mjs` (`pruneForeignFfprobeBinaries` / `pruneF
 
 `ffmpeg-static` downloads a single host-arch binary in a postinstall step that CI skips (`npm ci --ignore-scripts`), so a packaged build could ship without `ffmpeg` at all (the v0.9.6 video-transcription ENOENT) or with the wrong architecture. The fix is split across the two hooks:
 
-- **`beforePack`** (`scripts/ensure-media-binaries.js`) downloads each targeted arch into a build cache at `release/.media-cache/<platform>-<arch>/` (overridable via `ERFANA_MEDIA_CACHE`), verified against a size floor and a pinned SHA-256 in `FFMPEG_SHA256`.
-- **`afterPack`** (`ensurePackedMediaBinaries` in `scripts/fuses.js`) copies the cached binary matching *this* pack over the bundle's `app/node_modules/ffmpeg-static/ffmpeg`, re-verifies the same SHA-256 pin at its packed location, then `chmod 0755`'s it plus every `ffprobe` under `app/node_modules/ffprobe-static/bin/` (skipping symlinks).
+- **`beforePack`** (`scripts/ensure-media-binaries.js`) downloads a hardcoded per-platform arch set — `x64` **and** `arm64` on macOS, `process.arch` on every other platform, independent of the configured build target — into a build cache at `release/.media-cache/<platform>-<arch>/` (overridable via `ERFANA_MEDIA_CACHE`), verified against a ~1 MB size floor (`MEDIA_BINARY_MIN_BYTES`) and, where `FFMPEG_SHA256` carries a pin for that `<platform>-<arch>` key, a SHA-256.
+- **`afterPack`** (`ensurePackedMediaBinaries` in `scripts/fuses.js`) copies the cached binary matching *this* pack over the bundle's `app/node_modules/ffmpeg-static/ffmpeg`, re-runs that same verification at its packed location, then `chmod 0755`'s it plus every `ffprobe` under `app/node_modules/ffprobe-static/bin/` (skipping symlinks).
 
-Doing the copy in `afterPack` means each DMG carries exactly its own current, integrity-checked `ffmpeg` – no foreign-arch bloat, and no network I/O after `beforePack`. Re-hashing at the packed path, rather than trusting the `beforePack` check, closes the window between caching and packing. A missing or mismatched binary throws under `requireMatch` instead of shipping a `spawn … ffmpeg ENOENT` regression.
+Doing the copy in `afterPack` means each DMG carries exactly its own current `ffmpeg` – no foreign-arch bloat, and no network I/O after `beforePack`. A missing or too-small binary throws under `requireMatch` instead of shipping a `spawn … ffmpeg ENOENT` regression.
+
+**Pin coverage – macOS only.** `FFMPEG_SHA256` pins `darwin-x64` and `darwin-arm64`; `win32-x64` and `linux-x64` sit commented out in `scripts/ensure-media-binaries.js` ("add when those legs are built/pinned"). `verifyBinary()` skips hashing entirely when no pin is supplied, so a missing pin degrades to size-only verification rather than failing the build. Consequences:
+
+- On a **macOS** pack, re-verifying at the packed path really does re-hash, so it closes the window between caching and packing.
+- On a **Windows** pack, there is no hash to re-check at either point. The packed `ffmpeg.exe` is validated against the ~1 MB size floor and nothing else — enough to catch a stub or a text placeholder, not enough to detect substitution. Adding a `win32-x64` entry to `FFMPEG_SHA256` closes that gap.
 
 Unsupported ffmpeg target arches (`universal`, `armv7l`, `ia32`) are skipped, or throw under `requireMatch`.
 
@@ -149,7 +154,7 @@ Three guardrails keep such a build from being mistaken for a release:
 
 ---
 
-## Critical Security Fuses
+## Critical security fuses
 
 ### RunAsNode (CVE-2024-46992)
 
@@ -157,13 +162,13 @@ Three guardrails keep such a build from being mistaken for a release:
 
 **Mitigation**: `RunAsNode: false` - prevents this attack vector entirely.
 
-### NodeOptions Environment Variable
+### NodeOptions environment variable
 
 **Risk**: Attacker could inject malicious options via `NODE_OPTIONS` (e.g., `--require=malicious.js`).
 
 **Mitigation**: `EnableNodeOptionsEnvironmentVariable: false` - ignores `NODE_OPTIONS`.
 
-### NodeCli Inspect Arguments
+### NodeCli inspect arguments
 
 **Risk**: Attacker could enable remote debugging via `--inspect` flag and connect to debug port.
 
@@ -171,9 +176,9 @@ Three guardrails keep such a build from being mistaken for a release:
 
 ---
 
-## Cookie Encryption Decision
+## Cookie encryption decision
 
-### Why Disabled?
+### Why disabled?
 
 When `EnableCookieEncryption: true`, macOS shows this prompt at first launch:
 
@@ -193,7 +198,7 @@ When `EnableCookieEncryption: true`, macOS shows this prompt at first launch:
 
 Disable cookie encryption to avoid user confusion, accept plaintext settings storage.
 
-### Security Trade-off
+### Security trade-off
 
 - Settings stored in plaintext on disk (`~/Library/Application Support/Erfana/`)
 - Acceptable risk for a local development tool
@@ -201,7 +206,7 @@ Disable cookie encryption to avoid user confusion, accept plaintext settings sto
 
 ---
 
-## ASAR-Dependent Fuses
+## ASAR-dependent fuses
 
 ### EnableEmbeddedAsarIntegrityValidation
 
@@ -219,36 +224,36 @@ Disable cookie encryption to avoid user confusion, accept plaintext settings sto
 
 **Impact**: App can load code from file system (but sandboxing still restricts renderer).
 
-**See**: [ASAR Packaging](./asar.md) for why ASAR is disabled.
+**See**: [ASAR packaging](./asar.md) for why ASAR is disabled.
 
 ---
 
-## Security Summary
+## Security summary
 
 **Lost** (ASAR disabled):
-- ❌ Code integrity validation
-- ❌ Tamper detection
+- Code integrity validation
+- Tamper detection
 
 **Lost** (UX choice):
-- ❌ Cookie encryption
+- Cookie encryption
 
 **Kept** (critical fuses):
-- ✅ RunAsNode protection
-- ✅ NodeOptions protection
-- ✅ Inspect arguments protection (production builds; test builds deliberately opt out)
+- RunAsNode protection
+- NodeOptions protection
+- Inspect arguments protection (production builds; test builds deliberately opt out)
 
 **Kept** (other security):
-- ✅ Process sandboxing
-- ✅ Context isolation
-- ✅ Content Security Policy
+- Process sandboxing
+- Context isolation
+- Content Security Policy
 
 ---
 
 ## References
 
-- [Electron Fuses Documentation](https://www.electronjs.org/docs/latest/tutorial/fuses)
+- [Electron fuses documentation](https://www.electronjs.org/docs/latest/tutorial/fuses)
 - [CVE-2024-46992](https://nvd.nist.gov/vuln/detail/CVE-2024-46992) - RunAsNode vulnerability
 
 ---
 
-See also: [ASAR Packaging](./asar.md) | [Security Guidelines](../security.md) | [Build README](./README.md)
+See also: [ASAR packaging](./asar.md) | [Security guidelines](../security.md) | [Build README](./README.md)

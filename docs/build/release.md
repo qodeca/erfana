@@ -164,7 +164,7 @@ The release asset set is pinned in four places with no automated cross-check bet
 | `electron-builder.yml` | build targets + artifact names | `mac.target: dmg` (arm64 only) with `dmg.artifactName: ${name}-${version}-${arch}.${ext}`; `win.target: nsis` with `nsis.artifactName: ${name}-${version}-setup.${ext}` |
 | `.github/workflows/build_mac.yml` | upload glob | `gh release upload "$TAG" "$ART_DIR"/*.dmg` |
 | `.github/workflows/build_win.yml` | signtool-verify + upload globs | `*-setup.exe` in both the verify loop and `gh release upload` |
-| [`.claude/skills/releasing-erfana/SKILL.md`](../../.claude/skills/releasing-erfana/SKILL.md) § Constants | expected asset count | 2 binaries + `SHA256SUMS` + `SHA256SUMS.minisig`, i.e. `EXPECTED_ASSETS=4` (also asserted in §0.4 and `phase-4-verify.md` §4.5) |
+| [`.claude/skills/releasing-erfana/SKILL.md`](../../.claude/skills/releasing-erfana/SKILL.md) § Constants | expected asset count | 2 binaries + `SHA256SUMS` + `SHA256SUMS.minisig`, i.e. `EXPECTED_ASSETS=4`. Note this is **not** an equality assertion anywhere: §0.4 uses it as a floor (`[ "$ASSET_COUNT" -ge "$EXPECTED_ASSETS" ]`) to decide a draft is `draft-ready`, and `phase-4-verify.md` carries no count check at all — §4.6 only prints the expected set for the operator |
 
 **Verified in agreement on 2026-08-07.** The published `v0.16.3` release carries exactly four assets — `erfana-0.16.3-arm64.dmg`, `erfana-0.16.3-setup.exe`, `SHA256SUMS`, `SHA256SUMS.minisig` — matching all four definitions above. Adding or removing a build target is therefore a four-file change plus a release-notes/verification-doc sweep, never a one-line `electron-builder.yml` edit.
 
@@ -192,9 +192,19 @@ An end user downloading from the release page should run the following to confir
 
 ### 1. Integrity + aggregate signature (all platforms)
 
-Substitute the version you downloaded for `{version}` throughout — the worked example below uses **v0.16.3**, the current public release. Run the whole block from the directory that holds the downloaded `.dmg` / `.exe`: `SHA256SUMS` lists **only the two binaries** by bare filename, so `sha256sum -c` reports `No such file or directory` if you run it anywhere else.
+Substitute the version you downloaded for `{version}` throughout — the worked example below uses **v0.16.3**, the current public release. Run the whole block from the directory that holds the downloaded `.dmg` / `.exe`; `SHA256SUMS` lists **both** binaries by bare filename, and two things follow from that:
+
+- Most people download **one** platform, so a bare `sha256sum -c SHA256SUMS` reports `FAILED open or read` for the other one and exits 1 on a perfectly good download. The recipe therefore passes `--ignore-missing`, verified working with GNU `sha256sum` (coreutils), macOS's `/sbin/sha256sum`, and Perl `shasum -a 256` (6.x).
+- `--ignore-missing` also means "verified nothing" is a possible outcome — that is what running from the wrong directory looks like. GNU `sha256sum` and `shasum` exit 1 with `no file was verified`, but macOS's `/sbin/sha256sum` exits **0** silently, so the block below additionally requires at least one `OK` line.
+
+Save the block as `verify-erfana.sh` and run `bash verify-erfana.sh`. The failure
+paths use `exit 1` so that a wrapper, a `&&` chain, or CI sees a non-zero status —
+pasting it straight into an interactive shell works too, but a triggered `exit`
+closes that shell. If you inline it into a function instead, swap each `exit 1`
+for `return 1`.
 
 ```bash
+#!/usr/bin/env bash
 VERSION=0.16.3   # the v{version} you downloaded, without the leading "v"
 
 curl -LO "https://github.com/qodeca/erfana/releases/download/v${VERSION}/SHA256SUMS"
@@ -213,6 +223,21 @@ while IFS= read -r line; do
   PUBKEYS+=("$line")
 done < <(grep -E '^RW[A-Za-z0-9+/=]+$' release-pubkey.txt)
 
+# Guards, same as the skill's Phase 4.3: at least one key must be extracted,
+# and every extracted key must be minisign's 56-character base64 form
+# (2-byte algorithm magic + 8-byte key id + 32-byte Ed25519 key). A truncated
+# or reformatted release-pubkey.txt must fail loudly, not verify nothing.
+if [ "${#PUBKEYS[@]}" -lt 1 ]; then
+  echo "FAILED: no minisign public keys found in release-pubkey.txt" >&2
+  exit 1
+fi
+for KEY in "${PUBKEYS[@]}"; do
+  if [ "${KEY:0:2}" != "RW" ] || [ "${#KEY}" -ne 56 ]; then
+    echo "FAILED: malformed minisign public key (expected 56 chars, RW prefix)" >&2
+    exit 1
+  fi
+done
+
 VERIFIED=0
 for KEY in "${PUBKEYS[@]}"; do
   if minisign -V -P "$KEY" -m SHA256SUMS -x SHA256SUMS.minisig; then
@@ -221,18 +246,31 @@ for KEY in "${PUBKEYS[@]}"; do
   fi
 done
 
+# Fail closed: never fall through to the checksum step on a bad signature.
 if [ "$VERIFIED" != "1" ]; then
   echo "SIGNATURE VERIFICATION FAILED — do not run this download." >&2
-else
-  # Run from the directory containing erfana-${VERSION}-arm64.dmg and/or
-  # erfana-${VERSION}-setup.exe. SHA256SUMS names nothing else.
-  sha256sum -c SHA256SUMS
+  exit 1
 fi
+
+# Run from the directory containing erfana-${VERSION}-arm64.dmg and/or
+# erfana-${VERSION}-setup.exe. SHA256SUMS names nothing else, and lists both
+# platforms — hence --ignore-missing. On macOS substitute `shasum -a 256`.
+SUMS_OUT=$(sha256sum --ignore-missing -c SHA256SUMS 2>&1) || {
+  printf '%s\n' "$SUMS_OUT" >&2
+  echo "FAILED: checksum mismatch — do not run this download." >&2
+  exit 1
+}
+printf '%s\n' "$SUMS_OUT"
+case "$SUMS_OUT" in
+  *": OK"*) ;;
+  *) echo "FAILED: nothing was verified — run this from the directory holding your download." >&2
+     exit 1 ;;
+esac
 ```
 
-> A signature that verifies under **either** published key is valid. Accepting both is what lets us promote ROTATION to PRIMARY without re-signing historical releases. Do **not** paste the key values into your own scripts from this page — `docs/release-pubkey.txt` is the canonical copy, and `checks.yml` Guard 5 enforces byte-equality across exactly three published locations (`docs/release-pubkey.txt`, `docs/security.md`, `README.md`). A fourth copy would be unguarded and could drift silently.
+> A signature that verifies under **either** published key is valid. Accepting both is what lets us promote ROTATION to PRIMARY without re-signing historical releases. Do **not** paste the key values into your own scripts from this page — `docs/release-pubkey.txt` is the canonical copy. `checks.yml` Guard 5 enforces byte-equality across exactly **two** copies: `docs/release-pubkey.txt` and the fenced blocks in `docs/security.md`. Guard 5 has a third leg for `README.md`, but it is wrapped in `if [ -n "$README" ]` and `README.md` publishes no `RW…` key lines (it links to `docs/release-pubkey.txt` instead), so that leg currently no-ops. Any further copy would be unguarded and could drift silently.
 
-> On macOS, `minisign` comes from `brew install minisign` and `sha256sum` may not exist — substitute `shasum -a 256 -c SHA256SUMS`.
+> On macOS, `minisign` comes from `brew install minisign`. If `sha256sum` is absent, substitute `shasum -a 256 --ignore-missing -c SHA256SUMS` — Perl `shasum` 6.x accepts the same flag.
 
 > The minisign release pubkey is a **dedicated release-signing key**, separate from the `whisper-binaries` key. Using a second key isolates blast radius — a compromise of one does not invalidate the other.
 
@@ -341,12 +379,20 @@ az ad app credential list --id "$APP_ID" --cert -o table
 
 The Azure auth cert private key (PFX + password) lives in 1Password / Bitwarden, **not** on disk. If the operator workstation is lost:
 
-1. On a clean machine, install Azure CLI + openssl: `winget install Microsoft.AzureCLI` (Windows) or `brew install azure-cli openssl` (macOS).
+1. On a clean machine, install Azure CLI + OpenSSL 3.x: `winget install Microsoft.AzureCLI` (Windows) or `brew install azure-cli openssl@3` (macOS).
 2. `az login` (interactive browser flow). Confirm tenant `32ad6264-7454-4a6b-82d8-3aedd2e0867c` (Qodeca).
 3. Generate a fresh keypair locally:
    ```bash
-   PFX_PW=$(openssl rand -base64 24 | tr -d '/+=' | head -c 32)
-   openssl req -x509 -nodes -newkey rsa:2048 \
+   # Pin OpenSSL 3.x. Homebrew's openssl@3 is keg-only, so a bare `openssl`
+   # on a default macOS PATH is /usr/bin/openssl (LibreSSL) — it writes and
+   # reads legacy PKCS#12 containers transparently, so both the export flags
+   # below and the "loads without -legacy" check would prove nothing about CI.
+   OPENSSL=openssl   # Windows/winget ships OpenSSL 3.x as `openssl`
+   command -v brew >/dev/null && OPENSSL="$(brew --prefix openssl@3)/bin/openssl"
+   "$OPENSSL" version   # must print "OpenSSL 3.x", never "LibreSSL"
+
+   PFX_PW=$("$OPENSSL" rand -base64 24 | tr -d '/+=' | head -c 32)
+   "$OPENSSL" req -x509 -nodes -newkey rsa:2048 \
      -keyout private.key -out public.crt -days 730 \
      -subj "/CN=erfana-github-ci"
    # AES (PBES2) encryption is MANDATORY. Without these three flags openssl
@@ -355,13 +401,13 @@ The Azure auth cert private key (PFX + password) lives in 1Password / Bitwarden,
    # "Decode Azure signing certificate to PFX file" with "Decoded file is not
    # a valid PKCS#12 envelope or password is wrong". Same flags as § B.3;
    # omitting them burned v0.16.2.
-   openssl pkcs12 -export -out azure-signing.pfx \
+   "$OPENSSL" pkcs12 -export -out azure-signing.pfx \
      -inkey private.key -in public.crt \
      -passout "pass:$PFX_PW" \
      -keypbe AES-256-CBC -certpbe AES-256-CBC -macalg sha256
 
-   # Verify it loads WITHOUT -legacy — exactly what CI does.
-   openssl pkcs12 -info -in azure-signing.pfx -noout -passin "pass:$PFX_PW"
+   # Verify it loads WITHOUT -legacy under OpenSSL 3.x — exactly what CI does.
+   "$OPENSSL" pkcs12 -info -in azure-signing.pfx -noout -passin "pass:$PFX_PW"
    ```
 
    This applies to **both** install paths in step 1. A legacy PFX produced under
@@ -369,8 +415,12 @@ The Azure auth cert private key (PFX + password) lives in 1Password / Bitwarden,
    is merely the more dangerous of the two, because LibreSSL reads legacy
    containers transparently, so a local `MAC verified OK` proves nothing about CI
    compatibility. See § B.3 for the full rationale and the OpenSSL 3.x check.
-4. Upload public cert (preserves any other credentials on the app reg via `--append`):
+4. Upload public cert (preserves any other credentials on the app reg via `--append`). `$APP_ID` is set here rather than inherited from § B.1 — this procedure assumes a clean machine with nothing carried over:
    ```bash
+   # erfana-github-ci. Re-read it instead of trusting this literal if it ever drifts:
+   #   az ad app list --display-name erfana-github-ci --query "[].appId" -o tsv
+   APP_ID=45f70db0-2163-4ac6-80b6-1580d7c45b00   # verified live 2026-08-07
+
    az ad app credential reset --id "$APP_ID" --cert "@public.crt" --append --years 2
    ```
 5. Replace GitHub Secrets — **both, atomically, in the same sitting**:
@@ -400,13 +450,16 @@ The cert is short-lived (2 years) so this DR path is straightforward — the pro
 - **Storage:** the PFX and its password live ONLY in 1Password (or equivalent password manager). They are NEVER on disk for longer than the seconds it takes to base64-encode and `gh secret set`.
 - **Anti-pattern (do NOT use):** `~/Documents/erfana-signing-backup/` or any path under `~/Documents`, `~/Downloads`, OneDrive-synced folders, iCloud Drive, or any cloud-synced location. OneDrive auto-syncs and the PFX would land in Microsoft's cloud + version history; even after deletion the OneDrive Recycle Bin retains it for 30+ days.
 - **Migration of any existing on-disk PFX backup:** copy to 1Password as a secure-note attachment named "Erfana Azure signing cert (expires <YYYY-MM-DD>)", verify the entry, then securely delete the on-disk copy (`sdelete` on Windows, `shred` on POSIX). Inspect OneDrive Recycle Bin and version history; purge any cloud copies.
-- **Encryption algorithm — must be AES (PBES2), not legacy:** when (re-)exporting the PFX, force modern PKCS#12 encryption. The CI runner's OpenSSL 3.x and `@azure/identity` (Node) **reject** legacy PKCS#12 algorithms (`pbeWithSHA1And40BitRC2-CBC`, `3DES`) — a legacy PFX fails the decode step with `Decoded file is not a valid PKCS#12 envelope or password is wrong` even when the secret pair is correct. macOS LibreSSL reads legacy PFXs transparently, so a local `MAC verified OK` does **not** prove CI compatibility. Export and verify with OpenSSL 3.x:
+- **Encryption algorithm — must be AES (PBES2), not legacy:** when (re-)exporting the PFX, force modern PKCS#12 encryption. The CI runner's OpenSSL 3.x and `@azure/identity` (Node) **reject** legacy PKCS#12 algorithms (`pbeWithSHA1And40BitRC2-CBC`, `3DES`) — a legacy PFX fails the decode step with `Decoded file is not a valid PKCS#12 envelope or password is wrong` even when the secret pair is correct. macOS LibreSSL reads legacy PFXs transparently, so a local `MAC verified OK` does **not** prove CI compatibility. Export and verify with OpenSSL 3.x — on macOS that means the keg-only Homebrew build, not the `openssl` on the default PATH (see § B.2 for why):
   ```bash
-  openssl pkcs12 -export -inkey azure-private.key -in azure-public.crt \
+  OPENSSL=openssl
+  command -v brew >/dev/null && OPENSSL="$(brew --prefix openssl@3)/bin/openssl"
+
+  "$OPENSSL" pkcs12 -export -inkey azure-private.key -in azure-public.crt \
     -out azure-signing.pfx -passout env:PFXPW \
     -keypbe AES-256-CBC -certpbe AES-256-CBC -macalg sha256
   # Verify it loads WITHOUT -legacy (this is exactly what CI does):
-  openssl pkcs12 -info -in azure-signing.pfx -noout -password env:PFXPW
+  "$OPENSSL" pkcs12 -info -in azure-signing.pfx -noout -password env:PFXPW
   ```
   Re-exporting only changes the container encryption — the cert identity and validity are unchanged, so app-registration trust and expiry are unaffected. First burned: v0.16.2 ([`docs/release-incidents/v0.16.2-attempt-1.md`](../release-incidents/v0.16.2-attempt-1.md)).
 - **Rotation reminder:** add a calendar entry 60 days before the cert's expiry date — see the rotation calendar table above.
@@ -414,7 +467,7 @@ The cert is short-lived (2 years) so this DR path is straightforward — the pro
 ### C. Minisign key compromise
 
 1. Immediately publish the successor pubkey alongside a revocation notice in `docs/security.md` and pinned in the repo README.
-2. Cut a **fresh patch release** signed with the successor key rather than re-signing an existing one. Do not upload a versioned extra signature alongside the existing one: assets are never edited in place (see § Failure recovery), and the asset set is a fixed four (`EXPECTED_ASSETS=4` — see § Artifact set coupling), so any fifth asset fails the release gate. Both keys stay published in `docs/release-pubkey.txt`, so signatures made before the rotation keep verifying.
+2. Cut a **fresh patch release** signed with the successor key rather than re-signing an existing one. Do not upload a versioned extra signature alongside the existing one: assets are never edited in place (see § Failure recovery), and the asset set is a fixed four (`EXPECTED_ASSETS=4` — see § Artifact set coupling). Note that nothing hard-fails on a fifth asset: §0.4's count check is a floor, not an equality test, and Phase 4 only surfaces the count to the operator — an extra signature would ship unnoticed, which is exactly why the convention is enforced by hand here. Both keys stay published in `docs/release-pubkey.txt`, so signatures made before the rotation keep verifying.
 3. Verify the old key has not been used to sign any unknown artifacts.
 
 ### D. Signed malware published (supply-chain attack)
@@ -431,7 +484,7 @@ This is A + C simultaneously. Trigger both. Additionally: open an urgent advisor
 
 Phase I configuration was applied after dry-run `24925269258` validated all 5 jobs (`prepare`, `build_mac`, `build_win`, `finalize`, `cleanup`) end-to-end on the new pipeline. That run record is no longer retrievable through the Actions API, so the reference is kept as a plain identifier.
 
-**`main` branch protection** ([`gh api repos/qodeca/erfana/branches/main/protection`](https://api.github.com/repos/qodeca/erfana/branches/main/protection)):
+**`main` branch protection** (read it with `gh api repos/qodeca/erfana/branches/main/protection` — the bare API URL is not linked because it returns `401` to an unauthenticated browser):
 
 - Required status checks (strict mode — branch must be up to date before merge), read live from the API on **2026-08-07**: `Lint`, `Typecheck`, `Unit tests`, `Build`, `License compliance`, `Secret scan`. Six checks.
   - `Secret scan` is **app-pinned** (`app_id: 15368`); the other five accept any app (`app_id: null`). This matters when editing the set — see the traps under § Deliberate exclusion below.

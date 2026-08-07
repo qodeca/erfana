@@ -1,16 +1,20 @@
 # Phase 0 pre-flight checks (extracted)
 
 > Pre-flight check before the §0.5 agent delegation in the `releasing-erfana` skill.
-> Consumers: SKILL.md §0.4.6 (inline) and the `release-quality-runner` agent
-> (`<workflow>` step 11, gate key `windows_snapshot`).
+> SKILL.md §0.4.6 is a pointer to this guide; the script below is executed in exactly
+> one place — the `release-quality-runner` agent (`<workflow>` step 11, gate key
+> `windows_snapshot`).
 
 ## 0.4.6 Windows status snapshot is current
 
 `docs/windows/implementation-plan.md` is the declared single source of truth for
 Windows phase status, and the root `CLAUDE.md` refresh policy requires bumping its
-"Status snapshot" version anchor **before** tagging. v0.16.1, v0.16.2 and v0.16.3
-all shipped against a stale anchor, so the policy needs a gate rather than a
-convention.
+"Status snapshot" version anchor **before** tagging. v0.16.3 — the only one of the
+0.16.x attempts that actually published — shipped with the snapshot still anchored
+on **v0.16.0** (`git show v0.16.3:docs/windows/implementation-plan.md`); the two
+attempts before it, v0.16.1 and v0.16.2, were burned by Windows signing failures and
+still sit as unpublished drafts, and both carried the same v0.16.0 anchor. One shipped
+miss is enough: the policy needs a gate rather than a convention.
 
 ### Semantics
 
@@ -18,13 +22,28 @@ convention.
   so at check time `package.json` already carries the version about to be tagged.
   The snapshot anchor must equal it exactly – no "greater than the last tag" slack.
 - **The snapshot is deliberately written ahead of the tag.** Re-anchoring on a version
-  that is not yet released is not a documentation lie; it is part of release prep, and
-  the commit that carries it is the same §1.5 bundle that carries the release notes.
-- **The check runs twice, on purpose.** It is executed inline at §0.4.6 and again as an
-  agent gate, exactly as gates 0.1 / 0.2 / 0.3 are duplicated between the skill and
-  `release-quality-runner`. The inline run gives the operator a fast, local failure with
-  a line number; the agent run keeps the structured Phase 0 report complete. The
-  duplication is intentional, not an oversight.
+  that is not yet released is not a documentation lie; it is part of release prep.
+- **The re-anchor does NOT ride the §1.5 commit bundle.** §1.5 stages exactly
+  `package.json`, `docs/CHANGELOG.md` and `docs/release-notes/v{version}.md` —
+  `docs/windows/implementation-plan.md` is not in that list, and this gate runs at
+  §0.4.6, i.e. *after* §0.2's clean-tree gate. So remediating a failure mid-release
+  dirties the tree and §0.2 will refuse on the next run. The remediation is its own
+  earlier commit: edit the anchor, `git commit -m "docs(windows): re-anchor status
+  snapshot on v{version}"`, push, wait for `checks.yml`, then restart Phase 0 from
+  §0.1. Cheapest path: re-anchor in the same commit as the version bump, before the
+  skill is invoked at all.
+- **The check runs once, in the agent.** SKILL.md §0.4.6 is a three-line pointer with
+  no inline script and no checkbox; the executable copy lives here and runs as the
+  `release-quality-runner` `windows_snapshot` gate. This is deliberate delegation, not
+  the inline+agent duplication used for gates 0.1 / 0.2 / 0.3 — a shell script this
+  fiddly (BSD/GNU `sed`, `grep` exit codes) is worth keeping in exactly one place.
+- **The gate is unconditional; the `CLAUDE.md` refresh policy it serves is not.** That
+  policy asks for a refresh "on any release that touches Windows-phase scope OR changes
+  a phase issue's state". This gate is deliberately stricter: strict equality on *every*
+  release, including a pure macOS bugfix. Rationale — the anchor declares which release
+  the snapshot describes, so a stale anchor is factually wrong whether or not anything
+  Windows-specific moved. Over-triggering costs one line (date + version); under-
+  triggering costs silent doc-vs-code drift, which is what v0.16.3 shipped.
 
 ### Script
 

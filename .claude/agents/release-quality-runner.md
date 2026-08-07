@@ -132,8 +132,9 @@ Run the Phase 0 release-readiness checklist and return structured results.
       fi
       echo "OK: snapshot anchored on v$SNAP_VER"'`
     Non-zero exit = FAIL, with the offending line number in the remediation string.
-    This gate is deliberately duplicated with the skill's inline §0.4.6, exactly as
-    gates 1-3 duplicate the skill's §0.1-§0.3.
+    Unlike gates 1-3 (which duplicate the skill's inline §0.1-§0.3), this is the ONLY
+    place the snapshot script runs: SKILL.md §0.4.6 is a pointer with no inline script,
+    so skipping this gate means the check does not happen at all.
 
 12. Compile results
     Aggregate into structured output.

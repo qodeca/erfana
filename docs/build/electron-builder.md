@@ -40,7 +40,9 @@ See [electron-builder issue #8068](https://github.com/electron-userland/electron
 
 ### Why it happens
 
-`aproba` is an abandoned package that electron-builder's own dependency tree has historically reached for. It is no longer published in a form the npm-in-Electron app-deps rebuild accepts on every platform, so the scanner can look for a `node_modules/aproba` directory that npm never materialised.
+`aproba` is an abandoned package that electron-builder's own dependency tree has historically reached for, and the scanner can look for a `node_modules/aproba` directory that npm never materialised.
+
+The header comment in `scripts/prebuild.mjs` states the cause as: `aproba` "is no longer published in a form npm-in-electron accepts during app-deps rebuild on some platforms". **That mechanism is the script's stated rationale, not a verified fact** — `aproba` is still published on npm, and nothing in this repo demonstrates the rebuild rejecting it. The shim is empirically necessary; the explanation for *why* is unconfirmed.
 
 > **Correction (August 2026)**: this document previously attributed the missing package to the chain `jsdom → canvas → @mapbox/node-pre-gyp → npmlog → gauge → aproba`. That chain no longer exists — `canvas` and `@mapbox/node-pre-gyp` are in neither `package.json` nor `node_modules` (jsdom 25 stopped pulling `canvas`). The shim is still required and still runs on every build; only the stated cause was wrong.
 
@@ -95,8 +97,8 @@ electron-builder runs three of Erfana's scripts across the packaging lifecycle:
 
 | Hook | Script | Purpose |
 |------|--------|---------|
-| `beforePack` | `scripts/ensure-media-binaries.js` | Downloads each target arch's `ffmpeg-static` binary into `release/.media-cache/<platform>-<arch>/`, verified by size floor and pinned SHA-256. CI installs with `npm ci --ignore-scripts`, so `ffmpeg-static`'s own postinstall download never ran. |
-| `afterPack` | `scripts/fuses.js` | Renames the bundle on a test build; prunes foreign-platform/arch `ffprobe-static` binaries and `node-pty` prebuilds (plus a `.pdb` strip on `win32`); restores the `node-pty` `spawn-helper` execute bit to `0755`; copies the cached per-arch `ffmpeg` into the bundle, re-verifies its SHA-256 and chmods it along with every `ffprobe`; then flips the Electron fuses and resets the ad-hoc Darwin signature. |
+| `beforePack` | `scripts/ensure-media-binaries.js` | Downloads a hardcoded per-platform arch set of `ffmpeg-static` binaries (`x64` **and** `arm64` on macOS, the host arch elsewhere — not the configured target) into `release/.media-cache/<platform>-<arch>/`, verified by size floor plus a pinned SHA-256 on the arches listed in `FFMPEG_SHA256` (macOS only today; Windows is size-floor-only). CI installs with `npm ci --ignore-scripts`, so `ffmpeg-static`'s own postinstall download never ran. |
+| `afterPack` | `scripts/fuses.js` | Renames the bundle on a test build; prunes foreign-platform/arch `ffprobe-static` binaries and `node-pty` prebuilds (plus a `.pdb` strip on `win32`); restores the `node-pty` `spawn-helper` execute bit to `0755`; copies the cached per-arch `ffmpeg` into the bundle, re-runs the same size/hash verification at the packed path and chmods it along with every `ffprobe`; then flips the Electron fuses and resets the ad-hoc Darwin signature. |
 | `afterSign` | `scripts/resign.js` | Deep re-signs the entire `.app` bundle atomically. |
 
 ```yaml

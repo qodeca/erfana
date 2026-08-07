@@ -129,9 +129,9 @@ const config = PROMPT_REGISTRY['mermaid-bug-report']  // Returns undefined!
 
 **Problem**: Largest natural extraction candidate (`Release signing (v0.9.5+, #174)`, L490–L533) is structurally pinned. The pubkey block contains `<!-- minisign-pubkey-{primary,rotation}-{begin,end} -->` fence markers that are actively grepped by:
 
-- `.github/workflows/checks.yml:214–241` — release-pubkey drift detector (the `Release readiness guards` job; it runs on every push but is **not** a required status check on `main` — the required set is `Lint`, `Typecheck`, `Unit tests`, `Build`, `License compliance`, `Secret scan`, per [`ci.md`](./ci.md))
+- `.github/workflows/checks.yml:298–330` — release-pubkey drift detector (Guard 5; the step is `Guard - release pubkey drift across docs` at `:306`) (the `Release readiness guards` job; it runs on every push but is **not** a required status check on `main` — the required set is `Lint`, `Typecheck`, `Unit tests`, `Build`, `License compliance`, `Secret scan`, per [`ci.md`](./ci.md))
 - `.claude/skills/releasing-erfana/phases/phase-4-verify.md:45` — operator-facing canonical-source note
-- `README.md:156` — direct `#release-signing-v095-174` anchor
+- `README.md:57` — direct `#release-signing-v095-174` anchor (the file is 101 lines long)
 
 Moving the block would require synchronized edits to checks.yml + skill + README anchor. High blast-radius for cosmetic gain.
 

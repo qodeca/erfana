@@ -48,7 +48,7 @@ When Phase 5 cert arrives, add these secrets to `production-signing`:
 Then **add** a signtool step to `build-windows`. There is no signtool step and no
 commented-out placeholder in `whisper-binaries.yml` today — it has to be written from
 scratch. The canary workflow already probes that `signtool.exe` resolves on the
-`windows-latest` image (`windows-signtool-canary`), so the tooling side of the Phase 5
+`windows-latest` image (`windows-signtool-canary`), so the tooling side of the Phase 5
 flip is drop-in.
 
 ### 3. Minisign manifest-signing keys

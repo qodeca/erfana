@@ -14,8 +14,7 @@ user-invocable: true
 
 Orchestrates the Erfana release flow that ends with **one GitHub release containing signed, notarized artifacts for Windows + macOS** (the Linux distribution target was dropped). The CI matrix (`.github/workflows/release.yml`) does all build, sign, notarize, verify, and draft-upload work. This skill handles pre-tag sanity, tag push, CI polling, local cryptographic verification, and the human approval checkpoint.
 
-Detailed ops reference: [docs/build/release.md](../../../docs/build/release.md).
-Design anchor: #174 (pre-migration issue; no longer resolves on the public repo).
+Detailed ops reference: [docs/build/release.md](../../../docs/build/release.md). Design anchor: #174 (pre-migration issue; no longer resolves on the public repo).
 
 > **Note**: This skill is project-scope-only. The relative path `../../../docs/build/release.md` is intentional — moving the skill to user-scope (`~/.claude/skills/`) would break the doc reference and orphan the project-local `release-failure-analyzer` agent. See "Architectural exception" below.
 
@@ -56,7 +55,7 @@ All external credentials (Apple Developer, Azure Artifact Signing, minisign rele
 
 ## Constants
 
-These values appear in multiple places. Update here first, then `EXPECTED_ASSETS=4` in §0.4 and the count comment in `phase-4-verify.md` §4.5 will reference this table.
+These values appear in multiple places. Update here first, then update `EXPECTED_ASSETS=4` in §0.4 — which uses the number as a **floor** (`-ge`) to classify a draft as `draft-ready`, not as an equality assertion — and the expected-set line `phase-4-verify.md` §4.6 shows the operator. Neither place hard-fails on an unexpected extra asset.
 
 | Constant | Value | Note |
 |---|---|---|
@@ -86,7 +85,7 @@ These values appear in multiple places. Update here first, then `EXPECTED_ASSETS
 | CI workflow | `.github/workflows/release.yml` |
 | Expected release assets | See `## Constants` above (2 binaries + 2 = 4 total) |
 | Provenance attestations | **Not used** — off pending a deliberate pipeline change, not a plan restriction: the old blocker (Enterprise-only for private repos) expired when the repo went public on 2026-06-16. Authenticity covered by minisign + per-platform OS signing. |
-| Minisign release pubkey | `docs/release-pubkey.txt` (canonical; `docs/security.md` § Release signing and `README.md` mirror it) |
+| Minisign release pubkey | `docs/release-pubkey.txt` (canonical; `docs/security.md` § Release signing is the one mirror `checks.yml` Guard 5 enforces — `README.md` only links to the canonical file) |
 
 ## Critical enforcement rules (NON-NEGOTIABLE)
 
@@ -256,6 +255,7 @@ fi
 - [ ] `required_pull_request_reviews` is unset on the `main` branch protection rule
 
 ### 0.4.6 Windows status snapshot is current
+
 `docs/windows/implementation-plan.md` must be re-anchored on v{version} before tagging — script, semantics and traps in [`./guides/pre-flight-checks.md`](./guides/pre-flight-checks.md); also enforced as the agent's `windows_snapshot` gate.
 
 ### 0.5 Delegate the rest of the checklist to `release-quality-runner`
@@ -274,7 +274,7 @@ Task(subagent_type: "release-quality-runner",
               }")
 ```
 
-Any `fail` stops the skill. Warnings are surfaced to the operator, who can continue.
+Any `fail` stops the skill. Warnings are surfaced to the operator, who can continue. **Retired:** this prompt used to ask the agent to check for *running dev servers*, and no agent gate replaced it. It was dropped deliberately with the #174 CI migration — nothing is built locally any more (every binary comes from `release.yml` on GitHub-hosted runners), so a local `electron-vite dev` cannot contaminate a release artifact, and the clean-tree gate already catches anything it wrote to disk.
 
 ### Checkpoint 0.A
 
