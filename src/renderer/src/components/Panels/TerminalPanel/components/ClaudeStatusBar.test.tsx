@@ -30,6 +30,7 @@ function makeSnapshot(
     percent: 48,
     level: 'green',
     tooltip: '84k / 200k',
+    inferred: false,
     ...overrides
   }
 }
@@ -125,6 +126,37 @@ describe('ClaudeStatusBar', () => {
       expect(screen.getByRole('meter')).toHaveAttribute(
         'aria-valuetext',
         'Opus 4.8, 48% used, 84k of 200k tokens'
+      )
+    })
+
+    it('places the inferred marker AFTER the noun, not inside the figure', () => {
+      // The marker used to be carried only inside `tooltip`, and aria-valuetext
+      // was built by reformatting that string — so a screen reader announced
+      // "84k of 1M (inferred) tokens", with the qualifier mid-sentence. The
+      // snapshot now carries `inferred` structurally so each surface can place it.
+      seed('t', {
+        windowSize: 1000000,
+        usedTokens: 84000,
+        tooltip: '84k / 1M (inferred)',
+        inferred: true
+      })
+      render(<ClaudeStatusBar terminalId="t" />)
+
+      expect(screen.getByRole('meter')).toHaveAttribute(
+        'aria-valuetext',
+        'Opus 4.8, 48% used, 84k of 1M tokens (inferred)'
+      )
+    })
+
+    it('keeps the visual hover tooltip verbatim, marker and all', () => {
+      // The two surfaces phrase it differently on purpose: the hover title is a
+      // compact figure, the spoken value text is a sentence.
+      seed('t', { windowSize: 1000000, tooltip: '84k / 1M (inferred)', inferred: true })
+      render(<ClaudeStatusBar terminalId="t" />)
+
+      expect(screen.getByTestId(TEST_IDS.CLAUDE_STATUS_BAR)).toHaveAttribute(
+        'title',
+        '84k / 1M (inferred)'
       )
     })
 
