@@ -579,8 +579,25 @@ export function useCameraCapture(): UseCameraCaptureReturn {
     refreshDevices()
   }, [refreshDevices])
 
+  // Latest values the `devicechange` handler needs. The handler is registered
+  // ONCE (see below), so it must not close over `refreshDevices` /
+  // `selectedDeviceId` directly — it would read mount-time values forever.
+  const refreshDevicesRef = useRef(refreshDevices)
+  const selectedDeviceIdRef = useRef(selectedDeviceId)
+  useEffect(() => {
+    refreshDevicesRef.current = refreshDevices
+    selectedDeviceIdRef.current = selectedDeviceId
+  })
+
   // Listen for device changes (hot-plug support) with debouncing
   // Debounce prevents rapid enumeration when devices are rapidly connected/disconnected
+  //
+  // Registered once, with NO reactive dependencies. An earlier version depended
+  // on [refreshDevices, stream, selectedDeviceId]; because the cleanup cancels
+  // the pending debounce, any re-render that changed one of those within the
+  // 300 ms window silently dropped a queued refresh and never re-armed it — so
+  // a camera plugged in at that moment stayed missing from the device list
+  // until the next dialog open or manual Refresh.
   useEffect(() => {
     if (!navigator.mediaDevices) return
 
@@ -594,12 +611,18 @@ export function useCameraCapture(): UseCameraCaptureReturn {
 
       // Debounce the device enumeration to handle rapid hot-plug events
       deviceChangeTimerRef.current = setTimeout(() => {
-        logger.debug('Media devices changed (debounced)')
-        refreshDevices()
+        deviceChangeTimerRef.current = null
+        if (!mountedRef.current) return
 
-        // Check if current device was disconnected
-        if (stream && selectedDeviceId) {
-          const videoTrack = stream.getVideoTracks()[0]
+        logger.debug('Media devices changed (debounced)')
+        refreshDevicesRef.current()
+
+        // Check if current device was disconnected. `streamRef` is kept in
+        // lockstep with the `stream` state by startPreview/stopStream, so it
+        // is the live value here without needing a dependency.
+        const currentStream = streamRef.current
+        if (currentStream && selectedDeviceIdRef.current) {
+          const videoTrack = currentStream.getVideoTracks()[0]
           if (videoTrack && videoTrack.readyState === 'ended') {
             setError({
               message: 'Camera disconnected.',
@@ -615,13 +638,14 @@ export function useCameraCapture(): UseCameraCaptureReturn {
 
     return () => {
       navigator.mediaDevices.removeEventListener('devicechange', handleDeviceChange)
-      // Clear any pending debounced call on cleanup
+      // Only reached on unmount now, so cancelling the pending debounce here
+      // can no longer lose a refresh mid-flight.
       if (deviceChangeTimerRef.current) {
         clearTimeout(deviceChangeTimerRef.current)
         deviceChangeTimerRef.current = null
       }
     }
-  }, [refreshDevices, stream, selectedDeviceId])
+  }, [])
 
   // Cleanup on unmount
   useEffect(() => {
