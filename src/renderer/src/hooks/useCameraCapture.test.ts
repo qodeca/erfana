@@ -1050,6 +1050,53 @@ describe('useCameraCapture', () => {
         expect(result.current.devices).toHaveLength(2)
       })
     })
+
+    it('should still enumerate when a re-render lands inside the debounce window', async () => {
+      // Regression: the `devicechange` effect used to depend on
+      // [refreshDevices, stream, selectedDeviceId] while its cleanup cancelled
+      // the pending 300 ms debounce. Any re-render changing one of those inside
+      // that window dropped the queued refresh WITHOUT re-arming it, so a
+      // camera plugged in at that moment stayed invisible until the next dialog
+      // open or manual Refresh. `stopPreview()` is the trigger used here
+      // because it changes `stream` without enumerating on its own — a
+      // selectedDeviceId change would mask the bug by refreshing anyway.
+      const mockStream = new MockMediaStream([createMockTrack()])
+      mockGetUserMedia.mockResolvedValue(mockStream)
+      mockEnumerateDevices.mockResolvedValue([createMockDevice('device1', 'Camera 1')])
+
+      const { result } = renderHook(() => useCameraCapture())
+
+      await waitFor(() => {
+        expect(result.current.devices).toHaveLength(1)
+      })
+
+      // Active preview, so that stopPreview() below actually changes `stream`
+      await act(async () => {
+        await result.current.startPreview()
+      })
+      expect(result.current.stream).not.toBeNull()
+
+      // A second camera appears
+      mockEnumerateDevices.mockResolvedValue([
+        createMockDevice('device1', 'Camera 1'),
+        createMockDevice('device2', 'Camera 2')
+      ])
+
+      const deviceChangeHandler = mockAddEventListener.mock.calls.find(
+        (call) => call[0] === 'devicechange'
+      )?.[1]
+
+      // Hot-plug arms the debounce, then a re-render lands before it fires
+      await act(async () => {
+        deviceChangeHandler()
+        result.current.stopPreview()
+      })
+
+      // The queued refresh must survive that re-render and still run
+      await waitFor(() => {
+        expect(result.current.devices).toHaveLength(2)
+      })
+    })
   })
 
   // ===========================================================================

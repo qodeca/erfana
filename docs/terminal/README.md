@@ -263,7 +263,7 @@ Capture photos from connected cameras directly from the terminal toolbar.
 **Dialog Features**:
 - Live camera preview with device selector (when multiple cameras available)
 - "Mirror preview" checkbox below the preview – preview-only, remembered per camera, disabled until the preview is live
-- Hot-plug support: detects camera connect/disconnect
+- Hot-plug support: detects camera connect/disconnect, debounced 300 ms. The listener lives on the terminal panel, not the dialog, so a camera plugged in while the dialog is closed is already known by the time it opens
 - Fallback labels ("Camera 1", "Camera 2") when device labels unavailable
 - Keyboard: Escape closes; Enter captures only while the Capture button itself has focus (Enter on Cancel cancels, as expected)
 - Shutter animation on capture
@@ -285,7 +285,7 @@ Capture photos from connected cameras directly from the terminal toolbar.
 - `CameraService.ts`: Main process service for JPEG file saving
 - `camera-handlers.ts`: IPC handlers for renderer communication
 - `camera-schema.ts`: Zod schemas for IPC types
-- `useCameraCapture.ts`: React hook for camera access and capture
+- `useCameraCapture.ts`: React hook for camera access and capture. The `devicechange` effect is deliberately registered **once**, with an empty dependency array, reading `refreshDevices` / `selectedDeviceId` / the stream through refs. Do not "fix" this by adding those to the dependency array to satisfy `react-hooks/exhaustive-deps`: the cleanup cancels the pending 300 ms debounce, so a re-render inside that window would silently drop a queued enumeration and never re-arm it, leaving a hot-plugged camera invisible. Covered by the regression test "should still enumerate when a re-render lands inside the debounce window"
 - `useCameraMirrorPreference.ts` + `useCameraMirrorStore.ts`: per-camera mirror-preview preference, persisted to `localStorage` under `erfana-camera-mirror-state`; preview-only, never consulted by the capture path
 - `CameraDialog.tsx`: Modal dialog with preview and controls
 
