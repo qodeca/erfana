@@ -97,7 +97,6 @@ Erfana is an agent-native Markdown workspace – an Electron app that runs a ter
 ### Design records and plans
 - [Claude Code status bar](./designs/216-claude-status-bar.md) - Per-terminal context status bar design (issue #216; Windows follow-up #217)
 - [Clipboard service](./designs/issue-203-clipboard-service.md) - Central text-clipboard service design (issue #203)
-- [Open-source under GPL-3.0-only](./superpowers/plans/2026-06-16-open-source-gplv3.md) - Relicensing and public-release implementation plan
 
 ### Future Features (Planned)
 - [Graph Engine](./future/graph-engine.md) – SQLite + vec + FTS5 knowledge graph (not yet implemented)
