@@ -8,8 +8,8 @@ Erfana runs GitHub Actions workflows on pushes. The author-controlled workflows 
 | Secret Scan | `.github/workflows/secret-scan.yml` | active (**required check**) | push + PR | `ubuntu-latest` | ~1 min | gitleaks (full git history) + trufflehog (verified secrets only). Version-pinned, SHA-256-checksum-verified binary downloads; no third-party actions |
 | E2E Tests | `.github/workflows/e2e.yml` | **disabled** (2026-04-25) | (would be: push to `develop` + PRs) | `macos-latest` | ~5–8 min | Electron integration tests (Playwright) — see [E2E Tests (disabled)](#e2e-tests-e2eyml-disabled) below |
 | Release | `.github/workflows/release.yml` | active | tag push `v*.*.*` | matrix (mac/win) | ~15–25 min | Multi-platform release build → `prepare`/`build_*`/`finalize`/`cleanup` (calls `build_mac.yml`, `build_win.yml` reusables; Linux distribution target dropped) |
-| Whisper Binaries | `.github/workflows/whisper-binaries.yml` | active | `workflow_dispatch` only | `macos-14` + `windows-latest` | ~25 min | Self-hosted whisper.cpp build, sign, notarize, publish (see [`build/whisper-binaries.md`](./build/whisper-binaries.md)) |
-| Whisper Binaries (Canary) | `.github/workflows/whisper-binaries-canary.yml` | active | monthly schedule | `macos-14` | ~3 min | Credential-health check (Apple notarization, Windows signing) |
+| Whisper Binaries | `.github/workflows/whisper-binaries.yml` | active | `workflow_dispatch` only | `ubuntu-latest` (`validate-inputs`, `publish-release`) + `macos-14` (`build-macos`) + `windows-latest` (`build-windows`) | ~25 min | Self-hosted whisper.cpp build, sign, notarize, publish (see [`build/whisper-binaries.md`](./build/whisper-binaries.md)) |
+| Whisper Binaries (Canary) | `.github/workflows/whisper-binaries-canary.yml` | active | monthly schedule | `macos-14` + `windows-latest` + `ubuntu-latest` (`notify-on-failure`) | ~3 min | Credential-health check (Apple notarization, Windows signing) |
 | Claude Code Review | `.github/workflows/claude-code-review.yml` | active (allows `dependabot`) | `pull_request` opened/synchronize | `ubuntu-latest` | ~1 min | Auto-review on every PR; **non-blocking** (not in branch-protection required checks). `allowed_bots: 'dependabot'` since [#192](https://github.com/qodeca/erfana/pull/192) so Dependabot PRs get a real pass/fail instead of "non-human actor" abort |
 | Claude Code (interactive) | `.github/workflows/claude.yml` | active | `@claude` mention on issue/PR comment | `ubuntu-latest` | varies | Interactive code agent for follow-up commits and review-comment threads |
 
@@ -42,7 +42,18 @@ Eight jobs run in parallel (all `ubuntu-latest` except `windows-checks`). The **
   npm ci || (sleep 10 && npm ci) || (sleep 20 && npm ci)
   ```
 
-## E2E Tests (`e2e.yml`) — disabled
+## Secret scan (`secret-scan.yml`)
+
+Runs gitleaks over the **full git history**, then trufflehog for verified secrets. Both binaries are version-pinned and SHA-256-checksum-verified rather than pulled through third-party actions. `Secret scan` is a branch-protection required check on `main`.
+
+**The scan is repo-wide, not branch-wide.** gitleaks runs with `--log-opts="--all"`, so it walks every ref in the repository — not just the branch being tested. Two consequences that are easy to get wrong:
+
+- A finding in a commit that exists **only on another branch** still fails the check on your branch, as long as that commit is reachable from any ref on the remote.
+- Therefore `.gitleaksignore` must carry the fingerprint on **every** branch whose CI you need green — including branches where the offending file does not exist. Rewinding or rebasing a branch does not shrink what the scan sees, so an allowlist entry dropped by a history rewrite will fail a branch that never contained the secret.
+
+`.gitleaksignore` holds one finding fingerprint per line (`commit:file:rule:line`), each a reviewed non-secret — test fixtures that resemble high-entropy tokens. Add the fingerprint from the failing run's output; where the file is on the current branch, also mark the line with an inline `gitleaks:allow` comment so future commits of the same line do not re-trigger.
+
+## E2E Tests (`e2e.yml`, disabled)
 
 **Disabled 2026-04-25** via `gh workflow disable "E2E Tests"` (see commit `997ba65`). The disabled state is also documented inline at the top of `e2e.yml` so it's visible without the Actions UI.
 

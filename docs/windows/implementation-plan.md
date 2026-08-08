@@ -1,5 +1,7 @@
 # Windows implementation plan
 
+> **Note**: issue and PR numbers, commit SHAs, release tags and CI run links below predate the 2026-06 open-source migration and no longer resolve on `qodeca/erfana`; they are retained as provenance.
+
 Phased roadmap for bringing Erfana to full Windows parity. Each phase ends with a concrete manual verification on Windows 11.
 
 See [`gap-analysis.md`](gap-analysis.md) for the full finding-by-finding inventory and severity ratings referenced here (B1–B6, M1–M10, m1–m6).
@@ -8,17 +10,22 @@ See [`gap-analysis.md`](gap-analysis.md) for the full finding-by-finding invento
 
 ## Status snapshot
 
-*Last updated 2026-06-14, anchored on v0.16.0 (Windows NSIS installer + macOS arm64 DMG); the Windows Claude-status work below shipped in v0.16.0. Phase 3 (screenshots) shipped in [v0.12.0](https://github.com/qodeca/erfana/releases/tag/v0.12.0) (tag 2026-06-04) via [PR #208](https://github.com/qodeca/erfana/pull/208) (merge `9b2f91a`). **Phase 6 (polish, [#167](https://github.com/qodeca/erfana/issues/167)) partially shipped in [v0.13.0](https://github.com/qodeca/erfana/releases/tag/v0.13.0)** — items 1, 4, 7 (advisory CI), the single-bridge renderer platform detection, PII log redaction, and D5/D7 done and tagged; items 2 (CameraService) and 3 (ProjectLockService) verified working with no code change; D4 promoted to its own ticket ([#220](https://github.com/qodeca/erfana/issues/220)); items 5/6 + the forward-looking parity items remain (now tracked as [#221](https://github.com/qodeca/erfana/issues/221)–[#224](https://github.com/qodeca/erfana/issues/224)). **[v0.14.0](https://github.com/qodeca/erfana/releases/tag/v0.14.0) (tag 2026-06-06) added Windows-quality polish outside the formal Phase-6 issue scope**: bundled Cascadia Mono font for cross-platform terminal parity; project-tree header now shows the folder name on Windows instead of the full `C:\…` path; git-status worker prefers native `git` to fix CRLF false-positives and detects repo transitions; the OS window title shows project + version on both platforms; Claude Code context bar transcript selection is floored by `claude` process start time so a fresh session no longer mis-reports a prior session's percentage ([#225](https://github.com/qodeca/erfana/issues/225)). **[v0.15.0](https://github.com/qodeca/erfana/releases/tag/v0.15.0) (tag 2026-06-09) hardened multi-instance reliability on both platforms** — `ProjectLockService` lock files are HMAC-signed against same-user forgery, a heartbeat reclaims stale locks from a crashed window after 30 s, sleep/wake correctly refreshes held locks, symlinked lock paths are refused (junction-redirect / CVE-2025-68146 class), and the **Windows** process-liveness check (`isProcessRunning`) now fails closed on unknown errors rather than assuming a process is dead (closes the Phase-6 item 3 verification scope for `ProjectLockService`). **[v0.15.1](https://github.com/qodeca/erfana/releases/tag/v0.15.1) (tag 2026-06-10) fixed the Windows-specific parent-folder git-status dot** ([#237](https://github.com/qodeca/erfana/issues/237)) — `gitStatus.logic`'s parent-path lookup now recognises both `/` and `\`, restoring the colored folder indicator on Windows. Cross-platform companion: Project Tree git badges now auto-refresh after editing an existing file via a chokidar `change` listener in `DirectoryWatcherService` ([#241](https://github.com/qodeca/erfana/issues/241)). **Shipped in [v0.16.0](https://github.com/qodeca/erfana/releases/tag/v0.16.0)** ([PR #245](https://github.com/qodeca/erfana/pull/245), closes [#217](https://github.com/qodeca/erfana/issues/217)): Windows support for the Claude Code context status bar – `WinClaudeProcessDetector` (single static PowerShell `Win32_Process` BFS, fail-closed, liveness-cached, win32-path resolution), platform-branched `encodeCwd`, a shared `AbstractClaudeProcessDetector` base, turn-aware transcript selection (skips metadata-only sidecars), mid-session model-switch window tracking, and a shutdown chokidar timer-race fix that was the root cause of the Windows e2e EBUSY teardown timeout. Single-panel detection verified on a Windows host; two-panel UAT pending (see [technical-debt.md §12](../technical-debt.md)).*
+*Last updated 2026-08-07, anchored on v0.16.3 (first public open-source release; macOS arm64 DMG + Windows NSIS installer). Release history relevant to Windows: **Phase 3 (screenshots) shipped in [v0.12.0](https://github.com/qodeca/erfana/releases/tag/v0.12.0)** (tag 2026-06-04) via [PR #208](https://github.com/qodeca/erfana/pull/208) (merge `9b2f91a`). **Phase 6 (polish, [#167](https://github.com/qodeca/erfana/issues/167)) partially shipped in [v0.13.0](https://github.com/qodeca/erfana/releases/tag/v0.13.0)** — items 1, 4, 7 (advisory CI), the single-bridge renderer platform detection, PII log redaction, and D5/D7 done and tagged; items 2 (CameraService) and 3 (ProjectLockService) verified working with no code change; D4 promoted to its own ticket ([#220](https://github.com/qodeca/erfana/issues/220)); items 5/6 + the forward-looking parity items remain (now tracked as [#221](https://github.com/qodeca/erfana/issues/221)–[#224](https://github.com/qodeca/erfana/issues/224)). **[v0.14.0](https://github.com/qodeca/erfana/releases/tag/v0.14.0) (tag 2026-06-06) added Windows-quality polish outside the formal Phase-6 issue scope**: bundled Cascadia Mono font for cross-platform terminal parity; project-tree header now shows the folder name on Windows instead of the full `C:\…` path; git-status worker prefers native `git` to fix CRLF false-positives and detects repo transitions; the OS window title shows project + version on both platforms; Claude Code context bar transcript selection is floored by `claude` process start time so a fresh session no longer mis-reports a prior session's percentage ([#225](https://github.com/qodeca/erfana/issues/225)). **[v0.15.0](https://github.com/qodeca/erfana/releases/tag/v0.15.0) (tag 2026-06-09) hardened multi-instance reliability on both platforms** — `ProjectLockService` lock files are HMAC-signed against same-user forgery, a heartbeat reclaims stale locks from a crashed window after 30 s, sleep/wake correctly refreshes held locks, symlinked lock paths are refused (junction-redirect / CVE-2025-68146 class), and the **Windows** process-liveness check (`isProcessRunning`) now fails closed on unknown errors rather than assuming a process is dead (closes the Phase-6 item 3 verification scope for `ProjectLockService`). **[v0.15.1](https://github.com/qodeca/erfana/releases/tag/v0.15.1) (tag 2026-06-10) fixed the Windows-specific parent-folder git-status dot** ([#237](https://github.com/qodeca/erfana/issues/237)) — `gitStatus.logic`'s parent-path lookup now recognises both `/` and `\`, restoring the colored folder indicator on Windows. Cross-platform companion: Project Tree git badges now auto-refresh after editing an existing file via a chokidar `change` listener in `DirectoryWatcherService` ([#241](https://github.com/qodeca/erfana/issues/241)). **Windows support for the Claude Code context status bar** ([PR #245](https://github.com/qodeca/erfana/pull/245), closes [#217](https://github.com/qodeca/erfana/issues/217)) landed on `develop` after v0.15.1 and first reached users in [v0.16.3](https://github.com/qodeca/erfana/releases/tag/v0.16.3) — `WinClaudeProcessDetector` (single static PowerShell `Win32_Process` BFS, fail-closed, liveness-cached, win32-path resolution), platform-branched `encodeCwd`, a shared `AbstractClaudeProcessDetector` base, turn-aware transcript selection (skips metadata-only sidecars), mid-session model-switch window tracking, and a shutdown chokidar timer-race fix that was the root cause of the Windows e2e EBUSY teardown timeout. Single-panel detection verified on a Windows host; two-panel UAT pending (see [technical-debt.md §12](../technical-debt.md)). **v0.16.0, v0.16.1 and v0.16.2 were never published** — v0.16.0 was superseded before tagging and v0.16.1/v0.16.2 were burned by Windows signing failures (Azure secret mismatch, then a legacy-RC2/3DES PFX rejected by OpenSSL 3.x). [v0.16.3](https://github.com/qodeca/erfana/releases/tag/v0.16.3) (tag object dated 2026-06-17; GitHub release published 2026-06-18) is the first — and currently only — publicly released build.*
 
 **Current state:** Phases 0, 1, 2 shipped to `develop` in **v0.9.3** (merge `c1e085d`, release `0b593a1`, tag `v0.9.3` on 2026-04-22). **Phase 4 (local Whisper parity, [#165](https://github.com/qodeca/erfana/issues/165)) shipped in [v0.9.4](https://github.com/qodeca/erfana/releases/tag/v0.9.4)** (merge `110f1b9`, tag 2026-04-23) — see the Phase 4 section below and [`docs/build/whisper-binaries.md`](../build/whisper-binaries.md). In parallel, the Windows-host test-flake remediation pool ([#172](https://github.com/qodeca/erfana/issues/172)) + ThrottledWorker offset-deque refactor ([#173](https://github.com/qodeca/erfana/issues/173)) shipped the same day (`c3cc005`).
 
-Since v0.9.4 the project shipped five non-Windows-phase releases before Phase 3 landed: **v0.9.5** (multi-platform signed release pipeline via [#174](https://github.com/qodeca/erfana/issues/174) — Azure Artifact Signing for Windows, macOS notarization; SmartScreen reputation tracked in [#177](https://github.com/qodeca/erfana/issues/177)), **v0.9.6** (`spawn-helper` `chmod 0755` fix in `afterPack`), **v0.10.0–v0.10.1** (apply-to-document footer for mutation prompts, 22-diagram Visualize, terminal expand), and **v0.11.0–v0.11.2** (Linux distribution discontinued via [#206](https://github.com/qodeca/erfana/pull/206); macOS now arm64-only; clipboard service via [#203](https://github.com/qodeca/erfana/issues/203)). **Phase 3 (screenshot parity, [#164](https://github.com/qodeca/erfana/issues/164))** shipped in [v0.12.0](https://github.com/qodeca/erfana/releases/tag/v0.12.0) (tag 2026-06-04) via [PR #208](https://github.com/qodeca/erfana/pull/208) (merge `9b2f91a`) — alongside the chokidar v3 pin against FD exhaustion (`1139bf2`): `ScreenshotService` is a thin dispatcher selecting `MacScreenshotCapturer` (existing `screencapture` flow) or `DesktopCapturerScreenshotCapturer` (Electron `desktopCapturer` + `nativeImage` + a per-display transparent `AreaSelectOverlay` BrowserWindow); the renderer ships `WindowPickerDialog` for in-app window selection (thumbnail grid with roving tabindex) and a Tab-keyboard mode in `ScreenshotOverlay`; security boundary uses a dedicated `screenshotOverlay.ts` preload + per-capture UUID nonce + frame-scoped IPC + sender-frame URL validation on the four public `screenshot:*` handlers; the renderer hook + UI gate are `isScreenshotSupported` (was `isMacOS` pre-PR). UAT verified on Windows host 2026-06-04 (screen / window / area / camera all captured). Phase 5 (#166) remains narrowed to NSIS UX only — auto-updater and Windows signing both shipped via #174 in v0.9.5. Phase 6 (#167) work continues on `feature/windows-phase-6-*` branches off `develop`.
+Since v0.9.4 the project shipped seven non-Windows-phase releases before Phase 3 landed: **v0.9.5** (multi-platform signed release pipeline via [#174](https://github.com/qodeca/erfana/issues/174) — Azure Artifact Signing for Windows, macOS notarization; SmartScreen reputation tracked in [#177](https://github.com/qodeca/erfana/issues/177)), **v0.9.6** (`spawn-helper` `chmod 0755` fix in `afterPack`), **v0.10.0–v0.10.1** (apply-to-document footer for mutation prompts, 22-diagram Visualize, terminal expand), and **v0.11.0–v0.11.2** (Linux distribution discontinued via [#206](https://github.com/qodeca/erfana/pull/206); macOS now arm64-only; clipboard service via [#203](https://github.com/qodeca/erfana/issues/203)). **Phase 3 (screenshot parity, [#164](https://github.com/qodeca/erfana/issues/164))** shipped in [v0.12.0](https://github.com/qodeca/erfana/releases/tag/v0.12.0) (tag 2026-06-04) via [PR #208](https://github.com/qodeca/erfana/pull/208) (merge `9b2f91a`) — alongside the chokidar v3 pin against FD exhaustion (`1139bf2`): `ScreenshotService` is a thin dispatcher selecting `MacScreenshotCapturer` (existing `screencapture` flow) or `DesktopCapturerScreenshotCapturer` (Electron `desktopCapturer` + `nativeImage` + a per-display transparent `AreaSelectOverlay` BrowserWindow); the renderer ships `WindowPickerDialog` for in-app window selection (thumbnail grid with roving tabindex) and a Tab-keyboard mode in `ScreenshotOverlay`; security boundary uses a dedicated `screenshotOverlay.ts` preload + per-capture UUID nonce + frame-scoped IPC + sender-frame URL validation on the four public `screenshot:*` handlers; the renderer hook + UI gate are `isScreenshotSupported` (was `isMacOS` pre-PR). UAT verified on Windows host 2026-06-04 (screen / window / area / camera all captured). Phase 5 (#166) remains narrowed to NSIS UX only — auto-updater and Windows signing both shipped via #174 in v0.9.5. Phase 6 (#167) work continues on `feature/windows-phase-6-*` branches off `develop`.
 
-**Phase issue state (canonical, refreshed 2026-06-03):**
+**Phase issue state (pre-migration snapshot, last refreshed 2026-06-05):**
+
+The *phase* states below are canonical. The *issue* numbers are provenance only — verified
+2026-08-07 that none of #164–#177 exist on the public `qodeca/erfana` repository (its issue
+numbering restarts at #1 and currently tops out at #42), so the OPEN/CLOSED column records
+the state in the private pre-migration tracker, not something you can look up today.
 
 | Phase | Issue | State | Notes |
 |---|---|---|---|
-| 3 | [#164](https://github.com/qodeca/erfana/issues/164) | ✅ MERGED to `develop` ([PR #208](https://github.com/qodeca/erfana/pull/208), `9b2f91a`, 2026-06-03) | strategy + dispatcher, dedicated overlay preload + per-capture nonce, in-app `WindowPickerDialog`, keyboard area-select; UAT passed on Windows 2026-06-04; pending first tagged release |
+| 3 | [#164](https://github.com/qodeca/erfana/issues/164) | ✅ Shipped in [v0.12.0](https://github.com/qodeca/erfana/releases/tag/v0.12.0) ([PR #208](https://github.com/qodeca/erfana/pull/208), `9b2f91a`, merged 2026-06-03, tagged 2026-06-04) | strategy + dispatcher, dedicated overlay preload + per-capture nonce, in-app `WindowPickerDialog`, keyboard area-select; UAT passed on Windows 2026-06-04 |
 | 4 | [#165](https://github.com/qodeca/erfana/issues/165) | Shipped v0.9.4 (`110f1b9`) | Issue closure pending in alignment pass |
 | 5 | [#166](https://github.com/qodeca/erfana/issues/166) | OPEN, narrowed to NSIS UX only | Auto-updater + signing landed via #174 in v0.9.5 |
 | 6 | [#167](https://github.com/qodeca/erfana/issues/167) | OPEN, partially shipped in v0.13.0 | Items 1/4/7 + D5/D7 + platform-detection bridge + PII log redaction shipped in v0.13.0 (tag 2026-06-05); items 2/3 verified (no code change); D4 promoted to own ticket (#220); items 5/6 + parity items (#221–224) remain. `#158` reference dropped (#158 closed 2026-04-22); D6 owned by Phase 5 not Phase 6 |
@@ -46,15 +53,15 @@ Since v0.9.4 the project shipped five non-Windows-phase releases before Phase 3 
 | `1f0ae81` | Portable `test:cov` + `prebuild` scripts, prerequisites doc | #153 |
 | `d7d291d / 0888d0c` | Windows enablement roadmap docs | — |
 
-**Versions shipped:** `0.9.3` (Phases 0–2), `0.9.4` (Phase 4 local Whisper), `0.12.0` (Phase 3 screenshots + chokidar v3 pin). Current `develop` head is `333c1b6` (v0.12.0, in sync with `main`). Future Windows phase work ships per the `feature/windows-phase-<N>-*` branch convention.
+**Versions shipped:** `0.9.3` (Phases 0–2), `0.9.4` (Phase 4 local Whisper), `0.12.0` (Phase 3 screenshots + chokidar v3 pin), `0.13.0` (Phase 6 partial), `0.16.3` (Windows Claude-status bar, first public OSS release). `develop` currently carries version `0.16.3`; `main` lags `develop` and is not in sync with it. (No head SHA is pinned here on purpose — it goes stale the moment anything lands. Read it with `git rev-parse --short origin/develop`.) Future Windows phase work ships per the `feature/windows-phase-<N>-*` branch convention.
 
 **Closed 2026-04-20:** #153 (Phase 0), #156 (setJumpList), #157 (test portability), #159 (CameraDialog timer).
-**Closed 2026-04-21:** #160 (git allowlist), #161 (filename guard), #162 (LibreOffice detection). **#163 (long-path activation): decision-deferred to Phase 6** with promotion criteria recorded inline at `PlatformConfig.ts:194-201` (comment block above `isWindowsLongPath` at `:203`).
+**Closed 2026-04-21:** #160 (git allowlist), #161 (filename guard), #162 (LibreOffice detection). **#163 (long-path activation): decision-deferred to Phase 6** with promotion criteria recorded inline at `PlatformConfig.ts:188` (comment block above `isWindowsLongPath` at `:205`).
 **Closed 2026-04-22:** #158 (v8 coverage race — closed without code change; verify before relying on this row).
 **Closed 2026-04-23:** #172 (Windows test-flake remediation pool), #173 (ThrottledWorker offset-deque refactor).
 **Closed 2026-04-25:** #174 (multi-platform signed release pipeline shipped in v0.9.5).
 
-**Historical verification snapshots** (preserved for the audit trail; current test count is ~8,135 across 262 files — see [`../ci.md`](../ci.md)):
+**Historical verification snapshots** (preserved for the audit trail; the baseline drifts per release — see [`../testing/README.md`](../testing/README.md) for the current count, 8,768 tests across 299 files as of v0.16.3):
 
 Windows host (Phase-2 UAT, 2026-04-21):
 - `npm run test:main` → 241 files / 7437 tests / 89 skipped / 0 failures
@@ -67,24 +74,29 @@ macOS host (Phase 0 AC #4, 2026-04-20):
 
 ## Next session — start Phase 5 (NSIS UX)
 
-**Phase 3 (screenshot parity) merged to `develop` on 2026-06-03 via [PR #208](https://github.com/qodeca/erfana/pull/208) (merge `9b2f91a`)** — UAT verified on Windows host 2026-06-04. **Phase 4 (local Whisper) merged to `develop` on 2026-04-23 ahead of Phase 3** — the order was driven by [#165](https://github.com/qodeca/erfana/issues/165) scope becoming urgent once step-zero verification surfaced the ggml-org macOS gap. Windows work now resumes on **Phase 5 (NSIS UX, [#166](https://github.com/qodeca/erfana/issues/166))** — the next unstarted phase since auto-updater + Windows signing already shipped via #174 in v0.9.5.
+**Phase 3 (screenshot parity) shipped in [v0.12.0](https://github.com/qodeca/erfana/releases/tag/v0.12.0)** (merged to `develop` 2026-06-03 via [PR #208](https://github.com/qodeca/erfana/pull/208), merge `9b2f91a`; tagged 2026-06-04) — UAT verified on a Windows host 2026-06-04. **Phase 4 (local Whisper) merged to `develop` on 2026-04-23 ahead of Phase 3** — the order was driven by [#165](https://github.com/qodeca/erfana/issues/165) scope becoming urgent once step-zero verification surfaced the ggml-org macOS gap. Every phase that has been started is therefore released; Windows work resumes on **Phase 5 (NSIS UX, [#166](https://github.com/qodeca/erfana/issues/166))** — the next unstarted phase, since auto-updater and Windows signing already shipped via #174 in v0.9.5.
 
-### Open Windows-tagged issues (refreshed 2026-06-04)
+### Open Windows work items (issue numbers are pre-migration provenance)
 
-- [#164](https://github.com/qodeca/erfana/issues/164) — Phase 3: screenshot parity (✅ merged via [PR #208](https://github.com/qodeca/erfana/pull/208), closure queued for the next release tag)
+Verified 2026-08-07 against the public repository: **none of the issue numbers below exist there.**
+`qodeca/erfana` renumbered from #1 at the 2026-06 open-source migration and currently tops out at
+#42, so #166/#167/#168/#177 resolve to nothing — they name the item, they do not track it. The
+work itself is still open, and nothing has been re-filed on the public tracker yet. Run
+`gh issue list --repo qodeca/erfana --label windows --state open` for what is actually tracked today.
+
 - [#166](https://github.com/qodeca/erfana/issues/166) — Phase 5: NSIS UX only (next up; auto-updater + Windows signing shipped via #174 in v0.9.5)
-- [#167](https://github.com/qodeca/erfana/issues/167) — Phase 6: polish, Windows CI guard, visual baselines (#158 reference dropped; D6 owned by Phase 5)
+- [#167](https://github.com/qodeca/erfana/issues/167) — Phase 6: polish, Windows CI guard, visual baselines (#158 reference dropped; D6 owned by Phase 5). Partially shipped in v0.13.0 — items 5 and 6 are what remain
 - [#168](https://github.com/qodeca/erfana/issues/168) — D1–D8 deferred items meta (D1 amended out; D2/D3 re-evaluate after Phase 4 closed without trigger)
 - [#177](https://github.com/qodeca/erfana/issues/177) — SmartScreen reputation tracking (closes at v0.9.9 or "clean" status)
 
-Already closed (no longer in the open list): #158 (closed 2026-04-22), #163 (deferred-decision, closed 2026-04-21).
-Closure queued in the 2026-06-03 alignment pass: #165 (Phase 4 shipped v0.9.4 — closure posts the trust-chain summary as a comment), #169 (Dependabot — `npm audit` re-run before closing to confirm clean per CHANGELOG v0.11.2; falls back to body-trim if not).
+Already closed before the migration (never in the open list): #158 (closed 2026-04-22), #163 (deferred-decision, closed 2026-04-21).
+Closure queued in the 2026-06-03 alignment pass: #164 (Phase 3 shipped v0.12.0), #165 (Phase 4 shipped v0.9.4 — closure posts the trust-chain summary as a comment), #169 (Dependabot — `npm audit` re-run before closing to confirm clean per CHANGELOG v0.11.2; falls back to body-trim if not). None of these issues survived the 2026-06 repository migration, so the closures were never posted.
 
 ---
 
 ## Feature status on Windows today
 
-Honest per-feature assessment of what an end user running an NSIS install of v0.9.3 gets today. Phases 3–6 are tracked but not yet implemented.
+Honest per-feature assessment of what an end user running an NSIS install of v0.16.3 gets today. Phases 0–4 are shipped; Phase 5 is narrowed to NSIS UX and Phase 6 is partially shipped.
 
 ### ✅ Working
 
@@ -104,29 +116,32 @@ Honest per-feature assessment of what an end user running an NSIS install of v0.
 | **Git status in project tree** (#160) | Auto-discovers `git.exe` at Program Files / Chocolatey / Scoop with `--version` liveness probe |
 | **Reserved filename rejection** (#161) | `CON.md`, `PRN.md`, etc. produce friendly toast `"…" is not a valid filename — try "_…"` instead of cryptic EINVAL. Bidi-override stripping defends against Trojan-Source RTL attacks |
 | **DOCX import via LibreOffice** (#162) | DependencyDetector probes `C:\Program Files\LibreOffice\program\soffice.exe` (+ x86) with `--version` liveness when not on PATH |
+| **Screenshot capture** (screen / window / area) (#164) | Phase 3, shipped v0.12.0. `ScreenshotService` dispatches to `DesktopCapturerScreenshotCapturer` on win32 (Electron `desktopCapturer` + per-display area-select overlay + in-app `WindowPickerDialog`) |
+| **Local Whisper transcription** (offline, model download) (#165) | Phase 4, shipped v0.9.4. `classifyPlatform()` accepts `win32-x64`; self-hosted signed binaries with the 4-layer trust chain. Windows ARM64 and pre-SSE4.2 CPUs are still rejected by design |
+| **Signed NSIS installer** (#174) | Shipped v0.9.5. Azure Artifact Signing via X.509 certificate auth; SmartScreen reputation ramp tracked in [#177](https://github.com/qodeca/erfana/issues/177) |
 
-### ❌ Broken / non-functional on Windows
+### ❌ Not available on Windows
+
+Three of the four rows that used to sit here have shipped and moved to the ✅ table above: **screenshot capture** (Phase 3, v0.12.0 — `ScreenshotService` dispatches to `DesktopCapturerScreenshotCapturer` on win32), **local Whisper transcription** (Phase 4, v0.9.4 — `classifyPlatform()` in `whisper-assets.ts` accepts `win32-x64`; the `WhisperModelManager.getArchSuffix()` throw described here no longer exists anywhere in `src/`), and **signed installs** (#174, v0.9.5 — Azure Artifact Signing).
 
 | Feature | Why | Tracked |
 |---|---|---|
-| **Screenshot capture** (screen / window / area) | Was: `ScreenshotService.ts` threw on non-darwin. Fixed on `feature/windows-phase-3-screenshots`: dispatcher selects `DesktopCapturerScreenshotCapturer` on Windows | Phase 3 |
-| **Local Whisper transcription** (offline, model download) | `WhisperModelManager.getArchSuffix()` throws on non-darwin | Phase 4 |
-| **Auto-updater** | Publish URL is literally `https://example.com/auto-updates` | Phase 5 |
-| **SmartScreen-free install** | No code signing cert → SmartScreen "unrecognized app" warning | Phase 5 |
+| **Auto-updater** | Not broken — **deliberately absent on both platforms.** `electron-builder.yml` sets `publish: null`; in-app auto-update is an explicit non-goal of [#174](https://github.com/qodeca/erfana/issues/174), recorded as an architectural decision in [`gap-analysis.md`](gap-analysis.md) row B6. Users update by downloading the next release. | Closed by decision, not by code |
+| **SmartScreen reputation** | Installers *are* signed (Azure Artifact Signing, v0.9.5+), but a new certificate accumulates SmartScreen reputation over time; early downloads may still see an "unrecognized app" prompt | [#177](https://github.com/qodeca/erfana/issues/177) |
 
 ### ⚠️ Degraded / works only under specific conditions
 
 | Feature | Condition | Tracked |
 |---|---|---|
 | **Long paths (>260 chars)** | Works only if user enabled Win32 long-paths GP setting + `git config --global core.longpaths true`. `isWindowsLongPath` helper kept in source with promotion criteria | [#163](https://github.com/qodeca/erfana/issues/163) (deferred to Phase 6) |
-| **Camera photo capture** | WebRTC is cross-platform, *should* work, but unverified on Windows | Phase 6 |
-| **Stale project-lock recovery** | Force-kill + restart: untested on Windows, may leave stale lock | Phase 6 |
+| ~~**Camera photo capture**~~ | ✅ Verified working on a Windows host — Phase 6 item 2 (2026-06-05, pure WebRTC + `os.tmpdir()`, no code change) and again during the Phase 3 UAT on 2026-06-04 | Resolved |
+| ~~**Stale project-lock recovery**~~ | ✅ Verified Phase 6 item 3 (2026-06-05) and hardened in v0.15.0 — HMAC-signed lock files, 30 s heartbeat reclaim of stale locks, symlinked lock paths refused, Windows `isProcessRunning` fails closed | Resolved |
 | **Packaged OCR** (tessdata resolution in NSIS install) | Unverified in packaged build vs. dev | Phase 6 |
 | **`test:cov` clean exit on Windows** | Tests pass; vitest v8 coverage aggregator hits ENOENT race on NTFS | [#158](https://github.com/qodeca/erfana/issues/158) closed 2026-04-22 without code change — verify before relying |
-| **Duplicate-instance focus attention** | macOS bounces dock via `app.dock?.bounce`; Windows steals focus via `setAlwaysOnTop` without taskbar flash | Phase 6 polish (untracked GH issue) — `focusWindow.ts:41-58` should call `BrowserWindow.flashFrame(true)` |
-| **Recent projects in jumplist / dock menu** | Not wired; `app.addRecentDocument` never called on project open. Both OSes silently miss recent projects | Phase 6 polish (untracked GH issue) — `main/index.ts:293-308` |
-| **Windows menubar About / Help entry** | macOS app menu has About via `role: 'about'`; Windows menubar has File/Edit/View/Window only; users cannot see app version in-product | Phase 6 polish (untracked GH issue) — `menu.ts:21-94` |
-| **File deletion** | Both platforms permanently delete via `fs.rm`; no Trash / Recycle Bin via `shell.trashItem` | Phase 6 polish (untracked GH issue) — `FileService.ts:316-349` |
+| **Duplicate-instance focus attention** | macOS bounces dock via `app.dock?.bounce`; Windows steals focus via `setAlwaysOnTop` without taskbar flash | Phase 6 polish (untracked GH issue) — `focusWindow.ts:43-63` should call `BrowserWindow.flashFrame(true)` |
+| **Recent projects in jumplist / dock menu** | Not wired; `app.addRecentDocument` never called on project open. Both OSes silently miss recent projects | Phase 6 polish (untracked GH issue) — `main/index.ts:303-334` |
+| **Windows menubar About / Help entry** | macOS app menu has About via `role: 'about'`; Windows menubar has File/Edit/View/Window only; users cannot see app version in-product | Phase 6 polish (untracked GH issue) — `menu.ts:21-97` |
+| **File deletion** | Both platforms permanently delete via `fs.rm`; no Trash / Recycle Bin via `shell.trashItem` | Phase 6 polish (untracked GH issue) — `FileService.ts:318-352` |
 
 ---
 
@@ -138,8 +153,8 @@ Honest per-feature assessment of what an end user running an NSIS install of v0.
 
 ### Acceptance criteria status
 
-| AC | Status | Notes |
-|---|---|---|
+| AC | Status / notes |
+|---|---|
 | #1 `npm run test:cov` completes on Windows | ⚠️ Tests pass (238 files / 7405 tests / 0 failures); coverage aggregator hits v8 race → [#158](https://github.com/qodeca/erfana/issues/158) |
 | #2 `npm run build:win` produces NSIS installer | ✅ Met (Developer Mode required; documented) |
 | #3 `docs/build/windows.md` exists, linked, includes contributor guidance | ✅ Met |
@@ -184,7 +199,7 @@ Honest per-feature assessment of what an end user running an NSIS install of v0.
 
 1. **cmd.exe bootstrap** (fixes B3) — `TerminalService.ts` win32 branch
    - Spawns with `['/D', '/K', '@echo off && cd /d "<cwd>" && cd && echo <marker>']`. `/D` disables AutoRun; `/K` keeps cmd.exe interactive. **`@echo off` is critical**: without it, cmd.exe echoes the bootstrap commands back into the PTY and `markerDetector` mis-parses the echoed `echo <marker>` line as the cwd.
-   - Bare `cd` (no args) prints the working directory — the cmd.exe analog of `pwd`. The marker triggers the same handshake at `TerminalService.ts:245-285`.
+   - Bare `cd` (no args) prints the working directory — the cmd.exe analog of `pwd`. The marker triggers the same handshake at `TerminalService.ts:292-332`.
 2. **PowerShell `-LiteralPath`** (fixes M4) — `TerminalService.ts` PS branch
    - `Set-Location -LiteralPath '<single-quote-doubled cwd>'`. `-LiteralPath` disables wildcard and variable expansion; single quotes disable `$` interpolation. Marker is also single-quoted defensively (`Write-Output '<marker>'`).
    - Shell-kind detection regex: `/(?:^|[/\\])(pwsh(?:-preview)?|powershell)(?:\.exe)?$/i` — covers forward-slash Git Bash paths and `pwsh-preview.exe`.
@@ -213,7 +228,7 @@ Honest per-feature assessment of what an end user running an NSIS install of v0.
 
 ### Execution order (as shipped)
 
-1. **[#160](https://github.com/qodeca/erfana/issues/160) — Git allowlist** (P1, smallest) — `workers/git-status.worker.ts:25`
+1. **[#160](https://github.com/qodeca/erfana/issues/160) — Git allowlist** (P1, smallest) — `workers/git-status.worker.ts:28`
    - Added Windows entries: `C:\Program Files\Git\cmd\git.exe`, `…\bin\git.exe`, `C:\Program Files (x86)\Git\…`, `C:\ProgramData\chocolatey\bin\git.exe`, Scoop user-profile path (USERPROFILE-validated).
    - Replaced `fs.access(X_OK)` with `F_OK` + `git --version` liveness probe on Windows (X_OK is existence-only on Windows per Node docs).
    - **Landed:** `5e86349` (8 new tests in `git-resolver.test.ts`).
@@ -226,8 +241,8 @@ Honest per-feature assessment of what an end user running an NSIS install of v0.
    - On `win32` after the `soffice` PATH probe, probes `C:\Program Files\LibreOffice\program\soffice.exe` and the (x86) variant via `tryCommand(--version)` liveness (mirrors #160's pattern; security review HIGH-severity finding addressed).
    - Optional registry probe (`reg query HKLM\SOFTWARE\LibreOffice\UNO\InstallPath`) deferred unless filesystem probe proves insufficient.
    - **Landed:** `13bd3b8` (5 new DependencyDetector tests).
-4. **[#163](https://github.com/qodeca/erfana/issues/163) — `isWindowsLongPath`** (P2, decision-deferred) — `PlatformConfig.ts:203`
-   - Decision recorded inline at `PlatformConfig.ts:194-201` (comment block) with promotion criteria: re-activate as P1 if any real >260-char path victim surfaces in UAT, OR any Phase 3+ feature produces >200-char default paths.
+4. **[#163](https://github.com/qodeca/erfana/issues/163) — `isWindowsLongPath`** (P2, decision-deferred) — `PlatformConfig.ts:205`
+   - Decision recorded inline at `PlatformConfig.ts:188` (comment block) with promotion criteria: re-activate as P1 if any real >260-char path victim surfaces in UAT, OR any Phase 3+ feature produces >200-char default paths.
    - **Decision deferred to Phase 6** (`a2b5bd0`); helper kept in source (deletion would be worse churn).
 
 ### Post-Phase-2 review
@@ -243,15 +258,15 @@ Four parallel reviewers (architecture, solution, code, security) audited #160-#1
 
 ### Status
 
-All four sub-issues + umbrella closed 2026-04-21. Phase 2 **shipped in v0.9.3** on 2026-04-22 (merge `c1e085d`, release `0b593a1`). Phase 3 (screenshots, [#164](https://github.com/qodeca/erfana/issues/164)) **merged to `develop` on 2026-06-03 via [PR #208](https://github.com/qodeca/erfana/pull/208) (`9b2f91a`)** — pending first tagged release. Next phase up: Phase 5 (NSIS UX, [#166](https://github.com/qodeca/erfana/issues/166)).
+All four sub-issues + umbrella closed 2026-04-21. Phase 2 **shipped in v0.9.3** on 2026-04-22 (merge `c1e085d`, release `0b593a1`). Phase 3 (screenshots, [#164](https://github.com/qodeca/erfana/issues/164)) **shipped in [v0.12.0](https://github.com/qodeca/erfana/releases/tag/v0.12.0)** (merged to `develop` 2026-06-03 via [PR #208](https://github.com/qodeca/erfana/pull/208), `9b2f91a`; tagged 2026-06-04). Next phase up: Phase 5 (NSIS UX, [#166](https://github.com/qodeca/erfana/issues/166)).
 
 ---
 
-## Phase 3 — Screenshot parity — ✅ MERGED to `develop` on 2026-06-03 (`9b2f91a`) via [PR #208](https://github.com/qodeca/erfana/pull/208)
+## Phase 3 — Screenshot parity — ✅ Shipped in [v0.12.0](https://github.com/qodeca/erfana/releases/tag/v0.12.0) (tag 2026-06-04)
 
 **Why:** Feature parity with the macOS modes (full screen, window, area) on Windows.
 
-**What shipped (merged to `develop` 2026-06-03, `9b2f91a`):**
+**What shipped in v0.12.0** (merged to `develop` 2026-06-03, `9b2f91a`, via [PR #208](https://github.com/qodeca/erfana/pull/208); tagged 2026-06-04)**:**
 
 1. **Strategy + dispatcher** — `ScreenshotService` is a thin factory + dispatcher that picks `MacScreenshotCapturer` (existing `/usr/sbin/screencapture` flow) on darwin or `DesktopCapturerScreenshotCapturer` (Electron `desktopCapturer.getSources` + `nativeImage`) on win32; everything else returns `SCREENSHOT_NOT_SUPPORTED`. Capabilities live on each capturer (`getCapabilities()`); the service owns truncation + the `availability` discriminator. `createScreenshotService(capturer?)` factory enables test injection without `process.platform` shims.
 2. **Per-display area-select overlay** (`src/main/services/screenshot/ScreenshotOverlayWindow.ts`) — frameless transparent always-on-top BrowserWindow per display, owned via constructor injection. `Promise.allSettled` + per-overlay 5 s `did-finish-load` watchdog so a slow display does not block the round. `setFullScreen` is intentionally not called on Windows (kept transparent via `screen-saver` always-on-top level).
@@ -261,7 +276,7 @@ All four sub-issues + umbrella closed 2026-04-21. Phase 2 **shipped in v0.9.3** 
 6. **Schema split + tightening** — `ScreenshotCaptureRequestSchema` is a `.strict()` discriminated union on four modes: `'screen'`, `'window'` (Windows; `windowId: string` required), `'window-native'` (macOS native picker), `'area'`. `EnumerateWindowsResponseSchema` is a discriminated union on `availability` (`sources: z.tuple([])` for non-enumerable variants); `thumbnailDataUrl` is bounded to 600 KB and refined to `data:image/`.
 7. **shellKind plumbing** — `terminal:create` returns `{ terminalId, shellKind }`; the screenshot path-paste reads it from a `shellKindRef` and routes through `escapePathForShell(path, shellKind)` so PowerShell paths quote with `'...''` (doubled single quotes), cmd uses `"..."`, Git Bash / POSIX uses `'...'` with `'\''` escape.
 
-**Verification (2026-06-04):** all three modes (screen / window / area) captured successfully on a Windows host; camera capture also exercised; clean app quit. Path quoting verified in cmd. macOS regression check pending on a darwin host (see PR description test plan).
+**Verification (2026-06-04):** all three modes (screen / window / area) captured successfully on a Windows host; camera capture also exercised; clean app quit. Path quoting verified in cmd. The darwin-host regression check named in the PR test plan was never recorded as executed; it is closed as superseded rather than passed — `MacScreenshotCapturer` carries the pre-#164 `screencapture` flow unchanged, and it has shipped in every macOS build from v0.12.0 through v0.16.3 (five subsequent releases) with no reported regression.
 
 **Out-of-scope follow-ups (FT-1..FT-7):** broader `webPreferences` hardening on the main window; cross-package `ErrorCode` / Zod enum sync pattern; E2E screenshot coverage once `e2e.yml` is re-enabled; overlay-only design-token entry; `validateTerminalOwner` audit across all terminal IPC handlers; configurable `WINDOW_PICKER.MAX_SOURCES`. None are blocking; tracked in the PR thread for the follow-up backlog.
 
@@ -285,7 +300,7 @@ All four sub-issues + umbrella closed 2026-04-21. Phase 2 **shipped in v0.9.3** 
 **Option A — self-host signed binaries via dedicated CI workflow.** Rejected Option B (pin ggml-org releases) because of the macOS gap. All Phase 4 work lives across two commit streams:
 
 **Branch A (`chore/whisper-binaries-ci`)** — CI infrastructure:
-- `.github/workflows/whisper-binaries.yml` — 3-job workflow (build-macos, build-windows, publish-release) gated on `production-signing` GitHub Environment.
+- `.github/workflows/whisper-binaries.yml` — 4-job workflow (`validate-inputs` on ubuntu-latest, `build-macos` on macos-14, `build-windows` on windows-latest, `publish-release` on ubuntu-latest) gated on the `production-signing` GitHub Environment.
 - `docs/build/whisper-binaries.md` — ops runbook with diff-review checklist + cert-revocation procedures.
 - First release published as pre-release tag `whisper-build-v1.8.4-erfana1` with minisign-signed `manifest.json`, SHAs recorded in `docs/windows/phase4-binary-spec.md`.
 
@@ -354,13 +369,13 @@ Phase 4's ~55 new tests span 8 files. Table below is the authoritative coverage 
 
 ## Phase 6 — Polish & DX
 
-**Tracking:** [#167](https://github.com/qodeca/erfana/issues/167) — in progress on `feature/windows-phase-6-polish` (status as of 2026-06-05 below). Unreleased.
+**Tracking:** [#167](https://github.com/qodeca/erfana/issues/167) — **partially shipped in [v0.13.0](https://github.com/qodeca/erfana/releases/tag/v0.13.0)** (tag 2026-06-05): items 1, 4 and 7, plus the renderer platform-detection bridge, PII log redaction and D5/D7. Items 5 and 6 remain unreleased; item 3's `ProjectLockService` scope was closed later, in v0.15.0. Per-item status as of the v0.13.0 cut is below.
 
 Changes:
 
 1. ✅ **Migrate renderer platform detection** (fixes m1) — **done 2026-06-05.** All 6 sites (5 `navigator.platform` + `filePathLinks.logic.ts` `process.platform`) migrated to `window.api.utils.getPlatform()` via a new `src/renderer/src/utils/platform.ts` (`isMacOS` / `isWindows`). `filePathLinks.logic.ts` `isWindows()` was reading `process.platform` in the sandboxed renderer where it is `undefined` (dead / always-false) — now fixed via the bridge.
 2. ✅ **Verify `CameraService`** (fixes M9) — **verified working on Windows as-is 2026-06-05**, no code change: pure WebRTC + `os.tmpdir()` + `path.join`.
-3. ✅ **Verify `ProjectLockService`** (fixes M10) — **verified working on Windows as-is 2026-06-05**, no code change. Empirical test on Win11 / Node 24 confirmed `process.kill(pid, 0)` throws `ESRCH` for dead PIDs (disproving a prior no-op claim), so `isProcessAlive()` / stale-lock recovery work correctly. No PID-liveness fallback needed.
+3. ✅ **Verify `ProjectLockService`** (fixes M10) — **verified working on Windows as-is 2026-06-05**, no code change *at the time*. The empirical test on Win11 / Node 24 confirmed `process.kill(pid, 0)` throws `ESRCH` for dead PIDs (disproving a prior no-op claim), so `isProcessAlive()` / stale-lock recovery behaved correctly for the dead-PID case. **v0.15.0 superseded the "no code change needed" conclusion**: `isProcessRunning` now fails closed on *unknown* errors instead of assuming the process is dead — the 2026-06-05 check covered `ESRCH` only, not the ambiguous-error path — alongside HMAC-signed lock files, a 30 s heartbeat reclaim of stale locks and refusal of symlinked lock paths.
 4. ✅ **Write Windows section in `docs/known-issues.md`** (fixes m3) — **done 2026-06-05** (OneDrive / AV EPERM-storm subsection added; SmartScreen + long-path opt-in already present).
    - ✅ 2026-04-23: Windows test-flake remediation pool landed (#172). Fixes ThrottledWorker O(n²) eviction, FileService.copyItem 1000-conflict, directory-watcher e2e budget, SettingsOverlay focus race. See [`known-flakes.md`](known-flakes.md) for the register + follow-up audit candidates.
 5. ⏳ **Verify Tesseract `tessdata` path** on packaged Windows build (fixes m4) — **not done** (requires a packaged NSIS build to verify).
@@ -406,7 +421,7 @@ Erfana development happens across two hosts (Windows 11 + macOS). Each session w
 
 2. **On Windows: ensure Developer Mode is on** (for `build:win` NSIS step) and long-paths are enabled (for deep `node_modules`). Both documented in `docs/build/windows.md` steps 4–5.
 
-3. **Check open Windows issues:** `gh issue list --repo qodeca/erfana --label windows --state open`.
+3. **Check open Windows issues:** `gh issue list --repo qodeca/erfana --label windows --state open`. The `windows` label exists on the public repository (verified 2026-08-07 via `gh label list`) and is the session-start filter used across this folder.
 
 4. **Read `implementation-plan.md`** (this file) for current status snapshot — it's the canonical source.
 
@@ -457,7 +472,7 @@ All items below were satisfied before the `windows` → `develop` merge (`c1e085
 - `src/main/services/WindowsTerminalBootstrap.ts` — Phase 1 (landed; new strategy file)
 - `src/main/services/ScreenshotService.ts` — Phase 3 (full rewrite, strategy pattern)
 - `src/main/services/WhisperModelManager.ts` — Phase 4 (cross-platform arch, binary layout)
-- `src/main/services/whisper-assets.ts` — Phase 4 landed; canonical `classifyPlatform()` + per-platform `reason` strings live here. Edit when changing the cross-platform Whisper support matrix; `SettingsOverlay.tsx:80-84` mirrors this logic by comment (kept in lockstep manually).
+- `src/main/services/whisper-assets.ts` — Phase 4 landed; canonical `classifyPlatform()` + per-platform `reason` strings live here. Edit when changing the cross-platform Whisper support matrix; `SettingsOverlay.tsx:81-86` mirrors this logic by comment (kept in lockstep manually).
 - `src/main/services/import/DependencyDetector.ts` — Phase 2 (#162 LibreOffice Windows paths)
 - `src/main/services/workers/git-status.worker.ts` — Phase 2 (#160 git allowlist)
 - `src/main/services/watcher/PlatformConfig.ts` — Phase 2 (#163 wire up `isWindowsLongPath`)
@@ -474,26 +489,26 @@ All items below were satisfied before the `windows` → `develop` merge (`c1e085
 
 ## Existing utilities to reuse
 
-- `window.api.getPlatform()` preload bridge (`preload/index.ts:963`) — already exists; consolidate renderer usage on it
-- `PlatformConfig.isWindowsLongPath()` (`PlatformConfig.ts:203`) — exists as dead code, activate it in #163
-- `ProjectService.ts:59-63` — case-insensitive path comparison pattern; reuse in any new path equality check
-- `file-handlers.ts:464` — Windows system-path blocklist pattern; reuse shape for reserved-name guard in #161
+- `window.api.utils.getPlatform()` preload bridge (`preload/index.ts:1080`) — already exists; renderer usage is consolidated on it via `src/renderer/src/utils/platform.ts`
+- `PlatformConfig.isWindowsLongPath()` (`PlatformConfig.ts:205`) — exists as dead code, activate it in #163
+- `ProjectService.ts:61-63` — case-insensitive path comparison pattern; reuse in any new path equality check
+- `file-handlers.ts:555-557` — Windows system-path blocklist pattern; reuse shape for reserved-name guard in #161
 - `AppError` + `ErrorCode` — all new errors go through this
 - `execFile` (not `exec`) — existing pattern throughout; maintain for injection safety
 - `ffmpeg-static` / `ffprobe-static` — already cross-platform, no changes
-- Existing `markerDetector` handshake in `TerminalService.ts:245-285` — reused by the cmd.exe bootstrap (Phase 1 landed)
+- Existing `markerDetector` handshake in `TerminalService.ts:292-332` — reused by the cmd.exe bootstrap (Phase 1 landed)
 - `WindowsBootstrapBuilder` strategy (`WindowsTerminalBootstrap.ts`) — Phase 1 landed; Git Bash builder added during Phase-2 UAT hardening; **add new builder for WSL (`wsl.exe`) in Phase 6**, don't re-branch
 
 ## Intentional platform-divergent sites (not gaps — recognized divergences)
 
 These are platform-specific by design. They live with no parity-matrix entry because they cannot or should not converge to a single implementation. Listed so a future contributor recognizes them as deliberate rather than missing.
 
-- `src/main/index.ts:279` — macOS dock menu (`app.dock.setMenu`). Windows has no equivalent (jumplist serves the same purpose; see next entry).
-- `src/main/index.ts:292` — Windows jumplist (`app.setJumpList`). macOS uses dock menu instead.
-- `src/main/utils/focusWindow.ts:41-58` — three-way focus strategy. macOS calls `app.dock?.bounce`; Windows uses the `setAlwaysOnTop` trick; Linux falls back to plain `focus()`. **Forward-looking gap:** Windows should also call `BrowserWindow.flashFrame(true)` (tracked in §"Degraded" below).
-- `src/main/utils/spawnNewInstance.ts:82,112` — three-way spawn strategy for new instances.
-- `src/main/menu.ts:21-94` — macOS app menu (`role: 'about'`, Hide/HideOthers/Unhide); Windows menubar has File/Edit/View/Window only. **Forward-looking gap:** Windows menubar should expose About/Help (tracked in §"Degraded" below).
-- `src/main/services/LocalWhisperService.ts:831-843` — POSIX vs Win32 CPU-unsupported exit-code sets. POSIX set is macOS-only by accident-of-support (Linux is rejected upstream at `whisper-assets.ts:199`); any Linux enablement must validate the set against Linux SIGILL exit codes.
+- `src/main/index.ts:313` — macOS dock menu (`app.dock.setMenu`). Windows has no equivalent (jumplist serves the same purpose; see next entry).
+- `src/main/index.ts:318` — Windows jumplist (`app.setJumpList`). macOS uses dock menu instead.
+- `src/main/utils/focusWindow.ts:43-63` — three-way focus strategy. macOS calls `app.dock?.bounce`; Windows uses the `setAlwaysOnTop` trick; Linux falls back to plain `focus()`. **Forward-looking gap:** Windows should also call `BrowserWindow.flashFrame(true)` (tracked in §"Degraded" below).
+- `src/main/utils/spawnNewInstance.ts:84,114` — three-way spawn strategy for new instances (`darwin` branch at `:84`, `win32` at `:114`).
+- `src/main/menu.ts:21-97` — macOS app menu (`role: 'about'`, Hide/HideOthers/Unhide); Windows menubar has File/Edit/View/Window only. **Forward-looking gap:** Windows menubar should expose About/Help (tracked in §"Degraded" below).
+- `src/main/services/LocalWhisperService.ts:835-838` — POSIX vs Win32 CPU-unsupported exit-code sets. POSIX set is macOS-only by accident-of-support (Linux is rejected upstream at `whisper-assets.ts:199-202`); any Linux enablement must validate the set against Linux SIGILL exit codes.
 
 ---
 
@@ -511,7 +526,7 @@ Target: clean Windows 11 VM, no prior Erfana install, no Python / VS Build Tools
 8. **Camera (Phase 6):** take a photo via webcam → path pastes.
 9. **Document import:** OCR an image → text extracted correctly, tessdata found.
 10. **Build (Phase 0 + 5):** `npm run build:win` → NSIS installer produced → install on a second Windows box → launches → all above features still work.
-11. **Auto-update (Phase 5):** app checks update URL on launch → does not fail on `example.com` anymore.
+11. **Auto-update (Phase 5):** nothing to verify — `electron-builder.yml` sets `publish: null` and in-app auto-update is an explicit non-goal (#174). Confirm the app makes no update request on launch.
 
 ## Open research item (before Phase 4)
 

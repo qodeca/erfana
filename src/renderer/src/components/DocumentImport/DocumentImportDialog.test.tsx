@@ -705,4 +705,46 @@ describe('DocumentImportDialog', () => {
       expect(closeDialogSpy).not.toHaveBeenCalled()
     })
   })
+
+  // ===========================================================================
+  // Focus trap -- delegated to BaseDialog's `trapFocus` (was a local copy of
+  // the algorithm in this file). These assert the behaviour survived the move.
+  // ===========================================================================
+
+  describe('Focus trap', () => {
+    it('cycles Tab from the last control back to the first', () => {
+      useDocumentImportStore.setState({ ...openFileState })
+      render(<DocumentImportDialog />)
+
+      screen.getByTestId(TEST_IDS.DOCUMENT_IMPORT_BTN_START).focus()
+      const notPrevented = fireEvent.keyDown(document, { key: 'Tab' })
+
+      expect(notPrevented).toBe(false)
+      expect(document.activeElement).toBe(screen.getByTestId(TEST_IDS.DOCUMENT_IMPORT_OCR_TOGGLE))
+    })
+
+    it('cycles Shift+Tab from the first control back to the last', () => {
+      useDocumentImportStore.setState({ ...openFileState })
+      render(<DocumentImportDialog />)
+
+      screen.getByTestId(TEST_IDS.DOCUMENT_IMPORT_OCR_TOGGLE).focus()
+      const notPrevented = fireEvent.keyDown(document, { key: 'Tab', shiftKey: true })
+
+      expect(notPrevented).toBe(false)
+      expect(document.activeElement).toBe(screen.getByTestId(TEST_IDS.DOCUMENT_IMPORT_BTN_START))
+    })
+
+    it('pulls focus back in when it has escaped to <body>', () => {
+      // New with the shared trap: a backdrop mousedown leaves focus on <body>,
+      // where the old first/last-only comparison ignored Tab entirely.
+      useDocumentImportStore.setState({ ...openFileState })
+      render(<DocumentImportDialog />)
+
+      expect(document.activeElement).toBe(document.body)
+      const notPrevented = fireEvent.keyDown(document, { key: 'Tab' })
+
+      expect(notPrevented).toBe(false)
+      expect(document.activeElement).toBe(screen.getByTestId(TEST_IDS.DOCUMENT_IMPORT_OCR_TOGGLE))
+    })
+  })
 })

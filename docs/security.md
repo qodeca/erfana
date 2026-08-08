@@ -11,7 +11,7 @@ Erfana follows **2025 Electron security best practices** with comprehensive hard
 | Context Isolation | ✅ Enabled | v0.1.0 |
 | Node Integration | ✅ Disabled | v0.1.0 |
 | Process Sandboxing | ✅ Enabled (default) | v0.6.0 |
-| Electron Fuses | ⚠️ 3 of 6 critical fuses | v0.6.0 |
+| Electron Fuses | ⚠️ 4 of 6 configured (2 need ASAR) | v0.6.0 |
 | ASAR Packaging | ❌ Disabled | v0.6.0 |
 | ASAR Integrity | ❌ N/A (requires ASAR) | N/A |
 | Cookie Encryption | ❌ Disabled | v0.6.0 |
@@ -20,7 +20,7 @@ Erfana follows **2025 Electron security best practices** with comprehensive hard
 **Notes**:
 - ASAR is currently disabled due to runtime dependency loading issues with isomorphic-git (2 fuses unavailable)
 - Cookie encryption disabled to avoid macOS keychain prompts (settings stored in plaintext)
-- 3 critical fuses remain active: RunAsNode, NodeOptions, NodeCliInspect
+- `scripts/fuses.js` sets 4 of the 6 fuses. Three of them harden the build — RunAsNode, NodeOptions and NodeCliInspect (the last one only in production builds; see below) — while the fourth, EnableCookieEncryption, is deliberately set to `false`
 - Test builds (`ERFANA_TEST_BUILD=true`) enable NodeCliInspect for Playwright E2E testing - see [Test Builds](#test-builds-erfana_test_build)
 
 ---
@@ -68,7 +68,7 @@ The `sandbox: false` pattern is **3+ year old outdated information**. Modern Ele
 
 ## Electron Fuses (2025 Critical Security)
 
-**Status**: ✅ 4 of 6 critical fuses configured (2 ASAR-dependent fuses unavailable)
+**Status**: ✅ 4 of 6 critical fuses configured (2 ASAR-dependent fuses unavailable); 3 of the 4 are hardening fuses
 
 Fuses are **compile-time feature toggles** that disable unused Electron features to prevent "Living Off The Land" (LOTL) attacks.
 
@@ -83,7 +83,7 @@ Attackers exploit legitimate Electron features (like `ELECTRON_RUN_AS_NODE`) to 
 | `RunAsNode` | `false` | Disables `ELECTRON_RUN_AS_NODE` env var (prevents arbitrary code execution) |
 | `EnableCookieEncryption` | `false` | Disabled to avoid keychain prompts (settings stored in plaintext) |
 | `EnableNodeOptionsEnvironmentVariable` | `false` | Disables `NODE_OPTIONS` env var (prevents command injection) |
-| `EnableNodeCliInspectArguments` | `false` | Disables `--inspect` CLI args (prevents remote debugging) |
+| `EnableNodeCliInspectArguments` | `isTestBuild` – `false` on every production build | Disables `--inspect` CLI args (prevents remote debugging). `true` only under `ERFANA_TEST_BUILD=true` — see [Test Builds](#test-builds-erfana_test_build) |
 | `EnableEmbeddedAsarIntegrityValidation` | ❌ N/A | Requires ASAR enabled (see ASAR Configuration below) |
 | `OnlyLoadAppFromAsar` | ❌ N/A | Requires ASAR enabled (see ASAR Configuration below) |
 
@@ -94,13 +94,16 @@ Attackers exploit legitimate Electron features (like `ELECTRON_RUN_AS_NODE`) to 
 ```javascript
 const { flipFuses, FuseVersion, FuseV1Options } = require('@electron/fuses');
 
+// Test builds enable the Node CLI inspector; production builds never do.
+const isTestBuild = process.env.ERFANA_TEST_BUILD === 'true';
+
 await flipFuses(electronBinaryPath, {
   version: FuseVersion.V1,
   resetAdHocDarwinSignature: context.electronPlatformName === 'darwin',
   [FuseV1Options.RunAsNode]: false,
   [FuseV1Options.EnableCookieEncryption]: false,  // Disabled to avoid keychain prompts
   [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,
-  [FuseV1Options.EnableNodeCliInspectArguments]: false,
+  [FuseV1Options.EnableNodeCliInspectArguments]: isTestBuild,  // false in production
   // NOTE: ASAR integrity validation disabled because asar: false
   // When ASAR is disabled, these fuses cannot be used:
   // - EnableEmbeddedAsarIntegrityValidation
@@ -113,7 +116,7 @@ await flipFuses(electronBinaryPath, {
 Build logs show fuses applied during `npm run build:mac`:
 
 ```
-🔒 Applying Electron fuses to: release/{version}/mac/Erfana.app
+🔒 Applying Electron fuses to: release/{version}/mac-arm64/Erfana.app
 ✅ Electron fuses applied successfully
    - RunAsNode: disabled
    - CookieEncryption: disabled (no keychain prompt)
@@ -231,7 +234,7 @@ With ASAR disabled:
 - ❌ Protection against post-installation code injection
 
 **Remaining Security**:
-- ✅ 3 critical fuses still active (RunAsNode, NodeOptions, NodeCliInspect)
+- ✅ 3 of the 4 configured fuses still harden the build (RunAsNode, NodeOptions, NodeCliInspect)
 - ✅ Process sandboxing enabled
 - ✅ Context isolation enabled
 - ✅ CSP enforced
@@ -424,7 +427,44 @@ See [`build/architectures.md`](./build/architectures.md) for the full rationale.
 
 ## IPC Security Checklist
 
-Shipped: contextBridge on all IPC, Zod input validation in all handlers, path-traversal prevention, TypeScript + Zod type safety, error messages sanitised at the IPC boundary. Pending: rate limiting; permission system for destructive operations.
+Shipped: contextBridge on all IPC; Zod input validation on every handler that accepts a payload (the payload-free `system:openScreenRecordingSettings` and `system:relaunchApp` have nothing to validate and rely on sender-frame gating instead – see below); path-traversal prevention; TypeScript + Zod type safety; error messages sanitised at the IPC boundary. Pending: rate limiting; permission system for destructive operations.
+
+---
+
+## Sender-frame gating
+
+Zod answers "is this payload well-formed?". It cannot answer "did this call come from our own window?". For channels that reach OS-level capabilities, the second question is the one that matters – and for the payload-free `system:*` channels it is the **only** guard, because there is no payload to validate.
+
+### `isTrustedSender` (shared predicate)
+
+`isTrustedSender(event)` in [`src/main/ipc/senderValidation.ts`](../src/main/ipc/senderValidation.ts) accepts a call only when both hold:
+
+1. **Top-level frame.** `event.senderFrame` exists and `frame.parent === null` – any iframe or sub-frame is rejected.
+2. **Exact expected origin.** In development (`is.dev && ELECTRON_RENDERER_URL`) the sender's origin must equal the electron-vite dev-server origin. In production the sender URL must equal `RENDERER_FILE_URL` – `pathToFileURL(join(__dirname, '../renderer/index.html'))`, mirroring the exact `mainWindow.loadFile` call in `src/main/index.ts`. An arbitrary `file://` URL is **not** accepted, and the dev branch is unreachable in a production build because it is gated on the same condition that decides which URL the window actually loads.
+
+Consumers: `clipboard-handlers.ts` (`clipboard:readText` / `clipboard:writeText`), `file-handlers.ts` (`file:revealInFileManager`), `claude-status-handlers.ts` (via a local copy of the same predicate), and `system-handlers.ts`.
+
+### Why `system:*` needs it most
+
+`system:relaunchApp` calls `app.relaunch()` followed by `app.quit()`. That is a renderer-triggerable process restart – without the gate, an injected frame could drive a boot loop. `app.quit()` (not `app.exit()`) is used deliberately so `before-quit` still runs and releases the project lock, watchers and PTYs.
+
+`system:openScreenRecordingSettings` calls `shell.openExternal` on a **fixed module-level constant**:
+
+```
+x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture
+```
+
+No part of that URL comes from the renderer, so there is no arbitrary-URL or protocol-injection surface. The handler also no-ops off `darwin` (Screen Recording is a macOS TCC concept). Note that only *this* handler is platform-gated – `system:relaunchApp` runs on every platform.
+
+### Screenshot: a stricter local variant
+
+`screenshot-handlers.ts` defines its own `validateMainRendererSender`, applying the same top-level-frame + exact-`file://`-URL rule to every public screenshot channel (`capture`, `getDisplays`, `getCapabilities`, `getScreenPermission`, `enumerateWindows`). It is deliberately separate from `isTrustedSender` because it must also exclude the app's **own** per-display area-select overlay windows, which are legitimate `BrowserWindow`s of the same app but must never be able to invoke the public capture API. Rejections fail closed (empty display list, `supported: false`, `'unknown'` permission, `SCREENSHOT_FAILED`) and are logged.
+
+The overlay windows have their own, tighter channel path: `screenshot:areaSelected` / `screenshot:areaCancelled` are attached per capture to each overlay's `webContents.mainFrame.ipc` (never global `ipcMain`) and every payload must carry that round's freshly minted UUID token.
+
+### macOS usage-description strings
+
+`electron-builder.yml` declares the TCC purpose strings under `mac.extendInfo`, including `NSScreenCaptureUsageDescription` ("Erfana captures screenshots you insert into notes and terminals.") alongside `NSCameraUsageDescription`, `NSMicrophoneUsageDescription`, `NSDocumentsFolderUsageDescription` and `NSDownloadsFolderUsageDescription`. Without the screen-capture entry macOS shows an unexplained prompt, and a missing purpose string is a notarisation/UX liability rather than a bypass.
 
 ---
 
@@ -432,7 +472,7 @@ Shipped: contextBridge on all IPC, Zod input validation in all handlers, path-tr
 
 Run `npm audit` to check. **Policy**: zero high/critical production advisories at release. Pre-release: `npm audit --omit=dev --json` and diff against the table below.
 
-**Current state** (audited 2026-06-04, re-verified during the v0.12.0 release): production **0 vulnerabilities** (`npm audit --omit=dev`). The former `mermaid → langium → chevrotain` moderate advisories no longer count against production because Monaco and Mermaid moved to `devDependencies` in v0.11.0 ([#206](https://github.com/qodeca/erfana/pull/206)); `axios` and `fast-uri` high-severity advisories were patched in v0.11.2. Dev-only advisories remain (notably a `vitest` UI-server critical that needs a breaking 3→4 bump) but do not ship in production builds.
+**Current state** (audited 2026-06-04, re-verified during the v0.12.0 release): production **0 vulnerabilities** (`npm audit --omit=dev`). The former `mermaid → langium → chevrotain` moderate advisories no longer count against production because Monaco and Mermaid moved to `devDependencies` in v0.11.0 (#206 — pre-migration PR, no longer resolves on the public repo); `axios` and `fast-uri` high-severity advisories were patched in v0.11.2. Dev-only advisories remain (notably a `vitest` UI-server critical that needs a breaking 3→4 bump) but do not ship in production builds.
 
 ### Dependency overrides (package.json)
 
@@ -523,7 +563,7 @@ After A4 (`powerMonitor` resume), B1 (symlink TOCTOU), and D3 (HMAC), the major 
 
 4-layer client-side trust model for the whisper.cpp subprocess (manifest Ed25519 sig + artifact SHA pin + per-spawn re-hash for TOCTOU + monotonic revision floor). Composition + attacker model: [`windows/whisper-trust-chain.md`](./windows/whisper-trust-chain.md). Decisions: [ADR 0001](./adrs/0001-self-host-whisper-binaries.md)–[ADR 0004](./adrs/0004-per-spawn-toctou-rehash.md). Operator runbook: [`windows/whisper-support-runbook.md`](./windows/whisper-support-runbook.md).
 
-## Release signing (v0.9.5+, [#174](https://github.com/qodeca/erfana/issues/174))
+## Release signing (v0.9.5+, #174)
 
 End-to-end signed multi-platform release pipeline. Full operator reference: [`build/release.md`](./build/release.md).
 
@@ -532,7 +572,7 @@ Trust anchors:
 - **macOS**: Developer ID Application certificate + notarytool (user-auth mode: Apple ID + app-specific password + Team ID). Ticket stapled.
 - **Windows**: Azure Artifact Signing (formerly Azure Trusted Signing) via app-registration X.509 certificate auth (electron-builder 26's `WindowsSignAzureManager` does not support OIDC `AZURE_FEDERATED_TOKEN_FILE`, so we use a rotatable cert instead — public key lives on the app registration, private key is a GitHub Secret). The NSIS installer `.exe` is signed and timestamped via `http://timestamp.digicert.com`.
 - **Aggregate `SHA256SUMS`**: signed with a **dedicated release minisign keypair** (separate from the whisper-binaries key — blast-radius isolation per ADR 0003 pattern), covering every release artifact across macOS + Windows.
-- **Per-artifact provenance**: SLSA Build L2 attestations are currently **not enabled** — GitHub gates `actions/attest-build-provenance` to Enterprise Cloud for private repos. qodeca is on the **Team plan**, which still does not include attestations for private repos. The minisign signature on the aggregate `SHA256SUMS` + per-platform Developer ID / Azure Artifact Signing already provide artifact authenticity without requiring GitHub as a trust anchor. Revisit if Erfana goes public or moves to Enterprise.
+- **Per-artifact provenance**: SLSA Build L2 attestations are currently **not enabled** — GitHub gates `actions/attest-build-provenance` to Enterprise Cloud for private repos. That gate no longer applies — the repo went public on 2026-06-16 — so attestations are now simply **not wired into the pipeline**; enabling them is a deliberate change to `release.yml`, not a plan upgrade. The minisign signature on the aggregate `SHA256SUMS` + per-platform Developer ID / Azure Artifact Signing already provide artifact authenticity without requiring GitHub as a trust anchor.
 
 ### Release minisign public keys (dual-key, ADR-0003 style)
 
@@ -554,23 +594,32 @@ RWTxkJcmBbLk6J2eWEDWHYcAmgpKfRqO5PR8oRRLUpgn5rgCaWmTvd9w
 ```
 <!-- minisign-pubkey-rotation-end -->
 
-The fence markers above are load-bearing — `releasing-erfana` skill Phase 4 extracts the primary pubkey by `awk` between these markers. Do NOT remove or rename them without updating `phases/phase-4-verify.md` accordingly.
+The fence markers above are load-bearing — `.github/workflows/checks.yml` **Guard 5** (release-pubkey drift detector) `awk`s every key out from between them and asserts byte-equality against `docs/release-pubkey.txt`. That is the only comparison Guard 5 actually enforces today: it has a third leg for `README.md`, but the leg is wrapped in `if [ -n "$README" ]` and `README.md` contains no `RW…` key lines (it links to `docs/release-pubkey.txt` instead of mirroring the values), so the leg silently no-ops. **Two** copies are enforced — `docs/release-pubkey.txt` and this file. The `releasing-erfana` skill does **not** read this file: Phase 4.3 reads the canonical `docs/release-pubkey.txt` directly (`phases/phase-4-verify.md` §4.3). Do NOT remove or rename the markers without updating Guard 5 accordingly.
 
-Mirrored copies for offline retrieval: `README.md` § Release verification, `docs/release-pubkey.txt`. These keys are **separate** from the whisper-binaries minisign key — a compromise of one does not invalidate the other.
+Canonical copy for offline retrieval: `docs/release-pubkey.txt` (the fenced blocks above are the second enforced copy). `README.md` § Release verification only *links* to that file — it does not mirror the key values, so there is no third copy to keep in sync. These keys are **separate** from the whisper-binaries minisign key — a compromise of one does not invalidate the other.
 
 ### End-user verification
 
 ```bash
-# Integrity + aggregate signature (all platforms)
-minisign -V -P "$(cat docs/release-pubkey.txt)" -m SHA256SUMS -x SHA256SUMS.minisig
-sha256sum -c SHA256SUMS
+# Integrity + aggregate signature (all platforms). `minisign -P` takes ONE
+# base64 key and docs/release-pubkey.txt is a COMMENTED file publishing two,
+# so extract the keys instead of cat-ing the file into -P. Either key is valid.
+PRIMARY=$(grep -m1 -E '^RW[A-Za-z0-9+/=]+$' docs/release-pubkey.txt)
+ROTATION=$(grep -E '^RW[A-Za-z0-9+/=]+$' docs/release-pubkey.txt | sed -n 2p)
+minisign -V -P "$PRIMARY" -m SHA256SUMS -x SHA256SUMS.minisig \
+  || minisign -V -P "$ROTATION" -m SHA256SUMS -x SHA256SUMS.minisig \
+  || { echo "SIGNATURE VERIFICATION FAILED — do not run this download." >&2; exit 1; }
+
+# --ignore-missing: SHA256SUMS lists BOTH platform binaries and you probably
+# downloaded one. macOS without coreutils: shasum -a 256 --ignore-missing -c.
+sha256sum --ignore-missing -c SHA256SUMS
 ```
 
 Full verification recipes (macOS `codesign`, Windows `signtool`) are in [`build/release.md` § End-user verification](./build/release.md#end-user-verification).
 
 ## Future enhancements
 
-Auto-updates via signed electron-updater (deferred — not shipped with #174 per non-goals). Encrypted storage via OS keychain. Confirmation prompts before destructive operations. SLSA Build L2 attestations (re-enable when Erfana moves to Enterprise Cloud or repo goes public). **Windows code signing is now covered by #174; [#166](https://github.com/qodeca/erfana/issues/166) narrows to NSIS installer UX. Branch protection on `main` + protected `v*.*.*` tag ruleset are live as of 2026-04-25 — see [`build/release.md` § Branch protection](./build/release.md#branch-protection-phase-i--done-2026-04-25).**
+Auto-updates via signed electron-updater (deferred — not shipped with #174 per non-goals). Encrypted storage via OS keychain. Confirmation prompts before destructive operations. SLSA Build L2 attestations — still off, pending a deliberate pipeline change rather than a plan restriction: the original blocker (attestations gated to Enterprise Cloud for private repos) expired when the repo went public on 2026-06-16. **Windows code signing is now covered by #174; #166 narrows to NSIS installer UX. Branch protection on `main` + protected `v*.*.*` tag ruleset are live as of 2026-04-25 — see [`build/release.md` § Branch protection](./build/release.md#branch-protection-phase-i--done-2026-04-25).**
 
 ## References
 

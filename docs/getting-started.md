@@ -4,7 +4,7 @@ Quick onboarding guide for new developers working on Erfana.
 
 ## Prerequisites
 
-- **Node.js**: 24+ (Electron 39 bundles Node.js 22.20.0)
+- **Node.js**: 24+ (Electron 39.8.9 bundles Node.js 22.22.1)
 - **Python**: 3.12 (node-pty fails on 3.13)
 - **Git**: For version control
 - **On Windows**: VS 2022 Build Tools, Developer Mode enabled, Win32 long paths enabled. Skipping these breaks `node-pty` build + `npm run build:win`. Full setup: [`docs/build/windows.md`](./build/windows.md).
@@ -40,15 +40,15 @@ Read these docs in order:
 
 ```
 src/
-├── main/           # Electron main process
-│   ├── services/   # Business logic (FileService, TerminalService, etc.)
-│   └── ipc/        # IPC handlers (bridges services to renderer)
-├── preload/        # Context bridge API (exposes safe APIs to renderer)
-├── shared/         # Shared code (types, constants, Zod schemas)
-└── renderer/       # React UI
-    ├── components/ # UI components
-    ├── stores/     # Zustand state management
-    └── prompts/    # AI prompt templates
+├── main/               # Electron main process
+│   ├── services/       # Business logic (FileService, TerminalService, etc.)
+│   └── ipc/            # IPC handlers (bridges services to renderer)
+├── preload/            # Context bridge API (exposes safe APIs to renderer)
+├── shared/             # Shared code (types, constants, Zod schemas)
+└── renderer/src/       # React UI
+    ├── components/     # UI components
+    ├── stores/         # Zustand state management
+    └── prompts/        # AI prompt templates
 ```
 
 ## Common Workflows

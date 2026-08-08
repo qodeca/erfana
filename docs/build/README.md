@@ -1,6 +1,6 @@
 # Build Documentation
 
-**Last Updated**: June 2026 (v0.10.1)
+**Last updated**: August 2026 (v0.16.3)
 
 This directory contains detailed documentation for Erfana's production build configuration.
 
@@ -22,7 +22,7 @@ npm run build:mac
 
 **Duration**: ~2-3 minutes on modern Mac
 
-**Note**: The aproba workaround now runs automatically via the `prebuild` npm script.
+**Note**: The `aproba` shim runs automatically via the `prebuild` npm script (`node scripts/prebuild.mjs`). See [electron-builder.md](./electron-builder.md#known-issue-the-aproba-shim).
 
 ---
 
@@ -31,7 +31,7 @@ npm run build:mac
 ### System Requirements
 
 **Operating System**:
-- macOS 12+ (Big Sur or newer) - Required for building macOS apps
+- macOS 12+ (Monterey or newer) - Required for building macOS apps
 - Linux or Windows can build for those platforms, but not for macOS
 
 **Development Tools**:
@@ -87,19 +87,19 @@ npm install
 
 ## Build Process Overview
 
-1. **prebuild**: Create aproba workaround (automatic)
+1. **prebuild**: `node scripts/prebuild.mjs` creates the `aproba` stub (automatic — npm runs it before `npm run build`, which both `build:mac` and `build:win` call)
 2. **Typecheck**: Verify TypeScript compilation
-3. **Vite Build**: Bundle application code
-   - Main process: ~223 kB minified (externalized dependencies)
-   - Worker thread: ~5 kB (`git-status.worker.js`, separate entry via `rollupOptions.input`)
-   - Preload script: ~30 kB (bundled dependencies)
-   - Renderer: ~10.9 MB (Monaco, Mermaid, xterm.js included)
-4. **beforePack hook (v0.10.0)**: `scripts/ensure-media-binaries.js` resolves the host's `ffmpeg-static` binary via the shared `src/main/utils/mediaBinaries.ts` resolver and stages a per-architecture copy into `extraResources` so the packaged app ships the correct `ffmpeg` for its architecture rather than one bundled-at-install. Replaces the single-arch download-at-install pattern that produced the v0.9.6 video-transcription ENOENT.
-5. **electron-builder Package**: Create platform packages (includes `extraResources` – tessdata for offline OCR, per-arch ffmpeg)
+3. **Vite Build**: Bundle application code (measured on the v0.16.3 tree)
+   - Main process: ~308 kB minified, `out/main/index.js` (externalized dependencies)
+   - Worker thread: ~7.5 kB, `out/main/git-status.worker.js` (separate entry via `rollupOptions.input`)
+   - Preload: ~38 kB `out/preload/index.js` plus ~1.3 kB `out/preload/screenshotOverlay.js` (two entries, both bundled — see [preload.md](./preload.md))
+   - Renderer: ~35 MB across `out/renderer/` (Monaco, Mermaid, xterm.js included)
+4. **beforePack hook (v0.10.0)**: `scripts/ensure-media-binaries.js` downloads a hardcoded per-platform arch set of `ffmpeg-static` binaries — `x64` **and** `arm64` on macOS, `process.arch` on every other platform, independent of the configured build target — into a build cache at `release/.media-cache/<platform>-<arch>/`. Each is verified against a ~1 MB size floor and, where `FFMPEG_SHA256` carries a pin, a SHA-256. Only `darwin-x64` and `darwin-arm64` are pinned today; `win32-x64` falls back to size-only verification (see [fuses.md](./fuses.md#afterpack-also-stages-and-verifies-the-media-binaries)). This replaces the single-arch download-at-install pattern that produced the v0.9.6 video-transcription ENOENT. The cache is **not** `extraResources` — the copy into the bundle happens later, in `afterPack`.
+5. **electron-builder Package**: Create platform packages. `extraResources` holds exactly three things: `resources/tessdata` (offline OCR language data), `LICENSE`, and `THIRD-PARTY-LICENSES.md` (shipped to meet the GPL-3.0-only and third-party attribution obligations)
 6. **afterPack Hook** (`scripts/fuses.js`, before signing):
    - Apply Electron security fuses
    - Restore node-pty `spawn-helper` executable bit (`0755`)
-   - Verify the per-arch ffmpeg binary is present and executable
+   - Copy this pack's cached `ffmpeg` into `app/node_modules/ffmpeg-static/`, re-run the same verification at the packed path (size floor always; SHA-256 only on pinned arches — macOS today, not Windows), and chmod it plus every bundled `ffprobe`
    - Prune foreign-platform/arch `ffprobe-static` binaries (keeps only the target, ~260 MB saved on mac)
    - Prune foreign node-pty and better-sqlite3 prebuilds, and strip `.pdb` debug symbols from the kept Windows prebuild
    - Each prune is keep-then-verify (fails the build rather than shipping a binary-less bundle)
@@ -122,12 +122,12 @@ The Windows leg builds on its own runner and produces `erfana-{version}-setup.ex
 
 For detailed information on specific build aspects, see:
 
-- **[Electron Builder Configuration](./electron-builder.md)** - Version info, aproba workaround
+- **[Electron Builder Configuration](./electron-builder.md)** - Version pin, the `aproba` shim, build hooks, and an annotated tour of `electron-builder.yml`
 - **[ASAR Packaging](./asar.md)** - Why ASAR is disabled, security implications
 - **[Preload Bundling](./preload.md)** - Sandbox compatibility requirements
-- **[Architecture Builds](./architectures.md)** - x64/arm64 vs universal binary decision
+- **[Architecture Builds](./architectures.md)** - why macOS ships a single arm64 DMG (x64 dropped in v0.11.2, universal never adopted)
 - **[Electron Fuses](./fuses.md)** - Security fuses configuration
-- **[Dependencies](./dependencies.md)** - Exclusions and devDependencies
+- **[Dependencies](./dependencies.md)** - Exclusions, native modules, and the deliberate version pins
 - **[Troubleshooting](./troubleshooting.md)** - Common build errors and solutions
 - **[Windows build prerequisites](./windows.md)** - Setting up a Windows 11 dev box (Phase 0 of the Windows enablement roadmap)
 - **[Release pipeline](./release.md)** - Multi-platform release workflow (`.github/workflows/release.yml`), secrets + rotation calendar, end-user verification, incident response
@@ -144,8 +144,7 @@ For detailed information on specific build aspects, see:
    ls -lh release/${npm_package_version}/*.dmg
    ```
 
-2. **Verify file size** (approximately):
-   - arm64 DMG: ~214 MB
+2. **Verify file size**: the last recorded figure for the arm64 DMG was ~214 MB, measured before the v0.11.2 foreign-arch prunes. **It has not been re-measured** and should not be quoted as current — record the real number from your build instead.
 
 ### Post-Installation Verification
 

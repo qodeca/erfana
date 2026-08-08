@@ -12,10 +12,9 @@ user-invocable: true
 
 # Releasing Erfana
 
-Orchestrates the Erfana release flow that ends with **one GitHub release containing signed, notarized, attested artifacts for Windows + macOS** (the Linux distribution target was dropped). The CI matrix (`.github/workflows/release.yml`) does all build, sign, notarize, verify, and draft-upload work. This skill handles pre-tag sanity, tag push, CI polling, local cryptographic verification, and the human approval checkpoint.
+Orchestrates the Erfana release flow that ends with **one GitHub release containing signed, notarized artifacts for Windows + macOS** (the Linux distribution target was dropped). The CI matrix (`.github/workflows/release.yml`) does all build, sign, notarize, verify, and draft-upload work. This skill handles pre-tag sanity, tag push, CI polling, local cryptographic verification, and the human approval checkpoint.
 
-Detailed ops reference: [docs/build/release.md](../../../docs/build/release.md).
-Design anchor: [#174](https://github.com/qodeca/erfana/issues/174).
+Detailed ops reference: [docs/build/release.md](../../../docs/build/release.md). Design anchor: #174 (pre-migration issue; no longer resolves on the public repo).
 
 > **Note**: This skill is project-scope-only. The relative path `../../../docs/build/release.md` is intentional — moving the skill to user-scope (`~/.claude/skills/`) would break the doc reference and orphan the project-local `release-failure-analyzer` agent. See "Architectural exception" below.
 
@@ -50,12 +49,13 @@ Activate only when the working copy can reasonably be released.
 | `git cliff` | Technical section for release notes | `git cliff --version` (skill will fall back to `npx git-cliff` if needed) |
 | `minisign` | Verify `SHA256SUMS.minisig` | `minisign -v` |
 | `sha256sum` | Recompute asset hashes locally | `command -v sha256sum` |
+| `jq` | Parse `gh` JSON in §0.4 / §0.4.5 | `jq --version` |
 
-All external credentials (Apple Developer, Azure Artifact Signing, minisign release keypair) live in **GitHub secrets** and never flow through the local machine. See [docs/build/release.md § Secrets and rotation calendar](../../../docs/build/release.md#secrets-and-rotation-calendar).
+All external credentials (Apple Developer, Azure Artifact Signing, minisign release keypair) live in **GitHub secrets** and never flow through the local machine. See [docs/build/release.md § Secrets](../../../docs/build/release.md#secrets) — the rotation calendar is the subsection directly below it.
 
 ## Constants
 
-These values appear in multiple places. Update here first, then `EXPECTED_ASSETS=4` in §0.4 and the count comment in `phase-4-verify.md` §4.5 will reference this table.
+These values appear in multiple places. Update here first, then update `EXPECTED_ASSETS=4` in §0.4 — which uses the number as a **floor** (`-ge`) to classify a draft as `draft-ready`, not as an equality assertion — and the expected-set line `phase-4-verify.md` §4.6 shows the operator. Neither place hard-fails on an unexpected extra asset.
 
 | Constant | Value | Note |
 |---|---|---|
@@ -68,11 +68,11 @@ These values appear in multiple places. Update here first, then `EXPECTED_ASSETS
 
 | Agent | Purpose | Source | Used in |
 |-------|---------|--------|---------|
-| `release-quality-runner` | Enforce Phase 0 pre-flight checklist (branch, version, secrets, workflow lint, electron-builder schema) | shared (project override) | Phase 0 |
+| `release-quality-runner` | Enforce Phase 0 pre-flight checklist (branch, tree, version, CHANGELOG, tools, green `checks.yml`, secrets, workflow lint, electron-builder schema, Windows status snapshot) | shared (project override) | Phase 0 |
 | `release-notes-drafter` | Emit two-tier release-notes markdown via `git cliff` + operator summary | shared (project override) | Phase 1 |
 | `release-failure-analyzer` | On Phase 3 CI failure: identify failed leg, match log against the troubleshooting cookbook, write structured incident memo to `docs/release-incidents/` | project-local | Phase 3 (failure path) |
 
-**`release-build-executor` is retired** (removed in [#174](https://github.com/qodeca/erfana/issues/174)). CI owns the build. The skill watches, verifies, and publishes.
+**`release-build-executor` is retired** (removed in #174). CI owns the build. The skill watches, verifies, and publishes.
 
 ## Quick reference
 
@@ -84,8 +84,8 @@ These values appear in multiple places. Update here first, then `EXPECTED_ASSETS
 | Release notes path | `docs/release-notes/v{version}.md` (two-tier with `<details>`) |
 | CI workflow | `.github/workflows/release.yml` |
 | Expected release assets | See `## Constants` above (2 binaries + 2 = 4 total) |
-| Provenance attestations | **Not used** — GitHub Artifact Attestations are Enterprise-only for private repos. Authenticity covered by minisign + per-platform OS signing. |
-| Minisign release pubkey | `docs/security.md` § Release signing |
+| Provenance attestations | **Not used** — off pending a deliberate pipeline change, not a plan restriction: the old blocker (Enterprise-only for private repos) expired when the repo went public on 2026-06-16. Authenticity covered by minisign + per-platform OS signing. |
+| Minisign release pubkey | `docs/release-pubkey.txt` (canonical; `docs/security.md` § Release signing is the one mirror `checks.yml` Guard 5 enforces — `README.md` only links to the canonical file) |
 
 ## Critical enforcement rules (NON-NEGOTIABLE)
 
@@ -254,27 +254,27 @@ fi
 
 - [ ] `required_pull_request_reviews` is unset on the `main` branch protection rule
 
+### 0.4.6 Windows status snapshot is current
+
+`docs/windows/implementation-plan.md` must be re-anchored on v{version} before tagging — script, semantics and traps in [`./guides/pre-flight-checks.md`](./guides/pre-flight-checks.md); also enforced as the agent's `windows_snapshot` gate.
+
 ### 0.5 Delegate the rest of the checklist to `release-quality-runner`
 
 ```
 Task(subagent_type: "release-quality-runner",
      prompt: "Run the Phase 0 release-readiness checklist for Erfana at {project_path}
-              on branch main. Run all four quality gates (gates: ['lint', 'typecheck', 'test', 'audit'])
-              and the pre-flight checklist:
-              - running dev servers
-              - uncommitted changes (should be none after our gate)
-              - node version
-              - gh authenticated
-              - minisign installed
+              on branch main. Do NOT re-run lint / typecheck / test / audit — they are
+              required status checks on main; assert the green checks.yml run instead.
               Return: {
+                status: 'success'|'error',
+                gates: { <gate-key>: { result: 'PASS'|'FAIL'|'WARN'|'SKIP', ... } },
                 overall: 'pass'|'fail',
                 failures: string[],
-                warnings: string[],
-                gates_run: string[]
+                warnings: string[]
               }")
 ```
 
-Any `fail` stops the skill. Warnings are surfaced to the operator, who can continue.
+Any `fail` stops the skill. Warnings are surfaced to the operator, who can continue. **Retired:** this prompt used to ask the agent to check for *running dev servers*, and no agent gate replaced it. It was dropped deliberately with the #174 CI migration — nothing is built locally any more (every binary comes from `release.yml` on GitHub-hosted runners), so a local `electron-vite dev` cannot contaminate a release artifact, and the clean-tree gate already catches anything it wrote to disk.
 
 ### Checkpoint 0.A
 
@@ -487,6 +487,7 @@ See [`./guides/anti-patterns.md`](./guides/anti-patterns.md) for the full Don't/
 - [`guides/anti-patterns.md`](guides/anti-patterns.md) — Don't/Do table for release-day patterns
 - [`guides/examples.md`](guides/examples.md) — Worked examples (success, lockfile-drift, hash-mismatch)
 - [`guides/git-signing.md`](guides/git-signing.md) — Pre-flight git signing check (Phase 1.5)
+- [`guides/pre-flight-checks.md`](guides/pre-flight-checks.md) — Phase 0.4.6 Windows status-snapshot gate
 - [`guides/troubleshooting.md`](guides/troubleshooting.md) — failure recovery and rollback procedures
 - [`templates/release-notes.md`](templates/release-notes.md) — two-tier release-notes template
 - [`docs/build/release.md`](../../../docs/build/release.md) — full operator reference (matrix, secrets, incident response)

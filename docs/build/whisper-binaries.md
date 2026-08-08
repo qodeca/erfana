@@ -45,7 +45,11 @@ When Phase 5 cert arrives, add these secrets to `production-signing`:
 - `WINDOWS_CERT_PFX` — base64 of the PFX file
 - `WINDOWS_CERT_PASSWORD` — PFX password
 
-Then re-enable the signtool step in `build-windows` (commented placeholder exists).
+Then **add** a signtool step to `build-windows`. There is no signtool step and no
+commented-out placeholder in `whisper-binaries.yml` today — it has to be written from
+scratch. The canary workflow already probes that `signtool.exe` resolves on the
+`windows-latest` image (`windows-signtool-canary`), so the tooling side of the Phase 5
+flip is drop-in.
 
 ### 3. Minisign manifest-signing keys
 
@@ -75,37 +79,39 @@ Then:
 
 ### 4. GitHub Environment: `production-signing`
 
-Environment exists (created 2026-04-22 via `gh api`). The `whisper-binaries.yml` workflow references it via `environment: production-signing` so all secrets are scoped to that job only (not repo-wide).
+Environment exists (created 2026-06-17). The `whisper-binaries.yml` workflow references it via `environment: production-signing` on the `build-macos`, `build-windows` and `publish-release` jobs, so the signing / notarization / manifest secrets are scoped to those jobs only (not repo-wide).
 
-**Required-reviewer gate**: currently **unavailable** despite qodeca org being on the Team plan. Both the API (`PUT /environments/production-signing` with `reviewers`) and the web UI (Settings → Environments → production-signing) do NOT surface the option. Likely causes (untested):
+**Required-reviewer gate**: **live**. The environment carries a `required_reviewers` protection rule with `marcinobel` as the sole reviewer (`prevent_self_review: false`). Every whisper build therefore waits for an explicit approval in the Actions UI before any signing secret is attached.
 
-- Org-level policy: check `Settings → Actions → General → Deployment protection rules` at org level; enable if present.
-- Plan-propagation lag post-upgrade.
-- Docs-vs-reality mismatch on the Team tier.
+Verify anytime:
 
-**Deferred**: revisit if a follow-up shows the option. Trust fallback: only repo admins can edit `.github/workflows/`, so the secret-exfiltration surface is bounded by existing GitHub access control. This matches the trust model of every other repo secret (e.g. `CLAUDE_CODE_OAUTH_TOKEN`).
+```bash
+gh api repos/qodeca/erfana/environments/production-signing --jq '.protection_rules'
+```
+
+`can_admins_bypass` is `true`, so a repo admin can still skip the wait — the gate is an anti-mistake control, not a defence against a compromised admin account. The underlying trust boundary is unchanged: only repo admins can edit `.github/workflows/`, the same trust model as every other repo secret (e.g. `CLAUDE_CODE_OAUTH_TOKEN`).
 
 ### 5. Tag protection on whisper-build-* tags
 
-**Enabled** via Rulesets (ruleset ID `15399782`, created 2026-04-22 via `gh api`):
+**Enabled** via Rulesets — ruleset `protect-whisper-build-tags`, ID `17762301`, created 2026-06-16 (a sibling ruleset, `17762300`, covers the `v*.*.*` app-release tags):
 - `target: tag`, `include: refs/tags/whisper-build-*`
 - `rules: [deletion, non_fast_forward]` — prevents deletion or force-push of any `whisper-build-*` tag.
 - `enforcement: active`, `bypass_actors: []` (no bypass; even admins must delete via a ruleset edit).
 
-Verify anytime via `gh api repos/qodeca/erfana/rulesets/15399782`.
+Verify anytime via `gh api repos/qodeca/erfana/rulesets/17762301`.
 
 ## Triggering a build
 
-`Actions` tab → `whisper-binaries` workflow → `Run workflow`. Inputs:
+`Actions` tab → **Whisper Binaries** workflow (file `.github/workflows/whisper-binaries.yml`) → `Run workflow`. Inputs:
 
 - `upstream_sha` — full 40-char SHA from https://github.com/ggml-org/whisper.cpp. Always pin by SHA, not tag (tags are mutable).
 - `upstream_label` — `v1.8.4` or similar. Appears in release title.
 - `erfana_revision` — integer, monotonic. Increment on rebuild (e.g. cert rotated; compiler pinned differently).
 - `skip_notarization` — debug only; the publish job refuses to create the release if this is true.
 
-The `publish-release` job is gated by the `production-signing` environment — a repo admin must approve before it runs (this is when secrets are attached).
+Three of the workflow's four jobs — `build-macos`, `build-windows` and `publish-release` — declare `environment: production-signing`; only `validate-inputs` runs ungated. The approval prompt therefore appears within seconds of dispatch, as soon as input validation passes, and the run sits idle at the two build jobs until a reviewer approves. It does **not** build for ~25 minutes and then stop at publish. Approval is what attaches the signing / notarization / manifest secrets.
 
-Typical end-to-end time: ~25–30 minutes (macOS build ~15 min + Windows build ~8 min + notary queue ~5–10 min).
+Typical end-to-end time once approved: ~25–30 minutes (macOS build ~15 min + Windows build ~8 min + notary queue ~5–10 min).
 
 ## Diff-review checklist (every upstream bump)
 
@@ -123,10 +129,13 @@ Flag for manual review:
 - [ ] Any new `fs` / filesystem access outside of model loading / log writing
 - [ ] Any new dependency added in `CMakeLists.txt`, `ggml/CMakeLists.txt`, or vendored code
 - [ ] Any changes to signing / update mechanics (unlikely in whisper.cpp, but still)
-- [ ] CVE database check: `pip install safety; safety check` against whisper.cpp's deps
+- [ ] **Was the CLI binary renamed upstream?** Both build jobs probe for the executable in preference order — `whisper-whisper` → `whisper-cli` → `main` (`build-macos` step "Verify universal binary contains both slices"; `build-windows` step "Stage artifact dir") — precisely because upstream has already renamed it once. `main` is a deprecation shim that prints a warning and exits. A name outside that list fails the build outright; a reshuffle of which name is the real CLI can stage the shim instead, which only the JFK smoke test catches. Update the probe list in **both** jobs on any rename.
+- [ ] **Did the sidecar DLL set change?** The Windows staging step copies `build\bin\Release\*.dll` blindly, while `src/main/services/whisper-assets.ts` pins exactly four by name, size and SHA-256 (`whisper.dll`, `ggml.dll`, `ggml-base.dll`, `ggml-cpu.dll`). A DLL added, dropped or renamed upstream silently changes the shipped zip without changing the pin: a dropped or renamed one hard-fails install on end-user machines, an added one ships unverified. Re-derive the pins, and consider a `SCHEMA_VERSION` bump (see "Bumping the app-side pin", step 6).
 - [ ] Release notes from upstream — note any CVEs or security fixes
 
 If any item surfaces something suspicious, escalate or pin to an earlier SHA.
+
+This checklist and ["Security pre-check before the PR merge"](#security-pre-check-before-the-pr-merge) read the same upstream commit range at two different moments: run this one **before** dispatching the workflow, and the pre-check as the reviewer's gate **before** merging the app-side pin bump. They overlap deliberately — if you change one, change the other.
 
 ## Cert-revocation runbook
 
@@ -184,13 +193,17 @@ Quarterly integrity task: download and re-verify a random shipped binary against
 
 ## Cost
 
-Per rebuild on GitHub-hosted runners (private repo billing):
+`qodeca/erfana` is a **public** repository, and every job in this workflow runs on a GitHub-hosted **standard** runner (`macos-14`, `windows-latest`, `ubuntu-latest`). Those are billed at zero minutes for public repos, so a whisper rebuild costs **no GitHub Actions spend** — at any cadence, not just the typical 4–6 rebuilds per year.
 
-- `macos-14` × ~15 min × $0.16/min × 10× multiplier = **~$24**
-- `windows-latest` × ~8 min × $0.008/min × 2× multiplier = **~$0.13**
-- `ubuntu-latest` publish × ~2 min = **~$0.02**
+The real budget is wall-clock, not money:
 
-Total **~$24 per rebuild**. At a typical cadence of 4–6 rebuilds per year, **annual budget ceiling ≈ $150**.
+- `macos-14` build + sign + notarize — ~15 min, plus ~5–10 min of notary queue
+- `windows-latest` build — ~8 min
+- `ubuntu-latest` publish — ~2 min
+
+The only recurring cash cost attached to this workflow is the **Apple Developer Program ($99/yr)**, already paid for the app signing.
+
+Two changes would reinstate per-minute billing, so revisit this section if either happens: making the repo private (macOS minutes carry a 10× multiplier — that is what put the earlier estimate at ~$24 per rebuild and ~$150/yr), or moving any job to a larger or otherwise billed runner.
 
 ## Bumping the app-side pin
 
@@ -228,7 +241,7 @@ After CI publishes a new `whisper-build-<label>-erfana<N>` release, the app-side
    - Launch Erfana → Settings → Transcription → Backend = Local → Download model → transcribe a test audio file.
    - Expected log: `INFO: Whisper binary installed` with the new `manifestRevision` value.
 9. **Commit** with a conventional message: `feat(whisper): pin whisper-build-<label>-erfana<N> (upstream <whisper.cpp version>)`.
-10. **PR review** — reviewer should confirm: (a) SHAs match manifest, (b) `MIN_REVISION_INDEX` monotonic, (c) `CHANGELOG.md` mentions the security-relevant upstream changes (diff-review checklist — see below).
+10. **PR review** — reviewer should confirm: (a) SHAs match manifest, (b) `MIN_REVISION_INDEX` monotonic, (c) `CHANGELOG.md` mentions the security-relevant upstream changes (see the [diff-review checklist](#diff-review-checklist-every-upstream-bump) above).
 
 ### Security pre-check before the PR merge
 
@@ -244,13 +257,13 @@ Flag any commit that:
 - adds new `CMakeLists.txt` dependency entries.
 - touches signature / crypto primitives in surprising places.
 
-If any red flag — treat as a security review, don't auto-merge. This is the standard upstream-diff-review checklist for bumping any security-critical pin.
+If any red flag — treat as a security review, don't auto-merge. This is the reviewer-side twin of the [diff-review checklist](#diff-review-checklist-every-upstream-bump) above: same commit range, different moment. Keep the two in sync.
 
 ## Minisign manifest-signing keys
 
 ### Why minisign (not cosign / Sigstore)
 
-See [ADR 0002](../adrs/0002-minisign-over-cosign-sigstore.md) for the full decision and alternatives. Short version: minisign gives us offline verification (no Rekor dependency), tiny verifier surface (`verifyManifest.ts` ~170 lines), and no CA chain.
+See [ADR 0002](../adrs/0002-minisign-over-cosign-sigstore.md) for the full decision and alternatives. Short version: minisign gives us offline verification (no Rekor dependency), tiny verifier surface (`verifyManifest.ts` is 209 lines), and no CA chain.
 
 ### Dual-pubkey architecture (primary + rotation)
 
@@ -260,8 +273,8 @@ See [ADR 0003](../adrs/0003-dual-pubkey-trust-primary-rotation.md). Primary key 
 
 Hard-won knowledge from Phase 4 implementation — documented here so future maintainers don't re-derive them:
 
-1. **Key-ID byte order is reversed for display.** The on-wire key ID in the signature file header is 8 bytes in little-endian order. `minisign` CLI displays the hex reversed (big-endian). `verifyManifest.ts:84-88` reverses the bytes before comparison. Future maintainers comparing hex dumps of `.pub` files vs `.minisig` payload: the bytes are reversed.
-2. **Two signature algorithm variants**: `Ed` (legacy, raw Ed25519 over manifest bytes) and `ED` (prehashed via BLAKE2b-512, then Ed25519 over the 64-byte digest). Detected via magic bytes `0x45 0x44` in the signature file header. `verifyManifest.ts:91-97` handles both; future test signers must produce one of these two variants — check `minisign --version` first.
+1. **Key-ID byte order is reversed for display only.** The on-wire key ID in the signature file header is 8 bytes in little-endian order; the `minisign` CLI and `.pub` files show the hex reversed (big-endian). `verifyManifest.ts:91` reverses those bytes in a single statement, purely so the `signingKeyId` we report and log matches what a maintainer sees in the `.pub` file and the release description. The actual key-ID **comparison** runs on the raw, un-reversed bytes via `timingSafeEqual` (`verifyManifest.ts:109`). Future maintainers comparing hex dumps of `.pub` files vs `.minisig` payload: the bytes are reversed.
+2. **Two signature algorithm variants**: `Ed` (legacy, raw Ed25519 over the manifest bytes — magic bytes `0x45 0x64`) and `ED` (prehashed via BLAKE2b-512, then Ed25519 over the 64-byte digest — magic bytes `0x45 0x44`, the minisign ≥ 0.7 default). Both pairs are needed to detect both variants. `detectAlg` (`verifyManifest.ts:144-158`) matches the first two bytes against the `MINISIGN_ALG_ED_LEGACY` / `MINISIGN_ALG_ED_PREHASHED` constants (`verifyManifest.ts:29-30`) and throws `unsupported-algorithm` on anything else. Future test signers must produce one of these two variants — check `minisign --version` first.
 3. **Pure-JS verifier via `@noble/ed25519`.** We chose this over `sodium-native` to keep the verifier a pure-function with no native bindings. Tradeoff: ~100µs per verify vs ~10µs native — negligible for once-per-install use.
 4. **Test fixture pattern**: `src/main/utils/verifyManifest.test.ts` uses a real published manifest + signature from `whisper-build-v1.8.4-erfana1` as fixture bytes. When the pin advances, either (a) the fixture stays pointing at the old release (still cryptographically valid) or (b) refresh the fixture to the new release. Do NOT generate synthetic manifests with test keypairs — that would miss the `Ed`/`ED` variant-detection path.
 
@@ -277,5 +290,5 @@ Hard-won knowledge from Phase 4 implementation — documented here so future mai
 
 - Pinned SHAs + per-platform filenames: [`docs/windows/phase4-binary-spec.md`](../windows/phase4-binary-spec.md)
 - Erfana client-side code: `src/main/services/WhisperModelManager.ts` + `whisper-assets.ts`
-- Issue tracker: [#165](https://github.com/qodeca/erfana/issues/165)
+- Issue tracker: #165 (issue not present in the public repo)
 - Upstream: [ggml-org/whisper.cpp](https://github.com/ggml-org/whisper.cpp)

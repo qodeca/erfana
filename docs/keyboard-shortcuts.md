@@ -9,7 +9,17 @@ Work anywhere, override editor shortcuts:
 | `Cmd/Ctrl+B` | Toggle left sidebar (Project) |
 | `Cmd/Ctrl+J` | Toggle terminal panel |
 | `Cmd/Ctrl+Shift+M` | Maximize terminal over the editor (opens it if closed; opening a file restores the editor) |
-| `Cmd/Ctrl+,` | Open settings |
+| `Cmd/Ctrl+Alt+R` | Refresh the project tree (see [Project Panel](#project-panel)) |
+
+**Settings has no keyboard shortcut.** Open it with the gear icon at the bottom of the left activity bar; `Esc` closes it.
+
+## Application Menu
+
+| Shortcut | Action |
+|----------|--------|
+| `Cmd/Ctrl+Shift+N` | New Window (File menu, `src/main/menu.ts`) |
+
+Everything else in the menu uses Electron's standard roles (undo/redo, cut/copy/paste/select-all, reload, DevTools, zoom, fullscreen, minimize/zoom, and quit/close), so those accelerators are whatever the platform assigns.
 
 ## Monaco Editor
 
@@ -20,14 +30,23 @@ When editor is focused. Full Monaco shortcuts: [Monaco Editor Docs](https://code
 | Shortcut | Action |
 |----------|--------|
 | `Cmd/Ctrl+S` | Save |
-| `Cmd/Ctrl+F` | Find |
-| `Cmd/Ctrl+H` | Replace |
+| `Cmd/Ctrl+W` | Close the editor tab (confirmation dialog if unsaved) |
+| `Cmd/Ctrl+F` | Open the app search bar |
+| `Cmd/Ctrl+G` | Next search match |
+| `Cmd/Ctrl+Shift+G` | Previous search match |
+| `Cmd/Ctrl+K` | Insert link |
 | `Cmd/Ctrl+Z` / `Shift+Z` | Undo/Redo |
 | `Cmd/Ctrl+/` | Toggle comment |
 | `Alt+↑/↓` | Move line |
 | `Cmd/Ctrl+D` | Add selection to next match |
 | `Alt+Click` | Add cursor |
 | `F1` | Command palette |
+
+**Find is not Monaco's find.** `MonacoMarkdownEditor.tsx` registers `CtrlCmd|KeyF` as an explicit no-op so the window-level capture handler (`useSearchKeyboard`) can open Erfana's unified search bar instead; `CtrlCmd|KeyG` and `CtrlCmd|Shift|KeyG` are likewise re-pointed at that search store. Monaco's own find widget is therefore not reachable by keyboard.
+
+**There is no Replace shortcut in Erfana.** No replace keybinding is registered anywhere in `src/`. Monaco's built-in replace default is `Ctrl+H` on Windows and `Cmd+Alt+F` on macOS – on macOS `Cmd+H` is the OS Hide role registered in `src/main/menu.ts`, so it never reaches the editor.
+
+`Cmd/Ctrl+S` and `Cmd/Ctrl+W` come from `useKeyboardShortcuts.ts`, mounted by `MarkdownEditorPanel`. The `Cmd+W` entry under [Window Management](#window-management) is the OS window-close role – a different binding on a different surface.
 
 ## Markdown Formatting Toolbar
 
@@ -37,14 +56,16 @@ Alternative to shortcuts - toolbar buttons in Editor/Split View modes:
 
 ## Preview Context Menu
 
-Right-click selected text:
+Right-click selected text. The prompt entries are built from `getPromptsForArea('markdown-preview', 'context-menu')`, sorted by each template's `order`:
 
-- **Explain** - Explain with detail → Terminal
-- **Improve** - Enhance grammar/style → Terminal
-- **Simplify** - Make clearer → Terminal
-- **Rewrite** - Rephrase → Terminal
-- **Send to Terminal** - Paste selection
-- **Copy Selection** - Copy text to clipboard
+- **Explain** – explain the selection → Terminal (`explain.md`)
+- **Modify** – asks how to modify, then rewrites → Terminal (`modify.md`)
+- **Ask** – asks a question about the selection → Terminal (`ask.md`)
+- **Visualize** – generates a diagram from the selection → Terminal (`visualize.md`)
+- **Prompt** – free-form prompt over the selection → Terminal (`prompt.md`)
+- **Copy selection** – copy text to clipboard
+
+There is no Improve, Simplify, Rewrite or "Send to Terminal" entry.
 
 | Shortcut | Action |
 |----------|--------|
@@ -62,6 +83,8 @@ See: [Prompt Templates](./prompts/README.md)
 | `→/←` | Expand/collapse folder |
 | `Enter` | Open file |
 | `Space` | Preview |
+
+`Cmd/Ctrl+Alt+R` refreshes the tree. It is registered by `ProjectTree.tsx` as a `window` listener, so it fires from anywhere in the app, but it is ignored while a refresh is already running or while focus sits in an input, textarea, or contenteditable.
 
 ### File Operations
 
@@ -88,7 +111,7 @@ Standard terminal shortcuts when focused:
 | `Ctrl+U/K` | Clear before/after cursor |
 | `↑/↓` | History |
 | `Tab` | Auto-complete |
-| `Cmd/Ctrl+C` | Copy selected text (macOS: Cmd, Windows/Linux: Ctrl) |
+| `Cmd/Ctrl+C` | Copy selected text (macOS: Cmd, Windows: Ctrl) |
 | `Cmd/Ctrl+V` | Paste from clipboard |
 | `Ctrl+Shift+C/V` | Explicit copy/paste (all platforms) |
 
@@ -149,13 +172,15 @@ Note: Clipboard shortcuts use native browser behavior for better undo/redo integ
 
 ## Platform
 
+Erfana ships for macOS and Windows only – there is no Linux build.
+
 **macOS**: `Cmd` for shortcuts, `Option` = Alt
-**Windows/Linux**: `Ctrl` for shortcuts
+**Windows**: `Ctrl` for shortcuts
 
 ### Window Management
 
 **macOS**: `Cmd+M` (Minimize), `Cmd+Q` (Quit), `Cmd+W` (Close), `Cmd+H` (Hide)
-**Windows/Linux**: `Alt+F4` (Close/Quit), `F11` (Fullscreen)
+**Windows**: `Alt+F4` (Close/Quit), `F11` (Fullscreen)
 
 ## Image Viewer
 
@@ -185,18 +210,20 @@ When image viewer panel is focused:
 
 ## Conflicts
 
-| Shortcut | Global | Monaco | Winner |
-|----------|--------|--------|--------|
-| `Cmd/Ctrl+B` | Toggle Sidebar | Bold | Global |
+| Shortcut | Global handler | Monaco handler | Winner |
+|----------|----------------|----------------|--------|
+| `Cmd/Ctrl+B` | Toggle sidebar (`AppDockLayout.tsx`, bubble-phase `window` keydown listener) | Bold – `CtrlCmd\|KeyB` → `wrapSelection('**')` (`MonacoMarkdownEditor.tsx`) | **Unverified** |
 
-**Workaround**: Use toolbar button or Command Palette (F1 → "Bold")
+Both handlers are really registered. Monaco keybindings normally consume the event before it bubbles to the window listener, which would make Bold win while the editor is focused – but that has not been confirmed by running the app, so treat the outcome as unknown until someone checks.
+
+**Workaround if Bold does not fire**: use the toolbar button or the command palette (F1 → "Bold").
 
 ## Quick Reference
 
 | Action | Shortcut |
 |--------|----------|
 | Save | `Cmd/Ctrl+S` |
-| Find | `Cmd/Ctrl+F` |
+| Search | `Cmd/Ctrl+F` |
 | Palette | `F1` |
 | Sidebar | `Cmd/Ctrl+B` |
 | Terminal | `Cmd/Ctrl+J` |

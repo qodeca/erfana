@@ -11,11 +11,13 @@ Project-wide index of `ErrorCode` values in `src/shared/errors.ts`, grouped by c
 throw new AppError('human-readable message', ErrorCode.XYZ, originalError?)
 ```
 
-IPC layer sanitises raw messages to prevent internal-detail leaks; user sees only the `ERROR_MESSAGES[code]` mapping. See `getUserFriendlyMessage()` in `errors.ts:374`.
+IPC layer sanitises raw messages to prevent internal-detail leaks; user sees only the `ERROR_MESSAGES[code]` mapping. See `getUserFriendlyMessage()` in `errors.ts:403`.
 
 ---
 
 ## Path validation (8 codes)
+
+8 path/filename codes in `src/shared/errors.ts`.
 
 | Code | User copy | Primary throw site |
 |------|-----------|--------------------|
@@ -30,7 +32,9 @@ IPC layer sanitises raw messages to prevent internal-detail leaks; user sees onl
 
 ---
 
-## Settings / persistence (9 codes)
+## Settings / persistence (12 codes)
+
+2 `SETTINGS_*` + 3 `PROJECT_*` + 3 `PROJECT_SETTINGS_*` + 4 `GLOBAL_SETTINGS_*` in `src/shared/errors.ts`.
 
 `SETTINGS_READ_FAILED`, `SETTINGS_WRITE_FAILED`, `PROJECT_NOT_FOUND`, `PROJECT_NOT_DIRECTORY`, `PROJECT_OPEN_FAILED`, `PROJECT_SETTINGS_READ_FAILED`, `PROJECT_SETTINGS_INVALID_JSON`, `PROJECT_SETTINGS_VALIDATION_FAILED`, plus `GLOBAL_SETTINGS_*` (4 codes for read/write/validation/dir-create).
 
@@ -38,7 +42,9 @@ See `src/main/services/SettingsService.ts`, `ProjectSettingsService.ts`, `Global
 
 ---
 
-## Import & export (28 codes)
+## Import & export (29 codes)
+
+5 `PDF_*` (legacy import) + 11 generic `IMPORT_*` + 5 document-import `IMPORT_*` + 4 `PDF_EXPORT_*` + 4 `DOCX_EXPORT_*` in `src/shared/errors.ts`.
 
 Grouped by pipeline stage. See `docs/api-services-features.md` §LiteParseConverter and §DocxService for full flows.
 
@@ -54,30 +60,41 @@ Grouped by pipeline stage. See `docs/api-services-features.md` §LiteParseConver
 
 ## Prompt execution (4 codes)
 
+4 `PROMPT_*` in `src/shared/errors.ts`.
+
 `PROMPT_NOT_FOUND`, `PROMPT_VALIDATION_FAILED`, `PROMPT_TERMINAL_TIMEOUT`, `PROMPT_SEND_FAILED`. See `src/renderer/src/prompts/`.
 
 ---
 
-## Screenshot & camera (12 codes)
+## Screenshot & camera (13 codes)
+
+8 `SCREENSHOT_*` + 5 `CAMERA_*` in `src/shared/errors.ts`.
 
 | Code | User copy | Notes |
 |------|-----------|-------|
-| `SCREENSHOT_PERMISSION_DENIED` | "Screen recording permission required..." | macOS only (Windows desktopCapturer needs no extra grant) |
+| `SCREENSHOT_PERMISSION_DENIED` | "Screen recording permission required..." | macOS only (Windows desktopCapturer needs no extra grant). **Surfaced as a dialog, not a toast**: on macOS the renderer shows `ScreenPermissionDialog` (Open settings / Relaunch) for this code; every other platform falls back to the usual error toast |
 | `SCREENSHOT_TIMEOUT` | "Screenshot capture timed out" | 30s for macOS screencapture; 60s for the cross-platform overlay |
-| `SCREENSHOT_CANCELLED` | "Screenshot capture was cancelled" | User ESC during selection |
+| `SCREENSHOT_CANCELLED` | "Screenshot capture was cancelled" | User ESC during selection. On macOS this code is **reclassified** to `SCREENSHOT_PERMISSION_DENIED` when the capture produced no file *and* `systemPreferences.getMediaAccessStatus('screen') === 'denied'` – a denied `screencapture` exits 0 with no file, so cancel and denial are otherwise indistinguishable |
 | `SCREENSHOT_FAILED` | "Failed to capture screenshot" | Generic fallback |
-| `SCREENSHOT_NOT_SUPPORTED` | "Screenshot capture is not supported on this platform" | Linux (no capturer wired) |
+| `SCREENSHOT_NOT_SUPPORTED` | "Screenshot capture is not supported on this platform" | Any platform that is neither `darwin` nor `win32` – `pickCapturer()` returns `UnsupportedCapturer`, whose every method short-circuits with this code |
 | `SCREENSHOT_OVERLAY_FAILED` | "Could not open the screenshot selection overlay" | Windows-only; overlay BrowserWindow load failed (#164) |
 | `SCREENSHOT_WINDOW_NOT_FOUND` | "The selected window is no longer available" | desktopCapturer source vanished between picker and capture (#164) |
 | `SCREENSHOT_DISPLAY_NOT_FOUND` | "The selected display is no longer available" | display unplugged mid-capture (#164) |
-| `CAMERA_PERMISSION_DENIED` | "Camera permission required..." | cross-platform |
-| `CAMERA_NOT_FOUND` | "No camera found..." | No device enumerated |
-| `CAMERA_DISCONNECTED` | "Camera was disconnected during capture" | Mid-capture failure |
-| `CAMERA_SAVE_FAILED` / `CAMERA_INVALID_DATA` | "Failed to save photo" / "Invalid photo data received" | `CameraService.save()` guards |
+| `CAMERA_PERMISSION_DENIED` | "Camera permission required..." | Enum-only – never emitted by the main process (see note below) |
+| `CAMERA_NOT_FOUND` | "No camera found..." | Enum-only – never emitted by the main process (see note below) |
+| `CAMERA_DISCONNECTED` | "Camera was disconnected during capture" | Enum-only – never emitted by the main process (see note below) |
+| `CAMERA_SAVE_FAILED` | "Failed to save photo" | `CameraService.save()` write failure |
+| `CAMERA_INVALID_DATA` | "Invalid photo data received" | `CameraService.save()` payload guards (bad data URL, size cap) |
+
+> **Camera codes are split across two vocabularies.** Only `CAMERA_SAVE_FAILED` and `CAMERA_INVALID_DATA` are ever returned by the main process – `CameraService.save()` emits nothing else. `CAMERA_PERMISSION_DENIED`, `CAMERA_NOT_FOUND` and `CAMERA_DISCONNECTED` exist in the `ErrorCode` enum but no main-process code path produces them.
+>
+> The permission and device errors users actually see come from a **separate renderer-only union**, `CameraErrorCode` in [`src/renderer/src/hooks/useCameraCapture.ts`](../src/renderer/src/hooks/useCameraCapture.ts), which maps MediaDevices `DOMException`s: `NotAllowedError` → `CAMERA_PERMISSION_DENIED`, `NotFoundError` → `CAMERA_NOT_FOUND`, `NotReadableError` → `CAMERA_IN_USE`, `AbortError` → `CAMERA_DISCONNECTED`, anything else → `CAMERA_UNKNOWN_ERROR`. That union carries two members the enum does not have (`CAMERA_IN_USE`, `CAMERA_UNKNOWN_ERROR`), and its user-facing strings differ from the enum's – e.g. "Camera access denied. Please grant camera permission in your system settings." rather than "Camera permission required. Grant access in System Settings > Privacy & Security.", and "No camera detected. Please connect a camera and try again." rather than "No camera found. Please connect a camera and try again." When reading a camera error, check which side produced it before matching on the string.
 
 ---
 
 ## Logging (3 codes)
+
+3 `LOGGING_*` in `src/shared/errors.ts`.
 
 `LOGGING_INIT_FAILED`, `LOGGING_WRITE_FAILED`, `LOGGING_CLEANUP_FAILED`. See `docs/logging.md`.
 
@@ -85,11 +102,15 @@ Grouped by pipeline stage. See `docs/api-services-features.md` §LiteParseConver
 
 ## External file drop (7 codes)
 
+7 `EXTERNAL_FILE_*` in `src/shared/errors.ts`.
+
 `EXTERNAL_FILE_NOT_FOUND`, `EXTERNAL_FILE_IS_DIRECTORY`, `EXTERNAL_FILE_NOT_REGULAR`, `EXTERNAL_FILE_SYMLINK_SYSTEM`, `EXTERNAL_FILE_COPY_FAILED`, `EXTERNAL_FILE_MOVE_FAILED`, `EXTERNAL_FILE_SOURCE_DELETED`. See `src/main/services/ExternalFileService.ts` + Spec #012.
 
 ---
 
 ## Transcription – OpenAI backend (10 codes)
+
+10 `TRANSCRIPTION_*` in `src/shared/errors.ts`.
 
 `TRANSCRIPTION_NO_API_KEY`, `TRANSCRIPTION_INVALID_API_KEY`, `TRANSCRIPTION_API_ERROR`, `TRANSCRIPTION_RATE_LIMITED`, `TRANSCRIPTION_NETWORK_ERROR`, `TRANSCRIPTION_CANCELLED`, `TRANSCRIPTION_INVALID_AUDIO`, `TRANSCRIPTION_CHUNK_FAILED`, `TRANSCRIPTION_TIMEOUT`, `TRANSCRIPTION_FAILED`.
 
@@ -97,15 +118,18 @@ See `src/main/services/TranscriptionService.ts`. Retry semantics documented in `
 
 ---
 
-## Local Whisper (9 codes) — highest operator-visibility
+## Local Whisper (14 codes) — highest operator-visibility
+
+14 `WHISPER_*` in `src/shared/errors.ts`.
 
 Most Phase 4 / issue #165. See also [`docs/windows/whisper-support-runbook.md`](./windows/whisper-support-runbook.md) for diagnostic trail, log paths, and stuck-user procedures.
 
 | Code | User copy | Thrown at | Operator action |
 |------|-----------|-----------|-----------------|
-| `WHISPER_BINARY_NOT_FOUND` | "Whisper binary not found. Please download it from Settings." | `WhisperModelManager.getBinaryPath()` when `isBinaryInstalled()` returns false | User: click Download in Settings |
+| `WHISPER_BINARY_NOT_FOUND` | "Whisper binary not found. Please download it from Settings." | Enum-only – never emitted by the main process. `getBinaryPath()` calls `getSpecOrThrow()` then `join()`, so the only code it can raise is `WHISPER_UNSUPPORTED_PLATFORM`; a missing binary is handled by `ensureBinary()`, which downloads rather than throwing | None – no user-reachable path. If it ever surfaces, a new throw site was added without updating this table |
 | `WHISPER_BINARY_DOWNLOAD_FAILED` | "Failed to download whisper binary..." | Generic fallback in `ensureBinary` catch; also: signal abort, network failures from `SecureDownloaderError` | Check network; retry |
-| `WHISPER_MODEL_NOT_FOUND` / `WHISPER_MODEL_DOWNLOAD_FAILED` | "...download it from Settings" / "Failed to download whisper model..." | `ensureModel()` | Retry; check huggingface.co reachability |
+| `WHISPER_MODEL_NOT_FOUND` | "Whisper model not found. Please download it from Settings." | `WhisperModelManager.deleteModel()` only — `unlink()` rejects with `ENOENT` (or any other error) for the model being removed. `ensureModel()` never throws it: an absent model is exactly the case it downloads | Operator: benign — the model was already gone, so the delete is a no-op. Refresh the Settings model list; if it persists, the installed-model cache is out of sync with `{userData}/whisper/models/` |
+| `WHISPER_MODEL_DOWNLOAD_FAILED` | "Failed to download whisper model. Please check your connection and try again." | `ensureModel()` download failure | Retry; check huggingface.co reachability |
 | `WHISPER_PROCESS_FAILED` | "Local transcription failed..." | `runWhisper()` non-zero exit, spawn error | Check stderr in logs |
 | `WHISPER_PROCESS_TIMEOUT` | "Local transcription timed out..." | Per-chunk timeout at `LOCAL_WHISPER.PROCESS_TIMEOUT` | Try smaller model / shorter file |
 | `WHISPER_OUTPUT_PARSE_FAILED` | "Failed to parse transcription output..." | Missing `${audio}.txt` after successful exit | Usually a whisper-cli bug; report upstream SHA |
@@ -120,6 +144,8 @@ Most Phase 4 / issue #165. See also [`docs/windows/whisper-support-runbook.md`](
 ---
 
 ## Video import (3 codes)
+
+3 `VIDEO_*` in `src/shared/errors.ts`.
 
 `VIDEO_NO_AUDIO_TRACK`, `VIDEO_EXTRACTION_FAILED`, `VIDEO_FFMPEG_UNAVAILABLE`. See `src/main/services/AudioExtractionService.ts`.
 
@@ -163,6 +189,8 @@ Not every code is thrown: `GRAPH_INDEX_CANCELLED` is emitted as a terminal `last
 ---
 
 ## Generic (1 code)
+
+1 code (`UNKNOWN_ERROR`) in `src/shared/errors.ts`.
 
 `UNKNOWN_ERROR` — fallback for anything unmapped. `getUserFriendlyMessage()` returns this for non-`AppError` errors at the IPC boundary to prevent internal-detail leaks.
 

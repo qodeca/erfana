@@ -35,8 +35,14 @@ import { logger } from '../LoggingService'
 import { encodeProjectDir } from './encodeCwd'
 import { locateTranscriptCandidates, MAX_CANDIDATES } from './ClaudeTranscriptLocator'
 import { parseTranscript, type ParsedTurn } from './ClaudeTranscriptParser'
-import { detectWindowSize } from './ClaudeWindowDetector'
-import { friendlyModelName } from './friendlyModelName'
+import {
+  detectWindowDetail,
+  windowIsCorroborated,
+  type WindowDetection,
+  type WindowRule
+} from './ClaudeWindowDetector'
+import { friendlyModelName, sanitizeModelId } from './friendlyModelName'
+import { stickyModelKey } from './modelId'
 import { clampPercent, levelFor } from './thresholds'
 import { createProcessDetector } from './process/createProcessDetector'
 import type { IClaudeProcessDetector } from './process/types'
@@ -98,8 +104,12 @@ export interface ClaudeStatusDeps {
     modelId: string,
     used: number,
     forceExtended?: boolean,
-    opts?: { settingsPath?: string; now?: () => number }
-  ) => Promise<200000 | 1000000>
+    opts?: {
+      settingsPath?: string
+      now?: () => number
+      forceStandard?: boolean
+    }
+  ) => Promise<200000 | 1000000 | WindowDetection>
   /** External chokidar watcher owning the watched-dir set. */
   watcher: ClaudeTranscriptWatcher
   /** Push a change payload to a webContents (wired to electron send later). */
@@ -132,7 +142,7 @@ interface PanelEntry {
    * UNCHANGED model.
    */
   observedExtended?: boolean
-  /** Model id the {@link observedExtended} sticky bit currently applies to. */
+  /** Canonical, date-dropped model key {@link observedExtended} applies to (#41). */
   windowModelId?: string
 }
 
@@ -176,10 +186,14 @@ export class ClaudeStatusService {
         deps?.locateTranscripts ??
         ((cwd, minMtimeMs) => locateTranscriptCandidates(cwd, { minMtimeMs })),
       parseTranscript: deps?.parseTranscript ?? ((file) => parseTranscript(file)),
+      // The real dep reports the FULL detection (window + corroboration + which
+      // rule decided). A substitute may return just the size; the service then
+      // falls back to the in-memory corroboration signals, which is what every
+      // existing test mock does.
       detectWindowSize:
         deps?.detectWindowSize ??
         ((modelId, used, forceExtended, opts) =>
-          detectWindowSize(modelId, used, forceExtended, opts)),
+          detectWindowDetail(modelId, used, forceExtended, opts)),
       watcher,
       emit: deps?.emit ?? (() => {})
     }
@@ -366,59 +380,58 @@ export class ClaudeStatusService {
         return
       }
 
-      // 4. Window detection + snapshot composition. Detection runs on the REAL
-      // (pre-compaction) token count so a >200k signal still upgrades to 1M.
-      const detectedWindow = await this.deps.detectWindowSize(
-        parsed.modelId,
-        parsed.usedTokens,
-        parsed.modelForcedExtended
-      )
-      if (isStale()) return
+      // 4. Window detection + sticky state machine (extracted; see resolveWindow).
+      const resolved = await this.resolveWindow(entry, parsed, isStale)
+      if (resolved === null) return
+      const { windowSize, inferred, rule } = resolved
 
-      // Invalidate the sticky 1M bit on any genuine model/mode change so a
-      // mid-session switch (e.g. Opus 1M → Sonnet 200k) downgrades immediately:
-      //  - the model id changed (a switch re-evaluates from scratch), or
-      //  - the user explicitly selected standard mode (`/model …` without `[1m]`).
-      if (entry.windowModelId !== parsed.modelId) {
-        entry.observedExtended = false
-        entry.windowModelId = parsed.modelId
-      }
-      if (parsed.modelForcedStandard) entry.observedExtended = false
-
-      // Sticky 1M (finding #5), now scoped to the current model: once THIS model is
-      // observed at 1M, keep it so a post-compaction token reset cannot shrink the
-      // badge 1M→200k for the unchanged model. `entry` is the live object here
-      // (isStale() above caught any re-registration).
-      if (detectedWindow === 1000000) entry.observedExtended = true
-      const windowSize: 200000 | 1000000 = entry.observedExtended ? 1000000 : detectedWindow
-
+      // 5. Snapshot composition.
       const used = parsed.justCompacted ? 0 : parsed.usedTokens
       const rawPercentage = windowSize > 0 ? (used / windowSize) * 100 : 0
       const payload: ClaudeStatusChangePayload = {
         terminalId,
         snapshot: {
           terminalId,
-          modelId: parsed.modelId,
+          // Sanitized, not merely truncated (security audit INFO-3): this is raw
+          // transcript text crossing into the renderer, and truncation alone let
+          // C0/C1 controls, newlines and bidi overrides through. Same sanitizer as
+          // `friendlyName` below, so the two fields cannot disagree about what is
+          // safe. No renderer code reads `modelId` today; it stays on the wire
+          // because the sticky-key tests use it as their observable for the
+          // "raw on the wire, canonical for latching" decision (design (b)).
+          modelId: sanitizeModelId(parsed.modelId),
           friendlyName: friendlyModelName(parsed.modelId),
           windowSize,
           usedTokens: used,
           percent: clampPercent(used, windowSize),
           level: levelFor(rawPercentage),
-          tooltip: `${kfmt(used)} / ${windowSize === 1000000 ? '1M' : '200k'}`
+          tooltip: `${kfmt(used)} / ${windowSize === 1000000 ? '1M' : '200k'}${inferred ? ' (inferred)' : ''}`,
+          // Also carried STRUCTURED, not only baked into the tooltip string: the
+          // renderer reformats the tooltip into `aria-valuetext`, where a trailing
+          // marker would land mid-sentence.
+          inferred
         }
       }
 
-      // 5. Final generation re-check, then re-fetch the live entry before the
+      // 6. Final generation re-check, then re-fetch the live entry before the
       // targeted send so the emit can never target a since-removed panel even if
       // an await is later inserted before this point (finding #14).
       if (isStale()) return
       const live = this.entries.get(terminalId)
       if (!live) return
+      // #41 was a WRONGLY-SIZED bar, not a hidden one, and `HideReason` only
+      // explains invisibility. Without the model, the rule that decided and
+      // whether the size was inferred, "my Opus 5 meter says 200k" produces a log
+      // line that cannot separate a registry miss from an env cap from a settings
+      // read. `modelId` is untrusted transcript text, so it is sanitized.
       this.recordOutcome(terminalId, 'shown', {
         pid: entry.pid,
         candidates: candidates.length,
         chosenFile: chosenFile ? path.basename(chosenFile) : undefined,
+        modelId: sanitizeModelId(parsed.modelId),
         windowSize,
+        rule,
+        inferred,
         used
       })
       this.emitTo(live.webContentsId, payload)
@@ -429,6 +442,81 @@ export class ClaudeStatusService {
         error: error instanceof Error ? error.message : String(error)
       })
       if (!isStale()) this.emitNull(terminalId, 'exception')
+    }
+  }
+
+  /**
+   * Resolve the window to DISPLAY for one refresh pass, plus whether that window
+   * is an inference rather than an observation. Detection runs on the REAL
+   * (pre-compaction) token count so a >200k signal still upgrades to 1M.
+   *
+   * MUTATES `entry.observedExtended` / `entry.windowModelId` — that IS the state
+   * machine, not a side effect. The staleness re-check therefore stays exactly
+   * where it was, BETWEEN the await and those mutations, so an aborted run leaves
+   * the sticky state untouched.
+   *
+   * @param isStale Live-generation guard owned by the calling refresh pass.
+   * @returns The window, its `inferred` flag and the rule that decided, or
+   *   `null` when the run went stale mid-detection (caller aborts, no emit).
+   */
+  private async resolveWindow(
+    entry: PanelEntry,
+    parsed: ParsedTurn,
+    isStale: () => boolean
+  ): Promise<{ windowSize: 200000 | 1000000; inferred: boolean; rule?: WindowRule } | null> {
+    // R0' (#41) rides in `opts`, built incrementally so a second field added
+    // later cannot have to re-derive every combination. Always passed, even when
+    // empty: `detectWindowDetail` reads `opts?.x` throughout, so the two shapes
+    // were behaviourally identical and a conditional branch existed only to
+    // satisfy an arity assertion — production control flow shaped by a mock.
+    const forceStandard = parsed.modelForcedStandard === true
+    const windowOpts: { forceStandard?: boolean } = {}
+    if (forceStandard) windowOpts.forceStandard = true
+
+    const detected = await this.deps.detectWindowSize(
+      parsed.modelId,
+      parsed.usedTokens,
+      forceStandard ? false : parsed.modelForcedExtended,
+      windowOpts
+    )
+    if (isStale()) return null
+
+    // A substitute dep may report only the size; it then contributes no
+    // corroboration and the in-memory signals below decide on their own.
+    const detectedWindow = typeof detected === 'number' ? detected : detected.windowSize
+    const detail = typeof detected === 'number' ? undefined : detected
+
+    // Invalidate the sticky 1M bit on any genuine model/mode change so a
+    // mid-session switch (e.g. Opus 1M → Sonnet 200k) downgrades immediately:
+    //  - the model id changed (a switch re-evaluates from scratch), or
+    //  - the user explicitly selected standard mode (`/model …` without `[1m]`).
+    const modelKey = stickyModelKey(parsed.modelId)
+    if (entry.windowModelId !== modelKey) {
+      entry.observedExtended = false
+      entry.windowModelId = modelKey
+    }
+    if (forceStandard) entry.observedExtended = false
+
+    // Sticky 1M (finding #5), scoped to the current model and — since #41 §5.3 —
+    // to a CORROBORATED 1M only, so a wrong registry row cannot latch for the
+    // session while an OBSERVED 1M still survives a post-compaction token reset.
+    //
+    // Corroboration is the OR of what this process can see in memory (R0, R2) and
+    // what the detection pass itself saw — which is the only way the settings.json
+    // `[1m]` (R3) can count. Without it a user who explicitly configured 1M had
+    // their own configuration labelled `(inferred)`.
+    const corroborated =
+      windowIsCorroborated(parsed.usedTokens, parsed.modelForcedExtended) ||
+      detail?.corroborated === true
+    if (detectedWindow === 1000000 && corroborated) entry.observedExtended = true
+    const sticky = entry.observedExtended === true
+    const windowSize: 200000 | 1000000 = sticky ? 1000000 : detectedWindow
+
+    // Say so in the UI (#41 §5.4): a registry-only 1M badge is an inference.
+    return {
+      windowSize,
+      inferred: windowSize === 1000000 && !corroborated && !sticky,
+      rule: detail?.rule
     }
   }
 

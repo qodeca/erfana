@@ -1,5 +1,7 @@
 # Deferred work — Phase 4 audit aftermath (D9–D12)
 
+> **Note**: issue and PR numbers, commit SHAs, release tags and CI run links below predate the 2026-06 open-source migration and no longer resolve on `qodeca/erfana`; they are retained as provenance.
+
 Continuation of [`deferred-work.md`](deferred-work.md) for items surfaced by the Phase 4 3-reviewer audit (2026-04-21). Same template as D1-D8. Items D9-D12 are **Phase 4** in origin; the Phase 2 items D1-D8 stay in the primary ledger.
 
 **GitHub-tracked under [#168](https://github.com/qodeca/erfana/issues/168)** — see primary ledger for full cross-issue indexing.
@@ -55,7 +57,7 @@ Plan §"LocalWhisperService" §"Modified modules" commits to logging `{url, expe
 
 ### What
 
-`src/main/services/whisper-assets.ts:50` declares `type WhisperPlatform = 'darwin-universal' | 'win32-x64'` — a concatenated-string enum. The architecture review flagged that the original plan prescribed `{platform: NodeJS.Platform, arch: NodeJS.Architecture | 'universal'}` as a structural tuple. `WhisperModelManager.ts:336` further uses substring-sniffing (`spec.filename.includes('macos')`) to pick a manifest key, which is fragile across future filename renames.
+`src/main/services/whisper-assets.ts:52` declares `type WhisperPlatform = 'darwin-universal' | 'win32-x64'` — a concatenated-string enum. The architecture review flagged that the original plan prescribed `{platform: NodeJS.Platform, arch: NodeJS.Architecture | 'universal'}` as a structural tuple. `WhisperModelManager.ts:337-338` further uses substring-sniffing (`spec.filename.includes('macos')`) to pick a manifest key, which is fragile across future filename renames.
 
 ### Why deferred
 

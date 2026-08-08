@@ -1,5 +1,7 @@
 # Phase 4 binary spec — whisper.cpp
 
+> **Note**: issue and PR numbers, commit SHAs, release tags and CI run links below predate the 2026-06 open-source migration and no longer resolve on `qodeca/erfana`; they are retained as provenance.
+
 Authoritative record of the whisper.cpp binary release currently pinned by Erfana. Update this file every time `src/main/services/whisper-assets.ts` advances to a new `whisper-build-*` tag.
 
 See [`docs/build/whisper-binaries.md`](../build/whisper-binaries.md) for the rebuild runbook.
@@ -151,7 +153,7 @@ Review checklist: see [`docs/build/whisper-binaries.md#diff-review-checklist-eve
 
 ## CPU-unsupported exit-code contract (POSIX vs Win32)
 
-`src/main/services/LocalWhisperService.ts:831-843` branches the CPU-unsupported detection on `process.platform === 'win32'` and reads from `WIN32_CPU_UNSUPPORTED_EXIT_CODES` or `POSIX_CPU_UNSUPPORTED_EXIT_CODES` accordingly. The `POSIX_*` set is currently **macOS-only by accident-of-support**: `classifyPlatform()` in `whisper-assets.ts:171-201` rejects Linux outright with a `WHISPER_UNSUPPORTED_PLATFORM` reason, so the POSIX path never actually executes against a Linux SIGILL today.
+`src/main/services/LocalWhisperService.ts:835-838` branches the CPU-unsupported detection on `process.platform === 'win32'` and reads from `WIN32_CPU_UNSUPPORTED_EXIT_CODES` or `POSIX_CPU_UNSUPPORTED_EXIT_CODES` accordingly. The `POSIX_*` set is currently **macOS-only by accident-of-support**: `classifyPlatform()` in `whisper-assets.ts:170-203` rejects Linux outright with a `WHISPER_UNSUPPORTED_PLATFORM` reason, so the POSIX path never actually executes against a Linux SIGILL today.
 
 Any future Linux enablement must validate the `POSIX_CPU_UNSUPPORTED_EXIT_CODES` set against Linux SIGILL exit codes before unlocking the platform; the macOS values are not guaranteed to match. The branch is correct today; the contract is just implicit.
 

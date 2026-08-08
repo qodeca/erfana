@@ -8,6 +8,8 @@ The Erfana editor subsystem provides a comprehensive markdown editing experience
 - [Markdown Preview](./markdown-preview.md) - Live preview rendering and features
 - [Scroll Synchronization](./scroll-sync.md) - Bidirectional editor-preview sync
 - [Formatting Toolbar](./toolbar.md) - Visual markdown formatting buttons
+- [Export](./export.md) - PDF and DOCX export pipeline
+- [Mermaid Viewer](./mermaid-viewer.md) - Diagram rendering, zoom and pan
 
 ## Key Features
 

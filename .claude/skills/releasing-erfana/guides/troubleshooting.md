@@ -16,7 +16,7 @@ This is the canonical cookbook for `release.yml` failures. Each row below is a r
 
 - **Regex:** `actions/attest-build-provenance.+(403|billing|enterprise)`
 - **Human-readable symptom:** `actions/attest-build-provenance` step fails with HTTP 403 / billing-gate error.
-- **Root cause:** Private repo on Free tier; SLSA Build L2 provenance via `actions/attest-build-provenance` is GitHub Enterprise Cloud-only.
+- **Root cause:** At the time (v0.9.5 bring-up) `qodeca/erfana` was a private repo, and GitHub gates `actions/attest-build-provenance` to Enterprise Cloud for private repos. **That constraint is gone** — the repo has been public since 2026-06-16 — so this row is historical: attestations stay off by choice, not by plan restriction, and re-enabling them is a deliberate `release.yml` change (see `docs/build/release.md`). The row is kept because the regex still classifies the log signature if an attest step is ever re-added and fails.
 - **Fix:** Removed all `attest-build-provenance` steps from `build_*.yml` and `release.yml` finalize. Authenticity now relies on minisign + per-platform OS signing.
 - **Platform:** All
 - **First seen:** run 24897481170

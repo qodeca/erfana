@@ -14,10 +14,10 @@ npm run build:win        # Windows package (NSIS .exe; needs Developer Mode)
 # Quality
 npm run typecheck        # Type checking (node + web)
 npm run lint             # Linting
-npm run test             # All tests (vitest workspace)
-npm run test:main        # Main-process tests only (~90 files)
-npm run test:renderer    # Renderer tests (workspace; uses jsdom)
-npm run test:preload     # Preload tests
+npm run test             # All tests (vitest workspace: main + renderer + preload)
+npm run test:main        # vitest.main.ts config: src/main + src/shared + scripts (~134 test files)
+npm run test:renderer    # vitest.renderer.ts config: src/renderer/src only (jsdom)
+npm run test:preload     # vitest.preload.ts config: preload tests
 npm run test:cov         # Coverage report (all 3 projects)
 npm run test:e2e         # E2E tests (Playwright + Electron)
 npm run test:e2e:visual            # Visual regression baselines
@@ -26,17 +26,23 @@ npm run test:e2e:update-screenshots # Refresh visual baselines
 
 ## Keyboard Shortcuts
 
-| Action | macOS | Windows/Linux |
-|--------|-------|---------------|
+| Action | macOS | Windows |
+|--------|-------|---------|
 | Save | `Cmd+S` | `Ctrl+S` |
-| Find | `Cmd+F` | `Ctrl+F` |
+| Search | `Cmd+F` | `Ctrl+F` |
+| Next / previous match | `Cmd+G` / `Cmd+Shift+G` | `Ctrl+G` / `Ctrl+Shift+G` |
+| Close editor tab | `Cmd+W` | `Ctrl+W` |
+| Insert link | `Cmd+K` | `Ctrl+K` |
 | Command palette | `F1` | `F1` |
 | Toggle sidebar | `Cmd+B` | `Ctrl+B` |
 | Toggle terminal | `Cmd+J` | `Ctrl+J` |
 | Maximize terminal | `Cmd+Shift+M` | `Ctrl+Shift+M` |
-| Settings | `Cmd+,` | `Ctrl+,` |
+| Refresh project tree | `Cmd+Option+R` | `Ctrl+Alt+R` |
+| New window | `Cmd+Shift+N` | `Ctrl+Shift+N` |
 | Comment line | `Cmd+/` | `Ctrl+/` |
 | Multi-cursor | `Option+Click` | `Alt+Click` |
+
+Settings has no keyboard shortcut – open it with the gear icon at the bottom of the left activity bar (`Esc` closes it). Erfana ships for macOS and Windows only.
 
 Full list: [Keyboard Shortcuts](./keyboard-shortcuts.md)
 
@@ -69,14 +75,14 @@ Full guide: [UI Style Guide](./ui-style-guide.md)
 
 ```
 src/
-├── main/services/     # Backend services
-├── main/ipc/          # IPC handlers
-├── preload/           # Context bridge
-├── shared/            # Shared types/schemas
-└── renderer/
-    ├── components/    # React UI
-    ├── stores/        # Zustand state
-    └── prompts/       # AI templates
+├── main/services/         # Backend services
+├── main/ipc/              # IPC handlers
+├── preload/               # Context bridge
+├── shared/                # Shared types/schemas
+└── renderer/src/
+    ├── components/        # React UI
+    ├── stores/            # Zustand state
+    └── prompts/           # AI templates
 ```
 
 ## IPC Pattern

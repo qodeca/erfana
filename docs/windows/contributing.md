@@ -1,5 +1,7 @@
 # Contributing to Windows enablement
 
+> **Note**: issue and PR numbers, commit SHAs, release tags and CI run links below predate the 2026-06 open-source migration and no longer resolve on `qodeca/erfana`; they are retained as provenance.
+
 Workflow for contributors working on Windows parity (Phases 0–6). Environment setup lives in [`../build/windows.md`](../build/windows.md); this file is workflow only.
 
 > **Fresh setup just works.** As of [#213](https://github.com/qodeca/erfana/issues/213), `git clone && npm ci` completes on a default-hardened Windows 11 box with no manual `node_modules` recovery. The committed `patches/node-pty+1.1.0.patch` (applied via `patch-package` in `postinstall`) fixes the two `node-pty` build failures that previously broke a clean install — see [`../build/windows.md` § node-pty build failures on Windows 11](../build/windows.md#node-pty-build-failures-on-windows-11). Do not hand-edit anything under `node_modules`; if you bump `node-pty`, regenerate the patch instead (procedure in [`../build/README.md`](../build/README.md#install-dependencies)).
@@ -59,7 +61,7 @@ Cross-platform refactors that happen to also fix a Windows path use the affected
 
 ## Testing expectations
 
-Windows-targeted CI is **Phase 6** ([#167](https://github.com/qodeca/erfana/issues/167)). Until it lands, running tests on Windows before opening a PR is the contributor's responsibility.
+Windows-targeted CI is **live**: `.github/workflows/checks.yml` runs a `windows-checks` job on `windows-latest` (typecheck + `npm run test:main`, `shell: bash`) on every push. It is **advisory** — deliberately not in the branch-protection required-check set until it proves stable — so a red `windows-checks` does not block a merge. Running the full test set on a Windows host before opening a PR therefore remains the contributor's responsibility; the CI job is a safety net, not a gate.
 
 ### Before every Windows PR
 
@@ -160,7 +162,7 @@ Default: **one test file per source file** matching the `<Source>.test.ts` patte
 3. **The split aligns with a code review boundary**. If the new tests are "regression tests for finding X from audit Y", keeping them in a named file (`<Source>.<concern>.test.ts`) aids future reviewer discoverability.
 
 **Reference implementations**:
-- `src/main/services/WhisperModelManager.downgrade.test.ts` sits alongside `WhisperModelManager.test.ts`. The older file uses `mockFetch` at global level (pre-Phase-4 code path); the new file mocks at `secureDownloader` + `verifyManifest` module boundaries. Merging would require rewriting either side, which wasn't the scope of the Phase 4 audit fix. The split is tracked as [D12 in `deferred-work-phase4.md`](deferred-work-phase4.md#d12--rewrite-remaining-5-skip-tests-in-whispermodelmanagertests).
+- `src/main/services/WhisperModelManager.downgrade.test.ts` sits alongside `WhisperModelManager.test.ts`. The older file uses `mockFetch` at global level (pre-Phase-4 code path); the new file mocks at `secureDownloader` + `verifyManifest` module boundaries. Merging would require rewriting either side, which wasn't the scope of the Phase 4 audit fix. The split is tracked as [D12 in `deferred-work-phase4.md`](deferred-work-phase4.md#d12--rewrite-remaining-5-skip-tests-in-whispermodelmanagertestts---resolved-2026-04-23).
 - `src/main/services/FileService.copyItem.limit.test.ts` sits alongside `FileService.copyItem.test.ts`. The older file exercises real disk I/O via `mkdtemp`/`writeFile` in each test — appropriate for happy-path conflict resolution. The `.limit.test.ts` file mocks `fs/promises` at module level to test the `MAX_COPY_ATTEMPTS` safety guard without creating 1001 real files (25+ s on NTFS + Defender). Landed as part of the Windows flake remediation pool (#172).
 
 **Naming**: `<Source>.test.ts` for baseline, `<Source>.<concern>.test.ts` for splits. The `<concern>` should be the narrowest label that makes the split obvious at `ls` time (`downgrade`, `limit`, `timeout`, `e2e`, etc.).

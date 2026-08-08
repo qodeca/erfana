@@ -14,7 +14,7 @@ Phases 0–2 of Windows enablement shipped in **v0.9.3** (2026-04-22); Phase 4 (
 
 **Workaround**: Right-click the `.exe` → Properties → Unblock; OR click "More info → Run anyway" in the SmartScreen dialog.
 
-**Tracking**: [#166](https://github.com/qodeca/erfana/issues/166) (Phase 5 — code-signing).
+**Tracking**: #166 (Phase 5 — code-signing).
 
 ---
 
@@ -24,7 +24,7 @@ Phases 0–2 of Windows enablement shipped in **v0.9.3** (2026-04-22); Phase 4 (
 
 **Workaround**: Run `npx vitest --run --config vitest.main.ts --coverage` directly (exits 0). On macOS the wrapper exits 0 normally.
 
-**Tracking**: [#158](https://github.com/qodeca/erfana/issues/158) (Phase 6 — switch coverage provider to Istanbul OR reduce parallelism on Windows).
+**Tracking**: #158 (Phase 6 — switch coverage provider to Istanbul OR reduce parallelism on Windows).
 
 ---
 
@@ -34,7 +34,7 @@ Phases 0–2 of Windows enablement shipped in **v0.9.3** (2026-04-22); Phase 4 (
 
 **Workaround**: Enable Win32 long paths per [`docs/build/windows.md`](./build/windows.md) step 5 + `git config --global core.longpaths true`.
 
-**Tracking**: [#163](https://github.com/qodeca/erfana/issues/163) (decision-deferred to Phase 6 with promotion criteria recorded inline at `PlatformConfig.ts:194-201`).
+**Tracking**: #163 (decision-deferred to Phase 6 with promotion criteria recorded inline at `PlatformConfig.ts:194-201`).
 
 ---
 
@@ -56,7 +56,7 @@ Phases 0–2 of Windows enablement shipped in **v0.9.3** (2026-04-22); Phase 4 (
 
 **Workaround**: SHA-256 pinning + MOTW strip in `WhisperModelManager` means the binary has the same integrity guarantee as a signed one for Erfana's trust chain; only SmartScreen's UX-layer prompt is affected. Click "Run anyway" once. Erfana's own installer is signed, so this affects only the whisper subprocess.
 
-**Tracking**: [Phase 5](https://github.com/qodeca/erfana/issues/166) — procure Windows code-sign cert and add a signtool step to `.github/workflows/whisper-binaries.yml`.
+**Tracking**: Phase 5 (#166) — procure Windows code-sign cert and add a signtool step to `.github/workflows/whisper-binaries.yml`.
 
 ---
 
@@ -129,19 +129,23 @@ Pipeline contributors on Windows:
 
 ### Claude Code status bar: 1M-window detection caveats and token-count access
 
-**Issue**: Two documented limitations of the status bar:
-- **Rare-enterprise over-statement (inverse of the old bug).** Window detection now uses a model-capability registry: Claude Code auto-upgrades **Opus 4.6+** to the 1M window with no on-disk marker, so the bar correctly badges **1M** for an auto-upgraded Opus session under 200k usage (this fixes the prior bug where such a session briefly badged 200k). The remaining edge case is the *inverse*: a 200k-capped Opus deployment — e.g. **Microsoft Foundry Opus 4.8** — is actually 200k, but the registry over-states it as **1M** and so under-warns (it can never cross 200k to self-correct). Sonnet/Haiku/older models, and any unrecognized id, still default to 200k unless an explicit `settings.json` `[1m]` or observed usage > 200k forces 1M.
+**Issue**: Six documented limitations of the status bar:
+- **The window is not decided by the model name alone.** Since [#41](https://github.com/qodeca/erfana/issues/41) the bar sizes the window from a table of known models, verified 2026-08-07 against Anthropic's published model and Claude Code documentation: 1M for `claude-opus-5` / `4-8` / `4-7`, `claude-sonnet-5`, `claude-fable-5` and Mythos; 200k for `claude-opus-4-6` and older Opus, `claude-sonnet-4-6` and older Sonnet, and all Haiku. The two 4.6 entries are **plan-conditional defaults, not ceilings**: Opus 4.6 runs at 1M where the plan includes extended context (auto-granted on Max, Team and Enterprise), and Sonnet 4.6 runs at 1M with usage credits, which no plan includes by default — Max included. Erfana shows 200k for both whatever your plan is; the meter re-scales to 1M once your real usage crosses 200k, or immediately if you select the 1M variant yourself. The opposite error also exists: a Bedrock, Google Cloud or **Microsoft Foundry** deployment caps Opus at 200k, and an API gateway pointed at a custom base URL may budget a 1M model at 200k. None of that appears in the session files Erfana reads, so such a session can be badged **1M** and under-warn — and it can never cross 200k to correct itself.
+- **One signal decides, in a fixed order.** The bar does not blend signals; it takes the first one that applies: your real usage passing 200k (a 200k window physically cannot hold more, so this always wins) → the model you selected with `/model` this session (with a `[1m]` marker it means 1M; without one it means 200k) → a `[1m]` marker on the model name itself → the model table → a `[1m]` model in your `~/.claude/settings.json` → 200k. The table sits above the settings file deliberately: only a 1M entry in the table ends the search, so a 200k entry still leaves room for your settings file to upgrade the window.
+- **A 1M badge that rests on the table alone is marked `(inferred)`.** The marker appears in the hover tooltip and is read out by screen readers; the reading is recomputed on every update and never sticks for the session. Only a 1M that is confirmed — by real usage above 200k, by your own `/model …[1m]` selection, or by a `[1m]` model in your settings file — sticks. This bounds the damage of a wrong table entry without healing it: only crossing 200k of real usage corrects a wrong 200k, and nothing demotes a wrong 1M mid-session. The table carries a verification date with a test that fails once it is 180 days old, so staleness breaks the build rather than quietly mis-scaling the meter.
+- **An unfamiliar model name is guessed one generation at a time.** A name whose major version is already known inherits the window of that major version's newest known release, within four point releases — so a hypothetical `claude-sonnet-4-7` shows **200k**, like Sonnet 4.6, and not 1M like Sonnet 5. Only a name with an entirely unknown major version inherits the family's newest window, and only one generation ahead. Unrecognised families and bare names such as `opus` get no guess at all and fall back to 200k.
+- **Erfana cannot tell when you have switched the 1M window off.** If you disable the extended window in your own Claude Code configuration, the bar may still show 1M. An earlier rule that read the terminal environment for this was removed in [#41](https://github.com/qodeca/erfana/issues/41) — it could almost never fire (Erfana strips Claude Code's own variables from terminals it spawns), what remained proved only where requests were routed rather than how large the window was, and it overrode explicit user configuration. A narrower replacement that reads your settings instead is tracked as [#48](https://github.com/qodeca/erfana/issues/48).
 - Exact token counts (e.g. "84k / 200k") are available via the native-title hover tooltip / `aria-valuetext` only. The bar is non-focusable in v1, so the exact figures are not reachable by keyboard alone.
 
-**Workaround**: The percentage and color band remain accurate against the *displayed* window throughout; hover with the mouse (or read `aria-valuetext` via a screen reader) for exact tokens. There is no workaround for the Foundry-Opus over-statement — it is an accepted rare-enterprise trade-off (better to over-state for the rare 200k-capped deployment than under-warn the common auto-upgraded 1M case).
+**Workaround**: The percentage and color band remain accurate against the *displayed* window throughout; hover with the mouse (or read `aria-valuetext` via a screen reader) for exact tokens, and treat an `(inferred)` 1M badge as an estimate. There is no workaround for a capped-deployment over-statement — it is an accepted rare-enterprise trade-off (better to over-state for the rare 200k-capped deployment than under-warn the common 1M case).
 
-**Tracking**: Accepted residual limitations, consistent with the issue's degrade-gracefully philosophy. See [`docs/designs/216-claude-status-bar.md`](./designs/216-claude-status-bar.md).
+**Tracking**: Accepted residual limitations, consistent with the issue's degrade-gracefully philosophy. See [`docs/designs/41-model-capability-registry.md`](./designs/41-model-capability-registry.md) §5 (authoritative for model-id parsing and window sizing) and [`docs/designs/216-claude-status-bar.md`](./designs/216-claude-status-bar.md).
 
 ---
 
 ### Screenshot capture on Windows
 
-**Status**: ✅ Resolved by [#164](https://github.com/qodeca/erfana/issues/164) (Phase 3) — `ScreenshotService` now picks `MacScreenshotCapturer` on `darwin` and `DesktopCapturerScreenshotCapturer` on Windows + Linux. All three modes (screen / window / area) work cross-platform via Electron's `desktopCapturer` and an in-app overlay window. Area selection currently spawns the overlay on the **primary display only**; multi-display area-select is a deferred polish item.
+**Status**: ✅ Resolved by #164 (Phase 3) – `pickCapturer()` picks `MacScreenshotCapturer` on `darwin` and `DesktopCapturerScreenshotCapturer` on `win32`; every other platform gets `UnsupportedCapturer`, which fails each call with `SCREENSHOT_NOT_SUPPORTED`. All three modes (screen / window / area) work on both supported platforms via Electron's `desktopCapturer` and in-app overlay windows. Area selection spawns **one overlay per attached display** (`screen.getAllDisplays()`), so multi-display area-select is shipped – see [`docs/windows/implementation-plan.md`](./windows/implementation-plan.md).
 
 ---
 
@@ -167,11 +171,29 @@ Pipeline contributors on Windows:
 
 **Workaround (historical)**: None for end-users — upgrade to v0.9.6 or later. Manual `chmod 755 <app>.app/Contents/Resources/app.asar.unpacked/node_modules/node-pty/prebuilds/darwin-*/Release/spawn-helper` also worked but invalidated the codesign envelope.
 
-**Fix**: [`ea3eaf1`](https://github.com/qodeca/erfana/commit/ea3eaf1) — `scripts/fuses.js` `afterPack` hook now `chmod 0755`'s every `spawn-helper` under `node-pty/prebuilds/*/` before code-signing. `requireMatch: true` on platform-host match fails the build if zero helpers are found, blocking ship of a broken DMG. Documented in [`docs/build/fuses.md`](./build/fuses.md#afterpack-also-chmods-node-pty-spawn-helper).
+**Fix**: commit `ea3eaf1` (no longer resolvable — that history was rewritten at the 2026-06 migration) — `scripts/fuses.js` `afterPack` hook now `chmod 0755`'s every `spawn-helper` under `node-pty/prebuilds/*/` before code-signing. `requireMatch: true` on platform-host match fails the build if zero helpers are found, blocking ship of a broken DMG. Documented in [`docs/build/fuses.md`](./build/fuses.md#afterpack-also-chmods-node-pty-spawn-helper).
 
 ---
 
 ## Active Issues
+
+### macOS Screen Recording: Erfana asks for permission every time
+
+**Issue**: On macOS, screen capture keeps prompting for Screen Recording permission (or keeps failing with `SCREENSHOT_PERMISSION_DENIED`) even though the grant is already visible and enabled under System Settings › Privacy & Security › Screen Recording.
+
+**Root cause**: A stale TCC (Transparency, Consent and Control) record on the machine – typically left behind by an ad-hoc-signed build, a re-signed build, or an app bundle that moved. This is a machine-state problem, not an app bug: the OS is matching the grant against a code signature that no longer corresponds to the installed bundle. Because a denied `/usr/sbin/screencapture` exits 0 with no file, Erfana re-classifies the empty result as `SCREENSHOT_PERMISSION_DENIED` and shows `ScreenPermissionDialog` (see [terminal/README.md § macOS Screen Recording permission](./terminal/README.md#screenshot-capture-v065-macos-cross-platform-via-164)).
+
+**Workaround**: Reset the record and reboot.
+
+```bash
+tccutil reset ScreenCapture com.erfana.app
+```
+
+Then relaunch Erfana and grant the permission again when prompted. A relaunch is genuinely required – macOS applies a fresh Screen Recording grant only to a newly-launched process – which is why the in-app dialog offers a *Relaunch* button next to *Open settings*.
+
+**Tracking**: Accepted OS behaviour; no code fix planned.
+
+---
 
 ### Visual regression E2E suite hangs on GitHub `macos-latest` CI
 
@@ -249,17 +271,17 @@ ModuleNotFoundError: No module named 'distutils'
 
 Solution: downgrade to Python 3.12 (the `node-gyp` shipped with Node 24 doesn't yet handle Python 3.13's removed `distutils`). Not auto-fixable — see [`docs/build/windows.md`](./build/windows.md) step 2.
 
-**2. Windows 11 — `cmd.exe` current-directory hardening (resolved by [#213](https://github.com/qodeca/erfana/issues/213))**
+**2. Windows 11 — `cmd.exe` current-directory hardening (resolved by #213)**
 
 Symptom: `'GetCommitHash.bat' is not recognized` during the winpty build. When Windows sets `NoDefaultCurrentDirectoryInExePath=1` (a security-hardening flag, often via enterprise / Group Policy baselines), `cmd.exe` stops searching the current directory, so node-pty's `winpty.gyp` `.bat` invocations fail.
 
-**3. Windows 11 — Spectre-mitigated libraries (resolved by [#213](https://github.com/qodeca/erfana/issues/213))**
+**3. Windows 11 — Spectre-mitigated libraries (resolved by #213)**
 
 Symptom: `MSB8040: Spectre-mitigated libraries are required for this project`. node-pty's gyp requests `SpectreMitigation: 'Spectre'`, which fails on a default MSVC install that lacks those libs.
 
 **Status of (2) and (3)**: both are now handled automatically by the committed `patches/node-pty+1.1.0.patch`, applied via `patch-package` in the `postinstall` hook, so a fresh `npm ci` on a default-hardened Windows 11 box succeeds. The patch is keyed to the resolved version — when `node-pty` is bumped it must be regenerated (see [`docs/build/README.md`](./build/README.md#install-dependencies) and [`docs/build/windows.md` § node-pty build failures on Windows 11](./build/windows.md#node-pty-build-failures-on-windows-11)). A follow-up will evaluate node-pty `1.2.0-beta.7+`, which removes the winpty build step and eliminates failure (2) at the root.
 
-**Tracking**: [#213](https://github.com/qodeca/erfana/issues/213) (Windows 11 build fix, resolved); https://github.com/microsoft/node-pty/issues (upstream).
+**Tracking**: #213 (Windows 11 build fix, resolved); https://github.com/microsoft/node-pty/issues (upstream).
 
 ---
 

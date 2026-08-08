@@ -4,6 +4,30 @@ Per-version release notes for Erfana (v0.6.0 onwards; earlier in [archive/change
 
 > **Note:** In v0.7.2, BRS (Business Requirements Specifications) were renamed to "specs" and relocated from `specs/business-reqs/` to `specs/spec-t{tier}-{id}-{slug}/`. All references in code and docs now use `Spec #XXX`. Historical entries below have been updated accordingly.
 
+## Unreleased
+
+### Added
+
+- **macOS Screen Recording permission – grant-and-relaunch flow** – when a screenshot capture is denied by macOS, Erfana now shows `ScreenPermissionDialog` instead of a dead-end error toast. It offers *Open settings* (jumps straight to the Screen Recording privacy pane) and *Relaunch* (macOS applies a fresh grant only to a newly-launched process, so restarting is genuinely required). The capture is always attempted first and is never gated by a permission pre-check, so a stale TCC record cannot block a user who does have access. Backed by two sender-gated `system:*` IPC channels. Other platforms keep the toast fallback. See [`docs/terminal/README.md`](terminal/README.md).
+
+### Changed
+
+- **The camera preview is no longer mirrored, and mirroring is now your choice per camera** (#42) – the webcam preview used to be flipped horizontally for every camera, so anything with text in it read backwards and the preview never matched the photo you got. **Your preview will look different after this update**: it now shows the camera's true image. If you prefer the selfie-style mirrored view, tick **Mirror preview (saved photo is never mirrored)** below the preview; the setting is remembered separately for each camera and survives restarts. The saved photo has never been mirrored and still isn't, whichever way the checkbox is set. There is deliberately no automatic front-camera detection – macOS does not tell apps which way a camera faces, so guessing would get it wrong for some people every time.
+- **The camera preview now shows the whole photo you are about to take** (#42) – the preview was cropped to a 4:3 window, so parts of the picture that were still captured were hidden while you framed the shot. It is now a 16:9 box that fits the entire frame. Black bars may appear at the sides or top when the camera's own shape differs – an intentional trade for showing everything.
+
+### Fixed
+
+- **A camera plugged in while Erfana is running now shows up reliably** ([#52](https://github.com/qodeca/erfana/pull/52)) – Erfana waits 300 ms after the system reports a device change before rescanning, so that plugging things in quickly does not cause a storm of activity. That pending rescan could be thrown away: if the screen updated during the wait – opening the capture dialog, starting a preview, switching cameras – the scan was cancelled and never rescheduled. The camera then stayed missing from the list, with no error and nothing in the logs, until the dialog was reopened or **Refresh** was clicked, which made it look intermittent. The device-change listener is now registered once for the life of the terminal panel rather than being rebuilt on every render, so it can no longer cancel its own pending rescan. Reported against a Lumens USB document camera on macOS.
+- **Pressing Enter on a dialog's Cancel button no longer takes a photo** (#42) – in the camera dialog Enter was captured by the dialog itself and always fired the shutter, even when Cancel had keyboard focus. Enter now does what the focused control says; Capture still fires on Enter or Space while the Capture button is focused, and keyboard focus lands on Capture as soon as the camera is ready.
+- **Dialogs are easier to use with a keyboard and a screen reader** (#42) – Tab now cycles inside the camera, document-import and transcription dialogs instead of walking off into the page behind them, and focus is returned to a usable control when the one you were on becomes unavailable (a button greying out no longer strands you). Camera errors and the "Starting camera…" state are announced to screen readers.
+- **Confirm buttons in dialogs are now legible** (#42) – the label on the violet primary button (Capture, and every other confirm/submit button in a dialog) was too pale against its own background to meet the WCAG AA contrast minimum; it is now dark, taking the contrast from 2.2:1 to 8.4:1. Checkboxes, scrollbars and other controls drawn by the OS now also follow Erfana's dark theme instead of rendering light.
+- **Search bar no longer applies stale results after closing** – a pending debounced search survived unmount and wrote into the global search store, so results from a closed find bar could land on whatever was shown next. The debounce helper now exposes `cancel()`, which the search bar calls on unmount. Also removes an intermittent CI test failure.
+- **The Claude Code context meter now scales correctly for Opus 5, Sonnet 5 and Fable 5** ([#41](https://github.com/qodeca/erfana/issues/41)) – the terminal status bar showed a 200k context window for models that actually run 1M, so the used percentage climbed about five times too fast and the bar turned red while most of the window was still free. Three separate pieces of code each read the model name with their own pattern, and all three assumed a name shaped like `claude-opus-4-8`; current names drop the last number (`claude-opus-5`), and each one then broke differently: the window detector mis-sized a 1M model to 200k, the name renderer showed the raw identifier instead of "Opus 5", and the `/model` parser matched the `[1m]` marker, stripped it, and then rejected what was left – silently discarding the model you had just selected. They now share a single parser and one capability table, verified 2026-08-07 against Anthropic's published model and Claude Code documentation, so the label and the window can no longer disagree. The table also corrects two entries in the other direction: at the Claude Code layer **Opus 4.6 and Sonnet 4.6 are 200k**, not 1M. Those are the metered defaults rather than ceilings – Opus 4.6 reaches 1M where your plan includes extended context (automatic on Max, Team and Enterprise) and Sonnet 4.6 reaches it with usage credits, which no plan includes by default, Max included – so Erfana shows 200k for both whatever you are entitled to, and re-scales the meter once your real usage crosses 200k. Because the real window also depends on your plan and your provider (Bedrock, Google Cloud and Foundry cap Opus at 200k), a 1M badge resting on the table alone is now marked `(inferred)` in the hover tooltip, announced as such to screen readers, and re-checked on every update instead of sticking for the session. Signals are applied first-match rather than blended: real usage above 200k always wins, then an explicit `/model` selection (which can force either 1M or 200k), then the table, then a `[1m]` model in your `~/.claude/settings.json`. See [the design note](./designs/41-model-capability-registry.md).
+
+### Internal
+
+- **Guards against the capability table going stale or drifting from the docs** ([#41](https://github.com/qodeca/erfana/issues/41)) – the table carries a `CAPABILITIES_VERIFIED_ON` stamp with a unit test that fails once it is more than 180 days old, and a hand-derived oracle table plus document-parity and key-set guards keep the design note, the shipped table and the tests from disagreeing silently. The spawn-environment rule that forced 200k for a capped deployment was withdrawn in the same change: three of its four signals were unreachable because `TerminalService` strips `CLAUDE_CODE_*` from spawned terminals, the surviving one was a routing fact rather than a capacity fact, and the rule outranked explicit user configuration. A narrowed, settings-based replacement is tracked as [#48](https://github.com/qodeca/erfana/issues/48).
+
 ## 0.16.3
 
 *First public open-source release of Erfana. Tag [`v0.16.3`](https://github.com/qodeca/erfana/releases/tag/v0.16.3). (v0.16.1 and v0.16.2 were tagged but never published — Windows code-signing failures: first an Azure cert secret mismatch, then a legacy-encrypted (RC2/3DES) signing PFX that the CI/Node OpenSSL 3.x toolchain rejects. Resolved by re-exporting the PFX with AES-256 (PBES2). See [`docs/release-incidents/`](release-incidents/index.md).)*
@@ -12,13 +36,20 @@ Per-version release notes for Erfana (v0.6.0 onwards; earlier in [archive/change
 
 - **Erfana is now open source under `GPL-3.0-only`** *(2026-06-16)* – the project was relicensed from its prior proprietary ("All rights reserved") terms and published publicly at [github.com/qodeca/erfana](https://github.com/qodeca/erfana). The relicensing act of record is in [`COPYRIGHT`](../COPYRIGHT). Per-file licensing follows the [REUSE](https://reuse.software) specification (SPDX headers on every source file, `REUSE.toml`, `LICENSES/`); bundled third-party notices are in [`THIRD-PARTY-LICENSES.md`](../THIRD-PARTY-LICENSES.md). Added community-health files (`CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`, `CLA.md`, `TRADEMARKS.md`) and a secret-scan + license-compliance CI gate. The "Erfana"/"Qodeca" names and logos remain Qodeca trademarks — forks must rebrand. Contributions require the project CLA, which preserves Qodeca's dual-licensing option. `package.json` keeps `"private": true` as a desktop-app publish guard (not a license statement).
 
-## 0.16.0
+## 0.16.0 — never released
 
-*Released 2026-06-14. Tag [`v0.16.0`](https://github.com/qodeca/erfana/releases/tag/v0.16.0).*
+> **Accuracy correction (2026-08-07).** This section previously read
+> "*Released 2026-06-14. Tag `v0.16.0`.*" That is wrong and is corrected rather than
+> removed, because the changes below are real and shipped. **No `v0.16.0` tag was ever
+> created** (verified against `git tag -l` and `gh release list`: the repository holds only
+> `v0.16.1`, `v0.16.2` and `v0.16.3`, of which just `v0.16.3` is published — `v0.16.1` and
+> `v0.16.2` are drafts burned by Windows signing failures). 2026-06-14 was the date the
+> release was prepared, not a publish date. Everything listed below first reached users in
+> **v0.16.3**. The heading is kept at `0.16.0` so the version's own entry stays findable.
 
 ### Added
 
-- **Claude Code context status bar now works on Windows** ([#217](https://github.com/qodeca/erfana/issues/217)) – the per-terminal status bar (friendly model name, 200k/1M context-window badge, used-percentage meter) that shipped for macOS is now available on Windows. A native `WinClaudeProcessDetector` walks the PTY child-process tree, a shared `AbstractClaudeProcessDetector` base unifies the macOS and Windows detectors, and `encodeCwd` is platform-branched for Windows transcript paths. Context usage now also resets correctly after a `/compact` and tracks mid-session model switches.
+- **Claude Code context status bar now works on Windows** (#217) – the per-terminal status bar (friendly model name, 200k/1M context-window badge, used-percentage meter) that shipped for macOS is now available on Windows. A native `WinClaudeProcessDetector` walks the PTY child-process tree, a shared `AbstractClaudeProcessDetector` base unifies the macOS and Windows detectors, and `encodeCwd` is platform-branched for Windows transcript paths. Context usage now also resets correctly after a `/compact` and tracks mid-session model switches.
 - **New home-view background** – the central welcome screen now shows a branded background image, with the controls (Import button, Recent Projects) grouped in a dimmed bottom-right panel and the live app version in the heading. The image is scoped to the welcome view only, never the shared panel background.
 
 ### Fixed
@@ -29,20 +60,20 @@ Per-version release notes for Erfana (v0.6.0 onwards; earlier in [archive/change
 
 ### Internal
 
-- Claude status-bar documentation synced with the merged [#217](https://github.com/qodeca/erfana/issues/217) work; the home-view background and `.home-bg` scoping rule are documented; the macOS welcome visual-regression baseline was regenerated for the new home view.
+- Claude status-bar documentation synced with the merged #217 work; the home-view background and `.home-bg` scoping rule are documented; the macOS welcome visual-regression baseline was regenerated for the new home view.
 
 ## 0.15.1
 
-*Released 2026-06-10. Tag [`v0.15.1`](https://github.com/qodeca/erfana/releases/tag/v0.15.1).*
+*Released 2026-06-10. Tag `v0.15.1`.*
 
 ### Fixed
 
-- **Project Tree git-status badges update automatically after editing a file** ([#241](https://github.com/qodeca/erfana/issues/241)) – previously the `M` indicator only appeared after pressing `Cmd/Ctrl+Alt+R` because `DirectoryWatcherService` listened only to create / delete / rename events, never to chokidar `change`. Monaco autosaves (in-place `fs.writeFile`, same inode) emit `change`, which was silently dropped. The watcher now broadcasts `change` events through the existing throttle / coalesce / IPC pipeline; `.git/` internals are filtered so `GitWatcherService` stays the sole publisher for git-state changes. End-to-end latency is roughly 2.5–3 s on macOS (2 s autosave debounce + ~750 ms pipeline). A 250 ms debounce added to `useDirectoryWatcher` absorbs multi-file write storms (`prettier --write`, snapshot updates, AI multi-file edits) into one tree re-list.
-- **Parent-folder git-status dot now shows on Windows** ([#237](https://github.com/qodeca/erfana/issues/237)) – a folder's colored git-status indicator in the project tree was missing on Windows because the parent-path lookup only recognised the POSIX `/` separator; it now also recognises the Windows `\` separator, with no change to macOS/Linux behaviour.
+- **Project Tree git-status badges update automatically after editing a file** (#241) – previously the `M` indicator only appeared after pressing `Cmd/Ctrl+Alt+R` because `DirectoryWatcherService` listened only to create / delete / rename events, never to chokidar `change`. Monaco autosaves (in-place `fs.writeFile`, same inode) emit `change`, which was silently dropped. The watcher now broadcasts `change` events through the existing throttle / coalesce / IPC pipeline; `.git/` internals are filtered so `GitWatcherService` stays the sole publisher for git-state changes. End-to-end latency is roughly 2.5–3 s on macOS (2 s autosave debounce + ~750 ms pipeline). A 250 ms debounce added to `useDirectoryWatcher` absorbs multi-file write storms (`prettier --write`, snapshot updates, AI multi-file edits) into one tree re-list.
+- **Parent-folder git-status dot now shows on Windows** (#237) – a folder's colored git-status indicator in the project tree was missing on Windows because the parent-path lookup only recognised the POSIX `/` separator; it now also recognises the Windows `\` separator, with no change to macOS/Linux behaviour.
 
 ## 0.15.0
 
-*Released 2026-06-09. Tag [`v0.15.0`](https://github.com/qodeca/erfana/releases/tag/v0.15.0).*
+*Released 2026-06-09. Tag `v0.15.0`.*
 
 ### Multi-instance reliability
 
@@ -50,16 +81,16 @@ Per-version release notes for Erfana (v0.6.0 onwards; earlier in [archive/change
 
 ### Fixed
 
-- **Text is selectable again across the app** ([#211](https://github.com/qodeca/erfana/issues/211)) – you can now copy error messages, file paths, status data, dialog text, toast messages, settings descriptions, and chat content, and the markdown-preview prompt-template context menu (Explain / Modify / Ask / Visualize) works again. A dockview panel-chrome style had been disabling selection on nested content; the per-surface rule is now captured in the [Text selection policy](./ui-style-guide.md#text-selection-policy) so future components stay selectable by default where it matters.
+- **Text is selectable again across the app** (#211) – you can now copy error messages, file paths, status data, dialog text, toast messages, settings descriptions, and chat content, and the markdown-preview prompt-template context menu (Explain / Modify / Ask / Visualize) works again. A dockview panel-chrome style had been disabling selection on nested content; the per-surface rule is now captured in the [Text selection policy](./ui-style-guide.md#text-selection-policy) so future components stay selectable by default where it matters.
 
 ### Internal
 
-- **Text-selection policy lives in one file** ([#228](https://github.com/qodeca/erfana/issues/228)) – the `user-select: text` override previously repeated across 15 component CSS files (a follow-up to #211). It is now declared once in `src/renderer/src/styles/utilities.css` for 20 selectors, and the cross-cutting audit test (`src/renderer/src/styles/userSelect.audit.test.ts`) reads from the central file. Two CSS-module surfaces (`.metadataItem`, `.errorMessage` in `ImageViewerPanel.module.css`) keep their declarations in-place because build-time class-name hashing prevents the central selector from matching them at runtime; this is documented in [Text selection policy](./ui-style-guide.md#text-selection-policy).
+- **Text-selection policy lives in one file** (#228) – the `user-select: text` override previously repeated across 15 component CSS files (a follow-up to #211). It is now declared once in `src/renderer/src/styles/utilities.css` for 20 selectors, and the cross-cutting audit test (`src/renderer/src/styles/userSelect.audit.test.ts`) reads from the central file. Two CSS-module surfaces (`.metadataItem`, `.errorMessage` in `ImageViewerPanel.module.css`) keep their declarations in-place because build-time class-name hashing prevents the central selector from matching them at runtime; this is documented in [Text selection policy](./ui-style-guide.md#text-selection-policy).
 - **E2E terminal-driven tests no longer race the user's `.zshrc`** — `TerminalService`'s POSIX bootstrap pattern now honors `ERFANA_E2E_FAST_SHELL=1` and execs into `/bin/sh -i` instead of `exec -l "$SHELL" -i` when set. Removes the dependency on individual contributors' shell-init speed (a heavy `.zshrc` sourcing >1500 ms used to leave `e2e/directory-watcher.e2e.ts` consistently timing out on some dev machines while passing on CI). `e2e/directory-watcher.e2e.ts` opts in; production behaviour and other tests are unchanged. See [docs/known-issues.md § E2E terminal-driven tests sensitive to user's shell init speed](./known-issues.md#e2e-terminal-driven-tests-sensitive-to-users-shell-init-speed).
 
 ## 0.14.0
 
-*Released 2026-06-06. Tag [`v0.14.0`](https://github.com/qodeca/erfana/releases/tag/v0.14.0).*
+*Released 2026-06-06. Tag `v0.14.0`.*
 
 ### Terminal font
 
@@ -73,15 +104,15 @@ Per-version release notes for Erfana (v0.6.0 onwards; earlier in [archive/change
 
 - **Project panel header shows the folder name on Windows** — the sidebar header showed the full path (e.g. `C:\Users\…\erfana`) on Windows because the name was derived with a POSIX-only path split. It now shows just the folder name (e.g. `erfana`), matching macOS.
 - **More reliable `git status` on Windows** — the project tree no longer reports phantom "modified" files caused by CRLF line-ending handling differences between `isomorphic-git` and the user's `git config core.autocrlf` setting. The git-status worker now prefers the native `git` binary on Windows (and falls back to `isomorphic-git` only when `git` is not on PATH) and detects when a folder becomes or stops being a git repository.
-- **Accurate Claude Code context bar on launch** ([#225](https://github.com/qodeca/erfana/issues/225)) — a freshly launched `claude` session could briefly display the context percentage of a *previous* session that ran in the same terminal directory. Transcript selection is now floored by the running `claude` process's start time, so a fresh session hides the bar until it writes its own first turn instead of mis-reporting the prior session; `claude --continue` still resolves correctly because resume bumps the reused transcript's mtime above the floor.
+- **Accurate Claude Code context bar on launch** (#225) — a freshly launched `claude` session could briefly display the context percentage of a *previous* session that ran in the same terminal directory. Transcript selection is now floored by the running `claude` process's start time, so a fresh session hides the bar until it writes its own first turn instead of mis-reporting the prior session; `claude --continue` still resolves correctly because resume bumps the reused transcript's mtime above the floor.
 
 ## 0.13.0
 
-*Released 2026-06-05. Tag [`v0.13.0`](https://github.com/qodeca/erfana/releases/tag/v0.13.0).*
+*Released 2026-06-05. Tag `v0.13.0`.*
 
 ### Terminal Claude Code context status bar (macOS)
 
-- **See your Claude Code context usage right in the terminal** ([#216](https://github.com/qodeca/erfana/issues/216)) — when you run Claude Code (`claude`) in a terminal panel, a thin status bar appears at the bottom of that panel showing the model (e.g. "Opus 4.8"), a badge for the context-window size (200k or 1M), and how much of the window you've used as a percentage. A progress bar shifts from green to orange to red as you fill the window, so you can see at a glance how much room is left. Hover the bar to see exact token counts (e.g. "84k / 200k"). The bar is display-only and shows only while Claude Code is actively running in that panel; it disappears when Claude exits. Erfana reads this purely from Claude Code's own session files and **never changes your Claude Code configuration**. If anything can't be read, the bar quietly hides rather than showing stale or wrong numbers. **macOS only in this version** — Windows support is planned as a follow-up.
+- **See your Claude Code context usage right in the terminal** (#216) — when you run Claude Code (`claude`) in a terminal panel, a thin status bar appears at the bottom of that panel showing the model (e.g. "Opus 4.8"), a badge for the context-window size (200k or 1M), and how much of the window you've used as a percentage. A progress bar shifts from green to orange to red as you fill the window, so you can see at a glance how much room is left. Hover the bar to see exact token counts (e.g. "84k / 200k"). The bar is display-only and shows only while Claude Code is actively running in that panel; it disappears when Claude exits. Erfana reads this purely from Claude Code's own session files and **never changes your Claude Code configuration**. If anything can't be read, the bar quietly hides rather than showing stale or wrong numbers. **macOS only in this version** — Windows support is planned as a follow-up.
 
 ### Fixed
 
@@ -89,16 +120,16 @@ Per-version release notes for Erfana (v0.6.0 onwards; earlier in [archive/change
 
 ### Windows enablement (Phase 6)
 
-- **Filenames are no longer written to log files** ([#167](https://github.com/qodeca/erfana/issues/167)) — when a file or folder name is rejected as invalid, the on-screen message still shows the name you typed, but Erfana's local log files now record `[redacted-filename]` instead, keeping anything sensitive you might paste into a filename field out of the logs.
+- **Filenames are no longer written to log files** (#167) — when a file or folder name is rejected as invalid, the on-screen message still shows the name you typed, but Erfana's local log files now record `[redacted-filename]` instead, keeping anything sensitive you might paste into a filename field out of the logs.
 - **Internal** — renderer platform detection now routes through a single `window.api.utils.getPlatform()` bridge (retiring scattered `navigator.platform` / `process.platform` checks), the OneDrive and antivirus file-watching contention case is documented in [known issues](./known-issues.md#windows-specific-issues), and an advisory `windows-latest` CI job (typecheck + main-process tests) was added. The camera and project-lock services were verified working on Windows with no code change. See [docs/windows/implementation-plan.md](./windows/implementation-plan.md).
 
 ## 0.12.0
 
-*Released 2026-06-04. Tag [`v0.12.0`](https://github.com/qodeca/erfana/releases/tag/v0.12.0).*
+*Released 2026-06-04. Tag `v0.12.0`.*
 
 ### Windows screenshot capture
 
-- **Terminal screenshot capture now works on Windows and Linux** ([#164](https://github.com/qodeca/erfana/issues/164), [PR #208](https://github.com/qodeca/erfana/pull/208)) — the terminal screenshot button previously worked only on macOS (native `screencapture`). Windows and Linux now capture through Electron's `desktopCapturer`: full-screen and per-window capture use an in-app window picker with live thumbnails, and area capture uses a frameless transparent overlay you drag to select a region (with a keyboard-driven selection mode for accessibility). The captured image path is pasted into the terminal exactly as on macOS, and macOS behaviour is unchanged. This completes Windows enablement Phase 3.
+- **Terminal screenshot capture now works on Windows** (#164, PR #208) — the terminal screenshot button previously worked only on macOS (native `screencapture`). Windows now captures through Electron's `desktopCapturer`: full-screen and per-window capture use an in-app window picker with live thumbnails, and area capture uses a frameless transparent overlay you drag to select a region (with a keyboard-driven selection mode for accessibility). The captured image path is pasted into the terminal exactly as on macOS, and macOS behaviour is unchanged. This completes Windows enablement Phase 3. (Corrected 2026-08-07: the original entry said "Windows and Linux". `ScreenshotService` routes `darwin` to the native capturer and `win32` to `desktopCapturer`; every other platform gets `UnsupportedCapturer`, and Linux distribution had already been dropped in v0.11.x.)
 
 ### Fixes
 
@@ -112,13 +143,13 @@ Per-version release notes for Erfana (v0.6.0 onwards; earlier in [archive/change
 
 ## 0.11.2
 
-*Released 2026-06-01. Tag [`v0.11.2`](https://github.com/qodeca/erfana/releases/tag/v0.11.2).*
+*Released 2026-06-01. Tag `v0.11.2`.*
 
 ### Changes
 
 - **Single build per platform** — macOS now ships only an Apple Silicon (arm64) `.dmg` and Windows only the NSIS installer (`setup.exe`). The Intel (x64) macOS build, the macOS `.zip`, and the Windows portable `.exe` were dropped — auto-update is disabled, so the `.zip` and portable variants served no purpose. **Intel Macs are no longer supported.**
 - **Smaller download** — the installed macOS app is roughly 40% smaller (about 1.0 GB → 610 MB) after pruning bundled dependencies and foreign-architecture binaries. No features were removed.
-- **Linux builds discontinued** ([#206](https://github.com/qodeca/erfana/pull/206)) — Erfana no longer ships Linux packages (AppImage / deb / rpm); releases now target macOS and Windows only. Linux remains usable for local development (`npm run dev`).
+- **Linux builds discontinued** (#206) — Erfana no longer ships Linux packages (AppImage / deb / rpm); releases now target macOS and Windows only. Linux remains usable for local development (`npm run dev`).
 
 ### Security
 
@@ -126,17 +157,17 @@ Per-version release notes for Erfana (v0.6.0 onwards; earlier in [archive/change
 
 ### Fixes
 
-- **Copy and paste work again in the editor** ([#203](https://github.com/qodeca/erfana/issues/203)) — Electron's security sandbox blocked the browser clipboard, so Cmd/Ctrl+C/X/V in the Monaco editor failed silently with a `NotAllowedError`. All clipboard access now goes through a single central service backed by the app's own (main-process) clipboard, so copy, cut, and paste work reliably in the editor, terminal, dialog text fields, the markdown preview, and the file-picker "copy path" action — without weakening the sandbox.
+- **Copy and paste work again in the editor** (#203) — Electron's security sandbox blocked the browser clipboard, so Cmd/Ctrl+C/X/V in the Monaco editor failed silently with a `NotAllowedError`. All clipboard access now goes through a single central service backed by the app's own (main-process) clipboard, so copy, cut, and paste work reliably in the editor, terminal, dialog text fields, the markdown preview, and the file-picker "copy path" action — without weakening the sandbox.
 
 ### Internal
 
-- **Central text-clipboard service** ([#203](https://github.com/qodeca/erfana/issues/203)) — Every in-scope text surface now routes clipboard read/write through one renderer service (`textClipboard`) over a new async, Zod-validated IPC bridge (`clipboard:readText` / `clipboard:writeText`, `api.clipboard`) to Electron's main-process `clipboard` module. The service is the single transport-error chokepoint (retry-once + debounced, screen-reader-announced error toast); the main handler validates the sender frame and bounds writes to 5 MB. Monaco's keybinding/context-menu overrides extracted to the pure `monacoClipboardCommands.ts`; the per-surface dupes in PromptDialog/FileSystemDialog/ChatBubble were removed (`useTextareaClipboard` rebuilt). Over-limit textarea paste now truncates-and-inserts instead of silently rejecting. The terminal SIGINT-vs-copy decision table (`terminalClipboard.logic.ts`, #28/#122) is unchanged. Project-tree file clipboard (`useClipboardStore`) is out of scope and untouched.
-- **Package-size reduction** ([#206](https://github.com/qodeca/erfana/pull/206)) — Moved renderer-only libraries (Monaco, Mermaid, xterm, dockview, dnd-kit, markdown plugins) to `devDependencies` so Vite still bundles them but electron-builder no longer copies their raw sources into the packaged app; removed unused runtime dependencies; and pruned foreign-architecture binaries (ffprobe-static, node-pty prebuilds) plus Windows `.pdb` debug files in the `afterPack` hook. ASAR stays disabled (isomorphic-git's transitive `require()` tree). The macOS `Resources/app` payload dropped ~56% (791 MB → 347 MB).
+- **Central text-clipboard service** (#203) — Every in-scope text surface now routes clipboard read/write through one renderer service (`textClipboard`) over a new async, Zod-validated IPC bridge (`clipboard:readText` / `clipboard:writeText`, `api.clipboard`) to Electron's main-process `clipboard` module. The service is the single transport-error chokepoint (retry-once + debounced, screen-reader-announced error toast); the main handler validates the sender frame and bounds writes to 5 MB. Monaco's keybinding/context-menu overrides extracted to the pure `monacoClipboardCommands.ts`; the per-surface dupes in PromptDialog/FileSystemDialog/ChatBubble were removed (`useTextareaClipboard` rebuilt). Over-limit textarea paste now truncates-and-inserts instead of silently rejecting. The terminal SIGINT-vs-copy decision table (`terminalClipboard.logic.ts`, #28/#122) is unchanged. Project-tree file clipboard (`useClipboardStore`) is out of scope and untouched.
+- **Package-size reduction** (#206) — Moved renderer-only libraries (Monaco, Mermaid, xterm, dockview, dnd-kit, markdown plugins) to `devDependencies` so Vite still bundles them but electron-builder no longer copies their raw sources into the packaged app; removed unused runtime dependencies; and pruned foreign-architecture binaries (ffprobe-static, node-pty prebuilds) plus Windows `.pdb` debug files in the `afterPack` hook. ASAR stays disabled (isomorphic-git's transitive `require()` tree). The macOS `Resources/app` payload dropped ~56% (791 MB → 347 MB).
 - **CI build workflows aligned with the slim artifact set** — `build_mac.yml` no longer passes `--x64` or uploads `.zip`; `build_win.yml` no longer verifies or uploads the portable `.exe`. Each platform leg now produces and uploads exactly one binary.
 
 ## 0.10.1
 
-*Released 2026-05-31. Tag [`v0.10.1`](https://github.com/qodeca/erfana/releases/tag/v0.10.1).*
+*Released 2026-05-31. Tag `v0.10.1`.*
 
 ### Fixes
 
@@ -144,7 +175,7 @@ Per-version release notes for Erfana (v0.6.0 onwards; earlier in [archive/change
 
 ## 0.10.0
 
-*Released 2026-05-31. Tag [`v0.10.0`](https://github.com/qodeca/erfana/releases/tag/v0.10.0).*
+*Released 2026-05-31. Tag `v0.10.0`.*
 
 ### Terminal maximize
 
@@ -152,20 +183,20 @@ Per-version release notes for Erfana (v0.6.0 onwards; earlier in [archive/change
 
 ### In-app AI prompts apply directly to the document
 
-- **Modify, Visualize, and the diagram prompts now edit your file instead of printing to the terminal** ([#202](https://github.com/qodeca/erfana/pull/202)) — the in-app AI prompts previously printed their result into the terminal non-deterministically, forcing manual copy-paste. They now reliably apply the change in place: Modify replaces the selection with the edited version, Visualize inserts the new Mermaid diagram immediately after the selection, and the diagram prompts (Diagram Chat, Bug Report, Change Direction) edit the diagram block directly. Read-only prompts (Explain, Ask) are unchanged.
+- **Modify, Visualize, and the diagram prompts now edit your file instead of printing to the terminal** (#202) — the in-app AI prompts previously printed their result into the terminal non-deterministically, forcing manual copy-paste. They now reliably apply the change in place: Modify replaces the selection with the edited version, Visualize inserts the new Mermaid diagram immediately after the selection, and the diagram prompts (Diagram Chat, Bug Report, Change Direction) edit the diagram block directly. Read-only prompts (Explain, Ask) are unchanged.
 
 ### Fixes
 
-- **Video transcription works in installed builds** ([#199](https://github.com/qodeca/erfana/pull/199)) — packaged builds shipped a single-architecture ffmpeg that failed with ENOENT on video import; ffmpeg is now bundled per-architecture with an integrity-pinned binary, so video audio extraction works on both Intel and Apple Silicon.
-- **Quieter, more accurate logging** ([#199](https://github.com/qodeca/erfana/pull/199)) — broken markdown links are no longer recorded as errors (~186 false error lines removed per session), and test runs no longer write to the real application log.
+- **Video transcription works in installed builds** (#199) — packaged builds shipped a single-architecture ffmpeg that failed with ENOENT on video import; ffmpeg is now bundled per-architecture with an integrity-pinned binary, so video audio extraction works on both Intel and Apple Silicon.
+- **Quieter, more accurate logging** (#199) — broken markdown links are no longer recorded as errors (~186 false error lines removed per session), and test runs no longer write to the real application log.
 
 ## 0.9.6
 
-*Released 2026-05-22. Tag [`v0.9.6`](https://github.com/qodeca/erfana/releases/tag/v0.9.6).*
+*Released 2026-05-22. Tag `v0.9.6`.*
 
 ### Critical fix – terminal restored on macOS
 
-- **Terminal works again in macOS builds** ([`ea3eaf1`](https://github.com/qodeca/erfana/commit/ea3eaf1)) — v0.9.5 shipped with node-pty's `spawn-helper` binary at mode `0644` because `electron-builder` preserves npm-tarball permissions of prebuilt binaries and `npmRebuild: false` skipped the source rebuild that would have produced an executable copy. `pty.fork()` then called `posix_spawnp` against the un-executable helper, returning `EACCES`, so every terminal-spawn in the v0.9.5 macOS DMG failed with `Error: posix_spawnp failed.`. The `afterPack` hook in `scripts/fuses.js` now `chmod 0755`'s every spawn-helper under `node-pty/prebuilds/*/` before code-signing, so the signed bundle carries the executable bit. `requireMatch: true` on the platform-host match fails the build if zero helpers are found, blocking ship of a broken DMG. Dev builds were unaffected because `electron-vite` rebuilds node-pty via `node-gyp` and writes `spawn-helper` at `0755`. Nine new tests in `scripts/fuses.test.mjs` cover happy/idempotent/multi-arch/missing/empty/symlink/EROFS cases. **Anyone on v0.9.5 macOS must upgrade to use the terminal.**
+- **Terminal works again in macOS builds** (`ea3eaf1`) — v0.9.5 shipped with node-pty's `spawn-helper` binary at mode `0644` because `electron-builder` preserves npm-tarball permissions of prebuilt binaries and `npmRebuild: false` skipped the source rebuild that would have produced an executable copy. `pty.fork()` then called `posix_spawnp` against the un-executable helper, returning `EACCES`, so every terminal-spawn in the v0.9.5 macOS DMG failed with `Error: posix_spawnp failed.`. The `afterPack` hook in `scripts/fuses.js` now `chmod 0755`'s every spawn-helper under `node-pty/prebuilds/*/` before code-signing, so the signed bundle carries the executable bit. `requireMatch: true` on the platform-host match fails the build if zero helpers are found, blocking ship of a broken DMG. Dev builds were unaffected because `electron-vite` rebuilds node-pty via `node-gyp` and writes `spawn-helper` at `0755`. Nine new tests in `scripts/fuses.test.mjs` cover happy/idempotent/multi-arch/missing/empty/symlink/EROFS cases. **Anyone on v0.9.5 macOS must upgrade to use the terminal.**
 
 ### Internal tooling – `releasing-erfana` skill cleanup
 
@@ -183,25 +214,25 @@ Out of scope (deferred): `release-pretag-runner` agent; CI guard for cookbook-fo
 
 Three operational/metadata shifts on 2026-04-25 with no runtime impact:
 
-- **License switched MIT → proprietary** ([`34fd829`](https://github.com/qodeca/erfana/commit/34fd829)) — `LICENSE` now reads "All rights reserved" with Polish governing-law clause; `package.json` set to `license: UNLICENSED` + `private: true`; copyright holder is **Qodeca sp. z o.o.**, not the individual developer. Erfana is a closed-source freemium product; references to MIT in code or docs were corrected. The earlier `d259442` (added MIT `LICENSE`) was reverted by this commit.
-- **Workflow display names → Title Case** ([`9848451`](https://github.com/qodeca/erfana/commit/9848451), preceded by [`2bc4ab2`](https://github.com/qodeca/erfana/commit/2bc4ab2)) — Author-controlled GitHub Actions workflows now use Title Case for the `name:` field (e.g. `Quality Checks`, `Build Linux (Reusable)`, `Whisper Binaries (Canary)`). Project-specific override of the global Sentence-case style rule for `name:` fields only; filenames and `workflow_call` references untouched. Documented in `CLAUDE.md` § Continuous integration.
-- **E2E Tests workflow disabled** ([`997ba65`](https://github.com/qodeca/erfana/commit/997ba65)) — `gh workflow disable "E2E Tests"`. Playwright + Electron tests are unreliable on `macos-latest` hosted runners; the visual suite hangs at `waitForLoadState('domcontentloaded')`. E2E was already excluded from branch-protection required checks, so disabling does not block any merges or releases. Local-only path remains: `npm run test:e2e` / `npm run test:e2e:visual`. Re-enable with `gh workflow enable "E2E Tests"`. Full root-cause analysis in `docs/ci.md` § Visual regression on CI.
+- **License switched MIT → proprietary** (`34fd829`) — `LICENSE` now reads "All rights reserved" with Polish governing-law clause; `package.json` set to `license: UNLICENSED` + `private: true`; copyright holder is **Qodeca sp. z o.o.**, not the individual developer. Erfana is a closed-source freemium product; references to MIT in code or docs were corrected. The earlier `d259442` (added MIT `LICENSE`) was reverted by this commit.
+- **Workflow display names → Title Case** (`9848451`, preceded by `2bc4ab2`) — Author-controlled GitHub Actions workflows now use Title Case for the `name:` field (e.g. `Quality Checks`, `Build Linux (Reusable)`, `Whisper Binaries (Canary)`). Project-specific override of the global Sentence-case style rule for `name:` fields only; filenames and `workflow_call` references untouched. Documented in `CLAUDE.md` § Continuous integration.
+- **E2E Tests workflow disabled** (`997ba65`) — `gh workflow disable "E2E Tests"`. Playwright + Electron tests are unreliable on `macos-latest` hosted runners; the visual suite hangs at `waitForLoadState('domcontentloaded')`. E2E was already excluded from branch-protection required checks, so disabling does not block any merges or releases. Local-only path remains: `npm run test:e2e` / `npm run test:e2e:visual`. Re-enable with `gh workflow enable "E2E Tests"`. Full root-cause analysis in `docs/ci.md` § Visual regression on CI.
 
 ### Dependencies
 
-- **`tar` 7.4.0 → 7.5.11** ([#170](https://github.com/qodeca/erfana/pull/170), commit [`b0fd9ad`](https://github.com/qodeca/erfana/commit/b0fd9ad)) — Direct prod dep on the Phase 4 trust chain (Whisper macOS tarball extraction in `src/main/utils/tarArchive.ts`). The previous `7.4.0` was npm-marked deprecated with the explicit note "widely publicized security vulnerabilities, fixed in the current version". 7.5.x adds defense-in-depth (sanitize absolute linkpaths, hardlink-ahead-of-target prevention) — additive to the existing reject-symlinks/hardlinks `filter` callback, no API breakage. Upstream license field migrated ISC → BlueOak-1.0.0. Lockfile dedup removed 5 duplicated transitive entries under `node_modules/app-builder-lib/node_modules/{tar,chownr,minipass,minizlib,yallist}`. Pre-existing `WhisperModelManager` chmod-on-win32 test that failed on the original PR run was unrelated and already fixed on develop by [`faaee61`](https://github.com/qodeca/erfana/commit/faaee61); rebase pulled it in. Closes the `tar` rows in [#169](https://github.com/qodeca/erfana/issues/169)'s Dependabot triage.
+- **`tar` 7.4.0 → 7.5.11** (#170, commit `b0fd9ad`) — Direct prod dep on the Phase 4 trust chain (Whisper macOS tarball extraction in `src/main/utils/tarArchive.ts`). The previous `7.4.0` was npm-marked deprecated with the explicit note "widely publicized security vulnerabilities, fixed in the current version". 7.5.x adds defense-in-depth (sanitize absolute linkpaths, hardlink-ahead-of-target prevention) — additive to the existing reject-symlinks/hardlinks `filter` callback, no API breakage. Upstream license field migrated ISC → BlueOak-1.0.0. Lockfile dedup removed 5 duplicated transitive entries under `node_modules/app-builder-lib/node_modules/{tar,chownr,minipass,minizlib,yallist}`. Pre-existing `WhisperModelManager` chmod-on-win32 test that failed on the original PR run was unrelated and already fixed on develop by `faaee61`; rebase pulled it in. Closes the `tar` rows in #169's Dependabot triage.
 
 ### CI
 
-- **`claude-code-review.yml` allows Dependabot** ([#192](https://github.com/qodeca/erfana/pull/192), commit [`2c44ff8`](https://github.com/qodeca/erfana/commit/2c44ff8)) — Added `allowed_bots: 'dependabot'` to the action input. Without it the review job aborted with `Workflow initiated by non-human actor: dependabot` on every Dependabot PR (seen on #170). Scoped to `dependabot` only — the action's [security docs](https://github.com/anthropics/claude-code-action/blob/main/docs/security.md) warn against `'*'` because external Apps could invoke the action with attacker-controlled prompts. Effect takes hold on the next Dependabot PR after merge (GitHub uses base-branch workflow definitions for `pull_request` events).
+- **`claude-code-review.yml` allows Dependabot** (#192, commit `2c44ff8`) — Added `allowed_bots: 'dependabot'` to the action input. Without it the review job aborted with `Workflow initiated by non-human actor: dependabot` on every Dependabot PR (seen on #170). Scoped to `dependabot` only — the action's [security docs](https://github.com/anthropics/claude-code-action/blob/main/docs/security.md) warn against `'*'` because external Apps could invoke the action with attacker-controlled prompts. Effect takes hold on the next Dependabot PR after merge (GitHub uses base-branch workflow definitions for `pull_request` events).
 
 ## 0.9.5
 
-*Released 2026-04-25. Tag [`v0.9.5`](https://github.com/qodeca/erfana/releases/tag/v0.9.5).*
+*Released 2026-04-25. Tag `v0.9.5`.*
 
-> *Note added 2026-06-03: Linux distribution references in this entry are historical. The Linux build target was dropped in v0.11.2 ([#206](https://github.com/qodeca/erfana/pull/206)). The signed pipeline + signing infrastructure described below remain accurate for macOS + Windows.*
+> *Note added 2026-06-03: Linux distribution references in this entry are historical. The Linux build target was dropped in v0.11.2 (#206). The signed pipeline + signing infrastructure described below remain accurate for macOS + Windows.*
 
-### Multi-platform signed release pipeline ([#174](https://github.com/qodeca/erfana/issues/174))
+### Multi-platform signed release pipeline (#174)
 
 Single GitHub Actions workflow (`.github/workflows/release.yml`) now produces signed, notarized artifacts for macOS, Windows, and Linux on a single tag push. Replaces the prior tag-only flow used through v0.9.4.
 
@@ -217,7 +248,7 @@ Single GitHub Actions workflow (`.github/workflows/release.yml`) now produces si
 
 Both protections went live on `qodeca/erfana`:
 
-- **`main` branch protection** — 6 required status checks (`Lint`, `Typecheck`, `Unit tests`, `Build`, `npm audit signatures`, `Release readiness guards`), `enforce_admins: true`, no force pushes, no deletions, conversation resolution required. **No PR review requirement** (solo-developer workflow — Phase I initially shipped with `count=1`, was reduced to `count=0` during release prep, and was removed entirely on 2026-04-25 after the v0.9.5 release exposed the friction; the release skill verifies the no-PR state at Phase 0.4.5).
+- **`main` branch protection** — 6 required status checks, `enforce_admins: true`, no force pushes, no deletions. *(Accuracy correction 2026-08-07, verified via `gh api repos/qodeca/erfana/branches/main/protection`: the required set as shipped at the time was recorded here as `Lint`, `Typecheck`, `Unit tests`, `Build`, `npm audit signatures`, `Release readiness guards` with conversation resolution required. The live set is `Lint`, `Typecheck`, `Unit tests`, `Build`, `License compliance`, `Secret scan` — `npm audit signatures` and `Release readiness guards` run on every push but are **not** required — and `required_conversation_resolution` is `false`. See [`ci.md`](./ci.md).)* **No PR review requirement** (solo-developer workflow — Phase I initially shipped with `count=1`, was reduced to `count=0` during release prep, and was removed entirely on 2026-04-25 after the v0.9.5 release exposed the friction; the release skill verifies the no-PR state at Phase 0.4.5).
 - **Protected release tags** (ruleset id `15540259`) — `v*.*.*` semver pattern, signed-tag enforcement, deletion blocked.
 - `e2e` is intentionally excluded from required checks until the `macos-latest` hang in `waitForLoadState('domcontentloaded')` is resolved (see `docs/ci.md` § "Visual regression on CI").
 
@@ -242,15 +273,15 @@ Supersedes the tag-only release flow used through v0.9.4. v0.9.5 is the first re
 
 ## 0.9.4
 
-*Released 2026-04-23 (Windows installer; macOS + Linux builds follow on native build hosts). Tag [`v0.9.4`](https://github.com/qodeca/erfana/releases/tag/v0.9.4).*
+*Released 2026-04-23 (Windows installer; macOS + Linux builds follow on native build hosts). Tag `v0.9.4`.*
 
-> *Note added 2026-06-03: Linux references in this entry are historical. The Linux distribution target was dropped in v0.11.2 ([#206](https://github.com/qodeca/erfana/pull/206)).*
+> *Note added 2026-06-03: Linux references in this entry are historical. The Linux distribution target was dropped in v0.11.2 (#206).*
 
-### Windows-host test-flake remediation ([#172](https://github.com/qodeca/erfana/issues/172), [#173](https://github.com/qodeca/erfana/issues/173))
+### Windows-host test-flake remediation (#172, #173)
 
 Merged 2026-04-23 (`c3cc005`). Clears 5 tests that consistently failed on Windows under Defender + NTFS + V8 GC pressure, while green on Linux/macOS CI. The pool includes one real production perf bug alongside three test-quality issues.
 
-- **`ThrottledWorker` offset-based deque** (production code, closes [#173](https://github.com/qodeca/erfana/issues/173)) — Replaced `this.buffer = this.buffer.slice(droppedCount)` with an offset-based deque (`buffer: T[]` + `bufferOffset: number`). Push + eviction + chunk consumption now amortized O(1) via offset advance; periodic compaction reclaims wasted slots (floor = 1024 or ≥50 % waste). 60 k-event stress test: **31 s → 831 ms on Windows (37×)**. Nulls consumed/evicted slots before offset advance so V8 can GC payloads before the next compaction. Production side-effect: directory-watcher bursts during `npm install` / `git checkout` no longer interrupt the Electron main loop via GC sweeps.
+- **`ThrottledWorker` offset-based deque** (production code, closes #173) — Replaced `this.buffer = this.buffer.slice(droppedCount)` with an offset-based deque (`buffer: T[]` + `bufferOffset: number`). Push + eviction + chunk consumption now amortized O(1) via offset advance; periodic compaction reclaims wasted slots (floor = 1024 or ≥50 % waste). 60 k-event stress test: **31 s → 831 ms on Windows (37×)**. Nulls consumed/evicted slots before offset advance so V8 can GC payloads before the next compaction. Production side-effect: directory-watcher bursts during `npm install` / `git checkout` no longer interrupt the Electron main loop via GC sweeps.
 - **`FileService.copyItem` MAX_COPY_ATTEMPTS split** — Moved the 1000-conflict boundary test from real-disk I/O (25 s on NTFS + Defender) to mocked-fs in a new `FileService.copyItem.limit.test.ts`. Runs in <200 ms cross-platform. `MAX_COPY_ATTEMPTS` now exported as the source-of-truth constant (test asserts against the import, not a hardcoded `1000` literal).
 - **`directory-watcher.e2e.ts` platform-aware budget** — Per-platform timeout: 6000 ms Windows / 2000 ms POSIX. Added `test.describe.configure({ retries: 0 })` so budget regressions can't be masked by a fast retry (same discipline as `visual-regression.e2e.ts`). `test.info().attach('latency-trend', ...)` emits structured JSON for trend tracking.
 - **500 ms NFR-001 signal preserved** — New `016-NFR-001: Main-process pipeline latency budget` describe block in `DirectoryWatcherService.pipeline.test.ts` asserts <200 ms virtual latency for single add + atomic-save flows via fake timers. Isolates main-process latency from chokidar + Defender + UI noise.
@@ -258,7 +289,7 @@ Merged 2026-04-23 (`c3cc005`). Clears 5 tests that consistently failed on Window
 - **`docs/windows/known-flakes.md`** — New register for Windows-host test flakes with status legend (✅/🟡/🔴/🚫), issue links, remediation-patterns cheat-sheet (fake timers, mocked-fs splits, per-platform e2e budgets, offset-deque), and follow-up audit candidates. Seeded with the 4 fixes + 6 pool entries observed during verification.
 - **`.gitattributes`** — Force LF endings on the minisign trust-chain fixtures (`manifest.fixture.json` + `.minisig`) so Windows `core.autocrlf=true` checkouts don't CRLF-corrupt the signed bytes. Makes `verifyManifest.test.ts` pass locally on Windows.
 
-### Local Whisper transcription on macOS + Windows x64 (Phase 4, [#165](https://github.com/qodeca/erfana/issues/165))
+### Local Whisper transcription on macOS + Windows x64 (Phase 4, #165)
 
 Unlock the offline whisper.cpp transcription backend on both macOS and Windows x64. Previously the macOS code path referenced a ggml-org GitHub Release filename that **never existed** (ggml-org publishes Windows zips and a macOS xcframework-for-iOS only — no macOS CLI binary at any recent version), so `Local (whisper.cpp)` had been gated to macOS-only and would 404 on first download. 0.9.4 rebuilds the feature end-to-end by self-hosting signed binaries via a dedicated CI workflow.
 
@@ -302,7 +333,7 @@ See [`docs/build/whisper-binaries.md`](./build/whisper-binaries.md) for the oper
 
 ## 0.9.3 (test build, never publicly released)
 
-> **Status note (2026-04-25):** `v0.9.3` was a test build — the GitHub release artifact and `v0.9.3` git tag were deleted on 2026-04-25 because the binary distribution was a dry-run for the multi-platform release pipeline, not a customer-facing release. The Phase 0–2 codebase work documented below is real and shipped to `develop` on 2026-04-22; **the first publicly released Windows-capable version is [v0.9.4](https://github.com/qodeca/erfana/releases/tag/v0.9.4)** (which contains Phase 0–2 + Phase 4). This entry is preserved for development-history continuity.
+> **Status note (2026-04-25):** `v0.9.3` was a test build — the GitHub release artifact and `v0.9.3` git tag were deleted on 2026-04-25 because the binary distribution was a dry-run for the multi-platform release pipeline, not a customer-facing release. The Phase 0–2 codebase work documented below is real and shipped to `develop` on 2026-04-22; **the first publicly released Windows-capable version is v0.9.4** (which contains Phase 0–2 + Phase 4). This entry is preserved for development-history continuity.
 
 ### Platform support (Windows)
 
@@ -317,12 +348,12 @@ Phase 0 + Phase 1 + Phase 2 of the Windows enablement roadmap landed on `develop
   - **#163 long-path activation** — deferred to Phase 6 with promotion criteria recorded inline at `PlatformConfig.ts:194-201` (comment block above `isWindowsLongPath` at `:203`).
 - **#159 CameraDialog timer cleanup** + **`flakeGuard.ts`** shared post-teardown error catcher across all 3 vitest projects (no more invisible "Errors 1 error" reports).
 - **Phase-2 UAT hardening (2026-04-21 session)** — surfaced and closed during dev-build UAT on the `windows` host:
-  - **Windows terminal bootstrap parity (Git Bash support + ConPTY reflow fix).** `resolveWindowsShell` already honored `$SHELL=…\bash.exe`, but the dispatcher had no Git Bash builder — bash fell through to the cmd.exe catch-all and exited with code 126. New `GitBashBootstrapBuilder` emits the POSIX bootstrap and is registered ahead of the cmd.exe fallback. Separately, Windows ConPTY re-emits its screen-buffer contents through the PTY on every resize; the marker handshake cleared xterm.js but not ConPTY's own buffer, so resizes replayed pre-bootstrap `pwd`+marker as a "phantom header". Each of the three builders now appends a post-marker screen-clear (`printf '\033[2J\033[3J\033[H'` / `[Console]::Write([char]27 + '[2J' …)` / `cls`) so ConPTY is wiped before the interactive shell takes over. cmd.exe can only clear the viewport (not scrollback) from a bootstrap script – documented caveat in `known-issues.md`.
+  - **Windows terminal bootstrap parity (Git Bash support + ConPTY reflow fix).** `resolveWindowsShell` already honored `$SHELL=…\bash.exe`, but the dispatcher had no Git Bash builder — bash fell through to the cmd.exe catch-all and exited with code 126. New `GitBashBootstrapBuilder` emits the POSIX bootstrap and is registered ahead of the cmd.exe fallback. Separately, Windows ConPTY re-emits its screen-buffer contents through the PTY on every resize; the marker handshake cleared xterm.js but not ConPTY's own buffer, so resizes replayed pre-bootstrap `pwd`+marker as a "phantom header". Each of the three builders now appends a post-marker screen-clear (`printf '\033[2J\033[3J\033[H'` / `[Console]::Write([char]27 + '2J' …)` / `cls`) so ConPTY is wiped before the interactive shell takes over. cmd.exe can only clear the viewport (not scrollback) from a bootstrap script – documented caveat in `known-issues.md`.
   - **Log-spam cleanup (two Windows-specific noisy paths).** `TerminalService.resize()` swallows the node-pty `"Cannot resize a pty that has already exited"` race (demotes `!terminal` missing-id path to debug); `GitPollingService.hasIndexChanged()` detects `ENOENT` explicitly and logs once at debug on non-git projects (polling continues so a mid-session `git init` is still caught).
   - **`C:\Program Files (x86)\…` project paths are no longer rejected as unsafe.** `UNSAFE_WINDOWS_CWD_CHARS` dropped `(` and `)` — parens are cmd metacharacters only outside quotes and are literal inside `cd /d "<cwd>"`. 8-entry deny-list still covers every real injection vector.
   - **Test-suite additions** — new `WindowsTerminalBootstrap.test.ts` (60 cases: `canHandle` patterns, dispatch precedence, script shape per builder including the ConPTY clear, escape rules, loosened deny-list, `normalizeWindowsCwd`); fixed `e2e/settings-logs.e2e.ts` path-sep assertion so both Windows `\` and POSIX `/` hosts pass.
 - **Security**: `@xmldom/xmldom` resolves at 0.8.13 (transitive via `electron-builder → app-builder-lib → plist@3.1.0` which declares `^0.8.8`; npm resolution picks the highest matching 0.8.x which is 0.8.13). Dev-time only — the DOCX export path goes through `@turbodocx/html-to-docx@1.20.1` which does NOT depend on `@xmldom/xmldom`. Earlier CHANGELOG copy attributing the dep to the DOCX path was incorrect; corrected on 2026-04-21 (Phase 4 B5e audit follow-up). Pre-empts Dependabot PR #145 regardless.
-- **Phase 3-6 + deferred-work tracked on GitHub**: [#164](https://github.com/qodeca/erfana/issues/164) (screenshot parity), [#165](https://github.com/qodeca/erfana/issues/165) (local Whisper Windows binary), [#166](https://github.com/qodeca/erfana/issues/166) (distribution + signing), [#167](https://github.com/qodeca/erfana/issues/167) (polish + CI guard), [#168](https://github.com/qodeca/erfana/issues/168) (D1-D8 meta), [#169](https://github.com/qodeca/erfana/issues/169) (Dependabot triage + 28 security alerts).
+- **Phase 3-6 + deferred-work tracked on GitHub**: [#164 (screenshot parity), #165 (local Whisper Windows binary), #166 (distribution + signing), #167 (polish + CI guard), #168 (D1-D8 meta), #169 (Dependabot triage + 28 security alerts).
 
 Known gaps (deferred to Phases 3–6): screenshots, local Whisper, auto-updater URL, code signing, long-path `\\?\` activation, structured-error IPC serialization (D4).
 

@@ -48,6 +48,10 @@ GRAPH ENGINE (sequential chain):       INDEPENDENT:
 
 ## Sequential implementation order
 
+> **The graph chain (004–008) is already underway on the `graph` branch, not here.** Its R1 contracts are frozen under [#21](https://github.com/qodeca/erfana/issues/21) — schemas, DDL, `IGraph*` interfaces, error codes and the `specs/designs/sd-021-*` design set — and the refreshed spec requirements live there too. `develop` deliberately carries none of it, so the table below reflects the pre-freeze plan. Before starting any of 004–008, branch off `graph` and read its `specs/` and design set first; starting from `develop` means re-implementing work that already exists. See the Branching model section in `CLAUDE.md`.
+
+> **Chain status (verified 2026-08-07 against `gh issue list --repo qodeca/erfana --state all`):** the release-1 umbrella is [#17](https://github.com/qodeca/erfana/issues/17) "Graph engine R1: project search (spec 004)", still open. The analysis and architecture issues [#19](https://github.com/qodeca/erfana/issues/19), [#20](https://github.com/qodeca/erfana/issues/20) and [#21](https://github.com/qodeca/erfana/issues/21) are all **closed** – the contract freeze they describe has landed on `graph`. The implementation chain [#22](https://github.com/qodeca/erfana/issues/22)–[#32](https://github.com/qodeca/erfana/issues/32) (DB layer, preprocessing, indexing, search API, the three UI surfaces, MCP server, testing) is open and is where graph work now happens.
+
 | # | Spec | Tier | FRs | Rationale |
 |---|------|------|-----|-----------|
 | 1 | **004** Graph engine foundation | T4 | 50 | Foundational – unlocks entire graph pipeline. Largest single spec, best tackled with full focus |
@@ -76,7 +80,7 @@ Per the delivery model: plumbing/tail items may move across releases; cuts reduc
 
 ## Rationale for ordering decisions
 
-**004 first**: Foundational for the entire graph pipeline. Largest spec (50 FRs + 11 NFRs); best tackled with full focus before dependent specs start. Previously 021 took the #1 slot — that shipped in v0.9.0 (archived); dialog patterns (DocumentImportDialog, progress streaming, dependency detection) from 021 still inform 020's design.
+**004 first**: Foundational for the entire graph pipeline. It leads on **dependencies, not size** – 020 is in fact the larger spec (51 FRs + 15 NFRs = 66 requirements, versus 004's 50 + 11 = 61; `specs/registry.json` counts 110 against 107). 004 goes first because 005–008 cannot start without its database, sections table and indexing, and at 61 requirements it still deserves full focus before dependent specs start. Previously 021 took the #1 slot — that shipped in v0.9.0 (archived); dialog patterns (DocumentImportDialog, progress streaming, dependency detection) from 021 still inform 020's design.
 
 **004 → 005 → 006**: Strict dependency chain. 006 placed after 005 (not just 004) so it can use vector similarity for semantic entity matching – the optional dependency is worth respecting.
 

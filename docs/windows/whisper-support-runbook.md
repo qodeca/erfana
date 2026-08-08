@@ -1,5 +1,7 @@
 # Local Whisper – support & diagnostics runbook
 
+> **Note**: issue and PR numbers, commit SHAs, release tags and CI run links below predate the 2026-06 open-source migration and no longer resolve on `qodeca/erfana`; they are retained as provenance.
+
 Operator playbook for the 3 whisper error classes most likely to surface in the field, plus rarer edge cases. For CI / build side (how binaries get made), see [`docs/build/whisper-binaries.md`](../build/whisper-binaries.md). For the full error-code index, see [`docs/error-codes.md`](../error-codes.md) §"Local Whisper".
 
 **When to consult this doc**: a user reports "local transcription broken / crashed / won't start" and the error code is one of the `WHISPER_*` codes. Ask for logs first; this runbook tells you what to ask for and what the answer looks like.
@@ -131,7 +133,7 @@ Node.js REPL (or embedded in dev tools):
 | Brand string | Action |
 |--------------|--------|
 | Matches denylist, CPU confirmed pre-2013 | Expected behaviour. User → OpenAI API backend. Document in support ticket. |
-| Matches denylist, user insists CPU is modern | Collect the exact `os.cpus()[0].model` string. File an issue citing `LocalWhisperService.ts:103-118` (the `CPU_MODEL_DENYLIST` regex table). Refine the regex to exclude the false-positive. Workaround for user: OpenAI backend until fix ships. |
+| Matches denylist, user insists CPU is modern | Collect the exact `os.cpus()[0].model` string. File an issue citing `LocalWhisperService.ts:125` (the `CPU_MODEL_DENYLIST` regex table; `:106-122` is its JSDoc). Refine the regex to exclude the false-positive. Workaround for user: OpenAI backend until fix ships. |
 | Does NOT match denylist but user hit runtime SIGILL | CPU genuinely lacks SSE4.2 but has a modern brand string. Add the brand to denylist for cleaner UX. User action same as above. |
 
 The denylist is intentionally conservative — it's better to reject a supported CPU we don't recognise (one user uses OpenAI API instead) than to let an unsupported CPU through (full ~200 MB download + crash).
@@ -223,7 +225,7 @@ The `notify-on-failure` job auto-creates a GitHub issue titled `[canary] whisper
 
 ## Related
 
-- [`docs/error-codes.md`](../error-codes.md) §"Local Whisper" — the full 13-code index
+- [`docs/error-codes.md`](../error-codes.md) §"Local Whisper" — the full 14-code index
 - [`docs/build/whisper-binaries.md`](../build/whisper-binaries.md) — CI / rebuild / cert-revocation operations
 - [`docs/adrs/0001-self-host-whisper-binaries.md`](../adrs/0001-self-host-whisper-binaries.md) — why self-hosted
 - [`docs/adrs/0002-minisign-over-cosign-sigstore.md`](../adrs/0002-minisign-over-cosign-sigstore.md) — why minisign

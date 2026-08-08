@@ -9,10 +9,12 @@
  * @see Spec #014 - Camera photo capture specification
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { CameraDialog } from './CameraDialog'
 import { TEST_IDS } from '../../constants/testids'
+import { useCameraMirrorStore } from '../../stores/useCameraMirrorStore'
+import { mirrorMap } from '../../test-utils/mirrorMap'
 import type { UseCameraCaptureReturn } from '../../hooks/useCameraCapture'
 
 // =============================================================================
@@ -104,6 +106,12 @@ describe('CameraDialog', () => {
     // Reset mock implementations
     mockStartPreview.mockResolvedValue(undefined)
     mockCapturePhoto.mockResolvedValue('/tmp/camera-photo.jpg')
+
+    // The mirror store is REAL and module-scoped in this suite (only
+    // useCameraCapture is doubled), so it must be reset or a preference set by
+    // one test leaks into the next (#42).
+    useCameraMirrorStore.setState({ mirrorByDevice: mirrorMap() })
+    localStorage.clear()
   })
 
   // ===========================================================================
@@ -501,7 +509,13 @@ describe('CameraDialog', () => {
 
       await renderDialog()
 
-      expect(screen.getByText('Starting camera...')).toBeInTheDocument()
+      // Scoped to the VISUAL block: the same words now also live in the
+      // always-mounted `role="status"` region, and this test is about what a
+      // sighted user sees. The announcement is covered under 'status live
+      // region' below.
+      expect(
+        screen.getByText('Starting camera...', { selector: '.camera-preview-loading span' })
+      ).toBeInTheDocument()
     })
 
     it('should not show loading when preview active', async () => {
@@ -525,7 +539,10 @@ describe('CameraDialog', () => {
 
       await renderDialog()
 
-      expect(screen.getByText(/No camera detected/)).toBeInTheDocument()
+      // Scoped to the VISUAL block — see the loading-state test above.
+      expect(
+        screen.getByText(/No camera detected/, { selector: '.camera-empty-state-text' })
+      ).toBeInTheDocument()
     })
 
     it('should not show empty state when cameras available', async () => {
@@ -577,6 +594,222 @@ describe('CameraDialog', () => {
   })
 
   // ===========================================================================
+  // Preview Mirroring Tests (#42)
+  // ===========================================================================
+
+  describe('preview mirroring (#42)', () => {
+    // Every assertion keys on TEST_IDS.CAMERA_MIRROR_TOGGLE, never on the label
+    // string, so a copy change cannot break this suite.
+
+    it('renders the preview un-mirrored by default', async () => {
+      mockHookReturn.isPreviewActive = true
+      await renderDialog()
+
+      const video = screen.getByTestId(TEST_IDS.CAMERA_PREVIEW)
+      expect(video).toHaveClass('camera-preview')
+      expect(video).not.toHaveClass('camera-preview--mirrored')
+    })
+
+    it('mirrors the preview when the stored preference for the device is on', async () => {
+      useCameraMirrorStore.setState({ mirrorByDevice: mirrorMap({ device1: true }) })
+      mockHookReturn.isPreviewActive = true
+      await renderDialog()
+
+      expect(screen.getByTestId(TEST_IDS.CAMERA_PREVIEW)).toHaveClass('camera-preview--mirrored')
+      expect(screen.getByTestId(TEST_IDS.CAMERA_MIRROR_TOGGLE)).toBeChecked()
+    })
+
+    it('mirrors the preview when the checkbox is switched on', async () => {
+      mockHookReturn.isPreviewActive = true
+      await renderDialog()
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId(TEST_IDS.CAMERA_MIRROR_TOGGLE))
+      })
+
+      expect(screen.getByTestId(TEST_IDS.CAMERA_PREVIEW)).toHaveClass('camera-preview--mirrored')
+      expect(useCameraMirrorStore.getState().mirrorByDevice.device1).toBe(true)
+    })
+
+    it('un-mirrors the preview when the checkbox is switched off again', async () => {
+      useCameraMirrorStore.setState({ mirrorByDevice: mirrorMap({ device1: true }) })
+      mockHookReturn.isPreviewActive = true
+      await renderDialog()
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId(TEST_IDS.CAMERA_MIRROR_TOGGLE))
+      })
+
+      expect(screen.getByTestId(TEST_IDS.CAMERA_PREVIEW)).not.toHaveClass(
+        'camera-preview--mirrored'
+      )
+      expect(useCameraMirrorStore.getState().mirrorByDevice.device1).toBe(false)
+    })
+
+    it('renders the option row for a single-camera system', async () => {
+      // Guards against the row being nested inside the showDeviceSelector
+      // block, which only renders when devices.length > 1.
+      mockHookReturn.isPreviewActive = true
+      mockHookReturn.permissionState = 'granted'
+      await renderDialog()
+
+      expect(screen.queryByTestId(TEST_IDS.CAMERA_DEVICE_SELECT)).not.toBeInTheDocument()
+      expect(screen.getByTestId(TEST_IDS.CAMERA_MIRROR_TOGGLE)).toBeInTheDocument()
+    })
+
+    it('renders the option row before permission is granted, but disabled', async () => {
+      // The row is rendered unconditionally; only `disabled` is gated on
+      // `isPreviewActive && !error`.
+      mockHookReturn.isPreviewActive = false
+      mockHookReturn.permissionState = 'prompt'
+      await renderDialog()
+
+      const toggle = screen.getByTestId(TEST_IDS.CAMERA_MIRROR_TOGGLE)
+      expect(toggle).toBeInTheDocument()
+      expect(toggle).toBeDisabled()
+    })
+
+    it('disables the option row when the camera errors mid-session', async () => {
+      mockHookReturn.isPreviewActive = true
+      mockHookReturn.error = {
+        message: 'Camera is in use by another application.',
+        code: 'CAMERA_IN_USE'
+      }
+      await renderDialog()
+
+      const toggle = screen.getByTestId(TEST_IDS.CAMERA_MIRROR_TOGGLE)
+      expect(toggle).toBeInTheDocument()
+      expect(toggle).toBeDisabled()
+    })
+
+    it('keeps focus inside the dialog when the disabled control loses focus', async () => {
+      // The rescue itself lives in BaseDialog's `trapFocus` focusout handler
+      // (there is no per-control onBlur here any more); this asserts CameraDialog
+      // is actually wired to it. `focusout` — bubbling, `relatedTarget: null` —
+      // is what Chromium delivers when it blurs a control at the instant the
+      // control becomes disabled; jsdom does not emulate that, so it is
+      // dispatched by hand.
+      mockHookReturn.isPreviewActive = false
+      await renderDialog()
+
+      fireEvent.focusOut(screen.getByTestId(TEST_IDS.CAMERA_MIRROR_TOGGLE), {
+        relatedTarget: null
+      })
+
+      const container = screen.getByTestId(TEST_IDS.DIALOG_CONTAINER)
+      expect(container.contains(document.activeElement)).toBe(true)
+      // Cancel is the only enabled control in this state (Capture and the
+      // mirror toggle are both disabled), and no Refresh button exists to be
+      // nominated, so the rescue falls back to `first`.
+      expect(document.activeElement).toBe(screen.getByTestId(TEST_IDS.CAMERA_BTN_CANCEL))
+    })
+
+    it('rescues focus to Refresh, not to the device selector, after a disconnect', () => {
+      // First-in-DOM-order is the WRONG target here: with two cameras the first
+      // focusable is the device `<select>` at the top of the dialog, where the
+      // user's next arrow key silently switches camera and restarts the stream.
+      // `focusRescueRef` points BaseDialog at Refresh instead — the control a
+      // user whose camera just died actually needs.
+      mockHookReturn.devices = [
+        {
+          deviceId: 'device1',
+          kind: 'videoinput',
+          label: 'Built-in Camera',
+          groupId: 'default',
+          toJSON: () => ({}) as MediaDeviceInfo
+        },
+        {
+          deviceId: 'device2',
+          kind: 'videoinput',
+          label: 'USB Camera',
+          groupId: 'default',
+          toJSON: () => ({}) as MediaDeviceInfo
+        }
+      ]
+      mockHookReturn.permissionState = 'granted'
+      mockHookReturn.isPreviewActive = true
+      mockHookReturn.error = { message: 'Camera disconnected.', code: 'CAMERA_DISCONNECTED' }
+
+      return renderDialog().then(() => {
+        // Precondition: the selector really is first in DOM order, so the
+        // assertion below cannot pass by accident.
+        const container = screen.getByTestId(TEST_IDS.DIALOG_CONTAINER)
+        expect(container.querySelector('select')).toBe(
+          screen.getByTestId(TEST_IDS.CAMERA_DEVICE_SELECT)
+        )
+
+        fireEvent.focusOut(screen.getByTestId(TEST_IDS.CAMERA_MIRROR_TOGGLE), {
+          relatedTarget: null
+        })
+
+        expect(document.activeElement).toBe(screen.getByTestId(TEST_IDS.CAMERA_BTN_REFRESH))
+      })
+    })
+  })
+
+  // ===========================================================================
+  // Status live region (#42 pre-UAT accessibility fix)
+  // ===========================================================================
+
+  describe('status live region', () => {
+    /** The single `role="status"` region CameraDialog keeps mounted. */
+    function getStatusRegion(): HTMLElement {
+      return screen.getByRole('status')
+    }
+
+    it('keeps the region mounted with no text before anything is announced', async () => {
+      // The defect: the old markup created the region and its text in the SAME
+      // commit, inside a brand-new portal subtree. Assistive tech announces
+      // CHANGES to a live region, not content that was already there when the
+      // region appeared, so "Starting camera..." was most likely never spoken.
+      mockHookReturn.isPreviewActive = false
+      await renderDialog()
+
+      expect(getStatusRegion()).toBeInTheDocument()
+    })
+
+    it('does not repeat aria-live alongside the implicit role semantics', async () => {
+      // `role="status"` implies polite and `role="alert"` implies assertive;
+      // spelling the attribute out as well is a documented double-speaking
+      // source in some screen-reader/browser pairs.
+      mockHookReturn.error = { message: 'Camera is in use by another application.' }
+      await renderDialog()
+
+      expect(getStatusRegion()).not.toHaveAttribute('aria-live')
+      expect(screen.getByTestId(TEST_IDS.CAMERA_ERROR)).not.toHaveAttribute('aria-live')
+      expect(screen.getByTestId(TEST_IDS.CAMERA_ERROR)).toHaveAttribute('role', 'alert')
+    })
+
+    it('describes the mirror checkbox with the status region', async () => {
+      // A browse-mode user who lands on the dimmed checkbox hears WHY it is
+      // dimmed, instead of just "unavailable".
+      mockHookReturn.isPreviewActive = false
+      await renderDialog()
+
+      expect(screen.getByTestId(TEST_IDS.CAMERA_MIRROR_TOGGLE)).toHaveAttribute(
+        'aria-describedby',
+        getStatusRegion().id
+      )
+    })
+
+    it('leaves the region silent while an error owns the announcement', async () => {
+      mockHookReturn.isPreviewActive = false
+      mockHookReturn.error = { message: 'Camera is in use by another application.' }
+      await renderDialog()
+
+      expect(getStatusRegion()).toHaveTextContent('')
+    })
+
+    it('announces the empty state when no camera is attached', async () => {
+      mockHookReturn.permissionState = 'unavailable'
+      mockHookReturn.isPreviewActive = false
+      await renderDialog()
+
+      expect(getStatusRegion()).toHaveTextContent('No camera detected.')
+    })
+  })
+
+  // ===========================================================================
   // Focus Management Tests
   // ===========================================================================
 
@@ -592,6 +825,143 @@ describe('CameraDialog', () => {
 
       const dialog = screen.getByRole('dialog')
       expect(dialog).toHaveAttribute('aria-labelledby', 'camera-dialog-title')
+    })
+
+    it('does not put initial focus on the mirror checkbox (#42)', async () => {
+      vi.useFakeTimers()
+      try {
+        mockHookReturn.isPreviewActive = true // control enabled at t=0
+        await renderDialog()
+        await act(async () => {
+          vi.advanceTimersByTime(20) // BaseDialog's FOCUS_DELAY_MS is 10
+        })
+
+        expect(document.activeElement).not.toBe(
+          screen.getByTestId(TEST_IDS.CAMERA_MIRROR_TOGGLE)
+        )
+        expect(document.activeElement).toBe(screen.getByTestId(TEST_IDS.CAMERA_BTN_CAPTURE))
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    // =========================================================================
+    // Deferred camera start (#42)
+    //
+    // The tests above let `startPreview()` resolve in the same flush as the
+    // render, which is NOT how a real camera behaves: `getUserMedia()` takes
+    // hundreds of milliseconds, so at BaseDialog's 10ms focus tick the Capture
+    // button is still `disabled={!canCapture}` and cannot be the initial focus
+    // target. These three drive the real sequence instead — Capture stays
+    // disabled across the focus tick, and only then does the preview come up.
+    // Without the `initialFocusKey` wiring the second one fails: focus stays
+    // on Cancel forever.
+    // =========================================================================
+    describe('while the camera is still starting', () => {
+      /** Resolver for the pending `startPreview()` promise. */
+      let releasePreview: () => void
+
+      /**
+       * Render with `startPreview()` still in flight and the focus tick spent,
+       * i.e. the state a real user sees for the first few hundred ms.
+       */
+      async function renderWithPendingPreview(): Promise<ReturnType<typeof render>> {
+        mockStartPreview.mockImplementation(
+          () =>
+            new Promise<void>((resolve) => {
+              releasePreview = resolve
+            })
+        )
+        mockHookReturn.isPreviewActive = false
+
+        const result = await renderDialog()
+        await act(async () => {
+          vi.advanceTimersByTime(20) // past FOCUS_DELAY_MS (10)
+        })
+        return result
+      }
+
+      /**
+       * Let the camera finish coming up: the hook flips `isPreviewActive` and
+       * `startPreview()` settles, clearing `isLoading` — together they make
+       * `canCapture` true, which is the value wired to `initialFocusKey`.
+       */
+      async function activatePreview(): Promise<void> {
+        mockHookReturn.isPreviewActive = true
+        await act(async () => {
+          releasePreview()
+        })
+        await act(async () => {
+          vi.advanceTimersByTime(20)
+        })
+      }
+
+      beforeEach(() => {
+        vi.useFakeTimers()
+      })
+
+      afterEach(() => {
+        vi.useRealTimers()
+      })
+
+      it('parks focus on Cancel while Capture is still disabled', async () => {
+        await renderWithPendingPreview()
+
+        expect(screen.getByTestId(TEST_IDS.CAMERA_BTN_CAPTURE)).toBeDisabled()
+        expect(document.activeElement).toBe(screen.getByTestId(TEST_IDS.CAMERA_BTN_CANCEL))
+      })
+
+      it('promotes focus to Capture once the preview becomes active', async () => {
+        await renderWithPendingPreview()
+        expect(document.activeElement).toBe(screen.getByTestId(TEST_IDS.CAMERA_BTN_CANCEL))
+
+        await activatePreview()
+
+        expect(screen.getByTestId(TEST_IDS.CAMERA_BTN_CAPTURE)).toBeEnabled()
+        expect(document.activeElement).toBe(screen.getByTestId(TEST_IDS.CAMERA_BTN_CAPTURE))
+      })
+
+      it('swaps the status text inside a region that never unmounts', async () => {
+        // The load-bearing property of the fix, and the one the old markup got
+        // wrong twice over: the region must be the SAME node before and after,
+        // so the transition is a text change to an existing live region rather
+        // than a fresh region appearing with content already in it. The old
+        // markup UNMOUNTED the region when the stream started, so the moment
+        // Capture and the mirror checkbox became enabled was announced by
+        // nothing at all.
+        await renderWithPendingPreview()
+
+        const region = screen.getByRole('status')
+        expect(region).toHaveTextContent('Starting camera...')
+
+        await activatePreview()
+
+        expect(screen.getByRole('status')).toBe(region)
+        expect(region).toHaveTextContent('Camera ready')
+      })
+
+      it('does not steal focus the user has already moved elsewhere', async () => {
+        // A slow camera start gives the user time to tab away. Focus must stay
+        // where they put it — this is the guard on BaseDialog's re-armed pass.
+        const outside = document.createElement('button')
+        outside.textContent = 'Somewhere else'
+        document.body.appendChild(outside)
+
+        try {
+          await renderWithPendingPreview()
+          expect(document.activeElement).toBe(screen.getByTestId(TEST_IDS.CAMERA_BTN_CANCEL))
+
+          outside.focus()
+          expect(document.activeElement).toBe(outside)
+
+          await activatePreview()
+
+          expect(screen.getByTestId(TEST_IDS.CAMERA_BTN_CAPTURE)).toBeEnabled()
+          expect(document.activeElement).toBe(outside)
+        } finally {
+          outside.remove()
+        }
+      })
     })
   })
 })

@@ -65,16 +65,9 @@ const config = PROMPT_REGISTRY['mermaid-bug-report']  // Returns undefined!
 
 ---
 
-### 3. BaseDialog lacks Tab-cycling focus trap
+### 3. BaseDialog lacks Tab-cycling focus trap ✅ Resolved (#42)
 
-**Severity**: Low
-**Impact**: Only TranscriptionDialog has proper Tab cycling; all other dialogs allow Tab to escape the dialog.
-
-**Problem**: BaseDialog's comment says "Focus trap" but the code only auto-focuses the first element – it does NOT cycle Tab/Shift+Tab within the dialog. TranscriptionDialog implements its own `handleFocusTrap` to work around this.
-
-**Recommended Solution**: Move TranscriptionDialog's Tab-cycling logic into BaseDialog so all dialogs benefit.
-
-**Files**: `src/renderer/src/components/Dialog/BaseDialog.tsx`, `src/renderer/src/components/Transcription/TranscriptionDialog.tsx`
+Resolved – BaseDialog now owns the Tab trap behind the opt-in `trapFocus` prop, and the hand-rolled `handleFocusTrap` implementations in `DocumentImportDialog` and `TranscriptionDialog` were deleted. See [Resolved Issues](#resolved-issues). The number is kept so existing references to "item #3" stay valid.
 
 ---
 
@@ -129,9 +122,9 @@ const config = PROMPT_REGISTRY['mermaid-bug-report']  // Returns undefined!
 
 **Problem**: Largest natural extraction candidate (`Release signing (v0.9.5+, #174)`, L490–L533) is structurally pinned. The pubkey block contains `<!-- minisign-pubkey-{primary,rotation}-{begin,end} -->` fence markers that are actively grepped by:
 
-- `.github/workflows/checks.yml:214–241` — release-pubkey drift detector (a required `Release readiness guards` status check on `main`)
+- `.github/workflows/checks.yml:298–330` — release-pubkey drift detector (Guard 5; the step is `Guard - release pubkey drift across docs` at `:306`) (the `Release readiness guards` job; it runs on every push but is **not** a required status check on `main` — the required set is `Lint`, `Typecheck`, `Unit tests`, `Build`, `License compliance`, `Secret scan`, per [`ci.md`](./ci.md))
 - `.claude/skills/releasing-erfana/phases/phase-4-verify.md:45` — operator-facing canonical-source note
-- `README.md:156` — direct `#release-signing-v095-174` anchor
+- `README.md:57` — direct `#release-signing-v095-174` anchor (the file is 101 lines long)
 
 Moving the block would require synchronized edits to checks.yml + skill + README anchor. High blast-radius for cosmetic gain.
 
@@ -181,7 +174,7 @@ After the heartbeat hardening (Phase A4 resume-refresh, B1 symlink defense, D3 H
 
 ---
 
-### 12. Claude status bar — Windows v1 limitations ([#217](https://github.com/qodeca/erfana/issues/217), 2026-06)
+### 12. Claude status bar — Windows v1 limitations (#217, 2026-06)
 
 **Severity**: Low
 **Impact**: The Windows Claude Code context status bar works but carries three known v1 gaps (parity-limited vs the macOS detector).
@@ -219,6 +212,7 @@ Ongoing effort to keep `docs/` concise and high-value for Claude Code.
 
 ## Resolved Issues
 
+- ✅ BaseDialog lacks Tab-cycling focus trap (#42) – Tab cycling, escaped-focus recovery and a `focusout` rescue for controls that become disabled now live in BaseDialog behind the opt-in `trapFocus` prop; the per-dialog `handleFocusTrap` copies were removed
 - ✅ Worker thread statusCache crash (v0.9.2) – persistent isomorphic-git cache caused V8 cppgc assertion after ~42 min; replaced with per-call cache
 - ✅ Git status main-thread blocking (v0.9.0, #147) – offloaded to worker_threads with native git fallback
 - ✅ EMFILE cascade in DirectoryWatcherService (v0.9.0, #146) – restart logic + RateLimitedLogger
@@ -256,7 +250,7 @@ Ongoing effort to keep `docs/` concise and high-value for Claude Code.
 
 This doc covers project-wide non-Windows technical debt. For phase-structured deferred items with promotion criteria + risk-if-forgotten:
 
-- [`windows/deferred-work.md`](./windows/deferred-work.md) — D1-D8 (Phase 2 review aftermath, tracked in [#168](https://github.com/qodeca/erfana/issues/168))
+- [`windows/deferred-work.md`](./windows/deferred-work.md) — D1-D8 (Phase 2 review aftermath, tracked in #168)
 - [`windows/deferred-work-phase4.md`](./windows/deferred-work-phase4.md) — D9-D12 (Phase 4 audit aftermath; same issue)
 
 Amendment discipline + promotion-rule conventions in [`windows/contributing.md`](./windows/contributing.md) §"Amendment discipline".
@@ -271,4 +265,4 @@ Amendment discipline + promotion-rule conventions in [`windows/contributing.md`]
 
 ---
 
-**Last Updated**: PR #245 (2026-06-13 – entry #12 live-verification updated: single-panel detection + mid-session model-switch verified on a Windows host) + #217 Windows Claude status bar (2026-06-10 — entry #12 added: Windows v1 detector limitations) + v0.14.0 doc sweep (2026-06-08 — entries #9 + #10 added from `Transcription/CLAUDE.md` eviction) + v0.9.6 release (2026-05-22 — critical macOS terminal fix `ea3eaf1`) + v0.9.5 release (2026-04-25) + Phase I branch protection refinement (PR requirement removed same day) + entry #7 documenting `security.md` cap constraint (2026-04-25)
+**Last Updated**: #42 camera mirror + dialog focus work (2026-08-07 – entry #3 resolved: BaseDialog `trapFocus`) + PR #245 (2026-06-13 – entry #12 live-verification updated: single-panel detection + mid-session model-switch verified on a Windows host) + #217 Windows Claude status bar (2026-06-10 — entry #12 added: Windows v1 detector limitations) + v0.14.0 doc sweep (2026-06-08 — entries #9 + #10 added from `Transcription/CLAUDE.md` eviction) + v0.9.6 release (2026-05-22 — critical macOS terminal fix `ea3eaf1`) + v0.9.5 release (2026-04-25) + Phase I branch protection refinement (PR requirement removed same day) + entry #7 documenting `security.md` cap constraint (2026-04-25)

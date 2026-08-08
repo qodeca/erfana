@@ -1,6 +1,6 @@
 # Build Troubleshooting
 
-**Last Updated**: March 2026 (v0.9.0)
+**Last updated**: August 2026 (v0.16.3)
 
 This document provides solutions to common build errors.
 
@@ -20,17 +20,19 @@ electron-builder 26 dependency scanning bug ([Issue #8068](https://github.com/el
 
 ### Solution
 
-**Automated** (v0.6.0+):
+**Automated** – the `prebuild` npm script (`node scripts/prebuild.mjs`) creates the stub, and runs before every build path:
 ```bash
-npm run build:mac  # prebuild creates aproba stub automatically
+npm run build:mac  # prebuild runs automatically
 ```
 
-**Manual** (for custom build commands):
+**Invoking electron-builder directly?** Run the shim yourself first:
 ```bash
-mkdir -p node_modules/aproba && echo '{}' > node_modules/aproba/package.json
+node scripts/prebuild.mjs
 ```
 
-**See**: [Electron Builder Configuration](./electron-builder.md)
+> The old `mkdir -p … && echo '{}' > …` one-liner no longer exists. It was replaced because shell redirection does not work in `cmd.exe`, which broke Windows builds. Do not reintroduce it.
+
+**See**: [Electron Builder configuration](./electron-builder.md)
 
 ---
 
@@ -85,11 +87,17 @@ preload: {
   build: {
     externalizeDeps: false,  // Bundle all dependencies for sandbox compatibility
     rollupOptions: {
+      input: {
+        index: resolve('src/preload/index.ts'),
+        screenshotOverlay: resolve('src/preload/screenshotOverlay.ts')
+      },
       output: { format: 'cjs' }
     }
   }
 }
 ```
+
+Both entries must be present. If `screenshotOverlay` is missing, the screenshot overlay windows fail to load their bridge while the main window looks fine.
 
 **See**: [Preload Bundling](./preload.md)
 
@@ -142,12 +150,12 @@ asar: false
 
 ### Symptoms
 
-No DMG/ZIP files in `release/{version}/`
+No `.dmg` in `release/{version}/`
 
 ### Check
 
 1. Build completed without errors?
-2. Check `release/{version}/mac/` and `release/{version}/mac-arm64/` directories exist
+2. Check that `release/{version}/mac-arm64/` exists. There is no `mac/` directory — that was the x64 leg, dropped in v0.11.2 — and no `.zip` target, dropped at the same time because auto-update is disabled
 3. Look for error messages in build log
 
 ### Common Causes
@@ -215,9 +223,7 @@ Unsigned DMG on macOS with Gatekeeper enabled
 **Development**:
 - Right-click → Open (allows bypassing Gatekeeper once)
 
-**Production**:
-- Requires code signing with Apple Developer ID certificate
-- See [Future Roadmap](./README.md) for code signing plans
+**Production**: released builds are already signed and notarized, so this error on an official download means something else is wrong (a corrupted transfer, or a modified bundle). `electron-builder.yml` sets `mac.hardenedRuntime: true` and `mac.notarize: true`, and `afterSign: ./scripts/resign.js` deep re-signs the bundle after the fuses are flipped. Verify the download against the published `SHA256SUMS` before assuming a build problem — see [release.md](./release.md).
 
 ---
 
@@ -229,7 +235,7 @@ Build fails during `npm run typecheck`
 
 ### Solution
 
-1. Check TypeScript version: `npx tsc --version` (should be 5.7.2)
+1. Check TypeScript version: `npx tsc --version` (should be 6.0.x; `package.json` declares `typescript: ^6.0.3`)
 2. Clean and reinstall:
    ```bash
    rm -rf node_modules/
@@ -253,12 +259,7 @@ Build fails during `npm run typecheck`
 3. Close resource-intensive apps
 4. Disable antivirus scanning on project directory
 
-**Optimization**:
-```bash
-# Build single architecture (faster)
-electron-builder --mac --x64    # x64 only
-electron-builder --mac --arm64  # arm64 only
-```
+**Optimization**: the macOS target is already a single architecture (`dmg`/`arm64` only, see [architectures.md](./architectures.md)), so there is nothing to narrow. Passing `--x64` produces nothing useful.
 
 ---
 
@@ -277,7 +278,7 @@ Tests fail, preventing build
    npm run test:renderer
    ```
 2. Fix failing tests before building
-3. All 3469 tests must pass
+3. All tests must pass – 8,768 across 299 files as of v0.16.3
 
 ---
 
