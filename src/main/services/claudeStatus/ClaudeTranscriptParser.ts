@@ -31,6 +31,13 @@
  */
 import { promises as fs } from 'node:fs'
 import { logger } from '../LoggingService'
+import { MAX_MODEL_ID_LENGTH } from '../../../shared/ipc/claude-status-schema'
+import {
+  isExtendedVariant,
+  isRecognisedVariant,
+  parseModelId,
+  stripModelVariants
+} from './modelId'
 
 /** Latest main-session assistant turn extracted from a transcript. */
 export interface ParsedTurn {
@@ -149,15 +156,68 @@ function isCompactionMarker(record: unknown): boolean {
   return (record as Record<string, unknown>).isCompactSummary === true
 }
 
-/** Full `claude-<family>-<maj>-<min>[-<8-digit-date>]` id (rejects typed aliases). */
-const MODEL_OVERRIDE_ID_RE = /^claude-[a-z]+-\d+-\d+(-\d{8})?$/i
+/** Delimiters of the slash-command argument block inside a `user` record. */
+const COMMAND_ARGS_OPEN = '<command-args>'
+const COMMAND_ARGS_CLOSE = '</command-args>'
+
+/**
+ * Upper bound on the `content` we will search for a `<command-args>` block.
+ *
+ * A `/model` argument is discarded above {@link MAX_MODEL_ID_LENGTH} characters,
+ * so a few KB of surrounding markup is already far more than any real command
+ * needs. Transcripts record user messages VERBATIM, so `content` is attacker-
+ * influenced at the size of whatever text an agent ingested and echoed back —
+ * bounded only by the 256 KB tail window, and by nothing at all on the full-read
+ * retry path. This gate keeps the scan proportional to a command, not a document.
+ */
+const MAX_COMMAND_CONTENT_LENGTH = 8 * 1024
+
+/**
+ * Extract the text between the first `<command-args>` / `</command-args>` pair,
+ * or `null` when the block is absent, unterminated, or the content is too large
+ * to be a command.
+ *
+ * SECURITY: deliberately `indexOf`, not a regex. The previous
+ * `/<command-args>([\s\S]*?)<\/command-args>/` used a lazy quantifier, which
+ * restarts a full forward scan at EVERY position where the opening literal
+ * occurs — quadratic in `content`. Measured on the main-process event loop,
+ * which this runs on ~1x/1.25s per terminal: 64 KB took 40 ms, 256 KB took
+ * 630 ms and 1 MB took 10 s, i.e. a sustained stall that freezes the editor, the
+ * project tree and every IPC handler. Two `indexOf` calls are linear and cannot
+ * backtrack at all.
+ */
+function extractCommandArgs(content: string): string | null {
+  if (content.length > MAX_COMMAND_CONTENT_LENGTH) return null
+
+  const start = content.indexOf(COMMAND_ARGS_OPEN)
+  if (start === -1) return null
+
+  const from = start + COMMAND_ARGS_OPEN.length
+  const end = content.indexOf(COMMAND_ARGS_CLOSE, from)
+  if (end === -1) return null
+
+  return content.slice(from, end).trim()
+}
 
 /**
  * If `record` is a `/model` slash-command entry, return the selected model id
- * (and whether it carried the `[1m]` 1M-window marker), else undefined. Only a
- * full `claude-<family>-<maj>-<min>[-<8-digit-date>]` id is accepted — a typed
- * alias (`opus`, `default`, empty) returns undefined so the caller falls back to
- * the assistant turn's model. Untrusted data: parsed defensively, never executed.
+ * (and whether it carried the `[1m]` 1M-window marker), else undefined.
+ *
+ * Only an id the SHARED grammar decomposes is accepted (#41) — a typed alias
+ * (`opus`, `default`, empty) returns undefined so the caller falls back to the
+ * assistant turn's model.
+ *
+ * An override carrying an UNRECOGNISED bracket variant is ignored entirely
+ * (design decision (e)): `/model claude-opus-4-7[thinking]` must keep behaving
+ * exactly as it does today, because honouring it would set `modelForcedStandard`
+ * and clear the sticky 1M bit — a user-visible 1M→200k downgrade triggered by an
+ * unrelated suffix. For a *label* an unrecognised variant is merely ignored, but
+ * an override is an ACTION, so it fails closed.
+ *
+ * Untrusted data: parsed defensively, never executed. The surrounding `content`
+ * is size-gated and scanned linearly by {@link extractCommandArgs}, and the arg
+ * itself is length-capped BEFORE the parser is called (design §11, F10) — it
+ * originates in a `<command-args>` block bounded only by the tail window.
  */
 function modelOverrideFromRecord(
   record: unknown
@@ -181,18 +241,17 @@ function modelOverrideFromRecord(
       .join(' ')
   }
   if (!content.includes('<command-name>/model</command-name>')) return undefined
-  const m = content.match(/<command-args>([\s\S]*?)<\/command-args>/)
-  if (!m) return undefined
-  let arg = m[1].trim()
-  if (arg === '') return undefined
-  let forceExtended = false
-  if (arg.toLowerCase().endsWith('[1m]')) {
-    forceExtended = true
-    arg = arg.slice(0, -4).trim()
-  }
+
+  const arg = extractCommandArgs(content)
+  if (arg === null || arg === '' || arg.length > MAX_MODEL_ID_LENGTH) return undefined
+
+  const stripped = stripModelVariants(arg)
+  if (stripped === null) return undefined
+  if (!stripped.variants.every(isRecognisedVariant)) return undefined
   // Accept only a full claude-* model id (reject aliases like `opus`, `default`).
-  if (!MODEL_OVERRIDE_ID_RE.test(arg)) return undefined
-  return { modelId: arg, forceExtended }
+  if (parseModelId(stripped.base) === null) return undefined
+
+  return { modelId: stripped.base, forceExtended: stripped.variants.some(isExtendedVariant) }
 }
 
 /**
