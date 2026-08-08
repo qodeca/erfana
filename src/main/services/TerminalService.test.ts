@@ -106,7 +106,7 @@ async function createId(
       process.env.CLAUDE_CODE_CHILD_SESSION = 'abc'
       process.env.CLAUDE_CODE_SESSION_ID = 'sid'
       process.env.CLAUDE_CODE_ENTRYPOINT = 'cli'
-      process.env.ANTHROPIC_API_KEY = 'sk-test-keep'
+      process.env.ANTHROPIC_API_KEY = 'kept'
       process.env.ERFANA_KEEP_ME = 'yes'
 
       try {
@@ -121,7 +121,7 @@ async function createId(
         expect(env.CLAUDE_CODE_SESSION_ID).toBeUndefined()
         expect(env.CLAUDE_CODE_ENTRYPOINT).toBeUndefined()
         // Non-marker vars (incl. ANTHROPIC_* API keys) pass through unchanged.
-        expect(env.ANTHROPIC_API_KEY).toBe('sk-test-keep')
+        expect(env.ANTHROPIC_API_KEY).toBe('kept')
         expect(env.ERFANA_KEEP_ME).toBe('yes')
       } finally {
         delete process.env.CLAUDECODE
@@ -131,6 +131,36 @@ async function createId(
         delete process.env.ANTHROPIC_API_KEY
         delete process.env.ERFANA_KEEP_ME
       }
+    })
+
+    it('strips CLAUDE_CODE_* supplied by the CALLER, not just the base env', async () => {
+      // Security audit LOW-2: `config.env` arrives from the `terminal:create` IPC
+      // payload and used to be merged AFTER cleaning, so a caller could re-add the
+      // exact markers the exclusion list exists to remove — defeating the
+      // documented clean-top-level-session guarantee. The exclusion now runs on
+      // the merged environment.
+      vi.doMock('os', async () => {
+        const actual = await vi.importActual<any>('os')
+        return { ...actual, platform: () => 'darwin' }
+      })
+
+      const { terminalService } = await import('./TerminalService')
+      await createId(terminalService, {
+        cwd: '/tmp/project',
+        env: {
+          CLAUDE_CODE_DISABLE_1M_CONTEXT: '1',
+          CLAUDE_CODE_ENTRYPOINT: 'cli',
+          CLAUDECODE: '1',
+          ANTHROPIC_BASE_URL: 'https://gateway.internal'
+        }
+      })
+
+      const env = spawnedPTYs[0].opts.env as Record<string, string | undefined>
+      expect(env.CLAUDE_CODE_DISABLE_1M_CONTEXT).toBeUndefined()
+      expect(env.CLAUDE_CODE_ENTRYPOINT).toBeUndefined()
+      expect(env.CLAUDECODE).toBeUndefined()
+      // ANTHROPIC_* is deliberately NOT on the exclusion list and still passes.
+      expect(env.ANTHROPIC_BASE_URL).toBe('https://gateway.internal')
     })
   })
 
