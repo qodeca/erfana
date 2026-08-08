@@ -16,6 +16,7 @@ Newest first. Auto-appended by the `release-failure-analyzer` agent on terminal-
 
 | Date | Version | Attempt | Run | Failed leg | Matched signature | Memo |
 |------|---------|---------|-----|------------|-------------------|------|
+| 2026-08-08 | v0.17.0 | #1 | [31264941055](https://github.com/qodeca/erfana/actions/runs/31264941055) | Prepare | unknown (tag-push race vs checks.yml completion — not in cookbook) | [memo](v0.17.0-attempt-1.md) |
 | 2026-06-17 | v0.16.2 | #1 | [27716374257](https://github.com/qodeca/erfana/actions/runs/27716374257) | Windows | Row 11 (same signature, new cause: legacy PKCS#12 vs OpenSSL 3.x) | [memo](v0.16.2-attempt-1.md) |
 | 2026-06-17 | v0.16.1 | #1 | [27699667579](https://github.com/qodeca/erfana/actions/runs/27699667579) | Windows | unknown (Row 11 — add to cookbook) | [memo](v0.16.1-attempt-1.md) |
 
