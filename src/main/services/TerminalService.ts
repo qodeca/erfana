@@ -103,8 +103,12 @@ export class TerminalService extends EventEmitter {
   }
 
   /**
-   * Clean environment variables before passing to PTY
-   * Removes development/build-specific variables that leak into terminal
+   * Clean environment variables before passing to PTY.
+   *
+   * Removes development/build-specific variables that leak into the terminal, and
+   * the Claude Code nested-session markers. MUST be applied to the FULLY MERGED
+   * environment (base + caller-supplied): the caller-supplied half arrives over
+   * IPC, so filtering only the base would leave the guarantee bypassable.
    */
   private cleanEnvironment(
     baseEnv: NodeJS.ProcessEnv
@@ -245,24 +249,31 @@ export class TerminalService extends EventEmitter {
         shellArgs.push('-c', bootstrapScript)
       }
 
+      // Clean the MERGED environment, not just `process.env`. `config.env` arrives
+      // from the `terminal:create` IPC payload, so cleaning the base first and
+      // merging afterwards let a caller re-add the very names the exclusion list
+      // exists to remove — defeating the documented guarantee that an in-terminal
+      // `claude` runs as a clean top-level session. The explicit keys below are
+      // applied after cleaning because `COLORTERM` is itself on the exclusion list.
+      const spawnEnv: Record<string, string | undefined> = {
+        ...this.cleanEnvironment({ ...process.env, ...config.env }),
+        TERM: 'xterm-256color',
+        COLORTERM: 'truecolor',
+        // Set traditional prompt: username directory $
+        // %n = username, %~ = current directory (~ for home)
+        PROMPT: '%n %~ $ ',
+        PS1: '%n %~ $ ',
+        // Disable macOS session restoration (prevents "Restored session" message)
+        SHELL_SESSIONS_DISABLE: '1'
+      }
+
       // Spawn PTY process with bootstrap script
       const ptyProcess = pty.spawn(shell, shellArgs, {
         name: 'xterm-256color',
         cols,
         rows,
         cwd,
-        env: {
-          ...this.cleanEnvironment(process.env),
-          ...config.env,
-          TERM: 'xterm-256color',
-          COLORTERM: 'truecolor',
-          // Set traditional prompt: username directory $
-          // %n = username, %~ = current directory (~ for home)
-          PROMPT: '%n %~ $ ',
-          PS1: '%n %~ $ ',
-          // Disable macOS session restoration (prevents "Restored session" message)
-          SHELL_SESSIONS_DISABLE: '1'
-        }
+        env: spawnEnv
       })
 
       // Store terminal instance

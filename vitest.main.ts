@@ -37,6 +37,19 @@ export default defineConfig({
       'src/main/utils/secureDownloader.ts': { lines: 90, functions: 90, branches: 90, statements: 90 },
       'src/main/utils/zipArchive.ts': { lines: 90, functions: 90, branches: 90, statements: 90 },
       'src/main/utils/tarArchive.ts': { lines: 90, functions: 90, branches: 90, statements: 90 },
+      // Shared model-id parser + context-window capability registry (#41). It is
+      // the SINGLE source of truth behind both the meter's window size and the
+      // model label, and a coverage gap here means an unexercised capability row
+      // or grammar branch — the exact defect class #41 fixed. Declared as a
+      // per-file floor rather than a manually-checked target (design F24 / §12);
+      // measured at 100% statements / 98% branches when this entry landed.
+      // NOTE: like the four entries above, this block sits under a top-level
+      // `coverage` key, which vitest does not read (coverage options belong under
+      // `test.coverage`) — so these floors are documentation until that
+      // pre-existing placement is fixed. Moving them today fails on the
+      // verifyManifest / secureDownloader / zipArchive entries, not on this one.
+      // See: docs/designs/41-model-capability-registry.md §9.5
+      'src/main/services/claudeStatus/modelId.ts': { lines: 95, functions: 95, branches: 95, statements: 95 },
     },
     exclude: [
       'node_modules/**',
