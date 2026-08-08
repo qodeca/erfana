@@ -102,10 +102,10 @@ describe('TEST_IDS', () => {
       expect(claudeIds).toHaveLength(3)
     })
 
-    it('should have 8 Camera Dialog IDs', async () => {
+    it('should have 10 Camera Dialog IDs', async () => {
       const { TEST_IDS } = await getTestIds()
       const cameraIds = Object.keys(TEST_IDS).filter((k) => k.startsWith('CAMERA_'))
-      expect(cameraIds).toHaveLength(8)
+      expect(cameraIds).toHaveLength(10)
     })
 
     it('should have 15 Chat Bubble IDs', async () => {

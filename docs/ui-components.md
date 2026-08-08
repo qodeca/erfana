@@ -140,7 +140,7 @@ The maintained inventory – BaseDialog API, focus trap, ESC/backdrop handling, 
 | `PromptDialog` | Single text input with validation and character count |
 | `AlertDialog` | Single-OK notice |
 | `FileSystemDialog` (+ `NewFileDialog`, `NewFolderDialog`, `RenameDialog`) | Create/rename files and folders with cross-platform name validation |
-| `CameraDialog` | Live webcam preview, device selection, single-frame photo capture |
+| `CameraDialog` | Live webcam preview (full frame, un-mirrored by default, with an optional per-camera mirror toggle), device selection, single-frame photo capture |
 | `ScreenSelectDialog` | Pick which display to capture when multiple monitors are connected |
 | `WindowPickerDialog` | Thumbnail grid for picking a window to capture (desktopCapturer backend; macOS uses the OS picker instead) |
 | `ScreenPermissionDialog` | Advisory macOS Screen Recording flow – open the privacy pane, then relaunch |
@@ -376,7 +376,7 @@ Modal dialog for media file import with transcription (OpenAI API or local whisp
 
 **Features**:
 - Composes on BaseDialog (`closeOnEscape={false}`, `closeOnBackdrop={false}`) with custom Escape handling (cancel when transcribing, close otherwise)
-- Tab-cycling focus trap (unique to this dialog – BaseDialog only auto-focuses)
+- Tab-cycling focus trap via BaseDialog's opt-in `trapFocus` prop (the dialog's own `handleFocusTrap` was removed in #42)
 - Progress bar with percentage, ETA, and chunk indicator ("chunk N of M")
 - ARIA: `role="progressbar"`, `aria-live` on phase text/error/success, `aria-describedby`
 - Cancel via footer button or Escape key

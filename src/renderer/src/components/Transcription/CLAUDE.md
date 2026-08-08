@@ -15,7 +15,7 @@ useTranscriptionStore.ts        ← Zustand store (stores/)
 ## Key design decisions
 
 - **BaseDialog with `closeOnEscape={false}` and `closeOnBackdrop={false}`**: Custom Escape handler – cancels transcription when active, closes dialog otherwise
-- **Tab-cycling focus trap**: Implemented manually via `handleFocusTrap` (BaseDialog only auto-focuses, doesn't cycle)
+- **Tab-cycling focus trap**: Provided by BaseDialog via the `trapFocus` prop (#42). The local `handleFocusTrap` this dialog used to carry was deleted – do not reintroduce one
 - **`onClose={handleClose}`**: Safety guard – uses cancel-aware handler, not raw `closeDialog`
 - **Video detection**: Checks file extension against `VIDEO_IMPORT.SUPPORTED_EXTENSIONS` to show FileVideo icon and "Transcribe video" title
 - **Done button post-actions**: `handleDone` auto-opens the transcript file in an editor tab and triggers the organize-import prompt in the terminal (#113)
@@ -57,7 +57,7 @@ renderer                                       main
 
 ## Known tech debt
 
-Tracked in [`docs/technical-debt.md`](../../../../../docs/technical-debt.md): item #3 (BaseDialog Tab-cycling focus trap), #4 (LanguageSelect missing `id`), #9 (TranscriptionDialog hardcoded `zIndex`), #10 (language-select dropdown arrow hardcoded `background-size`).
+Tracked in [`docs/technical-debt.md`](../../../../../docs/technical-debt.md): item #4 (LanguageSelect missing `id`), #9 (TranscriptionDialog hardcoded `zIndex`), #10 (language-select dropdown arrow hardcoded `background-size`). Item #3 (BaseDialog Tab-cycling focus trap) is resolved – this dialog now uses `trapFocus`.
 
 ## Related files
 

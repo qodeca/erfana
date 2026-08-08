@@ -12,6 +12,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { useCameraCapture } from './useCameraCapture'
+import { useCameraMirrorPreference } from './useCameraMirrorPreference'
+import { useCameraMirrorStore } from '../stores/useCameraMirrorStore'
+import { mirrorMap } from '../test-utils/mirrorMap'
 
 // =============================================================================
 // Mock navigator.mediaDevices
@@ -142,9 +145,151 @@ vi.mock('../utils/logger', () => ({
 // =============================================================================
 
 const mockToDataURL = vi.fn(() => 'data:image/jpeg;base64,mockBase64Data')
-const mockGetContext = vi.fn(() => ({
-  drawImage: vi.fn()
-}))
+
+/**
+ * The members of `CanvasRenderingContext2D` this suite actually stubs.
+ *
+ * ONE hoisted object, not a fresh literal per getContext() call, so tests can
+ * assert on what capture did to the context. All SEVEN CanvasRenderingContext2D
+ * transform members are present so that a regression which re-introduces a flip
+ * fails on a meaningful assertion instead of on `ctx.transform is not a
+ * function` — which capturePhoto's catch would swallow into `return null`.
+ * `filter` is a plain property assignment and is therefore invisible to call
+ * assertions; it is asserted by value.
+ */
+const stubbedCanvasMembers = {
+  drawImage: vi.fn(),
+  translate: vi.fn(),
+  rotate: vi.fn(),
+  scale: vi.fn(),
+  transform: vi.fn(),
+  setTransform: vi.fn(),
+  resetTransform: vi.fn(),
+  getTransform: vi.fn(),
+  save: vi.fn(),
+  restore: vi.fn(),
+  filter: 'none'
+}
+
+/**
+ * Property names that are NOT canvas API and must pass through untrapped.
+ *
+ * The test runner, `pretty-format` and the `await` protocol probe objects for
+ * these while building failure output. Trapping them would turn a readable
+ * assertion failure into a confusing throw from inside the reporter.
+ */
+const INTROSPECTION_PASSTHROUGH = new Set([
+  'constructor',
+  'toString',
+  'toJSON',
+  'valueOf',
+  'then',
+  'nodeType',
+  'tagName',
+  '$$typeof',
+  'hasOwnProperty',
+  'asymmetricMatch',
+  '@@__IMMUTABLE_ITERABLE__@@',
+  '@@__IMMUTABLE_RECORD__@@'
+])
+
+/**
+ * Stable 2D-context stub, fronted by a DENY-BY-DEFAULT Proxy.
+ *
+ * The plain object above is an ALLOWLIST: any canvas API it does not name is
+ * simply `undefined`, so a flip built from an unstubbed member — the classic
+ * `getImageData` → reverse-rows → `putImageData` route, say — throws
+ * `ctx.getImageData is not a function`. `captureVideoFrame` runs inside
+ * `capturePhoto`'s `try`, whose `catch` turns any throw into `return null`. The
+ * #42 guards below would then see no transform call, `filter === 'none'` and
+ * the recorded `drawImage` args, and pass green over a capture that produced
+ * nothing at all.
+ *
+ * The Proxy closes that hole: reading a member nobody stubbed is a NAMED,
+ * loud failure instead of `undefined`. Combined with the success assertions in
+ * the guards (returned file path, `toDataURL`, `camera.save`), a swallowed
+ * throw can no longer masquerade as a pass.
+ *
+ * WRITES are denied on the same terms, and for the same reason. Half the canvas
+ * API is plain property assignment, and an assignment to an unstubbed member
+ * would otherwise be silently ACCEPTED: `ctx.globalCompositeOperation = 'copy'`
+ * or `ctx.imageSmoothingEnabled = false` calls no method, leaves `filter` at
+ * `'none'`, and the #42 guards — which watch the six transform methods and
+ * `filter` by value — would stay green over a capture that mutated the frame.
+ * Only `filter` is asserted by value, so only the stubbed members are writable.
+ *
+ * Symbols and {@link INTROSPECTION_PASSTHROUGH} are exempt: they are runner
+ * plumbing, never canvas API.
+ *
+ * If production code legitimately starts using a new context member, ADD IT to
+ * `stubbedCanvasMembers` — do not widen either trap.
+ */
+const mockCanvasContext = new Proxy(stubbedCanvasMembers, {
+  get(target, property, receiver) {
+    if (
+      typeof property === 'symbol' ||
+      INTROSPECTION_PASSTHROUGH.has(property) ||
+      Object.prototype.hasOwnProperty.call(target, property)
+    ) {
+      return Reflect.get(target, property, receiver)
+    }
+    throw new Error(
+      `UNSTUBBED CANVAS MEMBER: capture read ctx.${property}, which this ` +
+        `suite does not stub. Either production code gained a new canvas ` +
+        `dependency (add it to stubbedCanvasMembers) or a frame transform ` +
+        `sneaked back in through an API the #42 guards do not watch.`
+    )
+  },
+  set(target, property, value) {
+    if (
+      typeof property === 'symbol' ||
+      INTROSPECTION_PASSTHROUGH.has(property) ||
+      Object.prototype.hasOwnProperty.call(target, property)
+    ) {
+      // No `receiver`: the write belongs on the stub object itself, which is
+      // what the assertions read. Forwarding the proxy as receiver would route
+      // the write back through this proxy's `defineProperty` trap instead.
+      return Reflect.set(target, property, value)
+    }
+    throw new Error(
+      `UNSTUBBED CANVAS MEMBER: capture wrote ctx.${property} = ` +
+        `${String(value)}, which this suite does not stub. Either production ` +
+        `code gained a new canvas dependency (add it to stubbedCanvasMembers) ` +
+        `or a frame transform sneaked back in through a property the #42 ` +
+        `guards do not watch.`
+    )
+  }
+})
+
+/**
+ * Assertion message for "the capture must have succeeded".
+ *
+ * `capturePhoto` swallows every throw into `return null`, but it also parks the
+ * message on the hook's `error` state — so echoing it here turns an otherwise
+ * opaque `expected null` into the actual cause, e.g. the Proxy's
+ * `UNSTUBBED CANVAS MEMBER: capture read ctx.getImageData`.
+ *
+ * @param error - `result.current.error` at the moment of the assertion
+ * @returns Message naming both the contract and the swallowed cause
+ */
+function captureFailureMessage(error: { message: string } | null): string {
+  return (
+    'capture must SUCCEED, not be silently swallowed. ' +
+    `Hook error state: ${error === null ? '(none)' : error.message}`
+  )
+}
+
+/** The six members that MUTATE the transform. `getTransform` only reads. */
+const MUTATING_TRANSFORMS = [
+  'translate',
+  'rotate',
+  'scale',
+  'transform',
+  'setTransform',
+  'resetTransform'
+] as const
+
+const mockGetContext = vi.fn(() => mockCanvasContext)
 
 Object.defineProperty(HTMLCanvasElement.prototype, 'toDataURL', {
   writable: true,
@@ -164,6 +309,14 @@ describe('useCameraCapture', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     localStorageMock.clear()
+
+    // `vi.clearAllMocks()` clears call history but does NOT touch plain
+    // properties, so `filter` is reset by hand (#42).
+    mockCanvasContext.filter = 'none'
+
+    // The mirror store is module-scoped and therefore shared by every test in
+    // this file; reset it so a preference cannot leak between tests (#42).
+    useCameraMirrorStore.setState({ mirrorByDevice: mirrorMap() })
 
     // Reset mock implementations
     mockEnumerateDevices.mockResolvedValue([])
@@ -616,7 +769,190 @@ describe('useCameraCapture', () => {
       expect(filePath).toBeNull()
       expect(result.current.error?.message).toBe('Save failed')
     })
+
+    it('performs no canvas transform while the preview is mirrored (#42)', async () => {
+      // NOTE ON SCOPE: this asserts "captureVideoFrame performs no transform on
+      // the capture canvas". It does NOT assert "the saved file is unmirrored" —
+      // nothing in jsdom decodes the JPEG. The two coincide only because the
+      // canvas starts at the identity transform.
+      //
+      // `ctx.transform(-1, 0, 0, 1, w, 0)` is the idiomatic horizontal flip and
+      // was entirely unguarded before #42; it is one of the six members below.
+      mockEnumerateDevices.mockResolvedValue([createMockDevice('device1', 'Camera 1')])
+      const { result } = renderHook(() => useCameraCapture())
+      await waitFor(() => expect(result.current.selectedDeviceId).toBe('device1'))
+      await act(async () => {
+        await result.current.startPreview()
+      })
+
+      // Mirror ON for this device — the preview flag must not reach the canvas.
+      act(() => {
+        useCameraMirrorStore.getState().setMirror('device1', true)
+      })
+
+      const mockVideo = { videoWidth: 1920, videoHeight: 1080 } as HTMLVideoElement
+      let filePath: string | null = null
+      await act(async () => {
+        filePath = await result.current.capturePhoto(mockVideo)
+      })
+
+      // SUCCESS FIRST. Every assertion below is about what capture did NOT do,
+      // and `capturePhoto`'s catch turns any throw into `return null` — so
+      // without this the whole guard stays green over a capture that threw and
+      // produced no photo at all. A broken capture must fail here, loudly, and
+      // the swallowed message is echoed into the assertion so the failure names
+      // the real cause instead of just "expected null".
+      expect(filePath, captureFailureMessage(result.current.error)).toBe('/tmp/camera-photo.jpg')
+      expect(mockToDataURL).toHaveBeenCalledWith('image/jpeg', 0.92)
+      expect(mockCameraSave).toHaveBeenCalledWith({
+        dataUrl: 'data:image/jpeg;base64,mockBase64Data',
+        timestamp: expect.any(Number)
+      })
+
+      for (const method of MUTATING_TRANSFORMS) {
+        expect(
+          mockCanvasContext[method],
+          `ctx.${method}() must never be called during capture (#42)`
+        ).not.toHaveBeenCalled()
+      }
+      expect(mockCanvasContext.filter, 'ctx.filter must stay unset during capture').toBe('none')
+
+      expect(mockCanvasContext.drawImage).toHaveBeenCalledTimes(1)
+      expect(mockCanvasContext.drawImage).toHaveBeenCalledWith(mockVideo, 0, 0, 1920, 1080)
+    })
+
+    it('performs no canvas transform while the preview is un-mirrored (#42)', async () => {
+      // Same scope note as above. Run with the preference OFF as well, because
+      // the point of the pair is that the preview state never reaches the
+      // canvas in EITHER direction.
+      mockEnumerateDevices.mockResolvedValue([createMockDevice('device1', 'Camera 1')])
+      const { result } = renderHook(() => useCameraCapture())
+      await waitFor(() => expect(result.current.selectedDeviceId).toBe('device1'))
+      await act(async () => {
+        await result.current.startPreview()
+      })
+
+      expect(useCameraMirrorStore.getState().mirrorByDevice['device1']).toBeUndefined()
+
+      const mockVideo = { videoWidth: 1280, videoHeight: 720 } as HTMLVideoElement
+      let filePath: string | null = null
+      await act(async () => {
+        filePath = await result.current.capturePhoto(mockVideo)
+      })
+
+      // Same reason as the mirrored case: prove the capture SUCCEEDED before
+      // asserting what it refrained from doing.
+      expect(filePath, captureFailureMessage(result.current.error)).toBe('/tmp/camera-photo.jpg')
+      expect(mockToDataURL).toHaveBeenCalledWith('image/jpeg', 0.92)
+      expect(mockCameraSave).toHaveBeenCalledWith({
+        dataUrl: 'data:image/jpeg;base64,mockBase64Data',
+        timestamp: expect.any(Number)
+      })
+
+      for (const method of MUTATING_TRANSFORMS) {
+        expect(
+          mockCanvasContext[method],
+          `ctx.${method}() must never be called during capture (#42)`
+        ).not.toHaveBeenCalled()
+      }
+      expect(mockCanvasContext.filter, 'ctx.filter must stay unset during capture').toBe('none')
+
+      expect(mockCanvasContext.drawImage).toHaveBeenCalledTimes(1)
+      expect(mockCanvasContext.drawImage).toHaveBeenCalledWith(mockVideo, 0, 0, 1280, 720)
+    })
   })
+
+  // ===========================================================================
+  // Mirror Preference Tests (#42)
+  // ===========================================================================
+
+  describe('mirror preference render timing (#42)', () => {
+    /** Every committed render's (device, mirror) pair, in order. */
+    const commits: Array<{ deviceId: string | null; mirrored: boolean }> = []
+
+    beforeEach(() => {
+      commits.length = 0
+      useCameraMirrorStore.setState({ mirrorByDevice: mirrorMap() })
+    })
+
+    it('never commits a render whose mirror flag disagrees with its device', async () => {
+      mockEnumerateDevices.mockResolvedValue([
+        createMockDevice('device1', 'Camera 1'),
+        createMockDevice('device2', 'Camera 2')
+      ])
+      // Seeded through the store's public state, so the test does not depend on
+      // the persisted JSON shape.
+      useCameraMirrorStore.setState({
+        mirrorByDevice: mirrorMap({ device1: true, device2: false })
+      })
+
+      const { result } = renderHook(() => {
+        const camera = useCameraCapture()
+        const mirror = useCameraMirrorPreference(camera.selectedDeviceId)
+        // Pushed on EVERY render, before the commit is painted. A useState +
+        // useEffect reimplementation produces at least one render where the
+        // pair disagrees (new device, previous device's flag); a value derived
+        // during render cannot. Do NOT replace this with a settled-state
+        // assertion — act() drains effect-triggered re-renders, so the settled
+        // state is identical under both implementations, and the test would
+        // prove nothing. Do not "simplify" it.
+        commits.push({ deviceId: camera.selectedDeviceId, mirrored: mirror.isMirrored })
+        return { ...camera, ...mirror }
+      })
+
+      await waitFor(() => expect(result.current.selectedDeviceId).toBe('device1'))
+
+      // async act(): setSelectedDeviceId changes refreshDevices' identity,
+      // re-firing the mount effect whose enumerateDevices() promise resolves
+      // outside a synchronous act().
+      await act(async () => {
+        result.current.setSelectedDeviceId('device2')
+      })
+      await act(async () => {
+        result.current.setSelectedDeviceId('device1')
+      })
+
+      const expected: Record<string, boolean> = { device1: true, device2: false }
+      const inconsistent = commits.filter(
+        (commit) => commit.deviceId !== null && commit.mirrored !== expected[commit.deviceId]
+      )
+      expect(
+        inconsistent,
+        `commits holding an inconsistent (device, mirror) pair: ${JSON.stringify(inconsistent)}`
+      ).toEqual([])
+
+      // Sanity: an empty or single-device `commits` must not pass vacuously.
+      expect(commits.some((c) => c.deviceId === 'device2')).toBe(true)
+      expect(commits.filter((c) => c.deviceId === 'device1').length).toBeGreaterThan(1)
+    })
+
+    it('applies the stored preference on the refreshDevices auto-select path', async () => {
+      // No last-device key, so refreshDevices picks videoDevices[0] directly via
+      // setSelectedDeviceIdState — the path a sync wired into
+      // setSelectedDeviceId would miss entirely.
+      mockEnumerateDevices.mockResolvedValue([createMockDevice('device1', 'Camera 1')])
+      useCameraMirrorStore.setState({ mirrorByDevice: mirrorMap({ device1: true }) })
+
+      const { result } = renderHook(() => {
+        const camera = useCameraCapture()
+        const mirror = useCameraMirrorPreference(camera.selectedDeviceId)
+        commits.push({ deviceId: camera.selectedDeviceId, mirrored: mirror.isMirrored })
+        return { ...camera, ...mirror }
+      })
+
+      await waitFor(() => expect(result.current.selectedDeviceId).toBe('device1'))
+      expect(commits.filter((c) => c.deviceId === 'device1').every((c) => c.mirrored)).toBe(true)
+      // Guard against a vacuous pass if the auto-select path ever stops firing.
+      expect(commits.some((c) => c.deviceId === 'device1')).toBe(true)
+    })
+  })
+
+  // NOTE: "toggling the mirror preference does not restart the stream" is NOT
+  // tested here. `useCameraCapture` has no subscription to the mirror store, so
+  // mutating the store around a bare `renderHook(useCameraCapture)` cannot make
+  // the assertion fail by construction — the test would be tautological. It
+  // lives in `CameraDialog.mirror.integration.test.tsx`, where the real toggle
+  // is clicked and the whole component re-renders (#42).
 
   // ===========================================================================
   // Device Disconnection Tests

@@ -155,6 +155,11 @@ export class TerminalPage {
     return byTestId(this.page, TEST_IDS.TERMINAL_BTN_EXPAND)
   }
 
+  /** The camera-capture toolbar button (opens CameraDialog). */
+  cameraButton(): Locator {
+    return byTestId(this.page, TEST_IDS.TERMINAL_BTN_CAMERA)
+  }
+
   /** Click the expand/restore button to toggle terminal maximize. */
   async toggleExpand(): Promise<void> {
     await this.expandButton().click()

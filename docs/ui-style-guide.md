@@ -173,9 +173,12 @@ background: var(--color-btn-primary-active);  /* Violet active */
 background: var(--color-btn-secondary-bg);    /* #3c3c3c */
 background: var(--color-btn-secondary-hover); /* #505050 */
 
-/* Danger button (red - unchanged) */
-background: var(--color-btn-danger-bg);       /* #c72e0f */
-background: var(--color-btn-danger-hover);    /* #e03e18 */
+/* Danger button (red) */
+background: var(--color-btn-danger-bg);       /* #c72e0f - 5.49:1 with white */
+background: var(--color-btn-danger-hover);    /* #ad280d - 6.80:1 with white; DARKER
+                                                 than resting. The old lighter
+                                                 #e03e18 measured 4.31:1 and failed
+                                                 WCAG 1.4.3 for normal-size text. */
 ```
 
 ### Status Colors (Brand + Unchanged)
@@ -378,6 +381,20 @@ box-shadow: var(--shadow-focus);
 opacity: var(--opacity-disabled);  /* 0.4 */
 cursor: not-allowed;
 pointer-events: none;  /* optional - prevents interaction */
+```
+
+### Native form controls
+
+`:root` in `design-tokens.css` declares `color-scheme: dark`, so the browser paints checkboxes, radios, selects and scrollbars with dark UA defaults instead of the light ones. This is app-wide and is **not** a `prefers-color-scheme` query – Erfana stays dark-only.
+
+`color-scheme` covers the control's chrome; the checked fill still needs a tint:
+
+```css
+input[type='checkbox'] {
+  width: var(--icon-size-sm);          /* intrinsic control size, not a --space-* step */
+  height: var(--icon-size-sm);
+  accent-color: var(--color-accent-primary);
+}
 ```
 
 ---

@@ -258,9 +258,10 @@ Capture photos from connected cameras directly from the terminal toolbar.
 
 **Dialog Features**:
 - Live camera preview with device selector (when multiple cameras available)
+- "Mirror preview" checkbox below the preview – preview-only, remembered per camera, disabled until the preview is live
 - Hot-plug support: detects camera connect/disconnect
 - Fallback labels ("Camera 1", "Camera 2") when device labels unavailable
-- Keyboard shortcuts: Enter to capture, Escape to close
+- Keyboard: Escape closes; Enter captures only while the Capture button itself has focus (Enter on Cancel cancels, as expected)
 - Shutter animation on capture
 
 **Behavior**:
@@ -268,7 +269,8 @@ Capture photos from connected cameras directly from the terminal toolbar.
 - File path automatically pasted to active terminal with proper quoting
 - Success/error toasts provide user feedback
 - 20MB size limit for photo data
-- **Preview is mirrored, the saved file is not.** `CameraDialog.tsx` applies `.camera-preview--mirrored` (`transform: scaleX(-1)`) to the `<video>` unconditionally for every camera, while `captureVideoFrame()` in `useCameraCapture.ts` draws the frame to the canvas with no flip. The saved JPEG is therefore always the horizontal mirror of what the preview showed – which matters for the document-scanning / OCR use case, where any text in frame comes out reversed. Tracked as [#42](https://github.com/qodeca/erfana/issues/42)
+- **Preview is un-mirrored by default; the saved file is never mirrored.** Every camera opens with a true preview, so what you see is what lands in the JPEG – which is what the document-scanning / OCR use case needs, since text in frame stays readable. A **Mirror preview (saved photo is never mirrored)** checkbox under the preview flips the preview horizontally for selfie-style framing; the choice is stored per camera (by `deviceId`) and survives restarts, and the saved JPEG stays un-mirrored either way. The checkbox is disabled while no preview is running. There is deliberately **no** automatic front/selfie-camera detection – macOS does not expose which way a camera faces
+- **Preview shows the whole frame.** The preview is a 16:9 box that fits the entire captured frame inside it; it is no longer cropped to a 4:3 window, so the framing on screen matches the saved photo. Black letterbox bars appear when the camera's own aspect ratio differs – an accepted trade for showing everything that will be captured
 
 **Use Cases**:
 - Quick attachment of photos in chat/command workflows
@@ -280,6 +282,7 @@ Capture photos from connected cameras directly from the terminal toolbar.
 - `camera-handlers.ts`: IPC handlers for renderer communication
 - `camera-schema.ts`: Zod schemas for IPC types
 - `useCameraCapture.ts`: React hook for camera access and capture
+- `useCameraMirrorPreference.ts` + `useCameraMirrorStore.ts`: per-camera mirror-preview preference, persisted to `localStorage` under `erfana-camera-mirror-state`; preview-only, never consulted by the capture path
 - `CameraDialog.tsx`: Modal dialog with preview and controls
 
 **Files**:
@@ -287,11 +290,14 @@ Capture photos from connected cameras directly from the terminal toolbar.
 - `src/main/ipc/camera-handlers.ts`
 - `src/shared/ipc/camera-schema.ts`
 - `src/renderer/src/hooks/useCameraCapture.ts`
+- `src/renderer/src/hooks/useCameraMirrorPreference.ts`
+- `src/renderer/src/stores/useCameraMirrorStore.ts`
 - `src/renderer/src/components/Dialog/CameraDialog.tsx`
 - `src/renderer/src/components/Panels/TerminalPanel.tsx` (toolbar button)
 
 **Related issues**:
 - #93 - Camera photo capture from terminal toolbar
+- #42 - Un-mirrored preview by default, per-camera mirror toggle, full-frame preview
 
 ### Scroll Lock Toggle (v0.6.0)
 
