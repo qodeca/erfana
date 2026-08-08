@@ -13,7 +13,7 @@
  * - Page screenshot toggle with DPI selector
  * - Phase-based progress bar with indeterminate shimmer animation
  * - OCR warning banner for Tesseract availability issues
- * - Focus trap within the dialog for keyboard accessibility
+ * - Focus trap within the dialog for keyboard accessibility (BaseDialog `trapFocus`)
  * - Escape key to cancel/close
  * - ARIA attributes for screen reader support
  *
@@ -21,7 +21,7 @@
  * @see Spec #021 - LiteParse document import
  */
 
-import { useEffect, useRef, useCallback, useId } from 'react'
+import { useEffect, useId } from 'react'
 import { FileText } from 'lucide-react'
 import { useDocumentImportStore } from '../../stores/useDocumentImportStore'
 import { useProjectStore } from '../../stores/useProjectStore'
@@ -92,8 +92,6 @@ export function DocumentImportDialog(): JSX.Element | null {
   const titleId = `doc-import-title${id}`
   const descriptionId = `doc-import-desc${id}`
 
-  const dialogRef = useRef<HTMLDivElement>(null)
-
   // Escape key handler (custom cancel-vs-close logic)
   useEffect(() => {
     if (!isOpen) return undefined
@@ -113,40 +111,6 @@ export function DocumentImportDialog(): JSX.Element | null {
     document.addEventListener('keydown', handleKeyDown, true)
     return () => document.removeEventListener('keydown', handleKeyDown, true)
   }, [isOpen, isImporting, cancelImport, closeDialog])
-
-  // Focus trap within the dialog
-  const handleFocusTrap = useCallback(
-    (e: KeyboardEvent): void => {
-      if (e.key !== 'Tab' || !dialogRef.current) return
-
-      const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
-        'button:not(:disabled), select:not(:disabled), input:not(:disabled), [tabindex]:not([tabindex="-1"])'
-      )
-      if (focusable.length === 0) return
-
-      const first = focusable[0]
-      const last = focusable[focusable.length - 1]
-
-      if (e.shiftKey) {
-        if (document.activeElement === first) {
-          e.preventDefault()
-          last.focus()
-        }
-      } else {
-        if (document.activeElement === last) {
-          e.preventDefault()
-          first.focus()
-        }
-      }
-    },
-    []
-  )
-
-  useEffect(() => {
-    if (!isOpen) return undefined
-    document.addEventListener('keydown', handleFocusTrap)
-    return () => document.removeEventListener('keydown', handleFocusTrap)
-  }, [isOpen, handleFocusTrap])
 
   if (!isOpen) return null
 
@@ -209,11 +173,12 @@ export function DocumentImportDialog(): JSX.Element | null {
       zIndex={10000}
       closeOnBackdrop={false}
       closeOnEscape={false}
+      trapFocus
       className="doc-import-dialog"
       ariaLabelledBy={titleId}
       ariaDescribedBy={descriptionId}
     >
-      <div ref={dialogRef} data-testid={TEST_IDS.DOCUMENT_IMPORT_DIALOG}>
+      <div data-testid={TEST_IDS.DOCUMENT_IMPORT_DIALOG}>
         {/* Header */}
         <div className="dialog-header">
           <h3 id={titleId} className="dialog-title">

@@ -65,16 +65,9 @@ const config = PROMPT_REGISTRY['mermaid-bug-report']  // Returns undefined!
 
 ---
 
-### 3. BaseDialog lacks Tab-cycling focus trap
+### 3. BaseDialog lacks Tab-cycling focus trap ✅ Resolved (#42)
 
-**Severity**: Low
-**Impact**: Only TranscriptionDialog has proper Tab cycling; all other dialogs allow Tab to escape the dialog.
-
-**Problem**: BaseDialog's comment says "Focus trap" but the code only auto-focuses the first element – it does NOT cycle Tab/Shift+Tab within the dialog. TranscriptionDialog implements its own `handleFocusTrap` to work around this.
-
-**Recommended Solution**: Move TranscriptionDialog's Tab-cycling logic into BaseDialog so all dialogs benefit.
-
-**Files**: `src/renderer/src/components/Dialog/BaseDialog.tsx`, `src/renderer/src/components/Transcription/TranscriptionDialog.tsx`
+Resolved – BaseDialog now owns the Tab trap behind the opt-in `trapFocus` prop, and the hand-rolled `handleFocusTrap` implementations in `DocumentImportDialog` and `TranscriptionDialog` were deleted. See [Resolved Issues](#resolved-issues). The number is kept so existing references to "item #3" stay valid.
 
 ---
 
@@ -219,6 +212,7 @@ Ongoing effort to keep `docs/` concise and high-value for Claude Code.
 
 ## Resolved Issues
 
+- ✅ BaseDialog lacks Tab-cycling focus trap (#42) – Tab cycling, escaped-focus recovery and a `focusout` rescue for controls that become disabled now live in BaseDialog behind the opt-in `trapFocus` prop; the per-dialog `handleFocusTrap` copies were removed
 - ✅ Worker thread statusCache crash (v0.9.2) – persistent isomorphic-git cache caused V8 cppgc assertion after ~42 min; replaced with per-call cache
 - ✅ Git status main-thread blocking (v0.9.0, #147) – offloaded to worker_threads with native git fallback
 - ✅ EMFILE cascade in DirectoryWatcherService (v0.9.0, #146) – restart logic + RateLimitedLogger
@@ -271,4 +265,4 @@ Amendment discipline + promotion-rule conventions in [`windows/contributing.md`]
 
 ---
 
-**Last Updated**: PR #245 (2026-06-13 – entry #12 live-verification updated: single-panel detection + mid-session model-switch verified on a Windows host) + #217 Windows Claude status bar (2026-06-10 — entry #12 added: Windows v1 detector limitations) + v0.14.0 doc sweep (2026-06-08 — entries #9 + #10 added from `Transcription/CLAUDE.md` eviction) + v0.9.6 release (2026-05-22 — critical macOS terminal fix `ea3eaf1`) + v0.9.5 release (2026-04-25) + Phase I branch protection refinement (PR requirement removed same day) + entry #7 documenting `security.md` cap constraint (2026-04-25)
+**Last Updated**: #42 camera mirror + dialog focus work (2026-08-07 – entry #3 resolved: BaseDialog `trapFocus`) + PR #245 (2026-06-13 – entry #12 live-verification updated: single-panel detection + mid-session model-switch verified on a Windows host) + #217 Windows Claude status bar (2026-06-10 — entry #12 added: Windows v1 detector limitations) + v0.14.0 doc sweep (2026-06-08 — entries #9 + #10 added from `Transcription/CLAUDE.md` eviction) + v0.9.6 release (2026-05-22 — critical macOS terminal fix `ea3eaf1`) + v0.9.5 release (2026-04-25) + Phase I branch protection refinement (PR requirement removed same day) + entry #7 documenting `security.md` cap constraint (2026-04-25)

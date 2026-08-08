@@ -203,7 +203,7 @@ export const TEST_IDS = {
   EDITOR_PREVIEW: 'editor-preview',
 
   // =========================================================================
-  // Camera Dialog (8)
+  // Camera Dialog (10)
   // =========================================================================
 
   /** Camera dialog container */
@@ -222,6 +222,10 @@ export const TEST_IDS = {
   CAMERA_ERROR: 'camera-error',
   /** Shutter animation overlay */
   CAMERA_SHUTTER: 'camera-shutter',
+  /** Mirror-preview checkbox (#42) */
+  CAMERA_MIRROR_TOGGLE: 'camera-mirror-toggle',
+  /** Aspect-ratio wrapper around the video preview (#42) */
+  CAMERA_PREVIEW_WRAPPER: 'camera-preview-wrapper',
 
   // =========================================================================
   // Dialogs - Base (3)

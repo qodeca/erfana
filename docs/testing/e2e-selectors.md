@@ -1,6 +1,6 @@
 # E2E selector catalog
 
-All `data-testid` attributes available for E2E testing – **238 testids** across 35 sections.
+All `data-testid` attributes available for E2E testing – **240 testids** across 35 sections.
 
 **Related documentation**:
 - [E2E Testing Guide](./e2e-testing.md) – Main E2E documentation
@@ -150,13 +150,15 @@ Per-terminal Claude Code context meter (macOS + Windows). Present only while `cl
 
 ---
 
-## Camera dialog (8 testids)
+## Camera dialog (10 testids)
 
 | Testid | Element | Type |
 |--------|---------|------|
 | `camera-dialog` | Dialog container | static |
 | `camera-device-select` | Device selector dropdown | static |
 | `camera-preview` | Video preview element | static |
+| `camera-preview-wrapper` | 16:9 aspect-ratio wrapper around the preview | static |
+| `camera-mirror-toggle` | Mirror-preview checkbox (disabled until the preview is live) | static |
 | `camera-btn-capture` | Capture photo button | static |
 | `camera-btn-cancel` | Cancel button | static |
 | `camera-btn-refresh` | Refresh devices (on error) | static |

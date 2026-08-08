@@ -14,6 +14,15 @@
  */
 
 :root {
+  /* Paint native form controls and scrollbars with dark UA defaults.
+   * Erfana is dark-mode only (see the header above). With the initial value
+   * `normal`, Chromium paints a checkbox as a white square with a grey border
+   * on the near-black dialog surface. `accent-color` tints only the CHECKED
+   * fill, so it cannot substitute for this.
+   * App-wide by design: also affects the existing DocumentImport and
+   * Markdown-preview checkboxes and every scrollbar. */
+  color-scheme: dark;
+
   /* ============================================
    * COLORS: Qodeca Brand Palette
    * Primary brand identity colors
@@ -123,7 +132,13 @@
   --color-btn-secondary-bg: var(--color-gray-800);
   --color-btn-secondary-hover: #505050;
   --color-btn-danger-bg: #c72e0f;
-  --color-btn-danger-hover: #e03e18;
+  /* DARKER than the resting background, not lighter. White on the old #e03e18
+     measured 4.31:1 — under the 4.5:1 WCAG 1.4.3 asks for normal-size text — so
+     the button degraded on hover, while resting passed at 5.49:1. #ad280d is
+     the resting red darkened ~13%: 6.80:1 with white, and a 1.24:1 step from
+     resting, matching the primary button's 1.23:1 step. Guarded by
+     Dialog.contrast.test.ts. */
+  --color-btn-danger-hover: #ad280d;
   --color-bg-danger-hover: #5a1d1d;        /* Danger item hover background */
 
   /* ============================================

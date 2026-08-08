@@ -70,6 +70,8 @@ interface LanguageSelectProps {
   onChange: (language: TranscriptionLanguage) => void
   /** Whether the select is disabled (e.g., during transcription) */
   disabled?: boolean
+  /** HTML id for label association. Suppresses the fallback `aria-label`. */
+  id?: string
 }
 
 /**
@@ -81,7 +83,20 @@ interface LanguageSelectProps {
  * @param props - Component props
  * @returns Rendered select element
  *
- * @example
+ * NAMING: pass `id` whenever a visible `<label htmlFor=...>` sits beside the
+ * control, and the label becomes its accessible name. Without `id` the label
+ * is not associated — clicking it does nothing and a screen reader announces
+ * the `aria-label` instead of the visible text — so the fallback `aria-label`
+ * applies only when no `id` is given, and the two never compete. Same shape as
+ * `OcrLanguageSelect`.
+ *
+ * @example With an associated visible label (preferred)
+ * ```tsx
+ * <label htmlFor="transcription-lang">Language</label>
+ * <LanguageSelect id="transcription-lang" value={language} onChange={setLanguage} />
+ * ```
+ *
+ * @example Standalone, named by the fallback aria-label
  * ```tsx
  * const [language, setLanguage] = useState<TranscriptionLanguage>('auto')
  *
@@ -95,16 +110,18 @@ interface LanguageSelectProps {
 export function LanguageSelect({
   value,
   onChange,
-  disabled = false
+  disabled = false,
+  id
 }: LanguageSelectProps): JSX.Element {
   return (
     <select
+      id={id}
       className="transcription-language-select"
       value={value}
       onChange={(e) => onChange(e.target.value as TranscriptionLanguage)}
       disabled={disabled}
       data-testid={TEST_IDS.TRANSCRIPTION_LANGUAGE_SELECT}
-      aria-label="Transcription language"
+      aria-label={id ? undefined : 'Transcription language'}
     >
       {LANGUAGE_OPTIONS.map((option) => (
         <option key={option.value} value={option.value}>

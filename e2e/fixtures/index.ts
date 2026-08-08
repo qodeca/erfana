@@ -52,15 +52,63 @@ const DEFAULT_SEED_FILES: Record<string, string> = {
 }
 
 /**
+ * Chromium's on-disk renderer storage directories, relative to `userDataDir`.
+ *
+ * `localStorage` lives in `Local Storage/leveldb`; `Session Storage` is wiped
+ * alongside it so a spec cannot be reset "half way".
+ */
+const RENDERER_STORAGE_DIRS = ['Local Storage', 'Session Storage']
+
+/**
+ * Delete the renderer's persisted web storage before the app starts.
+ *
+ * MUST run pre-launch. Clearing `localStorage` from inside an already-running
+ * renderer is too late for anything read at module scope: zustand's `persist`
+ * with a synchronous storage backend hydrates AT STORE CREATION, so a store
+ * behind a static import (CameraDialog ← TerminalPanel) has already taken its
+ * copy by the time the first `page.evaluate` runs. Removing the key afterwards
+ * leaves the in-memory map untouched.
+ *
+ * `userDataDir` is WORKER-scoped while the app fixtures are TEST-scoped, so
+ * without this a preference written by one test is still on disk for the next
+ * one — including the next pass of `--repeat-each`, and including a run that
+ * crashed before any cleanup.
+ *
+ * Best-effort: a storage-reset problem must never masquerade as a behavioural
+ * failure, so an unlink error is warned about, not thrown.
+ *
+ * @param userDataDir - The worker's isolated Electron user-data directory
+ */
+async function resetRendererStorageDirs(userDataDir: string): Promise<void> {
+  for (const dir of RENDERER_STORAGE_DIRS) {
+    try {
+      await fs.promises.rm(path.join(userDataDir, dir), { recursive: true, force: true })
+    } catch (error) {
+      console.warn(`[fixture] could not reset ${dir} in ${userDataDir}:`, error)
+    }
+  }
+}
+
+/**
  * Launch an Electron app with consistent teardown.
  *
  * Shared by `app`, `appWithProject`, and `appWithTestProject` fixtures.
+ *
+ * @param args - Launch arguments, before `--user-data-dir`
+ * @param userDataDir - Worker-scoped user-data directory
+ * @param use - Playwright's fixture consumer
+ * @param resetRendererStorage - Wipe persisted web storage before launching
  */
 async function launchApp(
   args: string[],
   userDataDir: string,
-  use: (app: ElectronApplication) => Promise<void>
+  use: (app: ElectronApplication) => Promise<void>,
+  resetRendererStorage = false
 ): Promise<void> {
+  if (resetRendererStorage) {
+    await resetRendererStorageDirs(userDataDir)
+  }
+
   const app = await electron.launch({
     args: [...args, `--user-data-dir=${userDataDir}`],
     env: { ...process.env, NODE_ENV: 'development' }
@@ -100,6 +148,23 @@ type WorkerFixtures = {
 }
 
 type TestFixtures = {
+  /**
+   * Extra Chromium/Electron command-line switches appended to the launch args
+   * of `app`, `appWithProject` and `appWithTestProject`.
+   *
+   * Override per-spec with
+   * `test.use({ extraLaunchArgs: ['--use-fake-device-for-media-stream'] })`.
+   */
+  extraLaunchArgs: string[]
+  /**
+   * Delete the renderer's persisted `localStorage` / `sessionStorage` before
+   * `app`, `appWithProject` and `appWithTestProject` launch. Default `false`.
+   *
+   * Opt in from a spec whose subject IS persisted renderer state — clearing it
+   * from inside the page is too late, see {@link resetRendererStorageDirs}:
+   * `test.use({ resetRendererStorage: true })`.
+   */
+  resetRendererStorage: boolean
   app: ElectronApplication
   window: Page
   appWithProject: ElectronApplication
@@ -154,9 +219,15 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
     { scope: 'worker' }
   ],
 
+  // Option: extra launch switches (override with test.use())
+  extraLaunchArgs: [[], { option: true }],
+
+  // Option: pre-launch wipe of persisted renderer storage (override with test.use())
+  resetRendererStorage: [false, { option: true }],
+
   // Test-scoped: app launch
-  app: async ({ userDataDir }, use) => {
-    await launchApp([PROJECT_ROOT], userDataDir, use)
+  app: async ({ userDataDir, extraLaunchArgs, resetRendererStorage }, use) => {
+    await launchApp([PROJECT_ROOT, ...extraLaunchArgs], userDataDir, use, resetRendererStorage)
   },
 
   // Test-scoped: main window
@@ -165,8 +236,13 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
   },
 
   // Test-scoped: app with project loaded
-  appWithProject: async ({ userDataDir }, use) => {
-    await launchApp([PROJECT_ROOT, DEFAULT_TEST_PROJECT], userDataDir, use)
+  appWithProject: async ({ userDataDir, extraLaunchArgs, resetRendererStorage }, use) => {
+    await launchApp(
+      [PROJECT_ROOT, DEFAULT_TEST_PROJECT, ...extraLaunchArgs],
+      userDataDir,
+      use,
+      resetRendererStorage
+    )
   },
 
   // Test-scoped: window with project loaded
@@ -243,8 +319,12 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
   // `file:openProjectByPath` IPC handler from the renderer to open the path.
   // That handler is already production-tested and respects the project
   // safeguards (path validation, lockfile, watchers).
-  appWithTestProject: async ({ userDataDir }, use) => {
-    await launchApp([PROJECT_ROOT], userDataDir, use)
+  // `extraLaunchArgs` is threaded in here as well as into `app` — REQUIRED, not
+  // optional: specs that need switches (e.g. the fake camera in
+  // camera-mirror.e2e.ts) run on `windowWithTestProject`, which is fed by this
+  // fixture. Wiring only `app` would silently drop the switches.
+  appWithTestProject: async ({ userDataDir, extraLaunchArgs, resetRendererStorage }, use) => {
+    await launchApp([PROJECT_ROOT, ...extraLaunchArgs], userDataDir, use, resetRendererStorage)
   },
 
   // Test-scoped: window from appWithTestProject with the project opened.

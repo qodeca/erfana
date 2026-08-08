@@ -22,7 +22,7 @@ Complete guide for testing Erfana. This covers both automated tests (Vitest/Play
 
 #### Key test areas
 
-Run `npm run test` for current totals (8,768 tests across 299 files on macOS as of v0.16.3; ~78 cases platform-gate on Windows — 77 POSIX-only `pathSecurity.test.ts` + 1 macOS-only `LiteParseConverter.test.ts`). For the version-by-version test-addition history, see [`docs/CHANGELOG.md`](../CHANGELOG.md).
+Run `npm run test` for current totals (8,925 tests across 304 files on macOS as of v0.16.3; ~78 cases platform-gate on Windows — 77 POSIX-only `pathSecurity.test.ts` + 1 macOS-only `LiteParseConverter.test.ts`). For the version-by-version test-addition history, see [`docs/CHANGELOG.md`](../CHANGELOG.md).
 
 | Area | Key files | Docs |
 |------|-----------|------|
@@ -60,7 +60,7 @@ Run `npm run test` for current totals (8,768 tests across 299 files on macOS as 
 
 - Playwright setup and configuration for Electron (two projects: `electron` functional, `visual` regression)
 - Testing patterns for third-party components (Monaco, xterm.js, Mermaid)
-- Complete selector catalog (238 testids) – see [e2e-selectors.md](./e2e-selectors.md)
+- Complete selector catalog (240 testids) – see [e2e-selectors.md](./e2e-selectors.md)
 - Test helper utilities documentation
 - Troubleshooting guide
 
