@@ -67,7 +67,9 @@ export enum ErrorCode {
   IMPORT_ENCRYPTED = 'IMPORT_ENCRYPTED',
   IMPORT_EMPTY = 'IMPORT_EMPTY',
   IMPORT_CORRUPT = 'IMPORT_CORRUPT',
+  /** Non-blocking size warning: returned with `valid: true`; import still proceeds. */
   IMPORT_TOO_LARGE = 'IMPORT_TOO_LARGE',
+  /** Blocking size rejection: returned with `valid: false`; import is refused before conversion. */
   IMPORT_EXCEEDS_SIZE_LIMIT = 'IMPORT_EXCEEDS_SIZE_LIMIT',
   IMPORT_CONVERSION_FAILED = 'IMPORT_CONVERSION_FAILED',
   IMPORT_UNSUPPORTED_TYPE = 'IMPORT_UNSUPPORTED_TYPE',

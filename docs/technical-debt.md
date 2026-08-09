@@ -201,6 +201,21 @@ After the heartbeat hardening (Phase A4 resume-refresh, B1 symlink defense, D3 H
 
 ---
 
+### 14. `js-yaml` pinned to the legacy 4.x line (lens-review, 2026-08)
+
+**Severity**: Low
+**Impact**: `js-yaml` is a shipped runtime dependency (renderer frontmatter + prompt parsers) currently at `^4.3.1`. The 4.x line is now the maintained *legacy* line; 5.x (latest 5.2.3) is the active branch.
+
+**Problem**: `^4.3.1` is the correct floor for the current DoS advisories (it clears all three, including the `!!omap` one that 4.3.0 leaves open) and avoids a semver-major in a security patch. But future DoS-class fixes may land in 5.x first, and 5.x introduced schema changes (e.g. `YAML11_SCHEMA`) that a migration must account for.
+
+**Recommended Solution**: evaluate a `js-yaml` 5.x migration — check the frontmatter (`frontmatterParser.ts`, uses `JSON_SCHEMA`) and prompt (`prompts/parser.ts`) parse paths against 5.x schema behaviour before bumping. Keep `^4.3.1` until then.
+
+**Files**: `package.json`, `src/renderer/src/utils/frontmatterParser.ts`, `src/renderer/src/prompts/parser.ts`.
+
+**Status**: Deferred — no current advisory affects 4.3.1; this is forward-looking hygiene.
+
+---
+
 ## Code Quality Improvements
 
 ### Documentation Token Efficiency
