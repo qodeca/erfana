@@ -147,6 +147,8 @@ extraResources:
 
 **`ffmpeg` is not in `extraResources`.** It is cached by `beforePack` under `release/.media-cache/` and copied by `afterPack` into `app/node_modules/ffmpeg-static/`.
 
+**Editing this block is a coupled edit (issue #55).** The three `to:` destinations are the allowlist `ALLOWED_EXTRA_RESOURCES_DESTS` in `scripts/fuses.js`; adding or renaming a destination must land together with that constant (and `EXPECTED_RESOURCES_ENTRIES`, which derives from it) or the binding test in `scripts/fuses.test.mjs` — which parses the real config in the required Unit-tests job — fails on every push. A coarse CI presence grep in `checks.yml` warns on `extraResources:` edits and hard-fails any `extraFiles:` block. **There is deliberately no `extraFiles:`** (top-level or under `mac:`/`win:`); its allowlist `ALLOWED_EXTRA_FILES_DESTS` is empty, so any `extraFiles` entry is rejected fail-closed. See [fuses.md § Extra-content destinations](./fuses.md#extra-content-destinations--extrafiles--extraresources-issue-55).
+
 ### `files` allowlist
 
 ```yaml
@@ -188,12 +190,15 @@ So the list did the opposite of what it read like: the **entire repository root*
 
 All of them fail loudly rather than silently widening the bundle.
 
-**Two guards enforce the shape**, one on the config and one on the packed tree:
+**Guards enforce the shape**, on the config and on the packed tree. The `files:` allowlist (issue #43) and the `extraFiles`/`extraResources` destinations (issue #55) are guarded on the same axes:
 
 | Guard | Where | Checks |
 |-------|-------|--------|
-| `Guard - electron-builder packaging allowlist` | `.github/workflows/checks.yml`, `release-guards` job | Pure awk/grep against this YAML (the job is checkout-only — no `npm ci`, so no YAML parser is available): `afterPack:`/`afterSign:` wiring present, no platform-specific `files:` block, a `files:` block that has list items, at least one positive pattern, and no positive pattern whose first path segment is a wildcard. |
-| `assertConfigMatchesAllowlist()` + `assertPackagedAppContents()` | `scripts/fuses.js`, last statement of `afterPack`, before signing | Derives the permitted entry set from the live config and compares it with `ALLOWED_APP_ENTRIES`, then walks the packed `app/` tree. See [fuses.md](./fuses.md#afterpack-also-verifies-the-packed-app-contents). |
+| `Guard - electron-builder packaging allowlist` | `.github/workflows/checks.yml`, `release-guards` job | Pure awk/grep against this YAML (the job is checkout-only — no `npm ci`, so no YAML parser is available): `afterPack:`/`afterSign:` wiring present, no platform-specific `files:` block, a `files:` block that has list items, at least one positive pattern, and no positive pattern whose first path segment is a wildcard. Also (issue #55) a coarse presence grep that hard-fails any `extraFiles:` block — at column 0 **or** indented under `mac:`/`win:` — and warns on `extraResources:` edits. |
+| `assertConfigMatchesAllowlist()` + `assertPackagedAppContents()` | `scripts/fuses.js`, in `afterPack`, before signing | Derives the permitted entry set from the live config and compares it with `ALLOWED_APP_ENTRIES`, then walks the packed `app/` tree. See [fuses.md](./fuses.md#afterpack-also-verifies-the-packed-app-contents). |
+| `assertExtraContentAllowlist()` + `assertResourcesDestNoRepoLeak()` / `assertResourcesSiblingsAllowlist()` / `assertExtraFilesDestNoRepoLeak()` | `scripts/fuses.js`, in `afterPack`, before signing (issue #55) | Shape-checks the **merged** `extra*` config (top-level ∪ platform-scoped, so it sees `--config.win.*` overrides) against `ALLOWED_EXTRA_RESOURCES_DESTS` / the empty `ALLOWED_EXTRA_FILES_DESTS`, then walks the destinations beside and above `app/`. See [fuses.md § Extra-content destinations](./fuses.md#extra-content-destinations--extrafiles--extraresources-issue-55). |
+
+The `extraResources` allowlist is a **three-site coupling**: the `extraResources:` block in this file, `ALLOWED_EXTRA_RESOURCES_DESTS` in `scripts/fuses.js`, and the binding test in `scripts/fuses.test.mjs` must change together.
 
 ### macOS
 

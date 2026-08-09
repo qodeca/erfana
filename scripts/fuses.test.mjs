@@ -25,6 +25,20 @@ const {
   deriveAllowedAppEntries,
   resolvePackedResourcesDir,
   ALLOWED_APP_ENTRIES,
+  mergeExtraContent,
+  assertExtraContentAllowlist,
+  resolveExtraFilesDir,
+  verifyExtraContent,
+  assertResourcesDestNoRepoLeak,
+  assertResourcesSiblingsAllowlist,
+  assertExtraFilesDestNoRepoLeak,
+  ALLOWED_EXTRA_RESOURCES_DESTS,
+  ALLOWED_EXTRA_RESOURCES_FROM,
+  ALLOWED_EXTRA_FILES_DESTS,
+  EXPECTED_RESOURCES_ENTRIES,
+  REPO_ROOT_SENTINELS,
+  SUSPICIOUS_SIBLING_NAMES,
+  EXTRA_CONTENT_LEAK_NAMES,
 } = require('./fuses.js');
 const { Arch } = require('electron-builder');
 
@@ -588,6 +602,92 @@ describe('assertConfigMatchesAllowlist', () => {
     // fuses and the packaged-contents assertion in an otherwise-green build.
     expect(config.afterPack).toBe('./scripts/fuses.js');
     expect(config.afterSign).toBe('./scripts/resign.js');
+
+    // --- Extra-content binding (issue #55, F1/F4/F5) ---
+    // This is the AUTHORITATIVE extraResources/extraFiles shape validation: it
+    // parses the real config and runs in the required Unit-tests job, whereas the
+    // checks.yml awk guard is only a coarse presence check.
+    // Top-level extraResources binds to the constant.
+    expect(
+      assertExtraContentAllowlist(mergeExtraContent(config.extraResources, undefined), {
+        kind: 'extraResources',
+        allowedDests: ALLOWED_EXTRA_RESOURCES_DESTS,
+      })
+    ).toEqual([...ALLOWED_EXTRA_RESOURCES_DESTS].sort());
+
+    // Pin the `from:` side too, not just `to:`. The dest-allowlist above only
+    // constrains where copies LAND; it would still pass if someone changed
+    // `from: resources/tessdata` → `from: src` while keeping `to: tessdata`,
+    // smuggling source into an allowlisted dest. Bind the real `from` values to
+    // an expected set so that edit fails the required Unit-tests job (issue #55).
+    expect(
+      mergeExtraContent(config.extraResources, undefined)
+        .map((e) => e.from)
+        .sort()
+    ).toEqual(['LICENSE', 'THIRD-PARTY-LICENSES.md', 'resources/tessdata']);
+
+    // Absence of extraFiles is intentional — top-level AND platform-scoped (F1).
+    expect(config.extraFiles).toBeUndefined();
+    expect(config.mac?.extraFiles).toBeUndefined();
+    expect(config.mac?.extraResources).toBeUndefined();
+    expect(config.win?.extraFiles).toBeUndefined();
+    expect(config.win?.extraResources).toBeUndefined();
+
+    // Subset drift guard (F5): every config slot is a full-sibling entry, so the
+    // relation ALLOWED_EXTRA_RESOURCES_DESTS ⊆ EXPECTED_RESOURCES_ENTRIES holds.
+    expect(
+      ALLOWED_EXTRA_RESOURCES_DESTS.every((d) => EXPECTED_RESOURCES_ENTRIES.includes(d))
+    ).toBe(true);
+
+    // F1 wiring: verifyExtraContent (the extracted aggregate of the five #55
+    // guard calls) is exported (checked here) AND its call site inside afterPack
+    // is asserted by a source-reference check below — the export alone would stay
+    // green if afterPack stopped calling it. Together these mirror the
+    // afterPack/afterSign text binding above so either removal fails this job.
+    expect(typeof verifyExtraContent).toBe('function');
+
+    // F1 call-site (QG-6/7/8): the export check above proves verifyExtraContent
+    // EXISTS, not that afterPack still invokes it — deleting the
+    // `verifyExtraContent(context, …)` line from afterPack would pass every other
+    // test. Read fuses.js and assert the afterPack function body itself calls it,
+    // so that deletion fails the required Unit-tests job. Mirrors the
+    // config.afterPack === './scripts/fuses.js' text binding above.
+    const fusesSrc = fs.readFileSync(path.join(import.meta.dirname, 'fuses.js'), 'utf8');
+    const afterPackStart = fusesSrc.indexOf('async function afterPack(');
+    expect(afterPackStart).toBeGreaterThan(-1);
+    const afterPackBody = fusesSrc.slice(
+      afterPackStart,
+      fusesSrc.indexOf('module.exports = afterPack;')
+    );
+    expect(afterPackBody).toMatch(/verifyExtraContent\s*\(\s*context/);
+
+    // F5 provenance: the real extraResources `from` values are exactly the
+    // runtime source allowlist, so a `from: src` rename is rejected at pack time.
+    expect([...ALLOWED_EXTRA_RESOURCES_FROM].sort()).toEqual(
+      mergeExtraContent(config.extraResources, undefined)
+        .map((e) => e.from)
+        .sort()
+    );
+  });
+
+  // F2 — pin the exfil leak-name NET membership, not just its subset relation.
+  // Removing `.env`/`id_rsa`/any name from these literals fails CI, so the
+  // both-platforms-fatal L2a-1 tripwire cannot be silently narrowed.
+  it('pins the extra-content leak-name net membership (F2)', () => {
+    expect([...REPO_ROOT_SENTINELS]).toEqual([
+      'package.json', 'package-lock.json', '.git', 'node_modules', 'src', 'specs',
+      'scripts', 'docs', 'e2e', '.github', 'electron-builder.yml', 'CLAUDE.md',
+      'tsconfig.json', 'tsconfig.node.json', 'tsconfig.web.json',
+    ]);
+    expect([...SUSPICIOUS_SIBLING_NAMES]).toEqual([
+      'secrets', 'secret', 'credentials', 'creds', '.env', '.env.local',
+      '.npmrc', '.aws', '.ssh', 'api-keys', 'apikeys', 'private', 'id_rsa',
+    ]);
+    // EXTRA_CONTENT_LEAK_NAMES is exactly the concatenation of the two sets.
+    expect([...EXTRA_CONTENT_LEAK_NAMES]).toEqual([
+      ...REPO_ROOT_SENTINELS,
+      ...SUSPICIOUS_SIBLING_NAMES,
+    ]);
   });
 
   it('folds a platform-specific files: block into the derivation', () => {
@@ -844,28 +944,17 @@ describe('assertPackagedAppContents', () => {
     expect(() => assertPackagedAppContents(tmpRoot)).toThrow(/no main entry file/i);
   });
 
-  it('warns about unexpected entries beside app/ without failing the build', () => {
+  it('no longer inspects entries beside app/ (moved to the issue #55 extra-content guards)', () => {
+    // The beside-app/ advisory was extracted into
+    // assertResourcesDestNoRepoLeak / assertResourcesSiblingsAllowlist, so
+    // this walk neither warns nor throws on a stray sibling; those guards run
+    // separately in afterPack and are covered by their own describe blocks below.
     makePackedApp(tmpRoot);
     fs.mkdirSync(path.join(tmpRoot, 'unexpected-extra'));
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     expect(() => assertPackagedAppContents(tmpRoot)).not.toThrow();
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('unexpected-extra'));
-  });
-
-  it('does not warn about the real extraResources siblings or *.lproj folders', () => {
-    // A realistic Contents/Resources: app/ plus the extraResources outputs and
-    // Electron's localisation folders. Emptying EXPECTED_RESOURCES_ENTRIES or
-    // dropping the .lproj exemption would make this warn - so it pins both.
-    makePackedApp(tmpRoot);
-    fs.mkdirSync(path.join(tmpRoot, 'tessdata'));
-    fs.writeFileSync(path.join(tmpRoot, 'LICENSE'), 'x');
-    fs.mkdirSync(path.join(tmpRoot, 'en.lproj'));
-    fs.mkdirSync(path.join(tmpRoot, 'pl.lproj'));
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-    expect(() => assertPackagedAppContents(tmpRoot)).not.toThrow();
-    expect(warn).not.toHaveBeenCalled();
+    expect(warn).not.toHaveBeenCalledWith(expect.stringContaining('unexpected-extra'));
   });
 
   // Escape detection is the security property here, so the escape test runs on
@@ -968,5 +1057,702 @@ describe('assertPackagedAppContents', () => {
 
       expect(assertPackagedAppContents(tmpRoot).symlinks).toBe(1);
     });
+  });
+});
+
+// ---- Extra-content guards (issue #55) -------------------------------------
+
+// Windows needs an explicit link type for directory symlinks (a junction needs
+// no elevation); POSIX autodetects. Shared by the extra-content symlink tests.
+const dirLinkType = process.platform === 'win32' ? 'junction' : undefined;
+
+// The real extraResources FileSet as shipped in electron-builder.yml.
+const REAL_EXTRA_RESOURCES = [
+  { from: 'resources/tessdata', to: 'tessdata', filter: ['**/*'] },
+  { from: 'LICENSE', to: 'LICENSE' },
+  { from: 'THIRD-PARTY-LICENSES.md', to: 'THIRD-PARTY-LICENSES.md' },
+];
+
+// A resources dir mirroring Contents/Resources: app/ plus the given siblings.
+function makeResourcesDir(root, siblings = []) {
+  makePackedApp(root); // creates root/app/{out,node_modules,package.json}
+  for (const name of siblings) {
+    const full = path.join(root, name);
+    if (name.includes('.') && !name.endsWith('.lproj')) {
+      fs.writeFileSync(full, 'x'); // dotted name → treat as a file
+    } else {
+      fs.mkdirSync(full, { recursive: true });
+    }
+  }
+  return root;
+}
+
+describe('assertExtraContentAllowlist (L1)', () => {
+  const R = { kind: 'extraResources', allowedDests: ALLOWED_EXTRA_RESOURCES_DESTS };
+  // Use the exported constant (not an inline []) so this describe notices if
+  // ALLOWED_EXTRA_FILES_DESTS is ever populated — the empty-allowlist reject-all
+  // contract (F7) would then need re-checking.
+  const F = { kind: 'extraFiles', allowedDests: ALLOWED_EXTRA_FILES_DESTS };
+
+  it('accepts the real extraResources and returns the sorted dest set (AC5)', () => {
+    expect(assertExtraContentAllowlist(REAL_EXTRA_RESOURCES, R))
+      .toEqual([...ALLOWED_EXTRA_RESOURCES_DESTS].sort());
+  });
+
+  it('accepts nothing-configured (undefined) with an empty allowlist → [] (F7 accept)', () => {
+    expect(assertExtraContentAllowlist(undefined, F)).toEqual([]);
+  });
+
+  it('accepts an empty array with an empty allowlist → [] (F7 boundary)', () => {
+    expect(assertExtraContentAllowlist([], F)).toEqual([]);
+  });
+
+  it('rejects ANY entry against an empty allowlist (F7 reject-all)', () => {
+    expect(() => assertExtraContentAllowlist(['x'], F)).toThrow(/nothing is permitted/i);
+    expect(() => assertExtraContentAllowlist([{ from: 'x', to: 'x' }], F))
+      .toThrow(/nothing is permitted/i);
+  });
+
+  it.each(['.', '', './'])('rejects a root-sweep from %j', (from) => {
+    expect(() => assertExtraContentAllowlist([{ from, to: 'tessdata' }], R))
+      .toThrow(/root sweep|whole tree/i);
+  });
+
+  it('rejects a from that escapes the project root', () => {
+    expect(() => assertExtraContentAllowlist([{ from: '../secrets', to: 'tessdata' }], R))
+      .toThrow(/escapes the project root/i);
+  });
+
+  it.each(['.', '', '/'])('rejects a to of %j', (to) => {
+    // '.'/'' hit the destination-root branch; '/' hits the absolute-path branch —
+    // one pattern covers both so the assertion is specific, not a bare toThrow().
+    expect(() => assertExtraContentAllowlist([{ from: 'LICENSE', to }], R))
+      .toThrow(/destination root|escapes the destination/i);
+  });
+
+  it('rejects a to that escapes the destination', () => {
+    expect(() => assertExtraContentAllowlist([{ from: 'LICENSE', to: '../elsewhere' }], R))
+      .toThrow(/escapes/i);
+  });
+
+  it('rejects a to whose first segment is not in the allowlist', () => {
+    expect(() => assertExtraContentAllowlist([{ from: 'notes', to: 'notes' }], R))
+      .toThrow(/destination .* not permitted/i);
+  });
+
+  it('fails closed on a to-absent FileSet (F8 negative) and accepts its to-present counterpart', () => {
+    expect(() => assertExtraContentAllowlist([{ from: 'LICENSE' }], R)).toThrow(/cannot map/i);
+    expect(assertExtraContentAllowlist([{ from: 'LICENSE', to: 'LICENSE' }], R)).toEqual(['LICENSE']);
+  });
+
+  it('fails closed on an unmappable entry shape (bare number / empty object)', () => {
+    expect(() => assertExtraContentAllowlist([42], R)).toThrow(/cannot map/i);
+    expect(() => assertExtraContentAllowlist([{}], R)).toThrow(/cannot map/i);
+  });
+
+  // F7 — additional fail-closed input branches: a non-string `to`, the `./`
+  // dest-root form, a null entry, and a nested-array entry all throw.
+  it('fails closed on a non-string to (F7)', () => {
+    expect(() => assertExtraContentAllowlist([{ from: 'LICENSE', to: 42 }], R))
+      .toThrow(/cannot map/i);
+  });
+
+  it('rejects a to of "./" (dest root, F7)', () => {
+    expect(() => assertExtraContentAllowlist([{ from: 'LICENSE', to: './' }], R))
+      .toThrow(/destination root/i);
+  });
+
+  it('fails closed on a null entry (F7)', () => {
+    expect(() => assertExtraContentAllowlist([null], R)).toThrow(/cannot map/i);
+  });
+
+  it('fails closed on a nested-array entry (F7)', () => {
+    expect(() => assertExtraContentAllowlist([['x']], R)).toThrow(/cannot map/i);
+  });
+
+  // F5 — runtime `from`-provenance: with an `allowedFrom` set (as afterPack
+  // supplies for extraResources), a `from: src` renamed INTO an allowlisted dest
+  // is rejected at pack time, not only by the test-layer from-binding.
+  it('rejects a from renamed into an allowlisted dest when allowedFrom is set (F5)', () => {
+    expect(() =>
+      assertExtraContentAllowlist([{ from: 'src', to: 'tessdata' }], {
+        kind: 'extraResources',
+        allowedDests: ALLOWED_EXTRA_RESOURCES_DESTS,
+        allowedFrom: ALLOWED_EXTRA_RESOURCES_FROM,
+      })
+    ).toThrow(/not an allowlisted extra-content source/i);
+  });
+
+  it('accepts the real extraResources under allowedFrom (F5 no-false-positive)', () => {
+    expect(
+      assertExtraContentAllowlist(REAL_EXTRA_RESOURCES, {
+        kind: 'extraResources',
+        allowedDests: ALLOWED_EXTRA_RESOURCES_DESTS,
+        allowedFrom: ALLOWED_EXTRA_RESOURCES_FROM,
+      })
+    ).toEqual([...ALLOWED_EXTRA_RESOURCES_DESTS].sort());
+  });
+
+  it.each([42, { nested: true }, ['array']])(
+    'fails closed on a present-but-non-string from (%j)',
+    (from) => {
+      expect(() => assertExtraContentAllowlist([{ from, to: 'tessdata' }], R))
+        .toThrow(/cannot map/i);
+    }
+  );
+
+  it('rejects a --config.win.extraFiles=[{from:".",to:"."}] merge (F1 bypass, AC2)', () => {
+    // The exact --config.win.extraFiles override shape build_win.yml could carry.
+    expect(() =>
+      assertExtraContentAllowlist(mergeExtraContent(undefined, [{ from: '.', to: '.' }]), F)
+    ).toThrow(/nothing is permitted/i);
+  });
+
+  it('rejects a mac.extraResources merge adding an un-allowlisted dest (F1, AC2)', () => {
+    expect(() =>
+      assertExtraContentAllowlist(
+        mergeExtraContent(REAL_EXTRA_RESOURCES, [{ from: 'src', to: 'src' }]),
+        R
+      )
+    ).toThrow(/destination .* not permitted/i);
+  });
+});
+
+describe('mergeExtraContent', () => {
+  it('concatenates top-level and platform-scoped entries', () => {
+    expect(mergeExtraContent([{ to: 'a' }], [{ to: 'b' }])).toEqual([{ to: 'a' }, { to: 'b' }]);
+  });
+
+  it('tolerates either side undefined', () => {
+    expect(mergeExtraContent([{ to: 'a' }], undefined)).toEqual([{ to: 'a' }]);
+    expect(mergeExtraContent(undefined, [{ to: 'b' }])).toEqual([{ to: 'b' }]);
+  });
+
+  it('returns [] when both are undefined', () => {
+    expect(mergeExtraContent(undefined, undefined)).toEqual([]);
+  });
+
+  it('wraps a scalar value into a single-entry array', () => {
+    expect(mergeExtraContent('LICENSE', undefined)).toEqual(['LICENSE']);
+  });
+});
+
+describe('L1 merged-config observation (F6)', () => {
+  // Full electron-builder invocation is too heavy for the unit suite, so this is
+  // the documented fallback (design §5.7): it asserts the afterPack wiring reads
+  // BOTH context.packager.config.extra* AND
+  // context.packager.platformSpecificBuildOptions.extra*, which is where a
+  // --config.win.extraResources override lands. The ONE-TIME manual check that
+  // electron-builder actually surfaces --config overrides in these fields is
+  // recorded in docs (§7) and re-run per the release checklist.
+  it('observes both a top-level and a platform-scoped override via the context shape', () => {
+    const context = {
+      packager: {
+        config: { extraResources: [{ from: 'x', to: 'x' }] },
+        platformSpecificBuildOptions: { extraResources: [{ from: 'src', to: 'src' }] },
+      },
+    };
+    const merged = mergeExtraContent(
+      context.packager.config.extraResources,
+      context.packager.platformSpecificBuildOptions.extraResources
+    );
+    expect(merged).toEqual([{ from: 'x', to: 'x' }, { from: 'src', to: 'src' }]);
+    // The platform-scoped 'src' dest is not allowlisted, so L1 rejects the merge.
+    expect(() =>
+      assertExtraContentAllowlist(merged, {
+        kind: 'extraResources',
+        allowedDests: ALLOWED_EXTRA_RESOURCES_DESTS,
+      })
+    ).toThrow(/destination .* not permitted/i);
+  });
+});
+
+describe('resolveExtraFilesDir', () => {
+  it('resolves darwin under the .app bundle Contents/', () => {
+    expect(resolveExtraFilesDir('darwin', '/out', '/out/Erfana.app'))
+      .toBe(path.join('/out/Erfana.app', 'Contents'));
+  });
+
+  it('resolves win32 and linux to the app output root', () => {
+    expect(resolveExtraFilesDir('win32', '/out', '/out/Erfana.exe')).toBe('/out');
+    expect(resolveExtraFilesDir('linux', '/out', '/out/erfana')).toBe('/out');
+  });
+
+  it('returns null for an unknown platform so the caller fails closed', () => {
+    expect(resolveExtraFilesDir('sunos', '/out', '/out/x')).toBeNull();
+  });
+});
+
+describe('assertResourcesDestNoRepoLeak (L2a-1)', () => {
+  let tmpRoot;
+  beforeEach(() => {
+    tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'l2a1-'));
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    fs.rmSync(tmpRoot, { recursive: true, force: true });
+  });
+
+  it('passes when the config-slot siblings are exactly the allowed set (AC5)', () => {
+    makeResourcesDir(tmpRoot, ['tessdata', 'LICENSE', 'THIRD-PARTY-LICENSES.md', 'en.lproj']);
+    expect(() => assertResourcesDestNoRepoLeak(tmpRoot, { platform: 'darwin' })).not.toThrow();
+    expect(() => assertResourcesDestNoRepoLeak(tmpRoot, { platform: 'win32' })).not.toThrow();
+  });
+
+  // A repo-structure sentinel (`src`) AND a secret/exfil leak-name (`secrets`)
+  // must BOTH be fatal on BOTH platforms — the config leak vector a
+  // --config.win.extraResources=[{to:'src'}] / [{to:'secrets'}] injection
+  // produces. Fatal on every platform (F2), including win32 where L2a-2 is only
+  // advisory.
+  describe.each([
+    ['src', 'repo-structure sentinel'],
+    ['secrets', 'secret/exfil leak-name'],
+  ])('fatal beside app/ for %s (%s)', (leakName) => {
+    it.each(['darwin', 'win32'])('throws on platform=%s', (platform) => {
+      makeResourcesDir(tmpRoot, ['tessdata', leakName]);
+      expect(() => assertResourcesDestNoRepoLeak(tmpRoot, { platform }))
+        .toThrow(/not permitted extraResources destinations/i);
+    });
+  });
+
+  // F5 — an escaping sibling symlink beside app/ is fatal regardless of its name
+  // (the leak-name tripwire only inspects names).
+  it('fails closed on an escaping sibling symlink beside app/ (F5)', () => {
+    makeResourcesDir(tmpRoot, ['tessdata']);
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'l2a1-outside-'));
+    try {
+      fs.symlinkSync(outside, path.join(tmpRoot, 'leak'), dirLinkType);
+      expect(() => assertResourcesDestNoRepoLeak(tmpRoot, { platform: 'darwin' }))
+        .toThrow(/resolving outside/i);
+    } finally {
+      fs.rmSync(outside, { recursive: true, force: true });
+    }
+  });
+
+  it('accepts a sibling symlink whose target stays inside the bundle (F5 negative)', () => {
+    makeResourcesDir(tmpRoot, ['tessdata']);
+    fs.symlinkSync(path.join(tmpRoot, 'tessdata'), path.join(tmpRoot, 'tessdata-link'), dirLinkType);
+    expect(() => assertResourcesDestNoRepoLeak(tmpRoot, { platform: 'darwin' })).not.toThrow();
+  });
+
+  // F3 — the fail-closed readDirOrThrow path: a resources dir that cannot be
+  // read refuses to ship rather than silently skipping (a `catch { return [] }`
+  // mutation would turn this into a green build).
+  it.skipIf(process.platform === 'win32' || process.getuid?.() === 0)(
+    'refuses to ship when the resources dir cannot be read (fails closed) (F3)',
+    () => {
+      makeResourcesDir(tmpRoot, ['tessdata']);
+      fs.chmodSync(tmpRoot, 0o000);
+      try {
+        expect(() => assertResourcesDestNoRepoLeak(tmpRoot, { platform: 'darwin' }))
+          .toThrow(/could not be fully inspected/i);
+      } finally {
+        fs.chmodSync(tmpRoot, 0o755); // let afterEach clean it up
+      }
+    }
+  );
+});
+
+describe('assertResourcesSiblingsAllowlist (L2a-2)', () => {
+  let tmpRoot;
+  beforeEach(() => {
+    tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'l2a2-'));
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    fs.rmSync(tmpRoot, { recursive: true, force: true });
+  });
+
+  it('passes (no throw, no warn) on a realistic resources dir (AC5)', () => {
+    makeResourcesDir(tmpRoot, ['tessdata', 'LICENSE', 'THIRD-PARTY-LICENSES.md', 'en.lproj', 'pl.lproj']);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(() => assertResourcesSiblingsAllowlist(tmpRoot, { platform: 'darwin' })).not.toThrow();
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('accepts app.asar in place of app/ (pins the derived Electron-owned entry)', () => {
+    fs.mkdirSync(tmpRoot, { recursive: true });
+    fs.writeFileSync(path.join(tmpRoot, 'app.asar'), 'asar');
+    fs.mkdirSync(path.join(tmpRoot, 'tessdata'));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(() => assertResourcesSiblingsAllowlist(tmpRoot, { platform: 'win32' })).not.toThrow();
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('is FATAL on macOS for an unexpected non-config, non-.lproj sibling', () => {
+    makeResourcesDir(tmpRoot, ['tessdata', 'icon-extra', 'stray.dat']);
+    expect(() => assertResourcesSiblingsAllowlist(tmpRoot, { platform: 'darwin' }))
+      .toThrow(/unexpected/i);
+  });
+
+  it('is ADVISORY (warn, no throw) on win32 for the same unexpected sibling (F2)', () => {
+    makeResourcesDir(tmpRoot, ['tessdata', 'icon-extra', 'stray.dat']);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(() => assertResourcesSiblingsAllowlist(tmpRoot, { platform: 'win32' })).not.toThrow();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('stray.dat'));
+  });
+
+  it('still fails on win32 through L2a-1 when a REPO_ROOT_SENTINEL landed beside app/', () => {
+    // L2a-2 is advisory on win32, but a sentinel is a fortiori caught fatally by
+    // L2a-1 on every platform, so the config leak vector is never softened.
+    makeResourcesDir(tmpRoot, ['src']);
+    expect(() => assertResourcesDestNoRepoLeak(tmpRoot, { platform: 'win32' }))
+      .toThrow(/not permitted extraResources destinations/i);
+  });
+
+  // F5 — the escaping-symlink check runs ahead of the platform-variant
+  // enumeration and is fatal on BOTH platforms, even win32 where the enumeration
+  // is only advisory.
+  it.each(['darwin', 'win32'])('fails closed on an escaping sibling symlink on %s (F5)', (platform) => {
+    makeResourcesDir(tmpRoot, ['tessdata']);
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'l2a2-outside-'));
+    try {
+      fs.symlinkSync(outside, path.join(tmpRoot, 'leak'), dirLinkType);
+      expect(() => assertResourcesSiblingsAllowlist(tmpRoot, { platform }))
+        .toThrow(/resolving outside/i);
+    } finally {
+      fs.rmSync(outside, { recursive: true, force: true });
+    }
+  });
+
+  it('accepts a sibling symlink whose target stays inside the bundle (F5 negative)', () => {
+    makeResourcesDir(tmpRoot, ['tessdata']);
+    // Named `*.lproj` so the enumeration accepts it; target inside → no escape.
+    fs.symlinkSync(path.join(tmpRoot, 'tessdata'), path.join(tmpRoot, 'fr.lproj'), dirLinkType);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(() => assertResourcesSiblingsAllowlist(tmpRoot, { platform: 'darwin' })).not.toThrow();
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  // F3 — fail-closed readDirOrThrow path (the symlink pre-walk reads the dir).
+  it.skipIf(process.platform === 'win32' || process.getuid?.() === 0)(
+    'refuses to ship when the resources dir cannot be read (fails closed) (F3)',
+    () => {
+      makeResourcesDir(tmpRoot, ['tessdata']);
+      fs.chmodSync(tmpRoot, 0o000);
+      try {
+        expect(() => assertResourcesSiblingsAllowlist(tmpRoot, { platform: 'darwin' }))
+          .toThrow(/could not be fully inspected/i);
+      } finally {
+        fs.chmodSync(tmpRoot, 0o755); // let afterEach clean it up
+      }
+    }
+  );
+});
+
+describe('assertExtraFilesDestNoRepoLeak (L2b)', () => {
+  let tmpRoot;
+  beforeEach(() => {
+    tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'l2b-'));
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    fs.rmSync(tmpRoot, { recursive: true, force: true });
+  });
+
+  function seedMacContents(root) {
+    fs.writeFileSync(path.join(root, 'Info.plist'), '<plist/>');
+    fs.mkdirSync(path.join(root, 'MacOS'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'MacOS', 'Erfana'), 'macho');
+    fs.mkdirSync(path.join(root, 'Frameworks'), { recursive: true });
+    fs.mkdirSync(path.join(root, 'Resources'), { recursive: true });
+    fs.mkdirSync(path.join(root, 'Resources', 'app'), { recursive: true });
+  }
+
+  function seedWinRoot(root) {
+    fs.writeFileSync(path.join(root, 'Erfana.exe'), 'exe');
+    fs.writeFileSync(path.join(root, 'ffmpeg.dll'), 'dll');
+    fs.writeFileSync(path.join(root, 'icudtl.dat'), 'dat');
+    fs.mkdirSync(path.join(root, 'locales'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'locales', 'en-US.pak'), 'pak');
+    fs.mkdirSync(path.join(root, 'resources', 'app'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'resources', 'THIRD-PARTY-LICENSES.md'), 'md');
+  }
+
+  it('passes on a standard macOS Contents/ layout (AC5)', () => {
+    seedMacContents(tmpRoot);
+    expect(() => assertExtraFilesDestNoRepoLeak(tmpRoot, { platform: 'darwin' })).not.toThrow();
+  });
+
+  it('passes on a standard Windows output-root layout (AC5)', () => {
+    seedWinRoot(tmpRoot);
+    expect(() => assertExtraFilesDestNoRepoLeak(tmpRoot, { platform: 'win32' })).not.toThrow();
+  });
+
+  it.each(['package.json', '.git', 'node_modules', 'src', 'specs', 'tsconfig.json'])(
+    'throws on a %s sentinel at depth 1',
+    (sentinel) => {
+      seedWinRoot(tmpRoot);
+      if (sentinel.includes('.')) {
+        fs.writeFileSync(path.join(tmpRoot, sentinel), 'x');
+      } else {
+        fs.mkdirSync(path.join(tmpRoot, sentinel), { recursive: true });
+      }
+      expect(() => assertExtraFilesDestNoRepoLeak(tmpRoot, { platform: 'win32' }))
+        .toThrow(/repository\/extra-content leak/i);
+    }
+  );
+
+  it.each(['src', 'package.json'])(
+    'recurses ≥2 levels to catch a nested bundled/%s (F3)',
+    (sentinel) => {
+      seedMacContents(tmpRoot);
+      const bundled = path.join(tmpRoot, 'bundled');
+      fs.mkdirSync(bundled, { recursive: true });
+      if (sentinel.includes('.')) {
+        fs.writeFileSync(path.join(bundled, sentinel), 'x');
+      } else {
+        fs.mkdirSync(path.join(bundled, sentinel), { recursive: true });
+      }
+      expect(() => assertExtraFilesDestNoRepoLeak(tmpRoot, { platform: 'darwin' }))
+        .toThrow(/repository\/extra-content leak/i);
+    }
+  );
+
+  it.each(['secret.ts', 'secret.js', 'secret.cjs', 'secret.mjs'])(
+    'fires the source-extension tripwire on a renamed copy (%s) (F3)',
+    (renamed) => {
+      seedWinRoot(tmpRoot);
+      fs.writeFileSync(path.join(tmpRoot, renamed), 'export const leak = 1;');
+      expect(() => assertExtraFilesDestNoRepoLeak(tmpRoot, { platform: 'win32' }))
+        .toThrow(/repository\/extra-content leak/i);
+    }
+  );
+
+  it.each(['darwin', 'win32'])(
+    'tolerates the app\'s own .js at depth ≥3 on %s despite .js in the source-extension net (F6)',
+    (platform) => {
+      // Seed a REAL .js — the app's own JavaScript, which in a genuine bundle
+      // lives at `(Resources|resources)/app/out/**` (depth ≥3, beyond MAX_DEPTH=2).
+      // Without this file the .not.toThrow() below was vacuous: it discriminated
+      // nothing about the .js net. With it, a walk that OVER-FIRES by descending
+      // past MAX_DEPTH would flag this legitimate .js and fail the test (F6).
+      const appRoot = platform === 'darwin' ? 'Resources' : 'resources';
+      if (platform === 'darwin') {
+        seedMacContents(tmpRoot);
+      } else {
+        seedWinRoot(tmpRoot);
+      }
+      const outDir = path.join(tmpRoot, appRoot, 'app', 'out', 'main');
+      fs.mkdirSync(outDir, { recursive: true });
+      fs.writeFileSync(path.join(outDir, 'index.js'), 'export const main = 1;');
+      expect(() => assertExtraFilesDestNoRepoLeak(tmpRoot, { platform })).not.toThrow();
+    }
+  );
+
+  it('does not throw on resources/ or LICENSE at the root (excluded from sentinels)', () => {
+    seedWinRoot(tmpRoot);
+    fs.writeFileSync(path.join(tmpRoot, 'LICENSE'), 'x');
+    expect(() => assertExtraFilesDestNoRepoLeak(tmpRoot, { platform: 'win32' })).not.toThrow();
+  });
+
+  it('throws when the extraFiles dest does not exist (fails closed)', () => {
+    expect(() => assertExtraFilesDestNoRepoLeak(path.join(tmpRoot, 'missing'), { platform: 'darwin' }))
+      .toThrow(/not found/i);
+  });
+
+  // F3 — fail-closed readDirOrThrow path on a mid-walk subtree the sentinel scan
+  // descends into, so a `catch { return [] }` silent-skip mutation fails here.
+  it.skipIf(process.platform === 'win32' || process.getuid?.() === 0)(
+    'refuses to ship when a subtree at the extraFiles dest cannot be read (fails closed) (F3)',
+    () => {
+      seedWinRoot(tmpRoot);
+      const locked = path.join(tmpRoot, 'sub');
+      fs.mkdirSync(locked, { recursive: true });
+      fs.writeFileSync(path.join(locked, 'x'), 'x');
+      fs.chmodSync(locked, 0o000);
+      try {
+        expect(() => assertExtraFilesDestNoRepoLeak(tmpRoot, { platform: 'win32' }))
+          .toThrow(/could not be fully inspected/i);
+      } finally {
+        fs.chmodSync(locked, 0o755); // let afterEach clean it up
+      }
+    }
+  );
+
+  // L2 — pin the MAX_DEPTH=2 boundary. The walk scans depth 1 (the dest's
+  // direct children) and depth 2 (their children) only, so the legitimate
+  // Resources/app/package.json (macOS) / resources/app/package.json (win32),
+  // which sits at depth 3, is tolerated. These tests fail if MAX_DEPTH is bumped.
+  it('tolerates the legitimate Resources/app/package.json at depth 3 (macOS, MAX_DEPTH boundary)', () => {
+    seedMacContents(tmpRoot);
+    // Resources (d1) / app (d2) / package.json (d3) — a sentinel name past the walk.
+    fs.writeFileSync(path.join(tmpRoot, 'Resources', 'app', 'package.json'), '{}');
+    fs.writeFileSync(path.join(tmpRoot, 'Resources', 'app', 'foo.ts'), 'export const x = 1;');
+    expect(() => assertExtraFilesDestNoRepoLeak(tmpRoot, { platform: 'darwin' })).not.toThrow();
+  });
+
+  it('tolerates the legitimate resources/app/package.json at depth 3 (win32, MAX_DEPTH boundary)', () => {
+    seedWinRoot(tmpRoot);
+    // resources (d1) / app (d2) / package.json (d3) — a sentinel name past the walk.
+    fs.writeFileSync(path.join(tmpRoot, 'resources', 'app', 'package.json'), '{}');
+    fs.writeFileSync(path.join(tmpRoot, 'resources', 'app', 'foo.ts'), 'export const x = 1;');
+    expect(() => assertExtraFilesDestNoRepoLeak(tmpRoot, { platform: 'win32' })).not.toThrow();
+  });
+
+  // L3 — the L2b symlink-skip branch: the sentinel/source-extension walk skips
+  // symlinked entries (it never follows a link out of the dest), but F5's
+  // assertNoSymlinkEscape now makes an escaping symlink at the dest FATAL. The
+  // thrown error is the escape ("resolving outside"), NOT a repository-leak from
+  // following the link into the sentinel tree — proving the walk did not descend.
+  it('fails closed on a symlinked directory whose target escapes the dest (F5)', () => {
+    seedMacContents(tmpRoot);
+    // A tree full of sentinels living OUTSIDE the dest.
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'l2b-outside-'));
+    fs.writeFileSync(path.join(outside, 'package.json'), '{}');
+    fs.writeFileSync(path.join(outside, 'leak.ts'), 'export const x = 1;');
+    try {
+      // An innocuously-named symlink at the dest pointing at that tree.
+      fs.symlinkSync(outside, path.join(tmpRoot, 'vendored'), 'dir');
+      let captured;
+      try {
+        assertExtraFilesDestNoRepoLeak(tmpRoot, { platform: 'darwin' });
+      } catch (err) {
+        captured = err;
+      }
+      expect(captured?.message).toMatch(/resolving outside/i);
+      // The escape fired, not a repository-leak from following the link.
+      expect(captured?.message).not.toMatch(/repository\/extra-content leak/i);
+    } finally {
+      fs.rmSync(outside, { recursive: true, force: true });
+    }
+  });
+
+  it('a symlink NAMED like a sentinel still throws via the name check', () => {
+    seedWinRoot(tmpRoot);
+    const target = path.join(tmpRoot, 'innocuous-target');
+    fs.writeFileSync(target, 'x');
+    // The link's NAME is a repo-root sentinel; the name check fires before any
+    // symlink skip, so the leak is caught regardless of what it points at.
+    fs.symlinkSync(target, path.join(tmpRoot, 'package.json'));
+    expect(() => assertExtraFilesDestNoRepoLeak(tmpRoot, { platform: 'win32' }))
+      .toThrow(/repository\/extra-content leak/i);
+  });
+
+  it('a symlinked source-extension file is skipped by the extension tripwire', () => {
+    seedWinRoot(tmpRoot);
+    const target = path.join(tmpRoot, 'innocuous-target');
+    fs.writeFileSync(target, 'export const x = 1;');
+    // Named with a source extension but a symlink → the extension check requires
+    // a non-symlink, so this is skipped rather than flagged (and must not crash).
+    fs.symlinkSync(target, path.join(tmpRoot, 'linked.ts'));
+    expect(() => assertExtraFilesDestNoRepoLeak(tmpRoot, { platform: 'win32' })).not.toThrow();
+  });
+});
+
+// ---- verifyExtraContent — the wired aggregate of the five #55 guards (F1) ----
+//
+// This is the top lens-review finding: deleting any single guard call from
+// afterPack was green on every required check. Extracting the block into
+// verifyExtraContent lets a fabricated context + packed tree plant a leak at each
+// layer and assert the aggregate throws, so removing any one call fails a test in
+// the required Unit-tests job.
+describe('verifyExtraContent (F1 wiring)', () => {
+  let resDir; // bundleResources (the dir containing app/, beside the extraResources dest)
+  let filesDir; // the resolved extraFiles dest
+
+  beforeEach(() => {
+    resDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vec-res-'));
+    filesDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vec-files-'));
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    fs.rmSync(resDir, { recursive: true, force: true });
+    fs.rmSync(filesDir, { recursive: true, force: true });
+  });
+
+  // A clean afterPack-shaped context; `config`/`platformOpts` patch the merged
+  // config the L1 guard reads. extraResources defaults to the real shipped set.
+  function makeContext({ config = {}, platformOpts = {}, platform = 'darwin' } = {}) {
+    return {
+      electronPlatformName: platform,
+      packager: {
+        config: { extraResources: REAL_EXTRA_RESOURCES, ...config },
+        platformSpecificBuildOptions: { ...platformOpts },
+      },
+    };
+  }
+
+  function seedCleanResources(siblings = ['tessdata', 'LICENSE', 'THIRD-PARTY-LICENSES.md', 'en.lproj']) {
+    makeResourcesDir(resDir, siblings);
+  }
+  // A standard macOS Contents/ layout at the extraFiles dest (app under Resources/).
+  function seedCleanExtraFiles() {
+    fs.writeFileSync(path.join(filesDir, 'Info.plist'), '<plist/>');
+    fs.mkdirSync(path.join(filesDir, 'MacOS'), { recursive: true });
+    fs.writeFileSync(path.join(filesDir, 'MacOS', 'Erfana'), 'macho');
+    fs.mkdirSync(path.join(filesDir, 'Resources', 'app'), { recursive: true });
+  }
+
+  it('passes a clean bundle with the real config (no leak planted) (AC5)', () => {
+    seedCleanResources();
+    seedCleanExtraFiles();
+    expect(() =>
+      verifyExtraContent(makeContext(), { bundleResources: resDir, extraFilesDir: filesDir })
+    ).not.toThrow();
+  });
+
+  it('throws when a leak is planted at L1 (config shape) — proves the L1 call is wired', () => {
+    seedCleanResources();
+    seedCleanExtraFiles();
+    const ctx = makeContext({ config: { extraFiles: [{ from: '.', to: '.' }] } });
+    expect(() => verifyExtraContent(ctx, { bundleResources: resDir, extraFilesDir: filesDir }))
+      .toThrow(/nothing is permitted/i);
+  });
+
+  it('throws when a leak is planted at L1 via a `from` rename into an allowed dest (F5)', () => {
+    seedCleanResources();
+    seedCleanExtraFiles();
+    const ctx = makeContext({ config: { extraResources: [{ from: 'src', to: 'tessdata' }] } });
+    expect(() => verifyExtraContent(ctx, { bundleResources: resDir, extraFilesDir: filesDir }))
+      .toThrow(/not an allowlisted extra-content source/i);
+  });
+
+  it('throws when a leak is planted at L2a-1 (leak-name beside app/) — proves the L2a-1 call is wired', () => {
+    seedCleanResources(['tessdata', 'src']);
+    seedCleanExtraFiles();
+    expect(() => verifyExtraContent(makeContext(), { bundleResources: resDir, extraFilesDir: filesDir }))
+      .toThrow(/not permitted extraResources destinations/i);
+  });
+
+  it('throws when a leak is planted at L2a-2 (unexpected sibling on darwin) — proves the L2a-2 call is wired', () => {
+    seedCleanResources(['tessdata', 'stray.dat']);
+    seedCleanExtraFiles();
+    expect(() => verifyExtraContent(makeContext(), { bundleResources: resDir, extraFilesDir: filesDir }))
+      .toThrow(/unexpected/i);
+  });
+
+  it('throws when a leak is planted at L2b (sentinel at the extraFiles dest) — proves the L2b call is wired', () => {
+    seedCleanResources();
+    seedCleanExtraFiles();
+    fs.writeFileSync(path.join(filesDir, 'package.json'), '{}');
+    expect(() => verifyExtraContent(makeContext(), { bundleResources: resDir, extraFilesDir: filesDir }))
+      .toThrow(/repository\/extra-content leak/i);
+  });
+
+  it('fails closed when the extraFiles dest is null (unknown platform)', () => {
+    seedCleanResources();
+    expect(() =>
+      verifyExtraContent(makeContext(), { bundleResources: resDir, extraFilesDir: null })
+    ).toThrow(/cannot locate the extraFiles/i);
+  });
+
+  // LOW (QG-6/7/8): the two L2a guards share one resources-dir symlink walk, now
+  // hoisted into verifyExtraContent (they take skipSymlinkCheck: true). Prove the
+  // hoisted walk still fails closed on an escaping sibling symlink beside app/, so
+  // deleting it from verifyExtraContent — not just the sub-guards — fails a test.
+  it('fails closed on an escaping sibling symlink beside app/ via the hoisted L2a walk (F5)', () => {
+    seedCleanResources();
+    seedCleanExtraFiles();
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'vec-outside-'));
+    try {
+      fs.symlinkSync(outside, path.join(resDir, 'leak'), dirLinkType);
+      expect(() =>
+        verifyExtraContent(makeContext(), { bundleResources: resDir, extraFilesDir: filesDir })
+      ).toThrow(/resolving outside/i);
+    } finally {
+      fs.rmSync(outside, { recursive: true, force: true });
+    }
   });
 });

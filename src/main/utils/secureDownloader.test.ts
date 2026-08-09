@@ -73,6 +73,25 @@ describe('secureDownloader.downloadToFile', () => {
     expect(await readFile(destPath)).toEqual(Buffer.from(payload))
   })
 
+  it('rejects an unparseable URL before contacting the network (fails closed)', async () => {
+    // `new URL('not a url')` throws → assertAllowedHost maps it to a fail-closed
+    // hostname-not-allowed error, before any fetch is attempted.
+    await expect(
+      downloadToFile({ url: 'not a url', destPath, maxBytes: 100 })
+    ).rejects.toMatchObject({
+      name: 'SecureDownloaderError',
+      code: 'hostname-not-allowed'
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('rejects a 200 response with no body (fails closed)', async () => {
+    fetchMock.mockResolvedValueOnce(mockResponse({ status: 200 })) // no body
+    await expect(
+      downloadToFile({ url: 'https://github.com/x', destPath, maxBytes: 100 })
+    ).rejects.toMatchObject({ code: 'no-body' })
+  })
+
   it('rejects non-allowlisted hosts', async () => {
     await expect(
       downloadToFile({
