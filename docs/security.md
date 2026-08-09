@@ -513,9 +513,15 @@ The `afterSign` hook is critical: without it, macOS Sequoia+ rejects `@rpath` li
 
 - **Local OCR only** – Tesseract.js runs locally; no data sent to external APIs
 - **File validation** – LiteParseConverter validates file type, checks for encryption, enforces 1000-page limit and 60s timeout
+- **Hard size cap** – files above `IMPORT.SIZE_HARD_LIMIT` (250 MB) are rejected with `IMPORT_EXCEEDS_SIZE_LIMIT` before any converter runs, bounding memory-bomb input to the image/PDF parsers; `LiteParseConverter.convert()` re-checks this because the document-import IPC path bypasses `ImportService` validation. This bounds input bytes, not decoded pixels — see [technical-debt.md](./technical-debt.md) for the pixel-bomb follow-up
 - **Temp dir cleanup** – Screenshot temp directories cleaned in `finally` blocks (including abort paths)
 - **Dependency isolation** – LibreOffice/ImageMagick invoked via child process with no user-controlled arguments
 - **Zod validation** – All import IPC inputs validated via Zod schemas (`import-schema.ts`)
+
+## Document export security
+
+- **Remote-image SSRF strip** – `@turbodocx/html-to-docx` fetches any `http(s)` image `src` at export time (bundled axios). `docxImageStrip.ts` removes remote `<img>`/`<source>` (any URL scheme or protocol-relative source) with a real parser (parse5) before conversion, so the library never issues the request; `data:` and local/relative images are kept. Fail-closed: anything that is not empty, `data:`, or a relative path is stripped. The renderer shows a warning toast with the count.
+- **Process isolation** – conversion runs in a killable Electron `utilityProcess` child (`DocxConvertProcessAdapter` → `docx-convert.process.ts`), so a synchronous hang (malformed image) is terminated at the timeout and cannot freeze the main process, and a decompression bomb is capped to the child's memory. See [Architecture](./architecture.md) § Process isolation for DOCX conversion.
 
 ## Worker thread security (v0.9.0)
 
