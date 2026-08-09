@@ -29,7 +29,7 @@ Eight jobs run in parallel (all `ubuntu-latest` except `windows-checks`). The **
 | `build` (Build) | `npx electron-vite build` | yes | |
 | `license` (License compliance) | `npm run check:headers` + `pipx run reuse lint` | yes | SPDX headers on all sources + REUSE conformance |
 | `audit-signatures` (npm audit signatures) | `npm audit signatures` | no | also records the `package-lock.json` digest artifact that `release.yml` byte-verifies at tag time |
-| `release-guards` (Release readiness guards) | guard scripts | no | fails the build on a `pull_request_target` trigger, forbidden plist entitlements, etc. |
+| `release-guards` (Release readiness guards) | guard scripts | no | fails the build on a `pull_request_target` trigger, forbidden plist entitlements, legacy signing credentials, release-pubkey drift across docs, and a non-allowlist `files:` block in `electron-builder.yml` (`Guard - electron-builder packaging allowlist`, issue #43 — awk/grep only, since the job is checkout-only) |
 | `windows-checks` (Windows checks) | `npm run typecheck` + `npm run test:main` on `windows-latest` | no | advisory Windows gate; excluded from the required set until proven stable |
 
 **Required status checks on `main`** (six): `Lint`, `Typecheck`, `Unit tests`, `Build`, `License compliance` (from `checks.yml`), and `Secret scan` (from `secret-scan.yml`). `npm audit signatures`, `Release readiness guards`, and `Windows checks` run on every push but are not required to merge.

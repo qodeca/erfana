@@ -4,6 +4,12 @@ Per-version release notes for Erfana (v0.6.0 onwards; earlier in [archive/change
 
 > **Note:** In v0.7.2, BRS (Business Requirements Specifications) were renamed to "specs" and relocated from `specs/business-reqs/` to `specs/spec-t{tier}-{id}-{slug}/`. All references in code and docs now use `Spec #XXX`. Historical entries below have been updated accordingly.
 
+## Unreleased
+
+### Fixed
+
+- **The installed app no longer carries a copy of the project's own source tree** ([#43](https://github.com/qodeca/erfana/issues/43)) – every file in the repository – documentation, tests, specs, build configuration, and any folders that only ever existed on the machine doing the build – was being copied into the shipped application, uncompressed and readable by anyone who opened the bundle. The packaging configuration listed only what to *leave out*, and the packager reads a list of nothing-but-exclusions as "include everything", so the exclusions were being applied to a sweep of the whole project rather than to a chosen set. It now lists what to include: the built application code and its manifest, nothing else. Measured on a local macOS build, the app bundle drops from 612 MB to 581 MB and the application directory inside it from 350 MB to 319 MB, with 23 top-level items reduced to 3. A stray `.env` or `.npmrc` is now also stripped from anywhere in the tree, including inside bundled dependencies, where the previous rules did not reach. Two guards keep it that way: the wiring and allowlist shape are checked in the required test suite on every push, and the build itself refuses to sign an app whose contents do not match the list. The published `v0.16.3` artifact was audited to bound what earlier releases actually shipped — tracked development files only, **no credentials and no machine-local content**, because releases build from a clean checkout; see [`SECURITY.md`](../SECURITY.md#packaging-scope-of-releases-before-the-43-fix-audited). See [`docs/build/electron-builder.md`](build/electron-builder.md#files-allowlist).
+
 ## 0.17.0
 
 *Released 2026-08-08. Tag `v0.17.0`.*

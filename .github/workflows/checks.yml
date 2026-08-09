@@ -327,3 +327,128 @@ jobs:
             exit 1
           fi
           echo "release pubkeys consistent across docs/release-pubkey.txt, docs/security.md$( [ -n "$README" ] && echo ', README.md')"
+
+      # Guard 6: electron-builder packaging allowlist (issue #43).
+      # app-builder-lib's FileMatcher.containsOnlyIgnore() treats a `files:`
+      # list of only '!' patterns as "no includes given" and splices an implicit
+      # '**/*' at index 0, packaging the ENTIRE repository root into
+      # Contents/Resources/app/ - untracked local-only directories included, and
+      # uncompressed under `asar: false`. One positive pattern restores allowlist
+      # semantics; an all-matching positive re-creates the bug explicitly.
+      # This guard also asserts the afterPack/afterSign wiring, because deleting
+      # that one line silently disables every packaging guard AND all three
+      # Electron security fuses with a green build.
+      # The packed-tree counterpart is assertPackagedAppContents() in
+      # scripts/fuses.js, which runs during afterPack, before signing.
+      # Pure awk/grep: this job is checkout-only, so there is no `npm ci` and
+      # therefore no js-yaml (node itself is preinstalled, but a parser is not).
+      - name: Guard - electron-builder packaging allowlist
+        run: |
+          set -euo pipefail
+          # $1 is never passed by the `run:` step (it always defaults); it exists
+          # so the manual negative tests can point the guard at a mutated copy:
+          # `bash guard.sh /tmp/broken.yml`.
+          EB_CONFIG="${1:-electron-builder.yml}"
+
+          # 1. Hook wiring must still be present. Optional quotes: 'x' and x are
+          #    the same YAML, and both work in electron-builder.
+          grep -qE "^afterPack:[[:space:]]*['\"]?\./scripts/fuses\.js['\"]?[[:space:]]*$" "$EB_CONFIG" || {
+            echo "::error::$EB_CONFIG is missing 'afterPack: ./scripts/fuses.js' - every packaging guard and Electron fuse silently stops running (issue #43)"
+            exit 1
+          }
+          grep -qE "^afterSign:[[:space:]]*['\"]?\./scripts/resign\.js['\"]?[[:space:]]*$" "$EB_CONFIG" || {
+            echo "::error::$EB_CONFIG is missing 'afterSign: ./scripts/resign.js' - the macOS re-signing step stops running"
+            exit 1
+          }
+
+          # 1b. A platform block (mac:/win:) may carry its own indented files:,
+          #     which app-builder-lib concatenates into the SAME matcher. The
+          #     required Unit-tests job already verifies platform files: (the
+          #     electron-builder.yml binding test reads config.mac?.files), so this
+          #     shell scanner - which cannot parse the nested block - only warns.
+          if grep -qE '^[[:space:]]+files:' "$EB_CONFIG"; then
+            echo "::warning::$EB_CONFIG has a platform-specific files: block. This shell guard cannot verify it; the Unit-tests job's electron-builder.yml binding test is the hard gate for it (issue #43)."
+          fi
+
+          # 2. Extract the files: block. A list item may legally sit at column 0,
+          #    so only a non-list, non-comment line at column 0 ends the block;
+          #    an inline comment on the key is tolerated.
+          BLOCK=$(awk '
+            /^files:[[:space:]]*(#.*)?$/  { in_block=1; next }
+            in_block && /^[^[:space:]#-]/ { in_block=0 }
+            in_block                      { print }
+          ' "$EB_CONFIG")
+          if [ -z "$BLOCK" ]; then
+            echo "::error::$EB_CONFIG has no block-sequence files: list - this guard only understands the block form ('files:' on its own line, then '- pattern' items). The Unit-tests job's YAML-parsed binding test covers other shapes (issue #43)."
+            exit 1
+          fi
+
+          # 3. Count only this block's own top-level items, so a nested filter:
+          #    list inside a FileSet entry is not miscounted as an include.
+          # `|| true` on both: under `set -e` with pipefail a non-matching grep
+          # would abort the step before the diagnostics below could print.
+          # The trailing `sed 's/[[:space:]]+#.*$//'` strips an inline comment
+          # BEFORE the quote strip, so `- '*'  # everything` cannot smuggle a
+          # wildcard past check 5 as the literal item `*"  # everything`.
+          INDENT=$(printf '%s\n' "$BLOCK" | grep -vE '^[[:space:]]*#' \
+            | grep -m1 -E '^[[:space:]]*-[[:space:]]+' | sed -E 's/-.*//' || true)
+          ITEMS=$(printf '%s\n' "$BLOCK" | grep -E "^${INDENT}-[[:space:]]+" \
+            | sed -E "s/^${INDENT}-[[:space:]]+//" \
+            | sed -E "s/[[:space:]]+#.*\$//" \
+            | sed -E "s/^['\"]//; s/['\"][[:space:]]*\$//" || true)
+          if [ -z "$ITEMS" ]; then
+            echo "::error::$EB_CONFIG files: block contains no list items"
+            exit 1
+          fi
+
+          # 3b. A list item that opens a mapping (`- from: x`) is a FileSet, not
+          #     a pattern. Counting it as a positive would be a false pass, and
+          #     this guard cannot reason about where a FileSet lands, so it fails
+          #     closed. Deliberately STRICTER than scripts/fuses.js, which must
+          #     accept a non-remapping FileSet: electron-builder normalises a
+          #     plain string list into `[{filter: [...]}]` before handing it to
+          #     the afterPack hook, so rejecting that shape there would throw on
+          #     every real build. A literal FileSet in the YAML is still refused.
+          if printf '%s\n' "$ITEMS" | grep -qE '^[A-Za-z_][A-Za-z0-9_.-]*:([[:space:]]|$)'; then
+            echo "::error::$EB_CONFIG files: contains a FileSet entry, which this guard cannot verify. Update the guard in .github/workflows/checks.yml and deriveAllowedAppEntries in scripts/fuses.js together (issue #43)."
+            exit 1
+          fi
+
+          # 4. At least one positive pattern, or app-builder-lib splices '**/*'.
+          #    grep -c prints 0 and exits 1, so || true keeps the 0 reaching the test.
+          POSITIVE=$(printf '%s\n' "$ITEMS" | grep -cv '^!' || true)
+          if [ "$POSITIVE" -lt 1 ]; then
+            echo "::error::$EB_CONFIG files: contains only negated patterns - app-builder-lib splices an implicit '**/*' and packages the entire repository root (issue #43). Add a positive pattern, e.g. 'out/**'."
+            exit 1
+          fi
+
+          # 5. An all-matching positive reproduces the same bug explicitly.
+          #    Mirrors deriveAllowedAppEntries in scripts/fuses.js: reject when
+          #    the pattern's FIRST path segment is a wildcard, rather than
+          #    enumerating spellings ('**/**' and '*/**' sweep the root too).
+          while IFS= read -r item; do
+            [ -n "$item" ] || continue
+            case "$item" in '!'*) continue ;; esac
+            # electron-builder strips a leading './' before matching, so strip it
+            # here too - otherwise './**' yields first='.' and passes while
+            # deriveAllowedAppEntries in scripts/fuses.js rejects it.
+            item="${item#./}"
+            # A '..' segment escapes the project root (app-builder-lib normalises
+            # it, so `out/../**` becomes `**`); the shell scanner cannot normalise,
+            # so reject any traversal outright to stay in step with fuses.js.
+            case "$item" in
+              ''|.|..|../*|*/../*|*/..)
+                echo "::error::$EB_CONFIG files: positive pattern '$item' contains a '..' path segment that escapes the project root (issue #43)."
+                exit 1
+                ;;
+            esac
+            first="${item%%/*}"
+            if [ "$first" = '*' ] || [ "$first" = '**' ]; then
+              echo "::error::$EB_CONFIG files: positive pattern '$item' begins with a wildcard at the repository root - this packages the entire repository root exactly as the implicit '**/*' did (issue #43)."
+              exit 1
+            fi
+          done <<ITEMS_EOF
+          $ITEMS
+          ITEMS_EOF
+
+          echo "electron-builder packaging allowlist OK ($POSITIVE positive pattern(s); afterPack/afterSign wiring present)"

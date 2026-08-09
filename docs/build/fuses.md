@@ -2,7 +2,7 @@
 
 **Last updated**: August 2026 (v0.17.0)
 
-This document explains the Electron fuses configuration and security decisions. `scripts/fuses.js` is the single `afterPack` hook, so it also carries four non-fuse responsibilities: it restores the executable bit on bundled `node-pty` `spawn-helper` binaries (see [afterPack also chmods node-pty spawn-helper](#afterpack-also-chmods-node-pty-spawn-helper)), prunes foreign-arch native binaries, stages and re-verifies the per-arch `ffmpeg` binary, and renames the bundle for test builds.
+This document explains the Electron fuses configuration and security decisions. `scripts/fuses.js` is the single `afterPack` hook, so it also carries five non-fuse responsibilities: it restores the executable bit on bundled `node-pty` `spawn-helper` binaries (see [afterPack also chmods node-pty spawn-helper](#afterpack-also-chmods-node-pty-spawn-helper)), prunes foreign-arch native binaries, stages and re-verifies the per-arch `ffmpeg` binary, renames the bundle for test builds, and verifies the packed `app/` contents against the `files:` allowlist (see [afterPack also verifies the packed app/ contents](#afterpack-also-verifies-the-packed-app-contents)).
 
 ---
 
@@ -40,13 +40,14 @@ afterSign: ./scripts/resign.js
 
 **Hook sequencing**: `beforePack` (`scripts/ensure-media-binaries.js`) runs first and caches the platform's `ffmpeg` binaries (a hardcoded set: `x64` **and** `arm64` on macOS, `process.arch` elsewhere — not the configured build target), then `afterPack` (`scripts/fuses.js`) runs once per packaged target, then electron-builder signs, then `afterSign` (`scripts/resign.js`) deep re-signs the entire `.app` bundle.
 
-`afterPack` does five things, in this order:
+`afterPack` does six things, in this order:
 
 1. Resolve the packed Electron binary – and, on a test build, rename it via `renameTestBuildApp` to `Erfana (TEST BUILD).app`.
 2. Prune foreign-platform/arch `ffprobe-static` binaries and `node-pty` prebuilds (plus a `.pdb` strip on `win32`).
 3. Restore the `node-pty` `spawn-helper` execute bit (`0755`, Unix only).
 4. `ensurePackedMediaBinaries` – copy this pack's cached `ffmpeg` into the bundle, re-verify it (size floor always, SHA-256 only on pinned arches), and `chmod 0755` the packed `ffmpeg` + every `ffprobe`.
 5. Flip the Electron fuses and reset the ad-hoc Darwin signature on the main binary.
+6. `assertConfigMatchesAllowlist` + `assertPackagedAppContents` – verify the packed `app/` tree against the `files:` allowlist. Deliberately last, so it covers every mutation the steps above made.
 
 Everything happens before signing so the signed tree is the final tree. The `afterSign` step is critical because `flipFuses` modifies the main binary's code directory hash, creating a mismatch with helper processes. Without deep re-signing, macOS Sequoia+ rejects `@rpath` library loads. See [electron-builder.md](./electron-builder.md) for details.
 
@@ -112,6 +113,33 @@ Doing the copy in `afterPack` means each DMG carries exactly its own current `ff
 - On a **Windows** pack, there is no hash to re-check at either point. The packed `ffmpeg.exe` is validated against the ~1 MB size floor and nothing else — enough to catch a stub or a text placeholder, not enough to detect substitution. Adding a `win32-x64` entry to `FFMPEG_SHA256` closes that gap.
 
 Unsupported ffmpeg target arches (`universal`, `armv7l`, `ia32`) are skipped, or throw under `requireMatch`.
+
+---
+
+## afterPack also verifies the packed app/ contents
+
+Until [issue #43](https://github.com/qodeca/erfana/issues/43) the `files:` list in `electron-builder.yml` was negation-only, which app-builder-lib reads as "no includes given" and answers by packaging the **entire repository root** into `Contents/Resources/app/`. The list itself is now an allowlist ([electron-builder.md](./electron-builder.md#files-allowlist)); this hook is the check that the packed artifact actually matches it. It runs as the **last statement of `afterPack`** — after the prunes, the media staging and the fuse flip, so it sees the final tree, and still before signing, so a bad tree never becomes a trusted artifact and no notarization minutes are spent on it.
+
+Two functions run, both refusing to ship rather than warning:
+
+- **`assertConfigMatchesAllowlist(files, { platformFiles })`** derives the top-level entries the live electron-builder config permits under `app/` (first path segment of every positive pattern, plus the `package.json` + `node_modules` entries electron-builder adds unconditionally) and asserts equality with the hardcoded `ALLOWED_APP_ENTRIES`. A `mac:`/`win:` block may carry its own `files:` that app-builder-lib concatenates into the same matcher, so the platform list is folded in. **The derived set is evidence of non-drift, never the authority** — a guard that took its expectations from the artifact it guards would have passed the original bug, because a negation-only list derives nothing and would have "matched" an empty expectation.
+- **`assertPackagedAppContents(resourcesDir)`** walks the packed tree in three passes:
+  1. **Depth-1 allowlist, bidirectional.** Every entry under `app/` must be permitted *and* every permitted entry must be present. The second direction catches an allowlist so narrow that `out/` was dropped, and closes the drift path where someone widens the constant to make a build green. Runs before the walk, so a bundle still carrying the whole repository fails fast instead of being walked.
+  2. **Full-depth symlink escape check.** Every symlink at any depth must resolve inside `app/`. Absolute links into `/System` and `/Library` are allowed on darwin (Apple TN2206); a dangling link **throws** on darwin, because Gatekeeper rejects such a bundle and the user gets an app that will not launch, and warns elsewhere.
+  3. **Main-entry keep-then-verify.** The `main` path declared by the packed `app/package.json` must exist, resolve inside the bundle, and be a file. The packed manifest is the authority, so this adds no second hardcoded build path; `main` is treated as untrusted input (type-checked, resolved, containment-checked), and a manifest without `main` falls back to Node's own default of `index.js`.
+
+Hardening — four decisions worth keeping:
+
+1. **A symlinked `app/` root is refused outright.** Following it would silently re-root every containment check onto the link target.
+2. **An asar-packed bundle is refused unless `allowAsar` is passed explicitly.** ASAR changes how files are *stored*, not which files are *packaged*, so the issue #43 defect survives it; skipping silently would retire this guard the moment `asar: true` landed.
+3. **Platform-conditional rules key off the platform being packaged**, not the build host, so a `--win` pack on macOS is not judged by Gatekeeper's rules.
+4. **Entry names are JSON-quoted before printing.** Names originate from third-party `node_modules`, and a POSIX filename may contain newlines — unquoted, a hostile dependency could forge `::error::` workflow commands in a public release log.
+
+One advisory (warn-only) check rides along: entries directly under `Resources/` that are not in the expected set are reported but do not fail the build, because an `extraResources: from: .` slip would reproduce issue #43 one directory up and nothing else would notice. It stays advisory until the expected set has a Windows baseline — it was enumerated from a macOS bundle.
+
+The config-side counterpart is the `Guard - electron-builder packaging allowlist` step in `.github/workflows/checks.yml`, which rejects a negation-only `files:` list on every push, before a build is ever attempted.
+
+Test coverage: `scripts/fuses.test.mjs` (`resolvePackedResourcesDir`, `deriveAllowedAppEntries`, `assertConfigMatchesAllowlist` and `assertPackagedAppContents` describe blocks — clean-bundle exact file/dir counts proving the walk recurses, disallowed and missing top-level entries, the untracked dot-directory case from #43, offender-name quoting and truncation, a fail-closed unreadable-subtree case, asar refusal vs opt-in skip, manifest missing / unreadable / `main` absent / `main` escaping via `..` past an existing decoy file, the symlink escape + dangling + intra-bundle-relative + darwin-allowed-root + two `{ platform: 'win32' }` containment cases, and a case that binds the real `electron-builder.yml` — including its `afterPack`/`afterSign` wiring — to `ALLOWED_APP_ENTRIES` in the required Unit-tests job, so a config edit without a matching constant edit, or a deleted hook, fails on every push rather than inside the release build).
 
 ---
 

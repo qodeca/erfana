@@ -186,6 +186,21 @@ After the heartbeat hardening (Phase A4 resume-refresh, B1 symlink defense, D3 H
 
 ---
 
+### 13. `scripts/fuses.js` exceeds the 500-line guideline (#43, 2026-08)
+
+**Severity**: Low
+**Impact**: `scripts/fuses.js` is ~1,040 lines against the project's ~500-line-per-file guidance; its suite `scripts/fuses.test.mjs` is ~835.
+
+**Problem**: The issue #43 packaging-allowlist work added a self-contained `Packaged-contents allowlist` block (~400 lines: `deriveAllowedAppEntries`, `assertConfigMatchesAllowlist`, `assertPackagedAppContents` and their helpers) to a file that already carried the fuse flip, the `spawn-helper` chmod, the two foreign-arch prunes and the media-binary staging.
+
+**Recommended Solution**: extract the block to `scripts/packaging-allowlist.js` and split `fuses.test.mjs` along the same seam. The allowlist code has no dependency on the fuse / chmod / prune / media-cache code, with one exception: `resolvePackedResourcesDir` sits inside that block but has four call sites in `afterPack` — the prune step, the spawn-helper chmod, the media staging, and the allowlist assertion itself — so it has to stay in `fuses.js` (or be imported back). The advisory `Resources/`-inventory warning (`EXPECTED_RESOURCES_ENTRIES` and the check that reads it) should move with the block.
+
+**Files**: `scripts/fuses.js`, `scripts/fuses.test.mjs`.
+
+**Status**: Deferred from #43 — no behaviour change involved, so it can land whenever either file is next opened.
+
+---
+
 ## Code Quality Improvements
 
 ### Documentation Token Efficiency
@@ -263,4 +278,4 @@ Amendment discipline + promotion-rule conventions in [`windows/contributing.md`]
 
 ---
 
-**Last Updated**: v0.17.0 doc sweep (2026-08-08 – entry #4 resolved: `LanguageSelect` `id` prop; entries #7, #8, #10 re-measured against the v0.17.0 tree) + #42 camera mirror + dialog focus work (2026-08-07 – entry #3 resolved: BaseDialog `trapFocus`) + PR #245 (2026-06-13 – entry #12 live-verification updated: single-panel detection + mid-session model-switch verified on a Windows host) + #217 Windows Claude status bar (2026-06-10 — entry #12 added: Windows v1 detector limitations) + v0.14.0 doc sweep (2026-06-08 — entries #9 + #10 added from `Transcription/CLAUDE.md` eviction) + v0.9.6 release (2026-05-22 — critical macOS terminal fix `ea3eaf1`) + v0.9.5 release (2026-04-25) + Phase I branch protection refinement (PR requirement removed same day) + entry #7 documenting `security.md` cap constraint (2026-04-25)
+**Last Updated**: #43 packaging allowlist QG-11a remediation (2026-08-09 – entry #13 added: `scripts/fuses.js` size after the allowlist block; `resolvePackedResourcesDir` call-site count corrected to four) + v0.17.0 doc sweep (2026-08-08 – entry #4 resolved: `LanguageSelect` `id` prop; entries #7, #8, #10 re-measured against the v0.17.0 tree) + #42 camera mirror + dialog focus work (2026-08-07 – entry #3 resolved: BaseDialog `trapFocus`) + PR #245 (2026-06-13 – entry #12 live-verification updated: single-panel detection + mid-session model-switch verified on a Windows host) + #217 Windows Claude status bar (2026-06-10 — entry #12 added: Windows v1 detector limitations) + v0.14.0 doc sweep (2026-06-08 — entries #9 + #10 added from `Transcription/CLAUDE.md` eviction) + v0.9.6 release (2026-05-22 — critical macOS terminal fix `ea3eaf1`) + v0.9.5 release (2026-04-25) + Phase I branch protection refinement (PR requirement removed same day) + entry #7 documenting `security.md` cap constraint (2026-04-25)
