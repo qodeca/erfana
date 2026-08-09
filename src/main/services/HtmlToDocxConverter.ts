@@ -1,14 +1,23 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import HTMLtoDOCX from '@turbodocx/html-to-docx'
-import { DOCX_EXPORT } from '../../shared/constants'
 import { logger } from './LoggingService'
+import { stripRemoteImages } from './docx/docxImageStrip'
+import { docxConvertProcessAdapter } from './docx/DocxConvertProcessAdapter'
+
+/** Result of a DOCX conversion: the file bytes plus how many remote images were dropped. */
+export interface DocxConversionResult {
+  buffer: Buffer
+  removedRemoteImages: number
+}
 
 /**
  * HTML to DOCX Converter
  *
- * Uses @turbodocx/html-to-docx library for reliable HTML-to-DOCX conversion.
- * Handles: headings, paragraphs, lists, tables, code blocks, links, and images.
+ * Prepares markdown-preview HTML for export and delegates the actual conversion
+ * to a killable utilityProcess child (see DocxConvertProcessAdapter). This class
+ * owns the two safe, fast, main-process steps — stripping remote images and
+ * wrapping the content in a document shell — while the CPU-/memory-risky
+ * @turbodocx/html-to-docx run happens in isolation.
  *
  * Mermaid diagrams are pre-converted to PNG images in the renderer process,
  * then embedded as <img data-mermaid-diagram="true" src="data:image/png;base64,...">
@@ -18,133 +27,30 @@ import { logger } from './LoggingService'
  */
 export class HtmlToDocxConverter {
   /**
-   * Convert HTML string to DOCX buffer
+   * Convert HTML string to DOCX buffer.
    *
    * @param html - HTML content from markdown preview (with Mermaid diagrams pre-converted to images)
-   * @returns Buffer ready to be written to file
+   * @returns the DOCX buffer and the number of remote images stripped for security
    */
-  async convert(html: string): Promise<Buffer> {
+  async convert(html: string): Promise<DocxConversionResult> {
     // Security: drop remote http(s) <img> before conversion. The library fetches
     // any http/https image src during export (bundled axios), which turns a hostile
     // <img src="http://internal-host/..."> in an exported document into a
-    // server-side request from the main process (SSRF). Local and data: URI images
-    // (incl. pre-rendered Mermaid diagrams) are preserved.
-    const { html: safeHtml, removed } = this.stripRemoteImages(html)
+    // server-side request from the main process (SSRF). Only empty, data: URI, and
+    // relative-path images (incl. pre-rendered Mermaid diagrams) are preserved;
+    // every URL scheme (http, https, file, ftp, ...) and protocol-relative source
+    // is stripped. Uses a real HTML parser, not a tag regex — see docxImageStrip.
+    const { html: safeHtml, removed } = stripRemoteImages(html)
     if (removed > 0) {
       logger.warn(`DOCX export: skipped ${removed} remote image(s) to prevent outbound requests`)
     }
 
-    // Wrap in proper HTML structure for the library
+    // Wrap in proper HTML structure for the library, then convert in a killable
+    // utilityProcess so a synchronous hang (image bomb) is terminable.
     const wrappedHtml = this.wrapInHtmlDocument(safeHtml)
+    const buffer = await docxConvertProcessAdapter.convert(wrappedHtml)
 
-    // Convert to DOCX using @turbodocx/html-to-docx with timeout protection
-    const conversionPromise = HTMLtoDOCX(
-      wrappedHtml,
-      null, // No header
-      {
-        // Page settings
-        orientation: 'portrait',
-        margins: {
-          top: 1440,    // 1 inch in TWIPs (1440 TWIPs = 1 inch)
-          right: 1080,  // 0.75 inch
-          bottom: 1440, // 1 inch
-          left: 1080    // 0.75 inch
-        },
-        // Document metadata
-        title: 'Exported Document',
-        creator: 'Erfana',
-        // Typography
-        font: 'Calibri',
-        fontSize: 22, // 11pt (in half-points)
-        // Heading configuration - prevents orphaned headings at page bottoms
-        // keepNext: keeps heading with following paragraph
-        // keepLines: prevents heading from splitting across pages
-        // Spacing in TWIPs (1440 TWIPs = 1 inch, ~20 TWIPs = 1pt)
-        heading: {
-          heading1: { keepNext: true, keepLines: true, spacing: { before: 360, after: 120 } },
-          heading2: { keepNext: true, keepLines: true, spacing: { before: 280, after: 100 } },
-          heading3: { keepNext: true, keepLines: true, spacing: { before: 240, after: 80 } },
-          heading4: { keepNext: true, keepLines: true, spacing: { before: 200, after: 60 } },
-          heading5: { keepNext: true, keepLines: true, spacing: { before: 160, after: 40 } },
-          heading6: { keepNext: true, keepLines: true, spacing: { before: 120, after: 40 } }
-        },
-        // Table settings - prevent row splitting and remove extra spacing after tables
-        table: {
-          row: {
-            cantSplit: true
-          },
-          addSpacingAfter: false
-        }
-      },
-      null // No footer
-    )
-
-    // Apply timeout to prevent hung exports on complex/malformed HTML
-    let timeoutId: NodeJS.Timeout
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      timeoutId = setTimeout(
-        () => reject(new Error(`DOCX conversion timed out after ${DOCX_EXPORT.CONVERSION_TIMEOUT_MS / 1000} seconds`)),
-        DOCX_EXPORT.CONVERSION_TIMEOUT_MS
-      )
-    })
-
-    try {
-      const result = await Promise.race([conversionPromise, timeoutPromise])
-
-      // Convert result to Buffer
-      if (Buffer.isBuffer(result)) {
-        return result
-      } else if (result instanceof ArrayBuffer) {
-        return Buffer.from(result)
-      } else if (result instanceof Blob) {
-        // Handle Blob (defensive - @turbodocx/html-to-docx typically returns Buffer in Node.js)
-        const arrayBuffer = await result.arrayBuffer()
-        return Buffer.from(arrayBuffer)
-      }
-
-      throw new Error('Unexpected result type from HTMLtoDOCX')
-    } finally {
-      clearTimeout(timeoutId!)
-    }
-  }
-
-  /**
-   * Remove <img> tags whose src is a remote http(s) URL.
-   *
-   * The html-to-docx library fetches remote image URLs at export time; a
-   * user-authored document could point those at internal/loopback hosts (SSRF).
-   * Stripping them here means the library never issues the request. data: URIs,
-   * relative paths, and file: sources are left untouched.
-   *
-   * @returns the sanitized HTML and the number of images removed
-   */
-  private stripRemoteImages(html: string): { html: string; removed: number } {
-    let removed = 0
-    const sanitized = html.replace(/<img\b[^>]*>/gi, (tag) => {
-      // Match src as double-quoted, single-quoted, or unquoted.
-      const srcMatch = tag.match(/\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i)
-      const src = (srcMatch?.[1] ?? srcMatch?.[2] ?? srcMatch?.[3] ?? '').trim()
-      if (this.isRemoteImageSrc(src)) {
-        removed++
-        return ''
-      }
-      return tag
-    })
-    return { html: sanitized, removed }
-  }
-
-  /**
-   * Fail-closed classifier: a src is "remote" (and must be stripped) unless it is
-   * clearly local — empty, a data: URI, or a relative path. Anything carrying a
-   * URL scheme other than data: (http, https, file, ftp, ...) or a
-   * protocol-relative `//host` prefix is treated as remote.
-   */
-  private isRemoteImageSrc(src: string): boolean {
-    if (src === '') return false
-    if (/^data:/i.test(src)) return false
-    if (src.startsWith('//')) return true // protocol-relative
-    // Any explicit URL scheme (other than the data: handled above) is remote.
-    return /^[a-z][a-z0-9+.-]*:/i.test(src)
+    return { buffer, removedRemoteImages: removed }
   }
 
   /**
