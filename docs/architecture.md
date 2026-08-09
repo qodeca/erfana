@@ -106,7 +106,7 @@ src/
 │   │   ├── RecentProjectsRepository.ts, RecentProjectsDeduplicator.ts  # SettingsService internals
 │   │   ├── screenshot/          # MacScreenshotCapturer, DesktopCapturerScreenshotCapturer, ScreenshotOverlayWindow
 │   │   ├── claudeStatus/        # ClaudeStatusService, ClaudeTranscriptWatcher/Parser/Locator,
-│   │   │                        #   ClaudeWindowDetector, encodeCwd, friendlyModelName, thresholds,
+│   │   │                        #   ClaudeWindowDetector, encodeCwd, modelId, friendlyModelName, thresholds,
 │   │   │                        #   process/ (Mac/Win detectors + createProcessDetector)
 │   │   ├── workers/             # worker_threads scripts (git-status.worker.ts)
 │   │   ├── watcher/             # ThrottledWorker (offset-deque, #173), EventCoalescer, GitEventCoalescer,
@@ -302,7 +302,7 @@ if (confirmed) await deleteFile()
 - Submit button disabled when input invalid/empty
 - Context display showing parent path (e.g., "in /project/docs")
 
-**Test Coverage** (see [Testing](./testing/README.md#dialog-system)) – run `npm run test:cov` for current numbers rather than trusting a hardcoded count:
+**Test Coverage** (see [Testing](./testing/README.md)) – run `npm run test:cov` for current numbers rather than trusting a hardcoded count:
 - `src/renderer/src/utils/fileValidation.test.ts` - validation scenarios
 - `src/renderer/src/components/Dialog/FileSystemDialog.test.tsx` - component behavior
 - `src/renderer/src/components/Dialog/WrapperDialogs.test.tsx` - integration tests for the wrapper components

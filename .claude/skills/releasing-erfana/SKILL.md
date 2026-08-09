@@ -61,8 +61,8 @@ These values appear in multiple places. Update here first, then update `EXPECTED
 |---|---|---|
 | Expected binary count | 2 | macOS-arm64 (`erfana-{version}-arm64.dmg`), Windows x64 NSIS (`erfana-{version}-setup.exe`) |
 | Expected total asset count | 4 | 2 binaries + `SHA256SUMS` + `SHA256SUMS.minisig` |
-| Phase 3 polling cadence | 240 s × 22 polls | 88 min ceiling for `release.yml` completion |
-| Per-leg stuck-leg threshold | 2700 s (45 min) | Single leg in_progress beyond this triggers warning |
+| Phase 3 polling cadence | 240 s × 22 polls | 88 min ceiling for `release.yml` **running** time; polls observing `waiting` (approval gate) do not consume the budget |
+| Per-leg stuck-leg threshold | 2700 s (45 min) | Single leg `in_progress` beyond this triggers warning. Does **not** fire for a leg in `waiting` — that is the approval gate, handled separately |
 
 ## Agents
 
@@ -209,7 +209,7 @@ If a tag already exists, branch on `RELEASE_STATE` and present options via `AskU
 | Option | Meaning | Risk |
 |--------|---------|------|
 | Resume at Phase 3 | Wait for CI run to finish, then verify. | Low |
-| Delete remote tag and restart | `git push --delete origin v${VERSION}` and re-enter from Phase 1. | **DESTRUCTIVE** — voids any in-flight signed artifact. Require explicit confirmation. |
+| Bump to the next patch and restart | The tag ruleset forbids deleting `v*.*.*` (no bypass actors), so the version cannot be reused. Bump the patch and re-enter from Phase 1; `git tag -d v${VERSION}` clears only the local tag. | **DESTRUCTIVE** — voids any in-flight signed artifact. Require explicit confirmation. |
 | Abort | Exit the skill. | None |
 
 **Case B — `RELEASE_STATE=draft-empty`** (draft exists but `finalize` not yet complete):
@@ -221,7 +221,7 @@ Same as Case A — finalize is still in flight. Resume at Phase 3.
 | Option | Meaning | Risk |
 |--------|---------|------|
 | Resume at Phase 4 (verify + approve) | Skip Phase 3 polling; jump straight to cryptographic verification of the existing draft. | Low — Phase 4 is structurally re-entrant and idempotent (read-only verification, then operator approval). |
-| Delete draft and restart | `gh release delete "v${VERSION}" --yes --cleanup-tag=false` then `git push --delete origin v${VERSION}` and re-enter from Phase 1. | **DESTRUCTIVE** — voids the signed artifacts. Require explicit confirmation. |
+| Delete draft, bump patch, restart | `gh release delete "v${VERSION}" --yes --cleanup-tag=false`, then bump to the next patch and re-enter from Phase 1. The tag itself cannot be deleted (ruleset `deletion` rule, no bypass actors). | **DESTRUCTIVE** — voids the signed artifacts. Require explicit confirmation. |
 | Abort | Exit the skill. | None |
 
 **Case D — `RELEASE_STATE=published`** (release already published as latest):
@@ -405,14 +405,15 @@ If the push is rejected by the protected-tag rule, surface the exact rejection m
 
 ## Phase 3: Watch release.yml
 
-Full instructions live in [`phases/phase-3-watch.md`](phases/phase-3-watch.md) — Phase 3 spans up to 88 minutes wall-clock and uses a polling pattern (4-minute cadence, 22-poll ceiling) rather than a foreground `gh run watch`. Reasons: `timeout` is GNU-only (missing on macOS by default), and the orchestrator's per-tool budget cannot span the full pipeline anyway.
+Full instructions live in [`phases/phase-3-watch.md`](phases/phase-3-watch.md) — Phase 3 uses a polling pattern (4-minute cadence, 22-poll ceiling on running time) rather than a foreground `gh run watch`. **The run pauses indefinitely at the `production-signing` environment approval before either build leg starts**; that wait is unbounded and must not count toward the ceiling. Reasons: `timeout` is GNU-only (missing on macOS by default), and the orchestrator's per-tool budget cannot span the full pipeline anyway.
 
 Summary table:
 
 | Step | What | Why it's required |
 |---|---|---|
 | 3.1 | Resolve `RUN_ID` from the tag's dereferenced commit SHA, with retry loop | `release.yml` may take up to 60 s to appear after the push |
-| 3.2 | Poll `gh run view --json status,conclusion` every 240 s, hard ceiling 22 polls | Foreground watch exceeds the orchestrator's 600 s Bash budget; 240 s polls keep the prompt cache warm |
+| 3.2 | Poll `gh run view --json status,conclusion` every 240 s, hard ceiling 22 polls of non-`waiting` state | Foreground watch exceeds the orchestrator's 600 s Bash budget; 240 s polls keep the prompt cache warm |
+| [3.2a](phases/phase-3-watch.md) | On `status=waiting`, surface the pending `production-signing` approval to the operator, then keep polling (re-announcing hourly) without consuming budget | The gate is unbounded (2 h 22 min on v0.17.0); counting it down reports a healthy release as failed |
 | 3.3 | On non-success terminal state, dispatch `release-failure-analyzer` with run id + memo path | Structured incident memo to `docs/release-incidents/`; cookbook-driven fix |
 
 ⛔ **Failure aborts.** A failed `release.yml` burns the tag — next attempt requires a patch bump.

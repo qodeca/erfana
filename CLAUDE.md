@@ -3,7 +3,7 @@
 ## Project Overview
 An agent-native Markdown workspace (Electron) that runs terminal coding agents like Claude Code beside the editor — integrated terminal with a live Claude Code context-window meter, Monaco editor + live preview, and a project tree. Positioning: an "agent-native Markdown workspace," agent-agnostic with Claude Code as the lead example; Erfana hosts/companions the agent (it is not itself an AI model — never overclaim built-in AI). Note: the context-window meter is Claude Code-specific (reads `~/.claude` transcripts); the terminal itself runs any CLI agent.
 - **Repository**: `qodeca/erfana` (GitHub, public)
-- **Version**: 0.16.3
+- **Version**: 0.17.0
 - **License**: `GPL-3.0-only` (open source). Copyright (c) 2025-2026 **Qodeca sp. z o.o.** See [LICENSE](LICENSE) and [COPYRIGHT](COPYRIGHT) (relicensing record). Per-file licensing follows the [REUSE](https://reuse.software) spec (SPDX headers + `REUSE.toml`); third-party notices are in [THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md). The code is GPL; the "Erfana"/"Qodeca" names and logos remain Qodeca trademarks (see [TRADEMARKS.md](TRADEMARKS.md)) — forks must rebrand. Contributions require the project CLA (see [CLA.md](CLA.md)), which preserves Qodeca's dual-licensing option. `"private": true` in package.json is a publish guard for the desktop app, not a license statement.
 - **Tech Stack**: Electron 39, React 18, TypeScript 6.0, Monaco Editor, xterm.js
 - **Build Toolchain**: electron-vite 5, Vite 6, vitest 3
@@ -37,9 +37,9 @@ See `docs/` for details (keep Claude's context focused):
 - [Logging](docs/logging.md) — Logging layer, log levels, file rotation, configuration
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
 - [Testing](docs/testing/README.md) — Workspace, E2E (POM), visual regression, coverage
-- [Continuous Integration](docs/ci.md) — GitHub Actions workflows (`checks.yml` + `secret-scan.yml` + the two `claude*.yml` review workflows active; `e2e.yml` **disabled** — local-only until macos-latest fix; `release.yml` + `whisper-binaries*.yml` for release flow), required-checks set, retry patterns, visual-on-CI gap
+- [Continuous Integration](docs/ci.md) — GitHub Actions workflows (workflow map, required-checks set, retry patterns, and the visual-regression-on-CI gap)
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
-- [API Services](docs/api-services.md) — Service APIs (Terminal, File, Settings, Watchers)
+- [API Services](docs/api-services.md) — Service APIs (Terminal, File, Settings, Watchers, Clipboard, System actions)
 - [API Services – Features](docs/api-services-features.md) — Feature service APIs (GitStatus worker architecture, GitWatcher, GitPolling, GitStatusWorkerAdapter, GitStatusCircuitBreaker, Camera, ProjectLock, ExternalFile, LiteParse, DependencyDetector, DOCX, Transcription, LocalWhisper, WhisperModelManager, AudioMetadata, AudioExtraction, ApiKey)
 - [Error Codes](docs/error-codes.md) — Project-wide `ErrorCode` enum index (104 codes grouped by category; operator actions for whisper + transcription codes)
 - [ADRs](docs/adrs/README.md) — Architecture Decision Records. Current: 0001 self-host whisper binaries, 0002 minisign over cosign/Sigstore, 0003 dual-pubkey trust, 0004 per-spawn TOCTOU re-hash
@@ -59,23 +59,11 @@ See `docs/` for details (keep Claude's context focused):
 
 ## Feature specifications
 
-Feature specifications live in `specs/`. Check registry before implementing new features.
+Feature specifications live in `specs/`.
 
-### Active specs
+**Registry**: `specs/registry.json` is the authoritative list — check it before implementing a new feature. It carries id, name, tier, status and path for every spec; `path` is relative to `specs/`, and a spec is active unless its status is `archived` (archived: 009, 016–019, 021, 022, under `specs/archived/`). Read the registry rather than keeping a second copy here.
 
-| ID | Name | Tier | Status | Path |
-|----|------|------|--------|------|
-| 004 | Graph engine foundation | T4 | draft | `specs/spec-t4-004-graph-foundation` |
-| 005 | Vector search & hybrid retrieval | T3 | draft | `specs/spec-t3-005-vector-search` |
-| 006 | Knowledge graph & entities | T3 | draft | `specs/spec-t3-006-knowledge-graph` |
-| 007 | Temporal queries & timeline | T3 | draft | `specs/spec-t3-007-temporal-queries` |
-| 008 | Graph engine polish & maintenance | T3 | draft | `specs/spec-t3-008-graph-polish` |
-| 013 | Multi-CLI tool prompt optimization | T3 | draft | `specs/spec-t3-013-multi-cli-tool-prompt-optimization` |
-| 020 | Google Drive link integration | T4 | draft | `specs/spec-t4-020-google-drive-links` |
-
-**Registry**: `specs/registry.json` — also lists the archived specs (009, 016–019, 021, 022), whose files live under `specs/archived/`.
-
-**Before implementing a feature**: Read the spec overview (`requirements/01-overview.md`), requirements (`requirements/02-requirements.md`), and acceptance criteria (`requirements/03-acceptance.md`).
+**Before implementing a feature**: Read the spec overview (`requirements/01-overview.md`), requirements (`requirements/02-requirements.md`), and acceptance criteria (`requirements/03-acceptance.md` for T3 specs; `requirements/04-acceptance.md` for T4, where `03` is use-cases).
 
 ## Code Style & Conventions
 - TypeScript strict mode enabled
@@ -100,16 +88,9 @@ Feature specifications live in `specs/`. Check registry before implementing new 
 
 ## Testing
 - Unit/Integration: Vitest workspace across renderer, main, preload (see [docs/testing/README.md](docs/testing/README.md))
-- E2E: Playwright with Electron, Page Object Model pattern (see [docs/testing/e2e-testing.md](docs/testing/e2e-testing.md))
-  - POM classes in `e2e/pages/`: TerminalPage, MonacoPage, MermaidPage, ProjectTreePage, KeyboardHelper
-  - Composed fixtures in `e2e/fixtures/index.ts` – use `test` export with POM fixtures (worker-scoped userDataDir, test-scoped app/window)
-  - Project fixtures: `testProject` (isolated temp dir with seed files), `withSettings` (writes `.erfana/settings.json`), `withOpenFile` (opens file in editor, waits for Monaco readiness)
-  - App-with-project fixtures: `appWithTestProject` / `windowWithTestProject` – launch Electron with testProject path
-  - Backward-compatible adapter in `e2e/utils/helpers.ts` (WeakMap caching delegates to POM instances)
-  - Condition-based waits preferred over `waitForTimeout` – use `waitForPrompt()`, `waitForOutput()`, Playwright auto-waiting
-  - Wait helpers in `e2e/utils/wait-helpers.ts`: `waitForIpcComplete` (race-safe IPC wait helper)
-  - Shared locators in `e2e/utils/locators.ts`: `byTestId`, `byDynamicTestId`, `waitForTestId`, `waitForTestIdHidden`
-- Visual regression: Playwright `toHaveScreenshot()` for 5 UI states (welcome, editor, terminal, settings, confirm dialog); baselines in `e2e/screenshots/` with platform suffix; `--project=visual` in Playwright config; **runs locally only** – `macos-latest` CI hangs at `waitForLoadState('domcontentloaded')` ([docs/ci.md § Visual regression on CI](docs/ci.md#visual-regression-on-ci))
+- E2E: Playwright with Electron, Page Object Model pattern — POM classes, composed fixtures, and the shared locator/wait helpers are catalogued in [docs/testing/e2e-testing.md](docs/testing/e2e-testing.md)
+  - **Convention**: condition-based waits only – never `waitForTimeout`. Use the POM waits (`waitForPrompt()`, `waitForOutput()`), `waitForIpcComplete`, or Playwright auto-waiting
+- Visual regression: Playwright `toHaveScreenshot()` for 5 UI states (welcome, editor, terminal, settings, confirm dialog); baselines in `e2e/screenshots/` with platform suffix; `--project=visual` in Playwright config; **runs locally only** (see the `e2e.yml` bullet under Continuous Integration)
 - E2E env vars: Some tests require API keys via `.env` file (see `.env.example`); tests skip gracefully if not set
 - Coverage: `npm run test:cov` (text + lcov + HTML under `coverage/<project>/`)
 - Windows-host flakes: catalogued in [`docs/windows/known-flakes.md`](docs/windows/known-flakes.md) with status legend + remediation-patterns cheat-sheet. Test-file split policy in [`docs/windows/contributing.md`](docs/windows/contributing.md) §"Test-file split policy" — split when mocks hoist to module scope (reference: `FileService.copyItem.limit.test.ts`, `WhisperModelManager.downgrade.test.ts`); keep in-file for per-describe `vi.useFakeTimers` (reference: `SettingsOverlay.test.tsx` Focus management)
@@ -142,24 +123,12 @@ See [docs/ci.md](docs/ci.md) for the full pipeline map. Summary:
 ## IPC Contracts
 - Shared schemas/types: `src/shared/ipc/*.ts` (zod schemas)
 - `project:changed` payload: `{ oldPath: string | null; newPath: string | null }`
-- Clipboard channels (`src/shared/ipc/clipboard-channels.ts`, `clipboard-schema.ts`) – async `ipcMain.handle`/`ipcRenderer.invoke`, backed by Electron's main-process `clipboard` module (sandbox stays on; no `navigator.clipboard`). Handler `src/main/ipc/clipboard-handlers.ts` validates the sender frame (`event.senderFrame`, top-level + dev/`file://` origin only):
-  - `clipboard:readText` – Read plain text → `Promise<string>` (`''` on failure/untrusted)
-  - `clipboard:writeText` – Write plain text (Zod-validated `z.string().max(CLIPBOARD_MAX_TEXT_LENGTH)`, 5 MB) → `Promise<boolean>`
-  - Preload bridge `api.clipboard` (`ClipboardBridge` type); renderer `textClipboard` singleton (`src/renderer/src/services/textClipboard.ts`) is the single transport-error chokepoint (retry-once + debounced toast)
-- Document import channels (`src/shared/ipc/import-channels.ts`, `import-schema.ts`):
-  - `import:document` – Start document import with options and progress streaming
-  - `import:documentProgress` – Progress events (main → renderer push)
-  - `import:documentCancel` – Cancel active import
-  - `import:getDocumentExtensions` – Query available document extensions
-  - `import:dependenciesReady` – Dependency detection complete (main → renderer push)
-- Claude Code status channels (`src/shared/ipc/claude-status-channels.ts`, `claude-status-schema.ts`) – per-terminal Claude Code context status bar (macOS + Windows). Register carries `terminalId` only; the PTY pid is resolved main-side (never trusted from the renderer):
-  - `claude-status:register` – Register a terminal panel for status tracking (invoke)
-  - `claude-status:unregister` – Stop tracking a panel (invoke; on PTY exit / panel unmount)
-  - `claude-status:nudge` – Request an immediate refresh for a panel (invoke)
-  - `claude-status:changed` – Snapshot update for a `terminalId` (main → renderer push)
-- System channels (`src/shared/ipc/system-channels.ts`) – payload-free OS-integration actions behind the macOS Screen Recording grant-and-relaunch flow. Both handlers are sender-gated main-side in `src/main/ipc/system-handlers.ts`:
-  - `system:openScreenRecordingSettings` – Open the macOS Screen Recording privacy pane (invoke)
-  - `system:relaunchApp` – Restart Erfana; macOS applies a fresh Screen Recording grant only to a newly-launched process (invoke)
+
+The full channel index is [docs/ipc-patterns.md](docs/ipc-patterns.md) § Current IPC Channels; payload shapes live in `src/shared/ipc/*-schema.ts`, and name constants for the newer domains in `*-channels.ts` (older domains still declare channel strings inline in `src/main/ipc/*-handlers.ts`). Read those rather than duplicating them here. The invariants that are **not** visible from the schemas:
+
+- **Clipboard** – backed by Electron's main-process `clipboard` module, never `navigator.clipboard`, so the sandbox stays on. `src/main/ipc/clipboard-handlers.ts` validates the sender frame (`event.senderFrame`, top-level + dev/`file://` origin only). The renderer `textClipboard` singleton (`src/renderer/src/services/textClipboard.ts`) is the **single** transport-error chokepoint (retry-once + debounced toast) — don't call the bridge directly.
+- **Claude Code status** – register carries `terminalId` only; the PTY pid is resolved main-side and is **never** trusted from the renderer.
+- **System actions** (`system:*`) – payload-free and sender-gated; `system:relaunchApp` must quit gracefully, and the paired `screenshot:getScreenPermission` read is advisory and never gates a capture. Rationale for both in [docs/api-services.md § System actions](docs/api-services.md#system-actions-apisystem).
 
 ## Important Notes
 - node-pty may fail to build on Python 3.13 (use 3.12)

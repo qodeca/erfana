@@ -1,6 +1,6 @@
 # Build Documentation
 
-**Last updated**: August 2026 (v0.16.3)
+**Last updated**: August 2026 (v0.17.0)
 
 This directory contains detailed documentation for Erfana's production build configuration.
 
@@ -89,8 +89,8 @@ npm install
 
 1. **prebuild**: `node scripts/prebuild.mjs` creates the `aproba` stub (automatic — npm runs it before `npm run build`, which both `build:mac` and `build:win` call)
 2. **Typecheck**: Verify TypeScript compilation
-3. **Vite Build**: Bundle application code (measured on the v0.16.3 tree)
-   - Main process: ~308 kB minified, `out/main/index.js` (externalized dependencies)
+3. **Vite Build**: Bundle application code (measured on the v0.17.0 tree)
+   - Main process: ~319 kB minified, `out/main/index.js` (externalized dependencies), plus a shared chunk under `out/main/chunks/` (`git-schema-*.js`, ~3.5 kB)
    - Worker thread: ~7.5 kB, `out/main/git-status.worker.js` (separate entry via `rollupOptions.input`)
    - Preload: ~38 kB `out/preload/index.js` plus ~1.3 kB `out/preload/screenshotOverlay.js` (two entries, both bundled — see [preload.md](./preload.md))
    - Renderer: ~35 MB across `out/renderer/` (Monaco, Mermaid, xterm.js included)

@@ -96,7 +96,7 @@ Closure queued in the 2026-06-03 alignment pass: #164 (Phase 3 shipped v0.12.0),
 
 ## Feature status on Windows today
 
-Honest per-feature assessment of what an end user running an NSIS install of v0.16.3 gets today. Phases 0–4 are shipped; Phase 5 is narrowed to NSIS UX and Phase 6 is partially shipped.
+Honest per-feature assessment of what an end user running an NSIS install of v0.17.0 gets today. Phases 0–4 are shipped; Phase 5 is narrowed to NSIS UX and Phase 6 is partially shipped.
 
 ### ✅ Working
 

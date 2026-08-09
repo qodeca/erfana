@@ -7,13 +7,15 @@ Erfana runs GitHub Actions workflows on pushes. The author-controlled workflows 
 | Quality Checks | `.github/workflows/checks.yml` | active | push to **any branch** | `ubuntu-latest` | ~3 min | Fast feedback on lint / types / unit tests / build / licensing (see job table below) |
 | Secret Scan | `.github/workflows/secret-scan.yml` | active (**required check**) | push + PR | `ubuntu-latest` | ~1 min | gitleaks (full git history) + trufflehog (verified secrets only). Version-pinned, SHA-256-checksum-verified binary downloads; no third-party actions |
 | E2E Tests | `.github/workflows/e2e.yml` | **disabled** (2026-04-25) | (would be: push to `develop` + PRs) | `macos-latest` | ~5–8 min | Electron integration tests (Playwright) — see [E2E Tests (disabled)](#e2e-tests-e2eyml-disabled) below |
-| Release | `.github/workflows/release.yml` | active | tag push `v*.*.*` | matrix (mac/win) | ~15–25 min | Multi-platform release build → `prepare`/`build_*`/`finalize`/`cleanup` (calls `build_mac.yml`, `build_win.yml` reusables; Linux distribution target dropped) |
+| Release | `.github/workflows/release.yml` | active | tag push `v*.*.*` | matrix (mac/win) | ~15–25 min compute + **unbounded approval wait** | Multi-platform release build → `prepare`/`build_*`/`finalize`/`cleanup` (calls `build_mac.yml`, `build_win.yml` reusables; Linux distribution target dropped) |
 | Whisper Binaries | `.github/workflows/whisper-binaries.yml` | active | `workflow_dispatch` only | `ubuntu-latest` (`validate-inputs`, `publish-release`) + `macos-14` (`build-macos`) + `windows-latest` (`build-windows`) | ~25 min | Self-hosted whisper.cpp build, sign, notarize, publish (see [`build/whisper-binaries.md`](./build/whisper-binaries.md)) |
 | Whisper Binaries (Canary) | `.github/workflows/whisper-binaries-canary.yml` | active | monthly schedule | `macos-14` + `windows-latest` + `ubuntu-latest` (`notify-on-failure`) | ~3 min | Credential-health check (Apple notarization, Windows signing) |
 | Claude Code Review | `.github/workflows/claude-code-review.yml` | active (allows `dependabot`) | `pull_request` opened/synchronize | `ubuntu-latest` | ~1 min | Auto-review on every PR; **non-blocking** (not in branch-protection required checks). `allowed_bots: 'dependabot'` since [#192](https://github.com/qodeca/erfana/pull/192) so Dependabot PRs get a real pass/fail instead of "non-human actor" abort |
 | Claude Code (interactive) | `.github/workflows/claude.yml` | active | `@claude` mention on issue/PR comment | `ubuntu-latest` | varies | Interactive code agent for follow-up commits and review-comment threads |
 
-Node 24, `actions/setup-node@v4` with `cache: npm`, `permissions: contents: read`.
+The Release row's wall-clock needs a caveat: both build legs sit behind the `production-signing` environment approval, which is a required human review with no time limit. Compute time is 15–25 minutes; end-to-end is that plus however long the approval takes. See [release.md § Approval gate](./build/release.md#approval-gate-production-signing).
+
+Node 24, `permissions: contents: read`. Every `checks.yml` job that needs dependencies installs via the local composite action [`.github/actions/setup-node-with-retry`](../.github/actions/setup-node-with-retry/action.yml) rather than calling `actions/setup-node` directly. It SHA-pins `actions/setup-node` (v6.4.0) and `actions/cache` (v5.0.5), caches **`~/.npm` only — never `node_modules`** (an install tree poisoned by a compromised postinstall would persist in the cache indefinitely; the download cache is safe because a fresh `npm ci --ignore-scripts` still runs every time), and wraps `npm ci --ignore-scripts` in the 3-attempt retry described below. Postinstall builds are opt-in per job via `run-postinstall`, and only for the allowlisted native modules (electron, node-pty, node-addon-api). The caller must run `actions/checkout` first — a local composite action cannot check out on its own behalf.
 
 ## Quality checks (`checks.yml`)
 
@@ -23,7 +25,7 @@ Eight jobs run in parallel (all `ubuntu-latest` except `windows-checks`). The **
 |-----|---------|:---:|-------|
 | `lint` (Lint) | `npm run lint` | yes | |
 | `typecheck` (Typecheck) | `npm run typecheck` | yes | tsc node + web |
-| `test` (Unit tests) | `npm run test:ci` | yes | full vitest workspace (main / renderer / preload) |
+| `test` (Unit tests) | `npm run test:ci` | yes | full vitest workspace (main / renderer / preload). Also carries two extra gates — see below |
 | `build` (Build) | `npx electron-vite build` | yes | |
 | `license` (License compliance) | `npm run check:headers` + `pipx run reuse lint` | yes | SPDX headers on all sources + REUSE conformance |
 | `audit-signatures` (npm audit signatures) | `npm audit signatures` | no | also records the `package-lock.json` digest artifact that `release.yml` byte-verifies at tag time |
@@ -31,6 +33,11 @@ Eight jobs run in parallel (all `ubuntu-latest` except `windows-checks`). The **
 | `windows-checks` (Windows checks) | `npm run typecheck` + `npm run test:main` on `windows-latest` | no | advisory Windows gate; excluded from the required set until proven stable |
 
 **Required status checks on `main`** (six): `Lint`, `Typecheck`, `Unit tests`, `Build`, `License compliance` (from `checks.yml`), and `Secret scan` (from `secret-scan.yml`). `npm audit signatures`, `Release readiness guards`, and `Windows checks` run on every push but are not required to merge.
+
+**Two extra gates live inside the `test` job** — one runs before the tests, one wraps them:
+
+- **chokidar v3 pin guard** — reads the installed `chokidar/package.json` and fails unless it is exactly `3.6.0`. chokidar v4 opens one file descriptor per watched file and exhausts FDs on large projects; v3 uses FSEvents. A regenerated lockfile or a transitive `^4` would otherwise pass typecheck silently. Runs *before* the tests so the failure names the real cause.
+- **Deprecation tripwire** — tees vitest output and fails the job on any `deprecated` / `DEPnnn` line that is not on the known-and-tracked allowlist. The only allowlisted entry today is the vitest `workspace` / `defineWorkspace` deprecation, tracked for the vitest 3.2 → 4 migration. Any new deprecation (a vitest 3.x warning, a Node `DEPnnn`) fails the build rather than scrolling past.
 
 **Design notes**:
 - **`on: push:` only** (not `pull_request`). Same-repo PRs already trigger a push event on their source branch; adding `pull_request` would double-run the same SHA.

@@ -1,6 +1,6 @@
 # Preload Script Bundling
 
-**Last updated**: August 2026 (v0.16.3)
+**Last updated**: August 2026 (v0.17.0)
 
 This document explains why the preload script must be bundled for sandbox compatibility.
 
@@ -66,7 +66,7 @@ Set `build.externalizeDeps: false` in the preload config, allowing Vite to bundl
 
 ### Result
 
-- `out/preload/index.js`: ~38 kB bundled (38,119 bytes as built for v0.16.3)
+- `out/preload/index.js`: ~38 kB bundled (38,119 bytes as built for v0.17.0; v0.17.0 grew it by ~1 kB over v0.16.3 by adding the `api.system` bridge and `screenshot.getScreenPermission`)
 - `out/preload/screenshotOverlay.js`: ~1.3 kB bundled
 - No external dependency requires
 - Compatible with sandboxing

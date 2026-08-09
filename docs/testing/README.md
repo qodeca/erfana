@@ -22,7 +22,7 @@ Complete guide for testing Erfana. This covers both automated tests (Vitest/Play
 
 #### Key test areas
 
-Run `npm run test` for current totals (8,925 tests across 304 files on macOS as of v0.16.3; ~78 cases platform-gate on Windows — 77 POSIX-only `pathSecurity.test.ts` + 1 macOS-only `LiteParseConverter.test.ts`). For the version-by-version test-addition history, see [`docs/CHANGELOG.md`](../CHANGELOG.md).
+Run `npm run test` for current totals (9,218 tests across 308 files on macOS as of v0.17.0; ~78 cases platform-gate on Windows — 77 POSIX-only `pathSecurity.test.ts` + 1 macOS-only `LiteParseConverter.test.ts`). For the version-by-version test-addition history, see [`docs/CHANGELOG.md`](../CHANGELOG.md).
 
 | Area | Key files | Docs |
 |------|-----------|------|

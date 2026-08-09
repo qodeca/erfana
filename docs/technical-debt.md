@@ -71,12 +71,9 @@ Resolved – BaseDialog now owns the Tab trap behind the opt-in `trapFocus` prop
 
 ---
 
-### 4. LanguageSelect missing `id` for label association
+### 4. LanguageSelect missing `id` for label association ✅ Resolved (#42)
 
-**Severity**: Low
-**Impact**: `htmlFor="transcription-lang"` on the label references a non-existent `id` on `<select>`. Label click doesn't focus the select.
-
-**Fix**: Add `id="transcription-lang"` to `<select>` in `LanguageSelect.tsx`.
+Resolved – `LanguageSelect` accepts an optional `id` prop and renders it on the `<select>`; `TranscriptionDialog` passes `id="transcription-lang"`, matching the label's `htmlFor`. The prop's JSDoc records the naming rule: pass `id` when a visible `<label htmlFor=…>` supplies the accessible name, and the fallback `aria-label` applies only when no `id` is given, so the two never compete. See [Resolved Issues](#resolved-issues). The number is kept so existing references to "item #4" stay valid.
 
 ---
 
@@ -115,12 +112,12 @@ Resolved – BaseDialog now owns the Tab trap behind the opt-in `trapFocus` prop
 
 ---
 
-### 7. `docs/security.md` exceeds /doc-update soft cap (541 lines)
+### 7. `docs/security.md` exceeds /doc-update soft cap (626 lines)
 
 **Severity**: Low
-**Impact**: `/doc-update` protocol prefers ≤500-line doc files; `security.md` sits 41 lines over.
+**Impact**: `/doc-update` protocol prefers ≤500-line doc files; `security.md` sits 126 lines over (626 lines, re-measured 2026-08-08 at v0.17.0; it was 541 when this item was filed).
 
-**Problem**: Largest natural extraction candidate (`Release signing (v0.9.5+, #174)`, L490–L533) is structurally pinned. The pubkey block contains `<!-- minisign-pubkey-{primary,rotation}-{begin,end} -->` fence markers that are actively grepped by:
+**Problem**: Largest natural extraction candidate (`Release signing (v0.9.5+, #174)`, from L566 to the end of the file) is structurally pinned. The pubkey block contains `<!-- minisign-pubkey-{primary,rotation}-{begin,end} -->` fence markers that are actively grepped by:
 
 - `.github/workflows/checks.yml:298–330` — release-pubkey drift detector (Guard 5; the step is `Guard - release pubkey drift across docs` at `:306`) (the `Release readiness guards` job; it runs on every push but is **not** a required status check on `main` — the required set is `Lint`, `Typecheck`, `Unit tests`, `Build`, `License compliance`, `Secret scan`, per [`ci.md`](./ci.md))
 - `.claude/skills/releasing-erfana/phases/phase-4-verify.md:45` — operator-facing canonical-source note
@@ -128,15 +125,15 @@ Resolved – BaseDialog now owns the Tab trap behind the opt-in `trapFocus` prop
 
 Moving the block would require synchronized edits to checks.yml + skill + README anchor. High blast-radius for cosmetic gain.
 
-**Recommended Solution** (if cap-compliance is wanted later): extract the lower-risk `Test Builds (ERFANA_TEST_BUILD)` section (L134–L198, ~65 lines) to `docs/security/test-builds.md` instead. Single internal cross-ref at L24; no CI implications. Drops `security.md` to ~476 lines.
+**Recommended Solution** (if cap-compliance is wanted later): extract the lower-risk `Test Builds (ERFANA_TEST_BUILD)` section (L137–L201, ~65 lines) to `docs/security/test-builds.md` instead. Single internal cross-ref at L24; no CI implications. That alone drops `security.md` to ~561 lines — still over the cap, so cap-compliance now needs a second extraction as well.
 
-**Status**: Accepted constraint. Re-evaluate only if `security.md` grows further or if the CI drift detector is rewritten.
+**Status**: Re-opened 2026-08-08. The item was filed as an accepted constraint on the condition that it be revisited if `security.md` grew; it has, so the condition is spent. Decision needed: either extract two sections (Test Builds plus one more) to clear the cap, or record that the cap does not apply to this file and close the item.
 
 ---
 
 ### 8. Renderer components exceed the 500-line guideline
 
-**Severity**: Low — `MarkdownPreview.tsx` (~989 lines) and `ChatBubble.tsx` (~639 lines) exceed the 500-line-per-file guideline (pre-existing; out of scope for the issue #203 clipboard change). Candidates for a future decomposition pass.
+**Severity**: Low — `MarkdownPreview.tsx` (1,009 lines) and `ChatBubble.tsx` (641 lines) exceed the 500-line-per-file guideline (pre-existing; out of scope for the issue #203 clipboard change). Candidates for a future decomposition pass.
 
 ---
 
@@ -154,11 +151,11 @@ Moving the block would require synchronized edits to checks.yml + skill + README
 ### 10. Language-select dropdown arrow hardcodes `background-size`
 
 **Severity**: Low
-**Impact**: `background-size: 12px` is hardcoded for the dropdown-arrow background image in `LanguageSelect`. The same literal exists in `Dialog.css`. Two places to keep in sync; no token covers it.
+**Impact**: The chevron dropdown-arrow background (inline SVG data URI + `background-size: 12px`) is copied verbatim into **five** stylesheets. No token covers it, so restyling every `<select>` in the app means five synchronized edits.
 
 **Fix**: Extract the arrow background (image + size) to a shared utility class or design token so the size lives in one place.
 
-**Files**: `src/renderer/src/components/Transcription/LanguageSelect.tsx`, `src/renderer/src/components/Dialog/Dialog.css`.
+**Files** (re-verified 2026-08-08): `Settings/SettingsOverlay.css:171`, `DocumentImport/DocumentImportDialog.css:117`, `Transcription/TranscriptionDialog.css:71`, `Dialog/CameraDialog.css:54`, `Dialog/Dialog.css:555` — all under `src/renderer/src/components/`. Note `LanguageSelect.tsx`, named here originally, carries no such rule; the language select is styled by `TranscriptionDialog.css`. `SettingsOverlay.css:240` also sets `background-size: 12px` but for the checkbox tick, a different icon — out of scope for this item.
 
 ---
 
@@ -212,6 +209,7 @@ Ongoing effort to keep `docs/` concise and high-value for Claude Code.
 
 ## Resolved Issues
 
+- ✅ LanguageSelect missing `id` for label association (#42) – optional `id` prop on `LanguageSelect`, passed as `id="transcription-lang"` by `TranscriptionDialog`, so clicking the label focuses the select
 - ✅ BaseDialog lacks Tab-cycling focus trap (#42) – Tab cycling, escaped-focus recovery and a `focusout` rescue for controls that become disabled now live in BaseDialog behind the opt-in `trapFocus` prop; the per-dialog `handleFocusTrap` copies were removed
 - ✅ Worker thread statusCache crash (v0.9.2) – persistent isomorphic-git cache caused V8 cppgc assertion after ~42 min; replaced with per-call cache
 - ✅ Git status main-thread blocking (v0.9.0, #147) – offloaded to worker_threads with native git fallback
@@ -265,4 +263,4 @@ Amendment discipline + promotion-rule conventions in [`windows/contributing.md`]
 
 ---
 
-**Last Updated**: #42 camera mirror + dialog focus work (2026-08-07 – entry #3 resolved: BaseDialog `trapFocus`) + PR #245 (2026-06-13 – entry #12 live-verification updated: single-panel detection + mid-session model-switch verified on a Windows host) + #217 Windows Claude status bar (2026-06-10 — entry #12 added: Windows v1 detector limitations) + v0.14.0 doc sweep (2026-06-08 — entries #9 + #10 added from `Transcription/CLAUDE.md` eviction) + v0.9.6 release (2026-05-22 — critical macOS terminal fix `ea3eaf1`) + v0.9.5 release (2026-04-25) + Phase I branch protection refinement (PR requirement removed same day) + entry #7 documenting `security.md` cap constraint (2026-04-25)
+**Last Updated**: v0.17.0 doc sweep (2026-08-08 – entry #4 resolved: `LanguageSelect` `id` prop; entries #7, #8, #10 re-measured against the v0.17.0 tree) + #42 camera mirror + dialog focus work (2026-08-07 – entry #3 resolved: BaseDialog `trapFocus`) + PR #245 (2026-06-13 – entry #12 live-verification updated: single-panel detection + mid-session model-switch verified on a Windows host) + #217 Windows Claude status bar (2026-06-10 — entry #12 added: Windows v1 detector limitations) + v0.14.0 doc sweep (2026-06-08 — entries #9 + #10 added from `Transcription/CLAUDE.md` eviction) + v0.9.6 release (2026-05-22 — critical macOS terminal fix `ea3eaf1`) + v0.9.5 release (2026-04-25) + Phase I branch protection refinement (PR requirement removed same day) + entry #7 documenting `security.md` cap constraint (2026-04-25)

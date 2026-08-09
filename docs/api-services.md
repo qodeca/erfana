@@ -300,7 +300,7 @@ Rename a file or folder. The second argument is a **basename**, not a full path 
 
 **Throws (all `AppError` or `Error`):**
 - Empty name (`'Name cannot be empty'`)
-- `INVALID_FILENAME` from `assertValidUserFilename` (Windows-reserved basename, forbidden chars, control chars, bidi overrides — see [Filename validation](#filename-validation-161-phase-2) above)
+- `INVALID_FILENAME` from `assertValidUserFilename` (Windows-reserved basename, forbidden chars, control chars, bidi overrides — see [`createFile`](#createfiledirpath-string-filename-string-promisestring) above)
 - Target already exists (`'"<name>" already exists'`)
 - Path is outside the project root, or equals the project root
 
@@ -615,6 +615,24 @@ Async `ipcMain.handle` over Electron's main-process `clipboard` module. Each han
 - `api.clipboard.writeText(text)` → `Promise<boolean>`
 
 See [IPC Patterns § Clipboard channels](./ipc-patterns.md#clipboard-channels--async-invoke--sender-validation-203).
+
+---
+
+## System actions (`api.system`)
+
+Like the clipboard entry above, this has **no main-process service class** — it is a pair of sender-gated IPC handlers in `src/main/ipc/system-handlers.ts` fronted by a preload bridge. It exists for the macOS Screen Recording grant-and-relaunch flow (`ScreenPermissionDialog`).
+
+### `api.system.openScreenRecordingSettings(): Promise<void>`
+Opens the macOS Screen Recording privacy pane via `shell.openExternal` on a fixed constant URL. Payload-free. No-ops off `darwin`.
+
+### `api.system.relaunchApp(): Promise<void>`
+`app.relaunch()` + `app.quit()`. Required because macOS applies a fresh Screen Recording grant **only to a newly-launched process** — an existing process keeps the old denial for its lifetime, so "grant then retry" cannot work without a restart. Payload-free and deliberately **not** platform-gated. Uses `app.quit()` rather than `app.exit()` so the `before-quit` path still releases the project lock, watchers and PTYs.
+
+Both handlers validate `event.senderFrame` (`isTrustedSender`) — a compromised child frame must not be able to quit the app or fire OS-level navigations.
+
+The paired read side lives with the screenshot API: `api.screenshot.getScreenPermission()` (the main-process method behind it is `ScreenshotService.getScreenRecordingPermission()`) — see [API Services – Features](./api-services-features.md). It is **advisory only**: a capture is always attempted first and is never gated on a pre-check, so a stale TCC record cannot block a user who does have access.
+
+**Channels:** `system:openScreenRecordingSettings`, `system:relaunchApp` — see [IPC Patterns](./ipc-patterns.md).
 
 ---
 

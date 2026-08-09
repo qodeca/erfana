@@ -1,6 +1,6 @@
 # Electron Builder configuration
 
-**Last updated**: August 2026 (v0.16.3)
+**Last updated**: August 2026 (v0.17.0)
 
 This document explains the electron-builder version choice, the `aproba` build-time shim, and the parts of `electron-builder.yml` that are easy to get wrong.
 

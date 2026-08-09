@@ -1,6 +1,6 @@
 # Dependencies in the packaged build
 
-**Last verified**: 2026-08-07 against v0.16.3 (`electron-builder.yml:32-34`, `package.json`, installed `node_modules`).
+**Last verified**: 2026-08-08 against v0.17.0 (`electron-builder.yml:32-34`, `package.json`, installed `node_modules`).
 
 This document covers what electron-builder excludes from the packaged app, and how the native and heavyweight dependencies that *do* ship are handled.
 
@@ -150,7 +150,7 @@ ls release/*/mac-arm64/Erfana.app/Contents/Resources/app/node_modules/ffprobe-st
 
 The `jsdom` exclusion is worth single-digit MB. The `afterPack` prunes are the change that actually moved the number: the macOS `Resources/app` payload dropped roughly 56% (791 MB → 347 MB) in v0.11.2 when foreign-arch binaries and renderer-only sources were removed.
 
-Current packaged sizes have not been re-measured for v0.16.3; treat any figure older than that as historical.
+Current packaged sizes have not been re-measured for v0.17.0; treat any figure older than that as historical.
 
 ### Cleaner production bundle
 

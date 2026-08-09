@@ -1,6 +1,6 @@
 # Windows compatibility gap analysis
 
-Date: 2026-04-08; re-baselined 2026-06-03 against v0.11.2, again 2026-08-07 against v0.16.3
+Date: 2026-04-08; re-baselined 2026-06-03 against v0.11.2, again 2026-08-07 against v0.16.3, and re-confirmed 2026-08-08 against v0.17.0 (no Windows-phase scope moved in v0.17.0)
 (the 2026-08-07 pass re-read every live ref against current source; historical refs on resolved rows were left as provenance — see the Location note below)
 Scope: full Windows parity with macOS (renderer + main + build + tests + docs)
 

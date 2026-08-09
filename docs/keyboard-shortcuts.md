@@ -127,14 +127,16 @@ Click toolbar buttons (no keyboard shortcut):
 
 ## Dialog Shortcuts
 
-All dialogs (Tool Approval, Confirm, File Creation, Settings):
+All dialogs (Confirm, File Creation, Camera, Document import, Transcription, Settings):
 
 | Shortcut | Action |
 |----------|--------|
-| `Enter` | Confirm/OK |
+| `Enter` | Activates the **focused** button — not always the primary one. Pressing Enter while Cancel has focus cancels |
 | `Esc` | Cancel/Close |
-| `Tab` | Navigate fields |
-| `Space` | Toggle checkboxes |
+| `Tab` | Navigate fields; cycles within the dialog when `trapFocus` is set |
+| `Space` | Toggle checkboxes, activate the focused button |
+
+The Enter rule changed in v0.17.0: dialogs previously bound Enter to their primary action unconditionally, so Enter on Cancel still fired the primary action. `CameraDialog` keeps a shutter-on-Enter shortcut but bails out before `preventDefault()` when focus is inside a `button`, `select` or `input`, so the focused control wins. `PromptDialog` submits on Cmd/Ctrl+Enter rather than Enter, because its textarea needs newlines.
 
 ### Text Input Dialogs (PromptDialog, FileSystemDialog)
 
