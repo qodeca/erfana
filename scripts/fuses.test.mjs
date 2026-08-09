@@ -660,7 +660,15 @@ describe('assertPackagedAppContents', () => {
     expect(captured.message).toContain('playwright.config.ts');
   });
 
-  it('quotes offender names so a newline cannot forge a workflow command in the log', () => {
+  // Skipped on Windows: NTFS forbids a newline in a file name, so the fixture
+  // cannot be built there - and the threat it models (a dependency shipping a
+  // file whose name embeds a newline) cannot occur on Windows for the same
+  // reason. The quoting itself (formatOffenders -> JSON.stringify) is
+  // platform-agnostic and is exercised here on macOS/Linux CI.
+  // See docs/windows/known-flakes.md.
+  it.skipIf(process.platform === 'win32')(
+    'quotes offender names so a newline cannot forge a workflow command in the log',
+    () => {
     const app = makePackedApp(tmpRoot);
     // A hostile dependency could name a top-level entry with an embedded newline;
     // unquoted, it would forge a `::error::` line in the public release log.
