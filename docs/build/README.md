@@ -103,6 +103,7 @@ npm install
    - Prune foreign-platform/arch `ffprobe-static` binaries (keeps only the target, ~260 MB saved on mac)
    - Prune foreign node-pty prebuilds, and strip `.pdb` debug symbols from the kept Windows prebuild
    - Each prune is keep-then-verify (fails the build rather than shipping a binary-less bundle)
+   - Last, verify the packed `app/` tree against the `files:` allowlist — depth-1 entries, symlink containment, main-entry presence — and refuse to continue if it does not match (issue #43; see [fuses.md](./fuses.md#afterpack-also-verifies-the-packed-app-contents))
 7. **Code Signing**: electron-builder ad-hoc signs all binaries
 8. **afterSign Hook**: Deep re-sign bundle for consistent identity (`scripts/resign.js`)
 9. **DMG Creation**: Package for distribution (arm64 only; the `.zip` target was dropped with auto-update disabled)

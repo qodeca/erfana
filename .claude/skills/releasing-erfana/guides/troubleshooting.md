@@ -166,13 +166,25 @@ The fastest lessons from the v0.9.5 bring-up. Skill operators should adopt these
 
 ### Build size too large (>300 MB)
 
-Check electron-builder.yml excludes:
+Check the `files:` **allowlist** in `electron-builder.yml`. It must keep at least one non-negated pattern — a list of nothing but `!` exclusions is read by app-builder-lib as "no includes given" and packages the entire repository root into `Contents/Resources/app/` (issue #43):
+
 ```yaml
 files:
-  - "!release/**"
-  - "!coverage/**"
-  - "!tests/**"
+  - 'out/**'
+  - 'package.json'
+  - '!**/{.env,.env.*,.npmrc}'
+  - '!**/.vscode/**'
+  - '!**/*.map'
+  - '!node_modules/jsdom/**'
+  # ...
 ```
+
+Two guards should have caught it before you got here:
+
+- `Guard - electron-builder packaging allowlist` in the `release-guards` job of `.github/workflows/checks.yml` — surfaces on every push (advisory; `release-guards` is not a branch-protection required check) if the list has no positive pattern, if a positive pattern starts with a wildcard, or if the `afterPack`/`afterSign` wiring is missing. The wiring and allowlist invariants are also enforced in the **required** Unit-tests job, via the `electron-builder.yml` binding test in `scripts/fuses.test.mjs` — that is the hard gate.
+- `assertPackagedAppContents()` in `scripts/fuses.js` — runs last in `afterPack`, before signing, and refuses to continue if the packed `app/` tree holds anything outside `ALLOWED_APP_ENTRIES`. In a healthy build log, look for `✅ Packaged app contents verified`.
+
+A build that grew without either firing is a real size regression (dependencies or the media binaries), not a packaging-config regression. Full mechanism: `docs/build/electron-builder.md` § `files` allowlist.
 
 ## Tests failing
 

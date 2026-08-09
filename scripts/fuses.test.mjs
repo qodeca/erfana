@@ -20,6 +20,11 @@ const {
   MEDIA_BINARY_MIN_BYTES,
   pruneForeignFfprobeBinaries,
   pruneForeignNodePtyPrebuilds,
+  assertPackagedAppContents,
+  assertConfigMatchesAllowlist,
+  deriveAllowedAppEntries,
+  resolvePackedResourcesDir,
+  ALLOWED_APP_ENTRIES,
 } = require('./fuses.js');
 const { Arch } = require('electron-builder');
 
@@ -447,5 +452,513 @@ describe('pruneForeignNodePtyPrebuilds', () => {
     expect(() =>
       pruneForeignNodePtyPrebuilds(tmpRoot, 'win32', Arch.x64, { requireMatch: true })
     ).toThrow(/pty\.node missing/i);
+  });
+});
+
+// ---- Packaged-contents allowlist (issue #43) ------------------------------
+
+/**
+ * Minimal packed-bundle layout: <root>/app/{out,node_modules,package.json}.
+ * <root> IS the resourcesDir argument, same convention as the fixtures above.
+ * Deterministic shape: 4 files, 6 directories, 0 symlinks.
+ */
+function makePackedApp(root) {
+  const app = path.join(root, 'app');
+  fs.mkdirSync(path.join(app, 'out', 'main'), { recursive: true });
+  fs.writeFileSync(path.join(app, 'out', 'main', 'index.js'), 'main');
+  fs.mkdirSync(path.join(app, 'out', 'renderer', 'assets'), { recursive: true });
+  fs.writeFileSync(path.join(app, 'out', 'renderer', 'index.html'), '<html></html>');
+  fs.mkdirSync(path.join(app, 'node_modules', 'node-pty'), { recursive: true });
+  fs.writeFileSync(path.join(app, 'node_modules', 'node-pty', 'index.js'), 'pty');
+  fs.writeFileSync(
+    path.join(app, 'package.json'),
+    JSON.stringify({ name: 'erfana', main: './out/main/index.js' })
+  );
+  return app;
+}
+
+const NON_DARWIN = process.platform === 'darwin' ? 'linux' : process.platform;
+
+describe('resolvePackedResourcesDir', () => {
+  it('resolves darwin under the .app bundle', () => {
+    expect(resolvePackedResourcesDir('darwin', '/out', '/out/Erfana.app'))
+      .toBe(path.join('/out/Erfana.app', 'Contents', 'Resources'));
+  });
+
+  it('resolves linux and win32 under appOutDir', () => {
+    expect(resolvePackedResourcesDir('linux', '/out', '/out/erfana')).toBe(path.join('/out', 'resources'));
+    expect(resolvePackedResourcesDir('win32', '/out', '/out/Erfana.exe')).toBe(path.join('/out', 'resources'));
+  });
+
+  it('returns null for an unknown platform so each caller decides', () => {
+    expect(resolvePackedResourcesDir('sunos', '/out', '/out/x')).toBeNull();
+  });
+});
+
+describe('deriveAllowedAppEntries', () => {
+  it('maps positive patterns to their first path segment', () => {
+    expect(deriveAllowedAppEntries(['out/**', 'package.json'])).toEqual([
+      'node_modules', 'out', 'package.json',
+    ]);
+  });
+
+  it('adds the tool invariants even when unlisted', () => {
+    expect(deriveAllowedAppEntries(['out/**'])).toEqual(['node_modules', 'out', 'package.json']);
+  });
+
+  it('ignores negations, which only ever remove', () => {
+    expect(deriveAllowedAppEntries(['out/**', '!**/*.map', '!node_modules/jsdom/**'])).toEqual([
+      'node_modules', 'out', 'package.json',
+    ]);
+  });
+
+  it('derives only the tool invariants from a negation-only list (the #43 regression)', () => {
+    expect(deriveAllowedAppEntries(['!docs/**', '!src/*'])).toEqual(['node_modules', 'package.json']);
+  });
+
+  it.each(['**/*', '*', '**', '.', './**'])('throws on the all-matching pattern %s', (pattern) => {
+    expect(() => deriveAllowedAppEntries([pattern])).toThrow(/all-matching pattern/i);
+  });
+
+  it('throws on a positive pattern starting with a root wildcard', () => {
+    expect(() => deriveAllowedAppEntries(['**/foo'])).toThrow(/begins with a wildcard/i);
+  });
+
+  // electron-builder does not hand hooks the raw YAML array: a plain string list
+  // arrives normalised as [{ filter: [...] }]. This is the shape production
+  // actually passes, so it must be covered alongside the raw one.
+  it('accepts the normalised FileSet shape electron-builder passes to hooks', () => {
+    expect(deriveAllowedAppEntries([{ filter: ['out/**', 'package.json', '!**/*.map'] }])).toEqual([
+      'node_modules', 'out', 'package.json',
+    ]);
+  });
+
+  it('derives only the tool invariants from a normalised negation-only list', () => {
+    expect(deriveAllowedAppEntries([{ filter: ['!docs/**', '!src/*'] }])).toEqual([
+      'node_modules', 'package.json',
+    ]);
+  });
+
+  it('fails closed on a FileSet that remaps paths', () => {
+    expect(() => deriveAllowedAppEntries([{ from: 'extra', to: 'x', filter: ['**/*'] }]))
+      .toThrow(/cannot map to a top-level bundle path/i);
+  });
+
+  it('fails closed on an entry that is neither a string nor a FileSet', () => {
+    expect(() => deriveAllowedAppEntries([42])).toThrow(/cannot map to a top-level bundle path/i);
+  });
+
+  it('fails closed when files: is absent or an unsupported shape', () => {
+    expect(() => deriveAllowedAppEntries(undefined)).toThrow(/absent/i);
+    expect(() => deriveAllowedAppEntries('out/**')).toThrow(/unsupported shape/i);
+  });
+
+  it('rejects a deleted files: key (the real regression shape is [], never undefined)', () => {
+    // app-builder-lib's doMergeConfigs coerces a missing files: to [], so this -
+    // not undefined - is what "someone deleted files:" actually produces.
+    expect(() => assertConfigMatchesAllowlist([])).toThrow(/config and guard disagree/i);
+  });
+});
+
+describe('assertConfigMatchesAllowlist', () => {
+  it('accepts a config whose derived set equals ALLOWED_APP_ENTRIES', () => {
+    expect(assertConfigMatchesAllowlist(['out/**', 'package.json'])).toEqual([...ALLOWED_APP_ENTRIES]);
+  });
+
+  // Binds the REAL config to the constant. Without this, editing
+  // electron-builder.yml without updating ALLOWED_APP_ENTRIES is green on every
+  // push and only fails inside the release build, after the tag is cut.
+  it('agrees with the repository electron-builder.yml as shipped', () => {
+    const yaml = require('js-yaml');
+    const config = yaml.load(
+      fs.readFileSync(path.join(import.meta.dirname, '..', 'electron-builder.yml'), 'utf8')
+    );
+    // Raw js-yaml shape (string array).
+    expect(assertConfigMatchesAllowlist(config.files, { platformFiles: config.mac?.files }))
+      .toEqual([...ALLOWED_APP_ENTRIES]);
+    // Normalised shape electron-builder actually hands the afterPack hook: a
+    // string list becomes a single FileSet [{ filter: [...] }].
+    expect(assertConfigMatchesAllowlist([{ filter: config.files }], { platformFiles: config.mac?.files }))
+      .toEqual([...ALLOWED_APP_ENTRIES]);
+    expect(config.win?.files).toBeUndefined();
+    expect(config.linux?.files).toBeUndefined();
+    // The afterPack/afterSign wiring is the one invariant Guard 6 uniquely adds,
+    // and release-guards is not a required check - so assert it HERE, in the
+    // required test job. Deleting afterPack silently disables all three Electron
+    // fuses and the packaged-contents assertion in an otherwise-green build.
+    expect(config.afterPack).toBe('./scripts/fuses.js');
+    expect(config.afterSign).toBe('./scripts/resign.js');
+  });
+
+  it('folds a platform-specific files: block into the derivation', () => {
+    // app-builder-lib concatenates mac:/win: files into the same matcher, so a
+    // pattern hidden in a platform block must reach the comparison.
+    expect(() =>
+      assertConfigMatchesAllowlist(['out/**', 'package.json'], { platformFiles: ['scripts/**'] })
+    ).toThrow(/config and guard disagree/i);
+    expect(() =>
+      assertConfigMatchesAllowlist(['out/**', 'package.json'], { platformFiles: ['**/*'] })
+    ).toThrow(/all-matching pattern/i);
+    // A platform block that adds nothing new is fine.
+    expect(assertConfigMatchesAllowlist(['out/**', 'package.json'], { platformFiles: ['out/**'] }))
+      .toEqual([...ALLOWED_APP_ENTRIES]);
+  });
+
+  it('accepts a leading ./ the way electron-builder normalises it', () => {
+    expect(assertConfigMatchesAllowlist(['./out/**', 'package.json']))
+      .toEqual([...ALLOWED_APP_ENTRIES]);
+  });
+
+  it('rejects a pattern escaping the project root', () => {
+    expect(() => assertConfigMatchesAllowlist(['../elsewhere/**'])).toThrow(/escapes the project root/i);
+  });
+
+  it('throws when the config permits less than the guard expects', () => {
+    expect(() => assertConfigMatchesAllowlist(['!docs/**'])).toThrow(/config and guard disagree/i);
+  });
+
+  it('throws when the config permits more than the guard expects', () => {
+    expect(() => assertConfigMatchesAllowlist(['out/**', 'package.json', 'scripts/**']))
+      .toThrow(/config and guard disagree/i);
+  });
+});
+
+describe('assertPackagedAppContents', () => {
+  let tmpRoot;
+
+  beforeEach(() => {
+    tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'app-contents-'));
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    fs.rmSync(tmpRoot, { recursive: true, force: true });
+  });
+
+  it('accepts a clean bundle and counts the whole tree, proving the walk recurses', () => {
+    makePackedApp(tmpRoot);
+    // Exact counts: a non-recursive walk would report 1 file / 2 dirs.
+    expect(assertPackagedAppContents(tmpRoot)).toEqual({ files: 4, dirs: 6, symlinks: 0 });
+  });
+
+  it('names every disallowed top-level entry in a single throw', () => {
+    const app = makePackedApp(tmpRoot);
+    fs.mkdirSync(path.join(app, 'e2e'));
+    fs.mkdirSync(path.join(app, 'specs'));
+    fs.writeFileSync(path.join(app, 'playwright.config.ts'), 'cfg');
+
+    let captured;
+    try {
+      assertPackagedAppContents(tmpRoot);
+    } catch (err) {
+      captured = err;
+    }
+    expect(captured?.message).toMatch(/disallowed top-level path/i);
+    expect(captured.message).toContain('e2e');
+    expect(captured.message).toContain('specs');
+    expect(captured.message).toContain('playwright.config.ts');
+  });
+
+  it('quotes offender names so a newline cannot forge a workflow command in the log', () => {
+    const app = makePackedApp(tmpRoot);
+    // A hostile dependency could name a top-level entry with an embedded newline;
+    // unquoted, it would forge a `::error::` line in the public release log.
+    fs.mkdirSync(path.join(app, 'evil\n::error::forged'));
+
+    let captured;
+    try {
+      assertPackagedAppContents(tmpRoot);
+    } catch (err) {
+      captured = err;
+    }
+    // JSON.stringify turns the newline into a literal \n, so no bare newline
+    // followed by ::error:: survives into the message.
+    expect(captured?.message).not.toMatch(/\n::error::/);
+    expect(captured.message).toContain('\\n::error::forged');
+  });
+
+  it('truncates the offender list to 20 with a (+N more) suffix', () => {
+    const app = makePackedApp(tmpRoot);
+    for (let i = 0; i < 25; i++) fs.mkdirSync(path.join(app, `x${String(i).padStart(2, '0')}`));
+
+    let captured;
+    try {
+      assertPackagedAppContents(tmpRoot);
+    } catch (err) {
+      captured = err;
+    }
+    expect(captured?.message).toContain('(+5 more)');
+  });
+
+  // chmod 0 has no effect on Windows and is bypassed by root, so skip both -
+  // this exercises readDirOrThrow's fail-closed catch on a mid-walk subtree,
+  // which a `catch { return [] }` mutation would turn into a silent skip.
+  it.skipIf(process.platform === 'win32' || process.getuid?.() === 0)(
+    'refuses to ship when a nested subtree cannot be read (fails closed, not skipped)',
+    () => {
+      const app = makePackedApp(tmpRoot);
+      const locked = path.join(app, 'node_modules', 'locked');
+      fs.mkdirSync(locked, { recursive: true });
+      fs.writeFileSync(path.join(locked, 'x'), 'x');
+      fs.chmodSync(locked, 0o000);
+      try {
+        expect(() => assertPackagedAppContents(tmpRoot)).toThrow(/could not be fully inspected/i);
+      } finally {
+        fs.chmodSync(locked, 0o755); // let afterEach clean it up
+      }
+    }
+  );
+
+  it('rejects an untracked dot-directory (the local-only case from #43)', () => {
+    const app = makePackedApp(tmpRoot);
+    fs.mkdirSync(path.join(app, '.erfana'), { recursive: true });
+    fs.writeFileSync(path.join(app, '.erfana', 'settings.json'), '{}');
+
+    expect(() => assertPackagedAppContents(tmpRoot)).toThrow(/\.erfana/);
+  });
+
+  it('rejects a bundle missing an allowed entry (the allowlist-too-narrow direction)', () => {
+    const app = makePackedApp(tmpRoot);
+    fs.rmSync(path.join(app, 'node_modules'), { recursive: true, force: true });
+
+    expect(() => assertPackagedAppContents(tmpRoot)).toThrow(/missing 1 expected top-level path/i);
+  });
+
+  it('allows nesting under an allowed root and still walks to the bottom of it', () => {
+    const app = makePackedApp(tmpRoot);
+    const deep = path.join(app, 'node_modules', 'a', 'b', 'c');
+    fs.mkdirSync(deep, { recursive: true });
+    // A file merely NAMED e2e, deep inside node_modules, is legitimate.
+    fs.writeFileSync(path.join(deep, 'e2e'), 'dep payload');
+
+    // +1 file and +3 dirs over the clean baseline proves the walk reached depth 5.
+    expect(assertPackagedAppContents(tmpRoot)).toEqual({ files: 5, dirs: 9, symlinks: 0 });
+  });
+
+  it('honours a caller-supplied allowed set', () => {
+    makePackedApp(tmpRoot);
+    expect(() => assertPackagedAppContents(tmpRoot, { allowed: ['out', 'node_modules'] }))
+      .toThrow(/package\.json/);
+  });
+
+  it('checks the depth-1 allowlist before walking, so a repo-sized bundle fails fast', () => {
+    const app = makePackedApp(tmpRoot);
+    fs.mkdirSync(path.join(app, 'release'));
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'outside-bundle-'));
+    try {
+      fs.symlinkSync(outside, path.join(app, 'node_modules', 'leak'), 'junction');
+      // Both violations present: pass 1 must win.
+      expect(() => assertPackagedAppContents(tmpRoot)).toThrow(/disallowed top-level path/i);
+      expect(() => assertPackagedAppContents(tmpRoot)).not.toThrow(/resolving outside/i);
+    } finally {
+      fs.rmSync(outside, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses a symlinked app/ root rather than following it', () => {
+    const real = path.join(tmpRoot, 'real');
+    fs.mkdirSync(real);
+    makePackedApp(real);
+    fs.symlinkSync(path.join(real, 'app'), path.join(tmpRoot, 'app'), 'junction');
+
+    expect(() => assertPackagedAppContents(tmpRoot)).toThrow(/is a symlink/i);
+  });
+
+  it('throws when app/ is missing entirely', () => {
+    expect(() => assertPackagedAppContents(tmpRoot)).toThrow(/app directory not found/i);
+  });
+
+  it('refuses an asar-packed bundle unless the skip is explicitly opted into', () => {
+    fs.writeFileSync(path.join(tmpRoot, 'app.asar'), 'asar');
+    expect(() => assertPackagedAppContents(tmpRoot)).toThrow(/no explicit allowAsar/i);
+  });
+
+  it('skips with a warning only when allowAsar is set', () => {
+    fs.writeFileSync(path.join(tmpRoot, 'app.asar'), 'asar');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    expect(assertPackagedAppContents(tmpRoot, { allowAsar: true }).skipped).toBe('asar');
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('app.asar'));
+  });
+
+  it("falls back to Node's own default (index.js) when the manifest declares no main", () => {
+    const app = makePackedApp(tmpRoot);
+    fs.writeFileSync(path.join(app, 'package.json'), JSON.stringify({ name: 'erfana' }));
+
+    // Node's default is index.js at the package root - not this app's build
+    // path. Nothing is there, so the bundle genuinely cannot start and the
+    // guard says so. Under this allowlist index.js is not even a permitted
+    // top-level entry, so a manifest with no main can never pass: correct, since
+    // such a bundle would not launch.
+    expect(() => assertPackagedAppContents(tmpRoot)).toThrow(/no main entry file at index\.js/i);
+  });
+
+  it('distinguishes a missing manifest from an unreadable one', () => {
+    const app = makePackedApp(tmpRoot);
+    fs.rmSync(path.join(app, 'package.json'));
+    expect(() => assertPackagedAppContents(tmpRoot, { allowed: ['out', 'node_modules'] }))
+      .toThrow(/no app\/package\.json/i);
+
+    makePackedApp(tmpRoot);
+    fs.writeFileSync(path.join(app, 'package.json'), '{ not json');
+    expect(() => assertPackagedAppContents(tmpRoot)).toThrow(/not readable as JSON/i);
+  });
+
+  it('throws when the declared main entry is absent', () => {
+    const app = makePackedApp(tmpRoot);
+    fs.rmSync(path.join(app, 'out', 'main', 'index.js'));
+
+    expect(() => assertPackagedAppContents(tmpRoot)).toThrow(/no main entry file/i);
+  });
+
+  it('rejects a main entry that escapes the bundle via .. even when the target exists', () => {
+    const app = makePackedApp(tmpRoot);
+    // A real file one level ABOVE app/. `existsSync` alone would accept it, so
+    // only the containment check (`!inside(mainPath)`) can reject this - which is
+    // what makes the test discriminate the traversal guard from plain absence.
+    fs.writeFileSync(path.join(tmpRoot, 'decoy.js'), 'not shipped');
+    fs.writeFileSync(
+      path.join(app, 'package.json'),
+      JSON.stringify({ name: 'erfana', main: '../decoy.js' })
+    );
+
+    expect(() => assertPackagedAppContents(tmpRoot)).toThrow(/no main entry file/i);
+  });
+
+  it('rejects a main entry that resolves to a directory', () => {
+    const app = makePackedApp(tmpRoot);
+    fs.writeFileSync(
+      path.join(app, 'package.json'),
+      JSON.stringify({ name: 'erfana', main: './out/main' })
+    );
+
+    expect(() => assertPackagedAppContents(tmpRoot)).toThrow(/no main entry file/i);
+  });
+
+  it('warns about unexpected entries beside app/ without failing the build', () => {
+    makePackedApp(tmpRoot);
+    fs.mkdirSync(path.join(tmpRoot, 'unexpected-extra'));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    expect(() => assertPackagedAppContents(tmpRoot)).not.toThrow();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('unexpected-extra'));
+  });
+
+  it('does not warn about the real extraResources siblings or *.lproj folders', () => {
+    // A realistic Contents/Resources: app/ plus the extraResources outputs and
+    // Electron's localisation folders. Emptying EXPECTED_RESOURCES_ENTRIES or
+    // dropping the .lproj exemption would make this warn - so it pins both.
+    makePackedApp(tmpRoot);
+    fs.mkdirSync(path.join(tmpRoot, 'tessdata'));
+    fs.writeFileSync(path.join(tmpRoot, 'LICENSE'), 'x');
+    fs.mkdirSync(path.join(tmpRoot, 'en.lproj'));
+    fs.mkdirSync(path.join(tmpRoot, 'pl.lproj'));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    expect(() => assertPackagedAppContents(tmpRoot)).not.toThrow();
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  // Escape detection is the security property here, so the escape test runs on
+  // every platform - it links to a DIRECTORY, and a junction needs no elevation
+  // on Windows. The dangling and relative-file cases below cannot: Node
+  // autodetects type 'file' for them, which needs SeCreateSymbolicLinkPrivilege
+  // (Developer Mode or elevation). Registered in docs/windows/known-flakes.md
+  // under the `scripts/fuses.test.mjs (assertPackagedAppContents > symlinks)` row.
+  describe('symlinks', () => {
+    const dirLinkType = process.platform === 'win32' ? 'junction' : undefined;
+
+    it('throws when a symlink resolves outside the bundle', () => {
+      const app = makePackedApp(tmpRoot);
+      const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'outside-bundle-'));
+      try {
+        fs.writeFileSync(path.join(outside, 'secret'), 'nope');
+        fs.symlinkSync(outside, path.join(app, 'node_modules', 'leak'), dirLinkType);
+
+        expect(() => assertPackagedAppContents(tmpRoot)).toThrow(/resolving outside app/i);
+      } finally {
+        fs.rmSync(outside, { recursive: true, force: true });
+      }
+    });
+
+    it.skipIf(process.platform === 'win32')('throws on a dangling symlink on darwin, where Gatekeeper rejects the bundle', () => {
+      const app = makePackedApp(tmpRoot);
+      fs.symlinkSync(path.join(app, 'node_modules', 'gone'), path.join(app, 'node_modules', 'dangling'));
+
+      expect(() => assertPackagedAppContents(tmpRoot, { platform: 'darwin' }))
+        .toThrow(/unresolvable symlink/i);
+    });
+
+    it.skipIf(process.platform === 'win32')('only warns about a dangling symlink off darwin', () => {
+      const app = makePackedApp(tmpRoot);
+      fs.symlinkSync(path.join(app, 'node_modules', 'gone'), path.join(app, 'node_modules', 'dangling'));
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      expect(() => assertPackagedAppContents(tmpRoot, { platform: NON_DARWIN })).not.toThrow();
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('unresolvable symlink'));
+    });
+
+    it('allows an absolute link into a permitted root on darwin but not elsewhere', () => {
+      // TN2206: Gatekeeper permits bundle links into /System and /Library. That
+      // rule is exercised here against an INJECTED root (a real temp dir that
+      // exists on every runner), not the macOS-only /System - so the darwin-allow
+      // and non-darwin-reject branches both run on Linux and Windows CI too.
+      // The root is realpath'd: symlink targets are compared after realpathSync,
+      // and on macOS os.tmpdir() (/var/...) canonicalises to /private/var/....
+      const app = makePackedApp(tmpRoot);
+      const permittedRoot = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'permitted-')));
+      try {
+        fs.symlinkSync(permittedRoot, path.join(app, 'node_modules', 'sys'), dirLinkType);
+
+        expect(() =>
+          assertPackagedAppContents(tmpRoot, {
+            platform: 'darwin',
+            allowedAbsoluteLinkRoots: [permittedRoot],
+          })
+        ).not.toThrow();
+        expect(() =>
+          assertPackagedAppContents(tmpRoot, {
+            platform: 'linux',
+            allowedAbsoluteLinkRoots: [permittedRoot],
+          })
+        ).toThrow(/resolving outside app/i);
+      } finally {
+        fs.rmSync(permittedRoot, { recursive: true, force: true });
+      }
+    });
+
+    it('enters the win32 case-insensitive containment branch without a Windows host', () => {
+      // `platform` is a pure argument, so the win32 norm() lower-casing runs on
+      // any host. A clean bundle must pass (a `const norm = p => p` mutation would
+      // still pass here, but the escape case below forces the branch to matter).
+      makePackedApp(tmpRoot);
+      expect(assertPackagedAppContents(tmpRoot, { platform: 'win32' })).toEqual({
+        files: 4,
+        dirs: 6,
+        symlinks: 0,
+      });
+    });
+
+    it('rejects a win32 escaping symlink (case-folded containment still catches it)', () => {
+      const app = makePackedApp(tmpRoot);
+      const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'outside-win-'));
+      try {
+        fs.symlinkSync(outside, path.join(app, 'node_modules', 'leak'), dirLinkType);
+        expect(() => assertPackagedAppContents(tmpRoot, { platform: 'win32' }))
+          .toThrow(/resolving outside app/i);
+      } finally {
+        fs.rmSync(outside, { recursive: true, force: true });
+      }
+    });
+
+    it.skipIf(process.platform === 'win32')('accepts an intra-bundle relative symlink (npm .bin style)', () => {
+      const app = makePackedApp(tmpRoot);
+      const bin = path.join(app, 'node_modules', '.bin');
+      fs.mkdirSync(bin, { recursive: true });
+      fs.symlinkSync(path.join('..', 'node-pty', 'index.js'), path.join(bin, 'pty'));
+
+      expect(assertPackagedAppContents(tmpRoot).symlinks).toBe(1);
+    });
   });
 });
