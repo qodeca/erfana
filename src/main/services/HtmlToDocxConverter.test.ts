@@ -27,6 +27,11 @@ vi.mock('@turbodocx/html-to-docx', () => ({
   default: mockHTMLtoDOCX
 }))
 
+// Mock the logger to avoid pulling in electron-log during tests
+vi.mock('./LoggingService', () => ({
+  logger: { warn: vi.fn(), info: vi.fn(), error: vi.fn(), debug: vi.fn() }
+}))
+
 // ============================================================================
 // Tests
 // ============================================================================
@@ -43,6 +48,9 @@ describe('HtmlToDocxConverter', () => {
     // Re-mock after reset
     vi.doMock('@turbodocx/html-to-docx', () => ({
       default: mockHTMLtoDOCX
+    }))
+    vi.doMock('./LoggingService', () => ({
+      logger: { warn: vi.fn(), info: vi.fn(), error: vi.fn(), debug: vi.fn() }
     }))
 
     // Import fresh instance
@@ -810,6 +818,78 @@ describe('HtmlToDocxConverter', () => {
     it('should timeout in seconds (not milliseconds)', () => {
       const seconds = DOCX_EXPORT.CONVERSION_TIMEOUT_MS / 1000
       expect(seconds).toBe(60)
+    })
+  })
+
+  // ==========================================================================
+  // Remote image stripping (SSRF prevention)
+  // ==========================================================================
+
+  describe('remote image stripping', () => {
+    it('should strip remote http(s) <img> before conversion', async () => {
+      mockHTMLtoDOCX.mockResolvedValue(Buffer.from('DOCX content'))
+
+      await converter.convert(
+        '<p>Doc</p><img src="http://127.0.0.1:8080/x.png"><img src="https://evil.example/y.png">'
+      )
+
+      const passedHtml = mockHTMLtoDOCX.mock.calls[0][0] as string
+      expect(passedHtml).not.toContain('127.0.0.1')
+      expect(passedHtml).not.toContain('evil.example')
+      expect(passedHtml).not.toContain('<img')
+    })
+
+    it('should preserve data: URI and local images', async () => {
+      mockHTMLtoDOCX.mockResolvedValue(Buffer.from('DOCX content'))
+
+      const dataImg = '<img src="data:image/png;base64,iVBORw0KGgo=">'
+      const localImg = '<img src="./assets/pic.png">'
+      await converter.convert(`<p>Doc</p>${dataImg}${localImg}`)
+
+      const passedHtml = mockHTMLtoDOCX.mock.calls[0][0] as string
+      expect(passedHtml).toContain('data:image/png;base64')
+      expect(passedHtml).toContain('./assets/pic.png')
+    })
+
+    it('should strip the remote image but keep a sibling data: image', async () => {
+      mockHTMLtoDOCX.mockResolvedValue(Buffer.from('DOCX content'))
+
+      await converter.convert(
+        '<img src="https://evil.example/y.png"><img src="data:image/png;base64,AAAA">'
+      )
+
+      const passedHtml = mockHTMLtoDOCX.mock.calls[0][0] as string
+      expect(passedHtml).not.toContain('evil.example')
+      expect(passedHtml).toContain('data:image/png;base64,AAAA')
+    })
+
+    it('should strip unquoted remote src (regex-bypass guard)', async () => {
+      mockHTMLtoDOCX.mockResolvedValue(Buffer.from('DOCX content'))
+
+      await converter.convert('<img src=http://169.254.169.254/latest/meta-data>')
+
+      const passedHtml = mockHTMLtoDOCX.mock.calls[0][0] as string
+      expect(passedHtml).not.toContain('169.254.169.254')
+      expect(passedHtml).not.toContain('<img')
+    })
+
+    it('should strip protocol-relative src', async () => {
+      mockHTMLtoDOCX.mockResolvedValue(Buffer.from('DOCX content'))
+
+      await converter.convert('<img src="//evil.example/y.png">')
+
+      const passedHtml = mockHTMLtoDOCX.mock.calls[0][0] as string
+      expect(passedHtml).not.toContain('evil.example')
+    })
+
+    it('should strip non-http schemes (file:, ftp:)', async () => {
+      mockHTMLtoDOCX.mockResolvedValue(Buffer.from('DOCX content'))
+
+      await converter.convert('<img src="file:///etc/passwd"><img src="ftp://host/x.png">')
+
+      const passedHtml = mockHTMLtoDOCX.mock.calls[0][0] as string
+      expect(passedHtml).not.toContain('/etc/passwd')
+      expect(passedHtml).not.toContain('ftp://')
     })
   })
 })

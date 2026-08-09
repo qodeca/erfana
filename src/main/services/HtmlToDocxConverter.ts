@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import HTMLtoDOCX from '@turbodocx/html-to-docx'
 import { DOCX_EXPORT } from '../../shared/constants'
+import { logger } from './LoggingService'
 
 /**
  * HTML to DOCX Converter
@@ -23,8 +24,18 @@ export class HtmlToDocxConverter {
    * @returns Buffer ready to be written to file
    */
   async convert(html: string): Promise<Buffer> {
+    // Security: drop remote http(s) <img> before conversion. The library fetches
+    // any http/https image src during export (bundled axios), which turns a hostile
+    // <img src="http://internal-host/..."> in an exported document into a
+    // server-side request from the main process (SSRF). Local and data: URI images
+    // (incl. pre-rendered Mermaid diagrams) are preserved.
+    const { html: safeHtml, removed } = this.stripRemoteImages(html)
+    if (removed > 0) {
+      logger.warn(`DOCX export: skipped ${removed} remote image(s) to prevent outbound requests`)
+    }
+
     // Wrap in proper HTML structure for the library
-    const wrappedHtml = this.wrapInHtmlDocument(html)
+    const wrappedHtml = this.wrapInHtmlDocument(safeHtml)
 
     // Convert to DOCX using @turbodocx/html-to-docx with timeout protection
     const conversionPromise = HTMLtoDOCX(
@@ -95,6 +106,45 @@ export class HtmlToDocxConverter {
     } finally {
       clearTimeout(timeoutId!)
     }
+  }
+
+  /**
+   * Remove <img> tags whose src is a remote http(s) URL.
+   *
+   * The html-to-docx library fetches remote image URLs at export time; a
+   * user-authored document could point those at internal/loopback hosts (SSRF).
+   * Stripping them here means the library never issues the request. data: URIs,
+   * relative paths, and file: sources are left untouched.
+   *
+   * @returns the sanitized HTML and the number of images removed
+   */
+  private stripRemoteImages(html: string): { html: string; removed: number } {
+    let removed = 0
+    const sanitized = html.replace(/<img\b[^>]*>/gi, (tag) => {
+      // Match src as double-quoted, single-quoted, or unquoted.
+      const srcMatch = tag.match(/\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i)
+      const src = (srcMatch?.[1] ?? srcMatch?.[2] ?? srcMatch?.[3] ?? '').trim()
+      if (this.isRemoteImageSrc(src)) {
+        removed++
+        return ''
+      }
+      return tag
+    })
+    return { html: sanitized, removed }
+  }
+
+  /**
+   * Fail-closed classifier: a src is "remote" (and must be stripped) unless it is
+   * clearly local — empty, a data: URI, or a relative path. Anything carrying a
+   * URL scheme other than data: (http, https, file, ftp, ...) or a
+   * protocol-relative `//host` prefix is treated as remote.
+   */
+  private isRemoteImageSrc(src: string): boolean {
+    if (src === '') return false
+    if (/^data:/i.test(src)) return false
+    if (src.startsWith('//')) return true // protocol-relative
+    // Any explicit URL scheme (other than the data: handled above) is remote.
+    return /^[a-z][a-z0-9+.-]*:/i.test(src)
   }
 
   /**
