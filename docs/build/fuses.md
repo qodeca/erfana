@@ -139,6 +139,11 @@ One advisory (warn-only) check rides along: entries directly under `Resources/` 
 
 The config-side counterpart is the `Guard - electron-builder packaging allowlist` step in `.github/workflows/checks.yml`, which rejects a negation-only `files:` list on every push, before a build is ever attempted.
 
+**Known limitations (tracked).** Both guards are scoped to the `files:` key and the `<resources>/app/` subtree, so two coverage gaps remain, deferred from #43:
+
+- `extraFiles` / `extraResources` copy content into the bundle outside `app/`, past both guards — [#55](https://github.com/qodeca/erfana/issues/55). The advisory `Resources/` check above is the only partial mitigation, and it is warn-only.
+- The symlink-containment walk roots at `app/`, so a symlink escaping the bundle from `Contents/Resources/` (outside `app/`) or `Contents/Frameworks/` is not caught pre-signing — [#56](https://github.com/qodeca/erfana/issues/56). On macOS `codesign --strict` in `afterSign` is a post-signing backstop; the Windows leg has none.
+
 Test coverage: `scripts/fuses.test.mjs` (`resolvePackedResourcesDir`, `deriveAllowedAppEntries`, `assertConfigMatchesAllowlist` and `assertPackagedAppContents` describe blocks — clean-bundle exact file/dir counts proving the walk recurses, disallowed and missing top-level entries, the untracked dot-directory case from #43, offender-name quoting and truncation, a fail-closed unreadable-subtree case, asar refusal vs opt-in skip, manifest missing / unreadable / `main` absent / `main` escaping via `..` past an existing decoy file, the symlink escape + dangling + intra-bundle-relative + darwin-allowed-root + two `{ platform: 'win32' }` containment cases, and a case that binds the real `electron-builder.yml` — including its `afterPack`/`afterSign` wiring — to `ALLOWED_APP_ENTRIES` in the required Unit-tests job, so a config edit without a matching constant edit, or a deleted hook, fails on every push rather than inside the release build).
 
 ---
