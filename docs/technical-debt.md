@@ -233,6 +233,36 @@ After the heartbeat hardening (Phase A4 resume-refresh, B1 symlink defense, D3 H
 
 ---
 
+### 16. `readRelevantText` allocation hygiene on the transcript read path (#47, 2026-08)
+
+**Severity**: Low
+**Impact**: `readRelevantText` runs on the main process ~once/second per Claude terminal. Two small, bounded allocations recur on that path.
+
+**Problem**: The tail read does `Buffer.alloc(maxBytes)` (256 KB, or 2 MB on the bounded fallback), which zero-fills the whole buffer before `handle.read` overwrites only the bytes actually read; and it then materialises the window as two large strings (`buffer.toString(...)` followed by a `slice` past the first newline), the first of which is immediately garbage. Both are microsecond-scale and deliberately accepted (the `alloc` zero-fill is a stale-heap-safety choice noted in the code), but they are avoidable per-refresh GC pressure.
+
+**Recommended Solution**: optionally switch to `Buffer.allocUnsafe` bounded by `bytesRead` (no byte past `bytesRead` is ever read), and find the first newline via `buffer.indexOf(0x0a, …)` to `toString` once instead of allocating an intermediate window string. No behaviour change.
+
+**Files**: `src/main/services/claudeStatus/ClaudeTranscriptParser.ts` (`readRelevantText`).
+
+**Status**: Deferred — flagged by the #47 change-set lens review as pre-existing, out of scope for the freeze fix.
+
+---
+
+### 17. `fallbackGuard` uses FIFO, not LRU, eviction (#47, 2026-08)
+
+**Severity**: Low
+**Impact**: The transcript fallback-read result cache (`fallbackGuard`) caps at 256 entries and evicts oldest-by-insertion. Re-keying an existing entry does not refresh its position, so eviction is FIFO-by-first-insert rather than LRU.
+
+**Problem**: Past 256 distinct concurrent transcripts, a hot-but-early file can be evicted before a colder later one. The consequence is bounded — an evicted-but-live file pays one extra bounded (2 MB) fallback read next time — and 256 distinct live transcripts is unrealistic in practice, so this is a conscious accept, not a defect.
+
+**Recommended Solution**: if LRU is ever wanted, `delete` then `set` the key on every record so re-keyed hot entries move to the tail. Not required for correctness.
+
+**Files**: `src/main/services/claudeStatus/fallbackGuard.ts` (`record` helper).
+
+**Status**: Deferred — conscious accept given the 256 cap; flagged by the #47 change-set lens review.
+
+---
+
 ## Code Quality Improvements
 
 ### Documentation Token Efficiency
