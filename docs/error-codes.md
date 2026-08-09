@@ -2,7 +2,7 @@
 
 Project-wide index of `ErrorCode` values in `src/shared/errors.ts`, grouped by category. For each code: the enum name, the user-facing message (from `ERROR_MESSAGES` map), and the primary throw site. For whisper + transcription codes, also the operator action on encounter.
 
-**Why this document exists**: Phase 4 introduced 6 new whisper codes (see [ADR 0001](./adrs/0001-self-host-whisper-binaries.md)); the full enum has grown to 104 codes. A single mapping table saves every future maintainer a `grep -r ErrorCode` sweep.
+**Why this document exists**: Phase 4 introduced 6 new whisper codes (see [ADR 0001](./adrs/0001-self-host-whisper-binaries.md)); the full enum has grown to 105 codes. A single mapping table saves every future maintainer a `grep -r ErrorCode` sweep.
 
 **Source of truth**: `src/shared/errors.ts`. If this doc drifts, `errors.ts` wins — file an issue.
 
@@ -42,16 +42,16 @@ See `src/main/services/SettingsService.ts`, `ProjectSettingsService.ts`, `Global
 
 ---
 
-## Import & export (29 codes)
+## Import & export (30 codes)
 
-5 `PDF_*` (legacy import) + 11 generic `IMPORT_*` + 5 document-import `IMPORT_*` + 4 `PDF_EXPORT_*` + 4 `DOCX_EXPORT_*` in `src/shared/errors.ts`.
+5 `PDF_*` (legacy import) + 12 generic `IMPORT_*` + 5 document-import `IMPORT_*` + 4 `PDF_EXPORT_*` + 4 `DOCX_EXPORT_*` in `src/shared/errors.ts`.
 
 Grouped by pipeline stage. See `docs/api-services-features.md` §LiteParseConverter and §DocxService for full flows.
 
 | Category | Codes |
 |----------|-------|
 | PDF-legacy | `PDF_ENCRYPTED`, `PDF_EMPTY`, `PDF_CORRUPT`, `PDF_TOO_LARGE`, `PDF_CONVERSION_FAILED` |
-| Generic import | `IMPORT_FILE_NOT_FOUND`, `IMPORT_FILE_UNREADABLE`, `IMPORT_ENCRYPTED`, `IMPORT_EMPTY`, `IMPORT_CORRUPT`, `IMPORT_TOO_LARGE`, `IMPORT_CONVERSION_FAILED`, `IMPORT_UNSUPPORTED_TYPE`, `IMPORT_TEXT_ENCODING_ERROR`, `IMPORT_DIR_CREATE_FAILED`, `IMPORT_WRITE_FAILED` |
+| Generic import | `IMPORT_FILE_NOT_FOUND`, `IMPORT_FILE_UNREADABLE`, `IMPORT_ENCRYPTED`, `IMPORT_EMPTY`, `IMPORT_CORRUPT`, `IMPORT_TOO_LARGE`, `IMPORT_EXCEEDS_SIZE_LIMIT`, `IMPORT_CONVERSION_FAILED`, `IMPORT_UNSUPPORTED_TYPE`, `IMPORT_TEXT_ENCODING_ERROR`, `IMPORT_DIR_CREATE_FAILED`, `IMPORT_WRITE_FAILED` |
 | Document-import (#132) | `IMPORT_DEPENDENCY_MISSING`, `IMPORT_OCR_FAILED`, `IMPORT_PAGE_LIMIT_EXCEEDED`, `IMPORT_TIMEOUT`, `IMPORT_BUSY` |
 | PDF-export | `PDF_EXPORT_CANCELLED`, `PDF_EXPORT_FAILED`, `PDF_EXPORT_NO_CONTENT`, `PDF_EXPORT_INVALID_REQUEST` |
 | DOCX-export | `DOCX_EXPORT_CANCELLED`, `DOCX_EXPORT_FAILED`, `DOCX_EXPORT_NO_CONTENT`, `DOCX_EXPORT_INVALID_REQUEST` |

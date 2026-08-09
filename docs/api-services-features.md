@@ -465,11 +465,12 @@ Document import converter for 50+ formats via `@llamaindex/liteparse` with local
 - Two-phase extension registration (PDF always, Office/image conditional on system tools)
 - Implements `IConfigurableConverter` for per-import options via `createConfigured()`
 - 60-second conversion timeout via `Promise.race` (NFR-005); 1000-page document limit (`MAX_PARSE_PAGES`)
+- Blocking size cap: rejects files above `IMPORT.SIZE_HARD_LIMIT` (250 MB) with `IMPORT_EXCEEDS_SIZE_LIMIT` before parsing
 - csv/tsv/svg explicitly excluded (`LITEPARSE_EXCLUDED_EXTENSIONS`)
 
 ### Public methods
 - `validate(filePath)` – Delegates to `validateFileForImport()`
-- `convert(filePath)` – Parse document, generate frontmatter + spatial text, optional screenshots
+- `convert(filePath)` – Runs `validate()` first and bails on an invalid result (the document-import IPC path calls `convert()` directly, bypassing `ImportService` validation, so this is where the size cap is enforced), then parses the document, generates frontmatter + spatial text, and optional screenshots. Invalid-result messages come from `ERROR_MESSAGES[code]`, so a missing file and an over-size file stay distinct.
 - `createConfigured(options: ImportOptions)` – Factory returning new instance with baked-in options
 
 ### ImportOptions
@@ -589,11 +590,13 @@ DOCX generation from HTML content.
 - Word format export
 - Mermaid diagrams as high-resolution PNG
 - Uses the `@turbodocx/html-to-docx` npm package
+- Conversion runs in a **killable `utilityProcess` child** (`src/main/services/docx/`): `HtmlToDocxConverter` strips remote images and wraps the HTML in the main process, then `DocxConvertProcessAdapter` forks `docx-convert.process` to run `HTMLtoDOCX`, killing it on timeout. The library decodes images synchronously, so an in-thread timeout could not interrupt a hang; a separate process also caps memory against decompression bombs.
+- **Remote-image SSRF strip** (`docxImageStrip.ts`, parse5): before conversion, `<img>`/`<source>` with an `http(s)`/`file:`/`ftp:`/protocol-relative `src` (or remote `srcset`) are removed so the bundled library never fetches them; empty, `data:`, and relative sources are kept.
 
 ### Public Methods
 
 #### `exportToDocx(html: string, fileName: string): Promise<DocxExportResponse>`
-Export HTML content to DOCX. As with PDF, `fileName` is a suggested name run through `sanitizeFilename`; the destination comes from a native save dialog. There is **no `images` parameter** anywhere in `src/main`: Mermaid diagrams are pre-converted to PNG in the renderer and arrive inlined as `<img data-mermaid-diagram="true" src="data:image/png;base64,…">` inside the HTML string.
+Export HTML content to DOCX. As with PDF, `fileName` is a suggested name run through `sanitizeFilename`; the destination comes from a native save dialog. There is **no `images` parameter** anywhere in `src/main`: Mermaid diagrams are pre-converted to PNG in the renderer and arrive inlined as `<img data-mermaid-diagram="true" src="data:image/png;base64,…">` inside the HTML string. On success the response carries `removedRemoteImages` (count of remote images stripped), which the renderer surfaces as a warning toast.
 
 ---
 

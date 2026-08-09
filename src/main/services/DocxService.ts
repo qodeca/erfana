@@ -129,14 +129,15 @@ class DocxService implements IDocxService {
       }
 
       // Convert HTML to DOCX buffer (using @turbodocx/html-to-docx)
-      const buffer = await htmlToDocxConverter.convert(html)
+      const { buffer, removedRemoteImages } = await htmlToDocxConverter.convert(html)
 
       // Write to file
       await writeFile(savePath, buffer)
 
       return {
         success: true,
-        filePath: savePath
+        filePath: savePath,
+        removedRemoteImages
       }
     } catch (error) {
       logger.error('DOCX export failed', error instanceof Error ? error : undefined)

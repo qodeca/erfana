@@ -17,7 +17,9 @@ export default defineConfig({
       rollupOptions: {
         input: {
           index: resolve('src/main/index.ts'),
-          'git-status.worker': resolve('src/main/services/workers/git-status.worker.ts')
+          'git-status.worker': resolve('src/main/services/workers/git-status.worker.ts'),
+          // DOCX conversion runs in a killable utilityProcess child (#1 lens-review).
+          'docx/docx-convert.process': resolve('src/main/services/docx/docx-convert.process.ts')
         }
       },
       // externalizeDeps defaults to true for main process (electron-vite convention).

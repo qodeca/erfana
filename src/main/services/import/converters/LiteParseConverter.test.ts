@@ -10,7 +10,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { ErrorCode } from '../../../../shared/errors'
+import { ErrorCode, ERROR_MESSAGES } from '../../../../shared/errors'
 
 // --------------------------------------------------------------------------
 // Mocks – must be hoisted before imports
@@ -56,6 +56,7 @@ vi.mock('fs/promises', () => ({
 }))
 
 import { LiteParseConverter, getExtensionsForDependencies, createLiteParseConverter } from './LiteParseConverter'
+import { validateFileForImport } from '../../../utils/fileUtils'
 import type { DependencyStatus } from '../types'
 
 // --------------------------------------------------------------------------
@@ -724,6 +725,45 @@ describe('LiteParseConverter', () => {
       const result = await converter.convert('/path/to/document.docx')
       expect(result.success).toBe(true)
       expect(result.content).toContain('format: docx')
+    })
+  })
+
+  // ==========================================================================
+  // convert() – validation gate (blocks before parsing; sharp/libvips DoS bound)
+  // ==========================================================================
+
+  describe('convert() – validation gate', () => {
+    it('rejects an over-size file before parsing, propagating the specific code', async () => {
+      vi.mocked(validateFileForImport).mockResolvedValueOnce({
+        valid: false,
+        error: ErrorCode.IMPORT_EXCEEDS_SIZE_LIMIT,
+        sizeInMB: 300,
+        fileName: 'huge.pdf'
+      })
+
+      const converter = new LiteParseConverter(withBoth)
+      const result = await converter.convert('/path/to/huge.pdf')
+
+      expect(result.success).toBe(false)
+      expect(result.errorCode).toBe(ErrorCode.IMPORT_EXCEEDS_SIZE_LIMIT)
+      expect(result.error).toBe(ERROR_MESSAGES[ErrorCode.IMPORT_EXCEEDS_SIZE_LIMIT])
+      // The guard fires before any parsing happens.
+      expect(mockParse).not.toHaveBeenCalled()
+    })
+
+    it('falls back to IMPORT_CONVERSION_FAILED when validation yields no code', async () => {
+      vi.mocked(validateFileForImport).mockResolvedValueOnce({
+        valid: false,
+        sizeInMB: 0,
+        fileName: 'weird.pdf'
+      } as never)
+
+      const converter = new LiteParseConverter(withBoth)
+      const result = await converter.convert('/path/to/weird.pdf')
+
+      expect(result.success).toBe(false)
+      expect(result.errorCode).toBe(ErrorCode.IMPORT_CONVERSION_FAILED)
+      expect(mockParse).not.toHaveBeenCalled()
     })
   })
 })
