@@ -110,6 +110,43 @@ jobs:
           fi
           exit "$TEST_EXIT"
 
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
+    # Enforces the per-file coverage FLOORS declared in vitest.main.ts under
+    # test.coverage.thresholds: scripts/fuses.js (the issue #43/#55 packaging-
+    # integrity guards + Electron fuses) and the whisper trust-chain modules
+    # (verifyManifest / secureDownloader / zipArchive / tarArchive) + the #41
+    # model-id registry. The required `test` job runs `test:ci` WITHOUT coverage,
+    # so these floors fire ONLY here — this job is what makes them a gate rather
+    # than a local-only `npm run test:cov` nicety (issue #55, F4 residual).
+    #
+    # Scoped to the main project (`--project main`) on purpose: only the main
+    # project's tests load scripts/fuses.js (via scripts/fuses.test.mjs), so the
+    # v8 report carries exactly ONE fuses.js row at its real ~88% coverage. A
+    # full-workspace run pulls renderer/preload tests in too and — with an
+    # untested include or `all: true` — can emit a second 0%-baseline fuses.js
+    # row; `all: false` in vitest.main.ts already collapses that, and `--project
+    # main` keeps the instrumented set (and therefore the threshold match)
+    # unambiguous and deterministic. Do NOT drop `--project main`.
+    steps:
+      # actions/checkout v6.0.3 — MUST run before the local composite action
+      # below so the action.yml file can be loaded from the workspace.
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: ./.github/actions/setup-node-with-retry
+        with:
+          # scripts/fuses.test.mjs + the other main-process tests import the
+          # electron binary and node-pty native bindings; run the allowlisted
+          # postinstall so they are present for the coverage run.
+          run-postinstall: "true"
+      - name: Main-project coverage (enforces the scripts/fuses.js + whisper floors)
+        # Fails the job when any per-file floor in vitest.main.ts is breached
+        # (vitest exits non-zero on a threshold miss). --coverage activates the
+        # thresholds; --config supplies them; --project main scopes the run.
+        run: npx vitest --run --config vitest.main.ts --project main --coverage
+
   build:
     name: Build
     runs-on: ubuntu-latest
@@ -451,4 +488,35 @@ jobs:
           $ITEMS
           ITEMS_EOF
 
-          echo "electron-builder packaging allowlist OK ($POSITIVE positive pattern(s); afterPack/afterSign wiring present)"
+          # 6. Extra-content presence guard (issue #55). COARSE by design (F4):
+          #    this reasons about YAML text only, so it does NOT pair from/to or
+          #    judge FileSet dest validity - that authoritative shape check lives
+          #    in scripts/fuses.test.mjs ("agrees with the repository
+          #    electron-builder.yml as shipped"), which YAML-parses the real
+          #    config and runs in the required Unit-tests job. Coupled to the
+          #    ALLOWED_EXTRA_RESOURCES_DESTS / ALLOWED_EXTRA_FILES_DESTS constants
+          #    in scripts/fuses.js and the L1-L2 guards there.
+          #
+          # 6a. extraFiles: is fail-closed - ALLOWED_EXTRA_FILES_DESTS is empty,
+          #     so ANY extraFiles: key is a hard error, whether at column 0, OR
+          #     indented under a mac:/win: block (the platform-scoped edit path,
+          #     F1), OR inline in a flow mapping (`mac: { extraFiles: [...] }`,
+          #     F9). The runtime L1 guard folds platformSpecificBuildOptions, so
+          #     this static check mirrors it by matching every one of those
+          #     spellings: the block form (start-of-line, any indent) and the
+          #     flow form (the key preceded by `{` or `,`).
+          if grep -qE '^[[:space:]]*extraFiles[[:space:]]*:' "$EB_CONFIG" \
+            || grep -qE '[{,][[:space:]]*extraFiles[[:space:]]*:' "$EB_CONFIG"; then
+            echo "::error::$EB_CONFIG declares extraFiles:, but nothing is permitted at that destination (ALLOWED_EXTRA_FILES_DESTS in scripts/fuses.js is empty, fail-closed). Remove it, or update the allowlist + L1 guard together (issue #55)."
+            exit 1
+          fi
+
+          # 6b. extraResources: is permitted but coupled. Warn on its presence so
+          #     an edit is a visible prompt to re-check ALLOWED_EXTRA_RESOURCES_DESTS
+          #     and the binding test; the binding test is the hard gate for the
+          #     from/to shape (F4). Matches column-0 and indented mac:/win: forms.
+          if grep -qE '^[[:space:]]*extraResources:' "$EB_CONFIG"; then
+            echo "::warning::$EB_CONFIG declares extraResources:. Validate its from/to shape and dests in the Unit-tests job's binding test, and keep ALLOWED_EXTRA_RESOURCES_DESTS in scripts/fuses.js in step (issue #55)."
+          fi
+
+          echo "electron-builder packaging allowlist OK ($POSITIVE positive pattern(s); afterPack/afterSign wiring present; no extraFiles:)"

@@ -3,6 +3,21 @@ productName: Erfana
 beforePack: ./scripts/ensure-media-binaries.js
 afterPack: ./scripts/fuses.js
 afterSign: ./scripts/resign.js
+# EXTRA-CONTENT ALLOWLIST (issue #55). extraResources copies land BESIDE app/
+# (Contents/Resources/ on macOS, resources/ on Windows). Each `to:` below MUST
+# stay within ALLOWED_EXTRA_RESOURCES_DESTS in scripts/fuses.js. Enforced in
+# three coupled places, all of which fail loudly on drift:
+#   - runtime L1 assertExtraContentAllowlist() over the MERGED (top-level ∪
+#     mac:/win:) config, and L2a-1/L2a-2 packed-tree walks in scripts/fuses.js;
+#   - the "Guard - electron-builder packaging allowlist" step in
+#     .github/workflows/checks.yml (a COARSE presence check: warns on any
+#     extraResources: edit, hard-fails on any extraFiles:);
+#   - the authoritative from/to SHAPE check in scripts/fuses.test.mjs
+#     ("agrees with the repository electron-builder.yml as shipped"), which runs
+#     in the required Unit-tests job.
+# The ABSENCE of any extraFiles: key (here AND under mac:/win:) is intentional:
+# ALLOWED_EXTRA_FILES_DESTS in scripts/fuses.js is empty (fail-closed), so adding
+# extraFiles: is rejected by both the CI guard and the runtime L1 guard.
 extraResources:
   - from: resources/tessdata
     to: tessdata

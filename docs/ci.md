@@ -19,20 +19,23 @@ Node 24, `permissions: contents: read`. Every `checks.yml` job that needs depend
 
 ## Quality checks (`checks.yml`)
 
-Eight jobs run in parallel (all `ubuntu-latest` except `windows-checks`). The **Required check?** column reflects the live branch-protection required set on `main`; the separate `Secret scan` workflow (above) is the sixth required check.
+Nine jobs run in parallel (all `ubuntu-latest` except `windows-checks`). The **Required check?** column reflects the live branch-protection required set on `main`; the separate `Secret scan` workflow (above) is the sixth required check.
 
 | Job (`name:`) | Command | Required check? | Notes |
 |-----|---------|:---:|-------|
 | `lint` (Lint) | `npm run lint` | yes | |
 | `typecheck` (Typecheck) | `npm run typecheck` | yes | tsc node + web |
-| `test` (Unit tests) | `npm run test:ci` | yes | full vitest workspace (main / renderer / preload). Also carries two extra gates — see below |
+| `test` (Unit tests) | `npm run test:ci` | yes | full vitest workspace (main / renderer / preload), **no coverage**. Also carries two extra gates — see below |
+| `coverage` (Coverage) | `npx vitest --run --config vitest.main.ts --project main --coverage` | pending | enforces the per-file coverage **floors** in `vitest.main.ts` `test.coverage.thresholds` — `scripts/fuses.js` (the #43/#55 packaging-integrity guards + Electron fuses, floor lines/statements 86, functions 88, branches 93; met at ~88) and the whisper trust-chain modules `verifyManifest` / `secureDownloader` / `zipArchive` / `tarArchive` (90% each) plus the #41 `modelId` registry (95%). Since `test` runs `test:ci` **without** coverage, these floors gate only here. Scoped to `--project main` (with `all: false`) so `scripts/fuses.js` reports a single deterministic row — see the design note below (issue #55, F4). Promotion into the branch-protection required set is a pending repo-admin step |
 | `build` (Build) | `npx electron-vite build` | yes | |
 | `license` (License compliance) | `npm run check:headers` + `pipx run reuse lint` | yes | SPDX headers on all sources + REUSE conformance |
 | `audit-signatures` (npm audit signatures) | `npm audit signatures` | no | also records the `package-lock.json` digest artifact that `release.yml` byte-verifies at tag time |
-| `release-guards` (Release readiness guards) | guard scripts | no | fails the build on a `pull_request_target` trigger, forbidden plist entitlements, legacy signing credentials, release-pubkey drift across docs, and a non-allowlist `files:` block in `electron-builder.yml` (`Guard - electron-builder packaging allowlist`, issue #43 — awk/grep only, since the job is checkout-only) |
+| `release-guards` (Release readiness guards) | guard scripts | no | fails the build on a `pull_request_target` trigger, forbidden plist entitlements, legacy signing credentials, release-pubkey drift across docs, and a non-allowlist `files:` block in `electron-builder.yml` (`Guard - electron-builder packaging allowlist`, issue #43 — awk/grep only, since the job is checkout-only; extended in issue #55 to also hard-fail any `extraFiles:` block, at column 0 or indented under `mac:`/`win:`, and warn on `extraResources:` edits) |
 | `windows-checks` (Windows checks) | `npm run typecheck` + `npm run test:main` on `windows-latest` | no | advisory Windows gate; excluded from the required set until proven stable |
 
-**Required status checks on `main`** (six): `Lint`, `Typecheck`, `Unit tests`, `Build`, `License compliance` (from `checks.yml`), and `Secret scan` (from `secret-scan.yml`). `npm audit signatures`, `Release readiness guards`, and `Windows checks` run on every push but are not required to merge.
+**Required status checks on `main`** (six): `Lint`, `Typecheck`, `Unit tests`, `Build`, `License compliance` (from `checks.yml`), and `Secret scan` (from `secret-scan.yml`). `npm audit signatures`, `Release readiness guards`, and `Windows checks` run on every push but are not required to merge. The new `Coverage` job also runs on every push and enforces the coverage floors; adding it to the branch-protection required set is a pending repo-admin step (`gh api`), after which it becomes the seventh required check.
+
+**Why a separate `Coverage` job** (issue #55, F4): the per-file floors in `vitest.main.ts` fire only under `--coverage`, and the required `test` job runs `test:ci` without it — so before this job the `scripts/fuses.js` floor (and the whisper floors) were enforced only by a local `npm run test:cov`, never in required CI. The job runs the **main project only** (`--project main`): just the main suite loads `scripts/fuses.js` (via `scripts/fuses.test.mjs`), so the v8 report carries exactly one `fuses.js` row at its real coverage. Combined with `all: false` in `vitest.main.ts` (which suppresses the synthetic 0%-baseline row an untested-but-included file would otherwise emit), the threshold match is deterministic; a full-workspace coverage run could instead surface a second 0% `fuses.js` row and fail the gate spuriously.
 
 **Two extra gates live inside the `test` job** — one runs before the tests, one wraps them:
 
@@ -42,7 +45,7 @@ Eight jobs run in parallel (all `ubuntu-latest` except `windows-checks`). The **
 **Design notes**:
 - **`on: push:` only** (not `pull_request`). Same-repo PRs already trigger a push event on their source branch; adding `pull_request` would double-run the same SHA.
 - **ubuntu-latest** — the core checks do not need macOS; Ubuntu runners are ~10x cheaper and allocate faster (`windows-checks` is the sole exception, by design).
-- **Separate jobs** (not matrix). Even at eight jobs the count does not justify a matrix abstraction; explicit jobs are clearer.
+- **Separate jobs** (not matrix). Even at nine jobs the count does not justify a matrix abstraction; explicit jobs are clearer.
 - **Concurrency cancellation** via `concurrency: group: checks-${{ github.ref }} cancel-in-progress: true`. Rapid pushes / force-pushes to the same ref abort in-flight runs.
 - **`npm ci` retry** — every `npm ci` is wrapped in a 3-attempt loop with backoff to tolerate transient ECONNRESET on GitHub runners:
   ```bash
