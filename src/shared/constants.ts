@@ -43,8 +43,15 @@ export const BYTES_PER_MB = 1024 * 1024
 export const IMPORT = {
   /** Directory name for imported files */
   DIR_NAME: 'import',
-  /** Size warning threshold in bytes (50MB) */
+  /** Size warning threshold in bytes (50MB) — non-blocking; surfaces a warning */
   SIZE_WARNING_THRESHOLD: 50 * BYTES_PER_MB,
+  /**
+   * Hard size limit in bytes (250MB) — blocking. Files above this are rejected
+   * before reaching a converter, bounding memory-bomb inputs to image/PDF
+   * parsers (sharp/libvips) on the document-import path. Set well above
+   * legitimate large PDFs. This is a SECURITY limit and is not user-configurable.
+   */
+  SIZE_HARD_LIMIT: 250 * BYTES_PER_MB,
   /** Maximum number of auto-numbered copies before rejecting */
   MAX_COPY_ATTEMPTS: 1000,
   /**

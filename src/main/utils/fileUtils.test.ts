@@ -487,5 +487,28 @@ describe('fileUtils', () => {
         expect(result.error).toBeUndefined()
       })
     })
+
+    describe('hard size limit (blocking)', () => {
+      it('should reject files above the hard limit as invalid', async () => {
+        mockedAccess.mockResolvedValue(undefined)
+        // 1 byte over the 250MB hard limit
+        mockedStat.mockResolvedValue({ size: IMPORT.SIZE_HARD_LIMIT + 1 } as any)
+
+        const result = await validateFileForImport('/path/to/huge.pdf')
+
+        expect(result.valid).toBe(false)
+        expect(result.error).toBe(ErrorCode.IMPORT_EXCEEDS_SIZE_LIMIT)
+      })
+
+      it('should allow a file exactly at the hard limit (warning only)', async () => {
+        mockedAccess.mockResolvedValue(undefined)
+        mockedStat.mockResolvedValue({ size: IMPORT.SIZE_HARD_LIMIT } as any)
+
+        const result = await validateFileForImport('/path/to/at-limit.pdf')
+
+        expect(result.valid).toBe(true)
+        expect(result.error).toBe(ErrorCode.IMPORT_TOO_LARGE)
+      })
+    })
   })
 })

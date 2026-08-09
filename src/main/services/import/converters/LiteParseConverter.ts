@@ -111,6 +111,18 @@ export class LiteParseConverter implements IConverter, IConfigurableConverter {
     const fileName = basename(filePath)
     const ext = fileName.split('.').pop()?.toLowerCase() ?? ''
 
+    // Enforce the blocking size cap before any parsing. The document-import IPC
+    // path calls convert() directly (bypassing ImportService validation), so this
+    // is the guard that bounds memory-bomb inputs to sharp/libvips on this path.
+    const validation = await this.validate(filePath)
+    if (!validation.valid) {
+      return {
+        success: false,
+        error: `File validation failed: ${fileName}`,
+        errorCode: validation.error ?? ErrorCode.IMPORT_CONVERSION_FAILED
+      }
+    }
+
     // Dynamic import -- LiteParse is ESM-only
     const { LiteParse } = await import('@llamaindex/liteparse')
 
