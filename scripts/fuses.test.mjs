@@ -20,6 +20,7 @@ const {
   MEDIA_BINARY_MIN_BYTES,
   pruneForeignFfprobeBinaries,
   pruneForeignNodePtyPrebuilds,
+  pruneForeignBetterSqlitePrebuilds,
   assertPackagedAppContents,
   assertConfigMatchesAllowlist,
   deriveAllowedAppEntries,
@@ -466,6 +467,93 @@ describe('pruneForeignNodePtyPrebuilds', () => {
     expect(() =>
       pruneForeignNodePtyPrebuilds(tmpRoot, 'win32', Arch.x64, { requireMatch: true })
     ).toThrow(/pty\.node missing/i);
+  });
+});
+
+// ---- better-sqlite3 flat-file prebuild prune (SD-019 / #19) ----------------
+
+function sqlitePrebuildsDir(root) {
+  return path.join(root, 'app', 'node_modules', 'better-sqlite3', 'prebuilds');
+}
+
+// better-sqlite3 names prebuilds as flat files '<plat>-<arch>.node' — no subdir
+// per target (unlike node-pty). The fixture writes those files directly.
+function makeSqlitePrebuild(root, name) {
+  const dir = sqlitePrebuildsDir(root);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, name), 'addon');
+  return path.join(dir, name);
+}
+
+describe('pruneForeignBetterSqlitePrebuilds', () => {
+  let tmpRoot;
+  beforeEach(() => {
+    tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'sqlite-prune-'));
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    fs.rmSync(tmpRoot, { recursive: true, force: true });
+  });
+
+  it('keeps only the target prebuild on a darwin/arm64 build', () => {
+    ['darwin-arm64.node', 'darwin-x64.node', 'win32-x64.node'].forEach((n) => makeSqlitePrebuild(tmpRoot, n));
+    pruneForeignBetterSqlitePrebuilds(tmpRoot, 'darwin', Arch.arm64, { requireMatch: true });
+    expect(lsdirs(sqlitePrebuildsDir(tmpRoot))).toEqual(['darwin-arm64.node']);
+  });
+
+  it('on a universal mac target keeps both darwin prebuilds and drops win32', () => {
+    ['darwin-arm64.node', 'darwin-x64.node', 'win32-x64.node'].forEach((n) => makeSqlitePrebuild(tmpRoot, n));
+    pruneForeignBetterSqlitePrebuilds(tmpRoot, 'darwin', Arch.universal, { requireMatch: true });
+    expect(lsdirs(sqlitePrebuildsDir(tmpRoot))).toEqual(['darwin-arm64.node', 'darwin-x64.node']);
+  });
+
+  it('keeps only win32/x64 on a win32/x64 build', () => {
+    ['darwin-arm64.node', 'win32-x64.node', 'win32-arm64.node'].forEach((n) => makeSqlitePrebuild(tmpRoot, n));
+    pruneForeignBetterSqlitePrebuilds(tmpRoot, 'win32', Arch.x64, { requireMatch: true });
+    expect(lsdirs(sqlitePrebuildsDir(tmpRoot))).toEqual(['win32-x64.node']);
+  });
+
+  it('skips entirely for armv7l (no deletion)', () => {
+    ['darwin-arm64.node', 'win32-x64.node'].forEach((n) => makeSqlitePrebuild(tmpRoot, n));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    pruneForeignBetterSqlitePrebuilds(tmpRoot, 'linux', Arch.armv7l, { requireMatch: false });
+    expect(lsdirs(sqlitePrebuildsDir(tmpRoot))).toEqual(['darwin-arm64.node', 'win32-x64.node']);
+    expect(warn).toHaveBeenCalled();
+  });
+
+  it('skips (warns) when prebuilds/ is missing', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(() =>
+      pruneForeignBetterSqlitePrebuilds(tmpRoot, 'darwin', Arch.arm64, { requireMatch: true })
+    ).not.toThrow();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('better-sqlite3 prebuilds not found'));
+  });
+
+  it('throws under requireMatch when no target prebuild survives', () => {
+    makeSqlitePrebuild(tmpRoot, 'win32-x64.node'); // building darwin/arm64
+    expect(() =>
+      pruneForeignBetterSqlitePrebuilds(tmpRoot, 'darwin', Arch.arm64, { requireMatch: true })
+    ).toThrow(/left no prebuild for/i);
+  });
+
+  it('only warns (no throw) when target absent and requireMatch is false', () => {
+    makeSqlitePrebuild(tmpRoot, 'win32-x64.node');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(() =>
+      pruneForeignBetterSqlitePrebuilds(tmpRoot, 'darwin', Arch.arm64, { requireMatch: false })
+    ).not.toThrow();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('absent after prune'));
+  });
+
+  it('does not delete through a symlinked .node prebuild', () => {
+    makeSqlitePrebuild(tmpRoot, 'darwin-arm64.node');
+    const external = path.join(tmpRoot, 'external.node');
+    fs.writeFileSync(external, 'x');
+    // A foreign-named prebuild that is actually a symlink must be skipped, not
+    // deleted-through (lstat semantics: isFile() === false for a symlink).
+    fs.symlinkSync(external, path.join(sqlitePrebuildsDir(tmpRoot), 'win32-x64.node'));
+    pruneForeignBetterSqlitePrebuilds(tmpRoot, 'darwin', Arch.arm64, { requireMatch: true });
+    expect(fs.existsSync(external)).toBe(true);
   });
 });
 
