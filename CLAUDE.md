@@ -3,7 +3,6 @@
 ## Project Overview
 An agent-native Markdown workspace (Electron) that runs terminal coding agents like Claude Code beside the editor — integrated terminal with a live Claude Code context-window meter, Monaco editor + live preview, and a project tree. Positioning: an "agent-native Markdown workspace," agent-agnostic with Claude Code as the lead example; Erfana hosts/companions the agent (it is not itself an AI model — never overclaim built-in AI). Note: the context-window meter is Claude Code-specific (reads `~/.claude` transcripts); the terminal itself runs any CLI agent.
 - **Repository**: `qodeca/erfana` (GitHub, public)
-- **Version**: 0.17.1
 - **License**: `GPL-3.0-only` (open source). Copyright (c) 2025-2026 **Qodeca sp. z o.o.** See [LICENSE](LICENSE) and [COPYRIGHT](COPYRIGHT) (relicensing record). Per-file licensing follows the [REUSE](https://reuse.software) spec (SPDX headers + `REUSE.toml`); third-party notices are in [THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md). The code is GPL; the "Erfana"/"Qodeca" names and logos remain Qodeca trademarks (see [TRADEMARKS.md](TRADEMARKS.md)) — forks must rebrand. Contributions require the project CLA (see [CLA.md](CLA.md)), which preserves Qodeca's dual-licensing option. `"private": true` in package.json is a publish guard for the desktop app, not a license statement.
 - **Architecture**: Hybrid SplitviewReact (layout) + DockviewReact (tabs)
 - **Node Version**: 24+ (development), Electron 39 bundles Node.js 22.22.1
@@ -26,9 +25,9 @@ An agent-native Markdown workspace (Electron) that runs terminal coding agents l
 
 ## Main-process services
 
-Directory layout is derivable (`ls`, plus [docs/architecture.md](docs/architecture.md)). This one catalogue is not — it is the index of what exists under `src/main/services/`:
-
-- Core: FileService, TerminalService, WindowsTerminalBootstrap, ProjectService, RecentProjectsRepository, RecentProjectsDeduplicator, LoggingService; Git: GitStatusService, GitWatcherService, GitPollingService, GitStatusWorkerAdapter, GitStatusCircuitBreaker, workers/git-status.worker; Watchers: DirectoryWatcherService, FileWatcherService, watcher/ (AtomicSaveDetector, EventCoalescer, GitEventCoalescer, RepoPresenceWatcher, ThrottledWorker, WatcherMetrics, PlatformConfig); Settings: SettingsService, ProjectSettingsService, GlobalSettingsService; Media/export: ScreenshotService (dispatcher → screenshot/ subdir with MacScreenshotCapturer + DesktopCapturerScreenshotCapturer + ScreenshotOverlayWindow + sharedHelpers [#164]), CameraService, DocxService, HtmlToDocxConverter (strips remote images + wraps, then delegates conversion to a killable utilityProcess child), docx/ (docxImageStrip [parse5 remote-image SSRF strip before export], DocxConvertProcessAdapter [utilityProcess lifecycle + kill-on-timeout], docx-convert.process [the isolated child entry]), PdfService, TranscriptionService, LocalWhisperService, WhisperModelManager, whisper-assets (pinned release + classifyPlatform), whisper-pubkeys (dual minisign keys), AudioMetadataService, AudioExtractionService, ApiKeyService; Import: import/ (ImportService, ConverterRegistry, DependencyDetector, extensions, isoToTessLang, converters/{LiteParseConverter, AudioConverter, TextConverter, VideoConverter}); Claude status: claudeStatus/ (ClaudeStatusService orchestrator, ClaudeTranscriptWatcher [refcounted chokidar on ~/.claude/projects], ClaudeTranscriptParser, fallbackGuard [#47: per-file-version bounded-read result cache, caps the post-compaction transcript re-read], ClaudeTranscriptLocator, ClaudeWindowDetector [window-sizing rule chain 200k/1M], modelId [#41: shared model-id parser + exact-id capability registry, the single window-policy entry point], friendlyModelName, thresholds, encodeCwd [platform-branched: macOS `/`+`.`→`-`, Windows `/`+`\`+`:`+`.`→`-`], process/{AbstractClaudeProcessDetector, MacClaudeProcessDetector, WinClaudeProcessDetector [#217], exec (shared ExecLike), createProcessDetector}); Multi-instance: ProjectLockService, LockHeartbeat, LockStalenessPolicy, MonotonicTimestampGenerator, ExternalFileService; Subdirs: import/, watcher/, workers/, screenshot/, claudeStatus/, docx/
+The catalogue of what exists under `src/main/services/` lives in
+[`src/main/services/CLAUDE.md`](src/main/services/CLAUDE.md), which loads
+automatically when working in that directory.
 
 ## Core features
 
@@ -92,12 +91,8 @@ Feature specifications live in `specs/`.
 **Before implementing a feature**: Read the spec overview (`requirements/01-overview.md`), requirements (`requirements/02-requirements.md`), and acceptance criteria (`requirements/03-acceptance.md` for T3 specs; `requirements/04-acceptance.md` for T4, where `03` is use-cases).
 
 ## Code Style & Conventions
-- TypeScript strict mode enabled
-- React functional components with hooks
-- Zustand for state management
 - IPC pattern: main/services → ipc/handlers → preload → renderer
 - Component styling: plain co-located global CSS files imported by the component (e.g. `import './Dialog.css'`); `*.module.css` is the rare exception (currently only `Panels/ImageViewerPanel.module.css`)
-- Lucide React for icons
 - Renderer platform detection: use `isMacOS()` / `isWindows()` from `src/renderer/src/utils/platform.ts` (backed by the sync `window.api.utils.getPlatform()` bridge). Never read `navigator.platform` or `process.platform` in the renderer — `process.platform` is `undefined` under the sandbox
 - Renderer path handling: derive basenames, dirnames, and display relative paths via the cross-platform helpers in `src/renderer/src/utils/fileUtils.ts` (`getBasename`, `getDirname`, `getDisplayRelativePath`, `isPathInside`, `isStrictDescendant`) — never `filePath.split('/')`, `lastIndexOf('/')`, or POSIX-only path math, because the main process passes **native** separators across IPC (paths can contain `\` on Windows). An ESLint `no-restricted-syntax` rule (`src/renderer/**`, `fileUtils.ts` exempt) enforces this. These helpers are display/parse-only — they are **not** for filesystem confinement; real confinement stays main-side in `ExternalFileService` via `realpath`
 - User-input PII in logs: redact user-supplied values (e.g. filenames) before `logger.error` via `redactUserInput(message, code)` (`src/main/utils/redactUserInput.ts`); the user-facing toast keeps the full value, log files get `[redacted-filename]`
@@ -113,6 +108,7 @@ Feature specifications live in `specs/`.
 For detailed changelog, see [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
 ## Nested CLAUDE.md (component-specific patterns)
+- [`src/main/services/CLAUDE.md`](src/main/services/CLAUDE.md) - catalogue of every main-process service, with the issue context behind each
 - [`src/renderer/src/components/Dialog/CLAUDE.md`](src/renderer/src/components/Dialog/CLAUDE.md) - BaseDialog API, focus trap, ESC/backdrop handling
 - [`src/renderer/src/components/Transcription/CLAUDE.md`](src/renderer/src/components/Transcription/CLAUDE.md) - Dual-backend transcription (OpenAI + local whisper.cpp), IPC flow, store
 
@@ -126,15 +122,11 @@ For detailed changelog, see [docs/CHANGELOG.md](docs/CHANGELOG.md).
 - Windows-host flakes: catalogued in [`docs/windows/known-flakes.md`](docs/windows/known-flakes.md) with status legend + remediation-patterns cheat-sheet. Test-file split policy in [`docs/windows/contributing.md`](docs/windows/contributing.md) §"Test-file split policy" — split when mocks hoist to module scope (reference: `FileService.copyItem.limit.test.ts`, `WhisperModelManager.downgrade.test.ts`); keep in-file for per-describe `vi.useFakeTimers` (reference: `SettingsOverlay.test.tsx` Focus management)
 
 ## Continuous Integration
-See [docs/ci.md](docs/ci.md) for the full pipeline map. Summary:
-- **Branch-protection required checks** (not visible in the workflow files — a GitHub setting): `lint`, `typecheck`, `test`, `build`, `coverage`, `license`, and `Secret scan`. `windows-checks` is advisory and `e2e` is deliberately excluded until stable.
-- **`checks.yml`** (`.github/workflows/checks.yml`) — runs on **every push to any branch**. Nine parallel jobs on `ubuntu-latest` (except `windows-checks`): the four core required checks `lint` / `typecheck` / `test` (full vitest workspace — main/renderer/preload) / `build` (`electron-vite build`); `coverage` (main-project `vitest --coverage` enforcing the per-file coverage floors; also a required check); `license` (`check:headers` + `reuse lint`, also a required check); `audit-signatures` (`npm audit signatures` + records the `package-lock.json` digest artifact `release.yml` verifies); `release-guards` (fails on `pull_request_target`, forbidden plist entitlements, etc.); and an advisory `windows-checks` job on `windows-latest` (typecheck + `test:main`; `shell: bash`; not required until proven stable). ~3 min wall-clock. See [docs/ci.md](docs/ci.md) for the full job table + required-checks set.
+See [docs/ci.md](docs/ci.md) for the full pipeline map — workflow table, per-job breakdown, `npm ci` retry and concurrency-cancellation patterns. The parts that are **not** derivable from `.github/workflows/`:
+- **Required checks** (branch protection lives GitHub-side, not in the repo): `lint`, `typecheck`, `test`, `build`, `coverage`, `license`, `Secret scan`. `windows-checks` is advisory; `e2e` is intentionally excluded until stable.
 - **`e2e.yml`** (`.github/workflows/e2e.yml`) — **disabled**: both functional `electron` and `visual` suites run locally only until macos-latest instability is root-caused. Re-enable with `gh workflow enable "E2E Tests"`. E2E is excluded from branch-protection required checks, so disabling blocks no merges.
-- **`release.yml`** — fires on `v*.*.*` tag push, calls `build_mac.yml` / `build_win.yml` reusables (multi-platform build — macOS + Windows; Linux distribution target dropped). See [docs/build/release.md](docs/build/release.md).
-- **`whisper-binaries.yml` + `whisper-binaries-canary.yml`** — `workflow_dispatch` only and monthly schedule respectively. See [docs/build/whisper-binaries.md](docs/build/whisper-binaries.md).
 - **`secret-scan.yml`** — runs on **every push + PR**: gitleaks (full git history) + trufflehog (verified secrets), with version-pinned, SHA-256-checksum-verified binary downloads and no third-party actions. Its `Secret scan` job is a branch-protection required check. gitleaks runs with `--log-opts="--all"`, so it scans **every ref in the repo, not just the current branch** — a finding on another branch fails this one, and `.gitleaksignore` must therefore carry the fingerprint on every branch, even where the offending file is absent (see [docs/ci.md](docs/ci.md#secret-scan-secret-scanyml)).
 - **`claude.yml`** — Claude Code automation (`Claude Code` responds to `@claude` mentions on issues/PRs). `claude-code-review.yml` is **deleted on this branch** (`ec849e8`) and still live on `develop`/`main`; see the merge-back hazards above before reconciling.
-- **Every `npm ci` is wrapped in retry**: `npm ci || (sleep 10 && npm ci) || (sleep 20 && npm ci)` – handles transient ECONNRESET on GitHub runners.
 - **Workflow display names** use Title Case in the Actions UI (e.g. `Quality Checks`, `Whisper Binaries (Canary)`). This is a project-specific convention that overrides the global Sentence-case style rule for `name:` fields only — see [`.github/workflows/`](.github/workflows/) for the canonical list. Filenames stay lowercase/kebab-case.
 - **Before pushing**, run the local equivalents (`npm run lint && npm run typecheck && npm run test:ci && npx electron-vite build`) to catch issues without CI minutes. Run `npm run test:e2e` locally before merging anything that touches Electron-specific paths since CI no longer covers it.
 
