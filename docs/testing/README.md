@@ -161,23 +161,9 @@ See `specs/spec-t2-019-visual-regression-ci/` for full specification.
 
 ---
 
-## 🎯 Testing Capabilities
-
-Circuit Electron MCP enables Claude Code to:
-- ✅ Launch Erfana and capture screenshots
-- ✅ Interact with UI (click, type, keyboard shortcuts)
-- ✅ Verify functionality visually and programmatically
-- ✅ Test after code changes without manual inspection
-- ✅ Run automated test scenarios
-- ✅ Debug issues with visual feedback
-
----
-
 ## 📋 Prerequisites
 
-For unit/integration:
-1. Install dev deps: `npm i -D vitest @testing-library/react @testing-library/user-event @testing-library/jest-dom jsdom`
-2. Run tests: `npm run test`
+For unit/integration: `npm ci` (vitest, Testing Library, and jsdom are already devDependencies), then `npm run test`.
 
 For MCP visual testing:
 1. Build: `npm run build`
