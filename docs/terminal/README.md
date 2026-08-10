@@ -263,7 +263,7 @@ Capture photos from connected cameras directly from the terminal toolbar.
 **Dialog Features**:
 - Live camera preview with device selector (when multiple cameras available)
 - "Mirror preview" checkbox below the preview – preview-only, remembered per camera, disabled until the preview is live
-- Hot-plug support: detects camera connect/disconnect, debounced 300 ms. The listener lives on the terminal panel, not the dialog, so a camera plugged in while the dialog is closed is already known by the time it opens
+- Hot-plug support: detects camera connect/disconnect, debounced 300 ms. The listener is registered once for the life of the terminal panel rather than per dialog-open — it lives in `useCameraCapture`, and `TerminalPanel` renders `<CameraDialog>` unconditionally (visibility is driven by its `isOpen` prop), so the hook is never torn down and re-created by opening the dialog. As a result a camera plugged in while the dialog is closed is already known by the time it opens
 - Fallback labels ("Camera 1", "Camera 2") when device labels unavailable
 - Keyboard: Escape closes; Enter captures only while the Capture button itself has focus (Enter on Cancel cancels, as expected)
 - Shutter animation on capture

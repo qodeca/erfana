@@ -31,6 +31,13 @@ Design summary: one `v*.*.*` tag push from `main` produces one GitHub draft rele
       │                    │                            │   package-lock-digest artifact
       │                    │                            └── gh release create --draft
       │                    │                            │
+      │                    │                   ┌────────┴────────┐
+      │  Review deployments│                   │ environment:    │
+      │◄───────────────────┼───────────────────┤ production-signing
+      │  approve           │                   │ (required       │
+      ├───────────────────►┼──────────────────►│  reviewer)      │
+      │                    │                   └────────┬────────┘
+      │                    │                            │
       │                    │                    ┌───────┴───────┐
       │                    │                    │               │
       │                    │                build_mac       build_win
@@ -88,6 +95,8 @@ sequenceDiagram
   S->>GH: push signed tag v0.9.5
   GH->>CI: trigger release.yml
   CI->>GH: gh release create --draft
+  CI-->>O: production-signing approval required (both build legs hold)
+  O->>CI: approve deployment
   par matrix
     CI->>GH: build_mac uploads .dmg (arm64 only, notarized + stapled)
     CI->>GH: build_win uploads .exe (Authenticode signed)
@@ -144,12 +153,49 @@ All secrets live in the GitHub repo `qodeca/erfana` (Settings → Secrets and va
 
 Owner: release engineer on rotation (currently documented under repo owner email). Concrete dates above must be re-verified against the actual cert expiries on each rotation event — they are documented best-effort anchors, not authoritative.
 
+## Approval gate (`production-signing`)
+
+Both build legs declare `environment: production-signing` (`build_mac.yml`, `build_win.yml`), so **every release pauses for a human approval after `prepare` and before any signing credential is attached**. This is the single manual step inside an otherwise unattended pipeline, and it is the most common reason a release run looks stalled.
+
+What it looks like: `prepare` completes in seconds, then `gh run view` reports the run as `waiting` with `Build macOS` and `Build Windows` both in `waiting` — not `in_progress`, and not failed. Nothing further happens until someone approves.
+
+Approve either way:
+
+```bash
+# UI: Actions -> the run -> "Review deployments" -> tick production-signing -> Approve
+
+# CLI:
+RUN_ID="<release run id>"   # e.g. 31264941055
+ENV_ID=$(gh api "repos/qodeca/erfana/actions/runs/$RUN_ID/pending_deployments" --jq '.[0].environment.id')
+# Guard: if the run is not actually waiting, ENV_ID is the literal "null" and
+# the POST below fails with an opaque 422.
+[ -n "$ENV_ID" ] && [ "$ENV_ID" != "null" ] || { echo "no pending deployment on run $RUN_ID"; exit 1; }
+# All three body params are required by the API; omitting `comment` returns 422.
+gh api -X POST "repos/qodeca/erfana/actions/runs/$RUN_ID/pending_deployments" \
+  -f state=approved -f comment="release approved" -F "environment_ids[]=$ENV_ID"
+```
+
+Inspect the rule anytime:
+
+```bash
+gh api repos/qodeca/erfana/environments/production-signing --jq '.protection_rules'
+```
+
+`marcinobel` is the sole required reviewer, `prevent_self_review` is `false`, and `can_admins_bypass` is `true` — the gate is an anti-mistake control, not a defence against a compromised admin account. The same environment gates `whisper-binaries.yml`; see [whisper-binaries.md §4](./whisper-binaries.md) for the credential-scoping rationale.
+
+**Consequences for tooling.** Any watcher over `release.yml` must treat `waiting` as a normal, unbounded state:
+
+- A fixed polling ceiling will otherwise expire mid-wait and report a healthy release as failed. On v0.17.0 the legs were approved 2 h 22 min after `prepare` finished — well past the release skill's 88-minute ceiling.
+- A stuck-leg detector that matches only `status == "in_progress"` never fires here, because a leg awaiting approval reports `waiting` or `queued`. Detect `waiting` explicitly and prompt for approval rather than counting it toward a timeout.
+
 ## Runner strategy
 
 | Platform | Runner | Time budget | Notes |
 |---|---|---|---|
 | macOS | `macos-latest` (arm64 default) | ~60 min | Builds arm64 only (`--arm64`) — Apple Silicon is the sole macOS target. Intel (x64) and the `.zip` target were dropped. |
 | Windows | `windows-latest` (x64) | ~45 min | Azure Artifact Signing via app-reg certificate auth (OIDC unsupported by electron-builder 26). The NSIS installer `.exe` is signed. |
+
+Those budgets are `timeout-minutes` on the build jobs, and the clock starts only **after** the [approval gate](#approval-gate-production-signing) is cleared. End-to-end wall-clock is therefore approval latency + build time.
 
 No self-hosted runners for release. Self-hosted Windows with a `.pfx` on disk is explicitly out of scope — side-doors outlive the rationale for creating them.
 
@@ -166,7 +212,7 @@ The release asset set is pinned in four places with no automated cross-check bet
 | `.github/workflows/build_win.yml` | signtool-verify + upload globs | `*-setup.exe` in both the verify loop and `gh release upload` |
 | [`.claude/skills/releasing-erfana/SKILL.md`](../../.claude/skills/releasing-erfana/SKILL.md) § Constants | expected asset count | 2 binaries + `SHA256SUMS` + `SHA256SUMS.minisig`, i.e. `EXPECTED_ASSETS=4`. Note this is **not** an equality assertion anywhere: §0.4 uses it as a floor (`[ "$ASSET_COUNT" -ge "$EXPECTED_ASSETS" ]`) to decide a draft is `draft-ready`, and `phase-4-verify.md` carries no count check at all — §4.6 only prints the expected set for the operator |
 
-**Verified in agreement on 2026-08-07.** The published `v0.16.3` release carries exactly four assets — `erfana-0.16.3-arm64.dmg`, `erfana-0.16.3-setup.exe`, `SHA256SUMS`, `SHA256SUMS.minisig` — matching all four definitions above. Adding or removing a build target is therefore a four-file change plus a release-notes/verification-doc sweep, never a one-line `electron-builder.yml` edit.
+**Verified in agreement on 2026-08-08.** The published `v0.17.0` release carries exactly four assets — `erfana-0.17.0-arm64.dmg`, `erfana-0.17.0-setup.exe`, `SHA256SUMS`, `SHA256SUMS.minisig` — matching all four definitions above. Adding or removing a build target is therefore a four-file change plus a release-notes/verification-doc sweep, never a one-line `electron-builder.yml` edit.
 
 ## Hardened-runtime entitlements (known gap)
 
@@ -192,7 +238,7 @@ An end user downloading from the release page should run the following to confir
 
 ### 1. Integrity + aggregate signature (all platforms)
 
-Substitute the version you downloaded for `{version}` throughout — the worked example below uses **v0.16.3**, the current public release. Run the whole block from the directory that holds the downloaded `.dmg` / `.exe`; `SHA256SUMS` lists **both** binaries by bare filename, and two things follow from that:
+Substitute the version you downloaded for `{version}` throughout — the worked example below uses **v0.17.0**, the current public release. Run the whole block from the directory that holds the downloaded `.dmg` / `.exe`; `SHA256SUMS` lists **both** binaries by bare filename, and two things follow from that:
 
 - Most people download **one** platform, so a bare `sha256sum -c SHA256SUMS` reports `FAILED open or read` for the other one and exits 1 on a perfectly good download. The recipe therefore passes `--ignore-missing`, verified working with GNU `sha256sum` (coreutils), macOS's `/sbin/sha256sum`, and Perl `shasum -a 256` (6.x).
 - `--ignore-missing` also means "verified nothing" is a possible outcome — that is what running from the wrong directory looks like. GNU `sha256sum` and `shasum` exit 1 with `no file was verified`, but macOS's `/sbin/sha256sum` exits **0** silently, so the block below additionally requires at least one `OK` line.
@@ -205,7 +251,7 @@ for `return 1`.
 
 ```bash
 #!/usr/bin/env bash
-VERSION=0.16.3   # the v{version} you downloaded, without the leading "v"
+VERSION=0.17.0   # the v{version} you downloaded, without the leading "v"
 
 curl -LO "https://github.com/qodeca/erfana/releases/download/v${VERSION}/SHA256SUMS"
 curl -LO "https://github.com/qodeca/erfana/releases/download/v${VERSION}/SHA256SUMS.minisig"
@@ -315,7 +361,7 @@ $signtool = Join-Path $sdkBin.FullName "x64\signtool.exe"
 if (-not (Test-Path $signtool)) { throw "signtool.exe not found under $sdkRoot" }
 
 # Both signatures must verify independently.
-& $signtool verify /pa /all /tw C:\Path\To\erfana-0.16.3-setup.exe
+& $signtool verify /pa /all /tw C:\Path\To\erfana-0.17.0-setup.exe
 ```
 
 First-time Windows installs will see a SmartScreen warning on a newly provisioned Azure Artifact Signing identity. Reputation accrues organically regardless of EV/OV status — several successful installs will silence the warning. This is expected, not a defect.
@@ -324,8 +370,10 @@ First-time Windows installs will see a SmartScreen warning on a newly provisione
 
 | State | Remediation |
 |---|---|
-| Tag pushed; `prepare` failed (e.g., release-notes file missing) | `git push --delete origin v${version}` → fix locally → re-tag with same version. No draft to clean. |
-| Tag pushed; `prepare` succeeded; any matrix leg failed | `cleanup` deletes draft and exits red. `git push --delete origin v${version}` → bump to next patch. Any signed artifact, even in a draft, burns the version. |
+| Tag pushed; `prepare` failed on a repo-content assertion (e.g., release-notes file missing) | **Bump to the next patch version.** The tag ruleset carries a `deletion` rule with no bypass actors, so `git push --delete origin v${version}` is rejected (`push declined due to repository rule violations`) — the version cannot be reused. `gh run rerun` does not help either: it replays the same tagged commit, which still lacks the fix. No draft to clean. |
+| Tag pushed; `prepare` failed on `No green checks.yml run for <sha>` | **Not a red build — a race.** `checks.yml` had not yet reached `completed`/`success` for the tagged SHA when `prepare` queried it. Wait until `gh api "repos/qodeca/erfana/actions/workflows/checks.yml/runs?head_sha=$SHA&status=success"` reports `total_count ≥ 1`, then `gh run rerun <id>` — the same run id, no new tag. **The tag is not burned**: nothing was built, signed, or drafted. Prevention: poll the *workflow run* to completion before tagging, not just the six required check contexts (the advisory `windows-checks` job keeps the run `in_progress` for ~3 min after they go green). See [`docs/release-incidents/v0.17.0-attempt-1.md`](../release-incidents/v0.17.0-attempt-1.md). |
+| Run sits in `waiting`, both build legs unstarted | The `production-signing` environment approval is pending. Approve via **Review deployments** in the Actions UI, or the CLI recipe in [Approval gate](#approval-gate-production-signing) (all three body params — `environment_ids`, `state` **and** `comment` — are required; omitting `comment` returns HTTP 422). Not a failure; the tag is not burned. |
+| Tag pushed; `prepare` succeeded; any matrix leg failed | `cleanup` deletes the draft and exits red. Bump to the next patch — any signed artifact, even in a draft, burns the version. The tag itself cannot be deleted (ruleset `deletion` rule, no bypass actors); `git tag -d v${version}` clears only the local copy. |
 | Tag pushed; build all-green; `finalize` failed | Draft exists with unsigned `SHA256SUMS`. `cleanup` fires. Bump to next patch. |
 | Build all-green; operator rejects at skill Phase 4 (verify-then-approve) | `gh release delete v${version} --yes --cleanup-tag=false`. Bump to next patch. |
 | Draft published (`--draft=false --latest`); content bug reported | Cut hotfix `v${version+patch}` with the fix. Old release stays visible but is no longer Latest. Never edit assets in place. |

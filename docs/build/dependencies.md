@@ -1,6 +1,6 @@
 # Dependencies in the packaged build
 
-**Last verified**: 2026-08-07 against v0.16.3 (`electron-builder.yml:32-34`, `package.json`, installed `node_modules`).
+**Last verified**: 2026-08-09 against v0.17.0 (the `files:` allowlist in `electron-builder.yml`, `package.json`, installed `node_modules`).
 
 This document covers what electron-builder excludes from the packaged app, and how the native and heavyweight dependencies that *do* ship are handled.
 
@@ -11,7 +11,7 @@ This document covers what electron-builder excludes from the packaged app, and h
 ### Current configuration
 
 ```yaml
-# electron-builder.yml (lines 32-34, inside the `files` list)
+# electron-builder.yml — the three size exclusions at the end of the `files` allowlist
 files:
   # ...
   - '!node_modules/jsdom/**'
@@ -32,6 +32,10 @@ Only `jsdom` is installed. It is the DOM environment for two Vitest projects —
 `canvas` and `@mapbox/node-pre-gyp` appear in neither `package.json` nor `node_modules`. jsdom 25 no longer pulls `canvas` in (it is an optional peer, not a dependency), and with `canvas` gone its `@mapbox/node-pre-gyp` installer went too. Their globs are inert.
 
 > **Correction (August 2026)**: earlier revisions of this document claimed ~15 MB for `canvas`, ~5 MB for `@mapbox/node-pre-gyp`, and ~50 MB saved in total. Those figures described packages that are not installed. The real saving from this block is the size of `jsdom` — single-digit MB, not tens.
+
+### The allowlist change did not change any of this
+
+Issue #43 turned `files:` from a negation-only list into an allowlist (two positive patterns plus the negations — see [electron-builder.md](./electron-builder.md#files-allowlist)). Nothing about `node_modules` moved with it. app-builder-lib builds the node-modules matcher separately in `getNodeModuleFileMatcher()`. On the normalised FileSet form electron-builder actually hands the hook it copies **every** filter pattern out of the `files:` list — positives included — but prepends `**/*`, which makes the positives inert there, so in effect **only** the `!`-prefixed patterns change what ships from `node_modules`. The three exclusions above still bind exactly as before — and so does the new `!**/{.env,.env.*,.npmrc}` / `!**/*.map` pair, which the `**/` anchor now reaches into the packed dependency tree with. There is deliberately **no** positive `node_modules` pattern: adding one would not add files (electron-builder ships production `node_modules` unconditionally), it would relocate the `!**/node_modules/**` exclusion app-builder-lib splices in and change the list's semantics.
 
 ### Criteria for adding an exclusion
 
@@ -150,7 +154,7 @@ ls release/*/mac-arm64/Erfana.app/Contents/Resources/app/node_modules/ffprobe-st
 
 The `jsdom` exclusion is worth single-digit MB. The `afterPack` prunes are the change that actually moved the number: the macOS `Resources/app` payload dropped roughly 56% (791 MB → 347 MB) in v0.11.2 when foreign-arch binaries and renderer-only sources were removed.
 
-Current packaged sizes have not been re-measured for v0.16.3; treat any figure older than that as historical.
+The issue #43 allowlist fix is the most recent measurement (local macOS builds, August 2026). On the fix branch's original `v0.16.3` base the `.app` dropped from 612 MB to 581 MB and `Resources/app` from 350 MB to 319 MB, with the top-level entry count under `app/` falling from 23 to 3. After the branch was merged up to `v0.17.0`, the post-fix bundle re-measured at 588 MB `.app` / 327 MB `app/` (still exactly three top-level entries) — a little larger only because v0.17.0 carries more application code, confirming the allowlist holds across the merge. Treat any figure older than these as historical.
 
 ### Cleaner production bundle
 

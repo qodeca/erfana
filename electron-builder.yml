@@ -3,6 +3,21 @@ productName: Erfana
 beforePack: ./scripts/ensure-media-binaries.js
 afterPack: ./scripts/fuses.js
 afterSign: ./scripts/resign.js
+# EXTRA-CONTENT ALLOWLIST (issue #55). extraResources copies land BESIDE app/
+# (Contents/Resources/ on macOS, resources/ on Windows). Each `to:` below MUST
+# stay within ALLOWED_EXTRA_RESOURCES_DESTS in scripts/fuses.js. Enforced in
+# three coupled places, all of which fail loudly on drift:
+#   - runtime L1 assertExtraContentAllowlist() over the MERGED (top-level ∪
+#     mac:/win:) config, and L2a-1/L2a-2 packed-tree walks in scripts/fuses.js;
+#   - the "Guard - electron-builder packaging allowlist" step in
+#     .github/workflows/checks.yml (a COARSE presence check: warns on any
+#     extraResources: edit, hard-fails on any extraFiles:);
+#   - the authoritative from/to SHAPE check in scripts/fuses.test.mjs
+#     ("agrees with the repository electron-builder.yml as shipped"), which runs
+#     in the required Unit-tests job.
+# The ABSENCE of any extraFiles: key (here AND under mac:/win:) is intentional:
+# ALLOWED_EXTRA_FILES_DESTS in scripts/fuses.js is empty (fail-closed), so adding
+# extraFiles: is rejected by both the CI guard and the runtime L1 guard.
 extraResources:
   - from: resources/tessdata
     to: tessdata
@@ -16,19 +31,34 @@ directories:
   buildResources: resources
   output: release/${version}
 files:
-  - '!**/.vscode/*'
-  - '!src/*'
-  - '!electron.vite.config.{js,ts,mjs,cjs}'
-  - '!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
-  - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
-  - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
-  - '!docs/**'
-  - '!release/**'
-  - '!coverage/**'
-  - '!tests/**'
-  - '!vitest.*.ts'
-  - '!tsconfig.test.json'
-  - '!*.md'
+  # ALLOWLIST (issue #43) - at least one non-negated pattern MUST remain here.
+  # app-builder-lib's FileMatcher.containsOnlyIgnore() treats a list of only
+  # '!' patterns as "no includes given", and getMainFileMatchers() then splices
+  # an implicit '**/*' at index 0 - which packages the ENTIRE repository root
+  # into Contents/Resources/app/, untracked local-only directories included,
+  # and with `asar: false` it ships uncompressed and browsable.
+  # Enforced twice: "Guard - electron-builder packaging allowlist" in
+  # .github/workflows/checks.yml checks this file; assertPackagedAppContents()
+  # in scripts/fuses.js checks the packed tree during afterPack, before signing.
+  # Adding a positive pattern here also requires updating, together:
+  # ALLOWED_APP_ENTRIES in scripts/fuses.js, and makePackedApp plus the exact
+  # entry counts in scripts/fuses.test.mjs (pass 1 is bidirectional, so the
+  # fixture must carry every allowed entry). All of them fail loudly.
+  - 'out/**'
+  - 'package.json'
+  # Unconditional exclusions. Unlike the positives above these bind whatever the
+  # allowlist later becomes, and the '**/' anchor also reaches the packed
+  # node_modules tree: getNodeModuleFileMatcher() copies this list's patterns into
+  # a separate matcher behind a prepended '**/*', which makes the positives inert
+  # there, so only these '!' patterns change what ships from node_modules.
+  # electron-builder's built-in excludedNames covers .git/.github/lockfiles but
+  # NOT .env or .npmrc.
+  - '!**/{.env,.env.*,.npmrc}'
+  - '!**/.vscode/**'
+  - '!**/*.map'
+  # Size exclusions. No positive node_modules pattern: app-builder-lib splices
+  # '!**/node_modules/**' ahead of the first positive one, changing semantics
+  # rather than adding files. See docs/build/dependencies.md.
   - '!node_modules/jsdom/**'
   - '!node_modules/canvas/**'
   - '!node_modules/@mapbox/node-pre-gyp/**'

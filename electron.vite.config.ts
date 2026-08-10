@@ -20,7 +20,9 @@ export default defineConfig({
           'git-status.worker': resolve('src/main/services/workers/git-status.worker.ts'),
           // SD-019 (#19) native-dependency spike: emits out/main/sqlite-smoke.worker.js,
           // loaded by nativeDepsSmoke.ts via join(__dirname, ...) like the git worker.
-          'sqlite-smoke.worker': resolve('src/main/services/workers/sqlite-smoke.worker.ts')
+          'sqlite-smoke.worker': resolve('src/main/services/workers/sqlite-smoke.worker.ts'),
+          // DOCX conversion runs in a killable utilityProcess child (#1 lens-review).
+          'docx/docx-convert.process': resolve('src/main/services/docx/docx-convert.process.ts')
         },
         output: {
           // Keep split chunks flat in out/main/ (not out/main/chunks/) so a

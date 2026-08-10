@@ -52,8 +52,17 @@ export const BYTES_PER_MB = 1024 * 1024
 export const IMPORT = {
   /** Directory name for imported files */
   DIR_NAME: 'import',
-  /** Size warning threshold in bytes (50MB) */
+  /** Size warning threshold in bytes (50MB) — non-blocking; surfaces a warning */
   SIZE_WARNING_THRESHOLD: 50 * BYTES_PER_MB,
+  /**
+   * Hard size limit in bytes (250MB) — blocking. Files above this are rejected
+   * before reaching a converter. This bounds the *byte size* of the input (raw
+   * I/O and gross buffering), not the decoded pixel count — a small file can
+   * still decode to a huge image, so it is not a decompression-bomb guard on its
+   * own (see the document-import isolation follow-up). Set well above legitimate
+   * large PDFs. This is a SECURITY limit and is not user-configurable.
+   */
+  SIZE_HARD_LIMIT: 250 * BYTES_PER_MB,
   /** Maximum number of auto-numbered copies before rejecting */
   MAX_COPY_ATTEMPTS: 1000,
   /**

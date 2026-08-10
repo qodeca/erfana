@@ -1,6 +1,6 @@
 # Electron Builder configuration
 
-**Last updated**: August 2026 (v0.16.3)
+**Last updated**: August 2026 (v0.17.0)
 
 This document explains the electron-builder version choice, the `aproba` build-time shim, and the parts of `electron-builder.yml` that are easy to get wrong.
 
@@ -98,7 +98,7 @@ electron-builder runs three of Erfana's scripts across the packaging lifecycle:
 | Hook | Script | Purpose |
 |------|--------|---------|
 | `beforePack` | `scripts/ensure-media-binaries.js` | Downloads a hardcoded per-platform arch set of `ffmpeg-static` binaries (`x64` **and** `arm64` on macOS, the host arch elsewhere — not the configured target) into `release/.media-cache/<platform>-<arch>/`, verified by size floor plus a pinned SHA-256 on the arches listed in `FFMPEG_SHA256` (macOS only today; Windows is size-floor-only). CI installs with `npm ci --ignore-scripts`, so `ffmpeg-static`'s own postinstall download never ran. |
-| `afterPack` | `scripts/fuses.js` | Renames the bundle on a test build; prunes foreign-platform/arch `ffprobe-static` binaries and `node-pty` prebuilds (plus a `.pdb` strip on `win32`); restores the `node-pty` `spawn-helper` execute bit to `0755`; copies the cached per-arch `ffmpeg` into the bundle, re-runs the same size/hash verification at the packed path and chmods it along with every `ffprobe`; then flips the Electron fuses and resets the ad-hoc Darwin signature. |
+| `afterPack` | `scripts/fuses.js` | Renames the bundle on a test build; prunes foreign-platform/arch `ffprobe-static` binaries and `node-pty` prebuilds (plus a `.pdb` strip on `win32`); restores the `node-pty` `spawn-helper` execute bit to `0755`; copies the cached per-arch `ffmpeg` into the bundle, re-runs the same size/hash verification at the packed path and chmods it along with every `ffprobe`; flips the Electron fuses and resets the ad-hoc Darwin signature; and finally asserts the packed `app/` tree matches the `files:` allowlist (issue #43). |
 | `afterSign` | `scripts/resign.js` | Deep re-signs the entire `.app` bundle atomically. |
 
 ```yaml
@@ -147,29 +147,58 @@ extraResources:
 
 **`ffmpeg` is not in `extraResources`.** It is cached by `beforePack` under `release/.media-cache/` and copied by `afterPack` into `app/node_modules/ffmpeg-static/`.
 
-### `files` exclusions
+**Editing this block is a coupled edit (issue #55).** The three `to:` destinations are the allowlist `ALLOWED_EXTRA_RESOURCES_DESTS` in `scripts/fuses.js`; adding or renaming a destination must land together with that constant (and `EXPECTED_RESOURCES_ENTRIES`, which derives from it) or the binding test in `scripts/fuses.test.mjs` — which parses the real config in the required Unit-tests job — fails on every push. A coarse CI presence grep in `checks.yml` warns on `extraResources:` edits and hard-fails any `extraFiles:` block. **There is deliberately no `extraFiles:`** (top-level or under `mac:`/`win:`); its allowlist `ALLOWED_EXTRA_FILES_DESTS` is empty, so any `extraFiles` entry is rejected fail-closed. See [fuses.md § Extra-content destinations](./fuses.md#extra-content-destinations--extrafiles--extraresources-issue-55).
+
+### `files` allowlist
 
 ```yaml
 files:
-  - '!**/.vscode/*'
-  - '!src/*'
-  - '!electron.vite.config.{js,ts,mjs,cjs}'
-  - '!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
-  - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
-  - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
-  - '!docs/**'
-  - '!release/**'
-  - '!coverage/**'
-  - '!tests/**'
-  - '!vitest.*.ts'
-  - '!tsconfig.test.json'
-  - '!*.md'
+  # positives — at least one MUST remain (see below)
+  - 'out/**'
+  - 'package.json'
+  # unconditional exclusions
+  - '!**/{.env,.env.*,.npmrc}'
+  - '!**/.vscode/**'
+  - '!**/*.map'
+  # size exclusions
   - '!node_modules/jsdom/**'
   - '!node_modules/canvas/**'
   - '!node_modules/@mapbox/node-pre-gyp/**'
 ```
 
-The `.env` exclusion is a secrets guard, not a size optimisation. The three `node_modules` entries are discussed — including which of them are now no-ops — in [dependencies.md](./dependencies.md).
+**At least one non-negated pattern must stay in this list.** Until [issue #43](https://github.com/qodeca/erfana/issues/43) it held sixteen patterns and every one of them was a negation, which app-builder-lib reads as *no includes given*:
+
+- `FileMatcher.containsOnlyIgnore()` (`app-builder-lib/out/fileMatcher.js`) returns true when the list holds no pattern without a leading `!`.
+- `getMainFileMatchers()` (same file) then pushes `**/*` into `customFirstPatterns` and splices it in at index 0.
+
+So the list did the opposite of what it read like: the **entire repository root** was copied into `Contents/Resources/app/`, untracked local-only directories included, and with `asar: false` it shipped uncompressed and browsable. Measured on a local macOS build: 23 top-level entries under `app/` before the fix, 3 after; the `.app` 612 MB → 581 MB and `app/` 350 MB → 319 MB.
+
+**There is deliberately no positive `node_modules` pattern.** `package.json` and the production `node_modules` tree are added by electron-builder unconditionally, whatever the patterns say — adding `node_modules/**` here would not add files, it would change semantics. `getMainFileMatchers()` scans for the first *positive* pattern mentioning `node_modules` and, when it finds one, splices `!**/node_modules/**` immediately **before** it instead of at the head of the list. Keep `node_modules` out of the positives.
+
+**The negations are kept, and re-anchored.** They are now anchored at `**/` rather than at the repository root, and they are not redundant with the positives:
+
+- `.env` / `.env.*` / `.npmrc` are a secrets guard, not a size optimisation. electron-builder's built-in `excludedNames` covers `.git`, `.github`, `.gitignore` and the lockfiles, but **not** `.env` or `.npmrc`; `excludedExts` does not cover `.map` either.
+- The `**/` anchor is stronger than the old repo-root-relative form: `getNodeModuleFileMatcher()` copies this list's patterns into the node-modules matcher behind a prepended `**/*` (which makes the positive patterns inert there), so the `!`-prefixed ones — `!**/{.env,.env.*,.npmrc}` and `!**/*.map` — now also strip a dependency-shipped `.env`, `.npmrc` or source map out of the packed `node_modules`. The old root-anchored patterns did not.
+- The three `node_modules` size exclusions are unchanged and are discussed — including which of them are now no-ops — in [dependencies.md](./dependencies.md).
+
+`resources/` never needed an entry here: `directories.buildResources: resources` makes electron-builder exclude that directory from `app/` automatically, so the `tessdata` shipped via `extraResources` was never duplicated inside the app directory.
+
+**Adding a positive pattern is a two-place edit.** A new positive introduces a new top-level entry under `app/`, so it must land together with:
+
+1. `ALLOWED_APP_ENTRIES` in `scripts/fuses.js`, and
+2. `makePackedApp` plus the exact file/dir counts in `scripts/fuses.test.mjs` (the depth-1 check is bidirectional — the fixture must carry every allowed entry).
+
+All of them fail loudly rather than silently widening the bundle.
+
+**Guards enforce the shape**, on the config and on the packed tree. The `files:` allowlist (issue #43) and the `extraFiles`/`extraResources` destinations (issue #55) are guarded on the same axes:
+
+| Guard | Where | Checks |
+|-------|-------|--------|
+| `Guard - electron-builder packaging allowlist` | `.github/workflows/checks.yml`, `release-guards` job | Pure awk/grep against this YAML (the job is checkout-only — no `npm ci`, so no YAML parser is available): `afterPack:`/`afterSign:` wiring present, no platform-specific `files:` block, a `files:` block that has list items, at least one positive pattern, and no positive pattern whose first path segment is a wildcard. Also (issue #55) a coarse presence grep that hard-fails any `extraFiles:` block — at column 0 **or** indented under `mac:`/`win:` — and warns on `extraResources:` edits. |
+| `assertConfigMatchesAllowlist()` + `assertPackagedAppContents()` | `scripts/fuses.js`, in `afterPack`, before signing | Derives the permitted entry set from the live config and compares it with `ALLOWED_APP_ENTRIES`, then walks the packed `app/` tree. See [fuses.md](./fuses.md#afterpack-also-verifies-the-packed-app-contents). |
+| `assertExtraContentAllowlist()` + `assertResourcesDestNoRepoLeak()` / `assertResourcesSiblingsAllowlist()` / `assertExtraFilesDestNoRepoLeak()` | `scripts/fuses.js`, in `afterPack`, before signing (issue #55) | Shape-checks the **merged** `extra*` config (top-level ∪ platform-scoped, so it sees `--config.win.*` overrides) against `ALLOWED_EXTRA_RESOURCES_DESTS` / the empty `ALLOWED_EXTRA_FILES_DESTS`, then walks the destinations beside and above `app/`. See [fuses.md § Extra-content destinations](./fuses.md#extra-content-destinations--extrafiles--extraresources-issue-55). |
+
+The `extraResources` allowlist is a **three-site coupling**: the `extraResources:` block in this file, `ALLOWED_EXTRA_RESOURCES_DESTS` in `scripts/fuses.js`, and the binding test in `scripts/fuses.test.mjs` must change together.
 
 ### macOS
 

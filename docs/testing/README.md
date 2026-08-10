@@ -22,7 +22,7 @@ Complete guide for testing Erfana. This covers both automated tests (Vitest/Play
 
 #### Key test areas
 
-Run `npm run test` for current totals (8,925 tests across 304 files on macOS as of v0.16.3; ~78 cases platform-gate on Windows — 77 POSIX-only `pathSecurity.test.ts` + 1 macOS-only `LiteParseConverter.test.ts`). For the version-by-version test-addition history, see [`docs/CHANGELOG.md`](../CHANGELOG.md).
+Run `npm run test` for current totals (9,218 tests across 308 files on macOS as of v0.17.0; ~78 cases platform-gate on Windows — 77 POSIX-only `pathSecurity.test.ts` + 1 macOS-only `LiteParseConverter.test.ts`). For the version-by-version test-addition history, see [`docs/CHANGELOG.md`](../CHANGELOG.md).
 
 | Area | Key files | Docs |
 |------|-----------|------|
@@ -161,23 +161,9 @@ See `specs/spec-t2-019-visual-regression-ci/` for full specification.
 
 ---
 
-## 🎯 Testing Capabilities
-
-Circuit Electron MCP enables Claude Code to:
-- ✅ Launch Erfana and capture screenshots
-- ✅ Interact with UI (click, type, keyboard shortcuts)
-- ✅ Verify functionality visually and programmatically
-- ✅ Test after code changes without manual inspection
-- ✅ Run automated test scenarios
-- ✅ Debug issues with visual feedback
-
----
-
 ## 📋 Prerequisites
 
-For unit/integration:
-1. Install dev deps: `npm i -D vitest @testing-library/react @testing-library/user-event @testing-library/jest-dom jsdom`
-2. Run tests: `npm run test`
+For unit/integration: `npm ci` (vitest, Testing Library, and jsdom are already devDependencies), then `npm run test`.
 
 For MCP visual testing:
 1. Build: `npm run build`

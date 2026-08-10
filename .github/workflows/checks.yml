@@ -110,6 +110,43 @@ jobs:
           fi
           exit "$TEST_EXIT"
 
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
+    # Enforces the per-file coverage FLOORS declared in vitest.main.ts under
+    # test.coverage.thresholds: scripts/fuses.js (the issue #43/#55 packaging-
+    # integrity guards + Electron fuses) and the whisper trust-chain modules
+    # (verifyManifest / secureDownloader / zipArchive / tarArchive) + the #41
+    # model-id registry. The required `test` job runs `test:ci` WITHOUT coverage,
+    # so these floors fire ONLY here — this job is what makes them a gate rather
+    # than a local-only `npm run test:cov` nicety (issue #55, F4 residual).
+    #
+    # Scoped to the main project (`--project main`) on purpose: only the main
+    # project's tests load scripts/fuses.js (via scripts/fuses.test.mjs), so the
+    # v8 report carries exactly ONE fuses.js row at its real ~88% coverage. A
+    # full-workspace run pulls renderer/preload tests in too and — with an
+    # untested include or `all: true` — can emit a second 0%-baseline fuses.js
+    # row; `all: false` in vitest.main.ts already collapses that, and `--project
+    # main` keeps the instrumented set (and therefore the threshold match)
+    # unambiguous and deterministic. Do NOT drop `--project main`.
+    steps:
+      # actions/checkout v6.0.3 — MUST run before the local composite action
+      # below so the action.yml file can be loaded from the workspace.
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: ./.github/actions/setup-node-with-retry
+        with:
+          # scripts/fuses.test.mjs + the other main-process tests import the
+          # electron binary and node-pty native bindings; run the allowlisted
+          # postinstall so they are present for the coverage run.
+          run-postinstall: "true"
+      - name: Main-project coverage (enforces the scripts/fuses.js + whisper floors)
+        # Fails the job when any per-file floor in vitest.main.ts is breached
+        # (vitest exits non-zero on a threshold miss). --coverage activates the
+        # thresholds; --config supplies them; --project main scopes the run.
+        run: npx vitest --run --config vitest.main.ts --project main --coverage
+
   build:
     name: Build
     runs-on: ubuntu-latest
@@ -226,7 +263,13 @@ jobs:
     timeout-minutes: 3
     if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      # fetch-depth: 0 so the electron-builder.yml packaging guard can compare
+      # the extraResources: block against the push/PR base commit (issue #55).
+      # The default depth-1 checkout has no base to diff against, which would
+      # force that guard into its fail-safe warn-always path.
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          fetch-depth: 0
 
       # Guard 1: no pull_request_target triggers anywhere.
       # Fork exfiltration vector: pull_request_target runs with base-repo
@@ -339,3 +382,218 @@ jobs:
             exit 1
           fi
           echo "release pubkeys consistent across docs/release-pubkey.txt, docs/security.md$( [ -n "$README" ] && echo ', README.md')"
+
+      # Guard 6: electron-builder packaging allowlist (issue #43).
+      # app-builder-lib's FileMatcher.containsOnlyIgnore() treats a `files:`
+      # list of only '!' patterns as "no includes given" and splices an implicit
+      # '**/*' at index 0, packaging the ENTIRE repository root into
+      # Contents/Resources/app/ - untracked local-only directories included, and
+      # uncompressed under `asar: false`. One positive pattern restores allowlist
+      # semantics; an all-matching positive re-creates the bug explicitly.
+      # This guard also asserts the afterPack/afterSign wiring, because deleting
+      # that one line silently disables every packaging guard AND all three
+      # Electron security fuses with a green build.
+      # The packed-tree counterpart is assertPackagedAppContents() in
+      # scripts/fuses.js, which runs during afterPack, before signing.
+      # Pure awk/grep: this job is checkout-only, so there is no `npm ci` and
+      # therefore no js-yaml (node itself is preinstalled, but a parser is not).
+      - name: Guard - electron-builder packaging allowlist
+        env:
+          # Resolved here, not interpolated into the script body, so no github.*
+          # value is ever spliced into shell source. Empty on non-push/PR events;
+          # the guard treats empty as "no base" and falls back to warning.
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          set -euo pipefail
+          # $1 is never passed by the `run:` step (it always defaults); it exists
+          # so the manual negative tests can point the guard at a mutated copy:
+          # `bash guard.sh /tmp/broken.yml`.
+          EB_CONFIG="${1:-electron-builder.yml}"
+
+          # 1. Hook wiring must still be present. Optional quotes: 'x' and x are
+          #    the same YAML, and both work in electron-builder.
+          grep -qE "^afterPack:[[:space:]]*['\"]?\./scripts/fuses\.js['\"]?[[:space:]]*$" "$EB_CONFIG" || {
+            echo "::error::$EB_CONFIG is missing 'afterPack: ./scripts/fuses.js' - every packaging guard and Electron fuse silently stops running (issue #43)"
+            exit 1
+          }
+          grep -qE "^afterSign:[[:space:]]*['\"]?\./scripts/resign\.js['\"]?[[:space:]]*$" "$EB_CONFIG" || {
+            echo "::error::$EB_CONFIG is missing 'afterSign: ./scripts/resign.js' - the macOS re-signing step stops running"
+            exit 1
+          }
+
+          # 1b. A platform block (mac:/win:) may carry its own indented files:,
+          #     which app-builder-lib concatenates into the SAME matcher. The
+          #     required Unit-tests job already verifies platform files: (the
+          #     electron-builder.yml binding test reads config.mac?.files), so this
+          #     shell scanner - which cannot parse the nested block - only warns.
+          if grep -qE '^[[:space:]]+files:' "$EB_CONFIG"; then
+            echo "::warning::$EB_CONFIG has a platform-specific files: block. This shell guard cannot verify it; the Unit-tests job's electron-builder.yml binding test is the hard gate for it (issue #43)."
+          fi
+
+          # 2. Extract the files: block. A list item may legally sit at column 0,
+          #    so only a non-list, non-comment line at column 0 ends the block;
+          #    an inline comment on the key is tolerated.
+          BLOCK=$(awk '
+            /^files:[[:space:]]*(#.*)?$/  { in_block=1; next }
+            in_block && /^[^[:space:]#-]/ { in_block=0 }
+            in_block                      { print }
+          ' "$EB_CONFIG")
+          if [ -z "$BLOCK" ]; then
+            echo "::error::$EB_CONFIG has no block-sequence files: list - this guard only understands the block form ('files:' on its own line, then '- pattern' items). The Unit-tests job's YAML-parsed binding test covers other shapes (issue #43)."
+            exit 1
+          fi
+
+          # 3. Count only this block's own top-level items, so a nested filter:
+          #    list inside a FileSet entry is not miscounted as an include.
+          # `|| true` on both: under `set -e` with pipefail a non-matching grep
+          # would abort the step before the diagnostics below could print.
+          # The trailing `sed 's/[[:space:]]+#.*$//'` strips an inline comment
+          # BEFORE the quote strip, so `- '*'  # everything` cannot smuggle a
+          # wildcard past check 5 as the literal item `*"  # everything`.
+          INDENT=$(printf '%s\n' "$BLOCK" | grep -vE '^[[:space:]]*#' \
+            | grep -m1 -E '^[[:space:]]*-[[:space:]]+' | sed -E 's/-.*//' || true)
+          ITEMS=$(printf '%s\n' "$BLOCK" | grep -E "^${INDENT}-[[:space:]]+" \
+            | sed -E "s/^${INDENT}-[[:space:]]+//" \
+            | sed -E "s/[[:space:]]+#.*\$//" \
+            | sed -E "s/^['\"]//; s/['\"][[:space:]]*\$//" || true)
+          if [ -z "$ITEMS" ]; then
+            echo "::error::$EB_CONFIG files: block contains no list items"
+            exit 1
+          fi
+
+          # 3b. A list item that opens a mapping (`- from: x`) is a FileSet, not
+          #     a pattern. Counting it as a positive would be a false pass, and
+          #     this guard cannot reason about where a FileSet lands, so it fails
+          #     closed. Deliberately STRICTER than scripts/fuses.js, which must
+          #     accept a non-remapping FileSet: electron-builder normalises a
+          #     plain string list into `[{filter: [...]}]` before handing it to
+          #     the afterPack hook, so rejecting that shape there would throw on
+          #     every real build. A literal FileSet in the YAML is still refused.
+          if printf '%s\n' "$ITEMS" | grep -qE '^[A-Za-z_][A-Za-z0-9_.-]*:([[:space:]]|$)'; then
+            echo "::error::$EB_CONFIG files: contains a FileSet entry, which this guard cannot verify. Update the guard in .github/workflows/checks.yml and deriveAllowedAppEntries in scripts/fuses.js together (issue #43)."
+            exit 1
+          fi
+
+          # 4. At least one positive pattern, or app-builder-lib splices '**/*'.
+          #    grep -c prints 0 and exits 1, so || true keeps the 0 reaching the test.
+          POSITIVE=$(printf '%s\n' "$ITEMS" | grep -cv '^!' || true)
+          if [ "$POSITIVE" -lt 1 ]; then
+            echo "::error::$EB_CONFIG files: contains only negated patterns - app-builder-lib splices an implicit '**/*' and packages the entire repository root (issue #43). Add a positive pattern, e.g. 'out/**'."
+            exit 1
+          fi
+
+          # 5. An all-matching positive reproduces the same bug explicitly.
+          #    Mirrors deriveAllowedAppEntries in scripts/fuses.js: reject when
+          #    the pattern's FIRST path segment is a wildcard, rather than
+          #    enumerating spellings ('**/**' and '*/**' sweep the root too).
+          while IFS= read -r item; do
+            [ -n "$item" ] || continue
+            case "$item" in '!'*) continue ;; esac
+            # electron-builder strips a leading './' before matching, so strip it
+            # here too - otherwise './**' yields first='.' and passes while
+            # deriveAllowedAppEntries in scripts/fuses.js rejects it.
+            item="${item#./}"
+            # A '..' segment escapes the project root (app-builder-lib normalises
+            # it, so `out/../**` becomes `**`); the shell scanner cannot normalise,
+            # so reject any traversal outright to stay in step with fuses.js.
+            case "$item" in
+              ''|.|..|../*|*/../*|*/..)
+                echo "::error::$EB_CONFIG files: positive pattern '$item' contains a '..' path segment that escapes the project root (issue #43)."
+                exit 1
+                ;;
+            esac
+            first="${item%%/*}"
+            if [ "$first" = '*' ] || [ "$first" = '**' ]; then
+              echo "::error::$EB_CONFIG files: positive pattern '$item' begins with a wildcard at the repository root - this packages the entire repository root exactly as the implicit '**/*' did (issue #43)."
+              exit 1
+            fi
+          done <<ITEMS_EOF
+          $ITEMS
+          ITEMS_EOF
+
+          # 6. Extra-content presence guard (issue #55). COARSE by design (F4):
+          #    this reasons about YAML text only, so it does NOT pair from/to or
+          #    judge FileSet dest validity - that authoritative shape check lives
+          #    in scripts/fuses.test.mjs ("agrees with the repository
+          #    electron-builder.yml as shipped"), which YAML-parses the real
+          #    config and runs in the required Unit-tests job. Coupled to the
+          #    ALLOWED_EXTRA_RESOURCES_DESTS / ALLOWED_EXTRA_FILES_DESTS constants
+          #    in scripts/fuses.js and the L1-L2 guards there.
+          #
+          # 6a. extraFiles: is fail-closed - ALLOWED_EXTRA_FILES_DESTS is empty,
+          #     so ANY extraFiles: key is a hard error, whether at column 0, OR
+          #     indented under a mac:/win: block (the platform-scoped edit path,
+          #     F1), OR inline in a flow mapping (`mac: { extraFiles: [...] }`,
+          #     F9). The runtime L1 guard folds platformSpecificBuildOptions, so
+          #     this static check mirrors it by matching every one of those
+          #     spellings: the block form (start-of-line, any indent) and the
+          #     flow form (the key preceded by `{` or `,`).
+          if grep -qE '^[[:space:]]*extraFiles[[:space:]]*:' "$EB_CONFIG" \
+            || grep -qE '[{,][[:space:]]*extraFiles[[:space:]]*:' "$EB_CONFIG"; then
+            echo "::error::$EB_CONFIG declares extraFiles:, but nothing is permitted at that destination (ALLOWED_EXTRA_FILES_DESTS in scripts/fuses.js is empty, fail-closed). Remove it, or update the allowlist + L1 guard together (issue #55)."
+            exit 1
+          fi
+
+          # 6b. extraResources: is permitted but coupled. Warn when it is EDITED,
+          #     so the change is a visible prompt to re-check
+          #     ALLOWED_EXTRA_RESOURCES_DESTS and the binding test; the binding
+          #     test is the hard gate for the from/to shape (F4).
+          #
+          #     Edit-triggered, not presence-triggered: extraResources: is
+          #     permanently present (tessdata, LICENSE, THIRD-PARTY-LICENSES.md),
+          #     so warning on presence fired on every push and could not signal an
+          #     edit at all — the noise made it useless as a prompt. BASE_SHA is
+          #     resolved by the caller (github.event.before / pull_request.base.sha).
+          #
+          #     Fail-safe: when the base is unknowable (new branch, force-push,
+          #     shallow history) or $EB_CONFIG is not the tracked repo file (the
+          #     manual negative tests point it at a mutated copy, §5.8), fall back
+          #     to warning on presence rather than staying silent.
+          #     Block extraction mirrors check 2's rule (a list item may sit at
+          #     column 0, so only a non-list, non-comment line at an indent <= the
+          #     key's ends the block) and covers the indented mac:/win: forms too.
+          #     `tr -d '\r'` first: `git show` emits the blob (LF) while a checkout
+          #     on a CRLF-normalising host has CRLF on disk, which would make every
+          #     comparison unequal and warn on every run again.
+          extract_extra_resources() {
+            tr -d '\r' < "$1" | awk '
+              /^[[:space:]]*extraResources:[[:space:]]*(#.*)?$/ {
+                in_block = 1; key_indent = match($0, /[^[:space:]]/) - 1
+                print; next
+              }
+              in_block && /^[[:space:]]*$/            { print; next }
+              in_block && /^[[:space:]]*[-#]/         { print; next }
+              in_block {
+                if (match($0, /[^[:space:]]/) - 1 <= key_indent) { in_block = 0; next }
+                print
+              }
+            '
+          }
+
+          if grep -qE '^[[:space:]]*extraResources:' "$EB_CONFIG"; then
+            EB_WARN_REASON=""
+            EB_NOW=$(extract_extra_resources "$EB_CONFIG")
+            if [ "$EB_CONFIG" != "electron-builder.yml" ]; then
+              EB_WARN_REASON="the config is not the tracked repo file, so no base to compare"
+            elif [ -z "$EB_NOW" ]; then
+              EB_WARN_REASON="its block could not be extracted for comparison"
+            elif [ -z "${BASE_SHA:-}" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+              EB_WARN_REASON="there is no comparable base commit (new branch or force-push)"
+            elif ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+              EB_WARN_REASON="base commit ${BASE_SHA} is not in this checkout"
+            else
+              git show "${BASE_SHA}:electron-builder.yml" > /tmp/eb-base.yml 2>/dev/null \
+                || : > /tmp/eb-base.yml
+              if [ "$EB_NOW" != "$(extract_extra_resources /tmp/eb-base.yml)" ]; then
+                EB_WARN_REASON="its block changed since ${BASE_SHA}"
+              fi
+            fi
+
+            if [ -n "$EB_WARN_REASON" ]; then
+              echo "::warning::$EB_CONFIG declares extraResources: and $EB_WARN_REASON. Validate its from/to shape and dests in the Unit-tests job's binding test, and keep ALLOWED_EXTRA_RESOURCES_DESTS in scripts/fuses.js in step (issue #55)."
+            else
+              echo "extraResources: unchanged since ${BASE_SHA} - no re-check prompt needed"
+            fi
+          fi
+
+          echo "electron-builder packaging allowlist OK ($POSITIVE positive pattern(s); afterPack/afterSign wiring present; no extraFiles:)"

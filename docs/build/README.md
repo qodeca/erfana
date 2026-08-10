@@ -1,6 +1,6 @@
 # Build Documentation
 
-**Last updated**: August 2026 (v0.16.3)
+**Last updated**: August 2026 (v0.17.0)
 
 This directory contains detailed documentation for Erfana's production build configuration.
 
@@ -89,10 +89,11 @@ npm install
 
 1. **prebuild**: `node scripts/prebuild.mjs` creates the `aproba` stub (automatic — npm runs it before `npm run build`, which both `build:mac` and `build:win` call)
 2. **Typecheck**: Verify TypeScript compilation
-3. **Vite Build**: Bundle application code (measured on the v0.16.3 tree)
-   - Main process: ~308 kB minified, `out/main/index.js` (externalized dependencies)
-   - Worker thread: ~7.5 kB, `out/main/git-status.worker.js` (separate entry via `rollupOptions.input`)
-   - Preload: ~38 kB `out/preload/index.js` plus ~1.3 kB `out/preload/screenshotOverlay.js` (two entries, both bundled — see [preload.md](./preload.md))
+3. **Vite Build**: Bundle application code (measured on the v0.17.0 tree). The main and preload targets are **multi-entry** — each extra `rollupOptions.input` key in [electron.vite.config.ts](../../electron.vite.config.ts) is a separately-loaded process/child, not a code-split chunk. The *why* lives with each feature (git status off the main thread, DOCX conversion in a killable child, per-display overlay windows); this list is the build-output inventory.
+   - Main process, entry `index`: ~319 kB minified, `out/main/index.js` (externalized dependencies), plus a shared chunk under `out/main/chunks/` (`git-schema-*.js`, ~3.5 kB)
+   - Main process, entry `git-status.worker`: ~7.5 kB, `out/main/git-status.worker.js` — the `worker_threads` worker that runs git status off the main thread (see [../api-services-features.md](../api-services-features.md) § GitStatusService)
+   - Main process, entry `docx/docx-convert.process`: ~1.4 kB, `out/main/docx/docx-convert.process.js` — the isolated, killable `utilityProcess` child that runs DOCX conversion out-of-thread (see [../api-services-features.md](../api-services-features.md) DocxService and the process-isolation decision in [../architecture.md](../architecture.md))
+   - Preload, two entries: ~38 kB `out/preload/index.js` (main editor window) plus ~1.3 kB `out/preload/screenshotOverlay.js` (per-display area-select overlay windows) — both bundled, see [preload.md](./preload.md)
    - Renderer: ~35 MB across `out/renderer/` (Monaco, Mermaid, xterm.js included)
 4. **beforePack hook (v0.10.0)**: `scripts/ensure-media-binaries.js` downloads a hardcoded per-platform arch set of `ffmpeg-static` binaries — `x64` **and** `arm64` on macOS, `process.arch` on every other platform, independent of the configured build target — into a build cache at `release/.media-cache/<platform>-<arch>/`. Each is verified against a ~1 MB size floor and, where `FFMPEG_SHA256` carries a pin, a SHA-256. Only `darwin-x64` and `darwin-arm64` are pinned today; `win32-x64` falls back to size-only verification (see [fuses.md](./fuses.md#afterpack-also-stages-and-verifies-the-media-binaries)). This replaces the single-arch download-at-install pattern that produced the v0.9.6 video-transcription ENOENT. The cache is **not** `extraResources` — the copy into the bundle happens later, in `afterPack`.
 5. **electron-builder Package**: Create platform packages. `extraResources` holds exactly three things: `resources/tessdata` (offline OCR language data), `LICENSE`, and `THIRD-PARTY-LICENSES.md` (shipped to meet the GPL-3.0-only and third-party attribution obligations)
@@ -103,6 +104,8 @@ npm install
    - Prune foreign-platform/arch `ffprobe-static` binaries (keeps only the target, ~260 MB saved on mac)
    - Prune foreign node-pty and better-sqlite3 prebuilds, and strip `.pdb` debug symbols from the kept Windows prebuild
    - Each prune is keep-then-verify (fails the build rather than shipping a binary-less bundle)
+   - Verify the packed `app/` tree against the `files:` allowlist — depth-1 entries, symlink containment, main-entry presence — and refuse to continue if it does not match (issue #43; see [fuses.md](./fuses.md#afterpack-also-verifies-the-packed-app-contents))
+   - Last, verify the `extraFiles`/`extraResources` destinations beside and above `app/` (issue #55): a merged-config shape check (folding platform-scoped `--config.win.*` overrides), a fatal leak-name tripwire on both platforms, a full-sibling enumeration (fatal on macOS, advisory on Windows pending a real Windows packed-tree baseline), and a coarse repo-leak tripwire at the `extraFiles` dest. The Windows-advisory softening is deliberate — the Electron-owned sibling names were enumerated on macOS and CI never packs on Windows, so a fatal both-platforms enumeration could false-fail the first Windows release. See [fuses.md § Extra-content destinations](./fuses.md#extra-content-destinations--extrafiles--extraresources-issue-55)
 7. **Code Signing**: electron-builder ad-hoc signs all binaries
 8. **afterSign Hook**: Deep re-sign bundle for consistent identity (`scripts/resign.js`)
 9. **DMG Creation**: Package for distribution (arm64 only; the `.zip` target was dropped with auto-update disabled)

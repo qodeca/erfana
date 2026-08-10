@@ -101,14 +101,16 @@ src/
 │   │   ├── ExternalFileService.ts      # Files opened from outside the project root (realpath confinement)
 │   │   ├── ScreenshotService.ts # Screenshot dispatcher + pickCapturer/createScreenshotService factory
 │   │   ├── CameraService.ts     # Webcam photo capture
-│   │   ├── HtmlToDocxConverter.ts      # DOCX export conversion step
+│   │   ├── HtmlToDocxConverter.ts      # DOCX export: strips remote images + wraps, delegates to docx/ child
 │   │   ├── LockHeartbeat.ts, LockStalenessPolicy.ts, MonotonicTimestampGenerator.ts  # ProjectLock internals
 │   │   ├── RecentProjectsRepository.ts, RecentProjectsDeduplicator.ts  # SettingsService internals
 │   │   ├── screenshot/          # MacScreenshotCapturer, DesktopCapturerScreenshotCapturer, ScreenshotOverlayWindow
 │   │   ├── claudeStatus/        # ClaudeStatusService, ClaudeTranscriptWatcher/Parser/Locator,
-│   │   │                        #   ClaudeWindowDetector, encodeCwd, friendlyModelName, thresholds,
+│   │   │                        #   ClaudeWindowDetector, encodeCwd, modelId, friendlyModelName, thresholds,
 │   │   │                        #   process/ (Mac/Win detectors + createProcessDetector)
 │   │   ├── workers/             # worker_threads scripts (git-status.worker.ts)
+│   │   ├── docx/                # DOCX conversion isolation: docxImageStrip (parse5 SSRF strip),
+│   │   │                        #   DocxConvertProcessAdapter (utilityProcess lifecycle), docx-convert.process (child)
 │   │   ├── watcher/             # ThrottledWorker (offset-deque, #173), EventCoalescer, GitEventCoalescer,
 │   │   │                        #   AtomicSaveDetector, RepoPresenceWatcher, WatcherMetrics, PlatformConfig
 │   │   └── import/              # ImportService, ConverterRegistry, DependencyDetector, extensions,
@@ -202,6 +204,7 @@ src/
 - **Component Registry**: Splitview and Dockview use string-based component lookup
 - **Multi-model Editor**: Single Monaco instance, swap models per file
 - **Worker thread offloading**: Git status runs in a `worker_threads` Worker to keep the main thread responsive. Three-layer design: `IGitStatusWorker` (interface) → `GitStatusWorkerAdapter` (wraps worker_threads) → `git-status.worker.ts` (runs isomorphic-git or native git). Circuit breaker disables worker after repeated crashes. Strategy selector uses `.git/index` file size to choose between isomorphic-git (small repos) and native `git status --porcelain` (large repos). See [API Services – Features](./api-services-features.md) for details.
+- **Process isolation for DOCX conversion**: `@turbodocx/html-to-docx` decodes images synchronously, so a malformed image could spin the CPU in a loop that an in-thread `Promise.race` timeout cannot interrupt. The conversion therefore runs in a killable Electron `utilityProcess` child: `HtmlToDocxConverter` (main-side strip + wrap) → `DocxConvertProcessAdapter` (forks the child, mirrors `GitStatusWorkerAdapter`'s lifecycle, `kill()`s on timeout) → `docx-convert.process.ts` (child entry). A separate process — not a worker thread — is used deliberately, to also cap memory against decompression bombs. See [API Services – Features](./api-services-features.md#docxservice).
 - **Factory injection over module-eval singletons**: `ScreenshotService` is built by `createScreenshotService(capturer?, platform?)`, which falls back to `pickCapturer(platform)` – `darwin` → `MacScreenshotCapturer` (native `/usr/sbin/screencapture`), `win32` → `DesktopCapturerScreenshotCapturer` (Electron `desktopCapturer` + renderer-driven area-select overlay), anything else → `UnsupportedCapturer`. Both arguments are optional, so production gets `process.platform` while tests inject a fake capturer and a fake platform without stubbing globals. This replaced a module-eval singleton that froze the platform choice at import time (#164). `pickCapturer` is exported separately so the routing table can be asserted directly. The capturers implement one `IScreenshotCapturer.capture(request)` method over a discriminated-union request rather than three per-mode methods, keeping the platform branch in exactly one place.
 - **Mermaid Integration**: Client-side diagram rendering (22 types) with dark theme
 - **Prompt Template System**: CSP-compliant markdown templates with Handlebars-style syntax for context menu AI prompts (see [Prompt Templates](./prompts/README.md))
@@ -302,7 +305,7 @@ if (confirmed) await deleteFile()
 - Submit button disabled when input invalid/empty
 - Context display showing parent path (e.g., "in /project/docs")
 
-**Test Coverage** (see [Testing](./testing/README.md#dialog-system)) – run `npm run test:cov` for current numbers rather than trusting a hardcoded count:
+**Test Coverage** (see [Testing](./testing/README.md)) – run `npm run test:cov` for current numbers rather than trusting a hardcoded count:
 - `src/renderer/src/utils/fileValidation.test.ts` - validation scenarios
 - `src/renderer/src/components/Dialog/FileSystemDialog.test.tsx` - component behavior
 - `src/renderer/src/components/Dialog/WrapperDialogs.test.tsx` - integration tests for the wrapper components

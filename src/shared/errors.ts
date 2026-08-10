@@ -67,7 +67,10 @@ export enum ErrorCode {
   IMPORT_ENCRYPTED = 'IMPORT_ENCRYPTED',
   IMPORT_EMPTY = 'IMPORT_EMPTY',
   IMPORT_CORRUPT = 'IMPORT_CORRUPT',
+  /** Non-blocking size warning: returned with `valid: true`; import still proceeds. */
   IMPORT_TOO_LARGE = 'IMPORT_TOO_LARGE',
+  /** Blocking size rejection: returned with `valid: false`; import is refused before conversion. */
+  IMPORT_EXCEEDS_SIZE_LIMIT = 'IMPORT_EXCEEDS_SIZE_LIMIT',
   IMPORT_CONVERSION_FAILED = 'IMPORT_CONVERSION_FAILED',
   IMPORT_UNSUPPORTED_TYPE = 'IMPORT_UNSUPPORTED_TYPE',
   IMPORT_TEXT_ENCODING_ERROR = 'IMPORT_TEXT_ENCODING_ERROR',
@@ -320,6 +323,7 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.IMPORT_EMPTY]: 'File has no content to import',
   [ErrorCode.IMPORT_CORRUPT]: 'File appears to be corrupted',
   [ErrorCode.IMPORT_TOO_LARGE]: 'File is too large',
+  [ErrorCode.IMPORT_EXCEEDS_SIZE_LIMIT]: 'File exceeds the maximum import size',
   [ErrorCode.IMPORT_CONVERSION_FAILED]: 'Failed to convert file',
   [ErrorCode.IMPORT_UNSUPPORTED_TYPE]: 'File type is not supported',
   [ErrorCode.IMPORT_TEXT_ENCODING_ERROR]: 'File has invalid text encoding',

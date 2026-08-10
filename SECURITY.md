@@ -40,6 +40,16 @@ For Electron fuses, sandboxing, context isolation, CSP configuration, and audit 
 
 Every release on or after `v0.9.5` ships signed artifacts. End users should verify downloads before installing — see [`README.md` § Release verification](README.md#release-verification) and [`docs/security.md`](docs/security.md).
 
+## Packaging scope of releases before the #43 fix (audited)
+
+Until the [#43](https://github.com/qodeca/erfana/issues/43) packaging-allowlist fix, `electron-builder.yml`'s `files:` list was negation-only, so the packager copied the **entire repository root** into `Contents/Resources/app/`. Published releases were audited to bound the exposure:
+
+- **Audited:** the published `v0.16.3` macOS artifact (`erfana-0.16.3-arm64.dmg`), by mounting it and inspecting `Contents/Resources/app`. Date: 2026-08-09.
+- **What shipped:** tracked development directories and files — `e2e/`, `specs/`, `scripts/`, `patches/`, `build/`, `.claude/{agents,settings.json,skills}`, `.erfana/`, `eslint.config.mjs`, `playwright.config.ts` and similar (18 top-level entries under `app/`). This is bloat and non-runtime **source disclosure** of already-public GPL code.
+- **What did NOT ship:** no credential- or key-shaped files (`.env`, `.env.*`, `.npmrc`, `*.pem`, `*.key`, `id_*`, `*.local.json`) anywhere in the bundle, including inside `node_modules`; no secret-shaped values in the shipped config files (`.mcp.json`, `.claude/settings.json`, `.erfana/settings.json`); and **no untracked, machine-local content** — the gitignored `.claude/settings.local.json` was absent, confirming releases are built from a clean `actions/checkout` where only tracked paths exist.
+
+**Conclusion:** the impact on published releases is source disclosure and bundle bloat of already-public code, not confidentiality loss. The confidentiality half of the defect (untracked, mode-`0700` local directories losing their permissions inside the bundle) only reproduces on **local** developer builds, never on a CI-built release. No advisory is warranted; the fix removes the disclosure and bloat going forward.
+
 ## Supported versions
 
 Erfana is at a `0.x` stage. Only the latest released version receives security fixes.

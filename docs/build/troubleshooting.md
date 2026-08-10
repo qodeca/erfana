@@ -1,6 +1,6 @@
 # Build Troubleshooting
 
-**Last updated**: August 2026 (v0.16.3)
+**Last updated**: August 2026 (v0.17.0)
 
 This document provides solutions to common build errors.
 
@@ -278,7 +278,7 @@ Tests fail, preventing build
    npm run test:renderer
    ```
 2. Fix failing tests before building
-3. All tests must pass – 8,768 across 299 files as of v0.16.3
+3. All tests must pass – 9,218 across 308 files as of v0.17.0
 
 ---
 

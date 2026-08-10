@@ -113,6 +113,19 @@ This is the canonical cookbook for `release.yml` failures. Each row below is a r
 - **Platform:** Windows
 - **First seen:** run 27699667579 (cause 1); run 27716374257 (cause 2, legacy PFX)
 
+### Row 12: `prepare` fails on "No green checks.yml run for <sha>"
+
+- **Regex:** `No green checks\.yml run for [0-9a-f]{7,40}`
+- **Human-readable symptom:** `Prepare draft` fails within seconds of the tag push, before any build leg starts. `Build macOS` / `Build Windows` / `Finalize draft` all show `skipped`; `Cleanup on failure` shows `failure` (by design — its last step is `exit 1`). CI is **not** red: `checks.yml` for the same SHA goes green a minute or two later.
+- **Root cause:** A race, not a regression. `prepare`'s green-checks gate queries `actions/workflows/checks.yml/runs?head_sha=$SHA&status=success`, which matches only runs whose **workflow run** has reached `completed`.
+
+  `checks.yml` has 8 jobs, of which 5 are branch-protection required contexts (`Lint`, `Typecheck`, `Unit tests`, `Build`, `License compliance`; the sixth required check, `Secret scan`, comes from `secret-scan.yml`). The three advisory jobs — `windows-checks` on windows-latest, `audit-signatures`, `release-guards` — keep the run `in_progress` for roughly 2–3 minutes after the required ones report green.
+
+  An operator who waits on the required *check-runs* (the correct gate for pushing to protected `main`) and then tags immediately lands inside that window. Pushing through develop → main → tag in quick succession also fires three separate `checks.yml` runs for the same SHA, none of which has finished yet.
+- **Fix:** Do **not** delete the tag — the `v*.*.*` ruleset forbids tag deletion (`push declined due to repository rule violations`), and the tag is not burned (nothing built, signed, or drafted). Wait until `gh api "repos/qodeca/erfana/actions/workflows/checks.yml/runs?head_sha=$SHA&status=success" --jq .total_count` returns ≥ 1, then `gh run rerun <run-id>` on the same run. Prevention: before Phase 2 tags, poll that same `total_count` query rather than `commits/$SHA/check-runs` filtered to the required check names.
+- **Platform:** All
+- **First seen:** run 31264941055 (v0.17.0 attempt 1) — see `docs/release-incidents/v0.17.0-attempt-1.md`
+
 ### Adding a new row (template)
 
 Copy this template, fill in each field, and insert at the end of the row list. Do not skip fields — the analyzer parser depends on every row having all six.
@@ -153,13 +166,25 @@ The fastest lessons from the v0.9.5 bring-up. Skill operators should adopt these
 
 ### Build size too large (>300 MB)
 
-Check electron-builder.yml excludes:
+Check the `files:` **allowlist** in `electron-builder.yml`. It must keep at least one non-negated pattern — a list of nothing but `!` exclusions is read by app-builder-lib as "no includes given" and packages the entire repository root into `Contents/Resources/app/` (issue #43):
+
 ```yaml
 files:
-  - "!release/**"
-  - "!coverage/**"
-  - "!tests/**"
+  - 'out/**'
+  - 'package.json'
+  - '!**/{.env,.env.*,.npmrc}'
+  - '!**/.vscode/**'
+  - '!**/*.map'
+  - '!node_modules/jsdom/**'
+  # ...
 ```
+
+Two guards should have caught it before you got here:
+
+- `Guard - electron-builder packaging allowlist` in the `release-guards` job of `.github/workflows/checks.yml` — surfaces on every push (advisory; `release-guards` is not a branch-protection required check) if the list has no positive pattern, if a positive pattern starts with a wildcard, or if the `afterPack`/`afterSign` wiring is missing. The wiring and allowlist invariants are also enforced in the **required** Unit-tests job, via the `electron-builder.yml` binding test in `scripts/fuses.test.mjs` — that is the hard gate.
+- `assertPackagedAppContents()` in `scripts/fuses.js` — runs last in `afterPack`, before signing, and refuses to continue if the packed `app/` tree holds anything outside `ALLOWED_APP_ENTRIES`. In a healthy build log, look for `✅ Packaged app contents verified`.
+
+A build that grew without either firing is a real size regression (dependencies or the media binaries), not a packaging-config regression. Full mechanism: `docs/build/electron-builder.md` § `files` allowlist.
 
 ## Tests failing
 
@@ -225,12 +250,13 @@ The skill no longer builds locally — every binary is produced by `release.yml`
 
 ```bash
 gh release delete "v${VERSION}" --yes --cleanup-tag=false
-git push --delete origin "v${VERSION}"
-git tag -d "v${VERSION}"
+git tag -d "v${VERSION}"   # local only — see below
 # Bump patch and re-invoke the skill from Phase 0.
 ```
 
-The tag is **burned regardless** — even after deleting a draft, the next attempt MUST use a fresh patch version. Re-using a tag that ever shipped a signed artifact is forbidden.
+Do **not** attempt `git push --delete origin "v${VERSION}"`. The `Protected release tags (v*.*.*)` ruleset carries a `deletion` rule with an empty `bypass_actors` list, so the push is rejected with `push declined due to repository rule violations` — for everyone, admins included. The remote tag stays.
+
+That is harmless, because the tag is **burned regardless**: even after deleting a draft, the next attempt MUST use a fresh patch version. Re-using a tag that ever shipped a signed artifact is forbidden.
 
 ### Recovery checklist
 

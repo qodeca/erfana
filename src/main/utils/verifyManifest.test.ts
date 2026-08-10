@@ -128,6 +128,23 @@ describe('verifyManifest', () => {
     })
   })
 
+  it('takes the legacy (raw-content) signed-message branch for an "Ed" signature', async () => {
+    // The fixture is prehashed ("ED"); flip the signature alg byte to legacy
+    // ("Ed") so verifyManifest hashes nothing and signs raw content — exercising
+    // the non-prehashed branch. The keyId still matches primary, so verifyAsync
+    // runs and fails (the sig was over BLAKE2b(content)), proving the branch ran.
+    const sigFile = await readFile(FIXTURE_SIGNATURE_PATH, 'utf8')
+    const lines = sigFile.split(/\r?\n/)
+    const raw = Buffer.from(lines[1], 'base64')
+    raw[1] = 0x64 // 0x44 ("D", prehashed) → 0x64 ("d", legacy)
+    lines[1] = raw.toString('base64')
+    await copyFile(FIXTURE_MANIFEST_PATH, manifestPath)
+    await writeFile(sigPath, lines.join('\n'))
+    await expect(
+      verifyManifest({ contentPath: manifestPath, signaturePath: sigPath })
+    ).rejects.toMatchObject({ code: 'ed25519-rejected' })
+  })
+
   it('accepts prehashed ("ED") signatures — the minisign >= 0.7 default', async () => {
     // Our CI-produced fixture IS prehashed. This test re-asserts the
     // branch was exercised (future-proofing if we ever switch to legacy).
@@ -136,6 +153,25 @@ describe('verifyManifest', () => {
     const raw = Buffer.from(payloadB64, 'base64')
     expect(raw[0]).toBe(0x45) // E
     expect(raw[1]).toBe(0x44) // D — prehashed
+  })
+
+  it('skips a malformed embedded pubkey and verifies against the next valid one', async () => {
+    // A too-short base64 pubkey makes parsePubkey throw on its length check; the
+    // verifier must catch it, `continue`, and still match the real primary key.
+    // Covers the malformed-pubkey skip branch + the PUBKEY_LEN mismatch throw.
+    await copyFile(FIXTURE_MANIFEST_PATH, manifestPath)
+    await copyFile(FIXTURE_SIGNATURE_PATH, sigPath)
+    const withMalformed = [
+      { ...WHISPER_PUBKEYS[0], publicKey: 'Zm9v' }, // "foo" — 3 bytes, not 42
+      ...WHISPER_PUBKEYS
+    ]
+    const result = await verifyManifest({
+      contentPath: manifestPath,
+      signaturePath: sigPath,
+      trustedPubkeys: withMalformed
+    })
+    expect(result.valid).toBe(true)
+    expect(result.signingKeyRole).toBe('primary')
   })
 
   it('trusts any pubkey in the list — primary match still wins when primary signed', async () => {

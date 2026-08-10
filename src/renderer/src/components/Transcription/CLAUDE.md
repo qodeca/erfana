@@ -57,7 +57,7 @@ renderer                                       main
 
 ## Known tech debt
 
-Tracked in [`docs/technical-debt.md`](../../../../../docs/technical-debt.md): item #4 (LanguageSelect missing `id`), #9 (TranscriptionDialog hardcoded `zIndex`), #10 (language-select dropdown arrow hardcoded `background-size`). Item #3 (BaseDialog Tab-cycling focus trap) is resolved – this dialog now uses `trapFocus`.
+Two open items in [`docs/technical-debt.md`](../../../../../docs/technical-debt.md) touch this directory: **#9** (`TranscriptionDialog` hardcoded `zIndex={10000}`) and **#10** (the chevron dropdown-arrow background is copied into `TranscriptionDialog.css:71` and four other stylesheets). Check that file for current status rather than tracking it here.
 
 ## Related files
 

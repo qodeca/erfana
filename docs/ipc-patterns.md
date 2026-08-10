@@ -128,7 +128,6 @@ if (!writeResult.success) {
 | `directory-watch:resume` | directory-watcher-handlers | Resume watching after CRUD |
 | `directory-watch:changed` | directory-watcher-handlers | Event: Directory changed externally |
 | `directory-watch:project-deleted` | directory-watcher-handlers | Event: Project folder deleted |
- 
 | `settings:getProjectFilterMode` | settings-handlers | Get project filter mode (all/markdown) |
 | `settings:setProjectFilterMode` | settings-handlers | Set project filter mode (all/markdown) |
 | `settings:getDirectoryWatchDepth` | settings-handlers | Get directory watcher depth (number or undefined) |
@@ -155,6 +154,11 @@ if (!writeResult.success) {
 | `transcription:hasApiKey` | transcription-handlers | Check if API key exists for service |
 | `transcription:clearApiKey` | transcription-handlers | Remove stored API key |
 | `transcription:progress` | transcription-handlers | Event: Progress update (main → renderer) |
+| `transcription:whisperEnsureBinary` | transcription-handlers | Ensure the local whisper.cpp binary is present, signature-verified and SHA-pinned |
+| `transcription:whisperEnsureModel` | transcription-handlers | Ensure a whisper model is downloaded and verified |
+| `transcription:whisperListModels` | transcription-handlers | List locally available whisper models |
+| `transcription:whisperDeleteModel` | transcription-handlers | Delete a downloaded whisper model |
+| `transcription:whisperDownloadProgress` | transcription-handlers | Event: binary/model download progress (main → renderer) |
 | `import:document` | import-handlers | Import document with options (streamed progress) |
 | `import:documentProgress` | import-handlers | Event: Import progress update (main → renderer) |
 | `import:documentCancel` | import-handlers | Cancel active document import |
@@ -168,6 +172,8 @@ if (!writeResult.success) {
 | `claude-status:changed` | claude-status-handlers | Event: per-`terminalId` status snapshot update (main → renderer) (#216) |
 | `system:openScreenRecordingSettings` | system-handlers | Payload-free. Opens the macOS Screen Recording privacy pane via `shell.openExternal` on a fixed constant URL; no-ops off `darwin`. Sender-gated by `isTrustedSender` |
 | `system:relaunchApp` | system-handlers | Payload-free. `app.relaunch()` + `app.quit()` – needed because macOS applies a fresh Screen Recording grant only to a newly-launched process. **Not** platform-gated; `app.quit()` (not `app.exit()`) so `before-quit` releases the project lock, watchers and PTYs. Sender-gated by `isTrustedSender` |
+| `git:state-changed` | GitWatcherService (broadcast) | Event: git state changed (main → renderer). No handler registers this — `GitWatcherService` pushes it via `broadcastToAllWindows`. Carries both file-content and repo-state events; see `git-watcher-schema.ts` |
+| `git:poll-triggered` | GitPollingService (broadcast) | Event: a polling cycle fired (main → renderer). Broadcast, not handler-registered |
 
 ## Clipboard Channels – async invoke + sender validation (#203)
 
