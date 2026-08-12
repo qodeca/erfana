@@ -2,6 +2,8 @@
 
 *Roadmap for active drafts. Shipped specs (021 LiteParse v0.9.0, 022 git-status offloading v0.9.0, 009 media import v0.8.0) are removed once archived; see `specs/registry.json` for lifecycle.*
 
+> **Scope**: this file tracks spec-numbered feature work only. Bug-fix and performance streams are **not** listed here and are not untracked – they live in the GitHub issues (e.g. #60) and, for the large-project performance cluster #146–#151, in [`docs/large-project-performance-plan.md`](docs/large-project-performance-plan.md).
+
 ## Dependency map
 
 ```

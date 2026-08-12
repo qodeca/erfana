@@ -19,14 +19,24 @@ Project panel displays hierarchical file tree with filtering, visual indicators,
 <ProjectPanel>
   <Header> FolderOpen icon + Label + Chevron toggle </Header>
   <ControlPanel> FilterButtons </ControlPanel>
-  <ProjectTree />
+  <PanelErrorBoundary key={projectPath ?? 'none'} componentName="Project tree">
+    <ProjectTree />
+  </PanelErrorBoundary>
 </ProjectPanel>
 ```
 
 ### Responsibilities
 
-**ProjectPanel**: Header, control panel visibility, filter mode state & persistence
+**ProjectPanel**: Header, control panel visibility, filter mode state & persistence, panel-scoped error containment
 **ProjectTree**: Tree rendering, expansion/collapse, context menu, file opening, recursive filtering
+
+### Error Containment (#60)
+
+The tree is wrapped in `PanelErrorBoundary`, so a render failure degrades to a **"Project tree unavailable. The rest of Erfana still works."** message with a **Reload** button inside the sidebar, instead of blanking the window and taking unsaved Monaco buffers and a live terminal with it. Reload clears the error state and re-renders the tree in place; a second failure changes the copy to "Project tree is still unavailable." The boundary logs at `error` (`[PanelErrorBoundary] Project tree error`), not `fatal` — the window is still usable.
+
+**The `key={projectPath ?? 'none'}` is load-bearing.** The error state survives every re-render and is cleared only by Reload or a remount, so keying by project path is what makes opening a different project remount the boundary. Without the key, a tree that crashed on project A still reads "unavailable" after the user switches to project B, and only Reload would clear it. The panel reads that path from `useProjectManagementContextSafe()` — the safe accessor, because the path is needed only for the key and is not worth making the panel unrenderable outside the provider.
+
+See: [UI Components - Error containment](./ui-components.md#error-containment) for the two-tier root/panel design, and [Troubleshooting - Project tree unavailable](./troubleshooting.md#project-tree-unavailable) for the user-facing procedure.
 
 ## Toolbar
 

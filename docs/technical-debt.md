@@ -326,13 +326,13 @@ After the heartbeat hardening (Phase A4 resume-refresh, B1 symlink defense, D3 H
 ### 22. Shared renderer HTML entry keeps a whole family of CSS-leak guards alive (#60, 2026-08)
 
 **Severity**: Low
-**Impact**: The app window and the screenshot-overlay window share one entry, `src/renderer/index.html`, so any globally-scoped rule in a statically imported stylesheet reaches both. The overlay once inherited a crosshair cursor this way. Three guards exist purely to hold that line: `main.import-isolation.test.ts` (no app CSS imported on the overlay branch), `RootErrorBoundary.css.test.ts` (allowlist: every top-level selector must start with `.root-error`), and the standing rule that `src/renderer/src/index.css` must not gain a background rule (`design-issue-60` §2.5).
+**Impact**: The app window and the screenshot-overlay window share one entry, `src/renderer/index.html`, so any globally-scoped rule in a statically imported stylesheet reaches both. The overlay once inherited a crosshair cursor this way. Four guards exist purely to hold that line: `main.import-isolation.test.ts` (no app CSS imported on the overlay branch), `RootErrorBoundary.css.test.ts` (allowlist: every top-level selector must start with `.root-error`), the `.panel-error` prefix allowlist for `Panels/PanelErrorBoundary.css` — which has **no** stylesheet test file of its own and is instead bolted onto `RootErrorBoundary.contrast.test.ts` (the `scopes every PanelErrorBoundary.css selector to .panel-error` case in its `stylesheet shape` block) — and the standing rule that `src/renderer/src/index.css` must not gain a background rule (`design-issue-60` §2.5).
 
-**Problem**: Every new full-window surface has to re-derive the constraint and, in practice, ship its own allowlist test. The guards are cheap individually and unbounded collectively.
+**Problem**: Every new full-window surface has to re-derive the constraint and, in practice, ship its own allowlist test. The guards are cheap individually and unbounded collectively. The fourth guard **is that prediction happening**: the second crash surface needed the same allowlist, and because a whole test file per stylesheet was too much ceremony it was grafted onto a neighbouring suite instead — so the guard family is now growing sideways as well as in number, and the `.panel-error` rule lives in a file whose name does not mention it.
 
 **Recommended Solution**: give the overlay its own HTML entry, mirroring the existing preload split (`src/preload/screenshotOverlay.ts`). The two windows then have genuinely separate stylesheet graphs and the allowlist tests can be retired rather than multiplied.
 
-**Files**: `src/renderer/index.html`, `electron.vite.config.ts`, `src/main/services/screenshot/ScreenshotOverlayWindow.ts`, `src/renderer/src/main.tsx`, the three guard tests above.
+**Files**: `src/renderer/index.html`, `electron.vite.config.ts`, `src/main/services/screenshot/ScreenshotOverlayWindow.ts`, `src/renderer/src/main.tsx`, the four guards above (three test files: `main.import-isolation.test.ts`, `RootErrorBoundary.css.test.ts`, `RootErrorBoundary.contrast.test.ts`).
 
 **Status**: Deferred — build-config housekeeping; also listed in [`design/design-issue-60.md`](./design/design-issue-60.md) §8 with the allowlist as the interim control.
 

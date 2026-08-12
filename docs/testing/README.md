@@ -22,7 +22,7 @@ Complete guide for testing Erfana. This covers both automated tests (Vitest/Play
 
 #### Key test areas
 
-Run `npm run test` for current totals (9,218 tests across 308 files on macOS as of v0.17.0; ~78 cases platform-gate on Windows — 77 POSIX-only `pathSecurity.test.ts` + 1 macOS-only `LiteParseConverter.test.ts`). For the version-by-version test-addition history, see [`docs/CHANGELOG.md`](../CHANGELOG.md).
+Run `npm run test` for current totals. The workspace holds **326 test files** — main 144 (`src/main` 132 + `src/shared` 10 + `scripts` 2), renderer 178, preload 4 — enumerated on `develop` on 2026-08-12, i.e. **v0.17.1 plus the unreleased #60 work**, not a released tag. That tree runs **9,694 cases** (verified on 2026-08-12); re-run `npm run test:ci` for the live figure, since the case count moves with every commit while the file count is checkable with a glob. ~78 cases platform-gate on Windows — 77 POSIX-only `pathSecurity.test.ts` + 1 macOS-only `LiteParseConverter.test.ts`. For the version-by-version test-addition history, see [`docs/CHANGELOG.md`](../CHANGELOG.md).
 
 | Area | Key files | Docs |
 |------|-----------|------|
@@ -35,6 +35,7 @@ Run `npm run test` for current totals (9,218 tests across 308 files on macOS as 
 | Local whisper (Phase 4) | `LocalWhisperService.test.ts`, `WhisperModelManager.test.ts`, `WhisperModelManager.downgrade.test.ts` + utility tests (`zipArchive`, `tarArchive`, `secureDownloader`, `verifyManifest`) | [Phase 4 test inventory](../windows/implementation-plan.md#phase-4-test-inventory) · [Trust chain](../windows/whisper-trust-chain.md) · [API services – features](../api-services-features.md) |
 | Settings overlay | `SettingsOverlay.test.tsx` | [Settings](../settings.md) |
 | Build tooling | `scripts/fuses.test.mjs` (afterPack chmod helper — 9 cases: happy / idempotent / multi-arch / missing / empty+requireMatch / empty+lenient / symlink / dir / EROFS) | [Build – Fuses](../build/fuses.md#afterpack-also-chmods-node-pty-spawn-helper) |
+| Error containment (#60) | `RootErrorBoundary.test.tsx`, `RootErrorFallback.test.tsx`, `PanelErrorBoundary.test.tsx`, `useDragDropTree.test.ts` (explicit-stack `flattenTree`), `rendererCrashHandlers.test.ts` (main-side crash/hang trail) | [UI components § Error containment](../ui-components.md#error-containment) · [`design-issue-60.md`](../design/design-issue-60.md) |
 
 **Testing patterns used**:
 - "Extract Pure Logic" – business logic in `.logic.ts` files, tested without React overhead
@@ -58,9 +59,9 @@ Run `npm run test` for current totals (9,218 tests across 308 files on macOS as 
 
 **[e2e-testing.md](./e2e-testing.md)** – Comprehensive E2E testing guide
 
-- Playwright setup and configuration for Electron (two projects: `electron` functional, `visual` regression)
+- Playwright setup and configuration for Electron (three projects in `playwright.config.ts`: `electron` functional, `transcription` env-gated, `visual` regression)
 - Testing patterns for third-party components (Monaco, xterm.js, Mermaid)
-- Complete selector catalog (240 testids) – see [e2e-selectors.md](./e2e-selectors.md)
+- Complete selector catalog (248 testids) – see [e2e-selectors.md](./e2e-selectors.md)
 - Test helper utilities documentation
 - Troubleshooting guide
 
@@ -73,16 +74,36 @@ npm run test:e2e:visual            # Visual regression tests (visual project) �
 npm run test:e2e:update-screenshots  # Update visual baselines
 ```
 
-**E2E test files** (`e2e/`):
+**E2E test files** (all 18 specs in `e2e/`):
 - `app-launch.e2e.ts` – Application launch, activity bar, welcome panel visibility
 - `third-party-components.e2e.ts` – Monaco editor, xterm.js terminal, Mermaid diagrams
 - `directory-watcher.e2e.ts` – Directory watcher pipeline (#104): verifies file creation via terminal appears in Project Tree within latency budget
 - `context-menu-explain.e2e.ts` – Context menu Explain prompt flow: preview (selection gating, menu items, click-outside dismiss, Explain → terminal) and editor (disabled state, enabled after selection, Explain → terminal)
-- `audio-transcription.e2e.ts` – Full audio import transcription lifecycle (real OpenAI API, requires `OPENAI_API_KEY`, skips if not set)
+- `audio-transcription.e2e.ts` – Full audio import transcription lifecycle (real OpenAI API; runs only in the `transcription` project — see the env-var table below)
 - `document-import.e2e.ts` – Document import dialog flow with PDF fixture (LiteParse)
+- `welcome-open-toolbar-import.e2e.ts` – Welcome-screen Open/Change Project button (label toggle, real `file:openProject` IPC with the native dialog stubbed) and the Project Tree toolbar Import button
 - `settings-logs.e2e.ts` – Settings overlay logs folder path display and Open button (#137)
 - `fixture-smoke.e2e.ts` – Smoke tests for composed fixtures (testProject, withSettings, withOpenFile, appWithTestProject)
+- `git-status.e2e.ts` – Git decorations in the Project Tree: file letter-badges, folder dots, priority bubbling (wiring smoke, not the #237 separator guard — that is the `gitStatus.logic.test.ts` unit suite)
+- `git-status-on-edit.e2e.ts` – Badge refresh after an in-editor autosave, with no manual refresh: keystroke → autosave → chokidar `change` → IPC → store → row repaint
+- `terminal-expand.e2e.ts` – Terminal maximize over the editor area (Cmd/Ctrl+Shift+M and the header button); covers AppDockLayout splitview manipulation that has no unit test
+- `terminal-resize.e2e.ts` – Regression guard for the editor/terminal sash drag (real mouse drag; the editor area must actually shrink)
+- `dockview-resize.e2e.ts` – Regression guard that dockview drag-to-resize survives CSS changes (#211 AC #7)
+- `user-select.e2e.ts` – Organic selection coverage for #211 on two surfaces (markdown preview, settings overlay); the cross-cutting policy gate is `userSelect.audit.test.ts`
+- `camera-mirror.e2e.ts` – Camera preview mirroring default + per-camera toggle, 16:9 `object-fit: contain` framing, native Enter-to-capture (#42); runs against Chromium's fake capture device and asserts the fake device is the one streaming
+- `root-error-boundary.e2e.ts` – #60: a launcher-injected renderer crash must produce the recovery screen (details toggle, Copy / Open logs / Restart present) instead of a blank window, plus a negative case asserting the normal app renders when the crash flag is absent. Restart is asserted but never clicked — activating it relaunches the app mid-test
 - `visual-regression.e2e.ts` – Visual regression for 5 UI states (see below)
+
+**E2E environment variables**:
+
+| Variable | Set where | Effect |
+|----------|-----------|--------|
+| `ERFANA_E2E_FORCE_CRASH=1` | Launch environment of the Electron process (the spec sets it per launch) | Makes the main process append `--erfana-force-crash` to `webPreferences.additionalArguments`; the preload re-exposes it as `window.__ERFANA_FORCE_CRASH__` and `App.tsx` throws during render. **Launcher-only** (the renderer cannot set it) and gated on `!app.isPackaged`, so a shipped build ignores it outright. Drives `root-error-boundary.e2e.ts`. See `buildAdditionalArguments()` in `src/main/index.ts` |
+| `ERFANA_E2E_FAST_SHELL=1` | Launch environment | POSIX only: the PTY bootstrap execs `/bin/sh -i` instead of `exec -l "$SHELL" -i`, so no user rc files are sourced and terminal specs start deterministically (a heavy zsh framework can otherwise cost seconds). Production and any run without the variable are unchanged. See `TerminalService.createTerminal()` and [known issues](../known-issues.md) |
+| `ERFANA_E2E_TRANSCRIPTION=1` | Shell running Playwright | Enables the `transcription` Playwright project (`audio-transcription.e2e.ts`), which makes real, paid OpenAI API calls; also needs `OPENAI_API_KEY`. Without it the project is `grepInvert`-ed to nothing, and the `capability-summary` reporter prints a `SKIPPED CAPABILITIES` line so the gap is auditable rather than a silent green tick |
+| `ERFANA_TEST_BUILD=true` | Build environment (`npm run build:mac:test`) | afterPack (`scripts/fuses.js`) leaves `EnableNodeCliInspectArguments` **on** and renames the bundle with a "(TEST BUILD)" suffix. Required for `--inspect`-based debugging of a packaged app; never distribute such a build |
+
+`OPENAI_API_KEY` (from `.env`, see `.env.example`) is the only credential any suite needs.
 
 **Shared utilities**:
 - POM classes in `e2e/pages/` – see [e2e-testing.md](./e2e-testing.md#pom-classes)

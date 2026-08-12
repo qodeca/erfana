@@ -43,10 +43,13 @@ For fixed sidebars (Project, Git, Terminal) that don't need tabbing:
 
 **Wrapper Pattern** (recommended for panels with headers/controls):
 
-1. Create wrapper component with header + controls:
+1. Create wrapper component with header + controls, wrapping the panel's content in a `PanelErrorBoundary`:
    ```typescript
    const MyPanel = (props: ISplitviewPanelProps) => {
      const [showControl, setShowControl] = useState(true)
+     // SAFE accessor: the panel needs the path only to key the boundary, which
+     // is not worth making it unrenderable outside the provider.
+     const projectPath = useProjectManagementContextSafe()?.projectPath ?? null
 
      return (
        <div className="my-panel">
@@ -56,11 +59,15 @@ For fixed sidebars (Project, Git, Terminal) that don't need tabbing:
            <ChevronDown onClick={() => setShowControl(!showControl)} />
          </div>
          {showControl && <div className="control-panel">{/* Controls */}</div>}
-         <MyContentComponent {...props} />
+         <PanelErrorBoundary key={projectPath ?? 'none'} componentName="My panel">
+           <MyContentComponent {...props} />
+         </PanelErrorBoundary>
        </div>
      )
    }
    ```
+
+   > **The `key` is not optional.** Without it a panel that threw while project A was open keeps showing "unavailable" after the user switches to project B – React reuses the same boundary instance and error state survives the content swap. Key the boundary by whatever scopes its content (the project path for project-scoped panels; a document or terminal id elsewhere) so a new scope remounts it clean. The boundary itself is what turns a defect in one panel into a degraded panel rather than a blank window (#60). `PanelErrorBoundary` lives in `src/renderer/src/components/Panels/PanelErrorBoundary.tsx`; see [UI Components – Error containment](./ui-components.md#error-containment).
 
 2. Register in `splitviewComponents` in `AppDockLayout.tsx`:
    ```typescript
@@ -79,7 +86,7 @@ For fixed sidebars (Project, Git, Terminal) that don't need tabbing:
    })
    ```
 
-**Example**: See `ProjectPanel.tsx` (wrapper) + `ProjectTree.tsx` (content)
+**Example**: See `ProjectPanel.tsx` (wrapper – header, filter controls, and the `<PanelErrorBoundary key={projectPath ?? 'none'} componentName="Project tree">` around the tree) + `ProjectTree.tsx` (content)
 
 ### Adding Dockview Panel (Editor Tab)
 
@@ -88,9 +95,15 @@ For editor tabs that should appear in the center area:
 1. Create panel component:
    ```typescript
    const MyEditorPanel = (props: IDockviewPanelProps) => {
-     return <div>My Editor Content</div>
+     return (
+       <PanelErrorBoundary key={props.params.filePath} componentName="My editor">
+         <div>My Editor Content</div>
+       </PanelErrorBoundary>
+     )
    }
    ```
+
+   > Note: dockview panels are **not** contained by default – a throw here escalates straight to the root error boundary and replaces the whole window with the recovery screen. Wrap the panel's content in `PanelErrorBoundary` as above, keyed by whatever scopes it (the file path for a document panel), so the failure degrades to that one tab; without the key a tab that failed on file A still reads "unavailable" after the user opens file B in it. Same rule and rationale as the Splitview path above (#60) – see [UI Components – Error containment](./ui-components.md#error-containment).
 
    > Note: panel content is non-selectable by default – dockview applies `user-select: none` to panel chrome and the rule cascades into your component. To make a data-bearing surface inside your panel selectable, add its selector to the grouped rule in `src/renderer/src/styles/utilities.css` and add a row to `src/renderer/src/styles/userSelect.audit.test.ts`. See [Text selection policy](./ui-style-guide.md#text-selection-policy) for the decision rules and the CSS-module exception (`.metadataItem` / `.errorMessage` in `ImageViewerPanel.module.css` stay in-place because build-time class-name hashing prevents the central selector from matching them).
 

@@ -22,6 +22,7 @@ Erfana follows **2025 Electron security best practices** with comprehensive hard
 - Cookie encryption disabled to avoid macOS keychain prompts (settings stored in plaintext)
 - `scripts/fuses.js` sets 4 of the 6 fuses. Three of them harden the build — RunAsNode, NodeOptions and NodeCliInspect (the last one only in production builds; see below) — while the fourth, EnableCookieEncryption, is deliberately set to `false`
 - Test builds (`ERFANA_TEST_BUILD=true`) enable NodeCliInspect for Playwright E2E testing - see [Test Builds](#test-builds-erfana_test_build)
+- `ERFANA_E2E_FORCE_CRASH=1` injects a renderer crash for the error-boundary E2E scenario. Double-gated on `!app.isPackaged`, so a packaged build ignores it - see [Crash Injection](#crash-injection-erfana_e2e_force_crash)
 
 ---
 
@@ -196,6 +197,33 @@ const isTestBuild = process.env.ERFANA_TEST_BUILD === 'true';
 // In fuse configuration:
 [FuseV1Options.EnableNodeCliInspectArguments]: isTestBuild,
 ```
+
+---
+
+## Crash Injection (ERFANA_E2E_FORCE_CRASH)
+
+**Status**: ✅ DOUBLE-GATED — inert in any packaged build
+
+The E2E suite needs a renderer that throws on demand to exercise the error-boundary recovery screen (#60). Rather than shipping a test hook in the renderer, the flag travels the same path as the screenshot overlay's per-capture token: main → `additionalArguments` → preload → context bridge.
+
+### Mechanism
+
+1. **Main** — `buildAdditionalArguments()` in `src/main/index.ts` appends `FORCE_CRASH_ARG` (`--erfana-force-crash`, `src/shared/constants.ts`) to `webPreferences.additionalArguments` **only** when `!app.isPackaged && process.env.ERFANA_E2E_FORCE_CRASH === '1'`. Otherwise it returns `[]`.
+2. **Preload** — `src/preload/index.ts` reads the flag back off `process.argv` and exposes `window.__ERFANA_FORCE_CRASH__ = true` **only when present**; in every normal run the property is `undefined`, so a `=== true` check in the renderer is the whole contract.
+3. **Renderer** — reads the exposed boolean; it has no other way to learn the flag.
+
+Both spellings come from one shared constant so the two halves of the handshake cannot drift into a flag that silently never fires.
+
+### Security-relevant properties
+
+| Property | Why it holds |
+|----------|--------------|
+| A packaged build ignores the env var outright | `app.isPackaged` is checked *before* the env var; a shipped app can be launched with `ERFANA_E2E_FORCE_CRASH=1` and nothing changes |
+| The renderer cannot set the flag | It arrives as a Chromium command-line argument on the renderer process — only the **process launcher** can add it. Renderer JavaScript cannot write `process.argv`, and the sandboxed renderer has no `process` at all |
+| No new IPC surface | The flag is a boolean on the context bridge, not a channel; there is nothing to send, validate or gate |
+| Same mechanism as shipped code | Identical to the overlay-token path (`ScreenshotOverlayWindow.ts` → `screenshotOverlay.ts`), which is production code — this is not a bespoke test backdoor |
+
+Worst case if the gate were bypassed: the renderer throws and the user sees the recovery screen. No capability is granted.
 
 ---
 
@@ -460,7 +488,7 @@ No part of that URL comes from the renderer, so there is no arbitrary-URL or pro
 
 `screenshot-handlers.ts` defines its own `validateMainRendererSender`, applying the same top-level-frame + exact-`file://`-URL rule to every public screenshot channel (`capture`, `getDisplays`, `getCapabilities`, `getScreenPermission`, `enumerateWindows`). It is deliberately separate from `isTrustedSender` because it must also exclude the app's **own** per-display area-select overlay windows, which are legitimate `BrowserWindow`s of the same app but must never be able to invoke the public capture API. Rejections fail closed (empty display list, `supported: false`, `'unknown'` permission, `SCREENSHOT_FAILED`) and are logged.
 
-The overlay windows have their own, tighter channel path: `screenshot:areaSelected` / `screenshot:areaCancelled` are attached per capture to each overlay's `webContents.mainFrame.ipc` (never global `ipcMain`) and every payload must carry that round's freshly minted UUID token.
+The overlay windows have their own, tighter channel path: `screenshot:areaSelected` / `screenshot:areaCancelled` are attached per capture to each overlay's `webContents.mainFrame.ipc` (never global `ipcMain`) and every payload must carry that round's freshly minted UUID token — with one deliberate exception, the overlay's one-way `logging:log` forward (#60), which is untokenised because it carries a log record rather than a capture command and is re-validated main-side by the same `LogEntrySchema` as the editor window's entries.
 
 ### macOS usage-description strings
 

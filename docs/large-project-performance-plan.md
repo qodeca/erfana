@@ -59,6 +59,7 @@ Not one of the six issues above, but it landed in the same problem space and cha
 - a **single-pass memo** producing the flattened array *and* a `path → node` index in one traversal – deletes a second ~174k-object copy (`enhancedFlattenedItems`) and replaces six linear `.find` scans, one of which ran per drag-over event;
 - **two-tier error containment** – `PanelErrorBoundary` around the project tree, `RootErrorBoundary` + a distinct `FallbackGuard` at the root, plus a global error trail for async/handler errors – so a renderer defect degrades to a recovery screen instead of a blank window;
 - **main-process crash logging** – `render-process-gone`, `child-process-gone` and per-window `unresponsive` / `responsive`, log-only;
+- **per-window entry-module capture** – renderer console errors (`error` level only) and preload errors, the only trace of a boot failure that leaves the window blank without killing the process. Every renderer-supplied string is length-bounded at 1 000 characters and the console trail is capped at 20 records per window per 10 s, followed by one summary line carrying the dropped count. Log-only, like the rest;
 - **flatten instrumentation** – `[ProjectTree] flatten completed` with `{ nodeCount, durationMs }`, at `info` above a 50 ms threshold and `debug` below.
 
 Design of record: [`docs/design/design-issue-60.md`](./design/design-issue-60.md).

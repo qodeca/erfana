@@ -69,7 +69,8 @@ Erfana is an agent-native Markdown workspace – an Electron app that runs a ter
 - [Large Project Performance Plan](./large-project-performance-plan.md) - EMFILE mitigation, worker threads, diagnostics
 - [Testing](./testing/README.md) - Testing strategies and coverage
   - [E2E Testing](./testing/e2e-testing.md) - Playwright/Electron E2E guide
-  - [E2E Selectors](./testing/e2e-selectors.md) - 238 testids catalog
+  - [E2E Selectors](./testing/e2e-selectors.md) - 248 testids catalog
+  - [Test Scenarios](./testing/test-scenarios.md) - 10 manual/MCP visual test scenarios
   - [E2E Helpers](./testing/e2e-helpers.md) - Test utility functions
   - [E2E Third-Party](./testing/e2e-third-party.md) - Monaco, xterm.js, Mermaid patterns
   - [E2E Debugging](./testing/e2e-debugging.md) - Debugging and CI/CD
@@ -95,7 +96,14 @@ Erfana is an agent-native Markdown workspace – an Electron app that runs a ter
 - [Terminal Panel Architecture](./architecture-reviews/reviews/terminal-panel-architecture-review.md) - Terminal panel design review
 
 ### Design records and plans
+
+Design notes live in **two** directories, and the split is historical rather than meaningful: `docs/designs/` (plural) holds the older set and mixes two file-naming conventions (`<issue>-<slug>.md` and `issue-<issue>-<slug>.md`), while `docs/design/` (singular) holds the newer `design-issue-<n>.md` notes. Both are indexed below; check both when looking for the rationale behind a change.
+
+- [Packaging guards for `extraFiles` / `extraResources`](./design/design-issue-55.md) - Build-time leak guards beyond the `files:` allowlist (issue #55)
+- [Renderer crash on very large projects](./design/design-issue-60.md) - `flattenTree` stack overflow, error containment (root + panel boundaries), crash trail (issue #60)
 - [Claude Code status bar](./designs/216-claude-status-bar.md) - Per-terminal context status bar design (issue #216; Windows follow-up #217)
+- [Model capability registry](./designs/41-model-capability-registry.md) - Shared model-id parser + context-window capability table (issue #41)
+- [Context-meter freeze after compaction](./designs/47-context-meter-freeze.md) - Bounded fallback read + per-file-version result cache (issue #47)
 - [Clipboard service](./designs/issue-203-clipboard-service.md) - Central text-clipboard service design (issue #203)
 
 ### Future Features (Planned)
