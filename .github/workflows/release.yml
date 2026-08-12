@@ -293,7 +293,11 @@ jobs:
           mkdir -p dl
           cd dl
           gh release download "$TAG" --pattern '*' --clobber
-          sha256sum * > SHA256SUMS
+          # `-- *` not `./*`: both stop a dash-leading filename being read as an
+          # option, but `./*` would also prefix every recorded name with `./`,
+          # breaking the releasing-erfana Phase 4.4 hash comparison and end-user
+          # `sha256sum -c`. Filenames in SHA256SUMS must stay bare.
+          sha256sum -- * > SHA256SUMS
           cat SHA256SUMS
 
           umask 077
