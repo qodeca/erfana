@@ -26,7 +26,9 @@ vi.mock('electron', () => ({
   ipcRenderer: { send }
 }))
 
-const TOKEN = '3f2504e0-4f89-41d3-9a0c-0305e82c3301'
+// UUID-shaped (the preload validates the shape) but deliberately zero-entropy -
+// a realistic UUID here trips gitleaks' generic-api-key rule.
+const TOKEN = '00000000-0000-4000-8000-000000000000'
 
 interface OverlayApi {
   areaSelected: (selection: { x: number; y: number; width: number; height: number }) => void

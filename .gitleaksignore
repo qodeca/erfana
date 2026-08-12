@@ -13,3 +13,8 @@
 # also carries an inline `gitleaks:allow` on the `graph` branch; this entry
 # covers the original historical commit, which predates that comment.
 e5ec5f9714543b6e9f71c39212b7349cf19f28f6:src/shared/ipc/graph-mcp-schema.test.ts:generic-api-key:440
+
+# screenshotOverlay.test.ts: the RFC 4122 example UUID used as a fake overlay
+# capture token in commit 69df015 (issue #60). A follow-up commit replaced it
+# with a low-entropy literal; this entry covers the historical commit only.
+69df015eb860fa966a306c684827fe89207aa1ec:src/preload/screenshotOverlay.test.ts:generic-api-key:29
