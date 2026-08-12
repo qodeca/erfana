@@ -14,9 +14,11 @@ The Erfana editor subsystem provides a comprehensive markdown editing experience
 ## Key Features
 
 ### View Modes
-- **Editor Only** (📝) - Focus on writing
-- **Split View** (⚡) - Side-by-side with synchronized scrolling
-- **Preview Only** (👁️) - Presentation mode
+Four modes, toggled from the toolbar (`MarkdownToolbar.tsx`):
+- **Editor Only** (`editor`) - focus on writing; PDF/DOCX export is disabled in this mode
+- **Split Horizontal** (`split-horizontal`) - preview on top, editor below
+- **Split Vertical** (`split`) - side by side, with synchronized scrolling
+- **Preview Only** (`preview`) - presentation mode
 
 ### Export
 - **PDF Export** - Print-optimized PDF with vector Mermaid diagrams, A4 page size

@@ -309,7 +309,11 @@ Syntax error in graph
 
 **Solution:**
 1. Check diagram syntax at https://mermaid.js.org/
-2. Verify diagram type is supported (22 types available)
+2. Verify the diagram type is supported (22 documented types; other types the bundled
+   Mermaid version knows also render – see
+   [markdown-preview.md](./editor/markdown-preview.md#mermaid-diagrams). `zenuml` is the
+   known exception: it is listed in `mermaidDirections.ts` but its package is not a
+   dependency, so it always errors)
 3. Check for typos in keywords
 4. Use bug report button (🐛) in error message to send formatted report to Terminal panel
 

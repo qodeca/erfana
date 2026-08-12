@@ -119,7 +119,7 @@ const filterTree = useMemo(() => {
 }, [fileTree, filterMode])
 ```
 
-**Helper**: `isMarkdownFile()` checks `.md`, `.markdown`, `.mdown`, `.mkd`, `.mdx`
+**Helper**: `isMarkdownFile()` checks `.md` and `.markdown` only. Note there are two copies – a local one in `ProjectTree.tsx` (used by this filter) and the exported one in `src/renderer/src/utils/fileUtils.ts`; both accept the same two extensions, so `.mdx`, `.mdown` and `.mkd` files are hidden in Markdown mode.
 
 ### Behavior
 
@@ -160,15 +160,24 @@ See: [Known Issues](./known-issues.md#git-status-global-gitignore-not-supported)
 ### Sensitive Files
 
 **5 Categories**:
-1. Environment: `.env*`, `.npmrc`, `*.pem`, `*.key`
-2. Cloud: `.aws/`, `.azure/`, `.gcloud/`
-3. SSH: `.ssh/`, `id_rsa*`, `known_hosts`
-4. Security: `credentials*`, `secrets*`, `*.keystore`, `*.jks`
-5. Config: `config.json`, `settings.json`, `*.config.js`
+1. Exact filename: `credentials`, `secrets`, `id_rsa`, `id_dsa`, `id_ecdsa`, `id_ed25519`,
+   `known_hosts`, `authorized_keys`
+2. Dotfile prefix (exact, or followed by a dot): `.env`, `.npmrc`, `.netrc`, `.dockercfg`,
+   `.pypirc` – so `.env.production` matches
+3. Directory fragment: `.aws/`, `.ssh/`, `.gnupg/`
+4. Extension: `.key`, `.pem`, `.p12`, `.pfx`, `.keystore`, `.jks`, `.crt`, `.cer`
+5. Password/token files: a name containing `password` or `token` **and** ending `.txt` or `.json`
 
 **Visual**: Color `#d97706` (amber), icon ⚠️ (14px), ARIA label "Sensitive file"
-**Detection**: `isSensitiveFile()` with regex patterns
+**Detection**: `isSensitiveFile()` in `ProjectTreeNode.tsx` – plain string comparison
+(exact match, prefix, `includes`, `endsWith`), not regex
 **Location**: `ProjectTreeNode.tsx`
+
+**Two caveats.** `config.json`, `settings.json` and `*.config.js` are **not** flagged –
+they were never in the implementation. And category 3 is effectively dead: the component
+passes `node.name` (a bare filename) to `isSensitiveFile()`, so a path fragment such as
+`.aws/` can never match. Files inside `.aws/` or `.ssh/` are flagged only when their own
+name matches another category, as `credentials` and `known_hosts` do.
 
 ### Hidden Files
 
@@ -206,8 +215,18 @@ context-menu/
 
 ### Menu Items
 
-**Files**: Rename, ---, Delete
-**Folders**: New File, New Folder, Rename, ---, Delete
+Built by `strategies.tsx` from the command classes in `commands.tsx`, in this order:
+
+**Files**: Cut, Copy, ---, Rename, ---, Delete, ---, Reveal in Finder / Show in Explorer
+**Folders**: Cut, Copy, Paste, ---, New File, New Folder, Rename, Import..., ---, Delete,
+---, Reveal in Finder / Show in Explorer
+**Project root**: the root row is also a valid target; it cannot be moved
+("Cannot move project root")
+
+**Conditional items**: Paste appears only on directories and only when the internal
+clipboard is non-empty. Import... appears only on directories and only when an import
+handler is supplied. The Reveal label switches on `isMacOS()`.
+
 **Separator**: Visual separator before destructive actions
 
 ### Command Classes

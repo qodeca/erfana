@@ -26,7 +26,7 @@ Dual vertical activity bars on left and right edges (VS Code-style).
 ### Design
 
 - Background: `var(--color-gray-800)` (#3c3c3c)
-- Icons: Lucide React – `activityBarConfig.ts` imports `Files`, `Search` and `Terminal`
+- Icons: Lucide React – `activityBarConfig.ts` imports `Files`, `Search` and `Terminal`. The **Search panel is `enabled: false` ("Coming soon")** and `getPanelsBySide()` filters disabled panels out, so only the Project and Terminal icons are rendered. There is no project-wide search; `Cmd/Ctrl+F` is in-file search only
 - Active indicator: 2px Qodeca Lime vertical bar (`var(--color-brand-lime)`)
 - Hover: Icon changes to white
 
@@ -113,7 +113,7 @@ The three capture buttons appear only on platforms where screenshot capture is s
 - Cross-platform screenshot capture (screen / window / area) and webcam photo capture, inserted as a path into the terminal
 - Maximize over the editor (Cmd/Ctrl+Shift+M)
 - Per-terminal Claude Code context status bar (`ClaudeStatusBar`)
-- "Send Selection to Terminal" from preview context menu
+- Preview and editor context menus send a selection to the terminal via prompt templates (there is no "Send selection to terminal" item)
 
 **Theme**: Uses design tokens - `var(--color-black)` bg, white fg, `var(--color-cursor)` cursor
 

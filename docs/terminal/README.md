@@ -67,7 +67,7 @@ See the full design in [`docs/designs/216-claude-status-bar.md`](../designs/216-
 Terminal panel automatically opens when a project loads, providing immediate shell access.
 
 **Behavior**:
-- Opens automatically on Recent Projects selection or File > Open
+- Opens automatically when a project is opened – via the Project panel's open/change folder button or the Welcome tab's Recent Projects list. There is no File > Open menu item; the File menu contains only New Window (`src/main/menu.ts`)
 - Tracks user intent: if user closes terminal, it stays closed until next project load
 - Ephemeral state (`terminalUserClosed`) resets on project change
 
@@ -382,7 +382,7 @@ See [Scroll Fixes](./scroll-fixes.md) for related scroll preservation features.
 - **WebGL Rendering**: Hardware acceleration with canvas fallback
 - **Bold Font Support**: Renders bold text with proper font weight
 - **Full Environment**: Login shell on macOS/Linux loads user's shell configuration and Homebrew paths
-- **Context Integration**: "Send Selection to Terminal" from markdown preview
+- **Context Integration**: preview and editor context menus send a selection to the terminal through prompt templates (Explain / Modify / Ask / Visualize / Prompt)
 
 ### Terminal Configuration
 
@@ -542,11 +542,12 @@ Without bracketed paste, multi-line text or text containing special characters (
 ### Context Menu Integration
 **File**: `src/renderer/src/components/ContextMenu/PreviewContextMenu.tsx`
 
-**"Send Selection to Terminal"** menu item:
-1. Opens terminal panel (if closed)
-2. Waits 100ms for initialization
-3. Calls `sendToTerminal(selectedText)`
-4. Shows success/error toast
+There is **no** "Send selection to terminal" item. Selected text reaches the terminal only
+through a prompt template: right-clicking a selection in the preview (or in the Monaco
+editor) offers **Explain**, **Modify**, **Ask**, **Visualize** and **Prompt**, plus
+**Copy selection**. Each prompt renders its template with the selection, pastes the result
+into the terminal in bracketed-paste mode and presses Enter automatically
+(`autoExecute`). See [Prompt Templates](../prompts/README.md).
 
 ### Keyboard Shortcuts
 **Global**: `Cmd/Ctrl+J` - Toggle terminal panel (works anywhere in app)

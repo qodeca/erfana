@@ -123,7 +123,7 @@ Shell-specific (zsh): See zsh docs
 
 Click toolbar buttons (no keyboard shortcut):
 
-📝 **Editor Only** | ⚡ **Split View** (with scroll sync) | 👁️ **Preview Only**
+**Editor Only** | **Split Horizontal** (preview on top) | **Split Vertical** (side by side, with scroll sync) | **Preview Only**
 
 ## Dialog Shortcuts
 
