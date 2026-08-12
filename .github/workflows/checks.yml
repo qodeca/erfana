@@ -251,7 +251,13 @@ jobs:
     timeout-minutes: 3
     if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
     steps:
+      # fetch-depth: 0 so the electron-builder.yml packaging guard can compare
+      # the extraResources: block against the push/PR base commit (issue #55).
+      # The default depth-1 checkout has no base to diff against, which would
+      # force that guard into its fail-safe warn-always path.
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          fetch-depth: 0
 
       # Guard 1: no pull_request_target triggers anywhere.
       # Fork exfiltration vector: pull_request_target runs with base-repo
@@ -380,6 +386,11 @@ jobs:
       # Pure awk/grep: this job is checkout-only, so there is no `npm ci` and
       # therefore no js-yaml (node itself is preinstalled, but a parser is not).
       - name: Guard - electron-builder packaging allowlist
+        env:
+          # Resolved here, not interpolated into the script body, so no github.*
+          # value is ever spliced into shell source. Empty on non-push/PR events;
+          # the guard treats empty as "no base" and falls back to warning.
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
         run: |
           set -euo pipefail
           # $1 is never passed by the `run:` step (it always defaults); it exists
@@ -511,12 +522,66 @@ jobs:
             exit 1
           fi
 
-          # 6b. extraResources: is permitted but coupled. Warn on its presence so
-          #     an edit is a visible prompt to re-check ALLOWED_EXTRA_RESOURCES_DESTS
-          #     and the binding test; the binding test is the hard gate for the
-          #     from/to shape (F4). Matches column-0 and indented mac:/win: forms.
+          # 6b. extraResources: is permitted but coupled. Warn when it is EDITED,
+          #     so the change is a visible prompt to re-check
+          #     ALLOWED_EXTRA_RESOURCES_DESTS and the binding test; the binding
+          #     test is the hard gate for the from/to shape (F4).
+          #
+          #     Edit-triggered, not presence-triggered: extraResources: is
+          #     permanently present (tessdata, LICENSE, THIRD-PARTY-LICENSES.md),
+          #     so warning on presence fired on every push and could not signal an
+          #     edit at all — the noise made it useless as a prompt. BASE_SHA is
+          #     resolved by the caller (github.event.before / pull_request.base.sha).
+          #
+          #     Fail-safe: when the base is unknowable (new branch, force-push,
+          #     shallow history) or $EB_CONFIG is not the tracked repo file (the
+          #     manual negative tests point it at a mutated copy, §5.8), fall back
+          #     to warning on presence rather than staying silent.
+          #     Block extraction mirrors check 2's rule (a list item may sit at
+          #     column 0, so only a non-list, non-comment line at an indent <= the
+          #     key's ends the block) and covers the indented mac:/win: forms too.
+          #     `tr -d '\r'` first: `git show` emits the blob (LF) while a checkout
+          #     on a CRLF-normalising host has CRLF on disk, which would make every
+          #     comparison unequal and warn on every run again.
+          extract_extra_resources() {
+            tr -d '\r' < "$1" | awk '
+              /^[[:space:]]*extraResources:[[:space:]]*(#.*)?$/ {
+                in_block = 1; key_indent = match($0, /[^[:space:]]/) - 1
+                print; next
+              }
+              in_block && /^[[:space:]]*$/            { print; next }
+              in_block && /^[[:space:]]*[-#]/         { print; next }
+              in_block {
+                if (match($0, /[^[:space:]]/) - 1 <= key_indent) { in_block = 0; next }
+                print
+              }
+            '
+          }
+
           if grep -qE '^[[:space:]]*extraResources:' "$EB_CONFIG"; then
-            echo "::warning::$EB_CONFIG declares extraResources:. Validate its from/to shape and dests in the Unit-tests job's binding test, and keep ALLOWED_EXTRA_RESOURCES_DESTS in scripts/fuses.js in step (issue #55)."
+            EB_WARN_REASON=""
+            EB_NOW=$(extract_extra_resources "$EB_CONFIG")
+            if [ "$EB_CONFIG" != "electron-builder.yml" ]; then
+              EB_WARN_REASON="the config is not the tracked repo file, so no base to compare"
+            elif [ -z "$EB_NOW" ]; then
+              EB_WARN_REASON="its block could not be extracted for comparison"
+            elif [ -z "${BASE_SHA:-}" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+              EB_WARN_REASON="there is no comparable base commit (new branch or force-push)"
+            elif ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+              EB_WARN_REASON="base commit ${BASE_SHA} is not in this checkout"
+            else
+              git show "${BASE_SHA}:electron-builder.yml" > /tmp/eb-base.yml 2>/dev/null \
+                || : > /tmp/eb-base.yml
+              if [ "$EB_NOW" != "$(extract_extra_resources /tmp/eb-base.yml)" ]; then
+                EB_WARN_REASON="its block changed since ${BASE_SHA}"
+              fi
+            fi
+
+            if [ -n "$EB_WARN_REASON" ]; then
+              echo "::warning::$EB_CONFIG declares extraResources: and $EB_WARN_REASON. Validate its from/to shape and dests in the Unit-tests job's binding test, and keep ALLOWED_EXTRA_RESOURCES_DESTS in scripts/fuses.js in step (issue #55)."
+            else
+              echo "extraResources: unchanged since ${BASE_SHA} - no re-check prompt needed"
+            fi
           fi
 
           echo "electron-builder packaging allowlist OK ($POSITIVE positive pattern(s); afterPack/afterSign wiring present; no extraFiles:)"

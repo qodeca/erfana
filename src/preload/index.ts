@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { contextBridge, ipcRenderer, IpcRendererEvent, webUtils } from 'electron'
+import { FORCE_CRASH_ARG } from '../shared/constants'
 import type { ProjectChanged } from '../shared/ipc/schema'
 import type { GitStatusResponse } from '../shared/ipc/git-schema'
 import type { PdfExportRequest, PdfExportResponse } from '../shared/ipc/pdf-schema'
@@ -1104,14 +1105,36 @@ const electron = {
   }
 }
 
+/**
+ * E2E crash-injection flag.
+ *
+ * The main process appends {@link FORCE_CRASH_ARG} to `webPreferences
+ * .additionalArguments` only when the app is UNPACKAGED and
+ * `ERFANA_E2E_FORCE_CRASH=1` is set, so a packaged build can never see it and
+ * the renderer can never set it. Mirrors the shipped overlay-token mechanism
+ * (`ScreenshotOverlayWindow.ts` → `screenshotOverlay.ts`).
+ *
+ * Exposed ONLY when true — absent (`undefined`) in every normal run, so a
+ * `=== true` check in the renderer is the whole contract.
+ *
+ * @see docs/design/design-issue-60.md §2.8
+ */
+const forceCrash = process.argv.includes(FORCE_CRASH_ARG)
+
 if (process.contextIsolated) {
   try {
     contextBridge.exposeInMainWorld('electron', electron)
     contextBridge.exposeInMainWorld('api', api)
+    if (forceCrash) {
+      contextBridge.exposeInMainWorld('__ERFANA_FORCE_CRASH__', true)
+    }
   } catch (error) {
     console.error(error)
   }
 } else {
   ;(window as unknown as { electron: typeof electron }).electron = electron
   ;(window as unknown as { api: typeof api }).api = api
+  if (forceCrash) {
+    ;(window as unknown as { __ERFANA_FORCE_CRASH__: boolean }).__ERFANA_FORCE_CRASH__ = true
+  }
 }

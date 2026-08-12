@@ -83,6 +83,44 @@ const lastPath = settingsService.getLastProjectPath()
 
 ---
 
+## Recovery Screens
+
+Erfana contains render failures instead of blanking the window (#60). Both screens below are the containment working, not data loss. See [UI Components - Error containment](./ui-components.md#error-containment) for the two-tier design.
+
+### Recovery Screen Appeared
+
+**Symptom:** The window is replaced by "Erfana stopped unexpectedly." with Restart / Copy error details / Open logs folder buttons
+
+**Cause:** Something threw while Erfana was drawing the interface. The screen is the intended outcome — before #60 the same failure left a black window.
+
+**What is safe:** Files already saved to disk are unaffected. Unsaved editor buffers in the crashed window are gone.
+
+**Solution:**
+1. **Copy error details** — puts a plain-text crash report (version, timestamp, error name and message, stack, component stack; capped at ~16 KB) on the clipboard. Paste it into a bug report.
+2. **Open logs folder** — opens `~/.erfana/logs/`; `combined.log` holds the same crash with more context around it.
+3. **Restart Erfana** — relaunches the app. It comes back on the welcome screen, not on the project you had open: startup deliberately never auto-opens the last project, so a crash caused by that project cannot loop.
+
+**If Restart does nothing:** after ~3 seconds the screen says to quit and reopen manually — the main process is not answering. Quit Erfana from the Dock/taskbar and start it again.
+
+**If there are no buttons at all:** the screen falls back to instructions plus the log-folder location. The renderer's bridge to the main process never attached; quit and reopen.
+
+**See:** [Known Issues - Large repositories](./known-issues.md#large-repositories-emfile-on-repos-with-50k-files) for the #60 case that motivated this (a 100k+-file project blanking the window).
+
+---
+
+### Project Tree Unavailable
+
+**Symptom:** The left sidebar shows "Project tree unavailable. The rest of Erfana still works." with a Reload button; editor tabs and terminal keep running
+
+**Cause:** The project tree threw while rendering. Containment is panel-scoped, so the failure stops at the sidebar instead of taking the window with it.
+
+**Solution:**
+1. Click **Reload** to give the tree another render. On a transient failure the tree comes back; a repeat failure changes the message to "Project tree is still unavailable."
+2. Open a different project — the boundary is keyed by project path, so it remounts fresh and the new project's tree is never blocked by the previous one's error.
+3. If it reproduces on the same project, the details are in `~/.erfana/logs/combined.log` (grep for `[PanelErrorBoundary]`); include that line in a bug report.
+
+---
+
 ## Terminal
 
 ### Terminal Not Available

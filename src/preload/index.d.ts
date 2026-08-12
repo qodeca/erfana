@@ -433,6 +433,21 @@ declare global {
         selection: import('../shared/ipc/screenshot-schema').AreaSelection
       ) => void
       areaCancelled: () => void
+      /**
+       * One-way log forward over the shared `logging:log` channel — the only
+       * evidence trail the overlay window can produce (#60). Optional so a
+       * stale bundle without it still type-checks at the call site.
+       */
+      log?: (entry: LogEntry) => void
     }
+    /**
+     * E2E crash-injection flag, exposed by `src/preload/index.ts` only when the
+     * main process appended `--erfana-force-crash` (unpackaged +
+     * `ERFANA_E2E_FORCE_CRASH=1`). `undefined` in every normal run — declared
+     * optional and literal `true` so callers must test for it explicitly.
+     *
+     * @see docs/design/design-issue-60.md §2.8
+     */
+    __ERFANA_FORCE_CRASH__?: true
   }
 }

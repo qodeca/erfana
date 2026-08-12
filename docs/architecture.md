@@ -137,7 +137,7 @@ src/
 └── renderer/
     └── src/
         ├── assets/              # Vendored fonts (Cascadia Mono) and static assets
-        ├── components/          # 18 directories
+        ├── components/          # 19 directories
         │   ├── ActivityBar/     # Vertical activity bars (left/right) + activityBarConfig.ts
         │   ├── ContextMenu/     # Right-click menus (tree, editor, preview, terminal)
         │   ├── Dialog/          # Unified dialog system (Context + Provider + Hook) – inventory in Dialog/CLAUDE.md
@@ -147,6 +147,7 @@ src/
         │   ├── FileConflictNotification/  # External-change conflict banner
         │   ├── Panels/          # Panel implementations (Project, Terminal, Editor, ImageViewer) + WelcomePanel
         │   ├── ProjectTree/     # Project tree with context menu
+        │   ├── RootErrorBoundary/  # Crash boundary of last resort + FallbackGuard, recovery screen, errorDetails
         │   ├── Screenshot/      # ScreenshotOverlay (area-select surface for the overlay window)
         │   ├── Search/          # SearchBar (app-level unified search)
         │   ├── Settings/        # Settings overlay
@@ -209,7 +210,8 @@ src/
 - **Mermaid Integration**: Client-side diagram rendering (22 types) with dark theme
 - **Prompt Template System**: CSP-compliant markdown templates with Handlebars-style syntax for context menu AI prompts (see [Prompt Templates](./prompts/README.md))
 - **Line Range Tracking**: Enhanced markdown preview with `data-line-start/end` attributes for accurate source mapping
-- **Project Persistence**: Auto-loads last opened project on startup
+- **Project Persistence**: The last opened project is remembered — `SettingsService` persists `lastProjectPath` and the project appears in the Recent Projects list on the welcome screen — but **start-up never auto-opens it**. The "Load last project on mount - DISABLED" effect in `src/renderer/src/hooks/useProjectManagement.ts` marks the initial load complete without loading anything, and `useProjectManagement.noAutoLoad.test.ts` pins that. This is load bearing, not a preference: the crash screen's Restart button is only safe because a relaunch cannot reopen the project that caused the crash — see [UI Components § Restart-safety invariant](./ui-components.md#restart-safety-invariant) before changing it
+- **Layered error containment**: `PanelErrorBoundary` (panel-scoped, degrades one sidebar panel) → `RootErrorBoundary` plus a **distinct** `FallbackGuard` class (last-resort recovery screen, then an inline-styled `document.body` sibling) → `installGlobalErrorTrail()` (async / event-handler / unhandled-rejection trail) → main-process `rendererCrashHandlers` (process death, hangs, entry-module and preload failures). Every main-side layer is log-only by design: a crash caused by restored state would re-crash on reload, so no auto-reload, dialog or relaunch. Layer-by-layer coverage table in [UI Components § Error containment](./ui-components.md#error-containment)
 - **Shared Utilities**: `types/` for shared TypeScript types (FilterMode), `utils/` for shared functions (sanitizeFilePath, isMarkdownFile, panelUtils)
 
 ## Activity Bar System
@@ -331,7 +333,7 @@ if (confirmed) await deleteFile()
 ### Core Components
 
 **FileService Methods** (`src/main/services/FileService.ts`):
-- `moveItem(source, target, newName?)` - Move with fs.rename + copy/delete fallback for EXDEV
+- `moveItem(source, target, newName?, replaceExisting?)` - Move with fs.rename + copy/delete fallback for EXDEV; resolves `{ path, isSymlink? }`
 - `copyItem(source, target, newName?)` - Copy with automatic name conflict numbering (1), (2), etc.
 - `checkNameConflict(targetPath, itemName)` - Case-insensitive duplicate detection
 
@@ -381,11 +383,13 @@ interface FlattenedNode extends FileNode {
   parentId: string | null  // Track parent for hierarchy reconstruction
   depth: number           // Track depth for indentation/projection
   index: number           // Track sibling order
+  offset: number          // Position in the flattened array, recorded during the flatten pass
 }
 ```
 - Depth-first traversal preserves visual order
 - Metadata enables validation (circular move detection)
-- Memoized via `useMemo(() => flattenTree(files), [files])`
+- `offset` lets an index-backed `getProjection` start its shallower-branch walk in O(1), with no `findIndex` scan (the synthetic project root carries `-1`, matching a `findIndex` miss)
+- Single memoized pass: `useDragDropTree`'s `useMemo` calls the internal `flattenInto(files, null, 0, items, index)` and returns `{ flattenedItems, nodeIndex, flattenDurationMs }` — the flat array, its `path → node` index and the timing all come out of one traversal. The exported `flattenTree(nodes, parentId?, depth?)` is a thin wrapper over `flattenInto` kept for existing callers and tests; the hook does not call it
 
 ### Validation Constraints
 
@@ -448,8 +452,8 @@ interface FlattenedNode extends FileNode {
 
 **Preload Bridge** (`src/preload/index.ts`):
 ```typescript
-moveItem: (sourcePath, targetParentPath, newName?) =>
-  ipcRenderer.invoke('file:moveItem', sourcePath, targetParentPath, newName)
+moveItem: (sourcePath, targetParentPath, newName?, replaceExisting?) =>
+  ipcRenderer.invoke('file:moveItem', sourcePath, targetParentPath, newName, replaceExisting)
 ```
 - Type-safe API via `index.d.ts` definitions
 - No direct Node.js access from renderer

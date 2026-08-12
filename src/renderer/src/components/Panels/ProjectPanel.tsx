@@ -11,6 +11,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { ISplitviewPanelProps, DockviewApi } from 'dockview'
 import { FolderOpen, ChevronDown, ChevronLeft } from 'lucide-react'
 import { ProjectTree } from '../ProjectTree/ProjectTree'
+import { PanelErrorBoundary } from './PanelErrorBoundary'
+import { useProjectManagementContextSafe } from '../../context/ProjectManagementContext'
 import type { FilterMode } from '../../types/filters'
 import { sanitizeFilePath, getBasename } from '../../utils/fileUtils'
 import { isImageFile } from '../../utils/imageUtils'
@@ -28,6 +30,11 @@ function isValidFilterMode(value: unknown): value is FilterMode {
 export function ProjectPanel(props: ISplitviewPanelProps) {
   const [showControlPanel, setShowControlPanel] = useState(false)
   const [filterMode, setFilterMode] = useState<FilterMode>('all')
+
+  // Read via the SAFE accessor: this panel only needs the path to key the error
+  // boundary below, and that is not worth making the panel unrenderable outside
+  // the provider (same reasoning as TerminalPanel).
+  const projectPath = useProjectManagementContextSafe()?.projectPath ?? null
 
   // Load persisted filter mode on mount
   useEffect(() => {
@@ -138,12 +145,19 @@ export function ProjectPanel(props: ISplitviewPanelProps) {
         </span>
       </div>
       <div className="sidebar-panel-content">
-        <ProjectTree
-          onFileSelect={handleFileSelect}
-          showControlPanel={showControlPanel}
-          filterMode={filterMode}
-          onFilterModeChange={handleFilterModeChange}
-        />
+        {/* Panel-scoped containment (#60): a tree render failure degrades to
+            "Project tree unavailable" here instead of blanking the window.
+            Keyed by project so opening a different one remounts the boundary:
+            the error belongs to the tree that crashed, and a fresh project must
+            not inherit a stuck fallback. */}
+        <PanelErrorBoundary key={projectPath ?? 'none'} componentName="Project tree">
+          <ProjectTree
+            onFileSelect={handleFileSelect}
+            showControlPanel={showControlPanel}
+            filterMode={filterMode}
+            onFilterModeChange={handleFilterModeChange}
+          />
+        </PanelErrorBoundary>
       </div>
     </div>
   )

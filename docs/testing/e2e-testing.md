@@ -5,7 +5,7 @@
 Erfana supports automated E2E testing using Playwright with Electron. This guide covers setup, configuration, and test patterns.
 
 **Related documentation**:
-- [E2E Selectors](./e2e-selectors.md) – Complete testid catalog (240 testids)
+- [E2E Selectors](./e2e-selectors.md) – Complete testid catalog (248 testids)
 - [E2E Third-Party](./e2e-third-party.md) – Monaco, xterm.js, Mermaid testing
 - [E2E Helpers](./e2e-helpers.md) – Test utilities and patterns (backward-compatible adapter)
 - [E2E Debugging](./e2e-debugging.md) – Debugging and CI/CD
@@ -70,11 +70,12 @@ ERFANA_TEST_BUILD=true npm run build:mac
 
 Create `playwright.config.ts` in the project root:
 
-Two Playwright projects are configured:
+Three Playwright projects are configured:
 
 | Project | Test match | Retries | Purpose |
 |---------|-----------|---------|---------|
-| `electron` | `**/*.e2e.ts` (ignores `visual-regression*`) | 1 | Functional E2E tests |
+| `electron` | `**/*.e2e.ts` (ignores `visual-regression*` and `audio-transcription*`) | 2 on CI, 0 locally | Functional E2E tests |
+| `transcription` | `**/audio-transcription*.e2e.ts` | 2 on CI, 0 locally | Env-gated: runs only with `ERFANA_E2E_TRANSCRIPTION=1` (real, paid OpenAI calls) |
 | `visual` | `**/visual-regression.e2e.ts` | 0 | Screenshot comparison (diffs must be investigated) |
 
 Visual project settings: `snapshotDir: './e2e/screenshots'`, `snapshotPathTemplate: '{snapshotDir}/{arg}-{platform}{ext}'`, `maxDiffPixelRatio: 0.01`, `animations: 'disabled'`.
@@ -359,19 +360,42 @@ Some E2E tests require external API credentials:
 
 3. Tests requiring API keys will skip gracefully if the variable is not set
 
+### Erfana-specific environment variables
+
+Three `ERFANA_E2E_*` variables change app behaviour for tests. They are read by the app, not by Playwright, so they belong in the environment of the launched Electron process (`ERFANA_E2E_FORCE_CRASH`, `ERFANA_E2E_FAST_SHELL`) or of the Playwright run itself (`ERFANA_E2E_TRANSCRIPTION`, a project gate):
+
+| Variable | Effect |
+|----------|--------|
+| `ERFANA_E2E_FORCE_CRASH=1` | Launcher-only crash injection for `root-error-boundary.e2e.ts`: main appends `--erfana-force-crash` to `webPreferences.additionalArguments`, the preload re-exposes it as `window.__ERFANA_FORCE_CRASH__`, and `ForcedCrash` in `App.tsx` throws during render. Gated on `!app.isPackaged`, so packaged builds ignore it; the renderer can never set it |
+| `ERFANA_E2E_FAST_SHELL=1` | POSIX only: the PTY bootstrap execs `/bin/sh -i` instead of `exec -l "$SHELL" -i`, skipping user rc files so terminal specs start in tens of milliseconds rather than seconds |
+| `ERFANA_E2E_TRANSCRIPTION=1` | Enables the `transcription` Playwright project (real, paid OpenAI calls; also needs `OPENAI_API_KEY`). Without it the project matches nothing and the `capability-summary` reporter prints a `SKIPPED CAPABILITIES` line |
+
+`ERFANA_TEST_BUILD=true` is a *build*-time variable, not a test-time one – see [Test build vs production build](#test-build-vs-production-build) above. Canonical table: [Testing overview § E2E environment variables](./README.md#e2eui-playwright-electron).
+
 ### Test files
+
+All 18 specs in `e2e/`:
 
 - `app-launch.e2e.ts` – Application launch, activity bar, welcome panel visibility
 - `third-party-components.e2e.ts` – Monaco editor, xterm.js terminal, Mermaid diagrams
 - `directory-watcher.e2e.ts` – Directory watcher pipeline verification
-- `audio-transcription.e2e.ts` – Full audio import transcription lifecycle (real OpenAI API, requires `OPENAI_API_KEY`, skips if not set)
+- `audio-transcription.e2e.ts` – Full audio import transcription lifecycle (real OpenAI API; `transcription` project, gated by `ERFANA_E2E_TRANSCRIPTION=1` + `OPENAI_API_KEY`)
 - `context-menu-explain.e2e.ts` – Context-menu Explain prompt flow end-to-end in both preview and editor contexts (right-click → Explain → terminal opens)
 - `document-import.e2e.ts` – Full LiteParse document-import UI lifecycle: file dialog stub → DocumentImportDialog options → conversion → result on disk
+- `welcome-open-toolbar-import.e2e.ts` – Welcome-screen Open/Change Project button (label toggle, real `file:openProject` IPC with the native dialog stubbed) plus the Project Tree toolbar Import button
 - `fixture-smoke.e2e.ts` – Smoke tests for the composed Playwright fixtures (`testProject`, `withSettings`, `appWithTestProject`, `windowWithTestProject`, `withOpenFile`)
 - `settings-logs.e2e.ts` – Settings overlay "Logs folder" section: path display and the "Open" reveal button
+- `git-status.e2e.ts` – Project Tree git decorations: file letter-badges, folder dots, priority bubbling (wiring smoke; the cross-platform separator guard is the `gitStatus.logic.test.ts` unit suite)
+- `git-status-on-edit.e2e.ts` – Badge refresh after an in-editor autosave with no manual refresh (keystroke → autosave → chokidar `change` → IPC → store → repaint)
 - `terminal-expand.e2e.ts` – Terminal maximize over the editor area (Cmd/Ctrl+Shift+M and header button); covers the AppDockLayout splitview manipulation that has no unit test (dockview is not mocked)
 - `terminal-resize.e2e.ts` – Regression guard for the editor/terminal sash drag — simulates a real mouse drag and asserts the editor area actually shrinks (would fail on v0.10.0 unfixed; see [CHANGELOG § 0.10.1](../CHANGELOG.md#0101))
+- `dockview-resize.e2e.ts` – Regression guard that dockview drag-to-resize still works after the #211 CSS audit (AC #7)
+- `user-select.e2e.ts` – Organic selection coverage for #211 on two surfaces (markdown preview, settings overlay); cross-cutting policy coverage lives in `userSelect.audit.test.ts`
+- `camera-mirror.e2e.ts` – Camera preview mirroring default + per-camera toggle, 16:9 `object-fit: contain` framing, native Enter-to-capture (#42), against Chromium's fake capture device
+- `root-error-boundary.e2e.ts` – #60: a launcher-injected renderer crash must show the recovery screen (details toggle, Copy / Open logs / Restart), not a blank window, plus a negative case for the flag being unset
 - `visual-regression.e2e.ts` – Visual regression for 5 UI states (welcome, editor, terminal, settings, confirm dialog)
+
+> **Why `root-error-boundary.e2e.ts` bypasses the composed fixtures**: it needs a per-launch environment (`ERFANA_E2E_FORCE_CRASH` set for the positive case, and explicitly *deleted* from `process.env` for the negative one, so a developer's shell cannot make the negative test pass for the wrong reason). The shared `app` fixture owns its own launch and takes no env, so the spec calls `electron.launch()` directly and pairs it with `createTempUserDataDir()` from `e2e/utils/helpers.ts` to keep the per-test user-data isolation the `userDataDir` fixture would otherwise provide. Use the fixtures unless a spec genuinely needs a custom launch environment.
 
 ---
 

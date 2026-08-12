@@ -11,6 +11,35 @@
 /** Maximum number of recent projects to track */
 export const MAX_RECENT_PROJECTS = 5
 
+/**
+ * Logs directory, relative to the user's home directory.
+ *
+ * Single source of truth: `LoggingService` joins it with `homedir()` to decide
+ * where to write, and the crash fallback's DEGRADED mode (where
+ * `window.api.logging.getLogsDir()` cannot be called) renders this value as
+ * "<this> in your home folder" — prose rather than `~/…`, which would be wrong
+ * on Windows. Moving the logs means editing this line only.
+ *
+ * @see src/main/services/LoggingService.ts - getLogsDir()
+ * @see src/renderer/src/components/RootErrorBoundary/RootErrorFallback.tsx - degraded mode
+ */
+export const LOGS_DIR_RELATIVE = '.erfana/logs'
+
+/**
+ * Renderer-crash injection flag for the E2E error-boundary scenario (#60 §2.8).
+ *
+ * Shared because BOTH sides of the handshake must spell it identically: the
+ * main process appends it to `webPreferences.additionalArguments` (only when
+ * the app is unpackaged AND `ERFANA_E2E_FORCE_CRASH=1`), and the preload reads
+ * it back off `process.argv` to decide whether to expose
+ * `window.__ERFANA_FORCE_CRASH__`. Two literals could drift into a flag that
+ * silently never fires.
+ *
+ * @see src/main/index.ts - buildAdditionalArguments()
+ * @see src/preload/index.ts - forceCrash
+ */
+export const FORCE_CRASH_ARG = '--erfana-force-crash'
+
 /** Toast notification durations in milliseconds */
 export const TOAST_DURATION = {
   ERROR: 5000,

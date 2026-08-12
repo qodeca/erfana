@@ -556,14 +556,17 @@ Get the resolved logs directory path (e.g., `~/.erfana/logs/`).
 
 | Channel | Direction | Description |
 |---------|-----------|-------------|
-| `logging:log` | Renderer → Main | Send log entry from renderer process |
+| `logging:log` | Renderer → Main | Send log entry from renderer process. **Two senders**: the editor window via `api.logging.log` (`src/preload/index.ts`) and the screenshot-overlay window via `overlayApi.log` (`src/preload/screenshotOverlay.ts`, #60). Both are one-way `send`s and both are validated main-side with the same `LogEntrySchema` |
+| `logging:getLevel` | Renderer → Main | Get the current log level (renderer syncs its initial level from this) |
 | `logging:getLogsDir` | Renderer → Main | Get resolved logs directory path |
 | `logging:openLogsFolder` | Renderer → Main | Open logs folder in native file manager |
 
 ### Preload Bridge
 
+- `api.logging.log(entry)` – One-way send; the overlay window's equivalent is `overlayApi.log(entry)` on the same channel
+- `api.logging.getLevel()` – Returns the current log level
 - `api.logging.getLogsDir()` – Returns logs directory path
-- `api.logging.openLogsFolder()` – Opens logs folder via `shell.openPath()`
+- `api.logging.openLogsFolder()` – Opens logs folder via `shell.openPath()`; returns `''` on success or an error string on failure. Called from Settings and from the crash recovery screen's **Open logs folder** button (#60), which is capability-probed like Restart
 
 ### Usage
 The module exports the `LoggingService` class, the `loggingService` singleton, and a convenience `logger` object — `logger` is what main-process code imports.
@@ -620,13 +623,15 @@ See [IPC Patterns § Clipboard channels](./ipc-patterns.md#clipboard-channels--a
 
 ## System actions (`api.system`)
 
-Like the clipboard entry above, this has **no main-process service class** — it is a pair of sender-gated IPC handlers in `src/main/ipc/system-handlers.ts` fronted by a preload bridge. It exists for the macOS Screen Recording grant-and-relaunch flow (`ScreenPermissionDialog`).
+Like the clipboard entry above, this has **no main-process service class** — it is a pair of sender-gated IPC handlers in `src/main/ipc/system-handlers.ts` fronted by a preload bridge. It exists for the macOS Screen Recording grant-and-relaunch flow (`ScreenPermissionDialog`); since #60 `relaunchApp` has a second, platform-independent caller — see below.
 
 ### `api.system.openScreenRecordingSettings(): Promise<void>`
 Opens the macOS Screen Recording privacy pane via `shell.openExternal` on a fixed constant URL. Payload-free. No-ops off `darwin`.
 
 ### `api.system.relaunchApp(): Promise<void>`
 `app.relaunch()` + `app.quit()`. Required because macOS applies a fresh Screen Recording grant **only to a newly-launched process** — an existing process keeps the old denial for its lifetime, so "grant then retry" cannot work without a restart. Payload-free and deliberately **not** platform-gated. Uses `app.quit()` rather than `app.exit()` so the `before-quit` path still releases the project lock, watchers and PTYs.
+
+Second caller (#60): the crash recovery screen's **Restart** button (`src/renderer/src/components/RootErrorBoundary/RootErrorFallback.tsx`), on every platform. It is capability-probed — `typeof window.api?.system?.relaunchApp === 'function'`, so a missing or partially-exposed bridge hides the button instead of rendering a dead control — and bounded by a stall timer that tells the user to quit and reopen manually if the relaunch has not happened in 3 s. The screen also calls `file.closeProject()` best-effort first (raced against a 1.5 s timeout) so a crash caused by the open project cannot be reopened into a loop.
 
 Both handlers validate `event.senderFrame` (`isTrustedSender`) — a compromised child frame must not be able to quit the app or fire OS-level navigations.
 

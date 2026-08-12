@@ -9,43 +9,61 @@ The logging layer provides centralized, structured logging across both Electron 
 ### Architecture
 
 ```
-+------------------------+     +------------------------+
-|    Renderer Process    |     |     Main Process       |
-|                        |     |                        |
-|  +------------------+  |     |  +------------------+  |
-|  | RendererLogger   |  |     |  | LoggingService   |  |
-|  | (logger.ts)      |  |     |  | (singleton)      |  |
-|  +--------+---------+  |     |  +--------+---------+  |
-|           |            |     |           |            |
-|           | LogEntry   |     |           |            |
-+-----------+------------+     +-----------+------------+
-            |                              |
-            |    IPC: logging:log          |
-            +----------------------------->|
-                                           |
-                                           v
-                              +------------------------+
-                              |    electron-log        |
-                              |    (file transport)    |
-                              +------------------------+
-                                           |
-                                           v
-                              +------------------------+
-                              |  ~/.erfana/logs/       |
-                              |  - combined.log        |
-                              |  - main.log            |
-                              |  - renderer.log        |
-                              +------------------------+
++---------------------------+   +---------------------------+
+|  Editor window (renderer) |   | Overlay window (renderer) |
+|                           |   | (screenshot area-select)  |
+|  +---------------------+  |   |  +---------------------+  |
+|  | RendererLogger      |  |   |  | RendererLogger      |  |
+|  | (logger.ts)         |  |   |  | (logger.ts)         |  |
+|  +----------+----------+  |   |  +----------+----------+  |
+|             | LogEntry    |   |             | LogEntry    |
+|  window.api.logging.log   |   |   window.overlayApi.log   |
++-------------+-------------+   +-------------+-------------+
+              |                               |
+              |       IPC: logging:log        |
+              +---------------+---------------+
+                              |
+                              v
+                 +--------------------------+
+                 |      Main process        |
+                 |  logging-handlers.ts     |
+                 |  LogEntrySchema (zod)    |
+                 +------------+-------------+
+                              |
+                              v
+                 +--------------------------+
+                 |     LoggingService       |
+                 |     (singleton)          |
+                 +------------+-------------+
+                              |
+                              v
+                 +--------------------------+
+                 |      electron-log        |
+                 |      (file transport)    |
+                 +------------+-------------+
+                              |
+                              v
+                 +--------------------------+
+                 |  ~/.erfana/logs/         |
+                 |  - combined.log          |
+                 |  - main.log              |
+                 |  - renderer.log          |
+                 +--------------------------+
 ```
+
+**Two renderer senders, one channel.** The editor window reaches main through `window.api.logging.log` (`src/preload/index.ts`); the screenshot-overlay window has no `window.api` at all, so its dedicated preload exposes a one-way `window.overlayApi.log` over the **same** `logging:log` channel (#60). `resolveLogSink()` in `src/renderer/src/utils/logger.ts` picks the transport in that order — `api` → `overlayApi` → `console.error` — **per call, never cached**: a record can be emitted before the bridge is attached, and a cached miss would silence that window for the rest of its life. Main validates both senders identically (`LogEntrySchema`).
 
 **Key components:**
 
 | Component | Location | Purpose |
 |-----------|----------|---------|
 | `LoggingService` | `src/main/services/LoggingService.ts` | Main process singleton, manages file transports |
-| `RendererLogger` | `src/renderer/src/utils/logger.ts` | Renderer facade, sends logs via IPC |
+| `RendererLogger` | `src/renderer/src/utils/logger.ts` | Renderer facade, resolves a sink and sends logs via IPC |
+| `screenshotOverlay.ts` | `src/preload/screenshotOverlay.ts` | Overlay-window preload; exposes `overlayApi.log`, the overlay's only evidence trail (#60) |
 | `logging-schema.ts` | `src/shared/ipc/logging-schema.ts` | Shared types and validation |
 | `logging-handlers.ts` | `src/main/ipc/logging-handlers.ts` | IPC handlers |
+| `rendererCrashHandlers.ts` | `src/main/utils/rendererCrashHandlers.ts` | Main-side crash / hang trail for renderer + child processes (#60) |
+| `installGlobalErrorTrail.ts` | `src/renderer/src/utils/installGlobalErrorTrail.ts` | Renderer-side trail for uncaught errors and unhandled rejections (#60) |
 
 ## Quick start
 
@@ -122,6 +140,8 @@ All log files are stored in:
 └── ...
 ```
 
+The `~/.erfana/logs` literal above is correct, but the single source of truth is `LOGS_DIR_RELATIVE` (`.erfana/logs`) in `src/shared/constants.ts` — `LoggingService.getLogsDir()` joins it with `homedir()`, and the crash screen's degraded mode renders the same constant as prose when the logging bridge is unreachable. **Move the logs by editing that constant, not `LoggingService`.**
+
 ### File types
 
 | File | Content | Use case |
@@ -160,6 +180,29 @@ Format: `[timestamp] [instanceId] [level] message | Error: ... | Stack: ... | {c
 - Renderer logs prefixed with `[RENDERER]`
 - Error messages include stack traces
 - Context serialized as JSON
+
+### Crash and hang tags (#60)
+
+Support asks users for log excerpts, so the crash and hang records carry stable, greppable message tags. Grep `combined.log` for `[crash]`, `[hang]` or `[GlobalErrorTrail]` to find every record of this class.
+
+| Tag | Level | Written by | Meaning |
+|-----|-------|------------|---------|
+| `[crash] render-process-gone` | error | main, app-scope | A renderer process died. Context: `reason`, `exitCode` |
+| `[crash] child-process-gone` | error | main, app-scope | A child process died (GPU, utility, the DOCX `utilityProcess`, the PDF/DOCX render window). Context: `type`, `reason`, `exitCode`, plus `serviceName` / `name` when Electron supplies them |
+| `[crash] renderer-console-error` | error | main, per window | A renderer `console.error`. Context: `windowId`, `message`, `line`, `sourceId` — the renderer-supplied fields are bounded, see [Diagnostic logging](#diagnostic-logging-v090) |
+| `[crash] renderer-console-error suppressed` | error | main, per window | Console-error records dropped by the rate cap in the window that just closed. Context: `windowId`, `suppressed`, `windowMs` |
+| `[crash] preload-error` | error | main, per window | A preload script threw. Context: `windowId`, `preloadPath`, `error` |
+| `[hang] window-unresponsive` | warn | main, per window | The renderer event loop is blocked (beachball / "not responding"). Context: `windowId` |
+| `[hang] window-responsive` | info | main, per window | The same window recovered. Context: `windowId` |
+| `[GlobalErrorTrail] uncaught error` | fatal | renderer | An uncaught error reached `window`. Context: `filename`, `lineno`, `colno`, plus `componentStack`, `appVersion`, `errorName`, `stackTruncated` |
+| `[GlobalErrorTrail] unhandled rejection` | fatal | renderer | An unhandled promise rejection. Same context shape, minus the source coordinates |
+
+Reading notes:
+
+- A `[hang] window-unresponsive` **followed by** `[hang] window-responsive` is a recoverable freeze, not a death. `render-process-gone` with no `responsive` line after it is the renderer actually going away.
+- The main-process records land in `main.log` (and `combined.log`) even though they describe renderer failures — they are written by main. The `[GlobalErrorTrail]` records come from the renderer and are prefixed `[RENDERER]`.
+- The handlers are deliberately **log-only**: no auto-reload, no dialog, no relaunch. A crash caused by restored state would re-crash on reload, so automated recovery would be a boot loop.
+- `[crash] app crash logging already registered` (debug) means a duplicated bootstrap tried to register the app-scope listeners twice; registration is idempotent, so crash records are not doubled.
 
 ### Multi-instance support
 
@@ -220,6 +263,7 @@ The default log level is `info`. This captures normal operations, warnings, and 
 
 ## Security
 
+- **Single-sourced path**: the directory comes from `LOGS_DIR_RELATIVE` in `src/shared/constants.ts`, consumed by both `LoggingService` and the crash screen's degraded mode — edit the constant, never a hard-coded literal, or the symlink check and the crash screen can drift onto different directories
 - **Symlink protection**: `~/.erfana/logs/` validated as real directory (not symlink) on initialize
 - **Disk space checks**: Cleanup skipped below 100MB free
 - **Input validation**: Renderer log entries validated via Zod schema (`LogEntrySchema` in `logging-schema.ts`). Invalid entries rejected.
@@ -230,7 +274,7 @@ The default log level is `info`. This captures normal operations, warnings, and 
 - **Library**: [electron-log](https://github.com/megahertz/electron-log) with custom logrotate-style archive function
 - **Transports**: Separate logger instances for combined, main, renderer. Console disabled in production.
 - **Level mapping**: `trace` → `verbose`, `fatal` → `error` (electron-log lacks these)
-- **Global error handlers**: Renderer auto-captures `unhandledrejection` and `error` events
+- **Global error handlers**: TWO independent installations, both in the renderer. `RendererLogger.installErrorHandlers()` (run from `initialize()`) registers `error` / `unhandledrejection` listeners at **error** level ("Uncaught error" / "Unhandled promise rejection"); `installGlobalErrorTrail()` (`src/renderer/src/utils/installGlobalErrorTrail.ts`, called from `main.tsx` before the route branch so the overlay window is covered too) registers its own pair at **fatal** level. Both fire, so **one uncaught error currently produces two records** — one `fatal` `[GlobalErrorTrail] …` line and one `error` line from the logger. This is a known, accepted duplicate, documented in that module's docblock: suppressing the logger's pair would require `stopImmediatePropagation()`, which would silently kill every `error` listener registered after it, and collapsing the two belongs in `logger.ts`. **When reading a log, two records do not mean two crashes.** React's development build additionally re-throws a boundary-caught error to `window`, so in dev a single crash can appear twice again; production does not do this
 - **Safe console**: `safeConsole` utility (`src/main/utils/safeConsole.ts`) wraps console to suppress EPIPE errors during shutdown. Installed globally on app startup via `installSafeConsole()`. See [EPIPE error handling](./epipe-error-handling.md).
 
 ## Diagnostic logging (v0.9.0)
@@ -243,6 +287,16 @@ Performance instrumentation added for large-project debugging (#151):
 - **Watcher health**: `DirectoryWatcherService` logs health snapshot every 120s (debug level)
 - **Buffer pressure**: `ThrottledWorker` logs at 80% and 50% buffer capacity (warn/info level)
 - **Rate-limited errors**: `RateLimitedLogger` (`src/main/utils/RateLimitedLogger.ts`) prevents log spam during cascading EMFILE errors (10s default cooldown)
+
+### Renderer console-error rate cap (#60)
+
+A **second, unrelated** limiter, in `src/main/utils/rendererCrashHandlers.ts` — it does not use `RateLimitedLogger`, and the two never interact.
+
+- **Cap**: `MAX_CONSOLE_ERRORS_PER_WINDOW` (20) `[crash] renderer-console-error` records per `CONSOLE_ERROR_WINDOW_MS` (10 s), counted **per window** (each window gets its own counters)
+- **Fixed window, not a token bucket**: the window opens on the first console error and is closed by a `setTimeout` that is `unref`'d, so a pending window can never hold a quitting app open
+- **Summary on close**: the timer emits exactly one `[crash] renderer-console-error suppressed` line — at `error` level, matching the records it stands in for — and **only if something was dropped**. It is timer-driven rather than flushed lazily on the next event so that a loop which stops right after the cap is hit still leaves the "N records dropped" evidence behind
+- **Length bound**: renderer-supplied strings (console `message`, `sourceId`, preload-error text) are untrusted — a rendered document can log whatever it likes — so each is truncated at `MAX_UNTRUSTED_TEXT_LENGTH` (1000 chars) with a `[truncated]` marker and passed as structured context, never interpolated into the message
+- **Why**: a renderer stuck in an error loop emits thousands of `console.error` calls a second. Copied one-for-one, that loop pushes the crash that *started* it out of the rotation window — it destroys the evidence the handlers exist to preserve. Length bounds the size of one record; the cap bounds how many
 
 ## Related documentation
 

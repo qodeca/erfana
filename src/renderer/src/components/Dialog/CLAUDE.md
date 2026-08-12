@@ -81,6 +81,8 @@ Stack entries pair the per-instance container ref with the `zIndex` that instanc
 - `.dialog-btn-secondary` – cancel/dismiss (transparent with border)
 - `.dialog-btn-danger` – destructive actions (red)
 
+`.dialog-btn` / `-primary` / `-secondary` have an out-of-directory consumer: `RootErrorFallback` (the crash-recovery screen) references them from markup while `RootErrorBoundary.css` deliberately never declares them, relying on `Dialog.css` already being in the entry bundle at crash time – a future "scope these to dialogs only" cleanup would silently break the crash screen.
+
 ### Modifiers
 - `.dialog-container.my-dialog` – override container (e.g., `max-width`)
 

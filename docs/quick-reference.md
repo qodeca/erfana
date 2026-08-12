@@ -15,7 +15,7 @@ npm run build:win        # Windows package (NSIS .exe; needs Developer Mode)
 npm run typecheck        # Type checking (node + web)
 npm run lint             # Linting
 npm run test             # All tests (vitest workspace: main + renderer + preload)
-npm run test:main        # vitest.main.ts config: src/main + src/shared + scripts (~134 test files)
+npm run test:main        # vitest.main.ts config: src/main + src/shared + scripts (144 test files: 132 + 10 + 2)
 npm run test:renderer    # vitest.renderer.ts config: src/renderer/src only (jsdom)
 npm run test:preload     # vitest.preload.ts config: preload tests
 npm run test:cov         # Coverage report (all 3 projects)

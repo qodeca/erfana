@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
 import { CLIPBOARD_CHANNELS } from '../shared/ipc/clipboard-channels'
 
 // Mock electron + toolkit before importing preload
@@ -253,6 +253,82 @@ describe('utils.getPathForFile', () => {
 
     expect(webUtils.getPathForFile).toHaveBeenCalledWith(mockFile)
     expect(result).toBe(`/mocked/path/${longName}`)
+  })
+})
+
+/**
+ * Tests for the E2E crash-injection flag.
+ *
+ * The flag is the last link in the chain that lets the e2e suite crash the
+ * renderer on purpose: main appends `--erfana-force-crash` to
+ * `additionalArguments` (unpackaged + `ERFANA_E2E_FORCE_CRASH=1` only), and
+ * preload re-exposes it as `window.__ERFANA_FORCE_CRASH__`. The contract the
+ * renderer relies on is EXPOSED-ONLY-WHEN-TRUE: in a normal run the global must
+ * be absent, not `false`, so `=== true` is the whole check.
+ *
+ * The renderer component itself is NOT gated on `import.meta.env.DEV` — the e2e
+ * spec drives a production build, where a DEV gate would remove it. The double
+ * `isPackaged` + `argv` gate in main is what keeps it unreachable in a shipped
+ * app, and this test pins the argv half of it.
+ *
+ * @see docs/design/design-issue-60.md §2.8
+ * @see Issue #60 - root error boundary
+ */
+describe('__ERFANA_FORCE_CRASH__ exposure', () => {
+  const ORIGINAL_ARGV = process.argv
+  const FLAG = '__ERFANA_FORCE_CRASH__'
+
+  /**
+   * Re-run preload initialisation under a chosen argv.
+   *
+   * @param argv - Full argv the preload script should observe
+   * @param contextIsolated - Which of the two exposure branches to exercise
+   */
+  async function loadPreloadWith(argv: string[], contextIsolated: boolean): Promise<void> {
+    // The mocked bridge survives `vi.resetModules()`, so its call list has to
+    // be cleared per load or an earlier test's exposure leaks into this one.
+    const { contextBridge } = await import('electron')
+    vi.mocked(contextBridge.exposeInMainWorld).mockClear()
+
+    process.argv = argv
+    ;(process as any).contextIsolated = contextIsolated
+    vi.resetModules()
+    delete (window as any)[FLAG]
+    await import('./index')
+  }
+
+  afterEach(() => {
+    process.argv = ORIGINAL_ARGV
+    delete (window as any)[FLAG]
+  })
+
+  it('is absent when argv does not carry the flag', async () => {
+    await loadPreloadWith(['electron', 'main.js'], false)
+
+    expect(FLAG in (window as any)).toBe(false)
+  })
+
+  it('is exposed as true when argv carries --erfana-force-crash', async () => {
+    await loadPreloadWith(['electron', 'main.js', '--erfana-force-crash'], false)
+
+    expect((window as any)[FLAG]).toBe(true)
+  })
+
+  it('goes through contextBridge when context isolation is on', async () => {
+    const { contextBridge } = await import('electron')
+
+    await loadPreloadWith(['electron', 'main.js', '--erfana-force-crash'], true)
+
+    expect(contextBridge.exposeInMainWorld).toHaveBeenCalledWith(FLAG, true)
+  })
+
+  it('exposes nothing through contextBridge in a normal isolated run', async () => {
+    const { contextBridge } = await import('electron')
+
+    await loadPreloadWith(['electron', 'main.js'], true)
+
+    const keys = vi.mocked(contextBridge.exposeInMainWorld).mock.calls.map(([key]) => key)
+    expect(keys).not.toContain(FLAG)
   })
 })
 

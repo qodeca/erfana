@@ -4,6 +4,18 @@ Per-version release notes for Erfana (v0.6.0 onwards; earlier in [archive/change
 
 > **Note:** In v0.7.2, BRS (Business Requirements Specifications) were renamed to "specs" and relocated from `specs/business-reqs/` to `specs/spec-t{tier}-{id}-{slug}/`. All references in code and docs now use `Spec #XXX`. Historical entries below have been updated accordingly.
 
+## Unreleased
+
+*Not yet released.*
+
+### Fixed
+
+- **Erfana no longer crashes to a black window when you open a very large project** ([#60](https://github.com/qodeca/erfana/issues/60)) – opening a project with roughly 100 000 files or more (reported on a 174 000-item folder held on an external drive) turned the whole window black: no message, nothing to click, force-quit the only way out. Building the project tree's internal flat list ran into a hard limit in the JavaScript engine on how many items may be handed to a single function call, and the resulting error tore down the entire interface. That list is now built one item at a time, so the limit cannot be reached – checked against a 200 000-node test tree. In case something else ever fails the same way, the damage is now contained instead of taking the window with it: a failure inside the project tree leaves the rest of the app running and shows "Project tree unavailable" in the sidebar with a Reload button, and a failure anywhere else shows a recovery screen offering **Restart Erfana**, **Copy error details** and **Open logs folder**. Restarting always reopens Erfana on the welcome screen, never the project that just crashed. Crashes and hangs are also written to the log file now – including the case where the window dies outright and no in-app message is possible – so a report can carry evidence rather than a description. Very large projects still open **slowly** (that work is tracked separately as #149/#150); they no longer open fatally. See [`docs/design/design-issue-60.md`](design/design-issue-60.md) and [UI components § Error containment](ui-components.md#error-containment).
+
+### Internal
+
+- **The two Claude Code automation workflows were removed from CI** – `claude-code-review.yml` (automated pull-request review) and `claude.yml` (the `@claude` mention responder) both authenticate through the Claude Code GitHub App, which is not installed on this repository, so every run failed at token exchange and produced nothing but a red tick in the Actions tab. Neither was a branch-protection required check, so nothing is blocked by their absence and no other workflow depended on them. To reinstate: restore the two files from git history and install the [Claude Code GitHub App](https://github.com/apps/claude) on the repository. See [`docs/ci.md`](ci.md).
+
 ## 0.17.1
 
 *Released 2026-08-10. Tag `v0.17.1`.*

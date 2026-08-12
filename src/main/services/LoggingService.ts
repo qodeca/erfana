@@ -30,11 +30,12 @@ import { join, dirname, basename, extname } from 'path'
 import { unlinkSync, renameSync, lstatSync } from 'fs'
 import { globalSettingsService } from './GlobalSettingsService'
 import { AppError, ErrorCode } from '../../shared/errors'
+import { LOGS_DIR_RELATIVE } from '../../shared/constants'
 import { type LogLevel, type LogEntry, shouldLog, validateLogLevel } from '../../shared/ipc/logging-schema'
 import type { LoggingLevel } from '../../shared/ipc/global-settings-schema'
 
-/** Logs directory */
-const LOGS_DIR = '.erfana/logs'
+/** Logs directory, relative to the home directory (shared with the crash fallback) */
+const LOGS_DIR = LOGS_DIR_RELATIVE
 /** Combined log file (all logs from both processes) */
 const COMBINED_LOG = 'combined.log'
 /** Main process log file */

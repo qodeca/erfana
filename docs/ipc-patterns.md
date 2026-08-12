@@ -181,6 +181,19 @@ The central text-clipboard service (#203) deliberately uses **async `ipcMain.han
 
 Both handlers (`src/main/ipc/clipboard-handlers.ts`) apply the standard security rules plus a **sender-frame check**: each request must originate from the app's own top-level frame (the electron-vite dev origin, or the bundled `file://` index). Sub-frames and other origins get the safe value (`''`/`false`) and a logged warning. `writeText` is additionally Zod-validated (`ClipboardWriteTextSchema = z.string().max(CLIPBOARD_MAX_TEXT_LENGTH)`, 5 MB) — oversize or non-string payloads return `false`. Renderer consumers go through the `textClipboard` singleton, never `window.api.clipboard` directly.
 
+## `logging:log` – one channel, two preloads (#60)
+
+No new channel was added for the screenshot-overlay window's log trail. `logging:log` is simply now the **only** channel with two distinct preload scripts as senders:
+
+| Sender | Preload | Exposed as |
+|--------|---------|------------|
+| Editor window | `src/preload/index.ts` | `window.api.logging.log(entry)` |
+| Area-select overlay window | `src/preload/screenshotOverlay.ts` | `window.overlayApi.log(entry)` |
+
+The contrast with the overlay's *other* channels is deliberate. `screenshot:areaSelected` / `screenshot:areaCancelled` are frame-scoped (attached per capture to that overlay's `webContents.mainFrame.ipc`, never global `ipcMain`) and carry the round's freshly minted UUID token, because they are **commands** — a forged payload steals or cancels a capture. The log forward is **not** tokenised: its payload is a log record, not a command, it is one-way and fire-and-forget, and the worst a forged entry achieves is a junk line in a file that already accepts renderer-authored text. Main re-validates both senders identically with `LogEntrySchema` (`src/main/ipc/logging-handlers.ts`) before anything reaches `LoggingService`; an invalid entry is dropped.
+
+Renderer-side, `resolveLogSink()` (`src/renderer/src/utils/logger.ts`) resolves `api` → `overlayApi` → `console.error` on every call and never caches, so a window that logs before its bridge attaches is not silenced for the rest of its life. See [Logging § Architecture](./logging.md#architecture).
+
 ## Event-Based IPC Pattern
 
 Use event-based IPC for watchers and terminal events (e.g., `terminal:data`, `directory-watch:changed`).
