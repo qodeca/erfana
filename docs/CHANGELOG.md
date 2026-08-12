@@ -4,6 +4,14 @@ Per-version release notes for Erfana (v0.6.0 onwards; earlier in [archive/change
 
 > **Note:** In v0.7.2, BRS (Business Requirements Specifications) were renamed to "specs" and relocated from `specs/business-reqs/` to `specs/spec-t{tier}-{id}-{slug}/`. All references in code and docs now use `Spec #XXX`. Historical entries below have been updated accordingly.
 
+## Unreleased
+
+*Not yet released.*
+
+### Internal
+
+- **Three shellcheck findings in the CI workflow files were fixed** – no change to anything the app ships or does. `release.yml` now hashes the release assets with `sha256sum -- *` rather than `sha256sum *`, so a filename beginning with a dash can no longer be mistaken for a command-line option; the recorded names stay bare, which both the release-time verification and the end-user `sha256sum -c` recipe depend on (the `./*` form the linter also suggests would have prefixed every entry with `./` and broken both). In `whisper-binaries.yml`, an unused `IDENTITY` variable was dropped from the macOS code-signing step – that step signs by Team ID and never read it – and the Windows round-trip check now looks for the expected DLLs with a glob instead of `ls | grep`. See [`docs/build/release.md`](build/release.md) and [`docs/ci.md`](ci.md).
+
 ## 0.17.2
 
 *Released 2026-08-12. Tag `v0.17.2`.*

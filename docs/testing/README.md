@@ -22,7 +22,7 @@ Complete guide for testing Erfana. This covers both automated tests (Vitest/Play
 
 #### Key test areas
 
-Run `npm run test` for current totals. The workspace holds **326 test files** — main 144 (`src/main` 132 + `src/shared` 10 + `scripts` 2), renderer 178, preload 4 — enumerated on `develop` on 2026-08-12, i.e. **v0.17.1 plus the unreleased #60 work**, not a released tag. That tree runs **9,694 cases** (verified on 2026-08-12); re-run `npm run test:ci` for the live figure, since the case count moves with every commit while the file count is checkable with a glob. ~78 cases platform-gate on Windows — 77 POSIX-only `pathSecurity.test.ts` + 1 macOS-only `LiteParseConverter.test.ts`. For the version-by-version test-addition history, see [`docs/CHANGELOG.md`](../CHANGELOG.md).
+Run `npm run test` for current totals. The workspace holds **326 test files** — main 144 (`src/main` 132 + `src/shared` 10 + `scripts` 2), renderer 178, preload 4 — enumerated on `develop` on 2026-08-12, i.e. **v0.17.2 plus the unreleased CI workflow-lint fix**, not a released tag. That tree runs **9,694 cases** (verified on 2026-08-12); re-run `npm run test:ci` for the live figure, since the case count moves with every commit while the file count is checkable with a glob. ~78 cases platform-gate on Windows — 77 POSIX-only `pathSecurity.test.ts` + 1 macOS-only `LiteParseConverter.test.ts`. For the version-by-version test-addition history, see [`docs/CHANGELOG.md`](../CHANGELOG.md).
 
 | Area | Key files | Docs |
 |------|-----------|------|

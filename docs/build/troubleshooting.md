@@ -1,6 +1,6 @@
 # Build Troubleshooting
 
-**Last updated**: August 2026 (v0.17.1)
+**Last updated**: August 2026 (v0.17.2)
 
 This document provides solutions to common build errors.
 
@@ -278,7 +278,7 @@ Tests fail, preventing build
    npm run test:renderer
    ```
 2. Fix failing tests before building
-3. All tests must pass – 326 test files (main 144 · renderer 178 · preload 4), counted on `develop` on 2026-08-12 (v0.17.1 plus the unreleased #60 work); the case total most recently reported for that tree is ~9,694. Run `npm run test:ci` for the live figure – see [Testing overview](../testing/README.md#key-test-areas)
+3. All tests must pass – 326 test files (main 144 · renderer 178 · preload 4), counted on `develop` on 2026-08-12 (v0.17.2 plus the unreleased CI workflow-lint fix); the case total most recently reported for that tree is ~9,694. Run `npm run test:ci` for the live figure – see [Testing overview](../testing/README.md#key-test-areas)
 
 ---
 

@@ -52,7 +52,7 @@ Design summary: one `v*.*.*` tag push from `main` produces one GitHub draft rele
       │                    │                            │
       │                    │              wait for asset list to stabilize
       │                    │              strip leaked latest*.yml
-      │                    │              sha256sum *  →  SHA256SUMS
+      │                    │              sha256sum -- *  →  SHA256SUMS
       │                    │              minisign sign  →  SHA256SUMS.minisig
       │                    │              upload `sha256sums-digest` artifact
       │                    │
@@ -212,7 +212,7 @@ The release asset set is pinned in four places with no automated cross-check bet
 | `.github/workflows/build_win.yml` | signtool-verify + upload globs | `*-setup.exe` in both the verify loop and `gh release upload` |
 | [`.claude/skills/releasing-erfana/SKILL.md`](../../.claude/skills/releasing-erfana/SKILL.md) § Constants | expected asset count | 2 binaries + `SHA256SUMS` + `SHA256SUMS.minisig`, i.e. `EXPECTED_ASSETS=4`. Note this is **not** an equality assertion anywhere: §0.4 uses it as a floor (`[ "$ASSET_COUNT" -ge "$EXPECTED_ASSETS" ]`) to decide a draft is `draft-ready`, and `phase-4-verify.md` carries no count check at all — §4.6 only prints the expected set for the operator |
 
-**Verified in agreement on 2026-08-08.** The published `v0.17.0` release carries exactly four assets — `erfana-0.17.0-arm64.dmg`, `erfana-0.17.0-setup.exe`, `SHA256SUMS`, `SHA256SUMS.minisig` — matching all four definitions above. Adding or removing a build target is therefore a four-file change plus a release-notes/verification-doc sweep, never a one-line `electron-builder.yml` edit.
+**Verified in agreement on 2026-08-12.** The published `v0.17.2` release carries exactly four assets — `erfana-0.17.2-arm64.dmg`, `erfana-0.17.2-setup.exe`, `SHA256SUMS`, `SHA256SUMS.minisig` — matching all four definitions above. Adding or removing a build target is therefore a four-file change plus a release-notes/verification-doc sweep, never a one-line `electron-builder.yml` edit.
 
 ## Hardened-runtime entitlements (known gap)
 
@@ -238,7 +238,7 @@ An end user downloading from the release page should run the following to confir
 
 ### 1. Integrity + aggregate signature (all platforms)
 
-Substitute the version you downloaded for `{version}` throughout — the worked example below uses **v0.17.0**, the current public release. Run the whole block from the directory that holds the downloaded `.dmg` / `.exe`; `SHA256SUMS` lists **both** binaries by bare filename, and two things follow from that:
+Substitute the version you downloaded for `{version}` throughout — the worked example below uses **v0.17.2**, the current public release. Run the whole block from the directory that holds the downloaded `.dmg` / `.exe`; `SHA256SUMS` lists **both** binaries by bare filename, and two things follow from that:
 
 - Most people download **one** platform, so a bare `sha256sum -c SHA256SUMS` reports `FAILED open or read` for the other one and exits 1 on a perfectly good download. The recipe therefore passes `--ignore-missing`, verified working with GNU `sha256sum` (coreutils), macOS's `/sbin/sha256sum`, and Perl `shasum -a 256` (6.x).
 - `--ignore-missing` also means "verified nothing" is a possible outcome — that is what running from the wrong directory looks like. GNU `sha256sum` and `shasum` exit 1 with `no file was verified`, but macOS's `/sbin/sha256sum` exits **0** silently, so the block below additionally requires at least one `OK` line.
@@ -251,7 +251,7 @@ for `return 1`.
 
 ```bash
 #!/usr/bin/env bash
-VERSION=0.17.0   # the v{version} you downloaded, without the leading "v"
+VERSION=0.17.2   # the v{version} you downloaded, without the leading "v"
 
 curl -LO "https://github.com/qodeca/erfana/releases/download/v${VERSION}/SHA256SUMS"
 curl -LO "https://github.com/qodeca/erfana/releases/download/v${VERSION}/SHA256SUMS.minisig"
@@ -361,7 +361,7 @@ $signtool = Join-Path $sdkBin.FullName "x64\signtool.exe"
 if (-not (Test-Path $signtool)) { throw "signtool.exe not found under $sdkRoot" }
 
 # Both signatures must verify independently.
-& $signtool verify /pa /all /tw C:\Path\To\erfana-0.17.0-setup.exe
+& $signtool verify /pa /all /tw C:\Path\To\erfana-0.17.2-setup.exe
 ```
 
 First-time Windows installs will see a SmartScreen warning on a newly provisioned Azure Artifact Signing identity. Reputation accrues organically regardless of EV/OV status — several successful installs will silence the warning. This is expected, not a defect.
