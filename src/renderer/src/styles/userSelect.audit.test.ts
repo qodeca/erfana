@@ -65,6 +65,9 @@ export const AUDIT_211_SURFACES: readonly AuditSurface[] = [
   { surface: 'Search match count', file: 'src/renderer/src/styles/utilities.css', selector: '.search-match-count', css: utilitiesCss },
   { surface: 'Settings content', file: 'src/renderer/src/styles/utilities.css', selector: '.settings-content', css: utilitiesCss },
   { surface: 'Toast message', file: 'src/renderer/src/styles/utilities.css', selector: '.toast-message', css: utilitiesCss },
+  { surface: 'Root crash details region', file: 'src/renderer/src/styles/utilities.css', selector: '.root-error-details', css: utilitiesCss },
+  { surface: 'Root crash meta line', file: 'src/renderer/src/styles/utilities.css', selector: '.root-error-meta', css: utilitiesCss },
+  { surface: 'Root crash log-folder path (degraded mode)', file: 'src/renderer/src/styles/utilities.css', selector: '.root-error-log-path', css: utilitiesCss },
   { surface: 'Character count', file: 'src/renderer/src/styles/utilities.css', selector: '.char-count', css: utilitiesCss }
 ]
 

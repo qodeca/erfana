@@ -1,0 +1,54 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/*
+ * Panel-scoped crash fallback styles.
+ *
+ * Co-located global CSS, imported by `PanelErrorBoundary.tsx` — the project
+ * convention (`*.module.css` is the rare exception). Every selector is scoped
+ * to a `.panel-error` class: this file reaches the entry bundle that the
+ * screenshot-overlay window also loads, so a bare element or `#root` rule here
+ * would leak into every window (the defect `main.import-isolation.test.ts`
+ * exists for).
+ *
+ * Colour contract, measured by `RootErrorBoundary.contrast.test.ts` (it reads
+ * this file too): `.panel-error` declares the background it is painted on so
+ * the pairing with `.panel-error-message` is computable from CSS alone. The
+ * background is the same token `.project-panel` paints (ProjectPanel.css), so
+ * the fallback still sits flush in the sidebar. The muted token trio
+ * (text-muted / text-disabled / text-placeholder, all #6e6e6e) is forbidden
+ * here for the same reason it is on the root crash screen — it measures
+ * ~3.6:1 and fails WCAG 1.4.3.
+ */
+
+/* Wrapper around the healthy panel content. Exists to be a focus target after
+   a successful Reload, so `flex` passthrough is the whole layout job: the
+   panel below it still measures against `.sidebar-panel-content`. */
+.panel-error-content {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Focus lands here programmatically only (tabindex="-1"), never by Tab, so a
+   ring would appear without the user having navigated to it. */
+.panel-error-content:focus {
+  outline: none;
+}
+
+.panel-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-8);
+  border-radius: 0;
+  background-color: var(--color-bg-primary);
+  font-size: var(--text-base);
+  text-align: center;
+}
+
+.panel-error-message {
+  line-height: var(--leading-normal);
+  color: var(--color-text-primary);
+}

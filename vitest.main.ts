@@ -62,6 +62,13 @@ export default defineConfig({
         // measured at 100% statements / 98% branches when this entry landed.
         // See: docs/designs/41-model-capability-registry.md §9.5
         'src/main/services/claudeStatus/modelId.ts': { lines: 95, functions: 95, branches: 95, statements: 95 },
+        // Renderer / child-process crash + window-hang trail (#60). When the
+        // renderer dies the window goes blank and no renderer-side boundary can
+        // record it — these handlers are the only evidence the next incident
+        // gets, so a silent coverage regression here is a diagnostics outage.
+        // The module is small and fully unit-reachable; measured at 100% when
+        // this entry landed. See: docs/design/design-issue-60.md §2.6, §5
+        'src/main/utils/rendererCrashHandlers.ts': { lines: 90, functions: 90, branches: 90, statements: 90 },
       },
       exclude: [
         'node_modules/**',

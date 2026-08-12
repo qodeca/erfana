@@ -46,6 +46,9 @@
 .search-match-count,
 .settings-content,
 .toast-message,
+.root-error-details,
+.root-error-meta,
+.root-error-log-path,
 .char-count {
   user-select: text;
 }

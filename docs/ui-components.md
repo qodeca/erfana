@@ -337,6 +337,75 @@ Terminal is considered "active" when:
 
 ---
 
+## Error containment
+
+**Location**: `src/renderer/src/components/RootErrorBoundary/`, `src/renderer/src/components/Panels/PanelErrorBoundary.tsx`, `src/renderer/src/utils/installGlobalErrorTrail.ts`, `src/main/utils/rendererCrashHandlers.ts`
+
+Added by [#60](https://github.com/qodeca/erfana/issues/60), where a `RangeError` thrown while flattening a 174k-node project tree unmounted the React root and left a black window. Containment is layered on purpose – full rationale in [design-issue-60](./design/design-issue-60.md) §2.3.
+
+### Two-tier boundary contract
+
+**Tier 1 – `PanelErrorBoundary`** wraps one panel. `ProjectPanel.tsx` wraps `<ProjectTree/>` with it, so a tree defect degrades to *"Project tree unavailable. The rest of Erfana still works."* inside the sidebar while editor buffers and the live terminal keep running. It logs at `error`, not `fatal` – the window is still usable, so this is not the crash of last resort. A failed Reload reads *"Project tree is still unavailable."*
+
+**Focus contract**: swapping the subtree drops focus to `<body>`, so the boundary moves it deliberately – but only when the user was standing in this panel. Focus returns to the Reload button after a failed retry **or** any panel death with focus inside the panel (including an async re-throw after a reload succeeded, where no attempt counter changes); after a successful Reload it lands on the recovered panel container. A panel that throws while the user is in the editor never steals focus.
+
+**One announcement channel**: that focus move *is* the announcement – the fallback container carries **no** `role="alert"`. The alert and the focus would land in the same tick with the same sentence (the focused Reload button reads its accessible name plus the `aria-describedby` message), so a live region only buys a duplicate or interleaved reading. The trade-off is deliberate: a panel that dies while the user is elsewhere announces nothing, and the copy is waiting when they navigate to it.
+
+**Mount-site contract**: the error state survives every re-render and is cleared only by Reload or by a remount, so a caller whose content is scoped to something the user can switch must **key** the boundary by it – `<PanelErrorBoundary key={projectPath ?? 'none'} componentName="Project tree">`. Without the key, a tree that crashed on project A still reads "unavailable" after the user opens project B.
+
+**Tier 2 – `RootErrorBoundary`** is the boundary of last resort. It wraps only the `<App/>` branch in `main.tsx`; the screenshot-overlay branch is deliberately unwrapped, having no recovery UI to show. It renders `{hasError ? <FallbackGuard><RootErrorFallback/></FallbackGuard> : children}`, where `FallbackGuard` is a **distinct** boundary class (colocated, never merged) – React never routes an error thrown by a boundary's own fallback back into that boundary, so the guard cannot live in the class it protects. The guard's fallback is dependency-free static JSX (no stylesheet, no `TEST_IDS`, no `window.api`, no detail extraction) and it appends an inline-styled **sibling** to `document.body` – never a write into `#root`, which React owns during commit. That sibling never becomes a second live region, and it takes focus **only** when no guard alert reached the document (it queries for `[role="alert"][data-erfana-guard-alert]`): with the React alert on screen, focusing the sibling would read the same copy twice, so it stays as silent visual insurance. `logger.fatal` is level-independent: in production an error caught by `componentDidCatch` does not reach `window.onerror`, so that line is the only record of the crash.
+
+**Layer-coverage rule** – "no blank window" holds only for the failure classes a boundary can intercept, and each layer is scoped to one class:
+
+| Failure class | Caught by | User sees | Record |
+|---|---|---|---|
+| Throw during render/lifecycle inside the project tree | `PanelErrorBoundary` (panel-scoped) | "Project tree unavailable" in the sidebar; editor and terminal keep running | `logger.error` |
+| Throw during render/lifecycle anywhere else under `<App/>` | `RootErrorBoundary` | Full-window recovery screen | `logger.fatal` |
+| Throw inside the recovery screen itself | `FallbackGuard` (distinct inner boundary) | Dependency-free static text | best-effort `logger.fatal`, then an inline-styled `document.body` sibling |
+| Async throw, event-handler throw, unhandled rejection | `installGlobalErrorTrail()` | Nothing – the UI stays as it is | `logger.fatal`, boundary payload shape |
+| Renderer / child-process death, window hang | main-process `rendererCrashHandlers` | OS-level blank window or beachball (unchanged) | main log: `[crash] render-process-gone`, `[crash] child-process-gone`, `[hang] window-unresponsive` / `[hang] window-responsive` |
+| Main-process crash | nothing | app exits | OS crash report |
+
+`installGlobalErrorTrail()` runs in `main.tsx` **before** the route branch, so the overlay window gets a trail too, and it is idempotent. The main-process handlers are log-only by design – no auto-reload, no dialog, no relaunch, because a crash caused by restored state would re-crash on reload (boot-loop safety). The renderer console-error trail is rate-capped per window – 20 records per 10 s, then one `[crash] renderer-console-error suppressed` line carrying the dropped count when the window closes – so a renderer stuck in an error loop cannot push the crash that started it out of the log rotation.
+
+### Recovery screen (`RootErrorFallback`)
+
+- **Actions**: Restart Erfana (primary), Copy error details, Open logs folder, plus a Show/Hide error details disclosure. Each action is gated by its own `typeof … === 'function'` probe on `window.api`, so a partially exposed bridge hides only the affected button instead of rendering a dead one.
+- **Degraded mode**: when no bridge method is callable at all, the buttons are replaced by an instruction plus the log-folder location as platform-neutral prose (`.erfana/logs in your home folder`, from the shared `LOGS_DIR_RELATIVE` constant) – `~/…` would be wrong on Windows, and `process.platform` is `undefined` under the sandbox. The details disclosure still works.
+- **One announcement**: the container is `role="alertdialog"` + `aria-modal="true"` with a real accessible name (`aria-labelledby`), focused on mount. Focus lands on the **container**, never on Restart, so a buffered Enter cannot relaunch the app the instant the screen appears. There is no focus trap because the fallback renders *instead of* `<App/>` – nothing else focusable remains in the document.
+- **A single `role="status"` region** carries every transient message (copy result, restart pending, the 3 s manual-quit guidance). It exists from the first render so the live region is registered before anything is written to it, and writes are clear-then-set across two commits so a repeated message re-announces. Status is persistent until the next action – no timed revert.
+- **Restart pending uses `aria-disabled` + an early-return handler**, never the `disabled` attribute: Chromium blurs a control the moment it becomes `disabled` and parks focus on `<body>` (see [`Dialog/CLAUDE.md`](../src/renderer/src/components/Dialog/CLAUDE.md)). Styling hangs off `[aria-disabled='true']` with `--opacity-disabled`.
+- **Details region**: `role="region"`, `aria-label="Error details"`, `tabIndex={0}`, always in the DOM (so `aria-controls` always resolves) and `hidden` while collapsed. `error.message` is untrusted text – it is rendered as a text child inside this region only, never as HTML and never in the heading.
+
+### Copy deck (as shipped)
+
+| Slot | Text |
+|---|---|
+| Heading | `Erfana stopped unexpectedly.` |
+| Message, Restart available | `Files you saved are not affected. Restarting opens Erfana on the welcome screen.` |
+| Message, Restart bridge missing | `Files you saved are not affected. Quit Erfana and open it again.` |
+| Degraded instruction | `Files you saved are not affected. Erfana's recovery tools are unavailable, so quit Erfana and open it again. Log files are in:` + `.erfana/logs in your home folder` |
+| Buttons | `Restart Erfana` · `Copy error details` · `Open logs folder` |
+| Details toggle | `Show error details` / `Hide error details` |
+| Details body | `Erfana {version} · {timestamp}`, then `name: message`, truncated stack, component stack |
+| Stack elision marker | `… N more lines – use Copy error details for the full stack` |
+| Status – copy | `Error details copied to clipboard.` / `Could not copy the error details – the clipboard is unavailable.` |
+| Status – restart | `Restarting Erfana…` / `Restart didn't start – quit and reopen Erfana manually.` (after 3 s) / `Restart failed – quit and reopen Erfana manually.` |
+| Status – logs | `Opened the logs folder.` / `Could not open the logs folder.` |
+| `FallbackGuard` last resort | `Erfana stopped unexpectedly.` + `The recovery screen could not be drawn. Quit Erfana and open it again. Files you saved are not affected.` |
+
+The message paragraph branches on **capability, not taste**: promising that "restarting opens Erfana on the welcome screen" while rendering no Restart button would send the user hunting for a control that is not there.
+
+### Restart-safety invariant
+
+Offering Restart on a crash screen is only safe because **start-up never auto-opens the last project** – the "Load last project on mount - DISABLED" effect in [`useProjectManagement.ts`](../src/renderer/src/hooks/useProjectManagement.ts), which shows the welcome screen with recent projects instead. Were auto-restore re-enabled, restarting after a crash *caused by* a project would reopen that project and crash again, in a loop.
+
+Rather than rest on that coupling alone, the Restart handler clears `lastProjectPath` best-effort before `relaunchApp()`. `closeProjectBestEffort()` races `window.api.file.closeProject()` against a `CLOSE_PROJECT_TIMEOUT_MS` (1500 ms) timer – comfortably inside the 3 s `RESTART_STALLED_MS` window, so even the worst case still reaches the relaunch before the screen offers manual-quit guidance. Three outcomes, one behaviour: the call **settles** (happy path), **rejects** (swallowed), or **never settles** – the realistic case when the main process is the unwell part – and the wait is abandoned at the timeout. The relaunch proceeds in all three; the timer is cleared on every branch so it cannot outlive the screen. Both halves are load bearing – if auto-restore is ever re-enabled, this handler is the second line of defence, not the first.
+
+The invariant is pinned by `src/renderer/src/hooks/useProjectManagement.noAutoLoad.test.ts`. **Do not delete that test to "fix" a future auto-restore feature** – changing the behaviour means revisiting this screen first.
+
+---
+
 ## Image Viewer Panel
 
 **Location**: `src/renderer/src/components/Panels/ImageViewerPanel.tsx`

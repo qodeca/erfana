@@ -263,6 +263,96 @@ After the heartbeat hardening (Phase A4 resume-refresh, B1 symlink defense, D3 H
 
 ---
 
+### 18. `useDragDropTree` exposes an API surface production no longer consumes (#60, 2026-08)
+
+**Severity**: Low
+**Impact**: Three of the hook's six returned members — `flattenedItems`, `getProjection`, `validateMove` — have no production consumer. `ProjectTree.tsx`, the hook's only production call site in the files examined, destructures `findNode`, `findNodeWithRoot` and `isDescendant` only; the other three are exercised by `useDragDropTree.test.ts` alone.
+
+**Problem**: The #60 lookup work (deleting `enhancedFlattenedItems`, repointing six linear scans onto the Map-backed named lookups) left the positional members behind. `flattenedItems` is deliberately still returned — it is the flatten result the hook exists to produce, and its docblock warns against reading nodes out of it by path — but `getProjection` / `validateMove` are drag-projection helpers whose ProjectTree wiring predates the current dnd-kit collision handling. Keeping unconsumed members alive means every future change to the hook has to keep them correct against tests only, with no user-visible signal if they drift.
+
+**Recommended Solution**: narrow the return type when #149/#150 next open `ProjectTree.tsx` — either re-wire the drag path onto `getProjection` / `validateMove` (they encode the root-safety and circular-move rules the inline handlers re-derive) or drop them and keep the module-level `getProjection` / `canMoveItem` exports for tests. Do **not** narrow it in isolation: the decision belongs with whoever touches the drag handlers.
+
+**Files**: `src/renderer/src/hooks/useDragDropTree.ts` (return object), `src/renderer/src/components/ProjectTree/ProjectTree.tsx` (the `useDragDropTree` call site).
+
+**Status**: Deferred to #149/#150 — recorded by the #60 change-set review.
+
+---
+
+### 19. `vitest.renderer.ts` coverage block sits outside `test` (inert) (#60, 2026-08)
+
+**Severity**: Medium
+**Impact**: The renderer project has **no enforced coverage thresholds**. `vitest.renderer.ts` declares `coverage` as a sibling of `test` rather than inside it, and vitest ignores a top-level `coverage` key — so the provider, the report directory, the exclude list and the `{ lines: 10, functions: 10, branches: 5, statements: 10 }` thresholds are all dead configuration.
+
+**Problem**: Exactly the misplacement issue #55 F4 fixed for `vitest.main.ts`, which now carries the corrective comment above its `coverage` block. Until it is fixed for the renderer, any renderer coverage target — including the >80 % expectation on the #60 boundary components — is a review-time convention, not a gate.
+
+**Recommended Solution**: move the block under `test:` (one indentation change), then re-measure before choosing thresholds — the current values were never enforced, so they may be either far below or above what the suite actually meets.
+
+**Files**: `vitest.renderer.ts`. Reference fix: `vitest.main.ts`.
+
+**Status**: Open — recorded by the #60 change-set review; also listed as a deferral in [`design/design-issue-60.md`](./design/design-issue-60.md) §8.
+
+---
+
+### 20. `npm run test:cov` runs the whole workspace three times (#60, 2026-08)
+
+**Severity**: Low
+**Impact**: `scripts/test-cov.mjs` invokes vitest once per project config (`vitest.main.ts`, `vitest.preload.ts`, `vitest.renderer.ts`) with `--coverage` but **without** `--project`. `vitest.workspace.ts` is auto-discovered from the repo root, so each invocation expands back to all three projects: the full suite runs three times for one coverage report, and each run's coverage is collected across projects rather than scoped to the config that requested it.
+
+**Problem**: Slow locally, and it makes the per-file floors in `vitest.main.ts` (whisper trust chain, `scripts/fuses.js`, `modelId.ts`, `rendererCrashHandlers.ts`) behave differently on a developer machine than in CI. CI's Coverage job scopes with `--project main` — the reason that flag exists is recorded in a comment in `vitest.main.ts` — so the floors are effectively **CI-only** enforcement today.
+
+**Recommended Solution**: pass `--project main|preload|renderer` on each of the three `run(...)` calls in `scripts/test-cov.mjs`, matching what checks.yml already does. Verify the per-file thresholds still fire afterwards.
+
+**Files**: `scripts/test-cov.mjs` (the three `run(...)` calls), `vitest.workspace.ts`, `.github/workflows/checks.yml` (Coverage job).
+
+**Status**: Open — recorded by the #60 change-set review. Derived from configuration, not from a timed run.
+
+---
+
+### 21. No tsconfig covers `e2e/` (#60, 2026-08)
+
+**Severity**: Low
+**Impact**: TypeScript errors in Playwright specs are **editor-only**. `npm run typecheck` runs `tsconfig.node.json` (`src/main`, `src/preload`, `src/shared`) and `tsconfig.web.json` (`src/renderer`, `src/preload/*.d.ts`); `tsconfig.test.json` covers `src/**` + `tests/**` + `vitest.*.ts` and is not wired into the script at all. `e2e/` appears in no `include` and is explicitly excluded from every vitest project, so nothing in CI ever type-checks it.
+
+**Problem**: A spec, page object or fixture can be committed with a type error and stay green on every required check. Because `e2e.yml` is disabled (item #5), the error surfaces only when a developer runs the suite locally — and a *type* error surfaces even later than a behavioural one, since Playwright transpiles per file.
+
+**Recommended Solution**: add a `tsconfig.e2e.json` (extending `tsconfig.json`, `include: ["e2e/**/*.ts", "playwright.config.ts"]`, `types: ["node"]`) and a `typecheck:e2e` script folded into `typecheck`. Cheap, and it costs no CI minutes beyond one `tsc` pass.
+
+**Files**: `tsconfig.json`, `tsconfig.node.json`, `tsconfig.web.json`, `tsconfig.test.json`, `package.json` (`typecheck` scripts), `e2e/`.
+
+**Status**: Open — recorded by the #60 change-set review.
+
+---
+
+### 22. Shared renderer HTML entry keeps a whole family of CSS-leak guards alive (#60, 2026-08)
+
+**Severity**: Low
+**Impact**: The app window and the screenshot-overlay window share one entry, `src/renderer/index.html`, so any globally-scoped rule in a statically imported stylesheet reaches both. The overlay once inherited a crosshair cursor this way. Three guards exist purely to hold that line: `main.import-isolation.test.ts` (no app CSS imported on the overlay branch), `RootErrorBoundary.css.test.ts` (allowlist: every top-level selector must start with `.root-error`), and the standing rule that `src/renderer/src/index.css` must not gain a background rule (`design-issue-60` §2.5).
+
+**Problem**: Every new full-window surface has to re-derive the constraint and, in practice, ship its own allowlist test. The guards are cheap individually and unbounded collectively.
+
+**Recommended Solution**: give the overlay its own HTML entry, mirroring the existing preload split (`src/preload/screenshotOverlay.ts`). The two windows then have genuinely separate stylesheet graphs and the allowlist tests can be retired rather than multiplied.
+
+**Files**: `src/renderer/index.html`, `electron.vite.config.ts`, `src/main/services/screenshot/ScreenshotOverlayWindow.ts`, `src/renderer/src/main.tsx`, the three guard tests above.
+
+**Status**: Deferred — build-config housekeeping; also listed in [`design/design-issue-60.md`](./design/design-issue-60.md) §8 with the allowlist as the interim control.
+
+---
+
+### 23. `ThrottledWorker.workMany` carries the same spread-push pattern #60 fixed (#60, 2026-08)
+
+**Severity**: Low
+**Impact**: `this.buffer.push(...items)` in `ThrottledWorker.workMany` is `Function.prototype.apply` under the hood — the exact construct that threw `RangeError: Maximum call stack size exceeded` in `flattenTree` on a 174k-node project. A single `workMany` call with ~10^5 items would throw inside the watcher pipeline.
+
+**Problem**: Latent only: `workMany` was verified to have **no production callers** (two test call sites). Production feeds the buffer one event at a time through `work(item)`, which is unaffected. It becomes real the moment someone batches watcher events — which is a plausible thing to do for exactly the large-project scenario #60 came from.
+
+**Recommended Solution**: replace with a bounded loop (`for (const item of items) this.buffer.push(item)`) — same semantics, no argument-count exposure — or delete `workMany` if it is still unused when the watcher is next opened.
+
+**Files**: `src/main/services/watcher/ThrottledWorker.ts` (`workMany`).
+
+**Status**: Deferred — no production caller; recorded as a follow-up note on #60 (§8 of the design).
+
+---
+
 ## Code Quality Improvements
 
 ### Documentation Token Efficiency
@@ -340,4 +430,4 @@ Amendment discipline + promotion-rule conventions in [`windows/contributing.md`]
 
 ---
 
-**Last Updated**: #55 extra-content packaging guards (2026-08-09 – entry #14 added: `assertResourcesSiblingsAllowlist` advisory-on-Windows watch item) + #43 packaging allowlist QG-11a remediation (2026-08-09 – entry #13 added: `scripts/fuses.js` size after the allowlist block; `resolvePackedResourcesDir` call-site count corrected to four) + v0.17.0 doc sweep (2026-08-08 – entry #4 resolved: `LanguageSelect` `id` prop; entries #7, #8, #10 re-measured against the v0.17.0 tree) + #42 camera mirror + dialog focus work (2026-08-07 – entry #3 resolved: BaseDialog `trapFocus`) + PR #245 (2026-06-13 – entry #12 live-verification updated: single-panel detection + mid-session model-switch verified on a Windows host) + #217 Windows Claude status bar (2026-06-10 — entry #12 added: Windows v1 detector limitations) + v0.14.0 doc sweep (2026-06-08 — entries #9 + #10 added from `Transcription/CLAUDE.md` eviction) + v0.9.6 release (2026-05-22 — critical macOS terminal fix `ea3eaf1`) + v0.9.5 release (2026-04-25) + Phase I branch protection refinement (PR requirement removed same day) + entry #7 documenting `security.md` cap constraint (2026-04-25)
+**Last Updated**: #60 large-project crash + error containment (2026-08-11 – entries #18–#23 added from the change-set reviews: dead `useDragDropTree` API surface, inert `vitest.renderer.ts` coverage block, `test:cov` workspace fan-out, no tsconfig over `e2e/`, shared renderer HTML entry, `ThrottledWorker.workMany` spread-push) + #55 extra-content packaging guards (2026-08-09 – entry #14 added: `assertResourcesSiblingsAllowlist` advisory-on-Windows watch item) + #43 packaging allowlist QG-11a remediation (2026-08-09 – entry #13 added: `scripts/fuses.js` size after the allowlist block; `resolvePackedResourcesDir` call-site count corrected to four) + v0.17.0 doc sweep (2026-08-08 – entry #4 resolved: `LanguageSelect` `id` prop; entries #7, #8, #10 re-measured against the v0.17.0 tree) + #42 camera mirror + dialog focus work (2026-08-07 – entry #3 resolved: BaseDialog `trapFocus`) + PR #245 (2026-06-13 – entry #12 live-verification updated: single-panel detection + mid-session model-switch verified on a Windows host) + #217 Windows Claude status bar (2026-06-10 — entry #12 added: Windows v1 detector limitations) + v0.14.0 doc sweep (2026-06-08 — entries #9 + #10 added from `Transcription/CLAUDE.md` eviction) + v0.9.6 release (2026-05-22 — critical macOS terminal fix `ea3eaf1`) + v0.9.5 release (2026-04-25) + Phase I branch protection refinement (PR requirement removed same day) + entry #7 documenting `security.md` cap constraint (2026-04-25)

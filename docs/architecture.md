@@ -381,10 +381,12 @@ interface FlattenedNode extends FileNode {
   parentId: string | null  // Track parent for hierarchy reconstruction
   depth: number           // Track depth for indentation/projection
   index: number           // Track sibling order
+  offset: number          // Position in the flattened array, recorded during the flatten pass
 }
 ```
 - Depth-first traversal preserves visual order
 - Metadata enables validation (circular move detection)
+- `offset` lets an index-backed `getProjection` start its shallower-branch walk in O(1), with no `findIndex` scan (the synthetic project root carries `-1`, matching a `findIndex` miss)
 - Memoized via `useMemo(() => flattenTree(files), [files])`
 
 ### Validation Constraints
