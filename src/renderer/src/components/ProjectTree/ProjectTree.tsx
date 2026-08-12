@@ -24,6 +24,7 @@ import {
   DragEndEvent,
   DragOverlay,
   type CollisionDetection,
+  type DroppableContainer,
   pointerWithin,
   rectIntersection
 } from '@dnd-kit/core'
@@ -60,10 +61,60 @@ interface ProjectTreeProps {
   onFilterModeChange: (mode: FilterMode) => void
 }
 
+/**
+ * Collision detection that prioritises folders over files.
+ *
+ * Pointer intersection first (immediate feedback while dragging), narrowed to
+ * directory targets when there are any, with rectangle intersection as the
+ * fallback for pointer-less collisions.
+ *
+ * Two properties matter for large trees:
+ * - Each collision already carries the container it came from in
+ *   `data.droppableContainer` (`pointerWithin` populates it), so the type is
+ *   read off the entry instead of scanning `args.droppableContainers` once per
+ *   collision — that scan was O(collisions x droppables) on every pointer move,
+ *   with one droppable per rendered row.
+ * - It lives at module scope, so its identity is stable across renders and
+ *   `DndContext` is never handed a fresh `collisionDetection` prop.
+ */
+const treeCollisionDetection: CollisionDetection = (args) => {
+  const pointerCollisions = pointerWithin(args)
+
+  if (pointerCollisions.length > 0) {
+    const directoryCollisions = pointerCollisions.filter(collision => {
+      const container = collision.data?.droppableContainer as DroppableContainer | undefined
+      return container?.data.current?.type === 'directory'
+    })
+
+    if (directoryCollisions.length > 0) {
+      return directoryCollisions
+    }
+
+    return pointerCollisions
+  }
+
+  // Fallback to rectangle intersection
+  return rectIntersection(args)
+}
+
+/**
+ * The expansion set a project starts from: its root row, and nothing else.
+ *
+ * Shared by the two places that seed it — the lazy `useState` initializer (a
+ * remount, e.g. a project switch) and the project-changed callback (an in-place
+ * change, e.g. closing a project) — so the two can never disagree about what
+ * "freshly opened" looks like.
+ *
+ * @param path - The project path, or `null`/empty when no project is open
+ * @returns A new set holding the root path, or an empty one
+ */
+function seedExpansion(path: string | null): Set<string> {
+  return path ? new Set([path]) : new Set()
+}
+
 export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilterModeChange }: ProjectTreeProps) {
   // UI-specific state (not managed by hooks)
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null)
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
   const isInternalOperation = useRef(false)
 
   // Project lifecycle management via context (singleton - avoids duplicate IPC listeners)
@@ -79,10 +130,24 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     refreshFiles
   } = useProjectManagementContext()
 
-  // Register for project change notifications to reset UI state
+  // Seeded from the CURRENT project path rather than starting empty (#60).
+  // ProjectPanel keys the tree's error boundary by project path, so opening or
+  // switching a project REMOUNTS this component: any expansion the
+  // project-changed callback below wrote into the outgoing instance dies with
+  // it, and an empty initial set renders the new project fully collapsed. The
+  // lazy initializer runs on the remount itself, when the context already
+  // carries the new path, so the root is expanded on first paint.
+  // Declared after the context read for that reason – it needs `projectPath`.
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(() =>
+    seedExpansion(projectPath)
+  )
+
+  // Register for project change notifications to reset UI state.
+  // Still required for IN-PLACE changes (a project change that does not remount
+  // this component, e.g. closing a project): the initializer only runs on mount.
   useProjectChangedEffect((newPath) => {
     // Reset UI state when project changes
-    setExpandedFolders(newPath ? new Set([newPath]) : new Set())
+    setExpandedFolders(seedExpansion(newPath))
     setSelectedFolder(null)
   })
 
@@ -135,8 +200,11 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
   const treeContainerRef = useRef<HTMLDivElement | null>(null)
   const lastMousePositionRef = useRef<{ x: number; y: number } | null>(null)
 
-  // Drag-drop hooks
-  const { flattenedItems, isDescendant } = useDragDropTree(files, projectPath)
+  // Drag-drop hooks.
+  // `findNode` resolves the base tree only; `findNodeWithRoot` also resolves
+  // the synthetic project root. Both are Map-backed – never scan the flattened
+  // array here, or the root-inclusion policy stops living in one module.
+  const { findNode, findNodeWithRoot, isDescendant } = useDragDropTree(files, projectPath)
   const clipboard = useClipboardStore()
 
   // Import hook (for context menu, external drop, and toolbar button)
@@ -190,34 +258,12 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     })
   )
 
-  // Custom collision detection that prioritizes folders
-  const customCollisionDetection: CollisionDetection = (args) => {
-    // First use pointer intersection for immediate feedback
-    const pointerCollisions = pointerWithin(args)
-
-    if (pointerCollisions.length > 0) {
-      // Prioritize directories over files
-      const directoryCollisions = pointerCollisions.filter(collision => {
-        const droppableData = args.droppableContainers.find(c => c.id === collision.id)?.data.current
-        return droppableData?.type === 'directory'
-      })
-
-      if (directoryCollisions.length > 0) {
-        return directoryCollisions
-      }
-
-      return pointerCollisions
-    }
-
-    // Fallback to rectangle intersection
-    return rectIntersection(args)
-  }
-
   // Project management (loading, switching, closing) now handled by useProjectManagement hook
 
   const handleFileClick = (filePath: string) => {
-    // Find the node to determine type
-    const node = enhancedFlattenedItems.find(item => item.path === filePath)
+    // Find the node to determine type (root-inclusive: clicking the project
+    // root selects it as a paste target)
+    const node = findNodeWithRoot(filePath, rootFolderNode)
 
     if (node?.type === 'directory') {
       // Set selected folder for paste operations
@@ -323,33 +369,6 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     }
   }, [projectPath, filteredFiles])
 
-  /**
-   * Enhanced flattenedItems that includes the root folder node
-   * This ensures the root folder can be found during drag-drop operations
-   */
-  const enhancedFlattenedItems = useMemo(() => {
-    if (!rootFolderNode) {
-      return flattenedItems
-    }
-
-    // Add root folder as first item with depth 0, parentId null
-    return [
-      {
-        ...rootFolderNode,
-        parentId: null,
-        depth: 0,
-        index: 0
-      },
-      ...flattenedItems.map(item => ({
-        ...item,
-        // Adjust depth to account for root folder
-        depth: item.depth + 1,
-        // If item has no parent, its parent is now the root folder
-        parentId: item.parentId || rootFolderNode.path
-      }))
-    ]
-  }, [rootFolderNode, flattenedItems])
-
   const handleToggleFolder = (folderPath: string) => {
     setExpandedFolders((prev) => {
       const newSet = new Set(prev)
@@ -424,10 +443,12 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     }
   }
 
-  // Track mouse position globally during drag (more reliable than @dnd-kit delta)
+  // Track mouse position globally during drag (more reliable than @dnd-kit delta).
+  // Deliberately silent: this runs on every pointermove/mousemove of a drag, so
+  // logging here floods the log file (and the IPC bridge) at pointer rate. The
+  // position that actually matters is recorded once in `handleDragEnd`.
   const handlePointerEvent = useCallback((e: PointerEvent | MouseEvent) => {
     lastMousePositionRef.current = { x: e.clientX, y: e.clientY }
-    logger.info('Mouse position tracked', { x: e.clientX, y: e.clientY })
   }, [])
 
   // Drag-drop handlers
@@ -473,7 +494,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
       cancelAutoExpandTimer()
 
       // Check if the new target is a collapsed folder
-      const overNode = enhancedFlattenedItems.find(item => item.path === newOverId)
+      const overNode = findNodeWithRoot(newOverId, rootFolderNode)
       if (overNode && overNode.type === 'directory' && !expandedFolders.has(newOverId)) {
         startAutoExpandTimer(newOverId)
       }
@@ -579,7 +600,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     }
 
     // Get target folder - if dropping on a file, use its parent directory
-    const targetNode = enhancedFlattenedItems.find(item => item.path === targetPath)
+    const targetNode = findNodeWithRoot(targetPath, rootFolderNode)
     if (!targetNode) {
       showGlobalToast({
         title: 'Error',
@@ -648,106 +669,14 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     }
   }
 
-  // Keyboard shortcuts for cut/copy/paste
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Skip when user is typing in text inputs (issue #37)
-      const activeElement = document.activeElement as HTMLElement
-      if (
-        activeElement?.tagName === 'INPUT' ||
-        activeElement?.tagName === 'TEXTAREA' ||
-        activeElement?.contentEditable === 'true'
-      ) {
-        return // Let native text handling work
-      }
-
-      // Check for Ctrl/Cmd + X/C/V
-      if ((e.ctrlKey || e.metaKey) && selectedFolder) {
-        const node = flattenedItems.find(item => item.path === selectedFolder)
-        if (!node) return
-
-        if (e.key === 'x') {
-          // Cut
-          e.preventDefault()
-          clipboard.cut(node.path, node.name, node.type)
-          logger.info('Cut', { nodeName: node.name })
-          showGlobalToast({
-            title: 'Cut',
-            message: `"${node.name}" ready to move`,
-            type: 'info'
-          })
-        } else if (e.key === 'c') {
-          // Copy
-          e.preventDefault()
-          clipboard.copy(node.path, node.name, node.type)
-          logger.info('Copy', { nodeName: node.name })
-          showGlobalToast({
-            title: 'Copied',
-            message: `"${node.name}" ready to paste`,
-            type: 'info'
-          })
-        } else if (e.key === 'v' && clipboard.hasClipboard()) {
-          // Paste
-          e.preventDefault()
-          handlePaste()
-        }
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedFolder, flattenedItems, clipboard])
-
-  const handlePaste = async (targetFolder?: string) => {
-    const targetPath = targetFolder || selectedFolder
-
-    if (!targetPath) {
-      showGlobalToast({
-        title: 'Error',
-        message: 'Select a folder to paste into',
-        type: 'error'
-      })
-      return
-    }
-
-    // Check for name conflict BEFORE attempting paste (cut operations only)
-    const sourceItemName = clipboard.itemName
-    const sourceItemType = clipboard.itemType
-    if (sourceItemName && clipboard.operation === 'cut') {
-      try {
-        const hasConflict = await window.api.file.checkConflict(targetPath, sourceItemName)
-
-        if (hasConflict) {
-          // Show replace confirmation dialog
-          const itemTypeLabel = sourceItemType === 'directory' ? 'folder' : 'file'
-          const shouldReplace = await showConfirm({
-            title: 'Replace Item',
-            message: `A ${itemTypeLabel} named "${sourceItemName}" already exists in the target folder. Do you want to replace it?`,
-            confirmLabel: 'Replace',
-            cancelLabel: 'Cancel',
-            danger: true
-          })
-
-          if (!shouldReplace) {
-            return // User cancelled
-          }
-
-          // User confirmed, proceed with replace
-          await executePaste(targetPath, true)
-          return
-        }
-      } catch (error) {
-        logger.error('Error checking conflict', error instanceof Error ? error : undefined)
-        // Fall through to normal paste (backend will handle error)
-      }
-    }
-
-    // No conflict or copy operation, proceed normally
-    await executePaste(targetPath, false)
-  }
-
-  // Helper function to execute paste operation
-  const executePaste = async (targetPath: string, replaceExisting: boolean) => {
+  /**
+   * Execute a clipboard paste into `targetPath`.
+   *
+   * Memoized because `handlePaste` (and therefore the cut/copy/paste keydown
+   * listener) depends on it: an unstable identity here would silently pin the
+   * listener to a stale project path / refresh callback.
+   */
+  const executePaste = useCallback(async (targetPath: string, replaceExisting: boolean) => {
     try {
       const result = await withWatcherPause(projectPath, isInternalOperation, setFileOperationLoading, async () => {
         const pasteResult = await clipboard.paste(targetPath, replaceExisting)
@@ -794,7 +723,114 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
       })
       logger.error('Error pasting', err instanceof Error ? err : undefined)
     }
-  }
+  }, [projectPath, clipboard, refreshProjectTree])
+
+  /**
+   * Paste the clipboard item into `targetFolder` (defaults to the selection).
+   *
+   * Memoized and listed in the keydown effect's deps: this is the destructive
+   * path (a cut+replace deletes the target), so it must never run against a
+   * closure captured on an earlier render.
+   */
+  const handlePaste = useCallback(async (targetFolder?: string) => {
+    const targetPath = targetFolder || selectedFolder
+
+    if (!targetPath) {
+      showGlobalToast({
+        title: 'Error',
+        message: 'Select a folder to paste into',
+        type: 'error'
+      })
+      return
+    }
+
+    // Check for name conflict BEFORE attempting paste (cut operations only)
+    const sourceItemName = clipboard.itemName
+    const sourceItemType = clipboard.itemType
+    if (sourceItemName && clipboard.operation === 'cut') {
+      try {
+        const hasConflict = await window.api.file.checkConflict(targetPath, sourceItemName)
+
+        if (hasConflict) {
+          // Show replace confirmation dialog
+          const itemTypeLabel = sourceItemType === 'directory' ? 'folder' : 'file'
+          const shouldReplace = await showConfirm({
+            title: 'Replace Item',
+            message: `A ${itemTypeLabel} named "${sourceItemName}" already exists in the target folder. Do you want to replace it?`,
+            confirmLabel: 'Replace',
+            cancelLabel: 'Cancel',
+            danger: true
+          })
+
+          if (!shouldReplace) {
+            return // User cancelled
+          }
+
+          // User confirmed, proceed with replace
+          await executePaste(targetPath, true)
+          return
+        }
+      } catch (error) {
+        logger.error('Error checking conflict', error instanceof Error ? error : undefined)
+        // Fall through to normal paste (backend will handle error)
+      }
+    }
+
+    // No conflict or copy operation, proceed normally
+    await executePaste(targetPath, false)
+  }, [selectedFolder, clipboard, showConfirm, executePaste])
+
+  // Keyboard shortcuts for cut/copy/paste
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Skip when user is typing in text inputs (issue #37)
+      const activeElement = document.activeElement as HTMLElement
+      if (
+        activeElement?.tagName === 'INPUT' ||
+        activeElement?.tagName === 'TEXTAREA' ||
+        activeElement?.contentEditable === 'true'
+      ) {
+        return // Let native text handling work
+      }
+
+      // Check for Ctrl/Cmd + X/C/V
+      if ((e.ctrlKey || e.metaKey) && selectedFolder) {
+        // Root-EXCLUSIVE on purpose: the synthetic project root must not
+        // resolve here, which is what keeps it non-cuttable / non-copyable.
+        const node = findNode(selectedFolder)
+        if (!node) return
+
+        if (e.key === 'x') {
+          // Cut
+          e.preventDefault()
+          clipboard.cut(node.path, node.name, node.type)
+          logger.info('Cut', { nodeName: node.name })
+          showGlobalToast({
+            title: 'Cut',
+            message: `"${node.name}" ready to move`,
+            type: 'info'
+          })
+        } else if (e.key === 'c') {
+          // Copy
+          e.preventDefault()
+          clipboard.copy(node.path, node.name, node.type)
+          logger.info('Copy', { nodeName: node.name })
+          showGlobalToast({
+            title: 'Copied',
+            message: `"${node.name}" ready to paste`,
+            type: 'info'
+          })
+        } else if (e.key === 'v' && clipboard.hasClipboard()) {
+          // Paste
+          e.preventDefault()
+          handlePaste()
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selectedFolder, findNode, clipboard, handlePaste])
 
   /**
    * Execute external file drop operation (Spec #012)
@@ -1140,7 +1176,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'i') {
         // Check if a folder is selected
         if (selectedFolder) {
-          const node = enhancedFlattenedItems.find(item => item.path === selectedFolder)
+          const node = findNodeWithRoot(selectedFolder, rootFolderNode)
           if (node && node.type === 'directory') {
             e.preventDefault()
             handleImportShortcut(selectedFolder)
@@ -1151,7 +1187,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedFolder, enhancedFlattenedItems, handleImportShortcut])
+  }, [selectedFolder, findNodeWithRoot, rootFolderNode, handleImportShortcut])
 
   // Keyboard shortcut for manual refresh (Cmd/Ctrl+Alt+R)
   useEffect(() => {
@@ -1356,7 +1392,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
       <div className="project-tree-content" role="tree" aria-label="Project files" ref={treeContainerRef}>
         <DndContext
           sensors={sensors}
-          collisionDetection={customCollisionDetection}
+          collisionDetection={treeCollisionDetection}
           onDragStart={handleDragStart}
           onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
@@ -1388,7 +1424,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
             {activeId ? (
               <div className="drag-overlay" data-testid={TEST_IDS.PROJECT_TREE_DRAG_OVERLAY}>
                 <span className="file-name">
-                  {enhancedFlattenedItems.find(item => item.path === activeId)?.name}
+                  {findNodeWithRoot(activeId, rootFolderNode)?.name}
                 </span>
               </div>
             ) : null}

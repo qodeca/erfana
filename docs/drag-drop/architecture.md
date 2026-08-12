@@ -24,7 +24,8 @@ export function flattenTree(
       ...node,
       parentId,  // Track parent for hierarchy reconstruction
       depth,     // Track depth for indentation/projection
-      index      // Track sibling order
+      index,     // Track sibling order
+      offset: flattened.length  // Own position in the flattened array
     })
 
     if (node.type === 'directory' && node.children) {
@@ -37,6 +38,8 @@ export function flattenTree(
 ```
 
 **Why flattening?** dnd-kit requires linear array for SortableContext, but we need to preserve hierarchy metadata for validation and reconstruction.
+
+**`offset`** is recorded in the same single flatten pass – it is the node's own slot in the flat array, so a caller holding the node never has to scan the array back for its position. The synthetic project root is the one node absent from that array and carries `offset: -1`, which matches `findIndex`'s "not found".
 
 ### Projection Calculation
 
@@ -51,10 +54,15 @@ export function getProjection(
   activeId: string,
   overId: string,
   offsetLeft: number = 0,
-  indentationWidth: number = 16
+  indentationWidth: number = 16,
+  nodeIndex?: NodeIndex  // Optional path -> node map built alongside the flat array
 ): ProjectionResult | null {
-  const activeNode = flattenedItems.find(item => item.path === activeId)
-  const overNode = flattenedItems.find(item => item.path === overId)
+  const activeNode = nodeIndex
+    ? nodeIndex.get(activeId)
+    : flattenedItems.find(item => item.path === activeId)
+  const overNode = nodeIndex
+    ? nodeIndex.get(overId)
+    : flattenedItems.find(item => item.path === overId)
 
   // Calculate depth based on horizontal offset during drag
   const offsetDepth = Math.round(offsetLeft / indentationWidth)
@@ -71,7 +79,9 @@ export function getProjection(
     parentId = overNode.type === 'directory' ? overNode.path : overNode.parentId
   } else {
     // Moving shallower - walk up tree to find parent at projected depth
-    const overIndex = flattenedItems.findIndex(item => item.path === overId)
+    const overIndex = nodeIndex
+      ? overNode.offset  // O(1) start, no scan
+      : flattenedItems.findIndex(item => item.path === overId)
     for (let i = overIndex; i >= 0; i--) {
       const item = flattenedItems[i]
       if (item.depth === projectedDepth - 1 && item.type === 'directory') {
@@ -86,6 +96,8 @@ export function getProjection(
 ```
 
 **Projection result** indicates the new parent folder and depth where the item will move.
+
+**Id resolution is no longer purely find-based.** When a `nodeIndex` is passed, the two id lookups are hash lookups instead of linear scans, and the shallower-branch walk starts from `overNode.offset` in O(1) rather than a `findIndex` scan. Only the starting point changes: the walk itself stays positional (an ordered scan backwards from the hovered row), so the index cannot replace it. Without a `nodeIndex` the function falls back to scanning, so 5-argument callers keep working unchanged. A supplied index must be **complete** for `flattenedItems` – a stale index makes misses authoritative, so an id the array still contains resolves to `null` and the drag is rejected.
 
 ### Move Operation
 

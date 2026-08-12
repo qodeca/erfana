@@ -173,6 +173,32 @@ export const TEST_IDS = {
   EDITOR_ERROR_BOUNDARY: 'editor-error-boundary',
 
   // =========================================================================
+  // Root Error Boundary (7)
+  // =========================================================================
+
+  /** Full-window crash fallback container (role="alertdialog") */
+  ROOT_ERROR_BOUNDARY: 'root-error-boundary',
+  /** Show/hide error details disclosure toggle */
+  ROOT_ERROR_DETAILS_TOGGLE: 'root-error-details-toggle',
+  /** Error details region (scrollable, role="region") */
+  ROOT_ERROR_DETAILS: 'root-error-details',
+  /** Copy error details button */
+  ROOT_ERROR_BTN_COPY: 'root-error-btn-copy',
+  /** Open logs folder button */
+  ROOT_ERROR_BTN_LOGS: 'root-error-btn-logs',
+  /** Restart Erfana button */
+  ROOT_ERROR_BTN_RESTART: 'root-error-btn-restart',
+  /** Single role="status" live region carrying every transient message */
+  ROOT_ERROR_STATUS: 'root-error-status',
+
+  // =========================================================================
+  // Panel Error Boundary (1)
+  // =========================================================================
+
+  /** Panel-scoped error boundary fallback container */
+  PANEL_ERROR_BOUNDARY: 'panel-error-boundary',
+
+  // =========================================================================
   // File Conflict Notification (4)
   // =========================================================================
 

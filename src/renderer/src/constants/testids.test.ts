@@ -158,6 +158,32 @@ describe('TEST_IDS', () => {
       expect(editorErrorIds).toHaveLength(1)
     })
 
+    it('should have 7 Root Error Boundary IDs', async () => {
+      const { TEST_IDS } = await getTestIds()
+      const rootErrorIds = Object.keys(TEST_IDS).filter((k) => k.startsWith('ROOT_ERROR'))
+      expect(rootErrorIds).toHaveLength(7)
+    })
+
+    it('should have 1 Panel Error Boundary ID', async () => {
+      const { TEST_IDS } = await getTestIds()
+      const panelErrorIds = Object.keys(TEST_IDS).filter((k) => k.startsWith('PANEL_ERROR'))
+      expect(panelErrorIds).toHaveLength(1)
+    })
+
+    it('keeps the ROOT_ERROR and PANEL_ERROR prefixes disjoint from EDITOR_ERROR', async () => {
+      // The three boundary families are counted by prefix filters. A rename
+      // that made one a prefix of another would silently inflate two counts.
+      const { TEST_IDS } = await getTestIds()
+      const keys = Object.keys(TEST_IDS)
+      const editorErrorIds = keys.filter((k) => k.startsWith('EDITOR_ERROR'))
+      const rootErrorIds = keys.filter((k) => k.startsWith('ROOT_ERROR'))
+      const panelErrorIds = keys.filter((k) => k.startsWith('PANEL_ERROR'))
+
+      expect(editorErrorIds.some((k) => rootErrorIds.includes(k))).toBe(false)
+      expect(editorErrorIds.some((k) => panelErrorIds.includes(k))).toBe(false)
+      expect(rootErrorIds.some((k) => panelErrorIds.includes(k))).toBe(false)
+    })
+
     it('should have 4 File Conflict Notification IDs', async () => {
       const { TEST_IDS } = await getTestIds()
       const fileConflictIds = Object.keys(TEST_IDS).filter((k) => k.startsWith('FILE_CONFLICT'))

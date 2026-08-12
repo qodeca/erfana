@@ -13,13 +13,27 @@
  * main-process listener in `AreaSelectOverlay` rejects any payload whose
  * token does not match the in-flight token, blocking the cross-renderer
  * cross-talk that the prior single-channel design left unguarded.
+ *
+ * It also exposes a one-way log forward (#60). The overlay renderer never gets
+ * `window.api`, so a failure inside it — the very window that has no recovery
+ * UI — used to leave no evidence at all. Reusing the main preload's existing
+ * `logging:log` channel keeps the IPC surface unchanged; main validates every
+ * entry (`LogEntrySchema` in `logging-handlers.ts`) exactly as it does for the
+ * editor window.
  */
 
 import { contextBridge, ipcRenderer } from 'electron'
 import { SCREENSHOT_CHANNELS } from '../shared/ipc/screenshot-channels'
 import type { AreaSelection } from '../shared/ipc/screenshot-schema'
+import type { LogEntry } from '../shared/ipc/logging-schema'
 
 const OVERLAY_TOKEN_ARG_PREFIX = '--overlay-token='
+
+/**
+ * The main preload's logging channel, reused verbatim (`preload/index.ts`).
+ * One-way and validated main-side; no new channel is introduced for the overlay.
+ */
+const LOGGING_LOG_CHANNEL = 'logging:log'
 
 /**
  * Strict v4 UUID — what {@link crypto.randomUUID} on the main side emits.
@@ -68,5 +82,17 @@ contextBridge.exposeInMainWorld('overlayApi', {
    */
   areaCancelled: (): void => {
     ipcRenderer.send(SCREENSHOT_CHANNELS.AREA_CANCELLED, { token: overlayToken })
+  },
+
+  /**
+   * Forward one log entry to the main process (#60).
+   *
+   * The overlay's only evidence trail. Deliberately fire-and-forget and
+   * untokenised: the payload is a log record, not a capture command, and main
+   * re-validates it before it reaches the log file. `RendererLogger` falls back
+   * to this bridge when `window.api` is absent.
+   */
+  log: (entry: LogEntry): void => {
+    ipcRenderer.send(LOGGING_LOG_CHANNEL, entry)
   }
 })
