@@ -278,7 +278,7 @@ Tests fail, preventing build
    npm run test:renderer
    ```
 2. Fix failing tests before building
-3. All tests must pass – 326 test files (main 144 · renderer 178 · preload 4), counted on `develop` on 2026-08-12 (v0.17.2 plus the unreleased CI workflow-lint fix); the case total most recently reported for that tree is ~9,694. Run `npm run test:ci` for the live figure – see [Testing overview](../testing/README.md#key-test-areas)
+3. All tests must pass – `npm run test:ci` reported **356 test files, 10,057 cases, all passing** on `develop` on 2026-08-23 (v0.17.2). The vitest workspace has three projects, and the `main` project covers more than `src/main`: main 152 files (`src/main` 139 · `src/shared` 11 · `scripts` 2) · renderer 200 · preload 4. Run `npm run test:ci` for the live figure – see [Testing overview](../testing/README.md#key-test-areas)
 
 ---
 

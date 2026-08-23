@@ -32,45 +32,7 @@ the state in the private pre-migration tracker, not something you can look up to
 | meta | [#168](https://github.com/qodeca/erfana/issues/168) | OPEN | D1 amended out 2026-04-21 (whisper not probe-style); D2/D3 re-evaluate after Phase 4 closed without trigger |
 | post | [#177](https://github.com/qodeca/erfana/issues/177) | OPEN | SmartScreen reputation tracking; closes at v0.9.9 or "clean" status |
 
-**Recent commits on `windows` that landed in v0.9.3 (newest → oldest, frozen for the trail — historical, retained for the audit trail):**
-
-| Commit | Description | Issue |
-|---|---|---|
-| `c8543bf` | fix(windows): terminal bootstrap hardening — Git Bash dispatch, PTY resize race, git-polling log spam, ConPTY resize-reflow leak across all three bootstrap builders, `(`/`)` allowed in cwds (unblocks `Program Files (x86)`); new `WindowsTerminalBootstrap.test.ts` (60 tests — vitest reporter count with `it.each()` parameterisation; raw `it()` block count is 25); e2e path-sep fix; ESLint ignores for `playwright-report/` + `test-results/` + `coverage/`; 11 pre-existing lint errors cleared | Phase-2 UAT |
-| `13bd3b8` | feat(windows): detect LibreOffice at standard install paths | **#162 CLOSED** |
-| `612192b` | feat(windows): reserved-filename guard with cross-platform validation | **#161 CLOSED** |
-| `5e86349` | feat(windows): add Program Files entries to git allowlist + liveness probe | **#160 CLOSED** |
-| `ca38d44 / 6b59013` | fix: clear CameraDialog shutter timer on unmount | **#159 CLOSED** |
-| `abc6ea8` | docs: close Phase 0 after macOS verification, link #159 | #153 closed |
-| `47c2e27 / 23fb537` | test: fix hardcoded Unix paths in `git-status-cache.test.ts` after v0.9.2 merge | #153 follow-up |
-| `db0dc5e` | Merge develop (v0.9.2 cppgc fix) into windows | v0.9.2 |
-| `9edb243 / e21f625` | Docs propagation — terminal bootstrap, api-services, CHANGELOG | — |
-| `7da0979 / d48c452` | Multi-session cross-platform workflow docs | — |
-| `370dc19 / c5e5d61` | SearchBar focus-trap fix (`KeyboardEvent` dispatch) | #153 |
-| `3196314 / 75877a8` | Test path portability (24 files) | **#157 CLOSED** |
-| `ebc3088 / 54e8300` | `app.setJumpList` mock | **#156 CLOSED** |
-| `1bcedde / c5ffad8` | Terminal parity + `WindowsBootstrapBuilder` strategy | **#154 CLOSED** |
-| `1f0ae81` | Portable `test:cov` + `prebuild` scripts, prerequisites doc | #153 |
-| `d7d291d / 0888d0c` | Windows enablement roadmap docs | — |
-
-**Versions shipped:** `0.9.3` (Phases 0–2), `0.9.4` (Phase 4 local Whisper), `0.12.0` (Phase 3 screenshots + chokidar v3 pin), `0.13.0` (Phase 6 partial), `0.16.3` (Windows Claude-status bar, first public OSS release). `develop` currently carries version `0.16.3`; `main` lags `develop` and is not in sync with it. (No head SHA is pinned here on purpose — it goes stale the moment anything lands. Read it with `git rev-parse --short origin/develop`.) Future Windows phase work ships per the `feature/windows-phase-<N>-*` branch convention.
-
-**Closed 2026-04-20:** #153 (Phase 0), #156 (setJumpList), #157 (test portability), #159 (CameraDialog timer).
-**Closed 2026-04-21:** #160 (git allowlist), #161 (filename guard), #162 (LibreOffice detection). **#163 (long-path activation): decision-deferred to Phase 6** with promotion criteria recorded inline at `PlatformConfig.ts:188` (comment block above `isWindowsLongPath` at `:205`).
-**Closed 2026-04-22:** #158 (v8 coverage race — closed without code change; verify before relying on this row).
-**Closed 2026-04-23:** #172 (Windows test-flake remediation pool), #173 (ThrottledWorker offset-deque refactor).
-**Closed 2026-04-25:** #174 (multi-platform signed release pipeline shipped in v0.9.5).
-
-**Historical verification snapshots** (preserved for the audit trail; the baseline drifts per release — see [`../testing/README.md`](../testing/README.md) for the current count, 8,768 tests across 299 files as of v0.16.3):
-
-Windows host (Phase-2 UAT, 2026-04-21):
-- `npm run test:main` → 241 files / 7437 tests / 89 skipped / 0 failures
-- `npm run build:win` → NSIS installer produced (Developer Mode required)
-- `npm run test:cov` → tests pass; wrapper exit-1 was tracked under #158 (closed 2026-04-22)
-
-macOS host (Phase 0 AC #4, 2026-04-20):
-- `npm run test:cov` → 7532/7532 tests pass, 0 failures across main / preload / renderer
-- `npm run build:mac` → x64 + arm64 DMGs at v0.9.2 baseline. As of v0.11.2 macOS ships only the arm64 DMG.
+**Versions shipped:** `0.9.3` (Phases 0–2), `0.9.4` (Phase 4 local Whisper), `0.12.0` (Phase 3 screenshots + chokidar v3 pin), `0.13.0` (Phase 6 partial), `0.16.3` (Windows Claude-status bar, first public OSS release). The version `develop` carries is whatever is in [`package.json`](../../package.json) — read it there, never from this line; `main` lags `develop` and is not in sync with it. (No head SHA is pinned here on purpose — it goes stale the moment anything lands. Read it with `git rev-parse --short origin/develop`.) Future Windows phase work ships per the `feature/windows-phase-<N>-*` branch convention.
 
 ## Next session — start Phase 5 (NSIS UX)
 

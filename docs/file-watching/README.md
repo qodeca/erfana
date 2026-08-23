@@ -72,12 +72,12 @@ Monitors open files for external content modifications.
 The `useFileWatcher` hook prevents autosave-triggered file change events from being treated as external modifications. Three-layer defense:
 
 1. **`isSavingRef` guard** – Set during save operations, suppresses all change events while a save is in-flight
-2. **Content comparison (`isEchoEvent`)** – Compares incoming file content against `lastSavedContentRef` with CRLF normalization to detect self-save echoes that arrive after the saving flag clears
+2. **Content comparison (`isEchoEvent`)** – Compares incoming file content against `pendingSavedContentsRef`, a `Set` of recently saved content strings (a set, not a single ref, because rapid successive saves can leave several echoes in flight). Both sides are CRLF-normalized before comparison, so a self-save echo that arrives after the saving flag clears is still recognised. The set is cleared on reload, keep-local, file switch, and after a match
 3. **`hasLocalChangesRef`** – Ref mirror of `hasLocalChanges` state (avoids stale closures); if the user has local changes, external reload is suppressed
 
 The `MarkdownEditorPanel` coordinates via:
 - Reading content from Monaco editor model (not React state) to avoid stale closure overwrites
-- Calling `notifySaveComplete(savedContent)` after successful write to update `lastSavedContentRef`
+- Calling `notifySaveComplete(savedContent)` after a successful write, which adds the content to `pendingSavedContentsRef`
 - Post-save dirty re-detection: checks if Monaco buffer diverged from saved content during the save, re-marks as modified if so
 
 ### Conflict Resolution UI
@@ -519,20 +519,20 @@ The service integrates these components:
 
 - `src/main/services/watcher/` - All watcher optimization modules
 - Watcher unit tests in `src/main/services/watcher/*.test.ts`
-- Directory pipeline integration tests in `src/main/services/DirectoryWatcherService.pipeline.test.ts` (11 tests)
+- Directory pipeline integration tests in `src/main/services/DirectoryWatcherService.pipeline.test.ts` (17 tests)
 - Git pipeline integration tests in `src/main/services/GitWatcherService.pipeline.test.ts` (22 tests, #99)
   - Covers AC-004 (git add), AC-005 (git commit), AC-006 (git checkout), AC-018 (coalescer dedup)
   - Additional: all 5 event types, correlation ID, WatcherMetrics, disposal guards, circuit breaker
 - Watcher resilience tests in `src/main/services/WatcherResilience.test.ts` (14 tests, #100)
   - AC-011 (polling fallback), AC-015 (redundant polling suppression), AC-016 (exponential backoff restart)
-- Window visibility gating tests in `src/renderer/src/hooks/useGitStatus.test.ts` (5 tests, #102)
+- Window visibility gating tests in `src/renderer/src/hooks/useGitStatus.test.ts` – 5 of the file's 38 tests cover the visibility-gating case (#102)
   - AC-012: git status refreshes dropped while hidden, single catch-up on restore, cooldown respected
 - Event buffer overflow tests in `src/main/services/watcher/ThrottledWorker.test.ts` (24 tests, #102 + #173)
   - AC-017: 30,000-event cap, FIFO eviction, no crash/hang, post-burst recovery
   - Offset-deque coverage: 60 k-event stress burst runs in <1 s cross-platform after the refactor
 - 016-NFR-001 main-process latency integration tests in `DirectoryWatcherService.pipeline.test.ts`
   - Isolates chokidar + Defender noise via fake timers; asserts <200 ms virtual latency for single add + atomic-save flows
-- Hook tests in `src/renderer/src/hooks/useDirectoryWatcher.test.ts` (11 tests)
+- Hook tests in `src/renderer/src/hooks/useDirectoryWatcher.test.ts` (13 tests)
 - Pause/resume tests in `src/renderer/src/components/ProjectTree/withWatcherPause.test.ts` (17 tests)
 - Project switching tests in `src/main/services/ProjectService.switching.test.ts` (20 tests, #101)
   - Session token guards, step ordering, in-flight event handling during project switches

@@ -93,7 +93,7 @@ Resolved – `LanguageSelect` accepts an optional `id` prop and renders it on th
 
 **Recommended next step**: Fixture instrumentation – capture `document.readyState` and `app.getGPUInfo('basic')` before and after `waitForLoadState`, push once on a temporary re-enable (`gh workflow enable "E2E Tests"`), then form a targeted hypothesis. Re-disable until a fix is in.
 
-**Files**: `.github/workflows/e2e.yml`, `e2e/fixtures.ts` (lines 355–360, 406–410), `e2e/visual-regression.e2e.ts`.
+**Files**: `.github/workflows/e2e.yml`, `e2e/fixtures/index.ts` — the two visual fixtures `visualWindow` and `visualWindowWithProject`, each of which calls `await window.waitForLoadState('domcontentloaded')` immediately after `firstWindow()` — and `e2e/visual-regression.e2e.ts`. (The `e2e/fixtures.ts` cited here until 2026-08-23 no longer exists: the visual fixture set was moved into `e2e/fixtures/index.ts` and the legacy re-export file was deleted, so its old line numbers pointed at nothing.)
 
 **Tracking**: see [docs/ci.md § E2E Tests (disabled)](./ci.md#e2e-tests-e2eyml-disabled) and [docs/known-issues.md § Visual regression E2E suite hangs on GitHub `macos-latest` CI](./known-issues.md#visual-regression-e2e-suite-hangs-on-github-macos-latest-ci).
 
@@ -112,20 +112,22 @@ Resolved – `LanguageSelect` accepts an optional `id` prop and renders it on th
 
 ---
 
-### 7. `docs/security.md` exceeds /doc-update soft cap (626 lines)
+### 7. `docs/security.md` exceeds /doc-update soft cap (661 lines)
 
 **Severity**: Low
-**Impact**: `/doc-update` protocol prefers ≤500-line doc files; `security.md` sits 126 lines over (626 lines, re-measured 2026-08-08 at v0.17.0; it was 541 when this item was filed).
+**Impact**: `/doc-update` protocol prefers ≤500-line doc files; `security.md` sits 161 lines over (661 lines, re-measured 2026-08-23; it was 626 at v0.17.0 and 541 when this item was filed).
 
 **Problem**: Largest natural extraction candidate (`Release signing (v0.9.5+, #174)`, from L566 to the end of the file) is structurally pinned. The pubkey block contains `<!-- minisign-pubkey-{primary,rotation}-{begin,end} -->` fence markers that are actively grepped by:
 
-- `.github/workflows/checks.yml:298–330` — release-pubkey drift detector (Guard 5; the step is `Guard - release pubkey drift across docs` at `:306`) (the `Release readiness guards` job; it runs on every push but is **not** a required status check on `main` — the required set is `Lint`, `Typecheck`, `Unit tests`, `Build`, `License compliance`, `Secret scan`, per [`ci.md`](./ci.md))
-- `.claude/skills/releasing-erfana/phases/phase-4-verify.md:45` — operator-facing canonical-source note
-- `README.md:57` — direct `#release-signing-v095-174` anchor (the file is 101 lines long)
+- `.github/workflows/checks.yml` — release-pubkey drift detector: the `Guard - release pubkey drift across docs` step (Guard 5) of the `Release readiness guards` job. It runs on every push but is **not** a required status check on `main` — the required set is `Lint`, `Typecheck`, `Unit tests`, `Build`, `License compliance`, `Secret scan` and `Coverage`, per [`ci.md`](./ci.md)
+- `.claude/skills/releasing-erfana/phases/phase-4-verify.md` § 4.3 Verify minisign signature — operator-facing canonical-source note
+- `README.md` § Release verification — direct `#release-signing-v095-174` anchor into `docs/security.md`
+
+(Citations de-numbered 2026-08-23: the two line references here had already drifted — Guard 5 sits at `:341–372` today, its step name at `:349`, not the `:298–330` / `:306` recorded when the item was filed. Section and step names are stable; line numbers in this item are not.)
 
 Moving the block would require synchronized edits to checks.yml + skill + README anchor. High blast-radius for cosmetic gain.
 
-**Recommended Solution** (if cap-compliance is wanted later): extract the lower-risk `Test Builds (ERFANA_TEST_BUILD)` section (L137–L201, ~65 lines) to `docs/security/test-builds.md` instead. Single internal cross-ref at L24; no CI implications. That alone drops `security.md` to ~561 lines — still over the cap, so cap-compliance now needs a second extraction as well.
+**Recommended Solution** (if cap-compliance is wanted later): extract the lower-risk `Test Builds (ERFANA_TEST_BUILD)` section (~L138–L201, ~65 lines) to `docs/security/test-builds.md` instead. Single internal cross-ref at L24; no CI implications. That alone drops `security.md` to ~596 lines — still well over the cap, so cap-compliance now needs at least one further extraction.
 
 **Status**: Re-opened 2026-08-08. The item was filed as an accepted constraint on the condition that it be revisited if `security.md` grew; it has, so the condition is spent. Decision needed: either extract two sections (Test Builds plus one more) to clear the cap, or record that the cap does not apply to this file and close the item.
 
@@ -189,7 +191,7 @@ After the heartbeat hardening (Phase A4 resume-refresh, B1 symlink defense, D3 H
 ### 13. `scripts/fuses.js` exceeds the 500-line guideline (#43, 2026-08)
 
 **Severity**: Low
-**Impact**: `scripts/fuses.js` is ~1,040 lines against the project's ~500-line-per-file guidance; its suite `scripts/fuses.test.mjs` is ~835.
+**Impact**: `scripts/fuses.js` is ~1,715 lines against the project's ~500-line-per-file guidance; its suite `scripts/fuses.test.mjs` is ~1,758. (Both re-measured 2026-08-23; when this item was filed they were ~1,040 and ~835, so the seam has kept widening.)
 
 **Problem**: The issue #43 packaging-allowlist work added a self-contained `Packaged-contents allowlist` block (~400 lines: `deriveAllowedAppEntries`, `assertConfigMatchesAllowlist`, `assertPackagedAppContents` and their helpers) to a file that already carried the fuse flip, the `spawn-helper` chmod, the two foreign-arch prunes and the media-binary staging.
 
@@ -389,14 +391,14 @@ After the heartbeat hardening (Phase A4 resume-refresh, B1 symlink defense, D3 H
 
 **Severity**: Low
 
-The policy as practised: *a file a change adds behaviour to must come in under 500 lines; a file only read, moved unchanged, or trivially touched keeps its pre-existing debt and is waived.* Measured on the #70 branch:
+The policy as practised: *a file a change adds behaviour to must come in under 500 lines; a file only read, moved unchanged, or trivially touched keeps its pre-existing debt and is waived.* Line counts re-measured 2026-08-23; only `file-handlers.ts` has moved since the #70 measurement (601 → 626).
 
 | File | Lines | Why it is waived |
 |---|---|---|
 | `src/renderer/src/components/Panels/TerminalPanel.tsx` | 1,352 | Pre-existing; #70 only shrinks it (the panel router replaced its inline open logic) |
 | `src/renderer/src/components/Panels/ImageViewerPanel/imageViewer.logic.test.ts` | 693 | Moved unchanged by `git mv`; not a line was edited |
 | `src/renderer/src/components/Panels/MarkdownEditorPanel.tsx` | 614 | Pre-existing; untouched except by the optional router commit |
-| `src/main/ipc/file-handlers.ts` | 601 | Pre-existing; **grew by 4 lines** in #70 (the `projectConfinement` import plus two `assert*` calls). Adding a security guard to an over-cap file was accepted rather than blocking the fix on a refactor |
+| `src/main/ipc/file-handlers.ts` | 626 | Pre-existing; **grew by 4 lines** in #70 to 601 (the `projectConfinement` import plus two `assert*` calls) and has since reached 626. Adding a security guard to an over-cap file was accepted rather than blocking the fix on a refactor |
 | `src/renderer/src/components/Panels/ImageViewerPanel/imageViewer.logic.ts` | 539 | Moved unchanged by `git mv` |
 
 `FileWatcherService.ts` deliberately stayed under the cap (498 lines) by moving the watch factory, the unlink branch, the send loop and the subscriber counting into `src/main/services/watcher/`.
@@ -478,11 +480,11 @@ Ongoing effort to keep `docs/` concise and high-value for Claude Code.
 - Condense logging.md (525 → 239 lines) ✅
 - Condense terminal/README.md (code examples → tables) ✅
 - Condense CHANGELOG.md (old versions compressed) ✅
+- Inline the small editor stubs (2026-08-23) ✅ – `docs/editor/{toolbar.md, scroll-sync.md, monaco-configuration.md}` were merged into `docs/editor/README.md` (§ Monaco configuration, § Scroll synchronization, § Formatting toolbar) and deleted; both inbound refs – `docs/rendering/README.md` and `docs/archive/resolved-issues.md` – now point at `../editor/README.md#scroll-synchronization`
 
 **Remaining**:
 - Consolidate troubleshooting files (troubleshooting.md + troubleshooting-advanced.md)
 - Reduce code example verbosity across remaining files
-- Evaluate inlining of small editor stubs — `docs/editor/{toolbar.md, scroll-sync.md, monaco-configuration.md}` (40/53/60 lines). Deferred from Sprint 3: external inbound refs to `scroll-sync.md` from `docs/archive/resolved-issues.md:70` and `docs/rendering/README.md:42` would require anchor repointing; benefit (single file) vs cost (README bloat + link-break risk) currently balanced. Promotion criteria: when touching editor docs for any other reason (Phase 3+ UI work), re-evaluate the consolidation cost.
 
 **Note**: docs/future/ (8,604 lines) preserved for future graph-engine implementation.
 
@@ -544,4 +546,4 @@ Amendment discipline + promotion-rule conventions in [`windows/contributing.md`]
 
 ---
 
-**Last Updated**: #70 stale preview tabs (2026-08-23 – entries #24–#30 added from the design's accepted-debt ledger and the review rounds: text-only `watchFile` confinement, the `file:getStats` carve-out and its clean fix, the post-#70 over-cap file measurements, genuine deletes not re-arming, the `useFileWatcher` indicator timer, duplicated `IMAGE_EXTENSIONS`, and five smaller accepted trade-offs) + #60 large-project crash + error containment (2026-08-11 – entries #18–#23 added from the change-set reviews: dead `useDragDropTree` API surface, inert `vitest.renderer.ts` coverage block, `test:cov` workspace fan-out, no tsconfig over `e2e/`, shared renderer HTML entry, `ThrottledWorker.workMany` spread-push) + #55 extra-content packaging guards (2026-08-09 – entry #14 added: `assertResourcesSiblingsAllowlist` advisory-on-Windows watch item) + #43 packaging allowlist QG-11a remediation (2026-08-09 – entry #13 added: `scripts/fuses.js` size after the allowlist block; `resolvePackedResourcesDir` call-site count corrected to four) + v0.17.0 doc sweep (2026-08-08 – entry #4 resolved: `LanguageSelect` `id` prop; entries #7, #8, #10 re-measured against the v0.17.0 tree) + #42 camera mirror + dialog focus work (2026-08-07 – entry #3 resolved: BaseDialog `trapFocus`) + PR #245 (2026-06-13 – entry #12 live-verification updated: single-panel detection + mid-session model-switch verified on a Windows host) + #217 Windows Claude status bar (2026-06-10 — entry #12 added: Windows v1 detector limitations) + v0.14.0 doc sweep (2026-06-08 — entries #9 + #10 added from `Transcription/CLAUDE.md` eviction) + v0.9.6 release (2026-05-22 — critical macOS terminal fix `ea3eaf1`) + v0.9.5 release (2026-04-25) + Phase I branch protection refinement (PR requirement removed same day) + entry #7 documenting `security.md` cap constraint (2026-04-25)
+**Last Updated**: doc-sweep follow-up (2026-08-23 – the editor-stub inlining moved from *Remaining* to *Completed* under Documentation Token Efficiency, verified on disk: the three stubs are gone, their content is in `docs/editor/README.md`, and both inbound refs are repointed; entry #7's `checks.yml`, release-skill and `README.md` citations converted from line numbers to section/step names after the checks.yml numbers were found stale) + doc-accuracy sweep (2026-08-23 – entry #5 repointed from the deleted `e2e/fixtures.ts` to `e2e/fixtures/index.ts` and its dead line ranges replaced with fixture names; entries #7, #13 and #26 re-measured: `security.md` 626 → 661, `scripts/fuses.js` ~1,040 → ~1,715, `scripts/fuses.test.mjs` ~835 → ~1,758, `file-handlers.ts` 601 → 626) + #70 stale preview tabs (2026-08-23 – entries #24–#30 added from the design's accepted-debt ledger and the review rounds: text-only `watchFile` confinement, the `file:getStats` carve-out and its clean fix, the post-#70 over-cap file measurements, genuine deletes not re-arming, the `useFileWatcher` indicator timer, duplicated `IMAGE_EXTENSIONS`, and five smaller accepted trade-offs) + #60 large-project crash + error containment (2026-08-11 – entries #18–#23 added from the change-set reviews: dead `useDragDropTree` API surface, inert `vitest.renderer.ts` coverage block, `test:cov` workspace fan-out, no tsconfig over `e2e/`, shared renderer HTML entry, `ThrottledWorker.workMany` spread-push) + #55 extra-content packaging guards (2026-08-09 – entry #14 added: `assertResourcesSiblingsAllowlist` advisory-on-Windows watch item) + #43 packaging allowlist QG-11a remediation (2026-08-09 – entry #13 added: `scripts/fuses.js` size after the allowlist block; `resolvePackedResourcesDir` call-site count corrected to four) + v0.17.0 doc sweep (2026-08-08 – entry #4 resolved: `LanguageSelect` `id` prop; entries #7, #8, #10 re-measured against the v0.17.0 tree) + #42 camera mirror + dialog focus work (2026-08-07 – entry #3 resolved: BaseDialog `trapFocus`) + PR #245 (2026-06-13 – entry #12 live-verification updated: single-panel detection + mid-session model-switch verified on a Windows host) + #217 Windows Claude status bar (2026-06-10 — entry #12 added: Windows v1 detector limitations) + v0.14.0 doc sweep (2026-06-08 — entries #9 + #10 added from `Transcription/CLAUDE.md` eviction) + v0.9.6 release (2026-05-22 — critical macOS terminal fix `ea3eaf1`) + v0.9.5 release (2026-04-25) + Phase I branch protection refinement (PR requirement removed same day) + entry #7 documenting `security.md` cap constraint (2026-04-25)

@@ -125,9 +125,19 @@ For editor tabs that should appear in the center area:
    })
    ```
 
+4. If your panel needs to survive – or be skipped by – a "close all editor tabs"
+   sweep, match it by a **constant**, not a string literal. The welcome panel is
+   the existing case: its id lives in `src/renderer/src/constants/panels.ts` as
+   `WELCOME_PANEL_ID` (`'_center-placeholder'`), and `EditorAreaSplitPanel`,
+   `components/Tabs/tabOperations.ts` and `stores/useProjectStore.ts` all import
+   it rather than retyping the string – which is exactly what they used to do.
+   Add a new constant beside it if your panel needs the same treatment. Ids for
+   ordinary file panels are derived, not hard-coded: see
+   `src/renderer/src/utils/openFileInPanel.ts`.
+
 **Note**: The center `EditorAreaSplitPanel` contains the DockviewReact instance. File opening happens via `dockviewApi` passed through params.
 
-See: [Architecture](./architecture.md#hybrid-layout-architecture) | [UI Components](./ui-components.md#panel-communication-pattern)
+See: [Architecture](./architecture.md#hybrid-layout-architecture) | [UI Components](./ui-components.md#panel-communication)
 
 ## Adding import converters
 
@@ -252,7 +262,7 @@ localStorage.removeItem('erfana-sidebar-state')
 
 Protection is automatic - click interception and auto-restore work immediately.
 
-See: [UI Components](./ui-components.md#panel-protection)
+See: [UI Components](./ui-components.md#panel-toggle-system)
 
 ## Creating Prompt Templates
 
@@ -442,20 +452,5 @@ File and directory watching with chokidar provides automatic refresh on external
 - Pause/resume pattern - internal CRUD operations don't trigger duplicate refreshes
 
 See: [File Watching](./file-watching/README.md) for detailed testing instructions
-
-## Debugging
-
-- **Main Process**: Terminal output (`console.log`)
-- **Renderer**: Chrome DevTools (F12 in app)
-- **IPC**: Log both sides to trace calls
-- **Hot Reload**: Save file → automatic reload
-
-## Integrating New NPM Package
-
-1. `npm install package-name`
-2. Import where needed:
-   - Main/Preload: Direct import
-   - Renderer: Standard React import
-3. Add types if needed: `npm install -D @types/package-name`
 
 See: [Architecture](./architecture.md) | [IPC Patterns](./ipc-patterns.md) | [UI Components](./ui-components.md)

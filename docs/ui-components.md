@@ -276,6 +276,30 @@ Home-icon tab (41px square, non-draggable). The welcome screen is the central **
 - **Controls** – heading (`Welcome to ERFANA v{__APP_VERSION__}`, no Home icon in the panel), Import button, and Recent Projects sit in a dimmed, blurred container pinned to the bottom-right corner; the Recent Projects label is left-aligned.
 - **Styles** – `AppDockLayout.css`: `.panel-content.home-bg`, `.welcome-panel`, `.welcome-content`.
 
+### `WELCOME_PANEL_ID` – never hard-code the literal
+
+The welcome panel is the one non-closable panel in the editor dockview, so every
+"close all editor tabs" sweep has to skip it. Its id lives in
+`src/renderer/src/constants/panels.ts`:
+
+```typescript
+export const WELCOME_PANEL_ID = '_center-placeholder'
+```
+
+It sits in `constants/` rather than beside the component because the code that
+matches on it has no business importing a React component. Current call sites:
+
+| File | Use |
+|---|---|
+| `components/DockLayout/components/EditorAreaSplitPanel.tsx` | Creates the panel with this id, and skips it when clearing the area |
+| `components/Tabs/tabOperations.ts` | Filters it out of "close others" / "close all" |
+| `stores/useProjectStore.ts` | Skips it in the panel sweep on project switch |
+
+The string was copied into three files before the constant existed. Import the
+constant – do not retype `'_center-placeholder'`. The leading underscore keeps
+it out of the `editor-…` / `image-…` namespace that real file panels use; every
+other panel id is derived, see `utils/openFileInPanel.ts`.
+
 ## Development Patterns
 
 ### Add Activity Bar Item
@@ -430,6 +454,7 @@ Opens when clicking image files (PNG, JPG, GIF, WebP, SVG, BMP, ICO) in the proj
 - `hooks/useImageSource.ts` - Decode-first load/refresh, generation counter, visibility-deferred re-read
 - `hooks/useImageViewerTransform.ts` - Zoom/pan/wheel/keyboard/ResizeObserver behind a `getActiveContainer` seam; `applySourceChange` decides preserve-vs-reset
 - `hooks/useFullScreenOverlay.ts` - Open/close, portal-root guard, focus trap
+- `hooks/useReloadAction.ts` - The banner's Reload action. `recover()` returning `false` changes nothing else on screen, so this hook adds the transient "still not available" feedback that tells the user the click registered; it self-clears on the same `INDICATOR_DURATION_MS` budget as the "Reloaded from disk" confirmation (#70)
 - `imageViewer.logic.ts` - Pure functions for zoom, pan, keyboard actions
 - `imageViewerStatus.logic.ts` - Status precedence, clock formatting, all copy constants
 - `ImageViewerPanel.module.css` - The one remaining CSS module in the app

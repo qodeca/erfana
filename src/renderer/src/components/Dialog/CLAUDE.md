@@ -12,7 +12,7 @@ All dialogs MUST compose on `BaseDialog`. Never build portals, overlays, or focu
   closeOnBackdrop={true}             // false for modal operations
   closeOnEscape={true}               // false if custom Escape handling needed
   className="my-dialog"              // adds to dialog-container
-  ariaLabelledBy={titleId}           // required – points to title element
+  ariaLabelledBy={titleId}           // optional in the type, required by convention – points to title element
   ariaDescribedBy={descriptionId}    // recommended – points to body element
   initialFocusRef={captureButtonRef} // optional – focus this instead of the first focusable
   initialFocusKey={canCapture}       // optional – re-arm focus resolution (primitive!)
@@ -21,16 +21,7 @@ All dialogs MUST compose on `BaseDialog`. Never build portals, overlays, or focu
 >
 ```
 
-## What BaseDialog provides
-
-- Portal rendering to `#portal-root`
-- Overlay backdrop with configurable click-to-close
-- Escape key handling (configurable)
-- Auto-focus on the first focusable element, or on a preferred target (`initialFocusRef`)
-- **Tab-cycling focus trap** – opt-in via `trapFocus`, including recovery of focus that has already escaped the dialog
-- Focus restore on close
-- Fade-in + slide-up animation
-- `role="dialog"` and `aria-modal="true"` on container
+BaseDialog portals into `#portal-root`.
 
 ## Focus management
 
@@ -45,27 +36,13 @@ The focusable selector **excludes `:disabled` controls**, so a Start/Capture but
 
 **`initialFocusKey` is compared with `Object.is`, so pass a primitive.** A value rebuilt on every render – an object or array literal, an inline arrow – re-arms the pass every render, reschedules the timer before it ever fires, and focus never lands at all. Pass the boolean that gates the control (e.g. `canCapture`).
 
-The re-armed pass never steals focus. It runs only when all three hold: the preferred target is now focusable, focus is still where BaseDialog itself put it (or on `<body>`, where Chromium leaves it after disabling a focused control), and less than **1.5 s** has elapsed since the dialog opened. After that window the user has read the dialog and may be about to press Enter, so retargeting the keystroke would be worse than leaving focus alone.
-
-The re-armed pass and the rescue are the **same focus authority**: the rescue records where it parked focus, so a transient disable inside the promotion window does not make the next promotion mistake BaseDialog's own rescue for a deliberate user move.
-
-`trapFocus` also rescues focus **without a keystroke**: Chromium blurs a focused control the instant it becomes `disabled` and leaves focus on `<body>`, outside an `aria-modal` dialog. A `focusout` listener on the container detects that the control which lost focus is now `:disabled` and returns focus to `focusRescueRef` (or the first focusable control). A control that is still enabled and merely lost focus deliberately is left alone – no per-control `onBlur` handlers needed in individual dialogs.
-
-**An UNMOUNTED control is deliberately NOT rescued.** Measured in this app's runtime (Electron 39.8.9 / Chromium 142): removing a focused element *does* fire a bubbling `focusout` with `relatedTarget: null`, but Blink clears focus **before** it detaches the node, so at dispatch the target still reports `isConnected: true` and `matches(':disabled') === false`. Rescuing there would fire on `DocumentImportDialog` / `TranscriptionDialog`'s ordinary footer swap – pressing Enter on "Import" would park focus on the `.dialog-btn-danger` Cancel that replaces it, where a second reflexive Enter aborts the operation just started. Unmounts fall through to the Tab trap, which recovers on the next keystroke.
+**`trapFocus` is opt-in (default `false`). Pass the prop; never hand-roll a local `handleFocusTrap`.** The exact guards on the re-armed focus pass and the `focusout` rescue – the 1.5 s promotion window, why both share one focus authority, why an unmounted control is deliberately not rescued – are documented at length in `BaseDialog.tsx`, not restated here.
 
 ## Stacked dialogs
 
 BaseDialog keeps a **module-level stack of every open dialog** (trapping or not, because the dialog that lands on top is often a plain `ConfirmDialog`). The Tab trap and the focusout rescue both bail unless their dialog is the frontmost one.
 
-Without it, a background trapping dialog – `DocumentImportDialog` and `TranscriptionDialog` are mounted at app root and stack at `zIndex 10000`, while `DialogManager` stacks at 10001+ – reads "focus is in the dialog on top of me" as "focus escaped to the page", `preventDefault()`s Tab and drags focus down. The top dialog's own trap then pulls it back to *its* first control, so Tab can never advance: pressing Cmd+Q during a transcription made both Quit and Cancel keyboard-unreachable.
-
-**Ordering contract: the frontmost dialog is the one with the highest `zIndex`, and registration order only breaks a tie.** Paint order is what the user sees, so it is compared directly rather than inferred from open order. Registration order alone agreed with paint order everywhere reachable today, but it mis-answers one shape: a permanently-mounted app-root dialog at `zIndex 10000` whose `isOpen` cycles false → true while a `DialogManager` dialog at 10001+ is already up registers *last*, would claim topmost, and would reinstate the very keyboard trap the stack exists to prevent. Both halves of the contract are locked by tests in `BaseDialog.test.tsx` ("stacked dialogs").
-
-Stack entries pair the per-instance container ref with the `zIndex` that instance renders at, so registration is idempotent under StrictMode's setup/cleanup/setup double-invocation, and "topmost" skips entries whose element is no longer connected – a leaked registration cannot wedge every later dialog. A dialog re-rendered at a new `zIndex` is re-ranked.
-
-## What BaseDialog does NOT provide
-
-- **Tab cycling by default** – `trapFocus` is opt-in (default `false`) so shipping dialogs keep their existing keyboard behaviour. Pass the prop; never hand-roll a local `handleFocusTrap`. `DocumentImportDialog` and `TranscriptionDialog` both deleted theirs in favour of it.
+**Ordering contract: the frontmost dialog is the one with the highest `zIndex`, and registration order only breaks a tie.** Both halves are locked by tests in `BaseDialog.test.tsx` ("stacked dialogs"). The failure this prevents, and why registration order alone is not enough, is in the module comment of `BaseDialog.tsx`.
 
 ## Standard CSS classes (from Dialog.css)
 
@@ -88,38 +65,18 @@ Stack entries pair the per-instance container ref with the `zIndex` that instanc
 
 ## ARIA requirements
 
-- `ariaLabelledBy` – use `useId()` for unique IDs: `const titleId = \`my-title\${useId()}\``
-- `ariaDescribedBy` – point to body content element
-- Dynamic content: add `role="alert" aria-live="assertive"` for errors, `role="status" aria-live="polite"` for success/progress
-- Progress bars: `role="progressbar"` with `aria-valuenow/min/max`
+`ariaLabelledBy` is `ariaLabelledBy?: string` in the type – optional to the compiler, required by convention. Wiring it is two steps:
 
-## Dialog patterns by complexity
+1. **Derive an id.** A dialog mounted through `dialogService` / `DialogManager` is handed a stack `id` in its config, so it builds the ids from that: `` const titleId = `dialog-title-${id}` `` and `` const messageId = `dialog-message-${id}` `` (see `AlertDialog.tsx`, `ConflictDialog.tsx`, `DropModeDialog.tsx`). A dialog with no config id that can be mounted more than once at a time uses `useId()` instead – `CameraDialog.tsx` does exactly that for its status live region: `` const statusRegionId = `camera-dialog-status-${useId()}` ``.
+2. **Put that id on the title element** (`<h3 id={titleId} className="dialog-title">`) and pass the same value as `ariaLabelledBy`. `ariaDescribedBy` gets the body element's id the same way.
 
-| Pattern | Example | Use when |
-|---------|---------|----------|
-| Simple confirm | `AlertDialog`, `ConfirmDialog` | Static message + buttons |
-| Interactive | `FilePickerDialog`, `RenameDialog` | User input, keyboard navigation |
-| Multi-state | `TranscriptionDialog` | Progress, error, success states; custom Escape logic |
+## Existing dialogs (only where the filename misleads)
 
-## Existing dialogs (reference)
+Most dialog files do what their name says. These four do not:
 
-| File | Purpose |
-|------|---------|
-| `AlertDialog.tsx` | Simple OK dialog |
-| `ConfirmDialog.tsx` | Yes/No confirmation |
-| `FilePickerDialog.tsx` | List selection with keyboard nav |
-| `PromptDialog.tsx` | Text input with validation |
-| `NewFileDialog.tsx` / `NewFolderDialog.tsx` | Thin wrappers on `FileSystemDialog` (`operation="create"`), preset with icon and filename validation |
-| `RenameDialog.tsx` | File/folder rename with validation – wraps `FileSystemDialog` (`operation="rename"`, auto-selects the whole name) |
-| `FileSystemDialog.tsx` | Shared base for file/folder create **and** rename dialogs – validation, character count, keyboard shortcuts |
-| `DropModeDialog.tsx` | Mode selection (move/copy/import) |
-| `ConflictDialog.tsx` | File conflict resolution |
-| `CameraDialog.tsx` | Webcam photo capture – live preview, device selector, shutter animation. Single-shot: the frame is written to a temp file and returned to the caller immediately, with no review/retake state. Mirroring is **preview-only and off by default**: `.camera-preview--mirrored` (`transform: scaleX(-1)`) is applied to the `<video>` only while the per-camera checkbox is on (`useCameraMirrorPreference` → `useCameraMirrorStore`, persisted by `deviceId`), and `captureVideoFrame()` in `useCameraCapture.ts` draws the frame unflipped in every state, so the saved JPEG is never mirrored (#42). Uses `initialFocusRef` + `initialFocusKey={canCapture}` + `trapFocus` – the reference case for all three |
-| `ScreenSelectDialog.tsx` | Multi-monitor display picker – takes `displays: DisplayInfo[]`, returns the chosen `displayId`. Not macOS-only and not feature-gated: the TerminalPanel toolbar opens it wherever screenshot capture is supported (macOS + Windows) whenever more than one display is connected |
-| `WindowPickerDialog.tsx` | Cross-platform window picker – thumbnail grid with roving tabindex, used where the OS has no native picker |
-| `ScreenPermissionDialog.tsx` | macOS Screen Recording denial – offers open-settings and relaunch; shown only after a capture is actually denied, never as a pre-check gate |
-| `DialogContext.tsx` | Dialog stack manager (z-index) |
-| `DialogManager.tsx` | Imperative stack renderer (mounts dialogs from `dialogService`) |
-| `dialogService.ts` | Imperative dialog API |
-| `../DocumentImport/DocumentImportDialog.tsx` | Multi-state: options → progress → success/error (LiteParse) |
-| `../Transcription/TranscriptionDialog.tsx` | Multi-state: options → progress → success/error (transcription) |
+| File | What is not obvious |
+|------|---------------------|
+| `FileSystemDialog.tsx` | Shared base for file/folder create **and** rename – validation, character count, keyboard shortcuts. `NewFileDialog` / `NewFolderDialog` / `RenameDialog` are thin wrappers on it (`operation="create"` / `"rename"`) |
+| `CameraDialog.tsx` | Single-shot: the frame is written to a temp file and returned to the caller immediately, with no review/retake state. Mirroring is **preview-only and off by default**: `.camera-preview--mirrored` (`transform: scaleX(-1)`) is applied to the `<video>` only while the per-camera checkbox is on (`useCameraMirrorPreference` → `useCameraMirrorStore`, persisted by `deviceId`), and `captureVideoFrame()` in `useCameraCapture.ts` draws the frame unflipped in every state, so the saved JPEG is never mirrored (#42). Uses `initialFocusRef` + `initialFocusKey={canCapture}` + `trapFocus` – the reference case for all three |
+| `ScreenSelectDialog.tsx` | Not macOS-only and not feature-gated: the TerminalPanel toolbar opens it wherever screenshot capture is supported (macOS + Windows) whenever more than one display is connected |
+| `ScreenPermissionDialog.tsx` | macOS Screen Recording denial – shown only **after** a capture is actually denied, never as a pre-check gate |

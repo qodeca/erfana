@@ -302,7 +302,7 @@ test('should open project and display files', async () => {
 For reusable app setup, create a fixture:
 
 ```typescript
-// e2e/fixtures.ts
+// e2e/fixtures/index.ts
 import { test as base, _electron as electron, ElectronApplication, Page } from '@playwright/test'
 import path from 'path'
 

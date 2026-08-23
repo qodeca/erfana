@@ -1,6 +1,6 @@
 # Electron Builder configuration
 
-**Last updated**: August 2026 (v0.17.0)
+**Last updated**: August 2026 (v0.17.2)
 
 This document explains the electron-builder version choice, the `aproba` build-time shim, and the parts of `electron-builder.yml` that are easy to get wrong.
 
@@ -194,7 +194,7 @@ All of them fail loudly rather than silently widening the bundle.
 
 | Guard | Where | Checks |
 |-------|-------|--------|
-| `Guard - electron-builder packaging allowlist` | `.github/workflows/checks.yml`, `release-guards` job | Pure awk/grep against this YAML (the job is checkout-only — no `npm ci`, so no YAML parser is available): `afterPack:`/`afterSign:` wiring present, no platform-specific `files:` block, a `files:` block that has list items, at least one positive pattern, and no positive pattern whose first path segment is a wildcard. Also (issue #55) a coarse presence grep that hard-fails any `extraFiles:` block — at column 0 **or** indented under `mac:`/`win:` — and warns on `extraResources:` edits. |
+| `Guard - electron-builder packaging allowlist` | `.github/workflows/checks.yml`, `release-guards` job | Pure awk/grep against this YAML (the job is checkout-only — no `npm ci`, so no YAML parser is available): `afterPack:`/`afterSign:` wiring present, a `files:` block that has list items, at least one positive pattern, and no positive pattern whose first path segment is a wildcard. A platform-specific `files:` block is **warn-only** here (`::warning::`, no exit) — this shell scanner cannot parse a nested block, so the hard gate for it is the Unit-tests job's `electron-builder.yml` binding test, which reads `config.mac?.files` from the parsed YAML. Also (issue #55) a coarse presence grep that hard-fails any `extraFiles:` block — at column 0 **or** indented under `mac:`/`win:` — and warns on `extraResources:` edits. |
 | `assertConfigMatchesAllowlist()` + `assertPackagedAppContents()` | `scripts/fuses.js`, in `afterPack`, before signing | Derives the permitted entry set from the live config and compares it with `ALLOWED_APP_ENTRIES`, then walks the packed `app/` tree. See [fuses.md](./fuses.md#afterpack-also-verifies-the-packed-app-contents). |
 | `assertExtraContentAllowlist()` + `assertResourcesDestNoRepoLeak()` / `assertResourcesSiblingsAllowlist()` / `assertExtraFilesDestNoRepoLeak()` | `scripts/fuses.js`, in `afterPack`, before signing (issue #55) | Shape-checks the **merged** `extra*` config (top-level ∪ platform-scoped, so it sees `--config.win.*` overrides) against `ALLOWED_EXTRA_RESOURCES_DESTS` / the empty `ALLOWED_EXTRA_FILES_DESTS`, then walks the destinations beside and above `app/`. See [fuses.md § Extra-content destinations](./fuses.md#extra-content-destinations--extrafiles--extraresources-issue-55). |
 

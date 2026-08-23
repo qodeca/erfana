@@ -1,107 +1,81 @@
-# Testing Strategy
+# Testing strategy
 
-> Test coverage and testing scenarios for drag-drop operations
+> Where drag-drop behaviour is covered, and what is left to manual checks
 
 [← Back to Drag-Drop Overview](./README.md)
 
-## Testing Strategy
+## Automated coverage
 
-### Unit Tests (Pending Implementation)
+All of the suites below are implemented and green. Counts were measured with
+`npx vitest run <file>`; re-measure rather than trusting them if the code has
+moved on.
 
-**FileService.moveItem.test.ts** (15 tests):
-- ✓ Same filesystem move (fs.rename)
-- ✓ Cross-filesystem move (EXDEV fallback)
-- ✓ Circular move prevention
-- ✓ Project root protection
-- ✓ Same-location prevention
-- ✓ Name sanitization
-- ✓ Directory move with children
-- ✓ File move preserves timestamps
-- ✓ Error handling for missing source
-- ✓ Error handling for invalid target
-- ✓ Path traversal prevention
-- ✓ Outside-project boundary checks
-- ✓ Rename during move
-- ✓ Directory permissions errors
-- ✓ File permissions errors
+| Suite | Tests | Covers |
+|---|---|---|
+| `src/main/services/FileService.moveItem.test.ts` | 20 | Basic move operations, validation constraints, rename during move, name-conflict handling, error handling, cross-filesystem (EXDEV) fallback, `replaceExisting` |
+| `src/main/services/FileService.copyItem.test.ts` | 13 | Basic copy operations, auto-numbering for name conflicts, validation constraints, error handling, copy to the same location |
+| `src/main/services/FileService.copyItem.limit.test.ts` | 2 | `MAX_COPY_ATTEMPTS` overflow guard |
+| `src/renderer/src/hooks/useDragDropTree.test.ts` | 46 | `flattenTree` (incl. invariant guard and at-scale behaviour, #60), `buildTree`, `isDescendant`, `getProjection` (with and without the optional node index), the node index itself, flatten timing instrumentation, `canMoveItem` |
+| `src/renderer/src/stores/useClipboardStore.test.ts` | 21 | `cut`, `copy`, `paste` (incl. the `replaceExisting` parameter), `clear`, `hasClipboard`, `getOperation` |
+| `src/renderer/src/components/ProjectTree/ProjectTree.lookup.test.tsx` | 13 | Node lookup used by the tree's drag targets |
 
-**FileService.copyItem.test.ts** (12 tests):
-- ✓ Simple file copy
-- ✓ Directory copy with children
-- ✓ Auto-numbering (1), (2), (3)
-- ✓ Auto-numbering preserves extension
-- ✓ Copy to same location creates (1)
-- ✓ Copy preserves timestamps
-- ✓ Overflow safety (1000 limit)
-- ✓ Outside-project boundary checks
-- ✓ Name sanitization
-- ✓ Error handling for missing source
-- ✓ Error handling for invalid target
-- ✓ Directory permissions errors
+The overflow guard lives in its own file because its mocks hoist to module
+scope; see the test-file split policy in
+[`docs/windows/contributing.md`](../windows/contributing.md).
 
-**useDragDropTree.test.ts** (10 tests):
-- ✓ flattenTree preserves hierarchy metadata
-- ✓ buildTree reconstructs from flattened
-- ✓ getProjection calculates correct depth
-- ✓ getProjection handles root level
-- ✓ getProjection handles deeper nesting
-- ✓ getProjection handles shallower nesting
-- ✓ isDescendant detects circular moves
-- ✓ isDescendant handles edge cases
-- ✓ canMoveItem validates all constraints
-- ✓ canMoveItem prevents project root move
+Run everything at once:
 
-**useClipboardStore.test.ts** (8 tests):
-- ✓ cut() sets clipboard state
-- ✓ copy() sets clipboard state
-- ✓ paste() with cut clears clipboard
-- ✓ paste() with copy keeps clipboard
-- ✓ hasClipboard() detection
-- ✓ clear() resets state
-- ✓ paste() calls correct API (move vs copy)
-- ✓ paste() handles errors
+```bash
+npx vitest run \
+  src/main/services/FileService.moveItem.test.ts \
+  src/main/services/FileService.copyItem.test.ts \
+  src/main/services/FileService.copyItem.limit.test.ts \
+  src/renderer/src/hooks/useDragDropTree.test.ts \
+  src/renderer/src/stores/useClipboardStore.test.ts \
+  src/renderer/src/components/ProjectTree/ProjectTree.lookup.test.tsx
+```
 
-**ProjectTree.dragdrop.test.tsx** (12 integration tests):
-- ✓ Drag file to folder shows drop indicator
-- ✓ Drag folder to folder shows drop indicator
-- ✓ Drop executes move operation
-- ✓ Invalid drop shows error toast
-- ✓ Keyboard cut (Ctrl+X) sets clipboard
-- ✓ Keyboard copy (Ctrl+C) sets clipboard
-- ✓ Keyboard paste (Ctrl+V) executes operation
-- ✓ Context menu cut/copy/paste
-- ✓ Watcher pauses during operation
-- ✓ Tree refreshes after operation
-- ✓ ARIA announcements for all operations
-- ✓ Visual feedback (opacity, outlines, indicators)
+## Gaps
 
-### Manual Testing Scenarios (Pending)
+- **No end-to-end drag-drop spec.** None of the 20 files in `e2e/` drives an
+  actual drag gesture over the project tree, so the pointer-level interaction
+  (drop indicator, drag overlay, ARIA announcements) is only covered by the unit
+  tests behind it. The scenarios below therefore stay manual.
+- **Terminal drag-drop** (dropping paths into the terminal) is a separate
+  feature with its own coverage in
+  `src/renderer/src/components/Panels/TerminalPanel/hooks/useTerminalDragDrop.test.ts`
+  – see [Terminal](../terminal/README.md).
+
+## Manual test scenarios
 
 **Drag-drop operations**:
-1. Drag file to folder (should move file into folder)
-2. Drag folder to folder (should move folder into folder)
-3. Drag folder into its own subfolder (should show error)
-4. Drag item and drop in same location (should do nothing)
-5. Drag item while watcher is active (should pause/resume correctly)
-6. Drag file to root level (horizontal drag left)
-7. Drag file to nested level (horizontal drag right)
+
+1. Drag a file onto a folder (moves the file into the folder)
+2. Drag a folder onto a folder (moves the folder into the folder)
+3. Drag a folder into its own subfolder (shows an error)
+4. Drag an item and drop it in the same location (does nothing)
+5. Drag while the watcher is active (pauses and resumes correctly)
+6. Drag a file to root level (horizontal drag left)
+7. Drag a file to a nested level (horizontal drag right)
 
 **Keyboard shortcuts**:
-1. Select file → Ctrl+X → Select folder → Ctrl+V (should move)
-2. Select file → Ctrl+C → Select folder → Ctrl+V twice (should copy twice with numbering)
-3. Select folder → Ctrl+X → Select its parent → Ctrl+V (should move out)
-4. No selection → Ctrl+X (should do nothing)
-5. Cut item → switch selection → Ctrl+V (should paste at new location)
+
+1. Select file, Ctrl+X, select folder, Ctrl+V (moves)
+2. Select file, Ctrl+C, select folder, Ctrl+V twice (copies twice with numbering)
+3. Select folder, Ctrl+X, select its parent, Ctrl+V (moves out)
+4. No selection, Ctrl+X (does nothing)
+5. Cut an item, change selection, Ctrl+V (pastes at the new location)
 
 **Conflict resolution**:
-1. Copy file where name exists (should auto-number)
-2. Move file where name exists (should show confirm dialog)
-3. Cancel confirm dialog (should abort operation)
-4. Confirm overwrite (should replace file)
-5. Copy 1000 times (should hit overflow limit)
+
+1. Copy a file where the name already exists (auto-numbers)
+2. Move a file where the name already exists (shows the confirm dialog)
+3. Cancel the confirm dialog (aborts the operation)
+4. Confirm overwrite (replaces the file)
+5. Copy past the attempt limit (hits the overflow guard)
 
 **Cross-platform**:
-1. Move file on same volume (should use fs.rename)
-2. Move file across volumes (should use copy+delete fallback)
-3. Case-insensitive conflict (README.md vs readme.md on macOS)
 
+1. Move a file on the same volume (uses `fs.rename`)
+2. Move a file across volumes (uses the copy + delete fallback)
+3. Case-insensitive conflict (`README.md` vs `readme.md` on macOS)

@@ -134,7 +134,7 @@ Screenshot-based comparison for 5 core UI states:
 - `maxDiffPixelRatio: 0.01`, `retries: 0` (diffs must be investigated, not retried)
 - CI records video on failure for debugging
 
-See `specs/spec-t2-019-visual-regression-ci/` for full specification.
+See `specs/archived/spec-t2-019-visual-regression-ci/` for the full specification (archived spec).
 
 ### Coverage
 - Generate per-project coverage reports: `npm run test:cov`

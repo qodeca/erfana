@@ -91,7 +91,7 @@ For historical reference, when the workflow was active it ran on `push` to `deve
 
 **Status**: not running on CI — the entire `e2e.yml` workflow is disabled (see [E2E Tests (disabled)](#e2e-tests-e2eyml-disabled) above). Even when re-enabled, the visual suite would still need to be scoped out via `--project=electron` until the root cause below is resolved. Runs locally only today.
 
-**Symptom**: `page.waitForLoadState('domcontentloaded')` times out at 30s in `e2e/fixtures.ts:357` (`visualWindow`) and `:408` (`visualWindowWithProject`).
+**Symptom**: `page.waitForLoadState('domcontentloaded')` times out at 30s in the `visualWindow` and `visualWindowWithProject` fixtures (`e2e/fixtures/index.ts`).
 
 **What's known**:
 - Electron launches successfully on CI (main process, BrowserWindow, resize all work)
