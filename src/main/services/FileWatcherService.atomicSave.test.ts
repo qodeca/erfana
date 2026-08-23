@@ -17,8 +17,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { FileWatcherService } from './FileWatcherService'
 import { WATCH_DEAD_OUTSIDE_PROJECT, WATCH_DEAD_SESSION_ENDED } from './watcher/atomicRearm'
 
-const PROJECT = '/proj'
-const FILE = '/proj/icon.svg'
 const DETECTOR_WINDOW_MS = 100
 const DEBOUNCE_MS = 300
 
@@ -29,14 +27,63 @@ interface FakeWatcher {
   on: (event: string, handler: (arg?: unknown) => void) => FakeWatcher
 }
 
-const { sends, filesOnDisk, canonicalPaths, createdWatchers, watchHooks } = vi.hoisted(() => ({
-  sends: [] as Array<{ id: number; channel: string; payload: Record<string, unknown> }>,
-  filesOnDisk: new Set<string>(),
-  /** Path -> what `realpath` resolves it to, i.e. the fixture's symlinks. */
-  canonicalPaths: new Map<string, string>(),
-  createdWatchers: [] as FakeWatcher[],
-  watchHooks: { onCreate: null as ((watcher: FakeWatcher) => void) | null }
-}))
+/**
+ * Fixture paths are built for the host platform rather than hard-coded POSIX.
+ *
+ * The re-arm re-checks project confinement, and `classifyConfinement` compares
+ * `path.resolve`d paths. `path.resolve('/proj')` is `/proj` on macOS but
+ * `<drive>:\proj` on Windows, so a POSIX literal makes the `realpath` calls miss
+ * the mock below and reach the real filesystem: the `canonicalPaths` symlink
+ * fixture is bypassed, and real fs I/O is not guaranteed to settle inside
+ * `vi.advanceTimersByTimeAsync`, so the re-arm is still pending when the
+ * assertions run. Every fixture path therefore lives under one fake root in the
+ * host's own absolute form, which `path.resolve` returns unchanged on both
+ * platforms - and which the mock can recognise, so no fixture path ever reaches
+ * the real filesystem.
+ */
+const {
+  PROJECT,
+  OTHER_PROJECT,
+  FILE,
+  OUTSIDE_TARGET,
+  isFixturePath,
+  isFixtureDir,
+  sends,
+  filesOnDisk,
+  canonicalPaths,
+  createdWatchers,
+  watchHooks
+} = vi.hoisted(() => {
+  const isWindows = process.platform === 'win32'
+  const sep = isWindows ? '\\' : '/'
+  /** `/a/b` -> `/a/b` on POSIX, `C:\a\b` on Windows. Both are resolve-stable. */
+  const native = (posixPath: string): string =>
+    isWindows ? `C:${posixPath.split('/').join(sep)}` : posixPath
+
+  const FIXTURE_ROOT = native('/erfana-watch-fixture')
+  const PROJECT = native('/erfana-watch-fixture/proj')
+  const OTHER_PROJECT = native('/erfana-watch-fixture/other')
+
+  return {
+    PROJECT,
+    OTHER_PROJECT,
+    FILE: native('/erfana-watch-fixture/proj/icon.svg'),
+    /** Where the confinement fixture's symlink points, outside the project. */
+    OUTSIDE_TARGET: native('/erfana-watch-fixture/elsewhere/secret.txt'),
+    /** Is this a path the fixture owns, i.e. one the fs mock must answer? */
+    isFixturePath: (key: string): boolean =>
+      key === FIXTURE_ROOT || key.startsWith(FIXTURE_ROOT + sep),
+    /** Directories the fixture pretends exist; files follow `filesOnDisk`. */
+    isFixtureDir: (key: string): boolean =>
+      key === FIXTURE_ROOT || key === PROJECT || key === OTHER_PROJECT,
+    sends: [] as Array<{ id: number; channel: string; payload: Record<string, unknown> }>,
+    filesOnDisk: new Set<string>(),
+    /** Path -> what `realpath` resolves it to, i.e. the fixture's symlinks. */
+    canonicalPaths: new Map<string, string>(),
+    createdWatchers: [] as FakeWatcher[],
+    watchHooks: { onCreate: null as ((watcher: FakeWatcher) => void) | null }
+  }
+})
 
 vi.mock('electron', () => {
   const mkWin = (id: number) => ({
@@ -69,8 +116,8 @@ vi.mock('chokidar', () => ({
   }
 }))
 
-// Only paths under the fake project are controlled by `filesOnDisk`; everything
-// else (log rotation, for instance) keeps the real implementation.
+// Only fixture paths are controlled by `filesOnDisk`; everything else (log
+// rotation, for instance) keeps the real implementation.
 //
 // `realpath` is mocked alongside `stat` because the re-arm re-checks project
 // confinement before binding a new watcher: leaving it real would send the
@@ -79,12 +126,11 @@ vi.mock('fs/promises', async importOriginal => {
   const actual = await importOriginal<typeof import('fs/promises')>()
   const missing = (key: string): Error =>
     Object.assign(new Error(`ENOENT: ${key}`), { code: 'ENOENT' })
-  const isFake = (key: string): boolean => key === PROJECT || key.startsWith(`${PROJECT}/`)
   return {
     ...actual,
     stat: async (target: unknown, ...rest: unknown[]) => {
       const key = String(target)
-      if (!key.startsWith(`${PROJECT}/`)) {
+      if (!isFixturePath(key)) {
         return (actual.stat as (...args: unknown[]) => Promise<unknown>)(target, ...rest)
       }
       if (!filesOnDisk.has(key)) {
@@ -94,12 +140,12 @@ vi.mock('fs/promises', async importOriginal => {
     },
     realpath: async (target: unknown, ...rest: unknown[]) => {
       const key = String(target)
-      if (!isFake(key)) {
+      if (!isFixturePath(key)) {
         return (actual.realpath as (...args: unknown[]) => Promise<unknown>)(target, ...rest)
       }
-      // The fake project root always resolves; its files follow `filesOnDisk`
-      // and canonicalise to themselves unless a fixture made one a symlink.
-      if (key !== PROJECT && !filesOnDisk.has(key)) {
+      // Fixture directories always resolve; files follow `filesOnDisk` and
+      // canonicalise to themselves unless a fixture made one a symlink.
+      if (!isFixtureDir(key) && !filesOnDisk.has(key)) {
         throw missing(key)
       }
       return canonicalPaths.get(key) ?? key
@@ -272,7 +318,7 @@ describe('FileWatcherService re-arm bail-outs', () => {
 
     first.handlers.unlink()
     // Project switch inside the 100 ms window
-    service.setProjectPath('/other')
+    service.setProjectPath(OTHER_PROJECT)
     await closeDetectorWindow()
     await flushDebounce()
 
@@ -323,7 +369,7 @@ describe('FileWatcherService re-arm confinement', () => {
     // file for a symlink pointing out of the project; the re-arm re-checks with
     // realpath rather than trusting `watchFile`'s lexical entry check.
     const first = await startWatch()
-    canonicalPaths.set(FILE, '/elsewhere/secret.txt')
+    canonicalPaths.set(FILE, OUTSIDE_TARGET)
 
     first.handlers.unlink()
     await closeDetectorWindow()
