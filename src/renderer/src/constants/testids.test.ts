@@ -288,10 +288,10 @@ describe('TEST_IDS', () => {
       expect(ids).toHaveLength(5)
     })
 
-    it('should have 12 Image Viewer IDs', async () => {
+    it('should have 15 Image Viewer IDs', async () => {
       const { TEST_IDS } = await getTestIds()
       const ids = Object.keys(TEST_IDS).filter((k) => k.startsWith('IMAGE_VIEWER_'))
-      expect(ids).toHaveLength(12)
+      expect(ids).toHaveLength(15)
     })
 
     it('should have 4 Mermaid Toolbar IDs', async () => {

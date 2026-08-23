@@ -8,26 +8,8 @@ import { RollbackHandler } from '../utils/RollbackHandler'
 import { assertValidUserFilename } from '../utils/validateFilename'
 import { DEFAULT_TREE_HIDDEN_PATTERNS } from '../../shared/constants'
 import { logger } from './LoggingService'
-
-/**
- * Supported image extensions for readFileAsBase64.
- * Matches IMAGE_EXTENSIONS in renderer/src/utils/imageUtils.ts
- */
-const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp', '.ico']
-
-/**
- * MIME type mapping for image extensions.
- */
-const MIME_TYPES: Record<string, string> = {
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.gif': 'image/gif',
-  '.webp': 'image/webp',
-  '.svg': 'image/svg+xml',
-  '.bmp': 'image/bmp',
-  '.ico': 'image/x-icon'
-}
+import { IMAGE_EXTENSIONS, readImage } from './file/imageRead'
+import type { ImageReadResponse } from '../../shared/ipc/file-image-schema'
 
 export interface FileNode {
   name: string
@@ -201,47 +183,24 @@ export class FileService implements IFileService {
   }
 
   /**
-   * Read a file and return it as a base64-encoded data URL.
+   * Read an image as a base64 data URL, or report it as unchanged.
    *
-   * Used by ImageViewerPanel to load images in the sandboxed renderer.
-   * Constructs a data URL like: data:image/png;base64,iVBORw0KGgo...
+   * Used by ImageViewerPanel, which re-reads on every disk change (#70). Pass
+   * the `version` from a previous call as `knownVersion` and an unchanged file
+   * answers `{ status: 'unchanged' }` without the ~100-200 ms blocking encode
+   * and the multi-MB IPC payload. Omit it to force a full read.
    *
    * @param filePath - Absolute path to the image file
-   * @returns Data URL string for use in <img src="...">
-   * @throws Error if file doesn't exist or is not a supported image type
+   * @param knownVersion - Opaque version the caller already holds bytes for
+   * @returns The bytes plus their version, or `unchanged` plus that same version
+   * @throws Error if the file is missing, unsupported or over the 50 MB cap
    *
-   * @example
-   * ```ts
-   * const dataUrl = await fileService.readFileAsBase64('/path/to/image.png');
-   * // Returns: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB..."
-   * ```
+   * @see readImage in ./file/imageRead for why the stat precedes the read
    */
-  async readFileAsBase64(filePath: string): Promise<string> {
-    const ext = extname(filePath).toLowerCase()
-
-    // Validate file extension
-    if (!IMAGE_EXTENSIONS.includes(ext)) {
-      throw new Error(`Unsupported image format: ${ext}`)
-    }
-
-    // Security: Limit file size to prevent memory exhaustion (DoS)
-    // Base64 encoding increases size by ~33%, so 50MB file becomes ~67MB string
-    const MAX_IMAGE_SIZE = 50 * 1024 * 1024 // 50 MB
-    const stats = await stat(filePath)
-    if (stats.size > MAX_IMAGE_SIZE) {
-      const sizeMB = (stats.size / (1024 * 1024)).toFixed(1)
-      throw new Error(`Image file too large (${sizeMB} MB). Maximum size is 50 MB.`)
-    }
-
-    // Get MIME type
-    const mimeType = MIME_TYPES[ext] || 'application/octet-stream'
-
-    // Read file as buffer and convert to base64
-    const buffer = await readFile(filePath)
-    const base64 = buffer.toString('base64')
-
-    return `data:${mimeType};base64,${base64}`
+  async readImage(filePath: string, knownVersion?: string): Promise<ImageReadResponse> {
+    return await readImage(filePath, knownVersion)
   }
+
 
   async createFile(dirPath: string, fileName: string): Promise<string> {
     // Strip path separators FIRST — prevents `../../etc/passwd` style traversal

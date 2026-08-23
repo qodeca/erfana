@@ -47,17 +47,13 @@ import { DocumentStatsBar } from './DocumentStatsBar'
 
 // Types and pure functions
 import type { ViewMode, EditorFile } from '../Editor/MarkdownEditorPanel/types'
-import {
-  calculateStats,
-  extractFileName,
-  formatTabTitle,
-  getDefaultViewMode
-} from './markdownEditorPanel.logic'
+import { calculateStats, extractFileName, getDefaultViewMode } from './markdownEditorPanel.logic'
+import { formatTabTitle } from '../../utils/tabTitle'
+
+// Shared constants
+import { INDICATOR_DURATION_MS } from '../../constants/fileWatch'
 
 import './MarkdownEditorPanel.css'
-
-/** Duration to show auto-save indicator in milliseconds */
-const INDICATOR_DURATION_MS = 1000
 
 /**
  * Props passed to the MarkdownEditorPanel via Dockview.
@@ -431,6 +427,13 @@ export function MarkdownEditorPanel(
     }
 
     const fileName = extractFileName(targetFilePath)
+    // DEFERRED: migrating this call site to `openFileInPanel` is the optional
+    // commit 6b of the #70 plan and was consciously not taken - it would change
+    // behaviour (an `[x](diagram.svg)` link would open the image viewer instead
+    // of the SVG source in Monaco) with no acceptance criterion asking for it,
+    // and no "Open as text" escape hatch exists yet. Until that lands this stays
+    // the one hand-built panel id in the renderer.
+    // eslint-disable-next-line no-restricted-syntax -- see DEFERRED note above
     const panelId = `editor-${sanitizeFilePath(targetFilePath)}`
 
     // Check if already open

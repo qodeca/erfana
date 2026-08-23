@@ -14,10 +14,8 @@ import { ProjectTree } from '../ProjectTree/ProjectTree'
 import { PanelErrorBoundary } from './PanelErrorBoundary'
 import { useProjectManagementContextSafe } from '../../context/ProjectManagementContext'
 import type { FilterMode } from '../../types/filters'
-import { sanitizeFilePath, getBasename } from '../../utils/fileUtils'
-import { isImageFile } from '../../utils/imageUtils'
+import { openFileInPanel } from '../../utils/openFileInPanel'
 import './ProjectPanel.css'
-import { useProjectStore } from '../../stores/useProjectStore'
 import { logger } from '../../utils/logger'
 
 /**
@@ -71,8 +69,14 @@ export function ProjectPanel(props: ISplitviewPanelProps) {
     }
   }, [])
 
+  /**
+   * Opens the selected file in the appropriate panel.
+   *
+   * Delegates to the shared router so an image opens in the image viewer and
+   * anything else opens in the editor – the same decision the terminal makes.
+   */
   const handleFileSelect = (filePath: string) => {
-    // Get DockviewApi from params (passed by parent)
+    // dockviewApi is passed down by the parent through splitview params.
     const dockviewApi = props.params?.dockviewApi as DockviewApi | undefined
 
     if (!dockviewApi) {
@@ -80,51 +84,7 @@ export function ProjectPanel(props: ISplitviewPanelProps) {
       return
     }
 
-    const fileName = getBasename(filePath) || 'File'
-
-    // Check if the file is an image - open in ImageViewerPanel instead of editor
-    if (isImageFile(filePath)) {
-      const panelId = `image-${sanitizeFilePath(filePath)}`
-
-      // Check if panel already exists
-      let imagePanel = dockviewApi.getPanel(panelId)
-
-      if (!imagePanel) {
-        imagePanel = dockviewApi.addPanel({
-          id: panelId,
-          component: 'imageViewer',
-          title: fileName,
-          tabComponent: 'imageTab',
-          params: { filePath, panelId }
-        })
-        // Track opened panel id for later cleanup
-        useProjectStore.getState().registerEditorPanel(panelId)
-      }
-
-      imagePanel.api.setActive()
-      imagePanel.group.focus()
-      return
-    }
-
-    // Default: open as markdown editor
-    const panelId = `editor-${sanitizeFilePath(filePath)}`
-
-    let editorPanel = dockviewApi.getPanel(panelId)
-
-    if (!editorPanel) {
-      editorPanel = dockviewApi.addPanel({
-        id: panelId,
-        component: 'editor',
-        title: fileName,
-        tabComponent: 'editorTab',
-        params: { filePath, panelId }
-      })
-      // Track opened editor panel id for later cleanup
-      useProjectStore.getState().registerEditorPanel(panelId)
-    }
-
-    editorPanel.api.setActive()
-    editorPanel.group.focus()
+    openFileInPanel(dockviewApi, filePath)
   }
 
   return (

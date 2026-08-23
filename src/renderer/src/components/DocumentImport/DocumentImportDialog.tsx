@@ -28,7 +28,8 @@ import { useProjectStore } from '../../stores/useProjectStore'
 import { OcrLanguageSelect } from './OcrLanguageSelect'
 import { TEST_IDS } from '../../constants/testids'
 import { BaseDialog } from '../Dialog/BaseDialog'
-import { sanitizeFilePath, getBasename } from '../../utils/fileUtils'
+import { getBasename } from '../../utils/fileUtils'
+import { getFilePanelId } from '../../utils/openFileInPanel'
 import { triggerOrganizePrompt } from '../../hooks/useImport'
 import { useTerminalPortalOptional } from '../../context/TerminalPortalContext'
 import { logger } from '../../utils/logger'
@@ -140,7 +141,9 @@ export function DocumentImportDialog(): JSX.Element | null {
       const dockviewApi = useProjectStore.getState().dockviewApi
       if (dockviewApi) {
         const panelTitle = getBasename(outputPath) || 'Document'
-        const panelId = `editor-${sanitizeFilePath(outputPath)}`
+        // One source of panel ids (issue #70). The output is always `.md`, so
+        // this resolves to the same `editor-...` id as before.
+        const panelId = getFilePanelId(outputPath)
 
         let editorPanel = dockviewApi.getPanel(panelId)
         if (!editorPanel) {

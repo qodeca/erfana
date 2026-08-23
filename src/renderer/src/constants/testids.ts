@@ -401,7 +401,7 @@ export const TEST_IDS = {
   DIAGRAM_VIEWER_BTN_CHAT: 'diagram-viewer-btn-chat',
 
   // =========================================================================
-  // Image Viewer Panel (12)
+  // Image Viewer Panel (15)
   // =========================================================================
 
   /** Image viewer panel container */
@@ -428,6 +428,12 @@ export const TEST_IDS = {
   IMAGE_VIEWER_FULLSCREEN: 'image-viewer-fullscreen',
   /** Full screen content area */
   IMAGE_VIEWER_FULLSCREEN_CONTENT: 'image-viewer-fullscreen-content',
+  /** Refresh status slot (permanently mounted live region, issue #70) */
+  IMAGE_VIEWER_STATUS: 'image-viewer-status',
+  /** Deleted / auto-refresh-unavailable banner (issue #70) */
+  IMAGE_VIEWER_DELETED_BANNER: 'image-viewer-deleted-banner',
+  /** Reload button inside the degraded-state banner (issue #70) */
+  IMAGE_VIEWER_BTN_RELOAD: 'image-viewer-btn-reload',
 
   // =========================================================================
   // Chat Bubble (15)

@@ -20,9 +20,11 @@ import { useProjectStore } from '../../stores/useProjectStore'
 import { useDialog } from '../Dialog'
 import { ContextMenu } from '../ContextMenu/ContextMenu'
 import { useTabContextMenu } from './useTabContextMenu'
+import { useTabTitle } from './useTabTitle'
 import { useProjectManagementContext } from '../../context/ProjectManagementContext'
 import { TEST_IDS, getDynamicTestId } from '../../constants/testids'
 import { getBasename, getDisplayRelativePath } from '../../utils/fileUtils'
+import { DELETED_TAB_MARKER } from '../../utils/tabTitle'
 import './EditorTab.css'
 
 interface EditorTabParams {
@@ -50,10 +52,17 @@ export function EditorTab(props: IDockviewPanelHeaderProps<EditorTabParams>) {
   // Get context menu items
   const contextMenuItems = useTabContextMenu(panelId, () => setContextMenu(null))
 
-  // Get filename and tooltip content with relative path
+  // Get filename and tooltip content with relative path. The LABEL comes from
+  // the panel's live title, so the editor's "(deleted)" marker actually renders
+  // - it used to be set via `api.setTitle` and read by nobody (issue #70). The
+  // unsaved-changes bullet is NOT taken from the title: this tab draws its own
+  // indicator from the store, and both would show at once.
   const fileName = getBasename(filePath) || 'Untitled'
+  const { label, isDeleted } = useTabTitle(api, fileName)
   const relativePath = getDisplayRelativePath(filePath, projectPath)
-  const tooltipContent = `${fileName}\n${relativePath}`
+  const tooltipContent = isDeleted
+    ? `${fileName} ${DELETED_TAB_MARKER}\n${relativePath}`
+    : `${fileName}\n${relativePath}`
 
   /**
    * Handle close with dirty file confirmation
@@ -131,7 +140,10 @@ export function EditorTab(props: IDockviewPanelHeaderProps<EditorTabParams>) {
               data-testid={getDynamicTestId(TEST_IDS.TAB_DIRTY, filePath)}
             />
           )}
-          <span className="editor-tab-filename">{fileName}</span>
+          <span className="editor-tab-filename">
+            {label}
+            {isDeleted && <span className="editor-tab-deleted"> {DELETED_TAB_MARKER}</span>}
+          </span>
         </span>
 
         <button

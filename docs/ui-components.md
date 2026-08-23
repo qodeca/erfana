@@ -409,22 +409,32 @@ The invariant is pinned by `src/renderer/src/hooks/useProjectManagement.noAutoLo
 
 ## Image Viewer Panel
 
-**Location**: `src/renderer/src/components/Panels/ImageViewerPanel.tsx`
+**Location**: `src/renderer/src/components/Panels/ImageViewerPanel/` (a folder since #70; the panel, its CSS module and `imageViewer.logic.ts` all moved out of `Panels/`)
 
-Opens when clicking image files (PNG, JPG, GIF, WebP, SVG, BMP, ICO) in project tree.
+Opens when clicking image files (PNG, JPG, GIF, WebP, SVG, BMP, ICO) in the project tree, or an image path in the terminal — both go through `src/renderer/src/utils/openFileInPanel.ts` (#70).
 
 **Features**:
 - Zoom controls: buttons, mouse wheel (cursor-centered), keyboard (+/-)
 - Pan via click-drag or arrow keys
 - Fit to view with auto-scale on resize
 - Full-screen mode with portal overlay and focus trap
-- Metadata display: dimensions, file size, format
+- Metadata display: dimensions, file size, format, `Updated hh:mm:ss` stamp
+- **Live refresh on external change** (#70): decode-first, so the old image stays painted until the new one is ready — no blank frame, no unmount, one React commit for `src` + `transform`. Zoom and pan are preserved unless the image's intrinsic dimensions changed; the view resets to fit only then
+- **Degraded states** (#70): a permanently mounted `role="status"` slot (`idle` / `reloading` / `unavailable`) carrying `Reloaded from disk` or `Auto-refresh unavailable`, and a `role="alert"` banner with a single **Reload** action for the deleted and watch-unavailable cases. The tab is renamed `icon.svg (deleted)` via the shared `formatTabTitle` helper (`src/renderer/src/utils/tabTitle.ts`), the same one the Markdown editor uses
 - Accessibility: ARIA labels, keyboard navigation, prefers-reduced-motion
 
 **Architecture**:
-- `ImageViewerPanel.tsx` - Main component with state management
+- `ImageViewerPanel.tsx` - Panel shell: hook glue, render states, tab title
+- `components/ImageViewerToolbar.tsx` - Metadata group, status slot, zoom controls, fullscreen button
+- `components/ImageViewerBanner.tsx` - Degraded-state banner + Reload
+- `hooks/useImageSource.ts` - Decode-first load/refresh, generation counter, visibility-deferred re-read
+- `hooks/useImageViewerTransform.ts` - Zoom/pan/wheel/keyboard/ResizeObserver behind a `getActiveContainer` seam; `applySourceChange` decides preserve-vs-reset
+- `hooks/useFullScreenOverlay.ts` - Open/close, portal-root guard, focus trap
 - `imageViewer.logic.ts` - Pure functions for zoom, pan, keyboard actions
-- `imageUtils.ts` - Image format detection, MIME types
+- `imageViewerStatus.logic.ts` - Status precedence, clock formatting, all copy constants
+- `ImageViewerPanel.module.css` - The one remaining CSS module in the app
+- `imageUtils.ts` (in `utils/`) - Image format detection, MIME types
+- Watch subscription comes from `src/renderer/src/hooks/useFileChangeSubscription.ts` — see [File Watching](./file-watching/README.md#single-file-watch-internals-70)
 
 **Toolbar**: Zoom -, Zoom level %, Zoom +, Fit, Reset, Fullscreen
 

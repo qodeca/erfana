@@ -9,6 +9,7 @@ import type { DocxExportRequest, DocxExportResponse } from '../shared/ipc/docx-s
 import type { GlobalSettings, GlobalSettingsChanged } from '../shared/ipc/global-settings-schema'
 import type { LogEntry } from '../shared/ipc/logging-schema'
 import type { LockResult, LockStatus } from '../shared/ipc/project-lock-schema'
+import type { ImageReadResponse } from '../shared/ipc/file-image-schema'
 import type {
   ScreenshotCaptureRequest,
   ScreenshotCaptureResponse,
@@ -77,10 +78,11 @@ declare global {
           error?: string
         }>
         /**
-         * Read a file as base64-encoded data URL
+         * Read an image, or learn it has not changed since `knownVersion`
          * @see Spec #015 - Image preview viewer specification
+         * @see Issue #70 - preview tabs show stale content when the file changes
          */
-        readAsBase64: (filePath: string) => Promise<string>
+        readImage: (filePath: string, knownVersion?: string) => Promise<ImageReadResponse>
         /**
          * Validate an external file for drop into project
          * @see Spec #012 - External file drop to project tree

@@ -30,7 +30,6 @@ import {
   isSplitMode,
   extractFileName,
   extractBaseFileName,
-  formatTabTitle,
   isMarkdownFile,
   getDefaultViewMode
 } from './markdownEditorPanel.logic'
@@ -701,24 +700,6 @@ describe('extractBaseFileName', () => {
 
   it('should handle file without extension', () => {
     expect(extractBaseFileName('/path/to/README')).toBe('README')
-  })
-})
-
-describe('formatTabTitle', () => {
-  it('should return plain file name when not modified and not deleted', () => {
-    expect(formatTabTitle('doc.md', false, false)).toBe('doc.md')
-  })
-
-  it('should add bullet when modified', () => {
-    expect(formatTabTitle('doc.md', true, false)).toBe('● doc.md')
-  })
-
-  it('should add (deleted) suffix when deleted', () => {
-    expect(formatTabTitle('doc.md', false, true)).toBe('doc.md (deleted)')
-  })
-
-  it('should prefer deleted over modified indicator', () => {
-    expect(formatTabTitle('doc.md', true, true)).toBe('doc.md (deleted)')
   })
 })
 

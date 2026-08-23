@@ -353,6 +353,120 @@ After the heartbeat hardening (Phase A4 resume-refresh, B1 symlink defense, D3 H
 
 ---
 
+### 24. `FileWatcherService.watchFile` confinement check is text-only and unresolved (#70, 2026-08)
+
+**Severity**: Medium — it is a main-process security boundary, though a notification-only one.
+
+**Impact**: `watchFile` gates on `filePath.startsWith(this.projectPath)` (`FileWatcherService.ts:112`) — no `path.resolve`, no trailing separator, and no `fs.realpath`. It is wrong in both directions: `/proj-evil/x.png` **passes** when the project is `/proj` (prefix match without a separator), and `/proj/../p2/x.png` fails closed. The read handlers next to it (`file:readFile`, `file:readImage`) went through `assertInsideProject` in #70 and now do the two-stage lexical + canonical check.
+
+**Why it was left alone in #70**: it is a shared boundary used by every watcher consumer and deserves its own tests and review pass rather than a drive-by edit inside a bugfix. The exposure is bounded — watching is a notification side channel, the *content* read behind it goes through the stricter guard, and the atomic re-arm path already re-validates the path with `classifyConfinement` before rebuilding a watcher (`watcher/atomicRearm.ts` → `AtomicRearmDeps.isPathConfined`).
+
+**Recommended Solution**: route `watchFile` through `assertInsideProject` from `src/main/utils/projectConfinement.ts`, keeping the existing "file does not exist" throw (the guard lets a `missing` verdict through on purpose).
+
+**Files**: `src/main/services/FileWatcherService.ts` (`watchFile`), `src/main/utils/projectConfinement.ts`.
+
+**Status**: Open — recorded by the #70 design (§9.1) and its review rounds. **A follow-up issue should be filed.**
+
+---
+
+### 25. `file:getStats` is exempt from project confinement (#70, 2026-08)
+
+**Severity**: Low
+
+**Impact**: `file:getStats` is guarded by `assertNoConfinementEscape`, not `assertInsideProject`: a path that was never in the project is served, and only a path that *looks* in-project while canonically resolving out of it is refused. Every other read channel is fully confined.
+
+**Problem**: The carve-out is load-bearing, not an oversight. The external-file import shortcut (spec #012, `ProjectTree.handleImportShortcut`) stats the paths the user picked in the native file dialog, and those are outside the project by definition — confining the channel would break that flow. The weaker guard still closes the part #70 needed: the watcher's automatic re-stat of a watched, in-project path cannot be redirected through a symlink.
+
+**Recommended Solution** (the clean fix): have `file:selectExternalFiles` return sizes alongside paths, so `ProjectTree` never stats an external path at all. `file:getStats` can then be confined with `assertInsideProject` like the other read handlers and the carve-out disappears rather than being documented forever.
+
+**Files**: `src/main/ipc/file-handlers.ts` (`file:getStats`), `src/main/utils/projectConfinement.ts` (`assertNoConfinementEscape`), `src/main/ipc/external-file-handlers.ts` (`file:selectExternalFiles`), `src/renderer/src/components/ProjectTree/ProjectTree.tsx`.
+
+**Status**: Open — recorded by the #70 security review. See [API Services § Path confinement](./api-services.md#path-confinement-for-the-file-read-ipc-handlers).
+
+---
+
+### 26. Files over the 500-line guideline after #70 (2026-08)
+
+**Severity**: Low
+
+The policy as practised: *a file a change adds behaviour to must come in under 500 lines; a file only read, moved unchanged, or trivially touched keeps its pre-existing debt and is waived.* Measured on the #70 branch:
+
+| File | Lines | Why it is waived |
+|---|---|---|
+| `src/renderer/src/components/Panels/TerminalPanel.tsx` | 1,352 | Pre-existing; #70 only shrinks it (the panel router replaced its inline open logic) |
+| `src/renderer/src/components/Panels/ImageViewerPanel/imageViewer.logic.test.ts` | 693 | Moved unchanged by `git mv`; not a line was edited |
+| `src/renderer/src/components/Panels/MarkdownEditorPanel.tsx` | 614 | Pre-existing; untouched except by the optional router commit |
+| `src/main/ipc/file-handlers.ts` | 601 | Pre-existing; **grew by 4 lines** in #70 (the `projectConfinement` import plus two `assert*` calls). Adding a security guard to an over-cap file was accepted rather than blocking the fix on a refactor |
+| `src/renderer/src/components/Panels/ImageViewerPanel/imageViewer.logic.ts` | 539 | Moved unchanged by `git mv` |
+
+`FileWatcherService.ts` deliberately stayed under the cap (498 lines) by moving the watch factory, the unlink branch, the send loop and the subscriber counting into `src/main/services/watcher/`.
+
+**Recommended Solution**: `file-handlers.ts` is the one to split first, since it is the only entry actively gaining code — the project/file/stat/CRUD handler groups are independent. The two `imageViewer.logic*` files are candidates for the next pass that genuinely changes them.
+
+**Status**: Accepted for #70; recorded so the next change to any of these files does not re-litigate it.
+
+---
+
+### 27. A genuine delete does not re-arm the watch (#70, 2026-08)
+
+**Severity**: Low
+
+**Impact**: After a real delete, `FileWatcherService` drops the map entry. Restoring the file more than ~100 ms later does **not** resume auto-refresh — the tab keeps showing the last version it loaded until the user presses **Reload**.
+
+**Problem**: The 100 ms atomic-save window is a bound, not a guarantee. A tool that waits longer than that between `unlink` and `rename` is classified as a delete. Re-arming a genuine delete needs a directory-level watch on the parent, which is a different design from a 1 watcher : 1 path service.
+
+**Mitigation shipped**: the renderer re-checks existence via `file:getStats` before it shows the "deleted" banner, so a slow temp-then-rename recovers silently instead of showing a false banner; and the banner carries a **Reload** button, so the UI never claims freshness it does not have.
+
+**Files**: `src/main/services/watcher/atomicRearm.ts`, `src/renderer/src/hooks/useFileChangeSubscription.ts`.
+
+**Status**: Accepted, with the escape hatch in the UI. See [File Watching § Single-file watch internals](./file-watching/README.md#single-file-watch-internals-70).
+
+---
+
+### 28. `useFileWatcher.reloadFromDisk` does not clear its indicator timer on unmount (#70, 2026-08)
+
+**Severity**: Low
+
+**Impact**: The editor hook sets a 1000 ms "Reloaded from disk" timer and never clears it on unmount. Benign under React 18 (the state update on an unmounted component is a no-op, not a warning), but it is a post-teardown timer of exactly the class `flakeGuard` exists to catch.
+
+**Recommended Solution**: mirror what `useFileChangeSubscription` already does — hold the timeout in a ref and clear it in the effect cleanup. One-line alignment when the editor hook is next opened.
+
+**Files**: `src/renderer/src/hooks/useFileWatcher.ts` (`reloadFromDisk`). Reference implementation: `src/renderer/src/hooks/useFileChangeSubscription.ts`.
+
+**Status**: Deferred — recorded by the #70 review.
+
+---
+
+### 29. `IMAGE_EXTENSIONS` is duplicated across the process boundary (#70, 2026-08)
+
+**Severity**: Low
+
+**Impact**: The list of supported image extensions exists twice — `src/main/services/file/imageRead.ts` (8 entries, used to gate `readImage`) and `src/renderer/src/utils/imageUtils.ts:27` (the same 8 entries, used to decide which panel a file opens in). They are identical today, and the main-process copy even carries a comment saying it "Matches IMAGE_EXTENSIONS in renderer/src/utils/imageUtils.ts" — a comment is the only thing holding them together.
+
+**Problem**: Adding a format on one side only produces a silent asymmetry: a file the renderer routes to the image viewer that the main process then refuses to read, or the reverse.
+
+**Recommended Solution**: move the list to `src/shared/` and import it from both sides, as `DEFAULT_TREE_HIDDEN_PATTERNS` already does for `FileService`. The MIME map beside it can stay main-side.
+
+**Files**: `src/main/services/FileService.ts`, `src/renderer/src/utils/imageUtils.ts`, `src/shared/constants.ts`.
+
+**Status**: Deferred — recorded by the #70 design (§9.5).
+
+---
+
+### 30. Smaller accepted trade-offs from #70 (2026-08)
+
+**Severity**: Low. Recorded so none of them is later filed as a bug.
+
+- **One panel per path *string*.** `sanitizeFilePath` hashes the raw string, so on a case-insensitive volume `/proj/Icon.svg` and `/proj/icon.svg` still open two panels. Harmless now that watches are subscriber-counted — the second panel gets its own subscription and neither can deafen the other.
+- **No way to open an image file as text.** Once file opens route through `utils/openFileInPanel.ts`, an SVG always opens in the viewer. Hand-editing an SVG beside an agent is plausible, so a context-menu "Open as text" is worth a follow-up issue; it becomes a prerequisite if the Markdown-preview link path is migrated to the router as well.
+- **Two visual artefacts on refresh.** The degraded-state banner mounts above the content, so it pushes the image down and the `ResizeObserver` refires in fit mode (a second, small jump); and an animated GIF restarts from frame 0 when the source object is replaced.
+- **No visual-regression coverage for the new surfaces.** The status slot and the banner are transient states; baselines would flake. Descoped deliberately.
+- **The end-to-end proof of the fix has no CI gate.** `e2e/preview-refresh.e2e.ts` and `e2e/preview-refresh-terminal.e2e.ts` only run locally (item #5 above). The atomic-replace case is covered deterministically on CI by two main-process suites instead — `FileWatcherService.atomicSave.test.ts` (mocked) and `watcher/singleFileWatch.rename.integration.test.ts` (real chokidar, real rename).
+
+**Status**: Accepted; recorded by the #70 design (§9) and its review rounds.
+
+---
+
 ## Code Quality Improvements
 
 ### Documentation Token Efficiency
@@ -430,4 +544,4 @@ Amendment discipline + promotion-rule conventions in [`windows/contributing.md`]
 
 ---
 
-**Last Updated**: #60 large-project crash + error containment (2026-08-11 – entries #18–#23 added from the change-set reviews: dead `useDragDropTree` API surface, inert `vitest.renderer.ts` coverage block, `test:cov` workspace fan-out, no tsconfig over `e2e/`, shared renderer HTML entry, `ThrottledWorker.workMany` spread-push) + #55 extra-content packaging guards (2026-08-09 – entry #14 added: `assertResourcesSiblingsAllowlist` advisory-on-Windows watch item) + #43 packaging allowlist QG-11a remediation (2026-08-09 – entry #13 added: `scripts/fuses.js` size after the allowlist block; `resolvePackedResourcesDir` call-site count corrected to four) + v0.17.0 doc sweep (2026-08-08 – entry #4 resolved: `LanguageSelect` `id` prop; entries #7, #8, #10 re-measured against the v0.17.0 tree) + #42 camera mirror + dialog focus work (2026-08-07 – entry #3 resolved: BaseDialog `trapFocus`) + PR #245 (2026-06-13 – entry #12 live-verification updated: single-panel detection + mid-session model-switch verified on a Windows host) + #217 Windows Claude status bar (2026-06-10 — entry #12 added: Windows v1 detector limitations) + v0.14.0 doc sweep (2026-06-08 — entries #9 + #10 added from `Transcription/CLAUDE.md` eviction) + v0.9.6 release (2026-05-22 — critical macOS terminal fix `ea3eaf1`) + v0.9.5 release (2026-04-25) + Phase I branch protection refinement (PR requirement removed same day) + entry #7 documenting `security.md` cap constraint (2026-04-25)
+**Last Updated**: #70 stale preview tabs (2026-08-23 – entries #24–#30 added from the design's accepted-debt ledger and the review rounds: text-only `watchFile` confinement, the `file:getStats` carve-out and its clean fix, the post-#70 over-cap file measurements, genuine deletes not re-arming, the `useFileWatcher` indicator timer, duplicated `IMAGE_EXTENSIONS`, and five smaller accepted trade-offs) + #60 large-project crash + error containment (2026-08-11 – entries #18–#23 added from the change-set reviews: dead `useDragDropTree` API surface, inert `vitest.renderer.ts` coverage block, `test:cov` workspace fan-out, no tsconfig over `e2e/`, shared renderer HTML entry, `ThrottledWorker.workMany` spread-push) + #55 extra-content packaging guards (2026-08-09 – entry #14 added: `assertResourcesSiblingsAllowlist` advisory-on-Windows watch item) + #43 packaging allowlist QG-11a remediation (2026-08-09 – entry #13 added: `scripts/fuses.js` size after the allowlist block; `resolvePackedResourcesDir` call-site count corrected to four) + v0.17.0 doc sweep (2026-08-08 – entry #4 resolved: `LanguageSelect` `id` prop; entries #7, #8, #10 re-measured against the v0.17.0 tree) + #42 camera mirror + dialog focus work (2026-08-07 – entry #3 resolved: BaseDialog `trapFocus`) + PR #245 (2026-06-13 – entry #12 live-verification updated: single-panel detection + mid-session model-switch verified on a Windows host) + #217 Windows Claude status bar (2026-06-10 — entry #12 added: Windows v1 detector limitations) + v0.14.0 doc sweep (2026-06-08 — entries #9 + #10 added from `Transcription/CLAUDE.md` eviction) + v0.9.6 release (2026-05-22 — critical macOS terminal fix `ea3eaf1`) + v0.9.5 release (2026-04-25) + Phase I branch protection refinement (PR requirement removed same day) + entry #7 documenting `security.md` cap constraint (2026-04-25)

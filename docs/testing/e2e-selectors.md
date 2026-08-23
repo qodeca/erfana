@@ -1,6 +1,6 @@
 # E2E selector catalog
 
-All `data-testid` attributes available for E2E testing – **248 testids** across 37 sections.
+All `data-testid` attributes available for E2E testing – **251 testids** across 37 sections.
 
 **Related documentation**:
 - [E2E Testing Guide](./e2e-testing.md) – Main E2E documentation
@@ -341,7 +341,7 @@ Full-window crash recovery screen (issue #60). Action buttons are capability-gat
 
 ---
 
-## Image viewer panel (12 testids)
+## Image viewer panel (15 testids)
 
 | Testid | Element | Type |
 |--------|---------|------|
@@ -357,6 +357,9 @@ Full-window crash recovery screen (issue #60). Action buttons are capability-gat
 | `image-viewer-btn-close` | Close full screen | static |
 | `image-viewer-fullscreen` | Full screen overlay | static |
 | `image-viewer-fullscreen-content` | Full screen content area | static |
+| `image-viewer-status` | Refresh status slot (`role="status"`, `data-state=idle\|reloading\|unavailable`) | dynamic |
+| `image-viewer-deleted-banner` | Deleted / auto-refresh-unavailable banner (`data-variant=deleted\|unavailable`) | conditional |
+| `image-viewer-btn-reload` | Reload from disk (inside the banner) | conditional |
 
 ---
 

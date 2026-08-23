@@ -2,23 +2,15 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { useRef, useEffect, useState, useCallback } from 'react'
 import {
-  DockviewReact,
-  DockviewReadyEvent,
   DockviewApi,
   SplitviewReact,
   SplitviewReadyEvent,
-  ISplitviewPanelProps,
   SplitviewApi,
   Orientation
 } from 'dockview'
 import 'dockview/dist/styles/dockview.css'
 import './AppDockLayout.css'
 import { ProjectPanel } from '../Panels/ProjectPanel'
-import { MarkdownEditorPanel } from '../Panels/MarkdownEditorPanel'
-import { ImageViewerPanel } from '../Panels/ImageViewerPanel'
-import { WelcomePanel } from '../Panels/WelcomePanel'
-import { WelcomeTab } from '../Panels/WelcomeTab'
-import { EditorTab, ImageTab } from '../Tabs'
 // Copilot panel removed
 import { TerminalPanel } from '../Panels/TerminalPanel'
 import { ActivityBar } from '../ActivityBar/ActivityBar'
@@ -29,92 +21,17 @@ import { useProjectManagementContext } from '../../context/ProjectManagementCont
 import { useAutoOpenTerminal } from '../../hooks/useAutoOpenTerminal'
 import { logger } from '../../utils/logger'
 import { isMacOS } from '../../utils/platform'
-import { TEST_IDS } from '../../constants/testids'
+import { EditorAreaSplitPanel } from './components'
 import {
   shouldExpandTerminal,
   shouldPersistTerminalWidth,
   resolvePreExpandWidth
 } from './terminalExpand'
 
-/** Id of the non-closable welcome/home panel in the editor dockview. */
-const WELCOME_PANEL_ID = '_center-placeholder'
-
 // ============================================================================
 // LEFT SIDEBAR PANEL - Project Panel
 // ============================================================================
 // ProjectPanel now handles its own file selection logic internally
-
-// ============================================================================
-// CENTER PANEL - DockviewReact for editor tabs
-// ============================================================================
-const EditorAreaSplitPanel = (props: ISplitviewPanelProps) => {
-  const onEditorReady = (event: DockviewReadyEvent) => {
-    logger.info('📝 Editor DockView ready')
-
-    // Create the welcome/home panel
-    const welcomePanel = event.api.addPanel({
-      id: WELCOME_PANEL_ID,
-      component: 'welcome',
-      title: '',
-      tabComponent: 'welcomeTab'
-    })
-
-    // Disable dragging for welcome tab
-    if (welcomePanel) {
-      welcomePanel.group.locked = true
-    }
-
-    // Listen for active panel changes and focus the panel content
-    event.api.onDidActivePanelChange((panel) => {
-      if (panel) {
-        if (panel.id !== WELCOME_PANEL_ID) {
-          // Revealing any editor/image file exits terminal-expand (decision: auto-collapse).
-          useActivityBarStore.getState().setTerminalExpanded(false)
-        }
-
-        // Focus the group to show the active indicator
-        panel.group.focus()
-
-        // Use setTimeout to ensure the DOM is ready and focus the content
-        setTimeout(() => {
-          const panelElement = panel.group.element.querySelector('.panel-content, .markdown-editor-panel')
-          if (panelElement instanceof HTMLElement) {
-            panelElement.focus()
-          }
-        }, 0)
-      }
-    })
-
-    // Pass the API to parent via params callback
-    if (props.params?.setDockviewApi) {
-      props.params.setDockviewApi(event.api)
-    }
-  }
-
-  // Dockview components registry for editor area
-  const editorComponents = {
-    editor: MarkdownEditorPanel,
-    imageViewer: ImageViewerPanel,
-    welcome: WelcomePanel
-  }
-
-  return (
-    <div style={{ width: '100%', height: '100%' }} data-testid={TEST_IDS.EDITOR_AREA}>
-      <DockviewReact
-        components={editorComponents}
-        tabComponents={{ welcomeTab: WelcomeTab, editorTab: EditorTab, imageTab: ImageTab }}
-        onReady={onEditorReady}
-        className="dockview-theme-dark"
-        // Dockview is used for editor tabs only — never docking/splitting (see
-        // docs/architecture.md). Disabling DnD drops the `dv-draggable` class from the
-        // tab-header void area, removing the misleading open-hand "grab" cursor at its
-        // source and preventing accidental group splits/tear-outs. Tabs still switch and
-        // close normally.
-        disableDnd
-      />
-    </div>
-  )
-}
 
 // ============================================================================
 // RIGHT SIDEBAR PANEL - Terminal only

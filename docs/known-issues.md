@@ -229,6 +229,18 @@ See [E2E troubleshooting § Terminal commands not executing](./testing/e2e-troub
 
 ---
 
+### Auto-refresh does not resume by itself after a file is deleted and restored
+
+**Issue**: An image or SVG tab refreshes automatically while the file is being edited or replaced, but if the file is **deleted** and then restored a moment later, the tab keeps showing the last version it loaded. The banner says the file was deleted; the picture does not come back on its own.
+
+**Root cause**: Erfana watches one file at a time, and a watch cannot outlive the file it is attached to. A delete followed quickly by a rename (how most agents and design tools save) is recognised as a replacement and the watch is re-attached — but only inside a 100 ms window. Anything slower than that is treated as a genuine delete, the watch is released, and picking the file back up would need a watch on the whole containing folder, which is a different design.
+
+**Workaround**: Press **Reload** in the banner. It re-reads the file and restarts the watch, and both the banner and the degraded state clear on success. Closing and reopening the tab works too.
+
+**Tracking**: Accepted limitation of #70, deliberately paired with the **Reload** affordance so the viewer never claims freshness it does not have. See [`docs/technical-debt.md`](./technical-debt.md) items 27 and 30, and [`docs/file-watching/README.md`](./file-watching/README.md#single-file-watch-internals-70).
+
+---
+
 ### Git Status: Global .gitignore not supported
 
 **Issue**: Files ignored via global gitignore (`~/.gitignore_global` or `~/.config/git/ignore`) may appear as "untracked" in the project tree git status indicators.

@@ -107,7 +107,8 @@ For editor tabs that should appear in the center area:
 
    > Note: panel content is non-selectable by default – dockview applies `user-select: none` to panel chrome and the rule cascades into your component. To make a data-bearing surface inside your panel selectable, add its selector to the grouped rule in `src/renderer/src/styles/utilities.css` and add a row to `src/renderer/src/styles/userSelect.audit.test.ts`. See [Text selection policy](./ui-style-guide.md#text-selection-policy) for the decision rules and the CSS-module exception (`.metadataItem` / `.errorMessage` in `ImageViewerPanel.module.css` stay in-place because build-time class-name hashing prevents the central selector from matching them).
 
-2. Register in `editorComponents` inside `EditorAreaSplitPanel`:
+2. Register in `editorComponents` inside `EditorAreaSplitPanel`
+   (`src/renderer/src/components/DockLayout/components/EditorAreaSplitPanel.tsx`):
    ```typescript
    const editorComponents = {
      myEditor: MyEditorPanel

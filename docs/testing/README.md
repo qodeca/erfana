@@ -36,6 +36,7 @@ Run `npm run test` for current totals. The workspace holds **326 test files** �
 | Settings overlay | `SettingsOverlay.test.tsx` | [Settings](../settings.md) |
 | Build tooling | `scripts/fuses.test.mjs` (afterPack chmod helper — 9 cases: happy / idempotent / multi-arch / missing / empty+requireMatch / empty+lenient / symlink / dir / EROFS) | [Build – Fuses](../build/fuses.md#afterpack-also-chmods-node-pty-spawn-helper) |
 | Error containment (#60) | `RootErrorBoundary.test.tsx`, `RootErrorFallback.test.tsx`, `PanelErrorBoundary.test.tsx`, `useDragDropTree.test.ts` (explicit-stack `flattenTree`), `rendererCrashHandlers.test.ts` (main-side crash/hang trail) | [UI components § Error containment](../ui-components.md#error-containment) · [`design-issue-60.md`](../design/design-issue-60.md) |
+| Image viewer + single-file watch (#70) | Main: `FileWatcherService.atomicSave.test.ts`, `watcher/SubscriberCounter.test.ts`, `watcher/singleFileWatch.rename.integration.test.ts` (**real** chokidar + real `rename`, pins the platform's event sequence). Renderer: `hooks/useFileChangeSubscription.test.ts`, `hooks/fileWatchSlot.test.ts`, `utils/openFileInPanel.test.ts`, and the `ImageViewerPanel/` suite (`.test.tsx`, `.refresh`, `.status`, `.deleted`, `.integration`) | [File watching § Single-file watch internals](../file-watching/README.md#single-file-watch-internals-70) · [UI components § Image Viewer Panel](../ui-components.md#image-viewer-panel) |
 
 **Testing patterns used**:
 - "Extract Pure Logic" – business logic in `.logic.ts` files, tested without React overhead
@@ -61,7 +62,7 @@ Run `npm run test` for current totals. The workspace holds **326 test files** �
 
 - Playwright setup and configuration for Electron (three projects in `playwright.config.ts`: `electron` functional, `transcription` env-gated, `visual` regression)
 - Testing patterns for third-party components (Monaco, xterm.js, Mermaid)
-- Complete selector catalog (248 testids) – see [e2e-selectors.md](./e2e-selectors.md)
+- Complete selector catalog (251 testids) – see [e2e-selectors.md](./e2e-selectors.md)
 - Test helper utilities documentation
 - Troubleshooting guide
 
@@ -74,7 +75,7 @@ npm run test:e2e:visual            # Visual regression tests (visual project) �
 npm run test:e2e:update-screenshots  # Update visual baselines
 ```
 
-**E2E test files** (all 18 specs in `e2e/`):
+**E2E test files** (all 20 specs in `e2e/`):
 - `app-launch.e2e.ts` – Application launch, activity bar, welcome panel visibility
 - `third-party-components.e2e.ts` – Monaco editor, xterm.js terminal, Mermaid diagrams
 - `directory-watcher.e2e.ts` – Directory watcher pipeline (#104): verifies file creation via terminal appears in Project Tree within latency budget
@@ -92,6 +93,8 @@ npm run test:e2e:update-screenshots  # Update visual baselines
 - `user-select.e2e.ts` – Organic selection coverage for #211 on two surfaces (markdown preview, settings overlay); the cross-cutting policy gate is `userSelect.audit.test.ts`
 - `camera-mirror.e2e.ts` – Camera preview mirroring default + per-camera toggle, 16:9 `object-fit: contain` framing, native Enter-to-capture (#42); runs against Chromium's fake capture device and asserts the fake device is the one streaming
 - `root-error-boundary.e2e.ts` – #60: a launcher-injected renderer crash must produce the recovery screen (details toggle, Copy / Open logs / Restart present) instead of a blank window, plus a negative case asserting the normal app renders when the crash flag is absent. Restart is asserted but never clicked — activating it relaunches the app mid-test
+- `preview-refresh.e2e.ts` – #70: an open image tab repaints after an in-place rewrite and after an atomic replace, the status slot reaches `reloading` then returns to `idle`, zoom survives a same-size rewrite, a delete shows the banner and keeps the last image, and a `MutationObserver` proves there is no flicker. Uses `ImageViewerPage`; asserts the decoded `data-marker` rather than the raw `src`
+- `preview-refresh-terminal.e2e.ts` – #70: an image path clicked in a terminal opens the image viewer, not Monaco. Separate spec because it needs `ERFANA_E2E_FAST_SHELL` on its own `electron.launch()` and because clicking a WebGL-rendered xterm link needs cell-grid geometry plus retries
 - `visual-regression.e2e.ts` – Visual regression for 5 UI states (see below)
 
 **E2E environment variables**:
