@@ -80,6 +80,19 @@
   color: var(--color-white);
 }
 
+/*
+ * Deleted marker (issue #70).
+ *
+ * The panel reports "the file is gone" through `api.setTitle`; this is where
+ * that reaches the screen for a tab whose body is hidden. --color-warning
+ * measures 8:1 against the tab background, so it is legible without shouting
+ * like the error red used inside the panel.
+ */
+.editor-tab-deleted {
+  color: var(--color-warning);
+  white-space: nowrap;
+}
+
 /* Close button - hidden by default, visible on hover */
 .editor-tab-close {
   display: flex;

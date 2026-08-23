@@ -11,9 +11,14 @@ import { settingsService } from '../services/SettingsService'
 import { projectSettingsService } from '../services/ProjectSettingsService'
 import { projectLockService } from '../services/ProjectLockService'
 import type { ProjectChanged } from '../../shared/ipc/schema'
+import {
+  ImageReadRequestSchema,
+  type ImageReadResponse
+} from '../../shared/ipc/file-image-schema'
 import { logger } from '../services/LoggingService'
 import { fileExists } from '../utils/fileUtils'
 import { redactedLogError } from '../utils/redactUserInput'
+import { assertInsideProject, assertNoConfinementEscape } from '../utils/projectConfinement'
 import { isTrustedSender } from './senderValidation'
 
 /**
@@ -148,9 +153,14 @@ export function registerFileHandlers(): void {
     }
   })
 
-  // Read file content
+  // Read file content.
+  //
+  // Confined to the open project, symlinks resolved: the file watcher re-reads
+  // a watched path automatically now, so a one-shot user-initiated read became
+  // a repeating one an outside party can clock (issue #70, security MEDIUM-2).
   ipcMain.handle('file:readFile', async (_event, filePath: string) => {
     try {
+      await assertInsideProject(filePath, fileService.getProjectPath())
       return await fileService.readFile(filePath)
     } catch (error) {
       logger.error('Error reading file', error instanceof Error ? error : undefined)
@@ -169,9 +179,17 @@ export function registerFileHandlers(): void {
     }
   })
 
-  // Get file stats
+  // Get file stats.
+  //
+  // Deliberately NOT confined to the project: the external-file import shortcut
+  // stats the paths the user picked in the native dialog, which are outside the
+  // project by definition (spec #012, ProjectTree.handleImportShortcut). What is
+  // enforced is that a path that *looks* in-project may not resolve out of it
+  // through a symlink, so the watcher's automatic re-stat of a watched file
+  // cannot be pointed elsewhere (issue #70).
   ipcMain.handle('file:getStats', async (_event, filePath: string) => {
     try {
+      await assertNoConfinementEscape(filePath, fileService.getProjectPath())
       const stats = await fileService.getFileStats(filePath)
       return {
         size: stats.size,
@@ -434,34 +452,45 @@ export function registerFileHandlers(): void {
     }
   })
 
-  // Read file as base64 data URL (for image preview)
-  // Used by ImageViewerPanel to load images in sandboxed renderer
-  ipcMain.handle('file:readAsBase64', async (_event, filePath: string) => {
-    try {
-      // Validate input
-      if (!filePath || typeof filePath !== 'string') {
-        throw new Error('Invalid file path')
-      }
+  // Read an image, or answer "unchanged" when the caller already holds the
+  // current bytes (issue #70). This is the only base64 read channel - the
+  // unconditional file:readAsBase64 it replaced is gone.
+  //
+  // Confinement is lexical first and then re-checked against fs.realpath of
+  // both ends: path.resolve alone strips "../../../etc/passwd" but does not
+  // resolve symlinks, so an in-project link to an out-of-project file used to
+  // pass - and the image viewer now re-reads on every disk change, which turns
+  // that into a repeating read (issue #70, security MEDIUM-2). The check runs
+  // before the stat, so an out-of-project path is refused without this handler
+  // disclosing anything about it.
+  //
+  // The skip exists because the image viewer re-reads on every disk change and
+  // the base64 encode blocks the main-process event loop; see
+  // src/main/services/file/imageRead.ts for why the version is safe to trust.
+  ipcMain.handle(
+    'file:readImage',
+    async (_event, filePath: string, knownVersion?: string): Promise<ImageReadResponse> => {
+      try {
+        const parsed = ImageReadRequestSchema.safeParse({ filePath, knownVersion })
+        if (!parsed.success) {
+          throw new Error(parsed.error.issues.map((issue) => issue.message).join(', '))
+        }
 
-      // Security check: require a project to be open and file within project boundaries
-      const projectPath = fileService.getProjectPath()
-      if (!projectPath) {
-        throw new Error('No project is open')
-      }
+        await assertInsideProject(parsed.data.filePath, fileService.getProjectPath())
 
-      // Normalize paths to prevent path traversal attacks (e.g., "../../../etc/passwd")
-      const resolvedFilePath = path.resolve(filePath)
-      const resolvedProjectPath = path.resolve(projectPath)
-      if (!resolvedFilePath.startsWith(resolvedProjectPath + path.sep)) {
-        throw new Error('Cannot read files outside the project directory')
+        const result = await fileService.readImage(parsed.data.filePath, parsed.data.knownVersion)
+        if (result.status === 'unchanged') {
+          // No path in the log line: the version carries no user content, and
+          // this is the hot path of an agent rewriting an asset in a loop.
+          logger.debug('file:readImage unchanged, skipped re-encode', { version: result.version })
+        }
+        return result
+      } catch (error) {
+        logger.error('Error reading image', error instanceof Error ? error : undefined)
+        throw error
       }
-
-      return await fileService.readFileAsBase64(filePath)
-    } catch (error) {
-      logger.error('Error reading file as base64', error instanceof Error ? error : undefined)
-      throw error
     }
-  })
+  )
 
   // Reveal a file or folder in the native OS file manager (Finder / Explorer).
   //

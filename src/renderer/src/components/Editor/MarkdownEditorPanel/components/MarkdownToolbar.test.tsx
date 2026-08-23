@@ -446,6 +446,39 @@ describe('MarkdownToolbar', () => {
       expect(screen.queryByTestId(TEST_IDS.RELOAD_INDICATOR)).not.toBeInTheDocument()
     })
 
+    it('keeps the live region mounted while idle (issue #70 / UX-1)', () => {
+      render(
+        <MarkdownToolbar
+          {...createDefaultProps({ isAutoSaving: false, isReloading: false })}
+        />
+      )
+
+      // A live region that enters the DOM at the same moment its text appears is
+      // not announced, so the slot must exist before there is anything to say.
+      const slot = screen.getByRole('status')
+      expect(slot).toBeInTheDocument()
+      expect(slot).toHaveAttribute('aria-live', 'polite')
+      expect(slot).toBeEmptyDOMElement()
+    })
+
+    it('keeps the modified bullet OUT of the live region (QG-11a)', () => {
+      // Inside the region, every clean -> dirty transition announced a bullet
+      // glyph. The tab title already carries "modified" in words.
+      const currentFile = createMockFile({ modified: true })
+      render(<MarkdownToolbar {...createDefaultProps({ currentFile })} />)
+
+      const indicator = screen.getByTestId(TEST_IDS.MODIFIED_INDICATOR)
+      expect(indicator).toHaveAttribute('aria-hidden', 'true')
+      expect(screen.getByRole('status')).not.toContainElement(indicator)
+    })
+
+    it('announces the reload indicator through the same live region', () => {
+      render(<MarkdownToolbar {...createDefaultProps({ isReloading: true })} />)
+
+      const slot = screen.getByRole('status')
+      expect(slot).toContainElement(screen.getByTestId(TEST_IDS.RELOAD_INDICATOR))
+    })
+
     it('can show multiple indicators simultaneously', () => {
       const currentFile = createMockFile({ modified: true })
       render(

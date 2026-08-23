@@ -551,32 +551,6 @@ export function extractBaseFileName(filePath: string, extension: string = '.md')
 }
 
 /**
- * Formats tab title based on file state.
- *
- * @param fileName - Base file name
- * @param modified - Whether file has unsaved changes
- * @param deleted - Whether file was deleted externally
- * @returns Formatted title string
- *
- * @example
- * ```ts
- * formatTabTitle('doc.md', false, false) // 'doc.md'
- * formatTabTitle('doc.md', true, false) // '● doc.md'
- * formatTabTitle('doc.md', false, true) // 'doc.md (deleted)'
- * formatTabTitle('doc.md', true, true) // 'doc.md (deleted)'
- * ```
- */
-export function formatTabTitle(fileName: string, modified: boolean, deleted: boolean): string {
-  if (deleted) {
-    return `${fileName} (deleted)`
-  }
-  if (modified) {
-    return `● ${fileName}`
-  }
-  return fileName
-}
-
-/**
  * Determines if a file is a markdown file based on extension.
  *
  * @param filePath - File path to check

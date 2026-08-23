@@ -92,6 +92,32 @@ describe('preload api exposure', () => {
     expect(received.length).toBe(2)
   })
 
+  describe('file.readImage parameter passing (#70)', () => {
+    it('forwards the caller version so main can skip the encode', async () => {
+      const { ipcRenderer } = await import('electron')
+
+      await window.api.file.readImage('/project/shot.png', '12:34:56')
+
+      expect(ipcRenderer.invoke as any).toHaveBeenCalledWith(
+        'file:readImage',
+        '/project/shot.png',
+        '12:34:56'
+      )
+    })
+
+    it('sends no version when the caller holds no bytes', async () => {
+      const { ipcRenderer } = await import('electron')
+
+      await window.api.file.readImage('/project/shot.png')
+
+      expect(ipcRenderer.invoke as any).toHaveBeenCalledWith(
+        'file:readImage',
+        '/project/shot.png',
+        undefined
+      )
+    })
+  })
+
   describe('file.moveItem parameter passing', () => {
     it('should pass all 4 parameters to IPC when replaceExisting=true', async () => {
       const { ipcRenderer } = await import('electron')

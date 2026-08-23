@@ -3,6 +3,8 @@
 import { create } from 'zustand'
 import type { DockviewApi } from 'dockview'
 
+import { WELCOME_PANEL_ID } from '../constants/panels'
+
 interface ProjectState {
   dockviewApi: DockviewApi | null
   editorPanelIds: Set<string>
@@ -60,7 +62,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       const panels = typeof anyApi.getPanels === 'function' ? anyApi.getPanels() : []
       for (const p of panels) {
         // Prefer not to touch welcome placeholder
-        if (p?.id && p.id !== '_center-placeholder') {
+        if (p?.id && p.id !== WELCOME_PANEL_ID) {
           if (p?.api?.close) p.api.close()
           else if (typeof anyApi.removePanel === 'function') anyApi.removePanel(p.id)
         }

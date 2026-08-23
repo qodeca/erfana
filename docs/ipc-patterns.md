@@ -108,6 +108,7 @@ if (!writeResult.success) {
 | `file:getLastProjectPath` | file-handlers | Get last opened project path |
 | `file:readDirectory` | file-handlers | Read directory tree |
 | `file:readFile` | file-handlers | Read file content |
+| `file:readImage` | file-handlers | Read an image as a base64 data URL, or answer `unchanged` when the caller's version still matches (#70) |
 | `file:writeFile` | file-handlers | Write file content |
 | `file:getStats` | file-handlers | Get file metadata |
 | `file:getProjectPath` | file-handlers | Get current project path |

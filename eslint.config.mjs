@@ -98,15 +98,29 @@ export default [
       '@typescript-eslint/no-require-imports': 'off'
     }
   },
-  // Renderer process: ban POSIX-only path manipulation. The renderer is
-  // sandboxed (no Node `path` module) and receives paths in their NATIVE
-  // separators from the main process, so `.split('/')`-based basename/join
-  // logic silently breaks on Windows. Use the cross-platform helpers in
-  // `utils/fileUtils.ts` instead (which is itself exempt, as it owns the
-  // separator-class logic). See issue #238.
+  // Renderer process: two families of hand-rolled string building that keep
+  // reintroducing bugs.
+  //
+  // 1. POSIX-only path manipulation. The renderer is sandboxed (no Node `path`
+  //    module) and receives paths in their NATIVE separators from the main
+  //    process, so `.split('/')`-based basename/join logic silently breaks on
+  //    Windows. Use the cross-platform helpers in `utils/fileUtils.ts` (itself
+  //    exempt, as it owns the separator-class logic). See issue #238.
+  // 2. Hand-built dockview panel ids. The id prefix and the panel component
+  //    must be derived from the same `isImageFile` answer or a file opens in
+  //    the wrong panel type; `utils/openFileInPanel.ts` owns that (and is
+  //    therefore exempt). See issue #70.
+  //
+  // NOTE: both families live in ONE `no-restricted-syntax` entry on purpose.
+  // Flat config replaces a rule wholesale rather than merging, so a second
+  // block setting `no-restricted-syntax` for these files would silently
+  // disable whichever set it did not repeat.
   {
     files: ['src/renderer/**/*.{ts,tsx}'],
-    ignores: ['src/renderer/src/utils/fileUtils.ts'],
+    ignores: [
+      'src/renderer/src/utils/fileUtils.ts',
+      'src/renderer/src/utils/openFileInPanel.ts'
+    ],
     rules: {
       'no-restricted-syntax': [
         'error',
@@ -121,6 +135,21 @@ export default [
             "ConditionalExpression[test.type='CallExpression'][test.callee.property.name='endsWith'][test.arguments.length=1][test.arguments.0.type='Literal'][test.arguments.0.value='/']",
           message:
             "POSIX-only path join: x.endsWith('/') ? x : x+'/' breaks on Windows. Use isPathInside()/isStrictDescendant()/getDisplayRelativePath() from utils/fileUtils."
+        },
+        // The `sanitizeFilePath` callee is part of the selector on purpose:
+        // `editor-${...}` is also a legitimate React `key` (see
+        // EditorContentLayout), and only the sanitized-path form is a panel id.
+        {
+          selector:
+            "TemplateLiteral[quasis.0.value.raw='editor-'][expressions.0.callee.name='sanitizeFilePath']",
+          message:
+            'Panel ids are built in one place. Use getFilePanelId() from utils/openFileInPanel.'
+        },
+        {
+          selector:
+            "TemplateLiteral[quasis.0.value.raw='image-'][expressions.0.callee.name='sanitizeFilePath']",
+          message:
+            'Panel ids are built in one place. Use getFilePanelId() from utils/openFileInPanel.'
         }
       ]
     }

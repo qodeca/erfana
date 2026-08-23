@@ -69,7 +69,7 @@ Erfana is an agent-native Markdown workspace – an Electron app that runs a ter
 - [Large Project Performance Plan](./large-project-performance-plan.md) - EMFILE mitigation, worker threads, diagnostics
 - [Testing](./testing/README.md) - Testing strategies and coverage
   - [E2E Testing](./testing/e2e-testing.md) - Playwright/Electron E2E guide
-  - [E2E Selectors](./testing/e2e-selectors.md) - 248 testids catalog
+  - [E2E Selectors](./testing/e2e-selectors.md) - 251 testids catalog
   - [Test Scenarios](./testing/test-scenarios.md) - 10 manual/MCP visual test scenarios
   - [E2E Helpers](./testing/e2e-helpers.md) - Test utility functions
   - [E2E Third-Party](./testing/e2e-third-party.md) - Monaco, xterm.js, Mermaid patterns

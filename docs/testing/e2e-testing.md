@@ -5,7 +5,7 @@
 Erfana supports automated E2E testing using Playwright with Electron. This guide covers setup, configuration, and test patterns.
 
 **Related documentation**:
-- [E2E Selectors](./e2e-selectors.md) – Complete testid catalog (248 testids)
+- [E2E Selectors](./e2e-selectors.md) – Complete testid catalog (251 testids)
 - [E2E Third-Party](./e2e-third-party.md) – Monaco, xterm.js, Mermaid testing
 - [E2E Helpers](./e2e-helpers.md) – Test utilities and patterns (backward-compatible adapter)
 - [E2E Debugging](./e2e-debugging.md) – Debugging and CI/CD
@@ -99,6 +99,9 @@ Located in `e2e/pages/`:
 | `MonacoPage` | Editor interactions – `waitForReady()`, `focus()`, `setContent()`, `getContent()` |
 | `MermaidPage` | Mermaid diagram interactions |
 | `ProjectTreePage` | Project tree navigation and file operations |
+| `ImageViewerPage` | Image viewer tab (#70) – `openFromTree()`, `waitForReady()`, `marker()` / `waitForMarker()`, `zoomIn()`, `transformStyle()`, `expectStatusState()`, `expectBanner()` / `expectNoBanner()`, `clickReload()` |
+
+> `ImageViewerPage` is **not** exposed as a composed fixture – the two specs that use it construct it directly, because one of them needs its own launch environment. Two conventions in it are worth copying: every locator is scoped **inside** `[data-testid="image-viewer-panel"]`, so the full-screen portal (which renders the same test ids into `#portal-root`) can never satisfy a panel assertion; and freshness is asserted on the **decoded** bytes via a `data-marker` attribute embedded in the SVG, not by diffing two multi-kilobyte data URLs — a failing assertion then names which version is on screen instead of dumping base64.
 
 ### Composed fixtures
 
@@ -374,7 +377,7 @@ Three `ERFANA_E2E_*` variables change app behaviour for tests. They are read by 
 
 ### Test files
 
-All 18 specs in `e2e/`:
+All 20 specs in `e2e/`:
 
 - `app-launch.e2e.ts` – Application launch, activity bar, welcome panel visibility
 - `third-party-components.e2e.ts` – Monaco editor, xterm.js terminal, Mermaid diagrams
@@ -393,6 +396,8 @@ All 18 specs in `e2e/`:
 - `user-select.e2e.ts` – Organic selection coverage for #211 on two surfaces (markdown preview, settings overlay); cross-cutting policy coverage lives in `userSelect.audit.test.ts`
 - `camera-mirror.e2e.ts` – Camera preview mirroring default + per-camera toggle, 16:9 `object-fit: contain` framing, native Enter-to-capture (#42), against Chromium's fake capture device
 - `root-error-boundary.e2e.ts` – #60: a launcher-injected renderer crash must show the recovery screen (details toggle, Copy / Open logs / Restart), not a blank window, plus a negative case for the flag being unset
+- `preview-refresh.e2e.ts` – #70: an open image tab repaints after an in-place rewrite **and** after an atomic replace (`> tmp && mv tmp target`), the "Reloaded from disk" status appears and self-clears, zoom survives a same-size rewrite and resets to fit when the size changes, a delete shows the banner while keeping the last image (with **Reload** recovering), and a `MutationObserver` proves the `<img>` is never unmounted and `src` never blanks. Freshness is asserted on the decoded `data-marker`, not on the `src` attribute alone
+- `preview-refresh-terminal.e2e.ts` – #70: clicking an image path in a terminal opens the image viewer, not Monaco. Split out because it needs its own launch environment (`ERFANA_E2E_FAST_SHELL`) and because clicking an xterm link is a geometry problem — the WebGL renderer paints to canvas, so the cell grid is reconstructed from xterm's IME helper textarea and the click is retried across the printed rows (the link provider validates the path over IPC, so the first click can land before the link exists)
 - `visual-regression.e2e.ts` – Visual regression for 5 UI states (welcome, editor, terminal, settings, confirm dialog)
 
 > **Why `root-error-boundary.e2e.ts` bypasses the composed fixtures**: it needs a per-launch environment (`ERFANA_E2E_FORCE_CRASH` set for the positive case, and explicitly *deleted* from `process.env` for the negative one, so a developer's shell cannot make the negative test pass for the wrong reason). The shared `app` fixture owns its own launch and takes no env, so the spec calls `electron.launch()` directly and pairs it with `createTempUserDataDir()` from `e2e/utils/helpers.ts` to keep the per-test user-data isolation the `userDataDir` fixture would otherwise provide. Use the fixtures unless a spec genuinely needs a custom launch environment.

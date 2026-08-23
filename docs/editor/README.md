@@ -128,7 +128,7 @@ Real-time metrics in bottom status bar:
 
 ## Related Hooks (`src/renderer/src/hooks/`)
 - `useAutoSave.ts` - Debounced auto-save with React state management
-- `useFileWatcher.ts` - File change detection with race condition protection
+- `useFileWatcher.ts` - File change detection with race condition protection. Since #70 it holds its watch through the shared `fileWatchSlot.ts` (serialised acquire/release, so a start and its stop can never get out of order), and it takes `INDICATOR_DURATION_MS` from `constants/fileWatch.ts` rather than owning it. The read-only sibling for surfaces that never write is `useFileChangeSubscription.ts` — see [File Watching](../file-watching/README.md#single-file-watch-internals-70)
 - `useDividerPosition.ts` - Resizable split pane position management
 - `useEditorContextMenu.ts` - Context menu state and positioning
 - `useKeyboardShortcuts.ts` - Editor keyboard shortcut handling

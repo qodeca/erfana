@@ -23,7 +23,9 @@ Monitors open files for external content modifications.
 - **Debouncing**: 300ms (optimized for single file saves)
 - **Events**: `change`, `unlink`, `error`
 - **Scope**: Per-file watching (on-demand when file is opened)
-- **Limit**: 100 files maximum (security)
+- **Limit**: 100 files maximum, app-wide (security). The cap governs **new** map entries only — joining a path that is already watched can never fail on it (#70)
+- **Symlinks**: `followSymlinks: false` — the watch is on the path itself, never on what a link at that path points at (#70)
+- **Consumers**: two renderer hooks — `useFileWatcher` (Markdown editor, read/write) and `useFileChangeSubscription` (read-only surfaces, #70). Both hold a `fileWatchSlot`
 
 ### Use Cases
 
@@ -31,7 +33,9 @@ Monitors open files for external content modifications.
 |----------|----------|
 | File modified externally, no local changes | Auto-reload silently, show "Reloaded from disk" in toolbar (1s) |
 | File modified externally, has unsaved changes | Show orange conflict bar with options |
+| File replaced atomically (write temp + rename) | Surfaces as `file-watch:changed`, not a delete — see [Single-file watch internals](#single-file-watch-internals-70) |
 | File deleted externally | Show red warning banner, keep editor state |
+| Watch dies for any other reason | `file-watch:error` — the consumer shows a degraded state instead of silently going stale (#70) |
 | Rapid changes (git operations) | Debounced to single reload |
 
 ### IPC Channels
@@ -40,17 +44,27 @@ Monitors open files for external content modifications.
 |---------|-----------|---------|
 | `file-watch:start` | Renderer → Main | Start watching specific file |
 | `file-watch:stop` | Renderer → Main | Stop watching specific file |
+| `file-watch:stopAll` | Renderer → Main | Drop every watch held by this window |
 | `file-watch:pause` | Renderer → Main | Pause watching during save operation |
 | `file-watch:resume` | Renderer → Main | Resume watching after save completes |
-| `file-watch:changed` | Main → Renderer | Event: File content changed externally |
-| `file-watch:deleted` | Main → Renderer | Event: File deleted externally |
+| `file-watch:stats` | Renderer → Main | Watcher diagnostics |
+| `file-watch:changed` | Main → Renderer | Event: File content changed externally (**including** an atomic replace, #70) |
+| `file-watch:deleted` | Main → Renderer | Event: File genuinely deleted externally |
+| `file-watch:error` | Main → Renderer | Event: chokidar error, **or** the watch died and cannot be re-armed (#70) |
 
 ### Implementation Location
 
 - **Service**: `src/main/services/FileWatcherService.ts`
+- **Watch factory**: `src/main/services/watcher/singleFileWatch.ts` (`SINGLE_FILE_WATCH_OPTIONS` + `createSingleFileWatcher`, #70)
+- **Unlink branch**: `src/main/services/watcher/atomicRearm.ts` (atomic save vs genuine delete, #70)
+- **Subscription counting**: `src/main/services/watcher/SubscriberCounter.ts` (#70)
+- **Send loop**: `src/main/services/watcher/watchNotifier.ts` (#70)
 - **IPC Handlers**: `src/main/ipc/file-watcher-handlers.ts`
-- **Renderer Hook**: `src/renderer/src/hooks/useFileWatcher.ts` (echo detection, external change handling, `notifySaveComplete` action)
-- **Integration**: `src/renderer/src/components/Panels/MarkdownEditorPanel.tsx`
+- **Renderer Hooks**:
+  - `src/renderer/src/hooks/useFileWatcher.ts` (editor: echo detection, external change handling, `notifySaveComplete` action)
+  - `src/renderer/src/hooks/useFileChangeSubscription.ts` (read-only surfaces, #70)
+  - `src/renderer/src/hooks/fileWatchSlot.ts` (shared acquire/release slot, #70)
+- **Integration**: `src/renderer/src/components/Panels/MarkdownEditorPanel.tsx`, `src/renderer/src/components/Panels/ImageViewerPanel/`
 - **UI Component**: `src/renderer/src/components/FileConflictNotification/`
 
 ### Self-Save Echo Detection (v0.9.1, #124)
@@ -73,6 +87,114 @@ When a file has both external changes and unsaved local changes, an orange confl
 - **Reload from Disk**: Discard local changes, load external version
 - **Keep My Version**: Ignore external changes, keep local edits
 - **Dismiss**: Acknowledge conflict, decide later
+
+---
+
+## Single-file watch internals (#70)
+
+Issue #70 (a preview tab showing stale content forever) turned out to be three
+independent defects. Two of them were in this service and therefore affected the
+Markdown editor as well; the third was renderer-side.
+
+### Atomic-save detection and watcher re-arm
+
+A chokidar single-file watch is bound to the **inode** it opened. The dominant
+agent / design-tool write pattern is *write a temp file, rename it over the
+target*, which destroys that inode. Where the platform reports the rename as an
+`unlink`, the old behaviour emitted `file-watch:deleted`, closed the watcher and
+dropped the map entry — so every later edit was invisible until the tab was
+closed and reopened.
+
+`FileWatcherService` now runs one service-level `AtomicSaveDetector` (it already
+keys pending deletes by path, and this service is 1 watcher : 1 path, so a
+per-file detector would be a `Map` with one entry × 100 watches). The branch that
+follows the detector's verdict lives in `watcher/atomicRearm.ts`:
+
+| Verdict | Behaviour |
+|---|---|
+| File is back within the 100 ms window | Close the stale watcher, create a replacement through `createSingleFileWatcher`, mutate the existing entry in place, then **re-enter `handleFileChange`** |
+| File still gone (one final `stat` confirms) | `file-watch:deleted`, close, drop the entry — today's behaviour |
+| Session token bumped inside the window | `file-watch:error` (`WATCH_DEAD_SESSION_ENDED`), then drop — never a silent drop |
+| Path no longer resolves inside the project | `file-watch:error` (`WATCH_DEAD_OUTSIDE_PROJECT`), then drop |
+| `chokidar.watch()` throws on the replacement | `file-watch:error` (`WATCH_DEAD_REARM_FAILED`), then drop |
+| Path vanishes between the existence check and `chokidar.watch()` | `file-watch:deleted` + drop, so no zombie entry holds a `MAX_WATCHED_FILES` slot |
+
+Two design points that are easy to undo by accident:
+
+- The re-arm calls **`handleFileChange`**, never `notifyWebContents` directly. A
+  direct notify would skip `awaitWriteFinish.stabilityThreshold` (300 ms), the
+  300 ms debounce and the `isPaused` check — so `rm x.md && <slow write> x.md`
+  would tell the editor to reload a half-written file.
+- The record is updated **in place**, so subscribers, `isPaused` and the map size
+  survive. A re-arm can therefore never trip `MAX_WATCHED_FILES`.
+- The path is re-checked for project confinement at re-arm time
+  (`utils/projectConfinement.ts`). The entry check ran before somebody else
+  replaced the file, so an in-project name can be a symlink out of the project by
+  the time the replacement lands.
+
+**Platform split — measured, not assumed.** On **macOS** (fsevents,
+`usePolling: false`) chokidar v3 reports `mv tmp target` over a watched path as
+**`change`**, not `unlink`, and the watch keeps working afterwards. The re-arm
+branch is therefore **dormant on macOS**, and the ordinary debounced change path
+is what carries the fix there. The branch matters on platforms that do report
+`unlink`. This is pinned by
+`src/main/services/watcher/singleFileWatch.rename.integration.test.ts`, which
+drives the **real** production watcher factory against a real `rename` in
+`os.tmpdir()` and asserts the disjunction: either `unlink` (the branch's premise)
+or `change` *followed by a further change that still arrives* (proving the watch
+survived). **Do not delete the re-arm branch as dead code** because it never
+fires on a macOS box — and do not weaken that test to assert one platform's
+answer, or a platform that reports `change` and then goes deaf would break the
+fix silently.
+
+### Subscriber counting
+
+`WatchedFile.webContentsIds: Set<number>` became
+`subscribers: SubscriberCounter` (`watcher/SubscriberCounter.ts`), a
+`Map<number, number>`. A `Set` of window ids cannot represent **two consumers
+inside one window** watching one path: the first `unwatchFile` removed the id and
+closed the watcher out from under the second, which then went permanently deaf.
+
+| Method | Semantics |
+|---|---|
+| `add(id)` | Increment (first add = 1) |
+| `release(id)` | Decrement; delete the key at 0; returns how many windows still hold a subscription |
+| `removeAll(id)` | Drop the key outright — the webContents itself is gone (window closed, dev refresh), so every subscription it held dies together |
+| `has` / `size` / `countFor` / `totalSubscriptions` / `ids()` | Reads for `unwatchAll`, notification and diagnostics |
+
+`unwatchFile` closes the chokidar watcher only when `release()` reaches 0;
+`cleanupForWebContentsId` and `unwatchAll` use `removeAll`.
+
+The guarantee is precisely "no `release` before the last one closes the watch" —
+it holds only while every consumer that starts a watch releases it exactly once,
+and while joining an existing watch cannot fail. That is why `watchFile` checks
+`MAX_WATCHED_FILES` **after** the join branch: a refused join whose consumer
+still released on unmount would decrement a count it never incremented.
+
+### Renderer side: the read-only hook and the shared slot
+
+- **`hooks/useFileChangeSubscription.ts`** — a read-only subscription for
+  surfaces that only *display* a file. Deliberately **not** an option on
+  `useFileWatcher`: that hook is structurally text-coupled (it reads the file as
+  UTF-8 and hands a `string` to `onContentUpdate`), and its #124 echo/conflict
+  machinery is dead weight for a surface that never writes. It returns
+  `{ isReloading, isFileDeleted, isWatchUnavailable, unavailableReason,
+  markReloaded, recover }`, depends on `[filePath]` only (callbacks live in
+  refs), **never** calls `fileWatch.pause` / `resume` (those are global per path
+  with no safety timeout, so a stuck pause would deafen every consumer of that
+  path), and re-checks existence via `file:getStats` before reporting a delete.
+  `classifyWatchStartFailure` maps a refused `start` to `'limit'` only for the
+  watched-files cap, and `'watcher-error'` otherwise, so the UI never tells a
+  user to close tabs for an unrelated fault.
+- **`hooks/fileWatchSlot.ts`** — one consumer's hold on a main-process watch,
+  used by **both** hooks. `window.api.fileWatch.start` is not idempotent (it
+  increments a per-window count), so a consumer must send exactly as many stops
+  as successful starts. The slot pairs an `isHeld` flag with a serialised
+  operation queue, which makes three failure modes impossible: a double
+  acquire (leaks a slot out of the 100 available until `start` refuses for every
+  surface), an unmatched release (deafens whichever panel legitimately holds the
+  count), and a stop overtaking its own start (leaks the slot permanently).
+  `releaseFileWatch` is safe to call unconditionally in an effect cleanup.
 
 ---
 
@@ -422,8 +544,9 @@ The service integrates these components:
 ## Symlinks
 
 - Watchers do not follow symlinks (security)
+- **Single-file watches set `followSymlinks: false` explicitly** (`watcher/singleFileWatch.ts`, added in #70). chokidar v3 defaults this to `true`, so a link planted inside the project would otherwise make the watcher — and the automatic re-read behind it — track an out-of-project target
 - Symlinked entries are flagged in the Project Tree with a small chain icon and tooltip
-- Operations on symlink targets remain subject to project boundary checks
+- Operations on symlink targets remain subject to project boundary checks. Since #70 the read handlers enforce that with `fs.realpath` on both ends rather than by comparing path text — see [API Services § Path confinement](../api-services.md#path-confinement-for-the-file-read-ipc-handlers)
 
 ---
 

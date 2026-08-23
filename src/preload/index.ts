@@ -10,6 +10,7 @@ import type { GlobalSettings, GlobalSettingsChanged } from '../shared/ipc/global
 import type { LogEntry } from '../shared/ipc/logging-schema'
 import type { GitStateChangeEvent, GitWatcherStatus, GitPollTriggeredEvent } from '../shared/ipc/git-watcher-schema'
 import type { LockResult, LockStatus } from '../shared/ipc/project-lock-schema'
+import type { ImageReadResponse } from '../shared/ipc/file-image-schema'
 import type {
   ScreenshotCaptureRequest,
   ScreenshotCaptureResponse,
@@ -111,19 +112,31 @@ const api = {
     }> => ipcRenderer.invoke('file:validatePath', filePath, projectRoot),
 
     /**
-     * Read a file as base64-encoded data URL
+     * Read an image, or learn that it has not changed
      *
-     * Used by ImageViewerPanel to load images in the sandboxed renderer.
-     * Returns a data URL like: data:image/png;base64,iVBORw0KGgo...
+     * The only image read channel: ImageViewerPanel loads images through it in
+     * the sandboxed renderer, and gets back a data URL like
+     * data:image/png;base64,iVBORw0KGgo...
+     *
+     * Pass the `version` from the previous response as `knownVersion`: an
+     * unchanged file then answers `{ status: 'unchanged', version }` without
+     * re-encoding up to ~67 MB of base64 on the main-process event loop or
+     * sending it across IPC. `unchanged` is a SUCCESS - keep the bytes you
+     * have; it must not be surfaced as a failed refresh.
+     *
+     * Omit `knownVersion` whenever you hold no bytes (first load, remount,
+     * after an error) to force a full read. The version is opaque: store the
+     * one you were given, never parse or construct one.
      *
      * @param filePath - Absolute path to the image file
-     * @returns Data URL string for use in <img src="...">
+     * @param knownVersion - Version the caller already holds bytes for
+     * @returns The bytes plus their version, or `unchanged` plus that version
      * @throws Error if file doesn't exist, is outside project, or unsupported format
      *
-     * @see Spec #015 - Image preview viewer specification
+     * @see Issue #70 - preview tabs show stale content when the file changes
      */
-    readAsBase64: (filePath: string): Promise<string> =>
-      ipcRenderer.invoke('file:readAsBase64', filePath),
+    readImage: (filePath: string, knownVersion?: string): Promise<ImageReadResponse> =>
+      ipcRenderer.invoke('file:readImage', filePath, knownVersion),
 
     // External file drop operations (Spec #012)
     /**

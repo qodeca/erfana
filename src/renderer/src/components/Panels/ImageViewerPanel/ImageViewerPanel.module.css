@@ -59,6 +59,11 @@
   display: flex;
   align-items: center;
   gap: var(--space-4);
+  /* UX-8: the metadata group is what gives way in a narrow split layout, so the
+     status slot never shifts the zoom controls sideways mid-click. */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .metadataItem {
@@ -243,6 +248,15 @@
   user-select: text;
 }
 
+/*
+ * The error state reuses `.bannerButton` for its Reload action (H1): one
+ * affordance, one visual treatment, wherever the viewer offers a way out. The
+ * error state is a column, so the button carries no inline-row assumptions.
+ */
+.errorState .bannerButton {
+  margin-top: var(--space-2);
+}
+
 /* ============================================
  * Empty State
  * ============================================ */
@@ -296,13 +310,162 @@
 }
 
 /* ============================================
+ * Refresh Status Slot (issue #70)
+ * ============================================ */
+
+/*
+ * Permanently mounted live region. It is never conditionally rendered: a live
+ * region added to the DOM at the same moment its text appears is not announced.
+ *
+ * The reservation is sized to the longest PERSISTENT string ("Auto-refresh
+ * unavailable", ~137px at --text-sm) so text appearing and disappearing cannot
+ * shift the zoom controls (UX-8) - not to the longest string of all. The old
+ * 13rem reserved ~70px more than any wording needed, and `flex-shrink: 0` then
+ * pushed the fixed-width controls out of a narrow split panel, where
+ * `overflow: hidden` on the toolbar made them overlap. The slot now yields
+ * before the controls do and truncates rather than mangling them; a transient
+ * failure line that is longer borrows width from the metadata group, which
+ * truncates first.
+ */
+.statusSlot {
+  flex: 0 1 auto;
+  /* Not a --space-* token by design: that scale tops out at 48px
+     (--space-24) because it sizes gaps and padding, while this is a
+     text-content width. NOTE: --text-sm is a fixed 11px, so this reservation
+     does NOT track a user font-size preference - it tracks the root font size
+     only. */
+  min-width: 8.75rem;
+  margin-right: var(--space-6);
+  font-size: var(--text-sm);
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* Override dockview's inherited user-select: none (issue #211). */
+  user-select: text;
+}
+
+/* Transient good news: the app's positive signal colour, matching the editor. */
+.statusSlot--positive {
+  color: var(--color-accent-secondary);
+  animation: fadeIn var(--transition-normal);
+}
+
+/*
+ * Every degraded state - dead watch, failed re-read, failed Reload.
+ *
+ * Not --color-text-secondary: that is the exact token, size and row as
+ * `.metadataItem`, so "auto-refresh is broken" read as decorative metadata.
+ * --color-warning (#cca700) measures 8.01:1 against --color-bg-primary
+ * (#161312), comfortably past WCAG 1.4.3's 4.5:1, and is not the lime positive
+ * colour that would make bad news look like good news.
+ */
+.statusSlot--warning {
+  color: var(--color-warning);
+}
+
+/* ============================================
+ * Degraded-State Banner (issue #70)
+ * ============================================ */
+
+.deletedBanner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-6);
+  background-color: var(--color-bg-secondary);
+  border-bottom: var(--border-width) solid var(--color-border-default);
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  flex-shrink: 0;
+  animation: fadeIn var(--transition-normal);
+}
+
+/*
+ * Variant treatments. `data-variant` used to be set and never styled, so a
+ * deleted file and a dead watch looked identical - and neither matched the
+ * Markdown editor, which paints its "this file was deleted" warning in the
+ * error tokens.
+ *
+ * deleted -> the editor's exact tokens (#ffcccb on #3c1f1f = 10.5:1).
+ * unavailable / stale -> warning tokens: the file is still there, only the
+ * freshness guarantee is gone (#dcdcaa on the composited warning background
+ * = 11.2:1).
+ */
+.deletedBanner[data-variant='deleted'] {
+  background-color: var(--color-error-bg);
+  border-bottom-color: var(--color-error-border);
+  color: var(--color-error-text-light);
+}
+
+.deletedBanner[data-variant='unavailable'],
+.deletedBanner[data-variant='stale'] {
+  background-color: var(--color-warning-bg);
+  border-bottom-color: var(--color-warning-border);
+  color: var(--color-warning-icon);
+}
+
+.bannerMessage {
+  flex: 1;
+  min-width: 0;
+  /* Override dockview's inherited user-select: none (issue #211). */
+  user-select: text;
+}
+
+/*
+ * The only action either degraded surface offers, so it has to look like a
+ * button. --color-border-default on the old neutral banner measured 1.24:1 -
+ * invisible, which left Reload reading as plain text.
+ *
+ * Filled + bordered: --color-bg-primary fill against every banner background,
+ * with a --color-text-secondary (#858585) border that measures 4.1:1 on the
+ * deleted banner and 4.4:1 on the warning one, both past WCAG 1.4.11's 3:1 for
+ * a control boundary. The label (#cccccc on #161312) measures 11.5:1.
+ */
+.bannerButton {
+  flex-shrink: 0;
+  height: var(--input-height-sm);
+  padding: 0 var(--space-4);
+  background-color: var(--color-bg-primary);
+  border: var(--border-width) solid var(--color-text-secondary);
+  border-radius: 0;
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: all var(--transition-normal);
+}
+
+.bannerButton:hover:not(:disabled) {
+  background-color: var(--color-bg-hover-solid);
+  color: var(--color-white);
+}
+
+.bannerButton:disabled {
+  opacity: var(--opacity-disabled);
+  cursor: not-allowed;
+}
+
+.bannerButton:focus-visible {
+  outline: 1px solid var(--color-border-focus);
+  outline-offset: 1px;
+}
+
+/* ============================================
  * Reduced Motion Support
  * ============================================ */
 
 @media (prefers-reduced-motion: reduce) {
   .controlButton,
-  .zoomLevel {
+  .zoomLevel,
+  .bannerButton {
     transition: none;
+  }
+
+  /* UX-10: the #70 surfaces fade in; both opt out here rather than shipping a
+     second, unguarded animation. */
+  .statusSlot--positive,
+  .deletedBanner {
+    animation: none;
   }
 
   .spinner {
