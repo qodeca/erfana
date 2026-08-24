@@ -1,0 +1,7 @@
+SPDX-License-Identifier: GPL-3.0-only
+SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+
+Corpus 4 fixture: a subresource of an UNKNOWN asset type, referenced as a
+stylesheet by error/index.html. It exists (so it is served, not 404) but its
+.unknownext extension is not a known script/style type, so the preview scheme
+serves it 200 while recording an `unsupported-asset-type` diagnostic (AC7/AC20).
