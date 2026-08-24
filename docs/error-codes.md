@@ -2,7 +2,7 @@
 
 Project-wide index of `ErrorCode` values in `src/shared/errors.ts`, grouped by category. For each code: the enum name, the user-facing message (from `ERROR_MESSAGES` map), and the primary throw site. For whisper + transcription codes, also the operator action on encounter.
 
-**Why this document exists**: Phase 4 introduced 6 new whisper codes (see [ADR 0001](./adrs/0001-self-host-whisper-binaries.md)); the full enum has grown to 105 codes. A single mapping table saves every future maintainer a `grep -r ErrorCode` sweep.
+**Why this document exists**: Phase 4 introduced 6 new whisper codes (see [ADR 0001](./adrs/0001-self-host-whisper-binaries.md)); the full enum has grown to 120 codes. A single mapping table saves every future maintainer a `grep -r ErrorCode` sweep.
 
 **Source of truth**: `src/shared/errors.ts`. If this doc drifts, `errors.ts` wins — file an issue.
 
@@ -44,7 +44,7 @@ See `src/main/services/SettingsService.ts`, `ProjectSettingsService.ts`, `Global
 
 ## Import & export (30 codes)
 
-5 `PDF_*` (legacy import) + 12 generic `IMPORT_*` + 5 document-import `IMPORT_*` + 4 `PDF_EXPORT_*` + 4 `DOCX_EXPORT_*` in `src/shared/errors.ts`.
+5 `PDF_*` (legacy import) + 12 generic `IMPORT_*` + 5 document-import `IMPORT_*` + 4 `PDF_EXPORT_*` + 4 `DOCX_EXPORT_*` in `src/shared/errors.ts`. Image export has its own 15 codes — see [Image export](#image-export-15-codes) below; they are **not** counted here.
 
 Grouped by pipeline stage. See `docs/api-services-features.md` §LiteParseConverter and §DocxService for full flows.
 
@@ -55,6 +55,32 @@ Grouped by pipeline stage. See `docs/api-services-features.md` §LiteParseConver
 | Document-import (#132) | `IMPORT_DEPENDENCY_MISSING`, `IMPORT_OCR_FAILED`, `IMPORT_PAGE_LIMIT_EXCEEDED`, `IMPORT_TIMEOUT`, `IMPORT_BUSY` |
 | PDF-export | `PDF_EXPORT_CANCELLED`, `PDF_EXPORT_FAILED`, `PDF_EXPORT_NO_CONTENT`, `PDF_EXPORT_INVALID_REQUEST` |
 | DOCX-export | `DOCX_EXPORT_CANCELLED`, `DOCX_EXPORT_FAILED`, `DOCX_EXPORT_NO_CONTENT`, `DOCX_EXPORT_INVALID_REQUEST` |
+
+---
+
+## Image export (15 codes)
+
+15 `IMAGE_EXPORT_*` in `src/shared/errors.ts`, all from issue #73 (PNG / PDF / clipboard export in the image viewer).
+
+Unlike most domains, these never travel as a thrown `AppError`. `ImageExportService` returns `{ success: false, errorCode, error: ERROR_MESSAGES[errorCode] }` from a single mapping point, so the message the toast shows is by construction the string in this table — no `getUserFriendlyMessage()` hop, and no way for an unmapped code to read "An unexpected error occurred". Contract in `src/shared/ipc/image-export-schema.ts`; channel in [IPC patterns § Export](./ipc-patterns.md#export-pdf-handlersts-docx-handlersts-image-export-handlersts).
+
+| Code | User copy | Raised when |
+|------|-----------|-------------|
+| `IMAGE_EXPORT_CANCELLED` | "Image export was cancelled" | Save dialog dismissed. **Never shown** – the renderer suppresses the toast, because a cancel is not an error |
+| `IMAGE_EXPORT_INVALID_REQUEST` | "Invalid image export request" | Untrusted sender, Zod failure, or an extension outside the supported list |
+| `IMAGE_EXPORT_BUSY` | "Another image export is already running" | The single main-side export lock is held. Not normally reachable from the UI: all three buttons mark themselves busy together, so a legal click cannot produce it |
+| `IMAGE_EXPORT_SOURCE_UNREADABLE` | "Could not read this image – it may have been moved or deleted" | ENOENT / EACCES on the source, or it is not inside the open project. This is also the deleted-file path |
+| `IMAGE_EXPORT_SOURCE_TOO_LARGE` | "This image is over the 50 MB export limit" | Source exceeds `MAX_IMAGE_SIZE`, the same 50 MB cap `file:readImage` uses |
+| `IMAGE_EXPORT_DECODE_FAILED` | "Could not decode this image file" | The header parse produced no dimensions, or the rasterize harness could not decode the bytes |
+| `IMAGE_EXPORT_OUTPUT_TOO_LARGE` | "Too many pixels to export – Erfana never shrinks an export, so nothing was written" | Declared or decoded pixel count over `MAX_OUTPUT_PIXELS`. Refused before the bytes reach the harness where possible |
+| `IMAGE_EXPORT_SVG_TOO_LARGE` | "This SVG renders too large at 2x to export, so nothing was written" | An SVG's intrinsic size times the fixed 2x raster factor exceeds the cap. Separate code so the message names the 2x rule rather than blaming the file |
+| `IMAGE_EXPORT_PDF_PAGE_TOO_LARGE` | "Too big for one PDF page (the limit is 200 inches per side) – export as PNG instead" | Either side exceeds the PDF format's 200-inch page ceiling. Fails loudly because downscaling is forbidden |
+| `IMAGE_EXPORT_PDF_GEOMETRY_FAILED` | "The PDF page came out the wrong size, so nothing was written" | The produced PDF is not exactly one page of the requested geometry (`verifyPdfGeometry` runs before anything is written) |
+| `IMAGE_EXPORT_ICO_SIZE_MISMATCH` | "Could not export the largest size in this icon file" | Decoded dimensions disagree with the largest entry in the `.ico` directory and the entry is not a PNG slice. Never a silent wrong-size export |
+| `IMAGE_EXPORT_SOURCE_COLLISION` | "That would overwrite the image you are exporting" | The chosen destination resolves to the source, or cannot be *proven* not to (a non-ENOENT `realpath` error refuses rather than failing open) |
+| `IMAGE_EXPORT_WRITE_FAILED` | "Could not write to that folder" | Writing the exported file threw |
+| `IMAGE_EXPORT_CLIPBOARD_FAILED` | "The clipboard rejected the image" | The decoded image was empty, or `clipboard.writeImage` threw |
+| `IMAGE_EXPORT_FAILED` | "Image export failed" | Catch-all, including harness timeout and hidden-window load failure |
 
 ---
 

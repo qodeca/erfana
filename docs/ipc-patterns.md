@@ -256,12 +256,15 @@ flow added later, whose channel names come from `import-channels.ts`.
 | `import:documentProgress` | Event: import progress update (main → renderer) |
 | `import:dependenciesReady` | Event: dependency detection complete (main → renderer); sent from `src/main/index.ts` |
 
-### Export (`pdf-handlers.ts`, `docx-handlers.ts`)
+### Export (`pdf-handlers.ts`, `docx-handlers.ts`, `image-export-handlers.ts`)
 
 | Channel | Purpose |
 |---------|---------|
 | `pdf:exportToPdf` | Render the document to PDF via Electron's `printToPDF` |
 | `docx:exportToDocx` | Render the document to DOCX via `@turbodocx/html-to-docx` |
+| `image-export:run` | Export the image a viewer tab is showing as PNG, as PDF, or to the clipboard (#73). Payload `{ filePath, target }`; the response carries a code and its mapped message, never image bytes. **Sender-gated by `isTrustedSender` before the payload is parsed** — unlike `pdf:` / `docx:` above, which have no such gate (recorded as technical debt) |
+
+Three further `image-export:*` names exist in `src/shared/ipc/image-export-channels.ts` — `harness-ready`, `harness-render`, `harness-result`. They are **not** in the table above because they are never registered on the global `ipcMain`: `ImageRasterizeWindow` attaches them per run to the hidden rasterize window's `webContents.mainFrame.ipc`, the same frame-scoping the screenshot overlay uses for `screenshot:areaSelected`. A send from any other `webContents` cannot reach them, and each message additionally carries the run's UUID token and is checked against `senderFrame.url`.
 
 ### Transcription (`transcription-handlers.ts`)
 
@@ -365,6 +368,7 @@ To keep IPC payloads consistent across processes, shared zod schemas live at `sr
 - Transcription schemas — `TranscriptionImportRequestSchema`, `TranscriptionProgress`, `TranscriptionImportResult`, `TranscriptionSettingsSchema` (see `src/shared/ipc/transcription-schema.ts`)
 - Document import schemas — `DocumentImportRequestSchema`, `DocumentImportOptionsSchema`, `DocumentImportProgress`, `DocumentImportResult`, `DependencyReadyEvent` (see `src/shared/ipc/import-schema.ts`); channel constants in `src/shared/ipc/import-channels.ts`
 - Image read schemas — the contract behind `file:readImage` (#70): `ImageReadRequestSchema` plus the `unchanged`/`ok`-discriminated `ImageReadResponse`, which lets the renderer skip a re-encode when its cached `version` still matches (see `src/shared/ipc/file-image-schema.ts`)
+- Image export schemas — `ImageExportRequestSchema` (`.strict()`, with the supported-extension allow-list expressed in the schema itself, so "unsupported format" needs no error code of its own) and the `success`-discriminated `ImageExportResponse`, whose failure branch **requires** both `errorCode` and `error`; plus the main-only harness render/result union (see `src/shared/ipc/image-export-schema.ts`); channel constants in `src/shared/ipc/image-export-channels.ts` (#73). The supported extensions and their MIME map are shared across the process boundary by `src/shared/ipc/image-formats.ts`, which both `main/services/file/imageRead.ts` and `renderer/src/utils/imageUtils.ts` import rather than re-declaring
 - Clipboard schemas — `ClipboardWriteTextSchema`, `CLIPBOARD_MAX_TEXT_LENGTH`, and the `ClipboardBridge` contract shared by the preload bridge and renderer service (see `src/shared/ipc/clipboard-schema.ts`); channel constants in `src/shared/ipc/clipboard-channels.ts`
 - Claude Code status schemas — the per-`terminalId` `ClaudeStatusSnapshot` contract consumed by `useClaudeStatusStore` and the register/nudge payloads (see `src/shared/ipc/claude-status-schema.ts`); channel constants in `src/shared/ipc/claude-status-channels.ts` (#216)
 - System schemas – OS-integration actions with no payload, so there is nothing for Zod to validate and sender-frame gating is the sole guard. `system:openScreenRecordingSettings` opens the macOS Screen Recording privacy pane and is the **only** one of the two that is platform-gated (it no-ops off `darwin`). `system:relaunchApp` restarts the app on every platform; the macOS Screen Recording grant is merely the reason the flow exists, since macOS applies a fresh grant only to a newly-launched process. Channel constants in `src/shared/ipc/system-channels.ts`; both handlers are sender-gated main-side in `src/main/ipc/system-handlers.ts` via `isTrustedSender` (see [security.md § Sender-frame gating](./security.md#sender-frame-gating))
