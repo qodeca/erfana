@@ -21,12 +21,22 @@
  */
 
 /* Wrapper around the healthy panel content. Exists to be a focus target after
-   a successful Reload, so `flex` passthrough is the whole layout job: the
-   panel below it still measures against `.sidebar-panel-content`. */
+   a successful Reload, so passing the panel's own height through is the whole
+   layout job.
+
+   `height: 100%` AND `flex: 1 1 auto`, because this wrapper sits in two kinds of
+   parent: in the sidebar the parent (`.sidebar-panel-content`) is a flex column,
+   where `flex: 1 1 auto` fills; in the dockview editor area (the image viewer,
+   issue #73) the parent is a fixed-height block, where `flex` is inert and only
+   `height: 100%` fills. Without the height the wrapper collapsed to its content
+   and the image viewer's `height: 100%` container shrank to the image, leaving
+   dead space below it. Both parents have a definite height, so `height: 100%`
+   is correct in both. */
 .panel-error-content {
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
+  height: 100%;
   min-height: 0;
 }
 
