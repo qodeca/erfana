@@ -171,21 +171,66 @@ describe('PreviewRequestFilter gating', () => {
     )
   })
 
-  it('refuses an erfana-preview: redirect target even against a populated allowlist', () => {
+  it('allows an erfana-preview request even for a sensitive-looking path — the confining protocol handler, not this filter, refuses local reads', () => {
+    // The network filter governs REMOTE egress; local `erfana-preview:` reads are
+    // gated by `resolveConfined` (realpath confinement + dot-segment / excluded-dir
+    // exclusion), which refuses a dotfile like `.env` with a 403. So the filter
+    // passes the request through to that handler rather than blanket-cancelling
+    // the whole local scheme (which broke the entry page and every subresource).
     const s = makeSession()
-    const { ctx, onBlocked } = makeContext(['cdn.jsdelivr.net'])
+    const { ctx, onBlocked, onRequestStarted } = makeContext(['cdn.jsdelivr.net'])
     attach(s.session, ctx, FILTER_DEPS)
     const listener = s.onBeforeRequest.mock.calls[0][0] as OnBeforeListener
 
     const callback = vi.fn()
     listener(details(9, 'erfana-preview://deadbeef/.env'), callback)
 
+    expect(callback).toHaveBeenCalledWith({ cancel: false })
+    expect(onRequestStarted).toHaveBeenCalledWith(9)
+    expect(onBlocked).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['entry document (mainFrame)', 'mainFrame', 'erfana-preview://deadbeef/index.html'],
+    ['relative stylesheet', 'stylesheet', 'erfana-preview://deadbeef/styles.css'],
+    ['relative script', 'script', 'erfana-preview://deadbeef/app.js'],
+    ['relative image', 'image', 'erfana-preview://deadbeef/logo.svg']
+  ])(
+    'allows a local erfana-preview request — %s — so the confining protocol handler serves it',
+    (_label, resourceType, url) => {
+      const s = makeSession()
+      const { ctx, onBlocked, onRequestStarted } = makeContext(['cdn.jsdelivr.net'])
+      attach(s.session, ctx, FILTER_DEPS)
+      const listener = s.onBeforeRequest.mock.calls[0][0] as OnBeforeListener
+
+      const callback = vi.fn()
+      listener(details(7, url, resourceType), callback)
+
+      // Local, protocol-handled reads are confined by `resolveConfined`, not by
+      // this remote-egress filter. Cancelling them here breaks the whole page
+      // (ERR_BLOCKED_BY_CLIENT on the entry; broken CSS/JS/images on subresources).
+      expect(callback).toHaveBeenCalledWith({ cancel: false })
+      expect(onRequestStarted).toHaveBeenCalledWith(7)
+      expect(onBlocked).not.toHaveBeenCalled()
+    }
+  )
+
+  it('still refuses a remote https request to a non-approved host (egress gate intact)', () => {
+    const s = makeSession()
+    const { ctx, onBlocked, onRequestStarted } = makeContext(['cdn.jsdelivr.net'])
+    attach(s.session, ctx, FILTER_DEPS)
+    const listener = s.onBeforeRequest.mock.calls[0][0] as OnBeforeListener
+
+    const callback = vi.fn()
+    listener(details(8, 'https://tracker.example/beacon', 'script'), callback)
+
     expect(callback).toHaveBeenCalledWith({ cancel: true })
+    expect(onRequestStarted).not.toHaveBeenCalled()
     expect(onBlocked).toHaveBeenCalledWith(
-      'insecure-scheme',
-      'deadbeef',
-      'erfana-preview://deadbeef/.env',
-      false
+      'blocked-host',
+      'tracker.example',
+      'https://tracker.example/beacon',
+      true
     )
   })
 

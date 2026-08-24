@@ -13,10 +13,20 @@
  * exfiltration channel. So EVERY request is observed; the `cspReport`/`ping`
  * badge-noise suppression happens INSIDE the handler, AFTER the cancel decision.
  *
- * Each request — and each redirect hop, which re-enters `onBeforeRequest`
- * independently — is classified by the pure `decideRequest` (item 6). A deny
- * cancels with `callback({ cancel: true })`; an `erfana-preview:` redirect
- * target is always refused regardless of the allowlist (design §1.2).
+ * A request carrying the LOCAL `erfana-preview:` scheme — the entry document and
+ * every relative subresource it references — is served by the confining
+ * `protocol.handle` pipeline (`resolveConfined`: realpath confinement + excluded
+ * paths + an unguessable 32-hex root token), which is the real gate for local
+ * reads. Under Electron 39 those local requests re-enter this session-scoped
+ * filter, so the filter ALLOWS them and lets the handler confine the bytes;
+ * blanket-cancelling the scheme here instead broke the entry page
+ * (`ERR_BLOCKED_BY_CLIENT`) and every CSS/JS/image subresource (#78).
+ *
+ * Every OTHER request — and each redirect hop, which re-enters `onBeforeRequest`
+ * independently — is classified by the pure `decideRequest` (item 6): a remote
+ * load to an approved host is allowed, everything else cancels with
+ * `callback({ cancel: true })`. The network filter governs remote EGRESS; the
+ * protocol handler governs local reads.
  *
  * `onCompleted` and `onErrorOccurred` settle in-flight requests so the bounded
  * timeout sweep records `network-timeout` only for genuinely stuck requests, and
@@ -30,6 +40,7 @@
 import type { Session } from 'electron'
 import type { PreviewFailureType } from '../../../shared/ipc/preview-types'
 import { isApprovableHost } from '../../../shared/ipc/preview-settings-schema'
+import { logger } from '../LoggingService'
 import { decideRequest } from './previewFilterDecision'
 
 /**
@@ -99,27 +110,68 @@ export function attach(
   // The no-filter overload: NO `types`/`urls` argument, so every request is
   // observed and therefore cancellable (design §5(c), X2a).
   session.webRequest.onBeforeRequest((details, callback) => {
-    const verdict = decideRequest(details.url, ctx.getAllowedHosts())
-
-    if (verdict.action === 'allow') {
-      inFlight.set(details.id, { startedAt: now(), host: hostOf(details.url), url: details.url })
-      ctx.onRequestStarted(details.id)
-      callback({ cancel: false })
-      return
+    // Electron requires the callback be invoked with a response object exactly
+    // once. `answer` guarantees that: without it, an unexpected throw below would
+    // leave the request neither allowed nor cancelled — hung forever.
+    let answered = false
+    const answer = (response: { cancel: boolean }): void => {
+      if (answered) return
+      answered = true
+      callback(response)
     }
 
-    // Cancel FIRST — the refusal must land regardless of badge policy.
-    callback({ cancel: true })
+    try {
+      // A request carrying the LOCAL `erfana-preview:` scheme — the entry
+      // document AND every relative subresource it references (CSS, JS, images,
+      // fonts) — is served by the confining `protocol.handle` pipeline, NOT the
+      // remote-egress path this filter governs. Under Electron 39 these local
+      // requests re-enter this session-scoped filter, so they must be allowed
+      // here; otherwise `decideRequest` cancels them all as scheme-confusion and
+      // NOTHING renders (ERR_BLOCKED_BY_CLIENT on the entry, broken CSS/JS/images
+      // on every subresource — AC6). This grants no read capability: the protocol
+      // handler realpath-confines every byte to the served root, and the 32-hex
+      // root token is unguessable, so a page can reach only files it already may.
+      // The network filter's real job — blocking egress to non-approved remote
+      // hosts — is unaffected; `decideRequest` below still governs every https:
+      // (and other-scheme) request exactly as before.
+      if (isPreviewSchemeUrl(details.url)) {
+        inFlight.set(details.id, { startedAt: now(), host: hostOf(details.url), url: details.url })
+        ctx.onRequestStarted(details.id)
+        answer({ cancel: false })
+        return
+      }
 
-    // AFTER the cancel decision: suppress badge noise for `cspReport`/`ping`.
-    // These fire in volume from a hostile page (a beacon fan-out); cancelling
-    // them still matters, but badging every one would bury the real signal.
-    if (details.resourceType === 'cspReport' || details.resourceType === 'ping') {
-      return
+      const verdict = decideRequest(details.url, ctx.getAllowedHosts())
+
+      if (verdict.action === 'allow') {
+        inFlight.set(details.id, { startedAt: now(), host: hostOf(details.url), url: details.url })
+        ctx.onRequestStarted(details.id)
+        answer({ cancel: false })
+        return
+      }
+
+      // Cancel FIRST — the refusal must land regardless of badge policy.
+      answer({ cancel: true })
+
+      // AFTER the cancel decision: suppress badge noise for `cspReport`/`ping`.
+      // These fire in volume from a hostile page (a beacon fan-out); cancelling
+      // them still matters, but badging every one would bury the real signal.
+      if (details.resourceType === 'cspReport' || details.resourceType === 'ping') {
+        return
+      }
+
+      const approvable = verdict.reason === 'blocked-host' && isApprovableHost(verdict.host)
+      ctx.onBlocked(verdict.reason, verdict.host, details.url, approvable)
+    } catch (error) {
+      // Fail closed: deny by default (matching the filter's posture) and drop any
+      // half-recorded in-flight entry so the sweep does not later badge it.
+      inFlight.delete(details.id)
+      answer({ cancel: true })
+      logger.error(
+        'Preview request filter listener error',
+        error instanceof Error ? error : undefined
+      )
     }
-
-    const approvable = verdict.reason === 'blocked-host' && isApprovableHost(verdict.host)
-    ctx.onBlocked(verdict.reason, verdict.host, details.url, approvable)
   })
 
   const settle = (id: number): void => {
@@ -156,6 +208,18 @@ export function attach(
     session.webRequest.onCompleted(null)
     session.webRequest.onErrorOccurred(null)
     inFlight.clear()
+  }
+}
+
+/** The local preview scheme, matched case-insensitively on the URL prefix. */
+const PREVIEW_SCHEME_PREFIX = 'erfana-preview:'
+
+/** True when `url` is an `erfana-preview:` URL (the local, protocol-served scheme). */
+function isPreviewSchemeUrl(url: string): boolean {
+  try {
+    return new URL(url).protocol === PREVIEW_SCHEME_PREFIX
+  } catch {
+    return false
   }
 }
 
