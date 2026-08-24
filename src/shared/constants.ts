@@ -444,3 +444,56 @@ export const PAUSE_CONTROLLER = {
   /** Safety timeout in ms: auto-resume if resume() not called within this window */
   SAFETY_TIMEOUT_MS: 10_000
 } as const
+
+/**
+ * HTML preview constants (Issue #74).
+ *
+ * Caps and timers for the `WebContentsView`-backed HTML preview: the asset
+ * read cap enforced by the protocol handler, the preview-owned watcher pool
+ * timings, failure-log ring-buffer + emission coalescing, bounded close/swap
+ * timeouts, the host-block toast budget, the post-load reload rate limit and
+ * the still-frame downscale caps.
+ *
+ * @see docs designs/sd-074-html-preview.md §1.4, §2.4
+ */
+export const PREVIEW = {
+  /** Max bytes served per asset; a larger file yields HTTP 413 */
+  MAX_ASSET_BYTES: 25 * 1024 * 1024,
+  /**
+   * Max bytes of the entry HTML read for static-link discovery. Bounds both the
+   * read and the synchronous parse5 parse that runs on the main thread, so a
+   * large or generated entry file cannot freeze the UI on every reload. Links
+   * live near the top of a document, so a truncated head still finds them.
+   */
+  MAX_ENTRY_HTML_BYTES: 4 * 1024 * 1024,
+  /**
+   * Max asset reads buffered concurrently per preview session. Each read is
+   * capped at MAX_ASSET_BYTES, so this bounds peak main-process memory a hostile
+   * page can force by fetching many large in-repo assets at once.
+   */
+  MAX_CONCURRENT_ASSET_READS: 8,
+  /** Per-panel watch cap (bounds EMFILE exposure, #146–#151) */
+  MAX_WATCHED_FILES: 16,
+  /** Coalesce window for pool change events before a reload/swap (ms) */
+  WATCH_COALESCE_MS: 30,
+  /** chokidar awaitWriteFinish.stabilityThreshold for preview watches (ms) */
+  WATCH_STABILITY_MS: 50,
+  /** chokidar awaitWriteFinish.pollInterval for preview watches (ms) */
+  WATCH_POLL_INTERVAL_MS: 25,
+  /** Failure-log ring-buffer capacity; older entries drop, sets `truncated` */
+  MAX_FAILURES: 100,
+  /** Failure emission coalescing window with a trailing send (ms) */
+  FAILURE_COALESCE_MS: 250,
+  /** Bounded destroy: await close() this long before webContents.destroy (ms) */
+  CLOSE_TIMEOUT_MS: 1000,
+  /** CSS swap race timeout; any non-`true` outcome falls back to reload (ms) */
+  SWAP_TIMEOUT_MS: 1000,
+  /** Max host-block toasts surfaced per project before suppression */
+  MAX_HOST_TOASTS: 3,
+  /** At most one full post-load pipeline per this interval (ms) */
+  RELOAD_MIN_INTERVAL_MS: 750,
+  /** Still-frame downscale: longest edge in px before toDataURL */
+  MAX_FRAME_EDGE_PX: 1024,
+  /** Still-frame dataURL char cap; over budget ⇒ no frame emitted */
+  MAX_FRAME_DATAURL_CHARS: 2 * 1024 * 1024
+} as const

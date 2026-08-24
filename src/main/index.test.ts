@@ -130,7 +130,9 @@ describe('Main Process - Window Creation', () => {
       // #216: claude-status handler imports `webContents` for the targeted send.
       webContents: {
         fromId: vi.fn(() => null)
-      }
+      },
+      // #74: preview scheme registration runs at module load.
+      protocol: { registerSchemesAsPrivileged: vi.fn() }
     }))
 
     // Mock menu module
@@ -469,7 +471,8 @@ describe('Main Process - Window Creation', () => {
           },
           webContents: {
             fromId: vi.fn(() => null)
-          }
+          },
+          protocol: { registerSchemesAsPrivileged: vi.fn() }
         }))
 
         vi.doMock('./menu', () => ({

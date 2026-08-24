@@ -104,7 +104,7 @@ describe('ToastNotification', () => {
       })
     })
 
-    it('close button is keyboard focusable with tabIndex', async () => {
+    it('close button is keyboard focusable', async () => {
       render(
         <ToastProvider>
           <ToastNotification />
@@ -117,8 +117,11 @@ describe('ToastNotification', () => {
         expect(screen.getByText('Test')).toBeInTheDocument()
       })
 
+      // A native <button> is inherently keyboard-focusable — no explicit tabIndex
+      // needed (and the redundant onKeyDown that double-handled Enter/Space is gone).
       const closeButton = screen.getByRole('button', { name: 'Close' })
-      expect(closeButton).toHaveAttribute('tabIndex', '0')
+      closeButton.focus()
+      expect(closeButton).toHaveFocus()
     })
 
     it('toast auto-dismisses after timeout if not manually closed', async () => {
@@ -261,7 +264,9 @@ describe('ToastNotification', () => {
 
       const closeButton = screen.getByRole('button', { name: 'Close' })
       expect(closeButton).toBeInTheDocument()
-      expect(closeButton).toHaveAttribute('tabIndex', '0')
+      // Focusable as a native button (no explicit tabIndex needed).
+      closeButton.focus()
+      expect(closeButton).toHaveFocus()
     })
 
     it('can close multiple toasts individually', async () => {

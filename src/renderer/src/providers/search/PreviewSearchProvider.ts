@@ -11,7 +11,12 @@
  * @see SearchProvider interface for contract documentation
  */
 
-import type { SearchProvider, SearchOptions, SearchMatch } from './SearchProvider'
+import type {
+  SearchProvider,
+  SearchOptions,
+  SearchMatch,
+  SearchCapabilities
+} from './SearchProvider'
 import { logger } from '../../utils/logger'
 
 /**
@@ -53,6 +58,17 @@ const CURRENT_HIGHLIGHT_NAME = 'search-current'
 export class PreviewSearchProvider implements SearchProvider {
   readonly id = 'preview'
   readonly name = 'Markdown Preview'
+
+  /**
+   * Full-match provider: it walks the rendered DOM, collects every matching
+   * range up front, and can scroll to any of them by index. Whole-word matching
+   * is supported via the `\b` regex boundary in {@link search}.
+   */
+  readonly capabilities: SearchCapabilities = {
+    randomAccess: true,
+    matchList: true,
+    wholeWord: true
+  }
 
   private containerRef: React.RefObject<HTMLDivElement | null>
   private highlightRanges: Range[] = []

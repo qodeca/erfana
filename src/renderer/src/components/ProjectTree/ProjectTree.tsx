@@ -12,6 +12,8 @@ import './ProjectTree.css'
 import { showGlobalToast } from '../Toast/toastService'
 import { isPointInElement } from '../../utils/domGeometry'
 import { getBasename, getDirname } from '../../utils/fileUtils'
+import { openFileInPanel } from '../../utils/openFileInPanel'
+import { useProjectStore } from '../../stores/useProjectStore'
 import type { MenuContext } from './context-menu/types'
 import { ContextMenuFactory } from './context-menu/factory'
 import {
@@ -1237,7 +1239,16 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
       })
       return siblings.map((s) => s.name)
     },
-    importFile
+    importFile,
+    // "Open as source" bypasses the running preview and opens the `.html` file
+    // in Monaco. The editor-area dockview API lives in the project store (the
+    // same seam MarkdownEditorPanel uses); pinning `kind: 'editor'` skips the
+    // preview eligibility check entirely.
+    openAsSource: (filePath: string) => {
+      openFileInPanel(useProjectStore.getState().dockviewApi ?? undefined, filePath, {
+        kind: 'editor'
+      })
+    }
   })
 
   /**

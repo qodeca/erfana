@@ -1,0 +1,248 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * HtmlPreviewTab Styles (Issue #74).
+ *
+ * Chrome-style tab for the running HTML preview panel. Mirrors ImageTab.css —
+ * one mechanism, one look — with a distinct icon. All values come from
+ * design tokens (docs/ui-style-guide.md); no rounded corners.
+ *
+ * @see HtmlPreviewTab.tsx for the component
+ * @see ImageTab.css for the sibling read-only tab
+ */
+
+/* ============================================
+ * Tab Container
+ * ============================================ */
+
+.html-preview-tab {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--tab-height);
+  min-width: 80px;
+  max-width: 300px;
+  padding: 0 var(--space-2) 0 var(--space-6);
+  box-sizing: border-box;
+  cursor: pointer;
+  user-select: none;
+  gap: var(--space-2);
+  flex: 1 1 0;
+  overflow: hidden;
+  transition: background-color var(--transition-fast);
+}
+
+.html-preview-tab:hover {
+  background-color: var(--color-bg-hover);
+}
+
+.dv-active-tab .html-preview-tab:hover {
+  background-color: var(--color-bg-hover-solid);
+}
+
+/* ============================================
+ * Tab Icon
+ * ============================================ */
+
+.html-preview-tab-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--color-text-secondary);
+}
+
+.dv-active-tab .html-preview-tab-icon {
+  color: var(--color-text-primary);
+}
+
+/* ============================================
+ * Tab Label (Filename)
+ * ============================================ */
+
+.html-preview-tab-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: var(--text-base);
+  color: var(--color-text-primary);
+  flex: 1;
+  min-width: 0;
+}
+
+.dv-active-tab .html-preview-tab-label {
+  color: var(--color-white);
+}
+
+.html-preview-tab-deleted {
+  color: var(--color-warning);
+  white-space: nowrap;
+}
+
+/* ============================================
+ * Close Button
+ * ============================================ */
+
+.html-preview-tab-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--icon-size-md);
+  height: var(--icon-size-md);
+  min-width: var(--icon-size-md);
+  padding: 0;
+  border: none;
+  border-radius: var(--border-radius);
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--transition-fast),
+    background-color var(--transition-fast), color var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.html-preview-tab:hover .html-preview-tab-close {
+  opacity: 1;
+}
+
+.html-preview-tab-close:hover {
+  background-color: var(--color-border-default);
+  color: var(--color-text-primary);
+}
+
+.html-preview-tab-close:active {
+  background-color: var(--color-gray-600);
+}
+
+.html-preview-tab-close:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: -1px;
+  opacity: 1;
+}
+
+/* ============================================
+ * Failure badge + popover (AC20)
+ * ============================================ */
+
+/* The indicator lives inline in the tab — always-DOM chrome the native preview
+ * view never paints over (design §1.8). The popover is portalled to
+ * #portal-root, so the anchor is only a flow slot; its position is not a
+ * positioning context. */
+.html-preview-badge-anchor {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.html-preview-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: var(--icon-size-md);
+  padding: 0 var(--space-2);
+  border: var(--border-width) solid var(--color-warning-border);
+  border-radius: var(--border-radius);
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color var(--transition-fast);
+}
+
+.html-preview-badge:hover {
+  /* Keep the amber warning hue on hover (a slightly stronger amber token), so the
+     affordance does not turn neutral exactly when the user targets it. */
+  background: var(--color-bg-warning);
+}
+
+.html-preview-badge:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: 1px;
+}
+
+.html-preview-badge-count {
+  font-family: var(--font-mono);
+}
+
+/* Portalled over the preview region; top/right are set inline from the trigger
+ * rect. The native view is hidden by the `menu` occluder while this is open. */
+.html-preview-badge-popover {
+  min-width: 240px;
+  max-width: 360px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: var(--space-6);
+  border: var(--border-width) solid var(--color-border-default);
+  border-radius: var(--border-radius);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-md);
+  z-index: var(--z-popover);
+}
+
+.html-preview-badge-group {
+  margin-bottom: var(--space-6);
+}
+
+.html-preview-badge-group:last-child {
+  margin-bottom: 0;
+}
+
+.html-preview-badge-group-label {
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-emphasis);
+  margin-bottom: var(--space-2);
+}
+
+.html-preview-badge-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.html-preview-badge-item {
+  font-size: var(--text-sm);
+  font-family: var(--font-mono);
+  color: var(--color-text-secondary);
+  padding: var(--space-1) 0;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+/* ============================================
+ * Dockview Integration Overrides
+ * ============================================ */
+
+.dockview-theme-dark .dv-tab:has(.html-preview-tab) {
+  padding: 0 !important;
+  flex: 1 1 0 !important;
+  min-width: 80px !important;
+  max-width: 300px !important;
+}
+
+.dockview-theme-dark .dv-default-tab:has(.html-preview-tab) {
+  padding: 0 !important;
+  width: auto !important;
+  min-width: 80px !important;
+  max-width: 300px !important;
+  flex: 1 1 0 !important;
+}
+
+.dockview-theme-dark .dv-default-tab:has(.html-preview-tab) .dv-default-tab-action {
+  display: none !important;
+}
+
+.dockview-theme-dark .dv-default-tab:has(.html-preview-tab) .dv-default-tab-content {
+  display: none !important;
+}
+
+/* ============================================
+ * Accessibility
+ * ============================================ */
+
+.html-preview-tab:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: -1px;
+}

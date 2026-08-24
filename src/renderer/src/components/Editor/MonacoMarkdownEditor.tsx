@@ -7,11 +7,19 @@ import { useSearchStore } from '../../stores/useSearchStore'
 import { logger } from '../../utils/logger'
 import { TEST_IDS } from '../../constants/testids'
 import { registerClipboardActions } from '../../utils/monacoClipboardCommands'
+import { getMonacoLanguage } from '../../utils/monacoLanguage'
+import { disableWorkerLanguageServices } from '../../utils/monacoLanguageServices'
 import './MonacoMarkdownEditor.css'
 
 // Configure Monaco to use local files instead of CDN
 // This prevents CSP violations in Electron
 loader.config({ monaco })
+
+// Opening a `.html`/`.css`/`.ts` file switches the model language (item 75), which
+// would otherwise spin up worker-backed language services that cannot be
+// constructed in this bundle (no MonacoEnvironment). Turn them off once, here,
+// leaving the main-thread tokenizer (syntax highlighting) intact. Idempotent.
+disableWorkerLanguageServices(monaco)
 
 /**
  * Context menu event payload for editor right-click handling.
@@ -414,7 +422,10 @@ export const MonacoMarkdownEditor = forwardRef<MonacoEditorHandle, MonacoMarkdow
       <div className="monaco-markdown-editor" data-testid={TEST_IDS.EDITOR_MONACO}>
         <Editor
           height="100%"
-          language="markdown"
+          // Markdown stays markdown; a `.html`/`.css`/`.ts`/… file gets its own
+          // Monarch tokenizer (item 75). Unknown/absent extensions fall back to
+          // 'markdown', so existing `.md` behaviour is unchanged.
+          language={getMonacoLanguage(filePath ?? '')}
           theme="vs-dark"
           value={value}
           onChange={(value) => onChange(value || '')}

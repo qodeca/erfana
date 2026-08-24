@@ -1,0 +1,7 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96" role="img" aria-label="Corpus logo">
+  <rect width="96" height="96" fill="#2b6cb0" />
+  <circle cx="48" cy="48" r="28" fill="#ffffff" />
+  <text x="48" y="56" font-family="system-ui, sans-serif" font-size="24" font-weight="700" text-anchor="middle" fill="#2b6cb0">E</text>
+</svg>

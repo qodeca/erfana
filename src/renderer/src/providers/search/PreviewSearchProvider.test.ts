@@ -91,6 +91,14 @@ describe('PreviewSearchProvider', () => {
       expect(provider.name).toBe('Markdown Preview')
     })
 
+    it('declares full-match capabilities', () => {
+      expect(provider.capabilities).toEqual({
+        randomAccess: true,
+        matchList: true,
+        wholeWord: true
+      })
+    })
+
     it('stores container ref', () => {
       expect(containerRef.current).toBe(container)
     })

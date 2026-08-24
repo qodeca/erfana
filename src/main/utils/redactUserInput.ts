@@ -24,6 +24,12 @@ import { AppError, ErrorCode } from '../../shared/errors'
  * where `<displayName>` is the raw filename the user typed and, for the
  * `reserved` reason, `<reasonSuffix>` adds a SECOND user-derived quoted
  * segment: ` — try "<suggestion>"`. Both quoted segments are user-derived.
+ *
+ * NOTE: `PREVIEW_LOCAL_FILE_MISSING` (Issue #74) is intentionally NOT listed. Its
+ * code is used only as a renderer badge reason (which keeps the full path by
+ * design); no `logger.*` site ever logs its message, so a redaction entry would
+ * guard a log line that does not exist. Re-add it here together with any future
+ * producer that logs that error.
  */
 const USER_INPUT_CODES = new Set<ErrorCode>([ErrorCode.INVALID_FILENAME])
 

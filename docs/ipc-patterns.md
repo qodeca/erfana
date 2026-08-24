@@ -312,6 +312,29 @@ Three further `image-export:*` names exist in `src/shared/ipc/image-export-chann
 | `claude-status:nudge` | Request an immediate status refresh for a panel (#216) |
 | `claude-status:changed` | Event: per-`terminalId` status snapshot update (main → renderer) (#216) |
 
+### HTML preview (`preview/*-handlers.ts`, constants in `preview-channels.ts`) (#74)
+
+Channel names come from the `PreviewChannels` / `PreviewEvents` constants in `src/shared/ipc/preview-channels.ts`. Every request is sender-validated main-side via `isTrustedPreviewSender` (`src/main/ipc/preview/isTrustedPreviewSender.ts`); the register payload carries `terminalId`/panel identity only — the previewed page's own trust is resolved main-side and never taken from the renderer. All 10 control channels are `invoke`/`handle` **except** `setBounds` and `setVisibility`, which are high-frequency fire-and-forget `send`/`on`.
+
+| Channel | Purpose |
+|---------|---------|
+| `preview:checkEligibility` | Whether a path may open as a running preview |
+| `preview:open` | Mint the `WebContentsView` and open a preview for a panel (may refuse if one is live) |
+| `preview:close` | Close and destroy the preview for a panel (bounded destroy) |
+| `preview:setBounds` | `ipcMain.on` – update the native view bounds (fire-and-forget; stale seqs dropped) |
+| `preview:setVisibility` | `ipcMain.on` – update view visibility with a diagnostic reason (fire-and-forget) |
+| `preview:reload` | Reload the previewed page |
+| `preview:approveHost` | Approve a remote host, writing back to the project allowlist |
+| `preview:find` | Start / advance an in-page find |
+| `preview:stopFind` | Stop the active in-page find |
+| `preview:exportPdf` | Export the live previewed page to PDF |
+| `preview:failuresChanged` | Event: the failure log for a panel changed (coalesced) |
+| `preview:hostBlocked` | Event: a remote host was blocked; drives the approve toast (budgeted) |
+| `preview:findResult` | Event: an in-page find produced a final result |
+| `preview:stillFrameChanged` | Event: the still-frame captured on hide changed |
+| `preview:loadStateChanged` | Event: the load state for a panel changed |
+| `preview:forwardedShortcut` | Event: an enumerated keyboard accelerator was forwarded from the sealed page |
+
 ### Project lock (`project-lock-handlers.ts`)
 
 | Channel | Purpose |
@@ -371,6 +394,7 @@ To keep IPC payloads consistent across processes, shared zod schemas live at `sr
 - Image export schemas — `ImageExportRequestSchema` (`.strict()`, with the supported-extension allow-list expressed in the schema itself, so "unsupported format" needs no error code of its own) and the `success`-discriminated `ImageExportResponse`, whose failure branch **requires** both `errorCode` and `error`; plus the main-only harness render/result union (see `src/shared/ipc/image-export-schema.ts`); channel constants in `src/shared/ipc/image-export-channels.ts` (#73). The supported extensions and their MIME map are shared across the process boundary by `src/shared/ipc/image-formats.ts`, which both `main/services/file/imageRead.ts` and `renderer/src/utils/imageUtils.ts` import rather than re-declaring
 - Clipboard schemas — `ClipboardWriteTextSchema`, `CLIPBOARD_MAX_TEXT_LENGTH`, and the `ClipboardBridge` contract shared by the preload bridge and renderer service (see `src/shared/ipc/clipboard-schema.ts`); channel constants in `src/shared/ipc/clipboard-channels.ts`
 - Claude Code status schemas — the per-`terminalId` `ClaudeStatusSnapshot` contract consumed by `useClaudeStatusStore` and the register/nudge payloads (see `src/shared/ipc/claude-status-schema.ts`); channel constants in `src/shared/ipc/claude-status-channels.ts` (#216)
+- HTML preview schemas — the open/close/find/export and host-approval payloads plus the push-event shapes (see `src/shared/ipc/preview-schema.ts`), the versioned per-project allowlist contract (`src/shared/ipc/preview-settings-schema.ts`), and the `htmlPreview.enabled` global switch (`src/shared/ipc/global-settings-schema.ts`); channel constants in `src/shared/ipc/preview-channels.ts` (#74)
 - System schemas – OS-integration actions with no payload, so there is nothing for Zod to validate and sender-frame gating is the sole guard. `system:openScreenRecordingSettings` opens the macOS Screen Recording privacy pane and is the **only** one of the two that is platform-gated (it no-ops off `darwin`). `system:relaunchApp` restarts the app on every platform; the macOS Screen Recording grant is merely the reason the flow exists, since macOS applies a fresh grant only to a newly-launched process. Channel constants in `src/shared/ipc/system-channels.ts`; both handlers are sender-gated main-side in `src/main/ipc/system-handlers.ts` via `isTrustedSender` (see [security.md § Sender-frame gating](./security.md#sender-frame-gating))
 
 Recommended:

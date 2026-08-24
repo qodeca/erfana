@@ -2381,4 +2381,27 @@ describe('SettingsOverlay', () => {
       expect(mockUpdateTranscriptionBackend).not.toHaveBeenCalled()
     })
   })
+
+  describe('HTML preview section', () => {
+    beforeEach(() => {
+      useSettingsStore.setState({ isOpen: true })
+    })
+
+    it('renders the HTML preview section and its toggle', () => {
+      useGlobalSettingsStore.setState({
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          htmlPreview: { enabled: true }
+        }
+      })
+
+      render(<SettingsOverlay />)
+
+      expect(screen.getByRole('heading', { name: 'HTML preview' })).toBeInTheDocument()
+      expect(screen.getByTestId('settings-toggle-html-preview')).toBeChecked()
+    })
+  })
 })

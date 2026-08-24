@@ -14,6 +14,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { logger } from '../../../../utils/logger'
+import { useOccluder } from '../../../../hooks/useOccluder'
 
 /**
  * Elements the focus trap cycles through.
@@ -56,6 +57,11 @@ export function useFullScreenOverlay(): UseFullScreenOverlayResult {
   const [isFullScreen, setIsFullScreen] = useState(false)
   const overlayRef = useRef<HTMLDivElement>(null)
   const previousActiveElement = useRef<Element | null>(null)
+
+  // Occlude the live preview view while the image viewer is full-screen (item
+  // 67): the overlay covers the whole content area, so the preview's
+  // WebContentsView must hide behind its still frame until it closes.
+  useOccluder('overlay', isFullScreen)
 
   const open = useCallback(() => {
     // Without a portal root the overlay would mount nowhere and trap focus in a

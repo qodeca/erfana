@@ -78,14 +78,25 @@ export function SearchBar({ provider }: SearchBarProps) {
     options,
     matches,
     currentIndex,
+    count,
+    capabilities,
+    navToken,
+    navDirection,
     closeSearch,
     updateQuery,
     updateOptions,
     nextMatch,
     previousMatch,
     setMatches,
+    setCount,
+    setCapabilities,
     restoreFocus
   } = useSearchStore()
+
+  // (X15b) Track the navToken we last acted on so the count-only nav effect does
+  // NOT fire on mount (navToken 0) or on a provider-identity change — only on a
+  // genuine user next/prev, which increments the token.
+  const lastHandledNavToken = useRef(useSearchStore.getState().navToken)
 
   // Create debounced search function with error handling (NFR-006)
   const debouncedSearch = useMemo(
@@ -118,14 +129,52 @@ export function SearchBar({ provider }: SearchBarProps) {
   // function is recreated) so a late result cannot write to the global store
   useEffect(() => () => debouncedSearch.cancel(), [debouncedSearch])
 
-  // Navigate when currentIndex changes
-  // Pass focusEditor: false to prevent Monaco from stealing focus from search input
+  // Sync the active provider's capabilities into the store. The store branches
+  // on these (setMatches count derivation, next/prev), and SearchBar reads them
+  // for the label/nav/whole-word UI. A null provider keeps full defaults.
   useEffect(() => {
-    if (matches.length > 0 && provider) {
-      provider.navigateTo(currentIndex, { focusEditor: false })
-      provider.updateCurrentMatch(currentIndex)
+    setCapabilities(
+      provider ? provider.capabilities : { randomAccess: true, matchList: true, wholeWord: true }
+    )
+  }, [provider, setCapabilities])
+
+  // Count-only providers push their totals asynchronously; forward them to the
+  // store so the label can render "N of M" without a match list.
+  useEffect(() => {
+    if (!provider?.onCountChange) return undefined
+    return provider.onCountChange(setCount)
+  }, [provider, setCount])
+
+  // Navigate when currentIndex changes — FULL-MATCH providers only. Count-only
+  // providers keep currentIndex pinned at 0 and navigate via the navToken effect
+  // below; guarding here is what stops a naive rewrite from freezing Monaco's
+  // "N of M" label. Pass focusEditor: false so Monaco does not steal input focus.
+  useEffect(() => {
+    if (matches.length > 0 && provider && provider.capabilities.randomAccess) {
+      provider.navigateTo?.(currentIndex, { focusEditor: false })
+      provider.updateCurrentMatch?.(currentIndex)
     }
   }, [currentIndex, matches, provider])
+
+  // Relative navigation for count-only providers. Issues `navToken - lastHandled`
+  // steps in navDirection, so it never fires on mount (token starts at the ref's
+  // value) or on a provider swap (steps <= 0), only on a real next/prev.
+  useEffect(() => {
+    if (!provider || provider.capabilities.randomAccess) return
+    const steps = navToken - lastHandledNavToken.current
+    if (steps <= 0) {
+      lastHandledNavToken.current = navToken
+      return
+    }
+    for (let i = 0; i < steps; i++) {
+      if (navDirection === 'next') {
+        provider.nextMatch?.()
+      } else {
+        provider.previousMatch?.()
+      }
+    }
+    lastHandledNavToken.current = navToken
+  }, [navToken, navDirection, provider])
 
   // Auto-focus input on mount
   useEffect(() => {
@@ -171,41 +220,16 @@ export function SearchBar({ provider }: SearchBarProps) {
     e.stopPropagation()
   }, [])
 
-  // Focus trap handler - Tab cycles within SearchBar
-  const handleContainerKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLDivElement>) => {
-      // Stop propagation to prevent Monaco from receiving keystrokes
-      // Only stop for keys that Monaco might capture (not Space which triggers button clicks)
-      if (e.key !== ' ') {
-        e.stopPropagation()
-      }
-
-      if (e.key === 'Tab') {
-        const focusableElements = containerRef.current?.querySelectorAll(
-          'input, button:not([disabled])'
-        )
-        if (!focusableElements || focusableElements.length === 0) return
-
-        const firstElement = focusableElements[0] as HTMLElement
-        const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement
-
-        if (e.shiftKey) {
-          // Shift+Tab from first element goes to last
-          if (document.activeElement === firstElement) {
-            e.preventDefault()
-            lastElement.focus()
-          }
-        } else {
-          // Tab from last element goes to first
-          if (document.activeElement === lastElement) {
-            e.preventDefault()
-            firstElement.focus()
-          }
-        }
-      }
-    },
-    []
-  )
+  // Keep keystrokes from reaching Monaco, but do NOT trap Tab: the find bar is
+  // NON-modal chrome, so Tab must move focus onward like anywhere else (Escape
+  // still closes it). Trapping Tab here was an unexpected focus-order constraint
+  // (WCAG 2.2 SC 2.4.3).
+  const handleContainerKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+    // Only stop for keys Monaco might capture (not Space, which triggers button clicks).
+    if (e.key !== ' ') {
+      e.stopPropagation()
+    }
+  }, [])
 
   // Handle toggle button Enter key (Space is handled natively by button click)
   const handleToggleKeyDown = useCallback(
@@ -223,12 +247,15 @@ export function SearchBar({ provider }: SearchBarProps) {
 
   if (!isOpen) return null
 
-  const matchCountText =
-    matches.length > 0
-      ? `${currentIndex + 1} of ${matches.length}`
-      : query
-        ? 'No results'
-        : ''
+  // Label source depends on the provider shape:
+  // - matchList providers own the list, so read it directly (currentIndex+1 of
+  //   matches.length) — reading count.activeOrdinal here would freeze Monaco at
+  //   "1 of N" because nextMatch never writes count.
+  // - count-only providers have no list; read the pushed count.
+  const total = capabilities.matchList ? matches.length : count.total
+  const ordinal = capabilities.matchList ? currentIndex + 1 : count.activeOrdinal
+  const hasMatches = total > 0
+  const matchCountText = hasMatches ? `${ordinal} of ${total}` : query ? 'No results' : ''
 
   return (
     <div
@@ -274,7 +301,12 @@ export function SearchBar({ provider }: SearchBarProps) {
           onClick={() => updateOptions({ wholeWord: !options.wholeWord })}
           onKeyDown={(e) => handleToggleKeyDown(e, 'wholeWord')}
           aria-pressed={options.wholeWord}
-          title="Whole word (Alt+W)"
+          disabled={!capabilities.wholeWord}
+          title={
+            capabilities.wholeWord
+              ? 'Whole word (Alt+W)'
+              : 'Whole word (not supported by this view)'
+          }
           data-testid={TEST_IDS.SEARCH_BAR_TOGGLE_WORD}
         >
           ab
@@ -290,7 +322,7 @@ export function SearchBar({ provider }: SearchBarProps) {
           type="button"
           className="search-nav-btn"
           onClick={previousMatch}
-          disabled={matches.length === 0}
+          disabled={!hasMatches}
           aria-label="Previous match (Shift+Enter)"
           data-testid={TEST_IDS.SEARCH_BAR_BTN_PREV}
         >
@@ -300,7 +332,7 @@ export function SearchBar({ provider }: SearchBarProps) {
           type="button"
           className="search-nav-btn"
           onClick={nextMatch}
-          disabled={matches.length === 0}
+          disabled={!hasMatches}
           aria-label="Next match (Enter)"
           data-testid={TEST_IDS.SEARCH_BAR_BTN_NEXT}
         >

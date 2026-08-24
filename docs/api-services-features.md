@@ -600,6 +600,10 @@ Export HTML content to DOCX. As with PDF, `fileName` is a suggested name run thr
 
 ---
 
+## HTML preview (#74)
+
+The sandboxed HTML-preview subsystem is a service *family* under `src/main/services/preview/` (WebContentsView lifecycle, `erfana-preview://` protocol handler, request/host filter, per-project allowlist store, sealed session, watch pool, PDF/find controllers), not a single service, so it is documented in its own doc rather than duplicated here. For the full write-up see [HTML preview](./html-preview/README.md); for the per-service catalogue see [`src/main/services/CLAUDE.md`](../src/main/services/CLAUDE.md) § "HTML preview (#74)". IPC surface: [IPC patterns § HTML preview](./ipc-patterns.md#html-preview-previewhandlersts-constants-in-preview-channelsts-74).
+
 ## ImageExportService
 
 **File:** `src/main/services/imageExport/ImageExportService.ts` (+ the seven collaborators in the same folder). **Shared contract:** `src/shared/ipc/image-export-schema.ts`, `image-export-channels.ts`, `image-formats.ts`.

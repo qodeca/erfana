@@ -17,7 +17,7 @@ An agent-native Markdown workspace (Electron): integrated terminal for CLI codin
 ## Documentation
 See `docs/` for details (keep Claude's context focused):
 - Core: [Architecture](docs/architecture.md) · [Features](docs/features/README.md) · [UI Components](docs/ui-components.md) · [Settings](docs/settings.md) · [Known Issues](docs/known-issues.md) · [Technical Debt](docs/technical-debt.md) · [Development Tasks](docs/development-tasks.md) · [Roadmap](ROADMAP.md)
-- Subsystems: [Editor](docs/editor/README.md) · [Terminal](docs/terminal/README.md) · [Drag-Drop](docs/drag-drop/README.md) · [File Watching](docs/file-watching/README.md) · [Prompt Templates](docs/prompts/README.md) · [Logging](docs/logging.md) · [Large-Project Performance](docs/large-project-performance-plan.md) · [Source Grounding](docs/future/source-grounding/README.md)
+- Subsystems: [Editor](docs/editor/README.md) · [Terminal](docs/terminal/README.md) · [HTML Preview](docs/html-preview/README.md) · [Drag-Drop](docs/drag-drop/README.md) · [File Watching](docs/file-watching/README.md) · [Prompt Templates](docs/prompts/README.md) · [Logging](docs/logging.md) · [Large-Project Performance](docs/large-project-performance-plan.md) · [Source Grounding](docs/future/source-grounding/README.md)
 - Contracts: [IPC Patterns](docs/ipc-patterns.md) · [API Services](docs/api-services.md) · [API Services – Features](docs/api-services-features.md) · [Error Codes](docs/error-codes.md) · [ADRs](docs/adrs/README.md)
 - Build, CI, security: [Build](docs/build/README.md) · [Security](docs/security.md) · [Continuous Integration](docs/ci.md) · [Testing](docs/testing/README.md) · [Whisper Trust Chain](docs/windows/whisper-trust-chain.md) · [Whisper Support Runbook](docs/windows/whisper-support-runbook.md) · [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md)
 - [Release pipeline](docs/build/release.md) – macOS + Windows only; the Linux distribution target was dropped. Skill entry: [`.claude/skills/releasing-erfana/SKILL.md`](.claude/skills/releasing-erfana/SKILL.md) with [`guides/troubleshooting.md`](.claude/skills/releasing-erfana/guides/troubleshooting.md) + [`docs/release-incidents/`](docs/release-incidents/index.md)
@@ -51,6 +51,7 @@ Feature specifications live in `specs/`.
 - [`src/main/services/CLAUDE.md`](src/main/services/CLAUDE.md) - catalogue of every main-process service, with the issue context behind each
 - [`src/renderer/src/components/Dialog/CLAUDE.md`](src/renderer/src/components/Dialog/CLAUDE.md) - BaseDialog API, focus trap, ESC/backdrop handling
 - [`src/renderer/src/components/Transcription/CLAUDE.md`](src/renderer/src/components/Transcription/CLAUDE.md) - Dual-backend transcription (OpenAI + local whisper.cpp), IPC flow, store
+- [`src/renderer/src/components/Panels/HtmlPreviewPanel/CLAUDE.md`](src/renderer/src/components/Panels/HtmlPreviewPanel/CLAUDE.md) - HTML preview: native WebContentsView vs DOM chrome, occluder guard, tab-hosted failure badge, find-bar inset
 
 ## Testing
 - Unit/Integration: Vitest workspace across renderer, main, preload (see [docs/testing/README.md](docs/testing/README.md))

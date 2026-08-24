@@ -1,0 +1,71 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<!--
+  Corpus case 4: non-fatal diagnostics (AC7 / AC20, AC25 sentinel 4).
+  Deliberately triggers at least THREE distinct failure-badge entries while the
+  visible HTML still renders. The errors are non-fatal to page structure, so
+  isDestroyed() stays false and the <h1> and body remain visible.
+
+  Diagnostics raised on load:
+    1. script-error          -> the classic inline <script> throws uncaught.
+    2. unresolved-specifier  -> the module <script> imports a bare package that
+                                cannot resolve ('nonexistent-package').
+    3. unsupported-asset-type-> a subresource of an unsupported type is
+                                referenced (data.unknownext), which the preview
+                                scheme refuses to serve.
+  AC25 sentinel 4 expects >= 3 badge entries, including 'unsupported-asset-type'.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Error corpus page</title>
+    <!-- Diagnostic 3: unsupported asset type. The preview scheme refuses this. -->
+    <link rel="stylesheet" href="data.unknownext" />
+    <style>
+      body {
+        margin: 0;
+        padding: 2rem;
+        font: 16px/1.5 system-ui, sans-serif;
+        color: #1b1b1f;
+        background: #f6f8fa;
+      }
+      .card {
+        max-width: 40rem;
+        padding: 1rem 1.25rem;
+        background: #fff;
+        border: 1px solid #d0d7de;
+      }
+      h1 {
+        font-size: 1.4rem;
+        color: #a00;
+      }
+      code {
+        font-family: ui-monospace, monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Corpus 4: error page</h1>
+      <p>
+        You should see: this heading and text render normally (the errors are
+        non-fatal), while the preview's failure badge lists at least three
+        entries — a script error, an unresolved module specifier, and an
+        <code>unsupported-asset-type</code> for <code>data.unknownext</code>.
+      </p>
+    </div>
+
+    <!-- Diagnostic 1: uncaught exception from a classic script. -->
+    <script>
+      throw new Error('Corpus 4: deliberate uncaught script error')
+    </script>
+
+    <!-- Diagnostic 2: unresolved bare ES-module specifier. -->
+    <script type="module">
+      import nonexistent from 'nonexistent-package'
+      console.log(nonexistent)
+    </script>
+  </body>
+</html>
