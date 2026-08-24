@@ -5,7 +5,7 @@
 Erfana supports automated E2E testing using Playwright with Electron. This guide covers setup, configuration, and test patterns.
 
 **Related documentation**:
-- [E2E Selectors](./e2e-selectors.md) – Complete testid catalog (251 testids)
+- [E2E Selectors](./e2e-selectors.md) – Complete testid catalog (256 testids)
 - [E2E Third-Party](./e2e-third-party.md) – Monaco, xterm.js, Mermaid testing
 - [E2E Helpers](./e2e-helpers.md) – Test utilities and patterns (backward-compatible adapter)
 - [E2E Debugging](./e2e-debugging.md) – Debugging and CI/CD
@@ -80,6 +80,10 @@ Three Playwright projects are configured:
 
 Visual project settings: `snapshotDir: './e2e/screenshots'`, `snapshotPathTemplate: '{snapshotDir}/{arg}-{platform}{ext}'`, `maxDiffPixelRatio: 0.01`, `animations: 'disabled'`.
 
+Baselines are per platform and committed. `image-viewer-toolbar-narrow-darwin.png` (state (f), #73) currently exists for **darwin only** — the `win32`
+baseline has to be generated on a Windows host with `npm run test:e2e:update-screenshots` and committed, until then that one case fails loudly there by
+design (`assertBaselineExists`).
+
 See `playwright.config.ts` for the full configuration.
 
 ---
@@ -99,9 +103,10 @@ Located in `e2e/pages/`:
 | `MonacoPage` | Editor interactions – `waitForReady()`, `focus()`, `setContent()`, `getContent()` |
 | `MermaidPage` | Mermaid diagram interactions |
 | `ProjectTreePage` | Project tree navigation and file operations |
-| `ImageViewerPage` | Image viewer tab (#70) – `openFromTree()`, `waitForReady()`, `marker()` / `waitForMarker()`, `zoomIn()`, `transformStyle()`, `expectStatusState()`, `expectBanner()` / `expectNoBanner()`, `clickReload()` |
+| `ImageViewerPage` | Image viewer tab (#70, extended for #73) – `openFromTree()`, `waitForReady()`, `marker()` / `waitForMarker()`, `zoomIn()`, `transformStyle()`, `expectStatusState()`, `expectBanner()` / `expectNoBanner()`, `clickReload()`, `enterFullScreen()` / `exitFullScreen()`. Export (#73): three panel-scoped locators `exportPngButton()` / `exportPdfButton()` / `copyButton()`, their overlay-scoped twins `fullScreenExportPngButton()` / `fullScreenExportPdfButton()` / `fullScreenCopyButton()`, the `exportStatus()` polite live region (the assertive `image-viewer-export-alert` region has no POM locator — query it directly), plus `clickExport()`, `expectExportBusy()` and `expectExportAnnouncement()` |
+| `ImageViewerNarrowPage` | Extends the above for the narrow-width toolbar contract (#73) – `toolbar()`, `controls()`, `constrainPanelWidth()`, `toolbarScrollMetrics()`, `panelScrollLeft()`, `focusedTestId()`, `expectWithinPanel()`. A separate file only because the base POM is near the 500-line cap |
 
-> `ImageViewerPage` is **not** exposed as a composed fixture – the two specs that use it construct it directly, because one of them needs its own launch environment. Two conventions in it are worth copying: every locator is scoped **inside** `[data-testid="image-viewer-panel"]`, so the full-screen portal (which renders the same test ids into `#portal-root`) can never satisfy a panel assertion; and freshness is asserted on the **decoded** bytes via a `data-marker` attribute embedded in the SVG, not by diffing two multi-kilobyte data URLs — a failing assertion then names which version is on screen instead of dumping base64.
+> `ImageViewerPage` is **not** exposed as a composed fixture – the specs that use it construct it directly (the export specs go through `openImage()` in `e2e/utils/image-export-helpers.ts`, which is the same thing plus the export budget), because one of them needs its own launch environment. Three conventions in it are worth copying. Panel locators are scoped **inside** `[data-testid="image-viewer-panel"]`, so the full-screen portal (which renders the same test ids into `#portal-root`) can never satisfy a panel assertion — the deliberate exceptions are the `fullScreen*` locators, which scope to the overlay instead, and `exportStatus()`, which is looked up on the page because the panel-owned live region is rendered into whichever surface is on top and must resolve to exactly one element either way. Freshness is asserted on the **decoded** bytes via a `data-marker` attribute embedded in the SVG, not by diffing two multi-kilobyte data URLs — a failing assertion then names which version is on screen instead of dumping base64. And busy is `aria-disabled`, never `disabled`, so `clickExport()` arms a `MutationObserver` before the click rather than polling: a stubbed save dialog can settle inside one poll interval, so the busy transition has to be recorded, not sampled.
 
 ### Composed fixtures
 
@@ -377,7 +382,7 @@ Three `ERFANA_E2E_*` variables change app behaviour for tests. They are read by 
 
 ### Test files
 
-All 20 specs in `e2e/`:
+All 25 specs in `e2e/`:
 
 - `app-launch.e2e.ts` – Application launch, activity bar, welcome panel visibility
 - `third-party-components.e2e.ts` – Monaco editor, xterm.js terminal, Mermaid diagrams
@@ -398,7 +403,39 @@ All 20 specs in `e2e/`:
 - `root-error-boundary.e2e.ts` – #60: a launcher-injected renderer crash must show the recovery screen (details toggle, Copy / Open logs / Restart), not a blank window, plus a negative case for the flag being unset
 - `preview-refresh.e2e.ts` – #70: an open image tab repaints after an in-place rewrite **and** after an atomic replace (`> tmp && mv tmp target`), the "Reloaded from disk" status appears and self-clears, zoom survives a same-size rewrite and resets to fit when the size changes, a delete shows the banner while keeping the last image (with **Reload** recovering), and a `MutationObserver` proves the `<img>` is never unmounted and `src` never blanks. Freshness is asserted on the decoded `data-marker`, not on the `src` attribute alone
 - `preview-refresh-terminal.e2e.ts` – #70: clicking an image path in a terminal opens the image viewer, not Monaco. Split out because it needs its own launch environment (`ERFANA_E2E_FAST_SHELL`) and because clicking an xterm link is a geometry problem — the WebGL renderer paints to canvas, so the cell grid is reconstructed from xterm's IME helper textarea and the click is retried across the printed rows (the link provider validates the path over IPC, so the first click can land before the link exists)
-- `visual-regression.e2e.ts` – Visual regression for 5 UI states (welcome, editor, terminal, settings, confirm dialog)
+- `image-export.e2e.ts` – #73: the BYTES half of PNG / PDF / clipboard export from the image viewer. The only automated coverage of real pixel output —
+  all eight extensions exported to PNG, an SVG rasterized at 2x its viewBox, an animated GIF's first frame (asserted on the exported pixel, not just the
+  toast), a multi-size ICO's largest entry, single-page PDF geometry checked with the runtime gate's own `verifyPdfGeometry` and tolerance, and alpha
+  preserved on PNG but flattened to white on the clipboard. Fixtures are generated at test time from `e2e/fixtures/images/generateImageFixtures.ts` (no
+  binary file is committed); the native save dialog is stubbed with `stubDialog`, and the clipboard is read back through the main process, never
+  `navigator.clipboard`
+- `image-export.behaviour.e2e.ts` – #73: the BEHAVIOUR half of the same feature, split off so both files stay under the 500-line cap. An export is a
+  conversion of the file and not a screenshot of the panel (zoom changes nothing; a rewrite between two exports changes everything), all three actions
+  run from the full-screen overlay with the settled sentence going to the in-overlay live region rather than a toast the `aria-modal` overlay would
+  hide, and a cancelled save dialog writes nothing and says nothing. Shares the helpers and the fixture generator with the spec above; each file
+  composes its own `exportDir`, so the two can run in parallel
+- `image-export.matrix.e2e.ts` – #73: the PDF and clipboard columns of acceptance criterion 1's 3 x 8 grid, pinned per format from the PANEL toolbar (the
+  PNG column lives in `image-export.e2e.ts`). Rows are derived from `FORMAT_ROWS` in `e2e/utils/image-export-helpers.ts`, so a ninth supported format
+  cannot be added to the fixture table and silently skipped, and the row list itself is asserted. Each clipboard row clears the board main-side first, so
+  `empty: false` is evidence this export wrote something (two fixtures deliberately share a pixel size). Also carries the `PDF page-size grid regression`
+  case — see the note below
+- `image-export.overlay-matrix.e2e.ts` – #73: the same 3 x 8 grid run from the FULL-SCREEN OVERLAY, which AC 1 names as a first-class surface. Asserts
+  through overlay-scoped locators and reads the in-overlay live region rather than a toast the `aria-modal` overlay would hide, including the per-format
+  qualifier (GIF frame, ICO size, SVG 2x)
+- `image-viewer-narrow.e2e.ts` – #73: the toolbar's narrow-width contract measured in a real Chromium layout, which
+  `ImageViewerPanel.toolbarOverflow.test.ts` can only pin as stylesheet text. All eight controls stay hit-testable at a 300 px panel, and Tab scrolls the
+  rightmost control into view by scrolling the TOOLBAR — asserting the panel container's `scrollLeft` stays 0 is what distinguishes the fix from the old
+  behaviour, where Chromium scrolled the hidden `.container` instead and the rest of the row left the screen
+- `visual-regression.e2e.ts` – Visual regression for 6 UI states (welcome, editor, terminal, settings, confirm dialog, image viewer toolbar in a narrow
+  panel). State (f) uses its own extended test object so the image fixtures it seeds do not change the project tree in states (a)–(e)
+
+> **Why the PDF geometry tolerance is one CSS pixel (#73).** Chromium's `printToPDF` quantizes a CSS `@page` size onto a 1/300 in grid, and for any
+> dimension where `px % 8 === 6` the produced MediaBox comes back **0.54 pt larger** than requested. The gate's tolerance was originally 0.5 pt — tighter
+> than Chromium's own output grid can express — so it refused roughly one pixel size in eight per axis, in every format, and the user got "the PDF page came
+> out the wrong size, so nothing was written" for an ordinary image. `IMAGE_EXPORT.PDF_MEDIABOX_TOLERANCE_PT` is now **0.75 pt**, exactly one CSS pixel at
+> 96 dpi: still far too tight to admit letterboxing, scaling or multi-page output, all of which are off by whole page fractions. The `.jpg`, `.jpeg`
+> (22 px tall) and `.bmp` (14 px tall) matrix rows sit on that grid and pass like any other row, on both surfaces; the `image export – PDF page-size grid
+> regression` case holds the line with a **PNG** at 60 x 22, so a re-tightened tolerance fails there first.
 
 > **Why `root-error-boundary.e2e.ts` bypasses the composed fixtures**: it needs a per-launch environment (`ERFANA_E2E_FORCE_CRASH` set for the positive case, and explicitly *deleted* from `process.env` for the negative one, so a developer's shell cannot make the negative test pass for the wrong reason). The shared `app` fixture owns its own launch and takes no env, so the spec calls `electron.launch()` directly and pairs it with `createTempUserDataDir()` from `e2e/utils/helpers.ts` to keep the per-test user-data isolation the `userDataDir` fixture would otherwise provide. Use the fixtures unless a spec genuinely needs a custom launch environment.
 

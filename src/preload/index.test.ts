@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
 import { CLIPBOARD_CHANNELS } from '../shared/ipc/clipboard-channels'
+import { IMAGE_EXPORT_CHANNELS } from '../shared/ipc/image-export-channels'
 
 // Mock electron + toolkit before importing preload
 const listeners: Record<string, Array<(e: unknown, d: any) => void>> = {}
@@ -213,6 +214,37 @@ describe('clipboard bridge', () => {
       CLIPBOARD_CHANNELS.writeText,
       'hello clipboard'
     )
+  })
+})
+
+/**
+ * Tests for the image export bridge (#73).
+ *
+ * The property worth pinning is what does NOT cross: the renderer sends a path
+ * and a target, and gets a small structured result. No image bytes travel in
+ * either direction, which is what keeps a 50 MB source from becoming a ~67 MB
+ * base64 payload on the wire.
+ */
+describe('imageExport bridge', () => {
+  it('exposes an imageExport namespace with a single run verb', () => {
+    expect(window.api.imageExport).toBeDefined()
+    expect(Object.keys(window.api.imageExport)).toEqual(['run'])
+    expect(typeof window.api.imageExport.run).toBe('function')
+  })
+
+  it('invokes the run channel and passes the request through unchanged', async () => {
+    const { ipcRenderer } = await import('electron')
+    const request = { filePath: '/p/a.png', target: 'png' as const }
+
+    await window.api.imageExport.run(request)
+
+    expect(ipcRenderer.invoke as any).toHaveBeenCalledWith(IMAGE_EXPORT_CHANNELS.RUN, request)
+  })
+
+  it('does not expose the harness-only channels to the app renderer', () => {
+    const surface = JSON.stringify(Object.keys(window.api))
+    expect(surface).not.toContain('harness')
+    expect(window.api).not.toHaveProperty('imageExportApi')
   })
 })
 

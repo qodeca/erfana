@@ -179,7 +179,7 @@ export class FileService implements IFileService {
    */
   isImageFile(filePath: string): boolean {
     const ext = extname(filePath).toLowerCase()
-    return IMAGE_EXTENSIONS.includes(ext)
+    return (IMAGE_EXTENSIONS as readonly string[]).includes(ext)
   }
 
   /**

@@ -25,6 +25,13 @@ function makeProps(overrides: Partial<ImageViewerToolbarProps> = {}): ImageViewe
     canZoomIn: true,
     canZoomOut: true,
     isFullScreen: false,
+    isExportingPng: false,
+    isExportingPdf: false,
+    isCopying: false,
+    onExportPng: vi.fn(),
+    onExportPdf: vi.fn(),
+    onCopyImage: vi.fn(),
+    onBusyClick: vi.fn(),
     onZoomIn: vi.fn(),
     onZoomOut: vi.fn(),
     onReset: vi.fn(),
@@ -172,6 +179,72 @@ describe('ImageViewerToolbar', () => {
       expect(screen.getByTestId(TEST_IDS.IMAGE_VIEWER_ZOOM_LEVEL)).toHaveAccessibleName(
         'Zoom level 300%, click to reset'
       )
+    })
+  })
+  describe('Export controls (issue #73)', () => {
+    it('renders all three export controls', () => {
+      render(<ImageViewerToolbar {...makeProps()} />)
+
+      expect(screen.getByTestId(TEST_IDS.IMAGE_VIEWER_BTN_EXPORT_PNG)).toBeInTheDocument()
+      expect(screen.getByTestId(TEST_IDS.IMAGE_VIEWER_BTN_EXPORT_PDF)).toBeInTheDocument()
+      expect(screen.getByTestId(TEST_IDS.IMAGE_VIEWER_BTN_COPY)).toBeInTheDocument()
+    })
+
+    it('renders them in the full-screen instance too', () => {
+      // Requirement 14: the overlay covers the panel, so an export group only
+      // the panel carried would be unreachable exactly where a user is most
+      // likely to want it.
+      render(<ImageViewerToolbar {...makeProps({ isFullScreen: true })} />)
+
+      expect(screen.getByTestId(TEST_IDS.IMAGE_VIEWER_BTN_EXPORT_PNG)).toBeInTheDocument()
+      expect(screen.getByTestId(TEST_IDS.IMAGE_VIEWER_BTN_COPY)).toBeInTheDocument()
+    })
+
+    it('places the export group between the zoom cluster and the actions group', () => {
+      render(<ImageViewerToolbar {...makeProps()} />)
+
+      const order = [
+        TEST_IDS.IMAGE_VIEWER_BTN_FIT,
+        TEST_IDS.IMAGE_VIEWER_BTN_EXPORT_PNG,
+        TEST_IDS.IMAGE_VIEWER_BTN_COPY,
+        TEST_IDS.IMAGE_VIEWER_BTN_FULLSCREEN
+      ].map((id) => screen.getByTestId(id))
+
+      // DOM order is tab order: how I look at it, what I take away, where I
+      // look at it - with the corner left as the full-screen affordance.
+      for (let i = 0; i < order.length - 1; i += 1) {
+        expect(
+          order[i].compareDocumentPosition(order[i + 1]) & Node.DOCUMENT_POSITION_FOLLOWING
+        ).toBeTruthy()
+      }
+    })
+
+    it('passes the busy state straight through, holding none of its own', () => {
+      const { rerender } = render(<ImageViewerToolbar {...makeProps()} />)
+      expect(screen.getByTestId(TEST_IDS.IMAGE_VIEWER_BTN_EXPORT_PNG)).toHaveAttribute(
+        'aria-disabled',
+        'false'
+      )
+
+      rerender(<ImageViewerToolbar {...makeProps({ isExportingPng: true })} />)
+
+      expect(screen.getByTestId(TEST_IDS.IMAGE_VIEWER_BTN_EXPORT_PNG)).toHaveAttribute(
+        'aria-busy',
+        'true'
+      )
+      expect(screen.getByTestId(TEST_IDS.IMAGE_VIEWER_BTN_COPY)).toHaveAttribute(
+        'aria-disabled',
+        'true'
+      )
+    })
+
+    it('forwards a click to the handler the panel supplied', () => {
+      const props = makeProps()
+      render(<ImageViewerToolbar {...props} />)
+
+      fireEvent.click(screen.getByTestId(TEST_IDS.IMAGE_VIEWER_BTN_EXPORT_PDF))
+
+      expect(props.onExportPdf).toHaveBeenCalledTimes(1)
     })
   })
 })

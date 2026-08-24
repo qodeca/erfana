@@ -33,6 +33,11 @@ import type {
 import { TRANSCRIPTION_CHANNELS } from '../shared/ipc/transcription-channels'
 import { IMPORT_CHANNELS } from '../shared/ipc/import-channels'
 import { CLIPBOARD_CHANNELS } from '../shared/ipc/clipboard-channels'
+import { IMAGE_EXPORT_CHANNELS } from '../shared/ipc/image-export-channels'
+import type {
+  ImageExportRequest,
+  ImageExportResponse
+} from '../shared/ipc/image-export-schema'
 import {
   ClaudeStatusChannels,
   ClaudeStatusEvents
@@ -930,6 +935,23 @@ const api = {
     /** Write plain text to the OS clipboard (false on failure/reject) */
     writeText: (text: string): Promise<boolean> =>
       ipcRenderer.invoke(CLIPBOARD_CHANNELS.writeText, text)
+  },
+
+  /**
+   * Image export bridge (#73).
+   *
+   * Sends a path and a target; gets back a small structured result. NO IMAGE
+   * BYTES cross this bridge in either direction — the main process reads the
+   * file fresh from disk and writes or copies the output itself, so a 50 MB
+   * source never becomes a ~67 MB base64 payload on the wire.
+   *
+   * Never rejects: failures arrive as the `success: false` branch, carrying a
+   * code and the message to show for it.
+   */
+  imageExport: {
+    /** Export the image at `filePath` as PNG, as PDF, or to the clipboard. */
+    run: (request: ImageExportRequest): Promise<ImageExportResponse> =>
+      ipcRenderer.invoke(IMAGE_EXPORT_CHANNELS.RUN, request)
   },
 
   /**

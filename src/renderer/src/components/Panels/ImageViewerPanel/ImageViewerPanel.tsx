@@ -16,6 +16,8 @@
  * - Double-click to toggle between fit and 100 %
  * - Live refresh when the file changes on disk, with a permanently mounted
  *   status region and a banner + Reload action for the degraded states
+ * - Export controls: PNG, PDF and copy-to-clipboard, driven entirely by the
+ *   main process from a fresh read of the file on disk
  *
  * This file is deliberately glue only: state lives in `hooks/`, chrome lives in
  * `components/`, copy and precedence live in `imageViewerStatus.logic.ts`, and
@@ -24,6 +26,7 @@
  * @module ImageViewerPanel
  * @see Spec #015 - Image preview viewer specification
  * @see Issue #70 - preview tabs show stale content when the file changes
+ * @see Issue #73 - PNG / PDF / clipboard export controls
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -32,13 +35,14 @@ import { IDockviewPanelProps } from 'dockview'
 import { Loader2, AlertCircle, ImageIcon } from 'lucide-react'
 
 import { getImageFormat } from '../../../utils/imageUtils'
-import { getBasename } from '../../../utils/fileUtils'
+import { getBasename, sanitizeFileName } from '../../../utils/fileUtils'
 import { formatTabTitle } from '../../../utils/tabTitle'
 import { TEST_IDS } from '../../../constants/testids'
 import { useFileChangeSubscription } from '../../../hooks/useFileChangeSubscription'
 import { ImageViewerBanner, ImageViewerToolbar } from './components'
 import {
   useFullScreenOverlay,
+  useImageExportHandlers,
   useImageSource,
   useImageViewerTransform,
   useReloadAction
@@ -52,38 +56,6 @@ import {
   type ReloadFailure
 } from './imageViewerStatus.logic'
 import styles from './ImageViewerPanel.module.css'
-
-// ============================================================================
-// Constants
-// ============================================================================
-
-/** Maximum length for a displayed filename (defence in depth). */
-const MAX_FILENAME_LENGTH = 255
-
-/**
- * Sanitize a filename for display in `alt` / `aria-label` attributes.
- *
- * Defence in depth against path traversal and control characters that a
- * hostile filename could carry into the accessibility tree.
- *
- * @param filePath - The file path to extract and sanitize a filename from
- * @returns Sanitized filename safe for display
- */
-function sanitizeFileName(filePath: string): string {
-  const fileName = getBasename(filePath) || 'image'
-
-  // split/filter/join rather than a regex, to avoid eslint no-control-regex.
-  const sanitized = fileName
-    .split('')
-    .filter((char) => {
-      const code = char.charCodeAt(0)
-      return code >= 32 && code !== 127
-    })
-    .join('')
-    .slice(0, MAX_FILENAME_LENGTH)
-
-  return sanitized || 'image'
-}
 
 // ============================================================================
 // Types
@@ -282,6 +254,16 @@ export function ImageViewerPanel(props: IDockviewPanelProps<ImageViewerPanelPara
   })
 
   // ========================================
+  // Export
+  // ========================================
+
+  // Called ONCE, and its output handed to BOTH toolbar instances: one busy
+  // state, one in-flight request, so the overlay's PNG button is literally the
+  // panel's PNG button (requirement 14). A hook per instance would let the two
+  // disagree, and a second click could then reach the main-side lock.
+  const imageExport = useImageExportHandlers({ filePath, isFullScreen })
+
+  // ========================================
   // Render helpers
   // ========================================
 
@@ -300,6 +282,13 @@ export function ImageViewerPanel(props: IDockviewPanelProps<ImageViewerPanelPara
       // second element with the same `role="status"` and the same testid, so a
       // screen reader would announce every refresh twice.
       showStatus={!inFullScreen}
+      isExportingPng={imageExport.isExportingPng}
+      isExportingPdf={imageExport.isExportingPdf}
+      isCopying={imageExport.isCopying}
+      onExportPng={imageExport.onExportPng}
+      onExportPdf={imageExport.onExportPdf}
+      onCopyImage={imageExport.onCopyImage}
+      onBusyClick={imageExport.onBusyClick}
       onZoomIn={transform.zoomIn}
       onZoomOut={transform.zoomOut}
       onReset={transform.reset}
@@ -322,6 +311,48 @@ export function ImageViewerPanel(props: IDockviewPanelProps<ImageViewerPanelPara
         isReloadPending={isReloadPending}
       />
     )
+
+  // Panel-owned export live regions, rendered into whichever surface is on top -
+  // the toolbar must not own them, for the same reason it does not own the
+  // refresh status: two elements with one `role="status"` announce twice and
+  // break every `getByTestId`.
+  //
+  // TWO regions, split exactly the way `ToastNotification` splits its own: the
+  // full-screen overlay is `aria-modal="true"`, so the toast's assertive region
+  // is outside the accessibility tree while it is open. A failure written into
+  // a polite region can be queued behind whatever the reader is saying or
+  // dropped, and the user is then left believing the file was written. Errors
+  // therefore go to `role="alert"`, everything else stays polite.
+  //
+  // Both are permanently mounted with empty text when idle: a live region added
+  // to the DOM at the same moment its text appears is not announced at all.
+  // `aria-atomic` without an `aria-label`, matching the constraint recorded on
+  // the toolbar's status slot - an author-supplied name on an atomic region can
+  // replace the text the reader would otherwise speak.
+  const announcement = imageExport.exportAnnouncement
+  const renderExportStatus = () => (
+    <>
+      <span
+        className={styles.srOnly}
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        data-testid={TEST_IDS.IMAGE_VIEWER_EXPORT_STATUS}
+      >
+        {announcement.region === 'polite' ? announcement.text : ''}
+      </span>
+      {/* No `aria-live` here: `role="alert"` already implies assertive, and
+          pairing the two is the redundancy ToastNotification calls out. */}
+      <span
+        className={styles.srOnly}
+        role="alert"
+        aria-atomic="true"
+        data-testid={TEST_IDS.IMAGE_VIEWER_EXPORT_ALERT}
+      >
+        {announcement.region === 'alert' ? announcement.text : ''}
+      </span>
+    </>
+  )
 
   const renderImageContent = (
     ref: React.RefObject<HTMLDivElement>,
@@ -430,6 +461,8 @@ export function ImageViewerPanel(props: IDockviewPanelProps<ImageViewerPanelPara
 
       {!isFullScreen && renderBanner()}
 
+      {!isFullScreen && renderExportStatus()}
+
       {renderImageContent(containerRef)}
 
       {isFullScreen &&
@@ -445,6 +478,7 @@ export function ImageViewerPanel(props: IDockviewPanelProps<ImageViewerPanelPara
           >
             {renderToolbar(true)}
             {renderBanner()}
+            {renderExportStatus()}
             {renderImageContent(fullScreenContainerRef, true)}
           </div>,
           portalRoot

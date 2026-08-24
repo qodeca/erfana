@@ -29,7 +29,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { ImageViewerPanel } from './ImageViewerPanel'
 import { TEST_IDS } from '../../../constants/testids'
 import { VIEWER_STATUS_COPY } from './imageViewerStatus.logic'
-import { installImageViewerHarness } from './__test__/testUtils'
+import { alertsExcludingExportRegion, installImageViewerHarness } from './__test__/testUtils'
 
 const h = installImageViewerHarness()
 
@@ -89,7 +89,9 @@ describe('ImageViewerPanel – characterization', () => {
 
       const image = await screen.findByTestId(TEST_IDS.IMAGE_VIEWER_IMAGE)
       expect(image).toHaveAttribute('src', 'data:image/png;base64,BBBB')
-      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+      // The export live regions are always mounted and empty (issue #73), so
+      // the error screen is what has to be gone, not every `role="alert"`.
+      expect(alertsExcludingExportRegion()).toHaveLength(0)
     })
 
     it('reports a Reload that fails on the error screen (QG-11a H4)', async () => {

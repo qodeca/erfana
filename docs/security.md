@@ -376,6 +376,17 @@ Markdown preview allows HTML rendering with strict sanitization:
 - `data:` URI images are allowed – required by ImageViewerPanel (renders local images as base64 via `FileService.readImage`) and DOCX export (SVG-to-PNG canvas pipeline in `svgToImage.ts`). The sandboxed renderer cannot access `file://` URLs, so base64 data URIs are the secure transport mechanism for local image data from the main process.
 - Dangerous tags/attributes sanitized by `rehype-sanitize` + `hast-util-sanitize` (allowlist schema); Mermaid sanitizes its own SVG output via its bundled DOMPurify. The app does not import DOMPurify directly.
 
+### The rasterize harness has its own, stricter CSP (#73)
+
+`src/renderer/imageExport.html` is a second renderer entry — the hidden window that decodes an image for export — and it carries its **own** policy, deliberately not the one above:
+
+```
+default-src 'none'; script-src 'self'; img-src blob:; style-src 'unsafe-inline';
+connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'
+```
+
+Two differences are load-bearing. `img-src blob:` (the app policy has no `blob:`) is what lets an SVG decode at all, since the SVG path loads through `URL.createObjectURL`. `object-src 'none'` closes the `<object>` / `<embed>` route, which loads an SVG **as a document** and does execute script — the harness loads untrusted SVG only as `<img src=blob:…>`, Chromium's secure static mode. That rule is enforced by CSP *and* by lint, so a future one-line change cannot quietly reopen it: an ESLint block scoped to `src/renderer/src/imageExport/**` bans `innerHTML` / `outerHTML` / `insertAdjacentHTML`, `document.write`, `DOMParser`, `eval` and any runtime import from outside the folder (type-only imports are exempt, being erased by the compiler). The matching ban on *creating* an `object` / `embed` / `iframe` element lives in the renderer-wide `no-restricted-syntax` block instead — flat config replaces a rule wholesale rather than merging, so a second `no-restricted-syntax` declaration in the folder block would silently disable that block's other selectors for this folder. The window additionally runs in its own in-memory session with a deny-all `webRequest` allow-list installed before the window exists — see [API services – features § ImageExportService](./api-services-features.md#imageexportservice).
+
 See [HTML Rendering](./rendering/README.md) for details.
 
 ---
@@ -470,7 +481,11 @@ Zod answers "is this payload well-formed?". It cannot answer "did this call come
 1. **Top-level frame.** `event.senderFrame` exists and `frame.parent === null` – any iframe or sub-frame is rejected.
 2. **Exact expected origin.** In development (`is.dev && ELECTRON_RENDERER_URL`) the sender's origin must equal the electron-vite dev-server origin. In production the sender URL must equal `RENDERER_FILE_URL` – `pathToFileURL(join(__dirname, '../renderer/index.html'))`, mirroring the exact `mainWindow.loadFile` call in `src/main/index.ts`. An arbitrary `file://` URL is **not** accepted, and the dev branch is unreachable in a production build because it is gated on the same condition that decides which URL the window actually loads.
 
-Consumers: `clipboard-handlers.ts` (`clipboard:readText` / `clipboard:writeText`), `file-handlers.ts` (`file:revealInFileManager`), `claude-status-handlers.ts` (via a local copy of the same predicate), and `system-handlers.ts`.
+Consumers: `clipboard-handlers.ts` (`clipboard:readText` / `clipboard:writeText`), `file-handlers.ts` (`file:revealInFileManager`), `claude-status-handlers.ts` (via a local copy of the same predicate), `system-handlers.ts`, and `image-export-handlers.ts` (`image-export:run`, #73 — the gate runs **first**, before the payload is even parsed, so an untrusted sender never reaches the Zod parser, the filesystem or the save dialog).
+
+**Not** consumers: `pdf-handlers.ts` and `docx-handlers.ts`. The two document-export channels validate their payload but not their sender; the exposure is bounded (the app renders no untrusted remote content and creates no sub-frames) and the retrofit is recorded as entry #32 in [technical-debt.md](./technical-debt.md).
+
+One known limitation, recorded rather than fixed: in **development** rule 2 compares the dev-server *origin*, not the full URL, so any page served from that origin satisfies the predicate — including the image-export rasterize harness. It is not reachable in practice (the harness preload exposes four verbs and no `ipcRenderer` handle, so it has no bridge to a gated channel) and production pins the exact file URL. Entry #33 in [technical-debt.md](./technical-debt.md).
 
 ### Why `system:*` needs it most
 

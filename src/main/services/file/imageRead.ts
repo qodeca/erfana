@@ -38,26 +38,17 @@ import { readFile, stat } from 'fs/promises'
 import { extname } from 'path'
 import type { BigIntStats } from 'fs'
 import type { ImageReadOk, ImageReadResponse } from '../../../shared/ipc/file-image-schema'
+import {
+  IMAGE_EXTENSIONS,
+  getImageMimeType
+} from '../../../shared/ipc/image-formats'
 
-/**
- * Supported image extensions.
- * Matches IMAGE_EXTENSIONS in renderer/src/utils/imageUtils.ts
- */
-export const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp', '.ico']
-
-/**
- * MIME type mapping for image extensions.
- */
-const MIME_TYPES: Record<string, string> = {
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.gif': 'image/gif',
-  '.webp': 'image/webp',
-  '.svg': 'image/svg+xml',
-  '.bmp': 'image/bmp',
-  '.ico': 'image/x-icon'
-}
+// The supported-extension list and the extension -> MIME map used to be
+// declared here AND in the renderer, with a comment asking the two to be kept
+// in step by hand. Issue #73 needed the MIME map in a third place (the export
+// harness types its Blob with it), so both facts moved to
+// `src/shared/ipc/image-formats.ts` and every process imports them from there.
+export { IMAGE_EXTENSIONS }
 
 /**
  * Security: cap the file size to prevent memory exhaustion (DoS).
@@ -103,7 +94,7 @@ export async function readImage(
 ): Promise<ImageReadResponse> {
   const ext = extname(filePath).toLowerCase()
 
-  if (!IMAGE_EXTENSIONS.includes(ext)) {
+  if (!(IMAGE_EXTENSIONS as readonly string[]).includes(ext)) {
     throw new Error(`Unsupported image format: ${ext}`)
   }
 
@@ -125,7 +116,7 @@ export async function readImage(
     return { status: 'unchanged', version }
   }
 
-  const mimeType = MIME_TYPES[ext] || 'application/octet-stream'
+  const mimeType = getImageMimeType(ext) ?? 'application/octet-stream'
   const buffer = await readFile(filePath)
 
   return { status: 'ok', dataUrl: `data:${mimeType};base64,${buffer.toString('base64')}`, version }

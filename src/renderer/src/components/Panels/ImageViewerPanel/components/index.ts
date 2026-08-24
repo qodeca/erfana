@@ -11,3 +11,6 @@ export type { ImageViewerToolbarProps } from './ImageViewerToolbar'
 
 export { ImageViewerBanner } from './ImageViewerBanner'
 export type { ImageViewerBannerProps } from './ImageViewerBanner'
+
+export { ImageViewerExportControls } from './ImageViewerExportControls'
+export type { ImageViewerExportControlsProps } from './ImageViewerExportControls'

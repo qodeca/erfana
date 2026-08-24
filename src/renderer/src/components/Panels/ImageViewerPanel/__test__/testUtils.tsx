@@ -19,6 +19,10 @@ import { render, screen, cleanup, type RenderResult } from '@testing-library/rea
 import type { IDockviewPanelProps } from 'dockview'
 
 import type { ImageReadResponse } from '../../../../../../shared/ipc/file-image-schema'
+import type {
+  ImageExportRequest,
+  ImageExportResponse
+} from '../../../../../../shared/ipc/image-export-schema'
 import { ImageViewerPanel } from '../ImageViewerPanel'
 import { TEST_IDS } from '../../../../constants/testids'
 
@@ -82,6 +86,15 @@ export interface ImageViewerHarness {
   serveChanged: () => void
   /** Fake `window.api.file.getStats`. */
   getStats: Mock<(path: string) => Promise<{ size: number }>>
+  /**
+   * Fake `window.api.imageExport.run` (issue #73).
+   *
+   * Answers a plain success for whichever target was asked for - a written file
+   * for `png`/`pdf`, no `filePath` for `clipboard` - so a suite that only cares
+   * that the button is wired needs no setup. Override it to stage a
+   * cancellation, a failure or a qualifier-bearing selection.
+   */
+  imageExportRun: Mock<(request: ImageExportRequest) => Promise<ImageExportResponse>>
   /** Fake `window.api.fileWatch` bridge. */
   fileWatch: MockFileWatch
   /**
@@ -138,6 +151,18 @@ export function installImageViewerHarness(): ImageViewerHarness {
   const readBytes = vi.fn<(path: string) => Promise<string>>()
   const readImage = vi.fn<(path: string, knownVersion?: string) => Promise<ImageReadResponse>>()
   const getStats = vi.fn<(path: string) => Promise<{ size: number }>>()
+  const imageExportRun = vi.fn<(request: ImageExportRequest) => Promise<ImageExportResponse>>()
+
+  /** Default export behaviour: it worked, and nothing needed reporting. */
+  const exportSucceeds = async ({ target }: ImageExportRequest): Promise<ImageExportResponse> =>
+    target === 'clipboard'
+      ? { success: true, target, output: { width: 800, height: 600 } }
+      : {
+          success: true,
+          target,
+          filePath: `/exports/icon.${target}`,
+          output: { width: 800, height: 600 }
+        }
 
   /** Version counter behind the fake disk; bumped per minted version. */
   let versionSeq = 0
@@ -197,6 +222,7 @@ export function installImageViewerHarness(): ImageViewerHarness {
     readBytes.mockReset().mockResolvedValue('data:image/png;base64,AAAA')
     readImage.mockReset().mockImplementation(alwaysChanged)
     getStats.mockReset().mockResolvedValue({ size: 2048 })
+    imageExportRun.mockReset().mockImplementation(exportSucceeds)
     fileWatch.start.mockClear().mockResolvedValue({ success: true })
     fileWatch.stop.mockClear().mockResolvedValue({ success: true })
     fileWatch.pause.mockClear()
@@ -206,7 +232,8 @@ export function installImageViewerHarness(): ImageViewerHarness {
     // window object destroys React's DOM internals.
     ;(window as unknown as { api: unknown }).api = {
       file: { readImage, getStats },
-      fileWatch
+      fileWatch,
+      imageExport: { run: imageExportRun }
     }
 
     // jsdom lays everything out as 0x0; the fit maths needs a real box.
@@ -291,6 +318,7 @@ export function installImageViewerHarness(): ImageViewerHarness {
     readBytes,
     readImage,
     getStats,
+    imageExportRun,
     serveUnchanged: () => {
       readImage.mockImplementation(async (path, knownVersion) =>
         knownVersion === servedVersion
@@ -321,4 +349,21 @@ export function installImageViewerHarness(): ImageViewerHarness {
       return view
     }
   }
+}
+
+/**
+ * Every `role="alert"` in the tree EXCEPT the panel's export alert region.
+ *
+ * The export feature (issue #73) mounts a permanently-present, empty
+ * `role="alert"` region - a live region added to the DOM together with its text
+ * is not announced, so it has to exist while idle. A bare `getAllByRole('alert')`
+ * therefore no longer means "a banner or an error screen is showing", which is
+ * what the assertions using this helper are actually about.
+ *
+ * @returns The alert elements that carry real content, in document order
+ */
+export function alertsExcludingExportRegion(): HTMLElement[] {
+  return screen
+    .queryAllByRole('alert')
+    .filter((element) => element.dataset.testid !== TEST_IDS.IMAGE_VIEWER_EXPORT_ALERT)
 }

@@ -1,6 +1,6 @@
 # API Services - Feature Services
 
-**Location:** `src/main/services/`. Feature-specific: git (worker), multi-instance, media capture, transcription, audio extraction, file import. Core services (Terminal, File, Settings, Watchers): see [api-services.md](./api-services.md).
+**Location:** `src/main/services/`. Feature-specific: git (worker), multi-instance, media capture, transcription, audio extraction, file import, document and image export. Core services (Terminal, File, Settings, Watchers): see [api-services.md](./api-services.md).
 
 ---
 
@@ -597,6 +597,53 @@ DOCX generation from HTML content.
 
 #### `exportToDocx(html: string, fileName: string): Promise<DocxExportResponse>`
 Export HTML content to DOCX. As with PDF, `fileName` is a suggested name run through `sanitizeFilename`; the destination comes from a native save dialog. There is **no `images` parameter** anywhere in `src/main`: Mermaid diagrams are pre-converted to PNG in the renderer and arrive inlined as `<img data-mermaid-diagram="true" src="data:image/png;base64,…">` inside the HTML string. On success the response carries `removedRemoteImages` (count of remote images stripped), which the renderer surfaces as a warning toast.
+
+---
+
+## ImageExportService
+
+**File:** `src/main/services/imageExport/ImageExportService.ts` (+ the seven collaborators in the same folder). **Shared contract:** `src/shared/ipc/image-export-schema.ts`, `image-export-channels.ts`, `image-formats.ts`.
+
+PNG / PDF / clipboard export for the image a viewer tab is showing (#73). The whole job runs in the main process: the renderer sends `{ filePath, target }` and gets back a small structured result. **No image bytes cross IPC in either direction** — at the 50 MB source cap, round-tripping them as base64 would put ~67 MB through the bridge each way and block the UI thread encoding it.
+
+### Key features
+- **A conversion of the file, never a screenshot of the panel.** The bytes are read fresh from disk on every run, so zoom, pan and the panel's cached `<img>` are irrelevant, and a file that changed since the tab opened exports as it is now
+- Chromium is the decoder, because `nativeImage` handles only PNG and JPEG and the viewer supports eight formats including SVG. It runs in a hidden, sandboxed, network-isolated `BrowserWindow` — the **rasterize harness**
+- Format rules: SVG rasterized at a fixed 2x its intrinsic size; animated GIF exports its first frame; multi-size ICO exports its largest entry; PNG keeps alpha, while PDF and clipboard share one white-flattened pixel source
+- **Never silently downscales.** Over-cap input is refused with a specific code and nothing is written, rather than producing a smaller file than the user asked for
+- One `ExportLock` (`src/main/utils/ExportLock.ts`) per service instance, acquired **after** the save dialog closes — holding a process-wide mutex across a modal dialog would block every other image tab for as long as the user sat in the file picker
+
+### Public method
+
+#### `run({ filePath, target, parentWindow }): Promise<ImageExportResponse>`
+`target` is `'png' | 'pdf' | 'clipboard'`. `parentWindow` is resolved main-side from `event.sender`, never sent by the renderer, so the save dialog is modal to the window that asked for it. The response is a `success`-discriminated union; the failure branch always carries both `errorCode` and `error`, where `error` is `ERROR_MESSAGES[errorCode]` from a single mapping point — see [Error codes § Image export](./error-codes.md#image-export-15-codes).
+
+### Order of operations
+1. Handler gates: `isTrustedSender` → Zod `.strict()` → parent window
+2. `assertInsideProject(filePath, projectPath)` — the same confinement guard `file:readImage` uses. The **destination** is deliberately not confined; it comes from the user's own save dialog, as with PDF and DOCX export
+3. `stat` against `MAX_IMAGE_SIZE` (50 MB, imported from `file/imageRead.ts`, not redeclared)
+4. PNG / PDF only: suggested filename → native save dialog → forced extension → self-overwrite guard, which **fails closed** if `realpath` errors with anything other than ENOENT
+5. Acquire the lock; from here everything is inside it, released in `finally`
+6. `readFile` — the fresh read. Every byte parse below runs on this one buffer
+7. Declared-dimension preflight (`declaredDimensions.ts`) refuses a decompression bomb *before* any byte reaches a decoder; then the per-format metadata pass (`imageMetadata.ts`)
+8. `ImageRasterizeWindow.render(instruction)`; ICO output is hard-gated against the directory's largest entry
+9. Sink dispatch (`exportSinks.ts`), then destroy the window and release the lock
+
+### Security controls
+- The harness page carries its own CSP (`default-src 'none'`, `img-src blob:`, `object-src 'none'`) — deliberately **not** the app CSP, which has no `blob:` and would make SVG silently fail
+- Untrusted SVG is loaded **only** as `<img src=blobURL>`, Chromium's secure static mode: no script execution, no external fetches. Never as markup in the DOM. Enforced by that CSP plus an ESLint boundary over `src/renderer/src/imageExport/**`, not by a comment
+- A per-run in-memory session with a deny-all `webRequest` filter installed **before the window exists**, permission handlers denied, `setWindowOpenHandler` deny, and a `will-navigate` guard
+- Per-run UUID token plus a `senderFrame.url` check on every harness message, and frame-scoped listeners rather than global `ipcMain` — copied from the screenshot overlay
+- Byte parsing is bounded and never throws: a 64 KB read window for SVG, hard iteration caps for the GIF sub-block and JPEG marker walks, and **no XML or DTD-capable parser anywhere**, which closes billion-laughs and XXE
+- Every logged path goes through `redactPath`, every caught Node error through `redactedLogError` — the destination path is the more sensitive of the two, since it reflects the user's own folder layout outside the project
+
+### Collaborating modules
+`imageMetadata.ts` (GIF frame count, ICO directory, SVG intrinsic size) · `declaredDimensions.ts` (header preflight) · `exportPaths.ts` (suggested name, forced extension, self-overwrite guard) · `pdfGeometry.ts` (`verifyPdfGeometry` — exactly one page and a MediaBox within a shared tolerance constant, run **before** anything is written) · `rasterizeSession.ts` (session hardening) · `ImageRasterizeWindow.ts` (ready handshake, token, timeouts, guaranteed destroy) · `exportSinks.ts` (the three sinks).
+
+### Related files
+- `src/main/ipc/image-export-handlers.ts` – the single `image-export:run` handler
+- `src/renderer/imageExport.html` + `src/preload/imageExport.ts` + `src/renderer/src/imageExport/harness.ts` – the harness's own entry, preload and page. The preload exposes four verbs and deliberately **not** `imageExport.run`
+- `src/renderer/src/components/Panels/ImageViewerPanel/hooks/useImageExportHandlers.ts` – the renderer side; see [UI components § Image Viewer Panel](./ui-components.md#image-viewer-panel)
 
 ---
 

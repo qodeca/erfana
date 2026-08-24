@@ -25,3 +25,9 @@ export type { UseFullScreenOverlayResult } from './useFullScreenOverlay'
 
 export { useReloadAction } from './useReloadAction'
 export type { UseReloadActionOptions, UseReloadActionResult } from './useReloadAction'
+
+export { useImageExportHandlers } from './useImageExportHandlers'
+export type {
+  UseImageExportHandlersOptions,
+  UseImageExportHandlersResult
+} from './useImageExportHandlers'
