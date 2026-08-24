@@ -6,6 +6,7 @@
  * Covers the five ordered checks of design §1.5, each failing independently,
  * plus the "first failure wins" ordering.
  */
+import { join } from 'node:path'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 import { getDefaultGlobalSettings } from '../../../shared/ipc/global-settings-schema'
@@ -76,7 +77,11 @@ describe('PreviewEligibilityService', () => {
     gitignore.isIgnored.mockResolvedValueOnce(true)
     const verdict = await build().check(`${PROJECT}/build/page.html`, PROJECT)
     expect(verdict).toEqual({ eligible: false, reason: 'gitignored' })
-    expect(gitignore.isIgnored).toHaveBeenCalledWith(PROJECT, 'build/page.html')
+    // `relative()` yields NATIVE separators, so the expectation is built with
+    // `join` rather than a hardcoded POSIX literal — on win32 the service passes
+    // `build\page.html`. `git check-ignore` accepts either spelling, so the
+    // native form is correct input, not a bug to normalise away.
+    expect(gitignore.isIgnored).toHaveBeenCalledWith(PROJECT, join('build', 'page.html'))
   })
 
   it('first failure wins: global-off short-circuits before the extension check', async () => {

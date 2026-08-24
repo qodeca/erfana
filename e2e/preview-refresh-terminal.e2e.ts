@@ -81,28 +81,47 @@ type TerminalGrid = {
  * dependence on `.xterm-char-measure-element`, which this xterm build does not
  * leave in the DOM.
  */
+/**
+ * How long to wait for xterm to size its helper textarea. The element is in the
+ * DOM as soon as the terminal mounts, but its INLINE styles stay empty strings
+ * until xterm has measured the font and laid the grid out, which happens after
+ * `terminal.open()` returns. A one-shot read lands in that window on a slow
+ * host, `parseFloat('')` yields NaN, and the measurement reports "could not be
+ * measured" for a terminal that is merely a beat away from being ready.
+ */
+const GRID_MEASURE_TIMEOUT_MS = 15_000
+
 async function readTerminalGrid(page: Page): Promise<TerminalGrid> {
-  const grid = await page.evaluate(() => {
-    const root = document.querySelector('.xterm') as HTMLElement | null
-    const helper = document.querySelector('.xterm-helper-textarea') as HTMLElement | null
-    if (!root || !helper) return null
+  // Condition wait, not a sample (repo convention: no `waitForTimeout`).
+  // `waitForFunction` keeps polling while the callback returns null, so this
+  // resolves the instant xterm has written real cell dimensions.
+  const handle = await page
+    .waitForFunction(
+      () => {
+        const root = document.querySelector('.xterm') as HTMLElement | null
+        const helper = document.querySelector('.xterm-helper-textarea') as HTMLElement | null
+        if (!root || !helper) return null
 
-    const cellWidth = parseFloat(helper.style.width)
-    const cellHeight = parseFloat(helper.style.height)
-    if (!cellWidth || !cellHeight) return null
+        const cellWidth = parseFloat(helper.style.width)
+        const cellHeight = parseFloat(helper.style.height)
+        if (!cellWidth || !cellHeight) return null
 
-    const box = root.getBoundingClientRect()
-    return {
-      left: box.left,
-      top: box.top,
-      cellWidth,
-      cellHeight,
-      cursorRow: Math.round(parseFloat(helper.style.top) / cellHeight)
-    }
-  })
+        const box = root.getBoundingClientRect()
+        return {
+          left: box.left,
+          top: box.top,
+          cellWidth,
+          cellHeight,
+          cursorRow: Math.round(parseFloat(helper.style.top) / cellHeight)
+        }
+      },
+      undefined,
+      { timeout: GRID_MEASURE_TIMEOUT_MS }
+    )
+    .catch(() => null)
 
-  expect(grid, 'xterm cell grid could not be measured').not.toBeNull()
-  return grid!
+  expect(handle, 'xterm cell grid could not be measured').not.toBeNull()
+  return (await handle!.jsonValue()) as TerminalGrid
 }
 
 /** Click the centre of one terminal cell. */
@@ -153,6 +172,19 @@ test.describe('Terminal file links route images to the image viewer', () => {
       // misses by a row still lands on a link. `clear` puts the prompt on row 0
       // and keeps the command line from wrapping the output down the screen.
       await terminal.sendCommand(window, `cd "${projectPath}"`)
+
+      // Flatten the prompt to a SINGLE row before printing.
+      //
+      // The click maths below addresses the printed rows as `cursorRow - 1..3`,
+      // which is only correct when the prompt the shell draws after the output
+      // occupies exactly one row. That is an assumption about the developer's
+      // shell, not about the app: a Git Bash / oh-my-zsh style prompt renders
+      // three rows (user@host, cwd, `$`) and wraps again in a narrow panel, so
+      // the three offsets land on the prompt instead of the links and no link
+      // is ever hit. Clearing PROMPT_COMMAND first stops bash re-decorating PS1
+      // on the next draw. This spec is already POSIX-shell-only (`printf`,
+      // `clear`), so a POSIX prompt assignment adds no new constraint.
+      await terminal.sendCommand(window, "PROMPT_COMMAND=; PS1='$ '")
       await terminal.sendCommand(window, 'clear')
       await terminal.sendCommand(
         window,

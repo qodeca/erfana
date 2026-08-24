@@ -8,6 +8,7 @@
  * `vi.fn` carries an explicit function-type parameter so the test file is
  * type-clean even though test files are outside `npm run typecheck`.
  */
+import { dirname, resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ErrorCode } from '../../../shared/errors'
@@ -570,8 +571,13 @@ describe('PreviewViewService — post-load pipeline', () => {
     h.factory.emit('did-finish-load')
     await vi.waitFor(() => expect(h.setWatchSet).toHaveBeenCalled())
 
-    // The relative link resolved against the entry-file directory.
-    expect(h.setWatchSet).toHaveBeenCalledWith(['/proj/style.css'])
+    // The relative link resolved against the entry-file directory. Built with
+    // the same `resolve(dirname(entry), href)` the view uses rather than a POSIX
+    // literal: on win32 `resolve` anchors a rooted POSIX fixture to the current
+    // drive, so the produced path is `C:\proj\style.css`.
+    expect(h.setWatchSet).toHaveBeenCalledWith([
+      resolve(dirname(REQUEST_A.filePath), 'style.css')
+    ])
     expect(h.loadStateChanged).toHaveBeenCalledWith('panel-A', 'ready', 0)
   })
 })

@@ -20,6 +20,13 @@ export default [
       'playwright-report/**',
       'test-results/**',
       'coverage/**',
+      // Scratch project trees Playwright creates per e2e run. Already in
+      // .gitignore, but ESLint reads the working tree, not the index: on
+      // Windows a teardown can fail with EBUSY (the app still holds a handle),
+      // and the surviving fixtures — plain browser scripts, not app source —
+      // then fail `no-undef` on `document`/`window` and break `npm run lint`
+      // for reasons unrelated to any change.
+      '.e2e-temp/**',
       // Static browser test-input fixtures for the HTML-preview feature (#74):
       // these run inside the sealed preview WebContentsView, not the app/Node
       // context, so linting them as project source flags browser globals.

@@ -72,7 +72,14 @@ let recordFailure: ReturnType<typeof vi.fn<(input: PreviewFailureInput) => void>
 
 beforeEach(() => {
   globalProtocolHandle.mockClear()
-  root = realpathSync(mkdtempSync(join(tmpdir(), 'erfana-preview-')))
+  // `realpathSync.native`, NOT `realpathSync`: the handler resolves paths with
+  // `fsPromises.realpath`, which has NATIVE semantics and so expands a Windows
+  // 8.3 short name (a `C:\Users\MARCIN~1\...` TMP path becomes
+  // `C:\Users\marcinobel\...`). A non-native root would not expand, the two
+  // spellings would not be `relative()`-comparable, and every request here would
+  // fail confinement with a 403. Matching the production resolver keeps the root
+  // and the resolved target in the same namespace on every platform.
+  root = realpathSync.native(mkdtempSync(join(tmpdir(), 'erfana-preview-')))
   writeFileSync(join(root, 'index.html'), '<!doctype html><title>ok</title>')
   writeFileSync(join(root, 'app.tsx'), 'export const x = 1')
   recordFailure = vi.fn<(input: PreviewFailureInput) => void>()

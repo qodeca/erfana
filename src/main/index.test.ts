@@ -11,6 +11,16 @@ import { join } from 'node:path'
  * Focus on user-facing functionality like version display in title bar.
  */
 
+/**
+ * Every test here runs `vi.resetModules()` and re-imports `./index`, which
+ * pulls the WHOLE main-process module graph in again — a real, known cost, not
+ * a pending timer or an un-awaited promise. Under the full workspace run that
+ * repeated re-import can exceed the 5 s default on a loaded machine and time
+ * out a test that passes comfortably in isolation. The extra headroom only
+ * applies when the import is genuinely slow; a hung test still fails.
+ */
+vi.setConfig({ testTimeout: 20_000 })
+
 /** Renderer token file — the source of truth for the window's paint colour. */
 const DESIGN_TOKENS_PATH = join(__dirname, '../renderer/src/styles/design-tokens.css')
 

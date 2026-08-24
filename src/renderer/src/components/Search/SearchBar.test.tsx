@@ -785,6 +785,15 @@ describe('SearchBar', () => {
         text: 'test'
       }))
 
+      // The seeded query makes SearchBar's mount effect schedule a debounced
+      // `provider.search`. The default double resolves to [], so once that
+      // 100 ms timer lands mid-test it would call `setMatches([])` and the label
+      // would flip to "No results" — a race this test loses on a slow host.
+      // Teaching the provider to return the SAME matches makes the late write
+      // idempotent (`setMatches` preserves `currentIndex`), which is also how a
+      // real full-match provider behaves: it is the source of these matches.
+      vi.mocked(mockProvider.search).mockResolvedValue(matches)
+
       // Route through setMatches so count is derived like production.
       act(() => {
         useSearchStore.setState({ query: 'test' })
