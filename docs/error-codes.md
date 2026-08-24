@@ -2,7 +2,7 @@
 
 Project-wide index of `ErrorCode` values in `src/shared/errors.ts`, grouped by category. For each code: the enum name, the user-facing message (from `ERROR_MESSAGES` map), and the primary throw site. For whisper + transcription codes, also the operator action on encounter.
 
-**Why this document exists**: Phase 4 introduced 6 new whisper codes (see [ADR 0001](./adrs/0001-self-host-whisper-binaries.md)); the full enum has grown to 105 codes. A single mapping table saves every future maintainer a `grep -r ErrorCode` sweep.
+**Why this document exists**: Phase 4 introduced 6 new whisper codes (see [ADR 0001](./adrs/0001-self-host-whisper-binaries.md)); the full enum has grown to 110 codes. A single mapping table saves every future maintainer a `grep -r ErrorCode` sweep.
 
 **Source of truth**: `src/shared/errors.ts`. If this doc drifts, `errors.ts` wins — file an issue.
 
@@ -148,6 +148,20 @@ Most Phase 4 / issue #165. See also [`docs/windows/whisper-support-runbook.md`](
 3 `VIDEO_*` in `src/shared/errors.ts`.
 
 `VIDEO_NO_AUDIO_TRACK`, `VIDEO_EXTRACTION_FAILED`, `VIDEO_FFMPEG_UNAVAILABLE`. See `src/main/services/AudioExtractionService.ts`.
+
+---
+
+## Preview (5 codes)
+
+5 `PREVIEW_*` in `src/shared/errors.ts` (#74). See `src/main/services/preview/` and [`docs/html-preview/README.md`](./html-preview/README.md).
+
+| Code | User copy | Notes |
+|------|-----------|-------|
+| `PREVIEW_HOST_NOT_APPROVABLE` | "This host cannot be approved for preview." | `isApprovableHost` gate rejected the host (e.g. non-`http(s)`, IP-literal, or otherwise not eligible for the allowlist) |
+| `PREVIEW_CSP_INVALID` | "The preview security policy is invalid; the page was not served." | `PreviewRequestFilter` refused to serve because the CSP could not be built/enforced |
+| `PREVIEW_LOCAL_FILE_MISSING` | `"<path>" could not be read` | Path stays quoted so `redactUserInput`'s `QUOTED_SPAN` redacts it in logs; the toast keeps the real path |
+| `PREVIEW_VIEW_LIMIT_REACHED` | "A preview is already open." | `PreviewViewService` refused a second live view |
+| `PREVIEW_ALLOWLIST_FULL` | "The preview host allowlist is full." | `PreviewAllowlistStore` at the 200-host cap |
 
 ---
 

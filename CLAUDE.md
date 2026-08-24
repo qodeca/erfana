@@ -51,6 +51,7 @@ Feature specifications live in `specs/`.
 - [`src/main/services/CLAUDE.md`](src/main/services/CLAUDE.md) - catalogue of every main-process service, with the issue context behind each
 - [`src/renderer/src/components/Dialog/CLAUDE.md`](src/renderer/src/components/Dialog/CLAUDE.md) - BaseDialog API, focus trap, ESC/backdrop handling
 - [`src/renderer/src/components/Transcription/CLAUDE.md`](src/renderer/src/components/Transcription/CLAUDE.md) - Dual-backend transcription (OpenAI + local whisper.cpp), IPC flow, store
+- [`src/renderer/src/components/Panels/HtmlPreviewPanel/CLAUDE.md`](src/renderer/src/components/Panels/HtmlPreviewPanel/CLAUDE.md) - HTML preview: native WebContentsView vs DOM chrome, occluder guard, tab-hosted failure badge, find-bar inset
 
 ## Testing
 - Unit/Integration: Vitest workspace across renderer, main, preload (see [docs/testing/README.md](docs/testing/README.md))

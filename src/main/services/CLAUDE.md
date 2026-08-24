@@ -20,9 +20,12 @@ catalogue is not: it records what each service is for and which issue drove it.
 
 **Multi-instance** – ProjectLockService, LockHeartbeat, LockStalenessPolicy, MonotonicTimestampGenerator, ExternalFileService.
 
+**HTML preview (#74)** – `preview/`: PreviewViewService [WebContentsView lifecycle owner — mints/moves/destroys the native overlay view], PreviewLiveView [the live page wrapper it drives], PreviewProtocolHandler + PreviewRequestFilter [`erfana-preview://` serving + per-request/host gating and CSP enforcement], PreviewAllowlistStore [one-way per-project host allowlist, cap 200, kept out of ProjectSettings by design so a malformed host can't block project load], PreviewSessionFactory + PreviewStorageSeal [sealed in-memory `session` — no persistent cookies/cache/storage], PreviewEligibilityService [decides whether a path may open as a running preview], PreviewRootRegistry [tracks the served project roots], PreviewWatchCoordinator + PreviewWatchPool [bounded autorefresh watch pool], PreviewExportController [PDF export], PreviewFindController [find-in-page], PreviewFailureLog + PreviewHostBlockNotifier + PreviewStillFrameCache [coalesced failure log, blocked-host approve-toast budget, on-hide still-frame capture], PreviewReloadPolicy [reload gating]. IPC handlers live in `src/main/ipc/preview/` (allowlist-handlers, find-handlers, lifecycle-handlers, isTrustedPreviewSender, emit, buildPreviewGraph).
+
 ## See also
 
 - [Architecture](../../../docs/architecture.md) — system design patterns, SOLID principles, DI
 - [API Services](../../../docs/api-services.md) — Terminal, File, Settings, Watchers, Clipboard, system actions
-- [API Services – Features](../../../docs/api-services-features.md) — Git status worker architecture, GitWatcher, GitPolling, Camera, ProjectLock, ExternalFile, DOCX, Transcription, LocalWhisper, WhisperModelManager, AudioMetadata, AudioExtraction, ApiKey
-- [Error Codes](../../../docs/error-codes.md) — project-wide `ErrorCode` enum index
+- [API Services – Features](../../../docs/api-services-features.md) — Git status worker architecture, GitWatcher, GitPolling, Camera, ProjectLock, ExternalFile, DOCX, Transcription, LocalWhisper, WhisperModelManager, AudioMetadata, AudioExtraction, ApiKey, HTML preview pointer
+- [HTML preview](../../../docs/html-preview/README.md) — the full preview subsystem write-up (design, security threat model, IPC surface)
+- [Error Codes](../../../docs/error-codes.md) — project-wide `ErrorCode` enum index, incl. the 5 `PREVIEW_*` codes
