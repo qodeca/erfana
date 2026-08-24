@@ -20,6 +20,7 @@
  * @see Issue #70 - preview tabs show stale content when the file changes
  */
 
+import { IMAGE_EXPORT } from '../../../../../shared/ipc/image-export-schema'
 import { WATCHED_FILES_CAP } from '../../../constants/fileWatch'
 
 // ============================================================================
@@ -159,6 +160,103 @@ export const VIEWER_BANNER_COPY = {
 export const VIEWER_RELOAD_BUTTON_COPY = {
   label: 'Reload',
   ariaLabel: 'Reload image from disk'
+} as const
+
+/**
+ * Copy deck for the three export controls (issue #73).
+ *
+ * Every string the export feature shows a user lives here: tooltips, accessible
+ * names, their busy variants, the live-region sentence and the toast titles.
+ * Tests assert against these constants, so a copy change is a one-file edit and
+ * cannot drift from what the toolbar renders.
+ *
+ * Rules this deck encodes:
+ *
+ * 1. **Sentence case, format acronyms upper case** – matching this toolbar's
+ *    existing `Zoom out (-)` / `Fit to view (F)` / `Full screen`.
+ * 2. **No shortcut suffix.** No keyboard shortcut exists for these actions, and
+ *    inventing one in a tooltip would promise a key that does nothing.
+ * 3. **The accessible name says "image" where the tooltip does not.** A tooltip
+ *    is read in the visual context of the panel; an accessible name may be read
+ *    with no context at all.
+ * 4. `Copy to clipboard` deliberately does not say PNG – the user is copying
+ *    *the image*. That it lands as PNG bytes is a result, and the success toast
+ *    is where that is stated.
+ *
+ * @see Issue #73 - PNG / PDF / clipboard export controls in the image viewer
+ */
+export const IMAGE_EXPORT_COPY = {
+  png: {
+    tooltip: 'Export as PNG',
+    ariaLabel: 'Export image as PNG',
+    ariaLabelBusy: 'Exporting PNG, please wait',
+    announceBusy: 'Exporting PNG…',
+    toastTitle: 'PNG exported',
+    toastErrorTitle: 'Export failed'
+  },
+  pdf: {
+    tooltip: 'Export as PDF',
+    ariaLabel: 'Export image as PDF',
+    ariaLabelBusy: 'Exporting PDF, please wait',
+    announceBusy: 'Exporting PDF…',
+    toastTitle: 'PDF exported',
+    toastErrorTitle: 'Export failed'
+  },
+  clipboard: {
+    tooltip: 'Copy to clipboard',
+    ariaLabel: 'Copy image to clipboard',
+    ariaLabelBusy: 'Copying image, please wait',
+    announceBusy: 'Copying image…',
+    toastTitle: 'Copied to clipboard',
+    toastErrorTitle: 'Copy failed'
+  }
+} as const
+
+/**
+ * Which export action a control, a busy flag or a toast belongs to.
+ *
+ * Derived from {@link IMAGE_EXPORT_COPY} rather than written out again, so a
+ * fourth action cannot be added to the deck without the type following it.
+ */
+export type ImageExportAction = keyof typeof IMAGE_EXPORT_COPY
+
+/**
+ * Message-body templates for the export toasts (issue #73).
+ *
+ * Kept beside the button copy for the same reason: one file owns every string
+ * this feature can put on screen. The qualifier clauses use an EN DASH and the
+ * ` x ` dimension spacing that `formatDimensions()` (imageViewer.logic.ts)
+ * already prints in this toolbar, so a toast and the metadata row read the same.
+ */
+export const IMAGE_EXPORT_TOAST_COPY = {
+  /** Body of a successful PNG/PDF export; `name` is the truncated basename. */
+  saved: (name: string): string => `Saved as ${name}`,
+  /** Body of a successful clipboard copy. */
+  copied: 'Image copied as PNG',
+  /** Animated-GIF qualifier; only ever composed when `frameCount > 1`. */
+  gifFrame: (frameCount: number): string => `first frame of ${frameCount}`,
+  /** Multi-size-ICO qualifier; only ever composed when `sizeCount > 1`. */
+  icoSize: (width: number, height: number, sizeCount: number): string =>
+    `${width} x ${height} of ${sizeCount} sizes`,
+  /**
+   * SVG qualifier, naming the fixed rasterization factor and its result.
+   *
+   * The factor is interpolated from the constant main actually rasterizes at,
+   * so raising `SVG_RASTER_SCALE` cannot leave this sentence claiming a scale
+   * the file was never rendered at.
+   */
+  svgScaled: (width: number, height: number): string =>
+    `rendered at ${IMAGE_EXPORT.SVG_RASTER_SCALE}x (${width} x ${height})`,
+  /**
+   * Body used when the IPC call itself rejected, so no response - and therefore
+   * no `error` string - ever came back.
+   *
+   * Verbatim the main process's own catch-all message for
+   * `IMAGE_EXPORT_FAILED`, so the two channels cannot describe the same class
+   * of failure differently. The raw error goes to the log, never to the UI: it
+   * can carry an absolute path.
+   */
+  bridgeFailure: 'Image export failed'
 } as const
 
 // ============================================================================

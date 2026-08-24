@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Image viewer toolbar: metadata, refresh status, zoom controls, full screen.
+ * Image viewer toolbar: metadata, refresh status, zoom controls, export, full
+ * screen.
  *
  * Rendered twice – once in the panel and once inside the full-screen portal –
  * so it holds no state of its own, and only ONE of the two instances may carry
@@ -13,6 +14,7 @@
 import { ZoomIn, ZoomOut, Maximize2, Minimize2, X } from 'lucide-react'
 
 import { TEST_IDS } from '../../../../constants/testids'
+import { ImageViewerExportControls } from './ImageViewerExportControls'
 import { formatDimensions, formatFileSize, formatZoomLevel } from '../imageViewer.logic'
 import {
   formatUpdatedAccessibleName,
@@ -56,6 +58,25 @@ export interface ImageViewerToolbarProps {
    * @default true
    */
   showStatus?: boolean
+  /** Whether a PNG export is in flight (issue #73). */
+  isExportingPng: boolean
+  /** Whether a PDF export is in flight (issue #73). */
+  isExportingPdf: boolean
+  /** Whether a clipboard copy is in flight (issue #73). */
+  isCopying: boolean
+  /** Start a PNG export of the file on disk. */
+  onExportPng: () => void
+  /** Start a PDF export of the file on disk. */
+  onExportPdf: () => void
+  /** Copy the file on disk to the clipboard as PNG bytes. */
+  onCopyImage: () => void
+  /**
+   * Called instead of an action when a click lands while an export is running.
+   *
+   * The export controls stay live while busy, so the click is legal and does
+   * nothing; this is what stops it being completely silent.
+   */
+  onBusyClick: () => void
   onZoomIn: () => void
   onZoomOut: () => void
   onReset: () => void
@@ -92,6 +113,13 @@ export interface ImageViewerToolbarProps {
  *   canZoomIn
  *   canZoomOut
  *   isFullScreen={false}
+ *   isExportingPng={false}
+ *   isExportingPdf={false}
+ *   isCopying={false}
+ *   onExportPng={onExportPng}
+ *   onExportPdf={onExportPdf}
+ *   onCopyImage={onCopyImage}
+ *   onBusyClick={onBusyClick}
  *   onZoomIn={zoomIn}
  *   onZoomOut={zoomOut}
  *   onReset={reset}
@@ -112,6 +140,13 @@ export function ImageViewerToolbar({
   canZoomOut,
   isFullScreen,
   showStatus = true,
+  isExportingPng,
+  isExportingPdf,
+  isCopying,
+  onExportPng,
+  onExportPdf,
+  onCopyImage,
+  onBusyClick,
   onZoomIn,
   onZoomOut,
   onReset,
@@ -243,6 +278,23 @@ export function ImageViewerToolbar({
           <Minimize2 size={16} strokeWidth={2} />
         </button>
       </div>
+
+      {/* Export group. Between the zoom cluster and the actions group, so the
+          toolbar reads as three regions - how I look at it, what I take away,
+          where I look at it - and the far-right corner stays the full-screen
+          affordance it already was. Both instances render it; ONE hook in the
+          panel owns the busy state, so the two cannot disagree. */}
+      <div className={styles.toolbarSeparator} />
+
+      <ImageViewerExportControls
+        isExportingPng={isExportingPng}
+        isExportingPdf={isExportingPdf}
+        isCopying={isCopying}
+        onExportPng={onExportPng}
+        onExportPdf={onExportPdf}
+        onCopyImage={onCopyImage}
+        onBusyClick={onBusyClick}
+      />
 
       <div className={styles.toolbarSeparator} />
 

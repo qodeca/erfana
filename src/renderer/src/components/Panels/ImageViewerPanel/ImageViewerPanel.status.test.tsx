@@ -20,7 +20,7 @@ import { screen, fireEvent, waitFor } from '@testing-library/react'
 import { TEST_IDS } from '../../../constants/testids'
 import { INDICATOR_DURATION_MS } from '../../../constants/fileWatch'
 import { VIEWER_BANNER_COPY, VIEWER_STATUS_COPY } from './imageViewerStatus.logic'
-import { installImageViewerHarness } from './__test__/testUtils'
+import { alertsExcludingExportRegion, installImageViewerHarness } from './__test__/testUtils'
 
 const h = installImageViewerHarness()
 
@@ -132,7 +132,7 @@ describe('ImageViewerPanel – live refresh', () => {
       expect(slot).toHaveTextContent(VIEWER_STATUS_COPY.unavailable)
     })
 
-    it('keeps exactly one live region while full screen is open (QG-6 M5)', async () => {
+    it('keeps exactly one live region per subject while full screen is open (QG-6 M5)', async () => {
       // The toolbar renders twice - panel and portal. Two elements with
       // role="status" and the same text announce every refresh twice.
       await h.renderAndSettle('/proj/icon.png')
@@ -141,9 +141,13 @@ describe('ImageViewerPanel – live refresh', () => {
       await screen.findByTestId(TEST_IDS.IMAGE_VIEWER_FULLSCREEN)
 
       expect(screen.getAllByTestId(TEST_IDS.IMAGE_VIEWER_TOOLBAR)).toHaveLength(2)
-      // No getAllByTestId(...)[0] papering over a duplicate: there is one.
+      // No getAllByTestId(...)[0] papering over a duplicate: there is one of
+      // each. Counted per SUBJECT rather than by role, because issue #73 added
+      // a second, unrelated live region for export progress - the defect this
+      // pins is two regions saying the SAME thing, not two subjects.
       expect(screen.getByTestId(TEST_IDS.IMAGE_VIEWER_STATUS)).toBeInTheDocument()
-      expect(screen.getAllByRole('status')).toHaveLength(1)
+      expect(screen.getByTestId(TEST_IDS.IMAGE_VIEWER_EXPORT_STATUS)).toBeInTheDocument()
+      expect(screen.getAllByRole('status')).toHaveLength(2)
     })
 
     it('still announces a refresh that lands while full screen is open', async () => {
@@ -215,7 +219,7 @@ describe('ImageViewerPanel – live refresh', () => {
       expect(screen.getByTestId(TEST_IDS.IMAGE_VIEWER_BTN_RELOAD)).toBeInTheDocument()
       // One alert region, not two: the panel's copy is suppressed while the
       // overlay owns the surface.
-      expect(screen.getAllByRole('alert')).toHaveLength(1)
+      expect(alertsExcludingExportRegion()).toHaveLength(1)
     })
 
     it('moves the banner back into the panel when full screen closes', async () => {
@@ -226,7 +230,7 @@ describe('ImageViewerPanel – live refresh', () => {
 
       fireEvent.click(screen.getByTestId(TEST_IDS.IMAGE_VIEWER_BTN_FULLSCREEN))
       await screen.findByTestId(TEST_IDS.IMAGE_VIEWER_FULLSCREEN)
-      expect(screen.getAllByRole('alert')).toHaveLength(1)
+      expect(alertsExcludingExportRegion()).toHaveLength(1)
 
       fireEvent.click(screen.getByTestId(TEST_IDS.IMAGE_VIEWER_BTN_CLOSE))
 

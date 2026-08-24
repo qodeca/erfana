@@ -72,18 +72,56 @@ export function redactUserInput(message: string, code?: ErrorCode): string {
 }
 
 /**
- * Build the `Error` to hand to `logger.error` so user-derived filename text
- * never reaches the log file — neither via `Error.message` NOR via
- * `Error.stack` (the stack embeds the message verbatim).
+ * A quoted path operand inside a Node errno message.
+ *
+ * Node writes the path it failed on into `Error.message`, always as a quoted
+ * operand: `ENOENT: no such file or directory, open '/Users/alice/notes.md'`,
+ * and `rename` contributes two of them. The match requires the quoted content
+ * to START with a separator or a `C:`-style drive prefix, so ordinary quoted
+ * prose in a message survives while every absolute path (POSIX, Windows, UNC)
+ * is caught. `[^'"]*` is a single quantifier over a negated class — linear, no
+ * backtracking blow-up on a long value.
+ */
+const QUOTED_PATH = /(['"])(?:[A-Za-z]:)?[\\/][^'"]*\1/g
+
+const PATH_PLACEHOLDER = '[redacted-path]'
+
+/**
+ * `true` when the error looks like it came from a syscall.
+ *
+ * Deliberately loose: any of the three fields Node sets is enough. The cost of
+ * a false positive is nil — the rewrite below is a no-op unless the message
+ * actually contains a quoted absolute path — while a false negative writes a
+ * user's folder layout into the log file.
+ */
+function carriesSyscallFields(error: Error): boolean {
+  const candidate = error as { errno?: unknown; code?: unknown; syscall?: unknown }
+  return (
+    typeof candidate.errno === 'number' ||
+    typeof candidate.code === 'string' ||
+    typeof candidate.syscall === 'string'
+  )
+}
+
+/**
+ * Build the `Error` to hand to `logger.error` so neither user-derived filename
+ * text NOR an absolute path reaches the log file — and neither via
+ * `Error.message` nor via `Error.stack` (the stack embeds the message
+ * verbatim).
  *
  * - Non-`Error` input → `undefined` (matches the existing
  *   `error instanceof Error ? error : undefined` convention at the IPC call
  *   sites).
- * - An error whose message has nothing to redact → the ORIGINAL error, so its
- *   stack trace is preserved for debugging.
- * - An error whose message IS redacted → a fresh `Error` carrying only the
- *   redacted message; this deliberately drops the original stack, which would
- *   otherwise re-leak the raw filename.
+ * - A user-input-bearing `AppError` → a fresh `Error` with the quoted user
+ *   content replaced (see `redactUserInput`).
+ * - A syscall-shaped error (`errno` / `code` / `syscall`) whose message quotes
+ *   an absolute path → a fresh `Error` with each path operand replaced. This
+ *   is the branch that stops a caller's carefully redacted `destination` field
+ *   sitting next to the same path, unredacted, in the errno message beside it.
+ * - Anything else → the ORIGINAL error, so its stack survives for debugging.
+ *
+ * A rewrite always drops the original stack, which would otherwise re-leak the
+ * text that was just removed.
  *
  * Callers MUST still re-throw the ORIGINAL (unredacted) error so the renderer
  * toast keeps the full filename. This helper only shapes the logged copy.
@@ -93,9 +131,14 @@ export function redactUserInput(message: string, code?: ErrorCode): string {
  */
 export function redactedLogError(error: unknown): Error | undefined {
   if (!(error instanceof Error)) return undefined
+
   const code = error instanceof AppError ? error.code : undefined
-  const redacted = redactUserInput(error.message, code)
-  return redacted === error.message ? error : new Error(redacted)
+  const withoutUserInput = redactUserInput(error.message, code)
+  if (withoutUserInput !== error.message) return new Error(withoutUserInput)
+
+  if (!carriesSyscallFields(error)) return error
+  const withoutPaths = error.message.replace(QUOTED_PATH, PATH_PLACEHOLDER)
+  return withoutPaths === error.message ? error : new Error(withoutPaths)
 }
 
 /**

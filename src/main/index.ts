@@ -25,6 +25,7 @@ import { registerProjectLockHandlers } from './ipc/project-lock-handlers'
 import { registerExternalFileHandlers } from './ipc/external-file-handlers'
 import { registerTranscriptionHandlers } from './ipc/transcription-handlers'
 import { registerClipboardHandlers } from './ipc/clipboard-handlers'
+import { registerImageExportHandlers } from './ipc/image-export-handlers'
 import { registerClaudeStatusHandlers } from './ipc/claude-status-handlers'
 import { registerPreviewHandlers } from './ipc/preview-handlers'
 import { registerPreviewScheme } from './services/preview/previewScheme'
@@ -383,6 +384,7 @@ app.whenReady().then(async () => {
   registerExternalFileHandlers()
   registerTranscriptionHandlers()
   registerClipboardHandlers()
+  registerImageExportHandlers()
   // Per-terminal Claude Code context status bar (#216). Uses the same
   // terminalService singleton so it can look up the main-owned PTY pid + cwd.
   claudeStatusHandlers = registerClaudeStatusHandlers(terminalService)

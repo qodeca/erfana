@@ -401,7 +401,7 @@ export const TEST_IDS = {
   DIAGRAM_VIEWER_BTN_CHAT: 'diagram-viewer-btn-chat',
 
   // =========================================================================
-  // Image Viewer Panel (15)
+  // Image Viewer Panel (20)
   // =========================================================================
 
   /** Image viewer panel container */
@@ -434,6 +434,35 @@ export const TEST_IDS = {
   IMAGE_VIEWER_DELETED_BANNER: 'image-viewer-deleted-banner',
   /** Reload button inside the degraded-state banner (issue #70) */
   IMAGE_VIEWER_BTN_RELOAD: 'image-viewer-btn-reload',
+  /**
+   * Export-as-PNG button (issue #73).
+   *
+   * Rendered by BOTH toolbar instances on purpose - the panel's and the
+   * full-screen overlay's - so a locator must be scoped by ancestor, exactly
+   * as the zoom and full-screen ids already are.
+   */
+  IMAGE_VIEWER_BTN_EXPORT_PNG: 'image-viewer-btn-export-png',
+  /** Export-as-PDF button (issue #73); duplicated across both toolbars. */
+  IMAGE_VIEWER_BTN_EXPORT_PDF: 'image-viewer-btn-export-pdf',
+  /** Copy-image-to-clipboard button (issue #73); duplicated across both toolbars. */
+  IMAGE_VIEWER_BTN_COPY: 'image-viewer-btn-copy',
+  /**
+   * Polite export live region (issue #73).
+   *
+   * Panel-owned and visually hidden. Rendered into whichever surface is on top
+   * (the overlay when full screen, the panel otherwise), so exactly one element
+   * carries this id at any time. Carries busy and success sentences only.
+   */
+  IMAGE_VIEWER_EXPORT_STATUS: 'image-viewer-export-status',
+  /**
+   * Assertive export live region (issue #73).
+   *
+   * The `role="alert"` half of the pair above, mounted and moved with it. A
+   * failed export lands here: the overlay is `aria-modal`, so the toast's own
+   * alert region cannot be heard while full screen, and a politely announced
+   * failure can be queued or dropped.
+   */
+  IMAGE_VIEWER_EXPORT_ALERT: 'image-viewer-export-alert',
 
   // =========================================================================
   // Chat Bubble (15)

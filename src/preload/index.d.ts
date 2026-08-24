@@ -44,6 +44,7 @@ import type {
 import type { ClipboardBridge } from '../shared/ipc/clipboard-schema'
 import type { ClaudeStatusBridge } from '../shared/ipc/claude-status-schema'
 import type { PreviewBridge } from '../shared/ipc/preview-schema'
+import type { ImageExportBridge } from '../shared/ipc/image-export-schema'
 
 declare global {
   interface Window {
@@ -371,6 +372,11 @@ declare global {
        * @see Issue #203 - Central text-clipboard service
        */
       clipboard: ClipboardBridge
+      /**
+       * Image export bridge (PNG / PDF / clipboard)
+       * @see Issue #73 - image viewer export controls
+       */
+      imageExport: ImageExportBridge
       /**
        * Per-terminal Claude Code context status bridge
        * @see Issue #216 - Per-terminal Claude Code context status bar

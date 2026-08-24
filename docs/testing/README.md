@@ -22,7 +22,7 @@ Complete guide for testing Erfana. This covers both automated tests (Vitest/Play
 
 #### Key test areas
 
-Run `npm run test` for current totals. The workspace holds **326 test files** — main 144 (`src/main` 132 + `src/shared` 10 + `scripts` 2), renderer 178, preload 4 — enumerated on `develop` on 2026-08-12, i.e. **v0.17.2 plus the unreleased CI workflow-lint fix**, not a released tag. That tree runs **9,694 cases** (verified on 2026-08-12); re-run `npm run test:ci` for the live figure, since the case count moves with every commit while the file count is checkable with a glob. ~78 cases platform-gate on Windows — 77 POSIX-only `pathSecurity.test.ts` + 1 macOS-only `LiteParseConverter.test.ts`. For the version-by-version test-addition history, see [`docs/CHANGELOG.md`](../CHANGELOG.md).
+Run `npm run test` for current totals. The workspace holds **376 test files** — main 165 (`src/main` 151 + `src/shared` 12 + `scripts` 2), renderer 206, preload 5 — and runs **10,474 cases**, all passing. Both figures were measured on 2026-08-24 on the #73 image-export branch, which is ahead of `develop`; re-run `npm run test:ci` for the live figure, since the case count moves with every commit while the file count is checkable with a glob. ~78 cases platform-gate on Windows — 77 POSIX-only `pathSecurity.test.ts` + 1 macOS-only `LiteParseConverter.test.ts`. For the version-by-version test-addition history, see [`docs/CHANGELOG.md`](../CHANGELOG.md).
 
 | Area | Key files | Docs |
 |------|-----------|------|
@@ -37,6 +37,7 @@ Run `npm run test` for current totals. The workspace holds **326 test files** �
 | Build tooling | `scripts/fuses.test.mjs` (afterPack chmod helper — 9 cases: happy / idempotent / multi-arch / missing / empty+requireMatch / empty+lenient / symlink / dir / EROFS) | [Build – Fuses](../build/fuses.md#afterpack-also-chmods-node-pty-spawn-helper) |
 | Error containment (#60) | `RootErrorBoundary.test.tsx`, `RootErrorFallback.test.tsx`, `PanelErrorBoundary.test.tsx`, `useDragDropTree.test.ts` (explicit-stack `flattenTree`), `rendererCrashHandlers.test.ts` (main-side crash/hang trail) | [UI components § Error containment](../ui-components.md#error-containment) · [`design-issue-60.md`](../design/design-issue-60.md) |
 | Image viewer + single-file watch (#70) | Main: `FileWatcherService.atomicSave.test.ts`, `watcher/SubscriberCounter.test.ts`, `watcher/singleFileWatch.rename.integration.test.ts` (**real** chokidar + real `rename`, pins the platform's event sequence). Renderer: `hooks/useFileChangeSubscription.test.ts`, `hooks/fileWatchSlot.test.ts`, `utils/openFileInPanel.test.ts`, and the `ImageViewerPanel/` suite (`.test.tsx`, `.refresh`, `.status`, `.deleted`, `.integration`) | [File watching § Single-file watch internals](../file-watching/README.md#single-file-watch-internals-70) · [UI components § Image Viewer Panel](../ui-components.md#image-viewer-panel) |
+| Image export – PNG / PDF / clipboard (#73) | Main: `services/imageExport/` (`imageMetadata`, `declaredDimensions`, `exportPaths`, `pdfGeometry`, `rasterizeSession`, `ImageRasterizeWindow`, `exportSinks`, and `ImageExportService` split across `.test`, `.errors.test`, `.sinks.test`), `utils/ExportLock.test.ts`, `ipc/image-export-handlers.test.ts`. Shared: `ipc/image-formats.test.ts`. Renderer: `ImageViewerPanel/imageExportToast.logic.test.ts`, `hooks/useImageExportHandlers{,.announcement}.test.ts`, `components/ImageViewerExportControls.test.tsx`, `ImageViewerPanel.export.test.tsx`, `ImageViewerPanel.toolbarOverflow.test.ts`. The rasterize harness itself is the one piece with no unit coverage — it only runs inside a real Chromium page, so it is proven by the four e2e specs that actually export (`image-export`, `image-export.behaviour`, `image-export.matrix`, `image-export.overlay-matrix`) and the manual checklist | [API services – features § ImageExportService](../api-services-features.md#imageexportservice) · [UI components § Image Viewer Panel](../ui-components.md#image-viewer-panel) · [Error codes § Image export](../error-codes.md#image-export-15-codes) |
 
 **Testing patterns used**:
 - "Extract Pure Logic" – business logic in `.logic.ts` files, tested without React overhead
@@ -62,7 +63,7 @@ Run `npm run test` for current totals. The workspace holds **326 test files** �
 
 - Playwright setup and configuration for Electron (three projects in `playwright.config.ts`: `electron` functional, `transcription` env-gated, `visual` regression)
 - Testing patterns for third-party components (Monaco, xterm.js, Mermaid)
-- Complete selector catalog (251 testids) – see [e2e-selectors.md](./e2e-selectors.md)
+- Complete selector catalog (256 testids) – see [e2e-selectors.md](./e2e-selectors.md)
 - Test helper utilities documentation
 - Troubleshooting guide
 
@@ -75,7 +76,7 @@ npm run test:e2e:visual            # Visual regression tests (visual project) �
 npm run test:e2e:update-screenshots  # Update visual baselines
 ```
 
-**E2E test files** (all 20 specs in `e2e/`):
+**E2E test files** (all 25 specs in `e2e/`):
 - `app-launch.e2e.ts` – Application launch, activity bar, welcome panel visibility
 - `third-party-components.e2e.ts` – Monaco editor, xterm.js terminal, Mermaid diagrams
 - `directory-watcher.e2e.ts` – Directory watcher pipeline (#104): verifies file creation via terminal appears in Project Tree within latency budget
@@ -95,7 +96,12 @@ npm run test:e2e:update-screenshots  # Update visual baselines
 - `root-error-boundary.e2e.ts` – #60: a launcher-injected renderer crash must produce the recovery screen (details toggle, Copy / Open logs / Restart present) instead of a blank window, plus a negative case asserting the normal app renders when the crash flag is absent. Restart is asserted but never clicked — activating it relaunches the app mid-test
 - `preview-refresh.e2e.ts` – #70: an open image tab repaints after an in-place rewrite and after an atomic replace, the status slot reaches `reloading` then returns to `idle`, zoom survives a same-size rewrite, a delete shows the banner and keeps the last image, and a `MutationObserver` proves there is no flicker. Uses `ImageViewerPage`; asserts the decoded `data-marker` rather than the raw `src`
 - `preview-refresh-terminal.e2e.ts` – #70: an image path clicked in a terminal opens the image viewer, not Monaco. Separate spec because it needs `ERFANA_E2E_FAST_SHELL` on its own `electron.launch()` and because clicking a WebGL-rendered xterm link needs cell-grid geometry plus retries
-- `visual-regression.e2e.ts` – Visual regression for 5 UI states (see below)
+- `image-export.e2e.ts` – #73, the *bytes* half: real pixel output for all eight supported extensions, an SVG rasterized at exactly 2x its intrinsic size, an animated GIF's first frame, a multi-size ICO's largest entry, PDF geometry (exactly one page, MediaBox = pixels × 0.75 pt — asserted with the same `verifyPdfGeometry` the runtime gate uses, so gate and assertion cannot drift), and alpha handling. Everything here needs a real Chromium decoder, which neither jsdom nor the electron-mocked main project has. Clipboard cases run serially, because the OS clipboard is a global resource
+- `image-export.behaviour.e2e.ts` – #73, the *promises* half: the export follows the file rather than the panel (zooming changes nothing; rewriting the source between two exports changes everything), all three actions work from the full-screen overlay and announce into the in-overlay live region, and a cancelled save dialog writes nothing and says nothing. Split from the spec above so both stay under the 500-line cap; the native save dialog is stubbed with `stubDialog` rather than via a production test hook
+- `image-export.matrix.e2e.ts` – #73: the PDF and clipboard columns of acceptance criterion 1's 3 x 8 format grid, run from the panel toolbar, each row asserting that format's own expected pixel size (the PNG column lives in `image-export.e2e.ts`). Also carries the PDF page-size grid-regression case, which holds the one-CSS-pixel MediaBox tolerance
+- `image-export.overlay-matrix.e2e.ts` – #73: the same 3 x 8 grid run from the full-screen overlay, asserted through overlay-scoped locators and the in-overlay live region rather than a toast the `aria-modal` overlay would hide, including the per-format qualifier (GIF frame, ICO size, SVG 2x)
+- `image-viewer-narrow.e2e.ts` – #73: the toolbar's narrow-width contract in a real Chromium layout — all eight controls stay visible and hit-testable at a 300 px panel, and Tab scrolls the rightmost one into view by scrolling the *toolbar*, with the panel container's `scrollLeft` asserted to stay 0
+- `visual-regression.e2e.ts` – Visual regression for 6 UI states (see below)
 
 **E2E environment variables**:
 
@@ -119,12 +125,13 @@ See Spec #011 (archived) for the specification.
 
 ### Visual regression (Spec #019, archived)
 
-Screenshot-based comparison for 5 core UI states:
+Screenshot-based comparison for 6 core UI states:
 - **(a)** Welcome panel – empty project
 - **(b)** Editor loaded – tree + editor + preview
 - **(c)** Terminal open – split view with terminal
 - **(d)** Settings overlay – full-screen settings
 - **(e)** Confirm dialog – quit confirmation overlay
+- **(f)** Image viewer toolbar – narrow panel (#73); the only case about a single row rather than a whole window, and it seeds its image fixtures through its own extended test object so states (a)–(e) keep byte-identical baselines. Its baseline exists for darwin only — a Windows host has to generate and commit the `win32` one
 
 **Key details**:
 - Baselines in `e2e/screenshots/` with platform suffix (e.g., `welcome-empty-darwin.png`)

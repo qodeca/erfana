@@ -102,8 +102,97 @@ export default [
       '@typescript-eslint/no-require-imports': 'off'
     }
   },
-  // Renderer process: two families of hand-rolled string building that keep
-  // reintroducing bugs.
+  // The image-export rasterize harness (#73) is a hidden Chromium page that is
+  // handed image bytes straight from the user's project — SVG included, which
+  // is a document format with a script model. It is safe ONLY because an SVG
+  // reaches it as `<img src=blob:...>`, Chromium's secure static mode. Losing
+  // that property takes one line, so the rule is enforced rather than
+  // documented:
+  //
+  //   * no HTML-string sink can put SVG text into the DOM;
+  //   * no parser (`DOMParser`) and no `eval` family;
+  //   * no RUNTIME import from outside this folder, so the app bundle — and
+  //     with it `window.api` — cannot be pulled into the harness chunk.
+  //     Type-only imports are exempt via `allowTypeImports`: they are erased
+  //     entirely by the compiler, emit no code, and are how the harness stays
+  //     bound to the shared wire contract instead of re-declaring it. (A
+  //     negated allow-list such as `!../../../shared/**` is NOT usable here —
+  //     ESLint matches these patterns with the `ignore` package configured for
+  //     relative paths, where `!` negation does not take effect.)
+  //
+  // Deliberately uses `no-restricted-properties` / `-globals` / `-imports` and
+  // NOT `no-restricted-syntax`: flat config replaces a rule wholesale, and the
+  // `src/renderer/**` block below owns `no-restricted-syntax`, so a second
+  // declaration here would silently disable its selectors for this folder. The
+  // remaining harness ban — creating an `object` / `embed` / `iframe` element,
+  // which loads an SVG AS A DOCUMENT and does execute script — is therefore
+  // selector 5 of that block, where it covers this folder too.
+  {
+    files: ['src/renderer/src/imageExport/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-properties': [
+        'error',
+        {
+          property: 'innerHTML',
+          message:
+            'The rasterize harness must never put markup into the DOM — an untrusted SVG would become executable. Build elements with createElement.'
+        },
+        {
+          property: 'outerHTML',
+          message:
+            'The rasterize harness must never put markup into the DOM — an untrusted SVG would become executable. Build elements with createElement.'
+        },
+        {
+          property: 'insertAdjacentHTML',
+          message:
+            'The rasterize harness must never put markup into the DOM — an untrusted SVG would become executable. Build elements with createElement.'
+        },
+        {
+          object: 'document',
+          property: 'write',
+          message: 'document.write parses markup. The harness must not parse anything.'
+        },
+        {
+          object: 'document',
+          property: 'writeln',
+          message: 'document.writeln parses markup. The harness must not parse anything.'
+        }
+      ],
+      'no-restricted-globals': [
+        'error',
+        {
+          name: 'DOMParser',
+          message:
+            'The harness must never parse an untrusted document. Images are decoded via createImageBitmap or <img src=blob:...> only.'
+        },
+        {
+          name: 'eval',
+          message: 'No dynamic code evaluation in the rasterize harness.'
+        }
+      ],
+      'no-restricted-imports': 'off',
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              // `../**` is belt and braces. Verified by probe: the `ignore`
+              // matcher treats `../*` as a directory prefix, so it already
+              // rejects `../utils/logger` and `../../up/two/levels` as well as
+              // `../deep`. The explicit deep pattern keeps that property from
+              // resting on a matcher detail nobody can see from here.
+              group: ['../*', '../**', '@renderer/*', '@renderer/**'],
+              allowTypeImports: true,
+              message:
+                'The rasterize harness must not import app code at runtime — it runs in a window that decodes untrusted bytes. Only this folder, and type-only imports, are allowed.'
+            }
+          ]
+        }
+      ]
+    }
+  },
+  // Renderer process: four families of code that keep reintroducing bugs, or
+  // that would reintroduce a security property this app relies on.
   //
   // 1. POSIX-only path manipulation. The renderer is sandboxed (no Node `path`
   //    module) and receives paths in their NATIVE separators from the main
@@ -111,17 +200,24 @@ export default [
   //    Windows. Use the cross-platform helpers in `utils/fileUtils.ts` (itself
   //    exempt, as it owns the separator-class logic). See issue #238.
   // 2. Hand-built dockview panel ids. The id prefix and the panel component
-  //    must be derived from the same kind answer or a file opens in the wrong
-  //    panel type; `utils/openFileInPanel.ts` owns that (and is therefore
-  //    exempt). The `preview-` prefix is issue #74's running HTML preview.
-  //    See issues #70 and #74.
+  //    must be derived from the same `isImageFile`/kind answer or a file opens
+  //    in the wrong panel type; `utils/openFileInPanel.ts` owns that (and is
+  //    therefore exempt). The `preview-` prefix is issue #74's running HTML
+  //    preview. See issues #70 and #74.
   // 3. The running preview's visibility. `api.preview.setVisibility` and the
   //    `preview:setVisibility` channel have exactly ONE permitted caller,
   //    `services/preview/OverlayGuardService.ts` (exempt), so the "single
   //    hide/show owner" invariant is enforced by the linter, not by convention.
   //    See issue #74 design §1.8.
+  // 4. Creating an `object` / `embed` / `iframe` element. Those load an SVG AS
+  //    A DOCUMENT, which executes script — the one route the image-export
+  //    harness (#73) must never acquire. The selector lives HERE rather than in
+  //    the harness-scoped block below because this block owns
+  //    `no-restricted-syntax`, and a second declaration of the rule would
+  //    silently disable these selectors for whichever files it matched. No
+  //    renderer code creates those elements today.
   //
-  // NOTE: all three families live in ONE `no-restricted-syntax` entry on
+  // NOTE: all four families live in ONE `no-restricted-syntax` entry on
   // purpose. Flat config replaces a rule wholesale rather than merging, so a
   // second block setting `no-restricted-syntax` for these files would silently
   // disable whichever set it did not repeat.
@@ -180,6 +276,12 @@ export default [
             "CallExpression[callee.property.name='setVisibility'][callee.object.property.name='preview'], Literal[value='preview:setVisibility']",
           message:
             'Preview visibility is owned by services/preview/OverlayGuardService. Do not call api.preview.setVisibility or reference the preview:setVisibility channel elsewhere (issue #74, design §1.8).'
+        },
+        {
+          selector:
+            "CallExpression[callee.property.name='createElement'][arguments.0.value=/^(object|embed|iframe|frame)$/i]",
+          message:
+            'object / embed / iframe load an SVG AS A DOCUMENT, which executes script. Use <img> (see the image-export harness boundary, #73).'
         }
       ]
     }

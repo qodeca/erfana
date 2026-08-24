@@ -43,9 +43,22 @@ export type ImageViewerStatusState =
 /** Which degradation the banner is reporting. */
 export type ImageViewerBannerVariant = 'deleted' | 'unavailable' | 'stale'
 
+/**
+ * Expando `clickExport` writes on an export button to record that it went busy.
+ *
+ * Namespaced because it lives on a real DOM node in the app under test; the
+ * observer that sets it is armed and disconnected within one `clickExport`.
+ */
+const BUSY_LATCH = '__erfanaExportWentBusy'
+
 export class ImageViewerPage {
   constructor(
-    private readonly page: Page,
+    /**
+     * `protected` rather than `private` so `ImageViewerNarrowPage` can extend
+     * this vocabulary instead of duplicating it. The narrow-width additions
+     * live in their own file only because this one is near the 500-line cap.
+     */
+    protected readonly page: Page,
     /** Default budget for watcher-driven assertions. See `REFRESH_BUDGET_MS`. */
     private readonly defaultTimeout = 15_000
   ) {}
@@ -92,6 +105,81 @@ export class ImageViewerPage {
   /** The fit-to-view button. */
   fitButton(): Locator {
     return this.panel().locator(`[data-testid="${TEST_IDS.IMAGE_VIEWER_BTN_FIT}"]`)
+  }
+
+  /**
+   * The full-screen overlay root, rendered into `#portal-root` OUTSIDE the
+   * panel.
+   *
+   * It carries the same test ids as the panel, which is why every locator here
+   * is scoped: an unscoped `getByTestId` would match twice while full screen is
+   * open.
+   */
+  fullScreen(): Locator {
+    return byTestId(this.page, TEST_IDS.IMAGE_VIEWER_FULLSCREEN)
+  }
+
+  /** The panel's full-screen button. */
+  fullScreenButton(): Locator {
+    return this.panel().locator(`[data-testid="${TEST_IDS.IMAGE_VIEWER_BTN_FULLSCREEN}"]`)
+  }
+
+  /** The full-screen overlay's close button. */
+  fullScreenCloseButton(): Locator {
+    return this.fullScreen().locator(`[data-testid="${TEST_IDS.IMAGE_VIEWER_BTN_CLOSE}"]`)
+  }
+
+  /** The panel's Export-as-PNG button (issue #73). */
+  exportPngButton(): Locator {
+    return this.panel().locator(`[data-testid="${TEST_IDS.IMAGE_VIEWER_BTN_EXPORT_PNG}"]`)
+  }
+
+  /** The panel's Export-as-PDF button (issue #73). */
+  exportPdfButton(): Locator {
+    return this.panel().locator(`[data-testid="${TEST_IDS.IMAGE_VIEWER_BTN_EXPORT_PDF}"]`)
+  }
+
+  /** The panel's copy-to-clipboard button (issue #73). */
+  copyButton(): Locator {
+    return this.panel().locator(`[data-testid="${TEST_IDS.IMAGE_VIEWER_BTN_COPY}"]`)
+  }
+
+  /** The full-screen overlay's Export-as-PNG button. */
+  fullScreenExportPngButton(): Locator {
+    return this.fullScreen().locator(`[data-testid="${TEST_IDS.IMAGE_VIEWER_BTN_EXPORT_PNG}"]`)
+  }
+
+  /** The full-screen overlay's Export-as-PDF button. */
+  fullScreenExportPdfButton(): Locator {
+    return this.fullScreen().locator(`[data-testid="${TEST_IDS.IMAGE_VIEWER_BTN_EXPORT_PDF}"]`)
+  }
+
+  /** The full-screen overlay's copy-to-clipboard button. */
+  fullScreenCopyButton(): Locator {
+    return this.fullScreen().locator(`[data-testid="${TEST_IDS.IMAGE_VIEWER_BTN_COPY}"]`)
+  }
+
+  /**
+   * The visually hidden export live region.
+   *
+   * Panel-owned, and rendered into whichever surface is on top - so it is
+   * looked up on the PAGE, not inside the panel, and must always resolve to
+   * exactly one element.
+   */
+  exportStatus(): Locator {
+    return byTestId(this.page, TEST_IDS.IMAGE_VIEWER_EXPORT_STATUS)
+  }
+
+  /**
+   * The visually hidden ASSERTIVE export live region.
+   *
+   * The mirror of {@link exportStatus}: failures go here (`role="alert"`), so
+   * a user who is told the export failed cannot mistake silence for success.
+   * Panel-owned and rendered into whichever surface is on top, so it is looked
+   * up on the PAGE and must always resolve to exactly one element.
+   */
+  exportAlert(): Locator {
+    return byTestId(this.page, TEST_IDS.IMAGE_VIEWER_EXPORT_ALERT)
   }
 
   /**
@@ -246,5 +334,108 @@ export class ImageViewerPage {
   async clickReload(): Promise<void> {
     await expect(this.reloadButton()).toBeEnabled({ timeout: this.defaultTimeout })
     await this.reloadButton().click()
+  }
+
+  // ---------------------------------------------------------------------------
+  // Full screen
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Open the full-screen overlay and wait until it has painted an image.
+   *
+   * The overlay renders the same test ids into `#portal-root`, so a test that
+   * asserts on the overlay must go through `fullScreen()`-scoped locators from
+   * here on; the panel-scoped ones keep matching the panel behind it.
+   */
+  async enterFullScreen(): Promise<void> {
+    await this.fullScreenButton().click()
+    await expect(this.fullScreen()).toBeVisible({ timeout: this.defaultTimeout })
+    await expect(
+      this.fullScreen().locator(`[data-testid="${TEST_IDS.IMAGE_VIEWER_IMAGE}"]`)
+    ).toBeVisible({ timeout: this.defaultTimeout })
+  }
+
+  /** Close the full-screen overlay and wait until it is gone. */
+  async exitFullScreen(): Promise<void> {
+    await this.fullScreenCloseButton().click()
+    await expect(this.fullScreen()).toHaveCount(0, { timeout: this.defaultTimeout })
+  }
+
+  // ---------------------------------------------------------------------------
+  // Export (issue #73)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Click an export control and wait for the export to actually run and settle.
+   *
+   * Busy is `aria-disabled`, never `disabled`, so Playwright's `toBeEnabled`
+   * would report the control as usable throughout an export. `aria-disabled` is
+   * therefore the attribute every wait here asserts on.
+   *
+   * Waiting only for `'false'` after the click asserts a condition that already
+   * held before it, so it returns before the request has left the renderer and
+   * everything sequenced behind it races the export. The busy state has to be
+   * observed on the way through — but it cannot be POLLED for: a cancelled save
+   * dialog is stubbed in main and the whole round trip finishes in about a
+   * millisecond, well inside one poll interval, so `toHaveAttribute('true')`
+   * times out on a transition that certainly happened.
+   *
+   * A `MutationObserver` armed BEFORE the click records the transition instead
+   * of sampling for it, which makes the wait exact rather than fast enough. It
+   * latches on `oldValue === 'false'`, not on the attribute's live value: React
+   * can flip the attribute twice inside one microtask checkpoint, and the
+   * callback would then read the settled value and miss the run entirely.
+   *
+   * @param button - One of the six export locators above
+   */
+  async clickExport(button: Locator): Promise<void> {
+    await expect(button).toHaveAttribute('aria-disabled', 'false', {
+      timeout: this.defaultTimeout
+    })
+
+    await button.evaluate((element, latch) => {
+      const target = element as unknown as Record<string, unknown>
+      target[latch] = false
+      const observer = new MutationObserver((records) => {
+        for (const record of records) {
+          if (record.attributeName !== 'aria-disabled' || record.oldValue !== 'false') continue
+          target[latch] = true
+          observer.disconnect()
+          return
+        }
+      })
+      observer.observe(element, {
+        attributes: true,
+        attributeOldValue: true,
+        attributeFilter: ['aria-disabled']
+      })
+    }, BUSY_LATCH)
+
+    await button.click()
+
+    // Started: the click reached the handler and the request left the renderer.
+    await expect(button).toHaveJSProperty(BUSY_LATCH, true, { timeout: this.defaultTimeout })
+    // Settled: main has answered, any toast is out and the flag has cleared.
+    await expect(button).toHaveAttribute('aria-disabled', 'false', {
+      timeout: this.defaultTimeout
+    })
+  }
+
+  /**
+   * Assert every export control reads busy, in both surfaces if full screen is
+   * open.
+   *
+   * The two toolbar instances share ONE busy state, so a disagreement between
+   * them is the defect this catches.
+   */
+  async expectExportBusy(timeout = this.defaultTimeout): Promise<void> {
+    for (const button of [this.exportPngButton(), this.exportPdfButton(), this.copyButton()]) {
+      await expect(button).toHaveAttribute('aria-disabled', 'true', { timeout })
+    }
+  }
+
+  /** Assert the export live region settles on a sentence (full screen only). */
+  async expectExportAnnouncement(text: string, timeout = this.defaultTimeout): Promise<void> {
+    await expect(this.exportStatus()).toHaveText(text, { timeout })
   }
 }

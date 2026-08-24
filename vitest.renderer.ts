@@ -41,7 +41,14 @@ export default defineConfig({
       '**/__tests__/**',
       'vitest.*.ts',
       'electron.vite.config.ts',
-      'src/renderer/index.html'
+      'src/renderer/index.html',
+      // The image-export rasterize harness (#73) runs only inside a hidden
+      // Chromium page: it needs createImageBitmap, OffscreenCanvas and a real
+      // image decoder, none of which jsdom provides, so no renderer unit test
+      // can execute a line of it. Covered by the e2e suite and the manual
+      // checklist instead; the same justification is stated in-file at the top
+      // of harness.ts.
+      'src/renderer/src/imageExport/harness.ts'
     ],
   },
   resolve: {

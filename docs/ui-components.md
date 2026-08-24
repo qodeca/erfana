@@ -445,23 +445,31 @@ Opens when clicking image files (PNG, JPG, GIF, WebP, SVG, BMP, ICO) in the proj
 - Metadata display: dimensions, file size, format, `Updated hh:mm:ss` stamp
 - **Live refresh on external change** (#70): decode-first, so the old image stays painted until the new one is ready — no blank frame, no unmount, one React commit for `src` + `transform`. Zoom and pan are preserved unless the image's intrinsic dimensions changed; the view resets to fit only then
 - **Degraded states** (#70): a permanently mounted `role="status"` slot (`idle` / `reloading` / `unavailable`) carrying `Reloaded from disk` or `Auto-refresh unavailable`, and a `role="alert"` banner with a single **Reload** action for the deleted and watch-unavailable cases. The tab is renamed `icon.svg (deleted)` via the shared `formatTabTitle` helper (`src/renderer/src/utils/tabTitle.ts`), the same one the Markdown editor uses
+- **Export controls** (#73): Export as PNG, Export as PDF and Copy image, as a `role="group"` between the zoom cluster and the actions group — three semantic regions (*how I look at it* · *what I take away* · *where I look at it*), one `.toolbarSeparator` between each, and the far-right corner still the full-screen / close affordance. Rendered by **both** toolbar instances. The work happens entirely in the main process (see [API services – features § ImageExportService](./api-services-features.md#imageexportservice)); the panel sends a path and a target and gets back a small structured result, never image bytes
 - Accessibility: ARIA labels, keyboard navigation, prefers-reduced-motion
 
 **Architecture**:
 - `ImageViewerPanel.tsx` - Panel shell: hook glue, render states, tab title
-- `components/ImageViewerToolbar.tsx` - Metadata group, status slot, zoom controls, fullscreen button
+- `components/ImageViewerToolbar.tsx` - Metadata group, status slot, zoom controls, export group, fullscreen button. Stateless: it takes the three export handlers and their busy flags as props
+- `components/ImageViewerExportControls.tsx` - The three export buttons (#73)
 - `components/ImageViewerBanner.tsx` - Degraded-state banner + Reload
 - `hooks/useImageSource.ts` - Decode-first load/refresh, generation counter, visibility-deferred re-read
 - `hooks/useImageViewerTransform.ts` - Zoom/pan/wheel/keyboard/ResizeObserver behind a `getActiveContainer` seam; `applySourceChange` decides preserve-vs-reset
 - `hooks/useFullScreenOverlay.ts` - Open/close, portal-root guard, focus trap
+- `hooks/useImageExportHandlers.ts` - The three export handlers, their busy flags and the announcement sentence (#73). Called **once**, in the panel, and its output passed to both toolbar instances — one state, so clicking in full screen is literally the same handler and both toolbars agree on busy. Dispatches through `showGlobalToast` rather than `useToast()`, so the panel still renders without a `ToastProvider` in unit tests
 - `hooks/useReloadAction.ts` - The banner's Reload action. `recover()` returning `false` changes nothing else on screen, so this hook adds the transient "still not available" feedback that tells the user the click registered; it self-clears on the same `INDICATOR_DURATION_MS` budget as the "Reloaded from disk" confirmation (#70)
 - `imageViewer.logic.ts` - Pure functions for zoom, pan, keyboard actions
-- `imageViewerStatus.logic.ts` - Status precedence, clock formatting, all copy constants
+- `imageViewerStatus.logic.ts` - Status precedence, clock formatting, all copy constants — including the export copy deck (tooltips, accessible names, busy names, announcements, toast titles)
+- `imageExportToast.logic.ts` - Pure `formatExportToast` plus the qualifier builders (#73). It composes, it does not author: every qualifier — which GIF frame, which ICO size, the SVG's 2x factor — is built from the structured `selection` the main process reported *after* the export, never from a guess about the file, so the toast cannot claim something the export did not do. A cancelled export produces no toast and no announcement at all. Basenames are middle-truncated, because `.toast-message` has a max width and no `overflow-wrap`
 - `ImageViewerPanel.module.css` - The one remaining CSS module in the app
 - `imageUtils.ts` (in `utils/`) - Image format detection, MIME types
 - Watch subscription comes from `src/renderer/src/hooks/useFileChangeSubscription.ts` — see [File Watching](./file-watching/README.md#single-file-watch-internals-70)
 
-**Toolbar**: Zoom -, Zoom level %, Zoom +, Fit, Reset, Fullscreen
+**Toolbar**, left to right: metadata · status slot · Zoom out, Zoom level % (click to reset), Zoom in, Fit · separator · Export as PNG, Export as PDF, Copy image · separator · Full screen (or Close, in the overlay). There is no separate Reset button — the zoom-level indicator *is* the reset control.
+
+**Busy state uses `aria-disabled`, never the `disabled` attribute.** Chromium blurs a control the instant it becomes `disabled`, and the native save dialog then returns focus to a blurred element, dropping the keyboard user on `<body>` on every export. All three buttons mark themselves busy together (there is one main-side lock), the click handler early-returns, and only the invoked action shows a spinner. Same rule and same reason as the recovery screen's Restart button (§ Error containment).
+
+**Two live regions, panel-owned.** `role="status"` for busy and success, `role="alert"` for failures, both visually hidden and both rendered into whichever surface is on top — the overlay when full screen, the panel otherwise — so exactly one element carries each id at a time. The assertive half exists because the full-screen overlay is `aria-modal="true"`, which lets a screen reader suppress the toast that lives outside it; while full screen, the settled sentence is written into the region instead of being left to the toast alone.
 
 📚 **Keyboard shortcuts**: [Keyboard Shortcuts](./keyboard-shortcuts.md#image-viewer)
 

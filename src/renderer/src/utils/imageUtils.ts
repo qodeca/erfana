@@ -6,17 +6,32 @@
  * Shared utilities for detecting and handling image files in the renderer process.
  * Used by ImageViewerPanel and ProjectPanel for image file detection.
  *
+ * The supported-extension list and the extension -> MIME map used to be
+ * declared here as well as in the main process, with a comment on each copy
+ * asking the two to be kept in step by hand. Issue #73 needed the MIME map in
+ * a third place (the export harness types its `Blob` with it), so both facts
+ * now live in `src/shared/ipc/image-formats.ts` and every process imports them
+ * from there. What is left in this module is the renderer-facing shape of
+ * those facts: filename parsing, display names, and the historic
+ * `application/octet-stream` fallback.
+ *
  * @module imageUtils
  * @see {@link ImageViewerPanel} for image preview component
+ * @see src/shared/ipc/image-formats.ts for the canonical format facts
  */
+import {
+  IMAGE_EXTENSIONS,
+  getImageMimeType as getSupportedImageMimeType,
+  isSupportedImageExtension
+} from '../../../shared/ipc/image-formats'
 
 /**
  * Supported image file extensions.
  *
- * These formats are supported by the ImageViewerPanel for preview.
+ * Re-exported from the shared module so existing renderer imports keep
+ * working. These formats are supported by the ImageViewerPanel for preview.
  * SVG is included but rendered as `<img>` for security (no script execution).
  *
- * @constant
  * @example
  * ```ts
  * // Check if extension is supported
@@ -24,16 +39,7 @@
  * const isSupported = IMAGE_EXTENSIONS.includes(ext);
  * ```
  */
-export const IMAGE_EXTENSIONS = [
-  '.png',
-  '.jpg',
-  '.jpeg',
-  '.gif',
-  '.webp',
-  '.svg',
-  '.bmp',
-  '.ico'
-] as const
+export { IMAGE_EXTENSIONS }
 
 /**
  * Type representing a valid image extension.
@@ -43,7 +49,7 @@ export const IMAGE_EXTENSIONS = [
  * const ext: ImageExtension = '.png';
  * ```
  */
-export type ImageExtension = (typeof IMAGE_EXTENSIONS)[number]
+export type { ImageExtension } from '../../../shared/ipc/image-formats'
 
 /**
  * Check if a file is an image based on its extension.
@@ -82,10 +88,7 @@ export function isImageFile(filename: string): boolean {
     return false
   }
 
-  const extension = filename.slice(lastDotIndex).toLowerCase()
-
-  // Cast needed because includes() doesn't narrow readonly array types
-  return (IMAGE_EXTENSIONS as readonly string[]).includes(extension)
+  return isSupportedImageExtension(filename.slice(lastDotIndex))
 }
 
 /**
@@ -148,7 +151,10 @@ export function getImageFormat(filePath: string): string {
 /**
  * Get the MIME type for an image extension.
  *
- * Used when constructing data: URLs for image loading.
+ * Used when constructing data: URLs for image loading. Thin renderer-facing
+ * wrapper over the shared map: it additionally accepts a dot-less extension
+ * and returns `application/octet-stream` instead of `null` for anything
+ * unsupported, both of which existing callers rely on.
  *
  * @param extension - File extension with or without leading dot
  * @returns MIME type string (e.g., 'image/png')
@@ -162,26 +168,6 @@ export function getImageFormat(filePath: string): string {
  * ```
  */
 export function getImageMimeType(extension: string): string {
-  // Normalize: remove leading dot if present, lowercase
-  const ext = extension.startsWith('.') ? extension.slice(1).toLowerCase() : extension.toLowerCase()
-
-  switch (ext) {
-    case 'png':
-      return 'image/png'
-    case 'jpg':
-    case 'jpeg':
-      return 'image/jpeg'
-    case 'gif':
-      return 'image/gif'
-    case 'webp':
-      return 'image/webp'
-    case 'svg':
-      return 'image/svg+xml'
-    case 'bmp':
-      return 'image/bmp'
-    case 'ico':
-      return 'image/x-icon'
-    default:
-      return 'application/octet-stream'
-  }
+  const dotted = extension.startsWith('.') ? extension : `.${extension}`
+  return getSupportedImageMimeType(dotted) ?? 'application/octet-stream'
 }

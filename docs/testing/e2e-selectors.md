@@ -1,6 +1,6 @@
 # E2E selector catalog
 
-All `data-testid` attributes available for E2E testing – **251 testids** across 37 sections.
+All `data-testid` attributes available for E2E testing – **256 testids** across 37 sections.
 
 **Related documentation**:
 - [E2E Testing Guide](./e2e-testing.md) – Main E2E documentation
@@ -341,7 +341,7 @@ Full-window crash recovery screen (issue #60). Action buttons are capability-gat
 
 ---
 
-## Image viewer panel (15 testids)
+## Image viewer panel (20 testids)
 
 | Testid | Element | Type |
 |--------|---------|------|
@@ -360,6 +360,13 @@ Full-window crash recovery screen (issue #60). Action buttons are capability-gat
 | `image-viewer-status` | Refresh status slot (`role="status"`, `data-state=idle\|reloading\|unavailable`) | dynamic |
 | `image-viewer-deleted-banner` | Deleted / auto-refresh-unavailable banner (`data-variant=deleted\|unavailable`) | conditional |
 | `image-viewer-btn-reload` | Reload from disk (inside the banner) | conditional |
+| `image-viewer-btn-export-png` | Export the image as PNG (#73) | static |
+| `image-viewer-btn-export-pdf` | Export the image as PDF (#73) | static |
+| `image-viewer-btn-copy` | Copy the image to the clipboard (#73) | static |
+| `image-viewer-export-status` | Polite export live region (`role="status"`), visually hidden; carries busy and success sentences (#73) | dynamic |
+| `image-viewer-export-alert` | Assertive export live region (`role="alert"`), visually hidden; carries failures, which the `aria-modal` full-screen overlay would otherwise hide from a screen reader (#73) | dynamic |
+
+> **Ancestor scoping is mandatory in this section.** The panel toolbar and the full-screen overlay toolbar both render the zoom, full-screen, export and copy ids, and the two export live regions are rendered into whichever surface is on top. A bare `getByTestId` therefore resolves to two nodes for the buttons; scope by `image-viewer-panel` or `image-viewer-fullscreen` first, as `e2e/pages/image-viewer.page.ts` does.
 
 ---
 

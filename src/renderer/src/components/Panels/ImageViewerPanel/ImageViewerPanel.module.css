@@ -28,6 +28,23 @@
  * Toolbar (matches MarkdownToolbar style)
  * ============================================ */
 
+/*
+ * The toolbar SCROLLS rather than clipping (issue #73).
+ *
+ * `.container` is `overflow: hidden`, and the export group pushed the row's
+ * non-shrinkable width from ~335px to ~380px. dockview lets a group go down to
+ * 100px and this app sets no per-panel minimum, so between those two widths the
+ * full-screen button, a separator and then Copy fell past the right edge of the
+ * container and were painted nowhere. Reached by Tab they were still focused,
+ * just invisible - WCAG 2.2 SC 2.4.11 (focus not obscured).
+ *
+ * Three buttons, always visible, is a locked requirement, so nothing may be
+ * hidden, collapsed or conditionally rendered. Making this element the scroll
+ * port instead keeps every control present and, because a browser scrolls a
+ * newly focused element into view inside its nearest scrollable ancestor,
+ * reachable: Tab now brings the control to the user rather than the user to a
+ * control that is not there.
+ */
 .toolbar {
   display: flex;
   align-items: center;
@@ -36,6 +53,21 @@
   background-color: var(--color-bg-primary);
   border-bottom: var(--border-width) solid var(--color-border-default);
   flex-shrink: 0;
+  overflow-x: auto;
+  /* The row is one line of 24px controls; a vertical bar here would only ever
+     be a rendering artefact of the horizontal one. */
+  overflow-y: hidden;
+  /* No visible scrollbar: at --scrollbar-width (10px) a horizontal bar eats a
+     third of a 32px toolbar row and appears only in the narrow band this rule
+     exists to survive. The repo styles its other scrollbars with the
+     --scrollbar-* tokens; none is hidden today, so this pairing is new here -
+     `scrollbar-width` is the standard property, the pseudo-element is what
+     Chromium (and therefore Electron) actually honours. */
+  scrollbar-width: none;
+}
+
+.toolbar::-webkit-scrollbar {
+  display: none;
 }
 
 .toolbarSpacer {
@@ -49,6 +81,11 @@
   height: var(--icon-size-lg);
   background-color: var(--color-border-default);
   margin: 0 var(--space-4);
+  /* Unshrinkable for the same reason the three clusters beside it are: a 1px
+     rule that flexbox is allowed to shrink collapses to nothing first, and the
+     toolbar loses the "three regions" boundary exactly at the narrow widths
+     where the reading order is hardest to follow. */
+  flex-shrink: 0;
 }
 
 /* ============================================
@@ -60,7 +97,13 @@
   align-items: center;
   gap: var(--space-4);
   /* UX-8: the metadata group is what gives way in a narrow split layout, so the
-     status slot never shifts the zoom controls sideways mid-click. */
+     status slot never shifts the zoom controls sideways mid-click.
+
+     Flexbox shrinks every shrinkable item IN PARALLEL, weighted by basis x
+     shrink factor - there is no "this one first, then that one". The large
+     shrink factor is what actually makes the metadata yield before the status
+     slot does; `min-width: 0` is what lets it shrink past its content. */
+  flex: 0 100 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -152,16 +195,32 @@
  * Toolbar Controls Group
  * ============================================ */
 
+/* `flex-shrink: 0` on all three groups: a 32px icon button squashed into a
+   sliver is unhittable, so the give comes from the text (metadata first, then
+   the status slot) instead. Once both have given everything, the toolbar
+   scrolls horizontally - see `.toolbar`. Clipping was never the toolbar's own
+   doing: it declares no `overflow` of its own before that rule, and the element
+   that cuts the row off is `.container`. */
 .toolbarControls {
   display: flex;
   align-items: center;
   gap: var(--space-1);
+  flex-shrink: 0;
 }
 
 .toolbarActions {
   display: flex;
   align-items: center;
   gap: var(--space-1);
+  flex-shrink: 0;
+}
+
+/* Export group (issue #73): PNG, PDF, copy. Same shape as its two siblings. */
+.toolbarExport {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-shrink: 0;
 }
 
 /* ============================================
@@ -322,19 +381,24 @@
  * shift the zoom controls (UX-8) - not to the longest string of all. The old
  * 13rem reserved ~70px more than any wording needed, and `flex-shrink: 0` then
  * pushed the fixed-width controls out of a narrow split panel, where
- * `overflow: hidden` on the toolbar made them overlap. The slot now yields
+ * `overflow: hidden` on `.container` cut them off. The slot now yields
  * before the controls do and truncates rather than mangling them; a transient
  * failure line that is longer borrows width from the metadata group, which
  * truncates first.
+ *
+ * Issue #73 turned that reservation from a FLOOR into a preferred width: a flex
+ * BASIS with `min-width: 0`. That keeps the no-shifting invariant exactly while
+ * letting the slot truncate with its own ellipsis rather than clip one of the
+ * three export controls now sharing the row.
  */
 .statusSlot {
-  flex: 0 1 auto;
-  /* Not a --space-* token by design: that scale tops out at 48px
-     (--space-24) because it sizes gaps and padding, while this is a
+  /* The 8.75rem basis is not a --space-* token by design: that scale tops out
+     at 48px (--space-24) because it sizes gaps and padding, while this is a
      text-content width. NOTE: --text-sm is a fixed 11px, so this reservation
      does NOT track a user font-size preference - it tracks the root font size
-     only. */
-  min-width: 8.75rem;
+     only. `min-width: 0` is what lets the slot shrink past that basis. */
+  flex: 0 1 8.75rem;
+  min-width: 0;
   margin-right: var(--space-6);
   font-size: var(--text-sm);
   text-align: right;
@@ -343,6 +407,48 @@
   text-overflow: ellipsis;
   /* Override dockview's inherited user-select: none (issue #211). */
   user-select: text;
+}
+
+/* ============================================
+ * Export Controls (issue #73)
+ * ============================================ */
+
+/*
+ * Busy is `aria-disabled`, NEVER the `disabled` attribute: Chromium blurs a
+ * disabled control the instant it is disabled, and the native save dialog then
+ * returns focus to it - dropping a keyboard user on <body> after every export.
+ *
+ * No dimming either. Busy already reads as a state change through the glyph
+ * (icon -> spinner ring) and its colour (text-primary -> accent violet, via
+ * `.spinner`), so it is never signalled by colour alone and the reduced-motion
+ * opt-out below costs nothing.
+ */
+.controlButton[aria-disabled='true'] {
+  cursor: progress;
+}
+
+.controlButton[aria-disabled='true']:hover {
+  background-color: transparent;
+  color: var(--color-text-primary);
+}
+
+/*
+ * Visually hidden export live region, owned by the panel.
+ *
+ * Deliberately local rather than the global `.sr-only`: this is a CSS module,
+ * and CameraDialog.css already records a cross-file class dependency of that
+ * shape as fragile.
+ */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
 }
 
 /* Transient good news: the app's positive signal colour, matching the editor. */
@@ -458,6 +564,13 @@
   .controlButton,
   .zoomLevel,
   .bannerButton {
+    transition: none;
+  }
+
+  /* The two `[aria-disabled]` rules above change colour on a transition the
+     control inherits; the spinner's own animation is opted out further down. */
+  .controlButton[aria-disabled='true'],
+  .controlButton[aria-disabled='true']:hover {
     transition: none;
   }
 
