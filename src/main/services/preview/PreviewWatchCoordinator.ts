@@ -26,8 +26,7 @@
  * into a single "reload needed" signal carrying the changed paths, which the
  * consumer (the view service) feeds to `PreviewReloadPolicy`.
  */
-import type { ConfineVerdict } from '../../../shared/ipc/preview-types'
-import { confinePath } from './previewPathResolve'
+import { confinePath, type ConfineVerdict } from './previewPathResolve'
 import type { IPreviewWatchPool } from './PreviewWatchPool'
 import { PREVIEW } from '../../../shared/constants'
 
@@ -97,6 +96,11 @@ export function createPreviewWatchCoordinator(
   /** Confined absolute paths currently watched. */
   let watched = new Set<string>()
 
+  // Once disposed, no `setWatchSet` may acquire a watch this coordinator would
+  // never release. In-flight calls are tracked so `dispose` can await them.
+  let disposed = false
+  const inFlight = new Set<Promise<unknown>>()
+
   const pendingChanges = new Set<string>()
   let coalesceHandle: ReturnType<typeof setTimeout> | null = null
 
@@ -131,9 +135,22 @@ export function createPreviewWatchCoordinator(
   ): Promise<{ desired: string[]; dropped: DroppedCandidate[] }> => {
     const desired: string[] = []
     const seen = new Set<string>()
+    const rawSeen = new Set<string>()
     const dropped: DroppedCandidate[] = []
 
     for (const candidate of candidatePaths) {
+      // Cheap syntactic dedup first, so a repeated literal costs no realpath.
+      if (rawSeen.has(candidate)) continue
+      rawSeen.add(candidate)
+
+      // Once the watch set is full, drop the rest as over-cap WITHOUT paying for
+      // their realpath confinement — a page with hundreds of links no longer
+      // runs hundreds of realpath syscalls on every reload just to discard them.
+      if (desired.length >= maxWatched) {
+        dropped.push({ candidate, reason: 'over-cap' })
+        continue
+      }
+
       const verdict = await confine(deps.realRoot, candidate)
       if (!verdict.ok) {
         dropped.push({ candidate, reason: 'out-of-root' })
@@ -142,41 +159,56 @@ export function createPreviewWatchCoordinator(
       const target = verdict.realTarget
       if (seen.has(target)) continue
       seen.add(target)
-      if (desired.length >= maxWatched) {
-        dropped.push({ candidate, reason: 'over-cap' })
-        continue
-      }
       desired.push(target)
     }
 
     return { desired, dropped }
   }
 
+  const doSetWatchSet = async (
+    candidatePaths: readonly string[]
+  ): Promise<WatchSetResult> => {
+    if (disposed) return { watched: [], dropped: [] }
+    const { desired, dropped } = await resolveDesired(candidatePaths)
+    // A dispose can land on either side of the awaits below. Bailing here (and
+    // before the acquire loop) stops a disposed coordinator from acquiring a
+    // watch nothing will ever release.
+    if (disposed) return { watched: [], dropped }
+    const desiredSet = new Set(desired)
+
+    // Release removed watches and AWAIT them before acquiring new ones, so a
+    // reload storm cannot transiently stack file descriptors.
+    for (const target of watched) {
+      if (!desiredSet.has(target)) {
+        await deps.pool.release(target)
+      }
+    }
+    if (disposed) return { watched: [], dropped }
+
+    // Acquire the added watches. A watch already held is a no-op refcount bump.
+    for (const target of desired) {
+      if (!watched.has(target)) {
+        deps.pool.acquire(target, () => recordChange(target))
+      }
+    }
+
+    watched = desiredSet
+    return { watched: desired, dropped }
+  }
+
   return {
-    async setWatchSet(candidatePaths: readonly string[]): Promise<WatchSetResult> {
-      const { desired, dropped } = await resolveDesired(candidatePaths)
-      const desiredSet = new Set(desired)
-
-      // Release removed watches and AWAIT them before acquiring new ones, so a
-      // reload storm cannot transiently stack file descriptors.
-      for (const target of watched) {
-        if (!desiredSet.has(target)) {
-          await deps.pool.release(target)
-        }
-      }
-
-      // Acquire the added watches. A watch already held is a no-op refcount bump.
-      for (const target of desired) {
-        if (!watched.has(target)) {
-          deps.pool.acquire(target, () => recordChange(target))
-        }
-      }
-
-      watched = desiredSet
-      return { watched: desired, dropped }
+    setWatchSet(candidatePaths: readonly string[]): Promise<WatchSetResult> {
+      const op = doSetWatchSet(candidatePaths)
+      inFlight.add(op)
+      void op.catch(() => {}).finally(() => inFlight.delete(op))
+      return op
     },
 
     async dispose(): Promise<void> {
+      disposed = true
+      // Let any in-flight setWatchSet observe `disposed` and unwind before we
+      // release, so a late acquire cannot outlive this dispose.
+      await Promise.allSettled([...inFlight])
       clearCoalesce()
       pendingChanges.clear()
       for (const target of watched) {

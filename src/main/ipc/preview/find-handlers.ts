@@ -24,7 +24,7 @@ import {
 import { PreviewChannels } from '../../../shared/ipc/preview-channels'
 import type { PdfExportResult } from '../../../shared/ipc/preview-types'
 import { ErrorCode } from '../../../shared/errors'
-import type { PreviewFindOptions } from '../../services/preview/PreviewFindController'
+import type { PreviewFindExportService } from '../../services/preview/PreviewViewService'
 import { logger } from '../../services/LoggingService'
 
 /**
@@ -33,13 +33,6 @@ import { logger } from '../../services/LoggingService'
  * export controller's `deriveSafeFilename` further sanitises (#161).
  */
 const DEFAULT_EXPORT_SUGGESTED_NAME = 'preview'
-
-/** The find/export surface these handlers drive on the view service. */
-export interface PreviewFindExportService {
-  find(panelId: string, text: string, options: PreviewFindOptions): void
-  stopFind(panelId: string): void
-  exportPdf(panelId: string, suggestedName: string): Promise<PdfExportResult>
-}
 
 /** Injected collaborators for the find/export handlers. */
 export interface PreviewFindHandlerDeps {

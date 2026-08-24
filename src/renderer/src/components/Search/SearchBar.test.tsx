@@ -597,22 +597,17 @@ describe('SearchBar', () => {
       expect(preventDefaultSpy).toHaveBeenCalled()
     })
 
-    it('implements focus trap with Tab key wrapping forward', () => {
+    it('does not trap Tab: the non-modal find bar lets focus move on', () => {
       render(<SearchBar provider={mockProvider} />)
 
       const input = screen.getByPlaceholderText('Search...')
       const closeButton = screen.getByRole('button', { name: /close search/i })
       const container = screen.getByRole('search')
 
-      // Focus the close button directly (last focusable element when nav buttons disabled)
+      // Focus the close button (last focusable element when nav buttons disabled).
       closeButton.focus()
       expect(closeButton).toHaveFocus()
 
-      // Dispatch Tab keydown event on container (where the handler is attached).
-      // Uses direct KeyboardEvent dispatch (matching the Shift+Tab test below)
-      // instead of userEvent.keyboard('{Tab}') because userEvent's Tab
-      // simulation relies on jsdom's tabindex walk, which is platform-dependent
-      // and unreliable on Windows CI runners.
       const tabEvent = new KeyboardEvent('keydown', {
         key: 'Tab',
         bubbles: true,
@@ -620,22 +615,23 @@ describe('SearchBar', () => {
       })
       container.dispatchEvent(tabEvent)
 
-      // Tab from last element should wrap to first (input)
-      expect(input).toHaveFocus()
+      // The bar no longer wraps focus back to the input, and it does not
+      // preventDefault — Tab is free to move focus onward (WCAG 2.2 SC 2.4.3).
+      expect(input).not.toHaveFocus()
+      expect(tabEvent.defaultPrevented).toBe(false)
     })
 
-    it('implements focus trap with Shift+Tab wrapping backward', () => {
+    it('does not trap Shift+Tab: focus is free to leave the find bar', () => {
       render(<SearchBar provider={mockProvider} />)
 
       const input = screen.getByPlaceholderText('Search...')
       const closeButton = screen.getByRole('button', { name: /close search/i })
       const container = screen.getByRole('search')
 
-      // Focus the input (first focusable element)
+      // Focus the input (first focusable element).
       input.focus()
       expect(input).toHaveFocus()
 
-      // Dispatch Shift+Tab keydown event on container (where the handler is attached)
       const shiftTabEvent = new KeyboardEvent('keydown', {
         key: 'Tab',
         shiftKey: true,
@@ -644,8 +640,9 @@ describe('SearchBar', () => {
       })
       container.dispatchEvent(shiftTabEvent)
 
-      // Shift+Tab from first element should wrap to last (close button)
-      expect(closeButton).toHaveFocus()
+      // No wrap to the close button, and no preventDefault — focus is not trapped.
+      expect(closeButton).not.toHaveFocus()
+      expect(shiftTabEvent.defaultPrevented).toBe(false)
     })
   })
 

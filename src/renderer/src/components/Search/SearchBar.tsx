@@ -220,41 +220,16 @@ export function SearchBar({ provider }: SearchBarProps) {
     e.stopPropagation()
   }, [])
 
-  // Focus trap handler - Tab cycles within SearchBar
-  const handleContainerKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLDivElement>) => {
-      // Stop propagation to prevent Monaco from receiving keystrokes
-      // Only stop for keys that Monaco might capture (not Space which triggers button clicks)
-      if (e.key !== ' ') {
-        e.stopPropagation()
-      }
-
-      if (e.key === 'Tab') {
-        const focusableElements = containerRef.current?.querySelectorAll(
-          'input, button:not([disabled])'
-        )
-        if (!focusableElements || focusableElements.length === 0) return
-
-        const firstElement = focusableElements[0] as HTMLElement
-        const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement
-
-        if (e.shiftKey) {
-          // Shift+Tab from first element goes to last
-          if (document.activeElement === firstElement) {
-            e.preventDefault()
-            lastElement.focus()
-          }
-        } else {
-          // Tab from last element goes to first
-          if (document.activeElement === lastElement) {
-            e.preventDefault()
-            firstElement.focus()
-          }
-        }
-      }
-    },
-    []
-  )
+  // Keep keystrokes from reaching Monaco, but do NOT trap Tab: the find bar is
+  // NON-modal chrome, so Tab must move focus onward like anywhere else (Escape
+  // still closes it). Trapping Tab here was an unexpected focus-order constraint
+  // (WCAG 2.2 SC 2.4.3).
+  const handleContainerKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+    // Only stop for keys Monaco might capture (not Space, which triggers button clicks).
+    if (e.key !== ' ') {
+      e.stopPropagation()
+    }
+  }, [])
 
   // Handle toggle button Enter key (Space is handled natively by button click)
   const handleToggleKeyDown = useCallback(

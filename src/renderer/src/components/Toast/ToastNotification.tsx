@@ -68,18 +68,17 @@ export function ToastNotification() {
 function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
   const Icon = ICON_MAP[toast.type]
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault()
-      onClose()
-    }
-  }
-
   // No live role on the visual item: announcements are owned by the two hidden
-  // live regions (see ToastNotification). The item stays a normal focusable
-  // element so its Close button is reachable by assistive tech.
+  // live regions (see ToastNotification). An ACTIONABLE toast (e.g. approve a
+  // blocked host) becomes a labelled `group` so assistive tech can navigate to it
+  // and reach its action button, which otherwise sits unnamed at the DOM's end.
   return (
-    <div className={`toast toast-${toast.type}`} data-testid={`${TEST_IDS.TOAST}-${toast.type}`}>
+    <div
+      className={`toast toast-${toast.type}`}
+      data-testid={`${TEST_IDS.TOAST}-${toast.type}`}
+      role={toast.action ? 'group' : undefined}
+      aria-label={toast.action ? toast.title : undefined}
+    >
       <div className="toast-icon">
         <Icon size={20} strokeWidth={2} />
       </div>
@@ -104,8 +103,6 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
       <button
         className="toast-close"
         onClick={onClose}
-        onKeyDown={handleKeyDown}
-        tabIndex={0}
         aria-label="Close"
         data-testid={TEST_IDS.TOAST_BTN_DISMISS}
       >

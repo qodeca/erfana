@@ -459,6 +459,19 @@ export const PAUSE_CONTROLLER = {
 export const PREVIEW = {
   /** Max bytes served per asset; a larger file yields HTTP 413 */
   MAX_ASSET_BYTES: 25 * 1024 * 1024,
+  /**
+   * Max bytes of the entry HTML read for static-link discovery. Bounds both the
+   * read and the synchronous parse5 parse that runs on the main thread, so a
+   * large or generated entry file cannot freeze the UI on every reload. Links
+   * live near the top of a document, so a truncated head still finds them.
+   */
+  MAX_ENTRY_HTML_BYTES: 4 * 1024 * 1024,
+  /**
+   * Max asset reads buffered concurrently per preview session. Each read is
+   * capped at MAX_ASSET_BYTES, so this bounds peak main-process memory a hostile
+   * page can force by fetching many large in-repo assets at once.
+   */
+  MAX_CONCURRENT_ASSET_READS: 8,
   /** Per-panel watch cap (bounds EMFILE exposure, #146–#151) */
   MAX_WATCHED_FILES: 16,
   /** Coalesce window for pool change events before a reload/swap (ms) */

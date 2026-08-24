@@ -75,6 +75,20 @@ describe('PreviewFailureBadge', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
+  it('links the trigger to the portalled popover so AT can reach it (#7)', () => {
+    render(<PreviewFailureBadge summary={SUMMARY} />)
+    const trigger = screen.getByRole('button', { name: '1 preview issue' })
+    expect(trigger).toHaveAttribute('aria-haspopup', 'true')
+    // Closed: no dangling aria-controls to a non-existent element.
+    expect(trigger).not.toHaveAttribute('aria-controls')
+
+    fireEvent.click(trigger)
+    const popover = screen.getByRole('group', { name: 'Preview issues' })
+    // The trigger's aria-controls points at the popover's id.
+    expect(trigger.getAttribute('aria-controls')).toBe(popover.getAttribute('id'))
+    expect(popover.getAttribute('id')).toBeTruthy()
+  })
+
   it('registers a menu occluder while the popover is open and releases it on close', () => {
     render(<PreviewFailureBadge summary={SUMMARY} />)
     const trigger = screen.getByRole('button', { name: '1 preview issue' })

@@ -34,7 +34,7 @@
  * renderer-supplied path (the project path is resolved main-side by the caller).
  */
 
-import { WebContentsView, session as electronSession } from 'electron'
+import { WebContentsView, session as electronSession, type Session, type WebContents } from 'electron'
 import type {
   PreviewBounds,
   PreviewFailureInput,
@@ -182,17 +182,17 @@ export class PreviewSessionFactory implements IPreviewSessionFactory {
       createView: deps.createView ?? defaultCreateView,
       buildWebPreferences:
         deps.buildWebPreferences ??
-        ((session) => buildPreviewWebPreferences(session as unknown as never)),
+        ((session) => buildPreviewWebPreferences(session as unknown as Session)),
       nextPartitionName: deps.nextPartitionName ?? nextPartitionName,
       hardenSession:
         deps.hardenSession ??
         ((session, wc) =>
-          hardenPreviewSession(session as unknown as never, wc as unknown as never)),
+          hardenPreviewSession(session as unknown as Session, wc as unknown as WebContents)),
       attachProtocol:
         deps.attachProtocol ?? ((session, ctx) => attachProtocolHandler(session as never, ctx)),
       attachFilter:
         deps.attachFilter ?? ((session, ctx) => attachRequestFilter(session as never, ctx)),
-      assertSealed: deps.assertSealed ?? ((session) => assertSealed(session as unknown as never))
+      assertSealed: deps.assertSealed ?? ((session) => assertSealed(session as unknown as Session))
     }
   }
 
@@ -243,6 +243,11 @@ export class PreviewSessionFactory implements IPreviewSessionFactory {
       this.deps.assertSealed(session)
     } catch (error) {
       teardown()
+      // `teardown` only detaches the session wiring; destroy the view built at
+      // step 5 too, or the half-built WebContentsView leaks on a seal failure.
+      if (!view.webContents.isDestroyed()) {
+        view.webContents.destroy()
+      }
       registry.revoke(token)
       throw error
     }

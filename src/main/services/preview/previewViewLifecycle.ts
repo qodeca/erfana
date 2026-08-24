@@ -28,6 +28,8 @@
 
 import type { PreviewFailureInput } from '../../../shared/ipc/preview-types'
 import type { PreviewWebContentsHandle } from './PreviewSessionFactory'
+import { logger } from '../LoggingService'
+import { redactPath } from '../../utils/redactUserInput'
 import { classifyConsoleMessage } from './previewConsoleClassify'
 import { attachInputForwarding } from './previewInputForward'
 
@@ -38,7 +40,8 @@ export interface PreviewFileWatcherHandle {
 
 /** Callbacks the service supplies for each lifecycle transition. */
 export interface PreviewLifecycleHooks {
-  onRenderProcessGone(): void
+  /** The render process is gone; `reason` is Electron's crash reason if known. */
+  onRenderProcessGone(reason?: string): void
   onUnresponsive(): void
   onDidFinishLoad(): void
   onEntryChange(): void
@@ -105,7 +108,12 @@ export function wirePreviewLifecycle(
   const onWillNavigate = (event: PreventableEvent): void => {
     event.preventDefault()
   }
-  const onRenderProcessGone = (): void => hooks.onRenderProcessGone()
+  // Electron delivers `(event, details)`; `details.reason` distinguishes a crash
+  // ('crashed'/'oom'/'killed'/…) from a clean exit — carried through for the badge.
+  const onRenderProcessGone = (...args: unknown[]): void => {
+    const details = args[1] as { reason?: string } | undefined
+    hooks.onRenderProcessGone(details?.reason)
+  }
   const onUnresponsive = (): void => hooks.onUnresponsive()
   const onDidFinishLoad = (): void => hooks.onDidFinishLoad()
   // Page console output is untrusted DATA: it is only classified, never executed.
@@ -136,9 +144,15 @@ export function wirePreviewLifecycle(
     onChange: () => hooks.onEntryChange(),
     // A rename fires `unlink` on the old path — treat it as a delete.
     onUnlink: () => hooks.onEntryDeleted(),
-    onError: () => {
-      // A watcher error is not itself a page failure; the entry read on the next
-      // load surfaces a genuinely missing file. Swallow to avoid crashing teardown.
+    onError: (error) => {
+      // A watcher error is not itself a page failure (the next load surfaces a
+      // genuinely missing file), so it is still swallowed to avoid crashing
+      // teardown — but it is logged now, filename redacted, so an EMFILE or
+      // permission fault on the entry watch leaves a diagnostic trail.
+      logger.warn('Preview entry watcher error', {
+        path: redactPath(params.entryFilePath),
+        error: error instanceof Error ? error.message : String(error)
+      })
     }
   })
 

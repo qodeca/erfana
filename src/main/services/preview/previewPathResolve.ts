@@ -28,8 +28,23 @@ import { open, realpath, lstat } from 'node:fs/promises'
 import type { FileHandle } from 'node:fs/promises'
 import { basename, dirname, extname, isAbsolute, join, relative } from 'node:path'
 import { PREVIEW } from '../../../shared/constants'
-import type { ConfineVerdict, PreviewResolveResult } from '../../../shared/ipc/preview-types'
+import type { PreviewFailureType } from '../../../shared/ipc/preview-types'
 import { hasDotSegment, hasShortNameAlias, isInExcludedDirectory } from './previewExclusion'
+
+/**
+ * Result of confining a candidate path to the project root (§2.4). Main-only:
+ * it lives here (the producer), not in the renderer-shared `preview-types`, so a
+ * Node `Buffer` and the confinement internals never enter the renderer's type
+ * graph.
+ */
+export type ConfineVerdict =
+  | { ok: true; realTarget: string; rel: string }
+  | { ok: false; reason: 'escape' | 'excluded' | 'missing' }
+
+/** Result of resolving an `erfana-preview://` request to a served body (§2.4). */
+export type PreviewResolveResult =
+  | { ok: true; body: Buffer; ext: string }
+  | { ok: false; status: 400 | 403 | 404 | 413 | 500; reason: PreviewFailureType }
 
 /**
  * `O_NOFOLLOW` refuses to open a final-component symlink (ELOOP). It is a POSIX
@@ -128,29 +143,33 @@ async function readExactly(
   maxBytes: number
 ): Promise<{ overflow: true } | { overflow: false; buffer: Buffer }> {
   const chunks: Buffer[] = []
-  const scratch = Buffer.allocUnsafe(READ_CHUNK_BYTES)
   let total = 0
   let position = 0
 
-  // Read until EOF or until we have proven more than `maxBytes` exists.
+  // Read until EOF or until we have proven more than `maxBytes` exists. Each
+  // chunk is read into its OWN buffer (not a reused scratch), so the bytes are
+  // kept without a per-chunk copy; only the final `concat` copies, halving the
+  // memory traffic on a large served asset.
   while (total <= maxBytes) {
     const toRead = Math.min(READ_CHUNK_BYTES, maxBytes + 1 - total)
     if (toRead <= 0) {
       break
     }
-    const { bytesRead } = await handle.read(scratch, 0, toRead, position)
+    const buffer = Buffer.allocUnsafe(toRead)
+    const { bytesRead } = await handle.read(buffer, 0, toRead, position)
     if (bytesRead === 0) {
       break
     }
     position += bytesRead
     total += bytesRead
-    chunks.push(Buffer.from(scratch.subarray(0, bytesRead)))
+    chunks.push(bytesRead === buffer.length ? buffer : buffer.subarray(0, bytesRead))
   }
 
   if (total > maxBytes) {
     return { overflow: true }
   }
-  return { overflow: false, buffer: Buffer.concat(chunks) }
+  // Avoid even the concat copy when the whole asset fit in one chunk.
+  return { overflow: false, buffer: chunks.length === 1 ? chunks[0] : Buffer.concat(chunks) }
 }
 
 /**

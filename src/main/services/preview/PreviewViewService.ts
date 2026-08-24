@@ -42,6 +42,7 @@ import type {
 import type { IPreviewFailureLog, PreviewFailureEmit } from './PreviewFailureLog'
 import type {
   IPreviewSessionFactory,
+  PreviewSession,
   PreviewSessionLike,
   PreviewWebContentsHandle
 } from './PreviewSessionFactory'
@@ -73,6 +74,18 @@ export interface IPreviewViewService {
   destroyAll(reason: string): Promise<void>
   onProjectChanged(oldPath: string | null, newPath: string | null): Promise<void>
   dispose(): Promise<void>
+}
+
+/**
+ * The find/export surface the find/export IPC handlers drive on the service.
+ * Declared here in the service layer (not the ipc layer) so `PreviewViewService`
+ * can `implements` it and the compiler verifies these methods — the handlers and
+ * the graph import it from here rather than the other way around.
+ */
+export interface PreviewFindExportService {
+  find(panelId: string, text: string, options: PreviewFindOptions): void
+  stopFind(panelId: string): void
+  exportPdf(panelId: string, suggestedName: string): Promise<PdfExportResult>
 }
 
 /**
@@ -120,8 +133,13 @@ export interface PreviewViewDeps {
   readonly platform?: NodeJS.Platform
 }
 
-export class PreviewViewService implements IPreviewViewService {
+export class PreviewViewService implements IPreviewViewService, PreviewFindExportService {
   private live: PreviewLiveView | null = null
+  // Monotonic guard: every `open` claims the next value, and any concurrent open,
+  // close, project switch or destroyAll advances it, so an `open` that suspends on
+  // `sessionFactory.create` can detect it was superseded and discard its session
+  // rather than install a view for a stale project (or leak one).
+  private openEpoch = 0
   private readonly liveViewDeps: PreviewLiveViewDeps
 
   constructor(private readonly deps: PreviewViewDeps) {
@@ -152,6 +170,10 @@ export class PreviewViewService implements IPreviewViewService {
       return { ok: false, errorCode: ErrorCode.PROJECT_NOT_FOUND }
     }
 
+    // Claim this open. The re-checks after each await below abandon it if the
+    // epoch moved on in the meantime (NEW-9 single-view invariant, race-safe).
+    const epoch = ++this.openEpoch
+
     if (this.live !== null) {
       // A DIFFERENT panel is refused with the holder id; the SAME panel replaces.
       if (this.live.panelId !== req.panelId) {
@@ -162,6 +184,9 @@ export class PreviewViewService implements IPreviewViewService {
         }
       }
       await this.live.teardown('immediate')
+      if (this.openEpoch !== epoch) {
+        return { ok: false, errorCode: ErrorCode.PROJECT_NOT_FOUND }
+      }
       this.live = null
     }
 
@@ -182,7 +207,7 @@ export class PreviewViewService implements IPreviewViewService {
       }
     }
 
-    let session
+    let session: PreviewSession
     try {
       session = await this.deps.sessionFactory.create({
         projectPath,
@@ -193,6 +218,15 @@ export class PreviewViewService implements IPreviewViewService {
       // A seal/build failure means no view was produced (design §5(a)).
       failureLog.drop()
       return { ok: false, errorCode: ErrorCode.PREVIEW_CSP_INVALID }
+    }
+
+    if (this.openEpoch !== epoch) {
+      // Superseded while the session was building (project switch, global-off, or
+      // a newer open): discard it rather than install a stale-project view or let
+      // a newer view be overwritten and leaked.
+      failureLog.drop()
+      await this.discardSession(session)
+      return { ok: false, errorCode: ErrorCode.PROJECT_NOT_FOUND }
     }
 
     const live = new PreviewLiveView({
@@ -210,9 +244,26 @@ export class PreviewViewService implements IPreviewViewService {
     return { ok: true }
   }
 
+  /** Tear down a session that was built but never installed as a live view. */
+  private async discardSession(session: PreviewSession): Promise<void> {
+    session.teardown()
+    if (!session.view.webContents.isDestroyed()) {
+      session.view.webContents.destroy()
+    }
+    // A live view revokes its token on teardown; a never-installed session must
+    // do it here or the registry entry leaks.
+    this.deps.registry.revoke(session.token)
+    try {
+      await this.deps.storageSeal.purge(session.session)
+    } catch {
+      // A purge failure on a session being discarded is not recoverable.
+    }
+  }
+
   async close(panelId: string): Promise<void> {
     const live = this.forPanel(panelId)
     if (live !== null) {
+      this.openEpoch += 1
       await live.teardown('bounded')
       this.live = null
     }
@@ -275,6 +326,10 @@ export class PreviewViewService implements IPreviewViewService {
   }
 
   private async teardownLive(): Promise<void> {
+    // Advance the epoch UNCONDITIONALLY: an `open` may be mid-`create` with
+    // `this.live` still null, and a project switch or global-off must still make
+    // it abandon rather than install a view for the project being torn down.
+    this.openEpoch += 1
     if (this.live !== null) {
       const live = this.live
       this.live = null

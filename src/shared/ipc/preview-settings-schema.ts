@@ -24,8 +24,10 @@ export const MAX_ALLOWLIST_HOSTS = 200
 /**
  * True unless `host` is a form that must never be approvable: an IPv4 or IPv6
  * literal (including bracketed and hex/octal shorthands), an all-numeric label
- * set, `localhost`, or any `*.localhost` / `*.local` / `*.internal` name — and
- * never a value carrying a `\r` or `\n` (CSP / header-injection guard).
+ * set, `localhost`, any `*.localhost` / `*.local` / `*.internal` name, or a bare
+ * single-label name (which a DNS search domain can resolve to an internal
+ * service — an SSRF surface) — and never a value carrying a `\r` or `\n` (CSP /
+ * header-injection guard).
  *
  * Pure and dependency-free so it can run in both the main and renderer bundles.
  */
@@ -45,6 +47,11 @@ export function isApprovableHost(host: string): boolean {
   }
 
   const labels = lower.split('.')
+
+  // A bare single-label name (e.g. `intranet`, `wiki`) can resolve to an internal
+  // service via a DNS search domain — refuse anything without a registrable
+  // (dotted) domain shape.
+  if (labels.length < 2) return false
 
   // IPv4 dotted-decimal literal, e.g. 127.0.0.1.
   if (labels.length === 4 && labels.every((label) => /^\d{1,3}$/.test(label))) return false

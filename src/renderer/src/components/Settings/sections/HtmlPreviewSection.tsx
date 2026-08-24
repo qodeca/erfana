@@ -38,7 +38,7 @@ export function HtmlPreviewSection(): JSX.Element {
           <label htmlFor="html-preview-enabled" className="settings-label">
             Run HTML files
           </label>
-          <p className="settings-description">
+          <p id="html-preview-enabled-description" className="settings-description">
             Open <code>.html</code> files as a live, running page. When off, they open as
             source only and no preview process is created.
           </p>
@@ -50,6 +50,7 @@ export function HtmlPreviewSection(): JSX.Element {
           checked={enabled}
           onChange={(e) => updateHtmlPreviewEnabled(e.target.checked)}
           disabled={!settings}
+          aria-describedby="html-preview-enabled-description"
           data-testid={TEST_IDS.SETTINGS_TOGGLE_HTML_PREVIEW}
         />
       </div>

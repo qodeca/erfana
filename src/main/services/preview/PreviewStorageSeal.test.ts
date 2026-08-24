@@ -53,4 +53,14 @@ describe('purge', () => {
     expect(clearStorageData).toHaveBeenCalledTimes(1)
     expect(clearCache).toHaveBeenCalledTimes(1)
   })
+
+  it('purges the FULL storage scope — no narrowing options filter', async () => {
+    const { session, clearStorageData } = makeSessionMock()
+
+    await purge(session)
+
+    // Called with no arguments: a regression that passed an options filter (e.g.
+    // { storages: ['cookies'] }) would leave IndexedDB/cache behind and fail here.
+    expect(clearStorageData).toHaveBeenCalledWith()
+  })
 })

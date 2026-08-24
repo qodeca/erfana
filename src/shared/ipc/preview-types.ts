@@ -40,6 +40,7 @@ export type PreviewFailureType =
   | 'network-error'
   | 'network-timeout'
   | 'script-error'
+  | 'render-crash'
   | 'unresolved-specifier'
   | 'allowlist-invalid'
   | 'allowlist-unsupported-version'
@@ -51,15 +52,10 @@ export interface PreviewFailureInput {
   reasonCode: ErrorCode
 }
 
-/** Result of confining a candidate path to the project root (§2.4). */
-export type ConfineVerdict =
-  | { ok: true; realTarget: string; rel: string }
-  | { ok: false; reason: 'escape' | 'excluded' | 'missing' }
-
-/** Result of resolving an `erfana-preview://` request to a served body (§2.4). */
-export type PreviewResolveResult =
-  | { ok: true; body: Buffer; ext: string }
-  | { ok: false; status: 400 | 403 | 404 | 413 | 500; reason: PreviewFailureType }
+// NOTE: `ConfineVerdict` and `PreviewResolveResult` (a Node `Buffer` body + path
+// confinement internals) are MAIN-ONLY and live in
+// `src/main/services/preview/previewPathResolve.ts`, not here — this shared leaf
+// stays free of Node types and the renderer's type graph stays minimal.
 
 /**
  * Result of `preview:open`. `holderPanelId` is present for

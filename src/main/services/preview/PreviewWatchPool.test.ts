@@ -89,16 +89,18 @@ describe('createPreviewWatchPool', () => {
     expect(pool.size).toBe(0)
   })
 
-  it('fires onChange on both change and unlink', () => {
+  it('fires onChange on a change (unlink re-arms via the adapter, tested separately)', () => {
     const { factory, created } = makeHarness()
     const pool = createPreviewWatchPool({ createWatcher: factory })
     const onChange = vi.fn()
 
     pool.acquire('/proj/a.css', onChange)
+    // A change fires the reload signal synchronously. An unlink now flows through
+    // the re-arming adapter's atomic-save detector (covered in
+    // rearmingSingleFileWatch.test.ts), not a synchronous fire here.
     created[0].handlers.onChange()
-    created[0].handlers.onUnlink()
 
-    expect(onChange).toHaveBeenCalledTimes(2)
+    expect(onChange).toHaveBeenCalledTimes(1)
   })
 
   it('keeps the original handler across a refcount bump', () => {

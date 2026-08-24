@@ -31,9 +31,11 @@
  */
 
 import type { Session } from 'electron'
-import { ErrorCode } from '../../../shared/errors'
+import { AppError, ErrorCode } from '../../../shared/errors'
+import { PREVIEW } from '../../../shared/constants'
+import { logger } from '../LoggingService'
 import type { PreviewFailureInput } from '../../../shared/ipc/preview-types'
-import { resolveConfined } from './previewPathResolve'
+import { resolveConfined, type PreviewResolveResult } from './previewPathResolve'
 import {
   buildResponseHeaders,
   isKnownAssetType,
@@ -82,6 +84,42 @@ function errorResponse(status: number, headers?: Record<string, string>): Global
   return new Response(null, { status, headers })
 }
 
+/** Acquire/release token pair bounding concurrent work. */
+interface ConcurrencyLimiter {
+  acquire(): Promise<void>
+  release(): void
+}
+
+/**
+ * A per-session bound on how many asset reads buffer at once. Each read is
+ * capped at `MAX_ASSET_BYTES`, so limiting concurrency bounds the peak
+ * main-process memory a hostile page can force by fetching many large in-repo
+ * assets simultaneously. The token is handed straight to the next waiter on
+ * release, so the active count can never exceed `max`.
+ */
+function createConcurrencyLimiter(max: number): ConcurrencyLimiter {
+  let active = 0
+  const waiters: Array<() => void> = []
+  return {
+    async acquire(): Promise<void> {
+      if (active < max) {
+        active += 1
+        return
+      }
+      await new Promise<void>((resolve) => waiters.push(resolve))
+      // The token was handed over by release(); `active` already counts it.
+    },
+    release(): void {
+      const next = waiters.shift()
+      if (next) {
+        next() // hand the slot to the next waiter; active stays the same
+      } else {
+        active -= 1
+      }
+    }
+  }
+}
+
 /**
  * The request `destination` for step 10, read from the `sec-fetch-dest` request
  * header (the authoritative signal), falling back to `request.destination`.
@@ -97,10 +135,33 @@ function readDestination(request: GlobalRequest): string {
   return typeof dest === 'string' ? dest : ''
 }
 
-/** The request→response algorithm of design §2.4. */
+/**
+ * The request→response algorithm of design §2.4, wrapped so that any unexpected
+ * throw (a rejection from `resolveConfined`, `mimeForExtension`, `new Response`,
+ * …) becomes a bodyless 500 with no diagnostic leak, rather than escaping to
+ * `protocol.handle` as an unlabelled network failure.
+ */
 async function handleRequest(
   request: GlobalRequest,
-  ctx: PreviewProtocolContext
+  ctx: PreviewProtocolContext,
+  limiter: ConcurrencyLimiter
+): Promise<GlobalResponse> {
+  try {
+    return await handleRequestInner(request, ctx, limiter)
+  } catch (error) {
+    logger.error(
+      'Preview protocol handler error',
+      error instanceof Error ? error : undefined
+    )
+    return errorResponse(500)
+  }
+}
+
+/** The request→response algorithm of design §2.4. */
+async function handleRequestInner(
+  request: GlobalRequest,
+  ctx: PreviewProtocolContext,
+  limiter: ConcurrencyLimiter
 ): Promise<GlobalResponse> {
   // Step 1: parse the URL. A URL the platform cannot parse is a 404.
   let url: URL
@@ -138,8 +199,16 @@ async function handleRequest(
   }
 
   // Steps 6–9: safe-segment check, realpath confinement and the bounded read
-  // live in `resolveConfined`, which maps every failure to its §2.4 status.
-  const resolved = await resolveConfined(entry.realRoot, segments)
+  // live in `resolveConfined`, which maps every failure to its §2.4 status. The
+  // buffering read runs under a per-session concurrency bound so many large
+  // in-repo assets fetched at once cannot exhaust main-process memory.
+  await limiter.acquire()
+  let resolved: PreviewResolveResult
+  try {
+    resolved = await resolveConfined(entry.realRoot, segments)
+  } finally {
+    limiter.release()
+  }
   if (!resolved.ok) {
     return errorResponse(resolved.status)
   }
@@ -162,7 +231,13 @@ async function handleRequest(
   let headers: Record<string, string>
   try {
     headers = buildResponseHeaders(mimeForExtension(resolved.ext), entry.csp)
-  } catch {
+  } catch (error) {
+    // Only an invalid/unwired CSP is the `csp-missing` case. Any OTHER throw is
+    // unexpected and re-thrown to the outer catch-all (a bodyless 500), so it is
+    // never mislabelled as a CSP failure.
+    if (!(error instanceof AppError) || error.code !== ErrorCode.PREVIEW_CSP_INVALID) {
+      throw error
+    }
     ctx.recordFailure({
       type: 'csp-missing',
       resourceUrlOrHost: url.pathname,
@@ -187,7 +262,9 @@ async function handleRequest(
  * reads are served (design §0, §2.5).
  */
 export function attach(session: Session, ctx: PreviewProtocolContext): () => void {
-  session.protocol.handle(PREVIEW_SCHEME, (request) => handleRequest(request, ctx))
+  // One limiter per session so the bound is scoped to a single preview's reads.
+  const limiter = createConcurrencyLimiter(PREVIEW.MAX_CONCURRENT_ASSET_READS)
+  session.protocol.handle(PREVIEW_SCHEME, (request) => handleRequest(request, ctx, limiter))
   return () => {
     session.protocol.unhandle(PREVIEW_SCHEME)
   }

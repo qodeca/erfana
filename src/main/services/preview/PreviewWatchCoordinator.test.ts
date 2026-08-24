@@ -14,7 +14,7 @@
  *   - change events coalesce into one signal over the coalesce window.
  */
 import { describe, it, expect, vi } from 'vitest'
-import type { ConfineVerdict } from '../../../shared/ipc/preview-types'
+import type { ConfineVerdict } from './previewPathResolve'
 import { createPreviewWatchCoordinator } from './PreviewWatchCoordinator'
 import type { IPreviewWatchPool } from './PreviewWatchPool'
 
@@ -173,11 +173,10 @@ describe('createPreviewWatchCoordinator.setWatchSet', () => {
 
     // Swap a -> b. The release of a is deferred, so the acquire of b must wait.
     const pending = coord.setWatchSet(['/proj/b.css'])
-    // Drain microtasks (async confine + set diff) up to a macrotask so the
-    // release loop has run and parked on the deferred release.
-    await new Promise((resolve) => setTimeout(resolve, 0))
+    // Wait on the observable state (the release having started) rather than a
+    // wall-clock sleep, so the assertion is deterministic.
+    await vi.waitFor(() => expect(pool.log).toContain('release-start:/proj/a.css'))
 
-    expect(pool.log).toContain('release-start:/proj/a.css')
     expect(pool.log).not.toContain('acquire:/proj/b.css')
 
     pool.drainReleases()
@@ -188,6 +187,45 @@ describe('createPreviewWatchCoordinator.setWatchSet', () => {
       'release-done:/proj/a.css',
       'acquire:/proj/b.css'
     ])
+  })
+
+  it('a dispose mid-setWatchSet does not acquire a watch it would never release', async () => {
+    const pool = makeFakePool(true) // deferred releases
+    const coord = createPreviewWatchCoordinator({
+      realRoot: REAL_ROOT,
+      pool,
+      onChanged: () => {},
+      confine: makeConfine()
+    })
+
+    await coord.setWatchSet(['/proj/a.css']) // establishes watched = { a }
+    pool.log.length = 0
+
+    // Swap a -> b, but the release of a is deferred, so this call parks in its
+    // release loop BEFORE acquiring b.
+    const inFlight = coord.setWatchSet(['/proj/b.css'])
+    await vi.waitFor(() => expect(pool.log).toContain('release-start:/proj/a.css'))
+    expect(pool.log).not.toContain('acquire:/proj/b.css')
+
+    // A dispose lands while that call is parked. It must wait for the in-flight
+    // call to observe `disposed` and unwind before releasing.
+    const disposed = coord.dispose()
+    let done = false
+    void disposed.then(() => {
+      done = true
+    })
+
+    // The in-flight setWatchSet and the dispose each park on a deferred release
+    // in turn; drain repeatedly until both have unwound.
+    await vi.waitFor(() => {
+      pool.drainReleases()
+      expect(done).toBe(true)
+    })
+    await Promise.all([inFlight, disposed])
+
+    // The disposed coordinator refused to acquire b — no watch is left dangling.
+    expect(pool.log).not.toContain('acquire:/proj/b.css')
+    expect(pool.size).toBe(0)
   })
 
   it('drops over-cap candidates in input priority order', async () => {
@@ -205,6 +243,31 @@ describe('createPreviewWatchCoordinator.setWatchSet', () => {
     expect(result.watched).toEqual(['/proj/a.css', '/proj/b.css'])
     expect(result.dropped).toEqual([{ candidate: '/proj/c.css', reason: 'over-cap' }])
     expect(pool.log).toEqual(['acquire:/proj/a.css', 'acquire:/proj/b.css'])
+  })
+
+  it('does not realpath-confine candidates dropped as over-cap', async () => {
+    const pool = makeFakePool()
+    const confine = vi.fn(makeConfine())
+    const coord = createPreviewWatchCoordinator({
+      realRoot: REAL_ROOT,
+      pool,
+      onChanged: () => {},
+      confine,
+      maxWatched: 2
+    })
+
+    const result = await coord.setWatchSet([
+      '/proj/a.css',
+      '/proj/b.css',
+      '/proj/c.css',
+      '/proj/d.css'
+    ])
+
+    expect(result.watched).toEqual(['/proj/a.css', '/proj/b.css'])
+    expect(result.dropped.map((d) => d.candidate)).toEqual(['/proj/c.css', '/proj/d.css'])
+    // The two over-cap candidates were dropped without paying for a confine.
+    expect(confine).toHaveBeenCalledTimes(2)
+    expect(confine).not.toHaveBeenCalledWith(REAL_ROOT, '/proj/c.css')
   })
 })
 

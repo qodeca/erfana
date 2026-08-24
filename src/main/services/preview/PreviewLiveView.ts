@@ -17,7 +17,7 @@
  */
 
 import { basename, dirname, relative, resolve, sep } from 'node:path'
-import { readFile } from 'node:fs/promises'
+import { open } from 'node:fs/promises'
 
 import { ErrorCode } from '../../../shared/errors'
 import { PREVIEW } from '../../../shared/constants'
@@ -108,6 +108,27 @@ export interface PreviewLiveViewParams {
   readonly deps: PreviewLiveViewDeps
 }
 
+/**
+ * Read at most `PREVIEW.MAX_ENTRY_HTML_BYTES` of the entry HTML for static-link
+ * discovery. Bounding the read bounds the synchronous parse5 parse that follows,
+ * so a large or generated entry file cannot freeze the main thread on reload.
+ */
+async function readEntryHtmlBounded(filePath: string): Promise<string> {
+  const handle = await open(filePath, 'r')
+  try {
+    const buffer = Buffer.allocUnsafe(PREVIEW.MAX_ENTRY_HTML_BYTES)
+    let total = 0
+    while (total < buffer.length) {
+      const { bytesRead } = await handle.read(buffer, total, buffer.length - total, total)
+      if (bytesRead === 0) break
+      total += bytesRead
+    }
+    return buffer.toString('utf8', 0, total)
+  } finally {
+    await handle.close()
+  }
+}
+
 /** Build an `erfana-preview://<token>/<enc rel>` URL for an absolute local path. */
 function buildPreviewUrl(token: string, realRoot: string, absPath: string): string {
   const rel = relative(realRoot, absPath).split(sep).map(encodeURIComponent).join('/')
@@ -150,7 +171,7 @@ export class PreviewLiveView {
     this.window = params.window
     this.failureLog = params.failureLog
     this.deps = params.deps
-    this.readEntryHtml = params.deps.readEntryHtml ?? ((filePath) => readFile(filePath, 'utf8'))
+    this.readEntryHtml = params.deps.readEntryHtml ?? readEntryHtmlBounded
 
     this.view = params.session.view
     this.wc = params.session.view.webContents
@@ -182,10 +203,13 @@ export class PreviewLiveView {
         platform: this.deps.platform
       },
       {
-        onRenderProcessGone: () => this.onCrash(),
-        onUnresponsive: () => this.onCrash(),
+        onRenderProcessGone: (reason) => this.onCrash(reason ?? 'crashed'),
+        onUnresponsive: () => this.onCrash('unresponsive'),
         onDidFinishLoad: () => this.schedulePipeline(),
-        onEntryChange: () => this.doReload(false),
+        // Route the entry change through the same coalescing reload policy the
+        // subresources use, so an entry+stylesheet save collapses to ONE reload
+        // decision instead of racing an immediate reload against a CSS swap.
+        onEntryChange: () => this.reloadPolicy.record(this.entryFilePath),
         onEntryDeleted: () => this.onEntryDeleted(),
         onForwardedShortcut: (key) => this.deps.onForwardedShortcut?.(this.panelId, key),
         onConsoleMessage: (input) => this.onConsoleMessage(input)
@@ -211,7 +235,15 @@ export class PreviewLiveView {
     }
   }
 
+  /** True once torn down or the webContents is gone; guards late external calls. */
+  private get isDefunct(): boolean {
+    return this.destroyed || this.wc.isDestroyed()
+  }
+
   setBounds(bounds: PreviewBounds, seq: number): void {
+    if (this.isDefunct) {
+      return
+    }
     if (seq <= this.lastBoundsSeq) {
       return
     }
@@ -225,6 +257,9 @@ export class PreviewLiveView {
   }
 
   async setVisibility(visible: boolean): Promise<void> {
+    if (this.isDefunct) {
+      return
+    }
     if (visible) {
       // Re-adding an already-present child reorders it topmost (design §5(d)).
       this.window.contentView.addChildView(this.view)
@@ -253,6 +288,9 @@ export class PreviewLiveView {
   }
 
   async applyApprovedHosts(hosts: readonly string[]): Promise<void> {
+    if (this.isDefunct) {
+      return
+    }
     // §5(c): rebuild the CSP on the registry entry, purge, clear failures, reload.
     this.deps.registry.rebuildCsp(this.token, hosts)
     await this.deps.storageSeal.purge(this.session)
@@ -261,10 +299,16 @@ export class PreviewLiveView {
   }
 
   find(text: string, options: PreviewFindOptions): void {
+    if (this.isDefunct) {
+      return
+    }
     this.findController.find(text, options)
   }
 
   stopFind(): void {
+    if (this.isDefunct) {
+      return
+    }
     this.findController.clearHighlights()
   }
 
@@ -389,12 +433,13 @@ export class PreviewLiveView {
     this.deps.emit.loadStateChanged(this.panelId, 'ready', result.dropped.length)
   }
 
-  /** `render-process-gone` / `unresponsive`: mark failed, badge, keep Reload live. */
-  private onCrash(): void {
-    // TODO(#74): a process crash reuses `script-error`, now also produced by
-    // `onConsoleMessage`. A distinct crash type would ripple into preview-types,
-    // preview-schema and htmlPreview.logic.ts, so it is deferred here.
-    this.recordFailureAndFail('script-error', '', ErrorCode.UNKNOWN_ERROR)
+  /**
+   * `render-process-gone` / `unresponsive`: mark failed, badge, keep Reload live.
+   * Uses the distinct `render-crash` type carrying the crash reason, so a whole-
+   * renderer crash or OOM reads differently from a page's uncaught JS exception.
+   */
+  private onCrash(reason: string): void {
+    this.recordFailureAndFail('render-crash', reason, ErrorCode.UNKNOWN_ERROR)
   }
 
   /** A page `console-message` already classified into a failure input. */

@@ -16,7 +16,7 @@
  *
  * @see docs/designs/sd-074-html-preview.md §4.4, §5(a)
  */
-import { BrowserWindow } from 'electron'
+import { BrowserWindow, type Session } from 'electron'
 import type { WatchOptions } from 'chokidar'
 import { PREVIEW } from '../../../shared/constants'
 import type { GlobalSettings } from '../../../shared/ipc/global-settings-schema'
@@ -31,19 +31,24 @@ import { createPreviewEligibilityService } from '../../services/preview/PreviewE
 import { createPreviewWatchPool } from '../../services/preview/PreviewWatchPool'
 import { createPreviewWatchCoordinator } from '../../services/preview/PreviewWatchCoordinator'
 import { createPreviewReloadPolicy } from '../../services/preview/PreviewReloadPolicy'
-import { createPreviewFindController } from '../../services/preview/PreviewFindController'
+import {
+  createPreviewFindController,
+  type PreviewFindContents
+} from '../../services/preview/PreviewFindController'
 import { createPreviewFailureLog } from '../../services/preview/PreviewFailureLog'
 import { purge as purgePreviewSession } from '../../services/preview/PreviewStorageSeal'
-import { createSingleFileWatcher } from '../../services/watcher/singleFileWatch'
+import { createRearmingSingleFileWatcher } from '../../services/watcher/rearmingSingleFileWatch'
+import { classifyConfinement } from '../../utils/projectConfinement'
+import { confinePath } from '../../services/preview/previewPathResolve'
 import {
   PreviewViewService,
   type IPreviewViewService,
+  type PreviewFindExportService,
   type PreviewViewDeps
 } from '../../services/preview/PreviewViewService'
 import type { IPreviewEligibilityService } from '../../services/preview/PreviewEligibilityService'
 import type { IPreviewAllowlistStore } from '../../services/preview/PreviewAllowlistStore'
 import { createPreviewEmitters, type PreviewEmitTarget } from './emit'
-import type { PreviewFindExportService } from './find-handlers'
 import { logger } from '../../services/LoggingService'
 
 /** The composed service surface the handlers drive (lifecycle + find/export). */
@@ -122,25 +127,54 @@ export function buildPreviewGraph(deps: BuildPreviewGraphDeps): PreviewGraph {
     exportController,
     storageSeal: {
       // Bridge the narrow structural session type to electron's own `Session`.
-      purge: (session) => purgePreviewSession(session as unknown as never)
+      purge: (session) => purgePreviewSession(session as unknown as Session)
     },
     hostBlockNotifier,
     emit: emitters,
     createWatchCoordinator: (realRoot, onChanged) =>
-      createPreviewWatchCoordinator({ realRoot, pool: createPreviewWatchPool(), onChanged }),
+      createPreviewWatchCoordinator({
+        realRoot,
+        // The pool re-arms each subresource watch across an atomic save; give it
+        // the same realpath gate the coordinator uses so a re-arm re-confines the
+        // path an external writer just replaced (TOCTOU).
+        pool: createPreviewWatchPool({
+          isPathConfined: async (candidate) => (await confinePath(realRoot, candidate)).ok
+        }),
+        onChanged
+      }),
     createReloadPolicy: (onDecision) => createPreviewReloadPolicy({ onDecision }),
     createFindController: (wc, onCount) =>
-      createPreviewFindController(wc as unknown as never, onCount),
+      createPreviewFindController(wc as unknown as PreviewFindContents, onCount),
     createFailureLog: (onEmit) => createPreviewFailureLog({ onEmit }),
     createEntryWatcher: (filePath, handlers) =>
-      createSingleFileWatcher(filePath, handlers, PREVIEW_ENTRY_WATCH_OVERRIDES),
+      createRearmingSingleFileWatcher(
+        filePath,
+        {
+          onChange: handlers.onChange,
+          // A genuine delete is the entry-file "missing" case; an atomic-save
+          // rename re-arms instead, so live-reload survives editor saves.
+          onDeleted: handlers.onUnlink,
+          onError: handlers.onError
+        },
+        {
+          overrides: PREVIEW_ENTRY_WATCH_OVERRIDES,
+          isPathConfined: async (candidate) => {
+            const root = getProjectPath()
+            if (root === null) return true
+            const verdict = await classifyConfinement(candidate, root)
+            return verdict === 'inside' || verdict === 'missing'
+          }
+        }
+      ),
     getProjectPath,
     getZoomFactor,
     now: Date.now,
     onForwardedShortcut: (panelId, key) => emitters.forwardedShortcut(panelId, key)
   }
 
-  const service = new PreviewViewService(viewDeps) as PreviewComposedService
+  // No cast needed: the class `implements` both halves of the composed service,
+  // so a signature drift on find/stopFind/exportPdf now fails to compile.
+  const service: PreviewComposedService = new PreviewViewService(viewDeps)
 
   return {
     service,

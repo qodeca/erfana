@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppError, ErrorCode } from '../../../shared/errors'
 import type { PreviewFailureInput } from '../../../shared/ipc/preview-types'
+import { MAX_ALLOWLIST_HOSTS } from '../../../shared/ipc/preview-settings-schema'
 import { createPreviewAllowlistStore } from './PreviewAllowlistStore'
 
 let root: string
@@ -198,5 +199,28 @@ describe('PreviewAllowlistStore.approveHost', () => {
       'b.example.com',
       'c.example.com'
     ])
+  })
+})
+
+describe('PreviewAllowlistStore.approveHost cap', () => {
+  it('rejects with PREVIEW_ALLOWLIST_FULL past the cap and does not grow the file', async () => {
+    // Seed the file at exactly the cap with valid hosts.
+    const seeded = Array.from({ length: MAX_ALLOWLIST_HOSTS }, (_, i) => `host-${i}.example.com`)
+    await writeSettings(
+      JSON.stringify({ htmlPreview: { allowlist: { version: 1, hosts: seeded } } })
+    )
+    const store = createPreviewAllowlistStore({ getProjectRoot: () => root })
+
+    // Approving one MORE distinct host would exceed the cap.
+    await expect(store.approveHost('overflow.example.com')).rejects.toMatchObject({
+      code: ErrorCode.PREVIEW_ALLOWLIST_FULL
+    })
+
+    // The cap check runs before the write-back, so the file still holds exactly
+    // the cap — the overflow host was never persisted.
+    const settingsPath = join(realRoot, '.erfana', 'settings.json')
+    const parsed = JSON.parse(await readFile(settingsPath, 'utf8'))
+    expect(parsed.htmlPreview.allowlist.hosts).toHaveLength(MAX_ALLOWLIST_HOSTS)
+    expect(parsed.htmlPreview.allowlist.hosts).not.toContain('overflow.example.com')
   })
 })

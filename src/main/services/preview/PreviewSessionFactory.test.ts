@@ -52,7 +52,11 @@ function makeStore(hosts: string[]): IPreviewAllowlistStore {
 }
 
 function makeView(): PreviewViewHandle {
-  const wc = { id: 'wc' } as unknown as PreviewWebContentsHandle
+  const wc = {
+    id: 'wc',
+    isDestroyed: vi.fn(() => false),
+    destroy: vi.fn()
+  } as unknown as PreviewWebContentsHandle
   return {
     webContents: wc,
     setBounds: vi.fn(),

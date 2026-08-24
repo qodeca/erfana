@@ -23,7 +23,7 @@
  * @module HtmlPreviewPanel/components/PreviewFailureBadge
  */
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AlertTriangle } from 'lucide-react'
 import { useOccluder } from '../../../../hooks/useOccluder'
@@ -63,6 +63,10 @@ interface PopoverPosition {
 export function PreviewFailureBadge({ summary }: PreviewFailureBadgeProps): JSX.Element | null {
   const [open, setOpen] = useState(false)
   const [position, setPosition] = useState<PopoverPosition | null>(null)
+  // A stable id so the trigger can point `aria-controls` at the portalled popover
+  // — the two are far apart in the DOM (the popover renders under #portal-root),
+  // so this link is what lets a screen reader reach the revealed issue list.
+  const popoverId = useId()
   const anchorRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const popoverRef = useRef<HTMLDivElement>(null)
@@ -134,6 +138,7 @@ export function PreviewFailureBadge({ summary }: PreviewFailureBadgeProps): JSX.
     open && position ? (
       <div
         ref={popoverRef}
+        id={popoverId}
         className="html-preview-badge-popover"
         role="group"
         aria-label="Preview issues"
@@ -163,6 +168,8 @@ export function PreviewFailureBadge({ summary }: PreviewFailureBadgeProps): JSX.
         type="button"
         className="html-preview-badge"
         aria-expanded={open}
+        aria-haspopup="true"
+        aria-controls={open ? popoverId : undefined}
         aria-label={`${summary.count} preview ${summary.count === 1 ? 'issue' : 'issues'}`}
         onClick={(e) => {
           // Toggle only — never bubble to the tab (tab activation / drag).

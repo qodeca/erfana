@@ -15,6 +15,7 @@
  */
 import { z } from 'zod'
 import { ErrorCode } from '../errors'
+import { PreviewHostSchema } from './preview-settings-schema'
 import type {
   PdfExportResult,
   PreviewApproveResult,
@@ -78,23 +79,13 @@ export const PreviewOpenRequestSchema = z
   .strict()
 export type PreviewOpenRequest = z.infer<typeof PreviewOpenRequestSchema>
 
-/** `preview:open` response mirrors `PreviewOpenResult`. */
-export const PreviewOpenResponseSchema = z.discriminatedUnion('ok', [
-  z.object({ ok: z.literal(true) }).strict(),
-  z
-    .object({
-      ok: z.literal(false),
-      errorCode: z.enum(ErrorCode),
-      holderPanelId: PanelIdSchema.optional()
-    })
-    .strict()
-])
-
 /** No `projectRoot` (NEW-8). Root resolved main-side from ProjectService. */
 export const PreviewApproveHostRequestSchema = z
   .object({
     panelId: PanelIdSchema,
-    host: z.string().min(1).max(253)
+    // Validate approvability (and reject CSP-delimiter / CRLF chars) AT the
+    // boundary via the shared host schema, not only downstream in the store.
+    host: PreviewHostSchema
   })
   .strict()
 export type PreviewApproveHostRequest = z.infer<typeof PreviewApproveHostRequestSchema>
@@ -177,11 +168,18 @@ export const PreviewFailureSchema = z
       'network-error',
       'network-timeout',
       'script-error',
+      'render-crash',
       'unresolved-specifier',
       'allowlist-invalid',
       'allowlist-unsupported-version'
     ]),
-    resourceUrlOrHost: z.string().max(2048), // never absolute; Cf/Cc-stripped by record()
+    // Page-influenced value. The `record()` producer strips control chars; this
+    // regex is the emit-time tripwire that actually enforces "no CR/LF", so a
+    // stripping regression is caught here rather than shipped to the renderer.
+    resourceUrlOrHost: z
+      .string()
+      .max(2048)
+      .regex(/^[^\r\n]*$/, 'must not contain line breaks'),
     reasonCode: z.enum(ErrorCode),
     timestamp: z.number().int().nonnegative()
   })

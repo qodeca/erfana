@@ -29,7 +29,9 @@ describe('isApprovableHost', () => {
     ['*.local mDNS name', 'printer.local'],
     ['*.internal name', 'svc.internal'],
     ['all-numeric label set', '10.0.0.1'],
-    ['bare decimal (integer IPv4)', '2130706433']
+    ['bare decimal (integer IPv4)', '2130706433'],
+    ['bare single-label name (intranet-SSRF surface, #32)', 'intranet'],
+    ['single-label name (wiki)', 'wiki']
   ])('rejects %s (%s)', (_label, host) => {
     expect(isApprovableHost(host)).toBe(false)
   })

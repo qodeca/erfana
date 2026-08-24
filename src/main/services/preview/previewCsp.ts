@@ -63,6 +63,12 @@ export function buildPreviewCsp(
 
   return [
     "default-src 'none'",
+    // `'unsafe-inline' 'unsafe-eval'` are DELIBERATE: the whole point of the
+    // preview is to run the user's own untrusted page JS. The real containment
+    // boundary is `sandbox allow-scripts` (an opaque origin, no
+    // `allow-same-origin`) plus the sealed in-memory session — NOT script-src. Do
+    // not "tighten" this to nonces/hashes; that would break the feature without
+    // adding security (OWASP CSP cheat-sheet, inline-script carve-out).
     `script-src 'unsafe-inline' 'unsafe-eval' ${PREVIEW_SCHEME_SOURCE}${suffix}`,
     `style-src 'unsafe-inline' ${PREVIEW_SCHEME_SOURCE}${suffix}`,
     `img-src data: blob: ${PREVIEW_SCHEME_SOURCE}${suffix}`,
@@ -70,6 +76,9 @@ export function buildPreviewCsp(
     `media-src blob: ${PREVIEW_SCHEME_SOURCE}${suffix}`,
     `connect-src ${PREVIEW_SCHEME_SOURCE}${suffix}`,
     "frame-src 'none'",
+    // Defence-in-depth: the page can only ever load inside its own sealed view,
+    // but forbid framing it explicitly to match the documented baseline.
+    "frame-ancestors 'none'",
     "object-src 'none'",
     "worker-src 'none'",
     "form-action 'none'",

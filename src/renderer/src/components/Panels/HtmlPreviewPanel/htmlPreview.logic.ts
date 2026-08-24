@@ -188,6 +188,7 @@ export const FAILURE_TYPE_LABELS: Readonly<Record<PreviewFailureType, string>> =
   'network-error': 'Network error',
   'network-timeout': 'Network timeout',
   'script-error': 'Script error',
+  'render-crash': 'Preview crashed',
   'unresolved-specifier': 'Unresolved import',
   'allowlist-invalid': 'Invalid allowlist host',
   'allowlist-unsupported-version': 'Unsupported allowlist version'

@@ -15,8 +15,9 @@ describe('buildPreviewCsp', () => {
   })
 
   it('renders exactly the approved hosts as https:// sources', () => {
-    const csp = buildPreviewCsp(['a', 'b'])
-    expect(csp).toContain('erfana-preview: https://a https://b')
+    // Dotted hosts: a bare single-label name is no longer approvable (#32).
+    const csp = buildPreviewCsp(['a.io', 'b.io'])
+    expect(csp).toContain('erfana-preview: https://a.io https://b.io')
     // No bare `https:` scheme-source wildcard: every https: is followed by //.
     expect(csp).not.toMatch(/https:(?!\/\/)/)
   })

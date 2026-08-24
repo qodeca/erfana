@@ -151,6 +151,7 @@ interface Harness {
     typeof vi.fn<(panelId: string, state: string, dropped: number) => void>
   >
   hostBlocked: ReturnType<typeof vi.fn<(panelId: string, host: string, approvable: boolean) => void>>
+  reloadRecord: ReturnType<typeof vi.fn<(path: string) => void>>
   readEntryHtml: ReturnType<typeof vi.fn<(path: string) => Promise<string>>>
   entryHandlers(): EntryHandlers
   failureLog(): ReturnType<typeof makeFailureLog>
@@ -203,8 +204,9 @@ function makeHarness(options: { zoom?: number; now?: () => number } = {}): Harne
     dispose: vi.fn<() => Promise<void>>(() => Promise.resolve())
   }
 
+  const reloadRecord = vi.fn<(path: string) => void>()
   const reloadPolicy: IPreviewReloadPolicy = {
-    record: vi.fn<(path: string) => void>(),
+    record: reloadRecord,
     flush: vi.fn<() => void>(),
     cancel: vi.fn<() => void>(),
     dispose: vi.fn<() => void>()
@@ -291,6 +293,7 @@ function makeHarness(options: { zoom?: number; now?: () => number } = {}): Harne
     setWatchSet,
     loadStateChanged,
     hostBlocked,
+    reloadRecord,
     readEntryHtml,
     entryHandlers: () => {
       if (capturedEntryHandlers === null) throw new Error('entry watcher not wired')
@@ -349,6 +352,38 @@ describe('PreviewViewService — single view + replace-not-refuse', () => {
     // The stale view was destroyed as part of the replace.
     expect(h.factory.destroy).toHaveBeenCalled()
     expect(h.revoke).toHaveBeenCalledWith(h.token)
+  })
+})
+
+describe('PreviewViewService — open epoch guard', () => {
+  it('discards a session whose open was superseded by a project change mid-build', async () => {
+    const h = makeHarness()
+    let resolveCreate: (s: PreviewSession) => void = () => {}
+    h.sessionCreate.mockImplementationOnce(
+      () =>
+        new Promise<PreviewSession>((resolve) => {
+          resolveCreate = resolve
+        })
+    )
+
+    // Start the open; it suspends on `sessionFactory.create`.
+    const opening = h.service.open(REQUEST_A, h.window)
+    // A project switch lands while the session is still building.
+    await h.service.onProjectChanged('/proj', '/other')
+    // Now the session resolves — too late to install.
+    resolveCreate(h.session)
+    const result = await opening
+
+    expect(result).toEqual({ ok: false, errorCode: ErrorCode.PROJECT_NOT_FOUND })
+    // The built-but-unused session is torn down, its token revoked, view destroyed.
+    expect(h.session.teardown).toHaveBeenCalledTimes(1)
+    expect(h.revoke).toHaveBeenCalledWith(h.token)
+    expect(h.factory.destroy).toHaveBeenCalledTimes(1)
+    expect(h.addChildView).not.toHaveBeenCalled()
+
+    // The slot is free: a fresh open now succeeds.
+    const next = await h.service.open({ ...REQUEST_A, panelId: 'panel-B' }, h.window)
+    expect(next).toEqual({ ok: true })
   })
 })
 
@@ -458,16 +493,19 @@ describe('PreviewViewService — destroyAll', () => {
 })
 
 describe('PreviewViewService — four lifecycle events', () => {
-  it('render-process-gone ⇒ failed + script-error badge', async () => {
+  it('render-process-gone ⇒ failed + render-crash badge carrying the reason', async () => {
     const h = makeHarness()
     await h.service.open(REQUEST_A, h.window)
     const log = h.failureLog()
     h.loadStateChanged.mockClear()
 
-    h.factory.emit('render-process-gone')
+    // Electron delivers (event, details); details.reason distinguishes the crash.
+    h.factory.emit('render-process-gone', {}, { reason: 'oom' })
 
     expect(h.loadStateChanged).toHaveBeenCalledWith('panel-A', 'failed', 0)
-    expect(log.records.at(-1)?.type).toBe('script-error')
+    const last = log.records.at(-1)
+    expect(last?.type).toBe('render-crash')
+    expect(last?.resourceUrlOrHost).toBe('oom')
   })
 
   it('unresponsive ⇒ failed', async () => {
@@ -504,6 +542,19 @@ describe('PreviewViewService — four lifecycle events', () => {
     h.entryHandlers().onUnlink()
 
     expect(h.loadStateChanged).toHaveBeenCalledWith('panel-A', 'failed', 0)
+  })
+
+  it('entry-file change routes through the reload policy, not an immediate reload', async () => {
+    const h = makeHarness()
+    await h.service.open(REQUEST_A, h.window)
+    h.factory.reload.mockClear()
+
+    h.entryHandlers().onChange()
+
+    // Coalesced through the reload policy (so an entry+CSS burst is one reload),
+    // not a synchronous wc.reload().
+    expect(h.reloadRecord).toHaveBeenCalledWith('/proj/page.html')
+    expect(h.factory.reload).not.toHaveBeenCalled()
   })
 })
 

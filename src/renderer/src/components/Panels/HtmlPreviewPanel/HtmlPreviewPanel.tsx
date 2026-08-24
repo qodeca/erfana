@@ -254,7 +254,15 @@ export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelPara
               HtmlPreviewTab + PreviewFailureBadge (design §1.8). */}
           {/* The sized, brand-black target the native WebContentsView paints
               over. The fallback layer sits behind it for the hidden case. */}
-          <div ref={placeholderRef} className="html-preview-placeholder">
+          {/* Name the surface for assistive tech: while the native view is hidden
+              (inactive tab, overlay, pre-paint) its own a11y tree is gone, so
+              without a label a screen reader finds only an unnamed black region. */}
+          <div
+            ref={placeholderRef}
+            className="html-preview-placeholder"
+            role="img"
+            aria-label={`HTML preview of ${getBasename(filePath) || 'page'}`}
+          >
             <PreviewFallback kind={fallbackKind} stillFrame={stillFrame} />
           </div>
         </div>

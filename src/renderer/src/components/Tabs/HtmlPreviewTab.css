@@ -116,7 +116,7 @@
 }
 
 .html-preview-tab-close:focus-visible {
-  outline: 1px solid var(--color-border-focus);
+  outline: var(--border-width-thick) solid var(--color-border-focus);
   outline-offset: -1px;
   opacity: 1;
 }
@@ -152,11 +152,13 @@
 }
 
 .html-preview-badge:hover {
-  background: rgba(255, 255, 255, var(--opacity-hover-subtle));
+  /* Keep the amber warning hue on hover (a slightly stronger amber token), so the
+     affordance does not turn neutral exactly when the user targets it. */
+  background: var(--color-bg-warning);
 }
 
 .html-preview-badge:focus-visible {
-  outline: 1px solid var(--color-border-focus);
+  outline: var(--border-width-thick) solid var(--color-border-focus);
   outline-offset: 1px;
 }
 
@@ -241,6 +243,6 @@
  * ============================================ */
 
 .html-preview-tab:focus-visible {
-  outline: 1px solid var(--color-border-focus);
+  outline: var(--border-width-thick) solid var(--color-border-focus);
   outline-offset: -1px;
 }

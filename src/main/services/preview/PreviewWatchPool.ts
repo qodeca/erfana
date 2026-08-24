@@ -28,6 +28,11 @@
  */
 import type { FSWatcher, WatchOptions } from 'chokidar'
 import { createSingleFileWatcher } from '../watcher/singleFileWatch'
+import type { AtomicSaveDetector } from '../watcher/AtomicSaveDetector'
+import {
+  createRearmingSingleFileWatcher,
+  type RearmingSingleFileWatchHandle
+} from '../watcher/rearmingSingleFileWatch'
 import { PREVIEW } from '../../../shared/constants'
 
 /** The preview-tuned `awaitWriteFinish` overrides layered onto the base options. */
@@ -46,8 +51,16 @@ export type WatchFactory = (
 ) => FSWatcher
 
 export interface PreviewWatchPoolDeps {
-  /** Defaults to `createSingleFileWatcher`. */
+  /** The low-level chokidar factory; defaults to `createSingleFileWatcher`. */
   readonly createWatcher?: WatchFactory
+  /**
+   * Re-check realpath confinement before re-arming a watch across an atomic save
+   * (the TOCTOU window an external writer opens). Supplied per-preview by the
+   * coordinator, which owns the realRoot; defaults to always confined.
+   */
+  readonly isPathConfined?: (filePath: string) => Promise<boolean>
+  /** Atomic-save detector factory; injectable so tests avoid the real timer. */
+  readonly createDetector?: () => AtomicSaveDetector
   /** Per-preview watch cap; defaults to `PREVIEW.MAX_WATCHED_FILES`. */
   readonly maxWatched?: number
 }
@@ -72,7 +85,7 @@ export interface IPreviewWatchPool {
 }
 
 interface PoolEntry {
-  watcher: FSWatcher
+  watcher: RearmingSingleFileWatchHandle
   refCount: number
   onChange: () => void
 }
@@ -83,6 +96,8 @@ interface PoolEntry {
  */
 export function createPreviewWatchPool(deps: PreviewWatchPoolDeps = {}): IPreviewWatchPool {
   const createWatcher = deps.createWatcher ?? createSingleFileWatcher
+  const isPathConfined = deps.isPathConfined
+  const createDetector = deps.createDetector
   const maxWatched = deps.maxWatched ?? PREVIEW.MAX_WATCHED_FILES
 
   const entries = new Map<string, PoolEntry>()
@@ -109,15 +124,18 @@ export function createPreviewWatchPool(deps: PreviewWatchPoolDeps = {}): IPrevie
       // The handler indirects through the entry so a change/unlink always calls
       // the currently-registered callback.
       const entry: PoolEntry = {
-        watcher: undefined as unknown as FSWatcher,
+        watcher: undefined as unknown as RearmingSingleFileWatchHandle,
         refCount: 1,
         onChange
       }
+      // A changed, re-armed OR genuinely-deleted subresource all mean "reload
+      // needed", so onChange and onDeleted both fire the signal. The re-arm keeps
+      // the watch alive across an atomic save so later edits still reload.
       const fire = (): void => entry.onChange()
-      entry.watcher = createWatcher(
+      entry.watcher = createRearmingSingleFileWatcher(
         filePath,
-        { onChange: fire, onUnlink: fire, onError: () => {} },
-        PREVIEW_WATCH_OVERRIDES
+        { onChange: fire, onDeleted: fire, onError: () => {} },
+        { createWatcher, isPathConfined, createDetector, overrides: PREVIEW_WATCH_OVERRIDES }
       )
       entries.set(filePath, entry)
       return true

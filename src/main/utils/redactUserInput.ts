@@ -25,13 +25,13 @@ import { AppError, ErrorCode } from '../../shared/errors'
  * `reserved` reason, `<reasonSuffix>` adds a SECOND user-derived quoted
  * segment: ` — try "<suggestion>"`. Both quoted segments are user-derived.
  *
- * `PREVIEW_LOCAL_FILE_MISSING` (Issue #74) carries the user's file path in a
- * single quoted segment: `"<path>" could not be read`.
+ * NOTE: `PREVIEW_LOCAL_FILE_MISSING` (Issue #74) is intentionally NOT listed. Its
+ * code is used only as a renderer badge reason (which keeps the full path by
+ * design); no `logger.*` site ever logs its message, so a redaction entry would
+ * guard a log line that does not exist. Re-add it here together with any future
+ * producer that logs that error.
  */
-const USER_INPUT_CODES = new Set<ErrorCode>([
-  ErrorCode.INVALID_FILENAME,
-  ErrorCode.PREVIEW_LOCAL_FILE_MISSING
-])
+const USER_INPUT_CODES = new Set<ErrorCode>([ErrorCode.INVALID_FILENAME])
 
 const REDACTION_PLACEHOLDER = '[redacted-filename]'
 

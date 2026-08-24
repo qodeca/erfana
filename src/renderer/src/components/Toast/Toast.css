@@ -53,6 +53,23 @@
   }
 }
 
+@keyframes toast-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* A 400px slide is a vestibular trigger: honour prefers-reduced-motion by
+   swapping the slide for an opacity-only fade (keeps the same duration). */
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation-name: toast-fade-in;
+  }
+}
+
 .toast-icon {
   flex-shrink: 0;
   display: flex;
@@ -140,7 +157,7 @@
   background-color: var(--color-btn-primary-hover);
 }
 
-.toast-action:focus {
+.toast-action:focus-visible {
   outline: 2px solid var(--color-border-focus);
   outline-offset: 2px;
 }
