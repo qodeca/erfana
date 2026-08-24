@@ -38,6 +38,7 @@ import {
   ClaudeStatusEvents
 } from '../shared/ipc/claude-status-channels'
 import type { ClaudeStatusChangePayload } from '../shared/ipc/claude-status-schema'
+import { previewBridge } from './previewBridge'
 import type {
   DocumentImportRequest,
   DocumentImportResult,
@@ -958,6 +959,9 @@ const api = {
       return () => ipcRenderer.removeListener(ClaudeStatusEvents.CHANGED, listener)
     }
   },
+
+  // Running HTML preview bridge (#74): WebContentsView-backed preview control
+  preview: previewBridge,
 
   // Quit confirmation operations
   quit: {

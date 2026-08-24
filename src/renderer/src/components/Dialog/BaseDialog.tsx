@@ -4,6 +4,7 @@ import { useEffect, useRef, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { logger } from '../../utils/logger'
 import { TEST_IDS } from '../../constants/testids'
+import { useOccluder } from '../../hooks/useOccluder'
 import './Dialog.css'
 
 // Small delay to ensure dialog is fully rendered before focusing
@@ -299,6 +300,14 @@ export function BaseDialog({
     registerOpenDialog(dialogRef, zIndex)
     return () => unregisterOpenDialog(dialogRef)
   }, [isOpen, zIndex])
+
+  // Preview occluder (item 63, design §1.8 NEW-10). Every dialog composing on
+  // BaseDialog occludes the live preview view while open. Deliberately a
+  // SEPARATE hook keyed on `[kind, isOpen]` — NOT folded into the stack effect
+  // above (deps `[isOpen, zIndex]`) and NOT into registerOpenDialog (which runs
+  // a dedupe unregister→register). Either of those would toggle the count on a
+  // z-index change; keying on `isOpen` alone means one open is exactly one push.
+  useOccluder('dialog', isOpen)
 
   // Auto-focus: once per open, and again on every `initialFocusKey` change.
   //

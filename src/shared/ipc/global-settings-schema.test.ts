@@ -106,6 +106,9 @@ describe('GlobalSettingsSchema', () => {
           backend: 'openai' as const,
           openaiApiKeyStored: false,
           whisperModel: 'base' as const
+        },
+        htmlPreview: {
+          enabled: true
         }
       }
 
@@ -129,6 +132,9 @@ describe('GlobalSettingsSchema', () => {
           backend: 'openai' as const,
           openaiApiKeyStored: false,
           whisperModel: 'base' as const
+        },
+        htmlPreview: {
+          enabled: true
         }
       }
 
@@ -193,6 +199,9 @@ describe('GlobalSettingsSchema', () => {
           backend: 'openai',
           openaiApiKeyStored: false,
           whisperModel: 'base'
+        },
+        htmlPreview: {
+          enabled: true
         }
       }
 
@@ -207,7 +216,8 @@ describe('GlobalSettingsSchema', () => {
         logging: { level: 'info' },
         editor: { preserveLineBreaks: false },
         gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-        transcription: { backend: 'openai', openaiApiKeyStored: false, whisperModel: 'base' }
+        transcription: { backend: 'openai', openaiApiKeyStored: false, whisperModel: 'base' },
+        htmlPreview: { enabled: true }
       }
       expect(validSettings.logging.level).toBe('info')
     })

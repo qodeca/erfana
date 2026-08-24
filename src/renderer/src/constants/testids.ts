@@ -547,6 +547,8 @@ export const TEST_IDS = {
   TOAST_MESSAGE: 'toast-message',
   /** Toast dismiss button */
   TOAST_BTN_DISMISS: 'toast-btn-dismiss',
+  /** Toast action button (e.g. "Approve"); present only on actionable toasts */
+  TOAST_BTN_ACTION: 'toast-btn-action',
   /** Persistent visually-hidden polite live region (info/success/warning) */
   TOAST_LIVE_POLITE: 'toast-live-polite',
   /** Persistent visually-hidden alert live region (errors) */
@@ -596,6 +598,10 @@ export const TEST_IDS = {
   SETTINGS_LOGS_FOLDER_PATH: 'settings-logs-folder-path',
   /** Open logs folder button */
   SETTINGS_BTN_OPEN_LOGS: 'settings-btn-open-logs',
+  /** HTML preview settings section (Issue #74) */
+  SETTINGS_SECTION_HTML_PREVIEW: 'settings-section-html-preview',
+  /** HTML preview enabled toggle (Issue #74, AC21) */
+  SETTINGS_TOGGLE_HTML_PREVIEW: 'settings-toggle-html-preview',
 
   // =========================================================================
   // Transcription Dialog (10)

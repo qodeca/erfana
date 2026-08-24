@@ -28,6 +28,7 @@ interface GlobalSettingsState {
   updateGitStatusPollingInterval: (interval: number) => Promise<void>
   updateTranscriptionBackend: (backend: TranscriptionBackend) => Promise<void>
   updateWhisperModel: (model: WhisperModel) => Promise<void>
+  updateHtmlPreviewEnabled: (enabled: boolean) => Promise<void>
   resetSettings: () => Promise<void>
   clearCorruptionFlag: () => void
 
@@ -88,6 +89,12 @@ export const useGlobalSettingsStore = create<GlobalSettingsState>((set, get) => 
 
   updateWhisperModel: async (model: WhisperModel) => {
     await get()._updateSection('transcription', (current) => ({ ...current, whisperModel: model }))
+  },
+
+  // AC21 master switch: flipping this false makes the main process destroy every
+  // live preview view via its `globalSettingsService.onSettingsChanged` subscription.
+  updateHtmlPreviewEnabled: async (enabled: boolean) => {
+    await get()._updateSection('htmlPreview', (current) => ({ ...current, enabled }))
   },
 
   resetSettings: async () => {

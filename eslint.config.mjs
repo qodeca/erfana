@@ -19,7 +19,11 @@ export default [
       'temp/**',
       'playwright-report/**',
       'test-results/**',
-      'coverage/**'
+      'coverage/**',
+      // Static browser test-input fixtures for the HTML-preview feature (#74):
+      // these run inside the sealed preview WebContentsView, not the app/Node
+      // context, so linting them as project source flags browser globals.
+      'e2e/fixtures/html-preview-corpus/**'
     ]
   },
   { files: ['**/*.{js,mjs,cjs,ts,jsx,tsx}'] },
@@ -107,19 +111,26 @@ export default [
   //    Windows. Use the cross-platform helpers in `utils/fileUtils.ts` (itself
   //    exempt, as it owns the separator-class logic). See issue #238.
   // 2. Hand-built dockview panel ids. The id prefix and the panel component
-  //    must be derived from the same `isImageFile` answer or a file opens in
-  //    the wrong panel type; `utils/openFileInPanel.ts` owns that (and is
-  //    therefore exempt). See issue #70.
+  //    must be derived from the same kind answer or a file opens in the wrong
+  //    panel type; `utils/openFileInPanel.ts` owns that (and is therefore
+  //    exempt). The `preview-` prefix is issue #74's running HTML preview.
+  //    See issues #70 and #74.
+  // 3. The running preview's visibility. `api.preview.setVisibility` and the
+  //    `preview:setVisibility` channel have exactly ONE permitted caller,
+  //    `services/preview/OverlayGuardService.ts` (exempt), so the "single
+  //    hide/show owner" invariant is enforced by the linter, not by convention.
+  //    See issue #74 design §1.8.
   //
-  // NOTE: both families live in ONE `no-restricted-syntax` entry on purpose.
-  // Flat config replaces a rule wholesale rather than merging, so a second
-  // block setting `no-restricted-syntax` for these files would silently
+  // NOTE: all three families live in ONE `no-restricted-syntax` entry on
+  // purpose. Flat config replaces a rule wholesale rather than merging, so a
+  // second block setting `no-restricted-syntax` for these files would silently
   // disable whichever set it did not repeat.
   {
     files: ['src/renderer/**/*.{ts,tsx}'],
     ignores: [
       'src/renderer/src/utils/fileUtils.ts',
-      'src/renderer/src/utils/openFileInPanel.ts'
+      'src/renderer/src/utils/openFileInPanel.ts',
+      'src/renderer/src/services/preview/OverlayGuardService.ts'
     ],
     rules: {
       'no-restricted-syntax': [
@@ -150,6 +161,25 @@ export default [
             "TemplateLiteral[quasis.0.value.raw='image-'][expressions.0.callee.name='sanitizeFilePath']",
           message:
             'Panel ids are built in one place. Use getFilePanelId() from utils/openFileInPanel.'
+        },
+        // Mirrors the editor-/image- guards for the #74 running-preview prefix.
+        // getFilePanelId is kind-free (never `preview-`), so the preview id is
+        // built only inside openFileInPanel via `openFileInPanel({ kind:
+        // 'preview' })`.
+        {
+          selector:
+            "TemplateLiteral[quasis.0.value.raw='preview-'][expressions.0.callee.name='sanitizeFilePath']",
+          message:
+            'Preview panel ids are built in one place. Use openFileInPanel({ kind: "preview" }) from utils/openFileInPanel.'
+        },
+        // The running preview's visibility has a single owner (§1.8). Forbid the
+        // `api.preview.setVisibility` bridge call and the raw
+        // `preview:setVisibility` channel everywhere except OverlayGuardService.
+        {
+          selector:
+            "CallExpression[callee.property.name='setVisibility'][callee.object.property.name='preview'], Literal[value='preview:setVisibility']",
+          message:
+            'Preview visibility is owned by services/preview/OverlayGuardService. Do not call api.preview.setVisibility or reference the preview:setVisibility channel elsewhere (issue #74, design §1.8).'
         }
       ]
     }

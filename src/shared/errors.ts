@@ -186,6 +186,13 @@ export enum ErrorCode {
   VIDEO_EXTRACTION_FAILED = 'VIDEO_EXTRACTION_FAILED',
   VIDEO_FFMPEG_UNAVAILABLE = 'VIDEO_FFMPEG_UNAVAILABLE',
 
+  // Preview errors (Issue #74)
+  PREVIEW_HOST_NOT_APPROVABLE = 'PREVIEW_HOST_NOT_APPROVABLE',
+  PREVIEW_CSP_INVALID = 'PREVIEW_CSP_INVALID',
+  PREVIEW_LOCAL_FILE_MISSING = 'PREVIEW_LOCAL_FILE_MISSING',
+  PREVIEW_VIEW_LIMIT_REACHED = 'PREVIEW_VIEW_LIMIT_REACHED',
+  PREVIEW_ALLOWLIST_FULL = 'PREVIEW_ALLOWLIST_FULL',
+
   // Generic errors
   UNKNOWN_ERROR = 'UNKNOWN_ERROR'
 }
@@ -384,6 +391,15 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.VIDEO_NO_AUDIO_TRACK]: 'This video file contains no audio track to transcribe.',
   [ErrorCode.VIDEO_EXTRACTION_FAILED]: 'Failed to extract audio from video file.',
   [ErrorCode.VIDEO_FFMPEG_UNAVAILABLE]: 'Video import requires ffmpeg which is not available.',
+
+  // Preview errors (Issue #74)
+  [ErrorCode.PREVIEW_HOST_NOT_APPROVABLE]: 'This host cannot be approved for preview.',
+  [ErrorCode.PREVIEW_CSP_INVALID]: 'The preview security policy is invalid; the page was not served.',
+  // The path must stay quoted: redactUserInput's QUOTED_SPAN redacts only the
+  // span between the first and last '"', so an unquoted path would survive.
+  [ErrorCode.PREVIEW_LOCAL_FILE_MISSING]: '"<path>" could not be read',
+  [ErrorCode.PREVIEW_VIEW_LIMIT_REACHED]: 'A preview is already open.',
+  [ErrorCode.PREVIEW_ALLOWLIST_FULL]: 'The preview host allowlist is full.',
 
   // Generic errors
   [ErrorCode.UNKNOWN_ERROR]: 'An unexpected error occurred'

@@ -43,6 +43,7 @@ import type {
 } from '../shared/ipc/import-schema'
 import type { ClipboardBridge } from '../shared/ipc/clipboard-schema'
 import type { ClaudeStatusBridge } from '../shared/ipc/claude-status-schema'
+import type { PreviewBridge } from '../shared/ipc/preview-schema'
 
 declare global {
   interface Window {
@@ -375,6 +376,11 @@ declare global {
        * @see Issue #216 - Per-terminal Claude Code context status bar
        */
       claudeStatus: ClaudeStatusBridge
+      /**
+       * Running HTML preview bridge (WebContentsView-backed)
+       * @see Issue #74 - HTML preview with CSS and JavaScript execution
+       */
+      preview: PreviewBridge
       quit: {
         onQuitRequested: (callback: (data: { reason?: string }) => void) => () => void
         sendQuitResponse: (proceed: boolean) => void

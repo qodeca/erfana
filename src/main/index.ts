@@ -26,6 +26,8 @@ import { registerExternalFileHandlers } from './ipc/external-file-handlers'
 import { registerTranscriptionHandlers } from './ipc/transcription-handlers'
 import { registerClipboardHandlers } from './ipc/clipboard-handlers'
 import { registerClaudeStatusHandlers } from './ipc/claude-status-handlers'
+import { registerPreviewHandlers } from './ipc/preview-handlers'
+import { registerPreviewScheme } from './services/preview/previewScheme'
 import { DependencyDetector, converterRegistry, getExtensionsForDependencies } from './services/import'
 import { FORCE_CRASH_ARG } from '../shared/constants'
 import { IMPORT_CHANNELS } from '../shared/ipc/import-channels'
@@ -53,6 +55,11 @@ import {
 // Install safe console logging to prevent EPIPE crashes
 // Must be called before any other code that uses console.log
 installSafeConsole()
+
+// Register the `erfana-preview://` privileged scheme (#74). MUST run before
+// `app.whenReady()`, so it lives here at module scope beside the other pre-ready
+// setup (`registerSchemesAsPrivileged` is a no-op once the app is ready).
+registerPreviewScheme()
 
 // Strip --new-window flag to prevent infinite spawn loops
 // Must happen before any window creation
@@ -121,6 +128,9 @@ function isRendererGone(win: BrowserWindow): boolean {
 
 /** Claude status handler bundle (#216); disposed on app shutdown. */
 let claudeStatusHandlers: { dispose: () => Promise<void> } | null = null
+
+/** HTML preview handler bundle (#74); disposed on app shutdown. */
+let previewHandlers: { dispose: () => Promise<void> } | null = null
 
 // WebGL Command Line Switches (originally added for Electron 33+)
 // Fixes WebGL context creation issues and terminal flickering in production builds
@@ -376,6 +386,13 @@ app.whenReady().then(async () => {
   // Per-terminal Claude Code context status bar (#216). Uses the same
   // terminalService singleton so it can look up the main-owned PTY pid + cwd.
   claudeStatusHandlers = registerClaudeStatusHandlers(terminalService)
+  // Running HTML preview (#74). Project path + settings come from main-owned
+  // singletons; the graph (WebContentsView sessions, allowlist, watchers) is
+  // built inside the composition root.
+  previewHandlers = registerPreviewHandlers({
+    getProjectPath: () => fileService.getProjectPath(),
+    globalSettings: globalSettingsService
+  })
 
   // RELIABILITY FIX (todo012): Clean up stale projects on startup
   // This runs asynchronously but doesn't block window creation
@@ -597,6 +614,7 @@ app.on('before-quit', async (event) => {
         directoryWatcherService.dispose(),
         terminalService.dispose(),
         claudeStatusHandlers ? claudeStatusHandlers.dispose() : Promise.resolve(),
+        previewHandlers ? previewHandlers.dispose() : Promise.resolve(),
         gitWatcherService.dispose(),
         gitStatusService.dispose()
       ])

@@ -120,3 +120,27 @@
   outline: 2px solid var(--color-border-focus);
   outline-offset: 2px;
 }
+
+.toast-action {
+  align-self: flex-start;
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background-color: var(--color-btn-primary-bg);
+  color: var(--color-brand-black);
+  border: none;
+  border-radius: var(--border-radius);
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  cursor: pointer;
+  transition: background-color var(--transition-slow);
+  pointer-events: auto;
+}
+
+.toast-action:hover {
+  background-color: var(--color-btn-primary-hover);
+}
+
+.toast-action:focus {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}

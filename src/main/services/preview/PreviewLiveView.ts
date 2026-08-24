@@ -1,0 +1,500 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+/**
+ * One live preview view (Issue #74, work item 39; design §1.4, §5).
+ *
+ * Encapsulates everything that hangs off a single sealed `WebContentsView` —
+ * bounds, the rate-limited post-load pipeline, the CSS hot-swap, the four
+ * lifecycle events, find/export and a bounded teardown — so `PreviewViewService`
+ * stays a thin single-view MANAGER and each file stays under the 500-line cap.
+ *
+ * The service owns the "only one, replace-not-refuse" policy and hands a fully
+ * factory-built session to this class, which wires the per-view collaborators
+ * (watch coordinator, reload policy, find controller) and the lifecycle listeners.
+ *
+ * Trust model: the previewed page is untrusted; every signal it drives here
+ * (failure strings, still frames, find counts) is bounded, coalesced DATA.
+ */
+
+import { basename, dirname, relative, resolve, sep } from 'node:path'
+import { readFile } from 'node:fs/promises'
+
+import { ErrorCode } from '../../../shared/errors'
+import { PREVIEW } from '../../../shared/constants'
+import type {
+  PdfExportResult,
+  PreviewBounds,
+  PreviewEmitters,
+  PreviewFailureInput,
+  PreviewFailureType
+} from '../../../shared/ipc/preview-types'
+import type { IPreviewRootRegistry } from './PreviewRootRegistry'
+import type { IPreviewStillFrameCache } from './PreviewStillFrameCache'
+import type { IPreviewExportController } from './PreviewExportController'
+import type { IPreviewHostBlockNotifier } from './PreviewHostBlockNotifier'
+import type { IPreviewWatchCoordinator } from './PreviewWatchCoordinator'
+import type { IPreviewReloadPolicy, ReloadDecision } from './PreviewReloadPolicy'
+import type {
+  IPreviewFindController,
+  PreviewFindCount,
+  PreviewFindOptions
+} from './PreviewFindController'
+import type { IPreviewFailureLog } from './PreviewFailureLog'
+import type {
+  PreviewSession,
+  PreviewSessionLike,
+  PreviewViewHandle,
+  PreviewWebContentsHandle
+} from './PreviewSessionFactory'
+import { extractStaticLinks } from './linkExtract'
+import { buildCacheBustHref, buildCssSwapScript } from './previewCssSwap'
+import { clampAndZoomBounds } from './previewBoundsClamp'
+import { wirePreviewLifecycle, type PreviewFileWatcherHandle } from './previewViewLifecycle'
+
+/** ARGB placeholder colour — the same value the panel's fallback CSS encodes (§1.8). */
+const PLACEHOLDER_COLOR = '#FF161312'
+
+/** A non-main isolated world for the CSS-swap script (§1.4: page cannot shadow it). */
+const SWAP_WORLD_ID = 999
+
+/** The slice of a `BrowserWindow` a live view uses. Structural for tests. */
+export interface PreviewWindowLike {
+  readonly contentView: {
+    addChildView(view: PreviewViewHandle): void
+    removeChildView(view: PreviewViewHandle): void
+  }
+  getContentBounds(): { x: number; y: number; width: number; height: number }
+}
+
+/** Shared (non-per-view) collaborators a live view needs. */
+export interface PreviewLiveViewDeps {
+  readonly emit: PreviewEmitters
+  readonly stillFrameCache: IPreviewStillFrameCache
+  readonly exportController: IPreviewExportController
+  readonly registry: Pick<IPreviewRootRegistry, 'rebuildCsp' | 'revoke'>
+  readonly storageSeal: { purge(session: PreviewSessionLike): Promise<void> }
+  readonly hostBlockNotifier: IPreviewHostBlockNotifier
+  readonly createWatchCoordinator: (
+    realRoot: string,
+    onChanged: (paths: readonly string[]) => void
+  ) => IPreviewWatchCoordinator
+  readonly createReloadPolicy: (
+    onDecision: (decision: ReloadDecision) => void
+  ) => IPreviewReloadPolicy
+  readonly createFindController: (
+    wc: PreviewWebContentsHandle,
+    onCount: (count: PreviewFindCount) => void
+  ) => IPreviewFindController
+  readonly createEntryWatcher: (
+    filePath: string,
+    handlers: { onChange(): void; onUnlink(): void; onError(error: unknown): void }
+  ) => PreviewFileWatcherHandle
+  readonly getZoomFactor: () => number
+  readonly now: () => number
+  readonly readEntryHtml?: (filePath: string) => Promise<string>
+  readonly onForwardedShortcut?: (panelId: string, key: string) => void
+  readonly platform?: NodeJS.Platform
+}
+
+/** What the manager hands to a new live view. */
+export interface PreviewLiveViewParams {
+  readonly panelId: string
+  readonly projectPath: string
+  readonly entryFilePath: string
+  readonly window: PreviewWindowLike
+  readonly initialBounds: PreviewBounds
+  readonly session: PreviewSession
+  readonly failureLog: IPreviewFailureLog
+  readonly deps: PreviewLiveViewDeps
+}
+
+/** Build an `erfana-preview://<token>/<enc rel>` URL for an absolute local path. */
+function buildPreviewUrl(token: string, realRoot: string, absPath: string): string {
+  const rel = relative(realRoot, absPath).split(sep).map(encodeURIComponent).join('/')
+  return `erfana-preview://${token}/${rel}`
+}
+
+export class PreviewLiveView {
+  readonly panelId: string
+  readonly projectPath: string
+
+  private readonly view: PreviewViewHandle
+  private readonly wc: PreviewWebContentsHandle
+  private readonly session: PreviewSessionLike
+  private readonly token: string
+  private readonly realRoot: string
+  private readonly entryFilePath: string
+  private readonly window: PreviewWindowLike
+  private readonly failureLog: IPreviewFailureLog
+  private readonly deps: PreviewLiveViewDeps
+  private readonly readEntryHtml: (filePath: string) => Promise<string>
+  private readonly watchCoordinator: IPreviewWatchCoordinator
+  private readonly reloadPolicy: IPreviewReloadPolicy
+  private readonly findController: IPreviewFindController
+  private readonly lifecycle: { dispose(): Promise<void> }
+  private readonly factoryTeardown: () => void
+
+  private lastBoundsSeq = -1
+  private lastBounds: PreviewBounds | null = null
+  private swapVersion = 0
+  // Negative-infinity so the FIRST post-load pipeline always clears the rate-limit
+  // window and runs immediately; subsequent runs are gated to one per interval.
+  private lastPipelineAt = Number.NEGATIVE_INFINITY
+  private trailingTimer: ReturnType<typeof setTimeout> | null = null
+  private destroyed = false
+
+  constructor(params: PreviewLiveViewParams) {
+    this.panelId = params.panelId
+    this.projectPath = params.projectPath
+    this.entryFilePath = params.entryFilePath
+    this.window = params.window
+    this.failureLog = params.failureLog
+    this.deps = params.deps
+    this.readEntryHtml = params.deps.readEntryHtml ?? ((filePath) => readFile(filePath, 'utf8'))
+
+    this.view = params.session.view
+    this.wc = params.session.view.webContents
+    this.session = params.session.session
+    this.token = params.session.token
+    this.realRoot = params.session.realRoot
+    this.factoryTeardown = params.session.teardown
+
+    this.watchCoordinator = this.deps.createWatchCoordinator(this.realRoot, (paths) =>
+      this.onWatchChanged(paths)
+    )
+    this.reloadPolicy = this.deps.createReloadPolicy((decision) =>
+      this.handleReloadDecision(decision)
+    )
+    this.findController = this.deps.createFindController(this.wc, (count) =>
+      this.deps.emit.findResult({
+        panelId: this.panelId,
+        requestId: 0,
+        matches: count.total,
+        activeMatchOrdinal: count.activeOrdinal
+      })
+    )
+
+    this.lifecycle = wirePreviewLifecycle(
+      {
+        webContents: this.wc,
+        entryFilePath: this.entryFilePath,
+        createEntryWatcher: this.deps.createEntryWatcher,
+        platform: this.deps.platform
+      },
+      {
+        onRenderProcessGone: () => this.onCrash(),
+        onUnresponsive: () => this.onCrash(),
+        onDidFinishLoad: () => this.schedulePipeline(),
+        onEntryChange: () => this.doReload(false),
+        onEntryDeleted: () => this.onEntryDeleted(),
+        onForwardedShortcut: (key) => this.deps.onForwardedShortcut?.(this.panelId, key),
+        onConsoleMessage: (input) => this.onConsoleMessage(input)
+      }
+    )
+
+    this.window.contentView.addChildView(this.view)
+    const dip = this.computeBounds(params.initialBounds)
+    if (dip !== null) {
+      this.lastBounds = dip
+      this.view.setBounds(dip)
+    }
+    this.view.setBackgroundColor(PLACEHOLDER_COLOR)
+  }
+
+  /** Emit `loading` and navigate to the entry file. Failures surface via events. */
+  async load(): Promise<void> {
+    this.deps.emit.loadStateChanged(this.panelId, 'loading', 0)
+    try {
+      await this.wc.loadURL(buildPreviewUrl(this.token, this.realRoot, this.entryFilePath))
+    } catch {
+      // A load failure surfaces through the lifecycle events; do not throw here.
+    }
+  }
+
+  setBounds(bounds: PreviewBounds, seq: number): void {
+    if (seq <= this.lastBoundsSeq) {
+      return
+    }
+    this.lastBoundsSeq = seq
+    const dip = this.computeBounds(bounds)
+    if (dip === null) {
+      return
+    }
+    this.lastBounds = dip
+    this.view.setBounds(dip)
+  }
+
+  async setVisibility(visible: boolean): Promise<void> {
+    if (visible) {
+      // Re-adding an already-present child reorders it topmost (design §5(d)).
+      this.window.contentView.addChildView(this.view)
+      this.view.setVisible(true)
+      return
+    }
+    // Capture BEFORE hiding — the capturer count keeps the page live mid-capture.
+    await this.deps.stillFrameCache.captureIfStale(
+      this.wc,
+      this.panelId,
+      this.lastBounds ?? { x: 0, y: 0, width: 0, height: 0 }
+    )
+    const frame = this.deps.stillFrameCache.get(this.panelId)
+    if (frame !== undefined) {
+      this.deps.emit.stillFrameChanged(this.panelId, frame)
+    }
+    this.view.setVisible(false)
+  }
+
+  reload(ignoreCache: boolean): void {
+    this.doReload(ignoreCache)
+  }
+
+  swapStylesheet(relPath: string): Promise<boolean> {
+    return this.doSwap(resolve(dirname(this.entryFilePath), relPath))
+  }
+
+  async applyApprovedHosts(hosts: readonly string[]): Promise<void> {
+    // §5(c): rebuild the CSP on the registry entry, purge, clear failures, reload.
+    this.deps.registry.rebuildCsp(this.token, hosts)
+    await this.deps.storageSeal.purge(this.session)
+    this.failureLog.clear()
+    this.wc.reloadIgnoringCache()
+  }
+
+  find(text: string, options: PreviewFindOptions): void {
+    this.findController.find(text, options)
+  }
+
+  stopFind(): void {
+    this.findController.clearHighlights()
+  }
+
+  exportPdf(suggestedName: string): Promise<PdfExportResult> {
+    return this.deps.exportController.exportToPdf(this.wc, suggestedName)
+  }
+
+  /** Zoom-convert + clamp a CSS-px rect to the window content rect (§4.3). */
+  private computeBounds(cssRect: PreviewBounds): PreviewBounds | null {
+    const content = this.window.getContentBounds()
+    return clampAndZoomBounds(
+      cssRect,
+      { width: content.width, height: content.height },
+      this.deps.getZoomFactor()
+    )
+  }
+
+  /** A watched subresource changed — feed each path to the reload policy. */
+  private onWatchChanged(paths: readonly string[]): void {
+    if (this.destroyed) {
+      return
+    }
+    for (const path of paths) {
+      this.reloadPolicy.record(path)
+    }
+  }
+
+  /** The reload policy classified a burst: swap one stylesheet or full reload. */
+  private handleReloadDecision(decision: ReloadDecision): void {
+    if (this.destroyed) {
+      return
+    }
+    this.deps.stillFrameCache.invalidate(this.panelId)
+    if (decision.action === 'swap') {
+      void this.doSwap(decision.changedPath)
+    } else {
+      this.doReload(false)
+    }
+  }
+
+  private doReload(ignoreCache: boolean): void {
+    if (this.destroyed) {
+      return
+    }
+    if (ignoreCache) {
+      this.wc.reloadIgnoringCache()
+    } else {
+      this.wc.reload()
+    }
+  }
+
+  /** Hot-swap a stylesheet in an isolated world; any non-`true` outcome reloads. */
+  private async doSwap(absPath: string): Promise<boolean> {
+    const base = buildPreviewUrl(this.token, this.realRoot, absPath)
+    this.swapVersion += 1
+    const script = buildCssSwapScript(base, buildCacheBustHref(base, this.swapVersion))
+
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const timeout = new Promise<'timeout'>((res) => {
+      timer = setTimeout(() => res('timeout'), PREVIEW.SWAP_TIMEOUT_MS)
+    })
+    const swap = this.wc
+      .executeJavaScriptInIsolatedWorld(SWAP_WORLD_ID, [{ code: script }])
+      .then((value) => value, () => 'error' as const)
+
+    const outcome = await Promise.race([swap, timeout])
+    if (timer !== null) {
+      clearTimeout(timer)
+    }
+    if (outcome === true) {
+      return true
+    }
+    // Timeout, throw, `false` or a non-boolean ⇒ fall back to a full reload.
+    if (!this.destroyed) {
+      this.wc.reload()
+    }
+    return false
+  }
+
+  /** The rate-limited post-load pipeline scheduler (§1.4). */
+  private schedulePipeline(): void {
+    if (this.destroyed) {
+      return
+    }
+    const elapsed = this.deps.now() - this.lastPipelineAt
+    if (elapsed >= PREVIEW.RELOAD_MIN_INTERVAL_MS) {
+      void this.runPipeline()
+    } else if (this.trailingTimer === null) {
+      // One trailing run at the window's end; further did-finish-loads are dropped.
+      this.trailingTimer = setTimeout(() => {
+        this.trailingTimer = null
+        void this.runPipeline()
+      }, PREVIEW.RELOAD_MIN_INTERVAL_MS - elapsed)
+    }
+  }
+
+  /** One post-load pipeline: read entry → extract links → set watch → emit ready. */
+  private async runPipeline(): Promise<void> {
+    if (this.destroyed) {
+      return
+    }
+    this.lastPipelineAt = this.deps.now()
+
+    let html: string
+    try {
+      html = await this.readEntryHtml(this.entryFilePath)
+    } catch {
+      // A missing entry surfaces via the entry-file unlink event, not here.
+      return
+    }
+    if (this.destroyed) {
+      return
+    }
+
+    const dir = dirname(this.entryFilePath)
+    const candidates = extractStaticLinks(html).map((link) => resolve(dir, link))
+    const result = await this.watchCoordinator.setWatchSet(candidates)
+    if (this.destroyed) {
+      return
+    }
+    this.deps.stillFrameCache.invalidate(this.panelId)
+    this.deps.emit.loadStateChanged(this.panelId, 'ready', result.dropped.length)
+  }
+
+  /** `render-process-gone` / `unresponsive`: mark failed, badge, keep Reload live. */
+  private onCrash(): void {
+    // TODO(#74): a process crash reuses `script-error`, now also produced by
+    // `onConsoleMessage`. A distinct crash type would ripple into preview-types,
+    // preview-schema and htmlPreview.logic.ts, so it is deferred here.
+    this.recordFailureAndFail('script-error', '', ErrorCode.UNKNOWN_ERROR)
+  }
+
+  /** A page `console-message` already classified into a failure input. */
+  private onConsoleMessage(input: PreviewFailureInput): void {
+    this.recordFailureAndFail(input.type, input.resourceUrlOrHost, input.reasonCode)
+  }
+
+  /** Entry-file unlink (and rename, which unlinks the old path): failed + deleted. */
+  private onEntryDeleted(): void {
+    this.recordFailureAndFail(
+      'missing-local-file',
+      basename(this.entryFilePath),
+      ErrorCode.PREVIEW_LOCAL_FILE_MISSING
+    )
+  }
+
+  private recordFailureAndFail(
+    type: PreviewFailureType,
+    resourceUrlOrHost: string,
+    reasonCode: ErrorCode
+  ): void {
+    this.failureLog.record({ type, resourceUrlOrHost, reasonCode })
+    this.deps.emit.loadStateChanged(this.panelId, 'failed', 0)
+  }
+
+  /**
+   * Tear down the view. `immediate` destroys the webContents straight away
+   * (project switch / dispose / replace); `bounded` races `close()` against
+   * `PREVIEW.CLOSE_TIMEOUT_MS` before forcing `destroy()` (a user tab close, X21).
+   */
+  async teardown(mode: 'immediate' | 'bounded'): Promise<void> {
+    if (this.destroyed) {
+      return
+    }
+    this.destroyed = true
+    if (this.trailingTimer !== null) {
+      clearTimeout(this.trailingTimer)
+      this.trailingTimer = null
+    }
+
+    try {
+      this.window.contentView.removeChildView(this.view)
+    } catch {
+      // The window may already be gone on shutdown; nothing to reorder.
+    }
+
+    await this.lifecycle.dispose()
+    this.factoryTeardown()
+    await this.watchCoordinator.dispose()
+    this.reloadPolicy.dispose()
+    this.findController.dispose()
+    this.failureLog.drop()
+    this.deps.stillFrameCache.invalidate(this.panelId)
+    this.deps.hostBlockNotifier.clear(this.projectPath)
+    this.deps.registry.revoke(this.token)
+    try {
+      await this.deps.storageSeal.purge(this.session)
+    } catch {
+      // A purge failure on a session being destroyed is not recoverable.
+    }
+
+    if (mode === 'bounded') {
+      await this.boundedDestroy()
+    } else if (!this.wc.isDestroyed()) {
+      this.wc.destroy()
+    }
+  }
+
+  /** Race `close()` against `CLOSE_TIMEOUT_MS`, then force `destroy()` (X21). */
+  private boundedDestroy(): Promise<void> {
+    const wc = this.wc
+    return new Promise<void>((resolvePromise) => {
+      if (wc.isDestroyed()) {
+        resolvePromise()
+        return
+      }
+      let settled = false
+      const finish = (): void => {
+        if (settled) {
+          return
+        }
+        settled = true
+        clearTimeout(timer)
+        resolvePromise()
+      }
+      const timer = setTimeout(() => {
+        if (!wc.isDestroyed()) {
+          wc.destroy()
+        }
+        finish()
+      }, PREVIEW.CLOSE_TIMEOUT_MS)
+      wc.once('destroyed', (() => finish()) as (...args: never[]) => void)
+      try {
+        wc.close()
+      } catch {
+        if (!wc.isDestroyed()) {
+          wc.destroy()
+        }
+        finish()
+      }
+    })
+  }
+}

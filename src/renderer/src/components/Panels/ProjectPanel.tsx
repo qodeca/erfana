@@ -15,6 +15,7 @@ import { PanelErrorBoundary } from './PanelErrorBoundary'
 import { useProjectManagementContextSafe } from '../../context/ProjectManagementContext'
 import type { FilterMode } from '../../types/filters'
 import { openFileInPanel } from '../../utils/openFileInPanel'
+import { resolvePanelKind } from '../../utils/resolvePanelKind'
 import './ProjectPanel.css'
 import { logger } from '../../utils/logger'
 
@@ -72,10 +73,13 @@ export function ProjectPanel(props: ISplitviewPanelProps) {
   /**
    * Opens the selected file in the appropriate panel.
    *
-   * Delegates to the shared router so an image opens in the image viewer and
-   * anything else opens in the editor – the same decision the terminal makes.
+   * Resolves the panel kind first (the async step: a `.html` file may open as a
+   * running preview once the main-side eligibility check passes), then delegates
+   * to the shared router. An eligible `.html` opens as a native preview with its
+   * placeholder kept alive across tab switches; everything else keeps its
+   * pre-#74 behaviour – images in the image viewer, anything else in the editor.
    */
-  const handleFileSelect = (filePath: string) => {
+  const handleFileSelect = async (filePath: string) => {
     // dockviewApi is passed down by the parent through splitview params.
     const dockviewApi = props.params?.dockviewApi as DockviewApi | undefined
 
@@ -84,7 +88,13 @@ export function ProjectPanel(props: ISplitviewPanelProps) {
       return
     }
 
-    openFileInPanel(dockviewApi, filePath)
+    const kind = await resolvePanelKind(filePath)
+    if (kind === 'preview') {
+      openFileInPanel(dockviewApi, filePath, { kind: 'preview', renderer: 'always' })
+      return
+    }
+
+    openFileInPanel(dockviewApi, filePath, { kind })
   }
 
   return (

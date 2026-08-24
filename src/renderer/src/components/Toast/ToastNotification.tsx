@@ -86,6 +86,20 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
       <div className="toast-content">
         <div className="toast-title">{toast.title}</div>
         <div className="toast-message" data-testid={TEST_IDS.TOAST_MESSAGE}>{toast.message}</div>
+        {toast.action && (
+          <button
+            className="toast-action"
+            onClick={() => {
+              // Run the action, then dismiss — an actionable toast is
+              // manual-dismiss (duration 0), so it does not clear on its own.
+              toast.action?.onClick()
+              onClose()
+            }}
+            data-testid={TEST_IDS.TOAST_BTN_ACTION}
+          >
+            {toast.action.label}
+          </button>
+        )}
       </div>
       <button
         className="toast-close"

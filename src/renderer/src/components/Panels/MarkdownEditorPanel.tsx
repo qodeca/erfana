@@ -26,7 +26,8 @@ import { useDialog } from '../Dialog'
 import { useToast } from '../Toast/ToastContext'
 import { useProjectStore } from '../../stores/useProjectStore'
 import { useSearchStore } from '../../stores/useSearchStore'
-import { sanitizeFilePath, getBasename } from '../../utils/fileUtils'
+import { getBasename } from '../../utils/fileUtils'
+import { openFileInPanel } from '../../utils/openFileInPanel'
 import { logger } from '../../utils/logger'
 import { useAutoSave } from '../../hooks/useAutoSave'
 import { useFileWatcher, createFileSaveGuard } from '../../hooks/useFileWatcher'
@@ -426,37 +427,15 @@ export function MarkdownEditorPanel(
       return
     }
 
-    const fileName = extractFileName(targetFilePath)
-    // DEFERRED: migrating this call site to `openFileInPanel` is the optional
-    // commit 6b of the #70 plan and was consciously not taken - it would change
-    // behaviour (an `[x](diagram.svg)` link would open the image viewer instead
-    // of the SVG source in Monaco) with no acceptance criterion asking for it,
-    // and no "Open as text" escape hatch exists yet. Until that lands this stays
-    // the one hand-built panel id in the renderer.
-    // eslint-disable-next-line no-restricted-syntax -- see DEFERRED note above
-    const panelId = `editor-${sanitizeFilePath(targetFilePath)}`
-
-    // Check if already open
-    let editorPanel = dockviewApi.getPanel(panelId)
-
-    if (!editorPanel) {
-      // Create new panel
-      editorPanel = dockviewApi.addPanel({
-        id: panelId,
-        component: 'editor',
-        title: fileName,
-        tabComponent: 'editorTab',
-        params: { filePath: targetFilePath, panelId }
-      })
-      useProjectStore.getState().registerEditorPanel(panelId)
-    }
-
-    // Switch to panel
-    editorPanel.api.setActive()
-    editorPanel.group.focus()
+    // A markdown link is a "show me the source" gesture, so this call site
+    // pins `kind: 'editor'`: `[x](diagram.svg)` or `[x](page.html)` opens in
+    // Monaco, never the image viewer or a running preview. Routing through
+    // `openFileInPanel` retires the renderer's last hand-built panel id (and its
+    // `eslint-disable`) now that #74 ships an explicit "Open as source" path.
+    const editorPanel = openFileInPanel(dockviewApi, targetFilePath, { kind: 'editor' })
 
     // Scroll to anchor if provided
-    if (anchor) {
+    if (anchor && editorPanel) {
       previewHandleRef.current?.scrollToAnchor(anchor)
     }
   }, [showToast])

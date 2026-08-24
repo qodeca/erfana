@@ -107,3 +107,28 @@ export function isMarkdownFile(fileName: string): boolean {
   const lower = fileName.toLowerCase()
   return lower.endsWith('.md') || lower.endsWith('.markdown')
 }
+
+/**
+ * Check if a file is an HTML file by extension.
+ *
+ * Case-insensitive match on `.html` / `.htm`. This is a *display/parse* helper
+ * only – it decides whether a path is a candidate for the running preview and
+ * for the "Open as source" affordance. It is NOT an eligibility check: whether
+ * the file may actually run as a preview is decided main-side by
+ * `window.api.preview.checkEligibility` (design §1.5), which `resolvePanelKind`
+ * calls after this cheap extension gate passes.
+ *
+ * @param fileName - File name or full path to check.
+ * @returns `true` when the file has a `.html` or `.htm` extension.
+ *
+ * @example
+ * ```ts
+ * isHtmlFile('page.html')   // true
+ * isHtmlFile('index.HTM')   // true (case-insensitive)
+ * isHtmlFile('notes.md')    // false
+ * ```
+ */
+export function isHtmlFile(fileName: string): boolean {
+  const lower = fileName.toLowerCase()
+  return lower.endsWith('.html') || lower.endsWith('.htm')
+}

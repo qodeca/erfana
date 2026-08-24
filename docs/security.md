@@ -551,6 +551,64 @@ The `afterSign` hook is critical: without it, macOS Sequoia+ rejects `@rpath` li
 - **Remote-image SSRF strip** – `@turbodocx/html-to-docx` fetches any `http(s)` image `src` at export time (bundled axios). `docxImageStrip.ts` removes remote `<img>`/`<source>` (any URL scheme or protocol-relative source) with a real parser (parse5) before conversion, so the library never issues the request; `data:` and local/relative images are kept. Fail-closed: anything that is not empty, `data:`, or a relative path is stripped. The renderer shows a warning toast with the count.
 - **Process isolation** – conversion runs in a killable Electron `utilityProcess` child (`DocxConvertProcessAdapter` → `docx-convert.process.ts`), so a synchronous hang (malformed image) is terminated at the timeout and cannot freeze the main process, and a decompression bomb is capped to the child's memory. See [Architecture](./architecture.md) § Process isolation for DOCX conversion.
 
+## HTML preview
+
+The HTML preview (#74) executes a project's real CSS and JavaScript in a live page. Shipping execution is a one-way door, so the feature is built as a **sealed box**: the page runs in its own process on its own in-memory session partition, with no channel to Erfana in either direction. This section transcribes the design threat model (`specs/designs/sd-074-html-preview.md` §2.8). The user-facing feature page is [HTML preview](./html-preview/README.md).
+
+### Assets protected
+
+- **A1** – files inside the open project, outside the excluded set.
+- **A2** – files outside the project root.
+- **A3** – Erfana's IPC surface and the main renderer.
+- **A4** – the user's OS account.
+- **A5** – the integrity of `.erfana/settings.json`.
+- **A6** – the user's trust in what the preview pane shows.
+
+### Trust boundaries and attackers
+
+- **T1 – a malicious `.html` in the project** (the primary attacker). It arrives by clone, agent, or download and runs arbitrary JavaScript, including `unsafe-eval`.
+- **T2 – a malicious repository.** It controls `.gitignore`, `.git/config`, `.erfana/`, symlinks, short-name-aliasable filenames and the directory layout *before* the user previews anything.
+- **T3 – a network attacker on an approved host.**
+- **T4 – a compromised approved CDN.**
+
+The load-bearing boundary is that **Erfana exposes no scripted API to the page**: no preload, no `postMessage` endpoint, no bridge, no file-write path. The page's only outward influence is a bounded set of diagnostic signals (console messages, load failures, request metadata, find-in-page counts, one CSS-swap boolean, four enumerated keystrokes), each treated as untrusted data – never executed, never reflected into a response header, always length-bounded and control-character-stripped.
+
+### Sealed-box controls in place
+
+| Control | Assets | Effect |
+|---|---|---|
+| Own process + in-memory session partition, no preload, frozen `sandbox`/`contextIsolation`/`nodeIntegration:false` preferences asserted on the **constructed** value | A3, A4 | Keeps T1 from reaching Erfana IPC or node |
+| `sandbox allow-scripts` opaque origin (a header-only CSP directive) | A4 | `localStorage`/`sessionStorage` throw, `indexedDB` is unavailable – T1 persists nothing |
+| No persistence: in-memory partition (`storagePath === null`), no service workers, purge (`clearStorageData` + `clearCache`) before any Erfana-driven reload | A4 | Nothing survives a reload or an app restart |
+| `erfana-preview://<opaque-token>/<path>` serving, realpath-confined to the project root, `O_NOFOLLOW` + dev/ino identity check + post-resolve exclusion re-check; no filesystem path ever enters a URL | A1, A2 | Defeats symlink escape and the Windows 8.3 short-name alias bypass |
+| Protocol-layer exclusion of dot-prefixed segments and `node_modules`/`dist`/`out`/`coverage`/`.git` | A1 (partial) | Keeps T1 from reading `.git`, `.env`, `.erfana` |
+| Erfana-set CSP built from the project allowlist, applied at a single site, **plus** an independent unfiltered `onBeforeRequest`; per-hop redirect decisions; a hop targeting `erfana-preview:` is always refused | A1 | Two chokepoints gate remote subresources |
+| Host allowlist for remote subresources, grammar rejecting IP literals, `localhost`, `.local`, `.internal` | A4 | Raises the bar on loopback/LAN targets |
+| Watch-set realpath confinement (same gate as the protocol handler) | A2 | Keeps T2 from planting a watch outside the root |
+| `erfanaDirGate` + non-recursive `mkdir` | A5, A2 | Defeats T2's symlinked `.erfana` |
+| Hardened `git check-ignore` (absolute binary path, safe cwd, env allowlist, `core.fsmonitor=`, `core.hooksPath=<null>`) | A4 | Defeats T2's `.git/config` command-execution vector |
+| `setWebRTCIPHandlingPolicy('disable_non_proxied_udp')` | A1 | Narrows WebRTC local-IP exposure only – see accepted risk 3 |
+| `X-DNS-Prefetch-Control: off` | A1 | Suppresses `dns-prefetch`; does **not** cover `preconnect` – see risk 3 |
+| Enumerated 4-shortcut keyboard forwarding, no page↔app channel of any kind | A3 | Bounds the input bridge to a closed list |
+
+### Risks knowingly accepted
+
+These are accepted, not mitigated. The design chose to ship execution with them documented rather than block on closing them.
+
+1. **Any previewed page can read most of your project.** After the exclusion checks, everything under the root whose resolved path has no dot-prefixed segment and is not under `node_modules`/`dist`/`out`/`coverage`/`.git` is readable – all source, docs, notes and data. A secret in `config.json` is readable; one in `.env` is not.
+2. **Exfiltration over an approved host.** The allowlist controls *which* origins, never *what* is sent. A compromised approved CDN (T4) turns any approved host into a channel.
+3. **Exfiltration over channels no chokepoint sees.** `setWebRTCIPHandlingPolicy('disable_non_proxied_udp')` is a local-IP-exposure policy only; it does **not** stop an `RTCPeerConnection` reaching an attacker-controlled TURN server over TCP/443 – no permission gates a data channel, `onBeforeRequest` never observes ICE/TURN traffic, and Chromium does not enforce `connect-src` on WebRTC, so this is a real, unmitigated general-purpose exfiltration channel. `<link rel=preconnect>` opens a real TCP/TLS connection with no HTTP request, so `onBeforeRequest` never fires; ~60 bytes leak per hostname via subdomain labels. DNS prefetch is suppressed by `X-DNS-Prefetch-Control: off`, but a DNS resolution for an allowlist-blocked host may still occur before cancellation. The allowlist is therefore not written as an unqualified guarantee.
+4. **DNS rebinding is not defended.** The grammar rejects literal IPs and `localhost`, but a name that *resolves* to a private address is not detected – no IP pinning between resolution and connection. The residual is blind, fire-and-forget write-side SSRF to loopback/LAN services: the opaque origin means the page cannot read any response, so this is not a read primitive.
+5. **The allowlist is a speed bump, not a wall.** It lives in `.erfana/settings.json` inside the project, so a cloned repository or an agent edit can pre-approve hosts before a human ever sees the prompt.
+6. **Hardlinks defeat path confinement.** `realpath` resolves symlinks but not hardlinks.
+7. **A residual `realpath`→open race.** Narrowed by the post-resolve re-check, not closed – Node has no `openat`.
+8. **UI spoofing (partial mitigation).** The view rect is clamped to the window content area and the panel keeps its tab and toolbar chrome, so the page cannot paint over Erfana's own frame; Erfana never asks for credentials or API keys inside a preview panel. A persistent "Preview – not Erfana" strip is a follow-up.
+9. **Git config keys beyond `core.fsmonitor`.** The hardened invocation overrides the one key known to execute a command during `check-ignore`, bounded by fail-open and by `check-ignore` being the only subcommand run.
+10. **Windows short-name aliases beyond the tested set.** The full-path re-resolve is general, but the alias Windows assigns to a leading-dot name is an unverified implementation-time confirmation item.
+11. **A permanent Chromium attack surface.** Shipping execution makes Chromium advisories a recurring, indefinite obligation for this project.
+
+Two operational breakages are also accepted for this feature: projects on **external or network volumes** (see #60) and the **same project open in two Erfana windows**. Per repository policy, any vulnerability found in this feature after release goes to private advisory reporting, not a public issue.
+
 ## Worker thread security (v0.9.0)
 
 Git status runs in a `worker_threads` Worker – same process memory space, no new sandbox boundary. Security: `validateProjectPath()` in IPC handler before worker; worker also rejects non-absolute paths (defense-in-depth). Native git uses `execFile` with array args (no `shell: true`). Git binary resolved via hardcoded allowlist first.

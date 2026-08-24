@@ -24,8 +24,14 @@ import { AppError, ErrorCode } from '../../shared/errors'
  * where `<displayName>` is the raw filename the user typed and, for the
  * `reserved` reason, `<reasonSuffix>` adds a SECOND user-derived quoted
  * segment: ` — try "<suggestion>"`. Both quoted segments are user-derived.
+ *
+ * `PREVIEW_LOCAL_FILE_MISSING` (Issue #74) carries the user's file path in a
+ * single quoted segment: `"<path>" could not be read`.
  */
-const USER_INPUT_CODES = new Set<ErrorCode>([ErrorCode.INVALID_FILENAME])
+const USER_INPUT_CODES = new Set<ErrorCode>([
+  ErrorCode.INVALID_FILENAME,
+  ErrorCode.PREVIEW_LOCAL_FILE_MISSING
+])
 
 const REDACTION_PLACEHOLDER = '[redacted-filename]'
 

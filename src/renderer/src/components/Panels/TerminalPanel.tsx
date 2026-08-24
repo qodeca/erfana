@@ -40,6 +40,7 @@ import {
 import { useScreenshotCapture } from './TerminalPanel/hooks/useScreenshotCapture'
 import { getBasename } from '../../utils/fileUtils'
 import { openFileInPanel } from '../../utils/openFileInPanel'
+import { resolvePanelKind } from '../../utils/resolvePanelKind'
 import { formatPathsForTerminal, escapePathForShell, type ShellKind } from '../../utils/shellPathEscape'
 import { logger } from '../../utils/logger'
 import { TEST_IDS } from '../../constants/testids'
@@ -270,16 +271,25 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     // takes focus, exactly as before.
     //
     // Behaviour change, intended: an image path now opens the image viewer
-    // instead of Monaco on binary bytes.
+    // instead of Monaco on binary bytes, and an eligible `.html` link opens the
+    // running preview. The `dockviewApi` readiness toast above stays synchronous
+    // so a link click on a not-ready editor still fails fast; only the kind
+    // resolution (which may await `preview:checkEligibility`) is async.
     //
     // TODO(#26): position the cursor on an already-open panel once the editor
     // API can accept a line/column after activation.
-    openFileInPanel(dockviewApi, filePath, {
-      focusOnReuse: false,
-      params: { initialLine: line, initialColumn: column }
+    void resolvePanelKind(filePath).then((kind) => {
+      if (kind === 'preview') {
+        openFileInPanel(dockviewApi, filePath, { kind: 'preview', renderer: 'always' })
+      } else {
+        openFileInPanel(dockviewApi, filePath, {
+          kind,
+          focusOnReuse: false,
+          params: { initialLine: line, initialColumn: column }
+        })
+      }
+      logger.info(`Opened file from terminal link: ${filePath}`, { line, column })
     })
-
-    logger.info(`Opened file from terminal link: ${filePath}`, { line, column })
   }, [dockviewApi])
 
   // Terminal file links hook - enables clickable file paths with smart resolution

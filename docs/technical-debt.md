@@ -469,6 +469,148 @@ The policy as practised: *a file a change adds behaviour to must come in under 5
 
 ---
 
+### 31. Main-side project-switch teardown not wired for HTML preview (#74, 2026-08)
+
+**Severity**: Low
+
+**Impact**: The `subscribeProjectChanged` seam (`preview-handlers.ts`, `PreviewViewService.onProjectChanged`) passes nothing in production — `src/main/index.ts` calls `registerPreviewHandlers` with only `getProjectPath` + `globalSettings`, and no main-side project-changed observable exists (`ProjectService` uses an imperative `setProjectPath`). The renderer's idempotent `preview:close` is the sole teardown owner.
+
+**Problem**: A renderer crash or reload **during** a project switch can strand a running preview against the old root and lock new opens with `PREVIEW_VIEW_LIMIT_REACHED`. Edge case.
+
+**Recommended Solution**: expose a project-changed event from `ProjectService` and wire the seam so main-side teardown does not depend on the renderer surviving the switch.
+
+**Status**: Accepted at QG-6 — fix cost/scope judged greater than the value for this edge case.
+
+---
+
+### 32. HTML-preview CSP skip-and-badge half-wired on the registry path (#74, 2026-08)
+
+**Severity**: Low
+
+**Impact**: `PreviewRootRegistry.ts` calls `buildPreviewCsp(hosts)` without an `onReject` badge sink, so a host rejected at CSP-build time **on the registry path** emits no `allowlist-invalid` badge.
+
+**Problem**: Unreachable in practice — the `PreviewAllowlistStore` validation gate already rejects such hosts before they reach the registry, so this is belt-and-braces only. Recorded as unreachable rather than fixed.
+
+**Status**: Accepted at QG-6 — document-as-unreachable.
+
+---
+
+### 33. HTML-preview main-process memory amplification (#74, 2026-08)
+
+**Severity**: Low
+
+**Impact**: `previewPathResolve.readExactly` buffers up to `PREVIEW.MAX_ASSET_BYTES` (25 MB) per request with no per-session in-flight-bytes budget. Many parallel subresource fetches to large in-project files can transiently pin hundreds of MB.
+
+**Problem**: A self-inflicted DoS on the user's own project — no disclosure, and it aligns with the design's accepted-DoS posture (Erfana bounds its own work per reload, not the page's).
+
+**Recommended Solution**: a per-session in-flight byte ceiling, or streaming the response body instead of buffering.
+
+**Status**: Accepted LOW at QG-7 (security pass).
+
+---
+
+### 34. HTML-preview `about:` allowed for all request types in `decideRequest` (#74, 2026-08)
+
+**Severity**: Low
+
+**Impact**: `previewFilterDecision.decideRequest` allows the `about:` scheme for every request type.
+
+**Problem**: Defense-in-depth only — **not exploitable**: `frame-src 'none'`, the `will-navigate` handler and the sandbox already block it. Narrowing to `data:`/`blob:` only was judged not worth churning security-critical filter code.
+
+**Recommended Solution** (optional): narrow the allowed schemes if this filter is next opened for other reasons.
+
+**Status**: Accepted at QG-7.
+
+---
+
+### 35. HTML-preview `runPipeline` overlapping-run race (#74, 2026-08)
+
+**Severity**: Low
+
+**Impact**: The post-load pipeline (`runPipeline`) can overlap itself when `did-finish-load` events arrive faster than a run completes, despite the reload-interval rate limit.
+
+**Recommended Solution**: add a single-flight guard so a run in progress absorbs a trailing request rather than starting a second concurrent run.
+
+**Status**: Note-and-monitor — surfaced by the QG-8 code review as a LOW race.
+
+---
+
+### 36. HTML-preview `onCrash` reuses the `script-error` failure type (#74, 2026-08)
+
+**Severity**: Low
+
+**Impact**: The crash-handling path emits a failure of type `script-error`, which is a semantic mislabel — a `render-process-gone`/`unresponsive` crash is not a script error, so the failure badge misattributes the cause.
+
+**Recommended Solution**: introduce a distinct crash failure type. A `TODO` marks the spot in `PreviewLiveView`.
+
+**Files**: `PreviewLiveView` (crash handler).
+
+**Status**: Deferred — cosmetic on the badge; recorded so the mislabel is not re-filed as a bug.
+
+---
+
+### 37. HTML-preview failure badge occluded by the native view (#74, 2026-08) — RESOLVED
+
+**Severity**: Low
+
+**Status**: Resolved (2026-08-24, Phase 9/AC20 remediation). The badge indicator moved to the dockview tab (always-DOM chrome the `WebContentsView` never covers), subscribing to the preview store by panelId; its failure-list popover is portalled to `#portal-root` and registers a `menu` occluder, so the native view hides behind the still frame while the list is open. The `TODO(#74)` is gone and no badge renders inside `HtmlPreviewPanel`.
+
+**Files**: `src/renderer/src/components/Tabs/HtmlPreviewTab.tsx`, `src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewFailureBadge.tsx`.
+
+**Status**: Deferred — follow-up to the UX pass.
+
+---
+
+### 38. HTML-preview in-app allowlist view/revoke UI deferred (UX-004, #74, 2026-08)
+
+**Severity**: Low
+
+**Impact**: Settings carries a global on/off only; there is no in-app UI to see or revoke the per-project approved hosts. Removing an approval requires hand-editing `.erfana/settings.json`.
+
+**Problem**: The store/design built **only** `approveHost` (`PreviewAllowlistStore` has `approveHost` + `getHosts`; no revoke method, no list/revoke IPC channel, no bridge). Building the feature is new capability, not unwired plumbing: it needs `store.revokeHost`, `REVOKE`/`LIST` channels + handlers, a preload bridge, a schema, CSP-rebuild-on-revoke, a settings list UI and tests — out of #74 scope. Not release-blocking, since the allowlist is hand-editable.
+
+**Recommended Solution**: file a follow-up issue after #74 merges to build the view/revoke UI and its backend.
+
+**Status**: Deferred to a follow-up issue (QG-8 decision).
+
+---
+
+### 39. `isTrustedSender` duplicated across three copies (#74 design §7.1, 2026-08)
+
+**Severity**: Low
+
+**Impact**: The trusted-sender predicate exists in three copies (the shared `senderValidation.ts`, the `claude-status-handlers.ts` local copy, and the new `ipc/preview/isTrustedPreviewSender.ts`). Each must be kept correct independently.
+
+**Recommended Solution**: consolidate onto one shared predicate when the sender-validation surface is next revisited.
+
+**Status**: Pre-existing debt carried into #74; recorded from design §7.1.
+
+---
+
+### 40. Residual `realpath`→open race in local file serving (#74 design §7.1, 2026-08)
+
+**Severity**: Low
+
+**Impact**: Both the `erfana-preview://` protocol handler and the shared file-read handlers resolve a path with `realpath` and then open it in a separate step; a rename between the two can still race. The HTML-preview post-resolve re-check (§2.4 step 8h) narrows the window but does not close it.
+
+**Problem**: Node has no `openat`, so there is no atomic resolve-and-open primitive. The dev/ino compare pins the identity of the *opened* handle, not of a future name resolution.
+
+**Status**: Accepted — recorded from #74 design §7.1; the same residual class as the general file-read path.
+
+---
+
+### 41. Hardlinks defeat path confinement (#74 design §7.1, 2026-08)
+
+**Severity**: Low
+
+**Impact**: `realpath` resolves symlinks but not hardlinks, so a hardlink inside the project pointing at a file outside the excluded set (or, in principle, at content the confinement is meant to keep out) is not detected by the confinement gate.
+
+**Problem**: There is no portable way to detect a hardlink escape at open time; the exposure is bounded by the same read-only, opaque-origin posture as the rest of the preview.
+
+**Status**: Accepted — recorded from #74 design §7.1 and the §2.8 threat model (accepted risk 6).
+
+---
+
 ## Code Quality Improvements
 
 ### Documentation Token Efficiency
@@ -546,4 +688,4 @@ Amendment discipline + promotion-rule conventions in [`windows/contributing.md`]
 
 ---
 
-**Last Updated**: doc-sweep follow-up (2026-08-23 – the editor-stub inlining moved from *Remaining* to *Completed* under Documentation Token Efficiency, verified on disk: the three stubs are gone, their content is in `docs/editor/README.md`, and both inbound refs are repointed; entry #7's `checks.yml`, release-skill and `README.md` citations converted from line numbers to section/step names after the checks.yml numbers were found stale) + doc-accuracy sweep (2026-08-23 – entry #5 repointed from the deleted `e2e/fixtures.ts` to `e2e/fixtures/index.ts` and its dead line ranges replaced with fixture names; entries #7, #13 and #26 re-measured: `security.md` 626 → 661, `scripts/fuses.js` ~1,040 → ~1,715, `scripts/fuses.test.mjs` ~835 → ~1,758, `file-handlers.ts` 601 → 626) + #70 stale preview tabs (2026-08-23 – entries #24–#30 added from the design's accepted-debt ledger and the review rounds: text-only `watchFile` confinement, the `file:getStats` carve-out and its clean fix, the post-#70 over-cap file measurements, genuine deletes not re-arming, the `useFileWatcher` indicator timer, duplicated `IMAGE_EXTENSIONS`, and five smaller accepted trade-offs) + #60 large-project crash + error containment (2026-08-11 – entries #18–#23 added from the change-set reviews: dead `useDragDropTree` API surface, inert `vitest.renderer.ts` coverage block, `test:cov` workspace fan-out, no tsconfig over `e2e/`, shared renderer HTML entry, `ThrottledWorker.workMany` spread-push) + #55 extra-content packaging guards (2026-08-09 – entry #14 added: `assertResourcesSiblingsAllowlist` advisory-on-Windows watch item) + #43 packaging allowlist QG-11a remediation (2026-08-09 – entry #13 added: `scripts/fuses.js` size after the allowlist block; `resolvePackedResourcesDir` call-site count corrected to four) + v0.17.0 doc sweep (2026-08-08 – entry #4 resolved: `LanguageSelect` `id` prop; entries #7, #8, #10 re-measured against the v0.17.0 tree) + #42 camera mirror + dialog focus work (2026-08-07 – entry #3 resolved: BaseDialog `trapFocus`) + PR #245 (2026-06-13 – entry #12 live-verification updated: single-panel detection + mid-session model-switch verified on a Windows host) + #217 Windows Claude status bar (2026-06-10 — entry #12 added: Windows v1 detector limitations) + v0.14.0 doc sweep (2026-06-08 — entries #9 + #10 added from `Transcription/CLAUDE.md` eviction) + v0.9.6 release (2026-05-22 — critical macOS terminal fix `ea3eaf1`) + v0.9.5 release (2026-04-25) + Phase I branch protection refinement (PR requirement removed same day) + entry #7 documenting `security.md` cap constraint (2026-04-25)
+**Last Updated**: #74 HTML preview (2026-08-24 – entries #31–#41 added from the Phase 6/7/8 accepted-tech-debt ledger and the design §7.1 pre-existing items: main-side project-switch teardown unwired, CSP skip-and-badge unreachable on the registry path, main-process memory amplification, `about:` allowed for all request types, `runPipeline` overlapping-run race, `onCrash` reusing `script-error`, the failure badge occluded by the native view, the deferred in-app allowlist view/revoke UI, `isTrustedSender` triplication, the residual `realpath`→open race, and hardlinks defeating confinement) + doc-sweep follow-up (2026-08-23 – the editor-stub inlining moved from *Remaining* to *Completed* under Documentation Token Efficiency, verified on disk: the three stubs are gone, their content is in `docs/editor/README.md`, and both inbound refs are repointed; entry #7's `checks.yml`, release-skill and `README.md` citations converted from line numbers to section/step names after the checks.yml numbers were found stale) + doc-accuracy sweep (2026-08-23 – entry #5 repointed from the deleted `e2e/fixtures.ts` to `e2e/fixtures/index.ts` and its dead line ranges replaced with fixture names; entries #7, #13 and #26 re-measured: `security.md` 626 → 661, `scripts/fuses.js` ~1,040 → ~1,715, `scripts/fuses.test.mjs` ~835 → ~1,758, `file-handlers.ts` 601 → 626) + #70 stale preview tabs (2026-08-23 – entries #24–#30 added from the design's accepted-debt ledger and the review rounds: text-only `watchFile` confinement, the `file:getStats` carve-out and its clean fix, the post-#70 over-cap file measurements, genuine deletes not re-arming, the `useFileWatcher` indicator timer, duplicated `IMAGE_EXTENSIONS`, and five smaller accepted trade-offs) + #60 large-project crash + error containment (2026-08-11 – entries #18–#23 added from the change-set reviews: dead `useDragDropTree` API surface, inert `vitest.renderer.ts` coverage block, `test:cov` workspace fan-out, no tsconfig over `e2e/`, shared renderer HTML entry, `ThrottledWorker.workMany` spread-push) + #55 extra-content packaging guards (2026-08-09 – entry #14 added: `assertResourcesSiblingsAllowlist` advisory-on-Windows watch item) + #43 packaging allowlist QG-11a remediation (2026-08-09 – entry #13 added: `scripts/fuses.js` size after the allowlist block; `resolvePackedResourcesDir` call-site count corrected to four) + v0.17.0 doc sweep (2026-08-08 – entry #4 resolved: `LanguageSelect` `id` prop; entries #7, #8, #10 re-measured against the v0.17.0 tree) + #42 camera mirror + dialog focus work (2026-08-07 – entry #3 resolved: BaseDialog `trapFocus`) + PR #245 (2026-06-13 – entry #12 live-verification updated: single-panel detection + mid-session model-switch verified on a Windows host) + #217 Windows Claude status bar (2026-06-10 — entry #12 added: Windows v1 detector limitations) + v0.14.0 doc sweep (2026-06-08 — entries #9 + #10 added from `Transcription/CLAUDE.md` eviction) + v0.9.6 release (2026-05-22 — critical macOS terminal fix `ea3eaf1`) + v0.9.5 release (2026-04-25) + Phase I branch protection refinement (PR requirement removed same day) + entry #7 documenting `security.md` cap constraint (2026-04-25)

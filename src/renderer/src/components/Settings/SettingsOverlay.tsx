@@ -10,7 +10,9 @@ import { TranscriptionBackendSchema, WhisperModelSchema } from '../../../../shar
 import type { WhisperModel } from '../../../../shared/ipc/transcription-schema'
 import { LOCAL_WHISPER } from '../../../../shared/constants'
 import { logger } from '../../utils/logger'
+import { useOccluder } from '../../hooks/useOccluder'
 import { TEST_IDS } from '../../constants/testids'
+import { HtmlPreviewSection } from './sections/HtmlPreviewSection'
 import './SettingsOverlay.css'
 
 // Small delay to ensure overlay is fully rendered before focusing
@@ -59,6 +61,12 @@ const WHISPER_MODEL_OPTIONS: { value: WhisperModel; label: string }[] =
  */
 export function SettingsOverlay() {
   const { isOpen, closeSettings } = useSettingsStore()
+
+  // Register a 'settings' occluder while the overlay is open so the native
+  // preview WebContentsView hides behind a still frame (design §1.8). Called
+  // unconditionally before any early return; useOccluder no-ops while inactive.
+  useOccluder('settings', isOpen)
+
   const {
     settings,
     updateLoggingLevel,
@@ -591,6 +599,8 @@ export function SettingsOverlay() {
                 </>
               )}
             </section>
+
+            <HtmlPreviewSection />
           </div>
         </div>
       </div>

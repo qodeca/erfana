@@ -110,6 +110,57 @@ describe('openFileInPanel', () => {
     })
   })
 
+  describe('Explicit kind', () => {
+    it('opens the running preview on the htmlPreview component with renderer "always"', () => {
+      const { api, addPanel } = makeApi()
+
+      openFileInPanel(api, '/proj/page.html', { kind: 'preview', renderer: 'always' })
+
+      expect(addPanel).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: expect.stringMatching(/^preview-/),
+          component: 'htmlPreview',
+          tabComponent: 'htmlPreviewTab',
+          renderer: 'always'
+        })
+      )
+    })
+
+    it('defaults preview panels to renderer "always" without an explicit override', () => {
+      const { api, addPanel } = makeApi()
+
+      openFileInPanel(api, '/proj/page.html', { kind: 'preview' })
+
+      expect(addPanel).toHaveBeenCalledWith(
+        expect.objectContaining({ component: 'htmlPreview', renderer: 'always' })
+      )
+    })
+
+    it('forces the editor for an image path when kind is "editor" (Open as source)', () => {
+      const { api, addPanel } = makeApi()
+
+      openFileInPanel(api, '/proj/diagram.svg', { kind: 'editor' })
+
+      expect(addPanel).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: expect.stringMatching(/^editor-/),
+          component: 'editor',
+          tabComponent: 'editorTab'
+        })
+      )
+    })
+
+    it('leaves non-preview panels on the default renderer (undefined)', () => {
+      const { api, addPanel } = makeApi()
+
+      openFileInPanel(api, '/proj/notes.md', { kind: 'editor' })
+
+      expect(addPanel).toHaveBeenCalledWith(
+        expect.objectContaining({ component: 'editor', renderer: undefined })
+      )
+    })
+  })
+
   describe('New panels', () => {
     it('registers the panel, activates it and takes focus', () => {
       const { api, setActive, focus } = makeApi()

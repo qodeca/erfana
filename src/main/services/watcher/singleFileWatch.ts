@@ -53,14 +53,21 @@ export interface SingleFileWatchHandlers {
  *
  * The options object is copied (including the nested `awaitWriteFinish`) so a
  * chokidar-internal default fill-in can never mutate the shared constant.
+ *
+ * `overrides` shallow-merges over the base options after the copy, so a caller
+ * (the HTML preview watch pool) can lower `awaitWriteFinish` timings without
+ * touching the security-load-bearing `followSymlinks: false` / `disableGlobbing`
+ * invariants, which remain in the base. Omitted ⇒ behaviour is byte-identical.
  */
 export function createSingleFileWatcher(
   filePath: string,
-  handlers: SingleFileWatchHandlers
+  handlers: SingleFileWatchHandlers,
+  overrides?: Partial<WatchOptions>
 ): FSWatcher {
   const watcher = chokidar.watch(filePath, {
     ...SINGLE_FILE_WATCH_OPTIONS,
-    awaitWriteFinish: { ...(SINGLE_FILE_WATCH_OPTIONS.awaitWriteFinish as object) }
+    awaitWriteFinish: { ...(SINGLE_FILE_WATCH_OPTIONS.awaitWriteFinish as object) },
+    ...overrides
   })
 
   watcher.on('change', handlers.onChange)
