@@ -1,5 +1,7 @@
 # Deferred work — Phase 2 review aftermath
 
+> **Note**: issue and PR numbers, commit SHAs, release tags and CI run links below predate the 2026-06 open-source migration and no longer resolve on `qodeca/erfana`; they are retained as provenance.
+
 **GitHub-tracked under [#168](https://github.com/qodeca/erfana/issues/168)** (meta-issue indexing all D1–D8 items by target phase). Close that issue when all items here are resolved or accepted as won't-fix.
 
 This document tracks every item that surfaced during the four-reviewer audit of Phase 2 (#160–#163) and was **explicitly deferred** rather than fixed in the same commit. Each entry has:
@@ -20,7 +22,7 @@ This ledger covers **D1-D8** (Phase 2 review aftermath). **D9-D12** (Phase 4 aud
 
 | Phase | Items |
 |---|---|
-| **Phase 4** (whisper, OCP cleanup window) | ~~D1 `resolvePlatformBinary` extraction~~ (amended 2026-04-21 — whisper is not a probe-style caller; see D1 for revised promotion rule), D2 `MAX_FILENAME_LENGTH` consolidation, D3 `ExportLock` deduplication |
+| **Phase 4** (whisper, OCP cleanup window) | ~~D1 `resolvePlatformBinary` extraction~~ (amended 2026-04-21 — whisper is not a probe-style caller; see D1 for revised promotion rule), D2 `MAX_FILENAME_LENGTH` consolidation, D3 `ExportLock` deduplication (**half-done 2026-08-24**: shared module extracted by #73, `PdfService`/`DocxService` not yet re-pointed — see [technical-debt #31](../technical-debt.md)) |
 | **Phase 5** (distribution + signing) | D6 `DependencyDetector` cache TTL |
 | **Phase 6** (polish + CI guard) | ~~D5 Log-redaction pass for filename PII~~ (✅ RESOLVED 2026-06-05, `feature/windows-phase-6-polish`), ~~D7 Filename PII 40-char truncation review~~ (✅ RESOLVED 2026-06-05, bundled with D5). D4 Structured-error IPC serialization — **promoted to its own ticket** ([#220](https://github.com/qodeca/erfana/issues/220)) (design review found it larger/riskier than the umbrella implied; still deferred, now the active D-item). **Phase 4 items**: see [`deferred-work-phase4.md`](deferred-work-phase4.md) for D11 (ISP split of `IWhisperModelManager`) and D12 (rewrite the 5 skipped `WhisperModelManager.test.ts` cases). |
 | **Tracked-only** (no scheduled phase) | D8 IPC serialization ADR. **Phase 4 items**: see [`deferred-work-phase4.md`](deferred-work-phase4.md) for D9 (forensic-logging correlation ID) and D10 (`WhisperPlatform` tagged-union refactor, triggers when a 3rd platform lands). |
@@ -32,9 +34,9 @@ This ledger covers **D1-D8** (Phase 2 review aftermath). **D9-D12** (Phase 4 aud
 **Severity:** MEDIUM (architecture-reviewer M1, solution-reviewer SR-005)
 **Source:** Architecture — "Extract `resolvePlatformBinary` NOW, not in Phase 4"
 **Files implicated:**
-- `src/main/services/workers/git-status.worker.ts:36-51` (`buildWin32GitPaths` + `WIN32_GIT_PATHS` + `POSIX_GIT_PATHS`) + `:204-245` (`isExecutableGit` + call site)
-- `src/main/services/import/DependencyDetector.ts:17-20` (`WIN32_LIBREOFFICE_PATHS`)
-- `src/main/services/watcher/PlatformConfig.ts:194-201` (Phase 4 OCP comment block)
+- `src/main/services/workers/git-status.worker.ts:38-54` (`buildWin32GitPaths` + `WIN32_GIT_PATHS` + `POSIX_GIT_PATHS`) + `:377-409` (`isExecutableGit` + call site)
+- `src/main/services/import/DependencyDetector.ts:19-22` (`WIN32_LIBREOFFICE_PATHS`)
+- `src/main/services/watcher/PlatformConfig.ts:196-201` (Phase 4 OCP comment block)
 
 ### What
 
@@ -100,9 +102,9 @@ These are the three load-bearing features `resolvePlatformBinary` was designed f
 **Severity:** LOW (architecture-reviewer L1)
 **Source:** Architecture — "MAX_FILENAME_LENGTH in three places with three values"
 **Files:**
-- `src/main/utils/validateFilename.ts:69` → `255` (filesystem byte/char limit)
-- `src/main/services/DocxService.ts:97` → `200` (`.docx` extension headroom)
-- `src/main/services/PdfService.ts:628` → `200` (`.pdf` extension headroom)
+- `src/main/utils/validateFilename.ts:71` → `255` (filesystem byte/char limit)
+- `src/main/services/DocxService.ts:100` → `200` (`.docx` extension headroom)
+- `src/main/services/PdfService.ts:631` → `200` (`.pdf` extension headroom)
 
 ### What
 
@@ -135,13 +137,25 @@ NIL — pure cleanup.
 
 ## D3 — Deduplicate `ExportLock` (Pdf + Docx)
 
+**Status:** HALF-DONE 2026-08-24 (#73) — the shared module now exists and has one consumer; the two older services were not re-pointed. Remaining work is tracked as entry #31 in [`../technical-debt.md`](../technical-debt.md). Details in the amendment below.
+
 **Severity:** LOW (architecture-reviewer L)
 **Source:** Architecture — "`ExportLock` duplicated verbatim across PdfService + DocxService"
 **Files:**
-- `src/main/services/PdfService.ts:411-438`
-- `src/main/services/DocxService.ts:20-48`
+- `src/main/utils/ExportLock.ts` — **the shared module, created 2026-08-24 by #73**
+- `src/main/services/imageExport/ImageExportService.ts` — imports it
+- `src/main/services/PdfService.ts` — still declares its own copy inline
+- `src/main/services/DocxService.ts` — still declares its own copy inline
 
-### What
+### 2026-08-24 amendment — the promotion criterion fired, and half the work landed
+
+The stated trigger, *"a third service needs an export lock"*, happened: issue #73's image export opens a hidden window, allocates a large canvas and drives `printToPDF`, so it needs the same single-slot mutex. Rather than copy the class a third time, #73 **created the shared module** — at `src/main/utils/ExportLock.ts`, not the `Mutex.ts` name proposed below — with its own test file, and pointed the new service at it.
+
+Re-pointing `PdfService` and `DocxService` was deliberately **not** done in the same change: it touches two unrelated export paths that each carry their own suites, inside a PR that is otherwise about the image viewer. So the duplication count is unchanged at two, and the extraction half of this item is now complete.
+
+**What remains** is only the swap: delete the inline class from both older services and import the shared one. Behaviour is identical — the shared class was extracted verbatim — so their existing suites are the regression gate. Tracked as entry **#31** in [`../technical-debt.md`](../technical-debt.md), which is where the remaining work should be read from; this entry stays for provenance.
+
+### What (as originally proposed)
 
 Move `ExportLock` to `src/main/utils/Mutex.ts` (or similar). Both services import.
 
@@ -153,19 +167,18 @@ Move `ExportLock` to `src/main/utils/Mutex.ts` (or similar). Both services impor
 
 ### Cost when promoted
 
-~1 hour:
-- Extract `Mutex` class with own tests (existing tests in PdfService/DocxService cover behavior)
-- Replace both inline classes with imports
+~30 minutes for what is left (the extraction and its tests are done):
+- Replace both inline classes with `import { ExportLock } from '../utils/ExportLock'`
 - Verify `npm run test:main` clean
 
 ### Promotion criteria
 
-- A third service needs an export lock
+- ~~A third service needs an export lock~~ — **met** 2026-08-24 (`ImageExportService`); the extraction was done, the swap was not
 - Or any non-trivial change to either ExportLock instance (drift becomes inevitable)
 
 ### Risks if forgotten
 
-LOW — duplication is stable; both copies have stayed in sync.
+LOW → **MEDIUM**. While there were two copies they stayed in sync by symmetry. There are now three declarations of the same class and one of them is canonical, so the next reader has to work out which — and a fix applied to the shared module will not reach the PDF or DOCX export paths.
 
 ---
 
@@ -178,7 +191,7 @@ LOW — duplication is stable; both copies have stayed in sync.
 ### 2026-06-05 design-review findings
 
 - **Recommended transport is Option B (return-object), not a message-string prefix.** The 3 filename handlers (`createFile` / `createFolder` / `rename`) should **return** a structured `{ ok, data, error: { code } }` object instead of throwing — `invoke` resolves objects with their props intact, and the renderer reads `result.error.code`. A message-string prefix would just re-introduce a string sentinel (the very thing this item exists to retire). This narrows Option B's original "~50 handlers, breaking change" framing to the 3 filename handlers as the first slice.
-- **`INVALID_FILENAME_MARKER` has a wider consumer list than the H3 fix suggested.** The marker is also used to *build the thrown message* in `validateFilename.ts:54,217` and is asserted by tests in `validateFilename.test.ts`. Full consumer list spans **~8 code files plus docs** (`docs/glossary.md`, `docs/error-codes.md`, `docs/windows/implementation-plan.md`, `phase2-closure.md`). Any retirement must update all of these in lockstep.
+- **`INVALID_FILENAME_MARKER` has a wider consumer list than the H3 fix suggested.** The marker is also used to *build the thrown message* in `validateFilename.ts:56,219` and is asserted by tests in `validateFilename.test.ts`. Full consumer list spans **~8 code files plus docs** (`docs/glossary.md`, `docs/error-codes.md`, `docs/windows/implementation-plan.md`, `docs/archive/phase2-closure-2026-04.md`). Any retirement must update all of these in lockstep.
 
 ### What
 
@@ -289,7 +302,7 @@ Audit log calls that propagate `AppError` objects derived from user input. Add a
 
 **Severity:** LOW (security-auditor + solution-reviewer)
 **Source:** Security + solution — "Cache is permanent for the session"
-**File:** `src/main/services/import/DependencyDetector.ts:38-60` (`cachedResult` field + `detectDependencies` cache check)
+**File:** `src/main/services/import/DependencyDetector.ts:40,53` (`cachedResult` field at `:40`; the cache check is in `detect()` at `:53` — there is no `detectDependencies` method)
 
 ### What
 
@@ -326,7 +339,7 @@ Today, `cachedResult` lives forever once set. If LibreOffice is uninstalled mid-
 
 **Severity:** LOW (security-auditor)
 **Source:** Security
-**File:** `src/main/utils/validateFilename.ts:215` (`name.slice(0, 37)`)
+**File:** `src/main/utils/validateFilename.ts:217` (`name.slice(0, 37)`)
 
 ### What
 
@@ -395,7 +408,7 @@ Re-read this document at the start of:
 - Any change to a file referenced above (re-evaluate the deferral)
 
 Historical triage points (no longer applicable):
-- ~~Phase 4 implementation (D1 + D2 + D3 trigger)~~ — Phase 4 shipped in v0.9.4 without triggering D1/D2/D3 (D1 amended 2026-04-21, see entry; D2/D3 re-evaluate when a probe-style caller surfaces).
+- ~~Phase 4 implementation (D1 + D2 + D3 trigger)~~ — Phase 4 shipped in v0.9.4 without triggering D1/D2/D3 (D1 amended 2026-04-21, see entry). **D3 has since fired**: issue #73 became the third `ExportLock` consumer on 2026-08-24 and extracted the shared module, leaving only the swap in `PdfService`/`DocxService` — see the D3 entry and [technical-debt #31](../technical-debt.md). D2 re-evaluates when a third service needs filename truncation.
 - ~~Pre-0.9.4 PR merge (D12 promotion-criteria check)~~ — D12 was resolved 2026-04-23 (`fb3365e`); see [`deferred-work-phase4.md`](deferred-work-phase4.md).
 
 ### How to retire an item

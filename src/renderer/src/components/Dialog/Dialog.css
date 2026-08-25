@@ -133,10 +133,21 @@
   outline-offset: var(--space-1);
 }
 
-/* Primary button (confirm, submit) */
+/* Primary button (confirm, submit).
+ *
+ * Foreground is --color-brand-black, NOT --color-white: the brand violet
+ * (#A0A8FF) is a light tint, so white-on-violet measures 2.2:1 and fails
+ * WCAG 1.4.3 (4.5:1 required for normal-size text). #161312 on the same violet
+ * measures 8.4:1. This follows the precedent already in the repo —
+ * SettingsOverlay.css draws its toggle checkmark in #161312 on this violet.
+ *
+ * The hover/active rules below never restate `color`, so both inherit this
+ * foreground. :hover swaps in --color-brand-violet-hover (#8b94ff) → 6.85:1.
+ * :active changes only transform/box-shadow, so it keeps whichever background
+ * is current — in practice the hover one, i.e. the same 6.85:1. Both pass. */
 .dialog-btn-primary {
   background-color: var(--dialog-btn-primary-bg);
-  color: var(--color-white);
+  color: var(--color-brand-black);
   box-shadow: var(--shadow-sm);
 }
 
@@ -151,7 +162,16 @@
   box-shadow: var(--shadow-xs);
 }
 
-/* Danger button (delete, destructive actions) */
+/* Danger button (delete, destructive actions).
+ *
+ * --color-white on --color-btn-danger-bg (#c72e0f) measures 5.49:1, and on the
+ * hover background (#ad280d) 6.80:1 — both clear of WCAG 1.4.3's 4.5:1 for
+ * normal-size text. The hover token is DARKER than the resting one on purpose:
+ * it used to be lighter (#e03e18, 4.31:1), which made the label harder to read
+ * exactly while the pointer was on it, on a button that is often the only
+ * control on screen (Cancel during an import or transcription). Like the
+ * primary variant, the hover/active rules never restate `color`, and :active
+ * changes only transform/box-shadow. */
 .dialog-btn-danger {
   background-color: var(--dialog-btn-danger-bg);
   color: var(--color-white);
@@ -181,7 +201,12 @@
   border-color: var(--color-gray-700);
 }
 
-/* Disabled state */
+/* Disabled state. Shared by all three variants: only the opacity changes, so
+ * each variant keeps its own foreground. WCAG 1.4.3 exempts inactive controls
+ * from the contrast minimum; for the record, .dialog-btn-primary composited at
+ * this opacity over --color-bg-primary measures 2.35:1 with the #161312
+ * foreground against 1.62:1 with the old white one, so the change improves the
+ * disabled state as well. */
 .dialog-btn:disabled {
   opacity: var(--opacity-disabled);
   cursor: not-allowed;

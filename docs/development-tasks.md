@@ -43,10 +43,13 @@ For fixed sidebars (Project, Git, Terminal) that don't need tabbing:
 
 **Wrapper Pattern** (recommended for panels with headers/controls):
 
-1. Create wrapper component with header + controls:
+1. Create wrapper component with header + controls, wrapping the panel's content in a `PanelErrorBoundary`:
    ```typescript
    const MyPanel = (props: ISplitviewPanelProps) => {
      const [showControl, setShowControl] = useState(true)
+     // SAFE accessor: the panel needs the path only to key the boundary, which
+     // is not worth making it unrenderable outside the provider.
+     const projectPath = useProjectManagementContextSafe()?.projectPath ?? null
 
      return (
        <div className="my-panel">
@@ -56,11 +59,15 @@ For fixed sidebars (Project, Git, Terminal) that don't need tabbing:
            <ChevronDown onClick={() => setShowControl(!showControl)} />
          </div>
          {showControl && <div className="control-panel">{/* Controls */}</div>}
-         <MyContentComponent {...props} />
+         <PanelErrorBoundary key={projectPath ?? 'none'} componentName="My panel">
+           <MyContentComponent {...props} />
+         </PanelErrorBoundary>
        </div>
      )
    }
    ```
+
+   > **The `key` is not optional.** Without it a panel that threw while project A was open keeps showing "unavailable" after the user switches to project B – React reuses the same boundary instance and error state survives the content swap. Key the boundary by whatever scopes its content (the project path for project-scoped panels; a document or terminal id elsewhere) so a new scope remounts it clean. The boundary itself is what turns a defect in one panel into a degraded panel rather than a blank window (#60). `PanelErrorBoundary` lives in `src/renderer/src/components/Panels/PanelErrorBoundary.tsx`; see [UI Components – Error containment](./ui-components.md#error-containment).
 
 2. Register in `splitviewComponents` in `AppDockLayout.tsx`:
    ```typescript
@@ -79,7 +86,7 @@ For fixed sidebars (Project, Git, Terminal) that don't need tabbing:
    })
    ```
 
-**Example**: See `ProjectPanel.tsx` (wrapper) + `ProjectTree.tsx` (content)
+**Example**: See `ProjectPanel.tsx` (wrapper – header, filter controls, and the `<PanelErrorBoundary key={projectPath ?? 'none'} componentName="Project tree">` around the tree) + `ProjectTree.tsx` (content)
 
 ### Adding Dockview Panel (Editor Tab)
 
@@ -88,13 +95,20 @@ For editor tabs that should appear in the center area:
 1. Create panel component:
    ```typescript
    const MyEditorPanel = (props: IDockviewPanelProps) => {
-     return <div>My Editor Content</div>
+     return (
+       <PanelErrorBoundary key={props.params.filePath} componentName="My editor">
+         <div>My Editor Content</div>
+       </PanelErrorBoundary>
+     )
    }
    ```
 
+   > Note: dockview panels are **not** contained by default – a throw here escalates straight to the root error boundary and replaces the whole window with the recovery screen. Wrap the panel's content in `PanelErrorBoundary` as above, keyed by whatever scopes it (the file path for a document panel), so the failure degrades to that one tab; without the key a tab that failed on file A still reads "unavailable" after the user opens file B in it. Same rule and rationale as the Splitview path above (#60) – see [UI Components – Error containment](./ui-components.md#error-containment).
+
    > Note: panel content is non-selectable by default – dockview applies `user-select: none` to panel chrome and the rule cascades into your component. To make a data-bearing surface inside your panel selectable, add its selector to the grouped rule in `src/renderer/src/styles/utilities.css` and add a row to `src/renderer/src/styles/userSelect.audit.test.ts`. See [Text selection policy](./ui-style-guide.md#text-selection-policy) for the decision rules and the CSS-module exception (`.metadataItem` / `.errorMessage` in `ImageViewerPanel.module.css` stay in-place because build-time class-name hashing prevents the central selector from matching them).
 
-2. Register in `editorComponents` inside `EditorAreaSplitPanel`:
+2. Register in `editorComponents` inside `EditorAreaSplitPanel`
+   (`src/renderer/src/components/DockLayout/components/EditorAreaSplitPanel.tsx`):
    ```typescript
    const editorComponents = {
      myEditor: MyEditorPanel
@@ -111,9 +125,19 @@ For editor tabs that should appear in the center area:
    })
    ```
 
+4. If your panel needs to survive – or be skipped by – a "close all editor tabs"
+   sweep, match it by a **constant**, not a string literal. The welcome panel is
+   the existing case: its id lives in `src/renderer/src/constants/panels.ts` as
+   `WELCOME_PANEL_ID` (`'_center-placeholder'`), and `EditorAreaSplitPanel`,
+   `components/Tabs/tabOperations.ts` and `stores/useProjectStore.ts` all import
+   it rather than retyping the string – which is exactly what they used to do.
+   Add a new constant beside it if your panel needs the same treatment. Ids for
+   ordinary file panels are derived, not hard-coded: see
+   `src/renderer/src/utils/openFileInPanel.ts`.
+
 **Note**: The center `EditorAreaSplitPanel` contains the DockviewReact instance. File opening happens via `dockviewApi` passed through params.
 
-See: [Architecture](./architecture.md#hybrid-layout-architecture) | [UI Components](./ui-components.md#panel-communication-pattern)
+See: [Architecture](./architecture.md#hybrid-layout-architecture) | [UI Components](./ui-components.md#panel-communication)
 
 ## Adding import converters
 
@@ -238,7 +262,7 @@ localStorage.removeItem('erfana-sidebar-state')
 
 Protection is automatic - click interception and auto-restore work immediately.
 
-See: [UI Components](./ui-components.md#panel-protection)
+See: [UI Components](./ui-components.md#panel-toggle-system)
 
 ## Creating Prompt Templates
 
@@ -428,20 +452,5 @@ File and directory watching with chokidar provides automatic refresh on external
 - Pause/resume pattern - internal CRUD operations don't trigger duplicate refreshes
 
 See: [File Watching](./file-watching/README.md) for detailed testing instructions
-
-## Debugging
-
-- **Main Process**: Terminal output (`console.log`)
-- **Renderer**: Chrome DevTools (F12 in app)
-- **IPC**: Log both sides to trace calls
-- **Hot Reload**: Save file → automatic reload
-
-## Integrating New NPM Package
-
-1. `npm install package-name`
-2. Import where needed:
-   - Main/Preload: Direct import
-   - Renderer: Standard React import
-3. Add types if needed: `npm install -D @types/package-name`
 
 See: [Architecture](./architecture.md) | [IPC Patterns](./ipc-patterns.md) | [UI Components](./ui-components.md)

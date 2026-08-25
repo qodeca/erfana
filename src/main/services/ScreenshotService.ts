@@ -26,12 +26,14 @@
  * @see Issue #164 lens-review F[8], F[10], F[16], F[31] - Phase 3 refactor
  */
 
+import { systemPreferences } from 'electron'
 import { ErrorCode } from '../../shared/errors'
 import { WINDOW_PICKER } from '../../shared/constants'
 import type {
   DisplayInfo,
   EnumerateWindowsRequest,
   EnumerateWindowsResponse,
+  ScreenRecordingPermission,
   ScreenshotCapabilities,
   ScreenshotCaptureRequest,
   ScreenshotCaptureResponse,
@@ -67,12 +69,16 @@ class UnsupportedCapturer implements IScreenshotCapturer {
 export interface IScreenshotService {
   getDisplays(): DisplayInfo[]
   getCapabilities(): ScreenshotCapabilities
+  getScreenRecordingPermission(): ScreenRecordingPermission
   enumerateWindows(options?: EnumerateWindowsRequest): Promise<EnumerateWindowsResponse>
   capture(request: ScreenshotCaptureRequest): Promise<ScreenshotCaptureResponse>
 }
 
 class ScreenshotService implements IScreenshotService {
-  constructor(private readonly capturer: IScreenshotCapturer) {}
+  constructor(
+    private readonly capturer: IScreenshotCapturer,
+    private readonly platform: NodeJS.Platform = process.platform
+  ) {}
 
   getDisplays(): DisplayInfo[] {
     return listDisplays()
@@ -87,6 +93,19 @@ class ScreenshotService implements IScreenshotService {
    */
   getCapabilities(): ScreenshotCapabilities {
     return this.capturer.getCapabilities()
+  }
+
+  /**
+   * Advisory macOS Screen Recording status, read from Electron's
+   * `systemPreferences.getMediaAccessStatus('screen')`. The renderer uses this
+   * ONLY to enrich the failure-path dialog — never to gate a capture. A stale
+   * in-process read (Electron #36722) must never block a granted user, so the
+   * capture attempt always proceeds regardless of this value. Non-macOS
+   * platforms report `'unknown'` (they have no screen-recording TCC gate).
+   */
+  getScreenRecordingPermission(): ScreenRecordingPermission {
+    if (this.platform !== 'darwin') return 'unknown'
+    return systemPreferences.getMediaAccessStatus('screen') as ScreenRecordingPermission
   }
 
   /**
@@ -139,8 +158,11 @@ export function pickCapturer(platform: NodeJS.Platform): IScreenshotCapturer {
  * Replaces the module-eval singleton that previously froze the platform
  * choice at import time (#164 F[8]).
  */
-export function createScreenshotService(capturer?: IScreenshotCapturer): IScreenshotService {
-  return new ScreenshotService(capturer ?? pickCapturer(process.platform))
+export function createScreenshotService(
+  capturer?: IScreenshotCapturer,
+  platform: NodeJS.Platform = process.platform
+): IScreenshotService {
+  return new ScreenshotService(capturer ?? pickCapturer(platform), platform)
 }
 
 export { ScreenshotService }

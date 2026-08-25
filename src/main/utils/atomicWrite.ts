@@ -23,15 +23,28 @@ import { randomUUID } from 'node:crypto'
  *
  * @param filePath - Absolute path to the target file
  * @param content - Content to serialize and write
+ * @param space - Optional `JSON.stringify` indent. When provided the output is
+ *   pretty-printed with this indent AND a trailing newline is appended, so a
+ *   hand-edited, git-tracked file (e.g. `.erfana/settings.json`, Issue #74) is
+ *   not collapsed to one line. Omitting it preserves the compact,
+ *   newline-free output existing callers (`ProjectLockService`) rely on.
  * @throws Error if write or rename fails (temp file is cleaned up)
  */
-export async function atomicWriteJSON<T>(filePath: string, content: T): Promise<void> {
+export async function atomicWriteJSON<T>(
+  filePath: string,
+  content: T,
+  space?: number
+): Promise<void> {
   const dir = dirname(filePath)
   const tempPath = join(dir, `.${randomUUID()}.tmp`)
 
   try {
+    const serialized =
+      space === undefined
+        ? JSON.stringify(content)
+        : `${JSON.stringify(content, null, space)}\n`
     // Write to temp file with owner-only permissions
-    await writeFile(tempPath, JSON.stringify(content), {
+    await writeFile(tempPath, serialized, {
       encoding: 'utf8',
       mode: 0o600 // Owner read/write only
     })

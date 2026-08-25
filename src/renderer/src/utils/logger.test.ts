@@ -570,6 +570,179 @@ describe('RendererLogger', () => {
     })
   })
 
+  describe('log transport fallback (#60)', () => {
+    const overlayLog = vi.fn()
+
+    afterEach(() => {
+      ;(window as any).api = { logging: mockLoggingAPI }
+      delete (window as any).overlayApi
+    })
+
+    it('falls back to the overlay bridge when window.api is absent', () => {
+      // The screenshot-overlay window has no `window.api` at all (#164 split
+      // preload) — without this fallback it produces no record whatsoever.
+      ;(window as any).api = undefined
+      ;(window as any).overlayApi = {
+        areaSelected: vi.fn(),
+        areaCancelled: vi.fn(),
+        log: overlayLog
+      }
+
+      testLogger.setLevel('info')
+      testLogger.info('overlay is alive', { route: 'area-select' })
+
+      expect(overlayLog).toHaveBeenCalledTimes(1)
+      expect(overlayLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          level: 'info',
+          message: 'overlay is alive',
+          source: 'renderer',
+          context: { route: 'area-select' }
+        })
+      )
+      expect(consoleErrorSpy).not.toHaveBeenCalled()
+    })
+
+    it('prefers window.api when both bridges are present', () => {
+      ;(window as any).overlayApi = { log: overlayLog }
+
+      testLogger.setLevel('info')
+      testLogger.info('editor window message')
+
+      expect(mockLoggingAPI.log).toHaveBeenCalledTimes(1)
+      expect(overlayLog).not.toHaveBeenCalled()
+    })
+
+    it('ignores an overlay bridge that exposes no log function', () => {
+      ;(window as any).api = undefined
+      ;(window as any).overlayApi = { areaSelected: vi.fn(), areaCancelled: vi.fn() }
+
+      testLogger.setLevel('error')
+
+      expect(() => testLogger.error('nowhere to go')).not.toThrow()
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to send log to main process'),
+        expect.objectContaining({ message: 'nowhere to go' })
+      )
+    })
+
+    it('falls back to the console when no bridge exists', () => {
+      ;(window as any).api = undefined
+
+      testLogger.setLevel('error')
+      testLogger.error('pre-bridge boot failure')
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to send log to main process'),
+        expect.objectContaining({ level: 'error', message: 'pre-bridge boot failure' })
+      )
+    })
+  })
+
+  describe('defensive value extraction (#60)', () => {
+    it('keeps the record when error message and stack accessors throw', () => {
+      testLogger.setLevel('error')
+      const hostile = new Error('unused')
+      Object.defineProperty(hostile, 'message', {
+        get() {
+          throw new Error('hostile message accessor')
+        }
+      })
+      Object.defineProperty(hostile, 'stack', {
+        get() {
+          throw new Error('hostile stack accessor')
+        }
+      })
+
+      expect(() => testLogger.error('Something failed', hostile, { file: 'a.md' })).not.toThrow()
+
+      const call = mockLoggingAPI.log.mock.calls[0][0] as LogEntry
+      expect(call.message).toBe('Something failed')
+      expect(call.context).toEqual({ file: 'a.md' })
+      expect(call.error).toEqual({
+        name: 'Error',
+        message: '[unreadable]',
+        stack: undefined
+      })
+    })
+
+    it('keeps the record when the error name accessor throws', () => {
+      testLogger.setLevel('error')
+      const hostile = new Error('readable message')
+      Object.defineProperty(hostile, 'name', {
+        get() {
+          throw new Error('hostile name accessor')
+        }
+      })
+
+      testLogger.error('Something failed', hostile)
+
+      const call = mockLoggingAPI.log.mock.calls[0][0] as LogEntry
+      expect(call.error).toMatchObject({ name: '[unreadable]', message: 'readable message' })
+    })
+
+    it('handles a rejection reason whose toString throws', async () => {
+      await testLogger.initialize()
+      const reason = {
+        toString() {
+          throw new Error('hostile toString')
+        }
+      }
+      const handler = addEventListenerSpy.mock.calls.find(
+        (call: any) => call[0] === 'unhandledrejection'
+      )?.[1] as (event: any) => void
+
+      expect(() => handler({ reason, promise: {} })).not.toThrow()
+
+      expect(mockLoggingAPI.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'Unhandled promise rejection',
+          error: expect.objectContaining({ message: '[unreadable]' })
+        })
+      )
+    })
+
+    it('handles an error event whose fields throw', async () => {
+      await testLogger.initialize()
+      const handler = addEventListenerSpy.mock.calls.find(
+        (call: any) => call[0] === 'error'
+      )?.[1] as (event: any) => void
+
+      expect(() =>
+        handler({
+          get error() {
+            throw new Error('hostile error accessor')
+          },
+          get filename() {
+            throw new Error('hostile filename accessor')
+          },
+          get lineno() {
+            throw new Error('hostile lineno accessor')
+          },
+          colno: 7
+        })
+      ).not.toThrow()
+
+      const call = mockLoggingAPI.log.mock.calls[0][0] as LogEntry
+      expect(call.message).toBe('Uncaught error')
+      expect(call.error).toBeUndefined()
+      expect(call.context).toEqual({ filename: '[unreadable]', lineno: 0, colno: 7 })
+    })
+
+    it('normalises a non-Error thrown value on the error event', async () => {
+      await testLogger.initialize()
+      const handler = addEventListenerSpy.mock.calls.find(
+        (call: any) => call[0] === 'error'
+      )?.[1] as (event: any) => void
+
+      handler({ error: 'plain string throw', filename: 'a.js', lineno: 3, colno: 4 })
+
+      const call = mockLoggingAPI.log.mock.calls[0][0] as LogEntry
+      expect(call.error).toMatchObject({ name: 'Error', message: 'plain string throw' })
+      expect(call.context).toEqual({ filename: 'a.js', lineno: 3, colno: 4 })
+    })
+  })
+
   describe('singleton and exports', () => {
     it('exports singleton logger instance', () => {
       expect(logger).toBeInstanceOf(RendererLogger)

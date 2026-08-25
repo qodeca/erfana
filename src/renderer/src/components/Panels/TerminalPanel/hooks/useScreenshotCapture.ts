@@ -22,7 +22,9 @@ import {
 } from '../../../../utils/toastHelpers'
 import { escapePathForShell, type ShellKind } from '../../../../utils/shellPathEscape'
 import { getBasename } from '../../../../utils/fileUtils'
+import { isMacOS } from '../../../../utils/platform'
 import { logger } from '../../../../utils/logger'
+import type { ScreenRecordingPermission } from '../../../../../../shared/ipc/screenshot-schema'
 import type { ScreenshotCaptureMode, DisplayInfo, WindowSource } from '../types'
 
 /**
@@ -85,6 +87,15 @@ export interface UseScreenshotCaptureReturn {
     mode: ScreenshotCaptureMode,
     options?: { displayId?: number; windowId?: string }
   ) => Promise<void>
+  /**
+   * Whether the macOS Screen Recording permission dialog is open. Opened from
+   * the capture-failure path (never gates a capture attempt).
+   */
+  screenPermissionDialogOpen: boolean
+  /** Advisory permission status shown in the dialog copy. */
+  screenPermissionStatus: ScreenRecordingPermission
+  /** Dismiss the Screen Recording permission dialog. */
+  closeScreenPermissionDialog: () => void
 }
 
 /**
@@ -124,6 +135,13 @@ export function useScreenshotCapture(
   const [windowSources, setWindowSources] = useState<WindowSource[]>([])
   const [showScreenSelectDialog, setShowScreenSelectDialog] = useState(false)
   const [showWindowPickerDialog, setShowWindowPickerDialog] = useState(false)
+  const [screenPermissionDialogOpen, setScreenPermissionDialogOpen] = useState(false)
+  const [screenPermissionStatus, setScreenPermissionStatus] =
+    useState<ScreenRecordingPermission>('unknown')
+
+  const closeScreenPermissionDialog = useCallback(() => {
+    setScreenPermissionDialogOpen(false)
+  }, [])
 
   // Consult main for platform capabilities on mount (#164 lens-review F[31]).
   // Replaces the previous `getPlatform()` branch — keeping the platform
@@ -216,12 +234,23 @@ export function useScreenshotCapture(
             case 'SCREENSHOT_TIMEOUT':
               showErrorToast('Timeout', 'Screenshot capture timed out after 30 seconds')
               return
-            case 'SCREENSHOT_PERMISSION_DENIED':
-              showErrorToast(
-                'Permission required',
-                'Grant screen recording permission in System Settings > Privacy & Security'
-              )
+            case 'SCREENSHOT_PERMISSION_DENIED': {
+              // The capture was attempted and the OS denied it (never gated by
+              // a status pre-check — a stale read must not block a granted
+              // user). On macOS surface the actionable grant-and-relaunch
+              // dialog; elsewhere fall back to a toast.
+              if (isMacOS()) {
+                const status = await window.api.screenshot.getScreenPermission()
+                setScreenPermissionStatus(status)
+                setScreenPermissionDialogOpen(true)
+              } else {
+                showErrorToast(
+                  'Permission required',
+                  'Grant screen recording permission in system settings'
+                )
+              }
               return
+            }
             case 'SCREENSHOT_WINDOW_NOT_FOUND':
               showErrorToast('Window unavailable', 'The selected window is no longer available')
               return
@@ -295,6 +324,9 @@ export function useScreenshotCapture(
     setShowWindowPickerDialog,
     refreshDisplays,
     refreshWindowSources,
-    handleScreenshot
+    handleScreenshot,
+    screenPermissionDialogOpen,
+    screenPermissionStatus,
+    closeScreenPermissionDialog
   }
 }

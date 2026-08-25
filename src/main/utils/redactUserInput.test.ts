@@ -109,6 +109,55 @@ describe('redactedLogError', () => {
     expect(redactedLogError(original)).toBe(original)
   })
 
+  it('strips the POSIX path operand out of a Node ENOENT message', () => {
+    const original = Object.assign(
+      new Error("ENOENT: no such file or directory, open '/Users/alice/Documents/secret.png'"),
+      { errno: -2, code: 'ENOENT', syscall: 'open', path: '/Users/alice/Documents/secret.png' }
+    )
+
+    const logged = redactedLogError(original)
+
+    expect(logged).not.toBe(original)
+    expect(logged?.message).toBe('ENOENT: no such file or directory, open [redacted-path]')
+    expect(logged?.message).not.toContain('alice')
+    // The stack embeds the message, so a rewrite must not carry the old one.
+    expect(logged?.stack ?? '').not.toContain('alice')
+  })
+
+  it('strips a Windows drive-letter path operand too', () => {
+    const original = Object.assign(
+      new Error("EPERM: operation not permitted, open 'C:\\Users\\alice\\Documents\\secret.png'"),
+      { errno: -4048, code: 'EPERM', syscall: 'open' }
+    )
+
+    const logged = redactedLogError(original)
+
+    expect(logged?.message).toBe('EPERM: operation not permitted, open [redacted-path]')
+    expect(logged?.message).not.toContain('alice')
+    expect(logged?.stack ?? '').not.toContain('alice')
+  })
+
+  it('strips BOTH operands of a two-path syscall message', () => {
+    const original = Object.assign(
+      new Error("ENOENT: no such file or directory, rename '/a/one.md' -> '/b/two.md'"),
+      { errno: -2, code: 'ENOENT', syscall: 'rename' }
+    )
+
+    expect(redactedLogError(original)?.message).toBe(
+      'ENOENT: no such file or directory, rename [redacted-path] -> [redacted-path]'
+    )
+  })
+
+  it('leaves a syscall error with no path operand untouched, stack and all', () => {
+    const original = Object.assign(new Error('ECONNRESET: socket hang up'), {
+      errno: -54,
+      code: 'ECONNRESET',
+      syscall: 'read'
+    })
+
+    expect(redactedLogError(original)).toBe(original)
+  })
+
   it('returns undefined for non-Error input', () => {
     expect(redactedLogError('a string')).toBeUndefined()
     expect(redactedLogError(undefined)).toBeUndefined()

@@ -1,0 +1,116 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * HtmlPreviewPanel Styles (Issue #74, work item 71).
+ *
+ * Plain co-located global CSS (not a CSS module, per design §1.8). All values
+ * come from design tokens (docs/ui-style-guide.md); no rounded corners.
+ *
+ * The placeholder's background is `var(--color-brand-black)` on purpose — it is
+ * the same value main encodes as `setBackgroundColor('#FF161312')`, so the seam
+ * between the DOM placeholder and the native view never flashes a different
+ * colour (design §1.8).
+ *
+ * @see HtmlPreviewPanel.tsx for the component
+ */
+
+/* ============================================
+ * Panel container
+ * ============================================ */
+
+.html-preview-panel {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-brand-black);
+  overflow: hidden;
+}
+
+/* ============================================
+ * Preview surface (normal state)
+ * ============================================ */
+
+.html-preview-surface {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+/*
+ * The sized target the native WebContentsView paints over. Brand black so the
+ * seam with the native view is invisible; never left transparent/white.
+ */
+.html-preview-placeholder {
+  position: absolute;
+  inset: 0;
+  background: var(--color-brand-black);
+  overflow: hidden;
+}
+
+/* Still frame shown while the native view is hidden (fills the placeholder). */
+.html-preview-still-frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: top left;
+  background: var(--color-brand-black);
+  user-select: none;
+  pointer-events: none;
+}
+
+/* ============================================
+ * Banner (limit-reached / failed)
+ * ============================================ */
+
+.html-preview-banner {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-6);
+  padding: var(--space-16);
+  text-align: center;
+  color: var(--color-text-secondary);
+}
+
+.html-preview-banner-message {
+  font-size: var(--text-md);
+  color: var(--color-text-primary);
+  user-select: text;
+}
+
+.html-preview-banner-button {
+  height: var(--btn-height-md);
+  padding: 0 var(--space-12);
+  border: var(--border-width) solid var(--color-border-default);
+  border-radius: var(--border-radius);
+  background: var(--color-btn-secondary-bg);
+  color: var(--color-text-primary);
+  font-size: var(--text-base);
+  font-weight: var(--font-medium);
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.html-preview-banner-button:hover {
+  background: var(--color-btn-secondary-hover);
+}
+
+.html-preview-banner-button:active {
+  background: var(--color-btn-secondary-hover);
+}
+
+.html-preview-banner-button:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: 1px;
+}
+
+.html-preview-banner-button:disabled {
+  opacity: var(--opacity-disabled);
+  cursor: not-allowed;
+}

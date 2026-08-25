@@ -11,7 +11,7 @@
  * Features:
  * - Language selector with 30+ supported languages
  * - Real-time progress bar with phase text, chunk indicator, and ETA
- * - Focus trap within the dialog for keyboard accessibility
+ * - Focus trap within the dialog for keyboard accessibility (BaseDialog `trapFocus`)
  * - Escape key to cancel/close
  * - ARIA attributes for screen reader support
  *
@@ -19,7 +19,7 @@
  * @see Spec #009 - Media import with transcription specification
  */
 
-import { useState, useEffect, useRef, useCallback, useId } from 'react'
+import { useState, useEffect, useId } from 'react'
 import { FileAudio, FileVideo } from 'lucide-react'
 import { VIDEO_IMPORT } from '../../../../shared/constants'
 import { useTranscriptionStore } from '../../stores/useTranscriptionStore'
@@ -30,7 +30,8 @@ import { TEST_IDS } from '../../constants/testids'
 import type { TranscriptionLanguage } from '../../../../shared/ipc/transcription-schema'
 import { ErrorCode } from '../../../../shared/errors'
 import { BaseDialog } from '../Dialog/BaseDialog'
-import { sanitizeFilePath, getBasename } from '../../utils/fileUtils'
+import { getBasename } from '../../utils/fileUtils'
+import { getFilePanelId } from '../../utils/openFileInPanel'
 import { triggerOrganizePrompt } from '../../hooks/useImport'
 import { useTerminalPortalOptional } from '../../context/TerminalPortalContext'
 import { logger } from '../../utils/logger'
@@ -132,7 +133,6 @@ export function TranscriptionDialog(): JSX.Element | null {
   const descriptionId = `transcription-desc${id}`
 
   const [selectedLanguage, setSelectedLanguage] = useState<TranscriptionLanguage>('auto')
-  const dialogRef = useRef<HTMLDivElement>(null)
 
   // Initialize language selection from last used language when dialog opens
   useEffect(() => {
@@ -160,40 +160,6 @@ export function TranscriptionDialog(): JSX.Element | null {
     document.addEventListener('keydown', handleKeyDown, true)
     return () => document.removeEventListener('keydown', handleKeyDown, true)
   }, [isDialogOpen, isTranscribing, cancelTranscription, closeDialog])
-
-  // Focus trap within the dialog
-  const handleFocusTrap = useCallback(
-    (e: KeyboardEvent): void => {
-      if (e.key !== 'Tab' || !dialogRef.current) return
-
-      const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
-        'button:not(:disabled), select:not(:disabled), input:not(:disabled), [tabindex]:not([tabindex="-1"])'
-      )
-      if (focusable.length === 0) return
-
-      const first = focusable[0]
-      const last = focusable[focusable.length - 1]
-
-      if (e.shiftKey) {
-        if (document.activeElement === first) {
-          e.preventDefault()
-          last.focus()
-        }
-      } else {
-        if (document.activeElement === last) {
-          e.preventDefault()
-          first.focus()
-        }
-      }
-    },
-    []
-  )
-
-  useEffect(() => {
-    if (!isDialogOpen) return undefined
-    document.addEventListener('keydown', handleFocusTrap)
-    return () => document.removeEventListener('keydown', handleFocusTrap)
-  }, [isDialogOpen, handleFocusTrap])
 
   if (!isDialogOpen) return null
 
@@ -245,7 +211,9 @@ export function TranscriptionDialog(): JSX.Element | null {
       const dockviewApi = useProjectStore.getState().dockviewApi
       if (dockviewApi) {
         const panelTitle = getBasename(outputPath) || 'Transcript'
-        const panelId = `editor-${sanitizeFilePath(outputPath)}`
+        // One source of panel ids (issue #70). The output is always `.md`, so
+        // this resolves to the same `editor-...` id as before.
+        const panelId = getFilePanelId(outputPath)
 
         let editorPanel = dockviewApi.getPanel(panelId)
         if (!editorPanel) {
@@ -278,11 +246,12 @@ export function TranscriptionDialog(): JSX.Element | null {
       zIndex={10000}
       closeOnBackdrop={false}
       closeOnEscape={false}
+      trapFocus
       className="transcription-dialog"
       ariaLabelledBy={titleId}
       ariaDescribedBy={descriptionId}
     >
-      <div ref={dialogRef} data-testid={TEST_IDS.TRANSCRIPTION_DIALOG}>
+      <div data-testid={TEST_IDS.TRANSCRIPTION_DIALOG}>
         {/* Header */}
         <div className="dialog-header">
           <h3 id={titleId} className="dialog-title">
@@ -304,7 +273,12 @@ export function TranscriptionDialog(): JSX.Element | null {
               <label className="transcription-language-label" htmlFor="transcription-lang">
                 Language
               </label>
+              {/* `id` matches the label's htmlFor above: without it the label
+                  was decorative — clicking "Language" did nothing and the
+                  spoken name ("Transcription language") differed from the
+                  visible one. */}
               <LanguageSelect
+                id="transcription-lang"
                 value={selectedLanguage}
                 onChange={setSelectedLanguage}
                 disabled={false}

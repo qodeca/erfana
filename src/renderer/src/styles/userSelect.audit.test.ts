@@ -25,7 +25,7 @@
 import { describe, it, expect } from 'vitest'
 
 import utilitiesCss from './utilities.css?raw'
-import imageViewerCss from '../components/Panels/ImageViewerPanel.module.css?raw'
+import imageViewerCss from '../components/Panels/ImageViewerPanel/ImageViewerPanel.module.css?raw'
 
 interface AuditSurface {
   /** Plain label used in test names and assertion messages */
@@ -57,14 +57,19 @@ export const AUDIT_211_SURFACES: readonly AuditSurface[] = [
   { surface: 'Chat panel', file: 'src/renderer/src/styles/utilities.css', selector: '.chat-panel', css: utilitiesCss },
   { surface: 'File conflict message', file: 'src/renderer/src/styles/utilities.css', selector: '.file-conflict-message', css: utilitiesCss },
   { surface: 'Document stats bar', file: 'src/renderer/src/styles/utilities.css', selector: '.document-stats-bar', css: utilitiesCss },
-  { surface: 'Image viewer metadata', file: 'src/renderer/src/components/Panels/ImageViewerPanel.module.css', selector: '.metadataItem', css: imageViewerCss },
-  { surface: 'Image viewer error', file: 'src/renderer/src/components/Panels/ImageViewerPanel.module.css', selector: '.errorMessage', css: imageViewerCss },
+  { surface: 'Image viewer metadata', file: 'src/renderer/src/components/Panels/ImageViewerPanel/ImageViewerPanel.module.css', selector: '.metadataItem', css: imageViewerCss },
+  { surface: 'Image viewer error', file: 'src/renderer/src/components/Panels/ImageViewerPanel/ImageViewerPanel.module.css', selector: '.errorMessage', css: imageViewerCss },
+  { surface: 'Image viewer refresh status', file: 'src/renderer/src/components/Panels/ImageViewerPanel/ImageViewerPanel.module.css', selector: '.statusSlot', css: imageViewerCss },
+  { surface: 'Image viewer degraded-state banner message', file: 'src/renderer/src/components/Panels/ImageViewerPanel/ImageViewerPanel.module.css', selector: '.bannerMessage', css: imageViewerCss },
   { surface: 'Project panel content', file: 'src/renderer/src/styles/utilities.css', selector: '.project-panel .sidebar-panel-content', css: utilitiesCss },
   { surface: 'Claude status bar', file: 'src/renderer/src/styles/utilities.css', selector: '.terminal-claude-statusbar', css: utilitiesCss },
   { surface: 'Terminal status hint', file: 'src/renderer/src/styles/utilities.css', selector: '.terminal-status-hint', css: utilitiesCss },
   { surface: 'Search match count', file: 'src/renderer/src/styles/utilities.css', selector: '.search-match-count', css: utilitiesCss },
   { surface: 'Settings content', file: 'src/renderer/src/styles/utilities.css', selector: '.settings-content', css: utilitiesCss },
   { surface: 'Toast message', file: 'src/renderer/src/styles/utilities.css', selector: '.toast-message', css: utilitiesCss },
+  { surface: 'Root crash details region', file: 'src/renderer/src/styles/utilities.css', selector: '.root-error-details', css: utilitiesCss },
+  { surface: 'Root crash meta line', file: 'src/renderer/src/styles/utilities.css', selector: '.root-error-meta', css: utilitiesCss },
+  { surface: 'Root crash log-folder path (degraded mode)', file: 'src/renderer/src/styles/utilities.css', selector: '.root-error-log-path', css: utilitiesCss },
   { surface: 'Character count', file: 'src/renderer/src/styles/utilities.css', selector: '.char-count', css: utilitiesCss }
 ]
 

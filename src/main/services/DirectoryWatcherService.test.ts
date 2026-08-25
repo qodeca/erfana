@@ -19,9 +19,58 @@ vi.mock('electron', () => {
   }
 })
 
+/**
+ * Spin the microtask queue until `predicate` holds, or `maxTicks` is exhausted.
+ *
+ * `handleWatcherError` starts `stopAll()` as `void`-ed fire-and-forget work, so
+ * a test has no promise to await. The original code waited on a real
+ * `setTimeout(r, 0)` macrotask — precisely the thing that starves under two
+ * concurrent vitest workers on a Windows host, producing the 5 s timeout
+ * recorded in docs/windows/known-flakes.md. Spinning microtasks is
+ * wall-clock-free, so it cannot be pre-empted by worker scheduling, and a
+ * predicate that never holds surfaces as the following assertion failing
+ * rather than as a test-timeout with no diagnostic.
+ */
+async function flushMicrotasksUntil(
+  predicate: () => boolean,
+  maxTicks = 100
+): Promise<void> {
+  for (let tick = 0; tick < maxTicks; tick++) {
+    if (predicate()) return
+    await Promise.resolve()
+  }
+}
+
+/** Drain pending microtask work when there is no condition to wait on. */
+async function flushMicrotasks(ticks = 20): Promise<void> {
+  for (let tick = 0; tick < ticks; tick++) {
+    await Promise.resolve()
+  }
+}
+
 describe('DirectoryWatcherService ENOENT handling', () => {
   beforeEach(() => {
     sends.length = 0
+    // These tests share one singleton service, and `scheduleRestart` arms a real
+    // 800 ms timer. Faking only the timeout pair keeps the health logger's
+    // `setInterval` on real timers while guaranteeing a restart armed by one
+    // test can never fire mid-assertion in the next one.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+  })
+
+  afterEach(async () => {
+    // Return the singleton to a known-clean state so no in-flight work from this
+    // test can be observed by the next one, whatever order the two interleave in.
+    const mod = await import('./DirectoryWatcherService')
+    const svc: any = mod.directoryWatcherService
+    for (const timeout of svc.pendingRestarts.values()) {
+      clearTimeout(timeout)
+    }
+    svc.pendingRestarts.clear()
+    svc.restartAttempts.clear()
+    await flushMicrotasks()
+    svc.watchedDirectories.clear()
+    vi.useRealTimers()
   })
 
   it('sends project-deleted and remains recoverable (stopAll instead of dispose) after max restart attempts', async () => {
@@ -64,7 +113,7 @@ describe('DirectoryWatcherService ENOENT handling', () => {
     // Should notify project-deleted (max attempts reached)
     expect(sends.some(s => s.channel === 'directory-watch:project-deleted')).toBe(true)
     // stopAll clears watchedDirectories without setting isDisposing
-    await new Promise((r) => setTimeout(r, 0))
+    await flushMicrotasksUntil(() => svc.watchedDirectories.size === 0)
     expect(svc.watchedDirectories.size).toBe(0)
     expect(svc.isDisposing).toBe(false)
   })

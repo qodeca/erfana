@@ -28,6 +28,21 @@ export const ClaudeWindowSize = z.union([z.literal(200000), z.literal(1000000)])
 export type ClaudeWindowSize = z.infer<typeof ClaudeWindowSize>
 
 /**
+ * Max characters retained from an untrusted model id. Lives here so ONE bound
+ * governs the IPC schema, the display sanitizer and the shared model-id parser
+ * (#41 F20) — a longer id is malformed/adversarial and is truncated or rejected
+ * rather than carried through.
+ */
+export const MAX_MODEL_ID_LENGTH = 64
+
+/**
+ * Max characters for the precomputed tooltip. The real string is composed
+ * main-side from two formatted token counts and a fixed suffix — around 25
+ * characters — so this is a generous defence-in-depth ceiling, not a fit.
+ */
+export const MAX_TOOLTIP_LENGTH = 128
+
+/**
  * Display-only snapshot for a single terminal panel's Claude session.
  *
  * - `percent` is the display percentage (0–100, clamped).
@@ -37,10 +52,15 @@ export type ClaudeWindowSize = z.infer<typeof ClaudeWindowSize>
 export const ClaudeStatusSnapshotSchema = z.object({
   /** Terminal panel this snapshot belongs to */
   terminalId: z.string().min(1),
-  /** Raw Claude model id (e.g. `claude-opus-4-8`) */
-  modelId: z.string(),
-  /** Friendly, sanitized display name (e.g. `Opus 4.8`) */
-  friendlyName: z.string(),
+  /** Sanitized Claude model id (e.g. `claude-opus-4-8`), length-bounded (#41 F20) */
+  modelId: z.string().max(MAX_MODEL_ID_LENGTH),
+  /**
+   * Friendly, sanitized display name (e.g. `Opus 4.8`). Bounded here as
+   * defence-in-depth: every `friendlyModelName` path already derives from the
+   * ≤64-char sanitized id, so the schema restates that invariant at the trust
+   * boundary rather than relying on a caller two modules away to keep it.
+   */
+  friendlyName: z.string().max(MAX_MODEL_ID_LENGTH),
   /** Context window size: 200k or 1M */
   windowSize: ClaudeWindowSize,
   /** Tokens consumed by the latest main-session turn */
@@ -49,8 +69,18 @@ export const ClaudeStatusSnapshotSchema = z.object({
   percent: z.number().min(0).max(100),
   /** Severity band for color coding */
   level: ClaudeStatusLevel,
-  /** Precomputed exact-count tooltip string */
-  tooltip: z.string()
+  /** Precomputed exact-count tooltip string (e.g. `84k / 1M (inferred)`) */
+  tooltip: z.string().max(MAX_TOOLTIP_LENGTH),
+  /**
+   * True when {@link windowSize} was INFERRED from the capability registry
+   * rather than observed or explicitly configured (#41 §5.4).
+   *
+   * Structured rather than only baked into {@link tooltip}: the renderer builds
+   * `aria-valuetext` by reformatting the tooltip, so a trailing `(inferred)`
+   * landed mid-sentence ("84k of 1M (inferred) tokens") for screen-reader users.
+   * A boolean lets each surface place the marker grammatically.
+   */
+  inferred: z.boolean()
 })
 export type ClaudeStatusSnapshot = z.infer<typeof ClaudeStatusSnapshotSchema>
 

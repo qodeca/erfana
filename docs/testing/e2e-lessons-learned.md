@@ -30,15 +30,7 @@ window.close() → main process 'close' event → 'quit:requested' IPC
 
 ---
 
-## 3. User constraints override technical elegance
-
-When told "E2E tests MUST work with the UI as-is and click modal dialogs", don't propose workarounds that bypass the UI. The constraint is the requirement.
-
-**Lesson**: Listen to constraints carefully. They often encode important product decisions.
-
----
-
-## 4. Third-party libraries have testing blind spots
+## 3. Third-party libraries have testing blind spots
 
 xterm.js renders to canvas, not DOM. `toContainText()` returns empty string because there's no text to find - it's all pixels.
 
@@ -46,7 +38,7 @@ xterm.js renders to canvas, not DOM. `toContainText()` returns empty string beca
 
 ---
 
-## 5. Race conditions need defensive patterns
+## 4. Race conditions need defensive patterns
 
 The quit dialog might appear instantly or after 500ms depending on what blockers exist. A single check isn't enough.
 
@@ -66,7 +58,7 @@ for (let attempt = 0; attempt < 3; attempt++) {
 
 ---
 
-## 6. Page invalidation after close is expected
+## 5. Page invalidation after close is expected
 
 After clicking "Quit" in a dialog, the page becomes invalid. Any subsequent operations throw "Target page, context or browser has been closed".
 
@@ -74,6 +66,7 @@ After clicking "Quit" in a dialog, the page becomes invalid. Any subsequent oper
 
 ```typescript
 try {
+  // KNOWN_WAIT: Inter-dialog pause during quit – page may be destroyed
   await page.waitForTimeout(300)
 } catch {
   // Page closed - this is expected after quit
@@ -81,46 +74,11 @@ try {
 }
 ```
 
----
-
-## 7. E2E tests reveal integration issues
-
-Unit tests mock everything. E2E tests expose real integration problems: IPC timing, dialog sequences, state management across processes.
-
-**Lesson**: E2E failures often indicate real bugs users would encounter. Don't dismiss them as "flaky".
+> **Do not copy that `waitForTimeout` into a test.** The project rule is condition-based waits only – use a POM wait, `waitForIpcComplete`, or an auto-retrying `expect`. This snippet is the documented exception, quoted from the quit loop in `closeApp()` (`e2e/utils/helpers.ts`): it is a teardown path with no assertion, and the thing it waits on is the next dialog on a page that may already be destroyed, so there is no observable state left to poll. The exception mechanism is defined in [E2E Testing § Condition-based waits](./e2e-testing.md#condition-based-waits) – a genuinely necessary timeout carries a `// KNOWN_WAIT: <reason>` annotation, as it does in the source.
 
 ---
 
-## 8. Test infrastructure is production code
-
-Test helpers like `closeApp()`, `openProject()`, and `waitForAppReady()` are code that needs the same rigor as production code. They'll be used across dozens of tests.
-
-**Lesson**: Review and test your test utilities. A bug in `closeApp()` breaks every test that uses it.
-
----
-
-## 9. Delete stale documentation
-
-The old `dismissDialogIfPresent()` function was documented but broken - it checked for dialogs before they could exist. The fix wasn't just code; it was removing misleading comments.
-
-**Lesson**: When fixing bugs, audit related documentation. Wrong docs are worse than no docs.
-
----
-
-## 10. Incremental debugging wins
-
-The fix evolved through multiple iterations:
-1. `Meta+Q` → didn't trigger right events
-2. `electronApp.close()` → dialog appeared after check
-3. `window.close()` → worked but page invalidated
-4. Add try-catch → handled expected errors
-5. Add retry loop → handled race conditions
-
-**Lesson**: Each iteration taught something. Don't expect to get it right the first time with complex async flows.
-
----
-
-## 11. Playwright assertions beat manual state checks
+## 6. Playwright assertions beat manual state checks
 
 The `element.isVisible()` method returns a boolean immediately - it doesn't wait.
 During CSS animations, an element can have `display: block` (isVisible = true)
@@ -141,7 +99,7 @@ instead of state query methods (`isVisible()`, `textContent()`) for waiting logi
 
 ---
 
-## 12. Isolate browser state with `--user-data-dir`
+## 7. Isolate browser state with `--user-data-dir`
 
 Electron apps with Zustand persist middleware store state to localStorage. This causes test pollution - state from previous test runs bleeds into subsequent runs.
 
@@ -167,7 +125,7 @@ const app = await electron.launch({
 
 ---
 
-## 13. Guard webContents against destroyed state
+## 8. Guard webContents against destroyed state
 
 During E2E teardown, `closeApp()` triggers `window.close()` which fires the BrowserWindow `close` event. If `webContents` is already destroyed (race with Playwright cleanup), calling `webContents.send()` throws an uncaught "Object has been destroyed" exception that shows a native error dialog and blocks the process.
 
@@ -177,7 +135,7 @@ During E2E teardown, `closeApp()` triggers `window.close()` which fires the Brow
 
 ---
 
-## 14. Use `insertText()` instead of `keyboard.type()` for Monaco
+## 9. Use `insertText()` instead of `keyboard.type()` for Monaco
 
 `keyboard.type()` sends individual key-down/key-up events. Monaco Editor drops characters during re-layout cycles – especially after newline characters cause line breaks. Adding delays between keystrokes makes it *worse*, not better.
 
@@ -196,11 +154,11 @@ await page.keyboard.insertText('# Hello\n\nWorld')  // Single input event, like 
 
 ---
 
-## 15. Determinism beats masking; observable state beats side effects
+## 10. Determinism beats masking; observable state beats side effects
 
 Two convergent patterns that surfaced while stabilizing a visual-regression flake and a `userEvent.type()` flake (post-Phase-2 hygiene, 2026-04-21):
 
-**15a. Prefer deterministic fixture data over masking ephemeral content.**
+**10a. Prefer deterministic fixture data over masking ephemeral content.**
 
 The `visualTestProject` fixture originally did `mkdtemp(path.join(tmp, 'visual-project-'))`, producing paths like `.e2e-temp/visual-project-kb339w`. The random suffix leaked into the project tree label, terminal title, and toast path — causing ~2 % pixel drift in the `(b) editor-loaded` snapshot.
 
@@ -213,7 +171,7 @@ const projectPath = path.join(tmpParent, 'visual-project')   // deterministic le
 
 Isolation preserved (outer parent unique per worker); visible labels stable. Masking the ephemeral regions would have worked too, but every future UI element placed in those regions would be untested. Prefer determinism at the source.
 
-**15b. Gate `userEvent.type()` on observable state, not side-effect ordering.**
+**10b. Gate `userEvent.type()` on observable state, not side-effect ordering.**
 
 `userEvent.type(input, 'test')` can drop the first keystroke under CPU contention if React hasn't finished settling the initial render. Two fixes compared:
 

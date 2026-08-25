@@ -4,6 +4,13 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import './index.css'
 import App from './App'
+import { RootErrorBoundary } from './components/RootErrorBoundary/RootErrorBoundary'
+import { installGlobalErrorTrail } from './utils/installGlobalErrorTrail'
+
+// Before the route branch on purpose: the overlay window gets a trail too, and
+// it is the window with no recovery UI, so the log is its only evidence
+// (#60 §2.3).
+installGlobalErrorTrail()
 
 /**
  * Mount the area-select overlay instead of the main app when this renderer
@@ -48,9 +55,14 @@ if (isOverlayRoute()) {
     )
   })
 } else {
+  // Only the App branch is wrapped. The overlay window is a transparent
+  // click-through surface with no recovery UI to show — a full-window crash
+  // screen there would cover the user's actual screen content (#60 §2.3).
   root.render(
     <React.StrictMode>
-      <App />
+      <RootErrorBoundary>
+        <App />
+      </RootErrorBoundary>
     </React.StrictMode>
   )
 }

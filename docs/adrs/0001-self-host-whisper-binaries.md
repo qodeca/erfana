@@ -3,7 +3,7 @@
 - **Status**: accepted
 - **Date**: 2026-04-23
 - **Deciders**: Marcin Obel (project owner), Claude Code (implementation + 3 independent reviewer agents)
-- **Related**: [#165](https://github.com/qodeca/erfana/issues/165) · [ADR 0002](0002-minisign-over-cosign-sigstore.md) · [ADR 0003](0003-dual-pubkey-trust-primary-rotation.md) · [`docs/build/whisper-binaries.md`](../build/whisper-binaries.md)
+- **Related**: #165 (issue not present in the public repo) · [ADR 0002](0002-minisign-over-cosign-sigstore.md) · [ADR 0003](0003-dual-pubkey-trust-primary-rotation.md) · [`docs/build/whisper-binaries.md`](../build/whisper-binaries.md)
 
 ## Context
 
@@ -30,7 +30,7 @@ Manual `workflow_dispatch` only. Gated on a `production-signing` GitHub Environm
 
 **Acceptable costs**
 
-- **~$150/yr GitHub Actions compute** on private repo billing (macos-14 × ~15 min × $0.16/min × 10× multiplier dominates; see `docs/build/whisper-binaries.md` §Cost for the full breakdown).
+- **No GitHub Actions spend at the current cadence** — `qodeca/erfana` is a public repository, so the GitHub-hosted standard runners this workflow uses (macos-14, windows-latest, ubuntu-latest) are billed at zero minutes. The cost is wall-clock (~25–30 min per rebuild), not money. The original ~$150/yr estimate assumed private-repo billing, where the macos-14 10× multiplier dominates; it would return if the repo went private. See `docs/build/whisper-binaries.md` §Cost.
 - **Manual rebuild cadence** — ~4-6 rebuilds/year matched to whisper.cpp minor bumps + security-driven rebuilds. No auto-update loop for the subprocess.
 - **Apple Developer Program ($99/yr)** — already paid for the app signing.
 - **Non-reproducible builds** — CMake embeds timestamps + git SHA, so re-running with the same `upstream_sha` + `erfana_revision` does NOT produce bit-identical output. Pin = "this specific build we shipped", not "hash of any reproducible build". Quarterly integrity check verifies a random shipped binary against its pin.

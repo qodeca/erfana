@@ -10,17 +10,43 @@ Live preview rendering with GitHub-Flavored Markdown and extended features.
 - Lists (ordered, unordered, task lists)
 - Blockquotes with accent border
 - Tables with hover effects
-- Code blocks with syntax highlighting
+- Code blocks (see the note on syntax highlighting below)
 - Links and images
+
+#### Code blocks: no syntax highlighting
+
+Fenced code blocks render in a single flat colour. No highlighter is installed – the
+pipeline is `remarkGfm` (plus `remarkBreaks` when `editor.preserveLineBreaks` is on) →
+`rehypeRaw` → `rehypeSanitize`, with no `shiki`, `prismjs`, `highlight.js` or
+`rehype-highlight` dependency. The `language-*` class **is** emitted onto both `<pre>` and
+`<code>` (the sanitizer allows `className` matching `/^language-./`), but no stylesheet
+consumes it. Monaco provides highlighting in the **editor** pane only.
+
+#### Math is not supported
+
+`$x$` and `$$…$$` render as literal text. There is no `remark-math` / `rehype-katex`; KaTeX
+appears in `node_modules` solely as a transitive dependency of Mermaid, and no KaTeX
+stylesheet is loaded.
 
 ### Extended Features
 
 #### Mermaid Diagrams
-22 supported diagram types:
+22 documented diagram types:
 - Flowcharts, Sequence, Class, State
 - ER Diagrams, User Journey, Gantt
 - Pie Charts, Git Graphs, Mindmaps
 - And 12 more (see full list below)
+
+Erfana passes every `mermaid` fenced block straight to `mermaid.render` and filters nothing, so
+any type the bundled Mermaid version supports will render. Verified against Mermaid 11.16.1,
+that also includes `info`, `flowchart-elk`, `C4Container` / `C4Component` / `C4Dynamic` /
+`C4Deployment`, `wardley-beta`, `cynefin-beta`, `ishikawa`, `treeView-beta`,
+`railroad-beta` (and its `-ebnf` / `-peg` variants), `venn-beta`, `swimlane-beta` and
+`eventmodeling`. The list of 22 is the documented, supported set – not a technical limit.
+
+**`zenuml` is a known exception.** `src/renderer/src/utils/mermaidDirections.ts` lists it as
+a known chart type, but `@mermaid-js/mermaid-zenuml` is not a dependency, so a `zenuml`
+fence fails with "No diagram type detected".
 
 **Usage:**
 ````markdown
@@ -85,16 +111,23 @@ Expand Mermaid diagrams to full-screen overlay for detailed examination.
 #### HTML Embedding
 Safe HTML rendering with security sanitization.
 
-**Allowed Elements:**
-- Containers: `<div>`, `<section>`, `<article>`
+**Allowed elements:**
+- Containers: `<div>`, `<section>`
 - Interactive: `<details>`, `<summary>`
-- Semantic: `<figure>`, `<figcaption>`
-- Tables, lists, inline formatting
+- Media: `<img>`, `<picture>`, `<source>`
+- Tables, lists (including `<dl>`/`<dt>`/`<dd>`), inline formatting
 
-**Blocked (Security):**
-- `<script>`, `<iframe>`, `<style>`
-- Event handlers (`onclick`, etc.)
-- JavaScript URLs
+**Blocked (security):**
+- `<script>` – element and its text content are both removed
+- `<iframe>`, `<object>`, `<embed>` – unwrapped, child content kept
+- Event handlers (`onclick`, etc.) and `javascript:` / `data:` / `vbscript:` / `file://` URLs
+
+**Unwrapped, not blocked:** `<article>`, `<aside>`, `<main>`, `<nav>`, `<header>`,
+`<footer>`, `<figure>`, `<figcaption>`, `<mark>`, `<abbr>`, `<time>`, `<label>` and
+`<style>` are absent from the allowlist, so the tag disappears but its children remain.
+For `<style>` that means the CSS text renders as **visible body text** – it is neutralised,
+not discarded. The full list and its rationale are in
+[rendering/architecture.md](../rendering/architecture.md#allowed-elements).
 
 **Example:**
 ```html

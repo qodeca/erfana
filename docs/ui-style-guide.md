@@ -24,7 +24,6 @@ This style guide documents all design decisions for the Erfana application. All 
 8. [Do's and Don'ts](#dos-and-donts)
 9. [Checklist for UI Changes](#checklist-for-ui-changes)
 10. [Quick Reference](#quick-reference)
-11. [Additional Resources](#additional-resources)
 
 ---
 
@@ -163,19 +162,25 @@ color: var(--color-text-emphasis);   /* Headings, important text */
 
 ### Button Colors (Brand)
 
+> **Primary buttons take a dark foreground, never white.** The brand violet is a light tint: white-on-violet measures **2.2:1** and fails WCAG 1.4.3 (4.5:1 required), while `--color-brand-black` (`#161312`) on the same violet measures **8.4:1**. Match `.dialog-btn-primary`; the full snippet is in [`ui-style-guide-reference.md`](./ui-style-guide-reference.md). Danger buttons are the opposite case: their red is dark enough that white foreground is correct.
+
 ```css
-/* Primary button (Violet) */
+/* Primary button (Violet) – foreground is brand black, see note above */
 background: var(--color-btn-primary-bg);      /* Qodeca Violet */
 background: var(--color-btn-primary-hover);   /* Violet hover */
 background: var(--color-btn-primary-active);  /* Violet active */
+color: var(--color-brand-black);              /* #161312 – 8.4:1 on all three; white would be 2.2:1 */
 
 /* Secondary button (gray) */
 background: var(--color-btn-secondary-bg);    /* #3c3c3c */
 background: var(--color-btn-secondary-hover); /* #505050 */
 
-/* Danger button (red - unchanged) */
-background: var(--color-btn-danger-bg);       /* #c72e0f */
-background: var(--color-btn-danger-hover);    /* #e03e18 */
+/* Danger button (red) */
+background: var(--color-btn-danger-bg);       /* #c72e0f - 5.49:1 with white */
+background: var(--color-btn-danger-hover);    /* #ad280d - 6.80:1 with white; DARKER
+                                                 than resting. The old lighter
+                                                 #e03e18 measured 4.31:1 and failed
+                                                 WCAG 1.4.3 for normal-size text. */
 ```
 
 ### Status Colors (Brand + Unchanged)
@@ -378,6 +383,20 @@ box-shadow: var(--shadow-focus);
 opacity: var(--opacity-disabled);  /* 0.4 */
 cursor: not-allowed;
 pointer-events: none;  /* optional - prevents interaction */
+```
+
+### Native form controls
+
+`:root` in `design-tokens.css` declares `color-scheme: dark`, so the browser paints checkboxes, radios, selects and scrollbars with dark UA defaults instead of the light ones. This is app-wide and is **not** a `prefers-color-scheme` query – Erfana stays dark-only.
+
+`color-scheme` covers the control's chrome; the checked fill still needs a tint:
+
+```css
+input[type='checkbox'] {
+  width: var(--icon-size-sm);          /* intrinsic control size, not a --space-* step */
+  height: var(--icon-size-sm);
+  accent-color: var(--color-accent-primary);
+}
 ```
 
 ---

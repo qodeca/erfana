@@ -116,7 +116,7 @@ describe('MarkdownEditorPanel Integration', () => {
     })
 
     it('formatTabTitle is imported correctly', async () => {
-      const { formatTabTitle } = await import('./markdownEditorPanel.logic')
+      const { formatTabTitle } = await import('../../utils/tabTitle')
       expect(formatTabTitle).toBeDefined()
       expect(typeof formatTabTitle).toBe('function')
     })
@@ -150,7 +150,7 @@ describe('MarkdownEditorPanel Integration', () => {
     })
 
     it('formatTabTitle formats title with modified indicator', async () => {
-      const { formatTabTitle } = await import('./markdownEditorPanel.logic')
+      const { formatTabTitle } = await import('../../utils/tabTitle')
 
       expect(formatTabTitle('file.md', false, false)).toBe('file.md')
       expect(formatTabTitle('file.md', true, false)).toBe('● file.md')
@@ -186,7 +186,6 @@ describe('MarkdownEditorPanel Integration', () => {
       const expectedFunctions = [
         'calculateStats',
         'extractFileName',
-        'formatTabTitle',
         'getDefaultViewMode',
         'buildScrollMapEntries',
         'interpolateScrollPosition',

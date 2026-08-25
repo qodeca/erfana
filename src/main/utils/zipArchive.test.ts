@@ -76,6 +76,45 @@ describe('zipArchive.unzip (integration, happy path)', () => {
     expect(await readFile(join(dest, 'b.txt'), 'utf8')).toBe('bbb')
     expect(await readFile(join(dest, 'c.txt'), 'utf8')).toBe('ccc')
   })
+
+  it('fails closed with the ENOENT open error when the source zip cannot be opened', async () => {
+    // yauzl.open errors (ENOENT) → validateEntries rejects rather than extracting.
+    // Assert the specific ENOENT message so this cannot pass on any thrown value.
+    await expect(unzip(join(workDir, 'does-not-exist.zip'), join(workDir, 'dest')))
+      .rejects.toThrow(/ENOENT/)
+  })
+
+  // yazl refuses to emit an escaping/unsafe name, so build a benign zip and patch
+  // the fixed-length filename bytes (present in both the local header and the
+  // central directory) to an adversarial one. Reused by the two cases below.
+  async function makePatchedZip(src: string, replacement: string): Promise<void> {
+    const placeholder = 'AAAAAAAAA' // 9 bytes
+    const buf = await makeZip([{ name: placeholder, content: 'x' }])
+    const from = Buffer.from(placeholder)
+    const to = Buffer.from(replacement)
+    if (to.length !== from.length) throw new Error('replacement must match length')
+    for (let i = buf.indexOf(from); i !== -1; i = buf.indexOf(from, i + from.length)) {
+      to.copy(buf, i)
+    }
+    await writeFile(src, buf)
+  }
+
+  it('rejects a `..` entry through yauzl’s own error event (validateEntries reject path)', async () => {
+    // yauzl validates `..` itself and emits it on the zipfile `error` event, which
+    // validateEntries surfaces as a rejection — exercising the error-handler path.
+    const src = join(workDir, 'dots.zip')
+    await makePatchedZip(src, '../evil.z')
+    await expect(unzip(src, join(workDir, 'dest'))).rejects.toThrow(/invalid relative path/i)
+  })
+
+  it('rejects an entry our validator flags (NTFS colon) via assertSafeEntry in the entry loop', async () => {
+    // A colon passes yauzl’s own checks but assertSafeEntry rejects it, so the
+    // `entry` handler throws a ZipSlipError and validateEntries rejects with it —
+    // exercising the per-entry rejection path, not just the pure validator.
+    const src = join(workDir, 'colon.zip')
+    await makePatchedZip(src, 'file:x.tx')
+    await expect(unzip(src, join(workDir, 'dest'))).rejects.toBeInstanceOf(ZipSlipError)
+  })
 })
 
 describe('zipArchive.assertSafeEntry (unit tests for the validator)', () => {

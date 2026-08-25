@@ -11,7 +11,7 @@ Erfana follows **2025 Electron security best practices** with comprehensive hard
 | Context Isolation | ✅ Enabled | v0.1.0 |
 | Node Integration | ✅ Disabled | v0.1.0 |
 | Process Sandboxing | ✅ Enabled (default) | v0.6.0 |
-| Electron Fuses | ⚠️ 3 of 6 critical fuses | v0.6.0 |
+| Electron Fuses | ⚠️ 4 of 6 configured (2 need ASAR) | v0.6.0 |
 | ASAR Packaging | ❌ Disabled | v0.6.0 |
 | ASAR Integrity | ❌ N/A (requires ASAR) | N/A |
 | Cookie Encryption | ❌ Disabled | v0.6.0 |
@@ -20,8 +20,9 @@ Erfana follows **2025 Electron security best practices** with comprehensive hard
 **Notes**:
 - ASAR is currently disabled due to runtime dependency loading issues with isomorphic-git (2 fuses unavailable)
 - Cookie encryption disabled to avoid macOS keychain prompts (settings stored in plaintext)
-- 3 critical fuses remain active: RunAsNode, NodeOptions, NodeCliInspect
+- `scripts/fuses.js` sets 4 of the 6 fuses. Three of them harden the build — RunAsNode, NodeOptions and NodeCliInspect (the last one only in production builds; see below) — while the fourth, EnableCookieEncryption, is deliberately set to `false`
 - Test builds (`ERFANA_TEST_BUILD=true`) enable NodeCliInspect for Playwright E2E testing - see [Test Builds](#test-builds-erfana_test_build)
+- `ERFANA_E2E_FORCE_CRASH=1` injects a renderer crash for the error-boundary E2E scenario. Double-gated on `!app.isPackaged`, so a packaged build ignores it - see [Crash Injection](#crash-injection-erfana_e2e_force_crash)
 
 ---
 
@@ -68,7 +69,7 @@ The `sandbox: false` pattern is **3+ year old outdated information**. Modern Ele
 
 ## Electron Fuses (2025 Critical Security)
 
-**Status**: ✅ 4 of 6 critical fuses configured (2 ASAR-dependent fuses unavailable)
+**Status**: ✅ 4 of 6 critical fuses configured (2 ASAR-dependent fuses unavailable); 3 of the 4 are hardening fuses
 
 Fuses are **compile-time feature toggles** that disable unused Electron features to prevent "Living Off The Land" (LOTL) attacks.
 
@@ -83,7 +84,7 @@ Attackers exploit legitimate Electron features (like `ELECTRON_RUN_AS_NODE`) to 
 | `RunAsNode` | `false` | Disables `ELECTRON_RUN_AS_NODE` env var (prevents arbitrary code execution) |
 | `EnableCookieEncryption` | `false` | Disabled to avoid keychain prompts (settings stored in plaintext) |
 | `EnableNodeOptionsEnvironmentVariable` | `false` | Disables `NODE_OPTIONS` env var (prevents command injection) |
-| `EnableNodeCliInspectArguments` | `false` | Disables `--inspect` CLI args (prevents remote debugging) |
+| `EnableNodeCliInspectArguments` | `isTestBuild` – `false` on every production build | Disables `--inspect` CLI args (prevents remote debugging). `true` only under `ERFANA_TEST_BUILD=true` — see [Test Builds](#test-builds-erfana_test_build) |
 | `EnableEmbeddedAsarIntegrityValidation` | ❌ N/A | Requires ASAR enabled (see ASAR Configuration below) |
 | `OnlyLoadAppFromAsar` | ❌ N/A | Requires ASAR enabled (see ASAR Configuration below) |
 
@@ -94,13 +95,16 @@ Attackers exploit legitimate Electron features (like `ELECTRON_RUN_AS_NODE`) to 
 ```javascript
 const { flipFuses, FuseVersion, FuseV1Options } = require('@electron/fuses');
 
+// Test builds enable the Node CLI inspector; production builds never do.
+const isTestBuild = process.env.ERFANA_TEST_BUILD === 'true';
+
 await flipFuses(electronBinaryPath, {
   version: FuseVersion.V1,
   resetAdHocDarwinSignature: context.electronPlatformName === 'darwin',
   [FuseV1Options.RunAsNode]: false,
   [FuseV1Options.EnableCookieEncryption]: false,  // Disabled to avoid keychain prompts
   [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,
-  [FuseV1Options.EnableNodeCliInspectArguments]: false,
+  [FuseV1Options.EnableNodeCliInspectArguments]: isTestBuild,  // false in production
   // NOTE: ASAR integrity validation disabled because asar: false
   // When ASAR is disabled, these fuses cannot be used:
   // - EnableEmbeddedAsarIntegrityValidation
@@ -113,7 +117,7 @@ await flipFuses(electronBinaryPath, {
 Build logs show fuses applied during `npm run build:mac`:
 
 ```
-🔒 Applying Electron fuses to: release/{version}/mac/Erfana.app
+🔒 Applying Electron fuses to: release/{version}/mac-arm64/Erfana.app
 ✅ Electron fuses applied successfully
    - RunAsNode: disabled
    - CookieEncryption: disabled (no keychain prompt)
@@ -196,6 +200,33 @@ const isTestBuild = process.env.ERFANA_TEST_BUILD === 'true';
 
 ---
 
+## Crash Injection (ERFANA_E2E_FORCE_CRASH)
+
+**Status**: ✅ DOUBLE-GATED — inert in any packaged build
+
+The E2E suite needs a renderer that throws on demand to exercise the error-boundary recovery screen (#60). Rather than shipping a test hook in the renderer, the flag travels the same path as the screenshot overlay's per-capture token: main → `additionalArguments` → preload → context bridge.
+
+### Mechanism
+
+1. **Main** — `buildAdditionalArguments()` in `src/main/index.ts` appends `FORCE_CRASH_ARG` (`--erfana-force-crash`, `src/shared/constants.ts`) to `webPreferences.additionalArguments` **only** when `!app.isPackaged && process.env.ERFANA_E2E_FORCE_CRASH === '1'`. Otherwise it returns `[]`.
+2. **Preload** — `src/preload/index.ts` reads the flag back off `process.argv` and exposes `window.__ERFANA_FORCE_CRASH__ = true` **only when present**; in every normal run the property is `undefined`, so a `=== true` check in the renderer is the whole contract.
+3. **Renderer** — reads the exposed boolean; it has no other way to learn the flag.
+
+Both spellings come from one shared constant so the two halves of the handshake cannot drift into a flag that silently never fires.
+
+### Security-relevant properties
+
+| Property | Why it holds |
+|----------|--------------|
+| A packaged build ignores the env var outright | `app.isPackaged` is checked *before* the env var; a shipped app can be launched with `ERFANA_E2E_FORCE_CRASH=1` and nothing changes |
+| The renderer cannot set the flag | It arrives as a Chromium command-line argument on the renderer process — only the **process launcher** can add it. Renderer JavaScript cannot write `process.argv`, and the sandboxed renderer has no `process` at all |
+| No new IPC surface | The flag is a boolean on the context bridge, not a channel; there is nothing to send, validate or gate |
+| Same mechanism as shipped code | Identical to the overlay-token path (`ScreenshotOverlayWindow.ts` → `screenshotOverlay.ts`), which is production code — this is not a bespoke test backdoor |
+
+Worst case if the gate were bypassed: the renderer throws and the user sees the recovery screen. No capability is granted.
+
+---
+
 ## ASAR Configuration
 
 **Status**: ❌ DISABLED
@@ -231,7 +262,7 @@ With ASAR disabled:
 - ❌ Protection against post-installation code injection
 
 **Remaining Security**:
-- ✅ 3 critical fuses still active (RunAsNode, NodeOptions, NodeCliInspect)
+- ✅ 3 of the 4 configured fuses still harden the build (RunAsNode, NodeOptions, NodeCliInspect)
 - ✅ Process sandboxing enabled
 - ✅ Context isolation enabled
 - ✅ CSP enforced
@@ -342,8 +373,19 @@ Markdown preview allows HTML rendering with strict sanitization:
 
 - `<img>` tags can load from HTTPS sources (Unsplash, CDNs, etc.)
 - HTTP images are blocked by CSP (security)
-- `data:` URI images are allowed – required by ImageViewerPanel (renders local images as base64 via `FileService.readFileAsBase64`) and DOCX export (SVG-to-PNG canvas pipeline in `svgToImage.ts`). The sandboxed renderer cannot access `file://` URLs, so base64 data URIs are the secure transport mechanism for local image data from the main process.
+- `data:` URI images are allowed – required by ImageViewerPanel (renders local images as base64 via `FileService.readImage`) and DOCX export (SVG-to-PNG canvas pipeline in `svgToImage.ts`). The sandboxed renderer cannot access `file://` URLs, so base64 data URIs are the secure transport mechanism for local image data from the main process.
 - Dangerous tags/attributes sanitized by `rehype-sanitize` + `hast-util-sanitize` (allowlist schema); Mermaid sanitizes its own SVG output via its bundled DOMPurify. The app does not import DOMPurify directly.
+
+### The rasterize harness has its own, stricter CSP (#73)
+
+`src/renderer/imageExport.html` is a second renderer entry — the hidden window that decodes an image for export — and it carries its **own** policy, deliberately not the one above:
+
+```
+default-src 'none'; script-src 'self'; img-src blob:; style-src 'unsafe-inline';
+connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'
+```
+
+Two differences are load-bearing. `img-src blob:` (the app policy has no `blob:`) is what lets an SVG decode at all, since the SVG path loads through `URL.createObjectURL`. `object-src 'none'` closes the `<object>` / `<embed>` route, which loads an SVG **as a document** and does execute script — the harness loads untrusted SVG only as `<img src=blob:…>`, Chromium's secure static mode. That rule is enforced by CSP *and* by lint, so a future one-line change cannot quietly reopen it: an ESLint block scoped to `src/renderer/src/imageExport/**` bans `innerHTML` / `outerHTML` / `insertAdjacentHTML`, `document.write`, `DOMParser`, `eval` and any runtime import from outside the folder (type-only imports are exempt, being erased by the compiler). The matching ban on *creating* an `object` / `embed` / `iframe` element lives in the renderer-wide `no-restricted-syntax` block instead — flat config replaces a rule wholesale rather than merging, so a second `no-restricted-syntax` declaration in the folder block would silently disable that block's other selectors for this folder. The window additionally runs in its own in-memory session with a deny-all `webRequest` allow-list installed before the window exists — see [API services – features § ImageExportService](./api-services-features.md#imageexportservice).
 
 See [HTML Rendering](./rendering/README.md) for details.
 
@@ -424,7 +466,48 @@ See [`build/architectures.md`](./build/architectures.md) for the full rationale.
 
 ## IPC Security Checklist
 
-Shipped: contextBridge on all IPC, Zod input validation in all handlers, path-traversal prevention, TypeScript + Zod type safety, error messages sanitised at the IPC boundary. Pending: rate limiting; permission system for destructive operations.
+Shipped: contextBridge on all IPC; Zod input validation on every handler that accepts a payload (the payload-free `system:openScreenRecordingSettings` and `system:relaunchApp` have nothing to validate and rely on sender-frame gating instead – see below); path-traversal prevention; TypeScript + Zod type safety; error messages sanitised at the IPC boundary. Pending: rate limiting; permission system for destructive operations.
+
+---
+
+## Sender-frame gating
+
+Zod answers "is this payload well-formed?". It cannot answer "did this call come from our own window?". For channels that reach OS-level capabilities, the second question is the one that matters – and for the payload-free `system:*` channels it is the **only** guard, because there is no payload to validate.
+
+### `isTrustedSender` (shared predicate)
+
+`isTrustedSender(event)` in [`src/main/ipc/senderValidation.ts`](../src/main/ipc/senderValidation.ts) accepts a call only when both hold:
+
+1. **Top-level frame.** `event.senderFrame` exists and `frame.parent === null` – any iframe or sub-frame is rejected.
+2. **Exact expected origin.** In development (`is.dev && ELECTRON_RENDERER_URL`) the sender's origin must equal the electron-vite dev-server origin. In production the sender URL must equal `RENDERER_FILE_URL` – `pathToFileURL(join(__dirname, '../renderer/index.html'))`, mirroring the exact `mainWindow.loadFile` call in `src/main/index.ts`. An arbitrary `file://` URL is **not** accepted, and the dev branch is unreachable in a production build because it is gated on the same condition that decides which URL the window actually loads.
+
+Consumers: `clipboard-handlers.ts` (`clipboard:readText` / `clipboard:writeText`), `file-handlers.ts` (`file:revealInFileManager`), `claude-status-handlers.ts` (via a local copy of the same predicate), `system-handlers.ts`, and `image-export-handlers.ts` (`image-export:run`, #73 — the gate runs **first**, before the payload is even parsed, so an untrusted sender never reaches the Zod parser, the filesystem or the save dialog).
+
+**Not** consumers: `pdf-handlers.ts` and `docx-handlers.ts`. The two document-export channels validate their payload but not their sender; the exposure is bounded (the app renders no untrusted remote content and creates no sub-frames) and the retrofit is recorded as entry #32 in [technical-debt.md](./technical-debt.md).
+
+One known limitation, recorded rather than fixed: in **development** rule 2 compares the dev-server *origin*, not the full URL, so any page served from that origin satisfies the predicate — including the image-export rasterize harness. It is not reachable in practice (the harness preload exposes four verbs and no `ipcRenderer` handle, so it has no bridge to a gated channel) and production pins the exact file URL. Entry #33 in [technical-debt.md](./technical-debt.md).
+
+### Why `system:*` needs it most
+
+`system:relaunchApp` calls `app.relaunch()` followed by `app.quit()`. That is a renderer-triggerable process restart – without the gate, an injected frame could drive a boot loop. `app.quit()` (not `app.exit()`) is used deliberately so `before-quit` still runs and releases the project lock, watchers and PTYs.
+
+`system:openScreenRecordingSettings` calls `shell.openExternal` on a **fixed module-level constant**:
+
+```
+x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture
+```
+
+No part of that URL comes from the renderer, so there is no arbitrary-URL or protocol-injection surface. The handler also no-ops off `darwin` (Screen Recording is a macOS TCC concept). Note that only *this* handler is platform-gated – `system:relaunchApp` runs on every platform.
+
+### Screenshot: a stricter local variant
+
+`screenshot-handlers.ts` defines its own `validateMainRendererSender`, applying the same top-level-frame + exact-`file://`-URL rule to every public screenshot channel (`capture`, `getDisplays`, `getCapabilities`, `getScreenPermission`, `enumerateWindows`). It is deliberately separate from `isTrustedSender` because it must also exclude the app's **own** per-display area-select overlay windows, which are legitimate `BrowserWindow`s of the same app but must never be able to invoke the public capture API. Rejections fail closed (empty display list, `supported: false`, `'unknown'` permission, `SCREENSHOT_FAILED`) and are logged.
+
+The overlay windows have their own, tighter channel path: `screenshot:areaSelected` / `screenshot:areaCancelled` are attached per capture to each overlay's `webContents.mainFrame.ipc` (never global `ipcMain`) and every payload must carry that round's freshly minted UUID token — with one deliberate exception, the overlay's one-way `logging:log` forward (#60), which is untokenised because it carries a log record rather than a capture command and is re-validated main-side by the same `LogEntrySchema` as the editor window's entries.
+
+### macOS usage-description strings
+
+`electron-builder.yml` declares the TCC purpose strings under `mac.extendInfo`, including `NSScreenCaptureUsageDescription` ("Erfana captures screenshots you insert into notes and terminals.") alongside `NSCameraUsageDescription`, `NSMicrophoneUsageDescription`, `NSDocumentsFolderUsageDescription` and `NSDownloadsFolderUsageDescription`. Without the screen-capture entry macOS shows an unexplained prompt, and a missing purpose string is a notarisation/UX liability rather than a bypass.
 
 ---
 
@@ -432,7 +515,7 @@ Shipped: contextBridge on all IPC, Zod input validation in all handlers, path-tr
 
 Run `npm audit` to check. **Policy**: zero high/critical production advisories at release. Pre-release: `npm audit --omit=dev --json` and diff against the table below.
 
-**Current state** (audited 2026-06-04, re-verified during the v0.12.0 release): production **0 vulnerabilities** (`npm audit --omit=dev`). The former `mermaid → langium → chevrotain` moderate advisories no longer count against production because Monaco and Mermaid moved to `devDependencies` in v0.11.0 ([#206](https://github.com/qodeca/erfana/pull/206)); `axios` and `fast-uri` high-severity advisories were patched in v0.11.2. Dev-only advisories remain (notably a `vitest` UI-server critical that needs a breaking 3→4 bump) but do not ship in production builds.
+**Current state** (audited 2026-06-04, re-verified during the v0.12.0 release): production **0 vulnerabilities** (`npm audit --omit=dev`). The former `mermaid → langium → chevrotain` moderate advisories no longer count against production because Monaco and Mermaid moved to `devDependencies` in v0.11.0 (#206 — pre-migration PR, no longer resolves on the public repo); `axios` and `fast-uri` high-severity advisories were patched in v0.11.2. Dev-only advisories remain (notably a `vitest` UI-server critical that needs a breaking 3→4 bump) but do not ship in production builds.
 
 ### Dependency overrides (package.json)
 
@@ -473,9 +556,73 @@ The `afterSign` hook is critical: without it, macOS Sequoia+ rejects `@rpath` li
 
 - **Local OCR only** – Tesseract.js runs locally; no data sent to external APIs
 - **File validation** – LiteParseConverter validates file type, checks for encryption, enforces 1000-page limit and 60s timeout
+- **Hard size cap** – files above `IMPORT.SIZE_HARD_LIMIT` (250 MB) are rejected with `IMPORT_EXCEEDS_SIZE_LIMIT` before any converter runs, bounding memory-bomb input to the image/PDF parsers; `LiteParseConverter.convert()` re-checks this because the document-import IPC path bypasses `ImportService` validation. This bounds input bytes, not decoded pixels — see [technical-debt.md](./technical-debt.md) for the pixel-bomb follow-up
 - **Temp dir cleanup** – Screenshot temp directories cleaned in `finally` blocks (including abort paths)
 - **Dependency isolation** – LibreOffice/ImageMagick invoked via child process with no user-controlled arguments
 - **Zod validation** – All import IPC inputs validated via Zod schemas (`import-schema.ts`)
+
+## Document export security
+
+- **Remote-image SSRF strip** – `@turbodocx/html-to-docx` fetches any `http(s)` image `src` at export time (bundled axios). `docxImageStrip.ts` removes remote `<img>`/`<source>` (any URL scheme or protocol-relative source) with a real parser (parse5) before conversion, so the library never issues the request; `data:` and local/relative images are kept. Fail-closed: anything that is not empty, `data:`, or a relative path is stripped. The renderer shows a warning toast with the count.
+- **Process isolation** – conversion runs in a killable Electron `utilityProcess` child (`DocxConvertProcessAdapter` → `docx-convert.process.ts`), so a synchronous hang (malformed image) is terminated at the timeout and cannot freeze the main process, and a decompression bomb is capped to the child's memory. See [Architecture](./architecture.md) § Process isolation for DOCX conversion.
+
+## HTML preview
+
+The HTML preview (#74) executes a project's real CSS and JavaScript in a live page. Shipping execution is a one-way door, so the feature is built as a **sealed box**: the page runs in its own process on its own in-memory session partition, with no channel to Erfana in either direction. This section transcribes the design threat model (`specs/designs/sd-074-html-preview.md` §2.8). The user-facing feature page is [HTML preview](./html-preview/README.md).
+
+### Assets protected
+
+- **A1** – files inside the open project, outside the excluded set.
+- **A2** – files outside the project root.
+- **A3** – Erfana's IPC surface and the main renderer.
+- **A4** – the user's OS account.
+- **A5** – the integrity of `.erfana/settings.json`.
+- **A6** – the user's trust in what the preview pane shows.
+
+### Trust boundaries and attackers
+
+- **T1 – a malicious `.html` in the project** (the primary attacker). It arrives by clone, agent, or download and runs arbitrary JavaScript, including `unsafe-eval`.
+- **T2 – a malicious repository.** It controls `.gitignore`, `.git/config`, `.erfana/`, symlinks, short-name-aliasable filenames and the directory layout *before* the user previews anything.
+- **T3 – a network attacker on an approved host.**
+- **T4 – a compromised approved CDN.**
+
+The load-bearing boundary is that **Erfana exposes no scripted API to the page**: no preload, no `postMessage` endpoint, no bridge, no file-write path. The page's only outward influence is a bounded set of diagnostic signals (console messages, load failures, request metadata, find-in-page counts, one CSS-swap boolean, four enumerated keystrokes), each treated as untrusted data – never executed, never reflected into a response header, always length-bounded and control-character-stripped.
+
+### Sealed-box controls in place
+
+| Control | Assets | Effect |
+|---|---|---|
+| Own process + in-memory session partition, no preload, frozen `sandbox`/`contextIsolation`/`nodeIntegration:false` preferences asserted on the **constructed** value | A3, A4 | Keeps T1 from reaching Erfana IPC or node |
+| `sandbox allow-scripts` opaque origin (a header-only CSP directive) | A4 | `localStorage`/`sessionStorage` throw, `indexedDB` is unavailable – T1 persists nothing |
+| No persistence: in-memory partition (`storagePath === null`), no service workers, purge (`clearStorageData` + `clearCache`) before any Erfana-driven reload | A4 | Nothing survives a reload or an app restart |
+| `erfana-preview://<opaque-token>/<path>` serving, realpath-confined to the project root, `O_NOFOLLOW` + dev/ino identity check + post-resolve exclusion re-check; no filesystem path ever enters a URL | A1, A2 | Defeats symlink escape and the Windows 8.3 short-name alias bypass |
+| Protocol-layer exclusion of dot-prefixed segments and `node_modules`/`dist`/`out`/`coverage`/`.git` | A1 (partial) | Keeps T1 from reading `.git`, `.env`, `.erfana` |
+| Erfana-set CSP built from the project allowlist, applied at a single site, **plus** an independent unfiltered `onBeforeRequest` gating remote egress; per-hop redirect decisions; the local `erfana-preview:` scheme is passed through to the confining protocol handler (the real local-read gate), while every remote host is allowlist-checked | A1 | Two chokepoints gate remote subresources; local reads are gated by the protocol handler's realpath confinement, not by this filter |
+| Host allowlist for remote subresources, grammar rejecting IP literals, `localhost`, `.local`, `.internal` | A4 | Raises the bar on loopback/LAN targets |
+| Watch-set realpath confinement (same gate as the protocol handler) | A2 | Keeps T2 from planting a watch outside the root |
+| `erfanaDirGate` + non-recursive `mkdir` | A5, A2 | Defeats T2's symlinked `.erfana` |
+| Hardened `git check-ignore` (absolute binary path, safe cwd, env allowlist, `core.fsmonitor=`, `core.hooksPath=<null>`) | A4 | Defeats T2's `.git/config` command-execution vector |
+| `setWebRTCIPHandlingPolicy('disable_non_proxied_udp')` | A1 | Narrows WebRTC local-IP exposure only – see accepted risk 3 |
+| `X-DNS-Prefetch-Control: off` | A1 | Suppresses `dns-prefetch`; does **not** cover `preconnect` – see risk 3 |
+| Enumerated 4-shortcut keyboard forwarding, no page↔app channel of any kind | A3 | Bounds the input bridge to a closed list |
+
+### Risks knowingly accepted
+
+These are accepted, not mitigated. The design chose to ship execution with them documented rather than block on closing them.
+
+1. **Any previewed page can read most of your project.** After the exclusion checks, everything under the root whose resolved path has no dot-prefixed segment and is not under `node_modules`/`dist`/`out`/`coverage`/`.git` is readable – all source, docs, notes and data. A secret in `config.json` is readable; one in `.env` is not.
+2. **Exfiltration over an approved host.** The allowlist controls *which* origins, never *what* is sent. A compromised approved CDN (T4) turns any approved host into a channel.
+3. **Exfiltration over channels no chokepoint sees.** `setWebRTCIPHandlingPolicy('disable_non_proxied_udp')` is a local-IP-exposure policy only; it does **not** stop an `RTCPeerConnection` reaching an attacker-controlled TURN server over TCP/443 – no permission gates a data channel, `onBeforeRequest` never observes ICE/TURN traffic, and Chromium does not enforce `connect-src` on WebRTC, so this is a real, unmitigated general-purpose exfiltration channel. `<link rel=preconnect>` opens a real TCP/TLS connection with no HTTP request, so `onBeforeRequest` never fires; ~60 bytes leak per hostname via subdomain labels. DNS prefetch is suppressed by `X-DNS-Prefetch-Control: off`, but a DNS resolution for an allowlist-blocked host may still occur before cancellation. The allowlist is therefore not written as an unqualified guarantee.
+4. **DNS rebinding is not defended.** The grammar rejects literal IPs and `localhost`, but a name that *resolves* to a private address is not detected – no IP pinning between resolution and connection. The residual is blind, fire-and-forget write-side SSRF to loopback/LAN services: the opaque origin means the page cannot read any response, so this is not a read primitive.
+5. **The allowlist is a speed bump, not a wall.** It lives in `.erfana/settings.json` inside the project, so a cloned repository or an agent edit can pre-approve hosts before a human ever sees the prompt.
+6. **Hardlinks defeat path confinement.** `realpath` resolves symlinks but not hardlinks.
+7. **A residual `realpath`→open race.** Narrowed by the post-resolve re-check, not closed – Node has no `openat`.
+8. **UI spoofing (partial mitigation).** The view rect is clamped to the window content area and the panel keeps its tab and toolbar chrome, so the page cannot paint over Erfana's own frame; Erfana never asks for credentials or API keys inside a preview panel. A persistent "Preview – not Erfana" strip is a follow-up.
+9. **Git config keys beyond `core.fsmonitor`.** The hardened invocation overrides the one key known to execute a command during `check-ignore`, bounded by fail-open and by `check-ignore` being the only subcommand run.
+10. **Windows short-name aliases beyond the tested set.** The full-path re-resolve is general, but the alias Windows assigns to a leading-dot name is an unverified implementation-time confirmation item.
+11. **A permanent Chromium attack surface.** Shipping execution makes Chromium advisories a recurring, indefinite obligation for this project.
+
+Two operational breakages are also accepted for this feature: projects on **external or network volumes** (see #60) and the **same project open in two Erfana windows**. Per repository policy, any vulnerability found in this feature after release goes to private advisory reporting, not a public issue.
 
 ## Worker thread security (v0.9.0)
 
@@ -523,7 +670,7 @@ After A4 (`powerMonitor` resume), B1 (symlink TOCTOU), and D3 (HMAC), the major 
 
 4-layer client-side trust model for the whisper.cpp subprocess (manifest Ed25519 sig + artifact SHA pin + per-spawn re-hash for TOCTOU + monotonic revision floor). Composition + attacker model: [`windows/whisper-trust-chain.md`](./windows/whisper-trust-chain.md). Decisions: [ADR 0001](./adrs/0001-self-host-whisper-binaries.md)–[ADR 0004](./adrs/0004-per-spawn-toctou-rehash.md). Operator runbook: [`windows/whisper-support-runbook.md`](./windows/whisper-support-runbook.md).
 
-## Release signing (v0.9.5+, [#174](https://github.com/qodeca/erfana/issues/174))
+## Release signing (v0.9.5+, #174)
 
 End-to-end signed multi-platform release pipeline. Full operator reference: [`build/release.md`](./build/release.md).
 
@@ -532,7 +679,7 @@ Trust anchors:
 - **macOS**: Developer ID Application certificate + notarytool (user-auth mode: Apple ID + app-specific password + Team ID). Ticket stapled.
 - **Windows**: Azure Artifact Signing (formerly Azure Trusted Signing) via app-registration X.509 certificate auth (electron-builder 26's `WindowsSignAzureManager` does not support OIDC `AZURE_FEDERATED_TOKEN_FILE`, so we use a rotatable cert instead — public key lives on the app registration, private key is a GitHub Secret). The NSIS installer `.exe` is signed and timestamped via `http://timestamp.digicert.com`.
 - **Aggregate `SHA256SUMS`**: signed with a **dedicated release minisign keypair** (separate from the whisper-binaries key — blast-radius isolation per ADR 0003 pattern), covering every release artifact across macOS + Windows.
-- **Per-artifact provenance**: SLSA Build L2 attestations are currently **not enabled** — GitHub gates `actions/attest-build-provenance` to Enterprise Cloud for private repos. qodeca is on the **Team plan**, which still does not include attestations for private repos. The minisign signature on the aggregate `SHA256SUMS` + per-platform Developer ID / Azure Artifact Signing already provide artifact authenticity without requiring GitHub as a trust anchor. Revisit if Erfana goes public or moves to Enterprise.
+- **Per-artifact provenance**: SLSA Build L2 attestations are currently **not enabled** — GitHub gates `actions/attest-build-provenance` to Enterprise Cloud for private repos. That gate no longer applies — the repo went public on 2026-06-16 — so attestations are now simply **not wired into the pipeline**; enabling them is a deliberate change to `release.yml`, not a plan upgrade. The minisign signature on the aggregate `SHA256SUMS` + per-platform Developer ID / Azure Artifact Signing already provide artifact authenticity without requiring GitHub as a trust anchor.
 
 ### Release minisign public keys (dual-key, ADR-0003 style)
 
@@ -554,23 +701,32 @@ RWTxkJcmBbLk6J2eWEDWHYcAmgpKfRqO5PR8oRRLUpgn5rgCaWmTvd9w
 ```
 <!-- minisign-pubkey-rotation-end -->
 
-The fence markers above are load-bearing — `releasing-erfana` skill Phase 4 extracts the primary pubkey by `awk` between these markers. Do NOT remove or rename them without updating `phases/phase-4-verify.md` accordingly.
+The fence markers above are load-bearing — `.github/workflows/checks.yml` **Guard 5** (release-pubkey drift detector) `awk`s every key out from between them and asserts byte-equality against `docs/release-pubkey.txt`. That is the only comparison Guard 5 actually enforces today: it has a third leg for `README.md`, but the leg is wrapped in `if [ -n "$README" ]` and `README.md` contains no `RW…` key lines (it links to `docs/release-pubkey.txt` instead of mirroring the values), so the leg silently no-ops. **Two** copies are enforced — `docs/release-pubkey.txt` and this file. The `releasing-erfana` skill does **not** read this file: Phase 4.3 reads the canonical `docs/release-pubkey.txt` directly (`phases/phase-4-verify.md` §4.3). Do NOT remove or rename the markers without updating Guard 5 accordingly.
 
-Mirrored copies for offline retrieval: `README.md` § Release verification, `docs/release-pubkey.txt`. These keys are **separate** from the whisper-binaries minisign key — a compromise of one does not invalidate the other.
+Canonical copy for offline retrieval: `docs/release-pubkey.txt` (the fenced blocks above are the second enforced copy). `README.md` § Release verification only *links* to that file — it does not mirror the key values, so there is no third copy to keep in sync. These keys are **separate** from the whisper-binaries minisign key — a compromise of one does not invalidate the other.
 
 ### End-user verification
 
 ```bash
-# Integrity + aggregate signature (all platforms)
-minisign -V -P "$(cat docs/release-pubkey.txt)" -m SHA256SUMS -x SHA256SUMS.minisig
-sha256sum -c SHA256SUMS
+# Integrity + aggregate signature (all platforms). `minisign -P` takes ONE
+# base64 key and docs/release-pubkey.txt is a COMMENTED file publishing two,
+# so extract the keys instead of cat-ing the file into -P. Either key is valid.
+PRIMARY=$(grep -m1 -E '^RW[A-Za-z0-9+/=]+$' docs/release-pubkey.txt)
+ROTATION=$(grep -E '^RW[A-Za-z0-9+/=]+$' docs/release-pubkey.txt | sed -n 2p)
+minisign -V -P "$PRIMARY" -m SHA256SUMS -x SHA256SUMS.minisig \
+  || minisign -V -P "$ROTATION" -m SHA256SUMS -x SHA256SUMS.minisig \
+  || { echo "SIGNATURE VERIFICATION FAILED — do not run this download." >&2; exit 1; }
+
+# --ignore-missing: SHA256SUMS lists BOTH platform binaries and you probably
+# downloaded one. macOS without coreutils: shasum -a 256 --ignore-missing -c.
+sha256sum --ignore-missing -c SHA256SUMS
 ```
 
 Full verification recipes (macOS `codesign`, Windows `signtool`) are in [`build/release.md` § End-user verification](./build/release.md#end-user-verification).
 
 ## Future enhancements
 
-Auto-updates via signed electron-updater (deferred — not shipped with #174 per non-goals). Encrypted storage via OS keychain. Confirmation prompts before destructive operations. SLSA Build L2 attestations (re-enable when Erfana moves to Enterprise Cloud or repo goes public). **Windows code signing is now covered by #174; [#166](https://github.com/qodeca/erfana/issues/166) narrows to NSIS installer UX. Branch protection on `main` + protected `v*.*.*` tag ruleset are live as of 2026-04-25 — see [`build/release.md` § Branch protection](./build/release.md#branch-protection-phase-i--done-2026-04-25).**
+Auto-updates via signed electron-updater (deferred — not shipped with #174 per non-goals). Encrypted storage via OS keychain. Confirmation prompts before destructive operations. SLSA Build L2 attestations — still off, pending a deliberate pipeline change rather than a plan restriction: the original blocker (attestations gated to Enterprise Cloud for private repos) expired when the repo went public on 2026-06-16. **Windows code signing is now covered by #174; #166 narrows to NSIS installer UX. Branch protection on `main` + protected `v*.*.*` tag ruleset are live as of 2026-04-25 — see [`build/release.md` § Branch protection](./build/release.md#branch-protection-phase-i--done-2026-04-25).**
 
 ## References
 

@@ -25,10 +25,13 @@
   transition: var(--transition-normal);   /* 0.15s ease */
 }
 
-/* Primary button */
+/* Primary button.
+ * Foreground is the brand black, NOT white: the brand violet is a light tint,
+ * so white-on-violet measures 2.2:1 and fails WCAG 1.4.3 (4.5:1 needed).
+ * #161312 on the same violet measures 8.4:1. Matches `.dialog-btn-primary`. */
 .btn-primary {
   background: var(--color-btn-primary-bg);
-  color: var(--color-white);
+  color: var(--color-brand-black);
   box-shadow: var(--shadow-sm);
 }
 

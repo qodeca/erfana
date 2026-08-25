@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Erfana image export</title>
+    <!--
+      Hard CSP for the rasterize harness (issue #73). Deliberately NOT a copy of
+      index.html's policy: this page must load blob: images (the SVG path and the
+      raster fallback both go through URL.createObjectURL) and must load nothing
+      else at all. object-src 'none' closes the <object>/<embed> route, which is
+      the one way an SVG becomes a document that can execute script.
+      style-src 'unsafe-inline' is required for the injected @page rule.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; img-src blob:; style-src 'unsafe-inline'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"
+    />
+  </head>
+  <body>
+    <script type="module" src="/src/imageExport/harness.ts"></script>
+  </body>
+</html>

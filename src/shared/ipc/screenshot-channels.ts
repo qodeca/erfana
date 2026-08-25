@@ -54,6 +54,7 @@ export const SCREENSHOT_CHANNELS = {
   CAPTURE: 'screenshot:capture',
   GET_DISPLAYS: 'screenshot:getDisplays',
   GET_CAPABILITIES: 'screenshot:getCapabilities',
+  GET_SCREEN_PERMISSION: 'screenshot:getScreenPermission',
   ENUMERATE_WINDOWS: 'screenshot:enumerateWindows',
   AREA_SELECTED: 'screenshot:areaSelected',
   AREA_CANCELLED: 'screenshot:areaCancelled'

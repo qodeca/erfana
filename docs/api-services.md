@@ -22,7 +22,7 @@ Manages terminal emulator instances with xterm.js + node-pty. Cross-platform: ma
 
 ### Public Methods
 
-#### `async createTerminal(config?: TerminalConfig, webContentsId?: number): Promise<string | null>`
+#### `async createTerminal(config?: TerminalConfig, webContentsId?: number): Promise<{ terminalId: string; shellKind: ShellKind } | null>`
 Create a new PTY instance. Async because `node-pty` is dynamically imported on first call.
 
 **Parameters** (`config?: TerminalConfig`, all optional — defaults to `{}`):
@@ -34,7 +34,7 @@ Create a new PTY instance. Async because `node-pty` is dynamically imported on f
 **Parameters** (top-level):
 - `webContentsId?: number` — Owning webContents ID; used by `cleanupForWebContentsId(id)` to kill orphaned PTYs when the window closes
 
-**Returns:** Generated terminal ID (`terminal-N`), or `null` if cwd failed Windows deny-list validation or the shell could not be resolved.
+**Returns:** `{ terminalId, shellKind }` — the generated terminal ID (`terminal-N`) plus the `ShellKind` resolved at create time, so the renderer can quote pasted paths for the right shell flavour without a follow-up IPC round-trip (#164). Returns `null` if `node-pty` is unavailable, the cwd failed Windows deny-list validation, or the shell could not be resolved.
 
 **Side Effects:**
 - Spawns new PTY process (platform-resolved shell)
@@ -87,11 +87,14 @@ Watches file content for external changes with auto-reload and conflict detectio
 
 ### Public Methods
 
-#### `watchFile(filePath: string): void`
-Start watching file for changes.
+#### `async watchFile(filePath: string, webContents: WebContents): Promise<void>`
+Start watching file for changes. Watches are refcounted per `webContents`, so the caller must pass the owning window's `WebContents` (the same object is used to push change events back and to clean up via `cleanupForWebContentsId(id)`).
+
+`MAX_WATCHED_FILES` (100) governs **new** entries only: joining a path that is already watched never fails on the cap. A refused join would watch nothing while its later `unwatchFile` still decremented the count, closing the watcher for the consumer that owns it (issue #70).
 
 **Parameters:**
 - `filePath` - Absolute path to file
+- `webContents` - Electron `WebContents` of the subscribing window
 
 **Side Effects:**
 - Creates chokidar watcher (300ms debounce)
@@ -99,45 +102,54 @@ Start watching file for changes.
 
 ---
 
-#### `unwatchFile(filePath: string): void`
-Stop watching file.
+#### `async unwatchFile(filePath: string, webContents: WebContents): Promise<void>`
+Stop watching file for one subscriber. The underlying chokidar watcher is closed only when the last subscriber unwatches.
+
+**Parameters:**
+- `filePath` - Absolute path to file
+- `webContents` - Electron `WebContents` of the unsubscribing window
+
+---
+
+#### `pauseWatch(filePath: string): void`
+Temporarily pause watching (used during save operations). Synchronous.
 
 **Parameters:**
 - `filePath` - Absolute path to file
 
 ---
 
-#### `pauseWatching(filePath: string): void`
-Temporarily pause watching (used during save operations).
+#### `resumeWatch(filePath: string): void`
+Resume watching after pause. Synchronous.
 
 **Parameters:**
 - `filePath` - Absolute path to file
 
 ---
 
-#### `resumeWatching(filePath: string): void`
-Resume watching after pause.
-
-**Parameters:**
-- `filePath` - Absolute path to file
-
----
-
-### Events
-
-#### `'file-changed'`
-**Payload:** `{ filePath: string }`
-
-Emitted when file changes externally (after 300ms debounce).
-
-**Note:** Not emitted during pause window.
+#### Other public methods
+- `async unwatchAll(webContents: WebContents): Promise<void>` - Drop every watch held by one window
+- `async cleanupForWebContentsId(webContentsId: number): Promise<void>` - Called on window close to prevent stale watchers
+- `setProjectPath(path: string): void` - Set the project root and bump the session token so stale events from the previous project are dropped
+- `getStats(): { totalWatched: number; fileDetails: Array<{ path: string; watchers: number }> }`
+- `async stopAll(): Promise<void>` / `async dispose(): Promise<void>` - Shutdown paths
 
 ---
 
-#### `'file-deleted'`
-**Payload:** `{ filePath: string }`
+### Renderer notifications
 
-Emitted when watched file is deleted.
+`FileWatcherService` is not an `EventEmitter` — it sends straight to the
+subscribing windows over IPC (`watcher/watchNotifier.ts`, which skips destroyed
+windows and swallows send failures). Two of the three contracts changed in #70.
+
+| Channel | Payload | When |
+|---|---|---|
+| `file-watch:changed` | `{ filePath }` | Content changed externally, after `awaitWriteFinish` (300 ms) + a 300 ms debounce. **Since #70 this also covers an atomic replace** (write temp + rename): where the platform reports that as an `unlink`, the service re-arms the watch and re-enters the same debounced change path, so the renderer sees a change rather than a delete followed by silence |
+| `file-watch:deleted` | `{ filePath }` | The file is **genuinely** gone — confirmed by one final `stat` after the 100 ms atomic-save window closes |
+| `file-watch:error` | `{ filePath, error }` | A chokidar error, **and since #70 any watch teardown that is not a genuine delete**: the session token was bumped mid-window, the path stopped resolving inside the project, or the replacement watcher could not be created. Sent by `notifyWatchDead`, which deliberately bypasses the session-version guard that `notifyWebContents` applies — a "your watch is dead" message that the guard dropped would leave the renderer showing stale content with no indicator, which is the symptom #70 exists to remove |
+
+Neither `changed` nor `deleted` is emitted during a pause window. Full mechanics
+in [File Watching § Single-file watch internals](./file-watching/README.md#single-file-watch-internals-70).
 
 ---
 
@@ -149,11 +161,12 @@ Watches directory tree for changes with auto-refresh and pause/resume pattern.
 
 ### Public Methods
 
-#### `watchDirectory(dirPath: string): void`
-Start watching directory recursively.
+#### `async watchDirectory(dirPath: string, webContents: WebContents): Promise<void>`
+Start watching directory recursively. Watches are refcounted per `webContents`; the same object receives the change pushes and drives `cleanupForWebContentsId(id)`.
 
 **Parameters:**
 - `dirPath` - Absolute path to directory
+- `webContents` - Electron `WebContents` of the subscribing window
 
 **Side Effects:**
 - Creates chokidar watcher feeding a 75 ms collection window + 200 ms throttle (VS Code pattern). The renderer's `useDirectoryWatcher` debounces its `onRefresh` callback by another 250 ms.
@@ -162,41 +175,54 @@ Start watching directory recursively.
 
 ---
 
-#### `unwatchDirectory(dirPath: string): void`
-Stop watching directory.
+#### `async unwatchDirectory(dirPath: string, webContents: WebContents): Promise<void>`
+Stop watching directory for one subscriber. The chokidar watcher is closed only when the last subscriber unwatches.
 
 **Parameters:**
 - `dirPath` - Absolute path to directory
+- `webContents` - Electron `WebContents` of the unsubscribing window
 
 ---
 
-#### `pauseWatching(dirPath: string): void`
-Pause watching (used during CRUD operations).
+#### `pauseWatch(dirPath: string): void`
+Pause watching (used during CRUD operations). Synchronous, and reference-counted so nested pause/resume pairs nest safely. A no-op if no watcher exists for `dirPath`.
 
 **Parameters:**
 - `dirPath` - Absolute path to directory
 
-**Safety timeout:** A 10-second auto-resume guard prevents permanent pause states. If `resume()` is not called within 10 s (e.g., due to a lost IPC message), the PauseController auto-resumes, logs a warning, and triggers a compensating refresh (#103).
+**Safety timeout:** A 10-second auto-resume guard prevents permanent pause states. If `resumeWatch()` is not called within 10 s (e.g., due to a lost IPC message), the PauseController auto-resumes, logs a warning, and triggers a compensating refresh (#103).
 
 **Usage Pattern:**
 ```typescript
 // Before internal operation
-await directoryWatcherService.pauseWatching(projectPath)
+directoryWatcherService.pauseWatch(projectPath)
 
 // Perform CRUD
 await fs.writeFile(newFilePath, content)
 
 // After operation
-await directoryWatcherService.resumeWatching(projectPath)
+directoryWatcherService.resumeWatch(projectPath)
 ```
 
 ---
 
-#### `resumeWatching(dirPath: string): void`
-Resume watching after pause.
+#### `resumeWatch(dirPath: string): boolean`
+Resume watching after pause. Synchronous. Decrements the pause reference count; the watcher only actually resumes once the count reaches 0.
 
 **Parameters:**
 - `dirPath` - Absolute path to directory
+
+**Returns:** `false` if no watcher exists for `dirPath` (resume called for an unknown path), `true` otherwise — including when the watch stays paused because outer pauses are still outstanding.
+
+---
+
+#### Other public methods
+- `async unwatchAll(webContents: WebContents): Promise<void>` - Drop every watch held by one window
+- `async cleanupForWebContentsId(webContentsId: number): Promise<void>` - Called on window close to prevent stale watchers
+- `setProjectPath(path: string): void` - Set the project root and bump the session token so stale events are dropped
+- `setIgnorePatterns(patterns: string[]): void` / `getIgnorePatterns(): string[]`
+- `getStats()` / `getFormattedMetrics(): string` - Watcher diagnostics
+- `async stopAll(): Promise<void>` / `async dispose(): Promise<void>` - Shutdown paths
 
 ---
 
@@ -275,7 +301,7 @@ Rename a file or folder. The second argument is a **basename**, not a full path 
 
 **Throws (all `AppError` or `Error`):**
 - Empty name (`'Name cannot be empty'`)
-- `INVALID_FILENAME` from `assertValidUserFilename` (Windows-reserved basename, forbidden chars, control chars, bidi overrides — see [Filename validation](#filename-validation-161-phase-2) above)
+- `INVALID_FILENAME` from `assertValidUserFilename` (Windows-reserved basename, forbidden chars, control chars, bidi overrides — see [`createFile`](#createfiledirpath-string-filename-string-promisestring) above)
 - Target already exists (`'"<name>" already exists'`)
 - Path is outside the project root, or equals the project root
 
@@ -290,6 +316,25 @@ Reveals a file or folder in the native OS file manager (Finder/Explorer) by call
 - **Arg:** absolute path (the right-clicked tree node's `path`).
 - **Returns `Promise<string>`:** `''` on success, otherwise a human-readable error message the renderer surfaces as an error toast (`'Item no longer exists on disk'`, `'Cannot reveal items outside the project'`, `'No project is open'`, `'Invalid path'`).
 - **Security:** validates the IPC sender via the shared `isTrustedSender` (`src/main/ipc/senderValidation.ts`, also used by the clipboard handlers) and confines the path to the open project root (the root itself is allowed so the project-root node can be revealed); an untrusted sender is a silent no-op returning `''`. The path is `fs.realpath`-canonicalized before the boundary check, so an in-project symlink cannot escape the project.
+
+---
+
+### Path confinement for the file-read IPC handlers
+
+**Handlers:** `src/main/ipc/file-handlers.ts` · **Helper:** `src/main/utils/projectConfinement.ts`
+
+`path.resolve` normalises a path string but does not resolve symlinks, so a link planted inside the project used to carry an out-of-project target past the boundary check. Since #70 the file watcher re-reads a watched path automatically, which turns a one-shot user-initiated read into a repeating one, so the read handlers check twice: **lexically** first (no filesystem access, and it never discloses whether an out-of-project path exists), then **canonically** against `fs.realpath` of both the path and the project root. Both sides come from `realpath`, so platform canonicalisation — Windows casing, `/tmp` → `/private/tmp` on macOS — applies to each and an alias is not mistaken for an escape.
+
+`classifyConfinement` returns one of four verdicts: `inside`, `outside`, `missing` (lexically inside but the path does not exist, so the canonical stage could not run) or `unverifiable` (`realpath` failed for a reason other than ENOENT — EACCES, ELOOP, ENOTDIR). Two guards sit on top of it:
+
+| Channel | Guard | Rule when it escapes |
+|---|---|---|
+| `file:readFile`, `file:readImage` | `assertInsideProject` | Requires an open project; throws `Cannot read files outside the project directory`, or `Cannot verify this path is inside the project directory` on an `unverifiable` verdict |
+| `file:getStats` | `assertNoConfinementEscape` | **Deliberately not confined.** A path that was never in the project is left alone; only a path that *looks* in-project and canonically resolves out of it is refused |
+
+**Why `file:getStats` keeps the carve-out.** The external-file import shortcut (spec #012, `ProjectTree.handleImportShortcut`) stats the paths the user picked in the native file dialog, and those are outside the project by definition. Confining the channel would break that flow. What the weaker guard still buys is the part #70 needs: the watcher's automatic re-stat of a watched, in-project path cannot be pointed somewhere else through a symlink. The clean fix — have `file:selectExternalFiles` return sizes so `ProjectTree` stops stat-ing external paths at all, after which `getStats` can be confined like the read handlers — is recorded in [Technical Debt](./technical-debt.md).
+
+A path that simply does not exist passes both guards, so the caller's own ENOENT stays the error the renderer sees rather than this module claiming the file left the project. The same helper backs the file watcher's re-arm re-check (`watcher/atomicRearm.ts`), which re-validates after an unlink because the file was replaced by someone else in between. `file:revealInFileManager` deliberately keeps its own copy of the two-stage check: it needs the canonical path itself to hand to `shell.showItemInFolder`, and it answers with per-verdict user-facing strings instead of throwing.
 
 ---
 
@@ -323,39 +368,69 @@ Clear last project path.
 
 ---
 
-#### `getApprovedTools(): Promise<string[]>`
- 
+#### `getProjectFilterMode(): Promise<string>`
+Get the project tree filter mode.
 
-**Returns:** Array of tool names (defaults to all 17 tools).
+**Returns:** The stored mode, defaulting to `'all'`.
+
+**Throws:** `SettingsServiceError` if the store cannot be read.
 
 ---
 
-#### `setApprovedTools(tools: string[]): Promise<void>`
-Set approved tools.
+#### `setProjectFilterMode(mode: string): Promise<void>`
+Persist the project tree filter mode.
 
 **Parameters:**
-- `tools` - Array of tool names
+- `mode` - Filter mode to store
 
 ---
 
-#### `addApprovedTool(toolName: string): Promise<void>`
-Add single tool to approved list.
+#### `getDirectoryWatchDepth(): Promise<number | undefined>`
+Get the chokidar recursion depth used by `DirectoryWatcherService` (performance tuning).
+
+**Returns:** The stored non-negative depth, or `undefined` when unset or invalid (chokidar then watches unlimited depth).
+
+---
+
+#### `setDirectoryWatchDepth(depth: number | null): Promise<void>`
+Persist the directory watch depth. Values are floored and clamped to `>= 0`; pass `null` to clear the override and restore unlimited depth.
 
 **Parameters:**
-- `toolName` - Tool to add
+- `depth` - Depth to store, or `null` to clear
 
 ---
 
-#### `removeApprovedTool(toolName: string): Promise<void>`
-Remove single tool from approved list.
+#### `getRecentProjects(): Promise<RecentProject[]>`
+Get the recent-projects list (max 5), newest first.
+
+**Returns:** `Array<{ path: string; name: string; lastOpened: number }>`.
+
+---
+
+#### `addRecentProject(path: string, name: string): Promise<void>`
+Add or promote a project in the recent list. Mutex-guarded against parallel project opens; duplicates are collapsed by canonical path via `RecentProjectsDeduplicator`.
 
 **Parameters:**
-- `toolName` - Tool to remove
+- `path` - Absolute project path
+- `name` - Display name
 
 ---
 
-#### `resetApprovedTools(): Promise<void>`
-Reset to default (all 17 tools).
+#### `removeRecentProject(path: string): Promise<void>`
+Remove a project from the recent list (canonical-path match). Mutex-guarded.
+
+**Parameters:**
+- `path` - Absolute project path
+
+---
+
+#### `cleanupStaleProjects(): Promise<void>`
+Drop recent projects that are no longer accessible (`access(R_OK | X_OK)` checked in parallel), freeing slots for valid projects. Only writes when something changed. Mutex-guarded; intended for app startup.
+
+---
+
+#### `clearRecentProjects(): Promise<void>`
+Clear the entire recent-projects list. Mutex-guarded.
 
 ---
 
@@ -366,18 +441,21 @@ Reset to default (all 17 tools).
 ```typescript
 import { terminalService } from './services/TerminalService'
 
-// Create terminal — returns the generated ID, or null on failure
-const terminalId = await terminalService.createTerminal({
+// Create terminal — returns { terminalId, shellKind }, or null on failure
+const created = await terminalService.createTerminal({
   cwd: '/path/to/project',
   cols: 80,
   rows: 24,
 }, webContentsId)
 
-if (terminalId === null) {
-  // Cwd validation failed (Windows deny-list) or shell could not be resolved.
+if (created === null) {
+  // node-pty unavailable, cwd validation failed (Windows deny-list),
+  // or the shell could not be resolved.
   // Inspect the most recent 'error' event for details.
   return
 }
+
+const { terminalId, shellKind } = created
 
 // Listen for output (note: payload key is `terminalId`, not `id`)
 terminalService.on('data', ({ terminalId: id, data }) => {
@@ -399,8 +477,8 @@ terminalService.killTerminal(terminalId)
 ```typescript
 import { directoryWatcherService } from './services/DirectoryWatcherService'
 
-// Start watching
-directoryWatcherService.watchDirectory('/path/to/project')
+// Start watching — the owning window's WebContents is required
+await directoryWatcherService.watchDirectory('/path/to/project', webContents)
 
 // Listen for changes (renderer subscribes via preload bridge:
 //   window.api.directoryWatch.onDirectoryChanged((data) => …))
@@ -411,8 +489,8 @@ directoryWatcherService.on('directory-watch:changed', ({ dirPath, eventCount, su
 
 // Internal operation pattern
 async function createNewFile(fileName: string) {
-  // Pause watching
-  await directoryWatcherService.pauseWatching(projectPath)
+  // Pause watching (synchronous, reference-counted)
+  directoryWatcherService.pauseWatch(projectPath)
 
   // Perform operation
   await fs.writeFile(path.join(projectPath, fileName), '')
@@ -421,7 +499,7 @@ async function createNewFile(fileName: string) {
   await refreshProjectTree()
 
   // Resume watching
-  await directoryWatcherService.resumeWatching(projectPath)
+  directoryWatcherService.resumeWatch(projectPath)
 
   // No duplicate refresh event
 }
@@ -456,14 +534,24 @@ Application-wide settings with Zod schema validation.
 
 ### Public Methods
 
-#### `get(): GlobalSettings`
-Get current settings.
+#### `getSettings(): GlobalSettings`
+Get the whole in-memory settings object (synchronous).
 
-#### `update(partial: Partial<GlobalSettings>): GlobalSettings`
-Update settings (partial merge).
+#### `getSetting<K extends keyof GlobalSettings>(key: K): GlobalSettings[K]`
+Get one setting by key (synchronous).
 
-#### `reset(): GlobalSettings`
-Reset to defaults.
+#### `async setSetting<K extends keyof GlobalSettings>(key: K, value: GlobalSettings[K]): Promise<void>`
+Update one setting. Validates the resulting object against `GlobalSettingsSchema`, persists to disk, then notifies listeners. `$schema` writes are ignored (metadata only).
+
+**Throws:** `AppError(GLOBAL_SETTINGS_VALIDATION_FAILED)` if the new value fails schema validation.
+
+#### `async resetSettings(): Promise<void>`
+Back up the current file, then reset to defaults and notify listeners.
+
+#### Also public
+- `async initialize(): Promise<void>` - Load and validate settings at startup
+- `onSettingsChanged(callback): () => void` - Subscribe to change events; returns an unsubscribe function
+- `getSettingsPath(): string` - Resolved path of the settings file
 
 ---
 
@@ -488,21 +576,26 @@ Get the resolved logs directory path (e.g., `~/.erfana/logs/`).
 
 | Channel | Direction | Description |
 |---------|-----------|-------------|
-| `logging:log` | Renderer → Main | Send log entry from renderer process |
+| `logging:log` | Renderer → Main | Send log entry from renderer process. **Two senders**: the editor window via `api.logging.log` (`src/preload/index.ts`) and the screenshot-overlay window via `overlayApi.log` (`src/preload/screenshotOverlay.ts`, #60). Both are one-way `send`s and both are validated main-side with the same `LogEntrySchema` |
+| `logging:getLevel` | Renderer → Main | Get the current log level (renderer syncs its initial level from this) |
 | `logging:getLogsDir` | Renderer → Main | Get resolved logs directory path |
 | `logging:openLogsFolder` | Renderer → Main | Open logs folder in native file manager |
 
 ### Preload Bridge
 
+- `api.logging.log(entry)` – One-way send; the overlay window's equivalent is `overlayApi.log(entry)` on the same channel
+- `api.logging.getLevel()` – Returns the current log level
 - `api.logging.getLogsDir()` – Returns logs directory path
-- `api.logging.openLogsFolder()` – Opens logs folder via `shell.openPath()`
+- `api.logging.openLogsFolder()` – Opens logs folder via `shell.openPath()`; returns `''` on success or an error string on failure. Called from Settings and from the crash recovery screen's **Open logs folder** button (#60), which is capability-probed like Restart
 
 ### Usage
-```typescript
-import { MainLogger } from './services/LoggingService'
+The module exports the `LoggingService` class, the `loggingService` singleton, and a convenience `logger` object — `logger` is what main-process code imports.
 
-MainLogger.info('Application started')
-MainLogger.error('Operation failed', error)
+```typescript
+import { logger } from './services/LoggingService'
+
+logger.info('Application started')
+logger.error('Operation failed', error) // second arg is an Error, third an optional context object
 ```
 
 See [Logging Documentation](./logging.md) for details.
@@ -545,6 +638,26 @@ Async `ipcMain.handle` over Electron's main-process `clipboard` module. Each han
 - `api.clipboard.writeText(text)` → `Promise<boolean>`
 
 See [IPC Patterns § Clipboard channels](./ipc-patterns.md#clipboard-channels--async-invoke--sender-validation-203).
+
+---
+
+## System actions (`api.system`)
+
+Like the clipboard entry above, this has **no main-process service class** — it is a pair of sender-gated IPC handlers in `src/main/ipc/system-handlers.ts` fronted by a preload bridge. It exists for the macOS Screen Recording grant-and-relaunch flow (`ScreenPermissionDialog`); since #60 `relaunchApp` has a second, platform-independent caller — see below.
+
+### `api.system.openScreenRecordingSettings(): Promise<void>`
+Opens the macOS Screen Recording privacy pane via `shell.openExternal` on a fixed constant URL. Payload-free. No-ops off `darwin`.
+
+### `api.system.relaunchApp(): Promise<void>`
+`app.relaunch()` + `app.quit()`. Required because macOS applies a fresh Screen Recording grant **only to a newly-launched process** — an existing process keeps the old denial for its lifetime, so "grant then retry" cannot work without a restart. Payload-free and deliberately **not** platform-gated. Uses `app.quit()` rather than `app.exit()` so the `before-quit` path still releases the project lock, watchers and PTYs.
+
+Second caller (#60): the crash recovery screen's **Restart** button (`src/renderer/src/components/RootErrorBoundary/RootErrorFallback.tsx`), on every platform. It is capability-probed — `typeof window.api?.system?.relaunchApp === 'function'`, so a missing or partially-exposed bridge hides the button instead of rendering a dead control — and bounded by a stall timer that tells the user to quit and reopen manually if the relaunch has not happened in 3 s. The screen also calls `file.closeProject()` best-effort first (raced against a 1.5 s timeout) so a crash caused by the open project cannot be reopened into a loop.
+
+Both handlers validate `event.senderFrame` (`isTrustedSender`) — a compromised child frame must not be able to quit the app or fire OS-level navigations.
+
+The paired read side lives with the screenshot API: `api.screenshot.getScreenPermission()` (the main-process method behind it is `ScreenshotService.getScreenRecordingPermission()`) — see [API Services – Features](./api-services-features.md). It is **advisory only**: a capture is always attempted first and is never gated on a pre-check, so a stale TCC record cannot block a user who does have access.
+
+**Channels:** `system:openScreenRecordingSettings`, `system:relaunchApp` — see [IPC Patterns](./ipc-patterns.md).
 
 ---
 

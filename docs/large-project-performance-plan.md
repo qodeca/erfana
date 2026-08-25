@@ -3,6 +3,7 @@
 > Created: 2026-04-03
 > Status: In progress (4 of 6 done)
 > Scope: Issues #146, #147, #148, #149, #150, #151
+> Related: #60 – renderer crash on very large projects, landed (section below)
 
 ## Context
 
@@ -48,6 +49,33 @@ Six issues were filed. This document defines the implementation order based on d
 - **Type:** Performance | **Risk:** High | **Effort:** Large
 - **Why last:** Deepest refactor – changes `readDirectory()` from eager to lazy, adds incremental IPC updates, introduces virtualization library. Touches both main and renderer. Benefits from all prior work being stable. Most likely to surface new edge cases that #151's logging will help diagnose.
 - **Key deliverables:** Lazy subdirectory loading on expand, incremental FS event diffs, `react-window` or `@tanstack/react-virtual` for viewport-only rendering.
+
+## Related: #60 – renderer crash on very large projects (landed)
+
+Not one of the six issues above, but it landed in the same problem space and changes what "large project" means here: the failure mode is no longer a crash, it is slowness.
+
+**What shipped.** Opening a 174k-node project threw `RangeError: Maximum call stack size exceeded` in `flattenTree` (`src/renderer/src/hooks/useDragDropTree.ts`) – `flattened.push(...flattenTree(child))` is `Function.prototype.apply`, whose argument count is bounded by the engine stack (~10^5 on V8), so the first directory with a large enough flattened subtree threw, React 18 unmounted the root, and the window went black. The flattener is now an explicit-stack loop pushing exactly one node per iteration, output-identical to the recursion (pre-order DFS, forward sibling order, `depth` per level, `index` reset per parent). The crash is gone at 174k nodes and pinned by a 200k-node fixture. Landing with it:
+
+- a **single-pass memo** producing the flattened array *and* a `path → node` index in one traversal – deletes a second ~174k-object copy (`enhancedFlattenedItems`) and replaces six linear `.find` scans, one of which ran per drag-over event;
+- **two-tier error containment** – `PanelErrorBoundary` around the project tree, `RootErrorBoundary` + a distinct `FallbackGuard` at the root, plus a global error trail for async/handler errors – so a renderer defect degrades to a recovery screen instead of a blank window;
+- **main-process crash logging** – `render-process-gone`, `child-process-gone` and per-window `unresponsive` / `responsive`, log-only;
+- **per-window entry-module capture** – renderer console errors (`error` level only) and preload errors, the only trace of a boot failure that leaves the window blank without killing the process. Every renderer-supplied string is length-bounded at 1 000 characters and the console trail is capped at 20 records per window per 10 s, followed by one summary line carrying the dropped count. Log-only, like the rest;
+- **flatten instrumentation** – `[ProjectTree] flatten completed` with `{ nodeCount, durationMs }`, at `info` above a 50 ms threshold and `debug` below.
+
+Design of record: [`docs/design/design-issue-60.md`](./design/design-issue-60.md).
+
+**Follow-up trigger.** Two `[ProjectTree] flatten completed` log lines within 3 s of opening a project ⇒ **file the tree-rebuild dedup against #149/#150**. A double build at open is suspected but unconfirmed; the instrumentation above exists so the next report carries evidence instead of a hunch.
+
+**Still owned by #149/#150** – explicitly out of scope for #60, which fixed the crash without making a 174k-node project fast:
+
+| Deferred item | Owner |
+|---|---|
+| `React.memo` on `ProjectTreeNode` (verified absent) | #149 |
+| List virtualization of the project tree | #150 |
+| Lazy / on-demand directory loading | #150 |
+| ≤2 s TTI budget (scan ~2.0 s + IPC clone ~1.2 s dominate) | #149/#150 |
+| Cancelable project open | #150 |
+| Tree-rebuild dedup, once the trigger above fires | #149/#150 |
 
 ## Dependency graph
 

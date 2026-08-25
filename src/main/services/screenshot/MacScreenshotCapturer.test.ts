@@ -59,11 +59,15 @@ vi.mock('os', async (importOriginal) => {
 
 const mockGetAllDisplays = vi.fn()
 const mockGetPrimaryDisplay = vi.fn()
+const mockGetMediaAccessStatus = vi.fn(() => 'granted')
 
 vi.mock('electron', () => ({
   screen: {
     getAllDisplays: mockGetAllDisplays,
     getPrimaryDisplay: mockGetPrimaryDisplay
+  },
+  systemPreferences: {
+    getMediaAccessStatus: (...args: unknown[]) => mockGetMediaAccessStatus(...args)
   }
 }))
 
@@ -91,6 +95,7 @@ describe('MacScreenshotCapturer', () => {
       { id: 1, label: 'Built-in', bounds: { x: 0, y: 0, width: 1920, height: 1080 } }
     ])
     mockGetPrimaryDisplay.mockReturnValue({ id: 1 })
+    mockGetMediaAccessStatus.mockReturnValue('granted')
     Object.defineProperty(process, 'platform', { value: 'darwin', writable: true })
   })
 
@@ -202,6 +207,25 @@ describe('MacScreenshotCapturer', () => {
 
       expect(result.success).toBe(false)
       expect(result.errorCode).toBe('SCREENSHOT_CANCELLED')
+    })
+
+    it('classifies a missing file as PERMISSION_DENIED when screen status is denied', async () => {
+      // A denied capture can exit 0 (or 1) and produce no file without the
+      // 'cannot capture' stderr. The authoritative TCC status disambiguates a
+      // silent denial from a real user cancel. Capture is still attempted.
+      mockGetMediaAccessStatus.mockReturnValue('denied')
+      mockExecFile.mockImplementation((_p, _a, _o, cb) => {
+        cb(null, '', '')
+        return new EventEmitter() as ChildProcess
+      })
+      mockAccess.mockRejectedValue(new Error('ENOENT'))
+      const { MacScreenshotCapturer } = await import('./MacScreenshotCapturer')
+
+      const result = await new MacScreenshotCapturer().capture({ mode: 'screen' })
+
+      expect(mockExecFile).toHaveBeenCalledTimes(1) // never pre-skipped
+      expect(result.success).toBe(false)
+      expect(result.errorCode).toBe('SCREENSHOT_PERMISSION_DENIED')
     })
 
     it('returns SCREENSHOT_CANCELLED on exit code 1 + missing file', async () => {

@@ -18,6 +18,8 @@ import {
   ClaudeStatusChangePayloadSchema,
   ClaudeStatusRegisterRequestSchema,
   ClaudeStatusNudgeRequestSchema,
+  MAX_MODEL_ID_LENGTH,
+  MAX_TOOLTIP_LENGTH,
   type ClaudeStatusSnapshot,
   type ClaudeStatusChangePayload,
   type ClaudeStatusRegisterRequest
@@ -31,7 +33,8 @@ const validSnapshot: ClaudeStatusSnapshot = {
   usedTokens: 84000,
   percent: 42,
   level: 'green',
-  tooltip: '84k / 200k'
+  tooltip: '84k / 200k',
+  inferred: false
 }
 
 describe('ClaudeStatusLevel', () => {
@@ -115,6 +118,58 @@ describe('ClaudeStatusSnapshotSchema', () => {
     const partial: Record<string, unknown> = { ...validSnapshot }
     delete partial.tooltip
     expect(() => ClaudeStatusSnapshotSchema.parse(partial)).toThrow()
+  })
+
+  it('rejects a non-boolean inferred flag', () => {
+    expect(() => ClaudeStatusSnapshotSchema.parse({ ...validSnapshot, inferred: 'yes' })).toThrow()
+  })
+})
+
+describe('ClaudeStatusSnapshotSchema - length bounds (#41)', () => {
+  // These bounds had NO assertions until now: deleting every `.max()` broke no
+  // test. The inverse is what makes that dangerous — the register handler
+  // `safeParse`s and DROPS the payload on failure, so if the main-side sanitizer
+  // and these bounds ever diverge the status bar silently disappears with a
+  // green suite. Everything below is asserted against the exported constants,
+  // never a literal, so widening a bound is a deliberate two-file edit.
+  const bounded: ReadonlyArray<[field: 'modelId' | 'friendlyName' | 'tooltip', max: number]> = [
+    ['modelId', MAX_MODEL_ID_LENGTH],
+    ['friendlyName', MAX_MODEL_ID_LENGTH],
+    ['tooltip', MAX_TOOLTIP_LENGTH]
+  ]
+
+  it.each(bounded)('accepts %s at exactly its bound', (field, max) => {
+    const snap = { ...validSnapshot, [field]: 'x'.repeat(max) }
+    expect(ClaudeStatusSnapshotSchema.parse(snap)[field]).toHaveLength(max)
+  })
+
+  it.each(bounded)('rejects %s one character over its bound', (field, max) => {
+    const snap = { ...validSnapshot, [field]: 'x'.repeat(max + 1) }
+    expect(() => ClaudeStatusSnapshotSchema.parse(snap)).toThrow()
+  })
+
+  it.each(bounded)('enforces the %s bound through the change payload too', (field, max) => {
+    // The payload is what actually crosses IPC; an unbounded field would not be
+    // caught by asserting on the bare snapshot schema alone.
+    const overLong = { ...validSnapshot, [field]: 'x'.repeat(max + 1) }
+    expect(() =>
+      ClaudeStatusChangePayloadSchema.parse({ terminalId: 'term-1', snapshot: overLong })
+    ).toThrow()
+
+    const atBound = { ...validSnapshot, [field]: 'x'.repeat(max) }
+    expect(
+      ClaudeStatusChangePayloadSchema.parse({ terminalId: 'term-1', snapshot: atBound }).snapshot
+    ).not.toBeNull()
+  })
+
+  it('pins the constants themselves, so widening one is deliberate', () => {
+    // The sanitizer in main truncates to MAX_MODEL_ID_LENGTH. If someone raises
+    // it here without raising it there (or vice versa) the two caps diverge and
+    // the bar vanishes; this and the coupling test in friendlyModelName.test.ts
+    // are the pair that makes that a failing build rather than a silent hide.
+    expect(MAX_MODEL_ID_LENGTH).toBe(64)
+    expect(MAX_TOOLTIP_LENGTH).toBe(128)
+    expect(MAX_TOOLTIP_LENGTH).toBeGreaterThan(MAX_MODEL_ID_LENGTH)
   })
 })
 

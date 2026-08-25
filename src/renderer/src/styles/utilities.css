@@ -23,7 +23,7 @@
  * place. New selectable surfaces are added to this list (and to
  * `src/renderer/src/styles/userSelect.audit.test.ts`), not to component CSS.
  *
- * Two surfaces (`.metadataItem`, `.errorMessage` in ImageViewerPanel.module.css)
+ * Two surfaces (`.metadataItem`, `.errorMessage` in ImageViewerPanel/ImageViewerPanel.module.css)
  * remain declared in their CSS-module file because the build-time class-name
  * hashing prevents a global selector here from matching them at runtime.
  */
@@ -46,6 +46,9 @@
 .search-match-count,
 .settings-content,
 .toast-message,
+.root-error-details,
+.root-error-meta,
+.root-error-log-path,
 .char-count {
   user-select: text;
 }

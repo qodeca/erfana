@@ -14,6 +14,7 @@
  */
 
 import type { IContextMenuStrategy, IMenuItem, MenuContext, FileNode, FileNodeFile, FileNodeDirectory } from './types'
+import { isHtmlFile } from '../../../utils/fileUtils'
 import {
   CutCommand,
   CopyCommand,
@@ -25,6 +26,7 @@ import {
   NewFileInDirectoryCommand,
   NewFolderInDirectoryCommand,
   ImportCommand,
+  OpenAsSourceCommand,
   RevealInFileManagerCommand,
   separatorItem
 } from './commands'
@@ -89,6 +91,15 @@ export class FileContextMenuStrategy implements IContextMenuStrategy {
   build(node: FileNode, ctx: MenuContext): IMenuItem[] {
     const fileNode = node as FileNodeFile
     const items: IMenuItem[] = []
+
+    // "Open as source" is the explicit escape hatch for HTML files, which open
+    // as a running preview on a plain click (#74). Offered only when the tree
+    // can reach the editor (ctx.openAsSource wired) so a bare click always has
+    // a source fallback. Placed first as the primary open action.
+    if (ctx.openAsSource && isHtmlFile(fileNode.name)) {
+      items.push(new OpenAsSourceCommand(ctx, fileNode).toMenuItem())
+      items.push(separatorItem())
+    }
 
     // Clipboard operations
     items.push(new CutCommand(ctx, fileNode).toMenuItem())

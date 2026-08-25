@@ -1,0 +1,36 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<!--
+  Corpus case 2: multi-file (AC6 relative refs, AC14 CSS-swap, AC24 perf page).
+  index.html references three RELATIVE assets: styles.css, app.js and logo.svg.
+  - styles.css visibly styles the page. Its single body-background rule is the
+    obvious change surface for the AC14 CSS-swap / AC24 save-in-place test:
+    edit --page-bg in styles.css to see the background change on save.
+  - app.js visibly mutates the DOM and sets the title sentinel "-OK-2", but ONLY
+    after BOTH the stylesheet has applied AND logo.svg has loaded (AC25 sentinel 2).
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Multi-file corpus page (pending)</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="card">
+      <h1>Corpus 2: multi-file page</h1>
+      <p>
+        You should see: the tinted background and blue heading from
+        <code>styles.css</code>, the logo image below from <code>logo.svg</code>,
+        and the status line filled in by <code>app.js</code>. When all three land,
+        the status reads "CSS and image confirmed" and the tab title gains
+        <code>-OK-2</code>.
+      </p>
+      <img id="logo" src="logo.svg" alt="Corpus logo" width="96" height="96" />
+      <div id="status" class="pending">Waiting for CSS and image…</div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>

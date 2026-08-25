@@ -272,6 +272,24 @@ export const ScreenshotCapabilitiesSchema = z.object({
 export type ScreenshotCapabilities = z.infer<typeof ScreenshotCapabilitiesSchema>
 
 /**
+ * macOS Screen Recording (kTCCServiceScreenCapture) authorization state,
+ * mirrored from Electron `systemPreferences.getMediaAccessStatus('screen')`.
+ * Non-macOS platforms report `'unknown'` (capture works without a TCC gate).
+ *
+ * Advisory only: the OS/`screencapture` remains the source of truth. This is
+ * used to enrich the failure-path UX, never to gate a capture attempt (a
+ * stale in-process read — Electron #36722 — must never block a granted user).
+ */
+export const ScreenRecordingPermissionSchema = z.enum([
+  'granted',
+  'denied',
+  'not-determined',
+  'restricted',
+  'unknown'
+])
+export type ScreenRecordingPermission = z.infer<typeof ScreenRecordingPermissionSchema>
+
+/**
  * Error codes for screenshot capture failures.
  *
  * Note: CANCELLED is not a true error — it means user pressed Escape.

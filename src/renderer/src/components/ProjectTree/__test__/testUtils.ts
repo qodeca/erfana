@@ -97,6 +97,7 @@ export const createMockMenuContext = (overrides?: Partial<MenuContext>): MenuCon
     refreshProjectTree: vi.fn().mockResolvedValue(undefined),
     formatFileOperationError: vi.fn((err) => String(err)),
     getSiblingNames: vi.fn().mockReturnValue([]),
+    openAsSource: vi.fn(),
     ...overrides
   }
 }

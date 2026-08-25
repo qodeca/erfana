@@ -433,4 +433,4 @@ Historical changelog entries for v0.8.0–v0.8.3. For current changes see [CHANG
 
 ---
 
-**Earlier versions**: See [archive/changelog-v03-v05.md](./archive/changelog-v03-v05.md) for v0.3.0–v0.5.4 changelog entries.
+**Earlier versions**: See [archive/changelog-v03-v05.md](./changelog-v03-v05.md) for v0.3.0–v0.5.4 changelog entries.

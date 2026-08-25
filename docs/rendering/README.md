@@ -39,4 +39,4 @@ All rendered elements include line attributes:
 ## Related Documentation
 - [Editor Documentation](../editor/README.md)
 - [Markdown Preview](../editor/markdown-preview.md)
-- [Scroll Synchronization](../editor/scroll-sync.md)
+- [Scroll synchronization](../editor/README.md#scroll-synchronization)

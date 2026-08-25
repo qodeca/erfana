@@ -1,13 +1,13 @@
 # E2E selector catalog
 
-All `data-testid` attributes available for E2E testing – **225 testids** across 33 sections.
+All `data-testid` attributes available for E2E testing – **256 testids** across 37 sections.
 
 **Related documentation**:
 - [E2E Testing Guide](./e2e-testing.md) – Main E2E documentation
 - [Test ID constants](../../src/renderer/src/constants/testids.ts) – Source of truth
 - Spec #011 (archived) – Specification
 
-> **Counts are validated** by automated tests in `testids.test.ts`. If a section count becomes stale, tests fail.
+> **Scope of the automated check**: `testids.test.ts` asserts per-section counts against `testids.ts` – it validates the **source of truth, not this page**. Nothing fails when a table here drifts, so add the row by hand whenever you add a testid.
 
 ---
 
@@ -22,7 +22,7 @@ All `data-testid` attributes available for E2E testing – **225 testids** acros
 
 ---
 
-## Project tree (15 testids)
+## Project tree (16 testids)
 
 | Testid | Element | Type |
 |--------|---------|------|
@@ -32,6 +32,7 @@ All `data-testid` attributes available for E2E testing – **225 testids** acros
 | `project-tree-btn-close` | Close project button | static |
 | `project-tree-btn-new-file` | New file button | static |
 | `project-tree-btn-new-folder` | New folder button | static |
+| `project-tree-btn-import` | Import file button | static |
 | `project-tree-btn-refresh` | Refresh tree button | static |
 | `project-tree-node-{hash}` | Tree node | dynamic |
 | `project-tree-toggle-{hash}` | Folder toggle | dynamic |
@@ -63,7 +64,7 @@ const testId = getDynamicTestId(TEST_IDS.PROJECT_TREE_NODE, 'src/main/index.ts')
 
 ---
 
-## Terminal panel (13 testids)
+## Terminal panel (14 testids)
 
 | Testid | Element | Type |
 |--------|---------|------|
@@ -76,10 +77,36 @@ const testId = getDynamicTestId(TEST_IDS.PROJECT_TREE_NODE, 'src/main/index.ts')
 | `terminal-status-checking` | Status: checking availability | static |
 | `terminal-status-unavailable` | Status: node-pty missing | static |
 | `terminal-status-error` | Status: error occurred | static |
-| `terminal-btn-capture-screen` | Full screen capture (macOS) | static |
-| `terminal-btn-capture-window` | Window capture (macOS) | static |
-| `terminal-btn-capture-area` | Area capture (macOS) | static |
+| `terminal-btn-capture-screen` | Full screen capture (macOS + Windows) | static |
+| `terminal-btn-capture-window` | Window capture (macOS + Windows) | static |
+| `terminal-btn-capture-area` | Area capture (macOS + Windows) | static |
 | `terminal-btn-camera` | Camera photo capture | static |
+| `terminal-btn-expand` | Expand/restore terminal to cover the editor area | static |
+
+---
+
+## Screen permission dialog (4 testids)
+
+Advisory macOS Screen Recording permission prompt. It appears **after** the OS denies a capture and never blocks one – see [`ScreenPermissionDialog.tsx`](../../src/renderer/src/components/Dialog/ScreenPermissionDialog.tsx).
+
+| Testid | Element | Type |
+|--------|---------|------|
+| `screen-permission-dialog` | Screen-recording permission dialog container | static |
+| `screen-permission-btn-open-settings` | Opens the macOS Screen Recording privacy pane | static |
+| `screen-permission-btn-relaunch` | Relaunches the app so a fresh grant takes effect | static |
+| `screen-permission-btn-close` | Dismisses the dialog | static |
+
+---
+
+## Claude status bar (3 testids)
+
+Per-terminal Claude Code context meter (macOS + Windows). Present only while `claude` is running in that panel.
+
+| Testid | Element | Type |
+|--------|---------|------|
+| `claude-status-bar` | Status bar container | static |
+| `claude-status-badge` | Context-window size badge chip ("200k" / "1M") | static |
+| `claude-status-fill` | Progress meter fill element (width = percent) | static |
 
 ---
 
@@ -99,6 +126,30 @@ const testId = getDynamicTestId(TEST_IDS.PROJECT_TREE_NODE, 'src/main/index.ts')
 
 ---
 
+## Root error boundary (7 testids)
+
+Full-window crash recovery screen (issue #60). Action buttons are capability-gated – each one renders only when its bridge method is callable, and none render in degraded mode – see [`RootErrorFallback.tsx`](../../src/renderer/src/components/RootErrorBoundary/RootErrorFallback.tsx).
+
+| Testid | Element | Type |
+|--------|---------|------|
+| `root-error-boundary` | Fallback container (`role="alertdialog"`, focused on mount) | static |
+| `root-error-details-toggle` | Show/hide error details disclosure button | static |
+| `root-error-details` | Error details region (`role="region"`, `hidden` while collapsed) | static |
+| `root-error-btn-copy` | Copy error details button (needs the clipboard bridge) | static |
+| `root-error-btn-logs` | Open logs folder button (needs the logging bridge) | static |
+| `root-error-btn-restart` | Restart Erfana button (needs the system bridge) | static |
+| `root-error-status` | Live region (`role="status"`) carrying every transient message | static |
+
+---
+
+## Panel error boundary (1 testid)
+
+| Testid | Element | Type |
+|--------|---------|------|
+| `panel-error-boundary` | Panel-scoped fallback container (message + Reload button) | static |
+
+---
+
 ## File conflict notification (4 testids)
 
 | Testid | Element | Type |
@@ -110,10 +161,11 @@ const testId = getDynamicTestId(TEST_IDS.PROJECT_TREE_NODE, 'src/main/index.ts')
 
 ---
 
-## Editor content layout (5 testids)
+## Editor content layout (6 testids)
 
 | Testid | Element | Type |
 |--------|---------|------|
+| `editor-area` | Editor area wrapper – the center dockview region; collapses when the terminal is maximized | static |
 | `editor-content` | Content container | static |
 | `editor-pane` | Editor pane wrapper | static |
 | `preview-pane` | Preview pane wrapper | static |
@@ -122,13 +174,15 @@ const testId = getDynamicTestId(TEST_IDS.PROJECT_TREE_NODE, 'src/main/index.ts')
 
 ---
 
-## Camera dialog (8 testids)
+## Camera dialog (10 testids)
 
 | Testid | Element | Type |
 |--------|---------|------|
 | `camera-dialog` | Dialog container | static |
 | `camera-device-select` | Device selector dropdown | static |
 | `camera-preview` | Video preview element | static |
+| `camera-preview-wrapper` | 16:9 aspect-ratio wrapper around the preview | static |
+| `camera-mirror-toggle` | Mirror-preview checkbox (disabled until the preview is live) | static |
 | `camera-btn-capture` | Capture photo button | static |
 | `camera-btn-cancel` | Cancel button | static |
 | `camera-btn-refresh` | Refresh devices (on error) | static |
@@ -287,7 +341,7 @@ const testId = getDynamicTestId(TEST_IDS.PROJECT_TREE_NODE, 'src/main/index.ts')
 
 ---
 
-## Image viewer panel (12 testids)
+## Image viewer panel (20 testids)
 
 | Testid | Element | Type |
 |--------|---------|------|
@@ -303,6 +357,16 @@ const testId = getDynamicTestId(TEST_IDS.PROJECT_TREE_NODE, 'src/main/index.ts')
 | `image-viewer-btn-close` | Close full screen | static |
 | `image-viewer-fullscreen` | Full screen overlay | static |
 | `image-viewer-fullscreen-content` | Full screen content area | static |
+| `image-viewer-status` | Refresh status slot (`role="status"`, `data-state=idle\|reloading\|unavailable`) | dynamic |
+| `image-viewer-deleted-banner` | Deleted / auto-refresh-unavailable banner (`data-variant=deleted\|unavailable`) | conditional |
+| `image-viewer-btn-reload` | Reload from disk (inside the banner) | conditional |
+| `image-viewer-btn-export-png` | Export the image as PNG (#73) | static |
+| `image-viewer-btn-export-pdf` | Export the image as PDF (#73) | static |
+| `image-viewer-btn-copy` | Copy the image to the clipboard (#73) | static |
+| `image-viewer-export-status` | Polite export live region (`role="status"`), visually hidden; carries busy and success sentences (#73) | dynamic |
+| `image-viewer-export-alert` | Assertive export live region (`role="alert"`), visually hidden; carries failures, which the `aria-modal` full-screen overlay would otherwise hide from a screen reader (#73) | dynamic |
+
+> **Ancestor scoping is mandatory in this section.** The panel toolbar and the full-screen overlay toolbar both render the zoom, full-screen, export and copy ids, and the two export live regions are rendered into whichever surface is on top. A bare `getByTestId` therefore resolves to two nodes for the buttons; scope by `image-viewer-panel` or `image-viewer-fullscreen` first, as `e2e/pages/image-viewer.page.ts` does.
 
 ---
 
@@ -377,7 +441,7 @@ const testId = getDynamicTestId(TEST_IDS.PROJECT_TREE_NODE, 'src/main/index.ts')
 
 ---
 
-## Toast notifications (4 testids)
+## Toast notifications (6 testids)
 
 | Testid | Element | Type |
 |--------|---------|------|
@@ -385,6 +449,8 @@ const testId = getDynamicTestId(TEST_IDS.PROJECT_TREE_NODE, 'src/main/index.ts')
 | `toast` | Individual toast | static |
 | `toast-message` | Toast message | static |
 | `toast-btn-dismiss` | Dismiss button | static |
+| `toast-live-polite` | Persistent visually-hidden polite live region (info/success/warning) | static |
+| `toast-live-alert` | Persistent visually-hidden alert live region (errors) | static |
 
 ---
 
@@ -451,10 +517,11 @@ const testId = getDynamicTestId(TEST_IDS.PROJECT_TREE_NODE, 'src/main/index.ts')
 
 ---
 
-## Welcome panel (4 testids)
+## Welcome panel (5 testids)
 
 | Testid | Element | Type |
 |--------|---------|------|
+| `welcome-btn-open` | Open/Change project button | static |
 | `welcome-btn-import` | Import file button | static |
 | `welcome-recent-projects` | Recent projects list | static |
 | `welcome-recent-project-{hash}` | Recent project item | dynamic |

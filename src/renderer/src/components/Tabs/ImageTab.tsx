@@ -27,9 +27,11 @@ import { X, ImageIcon } from 'lucide-react'
 import { IDockviewPanelHeaderProps } from 'dockview'
 import { ContextMenu } from '../ContextMenu/ContextMenu'
 import { useTabContextMenu } from './useTabContextMenu'
+import { useTabTitle } from './useTabTitle'
 import { useProjectManagementContext } from '../../context/ProjectManagementContext'
 import { TEST_IDS, getDynamicTestId } from '../../constants/testids'
 import { getBasename, getDisplayRelativePath } from '../../utils/fileUtils'
+import { DELETED_TAB_MARKER } from '../../utils/tabTitle'
 import './ImageTab.css'
 
 // ============================================================================
@@ -82,10 +84,15 @@ export function ImageTab(props: IDockviewPanelHeaderProps<ImageTabParams>) {
   // Get context menu items using shared hook
   const contextMenuItems = useTabContextMenu(panelId, () => setContextMenu(null))
 
-  // Derived values
+  // Derived values. The LABEL comes from the panel's live title, not from the
+  // path: that is how the viewer's "(deleted)" marker reaches the screen for a
+  // tab whose panel body is not visible (issue #70).
   const fileName = getBasename(filePath) || 'Image'
+  const { label, isDeleted } = useTabTitle(api, fileName)
   const relativePath = getDisplayRelativePath(filePath, projectPath)
-  const tooltipContent = `${fileName}\n${relativePath}`
+  const tooltipContent = isDeleted
+    ? `${fileName} ${DELETED_TAB_MARKER}\n${relativePath}`
+    : `${fileName}\n${relativePath}`
 
   /**
    * Handle close button click.
@@ -146,12 +153,13 @@ export function ImageTab(props: IDockviewPanelHeaderProps<ImageTabParams>) {
           <ImageIcon size={14} />
         </span>
 
-        {/* Filename */}
+        {/* Filename, plus the deleted marker when the panel reports one. */}
         <span
           className="image-tab-label"
           data-testid={getDynamicTestId(TEST_IDS.IMAGE_TAB_LABEL, filePath)}
         >
-          {fileName}
+          {label}
+          {isDeleted && <span className="image-tab-deleted"> {DELETED_TAB_MARKER}</span>}
         </span>
 
         {/* Close button */}

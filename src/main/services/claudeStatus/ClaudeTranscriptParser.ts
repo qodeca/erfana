@@ -31,6 +31,19 @@
  */
 import { promises as fs } from 'node:fs'
 import { logger } from '../LoggingService'
+import { MAX_MODEL_ID_LENGTH } from '../../../shared/ipc/claude-status-schema'
+import {
+  isExtendedVariant,
+  isRecognisedVariant,
+  parseModelId,
+  stripModelVariants
+} from './modelId'
+import {
+  finalizeFallbackResult,
+  getFallbackResult,
+  recordFallbackProvisional,
+  rollbackFallbackProvisional
+} from './fallbackGuard'
 
 /** Latest main-session assistant turn extracted from a transcript. */
 export interface ParsedTurn {
@@ -72,7 +85,20 @@ const SYNTHETIC_MODEL = '<synthetic>'
  * while bounding read cost on long-running transcripts. Overridable per call via
  * `opts.maxBytes`.
  */
-const TAIL_THRESHOLD_BYTES = 256 * 1024
+export const TAIL_THRESHOLD_BYTES = 256 * 1024
+
+/**
+ * Upper bound (bytes) on the ONE-SHOT fallback read taken when the 256 KB tail
+ * ({@link TAIL_THRESHOLD_BYTES}) yields no usable turn — the compaction-recovery
+ * path (#4/#10). ~8× the tail: large enough to recover a turn evicted by a big
+ * compaction summary, small enough that it bounds the fallback to a single
+ * ~50 ms parse (a 2 MB no-turn scan is a frame drop, not a freeze), taken at most
+ * once per file-version. The old {@link Number.MAX_SAFE_INTEGER} read pulled the
+ * full ~18.8 MB file EVERY refresh, a sustained stall that froze the UI (#47).
+ * Paired with the {@link ./fallbackGuard} cache, which stores the result so a
+ * recovered turn is re-served with zero re-reads while the file is stable.
+ */
+export const FALLBACK_READ_MAX_BYTES = 2 * 1024 * 1024
 
 /**
  * Largest plausible token count. Real context windows top out at 1M; a value far
@@ -149,15 +175,68 @@ function isCompactionMarker(record: unknown): boolean {
   return (record as Record<string, unknown>).isCompactSummary === true
 }
 
-/** Full `claude-<family>-<maj>-<min>[-<8-digit-date>]` id (rejects typed aliases). */
-const MODEL_OVERRIDE_ID_RE = /^claude-[a-z]+-\d+-\d+(-\d{8})?$/i
+/** Delimiters of the slash-command argument block inside a `user` record. */
+const COMMAND_ARGS_OPEN = '<command-args>'
+const COMMAND_ARGS_CLOSE = '</command-args>'
+
+/**
+ * Upper bound on the `content` we will search for a `<command-args>` block.
+ *
+ * A `/model` argument is discarded above {@link MAX_MODEL_ID_LENGTH} characters,
+ * so a few KB of surrounding markup is already far more than any real command
+ * needs. Transcripts record user messages VERBATIM, so `content` is attacker-
+ * influenced at the size of whatever text an agent ingested and echoed back —
+ * bounded only by the 256 KB tail window, and by nothing at all on the full-read
+ * retry path. This gate keeps the scan proportional to a command, not a document.
+ */
+const MAX_COMMAND_CONTENT_LENGTH = 8 * 1024
+
+/**
+ * Extract the text between the first `<command-args>` / `</command-args>` pair,
+ * or `null` when the block is absent, unterminated, or the content is too large
+ * to be a command.
+ *
+ * SECURITY: deliberately `indexOf`, not a regex. The previous
+ * `/<command-args>([\s\S]*?)<\/command-args>/` used a lazy quantifier, which
+ * restarts a full forward scan at EVERY position where the opening literal
+ * occurs — quadratic in `content`. Measured on the main-process event loop,
+ * which this runs on ~1x/1.25s per terminal: 64 KB took 40 ms, 256 KB took
+ * 630 ms and 1 MB took 10 s, i.e. a sustained stall that freezes the editor, the
+ * project tree and every IPC handler. Two `indexOf` calls are linear and cannot
+ * backtrack at all.
+ */
+function extractCommandArgs(content: string): string | null {
+  if (content.length > MAX_COMMAND_CONTENT_LENGTH) return null
+
+  const start = content.indexOf(COMMAND_ARGS_OPEN)
+  if (start === -1) return null
+
+  const from = start + COMMAND_ARGS_OPEN.length
+  const end = content.indexOf(COMMAND_ARGS_CLOSE, from)
+  if (end === -1) return null
+
+  return content.slice(from, end).trim()
+}
 
 /**
  * If `record` is a `/model` slash-command entry, return the selected model id
- * (and whether it carried the `[1m]` 1M-window marker), else undefined. Only a
- * full `claude-<family>-<maj>-<min>[-<8-digit-date>]` id is accepted — a typed
- * alias (`opus`, `default`, empty) returns undefined so the caller falls back to
- * the assistant turn's model. Untrusted data: parsed defensively, never executed.
+ * (and whether it carried the `[1m]` 1M-window marker), else undefined.
+ *
+ * Only an id the SHARED grammar decomposes is accepted (#41) — a typed alias
+ * (`opus`, `default`, empty) returns undefined so the caller falls back to the
+ * assistant turn's model.
+ *
+ * An override carrying an UNRECOGNISED bracket variant is ignored entirely
+ * (design decision (e)): `/model claude-opus-4-7[thinking]` must keep behaving
+ * exactly as it does today, because honouring it would set `modelForcedStandard`
+ * and clear the sticky 1M bit — a user-visible 1M→200k downgrade triggered by an
+ * unrelated suffix. For a *label* an unrecognised variant is merely ignored, but
+ * an override is an ACTION, so it fails closed.
+ *
+ * Untrusted data: parsed defensively, never executed. The surrounding `content`
+ * is size-gated and scanned linearly by {@link extractCommandArgs}, and the arg
+ * itself is length-capped BEFORE the parser is called (design §11, F10) — it
+ * originates in a `<command-args>` block bounded only by the tail window.
  */
 function modelOverrideFromRecord(
   record: unknown
@@ -181,18 +260,17 @@ function modelOverrideFromRecord(
       .join(' ')
   }
   if (!content.includes('<command-name>/model</command-name>')) return undefined
-  const m = content.match(/<command-args>([\s\S]*?)<\/command-args>/)
-  if (!m) return undefined
-  let arg = m[1].trim()
-  if (arg === '') return undefined
-  let forceExtended = false
-  if (arg.toLowerCase().endsWith('[1m]')) {
-    forceExtended = true
-    arg = arg.slice(0, -4).trim()
-  }
+
+  const arg = extractCommandArgs(content)
+  if (arg === null || arg === '' || arg.length > MAX_MODEL_ID_LENGTH) return undefined
+
+  const stripped = stripModelVariants(arg)
+  if (stripped === null) return undefined
+  if (!stripped.variants.every(isRecognisedVariant)) return undefined
   // Accept only a full claude-* model id (reject aliases like `opus`, `default`).
-  if (!MODEL_OVERRIDE_ID_RE.test(arg)) return undefined
-  return { modelId: arg, forceExtended }
+  if (parseModelId(stripped.base) === null) return undefined
+
+  return { modelId: stripped.base, forceExtended: stripped.variants.some(isExtendedVariant) }
 }
 
 /**
@@ -206,15 +284,17 @@ function modelOverrideFromRecord(
 async function readRelevantText(
   filePath: string,
   maxBytes: number
-): Promise<{ text: string; truncated: boolean } | null> {
+): Promise<{ text: string; truncated: boolean; size: number; mtimeMs: number } | null> {
   let handle: fs.FileHandle | undefined
   try {
     handle = await fs.open(filePath, 'r')
-    const { size } = await handle.stat()
+    // mtimeMs is on the SAME stat() result the tail read already needs for `size`
+    // — surfaced so the version guard needs no extra syscall (design §3.1).
+    const { size, mtimeMs } = await handle.stat()
 
     if (size <= maxBytes) {
       const whole = await handle.readFile('utf8')
-      return { text: whole, truncated: false }
+      return { text: whole, truncated: false, size, mtimeMs }
     }
 
     const start = size - maxBytes
@@ -231,7 +311,7 @@ async function readRelevantText(
     // newline. Whole-file reads (start === 0 branch above) never reach here.
     const firstNewline = window.indexOf('\n')
     const text = firstNewline === -1 ? '' : window.slice(firstNewline + 1)
-    return { text, truncated: true }
+    return { text, truncated: true, size, mtimeMs }
   } catch {
     return null
   } finally {
@@ -252,33 +332,86 @@ async function readRelevantText(
  *
  * @param filePath Absolute path to a `<sessionUuid>.jsonl` transcript.
  * @param opts.maxBytes Override the tail/whole-read threshold (default 256 KB).
+ * @param readFn Bounded-read function used for BOTH the tail read and the fallback
+ *   read. Defaults to the real {@link readRelevantText}; injectable so a test can
+ *   drive the fallback-failure branch (D) — e.g. a reader that succeeds on the tail
+ *   read but returns `null` on the bounded read of a stable version. All production
+ *   callers pass nothing and get the real reader.
  * @returns The latest `{ modelId, usedTokens }` or `null`. Never throws.
  */
 export async function parseTranscript(
   filePath: string,
-  opts?: { maxBytes?: number }
+  opts?: { maxBytes?: number },
+  readFn: typeof readRelevantText = readRelevantText
 ): Promise<ParsedTurn | null> {
   const maxBytes = opts?.maxBytes && opts.maxBytes > 0 ? opts.maxBytes : TAIL_THRESHOLD_BYTES
 
-  const read = await readRelevantText(filePath, maxBytes)
+  const read = await readFn(filePath, maxBytes)
   if (read === null) return null
 
   let turn = scanForLatestTurn(read.text)
 
   // Compaction-summary / oversized-line resilience (findings #4/#10): a large
-  // compaction summary (the whole conversation condensed) or a single line bigger
-  // than the tail window can push the relevant assistant turn OUT of the window,
-  // so the tail scan finds nothing. When the read was truncated to a tail, retry
-  // ONCE over the whole file before giving up. This both recovers a turn that was
-  // merely evicted and keeps `justCompacted` honest — it now degrades only when
-  // even the full file genuinely has no post-compaction turn. Without this, an
-  // oversized tail silently hides the bar with no signal.
+  // compaction summary or a single line bigger than the tail window can push the
+  // relevant assistant turn OUT of the window, so the tail scan finds nothing.
+  // When the read was truncated to a tail, retry ONCE over a bounded window
+  // ({@link FALLBACK_READ_MAX_BYTES}) to recover an evicted turn and keep
+  // `justCompacted` honest. Version-guarded + result-cached (below) so the read
+  // runs at most once per file-version and never re-freezes the UI (#47).
   if (turn === null && read.truncated) {
-    logger.debug('ClaudeTranscriptParser: tail window yielded no turn; retrying full read', {
-      filePath
-    })
-    const full = await readRelevantText(filePath, Number.MAX_SAFE_INTEGER)
-    if (full !== null) turn = scanForLatestTurn(full.text)
+    const versionKey = `${read.size}:${read.mtimeMs}`
+
+    // (A) Cache HIT — re-serve the previously scanned result for this exact
+    //     file-version without any read. A turn recovered on refresh #1 is
+    //     returned again on #2, #3, …; a genuine no-turn returns null (freeze
+    //     fixed, meter not blanked after a one-shot recovery).
+    const cached = getFallbackResult(filePath, versionKey)
+    if (cached !== undefined) {
+      return cached.turn
+    }
+
+    // (B) Cache MISS — insert a PROVISIONAL entry to dedup any concurrent
+    //     refreshes for the same version, THEN do the bounded read. No `await`
+    //     sits between the get above and this set, so on the single-threaded event
+    //     loop at most one bounded read is issued per version.
+    //
+    //     The whole recovery block is wrapped: if ANYTHING between the provisional
+    //     insert and the finalize/rollback throws (scanForLatestTurn, logger.debug,
+    //     an unexpected reader error), the catch rolls the provisional entry back
+    //     so it can neither poison the cache as a permanent `null` HIT nor let the
+    //     throw escape and break this function's never-throws / fail-closed-to-null
+    //     contract. `turn` stays null on the throw path — the same fail-closed
+    //     result as a transient read failure (D), retried on the next refresh.
+    try {
+      recordFallbackProvisional(filePath, versionKey)
+
+      logger.debug('ClaudeTranscriptParser: tail window yielded no turn; retrying bounded read', {
+        filePath
+      })
+      const full = await readFn(filePath, FALLBACK_READ_MAX_BYTES)
+
+      if (full !== null) {
+        // (C) Read COMPLETED — finalise the cache with the scanned turn (a real
+        //     turn OR null; both are legitimate cached results for this version).
+        const scanned = scanForLatestTurn(full.text)
+        finalizeFallbackResult(filePath, versionKey, scanned)
+        turn = scanned
+      } else {
+        // (D) Read FAILED transiently (readFn returned null). Do NOT cache a
+        //     failure: roll back the provisional entry — but only if it is still
+        //     OURS (same version, still provisional), so a concurrent completed
+        //     read that finalised a real result is never clobbered. The next
+        //     refresh then retries instead of staying suppressed.
+        rollbackFallbackProvisional(filePath, versionKey)
+        // turn stays null → parseTranscript returns null this refresh; retried next.
+      }
+    } catch {
+      // (E) Unexpected throw anywhere in the recovery block. Roll back the
+      //     provisional entry (no-op if a concurrent read already finalised a real
+      //     result for this version) so no poisoned `null` HIT lingers, and fall
+      //     through with `turn` still null — fail-closed, per the contract.
+      rollbackFallbackProvisional(filePath, versionKey)
+    }
   }
 
   return turn

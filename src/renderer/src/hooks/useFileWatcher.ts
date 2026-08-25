@@ -10,10 +10,14 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { INDICATOR_DURATION_MS } from '../constants/fileWatch'
+import {
+  acquireFileWatch,
+  createFileWatchSlot,
+  releaseFileWatch,
+  type FileWatchSlot
+} from './fileWatchSlot'
 import { logger } from '../utils/logger'
-
-/** Duration to show reload indicator in milliseconds */
-const INDICATOR_DURATION_MS = 1000
 
 /**
  * Normalizes line endings to LF for cross-platform content comparison.
@@ -183,6 +187,13 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcherRe
   // Cleared on: reload, keepLocal, file switch (useEffect cleanup), and after echo match.
   const pendingSavedContentsRef = useRef<Set<string>>(new Set())
 
+  // This consumer's single hold on the main-process watch. `fileWatch.start` is
+  // a counting acquire, so start/stop must be balanced and ordered – the slot
+  // owns both properties (issue #70).
+  const slotRef = useRef<FileWatchSlot | null>(null)
+  if (slotRef.current === null) slotRef.current = createFileWatchSlot()
+  const slot = slotRef.current
+
   /**
    * Mark that a save operation is starting.
    * Call this before saving to prevent race conditions with file watcher.
@@ -335,10 +346,13 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcherRe
 
     logger.info('Starting watch for file', { filePath })
 
-    // Start watching
-    window.api.fileWatch.start(filePath).then((result) => {
-      if (!result.success) {
-        logger.error('Failed to start watching file', undefined, { error: result.error })
+    // Start watching. Acquire/release are serialised through the slot, so a
+    // refused start is never followed by a stop this consumer did not earn, and
+    // a mount->unmount faster than the IPC round trip cannot deliver the stop
+    // before the start and leak the watch slot for good (issue #70).
+    void acquireFileWatch(slot, filePath).then(({ started, error, cause }) => {
+      if (!started) {
+        logger.error('Failed to start watching file', cause, { error })
       }
     })
 
@@ -364,13 +378,13 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcherRe
     // Cleanup on unmount or file change
     return () => {
       logger.info('Stopping watch for file', { filePath })
-      window.api.fileWatch.stop(filePath)
+      void releaseFileWatch(slot, filePath)
       unsubscribeChanged()
       unsubscribeDeleted()
       unsubscribeError()
       pendingSavedContentsRef.current.clear() // Clear on file switch
     }
-  }, [filePath, handleExternalChange, handleFileDeleted])
+  }, [filePath, handleExternalChange, handleFileDeleted, slot])
 
   return {
     // State

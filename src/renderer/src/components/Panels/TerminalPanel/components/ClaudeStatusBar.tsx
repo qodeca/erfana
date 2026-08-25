@@ -42,6 +42,13 @@ const WINDOW_BADGE: Record<number, string> = {
 const METER_LABEL = 'Claude Code context usage'
 
 /**
+ * The marker main appends to the tooltip when the window is inferred. Stripped
+ * before the counts are reformatted for `aria-valuetext`, where it is re-placed
+ * after the noun rather than left inside the figure.
+ */
+const INFERRED_MARKER = ' (inferred)'
+
+/**
  * Compose the `aria-valuetext` exact-count phrasing for the meter.
  *
  * Reuses the precomputed `tooltip` (e.g. `"84k / 200k"`) for the rounded
@@ -49,15 +56,30 @@ const METER_LABEL = 'Claude Code context usage'
  * example `"Opus 4.8, 48% used, 84k of 200k tokens"`. The "Claude Code context"
  * naming lives in the meter's `aria-label` instead, so it is not repeated here.
  *
+ * Since #41 the window may be INFERRED from the capability registry rather than
+ * observed or explicitly configured. The visual tooltip carries that as a
+ * trailing `"(inferred)"`, but reusing that string here put the marker
+ * mid-sentence — `"84k of 1M (inferred) tokens"`. So the marker is taken from
+ * the snapshot's structured `inferred` flag and appended after the noun instead.
+ *
  * @param friendlyName - Display model name (already sanitized in main).
  * @param percent - Display percentage (0–100).
  * @param tooltip - Precomputed `used / window` string from the snapshot.
+ * @param inferred - Whether the window size was inferred rather than observed.
  * @returns The full accessible value text.
  */
-function buildValueText(friendlyName: string, percent: number, tooltip: string): string {
-  // tooltip is "84k / 200k"; reformat the separator to "84k of 200k tokens".
-  const counts = tooltip.replace(' / ', ' of ')
-  return `${friendlyName}, ${percent}% used, ${counts} tokens`
+function buildValueText(
+  friendlyName: string,
+  percent: number,
+  tooltip: string,
+  inferred: boolean
+): string {
+  // The tooltip is "84k / 200k", or "84k / 1M (inferred)" since #41. Strip any
+  // marker before reformatting the separator, then re-append it after "tokens"
+  // so the sentence reads correctly when spoken.
+  const counts = tooltip.replace(INFERRED_MARKER, '').trim().replace(' / ', ' of ')
+  const suffix = inferred ? INFERRED_MARKER : ''
+  return `${friendlyName}, ${percent}% used, ${counts} tokens${suffix}`
 }
 
 /**
@@ -80,13 +102,13 @@ export function ClaudeStatusBar({ terminalId }: ClaudeStatusBarProps): JSX.Eleme
   // No data → hide the bar entirely (fail-closed; xterm reclaims the height).
   if (!snapshot) return null
 
-  const { friendlyName, windowSize, percent, level, tooltip } = snapshot
+  const { friendlyName, windowSize, percent, level, tooltip, inferred } = snapshot
 
   // Clamp the visual fill width to the 0–100 band even if a snapshot ever
   // arrives with an out-of-range percent (defensive; main already clamps).
   const fillPercent = Math.max(0, Math.min(100, percent))
   const badgeText = WINDOW_BADGE[windowSize] ?? `${Math.round(windowSize / 1000)}k`
-  const valueText = buildValueText(friendlyName, percent, tooltip)
+  const valueText = buildValueText(friendlyName, percent, tooltip, inferred)
 
   return (
     <div

@@ -34,7 +34,10 @@ export type EditorSettings = z.infer<typeof EditorSettingsSchema>
 
 /**
  * Git status configuration
- * @see Issue #74 - real-time git status refresh
+ *
+ * Controls the real-time git status polling fallback. (The prior `@see Issue
+ * #74` reference was incorrect — #74 is the HTML preview feature — so it has
+ * been removed rather than pointing at the wrong tracker item.)
  */
 export const GitStatusSettingsSchema = z.object({
   /** Enable polling for git status updates */
@@ -43,6 +46,19 @@ export const GitStatusSettingsSchema = z.object({
   pollingInterval: z.number().min(3000).max(10000).default(5000)
 })
 export type GitStatusSettings = z.infer<typeof GitStatusSettingsSchema>
+
+/**
+ * HTML preview configuration (Issue #74).
+ *
+ * A single global toggle: when `enabled` flips false the preview service
+ * destroys every live view (AC21 global-off). Per-project host approvals live
+ * separately in `.erfana/settings.json` (see `preview-settings-schema.ts`).
+ */
+export const HtmlPreviewSettingsSchema = z.object({
+  /** Master switch for the HTML preview feature. */
+  enabled: z.boolean().default(true)
+})
+export type HtmlPreviewSettings = z.infer<typeof HtmlPreviewSettingsSchema>
 
 /**
  * Root schema for ~/.erfana/settings.json
@@ -61,7 +77,9 @@ export const GlobalSettingsSchema = z.object({
     backend: 'openai' as const,
     openaiApiKeyStored: false,
     whisperModel: 'base' as const
-  }))
+  })),
+  /** HTML preview configuration (Issue #74) */
+  htmlPreview: HtmlPreviewSettingsSchema.default(() => ({ enabled: true }))
 })
 export type GlobalSettings = z.infer<typeof GlobalSettingsSchema>
 

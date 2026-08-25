@@ -16,7 +16,7 @@
  * All commands are testable via dependency injection (MenuContext).
  */
 
-import { Copy, Scissors, Clipboard as ClipboardIcon, Edit, Trash, FilePlus, FolderPlus, FileUp, FolderOpen } from 'lucide-react'
+import { Copy, Scissors, Clipboard as ClipboardIcon, Edit, Trash, FilePlus, FolderPlus, FileUp, FolderOpen, FileCode } from 'lucide-react'
 import type { IMenuItem, MenuContext, FileNode, FileNodeDirectory, FileNodeFile } from './types'
 import { isMacOS, isWindows } from '../../../utils/platform'
 import { getDirname } from '../../../utils/fileUtils'
@@ -159,6 +159,31 @@ export class PasteIntoDirectoryCommand extends CommandBase {
       const msg = this.ctx.formatFileOperationError(err, 'paste')
       this.ctx.toast({ type: 'error', title: 'Error', message: msg })
     }
+  }
+}
+
+/* ========== Open Commands ========== */
+
+/**
+ * Open-as-source command – opens an `.html`/`.htm` file in the Monaco editor
+ * instead of the running HTML preview (issue #74).
+ *
+ * A plain click on a `.html` node opens the running preview when the file is
+ * eligible; this menu item is the explicit escape hatch to see the raw source.
+ * It routes through the injected {@link MenuContext.openAsSource} callback so
+ * the command stays free of any dockview/store dependency and remains testable
+ * via the same DI seam as every other command.
+ */
+export class OpenAsSourceCommand extends CommandBase {
+  label = 'Open as source'
+  icon = <FileCode size={14} strokeWidth={2} />
+
+  constructor(ctx: MenuContext, node: FileNodeFile) {
+    super(ctx, node)
+  }
+
+  execute(): void {
+    this.ctx.openAsSource?.((this.node as FileNodeFile).path)
   }
 }
 

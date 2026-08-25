@@ -11,6 +11,35 @@
 /** Maximum number of recent projects to track */
 export const MAX_RECENT_PROJECTS = 5
 
+/**
+ * Logs directory, relative to the user's home directory.
+ *
+ * Single source of truth: `LoggingService` joins it with `homedir()` to decide
+ * where to write, and the crash fallback's DEGRADED mode (where
+ * `window.api.logging.getLogsDir()` cannot be called) renders this value as
+ * "<this> in your home folder" — prose rather than `~/…`, which would be wrong
+ * on Windows. Moving the logs means editing this line only.
+ *
+ * @see src/main/services/LoggingService.ts - getLogsDir()
+ * @see src/renderer/src/components/RootErrorBoundary/RootErrorFallback.tsx - degraded mode
+ */
+export const LOGS_DIR_RELATIVE = '.erfana/logs'
+
+/**
+ * Renderer-crash injection flag for the E2E error-boundary scenario (#60 §2.8).
+ *
+ * Shared because BOTH sides of the handshake must spell it identically: the
+ * main process appends it to `webPreferences.additionalArguments` (only when
+ * the app is unpackaged AND `ERFANA_E2E_FORCE_CRASH=1`), and the preload reads
+ * it back off `process.argv` to decide whether to expose
+ * `window.__ERFANA_FORCE_CRASH__`. Two literals could drift into a flag that
+ * silently never fires.
+ *
+ * @see src/main/index.ts - buildAdditionalArguments()
+ * @see src/preload/index.ts - forceCrash
+ */
+export const FORCE_CRASH_ARG = '--erfana-force-crash'
+
 /** Toast notification durations in milliseconds */
 export const TOAST_DURATION = {
   ERROR: 5000,
@@ -43,8 +72,17 @@ export const BYTES_PER_MB = 1024 * 1024
 export const IMPORT = {
   /** Directory name for imported files */
   DIR_NAME: 'import',
-  /** Size warning threshold in bytes (50MB) */
+  /** Size warning threshold in bytes (50MB) — non-blocking; surfaces a warning */
   SIZE_WARNING_THRESHOLD: 50 * BYTES_PER_MB,
+  /**
+   * Hard size limit in bytes (250MB) — blocking. Files above this are rejected
+   * before reaching a converter. This bounds the *byte size* of the input (raw
+   * I/O and gross buffering), not the decoded pixel count — a small file can
+   * still decode to a huge image, so it is not a decompression-bomb guard on its
+   * own (see the document-import isolation follow-up). Set well above legitimate
+   * large PDFs. This is a SECURITY limit and is not user-configurable.
+   */
+  SIZE_HARD_LIMIT: 250 * BYTES_PER_MB,
   /** Maximum number of auto-numbered copies before rejecting */
   MAX_COPY_ATTEMPTS: 1000,
   /**
@@ -405,4 +443,57 @@ export const GIT_STATUS = {
 export const PAUSE_CONTROLLER = {
   /** Safety timeout in ms: auto-resume if resume() not called within this window */
   SAFETY_TIMEOUT_MS: 10_000
+} as const
+
+/**
+ * HTML preview constants (Issue #74).
+ *
+ * Caps and timers for the `WebContentsView`-backed HTML preview: the asset
+ * read cap enforced by the protocol handler, the preview-owned watcher pool
+ * timings, failure-log ring-buffer + emission coalescing, bounded close/swap
+ * timeouts, the host-block toast budget, the post-load reload rate limit and
+ * the still-frame downscale caps.
+ *
+ * @see docs designs/sd-074-html-preview.md §1.4, §2.4
+ */
+export const PREVIEW = {
+  /** Max bytes served per asset; a larger file yields HTTP 413 */
+  MAX_ASSET_BYTES: 25 * 1024 * 1024,
+  /**
+   * Max bytes of the entry HTML read for static-link discovery. Bounds both the
+   * read and the synchronous parse5 parse that runs on the main thread, so a
+   * large or generated entry file cannot freeze the UI on every reload. Links
+   * live near the top of a document, so a truncated head still finds them.
+   */
+  MAX_ENTRY_HTML_BYTES: 4 * 1024 * 1024,
+  /**
+   * Max asset reads buffered concurrently per preview session. Each read is
+   * capped at MAX_ASSET_BYTES, so this bounds peak main-process memory a hostile
+   * page can force by fetching many large in-repo assets at once.
+   */
+  MAX_CONCURRENT_ASSET_READS: 8,
+  /** Per-panel watch cap (bounds EMFILE exposure, #146–#151) */
+  MAX_WATCHED_FILES: 16,
+  /** Coalesce window for pool change events before a reload/swap (ms) */
+  WATCH_COALESCE_MS: 30,
+  /** chokidar awaitWriteFinish.stabilityThreshold for preview watches (ms) */
+  WATCH_STABILITY_MS: 50,
+  /** chokidar awaitWriteFinish.pollInterval for preview watches (ms) */
+  WATCH_POLL_INTERVAL_MS: 25,
+  /** Failure-log ring-buffer capacity; older entries drop, sets `truncated` */
+  MAX_FAILURES: 100,
+  /** Failure emission coalescing window with a trailing send (ms) */
+  FAILURE_COALESCE_MS: 250,
+  /** Bounded destroy: await close() this long before webContents.destroy (ms) */
+  CLOSE_TIMEOUT_MS: 1000,
+  /** CSS swap race timeout; any non-`true` outcome falls back to reload (ms) */
+  SWAP_TIMEOUT_MS: 1000,
+  /** Max host-block toasts surfaced per project before suppression */
+  MAX_HOST_TOASTS: 3,
+  /** At most one full post-load pipeline per this interval (ms) */
+  RELOAD_MIN_INTERVAL_MS: 750,
+  /** Still-frame downscale: longest edge in px before toDataURL */
+  MAX_FRAME_EDGE_PX: 1024,
+  /** Still-frame dataURL char cap; over budget ⇒ no frame emitted */
+  MAX_FRAME_DATAURL_CHARS: 2 * 1024 * 1024
 } as const

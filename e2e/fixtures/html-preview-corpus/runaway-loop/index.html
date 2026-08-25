@@ -1,0 +1,77 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<!--
+  Corpus case 5: runaway loop (performance / isolation floor, AC25 sentinel 5).
+
+  Stresses the preview's resilience under a misbehaving page WITHOUT permanently
+  wedging the render process: a fast setInterval floods the event loop with heavy
+  synchronous work every 0ms. This is deliberately RECOVERABLE — the flood yields
+  between ticks, so the process stays responsive enough that:
+    - an IPC round trip still completes within ~1s, and
+    - close()/tab-close resolves within PREVIEW_CLOSE_TIMEOUT_MS.
+  We intentionally do NOT use `while (true) {}`, which would wedge the process
+  forever and cannot be recovered from without killing it.
+
+  A visible counter shows the loop is running; it is the isolation proof that a
+  hostile page burns its OWN process, not the host window.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Runaway-loop corpus page</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 2rem;
+        font: 16px/1.5 system-ui, sans-serif;
+        color: #1b1b1f;
+        background: #f6f8fa;
+      }
+      .card {
+        max-width: 40rem;
+        padding: 1rem 1.25rem;
+        background: #fff;
+        border: 1px solid #d0d7de;
+      }
+      h1 {
+        font-size: 1.4rem;
+        color: #a00;
+      }
+      #ticks {
+        font-family: ui-monospace, monospace;
+        font-weight: 700;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Corpus 5: runaway loop</h1>
+      <p>
+        You should see: the tick counter below climbing very fast as a 0ms
+        <code>setInterval</code> floods the event loop with heavy work. The rest
+        of the app must stay usable and this tab must still close promptly —
+        that is the isolation proof.
+      </p>
+      <p>Ticks completed: <span id="ticks">0</span></p>
+    </div>
+
+    <script>
+      let ticks = 0
+      const counter = document.getElementById('ticks')
+
+      // Fast flood: each tick does a bounded burst of synchronous work, then
+      // yields so the process stays recoverable (unlike `while (true)`).
+      setInterval(() => {
+        let sink = 0
+        for (let i = 0; i < 500000; i++) {
+          sink += Math.sqrt(i)
+        }
+        // Touch the result so the burst is not optimised away.
+        ticks += sink > 0 ? 1 : 1
+        counter.textContent = String(ticks)
+      }, 0)
+    </script>
+  </body>
+</html>

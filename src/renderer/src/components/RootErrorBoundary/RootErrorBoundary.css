@@ -1,0 +1,192 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/*
+ * Root crash-fallback styles.
+ *
+ * ALLOWLIST CONSTRAINT (design §2.4, enforced by RootErrorBoundary.css.test.ts):
+ * after comment stripping, EVERY top-level selector in this file must start
+ * with `.root-error`. The renderer shares one `index.html` entry with the
+ * screenshot-overlay window, so a bare element / `#root` / `:root` rule in a
+ * statically imported stylesheet leaks into every window — the exact defect
+ * `main.import-isolation.test.ts` exists for. At-rules are forbidden too: the
+ * allowlist parser is flat, and an `@media` wrapper would hide its inner
+ * selectors from the check.
+ *
+ * The fallback REFERENCES `.dialog-btn`, `.dialog-btn-primary` and
+ * `.dialog-btn-secondary` from markup only. Those rules live in `Dialog.css`,
+ * which is already in the entry CSS at crash time; this file never declares or
+ * overrides them.
+ *
+ * Colour contract (design §2.3, enforced by RootErrorBoundary.contrast.test.ts):
+ * `--color-text-muted` / `--color-text-disabled` / `--color-text-placeholder`
+ * all resolve to #6e6e6e (~3.6:1 on the app background) and are FORBIDDEN here.
+ */
+
+.root-error {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-blocker);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* Two declarations on purpose. Plain `center` is the fallback for engines
+     that drop the whole declaration on an unknown keyword; `safe center`
+     degrades to flex-start once the panel is taller than the viewport, so the
+     overflow lands at the BOTTOM and the heading stays scrollable into view
+     instead of being cut off above the top edge. */
+  justify-content: center;
+  justify-content: safe center;
+  max-height: 100vh;
+  overflow-y: auto;
+  padding: var(--space-12);
+  background-color: var(--color-bg-primary);
+  font-family: var(--font-sans);
+}
+
+.root-error:focus {
+  outline: none;
+}
+
+.root-error-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  width: 100%;
+  max-width: var(--dialog-max-width);
+  /* Lets the details region shrink instead of pushing the action row off-screen. */
+  min-height: 0;
+}
+
+.root-error-heading {
+  margin: 0;
+  font-size: var(--text-2xl);
+  font-weight: var(--font-semibold);
+  line-height: var(--leading-tight);
+  /* Raw px, matching the precedent for dialog headings in Dialog.css:88 — the
+     token set has no letter-spacing scale, and this screen must read like the
+     app's other headings. */
+  letter-spacing: -0.2px;
+  color: var(--color-text-emphasis);
+}
+
+.root-error-message {
+  margin: 0;
+  font-size: var(--text-md);
+  line-height: var(--leading-relaxed);
+  color: var(--color-text-primary);
+}
+
+/* Live region. Reserves TWO lines so revealing a status never reflows the
+   layout under the user's pointer: the longest string
+   ("Could not copy the error details – the clipboard is unavailable.") wraps to
+   two lines in a narrow window, and a one-line reservation would still jump. */
+.root-error-status {
+  min-height: calc(var(--space-10) * 2);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  color: var(--color-text-primary);
+}
+
+.root-error-log-path {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  color: var(--color-text-primary);
+  overflow-wrap: break-word;
+}
+
+.root-error-details-toggle {
+  align-self: flex-start;
+}
+
+.root-error-details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  max-height: 40vh;
+  overflow-y: auto;
+  padding: var(--space-8);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--border-radius);
+  background-color: var(--color-bg-primary);
+}
+
+.root-error-details[hidden] {
+  display: none;
+}
+
+.root-error-details:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
+}
+
+.root-error-details::-webkit-scrollbar {
+  width: var(--scrollbar-width);
+}
+
+.root-error-details::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
+.root-error-details::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+}
+
+.root-error-details::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+
+.root-error-meta {
+  margin: 0;
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  color: var(--color-text-secondary);
+  overflow-wrap: break-word;
+}
+
+.root-error-stack {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  color: var(--color-text-secondary);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+/* Never shrinks: the recovery actions must stay reachable however long the
+   stack is (design §2.3 layout paragraph). */
+.root-error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  gap: var(--space-6);
+}
+
+/* Pending Restart uses aria-disabled, NOT the `disabled` attribute: Chromium
+   blurs a control the instant it becomes disabled and parks focus on <body>.
+   See src/renderer/src/components/Dialog/CLAUDE.md. `pointer-events` is left
+   alone on purpose so the click still reaches the early-return handler.
+
+   The lift and shadow are dropped as well: the shared button rules animate on
+   :hover/:active, and a control that ignores the click must not answer the
+   pointer as though it were live. */
+.root-error-actions [aria-disabled='true'] {
+  opacity: var(--opacity-disabled);
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Written as `button[…]:hover` (0,3,1) on purpose. The shared hover rule is
+   `:hover:not(:disabled)` (0,3,0) and `aria-disabled` is not `:disabled`, so it
+   still fires on a pending Restart; matching its specificity would leave the
+   winner to stylesheet order, which nothing here controls. The background is
+   the RESTING token, so hovering changes nothing rather than introducing a
+   colour of its own. */
+.root-error-actions button[aria-disabled='true']:hover {
+  transform: none;
+  box-shadow: none;
+  background-color: var(--color-btn-primary-bg);
+}

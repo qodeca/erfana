@@ -12,9 +12,10 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { EditorTab } from './EditorTab'
+import { TEST_IDS, getDynamicTestId } from '../../constants/testids'
 import type { IDockviewPanelHeaderProps } from 'dockview'
 
 // Mock useProjectStore
@@ -89,6 +90,10 @@ function createMockProps(
     filePath: string
     panelId: string
     apiId: string
+    /** Live panel title, as set by the editor panel via `api.setTitle`. */
+    title: string
+    /** Subscription the tab uses to follow later title changes. */
+    onDidTitleChange: (listener: (event: { title: string }) => void) => { dispose: () => void }
   }> = {}
 ): IDockviewPanelHeaderProps<{ filePath?: string; panelId?: string }> {
   const apiClose = vi.fn()
@@ -96,7 +101,9 @@ function createMockProps(
   return {
     api: {
       id: overrides.apiId || 'panel-123',
-      close: apiClose
+      close: apiClose,
+      title: overrides.title,
+      onDidTitleChange: overrides.onDidTitleChange
     },
     params: {
       filePath: overrides.filePath ?? '/path/to/document.md',
@@ -134,6 +141,59 @@ describe('EditorTab', () => {
       render(<EditorTab {...props} />)
 
       expect(screen.getByText('README.md')).toBeInTheDocument()
+    })
+
+    it('should render the deleted marker the panel put in the title', () => {
+      // QG-11a H5: the panel calls `api.setTitle('document.md (deleted)')`, and
+      // this is where that reaches the screen. The tab used to derive its label
+      // from the path alone, so the marker rendered nowhere - leaving a deleted
+      // file in a background tab with no indication at all.
+      const props = createMockProps({
+        filePath: '/project/document.md',
+        title: 'document.md (deleted)'
+      })
+
+      render(<EditorTab {...props} />)
+
+      const label = screen.getByTestId(getDynamicTestId(TEST_IDS.TAB_LABEL, '/project/document.md'))
+      expect(label).toHaveTextContent('document.md (deleted)')
+    })
+
+    it('should follow later title changes from the panel', () => {
+      let emit: (event: { title: string }) => void = () => {}
+      const props = createMockProps({
+        filePath: '/project/document.md',
+        title: 'document.md',
+        onDidTitleChange: (listener) => {
+          emit = listener
+          return { dispose: vi.fn() }
+        }
+      })
+
+      render(<EditorTab {...props} />)
+      const label = screen.getByTestId(getDynamicTestId(TEST_IDS.TAB_LABEL, '/project/document.md'))
+      expect(label).not.toHaveTextContent('(deleted)')
+
+      act(() => emit({ title: 'document.md (deleted)' }))
+
+      expect(label).toHaveTextContent('document.md (deleted)')
+    })
+
+    it('should not print the modified bullet twice', () => {
+      // The title carries `● ` for a dirty file, but this tab draws its own
+      // indicator element from the store; rendering the title verbatim would
+      // show two bullets.
+      mockDirtyPanelIds.add('panel-123')
+      const props = createMockProps({
+        filePath: '/project/document.md',
+        title: '● document.md'
+      })
+
+      render(<EditorTab {...props} />)
+
+      expect(screen.getByTestId(getDynamicTestId(TEST_IDS.TAB_DIRTY, '/project/document.md'))).toBeInTheDocument()
+      const label = screen.getByTestId(getDynamicTestId(TEST_IDS.TAB_LABEL, '/project/document.md'))
+      expect(label.textContent).toBe('document.md')
     })
 
     it('should render filename from nested path', () => {

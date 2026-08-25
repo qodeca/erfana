@@ -4,7 +4,7 @@ import { basename, join } from 'path'
 import { mkdtemp, rm, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import { app } from 'electron'
-import { ErrorCode } from '../../../../shared/errors'
+import { ErrorCode, ERROR_MESSAGES } from '../../../../shared/errors'
 import { DOCUMENT_IMPORT } from '../../../../shared/constants'
 import { validateFileForImport } from '../../../utils/fileUtils'
 import { isoToTessLang } from '../isoToTessLang'
@@ -110,6 +110,22 @@ export class LiteParseConverter implements IConverter, IConfigurableConverter {
   async convert(filePath: string): Promise<ConversionResult> {
     const fileName = basename(filePath)
     const ext = fileName.split('.').pop()?.toLowerCase() ?? ''
+
+    // Enforce the blocking size cap before any parsing. The document-import IPC
+    // path calls convert() directly (bypassing ImportService validation), so this
+    // is the guard that bounds memory-bomb inputs to sharp/libvips on this path.
+    const validation = await this.validate(filePath)
+    if (!validation.valid) {
+      // `validateFileForImport` always sets `error` on an invalid result; the `??`
+      // is a defensive type-narrowing default, not a reachable branch. Derive the
+      // message from the code so a missing file vs an over-size file stay distinct.
+      const code = validation.error ?? ErrorCode.IMPORT_CONVERSION_FAILED
+      return {
+        success: false,
+        error: ERROR_MESSAGES[code],
+        errorCode: code
+      }
+    }
 
     // Dynamic import -- LiteParse is ESM-only
     const { LiteParse } = await import('@llamaindex/liteparse')

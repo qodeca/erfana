@@ -42,14 +42,17 @@ ls -la "$WORK"
 
 ## 4.3 Verify minisign signature
 
-The dedicated release minisign public keys (PRIMARY active signer + ROTATION standby successor — dual-key per ADR-0003) are published in `docs/release-pubkey.txt` as the canonical source. `docs/security.md` § Release signing and `README.md` mirror them for end-user discovery; checks.yml has a drift detector (introduced with #174) that fails the build if the three locations disagree.
+The dedicated release minisign public keys (PRIMARY active signer + ROTATION standby successor — dual-key per ADR-0003) are published in `docs/release-pubkey.txt` as the canonical source. `docs/security.md` § Release signing mirrors them between fence markers for end-user discovery, and checks.yml Guard 5 fails the build if those **two** copies disagree. `README.md` only links to `docs/release-pubkey.txt` — it publishes no key values, so Guard 5's `README.md` leg (guarded by `if [ -n "$README" ]`) is inert today.
 
 Verification accepts either key (a SHA256SUMS.minisig that verifies under the primary OR the rotation key is valid). This lets the team rotate primary→rotation without re-signing old releases.
 
 ```bash
-# I7: use $REPO_ROOT (captured before cd) so this resolves correctly
-# regardless of cwd. Without this, the path would resolve against $WORK
-# (a temp dir with no docs/ subtree) and abort the gate.
+# Every path here is absolute, because §4.2 deliberately never cd's:
+#   - I7: $REPO_ROOT (captured before the temp dir was made) resolves the
+#     pubkey file. A bare docs/… path would resolve against $WORK — a temp
+#     dir with no docs/ subtree — and abort the gate.
+#   - The downloaded assets live in $WORK, so a bare "SHA256SUMS" would
+#     resolve against the repo root and verify the wrong file (or ENOENT).
 PUBKEY_FILE="$REPO_ROOT/docs/release-pubkey.txt"
 PRIMARY_PATH="$WORK/release-primary.pub"
 ROTATION_PATH="$WORK/release-rotation.pub"
@@ -90,9 +93,9 @@ ROTATION="${PUBKEYS[1]:-}"
 # Try primary first; on failure (verification, not extraction), retry
 # under the rotation key. Both must succeed-or-fail loudly so a malformed
 # .minisig file cannot silently slip through.
-if minisign -V -P "$PRIMARY" -m SHA256SUMS -x SHA256SUMS.minisig; then
+if minisign -V -P "$PRIMARY" -m "$WORK/SHA256SUMS" -x "$WORK/SHA256SUMS.minisig"; then
   echo "minisign verify: OK (PRIMARY key)"
-elif [ -n "$ROTATION" ] && minisign -V -P "$ROTATION" -m SHA256SUMS -x SHA256SUMS.minisig; then
+elif [ -n "$ROTATION" ] && minisign -V -P "$ROTATION" -m "$WORK/SHA256SUMS" -x "$WORK/SHA256SUMS.minisig"; then
   echo "minisign verify: OK (ROTATION key — primary may be in flight rotating)"
 else
   echo "FAIL: minisign verification failed under both PRIMARY and ROTATION keys"
@@ -114,7 +117,7 @@ ACTUAL="$WORK/SHA256SUMS.local"
 done) | sort > "$ACTUAL"
 
 # Compare against the sum list we just verified.
-diff <(sort SHA256SUMS) "$ACTUAL" || {
+diff <(sort "$WORK/SHA256SUMS") "$ACTUAL" || {
   echo "FAIL: Local hashes differ from signed SHA256SUMS"
   exit 1
 }
@@ -129,12 +132,33 @@ This catches tampering between `finalize` completion and the moment the operator
 ART_DIR="$WORK/ci-digest"
 SKIP_DIGEST_DIFF=0
 
-if ! gh run download "$RUN_ID" --name sha256sums-digest --dir "$ART_DIR" 2>"$WORK/digest-err.log"; then
+# --repo is mandatory here for the same reason as §4.2: cwd is a temp dir,
+# so gh cannot resolve the repo from remote.origin.url. Mirrors the idiom in
+# .github/workflows/release.yml (the package-lock-digest download step).
+if ! gh run download "$RUN_ID" --repo qodeca/erfana \
+     --name sha256sums-digest --dir "$ART_DIR" 2>"$WORK/digest-err.log"; then
   # Distinguish artifact-expired (>30 days retention) from genuine errors.
-  # GitHub's error wording: "expired" or "no artifact named" or "404".
-  if grep -qiE 'expired|not found|404|no artifact' "$WORK/digest-err.log"; then
+  # Measured against gh 2.91.0 on 2026-08-07:
+  #   missing/expired artifact on a real run -> "no valid artifacts found to download"
+  #   unknown run id                         -> "error fetching artifacts: HTTP 404: Not Found"
+  # So HTTP 404 is the RUN-not-found signature, not the artifact-expiry one,
+  # and it belongs in the hard-fail branch next to the repo/auth signatures.
+  # Anything routed to the degraded gate must carry the artifact-specific wording.
+  if grep -qiE 'could not (determine|resolve) .*repos|not a git repository|authentication|HTTP 40[134]' \
+       "$WORK/digest-err.log"; then
+    echo "FAIL: sha256sums-digest fetch could not resolve the repo or run, or could not authenticate."
+    echo "This is NOT artifact expiry — do not accept a degraded gate. Re-check \$RUN_ID and \`gh auth status\`."
+    cat "$WORK/digest-err.log" >&2
+    exit 1
+  fi
+  if grep -qiE 'no valid artifacts found to download|expired|no artifact (named|match)|artifact not found' \
+       "$WORK/digest-err.log"; then
     echo "WARN: sha256sums-digest artifact unavailable (>30 days retention?)."
     cat "$WORK/digest-err.log" >&2
+    # Same wording is emitted when the run simply never uploaded the artifact —
+    # e.g. $RUN_ID points at a checks.yml run instead of the release.yml run.
+    # Confirm the run is release.yml (`gh run view "$RUN_ID" --json workflowName`)
+    # before offering the degraded gate.
     # AskUserQuestion (orchestrator): "Proceed with degraded verification
     # gate? Minisign + per-asset SHA-256 still apply (4.3 + 4.4); only the
     # finalize-recorded digest comparison is skipped." Operator must

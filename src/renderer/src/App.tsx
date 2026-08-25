@@ -78,9 +78,32 @@ function AppContent() {
   )
 }
 
+/**
+ * E2E-only crash injector.
+ *
+ * Throws during render when `window.__ERFANA_FORCE_CRASH__` is set, which is
+ * the one way the root error boundary's real behaviour can be exercised end to
+ * end. The flag is exposed by `src/preload/index.ts` only when the main process
+ * appended `--erfana-force-crash` to `additionalArguments`, and main does that
+ * only when the app is UNPACKAGED and `ERFANA_E2E_FORCE_CRASH=1` is set — the
+ * renderer cannot set it, and a shipped build ignores the variable.
+ *
+ * Rendered inside `RootErrorBoundary`'s subtree, so the throw is caught by the
+ * boundary rather than blanking the window.
+ *
+ * @see docs/design/design-issue-60.md §2.8
+ */
+function ForcedCrash(): null {
+  if (window.__ERFANA_FORCE_CRASH__ === true) {
+    throw new Error('ERFANA_FORCE_CRASH test crash')
+  }
+  return null
+}
+
 function App() {
   return (
     <DialogProvider>
+      <ForcedCrash />
       <AppContent />
     </DialogProvider>
   )

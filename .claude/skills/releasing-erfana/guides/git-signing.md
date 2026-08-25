@@ -1,7 +1,7 @@
 # Git signing pre-flight check
 
 > Pre-flight check before §1.5 commit bundle in the `releasing-erfana` skill.
-> Spec heritage: [issue #174](https://github.com/qodeca/erfana/issues/174) reviewer finding.
+> Spec heritage: issue #174 reviewer finding (pre-migration issue; no longer resolves on the public repo).
 
 Pre-flight check (added per #174 reviewer finding): `git commit -S` fails silently if `user.signingkey` and `gpg.format` aren't configured. Surface a clear error before attempting.
 

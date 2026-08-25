@@ -68,30 +68,41 @@ export function ToastNotification() {
 function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
   const Icon = ICON_MAP[toast.type]
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault()
-      onClose()
-    }
-  }
-
   // No live role on the visual item: announcements are owned by the two hidden
-  // live regions (see ToastNotification). The item stays a normal focusable
-  // element so its Close button is reachable by assistive tech.
+  // live regions (see ToastNotification). An ACTIONABLE toast (e.g. approve a
+  // blocked host) becomes a labelled `group` so assistive tech can navigate to it
+  // and reach its action button, which otherwise sits unnamed at the DOM's end.
   return (
-    <div className={`toast toast-${toast.type}`} data-testid={`${TEST_IDS.TOAST}-${toast.type}`}>
+    <div
+      className={`toast toast-${toast.type}`}
+      data-testid={`${TEST_IDS.TOAST}-${toast.type}`}
+      role={toast.action ? 'group' : undefined}
+      aria-label={toast.action ? toast.title : undefined}
+    >
       <div className="toast-icon">
         <Icon size={20} strokeWidth={2} />
       </div>
       <div className="toast-content">
         <div className="toast-title">{toast.title}</div>
         <div className="toast-message" data-testid={TEST_IDS.TOAST_MESSAGE}>{toast.message}</div>
+        {toast.action && (
+          <button
+            className="toast-action"
+            onClick={() => {
+              // Run the action, then dismiss — an actionable toast is
+              // manual-dismiss (duration 0), so it does not clear on its own.
+              toast.action?.onClick()
+              onClose()
+            }}
+            data-testid={TEST_IDS.TOAST_BTN_ACTION}
+          >
+            {toast.action.label}
+          </button>
+        )}
       </div>
       <button
         className="toast-close"
         onClick={onClose}
-        onKeyDown={handleKeyDown}
-        tabIndex={0}
         aria-label="Close"
         data-testid={TEST_IDS.TOAST_BTN_DISMISS}
       >

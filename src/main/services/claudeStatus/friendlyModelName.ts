@@ -6,51 +6,75 @@
  * Security remediation §10: the raw id is UNTRUSTED transcript data that ends
  * up in visible text, the `aria-label`, and logs (React escaping covers only
  * HTML/XSS). So we FIRST sanitize — strip control characters and newlines, then
- * truncate to ≤64 chars — before any matching or fallback.
+ * truncate to ≤64 chars — before any matching or fallback. The order
+ * `sanitize → parse → render` is load-bearing and must not be reordered.
  *
  * Resolution order:
- *  1. Exact override table (curated display names).
- *  2. Generic derivation for `claude-<family>-<maj>-<min>[-<8-digit date>]`:
- *     strip `claude-`, drop a trailing date segment, title-case the family,
- *     join `maj.min` (e.g. `claude-opus-5-0` → `Opus 5.0`).
- *  3. Fallback: the sanitized raw id.
+ *  1. `parseModelId` (the SHARED grammar, #41): render `Family Major[.Minor]`,
+ *     dropping any snapshot date and bracketed variant — `claude-opus-5` →
+ *     `Opus 5`, `claude-opus-5-0` → `Opus 5.0`, `claude-haiku-4-5-20251001` →
+ *     `Haiku 4.5`. Using the same parse as the window detector is the point of
+ *     #41: for ids the grammar ACCEPTS, the label and the window cannot disagree.
+ *  2. A bare family alias (`opus`) → its title-cased family (design §6.3).
+ *  3. Fallback: the sanitized raw id, in its ORIGINAL casing.
+ *
+ * Steps 2 and 3 are OUTSIDE that guarantee, by design: an alias, an over-length
+ * id (truncated here, rejected for windowing) and `claude-mythos-preview` (a
+ * window from the undecomposable map, no derived label) each resolve their label
+ * and their window by different routes and may legitimately differ.
  *
  * @see Issue #216 - Per-terminal Claude Code context status bar
- * @see docs/designs/216-claude-status-bar.md §2, §10
+ * @see Issue #41 - Context meter reads the 200k window for Opus 5 sessions
+ * @see docs/designs/41-model-capability-registry.md §6.3, §11, §13
  */
-
-/** Max characters retained from an untrusted model id (§10). */
-const MAX_MODEL_ID_LENGTH = 64
-
-/** Curated display-name overrides for known model ids. */
-const OVERRIDES: Readonly<Record<string, string>> = {
-  'claude-opus-4-8': 'Opus 4.8',
-  'claude-opus-4-7': 'Opus 4.7',
-  'claude-opus-4-6': 'Opus 4.6',
-  'claude-sonnet-4-6': 'Sonnet 4.6',
-  'claude-sonnet-4-5': 'Sonnet 4.5',
-  'claude-haiku-4-5-20251001': 'Haiku 4.5',
-  'claude-haiku-4-5': 'Haiku 4.5'
-}
+import { MAX_MODEL_ID_LENGTH } from '../../../shared/ipc/claude-status-schema'
+import { familyAlias, parseModelId } from './modelId'
 
 /**
- * `claude-<family>-<maj>-<min>` with an optional trailing 8-digit date.
- * Family is alphabetic; version parts are numeric. Anchored to reject junk.
+ * Characters stripped from an untrusted id before it is rendered or parsed:
+ *
+ *  - C0 controls (U+0000–U+001F, incl. \n \r \t), DEL (U+007F), C1 controls
+ *    (U+0080–U+009F) — the original §10 remediation.
+ *  - Zero-width and directional formatting characters: ZWSP/ZWNJ/ZWJ/LRM/RLM
+ *    (U+200B–U+200F), the bidi embedding and OVERRIDE controls (U+202A–U+202E),
+ *    the bidi isolates (U+2066–U+2069) and the BOM (U+FEFF). These are invisible
+ *    but reorder rendered text, so `claude-opus-4-5\u202E…` can be made to READ
+ *    as a different model in the status bar and its aria-label. A meter that can
+ *    be made to display the wrong model is worse than one that displays nothing.
  */
-const GENERIC_PATTERN = /^claude-([a-z]+)-(\d+)-(\d+)(?:-\d{8})?$/
+const CONTROL_CHARS =
+  // eslint-disable-next-line no-control-regex
+  /[\u0000-\u001F\u007F-\u009F\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g
 
 /**
- * Matches C0 controls (U+0000–U+001F, incl. \n \r \t), DEL (U+007F), and C1
- * controls (U+0080–U+009F). These are stripped from untrusted ids.
+ * Upper bound on how much of an untrusted id is SCANNED (design §11).
+ *
+ * `modelId` reaches here straight from a transcript `model` field, which the
+ * parser bounds only by the 256 KB tail window — and this runs once per status
+ * refresh, ~1x/1.25s per terminal, on the main-process event loop. Scanning and
+ * copying the whole string before truncating made the cost linear in attacker-
+ * controlled input.
+ *
+ * Deliberately a MULTIPLE of {@link MAX_MODEL_ID_LENGTH} rather than the bound
+ * itself: slicing to 64 first would let a 64-character invisible prefix push a
+ * legitimate id out of the window entirely, which is a different bug. Eight
+ * times the bound keeps every realistic id intact while making the work O(1) in
+ * the size of the input.
  */
-// eslint-disable-next-line no-control-regex
-const CONTROL_CHARS = /[\u0000-\u001F\u007F-\u009F]/g
+const SANITIZE_SCAN_LIMIT = MAX_MODEL_ID_LENGTH * 8
 
 /**
- * Remove control characters (incl. newlines) and bound length.
+ * Bound the scan, remove control/bidi/zero-width characters, then bound length.
+ *
+ * Exported so `ClaudeStatusService` can apply the SAME rules to the raw
+ * `modelId` it puts on the wire — one sanitizer, one character class, so the two
+ * fields of a snapshot cannot diverge in what they consider safe.
  */
-function sanitize(modelId: string): string {
-  return modelId.replace(CONTROL_CHARS, '').slice(0, MAX_MODEL_ID_LENGTH)
+export function sanitizeModelId(modelId: string): string {
+  return modelId
+    .slice(0, SANITIZE_SCAN_LIMIT)
+    .replace(CONTROL_CHARS, '')
+    .slice(0, MAX_MODEL_ID_LENGTH)
 }
 
 /** Upper-case the first letter of a lower-case family token (`opus` → `Opus`). */
@@ -59,16 +83,18 @@ function titleCase(family: string): string {
 }
 
 export function friendlyModelName(modelId: string): string {
-  const clean = sanitize(modelId)
+  const clean = sanitizeModelId(modelId)
 
-  const override = OVERRIDES[clean]
-  if (override) return override
-
-  const match = GENERIC_PATTERN.exec(clean)
-  if (match) {
-    const [, family, major, minor] = match
-    return `${titleCase(family)} ${major}.${minor}`
+  const parsed = parseModelId(clean)
+  if (parsed !== null) {
+    // An omitted minor is rendered as omitted: `claude-opus-5` is "Opus 5", not
+    // "Opus 5.0" — the two are distinct published ids (AC6).
+    const version = parsed.minorOmitted ? `${parsed.major}` : `${parsed.major}.${parsed.minor}`
+    return `${titleCase(parsed.family)} ${version}`
   }
+
+  const alias = familyAlias(clean)
+  if (alias !== null) return titleCase(alias)
 
   return clean
 }

@@ -1,5 +1,7 @@
 # Local Whisper trust chain architecture
 
+> **Note**: issue and PR numbers, commit SHAs, release tags and CI run links below predate the 2026-06 open-source migration and no longer resolve on `qodeca/erfana`; they are retained as provenance.
+
 Single diagram + threat-model reference for the 4-layer client-side trust chain that defends Erfana's local whisper.cpp subprocess against tampering. Phase 4, issue [#165](https://github.com/qodeca/erfana/issues/165). For the decision rationale behind each layer, see [ADR 0001](../adrs/0001-self-host-whisper-binaries.md) through [ADR 0004](../adrs/0004-per-spawn-toctou-rehash.md).
 
 ## Why the trust chain exists
@@ -64,7 +66,7 @@ Each layer defeats a specific attacker. A full break requires defeating **all fo
 
 - **What it is**: `manifest.revisionIndex` must be `≥ max(MIN_REVISION_INDEX, persisted lastSeenRevision)`. `lastSeenRevision` is a sentinel file in `{userData}/whisper/.last-seen-revision` that records the highest revision this install has ever successfully fetched.
 - **What it defeats**: manifest-replay attacks where an attacker serves a **legitimately-signed-but-superseded** manifest (e.g. pre-revocation, pre-security-patch). Signature verifies (Layer 1 OK), artifact matches pin (Layer 2 OK), but the revision is below the monotonic floor.
-- **Where it lives**: `WhisperModelManager.ensureBinary()` guard at line 322 (downgrade block), sentinel read/write at `readLastSeenRevision()` / `writeLastSeenRevision()`.
+- **Where it lives**: `WhisperModelManager.ensureBinary()` guard at `WhisperModelManager.ts:324-332` (downgrade block), sentinel read/write at `readLastSeenRevision()` / `writeLastSeenRevision()`.
 - **Error**: `WHISPER_DOWNGRADE_BLOCKED` with message "below floor <N>".
 - **Support case for stuck users**: see [`whisper-support-runbook.md`](whisper-support-runbook.md) §`WHISPER_DOWNGRADE_BLOCKED`.
 

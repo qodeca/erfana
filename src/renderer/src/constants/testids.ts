@@ -127,12 +127,21 @@ export const TEST_IDS = {
   TERMINAL_STATUS_UNAVAILABLE: 'terminal-status-unavailable',
   /** Terminal status: error occurred */
   TERMINAL_STATUS_ERROR: 'terminal-status-error',
-  /** Capture full screen screenshot button (macOS only) */
+  /** Capture full screen screenshot button (macOS + Windows; gated by `capabilities.supported`) */
   TERMINAL_BTN_CAPTURE_SCREEN: 'terminal-btn-capture-screen',
-  /** Capture window screenshot button (macOS only) */
+  /** Capture window screenshot button (macOS + Windows; gated by `capabilities.supported`) */
   TERMINAL_BTN_CAPTURE_WINDOW: 'terminal-btn-capture-window',
-  /** Capture area screenshot button (macOS only) */
+  /** Capture area screenshot button (macOS + Windows; gated by `capabilities.supported`) */
   TERMINAL_BTN_CAPTURE_AREA: 'terminal-btn-capture-area',
+  // Screen Recording permission dialog (macOS grant-and-relaunch flow)
+  /** Screen-recording permission dialog container */
+  SCREEN_PERMISSION_DIALOG: 'screen-permission-dialog',
+  /** Open macOS Screen Recording settings pane */
+  SCREEN_PERMISSION_BTN_OPEN_SETTINGS: 'screen-permission-btn-open-settings',
+  /** Relaunch Erfana to apply the granted permission */
+  SCREEN_PERMISSION_BTN_RELAUNCH: 'screen-permission-btn-relaunch',
+  /** Dismiss the permission dialog */
+  SCREEN_PERMISSION_BTN_CLOSE: 'screen-permission-btn-close',
   /** Capture camera photo button (cross-platform) */
   TERMINAL_BTN_CAMERA: 'terminal-btn-camera',
   /** Expand/restore terminal to cover the editor area */
@@ -162,6 +171,32 @@ export const TEST_IDS = {
 
   /** Editor error boundary fallback container */
   EDITOR_ERROR_BOUNDARY: 'editor-error-boundary',
+
+  // =========================================================================
+  // Root Error Boundary (7)
+  // =========================================================================
+
+  /** Full-window crash fallback container (role="alertdialog") */
+  ROOT_ERROR_BOUNDARY: 'root-error-boundary',
+  /** Show/hide error details disclosure toggle */
+  ROOT_ERROR_DETAILS_TOGGLE: 'root-error-details-toggle',
+  /** Error details region (scrollable, role="region") */
+  ROOT_ERROR_DETAILS: 'root-error-details',
+  /** Copy error details button */
+  ROOT_ERROR_BTN_COPY: 'root-error-btn-copy',
+  /** Open logs folder button */
+  ROOT_ERROR_BTN_LOGS: 'root-error-btn-logs',
+  /** Restart Erfana button */
+  ROOT_ERROR_BTN_RESTART: 'root-error-btn-restart',
+  /** Single role="status" live region carrying every transient message */
+  ROOT_ERROR_STATUS: 'root-error-status',
+
+  // =========================================================================
+  // Panel Error Boundary (1)
+  // =========================================================================
+
+  /** Panel-scoped error boundary fallback container */
+  PANEL_ERROR_BOUNDARY: 'panel-error-boundary',
 
   // =========================================================================
   // File Conflict Notification (4)
@@ -194,7 +229,7 @@ export const TEST_IDS = {
   EDITOR_PREVIEW: 'editor-preview',
 
   // =========================================================================
-  // Camera Dialog (8)
+  // Camera Dialog (10)
   // =========================================================================
 
   /** Camera dialog container */
@@ -213,6 +248,10 @@ export const TEST_IDS = {
   CAMERA_ERROR: 'camera-error',
   /** Shutter animation overlay */
   CAMERA_SHUTTER: 'camera-shutter',
+  /** Mirror-preview checkbox (#42) */
+  CAMERA_MIRROR_TOGGLE: 'camera-mirror-toggle',
+  /** Aspect-ratio wrapper around the video preview (#42) */
+  CAMERA_PREVIEW_WRAPPER: 'camera-preview-wrapper',
 
   // =========================================================================
   // Dialogs - Base (3)
@@ -362,7 +401,7 @@ export const TEST_IDS = {
   DIAGRAM_VIEWER_BTN_CHAT: 'diagram-viewer-btn-chat',
 
   // =========================================================================
-  // Image Viewer Panel (12)
+  // Image Viewer Panel (20)
   // =========================================================================
 
   /** Image viewer panel container */
@@ -389,6 +428,41 @@ export const TEST_IDS = {
   IMAGE_VIEWER_FULLSCREEN: 'image-viewer-fullscreen',
   /** Full screen content area */
   IMAGE_VIEWER_FULLSCREEN_CONTENT: 'image-viewer-fullscreen-content',
+  /** Refresh status slot (permanently mounted live region, issue #70) */
+  IMAGE_VIEWER_STATUS: 'image-viewer-status',
+  /** Deleted / auto-refresh-unavailable banner (issue #70) */
+  IMAGE_VIEWER_DELETED_BANNER: 'image-viewer-deleted-banner',
+  /** Reload button inside the degraded-state banner (issue #70) */
+  IMAGE_VIEWER_BTN_RELOAD: 'image-viewer-btn-reload',
+  /**
+   * Export-as-PNG button (issue #73).
+   *
+   * Rendered by BOTH toolbar instances on purpose - the panel's and the
+   * full-screen overlay's - so a locator must be scoped by ancestor, exactly
+   * as the zoom and full-screen ids already are.
+   */
+  IMAGE_VIEWER_BTN_EXPORT_PNG: 'image-viewer-btn-export-png',
+  /** Export-as-PDF button (issue #73); duplicated across both toolbars. */
+  IMAGE_VIEWER_BTN_EXPORT_PDF: 'image-viewer-btn-export-pdf',
+  /** Copy-image-to-clipboard button (issue #73); duplicated across both toolbars. */
+  IMAGE_VIEWER_BTN_COPY: 'image-viewer-btn-copy',
+  /**
+   * Polite export live region (issue #73).
+   *
+   * Panel-owned and visually hidden. Rendered into whichever surface is on top
+   * (the overlay when full screen, the panel otherwise), so exactly one element
+   * carries this id at any time. Carries busy and success sentences only.
+   */
+  IMAGE_VIEWER_EXPORT_STATUS: 'image-viewer-export-status',
+  /**
+   * Assertive export live region (issue #73).
+   *
+   * The `role="alert"` half of the pair above, mounted and moved with it. A
+   * failed export lands here: the overlay is `aria-modal`, so the toast's own
+   * alert region cannot be heard while full screen, and a politely announced
+   * failure can be queued or dropped.
+   */
+  IMAGE_VIEWER_EXPORT_ALERT: 'image-viewer-export-alert',
 
   // =========================================================================
   // Chat Bubble (15)
@@ -502,6 +576,8 @@ export const TEST_IDS = {
   TOAST_MESSAGE: 'toast-message',
   /** Toast dismiss button */
   TOAST_BTN_DISMISS: 'toast-btn-dismiss',
+  /** Toast action button (e.g. "Approve"); present only on actionable toasts */
+  TOAST_BTN_ACTION: 'toast-btn-action',
   /** Persistent visually-hidden polite live region (info/success/warning) */
   TOAST_LIVE_POLITE: 'toast-live-polite',
   /** Persistent visually-hidden alert live region (errors) */
@@ -551,6 +627,10 @@ export const TEST_IDS = {
   SETTINGS_LOGS_FOLDER_PATH: 'settings-logs-folder-path',
   /** Open logs folder button */
   SETTINGS_BTN_OPEN_LOGS: 'settings-btn-open-logs',
+  /** HTML preview settings section (Issue #74) */
+  SETTINGS_SECTION_HTML_PREVIEW: 'settings-section-html-preview',
+  /** HTML preview enabled toggle (Issue #74, AC21) */
+  SETTINGS_TOGGLE_HTML_PREVIEW: 'settings-toggle-html-preview',
 
   // =========================================================================
   // Transcription Dialog (10)

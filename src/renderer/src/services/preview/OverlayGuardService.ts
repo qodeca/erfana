@@ -1,0 +1,266 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+/**
+ * Overlay guard service (Issue #74, work item 69; design §1.8, §5(d)).
+ *
+ * The SINGLE owner of preview show/hide. It watches two renderer signals — the
+ * occluder store (any dialog/settings/toast/menu/full-screen overlay on screen)
+ * and the preview store (which panel holds the one live `WebContentsView`) —
+ * and the active dockview tab (fed in via {@link IOverlayGuard.sync}). It sends
+ * `preview:setVisibility` for the live preview panel whenever the computed
+ * visibility changes:
+ *
+ * ```
+ * visible = (live preview is the active tab) && !isOccluded()
+ * ```
+ *
+ * **This is the ONLY file in `src/renderer/**` allowed to call
+ * `api.preview.setVisibility`.** An ESLint `no-restricted-syntax` rule (item 84,
+ * a separate batch) enforces that every other renderer module goes through this
+ * guard rather than poking main-side visibility directly, so hide/show ordering
+ * (capture-before-hide, single application site) has exactly one owner.
+ *
+ * Why this must be the sole owner (design §5(d)): main captures a still frame
+ * *before* hiding, and re-adds the child view topmost on show. A second caller
+ * racing `setVisibility` would flap the view, waste a `capturePage`, and flash.
+ *
+ * Dependency-injected so it is unit-testable with no real `window.api` or
+ * zustand store: {@link createOverlayGuard} takes an {@link OverlayGuardDeps};
+ * {@link getOverlayGuard} wires the real stores + bridge for production.
+ */
+
+import { useOverlayOccluderStore } from '../../stores/useOverlayOccluderStore'
+import { usePreviewStore } from '../../stores/usePreviewStore'
+
+/**
+ * Reason strings sent alongside `preview:setVisibility` (design §5(d)).
+ *
+ * The IPC `reason` is a bounded free string for main-side logging, NOT a closed
+ * enum (see `OccluderKind`'s doc comment) — so a coarse cause here is fine. The
+ * occluder store only exposes a boolean, so the guard cannot name the exact
+ * overlay kind; it distinguishes the three cases it can tell apart.
+ */
+const VISIBILITY_REASON = {
+  /** Live preview is the active tab and nothing occludes it. */
+  activeTab: 'active-tab',
+  /** Hidden because an overlay (dialog/toast/menu/…) is on screen. */
+  occluded: 'occluded',
+  /** Hidden because another tab is active. */
+  inactiveTab: 'inactive-tab'
+} as const
+
+/**
+ * Everything the guard needs from the outside world.
+ *
+ * Injected rather than imported so the guard is testable with plain fakes and
+ * so the "only `setVisibility` caller" invariant is a single, movable seam. The
+ * production wiring in {@link getOverlayGuard} passes the real stores + bridge.
+ */
+export interface OverlayGuardDeps {
+  /**
+   * @returns `true` while any overlay currently occludes the preview.
+   * Reads the *live* occluder counts (synchronous), matching the store getter.
+   */
+  isOccluded: () => boolean
+  /**
+   * Subscribe to occluder-count changes.
+   * @param listener - Called (no args) after any occluder count changes.
+   * @returns An unsubscribe function.
+   */
+  subscribeOccluded: (listener: () => void) => () => void
+  /**
+   * @returns The panel id of the one live preview (the panel that owns a
+   * `WebContentsView`), or `null` when no preview is live. Derived from the
+   * preview store's per-panel load state — a panel is live once it has left the
+   * `'idle'` state and until it is removed.
+   */
+  getLivePreviewPanelId: () => string | null
+  /**
+   * Subscribe to preview-store changes (load state, panel add/remove).
+   * @param listener - Called (no args) after any preview-store change.
+   * @returns An unsubscribe function.
+   */
+  subscribePreview: (listener: () => void) => () => void
+  /**
+   * Fire-and-forget visibility send to main. In production this is
+   * `window.api.preview.setVisibility` — the ONE permitted call site.
+   * @param panelId - The live preview panel.
+   * @param visible - Whether the view should be shown.
+   * @param reason - Advisory cause, for main-side logging.
+   */
+  setVisibility: (panelId: string, visible: boolean, reason: string) => void
+}
+
+/**
+ * Public surface of the overlay guard.
+ *
+ * @see {@link createOverlayGuard} to build one, {@link getOverlayGuard} for the
+ * production singleton.
+ */
+export interface IOverlayGuard {
+  /**
+   * Records the currently active dockview tab and recomputes visibility.
+   *
+   * Called from `EditorAreaSplitPanel`'s `onDidActivePanelChange` (item 80): a
+   * tab switch changes no occluder count, so without this the "hide the preview
+   * when you switch away / show it when you switch back" path has no trigger
+   * (design §1.8 X18). Also safe to call after any external state change to
+   * force a recompute.
+   *
+   * @param activeTabId - The active tab's panel id, or `null` when none.
+   */
+  sync: (activeTabId: string | null) => void
+  /** Detaches both store subscriptions. Idempotent. */
+  dispose: () => void
+}
+
+/**
+ * Owns preview show/hide. Constructed with injected {@link OverlayGuardDeps}.
+ *
+ * Holds three pieces of state: the active tab id (from {@link sync}), the panel
+ * id it is currently tracking as the live preview, and the last visibility it
+ * sent for that panel — so `setVisibility` fires ONLY when the value changes.
+ */
+class OverlayGuardService implements IOverlayGuard {
+  /** The active dockview tab id, or `null` before the first {@link sync}. */
+  private activeTabId: string | null = null
+
+  /** The live preview panel currently tracked, or `null` when none is live. */
+  private trackedPanelId: string | null = null
+
+  /**
+   * Last visibility sent for {@link trackedPanelId}, or `null` when unknown
+   * (before the first send, or right after the tracked panel changed). `null`
+   * guarantees the first computed value is always sent.
+   */
+  private lastVisible: boolean | null = null
+
+  private readonly unsubscribers: Array<() => void> = []
+
+  constructor(private readonly deps: OverlayGuardDeps) {
+    // Recompute whenever either signal changes. `sync` covers the third trigger
+    // (tab activation), which neither store observes.
+    this.unsubscribers.push(deps.subscribeOccluded(() => this.recompute()))
+    this.unsubscribers.push(deps.subscribePreview(() => this.recompute()))
+  }
+
+  sync(activeTabId: string | null): void {
+    this.activeTabId = activeTabId
+    this.recompute()
+  }
+
+  dispose(): void {
+    while (this.unsubscribers.length > 0) {
+      this.unsubscribers.pop()?.()
+    }
+  }
+
+  /**
+   * Computes `visible = isActiveTab && !isOccluded()` for the live preview and
+   * sends `setVisibility` only when it differs from the last sent value.
+   *
+   * When the live preview panel changes (a new preview opens, or the old one
+   * closes) the last-visibility cache is reset so the new panel gets an initial
+   * send. When no preview is live there is nothing to hide — main destroyed the
+   * view on close — so the method returns without sending.
+   */
+  private recompute(): void {
+    const panelId = this.deps.getLivePreviewPanelId()
+
+    if (panelId !== this.trackedPanelId) {
+      this.trackedPanelId = panelId
+      this.lastVisible = null
+    }
+
+    if (panelId === null) return
+
+    const occluded = this.deps.isOccluded()
+    const visible = this.activeTabId === panelId && !occluded
+    if (visible === this.lastVisible) return
+
+    this.lastVisible = visible
+    const reason = visible
+      ? VISIBILITY_REASON.activeTab
+      : occluded
+        ? VISIBILITY_REASON.occluded
+        : VISIBILITY_REASON.inactiveTab
+    this.deps.setVisibility(panelId, visible, reason)
+  }
+}
+
+/**
+ * Builds an overlay guard from injected dependencies.
+ *
+ * @param deps - The store readers/subscribers and the `setVisibility` sink.
+ * @returns A guard; call {@link IOverlayGuard.sync} on active-tab change and
+ * {@link IOverlayGuard.dispose} on teardown.
+ *
+ * @example Unit test with fakes (no real window.api)
+ * ```ts
+ * const sent: Array<[string, boolean]> = []
+ * const guard = createOverlayGuard({
+ *   isOccluded: () => occluded,
+ *   subscribeOccluded: () => () => {},
+ *   getLivePreviewPanelId: () => 'preview-1',
+ *   subscribePreview: () => () => {},
+ *   setVisibility: (id, v) => sent.push([id, v])
+ * })
+ * guard.sync('preview-1') // → setVisibility('preview-1', true, 'active-tab')
+ * ```
+ */
+export function createOverlayGuard(deps: OverlayGuardDeps): IOverlayGuard {
+  return new OverlayGuardService(deps)
+}
+
+/**
+ * Reads the one live preview panel id from the preview store.
+ *
+ * A panel is "live" once it has left the initial `'idle'` load state (main
+ * emits `loadStateChanged` on open) and until it is removed. Only one preview
+ * is ever live, so the first non-idle panel is returned.
+ *
+ * @returns The live preview panel id, or `null` when no preview is live.
+ */
+function readLivePreviewPanelId(): string | null {
+  const { panels } = usePreviewStore.getState()
+  for (const [panelId, state] of panels) {
+    // Correct only under the single-live-view invariant (design §1.8): at most
+    // one panel is ever non-idle, so the first one found IS the live preview.
+    // A future multi-preview change must not rely on Map iteration order here.
+    if (state.loadState !== 'idle') return panelId
+  }
+  return null
+}
+
+let singleton: IOverlayGuard | null = null
+
+/**
+ * The production overlay-guard singleton, wired to the real occluder + preview
+ * stores and the `window.api.preview.setVisibility` bridge.
+ *
+ * The `setVisibility` closure here is the ONLY `api.preview.setVisibility` call
+ * site in `src/renderer/**` (design §1.8; item 84 ESLint guard).
+ *
+ * @returns The lazily-created singleton guard.
+ */
+export function getOverlayGuard(): IOverlayGuard {
+  if (singleton) return singleton
+  singleton = createOverlayGuard({
+    isOccluded: () => useOverlayOccluderStore.getState().isOccluded(),
+    subscribeOccluded: (listener) => useOverlayOccluderStore.subscribe(listener),
+    getLivePreviewPanelId: readLivePreviewPanelId,
+    subscribePreview: (listener) => usePreviewStore.subscribe(listener),
+    setVisibility: (panelId, visible, reason) =>
+      window.api.preview.setVisibility(panelId, visible, reason)
+  })
+  return singleton
+}
+
+/**
+ * Disposes and clears the production singleton. Intended for tests and hard
+ * teardown; production code holds the guard for the app's lifetime.
+ */
+export function resetOverlayGuard(): void {
+  singleton?.dispose()
+  singleton = null
+}

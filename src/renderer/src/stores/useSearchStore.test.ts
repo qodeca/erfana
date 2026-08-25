@@ -79,6 +79,143 @@ describe('useSearchStore', () => {
       expect(state.providerStates).toBeInstanceOf(Map)
       expect(state.providerStates.size).toBe(0)
     })
+
+    it('starts with a zero count', () => {
+      expect(useSearchStore.getState().count).toEqual({ total: 0, activeOrdinal: 0 })
+    })
+
+    it('starts with full default capabilities', () => {
+      expect(useSearchStore.getState().capabilities).toEqual({
+        randomAccess: true,
+        matchList: true,
+        wholeWord: true
+      })
+    })
+
+    it('starts with navToken 0 and direction next', () => {
+      const state = useSearchStore.getState()
+      expect(state.navToken).toBe(0)
+      expect(state.navDirection).toBe('next')
+    })
+  })
+
+  describe('Capabilities and count (widened interface)', () => {
+    beforeEach(() => {
+      useSearchStore.setState({
+        capabilities: { randomAccess: true, matchList: true, wholeWord: true },
+        count: { total: 0, activeOrdinal: 0 },
+        matches: [],
+        currentIndex: 0,
+        navToken: 0,
+        navDirection: 'next'
+      })
+    })
+
+    it('setCapabilities replaces the active capabilities', () => {
+      useSearchStore.getState().setCapabilities({
+        randomAccess: false,
+        matchList: false,
+        wholeWord: false
+      })
+      expect(useSearchStore.getState().capabilities.matchList).toBe(false)
+    })
+
+    it('setCount replaces the pushed count', () => {
+      useSearchStore.getState().setCount({ total: 7, activeOrdinal: 3 })
+      expect(useSearchStore.getState().count).toEqual({ total: 7, activeOrdinal: 3 })
+    })
+
+    it('setMatches derives count for a matchList provider', () => {
+      const matches: SearchMatch[] = [
+        { id: 'a', line: 1, startColumn: 0, endColumn: 1, text: 'a' },
+        { id: 'b', line: 2, startColumn: 0, endColumn: 1, text: 'a' }
+      ]
+      useSearchStore.getState().setMatches(matches)
+      expect(useSearchStore.getState().count).toEqual({ total: 2, activeOrdinal: 1 })
+    })
+
+    it('setMatches does NOT clobber the pushed count for a count-only provider', () => {
+      useSearchStore.setState({
+        capabilities: { randomAccess: false, matchList: false, wholeWord: false },
+        count: { total: 9, activeOrdinal: 4 }
+      })
+      useSearchStore.getState().setMatches([])
+      // count preserved (arrives via setCount), matches stays empty
+      expect(useSearchStore.getState().count).toEqual({ total: 9, activeOrdinal: 4 })
+      expect(useSearchStore.getState().matches).toEqual([])
+    })
+
+    it('nextMatch on a count-only provider bumps navToken and pins currentIndex', () => {
+      useSearchStore.setState({
+        capabilities: { randomAccess: false, matchList: false, wholeWord: false }
+      })
+      useSearchStore.getState().nextMatch()
+      const state = useSearchStore.getState()
+      expect(state.navToken).toBe(1)
+      expect(state.navDirection).toBe('next')
+      expect(state.currentIndex).toBe(0)
+    })
+
+    it('previousMatch on a count-only provider records the direction', () => {
+      useSearchStore.setState({
+        capabilities: { randomAccess: false, matchList: false, wholeWord: false }
+      })
+      useSearchStore.getState().previousMatch()
+      const state = useSearchStore.getState()
+      expect(state.navToken).toBe(1)
+      expect(state.navDirection).toBe('previous')
+      expect(state.currentIndex).toBe(0)
+    })
+
+    it('nextMatch on a full-match provider still advances currentIndex', () => {
+      const matches: SearchMatch[] = [
+        { id: 'a', line: 1, startColumn: 0, endColumn: 1, text: 'a' },
+        { id: 'b', line: 2, startColumn: 0, endColumn: 1, text: 'a' }
+      ]
+      useSearchStore.setState({ matches, currentIndex: 0 })
+      useSearchStore.getState().nextMatch()
+      expect(useSearchStore.getState().currentIndex).toBe(1)
+      // navToken still bumps but is harmless for full-match providers
+      expect(useSearchStore.getState().navToken).toBe(1)
+    })
+
+    it('restoreProviderState resets capabilities and navToken for an uncached provider', () => {
+      useSearchStore.setState({
+        capabilities: { randomAccess: false, matchList: false, wholeWord: false },
+        navToken: 5,
+        count: { total: 3, activeOrdinal: 1 }
+      })
+      useSearchStore.getState().restoreProviderState('brand-new')
+      const state = useSearchStore.getState()
+      expect(state.capabilities).toEqual({
+        randomAccess: true,
+        matchList: true,
+        wholeWord: true
+      })
+      expect(state.navToken).toBe(0)
+      expect(state.count).toEqual({ total: 0, activeOrdinal: 0 })
+    })
+
+    it('cache then restore round-trips capabilities and count', () => {
+      const caps = { randomAccess: false, matchList: false, wholeWord: false }
+      useSearchStore.setState({
+        capabilities: caps,
+        count: { total: 6, activeOrdinal: 2 },
+        query: 'q'
+      })
+      useSearchStore.getState().cacheProviderState('preview-page')
+
+      // Switch to something else, then restore the cached provider.
+      useSearchStore.setState({
+        capabilities: { randomAccess: true, matchList: true, wholeWord: true },
+        count: { total: 0, activeOrdinal: 0 }
+      })
+      useSearchStore.getState().restoreProviderState('preview-page')
+
+      const state = useSearchStore.getState()
+      expect(state.capabilities).toEqual(caps)
+      expect(state.count).toEqual({ total: 6, activeOrdinal: 2 })
+    })
   })
 
   describe('openSearch', () => {
@@ -399,7 +536,9 @@ describe('useSearchStore', () => {
       expect(cachedState).toEqual({
         query: 'hello',
         matches,
-        currentIndex: 0
+        currentIndex: 0,
+        count: { total: 0, activeOrdinal: 0 },
+        capabilities: { randomAccess: true, matchList: true, wholeWord: true }
       })
     })
 
@@ -494,7 +633,9 @@ describe('useSearchStore', () => {
       expect(cached).toEqual({
         query: 'test query',
         matches,
-        currentIndex: 3
+        currentIndex: 3,
+        count: { total: 0, activeOrdinal: 0 },
+        capabilities: { randomAccess: true, matchList: true, wholeWord: true }
       })
     })
 
@@ -559,7 +700,9 @@ describe('useSearchStore', () => {
       expect(cached).toEqual({
         query: '',
         matches: [],
-        currentIndex: 0
+        currentIndex: 0,
+        count: { total: 0, activeOrdinal: 0 },
+        capabilities: { randomAccess: true, matchList: true, wholeWord: true }
       })
     })
 

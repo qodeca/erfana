@@ -111,6 +111,13 @@ export interface MenuContext {
   getSiblingNames: (nodePath: string, currentName: string) => string[]
   // For file import command
   importFile?: () => Promise<string | null>
+  /**
+   * Opens a file as source in the Monaco editor, bypassing the running HTML
+   * preview (issue #74). Present only when the tree can reach the editor-area
+   * dockview API; the "Open as source" menu item is offered on `.html`/`.htm`
+   * nodes only when this is wired.
+   */
+  openAsSource?: (filePath: string) => void
 }
 
 /**

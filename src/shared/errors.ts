@@ -67,7 +67,10 @@ export enum ErrorCode {
   IMPORT_ENCRYPTED = 'IMPORT_ENCRYPTED',
   IMPORT_EMPTY = 'IMPORT_EMPTY',
   IMPORT_CORRUPT = 'IMPORT_CORRUPT',
+  /** Non-blocking size warning: returned with `valid: true`; import still proceeds. */
   IMPORT_TOO_LARGE = 'IMPORT_TOO_LARGE',
+  /** Blocking size rejection: returned with `valid: false`; import is refused before conversion. */
+  IMPORT_EXCEEDS_SIZE_LIMIT = 'IMPORT_EXCEEDS_SIZE_LIMIT',
   IMPORT_CONVERSION_FAILED = 'IMPORT_CONVERSION_FAILED',
   IMPORT_UNSUPPORTED_TYPE = 'IMPORT_UNSUPPORTED_TYPE',
   IMPORT_TEXT_ENCODING_ERROR = 'IMPORT_TEXT_ENCODING_ERROR',
@@ -100,6 +103,38 @@ export enum ErrorCode {
   DOCX_EXPORT_FAILED = 'DOCX_EXPORT_FAILED',
   DOCX_EXPORT_NO_CONTENT = 'DOCX_EXPORT_NO_CONTENT',
   DOCX_EXPORT_INVALID_REQUEST = 'DOCX_EXPORT_INVALID_REQUEST',
+
+  // Image export errors (Issue #73)
+  /** Save dialog dismissed. Never surfaced — the renderer suppresses the toast. */
+  IMAGE_EXPORT_CANCELLED = 'IMAGE_EXPORT_CANCELLED',
+  /** Untrusted sender, Zod failure, or an unsupported extension. */
+  IMAGE_EXPORT_INVALID_REQUEST = 'IMAGE_EXPORT_INVALID_REQUEST',
+  /** The single main-side export lock is already held. */
+  IMAGE_EXPORT_BUSY = 'IMAGE_EXPORT_BUSY',
+  /** ENOENT / EACCES on the source, or it is not inside the open project. */
+  IMAGE_EXPORT_SOURCE_UNREADABLE = 'IMAGE_EXPORT_SOURCE_UNREADABLE',
+  /** Source file exceeds the 50 MB read cap. */
+  IMAGE_EXPORT_SOURCE_TOO_LARGE = 'IMAGE_EXPORT_SOURCE_TOO_LARGE',
+  /** Header parse produced no dimensions, or the harness could not decode. */
+  IMAGE_EXPORT_DECODE_FAILED = 'IMAGE_EXPORT_DECODE_FAILED',
+  /** Declared or decoded pixel count exceeds the output cap. */
+  IMAGE_EXPORT_OUTPUT_TOO_LARGE = 'IMAGE_EXPORT_OUTPUT_TOO_LARGE',
+  /** An SVG's intrinsic size multiplied by the 2x factor exceeds the cap. */
+  IMAGE_EXPORT_SVG_TOO_LARGE = 'IMAGE_EXPORT_SVG_TOO_LARGE',
+  /** Either side exceeds the PDF format's 200-inch page limit. */
+  IMAGE_EXPORT_PDF_PAGE_TOO_LARGE = 'IMAGE_EXPORT_PDF_PAGE_TOO_LARGE',
+  /** The produced PDF is not exactly one page of the requested geometry. */
+  IMAGE_EXPORT_PDF_GEOMETRY_FAILED = 'IMAGE_EXPORT_PDF_GEOMETRY_FAILED',
+  /** Decoded dimensions disagree with the largest entry in the .ico directory. */
+  IMAGE_EXPORT_ICO_SIZE_MISMATCH = 'IMAGE_EXPORT_ICO_SIZE_MISMATCH',
+  /** The chosen destination resolves to the source image, or cannot be proven not to. */
+  IMAGE_EXPORT_SOURCE_COLLISION = 'IMAGE_EXPORT_SOURCE_COLLISION',
+  /** Writing the exported file threw. */
+  IMAGE_EXPORT_WRITE_FAILED = 'IMAGE_EXPORT_WRITE_FAILED',
+  /** The OS clipboard rejected the image, or the decoded image was empty. */
+  IMAGE_EXPORT_CLIPBOARD_FAILED = 'IMAGE_EXPORT_CLIPBOARD_FAILED',
+  /** Catch-all, including harness timeout and hidden-window load failure. */
+  IMAGE_EXPORT_FAILED = 'IMAGE_EXPORT_FAILED',
 
   // Screenshot capture errors
   SCREENSHOT_PERMISSION_DENIED = 'SCREENSHOT_PERMISSION_DENIED',
@@ -182,6 +217,13 @@ export enum ErrorCode {
   VIDEO_NO_AUDIO_TRACK = 'VIDEO_NO_AUDIO_TRACK',
   VIDEO_EXTRACTION_FAILED = 'VIDEO_EXTRACTION_FAILED',
   VIDEO_FFMPEG_UNAVAILABLE = 'VIDEO_FFMPEG_UNAVAILABLE',
+
+  // Preview errors (Issue #74)
+  PREVIEW_HOST_NOT_APPROVABLE = 'PREVIEW_HOST_NOT_APPROVABLE',
+  PREVIEW_CSP_INVALID = 'PREVIEW_CSP_INVALID',
+  PREVIEW_LOCAL_FILE_MISSING = 'PREVIEW_LOCAL_FILE_MISSING',
+  PREVIEW_VIEW_LIMIT_REACHED = 'PREVIEW_VIEW_LIMIT_REACHED',
+  PREVIEW_ALLOWLIST_FULL = 'PREVIEW_ALLOWLIST_FULL',
 
   // Generic errors
   UNKNOWN_ERROR = 'UNKNOWN_ERROR'
@@ -286,6 +328,7 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.IMPORT_EMPTY]: 'File has no content to import',
   [ErrorCode.IMPORT_CORRUPT]: 'File appears to be corrupted',
   [ErrorCode.IMPORT_TOO_LARGE]: 'File is too large',
+  [ErrorCode.IMPORT_EXCEEDS_SIZE_LIMIT]: 'File exceeds the maximum import size',
   [ErrorCode.IMPORT_CONVERSION_FAILED]: 'Failed to convert file',
   [ErrorCode.IMPORT_UNSUPPORTED_TYPE]: 'File type is not supported',
   [ErrorCode.IMPORT_TEXT_ENCODING_ERROR]: 'File has invalid text encoding',
@@ -316,6 +359,23 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.DOCX_EXPORT_FAILED]: 'Failed to generate DOCX',
   [ErrorCode.DOCX_EXPORT_NO_CONTENT]: 'No content to export',
   [ErrorCode.DOCX_EXPORT_INVALID_REQUEST]: 'Invalid DOCX export request',
+
+  // Image export errors (Issue #73)
+  [ErrorCode.IMAGE_EXPORT_CANCELLED]: 'Image export was cancelled',
+  [ErrorCode.IMAGE_EXPORT_INVALID_REQUEST]: 'Invalid image export request',
+  [ErrorCode.IMAGE_EXPORT_BUSY]: 'Another image export is already running',
+  [ErrorCode.IMAGE_EXPORT_SOURCE_UNREADABLE]: 'Could not read this image – it may have been moved or deleted',
+  [ErrorCode.IMAGE_EXPORT_SOURCE_TOO_LARGE]: 'This image is over the 50 MB export limit',
+  [ErrorCode.IMAGE_EXPORT_DECODE_FAILED]: 'Could not decode this image file',
+  [ErrorCode.IMAGE_EXPORT_OUTPUT_TOO_LARGE]: 'Too many pixels to export – Erfana never shrinks an export, so nothing was written',
+  [ErrorCode.IMAGE_EXPORT_SVG_TOO_LARGE]: 'This SVG renders too large at 2x to export, so nothing was written',
+  [ErrorCode.IMAGE_EXPORT_PDF_PAGE_TOO_LARGE]: 'Too big for one PDF page (the limit is 200 inches per side) – export as PNG instead',
+  [ErrorCode.IMAGE_EXPORT_PDF_GEOMETRY_FAILED]: 'The PDF page came out the wrong size, so nothing was written',
+  [ErrorCode.IMAGE_EXPORT_ICO_SIZE_MISMATCH]: 'Could not export the largest size in this icon file',
+  [ErrorCode.IMAGE_EXPORT_SOURCE_COLLISION]: 'That would overwrite the image you are exporting',
+  [ErrorCode.IMAGE_EXPORT_WRITE_FAILED]: 'Could not write to that folder',
+  [ErrorCode.IMAGE_EXPORT_CLIPBOARD_FAILED]: 'The clipboard rejected the image',
+  [ErrorCode.IMAGE_EXPORT_FAILED]: 'Image export failed',
 
   // Screenshot capture errors
   [ErrorCode.SCREENSHOT_PERMISSION_DENIED]: 'Screen recording permission required. Grant access in System Settings > Privacy & Security.',
@@ -380,6 +440,15 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.VIDEO_NO_AUDIO_TRACK]: 'This video file contains no audio track to transcribe.',
   [ErrorCode.VIDEO_EXTRACTION_FAILED]: 'Failed to extract audio from video file.',
   [ErrorCode.VIDEO_FFMPEG_UNAVAILABLE]: 'Video import requires ffmpeg which is not available.',
+
+  // Preview errors (Issue #74)
+  [ErrorCode.PREVIEW_HOST_NOT_APPROVABLE]: 'This host cannot be approved for preview.',
+  [ErrorCode.PREVIEW_CSP_INVALID]: 'The preview security policy is invalid; the page was not served.',
+  // The path must stay quoted: redactUserInput's QUOTED_SPAN redacts only the
+  // span between the first and last '"', so an unquoted path would survive.
+  [ErrorCode.PREVIEW_LOCAL_FILE_MISSING]: '"<path>" could not be read',
+  [ErrorCode.PREVIEW_VIEW_LIMIT_REACHED]: 'A preview is already open.',
+  [ErrorCode.PREVIEW_ALLOWLIST_FULL]: 'The preview host allowlist is full.',
 
   // Generic errors
   [ErrorCode.UNKNOWN_ERROR]: 'An unexpected error occurred'

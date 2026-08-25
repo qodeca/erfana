@@ -12,79 +12,11 @@ vi.mock('../LoggingService', () => ({
   }
 }))
 
-import { ClaudeStatusService, type ClaudeStatusDeps } from './ClaudeStatusService'
 import type { IClaudeProcessDetector } from './process/types'
-import type { ClaudeStatusChangePayload } from '../../../shared/ipc/claude-status-schema'
-import { modelNativelySupportsExtended } from './ClaudeWindowDetector'
-
-/** Minimal fake watcher implementing the surface ClaudeStatusService uses. */
-function makeFakeWatcher() {
-  const watchDir = vi.fn()
-  const unwatchDir = vi.fn()
-  const closeAll = vi.fn().mockResolvedValue(undefined)
-  let onChangeCb: ((dir: string) => void) | null = null
-  const onChange = vi.fn((cb: (dir: string) => void) => {
-    onChangeCb = cb
-  })
-  return {
-    watchDir,
-    unwatchDir,
-    closeAll,
-    onChange,
-    /** Drive a transcript-dir change as the real watcher would. */
-    fire: (dir: string) => onChangeCb?.(dir)
-  }
-}
-
-type FakeWatcher = ReturnType<typeof makeFakeWatcher>
-
-interface Harness {
-  service: ClaudeStatusService
-  detector: { isClaudeRunning: ReturnType<typeof vi.fn> }
-  locateTranscripts: ReturnType<typeof vi.fn>
-  parseTranscript: ReturnType<typeof vi.fn>
-  detectWindowSize: ReturnType<typeof vi.fn>
-  watcher: FakeWatcher
-  emit: ReturnType<typeof vi.fn>
-  emitted: Array<{ wc: number; payload: ClaudeStatusChangePayload }>
-}
-
-function makeHarness(overrides?: Partial<ClaudeStatusDeps>): Harness {
-  const emitted: Array<{ wc: number; payload: ClaudeStatusChangePayload }> = []
-  const detector = { isClaudeRunning: vi.fn() }
-  const locateTranscripts = vi.fn().mockResolvedValue(['/root/ENC/session.jsonl'])
-  const parseTranscript = vi.fn().mockResolvedValue({ modelId: 'claude-opus-4-8', usedTokens: 95329 })
-  // Default mirrors the real registry: Opus 4.6+ (incl. claude-opus-4-8) is
-  // auto-1M even under 200k usage; everything else with low usage is 200k.
-  const detectWindowSize = vi
-    .fn()
-    .mockImplementation(async (modelId: string, used: number, forceExtended?: boolean) =>
-      forceExtended || modelNativelySupportsExtended(modelId) || used > 200000 ? 1000000 : 200000
-    )
-  const watcher = makeFakeWatcher()
-  const emit = vi.fn((wc: number, payload: ClaudeStatusChangePayload) => {
-    emitted.push({ wc, payload })
-  })
-
-  detector.isClaudeRunning.mockResolvedValue({ running: true })
-
-  const service = new ClaudeStatusService({
-    detector: detector as unknown as IClaudeProcessDetector,
-    locateTranscripts,
-    parseTranscript,
-    detectWindowSize,
-    watcher: watcher as never,
-    emit,
-    ...overrides
-  })
-
-  return { service, detector, locateTranscripts, parseTranscript, detectWindowSize, watcher, emit, emitted }
-}
-
-/** Flush all pending microtasks (lets serialized refresh chains settle). */
-async function flush(): Promise<void> {
-  for (let i = 0; i < 20; i++) await Promise.resolve()
-}
+// Issue #41 §9.6: the harness lives in __fixtures__ so every service test file
+// drives the same fakes — in particular the detectWindowSize default that
+// delegates to the REAL capability registry.
+import { makeHarness, flush } from './__fixtures__/claudeStatusHarness'
 
 describe('ClaudeStatusService', () => {
   beforeEach(() => {
@@ -117,7 +49,10 @@ describe('ClaudeStatusService', () => {
       // the display never enters a band before the colour does — CORRECTNESS-1).
       percent: 9,
       level: 'green',
-      tooltip: '95k / 1M'
+      // Issue #41 §5.4: the 1M window here comes only from the capability
+      // registry (usage is well under 200k and no `[1m]` was selected), so the
+      // tooltip must say the window is inferred rather than observed.
+      tooltip: '95k / 1M (inferred)'
     })
   })
 
@@ -140,7 +75,8 @@ describe('ClaudeStatusService', () => {
       usedTokens: 0,
       percent: 0,
       level: 'green',
-      tooltip: '0k / 1M'
+      // Issue #41 §5.4: registry-derived (provisional) 1M window — see above.
+      tooltip: '0k / 1M (inferred)'
     })
   })
 
@@ -157,7 +93,7 @@ describe('ClaudeStatusService', () => {
     h.service.registerPanel('t1', 4242, '/p', 7)
     await flush()
 
-    expect(h.detectWindowSize).toHaveBeenCalledWith('claude-sonnet-4-5', 250000, undefined)
+    expect(h.detectWindowSize).toHaveBeenCalledWith('claude-sonnet-4-5', 250000, undefined, {})
     expect(h.emitted[0].payload.snapshot?.windowSize).toBe(1000000)
     expect(h.emitted[0].payload.snapshot?.usedTokens).toBe(0)
     expect(h.emitted[0].payload.snapshot?.percent).toBe(0)
@@ -174,7 +110,8 @@ describe('ClaudeStatusService', () => {
     await flush()
 
     expect(h.emitted[0].payload.snapshot?.usedTokens).toBe(95329)
-    expect(h.emitted[0].payload.snapshot?.tooltip).toBe('95k / 1M')
+    // Issue #41 §5.4: registry-derived (provisional) 1M window — see above.
+    expect(h.emitted[0].payload.snapshot?.tooltip).toBe('95k / 1M (inferred)')
   })
 
   it('formats the 1M tooltip and badge for an extended window', async () => {
@@ -214,7 +151,7 @@ describe('ClaudeStatusService', () => {
 
     // The forceExtended hint is forwarded as the third arg and forces 1M even for
     // a 200k-family model (Sonnet 4.6) under 200k usage.
-    expect(h.detectWindowSize).toHaveBeenCalledWith('claude-sonnet-4-6', 50000, true)
+    expect(h.detectWindowSize).toHaveBeenCalledWith('claude-sonnet-4-6', 50000, true, {})
     expect(h.emitted).toHaveLength(1)
     expect(h.emitted[0].payload.snapshot).toMatchObject({
       modelId: 'claude-sonnet-4-6',
@@ -531,7 +468,7 @@ describe('ClaudeStatusService', () => {
       await h.service.refresh('t1')
       await flush()
 
-      expect(h.detectWindowSize).toHaveBeenLastCalledWith('claude-sonnet-4-5', 30000, undefined)
+      expect(h.detectWindowSize).toHaveBeenLastCalledWith('claude-sonnet-4-5', 30000, undefined, {})
       const last = h.emitted.at(-1)?.payload.snapshot
       expect(last?.windowSize).toBe(1000000) // stayed 1M despite detection → 200k
       expect(last?.usedTokens).toBe(0)

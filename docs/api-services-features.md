@@ -1,6 +1,6 @@
 # API Services - Feature Services
 
-**Location:** `src/main/services/`. Feature-specific: git (worker), multi-instance, media capture, transcription, audio extraction, file import. Core services (Terminal, File, Settings, Watchers): see [api-services.md](./api-services.md).
+**Location:** `src/main/services/`. Feature-specific: git (worker), multi-instance, media capture, transcription, audio extraction, file import, document and image export. Core services (Terminal, File, Settings, Watchers): see [api-services.md](./api-services.md).
 
 ---
 
@@ -63,10 +63,11 @@ Per-project circuit breaker preventing cascading failures when the git status wo
 - Resets on success
 
 ### Public methods
-- `isOpen(projectPath)` – Check if circuit is open for a project
-- `recordFailure(projectPath)` – Record a worker failure
-- `recordSuccess(projectPath)` – Reset failure count on success
-- `reset(projectPath?)` – Manually reset one or all circuits
+- `isOpen(projectPath: string): boolean` – Check if circuit is open for a project (transitions to half-open once the reset period has elapsed)
+- `recordCrash(projectPath: string): void` – Record a worker crash
+- `recordSuccess(projectPath: string): void` – Reset failure count on success
+- `reset(projectPath?: string): void` – Manually reset one circuit, or all when the argument is omitted
+- `dispose(): void` – Release internal state on shutdown
 
 ---
 
@@ -83,6 +84,9 @@ See [File Watching – GitWatcherService](./file-watching/README.md#gitwatcherse
 - `getLastEventTimestamp()` – Used by GitPollingService for hybrid coordination
 - `isWatching()` – Reports active watcher status
 
+### Related files
+- `src/main/services/watcher/RepoPresenceWatcher.ts` – Watches the `.git` path itself so `git init` / `git clone` (or deleting `.git`) flips git decorations on and off without reopening the project. Debounces the write flurry that follows `git init` into a single transition callback, re-derives the transition kind from disk before firing, and gets bounded exponential-backoff restart on chokidar errors. Drives `GitWatcherService.onRepoTransition(projectPath, kind)`.
+
 ---
 
 ## GitPollingService
@@ -95,7 +99,7 @@ See [File Watching – GitPollingService](./file-watching/README.md#gitpollingse
 
 ### Key Methods
 - `cleanupForWebContentsId(id)` – Called on window close to stop polling (#106)
-- `setWatcherCoordination(getTimestamp, isWatching)` – DIP pattern for hybrid coordination with GitWatcherService
+- `setWatcherCoordination(timestampProvider: TimestampProvider, watchingProvider: WatchingStatusProvider): void` – DIP pattern for hybrid coordination with GitWatcherService. `TimestampProvider = () => number | null`, `WatchingStatusProvider = () => boolean`
 
 ---
 
@@ -118,14 +122,22 @@ File-based project locking for multi-instance support.
 #### `acquireLock(projectPath: string): Promise<LockResult>`
 Attempt to acquire lock for a project.
 
-**Returns:** `{ status: 'acquired' | 'already_locked' | 'error', holderPid?, holderHostname?, message? }`
+**Returns:** a discriminated union on `status` (`src/shared/ipc/project-lock-schema.ts`) – each variant carries only its own fields:
+- `{ status: 'acquired', lockPath: string }`
+- `{ status: 'already_locked', holderPid: number, holderHostname: string }`
+- `{ status: 'error', message: string }`
 
 #### `releaseLock(projectPath: string): Promise<void>`
 Release lock for a project.
 
 #### `checkLock(projectPath: string): Promise<LockStatus>`
 Check lock status without acquiring.
-**Returns:** `{ status: 'unlocked' | 'locked_by_self' | 'locked_by_other' | 'error' }`
+
+**Returns:** a discriminated union on `status`:
+- `{ status: 'unlocked' }`
+- `{ status: 'locked_by_self', lockPath: string }`
+- `{ status: 'locked_by_other', holderPid: number, holderHostname: string }`
+- `{ status: 'error', message: string }`
 
 #### `requestFocus(projectPath: string): Promise<boolean>`
 Request focus from the lock holder (triggers window focus via polling).
@@ -133,13 +145,34 @@ Request focus from the lock holder (triggers window focus via polling).
 #### `cleanupStaleLocks(): Promise<number>`
 Cleanup stale locks from dead processes or timed-out network locks.
 
+#### Also public
+- `getLocksDirectory(): string` – Resolved `~/.erfana/locks/` path
+- `computeLockHash(projectPath: string): Promise<string>` – SHA-256 lock filename derivation
+- `dispose(): Promise<void>` – Stop heartbeats/polling and release held locks on shutdown
+
+### Collaborating modules
+- `src/main/services/LockHeartbeat.ts` – Polling timer, heartbeat write, and `powerMonitor` integration, extracted from `ProjectLockService` (D2b) and injected. The holder rewrites its lock with a fresh heartbeat every `HEARTBEAT_INTERVAL_MS` (5 s); focus-request polling runs at `POLL_INTERVAL_MS` (500 ms). Heartbeat writes go through `atomicWriteJSON` and are HMAC-signed (`signLock`).
+- `src/main/services/LockStalenessPolicy.ts` – The stale-lock decision, injected as `createLockStalenessPolicy({ clock, liveness, currentHostname })`. Same-host: PID liveness plus heartbeat freshness (`HEARTBEAT_STALE_MS`, 30 s). Cross-host: timestamp age against `STALE_TIMEOUT_MS` (60 min) plus `CLOCK_SKEW_BUFFER_MS` (15 min). Unparseable timestamps count as stale.
+
 ---
 
 ## ScreenshotService
 
 **File:** `src/main/services/ScreenshotService.ts`
 
-Thin dispatcher over an `IScreenshotCapturer` strategy: `MacScreenshotCapturer` on `darwin` (native `/usr/sbin/screencapture`), `DesktopCapturerScreenshotCapturer` on every other platform (Electron's `desktopCapturer.getSources()` + `nativeImage` + an in-app `ScreenshotOverlayWindow` for area mode). Strategy is picked once in the constructor.
+Thin dispatcher over an `IScreenshotCapturer` strategy: `MacScreenshotCapturer` on `darwin` (native `/usr/sbin/screencapture`), `DesktopCapturerScreenshotCapturer` on `win32` (Electron's `desktopCapturer.getSources()` + `nativeImage` + an in-app `ScreenshotOverlayWindow` for area mode), and `UnsupportedCapturer` on every other platform — the sentinel fails every capture with `SCREENSHOT_NOT_SUPPORTED` and reports `supported: false`.
+
+The capturer is **injected** into the constructor; platform routing lives in the exported factory pair, which is also the DI seam the tests use:
+
+```typescript
+export function pickCapturer(platform: NodeJS.Platform): IScreenshotCapturer
+export function createScreenshotService(
+  capturer?: IScreenshotCapturer,
+  platform: NodeJS.Platform = process.platform
+): IScreenshotService
+```
+
+Production calls `createScreenshotService()` and lets it pick; tests pass a stub capturer (and optionally a fake platform) without mocking `process`. This replaced a module-eval singleton that froze the platform choice at import time (#164 F[8]).
 
 ### Key features
 - Three capture modes — screen, window, area — across macOS + Windows (#164)
@@ -153,15 +186,32 @@ Thin dispatcher over an `IScreenshotCapturer` strategy: `MacScreenshotCapturer` 
 #### `getDisplays(): DisplayInfo[]`
 Synchronous list of displays for the multi-monitor picker. Same shape on both backends.
 
-#### `enumerateWindows(): Promise<WindowSource[]>`
-List capturable windows for the in-app picker. Returns an empty list on macOS (uses the OS-native picker instead).
+#### `getCapabilities(): ScreenshotCapabilities`
+Delegates straight to the capturer, so platform routing stays in the factory (#164 round-2 F#6). Returns `{ supported: boolean; hasNativeWindowPicker: boolean; areaCaptureMode: 'native' | 'overlay' | 'unsupported' }`. The renderer hook calls this on mount instead of branching on `getPlatform()`.
 
-#### `capture(mode: ScreenshotMode, displayId?: number, windowId?: string): Promise<ScreenshotCaptureResponse>`
-Dispatches to `captureScreen` / `captureWindow` / `captureArea` on the selected capturer.
+#### `getScreenRecordingPermission(): ScreenRecordingPermission`
+Advisory macOS Screen Recording (TCC) status, mirrored from Electron `systemPreferences.getMediaAccessStatus('screen')`; one of `'granted' | 'denied' | 'not-determined' | 'restricted' | 'unknown'`. Non-macOS platforms always report `'unknown'`. **Advisory only** — the screen-permission dialog flow uses it to enrich the failure path, never to gate a capture, because a stale in-process read (Electron #36722) must not block a user who has already granted access.
+
+#### `enumerateWindows(options?: EnumerateWindowsRequest): Promise<EnumerateWindowsResponse>`
+List capturable windows for the in-app picker. The response is a discriminated union on `availability`:
+- `{ availability: 'enumerable', sources: WindowSource[], truncated: boolean }` — Windows; the service applies the `maxSources` cap (default `WINDOW_PICKER.MAX_SOURCES`) and the `includeThumbnails` opt-out on top of the capturer's raw list
+- `{ availability: 'native-picker', sources: [], truncated: false }` — macOS; `screencapture -iw` runs its own OS-level picker, so the in-app dialog stays hidden
+- `{ availability: 'unsupported', sources: [], truncated: false }` — capturer reports `supported: false`
+
+Pagination, the thumbnail opt-out, and the availability discriminator are service-layer policy; capturers only implement `enumerateWindowsRaw()` (#164 round-2 F#8).
+
+#### `capture(request: ScreenshotCaptureRequest): Promise<ScreenshotCaptureResponse>`
+Delegates to `capturer.capture(request)`. The request is a discriminated union on `mode`, so the type system — not a runtime check — guarantees each mode's arguments (#164 round-2 D4):
+- `{ mode: 'screen', displayId?: number }` — primary display when `displayId` is omitted
+- `{ mode: 'window', windowId: string }` — `DesktopCapturerSource.id` from the in-app picker; required
+- `{ mode: 'window-native' }` — no arguments; the OS picker selects the window
+- `{ mode: 'area' }` — no arguments
+
+All four variants are `.strict()`, so unknown keys fail validation rather than being silently stripped.
 
 ### Capturer modules
 
-- `src/main/services/screenshot/types.ts` — `IScreenshotCapturer` interface
+- `src/main/services/screenshot/types.ts` — the `IScreenshotCapturer` interface, with exactly three members: `getCapabilities()`, `enumerateWindowsRaw()`, and `capture(request)`. The earlier three-method capture surface (`captureScreen` / `captureWindow` / `captureArea`) was **deliberately removed**: its argument requirements differed per platform (macOS ignored `windowId`, Windows required it), which the lens review flagged as an ISP/OCP violation (F[10]). Collapsing to one `capture(request)` that switches on the union's `mode` makes the contract enforceable by TypeScript. See the file's header comment for the full rationale.
 - `src/main/services/screenshot/MacScreenshotCapturer.ts`
 - `src/main/services/screenshot/DesktopCapturerScreenshotCapturer.ts`
 - `src/main/services/screenshot/ScreenshotOverlayWindow.ts` — area-select BrowserWindow lifecycle
@@ -178,8 +228,10 @@ Saves camera photos captured from the renderer process to the filesystem.
 
 ### Key features
 - JPEG photo saving to OS temp directory with timestamped filenames
-- Base64 data URL validation, 20MB size limit
-- `save(dataUrl, timestamp?)` → `{ filePath, error?, errorCode? }`
+- Base64 data URL validation (`data:image/jpeg;base64,` prefix required), 20MB size limit
+- `save(dataUrl, timestamp?): Promise<{ filePath?, error?, errorCode? }>` — **all three fields optional**; success sets only `filePath`, failure sets only `error` + `errorCode`. There is no `success` flag on the service result
+- The IPC layer reshapes this: `src/main/ipc/camera-handlers.ts` returns `{ success, filePath?, error?, errorCode? }`, which is what the renderer actually sees
+- Filenames are formatted from a **local date**, not epoch ms: `erfana-camera-YYYY-MM-DD-HHMMSS.jpg` (`CAMERA.TEMP_PREFIX` + `CAMERA.FILE_EXTENSION`)
 - Error codes: `CAMERA_INVALID_DATA`, `CAMERA_SAVE_FAILED`
 
 ---
@@ -198,12 +250,23 @@ Handles external file operations for Spec #012 (external file drop to project tr
 
 ### Public Methods
 
-#### `validateExternalFile(sourcePath, projectRoot)` – Validate file before copy/move
-#### `copyFromExternal(options: CopyOptions)` – Copy external file into project
-#### `moveFromExternal(options: MoveOptions)` – Move external file (deletes source after copy)
+All three take **positional** parameters — there is no options object.
 
-Options: `sourcePath`, `targetFolder`, `projectRoot`, `conflictResolution` (`'replace'`/`'keepBoth'`).
-Returns: `{ success, path?, isSymlink?, error?, errorCode? }`
+#### `validateExternalFile(sourcePath: string, projectRoot: string): Promise<ExternalFileValidateResponse>`
+Validate file before copy/move.
+
+**Returns:** `{ valid, isSymlink, isDirectory, exists, isRegularFile, error?, errorCode? }`
+
+#### `copyFromExternal(sourcePath: string, targetFolder: string, projectRoot: string, conflictResolution?: ConflictResolution): Promise<ExternalFileCopyResponse>`
+Copy external file into project. Validates first, then delegates the copy to `FileService`.
+
+#### `moveFromExternal(sourcePath: string, targetFolder: string, projectRoot: string, conflictResolution?: ConflictResolution): Promise<ExternalFileMoveResponse>`
+Move external file (validates, copies, then deletes source).
+
+`ConflictResolution` is the zod enum `'replace' | 'keepBoth'` (optional).
+Both copy and move return `{ success: boolean, path?: string, isSymlink?: boolean, error?: string, errorCode?: string }`.
+
+The options-object shapes live only in the IPC layer — `ExternalFileCopyRequestSchema` / `ExternalFileMoveRequestSchema` in `src/shared/ipc/external-file-schema.ts` carry those same four fields as a validated request payload.
 
 ### Security validations
 Path traversal rejection, symlink detection, system directory blocking, project boundary enforcement, special file rejection (devices, pipes, sockets).
@@ -363,14 +426,22 @@ Extracts audio tracks from video files using ffmpeg for transcription pipeline i
 - Automatic temp file cleanup
 
 ### Public Methods
-- `isAvailable()` – Check if ffmpeg binaries are available
-- `hasAudioStream(filePath)` – Check if video contains an audio track
-- `extractAudio(filePath, onProgress?, signal?)` – Extract audio to temp MP3; returns `{ audioPath, duration, error?, errorCode? }`
-- `getVideoMetadata(filePath)` – Returns `{ duration, resolution, videoCodec, audioCodec, fileSize }`
-- `cleanupTempFile(filePath)` – Remove temporary extracted audio file
+- `isAvailable(): boolean` – Check if ffmpeg binaries are available
+- `hasAudioStream(filePath): Promise<boolean>` – Check if video contains an audio track
+- `extractAudio(filePath, onProgress?, signal?): Promise<ExtractionResult>` – Extract audio to temp MP3. `ExtractionResult` is `{ audioPath: string; durationSeconds: number }` — **success-only**; there are no `error` / `errorCode` fields, failures **throw** (e.g. `Error('ffmpeg is not available')` when `isAvailable()` is false)
+- `extractAudioSegments(filePath, segmentSeconds?, onProgress?, signal?): Promise<SegmentedExtractionResult>` – Frame-aligned MP3 chunks for long videos, avoiding the corrupt-audio problem of byte-stream slicing
+- `getVideoMetadata(filePath): Promise<VideoMetadata>` – Returns `{ durationSeconds: number; resolution?: string; videoCodec?: string; audioCodec?: string }`. Only `durationSeconds` is required; **there is no `fileSize` field**
+- `cleanupTempFile(filePath)` / `cleanupTempFiles(filePaths)` – Remove temporary extracted audio files
 
 ### Error Codes
-- `VIDEO_NO_AUDIO_TRACK`, `VIDEO_EXTRACTION_FAILED`, `VIDEO_FFMPEG_UNAVAILABLE`
+
+`AudioExtractionService` itself emits **no** `ErrorCode` values — it throws plain errors and lets callers classify. The `VIDEO_*` codes are emitted by its consumers:
+
+| Code | Emitted by |
+|---|---|
+| `VIDEO_FFMPEG_UNAVAILABLE` | `src/main/ipc/transcription-handlers.ts`, `src/main/services/import/converters/VideoConverter.ts` |
+| `VIDEO_NO_AUDIO_TRACK` | `src/main/ipc/transcription-handlers.ts`, `VideoConverter.ts` |
+| `VIDEO_EXTRACTION_FAILED` | `VideoConverter.ts` |
 
 ### Related Files
 - `src/main/services/import/converters/VideoConverter.ts` – Import pipeline converter
@@ -394,11 +465,12 @@ Document import converter for 50+ formats via `@llamaindex/liteparse` with local
 - Two-phase extension registration (PDF always, Office/image conditional on system tools)
 - Implements `IConfigurableConverter` for per-import options via `createConfigured()`
 - 60-second conversion timeout via `Promise.race` (NFR-005); 1000-page document limit (`MAX_PARSE_PAGES`)
+- Blocking size cap: rejects files above `IMPORT.SIZE_HARD_LIMIT` (250 MB) with `IMPORT_EXCEEDS_SIZE_LIMIT` before parsing
 - csv/tsv/svg explicitly excluded (`LITEPARSE_EXCLUDED_EXTENSIONS`)
 
 ### Public methods
 - `validate(filePath)` – Delegates to `validateFileForImport()`
-- `convert(filePath)` – Parse document, generate frontmatter + spatial text, optional screenshots
+- `convert(filePath)` – Runs `validate()` first and bails on an invalid result (the document-import IPC path calls `convert()` directly, bypassing `ImportService` validation, so this is where the size cap is enforced), then parses the document, generates frontmatter + spatial text, and optional screenshots. Invalid-result messages come from `ERROR_MESSAGES[code]`, so a missing file and an over-size file stay distinct.
 - `createConfigured(options: ImportOptions)` – Factory returning new instance with baked-in options
 
 ### ImportOptions
@@ -413,7 +485,7 @@ Document import converter for 50+ formats via `@llamaindex/liteparse` with local
 ### IPC layer (#133)
 - Channels: `import:document`, `import:documentCancel`, `import:getDocumentExtensions`, `import:documentProgress` (push), `import:dependenciesReady` (push)
 - Schemas: `src/shared/ipc/import-schema.ts` (Zod-validated request/options/progress/result types)
-- Preload: `api.import` namespace with 5 methods
+- Preload: `api.import` namespace — 10 members in `src/preload/index.ts`: `selectFile`, `validate`, `process`, `getSupportedExtensions`, `isSupported`, `documentImport`, `cancelDocument`, `getDocumentExtensions`, plus the two subscription helpers `onDocumentProgress` and `onDependenciesReady` (each returns an unsubscribe function). The five listed channels back the document-import subset (`documentImport`, `cancelDocument`, `getDocumentExtensions`, and the two push events)
 - Error code: `IMPORT_BUSY` – returned when import is already in progress
 
 ### Related files
@@ -450,6 +522,46 @@ Runtime detection of optional system tools for document import.
 
 ---
 
+## ConverterRegistry
+
+**File:** `src/main/services/import/ConverterRegistry.ts`
+
+Central Strategy-pattern registry mapping file extensions to `IConverter` implementations. Built-in converters registered here: `LiteParseConverter`, `TextConverter`, `AudioConverter`, `VideoConverter`.
+
+### Public methods
+- `register(converter: IConverter): void`
+- `getConverter(extension: string): IConverter | undefined` / `getConverterByCategory(category: FileTypeCategory): IConverter | undefined`
+- `isSupported(extension: string): boolean`
+- `getSupportedExtensions(): string[]` / `getExtensionsByConversionType()` / `getCategories(): FileTypeCategory[]`
+- `mightBeTextFile(extension: string): boolean`
+- `updateConverterExtensions(category: FileTypeCategory, extensions: string[]): void` – Two-phase registration hook consumed by `DependencyDetector`
+
+Exports both the class and a shared `converterRegistry` singleton.
+
+---
+
+## ImportService
+
+**File:** `src/main/services/import/ImportService.ts`
+
+Unified import orchestrator sitting on top of `ConverterRegistry` (injected via constructor, defaulting to the shared singleton).
+
+### Workflow
+1. Get the converter for the file extension from the registry, falling back to the `text` converter when `mightBeTextFile(ext)` (otherwise `IMPORT_UNSUPPORTED_TYPE`)
+2. Validate the file using that converter
+3. Convert content; `converter.requiresConversion` decides whether the output takes a `.md` extension or keeps the original one
+4. Write to the project's `import/` directory, auto-creating it (`IMPORT_DIR_CREATE_FAILED` on failure)
+5. Return the result with the output path
+
+Filename conflicts are resolved by auto-incrementing (`file.md`, `file (1).md`, …) via `findAvailableFileName`; names are sanitized with `sanitizeFileName`.
+
+### Public methods
+- `getConverter(filePath): IConverter | undefined` / `isSupported(filePath): boolean` / `getSupportedExtensions(): string[]`
+- `validate(filePath): Promise<ValidationResult>`
+- `importFile(filePath, projectPath, options?: ImportOptions): Promise<ImportResult>` – Configurable converters are re-created per import via `isConfigurableConverter` + `createConfigured()`
+
+---
+
 ## PdfService
 
 **File:** `src/main/services/PdfService.ts`
@@ -463,8 +575,8 @@ PDF generation from HTML content.
 
 ### Public Methods
 
-#### `generatePdf(html: string, outputPath: string): Promise<void>`
-Generate PDF from HTML content.
+#### `exportToPdf(html: string, fileName: string): Promise<PdfExportResponse>`
+Export HTML content to PDF. `fileName` is only a **suggested** name: the destination is chosen by the user in a native save dialog (`getSavePath`, which also runs it through `deriveSafeFilename`), so there is no output-path parameter. Rendering happens in a hidden window and the result is reported in the returned `PdfExportResponse` rather than thrown.
 
 ---
 
@@ -478,11 +590,64 @@ DOCX generation from HTML content.
 - Word format export
 - Mermaid diagrams as high-resolution PNG
 - Uses the `@turbodocx/html-to-docx` npm package
+- Conversion runs in a **killable `utilityProcess` child** (`src/main/services/docx/`): `HtmlToDocxConverter` strips remote images and wraps the HTML in the main process, then `DocxConvertProcessAdapter` forks `docx-convert.process` to run `HTMLtoDOCX`, killing it on timeout. The library decodes images synchronously, so an in-thread timeout could not interrupt a hang; a separate process also caps memory against decompression bombs.
+- **Remote-image SSRF strip** (`docxImageStrip.ts`, parse5): before conversion, `<img>`/`<source>` with an `http(s)`/`file:`/`ftp:`/protocol-relative `src` (or remote `srcset`) are removed so the bundled library never fetches them; empty, `data:`, and relative sources are kept.
 
 ### Public Methods
 
-#### `generateDocx(html: string, images: ImageData[], outputPath: string): Promise<void>`
-Generate DOCX from HTML with embedded images.
+#### `exportToDocx(html: string, fileName: string): Promise<DocxExportResponse>`
+Export HTML content to DOCX. As with PDF, `fileName` is a suggested name run through `sanitizeFilename`; the destination comes from a native save dialog. There is **no `images` parameter** anywhere in `src/main`: Mermaid diagrams are pre-converted to PNG in the renderer and arrive inlined as `<img data-mermaid-diagram="true" src="data:image/png;base64,…">` inside the HTML string. On success the response carries `removedRemoteImages` (count of remote images stripped), which the renderer surfaces as a warning toast.
+
+---
+
+## HTML preview (#74)
+
+The sandboxed HTML-preview subsystem is a service *family* under `src/main/services/preview/` (WebContentsView lifecycle, `erfana-preview://` protocol handler, request/host filter, per-project allowlist store, sealed session, watch pool, PDF/find controllers), not a single service, so it is documented in its own doc rather than duplicated here. For the full write-up see [HTML preview](./html-preview/README.md); for the per-service catalogue see [`src/main/services/CLAUDE.md`](../src/main/services/CLAUDE.md) § "HTML preview (#74)". IPC surface: [IPC patterns § HTML preview](./ipc-patterns.md#html-preview-previewhandlersts-constants-in-preview-channelsts-74).
+
+## ImageExportService
+
+**File:** `src/main/services/imageExport/ImageExportService.ts` (+ the seven collaborators in the same folder). **Shared contract:** `src/shared/ipc/image-export-schema.ts`, `image-export-channels.ts`, `image-formats.ts`.
+
+PNG / PDF / clipboard export for the image a viewer tab is showing (#73). The whole job runs in the main process: the renderer sends `{ filePath, target }` and gets back a small structured result. **No image bytes cross IPC in either direction** — at the 50 MB source cap, round-tripping them as base64 would put ~67 MB through the bridge each way and block the UI thread encoding it.
+
+### Key features
+- **A conversion of the file, never a screenshot of the panel.** The bytes are read fresh from disk on every run, so zoom, pan and the panel's cached `<img>` are irrelevant, and a file that changed since the tab opened exports as it is now
+- Chromium is the decoder, because `nativeImage` handles only PNG and JPEG and the viewer supports eight formats including SVG. It runs in a hidden, sandboxed, network-isolated `BrowserWindow` — the **rasterize harness**
+- Format rules: SVG rasterized at a fixed 2x its intrinsic size; animated GIF exports its first frame; multi-size ICO exports its largest entry; PNG keeps alpha, while PDF and clipboard share one white-flattened pixel source
+- **Never silently downscales.** Over-cap input is refused with a specific code and nothing is written, rather than producing a smaller file than the user asked for
+- One `ExportLock` (`src/main/utils/ExportLock.ts`) per service instance, acquired **after** the save dialog closes — holding a process-wide mutex across a modal dialog would block every other image tab for as long as the user sat in the file picker
+
+### Public method
+
+#### `run({ filePath, target, parentWindow }): Promise<ImageExportResponse>`
+`target` is `'png' | 'pdf' | 'clipboard'`. `parentWindow` is resolved main-side from `event.sender`, never sent by the renderer, so the save dialog is modal to the window that asked for it. The response is a `success`-discriminated union; the failure branch always carries both `errorCode` and `error`, where `error` is `ERROR_MESSAGES[errorCode]` from a single mapping point — see [Error codes § Image export](./error-codes.md#image-export-15-codes).
+
+### Order of operations
+1. Handler gates: `isTrustedSender` → Zod `.strict()` → parent window
+2. `assertInsideProject(filePath, projectPath)` — the same confinement guard `file:readImage` uses. The **destination** is deliberately not confined; it comes from the user's own save dialog, as with PDF and DOCX export
+3. `stat` against `MAX_IMAGE_SIZE` (50 MB, imported from `file/imageRead.ts`, not redeclared)
+4. PNG / PDF only: suggested filename → native save dialog → forced extension → self-overwrite guard, which **fails closed** if `realpath` errors with anything other than ENOENT
+5. Acquire the lock; from here everything is inside it, released in `finally`
+6. `readFile` — the fresh read. Every byte parse below runs on this one buffer
+7. Declared-dimension preflight (`declaredDimensions.ts`) refuses a decompression bomb *before* any byte reaches a decoder; then the per-format metadata pass (`imageMetadata.ts`)
+8. `ImageRasterizeWindow.render(instruction)`; ICO output is hard-gated against the directory's largest entry
+9. Sink dispatch (`exportSinks.ts`), then destroy the window and release the lock
+
+### Security controls
+- The harness page carries its own CSP (`default-src 'none'`, `img-src blob:`, `object-src 'none'`) — deliberately **not** the app CSP, which has no `blob:` and would make SVG silently fail
+- Untrusted SVG is loaded **only** as `<img src=blobURL>`, Chromium's secure static mode: no script execution, no external fetches. Never as markup in the DOM. Enforced by that CSP plus an ESLint boundary over `src/renderer/src/imageExport/**`, not by a comment
+- A per-run in-memory session with a deny-all `webRequest` filter installed **before the window exists**, permission handlers denied, `setWindowOpenHandler` deny, and a `will-navigate` guard
+- Per-run UUID token plus a `senderFrame.url` check on every harness message, and frame-scoped listeners rather than global `ipcMain` — copied from the screenshot overlay
+- Byte parsing is bounded and never throws: a 64 KB read window for SVG, hard iteration caps for the GIF sub-block and JPEG marker walks, and **no XML or DTD-capable parser anywhere**, which closes billion-laughs and XXE
+- Every logged path goes through `redactPath`, every caught Node error through `redactedLogError` — the destination path is the more sensitive of the two, since it reflects the user's own folder layout outside the project
+
+### Collaborating modules
+`imageMetadata.ts` (GIF frame count, ICO directory, SVG intrinsic size) · `declaredDimensions.ts` (header preflight) · `exportPaths.ts` (suggested name, forced extension, self-overwrite guard) · `pdfGeometry.ts` (`verifyPdfGeometry` — exactly one page and a MediaBox within a shared tolerance constant, run **before** anything is written) · `rasterizeSession.ts` (session hardening) · `ImageRasterizeWindow.ts` (ready handshake, token, timeouts, guaranteed destroy) · `exportSinks.ts` (the three sinks).
+
+### Related files
+- `src/main/ipc/image-export-handlers.ts` – the single `image-export:run` handler
+- `src/renderer/imageExport.html` + `src/preload/imageExport.ts` + `src/renderer/src/imageExport/harness.ts` – the harness's own entry, preload and page. The preload exposes four verbs and deliberately **not** `imageExport.run`
+- `src/renderer/src/components/Panels/ImageViewerPanel/hooks/useImageExportHandlers.ts` – the renderer side; see [UI components § Image Viewer Panel](./ui-components.md#image-viewer-panel)
 
 ---
 

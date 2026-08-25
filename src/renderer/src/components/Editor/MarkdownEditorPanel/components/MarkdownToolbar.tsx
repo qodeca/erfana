@@ -247,22 +247,43 @@ export function MarkdownToolbar({
 
       <div className="toolbar-spacer" />
 
-      {/* File status indicators */}
+      {/*
+        File status indicators.
+
+        The modified bullet sits OUTSIDE the live region below, on purpose: it
+        is a persistent state, not news, and inside the region every
+        clean -> dirty transition made a screen reader announce a bullet glyph.
+        `aria-hidden` because the tab title already carries "modified" in words
+        (QG-11a).
+      */}
       {currentFile?.modified && (
-        <span className="modified-indicator" data-testid={TEST_IDS.MODIFIED_INDICATOR}>
+        <span
+          className="modified-indicator"
+          aria-hidden="true"
+          data-testid={TEST_IDS.MODIFIED_INDICATOR}
+        >
           ●
         </span>
       )}
-      {isAutoSaving && (
-        <span className="file-status-indicator" data-testid={TEST_IDS.AUTOSAVE_INDICATOR}>
-          Auto-saving...
-        </span>
-      )}
-      {isReloading && (
-        <span className="file-status-indicator" data-testid={TEST_IDS.RELOAD_INDICATOR}>
-          Reloaded from disk
-        </span>
-      )}
+
+      {/*
+        The live region is PERMANENTLY mounted: one that enters the DOM at the
+        same moment its text appears is not announced (WCAG 2.2 4.1.3). The
+        inner spans stay conditional, so every existing testid assertion keeps
+        its meaning. Issue #70 / finding UX-1.
+      */}
+      <span className="file-status-slot" role="status" aria-live="polite">
+        {isAutoSaving && (
+          <span className="file-status-indicator" data-testid={TEST_IDS.AUTOSAVE_INDICATOR}>
+            Auto-saving...
+          </span>
+        )}
+        {isReloading && (
+          <span className="file-status-indicator" data-testid={TEST_IDS.RELOAD_INDICATOR}>
+            Reloaded from disk
+          </span>
+        )}
+      </span>
 
       {/* View mode buttons */}
       <button

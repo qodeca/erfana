@@ -208,9 +208,8 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           set -euo pipefail
-          IDENTITY="Developer ID Application: ${APPLE_TEAM_ID}"
-          # Use substring-match against the imported identity — works
-          # regardless of the owner's legal-name formatting.
+          # Sign by Team ID: codesign substring-matches it against the imported
+          # identity, so this works regardless of the owner's legal-name formatting.
           codesign --force --options runtime --timestamp \
                    --sign "$APPLE_TEAM_ID" staging/whisper-cli
           codesign --verify --deep --strict --verbose=2 staging/whisper-cli
@@ -384,7 +383,9 @@ jobs:
           node -e "require('extract-zip')(process.argv[1], { dir: process.argv[2] })" \
                "$(pwd)/${PKG}" "$(pwd)/roundtrip"
           test -f roundtrip/whisper.exe
-          ls roundtrip/*.dll | grep -E "(whisper|ggml)" >/dev/null
+          shopt -s nullglob
+          dlls=(roundtrip/*whisper*.dll roundtrip/*ggml*.dll)
+          test "${#dlls[@]}" -gt 0
 
       - name: Upload artifact
         # actions/upload-artifact v7.0.1 — keep aligned with build_*.yml + checks.yml

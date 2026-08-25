@@ -72,37 +72,106 @@
   padding: var(--space-4);
 }
 
-/* Video preview container - maintains 4:3 aspect ratio */
+/* Video preview container. Height comes from the 16:9 wrapper below; the old
+ * `min-height: 480px` is deleted because at 720px width the wrapper is 405px,
+ * and a 480px container would leave a 75px black strip under the video,
+ * pushing it 37.5px above centre. */
 .camera-preview-container {
   position: relative;
   width: 100%;
-  min-height: 480px;
   background-color: var(--color-black);
   overflow: hidden;
   margin-bottom: var(--space-8);
 }
 
-/* Maintain aspect ratio using padding trick */
+/* 16:9 box, matching the 1920x1080 the stream is requested at.
+ * `min-height: 0` pins the ratio: a non-replaced box with a preferred aspect
+ * ratio takes a CONTENT-BASED automatic minimum size, so a future in-flow
+ * child (or longer empty-state copy at a larger UI font) could otherwise push
+ * the box past 405px and silently break the ratio. Every child here is
+ * absolutely positioned, so 0 is correct today and stays correct.
+ * Must keep `position: relative` — all four children resolve against it. */
 .camera-preview-wrapper {
   position: relative;
   width: 100%;
-  padding-top: 75%; /* 4:3 aspect ratio (3/4 = 0.75) */
+  aspect-ratio: 16 / 9;
+  min-height: 0;
 }
 
-/* Video element fills the container */
+/* Video element fills the wrapper.
+ * `contain`, not `cover`: the saved JPEG is the full sensor frame, so the
+ * preview must show the full frame too (#42). Letterbox bars are the intended
+ * trade-off; they are --color-black, identical to the shutter overlay, so the
+ * shutter flash over them is invisible by construction.
+ * INVARIANT for the mirror below: no padding and no border on this element, so
+ * the border box that `transform-origin` resolves against coincides with the
+ * content box that `object-position` centres the fitted frame in. Do not add
+ * asymmetric horizontal padding here — a flip would then translate the content
+ * by twice the offset. */
 .camera-preview {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   background-color: var(--color-black);
 }
 
-/* Mirror the preview horizontally for natural selfie-style view */
+/* Optional horizontal mirror, applied per camera by the user (#42).
+ * Preview-only: captureVideoFrame() never flips the saved image.
+ * No `transition` — the flip is instantaneous by design. */
 .camera-preview--mirrored {
   transform: scaleX(-1);
+}
+
+/* Mirror-preview option row (#42). `.camera-option-row` is a structural hook in
+ * the markup only — it deliberately carries NO declarations. It is the last
+ * child of .dialog-body, which already contributes var(--space-12) below
+ * itself, and a <div> has no default margin, so the `margin-bottom: 0` this
+ * comment used to introduce was a no-op. */
+
+/* The pointer target is the LABEL box, not the row — the wrapping-<label>
+ * pattern makes the label the region that accepts the click. 24px is the
+ * WCAG 2.2 target-size minimum; --space-12 is the 24px step on the layout
+ * grid. --dialog-text-secondary matches .camera-device-label in this same
+ * dialog rather than the global tier the DocumentImport precedent uses. */
+.camera-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: var(--space-12);
+  font-size: var(--text-base);
+  color: var(--dialog-text-secondary);
+  cursor: pointer;
+}
+
+/* --icon-size-sm (16px), not --space-8: this is a control's intrinsic size,
+ * so it must not ride the spacing scale. `color-scheme: dark` on :root makes
+ * the UA paint the box dark; accent-color tints the checked fill. */
+.camera-checkbox-label input[type='checkbox'] {
+  width: var(--icon-size-sm);
+  height: var(--icon-size-sm);
+  accent-color: var(--color-accent-primary);
+  cursor: pointer;
+}
+
+/* Disabled while no live preview is showing. Class modifier rather than :has()
+ * to match the repo's existing --modifier convention.
+ *
+ * --color-text-secondary (#858585, 5.01:1 on --color-bg-primary), NOT
+ * --color-text-muted (#6e6e6e, 3.63:1): this 45-character sentence is the only
+ * explanation of what the feature does, and it is disabled exactly while the
+ * camera is starting — i.e. it is least legible at the one moment the user is
+ * idle and reading it. Still visibly muted against the enabled
+ * --dialog-text-secondary above. */
+.camera-checkbox-label--disabled {
+  color: var(--color-text-secondary);
+  cursor: default;
+}
+
+.camera-checkbox-label--disabled input[type='checkbox'] {
+  cursor: default;
 }
 
 /* Loading state placeholder */
@@ -188,8 +257,15 @@
   line-height: var(--leading-relaxed);
 }
 
-/* Empty state when no camera is available */
+/* Empty state when no camera is available.
+ * `position: absolute; inset: 0` is REQUIRED, not cosmetic: absolutely
+ * positioned children resolve against the nearest positioned ancestor's
+ * PADDING BOX, which is why .camera-preview-loading already centres correctly
+ * today. Without it this box stays in normal flow and top-aligns inside the
+ * 405px wrapper, leaving ~240px of dead black beneath it. */
 .camera-empty-state {
+  position: absolute;
+  inset: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -223,4 +299,24 @@
   display: flex;
   align-items: center;
   margin-right: auto;
+}
+
+/*
+ * Visually-hidden status live region (standard clip-rect sr-only), matching the
+ * component-scoped pattern used by `.toast-sr-only` and
+ * `.screenshot-overlay-sr-only`. Scoped locally rather than reusing the
+ * `.sr-only` utility that happens to live in AppDockLayout.css: if this dialog
+ * ever renders without that stylesheet in the bundle, the announcement text
+ * would become visible over the preview.
+ */
+.camera-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }

@@ -78,6 +78,15 @@
   color: var(--color-white);
 }
 
+/*
+ * Deleted marker (issue #70). See EditorTab.css for the colour rationale; both
+ * tabs mark a deleted file the same way, because it is one mechanism.
+ */
+.image-tab-deleted {
+  color: var(--color-warning);
+  white-space: nowrap;
+}
+
 /* ============================================
  * Close Button
  * ============================================ */

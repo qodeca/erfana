@@ -1,0 +1,99 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<!--
+  Corpus case 3: CDN subresource (AC7 blocked / AC8 approved, AC25 sentinel 3).
+
+  HOST TO APPROVE: cdn.jsdelivr.net
+  Subresource:     https://cdn.jsdelivr.net/npm/normalize.css@8.0.1/normalize.css
+
+  Behaviour:
+  - Host NOT approved  -> the <link> is blocked, onerror fires, the page shows
+    the graceful fallback text and an "CDN blocked" note. The preview raises its
+    error badge/toast for the blocked host. Title stays WITHOUT the sentinel.
+  - Host approved      -> the stylesheet loads, onload fires, the marker turns to
+    "CDN loaded" and the title gains "-OK-3" (AC25 sentinel 3, skipped offline).
+
+  The single external subresource keeps the allowlist decision unambiguous for
+  the tester: approve exactly one host, cdn.jsdelivr.net.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CDN corpus page (fallback)</title>
+    <!-- Local fallback styling so the page is meaningful even when the CDN host is blocked. -->
+    <style>
+      body {
+        margin: 0;
+        padding: 2rem;
+        font: 16px/1.5 system-ui, sans-serif;
+        color: #1b1b1f;
+        background: #f6f8fa;
+      }
+      .card {
+        max-width: 40rem;
+        padding: 1rem 1.25rem;
+        background: #fff;
+        border: 1px solid #d0d7de;
+      }
+      h1 {
+        font-size: 1.4rem;
+        color: #2b6cb0;
+      }
+      #cdn-status {
+        margin-top: 1rem;
+        padding: 0.75rem;
+        border-left: 4px solid #a00;
+        background: #fff5f5;
+        color: #a00;
+      }
+      #cdn-status.loaded {
+        border-left-color: #1a7f37;
+        background: #eaf6ec;
+        color: #1a7f37;
+      }
+      code {
+        font-family: ui-monospace, monospace;
+      }
+    </style>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/normalize.css@8.0.1/normalize.css"
+      onload="window.__cdnLoaded && window.__cdnLoaded()"
+      onerror="window.__cdnFailed && window.__cdnFailed()"
+    />
+    <script>
+      // Defined before the <link> resolves so early onload/onerror is not lost.
+      window.__cdnLoaded = function () {
+        const el = document.getElementById('cdn-status')
+        if (el) {
+          el.classList.add('loaded')
+          el.textContent =
+            'CDN loaded — cdn.jsdelivr.net subresource fetched and applied.'
+        }
+        document.title = 'CDN corpus page -OK-3'
+      }
+      window.__cdnFailed = function () {
+        const el = document.getElementById('cdn-status')
+        if (el) {
+          el.textContent =
+            'CDN blocked — cdn.jsdelivr.net is not approved (or offline). ' +
+            'This fallback text confirms the page still renders.'
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Corpus 3: CDN subresource</h1>
+      <p>
+        You should see: if you approve <code>cdn.jsdelivr.net</code>, the status
+        box turns green and reads "CDN loaded" and the tab title gains
+        <code>-OK-3</code>. If the host is not approved, the box stays red with a
+        fallback message and the preview shows a blocked-host error badge.
+      </p>
+      <div id="cdn-status">Waiting for cdn.jsdelivr.net…</div>
+    </div>
+  </body>
+</html>

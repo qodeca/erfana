@@ -7,8 +7,18 @@
  */
 
 // Interface and types
-export type { SearchProvider, SearchOptions, SearchMatch } from './SearchProvider'
+export type {
+  SearchProvider,
+  SearchOptions,
+  SearchMatch,
+  SearchCapabilities,
+  SearchCount
+} from './SearchProvider'
 
 // Implementations
 export { MonacoSearchProvider } from './MonacoSearchProvider'
 export { PreviewSearchProvider } from './PreviewSearchProvider'
+export { PreviewPageSearchProvider } from './PreviewPageSearchProvider'
+
+// Dev-time contract check
+export { assertProviderContract } from './providerAssertions'

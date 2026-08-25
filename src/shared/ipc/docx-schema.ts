@@ -27,7 +27,9 @@ export const DocxExportResponseSchema = z.object({
   /** Error message (if failed) */
   error: z.string().optional(),
   /** Error code for structured handling */
-  errorCode: z.string().optional()
+  errorCode: z.string().optional(),
+  /** Number of remote images stripped for security before conversion (if success) */
+  removedRemoteImages: z.number().int().nonnegative().optional()
 })
 
 export type DocxExportResponse = z.infer<typeof DocxExportResponseSchema>

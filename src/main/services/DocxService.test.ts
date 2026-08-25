@@ -72,7 +72,7 @@ vi.mock('./LoggingService', () => ({
  */
 function setupSuccessfulExport(filePath = '/tmp/test.docx'): void {
   mockShowSaveDialog.mockResolvedValue({ canceled: false, filePath })
-  mockConvert.mockResolvedValue(Buffer.from('DOCX content'))
+  mockConvert.mockResolvedValue({ buffer: Buffer.from('DOCX content'), removedRemoteImages: 0 })
   mockWriteFile.mockResolvedValue(undefined)
 }
 
@@ -516,7 +516,7 @@ describe('DocxService', () => {
 
     it('should append .docx if missing', async () => {
       mockShowSaveDialog.mockResolvedValue({ canceled: false, filePath: '/tmp/document' })
-      mockConvert.mockResolvedValue(Buffer.from('DOCX content'))
+      mockConvert.mockResolvedValue({ buffer: Buffer.from('DOCX content'), removedRemoteImages: 0 })
       mockWriteFile.mockResolvedValue(undefined)
 
       const result = await docxService.exportToDocx('<p>Test</p>', 'test')
@@ -659,7 +659,7 @@ describe('DocxService', () => {
     it('should write converted buffer to file', async () => {
       const docxBuffer = Buffer.from('DOCX binary content')
       mockShowSaveDialog.mockResolvedValue({ canceled: false, filePath: '/tmp/test.docx' })
-      mockConvert.mockResolvedValue(docxBuffer)
+      mockConvert.mockResolvedValue({ buffer: docxBuffer, removedRemoteImages: 0 })
       mockWriteFile.mockResolvedValue(undefined)
 
       await docxService.exportToDocx('<p>Test</p>', 'test')
@@ -680,7 +680,7 @@ describe('DocxService', () => {
 
     it('should return FAILED on file write EACCES (permission denied)', async () => {
       mockShowSaveDialog.mockResolvedValue({ canceled: false, filePath: '/tmp/test.docx' })
-      mockConvert.mockResolvedValue(Buffer.from('DOCX content'))
+      mockConvert.mockResolvedValue({ buffer: Buffer.from('DOCX content'), removedRemoteImages: 0 })
       const accessError = new Error('Permission denied') as NodeJS.ErrnoException
       accessError.code = 'EACCES'
       mockWriteFile.mockRejectedValue(accessError)
@@ -694,7 +694,7 @@ describe('DocxService', () => {
 
     it('should return FAILED on file write ENOSPC (no space)', async () => {
       mockShowSaveDialog.mockResolvedValue({ canceled: false, filePath: '/tmp/test.docx' })
-      mockConvert.mockResolvedValue(Buffer.from('DOCX content'))
+      mockConvert.mockResolvedValue({ buffer: Buffer.from('DOCX content'), removedRemoteImages: 0 })
       const spaceError = new Error('No space left on device') as NodeJS.ErrnoException
       spaceError.code = 'ENOSPC'
       mockWriteFile.mockRejectedValue(spaceError)
@@ -708,7 +708,7 @@ describe('DocxService', () => {
 
     it('should return FAILED on generic write errors', async () => {
       mockShowSaveDialog.mockResolvedValue({ canceled: false, filePath: '/tmp/test.docx' })
-      mockConvert.mockResolvedValue(Buffer.from('DOCX content'))
+      mockConvert.mockResolvedValue({ buffer: Buffer.from('DOCX content'), removedRemoteImages: 0 })
       mockWriteFile.mockRejectedValue(new Error('Generic write error'))
 
       const result = await docxService.exportToDocx('<p>Test</p>', 'test')
@@ -754,7 +754,7 @@ describe('DocxService', () => {
       const docxBuffer = Buffer.from('DOCX binary data')
 
       mockShowSaveDialog.mockResolvedValue({ canceled: false, filePath })
-      mockConvert.mockResolvedValue(docxBuffer)
+      mockConvert.mockResolvedValue({ buffer: docxBuffer, removedRemoteImages: 0 })
       mockWriteFile.mockResolvedValue(undefined)
 
       const result = await docxService.exportToDocx(htmlContent, 'integration-test')
@@ -800,7 +800,7 @@ describe('DocxService', () => {
       const docxBuffer = Buffer.from('DOCX data')
 
       mockShowSaveDialog.mockResolvedValue({ canceled: false, filePath })
-      mockConvert.mockResolvedValue(docxBuffer)
+      mockConvert.mockResolvedValue({ buffer: docxBuffer, removedRemoteImages: 0 })
       mockWriteFile.mockResolvedValue(undefined)
 
       await docxService.exportToDocx('<p>Test</p>', 'test')

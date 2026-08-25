@@ -291,6 +291,15 @@ export function useExportHandlers(
           type: 'success',
           duration: 3000
         })
+        // Notify if remote images were dropped for security (they are not embedded).
+        if (result.removedRemoteImages && result.removedRemoteImages > 0) {
+          showToast({
+            title: 'Remote images skipped',
+            message: `${result.removedRemoteImages} remote image(s) were not embedded (blocked for security)`,
+            type: 'warning',
+            duration: 5000
+          })
+        }
       } else if (result.errorCode !== 'DOCX_EXPORT_CANCELLED') {
         // Show error (but not for cancelled exports - user intentionally cancelled)
         showToast({

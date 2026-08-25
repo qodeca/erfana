@@ -32,12 +32,12 @@ Erfana uses a **hybrid architecture** matching VS Code's actual implementation p
 
 ```
 SplitviewReact (outer horizontal 3-column split)
-  ├─ Left: ProjectPanelWrapper (170-600px, resizable)
+  ├─ Left: ProjectPanel (170-600px, resizable)
   │   └─ Wraps ProjectTree component
   ├─ Center: EditorAreaSplitPanel (400px min, flex-fills remaining)
   │   └─ Contains DockviewReact for tabbed editors
-  └─ Right: TerminalSplitPanel (170-600px)
-      └─ Separate panels, only one visible at a time
+  └─ Right: TerminalPanel (170-1200px)
+      └─ Added only when a project is open; cap relaxed while maximized
 ```
 
 **SplitviewReact** (outer layer):
@@ -53,16 +53,19 @@ SplitviewReact (outer horizontal 3-column split)
 - Each opened file = new tab in DockviewReact
 
 **Key Components**:
-- `ProjectPanelWrapper` - Splitview panel wrapping ProjectTree
+- `ProjectPanel` - Splitview panel wrapping ProjectTree
 - `EditorAreaSplitPanel` - Splitview panel containing nested DockviewReact
-- `TerminalSplitPanel` - Splitview panel for terminal (mutually exclusive with Git)
- 
+- `TerminalPanel` - Splitview panel for the terminal, and the only right-side panel. `activityBarConfig.ts` defines exactly three entries: `project`, `search` (disabled, "coming soon") and `terminal` – there is no Git panel.
 
-**Panel Communication**: DockviewApi passed via params to ProjectPanelWrapper for opening files as tabs.
+**Size constraints** (`AppDockLayout.tsx`): left sidebar 170–600px, center editor 400px minimum, terminal 170–`TERMINAL_MAX` (1200px). Maximizing the terminal swaps the cap for `TERMINAL_EXPANDED_MAX` (`Number.MAX_SAFE_INTEGER`) and hides the center panel.
+
+**Panel Communication**: DockviewApi passed via params to `ProjectPanel` for opening files as tabs.
 
 Reference: [Dockview Documentation](https://dockview.dev/)
 
 ## Directory Structure
+
+The tree below is annotated rather than exhaustive: `services/`, `interfaces/`, `ipc/` and `components/` are listed in full, everything else (`utils/`, `hooks/`, `stores/`, …) shows representative entries only. Run `ls` for the authoritative listing.
 
 ```
 src/
@@ -93,21 +96,36 @@ src/
 │   │   ├── AudioExtractionService.ts # Video → audio extraction (ffmpeg)
 │   │   ├── ApiKeyService.ts     # Encrypted API key storage (Electron safeStorage)
 │   │   ├── TerminalService.ts   # PTY management with node-pty
+│   │   ├── WindowsTerminalBootstrap.ts # Shell-specific ConPTY bootstrap strategies
+│   │   ├── ProjectSettingsService.ts   # Per-project settings (.erfana/settings.json)
+│   │   ├── ExternalFileService.ts      # Files opened from outside the project root (realpath confinement)
+│   │   ├── ScreenshotService.ts # Screenshot dispatcher + pickCapturer/createScreenshotService factory
+│   │   ├── CameraService.ts     # Webcam photo capture
+│   │   ├── HtmlToDocxConverter.ts      # DOCX export: strips remote images + wraps, delegates to docx/ child
+│   │   ├── LockHeartbeat.ts, LockStalenessPolicy.ts, MonotonicTimestampGenerator.ts  # ProjectLock internals
+│   │   ├── RecentProjectsRepository.ts, RecentProjectsDeduplicator.ts  # SettingsService internals
+│   │   ├── screenshot/          # MacScreenshotCapturer, DesktopCapturerScreenshotCapturer, ScreenshotOverlayWindow
+│   │   ├── claudeStatus/        # ClaudeStatusService, ClaudeTranscriptWatcher/Parser/Locator,
+│   │   │                        #   ClaudeWindowDetector, encodeCwd, modelId, friendlyModelName, thresholds,
+│   │   │                        #   process/ (Mac/Win detectors + createProcessDetector)
 │   │   ├── workers/             # worker_threads scripts (git-status.worker.ts)
-│   │   ├── watcher/             # ThrottledWorker (offset-deque, #173), EventCoalescer, AtomicSaveDetector, WatcherMetrics
-│   │   └── import/converters/   # LiteParseConverter, Audio/VideoConverter, TextConverter (IConverter)
-│   ├── interfaces/
-│   │   └── IGitStatusWorker.ts  # Worker adapter interface
-│   ├── ipc/
-│   │   ├── file-handlers.ts     # IPC handlers
-│   │   ├── file-watcher-handlers.ts  # File watching IPC
-│   │   ├── directory-watcher-handlers.ts  # Directory watching IPC
-│   │   ├── logging-handlers.ts  # Logging IPC (getLevel, getLogsDir, openLogsFolder)
-│   │   ├── git-watcher-handlers.ts # Git watching IPC
-│   │   ├── project-lock-handlers.ts # Project lock IPC
-│   │   ├── import-handlers.ts   # Document import IPC (LiteParse)
-│   │   ├── transcription-handlers.ts # Transcription IPC
-│   │   └── terminal-handlers.ts # Terminal emulator IPC
+│   │   ├── docx/                # DOCX conversion isolation: docxImageStrip (parse5 SSRF strip),
+│   │   │                        #   DocxConvertProcessAdapter (utilityProcess lifecycle), docx-convert.process (child)
+│   │   ├── watcher/             # ThrottledWorker (offset-deque, #173), EventCoalescer, GitEventCoalescer,
+│   │   │                        #   AtomicSaveDetector, RepoPresenceWatcher, WatcherMetrics, PlatformConfig
+│   │   └── import/              # ImportService, ConverterRegistry, DependencyDetector, extensions,
+│   │                            #   converters/ (LiteParseConverter, Audio/VideoConverter, TextConverter – IConverter)
+│   ├── interfaces/              # 9 service interfaces (DIP seams)
+│   │   ├── IFileService.ts, IFileWatcherService.ts, IDirectoryWatcherService.ts
+│   │   ├── IGitStatusWorker.ts, IGitWatcherService.ts, IGitPollingService.ts
+│   │   └── IProjectLockService.ts, IProjectSettingsService.ts, ISettingsService.ts
+│   ├── ipc/                     # 22 handler modules + senderValidation.ts (frame/origin gate)
+│   │   ├── file-handlers.ts, file-watcher-handlers.ts, directory-watcher-handlers.ts
+│   │   ├── terminal-handlers.ts, shell-handlers.ts, quit-handlers.ts, system-handlers.ts
+│   │   ├── settings-handlers.ts, global-settings-handlers.ts, logging-handlers.ts
+│   │   ├── git-handlers.ts, git-watcher-handlers.ts, project-lock-handlers.ts, external-file-handlers.ts
+│   │   ├── screenshot-handlers.ts, camera-handlers.ts, clipboard-handlers.ts, claude-status-handlers.ts
+│   │   └── import-handlers.ts, transcription-handlers.ts, docx-handlers.ts, pdf-handlers.ts
 │   └── utils/
 │       ├── PauseController.ts   # Pause/resume with safety timeout
 │       ├── RateLimitedLogger.ts # Cooldown-based log deduplication
@@ -119,18 +137,26 @@ src/
 └── renderer/
     └── src/
         ├── assets/              # Vendored fonts (Cascadia Mono) and static assets
-        ├── components/
+        ├── components/          # 19 directories
+        │   ├── ActivityBar/     # Vertical activity bars (left/right) + activityBarConfig.ts
+        │   ├── ContextMenu/     # Right-click menus (tree, editor, preview, terminal)
+        │   ├── Dialog/          # Unified dialog system (Context + Provider + Hook) – inventory in Dialog/CLAUDE.md
         │   ├── DockLayout/      # Hybrid SplitviewReact + DockviewReact
-        │   ├── ActivityBar/     # Vertical activity bars (left/right)
-        │   ├── Panels/          # Panel implementations + WelcomePanel
-        │   ├── Editor/          # Monaco + Preview + Context Menus
+        │   ├── DocumentImport/  # DocumentImportDialog, OcrLanguageSelect
+        │   ├── Editor/          # Monaco + Preview + formatting toolbar
+        │   ├── FileConflictNotification/  # External-change conflict banner
+        │   ├── Panels/          # Panel implementations (Project, Terminal, Editor, ImageViewer) + WelcomePanel
         │   ├── ProjectTree/     # Project tree with context menu
-        │   ├── Tabs/            # EditorTab, WelcomeTab (Chrome-style tabs)
-        │   ├── Dialog/          # Unified dialog system (Context + Provider + Hook)
-        │   ├── ContextMenu/     # Right-click context menu
-        │   ├── Toast/           # Toast notification system
+        │   ├── RootErrorBoundary/  # Crash boundary of last resort + FallbackGuard, recovery screen, errorDetails
+        │   ├── Screenshot/      # ScreenshotOverlay (area-select surface for the overlay window)
+        │   ├── Search/          # SearchBar (app-level unified search)
         │   ├── Settings/        # Settings overlay
-        │   └── Transcription/   # TranscriptionDialog, LanguageSelect
+        │   ├── Tabs/            # EditorTab, WelcomeTab (Chrome-style tabs)
+        │   ├── Toast/           # Toast notification system
+        │   ├── Toolbar/         # Top application toolbar (app title bar)
+        │   ├── Transcription/   # TranscriptionDialog, LanguageSelect
+        │   ├── UIBlocker/       # Full-surface interaction blocker for long operations
+        │   └── shared/          # Cross-component primitives (CharacterCount)
         ├── constants/           # Shared renderer constants
         ├── context/             # React contexts (ProjectManagementContext, TerminalPortalContext)
         ├── hooks/               # React hooks
@@ -145,7 +171,9 @@ src/
         │   └── types.ts         # TypeScript interfaces
         ├── providers/           # React provider components
         ├── services/            # Renderer-side services (textClipboard transport)
-        ├── stores/              # Zustand stores (ActivityBar, Settings, GlobalSettings, Transcription)
+        ├── stores/              # 12 Zustand stores: ActivityBar, ClaudeStatus, Clipboard, DiagramViewer,
+        │                        #   DocumentImport, Git, GlobalSettings, Project, Search, Settings,
+        │                        #   Terminal, Transcription
         ├── styles/              # Global stylesheets
         │   ├── fonts.css            # @font-face declarations (Cascadia Mono)
         │   ├── design-tokens.css    # Design system tokens (colors, spacing, typography)
@@ -177,10 +205,14 @@ src/
 - **Component Registry**: Splitview and Dockview use string-based component lookup
 - **Multi-model Editor**: Single Monaco instance, swap models per file
 - **Worker thread offloading**: Git status runs in a `worker_threads` Worker to keep the main thread responsive. Three-layer design: `IGitStatusWorker` (interface) → `GitStatusWorkerAdapter` (wraps worker_threads) → `git-status.worker.ts` (runs isomorphic-git or native git). Circuit breaker disables worker after repeated crashes. Strategy selector uses `.git/index` file size to choose between isomorphic-git (small repos) and native `git status --porcelain` (large repos). See [API Services – Features](./api-services-features.md) for details.
+- **Process isolation for DOCX conversion**: `@turbodocx/html-to-docx` decodes images synchronously, so a malformed image could spin the CPU in a loop that an in-thread `Promise.race` timeout cannot interrupt. The conversion therefore runs in a killable Electron `utilityProcess` child: `HtmlToDocxConverter` (main-side strip + wrap) → `DocxConvertProcessAdapter` (forks the child, mirrors `GitStatusWorkerAdapter`'s lifecycle, `kill()`s on timeout) → `docx-convert.process.ts` (child entry). A separate process — not a worker thread — is used deliberately, to also cap memory against decompression bombs. See [API Services – Features](./api-services-features.md#docxservice).
+- **Sandboxed HTML preview subsystem (#74)**: live HTML/CSS/JS previews render in a dedicated Electron `WebContentsView` overlaid on the preview panel — a separate web contents, **not** the renderer DOM — so a hostile page cannot reach Erfana's own renderer. Its assets are served over a registered privileged `erfana-preview://` scheme by `PreviewProtocolHandler`; the view runs on a sealed in-memory `session` (no persistent cookies, cache or storage) minted by `PreviewSessionFactory`/`PreviewStorageSeal`; and `PreviewRequestFilter` enforces the per-project host allowlist plus a Content-Security-Policy on every request, blocking un-approved remote hosts. `PreviewViewService` owns the native view lifecycle; IPC is sender-gated by `isTrustedPreviewSender`. See [HTML preview](./html-preview/README.md) and [Security](./security.md).
+- **Factory injection over module-eval singletons**: `ScreenshotService` is built by `createScreenshotService(capturer?, platform?)`, which falls back to `pickCapturer(platform)` – `darwin` → `MacScreenshotCapturer` (native `/usr/sbin/screencapture`), `win32` → `DesktopCapturerScreenshotCapturer` (Electron `desktopCapturer` + renderer-driven area-select overlay), anything else → `UnsupportedCapturer`. Both arguments are optional, so production gets `process.platform` while tests inject a fake capturer and a fake platform without stubbing globals. This replaced a module-eval singleton that froze the platform choice at import time (#164). `pickCapturer` is exported separately so the routing table can be asserted directly. The capturers implement one `IScreenshotCapturer.capture(request)` method over a discriminated-union request rather than three per-mode methods, keeping the platform branch in exactly one place.
 - **Mermaid Integration**: Client-side diagram rendering (22 types) with dark theme
 - **Prompt Template System**: CSP-compliant markdown templates with Handlebars-style syntax for context menu AI prompts (see [Prompt Templates](./prompts/README.md))
 - **Line Range Tracking**: Enhanced markdown preview with `data-line-start/end` attributes for accurate source mapping
-- **Project Persistence**: Auto-loads last opened project on startup
+- **Project Persistence**: The last opened project is remembered — `SettingsService` persists `lastProjectPath` and the project appears in the Recent Projects list on the welcome screen — but **start-up never auto-opens it**. The "Load last project on mount - DISABLED" effect in `src/renderer/src/hooks/useProjectManagement.ts` marks the initial load complete without loading anything, and `useProjectManagement.noAutoLoad.test.ts` pins that. This is load bearing, not a preference: the crash screen's Restart button is only safe because a relaunch cannot reopen the project that caused the crash — see [UI Components § Restart-safety invariant](./ui-components.md#restart-safety-invariant) before changing it
+- **Layered error containment**: `PanelErrorBoundary` (panel-scoped, degrades one sidebar panel) → `RootErrorBoundary` plus a **distinct** `FallbackGuard` class (last-resort recovery screen, then an inline-styled `document.body` sibling) → `installGlobalErrorTrail()` (async / event-handler / unhandled-rejection trail) → main-process `rendererCrashHandlers` (process death, hangs, entry-module and preload failures). Every main-side layer is log-only by design: a crash caused by restored state would re-crash on reload, so no auto-reload, dialog or relaunch. Layer-by-layer coverage table in [UI Components § Error containment](./ui-components.md#error-containment)
 - **Shared Utilities**: `types/` for shared TypeScript types (FilterMode), `utils/` for shared functions (sanitizeFilePath, isMarkdownFile, panelUtils)
 
 ## Activity Bar System
@@ -276,10 +308,10 @@ if (confirmed) await deleteFile()
 - Submit button disabled when input invalid/empty
 - Context display showing parent path (e.g., "in /project/docs")
 
-**Test Coverage**: 129 tests (see [Testing](./testing/README.md#dialog-system))
-- `fileValidation.test.ts` - 80 tests covering all validation scenarios
-- `FileSystemDialog.test.tsx` - 49 tests covering component behavior
-- `WrapperDialogs.test.tsx` - Integration tests for wrapper components
+**Test Coverage** (see [Testing](./testing/README.md)) – run `npm run test:cov` for current numbers rather than trusting a hardcoded count:
+- `src/renderer/src/utils/fileValidation.test.ts` - validation scenarios
+- `src/renderer/src/components/Dialog/FileSystemDialog.test.tsx` - component behavior
+- `src/renderer/src/components/Dialog/WrapperDialogs.test.tsx` - integration tests for the wrapper components
 
 **Benefits of SOLID Refactoring**:
 - DRY: Eliminated duplication across 3 dialog types
@@ -290,178 +322,26 @@ if (confirmed) await deleteFile()
 
 ## Drag-Drop File Reorganization
 
-**VS Code-style drag-drop** for project tree file/folder manipulation.
+VS Code-style drag-drop for reorganizing files and folders in the project tree:
+`FileService.moveItem`/`copyItem` in main, a sanitizing IPC layer, and
+`ProjectTree` + `useDragDropTree` in the renderer.
 
-### Architecture Overview
+The full write-up lives in its own doc set rather than being duplicated here:
 
-**Three-layer system**:
-1. **Backend Layer** (`FileService`): File system operations with cross-filesystem fallback
-2. **IPC Layer** (`file-handlers`): Secure bridge with input sanitization
-3. **Frontend Layer** (`ProjectTree` + `useDragDropTree`): Tree manipulation algorithms + UI
+- [Drag-Drop overview](./drag-drop/README.md)
+- [Architecture](./drag-drop/architecture.md) - the three layers, tree algorithms, IPC surface
+- [Validation](./drag-drop/validation.md) - move/copy constraints and conflict handling
+- [Visual feedback](./drag-drop/visual-feedback.md) - drop indicators and drag overlays
+- [Clipboard](./drag-drop/clipboard.md) - cut/copy/paste equivalents
+- [Integration](./drag-drop/integration.md) - watcher pausing, tree refresh, accessibility
+- [Testing](./drag-drop/testing.md) - the shipped suites
+- [Troubleshooting](./drag-drop/troubleshooting.md)
 
-### Core Components
-
-**FileService Methods** (`src/main/services/FileService.ts`):
-- `moveItem(source, target, newName?)` - Move with fs.rename + copy/delete fallback for EXDEV
-- `copyItem(source, target, newName?)` - Copy with automatic name conflict numbering (1), (2), etc.
-- `checkNameConflict(targetPath, itemName)` - Case-insensitive duplicate detection
-
-**Tree Algorithm Hook** (`src/renderer/src/hooks/useDragDropTree.ts`):
-- `flattenTree()` - Convert hierarchy to flat array with depth/parent metadata
-- `buildTree()` - Reconstruct hierarchy from flat array
-- `getProjection()` - Calculate target depth/parent based on horizontal drag offset
-- `isDescendant()` - Detect circular move attempts (folder into its own subfolder)
-- `validateMove()` - Validate all constraints before operation
-
-**Clipboard Store** (`src/renderer/src/stores/useClipboardStore.ts`):
-- Zustand store for cut/copy/paste state management
-- Cut: Move operation, clears clipboard after paste
-- Copy: Copy operation, keeps clipboard for multiple pastes
-- Visual feedback via `data-clipboard-cut` attribute
-
-### Key Design Decisions
-
-**dnd-kit Library Choice**:
-- Chosen over alternatives for small bundle size (10kb vs 96kb)
-- Tree flattening strategy compatible with dnd-kit's flat array expectation
-- `useSortable` hook per tree node, `DndContext` + `SortableContext` at container level
-
-**Cross-Filesystem Move Pattern**:
-```typescript
-try {
-  await fsRename(sourcePath, targetPath)  // Fast atomic rename
-} catch (error) {
-  if (error.code === 'EXDEV') {
-    await cp(sourcePath, targetPath, { recursive: true })  // Fallback
-    await rm(sourcePath, { recursive: true, force: true })
-  }
-}
-```
-- Try `fs.rename()` first (instant for same filesystem)
-- Fallback to `copy + delete` on EXDEV error (cross-volume moves)
-- Preserves timestamps with `preserveTimestamps: true`
-
-**Watcher Synchronization**:
-- Problem: File watcher triggers refresh during move, causing stale tree state
-- Solution: Pause watcher → execute operation → refresh tree → resume watcher
-- Pattern used for all file mutations (drag-drop, keyboard shortcuts, context menu)
-
-**Tree Flattening Algorithm**:
-```typescript
-interface FlattenedNode extends FileNode {
-  parentId: string | null  // Track parent for hierarchy reconstruction
-  depth: number           // Track depth for indentation/projection
-  index: number           // Track sibling order
-}
-```
-- Depth-first traversal preserves visual order
-- Metadata enables validation (circular move detection)
-- Memoized via `useMemo(() => flattenTree(files), [files])`
-
-### Validation Constraints
-
-**Circular Move Prevention**:
-- Cannot drag folder into its own descendant
-- Validation: `isDescendant(targetPath, sourcePath)` checks path prefix
-
-**Project Root Protection**:
-- Cannot move/rename project root directory itself
-- Enforced in FileService validation layer
-
-**Name Conflict Handling**:
-- Move conflicts: Show confirm dialog (overwrite or cancel)
-- Copy conflicts: Auto-numbering (file.md → file (1).md → file (2).md)
-- Case-insensitive detection for cross-platform compatibility
-
-### Keyboard Shortcuts
-
-**Cut/Copy/Paste**:
-- `Ctrl+X` / `Cmd+X` - Cut selected item
-- `Ctrl+C` / `Cmd+C` - Copy selected item
-- `Ctrl+V` / `Cmd+V` - Paste into selected folder
-
-**Visual Feedback**:
-- Cut items: 50% opacity + dashed underline
-- Clipboard persists across re-renders (Zustand store)
-
-### Visual Feedback States
-
-**Drag States** (CSS data attributes):
-- `data-dragging="true"` - 40% opacity on source item
-- `data-drop-target="true"` - Blue outline + background on target folder
-- `data-drop-invalid="true"` - Red outline for invalid drop locations
-- `data-clipboard-cut="true"` - Dimmed + dashed underline for cut items
-
-**Drop Indicators**:
-- `DropIndicator.tsx` - Horizontal blue line showing exact drop position
-- `FolderDropHighlight.tsx` - Folder outline during "move into" operation
-- Position calculated from projected depth × indentation width
-
-### Accessibility
-
-**ARIA Live Announcements**:
-- "Dragging [filename]" on drag start
-- "Moved [filename] to [folder]" on successful drop
-- "Cut/Copied [filename]" on keyboard operations
-- Off-screen live region (`aria-live="polite"`, `aria-atomic="true"`)
-
-**Keyboard Support**:
-- Full cut/copy/paste via keyboard shortcuts
-- Context menu accessible via right-click or context menu key
-- Focus management during dialog interactions
-
-### Integration Points
-
-**IPC Handlers** (`src/main/ipc/file-handlers.ts`):
-- `file:moveItem` - Sanitizes input (strips path separators), calls FileService
-- `file:copyItem` - Same sanitization, handles numbering
-- `file:checkConflict` - Returns boolean for duplicate detection
-
-**Preload Bridge** (`src/preload/index.ts`):
-```typescript
-moveItem: (sourcePath, targetParentPath, newName?) =>
-  ipcRenderer.invoke('file:moveItem', sourcePath, targetParentPath, newName)
-```
-- Type-safe API via `index.d.ts` definitions
-- No direct Node.js access from renderer
-
-**ProjectTree Component** (`src/renderer/src/components/ProjectTree/ProjectTree.tsx`):
-- DndContext with sensors (5px activation distance prevents accidental drags)
-- Drag handlers: `onDragStart`, `onDragOver`, `onDragEnd`
-- Keyboard event listener for Ctrl+X/C/V
-- Context menu integration with Cut/Copy/Paste items
-
-### Performance Considerations
-
-**Tree Flattening**:
-- Memoized: Only recalculates when `files` array changes
-- Typical project (500 files) flattens in <5ms
-
-**Watcher Pause/Resume**:
-- Brief delay (<100ms) during operations
-- Trade-off: Prevents race conditions vs. slight UX latency
-
-**Drag Sensor Configuration**:
-- 5px activation distance (prevents click interference)
-- `closestCenter` collision detection (better performance than `closestCorners`)
-
-### Known Limitations
-
-1. No undo/redo - Operations are immediate and permanent
-2. No multi-select drag - One item at a time
-3. No manual file ordering - Alphabetical sort only
-4. No auto-open folders on hover during drag
-5. No progress indicators for large folder copies
-
-### Future Enhancements
-
-Undo/redo, multi-select drag (Shift/Ctrl+Click), custom drag previews, auto-open on hover (1s), progress indicators with cancel.
-
-See: [Drag-Drop](./drag-drop/README.md) · [IPC](./ipc-patterns.md) · [UI](./ui-components.md) · [Security](./security.md) · [Testing](./testing/README.md)
+See also: [IPC](./ipc-patterns.md) - [UI](./ui-components.md) - [Security](./security.md) - [Testing](./testing/README.md)
 
 ## ProjectTree Modularization
 
-**v0.3.7 Refactoring**: Reduced ProjectTree.tsx complexity by 38.4% (1,338 → 824 lines) through SOLID principles and design patterns.
+**v0.3.7 refactoring**: cut ProjectTree.tsx from 1,338 to 824 lines (38.4%) by applying SOLID principles and design patterns. That was the state at v0.3.7 – the file has grown back since (1,457 lines today) as features landed, so treat the figures below as the record of that refactoring, not a current measurement.
 
 **Key Achievements**:
 - Applied Strategy + Command + Factory patterns for context menus
@@ -477,8 +357,8 @@ See: [Drag-Drop](./drag-drop/README.md) · [IPC](./ipc-patterns.md) · [UI](./ui
 - **Pure Logic**: 57 functions extracted to `.logic.ts` files for fast, deterministic testing
 
 **Pure Logic Pattern Examples** (v0.6.3):
-- `markdownEditorPanel.logic.ts` - Stats calculation, scroll sync algorithms (591 lines, 83 tests)
-- `promptScrollScheduler.logic.ts` - Timestamp-based scroll scheduling with user intent detection (141 lines, 66 tests)
+- `markdownEditorPanel.logic.ts` - Stats calculation, scroll sync algorithms (587 lines, 82 tests)
+- `promptScrollScheduler.logic.ts` - Timestamp-based scroll scheduling with user intent detection (144 lines, 39 tests)
 - `chatBubble.logic.ts` / `diagramViewer.logic.ts` / `mermaidDirections.ts` - Validation helpers, zoom/pan math, chart-type detection — all testable without React
 
 **Shared utility patterns** (cross-platform / cross-process):

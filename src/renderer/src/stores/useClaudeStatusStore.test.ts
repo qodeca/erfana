@@ -24,6 +24,7 @@ function makeSnapshot(
     percent: 42,
     level: 'green',
     tooltip: '84k / 200k',
+    inferred: false,
     ...overrides
   }
 }

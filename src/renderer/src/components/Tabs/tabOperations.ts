@@ -14,6 +14,7 @@
 import type { DockviewApi } from 'dockview'
 import { useProjectStore } from '../../stores/useProjectStore'
 import { getBasename } from '../../utils/fileUtils'
+import { WELCOME_PANEL_ID } from '../../constants/panels'
 
 /**
  * Get all editor panel IDs from dockview API
@@ -22,7 +23,7 @@ import { getBasename } from '../../utils/fileUtils'
 export function getEditorPanelIds(api: DockviewApi): string[] {
   const panels = api.panels
   return panels
-    .filter((panel) => panel.id !== '_center-placeholder')
+    .filter((panel) => panel.id !== WELCOME_PANEL_ID)
     .map((panel) => panel.id)
 }
 

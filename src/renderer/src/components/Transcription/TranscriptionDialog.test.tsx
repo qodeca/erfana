@@ -437,7 +437,7 @@ describe('TranscriptionDialog', () => {
       expect(progressBar).toHaveAttribute('role', 'progressbar')
     })
 
-    it('language select has aria-label', () => {
+    it('language select is named by its VISIBLE label, not an aria-label', () => {
       useTranscriptionStore.setState({
         isDialogOpen: true,
         filePath: '/path/to/audio.mp3',
@@ -446,7 +446,14 @@ describe('TranscriptionDialog', () => {
 
       render(<TranscriptionDialog />)
       const select = screen.getByTestId(TEST_IDS.TRANSCRIPTION_LANGUAGE_SELECT)
-      expect(select).toHaveAttribute('aria-label', 'Transcription language')
+
+      // getByLabelText resolves the accessible name the same way a screen
+      // reader does, so this fails if the label's htmlFor points at an id
+      // nothing renders — which it did until #42's review pass.
+      expect(screen.getByLabelText('Language')).toBe(select)
+      // The fallback name must stand down when a real label exists, or the
+      // spoken name ("Transcription language") differs from the visible one.
+      expect(select).not.toHaveAttribute('aria-label')
     })
 
     it('has aria-describedby pointing to body', () => {
@@ -691,6 +698,62 @@ describe('TranscriptionDialog', () => {
       fireEvent.keyDown(document, { key: 'Escape' })
 
       expect(cancelSpy).toHaveBeenCalledOnce()
+    })
+  })
+
+  // ===========================================================================
+  // Focus trap -- delegated to BaseDialog's `trapFocus` (was a local copy of
+  // the algorithm in this file). These assert the behaviour survived the move.
+  // ===========================================================================
+
+  describe('Focus trap', () => {
+    /** Language-selection view: select, Cancel, Start transcription. */
+    function openOptionsView(): void {
+      useTranscriptionStore.setState({
+        isDialogOpen: true,
+        filePath: '/path/to/audio.mp3',
+        fileName: 'audio.mp3',
+        isTranscribing: false
+      })
+    }
+
+    it('cycles Tab from the last control back to the first', () => {
+      openOptionsView()
+      render(<TranscriptionDialog />)
+
+      screen.getByTestId(TEST_IDS.TRANSCRIPTION_BTN_START).focus()
+      const notPrevented = fireEvent.keyDown(document, { key: 'Tab' })
+
+      expect(notPrevented).toBe(false)
+      expect(document.activeElement).toBe(
+        screen.getByTestId(TEST_IDS.TRANSCRIPTION_LANGUAGE_SELECT)
+      )
+    })
+
+    it('cycles Shift+Tab from the first control back to the last', () => {
+      openOptionsView()
+      render(<TranscriptionDialog />)
+
+      screen.getByTestId(TEST_IDS.TRANSCRIPTION_LANGUAGE_SELECT).focus()
+      const notPrevented = fireEvent.keyDown(document, { key: 'Tab', shiftKey: true })
+
+      expect(notPrevented).toBe(false)
+      expect(document.activeElement).toBe(screen.getByTestId(TEST_IDS.TRANSCRIPTION_BTN_START))
+    })
+
+    it('pulls focus back in when it has escaped to <body>', () => {
+      // New with the shared trap: a backdrop mousedown leaves focus on <body>,
+      // where the old first/last-only comparison ignored Tab entirely.
+      openOptionsView()
+      render(<TranscriptionDialog />)
+
+      expect(document.activeElement).toBe(document.body)
+      const notPrevented = fireEvent.keyDown(document, { key: 'Tab' })
+
+      expect(notPrevented).toBe(false)
+      expect(document.activeElement).toBe(
+        screen.getByTestId(TEST_IDS.TRANSCRIPTION_LANGUAGE_SELECT)
+      )
     })
   })
 })

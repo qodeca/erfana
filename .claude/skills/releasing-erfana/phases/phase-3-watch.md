@@ -1,6 +1,8 @@
 # Phase 3: Watch release.yml
 
-This phase polls the `release.yml` CI run started by the Phase 2 tag push. The pipeline takes 25–60 minutes wall-clock (Windows ~8 min in parallel; macOS notarize is the long pole at 20–45 min). The skill **polls** rather than foreground-watches because the orchestrator's per-tool execution budget is bounded — `gh run watch` cannot span the full pipeline.
+This phase polls the `release.yml` CI run started by the Phase 2 tag push. Build work takes 25–60 minutes wall-clock (Windows ~8 min in parallel; macOS notarize is the long pole at 20–45 min). The skill **polls** rather than foreground-watches because the orchestrator's per-tool execution budget is bounded — `gh run watch` cannot span the full pipeline.
+
+> **The run pauses for a human before either build leg starts.** Both legs declare `environment: production-signing`, which carries a required-reviewer rule. After `prepare` completes (seconds), the run reports `status=waiting` with both build jobs in `waiting` until someone approves. This wait is **unbounded** — on v0.17.0 it lasted 2 h 22 min against ~10 min of build work. Time spent in `waiting` must never count toward a timeout, and `waiting` must never be reported as a failure. See [`docs/build/release.md` § Approval gate](../../../../docs/build/release.md#approval-gate-production-signing).
 
 **Pre-condition**: tag `v${VERSION}` exists on origin, dereferences to a commit on `main`, and that commit has a green `checks.yml` run (asserted by the workflow's `prepare` job).
 
@@ -29,14 +31,24 @@ echo "Release run: https://github.com/qodeca/erfana/actions/runs/${RUN_ID}"
 
 ## 3.2 Poll until completion
 
-The orchestrator polls every **240 s** (4 min) — under the 5-min Anthropic prompt-cache TTL so the cache stays warm — with a hard ceiling of **22 polls (~88 min)**. Foreground `gh run watch` is intentionally not used: `timeout 90m` is GNU-only (missing on macOS by default), and the Bash tool's 600 s ceiling cannot span the full pipeline anyway.
+The orchestrator polls every **240 s** (4 min) — under the 5-min Anthropic prompt-cache TTL so the cache stays warm — with a hard ceiling of **22 polls (~88 min) of non-`waiting` time**. Foreground `gh run watch` is intentionally not used: `timeout 90m` is GNU-only (missing on macOS by default), and the Bash tool's 600 s ceiling cannot span the full pipeline anyway.
 
-A **per-leg stuck-leg early warning** fires at 45 min (2700 s) — see Constants table in `SKILL.md`. The aggregate 88-min ceiling can mask a single leg hung at notarization while others completed normally. Detection uses each leg's job-level `startedAt` timestamp from `gh run view --json jobs`, computes wall time, and surfaces a warning + abort prompt if any leg crosses the threshold.
+### 3.2a Approval gate (`waiting`)
+
+**The ceiling excludes approval wait.** Polls that observe `status=waiting` are not charged against the budget. Otherwise the ceiling expires while the run is still waiting for a human and a healthy release is reported as failed — which is what would have happened on v0.17.0: the tag was pushed at 15:37Z, so an 88-minute budget would have run out at 17:06Z, and the legs were not approved until 18:24Z. On the first `waiting` observation the orchestrator surfaces the pending approval to the operator instead of counting down.
+
+A **per-leg stuck-leg early warning** fires at 45 min (2700 s) — see Constants table in `SKILL.md`. The aggregate ceiling can mask a single leg hung at notarization while others completed normally. Detection uses each leg's job-level `startedAt` timestamp from `gh run view --json jobs`, computes wall time, and surfaces a warning + abort prompt if any leg crosses the threshold.
+
+The detector matches `in_progress` **only** — the `[ "$JOB_STATUS" = "in_progress" ] || continue` guard is what skips a leg parked at the approval gate (which reports `waiting` or `queued`). Do not rely on the `startedAt` emptiness check for that: `gh` marshals an unstarted job's null timestamp as the Go zero time `0001-01-01T00:00:00Z`, which is non-empty. The consequence is that the stuck-leg warning never surfaces a pending approval; the explicit `waiting` branch in the poll loop below is what does that.
 
 ```bash
 STUCK_LEG_THRESHOLD=2700   # 45 min in seconds (per SKILL.md ## Constants)
 
-for poll in $(seq 1 22); do
+POLL_BUDGET=22
+APPROVAL_PROMPTED=0
+WAIT_POLLS=0
+poll=0
+while [ "$POLL_BUDGET" -gt 0 ]; do
   STATE=$(gh run view "$RUN_ID" \
     --json status,conclusion \
     --jq '"\(.status)/\(.conclusion // "")"')
@@ -51,7 +63,31 @@ for poll in $(seq 1 22); do
       RC=1
       break
       ;;
+    waiting/*)
+      # Parked at the production-signing approval gate. This is a normal,
+      # unbounded state — do NOT decrement the budget and do NOT fail.
+      WAIT_POLLS=$((WAIT_POLLS + 1))
+      # Re-announce on the first observation and then hourly, so a multi-hour
+      # wait never looks like a hang. `|| true` is required: under `set -e` a
+      # bare assignment from a command substitution adopts gh's exit status,
+      # so one transient API error would kill the watcher mid-release.
+      if [ "$APPROVAL_PROMPTED" -eq 0 ] || [ $((WAIT_POLLS % 15)) -eq 0 ]; then
+        PENDING=$(gh api "repos/qodeca/erfana/actions/runs/$RUN_ID/pending_deployments" \
+          --jq '.[] | "\(.environment.name) (can_approve=\(.current_user_can_approve))"' 2>/dev/null) || true
+        echo "release.yml awaiting environment approval: ${PENDING:-production-signing}" \
+             "(~$((WAIT_POLLS * 4)) min so far)"
+        # AskUserQuestion (orchestrator), on the first observation only:
+        # approve now, approve in the GitHub UI yourself, or cancel the run.
+        # Approving releases the signing credentials to the build jobs, so it
+        # is the operator's call.
+        APPROVAL_PROMPTED=1
+      fi
+      sleep 240
+      continue
+      ;;
     *)
+      poll=$((poll + 1))
+      POLL_BUDGET=$((POLL_BUDGET - 1))
       echo "poll $poll/22: $STATE"
 
       # Per-leg stuck-leg detection. Each leg's job-level startedAt is
@@ -81,10 +117,10 @@ for poll in $(seq 1 22); do
   esac
 done
 
-# If we exhausted the loop without breaking, the pipeline exceeded the
-# 88-minute ceiling — treat as failure.
+# If we exhausted the budget without breaking, the pipeline exceeded 88 min
+# of actual running time (approval wait excluded) — treat as failure.
 if [ -z "${RC:-}" ]; then
-  echo "FAIL: release.yml exceeded 88-minute ceiling"
+  echo "FAIL: release.yml exceeded the 88-minute running-time ceiling"
   RC=1
 fi
 ```

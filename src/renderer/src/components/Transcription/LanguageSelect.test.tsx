@@ -18,6 +18,29 @@ describe('LanguageSelect', () => {
     expect(select).toHaveAttribute('aria-label', 'Transcription language')
   })
 
+  it('carries the id it is given, so a visible label can point at it', () => {
+    render(
+      <>
+        <label htmlFor="lang">Language</label>
+        <LanguageSelect id="lang" value="auto" onChange={() => {}} />
+      </>
+    )
+
+    const select = screen.getByTestId(TEST_IDS.TRANSCRIPTION_LANGUAGE_SELECT)
+    expect(select).toHaveAttribute('id', 'lang')
+    expect(screen.getByLabelText('Language')).toBe(select)
+  })
+
+  it('drops the fallback aria-label when an id is supplied', () => {
+    // Two competing names would make the spoken name differ from the visible
+    // one; the visible label wins. Same rule as OcrLanguageSelect.
+    render(<LanguageSelect id="lang" value="auto" onChange={() => {}} />)
+
+    expect(screen.getByTestId(TEST_IDS.TRANSCRIPTION_LANGUAGE_SELECT)).not.toHaveAttribute(
+      'aria-label'
+    )
+  })
+
   it('renders all language options', () => {
     render(<LanguageSelect value="auto" onChange={() => {}} />)
     const select = screen.getByTestId(TEST_IDS.TRANSCRIPTION_LANGUAGE_SELECT) as HTMLSelectElement
