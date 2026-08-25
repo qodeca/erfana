@@ -8,6 +8,10 @@ Per-version release notes for Erfana, v0.9.0 onwards. Earlier: v0.8.0–v0.8.3 i
 
 *Not yet released.*
 
+## 0.18.0
+
+*Released 2026-08-25. Tag `v0.18.0`.*
+
 ### Added
 
 - **HTML preview – see a page's HTML render with its CSS and JavaScript actually running** ([#74](https://github.com/qodeca/erfana/issues/74)) – Erfana can now show a live preview of an HTML page, with styles applied and scripts executing, instead of only its source. The page renders in a sandboxed, isolated view layered over the panel, kept apart from Erfana's own interface, and its local files are served over a private, app-only channel rather than opened directly. A page that reaches out to a remote host is blocked until you approve that host: you are prompted once, and your approvals are remembered per project (up to 200 hosts) so you are not asked again. You can export the live page to PDF and search within it, and there is a single global switch to turn the whole feature off (on by default). See [HTML preview](./html-preview/README.md) and [`docs/security.md`](security.md).
