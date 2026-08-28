@@ -55,7 +55,9 @@ export const PreviewEvents = {
   /** The load state for a panel changed */
   LOAD_STATE_CHANGED: 'preview:loadStateChanged',
   /** An enumerated keyboard accelerator was forwarded from the sealed page */
-  FORWARDED_SHORTCUT: 'preview:forwardedShortcut'
+  FORWARDED_SHORTCUT: 'preview:forwardedShortcut',
+  /** A link in the page resolved to a project file the renderer should open */
+  OPEN_FILE_REQUESTED: 'preview:openFileRequested'
 } as const
 
 /**

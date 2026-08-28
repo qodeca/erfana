@@ -140,3 +140,60 @@ describe('wirePreviewLifecycle console-message wiring', () => {
     expect(hooks.onConsoleMessage).not.toHaveBeenCalled()
   })
 })
+
+// =============================================================================
+// Navigation denies (sd-074b §2)
+//
+// These two lines are the ONLY thing stopping a previewed page from navigating
+// itself. The design originally credited the CSP sandbox as a second,
+// independent lock, but the sandboxed-navigation flag only prevents navigating
+// OTHER browsing contexts — a top-level document under `CSP: sandbox` may still
+// navigate its own. They were untested until now.
+// =============================================================================
+
+describe('wirePreviewLifecycle navigation guards', () => {
+  it('cancels every same-tab navigation the page attempts', () => {
+    const { wc, emit } = makeWebContents()
+    wirePreviewLifecycle(makeParams(wc), makeHooks())
+
+    const event = { preventDefault: vi.fn() }
+    emit('will-navigate', event, 'https://example.com/')
+
+    expect(event.preventDefault).toHaveBeenCalledTimes(1)
+  })
+
+  it('cancels an in-project navigation too, not just remote ones', () => {
+    const { wc, emit } = makeWebContents()
+    wirePreviewLifecycle(makeParams(wc), makeHooks())
+
+    const event = { preventDefault: vi.fn() }
+    emit('will-navigate', event, 'erfana-preview://token/other.html')
+
+    expect(event.preventDefault).toHaveBeenCalledTimes(1)
+  })
+
+  it('denies every window-open request', () => {
+    const { wc } = makeWebContents()
+    wirePreviewLifecycle(makeParams(wc), makeHooks())
+
+    const setWindowOpenHandler = wc.setWindowOpenHandler as unknown as ReturnType<typeof vi.fn>
+    expect(setWindowOpenHandler).toHaveBeenCalledTimes(1)
+
+    const handler = setWindowOpenHandler.mock.calls[0][0] as (details: unknown) => unknown
+    expect(handler({ url: 'https://example.com/', disposition: 'foreground-tab' })).toEqual({
+      action: 'deny'
+    })
+  })
+
+  it('stops cancelling once disposed', async () => {
+    const { wc, emit, hasListener } = makeWebContents()
+    const lifecycle = wirePreviewLifecycle(makeParams(wc), makeHooks())
+
+    await lifecycle.dispose()
+
+    expect(hasListener('will-navigate')).toBe(false)
+    const event = { preventDefault: vi.fn() }
+    emit('will-navigate', event, 'https://example.com/')
+    expect(event.preventDefault).not.toHaveBeenCalled()
+  })
+})

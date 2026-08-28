@@ -472,8 +472,38 @@ export const PREVIEW = {
    * page can force by fetching many large in-repo assets at once.
    */
   MAX_CONCURRENT_ASSET_READS: 8,
+  /**
+   * How many asset reads may WAIT for a slot before the protocol handler starts
+   * shedding them with 503.
+   *
+   * The limiter is process-wide (sd-074b §4.7), so without a queue bound one
+   * hostile page could park an unbounded number of Chromium URLLoaders and
+   * starve every other preview — a hang with no error and no failure entry.
+   * Shedding instead is visible: the badge records it.
+   */
+  MAX_QUEUED_ASSET_READS: 64,
+  /**
+   * How many previews stay LIVE at once (sd-074b D5). Beyond this the least
+   * recently active preview is torn down to its still frame and re-opens by
+   * itself when its tab is activated again — the "exit state" whose absence
+   * killed the original LRU proposal (sd-074 §10).
+   *
+   * Each live preview is a separate renderer process with its own session, so
+   * this is the cap that actually bounds CPU and RSS; the byte and descriptor
+   * budgets below are derived from it.
+   */
+  MAX_LIVE_VIEWS: 3,
   /** Per-panel watch cap (bounds EMFILE exposure, #146–#151) */
   MAX_WATCHED_FILES: 16,
+  /**
+   * Ceiling on watch acquisitions across ALL previews. Derived from
+   * `MAX_LIVE_VIEWS × MAX_WATCHED_FILES` plus headroom for a view that is mid
+   * teardown while another opens — pools are per view, so this counts
+   * acquisitions rather than distinct descriptors. Over budget degrades
+   * auto-refresh for the newest view and records a failure entry; it never
+   * silently stops watching (sd-074b §4.6).
+   */
+  MAX_WATCHED_FILES_GLOBAL: 64,
   /** Coalesce window for pool change events before a reload/swap (ms) */
   WATCH_COALESCE_MS: 30,
   /** chokidar awaitWriteFinish.stabilityThreshold for preview watches (ms) */

@@ -9,9 +9,14 @@
  * (bounds/pipeline/swap/lifecycle/teardown live there so each file stays under the
  * 500-line cap).
  *
- *  - A second `open` with a DIFFERENT panelId is refused with
- *    `PREVIEW_VIEW_LIMIT_REACHED` + the holder's panelId; the SAME panelId is a
- *    replace (a main-renderer reload cannot strand the view and lock out opens).
+ *  - Every panel may hold its OWN live view (sd-074b D5). A second `open` with
+ *    the SAME panelId replaces (a main-renderer reload cannot strand the view
+ *    and lock out opens); the same panelId from a DIFFERENT window is refused
+ *    with `PREVIEW_VIEW_LIMIT_REACHED`, because panel ids are path-derived and
+ *    would otherwise collide across windows.
+ *  - At most `PREVIEW.MAX_LIVE_VIEWS` run at once: opening beyond that suspends
+ *    the least recently active preview to its still frame, and the renderer
+ *    re-opens it when its tab is activated again.
  *  - `applyApprovedHosts` (§5(c)), `destroyAll` (AC21 global-off) and
  *    `onProjectChanged` (§5(f)) route through here to the single live view.
  *
@@ -21,6 +26,7 @@
  */
 
 import { ErrorCode } from '../../../shared/errors'
+import { PREVIEW } from '../../../shared/constants'
 import type {
   PdfExportResult,
   PreviewBounds,
@@ -52,6 +58,7 @@ import {
   type PreviewLiveViewDeps,
   type PreviewWindowLike
 } from './PreviewLiveView'
+import { PreviewViewRegistry } from './PreviewViewRegistry'
 
 export type { PreviewWindowLike } from './PreviewLiveView'
 
@@ -131,15 +138,13 @@ export interface PreviewViewDeps {
   /** Route a forwarded accelerator (§1.9) to the renderer; defaults to a no-op. */
   readonly onForwardedShortcut?: (panelId: string, key: string) => void
   readonly platform?: NodeJS.Platform
+  /** Hand a vetted external URL to the OS browser (sd-074b §5.5). */
+  readonly openExternal?: (url: string) => Promise<void>
 }
 
 export class PreviewViewService implements IPreviewViewService, PreviewFindExportService {
-  private live: PreviewLiveView | null = null
-  // Monotonic guard: every `open` claims the next value, and any concurrent open,
-  // close, project switch or destroyAll advances it, so an `open` that suspends on
-  // `sessionFactory.create` can detect it was superseded and discard its session
-  // rather than install a view for a stale project (or leak one).
-  private openEpoch = 0
+  /** Live views plus the two-part staleness guard over them (sd-074b §4.2). */
+  private readonly registry = new PreviewViewRegistry()
   private readonly liveViewDeps: PreviewLiveViewDeps
 
   constructor(private readonly deps: PreviewViewDeps) {
@@ -160,7 +165,8 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
       now: deps.now,
       readEntryHtml: deps.readEntryHtml,
       onForwardedShortcut: deps.onForwardedShortcut,
-      platform: deps.platform
+      platform: deps.platform,
+      openExternal: deps.openExternal
     }
   }
 
@@ -170,27 +176,34 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
       return { ok: false, errorCode: ErrorCode.PROJECT_NOT_FOUND }
     }
 
-    // Claim this open. The re-checks after each await below abandon it if the
-    // epoch moved on in the meantime (NEW-9 single-view invariant, race-safe).
-    const epoch = ++this.openEpoch
-
-    if (this.live !== null) {
-      // A DIFFERENT panel is refused with the holder id; the SAME panel replaces.
-      if (this.live.panelId !== req.panelId) {
-        return {
-          ok: false,
-          errorCode: ErrorCode.PREVIEW_VIEW_LIMIT_REACHED,
-          holderPanelId: this.live.panelId
-        }
+    const { panelId } = req
+    const existing = this.registry.entry(panelId)
+    if (existing !== null && existing.windowId !== window.id) {
+      // Same path, two windows, therefore the same panel id. Replacing would
+      // destroy the other window's running view; refuse instead.
+      return {
+        ok: false,
+        errorCode: ErrorCode.PREVIEW_VIEW_LIMIT_REACHED,
+        holderPanelId: panelId
       }
-      await this.live.teardown('immediate')
-      if (this.openEpoch !== epoch) {
-        return { ok: false, errorCode: ErrorCode.PROJECT_NOT_FOUND }
-      }
-      this.live = null
     }
 
-    const { panelId } = req
+    // Claim the open. Every await below re-checks it, so a close, a project
+    // switch, the global off-switch or a newer open for this panel makes this
+    // one abandon rather than install a stale view.
+    const claim = this.registry.claimOpen(panelId)
+
+    if (existing !== null) {
+      // Same panel, same window: replace. Remove BEFORE awaiting so a rejecting
+      // teardown cannot strand the entry.
+      this.registry.remove(panelId)
+      await existing.view.teardown('immediate')
+      this.releaseProjectIfLast(existing.view.projectPath)
+      if (this.registry.isStale(claim)) {
+        return { ok: false, errorCode: ErrorCode.PROJECT_NOT_FOUND }
+      }
+    }
+
     const failureLog = this.deps.createFailureLog((failures, truncated) =>
       this.deps.emit.failuresChanged(panelId, failures, truncated)
     )
@@ -220,10 +233,9 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
       return { ok: false, errorCode: ErrorCode.PREVIEW_CSP_INVALID }
     }
 
-    if (this.openEpoch !== epoch) {
-      // Superseded while the session was building (project switch, global-off, or
-      // a newer open): discard it rather than install a stale-project view or let
-      // a newer view be overwritten and leaked.
+    if (this.registry.isStale(claim)) {
+      // Superseded while the session was building (project switch, global-off, a
+      // close, or a newer open): discard it rather than install a stale view.
       failureLog.drop()
       await this.discardSession(session)
       return { ok: false, errorCode: ErrorCode.PROJECT_NOT_FOUND }
@@ -239,9 +251,51 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
       failureLog,
       deps: this.liveViewDeps
     })
-    this.live = live
+    this.registry.install(panelId, live, window.id)
     await live.load()
+
+    // `load()` is an await like any other: re-check before leaving it running.
+    if (this.registry.isStale(claim)) {
+      if (this.registry.get(panelId) === live) {
+        this.registry.remove(panelId)
+      }
+      await live.teardown('immediate')
+      this.releaseProjectIfLast(projectPath)
+      return { ok: false, errorCode: ErrorCode.PROJECT_NOT_FOUND }
+    }
+
+    await this.enforceLiveViewBudget(panelId)
     return { ok: true }
+  }
+
+  /**
+   * Suspend the least recently active previews until at most
+   * `PREVIEW.MAX_LIVE_VIEWS` remain live. The panel just opened or activated is
+   * never a candidate.
+   */
+  private async enforceLiveViewBudget(keepPanelId: string): Promise<void> {
+    const candidates = this.registry.evictionCandidates(PREVIEW.MAX_LIVE_VIEWS, keepPanelId)
+    for (const panelId of candidates) {
+      await this.suspend(panelId)
+    }
+  }
+
+  /**
+   * Tear a live view down but leave its panel open, showing the still frame it
+   * had. The renderer re-opens it when the tab is activated again, which is the
+   * exit state the original single-view design lacked (sd-074 §10).
+   */
+  private async suspend(panelId: string): Promise<void> {
+    const view = this.registry.remove(panelId)
+    if (view === null) {
+      return
+    }
+    // Hiding captures the still frame and emits it, so the suspended tab shows
+    // the page as it was rather than an empty placeholder.
+    await view.setVisibility(false)
+    await view.teardown('immediate')
+    this.releaseProjectIfLast(view.projectPath)
+    this.deps.emit.loadStateChanged(panelId, 'suspended', 0)
   }
 
   /** Tear down a session that was built but never installed as a live view. */
@@ -261,79 +315,118 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
   }
 
   async close(panelId: string): Promise<void> {
-    const live = this.forPanel(panelId)
+    // Invalidate UNCONDITIONALLY, before looking for a view: an `open` for this
+    // panel may be suspended on `sessionFactory.create` with nothing installed
+    // yet, and the renderer sends `close` on every panel unmount. Without this
+    // the open would install a view for a panel that no longer exists, and
+    // nothing would ever reap it (sd-074b §4.1).
+    this.registry.invalidateOpen(panelId)
+    const live = this.registry.remove(panelId)
     if (live !== null) {
-      this.openEpoch += 1
       await live.teardown('bounded')
-      this.live = null
+      this.releaseProjectIfLast(live.projectPath)
     }
   }
 
   setBounds(panelId: string, bounds: PreviewBounds, seq: number): void {
-    this.forPanel(panelId)?.setBounds(bounds, seq)
+    this.registry.get(panelId)?.setBounds(bounds, seq)
   }
 
   async setVisibility(panelId: string, visible: boolean, _reason: string): Promise<void> {
-    await this.forPanel(panelId)?.setVisibility(visible)
+    const live = this.registry.get(panelId)
+    if (live === null) {
+      return
+    }
+    if (visible) {
+      // Becoming visible is the activation signal the eviction order uses.
+      this.registry.touch(panelId)
+    }
+    await live.setVisibility(visible)
   }
 
   async reload(panelId: string, opts?: { ignoreCache?: boolean }): Promise<void> {
-    this.forPanel(panelId)?.reload(opts?.ignoreCache ?? false)
+    this.registry.get(panelId)?.reload(opts?.ignoreCache ?? false)
   }
 
   async swapStylesheet(panelId: string, relPath: string): Promise<boolean> {
-    return (await this.forPanel(panelId)?.swapStylesheet(relPath)) ?? false
+    return (await this.registry.get(panelId)?.swapStylesheet(relPath)) ?? false
   }
 
+  /**
+   * Apply an approved host to EVERY live view of the approving panel's project,
+   * not just the approving panel.
+   *
+   * The allowlist host set is shared and every session's request filter reads it
+   * live, while only a CSP rebuild lets the page actually use the host. Applying
+   * to one view would open the network filter for all of them while their CSPs
+   * still forbade it — an inconsistency that exists today and that a second
+   * preview would expose (sd-074b §4.4).
+   */
   async applyApprovedHosts(panelId: string, hosts: readonly string[]): Promise<void> {
-    await this.forPanel(panelId)?.applyApprovedHosts(hosts)
+    const entry = this.registry.entry(panelId)
+    if (entry === null) {
+      return
+    }
+    const targets = this.registry.ofProject(entry.view.projectPath)
+    // `allSettled` over a snapshot: one view failing (or being torn down
+    // mid-flight) must not stop the others from getting the rebuilt CSP.
+    await Promise.allSettled(targets.map((target) => target.view.applyApprovedHosts(hosts)))
   }
 
   async destroyAll(_reason: string): Promise<void> {
-    await this.teardownLive()
+    await this.teardownAll()
   }
 
   async onProjectChanged(_oldPath: string | null, _newPath: string | null): Promise<void> {
-    await this.teardownLive()
+    await this.teardownAll()
   }
 
   async dispose(): Promise<void> {
-    await this.teardownLive()
+    await this.teardownAll()
   }
 
-  /** Start / advance a find-in-page on the live view. */
+  /** Start / advance a find-in-page on a live view. */
   find(panelId: string, text: string, options: PreviewFindOptions): void {
-    this.forPanel(panelId)?.find(text, options)
+    this.registry.get(panelId)?.find(text, options)
   }
 
-  /** Clear find highlights on the live view. */
+  /** Clear find highlights on a live view. */
   stopFind(panelId: string): void {
-    this.forPanel(panelId)?.stopFind()
+    this.registry.get(panelId)?.stopFind()
   }
 
-  /** Export the live view to PDF. */
+  /** Export a live view to PDF. */
   async exportPdf(panelId: string, suggestedName: string): Promise<PdfExportResult> {
-    const live = this.forPanel(panelId)
+    const live = this.registry.get(panelId)
     if (live === null) {
       return { ok: false, errorCode: ErrorCode.PDF_EXPORT_FAILED }
     }
     return live.exportPdf(suggestedName)
   }
 
-  /** The live view iff it holds `panelId`, else `null`. */
-  private forPanel(panelId: string): PreviewLiveView | null {
-    return this.live !== null && this.live.panelId === panelId ? this.live : null
+  /**
+   * Release the project's blocked-host toast budget once its LAST view is gone.
+   *
+   * The budget is per project and used to be cleared by whichever view happened
+   * to tear down first, which wiped a sibling preview's dedupe state and let an
+   * already-suppressed host toast again (sd-074b §4.5).
+   */
+  private releaseProjectIfLast(projectPath: string): void {
+    if (this.registry.countForProject(projectPath) === 0) {
+      this.deps.hostBlockNotifier.clear(projectPath)
+    }
   }
 
-  private async teardownLive(): Promise<void> {
-    // Advance the epoch UNCONDITIONALLY: an `open` may be mid-`create` with
-    // `this.live` still null, and a project switch or global-off must still make
-    // it abandon rather than install a view for the project being torn down.
-    this.openEpoch += 1
-    if (this.live !== null) {
-      const live = this.live
-      this.live = null
-      await live.teardown('immediate')
+  private async teardownAll(): Promise<void> {
+    // Invalidate every in-flight open FIRST: one may be mid-`create` with
+    // nothing installed, and must not install a view for the state being torn
+    // down.
+    this.registry.bumpGeneration()
+    const entries = this.registry.drain()
+    const projects = new Set(entries.map((entry) => entry.view.projectPath))
+    await Promise.allSettled(entries.map((entry) => entry.view.teardown('immediate')))
+    for (const projectPath of projects) {
+      this.releaseProjectIfLast(projectPath)
     }
   }
 }

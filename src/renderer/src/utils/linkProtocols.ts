@@ -7,7 +7,14 @@
  * Used by both MarkdownPreview component and markdownLinkResolver.
  *
  * Security: Blocks dangerous protocols that could lead to XSS attacks.
+ *
+ * The two predicates now delegate to `src/shared/linkProtocolPolicy.ts`, which
+ * classifies by PARSED protocol rather than by string prefix, so the Markdown
+ * preview and the HTML preview's navigation policy cannot disagree about what
+ * counts as safe (sd-074b §5.4). The exported constants stay as they are for
+ * display code that formats protocol prefixes.
  */
+import { classifyLinkProtocol } from '../../../shared/linkProtocolPolicy'
 
 /**
  * Safe external protocols that can be opened in browser/external apps
@@ -48,8 +55,7 @@ export const DANGEROUS_PROTOCOLS = [
 export function isDangerousProtocol(href: string): boolean {
   if (!href) return false;
 
-  const lowerHref = href.toLowerCase().trim();
-  return DANGEROUS_PROTOCOLS.some((proto) => lowerHref.startsWith(proto));
+  return classifyLinkProtocol(href) === 'dangerous';
 }
 
 /**
@@ -67,13 +73,7 @@ export function isDangerousProtocol(href: string): boolean {
 export function isExternalProtocol(href: string): boolean {
   if (!href) return false;
 
-  // First check if it's dangerous - dangerous protocols are NOT external
-  if (isDangerousProtocol(href)) {
-    return false;
-  }
-
-  const lowerHref = href.toLowerCase().trim();
-  return SAFE_EXTERNAL_PROTOCOLS.some((proto) => lowerHref.startsWith(proto));
+  return classifyLinkProtocol(href) === 'external';
 }
 
 /**

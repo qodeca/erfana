@@ -11,7 +11,7 @@ The native `WebContentsView` paints ABOVE all sibling DOM in the panel, regardle
 
 ## Occluder guard — never toggle the view directly
 
-`OverlayGuardService` (`../../../services/preview/OverlayGuardService.ts`) is the SINGLE owner of preview show/hide and the ONLY renderer module allowed to call `api.preview.setVisibility` (ESLint-enforced). It computes `visible = (live preview is the active tab) && !isOccluded()`. Overlays register via `useOccluder(kind, active)` (`../../../hooks/useOccluder.ts`) — kinds `dialog`/`settings`/`toast`/`menu`/`overlay`/`drag`. Opening a dialog, settings, toast, menu (the badge popover), a full-screen overlay, or switching to another tab all hide the view. Never call `setVisibility` or manipulate the view from a component.
+`OverlayGuardService` (`../../../services/preview/OverlayGuardService.ts`) is the SINGLE owner of preview show/hide and the ONLY renderer module allowed to call `api.preview.setVisibility` (ESLint-enforced). It computes, PER live preview, `visible = (that panel is the active tab) && !isOccluded()`. Overlays register via `useOccluder(kind, active)` (`../../../hooks/useOccluder.ts`) — kinds `dialog`/`settings`/`toast`/`menu`/`overlay`/`drag`. Opening a dialog, settings, toast, menu (the badge popover), a full-screen overlay, or switching to another tab all hide the view. Never call `setVisibility` or manipulate the view from a component.
 
 - `BaseDialog` pushes the occluder count from its `isOpen` effect, NOT via `useOccluder` (it needs the raw stack length, not a boolean).
 - Occluder counts publish on a `queueMicrotask` flush, so a synchronous unregister→register pair (e.g. a dialog z-index change) coalesces to one notification — no hide/show flap or wasted `capturePage`.
@@ -25,11 +25,17 @@ When the search bar opens, the native view's bounds are inset from the top by `S
 Mirrors the `ImageViewerPanel` split:
 
 - **`htmlPreview.logic.ts`** — every decision as a pure function (`deriveBounds`, `selectPanelView`, `selectFallback`, `summarizeFailures`); no React, no `window.api`, no store. Unit-tested in isolation.
-- **`hooks/`** — one concern each: `usePreviewLifecycle` (`preview:open`/`close` + limit-reached/failed signals), `usePreviewEvents` (store updates), `usePreviewBounds` (ResizeObserver bounds pump), `usePreviewFindShortcuts` (forwarded accelerators).
+- **`hooks/`** — one concern each: `usePreviewLifecycle` (`preview:open`/`close`, the limit-reached/failed signals, and the re-open of a suspended preview when its tab becomes visible), `usePreviewEvents` (store updates), `usePreviewBounds` (ResizeObserver bounds pump), `usePreviewFindShortcuts` (forwarded accelerators).
 - **`components/`** — presentational chrome only (`PreviewBanner`, `PreviewFallback`, `PreviewFailureBadge`).
 - **`HtmlPreviewPanel.tsx`** — glue: wires hooks to chrome, holds no decision logic.
 
-**Single-live-view invariant**: only one preview is ever live. `readLivePreviewPanelId()` (in `OverlayGuardService`) returns the first non-`idle` panel in `usePreviewStore` — correct only under this invariant; a future multi-preview change must not rely on `Map` iteration order there.
+**Several previews are live at once** (sd-074b D5). `readLivePreviewPanelIds()` in `OverlayGuardService` returns EVERY non-idle, non-suspended panel, and the guard sends visibility per panel. Map iteration order no longer matters — the old "first non-idle panel IS the live preview" scan is gone.
+
+The rule per panel is unchanged: `visible = (panel is the active tab) && !occluded`. That yields exactly one `true` only because dockview drag-and-drop is disabled (`EditorAreaSplitPanel.tsx`), which nothing enforces — so `recompute` logs in development if two panels ever compute visible at once. If you re-enable DnD, fix the guard first.
+
+**Suspended is a fourth load state.** Beyond `PREVIEW.MAX_LIVE_VIEWS`, main tears the least recently active view down and emits `suspended`; the panel keeps showing its still frame, and `usePreviewLifecycle` re-opens it when the tab becomes visible again. A suspended panel has no `WebContentsView`, so it must never be sent visibility.
+
+**Limit-reached now means "open in another window".** The refusal survives only for a cross-window panel-id collision (ids are path-derived, so two windows previewing one file mint the same id). It is not a "one preview at a time" message any more.
 
 ## Other gotchas
 

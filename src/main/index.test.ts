@@ -169,7 +169,10 @@ describe('Main Process - Window Creation', () => {
     // Mock service modules
     vi.doMock('./services/FileService', () => ({
       fileService: {
-        setProjectPath: vi.fn() // issue #59: clear project state on destroy
+        setProjectPath: vi.fn(), // issue #59: clear project state on destroy
+        getProjectPath: vi.fn(() => null),
+        // sd-074b §4.9: the preview handlers subscribe to project changes.
+        onProjectPathChanged: vi.fn(() => () => {})
       }
     }))
     vi.doMock('./services/FileWatcherService', () => ({

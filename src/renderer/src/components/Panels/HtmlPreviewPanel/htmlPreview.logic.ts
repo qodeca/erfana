@@ -178,6 +178,7 @@ export function selectFallback(input: SelectFallbackInput): PreviewFallbackKind 
 /** Human-readable labels for each failure type, shown in the popover. */
 export const FAILURE_TYPE_LABELS: Readonly<Record<PreviewFailureType, string>> = {
   'blocked-host': 'Blocked host',
+  'blocked-link': 'Blocked link',
   'insecure-scheme': 'Insecure scheme',
   'missing-local-file': 'Missing local file',
   'path-escape': 'Path escaped the project',

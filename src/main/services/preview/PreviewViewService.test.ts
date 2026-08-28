@@ -138,6 +138,7 @@ interface Harness {
   service: PreviewViewService
   deps: PreviewViewDeps
   window: PreviewWindowLike
+  otherWindow: PreviewWindowLike
   factory: FakeWc
   session: PreviewSession
   view: PreviewViewHandle
@@ -159,7 +160,9 @@ interface Harness {
   token: string
 }
 
-function makeHarness(options: { zoom?: number; now?: () => number } = {}): Harness {
+function makeHarness(
+  options: { zoom?: number; now?: () => number; windowId?: number } = {}
+): Harness {
   const factory = makeFakeWc()
   const view = {
     webContents: factory.wc,
@@ -189,6 +192,13 @@ function makeHarness(options: { zoom?: number; now?: () => number } = {}): Harne
   const addChildView = vi.fn<(v: PreviewViewHandle) => void>()
   const removeChildView = vi.fn<(v: PreviewViewHandle) => void>()
   const window = {
+    id: options.windowId ?? 1,
+    contentView: { addChildView, removeChildView },
+    getContentBounds: () => ({ x: 0, y: 0, width: 1000, height: 800 })
+  } as unknown as PreviewWindowLike
+  /** A second window for the cross-window panel-id collision case. */
+  const otherWindow = {
+    id: (options.windowId ?? 1) + 1,
     contentView: { addChildView, removeChildView },
     getContentBounds: () => ({ x: 0, y: 0, width: 1000, height: 800 })
   } as unknown as PreviewWindowLike
@@ -282,6 +292,7 @@ function makeHarness(options: { zoom?: number; now?: () => number } = {}): Harne
     service,
     deps,
     window,
+    otherWindow,
     factory,
     session,
     view,
@@ -314,7 +325,7 @@ const REQUEST_A: PreviewOpenRequest = {
   bounds: { x: 10, y: 20, width: 100, height: 50 }
 }
 
-describe('PreviewViewService — single view + replace-not-refuse', () => {
+describe('PreviewViewService — independent views + replace-not-refuse', () => {
   it('refuses NO project with PROJECT_NOT_FOUND', async () => {
     const h = makeHarness()
     ;(h.deps as { getProjectPath: () => string | null }).getProjectPath = () => null
@@ -332,10 +343,24 @@ describe('PreviewViewService — single view + replace-not-refuse', () => {
     expect(h.factory.loadURL).toHaveBeenCalledWith('erfana-preview://' + h.token + '/page.html')
   })
 
-  it('REFUSES a second, DIFFERENT panel with the holder id', async () => {
+  it('OPENS a second, DIFFERENT panel as its own independent view', async () => {
+    // Inverted by sd-074b D5: the one-live-view refusal is gone. Each panel gets
+    // its own sealed session, so two previews run side by side.
     const h = makeHarness()
     await h.service.open(REQUEST_A, h.window)
     const result = await h.service.open({ ...REQUEST_A, panelId: 'panel-B' }, h.window)
+    expect(result).toEqual({ ok: true })
+    expect(h.sessionCreate).toHaveBeenCalledTimes(2)
+    // The first view is NOT torn down to make room.
+    expect(h.factory.destroy).not.toHaveBeenCalled()
+  })
+
+  it('REFUSES the same panel id from a DIFFERENT window', async () => {
+    // Panel ids are path-derived, so two windows previewing one file collide.
+    // Replacing would destroy the other window's running view.
+    const h = makeHarness()
+    await h.service.open(REQUEST_A, h.window)
+    const result = await h.service.open(REQUEST_A, h.otherWindow)
     expect(result).toEqual({
       ok: false,
       errorCode: ErrorCode.PREVIEW_VIEW_LIMIT_REACHED,
@@ -579,5 +604,236 @@ describe('PreviewViewService — post-load pipeline', () => {
       resolve(dirname(REQUEST_A.filePath), 'style.css')
     ])
     expect(h.loadStateChanged).toHaveBeenCalledWith('panel-A', 'ready', 0)
+  })
+})
+
+// =============================================================================
+// Teardown races (sd-074b §4.1)
+//
+// Both defects predate multi-view: with one live view they leak a single
+// session; keyed by panel they would leak one per tab and permanently wedge the
+// panel id. Fixed on the single-view code first so the fix is reviewable on its
+// own, before the registry refactor lands on top.
+// =============================================================================
+
+/** A promise plus its resolver, for interleaving an await deliberately. */
+function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((res) => {
+    resolve = res
+  })
+  return { promise, resolve }
+}
+
+describe('PreviewViewService — teardown races', () => {
+  beforeEach(() => vi.useFakeTimers())
+  afterEach(() => vi.useRealTimers())
+
+  it('abandons an open whose panel was closed while the session was building', async () => {
+    const h = makeHarness()
+    const gate = deferred<PreviewSession>()
+    h.sessionCreate.mockImplementationOnce(() => gate.promise)
+
+    const opening = h.service.open(REQUEST_A, h.window)
+    // The renderer unmounts the panel — and therefore sends `close` — while the
+    // session is still being built. `this.live` is null in this window, which is
+    // exactly what used to make the close a no-op.
+    const closing = h.service.close('panel-A')
+    gate.resolve(h.session)
+
+    const result = await opening
+    await closing
+
+    expect(result.ok).toBe(false)
+    // No view was ever installed for the dead panel...
+    expect(h.addChildView).not.toHaveBeenCalled()
+    // ...and the session that was already built got discarded, not leaked.
+    expect(h.revoke).toHaveBeenCalledWith(h.token)
+  })
+
+  it('tears the view down when the panel is closed while the entry page loads', async () => {
+    const h = makeHarness()
+    const gate = deferred<void>()
+    h.factory.loadURL.mockImplementationOnce(() => gate.promise)
+
+    const opening = h.service.open(REQUEST_A, h.window)
+    await Promise.resolve()
+    const closing = h.service.close('panel-A')
+    gate.resolve()
+
+    const result = await opening
+    await vi.advanceTimersByTimeAsync(PREVIEW.CLOSE_TIMEOUT_MS)
+    await closing
+
+    expect(result.ok).toBe(false)
+    expect(h.factory.destroy).toHaveBeenCalled()
+  })
+
+  it('destroys the webContents and revokes the token even when a teardown step throws', async () => {
+    const h = makeHarness()
+    ;(
+      h.deps.createEntryWatcher as unknown as ReturnType<
+        typeof vi.fn<(filePath: string, handlers: EntryHandlers) => PreviewFileWatcherHandle>
+      >
+    ).mockImplementation(() => ({
+      close: vi.fn<() => Promise<void>>(() => Promise.reject(new Error('watcher close failed')))
+    }))
+
+    await h.service.open(REQUEST_A, h.window)
+
+    const closing = h.service.close('panel-A')
+    await vi.advanceTimersByTimeAsync(PREVIEW.CLOSE_TIMEOUT_MS)
+
+    await expect(closing).resolves.toBeUndefined()
+    expect(h.revoke).toHaveBeenCalledWith(h.token)
+    expect(h.factory.destroy).toHaveBeenCalled()
+  })
+
+  it('leaves the panel re-openable after a teardown step threw', async () => {
+    const h = makeHarness()
+    ;(
+      h.deps.createEntryWatcher as unknown as ReturnType<
+        typeof vi.fn<(filePath: string, handlers: EntryHandlers) => PreviewFileWatcherHandle>
+      >
+    ).mockImplementationOnce(() => ({
+      close: vi.fn<() => Promise<void>>(() => Promise.reject(new Error('watcher close failed')))
+    }))
+
+    await h.service.open(REQUEST_A, h.window)
+    const closing = h.service.close('panel-A')
+    await vi.advanceTimersByTimeAsync(PREVIEW.CLOSE_TIMEOUT_MS)
+    await closing
+
+    // The slot must be free: a wedged entry would refuse or re-await the dead
+    // teardown forever.
+    const reopened = await h.service.open(REQUEST_A, h.window)
+    expect(reopened).toEqual({ ok: true })
+  })
+})
+
+// =============================================================================
+// Multiple live views, sleep-when-idle, and project-scoped shared state
+// (sd-074b §4.2–4.5)
+// =============================================================================
+
+describe('PreviewViewService — live-view budget', () => {
+  /** Open `count` panels named panel-1..panel-N in order. */
+  async function openPanels(h: Harness, count: number): Promise<void> {
+    for (let i = 1; i <= count; i += 1) {
+      await h.service.open({ ...REQUEST_A, panelId: `panel-${i}` }, h.window)
+    }
+  }
+
+  it('keeps up to MAX_LIVE_VIEWS running without suspending anything', async () => {
+    const h = makeHarness()
+    await openPanels(h, PREVIEW.MAX_LIVE_VIEWS)
+
+    expect(h.sessionCreate).toHaveBeenCalledTimes(PREVIEW.MAX_LIVE_VIEWS)
+    expect(
+      h.loadStateChanged.mock.calls.filter(([, state]) => state === 'suspended')
+    ).toHaveLength(0)
+  })
+
+  it('suspends the least recently active preview when the budget is exceeded', async () => {
+    const h = makeHarness()
+    await openPanels(h, PREVIEW.MAX_LIVE_VIEWS + 1)
+
+    const suspended = h.loadStateChanged.mock.calls
+      .filter(([, state]) => state === 'suspended')
+      .map(([panelId]) => panelId)
+
+    // panel-1 was opened first and never touched since, so it is the candidate.
+    expect(suspended).toEqual(['panel-1'])
+  })
+
+  it('never suspends the panel that was just opened', async () => {
+    const h = makeHarness()
+    await openPanels(h, PREVIEW.MAX_LIVE_VIEWS + 2)
+
+    const suspended = h.loadStateChanged.mock.calls
+      .filter(([, state]) => state === 'suspended')
+      .map(([panelId]) => panelId)
+
+    expect(suspended).not.toContain(`panel-${PREVIEW.MAX_LIVE_VIEWS + 2}`)
+  })
+
+  it('treats becoming visible as activation, so an active tab is not evicted', async () => {
+    const h = makeHarness()
+    await openPanels(h, PREVIEW.MAX_LIVE_VIEWS)
+    // The user switches back to the oldest tab before opening one more.
+    await h.service.setVisibility('panel-1', true, 'active-tab')
+    await h.service.open({ ...REQUEST_A, panelId: 'panel-new' }, h.window)
+
+    const suspended = h.loadStateChanged.mock.calls
+      .filter(([, state]) => state === 'suspended')
+      .map(([panelId]) => panelId)
+
+    expect(suspended).toEqual(['panel-2'])
+    expect(suspended).not.toContain('panel-1')
+  })
+
+  it('a suspended panel can be re-opened as a fresh live view', async () => {
+    const h = makeHarness()
+    await openPanels(h, PREVIEW.MAX_LIVE_VIEWS + 1)
+    const createsBefore = h.sessionCreate.mock.calls.length
+
+    const reopened = await h.service.open({ ...REQUEST_A, panelId: 'panel-1' }, h.window)
+
+    expect(reopened).toEqual({ ok: true })
+    expect(h.sessionCreate.mock.calls.length).toBe(createsBefore + 1)
+  })
+})
+
+describe('PreviewViewService — project-scoped shared state', () => {
+  it('applies an approved host to EVERY live view of the project', async () => {
+    const h = makeHarness()
+    await h.service.open(REQUEST_A, h.window)
+    await h.service.open({ ...REQUEST_A, panelId: 'panel-B' }, h.window)
+
+    await h.service.applyApprovedHosts('panel-A', ['cdn.example.com'])
+
+    // One rebuild per live view, not just the approving panel: the request
+    // filter reads the shared host set live, so a single rebuild would leave the
+    // other view's CSP forbidding a host its network filter already allows.
+    expect(h.rebuildCsp).toHaveBeenCalledTimes(2)
+  })
+
+  it('is a no-op for a panel with no live view', async () => {
+    const h = makeHarness()
+    await h.service.open(REQUEST_A, h.window)
+
+    await h.service.applyApprovedHosts('panel-unknown', ['cdn.example.com'])
+
+    expect(h.rebuildCsp).not.toHaveBeenCalled()
+  })
+
+  it('releases the toast budget only when the project loses its LAST view', async () => {
+    const h = makeHarness()
+    const clear = h.deps.hostBlockNotifier.clear as unknown as ReturnType<
+      typeof vi.fn<(projectPath?: string) => void>
+    >
+    await h.service.open(REQUEST_A, h.window)
+    await h.service.open({ ...REQUEST_A, panelId: 'panel-B' }, h.window)
+
+    await h.service.close('panel-A')
+    expect(clear).not.toHaveBeenCalled()
+
+    await h.service.close('panel-B')
+    expect(clear).toHaveBeenCalledWith('/proj')
+  })
+
+  it('destroyAll tears down every live view', async () => {
+    const h = makeHarness()
+    await h.service.open(REQUEST_A, h.window)
+    await h.service.open({ ...REQUEST_A, panelId: 'panel-B' }, h.window)
+
+    await h.service.destroyAll('global-off')
+
+    // The harness hands every open the SAME fake session, so `destroy` cannot
+    // count views — the second call sees `isDestroyed()` already true. Token
+    // revocation runs per view regardless, so that is what proves both went.
+    expect(h.revoke).toHaveBeenCalledTimes(2)
+    // The slots are free again.
+    expect(await h.service.open(REQUEST_A, h.window)).toEqual({ ok: true })
   })
 })

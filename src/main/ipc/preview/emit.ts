@@ -29,6 +29,7 @@ import {
   PreviewStillFrameSchema,
   PreviewLoadStatePayloadSchema,
   PreviewForwardedShortcutSchema,
+  PreviewOpenFileRequestedSchema,
   type PreviewFailure
 } from '../../../shared/ipc/preview-schema'
 import { PreviewEvents } from '../../../shared/ipc/preview-channels'
@@ -48,6 +49,16 @@ import { logger } from '../../services/LoggingService'
 export interface PreviewEmitTarget {
   isDestroyed(): boolean
   send(channel: string, payload: unknown): void
+  /**
+   * `BrowserWindow.id` of the window this target belongs to, when known.
+   *
+   * Most preview events carry a `panelId` and are harmless to broadcast, but
+   * `openFileRequested` ACTS: broadcasting it would make every window open a
+   * tab for one window's link click (sd-074b §4.9). Targets without an id are
+   * always included, so test fakes and any future non-window target keep
+   * receiving.
+   */
+  readonly windowId?: number
 }
 
 /** Injectable dependencies (all but `resolveTargets` defaulted). */
@@ -95,11 +106,15 @@ export function createPreviewEmitters(deps: PreviewEmittersDeps): PreviewEmitter
   /** Monotonic id source for synthesised failure entries (schema requires `id`). */
   let failureSeq = 0
 
-  const send = (channel: string, payload: unknown): void => {
+  const send = (channel: string, payload: unknown, windowId?: number): void => {
     for (const target of deps.resolveTargets()) {
-      if (!target.isDestroyed()) {
-        target.send(channel, payload)
+      if (target.isDestroyed()) continue
+      // Scoped send: skip windows other than the requested one. A target that
+      // reports no id is never skipped.
+      if (windowId !== undefined && target.windowId !== undefined && target.windowId !== windowId) {
+        continue
       }
+      target.send(channel, payload)
     }
   }
 
@@ -107,7 +122,8 @@ export function createPreviewEmitters(deps: PreviewEmittersDeps): PreviewEmitter
   const validateAndSend = (
     channel: string,
     schema: { safeParse: (v: unknown) => { success: boolean; error?: { message: string } } },
-    payload: unknown
+    payload: unknown,
+    windowId?: number
   ): void => {
     const parsed = schema.safeParse(payload)
     if (!parsed.success) {
@@ -116,7 +132,7 @@ export function createPreviewEmitters(deps: PreviewEmittersDeps): PreviewEmitter
       })
       return
     }
-    send(channel, payload)
+    send(channel, payload, windowId)
   }
 
   const toFailure = (input: PreviewFailureInput): PreviewFailure => ({
@@ -192,7 +208,7 @@ export function createPreviewEmitters(deps: PreviewEmittersDeps): PreviewEmitter
 
     loadStateChanged(
       panelId: string,
-      state: 'idle' | 'loading' | 'ready' | 'failed',
+      state: 'idle' | 'loading' | 'ready' | 'failed' | 'suspended',
       dropped: number
     ): void {
       validateAndSend(PreviewEvents.LOAD_STATE_CHANGED, PreviewLoadStatePayloadSchema, {
@@ -200,6 +216,20 @@ export function createPreviewEmitters(deps: PreviewEmittersDeps): PreviewEmitter
         state,
         dropped
       })
+    },
+
+    openFileRequested(
+      sourcePanelId: string,
+      filePath: string,
+      anchor: string | null,
+      windowId?: number
+    ): void {
+      validateAndSend(
+        PreviewEvents.OPEN_FILE_REQUESTED,
+        PreviewOpenFileRequestedSchema,
+        { sourcePanelId, filePath, anchor },
+        windowId
+      )
     },
 
     forwardedShortcut(panelId: string, key: string): void {

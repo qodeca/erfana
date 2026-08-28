@@ -1403,7 +1403,7 @@ switch for at the session level, and which would need a Chromium-flag change wit
 
 | Narrowing | Reason |
 |---|---|
-| **One live preview**; same-panelId re-open replaces | No AC asks for concurrency; LRU had no exit state. Replace-on-same-id is required or a renderer reload wedges every panel |
+| ~~**One live preview**~~ **SUPERSEDED by sd-074b D5** | Was: "No AC asks for concurrency; LRU had no exit state." LRU now HAS an exit state — a suspended preview keeps its still frame and re-opens itself when its tab is activated — so several previews run at once, capped by `PREVIEW.MAX_LIVE_VIEWS`. Same-panelId re-open still replaces |
 | **`stream:false`, no `Range`/206** | Electron will not synthesise range responses; large-`<video>` seeking does not work |
 | **Dot-prefixed paths are unservable** | A blanket rule beats a blocklist. Cost: `.well-known` is unreachable |
 | **`~[0-9]` segments rejected on `win32`** | 8.3 alias defence layer 1. Cost: a long name legitimately containing `~1` is unservable **on Windows only** |
@@ -1416,7 +1416,7 @@ switch for at the session level, and which would need a Chromium-flag change wit
 | **AC10 timeout UX is quiet in the badge** | Operator decision; an interrupting message per offline CDN asset is worse than a badge count |
 | **Blocked-host toasts stop after 3 distinct hosts per panel** | Otherwise a page mints unbounded hosts and turns the toast stack into a DoS surface |
 | **A hostile page can defeat its own CSS swap** | Any non-`true` outcome falls back to a full reload; the cost lands on the page |
-| **Markdown links to `.html` open source** | Matches today's `.svg` behaviour; not AC1's "explicit action" |
+| **Markdown links to `.html` open source** — kept, deliberately | Matches today's `.svg` behaviour; not AC1's "explicit action". sd-074b makes the same link RUN when clicked inside an HTML preview, and the divergence is intended: a markdown link is a "show me the source" gesture, an HTML hyperlink is a hyperlink. Unifying them needs the "Open as text" action in technical-debt #455 first, so it is a separate issue |
 | **`getFilePanelId(path)` stays kind-free** | Its only two call sites (`TranscriptionDialog.tsx:216`, `DocumentImportDialog.tsx:146`) pass markdown paths, so `.html` lossiness is **unreachable** |
 | **`PreviewExportController` duplicates PdfService's save-dialog config** | Its save path is private and `IPdfService` exposes only `exportToPdf`; ~10 duplicated lines beat widening a working service. `deriveSafeFilename` is shared, so #161 is not duplicated |
 | **No cross-window allowlist locking** | Two windows on one project is accepted as broken; the kept guarantee is that the file always parses |
@@ -1424,7 +1424,7 @@ switch for at the session level, and which would need a Chromium-flag change wit
 | **Monaco worker-backed services are disabled, not bundled** | AC11 asks for highlighting (Monarch, main-thread); bundling four workers raises a `file://` module-worker question no AC requires |
 | **Hardlinks and the realpath→open race are documented, not fixed** | No proportionate fix without `openat`; debt 32–33 |
 | **No UI trust chrome in v1** | §2.8 risk 8; follow-up |
-| **`alert`/`confirm`/`prompt` and `<a download>` silently no-op** | The `sandbox` token withholds `allow-modals` and `allow-downloads`; granting either re-opens a modal-blocking or file-write surface |
+| **`alert`/`confirm`/`prompt` no-op; `<a download>` is refused and badged** | The `sandbox` token withholds `allow-modals` and `allow-downloads`; granting either re-opens a modal-blocking or file-write surface. sd-074b keeps the refusal but stops it being silent: a download click now records a `blocked-link` failure |
 | **A single CSP application site (no `onHeadersReceived` overwrite)** | Round-4 option b: one owner cannot drift or be left unwired; §2.6's single-ownership claim becomes literal. A CDN subresource's own CSP header is ignored by the browser anyway, so the second site protected nothing |
 | **AC24 is a local gate; AC19b is manual** | Shared CI runners flake on perf floors; visual regression is local-only |
 | **Gate 3's behavioural half is not in CI** | `e2e.yml` is disabled; re-enabling it is out of scope for #74 |

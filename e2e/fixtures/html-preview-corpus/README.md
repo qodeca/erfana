@@ -38,3 +38,15 @@ exercise the AC7 blocked path.
 
 [issue #74]: https://github.com/qodeca/erfana/issues/74
 [`sd-074-html-preview.md`]: ../../../specs/designs/sd-074-html-preview.md
+
+## `links/`
+
+Added for sd-074b (in-page link navigation). `index.html` carries one anchor per
+routing case — plain, `_blank`, `_self`, a named target, a same-page anchor, a
+`javascript:` URL, a path escape, a missing file and a markdown file — each with
+a stable `id` so a test can click exactly one. `target.html` is what the
+in-project links point at; its `<title>` (`-LINKS-TARGET-`) is the sentinel that
+proves the link actually opened it.
+
+The `javascript:` link would set `document.title` to `-HIJACKED-` if it were ever
+followed, so that sentinel failing to appear IS the assertion.

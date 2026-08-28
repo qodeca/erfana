@@ -586,13 +586,22 @@ The HTML preview (#74) executes a project's real CSS and JavaScript in a live pa
 - **T3 – a network attacker on an approved host.**
 - **T4 – a compromised approved CDN.**
 
-The load-bearing boundary is that **Erfana exposes no scripted API to the page**: no preload, no `postMessage` endpoint, no bridge, no file-write path. The page's only outward influence is a bounded set of diagnostic signals (console messages, load failures, request metadata, find-in-page counts, one CSS-swap boolean, four enumerated keystrokes), each treated as untrusted data – never executed, never reflected into a response header, always length-bounded and control-character-stripped.
+The load-bearing boundary is that **Erfana exposes no scripted API to the page**: no `postMessage` endpoint, no bridge into `window`, no file-write path. The page's only outward influence is a bounded set of diagnostic signals (console messages, load failures, request metadata, find-in-page counts, one CSS-swap boolean, four enumerated keystrokes, and one link-click report), each treated as untrusted data – never executed, never reflected into a response header, always length-bounded and control-character-stripped.
+
+**Revised for in-page links (sd-074b).** The page now carries a preload, so the sentence above no longer reads "no preload". What it does and does not change:
+
+- The preload calls no `contextBridge`, so the page's own JavaScript still cannot see or reach it — `contextIsolation` keeps them in separate worlds, and a source-level test pins the absence of `contextBridge`, `webFrame` and any `ipcRenderer.invoke`/`.on`.
+- It is **send-only**, on a channel registered with `webContents.ipc`, never on the global `ipcMain`. Nothing else in the app can be addressed through it, and it carries exactly one message shape: an activated link.
+- Main re-parses and re-confines every path before acting. The page's href is a request, never an instruction.
+- The real delta is at the process level: a Chromium or V8 compromise inside the preview now has an IPC path where it previously had none. That is why the **global `ipcMain` sender gate** (`src/main/ipc/ipcSenderGate.ts`) landed first, in its own change: every handler in the app is now gated on the app's own top-level renderer by default, instead of the handful that opted in.
+- **External links** are handed to the OS browser only after Erfana shows the destination origin and the user confirms. A trusted click proves a human clicked; it does not prove they knew where the link went, and the preview has no address bar, status bar or hover-URL of its own.
+- Several previews now run at once, each in its own in-memory partition, capped by `PREVIEW.MAX_LIVE_VIEWS`. Each still asserts `storagePath === null` on creation.
 
 ### Sealed-box controls in place
 
 | Control | Assets | Effect |
 |---|---|---|
-| Own process + in-memory session partition, no preload, frozen `sandbox`/`contextIsolation`/`nodeIntegration:false` preferences asserted on the **constructed** value | A3, A4 | Keeps T1 from reaching Erfana IPC or node |
+| Own process + in-memory session partition, frozen `sandbox`/`contextIsolation`/`nodeIntegration:false` preferences asserted on the **constructed** value, and a send-only preload that exposes nothing to the page | A3, A4 | Keeps T1 from reaching Erfana IPC or node |
 | `sandbox allow-scripts` opaque origin (a header-only CSP directive) | A4 | `localStorage`/`sessionStorage` throw, `indexedDB` is unavailable – T1 persists nothing |
 | No persistence: in-memory partition (`storagePath === null`), no service workers, purge (`clearStorageData` + `clearCache`) before any Erfana-driven reload | A4 | Nothing survives a reload or an app restart |
 | `erfana-preview://<opaque-token>/<path>` serving, realpath-confined to the project root, `O_NOFOLLOW` + dev/ino identity check + post-resolve exclusion re-check; no filesystem path ever enters a URL | A1, A2 | Defeats symlink escape and the Windows 8.3 short-name alias bypass |

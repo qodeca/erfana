@@ -90,7 +90,17 @@ export function isSafeSegment(
  * `realRoot` MUST already be the `fsPromises.realpath` of the project root.
  * Returns the fully-resolved target and its root-relative path on success.
  */
-export async function confinePath(realRoot: string, candidate: string): Promise<ConfineVerdict> {
+export async function confinePath(
+  realRoot: string,
+  candidate: string,
+  options: { allowExcluded?: boolean } = {}
+): Promise<ConfineVerdict> {
+  // `allowExcluded` keeps every ESCAPE rule and skips only the excluded-directory
+  // rule. It exists for link routing (sd-074b §3.2): a link to
+  // `node_modules/x/demo.html` must not be SERVED to the page, but clicking it
+  // should still open the file as source in the editor — which needs the
+  // fully-resolved path, and must still refuse anything outside the root.
+  const { allowExcluded = false } = options
   // 8a: resolve the parent (native semantics). A missing parent is a 404-class
   // "missing", never an escape.
   let parentReal: string
@@ -108,7 +118,7 @@ export async function confinePath(realRoot: string, candidate: string): Promise<
     return { ok: false, reason: 'escape' }
   }
   // 8d: exclusion against the parent-based path.
-  if (isInExcludedDirectory(parentRel) || hasDotSegment(parentRel)) {
+  if (!allowExcluded && (isInExcludedDirectory(parentRel) || hasDotSegment(parentRel))) {
     return { ok: false, reason: 'excluded' }
   }
 
@@ -125,7 +135,7 @@ export async function confinePath(realRoot: string, candidate: string): Promise<
   if (rel === '' || rel.startsWith('..') || isAbsolute(rel)) {
     return { ok: false, reason: 'escape' }
   }
-  if (isInExcludedDirectory(rel) || hasDotSegment(rel)) {
+  if (!allowExcluded && (isInExcludedDirectory(rel) || hasDotSegment(rel))) {
     return { ok: false, reason: 'excluded' }
   }
 

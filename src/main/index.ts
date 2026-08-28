@@ -4,6 +4,7 @@ import { app, shell, BrowserWindow, Menu } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { spawnNewInstance } from './utils/spawnNewInstance'
+import { installIpcSenderGate } from './ipc/ipcSenderGate'
 import { registerFileHandlers } from './ipc/file-handlers'
 import { registerFileWatcherHandlers } from './ipc/file-watcher-handlers'
 import { registerDirectoryWatcherHandlers } from './ipc/directory-watcher-handlers'
@@ -362,6 +363,11 @@ app.whenReady().then(async () => {
     () => gitWatcherService.isWatching()
   )
 
+  // Gate every global ipcMain channel on the app's own top-level renderer
+  // BEFORE any handler registers — handlers registered earlier keep the
+  // unwrapped path (sd-074b §7).
+  installIpcSenderGate()
+
   // Register IPC handlers
   registerFileHandlers()
   registerFileWatcherHandlers()
@@ -393,6 +399,10 @@ app.whenReady().then(async () => {
   // built inside the composition root.
   previewHandlers = registerPreviewHandlers({
     getProjectPath: () => fileService.getProjectPath(),
+    // Main-side teardown on project switch. Until now this seam had no
+    // producer, so only the renderer's own `preview:close` tore views down
+    // (sd-074b §4.9).
+    subscribeProjectChanged: (listener) => fileService.onProjectPathChanged(listener),
     globalSettings: globalSettingsService
   })
 

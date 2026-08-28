@@ -177,7 +177,7 @@ Most Phase 4 / issue #165. See also [`docs/windows/whisper-support-runbook.md`](
 
 ---
 
-## Preview (5 codes)
+## Preview (7 codes)
 
 5 `PREVIEW_*` in `src/shared/errors.ts` (#74). See `src/main/services/preview/` and [`docs/html-preview/README.md`](./html-preview/README.md).
 

@@ -8,6 +8,22 @@ Per-version release notes for Erfana, v0.9.0 onwards. Earlier: v0.8.0–v0.8.3 i
 
 *Not yet released.*
 
+### Added
+
+- **Links inside an HTML preview now work, and every `.html` file gets its own tab** ([#74](https://github.com/qodeca/erfana/issues/74) follow-up) – until now, clicking a link in a previewed page did nothing at all: no navigation, no message, not even an entry in the failure badge. And only one preview could run: opening a second `.html` file showed "A preview is already open." Both are fixed. **Every `.html` file now opens in its own tab and runs independently**, like a Markdown preview. To keep the cost bounded, the three most recently used previews stay running and the rest freeze to a still picture of the page, starting themselves again the moment you click their tab — so a sleeping preview looks like the page you left, not a blank panel. Page state (scroll position, typed text) is lost when a preview sleeps. **Clicking a link opens its target inside Erfana, in a new tab**, reusing the tab if that file is already open, exactly like clicking in the project tree. Be aware this deliberately departs from web convention: on the web a plain link replaces the page you are on and only `target="_blank"` opens a tab, whereas here *every* link opens a tab — so clicking through a generated documentation site accumulates tabs quickly. `target`, `_self` and `<base target>` are read but change nothing; there is no in-page navigation in this version. A link to a `.md`, an image or any other project file opens in its usual panel; a link into `node_modules/`, `dist/` or a gitignored path opens as source; a link to a missing file or one outside the project is refused and listed in the failure badge, so a dead link finally says so instead of doing nothing. An `https:` or `mailto:` link shows you where it goes and asks before handing it to your browser — a click proves you clicked, not that you knew the destination, and a previewed page can move a link under your cursor. Two cases where a link still does nothing, both unchanged: a page whose own JavaScript cancels the click, and a link inside a closed shadow root. See [HTML preview § Links](./html-preview/README.md#links).
+
+### Fixed
+
+- **Closing a preview tab while it was still opening leaked the whole preview** – closing a tab in the moment between clicking an `.html` file and the page appearing left a running preview behind with nothing pointing at it: its browser view, its session, its file watchers and its registry entry all stayed alive for the rest of the session. The close was a no-op in exactly that window, and nothing ever cleaned up afterwards. With one preview that leaked one; with a preview per tab it would have leaked one per tab.
+- **A preview tab could become permanently unusable** – if any step of tearing a preview down failed, the teardown stopped there, skipping the part that actually destroys the view. The panel was left marked as destroyed but still holding a live browser view, and that tab could never show a preview again until the app was restarted. Teardown now always completes and always destroys the view, whatever fails along the way.
+- **Approving a remote host now applies to every open preview of that project**, not just the one that asked. The approval already opened the network gate for all of them, while only the approving preview had its security policy rebuilt — so a second preview could be left forbidding a host its own network filter had already allowed.
+
+### Internal
+
+- **Every IPC channel is now sender-gated by default** – the app has roughly 118 main-process handlers and only eight files checked who was calling, leaving `shell:openExternal`, terminal creation and the file-writing handlers open to any renderer frame that could send. A single guard now sits in front of all of them, so handlers are protected by default rather than by each author remembering, and future handlers are covered automatically.
+- **`shell:openExternal` validates URLs by parsing them** instead of comparing text prefixes, rejects embedded credentials, bounds the length, and no longer writes full URLs into log files. Electron's own guidance is that prefix comparison can be fooled; a `javascript:` URL containing the text `https://` would previously have passed.
+- **Electron raised to 39.8.10**, which carries a fix for a sandboxed-iframe popup bypass — the preview relies on exactly that restriction.
+
 ## 0.18.0
 
 *Released 2026-08-25. Tag `v0.18.0`.*

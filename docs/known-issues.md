@@ -161,6 +161,17 @@ Pipeline contributors on Windows:
 
 ---
 
+## HTML preview links
+
+**A link can stay dead in two cases** (sd-074b §5.1), both unchanged from before links worked at all:
+
+- The page's own JavaScript calls `stopPropagation()` on the click, which hides the event from Erfana. Nothing happens and no failure is recorded, because Erfana never saw the click.
+- The link lives inside a **closed** shadow root, which `composedPath()` cannot see from outside the page.
+
+**A page's link opens a tab per click.** Every link opens a new Erfana tab by design, so clicking through a generated documentation site accumulates tabs quickly. Idle previews sleep after `PREVIEW.MAX_LIVE_VIEWS`, so the cost is bounded, but the tabs remain until closed.
+
+**Page state is lost when a preview sleeps.** A suspended preview reloads from disk when you return to it: scroll position, typed text and in-memory JavaScript state do not survive.
+
 ## Resolved (kept for the trail)
 
 ### v0.9.5 macOS — terminal does not work in the signed DMG (resolved in v0.9.6)

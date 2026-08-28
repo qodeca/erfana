@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import type { IpcMainInvokeEvent } from 'electron'
+import type { IpcMainEvent, IpcMainInvokeEvent } from 'electron'
 import { join } from 'path'
 import { pathToFileURL } from 'url'
 import { is } from '@electron-toolkit/utils'
@@ -55,4 +55,53 @@ export function isTrustedSender(event: IpcMainInvokeEvent): boolean {
 
   // Production: pin to the exact bundled renderer file URL index.ts loads.
   return senderUrl === RENDERER_FILE_URL
+}
+
+/**
+ * Route-tolerant variant of {@link isTrustedSender}, used by the process-wide
+ * IPC sender gate ({@link file://./ipcSenderGate.ts}).
+ *
+ * Identical trust decision, with two deliberate differences:
+ *
+ * - **Fragment and query are ignored.** The screenshot overlay windows load the
+ *   SAME bundled entry with a route hash
+ *   (`ScreenshotOverlayWindow.loadOverlay` → `loadFile(index.html, { hash })`),
+ *   and one of the channels they use is global (`logging:log`, sent from
+ *   `src/preload/screenshotOverlay.ts`). Exact-URL equality would silently drop
+ *   those messages. Stripping hash/query admits our own renderer entry on any
+ *   route and nothing else — the preview page is served over `erfana-preview://`
+ *   and can never match a `file://` URL whatever its fragment.
+ * - **Accepts `send` events too**, because the gate wraps `ipcMain.on` as well
+ *   as `ipcMain.handle`.
+ *
+ * The stricter {@link isTrustedSender} is unchanged and stays in place inside
+ * the handlers that already call it, so this is defence in depth, not a
+ * relaxation of any existing gate.
+ */
+export function isTrustedAppSender(event: IpcMainEvent | IpcMainInvokeEvent): boolean {
+  const frame = event.senderFrame
+
+  if (!frame || frame.parent !== null) {
+    return false
+  }
+
+  const senderUrl = frame.url
+
+  const devUrl = process.env['ELECTRON_RENDERER_URL']
+  if (is.dev && devUrl) {
+    try {
+      return new URL(senderUrl).origin === new URL(devUrl).origin
+    } catch {
+      return false
+    }
+  }
+
+  try {
+    const url = new URL(senderUrl)
+    url.hash = ''
+    url.search = ''
+    return url.href === RENDERER_FILE_URL
+  } catch {
+    return false
+  }
 }

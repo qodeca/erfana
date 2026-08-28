@@ -44,6 +44,7 @@ export type PreviewFailureType =
   | 'unresolved-specifier'
   | 'allowlist-invalid'
   | 'allowlist-unsupported-version'
+  | 'blocked-link'
 
 /** What a producer hands to `PreviewFailureLog.record`; `id`/`timestamp` are added there. */
 export interface PreviewFailureInput {
@@ -114,7 +115,22 @@ export interface PreviewEmitters {
   stillFrameChanged(panelId: string, frame: PreviewStillFrame): void
   loadStateChanged(
     panelId: string,
-    state: 'idle' | 'loading' | 'ready' | 'failed',
+    state: 'idle' | 'loading' | 'ready' | 'failed' | 'suspended',
     dropped: number
+  ): void
+  /**
+   * A link inside the previewed page resolved to a project file that should
+   * open as an Erfana tab (sd-074b §5.4).
+   *
+   * Deliberately carries NO panel kind: main answers only "is this a real,
+   * confined, in-project path", and `resolvePanelKind` in the renderer stays the
+   * single owner of which panel type a file opens in — the same rule the project
+   * tree and the terminal follow.
+   */
+  openFileRequested(
+    sourcePanelId: string,
+    filePath: string,
+    anchor: string | null,
+    windowId?: number
   ): void
 }

@@ -22,6 +22,7 @@ import type {
   PreviewFailureListPayload,
   PreviewFindRequest,
   PreviewForwardedShortcut,
+  PreviewOpenFileRequestedPayload,
   PreviewHostBlockedPayload,
   PreviewLoadStatePayload,
   PreviewOpenRequest,
@@ -92,5 +93,9 @@ export const previewBridge: PreviewBridge = {
     subscribe(PreviewEvents.LOAD_STATE_CHANGED, callback),
 
   onForwardedShortcut: (callback: (payload: PreviewForwardedShortcut) => void): (() => void) =>
-    subscribe(PreviewEvents.FORWARDED_SHORTCUT, callback)
+    subscribe(PreviewEvents.FORWARDED_SHORTCUT, callback),
+
+  onOpenFileRequested: (
+    callback: (payload: PreviewOpenFileRequestedPayload) => void
+  ): (() => void) => subscribe(PreviewEvents.OPEN_FILE_REQUESTED, callback)
 }

@@ -63,8 +63,8 @@ const COPY = {
   failed: 'The preview stopped running.',
   /** Failed-state primary action. */
   reload: 'Reload',
-  /** Limit-reached banner headline. */
-  limitReached: 'A preview is already open.',
+  /** Limit-reached banner headline (this file is previewed in another window). */
+  limitReached: 'This file is already previewed in another window.',
   /** Limit-reached primary action. */
   openAsSource: 'Open as source'
 } as const
@@ -122,7 +122,12 @@ export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelPara
   // Lifecycle, events, bounds, shortcuts
   // ========================================
 
-  const { limitReached, openFailed } = usePreviewLifecycle({ panelId, filePath, placeholderRef })
+  const { limitReached, openFailed } = usePreviewLifecycle({
+    panelId,
+    filePath,
+    placeholderRef,
+    isVisible
+  })
 
   usePreviewEvents(panelId)
   // Renderer-focus Cmd/Ctrl+F (view hidden). The sealed-page case is forwarded

@@ -71,6 +71,20 @@ export interface PreviewSessionLike {
  * controllers and the input-forwarding target, so one handle flows to them all.
  */
 export interface PreviewWebContentsHandle {
+  /**
+   * WebContents-scoped IPC (sd-074b §5.3). Optional so existing test doubles
+   * stay valid; absent simply means no link channel for that fake.
+   *
+   * Deliberately NOT `mainFrame.ipc`: a `WebFrameMain` is replaced when a
+   * navigated page replaces it, which would silently drop the listener.
+   */
+  readonly ipc?: {
+    on(channel: string, listener: (...args: never[]) => void): void
+    removeListener(channel: string, listener: (...args: never[]) => void): void
+  }
+  /** The top-level frame, used to reject sub-frame senders on that channel. */
+  readonly mainFrame?: unknown
+
   loadURL(url: string): Promise<void>
   reload(): void
   reloadIgnoringCache(): void
@@ -153,6 +167,15 @@ export interface PreviewSessionFactoryDeps {
   readonly createView?: (webPreferences: unknown) => PreviewViewHandle
   /** Build the frozen web prefs; defaults to `buildPreviewWebPreferences`. */
   readonly buildWebPreferences?: (session: PreviewSessionLike) => unknown
+  /**
+   * Absolute path to the built `previewPage.js` preload (sd-074b §5.2).
+   *
+   * Resolved and existence-checked by the composition root, never by this
+   * factory: a path baked in here would be wrong under Vitest and in a packaged
+   * build. `null` means no preload — links stay inert, which is the deliberate
+   * degradation when the bundle is missing rather than a failure to open.
+   */
+  readonly previewPagePreloadPath?: string | null
   /** A fresh partition name; defaults to `nextPartitionName`. */
   readonly nextPartitionName?: () => string
   /** Harden permissions/downloads/WebRTC; defaults to `hardenPreviewSession`. */
@@ -180,9 +203,14 @@ export class PreviewSessionFactory implements IPreviewSessionFactory {
       allowlistStore: deps.allowlistStore,
       createSession: deps.createSession ?? defaultCreateSession,
       createView: deps.createView ?? defaultCreateView,
+      previewPagePreloadPath: deps.previewPagePreloadPath ?? null,
       buildWebPreferences:
         deps.buildWebPreferences ??
-        ((session) => buildPreviewWebPreferences(session as unknown as Session)),
+        ((session) =>
+          buildPreviewWebPreferences(
+            session as unknown as Session,
+            deps.previewPagePreloadPath ?? null
+          )),
       nextPartitionName: deps.nextPartitionName ?? nextPartitionName,
       hardenSession:
         deps.hardenSession ??

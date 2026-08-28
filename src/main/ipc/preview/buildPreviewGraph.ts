@@ -16,7 +16,9 @@
  *
  * @see docs/designs/sd-074-html-preview.md §4.4, §5(a)
  */
-import { BrowserWindow, type Session } from 'electron'
+import { BrowserWindow, dialog, shell, type Session } from 'electron'
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 import type { WatchOptions } from 'chokidar'
 import { PREVIEW } from '../../../shared/constants'
 import type { GlobalSettings } from '../../../shared/ipc/global-settings-schema'
@@ -87,7 +89,67 @@ const PREVIEW_ENTRY_WATCH_OVERRIDES: Partial<WatchOptions> = {
 function defaultResolveEmitTargets(): readonly PreviewEmitTarget[] {
   return BrowserWindow.getAllWindows()
     .filter((win) => !win.isDestroyed())
-    .map((win) => win.webContents)
+    .map((win) => {
+      // Carry the window id so an acting event (`openFileRequested`) can be sent
+      // to exactly the window whose preview asked for it.
+      const target = win.webContents as unknown as PreviewEmitTarget & { windowId?: number }
+      return Object.assign(target, { windowId: win.id })
+    })
+}
+
+/**
+ * Show where an external link goes, then open it only if the user agrees
+ * (sd-074b §5.5).
+ *
+ * The URL has already been parsed and allow-listed by the navigation policy, and
+ * the click was a genuine user gesture — but a gesture is not informed consent.
+ * A previewed page owns its whole viewport and can move an anchor under the
+ * cursor between mousedown and click, and the preview has no address bar, no
+ * status bar and no hover-URL, so the destination is otherwise invisible.
+ *
+ * The destination shown is the ORIGIN (or the address for `mailto:`), not the
+ * full URL: it is the part that decides where you actually end up, and it keeps
+ * a hostile path or query from filling the dialog.
+ *
+ * Cancel is the default button, so dismissing the dialog opens nothing.
+ */
+async function confirmThenOpenExternal(url: string): Promise<void> {
+  const parsed = new URL(url)
+  const destination =
+    parsed.protocol === 'mailto:' ? parsed.pathname : parsed.origin || parsed.protocol
+
+  const { response } = await dialog.showMessageBox({
+    type: 'question',
+    buttons: ['Cancel', 'Open'],
+    defaultId: 0,
+    cancelId: 0,
+    message: 'Open this link outside Erfana?',
+    detail: `The preview wants to open:\n\n${destination}`
+  })
+
+  if (response === 1) {
+    await shell.openExternal(url)
+  }
+}
+
+/**
+ * Absolute path of the built preview-page preload, or `null` when it is missing.
+ *
+ * Resolved HERE, at the composition root, and existence-checked — the frozen
+ * `PREVIEW_WEB_PREFERENCES` literal must stay environment-independent, and
+ * `__dirname` differs between a build and Vitest (sd-074b §5.2). A missing
+ * bundle is logged loudly and degrades to inert links rather than a preview that
+ * fails to open, mirroring `ScreenshotOverlayWindow`'s existsSync gate.
+ */
+function resolvePreviewPagePreload(): string | null {
+  const preloadPath = join(__dirname, '../preload/previewPage.js')
+  if (!existsSync(preloadPath)) {
+    logger.error('Preview page preload missing; links inside previews will not work', undefined, {
+      preloadPath
+    })
+    return null
+  }
+  return preloadPath
 }
 
 /** The host window's zoom factor, or 1 when no window is available. */
@@ -113,7 +175,11 @@ export function buildPreviewGraph(deps: BuildPreviewGraphDeps): PreviewGraph {
     // and carries no panel context, so it cannot address a per-view failure log.
     onBadge: (badge) => logger.warn('Preview allowlist badge', { type: badge.type })
   })
-  const sessionFactory = createPreviewSessionFactory({ registry, allowlistStore })
+  const sessionFactory = createPreviewSessionFactory({
+    registry,
+    allowlistStore,
+    previewPagePreloadPath: resolvePreviewPagePreload()
+  })
   const hostBlockNotifier = createPreviewHostBlockNotifier()
   const stillFrameCache = createPreviewStillFrameCache()
   const exportController = createPreviewExportController()
@@ -143,6 +209,8 @@ export function buildPreviewGraph(deps: BuildPreviewGraphDeps): PreviewGraph {
         onChanged
       }),
     createReloadPolicy: (onDecision) => createPreviewReloadPolicy({ onDecision }),
+    // The OS hand-off for an external link, behind a confirmation.
+    openExternal: (url) => confirmThenOpenExternal(url),
     createFindController: (wc, onCount) =>
       createPreviewFindController(wc as unknown as PreviewFindContents, onCount),
     createFailureLog: (onEmit) => createPreviewFailureLog({ onEmit }),

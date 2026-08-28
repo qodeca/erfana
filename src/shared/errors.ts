@@ -224,6 +224,8 @@ export enum ErrorCode {
   PREVIEW_LOCAL_FILE_MISSING = 'PREVIEW_LOCAL_FILE_MISSING',
   PREVIEW_VIEW_LIMIT_REACHED = 'PREVIEW_VIEW_LIMIT_REACHED',
   PREVIEW_ALLOWLIST_FULL = 'PREVIEW_ALLOWLIST_FULL',
+  PREVIEW_READ_BUDGET_EXCEEDED = 'PREVIEW_READ_BUDGET_EXCEEDED',
+  PREVIEW_LINK_BLOCKED = 'PREVIEW_LINK_BLOCKED',
 
   // Generic errors
   UNKNOWN_ERROR = 'UNKNOWN_ERROR'
@@ -449,6 +451,9 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.PREVIEW_LOCAL_FILE_MISSING]: '"<path>" could not be read',
   [ErrorCode.PREVIEW_VIEW_LIMIT_REACHED]: 'A preview is already open.',
   [ErrorCode.PREVIEW_ALLOWLIST_FULL]: 'The preview host allowlist is full.',
+  [ErrorCode.PREVIEW_READ_BUDGET_EXCEEDED]:
+    'The preview asked for too many files at once; some were not loaded.',
+  [ErrorCode.PREVIEW_LINK_BLOCKED]: 'That link was blocked.',
 
   // Generic errors
   [ErrorCode.UNKNOWN_ERROR]: 'An unexpected error occurred'

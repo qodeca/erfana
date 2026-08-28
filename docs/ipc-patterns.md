@@ -424,3 +424,10 @@ This pattern avoids stale updates from previous switches.
 Applied in services:
 - File watcher: src/main/services/FileWatcherService.ts (`switchVersion` guards change/delete/notify)
 - Directory watcher: src/main/services/DirectoryWatcherService.ts (`switchVersion` guards queue/process/notify)
+
+### Preview channels not in this index (sd-074b)
+
+Two preview channels are deliberately absent from the table above:
+
+- **`preview-page:linkActivated`** — page → main, registered with `webContents.ipc` on the preview's own WebContents, never on the global `ipcMain`. Only that WebContents can reach it, so it needs no sender predicate; the handler additionally rejects sub-frame senders. WebContents-scoped rather than frame-scoped on purpose: a `WebFrameMain` is replaced when a navigated page replaces it, which would silently drop a `mainFrame.ipc` listener. Same shape of "invisible to the rest of the app" as the `image-export:harness-*` channels, though those are frame-scoped.
+- **`preview:openFileRequested`** — main → renderer, and the only preview event that is **window-scoped** rather than broadcast. Every other preview event carries a `panelId` and is harmless to send everywhere; this one causes a tab to open, so broadcasting it would make every window open a tab for one window's link click.

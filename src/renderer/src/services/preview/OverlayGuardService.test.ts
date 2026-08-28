@@ -19,7 +19,7 @@ function makeGuard(overrides: Partial<OverlayGuardDeps> = {}): {
   fireOccluded: () => void
   firePreview: () => void
 } {
-  const state = { occluded: false, livePanelId: 'preview-1' as string | null }
+  const state = { occluded: false, livePanelIds: ['preview-1'] as readonly string[] }
   const setVisibility = vi.fn()
   let occludedListener: () => void = () => {}
   let previewListener: () => void = () => {}
@@ -30,7 +30,7 @@ function makeGuard(overrides: Partial<OverlayGuardDeps> = {}): {
       occludedListener = l
       return () => {}
     },
-    getLivePreviewPanelId: () => state.livePanelId,
+    getLivePreviewPanelIds: () => state.livePanelIds,
     subscribePreview: (l) => {
       previewListener = l
       return () => {}
@@ -107,12 +107,12 @@ describe('OverlayGuardService (item 69)', () => {
     const { guard, setVisibility, state, firePreview } = makeGuard()
 
     // No live preview yet: nothing to send even if a tab is "active".
-    state.livePanelId = null
+    state.livePanelIds = []
     guard.sync('preview-1')
     expect(setVisibility).not.toHaveBeenCalled()
 
     // A preview opens under the active tab id → store change → show.
-    state.livePanelId = 'preview-1'
+    state.livePanelIds = ['preview-1']
     firePreview()
     expect(setVisibility).toHaveBeenCalledTimes(1)
     expect(setVisibility).toHaveBeenLastCalledWith('preview-1', true, 'active-tab')
@@ -126,7 +126,7 @@ describe('OverlayGuardService (item 69)', () => {
 
     // The preview closes: no live panel remains, nothing to hide (main already
     // destroyed the view on close).
-    state.livePanelId = null
+    state.livePanelIds = []
     firePreview()
     expect(setVisibility).not.toHaveBeenCalled()
   })
@@ -143,5 +143,50 @@ describe('OverlayGuardService (item 69)', () => {
 
     expect(unsubOccluded).toHaveBeenCalledTimes(1)
     expect(unsubPreview).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('OverlayGuardService — several live previews (sd-074b §4.8)', () => {
+  it('shows only the active tab and hides the other live previews', () => {
+    const { guard, setVisibility, state } = makeGuard()
+    state.livePanelIds = ['preview-1', 'preview-2', 'preview-3']
+
+    guard.sync('preview-2')
+
+    expect(setVisibility).toHaveBeenCalledWith('preview-2', true, 'active-tab')
+    expect(setVisibility).toHaveBeenCalledWith('preview-1', false, 'inactive-tab')
+    expect(setVisibility).toHaveBeenCalledWith('preview-3', false, 'inactive-tab')
+  })
+
+  it('hides every live preview while an overlay occludes them', () => {
+    const { guard, setVisibility, state, fireOccluded } = makeGuard()
+    state.livePanelIds = ['preview-1', 'preview-2']
+    guard.sync('preview-1')
+    setVisibility.mockClear()
+
+    state.occluded = true
+    fireOccluded()
+
+    expect(setVisibility).toHaveBeenCalledWith('preview-1', false, 'occluded')
+    // preview-2 was already hidden, so no redundant send for it.
+    expect(setVisibility).toHaveBeenCalledTimes(1)
+  })
+
+  it('treats a re-opened panel as new rather than reusing its stale visibility', () => {
+    const { guard, setVisibility, state, firePreview } = makeGuard()
+    state.livePanelIds = ['preview-1']
+    guard.sync('preview-1')
+    setVisibility.mockClear()
+
+    // Suspended: main destroyed the view, so the panel leaves the live set.
+    state.livePanelIds = []
+    firePreview()
+    expect(setVisibility).not.toHaveBeenCalled()
+
+    // Re-opened under the same active tab: the cached `true` must not suppress
+    // the send, or the fresh view would never be shown.
+    state.livePanelIds = ['preview-1']
+    firePreview()
+    expect(setVisibility).toHaveBeenCalledWith('preview-1', true, 'active-tab')
   })
 })

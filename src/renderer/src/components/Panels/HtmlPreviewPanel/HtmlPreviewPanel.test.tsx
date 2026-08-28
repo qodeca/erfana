@@ -159,7 +159,7 @@ describe('HtmlPreviewPanel', () => {
     expect(preview.close).toHaveBeenCalledWith('preview-1')
   })
 
-  it('shows the limit-reached refusal with an Open as source action', async () => {
+  it('shows the other-window refusal with an Open as source action', async () => {
     preview.open.mockResolvedValue({
       ok: false,
       errorCode: ErrorCode.PREVIEW_VIEW_LIMIT_REACHED,
@@ -168,7 +168,9 @@ describe('HtmlPreviewPanel', () => {
 
     render(<HtmlPreviewPanel {...makeProps('/proj/page.html')} />)
 
-    expect(await screen.findByText('A preview is already open.')).toBeInTheDocument()
+    expect(
+      await screen.findByText('This file is already previewed in another window.')
+    ).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Open as source' }))
     // openFileInPanel routes an editor-kind open through the container api.

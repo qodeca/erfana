@@ -171,7 +171,8 @@ export const PreviewFailureSchema = z
       'render-crash',
       'unresolved-specifier',
       'allowlist-invalid',
-      'allowlist-unsupported-version'
+      'allowlist-unsupported-version',
+      'blocked-link'
     ]),
     // Page-influenced value. The `record()` producer strips control chars; this
     // regex is the emit-time tripwire that actually enforces "no CR/LF", so a
@@ -222,11 +223,28 @@ export type PreviewStillFramePayload = z.infer<typeof PreviewStillFrameSchema>
 export const PreviewLoadStatePayloadSchema = z
   .object({
     panelId: PanelIdSchema,
-    state: z.enum(['idle', 'loading', 'ready', 'failed']),
+    state: z.enum(['idle', 'loading', 'ready', 'failed', 'suspended']),
     dropped: z.number().int().nonnegative()
   })
   .strict()
 export type PreviewLoadStatePayload = z.infer<typeof PreviewLoadStatePayloadSchema>
+
+/**
+ * `preview:openFileRequested` event payload (sd-074b §5.4).
+ *
+ * `filePath` is absolute and has ALREADY been confined to the project root by
+ * main; the renderer still routes it through `resolvePanelKind` +
+ * `openFileInPanel` like any other open, so eligibility stays a renderer
+ * decision and `preview-` ids stay minted in one place.
+ */
+export const PreviewOpenFileRequestedSchema = z
+  .object({
+    sourcePanelId: PanelIdSchema,
+    filePath: z.string().min(1).max(4096),
+    anchor: z.string().max(512).nullable()
+  })
+  .strict()
+export type PreviewOpenFileRequestedPayload = z.infer<typeof PreviewOpenFileRequestedSchema>
 
 /** `preview:forwardedShortcut` event payload — the 4 accelerators of §1.9. */
 export const PreviewForwardedShortcutSchema = z
@@ -278,4 +296,9 @@ export interface PreviewBridge {
   onLoadStateChanged(callback: (payload: PreviewLoadStatePayload) => void): () => void
   /** Subscribe to forwarded keyboard accelerators; returns an unsubscribe. */
   onForwardedShortcut(callback: (payload: PreviewForwardedShortcut) => void): () => void
+  /**
+   * A link in a previewed page resolved to a project file. The renderer decides
+   * the panel kind and opens the tab (sd-074b §5.4).
+   */
+  onOpenFileRequested(callback: (payload: PreviewOpenFileRequestedPayload) => void): () => void
 }

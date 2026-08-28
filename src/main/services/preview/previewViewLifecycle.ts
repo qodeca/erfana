@@ -29,6 +29,7 @@
 import type { PreviewFailureInput } from '../../../shared/ipc/preview-types'
 import type { PreviewWebContentsHandle } from './PreviewSessionFactory'
 import { logger } from '../LoggingService'
+import { PREVIEW_PAGE_LINK_CHANNEL } from './previewLinkBridge'
 import { redactPath } from '../../utils/redactUserInput'
 import { classifyConsoleMessage } from './previewConsoleClassify'
 import { attachInputForwarding } from './previewInputForward'
@@ -49,6 +50,16 @@ export interface PreviewLifecycleHooks {
   onForwardedShortcut(key: string): void
   /** A page console message already classified as a preview failure. */
   onConsoleMessage(input: PreviewFailureInput): void
+  /**
+   * A link was activated in the page and reported by the preview preload
+   * (sd-074b §5.1). The payload is UNVALIDATED — the bridge parses it.
+   */
+  onLinkActivated?(payload: unknown): void
+  /**
+   * The page tried to navigate itself. The navigation is still cancelled; the
+   * URL is handed on so a plain link works even when the preload is absent.
+   */
+  onNavigationAttempt?(url: string): void
 }
 
 /**
@@ -105,8 +116,12 @@ export function wirePreviewLifecycle(
   // No popups: every window-open request is denied.
   wc.setWindowOpenHandler(() => ({ action: 'deny' }))
 
-  const onWillNavigate = (event: PreventableEvent): void => {
+  const onWillNavigate = (event: PreventableEvent, url?: unknown): void => {
+    // The page never navigates itself; Erfana decides what a link means.
     event.preventDefault()
+    if (typeof url === 'string' && url !== '') {
+      hooks.onNavigationAttempt?.(url)
+    }
   }
   // Electron delivers `(event, details)`; `details.reason` distinguishes a crash
   // ('crashed'/'oom'/'killed'/…) from a clean exit — carried through for the badge.
@@ -133,6 +148,21 @@ export function wirePreviewLifecycle(
   wc.on('unresponsive', onUnresponsive as (...args: never[]) => void)
   wc.on('did-finish-load', onDidFinishLoad as (...args: never[]) => void)
   wc.on('console-message', onConsoleMessage as (...args: never[]) => void)
+
+  // Page → main link reports. Registered on the WebContents-scoped `ipc`, never
+  // on the global `ipcMain`: it is invisible to every other handler in the app
+  // and needs no sender predicate, because only this WebContents can reach it.
+  // WebContents-scoped rather than frame-scoped because a `WebFrameMain` is
+  // replaced when a navigated page replaces it (sd-074b §5.3).
+  const onLinkActivated = (event: unknown, payload: unknown): void => {
+    // Sub-frames are not trusted to speak for the page.
+    const senderFrame = (event as { senderFrame?: unknown })?.senderFrame
+    if (senderFrame !== undefined && senderFrame !== wc.mainFrame) {
+      return
+    }
+    hooks.onLinkActivated?.(payload)
+  }
+  wc.ipc?.on(PREVIEW_PAGE_LINK_CHANNEL, onLinkActivated as (...args: never[]) => void)
 
   const detachInput = attachInputForwarding(
     wc as never,
@@ -164,6 +194,10 @@ export function wirePreviewLifecycle(
       wc.removeListener('unresponsive', onUnresponsive as (...args: never[]) => void)
       wc.removeListener('did-finish-load', onDidFinishLoad as (...args: never[]) => void)
       wc.removeListener('console-message', onConsoleMessage as (...args: never[]) => void)
+      wc.ipc?.removeListener(
+        PREVIEW_PAGE_LINK_CHANNEL,
+        onLinkActivated as (...args: never[]) => void
+      )
       await entryWatcher.close()
     }
   }

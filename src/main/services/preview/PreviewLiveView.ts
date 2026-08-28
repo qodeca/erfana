@@ -21,6 +21,7 @@ import { open } from 'node:fs/promises'
 
 import { ErrorCode } from '../../../shared/errors'
 import { PREVIEW } from '../../../shared/constants'
+import { logger } from '../LoggingService'
 import type {
   PdfExportResult,
   PreviewBounds,
@@ -50,6 +51,7 @@ import { extractStaticLinks } from './linkExtract'
 import { buildCacheBustHref, buildCssSwapScript } from './previewCssSwap'
 import { clampAndZoomBounds } from './previewBoundsClamp'
 import { wirePreviewLifecycle, type PreviewFileWatcherHandle } from './previewViewLifecycle'
+import { createPreviewLinkBridge, type PreviewLinkBridge } from './previewLinkBridge'
 
 /** ARGB placeholder colour — the same value the panel's fallback CSS encodes (§1.8). */
 const PLACEHOLDER_COLOR = '#FF161312'
@@ -59,6 +61,12 @@ const SWAP_WORLD_ID = 999
 
 /** The slice of a `BrowserWindow` a live view uses. Structural for tests. */
 export interface PreviewWindowLike {
+  /**
+   * `BrowserWindow.id`. Stored with the registry entry because panel ids are
+   * path-derived, so two windows previewing the same file mint the same id
+   * (sd-074b §4.2).
+   */
+  readonly id: number
   readonly contentView: {
     addChildView(view: PreviewViewHandle): void
     removeChildView(view: PreviewViewHandle): void
@@ -94,6 +102,12 @@ export interface PreviewLiveViewDeps {
   readonly readEntryHtml?: (filePath: string) => Promise<string>
   readonly onForwardedShortcut?: (panelId: string, key: string) => void
   readonly platform?: NodeJS.Platform
+  /**
+   * Hand a vetted URL to the OS browser (sd-074b §5.5). Injected rather than
+   * importing `shell` here, so link routing is unit-testable without Electron.
+   * Absent means external links are refused and badged.
+   */
+  readonly openExternal?: (url: string) => Promise<void>
 }
 
 /** What the manager hands to a new live view. */
@@ -154,6 +168,7 @@ export class PreviewLiveView {
   private readonly findController: IPreviewFindController
   private readonly lifecycle: { dispose(): Promise<void> }
   private readonly factoryTeardown: () => void
+  private readonly linkBridge: PreviewLinkBridge
 
   private lastBoundsSeq = -1
   private lastBounds: PreviewBounds | null = null
@@ -163,6 +178,7 @@ export class PreviewLiveView {
   private lastPipelineAt = Number.NEGATIVE_INFINITY
   private trailingTimer: ReturnType<typeof setTimeout> | null = null
   private destroyed = false
+  private closing = false
 
   constructor(params: PreviewLiveViewParams) {
     this.panelId = params.panelId
@@ -195,6 +211,23 @@ export class PreviewLiveView {
       })
     )
 
+    this.linkBridge = createPreviewLinkBridge(
+      {
+        panelId: this.panelId,
+        token: this.token,
+        realRoot: this.realRoot,
+        windowId: params.window.id,
+        currentUrl: buildPreviewUrl(this.token, this.realRoot, this.entryFilePath)
+      },
+      {
+        requestOpenFile: (sourcePanelId, filePath, anchor, windowId) =>
+          this.deps.emit.openFileRequested(sourcePanelId, filePath, anchor, windowId),
+        openExternal: (url) =>
+          this.deps.openExternal?.(url) ?? Promise.reject(new Error('No external opener')),
+        recordFailure: (input) => this.failureLog.record(input)
+      }
+    )
+
     this.lifecycle = wirePreviewLifecycle(
       {
         webContents: this.wc,
@@ -212,7 +245,9 @@ export class PreviewLiveView {
         onEntryChange: () => this.reloadPolicy.record(this.entryFilePath),
         onEntryDeleted: () => this.onEntryDeleted(),
         onForwardedShortcut: (key) => this.deps.onForwardedShortcut?.(this.panelId, key),
-        onConsoleMessage: (input) => this.onConsoleMessage(input)
+        onConsoleMessage: (input) => this.onConsoleMessage(input),
+        onLinkActivated: (payload) => this.linkBridge.handleActivation(payload),
+        onNavigationAttempt: (url) => this.linkBridge.handleWillNavigate(url)
       }
     )
 
@@ -235,9 +270,16 @@ export class PreviewLiveView {
     }
   }
 
-  /** True once torn down or the webContents is gone; guards late external calls. */
+  /**
+   * True once torn down, closing, or the webContents is gone; guards late
+   * external calls.
+   *
+   * `closing` matters because `boundedDestroy` calls `wc.close()` and then waits
+   * up to `PREVIEW.CLOSE_TIMEOUT_MS` — a full second during which the contents
+   * is going away but `isDestroyed()` still answers `false` (sd-074b §4.4).
+   */
   private get isDefunct(): boolean {
-    return this.destroyed || this.wc.isDestroyed()
+    return this.destroyed || this.closing || this.wc.isDestroyed()
   }
 
   setBounds(bounds: PreviewBounds, seq: number): void {
@@ -294,6 +336,12 @@ export class PreviewLiveView {
     // §5(c): rebuild the CSP on the registry entry, purge, clear failures, reload.
     this.deps.registry.rebuildCsp(this.token, hosts)
     await this.deps.storageSeal.purge(this.session)
+    // Re-check AFTER the await: the purge yields, and a teardown starting in
+    // that window would otherwise leave `failureLog.clear()` re-emitting into a
+    // dropped log and `reloadIgnoringCache()` reaching a closing WebContents.
+    if (this.isDefunct) {
+      return
+    }
     this.failureLog.clear()
     this.wc.reloadIgnoringCache()
   }
@@ -480,36 +528,69 @@ export class PreviewLiveView {
       this.trailingTimer = null
     }
 
-    try {
-      this.window.contentView.removeChildView(this.view)
-    } catch {
-      // The window may already be gone on shutdown; nothing to reorder.
+    // EVERY step is individually guarded and the destroy is in a `finally`.
+    // Before this, `lifecycle.dispose()` and `watchCoordinator.dispose()` were
+    // awaited bare: a throw from either (a chokidar `close()` rejecting, say)
+    // skipped the token revoke, the still-frame invalidate AND `wc.destroy()`,
+    // while `this.destroyed` was already latched at the top — leaving a
+    // permanently inert object holding a live WebContents and a registry token.
+    // Under the multi-view registry that also strands the panel id forever,
+    // because every re-open would take the replace branch and re-await this
+    // same dead teardown (sd-074b §4.1).
+    await this.disposeCollaborators().finally(async () => {
+      if (mode === 'bounded') {
+        await this.boundedDestroy()
+      } else if (!this.wc.isDestroyed()) {
+        this.wc.destroy()
+      }
+    })
+  }
+
+  /**
+   * Release every collaborator this view owns. Each step is isolated so one
+   * failure cannot skip the rest; failures are logged, never rethrown, because
+   * a teardown that reports an error is still a teardown that must complete.
+   */
+  private async disposeCollaborators(): Promise<void> {
+    const step = (label: string, run: () => void): void => {
+      try {
+        run()
+      } catch (error) {
+        logger.warn('Preview teardown step failed', {
+          panelId: this.panelId,
+          step: label,
+          error: error instanceof Error ? error.message : String(error)
+        })
+      }
+    }
+    const asyncStep = async (label: string, run: () => Promise<void>): Promise<void> => {
+      try {
+        await run()
+      } catch (error) {
+        logger.warn('Preview teardown step failed', {
+          panelId: this.panelId,
+          step: label,
+          error: error instanceof Error ? error.message : String(error)
+        })
+      }
     }
 
-    await this.lifecycle.dispose()
-    this.factoryTeardown()
-    await this.watchCoordinator.dispose()
-    this.reloadPolicy.dispose()
-    this.findController.dispose()
-    this.failureLog.drop()
-    this.deps.stillFrameCache.invalidate(this.panelId)
-    this.deps.hostBlockNotifier.clear(this.projectPath)
-    this.deps.registry.revoke(this.token)
-    try {
-      await this.deps.storageSeal.purge(this.session)
-    } catch {
-      // A purge failure on a session being destroyed is not recoverable.
-    }
-
-    if (mode === 'bounded') {
-      await this.boundedDestroy()
-    } else if (!this.wc.isDestroyed()) {
-      this.wc.destroy()
-    }
+    step('removeChildView', () => this.window.contentView.removeChildView(this.view))
+    await asyncStep('lifecycle.dispose', () => this.lifecycle.dispose())
+    step('factoryTeardown', () => this.factoryTeardown())
+    await asyncStep('watchCoordinator.dispose', () => this.watchCoordinator.dispose())
+    step('linkBridge.dispose', () => this.linkBridge.dispose())
+    step('reloadPolicy.dispose', () => this.reloadPolicy.dispose())
+    step('findController.dispose', () => this.findController.dispose())
+    step('failureLog.drop', () => this.failureLog.drop())
+    step('stillFrameCache.invalidate', () => this.deps.stillFrameCache.invalidate(this.panelId))
+    step('registry.revoke', () => this.deps.registry.revoke(this.token))
+    await asyncStep('storageSeal.purge', () => this.deps.storageSeal.purge(this.session))
   }
 
   /** Race `close()` against `CLOSE_TIMEOUT_MS`, then force `destroy()` (X21). */
   private boundedDestroy(): Promise<void> {
+    this.closing = true
     const wc = this.wc
     return new Promise<void>((resolvePromise) => {
       if (wc.isDestroyed()) {

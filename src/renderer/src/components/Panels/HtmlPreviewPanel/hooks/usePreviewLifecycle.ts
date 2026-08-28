@@ -7,20 +7,28 @@
  * preview panel, and surfaces the two refusal/failure signals the panel body
  * renders around:
  *
- * - **limit-reached** — a second `open` with a different panel id is refused
- *   with `PREVIEW_VIEW_LIMIT_REACHED` and a `holderPanelId`, which the panel
- *   turns into "a preview is already open — Open as source" (design §1.4 X20).
+ * - **limit-reached** — this file is already previewed in ANOTHER WINDOW.
+ *   Panel ids are path-derived, so both windows mint the same id; main refuses
+ *   with `PREVIEW_VIEW_LIMIT_REACHED` rather than destroying the other window's
+ *   running view, and the panel offers "Open as source" (sd-074b §4.2).
+ *   Independent previews in the SAME window are no longer refused.
  * - **open-failed** — any other `open` failure (eligibility flip, session build
  *   error) collapses the panel to the failed banner, since no view was created.
  *
  * The successful path is silent here: once main accepts the open, load state,
  * failures and still frames flow through {@link usePreviewEvents} into the store.
  *
+ * The hook also RESUMES a suspended preview. Beyond `PREVIEW.MAX_LIVE_VIEWS`,
+ * main tears the least recently active view down to its still frame and emits
+ * `suspended`; when such a panel becomes the visible tab again, this hook
+ * re-opens it (sd-074b §4.3). That round trip is what makes the sleep policy
+ * invisible to the user.
+ *
  * @module usePreviewLifecycle
  * @see Issue #74 - HTML preview with CSS and JavaScript execution
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { ErrorCode } from '../../../../../../shared/errors'
 import { usePreviewStore } from '../../../../stores/usePreviewStore'
 import { deriveBounds } from '../htmlPreview.logic'
@@ -34,6 +42,12 @@ export interface UsePreviewLifecycleOptions {
   filePath: string
   /** Ref to the placeholder, read once to seed the initial `open` bounds. */
   placeholderRef: React.RefObject<HTMLElement>
+  /**
+   * Whether this panel is the visible tab. A suspended preview re-opens only
+   * when it becomes visible, so a background tab never resurrects itself and
+   * re-evicts the tab the user is actually looking at.
+   */
+  isVisible?: boolean
 }
 
 /** Result of {@link usePreviewLifecycle}. */
@@ -73,7 +87,7 @@ function initialBounds(el: HTMLElement | null): { x: number; y: number; width: n
 export function usePreviewLifecycle(
   options: UsePreviewLifecycleOptions
 ): UsePreviewLifecycleResult {
-  const { panelId, filePath, placeholderRef } = options
+  const { panelId, filePath, placeholderRef, isVisible = true } = options
 
   const [limitReached, setLimitReached] = useState(false)
   const [holderPanelId, setHolderPanelId] = useState<string | null>(null)
@@ -84,17 +98,20 @@ export function usePreviewLifecycle(
   const placeholderRefStable = useRef(placeholderRef)
   placeholderRefStable.current = placeholderRef
 
-  useEffect(() => {
-    let cancelled = false
-
-    void (async () => {
+  /**
+   * Ask main to open this preview. Shared by the mount effect and the resume
+   * effect, so an initial open and a wake-from-suspended take the identical
+   * path — including the refusal handling.
+   */
+  const requestOpen = useCallback(
+    async (isCancelled: () => boolean): Promise<void> => {
       try {
         const result = await window.api.preview.open({
           panelId,
           filePath,
           bounds: initialBounds(placeholderRefStable.current.current)
         })
-        if (cancelled) return
+        if (isCancelled()) return
 
         if (result.ok) return
 
@@ -111,15 +128,21 @@ export function usePreviewLifecycle(
         setOpenFailed(true)
         logger.warn('Preview open failed', { panelId, filePath, errorCode: result.errorCode })
       } catch (error) {
-        if (cancelled) return
+        if (isCancelled()) return
         setOpenFailed(true)
-        logger.error(
-          'Preview open threw',
-          error instanceof Error ? error : undefined,
-          { panelId, filePath }
-        )
+        logger.error('Preview open threw', error instanceof Error ? error : undefined, {
+          panelId,
+          filePath
+        })
       }
-    })()
+    },
+    [panelId, filePath]
+  )
+
+  useEffect(() => {
+    let cancelled = false
+
+    void requestOpen(() => cancelled)
 
     return () => {
       cancelled = true
@@ -129,7 +152,21 @@ export function usePreviewLifecycle(
       store.removePanel(panelId)
       if (store.holderPanelId === panelId) store.clearHolder()
     }
-  }, [panelId, filePath])
+  }, [panelId, filePath, requestOpen])
+
+  // Resume a suspended preview when its tab becomes visible again. Main emits
+  // `suspended` after evicting the least recently active view; the still frame
+  // stays on screen until this re-open lands, so the tab is never blank.
+  const loadState = usePreviewStore((state) => state.getLoadState(panelId))
+  useEffect(() => {
+    if (!isVisible || loadState !== 'suspended') return
+
+    let cancelled = false
+    void requestOpen(() => cancelled)
+    return () => {
+      cancelled = true
+    }
+  }, [isVisible, loadState, requestOpen])
 
   return { limitReached, holderPanelId, openFailed }
 }

@@ -570,6 +570,8 @@ Resolved by the #73 image-export work. The canonical extension list, the MIME ma
 
 **Impact**: `previewPathResolve.readExactly` buffers up to `PREVIEW.MAX_ASSET_BYTES` (25 MB) per request with no per-session in-flight-bytes budget. Many parallel subresource fetches to large in-project files can transiently pin hundreds of MB.
 
+  **Narrowed by sd-074b §4.7, not closed.** `MAX_CONCURRENT_ASSET_READS` is now a PROCESS-WIDE limiter with a bounded wait queue, rather than one limiter per session, so opening more previews no longer multiplies the bound; over the queue bound a read is shed with 503 and recorded as a failure instead of parking a URLLoader indefinitely. The per-read 25 MB ceiling and the absence of an in-flight BYTE budget remain.
+
 **Problem**: A self-inflicted DoS on the user's own project — no disclosure, and it aligns with the design's accepted-DoS posture (Erfana bounds its own work per reload, not the page's).
 
 **Recommended Solution**: a per-session in-flight byte ceiling, or streaming the response body instead of buffering.
