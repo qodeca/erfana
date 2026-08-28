@@ -236,51 +236,75 @@ export class PreviewSessionFactory implements IPreviewSessionFactory {
       throw new Error('Preview registry lost the token it just issued')
     }
 
-    // 3–5: fresh in-memory partition, web prefs, then the view (before hardening).
-    const session = this.deps.createSession(this.deps.nextPartitionName())
-    const webPreferences = this.deps.buildWebPreferences(session)
-    const view = this.deps.createView(webPreferences)
-
-    // 6: harden — needs the view's webContents for the WebRTC policy.
-    const disposeHarden = this.deps.hardenSession(session, view.webContents)
-
-    // 7: the single `erfana-preview://` application site.
-    const detachProtocol = this.deps.attachProtocol(session, {
-      resolve: (t) => registry.resolve(t) ?? null,
-      recordFailure: ctx.recordFailure
-    })
-
-    // 8: the unfiltered network gate, reading the LIVE allowed-host set so an
-    // approve does not need the filter re-attached.
-    const detachFilter = this.deps.attachFilter(session, {
-      getAllowedHosts: () => allowlistStore.getHosts(),
-      onBlocked: ctx.onBlocked,
-      onRequestStarted: () => {},
-      onRequestSettled: () => {}
-    })
-
-    const teardown = (): void => {
-      detachFilter()
-      detachProtocol()
-      disposeHarden()
+    // Steps 3–9 all run AFTER the token is live, and every one of them can
+    // throw: `createView` allocates a WebContentsView, `hardenSession` touches
+    // the new webContents, and both attach steps install session-level wiring.
+    //
+    // An earlier revision guarded step 9 only, under a comment claiming "no
+    // half-wired view leaks". That was true of the seal tripwire and of nothing
+    // else: a throw in `attachFilter` left the token resolvable and the protocol
+    // handler attached, so it kept serving confined file reads for the life of
+    // the process (lens review F9). The cleanup list is now built incrementally,
+    // so a failure at ANY step unwinds exactly what was built before it.
+    const unwind: Array<() => void> = [() => registry.revoke(token)]
+    const rollback = (): void => {
+      // Last built, first undone. Each step is independently guarded: one
+      // failing disposer must not strand the rest.
+      for (const undo of unwind.reverse()) {
+        try {
+          undo()
+        } catch {
+          // Nothing useful to do while already unwinding a failed build.
+        }
+      }
     }
 
-    // 9: the seal tripwire. A persistent partition throws — tear down everything
-    // built above, revoke the token and rethrow so no half-wired view leaks.
     try {
+      // 3–5: fresh in-memory partition, web prefs, then the view (before hardening).
+      const session = this.deps.createSession(this.deps.nextPartitionName())
+      const webPreferences = this.deps.buildWebPreferences(session)
+      const view = this.deps.createView(webPreferences)
+      unwind.push(() => {
+        if (!view.webContents.isDestroyed()) {
+          view.webContents.destroy()
+        }
+      })
+
+      // 6: harden — needs the view's webContents for the WebRTC policy.
+      const disposeHarden = this.deps.hardenSession(session, view.webContents)
+      unwind.push(disposeHarden)
+
+      // 7: the single `erfana-preview://` application site.
+      const detachProtocol = this.deps.attachProtocol(session, {
+        resolve: (t) => registry.resolve(t) ?? null,
+        recordFailure: ctx.recordFailure
+      })
+      unwind.push(detachProtocol)
+
+      // 8: the unfiltered network gate, reading the LIVE allowed-host set so an
+      // approve does not need the filter re-attached.
+      const detachFilter = this.deps.attachFilter(session, {
+        getAllowedHosts: () => allowlistStore.getHosts(),
+        onBlocked: ctx.onBlocked,
+        onRequestStarted: () => {},
+        onRequestSettled: () => {}
+      })
+      unwind.push(detachFilter)
+
+      // 9: the seal tripwire. A persistent partition throws.
       this.deps.assertSealed(session)
-    } catch (error) {
-      teardown()
-      // `teardown` only detaches the session wiring; destroy the view built at
-      // step 5 too, or the half-built WebContentsView leaks on a seal failure.
-      if (!view.webContents.isDestroyed()) {
-        view.webContents.destroy()
+
+      const teardown = (): void => {
+        detachFilter()
+        detachProtocol()
+        disposeHarden()
       }
-      registry.revoke(token)
+
+      return { view, session, token, realRoot: entry.realRoot, teardown }
+    } catch (error) {
+      rollback()
       throw error
     }
-
-    return { view, session, token, realRoot: entry.realRoot, teardown }
   }
 }
 

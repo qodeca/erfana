@@ -400,7 +400,11 @@ describe('PreviewViewService — open epoch guard', () => {
     resolveCreate(h.session)
     const result = await opening
 
-    expect(result).toEqual({ ok: false, errorCode: ErrorCode.PROJECT_NOT_FOUND })
+    // Supersession has its OWN code now. It used to share PROJECT_NOT_FOUND
+    // with the genuine "no project open" case, which left the renderer unable
+    // to tell a benign race from a real failure and latched a banner it never
+    // cleared (lens review F27).
+    expect(result).toEqual({ ok: false, errorCode: ErrorCode.PREVIEW_OPEN_SUPERSEDED })
     // The built-but-unused session is torn down, its token revoked, view destroyed.
     expect(h.session.teardown).toHaveBeenCalledTimes(1)
     expect(h.revoke).toHaveBeenCalledWith(h.token)
@@ -723,6 +727,28 @@ describe('PreviewViewService — live-view budget', () => {
       await h.service.open({ ...REQUEST_A, panelId: `panel-${i}` }, h.window)
     }
   }
+
+  /**
+   * The still-frame capture is real I/O and can reject. By that point the entry
+   * is already out of the registry, so a throw that skipped the teardown would
+   * leave a live renderer with no owner — unreachable by `close()`, and with the
+   * renderer never told it was suspended, so its resume effect never fires and
+   * the tab is permanently dead (lens review F8).
+   */
+  it('still tears the view down when the still-frame capture rejects', async () => {
+    const h = makeHarness()
+    const capture = h.deps.stillFrameCache.captureIfStale as unknown as ReturnType<typeof vi.fn>
+    capture.mockRejectedValue(new Error('capture failed'))
+
+    await openPanels(h, PREVIEW.MAX_LIVE_VIEWS + 1)
+
+    // The eviction still destroyed the view and told the renderer about it.
+    expect(h.factory.destroy).toHaveBeenCalled()
+    const suspended = h.loadStateChanged.mock.calls
+      .filter(([, state]) => state === 'suspended')
+      .map(([panelId]) => panelId)
+    expect(suspended).toEqual(['panel-1'])
+  })
 
   it('keeps up to MAX_LIVE_VIEWS running without suspending anything', async () => {
     const h = makeHarness()

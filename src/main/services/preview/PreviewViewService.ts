@@ -200,7 +200,7 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
       await existing.view.teardown('immediate')
       this.releaseProjectIfLast(existing.view.projectPath)
       if (this.registry.isStale(claim)) {
-        return { ok: false, errorCode: ErrorCode.PROJECT_NOT_FOUND }
+        return { ok: false, errorCode: ErrorCode.PREVIEW_OPEN_SUPERSEDED }
       }
     }
 
@@ -238,30 +238,50 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
       // close, or a newer open): discard it rather than install a stale view.
       failureLog.drop()
       await this.discardSession(session)
-      return { ok: false, errorCode: ErrorCode.PROJECT_NOT_FOUND }
+      return { ok: false, errorCode: ErrorCode.PREVIEW_OPEN_SUPERSEDED }
     }
 
-    const live = new PreviewLiveView({
-      panelId,
-      projectPath,
-      entryFilePath: req.filePath,
-      window,
-      initialBounds: req.bounds,
-      session,
-      failureLog,
-      deps: this.liveViewDeps
-    })
+    // The constructor does REAL work that can throw — it builds the watch
+    // coordinator, the find controller and a chokidar entry watcher, and calls
+    // `window.contentView.addChildView`. If the host window closed during the
+    // `create()` await above, that last call throws against a destroyed
+    // BrowserWindow. Unguarded, the session built one line earlier would never
+    // be discarded: its token stays resolvable and keeps serving file reads for
+    // the life of the process (lens review F9).
+    let live: PreviewLiveView
+    try {
+      live = new PreviewLiveView({
+        panelId,
+        projectPath,
+        entryFilePath: req.filePath,
+        window,
+        initialBounds: req.bounds,
+        session,
+        failureLog,
+        deps: this.liveViewDeps
+      })
+    } catch {
+      failureLog.drop()
+      await this.discardSession(session)
+      return { ok: false, errorCode: ErrorCode.PREVIEW_CSP_INVALID }
+    }
+
     this.registry.install(panelId, live, window.id)
     await live.load()
 
     // `load()` is an await like any other: re-check before leaving it running.
-    if (this.registry.isStale(claim)) {
+    //
+    // Identity FIRST, then staleness. `suspend()` removes the entry without
+    // moving the generation or this panel's sequence, so a staleness-only check
+    // would let this call report success for a view that is no longer installed
+    // (F8).
+    if (this.registry.get(panelId) !== live || this.registry.isStale(claim)) {
       if (this.registry.get(panelId) === live) {
         this.registry.remove(panelId)
       }
       await live.teardown('immediate')
       this.releaseProjectIfLast(projectPath)
-      return { ok: false, errorCode: ErrorCode.PROJECT_NOT_FOUND }
+      return { ok: false, errorCode: ErrorCode.PREVIEW_OPEN_SUPERSEDED }
     }
 
     await this.enforceLiveViewBudget(panelId)
@@ -286,13 +306,36 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
    * exit state the original single-view design lacked (sd-074 §10).
    */
   private async suspend(panelId: string): Promise<void> {
+    // Invalidate the panel's open claim, exactly as `close()` does. Without it,
+    // an `open` for this panel parked on `await live.load()` resumes, finds
+    // `isStale` false — neither the generation nor this panel's sequence moved —
+    // and reports `{ ok: true }` for a panel that no longer has a view (lens
+    // review F8).
+    this.registry.invalidateOpen(panelId)
+
     const view = this.registry.remove(panelId)
     if (view === null) {
       return
     }
     // Hiding captures the still frame and emits it, so the suspended tab shows
     // the page as it was rather than an empty placeholder.
-    await view.setVisibility(false)
+    //
+    // The capture is real I/O and can reject. The entry is already out of the
+    // registry at this point, so a throw that skipped the teardown would leave a
+    // live renderer process with no owner, unreachable by `close()`, and the
+    // renderer would never see `suspended` — leaving that tab permanently dead
+    // (lens review F8).
+    //
+    // The rejection is SWALLOWED rather than rethrown. Suspending is
+    // housekeeping the caller did not ask for — it happens inside someone else's
+    // `open` — so a failed screenshot must not fail their open. The cost of
+    // losing the frame is a placeholder-coloured tab, which is what a preview
+    // with no frame already shows.
+    try {
+      await view.setVisibility(false)
+    } catch {
+      // Nothing actionable: the view is being destroyed on the next line.
+    }
     await view.teardown('immediate')
     this.releaseProjectIfLast(view.projectPath)
     this.deps.emit.loadStateChanged(panelId, 'suspended', 0)

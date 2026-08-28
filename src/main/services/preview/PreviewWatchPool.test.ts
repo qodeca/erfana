@@ -11,6 +11,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import type { FSWatcher, WatchOptions } from 'chokidar'
 import { createPreviewWatchPool, type WatchFactory } from './PreviewWatchPool'
+import { createPreviewWatchBudget } from './previewWatchBudget'
 import { PREVIEW } from '../../../shared/constants'
 
 interface FakeWatcher {
@@ -194,4 +195,51 @@ describe('createPreviewWatchPool', () => {
 
     await expect(pool.release('/never-watched')).resolves.toBeUndefined()
   })
+
+  /**
+   * The budget slot is TAKEN in `acquire` and RETURNED only by `closeEntry`,
+   * which is reachable only through the entries map. A throw between the two
+   * burns the slot permanently, and the module docblock claims the take and the
+   * give "are one function apart and cannot drift" — this is the gap where they
+   * can (lens review F12).
+   *
+   * It matters because `acquire` returning false is the degrade-quietly branch:
+   * once the shared 64-slot budget is exhausted, every preview silently loses
+   * auto-refresh with nothing surfaced anywhere.
+   */
+  it('returns the budget slot when the watcher factory throws', () => {
+    const budget = createPreviewWatchBudget(1)
+    const exploding: WatchFactory = () => {
+      throw new Error('EMFILE')
+    }
+    const pool = createPreviewWatchPool({ createWatcher: exploding, budget })
+
+    expect(() => pool.acquire('/p/a.css', vi.fn())).toThrow('EMFILE')
+
+    // The single slot must be back, or the next preview never watches anything.
+    expect(budget.tryTake()).toBe(true)
+  })
+
+  it('does not leak the slot across repeated failures', () => {
+    const budget = createPreviewWatchBudget(2)
+    let calls = 0
+    const flaky: WatchFactory = (path, handlers, overrides) => {
+      calls += 1
+      if (calls <= 3) throw new Error('ENOSPC')
+      const watcher = { close: vi.fn(async () => {}) }
+      void path
+      void handlers
+      void overrides
+      return watcher as unknown as FSWatcher
+    }
+    const pool = createPreviewWatchPool({ createWatcher: flaky, budget })
+
+    for (const file of ['/p/a.css', '/p/b.css', '/p/c.css']) {
+      expect(() => pool.acquire(file, vi.fn())).toThrow('ENOSPC')
+    }
+
+    // Three failures must not have consumed the two-slot budget.
+    expect(pool.acquire('/p/d.css', vi.fn())).toBe(true)
+  })
+
 })

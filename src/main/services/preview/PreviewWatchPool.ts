@@ -151,11 +151,22 @@ export function createPreviewWatchPool(deps: PreviewWatchPoolDeps = {}): IPrevie
       // needed", so onChange and onDeleted both fire the signal. The re-arm keeps
       // the watch alive across an atomic save so later edits still reload.
       const fire = (): void => entry.onChange()
-      entry.watcher = createRearmingSingleFileWatcher(
-        filePath,
-        { onChange: fire, onDeleted: fire, onError: () => {} },
-        { createWatcher, isPathConfined, createDetector, overrides: PREVIEW_WATCH_OVERRIDES }
-      )
+      // The slot is taken above but only RETURNED by `closeEntry`, which is
+      // reachable only through `entries`. A throw between the two — chokidar
+      // failing on EMFILE/ENOSPC, or the confinement check rejecting — would
+      // burn the slot permanently, and 64 of those stop auto-refresh for every
+      // preview with no error surfaced anywhere, because `acquire` returning
+      // false is the degrade-quietly branch (lens review F12).
+      try {
+        entry.watcher = createRearmingSingleFileWatcher(
+          filePath,
+          { onChange: fire, onDeleted: fire, onError: () => {} },
+          { createWatcher, isPathConfined, createDetector, overrides: PREVIEW_WATCH_OVERRIDES }
+        )
+      } catch (error) {
+        budget.give()
+        throw error
+      }
       entries.set(filePath, entry)
       return true
     },

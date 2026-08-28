@@ -298,10 +298,29 @@ export class PreviewLiveView {
     this.view.setBounds(dip)
   }
 
+  /**
+   * Show or hide the native view.
+   *
+   * ORDERING IS THE HARD PART. The hide path captures a still frame first, which
+   * is a real async round trip, while the show path is entirely synchronous. So
+   * a hide that started earlier can finish LATER than a show that started after
+   * it — open an overlay and dismiss it quickly and the late hide wins, leaving
+   * the view hidden while `OverlayGuardService` has already recorded it visible.
+   * Because that guard only re-sends on a CHANGE, nothing corrects it and the
+   * panel stays on its placeholder until some unrelated transition (F10).
+   *
+   * `wantedVisible` is the last state anyone asked for. The hide re-reads it
+   * after the capture and stands down if a show overtook it. The call is also
+   * fire-and-forget from `ipcMain.on`, so nothing else serialises these.
+   */
+  private wantedVisible = false
+
   async setVisibility(visible: boolean): Promise<void> {
     if (this.isDefunct) {
       return
     }
+    this.wantedVisible = visible
+
     if (visible) {
       // Re-adding an already-present child reorders it topmost (design §5(d)).
       this.window.contentView.addChildView(this.view)
@@ -314,6 +333,13 @@ export class PreviewLiveView {
       this.panelId,
       this.lastBounds ?? { x: 0, y: 0, width: 0, height: 0 }
     )
+
+    // A show landed while we were capturing, or the view died. Either way this
+    // hide is stale; the frame we just captured is still worth keeping.
+    if (this.wantedVisible || this.isDefunct) {
+      return
+    }
+
     const frame = this.deps.stillFrameCache.get(this.panelId)
     if (frame !== undefined) {
       this.deps.emit.stillFrameChanged(this.panelId, frame)

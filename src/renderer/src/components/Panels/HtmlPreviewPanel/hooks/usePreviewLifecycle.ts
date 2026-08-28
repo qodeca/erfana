@@ -105,6 +105,12 @@ export function usePreviewLifecycle(
    */
   const requestOpen = useCallback(
     async (isCancelled: () => boolean): Promise<void> => {
+      // Clear whatever the LAST attempt concluded. Without this there is no
+      // path back out of either banner: a panel that once failed keeps saying so
+      // for the rest of its mount even after a later open succeeds (F27).
+      setOpenFailed(false)
+      setLimitReached(false)
+
       try {
         const result = await window.api.preview.open({
           panelId,
@@ -121,6 +127,19 @@ export function usePreviewLifecycle(
           if (result.holderPanelId) {
             usePreviewStore.getState().setHolder(result.holderPanelId)
           }
+          return
+        }
+
+        if (result.errorCode === ErrorCode.PREVIEW_OPEN_SUPERSEDED) {
+          // Not a failure. Something newer overtook this open — a project
+          // switch, a close, a suspend, or another open for the same panel — so
+          // the staleness guard did exactly its job. Whoever superseded us owns
+          // what happens next; showing a banner here would be wrong, and used to
+          // be permanent because nothing ever cleared it.
+          //
+          // `isCancelled()` covers only supersession started by THIS effect, so
+          // it does not catch the suspend/evict case, which is why the code
+          // exists at all.
           return
         }
 
