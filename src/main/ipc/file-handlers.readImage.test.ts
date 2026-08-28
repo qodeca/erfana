@@ -12,7 +12,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 const handlers: Record<string, (...args: any[]) => any> = {}
 
 vi.mock('./senderValidation', () => ({
-  isTrustedSender: vi.fn(() => true)
+  isTrustedSender: vi.fn(() => true),
+    isTrustedAppSender: () => true
 }))
 
 vi.mock('electron', () => ({

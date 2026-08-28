@@ -9,9 +9,10 @@
  * @see logger.ts - renderer process logger
  * @see Issue #49 - logging layer implementation
  */
-import { ipcMain, shell } from 'electron'
+import { shell } from 'electron'
 import { loggingService } from '../services/LoggingService'
 import { LogEntrySchema } from '../../shared/ipc/logging-schema'
+import { registerHandle, registerOn } from './registry'
 
 /**
  * Register all logging IPC handlers
@@ -21,7 +22,7 @@ export function registerLoggingHandlers(): void {
    * Receive log entry from renderer process
    * One-way channel (ipcMain.on) for performance - renderer doesn't need response
    */
-  ipcMain.on('logging:log', (_event, entry: unknown) => {
+  registerOn('logging:log', (_event, entry: unknown) => {
     // Validate log entry
     const result = LogEntrySchema.safeParse(entry)
     if (!result.success) {
@@ -37,7 +38,7 @@ export function registerLoggingHandlers(): void {
    * Get current log level
    * Used by renderer to sync its initial level
    */
-  ipcMain.handle('logging:getLevel', async () => {
+  registerHandle('logging:getLevel', async () => {
     return loggingService.getLevel()
   })
 
@@ -45,7 +46,7 @@ export function registerLoggingHandlers(): void {
    * Get logs directory path
    * Used by renderer to display the path in settings
    */
-  ipcMain.handle('logging:getLogsDir', async () => {
+  registerHandle('logging:getLogsDir', async () => {
     return loggingService.getLogsDir()
   })
 
@@ -53,7 +54,7 @@ export function registerLoggingHandlers(): void {
    * Open logs folder in the system file manager
    * Returns empty string on success, error string on failure
    */
-  ipcMain.handle('logging:openLogsFolder', async () => {
+  registerHandle('logging:openLogsFolder', async () => {
     return shell.openPath(loggingService.getLogsDir())
   })
 }

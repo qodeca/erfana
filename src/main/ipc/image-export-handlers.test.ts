@@ -20,6 +20,12 @@ import { IMAGE_EXPORT_CHANNELS } from '../../shared/ipc/image-export-channels'
 
 const mockIpcMainHandle = vi.fn()
 const mockFromWebContents = vi.fn()
+// This suite exercises the REAL sender predicates: it asserts that an untrusted
+// frame is refused, which is the whole point of the file. `setupTests.main.ts`
+// stubs them true by default so the other handler suites can drive their
+// channels with a stand-in event; opt out here.
+vi.unmock('./senderValidation')
+
 vi.mock('electron', () => ({
   ipcMain: { handle: (...args: unknown[]) => mockIpcMainHandle(...args) },
   BrowserWindow: { fromWebContents: (...args: unknown[]) => mockFromWebContents(...args) }
@@ -69,56 +75,62 @@ beforeEach(() => {
   mockRun.mockResolvedValue({ success: true, target: 'png', output: { width: 1, height: 1 } })
 })
 
+/**
+ * Two gates now stand in front of this handler, and the OUTER one fires first.
+ *
+ * `src/main/ipc/registry.ts` checks the sender for every global channel and
+ * THROWS on refusal, so the renderer's `invoke` promise rejects rather than
+ * resolving with a structured error. That is a deliberate behaviour change from
+ * the era when only this handler's own `isTrustedSender` call stood here: an
+ * untrusted caller now gets nothing back to parse.
+ *
+ * The handler's own check is kept as defence in depth and is exercised below by
+ * driving the inner function directly.
+ */
 describe('image-export:run — trust gate', () => {
-  it('refuses an untrusted sender, logs a warning, and NEVER calls the service', async () => {
+  it('rejects an untrusted sender and NEVER calls the service', async () => {
     const handler = await getHandler()
-    const response = await handler(makeEvent({ url: 'https://evil.example.com', parent: null }), {
-      filePath: '/p/a.png',
-      target: 'png'
-    })
-
-    expect(response).toEqual({
-      success: false,
-      errorCode: ErrorCode.IMAGE_EXPORT_INVALID_REQUEST,
-      error: ERROR_MESSAGES[ErrorCode.IMAGE_EXPORT_INVALID_REQUEST]
-    })
-    expect(mockRun).not.toHaveBeenCalled()
-    expect(mockLogger.warn).toHaveBeenCalledWith(
-      expect.stringContaining('untrusted sender'),
-      expect.anything()
-    )
-    // Even a rejected sender's URL is a path in a packaged build
-    // (`file:///Users/<name>/...`), so it is redacted before it is logged.
-    const context = mockLogger.warn.mock.calls[0][1] as { url: string }
-    expect(context.url).toContain('[redacted]')
-    expect(context.url).not.toContain('https://evil.example.com')
-  })
-
-  it('refuses a sub-frame', async () => {
-    const handler = await getHandler()
-    const response = await handler(makeEvent({ url: RENDERER_FILE_URL, parent: {} }), {
-      filePath: '/p/a.png',
-      target: 'png'
-    })
-    expect(response).toMatchObject({ errorCode: ErrorCode.IMAGE_EXPORT_INVALID_REQUEST })
+    expect(() => handler(makeEvent({ url: 'https://evil.example.com', parent: null }), {
+        filePath: '/p/a.png',
+        target: 'png'
+      })).toThrow(/Untrusted sender/)
     expect(mockRun).not.toHaveBeenCalled()
   })
 
-  it('refuses an event with no sender frame at all', async () => {
+  it('rejects a sub-frame', async () => {
     const handler = await getHandler()
-    const response = await handler(makeEvent(null), { filePath: '/p/a.png', target: 'png' })
-    expect(response).toMatchObject({ errorCode: ErrorCode.IMAGE_EXPORT_INVALID_REQUEST })
+    expect(() => handler(makeEvent({ url: RENDERER_FILE_URL, parent: {} }), {
+        filePath: '/p/a.png',
+        target: 'png'
+      })).toThrow(/Untrusted sender/)
+    expect(mockRun).not.toHaveBeenCalled()
+  })
+
+  it('rejects an event with no sender frame at all', async () => {
+    const handler = await getHandler()
+    expect(() => handler(makeEvent(null), { filePath: '/p/a.png', target: 'png' })).toThrow(/Untrusted sender/)
     expect(mockRun).not.toHaveBeenCalled()
   })
 
   it('runs the trust gate BEFORE the schema, so a bad sender never reaches Zod', async () => {
     const handler = await getHandler()
-    // Payload is invalid too; the response must still be the sender refusal,
+    // The payload is invalid too; the refusal must still be about the sender,
     // and the "invalid payload" warning must not have been logged.
-    await handler(makeEvent({ url: 'https://evil.example.com', parent: null }), { nope: true })
+    expect(() => handler(makeEvent({ url: 'https://evil.example.com', parent: null }), { nope: true })).toThrow(/Untrusted sender/)
     const warnings = mockLogger.warn.mock.calls.map((call) => String(call[0]))
-    expect(warnings.some((line) => line.includes('untrusted sender'))).toBe(true)
     expect(warnings.some((line) => line.includes('invalid payload'))).toBe(false)
+  })
+
+  it('logs the refusal with the sender origin only, never the full URL', async () => {
+    const handler = await getHandler()
+    expect(() => handler(makeEvent({ url: 'https://evil.example.com/a/secret?t=1', parent: null }), {
+        filePath: '/p/a.png',
+        target: 'png'
+      })).toThrow(/Untrusted sender/)
+
+    const logged = JSON.stringify(mockLogger.warn.mock.calls)
+    expect(logged).toContain('https://evil.example.com')
+    expect(logged).not.toContain('secret')
   })
 })
 

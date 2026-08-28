@@ -11,6 +11,8 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
+import { PREVIEW_PAGE_LINK_CHANNEL } from '../main/services/preview/previewLinkBridge'
+
 const RAW = readFileSync(join(__dirname, 'previewPage.ts'), 'utf8')
 
 /**
@@ -23,6 +25,21 @@ const RAW = readFileSync(join(__dirname, 'previewPage.ts'), 'utf8')
 const SOURCE = RAW.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
 
 describe('previewPage preload contract', () => {
+  /**
+   * The channel name exists TWICE on purpose: the preload must stay
+   * self-contained, because `electron.vite.config.ts` fails the build if two
+   * preload entries share a module by value (#73). Nothing else pins the two
+   * copies together, and a drift between them makes every preview link go inert
+   * with no error anywhere — silence being the exact failure this feature was
+   * built to remove (lens review F31).
+   *
+   * A value import is fine HERE: the build constraint applies to the preload
+   * bundle, not to its test.
+   */
+  it('inlines the same channel name the main process listens on', () => {
+    expect(SOURCE).toContain(`'${PREVIEW_PAGE_LINK_CHANNEL}'`)
+  })
+
   it('exposes nothing to the page — no contextBridge', () => {
     expect(SOURCE).not.toContain('contextBridge')
   })

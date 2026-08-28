@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { ipcMain } from 'electron'
 import { gitStatusService, createGitStatusService, GitStatusService } from '../services/GitStatusService'
 import { validateProjectPath } from '../utils/pathSecurity'
 import { logger } from '../services/LoggingService'
+import { registerHandle } from './registry'
 
 /**
  * Register git-related IPC handlers
@@ -13,7 +13,7 @@ import { logger } from '../services/LoggingService'
  */
 export function registerGitHandlers(gitService: GitStatusService = gitStatusService): void {
   // Get git status for a project directory
-  ipcMain.handle('git:getStatus', async (_event, projectPath: string) => {
+  registerHandle('git:getStatus', async (_event, projectPath: string) => {
     try {
       // Validate input type
       if (!projectPath || typeof projectPath !== 'string') {

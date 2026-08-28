@@ -47,7 +47,8 @@ function setup(overrides?: {
   registerPreviewAllowlistHandlers({
     allowlistStore: { approveHost },
     service: { applyApprovedHosts },
-    isTrustedSender: () => overrides?.trusted ?? true
+    isTrustedSender: () => overrides?.trusted ?? true,
+    isTrustedAppSender: () => true
   })
   return { approveHost, applyApprovedHosts }
 }

@@ -5,7 +5,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // Capture ipc handlers
 const handlers: Record<string, (...args: any[]) => any> = {}
 
-vi.mock('./senderValidation', () => ({ isTrustedSender: () => true }))
+vi.mock('./senderValidation', () => ({ isTrustedSender: () => true,
+    isTrustedAppSender: () => true }))
 
 vi.mock('electron', () => ({
   ipcMain: {

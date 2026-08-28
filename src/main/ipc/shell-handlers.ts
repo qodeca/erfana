@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { ipcMain, shell } from 'electron'
+import { shell } from 'electron'
 import { logger } from '../services/LoggingService'
+import { registerHandle } from './registry'
 
 /**
  * Shell IPC Handlers
@@ -67,7 +68,7 @@ export function registerShellHandlers(): void {
    * @throws when the URL is missing, oversize, unparseable, carries a protocol
    *         outside {@link ALLOWED_EXTERNAL_PROTOCOLS}, or embeds credentials
    */
-  ipcMain.handle('shell:openExternal', async (_event, url: unknown) => {
+  registerHandle('shell:openExternal', async (_event, url: unknown) => {
     if (typeof url !== 'string' || url.length === 0 || url.length > MAX_URL_LENGTH) {
       logger.warn('Refused shell:openExternal — not a bounded string', {
         type: typeof url,

@@ -198,6 +198,51 @@ export default [
       ]
     }
   },
+  // Main process: `ipcMain` has exactly ONE permitted importer,
+  // `src/main/ipc/registry.ts` (exempt below).
+  //
+  // Every global IPC channel must be gated on the app's own top-level renderer.
+  // That was first attempted by monkey-patching the `ipcMain` singleton at the
+  // composition root, which failed three ways: it broke `removeListener` by
+  // registering a different closure than the caller held, it was walked around
+  // entirely by `addListener` / `prependListener` (the same prototype function
+  // under another name), and its "install before any handler registers"
+  // requirement was a comment with nothing to enforce it.
+  //
+  // Routing every registration through one module removes all three by
+  // construction, and this rule is what keeps the module from being bypassed —
+  // the same enforcement pattern used for `api.preview.setVisibility` and
+  // `openFileInPanel` in the renderer block below. See sd-074b §7.
+  //
+  // NOTE: `no-restricted-imports` is set for `e2e/**` and for
+  // `src/renderer/src/imageExport/**` elsewhere in this file. Neither overlaps
+  // `src/main/**`, so this block is safe — but flat config REPLACES a rule
+  // rather than merging it, so never add a second block setting
+  // `no-restricted-imports` for main-process files.
+  {
+    files: ['src/main/**/*.ts'],
+    // Tests read the emitter to assert what a `register*Handlers()` call put on
+    // it, which is exactly what they are for. The rule exists to keep
+    // PRODUCTION registrations behind the gate; a test is not an attack surface.
+    ignores: ['src/main/ipc/registry.ts', 'src/main/**/*.test.ts'],
+    rules: {
+      'no-restricted-imports': 'off',
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'electron',
+              importNames: ['ipcMain'],
+              allowTypeImports: true,
+              message:
+                'Register global IPC through src/main/ipc/registry.ts (registerHandle / registerOn / …) so every channel is gated on the app renderer. Importing ipcMain directly bypasses that gate.'
+            }
+          ]
+        }
+      ]
+    }
+  },
   // Renderer process: four families of code that keep reintroducing bugs, or
   // that would reintroduce a security property this app relies on.
   //

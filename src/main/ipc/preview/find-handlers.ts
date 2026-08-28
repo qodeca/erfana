@@ -16,7 +16,7 @@
  *
  * @see docs/designs/sd-074-html-preview.md §5(e), §1.7, §7 item 45
  */
-import { ipcMain, type IpcMainInvokeEvent } from 'electron'
+import { type IpcMainInvokeEvent } from 'electron'
 import {
   PreviewFindRequestSchema,
   PreviewPanelRequestSchema
@@ -26,6 +26,7 @@ import type { PdfExportResult } from '../../../shared/ipc/preview-types'
 import { ErrorCode } from '../../../shared/errors'
 import type { PreviewFindExportService } from '../../services/preview/PreviewViewService'
 import { logger } from '../../services/LoggingService'
+import { registerHandle, unregisterHandle } from '../registry'
 
 /**
  * Default suggested export filename. The strict `exportPdf` schema carries no
@@ -54,7 +55,7 @@ export function registerPreviewFindHandlers(deps: PreviewFindHandlerDeps): () =>
     return true
   }
 
-  ipcMain.handle(PreviewChannels.FIND, async (event, arg: unknown): Promise<void> => {
+  registerHandle(PreviewChannels.FIND, async (event, arg: unknown): Promise<void> => {
     if (rejectUntrusted(PreviewChannels.FIND, event)) {
       return
     }
@@ -71,7 +72,7 @@ export function registerPreviewFindHandlers(deps: PreviewFindHandlerDeps): () =>
     }
   })
 
-  ipcMain.handle(PreviewChannels.STOP_FIND, async (event, arg: unknown): Promise<void> => {
+  registerHandle(PreviewChannels.STOP_FIND, async (event, arg: unknown): Promise<void> => {
     if (rejectUntrusted(PreviewChannels.STOP_FIND, event)) {
       return
     }
@@ -89,7 +90,7 @@ export function registerPreviewFindHandlers(deps: PreviewFindHandlerDeps): () =>
     }
   })
 
-  ipcMain.handle(
+  registerHandle(
     PreviewChannels.EXPORT_PDF,
     async (event, arg: unknown): Promise<PdfExportResult> => {
       if (rejectUntrusted(PreviewChannels.EXPORT_PDF, event)) {
@@ -112,8 +113,8 @@ export function registerPreviewFindHandlers(deps: PreviewFindHandlerDeps): () =>
   )
 
   return () => {
-    ipcMain.removeHandler(PreviewChannels.FIND)
-    ipcMain.removeHandler(PreviewChannels.STOP_FIND)
-    ipcMain.removeHandler(PreviewChannels.EXPORT_PDF)
+    unregisterHandle(PreviewChannels.FIND)
+    unregisterHandle(PreviewChannels.STOP_FIND)
+    unregisterHandle(PreviewChannels.EXPORT_PDF)
   }
 }

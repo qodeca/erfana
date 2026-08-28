@@ -21,7 +21,6 @@
  * @see Issue #75 - Media import with transcription
  * @see Issue #111 - Local Whisper transcription backend
  */
-import { ipcMain } from 'electron'
 import { writeFile, mkdir } from 'fs/promises'
 import { join, basename, extname, isAbsolute, normalize } from 'path'
 import { TRANSCRIPTION_CHANNELS } from '../../shared/ipc/transcription-channels'
@@ -49,6 +48,7 @@ import { fileService } from '../services/FileService'
 import { logger } from '../services/LoggingService'
 import { changeExtension, sanitizeFileName, findAvailableFileName, formatDuration } from '../utils/fileUtils'
 import { isVideoExtension } from '../services/import/extensions'
+import { registerHandle } from './registry'
 
 /** Active AbortController for current transcription */
 let activeController: AbortController | null = null
@@ -92,7 +92,7 @@ export function registerTranscriptionHandlers(): void {
    * 7. Writes markdown to import/ directory
    * 8. Returns result
    */
-  ipcMain.handle(
+  registerHandle(
     TRANSCRIPTION_CHANNELS.IMPORT,
     async (event, request: unknown): Promise<TranscriptionImportResult> => {
       // Validate request schema
@@ -436,7 +436,7 @@ export function registerTranscriptionHandlers(): void {
   /**
    * Cancel active transcription
    */
-  ipcMain.handle(
+  registerHandle(
     TRANSCRIPTION_CHANNELS.CANCEL,
     async (): Promise<{ success: boolean; error?: string }> => {
       if (activeController) {
@@ -452,7 +452,7 @@ export function registerTranscriptionHandlers(): void {
   /**
    * Quick validation of audio file
    */
-  ipcMain.handle(
+  registerHandle(
     TRANSCRIPTION_CHANNELS.VALIDATE,
     async (
       _event,
@@ -494,7 +494,7 @@ export function registerTranscriptionHandlers(): void {
   /**
    * Store API key in safeStorage
    */
-  ipcMain.handle(
+  registerHandle(
     TRANSCRIPTION_CHANNELS.SET_API_KEY,
     async (_event, apiKey: string): Promise<{ success: boolean; error?: string }> => {
       if (!apiKey || typeof apiKey !== 'string' || apiKey.trim().length === 0) {
@@ -525,7 +525,7 @@ export function registerTranscriptionHandlers(): void {
   /**
    * Check if API key exists
    */
-  ipcMain.handle(
+  registerHandle(
     TRANSCRIPTION_CHANNELS.HAS_API_KEY,
     async (): Promise<boolean> => {
       try {
@@ -540,7 +540,7 @@ export function registerTranscriptionHandlers(): void {
   /**
    * Remove stored API key
    */
-  ipcMain.handle(
+  registerHandle(
     TRANSCRIPTION_CHANNELS.CLEAR_API_KEY,
     async (): Promise<{ success: boolean; error?: string }> => {
       try {
@@ -569,7 +569,7 @@ export function registerTranscriptionHandlers(): void {
    *
    * Streams download progress to renderer via WHISPER_DOWNLOAD_PROGRESS channel.
    */
-  ipcMain.handle(
+  registerHandle(
     TRANSCRIPTION_CHANNELS.WHISPER_ENSURE_BINARY,
     async (event): Promise<{ success: boolean; path?: string; error?: string }> => {
       const webContents = event.sender
@@ -602,7 +602,7 @@ export function registerTranscriptionHandlers(): void {
    *
    * Streams download progress to renderer via WHISPER_DOWNLOAD_PROGRESS channel.
    */
-  ipcMain.handle(
+  registerHandle(
     TRANSCRIPTION_CHANNELS.WHISPER_ENSURE_MODEL,
     async (
       event,
@@ -641,7 +641,7 @@ export function registerTranscriptionHandlers(): void {
   /**
    * List installed whisper models with info
    */
-  ipcMain.handle(
+  registerHandle(
     TRANSCRIPTION_CHANNELS.WHISPER_LIST_MODELS,
     async (): Promise<{
       success: boolean
@@ -667,7 +667,7 @@ export function registerTranscriptionHandlers(): void {
   /**
    * Delete an installed whisper model
    */
-  ipcMain.handle(
+  registerHandle(
     TRANSCRIPTION_CHANNELS.WHISPER_DELETE_MODEL,
     async (
       _event,

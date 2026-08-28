@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { ipcMain } from 'electron'
 import { docxService } from '../services/DocxService'
 import { DocxExportRequestSchema, type DocxExportResponse } from '../../shared/ipc/docx-schema'
 import { ErrorCode } from '../../shared/errors'
 import { logger } from '../services/LoggingService'
+import { registerHandle } from './registry'
 
 /**
  * Register DOCX export IPC handlers
@@ -23,7 +23,7 @@ export function registerDocxHandlers(): void {
    * @param request - { html: string, fileName: string }
    * @returns Export result with file path or error
    */
-  ipcMain.handle(
+  registerHandle(
     'docx:exportToDocx',
     async (_event, request: unknown): Promise<DocxExportResponse> => {
       // Validate request schema

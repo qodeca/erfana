@@ -14,7 +14,7 @@
  *
  * @see docs/designs/sd-074-html-preview.md §3.3, §5(c)
  */
-import { ipcMain, type IpcMainInvokeEvent } from 'electron'
+import { type IpcMainInvokeEvent } from 'electron'
 import { PreviewApproveHostRequestSchema } from '../../../shared/ipc/preview-schema'
 import { PreviewChannels } from '../../../shared/ipc/preview-channels'
 import type { PreviewApproveResult } from '../../../shared/ipc/preview-types'
@@ -22,6 +22,7 @@ import { AppError, ErrorCode } from '../../../shared/errors'
 import type { IPreviewViewService } from '../../services/preview/PreviewViewService'
 import type { IPreviewAllowlistStore } from '../../services/preview/PreviewAllowlistStore'
 import { logger } from '../../services/LoggingService'
+import { registerHandle, unregisterHandle } from '../registry'
 
 /** Injected collaborators for the allowlist handler. */
 export interface PreviewAllowlistHandlerDeps {
@@ -40,7 +41,7 @@ export function registerPreviewAllowlistHandlers(
 ): () => void {
   const { allowlistStore, service, isTrustedSender } = deps
 
-  ipcMain.handle(
+  registerHandle(
     PreviewChannels.APPROVE_HOST,
     async (event, arg: unknown): Promise<PreviewApproveResult> => {
       if (!isTrustedSender(event)) {
@@ -73,6 +74,6 @@ export function registerPreviewAllowlistHandlers(
   )
 
   return () => {
-    ipcMain.removeHandler(PreviewChannels.APPROVE_HOST)
+    unregisterHandle(PreviewChannels.APPROVE_HOST)
   }
 }

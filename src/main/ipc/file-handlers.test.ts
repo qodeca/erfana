@@ -12,7 +12,8 @@ const showItemInFolder = vi.fn()
 const isTrustedSenderMock = vi.fn(() => true)
 
 vi.mock('./senderValidation', () => ({
-  isTrustedSender: isTrustedSenderMock
+  isTrustedSender: isTrustedSenderMock,
+    isTrustedAppSender: () => true
 }))
 
 vi.mock('electron', () => {

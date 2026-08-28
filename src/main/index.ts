@@ -4,7 +4,6 @@ import { app, shell, BrowserWindow, Menu } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { spawnNewInstance } from './utils/spawnNewInstance'
-import { installIpcSenderGate } from './ipc/ipcSenderGate'
 import { registerFileHandlers } from './ipc/file-handlers'
 import { registerFileWatcherHandlers } from './ipc/file-watcher-handlers'
 import { registerDirectoryWatcherHandlers } from './ipc/directory-watcher-handlers'
@@ -363,12 +362,11 @@ app.whenReady().then(async () => {
     () => gitWatcherService.isWatching()
   )
 
-  // Gate every global ipcMain channel on the app's own top-level renderer
-  // BEFORE any handler registers — handlers registered earlier keep the
-  // unwrapped path (sd-074b §7).
-  installIpcSenderGate()
-
-  // Register IPC handlers
+  // Register IPC handlers. Every global channel is gated on the app's own
+  // top-level renderer by construction: the handlers register through
+  // `src/main/ipc/registry.ts`, and an ESLint rule stops `ipcMain` being
+  // imported anywhere else (sd-074b §7). There is no install step to forget and
+  // no ordering to get wrong.
   registerFileHandlers()
   registerFileWatcherHandlers()
   registerDirectoryWatcherHandlers()

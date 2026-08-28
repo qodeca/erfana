@@ -18,7 +18,7 @@
  *
  * @see docs/designs/sd-074-html-preview.md §4.3, §5(a)
  */
-import { ipcMain, BrowserWindow, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron'
+import { BrowserWindow, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron'
 import {
   PreviewCheckEligibilityRequestSchema,
   PreviewOpenRequestSchema,
@@ -35,6 +35,7 @@ import type { IPreviewViewService, PreviewOpenRequest } from '../../services/pre
 import type { PreviewWindowLike } from '../../services/preview/PreviewViewService'
 import type { IPreviewEligibilityService } from '../../services/preview/PreviewEligibilityService'
 import { logger } from '../../services/LoggingService'
+import { registerHandle, registerOn, unregisterHandle, unregisterOn } from '../registry'
 
 /** The lifecycle service surface (a slice of {@link IPreviewViewService}). */
 export type PreviewLifecycleService = Pick<
@@ -75,7 +76,7 @@ export function registerPreviewLifecycleHandlers(
     return true
   }
 
-  ipcMain.handle(
+  registerHandle(
     PreviewChannels.CHECK_ELIGIBILITY,
     async (event, arg: unknown): Promise<PreviewCheckEligibilityResponse> => {
       if (rejectUntrusted(PreviewChannels.CHECK_ELIGIBILITY, event)) {
@@ -105,7 +106,7 @@ export function registerPreviewLifecycleHandlers(
     }
   )
 
-  ipcMain.handle(
+  registerHandle(
     PreviewChannels.OPEN,
     async (event, arg: unknown): Promise<PreviewOpenResult> => {
       if (rejectUntrusted(PreviewChannels.OPEN, event)) {
@@ -136,7 +137,7 @@ export function registerPreviewLifecycleHandlers(
     }
   )
 
-  ipcMain.handle(PreviewChannels.CLOSE, async (event, arg: unknown): Promise<void> => {
+  registerHandle(PreviewChannels.CLOSE, async (event, arg: unknown): Promise<void> => {
     if (rejectUntrusted(PreviewChannels.CLOSE, event)) {
       return
     }
@@ -154,7 +155,7 @@ export function registerPreviewLifecycleHandlers(
     }
   })
 
-  ipcMain.handle(PreviewChannels.RELOAD, async (event, arg: unknown): Promise<void> => {
+  registerHandle(PreviewChannels.RELOAD, async (event, arg: unknown): Promise<void> => {
     if (rejectUntrusted(PreviewChannels.RELOAD, event)) {
       return
     }
@@ -208,15 +209,15 @@ export function registerPreviewLifecycleHandlers(
     }
   }
 
-  ipcMain.on(PreviewChannels.SET_BOUNDS, onSetBounds)
-  ipcMain.on(PreviewChannels.SET_VISIBILITY, onSetVisibility)
+  registerOn(PreviewChannels.SET_BOUNDS, onSetBounds)
+  registerOn(PreviewChannels.SET_VISIBILITY, onSetVisibility)
 
   return () => {
-    ipcMain.removeHandler(PreviewChannels.CHECK_ELIGIBILITY)
-    ipcMain.removeHandler(PreviewChannels.OPEN)
-    ipcMain.removeHandler(PreviewChannels.CLOSE)
-    ipcMain.removeHandler(PreviewChannels.RELOAD)
-    ipcMain.removeListener(PreviewChannels.SET_BOUNDS, onSetBounds)
-    ipcMain.removeListener(PreviewChannels.SET_VISIBILITY, onSetVisibility)
+    unregisterHandle(PreviewChannels.CHECK_ELIGIBILITY)
+    unregisterHandle(PreviewChannels.OPEN)
+    unregisterHandle(PreviewChannels.CLOSE)
+    unregisterHandle(PreviewChannels.RELOAD)
+    unregisterOn(PreviewChannels.SET_BOUNDS, onSetBounds)
+    unregisterOn(PreviewChannels.SET_VISIBILITY, onSetVisibility)
   }
 }
