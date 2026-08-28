@@ -8,6 +8,8 @@
  * hand-off, and that a refused link always leaves a badge entry instead of
  * today's silence.
  */
+import { resolve } from 'node:path'
+
 import { describe, expect, it, vi } from 'vitest'
 import { ErrorCode } from '../../../shared/errors'
 import { routeLinkActivation, type PreviewLinkNavigationDeps } from './previewLinkNavigation'
@@ -47,7 +49,7 @@ describe('routeLinkActivation', () => {
   it('asks the OWNING window to open a confined in-project file', async () => {
     const deps = makeDeps()
 
-    await routeLinkActivation({ href: `erfana-preview://${TOKEN}/other.html` }, CONTEXT, deps)
+    await routeLinkActivation({ href: `erfana-preview://${TOKEN}/other.html`, provenance: 'gesture' }, CONTEXT, deps)
 
     expect(deps.requestOpenFile).toHaveBeenCalledWith(
       'preview-1',
@@ -62,7 +64,7 @@ describe('routeLinkActivation', () => {
     const deps = makeDeps()
 
     await routeLinkActivation(
-      { href: `erfana-preview://${TOKEN}/other.html#part-2` },
+      { href: `erfana-preview://${TOKEN}/other.html#part-2`, provenance: 'gesture' },
       CONTEXT,
       deps
     )
@@ -83,15 +85,21 @@ describe('routeLinkActivation', () => {
     })
 
     await routeLinkActivation(
-      { href: `erfana-preview://${TOKEN}/node_modules/pkg/demo.html` },
+      { href: `erfana-preview://${TOKEN}/node_modules/pkg/demo.html`, provenance: 'gesture' },
       CONTEXT,
       deps
     )
 
-    // Confinement is asked to skip the exclusion rule, never the escape rules.
-    expect(deps.confine).toHaveBeenCalledWith(REAL_ROOT, expect.any(String), {
-      allowExcluded: true
-    })
+    // Confinement is asked to skip the BUILD-DIRECTORY rule only — never the
+    // escape rules and never the dot-segment rule (F2). The candidate is
+    // asserted exactly, not as `expect.any(String)`: the whole point is that the
+    // path handed to confinement is re-resolved against the real root rather
+    // than taken from the page.
+    expect(deps.confine).toHaveBeenCalledWith(
+      REAL_ROOT,
+      resolve(REAL_ROOT, 'node_modules/pkg/demo.html'),
+      { allowBuildDirs: true }
+    )
     expect(deps.requestOpenFile).toHaveBeenCalled()
   })
 
@@ -99,7 +107,7 @@ describe('routeLinkActivation', () => {
     const deps = makeDeps({ ok: false, reason: 'escape' })
 
     await routeLinkActivation(
-      { href: `erfana-preview://${TOKEN}/..%2F..%2Fetc%2Fhosts` },
+      { href: `erfana-preview://${TOKEN}/..%2F..%2Fetc%2Fhosts`, provenance: 'gesture' },
       CONTEXT,
       deps
     )
@@ -113,7 +121,7 @@ describe('routeLinkActivation', () => {
   it('records a missing-file failure for a dead in-project link', async () => {
     const deps = makeDeps({ ok: false, reason: 'missing' })
 
-    await routeLinkActivation({ href: `erfana-preview://${TOKEN}/gone.html` }, CONTEXT, deps)
+    await routeLinkActivation({ href: `erfana-preview://${TOKEN}/gone.html`, provenance: 'gesture' }, CONTEXT, deps)
 
     expect(deps.recordFailure).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'missing-local-file' })
@@ -123,17 +131,49 @@ describe('routeLinkActivation', () => {
   it('hands an external link to the OS browser', async () => {
     const deps = makeDeps()
 
-    await routeLinkActivation({ href: 'https://example.com/docs' }, CONTEXT, deps)
+    await routeLinkActivation({ href: 'https://example.com/docs', provenance: 'gesture' }, CONTEXT, deps)
 
     expect(deps.openExternal).toHaveBeenCalledWith('https://example.com/docs')
     expect(deps.requestOpenFile).not.toHaveBeenCalled()
+  })
+
+  it('refuses an external link the page navigated to itself', async () => {
+    const deps = makeDeps()
+
+    // `will-navigate` fires for `location.href = …` exactly as it does for a
+    // click, so it proves nothing about user intent. Only the preload can prove
+    // a gesture, and the OS hand-off requires one (F1).
+    await routeLinkActivation(
+      { href: 'https://example.com/docs', provenance: 'navigation' },
+      CONTEXT,
+      deps
+    )
+
+    expect(deps.openExternal).not.toHaveBeenCalled()
+    expect(deps.recordFailure).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'blocked-link', resourceUrlOrHost: 'https://example.com' })
+    )
+  })
+
+  it('still opens an in-project link the page navigated to itself', async () => {
+    const deps = makeDeps()
+
+    // The degradation path stays useful: a plain same-tab link keeps working
+    // even if the preload is missing from the bundle.
+    await routeLinkActivation(
+      { href: `erfana-preview://${TOKEN}/other.html`, provenance: 'navigation' },
+      CONTEXT,
+      deps
+    )
+
+    expect(deps.requestOpenFile).toHaveBeenCalled()
   })
 
   it('records a failure when the OS refuses the hand-off', async () => {
     const deps = makeDeps()
     deps.openExternal.mockRejectedValue(new Error('no handler'))
 
-    await routeLinkActivation({ href: 'https://example.com/' }, CONTEXT, deps)
+    await routeLinkActivation({ href: 'https://example.com/', provenance: 'gesture' }, CONTEXT, deps)
 
     expect(deps.recordFailure).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'blocked-link' })
@@ -143,7 +183,7 @@ describe('routeLinkActivation', () => {
   it('records a blocked-link failure for a dangerous scheme — never silence', async () => {
     const deps = makeDeps()
 
-    await routeLinkActivation({ href: 'javascript:alert(1)' }, CONTEXT, deps)
+    await routeLinkActivation({ href: 'javascript:alert(1)', provenance: 'gesture' }, CONTEXT, deps)
 
     expect(deps.recordFailure).toHaveBeenCalledWith({
       type: 'blocked-link',
@@ -157,7 +197,7 @@ describe('routeLinkActivation', () => {
     const deps = makeDeps()
 
     await routeLinkActivation(
-      { href: 'https://user:pass@example.com/secret?token=abc123' },
+      { href: 'https://user:pass@example.com/secret?token=abc123', provenance: 'gesture' },
       CONTEXT,
       deps
     )
@@ -171,7 +211,7 @@ describe('routeLinkActivation', () => {
   it('strips control characters from the recorded value', async () => {
     const deps = makeDeps()
 
-    await routeLinkActivation({ href: 'javascript:\u0000\u001f fake-log-line' }, CONTEXT, deps)
+    await routeLinkActivation({ href: 'javascript:\u0000\u001f fake-log-line', provenance: 'gesture' }, CONTEXT, deps)
 
     const recorded = deps.recordFailure.mock.calls[0][0] as { resourceUrlOrHost: string }
     // eslint-disable-next-line no-control-regex
@@ -181,7 +221,7 @@ describe('routeLinkActivation', () => {
   it('does nothing for a fragment on the current document', async () => {
     const deps = makeDeps()
 
-    await routeLinkActivation({ href: `${CURRENT}#section` }, CONTEXT, deps)
+    await routeLinkActivation({ href: `${CURRENT}#section`, provenance: 'gesture' }, CONTEXT, deps)
 
     expect(deps.requestOpenFile).not.toHaveBeenCalled()
     expect(deps.openExternal).not.toHaveBeenCalled()
@@ -192,7 +232,7 @@ describe('routeLinkActivation', () => {
     const deps = makeDeps()
 
     await routeLinkActivation(
-      { href: `erfana-preview://${TOKEN}/report.pdf`, download: true },
+      { href: `erfana-preview://${TOKEN}/report.pdf`, download: true, provenance: 'gesture' },
       CONTEXT,
       deps
     )

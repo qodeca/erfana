@@ -21,6 +21,21 @@ import type { PreviewFailureInput } from '../../../shared/ipc/preview-types'
 import { decideLinkIntent, type LinkActivation } from './PreviewNavigationPolicy'
 import { confinePath } from './previewPathResolve'
 
+/**
+ * How the activation reached us, and therefore how much it is trusted.
+ *
+ * `gesture` comes from the preview preload, which refuses anything without
+ * `event.isTrusted` — so a real person clicked something. `navigation` comes
+ * from `will-navigate`, which fires for `location.href = …` just as readily as
+ * for a click, so it proves nothing about user intent.
+ *
+ * The distinction is load-bearing, not cosmetic: `will-navigate` is the ONLY
+ * lock on a page navigating itself under `CSP: sandbox`, and before the split a
+ * page could reach `shell.openExternal` in a `setInterval` loop with nobody
+ * touching the mouse (lens review F1).
+ */
+export type LinkProvenance = 'gesture' | 'navigation'
+
 /** Where the activated link happened, and who should hear about the result. */
 export interface PreviewLinkContext {
   /** The panel whose page was clicked in. */
@@ -91,7 +106,7 @@ function sanitize(value: string): string {
  * ```
  */
 export async function routeLinkActivation(
-  activation: Omit<LinkActivation, 'currentUrl' | 'token'>,
+  activation: Omit<LinkActivation, 'currentUrl' | 'token'> & { provenance: LinkProvenance },
   context: PreviewLinkContext,
   deps: PreviewLinkNavigationDeps
 ): Promise<void> {
@@ -117,6 +132,18 @@ export async function routeLinkActivation(
       return
 
     case 'external':
+      // Handing a URL to the OS browser is the highest-consequence thing a link
+      // can do here, so it requires a gesture we can actually vouch for. Only
+      // the preload can prove one, and it ships in every build — `will-navigate`
+      // is the degradation path for plain links, not an equal citizen (F1).
+      if (activation.provenance !== 'gesture') {
+        deps.recordFailure({
+          type: 'blocked-link',
+          resourceUrlOrHost: sanitize(describeLink(intent.url)),
+          reasonCode: ErrorCode.PREVIEW_LINK_BLOCKED
+        })
+        return
+      }
       try {
         await deps.openExternal(intent.url)
       } catch {
@@ -131,11 +158,15 @@ export async function routeLinkActivation(
 
     case 'in-project': {
       const candidate = resolve(context.realRoot, intent.relPath)
-      // `allowExcluded`: a link into `node_modules/` or `dist/` must still be
-      // openable as SOURCE, so the exclusion rule is skipped while every escape
-      // rule stays (sd-074b §3.2). The renderer's `resolvePanelKind` is what
-      // then decides it opens in Monaco rather than as a running preview.
-      const verdict = await confine(context.realRoot, candidate, { allowExcluded: true })
+      // `allowBuildDirs`: a link into `node_modules/` or `dist/` must still be
+      // openable as SOURCE, so the build-directory rule is skipped while every
+      // escape rule AND the dot-segment rule stay (sd-074b §3.2). The renderer's
+      // `resolvePanelKind` is what then decides it opens in Monaco rather than as
+      // a running preview.
+      //
+      // Do NOT widen this to the dot-segment rule: that would let a link in an
+      // untrusted page open `.env` or `.git/config` in the editor (F2).
+      const verdict = await confine(context.realRoot, candidate, { allowBuildDirs: true })
 
       if (!verdict.ok) {
         deps.recordFailure({

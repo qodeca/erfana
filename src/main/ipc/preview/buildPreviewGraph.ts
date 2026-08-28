@@ -112,8 +112,23 @@ function defaultResolveEmitTargets(): readonly PreviewEmitTarget[] {
  * a hostile path or query from filling the dialog.
  *
  * Cancel is the default button, so dismissing the dialog opens nothing.
+ *
+ * SERIALISED. Link routing is fire-and-forget (`void routeLinkActivation(…)`),
+ * so without a queue several activations could each open a modal and stack them
+ * on top of one another — consent fatigue at best, an unusable app at worst
+ * (lens review F1). One dialog is in flight at a time, process-wide.
  */
+let externalConfirmChain: Promise<void> = Promise.resolve()
+
 async function confirmThenOpenExternal(url: string): Promise<void> {
+  const run = externalConfirmChain.then(() => showConfirmAndOpen(url))
+  // Keep the chain alive even if this link's dialog or hand-off rejects; a
+  // failure must not wedge every later external link.
+  externalConfirmChain = run.catch(() => undefined)
+  return run
+}
+
+async function showConfirmAndOpen(url: string): Promise<void> {
   const parsed = new URL(url)
   const destination =
     parsed.protocol === 'mailto:' ? parsed.pathname : parsed.origin || parsed.protocol

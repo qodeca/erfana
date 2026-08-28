@@ -275,7 +275,19 @@ Roughly 118 `ipcMain.handle` / `.on` registrations exist; sender checks appear i
 
 Resolution: floor raised to `^39.8.10` and installed. `CVE-2026-70612`, named in the review, was **not** confirmed by first-hand reading; the advisories above are what `npm audit` actually reports, and the first one covers the same class of risk.
 
-Remaining: `npm audit` still flags `electron` transitively through `extract-zip`, with Electron **44** as the only offered fix. That is an install-time dependency, not app runtime, and a major upgrade — recorded here as a separate product decision, not part of this work.
+**Correction (lens review F4).** An earlier revision of this section said one advisory remained, reachable only through `extract-zip`. That was wrong on both counts, and the corrected picture is below. `npm audit` run 2026-08-29 against this lockfile:
+
+| Scope | Result |
+|---|---|
+| All dependencies | 29 advisories — 1 critical, 25 high, 1 moderate, 2 low |
+| Production only (`--omit=dev`) | **10 high, no critical** |
+
+- **Fixed here:** `tar` was pinned at `7.5.16` as a direct **production** dependency, reached at runtime by `tarArchive.ts` → `WhisperModelManager` when a whisper binary is extracted. It carried a critical decompression-DoS advisory (GHSA-23hp-3jrh-7fpw) plus eleven others. Bumped to **`7.5.22`**, which clears every one of them — the newest, GHSA-r292-9mhp-454m, covers `<=7.5.20`, so 7.5.19 would not have been enough.
+- **Still critical, but build-time only:** the remaining critical is `tar@6.2.1` inside `electron-builder`'s own chain (`@electron/node-gyp`, `@electron/rebuild`, `cacache`). It never ships to a user. `npm audit` offers `electron-builder@26.15.3`, a same-major fix that also clears a large share of the 25 high findings. **Not applied here**: electron-builder is the release toolchain, and a change to it wants a real release to validate rather than a merge to `develop`.
+- **`extract-zip`:** the framing was imprecise. Erfana has its **own** direct dependency on the vulnerable version, and that copy is mitigated by the `assertSafeEntry` zip-slip pre-validation pass in `src/main/utils/zipArchive.ts`. Electron's internal copy has no such guard and moves only with a major upgrade. Two different things, previously conflated.
+- **`electron` itself is among the ten production advisories.** The flagged range covers the installed 39.8.10, and 39.x has been out of support since 2026-05-05. Raising the floor inside a dead line buys the fixes already published and none of the future ones — see the Electron 44 decision, which is tracked separately from this work.
+
+The other nine production advisories (`@llamaindex/liteparse`, `@turbodocx/html-to-docx`, `axios`, `fast-uri`, `form-data`, `image-size`, `nanoid`, `sharp`) all predate this work and are untouched by it.
 
 This phase stands on its own merits and should ship whether or not the rest lands.
 

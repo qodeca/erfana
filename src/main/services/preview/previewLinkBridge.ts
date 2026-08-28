@@ -24,6 +24,7 @@ import { ErrorCode } from '../../../shared/errors'
 import type { PreviewFailureInput } from '../../../shared/ipc/preview-types'
 import {
   routeLinkActivation,
+  type LinkProvenance,
   type PreviewLinkContext,
   type PreviewLinkNavigationDeps
 } from './previewLinkNavigation'
@@ -31,8 +32,20 @@ import {
 /** Channel name; must match the inlined constant in `src/preload/previewPage.ts`. */
 export const PREVIEW_PAGE_LINK_CHANNEL = 'preview-page:linkActivated'
 
-/** At most this many link activations are honoured per second, per view. */
-const MAX_ACTIVATIONS_PER_SECOND = 10
+/**
+ * At most this many link activations are honoured per second, per view, per
+ * provenance. The two budgets are separate on purpose.
+ *
+ * `gesture` is generous because a human clicking fast is still a human.
+ * `navigation` is deliberately tiny: a page can drive `will-navigate` from
+ * `location.href` with no user involvement at all, so this is the ceiling on
+ * what an untrusted page can make Erfana do by itself. It must never be able to
+ * spend the human's allowance (lens review F1).
+ */
+const MAX_ACTIVATIONS_PER_SECOND: Record<LinkProvenance, number> = {
+  gesture: 10,
+  navigation: 2
+}
 
 /** A repeat of the same href inside this window is the same click. */
 const DEDUPE_WINDOW_MS = 1000
@@ -79,53 +92,83 @@ export function createPreviewLinkBridge(
 ): PreviewLinkBridge {
   const now = deps.now ?? Date.now
   const recentHrefs = new Map<string, number>()
-  let windowStartedAt = now()
-  let inWindow = 0
+  const windows: Record<LinkProvenance, { startedAt: number; used: number }> = {
+    gesture: { startedAt: now(), used: 0 },
+    navigation: { startedAt: now(), used: 0 }
+  }
   let disposed = false
 
-  /** `false` when this activation exceeds the per-second allowance. */
-  const withinRateLimit = (): boolean => {
+  /** `false` when this activation exceeds its provenance's per-second allowance. */
+  const withinRateLimit = (provenance: LinkProvenance): boolean => {
     const timestamp = now()
-    if (timestamp - windowStartedAt >= 1000) {
-      windowStartedAt = timestamp
-      inWindow = 0
+    const window = windows[provenance]
+    if (timestamp - window.startedAt >= 1000) {
+      window.startedAt = timestamp
+      window.used = 0
     }
-    inWindow += 1
-    return inWindow <= MAX_ACTIVATIONS_PER_SECOND
+    window.used += 1
+    return window.used <= MAX_ACTIVATIONS_PER_SECOND[provenance]
   }
 
-  /** `true` when this href was already routed for what is plainly the same click. */
+  /**
+   * `true` when this href was already routed for what is plainly the same click.
+   *
+   * The stamp is recorded only for activations that are actually ROUTED. Writing
+   * it on every attempt made the window slide, so holding a link down — or a
+   * page re-navigating to it — suppressed it indefinitely rather than for one
+   * second (lens review F25).
+   */
   const isDuplicate = (href: string): boolean => {
     const timestamp = now()
     for (const [seen, at] of recentHrefs) {
       if (timestamp - at >= DEDUPE_WINDOW_MS) recentHrefs.delete(seen)
     }
     const previous = recentHrefs.get(href)
+    if (previous !== undefined && timestamp - previous < DEDUPE_WINDOW_MS) {
+      return true
+    }
     recentHrefs.set(href, timestamp)
-    return previous !== undefined && timestamp - previous < DEDUPE_WINDOW_MS
+    return false
   }
 
-  const route = (activation: { href: string; target?: string; download?: boolean }): void => {
+  /**
+   * Validate, budget, de-duplicate, then route.
+   *
+   * BOTH entry points come through here, so the bound in
+   * {@link LinkActivationPayloadSchema} applies to `will-navigate` too. It did
+   * not before, which left the OS hand-off reachable with a multi-megabyte URL
+   * (lens review F1).
+   */
+  const route = (payload: unknown, provenance: LinkProvenance): void => {
     if (disposed) return
-    if (!withinRateLimit()) return
-    if (isDuplicate(activation.href)) return
-    void routeLinkActivation(activation, context, deps)
+
+    const parsed = LinkActivationPayloadSchema.safeParse(payload)
+    if (!parsed.success) {
+      // From the preload this can only be a compromised preview renderer; from
+      // `will-navigate` it is an href the page made too long or too strange to
+      // be worth acting on. Either way it is a finding, not a routing decision.
+      deps.recordFailure(malformedPayloadFailure())
+      return
+    }
+
+    if (!withinRateLimit(provenance)) {
+      // Never silent: a click that goes nowhere with no trace is the failure
+      // mode this whole feature exists to remove.
+      deps.recordFailure(rateLimitedFailure())
+      return
+    }
+    if (isDuplicate(parsed.data.href)) return
+
+    void routeLinkActivation({ ...parsed.data, provenance }, context, deps)
   }
 
   return {
     handleActivation(payload: unknown): void {
-      const parsed = LinkActivationPayloadSchema.safeParse(payload)
-      if (!parsed.success) {
-        // A malformed payload can only come from a compromised preview
-        // renderer, so it is a finding, not a routing decision.
-        deps.recordFailure(malformedPayloadFailure())
-        return
-      }
-      route(parsed.data)
+      route(payload, 'gesture')
     },
 
     handleWillNavigate(url: string): void {
-      route({ href: url })
+      route({ href: url }, 'navigation')
     },
 
     dispose(): void {
@@ -140,6 +183,15 @@ function malformedPayloadFailure(): PreviewFailureInput {
   return {
     type: 'blocked-link',
     resourceUrlOrHost: '(malformed link message)',
+    reasonCode: ErrorCode.PREVIEW_LINK_BLOCKED
+  }
+}
+
+/** The failure entry recorded when a link is dropped for exceeding its budget. */
+function rateLimitedFailure(): PreviewFailureInput {
+  return {
+    type: 'blocked-link',
+    resourceUrlOrHost: '(too many links at once)',
     reasonCode: ErrorCode.PREVIEW_LINK_BLOCKED
   }
 }

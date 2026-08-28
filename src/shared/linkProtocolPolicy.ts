@@ -78,6 +78,15 @@ export type LinkProtocolKind =
  * classifyLinkProtocol('ms-msdt:/id')           // 'unknown'
  * ```
  */
+/**
+ * A leading `scheme:`, using the WHATWG scheme grammar.
+ *
+ * Only consulted when `new URL()` has already THROWN, to tell "malformed web
+ * address" apart from "no scheme at all". Tab, newline and carriage return are
+ * stripped first because the parser strips them too.
+ */
+const SCHEME_PREFIX = /^[a-z][a-z0-9+.-]*:/i
+
 export function classifyLinkProtocol(href: string): LinkProtocolKind {
   if (typeof href !== 'string' || href.trim() === '') {
     return 'relative'
@@ -87,9 +96,18 @@ export function classifyLinkProtocol(href: string): LinkProtocolKind {
   try {
     protocol = new URL(href).protocol.toLowerCase()
   } catch {
-    // No scheme (or an unparseable one): a relative path or fragment. Callers
+    // Unparseable. That is NOT the same as "has no scheme": `http://exa mple.com`
+    // and a bare `http://` both throw, and treating them as relative would hand
+    // a malformed WEB address to project-file resolution — which is what the
+    // first revision of this module did, silently changing which links work
+    // (lens review F23).
+    //
+    // A href that announces a scheme it cannot honour is refused by default; one
+    // with no scheme at all is a project-relative path or fragment, and callers
     // resolve it against the document and confine it to the project.
-    return 'relative'
+    // eslint-disable-next-line no-control-regex
+    const withoutStrippable = href.replace(/[\u0009\u000a\u000d]/g, '')
+    return SCHEME_PREFIX.test(withoutStrippable) ? 'unknown' : 'relative'
   }
 
   if (DANGEROUS_PROTOCOLS.has(protocol)) return 'dangerous'
