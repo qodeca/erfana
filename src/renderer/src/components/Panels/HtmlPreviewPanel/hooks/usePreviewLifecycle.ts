@@ -33,6 +33,7 @@ import { ErrorCode } from '../../../../../../shared/errors'
 import { usePreviewStore } from '../../../../stores/usePreviewStore'
 import { deriveBounds } from '../htmlPreview.logic'
 import { logger } from '../../../../utils/logger'
+import { getBasename } from '../../../../utils/fileUtils'
 
 /** Options for {@link usePreviewLifecycle}. */
 export interface UsePreviewLifecycleOptions {
@@ -140,6 +141,15 @@ export function usePreviewLifecycle(
           // `isCancelled()` covers only supersession started by THIS effect, so
           // it does not catch the suspend/evict case, which is why the code
           // exists at all.
+          //
+          // But say so somewhere. Returning in total silence is what made an
+          // invisible preview so slow to find: a genuinely failed open painted a
+          // black rectangle and reported nothing anywhere. Basename only — the
+          // absolute path carries the user's home directory.
+          logger.debug('Preview open superseded', {
+            panelId,
+            file: getBasename(filePath)
+          })
           return
         }
 
