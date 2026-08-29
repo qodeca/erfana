@@ -41,7 +41,12 @@ vi.mock('../../services/LoggingService', () => ({
 }))
 
 const BOUNDS: PreviewBoundsPayload = { x: 0, y: 0, width: 100, height: 100 }
-const FAKE_WINDOW = { contentView: {}, getContentBounds: () => BOUNDS } as never
+const FAKE_WINDOW = {
+  id: 1,
+  isDestroyed: () => false,
+  contentView: {},
+  getContentBounds: () => BOUNDS
+} as never
 
 function makeService(): PreviewLifecycleService & {
   open: ReturnType<typeof vi.fn>

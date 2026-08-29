@@ -72,6 +72,8 @@ export interface PreviewHandlerDeps {
 export interface PreviewHandlerBundle {
   /** Zoom a focused previewed page; `false` when none is focused. */
   zoomFocused(step: number): Promise<boolean>
+  /** Tear down every preview hosted by a window that is closing. */
+  closeWindow(windowId: number): Promise<void>
   dispose: () => Promise<void>
 }
 
@@ -128,6 +130,8 @@ export function registerPreviewHandlers(deps: PreviewHandlerDeps): PreviewHandle
     // must not reach up into the app shell, and doing so also dragged the real
     // `electron` module into every test that loads this file.
     zoomFocused: (step: number): Promise<boolean> => graph.service.zoomFocused(step),
+
+    closeWindow: (windowId: number): Promise<void> => graph.service.closeWindow(windowId),
 
     dispose: async (): Promise<void> => {
       unregisterLifecycle()

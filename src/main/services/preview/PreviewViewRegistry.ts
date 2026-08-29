@@ -151,6 +151,24 @@ export class PreviewViewRegistry {
     return this.ofProject(projectPath).length
   }
 
+  /**
+   * Remove and return every entry belonging to one window.
+   *
+   * Used when that window closes. Without it nothing reaps a window's views: the
+   * app-level disposer only runs at quit, and by then the window — and its
+   * `contentView` — is already destroyed, so every `removeChildView` throws.
+   */
+  drainWindow(windowId: number): readonly PreviewViewEntry[] {
+    const drained: PreviewViewEntry[] = []
+    for (const [panelId, entry] of [...this.views.entries()]) {
+      if (entry.windowId === windowId) {
+        this.views.delete(panelId)
+        drained.push(entry)
+      }
+    }
+    return drained
+  }
+
   /** Remove and return every entry, leaving the registry empty. */
   drain(): readonly PreviewViewEntry[] {
     const entries = [...this.views.values()]

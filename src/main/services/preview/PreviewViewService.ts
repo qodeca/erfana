@@ -78,6 +78,8 @@ export interface IPreviewViewService {
   reload(panelId: string, opts?: { ignoreCache?: boolean }): Promise<void>
   /** Zoom the previewed page by `step` levels, or back to 100% with `0`. */
   setZoom(panelId: string, step: number): Promise<void>
+  /** Tear down every preview hosted by a window that is closing. */
+  closeWindow(windowId: number): Promise<void>
   /**
    * Zoom whichever previewed page holds keyboard focus.
    *
@@ -475,6 +477,37 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
 
   async destroyAll(_reason: string): Promise<void> {
     await this.teardownAll()
+  }
+
+  /**
+   * Tear down every preview hosted by a window that is closing.
+   *
+   * WHY THIS EXISTS RATHER THAN A LIVENESS GUARD. On quit the window is destroyed
+   * first (`index.ts` — `mainWindowRef.destroy()` then `app.quit()`), and only
+   * afterwards does `before-quit` dispose the preview handlers. So every view was
+   * torn down against a dead window and logged
+   * `Preview teardown step failed { step: 'removeChildView' }` on every clean
+   * exit. Guarding the detach against `isDestroyed()` would have silenced that
+   * warning while leaving the real gap: nothing reaped a window's views when the
+   * WINDOW went away, which is latent with one window and a leak with two.
+   *
+   * Draining here closes both — there is nothing left to detach by the time the
+   * app-level disposer runs. `index.ts` already does exactly this for watchers,
+   * terminals and git.
+   */
+  async closeWindow(windowId: number): Promise<void> {
+    const entries = this.registry.drainWindow(windowId)
+    if (entries.length === 0) {
+      return
+    }
+    for (const entry of entries) {
+      this.registry.invalidateOpen(entry.view.panelId)
+    }
+    const projects = new Set(entries.map((entry) => entry.view.projectPath))
+    await Promise.allSettled(entries.map((entry) => entry.view.teardown('immediate')))
+    for (const projectPath of projects) {
+      this.releaseProjectIfLast(projectPath)
+    }
   }
 
   async onProjectChanged(_oldPath: string | null, _newPath: string | null): Promise<void> {

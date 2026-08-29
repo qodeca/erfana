@@ -157,6 +157,8 @@ interface Harness {
   factory: FakeWc
   session: PreviewSession
   view: PreviewViewHandle
+  /** Flip the host window to destroyed, modelling the quit ordering. */
+  setWindowDestroyed(value: boolean): void
   /** The view double's `setBackgroundColor`, typed so its calls are readable. */
   setBackgroundColor: ReturnType<typeof vi.fn<(color: string) => void>>
   backdropChanged: ReturnType<typeof vi.fn<(panelId: string, color: string) => void>>
@@ -214,14 +216,19 @@ function makeHarness(
 
   const addChildView = vi.fn<(v: PreviewViewHandle) => void>()
   const removeChildView = vi.fn<(v: PreviewViewHandle) => void>()
+  // `windowDestroyed` is settable so a test can model the quit ordering: the
+  // window dies first, previews are torn down afterwards.
+  let windowDestroyed = false
   const window = {
     id: options.windowId ?? 1,
+    isDestroyed: () => windowDestroyed,
     contentView: { addChildView, removeChildView },
     getContentBounds: () => ({ x: 0, y: 0, width: 1000, height: 800 })
   } as unknown as PreviewWindowLike
   /** A second window for the cross-window panel-id collision case. */
   const otherWindow = {
     id: (options.windowId ?? 1) + 1,
+    isDestroyed: () => false,
     contentView: { addChildView, removeChildView },
     getContentBounds: () => ({ x: 0, y: 0, width: 1000, height: 800 })
   } as unknown as PreviewWindowLike
@@ -328,6 +335,9 @@ function makeHarness(
     purge,
     setWatchSet,
     loadStateChanged,
+    setWindowDestroyed: (value: boolean) => {
+      windowDestroyed = value
+    },
     setBackgroundColor,
     backdropChanged,
     hostBlocked,
@@ -440,6 +450,75 @@ describe('PreviewViewService — open epoch guard', () => {
     // The slot is free: a fresh open now succeeds.
     const next = await h.service.open({ ...REQUEST_A, panelId: 'panel-B' }, h.window)
     expect(next).toEqual({ ok: true })
+  })
+})
+
+describe('PreviewViewService — window teardown', () => {
+  it('drains a window\'s previews when that window closes', async () => {
+    const h = makeHarness()
+    await h.service.open(REQUEST_A, h.window)
+
+    await h.service.closeWindow(h.window.id)
+
+    // Nothing reaped a window's views before this: the app-level disposer only
+    // runs at quit, so a second window's previews simply leaked.
+    expect(h.factory.destroy).toHaveBeenCalled()
+    expect(h.revoke).toHaveBeenCalled()
+  })
+
+  it('leaves another window\'s previews alone', async () => {
+    const h = makeHarness()
+    await h.service.open(REQUEST_A, h.window)
+
+    await h.service.closeWindow(h.otherWindow.id)
+
+    expect(h.factory.destroy).not.toHaveBeenCalled()
+  })
+
+  it('is a no-op for a window with no previews', async () => {
+    const h = makeHarness()
+    await expect(h.service.closeWindow(h.window.id)).resolves.toBeUndefined()
+  })
+
+  it('does not detach from a window that is already destroyed', async () => {
+    const h = makeHarness()
+    await h.service.open(REQUEST_A, h.window)
+
+    // The quit ordering: `mainWindowRef.destroy()` runs before `before-quit`
+    // disposes the preview handlers, so teardown used to detach from a dead
+    // window and log a warning on EVERY clean exit.
+    //
+    // The fake THROWS the way Electron does. A bare `vi.fn()` returns undefined
+    // and never throws, so "no warning" would be the harness's default state and
+    // this test would pass against unfixed code — which is the whole failure
+    // mode this branch keeps finding.
+    h.removeChildView.mockImplementation(() => {
+      throw new Error('Object has been destroyed')
+    })
+    h.setWindowDestroyed(true)
+
+    await h.service.close('panel-A')
+
+    expect(h.removeChildView).not.toHaveBeenCalled()
+  })
+
+  it('still detaches — and still reports a failure — while the window is alive', async () => {
+    const h = makeHarness()
+    await h.service.open(REQUEST_A, h.window)
+
+    // A throw from a LIVE window is a real signal: `close()`, budget eviction,
+    // replace-on-reopen, the global off-switch and a project switch all detach
+    // while the window is up. The guard must be on window liveness, never on the
+    // step itself.
+    h.removeChildView.mockImplementation(() => {
+      throw new Error('boom')
+    })
+
+    await h.service.close('panel-A')
+
+    expect(h.removeChildView).toHaveBeenCalled()
+    // The teardown completes regardless — a failed step never skips the destroy.
+    expect(h.factory.destroy).toHaveBeenCalled()
   })
 })
 

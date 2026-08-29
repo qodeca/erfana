@@ -75,6 +75,17 @@ const SWAP_WORLD_ID = 999
 /** The slice of a `BrowserWindow` a live view uses. Structural for tests. */
 export interface PreviewWindowLike {
   /**
+   * Whether the host window is gone.
+   *
+   * REQUIRED, not optional. An optional member fails open — every existing test
+   * fake omitted it, and the production object arrives through an unchecked
+   * `as PreviewWindowLike` cast in `lifecycle-handlers.ts`, so a typo would pass
+   * silently and the guard would never run. Belt-and-braces beside the
+   * per-window drain in `PreviewViewService.closeWindow`, which is what actually
+   * stops a view outliving its window.
+   */
+  isDestroyed(): boolean
+  /**
    * `BrowserWindow.id`. Stored with the registry entry because panel ids are
    * path-derived, so two windows previewing the same file mint the same id
    * (sd-074b §4.2).
@@ -714,7 +725,13 @@ export class PreviewLiveView {
       }
     }
 
-    step('removeChildView', () => this.window.contentView.removeChildView(this.view))
+    // Skip only when the window is genuinely gone. A throw from a LIVE window is
+    // a real signal — `close()`, budget eviction, replace-on-reopen, the global
+    // off-switch and a project switch all detach while the window is alive — so
+    // the guard is on window liveness, never on the step itself.
+    if (!this.window.isDestroyed()) {
+      step('removeChildView', () => this.window.contentView.removeChildView(this.view))
+    }
     await asyncStep('lifecycle.dispose', () => this.lifecycle.dispose())
     step('factoryTeardown', () => this.factoryTeardown())
     await asyncStep('watchCoordinator.dispose', () => this.watchCoordinator.dispose())

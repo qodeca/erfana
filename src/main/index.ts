@@ -134,6 +134,7 @@ let claudeStatusHandlers: { dispose: () => Promise<void> } | null = null
 let previewHandlers: {
   dispose: () => Promise<void>
   zoomFocused: (step: number) => Promise<boolean>
+  closeWindow: (windowId: number) => Promise<void>
 } | null = null
 
 // WebGL Command Line Switches (originally added for Electron 33+)
@@ -270,6 +271,23 @@ function createWindow(): BrowserWindow {
   // This prevents stale watchers and terminal processes from accumulating
   // CRITICAL: Must also clear project state so new window can re-open the same project
   const webContentsId = mainWindow.webContents.id
+
+  // Previews belong to a WINDOW, so they are reaped when the window goes — the
+  // same rule watchers, terminals and git already follow below. Without this the
+  // only teardown was the app-level disposer at `before-quit`, which runs AFTER
+  // `mainWindowRef.destroy()`: every view was detached from a dead window and
+  // logged a teardown warning on each clean exit, and a second window's views
+  // would simply have leaked.
+  const previewWindowId = mainWindow.id
+  mainWindow.on('closed', () => {
+    void previewHandlers?.closeWindow(previewWindowId).catch((error) => {
+      logger.warn('Preview teardown on window close failed', {
+        windowId: previewWindowId,
+        error: error instanceof Error ? error.message : String(error)
+      })
+    })
+  })
+
   mainWindow.webContents.on('destroyed', () => {
     logger.info('WebContents destroyed, cleaning up services', { webContentsId })
 
