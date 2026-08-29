@@ -230,6 +230,27 @@ export const PreviewLoadStatePayloadSchema = z
 export type PreviewLoadStatePayload = z.infer<typeof PreviewLoadStatePayloadSchema>
 
 /**
+ * `preview:backdropChanged` event payload.
+ *
+ * The colour painted BEHIND the previewed page — Erfana's chrome black before
+ * the page paints, the page's own resolved paper afterwards. The renderer paints
+ * the same value on `.html-preview-placeholder` so the DOM and the native view
+ * never disagree; that equality is what keeps a bounds update, a hide without a
+ * cached still frame, and a show all seamless.
+ *
+ * `color` is derived main-side from an UNTRUSTED page's computed style, so it is
+ * bounded to a strict 6-digit hex here rather than trusted as a CSS string: it is
+ * interpolated into a style property in the renderer.
+ */
+export const PreviewBackdropPayloadSchema = z
+  .object({
+    panelId: PanelIdSchema,
+    color: z.string().regex(/^#[0-9a-fA-F]{6}$/)
+  })
+  .strict()
+export type PreviewBackdropPayload = z.infer<typeof PreviewBackdropPayloadSchema>
+
+/**
  * `preview:openFileRequested` event payload (sd-074b §5.4).
  *
  * `filePath` is absolute and has ALREADY been confined to the project root by
@@ -294,6 +315,8 @@ export interface PreviewBridge {
   onStillFrameChanged(callback: (payload: PreviewStillFramePayload) => void): () => void
   /** Subscribe to load-state changes; returns an unsubscribe. */
   onLoadStateChanged(callback: (payload: PreviewLoadStatePayload) => void): () => void
+  /** Subscribe to backdrop-colour changes; returns an unsubscribe. */
+  onBackdropChanged(callback: (payload: PreviewBackdropPayload) => void): () => void
   /** Subscribe to forwarded keyboard accelerators; returns an unsubscribe. */
   onForwardedShortcut(callback: (payload: PreviewForwardedShortcut) => void): () => void
   /**

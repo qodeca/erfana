@@ -119,6 +119,12 @@ export interface PreviewEmitters {
     dropped: number
   ): void
   /**
+   * The colour behind the page changed. `color` is `#RRGGBB`; the renderer
+   * paints it on the placeholder so the DOM and the native view always carry the
+   * same value (the invariant replacing sd-074 §1.8's "both are brand black").
+   */
+  backdropChanged(panelId: string, color: string): void
+  /**
    * A link inside the previewed page resolved to a project file that should
    * open as an Erfana tab (sd-074b §5.4).
    *

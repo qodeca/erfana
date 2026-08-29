@@ -142,6 +142,9 @@ interface Harness {
   factory: FakeWc
   session: PreviewSession
   view: PreviewViewHandle
+  /** The view double's `setBackgroundColor`, typed so its calls are readable. */
+  setBackgroundColor: ReturnType<typeof vi.fn<(color: string) => void>>
+  backdropChanged: ReturnType<typeof vi.fn<(panelId: string, color: string) => void>>
   sessionCreate: ReturnType<typeof vi.fn<() => Promise<PreviewSession>>>
   addChildView: ReturnType<typeof vi.fn<(view: PreviewViewHandle) => void>>
   removeChildView: ReturnType<typeof vi.fn<(view: PreviewViewHandle) => void>>
@@ -163,11 +166,16 @@ interface Harness {
 function makeHarness(
   options: { zoom?: number; now?: () => number; windowId?: number } = {}
 ): Harness {
+  const backdropChanged = vi.fn<(panelId: string, color: string) => void>()
   const factory = makeFakeWc()
+  // Held as its own typed reference: the `as unknown as PreviewViewHandle` cast
+  // below erases the `vi.fn` typing, so a test that wants to read the colours
+  // this was called with cannot get at them through `harness.view`.
+  const setBackgroundColor = vi.fn<(color: string) => void>()
   const view = {
     webContents: factory.wc,
     setBounds: vi.fn<(bounds: { x: number; y: number; width: number; height: number }) => void>(),
-    setBackgroundColor: vi.fn<(color: string) => void>(),
+    setBackgroundColor,
     setVisible: vi.fn<(visible: boolean) => void>()
   } as unknown as PreviewViewHandle
 
@@ -258,6 +266,7 @@ function makeHarness(
       hostBlocked,
       findResult: vi.fn(),
       stillFrameChanged: vi.fn(),
+      backdropChanged,
       loadStateChanged
     },
     createWatchCoordinator: vi.fn<
@@ -304,6 +313,8 @@ function makeHarness(
     purge,
     setWatchSet,
     loadStateChanged,
+    setBackgroundColor,
+    backdropChanged,
     hostBlocked,
     reloadRecord,
     readEntryHtml,
@@ -414,6 +425,172 @@ describe('PreviewViewService — open epoch guard', () => {
     // The slot is free: a fresh open now succeeds.
     const next = await h.service.open({ ...REQUEST_A, panelId: 'panel-B' }, h.window)
     expect(next).toEqual({ ok: true })
+  })
+})
+
+describe('PreviewViewService — backdrop', () => {
+  /** Open one preview through the real service path. */
+  async function openOne(h: ReturnType<typeof makeHarness>): Promise<void> {
+    await h.service.open(REQUEST_A, h.window)
+  }
+
+  /** Let the isolated-world read and its follow-up repaint settle. */
+  async function flush(): Promise<void> {
+    await new Promise((resolve) => setImmediate(resolve))
+  }
+
+  it('paints chrome black before the page has painted', async () => {
+    const h = makeHarness()
+    await openOne(h)
+
+    // The constructor runs before load(): at this point the DOM placeholder is
+    // the only thing on screen and the two must be indistinguishable.
+    expect(h.setBackgroundColor).toHaveBeenNthCalledWith(1, '#FF161312')
+  })
+
+  it("hands the page its own paper when the load stops", async () => {
+    const h = makeHarness()
+    h.factory.executeJavaScriptInIsolatedWorld.mockResolvedValue('rgb(255, 255, 255)')
+    await openOne(h)
+
+    h.factory.emit('did-stop-loading')
+    await flush()
+
+    expect(h.setBackgroundColor).toHaveBeenLastCalledWith('#FFFFFFFF')
+  })
+
+  it('respects a page that paints itself dark', async () => {
+    const h = makeHarness()
+    h.factory.executeJavaScriptInIsolatedWorld.mockResolvedValue('rgb(18, 18, 18)')
+    await openOne(h)
+
+    h.factory.emit('did-stop-loading')
+    await flush()
+
+    // Forcing white here would put the page's own light text on white — the
+    // unreadable bug, mirrored.
+    expect(h.setBackgroundColor).toHaveBeenLastCalledWith('#FF121212')
+  })
+
+  it('falls back to the browser default when the page declares nothing', async () => {
+    const h = makeHarness()
+    h.factory.executeJavaScriptInIsolatedWorld.mockResolvedValue(null)
+    await openOne(h)
+
+    h.factory.emit('did-stop-loading')
+    await flush()
+
+    expect(h.setBackgroundColor).toHaveBeenLastCalledWith('#FFFFFFFF')
+  })
+
+  it('gives a FAILED load paper too, so an error page is readable', async () => {
+    const h = makeHarness()
+    h.factory.executeJavaScriptInIsolatedWorld.mockResolvedValue(null)
+    await openOne(h)
+
+    // `did-finish-load` never fires for a failed load. Waiting for it would
+    // leave Chromium's dark error text on the dark chrome backdrop — the
+    // original defect, relocated to the failure path.
+    h.factory.emit('did-fail-load')
+    await flush()
+
+    expect(h.setBackgroundColor).toHaveBeenLastCalledWith('#FFFFFFFF')
+  })
+
+  it('does NOT repaint chrome on a reload, so a save never flashes dark', async () => {
+    const h = makeHarness()
+    h.factory.executeJavaScriptInIsolatedWorld.mockResolvedValue('rgb(255, 255, 255)')
+    await openOne(h)
+    h.factory.emit('did-stop-loading')
+    await flush()
+
+    // A reload keeps the previous document on screen until the new one commits,
+    // and `setBackgroundColor` is not deferred to the next paint — so painting
+    // chrome here would flash the CURRENT page dark on every autosave.
+    h.factory.emit('did-start-loading')
+    await flush()
+
+    // Asserted as "the paper is STILL what is painted", not as "chrome was not
+    // painted": the latter passes against code that never repaints at all.
+    expect(h.setBackgroundColor).toHaveBeenLastCalledWith('#FFFFFFFF')
+  })
+
+  it('survives a subframe load that re-enters the loading state', async () => {
+    const h = makeHarness()
+    h.factory.executeJavaScriptInIsolatedWorld.mockResolvedValue('rgb(255, 255, 255)')
+    await openOne(h)
+    h.factory.emit('did-stop-loading')
+    await flush()
+
+    // `did-start-loading` is frame-tree scoped, so a lazily-loaded <iframe>
+    // fires it again long after the page is up. Pairing it with the
+    // main-frame-only `did-finish-load` would strand the page on chrome.
+    h.factory.emit('did-start-loading')
+    await flush()
+
+    expect(h.setBackgroundColor).toHaveBeenLastCalledWith('#FFFFFFFF')
+  })
+
+  it('is not routed through the rate-limited post-load pipeline', async () => {
+    const h = makeHarness({ now: () => 0 })
+    h.factory.executeJavaScriptInIsolatedWorld.mockResolvedValue('rgb(255, 255, 255)')
+    await openOne(h)
+
+    // Three terminations inside one rate-limit window. The pipeline collapses
+    // these to a single trailing run; the backdrop must not share that budget,
+    // because a dropped transition leaves the page unreadable.
+    h.factory.emit('did-stop-loading')
+    h.factory.emit('did-stop-loading')
+    h.factory.emit('did-stop-loading')
+    await flush()
+
+    expect(h.setBackgroundColor).toHaveBeenLastCalledWith('#FFFFFFFF')
+  })
+
+  it('returns to chrome when the render process is gone', async () => {
+    const h = makeHarness()
+    h.factory.executeJavaScriptInIsolatedWorld.mockResolvedValue('rgb(255, 255, 255)')
+    await openOne(h)
+    h.factory.emit('did-stop-loading')
+    await flush()
+
+    // Nothing is painting any more, and the DOM shows its own failure banner —
+    // a white rectangle would sit on top of it.
+    h.factory.emit('render-process-gone', {}, { reason: 'oom' })
+    await flush()
+
+    // The MOVE is the assertion. "Ends on chrome" alone passes against code
+    // that only ever painted chrome in the first place.
+    const painted = h.setBackgroundColor.mock.calls.map(([argb]) => argb)
+    expect(painted).toEqual(['#FF161312', '#FFFFFFFF', '#FF161312'])
+  })
+
+  it('refuses a colour it cannot parse rather than passing it through', async () => {
+    const h = makeHarness()
+    // The value is computed from an UNTRUSTED page and is interpolated into a
+    // colour on both sides of the IPC boundary.
+    h.factory.executeJavaScriptInIsolatedWorld.mockResolvedValue('rgb(1,2,3); background: url(x)')
+    await openOne(h)
+
+    h.factory.emit('did-stop-loading')
+    await flush()
+
+    expect(h.setBackgroundColor).toHaveBeenLastCalledWith('#FFFFFFFF')
+  })
+
+  it('tells the renderer the same value it paints, every time', async () => {
+    const h = makeHarness()
+    h.factory.executeJavaScriptInIsolatedWorld.mockResolvedValue('rgb(255, 255, 255)')
+    await openOne(h)
+    h.factory.emit('did-stop-loading')
+    await flush()
+
+    // The invariant replacing "both are brand black": the DOM placeholder and
+    // the native view always carry the SAME colour, so no seam can show a band
+    // of the wrong one.
+    const painted = h.setBackgroundColor.mock.calls.map(([argb]) => `#${argb.slice(3)}`)
+    const reported = h.backdropChanged.mock.calls.map(([, css]) => css.toUpperCase())
+    expect(reported).toEqual(painted)
   })
 })
 

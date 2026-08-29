@@ -54,6 +54,8 @@ export const PreviewEvents = {
   STILL_FRAME_CHANGED: 'preview:stillFrameChanged',
   /** The load state for a panel changed */
   LOAD_STATE_CHANGED: 'preview:loadStateChanged',
+  /** The colour painted behind the page changed (chrome vs the page's own paper) */
+  BACKDROP_CHANGED: 'preview:backdropChanged',
   /** An enumerated keyboard accelerator was forwarded from the sealed page */
   FORWARDED_SHORTCUT: 'preview:forwardedShortcut',
   /** A link in the page resolved to a project file the renderer should open */

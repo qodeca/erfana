@@ -27,6 +27,7 @@ import {
   PreviewHostBlockedPayloadSchema,
   PreviewFindResultSchema,
   PreviewStillFrameSchema,
+  PreviewBackdropPayloadSchema,
   PreviewLoadStatePayloadSchema,
   PreviewForwardedShortcutSchema,
   PreviewOpenFileRequestedSchema,
@@ -215,6 +216,13 @@ export function createPreviewEmitters(deps: PreviewEmittersDeps): PreviewEmitter
         panelId,
         state,
         dropped
+      })
+    },
+
+    backdropChanged(panelId: string, color: string): void {
+      validateAndSend(PreviewEvents.BACKDROP_CHANGED, PreviewBackdropPayloadSchema, {
+        panelId,
+        color
       })
     },
 

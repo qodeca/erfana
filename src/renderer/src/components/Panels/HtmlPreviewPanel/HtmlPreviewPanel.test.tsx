@@ -63,6 +63,7 @@ interface MockPreview {
   onFindResult: Mock
   onLoadStateChanged: Mock
   onFailuresChanged: Mock
+  onBackdropChanged: Mock
   onStillFrameChanged: Mock
   onHostBlocked: Mock
   onForwardedShortcut: Mock
@@ -113,6 +114,7 @@ beforeEach(() => {
       listeners.failures = cb
       return vi.fn()
     }),
+    onBackdropChanged: vi.fn(() => vi.fn()),
     onStillFrameChanged: vi.fn(() => vi.fn()),
     onHostBlocked: vi.fn((cb: (p: PreviewHostBlockedPayload) => void) => {
       listeners.hostBlocked = cb

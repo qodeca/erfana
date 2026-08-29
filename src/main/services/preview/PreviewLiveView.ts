@@ -47,14 +47,27 @@ import type {
   PreviewViewHandle,
   PreviewWebContentsHandle
 } from './PreviewSessionFactory'
+import {
+  INITIAL_BACKDROP_STATE,
+  READ_PAGE_BACKDROP_SCRIPT,
+  argbToCss,
+  backdropColor,
+  nextBackdropState,
+  toArgb,
+  type BackdropEvent,
+  type BackdropState
+} from './previewBackdrop'
 import { extractStaticLinks } from './linkExtract'
 import { buildCacheBustHref, buildCssSwapScript } from './previewCssSwap'
 import { clampAndZoomBounds } from './previewBoundsClamp'
 import { wirePreviewLifecycle, type PreviewFileWatcherHandle } from './previewViewLifecycle'
 import { createPreviewLinkBridge, type PreviewLinkBridge } from './previewLinkBridge'
 
-/** ARGB placeholder colour — the same value the panel's fallback CSS encodes (§1.8). */
-const PLACEHOLDER_COLOR = '#FF161312'
+/**
+ * Isolated world for reading the page's own paper. Distinct from the CSS-swap
+ * world so a hung swap script cannot block the backdrop read.
+ */
+const BACKDROP_WORLD_ID = 998
 
 /** A non-main isolated world for the CSS-swap script (§1.4: page cannot shadow it). */
 const SWAP_WORLD_ID = 999
@@ -179,6 +192,10 @@ export class PreviewLiveView {
   private trailingTimer: ReturnType<typeof setTimeout> | null = null
   private destroyed = false
   private closing = false
+  /** Which backdrop the view is showing, and whether its first load is still ahead. */
+  private backdrop: BackdropState = INITIAL_BACKDROP_STATE
+  /** The page's own resolved paper, once read; `null` until then. */
+  private pageBackdrop: string | null = null
 
   constructor(params: PreviewLiveViewParams) {
     this.panelId = params.panelId
@@ -236,9 +253,19 @@ export class PreviewLiveView {
         platform: this.deps.platform
       },
       {
-        onRenderProcessGone: (reason) => this.onCrash(reason ?? 'crashed'),
+        onRenderProcessGone: (reason) => {
+          this.moveBackdrop('crashed')
+          this.onCrash(reason ?? 'crashed')
+        },
         onUnresponsive: () => this.onCrash('unresponsive'),
         onDidFinishLoad: () => this.schedulePipeline(),
+        // Backdrop transitions are SIBLINGS of the post-load pipeline, never
+        // routed through it: `schedulePipeline` is rate-limited and drops events
+        // during a save burst, and a dropped transition leaves the page
+        // unreadable.
+        onDidStartLoading: () => this.moveBackdrop('start-loading'),
+        onDidStopLoading: () => void this.onLoadSettled(),
+        onDidFailLoad: () => void this.onLoadSettled('fail-load'),
         // Route the entry change through the same coalescing reload policy the
         // subresources use, so an entry+stylesheet save collapses to ONE reload
         // decision instead of racing an immediate reload against a CSS swap.
@@ -257,7 +284,68 @@ export class PreviewLiveView {
       this.lastBounds = dip
       this.view.setBounds(dip)
     }
-    this.view.setBackgroundColor(PLACEHOLDER_COLOR)
+    this.applyBackdrop()
+  }
+
+  /**
+   * Advance the backdrop state machine and repaint if the colour moved.
+   *
+   * @param event - The lifecycle edge that fired.
+   */
+  private moveBackdrop(event: BackdropEvent): void {
+    const next = nextBackdropState(this.backdrop, event)
+    if (next === this.backdrop) {
+      return
+    }
+    this.backdrop = next
+    this.applyBackdrop()
+  }
+
+  /**
+   * Paint the current backdrop on the native view and tell the renderer, so the
+   * DOM placeholder behind the view carries the identical value.
+   */
+  private applyBackdrop(): void {
+    if (this.isDefunct) {
+      return
+    }
+    const argb = backdropColor(this.backdrop, this.pageBackdrop)
+    this.view.setBackgroundColor(argb)
+    const css = argbToCss(argb)
+    if (css !== null) {
+      this.deps.emit.backdropChanged(this.panelId, css)
+    }
+  }
+
+  /**
+   * A load terminated — by success, by failure, or by the page calling
+   * `window.stop()`. Read the page's own paper, then hand it the backdrop.
+   *
+   * The read runs in its own isolated world, so the page cannot shadow
+   * `getComputedStyle`, and its result is parsed strictly by `toArgb`: the value
+   * crosses a trust boundary and is interpolated into a colour, so anything
+   * unrecognised falls back rather than being passed through.
+   */
+  private async onLoadSettled(event: BackdropEvent = 'stop-loading'): Promise<void> {
+    if (this.isDefunct) {
+      return
+    }
+    try {
+      const raw = await this.wc.executeJavaScriptInIsolatedWorld(BACKDROP_WORLD_ID, [
+        { code: READ_PAGE_BACKDROP_SCRIPT }
+      ])
+      this.pageBackdrop = toArgb(raw)
+    } catch {
+      // A page that refuses to be measured gets the browser default.
+      this.pageBackdrop = null
+    }
+    if (this.isDefunct) {
+      return
+    }
+    // Move AFTER the read so the repaint carries the resolved paper rather than
+    // flashing the fallback white and correcting a frame later.
+    this.backdrop = nextBackdropState(this.backdrop, event)
+    this.applyBackdrop()
   }
 
   /** Emit `loading` and navigate to the entry file. Failures surface via events. */

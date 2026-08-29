@@ -40,11 +40,18 @@ import { showGlobalToast } from '../../../Toast/toastService'
  */
 export function usePreviewEvents(panelId: string): void {
   useEffect(() => {
-    const { setLoadState, pushFailures, setStillFrame } = usePreviewStore.getState()
+    const { setLoadState, pushFailures, setStillFrame, setBackdrop } = usePreviewStore.getState()
 
     const unsubscribeLoadState = window.api.preview.onLoadStateChanged((payload) => {
       if (payload.panelId !== panelId) return
       setLoadState(panelId, payload.state, payload.dropped)
+    })
+
+    // Main paints this colour behind the page; the placeholder paints the same
+    // value so the two never disagree at a seam.
+    const unsubscribeBackdrop = window.api.preview.onBackdropChanged((payload) => {
+      if (payload.panelId !== panelId) return
+      setBackdrop(panelId, payload.color)
     })
 
     const unsubscribeFailures = window.api.preview.onFailuresChanged((payload) => {
@@ -94,6 +101,7 @@ export function usePreviewEvents(panelId: string): void {
 
     return () => {
       unsubscribeLoadState()
+      unsubscribeBackdrop()
       unsubscribeFailures()
       unsubscribeStillFrame()
       unsubscribeHostBlocked()

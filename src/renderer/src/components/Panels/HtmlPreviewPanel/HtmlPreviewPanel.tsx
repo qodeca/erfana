@@ -151,6 +151,9 @@ export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelPara
   const panel = usePreviewStore((s) => s.panels.get(panelId))
   const loadState = panel?.loadState ?? 'idle'
   const stillFrame = panel?.stillFrame ?? null
+  // Main reports the colour it paints behind the page; the placeholder carries
+  // the identical value so no seam ever shows a band of the wrong colour.
+  const backdrop = panel?.backdrop ?? null
 
   // The hook owns every push, including the one on becoming visible: a tab
   // switch changes no size, so the `ResizeObserver` alone would not re-emit.
@@ -266,10 +269,18 @@ export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelPara
           {/* Name the surface for assistive tech: while the native view is hidden
               (inactive tab, overlay, pre-paint) its own a11y tree is gone, so
               without a label a screen reader finds only an unnamed black region. */}
+          {/* `role="img"` is correct ONLY while the native view is hidden and the
+              placeholder really is a picture (a still frame) or a flat colour.
+              While the view is live the user is looking at a running, scrollable
+              document, and `role="img"` would both mislabel it and make its
+              subtree presentational. `aria-busy` carries the "not readable yet"
+              state that is otherwise visual-only. */}
           <div
             ref={placeholderRef}
             className="html-preview-placeholder"
-            role="img"
+            style={backdrop !== null ? { background: backdrop } : undefined}
+            role={isViewHidden ? 'img' : 'group'}
+            aria-busy={loadState === 'loading' || loadState === 'idle'}
             aria-label={`HTML preview of ${getBasename(filePath) || 'page'}`}
           >
             <PreviewFallback kind={fallbackKind} stillFrame={stillFrame} />

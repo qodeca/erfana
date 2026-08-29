@@ -48,6 +48,17 @@ export interface PreviewPanelState {
   truncated: boolean
   /** Latest still frame captured on hide, or `null` to fall back to the placeholder. */
   stillFrame: PreviewStillFrame | null
+  /**
+   * The colour main is painting BEHIND the page (`#RRGGBB`), or `null` before the
+   * first report.
+   *
+   * The panel paints the identical value on its placeholder. That equality is
+   * the invariant replacing sd-074 §1.8's "both are brand black", which no
+   * longer holds now the backdrop follows the page's own paper: keeping the two
+   * sides equal is what stops a bounds update, or a show with no cached still
+   * frame, flashing a band of the wrong colour.
+   */
+  backdrop: string | null
 }
 
 /** The state a panel occupies before any event has arrived for it. */
@@ -56,7 +67,8 @@ const DEFAULT_PANEL_STATE: PreviewPanelState = {
   dropped: 0,
   failures: [],
   truncated: false,
-  stillFrame: null
+  stillFrame: null,
+  backdrop: null
 }
 
 /**
@@ -135,6 +147,8 @@ export interface PreviewStoreState {
    * @param frame - The captured, downscaled still frame.
    */
   setStillFrame: (panelId: string, frame: PreviewStillFrame) => void
+  /** Record the colour main is painting behind the page (`#RRGGBB`). */
+  setBackdrop: (panelId: string, color: string) => void
   /**
    * Clears a panel's still frame so it falls back to the placeholder colour.
    * @param panelId - Panel to update.
@@ -204,6 +218,11 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
   clearFailures: (panelId) =>
     set((state) => ({
       panels: withPanel(state.panels, panelId, { failures: [], truncated: false })
+    })),
+
+  setBackdrop: (panelId, color) =>
+    set((state) => ({
+      panels: withPanel(state.panels, panelId, { backdrop: color })
     })),
 
   setStillFrame: (panelId, frame) =>
