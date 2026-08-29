@@ -33,6 +33,20 @@ import { usePreviewViewportStore } from '../../../../stores/usePreviewViewportSt
 export const SEARCH_BAR_INSET_PX = 48
 
 /**
+ * Height of the always-DOM "Preview – not Erfana" strip above the native view,
+ * in CSS pixels.
+ *
+ * The strip is a security control, not decoration. The previewed page is
+ * untrusted and paints above all sibling DOM, and since the toast-placement
+ * change it now stays on screen while Erfana asks a security question ("Approve
+ * this host?"). A permanently visible band of Erfana's own chrome, which the
+ * page provably cannot paint over because the view is inset below it, is how a
+ * reader tells a real Erfana prompt from one the page drew. Recorded as residual
+ * risk 8 in docs/security.md until now.
+ */
+export const PREVIEW_CHROME_INSET_PX = 22
+
+/**
  * How many animation frames the first-rect pump waits for a laid-out
  * placeholder before giving up (≈2s at 60Hz).
  *
@@ -115,7 +129,9 @@ export function usePreviewBounds(options: UsePreviewBoundsOptions): UsePreviewBo
     if (!enabledRef.current) return false
     const el = placeholderRef.current
     if (!el) return false
-    const topInset = searchOpenRef.current ? SEARCH_BAR_INSET_PX : 0
+    // The chrome strip is unconditional; the find bar stacks on top of it.
+    const topInset =
+      PREVIEW_CHROME_INSET_PX + (searchOpenRef.current ? SEARCH_BAR_INSET_PX : 0)
     const bounds = deriveBounds(el.getBoundingClientRect(), topInset)
     if (!bounds) return false
     window.api.preview.setBounds(panelId, bounds, seqRef.current++)

@@ -25,7 +25,11 @@
 import { renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { usePreviewBounds, SEARCH_BAR_INSET_PX } from './usePreviewBounds'
+import {
+  usePreviewBounds,
+  PREVIEW_CHROME_INSET_PX,
+  SEARCH_BAR_INSET_PX
+} from './usePreviewBounds'
 import { usePreviewViewportStore } from '../../../../stores/usePreviewViewportStore'
 
 const PANEL_ID = 'preview-panel-1'
@@ -98,9 +102,31 @@ describe('usePreviewBounds — first rect after open', () => {
 
     expect(setBounds).toHaveBeenCalledWith(
       PANEL_ID,
-      { x: 477, y: 41, width: 400, height: 827 },
+      { x: 477, y: 41 + PREVIEW_CHROME_INSET_PX, width: 400, height: 827 - PREVIEW_CHROME_INSET_PX },
       expect.any(Number)
     )
+  })
+
+  it('always leaves room for the chrome strip the page cannot paint over', () => {
+    // A security control, not a margin: the strip is how a reader tells a real
+    // Erfana prompt from one an untrusted page drew, so the view must never be
+    // allowed to cover it — including when the find bar is closed.
+    const { ref } = makePlaceholder(LAID_OUT)
+
+    renderHook(() =>
+      usePreviewBounds({
+        placeholderRef: ref,
+        panelId: PANEL_ID,
+        enabled: true,
+        isVisible: true,
+        isLive: true,
+        searchOpen: false
+      })
+    )
+
+    const [, bounds] = setBounds.mock.calls[0] as [string, { y: number; height: number }]
+    expect(bounds.y).toBeGreaterThanOrEqual(LAID_OUT.top + PREVIEW_CHROME_INSET_PX)
+    expect(bounds.y + bounds.height).toBeLessThanOrEqual(LAID_OUT.top + LAID_OUT.height)
   })
 
   it('stops asking once a real rect has gone out', () => {
@@ -174,8 +200,9 @@ describe('usePreviewBounds — first rect after open', () => {
     expect(setBounds).toHaveBeenCalledWith(
       PANEL_ID,
       expect.objectContaining({
-        y: LAID_OUT.top + SEARCH_BAR_INSET_PX,
-        height: LAID_OUT.height - SEARCH_BAR_INSET_PX
+        // The find bar stacks ON TOP of the always-present chrome strip.
+        y: LAID_OUT.top + PREVIEW_CHROME_INSET_PX + SEARCH_BAR_INSET_PX,
+        height: LAID_OUT.height - PREVIEW_CHROME_INSET_PX - SEARCH_BAR_INSET_PX
       }),
       expect.any(Number)
     )
@@ -234,7 +261,7 @@ describe('usePreviewBounds — first rect after open', () => {
 
     expect(setBounds).toHaveBeenCalledWith(
       PANEL_ID,
-      { x: 477, y: 41, width: 400, height: 827 },
+      { x: 477, y: 41 + PREVIEW_CHROME_INSET_PX, width: 400, height: 827 - PREVIEW_CHROME_INSET_PX },
       expect.any(Number)
     )
   })
@@ -255,11 +282,13 @@ describe('usePreviewBounds — publishing where the view sits', () => {
       })
     )
 
+    // The published rect is where the view ACTUALLY sits, chrome strip included,
+    // so anything dodging it dodges the real rectangle.
     expect(usePreviewViewportStore.getState().rects.get(PANEL_ID)).toEqual({
       left: 477,
-      top: 41,
+      top: 41 + PREVIEW_CHROME_INSET_PX,
       width: 400,
-      height: 827
+      height: 827 - PREVIEW_CHROME_INSET_PX
     })
   })
 

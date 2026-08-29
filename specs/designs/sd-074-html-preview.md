@@ -631,10 +631,14 @@ the user previews. (T3) A network attacker on an approved host. (T4) A compromis
 6. **Hardlinks defeat path confinement.** `realpath` resolves symlinks but not hardlinks (debt 33).
 7. **A residual realpath→open race.** Narrowed, not closed; Node has no `openat` (debt 32). The 8h
    re-resolve narrows but does not remove it.
-8. **UI spoofing.** Partial mitigation: the rect is clamped to the window content area and the panel
-   keeps tab and toolbar chrome, so the page cannot paint over Erfana's own frame; **Erfana never asks
-   for credentials or API keys inside a preview panel**, and the AC22 page says so. A persistent
-   "Preview — not Erfana" strip is the follow-up.
+8. **UI spoofing.** Mitigated: the rect is clamped to the window content area, the panel keeps tab and
+   toolbar chrome, **Erfana never asks for credentials or API keys inside a preview panel** (the AC22
+   page says so), and a persistent **"Preview – not Erfana" strip** now sits above every live preview
+   in always-DOM chrome with the native view inset below it (`PREVIEW_CHROME_INSET_PX`), so the page
+   cannot cover it. Promoted from follow-up to shipped when toast placement (sd-074b follow-up) stopped
+   hiding the preview during a security prompt: an untrusted page now stays on screen while Erfana asks
+   "Approve this host?", and the strip is what distinguishes a genuine prompt from a drawn one.
+   Residual: the strip proves the panel is a preview, not that a dialog elsewhere is genuine.
 9. **Git config keys beyond `core.fsmonitor`.** The hardened invocation overrides the one key known to
    execute a command during `check-ignore`. Bounded by fail-open and by `check-ignore` being the only
    subcommand run.
@@ -1386,7 +1390,8 @@ bounded destroy; the post-load pipeline is rate-limited so Erfana's own work per
 is capped.
 
 **R11 — UI spoofing** (med/high). Clamped rect + retained tab/toolbar chrome + "Erfana never asks for
-credentials inside a preview". Residual §2.8 risk 8.
+credentials inside a preview" + the always-DOM "Preview – not Erfana" strip the view is inset below.
+Residual §2.8 risk 8.
 
 **R12 — Exfiltration channels outside every chokepoint** (med/high). **New, and honestly unmitigated.**
 WebRTC over TURN/TCP-443 and `<link rel=preconnect>` are general-purpose channels that neither the CSP

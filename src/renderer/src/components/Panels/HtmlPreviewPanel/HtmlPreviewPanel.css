@@ -39,8 +39,40 @@
 }
 
 /*
- * The sized target the native WebContentsView paints over. Brand black so the
- * seam with the native view is invisible; never left transparent/white.
+ * The always-DOM "Preview – not Erfana" strip.
+ *
+ * A SECURITY CONTROL, not a label. The native view is inset below it
+ * (`PREVIEW_CHROME_INSET_PX` in hooks/usePreviewBounds.ts), so the untrusted page
+ * provably cannot paint over it — which is what lets a reader tell a genuine
+ * Erfana prompt from one the page drew. Keep it unconditional, keep it opaque,
+ * and keep its height in step with that constant.
+ */
+.html-preview-chrome-strip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-4);
+  background: var(--color-bg-secondary);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-tertiary);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  user-select: none;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/*
+ * The sized target the native WebContentsView paints over. Carries whatever
+ * colour main reports painting behind the page (see the `backdrop` inline style
+ * in HtmlPreviewPanel.tsx), so the DOM and the native view never disagree at a
+ * seam; the token below is the pre-first-report default and matches main's
+ * `CHROME_BACKDROP`.
  */
 .html-preview-placeholder {
   position: absolute;

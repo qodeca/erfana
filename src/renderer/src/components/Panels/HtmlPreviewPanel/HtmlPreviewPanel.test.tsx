@@ -152,6 +152,18 @@ describe('HtmlPreviewPanel', () => {
     expect(container.querySelector('.html-preview-placeholder')).not.toBeNull()
   })
 
+  it('always shows the "not Erfana" strip beside a live preview', () => {
+    // A security control, not a label. The previewed page is untrusted, paints
+    // above all sibling DOM, and now stays on screen while Erfana asks a
+    // security question — so a permanently visible band of Erfana's own chrome
+    // is how a reader tells a genuine prompt from one the page drew. It must not
+    // be conditional on load state, failures or visibility.
+    const { container } = render(<HtmlPreviewPanel {...makeProps('/proj/page.html')} />)
+    const strip = container.querySelector('.html-preview-chrome-strip')
+    expect(strip).not.toBeNull()
+    expect(strip?.textContent).toContain('not Erfana')
+  })
+
   it('closes the preview on unmount', () => {
     const { unmount } = render(<HtmlPreviewPanel {...makeProps('/proj/page.html')} />)
     unmount()

@@ -269,6 +269,16 @@ export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelPara
           {/* Name the surface for assistive tech: while the native view is hidden
               (inactive tab, overlay, pre-paint) its own a11y tree is gone, so
               without a label a screen reader finds only an unnamed black region. */}
+          {/* A permanently visible band of Erfana's OWN chrome, which the page
+              cannot paint over because the native view is inset below it
+              (`PREVIEW_CHROME_INSET_PX`). The previewed page is untrusted and
+              paints above all sibling DOM, and it now stays on screen while
+              Erfana asks a security question — so this is how a reader tells a
+              real Erfana prompt from one the page drew. Was residual risk 8 in
+              docs/security.md. Do NOT make it conditional or let it scroll. */}
+          <div className="html-preview-chrome-strip" data-testid="preview-chrome-strip">
+            Preview – not Erfana
+          </div>
           {/* `role="img"` is correct ONLY while the native view is hidden and the
               placeholder really is a picture (a still frame) or a flat colour.
               While the view is live the user is looking at a running, scrollable
