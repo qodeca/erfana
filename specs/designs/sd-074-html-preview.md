@@ -432,7 +432,7 @@ toast, the preview's own blocked-host prompt hid every preview **indefinitely**.
   **only when placement returns `blocked`**. It therefore **fails safe**: when nothing fits, the old
   hide-everything behaviour returns, so a consent prompt can never end up under an untrusted page.
 
-**(c) The "Preview – not Erfana" strip.** A permanently visible band of Erfana's own chrome above the
+**(c) The "Preview – content below is not Erfana" strip.** A permanently visible band of Erfana's own chrome above the
 native view, which is inset below it by `PREVIEW_CHROME_INSET_PX` through the same `topInset` path the
 find bar uses. Rule (b) keeps an untrusted page on screen while Erfana asks a security question, and
 rule (a) gives that page browser-native colours, so this is what lets a reader tell a real Erfana
@@ -702,7 +702,7 @@ the user previews. (T3) A network attacker on an approved host. (T4) A compromis
    re-resolve narrows but does not remove it.
 8. **UI spoofing.** Mitigated: the rect is clamped to the window content area, the panel keeps tab and
    toolbar chrome, **Erfana never asks for credentials or API keys inside a preview panel** (the AC22
-   page says so), and a persistent **"Preview – not Erfana" strip** now sits above every live preview
+   page says so), and a persistent **"Preview – content below is not Erfana" strip** now sits above every live preview
    in always-DOM chrome with the native view inset below it (`PREVIEW_CHROME_INSET_PX`), so the page
    cannot cover it. Promoted from follow-up to shipped when toast placement (sd-074b follow-up) stopped
    hiding the preview during a security prompt: an untrusted page now stays on screen while Erfana asks
@@ -1463,7 +1463,7 @@ bounded destroy; the post-load pipeline is rate-limited so Erfana's own work per
 is capped.
 
 **R11 — UI spoofing** (med/high). Clamped rect + retained tab/toolbar chrome + "Erfana never asks for
-credentials inside a preview" + the always-DOM "Preview – not Erfana" strip the view is inset below.
+credentials inside a preview" + the always-DOM "Preview – content below is not Erfana" strip the view is inset below.
 Residual §2.8 risk 8.
 
 **R12 — Exfiltration channels outside every chokepoint** (med/high). **New, and honestly unmitigated.**

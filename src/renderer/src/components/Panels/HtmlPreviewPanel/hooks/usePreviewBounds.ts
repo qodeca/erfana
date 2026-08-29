@@ -33,7 +33,7 @@ import { usePreviewViewportStore } from '../../../../stores/usePreviewViewportSt
 export const SEARCH_BAR_INSET_PX = 48
 
 /**
- * Height of the always-DOM "Preview – not Erfana" strip above the native view,
+ * Height of the always-DOM "Preview – content below is not Erfana" strip above the native view,
  * in CSS pixels.
  *
  * The strip is a security control, not decoration. The previewed page is

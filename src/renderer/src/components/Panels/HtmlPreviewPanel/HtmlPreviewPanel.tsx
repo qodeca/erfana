@@ -281,7 +281,7 @@ export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelPara
               real Erfana prompt from one the page drew. Was residual risk 8 in
               docs/security.md. Do NOT make it conditional or let it scroll. */}
           <div className="html-preview-chrome-strip" data-testid="preview-chrome-strip">
-            Preview – not Erfana
+            Preview – content below is not Erfana
           </div>
           {/* `role="img"` is correct ONLY while the native view is hidden and the
               placeholder really is a picture (a still frame) or a flat colour.

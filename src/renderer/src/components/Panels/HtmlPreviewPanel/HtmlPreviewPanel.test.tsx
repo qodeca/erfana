@@ -11,6 +11,8 @@
  * @see HtmlPreviewPanel.tsx
  */
 
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from 'vitest'
 import { render, screen, fireEvent, waitFor, cleanup, act } from '@testing-library/react'
 import type { IDockviewPanelProps } from 'dockview'
@@ -162,6 +164,35 @@ describe('HtmlPreviewPanel', () => {
     const strip = container.querySelector('.html-preview-chrome-strip')
     expect(strip).not.toBeNull()
     expect(strip?.textContent).toContain('not Erfana')
+  })
+
+  it('says WHICH SIDE of the strip is not Erfana', () => {
+    // The wording carries the control. "Preview – not Erfana" on its own reads
+    // as the strip disowning itself — but the strip IS Erfana, and the area
+    // BELOW it is the untrusted page. A reader who cannot tell which side is
+    // meant gets no protection from the band being there.
+    const { container } = render(<HtmlPreviewPanel {...makeProps('/proj/page.html')} />)
+    const text = container.querySelector('.html-preview-chrome-strip')?.textContent ?? ''
+    expect(text).toContain('content below')
+  })
+
+  it('pins the strip to one unwrappable line', () => {
+    // Read from the shipping stylesheet, the way Dialog.contrast.test.ts does:
+    // the rule is the artefact, not a value duplicated in the test.
+    //
+    // Why this is not cosmetic. `PREVIEW_CHROME_INSET_PX` reserves a FIXED 22px
+    // band and the native view is inset by exactly that much. A label long
+    // enough to wrap would take a second line the inset does not cover, and the
+    // untrusted page would paint over it — the one thing the strip exists to
+    // prevent. Lengthening the text is fine; letting it wrap is not.
+    const css = readFileSync(resolve(__dirname, 'HtmlPreviewPanel.css'), 'utf8')
+    const rule = css.slice(
+      css.indexOf('.html-preview-chrome-strip {'),
+      css.indexOf('}', css.indexOf('.html-preview-chrome-strip {'))
+    )
+    expect(rule).toContain('white-space: nowrap')
+    expect(rule).toContain('overflow: hidden')
+    expect(rule).toContain('height: 22px')
   })
 
   it('closes the preview on unmount', () => {
