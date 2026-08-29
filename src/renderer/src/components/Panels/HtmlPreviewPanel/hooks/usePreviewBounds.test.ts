@@ -26,6 +26,7 @@ import { renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { usePreviewBounds, SEARCH_BAR_INSET_PX } from './usePreviewBounds'
+import { usePreviewViewportStore } from '../../../../stores/usePreviewViewportStore'
 
 const PANEL_ID = 'preview-panel-1'
 
@@ -76,6 +77,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  usePreviewViewportStore.setState({ rects: new Map() })
 })
 
 describe('usePreviewBounds — first rect after open', () => {
@@ -235,5 +237,110 @@ describe('usePreviewBounds — first rect after open', () => {
       { x: 477, y: 41, width: 400, height: 827 },
       expect.any(Number)
     )
+  })
+})
+
+describe('usePreviewBounds — publishing where the view sits', () => {
+  it('publishes the rect so app chrome can place itself beside the view', () => {
+    const { ref } = makePlaceholder(LAID_OUT)
+
+    renderHook(() =>
+      usePreviewBounds({
+        placeholderRef: ref,
+        panelId: PANEL_ID,
+        enabled: true,
+        isVisible: true,
+        isLive: true,
+        searchOpen: false
+      })
+    )
+
+    expect(usePreviewViewportStore.getState().rects.get(PANEL_ID)).toEqual({
+      left: 477,
+      top: 41,
+      width: 400,
+      height: 827
+    })
+  })
+
+  it('clears the rect when the tab stops being visible', () => {
+    const { ref } = makePlaceholder(LAID_OUT)
+
+    const { rerender } = renderHook(
+      ({ isVisible }) =>
+        usePreviewBounds({
+          placeholderRef: ref,
+          panelId: PANEL_ID,
+          enabled: true,
+          isVisible,
+          isLive: true,
+          searchOpen: false
+        }),
+      { initialProps: { isVisible: true } }
+    )
+    expect(usePreviewViewportStore.getState().rects.has(PANEL_ID)).toBe(true)
+
+    rerender({ isVisible: false })
+
+    // A rect left behind would push the toast around a view that is no longer
+    // on screen — a fault that looks exactly like the bug this machinery fixes.
+    expect(usePreviewViewportStore.getState().rects.has(PANEL_ID)).toBe(false)
+  })
+
+  it('clears the rect when the view is no longer live', () => {
+    const { ref } = makePlaceholder(LAID_OUT)
+
+    const { rerender } = renderHook(
+      ({ isLive }) =>
+        usePreviewBounds({
+          placeholderRef: ref,
+          panelId: PANEL_ID,
+          enabled: true,
+          isVisible: true,
+          isLive,
+          searchOpen: false
+        }),
+      { initialProps: { isLive: true } }
+    )
+    expect(usePreviewViewportStore.getState().rects.has(PANEL_ID)).toBe(true)
+
+    rerender({ isLive: false })
+    expect(usePreviewViewportStore.getState().rects.has(PANEL_ID)).toBe(false)
+  })
+
+  it('clears the rect on unmount', () => {
+    const { ref } = makePlaceholder(LAID_OUT)
+
+    const { unmount } = renderHook(() =>
+      usePreviewBounds({
+        placeholderRef: ref,
+        panelId: PANEL_ID,
+        enabled: true,
+        isVisible: true,
+        isLive: true,
+        searchOpen: false
+      })
+    )
+    expect(usePreviewViewportStore.getState().rects.has(PANEL_ID)).toBe(true)
+
+    unmount()
+    expect(usePreviewViewportStore.getState().rects.has(PANEL_ID)).toBe(false)
+  })
+
+  it('publishes nothing while the panel is refused', () => {
+    const { ref } = makePlaceholder(LAID_OUT)
+
+    renderHook(() =>
+      usePreviewBounds({
+        placeholderRef: ref,
+        panelId: PANEL_ID,
+        enabled: false,
+        isVisible: true,
+        isLive: true,
+        searchOpen: false
+      })
+    )
+
+    expect(usePreviewViewportStore.getState().rects.has(PANEL_ID)).toBe(false)
   })
 })

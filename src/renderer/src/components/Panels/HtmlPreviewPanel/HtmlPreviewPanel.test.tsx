@@ -26,12 +26,9 @@ import type {
   PreviewLoadStatePayload
 } from '../../../../../shared/ipc/preview-schema'
 
-// jsdom has no ResizeObserver; a no-op stub is enough — the bounds pump is
-// covered by htmlPreview.logic.test.ts (deriveBounds).
-vi.stubGlobal(
-  'ResizeObserver',
-  vi.fn(() => ({ observe: vi.fn(), disconnect: vi.fn(), unobserve: vi.fn() }))
-)
+// NOTE: no local ResizeObserver stub. `tests/setup/setupTests.renderer.ts`
+// installs one that records its callback; a second, divergent no-op here meant
+// the two files silently disagreed about what an observer does.
 
 const CONTAINER_BOX = { width: 800, height: 600, top: 0, left: 0, right: 800, bottom: 600 }
 

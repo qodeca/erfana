@@ -21,6 +21,7 @@
 
 import { useCallback, useEffect, useRef } from 'react'
 import { deriveBounds } from '../htmlPreview.logic'
+import { usePreviewViewportStore } from '../../../../stores/usePreviewViewportStore'
 
 /**
  * CSS pixels reserved at the top of the native view while the find bar is open
@@ -118,6 +119,17 @@ export function usePreviewBounds(options: UsePreviewBoundsOptions): UsePreviewBo
     const bounds = deriveBounds(el.getBoundingClientRect(), topInset)
     if (!bounds) return false
     window.api.preview.setBounds(panelId, bounds, seqRef.current++)
+    // Publish where the native view sits so Erfana's own chrome can place itself
+    // beside it instead of hiding it (the toast stack does this). Deliberately
+    // NOT keyed on whether the view is currently visible: occlusion is the
+    // overlay guard's OUTPUT and the toast's placement is one of its inputs, so
+    // keying on visibility would oscillate every frame.
+    usePreviewViewportStore.getState().setRect(panelId, {
+      left: bounds.x,
+      top: bounds.y,
+      width: bounds.width,
+      height: bounds.height
+    })
     return true
   }, [panelId, placeholderRef])
 
@@ -156,6 +168,21 @@ export function usePreviewBounds(options: UsePreviewBoundsOptions): UsePreviewBo
   //
   // So while the tab is visible, ask on each animation frame until one real rect
   // goes out, then stand down and let the observer own the steady state.
+  // A panel that is not the visible tab, has no view, or is unmounting has no
+  // rectangle on screen. Leaving a stale one behind would push the toast around
+  // a view that is not there.
+  useEffect(() => {
+    if (enabled && isVisible && isLive) return
+    usePreviewViewportStore.getState().clearRect(panelId)
+  }, [enabled, isVisible, isLive, panelId])
+
+  useEffect(
+    () => () => {
+      usePreviewViewportStore.getState().clearRect(panelId)
+    },
+    [panelId]
+  )
+
   useEffect(() => {
     if (!enabled || !isVisible || !isLive) return
 

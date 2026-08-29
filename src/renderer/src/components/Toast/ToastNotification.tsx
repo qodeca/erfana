@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { CheckCircle, XCircle, AlertCircle, Info, X } from 'lucide-react'
 import { useToast, Toast } from './ToastContext'
 import { TEST_IDS } from '../../constants/testids'
+import { useOccluder } from '../../hooks/useOccluder'
+import { readPreviewRects, usePreviewViewportStore } from '../../stores/usePreviewViewportStore'
+import { placeToastContainer, type ToastPlacement } from './toastPlacement'
 import './Toast.css'
 
 const ICON_MAP = {
@@ -19,6 +23,62 @@ function toastAnnouncement(toast: Toast): string {
 
 export function ToastNotification() {
   const { toasts, removeToast } = useToast()
+
+  // A previewed page runs in a native view the OS paints ABOVE all sibling DOM,
+  // so a toast that overlaps one is invisible AND unclickable — a click lands on
+  // the untrusted page instead. Erfana used to hide every preview whenever any
+  // toast appeared; that is safe but blanks a page the user is reading, and an
+  // actionable toast never auto-dismisses, so the "Approve this host?" prompt
+  // the preview itself raises hid every preview indefinitely.
+  //
+  // So the toast moves instead, and only falls back to hiding when there is
+  // genuinely nowhere clear to put it. See `toastPlacement.ts`.
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [placement, setPlacement] = useState<ToastPlacement>({
+    kind: 'clear',
+    offsetX: 0,
+    offsetY: 0
+  })
+
+  const recompute = useCallback(() => {
+    const el = containerRef.current
+    if (el === null) {
+      setPlacement({ kind: 'clear', offsetX: 0, offsetY: 0 })
+      return
+    }
+    // Measured HERE rather than read from a cache. `.toast-container` is
+    // `position: fixed`, so a window resize MOVES it without changing its box
+    // and no ResizeObserver fires — a stored rect would go stale exactly when
+    // the layout changed under it.
+    const rect = el.getBoundingClientRect()
+    setPlacement(
+      placeToastContainer(
+        { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+        readPreviewRects(),
+        { width: window.innerWidth, height: window.innerHeight }
+      )
+    )
+  }, [])
+
+  // Recompute before paint whenever the stack changes, so a toast never shows
+  // for a frame in the wrong place.
+  useLayoutEffect(recompute, [recompute, toasts])
+
+  useEffect(() => {
+    const unsubscribe = usePreviewViewportStore.subscribe(recompute)
+    window.addEventListener('resize', recompute)
+    return () => {
+      unsubscribe()
+      window.removeEventListener('resize', recompute)
+    }
+  }, [recompute])
+
+  // Register the occluder ONLY when the toast could not be placed clear. That is
+  // what keeps this honest: the rule is "say you occlude when you actually do",
+  // so the overlay guard needs no per-kind exemption, the panel's own
+  // `isViewHidden` cannot drift away from the guard's answer, and a consent
+  // toast added years from now inherits no silent carve-out.
+  useOccluder('toast', toasts.length > 0 && placement.kind === 'blocked')
 
   // Decoupled live-region pattern (UX-003 / AC#4): TWO always-mounted,
   // visually-hidden live regions exist in the DOM with zero toasts so assistive
@@ -56,7 +116,16 @@ export function ToastNotification() {
       >
         {alertText}
       </div>
-      <div className="toast-container" data-testid={TEST_IDS.TOAST_CONTAINER}>
+      <div
+        ref={containerRef}
+        className="toast-container"
+        data-testid={TEST_IDS.TOAST_CONTAINER}
+        style={
+          placement.kind === 'clear' && (placement.offsetX !== 0 || placement.offsetY !== 0)
+            ? { transform: `translate(${placement.offsetX}px, ${placement.offsetY}px)` }
+            : undefined
+        }
+      >
         {toasts.map((toast) => (
           <ToastItem key={toast.id} toast={toast} onClose={() => removeToast(toast.id)} />
         ))}
