@@ -15,7 +15,9 @@ import { ErrorCode } from '../../../shared/errors'
 import { routeLinkActivation, type PreviewLinkNavigationDeps } from './previewLinkNavigation'
 import type { ConfineVerdict } from './previewPathResolve'
 
-const TOKEN = 'abcdef0123456789abcdef0123456789'
+// A fake 32-hex preview root token. Not a credential: the real one is minted
+// per view by PreviewRootRegistry and never leaves the main process.
+const TOKEN = 'abcdef0123456789abcdef0123456789' // gitleaks:allow
 const REAL_ROOT = '/projects/site'
 const CURRENT = `erfana-preview://${TOKEN}/index.html`
 

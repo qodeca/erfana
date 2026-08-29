@@ -10,7 +10,9 @@
 import { describe, expect, it } from 'vitest'
 import { decideLinkIntent } from './PreviewNavigationPolicy'
 
-const TOKEN = 'abcdef0123456789abcdef0123456789'
+// A fake 32-hex preview root token. Not a credential: the real one is minted
+// per view by PreviewRootRegistry and never leaves the main process.
+const TOKEN = 'abcdef0123456789abcdef0123456789' // gitleaks:allow
 const CURRENT = `erfana-preview://${TOKEN}/index.html`
 
 /** Decide for an href clicked in the standard test document. */

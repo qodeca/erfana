@@ -18,3 +18,13 @@ e5ec5f9714543b6e9f71c39212b7349cf19f28f6:src/shared/ipc/graph-mcp-schema.test.ts
 # capture token in commit 69df015 (issue #60). A follow-up commit replaced it
 # with a low-entropy literal; this entry covers the historical commit only.
 69df015eb860fa966a306c684827fe89207aa1ec:src/preload/screenshotOverlay.test.ts:generic-api-key:29
+
+# preview link tests: the same fake 32-hex `erfana-preview://` root token used
+# across three suites (sd-074b). It is a test fixture, never a credential — the
+# real token is minted per view by PreviewRootRegistry and never leaves the main
+# process. The current lines carry an inline `gitleaks:allow`; these entries
+# cover the historical commits, which gitleaks still sees because the workflow
+# scans every ref with `--log-opts="--all"`.
+e42a931a80ddd4a8d1185bf3b5ba4c0fb439855c:src/main/services/preview/PreviewNavigationPolicy.test.ts:generic-api-key:13
+e42a931a80ddd4a8d1185bf3b5ba4c0fb439855c:src/main/services/preview/previewLinkNavigation.test.ts:generic-api-key:16
+555a0732576efaa0fdc93f14e5560c81ec923e4e:src/main/services/preview/previewLinkBridge.test.ts:generic-api-key:25
