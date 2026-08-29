@@ -138,6 +138,36 @@ async function previewEval(app: ElectronApplication, expr: string): Promise<stri
   }, expr)
 }
 
+/**
+ * The on-screen rectangle of the live preview's native `WebContentsView`, read
+ * from the main process. `null` when no preview view is attached.
+ *
+ * This is the ONE thing every other assertion in this file misses: they all read
+ * the preview's web contents, which loads and runs its JavaScript whether or not
+ * the view has ever been given a size. A view left at 0x0 executes its page
+ * perfectly and shows the user a black rectangle.
+ */
+async function previewViewBounds(
+  app: ElectronApplication
+): Promise<{ width: number; height: number } | null> {
+  return app.evaluate(({ BrowserWindow }) => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      for (const child of win.contentView.children) {
+        const wc = (child as { webContents?: { getURL(): string } }).webContents
+        try {
+          if (wc && wc.getURL().startsWith('erfana-preview://')) {
+            const b = child.getBounds()
+            return { width: b.width, height: b.height }
+          }
+        } catch {
+          // View mid-teardown; keep scanning.
+        }
+      }
+    }
+    return null
+  })
+}
+
 /** Open the failure-badge popover and return the text of its listed entries. */
 async function failureBadgeEntries(page: Page): Promise<string> {
   await page.locator('.html-preview-badge').first().click()
@@ -307,5 +337,30 @@ test.describe('HTML preview corpus', () => {
         message: 'cdn page never took its blocked-host fallback path'
       })
       .toContain('CDN blocked')
+  })
+
+  test('the native view is sized on open, with no tab switch to prod it (black-panel regression)', async ({
+    windowWithTestProject,
+    appWithTestProject
+  }) => {
+    await openPreview(windowWithTestProject, 'self-contained/index.html')
+
+    // The page loading proves nothing about what the user sees: a `WebContentsView`
+    // left at 0x0 still loads and still runs its scripts. Assert the RECTANGLE.
+    //
+    // Deliberately short: the panel measures its placeholder on mount, before
+    // dockview has laid the panel out, so the first measurement is 0x0 and sends
+    // nothing. Before the fix the next send only came from a later tab switch or
+    // window resize, so the preview stayed black until the user clicked around —
+    // which no other test in this suite could see.
+    await expect
+      .poll(async () => (await previewViewBounds(appWithTestProject))?.width ?? 0, {
+        timeout: 5000,
+        message: 'preview view never got a non-zero width without user interaction'
+      })
+      .toBeGreaterThan(0)
+
+    const bounds = await previewViewBounds(appWithTestProject)
+    expect(bounds?.height).toBeGreaterThan(0)
   })
 })

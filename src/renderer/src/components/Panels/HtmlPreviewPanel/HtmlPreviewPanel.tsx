@@ -138,18 +138,6 @@ export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelPara
   // not occluded by it (UX-002). Only meaningful while this tab is visible.
   const isSearchOpen = useSearchStore((s) => s.isOpen)
 
-  const { pushBounds } = usePreviewBounds({
-    placeholderRef,
-    panelId,
-    enabled: !limitReached && !openFailed,
-    searchOpen: isVisible && isSearchOpen
-  })
-
-  // A tab switch changes no size, so re-push the rect when we become visible.
-  useEffect(() => {
-    if (isVisible) pushBounds()
-  }, [isVisible, pushBounds])
-
   // ========================================
   // Store-derived UI state
   // ========================================
@@ -157,9 +145,25 @@ export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelPara
   // Select the panel ENTRY (stable object reference) and derive with stable
   // fallbacks — selecting `getFailures(panelId)` directly would return a fresh
   // `[]` each render and loop `useSyncExternalStore`.
+  //
+  // Read BEFORE the bounds hook: `loadState` is what tells that hook a native
+  // view exists to receive a rect, and main drops one sent any earlier.
   const panel = usePreviewStore((s) => s.panels.get(panelId))
   const loadState = panel?.loadState ?? 'idle'
   const stillFrame = panel?.stillFrame ?? null
+
+  // The hook owns every push, including the one on becoming visible: a tab
+  // switch changes no size, so the `ResizeObserver` alone would not re-emit.
+  usePreviewBounds({
+    placeholderRef,
+    panelId,
+    enabled: !limitReached && !openFailed,
+    isVisible,
+    // Main emits the first non-idle load state AFTER installing the view, so
+    // this is the earliest point a `setBounds` is not thrown away.
+    isLive: loadState !== 'idle',
+    searchOpen: isVisible && isSearchOpen
+  })
 
   const view = selectPanelView({
     limitReached,

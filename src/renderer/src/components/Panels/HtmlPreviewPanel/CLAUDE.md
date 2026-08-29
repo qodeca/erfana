@@ -25,7 +25,7 @@ When the search bar opens, the native view's bounds are inset from the top by `S
 Mirrors the `ImageViewerPanel` split:
 
 - **`htmlPreview.logic.ts`** — every decision as a pure function (`deriveBounds`, `selectPanelView`, `selectFallback`, `summarizeFailures`); no React, no `window.api`, no store. Unit-tested in isolation.
-- **`hooks/`** — one concern each: `usePreviewLifecycle` (`preview:open`/`close`, the limit-reached/failed signals, and the re-open of a suspended preview when its tab becomes visible), `usePreviewEvents` (store updates), `usePreviewBounds` (ResizeObserver bounds pump), `usePreviewFindShortcuts` (forwarded accelerators).
+- **`hooks/`** — one concern each: `usePreviewLifecycle` (`preview:open`/`close`, the limit-reached/failed signals, and the re-open of a suspended preview when its tab becomes visible), `usePreviewEvents` (store updates), `usePreviewBounds` (bounds pump), `usePreviewFindShortcuts` (forwarded accelerators).
 - **`components/`** — presentational chrome only (`PreviewBanner`, `PreviewFallback`, `PreviewFailureBadge`).
 - **`HtmlPreviewPanel.tsx`** — glue: wires hooks to chrome, holds no decision logic.
 
@@ -36,6 +36,16 @@ The rule per panel is unchanged: `visible = (panel is the active tab) && !occlud
 **Suspended is a fourth load state.** Beyond `PREVIEW.MAX_LIVE_VIEWS`, main tears the least recently active view down and emits `suspended`; the panel keeps showing its still frame, and `usePreviewLifecycle` re-opens it when the tab becomes visible again. A suspended panel has no `WebContentsView`, so it must never be sent visibility.
 
 **Limit-reached now means "open in another window".** The refusal survives only for a cross-window panel-id collision (ids are path-derived, so two windows previewing one file mint the same id). It is not a "one preview at a time" message any more.
+
+## Bounds: the first rect is the one that bites
+
+`openFileInPanel` calls dockview's `addPanel` and only then `setActive`, so `usePreviewBounds` first runs while the panel is still an INACTIVE tab — which has a 0x0 box. `deriveBounds` refuses a degenerate rect, so nothing is sent and the native view keeps the 1x1 fallback rect `preview:open` was called with: a view too small to see, sitting over a brand-black placeholder. The symptom is a black panel that only appears once you click around the tabs.
+
+A second race compounds it: `preview:open` is still in flight while the hook mounts, and `PreviewViewService.setBounds` silently DROPS a rect for a panel with no view in the registry. A rect sent that early looks like success in the renderer and vanishes main-side.
+
+The `ResizeObserver` is not a dependable second chance either: dockview re-parents an `always`-rendered panel rather than resizing it in place, so the 0x0 -> laid-out transition need not produce a resize callback at all. `usePreviewBounds` therefore runs an animation-frame pump, armed by `isVisible && isLive`, asking until one real rect goes out (bounded by `FIRST_RECT_FRAME_BUDGET`), then stands down and lets the observer own the steady state. `pushBounds` returns a boolean for exactly that reason. `isLive` is the store load state leaving `'idle'`, which main emits AFTER `registry.install` — the earliest point a rect is not thrown away, which is why the panel reads the store BEFORE calling the hook.
+
+The hook owns EVERY push, including the become-visible one — do not add a `pushBounds()` effect back into the panel. Regression cover: `hooks/usePreviewBounds.test.ts`, plus an e2e test that asserts the real `WebContentsView` has a non-zero rect after an open with no user interaction (`e2e/html-preview-corpus.e2e.ts`). Every other preview test reads the preview's web contents, which loads and runs its scripts perfectly at 0x0 — only the rectangle assertion sees this class of bug.
 
 ## Other gotchas
 
