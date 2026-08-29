@@ -493,6 +493,15 @@ export const PREVIEW = {
    * budgets below are derived from it.
    */
   MAX_LIVE_VIEWS: 3,
+  /**
+   * Bounds on the previewed page's own zoom level (Chromium scale, 0 = 100%).
+   *
+   * ±5 covers roughly 30% to 300%, which clears WCAG 2.2 SC 1.4.4's 200%
+   * requirement in both directions while stopping a runaway key-repeat at a
+   * level the page can still be laid out at.
+   */
+  MIN_ZOOM_LEVEL: -5,
+  MAX_ZOOM_LEVEL: 5,
   /** Per-panel watch cap (bounds EMFILE exposure, #146–#151) */
   MAX_WATCHED_FILES: 16,
   /**

@@ -101,6 +101,11 @@ export interface PreviewWebContentsHandle {
     options: { forward: boolean; findNext: boolean; matchCase: boolean }
   ): number
   stopFindInPage(action: 'clearSelection' | 'keepSelection' | 'activateSelection'): void
+  /** Chromium zoom level; 0 is 100%, each step is a ~20% change. */
+  setZoomLevel(level: number): void
+  getZoomLevel(): number
+  /** Whether this web contents currently has keyboard focus. */
+  isFocused(): boolean
   // Event surface: `on`, `once` and `removeListener` are intentionally loose
   // because the wired events (`render-process-gone`, `unresponsive`,
   // `will-navigate`, `did-finish-load`, `destroyed`, `before-input-event`) carry

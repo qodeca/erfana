@@ -147,7 +147,8 @@ describe('Main Process - Window Creation', () => {
 
     // Mock menu module
     vi.doMock('./menu', () => ({
-      createApplicationMenu: vi.fn(() => ({}))
+      createApplicationMenu: vi.fn(() => ({})),
+      setPreviewZoomHandler: vi.fn()
     }))
 
     // Mock @electron-toolkit/utils
@@ -489,7 +490,8 @@ describe('Main Process - Window Creation', () => {
         }))
 
         vi.doMock('./menu', () => ({
-          createApplicationMenu: vi.fn(() => ({}))
+          createApplicationMenu: vi.fn(() => ({})),
+          setPreviewZoomHandler: vi.fn()
         }))
 
         vi.doMock('@electron-toolkit/utils', () => ({

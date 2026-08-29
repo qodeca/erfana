@@ -435,6 +435,31 @@ export class PreviewLiveView {
     this.view.setVisible(false)
   }
 
+  /**
+   * Set the page's own zoom level (Chromium scale, 0 = 100%).
+   *
+   * Distinct from the host window's zoom, which `clampAndZoomBounds` applies to
+   * the view's RECTANGLE: scaling the rectangle alone makes the page's text
+   * relatively smaller, which is the opposite of what a reader pressing
+   * Cmd/Ctrl-+ wants.
+   */
+  setZoomLevel(level: number): void {
+    if (this.isDefunct) {
+      return
+    }
+    this.wc.setZoomLevel(level)
+  }
+
+  /** The page's current zoom level, or 0 once the view is gone. */
+  getZoomLevel(): number {
+    return this.isDefunct ? 0 : this.wc.getZoomLevel()
+  }
+
+  /** Whether the previewed page currently holds keyboard focus. */
+  isFocused(): boolean {
+    return !this.isDefunct && this.wc.isFocused()
+  }
+
   reload(ignoreCache: boolean): void {
     this.doReload(ignoreCache)
   }

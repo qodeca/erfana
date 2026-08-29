@@ -30,6 +30,19 @@ export const PREVIEW_FORWARDED_SHORTCUTS = Object.freeze([
   { key: 'f', accel: true },
   { key: 's', accel: true },
   { key: 'w', accel: true },
+  // Zoom. Without these the sealed page swallows Cmd/Ctrl +/-/0 and there is no
+  // way to make previewed text bigger: the host's zoom only scales the view's
+  // RECTANGLE, so pressing it makes the page's text relatively SMALLER. WCAG 2.2
+  // SC 1.4.4 requires text to reach 200%.
+  //
+  // Both the unshifted and shifted forms of each key are listed because the
+  // physical key reports differently with Shift held ('=' vs '+', '-' vs '_'),
+  // and users hit either.
+  { key: '=', accel: true },
+  { key: '+', accel: true },
+  { key: '-', accel: true },
+  { key: '_', accel: true },
+  { key: '0', accel: true },
   { key: 'Escape', accel: false }
 ] as const satisfies readonly ForwardedShortcut[])
 

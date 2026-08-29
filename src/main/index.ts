@@ -33,7 +33,7 @@ import { DependencyDetector, converterRegistry, getExtensionsForDependencies } f
 import { FORCE_CRASH_ARG } from '../shared/constants'
 import { IMPORT_CHANNELS } from '../shared/ipc/import-channels'
 import type { DependencyReadyEvent } from '../shared/ipc/import-schema'
-import { createApplicationMenu } from './menu'
+import { createApplicationMenu, setPreviewZoomHandler } from './menu'
 import { fileService } from './services/FileService'
 import { fileWatcherService } from './services/FileWatcherService'
 import { directoryWatcherService } from './services/DirectoryWatcherService'
@@ -131,7 +131,10 @@ function isRendererGone(win: BrowserWindow): boolean {
 let claudeStatusHandlers: { dispose: () => Promise<void> } | null = null
 
 /** HTML preview handler bundle (#74); disposed on app shutdown. */
-let previewHandlers: { dispose: () => Promise<void> } | null = null
+let previewHandlers: {
+  dispose: () => Promise<void>
+  zoomFocused: (step: number) => Promise<boolean>
+} | null = null
 
 // WebGL Command Line Switches (originally added for Electron 33+)
 // Fixes WebGL context creation issues and terminal flickering in production builds
@@ -403,6 +406,13 @@ app.whenReady().then(async () => {
     subscribeProjectChanged: (listener) => fileService.onProjectPathChanged(listener),
     globalSettings: globalSettingsService
   })
+
+  // Route View-menu zoom to a focused previewed page. A menu accelerator is
+  // global to the app, so with a preview focused Cmd/Ctrl-+ would otherwise fire
+  // the menu AND be forwarded to the page — zooming the window and the page at
+  // once. The menu holds a late-bound handler because it is installed before this
+  // graph exists.
+  setPreviewZoomHandler((step) => previewHandlers?.zoomFocused(step) ?? Promise.resolve(false))
 
   // RELIABILITY FIX (todo012): Clean up stale projects on startup
   // This runs asynchronously but doesn't block window creation

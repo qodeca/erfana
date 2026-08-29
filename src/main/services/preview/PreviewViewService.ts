@@ -76,6 +76,15 @@ export interface IPreviewViewService {
   setBounds(panelId: string, bounds: PreviewBounds, seq: number): void
   setVisibility(panelId: string, visible: boolean, reason: string): Promise<void>
   reload(panelId: string, opts?: { ignoreCache?: boolean }): Promise<void>
+  /** Zoom the previewed page by `step` levels, or back to 100% with `0`. */
+  setZoom(panelId: string, step: number): Promise<void>
+  /**
+   * Zoom whichever previewed page holds keyboard focus.
+   *
+   * @returns `true` when a preview took it, so the View menu falls through to
+   * the host window only when none did.
+   */
+  zoomFocused(step: number): Promise<boolean>
   swapStylesheet(panelId: string, relPath: string): Promise<boolean>
   applyApprovedHosts(panelId: string, hosts: readonly string[]): Promise<void>
   destroyAll(reason: string): Promise<void>
@@ -145,6 +154,14 @@ export interface PreviewViewDeps {
 export class PreviewViewService implements IPreviewViewService, PreviewFindExportService {
   /** Live views plus the two-part staleness guard over them (sd-074b §4.2). */
   private readonly registry = new PreviewViewRegistry()
+  /**
+   * Page zoom per panel, surviving the view itself.
+   *
+   * A preview evicted by the live-view budget is torn down and rebuilt when its
+   * tab returns, so a level held on the view would reset every time the reader
+   * looked away.
+   */
+  private readonly zoomLevels = new Map<string, number>()
   private readonly liveViewDeps: PreviewLiveViewDeps
 
   constructor(private readonly deps: PreviewViewDeps) {
@@ -267,6 +284,12 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
     }
 
     this.registry.install(panelId, live, window.id)
+    // Re-apply a zoom the reader set before this panel last slept. Applied
+    // BEFORE the load so the first paint is already at the right scale.
+    const remembered = this.zoomLevels.get(panelId)
+    if (remembered !== undefined && remembered !== 0) {
+      live.setZoomLevel(remembered)
+    }
     await live.load()
 
     // `load()` is an await like any other: re-check before leaving it running.
@@ -385,6 +408,40 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
       this.registry.touch(panelId)
     }
     await live.setVisibility(visible)
+  }
+
+  /**
+   * Zoom the previewed page, and remember the level for this panel.
+   *
+   * The level is held by the SERVICE, not the view: a preview that sleeps past
+   * the live-view budget is torn down and rebuilt when its tab comes back, so a
+   * level stored on the view would silently reset. Held here it survives
+   * suspend/resume and a same-panel reopen, which is what a reader who zoomed in
+   * to read something expects.
+   */
+  async setZoom(panelId: string, step: number): Promise<void> {
+    const current = this.zoomLevels.get(panelId) ?? 0
+    const next =
+      step === 0
+        ? 0
+        : Math.min(PREVIEW.MAX_ZOOM_LEVEL, Math.max(PREVIEW.MIN_ZOOM_LEVEL, current + step))
+    this.zoomLevels.set(panelId, next)
+    this.registry.get(panelId)?.setZoomLevel(next)
+  }
+
+  /**
+   * Zoom whichever previewed page currently holds keyboard focus.
+   *
+   * @returns `true` when a preview handled it, so the caller can fall through to
+   * the host window's own zoom when it did not.
+   */
+  async zoomFocused(step: number): Promise<boolean> {
+    const focused = this.registry.all().find((entry) => entry.view.isFocused())
+    if (focused === undefined) {
+      return false
+    }
+    await this.setZoom(focused.view.panelId, step)
+    return true
   }
 
   async reload(panelId: string, opts?: { ignoreCache?: boolean }): Promise<void> {

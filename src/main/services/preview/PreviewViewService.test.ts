@@ -38,6 +38,9 @@ interface FakeWc {
   loadURL: ReturnType<typeof vi.fn<(url: string) => Promise<void>>>
   reload: ReturnType<typeof vi.fn<() => void>>
   reloadIgnoringCache: ReturnType<typeof vi.fn<() => void>>
+  setZoomLevel: ReturnType<typeof vi.fn<(level: number) => void>>
+  getZoomLevel: ReturnType<typeof vi.fn<() => number>>
+  isFocused: ReturnType<typeof vi.fn<() => boolean>>
   destroy: ReturnType<typeof vi.fn<() => void>>
   close: ReturnType<typeof vi.fn<() => void>>
   executeJavaScriptInIsolatedWorld: ReturnType<
@@ -70,11 +73,17 @@ function makeFakeWc(): FakeWc {
   const executeJavaScriptInIsolatedWorld = vi.fn<
     (worldId: number, scripts: { code: string }[]) => Promise<unknown>
   >(() => Promise.resolve(true))
+  const setZoomLevel = vi.fn<(level: number) => void>()
+  const getZoomLevel = vi.fn<() => number>(() => 0)
+  const isFocused = vi.fn<() => boolean>(() => false)
 
   const wc = {
     loadURL,
     reload,
     reloadIgnoringCache,
+    setZoomLevel,
+    getZoomLevel,
+    isFocused,
     destroy,
     close,
     isDestroyed: () => destroyed,
@@ -92,6 +101,9 @@ function makeFakeWc(): FakeWc {
     printToPDF: vi.fn(() => Promise.resolve(Buffer.from(''))),
     findInPage: vi.fn(() => 1),
     stopFindInPage: vi.fn(),
+    setZoomLevel,
+    getZoomLevel,
+    isFocused,
     on: on as unknown as PreviewWebContentsHandle['on'],
     once: once as unknown as PreviewWebContentsHandle['once'],
     removeListener: removeListener as unknown as PreviewWebContentsHandle['removeListener']
@@ -107,6 +119,9 @@ function makeFakeWc(): FakeWc {
     loadURL,
     reload,
     reloadIgnoringCache,
+    setZoomLevel,
+    getZoomLevel,
+    isFocused,
     destroy,
     close,
     executeJavaScriptInIsolatedWorld,
@@ -425,6 +440,98 @@ describe('PreviewViewService — open epoch guard', () => {
     // The slot is free: a fresh open now succeeds.
     const next = await h.service.open({ ...REQUEST_A, panelId: 'panel-B' }, h.window)
     expect(next).toEqual({ ok: true })
+  })
+})
+
+describe('PreviewViewService — page zoom', () => {
+  async function openOne(h: ReturnType<typeof makeHarness>): Promise<void> {
+    await h.service.open(REQUEST_A, h.window)
+  }
+
+  it('zooms the PAGE, not the host window', async () => {
+    const h = makeHarness()
+    await openOne(h)
+
+    await h.service.setZoom('panel-A', 1)
+
+    // The host's zoom only scales the view's rectangle, which makes the page's
+    // text relatively SMALLER. WCAG 2.2 SC 1.4.4 needs the text itself to grow.
+    expect(h.factory.setZoomLevel).toHaveBeenLastCalledWith(1)
+  })
+
+  it('steps up and down from where it was', async () => {
+    const h = makeHarness()
+    await openOne(h)
+
+    await h.service.setZoom('panel-A', 1)
+    await h.service.setZoom('panel-A', 1)
+    await h.service.setZoom('panel-A', -1)
+
+    expect(h.factory.setZoomLevel).toHaveBeenLastCalledWith(1)
+  })
+
+  it('returns to 100% on reset', async () => {
+    const h = makeHarness()
+    await openOne(h)
+
+    await h.service.setZoom('panel-A', 1)
+    await h.service.setZoom('panel-A', 0)
+
+    expect(h.factory.setZoomLevel).toHaveBeenLastCalledWith(0)
+  })
+
+  it('clamps a held-down key rather than zooming without limit', async () => {
+    const h = makeHarness()
+    await openOne(h)
+
+    for (let i = 0; i < 50; i += 1) {
+      await h.service.setZoom('panel-A', 1)
+    }
+
+    expect(h.factory.setZoomLevel).toHaveBeenLastCalledWith(PREVIEW.MAX_ZOOM_LEVEL)
+
+    for (let i = 0; i < 100; i += 1) {
+      await h.service.setZoom('panel-A', -1)
+    }
+    expect(h.factory.setZoomLevel).toHaveBeenLastCalledWith(PREVIEW.MIN_ZOOM_LEVEL)
+  })
+
+  it('remembers the zoom when a panel sleeps and comes back', async () => {
+    const h = makeHarness()
+    await openOne(h)
+    await h.service.setZoom('panel-A', 1)
+
+    // A preview evicted by the live-view budget is torn down and REBUILT when
+    // its tab returns, so a level held on the view itself would silently reset
+    // every time the reader looked away.
+    await h.service.close('panel-A')
+    // The harness shares ONE fake webContents across every view it builds, so
+    // the close leaves it flagged destroyed and the rebuilt view would refuse
+    // every call. Real Electron hands the new view a fresh one.
+    h.factory.setDestroyed(false)
+    h.factory.setZoomLevel.mockClear()
+    await openOne(h)
+
+    expect(h.factory.setZoomLevel).toHaveBeenCalledWith(1)
+  })
+
+  it('does not touch zoom on a fresh panel that was never zoomed', async () => {
+    const h = makeHarness()
+    await openOne(h)
+
+    expect(h.factory.setZoomLevel).not.toHaveBeenCalled()
+  })
+
+  it('zooms whichever preview has focus, and reports when none does', async () => {
+    const h = makeHarness()
+    await openOne(h)
+
+    h.factory.isFocused.mockReturnValue(false)
+    expect(await h.service.zoomFocused(1)).toBe(false)
+
+    h.factory.isFocused.mockReturnValue(true)
+    expect(await h.service.zoomFocused(1)).toBe(true)
+    expect(h.factory.setZoomLevel).toHaveBeenLastCalledWith(1)
   })
 })
 

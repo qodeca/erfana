@@ -30,14 +30,27 @@ function keyDown(overrides: Partial<ForwardableInput>): ForwardableInput {
 }
 
 describe('PREVIEW_FORWARDED_SHORTCUTS', () => {
-  it('is a frozen list of exactly the four accelerators', () => {
+  it('is a frozen list of exactly the forwarded accelerators', () => {
     expect(Object.isFrozen(PREVIEW_FORWARDED_SHORTCUTS)).toBe(true)
     expect(PREVIEW_FORWARDED_SHORTCUTS).toEqual([
       { key: 'f', accel: true },
       { key: 's', accel: true },
       { key: 'w', accel: true },
+      { key: '=', accel: true },
+      { key: '+', accel: true },
+      { key: '-', accel: true },
+      { key: '_', accel: true },
+      { key: '0', accel: true },
       { key: 'Escape', accel: false }
     ])
+  })
+
+  it('forwards the zoom keys, without which previewed text cannot be enlarged', () => {
+    // The sealed page swallows every key it is not handed. Host zoom scales the
+    // view's RECTANGLE, so it makes the page's text relatively smaller — leaving
+    // a reader no way to reach the 200% WCAG 2.2 SC 1.4.4 requires.
+    const zoomKeys = PREVIEW_FORWARDED_SHORTCUTS.filter((s) => s.accel).map((s) => s.key)
+    expect(zoomKeys).toEqual(expect.arrayContaining(['=', '+', '-', '_', '0']))
   })
 })
 
