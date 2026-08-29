@@ -264,8 +264,12 @@ export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelPara
               WebContentsView paints above all sibling DOM in this surface, so a
               badge here would be invisible while the page runs. See
               HtmlPreviewTab + PreviewFailureBadge (design §1.8). */}
-          {/* The sized, brand-black target the native WebContentsView paints
-              over. The fallback layer sits behind it for the hidden case. */}
+          {/* The sized target the native WebContentsView paints over. Its
+              background is held equal to the view's own backdrop — brand black
+              until the page paints, then the page's resolved paper colour from
+              `preview:backdropChanged` — so the seam between DOM and native view
+              never flashes. The fallback layer sits behind it for the hidden
+              case. */}
           {/* Name the surface for assistive tech: while the native view is hidden
               (inactive tab, overlay, pre-paint) its own a11y tree is gone, so
               without a label a screen reader finds only an unnamed black region. */}

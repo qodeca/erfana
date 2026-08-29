@@ -11,7 +11,9 @@ The native `WebContentsView` paints ABOVE all sibling DOM in the panel, regardle
 
 ## Occluder guard — never toggle the view directly
 
-`OverlayGuardService` (`../../../services/preview/OverlayGuardService.ts`) is the SINGLE owner of preview show/hide and the ONLY renderer module allowed to call `api.preview.setVisibility` (ESLint-enforced). It computes, PER live preview, `visible = (that panel is the active tab) && !isOccluded()`. Overlays register via `useOccluder(kind, active)` (`../../../hooks/useOccluder.ts`) — kinds `dialog`/`settings`/`toast`/`menu`/`overlay`/`drag`. Opening a dialog, settings, toast, menu (the badge popover), a full-screen overlay, or switching to another tab all hide the view. Never call `setVisibility` or manipulate the view from a component.
+`OverlayGuardService` (`../../../services/preview/OverlayGuardService.ts`) is the SINGLE owner of preview show/hide and the ONLY renderer module allowed to call `api.preview.setVisibility` (ESLint-enforced). It computes, PER live preview, `visible = (that panel is the active tab) && !isOccluded()`. Overlays register via `useOccluder(kind, active)` (`../../../hooks/useOccluder.ts`) — kinds `dialog`/`settings`/`toast`/`menu`/`overlay`/`drag`. Opening a dialog, settings, a menu (the badge popover), a full-screen overlay, or switching to another tab all hide the view. Never call `setVisibility` or manipulate the view from a component.
+
+**A toast is the one exception, and it is deliberate** — see "Toasts move, the page does not" below.
 
 - `BaseDialog` pushes the occluder count from its `isOpen` effect, NOT via `useOccluder` (it needs the raw stack length, not a boolean).
 - Occluder counts publish on a `queueMicrotask` flush, so a synchronous unregister→register pair (e.g. a dialog z-index change) coalesces to one notification — no hide/show flap or wasted `capturePage`.
@@ -50,6 +52,34 @@ The hook owns EVERY push, including the become-visible one — do not add a `pus
 ## Other gotchas
 
 - **Stable empty-failures sentinel.** Falling back to a fresh `[]` INSIDE a `usePreviewStore` selector loops `useSyncExternalStore`. Select the stored array reference and fall back to a module-level `NO_FAILURES` constant OUTSIDE the selector (see `HtmlPreviewTab`); the panel does the same with `panels.get(panelId)` + `?? 'idle'`/`?? null` fallbacks.
-- **Forwarded accelerators.** The native view swallows renderer keys, so main forwards `f`/`s`/`w`/`Escape` via `preview:forwardedShortcut`; `usePreviewFindShortcuts` routes them to panel actions. Forwarded Escape must run the provider's `clearHighlights()` + restore focus (matching `SearchBar.handleClose`), not just flip the store flag.
+- **Forwarded accelerators.** The native view swallows renderer keys, so main forwards `f`/`s`/`w`/`Escape` **plus the five zoom keys (`=`, `+`, `-`, `_`, `0`)** via `preview:forwardedShortcut`; `usePreviewFindShortcuts` routes them to panel actions. Forwarded Escape must run the provider's `clearHighlights()` + restore focus (matching `SearchBar.handleClose`), not just flip the store flag.
+- **Zoom means the page, not the rectangle.** Host zoom is applied geometrically (`clampAndZoomBounds` multiplies the CSS rect), so without `preview:setZoom` calling `setZoomLevel` on the preview's own webContents, Cmd/Ctrl-+ grows the preview *box* while the text stays at 100% — i.e. the text gets relatively smaller. The View menu routes to the focused preview and falls through to the host window otherwise; levels are held per panel in `PreviewViewService` and re-applied after `registry.install`, so a zoom survives suspend/resume.
 - **Empty-badge cleanup.** `PreviewFailureBadge` force-closes when `summary.count` hits 0, in an effect that runs BEFORE its `count === 0` early return — otherwise an open popover's `useOccluder('menu', open)` never releases and the view stays stuck behind its still frame. Keep that effect above the early return (hook ordering).
-- **Placeholder colour** is `var(--color-brand-black)`, matching main's `setBackgroundColor('#FF161312')`, so the hidden-with-no-frame fallback is never a blank rectangle.
+- **Chrome strip.** `.html-preview-chrome-strip` ("Preview – not Erfana") is always-DOM and the view is inset below it by `PREVIEW_CHROME_INSET_PX`, through the same `topInset` path the find bar uses. It is a security control, not decoration (was residual risk 8 in `docs/security.md`): a toast now leaves an untrusted page on screen while Erfana asks "Approve this host?", so this band is how a reader tells a real Erfana prompt from one the page drew. Do not make it conditional and do not let it scroll.
+
+## The backdrop is a state machine, not a constant
+
+**The invariant: the DOM placeholder's background and the native view's `setBackgroundColor` always carry the same value.** Break either half and the seam flashes at the view's edge on every bounds update.
+
+The value moves. `src/main/services/preview/previewBackdrop.ts` holds it as a pure state machine: brand black (`#FF161312`, matching `var(--color-brand-black)`) until the page has painted, then the page's own resolved paper colour, read via `getComputedStyle` in isolated world 998 and defaulting to `#FFFFFFFF`. Main emits it on `preview:backdropChanged`; the panel writes it as an inline `background` on the placeholder.
+
+The defect it fixes: the colour was set once in the constructor, so a page declaring no background of its own — which is transparent — got Erfana's near-black as its paper while its default text stayed black. Most plain HTML was unreadable.
+
+Three things here look like they could be simplified and cannot:
+
+- **`did-stop-loading`, never `did-finish-load`.** Chromium scopes start/stop loading to *any* document in the frame tree but `did-finish-load` to the *primary main frame's* `onload`. Pair them and one lazily-loaded `<iframe>` flips the backdrop back to chrome with nothing to flip it forward: unreadable for good. `did-stop-loading` also covers a failed or cancelled load, which matters because `window.stop()` is page-callable.
+- **A reload must NOT repaint chrome.** `setBackgroundColor` is not deferred to the next paint. During a reload the old document is still on screen, so repainting dark under it flashes the page dark on every autosave. Only the first load has nothing to lose.
+- **Page colour, not forced white.** White breaks any page shipping `color-scheme: dark` — light text on white, the same bug mirrored.
+
+The listeners are siblings of `did-finish-load` in `previewViewLifecycle.ts`, **outside `schedulePipeline()`** on purpose: that pipeline is rate-limited and drops events during a save burst, which would strand the backdrop in the chrome phase.
+
+## Toasts move, the page does not
+
+A toast used to hide every live preview simply by existing. Because `ToastContext` forces `duration: 0` on an actionable toast, the preview's own blocked-host prompt ("Approve this host?") then hid every preview **indefinitely** — a toast raised by the preview, hiding the preview, with no auto-dismiss.
+
+Now `usePreviewBounds` publishes each live view's CSS-pixel rect into `stores/usePreviewViewportStore.ts`, and the pure `Toast/toastPlacement.ts` picks the first position clear of them (stay put → slide right → slide left → rise above). `ToastNotification` applies the offset as a `transform`.
+
+- **`useOccluder('toast', …)` now lives in `ToastNotification`, not `ToastContext`, and registers only when placement returns `blocked`.** That keeps the guard kind-blind and needs no `isOccluded({ except })`, and it **fails safe**: nothing fits ⇒ the old hide-everything behaviour, so a consent prompt can never sit under an untrusted page.
+- **The published rect is keyed on visible + live, NOT on occlusion.** Occlusion is the guard's output and placement is one of its inputs; keying on visibility would make the toast hide the view, the hidden view withdraw its rect, the toast unhide the view, every frame.
+- **Measure at decision time.** `.toast-container` is `position: fixed`, so a window resize moves it without changing its box and no `ResizeObserver` fires. Read `getBoundingClientRect()` when computing, and recompute on `window.resize` too.
+- **Clear the rect on hide and on unmount.** A rect left behind permanently displaces every toast — which looks exactly like the bug this machinery exists to fix.

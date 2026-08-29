@@ -57,6 +57,13 @@ The preview watches the page plus every local file it links, and re-subscribes w
 
 For the acceptance corpus, save-to-visible-change stays under 300 ms.
 
+## Colours, zoom, and the "not Erfana" strip
+
+- **A page is painted in its own colours.** A preview uses the background the page itself resolves to – white for ordinary HTML, dark for a page declaring `color-scheme: dark` – exactly as a browser would. Erfana's own dark colour appears only before the page has painted anything, so the seam between Erfana's panel and the page never flashes.
+- **Zoom applies to the page, not the panel.** Cmd/Ctrl-plus, minus and 0 over a preview, or the **View** menu, zoom the previewed page the way a browser does. Each preview keeps its own zoom level, including across a sleep and wake.
+- **Every live preview carries a "Preview – not Erfana" strip.** A thin band of Erfana's own interface sits above the page, in an area the page cannot draw on. It is a security control, not decoration: a previewed page is untrusted, it paints over everything else in its panel, and it stays on screen while Erfana asks you about it. A prompt appearing inside the preview area is the page imitating Erfana.
+- **Notifications move rather than hide the page.** A message in the corner shifts itself clear of a running preview instead of blanking it, so you can read the page and answer a prompt at the same time. If the window is too small for it to fit clear, the preview hides instead – a prompt must never sit underneath somebody else's page.
+
 ## Find, export, and the off-switch
 
 - **Find-in-page.** The existing search UI matches text inside the running page, reports match counts, and steps through matches – it drives the view's own find, not a DOM search.

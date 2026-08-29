@@ -6,10 +6,15 @@
  * Plain co-located global CSS (not a CSS module, per design §1.8). All values
  * come from design tokens (docs/ui-style-guide.md); no rounded corners.
  *
- * The placeholder's background is `var(--color-brand-black)` on purpose — it is
- * the same value main encodes as `setBackgroundColor('#FF161312')`, so the seam
- * between the DOM placeholder and the native view never flashes a different
- * colour (design §1.8).
+ * The placeholder's background is the STARTING half of a two-value invariant:
+ * the DOM placeholder and the native view's backdrop always carry the same
+ * colour, so the seam between them never flashes (design §1.8). The value here
+ * is only the chrome phase — `var(--color-brand-black)`, matching main's
+ * `setBackgroundColor('#FF161312')` in the constructor. Once the page settles,
+ * main resolves the page's own paper colour and emits `preview:backdropChanged`;
+ * `HtmlPreviewPanel.tsx` then writes it as an inline `background` on the
+ * placeholder, overriding the rule below. Both halves move together or the
+ * invariant is broken — see `src/main/services/preview/previewBackdrop.ts`.
  *
  * @see HtmlPreviewPanel.tsx for the component
  */
@@ -73,6 +78,11 @@
  * in HtmlPreviewPanel.tsx), so the DOM and the native view never disagree at a
  * seam; the token below is the pre-first-report default and matches main's
  * `CHROME_BACKDROP`.
+ */
+/*
+ * Chrome-phase backdrop only. `HtmlPreviewPanel.tsx` replaces this with an
+ * inline `background` once main reports the loaded page's own paper colour, so
+ * this value must stay equal to `CHROME_BACKDROP` in previewBackdrop.ts.
  */
 .html-preview-placeholder {
   position: absolute;

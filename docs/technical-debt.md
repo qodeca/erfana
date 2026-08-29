@@ -542,7 +542,9 @@ Resolved by the #73 image-export work. The canonical extension list, the MIME ma
 
 **Severity**: Low
 
-**Impact**: The `subscribeProjectChanged` seam (`preview-handlers.ts`, `PreviewViewService.onProjectChanged`) passes nothing in production — `src/main/index.ts` calls `registerPreviewHandlers` with only `getProjectPath` + `globalSettings`, and no main-side project-changed observable exists (`ProjectService` uses an imperative `setProjectPath`). The renderer's idempotent `preview:close` is the sole teardown owner.
+**Impact**: The `subscribeProjectChanged` seam (`preview-handlers.ts`, `PreviewViewService.onProjectChanged`) passes nothing in production — `src/main/index.ts` calls `registerPreviewHandlers` with only `getProjectPath` + `globalSettings`, and no main-side project-changed observable exists (`ProjectService` uses an imperative `setProjectPath`). The renderer's idempotent `preview:close` is the sole teardown owner **for a project switch**.
+
+**Narrowed (2026-08-29), not closed.** Main now reaps a window's previews when the window itself goes away: `index.ts` subscribes `closed` per window and calls `PreviewViewService.closeWindow`, which drains that window's registry entries, invalidates their in-flight opens and releases the project refcount. That removes the quit-time `removeChildView` warning at source and closes the latent second-window leak. A **project switch** inside a surviving window still has no main-side teardown, which is what this entry remains open for.
 
 **Problem**: A renderer crash or reload **during** a project switch can strand a running preview against the old root and lock new opens with `PREVIEW_VIEW_LIMIT_REACHED`. Edge case.
 

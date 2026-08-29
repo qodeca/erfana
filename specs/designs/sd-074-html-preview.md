@@ -351,8 +351,11 @@ print a live `WebContents`. `PreviewExportController` therefore imports the alre
 
 **Styling**: a plain co-located global CSS file imported by the component (not a CSS module), every
 colour/space/size from `src/renderer/src/styles/design-tokens.css`, `border-radius: 0`. The
-placeholder uses **`var(--color-brand-black)`**, the same value `setBackgroundColor('#FF161312')`
-encodes — R1's seam mitigation is only real if the two agree.
+placeholder's background is **held equal to the native view's backdrop at all times** — R1's seam
+mitigation is only real if the two agree. That is now a moving value, not one constant: brand black
+(`var(--color-brand-black)` / `setBackgroundColor('#FF161312')`) until the page has painted, then the
+page's own resolved paper colour, pushed to the panel over `preview:backdropChanged` and written as an
+inline `background` on the placeholder. See §1.8a.
 
 **The occluder is pushed from `BaseDialog`, not `DialogContext`** (X13). The brief's claim that no
 "is any dialog open" observable exists was wrong: `BaseDialog.tsx:95` holds a module-level
@@ -380,15 +383,81 @@ assertion** fires when an element with `z-index >= BASE_ZINDEX` mounts while the
 `overlayGuard.sync()` also runs from `onDidActivePanelChange` (`EditorAreaSplitPanel.tsx:74`) —
 occluder counts do not change on a tab switch, so without it AC17 case 1 has no trigger (X18).
 
+### 1.8a Backdrop, toast placement and the chrome strip
+
+Added after the feature shipped and was found unusable on a production build. Three rules, each
+normative.
+
+**(a) The backdrop invariant.** *The DOM placeholder's background and the native view's
+`setBackgroundColor` always carry the same value.* The value is a two-phase state machine, kept pure
+in `src/main/services/preview/previewBackdrop.ts`:
+
+| Event | Phase | Note |
+|---|---|---|
+| `constructed` | chrome (`#FF161312`) | matches `var(--color-brand-black)`; nothing has painted yet |
+| `did-start-loading` | chrome **on the first load only** | a reload keeps the previous document on screen, and `setBackgroundColor` is not deferred to the next paint — repainting under it flashes the page dark on every autosave |
+| `did-stop-loading` | page | reads the page's own resolved backdrop, falling back to `#FFFFFFFF` |
+| `did-fail-load` | page | belt-and-braces; `did-stop-loading` already covers it |
+| `render-process-gone` | chrome | the DOM failure banner is what the user should be reading |
+
+Two choices here are load-bearing and must not be "simplified":
+
+- **`did-stop-loading`, never `did-finish-load`.** Chromium scopes `DidStartLoading`/`DidStopLoading`
+  to *any document in the frame tree* but `DidFinishLoad` to the *primary main frame's* `onload`.
+  Pairing the first with the third means one lazily-loaded `<iframe>` flips the backdrop to chrome
+  with nothing to flip it back: the page is unreadable permanently. `did-stop-loading` also fires on
+  a failed or cancelled load, which matters because `window.stop()` is page-callable.
+- **The page's own colour, not white.** Forcing `#FFFFFFFF` breaks any page declaring
+  `color-scheme: dark`, which then renders light text on white — the original defect mirrored. Main
+  reads `getComputedStyle` in an isolated world (id 998, the `previewCssSwap` precedent) so the page
+  cannot shadow it.
+
+The resolved colour is emitted on `preview:backdropChanged` and written by `HtmlPreviewPanel.tsx` as
+an inline `background` on the placeholder. Both halves move together, or the invariant is broken.
+
+These listeners are registered as **siblings** of `did-finish-load` in `previewViewLifecycle.ts`,
+deliberately outside `schedulePipeline()` — that pipeline is rate-limited and drops events during a
+save burst, which would strand the backdrop in the chrome phase.
+
+**(b) The toast moves; the page does not.** A toast used to register an occluder simply by existing,
+which hid every live preview. Combined with `ToastContext`'s forced `duration: 0` for an actionable
+toast, the preview's own blocked-host prompt hid every preview **indefinitely**. Now:
+
+- `usePreviewBounds` publishes each live view's CSS-pixel rect into `stores/usePreviewViewportStore.ts`,
+  keyed on **visible + live, not on occlusion** — occlusion is the guard's output and toast placement
+  is one of its inputs, so keying on visibility would oscillate every frame.
+- The pure `Toast/toastPlacement.ts` tries, in order: stay put, slide right, slide left, rise above.
+  `ToastNotification` applies the winning offset as a `transform`.
+- `useOccluder('toast', …)` moved out of `ToastContext` and into `ToastNotification`, registered
+  **only when placement returns `blocked`**. It therefore **fails safe**: when nothing fits, the old
+  hide-everything behaviour returns, so a consent prompt can never end up under an untrusted page.
+
+**(c) The "Preview – not Erfana" strip.** A permanently visible band of Erfana's own chrome above the
+native view, which is inset below it by `PREVIEW_CHROME_INSET_PX` through the same `topInset` path the
+find bar uses. Rule (b) keeps an untrusted page on screen while Erfana asks a security question, and
+rule (a) gives that page browser-native colours, so this is what lets a reader tell a real Erfana
+prompt from one the page drew. Was residual risk 8 (§2.8). Do **not** make it conditional.
+
 ### 1.9 Keyboard forwarding
 
 ```ts
 /** A ONE-WAY DOOR on what the sealed box lets through. `accel` = Cmd on macOS, Ctrl elsewhere. */
 export const PREVIEW_FORWARDED_SHORTCUTS = Object.freeze([
   { key: 'f', accel: true }, { key: 's', accel: true },
-  { key: 'w', accel: true }, { key: 'Escape', accel: false }
+  { key: 'w', accel: true }, { key: 'Escape', accel: false },
+  // Zoom (§1.8a). Both forms of each key: the physical key reports differently
+  // with Shift held, and users press either.
+  { key: '=', accel: true }, { key: '+', accel: true },
+  { key: '-', accel: true }, { key: '_', accel: true },
+  { key: '0', accel: true }
 ] as const)
 ```
+
+The zoom keys are not a convenience. Host zoom is applied geometrically — `clampAndZoomBounds`
+multiplies the CSS rect — so without them Cmd/Ctrl-+ enlarges the preview *rectangle* while the page's
+text stays at 100%, making it relatively **smaller**. WCAG 2.2 SC 1.4.4 requires text to reach 200%.
+They route to `preview:setZoom`, which is clamped to `MIN_ZOOM_LEVEL`/`MAX_ZOOM_LEVEL` and persisted
+per panel so a zoom survives a suspend/resume.
 
 Everything else stays with the page. `before-input-event` is Chromium's pre-dispatch input pipeline,
 not a page-callable API.
@@ -962,7 +1031,7 @@ different ⇒ refuse with `holderPanelId` (NEW-9) → `PreviewSessionFactory`:
 `buildPreviewCsp` and stores it on the entry) → partition → harden → protocol attach → filter attach
 → `assertSealed`** (throws ⇒ no view). Then
 `new WebContentsView({ webPreferences: buildPreviewWebPreferences(session) })` → `addChildView` →
-zoom-converted, clamped `setBounds` → `setBackgroundColor('#FF161312')` → `setWindowOpenHandler` deny
+zoom-converted, clamped `setBounds` → `setBackgroundColor(CHROME_BACKDROP)` (§1.8a) → `setWindowOpenHandler` deny
 → `will-navigate` deny → `attachInputForwarding` → `loadURL`.
 
 `did-finish-load` → **rate-limited pipeline** (§1.4) → read entry HTML → `extractStaticLinks` (uses
@@ -1321,7 +1390,10 @@ behaviour lives main-side or in `src/shared/`.
 | 15 | `SearchBar.countOnly.test.tsx` | R | Label from the pushed count; nav enabled on `count.total>0`; Enter calls `nextMatch()`; whole-word disabled; **no `findInPage` on mount**; **clearing the query resets the label** |
 | 15 | `SearchBar.monaco.regression.test.tsx` | R | Stepping through 17 matches shows "2 of 17", "3 of 17"… — not a frozen "1 of 17" |
 | 15 | `useSearchStore.test.ts` | R | Switching provider twice never pairs one provider's `matches` with another's `capabilities`; the `else` branch resets `count`, `navToken`, `capabilities` |
-| 15 | `previewInputForward.test.ts` | M | Exactly the four shortcuts forwarded with `preventDefault()`; Cmd+R, Cmd+P and plain typing are not |
+| 15 | `previewInputForward.test.ts` | M | Exactly the listed shortcuts forwarded with `preventDefault()` — the original four plus the five zoom keys (§1.8a); Cmd+R, Cmd+P and plain typing are not |
+| 1.8a | `previewBackdrop.test.ts` | M | The transition table over all five events; a `start`→`stop` burst settles on the page colour; a reload never repaints chrome; a crash does. The readability assertion is a **property, not a literal** — the painted backdrop must reach 4.5:1 against black, which `#161312` (≈1.2:1) cannot pass for the wrong reason |
+| 1.8a | `toastPlacement.test.ts` | R | Hand-built rects (jsdom does no layout): no overlap; partial; full cover ⇒ `blocked`; exact touch yields clearance, not 1 px. Plus: the occluder is registered **only** on `blocked`, and the published rect is cleared on hide and on unmount |
+| 1.8a | `PreviewViewService.test.ts` | M | Closing a window drains its views without warning; the destroyed-window fake's `removeChildView` must **throw**, or the assertion passes against unfixed code |
 | 16 | `PreviewExportController.test.ts` | M | `printToPDF` with `printBackground:true`; `deriveSafeFilename` applied; **`PdfService` not imported** |
 | 17 | `OverlayGuardService.test.ts` | R | One case per trigger — **tab activation**, dialog, settings, toast, context menu, full-screen overlay. Case 4 (tab drag) has **no test**: `EditorAreaSplitPanel.tsx:119` sets `disableDnd`, so it is unreachable; AC17 is three testable cases plus one structurally covered |
 | 17 | `BaseDialog.occluder.test.tsx` | R | Opening any BaseDialog raises the count; nesting two and closing one keeps it raised; **a single `registerOpenDialog` produces exactly ONE occluder notification (not 0 then 1), and a `zIndex` change produces none** (NEW-10); the dev assertion fires for a high-z-index element mounted with count 0 |
@@ -1350,8 +1422,9 @@ floor at 95/95/95/95: `previewPathResolve.ts`, `previewFilterDecision.ts`, `prev
 
 ## 9. Risks and mitigations
 
-**R1 — Bounds-sync tearing** (high/med). rAF coalescing + 120 ms trailing + `seq` + placeholder painted
-`var(--color-brand-black)` matching `#FF161312`. Residual: 1–2 frames of seam under load.
+**R1 — Bounds-sync tearing** (high/med). rAF coalescing + 120 ms trailing + `seq` + the placeholder
+painted with whatever the native view's backdrop currently is, kept in step by `preview:backdropChanged`
+(§1.8a). Residual: 1–2 frames of seam under load.
 
 **R2 — Watcher file descriptors** (med/med). The pool is **additive** to `FileWatcherService`'s
 app-wide `MAX_WATCHED_FILES = 100`. One live view × 16 files ⇒ **116 worst case**. chokidar is pinned

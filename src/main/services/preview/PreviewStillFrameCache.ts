@@ -8,7 +8,8 @@
  * downscaled snapshot of the LIVE page so the inactive tab can paint the last
  * frame instead — with a **defined fallback**: if a frame cannot be produced
  * within budget, NO frame is emitted and the panel falls back to the
- * placeholder colour (`var(--color-brand-black)` / `#161312`). It never emits a
+ * placeholder's current backdrop — brand black before the page has painted, the
+ * page's own paper colour afterwards (`previewBackdrop.ts`). It never emits a
  * blank frame (design §1.4).
  *
  * `captureIfStale` must be called BEFORE the view is hidden, or with a capture

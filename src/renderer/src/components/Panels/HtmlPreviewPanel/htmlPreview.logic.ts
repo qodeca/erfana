@@ -153,9 +153,13 @@ export interface SelectFallbackInput {
  * The still frame is only meaningful while the native view is hidden — when the
  * view is visible it paints over the placeholder, so the fallback stays behind
  * it and the placeholder colour is enough. When hidden with no cached frame the
- * placeholder colour (`var(--color-brand-black)`, matching main's
- * `setBackgroundColor('#FF161312')`) is shown — never a blank rectangle
- * (design §1.4).
+ * placeholder's backdrop is shown — never a blank rectangle (design §1.4).
+ *
+ * That backdrop is no longer one fixed colour. It tracks the native view's own
+ * backdrop: brand black before the page has painted, and the page's resolved
+ * paper colour afterwards, pushed over `preview:backdropChanged`. The two
+ * always agree, which is what keeps the seam invisible
+ * (`src/main/services/preview/previewBackdrop.ts`).
  *
  * @param input - Whether a frame is cached and whether the view is hidden.
  * @returns `'frame'` to show the cached `<img>`, else `'placeholder'`.
