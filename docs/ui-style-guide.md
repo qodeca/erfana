@@ -4,9 +4,9 @@
      Existing Title-Case headings are grandfathered to preserve anchor URLs
      referenced elsewhere; do not bulk-rename without coordinating links. -->
 
-> **Version**: 2.0
-> **Last Updated**: November 2025
-> **Design System**: Qodeca brand with dark theme
+> **Version**: 3.0
+> **Last Updated**: August 2026
+> **Design System**: the cards in [`design/`](../design/index.html); this file keeps only what they do not decide
 
 > **The visual decisions have moved to [`design/`](../design/index.html).**
 > Colours, typography, spacing, surfaces and interactive states are now decided by

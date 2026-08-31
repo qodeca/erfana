@@ -65,7 +65,12 @@ Reference: [Dockview Documentation](https://dockview.dev/)
 
 ## Directory Structure
 
-The tree below is annotated rather than exhaustive: `services/`, `interfaces/`, `ipc/` and `components/` are listed in full, everything else (`utils/`, `hooks/`, `stores/`, …) shows representative entries only. Run `ls` for the authoritative listing.
+The tree below covers `src/` and is annotated rather than exhaustive: `services/`, `interfaces/`, `ipc/` and `components/` are listed in full, everything else (`utils/`, `hooks/`, `stores/`, …) shows representative entries only. Run `ls` for the authoritative listing.
+
+Two tracked trees sit outside `src/` and are not shown below:
+
+- **`design/`** — the design system. Plain HTML cards, opened in a browser, that decide the visual rules and render them live. Built by `scripts/design-sync.mjs`; see [`design/README.md`](../design/README.md).
+- **`scripts/`** — build and check tooling (`.mjs`/`.js`, no shell or Python), including `scripts/lib/` for shared helpers.
 
 ```
 src/
@@ -176,7 +181,7 @@ src/
         │                        #   Terminal, Transcription
         ├── styles/              # Global stylesheets
         │   ├── fonts.css            # @font-face declarations (Cascadia Mono)
-        │   ├── design-tokens.css    # Design system tokens (colors, spacing, typography)
+        │   ├── design-tokens.css    # Design tokens - governed by the cards in design/
         │   ├── utilities.css        # Cross-cutting CSS policies (text-selection, etc.)
         │   └── userSelect.audit.test.ts  # Raw-CSS policy audit (#211/#228)
         ├── test-utils/          # Vitest helpers for renderer-side tests

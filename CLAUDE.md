@@ -15,13 +15,10 @@ An agent-native Markdown workspace (Electron): integrated terminal for CLI codin
 - Feature branches: `feature/<name>`, off whichever integration branch owns the work. Commits follow Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`).
 
 ## Documentation
-See `docs/` for details (keep Claude's context focused):
-- Core: [Architecture](docs/architecture.md) · [Features](docs/features/README.md) · [UI Components](docs/ui-components.md) · [Settings](docs/settings.md) · [Known Issues](docs/known-issues.md) · [Technical Debt](docs/technical-debt.md) · [Development Tasks](docs/development-tasks.md) · [Roadmap](ROADMAP.md)
-- Subsystems: [Editor](docs/editor/README.md) · [Terminal](docs/terminal/README.md) · [HTML Preview](docs/html-preview/README.md) · [Drag-Drop](docs/drag-drop/README.md) · [File Watching](docs/file-watching/README.md) · [Prompt Templates](docs/prompts/README.md) · [Logging](docs/logging.md) · [Large-Project Performance](docs/large-project-performance-plan.md) · [Source Grounding](docs/future/source-grounding/README.md)
-- Contracts: [IPC Patterns](docs/ipc-patterns.md) · [API Services](docs/api-services.md) · [API Services – Features](docs/api-services-features.md) · [Error Codes](docs/error-codes.md) · [ADRs](docs/adrs/README.md)
-- Build, CI, security: [Build](docs/build/README.md) · [Security](docs/security.md) · [Continuous Integration](docs/ci.md) · [Testing](docs/testing/README.md) · [Whisper Trust Chain](docs/windows/whisper-trust-chain.md) · [Whisper Support Runbook](docs/windows/whisper-support-runbook.md) · [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md)
-- [Release pipeline](docs/build/release.md) – macOS + Windows only; the Linux distribution target was dropped. Skill entry: [`.claude/skills/releasing-erfana/SKILL.md`](.claude/skills/releasing-erfana/SKILL.md) with [`guides/troubleshooting.md`](.claude/skills/releasing-erfana/guides/troubleshooting.md) + [`docs/release-incidents/`](docs/release-incidents/index.md)
-- [Changelog](docs/CHANGELOG.md) – v0.9.0 onwards. Earlier: [v0.8.x](docs/archive/changelog-v08.md), [v0.3–v0.5](docs/archive/changelog-v03-v05.md); v0.6.x–v0.7.x have no entries at all
+Index and descriptions live in [docs/README.md](docs/README.md) — read that rather than a second copy here. Two pointers carry rules that are easy to skip past:
+
+- **Before filing, editing or closing a GitHub issue**: [GitHub issues protocol](docs/claude-code/github-issues-protocol.md). The repo ships issue *forms*; `gh issue create` applies neither their title prefix nor their required fields, so both must be supplied by hand. Security vulnerabilities go to private advisory reporting, never a public issue.
+
 - [Windows enablement](docs/windows/README.md) – cross-platform support (macOS + Windows). **Canonical phase roadmap + current status** lives in [`docs/windows/implementation-plan.md`](docs/windows/implementation-plan.md) – consult it rather than tracking phase state here. Sub-docs: [contributor workflow](docs/windows/contributing.md), [test-flake register](docs/windows/known-flakes.md), deferred work [D1–D8](docs/windows/deferred-work.md) / [D9–D12](docs/windows/deferred-work-phase4.md), [whisper binary build runbook](docs/build/whisper-binaries.md), [Windows-specific known issues](docs/known-issues.md#windows-specific-issues). **Refresh policy**: on any release that touches Windows-phase scope OR changes a phase issue's state, bump the "Status snapshot" date + version anchor in `docs/windows/implementation-plan.md` before tagging – that file is the single source of truth, so keep it current to avoid doc-vs-code drift.
 
 ## Feature specifications
@@ -57,12 +54,6 @@ Read the card for what you are changing. A card marked `status="decided"` is bin
 
 **Naming, because it is confusable**: `design/` (repo root) is the design system. `docs/design/` and `docs/designs/` are per-issue design notes and are unrelated.
 
-## Nested CLAUDE.md (component-specific patterns)
-- [`src/main/services/CLAUDE.md`](src/main/services/CLAUDE.md) - catalogue of every main-process service, with the issue context behind each
-- [`src/renderer/src/components/Dialog/CLAUDE.md`](src/renderer/src/components/Dialog/CLAUDE.md) - BaseDialog API, focus trap, ESC/backdrop handling
-- [`src/renderer/src/components/Transcription/CLAUDE.md`](src/renderer/src/components/Transcription/CLAUDE.md) - Dual-backend transcription (OpenAI + local whisper.cpp), IPC flow, store
-- [`src/renderer/src/components/Panels/HtmlPreviewPanel/CLAUDE.md`](src/renderer/src/components/Panels/HtmlPreviewPanel/CLAUDE.md) - HTML preview: native WebContentsView vs DOM chrome, occluder guard, tab-hosted failure badge, find-bar inset
-
 ## Testing
 - Unit/Integration: Vitest workspace across renderer, main, preload (see [docs/testing/README.md](docs/testing/README.md))
 - E2E: Playwright with Electron, Page Object Model pattern — POM classes, composed fixtures, and the shared locator/wait helpers are catalogued in [docs/testing/e2e-testing.md](docs/testing/e2e-testing.md)
@@ -78,14 +69,10 @@ See [docs/ci.md](docs/ci.md) for the full pipeline map — workflow table, per-j
 - **`e2e.yml`** (`.github/workflows/e2e.yml`) — **disabled**: both functional `electron` and `visual` suites run locally only until macos-latest instability is root-caused. Re-enable with `gh workflow enable "E2E Tests"`. E2E is excluded from branch-protection required checks, so disabling blocks no merges.
 - **`secret-scan.yml`** — runs on **every push + PR**: gitleaks (full git history) + trufflehog (verified secrets), with version-pinned, SHA-256-checksum-verified binary downloads and no third-party actions. Its `Secret scan` job is a branch-protection required check. gitleaks runs with `--log-opts="--all"`, so it scans **every ref in the repo, not just the current branch** — a finding on another branch fails this one, and `.gitleaksignore` must therefore carry the fingerprint on every branch, even where the offending file is absent (see [docs/ci.md](docs/ci.md#secret-scan-secret-scanyml)).
 - **Workflow display names** use Title Case in the Actions UI (e.g. `Quality Checks`, `Whisper Binaries (Canary)`). This is a project-specific convention that overrides the global Sentence-case style rule for `name:` fields only — see [`.github/workflows/`](.github/workflows/) for the canonical list. Filenames stay lowercase/kebab-case.
-- **Before pushing**, run the local equivalents (`npm run lint && npm run typecheck && npm run test:ci && npx electron-vite build`) to catch issues without CI minutes. Run `npm run test:e2e` locally before merging anything that touches Electron-specific paths since CI no longer covers it.
+- **Before pushing**, run the local equivalents (`npm run lint && npm run lint:css && npm run design -- --check && npm run typecheck && npm run test:ci && npx electron-vite build`) to catch issues without CI minutes. `lint:css` and the design-sync check are **steps inside the required `Lint` job**, not separate jobs — branch protection matches the job name, so a new job would enforce nothing. Run `npm run test:e2e` locally before merging anything that touches Electron-specific paths since CI no longer covers it.
 
 ## Project Switching Safeguards
-- Unsaved editor prompt on open/close (Discard/Cancel)
-- A terminal is treated as busy by a per-terminal activity heuristic before a project switch is allowed; the thresholds live in named constants, not here
-- Terminal initialization defers until panel is visible
-- Watchers increment session tokens on switch; stale events dropped
-- Project settings loaded and validated before project opens (invalid settings block load)
+Behaviour is readable from the code; the one non-obvious guard is:
 - Autosave must never lose keystrokes: a save in flight, its own echo event, and local edits made during the save are each guarded separately in `useFileWatcher`, and `MarkdownEditorPanel` re-checks the Monaco buffer after every write (#124). See [docs/file-watching/README.md](docs/file-watching/README.md)
 
 ## IPC Contracts
@@ -99,6 +86,4 @@ The full channel index is [docs/ipc-patterns.md](docs/ipc-patterns.md) § Curren
 - **System actions** (`system:*`) – payload-free and sender-gated; `system:relaunchApp` must quit gracefully, and the paired `screenshot:getScreenPermission` read is advisory and never gates a capture. Rationale for both in [docs/api-services.md § System actions](docs/api-services.md#system-actions-apisystem).
 
 ## Important Notes
-- node-pty may fail to build on Python 3.13 (use 3.12)
-- electron-store requires dynamic import (ES module)
-- Git status runs in a worker thread via `worker_threads` (isomorphic-git default, native `git status --porcelain` fallback for large repos); global `.gitignore` not supported by isomorphic-git
+- node-pty may fail to build on Python 3.13 (use 3.12) — this one is worth keeping here because it fails at install time, before any doc gets read

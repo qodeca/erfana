@@ -366,7 +366,7 @@ Note: Double-click handling requires intercepting the standard "open in editor" 
 - **Sign-in dialog:** Tab cycles between Cancel and Sign in buttons; Enter activates the focused button; Escape cancels
 - **Unlink dialog:** Same keyboard pattern as existing `ConfirmDialog` -- Enter confirms, Escape cancels
 - **Ask about document:** Same keyboard pattern as existing `PromptDialog` -- Cmd/Ctrl+Enter submits, Escape cancels
-- **Settings section:** Sign in/Sign out button is focusable and activatable via Enter/Space; focus ring uses `var(--shadow-focus)`
+- **Settings section:** Sign in/Sign out button is focusable and activatable via Enter/Space; focus ring uses `var(--color-border-focus)` outline (**not** `--shadow-focus`, which is retired as a focus indicator: composited it measures 1.63:1 and SC 1.4.11 requires 3:1 — see `design/system/foundations/focus.html`)``
 - **Tree node:** `.gdrive` nodes are focusable via arrow keys (existing tree keyboard nav). Enter triggers single-click (open in editor). No dedicated shortcut for double-click behavior -- use context menu "Open in browser" instead.
 
 ### ARIA and screen reader support

@@ -63,7 +63,7 @@ src/
    - Preload bridge: `src/preload/`
    - UI component: `src/renderer/src/components/`
 4. Add tests
-5. Run quality gates: `npm run typecheck && npm run lint && npm run test`
+5. Run quality gates: `npm run typecheck && npm run lint && npm run lint:css && npm run test`
 
 ### Fixing a bug
 

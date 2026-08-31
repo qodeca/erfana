@@ -13,9 +13,12 @@ npm run build:win        # Windows package (NSIS .exe; needs Developer Mode)
 
 # Quality
 npm run typecheck        # Type checking (node + web)
-npm run lint             # Linting
+npm run lint             # Linting (eslint, JS/TS only)
+npm run lint:css         # stylelint: src/ CSS + the design/ cards' inline styles
+npm run design           # Rebuild design/ (index, token copy, claims)
+npm run design -- --check # Fail if a generated file under design/ is stale
 npm run test             # All tests (vitest workspace: main + renderer + preload)
-npm run test:main        # vitest.main.ts config: src/main + src/shared + scripts (144 test files: 132 + 10 + 2)
+npm run test:main        # vitest.main.ts config: src/main + src/shared + scripts (208 test files: 191 + 13 + 4)
 npm run test:renderer    # vitest.renderer.ts config: src/renderer/src only (jsdom)
 npm run test:preload     # vitest.preload.ts config: preload tests
 npm run test:cov         # Coverage report (all 3 projects)
@@ -115,10 +118,21 @@ Schemas: `src/shared/ipc/*.ts`
 
 ## UI Rules (Non-negotiable)
 
-- Use design tokens (no hardcoded values)
-- `border-radius: 0` (no rounded corners)
-- Use `var(--transition-normal)` for animations
-- Test focus states (accessibility)
+Open [`design/index.html`](../design/index.html) first — the cards decide these, and
+render each rule live.
+
+Machine-enforced by `npm run lint:css` in the required `Lint` job:
+
+- Design tokens only — no raw hex outside `design-tokens.css`
+- `border-radius: 0` (or the circle token); nothing else
+- No bare `z-index` — use a rung from the scale
+
+Nobody checks these but you:
+
+- The focus ring is visible and reaches 3:1 — tab to it and look
+- Every state has a non-colour cue as well as a colour one
+- Anything that loops forever stops under `prefers-reduced-motion: reduce`
+- Interactive targets are at least 24 x 24 (WCAG 2.2 SC 2.5.8)
 
 ---
 

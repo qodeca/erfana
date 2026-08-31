@@ -144,6 +144,8 @@ Moving the block would require synchronized edits to checks.yml + skill + README
 **Severity**: Low
 **Impact**: `zIndex={10000}` is hardcoded on the TranscriptionDialog instance instead of going through the dialog-stack manager or the `var(--z-dialog)` design token. Diverges from the project's tokens-only rule for spacing/colors/typography and from the dialog stack's contract.
 
+**Note (2026-08-31)**: `npm run lint:css` now bans a bare `z-index` in CSS and runs in the required `Lint` job. This instance is **not** caught by it — the literal is a TSX prop, not a CSS declaration, and stylelint does not read TSX. Bare stacking values in TypeScript stay unenforced; see [`design/system/foundations/layering.html`](../design/system/foundations/layering.html).
+
 **Fix**: Replace the literal with the dialog-stack manager value, or with `var(--z-dialog)` if the dialog is not stack-managed.
 
 **Files**: `src/renderer/src/components/Transcription/TranscriptionDialog.tsx`.
