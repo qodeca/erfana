@@ -1,0 +1,104 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+/**
+ * Every design token this panel's stylesheet references must exist.
+ *
+ * THE BUG THIS EXISTS FOR. `.html-preview-chrome-strip` shipped with
+ * `border-bottom: 1px solid var(--color-border)` — a custom property defined
+ * nowhere. The real tokens are `--color-border-default` / `-subtle` / `-focus` /
+ * `-warning`.
+ *
+ * That typo is SILENT and total. An undefined custom property inside a shorthand
+ * makes the whole declaration invalid at computed-value time, so every longhand
+ * falls back to its initial value — and `border-bottom-style`'s initial value is
+ * `none`. Not a wrong colour: no border at all.
+ *
+ * It mattered here more than a missing line usually would. That border is the
+ * seam between Erfana's own chrome and an untrusted page which now picks its own
+ * paper colour (`previewBackdrop.ts`) and stays on screen while Erfana asks a
+ * security question. With the border gone the boundary was carried only by a
+ * background colour the page can simply match.
+ *
+ * Nothing catches this class of fault: not the type-checker, not ESLint, not a
+ * rendering test in jsdom (which resolves no custom properties). Only reading
+ * the shipping stylesheet against the shipping tokens does — the same approach
+ * `Dialog.contrast.test.ts` takes.
+ *
+ * @see HtmlPreviewPanel.css
+ */
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { describe, it, expect } from 'vitest'
+
+const PANEL_CSS = readFileSync(resolve(__dirname, 'HtmlPreviewPanel.css'), 'utf8')
+const TOKENS_CSS = readFileSync(
+  resolve(__dirname, '../../../styles/design-tokens.css'),
+  'utf8'
+)
+
+/**
+ * The stylesheet with its comments removed.
+ *
+ * Needed because these files explain themselves at length, and the comment on
+ * the strip's border quotes the very token that was missing. A token named in
+ * prose is not a reference, and scanning it as one made this test fail on its
+ * own explanation.
+ */
+function withoutComments(css: string): string {
+  return css.replace(/\/\*[\s\S]*?\*\//g, '')
+}
+
+/**
+ * Every custom property the stylesheet READS, with its fallback stripped.
+ *
+ * `var(--a, var(--b))` yields both names; a literal fallback (`var(--a, 32px)`)
+ * yields only `--a`, which is correct — a declared fallback is a deliberate
+ * default, not a missing token.
+ */
+function referencedTokens(css: string): string[] {
+  return [...withoutComments(css).matchAll(/var\(\s*(--[\w-]+)/g)].map((match) => match[1])
+}
+
+/** Every custom property the token sheet DEFINES. */
+function definedTokens(css: string): Set<string> {
+  return new Set(
+    [...withoutComments(css).matchAll(/^\s*(--[\w-]+)\s*:/gm)].map((match) => match[1])
+  )
+}
+
+describe('HtmlPreviewPanel.css token references', () => {
+  it('references only tokens that exist', () => {
+    const defined = definedTokens(TOKENS_CSS)
+    // The panel defines a few of its own properties inline (e.g. the band height
+    // it publishes for the find bar); those count as defined too.
+    for (const own of definedTokens(PANEL_CSS)) {
+      defined.add(own)
+    }
+
+    const missing = [...new Set(referencedTokens(PANEL_CSS))]
+      .filter((token) => !defined.has(token))
+      .sort()
+
+    expect(missing).toEqual([])
+  })
+
+  it('paints a bottom border under the not-Erfana strip', () => {
+    // The seam is the point. Assert the declaration resolves to something that
+    // can paint — a style and a defined colour — rather than asserting one
+    // literal, so the border can be restyled without editing this test.
+    const rule = PANEL_CSS.slice(
+      PANEL_CSS.indexOf('.html-preview-chrome-strip {'),
+      PANEL_CSS.indexOf('}', PANEL_CSS.indexOf('.html-preview-chrome-strip {'))
+    )
+    const border = /border-bottom:\s*([^;]+);/.exec(rule)?.[1]
+
+    expect(border).toBeDefined()
+    expect(border).toMatch(/solid/)
+
+    const colours = referencedTokens(border ?? '')
+    expect(colours.length).toBeGreaterThan(0)
+    for (const colour of colours) {
+      expect(definedTokens(TOKENS_CSS).has(colour)).toBe(true)
+    }
+  })
+})

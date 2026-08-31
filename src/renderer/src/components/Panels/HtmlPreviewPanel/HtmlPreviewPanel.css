@@ -71,7 +71,23 @@
   align-items: center;
   padding: 0 var(--space-4);
   background: var(--color-bg-secondary);
-  border-bottom: 1px solid var(--color-border);
+  /*
+   * THE SEAM. This is the line that says where Erfana stops and the untrusted
+   * page starts, so it is a security control and not trim.
+   *
+   * It shipped as `1px solid var(--color-border)` — a token that does not
+   * exist. An undefined custom property inside a shorthand is invalid at
+   * computed-value time, so every longhand fell back to its initial value and
+   * `border-bottom-style: none` meant NO line at all. The boundary was left to a
+   * background colour the page can simply match, which it chooses itself since
+   * previews render in their own paper colour.
+   *
+   * Deliberately the brand accent at 2px rather than a neutral hairline: it
+   * clears 3:1 against both this surface and any paper a page picks, and the
+   * page cannot draw it, because the native view is inset below this band.
+   * `HtmlPreviewPanel.tokens.test.ts` fails if either token stops resolving.
+   */
+  border-bottom: var(--border-width-thick) solid var(--color-accent-primary);
   color: var(--color-text-tertiary);
   font-size: var(--text-xs);
   letter-spacing: 0.04em;
