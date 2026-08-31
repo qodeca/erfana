@@ -116,6 +116,16 @@ describe('Actionable toast (items 64/65)', () => {
     // "Approve this host?" prompt the preview itself raises hid every preview
     // indefinitely. The occluder is now registered only when the stack cannot be
     // placed clear of a live view.
+    // A LIVE preview must actually exist, and the toast must actually have a
+    // box, or this proves nothing: with no rect published and jsdom's 0x0
+    // container, `placeToastContainer` short-circuits and the answer would be
+    // `false` however the placement behaved. The rect sits top-right; the
+    // stack's anchor is bottom-left.
+    stubToastContainerRect({ left: 16, top: 660, width: 300, height: 100 })
+    usePreviewViewportStore
+      .getState()
+      .setRect('preview-1', { left: 600, top: 0, width: 380, height: 300 })
+
     setup({
       title: 'Host blocked',
       message: 'cdn.example.com',

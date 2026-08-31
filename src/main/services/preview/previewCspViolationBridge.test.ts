@@ -156,6 +156,40 @@ describe('previewCspViolationBridge', () => {
       expect(onBlockedHost).toHaveBeenCalledTimes(1)
     })
 
+    it('re-reports a known host when it is refused for a NEW kind', () => {
+      // THE GAP. Every violation in this file used the same default `img-src`
+      // directive, so nothing exercised the reason `reportedHosts` is a
+      // Map<host, kinds[]> rather than a bare Set<string>. Reverting it to a
+      // Set kept the whole file green — including the dedupe case, whose
+      // comment was the only record of the intent.
+      //
+      // The intent: a host first refused for a font and later for a SCRIPT must
+      // report the script too, or the row keeps saying "font" for something
+      // that will execute. A reader who consents to a font and gets code was
+      // misled by the control built to inform them.
+      const { bridge, onBlockedHost } = makeBridge()
+
+      bridge.handleViolation(violation('https://cdn.example.com/a.woff2', 'font-src'))
+      bridge.handleViolation(violation('https://cdn.example.com/b.js', 'script-src'))
+
+      expect(onBlockedHost).toHaveBeenCalledTimes(2)
+      expect(onBlockedHost.mock.calls[0][3]).toBe('font')
+      expect(onBlockedHost.mock.calls[1][3]).toBe('script')
+    })
+
+    it('does not re-report a known host for a kind it already carries', () => {
+      // The control for the case above: widening the dedupe to per-kind must
+      // not turn every repeat back into a row.
+      const { bridge, onBlockedHost } = makeBridge()
+
+      bridge.handleViolation(violation('https://cdn.example.com/a.woff2', 'font-src'))
+      bridge.handleViolation(violation('https://cdn.example.com/b.woff2', 'font-src'))
+      bridge.handleViolation(violation('https://cdn.example.com/c.js', 'script-src'))
+      bridge.handleViolation(violation('https://cdn.example.com/d.js', 'script-src'))
+
+      expect(onBlockedHost).toHaveBeenCalledTimes(2)
+    })
+
     it('records an http host but never offers it for approval', () => {
       // THE MISMATCH. The network-filter path classifies a plain-http request
       // `insecure-scheme` and NOT approvable; this path marked the same host

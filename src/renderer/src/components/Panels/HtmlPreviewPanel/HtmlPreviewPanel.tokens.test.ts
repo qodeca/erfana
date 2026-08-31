@@ -75,9 +75,15 @@ describe('HtmlPreviewPanel.css token references', () => {
       defined.add(own)
     }
 
-    const missing = [...new Set(referencedTokens(PANEL_CSS))]
-      .filter((token) => !defined.has(token))
-      .sort()
+    const referenced = [...new Set(referencedTokens(PANEL_CSS))]
+    // Guard the guard. `missing` is empty both when every token resolves AND
+    // when the scan found nothing at all — a changed `var(...)` shape, a moved
+    // file, an over-eager comment stripper. Without this the check could pass
+    // forever while reading nothing.
+    expect(referenced.length).toBeGreaterThan(5)
+    expect(defined.size).toBeGreaterThan(20)
+
+    const missing = referenced.filter((token) => !defined.has(token)).sort()
 
     expect(missing).toEqual([])
   })
