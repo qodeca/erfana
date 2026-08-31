@@ -10,7 +10,10 @@
  * This file is the single source of truth for all design values.
  * Import this file in index.css and use these variables in all NEW CSS.
  *
- * See docs/ui-style-guide.md for comprehensive usage guidelines.
+ * Governed by design/system/foundations/colors.html (and the type, spacing,
+ * surfaces, motion and layering cards). Those render every token live and
+ * compute their own contrast; docs/ui-style-guide.md keeps only the
+ * text-selection policy now.
  */
 
 :root {
@@ -60,7 +63,9 @@
   --color-gray-200: #d4d4d4;
   --color-gray-300: #cccccc;
   --color-gray-400: #b8b8b8;
+  --color-gray-450: #949494;             /* Placeholder text - the darkest grey that clears 4.5:1 on an input */
   --color-gray-500: #858585;
+  --color-gray-550: #787878;             /* Input boundary - the darkest grey that clears 3:1 on ALL THREE input surfaces */
   --color-gray-600: #6e6e6e;
   --color-gray-700: #454545;
   --color-gray-800: #3c3c3c;
@@ -78,6 +83,11 @@
   --color-bg-tertiary: var(--color-gray-950);    /* Sidebar, tree */
   --color-bg-elevated: var(--color-gray-900);    /* Floating elements */
   --color-bg-input: var(--color-gray-900);       /* Input fields */
+  /* Used by the window picker's 16:9 thumbnail well and never declared, so the
+   * background fell to transparent and a thumbnail that is not 16:9 floated on
+   * the dialog with no letterbox around it. Darker than the card it sits on, so
+   * the well reads as a recess rather than another panel. */
+  --color-bg-subtle: var(--color-gray-1000);     /* Recessed wells - thumbnail letterbox */
   --color-bg-hover: rgba(255, 255, 255, 0.05);   /* Hover state (overlay) */
   --color-bg-hover-solid: #2a2d2e;               /* Hover state (solid, for menus) */
   --color-bg-active: rgba(255, 255, 255, 0.1);   /* Active/pressed state */
@@ -92,7 +102,7 @@
   --color-text-muted: var(--color-gray-600);     /* Very muted text */
   --color-text-emphasis: var(--color-white);     /* Headings, emphasis */
   --color-text-disabled: var(--color-gray-600);  /* Disabled text */
-  --color-text-placeholder: var(--color-gray-600); /* Placeholder text */
+  --color-text-placeholder: var(--color-gray-450); /* Placeholder text - 4.53:1 on an input; gray-600 was 2.69:1 */
 
   /* ============================================
    * COLORS: Semantic Borders
@@ -100,6 +110,17 @@
    * ============================================ */
   --color-border-default: var(--color-gray-800); /* Standard borders */
   --color-border-subtle: var(--color-gray-700);  /* Subtle borders */
+  /* The boundary that IDENTIFIES a text input, as opposed to dividing things.
+   * SC 1.4.11 is met if EITHER the fill or the boundary reaches 3:1 against the
+   * surface. Neither did: --color-bg-input and --color-bg-secondary resolve to
+   * the same colour, so a field's interior was pixel-identical to the panel
+   * behind it, and the border measured 1.24:1. A low-vision reader could not
+   * see the control at all.
+   * The fix is a border token, NOT a brighter fill: a fill bright enough to
+   * clear 3:1 against bg-primary, bg-secondary AND bg-tertiary would read as a
+   * button. --color-border-default and --color-border-subtle stay as they are;
+   * 1.4.11 does not govern decorative dividers. */
+  --color-border-input: var(--color-gray-550); /* Input boundary - 4.19 / 3.11 / 3.47 on the three surfaces */
   --color-border-focus: var(--color-brand-violet); /* Focus indicators - brand violet */
 
   /* ============================================
@@ -148,10 +169,14 @@
   --color-success: var(--color-brand-lime);  /* Qodeca Lime - vibrant success */
   --color-context-safe: #3fb950;             /* True green - context-usage safe band (#216); distinct from lime/amber */
   --color-warning: #cca700;                  /* Amber - unchanged */
-  --color-warning-bright: #f59e0b;           /* Amber bright - unchanged */
-  --color-warning-icon: #dcdcaa;             /* Warning icon color */
+  /* RETIRED as a warning colour - use --color-warning.
+   * Erfana carried several colours for one meaning, and the toast (the surface
+   * users see most) was the odd one out. Still referenced in src/; the ban is
+   * enforced in design/ today and follows here with the migration. */
+  --color-warning-bright: #f59e0b;           /* RETIRED - use --color-warning */
+  --color-warning-icon: #dcdcaa;             /* RETIRED - use --color-warning */
   --color-error: #f48771;                    /* Coral - unchanged */
-  --color-error-bright: #ff6b6b;             /* Coral bright - unchanged */
+  --color-error-bright: #ff6b6b;             /* RETIRED - use --color-error */
   --color-info: var(--color-brand-violet);   /* Qodeca Violet - info */
 
   /* ============================================
@@ -161,7 +186,7 @@
   --color-error-bg: #3c1f1f;              /* Error container background */
   --color-error-bg-dark: #2a1414;         /* Error code block background */
   --color-error-border: #5c2e2e;          /* Error container border */
-  --color-error-text-light: #ffcccb;      /* Light error text (code blocks) */
+  --color-error-text-light: #ffcccb;      /* RETIRED - use --color-error */
   --color-error-text-hint: #d4a5a5;       /* Muted error hints */
 
   /* ============================================
@@ -183,6 +208,8 @@
    * For code blocks and inline code
    * ============================================ */
   --color-syntax-string: #ce9178;         /* String literals, inline code */
+  --color-syntax-keyword: #569cd6;        /* Keywords, booleans - 5.89:1 on the preview surface */
+  --color-syntax-number: #b5cea8;         /* Numeric literals - 10.23:1 on the preview surface */
 
   /* ============================================
    * COLORS: Terminal
@@ -221,7 +248,6 @@
   --color-bg-preview: #1a1a1c;                  /* Markdown preview - softer than primary */
   --color-bg-warning: rgba(204, 167, 0, 0.12);  /* Warning notification background */
   --color-bg-tertiary-translucent: rgba(45, 45, 48, 0.9); /* Semi-transparent tertiary bg */
-  --color-bg-primary-translucent: rgba(255, 255, 255, 0.95); /* Light mode translucent */
   --color-overlay-dialog: rgba(0, 0, 0, 0.75);               /* Dialog backdrop overlay */
 
   /* ============================================
@@ -315,7 +341,13 @@
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
   --shadow-xl: 0 12px 48px rgba(0, 0, 0, 0.8);
-  --shadow-focus: 0 0 0 3px rgba(160, 168, 255, 0.25); /* Qodeca Violet focus ring */
+  /* RETIRED as a focus indicator - use the outline from the Focus card.
+   * Two independent reasons, and the second is disqualifying: it reads as a glow
+   * rather than an edge and is a fourth competing idiom; and composited over
+   * --color-bg-primary it resolves to #39384d, which is 1.63:1. A focus
+   * indicator needs 3:1 (SC 1.4.11), so this cannot be one of the candidates
+   * when the focus ring is settled - it has to go. Still used in src/. */
+  --shadow-focus: 0 0 0 3px rgba(160, 168, 255, 0.25); /* RETIRED - see the Focus card */
   /* Dialog shadow with subtle edge highlight */
   --shadow-dialog: 0 12px 48px rgba(0, 0, 0, 0.8),
                    0 0 0 1px rgba(255, 255, 255, 0.05);

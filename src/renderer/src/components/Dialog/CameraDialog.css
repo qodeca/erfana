@@ -34,7 +34,9 @@
   padding: var(--space-5) var(--space-6);
   padding-right: var(--space-12);
   background-color: var(--color-bg-input);
-  border: var(--border-width) solid var(--dialog-border);
+  /* --color-border-input, not a divider token: this boundary is the only thing
+     identifying the control (its fill matches the panel). SC 1.4.11 needs 3:1. */
+  border: var(--border-width) solid var(--color-border-input);
   border-radius: var(--border-radius);
   color: var(--color-text-primary);
   font-size: var(--text-md);
@@ -214,6 +216,10 @@
   background-color: var(--color-black);
   pointer-events: none;
   opacity: 0;
+  /* stylelint-disable-next-line declaration-property-value-disallowed-list --
+     Local stacking inside the dialog: this is the shutter flash sitting over the
+     video element, not a rung on the app-wide ladder. The z-scale answers "what
+     covers what across the window"; it has nothing to say about two siblings. */
   z-index: 10;
 }
 

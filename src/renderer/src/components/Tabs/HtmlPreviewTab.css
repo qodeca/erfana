@@ -5,7 +5,8 @@
  *
  * Chrome-style tab for the running HTML preview panel. Mirrors ImageTab.css —
  * one mechanism, one look — with a distinct icon. All values come from
- * design tokens (docs/ui-style-guide.md); no rounded corners.
+ * design tokens; no rounded corners. Governed by
+ * design/system/foundations/surfaces.html.
  *
  * @see HtmlPreviewTab.tsx for the component
  * @see ImageTab.css for the sibling read-only tab

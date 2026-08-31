@@ -5,25 +5,41 @@
  *
  * Styles for terminal status messages and actions.
  * Base terminal-status styles are in TerminalPanel.css.
+ *
+ * The var() fallbacks that used to be here were removed, not corrected.
+ *
+ * They were wrong: `var(--space-2, 8px)` read the token name as Tailwind's
+ * N x 4px scale, but Erfana's is N x 2px, so `--space-2` is 4px and the
+ * fallback was double. Three declarations had that shape, and two more were
+ * off by a smaller factor.
+ *
+ * They were also dead: `design-tokens.css` is imported globally at
+ * `src/renderer/src/index.css`, so every token here always resolves and no
+ * fallback has ever rendered. A fallback that cannot fire is not a safety net —
+ * it is a second, wrong copy of the value, which is the thing the token scale
+ * exists to prevent. Two of them were raw hex as well.
+ *
+ * If a token is genuinely optional, give it a fallback that is CORRECT and say
+ * why it might be missing. Otherwise let it fail loudly.
  */
 
 /* Status actions button group */
 .terminal-status-actions {
   display: flex;
-  gap: var(--space-2, 8px);
-  margin-top: var(--space-2, 8px);
+  gap: var(--space-2);
+  margin-top: var(--space-2);
 }
 
 /* Hint text with code */
 .terminal-status-hint {
-  margin-top: var(--space-3, 12px);
-  font-size: var(--text-sm, 0.875rem);
-  color: var(--color-text-secondary, #888);
+  margin-top: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
 }
 
 .terminal-status-hint code {
-  background: var(--color-bg-tertiary, #1e1e1e);
-  padding: 2px 6px;
-  font-family: 'Cascadia Mono', 'SF Mono', 'Monaco', Consolas, 'Courier New', monospace;
-  font-size: var(--text-xs, 0.75rem);
+  background: var(--color-bg-tertiary);
+  padding: var(--space-1) var(--space-3);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
 }
