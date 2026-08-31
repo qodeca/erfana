@@ -12,6 +12,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 import { PREVIEW_PAGE_LINK_CHANNEL } from '../main/services/preview/previewLinkBridge'
+import { PREVIEW_PAGE_CSP_VIOLATION_CHANNEL } from '../main/services/preview/previewCspViolationBridge'
 
 const RAW = readFileSync(join(__dirname, 'previewPage.ts'), 'utf8')
 
@@ -38,6 +39,32 @@ describe('previewPage preload contract', () => {
    */
   it('inlines the same channel name the main process listens on', () => {
     expect(SOURCE).toContain(`'${PREVIEW_PAGE_LINK_CHANNEL}'`)
+  })
+
+  it('inlines the same CSP-violation channel name main listens on', () => {
+    // Same drift risk as the link channel above, and the same build reason for
+    // duplicating the string. Drift here is worse than inert links: a host the
+    // page's CSP refused would never be reported, so it could never be
+    // approved — and on a project with an empty allowlist that is EVERY remote
+    // host, silently.
+    expect(SOURCE).toContain(`'${PREVIEW_PAGE_CSP_VIOLATION_CHANNEL}'`)
+  })
+
+  it('reports CSP violations, and only genuine ones', () => {
+    // `isTrusted` is the whole guard against a page calling `dispatchEvent` to
+    // make Erfana prompt for a host it never referenced.
+    expect(SOURCE).toContain('securitypolicyviolation')
+    expect(SOURCE).toMatch(/if \(!event\.isTrusted\) return/)
+  })
+
+  it('listens for violations in the capture phase', () => {
+    // Bubble phase would let a page listener call `stopPropagation()` and hide
+    // its own remote hosts from Erfana. The link listeners are deliberately
+    // bubble-phase (the page's own handlers must win); this one is not, and the
+    // difference is easy to "tidy" away.
+    expect(SOURCE).toMatch(
+      /addEventListener\(\s*'securitypolicyviolation'\s*,\s*\w+\s*,\s*true\s*\)/
+    )
   })
 
   it('exposes nothing to the page — no contextBridge', () => {

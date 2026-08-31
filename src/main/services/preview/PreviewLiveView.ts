@@ -62,6 +62,10 @@ import { buildCacheBustHref, buildCssSwapScript } from './previewCssSwap'
 import { clampAndZoomBounds } from './previewBoundsClamp'
 import { wirePreviewLifecycle, type PreviewFileWatcherHandle } from './previewViewLifecycle'
 import { createPreviewLinkBridge, type PreviewLinkBridge } from './previewLinkBridge'
+import {
+  createPreviewCspViolationBridge,
+  type PreviewCspViolationBridge
+} from './previewCspViolationBridge'
 
 /**
  * Isolated world for reading the page's own paper. Distinct from the CSS-swap
@@ -144,6 +148,21 @@ export interface PreviewLiveViewParams {
   readonly session: PreviewSession
   readonly failureLog: IPreviewFailureLog
   readonly deps: PreviewLiveViewDeps
+  /**
+   * Report a remote host the page's CSP refused.
+   *
+   * The SAME sink `PreviewSessionFactory` is given for network-layer refusals,
+   * so a CSP refusal and a filter refusal share one failure type, one toast
+   * budget and one dedupe rule.
+   *
+   * REQUIRED, not optional. An optional sink fails open in precisely the shape
+   * of the defect it exists to fix — a missing wire would mean CSP refusals go
+   * unreported and the Approve prompt never appears, silently. There is exactly
+   * one construction site in the codebase, so required costs nothing and turns
+   * a future missing wire into a compile error. (Same reasoning as
+   * `isDestroyed` on `PreviewWindowLike`.)
+   */
+  readonly onBlockedHost: (host: string, url: string, approvable: boolean) => void
 }
 
 /**
@@ -193,6 +212,7 @@ export class PreviewLiveView {
   private readonly lifecycle: { dispose(): Promise<void> }
   private readonly factoryTeardown: () => void
   private readonly linkBridge: PreviewLinkBridge
+  private readonly cspViolationBridge: PreviewCspViolationBridge
 
   private lastBoundsSeq = -1
   private lastBounds: PreviewBounds | null = null
@@ -256,6 +276,10 @@ export class PreviewLiveView {
       }
     )
 
+    this.cspViolationBridge = createPreviewCspViolationBridge({
+      onBlockedHost: (host, url, approvable) => params.onBlockedHost(host, url, approvable)
+    })
+
     this.lifecycle = wirePreviewLifecycle(
       {
         webContents: this.wc,
@@ -285,7 +309,8 @@ export class PreviewLiveView {
         onForwardedShortcut: (key) => this.deps.onForwardedShortcut?.(this.panelId, key),
         onConsoleMessage: (input) => this.onConsoleMessage(input),
         onLinkActivated: (payload) => this.linkBridge.handleActivation(payload),
-        onNavigationAttempt: (url) => this.linkBridge.handleWillNavigate(url)
+        onNavigationAttempt: (url) => this.linkBridge.handleWillNavigate(url),
+        onCspViolation: (payload) => this.cspViolationBridge.handleViolation(payload)
       }
     )
 
@@ -736,6 +761,7 @@ export class PreviewLiveView {
     step('factoryTeardown', () => this.factoryTeardown())
     await asyncStep('watchCoordinator.dispose', () => this.watchCoordinator.dispose())
     step('linkBridge.dispose', () => this.linkBridge.dispose())
+    step('cspViolationBridge.dispose', () => this.cspViolationBridge.dispose())
     step('reloadPolicy.dispose', () => this.reloadPolicy.dispose())
     step('findController.dispose', () => this.findController.dispose())
     step('failureLog.drop', () => this.failureLog.drop())

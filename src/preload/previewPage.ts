@@ -3,10 +3,27 @@
 /**
  * Preload for the SEALED preview page (sd-074b §5.1).
  *
- * Its entire job is to notice that a link was clicked and tell main. It exposes
- * NOTHING: there is no `contextBridge` call in this file, so the page's own
- * JavaScript gains no new capability and cannot reach `ipcRenderer` — that lives
- * in the isolated preload world, which `contextIsolation: true` keeps separate.
+ * It has two jobs, and it exposes NOTHING for either: there is no
+ * `contextBridge` call in this file, so the page's own JavaScript gains no new
+ * capability and cannot reach `ipcRenderer` — that lives in the isolated preload
+ * world, which `contextIsolation: true` keeps separate.
+ *
+ *  1. Notice that a link was clicked and tell main.
+ *  2. Notice that the page's CSP refused a remote subresource and tell main.
+ *
+ * WHY (2) IS HERE RATHER THAN AT THE NETWORK LAYER. Erfana gates remote hosts
+ * twice: the CSP built from the project allowlist, and an independent
+ * `onBeforeRequest` filter. The filter is what raises the "Approve this host?"
+ * prompt — but Chromium enforces the CSP in the RENDERER, before the request is
+ * ever dispatched, so for a host that is not on the allowlist the filter never
+ * sees it and the prompt could never appear. On a project with no approvals yet
+ * that made the whole approve flow unreachable: the toast was the only way to
+ * add a host, and nothing could produce the toast.
+ *
+ * A `securitypolicyviolation` listener closes that gap without weakening either
+ * gate. Verified in Electron 39 against a sandboxed, context-isolated preload:
+ * the isolated world shares the page's DOM, so the event arrives here with the
+ * full `blockedURI`, and `isTrusted` is `true` for a real refusal.
  *
  * WHY A PRELOAD IS NEEDED AT ALL. The page's CSP sandbox has no `allow-popups`,
  * so `target="_blank"`, named targets and middle-clicks are killed by Blink
@@ -41,6 +58,12 @@ import { ipcRenderer } from 'electron'
  * other handler in the app.
  */
 const LINK_ACTIVATED_CHANNEL = 'preview-page:linkActivated'
+
+/**
+ * Page → main channel for a CSP refusal. INLINED for the same build reason as
+ * the channel above; must match `previewCspViolationBridge.ts`.
+ */
+const CSP_VIOLATION_CHANNEL = 'preview-page:cspViolation'
 
 /** Primary (left) and auxiliary (middle) buttons both open links. */
 const ACTIVATING_BUTTONS = new Set([0, 1])
@@ -130,7 +153,37 @@ function onLinkActivation(event: MouseEvent): void {
   })
 }
 
+/**
+ * Report a CSP refusal of a remote subresource to main.
+ *
+ * Sends the URI, never a decision — main re-parses it, re-validates the host and
+ * owns every policy question. Everything here is a cheap filter to keep obvious
+ * noise off the channel, not a security boundary.
+ */
+function onCspViolation(event: SecurityPolicyViolationEvent): void {
+  // A page can `dispatchEvent` a forged `securitypolicyviolation` to make Erfana
+  // prompt for a host it never referenced. Only the browser can set `isTrusted`.
+  if (!event.isTrusted) return
+
+  const blockedURI = event.blockedURI
+  if (typeof blockedURI !== 'string' || blockedURI === '') return
+
+  // `blockedURI` is often a keyword rather than a URL — `inline`, `eval`,
+  // `wasm-eval`, `trusted-types-sink`. Those carry no host and are not something
+  // a reader can approve.
+  if (!blockedURI.startsWith('https://') && !blockedURI.startsWith('http://')) return
+
+  ipcRenderer.send(CSP_VIOLATION_CHANNEL, {
+    blockedURI,
+    effectiveDirective: event.effectiveDirective ?? ''
+  })
+}
+
 // Bubble phase on `document`: ancestors of the link get their turn first, and
 // the microtask above covers listeners that run after this one.
 document.addEventListener('click', onLinkActivation)
 document.addEventListener('auxclick', onLinkActivation)
+
+// CAPTURE phase, so a page listener that calls `stopPropagation()` on its own
+// violation events cannot hide its remote hosts from Erfana.
+document.addEventListener('securitypolicyviolation', onCspViolation, true)

@@ -16,14 +16,22 @@ import {
   type PreviewLifecycleParams
 } from './previewViewLifecycle'
 import type { PreviewWebContentsHandle } from './PreviewSessionFactory'
+import { PREVIEW_PAGE_CSP_VIOLATION_CHANNEL } from './previewCspViolationBridge'
 
 /** A WebContents test double that records listeners keyed by event name. */
+/** The object the fake uses as its top-level frame identity. */
+const MAIN_FRAME = { id: 'main-frame' }
+
 function makeWebContents(): {
   wc: PreviewWebContentsHandle
   emit: (event: string, ...args: unknown[]) => void
   hasListener: (event: string) => boolean
+  /** Deliver a payload on a WebContents-scoped channel, as the preload would. */
+  emitIpc: (channel: string, event: unknown, payload: unknown) => void
+  hasIpcListener: (channel: string) => boolean
 } {
   const listeners = new Map<string, Set<(...args: never[]) => void>>()
+  const ipcListeners = new Map<string, Set<(...args: never[]) => void>>()
   const wc = {
     setWindowOpenHandler: vi.fn(),
     on: (event: string, listener: (...args: never[]) => void) => {
@@ -34,6 +42,19 @@ function makeWebContents(): {
     once: vi.fn(),
     removeListener: (event: string, listener: (...args: never[]) => void) => {
       listeners.get(event)?.delete(listener)
+    },
+    // WebContents-scoped IPC, deliberately not `mainFrame.ipc`: a WebFrameMain
+    // is replaced when a navigated page replaces it (sd-074b §5.3).
+    mainFrame: MAIN_FRAME,
+    ipc: {
+      on: (channel: string, listener: (...args: never[]) => void) => {
+        const set = ipcListeners.get(channel) ?? new Set()
+        set.add(listener)
+        ipcListeners.set(channel, set)
+      },
+      removeListener: (channel: string, listener: (...args: never[]) => void) => {
+        ipcListeners.get(channel)?.delete(listener)
+      }
     }
   } as unknown as PreviewWebContentsHandle
   return {
@@ -43,7 +64,13 @@ function makeWebContents(): {
         ;(listener as (...a: unknown[]) => void)(...args)
       }
     },
-    hasListener: (event) => (listeners.get(event)?.size ?? 0) > 0
+    hasListener: (event) => (listeners.get(event)?.size ?? 0) > 0,
+    emitIpc: (channel, event, payload) => {
+      for (const listener of ipcListeners.get(channel) ?? []) {
+        ;(listener as (...a: unknown[]) => void)(event, payload)
+      }
+    },
+    hasIpcListener: (channel) => (ipcListeners.get(channel)?.size ?? 0) > 0
   }
 }
 
@@ -55,7 +82,8 @@ function makeHooks(): PreviewLifecycleHooks {
     onEntryChange: vi.fn(),
     onEntryDeleted: vi.fn(),
     onForwardedShortcut: vi.fn(),
-    onConsoleMessage: vi.fn()
+    onConsoleMessage: vi.fn(),
+    onCspViolation: vi.fn()
   }
 }
 
@@ -81,6 +109,63 @@ function consoleDetails(overrides: {
     sourceId: overrides.sourceId ?? 'erfana-preview://project/index.html'
   }
 }
+
+describe('wirePreviewLifecycle CSP-violation wiring', () => {
+  // This channel is the ONLY route by which a host refused by the page's CSP
+  // becomes approvable. Chromium enforces a CSP in the renderer, before the
+  // request reaches `onBeforeRequest`, so the network filter — the thing that
+  // raises the Approve prompt — never sees an unapproved host. Without this
+  // wiring the bridge is fully unit-tested and completely disconnected, and a
+  // project with an empty allowlist has no route to approving anything.
+
+  it('routes a violation payload from the page to onCspViolation', () => {
+    const { wc, emitIpc } = makeWebContents()
+    const hooks = makeHooks()
+    wirePreviewLifecycle(makeParams(wc), hooks)
+
+    const payload = { blockedURI: 'https://cdn.example.com/a.js', effectiveDirective: 'script-src' }
+    emitIpc(PREVIEW_PAGE_CSP_VIOLATION_CHANNEL, { senderFrame: MAIN_FRAME }, payload)
+
+    expect(hooks.onCspViolation).toHaveBeenCalledWith(payload)
+  })
+
+  it('ignores a violation reported by a sub-frame', () => {
+    // A sub-frame does not speak for the page. Same gate as the link channel.
+    //
+    // The main-frame half is here on purpose. "Not called" is the state of a
+    // harness where NOTHING is wired, so a sub-frame-only assertion passes
+    // against code that never registered the listener at all — it would prove
+    // the gate while the channel was dead. Proving the listener is live in the
+    // same test is what makes the rejection mean something.
+    const { wc, emitIpc } = makeWebContents()
+    const hooks = makeHooks()
+    wirePreviewLifecycle(makeParams(wc), hooks)
+    const payload = { blockedURI: 'https://cdn.example.com/a.js', effectiveDirective: 'script-src' }
+
+    emitIpc(PREVIEW_PAGE_CSP_VIOLATION_CHANNEL, { senderFrame: { id: 'some-iframe' } }, payload)
+    expect(hooks.onCspViolation).not.toHaveBeenCalled()
+
+    emitIpc(PREVIEW_PAGE_CSP_VIOLATION_CHANNEL, { senderFrame: MAIN_FRAME }, payload)
+    expect(hooks.onCspViolation).toHaveBeenCalledTimes(1)
+  })
+
+  it('detaches the violation listener on dispose', async () => {
+    const { wc, emitIpc, hasIpcListener } = makeWebContents()
+    const hooks = makeHooks()
+    const lifecycle = wirePreviewLifecycle(makeParams(wc), hooks)
+
+    expect(hasIpcListener(PREVIEW_PAGE_CSP_VIOLATION_CHANNEL)).toBe(true)
+    await lifecycle.dispose()
+    expect(hasIpcListener(PREVIEW_PAGE_CSP_VIOLATION_CHANNEL)).toBe(false)
+
+    emitIpc(
+      PREVIEW_PAGE_CSP_VIOLATION_CHANNEL,
+      { senderFrame: MAIN_FRAME },
+      { blockedURI: 'https://cdn.example.com/a.js', effectiveDirective: 'script-src' }
+    )
+    expect(hooks.onCspViolation).not.toHaveBeenCalled()
+  })
+})
 
 describe('wirePreviewLifecycle console-message wiring', () => {
   it('routes an uncaught page exception to onConsoleMessage as a script-error', () => {

@@ -30,6 +30,7 @@ import type { PreviewFailureInput } from '../../../shared/ipc/preview-types'
 import type { PreviewWebContentsHandle } from './PreviewSessionFactory'
 import { logger } from '../LoggingService'
 import { PREVIEW_PAGE_LINK_CHANNEL } from './previewLinkBridge'
+import { PREVIEW_PAGE_CSP_VIOLATION_CHANNEL } from './previewCspViolationBridge'
 import { redactPath } from '../../utils/redactUserInput'
 import { classifyConsoleMessage } from './previewConsoleClassify'
 import { attachInputForwarding } from './previewInputForward'
@@ -72,6 +73,8 @@ export interface PreviewLifecycleHooks {
    * (sd-074b §5.1). The payload is UNVALIDATED — the bridge parses it.
    */
   onLinkActivated?(payload: unknown): void
+  /** The page's CSP refused a subresource (see previewCspViolationBridge). */
+  onCspViolation?(payload: unknown): void
   /**
    * The page tried to navigate itself. The navigation is still cancelled; the
    * URL is handed on so a plain link works even when the preload is absent.
@@ -191,6 +194,18 @@ export function wirePreviewLifecycle(
   }
   wc.ipc?.on(PREVIEW_PAGE_LINK_CHANNEL, onLinkActivated as (...args: never[]) => void)
 
+  // Same channel discipline as the link one above, and the same main-frame gate:
+  // a sub-frame does not speak for the page. This is the CSP half of the
+  // blocked-host signal — the half `onBeforeRequest` structurally cannot see.
+  const onCspViolation = (event: unknown, payload: unknown): void => {
+    const senderFrame = (event as { senderFrame?: unknown })?.senderFrame
+    if (senderFrame !== undefined && senderFrame !== wc.mainFrame) {
+      return
+    }
+    hooks.onCspViolation?.(payload)
+  }
+  wc.ipc?.on(PREVIEW_PAGE_CSP_VIOLATION_CHANNEL, onCspViolation as (...args: never[]) => void)
+
   const detachInput = attachInputForwarding(
     wc as never,
     hooks.onForwardedShortcut,
@@ -227,6 +242,10 @@ export function wirePreviewLifecycle(
       wc.ipc?.removeListener(
         PREVIEW_PAGE_LINK_CHANNEL,
         onLinkActivated as (...args: never[]) => void
+      )
+      wc.ipc?.removeListener(
+        PREVIEW_PAGE_CSP_VIOLATION_CHANNEL,
+        onCspViolation as (...args: never[]) => void
       )
       await entryWatcher.close()
     }

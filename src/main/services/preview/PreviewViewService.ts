@@ -277,7 +277,14 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
         initialBounds: req.bounds,
         session,
         failureLog,
-        deps: this.liveViewDeps
+        deps: this.liveViewDeps,
+        // The CSP half of the blocked-host signal. Chromium refuses an
+        // unapproved host in the RENDERER, so `onBeforeRequest` — and therefore
+        // the Approve prompt — never sees it; the preload reports it instead and
+        // it lands here, on the identical sink, sharing the failure type, the
+        // toast budget and the dedupe rule.
+        onBlockedHost: (host, url, approvable) =>
+          onBlocked('blocked-host', host, url, approvable)
       })
     } catch {
       failureLog.drop()
