@@ -245,12 +245,13 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
     ): void => {
       failureLog.record({ type: kind, resourceUrlOrHost: host, reasonCode: ErrorCode.UNKNOWN_ERROR })
 
-      const known = kindsByHost.get(host) ?? []
-      const merged = mergeBlockedKinds(known, resourceKind)
+      // `mergeBlockedKinds` returns null only when the set is UNCHANGED, and
+      // adding a kind to an empty set always changes it — so there is no
+      // "first sighting" branch to write here. One used to exist and was
+      // unreachable.
+      const merged = mergeBlockedKinds(kindsByHost.get(host) ?? [], resourceKind)
       if (merged !== null) {
         kindsByHost.set(host, merged)
-      } else if (known.length === 0) {
-        kindsByHost.set(host, [resourceKind])
       }
 
       // EMIT UNCONDITIONALLY. This used to fire only when the toast budget

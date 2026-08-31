@@ -82,9 +82,19 @@
    * background colour the page can simply match, which it chooses itself since
    * previews render in their own paper colour.
    *
-   * Deliberately the brand accent at 2px rather than a neutral hairline: it
-   * clears 3:1 against both this surface and any paper a page picks, and the
-   * page cannot draw it, because the native view is inset below this band.
+   * Deliberately the brand accent at 2px rather than a neutral hairline, and
+   * the page cannot draw it, because the native view is inset below this band.
+   *
+   * It does NOT clear 3:1 against every paper a page can pick, and an earlier
+   * version of this comment claimed it did. Measured: the accent (#A0A8FF) is
+   * 6.24:1 against this strip's own background but only 2.20:1 against white,
+   * which is the DEFAULT page paper (`previewBackdrop.ts`).
+   *
+   * The seam is still legible, because two mechanisms carry it and they cover
+   * each other: the strip's opaque background is 13.7:1 against white paper,
+   * and where THAT collapses — a dark page at 1.4:1 — the accent is 8.5:1.
+   * Changing either one means re-checking the other.
+   *
    * `HtmlPreviewPanel.tokens.test.ts` fails if either token stops resolving.
    */
   border-bottom: var(--border-width-thick) solid var(--color-accent-primary);

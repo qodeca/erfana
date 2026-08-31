@@ -59,7 +59,7 @@ export function isTrustedSender(event: IpcMainInvokeEvent): boolean {
 
 /**
  * Route-tolerant variant of {@link isTrustedSender}, used by the process-wide
- * IPC sender gate ({@link file://./ipcSenderGate.ts}).
+ * IPC sender gate ({@link file://./registry.ts}).
  *
  * Identical trust decision, with two deliberate differences:
  *

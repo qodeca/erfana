@@ -10,7 +10,9 @@
  *
  * State is keyed by `panelId` in a `Map` (mirroring `useSearchStore`'s
  * `providerStates` convention) so multiple refused/closing panels stay isolated;
- * only ONE preview is ever live, but a refused panel still renders its own
+ * SEVERAL previews can be live at once (sd-074b D5) — an earlier version of
+ * this comment said only one ever was, which is the assumption the overlay
+ * guard was rewritten to remove. A refused panel also renders its own
  * limit-reached UI keyed by its own id. Payload shapes come from the shared
  * schema (item 41) and types (item 4) — this store never re-defines them.
  */
@@ -24,10 +26,12 @@ import type {
 } from '../../../shared/ipc/preview-schema'
 
 /**
- * The four load states a preview panel can be in.
+ * The load states a preview panel can be in.
  *
  * Derived from the `preview:loadStateChanged` payload (item 41) so the union
- * never drifts from the IPC contract: `idle | loading | ready | failed`.
+ * never drifts from the IPC contract. FIVE of them, not four: `suspended` was
+ * added when eviction landed, and a reader trusting the old count writes the
+ * single-live-preview assumption back in.
  */
 export type PreviewLoadState = PreviewLoadStatePayload['state']
 

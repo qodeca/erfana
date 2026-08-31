@@ -445,19 +445,25 @@ prompt from one the page drew. Was residual risk 8 (§2.8). Do **not** make it c
 export const PREVIEW_FORWARDED_SHORTCUTS = Object.freeze([
   { key: 'f', accel: true }, { key: 's', accel: true },
   { key: 'w', accel: true }, { key: 'Escape', accel: false },
-  // Zoom (§1.8a). Both forms of each key: the physical key reports differently
-  // with Shift held, and users press either.
-  { key: '=', accel: true }, { key: '+', accel: true },
-  { key: '-', accel: true }, { key: '_', accel: true },
-  { key: '0', accel: true }
+  // No zoom keys — see below.
 ] as const)
 ```
 
-The zoom keys are not a convenience. Host zoom is applied geometrically — `clampAndZoomBounds`
-multiplies the CSS rect — so without them Cmd/Ctrl-+ enlarges the preview *rectangle* while the page's
-text stays at 100%, making it relatively **smaller**. WCAG 2.2 SC 1.4.4 requires text to reach 200%.
-They route to `preview:setZoom`, which is clamped to `MIN_ZOOM_LEVEL`/`MAX_ZOOM_LEVEL` and persisted
-per panel so a zoom survives a suspend/resume.
+Page zoom matters, and it is **not** carried by this list. Host zoom is applied geometrically —
+`clampAndZoomBounds` multiplies the CSS rect — so Cmd/Ctrl-+ would enlarge the preview *rectangle*
+while the page's text stayed at 100%, making it relatively **smaller**. WCAG 2.2 SC 1.4.4 requires
+text to reach 200%.
+
+The **View menu** is what delivers it: `menu.ts` -> `previewZoomHandler` -> `zoomFocused` finds the
+focused preview and calls `preview:setZoom`, which is clamped to `MIN_ZOOM_LEVEL`/`MAX_ZOOM_LEVEL` and
+persisted per panel so a zoom survives a suspend/resume. The menu's items are handlers rather than
+Electron's built-in zoom *roles* precisely so the two cannot both fire.
+
+The zoom keys were briefly listed above as well. That was dead in one direction and a hazard in the
+other: `PreviewForwardedShortcutSchema` never enumerated them, so every one was dropped at
+`validateAndSend` and the renderer's zoom branch never ran — and widening that enum to "fix" it would
+have zoomed **twice** per keypress, once from the accelerator and once from the forward. The forwarded
+list and the schema are now pinned equal by a test, in both directions.
 
 Everything else stays with the page. `before-input-event` is Chromium's pre-dispatch input pipeline,
 not a page-callable API.
@@ -1390,7 +1396,7 @@ behaviour lives main-side or in `src/shared/`.
 | 15 | `SearchBar.countOnly.test.tsx` | R | Label from the pushed count; nav enabled on `count.total>0`; Enter calls `nextMatch()`; whole-word disabled; **no `findInPage` on mount**; **clearing the query resets the label** |
 | 15 | `SearchBar.monaco.regression.test.tsx` | R | Stepping through 17 matches shows "2 of 17", "3 of 17"… — not a frozen "1 of 17" |
 | 15 | `useSearchStore.test.ts` | R | Switching provider twice never pairs one provider's `matches` with another's `capabilities`; the `else` branch resets `count`, `navToken`, `capabilities` |
-| 15 | `previewInputForward.test.ts` | M | Exactly the listed shortcuts forwarded with `preventDefault()` — the original four plus the five zoom keys (§1.8a); Cmd+R, Cmd+P and plain typing are not |
+| 15 | `previewInputForward.test.ts` | M | Exactly the listed shortcuts forwarded with `preventDefault()` — `f`/`s`/`w`/`Escape` only, and the forwarded set is pinned equal to `PreviewForwardedShortcutSchema`; Cmd+R, Cmd+P and plain typing are not. Zoom keys are NOT forwarded: the View menu owns page zoom, and forwarding them too would zoom twice per keypress |
 | 1.8a | `previewBackdrop.test.ts` | M | The transition table over all five events; a `start`→`stop` burst settles on the page colour; a reload never repaints chrome; a crash does. The readability assertion is a **property, not a literal** — the painted backdrop must reach 4.5:1 against black, which `#161312` (≈1.2:1) cannot pass for the wrong reason |
 | 1.8a | `toastPlacement.test.ts` | R | Hand-built rects (jsdom does no layout): no overlap; partial; full cover ⇒ `blocked`; exact touch yields clearance, not 1 px. Plus: the occluder is registered **only** on `blocked`, and the published rect is cleared on hide and on unmount |
 | 1.8a | `PreviewViewService.test.ts` | M | Closing a window drains its views without warning; the destroyed-window fake's `removeChildView` must **throw**, or the assertion passes against unfixed code |

@@ -18,7 +18,7 @@ import { registerHandle } from './registry'
  * parser rather than string comparison, because prefix matching is foolable.
  *
  * The gate is now:
- *  - the process-wide sender gate (`ipcSenderGate.ts`) — only our own renderer;
+ *  - the process-wide sender gate (`registry.ts`) — only our own renderer;
  *  - a `new URL()` parse — an unparseable string is refused;
  *  - exact `url.protocol` equality against {@link ALLOWED_EXTERNAL_PROTOCOLS};
  *  - refusal of embedded credentials (`user:pass@host`), a classic phishing and
