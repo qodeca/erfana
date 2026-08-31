@@ -56,19 +56,6 @@ export interface PreviewShortcutActions {
  * })
  * ```
  */
-/**
- * Forwarded accelerator key → zoom step for the previewed page.
- *
- * Both the unshifted and shifted forms are listed because the physical key
- * reports differently with Shift held, and users press either.
- */
-const ZOOM_STEPS: Readonly<Record<string, -1 | 0 | 1>> = {
-  '=': 1,
-  '+': 1,
-  '-': -1,
-  _: -1,
-  '0': 0
-}
 
 export function usePreviewFindShortcuts(
   panelId: string,
@@ -94,13 +81,11 @@ export function usePreviewFindShortcuts(
         current.closePanel()
       } else if (payload.key === 'Escape') {
         current.closeSearch()
-      } else if (payload.accel && ZOOM_STEPS[payload.key] !== undefined) {
-        // The sealed page swallows these, so main forwards them and the panel
-        // turns them into a page zoom. Without this there is no way at all to
-        // enlarge previewed text: the host's zoom scales the view's rectangle,
-        // which makes the page's text relatively SMALLER (WCAG 2.2 SC 1.4.4).
-        void window.api.preview.setZoom(panelId, ZOOM_STEPS[payload.key])
       }
+      // No zoom branch: Cmd/Ctrl +/-/0 reach a focused preview through the View
+      // menu (`menu.ts` -> `zoomFocused`), not through this channel. The branch
+      // that used to live here was unreachable — the IPC schema never carried
+      // those keys — and reviving it would have doubled every zoom step.
     })
 
     return unsubscribe

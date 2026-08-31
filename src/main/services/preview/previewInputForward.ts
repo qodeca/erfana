@@ -30,19 +30,17 @@ export const PREVIEW_FORWARDED_SHORTCUTS = Object.freeze([
   { key: 'f', accel: true },
   { key: 's', accel: true },
   { key: 'w', accel: true },
-  // Zoom. Without these the sealed page swallows Cmd/Ctrl +/-/0 and there is no
-  // way to make previewed text bigger: the host's zoom only scales the view's
-  // RECTANGLE, so pressing it makes the page's text relatively SMALLER. WCAG 2.2
-  // SC 1.4.4 requires text to reach 200%.
+  // NO zoom keys. Cmd/Ctrl +/-/0 reach a focused preview through the View menu
+  // instead (`menu.ts` -> `zoomFocused` -> `wc.setZoomLevel`), which is a real
+  // PAGE zoom and is what satisfies WCAG 2.2 SC 1.4.4 here.
   //
-  // Both the unshifted and shifted forms of each key are listed because the
-  // physical key reports differently with Shift held ('=' vs '+', '-' vs '_'),
-  // and users hit either.
-  { key: '=', accel: true },
-  { key: '+', accel: true },
-  { key: '-', accel: true },
-  { key: '_', accel: true },
-  { key: '0', accel: true },
+  // They were briefly listed here as well, which was dead weight in one
+  // direction and a hazard in the other: `PreviewForwardedShortcutSchema` never
+  // enumerated them, so every one was dropped at the IPC boundary and the
+  // renderer's zoom branch never ran. Widening that enum to "fix" it would have
+  // made a single keypress zoom TWICE — once from the accelerator and once from
+  // the forward — which is the collision `menu.ts` replaced the built-in zoom
+  // roles to avoid.
   { key: 'Escape', accel: false }
 ] as const satisfies readonly ForwardedShortcut[])
 
