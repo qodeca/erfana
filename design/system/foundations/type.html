@@ -1,0 +1,110 @@
+<!-- @card group="Foundations" name="Typography" subtitle="Seven sizes, four weights, five line heights — rendered at real size" status="proposed" reviewed="2026-08-31" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Erfana — typography</title>
+<link rel="stylesheet" href="../../tokens.css">
+<link rel="stylesheet" href="../../ds.css">
+<style>
+  .ty-row { display: grid; grid-template-columns: 140px 64px 1fr; gap: var(--space-8);
+            align-items: baseline; padding: var(--space-6) 0;
+            border-bottom: var(--border-width) solid var(--color-border-default); }
+  .ty-token { font-family: var(--font-mono); font-size: var(--text-sm);
+              color: var(--color-text-tertiary); }
+  .ty-px { font-family: var(--font-mono); font-size: var(--text-sm);
+           color: var(--color-text-secondary); }
+  .fam { padding: var(--space-8) 0;
+         border-bottom: var(--border-width) solid var(--color-border-default); }
+  .fam p { margin: var(--space-3) 0 0; font-size: var(--text-md); }
+</style>
+</head>
+<body>
+
+<h1>Typography</h1>
+<p class="ds-lede">
+  Erfana is a desktop editor, so the type scale is small and dense. The default body size is
+  <strong>13px</strong>, not 16px. Sizes below are rendered at their true size — what you see is
+  what the app shows.
+</p>
+
+<h2>Size scale</h2>
+<div id="sizes"></div>
+
+<div class="ds-note">
+  <strong>10px and 11px are label sizes, not text sizes.</strong> Use them for a chip, a count or a
+  column header. Anything a reader has to actually read starts at <code>--text-base</code>.
+</div>
+
+<h2>Weights</h2>
+<div id="weights"></div>
+
+<h2>Line heights</h2>
+<div id="leading"></div>
+
+<h2>Font families</h2>
+
+<div class="fam">
+  <div class="ty-token">--font-sans</div>
+  <p style="font-family: var(--font-sans)">The system UI face. Everything chrome-side uses this.</p>
+</div>
+
+<div class="fam">
+  <div class="ty-token">--font-mono</div>
+  <p style="font-family: var(--font-mono)">
+    Cascadia Mono ships with the app, so code renders identically on macOS and Windows.
+    Use it for anything a machine produced: paths, hostnames, code, ids.
+    cdn.jsdelivr.net · xn--80ak6aa92e.com
+  </p>
+</div>
+
+<div class="fam">
+  <div class="ty-token">--font-serif</div>
+  <p style="font-family: var(--font-serif)">Charter / Georgia. Reserved for rendered document content.</p>
+</div>
+
+<script>
+const SIZES = [
+  ['--text-xs', 'Tiny labels'],
+  ['--text-sm', 'Small labels, hints'],
+  ['--text-base', 'Default body text'],
+  ['--text-md', 'Slightly larger body'],
+  ['--text-lg', 'Subheadings'],
+  ['--text-xl', 'Headings'],
+  ['--text-2xl', 'Large headings']
+];
+const WEIGHTS = [['--font-normal', 'Body copy'], ['--font-medium', 'Emphasis inside a row'],
+                 ['--font-semibold', 'Headings, button labels'], ['--font-bold', 'Rare — reserve it']];
+const LEADING = [['--leading-none', 'Single-line chrome'], ['--leading-tight', 'Headings'],
+                 ['--leading-snug', 'Dense lists'], ['--leading-normal', 'Default'],
+                 ['--leading-relaxed', 'Long prose']];
+
+function resolved(token) {
+  const probe = document.createElement('span');
+  probe.style.setProperty('--probe', `var(${token})`);
+  document.body.appendChild(probe);
+  const value = getComputedStyle(probe).getPropertyValue('--probe').trim();
+  probe.remove();
+  return value;
+}
+
+function row(host, token, note, style) {
+  const el = document.createElement('div');
+  el.className = 'ty-row';
+  el.innerHTML = `<div class="ty-token"></div><div class="ty-px"></div><div class="ty-sample"></div>`;
+  el.children[0].textContent = token;
+  el.children[1].textContent = resolved(token);
+  el.children[2].textContent = note;
+  Object.assign(el.children[2].style, style);
+  host.appendChild(el);
+}
+
+for (const [token, note] of SIZES) row(document.getElementById('sizes'), token, note, { fontSize: `var(${token})` });
+for (const [token, note] of WEIGHTS) row(document.getElementById('weights'), token, note, { fontWeight: `var(${token})`, fontSize: 'var(--text-md)' });
+for (const [token, note] of LEADING) row(document.getElementById('leading'), token, note, { lineHeight: `var(${token})`, fontSize: 'var(--text-base)' });
+</script>
+</body>
+</html>

@@ -73,7 +73,7 @@ Never commit a real secret, even to history — rewrite it out and rotate the cr
 
 - TypeScript strict mode; React functional components with hooks; Zustand for state.
 - IPC pattern: `shared/ipc` schemas → `main/services` → `main/ipc` handlers → preload bridge → renderer.
-- UI: use design tokens (`var(--color-*)`, `var(--space-*)`, `var(--text-*)`); `border-radius: 0` always. See [`docs/ui-style-guide.md`](docs/ui-style-guide.md).
+- UI: open the design system first — [`design/index.html`](design/index.html) — and use design tokens (`var(--color-*)`, `var(--space-*)`, `var(--text-*)`); `border-radius: 0` always. `npm run lint:css` enforces the token rules. (`design/` is the design system; `docs/design*/` are per-issue notes.)
 - Prose: **sentence case**, en dashes (not em dashes).
 - New source files must carry the SPDX header (`npm run check:headers` enforces it); new binary assets are covered by the `REUSE.toml` catch-all — add a `.license` sidecar only to *override* it (e.g. a third-party asset). `reuse lint` must pass.
 

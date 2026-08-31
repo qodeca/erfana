@@ -41,11 +41,21 @@ Feature specifications live in `specs/`.
 - User-input PII in logs: redact user-supplied values (e.g. filenames) before `logger.error` via `redactUserInput(message, code)` (`src/main/utils/redactUserInput.ts`); the user-facing toast keeps the full value, log files get `[redacted-filename]`
 - Error containment (two tiers): a new panel wraps its content in `<PanelErrorBoundary componentName="…">` **keyed by whatever scopes that content** (e.g. `key={projectPath ?? 'none'}`, see `src/renderer/src/components/Panels/ProjectPanel.tsx`), so a defect degrades that panel instead of the window – without the key a panel that failed on project A still reads "unavailable" after switching to project B. `RootErrorBoundary`, `installGlobalErrorTrail()` and the main-process crash handlers are the outer layers: [docs/ui-components.md § Error containment](docs/ui-components.md#error-containment)
 
-## UI Style Guide (MANDATORY)
+## Design system (MANDATORY)
 
-**Before implementing ANY UI changes**: Read [docs/ui-style-guide.md](docs/ui-style-guide.md) and use design tokens from `src/renderer/src/styles/design-tokens.css`.
+**Before implementing ANY UI changes**: open [`design/index.html`](design/index.html) in a browser. It is the design system — plain HTML cards that each **decide** one rule and render it live, loading a synced copy of the app's real `src/renderer/src/styles/design-tokens.css` and its real bundled font. A card shows every state rather than describing it, which is how its defects get found.
 
-**Key rules**: Use `var(--color-*)`, `var(--space-*)`, `var(--text-*)` tokens. No hardcoded values. `border-radius: 0` always.
+Read the card for what you are changing. A card marked `status="decided"` is binding; `status="proposed"` means it is still a sketch — use it as the direction of travel, not as settled law.
+
+**Key rules**: Use `var(--color-*)`, `var(--space-*)`, `var(--text-*)` tokens. No hardcoded values. `border-radius: 0` always. These three are enforced by `npm run lint:css` in the required `Lint` job, so they fail before review rather than during it.
+
+**Numbers in a card are generated**, never typed: they come from `design/claims.json` via a runnable predicate over `src/`, and `scripts/design-claims.test.mjs` re-derives every one on each CI run. Do not hand-edit a number into a card — add a ledger entry.
+
+**Deviating is allowed if the code says so at the site**: `/* deviates: design/<card> — why */`, plus a row in that card's Exceptions section. An undocumented deviation is a bug.
+
+[docs/ui-style-guide.md](docs/ui-style-guide.md) still holds the text-selection policy and the dark-only stance; its visual sections are stubs pointing at the cards. Do not put a new visual rule there.
+
+**Naming, because it is confusable**: `design/` (repo root) is the design system. `docs/design/` and `docs/designs/` are per-issue design notes and are unrelated.
 
 ## Nested CLAUDE.md (component-specific patterns)
 - [`src/main/services/CLAUDE.md`](src/main/services/CLAUDE.md) - catalogue of every main-process service, with the issue context behind each

@@ -1,0 +1,111 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * The menu — right-click menus, and any future dropdown menu.
+ *
+ * PROPOSED — not adopted. The app's version is
+ * src/renderer/src/components/ContextMenu/ContextMenu.css. Adopting this is a
+ * MOVE, not a copy: the rules land there, and scripts/design-sync.mjs then syncs
+ * the file back here the way it syncs tokens.css, so this card renders what
+ * actually ships.
+ *
+ * The visual layer here is close to what ships already. What is missing in the
+ * app is not CSS at all — it is the keyboard contract that `role="menu"`
+ * promises. See the card: a role is a promise, and this one is currently broken
+ * for every one of its dependants.
+ *
+ * Classes are prefixed `erf-`, like every other component file here.
+ */
+
+.erf-menu {
+  min-width: 180px;
+  padding: var(--space-2) 0;
+  background-color: var(--color-bg-tertiary);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-md);
+  user-select: none;
+}
+
+/* The menu owns ONE tab stop. Focus moves between items with the arrow keys —
+   see the roving-tabindex note on the card. A menu of twelve items with twelve
+   tab stops is why people stop using Tab. */
+.erf-menu:focus { outline: none; }
+
+.erf-menu-item {
+  display: flex;
+  align-items: center;
+  /* 28px minimum. WCAG 2.2 SC 2.5.8 asks for 24x24; a menu row is full-width, so
+     the height is the whole constraint. */
+  min-height: var(--space-14);
+  padding: var(--space-3) var(--space-6);
+  color: var(--color-text-primary);
+  font-size: var(--text-base);
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+/* Hover and keyboard focus look the SAME on purpose. A menu has one active item
+   at a time whichever device you are using, and showing two highlights at once
+   (one under the pointer, one under the keyboard) is the single most confusing
+   thing a menu can do. */
+.erf-menu-item:hover:not([aria-disabled='true']),
+.erf-menu-item:focus-visible:not([aria-disabled='true']),
+.erf-menu-item--active:not([aria-disabled='true']) {
+  background-color: var(--color-bg-hover-solid);
+}
+
+/* The ring is INSET: a long menu scrolls, and an outward ring on the first or
+   last item gets clipped by the scroll container. Same rule as the rows card. */
+.erf-menu-item:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: calc(var(--space-1) * -1);
+}
+
+/*
+ * PRECEDENCE: disabled beats danger.
+ *
+ * A greyed-out Delete must not still read as dangerous — the colour is a
+ * promise about what will happen if you activate it, and a disabled item will
+ * not do anything at all. Ordering these two rules the other way around gives a
+ * red item that cannot be clicked, which reads as an error rather than as
+ * "not available right now".
+ *
+ * WCAG 1.4.3 exempts inactive controls, which is why this colour is allowed to
+ * be dim. It is the one place on this card where low contrast is the point.
+ */
+.erf-menu-item--danger { color: var(--color-error); }
+.erf-menu-item--danger:hover:not([aria-disabled='true']) {
+  background-color: var(--color-bg-danger-hover);
+}
+
+.erf-menu-item[aria-disabled='true'] {
+  color: var(--color-text-disabled);
+  cursor: not-allowed;
+}
+
+.erf-menu-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--icon-size-sm);
+  margin-right: var(--space-4);
+  font-size: var(--text-md);
+}
+
+.erf-menu-label { flex: 1 1 auto; }
+
+/* The shortcut is a HINT, not a control. It never takes focus and it is never
+   the only place a capability is announced. */
+.erf-menu-shortcut {
+  margin-left: var(--space-8);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.erf-menu-separator {
+  height: var(--border-width);
+  margin: var(--space-2) 0;
+  background-color: var(--color-border-subtle);
+}

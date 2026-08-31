@@ -69,7 +69,7 @@ Full list: [Keyboard Shortcuts](./keyboard-shortcuts.md)
 --text-sm   /* 11px */
 ```
 
-Full guide: [UI Style Guide](./ui-style-guide.md)
+Full guide: the [design system](../design/index.html) — open it in a browser. [UI Style Guide](./ui-style-guide.md) keeps the text-selection policy.
 
 ## Project Structure
 

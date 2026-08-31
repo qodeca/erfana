@@ -1,0 +1,144 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Erfana design</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="ds.css">
+<style>
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+          gap: var(--border-width); background: var(--color-border-default);
+          border: var(--border-width) solid var(--color-border-default);
+          margin-bottom: var(--space-16); }
+  .card { display: flex; flex-direction: column; gap: var(--space-3);
+          padding: var(--space-8) var(--space-10); background: var(--color-bg-secondary);
+          text-decoration: none; }
+  .card:hover { background: var(--color-bg-hover-solid); }
+  /* The grid does not scroll, so the ring goes OUTSIDE the card. The inset
+     variant is for a target clipped by a scroll container — see
+     design/system/foundations/focus.html. */
+  .card:focus-visible { outline: var(--border-width-thick) solid var(--color-border-focus);
+                        outline-offset: var(--space-1); }
+  .card__name { font-family: var(--font-mono); font-size: var(--text-md);
+                color: var(--color-text-emphasis); }
+  .card__sub { font-size: var(--text-sm); line-height: var(--leading-snug);
+               color: var(--color-text-tertiary); }
+  .count { font-family: var(--font-mono); font-size: var(--text-sm);
+           color: var(--color-text-secondary); font-weight: var(--font-normal); }
+  /* Status is on the card, not buried in the page. "proposed" is not a failure
+     state - it is the honest one for most of these, and hiding it is how a
+     sketch gets cited as a decision. */
+  .card__meta { font-family: var(--font-mono); font-size: var(--text-xs);
+                color: var(--color-text-tertiary); }
+  .card__meta[data-status="decided"] { color: var(--color-brand-lime); }
+</style>
+</head>
+<body>
+
+<h1>Erfana design</h1>
+<p class="ds-lede">
+  15 cards, generated from the folder itself. Every page reads a synced copy of
+  the app's <code>design-tokens.css</code> and the real bundled Cascadia Mono, so no value
+  here is transcribed by hand — and <code>npm run design -- --check</code> fails in CI when
+  the copy and the app disagree.
+</p>
+<p class="ds-lede">
+  <strong>Check a card's status before citing it.</strong> <em>decided</em> is binding;
+  <em>proposed</em> is a direction of travel, not settled law.
+</p>
+
+<div class="ds-note">
+  <strong>Rebuild with <code>npm run design</code></strong> after adding a card or changing a token.
+  This index, <code>tokens.css</code> and the fonts are generated — do not edit them.
+</div>
+
+  <h2>Foundations <span class="count">7</span></h2>
+  <div class="grid">
+    <a class="card" href="system/foundations/colors.html">
+      <span class="card__name">Colours</span>
+      <span class="card__sub">Every token resolved from the shipping CSS, contrast measured in the page</span>
+      <span class="card__meta" data-status="proposed">proposed · reviewed 2026-08-31</span>
+    </a>
+    <a class="card" href="system/foundations/focus.html">
+      <span class="card__name">Focus &amp; keyboard</span>
+      <span class="card__sub">One ring, one width — and the rule that outline:none needs a named replacement</span>
+      <span class="card__meta" data-status="decided">decided · reviewed 2026-08-31</span>
+    </a>
+    <a class="card" href="system/foundations/layering.html">
+      <span class="card__name">Layering</span>
+      <span class="card__sub">The z-index ladder — and the rung above it that no z-index can reach</span>
+      <span class="card__meta" data-status="proposed">proposed · reviewed 2026-08-31</span>
+    </a>
+    <a class="card" href="system/foundations/motion.html">
+      <span class="card__name">Motion</span>
+      <span class="card__sub">Four durations, the missing easing scale, one spinner, and when everything must stop</span>
+      <span class="card__meta" data-status="proposed">proposed · reviewed 2026-08-31</span>
+    </a>
+    <a class="card" href="system/foundations/spacing.html">
+      <span class="card__name">Spacing</span>
+      <span class="card__sub">The 2px-per-step scale, drawn to size — the token number is NOT the pixel count</span>
+      <span class="card__meta" data-status="proposed">proposed · reviewed 2026-08-31</span>
+    </a>
+    <a class="card" href="system/foundations/surfaces.html">
+      <span class="card__name">Surfaces &amp; sizing</span>
+      <span class="card__sub">Borders, shadows, control heights — and the zero-radius rule</span>
+      <span class="card__meta" data-status="proposed">proposed · reviewed 2026-08-31</span>
+    </a>
+    <a class="card" href="system/foundations/type.html">
+      <span class="card__name">Typography</span>
+      <span class="card__sub">Seven sizes, four weights, five line heights — rendered at real size</span>
+      <span class="card__meta" data-status="proposed">proposed · reviewed 2026-08-31</span>
+    </a>
+  </div>
+  <h2>Components <span class="count">7</span></h2>
+  <div class="grid">
+    <a class="card" href="system/components/button/index.html">
+      <span class="card__name">Buttons</span>
+      <span class="card__sub">Primary, secondary, danger — rules copied verbatim from Dialog.css</span>
+      <span class="card__meta" data-status="proposed">proposed · reviewed 2026-08-31</span>
+    </a>
+    <a class="card" href="system/components/feedback/index.html">
+      <span class="card__name">Feedback</span>
+      <span class="card__sub">One warning colour, one banner shape, and one way to tell a screen reader something happened</span>
+      <span class="card__meta" data-status="proposed">proposed · reviewed 2026-08-31</span>
+    </a>
+    <a class="card" href="system/components/form/index.html">
+      <span class="card__name">Form controls</span>
+      <span class="card__sub">One input, one select, one checkbox — and an error that a screen reader can find</span>
+      <span class="card__meta" data-status="decided">decided · reviewed 2026-08-31</span>
+    </a>
+    <a class="card" href="system/components/icon/index.html">
+      <span class="card__name">Icons</span>
+      <span class="card__sub">Five sizes from the token scale, and the rule for when an icon has a name</span>
+      <span class="card__meta" data-status="proposed">proposed · reviewed 2026-08-31</span>
+    </a>
+    <a class="card" href="system/components/menu/index.html">
+      <span class="card__name">Menu</span>
+      <span class="card__sub">A role is a promise — arrows, typeahead, and the precedence rule for a disabled danger item</span>
+      <span class="card__meta" data-status="decided">decided · reviewed 2026-08-31</span>
+    </a>
+    <a class="card" href="system/components/permission-band/index.html">
+      <span class="card__name">Permission band</span>
+      <span class="card__sub">Approve blocked hosts from the preview&#x27;s own chrome — collapsed, expanded, confirming, fail-safe</span>
+      <span class="card__meta" data-status="decided">decided · reviewed 2026-08-31</span>
+    </a>
+    <a class="card" href="system/components/row/index.html">
+      <span class="card__name">Rows &amp; lists</span>
+      <span class="card__sub">One selected state instead of four, and the arrow-key contract the tree is missing</span>
+      <span class="card__meta" data-status="decided">decided · reviewed 2026-08-31</span>
+    </a>
+  </div>
+  <h2>HTML preview <span class="count">1</span></h2>
+  <div class="grid">
+    <a class="card" href="product/html-approval/index.html">
+      <span class="card__name">Approving a remote host</span>
+      <span class="card__sub">The whole journey — nine states, from a clean page to a page that will not yield</span>
+      <span class="card__meta" data-status="proposed">proposed · reviewed 2026-08-31</span>
+    </a>
+  </div>
+
+</body>
+</html>

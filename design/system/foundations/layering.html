@@ -1,0 +1,97 @@
+<!-- @card group="Foundations" name="Layering" subtitle="The z-index ladder — and the rung above it that no z-index can reach" status="proposed" reviewed="2026-08-31" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Erfana — layering</title>
+<link rel="stylesheet" href="../../tokens.css">
+<link rel="stylesheet" href="../../ds.css">
+<script src="../../claims.js"></script>
+<style>
+  /* NOT column-reverse. The rungs below are authored highest-z first, so
+     reversing them put --z-base: 0 at the top and made three sentences on this
+     card false — on a card about which way is up. Authored order IS painted
+     order. */
+  .ladder { display: flex; flex-direction: column; gap: var(--border-width);
+            background: var(--color-border-default); border: var(--border-width) solid var(--color-border-default); }
+  .rung { display: grid; grid-template-columns: 200px 92px 1fr; gap: var(--space-8);
+          align-items: center; padding: var(--space-6) var(--space-8); background: var(--color-bg-secondary); }
+  .rung .tok { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text-tertiary); }
+  .rung .val { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text-secondary);
+               text-align: right; font-variant-numeric: tabular-nums; }
+  .rung .use { font-size: var(--text-sm); color: var(--color-text-tertiary); }
+  .rung--native { background: var(--color-brand-white); }
+  .rung--native .tok, .rung--native .val, .rung--native .use { color: var(--color-brand-black); }
+  .rung--broken { border-left: var(--border-width-thick) solid var(--color-error); }
+</style>
+</head>
+<body>
+
+<h1>Layering</h1>
+<p class="ds-lede">
+  What covers what. The top of this list is the top of the screen — the highest rung wins.
+</p>
+
+<div class="ladder">
+  <div class="rung rung--native">
+    <span class="tok">no z-index exists</span>
+    <span class="val">—</span>
+    <span class="use"><strong>The previewed HTML page.</strong> A native view painted by the operating system, above every rung below, whatever number you write.</span>
+  </div>
+  <div class="rung"><span class="tok">--z-context-menu</span><span class="val">100000</span><span class="use">Right-click menus. Must beat dialogs.</span></div>
+  <div class="rung"><span class="tok">(dialogs, in code)</span><span class="val">10001+</span><span class="use">Handed out by <code>DialogContext</code>, one per open dialog.</span></div>
+  <div class="rung"><span class="tok">--z-dialog</span><span class="val">10000</span><span class="use">The base a dialog counts up from.</span></div>
+  <div class="rung rung--broken"><span class="tok">--z-blocker</span><span class="val">9999</span><span class="use">Labelled <em>"above everything"</em> — and it is below both rungs above. See below.</span></div>
+  <div class="rung"><span class="tok">--z-toast</span><span class="val">9000</span><span class="use">Toasts.</span></div>
+  <div class="rung"><span class="tok">--z-tooltip</span><span class="val">3000</span><span class="use">Tooltips.</span></div>
+  <div class="rung"><span class="tok">--z-popover</span><span class="val">2000</span><span class="use">Popovers, the failure-badge panel.</span></div>
+  <div class="rung"><span class="tok">--z-modal</span><span class="val">1000</span><span class="use">Full-screen overlays that are not dialogs.</span></div>
+  <div class="rung"><span class="tok">--z-fixed / --z-sticky</span><span class="val">500 / 200</span><span class="use">Pinned chrome.</span></div>
+  <div class="rung"><span class="tok">--z-dropdown</span><span class="val">100</span><span class="use">Dropdowns — and two hardcoded <code>100</code>s that tie with it.</span></div>
+  <div class="rung"><span class="tok">--z-base</span><span class="val">0</span><span class="use">Everything else.</span></div>
+</div>
+
+<h2>The rung that breaks the ladder</h2>
+
+<div class="ds-note">
+  <strong>The white rung at the top is not styled by CSS and cannot be out-ranked.</strong>
+  The HTML preview runs the page in a native view that the operating system composites above all
+  sibling DOM. A button given <code>z-index: 999999</code> still sits underneath it.
+  <br><br>
+  So the ladder describes the DOM's internal order only. Above it sits a layer with no number.
+  The app's answer is procedural, not declarative: one service owns whether that view is visible, and a
+  lint rule stops anything else touching it. <strong>Anything that must appear over a preview either
+  lives outside the preview's rectangle, or hides the view first.</strong>
+</div>
+
+<h2>Two things to fix</h2>
+
+<div class="ds-note">
+  <strong>The blocker does not block.</strong> <code>--z-blocker</code> is annotated "above everything"
+  and sits below every dialog and every context menu. It is the layer shown while a project switches —
+  precisely when a dialog might be open. Either renumber it above <code>--z-context-menu</code>, or
+  rename it to what it actually is.
+</div>
+
+<div class="ds-note">
+  <strong><span data-claim="zindex-css-literals"></span> stylesheets set a bare <code>z-index</code></strong>
+  instead of a token, and one of the values is <code>100</code> — the exact value of
+  <code>--z-dropdown</code>. When the active-tab underline and a dropdown overlap, the winner is decided
+  by which appears later in the DOM, not by intent. Use the token.
+  <br><br>
+  That count is CSS only. More bare values live in TypeScript, where no stylesheet lint will ever see
+  them — see the rule below.
+</div>
+
+<h2>The rule</h2>
+<p style="max-width: 76ch; color: var(--color-text-tertiary)">
+  Never write a raw z-index. If no rung fits, add one to the scale — do not squeeze a number in between.
+  And never mirror a token into TypeScript: two files currently hardcode <code>10000</code> and
+  <code>1000</code> as JS constants, so changing the CSS silently desynchronises the runtime.
+</p>
+
+</body>
+</html>
