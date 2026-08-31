@@ -21,6 +21,24 @@ function toastAnnouncement(toast: Toast): string {
   return toast.message ? `${toast.title}: ${toast.message}` : toast.title
 }
 
+/**
+ * The translate currently applied to the container, in CSS pixels.
+ *
+ * Parsed from the inline style because this component is its only writer, and
+ * because it is the state actually on screen — which a remembered value need
+ * not be. Anything unparseable reads as no offset, so the worst case is the
+ * behaviour this replaces rather than a wrong correction.
+ */
+function appliedTranslate(el: HTMLElement): { x: number; y: number } {
+  const match = /translate\((-?[\d.]+)px,\s*(-?[\d.]+)px\)/.exec(el.style.transform)
+  if (match === null) {
+    return { x: 0, y: 0 }
+  }
+  const x = Number.parseFloat(match[1])
+  const y = Number.parseFloat(match[2])
+  return { x: Number.isFinite(x) ? x : 0, y: Number.isFinite(y) ? y : 0 }
+}
+
 export function ToastNotification() {
   const { toasts, removeToast } = useToast()
 
@@ -50,10 +68,29 @@ export function ToastNotification() {
     // `position: fixed`, so a window resize MOVES it without changing its box
     // and no ResizeObserver fires — a stored rect would go stale exactly when
     // the layout changed under it.
+    //
+    // But `getBoundingClientRect` reports the box AFTER this element's own
+    // transform, and `placeToastContainer` returns an ABSOLUTE offset from the
+    // untransformed CSS anchor. Feeding it the displaced box made the placement
+    // eat itself: the second recompute saw a stack already clear of every
+    // preview, returned `AT_REST`, dropped the transform, and put the toasts
+    // back on top of the native view — reporting `clear`, so the occluder
+    // fallback never fired either. It failed OPEN, for the consent prompt.
+    //
+    // So subtract whatever is applied to get back to the anchor. Read from the
+    // DOM rather than remembered in a ref: two recomputes can run before React
+    // commits (the store notifies outside React), and a remembered value would
+    // describe a frame that is not on screen yet.
     const rect = el.getBoundingClientRect()
+    const applied = appliedTranslate(el)
     setPlacement(
       placeToastContainer(
-        { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+        {
+          left: rect.left - applied.x,
+          top: rect.top - applied.y,
+          width: rect.width,
+          height: rect.height
+        },
         readPreviewRects(),
         { width: window.innerWidth, height: window.innerHeight }
       )

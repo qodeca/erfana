@@ -149,7 +149,12 @@ describe('placeToastContainer', () => {
     const left: Box = { left: 0, top: 600, width: 500, height: 300 }
     const right: Box = { left: 520, top: 600, width: 500, height: 300 }
     const placement = placeToastContainer(TOAST, [left, right], VIEWPORT)
-    if (placement.kind === 'blocked') return
+    // Asserted, not returned past. A bare `return` here made a regression to
+    // `blocked` end the test with ZERO assertions — which Vitest reports as a
+    // pass. The siblings above throw for the same reason.
+    if (placement.kind === 'blocked') {
+      throw new Error('expected a clear placement, got blocked')
+    }
     const moved = {
       left: TOAST.left + placement.offsetX,
       top: TOAST.top + placement.offsetY,
