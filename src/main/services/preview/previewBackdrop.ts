@@ -158,19 +158,27 @@ export const READ_PAGE_BACKDROP_SCRIPT = `(() => {
       !v || v === 'transparent' || v === 'rgba(0, 0, 0, 0)'
     const root = document.documentElement
     const body = document.body
-    const rootBg = root ? getComputedStyle(root).backgroundColor : ''
-    if (!transparent(rootBg)) return rootBg
-    const bodyBg = body ? getComputedStyle(body).backgroundColor : ''
-    if (!transparent(bodyBg)) return bodyBg
     const scheme = root ? getComputedStyle(root).colorScheme : ''
-    if (typeof scheme === 'string' && /\\bdark\\b/.test(scheme) && !/\\blight\\b/.test(scheme)) {
-      return 'rgb(18, 18, 18)'
-    }
-    if (typeof scheme === 'string' && /\\bdark\\b/.test(scheme) &&
-        window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      return 'rgb(18, 18, 18)'
-    }
-    return null
+    const dark =
+      typeof scheme === 'string' && /\\bdark\\b/.test(scheme) &&
+      (!/\\blight\\b/.test(scheme) ||
+        (!!window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches))
+    const rootBg = root ? getComputedStyle(root).backgroundColor : ''
+    const bodyBg = body ? getComputedStyle(body).backgroundColor : ''
+    const found = !transparent(rootBg) ? rootBg : (!transparent(bodyBg) ? bodyBg : null)
+    if (found === null) return dark ? 'rgb(18, 18, 18)' : null
+    // A TRANSLUCENT paper is composited here, over the canvas the browser would
+    // paint under it, because only the page knows which canvas that is. Main
+    // sees an opaque colour and never has to guess. Returning the raw value
+    // instead is what made 'rgba(0, 0, 0, 0.03)' arrive as solid black.
+    const parts =
+      /^rgba?\\(\\s*(\\d{1,3})\\s*,\\s*(\\d{1,3})\\s*,\\s*(\\d{1,3})\\s*(?:,\\s*([0-9.]+)\\s*)?\\)$/.exec(found)
+    if (!parts) return found
+    const a = parts[4] === undefined ? 1 : parseFloat(parts[4])
+    if (!(a >= 0 && a <= 1) || a === 1) return found
+    const base = dark ? 18 : 255
+    const mix = (c) => Math.round(a * parseInt(c, 10) + (1 - a) * base)
+    return 'rgb(' + mix(parts[1]) + ', ' + mix(parts[2]) + ', ' + mix(parts[3]) + ')'
   } catch {
     return null
   }
@@ -185,9 +193,19 @@ const RGB_PATTERN = /^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*(?:,
  *
  * The value crosses a trust boundary — it is computed from an untrusted page —
  * so it is parsed strictly and anything unrecognised becomes `null` rather than
- * being interpolated into a colour string. Alpha is dropped: the backdrop is the
- * bottom layer and must be opaque, or the chrome colour shows through and the
- * unreadable-page defect comes back at partial strength.
+ * being interpolated into a colour string.
+ *
+ * The RESULT is always opaque: the backdrop is the bottom layer, and anything
+ * translucent lets the chrome colour through, which is the unreadable-page
+ * defect from the other side. But alpha is COMPOSITED to get there, not
+ * discarded. Discarding it painted `background: rgba(0, 0, 0, 0.03)` — an
+ * ordinary subtle-tint idiom — as solid black, where a browser paints it over
+ * the canvas at about #F7F7F7. The page's own black text then sat on black.
+ *
+ * Composited over {@link DEFAULT_PAGE_BACKDROP}, the white a browser paints
+ * behind a document that declares nothing. A dark-scheme page is handled before
+ * this point: `READ_PAGE_BACKDROP_SCRIPT` resolves its own canvas base, so a
+ * translucent background on a dark page arrives here already opaque.
  *
  * @param value - The script's return value; anything at all.
  * @returns An `#AARRGGBB` string, or `null` when it is not a usable colour.
@@ -204,12 +222,23 @@ export function toArgb(value: unknown): string | null {
   if (channels.some((channel) => !Number.isInteger(channel) || channel < 0 || channel > 255)) {
     return null
   }
-  // A fully transparent background is the page declining to paint; treat it as
-  // "no opinion" so the caller falls back rather than painting black.
-  if (match[4] !== undefined && Number.parseFloat(match[4]) === 0) {
+
+  const alpha = match[4] === undefined ? 1 : Number.parseFloat(match[4])
+  // Alpha reaches this from an untrusted page like everything else, so a value
+  // that is not a real 0..1 fraction is refused rather than clamped.
+  if (!Number.isFinite(alpha) || alpha < 0 || alpha > 1) {
     return null
   }
-  const hex = channels.map((channel) => channel.toString(16).padStart(2, '0')).join('')
+  // A fully transparent background is the page declining to paint; treat it as
+  // "no opinion" so the caller falls back rather than painting black.
+  if (alpha === 0) {
+    return null
+  }
+
+  const hex = channels
+    .map((channel) => Math.round(alpha * channel + (1 - alpha) * 255))
+    .map((channel) => channel.toString(16).padStart(2, '0'))
+    .join('')
   return `#FF${hex.toUpperCase()}`
 }
 

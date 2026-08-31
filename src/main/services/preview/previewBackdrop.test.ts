@@ -22,6 +22,7 @@ import {
   backdropColor,
   nextBackdropState,
   toArgb,
+  READ_PAGE_BACKDROP_SCRIPT,
   type BackdropState
 } from './previewBackdrop'
 
@@ -139,6 +140,84 @@ describe('backdropColor', () => {
   })
 })
 
+describe('READ_PAGE_BACKDROP_SCRIPT', () => {
+  /**
+   * Evaluate the script with a fake DOM.
+   *
+   * The script is a string of JavaScript that runs inside the previewed page's
+   * isolated world, so nothing in the main-process suite exercised it — it had
+   * no tests at all. `new Function` shadows the three globals it touches with
+   * parameters, which is enough to drive every branch.
+   */
+  function run(page: {
+    rootBg?: string
+    bodyBg?: string
+    colorScheme?: string
+    prefersDark?: boolean
+  }): unknown {
+    const evaluate = new Function(
+      'document',
+      'getComputedStyle',
+      'window',
+      `return ${READ_PAGE_BACKDROP_SCRIPT}`
+    ) as (
+      doc: unknown,
+      gcs: (el: unknown) => unknown,
+      win: unknown
+    ) => unknown
+    const root = { tag: 'html' }
+    const body = { tag: 'body' }
+    return evaluate(
+      { documentElement: root, body },
+      (el: unknown) =>
+        el === root
+          ? { backgroundColor: page.rootBg ?? '', colorScheme: page.colorScheme ?? '' }
+          : { backgroundColor: page.bodyBg ?? '', colorScheme: '' },
+      { matchMedia: () => ({ matches: page.prefersDark === true }) }
+    )
+  }
+
+  it('reads the root background, then the body background', () => {
+    expect(run({ rootBg: 'rgb(1, 2, 3)', bodyBg: 'rgb(9, 9, 9)' })).toBe('rgb(1, 2, 3)')
+    expect(run({ rootBg: 'rgba(0, 0, 0, 0)', bodyBg: 'rgb(9, 9, 9)' })).toBe('rgb(9, 9, 9)')
+  })
+
+  it('leaves the canvas to the caller when the page declares nothing', () => {
+    expect(run({})).toBeNull()
+  })
+
+  it('composites a translucent paper over the white canvas', () => {
+    // THE DEFECT this file's `toArgb` case describes, caught one layer earlier:
+    // only the page knows which canvas sits under a translucent background, so
+    // it resolves it here rather than leaving main to guess.
+    expect(run({ bodyBg: 'rgba(0, 0, 0, 0.03)' })).toBe('rgb(247, 247, 247)')
+  })
+
+  it('composites a translucent paper over a DARK canvas when the page is dark', () => {
+    // The case main cannot get right on its own: the same rgba over #121212 is
+    // nearly black, and compositing it over white would wash the page out.
+    expect(run({ bodyBg: 'rgba(0, 0, 0, 0.5)', colorScheme: 'dark' })).toBe('rgb(9, 9, 9)')
+  })
+
+  it('still reports dark paper for a page that only opts into dark mode', () => {
+    // The common `<meta name="color-scheme">` case: no background at all.
+    expect(run({ colorScheme: 'dark' })).toBe('rgb(18, 18, 18)')
+    expect(run({ colorScheme: 'light dark', prefersDark: true })).toBe('rgb(18, 18, 18)')
+    expect(run({ colorScheme: 'light dark', prefersDark: false })).toBeNull()
+  })
+
+  it('passes an opaque colour through untouched', () => {
+    // The control for the compositing: alpha 1 must not drift the channels.
+    expect(run({ bodyBg: 'rgba(12, 34, 56, 1)' })).toBe('rgba(12, 34, 56, 1)')
+  })
+
+  it('returns an unrecognised value unchanged, for main to refuse', () => {
+    // The script does not get to decide what is safe; `toArgb` is the strict
+    // gate. Anything it cannot parse is handed on rather than guessed at.
+    expect(run({ bodyBg: 'color-mix(in srgb, red, blue)' })).toBe('color-mix(in srgb, red, blue)')
+  })
+})
+
 describe('toArgb', () => {
   it.each([
     ['rgb(255, 255, 255)', '#FFFFFFFF'],
@@ -149,10 +228,36 @@ describe('toArgb', () => {
     expect(toArgb(input)).toBe(expected)
   })
 
-  it('drops alpha, because the backdrop is the bottom layer', () => {
-    // A translucent backdrop lets the chrome colour through and brings the
-    // unreadable-page defect back at partial strength.
-    expect(toArgb('rgba(255, 255, 255, 0.5)')).toBe('#FFFFFFFF')
+  it('composites a translucent background over the paper, rather than dropping alpha', () => {
+    // THE DEFECT. Alpha was discarded and the raw channels stamped opaque, so
+    // `background: rgba(0, 0, 0, 0.03)` — an ordinary subtle-tint idiom — was
+    // painted SOLID BLACK. A browser paints it over the white canvas at about
+    // #F7F7F7, so the page's default black text stayed readable; Erfana put
+    // black text on black. That is the unreadable-page defect this module
+    // exists to prevent, at full strength rather than partial.
+    //
+    // 0.03 x 0 + 0.97 x 255 = 247.35 -> 247 -> 0xF7.
+    expect(toArgb('rgba(0, 0, 0, 0.03)')).toBe('#FFF7F7F7')
+  })
+
+  it('still yields an OPAQUE colour, whatever the alpha was', () => {
+    // The backdrop is the bottom layer. Anything translucent lets the chrome
+    // colour through, which is the same defect from the other side.
+    for (const input of ['rgba(0, 0, 0, 0.03)', 'rgba(12, 34, 56, 0.5)', 'rgb(9, 9, 9)']) {
+      expect(toArgb(input)?.slice(0, 3)).toBe('#FF')
+    }
+  })
+
+  it('leaves an opaque colour untouched', () => {
+    // The control for the compositing: alpha 1 must not drift the channels.
+    expect(toArgb('rgba(12, 34, 56, 1)')).toBe('#FF0C2238')
+  })
+
+  it('treats an out-of-range or unparseable alpha as no opinion', () => {
+    // Alpha reaches this from an untrusted page like everything else.
+    for (const input of ['rgba(1, 2, 3, 2)', 'rgba(1, 2, 3, -1)', 'rgba(1, 2, 3, .)']) {
+      expect(toArgb(input)).toBeNull()
+    }
   })
 
   it('treats a fully transparent background as no opinion', () => {
