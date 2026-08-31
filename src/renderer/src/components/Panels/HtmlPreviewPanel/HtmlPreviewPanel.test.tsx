@@ -225,6 +225,54 @@ describe('HtmlPreviewPanel', () => {
     )
   })
 
+  it('retries a resume that was superseded, instead of stranding the panel', async () => {
+    // THE DEFECT. `PREVIEW_OPEN_SUPERSEDED` is deliberately not a failure — the
+    // handler logs and returns without touching state. On the RESUME path that
+    // left `loadState` at 'suspended' with no dep changed, so nothing re-armed:
+    // the tab sat on a frozen still frame with no live view and no banner,
+    // recoverable only by switching away and back or closing it. Reachable
+    // whenever eviction is active and another panel's open overtakes this one.
+    render(<HtmlPreviewPanel {...makeProps('/proj/page.html')} />)
+    await waitFor(() => expect(preview.open).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(listeners.loadState).not.toBeNull())
+
+    // The next open (the resume) is overtaken.
+    preview.open.mockResolvedValueOnce({
+      ok: false,
+      errorCode: ErrorCode.PREVIEW_OPEN_SUPERSEDED
+    })
+
+    act(() => {
+      listeners.loadState?.({ panelId: 'preview-1', state: 'suspended', dropped: 0 })
+    })
+
+    // Two more opens: the superseded resume, then the retry that re-arms it.
+    await waitFor(() => expect(preview.open).toHaveBeenCalledTimes(3))
+  })
+
+  it('does not retry a resume forever', async () => {
+    // The control on the retry above. A supersession can repeat — another
+    // panel's open keeps winning — so the re-arm has to be bounded or the panel
+    // spins reopening for as long as the tab is visible.
+    render(<HtmlPreviewPanel {...makeProps('/proj/page.html')} />)
+    await waitFor(() => expect(preview.open).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(listeners.loadState).not.toBeNull())
+
+    preview.open.mockResolvedValue({
+      ok: false,
+      errorCode: ErrorCode.PREVIEW_OPEN_SUPERSEDED
+    })
+
+    act(() => {
+      listeners.loadState?.({ panelId: 'preview-1', state: 'suspended', dropped: 0 })
+    })
+
+    await waitFor(() => expect(preview.open.mock.calls.length).toBeGreaterThan(2))
+    const settled = preview.open.mock.calls.length
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(preview.open.mock.calls.length).toBe(settled)
+  })
+
   it('shows the failed banner and reloads on demand', async () => {
     render(<HtmlPreviewPanel {...makeProps('/proj/page.html')} />)
 
@@ -422,6 +470,52 @@ describe('HtmlPreviewPanel', () => {
       expect(rows).toHaveLength(1)
       expect(rows[0].kinds).toEqual(['style', 'script'])
     })
+  })
+
+  it('refuses to approve for a panel that is no longer open', async () => {
+    // THE DEFECT. The toast is app-level and, carrying an action, never
+    // auto-dismisses — but this panel's cleanup only unsubscribes IPC. Close
+    // the tab, then click Approve, and the host was still written into
+    // `.erfana/settings.json`: `allowlist-handlers` persists before the view is
+    // consulted, and `applyApprovedHosts` then returns silently for a panel
+    // that does not exist. A permanent, repo-wide grant with nothing on screen.
+    const toastEvents: CustomEvent[] = []
+    const capture = (e: Event): void => {
+      toastEvents.push(e as CustomEvent)
+    }
+    window.addEventListener('app:toast', capture)
+
+    try {
+      const { unmount } = render(<HtmlPreviewPanel {...makeProps('/proj/page.html')} />)
+      await waitFor(() => expect(listeners.hostBlocked).not.toBeNull())
+      listeners.hostBlocked?.({
+        panelId: 'preview-1',
+        host: 'cdn.example',
+        approvable: true,
+        kinds: ['script'],
+        notify: true
+      })
+      await waitFor(() => expect(toastEvents.length).toBe(1))
+      const approve = toastEvents[0].detail.action
+
+      // The control: while the panel IS open, the action approves.
+      approve?.onClick()
+      expect(preview.approveHost).toHaveBeenCalledTimes(1)
+
+      // Now the panel goes away, as closing its tab would do.
+      act(() => {
+        unmount()
+      })
+      usePreviewStore.getState().reset()
+
+      approve?.onClick()
+
+      expect(preview.approveHost).toHaveBeenCalledTimes(1)
+      // And the reader is told, rather than the click doing nothing at all.
+      expect(toastEvents.at(-1)?.detail.title).toBe('Preview closed')
+    } finally {
+      window.removeEventListener('app:toast', capture)
+    }
   })
 
   it('raises a non-actionable toast on a non-approvable blocked host (UX-001)', async () => {

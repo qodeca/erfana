@@ -115,6 +115,23 @@ export function usePreviewEvents(panelId: string): void {
             // Main rebuilds the CSP, purges storage and reloads on approve, so
             // the renderer just fires the request (design §5(c)).
             onClick: () => {
+              // The toast OUTLIVES its panel: it goes to the app-level stack,
+              // and carrying an action it is forced to manual-dismiss, while
+              // this hook's cleanup only unsubscribes the IPC listeners. Close
+              // the tab and click Approve and the host is still written to
+              // `.erfana/settings.json` — `allowlist-handlers` persists before
+              // the view is consulted, and `applyApprovedHosts` then returns
+              // silently for a panel that no longer exists. The reader would
+              // have changed the project permanently with nothing on screen to
+              // show for it.
+              if (!usePreviewStore.getState().panels.has(panelId)) {
+                showGlobalToast({
+                  type: 'info',
+                  title: 'Preview closed',
+                  message: `${payload.host} was not approved: the preview it was blocked in is no longer open.`
+                })
+                return
+              }
               void window.api.preview.approveHost(panelId, payload.host)
             }
           }

@@ -85,6 +85,16 @@ function initialBounds(el: HTMLElement | null): { x: number; y: number; width: n
  * })
  * ```
  */
+/**
+ * How many times a superseded RESUME re-arms itself before giving up.
+ *
+ * Small on purpose. Each retry is a full `preview:open` round trip, and the
+ * thing that superseded us may keep winning, so this bounds a loop rather than
+ * guaranteeing success. Giving up leaves the still frame on screen, which is
+ * what the panel already shows while suspended.
+ */
+const RESUME_RETRY_LIMIT = 3
+
 export function usePreviewLifecycle(
   options: UsePreviewLifecycleOptions
 ): UsePreviewLifecycleResult {
@@ -105,7 +115,7 @@ export function usePreviewLifecycle(
    * path — including the refusal handling.
    */
   const requestOpen = useCallback(
-    async (isCancelled: () => boolean): Promise<void> => {
+    async (isCancelled: () => boolean, onSuperseded?: () => void): Promise<void> => {
       // Clear whatever the LAST attempt concluded. Without this there is no
       // path back out of either banner: a panel that once failed keeps saying so
       // for the rest of its mount even after a later open succeeds (F27).
@@ -132,6 +142,12 @@ export function usePreviewLifecycle(
         }
 
         if (result.errorCode === ErrorCode.PREVIEW_OPEN_SUPERSEDED) {
+          // Tell the caller, so a RESUME can re-arm. The initial open needs no
+          // such thing — whoever superseded it owns the panel from then on —
+          // but a resume has nowhere else to come from: `loadState` stays
+          // 'suspended' and no dependency changes, so without this the tab sits
+          // on a frozen still frame with no live view and no banner.
+          onSuperseded?.()
           // Not a failure. Something newer overtook this open — a project
           // switch, a close, a suspend, or another open for the same panel — so
           // the staleness guard did exactly its job. Whoever superseded us owns
@@ -187,15 +203,36 @@ export function usePreviewLifecycle(
   // `suspended` after evicting the least recently active view; the still frame
   // stays on screen until this re-open lands, so the tab is never blank.
   const loadState = usePreviewStore((state) => state.getLoadState(panelId))
+  const [resumeAttempt, setResumeAttempt] = useState(0)
+
+  // Reset the budget once the panel is live again, so a later suspend/resume
+  // cycle does not inherit a spent one.
+  useEffect(() => {
+    if (loadState !== 'suspended') {
+      setResumeAttempt((attempt) => (attempt === 0 ? attempt : 0))
+    }
+  }, [loadState])
+
   useEffect(() => {
     if (!isVisible || loadState !== 'suspended') return
 
     let cancelled = false
-    void requestOpen(() => cancelled)
+    void requestOpen(
+      () => cancelled,
+      () => {
+        // Bounded: a supersession can repeat — another panel's open keeps
+        // winning — and an unbounded re-arm would spin reopening for as long as
+        // the tab is visible.
+        if (cancelled) return
+        setResumeAttempt((attempt) =>
+          attempt < RESUME_RETRY_LIMIT ? attempt + 1 : attempt
+        )
+      }
+    )
     return () => {
       cancelled = true
     }
-  }, [isVisible, loadState, requestOpen])
+  }, [isVisible, loadState, requestOpen, resumeAttempt])
 
   return { limitReached, holderPanelId, openFailed }
 }

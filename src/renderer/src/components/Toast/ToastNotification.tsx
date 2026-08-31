@@ -131,9 +131,30 @@ export function ToastNotification() {
   // The newest toast's text is written into the matching hidden region so the
   // screen reader announces it once. The visual toasts stay normal focusable
   // elements (NOT aria-hidden) so the Close button remains reachable by AT.
-  const newest = toasts.length > 0 ? toasts[toasts.length - 1] : null
-  const politeText = newest && newest.type !== 'error' ? toastAnnouncement(newest) : ''
-  const alertText = newest && newest.type === 'error' ? toastAnnouncement(newest) : ''
+  // Latched on ARRIVAL, keyed by id — not derived from the stack on every
+  // render. Deriving it meant that dismissing the newest toast re-evaluated
+  // both strings to the PREVIOUS toast's text and wrote it into an
+  // `aria-atomic` region, which assistive tech announces as a new status. With
+  // three toasts, dismissing them one by one read the stack backwards.
+  const announcedIds = useRef(new Set<string>())
+  const [announced, setAnnounced] = useState({ polite: '', alert: '' })
+
+  useEffect(() => {
+    const newest = toasts.length > 0 ? toasts[toasts.length - 1] : null
+    if (newest === null || announcedIds.current.has(newest.id)) {
+      return
+    }
+    // Pruned to the live ids so the set cannot grow for the session's lifetime;
+    // ids are unique, so a dismissed toast can never return to be re-announced.
+    announcedIds.current = new Set(toasts.map((toast) => toast.id))
+    const text = toastAnnouncement(newest)
+    setAnnounced(
+      newest.type === 'error' ? { polite: '', alert: text } : { polite: text, alert: '' }
+    )
+  }, [toasts])
+
+  const politeText = announced.polite
+  const alertText = announced.alert
 
   return (
     <>
