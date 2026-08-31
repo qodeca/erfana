@@ -59,6 +59,30 @@ describe('decideLinkIntent — in-project links', () => {
     expect(decide(`${CURRENT}#section-2`)).toEqual({ kind: 'same-document' })
   })
 
+  it('treats an EMPTY fragment on the current document as a scroll too', () => {
+    // THE HOLE. `<a href="#">` is the standard no-op idiom behind dropdowns,
+    // tabs and toggles. Its resolved URL has `hash === ''`, so the
+    // `anchor !== null` guard skipped the same-document arm and the click was
+    // classified `in-project` — re-opening the document already on screen and,
+    // through `openFileInPanel`, stealing focus off the page on every click.
+    expect(decide(`${CURRENT}#`)).toEqual({ kind: 'same-document' })
+  })
+
+  it('treats a link to the current document with no fragment as a scroll', () => {
+    // `<a href="">` resolves to the current URL exactly, and behaves the same
+    // way for the same reason.
+    expect(decide(CURRENT)).toEqual({ kind: 'same-document' })
+  })
+
+  it('still treats a link to a DIFFERENT document as a navigation', () => {
+    // The control: widening the same-document arm must not swallow real links.
+    expect(decide(`erfana-preview://${TOKEN}/other.html`)).toEqual({
+      kind: 'in-project',
+      relPath: 'other.html',
+      anchor: null
+    })
+  })
+
   it('refuses another preview root token', () => {
     expect(decide('erfana-preview://ffffffffffffffffffffffffffffffff/secret.html')).toEqual({
       kind: 'blocked',

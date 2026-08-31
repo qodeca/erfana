@@ -96,11 +96,17 @@ function documentBaseTarget(): string {
   return base?.getAttribute('target') ?? ''
 }
 
-/** Whether the href only moves the fragment within the current document. */
+/**
+ * Whether the href addresses the current document, fragment or not.
+ *
+ * No `hash === ''` guard: `<a href="#">` and `<a href="">` both resolve to an
+ * empty hash, and both are same-document. Requiring a fragment reported the
+ * standard no-op link idiom to main as a navigation, which mirrors the same
+ * hole in `PreviewNavigationPolicy`.
+ */
 function isFragmentOfCurrentDocument(href: string): boolean {
   try {
     const target = new URL(href)
-    if (target.hash === '') return false
     const current = new URL(window.location.href)
     return target.origin === current.origin && target.pathname === current.pathname
   } catch {

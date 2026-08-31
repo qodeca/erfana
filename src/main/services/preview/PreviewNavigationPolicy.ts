@@ -141,9 +141,16 @@ function decideInProject(url: URL, currentUrl: string, token: string): LinkInten
 
   const anchor = url.hash.startsWith('#') ? url.hash.slice(1) : null
 
-  // A fragment on the SAME document is a scroll, not a navigation. Chromium
-  // handles it natively inside the sandbox, so the click must be left alone.
-  if (anchor !== null && sameDocument(url, currentUrl)) {
+  // A link to the SAME document is a scroll, not a navigation. Chromium handles
+  // it natively inside the sandbox, so the click must be left alone.
+  //
+  // Deliberately not gated on there being a fragment. `<a href="#">` — the
+  // standard no-op idiom behind dropdowns, tabs and toggles — resolves to a URL
+  // whose `hash` is the EMPTY string, as does `<a href="">`. Requiring an anchor
+  // sent both down the in-project path, which re-opened the document already on
+  // screen and, through `openFileInPanel`, pulled focus off the page on every
+  // click.
+  if (sameDocument(url, currentUrl)) {
     return { kind: 'same-document' }
   }
 
