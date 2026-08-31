@@ -19,6 +19,7 @@ import type { IDockviewPanelProps } from 'dockview'
 
 import { HtmlPreviewPanel, type HtmlPreviewPanelParams } from './HtmlPreviewPanel'
 import { usePreviewStore } from '../../../stores/usePreviewStore'
+import { usePreviewViewportStore } from '../../../stores/usePreviewViewportStore'
 import { useSearchStore } from '../../../stores/useSearchStore'
 import { ErrorCode } from '../../../../../shared/errors'
 import type {
@@ -135,6 +136,9 @@ beforeEach(() => {
 afterEach(() => {
   cleanup()
   usePreviewStore.getState().reset()
+  // Seeded by the published-rect cases; a leaked rect would place the next
+  // test's toasts around a preview that is not in that test at all.
+  usePreviewViewportStore.setState({ rects: new Map() })
   useSearchStore.getState().resetSearch()
   vi.clearAllMocks()
 })
@@ -230,6 +234,50 @@ describe('HtmlPreviewPanel', () => {
     const reload = await screen.findByRole('button', { name: 'Reload' })
     fireEvent.click(reload)
     expect(preview.reload).toHaveBeenCalledWith('preview-1')
+  })
+
+  it('drops the published rect when the load fails', async () => {
+    // THE DEFECT. `isLive` was `loadState !== 'idle'`, which is TRUE for
+    // 'failed'. On failure the panel swaps the placeholder for a banner, so
+    // `pushBounds` bails before it can update anything — but the clear effect
+    // never fired either, leaving a rectangle published for a view that is not
+    // there. Every later toast then dodged empty space, and on a large panel
+    // `placeToastContainer` returned `blocked`, which registers the toast
+    // occluder and hides EVERY live preview in the window. An actionable toast
+    // never auto-dismisses, so that hide had no end.
+    render(<HtmlPreviewPanel {...makeProps('/proj/page.html')} />)
+    await waitFor(() => expect(listeners.loadState).not.toBeNull())
+
+    // jsdom lays nothing out, so the panel can never publish a rect of its own.
+    // Seed the one a laid-out panel would have published.
+    act(() => {
+      usePreviewViewportStore
+        .getState()
+        .setRect('preview-1', { left: 0, top: 0, width: 800, height: 600 })
+    })
+    expect(usePreviewViewportStore.getState().rects.get('preview-1')).toBeDefined()
+
+    act(() => {
+      listeners.loadState?.({ panelId: 'preview-1', state: 'failed', dropped: 0 })
+    })
+
+    expect(usePreviewViewportStore.getState().rects.get('preview-1')).toBeUndefined()
+  })
+
+  it('keeps the published rect while the preview is healthy', async () => {
+    // The control for the case above. Without it, "the rect is gone" would also
+    // be satisfied by a panel that never keeps a rect at all.
+    render(<HtmlPreviewPanel {...makeProps('/proj/page.html')} />)
+    await waitFor(() => expect(listeners.loadState).not.toBeNull())
+
+    act(() => {
+      listeners.loadState?.({ panelId: 'preview-1', state: 'ready', dropped: 0 })
+      usePreviewViewportStore
+        .getState()
+        .setRect('preview-1', { left: 0, top: 0, width: 800, height: 600 })
+    })
+
+    expect(usePreviewViewportStore.getState().rects.get('preview-1')).toBeDefined()
   })
 
   it('routes failures into the store and renders no in-panel badge (AC20, §1.8)', async () => {

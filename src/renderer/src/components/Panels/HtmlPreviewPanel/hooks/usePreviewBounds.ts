@@ -128,7 +128,13 @@ export function usePreviewBounds(options: UsePreviewBoundsOptions): UsePreviewBo
   const pushBounds = useCallback((): boolean => {
     if (!enabledRef.current) return false
     const el = placeholderRef.current
-    if (!el) return false
+    if (!el) {
+      // No placeholder means no box on screen for this panel. Returning without
+      // clearing left a rect published for a view that is not there — Erfana's
+      // own chrome then placed itself around a rectangle nothing occupies.
+      usePreviewViewportStore.getState().clearRect(panelId)
+      return false
+    }
     // The chrome strip is unconditional; the find bar stacks on top of it.
     const topInset =
       PREVIEW_CHROME_INSET_PX + (searchOpenRef.current ? SEARCH_BAR_INSET_PX : 0)

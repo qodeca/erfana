@@ -157,20 +157,29 @@ export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelPara
 
   // The hook owns every push, including the one on becoming visible: a tab
   // switch changes no size, so the `ResizeObserver` alone would not re-emit.
-  usePreviewBounds({
-    placeholderRef,
-    panelId,
-    enabled: !limitReached && !openFailed,
-    isVisible,
-    // Main emits the first non-idle load state AFTER installing the view, so
-    // this is the earliest point a `setBounds` is not thrown away.
-    isLive: loadState !== 'idle',
-    searchOpen: isVisible && isSearchOpen
-  })
-
+  // Computed BEFORE the bounds hook, because it is what decides whether the
+  // placeholder exists at all — and the hook's `enabled` has to mean exactly
+  // that. It used to be `!limitReached && !openFailed`, which stayed true for a
+  // FAILED load: the placeholder was already gone, so nothing could be pushed,
+  // and nothing cleared the rect that had been published for it either.
   const view = selectPanelView({
     limitReached,
     loadState: openFailed ? 'failed' : loadState
+  })
+
+  usePreviewBounds({
+    placeholderRef,
+    panelId,
+    // `'normal'` is precisely "there is a placeholder to measure".
+    enabled: view === 'normal',
+    isVisible,
+    // Main emits the first non-idle load state AFTER installing the view, so
+    // this is the earliest point a `setBounds` is not thrown away. `suspended`
+    // is excluded for the mirror reason — the view has been evicted, so the
+    // published rect describes nothing, which is also how the overlay guard
+    // reads that state.
+    isLive: loadState !== 'idle' && loadState !== 'suspended',
+    searchOpen: isVisible && isSearchOpen
   })
   const fallbackKind = selectFallback({ hasFrame: stillFrame !== null, isViewHidden })
 
