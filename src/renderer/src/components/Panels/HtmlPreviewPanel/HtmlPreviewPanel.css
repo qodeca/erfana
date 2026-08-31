@@ -4,7 +4,8 @@
  * HtmlPreviewPanel Styles (Issue #74, work item 71).
  *
  * Plain co-located global CSS (not a CSS module, per design §1.8). All values
- * come from design tokens (docs/ui-style-guide.md); no rounded corners.
+ * come from design tokens; no rounded corners. Governed by
+ * design/system/foundations/surfaces.html.
  *
  * The placeholder's background is `var(--color-brand-black)` on purpose — it is
  * the same value main encodes as `setBackgroundColor('#FF161312')`, so the seam

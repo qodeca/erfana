@@ -1,0 +1,364 @@
+<!-- @card group="Components" name="Rows & lists" subtitle="One selected state instead of four, and the arrow-key contract the tree is missing" status="decided" reviewed="2026-08-31" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Erfana — rows and lists</title>
+<link rel="stylesheet" href="../../../tokens.css">
+<link rel="stylesheet" href="../../../ds.css">
+<link rel="stylesheet" href="./row.css">
+<style>
+  .stage { display: flex; gap: var(--space-16); flex-wrap: wrap; align-items: flex-start; }
+  .list-frame { width: 340px; background: var(--color-bg-tertiary);
+                border: var(--border-width) solid var(--color-border-default); padding: var(--space-4) 0; }
+  .notes { max-width: 42ch; }
+  .states { display: flex; flex-direction: column; gap: var(--border-width);
+            background: var(--color-border-default);
+            border: var(--border-width) solid var(--color-border-default); width: 340px; }
+  .state-demo { background: var(--color-bg-tertiary); padding: var(--space-2) 0; }
+  .state-name { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-tertiary);
+                padding: var(--space-2) var(--space-8) 0; }
+  /* The host demo is deliberately squeezable: the elide only misbehaves when it
+     actually has to cut, which is why this defect survived unseen. */
+  /* overflow-x: auto IS the "the parent gives" half of the contract. Squeeze the
+     slider past the widest domain and this scrolls rather than cutting it. */
+  .host-frame { background: var(--color-bg-tertiary);
+                border: var(--border-width) solid var(--color-border-default); padding: var(--space-4) 0;
+                overflow-x: auto; }
+  .host-width { display: flex; align-items: center; gap: var(--space-4); margin-bottom: var(--space-8); }
+  .host-width input { flex: 1 1 auto; }
+</style>
+</head>
+<body>
+
+<h1>Rows and lists</h1>
+<p class="ds-lede">
+  The densest thing in Erfana. A file tree row, a picker option, a host in the permission band — all the
+  same primitive. <strong>Click into the list, then use the arrow keys.</strong>
+</p>
+
+<div class="ds-note">
+  <strong>The decision.</strong> Erfana has four different ways of showing that a row is selected: a lime
+  left border in the tree, an outline in the file picker, and a border-colour swap in two other pickers —
+  where hover and selected are so close they are hard to tell apart.
+  <strong>The tree's version wins:</strong> a filled background plus a 2px lime edge. It is the most used,
+  it survives losing focus, and the edge marker is Erfana's own signature — the activity bar uses the same
+  idea for the active panel.
+</div>
+
+<div class="ds-note">
+  <strong>Every class here is prefixed <code>erf-</code>.</strong> Not cosmetic. Mermaid puts
+  <code>class="row"</code> on gitGraph commit labels and on its generic label path, and Erfana injects that
+  SVG with <code>innerHTML</code> — so a bare global <code>.row</code> would reach into diagram labels in
+  the preview and in exported images. Nothing defines <code>.row</code> in the app today, which is the only
+  reason this has never bitten.
+</div>
+
+<h2>Live — arrow keys work</h2>
+
+<div class="stage">
+  <div class="list-frame">
+    <ul class="erf-row-list" role="tree" aria-label="Project files" id="list" tabindex="0"></ul>
+  </div>
+  <div class="notes">
+    <h2 style="margin-top:0">The keyboard contract</h2>
+    <table>
+      <tbody>
+        <tr><td><code>Tab</code></td><td>Enters the list <strong>once</strong> — not once per row.</td></tr>
+        <tr><td><code>↑ ↓</code></td><td>Move between rows.</td></tr>
+        <tr><td><code>→ ←</code></td><td>Expand / collapse a folder. On a leaf, ← jumps to its parent.</td></tr>
+        <tr><td><code>Home End</code></td><td>First and last row.</td></tr>
+        <tr><td><code>Enter</code></td><td>Open.</td></tr>
+      </tbody>
+    </table>
+    <div class="ds-note" style="margin-top: var(--space-8)">
+      <strong>One Tab stop, not one per row.</strong> A tree of 400 files with a Tab stop each is
+      unusable — that is why the roving pattern exists: the list holds the tab stop and moves focus
+      internally with arrows.
+      <br><br>
+      Erfana's file tree has <strong>none</strong> of this today. Nothing in it is focusable — yet it
+      declares <code>role="tree"</code>, so a screen reader switches to application mode and hands the
+      arrow keys to a widget that implements none of them. A wrong role is worse than a missing one.
+      The file, screen and window pickers all implement the pattern correctly, so the code to copy exists.
+    </div>
+  </div>
+</div>
+
+<h2>Truncating a host — the head goes, never the tail</h2>
+
+<div class="stage">
+  <div>
+    <div class="host-width">
+      <label for="w">Width</label>
+      <input type="range" id="w" min="90" max="420" value="200">
+      <span id="wval" style="font-family: var(--font-mono); font-size: var(--text-sm)"></span>
+    </div>
+    <div class="host-frame" id="hostFrame"></div>
+  </div>
+  <div class="notes">
+    <div class="ds-note" style="margin-top:0">
+      <strong>Drag the slider until the hosts cut.</strong> Every one must keep its registrable domain —
+      the part that decides whether you are about to trust <code>evil.com</code>. If any row ends up
+      reading <code>cdn.jsdelivr…</code> instead of <code>…cdn.evil.com</code>, the control is broken.
+    </div>
+    <div class="ds-note">
+      <strong>This used to be one CSS rule, and it was backwards.</strong>
+      <code>direction: rtl</code> put the cut at the front; the next line,
+      <code>unicode-bidi: plaintext</code>, threw that away and took the direction from the first strong
+      character instead. Hostnames start with a Latin letter, so the paragraph came out left-to-right and
+      the ellipsis went back to the tail. The rule delivered the exact trap its own comment described.
+      It survived because no card ever rendered a host long enough to cut.
+    </div>
+    <div class="ds-note">
+      <strong>So the guarantee is layout, not text rendering.</strong> The component splits the host at the
+      registrable-domain boundary and only the prefix is allowed to shrink. Worst case the prefix collapses
+      to a bare ellipsis; the domain cannot be cut, because nothing is telling it to.
+    </div>
+    <div class="ds-note">
+      <strong>Two things CSS cannot decide.</strong>
+      Truncation is not the only way to lie about a host: <code>аpple.com</code> with a Cyrillic <code>а</code>
+      truncates perfectly and is still a different domain. Render the punycode form when the label mixes
+      scripts. And the accessible name must carry the <em>full</em> host — <code>title</code> is unreachable
+      by keyboard and by touch, so it is not a substitute for <code>aria-label</code>.
+    </div>
+    <div class="ds-note">
+      <strong>The split needs the Public Suffix List, not a dot count.</strong> The demo below takes the
+      last two labels, which is wrong for <code>example.co.uk</code>. Shipping code must use the real list —
+      getting the boundary wrong moves the invariant to the wrong place, which is worse than no invariant.
+    </div>
+  </div>
+</div>
+
+<h2>Every state</h2>
+
+<div class="stage">
+  <div class="states" id="states"></div>
+  <div class="notes">
+    <div class="ds-note" style="margin-top:0">
+      <strong>Never colour alone.</strong> The git badge carries a letter, not just a hue. Cut rows get a
+      dashed underline as well as fading. Drop targets get a solid edge. Someone who cannot separate the
+      colours still sees every state.
+    </div>
+    <div class="ds-note">
+      <strong>Hover and selected must not look alike.</strong> Hover is a flat background change.
+      Selected adds the lime edge. In today's file picker they share one declaration, so a pointer
+      passing over a row looks identical to the row you chose.
+    </div>
+  </div>
+</div>
+
+<h2>All six git states</h2>
+
+<div class="stage">
+  <div class="states" id="badges"></div>
+  <div class="notes">
+    <div class="ds-note" style="margin-top:0">
+      <strong>Six, not four.</strong> This card used to paint backgrounds for four states and seed only
+      three, so a renamed or conflicted badge was a near-black label on a transparent row — measured
+      <strong>1.21:1</strong> against <code>--color-bg-tertiary</code>, which is invisible. Nothing rendered
+      them, so nobody saw it.
+      <br><br>
+      The app itself already ships all six. This was a defect in the <em>card</em>, and adopting the old
+      version would have made the app worse — which is the argument against the "copy this in verbatim"
+      note this file used to carry.
+    </div>
+  </div>
+</div>
+
+<h2>Measurements</h2>
+<table>
+  <thead><tr><th>Property</th><th>Value</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td>Row height</td><td><code>28px</code> minimum</td><td>Dense enough for a tree, tall enough for a 24px target inside it.</td></tr>
+    <tr><td>Indent step</td><td><code>16px</code> per level</td><td>Duplicated as raw arithmetic across several files, and again in this card's own demo. Proposed token: <code>--tree-indent</code>.</td></tr>
+    <tr><td>Selected edge</td><td><code>2px</code> lime, left</td><td><code>--border-width-thick</code> + <code>--color-brand-lime</code>.</td></tr>
+    <tr><td>Focus ring</td><td>Inset 2px</td><td>Rows scroll, so an outward ring gets clipped. See the Focus card.</td></tr>
+  </tbody>
+</table>
+
+<script>
+const FILES = [
+  { name: 'README.md', git: null, kind: 'file' },
+  { name: 'src', git: null, kind: 'folder', open: true },
+  { name: 'PreviewChromeBand.tsx', git: 'U', gitName: 'Untracked', kind: 'file', depth: 1 },
+  { name: 'usePreviewBounds.ts', git: 'M', gitName: 'Modified', kind: 'file', depth: 1 },
+  { name: 'toastService.ts', git: 'D', gitName: 'Deleted', kind: 'file', depth: 1 },
+  { name: 'package.json', git: null, kind: 'file' }
+];
+
+let active = 0;
+const list = document.getElementById('list');
+
+function build() {
+  list.innerHTML = '';
+  FILES.forEach((f, i) => {
+    const li = document.createElement('li');
+    li.className = 'erf-row';
+    li.setAttribute('role', 'treeitem');
+    li.setAttribute('aria-selected', String(i === active));
+    if (f.kind === 'folder') li.setAttribute('aria-expanded', String(!!f.open));
+    li.id = `row-${i}`;
+    li.style.paddingLeft = `calc(var(--space-4) + ${(f.depth || 0)} * 16px)`;
+    if (i === active) li.classList.add('erf-row--selected');
+
+    const glyph = document.createElement('span');
+    glyph.className = 'erf-row__glyph';
+    glyph.setAttribute('aria-hidden', 'true');
+    glyph.textContent = f.kind === 'folder' ? (f.open ? '▾' : '▸') : '';
+
+    const name = document.createElement('span');
+    name.className = 'erf-row__name';
+    name.textContent = f.name;
+    // The full name goes in the accessible name, not only in a title: a title is
+    // unreachable by keyboard and by touch.
+    name.setAttribute('aria-label', f.name);
+
+    li.append(glyph, name);
+
+    if (f.git) {
+      const badge = document.createElement('span');
+      badge.className = 'erf-row__badge';
+      badge.dataset.git = f.gitName.toLowerCase();
+      badge.setAttribute('role', 'img');
+      badge.setAttribute('aria-label', f.gitName);
+      badge.textContent = f.git;
+      li.appendChild(badge);
+    }
+
+    li.addEventListener('click', () => { active = i; build(); list.focus(); });
+    list.appendChild(li);
+  });
+  list.setAttribute('aria-activedescendant', `row-${active}`);
+}
+
+const opened = document.createElement('div');
+opened.className = 'ds-note';
+opened.hidden = true;
+list.parentElement.appendChild(opened);
+
+list.addEventListener('keydown', (e) => {
+  const last = FILES.length - 1;
+  const current = FILES[active];
+  let next = active;
+
+  if (e.key === 'ArrowDown') next = Math.min(active + 1, last);
+  else if (e.key === 'ArrowUp') next = Math.max(active - 1, 0);
+  else if (e.key === 'Home') next = 0;
+  else if (e.key === 'End') next = last;
+  else if (e.key === 'ArrowRight') {
+    // On a closed folder, open it. On an open folder, step to its first child.
+    if (current.kind === 'folder' && !current.open) { current.open = true; build(); e.preventDefault(); return; }
+    if (current.kind === 'folder') next = Math.min(active + 1, last);
+  } else if (e.key === 'ArrowLeft') {
+    // On an open folder, close it. On a leaf, jump to the parent.
+    if (current.kind === 'folder' && current.open) { current.open = false; build(); e.preventDefault(); return; }
+    for (let i = active - 1; i >= 0; i -= 1) {
+      if ((FILES[i].depth || 0) < (current.depth || 0)) { next = i; break; }
+    }
+  } else if (e.key === 'Enter') {
+    opened.hidden = false;
+    opened.textContent = `Enter opened: ${current.name}`;
+    e.preventDefault();
+    return;
+  } else return;
+
+  e.preventDefault();
+  active = next;
+  build();
+});
+
+build();
+
+// The state gallery: one row per state, rendered from the same CSS the list uses.
+const STATES = [
+  ['resting', ''],
+  ['hover', 'erf-row--hover'],
+  ['selected', 'erf-row--selected'],
+  ['focused', 'erf-row--focus'],
+  ['dragging', 'erf-row--dragging'],
+  ['drop target', 'erf-row--drop'],
+  ['drop rejected', 'erf-row--drop-invalid'],
+  ['cut to clipboard', 'erf-row--cut']
+];
+const gallery = document.getElementById('states');
+for (const [label, cls] of STATES) {
+  const wrap = document.createElement('div');
+  wrap.className = 'state-demo';
+  wrap.innerHTML = `<div class="state-name">${label}</div>
+    <div class="erf-row ${cls}"><span class="erf-row__glyph" aria-hidden="true"></span><span class="erf-row__name">PreviewChromeBand.tsx</span></div>`;
+  gallery.appendChild(wrap);
+}
+
+// Every git state, including the two that were invisible.
+const GIT = [
+  ['modified', 'M', 'Modified'],
+  ['untracked', 'U', 'Untracked'],
+  ['deleted', 'D', 'Deleted'],
+  ['staged', 'A', 'Staged'],
+  ['renamed', 'R', 'Renamed'],
+  ['conflicted', '!', 'Conflicted']
+];
+const badges = document.getElementById('badges');
+for (const [state, letter, label] of GIT) {
+  const wrap = document.createElement('div');
+  wrap.className = 'state-demo';
+  wrap.innerHTML = `<div class="state-name">${state}</div>
+    <div class="erf-row"><span class="erf-row__glyph" aria-hidden="true"></span
+      ><span class="erf-row__name">usePreviewBounds.ts</span
+      ><span class="erf-row__badge" data-git="${state}" role="img" aria-label="${label}">${letter}</span></div>`;
+  badges.appendChild(wrap);
+}
+
+/* ---- the host elide, with the strings that actually break it ---- */
+
+const HOSTS = [
+  'a-very-long-subdomain.cdn.evil.com',
+  'cdn.jsdelivr.net',
+  'evil.com:8443',
+  'evil.com.',
+  'xn--80ak6aa92e.com',
+  'مثال.إختبار.evil.com',
+  'averyveryverylongregistrabledomainname.example'
+];
+
+/* DEMO ONLY. Real code must use the Public Suffix List — "last two labels" is
+   wrong for example.co.uk, and a wrong boundary puts the invariant in the wrong
+   place. Stated on the card so nobody copies this function. */
+function splitHost(host) {
+  const bare = host.replace(/\.$/, '').split(':')[0];
+  const port = host.slice(bare.length);
+  const labels = bare.split('.');
+  if (labels.length <= 2) return { prefix: '', registrable: bare + port };
+  const registrable = labels.slice(-2).join('.');
+  return { prefix: bare.slice(0, bare.length - registrable.length), registrable: registrable + port };
+}
+
+const frame = document.getElementById('hostFrame');
+const slider = document.getElementById('w');
+const wval = document.getElementById('wval');
+
+function buildHosts() {
+  frame.style.width = `${slider.value}px`;
+  wval.textContent = `${slider.value}px`;
+  frame.innerHTML = '';
+  for (const host of HOSTS) {
+    const { prefix, registrable } = splitHost(host);
+    const row = document.createElement('div');
+    row.className = 'erf-row';
+    row.innerHTML =
+      `<span class="erf-host" dir="ltr" aria-label="Host ${host}, registrable domain ${registrable}">` +
+      `<span class="erf-host__prefix"><bdi>${prefix}</bdi></span>` +
+      `<bdi class="erf-host__registrable">${registrable}</bdi></span>`;
+    frame.appendChild(row);
+  }
+}
+
+slider.addEventListener('input', buildHosts);
+buildHosts();
+</script>
+
+</body>
+</html>

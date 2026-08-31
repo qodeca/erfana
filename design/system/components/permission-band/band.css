@@ -1,0 +1,220 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * PreviewChromeBand — the trust strip above an HTML preview.
+ *
+ * PROPOSED — not adopted. There is no PreviewChromeBand.css in src/ yet.
+ * Adopting this is a MOVE, not a copy: the file goes to src/, and
+ * scripts/design-sync.mjs syncs it back here the way it syncs tokens.css, so
+ * this card renders what actually ships. Two copies at once is how a design
+ * system starts describing an app that no longer exists.
+ *
+ * Prerequisites before it can move, both real blockers:
+ *   - The preview inset is a fixed constant and this bar is taller than it. The
+ *     inset has to become dynamic first, or the previewed page paints over the
+ *     bottom of the very strip that exists to stop it.
+ *   - The host markup below depends on .erf-host from ../row/row.css. That
+ *     primitive moves first, or moves with this.
+ *
+ * Two properties this file must never lose:
+ *   1. The band is ALWAYS present. It is the marker that says the content below
+ *      is not Erfana's own UI, so it must not appear only when something is
+ *      wrong. A control that is sometimes absent cannot be trusted.
+ *   2. The seam at the bottom is the boundary the previewed page provably
+ *      cannot paint over, because the page is inset below it.
+ */
+
+.erf-band {
+  background: var(--color-bg-secondary);
+  border-bottom: var(--border-width-thick) solid var(--color-accent-primary);
+  font-family: var(--font-sans);
+  user-select: none;
+  /* No transition. The native view moves in one step, so an eased height would
+     race it and expose page pixels under the rows mid-animation. Instant height
+     also sidesteps prefers-reduced-motion entirely. */
+}
+
+/* ---------- the always-visible row ---------- */
+
+.erf-band__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-8);
+  height: var(--btn-height-md);          /* 32px — fits a 24px target */
+  padding: 0 var(--space-6) 0 var(--space-8);
+}
+
+.erf-band__label {
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-tertiary);     /* 6.33:1 on the band — passes 4.5:1 */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;                  /* only the LABEL ignores clicks */
+}
+
+/* ---------- the disclosure chip ---------- */
+
+.erf-band__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex: 0 0 auto;
+  height: var(--btn-height-sm);          /* 24px — the WCAG 2.5.8 minimum */
+  padding: 0 var(--space-6);
+  background: transparent;
+  border: var(--border-width) solid var(--color-accent-primary);
+  border-radius: var(--border-radius);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.erf-band__chip:hover { background: var(--color-brand-violet-muted); }
+
+.erf-band__chip:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
+}
+
+.erf-band__chip-caret { font-size: var(--text-xs); color: var(--color-accent-primary); }
+
+/* A failed approval must survive collapsing the list. */
+.erf-band__chip--failed { border-color: var(--color-error); }
+.erf-band__chip--failed .erf-band__chip-caret { color: var(--color-error); }
+
+/* ---------- the expanded list ---------- */
+
+.erf-band__list { padding: 0 var(--space-8) var(--space-6); }
+
+.erf-band__scroll { max-height: var(--erf-band-max-list, 240px); overflow-y: auto; }
+
+.erf-band__section {
+  padding: var(--space-4) 0 var(--space-2);
+  font-size: var(--text-xs);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--color-text-tertiary);
+}
+
+.erf-band__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 72px auto;
+  gap: var(--space-8);
+  align-items: center;
+  min-height: var(--space-14);           /* 28px */
+  border-top: var(--border-width) solid var(--color-border-default);
+}
+
+/* The host is NOT defined here. It is .erf-host from ../row/row.css — one
+   primitive, one definition. This file used to carry its own copy with
+   `direction: rtl; unicode-bidi: plaintext`, which cancelled the front-elide and
+   delivered the trap the comment said it prevented. Two copies of a security
+   control is how one of them stays wrong. */
+
+.erf-band__kind {
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);     /* NOT --color-text-secondary: 3.72:1, fails */
+}
+
+.erf-band__allow {
+  height: var(--btn-height-sm);          /* 24px */
+  padding: 0 var(--space-8);
+  background: transparent;
+  border: var(--border-width) solid var(--color-accent-primary);
+  border-radius: var(--border-radius);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.erf-band__allow:hover { background: var(--color-brand-violet-muted); }
+
+.erf-band__allow:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  /* INSET. Allow lives inside .erf-band__scroll, and an outward ring on a
+     scroll-clipped target gets cut off. The chip above is outside the scroller,
+     so its ring stays outward — that is the rule from the Focus card, not two
+     different habits. */
+  outline-offset: calc(var(--space-1) * -1);
+}
+
+/* State is carried by a WORD plus a shape, never by colour alone. */
+.erf-band__state {
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+  white-space: nowrap;
+}
+
+.erf-band__state--failed { color: var(--color-error); }
+
+/* ---------- the confirm step ---------- */
+
+.erf-band__confirm {
+  border-left: var(--border-width-thick) solid var(--color-accent-primary);
+  padding: var(--space-6) var(--space-8) var(--space-8);
+  margin: var(--space-2) 0 var(--space-4);
+  background: var(--color-bg-tertiary);
+}
+
+.erf-band__confirm-title {
+  margin: 0 0 var(--space-4);
+  font-size: var(--text-md);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-emphasis);
+}
+
+.erf-band__confirm-body {
+  margin: 0 0 var(--space-6);
+  max-width: 72ch;
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  color: var(--color-text-tertiary);
+}
+
+.erf-band__confirm-body + .erf-band__confirm-body { margin-top: calc(var(--space-4) * -1); }
+
+.erf-band__confirm-actions {
+  display: flex;
+  gap: var(--space-6);
+  justify-content: flex-end;
+}
+
+/* ---------- the fail-safe notice ---------- */
+
+/* Every `display` in this file beats the browser's built-in rule for the
+   `hidden` attribute, so `hidden` silently does nothing without an opt-out.
+   This used to name two classes, which left four more armed — the bar, the chip,
+   a row and the confirm actions. Naming classes is how you miss the fifth.
+   One descendant rule instead, so a new element cannot be forgotten. */
+.erf-band [hidden] { display: none !important; }
+
+.erf-band__paused {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-8);
+  background: var(--color-warning-bg);
+  border-top: var(--border-width) solid var(--color-border-warning);
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+}
+
+/* ---------- the live region ---------- */
+
+/* Present for the panel's whole life and empty until it has something to say.
+   A live region created at the same moment as its content is not announced. */
+.erf-band__announce {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}

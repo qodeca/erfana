@@ -1,0 +1,139 @@
+<!-- @card group="Foundations" name="Focus & keyboard" subtitle="One ring, one width — and the rule that outline:none needs a named replacement" status="decided" reviewed="2026-08-31" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Erfana — focus and keyboard</title>
+<link rel="stylesheet" href="../../tokens.css">
+<link rel="stylesheet" href="../../ds.css">
+<script src="../../claims.js"></script>
+<style>
+  .demo { display: flex; flex-wrap: wrap; gap: var(--space-12); align-items: center;
+          padding: var(--space-12); background: var(--color-bg-secondary); margin-bottom: var(--space-8); }
+  .demo-label { width: 132px; font-family: var(--font-mono); font-size: var(--text-sm);
+                color: var(--color-text-tertiary); }
+
+  /* ===== THE RULE. Copy this block; do not re-invent it. ===== */
+  .focus-ring:focus-visible {
+    outline: var(--border-width-thick) solid var(--color-border-focus);
+    outline-offset: var(--space-1);
+  }
+  /* Inside a scrolling list, an outward ring is clipped by the container.
+     Only then, move it inward — same width, same colour. */
+  .focus-ring--inset:focus-visible { outline-offset: calc(var(--space-1) * -1); }
+  /* ========================================================== */
+
+  .sample { height: var(--btn-height-md); padding: 0 var(--space-8); background: transparent;
+            border: var(--border-width) solid var(--color-border-subtle);
+            color: var(--color-text-primary); font: var(--text-sm) var(--font-sans); cursor: pointer; }
+  .sample:hover { background: var(--color-bg-hover); }
+
+  .bad { border-color: var(--color-error); }
+  .scroller { height: 76px; overflow-y: auto; background: var(--color-bg-tertiary);
+              padding: var(--space-4); width: 260px; }
+  .scroller .sample { display: block; width: 100%; margin-bottom: var(--space-2); text-align: left; }
+</style>
+</head>
+<body>
+
+<h1>Focus and keyboard</h1>
+<p class="ds-lede">
+  Where the keyboard is, and how you can tell. <strong>Tab through this page</strong> — every ring
+  below is the real one.
+</p>
+
+<div class="ds-note">
+  <strong>The decision.</strong> The app currently ships three focus rings: a 1px outline on tabs and the
+  activity bar, a 2px outline in dialogs and toasts, and a 3px soft glow on inputs. That is not a style
+  choice, it is drift. <strong>One ring wins: a 2px solid outline in
+  <code>--color-border-focus</code>, offset 2px.</strong> WCAG 2.4.11 asks for at least 2px, so the 1px
+  version fails outright — that settles it without a taste argument.
+</div>
+
+<h2>The ring</h2>
+
+<div class="demo">
+  <span class="demo-label">default</span>
+  <button class="sample focus-ring">Tab to me</button>
+  <button class="sample focus-ring">And me</button>
+  <span style="font-size: var(--text-sm); color: var(--color-text-secondary)">
+    <code>outline: 2px solid var(--color-border-focus)</code>, offset 2px —
+    <strong><span data-claim="contrast-focus-ring"></span>:1</strong> against a panel, clear of the
+    3:1 that WCAG 2.2 SC 1.4.11 requires of a focus indicator.
+  </span>
+</div>
+
+<div class="demo">
+  <span class="demo-label">inside a list</span>
+  <div class="scroller">
+    <button class="sample focus-ring focus-ring--inset">First row</button>
+    <button class="sample focus-ring focus-ring--inset">Second row</button>
+    <button class="sample focus-ring focus-ring--inset">Third row</button>
+  </div>
+  <span style="font-size: var(--text-sm); color: var(--color-text-secondary); max-width: 34ch">
+    Same ring, offset <em>inward</em>. An outward ring gets sliced off by the scroll container.
+    This is the only permitted variation.
+  </span>
+</div>
+
+<h2>Two rules that are not negotiable</h2>
+
+<div class="ds-note">
+  <strong>1 · Use <code>:focus-visible</code>, never bare <code>:focus</code>.</strong>
+  Bare <code>:focus</code> paints the ring after a mouse click too, which looks broken, which is what
+  makes people delete it. <code>:focus-visible</code> shows it to keyboard users only, so nobody wants
+  it gone.
+</div>
+
+<div class="ds-note">
+  <strong>2 · <code>outline: none</code> is only allowed with a replacement on the very next line.</strong>
+  Two panels in Erfana can be reached with Tab and show nothing at all, because someone wrote
+  <code>outline: none; /* Remove focus outline */</code> and stopped there. A keyboard user lands in the
+  editor and has no idea. If an element takes focus, something must change on screen.
+  <br><br>
+  <strong><span data-claim="outline-none-unreplaced"></span> stylesheets</strong> remove an outline
+  without declaring a <code>:focus-visible</code> rule anywhere in the same file. That is a
+  <em>signal</em>, not a verdict — a few of them replace the ring with a box-shadow or sit on an element
+  nothing can focus. It is the list worth reading, not the list of confirmed defects, and it is stated
+  that way rather than inflated into one.
+</div>
+
+<div class="demo">
+  <span class="demo-label">what shipped</span>
+  <button class="sample bad" style="outline: none">No ring at all</button>
+  <span style="font-size: var(--text-sm); color: var(--color-error); max-width: 40ch">
+    Tab onto this and nothing happens. This is the live defect, reproduced. WCAG 2.4.7, Level A.
+  </span>
+</div>
+
+<h2>Retired</h2>
+<p style="max-width: 76ch; color: var(--color-text-tertiary)">
+  <code>--shadow-focus</code> — the 3px soft glow used on inputs — is retired as a focus indicator. It
+  reads as a glow rather than an edge, it is a fourth idiom, and two dialogs hand-rolled its exact
+  geometry with a different colour instead of using the token. Inputs take the same outline as
+  everything else.
+</p>
+
+<h2>What a card must promise about the keyboard</h2>
+<table>
+  <thead><tr><th>Question</th><th>The answer a component owes you</th></tr></thead>
+  <tbody>
+    <tr><td>Can I reach it?</td><td>Every control is a real <code>&lt;button&gt;</code> or has a tabIndex. A <code>&lt;div onClick&gt;</code> is not reachable.</td></tr>
+    <tr><td>Can I tell where I am?</td><td>The ring above. Always.</td></tr>
+    <tr><td>Can I move inside it?</td><td>Lists, trees and menus take arrow keys, and hold one Tab stop between them — not one per row.</td></tr>
+    <tr><td>Can I get out?</td><td>Escape closes and returns focus to whatever opened it.</td></tr>
+    <tr><td>Do I know what it is?</td><td>A visible label tied by <code>for</code>/<code>id</code>, or an <code>aria-label</code> — never both competing.</td></tr>
+  </tbody>
+</table>
+
+<div class="ds-note">
+  Erfana currently fails row three in two places: the file tree and the right-click menu have no arrow
+  keys and nothing focusable inside them. The file picker, screen picker and window picker all do it
+  correctly — so the pattern to copy is already in the codebase.
+</div>
+
+</body>
+</html>

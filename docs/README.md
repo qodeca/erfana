@@ -46,8 +46,9 @@ Erfana is an agent-native Markdown workspace – an Electron app that runs a ter
 - [Settings](./settings.md) - Editor, git, logging, and transcription configuration
 
 ### UI/UX
-- [UI Style Guide](./ui-style-guide.md) - Design tokens, colors, typography (MANDATORY for UI changes)
-- [UI Style Guide Reference](./ui-style-guide-reference.md) - Quick reference for design tokens
+- **[Design system](../design/index.html)** - the cards that decide colours, type, spacing, surfaces, focus, motion, layering and each component (MANDATORY for UI changes; open it in a browser)
+- [UI Style Guide](./ui-style-guide.md) - text-selection policy and the dark-only stance; its visual sections are stubs pointing at the cards
+- [UI Style Guide Reference](./ui-style-guide-reference.md) - the v0.5.3 token migration table
 - [UI Components](./ui-components.md) - React component architecture
 - [Keyboard Shortcuts](./keyboard-shortcuts.md) - Application keyboard shortcuts
 
@@ -98,7 +99,7 @@ Erfana is an agent-native Markdown workspace – an Electron app that runs a ter
 
 ### Design records and plans
 
-Design notes live in **two** directories, and the split is historical rather than meaningful: `docs/designs/` (plural) holds the older set and mixes two file-naming conventions (`<issue>-<slug>.md` and `issue-<issue>-<slug>.md`), while `docs/design/` (singular) holds the newer `design-issue-<n>.md` notes. Both are indexed below; check both when looking for the rationale behind a change.
+Not to be confused with **[`design/`](../design/index.html)** at the repo root, which is the design system. Design *notes* live in **two** directories here, and that split is historical rather than meaningful: `docs/designs/` (plural) holds the older set and mixes two file-naming conventions (`<issue>-<slug>.md` and `issue-<issue>-<slug>.md`), while `docs/design/` (singular) holds the newer `design-issue-<n>.md` notes. Both are indexed below; check both when looking for the rationale behind a change.
 
 - [Packaging guards for `extraFiles` / `extraResources`](./design/design-issue-55.md) - Build-time leak guards beyond the `files:` allowlist (issue #55)
 - [Renderer crash on very large projects](./design/design-issue-60.md) - `flattenTree` stack overflow, error containment (root + panel boundaries), crash trail (issue #60)
@@ -115,7 +116,7 @@ Design notes live in **two** directories, and the split is historical rather tha
 
 **New to the project?** Start with [Getting Started](./getting-started.md), then browse [Quick Reference](./quick-reference.md) and [Glossary](./glossary.md).
 
-**Building features?** Read [Architecture](./architecture.md) → pick your area (Editor, Terminal, etc.) → review [IPC Patterns](./ipc-patterns.md) and [UI Style Guide](./ui-style-guide.md).
+**Building features?** Read [Architecture](./architecture.md) → pick your area (Editor, Terminal, etc.) → review [IPC Patterns](./ipc-patterns.md) and, for anything with a UI, the [design system](../design/index.html).
 
 **Testing?** Run `npm run test` for unit tests, `npm run test:e2e` for E2E tests. See [Testing](./testing/README.md) for strategies.
 

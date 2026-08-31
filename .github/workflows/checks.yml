@@ -34,6 +34,16 @@ jobs:
       - uses: ./.github/actions/setup-node-with-retry
       - name: Lint
         run: npm run lint
+      # Steps, not a separate job: branch protection matches the JOB name
+      # ("Lint"), so a new job called "Lint CSS" would be advisory only and
+      # nothing would be enforced. Adding steps here needs no protection change.
+      - name: Lint CSS
+        run: npm run lint:css
+      # Everything under design/ is committed, generated files included, so the
+      # folder renders on a fresh clone. This is what stops a stale token copy or
+      # a stale index being trusted by a reader.
+      - name: Design system is in sync
+        run: npm run design -- --check
 
   typecheck:
     name: Typecheck

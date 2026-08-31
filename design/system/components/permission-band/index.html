@@ -1,0 +1,540 @@
+<!-- @card group="Components" name="Permission band" subtitle="Approve blocked hosts from the preview's own chrome — collapsed, expanded, confirming, fail-safe" status="decided" reviewed="2026-08-31" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Erfana — permission band</title>
+<link rel="stylesheet" href="../../../tokens.css">
+<link rel="stylesheet" href="../../../ds.css">
+<script src="../../../claims.js"></script>
+<link rel="stylesheet" href="../row/row.css">
+<link rel="stylesheet" href="./band.css">
+<style>
+  /* Documentation-only chrome. None of this ships. */
+  .stage { display: flex; gap: var(--space-16); align-items: flex-start; flex-wrap: wrap; }
+
+  .panel {
+    width: 640px;
+    border: var(--border-width) solid var(--color-border-subtle);
+    background: var(--color-bg-primary);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Stands in for the native WebContentsView. In the app this is a separate OS
+     layer that paints ABOVE the DOM and takes clicks over its own rectangle
+     whatever the DOM says — which is the entire reason the fail-safe exists. */
+  /* stylelint-disable color-no-hex --
+     These are the PREVIEWED PAGE, not Erfana. It is arbitrary third-party HTML
+     rendered in a native view; using Erfana tokens here would make the demo lie
+     about the one thing this card exists to show - where Erfana stops and
+     untrusted content begins. */
+  .fake-page { flex: 1 1 auto; background: #ffffff; padding: 20px; overflow: hidden; }
+  .fake-page h3 { margin: 0 0 12px; font: 600 18px/1.3 Georgia, serif; color: #1a1a1a; }
+  .fake-page p { margin: 0 0 10px; font: 14px/1.6 Georgia, serif; color: #444; }
+  .fake-page.is-hidden { visibility: hidden; }
+  /* stylelint-enable color-no-hex */
+
+  .controls { width: 320px; }
+  .controls label { display: block; margin-bottom: var(--space-8); font-size: var(--text-sm);
+                    color: var(--color-text-tertiary); }
+  .controls input[type=range] { width: 100%; }
+  .readout { font-family: var(--font-mono); font-size: var(--text-sm);
+             color: var(--color-text-secondary); }
+  .readout b { color: var(--color-brand-lime); font-weight: var(--font-normal); }
+  .readout b.over { color: var(--color-error); }
+  .ctl-btn { margin-bottom: var(--space-6); }
+</style>
+</head>
+<body>
+
+<h1>Permission band</h1>
+<p class="ds-lede">
+  A preview page that asks for a remote host gets <strong>one row</strong> here, not a toast.
+  Click the chip to open it. Click <em>Allow</em>, read the confirm step, then Confirm or Cancel.
+  Press <kbd>Escape</kbd> to close.
+</p>
+
+<div class="ds-note">
+  <strong>The band's own text is measured, not assumed.</strong> Its labels use
+  <code>--color-text-tertiary</code>, which is
+  <strong><span data-claim="contrast-tertiary-on-panel"></span>:1</strong> on the band — clear of the
+  4.5:1 floor. The obvious-looking <code>--color-text-secondary</code> is
+  <span data-claim="contrast-secondary-on-panel"></span>:1 on the same surface and fails, which is why
+  it is not used here.
+</div>
+
+<div class="ds-note">
+  <strong>Why this replaces the toast.</strong> Approval used to be a pop-up per host, capped at
+  three. A page reaching four hosts produced three stacked walls of identical text over the file
+  tree — and the fourth host could not be approved at all. The band lists every host, in the
+  preview's own chrome, and each decision is read once on the row it belongs to.
+</div>
+
+<div class="stage">
+
+  <div class="panel" id="panel">
+    <div class="erf-band" id="band">
+      <div class="erf-band__announce" role="status" aria-live="polite" id="announce"></div>
+
+      <div class="erf-band__bar">
+        <span class="erf-band__label">Preview — content below is not Erfana</span>
+        <button class="erf-band__chip" id="chip" aria-expanded="false">
+          <span id="chipCounts">0 blocked · 0 allowed</span>
+          <span class="erf-band__chip-caret" id="chipCaret" aria-hidden="true">▸</span>
+        </button>
+      </div>
+
+      <div class="erf-band__paused" id="paused" hidden>
+        <span aria-hidden="true">⚠</span>
+        <span>Paused the page so this list cannot be covered.</span>
+      </div>
+
+      <div class="erf-band__list" id="list" hidden>
+        <div class="erf-band__scroll" id="scroll"></div>
+      </div>
+    </div>
+
+    <div class="fake-page" id="page">
+      <h3>Quarterly report</h3>
+      <p>This stands in for the previewed page. In the running app it is a native view painted
+        above the DOM, so it must be pushed down before a single button appears above it.</p>
+      <p>If the page never confirms it moved, the band hides it rather than draw controls a page
+        could be sitting on top of — or imitate.</p>
+    </div>
+  </div>
+
+  <div class="controls">
+    <h2 style="margin-top:0">Try the hard cases</h2>
+
+    <label>Panel height — <span class="readout" id="hOut"></span>
+      <input type="range" id="h" min="220" max="720" value="520">
+    </label>
+
+    <p style="font-size:var(--text-sm); color:var(--color-text-secondary); margin-top:calc(var(--space-6) * -1)">
+      Drag below ~320px. A 64px sliver of page is not a preview, so the band hides the page
+      instead of insetting it.
+    </p>
+
+    <button class="erf-band__allow ctl-btn" id="slow">Simulate a page that never yields</button>
+    <p style="font-size:var(--text-sm); color:var(--color-text-secondary); margin-top:calc(var(--space-6) * -1)">
+      The page has 300 ms to acknowledge that it moved. Silence means "assume it is still covering
+      you" — so the page is hidden and the band says so.
+    </p>
+
+    <button class="erf-band__allow ctl-btn" id="failNext">Make the next approval fail to save</button>
+    <p style="font-size:var(--text-sm); color:var(--color-text-secondary); margin-top:calc(var(--space-6) * -1)">
+      Writing <code>.erfana/settings.json</code> can fail — a read-only checkout, a full disk. The row
+      then says <b>Not saved</b>, and the chip keeps a red caret so the failure survives collapsing the
+      list. Until this button existed the state was unreachable: <code>failed</code> was only ever
+      assigned <code>null</code>, so the card described a state it could not render.
+    </p>
+
+    <button class="erf-band__allow ctl-btn" id="reset">Reset to 4 blocked · 2 allowed</button>
+
+    <h2>Measured, not asserted</h2>
+    <div class="readout">
+      band height <b id="bandH">—</b><br>
+      page height <b id="pageH">—</b><br>
+      chip target <b id="chipT">—</b><br>
+      allow target <b id="allowT">—</b>
+    </div>
+    <p style="font-size:var(--text-sm); color:var(--color-text-secondary)">
+      Targets go red below 24 × 24, the WCAG 2.2 SC 2.5.8 minimum.
+    </p>
+  </div>
+</div>
+
+<h2>What the confirm step has to say, and why</h2>
+<div class="ds-note">
+  The kind column ("script", "image") says what the host was blocked <em>for</em> — not what you are
+  granting. Erfana cannot narrow a grant to one kind: an approved host is added to every CSP
+  directive the preview builds, so it can serve code and receive data. The confirm step says that in
+  plain words rather than letting the column imply otherwise.
+  <br><br>
+  It also says the grant is written into the project, travels to anyone who clones the repository,
+  and cannot be undone from inside Erfana. That is the honest sentence — and it is read once, on the
+  row you chose, instead of four times over your file tree.
+</div>
+
+<script>
+const SEED = {
+  blocked: [
+    { host: 'fonts.googleapis.com', kind: 'style' },
+    { host: 'cdn.jsdelivr.net', kind: 'script' },
+    { host: 'cdnjs.cloudflare.com', kind: 'script' },
+    { host: 'placehold.co', kind: 'image' }
+  ],
+  allowed: [
+    { host: 'fonts.gstatic.com', kind: 'font' },
+    { host: 'cdn.example.com', kind: 'image' }
+  ]
+};
+
+let blocked = [];
+let allowed = [];
+let open = false;
+let confirming = null;   // host awaiting confirmation
+let failed = null;       // host whose approval failed
+let slowPage = false;
+let failNext = false;    // arms the "settings.json would not write" path
+
+const el = (id) => document.getElementById(id);
+
+function announce(text) { el('announce').textContent = text; }
+
+function render() {
+  el('chipCounts').textContent = `${blocked.length} blocked · ${allowed.length} allowed`;
+  el('chip').setAttribute('aria-expanded', String(open));
+  el('chipCaret').textContent = open ? '▾' : '▸';
+  el('chip').classList.toggle('erf-band__chip--failed', failed !== null);
+  if (open) el('chip').setAttribute('aria-controls', 'list');
+  else el('chip').removeAttribute('aria-controls');
+
+  el('list').hidden = !open;
+
+  // The fail-safe: rows exist only once the page has proved it moved. A page
+  // that never yields never proves it, so it gets hidden instead.
+  const panelTooShort = el('panel').clientHeight < 320;
+  const hidePage = open && (slowPage || panelTooShort);
+  el('paused').hidden = !hidePage;
+  el('page').classList.toggle('is-hidden', hidePage);
+
+  const scroll = el('scroll');
+  scroll.innerHTML = '';
+
+  // While a confirm is open, the other rows step aside. Found by clicking this
+  // page: with all six rows present the confirm block was clipped by the list's
+  // scroll clamp, so Cancel and Confirm sat off-screen — an irreversible
+  // question with no visible way to answer it. It also put the band at 286px of
+  // a 518px panel. Showing one row keeps the whole question on screen and
+  // matches the rule that this is one deliberate decision at a time.
+  const showBlocked = confirming ? blocked.filter((b) => b.host === confirming) : blocked;
+
+  if (showBlocked.length) {
+    scroll.appendChild(section(confirming ? 'Approving' : 'Blocked on load'));
+    for (const item of showBlocked) scroll.appendChild(blockedRow(item));
+  }
+  if (allowed.length && !confirming) {
+    scroll.appendChild(section('Already allowed in this project'));
+    for (const item of allowed) scroll.appendChild(allowedRow(item));
+  }
+  if (!blocked.length && !allowed.length) {
+    const empty = document.createElement('div');
+    empty.className = 'erf-band__section';
+    empty.textContent = 'No remote hosts requested';
+    scroll.appendChild(empty);
+  }
+
+  measure();
+}
+
+function section(text) {
+  const node = document.createElement('div');
+  node.className = 'erf-band__section';
+  node.textContent = text;
+  return node;
+}
+
+/* DEMO ONLY — a real split needs the Public Suffix List. "Last two labels" is
+   wrong for example.co.uk, and a wrong boundary puts the invariant in the wrong
+   place, which is worse than having none. See the Rows card. */
+function splitHost(host) {
+  const bare = host.replace(/\.$/, '').split(':')[0];
+  const port = host.slice(bare.length);
+  const labels = bare.split('.');
+  if (labels.length <= 2) return { prefix: '', registrable: bare + port };
+  const registrable = labels.slice(-2).join('.');
+  return { prefix: bare.slice(0, bare.length - registrable.length), registrable: registrable + port };
+}
+
+/* The host, front-elided so the registrable domain can never be the part cut
+   off. .erf-host comes from ../row/row.css — one primitive, one definition.
+   The full host goes in the accessible name: `title` is unreachable by keyboard
+   and by touch, so it is not a substitute. */
+function hostNode(host) {
+  const { prefix, registrable } = splitHost(host);
+  const wrap = document.createElement('span');
+  wrap.className = 'erf-host';
+  wrap.dir = 'ltr';
+  wrap.setAttribute('aria-label', `${host}, registrable domain ${registrable}`);
+
+  const pre = document.createElement('span');
+  pre.className = 'erf-host__prefix';
+  const preBdi = document.createElement('bdi');
+  preBdi.textContent = prefix;
+  pre.appendChild(preBdi);
+
+  const reg = document.createElement('bdi');
+  reg.className = 'erf-host__registrable';
+  reg.textContent = registrable;
+
+  wrap.append(pre, reg);
+  return wrap;
+}
+
+function blockedRow(item) {
+  const row = document.createElement('div');
+  row.className = 'erf-band__row';
+
+  const host = hostNode(item.host);
+
+  const kind = document.createElement('span');
+  kind.className = 'erf-band__kind';
+  kind.textContent = item.kind;
+
+  const action = document.createElement('button');
+  action.className = 'erf-band__allow';
+  action.textContent = 'Allow';
+  // Allow discloses the confirm step, so it says so.
+  action.setAttribute('aria-expanded', String(confirming === item.host));
+  if (confirming === item.host) action.setAttribute('aria-controls', 'confirmBox');
+  action.addEventListener('click', () => {
+    confirming = item.host;
+    failed = null;
+    render();
+    focusConfirm();
+  });
+
+  row.append(host, kind, action);
+
+  if (failed === item.host) {
+    const note = document.createElement('span');
+    note.className = 'erf-band__state erf-band__state--failed';
+    note.textContent = 'Not saved';
+    row.replaceChild(note, kind);
+    row.append(action);
+  }
+
+  if (confirming !== item.host) return row;
+
+  const wrap = document.createElement('div');
+  wrap.appendChild(row);
+  wrap.appendChild(confirmBlock(item));
+  return wrap;
+}
+
+function confirmBlock(item) {
+  const box = document.createElement('div');
+  box.className = 'erf-band__confirm';
+  // The container is the focus target, not the Confirm button — see focusConfirm().
+  // alertdialog + these two references are what make a screen reader read the
+  // whole consequence before any control is reachable.
+  box.id = 'confirmBox';
+  box.setAttribute('role', 'alertdialog');
+  box.setAttribute('aria-modal', 'true');
+  box.setAttribute('aria-labelledby', 'confirmTitle');
+  box.setAttribute('aria-describedby', 'confirmBody1 confirmBody2');
+  box.tabIndex = -1;
+
+  const title = document.createElement('p');
+  title.className = 'erf-band__confirm-title';
+  title.id = 'confirmTitle';
+  title.textContent = `Let this page load from ${item.host}?`;
+
+  const one = document.createElement('p');
+  one.className = 'erf-band__confirm-body';
+  one.id = 'confirmBody1';
+  one.textContent = `It was blocked for ${anArticle(item.kind)}, but Erfana cannot limit it to that — `
+    + 'the host will also be able to run code and send data to it.';
+
+  const two = document.createElement('p');
+  two.className = 'erf-band__confirm-body';
+  two.id = 'confirmBody2';
+  two.textContent = "Saved in this project's .erfana/settings.json, so it applies to every preview "
+    + 'here, survives restarts, and travels to anyone who clones the repository. '
+    + 'Erfana cannot undo it.';
+
+  const actions = document.createElement('div');
+  actions.className = 'erf-band__confirm-actions';
+
+  const cancel = document.createElement('button');
+  cancel.className = 'erf-band__allow';
+  cancel.textContent = 'Cancel';
+  cancel.addEventListener('click', () => { confirming = null; render(); el('chip').focus(); });
+
+  const confirm = document.createElement('button');
+  confirm.className = 'erf-band__allow';
+  confirm.id = 'confirmBtn';
+  confirm.textContent = 'Confirm';
+  confirm.style.background = 'var(--color-accent-primary)';
+  confirm.style.color = 'var(--color-brand-black)';
+  confirm.style.fontWeight = 'var(--font-semibold)';
+  confirm.addEventListener('click', () => approve(item.host));
+
+  actions.append(cancel, confirm);
+  box.append(title, one, two, actions);
+  return box;
+}
+
+function anArticle(kind) {
+  return /^[aeiou]/i.test(kind) ? `an ${kind}` : `a ${kind}`;
+}
+
+function allowedRow(item) {
+  const row = document.createElement('div');
+  row.className = 'erf-band__row';
+
+  const host = hostNode(item.host);
+
+  const kind = document.createElement('span');
+  kind.className = 'erf-band__kind';
+  kind.textContent = item.kind;
+
+  const state = document.createElement('span');
+  state.className = 'erf-band__state';
+  state.textContent = 'Allowed ✓';
+
+  row.append(host, kind, state);
+  return row;
+}
+
+function approve(host) {
+  const index = blocked.findIndex((b) => b.host === host);
+  if (index === -1) return;
+
+  // The write can fail — a read-only checkout, a full disk. Nothing is moved to
+  // `allowed` in that case: the row stays blocked and says so, because a host
+  // shown as allowed but not persisted is a lie that survives a restart.
+  if (failNext) {
+    failNext = false;
+    el('failNext').textContent = 'Make the next approval fail to save';
+    confirming = null;
+    failed = host;
+    announce(`Could not save ${host} to this project. It is still blocked.`);
+    render();
+    el('chip').focus();
+    return;
+  }
+
+  const [item] = blocked.splice(index, 1);
+  allowed.push(item);
+  confirming = null;
+  failed = null;
+  announce(`${host} is now allowed in this project. The preview is reloading.`);
+  render();
+  el('chip').focus();
+}
+
+/*
+ * SC 2.4.3. This function used to be empty on purpose, reasoning that leaving
+ * focus put stopped a click being followed by an accidental Return.
+ *
+ * That reasoning was sound and the conclusion was still wrong, because focus was
+ * never left put: pressing Allow calls render(), render() does
+ * `scroll.innerHTML = ''`, and the button that was just pressed stops existing.
+ * Focus falls to <body> — on the pointer path AND the keyboard path. A keyboard
+ * user who has just opened an irreversible security question is dropped at the
+ * top of the document and has to tab back to find Confirm.
+ *
+ * So focus moves, unconditionally, to the confirm CONTAINER — never to Confirm
+ * itself. Two reasons:
+ *   - Confirm is irreversible ("Erfana cannot undo it"), and a stray Return or a
+ *     key repeat lands on it. That is the accident the old comment feared, and
+ *     focusing the container is what actually prevents it.
+ *   - Focusing the container makes a screen reader read the title and both
+ *     consequence paragraphs. Focusing the button reads "Confirm, button".
+ *
+ * Cancel stays first in DOM order, so the first Tab from here is the safe one.
+ */
+function focusConfirm() {
+  const box = el('confirmBox');
+  if (!box) return;
+  box.focus();
+  announce(`Approving ${confirming}. This cannot be undone. Cancel or confirm.`);
+}
+
+/* The band floats above a page Erfana does not trust, so Tab must not walk out
+   of an open confirm step and into it. */
+function trapFocus(event) {
+  if (event.key !== 'Tab' || !confirming) return;
+  const box = el('confirmBox');
+  if (!box) return;
+  const stops = box.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+  if (!stops.length) return;
+  const first = stops[0];
+  const last = stops[stops.length - 1];
+  if (event.shiftKey && (document.activeElement === first || document.activeElement === box)) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
+}
+
+function measure() {
+  const band = el('band').getBoundingClientRect();
+  const page = el('page').getBoundingClientRect();
+  el('bandH').textContent = `${Math.round(band.height)}px`;
+  el('pageH').textContent = `${Math.round(page.height)}px`;
+
+  const chip = el('chip').getBoundingClientRect();
+  setTarget('chipT', chip);
+
+  // Only measure a button that is actually on screen. A hidden element still
+  // matches a selector but reports 0 x 0, which reads as a failed target.
+  const allow = open ? document.querySelector('.erf-band__list .erf-band__allow') : null;
+  if (allow) setTarget('allowT', allow.getBoundingClientRect());
+  else { el('allowT').textContent = 'list closed'; el('allowT').classList.remove('over'); }
+
+  el('hOut').textContent = `${el('panel').clientHeight}px`;
+}
+
+function setTarget(id, rect) {
+  const node = el(id);
+  const w = Math.round(rect.width);
+  const h = Math.round(rect.height);
+  node.textContent = `${w} × ${h}`;
+  node.classList.toggle('over', w < 24 || h < 24);
+}
+
+el('chip').addEventListener('click', () => {
+  open = !open;
+  if (!open) confirming = null;
+  render();
+});
+
+document.addEventListener('keydown', (event) => {
+  trapFocus(event);
+  if (event.key !== 'Escape') return;
+  if (confirming) { confirming = null; render(); el('chip').focus(); return; }
+  if (open) { open = false; render(); el('chip').focus(); }
+});
+
+el('h').addEventListener('input', (event) => {
+  el('panel').style.height = `${event.target.value}px`;
+  render();
+});
+
+el('slow').addEventListener('click', () => {
+  slowPage = !slowPage;
+  el('slow').textContent = slowPage ? 'Let the page yield again' : 'Simulate a page that never yields';
+  render();
+});
+
+el('failNext').addEventListener('click', () => {
+  failNext = !failNext;
+  el('failNext').textContent = failNext
+    ? 'Next approval WILL fail — click Allow, then Confirm'
+    : 'Make the next approval fail to save';
+});
+
+el('reset').addEventListener('click', () => {
+  blocked = SEED.blocked.map((x) => ({ ...x }));
+  allowed = SEED.allowed.map((x) => ({ ...x }));
+  confirming = null;
+  failed = null;
+  failNext = false;
+  el('failNext').textContent = 'Make the next approval fail to save';
+  render();
+});
+
+el('panel').style.height = '520px';
+el('reset').click();
+</script>
+</body>
+</html>

@@ -1,0 +1,321 @@
+<!-- @card group="Components" name="Menu" subtitle="A role is a promise — arrows, typeahead, and the precedence rule for a disabled danger item" status="decided" reviewed="2026-08-31" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Erfana — menu</title>
+<link rel="stylesheet" href="../../../tokens.css">
+<link rel="stylesheet" href="../../../ds.css">
+<script src="../../../claims.js"></script>
+<link rel="stylesheet" href="./menu.css">
+<style>
+  .stage { display: flex; gap: var(--space-16); align-items: flex-start; flex-wrap: wrap; }
+  /* Tall enough for the whole menu. At 260px the last two items were clipped by
+     the surface — a demo that hides the state it is demonstrating. */
+  .surface { width: 420px; height: 380px; position: relative; overflow: hidden;
+             background: var(--color-bg-secondary);
+             border: var(--border-width) solid var(--color-border-default);
+             display: flex; align-items: center; justify-content: center; }
+  .surface p { max-width: 30ch; text-align: center; font-size: var(--text-sm);
+               color: var(--color-text-tertiary); }
+  .notes { max-width: 44ch; }
+  .live-menu { position: absolute; }
+  .readout { font-family: var(--font-mono); font-size: var(--text-sm);
+             color: var(--color-text-secondary); min-height: var(--space-14); }
+  .readout b { color: var(--color-brand-lime); font-weight: var(--font-normal); }
+  .gallery { display: flex; gap: var(--space-12); flex-wrap: wrap; align-items: flex-start; }
+  .gallery figure { margin: 0; }
+  .gallery figcaption { font-family: var(--font-mono); font-size: var(--text-xs);
+                        color: var(--color-text-tertiary); padding-bottom: var(--space-3); }
+</style>
+</head>
+<body>
+
+<h1>Menu</h1>
+<p class="ds-lede">
+  <strong>Right-click the panel below</strong> — then use only the keyboard. Arrows, Home, End, Enter,
+  Escape, and type a letter to jump.
+</p>
+
+<div class="ds-note">
+  <strong>The decision: a role is a promise.</strong> Erfana's context menu declares
+  <code>role="menu"</code> and <code>role="menuitem"</code> today and implements none of the keyboard
+  behaviour those roles commit to — no <code>tabIndex</code>, no arrow keys, no focus moved on open, no
+  focus returned on close. Only <kbd>Escape</kbd> is bound.
+  <br><br>
+  That is <strong>worse than declaring nothing</strong>. A screen reader switches to application mode on
+  a <code>menu</code> and hands the arrow keys straight to the widget, so the user loses their normal
+  browse-mode keys and gets nothing in exchange. The menu has
+  <strong><span data-claim="context-menu-dependants"></span></strong> dependants, so this is not a
+  corner of the app.
+  <br><br>
+  <strong>Either implement the contract or drop the roles.</strong> Both are honest; only the current
+  state is not. This card implements it.
+</div>
+
+<h2>Live — keyboard only</h2>
+
+<div class="stage">
+  <div>
+    <div class="surface" id="surface" tabindex="0">
+      <p>Right-click here, or focus this panel and press <kbd>Shift</kbd>+<kbd>F10</kbd>.</p>
+    </div>
+    <div class="readout" id="readout">nothing chosen yet</div>
+  </div>
+  <div class="notes">
+    <h2 style="margin-top:0">The keyboard contract</h2>
+    <table>
+      <tbody>
+        <tr><td><code>↑ ↓</code></td><td>Move between items. Wraps at both ends.</td></tr>
+        <tr><td><code>Home End</code></td><td>First and last item.</td></tr>
+        <tr><td><code>Enter Space</code></td><td>Activate. A disabled item does nothing.</td></tr>
+        <tr><td><code>Escape</code></td><td>Close, and <strong>return focus to whatever opened it</strong>.</td></tr>
+        <tr><td><code>a–z</code></td><td>Jump to the next item starting with that letter.</td></tr>
+        <tr><td><code>Tab</code></td><td>Closes the menu. A menu is modal to the keyboard while open.</td></tr>
+      </tbody>
+    </table>
+
+    <div class="ds-note" style="margin-top: var(--space-8)">
+      <strong>Roving <code>tabindex</code>, not <code>aria-activedescendant</code>.</strong> Exactly one
+      item carries <code>tabindex="0"</code> and really holds focus; the rest are <code>-1</code>. Both
+      patterns are valid, and this one is chosen because real DOM focus is what makes
+      <code>:focus-visible</code>, scroll-into-view and the browser's own find behave normally. With
+      <code>aria-activedescendant</code> the focus ring is something you have to draw yourself, and a
+      design system that has just spent a card unifying focus rings should not immediately need a second
+      way to paint one.
+    </div>
+
+    <div class="ds-note">
+      <strong>Focus must come back.</strong> Closing a menu without restoring focus drops the user at
+      the top of the document — the same defect the Permission band card fixes on its Allow button. The
+      trigger is remembered when the menu opens, not looked up when it closes.
+    </div>
+
+    <div class="ds-note">
+      <strong>Typeahead is not a nicety.</strong> It is the only way a long menu is usable without
+      counting arrow presses, and it is what people expect from every native menu on every platform.
+    </div>
+  </div>
+</div>
+
+<h2>Every state</h2>
+
+<div class="gallery" id="gallery"></div>
+
+<div class="ds-note">
+  <strong>Disabled beats danger.</strong> A greyed-out <em>Delete</em> must not still be red. The colour
+  is a promise about what activating the item will do, and a disabled item will not do anything — a red
+  item you cannot click reads as an error, not as "not available right now". So the disabled rule wins
+  the cascade, and the demo above renders that case rather than describing it.
+  <br><br>
+  Disabled text is deliberately dim: WCAG 1.4.3 exempts inactive controls. It is the one place on this
+  card where low contrast is correct, which is worth saying out loud so nobody "fixes" it.
+</div>
+
+<div class="ds-note">
+  <strong>The trigger has to say something too.</strong> Whatever opens a menu carries
+  <code>aria-haspopup="menu"</code> and <code>aria-expanded</code>. Without them a screen-reader user
+  has no way to know the control does anything before pressing it. Erfana's tree rows do not do this
+  today.
+</div>
+
+<h2>What this card does not decide</h2>
+<table>
+  <thead><tr><th>Question</th><th>Where it belongs</th></tr></thead>
+  <tbody>
+    <tr><td>Submenus</td><td>Nothing in Erfana has one. Adding one adds <code>→</code> to open, <code>←</code> to close, and a hover delay — do not build it speculatively.</td></tr>
+    <tr><td>Which items appear</td><td>The feature that owns the menu. This card decides how a menu behaves, not what is in it.</td></tr>
+    <tr><td>Where the menu is positioned</td><td>Layering card for the stacking rung; flipping near a screen edge is component logic.</td></tr>
+  </tbody>
+</table>
+
+<script>
+const ITEMS = [
+  { label: 'Open', icon: '↗', shortcut: 'Enter' },
+  { label: 'Open to the side', icon: '⇥' },
+  { separator: true },
+  { label: 'Cut', icon: '✂', shortcut: '⌘X' },
+  { label: 'Copy', icon: '⧉', shortcut: '⌘C' },
+  { label: 'Paste', icon: '⎘', shortcut: '⌘V', disabled: true },
+  { separator: true },
+  { label: 'Rename…', icon: '✎', shortcut: '↩' },
+  { label: 'Delete', icon: '⌫', shortcut: '⌘⌫', danger: true },
+  { label: 'Delete permanently', icon: '⌫', danger: true, disabled: true }
+];
+
+const surface = document.getElementById('surface');
+const readout = document.getElementById('readout');
+let menu = null;
+let trigger = null;      // remembered on OPEN, never looked up on close
+let typed = '';
+let typedAt = 0;
+
+function itemNodes() {
+  return menu ? [...menu.querySelectorAll('.erf-menu-item')] : [];
+}
+
+function focusItem(index) {
+  const nodes = itemNodes();
+  if (!nodes.length) return;
+  const wrapped = (index + nodes.length) % nodes.length;
+  for (const [i, node] of nodes.entries()) {
+    // Roving tabindex: exactly one item is reachable, and it is the one that has
+    // focus. Everything else is -1 so Tab cannot walk the list.
+    node.tabIndex = i === wrapped ? 0 : -1;
+    node.classList.toggle('erf-menu-item--active', i === wrapped);
+  }
+  nodes[wrapped].focus();
+}
+
+function activeIndex() {
+  return itemNodes().findIndex(n => n === document.activeElement);
+}
+
+function build(x, y) {
+  close();
+  menu = document.createElement('div');
+  menu.className = 'erf-menu live-menu';
+  menu.setAttribute('role', 'menu');
+  menu.setAttribute('aria-label', 'File actions');
+  menu.style.left = `${x}px`;
+  menu.style.top = `${y}px`;
+
+  for (const item of ITEMS) {
+    if (item.separator) {
+      const sep = document.createElement('div');
+      sep.className = 'erf-menu-separator';
+      sep.setAttribute('role', 'separator');
+      menu.appendChild(sep);
+      continue;
+    }
+    const node = document.createElement('div');
+    node.className = 'erf-menu-item'
+      + (item.danger ? ' erf-menu-item--danger' : '');
+    node.setAttribute('role', 'menuitem');
+    node.tabIndex = -1;
+    // aria-disabled, not the `disabled` attribute: a disabled menu item must
+    // stay REACHABLE by the arrow keys, or a keyboard user cannot discover that
+    // the capability exists at all. Removing it from the sequence hides
+    // information; greying it out conveys it.
+    if (item.disabled) node.setAttribute('aria-disabled', 'true');
+
+    node.innerHTML =
+      `<span class="erf-menu-icon" aria-hidden="true">${item.icon ?? ''}</span>` +
+      `<span class="erf-menu-label"></span>` +
+      (item.shortcut ? `<span class="erf-menu-shortcut" aria-hidden="true">${item.shortcut}</span>` : '');
+    node.querySelector('.erf-menu-label').textContent = item.label;
+    // The shortcut is decorative in the DOM, so the accessible name carries it.
+    if (item.shortcut) node.setAttribute('aria-keyshortcuts', item.shortcut);
+
+    node.addEventListener('click', () => choose(item, node));
+    menu.appendChild(node);
+  }
+
+  surface.appendChild(menu);
+  focusItem(0);
+}
+
+function choose(item, node) {
+  if (node.getAttribute('aria-disabled') === 'true') {
+    readout.innerHTML = `<b>${item.label}</b> is disabled — nothing happened, and focus stayed put.`;
+    return;
+  }
+  readout.innerHTML = `chose <b>${item.label}</b>`;
+  close();
+}
+
+function close() {
+  if (!menu) return;
+  menu.remove();
+  menu = null;
+  // Focus goes back to whatever opened this. Remembered on open — looking it up
+  // now would find the item that just disappeared.
+  if (trigger) trigger.focus();
+}
+
+surface.addEventListener('contextmenu', event => {
+  event.preventDefault();
+  trigger = surface;
+  const box = surface.getBoundingClientRect();
+  build(event.clientX - box.left, event.clientY - box.top);
+});
+
+surface.addEventListener('keydown', event => {
+  if (menu) return;
+  // Shift+F10 and the Menu key are the standard keyboard route to a context
+  // menu. Without them the menu is mouse-only however good its internals are.
+  if ((event.shiftKey && event.key === 'F10') || event.key === 'ContextMenu') {
+    event.preventDefault();
+    trigger = surface;
+    build(24, 24);
+  }
+});
+
+document.addEventListener('keydown', event => {
+  if (!menu) return;
+  const nodes = itemNodes();
+  const current = activeIndex();
+
+  switch (event.key) {
+    case 'ArrowDown': event.preventDefault(); focusItem(current + 1); return;
+    case 'ArrowUp': event.preventDefault(); focusItem(current - 1); return;
+    case 'Home': event.preventDefault(); focusItem(0); return;
+    case 'End': event.preventDefault(); focusItem(nodes.length - 1); return;
+    case 'Escape': event.preventDefault(); close(); return;
+    case 'Tab': event.preventDefault(); close(); return;
+    case 'Enter':
+    case ' ': {
+      event.preventDefault();
+      const node = nodes[current];
+      if (node) node.click();
+      return;
+    }
+    default: break;
+  }
+
+  // Typeahead. The buffer resets after a pause, so "de" finds Delete but a
+  // later "d" starts again rather than searching for "ded".
+  if (event.key.length === 1 && /\S/.test(event.key)) {
+    const now = Date.now();
+    typed = now - typedAt > 800 ? event.key : typed + event.key;
+    typedAt = now;
+    const from = typed.length === 1 ? current + 1 : current;
+    for (let i = 0; i < nodes.length; i += 1) {
+      const at = (from + i + nodes.length) % nodes.length;
+      const label = nodes[at].querySelector('.erf-menu-label').textContent.toLowerCase();
+      if (label.startsWith(typed.toLowerCase())) { focusItem(at); return; }
+    }
+  }
+});
+
+/* The state gallery: rendered from the same CSS the live menu uses, so a state
+   cannot look right here and wrong there. */
+const STATES = [
+  ['resting', ''],
+  ['active / hover', 'erf-menu-item--active'],
+  ['danger', 'erf-menu-item--danger'],
+  ['danger + active', 'erf-menu-item--danger erf-menu-item--active'],
+  ['disabled', ''],
+  ['disabled + danger — disabled wins', 'erf-menu-item--danger']
+];
+const gallery = document.getElementById('gallery');
+for (const [caption, cls] of STATES) {
+  const fig = document.createElement('figure');
+  const disabled = caption.startsWith('disabled');
+  fig.innerHTML = `<figcaption>${caption}</figcaption>
+    <div class="erf-menu" style="min-width:200px">
+      <div class="erf-menu-item ${cls}" role="menuitem"${disabled ? ' aria-disabled="true"' : ''}>
+        <span class="erf-menu-icon" aria-hidden="true">⌫</span>
+        <span class="erf-menu-label">Delete</span>
+        <span class="erf-menu-shortcut" aria-hidden="true">⌘⌫</span>
+      </div>
+    </div>`;
+  gallery.appendChild(fig);
+}
+</script>
+
+</body>
+</html>

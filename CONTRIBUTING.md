@@ -43,6 +43,8 @@ Run the same checks CI runs before opening a PR:
 
 ```bash
 npm run lint            # eslint --fix
+npm run lint:css        # stylelint over src/ CSS and the design/ cards
+npm run design -- --check   # fails if a generated file under design/ is stale
 npm run typecheck       # tsc (node + web projects)
 npm run test:ci         # vitest workspace (main / renderer / preload)
 npx electron-vite build # production build
@@ -73,7 +75,7 @@ Never commit a real secret, even to history — rewrite it out and rotate the cr
 
 - TypeScript strict mode; React functional components with hooks; Zustand for state.
 - IPC pattern: `shared/ipc` schemas → `main/services` → `main/ipc` handlers → preload bridge → renderer.
-- UI: use design tokens (`var(--color-*)`, `var(--space-*)`, `var(--text-*)`); `border-radius: 0` always. See [`docs/ui-style-guide.md`](docs/ui-style-guide.md).
+- UI: open the design system first — [`design/index.html`](design/index.html) — and use design tokens (`var(--color-*)`, `var(--space-*)`, `var(--text-*)`); `border-radius: 0` always. `npm run lint:css` enforces the token rules. (`design/` is the design system; `docs/design*/` are per-issue notes.)
 - Prose: **sentence case**, en dashes (not em dashes).
 - New source files must carry the SPDX header (`npm run check:headers` enforces it); new binary assets are covered by the `REUSE.toml` catch-all — add a `.license` sidecar only to *override* it (e.g. a third-party asset). `reuse lint` must pass.
 
@@ -81,7 +83,7 @@ Never commit a real secret, even to history — rewrite it out and rotate the cr
 
 - [ ] Work is on a `feature/...` branch cut from the right integration branch, and the PR targets that same branch (not `main`) — `develop` for general work, `graph` for graph-engine work.
 - [ ] Commits follow [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `docs:`, `chore:`).
-- [ ] All quality gates pass locally (lint, typecheck, test:ci, build, check:headers, reuse lint).
+- [ ] All quality gates pass locally (lint, lint:css, design -- --check, typecheck, test:ci, build, check:headers, reuse lint).
 - [ ] No secrets introduced — `gitleaks` and `trufflehog` are clean locally.
 - [ ] Docs updated if behavior or project shape changed.
 - [ ] You agree to the project [CLA](CLA.md) (opening this PR records your agreement).

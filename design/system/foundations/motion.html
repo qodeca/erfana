@@ -1,0 +1,121 @@
+<!-- @card group="Foundations" name="Motion" subtitle="Four durations, the missing easing scale, one spinner, and when everything must stop" status="proposed" reviewed="2026-08-31" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Erfana — motion</title>
+<link rel="stylesheet" href="../../tokens.css">
+<link rel="stylesheet" href="../../ds.css">
+<script src="../../claims.js"></script>
+<style>
+  .row { display: grid; grid-template-columns: 160px 72px 1fr; gap: var(--space-8); align-items: center;
+         padding: var(--space-6) 0; border-bottom: var(--border-width) solid var(--color-border-default); }
+  .tok { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text-tertiary); }
+  .val { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text-secondary); }
+  .track { height: 24px; background: var(--color-bg-tertiary); position: relative; overflow: hidden; }
+  .puck { position: absolute; inset-block: 0; width: 24px; background: var(--color-accent-primary); left: 0; }
+  .track:hover .puck { left: calc(100% - 24px); }
+
+  .spinner { width: var(--icon-size-md); height: var(--icon-size-md);
+             border: var(--border-width-thick) solid var(--color-border-subtle);
+             border-top-color: var(--color-accent-primary);
+             border-radius: var(--border-radius-circle);
+             animation: erfana-spin 0.8s linear infinite; }
+  @keyframes erfana-spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spinner { animation: none; border-top-color: var(--color-text-tertiary); } }
+
+  .demo { display: flex; gap: var(--space-12); align-items: center; padding: var(--space-12);
+          background: var(--color-bg-secondary); margin-bottom: var(--space-8); }
+</style>
+</head>
+<body>
+
+<h1>Motion</h1>
+<p class="ds-lede">
+  <strong>Hover a bar</strong> to see its duration. Erfana's transitions are already disciplined — in 46
+  stylesheets, exactly one hardcodes a duration. Animations are the problem.
+</p>
+
+<h2>Durations</h2>
+<div id="scale"></div>
+
+<div class="ds-note">
+  <strong>The gap.</strong> Every duration token bakes <code>ease</code> into its value, so any other
+  curve has to be written by hand and can never be themed. And nothing in the scale is longer than
+  0.3s, which is why every spinner in the app invented its own length.
+  <strong>Two additions are proposed:</strong> an easing set
+  (<code>--ease-standard</code>, <code>--ease-out</code>, <code>--ease-linear</code>) and
+  <code>--duration-spin: 0.8s</code>.
+</div>
+
+<h2>One spinner</h2>
+
+<div class="demo">
+  <div class="spinner"></div>
+  <div style="font-size: var(--text-sm); color: var(--color-text-tertiary); max-width: 56ch">
+    Erfana currently has <strong><span data-claim="spinner-keyframes"></span></strong> — copies of a
+    <code>spin</code> keyframe plus renamed clones of the same thing — running at
+    <strong><span data-claim="spinner-durations"></span></strong> different speeds. This is the one. It
+    lives in the shared utilities stylesheet and nothing redefines it.
+  </div>
+</div>
+
+<h2>When motion must stop</h2>
+
+<div class="ds-note">
+  <strong>Anything that repeats forever must stop under <code>prefers-reduced-motion: reduce</code>.</strong>
+  Spinning, pulsing, shimmering, flashing. For some people this is not a preference — looping motion
+  causes nausea and dizziness. The setting is how they tell you.
+  <br><br>
+  The spinner above obeys it. If your system is set to reduce motion, it is a static ring right now and
+  the app is still perfectly usable — which is the point.
+  <strong><span data-claim="reduced-motion-gaps"></span> stylesheets in Erfana animate with no
+  reduced-motion escape</strong>, including a full-screen camera flash and several infinite spinners.
+  <br><br>
+  <strong>Per-file opt-in is why that number is what it is.</strong> Four files do it correctly, and one
+  of those disables the very same <code>spin</code> keyframe another file leaves running. The rule
+  belongs once, in the entry stylesheet, not once per component — a list this long is not carelessness,
+  it is the predictable result of asking every author to remember.
+</div>
+
+<table>
+  <thead><tr><th>Kind of motion</th><th>Under reduce</th></tr></thead>
+  <tbody>
+    <tr><td>Infinite spin / pulse / shimmer</td><td>Stop it. Keep the shape so the meaning survives.</td></tr>
+    <tr><td>Full-screen flash or wipe</td><td>Remove entirely. Never negotiable.</td></tr>
+    <tr><td>Slide-in of a new element</td><td>Cross-fade instead — no travel.</td></tr>
+    <tr><td>Colour or opacity change on hover</td><td>Keep. It does not move, so it is safe.</td></tr>
+  </tbody>
+</table>
+
+<div class="ds-note">
+  <strong>One thing that must never animate:</strong> the height of the HTML preview's permission band.
+  The previewed page sits in a native view that moves in one step, so an eased height would race it and
+  expose page pixels underneath the buttons. Instant height also means there is no reduced-motion case
+  to handle.
+</div>
+
+<script>
+const STEPS = [['--transition-fast','Icon hover, small state flips'],
+               ['--transition-normal','The default'],
+               ['--transition-slow','Panels, larger surfaces'],
+               ['--transition-slower','Rare — only when distance is large']];
+function resolved(t){const p=document.createElement('span');p.style.setProperty('--p',`var(${t})`);
+  document.body.appendChild(p);const v=getComputedStyle(p).getPropertyValue('--p').trim();p.remove();return v;}
+const host=document.getElementById('scale');
+for(const [token,note] of STEPS){
+  const row=document.createElement('div');row.className='row';
+  row.innerHTML='<div class="tok"></div><div class="val"></div><div class="track"><div class="puck"></div></div>';
+  row.children[0].textContent=token;
+  row.children[1].textContent=resolved(token);
+  row.children[2].firstElementChild.style.transition=`left var(${token})`;
+  row.children[2].title=note;
+  host.appendChild(row);
+}
+</script>
+
+</body>
+</html>

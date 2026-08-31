@@ -55,11 +55,23 @@ const STYLESHEETS: Array<[string, string]> = [
  * Tokens that all resolve to `#6e6e6e` (~3.6:1 on `--color-bg-primary`) and are
  * therefore forbidden on this surface.
  */
-const FORBIDDEN_TOKENS = [
-  '--color-text-muted',
-  '--color-text-disabled',
-  '--color-text-placeholder'
-] as const
+/**
+ * Tokens too dim to use as text on the crash screen.
+ *
+ * `--color-text-placeholder` used to be here and has been REMOVED, because the
+ * reason for its ban stopped being true. All three once resolved to
+ * `--color-gray-600` (#6e6e6e, 3.63:1 on this background). The placeholder token
+ * now resolves to `--color-gray-450` (#949494, 6.09:1) — it was repointed to fix
+ * a real WCAG 1.4.3 failure inside text inputs, where 2.69:1 made typed-over
+ * placeholder text unreadable.
+ *
+ * Leaving it listed would have made this suite assert something false, which the
+ * "ban is about contrast, not naming" test below caught immediately — exactly
+ * what that test is for. The remaining two still resolve to #6e6e6e and still
+ * fail; if either is ever repointed, that test fails again and this list should
+ * shrink again rather than the assertion being loosened.
+ */
+const FORBIDDEN_TOKENS = ['--color-text-muted', '--color-text-disabled'] as const
 
 /**
  * Remove CSS block comments so prose cannot be parsed as a rule.

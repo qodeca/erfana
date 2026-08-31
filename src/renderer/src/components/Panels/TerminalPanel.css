@@ -127,6 +127,10 @@
   top: -9999px !important;
   width: 0 !important;
   height: 0 !important;
+  /* stylelint-disable-next-line declaration-property-value-disallowed-list --
+     Not a layering decision: this is the off-screen park idiom, paired with the
+     left/top: -9999px above. The z-scale describes what stacks ABOVE what; there
+     is no rung for "removed from the conversation entirely". */
   z-index: -9999 !important;
   pointer-events: none !important;
 }
@@ -199,7 +203,7 @@
   margin: -5px 0 0 -5px;
   border: 2px solid transparent;
   border-top-color: var(--color-accent-primary);
-  border-radius: 50%;
+  border-radius: var(--border-radius-circle);
   animation: spin 0.8s linear infinite;
 }
 

@@ -248,7 +248,7 @@ Restart is safe today only because auto-restore of the last project is disabled 
 | `docs/architecture.md` | modify | *Added during implementation (recorded 2026-08-12).* Flatten-algorithm section — the `offset` field and the single-pass memo. The same audit that added this row also folded in what the implementation had missed here: the `RootErrorBoundary/` component directory, a layered-containment design decision, and a corrected project-persistence entry (start-up does **not** auto-open the last project — the invariant §2.7 rests on, previously documented in this file as its opposite). |
 | `docs/drag-drop/architecture.md` | modify | *Added during implementation (recorded 2026-08-12).* The `offset` field and the index-backed projection prose. The implementation left the code snippets themselves on the **pre-fix recursion** — including the exact `flattened.push(...flattenTree(…))` spread this issue deleted, documented as current — so the same audit replaced them with the shipped `flattenInto` loop and the shipped `getProjection` guards. |
 
-New `.ts` / `.tsx` / `.css` files each need the SPDX header pair — `scripts/check-spdx-headers.mjs` enforces `.ts .tsx .js .mjs .cjs .css` and the `license` job is a required check.
+New `.ts` / `.tsx` / `.css` files each need the SPDX header pair — `scripts/check-spdx-headers.mjs` enforces `.ts .tsx .js .mjs .cjs .css .html` and the `license` job is a required check.
 
 **Recorded deviations from the ~500-line-per-file guideline.** **Three** test files ship over it, all deliberately. Line counts re-measured against the shipped tree on 2026-08-12; the 887 / 574 figures recorded here earlier were taken mid-implementation:
 
