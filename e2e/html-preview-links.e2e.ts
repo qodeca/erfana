@@ -67,28 +67,69 @@ async function livePreviews(
   })
 }
 
-/** Click an element by id inside the live preview page whose title matches. */
+/**
+ * Click an element by id inside the live preview page whose title matches.
+ *
+ * @returns `true` only when the page WAS found and the element WAS clicked.
+ *
+ * The return value is the point. This used to swallow every failure — the
+ * `catch` wrapped the click itself — and return normally, so a renamed fixture
+ * id, or an element that never rendered, produced a test that quietly clicked
+ * nothing. Every caller here then asserted only that something bad had not
+ * happened, which is equally true of a click that never occurred. The three
+ * security cases in this file proved nothing at all.
+ */
 async function clickInPreview(
   app: ElectronApplication,
   docTitle: string,
   elementId: string
-): Promise<void> {
-  await app.evaluate(
+): Promise<boolean> {
+  return app.evaluate(
     async ({ webContents }, { title, id }) => {
       for (const wc of webContents.getAllWebContents()) {
+        if (!wc.getURL().startsWith('erfana-preview://')) continue
+        let found = ''
         try {
-          if (!wc.getURL().startsWith('erfana-preview://')) continue
-          const found: string = await wc.executeJavaScript('document.title')
-          if (!found.includes(title)) continue
-          await wc.executeJavaScript(`document.getElementById(${JSON.stringify(id)}).click()`)
-          return
+          found = await wc.executeJavaScript('document.title')
         } catch {
-          // Not the page we want, or it went away; keep looking.
+          // Mid-load or already gone: this is not the page we are looking for.
+          // Only the IDENTIFICATION probe is allowed to fail quietly.
+          continue
         }
+        if (!found.includes(title)) continue
+        return await wc.executeJavaScript(
+          `(() => {
+             const el = document.getElementById(${JSON.stringify(id)})
+             if (!el) return false
+             el.click()
+             return true
+           })()`
+        )
       }
+      return false
     },
     { title: docTitle, id: elementId }
   )
+}
+
+/**
+ * Click `elementId`, then drive a known-good link behind it and wait for that
+ * to land.
+ *
+ * Why a barrier rather than a poll: `expect.poll(...).not.toContain(...)` stops
+ * the moment the assertion holds, and a negative assertion holds on the FIRST
+ * sample — before a click can possibly have been routed. Playwright's own
+ * matcher returns `continuePolling: false` as soon as a `.not` matcher does not
+ * throw. So the timeout never applied and the effect was never waited for.
+ *
+ * Both clicks traverse the same preload → main → policy → renderer pipeline in
+ * order, so once the second has visibly landed the first has had its full
+ * chance. The negative is then asserted once, on settled state.
+ */
+async function clickThenSettle(app: ElectronApplication, elementId: string): Promise<void> {
+  expect(await clickInPreview(app, '-LINKS-1', elementId)).toBe(true)
+  expect(await clickInPreview(app, '-LINKS-1', 'plain')).toBe(true)
+  await waitForPreviewTitled(app, '-LINKS-TARGET-')
 }
 
 /** Open a project-relative `.html` file as a running preview. */
@@ -161,26 +202,58 @@ test.describe('HTML preview — link routing', () => {
     await openPreview(windowWithTestProject, 'links/index.html')
     await waitForPreviewTitled(appWithTestProject, '-LINKS-1')
 
-    await clickInPreview(appWithTestProject, '-LINKS-1', 'plain')
+    expect(await clickInPreview(appWithTestProject, '-LINKS-1', 'plain')).toBe(true)
 
     // The target opens as its OWN running preview; the source page stays open.
     await waitForPreviewTitled(appWithTestProject, '-LINKS-TARGET-')
     expect(await liveTitles(appWithTestProject)).toContain('-LINKS-1')
   })
 
-  test('a javascript: link never runs and never opens anything', async ({
+  test('a javascript: link cannot navigate the preview or open anything', async ({
     windowWithTestProject,
     appWithTestProject
   }) => {
+    // WHAT THIS DOES AND DOES NOT CLAIM. The previous version of this test was
+    // called "a javascript: link never runs", and that is false: measured on
+    // Electron 39, clicking the fixture's `javascript:` link executes it and
+    // replaces the document with the expression's value.
+    //
+    // That is not an escalation, and it is not a hole. `script-src` carries
+    // 'unsafe-inline' and 'unsafe-eval' DELIBERATELY (previewCsp.ts), because a
+    // preview exists to run the page. The threat model's primary attacker, T1,
+    // is defined as an .html file that "runs arbitrary JavaScript, including
+    // unsafe-eval" (docs/security.md). A javascript: URL gives the page a second
+    // route to something it is already allowed to do to its own document. The
+    // boundary is the sandboxed opaque origin and the sealed in-memory session,
+    // not script-src.
+    //
+    // Two things worth recording about the old assertion. It polled with
+    // `.not.toContain(...)`, which returns on the first sample, so it never
+    // waited. And it watched the document TITLE — which a successful payload
+    // wipes, because the expression yields a string and the browser then
+    // replaces the whole document. It could not have detected the thing it
+    // named even given unlimited time.
+    //
+    // So this asserts the invariants that DO hold and that do matter: the view
+    // does not navigate, and nothing new is opened.
     await openPreview(windowWithTestProject, 'links/index.html')
     await waitForPreviewTitled(appWithTestProject, '-LINKS-1')
+    const before = await livePreviews(appWithTestProject)
+    const sourceUrl = before[0].url
 
-    await clickInPreview(appWithTestProject, '-LINKS-1', 'dangerous')
+    expect(await clickInPreview(appWithTestProject, '-LINKS-1', 'dangerous')).toBe(true)
 
-    // The fixture's javascript: URL would rename the document if it ever ran.
-    await expect
-      .poll(async () => liveTitles(appWithTestProject), { timeout: 5000 })
-      .not.toContain('-HIJACKED-')
+    // The barrier cannot be another click on this page — the payload replaced
+    // its document, so there is no `-LINKS-1` left to click. Drive a real UI
+    // action instead and wait for it, which drains the same pipeline.
+    await openPreview(windowWithTestProject, 'self-contained/index.html')
+    await waitForPreviewTitled(appWithTestProject, '-OK-1')
+
+    const after = await livePreviews(appWithTestProject)
+    // The sealed view stayed on its own document: no navigation escaped.
+    expect(after.map((p) => p.url)).toContain(sourceUrl)
+    // Only the preview this test opened on purpose is new.
+    expect(after.length).toBe(before.length + 1)
   })
 
   test('a link escaping the project opens nothing', async ({
@@ -191,12 +264,13 @@ test.describe('HTML preview — link routing', () => {
     await waitForPreviewTitled(appWithTestProject, '-LINKS-1')
 
     const before = (await livePreviews(appWithTestProject)).length
-    await clickInPreview(appWithTestProject, '-LINKS-1', 'escape')
+    await clickThenSettle(appWithTestProject, 'escape')
 
-    // Nothing new is ever shown for a path outside the project.
-    await expect
-      .poll(async () => (await livePreviews(appWithTestProject)).length, { timeout: 5000 })
-      .toBe(before)
+    // Nothing new is ever shown for a path outside the project. The barrier's
+    // own target accounts for exactly one new preview; a third would be the
+    // escaped file.
+    expect((await livePreviews(appWithTestProject)).length).toBe(before + 1)
+    expect(await liveTitles(appWithTestProject)).not.toContain('hosts')
   })
 
   test('a same-page anchor scrolls instead of opening a tab', async ({
@@ -207,10 +281,10 @@ test.describe('HTML preview — link routing', () => {
     await waitForPreviewTitled(appWithTestProject, '-LINKS-1')
 
     const before = (await livePreviews(appWithTestProject)).length
-    await clickInPreview(appWithTestProject, '-LINKS-1', 'anchor')
+    await clickThenSettle(appWithTestProject, 'anchor')
 
-    await expect
-      .poll(async () => (await livePreviews(appWithTestProject)).length, { timeout: 5000 })
-      .toBe(before)
+    // A fragment on the same document is a scroll, so only the barrier's own
+    // target may appear.
+    expect((await livePreviews(appWithTestProject)).length).toBe(before + 1)
   })
 })

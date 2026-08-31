@@ -353,14 +353,32 @@ test.describe('HTML preview corpus', () => {
     // nothing. Before the fix the next send only came from a later tab switch or
     // window resize, so the preview stayed black until the user clicked around —
     // which no other test in this suite could see.
+    // Compared against the PLACEHOLDER's real box, not against zero. `> 0` was
+    // satisfied by the exact bug it names: the rect a view keeps when no real
+    // measurement ever reaches it is `{ x: 0, y: 0, width: 1, height: 1 }`
+    // (usePreviewLifecycle seeds `preview:open` with it), and 1 is greater
+    // than 0. The regression this test exists for would have shipped green.
+    const placeholder = await windowWithTestProject
+      .locator('.html-preview-placeholder')
+      .first()
+      .boundingBox()
+    expect(placeholder).not.toBeNull()
+    const expectedWidth = placeholder?.width ?? 0
+    const expectedHeight = placeholder?.height ?? 0
+    expect(expectedWidth).toBeGreaterThan(100)
+
+    // A few pixels of tolerance for DIP rounding; the point is that the view
+    // tracks the panel, not that it is non-degenerate.
     await expect
       .poll(async () => (await previewViewBounds(appWithTestProject))?.width ?? 0, {
         timeout: 5000,
-        message: 'preview view never got a non-zero width without user interaction'
+        message: 'preview view never matched its placeholder without user interaction'
       })
-      .toBeGreaterThan(0)
+      .toBeGreaterThan(expectedWidth - 4)
 
     const bounds = await previewViewBounds(appWithTestProject)
-    expect(bounds?.height).toBeGreaterThan(0)
+    // Height is the placeholder minus the chrome strip the view is inset below,
+    // so it is checked with a wider allowance than the width.
+    expect(bounds?.height).toBeGreaterThan(expectedHeight - 40)
   })
 })
