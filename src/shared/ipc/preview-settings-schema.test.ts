@@ -44,6 +44,42 @@ describe('isApprovableHost', () => {
   it('rejects a bare IPv6 literal without brackets', () => {
     expect(isApprovableHost('fe80::1')).toBe(false)
   })
+  it('refuses a hostname the WRITE schema would reject', () => {
+    // THE MISMATCH. This predicate decides the `approvable` flag the user sees;
+    // `PreviewHostSchema`'s regex decides whether the write is accepted. The
+    // predicate was the LOOSER of the two, so a trailing dot or an underscore
+    // produced an Approve button that `preview:approveHost` then refused —
+    // and the renderer discards that result, so the reader saw the toast
+    // dismiss and believed a decision had been made.
+    expect(isApprovableHost('example.com.')).toBe(false)
+    expect(isApprovableHost('foo_bar.com')).toBe(false)
+    expect(isApprovableHost('-leading.com')).toBe(false)
+    expect(isApprovableHost('trailing-.com')).toBe(false)
+  })
+
+  it('agrees with the schema that gates the write, in both directions', () => {
+    // The guard that keeps them aligned. Anything this predicate calls
+    // approvable must survive `PreviewHostSchema`, or the Approve button is
+    // offering something the boundary will refuse.
+    const cases = [
+      'cdn.jsdelivr.net',
+      'fonts.gstatic.com',
+      'example.com.',
+      'foo_bar.com',
+      'localhost',
+      '127.0.0.1',
+      'intranet',
+      'a.b.c.d.example.com',
+      '-leading.com'
+    ]
+    for (const host of cases) {
+      expect({ host, ok: isApprovableHost(host) }).toEqual({
+        host,
+        ok: PreviewHostSchema.safeParse(host).success
+      })
+    }
+  })
+
 })
 
 describe('PreviewHostSchema', () => {

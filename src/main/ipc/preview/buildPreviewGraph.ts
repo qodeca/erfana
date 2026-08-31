@@ -128,10 +128,36 @@ async function confirmThenOpenExternal(url: string): Promise<void> {
   return run
 }
 
+/**
+ * What the consent dialog names as the destination.
+ *
+ * `URL.origin` is the STRING `"null"` for every non-special scheme — `tel:`,
+ * `sms:`, `mailto:` — and `"null"` is truthy, so `origin || protocol` printed
+ * the literal word "null" as the destination. That dialog is the only thing
+ * between an untrusted page and an OS hand-off, and for those schemes it named
+ * nothing at all.
+ *
+ * Never the full href: it is attacker-controlled, so it is both a leak surface
+ * (a `mailto:` body, a query string) and a log/UI-injection surface. Scheme plus
+ * the addressed target is enough to decide with.
+ */
+export function describeExternalDestination(url: string): string {
+  let parsed: URL
+  try {
+    parsed = new URL(url)
+  } catch {
+    return '(unparseable link)'
+  }
+  if (parsed.origin !== 'null' && parsed.origin !== '') {
+    return parsed.origin
+  }
+  // Opaque-origin scheme: the pathname carries the number or address.
+  const target = parsed.pathname
+  return target === '' ? parsed.protocol : `${parsed.protocol}${target}`
+}
+
 async function showConfirmAndOpen(url: string): Promise<void> {
-  const parsed = new URL(url)
-  const destination =
-    parsed.protocol === 'mailto:' ? parsed.pathname : parsed.origin || parsed.protocol
+  const destination = describeExternalDestination(url)
 
   const { response } = await dialog.showMessageBox({
     type: 'question',

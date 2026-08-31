@@ -144,7 +144,7 @@ export interface PreviewCspViolationBridgeDeps {
  * `eval` keywords CSP reports instead of a URL, `data:`, `blob:`, and the
  * preview's own `erfana-preview:` scheme — is dropped here.
  */
-function remoteHostOf(blockedURI: string): string | null {
+function remoteHostOf(blockedURI: string): { host: string; secure: boolean } | null {
   let parsed: URL
   try {
     parsed = new URL(blockedURI)
@@ -154,10 +154,14 @@ function remoteHostOf(blockedURI: string): string | null {
   if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
     return null
   }
-  // `hostname`, not `host`: a port is not part of the allowlist's unit, and
-  // `hostname` also strips the IPv6 brackets `isApprovableHost` refuses anyway.
+  // `hostname`, not `host`: a port is not part of the allowlist's unit. Note it
+  // does NOT strip IPv6 brackets — `isApprovableHost` is what refuses those.
   const hostname = parsed.hostname
-  return hostname === '' ? null : hostname.toLowerCase()
+  if (hostname === '') return null
+  // An allowlist entry is only ever rendered as an `https://` CSP host-source,
+  // so a host observed over plain http is not eligible for approval — which is
+  // what the network-filter path already decides for the same URL.
+  return { host: hostname.toLowerCase(), secure: parsed.protocol === 'https:' }
 }
 
 /** A fixed one-second window that admits at most `limit` takes. */
@@ -206,8 +210,9 @@ export function createPreviewCspViolationBridge(
       const parsed = CspViolationPayloadSchema.safeParse(payload)
       if (!parsed.success) return
 
-      const host = remoteHostOf(parsed.data.blockedURI)
-      if (host === null) return
+      const remote = remoteHostOf(parsed.data.blockedURI)
+      if (remote === null) return
+      const { host } = remote
 
       // One report per host per KIND. The network-filter path records per
       // REQUEST, which is right there because each is a distinct attempt the
@@ -233,7 +238,12 @@ export function createPreviewCspViolationBridge(
       // A non-approvable host (an IP literal, `localhost`, a bare single-label
       // name) is still recorded as a failure and still never offered for
       // approval — the same split the filter path makes.
-      deps.onBlockedHost(host, parsed.data.blockedURI, isApprovableHost(host), kind)
+      deps.onBlockedHost(
+        host,
+        parsed.data.blockedURI,
+        remote.secure && isApprovableHost(host),
+        kind
+      )
     },
 
     reset(): void {

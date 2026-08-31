@@ -8,7 +8,8 @@
  * electron's ipcMain is mocked to capture the registered handlers; the service,
  * eligibility, window resolver and sender predicate are injected fakes.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
+import { ipcMain } from 'electron'
 import type { IpcMainEvent, IpcMainInvokeEvent } from 'electron'
 import { PreviewChannels } from '../../../shared/ipc/preview-channels'
 import type { PreviewBoundsPayload } from '../../../shared/ipc/preview-schema'
@@ -68,11 +69,12 @@ function setup(overrides?: Partial<PreviewLifecycleHandlerDeps>): {
   service: ReturnType<typeof makeService>
   eligibilityCheck: ReturnType<typeof vi.fn>
   trusted: { value: boolean }
+  dispose: () => void
 } {
   const service = makeService()
   const eligibilityCheck = vi.fn(async () => ({ eligible: true }) as const)
   const trusted = { value: true }
-  registerPreviewLifecycleHandlers({
+  const dispose = registerPreviewLifecycleHandlers({
     service,
     eligibility: { check: eligibilityCheck },
     getProjectPath: () => '/project',
@@ -81,7 +83,7 @@ function setup(overrides?: Partial<PreviewLifecycleHandlerDeps>): {
     resolveWindow: () => FAKE_WINDOW,
     ...overrides
   })
-  return { service, eligibilityCheck, trusted }
+  return { service, eligibilityCheck, trusted, dispose }
 }
 
 const event = {} as IpcMainInvokeEvent & IpcMainEvent
@@ -100,6 +102,29 @@ describe('registerPreviewLifecycleHandlers', () => {
     expect(handlers[PreviewChannels.RELOAD]).toBeTypeOf('function')
     expect(listeners[PreviewChannels.SET_BOUNDS]).toBeTypeOf('function')
     expect(listeners[PreviewChannels.SET_VISIBILITY]).toBeTypeOf('function')
+  })
+
+  it('unregisters every channel it registered', () => {
+    // THE GAP. `preview:setZoom` was registered and left behind by the
+    // disposer, whose own doc says it "removes all of them". Latent today —
+    // there is one call site and it disposes only at quit — but the bundle is
+    // modelled as re-registrable, and `ipcMain.handle` THROWS on a second
+    // registration for the same channel, which would abort the find and
+    // allowlist bundles registered after it.
+    //
+    // Derived from what was registered rather than restated, so a channel added
+    // later cannot be forgotten here the way SET_ZOOM was.
+    const { dispose } = setup()
+    const registered = [...Object.keys(handlers), ...Object.keys(listeners)]
+    expect(registered.length).toBeGreaterThan(0)
+
+    dispose()
+
+    const removed = [
+      ...(ipcMain.removeHandler as unknown as Mock).mock.calls.map((c) => c[0] as string),
+      ...(ipcMain.removeListener as unknown as Mock).mock.calls.map((c) => c[0] as string)
+    ]
+    expect([...registered].sort()).toEqual([...new Set(removed)].sort())
   })
 
   it('rejects an untrusted sender on open (service untouched)', async () => {

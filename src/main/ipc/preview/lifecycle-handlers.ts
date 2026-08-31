@@ -236,6 +236,7 @@ export function registerPreviewLifecycleHandlers(
     unregisterHandle(PreviewChannels.OPEN)
     unregisterHandle(PreviewChannels.CLOSE)
     unregisterHandle(PreviewChannels.RELOAD)
+    unregisterHandle(PreviewChannels.SET_ZOOM)
     unregisterOn(PreviewChannels.SET_BOUNDS, onSetBounds)
     unregisterOn(PreviewChannels.SET_VISIBILITY, onSetVisibility)
   }

@@ -63,6 +63,17 @@ export function isApprovableHost(host: string): boolean {
   // Hex / octal IPv4 shorthands, e.g. 0x7f.1.
   if (labels.some((label) => /^0x[\da-f]+$/.test(label))) return false
 
+  // Every label must be a real DNS label: alphanumeric, inner hyphens only.
+  //
+  // Without this the predicate was WIDER than `PreviewHostSchema`, the regex
+  // that actually gates the write. A trailing dot (`example.com.`, whose last
+  // label is empty) or an underscore (`foo_bar.com`) passed here and failed
+  // there, so the reader was offered an Approve button for a host the boundary
+  // then refused — and the renderer discards that refusal, so the toast simply
+  // dismissed and the decision looked made. The two must agree.
+  if (lower.length > 253) return false
+  if (!labels.every((label) => /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/.test(label))) return false
+
   return true
 }
 

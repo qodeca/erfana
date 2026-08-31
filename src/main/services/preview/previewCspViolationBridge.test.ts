@@ -156,6 +156,31 @@ describe('previewCspViolationBridge', () => {
       expect(onBlockedHost).toHaveBeenCalledTimes(1)
     })
 
+    it('records an http host but never offers it for approval', () => {
+      // THE MISMATCH. The network-filter path classifies a plain-http request
+      // `insecure-scheme` and NOT approvable; this path marked the same host
+      // approvable. Approving it wrote an `https://` grant into every CSP
+      // directive — bootstrapped off an observation that was never eligible —
+      // while the http resource still would not load.
+      const { bridge, onBlockedHost } = makeBridge()
+
+      bridge.handleViolation(violation('http://cdn.example.com/a.js'))
+
+      expect(onBlockedHost).toHaveBeenCalledTimes(1)
+      // Still RECORDED: it is a genuine refusal the badge should carry.
+      expect(onBlockedHost.mock.calls[0][0]).toBe('cdn.example.com')
+      expect(onBlockedHost.mock.calls[0][2]).toBe(false)
+    })
+
+    it('still offers the same host over https', () => {
+      // The control: the refusal above is about the SCHEME, not the host.
+      const { bridge, onBlockedHost } = makeBridge()
+
+      bridge.handleViolation(violation('https://cdn.example.com/a.js'))
+
+      expect(onBlockedHost.mock.calls[0][2]).toBe(true)
+    })
+
     it('stops reporting new hosts past the per-view cap', () => {
       // The clock advances a full second per report so the RATE limit is never
       // the binding constraint — this case is about the distinct-HOST cap, and
