@@ -37,6 +37,11 @@
 import { z } from 'zod'
 
 import { isApprovableHost } from '../../../shared/ipc/preview-settings-schema'
+import {
+  kindFromDirective,
+  mergeBlockedKinds,
+  type PreviewBlockedKind
+} from '../../../shared/ipc/previewBlockedKind'
 
 /** Channel name; must match the inlined constant in `src/preload/previewPage.ts`. */
 export const PREVIEW_PAGE_CSP_VIOLATION_CHANNEL = 'preview-page:cspViolation'
@@ -93,7 +98,12 @@ export interface PreviewCspViolationBridgeDeps {
    * filter refusal produce one failure type, one toast budget and one dedupe
    * rule rather than two half-consistent paths.
    */
-  readonly onBlockedHost: (host: string, url: string, approvable: boolean) => void
+  readonly onBlockedHost: (
+    host: string,
+    url: string,
+    approvable: boolean,
+    kind: PreviewBlockedKind
+  ) => void
   /** Injectable clock for the rate-limit window. */
   readonly now?: () => number
 }
@@ -126,7 +136,10 @@ export function createPreviewCspViolationBridge(
   deps: PreviewCspViolationBridgeDeps
 ): PreviewCspViolationBridge {
   const now = deps.now ?? Date.now
-  const reportedHosts = new Set<string>()
+  // Host -> the kinds already reported for it. Not a bare Set of hosts any more:
+  // a host refused first for a font and later for a script must report the
+  // script too, or the row keeps saying "font" for something that will execute.
+  const reportedHosts = new Map<string, PreviewBlockedKind[]>()
   let windowStartedAt = now()
   let windowUsed = 0
   let disposed = false
@@ -153,19 +166,25 @@ export function createPreviewCspViolationBridge(
       const host = remoteHostOf(parsed.data.blockedURI)
       if (host === null) return
 
-      // One report per host per view. The network-filter path records per
+      // One report per host per KIND. The network-filter path records per
       // REQUEST, which is right there because each is a distinct attempt the
       // reader may care about; here a single stylesheet can fire twenty
       // violations for one font host, and twenty identical badge rows would bury
       // the signal the badge exists to carry.
-      if (reportedHosts.has(host)) return
-      if (reportedHosts.size >= MAX_HOSTS_PER_VIEW) return
-      reportedHosts.add(host)
+      //
+      // But a NEW kind for a known host is new information the reader is
+      // entitled to, so it is not deduped away.
+      const kind = kindFromDirective(parsed.data.effectiveDirective)
+      const known = reportedHosts.get(host)
+      if (known === undefined && reportedHosts.size >= MAX_HOSTS_PER_VIEW) return
+      const merged = mergeBlockedKinds(known ?? [], kind)
+      if (merged === null) return
+      reportedHosts.set(host, merged)
 
       // A non-approvable host (an IP literal, `localhost`, a bare single-label
       // name) is still recorded as a failure and still never offered for
       // approval — the same split the filter path makes.
-      deps.onBlockedHost(host, parsed.data.blockedURI, isApprovableHost(host))
+      deps.onBlockedHost(host, parsed.data.blockedURI, isApprovableHost(host), kind)
     },
 
     dispose(): void {

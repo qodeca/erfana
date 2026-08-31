@@ -15,6 +15,7 @@
  */
 
 import type { ErrorCode } from '../errors'
+import type { PreviewBlockedKind } from './previewBlockedKind'
 
 /** A rectangle in the coordinate space of the host window content view. */
 export interface PreviewBounds {
@@ -110,7 +111,13 @@ export interface PreviewEmitters {
     failures: readonly PreviewFailureInput[],
     truncated: boolean
   ): void
-  hostBlocked(panelId: string, host: string, approvable: boolean): void
+  hostBlocked(
+    panelId: string,
+    host: string,
+    approvable: boolean,
+    kinds: readonly PreviewBlockedKind[],
+    notify: boolean
+  ): void
   findResult(r: PreviewFindResult): void
   stillFrameChanged(panelId: string, frame: PreviewStillFrame): void
   loadStateChanged(

@@ -43,7 +43,8 @@ describe('previewCspViolationBridge', () => {
       expect(onBlockedHost).toHaveBeenCalledWith(
         'cdn.jsdelivr.net',
         'https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js',
-        true
+        true,
+        'image'
       )
     })
 
@@ -72,7 +73,8 @@ describe('previewCspViolationBridge', () => {
       expect(onBlockedHost).toHaveBeenCalledWith(
         'cdn.example.com',
         'https://cdn.example.com:8443/a.js',
-        true
+        true,
+        'image'
       )
     })
 
@@ -86,7 +88,8 @@ describe('previewCspViolationBridge', () => {
       expect(onBlockedHost).toHaveBeenCalledWith(
         'cdn.example.com',
         'https://CDN.Example.COM/a.js',
-        true
+        true,
+        'image'
       )
     })
   })

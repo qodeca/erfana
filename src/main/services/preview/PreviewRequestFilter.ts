@@ -40,6 +40,10 @@
 import type { Session } from 'electron'
 import type { PreviewFailureType } from '../../../shared/ipc/preview-types'
 import { isApprovableHost } from '../../../shared/ipc/preview-settings-schema'
+import {
+  kindFromResourceType,
+  type PreviewBlockedKind
+} from '../../../shared/ipc/previewBlockedKind'
 import { logger } from '../LoggingService'
 import { decideRequest } from './previewFilterDecision'
 
@@ -68,7 +72,14 @@ export interface PreviewFilterContext {
    * `true` only for a blocked HTTPS host the user could add to the allowlist;
    * the notifier decides whether to also raise a toast.
    */
-  onBlocked(kind: PreviewFailureType, host: string, url: string, approvable: boolean): void
+  onBlocked(
+    kind: PreviewFailureType,
+    host: string,
+    url: string,
+    approvable: boolean,
+    /** What the resource WAS, so a consent row can say more than a hostname. */
+    resourceKind: PreviewBlockedKind
+  ): void
   /** A request `onBeforeRequest` allowed and that is now in flight. */
   onRequestStarted(id: number): void
   /** A previously-started request that completed, errored or timed out. */
@@ -161,7 +172,13 @@ export function attach(
       }
 
       const approvable = verdict.reason === 'blocked-host' && isApprovableHost(verdict.host)
-      ctx.onBlocked(verdict.reason, verdict.host, details.url, approvable)
+      ctx.onBlocked(
+        verdict.reason,
+        verdict.host,
+        details.url,
+        approvable,
+        kindFromResourceType(details.resourceType)
+      )
     } catch (error) {
       // Fail closed: deny by default (matching the filter's posture) and drop any
       // half-recorded in-flight entry so the sweep does not later badge it.
@@ -194,7 +211,10 @@ export function attach(
     for (const [id, req] of inFlight) {
       if (req.startedAt <= deadline) {
         inFlight.delete(id)
-        ctx.onBlocked('network-timeout', req.host, req.url, false)
+        // The in-flight record keeps only host, url and a timestamp, so the
+      // resource type is genuinely unknown here. `other` says "something",
+      // which is honest; inventing a specific kind would not be.
+      ctx.onBlocked('network-timeout', req.host, req.url, false, 'other')
         ctx.onRequestSettled(id)
       }
     }

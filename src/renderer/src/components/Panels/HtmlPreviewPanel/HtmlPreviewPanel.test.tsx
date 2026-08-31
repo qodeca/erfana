@@ -271,7 +271,13 @@ describe('HtmlPreviewPanel', () => {
       render(<HtmlPreviewPanel {...makeProps('/proj/page.html')} />)
 
       await waitFor(() => expect(listeners.hostBlocked).not.toBeNull())
-      listeners.hostBlocked?.({ panelId: 'preview-1', host: 'cdn.example', approvable: true })
+      listeners.hostBlocked?.({
+        panelId: 'preview-1',
+        host: 'cdn.example',
+        approvable: true,
+        kinds: ['script'],
+        notify: true
+      })
 
       await waitFor(() => expect(toastEvents.length).toBe(1))
       const detail = toastEvents[0].detail
@@ -286,6 +292,79 @@ describe('HtmlPreviewPanel', () => {
     }
   })
 
+  it('records a blocked host the toast budget suppressed', async () => {
+    // THE DEFECT, from the renderer's side. Host four raises no toast by design,
+    // and used not to arrive at all — so it could not be listed and could not be
+    // approved. It must now be recorded whatever `notify` says.
+    render(<HtmlPreviewPanel {...makeProps('/proj/page.html')} />)
+    await waitFor(() => expect(listeners.hostBlocked).not.toBeNull())
+
+    listeners.hostBlocked?.({
+      panelId: 'preview-1',
+      host: 'fourth.example',
+      approvable: true,
+      kinds: ['image'],
+      notify: false
+    })
+
+    await waitFor(() =>
+      expect(usePreviewStore.getState().panels.get('preview-1')?.blockedHosts).toEqual([
+        { host: 'fourth.example', kinds: ['image'], approvable: true }
+      ])
+    )
+  })
+
+  it('keeps the blocked-host list when the failure log is cleared', async () => {
+    // Approving runs `applyApprovedHosts`, which clears the failure log and
+    // reloads. A list derived from failures would empty under the reader's hands
+    // precisely mid-cascade — as they are about to approve the next host.
+    render(<HtmlPreviewPanel {...makeProps('/proj/page.html')} />)
+    await waitFor(() => expect(listeners.hostBlocked).not.toBeNull())
+
+    listeners.hostBlocked?.({
+      panelId: 'preview-1',
+      host: 'cdn.example',
+      approvable: true,
+      kinds: ['script'],
+      notify: true
+    })
+    await waitFor(() =>
+      expect(usePreviewStore.getState().panels.get('preview-1')?.blockedHosts).toHaveLength(1)
+    )
+
+    act(() => {
+      usePreviewStore.getState().clearFailures('preview-1')
+    })
+
+    expect(usePreviewStore.getState().panels.get('preview-1')?.blockedHosts).toHaveLength(1)
+  })
+
+  it('merges a repeat sighting instead of listing the host twice', async () => {
+    render(<HtmlPreviewPanel {...makeProps('/proj/page.html')} />)
+    await waitFor(() => expect(listeners.hostBlocked).not.toBeNull())
+
+    listeners.hostBlocked?.({
+      panelId: 'preview-1',
+      host: 'cdn.example',
+      approvable: true,
+      kinds: ['style'],
+      notify: true
+    })
+    listeners.hostBlocked?.({
+      panelId: 'preview-1',
+      host: 'cdn.example',
+      approvable: true,
+      kinds: ['style', 'script'],
+      notify: false
+    })
+
+    await waitFor(() => {
+      const rows = usePreviewStore.getState().panels.get('preview-1')?.blockedHosts ?? []
+      expect(rows).toHaveLength(1)
+      expect(rows[0].kinds).toEqual(['style', 'script'])
+    })
+  })
+
   it('raises a non-actionable toast on a non-approvable blocked host (UX-001)', async () => {
     const toastEvents: CustomEvent[] = []
     const capture = (e: Event): void => {
@@ -297,7 +376,13 @@ describe('HtmlPreviewPanel', () => {
       render(<HtmlPreviewPanel {...makeProps('/proj/page.html')} />)
 
       await waitFor(() => expect(listeners.hostBlocked).not.toBeNull())
-      listeners.hostBlocked?.({ panelId: 'preview-1', host: 'evil.example', approvable: false })
+      listeners.hostBlocked?.({
+        panelId: 'preview-1',
+        host: 'evil.example',
+        approvable: false,
+        kinds: ['connect'],
+        notify: true
+      })
 
       await waitFor(() => expect(toastEvents.length).toBe(1))
       expect(toastEvents[0].detail.action).toBeUndefined()

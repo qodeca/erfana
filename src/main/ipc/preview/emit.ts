@@ -34,6 +34,7 @@ import {
   PreviewOpenFileRequestedSchema,
   type PreviewFailure
 } from '../../../shared/ipc/preview-schema'
+import type { PreviewBlockedKind } from '../../../shared/ipc/previewBlockedKind'
 import { PreviewEvents } from '../../../shared/ipc/preview-channels'
 import { PREVIEW_FORWARDED_SHORTCUTS } from '../../services/preview/previewInputForward'
 import type {
@@ -181,11 +182,19 @@ export function createPreviewEmitters(deps: PreviewEmittersDeps): PreviewEmitter
       }
     },
 
-    hostBlocked(panelId: string, host: string, approvable: boolean): void {
+    hostBlocked(
+      panelId: string,
+      host: string,
+      approvable: boolean,
+      kinds: readonly PreviewBlockedKind[],
+      notify: boolean
+    ): void {
       validateAndSend(PreviewEvents.HOST_BLOCKED, PreviewHostBlockedPayloadSchema, {
         panelId,
         host,
-        approvable
+        approvable,
+        kinds: [...kinds],
+        notify
       })
     },
 

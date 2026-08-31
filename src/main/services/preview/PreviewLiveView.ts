@@ -61,6 +61,7 @@ import { extractStaticLinks } from './linkExtract'
 import { buildCacheBustHref, buildCssSwapScript } from './previewCssSwap'
 import { clampAndZoomBounds } from './previewBoundsClamp'
 import { wirePreviewLifecycle, type PreviewFileWatcherHandle } from './previewViewLifecycle'
+import type { PreviewBlockedKind } from '../../../shared/ipc/previewBlockedKind'
 import { createPreviewLinkBridge, type PreviewLinkBridge } from './previewLinkBridge'
 import {
   createPreviewCspViolationBridge,
@@ -178,7 +179,12 @@ export interface PreviewLiveViewParams {
    * a future missing wire into a compile error. (Same reasoning as
    * `isDestroyed` on `PreviewWindowLike`.)
    */
-  readonly onBlockedHost: (host: string, url: string, approvable: boolean) => void
+  readonly onBlockedHost: (
+    host: string,
+    url: string,
+    approvable: boolean,
+    kind: PreviewBlockedKind
+  ) => void
 }
 
 /**
@@ -293,7 +299,8 @@ export class PreviewLiveView {
     )
 
     this.cspViolationBridge = createPreviewCspViolationBridge({
-      onBlockedHost: (host, url, approvable) => params.onBlockedHost(host, url, approvable)
+      onBlockedHost: (host, url, approvable, kind) =>
+        params.onBlockedHost(host, url, approvable, kind)
     })
 
     this.lifecycle = wirePreviewLifecycle(

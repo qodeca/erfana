@@ -130,7 +130,10 @@ describe('PreviewRequestFilter gating', () => {
       'blocked-host',
       'evil.example',
       'https://evil.example/collect',
-      true
+      true,
+      // The default `resourceType` in this harness is `xhr`, which maps to
+      // `connect` — what the consent row will say the host wanted to do.
+      'connect'
     )
   })
 
@@ -167,7 +170,8 @@ describe('PreviewRequestFilter gating', () => {
       'blocked-host',
       'tracker.example',
       'https://tracker.example/beacon',
-      true
+      true,
+      'connect'
     )
   })
 
@@ -230,7 +234,12 @@ describe('PreviewRequestFilter gating', () => {
       'blocked-host',
       'tracker.example',
       'https://tracker.example/beacon',
-      true
+      true,
+      // This case passes `script` as the resource type, so it proves the kind
+      // is read from the REQUEST rather than defaulted — the difference
+      // between a consent row saying "wants to run a script" and one saying
+      // "something", which is the difference the reader decides on.
+      'script'
     )
   })
 

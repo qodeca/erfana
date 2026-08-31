@@ -40,7 +40,8 @@ import { showGlobalToast } from '../../../Toast/toastService'
  */
 export function usePreviewEvents(panelId: string): void {
   useEffect(() => {
-    const { setLoadState, pushFailures, setStillFrame, setBackdrop } = usePreviewStore.getState()
+    const { setLoadState, pushFailures, setStillFrame, setBackdrop, recordBlockedHost } =
+      usePreviewStore.getState()
 
     const unsubscribeLoadState = window.api.preview.onLoadStateChanged((payload) => {
       if (payload.panelId !== panelId) return
@@ -71,6 +72,19 @@ export function usePreviewEvents(panelId: string): void {
 
     const unsubscribeHostBlocked = window.api.preview.onHostBlocked((payload) => {
       if (payload.panelId !== panelId) return
+
+      // Record FIRST, and unconditionally. The permission band lists from this,
+      // and it must list every host — the toast budget used to gate the event
+      // itself, so past three hosts the renderer never heard about a block at
+      // all and the reader had no way to approve it.
+      recordBlockedHost(panelId, {
+        host: payload.host,
+        kinds: payload.kinds,
+        approvable: payload.approvable
+      })
+
+      // `notify` is the budget's verdict, now a hint rather than a gate.
+      if (!payload.notify) return
 
       if (payload.approvable) {
         // Approvable host: offer to load it. The action toast is manual-dismiss

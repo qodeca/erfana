@@ -16,6 +16,7 @@
  */
 
 import { create } from 'zustand'
+import type { PreviewBlockedKind } from '../../../shared/ipc/previewBlockedKind'
 import type { PreviewStillFrame } from '../../../shared/ipc/preview-types'
 import type {
   PreviewFailure,
@@ -59,11 +60,36 @@ export interface PreviewPanelState {
    * frame, flashing a band of the wrong colour.
    */
   backdrop: string | null
+  /**
+   * Every remote host this panel has been refused, in first-seen order.
+   *
+   * DELIBERATELY NOT DERIVED FROM `failures`. Approving a host runs
+   * `applyApprovedHosts`, which calls `failureLog.clear()` — so a list built on
+   * the failure log empties the moment the reader approves anything, exactly
+   * when they are mid-way through a cascade and about to approve the next one.
+   * This slice is fed by `hostBlocked` events and is never cleared by
+   * `clearFailures`.
+   *
+   * It survives the page reload that follows an approval, because the React
+   * panel does not unmount when the previewed page reloads. It dies with the
+   * panel, which is right: a fresh panel re-discovers on load.
+   */
+  blockedHosts: PreviewBlockedHost[]
+}
+
+/** One remote host the preview was refused, and what it wanted. */
+export interface PreviewBlockedHost {
+  readonly host: string
+  /** What it was refused FOR, accumulated across sightings. */
+  readonly kinds: readonly PreviewBlockedKind[]
+  /** `false` for a host that may never be approved (an IP literal, localhost). */
+  readonly approvable: boolean
 }
 
 /** The state a panel occupies before any event has arrived for it. */
 const DEFAULT_PANEL_STATE: PreviewPanelState = {
   loadState: 'idle',
+  blockedHosts: [],
   dropped: 0,
   failures: [],
   truncated: false,
@@ -150,6 +176,14 @@ export interface PreviewStoreState {
   /** Record the colour main is painting behind the page (`#RRGGBB`). */
   setBackdrop: (panelId: string, color: string) => void
   /**
+   * Record (or update) a remote host this panel was refused.
+   *
+   * Idempotent per host: a repeat sighting merges its kinds rather than
+   * appending a second row, so a stylesheet firing twenty violations for one
+   * font host produces one entry.
+   */
+  recordBlockedHost: (panelId: string, entry: PreviewBlockedHost) => void
+  /**
    * Clears a panel's still frame so it falls back to the placeholder colour.
    * @param panelId - Panel to update.
    */
@@ -224,6 +258,29 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
     set((state) => ({
       panels: withPanel(state.panels, panelId, { backdrop: color })
     })),
+  recordBlockedHost: (panelId, entry) =>
+    set((state) => {
+      const current = state.panels.get(panelId)?.blockedHosts ?? []
+      const existing = current.find((row) => row.host === entry.host)
+      if (existing !== undefined) {
+        const merged = [...new Set([...existing.kinds, ...entry.kinds])]
+        if (merged.length === existing.kinds.length) {
+          // Nothing new: return the SAME state object so subscribers do not
+          // re-render on every repeat violation from a chatty page.
+          return state
+        }
+        return {
+          panels: withPanel(state.panels, panelId, {
+            blockedHosts: current.map((row) =>
+              row.host === entry.host ? { ...row, kinds: merged } : row
+            )
+          })
+        }
+      }
+      return {
+        panels: withPanel(state.panels, panelId, { blockedHosts: [...current, entry] })
+      }
+    }),
 
   setStillFrame: (panelId, frame) =>
     set((state) => ({

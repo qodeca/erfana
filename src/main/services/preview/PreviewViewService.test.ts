@@ -172,7 +172,19 @@ interface Harness {
   loadStateChanged: ReturnType<
     typeof vi.fn<(panelId: string, state: string, dropped: number) => void>
   >
-  hostBlocked: ReturnType<typeof vi.fn<(panelId: string, host: string, approvable: boolean) => void>>
+  hostBlocked: ReturnType<
+    typeof vi.fn<
+      (
+        panelId: string,
+        host: string,
+        approvable: boolean,
+        kinds: readonly string[],
+        notify: boolean
+      ) => void
+    >
+  >
+  /** The context `sessionFactory.create` was handed, for reaching `onBlocked`. */
+  sessionCreate: ReturnType<typeof vi.fn>
   reloadRecord: ReturnType<typeof vi.fn<(path: string) => void>>
   readEntryHtml: ReturnType<typeof vi.fn<(path: string) => Promise<string>>>
   entryHandlers(): EntryHandlers
@@ -261,7 +273,16 @@ function makeHarness(
   }
 
   const loadStateChanged = vi.fn<(panelId: string, state: string, dropped: number) => void>()
-  const hostBlocked = vi.fn<(panelId: string, host: string, approvable: boolean) => void>()
+  const hostBlocked =
+    vi.fn<
+      (
+        panelId: string,
+        host: string,
+        approvable: boolean,
+        kinds: readonly string[],
+        notify: boolean
+      ) => void
+    >()
 
   const readEntryHtml = vi.fn<(path: string) => Promise<string>>(() =>
     Promise.resolve('<html></html>')
@@ -344,6 +365,7 @@ function makeHarness(
     backdropChanged,
     boundsApplied,
     hostBlocked,
+    sessionCreate,
     reloadRecord,
     readEntryHtml,
     entryHandlers: () => {
@@ -1373,5 +1395,86 @@ describe('PreviewViewService — bounds confirmation', () => {
     // Control: seq 32 confirms as itself, so the withheld 30 is about being
     // overtaken rather than about nothing ever confirming.
     await expectConfirms(h, 32)
+  })
+})
+
+describe('PreviewViewService — every blocked host reaches the renderer', () => {
+  /** The `onBlocked` sink the session factory was handed for panel A. */
+  async function blockedSink(h: ReturnType<typeof makeHarness>): Promise<
+    (kind: string, host: string, url: string, approvable: boolean, resourceKind?: string) => void
+  > {
+    await h.service.open(REQUEST_A, h.window)
+    const context = h.sessionCreate.mock.calls[0][0] as {
+      onBlocked: (
+        kind: string,
+        host: string,
+        url: string,
+        approvable: boolean,
+        resourceKind?: string
+      ) => void
+    }
+    return context.onBlocked
+  }
+
+  it('reports a host even when the toast budget is spent', async () => {
+    // THE DEFECT. `hostBlocked` used to be emitted only when the notifier
+    // allowed a toast, so the 3-toast budget silently gated the DATA: past the
+    // third host the renderer was never told a host had been blocked at all. It
+    // could not list it, and the reader had no way to approve it — observed as a
+    // page with four hosts where the fourth image stayed broken with no prompt
+    // and no route to one.
+    const h = makeHarness()
+    const onBlocked = await blockedSink(h)
+    ;(h.deps.hostBlockNotifier.shouldNotify as ReturnType<typeof vi.fn>).mockReturnValue(false)
+    h.hostBlocked.mockClear()
+
+    onBlocked('blocked-host', 'fourth.example.com', 'https://fourth.example.com/a.png', true, 'image')
+
+    expect(h.hostBlocked).toHaveBeenCalledTimes(1)
+    const [panelId, host, approvable, kinds, notify] = h.hostBlocked.mock.calls[0]
+    expect(panelId).toBe('panel-A')
+    expect(host).toBe('fourth.example.com')
+    expect(approvable).toBe(true)
+    expect(kinds).toEqual(['image'])
+    // The budget verdict survives as a HINT the renderer may act on, rather
+    // than as a gate that decides whether the fact exists.
+    expect(notify).toBe(false)
+  })
+
+  it('passes the budget verdict through when a toast IS allowed', async () => {
+    const h = makeHarness()
+    const onBlocked = await blockedSink(h)
+    h.hostBlocked.mockClear()
+
+    onBlocked('blocked-host', 'first.example.com', 'https://first.example.com/a.js', true, 'script')
+
+    expect(h.hostBlocked.mock.calls[0][4]).toBe(true)
+  })
+
+  it('accumulates the kinds one host is refused for', async () => {
+    // A host serving both a stylesheet and a script must not keep reading
+    // "style". A reader who consented to a stylesheet and got script execution
+    // was misinformed by the surface built to inform them.
+    const h = makeHarness()
+    const onBlocked = await blockedSink(h)
+    h.hostBlocked.mockClear()
+
+    onBlocked('blocked-host', 'cdn.example.com', 'https://cdn.example.com/a.css', true, 'style')
+    onBlocked('blocked-host', 'cdn.example.com', 'https://cdn.example.com/a.js', true, 'script')
+
+    expect(h.hostBlocked.mock.calls[0][3]).toEqual(['style'])
+    expect(h.hostBlocked.mock.calls[1][3]).toEqual(['script', 'style'])
+  })
+
+  it('still records a non-approvable host, and still refuses to offer it', async () => {
+    const h = makeHarness()
+    const onBlocked = await blockedSink(h)
+    h.hostBlocked.mockClear()
+
+    onBlocked('blocked-host', 'localhost', 'http://localhost:9000/x', false, 'connect')
+
+    const [, host, approvable] = h.hostBlocked.mock.calls[0]
+    expect(host).toBe('localhost')
+    expect(approvable).toBe(false)
   })
 })

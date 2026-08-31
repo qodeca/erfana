@@ -25,6 +25,10 @@
  * (`getProjectPath`), never taken from the renderer (NEW-8).
  */
 
+import {
+  mergeBlockedKinds,
+  type PreviewBlockedKind
+} from '../../../shared/ipc/previewBlockedKind'
 import { ErrorCode } from '../../../shared/errors'
 import { PREVIEW } from '../../../shared/constants'
 import type {
@@ -227,16 +231,43 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
       this.deps.emit.failuresChanged(panelId, failures, truncated)
     )
 
+    // What each host has been refused FOR, accumulated for the life of this
+    // view. One host is commonly refused for several things, and reporting only
+    // the first would label a host that will run scripts as "font".
+    const kindsByHost = new Map<string, PreviewBlockedKind[]>()
+
     const onBlocked = (
       kind: PreviewFailureType,
       host: string,
       _url: string,
-      approvable: boolean
+      approvable: boolean,
+      resourceKind: PreviewBlockedKind = 'other'
     ): void => {
       failureLog.record({ type: kind, resourceUrlOrHost: host, reasonCode: ErrorCode.UNKNOWN_ERROR })
-      if (approvable && this.deps.hostBlockNotifier.shouldNotify(projectPath, host)) {
-        this.deps.emit.hostBlocked(panelId, host, approvable)
+
+      const known = kindsByHost.get(host) ?? []
+      const merged = mergeBlockedKinds(known, resourceKind)
+      if (merged !== null) {
+        kindsByHost.set(host, merged)
+      } else if (known.length === 0) {
+        kindsByHost.set(host, [resourceKind])
       }
+
+      // EMIT UNCONDITIONALLY. This used to fire only when the toast budget
+      // allowed, which meant the budget silently gated the DATA and not just the
+      // interruption: past three hosts the renderer was never told a host had
+      // been blocked, so it could not list it and the reader had no way to
+      // approve it. `notify` carries the budget verdict instead, and the
+      // renderer decides whether to interrupt.
+      const notify =
+        approvable && this.deps.hostBlockNotifier.shouldNotify(projectPath, host)
+      this.deps.emit.hostBlocked(
+        panelId,
+        host,
+        approvable,
+        kindsByHost.get(host) ?? [resourceKind],
+        notify
+      )
     }
 
     let session: PreviewSession
@@ -283,8 +314,8 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
         // the Approve prompt — never sees it; the preload reports it instead and
         // it lands here, on the identical sink, sharing the failure type, the
         // toast budget and the dedupe rule.
-        onBlockedHost: (host, url, approvable) =>
-          onBlocked('blocked-host', host, url, approvable)
+        onBlockedHost: (host, url, approvable, resourceKind) =>
+          onBlocked('blocked-host', host, url, approvable, resourceKind)
       })
     } catch {
       failureLog.drop()

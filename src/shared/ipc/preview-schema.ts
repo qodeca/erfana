@@ -14,6 +14,8 @@
  * @see docs/designs/sd-074-html-preview.md §4.2 - Schemas
  */
 import { z } from 'zod'
+
+import { PREVIEW_BLOCKED_KINDS } from './previewBlockedKind'
 import { ErrorCode } from '../errors'
 import { PreviewHostSchema } from './preview-settings-schema'
 import type {
@@ -179,7 +181,26 @@ export const PreviewHostBlockedPayloadSchema = z
   .object({
     panelId: PanelIdSchema,
     host: z.string().min(1).max(253),
-    approvable: z.boolean()
+    approvable: z.boolean(),
+    /**
+     * What the host was refused FOR, accumulated across sightings.
+     *
+     * A hostname alone is not something most people can judge. One host is
+     * often refused for several things, so this grows rather than recording
+     * only the first — labelling a host that will run scripts as "font" would
+     * misinform the reader through the very surface built to inform them.
+     */
+    kinds: z.array(z.enum(PREVIEW_BLOCKED_KINDS)).min(1).max(PREVIEW_BLOCKED_KINDS.length),
+    /**
+     * Whether this warrants interrupting the reader with a toast.
+     *
+     * A HINT, not a gate. This event used to be emitted ONLY when the toast
+     * budget allowed, which meant the budget silently gated the DATA: past
+     * three hosts the renderer was never told a host had been blocked at all,
+     * so it could not list it and the reader could not approve it. Every block
+     * is now reported and the renderer decides what to do about it.
+     */
+    notify: z.boolean()
   })
   .strict()
 export type PreviewHostBlockedPayload = z.infer<typeof PreviewHostBlockedPayloadSchema>

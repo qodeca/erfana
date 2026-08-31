@@ -40,6 +40,7 @@ import type {
   PreviewFailureInput,
   PreviewFailureType
 } from '../../../shared/ipc/preview-types'
+import type { PreviewBlockedKind } from '../../../shared/ipc/previewBlockedKind'
 import type { IPreviewAllowlistStore } from './PreviewAllowlistStore'
 import type { IPreviewRootRegistry } from './PreviewRootRegistry'
 import type { PreviewNativeImage } from './PreviewStillFrameCache'
@@ -134,7 +135,8 @@ export interface PreviewSessionCreateContext {
     kind: PreviewFailureType,
     host: string,
     url: string,
-    approvable: boolean
+    approvable: boolean,
+    resourceKind: PreviewBlockedKind
   ) => void
 }
 
