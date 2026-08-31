@@ -85,6 +85,21 @@ const CspViolationPayloadSchema = z
 export interface PreviewCspViolationBridge {
   /** Handle a payload from the preview page's preload. */
   handleViolation(payload: unknown): void
+  /**
+   * Forget everything reported so far, because the page is about to be replaced.
+   *
+   * Called when an approval reloads the view. The dedupe below is scoped to a
+   * PAGE LOAD, not to the view: a reload re-runs the document, so every host it
+   * still cannot reach is refused again and is news to the reader all over
+   * again. Without this the approve-one-host cascade silently ate the rest —
+   * `applyApprovedHosts` clears the failure log, the reload re-refused the
+   * remaining hosts, and this map swallowed every one of them, so they vanished
+   * from the badge AND became unapprovable until the panel was reopened.
+   *
+   * The rate-limit window is reset with it: a burst spent on the previous
+   * document must not silence the first reports of the new one.
+   */
+  reset(): void
   /** Stop reporting; called on teardown. */
   dispose(): void
 }
@@ -185,6 +200,12 @@ export function createPreviewCspViolationBridge(
       // name) is still recorded as a failure and still never offered for
       // approval — the same split the filter path makes.
       deps.onBlockedHost(host, parsed.data.blockedURI, isApprovableHost(host), kind)
+    },
+
+    reset(): void {
+      reportedHosts.clear()
+      windowStartedAt = now()
+      windowUsed = 0
     },
 
     dispose(): void {

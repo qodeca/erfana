@@ -26,6 +26,7 @@ import type {
 } from './PreviewSessionFactory'
 import type { PreviewFileWatcherHandle } from './previewViewLifecycle'
 import type { PreviewWindowLike } from './PreviewLiveView'
+import { PREVIEW_PAGE_CSP_VIOLATION_CHANNEL } from './previewCspViolationBridge'
 import { PreviewViewService, type PreviewOpenRequest, type PreviewViewDeps } from './PreviewViewService'
 
 type Listener = (...args: unknown[]) => void
@@ -46,12 +47,24 @@ interface FakeWc {
   executeJavaScriptInIsolatedWorld: ReturnType<
     typeof vi.fn<(worldId: number, scripts: { code: string }[]) => Promise<unknown>>
   >
+  /**
+   * Deliver a payload on a WebContents-scoped channel, as the previewed page's
+   * preload does.
+   *
+   * The page→main channels are registered on `wc.ipc`, never on global
+   * `ipcMain`. Without this the registration in `wirePreviewLifecycle` was
+   * optional-chained away (`wc.ipc?.on(...)`) against a fake that had no `ipc`
+   * at all, so the whole CSP-violation path existed unexercised.
+   */
+  emitIpc(channel: string, payload: unknown, senderFrame?: unknown): void
   setDestroyed(value: boolean): void
 }
 
 function makeFakeWc(): FakeWc {
   const listeners = new Map<string, Listener[]>()
+  const ipcListeners = new Map<string, Listener[]>()
   let destroyed = false
+  const mainFrame = { id: 'main-frame' }
 
   const on = vi.fn<(event: string, listener: Listener) => void>((event, listener) => {
     const arr = listeners.get(event) ?? []
@@ -106,7 +119,22 @@ function makeFakeWc(): FakeWc {
     isFocused,
     on: on as unknown as PreviewWebContentsHandle['on'],
     once: once as unknown as PreviewWebContentsHandle['once'],
-    removeListener: removeListener as unknown as PreviewWebContentsHandle['removeListener']
+    removeListener: removeListener as unknown as PreviewWebContentsHandle['removeListener'],
+    mainFrame,
+    ipc: {
+      on: (channel: string, listener: Listener) => {
+        const arr = ipcListeners.get(channel) ?? []
+        arr.push(listener)
+        ipcListeners.set(channel, arr)
+      },
+      removeListener: (channel: string, listener: Listener) => {
+        const arr = ipcListeners.get(channel) ?? []
+        ipcListeners.set(
+          channel,
+          arr.filter((entry) => entry !== listener)
+        )
+      }
+    }
   } as unknown as PreviewWebContentsHandle
 
   return {
@@ -125,6 +153,11 @@ function makeFakeWc(): FakeWc {
     destroy,
     close,
     executeJavaScriptInIsolatedWorld,
+    emitIpc: (channel, payload, senderFrame = mainFrame) => {
+      for (const listener of ipcListeners.get(channel) ?? []) {
+        listener({ senderFrame }, payload)
+      }
+    },
     setDestroyed: (value) => {
       destroyed = value
     }
@@ -1476,5 +1509,82 @@ describe('PreviewViewService — every blocked host reaches the renderer', () =>
     const [, host, approvable] = h.hostBlocked.mock.calls[0]
     expect(host).toBe('localhost')
     expect(approvable).toBe(false)
+  })
+})
+
+describe('PreviewViewService — a CSP refusal survives an approval', () => {
+  /**
+   * Refuse one subresource, the way the previewed page's preload reports it.
+   *
+   * Goes through the real `wc.ipc` channel rather than the bridge's API, so
+   * these cases cover the WIRING — preload channel → main-frame gate → bridge →
+   * `onBlockedHost` → `hostBlocked` — and not just the bridge in isolation.
+   */
+  function refuse(
+    h: ReturnType<typeof makeHarness>,
+    url: string,
+    effectiveDirective = 'img-src'
+  ): void {
+    h.factory.emitIpc(PREVIEW_PAGE_CSP_VIOLATION_CHANNEL, { blockedURI: url, effectiveDirective })
+  }
+
+  /** The hosts `hostBlocked` was called with, in order. */
+  function reportedHosts(h: ReturnType<typeof makeHarness>): string[] {
+    return h.hostBlocked.mock.calls.map((call) => call[1] as string)
+  }
+
+  it('reports a host the CSP refused, and reports it once', async () => {
+    // The positive control for every case below: without this, "nothing was
+    // reported" would be indistinguishable from "the channel was never wired".
+    const h = makeHarness()
+    await h.service.open(REQUEST_A, h.window)
+
+    refuse(h, 'https://fonts.gstatic.com/f.woff2', 'font-src')
+    refuse(h, 'https://fonts.gstatic.com/g.woff2', 'font-src')
+
+    expect(reportedHosts(h)).toEqual(['fonts.gstatic.com'])
+  })
+
+  it('re-reports the hosts still blocked after a different host is approved', async () => {
+    // THE DEFECT. `applyApprovedHosts` clears the failure log and reloads the
+    // SAME WebContents, but the CSP bridge's per-host dedupe map lived for the
+    // whole life of the view. So the reload refused B and C again, the bridge
+    // swallowed both as already-seen, and the log they would have been listed in
+    // had just been emptied. Approving one host made every other blocked host
+    // vanish from the badge AND become unapprovable — recoverable only by
+    // closing and reopening the panel.
+    //
+    // The network filter cannot compensate: the whole premise of the CSP bridge
+    // is that a refusal in the renderer never reaches `onBeforeRequest`.
+    const h = makeHarness()
+    await h.service.open(REQUEST_A, h.window)
+
+    refuse(h, 'https://a.example.com/1.png')
+    refuse(h, 'https://b.example.com/2.png')
+    refuse(h, 'https://c.example.com/3.png')
+    expect(reportedHosts(h)).toEqual(['a.example.com', 'b.example.com', 'c.example.com'])
+
+    h.hostBlocked.mockClear()
+    await h.service.applyApprovedHosts('panel-A', ['a.example.com'])
+
+    // The reload replays the page, so the CSP refuses B and C all over again.
+    refuse(h, 'https://b.example.com/2.png')
+    refuse(h, 'https://c.example.com/3.png')
+
+    expect(reportedHosts(h)).toEqual(['b.example.com', 'c.example.com'])
+  })
+
+  it('still de-duplicates within one page load', async () => {
+    // The reset must be tied to the approval, not applied on every violation:
+    // twenty violations for one font host are still one row.
+    const h = makeHarness()
+    await h.service.open(REQUEST_A, h.window)
+    h.hostBlocked.mockClear()
+
+    for (let i = 0; i < 20; i += 1) {
+      refuse(h, `https://cdn.example.com/img-${i}.png`)
+    }
+
+    expect(reportedHosts(h)).toEqual(['cdn.example.com'])
   })
 })

@@ -190,6 +190,53 @@ describe('previewCspViolationBridge', () => {
     })
   })
 
+  describe('a new page load', () => {
+    it('reports a host again after reset, but not before it', () => {
+      // The dedupe is scoped to a PAGE LOAD. An approval reloads the document,
+      // so every host still refused is news to the reader again. The first half
+      // of this test is the control: without it, "reported twice" could mean the
+      // dedupe had simply stopped working.
+      const { bridge, onBlockedHost } = makeBridge()
+
+      bridge.handleViolation(violation('https://cdn.example.com/a.png'))
+      bridge.handleViolation(violation('https://cdn.example.com/b.png'))
+      expect(onBlockedHost).toHaveBeenCalledTimes(1)
+
+      bridge.reset()
+      bridge.handleViolation(violation('https://cdn.example.com/a.png'))
+
+      expect(onBlockedHost).toHaveBeenCalledTimes(2)
+    })
+
+    it('gives the new page a fresh rate-limit budget', () => {
+      // A burst spent on the previous document must not silence the first
+      // reports of the next one.
+      const clock = 1_000_000
+      const { bridge, onBlockedHost } = makeBridge(() => clock)
+
+      for (let i = 0; i < 40; i += 1) {
+        bridge.handleViolation(violation(`https://burst-${i}.example.com/a.js`))
+      }
+      expect(onBlockedHost).toHaveBeenCalledTimes(30)
+
+      // Same instant, so only the reset can explain the next report landing.
+      bridge.reset()
+      bridge.handleViolation(violation('https://after-the-reload.example.com/a.js'))
+
+      expect(onBlockedHost).toHaveBeenCalledTimes(31)
+    })
+
+    it('does not resurrect a disposed bridge', () => {
+      const { bridge, onBlockedHost } = makeBridge()
+
+      bridge.dispose()
+      bridge.reset()
+      bridge.handleViolation(violation('https://cdn.example.com/a.png'))
+
+      expect(onBlockedHost).not.toHaveBeenCalled()
+    })
+  })
+
   describe('teardown', () => {
     it('reports nothing after dispose', () => {
       const { bridge, onBlockedHost } = makeBridge()

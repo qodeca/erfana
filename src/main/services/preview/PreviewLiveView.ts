@@ -592,6 +592,11 @@ export class PreviewLiveView {
       return
     }
     this.failureLog.clear()
+    // The dedupe is scoped to a page load, and this is a new one. Clearing the
+    // log without clearing the bridge left every host the reader did NOT approve
+    // swallowed as already-seen on the reload — gone from the badge and
+    // unapprovable. See `PreviewCspViolationBridge.reset`.
+    this.cspViolationBridge.reset()
     this.wc.reloadIgnoringCache()
   }
 
