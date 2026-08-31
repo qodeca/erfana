@@ -184,6 +184,7 @@ function makeHarness(
   options: { zoom?: number; now?: () => number; windowId?: number } = {}
 ): Harness {
   const backdropChanged = vi.fn<(panelId: string, color: string) => void>()
+  const boundsApplied = vi.fn<(panelId: string, seq: number) => void>()
   const factory = makeFakeWc()
   // Held as its own typed reference: the `as unknown as PreviewViewHandle` cast
   // below erases the `vi.fn` typing, so a test that wants to read the colours
@@ -289,7 +290,8 @@ function makeHarness(
       findResult: vi.fn(),
       stillFrameChanged: vi.fn(),
       backdropChanged,
-      loadStateChanged
+      loadStateChanged,
+      boundsApplied
     },
     createWatchCoordinator: vi.fn<
       (realRoot: string, onChanged: (paths: readonly string[]) => void) => IPreviewWatchCoordinator
@@ -340,6 +342,7 @@ function makeHarness(
     },
     setBackgroundColor,
     backdropChanged,
+    boundsApplied,
     hostBlocked,
     reloadRecord,
     readEntryHtml,
@@ -1224,5 +1227,151 @@ describe('PreviewViewService — project-scoped shared state', () => {
     expect(h.revoke).toHaveBeenCalledTimes(2)
     // The slots are free again.
     expect(await h.service.open(REQUEST_A, h.window)).toEqual({ ok: true })
+  })
+})
+
+describe('PreviewViewService — bounds confirmation', () => {
+  /** A harness with panel A already open, ready to be pushed new bounds. */
+  async function openPanel(): Promise<ReturnType<typeof makeHarness>> {
+    const h = makeHarness()
+    await h.service.open(REQUEST_A, h.window)
+    return h
+  }
+
+  /**
+   * Push with `ack` and assert it DID confirm.
+   *
+   * Every "says nothing" case below needs one of these. "Not called" is also the
+   * state of a build where the confirmation does not exist at all, so a lone
+   * negative assertion passes against unfeatured code and proves nothing — this
+   * branch has produced that shape of vacuous test repeatedly. The control makes
+   * the silence mean "deliberately withheld" rather than "never implemented".
+   */
+  async function expectConfirms(
+    h: Awaited<ReturnType<typeof openPanel>>,
+    seq: number
+  ): Promise<void> {
+    h.service.setBounds('panel-A', { x: 0, y: 0, width: 200, height: 100 }, seq, true)
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(h.boundsApplied).toHaveBeenCalledWith('panel-A', seq)
+  }
+
+  // A confirmation exists so a caller can reveal Erfana's own chrome and know
+  // the untrusted page has actually moved off it. Until then the page is still
+  // painting there, and a native view takes input over its rect whatever the
+  // DOM says — so a control rendered early can be both spoofed and clicked
+  // through.
+  //
+  // Which means SILENCE has to be safe, and every path that drops a push must
+  // stay silent. These cases are mostly about that.
+
+  it('confirms only after the page reports a repaint', async () => {
+    const h = await openPanel()
+    h.boundsApplied.mockClear()
+
+    // The isolated-world call is what asks the page. Hold it pending, and no
+    // confirmation may go out: `view.setBounds` having returned is exactly the
+    // thing that is NOT sufficient.
+    let release: (value: unknown) => void = () => {}
+    h.factory.executeJavaScriptInIsolatedWorld.mockImplementationOnce(
+      () => new Promise((resolve) => { release = resolve })
+    )
+
+    h.service.setBounds('panel-A', { x: 0, y: 0, width: 200, height: 100 }, 9, true)
+    expect(h.view.setBounds).toHaveBeenCalled()
+    expect(h.boundsApplied).not.toHaveBeenCalled()
+
+    release(420)
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(h.boundsApplied).toHaveBeenCalledWith('panel-A', 9)
+  })
+
+  it('asks the page in an isolated world, so it cannot answer on Erfana\'s behalf', async () => {
+    const h = await openPanel()
+    h.factory.executeJavaScriptInIsolatedWorld.mockClear()
+
+    h.service.setBounds('panel-A', { x: 0, y: 0, width: 200, height: 100 }, 10, true)
+
+    const [worldId, scripts] = h.factory.executeJavaScriptInIsolatedWorld.mock.calls[0]
+    expect(worldId).toBeGreaterThan(0)
+    // Two frames, not one: the first may already have been scheduled before the
+    // resize reached the page.
+    const code = (scripts as { code: string }[])[0].code
+    expect(code.match(/requestAnimationFrame/g)?.length).toBe(2)
+  })
+
+  it('says nothing for an ordinary push that did not ask', async () => {
+    const h = await openPanel()
+    h.boundsApplied.mockClear()
+    h.factory.executeJavaScriptInIsolatedWorld.mockClear()
+
+    h.service.setBounds('panel-A', { x: 0, y: 0, width: 200, height: 100 }, 11)
+    await Promise.resolve()
+
+    expect(h.view.setBounds).toHaveBeenCalled()
+    expect(h.factory.executeJavaScriptInIsolatedWorld).not.toHaveBeenCalled()
+    expect(h.boundsApplied).not.toHaveBeenCalled()
+
+    // Control: the very next push, asking, does confirm.
+    await expectConfirms(h, 12)
+  })
+
+  it('says nothing when the push was DROPPED as stale', async () => {
+    const h = await openPanel()
+    h.service.setBounds('panel-A', { x: 0, y: 0, width: 200, height: 100 }, 20)
+    h.boundsApplied.mockClear()
+    h.factory.executeJavaScriptInIsolatedWorld.mockClear()
+
+    // Lower seq: dropped. Confirming it would tell the renderer the view is
+    // somewhere it is not.
+    h.service.setBounds('panel-A', { x: 0, y: 0, width: 200, height: 100 }, 19, true)
+    await Promise.resolve()
+
+    expect(h.boundsApplied).not.toHaveBeenCalled()
+
+    // Control: a FRESH seq on the same view confirms, so the silence above is
+    // about staleness and not about a missing feature.
+    await expectConfirms(h, 21)
+  })
+
+  it('says nothing when the page fails to answer', async () => {
+    const h = await openPanel()
+    h.boundsApplied.mockClear()
+    h.factory.executeJavaScriptInIsolatedWorld.mockRejectedValueOnce(new Error('gone'))
+
+    h.service.setBounds('panel-A', { x: 0, y: 0, width: 200, height: 100 }, 12, true)
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(h.boundsApplied).not.toHaveBeenCalled()
+
+    // Control: the rejection was one-shot, and the next push confirms.
+    await expectConfirms(h, 13)
+  })
+
+  it('lets the newest push own the confirmation', async () => {
+    // A resize mid-flight means the earlier answer describes a geometry that is
+    // already gone.
+    const h = await openPanel()
+    h.boundsApplied.mockClear()
+
+    let release: (value: unknown) => void = () => {}
+    h.factory.executeJavaScriptInIsolatedWorld.mockImplementationOnce(
+      () => new Promise((resolve) => { release = resolve })
+    )
+    h.service.setBounds('panel-A', { x: 0, y: 0, width: 200, height: 100 }, 30, true)
+    h.service.setBounds('panel-A', { x: 0, y: 0, width: 300, height: 100 }, 31)
+
+    release(420)
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(h.boundsApplied).not.toHaveBeenCalledWith('panel-A', 30)
+
+    // Control: seq 32 confirms as itself, so the withheld 30 is about being
+    // overtaken rather than about nothing ever confirming.
+    await expectConfirms(h, 32)
   })
 })

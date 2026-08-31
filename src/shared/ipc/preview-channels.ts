@@ -61,7 +61,18 @@ export const PreviewEvents = {
   /** An enumerated keyboard accelerator was forwarded from the sealed page */
   FORWARDED_SHORTCUT: 'preview:forwardedShortcut',
   /** A link in the page resolved to a project file the renderer should open */
-  OPEN_FILE_REQUESTED: 'preview:openFileRequested'
+  OPEN_FILE_REQUESTED: 'preview:openFileRequested',
+  /**
+   * A bounds push has been APPLIED and the page has repainted at the new size.
+   *
+   * Only sent for a push that asked for it. `setBounds` is otherwise
+   * fire-and-forget, which is fine for the steady state but not for a change
+   * that REVEALS Erfana's own chrome: until the page has actually moved, it is
+   * still painting over the area, and a native view takes input over its rect
+   * whatever the DOM says. Anything that puts controls in newly revealed space
+   * must wait for this.
+   */
+  BOUNDS_APPLIED: 'preview:boundsApplied'
 } as const
 
 /**

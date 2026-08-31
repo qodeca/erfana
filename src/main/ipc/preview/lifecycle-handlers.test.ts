@@ -167,7 +167,38 @@ describe('registerPreviewLifecycleHandlers', () => {
   it('setBounds delegates panelId, bounds and seq to the service', () => {
     const { service } = setup()
     listeners[PreviewChannels.SET_BOUNDS](event, { panelId: 'p1', bounds: BOUNDS, seq: 5 })
-    expect(service.setBounds).toHaveBeenCalledWith('p1', BOUNDS, 5)
+    // `ack` arrives as `undefined` for an ordinary pump push: the flag is
+    // omitted from the wire payload rather than sent as `false`, so a
+    // steady-state push is byte-identical to what it was before it existed.
+    expect(service.setBounds).toHaveBeenCalledWith('p1', BOUNDS, 5, undefined)
+  })
+
+  it('forwards a request for a bounds confirmation', () => {
+    // The flag is what makes a transition that REVEALS Erfana's chrome wait for
+    // the page to move. Dropped here, the renderer would render controls into
+    // space the page is still painting over — and a native view takes input
+    // over its rect whatever the DOM says.
+    const { service } = setup()
+    listeners[PreviewChannels.SET_BOUNDS](event, {
+      panelId: 'p1',
+      bounds: BOUNDS,
+      seq: 6,
+      ack: true
+    })
+    expect(service.setBounds).toHaveBeenCalledWith('p1', BOUNDS, 6, true)
+  })
+
+  it('refuses a setBounds payload carrying an unknown key', () => {
+    // The schema is `.strict()`. Adding an optional field must not turn the
+    // payload into an open bag.
+    const { service } = setup()
+    listeners[PreviewChannels.SET_BOUNDS](event, {
+      panelId: 'p1',
+      bounds: BOUNDS,
+      seq: 7,
+      smuggled: true
+    })
+    expect(service.setBounds).not.toHaveBeenCalled()
   })
 
   it('setVisibility delegates to the service', () => {

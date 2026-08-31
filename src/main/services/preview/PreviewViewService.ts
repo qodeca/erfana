@@ -73,7 +73,7 @@ export interface PreviewOpenRequest {
 export interface IPreviewViewService {
   open(req: PreviewOpenRequest, window: PreviewWindowLike): Promise<PreviewOpenResult>
   close(panelId: string): Promise<void>
-  setBounds(panelId: string, bounds: PreviewBounds, seq: number): void
+  setBounds(panelId: string, bounds: PreviewBounds, seq: number, ack?: boolean): void
   setVisibility(panelId: string, visible: boolean, reason: string): Promise<void>
   reload(panelId: string, opts?: { ignoreCache?: boolean }): Promise<void>
   /** Zoom the previewed page by `step` levels, or back to 100% with `0`. */
@@ -403,8 +403,11 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
     }
   }
 
-  setBounds(panelId: string, bounds: PreviewBounds, seq: number): void {
-    this.registry.get(panelId)?.setBounds(bounds, seq)
+  setBounds(panelId: string, bounds: PreviewBounds, seq: number, ack = false): void {
+    // A panel with no live view drops the push silently, as it always has — and
+    // therefore sends no confirmation either, which is the honest answer: the
+    // view is not where the renderer thinks it is.
+    this.registry.get(panelId)?.setBounds(bounds, seq, ack)
   }
 
   async setVisibility(panelId: string, visible: boolean, _reason: string): Promise<void> {

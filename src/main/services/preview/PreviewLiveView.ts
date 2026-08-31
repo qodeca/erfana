@@ -76,6 +76,22 @@ const BACKDROP_WORLD_ID = 998
 /** A non-main isolated world for the CSS-swap script (§1.4: page cannot shadow it). */
 const SWAP_WORLD_ID = 999
 
+/**
+ * Isolated world for the bounds-repaint confirmation. Distinct from the backdrop
+ * and CSS-swap worlds so a long-running swap cannot delay it.
+ */
+const BOUNDS_ACK_WORLD_ID = 997
+
+/**
+ * Resolve once the page has produced a frame at its current size.
+ *
+ * Two frames, not one: the first can be one already scheduled before the resize
+ * reached the page, so only the second is certainly after it.
+ */
+const REPAINTED_SCRIPT = `new Promise((resolve) => {
+  requestAnimationFrame(() => requestAnimationFrame(() => resolve(window.innerHeight)))
+})`
+
 /** The slice of a `BrowserWindow` a live view uses. Structural for tests. */
 export interface PreviewWindowLike {
   /**
@@ -406,7 +422,7 @@ export class PreviewLiveView {
     return this.destroyed || this.closing || this.wc.isDestroyed()
   }
 
-  setBounds(bounds: PreviewBounds, seq: number): void {
+  setBounds(bounds: PreviewBounds, seq: number, ack = false): void {
     if (this.isDefunct) {
       return
     }
@@ -420,6 +436,57 @@ export class PreviewLiveView {
     }
     this.lastBounds = dip
     this.view.setBounds(dip)
+
+    // Every path that returns EARLY above deliberately emits nothing. A caller
+    // waiting on this confirmation must fall back safely on silence, and a
+    // dropped push is exactly a case where it must: the view is not where the
+    // renderer believes it is.
+    if (ack) {
+      void this.confirmRepaint(seq)
+    }
+  }
+
+  /**
+   * Tell the renderer once the PAGE has repainted at its new size.
+   *
+   * WHY THIS ASKS THE PAGE. The obvious confirmation is "`view.setBounds`
+   * returned", which assumes a `WebContentsView`'s composited texture is clipped
+   * to its bounds in that same frame. That could not be verified from inside the
+   * app — `capturePage` on the host does NOT include native child views, so the
+   * host cannot observe what the compositor did, and checking it properly would
+   * need an OS-level screen grab behind a permission prompt. Rather than build a
+   * security control on an unverifiable claim, this asks the page for something
+   * directly observable: two animation frames, which cannot both run before the
+   * resize has been applied to it.
+   *
+   * Isolated world, so a page cannot shadow `requestAnimationFrame` and answer
+   * early on Erfana's behalf.
+   *
+   * The reported height is logged, never compared. The page's own zoom level
+   * makes `innerHeight` differ from the DIP height by design, so an equality
+   * check would fail on every zoomed preview; the frame count is the guarantee.
+   *
+   * Measured on Electron 39: ~17 ms for an idle page, ~120-139 ms for one doing
+   * real work each frame, and NEVER for a page that refuses to yield. The last
+   * case is why callers need a timeout — and why silence is safe to treat as
+   * "assume it is still covering you": a page that never yields never repaints
+   * either, so its stale texture really is still at the old geometry.
+   */
+  private async confirmRepaint(seq: number): Promise<void> {
+    try {
+      const height = await this.wc.executeJavaScriptInIsolatedWorld(BOUNDS_ACK_WORLD_ID, [
+        { code: REPAINTED_SCRIPT }
+      ])
+      if (this.isDefunct || seq !== this.lastBoundsSeq) {
+        // A newer push overtook this one; that push owns the confirmation.
+        return
+      }
+      this.deps.emit.boundsApplied(this.panelId, seq)
+      logger.debug('Preview bounds applied', { panelId: this.panelId, seq, height })
+    } catch {
+      // A page that tore down mid-frame, or a world that could not run. Silence
+      // is the safe answer, and the caller already has to handle it.
+    }
   }
 
   /**

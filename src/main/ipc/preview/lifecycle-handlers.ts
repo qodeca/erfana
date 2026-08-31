@@ -204,7 +204,7 @@ export function registerPreviewLifecycleHandlers(
         })
         return
       }
-      service.setBounds(parsed.data.panelId, parsed.data.bounds, parsed.data.seq)
+      service.setBounds(parsed.data.panelId, parsed.data.bounds, parsed.data.seq, parsed.data.ack)
     } catch (error) {
       logger.error('preview:setBounds failed', error instanceof Error ? error : undefined)
     }

@@ -27,7 +27,8 @@ import type {
   PreviewBackdropPayload,
   PreviewLoadStatePayload,
   PreviewOpenRequest,
-  PreviewStillFramePayload
+  PreviewStillFramePayload,
+  PreviewBoundsAppliedPayload
 } from '../shared/ipc/preview-schema'
 import type {
   PdfExportResult,
@@ -54,8 +55,18 @@ export const previewBridge: PreviewBridge = {
   close: (panelId: string): Promise<void> =>
     ipcRenderer.invoke(PreviewChannels.CLOSE, { panelId }),
 
-  setBounds: (panelId: string, bounds: PreviewBoundsPayload, seq: number): void =>
-    ipcRenderer.send(PreviewChannels.SET_BOUNDS, { panelId, bounds, seq }),
+  setBounds: (
+    panelId: string,
+    bounds: PreviewBoundsPayload,
+    seq: number,
+    options?: { ack?: boolean }
+  ): void =>
+    // `ack` is omitted rather than sent as `false` so a steady-state push stays
+    // byte-identical to what it was before the flag existed.
+    ipcRenderer.send(
+      PreviewChannels.SET_BOUNDS,
+      options?.ack === true ? { panelId, bounds, seq, ack: true } : { panelId, bounds, seq }
+    ),
 
   setVisibility: (panelId: string, visible: boolean, reason: string): void =>
     ipcRenderer.send(PreviewChannels.SET_VISIBILITY, { panelId, visible, reason }),
@@ -98,6 +109,9 @@ export const previewBridge: PreviewBridge = {
 
   onBackdropChanged: (callback: (payload: PreviewBackdropPayload) => void): (() => void) =>
     subscribe(PreviewEvents.BACKDROP_CHANGED, callback),
+
+  onBoundsApplied: (callback: (payload: PreviewBoundsAppliedPayload) => void): (() => void) =>
+    subscribe(PreviewEvents.BOUNDS_APPLIED, callback),
 
   onForwardedShortcut: (callback: (payload: PreviewForwardedShortcut) => void): (() => void) =>
     subscribe(PreviewEvents.FORWARDED_SHORTCUT, callback),

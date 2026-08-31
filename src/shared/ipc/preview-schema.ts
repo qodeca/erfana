@@ -95,10 +95,42 @@ export const PreviewSetBoundsSchema = z
   .object({
     panelId: PanelIdSchema,
     bounds: PreviewBoundsSchema,
-    seq: z.number().int().nonnegative()
+    seq: z.number().int().nonnegative(),
+    /**
+     * Ask for a `boundsApplied` confirmation once the page has repainted at the
+     * new size.
+     *
+     * OPTIONAL, and set only on the pushes that need it — a transition that
+     * reveals Erfana's chrome. The bounds pump sends one of these per frame
+     * while a panel is resizing, and confirming every one would cost a round
+     * trip into the page for each. Absent means today's fire-and-forget.
+     */
+    ack: z.boolean().optional()
   })
   .strict()
 export type PreviewSetBounds = z.infer<typeof PreviewSetBoundsSchema>
+
+/**
+ * Sent once for a push that asked for it, AFTER the page has painted at its new
+ * size — never merely after `view.setBounds` returned.
+ *
+ * The distinction is the whole point. Whether a view's composited texture is
+ * clipped to its bounds in the same frame the call returns could not be
+ * measured from inside the app: `capturePage` on the host does not include
+ * native child views, so the host cannot observe what the compositor did.
+ * Rather than rest on an unverifiable claim, the confirmation asks the page
+ * itself — two animation frames in an isolated world — which is directly
+ * observable. Measured on Electron 39: ~17 ms for an idle page, ~130 ms for a
+ * heavy one, and never for a page that refuses to yield, which is why every
+ * caller needs a timeout and a safe fallback.
+ */
+export const PreviewBoundsAppliedPayloadSchema = z
+  .object({
+    panelId: PanelIdSchema,
+    seq: z.number().int().nonnegative()
+  })
+  .strict()
+export type PreviewBoundsAppliedPayload = z.infer<typeof PreviewBoundsAppliedPayloadSchema>
 
 export const PreviewSetVisibilitySchema = z
   .object({
@@ -308,7 +340,13 @@ export interface PreviewBridge {
   /** Close and destroy the preview for a panel. */
   close(panelId: string): Promise<void>
   /** Update the native view bounds (fire-and-forget; stale seqs dropped). */
-  setBounds(panelId: string, bounds: PreviewBoundsPayload, seq: number): void
+  setBounds(
+    panelId: string,
+    bounds: PreviewBoundsPayload,
+    seq: number,
+    /** Ask for a `boundsApplied` confirmation; see {@link PreviewSetBoundsSchema}. */
+    options?: { ack?: boolean }
+  ): void
   /** Update view visibility with a diagnostic reason (fire-and-forget). */
   setVisibility(panelId: string, visible: boolean, reason: string): void
   /** Reload the previewed page. */
@@ -340,6 +378,8 @@ export interface PreviewBridge {
   onLoadStateChanged(callback: (payload: PreviewLoadStatePayload) => void): () => void
   /** Subscribe to backdrop-colour changes; returns an unsubscribe. */
   onBackdropChanged(callback: (payload: PreviewBackdropPayload) => void): () => void
+  /** The page has repainted at the size a prior `ack` push asked about. */
+  onBoundsApplied(callback: (payload: PreviewBoundsAppliedPayload) => void): () => void
   /** Subscribe to forwarded keyboard accelerators; returns an unsubscribe. */
   onForwardedShortcut(callback: (payload: PreviewForwardedShortcut) => void): () => void
   /**

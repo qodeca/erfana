@@ -125,6 +125,14 @@ export interface PreviewEmitters {
    */
   backdropChanged(panelId: string, color: string): void
   /**
+   * A bounds push that asked for confirmation has been applied AND the page has
+   * repainted at the new size.
+   *
+   * Only the renderer knows which push it cares about, so the `seq` it sent
+   * comes back with it.
+   */
+  boundsApplied(panelId: string, seq: number): void
+  /**
    * A link inside the previewed page resolved to a project file that should
    * open as an Erfana tab (sd-074b §5.4).
    *

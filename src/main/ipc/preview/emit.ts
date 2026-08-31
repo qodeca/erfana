@@ -28,6 +28,7 @@ import {
   PreviewFindResultSchema,
   PreviewStillFrameSchema,
   PreviewBackdropPayloadSchema,
+  PreviewBoundsAppliedPayloadSchema,
   PreviewLoadStatePayloadSchema,
   PreviewForwardedShortcutSchema,
   PreviewOpenFileRequestedSchema,
@@ -223,6 +224,16 @@ export function createPreviewEmitters(deps: PreviewEmittersDeps): PreviewEmitter
       validateAndSend(PreviewEvents.BACKDROP_CHANGED, PreviewBackdropPayloadSchema, {
         panelId,
         color
+      })
+    },
+
+    boundsApplied(panelId: string, seq: number): void {
+      // Deliberately NOT coalesced. It is sent only for a push that asked for
+      // it, which is a user-initiated transition, not the per-frame pump; and a
+      // renderer waiting on a specific `seq` must not have it collapsed away.
+      validateAndSend(PreviewEvents.BOUNDS_APPLIED, PreviewBoundsAppliedPayloadSchema, {
+        panelId,
+        seq
       })
     },
 
