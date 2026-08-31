@@ -6,7 +6,21 @@ Per-version release notes for Erfana, v0.9.0 onwards. Earlier: v0.8.0–v0.8.3 i
 
 ## Unreleased
 
-*Not yet released.*
+### Fixed
+
+- **Text fields you could not see** – an input's inside was exactly the same colour as the panel behind it, and its border was so faint it measured 1.24:1 against a required 3:1. On a good monitor in a bright room you found the box by clicking where you guessed it was; with low vision you could not find it at all. Fields now draw a boundary you can actually see, on every surface they appear on, and placeholder text went from 2.69:1 to 4.53:1 so it is readable rather than a suggestion of text. This affects every dialog, the rename box, the search bar and the settings panel.
+- **Coloured values in document frontmatter came out plain grey** – a `true` or a `42` at the top of a markdown file was supposed to be colour-coded like the strings beside it. The colours were referenced but never defined, so they silently fell back to body text in every document with frontmatter. Numbers and booleans are now coloured, and the window picker's thumbnail frame – missing for the same reason – is back.
+- **A flash of light theme on a light-mode Mac or PC** – one toolbar in the diagram view had its own light-mode styling, left over and unmaintained. Erfana is dark-only, but that toolbar followed your operating system instead, so anyone running a light desktop saw it in the wrong colours. Removed.
+- **The keyboard focus ring on dialog buttons appeared after mouse clicks too**, which made it look like a rendering fault. It is now shown to keyboard users only, which is who it is for.
+
+### Changed
+
+- **Two more checks now have to pass before code can merge**, both inside the existing `Lint` job: a stylesheet linter that fails on a raw colour, a hard-coded stacking order, or a rounded corner; and a check that the design system in `design/` has been rebuilt after a token change. Run `npm run lint:css` and `npm run design -- --check` locally before pushing. See [Continuous integration](./ci.md).
+- **`design/` is now the source of truth for how Erfana looks.** It is a set of pages you open in a browser, each deciding one rule – one focus ring, one selected state, one warning colour – and showing it working rather than describing it. Every number in it is calculated from the real code on each run, so it cannot quietly go out of date. [`docs/ui-style-guide.md`](./ui-style-guide.md) has been cut back to the few things the cards do not cover. Start at [`design/index.html`](../design/index.html).
+
+### Known issues
+
+- Nine accessibility defects found during this work are recorded and filed but **not yet fixed**: the file tree and right-click menu cannot be used with a keyboard, most dialogs do not trap focus, and several controls are smaller than the minimum touch target. See [Known issues § Accessibility](./known-issues.md#accessibility) and issues [#88–#96](https://github.com/qodeca/erfana/issues/88).
 
 ### Added
 

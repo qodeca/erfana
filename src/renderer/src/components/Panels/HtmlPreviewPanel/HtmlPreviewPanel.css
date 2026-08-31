@@ -4,7 +4,8 @@
  * HtmlPreviewPanel Styles (Issue #74, work item 71).
  *
  * Plain co-located global CSS (not a CSS module, per design §1.8). All values
- * come from design tokens (docs/ui-style-guide.md); no rounded corners.
+ * come from design tokens; no rounded corners. Governed by
+ * design/system/foundations/surfaces.html.
  *
  * The placeholder's background is the STARTING half of a two-value invariant:
  * the DOM placeholder and the native view's backdrop always carry the same

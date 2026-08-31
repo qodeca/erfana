@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 
-const EXTS = ['.ts', '.tsx', '.js', '.mjs', '.cjs', '.css']
+const EXTS = ['.ts', '.tsx', '.js', '.mjs', '.cjs', '.css', '.html']
 // REUSE-IgnoreStart
 const TOKEN = 'SPDX-License-Identifier: GPL-3.0-only'
 // REUSE-IgnoreEnd

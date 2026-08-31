@@ -21,7 +21,6 @@
   --dialog-tooltip-min-width: 100px;
   --dialog-icon-size: var(--icon-size-xl);
   --dialog-icon-gap: var(--space-6);
-  --dialog-icon-radius: var(--border-radius);
   --dialog-header-margin: var(--space-8);
 }
 
@@ -128,8 +127,21 @@
   letter-spacing: 0.2px;
 }
 
-.dialog-btn:focus {
-  outline: 2px solid var(--dialog-btn-primary-bg);
+/* The one focus ring, per design/system/foundations/focus.html.
+ *
+ * Three things changed here and none of them is visible today:
+ *   :focus -> :focus-visible   a bare :focus paints the ring after a MOUSE click
+ *                              too, which looks broken, which is why people
+ *                              delete focus rings.
+ *   2px -> --border-width-thick  the width is a token, not a literal.
+ *   --dialog-btn-primary-bg -> --color-border-focus
+ *                              both resolve to --color-brand-violet, so this is
+ *                              identical on screen - but one of them MEANS
+ *                              "focus" and the other means "the primary button
+ *                              is violet". Repoint the button colour and the old
+ *                              rule would have silently moved the focus ring. */
+.dialog-btn:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
   outline-offset: var(--space-1);
 }
 
@@ -218,7 +230,9 @@
   width: 100%;
   padding: var(--space-6);
   background-color: var(--color-bg-input);
-  border: var(--border-width) solid var(--dialog-border);
+  /* --color-border-input, not a divider token: this boundary is the only thing
+     identifying the control (its fill matches the panel). SC 1.4.11 needs 3:1. */
+  border: var(--border-width) solid var(--color-border-input);
   border-radius: var(--border-radius);
   color: var(--dialog-text-secondary);
   font-size: var(--text-md);
@@ -457,7 +471,7 @@
   justify-content: center;
   width: var(--dialog-icon-size);
   height: var(--dialog-icon-size);
-  border-radius: var(--dialog-icon-radius);
+  border-radius: var(--border-radius);
   background-color: var(--color-bg-hover);
   color: var(--dialog-text-secondary);
 }
@@ -494,7 +508,9 @@
   width: 100%;
   padding: var(--space-5) var(--space-6);
   background-color: var(--color-bg-input);
-  border: var(--border-width) solid var(--dialog-border);
+  /* --color-border-input, not a divider token: this boundary is the only thing
+     identifying the control (its fill matches the panel). SC 1.4.11 needs 3:1. */
+  border: var(--border-width) solid var(--color-border-input);
   border-radius: var(--border-radius);
   color: var(--dialog-text-secondary);
   font-size: var(--text-md);
@@ -535,7 +551,9 @@
   padding: var(--space-5) var(--space-6);
   padding-right: var(--space-12); /* Extra space for custom arrow */
   background-color: var(--color-bg-input);
-  border: var(--border-width) solid var(--dialog-border);
+  /* --color-border-input, not a divider token: this boundary is the only thing
+     identifying the control (its fill matches the panel). SC 1.4.11 needs 3:1. */
+  border: var(--border-width) solid var(--color-border-input);
   border-radius: 0; /* UI Style Guide: no rounded corners */
   color: var(--color-text-primary);
   font-size: var(--text-md);

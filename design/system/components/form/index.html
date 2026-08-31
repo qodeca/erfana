@@ -1,0 +1,226 @@
+<!-- @card group="Components" name="Form controls" subtitle="One input, one select, one checkbox — and an error that a screen reader can find" status="decided" reviewed="2026-08-31" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Erfana — form controls</title>
+<link rel="stylesheet" href="../../../tokens.css">
+<link rel="stylesheet" href="../../../ds.css">
+<script src="../../../claims.js"></script>
+<style>
+  .field { max-width: 420px; margin-bottom: var(--space-12); }
+  .field__label { display: block; margin-bottom: var(--space-3);
+                  font-size: var(--text-base); color: var(--color-text-primary); }
+  .field__hint { margin: var(--space-2) 0 0; font-size: var(--text-sm); color: var(--color-text-tertiary); }
+  .field__error { display: flex; gap: var(--space-3); align-items: flex-start;
+                  margin: var(--space-3) 0 0; font-size: var(--text-sm); color: var(--color-error); }
+
+  .input, .select {
+    width: 100%;
+    height: var(--input-height-md);
+    padding: 0 var(--space-6);
+    background: var(--color-bg-input);
+    border: var(--border-width) solid var(--color-border-input);
+    border-radius: var(--border-radius);
+    color: var(--color-text-primary);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+  }
+  .input::placeholder { color: var(--color-text-placeholder); }
+  .input:hover:not(:disabled), .select:hover:not(:disabled) { border-color: var(--color-border-subtle); }
+  .input:focus-visible, .select:focus-visible {
+    outline: var(--border-width-thick) solid var(--color-border-focus);
+    outline-offset: var(--space-1);
+  }
+  .input:disabled, .select:disabled { opacity: var(--opacity-disabled); cursor: not-allowed; }
+  .input[aria-invalid="true"] { border-color: var(--color-error); }
+
+  /* The chevron is drawn with borders, so it follows currentColor and can never
+     go stale the way a colour baked into a data URI does. */
+  .select-wrap { position: relative; }
+  .select { appearance: none; padding-right: var(--space-20); }
+  .select-wrap::after {
+    content: '';
+    position: absolute;
+    right: var(--space-8);
+    top: 50%;
+    width: var(--space-3); height: var(--space-3);
+    border-right: var(--border-width-thick) solid var(--color-text-tertiary);
+    border-bottom: var(--border-width-thick) solid var(--color-text-tertiary);
+    transform: translateY(-70%) rotate(45deg);
+    pointer-events: none;
+  }
+
+  .check-row { display: flex; gap: var(--space-6); align-items: flex-start;
+               max-width: 460px; margin-bottom: var(--space-8); }
+  .check {
+    appearance: none;
+    flex: 0 0 auto;
+    width: var(--icon-size-sm); height: var(--icon-size-sm);
+    margin: 0;
+    background: var(--color-bg-input);
+    border: var(--border-width) solid var(--color-border-subtle);
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    display: grid; place-content: center;
+  }
+  .check:checked { background: var(--color-accent-primary); border-color: var(--color-accent-primary); }
+  .check:checked::after {
+    content: '';
+    width: var(--space-3); height: var(--space-5);
+    border-right: var(--border-width-thick) solid var(--color-brand-black);
+    border-bottom: var(--border-width-thick) solid var(--color-brand-black);
+    transform: translateY(-1px) rotate(45deg);
+  }
+  .check:focus-visible { outline: var(--border-width-thick) solid var(--color-border-focus);
+                         outline-offset: var(--space-1); }
+  .check:disabled { opacity: var(--opacity-disabled); cursor: not-allowed; }
+  .check-text { font-size: var(--text-base); color: var(--color-text-primary); }
+  .check-desc { margin: var(--space-1) 0 0; font-size: var(--text-sm); color: var(--color-text-tertiary); }
+
+  .panel { padding: var(--space-16); background: var(--color-bg-secondary); }
+</style>
+</head>
+<body>
+
+<h1>Form controls</h1>
+<p class="ds-lede">
+  Every control below is live. <strong>Tab through them.</strong>
+</p>
+
+<div class="ds-note">
+  <strong>These controls were invisible, and it was a token defect, not a card defect.</strong>
+  <code>--color-bg-input</code> and <code>--color-bg-secondary</code> resolve to the same colour, so a
+  field's interior is pixel-identical to the panel behind it. The only thing marking the control is its
+  border — and that border was <code>--color-border-default</code> at 1.24:1, against the 3:1 that
+  WCAG 2.2 SC 1.4.11 requires.
+  <br><br>
+  1.4.11 is met if <em>either</em> the fill or the boundary reaches 3:1. Neither did, on any of the
+  three surfaces an input actually sits on. The fix is a new <code>--color-border-input</code>, now
+  <strong><span data-claim="contrast-input-border"></span>:1</strong> here — not a brighter fill, which
+  would have to clear 3:1 against all three surfaces and would end up reading as a button.
+  <code>--color-border-default</code> and <code>--color-border-subtle</code> are unchanged; 1.4.11 does
+  not govern decorative dividers.
+  <br><br>
+  Separately, and under a different rule: the placeholder was 2.69:1. Placeholders are text, so the bar
+  is 1.4.3's 4.5:1, not 3:1 — it is now
+  <strong><span data-claim="contrast-placeholder"></span>:1</strong>.
+</div>
+
+<div class="ds-note">
+  <strong>What this card replaces.</strong> Five copies of the same dropdown, three text inputs of three
+  different heights, and two entirely different checkboxes shipping in the same window. Two of the five
+  dropdowns have no disabled style, so they still light up on hover when they cannot be used.
+</div>
+
+<h2>Live</h2>
+
+<div class="panel">
+
+  <div class="field">
+    <label class="field__label" for="f-name">Project name</label>
+    <input class="input" id="f-name" type="text" placeholder="my-notes">
+    <p class="field__hint">Letters, numbers and dashes.</p>
+  </div>
+
+  <div class="field">
+    <label class="field__label" for="f-bad">Project name</label>
+    <input class="input" id="f-bad" type="text" value="my notes/2" aria-invalid="true" aria-describedby="f-bad-err">
+    <p class="field__error" id="f-bad-err">
+      <span aria-hidden="true">✕</span>
+      <span>A name cannot contain a space or a slash. Try <code>my-notes-2</code>.</span>
+    </p>
+  </div>
+
+  <div class="field">
+    <label class="field__label" for="f-lang">Transcription language</label>
+    <div class="select-wrap">
+      <select class="select" id="f-lang">
+        <option>Detect automatically</option>
+        <option>English</option>
+        <option>Polish</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="field">
+    <label class="field__label" for="f-off">Model status</label>
+    <div class="select-wrap">
+      <select class="select" id="f-off" disabled><option>Not downloaded</option></select>
+    </div>
+    <p class="field__hint">Disabled controls do not respond to hover either.</p>
+  </div>
+
+  <div class="check-row">
+    <input class="check" type="checkbox" id="c-wrap" checked>
+    <label class="check-text" for="c-wrap">
+      Wrap long lines
+      <span class="check-desc">Break lines at the editor edge instead of scrolling sideways.</span>
+    </label>
+  </div>
+
+  <div class="check-row">
+    <input class="check" type="checkbox" id="c-prev">
+    <label class="check-text" for="c-prev">
+      Enable HTML preview
+      <span class="check-desc">Runs the page's own scripts in a sandbox.</span>
+    </label>
+  </div>
+
+</div>
+
+<h2>The error contract</h2>
+
+<div class="ds-note">
+  <strong>Erfana has no error contract today.</strong> <code>aria-invalid</code> appears in
+  <span data-claim="aria-invalid-uses"></span> places in the renderer. No error message is linked to the
+  field it belongs to. The only in-field signal is red text on the value the reader typed — colour
+  alone, which fails WCAG 1.4.1.
+</div>
+
+<table>
+  <thead><tr><th>Rule</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td>The field carries <code>aria-invalid="true"</code></td><td>It is how a screen reader knows this field is the problem.</td></tr>
+    <tr><td>The field points at the message with <code>aria-describedby</code></td><td>Otherwise the message is read out of order, or not at all.</td></tr>
+    <tr><td>The border changes, and there is an icon</td><td>Colour alone is invisible to some readers. Two signals, always.</td></tr>
+    <tr><td>The message says what to do</td><td>"Invalid name" is a verdict. "Cannot contain a space — try <code>my-notes</code>" is help.</td></tr>
+    <tr><td>The message sits directly under the field</td><td>Not at the top of the form. Not in a toast.</td></tr>
+  </tbody>
+</table>
+
+<h2>Naming a field</h2>
+
+<div class="ds-note">
+  <strong>Every control has exactly one name, from exactly one source.</strong> Either a visible
+  <code>&lt;label for&gt;</code> tied to the control's <code>id</code>, or an <code>aria-label</code> when
+  there is genuinely no visible text. <strong>Never both</strong> — they compete, and the reader hears the
+  wrong one.
+  <br><br>
+  Two fields in Erfana have <em>neither</em>: a <code>&lt;label&gt;</code> linked to nothing and a control
+  with no id. The rename field is on the path for every rename, new file and new folder in the app.
+  <br><br>
+  And a <code>&lt;label&gt;</code> with no control is not a label — it is a heading. Use a
+  <code>&lt;span&gt;</code>.
+</div>
+
+<h2>Sizes</h2>
+<table>
+  <thead><tr><th>Token</th><th>Height</th><th>Where</th></tr></thead>
+  <tbody>
+    <tr><td><code>--input-height-sm</code></td><td>28px</td><td>Dense chrome — the find bar, a toolbar field.</td></tr>
+    <tr><td><code>--input-height-md</code></td><td>36px</td><td>The default. Dialogs and settings. Used above.</td></tr>
+    <tr><td><code>--input-height-lg</code></td><td>44px</td><td>A single prominent field on its own.</td></tr>
+  </tbody>
+</table>
+
+<div class="ds-note">
+  Exactly one input in Erfana sets a height from these tokens. The other two derive height from padding,
+  so the same control is three different sizes depending on which dialog you opened.
+</div>
+
+</body>
+</html>

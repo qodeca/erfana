@@ -1,0 +1,197 @@
+<!-- @card group="Foundations" name="Colours" subtitle="Every token resolved from the shipping CSS, contrast measured in the page" status="proposed" reviewed="2026-08-31" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Erfana — colour foundations</title>
+<link rel="stylesheet" href="../../tokens.css">
+<link rel="stylesheet" href="../../ds.css">
+<script src="../../claims.js"></script>
+</head>
+<body>
+
+<h1>Colours</h1>
+<p class="ds-lede">
+  Erfana is <strong>dark mode only</strong>, and that is now true rather than aspirational: the
+  renderer contains <strong><span data-claim="prefers-color-scheme-blocks"></span></strong>
+  <code>prefers-color-scheme</code> blocks.
+  <br><br>
+  It shipped one until recently — thirty lines restyling the Mermaid toolbar for a light OS. Not dead
+  code: <code>color-scheme: dark</code> does not change what that query reports, because the query
+  follows the operating system. It was a second, unmaintained theme that real users saw in exactly one
+  component. It was deleted rather than documented, because a card reading "dark only, except there"
+  writes a bug down as a rule.
+</p>
+
+<div class="ds-note">
+  <strong>Nothing on this page is typed by hand.</strong> Every swatch is painted with
+  <code>var(--token)</code> from the app's own <code>design-tokens.css</code>, then read back with
+  <code>getComputedStyle</code>. Every contrast ratio is computed in this page at load, across the
+  <span data-claim="colour-tokens"></span> colour tokens the app declares.
+  <br><br>
+  This page used to claim the two <em>cannot</em> drift. That was false three ways:
+  <code>tokens.css</code> here is a copy refreshed by a build step, the tables below hand-list a subset
+  of the tokens, and a deleted token falls back to inherited colour — so it renders as a plausible
+  swatch with a plausible ratio rather than failing. What is true is narrower and worth more:
+  <code>npm run design -- --check</code> fails in CI when the copy and the app disagree.
+</div>
+
+<h2>Brand</h2>
+<table data-group="brand"><thead><tr>
+  <th>Token</th><th>Swatch</th><th>Resolved</th><th>on panel</th><th>on app bg</th>
+</tr></thead><tbody></tbody></table>
+
+<h2>Neutral scale</h2>
+<table data-group="neutral"><thead><tr>
+  <th>Token</th><th>Swatch</th><th>Resolved</th><th>on panel</th><th>on app bg</th>
+</tr></thead><tbody></tbody></table>
+
+<h2>Surfaces</h2>
+<table data-group="surface"><thead><tr>
+  <th>Token</th><th>Swatch</th><th>Resolved</th><th>on panel</th><th>on app bg</th>
+</tr></thead><tbody></tbody></table>
+
+<h2>Text</h2>
+<div class="ds-note">
+  This is the table that decides accessibility arguments. <strong>4.5:1</strong> is the WCAG 2.2
+  minimum for normal text (SC 1.4.3); <strong>3:1</strong> is the minimum for large text and for
+  non-text parts of a control (SC 1.4.11).
+  <code>--color-text-secondary</code> reaches only
+  <strong><span data-claim="contrast-secondary-on-panel"></span>:1</strong> on a panel — it is a muted
+  label colour, not a body-text colour. <code>--color-text-tertiary</code> is the lightest muted option
+  that passes.
+  <br><br>
+  Read the scope of that carefully: <em>on a panel</em>. The same token on the app background clears
+  4.5:1 comfortably, which is why this card judges a pair, never a colour on its own.
+</div>
+<table data-group="text"><thead><tr>
+  <th>Token</th><th>Sample</th><th>Resolved</th><th>on panel</th><th>on app bg</th>
+</tr></thead><tbody></tbody></table>
+
+<h2>Borders and accents</h2>
+<table data-group="line"><thead><tr>
+  <th>Token</th><th>Swatch</th><th>Resolved</th><th>on panel</th><th>on app bg</th>
+</tr></thead><tbody></tbody></table>
+
+<h2>Status</h2>
+<table data-group="status"><thead><tr>
+  <th>Token</th><th>Swatch</th><th>Resolved</th><th>on panel</th><th>on app bg</th>
+</tr></thead><tbody></tbody></table>
+
+<script>
+const TOKENS = {
+  brand: ['--color-brand-lime', '--color-brand-violet', '--color-brand-black',
+          '--color-brand-white', '--color-brand-amber', '--color-brand-coral',
+          '--color-brand-magenta', '--color-brand-indigo'],
+  neutral: ['--color-white', '--color-gray-100', '--color-gray-200', '--color-gray-300',
+            '--color-gray-400', '--color-gray-500', '--color-gray-600', '--color-gray-700',
+            '--color-gray-800', '--color-gray-900', '--color-gray-950', '--color-gray-1000',
+            '--color-black'],
+  surface: ['--color-bg-primary', '--color-bg-secondary', '--color-bg-tertiary',
+            '--color-bg-elevated', '--color-bg-input', '--color-bg-hover-solid',
+            '--color-bg-selected', '--color-bg-preview'],
+  text: ['--color-text-emphasis', '--color-text-bright', '--color-text-primary',
+         '--color-text-tertiary', '--color-text-secondary', '--color-text-muted',
+         '--color-text-disabled'],
+  line: ['--color-border-default', '--color-border-subtle', '--color-border-focus',
+         '--color-accent-primary', '--color-accent-secondary', '--color-link'],
+  status: ['--color-success', '--color-context-safe', '--color-warning',
+           '--color-warning-bright', '--color-error', '--color-error-bright', '--color-info']
+};
+
+/** Resolve a token to an [r,g,b,a] tuple by letting the browser do it. */
+function resolve(token) {
+  const probe = document.createElement('span');
+  probe.style.color = `var(${token})`;
+  probe.style.display = 'none';
+  document.body.appendChild(probe);
+  const value = getComputedStyle(probe).color;
+  probe.remove();
+  const parts = value.match(/[\d.]+/g) || [];
+  return [Number(parts[0]) || 0, Number(parts[1]) || 0, Number(parts[2]) || 0,
+          parts[3] === undefined ? 1 : Number(parts[3])];
+}
+
+/** Composite a translucent colour over an opaque one, so the ratio is honest. */
+function over(fg, bg) {
+  const a = fg[3];
+  return [a * fg[0] + (1 - a) * bg[0], a * fg[1] + (1 - a) * bg[1], a * fg[2] + (1 - a) * bg[2], 1];
+}
+
+function luminance([r, g, b]) {
+  const channel = (c) => {
+    const s = c / 255;
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+}
+
+function contrast(fg, bg) {
+  const a = luminance(over(fg, bg));
+  const b = luminance(bg);
+  const [hi, lo] = a > b ? [a, b] : [b, a];
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+function hex([r, g, b, a]) {
+  const pair = (n) => Math.round(n).toString(16).padStart(2, '0');
+  const base = `#${pair(r)}${pair(g)}${pair(b)}`;
+  return a === 1 ? base : `${base} · alpha ${a}`;
+}
+
+const PANEL = resolve('--color-bg-secondary');
+const APP = resolve('--color-bg-primary');
+
+function ratioCell(value, isText) {
+  const cell = document.createElement('td');
+  cell.className = 'ds-ratio';
+  const bar = isText ? 4.5 : 3;
+  cell.textContent = `${value.toFixed(2)}:1`;
+  cell.classList.add(value >= bar ? 'ds-pass' : 'ds-fail');
+  cell.title = isText ? 'Body text needs 4.5:1' : 'Non-text needs 3:1';
+  return cell;
+}
+
+for (const [group, tokens] of Object.entries(TOKENS)) {
+  const body = document.querySelector(`table[data-group="${group}"] tbody`);
+  const isText = group === 'text';
+  for (const token of tokens) {
+    const rgba = resolve(token);
+    const row = document.createElement('tr');
+
+    const nameCell = document.createElement('td');
+    nameCell.className = 'ds-mono';
+    nameCell.textContent = token;
+    row.appendChild(nameCell);
+
+    const sampleCell = document.createElement('td');
+    if (isText) {
+      const sample = document.createElement('span');
+      sample.style.color = `var(${token})`;
+      sample.style.fontSize = 'var(--text-base)';
+      sample.textContent = 'The quick brown fox';
+      sampleCell.appendChild(sample);
+    } else {
+      const swatch = document.createElement('div');
+      swatch.className = 'ds-swatch';
+      swatch.style.background = `var(${token})`;
+      sampleCell.appendChild(swatch);
+    }
+    row.appendChild(sampleCell);
+
+    const hexCell = document.createElement('td');
+    hexCell.className = 'ds-mono';
+    hexCell.textContent = hex(rgba);
+    row.appendChild(hexCell);
+
+    row.appendChild(ratioCell(contrast(rgba, PANEL), isText));
+    row.appendChild(ratioCell(contrast(rgba, APP), isText));
+    body.appendChild(row);
+  }
+}
+</script>
+</body>
+</html>

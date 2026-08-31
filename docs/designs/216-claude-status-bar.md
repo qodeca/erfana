@@ -101,7 +101,13 @@ encodeCwd, locator, parser, window-detector, friendlyName, thresholds, Mac/Win d
 - **Placement:** new sibling inside `.terminal-panel` after `<TerminalStatusContent>`. Stack = header (41px) → xterm (flex:1) → ccbar (26px). Hidden by **unmounting** (xterm reclaims height; accepted reflow).
 - **Order (single flex row):** model name (primary, `--text-sm`/`--font-medium`/`--color-text-primary`) · window badge chip (`--text-xs`/`--font-semibold`/**`--color-text-primary`** on `--color-bg-tertiary`) · spacer · percentage (primary, `--text-sm`/`--font-semibold`, state-colored) · progress bar (64px track `--color-bg-tertiary`, 4px high).
 - **Rail:** `height:26px; box-sizing:border-box`, background `--color-bg-secondary`, top border `1px solid var(--color-border-subtle)`, padding-inline `--space-6`.
-- **States:** green `<30%` (fill `--color-success`, % text neutral `--color-text-primary`); amber `30–<60%` (fill+text `--color-warning-bright`); red `≥60%` (fill+text `--color-error-bright`). Track constant. Comparisons `pct>=30`, `pct>=60`. (On 1M these are 300k/600k tokens; on 200k, 60k/120k.) The meter fills the available width between the badge and the percentage.
+- **States:** green `<30%` (fill `--color-success`, % text neutral `--color-text-primary`); amber `30–<60%` (fill+text `--color-warning`); red `≥60%` (fill+text `--color-error`). Track constant. Comparisons `pct>=30`, `pct>=60`. (On 1M these are 300k/600k tokens; on 200k, 60k/120k.) The meter fills the available width between the badge and the percentage.
+
+  > Token note (2026-08-31): this design originally specified `--color-warning-bright`
+  > and `--color-error-bright`. Both are now retired in favour of the semantic
+  > `--color-warning` / `--color-error`, and are marked RETIRED in
+  > `design-tokens.css`. Corrected above so the note cannot be implemented as
+  > written; the rest of the design is unchanged.
 - **Tooltip:** entire row is hover target (still non-interactive); content `"84k / 200k"` / `"95k / 1M"` mono; anchored above; 400ms open / 0ms close.
 - **Edge cases:** 0% green; >100% clamps fill + headline % to 100 but tooltip shows raw used; unknown window defaults 200k silently (if used unknown → hide whole bar); narrow-panel degradation order = drop bar+track first, then badge, then ellipsize name — **percentage never dropped**.
 - **A11y (WCAG 2.2 AA):** container `role="status" aria-live="polite"` throttled to band changes only; `aria-label` exposes exact counts without focus (`"Opus 4.8, Claude Code context: 48% used, 84k of 200k tokens"`) since v1 has no keyboard-reachable tooltip trigger; progressbar role with valuenow; color never sole indicator (% text always present). **Badge must use `--color-text-primary`** (not `--color-text-secondary`, which fails 4.5:1). `prefers-reduced-motion` disables the fill width transition. Dark-only product → no `prefers-color-scheme`.

@@ -124,39 +124,16 @@
 }
 
 /* Light mode adjustments */
-@media (prefers-color-scheme: light) {
-  .mermaid-toolbar-directions {
-    background: var(--color-bg-primary-translucent);
-    border-color: var(--color-gray-400);
-  }
 
-  .mermaid-direction-btn {
-    color: var(--color-gray-800);
-  }
-
-  .mermaid-direction-btn:hover:not(:disabled) {
-    background: var(--color-brand-lime);
-  }
-
-  .mermaid-direction-btn:active:not(:disabled) {
-    background: var(--color-brand-lime);
-  }
-
-  .mermaid-direction-btn--active {
-    background: var(--color-brand-violet-muted);
-    color: var(--color-brand-violet);
-  }
-
-  .mermaid-toolbar-expand-btn {
-    background: transparent;
-    color: var(--color-gray-800);
-  }
-
-  .mermaid-toolbar-expand-btn:hover:not(:disabled) {
-    background: var(--color-brand-lime);
-  }
-
-  .mermaid-toolbar-expand-btn:active:not(:disabled) {
-    background: var(--color-brand-lime);
-  }
-}
+/* A `@media (prefers-color-scheme: light)` block used to live here, restyling
+ * this toolbar for a light OS. It was deleted, not fixed.
+ *
+ * design-tokens.css line 8 says Erfana is DARK MODE ONLY. Setting
+ * `color-scheme: dark` does not change what that media query reports - the
+ * query follows the OS - so this was not dead code. It was a second,
+ * unmaintained theme that users on a light-themed machine actually saw, in
+ * exactly one component.
+ *
+ * A design system that documents "dark only, except here" is writing a bug
+ * down as a rule. If Erfana ever wants light mode it gets a theme, not a
+ * thirty-line exception in one toolbar. */

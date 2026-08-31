@@ -4,6 +4,31 @@ Current issues and their workarounds. For historical resolved issues, see [archi
 
 ---
 
+## Accessibility
+
+Nine defects found by an audit of the renderer on 2026-08-31, all **shipping
+today**. They are grouped here because they share a cause: a role or an ARIA
+attribute was declared without the behaviour it promises, which is worse than
+declaring nothing — a screen reader changes its own behaviour on the strength of
+that promise and then gets nothing back.
+
+The design system decides the correct pattern for each; the app has not caught up.
+See [`design/README.md`](../design/README.md) for which card governs which defect.
+
+| Issue | What is broken | Workaround |
+|---|---|---|
+| [#88](https://github.com/qodeca/erfana/issues/88) | The file tree cannot be used with a keyboard at all — nothing in it is focusable, and no arrow key does anything. It declares `role="tree"`, so a screen reader hands it the arrow keys and loses its own. | Use the file picker dialog (⌘O / Ctrl+O), which does implement keyboard navigation correctly. |
+| [#89](https://github.com/qodeca/erfana/issues/89) | An expanded folder's announced name includes every visible file inside it. | None. |
+| [#90](https://github.com/qodeca/erfana/issues/90) | The right-click menu is mouse-only. Only Escape is bound; there is no keyboard way to open it. | Use the keyboard shortcuts shown in the menu directly where they exist. |
+| [#91](https://github.com/qodeca/erfana/issues/91) | 10 of 13 dialogs tell assistive technology the background is inert, and then let Tab walk into it. | Use Escape to close, rather than tabbing to a Cancel button. |
+| [#92](https://github.com/qodeca/erfana/issues/92) | The app declares no language, so a screen reader may read the interface with the wrong voice. | Set the reader's default language manually. |
+| [#93](https://github.com/qodeca/erfana/issues/93) | Three places give a keyboard user no visible focus: the editor panel, the welcome panel, and tab close buttons. | None. |
+| [#94](https://github.com/qodeca/erfana/issues/94) | The rename field and the prompt textarea are announced as unlabelled boxes, and no validation error is linked to its field. | None. |
+| [#95](https://github.com/qodeca/erfana/issues/95) | Folder git state is shown by colour alone, and the `M3 U2 D1` counts change without being announced. | The per-file badges carry a letter; read those instead of the folder dot. |
+| [#96](https://github.com/qodeca/erfana/issues/96) | "Reduce motion" is ignored by 12 stylesheets, including a full-screen camera flash. Four controls are smaller than the 24 x 24 minimum. | None for the motion issue. |
+
+---
+
 ## Windows-specific issues
 
 Phases 0–2 of Windows enablement shipped in **v0.9.3** (2026-04-22); Phase 4 (local Whisper trust chain + Windows x64 binary) shipped in **v0.9.4** (merge `110f1b9`, 2026-04-23). The following gaps remain user-visible until Phases 3, 5, and 6 ship. See [`docs/windows/implementation-plan.md`](./windows/implementation-plan.md) for the canonical roadmap.
