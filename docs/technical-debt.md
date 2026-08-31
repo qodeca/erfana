@@ -636,15 +636,19 @@ Resolved by the #73 image-export work. The canonical extension list, the MIME ma
 
 ### 43. HTML-preview in-app allowlist view/revoke UI deferred (UX-004, #74, 2026-08)
 
-**Severity**: Low
+**Severity**: Low when filed; **Medium** as of 2026-08-31 — see Impact.
 
 **Impact**: Settings carries a global on/off only; there is no in-app UI to see or revoke the per-project approved hosts. Removing an approval requires hand-editing `.erfana/settings.json`.
 
+Raised from Low because the approve flow was **unreachable** when this was filed: a host absent from the allowlist is refused by the CSP in the renderer, so the network filter never saw it and no prompt could appear. On a project with no approvals yet there was no route to approving anything at all. The #74 follow-up work closed that gap, so the one-way door is now one a reader can actually walk through — and every approval is written into the project, applies project-wide, survives restarts and reaches anyone who clones the repository (`docs/security.md` residual risk 5), with no way back from inside Erfana.
+
 **Problem**: The store/design built **only** `approveHost` (`PreviewAllowlistStore` has `approveHost` + `getHosts`; no revoke method, no list/revoke IPC channel, no bridge). Building the feature is new capability, not unwired plumbing: it needs `store.revokeHost`, `REVOKE`/`LIST` channels + handlers, a preload bridge, a schema, CSP-rebuild-on-revoke, a settings list UI and tests — out of #74 scope. Not release-blocking, since the allowlist is hand-editable.
+
+One extra obstacle found since: `PreviewViewService.applyApprovedHosts` returns early when no live view exists, so a revoke issued from a settings screen with no preview open has no CSP-rebuild path today.
 
 **Recommended Solution**: file a follow-up issue after #74 merges to build the view/revoke UI and its backend.
 
-**Status**: Deferred to a follow-up issue (QG-8 decision).
+**Status**: Filed as [#86](https://github.com/qodeca/erfana/issues/86) (2026-08-31). Interim mitigation in `9b139a8`: the consent prompt now states that approval permits remote code and data egress, is saved into the project, reaches anyone who clones it, and cannot be undone from Erfana — so the door is at least labelled. See also [#81](https://github.com/qodeca/erfana/issues/81) for narrowing what a grant covers.
 
 ---
 
