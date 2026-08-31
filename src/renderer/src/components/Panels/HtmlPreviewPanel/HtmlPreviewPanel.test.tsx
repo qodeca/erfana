@@ -330,7 +330,18 @@ describe('HtmlPreviewPanel', () => {
       await waitFor(() => expect(toastEvents.length).toBe(1))
       const detail = toastEvents[0].detail
       expect(detail.message).toContain('cdn.example')
-      expect(detail.action?.label).toBe('Approve')
+      expect(detail.action?.label).toBe('Approve for this project')
+
+      // The copy must name the GRANT, not the UI's reaction. It used to say the
+      // preview "will reload and may fetch remote content", which reads as
+      // unblocking one image in one preview — while the host is in fact added
+      // to `script-src` and `connect-src` too, saved into the repository, and
+      // not revocable from Erfana. Asserted as properties rather than as an
+      // exact string so the wording can be improved without editing this test.
+      expect(detail.message).toMatch(/\.erfana\/settings\.json/)
+      expect(detail.message).toMatch(/every preview/i)
+      expect(detail.message).toMatch(/clone/i)
+      expect(detail.message).toMatch(/cannot undo/i)
 
       // Activating the action approves the host; main reloads on its side.
       detail.action?.onClick()
@@ -450,7 +461,13 @@ describe('HtmlPreviewPanel', () => {
     try {
       render(<HtmlPreviewPanel {...makeProps('/proj/page.html')} />)
       await waitFor(() => expect(listeners.hostBlocked).not.toBeNull())
-      listeners.hostBlocked?.({ panelId: 'preview-other', host: 'cdn.example', approvable: true })
+      listeners.hostBlocked?.({
+        panelId: 'preview-other',
+        host: 'cdn.example',
+        approvable: true,
+        kinds: ['script'],
+        notify: true
+      })
       // A microtask settle is enough; no toast must be dispatched.
       await Promise.resolve()
       expect(toastEvents.length).toBe(0)

@@ -73,10 +73,16 @@ export function usePreviewEvents(panelId: string): void {
     const unsubscribeHostBlocked = window.api.preview.onHostBlocked((payload) => {
       if (payload.panelId !== panelId) return
 
-      // Record FIRST, and unconditionally. The permission band lists from this,
-      // and it must list every host — the toast budget used to gate the event
-      // itself, so past three hosts the renderer never heard about a block at
-      // all and the reader had no way to approve it.
+      // Record FIRST, and unconditionally. The toast budget used to gate the
+      // EVENT, so past three hosts the renderer never heard about a block at
+      // all. This slice is the record of every host refused in this panel,
+      // independent of whether a toast was allowed to mention it, and it is
+      // deliberately not derived from the failure log — `applyApprovedHosts`
+      // clears that log on every approval.
+      //
+      // Nothing renders it yet. The surface that will (a permission band
+      // listing blocked and already-allowed hosts together) is not built; until
+      // it is, a host past the toast budget is recorded but not offerable.
       recordBlockedHost(panelId, {
         host: payload.host,
         kinds: payload.kinds,
@@ -90,12 +96,22 @@ export function usePreviewEvents(panelId: string): void {
         // Approvable host: offer to load it. The action toast is manual-dismiss
         // (ToastProvider forces duration 0 when an action is present), giving
         // the user time to read the host before deciding.
+        // The copy names the GRANT and its blast radius, not the UI's reaction.
+        // It used to say the preview "will reload and may fetch remote
+        // content", which reads as unblocking one image in one preview. What is
+        // actually granted is much wider: the approved host is added to every
+        // CSP directive this preview builds — `script-src` and `connect-src`
+        // included, and `script-src` already carries 'unsafe-inline' — so the
+        // host may serve code and receive data. The grant is written into the
+        // project, shared with anyone who clones it, and Erfana has no revoke
+        // screen (technical-debt #43). A reader agreeing to "a font" and
+        // getting that was misinformed by the control built to inform them.
         showGlobalToast({
           type: 'warning',
-          title: 'Blocked a remote resource',
-          message: `The preview blocked ${payload.host}. Approve to load resources from it – the preview will reload and may fetch remote content.`,
+          title: 'Approve a remote host for this project?',
+          message: `The preview blocked ${payload.host}. Approving lets previews in this project load code from it and send data to it. It is saved in the project's .erfana/settings.json, so it applies to every preview here, survives restarts, and travels to anyone who clones the repository. Erfana cannot undo it.`,
           action: {
-            label: 'Approve',
+            label: 'Approve for this project',
             // Main rebuilds the CSP, purges storage and reloads on approve, so
             // the renderer just fires the request (design §5(c)).
             onClick: () => {
