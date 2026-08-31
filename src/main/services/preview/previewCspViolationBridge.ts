@@ -47,15 +47,29 @@ import {
 export const PREVIEW_PAGE_CSP_VIOLATION_CHANNEL = 'preview-page:cspViolation'
 
 /**
- * At most this many violation reports are read per second, per view.
+ * At most this many violations are PARSED per second, per view.
  *
  * Unlike a click, a violation is NOT a human action: a hostile page can emit
  * thousands by referencing thousands of hosts, and every one costs a URL parse.
- * The budget is generous enough for a real page — a documentation site pulling a
- * font, a CDN and an analytics script trips three — and hard enough that a
- * fan-out cannot occupy the main process.
+ * This is the ceiling on that work, so a fan-out cannot occupy the main process.
+ *
+ * Deliberately far above anything a real page reaches. It is a floor under
+ * pathology, not a shaping budget — that is `MAX_REPORTS_PER_SECOND`.
  */
-const MAX_VIOLATIONS_PER_SECOND = 30
+const MAX_PARSES_PER_SECOND = 500
+
+/**
+ * At most this many DISTINCT reports are forwarded per second, per view.
+ *
+ * Charged only for a report that actually reaches the reader — a new host, or a
+ * new kind for a known host. It used to be charged on ARRIVAL instead, which
+ * meant repeats paid for themselves: one image host firing forty violations
+ * spent the whole allowance on thirty-nine reports the dedupe was about to
+ * discard, and a later refusal from a genuinely different host was turned away
+ * at the door. That host was then never recorded, never offered for approval,
+ * and never retried, because a reload replays the same ordering.
+ */
+const MAX_REPORTS_PER_SECOND = 30
 
 /**
  * At most this many DISTINCT hosts are ever reported by one view.
@@ -146,6 +160,30 @@ function remoteHostOf(blockedURI: string): string | null {
   return hostname === '' ? null : hostname.toLowerCase()
 }
 
+/** A fixed one-second window that admits at most `limit` takes. */
+function createRateWindow(
+  limit: number,
+  now: () => number
+): { take(): boolean; reset(): void } {
+  let startedAt = now()
+  let used = 0
+  return {
+    take(): boolean {
+      const timestamp = now()
+      if (timestamp - startedAt >= 1000) {
+        startedAt = timestamp
+        used = 0
+      }
+      used += 1
+      return used <= limit
+    },
+    reset(): void {
+      startedAt = now()
+      used = 0
+    }
+  }
+}
+
 /** Build the bridge for one live view. */
 export function createPreviewCspViolationBridge(
   deps: PreviewCspViolationBridgeDeps
@@ -155,25 +193,15 @@ export function createPreviewCspViolationBridge(
   // a host refused first for a font and later for a script must report the
   // script too, or the row keeps saying "font" for something that will execute.
   const reportedHosts = new Map<string, PreviewBlockedKind[]>()
-  let windowStartedAt = now()
-  let windowUsed = 0
   let disposed = false
 
-  /** `false` when this report exceeds the per-second allowance. */
-  const withinRateLimit = (): boolean => {
-    const timestamp = now()
-    if (timestamp - windowStartedAt >= 1000) {
-      windowStartedAt = timestamp
-      windowUsed = 0
-    }
-    windowUsed += 1
-    return windowUsed <= MAX_VIOLATIONS_PER_SECOND
-  }
+  const parseBudget = createRateWindow(MAX_PARSES_PER_SECOND, now)
+  const reportBudget = createRateWindow(MAX_REPORTS_PER_SECOND, now)
 
   return {
     handleViolation(payload: unknown): void {
       if (disposed) return
-      if (!withinRateLimit()) return
+      if (!parseBudget.take()) return
 
       const parsed = CspViolationPayloadSchema.safeParse(payload)
       if (!parsed.success) return
@@ -194,6 +222,12 @@ export function createPreviewCspViolationBridge(
       if (known === undefined && reportedHosts.size >= MAX_HOSTS_PER_VIEW) return
       const merged = mergeBlockedKinds(known ?? [], kind)
       if (merged === null) return
+
+      // Charged HERE, on a report that is actually going out, and BEFORE the
+      // host is written into the dedupe map. Recording it first would swallow a
+      // rate-refused host permanently; leaving it unrecorded means the next
+      // violation for it can still arrive, which is the milder failure.
+      if (!reportBudget.take()) return
       reportedHosts.set(host, merged)
 
       // A non-approvable host (an IP literal, `localhost`, a bare single-label
@@ -204,8 +238,8 @@ export function createPreviewCspViolationBridge(
 
     reset(): void {
       reportedHosts.clear()
-      windowStartedAt = now()
-      windowUsed = 0
+      parseBudget.reset()
+      reportBudget.reset()
     },
 
     dispose(): void {

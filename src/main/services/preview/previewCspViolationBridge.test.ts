@@ -174,6 +174,65 @@ describe('previewCspViolationBridge', () => {
       expect(onBlockedHost).toHaveBeenCalledTimes(50)
     })
 
+    it('does not let one host\'s duplicates starve a different host', () => {
+      // THE DEFECT. The budget was charged BEFORE the parse and the dedupe, so
+      // repeats paid for themselves. An ordinary gallery page firing 40
+      // violations for one image host spent the whole allowance on 39 reports
+      // the bridge was going to discard anyway, and a later `script-src`
+      // refusal from a DIFFERENT host was refused at the door — never recorded,
+      // never offered for approval, and never retried, because a reload replays
+      // the same ordering.
+      //
+      // A fixed clock throughout: only the ordering of the charge can explain
+      // the outcome.
+      const { bridge, onBlockedHost } = makeBridge(() => 1_000_000)
+
+      for (let i = 0; i < 40; i += 1) {
+        bridge.handleViolation(violation(`https://images.example.com/pic-${i}.png`))
+      }
+      // The control: the duplicates collapse to one row, as they should.
+      expect(onBlockedHost).toHaveBeenCalledTimes(1)
+
+      bridge.handleViolation(violation('https://cdn.jsdelivr.net/x.js', 'script-src'))
+
+      expect(onBlockedHost).toHaveBeenCalledTimes(2)
+      expect(onBlockedHost.mock.calls[1][0]).toBe('cdn.jsdelivr.net')
+    })
+
+    it('a report refused by the budget is not recorded, so it can arrive later', () => {
+      // A novel host dropped for rate must not be written into the dedupe map on
+      // the way out — that would swallow it permanently, which is the failure
+      // mode this whole budget is meant to be milder than.
+      let clock = 1_000_000
+      const { bridge, onBlockedHost } = makeBridge(() => clock)
+
+      for (let i = 0; i < 40; i += 1) {
+        bridge.handleViolation(violation(`https://burst-${i}.example.com/a.js`))
+      }
+      expect(onBlockedHost).toHaveBeenCalledTimes(30)
+
+      clock += 1000
+      bridge.handleViolation(violation('https://burst-35.example.com/a.js'))
+
+      expect(onBlockedHost).toHaveBeenCalledTimes(31)
+      expect(onBlockedHost.mock.calls[30][0]).toBe('burst-35.example.com')
+    })
+
+    it('still bounds the work a hostile page can force', () => {
+      // The budget above is about REPORTS. A page that references thousands of
+      // hosts still costs a URL parse each, so a separate, much larger ceiling
+      // bounds that independently.
+      const { bridge, onBlockedHost } = makeBridge(() => 1_000_000)
+
+      for (let i = 0; i < 2000; i += 1) {
+        bridge.handleViolation(violation(`https://flood-${i}.example.com/a.js`))
+      }
+
+      // Capped by the report budget long before the parse ceiling matters; the
+      // point is that it terminates and reports a bounded number.
+      expect(onBlockedHost.mock.calls.length).toBeLessThanOrEqual(30)
+    })
+
     it('rate-limits a burst, and recovers in the next second', () => {
       let clock = 1_000_000
       const { bridge, onBlockedHost } = makeBridge(() => clock)
