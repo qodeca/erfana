@@ -30,7 +30,7 @@ window.ERFANA_CLAIMS = {
     "card": "system/components/form/index.html"
   },
   "zindex-css-literals": {
-    "value": 2,
+    "value": 3,
     "label": "stylesheets setting a bare z-index instead of a token",
     "card": "system/foundations/layering.html"
   },
