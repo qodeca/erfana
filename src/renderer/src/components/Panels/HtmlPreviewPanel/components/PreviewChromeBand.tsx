@@ -50,6 +50,7 @@ import {
 } from '../permissionBand.logic'
 import { PreviewBandConfirm } from './PreviewBandConfirm'
 import { PreviewBandRow } from './PreviewBandRow'
+import { ErrorCode } from '../../../../../../shared/errors'
 import type { PreviewApproveResult } from '../../../../../../shared/ipc/preview-types'
 import type { PreviewBlockedHost } from '../../../../stores/usePreviewStore'
 
@@ -161,7 +162,26 @@ export function PreviewChromeBand({
   const approve = useCallback(
     async (host: string): Promise<void> => {
       dispatch({ type: 'approveStarted', host })
-      const result = await onApprove(host)
+      /*
+       * THE AWAIT MUST NOT BE BARE, or a rejection strands the band forever.
+       *
+       * `bandReducer` ignores every action while `mode.kind === 'approving'`
+       * except `approveSucceeded` and `approveFailed`. A rejected promise
+       * dispatches neither, so the band sits on "Saving…" with Cancel dead,
+       * Escape dead, and the chip unable to collapse the list — and because
+       * `bandExpanded` stays true the chrome gate keeps evaluating behind it.
+       * Nothing but closing the tab recovers.
+       *
+       * The reachable paths are narrow — `approveHost` is an `invoke` whose
+       * handler catches everything and returns a result — but they exist: main
+       * tearing down mid-invoke, a handler unregistered, a non-cloneable value.
+       * A permanent dead end is too high a price for a narrow path, and the
+       * failure branch already exists and says the right thing.
+       */
+      const result = await onApprove(host).catch(() => ({
+        ok: false as const,
+        errorCode: ErrorCode.UNKNOWN_ERROR
+      }))
       if (result.ok) {
         dispatch({ type: 'approveSucceeded', host })
       } else {

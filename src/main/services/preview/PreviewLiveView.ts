@@ -546,7 +546,7 @@ export class PreviewLiveView {
   private wantedVisible = true
 
   /**
-   * The still-frame capture started by the most recent hide.
+   * Every still-frame capture this view has started that has not settled yet.
    *
    * Nothing on the interactive path waits for this — that is the whole point of
    * the synchronous hide. It exists for the ONE caller that legitimately must:
@@ -554,13 +554,23 @@ export class PreviewLiveView {
    * later. Without somewhere to await, that teardown races the capture and a
    * suspended panel wakes up with no picture, which is exactly what the frame
    * was captured for.
+   *
+   * It ACCUMULATES rather than being replaced, and that is load-bearing. See
+   * `captureWhileVisible`.
    */
   private pendingCapture: Promise<void> = Promise.resolve()
 
   /**
-   * Resolve once the still-frame capture from the last hide has settled.
+   * Resolve once every still-frame capture this view started has settled.
    *
    * For callers about to destroy this view. Never call it from an overlay path.
+   *
+   * Never rejects: `Promise.allSettled` absorbs a failed capture, because the
+   * only question this answers is "is Chromium still reading this page?", and a
+   * capture that failed is a capture that has stopped reading. A caller about to
+   * call `destroy()` has nothing to do with the error either way, and a
+   * rejection here would be an unhandled one on the ordinary path, where nobody
+   * awaits this at all.
    */
   whenCaptureSettled(): Promise<void> {
     return this.pendingCapture
@@ -568,6 +578,25 @@ export class PreviewLiveView {
 
   setVisibility(visible: boolean): void {
     if (this.isDefunct) {
+      return
+    }
+    /*
+     * `isDefunct` asks about the CONTENTS; this asks about the WINDOW, and the
+     * show path below reaches through the window to `contentView.addChildView`.
+     * Against a destroyed `BrowserWindow` that throws — and because the caller
+     * `void`s an async method, it would surface as an unhandled rejection rather
+     * than anything anyone sees.
+     *
+     * Deliberately NOT folded into `isDefunct`, which has fifteen call sites and
+     * two that would change meaning: `setVisibility` would stop emitting
+     * `visibilityApplied` (what the overlay guard reconciles against) and
+     * `captureWhileVisible`'s `shouldKeep` would start discarding good frames.
+     * The window is destroyed only in the gap between `BrowserWindow` teardown
+     * and `drainWindow`, so every panel here is on its way out regardless; not
+     * emitting is the honest answer, and it is scoped to the one method that
+     * can actually throw.
+     */
+    if (this.window.isDestroyed()) {
       return
     }
     this.wantedVisible = visible
@@ -622,7 +651,7 @@ export class PreviewLiveView {
     // Only the SIZE of `lastBounds` travels: its `x`/`y` are window-relative
     // DIPs for `setBounds` and mean nothing to `capturePage`, whose rect is
     // page-relative.
-    this.pendingCapture = this.deps.stillFrameCache.captureIfStale(
+    const capture = this.deps.stillFrameCache.captureIfStale(
       this.wc,
       this.panelId,
       { width: this.lastBounds?.width ?? 0, height: this.lastBounds?.height ?? 0 },
@@ -630,6 +659,28 @@ export class PreviewLiveView {
       // its way out. Keeping it would overwrite a good frame with a partial one.
       { shouldKeep: () => this.wantedVisible && !this.isDefunct }
     )
+
+    /*
+     * CHAIN, NEVER REPLACE — the assignment used to be `this.pendingCapture =`
+     * on the call above, and that quietly made the barrier skippable.
+     *
+     * `captureIfStale` short-circuits to an ALREADY-RESOLVED promise in two
+     * cases without starting anything: a capture is already in flight, or the
+     * view has no size yet. Replacing the handle with one of those threw away
+     * the only reference to the capture that was still running, so
+     * `whenCaptureSettled()` resolved in a microtask and eviction destroyed the
+     * `webContents` mid-`capturePage` — the precise state the whole
+     * capture-while-visible design exists to avoid.
+     *
+     * It is reachable without anything exotic: a large page captures slowly, a
+     * watched file is saved inside that window, the reload's pipeline calls this
+     * again and is short-circuited, and the next view to open evicts this one.
+     *
+     * `allSettled` is deliberate. It waits for BOTH, so no handle can be lost,
+     * and it cannot reject — see `whenCaptureSettled`.
+     */
+    const previous = this.pendingCapture
+    this.pendingCapture = Promise.allSettled([previous, capture]).then(() => undefined)
   }
 
   /**

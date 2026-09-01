@@ -316,6 +316,43 @@ describe('PreviewChromeBand', () => {
     )
   })
 
+  /**
+   * The same rule when the call REJECTS rather than returning a failure.
+   *
+   * `bandReducer` ignores every action while `mode.kind === 'approving'` except
+   * `approveSucceeded` and `approveFailed`. A rejected promise dispatched
+   * neither, so the band sat on "Saving…" forever: Cancel dead, Escape dead, the
+   * chip unable to collapse the list, and nothing but closing the tab to escape
+   * it. `approveHost` is an `invoke` whose handler catches everything, so the
+   * paths are narrow — main tearing down mid-invoke, a handler unregistered —
+   * but a permanent dead end is too high a price for a narrow path.
+   */
+  it('recovers when the approve call rejects instead of returning a failure', async () => {
+    const user = userEvent.setup()
+    const onApprove = vi.fn(async (): Promise<PreviewApproveResult> => {
+      throw new Error('the handler went away mid-invoke')
+    })
+    render(
+      <PreviewChromeBand
+        blockedHosts={[host('a.example.com')]}
+        allowedHosts={[]}
+        onApprove={onApprove}
+      />
+    )
+
+    await user.click(screen.getByTestId('preview-band-chip'))
+    await user.click(screen.getByRole('button', { name: 'Allow https://a.example.com' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm' }))
+
+    // It reports the failure rather than hanging on "Saving…".
+    await waitFor(() => expect(screen.getByText('Not saved')).toBeInTheDocument())
+    expect(screen.queryByText('Saving…')).toBeNull()
+    // And the band is USABLE again — the row offers its button back.
+    expect(
+      screen.getByRole('button', { name: 'Allow https://a.example.com' })
+    ).toBeInTheDocument()
+  })
+
   it('brings the row BACK when the write fails, and keeps the failure on the chip', async () => {
     // A host shown as allowed but not persisted is a lie that survives a
     // restart. This state was unreachable in the card until a control was added

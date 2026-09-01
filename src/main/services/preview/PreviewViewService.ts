@@ -31,6 +31,7 @@ import {
 } from '../../../shared/ipc/previewBlockedKind'
 import { ErrorCode } from '../../../shared/errors'
 import { PREVIEW } from '../../../shared/constants'
+import { logger } from '../LoggingService'
 import type {
   PdfExportResult,
   PreviewBounds,
@@ -460,7 +461,28 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
       return { ok: false, errorCode: ErrorCode.PREVIEW_OPEN_SUPERSEDED }
     }
 
-    await this.enforceLiveViewBudget(panelId)
+    /*
+     * Housekeeping for OTHER panels must never change this open's answer.
+     *
+     * `enforceLiveViewBudget` suspends the least recently used previews, which
+     * runs after `registry.install` and after `live.load()` — so this panel is
+     * already open and painting. Letting a failure while tidying up someone
+     * else's view propagate turned it into `{ ok: false, UNKNOWN_ERROR }`, the
+     * renderer took its `openFailed` branch and showed the failed banner, and
+     * because that branch does not send `preview:close`, a fully live, visible
+     * `WebContentsView` went on painting over a panel whose renderer believed
+     * the open had failed.
+     *
+     * The cost of swallowing it is one preview over budget until the next open.
+     */
+    try {
+      await this.enforceLiveViewBudget(panelId)
+    } catch (error) {
+      logger.warn('Preview live-view budget enforcement failed', {
+        panelId,
+        error: error instanceof Error ? error.message : String(error)
+      })
+    }
     return { ok: true }
   }
 
@@ -498,33 +520,52 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
     if (view === null) {
       return
     }
-    // Hiding starts the still-frame capture and emits the frame, so the suspended
-    // tab shows the page as it was rather than an empty placeholder.
+    // Hiding EMITS the still frame — it does not start one. Captures happen at
+    // `'ready'`, while the view is drawn; the first clause of this sentence used
+    // to say "starts the still-frame capture", which sent a reader looking for a
+    // capture on this line and away from the one actually in flight.
     //
     // The entry is already out of the registry at this point, so anything that
     // threw past the teardown below would leave a live renderer process with no
     // owner, unreachable by `close()`, and the renderer would never see
-    // `suspended` — leaving that tab permanently dead (lens review F8). That is
-    // why the wait is wrapped rather than trusted.
+    // `suspended` — leaving that tab permanently dead (lens review F8).
     view.setVisibility(false)
-    // The ONE place that waits for the capture. `setVisibility` no longer does —
-    // a hide must never sit behind I/O, because the native view eats clicks
-    // meant for whatever overlay just opened. Here there is no overlay and no
-    // pointer to steal: `teardown` destroys the `webContents` on the next line,
-    // so without this the capture would race its own subject and a suspended
-    // panel would wake with no picture.
+    // The ONE place that waits for a capture, and what it waits for is whatever
+    // `'ready'` started and has not finished. `setVisibility` deliberately waits
+    // for nothing: a hide must never sit behind I/O, because the native view eats
+    // clicks meant for whatever overlay just opened. Here there is no overlay and
+    // no pointer to steal, and `teardown` destroys the `webContents` on the next
+    // line — so without this the capture would race its own subject and a
+    // suspended panel would wake with no picture.
     //
-    // Never rethrown. Suspending is housekeeping the caller did not ask for — it
-    // happens inside someone else's `open` — so a failed screenshot must not
-    // fail their open. Losing the frame costs a placeholder-coloured tab, which
-    // is what a preview with no frame already shows.
+    // Cannot reject: `whenCaptureSettled` absorbs a failed capture, because the
+    // only question it answers is whether Chromium is still reading this page.
+    await view.whenCaptureSettled()
+
+    /*
+     * `finally`, because the comment above is only half-true otherwise.
+     *
+     * It says anything that threw past the teardown would leave a live renderer
+     * with no owner and a tab that never sees `suspended` — and then guards only
+     * the wait. `teardown` can reject too: `disposeCollaborators` is fully
+     * guarded, but the `.finally` callback that calls `wc.destroy()` is not.
+     *
+     * A throw there was the worse half of the same fault. The registry entry is
+     * already gone, so `close()` cannot reach the view; `'suspended'` never
+     * arrives, so the renderer's `loadState` stays `'ready'` and its resume
+     * effect never fires; the overlay guard keeps sending `setVisibility` for a
+     * panel main now drops silently, and therefore sends no `visibilityApplied`
+     * for the reconciler to correct against. Nothing recovers until unmount.
+     *
+     * Emitting `'suspended'` regardless is the honest report: the view IS gone
+     * from the registry either way, and the renderer's resume path is the only
+     * thing that can put it back.
+     */
     try {
-      await view.whenCaptureSettled()
-    } catch {
-      // Nothing actionable: the view is being destroyed on the next line.
+      await view.teardown('immediate')
+    } finally {
+      this.deps.emit.loadStateChanged(panelId, 'suspended', 0)
     }
-    await view.teardown('immediate')
-    this.deps.emit.loadStateChanged(panelId, 'suspended', 0)
   }
 
   /** Tear down a session that was built but never installed as a live view. */
@@ -572,7 +613,12 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
       // Becoming visible is the activation signal the eviction order uses.
       this.registry.touch(panelId)
     }
-    await live.setVisibility(visible)
+    // NOT awaited, because there is nothing to await: `setVisibility` returns
+    // `void` and applies the change in this tick, which is the whole point — a
+    // hide that waits leaves a native view eating clicks meant for the overlay
+    // that just opened. The `await` that used to be here was a no-op that read
+    // like the opposite of the rule it sits under.
+    live.setVisibility(visible)
   }
 
   /**

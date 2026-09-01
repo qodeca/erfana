@@ -114,9 +114,6 @@ function makeFakeWc(): FakeWc {
     printToPDF: vi.fn(() => Promise.resolve(Buffer.from(''))),
     findInPage: vi.fn(() => 1),
     stopFindInPage: vi.fn(),
-    setZoomLevel,
-    getZoomLevel,
-    isFocused,
     on: on as unknown as PreviewWebContentsHandle['on'],
     once: once as unknown as PreviewWebContentsHandle['once'],
     removeListener: removeListener as unknown as PreviewWebContentsHandle['removeListener'],
@@ -195,7 +192,7 @@ interface Harness {
   /** The view double's `setBackgroundColor`, typed so its calls are readable. */
   setBackgroundColor: ReturnType<typeof vi.fn<(color: string) => void>>
   backdropChanged: ReturnType<typeof vi.fn<(panelId: string, color: string) => void>>
-  sessionCreate: ReturnType<typeof vi.fn<() => Promise<PreviewSession>>>
+  sessionCreate: ReturnType<typeof vi.fn<(ctx: unknown) => Promise<PreviewSession>>>
   addChildView: ReturnType<typeof vi.fn<(view: PreviewViewHandle) => void>>
   removeChildView: ReturnType<typeof vi.fn<(view: PreviewViewHandle) => void>>
   rebuildCsp: ReturnType<typeof vi.fn<(token: string, hosts: readonly string[]) => void>>
@@ -219,8 +216,7 @@ interface Harness {
       ) => void
     >
   >
-  /** The context `sessionFactory.create` was handed, for reaching `onBlocked`. */
-  sessionCreate: ReturnType<typeof vi.fn>
+  boundsApplied: ReturnType<typeof vi.fn<(panelId: string, seq: number) => void>>
   reloadRecord: ReturnType<typeof vi.fn<(path: string) => void>>
   readEntryHtml: ReturnType<typeof vi.fn<(path: string) => Promise<string>>>
   entryHandlers(): EntryHandlers
@@ -261,7 +257,9 @@ function makeHarness(
     teardown: vi.fn<() => void>()
   }
 
-  const sessionCreate = vi.fn<() => Promise<PreviewSession>>(() => Promise.resolve(session))
+  const sessionCreate = vi.fn<(ctx: unknown) => Promise<PreviewSession>>(() =>
+    Promise.resolve(session)
+  )
 
   const addChildView = vi.fn<(v: PreviewViewHandle) => void>()
   const removeChildView = vi.fn<(v: PreviewViewHandle) => void>()
@@ -402,7 +400,7 @@ function makeHarness(
     backdropChanged,
     boundsApplied,
     hostBlocked,
-    sessionCreate,
+    allowlistChanged,
     reloadRecord,
     readEntryHtml,
     entryHandlers: () => {
@@ -1290,6 +1288,59 @@ describe('PreviewViewService — live-view budget', () => {
     expect(suspended).toEqual(['panel-1'])
   })
 
+  /**
+   * The worse half of the same fault, and the one the `try/catch` above missed.
+   *
+   * `teardown` can reject too — `disposeCollaborators` is guarded, but the
+   * `.finally` that calls `wc.destroy()` is not. By then the registry entry is
+   * gone, so `close()` cannot reach the view; if `'suspended'` never arrives the
+   * renderer's `loadState` stays `'ready'` and its resume effect never fires,
+   * the overlay guard keeps sending `setVisibility` for a panel main now drops
+   * silently, and nothing recovers until unmount.
+   */
+  it('still reports a panel suspended when its teardown throws', async () => {
+    const h = makeHarness()
+    await openPanels(h, PREVIEW.MAX_LIVE_VIEWS)
+    h.factory.destroy.mockImplementationOnce(() => {
+      throw new Error('destroy failed')
+    })
+
+    await h.service.open(
+      { ...REQUEST_A, panelId: `panel-${PREVIEW.MAX_LIVE_VIEWS + 1}` },
+      h.window
+    )
+
+    const suspended = h.loadStateChanged.mock.calls
+      .filter(([, state]) => state === 'suspended')
+      .map(([panelId]) => panelId)
+    expect(suspended).toEqual(['panel-1'])
+  })
+
+  /**
+   * And the caller must not wear it either.
+   *
+   * `enforceLiveViewBudget` runs AFTER this panel is installed and loaded, so a
+   * failure while tidying up someone else's view used to come back as
+   * `{ ok: false, UNKNOWN_ERROR }`. The renderer then took its `openFailed`
+   * branch — which does not send `preview:close` — so a live, visible
+   * `WebContentsView` went on painting over a panel whose renderer believed the
+   * open had failed.
+   */
+  it('does not fail an open because housekeeping for another panel threw', async () => {
+    const h = makeHarness()
+    await openPanels(h, PREVIEW.MAX_LIVE_VIEWS)
+    h.factory.destroy.mockImplementationOnce(() => {
+      throw new Error('destroy failed')
+    })
+
+    const result = await h.service.open(
+      { ...REQUEST_A, panelId: `panel-${PREVIEW.MAX_LIVE_VIEWS + 1}` },
+      h.window
+    )
+
+    expect(result.ok).toBe(true)
+  })
+
   it('keeps up to MAX_LIVE_VIEWS running without suspending anything', async () => {
     const h = makeHarness()
     await openPanels(h, PREVIEW.MAX_LIVE_VIEWS)
@@ -1797,5 +1848,65 @@ describe('PreviewViewService — a CSP refusal survives an approval', () => {
     }
 
     expect(reportedHosts(h)).toEqual(['https://cdn.example.com'])
+  })
+})
+
+/**
+ * The barrier that stops eviction destroying a page mid-screenshot.
+ *
+ * `whenCaptureSettled()` is the seam eviction waits on, and it was skippable.
+ * `captureIfStale` short-circuits to an ALREADY-RESOLVED promise in two cases
+ * without starting anything — a capture is already in flight, or the view has no
+ * size — and `captureWhileVisible` assigned that over the handle regardless. The
+ * reference to the capture still running was simply lost, so the barrier
+ * resolved in a microtask and `wc.destroy()` landed mid-`capturePage`.
+ *
+ * Nothing exotic reaches it: a large page captures slowly, a watched file is
+ * saved inside that window, the reload's pipeline calls again and is
+ * short-circuited, and the next preview to open evicts this one.
+ */
+describe('PreviewViewService — the still-frame barrier', () => {
+  beforeEach(() => vi.useFakeTimers())
+  afterEach(() => vi.useRealTimers())
+
+  it('waits for a capture still in flight after a later one short-circuits', async () => {
+    const h = makeHarness({ now: () => 0 })
+    const capture = h.deps.stillFrameCache.captureIfStale as unknown as ReturnType<typeof vi.fn>
+
+    let releaseFirst: () => void = () => {}
+    const firstCapture = new Promise<void>((resolve) => {
+      releaseFirst = resolve
+    })
+    // #1 is still reading the page.
+    capture.mockImplementationOnce(() => firstCapture)
+    // #2 is what a SKIPPED `captureIfStale` returns: already resolved, nothing
+    // started. This is the value that used to replace the handle to #1.
+    capture.mockImplementation(() => Promise.resolve())
+
+    await h.service.open(REQUEST_A, h.window)
+    h.factory.emit('did-finish-load')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(capture).toHaveBeenCalledTimes(1)
+
+    // The coalesced trailing run, which short-circuits behind #1.
+    h.factory.emit('did-finish-load')
+    await vi.advanceTimersByTimeAsync(PREVIEW.RELOAD_MIN_INTERVAL_MS)
+    expect(capture).toHaveBeenCalledTimes(2)
+
+    // Fill the budget so panel-A — the least recently active — is evicted.
+    const evicting = (async () => {
+      for (let i = 1; i <= PREVIEW.MAX_LIVE_VIEWS; i += 1) {
+        await h.service.open({ ...REQUEST_A, panelId: `panel-${i}` }, h.window)
+      }
+    })()
+    await vi.advanceTimersByTimeAsync(0)
+
+    // THE ASSERTION. Capture #1 has not settled, so nothing may destroy the page
+    // it is reading. Before the fix this had already been torn down.
+    expect(h.factory.destroy).not.toHaveBeenCalled()
+
+    releaseFirst()
+    await evicting
+    expect(h.factory.destroy).toHaveBeenCalled()
   })
 })

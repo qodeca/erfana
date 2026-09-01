@@ -222,7 +222,19 @@ export function registerPreviewLifecycleHandlers(
         })
         return
       }
-      void service.setVisibility(parsed.data.panelId, parsed.data.visible, parsed.data.reason)
+      // The `catch` below cannot see this one. `setVisibility` is `async`, so a
+      // throw inside it — `addChildView` against a window destroyed in the gap
+      // before `drainWindow` runs — becomes a REJECTED PROMISE, not a synchronous
+      // throw, and `void` would drop it into the process-level handler. This file
+      // promises no handler ever throws; that promise needs both halves.
+      void service
+        .setVisibility(parsed.data.panelId, parsed.data.visible, parsed.data.reason)
+        .catch((error: unknown) => {
+          logger.error(
+            'preview:setVisibility failed',
+            error instanceof Error ? error : undefined
+          )
+        })
     } catch (error) {
       logger.error('preview:setVisibility failed', error instanceof Error ? error : undefined)
     }
