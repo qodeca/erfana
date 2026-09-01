@@ -108,6 +108,23 @@ export interface OverlayGuardDeps {
    * @param reason - Advisory cause, for main-side logging.
    */
   setVisibility: (panelId: string, visible: boolean, reason: string) => void
+  /**
+   * Subscribe to main's report of what it ACTUALLY did with a view.
+   *
+   * The guard writes `lastVisible` optimistically, at send time, and re-sends
+   * only on a change — so a send that main drops, or that Chromium does not
+   * honour, is permanent. Nothing corrected it until an unrelated transition,
+   * and the symptom is a preview panel that is simply black and stays black.
+   *
+   * This is the reconciliation. Optional, because a caller with no bridge is
+   * strictly no worse off than before it existed.
+   *
+   * @param listener - Called with what main applied, per panel.
+   * @returns An unsubscribe function.
+   */
+  subscribeVisibilityApplied?: (
+    listener: (panelId: string, visible: boolean) => void
+  ) => () => void
 }
 
 /**
@@ -166,6 +183,30 @@ class OverlayGuardService implements IOverlayGuard {
     this.unsubscribers.push(deps.subscribeOccluded(() => this.recompute()))
     this.unsubscribers.push(deps.subscribePreview(() => this.recompute()))
     this.unsubscribers.push(deps.subscribeGate(() => this.recompute()))
+
+    /*
+     * RECONCILE, because "I sent it" is not "it happened".
+     *
+     * `lastVisible` is written at send time and gates every later send, so one
+     * lost message wedges a panel for the life of the session. Main reports what
+     * it applied; if that disagrees with what this guard believes, the belief is
+     * wrong and must be dropped — the next recompute then sends again.
+     *
+     * Deliberately NOT a retry loop. It corrects the CACHE and asks for a fresh
+     * decision; if the world genuinely wants the other state, the recompute says
+     * so and one more message goes out. If main keeps disagreeing, that is a
+     * main-side fault and hammering it would only hide it.
+     */
+    const subscribeApplied = deps.subscribeVisibilityApplied
+    if (subscribeApplied !== undefined) {
+      this.unsubscribers.push(
+        subscribeApplied((panelId, applied) => {
+          if (this.lastVisible.get(panelId) === applied) return
+          this.lastVisible.delete(panelId)
+          this.recompute()
+        })
+      )
+    }
   }
 
   sync(activeTabId: string | null): void {
@@ -310,7 +351,11 @@ export function getOverlayGuard(): IOverlayGuard {
     getPanelGate: (panelId) => usePreviewChromeGateStore.getState().getGate(panelId),
     subscribeGate: (listener) => usePreviewChromeGateStore.subscribe(listener),
     setVisibility: (panelId, visible, reason) =>
-      window.api.preview.setVisibility(panelId, visible, reason)
+      window.api.preview.setVisibility(panelId, visible, reason),
+    subscribeVisibilityApplied: (listener) =>
+      window.api.preview.onVisibilityApplied((payload) =>
+        listener(payload.panelId, payload.visible)
+      )
   })
   return singleton
 }

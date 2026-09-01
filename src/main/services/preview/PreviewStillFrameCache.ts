@@ -84,7 +84,8 @@ export interface IPreviewStillFrameCache {
   captureIfStale(
     wc: PreviewCaptureContents,
     panelId: string,
-    size: { width: number; height: number }
+    size: { width: number; height: number },
+    opts?: { shouldKeep?: () => boolean }
   ): Promise<void>
   /** The cached frame for `panelId`, or `undefined` (⇒ placeholder colour). */
   get(panelId: string): PreviewStillFrame | undefined
@@ -107,7 +108,8 @@ export class PreviewStillFrameCache implements IPreviewStillFrameCache {
   async captureIfStale(
     wc: PreviewCaptureContents,
     panelId: string,
-    size: { width: number; height: number }
+    size: { width: number; height: number },
+    opts: { shouldKeep?: () => boolean } = {}
   ): Promise<void> {
     // A capture is already in flight — skip rather than stack captures.
     if (wc.isBeingCaptured()) {
@@ -143,6 +145,24 @@ export class PreviewStillFrameCache implements IPreviewStillFrameCache {
 
     // Over the data-URL budget ⇒ NO frame (never a partial/blank one).
     if (dataUrl.length > this.maxDataUrlChars) {
+      return
+    }
+
+    /*
+     * LAST CHANCE TO THROW THE RESULT AWAY, and it is the only defence against
+     * poisoning a good frame with a bad one.
+     *
+     * `isEmpty()` above catches a ZERO-DIMENSION image and nothing else — an
+     * all-black picture at the right size sails through and overwrites whatever
+     * was cached. So a capture that started while the page was on screen and
+     * finished after it had gone could replace a perfectly good frame with a
+     * black rectangle, and nothing invalidates it afterwards: the only callers
+     * of `invalidate` are a file change, a completed load, and teardown.
+     *
+     * The caller knows whether its subject was still there the whole time. This
+     * asks, at the last possible moment, rather than guessing from the pixels.
+     */
+    if (opts.shouldKeep !== undefined && !opts.shouldKeep()) {
       return
     }
 

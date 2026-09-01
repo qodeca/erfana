@@ -63,6 +63,52 @@ function makeGuard(overrides: Partial<OverlayGuardDeps> = {}): {
   }
 }
 
+describe('OverlayGuardService — reconciling with what main actually did', () => {
+  /**
+   * The guard writes `lastVisible` at SEND time and re-sends only on a change,
+   * so a send main drops is permanent — the panel is black and stays black until
+   * some unrelated transition. A reported fault looked exactly like that. Main
+   * already reports what it applied; the guard now listens.
+   */
+  it('re-sends when main reports the opposite of what was sent', () => {
+    let applied: (panelId: string, visible: boolean) => void = () => {}
+    const { guard, setVisibility } = makeGuard({
+      subscribeVisibilityApplied: (l) => {
+        applied = l
+        return () => {}
+      }
+    })
+
+    guard.sync('preview-1')
+    expect(setVisibility).toHaveBeenCalledWith('preview-1', true, expect.any(String))
+    setVisibility.mockClear()
+
+    // Main says the view is hidden. The guard believed it was visible, so its
+    // belief is wrong and the next recompute must speak again.
+    applied('preview-1', false)
+
+    expect(setVisibility).toHaveBeenCalledWith('preview-1', true, expect.any(String))
+  })
+
+  it('stays quiet when main agrees', () => {
+    // Reconciliation must not turn every confirmation into another message.
+    let applied: (panelId: string, visible: boolean) => void = () => {}
+    const { guard, setVisibility } = makeGuard({
+      subscribeVisibilityApplied: (l) => {
+        applied = l
+        return () => {}
+      }
+    })
+
+    guard.sync('preview-1')
+    setVisibility.mockClear()
+
+    applied('preview-1', true)
+
+    expect(setVisibility).not.toHaveBeenCalled()
+  })
+})
+
 describe('OverlayGuardService (item 69)', () => {
   it('shows the preview when it is the active tab and not occluded', () => {
     const { guard, setVisibility } = makeGuard()

@@ -109,6 +109,26 @@ describe('PreviewStillFrameCache', () => {
     expect(captured.resize).toHaveBeenCalledWith({ width: 1024, height: 512, quality: 'good' })
   })
 
+  it('keeps the previous frame when the caller says to discard the new one', async () => {
+    // `isEmpty()` catches a ZERO-DIMENSION image and nothing else, so an
+    // all-black picture at the right size would overwrite a good frame — and
+    // nothing invalidates it afterwards. The caller knows whether its subject
+    // was still on screen for the whole capture; it is asked at the last moment.
+    const first = makeImage({ width: 10, height: 10 }, SHORT_DATA_URL)
+    const wc = makeWc(vi.fn(async () => first))
+    const cache = createPreviewStillFrameCache({ now: () => 7 })
+
+    await cache.captureIfStale(wc, PANEL, SIZE)
+    expect(cache.get(PANEL)?.capturedAt).toBe(7)
+
+    const second = makeImage({ width: 10, height: 10 }, 'data:image/png;base64,BBBB')
+    const wc2 = makeWc(vi.fn(async () => second))
+    await cache.captureIfStale(wc2, PANEL, SIZE, { shouldKeep: () => false })
+
+    // Untouched — still the first frame, not the discarded one.
+    expect(cache.get(PANEL)?.dataUrl).toBe(SHORT_DATA_URL)
+  })
+
   it('emits NO frame, and asks for nothing, when the view has no size', async () => {
     // A view that was never laid out reports 0x0. Capturing that is a wasted
     // round trip with no time budget behind it, and the answer is knowable here.

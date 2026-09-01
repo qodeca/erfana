@@ -532,7 +532,18 @@ export class PreviewLiveView {
    * TAIL is still async, and a frame captured for a hide that has since been
    * superseded must not be published as the panel's current picture.
    */
-  private wantedVisible = false
+  /*
+   * TRUE FROM BIRTH, because that is what the view actually is.
+   *
+   * The constructor adds the view to the window's content view and a fresh
+   * `WebContentsView` is drawn unless something hides it, so starting this at
+   * `false` described a state that never existed. It mattered once
+   * `captureWhileVisible` began reading it: the load pipeline reaches `'ready'`
+   * before the renderer's first `setVisibility(true)` has necessarily arrived,
+   * so a `false` default meant the one capture that matters was skipped and
+   * every hide published nothing.
+   */
+  private wantedVisible = true
 
   /**
    * The still-frame capture started by the most recent hide.
@@ -569,36 +580,56 @@ export class PreviewLiveView {
       return
     }
 
-    // Whatever we captured last time, on screen before the view goes — so the
-    // hide is not a flash of empty backdrop.
-    const previous = this.deps.stillFrameCache.get(this.panelId)
-    if (previous !== undefined) {
-      this.deps.emit.stillFrameChanged(this.panelId, previous)
+    // The frame captured while the page was on screen, published before the view
+    // goes, so the hide is not a flash of empty backdrop.
+    const frame = this.deps.stillFrameCache.get(this.panelId)
+    if (frame !== undefined) {
+      this.deps.emit.stillFrameChanged(this.panelId, frame)
     }
-
-    // Started, NOT awaited. Only the SIZE of `lastBounds` travels: its `x`/`y`
-    // are window-relative DIPs for `setBounds` and mean nothing to
-    // `capturePage`, whose rect is page-relative.
-    const capture = this.deps.stillFrameCache.captureIfStale(this.wc, this.panelId, {
-      width: this.lastBounds?.width ?? 0,
-      height: this.lastBounds?.height ?? 0
-    })
-    this.pendingCapture = capture
 
     this.view.setVisible(false)
     this.deps.emit.visibilityApplied(this.panelId, false)
+  }
 
-    void capture.then(() => {
-      // A show landed while the capture ran, or the view died. The frame is
-      // still worth keeping for the next hide — it just must not be published
-      // now, when the panel is showing the live page again.
-      if (this.wantedVisible || this.isDefunct) return
+  /**
+   * Refresh the still frame, from a view that is ON SCREEN.
+   *
+   * WHY NOT AT HIDE TIME, WHICH IS THE OBVIOUS PLACE. A hide must be
+   * synchronous — a native view eats clicks meant for whatever overlay just
+   * opened — so a capture at hide time is necessarily still running after
+   * `setVisible(false)`. That left a `stayHidden` capture in flight across, and
+   * after, the hide, which is a state this code never used to enter, and it
+   * lines up with a reported fault where the page never came back: the panel
+   * went flat black and stayed that way.
+   *
+   * Whether a capture overlapping `View.setVisible(false)` settles at all, or
+   * leaves the page non-painting afterwards, is runtime Chromium behaviour this
+   * repo cannot answer. So it does not do it. Captures happen only while the
+   * view is drawn, and the hide publishes what is already cached.
+   *
+   * The cost is stated rather than hidden: the picture is from the last capture,
+   * not the last painted pixel, so a page that animates after load shows the
+   * frame it had then. For a placeholder behind a permission list that is the
+   * right trade — a slightly old picture beats a black rectangle, and beats a
+   * class of bug nobody can reproduce.
+   *
+   * Never awaited by anything interactive. `whenCaptureSettled` exists for
+   * eviction, which destroys the page a line later.
+   */
+  private captureWhileVisible(): void {
+    if (this.isDefunct || !this.wantedVisible) return
 
-      const frame = this.deps.stillFrameCache.get(this.panelId)
-      if (frame !== undefined && frame !== previous) {
-        this.deps.emit.stillFrameChanged(this.panelId, frame)
-      }
-    })
+    // Only the SIZE of `lastBounds` travels: its `x`/`y` are window-relative
+    // DIPs for `setBounds` and mean nothing to `capturePage`, whose rect is
+    // page-relative.
+    this.pendingCapture = this.deps.stillFrameCache.captureIfStale(
+      this.wc,
+      this.panelId,
+      { width: this.lastBounds?.width ?? 0, height: this.lastBounds?.height ?? 0 },
+      // A hide DURING the capture means the result describes a page that was on
+      // its way out. Keeping it would overwrite a good frame with a partial one.
+      { shouldKeep: () => this.wantedVisible && !this.isDefunct }
+    )
   }
 
   /**
@@ -789,6 +820,9 @@ export class PreviewLiveView {
     }
     this.deps.stillFrameCache.invalidate(this.panelId)
     this.deps.emit.loadStateChanged(this.panelId, 'ready', result.dropped.length)
+    // The page has painted and the watch set is established: the one moment we
+    // know the view is showing something worth photographing.
+    this.captureWhileVisible()
   }
 
   /**

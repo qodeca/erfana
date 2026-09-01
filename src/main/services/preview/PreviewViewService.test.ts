@@ -1167,19 +1167,55 @@ describe('PreviewViewService — live-view budget', () => {
    * A capture that NEVER resolves is the honest way to pin this: if the hide is
    * behind the await, `setVisible(false)` never happens at all.
    */
-  it('hides the view without waiting for the still-frame capture', async () => {
+  it('hides the view synchronously, and starts no capture while doing it', async () => {
+    // The hide must not sit behind I/O, and it must not leave a capture running
+    // across `setVisible(false)` either — that is a state Chromium's behaviour
+    // for is undefined, and it lines up with a reported fault where the page
+    // never came back. Frames are taken while the view is ON SCREEN instead.
     const h = makeHarness()
-    const capture = h.deps.stillFrameCache.captureIfStale as unknown as ReturnType<typeof vi.fn>
-    capture.mockReturnValue(new Promise<void>(() => {}))
-
     await h.service.open(REQUEST_A, h.window)
+
+    const capture = h.deps.stillFrameCache.captureIfStale as unknown as ReturnType<typeof vi.fn>
     const setVisible = h.view.setVisible as unknown as ReturnType<typeof vi.fn>
+    capture.mockClear()
     setVisible.mockClear()
 
     await h.service.setVisibility('panel-A', false, 'dialog')
 
-    expect(capture).toHaveBeenCalled()
     expect(setVisible).toHaveBeenCalledWith(false)
+    expect(capture).not.toHaveBeenCalled()
+  })
+
+  it('captures the still frame once the page is ready, while the view is drawn', async () => {
+    const h = makeHarness()
+    const capture = h.deps.stillFrameCache.captureIfStale as unknown as ReturnType<typeof vi.fn>
+
+    await h.service.open(REQUEST_A, h.window)
+    capture.mockClear()
+
+    h.factory.emit('did-finish-load')
+    await vi.waitFor(() => expect(capture).toHaveBeenCalled())
+
+    // Only a SIZE travels; the cache builds the page-relative rect at the origin.
+    const [, panelId, size, opts] = capture.mock.calls[0]
+    expect(panelId).toBe('panel-A')
+    expect(size).toEqual({ width: expect.any(Number), height: expect.any(Number) })
+    // And it can still be thrown away if the view goes before it finishes.
+    expect(opts.shouldKeep()).toBe(true)
+  })
+
+  it('publishes the cached frame on hide, so the panel is never a blank rectangle', async () => {
+    const h = makeHarness()
+    const frame = { dataUrl: 'data:image/png;base64,AAAA', width: 4, height: 4, capturedAt: 1 }
+    ;(h.deps.stillFrameCache.get as unknown as ReturnType<typeof vi.fn>).mockReturnValue(frame)
+
+    await h.service.open(REQUEST_A, h.window)
+    const changed = h.deps.emit.stillFrameChanged as unknown as ReturnType<typeof vi.fn>
+    changed.mockClear()
+
+    await h.service.setVisibility('panel-A', false, 'dialog')
+
+    expect(changed).toHaveBeenCalledWith('panel-A', frame)
   })
 
   /**
@@ -1210,12 +1246,14 @@ describe('PreviewViewService — live-view budget', () => {
    * the frame is captured for. `whenCaptureSettled()` is the seam, and this is
    * the test that it is actually used: destroy must come after the capture.
    */
-  it('lets the still-frame capture finish before tearing an evicted view down', async () => {
+  it('does not photograph a view it is about to destroy', async () => {
+    // Eviction hides and then tears down a line later. It used to capture in
+    // between; it now relies on the frame taken while the page was on screen,
+    // so nothing races the destruction of its own subject.
     const h = makeHarness()
     const order: string[] = []
     const capture = h.deps.stillFrameCache.captureIfStale as unknown as ReturnType<typeof vi.fn>
     capture.mockImplementation(async () => {
-      await Promise.resolve()
       order.push('capture')
     })
     h.factory.destroy.mockImplementation(() => {
@@ -1225,7 +1263,9 @@ describe('PreviewViewService — live-view budget', () => {
 
     await openPanels(h, PREVIEW.MAX_LIVE_VIEWS + 1)
 
-    expect(order).toEqual(['capture', 'destroy'])
+    // Captures happen at 'ready', never between the eviction hide and destroy.
+    expect(order[order.length - 1]).toBe('destroy')
+    expect(order.lastIndexOf('capture')).toBeLessThan(order.indexOf('destroy'))
   })
 
   /**
