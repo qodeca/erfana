@@ -145,8 +145,12 @@ export interface BandRow {
 }
 
 export interface BandRows {
+  /** Blocked and offerable — the rows with an Allow button. */
   readonly blocked: readonly BandRow[]
+  /** Approved for this project. */
   readonly allowed: readonly BandRow[]
+  /** Blocked with no button, because the mechanism cannot express them. */
+  readonly unapprovable: readonly BandRow[]
   readonly counts: { readonly blocked: number; readonly allowed: number }
 }
 
@@ -182,13 +186,33 @@ export function selectBandRows(
 ): BandRows {
   const allowedSet = new Set(allowedHosts)
 
-  const blocked: BandRow[] = blockedHosts
-    .filter(entry => !allowedSet.has(entry.host))
-    .map(entry => ({
-      host: entry.host,
-      kinds: entry.kinds,
-      state: entry.approvable ? ('allow' as const) : ('not-approvable' as const)
-    }))
+  const stillBlocked = blockedHosts.filter(entry => !allowedSet.has(entry.host))
+
+  /*
+   * THREE GROUPS, ORDERED BY WHAT THE READER CAN DO ABOUT THEM.
+   *
+   * Answerable first, then answered, then unanswerable. The list is a queue of
+   * decisions, and the only rows that are a decision are the ones with a button
+   * — so a page that asked for twenty hosts does not bury its one actionable
+   * row under nineteen settled ones.
+   *
+   * The unapprovable rows go LAST rather than being dropped. They are still
+   * facts about what the page tried to reach, and a refusal the reader cannot
+   * act on is exactly the kind of thing that must not be silently hidden — but
+   * it does not belong between them and the button they came for.
+   *
+   * Arrival order is preserved WITHIN each group. Blocked hosts are already in
+   * first-seen order, which is the only order that means anything about a page,
+   * and re-sorting them by name would shuffle the list every time the page
+   * requested something new.
+   */
+  const blocked: BandRow[] = stillBlocked
+    .filter(entry => entry.approvable)
+    .map(entry => ({ host: entry.host, kinds: entry.kinds, state: 'allow' as const }))
+
+  const unapprovable: BandRow[] = stillBlocked
+    .filter(entry => !entry.approvable)
+    .map(entry => ({ host: entry.host, kinds: entry.kinds, state: 'not-approvable' as const }))
 
   const allowed: BandRow[] = [...allowedHosts]
     .sort((a, b) => a.localeCompare(b))
@@ -197,7 +221,12 @@ export function selectBandRows(
   return {
     blocked,
     allowed,
-    counts: { blocked: blocked.length, allowed: allowed.length }
+    unapprovable,
+    // An unapprovable host IS blocked, and the count says so. Splitting it out
+    // of the total would make the chip disagree with the failure badge, which
+    // counts every refusal — the exact class of contradiction the origin work
+    // removed.
+    counts: { blocked: blocked.length + unapprovable.length, allowed: allowed.length }
   }
 }
 

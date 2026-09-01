@@ -94,9 +94,56 @@ describe('selectBandRows', () => {
     expect(rows.counts).toEqual({ blocked: 1, allowed: 1 })
   })
 
-  it('marks a host that can never be approved', () => {
+  it('puts a host that can never be approved in its own group, not among the buttons', () => {
     const rows = selectBandRows([blocked('203.0.113.7', ['image'], false)], [])
-    expect(rows.blocked[0].state).toBe('not-approvable')
+
+    expect(rows.blocked).toEqual([])
+    expect(rows.unapprovable[0].state).toBe('not-approvable')
+  })
+
+  it('still COUNTS an unapprovable host as blocked', () => {
+    // It is blocked. Leaving it out of the total would make the chip disagree
+    // with the failure badge, which counts every refusal — and two Erfana
+    // surfaces contradicting each other about the same host is the exact defect
+    // the origin work went in to remove.
+    const rows = selectBandRows(
+      [blocked('cdn.example.com', ['script'], true), blocked('203.0.113.7', ['image'], false)],
+      []
+    )
+
+    expect(rows.counts).toEqual({ blocked: 2, allowed: 0 })
+  })
+
+  it('orders the groups: answerable, then answered, then unanswerable', () => {
+    // The list is a queue of decisions. A page asking for many hosts must not
+    // bury its one actionable row under settled or unactionable ones.
+    const rows = selectBandRows(
+      [
+        blocked('203.0.113.7', ['image'], false),
+        blocked('cdn.example.com', ['script'], true),
+        blocked('fonts.example.com', ['font'], true)
+      ],
+      ['already.example.com']
+    )
+
+    expect(rows.blocked.map(r => r.host)).toEqual(['cdn.example.com', 'fonts.example.com'])
+    expect(rows.allowed.map(r => r.host)).toEqual(['already.example.com'])
+    expect(rows.unapprovable.map(r => r.host)).toEqual(['203.0.113.7'])
+  })
+
+  it('keeps first-seen order inside the blocked group', () => {
+    // Arrival order is the only order that says anything about a page. Sorting
+    // by name would reshuffle the list every time the page asked for something
+    // new, under whatever the reader was about to click.
+    const rows = selectBandRows(
+      [
+        blocked('zeta.example.com', ['script'], true),
+        blocked('alpha.example.com', ['script'], true)
+      ],
+      []
+    )
+
+    expect(rows.blocked.map(r => r.host)).toEqual(['zeta.example.com', 'alpha.example.com'])
   })
 })
 

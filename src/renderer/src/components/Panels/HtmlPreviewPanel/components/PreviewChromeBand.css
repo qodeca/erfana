@@ -66,6 +66,20 @@
   flex: 1 1 auto;
 }
 
+/*
+ * The rule between the page's own controls and the one that writes a file
+ * elsewhere. Copied from `.markdown-toolbar .toolbar-separator` — same width,
+ * same 24px height, same token, same 8px margins — because the two toolbars
+ * should not disagree about what a separator looks like.
+ */
+.erf-band__separator {
+  flex: 0 0 auto;
+  width: 1px;
+  height: var(--icon-size-lg);           /* 24px */
+  margin: 0 var(--space-4);
+  background: var(--color-border-default);
+}
+
 /* An icon button, sized and coloured as `.markdown-toolbar .toolbar-btn`. */
 .erf-band__tool {
   display: flex;
@@ -197,6 +211,13 @@
   grid-template-columns: minmax(0, 1fr) 72px auto;
   gap: var(--space-8);
   align-items: center;
+  /*
+   * `min-height` is the 24px target floor plus the padding, and the padding is
+   * what makes the row readable: a 24px button in a 28px row left about 2px
+   * between the button's edge and the separator above it, so the rules read as
+   * boxes drawn around the buttons rather than as lines between rows.
+   */
+  padding-block: var(--space-3);         /* 6px above and below */
   min-height: var(--space-14);           /* 28px */
   border-top: var(--border-width) solid var(--color-border-default);
 }
