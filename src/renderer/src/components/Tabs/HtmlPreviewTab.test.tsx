@@ -91,6 +91,19 @@ describe('HtmlPreviewTab', () => {
     expect(props.api.close).toHaveBeenCalledTimes(1)
   })
 
+  it('offers no export in its context menu — that lives on the preview toolbar', () => {
+    // It used to be prepended here, because the panel surface is painted over by
+    // the native view and the tab was the only chrome that survived (UX-003).
+    // The preview has its own toolbar above the view now, which is where the
+    // markdown editor has always kept its export button. An export hidden behind
+    // a right-click on a tab handle is an export nobody finds.
+    render(<HtmlPreviewTab {...props} />)
+    fireEvent.contextMenu(screen.getByText('index.html').closest('.html-preview-tab')!)
+
+    expect(screen.queryByText('Export as PDF')).toBeNull()
+    expect(screen.queryByText('Export to PDF')).toBeNull()
+  })
+
   it('shows the failure indicator reflecting the store count for its panelId (AC20)', () => {
     const panelId = props.params!.panelId!
     usePreviewStore.getState().pushFailures(panelId, [blockedHost('cdn.example')])

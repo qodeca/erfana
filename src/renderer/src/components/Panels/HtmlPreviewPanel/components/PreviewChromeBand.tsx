@@ -36,7 +36,7 @@
  * @see design/system/components/permission-band/index.html - status="decided"
  * @see design/product/html-approval/index.html - the nine-state journey
  */
-import { Search } from 'lucide-react'
+import { FileDown, Search } from 'lucide-react'
 import { useCallback, useEffect, useId, useMemo, useReducer, useRef } from 'react'
 
 import './PreviewChromeBand.css'
@@ -86,6 +86,11 @@ export interface PreviewChromeBandProps {
    * is not rendered without it rather than rendering a control that does nothing.
    */
   readonly onFind?: () => void
+  /** Export the previewed page to PDF. Optional for the same reason as `onFind`. */
+  readonly onExportPdf?: () => void
+  /** An export is in flight — the button is disabled so a second click cannot
+   * open a second save dialog behind the first. */
+  readonly exportingPdf?: boolean
   /** Approve one host. Resolves with the IPC result — the band renders failure. */
   readonly onApprove: (host: string) => Promise<PreviewApproveResult>
   /** The list opened or closed, so the panel can re-measure. */
@@ -100,6 +105,8 @@ export function PreviewChromeBand({
   chipRef,
   controlsAllowed = true,
   onFind,
+  onExportPdf,
+  exportingPdf = false,
   onApprove,
   onExpandedChange
 }: PreviewChromeBandProps): React.JSX.Element {
@@ -135,6 +142,7 @@ export function PreviewChromeBand({
     ? rows.blocked.filter(row => row.host === confirmingHost)
     : rows.blocked
   const visibleAllowed = confirmingHost ? [] : rows.allowed
+  const visibleUnapprovable = confirmingHost ? [] : rows.unapprovable
 
   useEffect(() => {
     onExpandedChange?.(state.expanded)
@@ -267,6 +275,38 @@ export function PreviewChromeBand({
             {state.expanded ? '▾' : '▸'}
           </span>
         </button>
+
+        {/*
+          Export to PDF, LAST and behind a rule — the same position, separator
+          and button `MarkdownToolbar` gives it, so the two previews in this app
+          put the same control in the same corner.
+
+          It lived on the TAB's context menu because the panel surface is painted
+          over by the native view and the tab was the only chrome that survived.
+          This bar is that chrome now, so an export nobody could find behind a
+          right-click is an ordinary button again.
+
+          The rule is not decoration: everything to its left is about THIS PAGE —
+          find inside it, what it was blocked from reaching — and the export is
+          the one control that writes a file somewhere else. Grouping is what the
+          separator is for.
+        */}
+        {onExportPdf !== undefined && (
+          <>
+            <span className="erf-band__separator" aria-hidden="true" />
+            <button
+              type="button"
+              className="erf-band__tool"
+              aria-label="Export to PDF"
+              title="Export to PDF"
+              data-testid="preview-band-export-pdf"
+              disabled={exportingPdf}
+              onClick={onExportPdf}
+            >
+              <FileDown size={16} strokeWidth={2} aria-hidden="true" />
+            </button>
+          </>
+        )}
       </div>
 
       {/*
@@ -339,9 +379,37 @@ export function PreviewChromeBand({
             />
           ))}
 
-          {rows.blocked.length === 0 && rows.allowed.length === 0 && (
-            <div className="erf-band__section">No remote hosts requested</div>
+          {/*
+            LAST, and behind its own heading. These are blocked too, but there is
+            no button to reach for, so they sit after the rows the reader can act
+            on and after the ones already settled.
+
+            The heading is not decoration: without it a run of buttonless rows
+            immediately under "Allowed in this project" reads as part of that
+            list — a refusal presented as a grant, which is the worst direction
+            for this control to fail in.
+          */}
+          {visibleUnapprovable.length > 0 && (
+            <div className="erf-band__section">Cannot be allowed</div>
           )}
+          {visibleUnapprovable.map(row => (
+            <PreviewBandRow
+              key={row.host}
+              row={row}
+              failureText={null}
+              confirming={false}
+              confirmId={null}
+              isRovingTarget={false}
+              allowRef={undefined}
+              onAllow={() => {}}
+            />
+          ))}
+
+          {rows.blocked.length === 0 &&
+            rows.allowed.length === 0 &&
+            rows.unapprovable.length === 0 && (
+              <div className="erf-band__section">No remote hosts requested</div>
+            )}
         </div>
       </div>
     </div>

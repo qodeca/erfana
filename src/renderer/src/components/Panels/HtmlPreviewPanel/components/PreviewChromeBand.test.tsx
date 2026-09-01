@@ -73,6 +73,35 @@ describe('PreviewChromeBand', () => {
     expect(screen.queryByTestId('preview-band-find')).toBeNull()
   })
 
+  it('renders an Export to PDF button, and disables it while one is running', async () => {
+    // It used to live behind a right-click on the TAB, because the panel surface
+    // is painted over by the native view and the tab was the only chrome that
+    // survived. This bar is that chrome now, so the affordance sits where the
+    // markdown editor has always kept it.
+    const user = userEvent.setup()
+    const onExportPdf = vi.fn()
+    const { rerender } = renderBand({ onExportPdf })
+
+    const button = screen.getByTestId('preview-band-export-pdf')
+    expect(button).toHaveAccessibleName('Export to PDF')
+
+    await user.click(button)
+    expect(onExportPdf).toHaveBeenCalledTimes(1)
+
+    // A save dialog is modal to the OS: a second click while the first is open
+    // would queue another one behind it.
+    rerender(
+      <PreviewChromeBand
+        blockedHosts={[]}
+        allowedHosts={[]}
+        onApprove={vi.fn(async () => ok)}
+        onExportPdf={onExportPdf}
+        exportingPdf
+      />
+    )
+    expect(screen.getByTestId('preview-band-export-pdf')).toBeDisabled()
+  })
+
   it("renders a Find button, named and titled like the markdown toolbar's", async () => {
     const user = userEvent.setup()
     const onFind = vi.fn()

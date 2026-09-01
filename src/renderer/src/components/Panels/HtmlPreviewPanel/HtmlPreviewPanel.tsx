@@ -267,7 +267,17 @@ export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelPara
   }, [searchProvider])
 
   const openPreviewSearch = useCallback(() => useSearchStore.getState().openSearch(), [])
-  const exportPdf = useCallback(() => void exportPreviewPdf(panelId), [panelId])
+  // A save dialog is modal to the OS, so a second click while the first is open
+  // would queue a second one behind it. `MarkdownToolbar` disables its button the
+  // same way; the shortcut route is guarded by the same flag.
+  const [exportingPdf, setExportingPdf] = useState(false)
+  const exportPdf = useCallback(() => {
+    setExportingPdf(current => {
+      if (current) return current
+      void exportPreviewPdf(panelId).finally(() => setExportingPdf(false))
+      return true
+    })
+  }, [panelId])
   // Cmd/Ctrl+W closes the panel via the dockview api, matching how the tab
   // close button and MarkdownEditorPanel close a panel (UX-006).
   const closePanel = useCallback(() => api.close(), [api])
@@ -361,6 +371,8 @@ export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelPara
             controlsAllowed={controlsAllowed}
             paused={gate !== null}
             onFind={openPreviewSearch}
+            onExportPdf={exportPdf}
+            exportingPdf={exportingPdf}
             onApprove={approveHost}
             onExpandedChange={setBandExpanded}
           />

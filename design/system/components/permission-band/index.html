@@ -120,6 +120,16 @@
           <span id="chipCounts">0 blocked · 0 allowed</span>
           <span class="erf-band__chip-caret" id="chipCaret" aria-hidden="true">▸</span>
         </button>
+      <span class="erf-band__separator" aria-hidden="true"></span>
+      <button class="erf-band__tool" type="button" aria-label="Export to PDF" title="Export to PDF">
+          <!-- lucide `file-down`, 16px — the same button the markdown toolbar has. -->
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path>
+            <path d="M14 2v4a2 2 0 0 0 2 2h4"></path>
+            <path d="M12 18v-6"></path><path d="m9 15 3 3 3-3"></path>
+          </svg>
+        </button>
       </div>
 
       <div class="erf-band__paused" id="paused" hidden>
@@ -349,13 +359,35 @@ function render() {
   // matches the rule that this is one deliberate decision at a time.
   const showBlocked = confirming ? blocked.filter((b) => b.host === confirming) : blocked;
 
-  if (showBlocked.length) {
+  /*
+   * THREE GROUPS, ORDERED BY WHAT THE READER CAN DO ABOUT THEM: answerable,
+   * then answered, then unanswerable.
+   *
+   * The list is a queue of decisions, and only the rows with a button are a
+   * decision. A page that asked for twenty hosts must not bury its one
+   * actionable row under nineteen settled or unactionable ones.
+   *
+   * The buttonless rows go LAST rather than being dropped — they are still
+   * facts about what the page reached for, and a refusal the reader cannot act
+   * on is the last thing that should be quietly hidden. They keep their own
+   * heading, because a run of buttonless rows sitting directly under "Allowed
+   * in this project" reads as part of that list: a refusal presented as a
+   * grant, the worst direction for this control to fail in.
+   */
+  const offerable = showBlocked.filter((b) => b.approvable !== false);
+  const unapprovable = confirming ? [] : blocked.filter((b) => b.approvable === false);
+
+  if (offerable.length) {
     scroll.appendChild(section(confirming ? 'Approving' : 'Blocked on load'));
-    for (const item of showBlocked) scroll.appendChild(blockedRow(item));
+    for (const item of offerable) scroll.appendChild(blockedRow(item));
   }
   if (allowed.length && !confirming) {
     scroll.appendChild(section('Allowed in this project'));
     for (const item of allowed) scroll.appendChild(allowedRow(item));
+  }
+  if (unapprovable.length) {
+    scroll.appendChild(section('Cannot be allowed'));
+    for (const item of unapprovable) scroll.appendChild(blockedRow(item));
   }
   if (!blocked.length && !allowed.length) {
     const empty = document.createElement('div');

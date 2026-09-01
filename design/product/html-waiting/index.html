@@ -518,6 +518,16 @@ function band({ counts = '0 blocked · 0 allowed', slot = '', paused = false, op
           <span>${counts}</span>
           <span class="erf-band__chip-caret" aria-hidden="true">${open ? '▾' : '▸'}</span>
         </button>
+      <span class="erf-band__separator" aria-hidden="true"></span>
+      <button class="erf-band__tool" type="button" aria-label="Export to PDF" title="Export to PDF">
+          <!-- lucide `file-down`, 16px — the same button the markdown toolbar has. -->
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path>
+            <path d="M14 2v4a2 2 0 0 0 2 2h4"></path>
+            <path d="M12 18v-6"></path><path d="m9 15 3 3 3-3"></path>
+          </svg>
+        </button>
       </div>
       ${paused ? `<div class="erf-band__paused"><span aria-hidden="true">⚠</span>
         <span>Paused the page so this list cannot be covered.</span></div>` : ''}

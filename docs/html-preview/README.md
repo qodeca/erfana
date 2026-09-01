@@ -71,7 +71,7 @@ For the acceptance corpus, save-to-visible-change stays under 300 ms.
 ## Find, export, and the off-switch
 
 - **Find-in-page.** The existing search UI matches text inside the running page, reports match counts, and steps through matches – it drives the view's own find, not a DOM search. It opens from Cmd/Ctrl-F as it always did, and now also from the **Find** button in the preview's toolbar, so it can be found without knowing the shortcut.
-- **PDF export.** Export produces a PDF of the page as rendered *after* its JavaScript has run.
+- **PDF export.** The **Export to PDF** button in the preview's toolbar produces a PDF of the page as rendered *after* its JavaScript has run. It used to be a right-click on the tab handle, which nobody found; it is now where the Markdown editor keeps the same button. The button greys out while a save dialog is open, so a second click cannot stack another one behind it.
 - **Global off-switch.** A single setting disables HTML execution entirely. With it off, `.html` files open as source only and no preview process is ever created – existing previews are torn down when the toggle flips.
 
 ## Failure reporting
