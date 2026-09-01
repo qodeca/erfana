@@ -67,7 +67,17 @@ export function usePreviewChromeGate({
   needsProof,
   panelRef
 }: UsePreviewChromeGateOptions): UsePreviewChromeGateResult {
-  const [proven, setProven] = useState(true)
+  /*
+   * FALSE until something proves otherwise, and the default matters.
+   *
+   * It started `true`, so on the commit that first renders the list the rows
+   * were painted, hit-testable and in the accessibility tree before any push had
+   * been acked — the reservation arrived a commit late. Starting false costs
+   * nothing: the FIRST push takes the baseline branch in `recordPush` and sets
+   * this true immediately, and a panel that needs no proof at all is set true by
+   * the `!needsProof` effect below.
+   */
+  const [proven, setProven] = useState(false)
   const [sticky, setSticky] = useState<PreviewChromeGateReason | null>(null)
   const [tooShort, setTooShort] = useState(false)
 
@@ -78,6 +88,17 @@ export function usePreviewChromeGate({
   const epochRef = useRef<{ inset: number; firstSeq: number } | null>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pageHiddenRef = useRef(false)
+  /**
+   * The same fact as `pageHiddenRef`, as state, because `controlsAllowed` has to
+   * RE-RENDER on it. The ref is read synchronously by the bounds pump; this is
+   * read by the render.
+   */
+  const [hideConfirmed, setHideConfirmed] = useState(false)
+  /**
+   * The fail-safe under `hideConfirmed`: a hide that is asked for and never
+   * confirmed must not hide the controls forever.
+   */
+  const [hideUnconfirmed, setHideUnconfirmed] = useState(false)
 
   const clearTimer = useCallback(() => {
     if (timerRef.current !== null) {
@@ -167,6 +188,7 @@ export function usePreviewChromeGate({
     return window.api.preview.onVisibilityApplied((payload) => {
       if (payload.panelId !== panelId) return
       pageHiddenRef.current = !payload.visible
+      setHideConfirmed(!payload.visible)
       if (!payload.visible) {
         // Nothing is on screen to cover anything, so an epoch waiting for a
         // repaint that will never come is released rather than left to time out.
@@ -235,11 +257,45 @@ export function usePreviewChromeGate({
     }
   }, [panelId, clearTimer])
 
+  /*
+   * ASKING FOR A HIDE IS NOT THE SAME AS THE PAGE BEING GONE.
+   *
+   * `controlsAllowed` used to be `proven || gate !== null`, which revealed the
+   * controls on the render that DECIDED to hide the page — before the guard had
+   * sent `setVisibility`, let alone before main had applied it. The hook already
+   * receives the confirmation (`visibilityApplied`) and already stored it in
+   * `pageHiddenRef`; it simply never read it here.
+   *
+   * The exposure was a dead CLICK rather than a wrong grant — a native view eats
+   * pointer input over its own rectangle, so a click in that window lands on the
+   * page, not on Erfana's button. But the rule is stated as absolute in this
+   * panel's guide and on a `decided` card, and a rule that is false for one
+   * frame is a rule nobody can rely on.
+   *
+   * WITH A DEADLINE, because the obvious fix is a worse bug. If the confirmation
+   * is dropped — main tearing down, a panel main no longer knows about — then
+   * `proven || hideConfirmed` alone would leave a band whose buttons never
+   * appear at all: unusable, permanent, and far worse than one early frame. The
+   * same budget the bounds ack uses bounds this too, so the worst case is 300 ms
+   * later than the old behaviour and never worse than it.
+   */
+  useEffect(() => {
+    if (gate === null || hideConfirmed) {
+      setHideUnconfirmed(false)
+      return
+    }
+    const timer = setTimeout(() => setHideUnconfirmed(true), PREVIEW_BOUNDS_ACK_TIMEOUT_MS)
+    return () => clearTimeout(timer)
+  }, [gate, hideConfirmed])
+
   return {
     gate,
-    // Either the page proved it moved, or it is being held hidden — in both cases
-    // there is nothing of the page in the space the controls occupy.
-    controlsAllowed: proven || gate !== null,
+    // The page proved it moved, or it has CONFIRMED it is hidden, or the
+    // confirmation never came and the fail-safe released it. In the first two
+    // there is nothing of the page in the space the controls occupy; the third
+    // is the old behaviour, kept for exactly the case that would otherwise
+    // strand the reader.
+    controlsAllowed: proven || hideConfirmed || hideUnconfirmed,
     ackController
   }
 }
