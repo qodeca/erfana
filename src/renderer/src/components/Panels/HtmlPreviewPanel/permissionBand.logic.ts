@@ -136,10 +136,11 @@ export function bandReducer(
 /** One row of the band's list. */
 export interface BandRow {
   readonly host: string
-  /** Absent on an allowed row, deliberately — see `selectBandRows`. */
-  readonly kind: PreviewBlockedKind | null
   readonly state: 'allow' | 'not-approvable' | 'allowed'
-  /** All kinds this host was refused for, for the confirm copy and the a11y name. */
+  /**
+   * All kinds this host was refused for. Read by the CONFIRM copy only — no row
+   * ever shows a kind. See `selectBandRows`.
+   */
   readonly kinds: readonly PreviewBlockedKind[]
 }
 
@@ -158,14 +159,22 @@ export interface BandRows {
  * allowlist. So the store's "never cleared" contract stays true, and the card's
  * step 5 — the row moves to Allowed, the remaining three stay listed — falls out.
  *
- * ALLOWED ROWS CARRY NO KIND, and the empty column is the point. On a blocked row
- * the kind is a true statement about something that happened: this host was
- * refused, for a font. On an allowed row the same word reads as "this host may
- * only serve a font", which is exactly the belief the confirm step exists to
- * destroy — an approved host is added to every CSP directive the preview builds.
- * The allowlist stores hosts and nothing else, so for a host approved last month
- * the kind is unknowable anyway; filling the column for this session's approvals
- * only would invite a reader to infer a difference in grant that does not exist.
+ * NO ROW CARRIES A KIND — not blocked, not allowed. It is true that a blocked host
+ * was refused for a font, but that is a fact about what the page happened to
+ * request, and a permission list is not where a fact about traffic belongs: put
+ * "font" beside a host and an Allow button and it reads as the SCOPE of the
+ * block and of the grant. Neither is scoped. `previewCsp.ts` appends the same
+ * host list to `script-src`, `style-src`, `img-src`, `font-src`, `media-src` and
+ * `connect-src`, so a host is refused for everything and, once approved, allowed
+ * for everything.
+ *
+ * The kinds survive in `kinds`, for the CONFIRM copy alone. There the sentence
+ * denies the scope in the same breath it names it — "blocked for a stylesheet,
+ * but Erfana cannot limit it to that" — which is the one place the word can
+ * appear without misleading. On the row there is no such breath.
+ *
+ * (An allowed row could not show one anyway: the allowlist stores hosts and
+ * nothing else, so for a host approved last month the kind is unknowable.)
  */
 export function selectBandRows(
   blockedHosts: readonly PreviewBlockedHost[],
@@ -177,38 +186,19 @@ export function selectBandRows(
     .filter(entry => !allowedSet.has(entry.host))
     .map(entry => ({
       host: entry.host,
-      kind: mostCapableKind(entry.kinds),
       kinds: entry.kinds,
       state: entry.approvable ? ('allow' as const) : ('not-approvable' as const)
     }))
 
   const allowed: BandRow[] = [...allowedHosts]
     .sort((a, b) => a.localeCompare(b))
-    .map(host => ({ host, kind: null, kinds: [], state: 'allowed' as const }))
+    .map(host => ({ host, kinds: [], state: 'allowed' as const }))
 
   return {
     blocked,
     allowed,
     counts: { blocked: blocked.length, allowed: allowed.length }
   }
-}
-
-/**
- * The one kind to show in a 72px column.
- *
- * `PREVIEW_BLOCKED_KINDS` is ordered by how much the resource can do, so the
- * first member present is the most capable — and the most capable is the honest
- * one to show, since it is the worst thing this host was already trying to do.
- *
- * NOT `kinds[0]`. `recordBlockedHost` merges sightings with a Set, which
- * preserves arrival order, not vocabulary order. It only happens to agree today
- * because main sends the whole accumulated set each time.
- */
-export function mostCapableKind(
-  kinds: readonly PreviewBlockedKind[]
-): PreviewBlockedKind | null {
-  if (kinds.length === 0) return null
-  return PREVIEW_BLOCKED_KINDS.find(candidate => kinds.includes(candidate)) ?? null
 }
 
 /**
@@ -228,9 +218,20 @@ const KIND_PHRASE: Record<PreviewBlockedKind, string> = {
   other: 'a resource'
 }
 
-/** "a script", "a font and an image", "a script, a font and an image". */
+/**
+ * "a script", "a font and an image", "a script, a font and an image".
+ *
+ * MOST CAPABLE FIRST, not arrival order. `PREVIEW_BLOCKED_KINDS` is ordered by
+ * how much a resource can do, and this sentence is the last thing read before a
+ * one-way grant, so the worst thing the host was already trying to do leads it.
+ * Sorting is not cosmetic: `recordBlockedHost` merges sightings with a Set,
+ * which preserves arrival order, not vocabulary order — the two only happen to
+ * agree today because main sends the whole accumulated set each time.
+ */
 export function describeKinds(kinds: readonly PreviewBlockedKind[]): string {
-  const phrases = kinds.map(kind => KIND_PHRASE[kind])
+  const phrases = PREVIEW_BLOCKED_KINDS.filter(kind => kinds.includes(kind)).map(
+    kind => KIND_PHRASE[kind]
+  )
   if (phrases.length === 0) return 'a resource'
   if (phrases.length === 1) return phrases[0]
   return `${phrases.slice(0, -1).join(', ')} and ${phrases[phrases.length - 1]}`
@@ -239,7 +240,8 @@ export function describeKinds(kinds: readonly PreviewBlockedKind[]): string {
 /**
  * What a failed approval says on the row.
  *
- * Kept short: it replaces the 72px kind column rather than widening the grid.
+ * Kept short: it is the ONE message the 72px middle cell carries, and it must
+ * fit rather than widen the grid.
  * The product card widens the grid inline to fit a long message, which is a card
  * hack — copying it into the component would put an inline
  * `grid-template-columns` in shipping code.

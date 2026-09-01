@@ -12,7 +12,7 @@ import type { BandRow } from '../permissionBand.logic'
 /** Props for {@link PreviewBandRow}. */
 export interface PreviewBandRowProps {
   readonly row: BandRow
-  /** Replaces the kind column when this host's last approval failed. */
+  /** The middle cell's only message: this host's last approval failed. */
   readonly failureText: string | null
   /** True while this row's confirm step is open. */
   readonly confirming: boolean
@@ -34,18 +34,25 @@ export function PreviewBandRow({
   onAllow
 }: PreviewBandRowProps): React.JSX.Element {
   /*
-   * The middle cell. Three cases, and the empty one is deliberate:
+   * The middle cell exists for ONE message: a failed approval. Otherwise it is
+   * empty, and the emptiness is the decision.
    *
-   *  - A failed approval REPLACES the kind here rather than widening the grid.
-   *    The product card widens it with an inline `grid-template-columns`, which
-   *    is a card hack; shipping code keeps one grid and shortens the copy.
-   *  - An ALLOWED row leaves it empty. A kind there would read as a limit on the
-   *    grant, and there is no limit — see `selectBandRows`.
+   * It used to name the resource kind — "style", "script". That was a true fact
+   * in a place that made it a false one: beside a host and an Allow button, the
+   * word reads as the scope of the block and of the grant, and neither is
+   * scoped. `previewCsp.ts` appends the same host list to every directive, so a
+   * blocked host is blocked for everything and an approved one is allowed for
+   * everything. The kind still appears in the confirm box, where the very next
+   * clause denies the limit it would otherwise imply.
+   *
+   * The failure text REPLACES it rather than widening the grid. The product card
+   * widens it with an inline `grid-template-columns`, which is a card hack;
+   * shipping code keeps one grid and shortens the copy.
    */
   const middle = failureText ? (
     <span className="erf-band__state erf-band__state--failed">{failureText}</span>
   ) : (
-    <span className="erf-band__kind">{row.kind ?? ''}</span>
+    <span className="erf-band__kind" />
   )
 
   const right =

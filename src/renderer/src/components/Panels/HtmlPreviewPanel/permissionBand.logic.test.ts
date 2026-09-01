@@ -16,7 +16,6 @@ import {
   chipAccessibleName,
   countsLabel,
   describeKinds,
-  mostCapableKind,
   selectBandRows
 } from './permissionBand.logic'
 import type { PreviewBlockedHost } from '../../../stores/usePreviewStore'
@@ -61,39 +60,27 @@ describe('selectBandRows', () => {
     expect(rows.counts.allowed).toBe(1)
   })
 
-  it('gives an allowed row NO kind', () => {
-    // On a blocked row the kind is a fact about something that happened. On an
-    // allowed row the same word reads as "this host may only serve that", which
-    // is exactly the belief the confirm step exists to destroy — an approved host
-    // is appended to every CSP directive the preview builds.
+  it('carries the kinds for the confirm copy without putting them on a row', () => {
+    // A row never names a resource kind — the word would read as the scope of
+    // the block and of the grant, and neither is scoped: `previewCsp.ts` appends
+    // the same host list to script-src, style-src, img-src, font-src, media-src
+    // and connect-src. The kinds survive on the row DATA because the confirm box
+    // reads them, in a sentence that denies the limit in its next clause.
+    const rows = selectBandRows([blocked('a.example.com', ['font', 'script'])], [])
+    expect(rows.blocked[0].kinds).toEqual(['font', 'script'])
+    expect(rows.blocked[0]).not.toHaveProperty('kind')
+  })
+
+  it('gives an allowed row no kinds at all', () => {
+    // Nothing to carry: the allowlist stores hosts and nothing else, so for a
+    // host approved last month the kind is unknowable.
     const rows = selectBandRows([blocked('a.example.com', ['font'])], ['a.example.com'])
-    expect(rows.allowed[0].kind).toBeNull()
+    expect(rows.allowed[0].kinds).toEqual([])
   })
 
   it('marks a host that can never be approved', () => {
     const rows = selectBandRows([blocked('203.0.113.7', ['image'], false)], [])
     expect(rows.blocked[0].state).toBe('not-approvable')
-  })
-})
-
-describe('mostCapableKind', () => {
-  it('picks by capability, not by arrival order', () => {
-    // NOT `kinds[0]`. `recordBlockedHost` merges sightings with a Set, which
-    // preserves arrival order; it only happens to agree with the vocabulary
-    // order today because main sends the whole accumulated set each time.
-    expect(mostCapableKind(['image', 'script'])).toBe('script')
-    expect(mostCapableKind(['other', 'font'])).toBe('font')
-    expect(mostCapableKind(['connect', 'style'])).toBe('style')
-  })
-
-  it('returns null for an empty set', () => {
-    expect(mostCapableKind([])).toBeNull()
-  })
-
-  it('resolves every kind in the vocabulary', () => {
-    for (const kind of PREVIEW_BLOCKED_KINDS) {
-      expect(mostCapableKind([kind])).toBe(kind)
-    }
   })
 })
 
@@ -111,6 +98,17 @@ describe('describeKinds', () => {
   it('joins several kinds', () => {
     expect(describeKinds(['script', 'font'])).toBe('a script and a font')
     expect(describeKinds(['script', 'font', 'image'])).toBe('a script, a font and an image')
+  })
+
+  it('leads with the most capable kind, whatever order they arrived in', () => {
+    // This sentence is the last thing read before a one-way grant, so the worst
+    // thing the host was already trying to do goes first. Not cosmetic:
+    // `recordBlockedHost` merges sightings with a Set, which preserves arrival
+    // order, not vocabulary order — the two only happen to agree today because
+    // main sends the whole accumulated set each time.
+    expect(describeKinds(['image', 'script'])).toBe('a script and an image')
+    expect(describeKinds(['other', 'font'])).toBe('a font and a resource')
+    expect(describeKinds(['connect', 'style'])).toBe('a stylesheet and a network request')
   })
 
   it('never returns an empty phrase', () => {
@@ -219,7 +217,8 @@ describe('bandReducer', () => {
 
 describe('approveFailureText', () => {
   it('names the cause where it can, and stays short enough for the row', () => {
-    // The failed text REPLACES the 72px kind column rather than widening the
+    // The failed text is the one message the 72px middle cell carries, and it
+    // has to fit that cell rather than widening the
     // grid; the product card widens it with an inline `grid-template-columns`,
     // which is a card hack and must not reach shipping code.
     expect(approveFailureText(ErrorCode.PREVIEW_ALLOWLIST_FULL)).toBe('Not saved — list full')

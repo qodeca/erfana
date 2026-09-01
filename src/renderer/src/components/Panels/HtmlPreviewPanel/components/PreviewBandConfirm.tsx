@@ -109,11 +109,14 @@ export function PreviewBandConfirm({
         Let this page load from {host}?
       </p>
       {/*
-        The honest sentence. The kind column says what the host was blocked FOR,
-        which is a fact about what happened — but Erfana cannot narrow a grant to
-        one kind, because an approved host is appended to every CSP directive the
-        preview builds. Saying so here is what stops the column implying a limit
-        that does not exist.
+        The honest sentence, and THE ONLY PLACE a resource kind is named.
+
+        No row shows one: beside a host and an Allow button, "style" reads as the
+        scope of the block and of the grant, and neither is scoped — an approved
+        host is appended to every CSP directive the preview builds. Here the word
+        is safe, because the clause that follows it takes the limit back in the
+        same breath. That contradiction is what makes the sentence honest, and it
+        is why the word cannot be lifted out of it and put on a row.
       */}
       <p className="erf-band__confirm-body" id={bodyOneId}>
         It was blocked for {describeKinds(kinds)}, but Erfana cannot limit it to

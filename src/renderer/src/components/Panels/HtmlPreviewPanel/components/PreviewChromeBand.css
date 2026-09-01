@@ -120,6 +120,11 @@
    delivered the trap the comment said it prevented. Two copies of a security
    control is how one of them stays wrong. */
 
+/* The middle cell. It renders EMPTY on every row except a failed approval — it
+   used to name the resource kind, and beside a host and an Allow button that
+   word reads as a scope the grant does not have. The rule stays because the cell
+   still reserves its 72px track, so blocked, allowed and failed rows share one
+   grid. */
 .erf-band__kind {
   font-size: var(--text-sm);
   color: var(--color-text-tertiary);     /* NOT --color-text-secondary: 3.72:1, fails */

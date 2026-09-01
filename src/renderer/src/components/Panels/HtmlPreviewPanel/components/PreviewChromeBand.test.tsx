@@ -93,8 +93,24 @@ describe('PreviewChromeBand', () => {
     expect(screen.getByText('Blocked on load')).toBeInTheDocument()
     expect(screen.getByText('Allowed in this project')).toBeInTheDocument()
     expect(screen.getByText('Allowed ✓')).toBeInTheDocument()
-    // The most CAPABLE kind, not the first seen.
-    expect(screen.getByText('script')).toBeInTheDocument()
+  })
+
+  it('never names a resource kind on a row', async () => {
+    // A row shows the host and the button, and nothing that looks like a scope.
+    // "script" beside an Allow button reads as a limit on what is being granted,
+    // and there is no limit: `previewCsp.ts` appends the same host list to
+    // script-src, style-src, img-src, font-src, media-src and connect-src. The
+    // word belongs in the confirm box, where the next clause takes it back.
+    const user = userEvent.setup()
+    renderBand({
+      blockedHosts: [host('blocked.example.com', ['script', 'image'])],
+      allowedHosts: ['allowed.example.com']
+    })
+    await user.click(screen.getByTestId('preview-band-chip'))
+
+    for (const kind of ['script', 'image', 'style', 'font', 'connect']) {
+      expect(screen.queryByText(kind)).not.toBeInTheDocument()
+    }
   })
 
   it('offers no Allow on a host that can never be approved', async () => {

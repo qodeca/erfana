@@ -151,20 +151,31 @@
 
 <h2>What the confirm step has to say, and why</h2>
 <div class="ds-note">
-  The kind column ("script", "image") says what the host was blocked <em>for</em> — not what you are
-  granting. Erfana cannot narrow a grant to one kind: an approved host is added to every CSP
-  directive the preview builds, so it can serve code and receive data. The confirm step says that in
-  plain words rather than letting the column imply otherwise.
+  <strong>No row names a resource kind — not a blocked one, not an allowed one.</strong> An earlier
+  draft of this card put "script" or "image" beside every blocked host. The word was true and the
+  placement made it false: next to a host and an Allow button it reads as the scope of the block and
+  of the grant, and <em>neither is scoped</em>. <code>previewCsp.ts</code> appends the same host list
+  to <code>script-src</code>, <code>style-src</code>, <code>img-src</code>, <code>font-src</code>,
+  <code>media-src</code> and <code>connect-src</code> — so a host is refused for everything, and once
+  approved it is allowed for everything.
   <br><br>
-  It also says the grant is written into the project, travels to anyone who clones the repository,
-  and cannot be undone from inside Erfana. That is the honest sentence — and it is read once, on the
-  row you chose, instead of four times over your file tree.
+  The kind belongs in exactly one place: <strong>the confirm box</strong>, where the very next clause
+  takes the limit back. "It was blocked for a stylesheet, but Erfana cannot limit it to that — the
+  host will also be able to run code and send data to it." A word that misleads on a row is safe in a
+  sentence that contradicts it. There is no such sentence on a row.
   <br><br>
-  <strong>Which is why an allowed row shows no kind at all.</strong> The same word that is a fact on a
-  blocked row — "this was refused, for a font" — becomes a claim about scope on an allowed one, and the
-  scope is not real. The allowlist stores hosts and nothing else, so for a host approved last month the
-  kind is unknowable anyway; filling the column for this session's approvals only would invite the
+  The confirm step also says the grant is written into the project, travels to anyone who clones the
+  repository, and cannot be undone from inside Erfana. That is the honest sentence — and it is read
+  once, on the row you chose, instead of four times over your file tree.
+  <br><br>
+  The data agrees with the decision. <code>PreviewAllowlistSchema</code> stores hosts and nothing
+  else, so for a host approved last month, or one that arrived with a cloned repository, the kind is
+  unknowable. A column that could only ever be filled for this session's blocks would invite the
   reader to infer a difference in grant that does not exist.
+  <br><br>
+  If <a href="https://github.com/qodeca/erfana/issues/81">#81</a> ever scopes a grant to the kinds it
+  was refused for, the column earns its place back — but only then, and the card is the thing to
+  change first.
 </div>
 
 <h2>Exceptions</h2>
@@ -310,9 +321,15 @@ function blockedRow(item) {
 
   const host = hostNode(item.host);
 
+  // The 72px cell stays, EMPTY. It used to name the resource kind, and that was
+  // a true fact standing in a place that made it false: beside a host and an
+  // Allow button the word reads as the scope of the block and of the grant, and
+  // neither is scoped — `previewCsp.ts` appends the same host list to
+  // script-src, style-src, img-src, font-src, media-src and connect-src. The
+  // kind survives only in the confirm box below, where the next clause denies
+  // the limit it would otherwise imply.
   const kind = document.createElement('span');
   kind.className = 'erf-band__kind';
-  kind.textContent = item.kind;
 
   // A host the allowlist can never accept — an IP literal, a loopback name, a
   // single label. `isApprovableHost` refuses it on both the read and the write
@@ -422,19 +439,9 @@ function anArticle(kind) {
 }
 
 /*
- * NO KIND COLUMN HERE, and the empty cell is the point.
- *
- * On a BLOCKED row the kind is a true statement about something that just
- * happened: this host was refused, for a font. On an ALLOWED row the same word
- * reads as "this host may only serve a font" — which is exactly the belief the
- * confirm step exists to destroy. An approved host is added to every CSP
- * directive the preview builds; it can serve code and receive data.
- *
- * The data agrees. `PreviewAllowlistSchema` stores hosts and nothing else, so
- * for a host approved last month, or one that arrived with a cloned repository,
- * the kind is simply unknowable. Filling the column for this session's
- * approvals and leaving it blank for older ones would invite a reader to infer
- * a difference in grant that does not exist.
+ * The same empty 72px cell a blocked row has — see blockedRow(). No row in this
+ * band names a resource kind; the kind appears only inside the confirm box,
+ * where the next clause denies the scope it would otherwise imply.
  */
 function allowedRow(item) {
   const row = document.createElement('div');
@@ -442,7 +449,7 @@ function allowedRow(item) {
 
   const host = hostNode(item.host);
 
-  // The 72px cell stays, empty, so allowed and blocked rows share one grid.
+  // The same empty 72px cell as a blocked row, so the two share one grid.
   const gap = document.createElement('span');
   gap.className = 'erf-band__kind';
 

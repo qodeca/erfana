@@ -8,7 +8,7 @@ Per-version release notes for Erfana, v0.9.0 onwards. Earlier: v0.8.0–v0.8.3 i
 
 ### Changed
 
-- **Approving a remote host in an HTML preview is a completely different experience.** A previewed page that wanted fonts, scripts or images from the internet used to raise one pop-up per host over your file tree, capped at three — so a page reaching four hosts gave you three stacked walls of identical text, and the fourth host **could not be approved at all**, because the app had run out of pop-ups. There is now a strip along the top of every preview showing how many hosts were blocked and how many are already allowed. Click it to see them, each with what it was blocked for, and approve them one at a time. Nothing pops up.
+- **Approving a remote host in an HTML preview is a completely different experience.** A previewed page that wanted fonts, scripts or images from the internet used to raise one pop-up per host over your file tree, capped at three — so a page reaching four hosts gave you three stacked walls of identical text, and the fourth host **could not be approved at all**, because the app had run out of pop-ups. There is now a strip along the top of every preview showing how many hosts were blocked and how many are already allowed. Click it to see them and approve them one at a time. Nothing pops up.
 
   Four things that were not possible before:
 
@@ -16,6 +16,7 @@ Per-version release notes for Erfana, v0.9.0 onwards. Earlier: v0.8.0–v0.8.3 i
   - **A failed approval says so.** If the settings file cannot be written — a read-only checkout, a full list — the row comes back and tells you, instead of the prompt just disappearing as though it had worked.
   - **Every blocked host is listed**, not the first three.
   - **The question is read once**, on the row it belongs to, and answering it takes two steps: Allow opens it, Confirm answers it. The confirm step says plainly that the grant lets that host run code and send data, is written into the project, travels to anyone who clones it, and cannot be undone from inside Erfana.
+  - **No row claims a host was blocked for one kind of thing.** A blocked host is blocked for everything, and an approved one is allowed everything — Erfana cannot narrow a grant. An earlier draft of the list put "style" or "script" beside each host, which is true of what the page asked for but reads as a limit on what you are granting. The confirm step still names it, in the one sentence that also says the limit is not real.
 
 ### Fixed
 

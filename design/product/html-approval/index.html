@@ -208,7 +208,7 @@ function band(step) {
 
   if (step.confirm) {
     rows.push(section('Approving'));
-    rows.push(row('placehold.co', 'image', 'allow'));
+    rows.push(row('placehold.co', 'allow'));
     rows.push(`<div class="erf-band__confirm">
       <p class="erf-band__confirm-title">Let this page load from placehold.co?</p>
       <p class="erf-band__confirm-body">It was blocked for an image, but Erfana cannot limit it to
@@ -225,19 +225,21 @@ function band(step) {
     rows.push(section('Allowed in this project'));
     for (const h of ['fonts.googleapis.com', 'cdn.jsdelivr.net',
                      'cdnjs.cloudflare.com', 'placehold.co'])
-      rows.push(row(h, '', 'allowed'));
+      rows.push(row(h, 'allowed'));
   } else {
-    const blocked = [['fonts.googleapis.com','style'],['cdn.jsdelivr.net','script'],
-                     ['cdnjs.cloudflare.com','script'],['placehold.co','image']]
-      .filter(([h]) => h !== step.approved);
+    // Hosts only. The kinds these were refused for are not shown on a row —
+    // they belong in the confirm box, and nowhere else.
+    const blocked = ['fonts.googleapis.com', 'cdn.jsdelivr.net',
+                     'cdnjs.cloudflare.com', 'placehold.co']
+      .filter(h => h !== step.approved);
     if (blocked.length) {
       rows.push(section('Blocked on load'));
-      for (const [h, k] of blocked)
-        rows.push(row(h, k, step.failed === h ? 'failed' : 'allow'));
+      for (const h of blocked)
+        rows.push(row(h, step.failed === h ? 'failed' : 'allow'));
     }
     if (step.approved) {
       rows.push(section('Allowed in this project'));
-      rows.push(row(step.approved, '', 'allowed'));
+      rows.push(row(step.approved, 'allowed'));
     }
   }
 
@@ -268,17 +270,23 @@ function hostCell(host) {
   return `<span class="erf-host" dir="ltr" aria-label="${label}">${label.replace(/\./g, '.<wbr>')}</span>`;
 }
 
-function row(host, kind, state) {
+function row(host, state) {
   const right =
     state === 'allowed' ? '<span class="erf-band__state">Allowed ✓</span>'
   : `<button class="erf-band__allow" aria-label="Allow ${host}">Allow</button>`;
-  // An allowed row's middle cell is EMPTY on purpose: a kind there reads as a
-  // limit on the grant, and there is no limit. See the Permission band card.
+  /*
+   * The middle cell carries ONE message — a failed approval — and is otherwise
+   * empty, on a blocked row and an allowed row alike.
+   *
+   * There is no `kind` parameter any more, and its absence is the decision.
+   * Beside a host and an Allow button, "style" or "script" names a scope for
+   * the block and for the grant, and neither is scoped. The word survives in
+   * the confirm box in step 4, where the next clause takes the limit back. See
+   * the Permission band card.
+   */
   const mid = state === 'failed'
     ? '<span class="erf-band__state erf-band__state--failed">Not saved</span>'
-  : state === 'allowed'
-    ? '<span class="erf-band__kind"></span>'
-    : `<span class="erf-band__kind">${kind}</span>`;
+    : '<span class="erf-band__kind"></span>';
   return `<div class="erf-band__row">${hostCell(host)}${mid}${right}</div>`;
 }
 
