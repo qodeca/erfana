@@ -20,6 +20,12 @@ export interface PreviewBandConfirmProps {
   readonly kinds: readonly PreviewBlockedKind[]
   /** A write is in flight. Confirm goes busy and Escape stops working. */
   readonly busy: boolean
+  /**
+   * Whether the band's controls are currently REVEALED. False while the band is
+   * reserving space it has not yet proved the page moved out of — during which
+   * this box is `visibility: hidden` and cannot hold focus.
+   */
+  readonly visible: boolean
   readonly onCancel: () => void
   readonly onConfirm: () => void
 }
@@ -28,6 +34,7 @@ export function PreviewBandConfirm({
   host,
   kinds,
   busy,
+  visible,
   onCancel,
   onConfirm
 }: PreviewBandConfirmProps): React.JSX.Element {
@@ -56,10 +63,19 @@ export function PreviewBandConfirm({
    * It is also not a no-op the way "just leave focus alone" would be: React has
    * re-rendered the list and the Allow button that was pressed may no longer be
    * the same node, so leaving focus put can drop it on <body>.
+   *
+   * KEYED ON `visible`, NOT ON MOUNT ALONE, and that is the whole fix for a real
+   * defect. Opening this box GROWS the band; the growth trips a bounds re-proof;
+   * an unproven band hides its controls with `visibility: hidden` — and hiding
+   * the element that currently holds focus makes Chromium reset focus to
+   * `<body>`. So for up to 300 ms the irreversible question was invisible, and
+   * when it came back a mouse user's focus was on `<body>`: the Tab trap below
+   * never saw a key, and the `alertdialog` was never announced. Re-focusing on
+   * the way back in is what makes the reservation survivable.
    */
   useEffect(() => {
-    boxRef.current?.focus()
-  }, [])
+    if (visible) boxRef.current?.focus()
+  }, [visible])
 
   /*
    * Tab is trapped here because the band floats above a page Erfana does not
@@ -74,9 +90,22 @@ export function PreviewBandConfirm({
    */
   const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>): void => {
     if (event.key === 'Escape') {
-      // A write already sent cannot be called back, so there is nothing for
-      // Escape to do but mislead.
-      if (busy) return
+      /*
+       * A write already sent cannot be called back, so there is nothing for
+       * Escape to do but mislead.
+       *
+       * It still has to be SWALLOWED. Returning bare let it bubble to the band,
+       * which calls `preventDefault`, `stopPropagation`, dispatches `collapse` —
+       * silently dropped by the reducer's `approving` guard — and then focuses
+       * the chip unconditionally. So Escape during a save did exactly one thing,
+       * and it was the wrong one: it yanked focus out of the open confirm box
+       * while the box stayed on screen and busy.
+       */
+      if (busy) {
+        event.preventDefault()
+        event.stopPropagation()
+        return
+      }
       event.preventDefault()
       event.stopPropagation()
       onCancel()

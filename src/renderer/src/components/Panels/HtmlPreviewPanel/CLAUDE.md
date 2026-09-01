@@ -118,14 +118,27 @@ function returns, so the string on disk, the string in the CSP and the string
 The row shows the scheme only when it is not `https` and the port only when it is
 not the default, while the accessible name always carries the whole origin.
 
-**The only row without an Allow button is an IPv6 literal**, and it states its
-reason. Every other refusal was policy — `localhost`, IP literals, `.local`,
-single-label names — and all of it is deleted (#108): it never detected a name
-that merely *resolved* to a private address, so it stopped the honest reader and
-not a hostile page. IPv6 is different in kind: a CSP host-source cannot express
-one, and Chromium says so out loud ("contains an invalid source … It will be
-ignored"), which would leave a grant live in the network filter and absent from
-the CSP. See `docs/designs/108-http-and-ipv6-in-the-preview.md`, which also
+**A row without an Allow button states its reason, and the reason is DERIVED**
+from the origin (`describeRefusal`), never assumed. It used to hardcode the IPv6
+sentence for every buttonless row, so a host refused for a different cause was
+told the wrong one.
+
+Every policy refusal is deleted (#108) — `localhost`, IP literals, `.local`,
+single-label names — because none of it detected a name that merely *resolved* to
+a private address, so it stopped the honest reader and not a hostile page. Two
+shapes still reach a buttonless row. IPv6 is physics: a CSP host-source cannot
+express one, and Chromium says so out loud ("contains an invalid source … It will
+be ignored"), which would leave a grant live in the network filter and absent
+from the CSP. A name that is not a valid host name — an underscore, an empty
+label — cannot have a permission written for it at all.
+
+**A trailing dot is part of the origin**, not noise to normalise away. Measured in
+the shipping Chromium: a CSP host-source matches only its own spelling, so
+`evil.com.` and `evil.com` are two separate grants that never match each other.
+Stripping it was the defect — a page requesting `evil.com./x` got a row offering
+`evil.com`, whose grant could not apply to the request that produced it. The dot
+is kept by the canonicaliser and DRAWN by `HostName`, because two grants that
+render identically in a permission list is a spoof. See `docs/designs/108-http-and-ipv6-in-the-preview.md`, which also
 records the measurement that `http://` genuinely works here — the preview
 document sits at an opaque origin, so mixed content never applies.
 

@@ -63,17 +63,6 @@ interface OriginParts {
 }
 
 /**
- * One trailing dot, and one only — `example.com..` is not a host.
- *
- * A trailing dot is NORMALISED AWAY rather than refused: `evil.com.` and
- * `evil.com` are the same name to the resolver, and CSP has no empty-label
- * production, so refusing it would mean a blocked row that gets an Allow button
- * the boundary then rejects. A button that lies is worse than no button.
- */
-function stripTrailingDot(hostname: string): string {
-  return hostname.endsWith('.') ? hostname.slice(0, -1) : hostname
-}
-
 /**
  * Split an origin into what is drawn and what is announced, without ever decoding
  * punycode.
@@ -102,7 +91,18 @@ function parseOrigin(origin: string): OriginParts | null {
   }
   if (url.hostname === '') return null
 
-  const host = stripTrailingDot(url.hostname)
+  /*
+   * THE TRAILING DOT IS DRAWN, not hidden, and that is a security property
+   * rather than a detail.
+   *
+   * This used to strip it, back when the canonicaliser did too. It no longer
+   * does: measured in the Chromium this ships, `evil.com.` and `evil.com` are
+   * two different hosts to a CSP host-source and never match each other, so they
+   * are two different grants. Two different grants that render as the same
+   * string, in the list a reader uses to decide what to trust, is a spoof — one
+   * row that works and one that does not, indistinguishable.
+   */
+  const host = url.hostname
   const port = url.port === '' ? null : url.port
   return {
     scheme: url.protocol === 'https:' ? null : `${url.protocol}//`,
@@ -141,18 +141,33 @@ export function HostName({ host, labelPrefix }: HostNameProps): React.JSX.Elemen
   const labels = parts ? parts.host.split('.') : null
 
   return (
-    <span
-      className="erf-host"
-      dir="ltr"
-      // The accessible name is the FULL origin, always — scheme and port included
-      // even when they are not drawn. What is de-emphasised for scanning must
-      // still be announced in full, or the two audiences are deciding different
-      // questions.
-      //
-      // NOT `title`: it is unreachable by keyboard and by touch, so it is not a
-      // substitute for an accessible name.
-      aria-label={labelPrefix ? `${labelPrefix} ${label}` : label}
-    >
+    <span className="erf-host" dir="ltr">
+      {/*
+       * THE FULL ORIGIN, ANNOUNCED — as real text, not as `aria-label`.
+       *
+       * The rule is unchanged and load-bearing: scheme and port must reach a
+       * screen-reader user even when they are not drawn, or the two audiences are
+       * deciding different questions. What changed is the mechanism. This carried
+       * `aria-label` on a bare `<span>`, which maps to role `generic`, and ARIA
+       * 1.2 PROHIBITS a name there — axe flags `aria-prohibited-attr` and browse
+       * mode announces the child text instead. So the property the visual design
+       * depends on was not actually being delivered: `http://` and `:8443` could
+       * simply not be spoken.
+       *
+       * `role="img"` would fix the prohibition and cost something worse — every
+       * host in a permission list announced as an image. A hidden text node has no
+       * role at all: the drawn parts are hidden from the tree, this one is read,
+       * and the accessible name is a real string rather than an attribute the spec
+       * says to ignore.
+       */}
+      <span className="erf-host__announced">
+        {labelPrefix ? `${labelPrefix} ${label}` : label}
+      </span>
+      {/*
+       * Everything below is DECORATION for the eye. It is the same string,
+       * segmented for wrapping, so announcing it too would read the origin twice.
+       */}
+      <span className="erf-host__drawn" aria-hidden="true">
       {parts?.scheme && <span className="erf-host__scheme">{parts.scheme}</span>}
       {labels === null
         ? host
@@ -168,6 +183,7 @@ export function HostName({ host, labelPrefix }: HostNameProps): React.JSX.Elemen
             </Fragment>
           ))}
       {parts?.port && <span className="erf-host__port">:{parts.port}</span>}
+      </span>
     </span>
   )
 }

@@ -115,10 +115,44 @@ describe('usePreviewChromeGate', () => {
     })
 
     expect(result.current.gate).toBe('unconfirmed')
-    // Controls ARE allowed now — not because the page moved, but because it is
-    // being held hidden, so there is nothing of it over them either way.
-    expect(result.current.controlsAllowed).toBe(true)
     expect(usePreviewChromeGateStore.getState().getGate(PANEL)).toBe('unconfirmed')
+
+    /*
+     * AND THE CONTROLS STAY DOWN UNTIL THE HIDE IS CONFIRMED.
+     *
+     * This used to assert `true` right here, on the reasoning that the page "is
+     * being held hidden". It is being ASKED to be hidden: the gate has only just
+     * been published, the overlay guard has not sent `setVisibility` yet, and
+     * main has not applied it. Revealing an irreversible Allow on the strength of
+     * an intention is the one thing this whole mechanism exists to prevent.
+     */
+    expect(result.current.controlsAllowed).toBe(false)
+
+    // Main says the view is down. NOW there is nothing of the page over them.
+    act(() => visibilityListener?.({ panelId: PANEL, visible: false }))
+    expect(result.current.controlsAllowed).toBe(true)
+  })
+
+  it('releases the controls anyway if the hide is never confirmed', () => {
+    /*
+     * The fail-safe under the rule above, and the reason it is a deadline rather
+     * than a wait. If `visibilityApplied` is dropped — main tearing down, or a
+     * panel main no longer knows about — then waiting for it forever would leave
+     * a band whose buttons never appear at all. Unusable and permanent is worse
+     * than one early frame, so silence releases on the same budget the bounds ack
+     * uses: 300 ms later than the old behaviour, never worse than it.
+     */
+    const { result } = mount()
+    act(() => result.current.ackController.recordPush(1, 0, false))
+    act(() => result.current.ackController.recordPush(2, 180, true))
+
+    // The bounds deadline fires and publishes the gate.
+    act(() => vi.advanceTimersByTime(PREVIEW_BOUNDS_ACK_TIMEOUT_MS + 1))
+    expect(result.current.controlsAllowed).toBe(false)
+
+    // No confirmation ever arrives.
+    act(() => vi.advanceTimersByTime(PREVIEW_BOUNDS_ACK_TIMEOUT_MS + 1))
+    expect(result.current.controlsAllowed).toBe(true)
   })
 
   it('needs no proof to SHRINK', () => {

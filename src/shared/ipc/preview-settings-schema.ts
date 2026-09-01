@@ -144,12 +144,34 @@ export function parsePreviewOrigin(input: string): string | null {
   if (url.username !== '' || url.password !== '') return null
   if (url.pathname !== '/' || url.search !== '' || url.hash !== '') return null
 
-  // ONE trailing dot is stripped, not refused. `example.com.` and `example.com`
-  // are the same name to a resolver and a CSP host-source has no empty-label
-  // production — so refusing it would produce a blocked row carrying an Allow
-  // button that the boundary then rejects, and a button that lies is worse than
-  // no button. `example.com..` has an empty label and stays refused below.
-  const hostname = url.hostname.endsWith('.') ? url.hostname.slice(0, -1) : url.hostname
+  /*
+   * A TRAILING DOT IS KEPT, and this was measured rather than reasoned.
+   *
+   * It used to be stripped, on the argument that `example.com.` and
+   * `example.com` are the same name to a resolver and that CSP's grammar cannot
+   * express the dotted form — so a grant would have to be written dotless
+   * anyway. The second half is false in practice. Probed in the Chromium this
+   * app ships (142.0.7444.265, Electron 39.8.10), serving one page per case:
+   *
+   *   CSP `img-src http://localhost:P`   ⇒ `http://localhost:P/x`  LOADS
+   *                                        `http://localhost.:P/x` BLOCKED
+   *   CSP `img-src http://localhost.:P`  ⇒ `http://localhost.:P/x` LOADS
+   *                                        `http://localhost:P/x`  BLOCKED
+   *
+   * So Chromium accepts a dotted host-source, and treats the two spellings as
+   * DIFFERENT hosts that never match each other. Stripping was therefore the
+   * defect, not the fix: it made a page's request for `cdn.example.com./x`
+   * report as `cdn.example.com`, so the row offered an Allow whose grant the CSP
+   * would refuse to apply to the request that produced it — "allowed" and still
+   * blocked, forever, with no user-reachable fix.
+   *
+   * Keeping it makes all three layers agree on one string: the filter compares
+   * it, the CSP emits it, and the row shows it — dot included, so two spellings
+   * of one name cannot render identically in a permission list.
+   *
+   * `example.com..` has an empty label and is still refused below.
+   */
+  const hostname = url.hostname
   if (hostname === '' || hostname.length > 253) return null
 
   // IPv6, and the only refusal here that is PHYSICS rather than policy: CSP3's
@@ -158,14 +180,23 @@ export function parsePreviewOrigin(input: string): string | null {
   // filter and not in the CSP — a grant that looks live and is half-refused.
   if (hostname.includes(':') || hostname.includes('[') || hostname.includes(']')) return null
 
+  // A single trailing dot is the DNS ROOT LABEL, and it is legal. Take it off
+  // before validating the labels — otherwise the empty string it leaves behind
+  // fails the pattern below and the dotted form is refused after all, which is
+  // the behaviour this stopped doing. `example.com..` keeps a genuinely empty
+  // label even after this and is still refused.
+  const namePart = hostname.endsWith('.') ? hostname.slice(0, -1) : hostname
+
   // Every label a real DNS label. Catches `foo_bar.com` and the empty label in
   // `example..com`, both of which the URL parser accepts.
-  const labels = hostname.split('.')
+  const labels = namePart.split('.')
   if (!labels.every((label) => /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/.test(label))) return null
 
   // Policy, and the layer that is on its way out. Kept for now so this change is
-  // about the UNIT of approval and nothing else.
-  if (!isApprovableHost(hostname)) return null
+  // about the UNIT of approval and nothing else. Asked of the NAME, without the
+  // root dot: `isApprovableHost('example.com.')` is false, and the root label
+  // is not part of what that policy is about.
+  if (!isApprovableHost(namePart)) return null
 
   // Port `0` parses, is a valid CSP `port-part`, and never connects — another
   // grant that could only ever be written and never work.

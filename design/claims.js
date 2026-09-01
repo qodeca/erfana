@@ -55,8 +55,13 @@ window.ERFANA_CLAIMS = {
     "card": "system/foundations/colors.html"
   },
   "contrast-tertiary-on-panel": {
-    "value": 6.33,
-    "label": "--color-text-tertiary on --color-bg-secondary",
+    "value": 8.52,
+    "label": "--color-text-tertiary on --color-bg-primary",
+    "card": "system/components/permission-band/index.html"
+  },
+  "contrast-secondary-on-band": {
+    "value": 5.01,
+    "label": "--color-text-secondary on --color-bg-primary",
     "card": "system/components/permission-band/index.html"
   },
   "contrast-input-border": {
@@ -100,8 +105,8 @@ window.ERFANA_CLAIMS = {
     "card": "system/foundations/focus.html"
   },
   "contrast-warning-on-panel": {
-    "value": 5.95,
-    "label": "--color-warning on --color-bg-secondary",
+    "value": 6.63,
+    "label": "--color-warning on --color-bg-tertiary",
     "card": "system/components/permission-band/index.html"
   }
 };
