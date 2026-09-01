@@ -1,17 +1,31 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * The trust strip above an HTML preview, and the place remote hosts are approved.
+ * The HTML preview's toolbar, and the place remote hosts are approved.
  *
- * TWO JOBS, AND THE FIRST IS WHY THE SECOND LIVES HERE.
+ * TWO JOBS.
  *
- * 1. It is the marker that says the content below is not Erfana's own UI. It is
- *    ALWAYS present — a trust signal that appears only when something is wrong is
- *    not a trust signal — and the previewed page provably cannot paint over it,
- *    because the page is a flow sibling below it rather than an overlay on it.
+ * 1. It is the preview's toolbar: Find on the left, the permission chip on the
+ *    right, laid out and styled like `MarkdownToolbar` so the two previews in
+ *    this app do not look like two different products.
  * 2. It is where a blocked remote host is approved. A permission decision
  *    outlives the message that raised it, so it belongs on the preview's own
  *    chrome rather than floating over an unrelated part of the app.
+ *
+ * WHAT WAS DELIBERATELY REMOVED, so nobody restores it as a "fix".
+ *
+ * This bar used to carry the words "Preview — content below is not Erfana" and a
+ * 2px accent seam, and both were the documented mitigation for UI spoofing
+ * (`docs/security.md`, residual risk 8). The project owner withdrew both in
+ * favour of a conventional toolbar. Nothing on screen names the boundary any
+ * more, and the remaining 1px neutral rule is weak against a light page — a page
+ * drawing a convincing fake Erfana dialog inside its own rectangle now has one
+ * fewer cue working against it. `docs/security.md` records that as accepted.
+ *
+ * What still holds, and must keep holding: this bar is ALWAYS present, and it is
+ * a flow sibling ABOVE `.html-preview-page-area` rather than an overlay on it,
+ * so the previewed page still has nowhere to paint that could cover it. Making
+ * it conditional, or absolutely positioned, would remove the last thing left.
  *
  * WHAT THIS REPLACED. Each blocked host used to raise its own toast over the file
  * tree, capped at three. A page reaching four hosts produced three stacked walls
@@ -22,6 +36,7 @@
  * @see design/system/components/permission-band/index.html - status="decided"
  * @see design/product/html-approval/index.html - the nine-state journey
  */
+import { Search } from 'lucide-react'
 import { useCallback, useEffect, useId, useMemo, useReducer, useRef } from 'react'
 
 import './PreviewChromeBand.css'
@@ -65,6 +80,12 @@ export interface PreviewChromeBandProps {
    * still hit-tests, so a click would land on a control nobody can see.
    */
   readonly controlsAllowed?: boolean
+  /**
+   * Open find-in-page. Optional only so the band can be rendered in isolation by
+   * tests and by the design cards; the panel always supplies it, and the button
+   * is not rendered without it rather than rendering a control that does nothing.
+   */
+  readonly onFind?: () => void
   /** Approve one host. Resolves with the IPC result — the band renders failure. */
   readonly onApprove: (host: string) => Promise<PreviewApproveResult>
   /** The list opened or closed, so the panel can re-measure. */
@@ -78,6 +99,7 @@ export function PreviewChromeBand({
   paused = false,
   chipRef,
   controlsAllowed = true,
+  onFind,
   onApprove,
   onExpandedChange
 }: PreviewChromeBandProps): React.JSX.Element {
@@ -200,8 +222,31 @@ export function PreviewChromeBand({
         {state.announcement}
       </div>
 
-      <div className="erf-band__bar">
-        <span className="erf-band__label">Preview — content below is not Erfana</span>
+      <div className="erf-band__bar" role="toolbar" aria-label="Preview">
+        {/*
+          Find, matching MarkdownToolbar's search button exactly — same icon at
+          the same size, same accessible name, same shortcut in the tooltip. The
+          find bar itself is shared: both panels open the same `SearchBar`, this
+          one over a Chromium `findInPage` provider.
+
+          The keyboard route existed long before this button did. Cmd/Ctrl+F has
+          always worked here, including while focus is inside the native view,
+          which swallows renderer keys and needs the accelerator forwarded. The
+          button only makes a working feature discoverable.
+        */}
+        {onFind !== undefined && (
+          <button
+            type="button"
+            className="erf-band__tool"
+            aria-label="Find"
+            title="Find (Cmd/Ctrl+F)"
+            data-testid="preview-band-find"
+            onClick={onFind}
+          >
+            <Search size={16} strokeWidth={2} aria-hidden="true" />
+          </button>
+        )}
+        <span className="erf-band__spacer" />
         <button
           ref={chip}
           type="button"

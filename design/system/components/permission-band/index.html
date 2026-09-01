@@ -60,6 +60,26 @@
 </p>
 
 <div class="ds-note">
+  <strong>This card used to decide that the band carried a permanent
+  “Preview — content below is not Erfana” label, and a 2px accent seam the page could not
+  paint over. It no longer does.</strong> Both were removed by owner decision when the bar became a
+  toolbar matching <code>MarkdownToolbar</code>, and the seam is now the same 1px neutral rule.
+  <br><br>
+  Recorded here rather than quietly deleted, because a <code>decided</code> card that changes its
+  mind owes the next reader the reason. <code>design/README.md</code> is explicit that this is
+  allowed — “a <code>decided</code> card the app keeps having to deviate from is a card that was
+  wrong” — but the cost is real and belongs on the card: <strong>nothing on screen names the
+  boundary any more</strong>, and 1px of <code>--color-border-default</code> is weak against the
+  white paper a page picks by default. <code>docs/security.md</code> residual risk 8 carries the
+  accepted residual.
+  <br><br>
+  <strong>What this card still decides, and it is now the whole of it:</strong> the band is
+  <em>always present</em>, and it is a flow sibling <em>above</em> the page area rather than an
+  overlay on it. That placement is the only thing left separating Erfana's chrome from untrusted
+  content. Conditional rendering or <code>position: absolute</code> would remove the last of it.
+</div>
+
+<div class="ds-note">
   <strong>The band's own text is measured, not assumed.</strong> Its labels use
   <code>--color-text-tertiary</code>, which is
   <strong><span data-claim="contrast-tertiary-on-panel"></span>:1</strong> on the band — clear of the
@@ -86,8 +106,16 @@
     <div class="erf-band" id="band">
       <div class="erf-band__announce" role="status" aria-live="polite" id="announce"></div>
 
-      <div class="erf-band__bar">
-        <span class="erf-band__label">Preview — content below is not Erfana</span>
+      <div class="erf-band__bar" role="toolbar" aria-label="Preview">
+        <button class="erf-band__tool" type="button" aria-label="Find" title="Find (Cmd/Ctrl+F)">
+          <!-- lucide `search`, 16px, matching MarkdownToolbar's button exactly.
+               Inline here so the card needs no script tag from a CDN. -->
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path>
+          </svg>
+        </button>
+        <span class="erf-band__spacer"></span>
         <button class="erf-band__chip" id="chip" aria-expanded="false">
           <span id="chipCounts">0 blocked · 0 allowed</span>
           <span class="erf-band__chip-caret" id="chipCaret" aria-hidden="true">▸</span>
@@ -257,7 +285,22 @@ const SEED = {
     // a CSP host-source cannot express an IPv6 literal at all, and Chromium
     // says so out loud — "contains an invalid source … It will be ignored" —
     // so a grant would live in the network filter and never reach the CSP.
-    { host: 'http://[::1]:9000', kind: 'image', approvable: false }
+    { host: 'http://[::1]:9000', kind: 'image', approvable: false },
+    /*
+     * THE LIST MUST OVERFLOW. These four are ordinary and say nothing new on
+     * their own — they are here so the list is taller than its 240px clamp and
+     * actually scrolls.
+     *
+     * Without them the scrollbar was a state the card described and never drew,
+     * and it hid a real defect: macOS overlay scrollbars paint ON TOP of content
+     * and take no width, so the bar landed directly over the Allow buttons.
+     * Fixed in PreviewChromeBand.css by opting out of overlay scrollbars and
+     * reserving a stable gutter. Do not trim this list back.
+     */
+    { host: 'https://unpkg.com', kind: 'script' },
+    { host: 'https://api.telemetry.example.org', kind: 'connect' },
+    { host: 'https://images.cdn.example.net', kind: 'image' },
+    { host: 'http://localhost:3000', kind: 'script' }
   ],
   // No `kind` here, deliberately — see allowedRow().
   allowed: [

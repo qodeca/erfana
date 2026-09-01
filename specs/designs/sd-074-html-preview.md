@@ -438,6 +438,21 @@ find bar uses. Rule (b) keeps an untrusted page on screen while Erfana asks a se
 rule (a) gives that page browser-native colours, so this is what lets a reader tell a real Erfana
 prompt from one the page drew. Was residual risk 8 (§2.8). Do **not** make it conditional.
 
+> **Withdrawn 2026-09, by owner decision.** The paragraph above is kept because it is why the control
+> was built, not because it still ships. The bar above a preview is now a conventional **toolbar**
+> matching the Markdown editor's: `var(--border-width) solid var(--color-border-default)` under it,
+> carrying a Find button and the permission chip. The naming label and the 2px accent seam are both
+> gone, and **nothing replaced them** — no substitute wording, no tooltip, no icon.
+>
+> **What did not change:** the bar is still always-DOM Erfana chrome, still rendered unconditionally,
+> and still a flow sibling ABOVE the page area rather than an overlay on it, so the page still cannot
+> paint over it; the view rect is still clamped to the window content area; the security question is
+> still asked inside the bar; and Erfana still never asks for credentials inside a preview. (The
+> `PREVIEW_CHROME_INSET_PX` inset named above is itself historical — layout subtracts the bar's own
+> box now.) **What is lost:** no on-screen text names the boundary any more, and a 1px neutral rule is
+> weak against a light page, so §2.8 risk 8's residual is wider than the entry there originally
+> recorded.
+
 ### 1.9 Keyboard forwarding
 
 ```ts
@@ -714,6 +729,14 @@ the user previews. (T3) A network attacker on an approved host. (T4) A compromis
    hiding the preview during a security prompt: an untrusted page now stays on screen while Erfana asks
    "Approve this host?", and the strip is what distinguishes a genuine prompt from a drawn one.
    Residual: the strip proves the panel is a preview, not that a dialog elsewhere is genuine.
+
+   **Amended 2026-09 (owner decision, §1.8(c)).** The naming label and the 2px accent seam were
+   withdrawn when the bar became a conventional toolbar; nothing replaced either. The structural half
+   of this entry stands unchanged — always-DOM Erfana chrome, a flow sibling above the page area, a
+   clamped view rect, no credential prompts in a preview — but the wording that told a reader which
+   side of the line they were looking at is gone. **Widened residual:** nothing on screen names the
+   boundary, and a 1px neutral rule is weak against a light page, so a page drawing a convincing fake
+   Erfana dialog inside its own rectangle meets one fewer cue. Accepted as stated.
 9. **Git config keys beyond `core.fsmonitor`.** The hardened invocation overrides the one key known to
    execute a command during `check-ignore`. Bounded by fail-open and by `check-ignore` being the only
    subcommand run.
@@ -1469,8 +1492,10 @@ bounded destroy; the post-load pipeline is rate-limited so Erfana's own work per
 is capped.
 
 **R11 — UI spoofing** (med/high). Clamped rect + retained tab/toolbar chrome + "Erfana never asks for
-credentials inside a preview" + the always-DOM "Preview – content below is not Erfana" strip the view is inset below.
-Residual §2.8 risk 8.
+credentials inside a preview" + the always-DOM Erfana bar the view sits below. **Amended 2026-09**: that
+bar is now a conventional toolbar (Find + permission chip); its "Preview – content below is not Erfana"
+label and 2px accent seam were withdrawn by owner decision, with nothing in their place, so the
+mitigation is structural only and no longer names itself. Widened residual §2.8 risk 8, §1.8(c).
 
 **R12 — Exfiltration channels outside every chokepoint** (med/high). **New, and honestly unmitigated.**
 WebRTC over TURN/TCP-443 and `<link rel=preconnect>` are general-purpose channels that neither the CSP

@@ -15,7 +15,7 @@ window.ERFANA_CLAIMS = {
     "card": "system/foundations/motion.html"
   },
   "icon-registry-bypass": {
-    "value": 49,
+    "value": 50,
     "label": "files importing the icon library directly instead of the registry",
     "card": "system/components/icon/index.html"
   },

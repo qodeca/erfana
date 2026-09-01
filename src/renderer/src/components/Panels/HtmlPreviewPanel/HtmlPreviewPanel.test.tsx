@@ -170,46 +170,27 @@ describe('HtmlPreviewPanel', () => {
     expect(container.querySelector('.html-preview-placeholder')).not.toBeNull()
   })
 
-  it('always shows the "not Erfana" strip beside a live preview', () => {
-    // A security control, not a label. The previewed page is untrusted, paints
-    // above all sibling DOM, and now stays on screen while Erfana asks a
-    // security question — so a permanently visible band of Erfana's own chrome
-    // is how a reader tells a genuine prompt from one the page drew. It must not
-    // be conditional on load state, failures or visibility.
+  it('always shows the preview toolbar beside a live preview', () => {
+    // The band's PLACEMENT is now the whole of what separates Erfana's chrome
+    // from an untrusted page. The "content below is not Erfana" wording and the
+    // 2px accent seam were both withdrawn by owner decision when this became a
+    // toolbar (docs/security.md, residual risk 8) — so this assertion is
+    // deliberately about presence, not text, and it is the last one of its kind.
+    // It must not become conditional on load state, failures or visibility.
     const { container } = render(<HtmlPreviewPanel {...makeProps('/proj/page.html')} />)
-    const strip = container.querySelector('.erf-band')
-    expect(strip).not.toBeNull()
-    expect(strip?.textContent).toContain('not Erfana')
+    expect(container.querySelector('.erf-band')).not.toBeNull()
   })
 
-  it('says WHICH SIDE of the strip is not Erfana', () => {
-    // The wording carries the control. "Preview – not Erfana" on its own reads
-    // as the strip disowning itself — but the strip IS Erfana, and the area
-    // BELOW it is the untrusted page. A reader who cannot tell which side is
-    // meant gets no protection from the band being there.
-    const { container } = render(<HtmlPreviewPanel {...makeProps('/proj/page.html')} />)
-    const text = container.querySelector('.erf-band')?.textContent ?? ''
-    expect(text).toContain('content below')
-  })
+  it('carries a Find button that opens the find bar', () => {
+    // Find-in-page worked here long before it had a button — Cmd/Ctrl+F, and a
+    // forwarded accelerator for when focus is inside the native view, which
+    // swallows renderer keys. This pins the DISCOVERABLE route, which is the
+    // only part that was missing.
+    render(<HtmlPreviewPanel {...makeProps('/proj/page.html')} />)
 
-  it('pins the strip to one unwrappable line', () => {
-    // Read from the shipping stylesheet, the way Dialog.contrast.test.ts does:
-    // the rule is the artefact, not a value duplicated in the test.
-    //
-    // The reason changed but the rule did not. It used to be that a wrapped
-    // label would take a second line the FIXED 22px inset did not cover, and the
-    // page would paint over it. There is no fixed inset any more — the strip is
-    // in flow, so a second line would push the page down rather than be covered.
-    // What is still true is that the strip is a one-line control whose text must
-    // stay readable at any panel width; an ellipsis is the intended degradation,
-    // a silent reflow is not. Lengthening the text is fine; letting it wrap is not.
-    const css = readFileSync(resolve(__dirname, 'components/PreviewChromeBand.css'), 'utf8')
-    const rule = css.slice(
-      css.indexOf('.erf-band__label {'),
-      css.indexOf('}', css.indexOf('.erf-band__label {'))
-    )
-    expect(rule).toContain('white-space: nowrap')
-    expect(rule).toContain('overflow: hidden')
+    expect(useSearchStore.getState().isOpen).toBe(false)
+    fireEvent.click(screen.getByTestId('preview-band-find'))
+    expect(useSearchStore.getState().isOpen).toBe(true)
   })
 
   it('puts the page area BELOW the strip, so it cannot overlap it', () => {

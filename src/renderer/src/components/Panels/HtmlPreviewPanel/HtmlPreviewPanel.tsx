@@ -342,15 +342,17 @@ export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelPara
           {/* Name the surface for assistive tech: while the native view is hidden
               (inactive tab, overlay, pre-paint) its own a11y tree is gone, so
               without a label a screen reader finds only an unnamed black region. */}
-          {/* A permanently visible band of Erfana's OWN chrome, which the page
-              cannot paint over because the native view is inset below it
-              — it is a flow sibling ABOVE the page area, not an overlay on it,
-              so the page has nowhere to paint that could cover it and the strip
-              may grow to any height. The previewed page is untrusted and
-              paints above all sibling DOM, and it now stays on screen while
-              Erfana asks a security question — so this is how a reader tells a
-              real Erfana prompt from one the page drew. Was residual risk 8 in
-              docs/security.md. Do NOT make it conditional or let it scroll. */}
+          {/* The preview's toolbar — Find, and the permission chip. Always
+              rendered, and a flow sibling ABOVE the page area rather than an
+              overlay on it, so the untrusted page has nowhere to paint that
+              could cover it and the bar may grow to any height.
+
+              That placement is now the WHOLE of what separates Erfana's chrome
+              from the page: the "content below is not Erfana" wording and the
+              2px accent seam were both removed by owner decision when this
+              became a toolbar (docs/security.md, residual risk 8). Do NOT make
+              it conditional, do NOT let it scroll, and do NOT position it
+              absolutely — there is nothing left underneath it to fall back on. */}
           <PreviewChromeBand
             blockedHosts={blockedHosts}
             allowedHosts={allowedHosts}
@@ -358,6 +360,7 @@ export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelPara
             chipRef={bandChipRef}
             controlsAllowed={controlsAllowed}
             paused={gate !== null}
+            onFind={openPreviewSearch}
             onApprove={approveHost}
             onExpandedChange={setBandExpanded}
           />

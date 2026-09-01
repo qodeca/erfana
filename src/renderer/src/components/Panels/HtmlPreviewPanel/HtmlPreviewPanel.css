@@ -65,77 +65,18 @@
 }
 
 /*
- * The always-DOM "Preview – content below is not Erfana" strip.
+ * `.html-preview-chrome-strip` used to live here: a 22px always-DOM strip
+ * reading "Preview – content below is not Erfana", with a 2px accent seam under
+ * it. `PreviewChromeBand` replaced the element long ago and this rule has
+ * rendered nowhere since; it is deleted now rather than left as a second,
+ * divergent description of a bar that is no longer even shaped like this.
  *
- * A SECURITY CONTROL, not a label. It is a flow sibling ABOVE
- * `.html-preview-page-area` in a flex column, so the untrusted page has nowhere
- * to paint that could cover it — which is what lets a reader tell a genuine
- * Erfana prompt from one the page drew. Keep it unconditional and keep it opaque.
- *
- * Its height is now free. The strip used to be `position: absolute` over the page
- * area, so this `height` had to be restated as PREVIEW_CHROME_INSET_PX in
- * hooks/usePreviewBounds.ts and added back on when the native view's bounds were
- * computed; the guarantee held only while those two numbers agreed. In flow the
- * placeholder's own box excludes the strip whatever it measures, which is what
- * lets the permission band grow when it opens its list.
- *
- * The wording names WHICH SIDE of the line is which. "Preview – not Erfana"
- * alone read as the strip disowning itself, when the strip IS Erfana and the
- * area below it is not.
- *
- * It must never wrap. Not because a second line would be covered any more — it
- * would push the page down instead — but because this is a one-line control whose
- * text has to stay readable at any panel width. Clipping to an ellipsis in a
- * narrow panel is the correct degradation; a silent reflow is not.
+ * The strip's two security properties did not move with it. The wording and the
+ * accent seam were both withdrawn by owner decision when the band became a
+ * toolbar — see PreviewChromeBand.css and `docs/security.md` residual risk 8.
+ * What survives is placement: the band is a flow sibling ABOVE
+ * `.html-preview-page-area`, so the untrusted page cannot paint over it.
  */
-.html-preview-chrome-strip {
-  flex: 0 0 auto;
-  height: 22px;
-  display: flex;
-  align-items: center;
-  padding: 0 var(--space-4);
-  background: var(--color-bg-secondary);
-  /*
-   * THE SEAM. This is the line that says where Erfana stops and the untrusted
-   * page starts, so it is a security control and not trim.
-   *
-   * It shipped as `1px solid var(--color-border)` — a token that does not
-   * exist. An undefined custom property inside a shorthand is invalid at
-   * computed-value time, so every longhand fell back to its initial value and
-   * `border-bottom-style: none` meant NO line at all. The boundary was left to a
-   * background colour the page can simply match, which it chooses itself since
-   * previews render in their own paper colour.
-   *
-   * Deliberately the brand accent at 2px rather than a neutral hairline, and
-   * the page cannot draw it, because the native view is inset below this band.
-   *
-   * It does NOT clear 3:1 against every paper a page can pick, and an earlier
-   * version of this comment claimed it did. Measured: the accent (#A0A8FF) is
-   * 6.24:1 against this strip's own background but only 2.20:1 against white,
-   * which is the DEFAULT page paper (`previewBackdrop.ts`).
-   *
-   * The seam is still legible, because two mechanisms carry it and they cover
-   * each other: the strip's opaque background is 13.7:1 against white paper,
-   * and where THAT collapses — a dark page at 1.4:1 — the accent is 8.5:1.
-   * Changing either one means re-checking the other.
-   *
-   * `HtmlPreviewPanel.tokens.test.ts` fails if either token stops resolving.
-   */
-  border-bottom: var(--border-width-thick) solid var(--color-accent-primary);
-  color: var(--color-text-tertiary);
-  font-size: var(--text-xs);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  user-select: none;
-  pointer-events: none;
-  /* No z-index. The strip used to need one because it was absolutely positioned
-     OVER the placeholder; in flow it is a sibling above it in the column and
-     nothing overlaps. One fewer stacking claim, and one fewer stylelint
-     exception — see design/system/foundations/layering.html, which counts them. */
-}
 
 /*
  * The sized target the native WebContentsView paints over. Carries whatever
@@ -156,13 +97,26 @@
   overflow: hidden;
 }
 
-/* Still frame shown while the native view is hidden (fills the placeholder). */
+/*
+ * Still frame shown while the native view is hidden (fills the placeholder).
+ *
+ * `cover`, NOT `contain`. The frame is captured at the view's aspect at hide
+ * time, and the box it lands in is a different shape whenever the band grew to
+ * cause the hide — which is the common case, because opening the permission
+ * band's list is what hides the page. `contain` letterboxes that difference,
+ * and the bars read as a broken panel rather than as a frozen page. `cover`
+ * fills, anchored top-left so the page's own top-left stays put; the frame is
+ * transient and a few cropped pixels at the far edge cost nothing.
+ *
+ * The black below is what shows through only while the image itself is still
+ * decoding, and it matches the pre-paint placeholder backdrop.
+ */
 .html-preview-still-frame {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
   object-position: top left;
   background: var(--color-brand-black);
   user-select: none;

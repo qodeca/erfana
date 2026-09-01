@@ -13,11 +13,17 @@
  * falls back to its initial value — and `border-bottom-style`'s initial value is
  * `none`. Not a wrong colour: no border at all.
  *
- * It mattered here more than a missing line usually would. That border is the
- * seam between Erfana's own chrome and an untrusted page which now picks its own
+ * It mattered here more than a missing line usually would. That border was the
+ * seam between Erfana's own chrome and an untrusted page which picks its own
  * paper colour (`previewBackdrop.ts`) and stays on screen while Erfana asks a
  * security question. With the border gone the boundary was carried only by a
  * background colour the page can simply match.
+ *
+ * The strip itself is gone — `PreviewChromeBand` replaced it, and the band's
+ * bottom rule is now a 1px neutral one by owner decision (`docs/security.md`
+ * residual risk 8). The typo class has not gone anywhere, so the assertion
+ * follows the live rule into `PreviewChromeBand.css` rather than retiring with
+ * the element it was written for.
  *
  * Nothing catches this class of fault: not the type-checker, not ESLint, not a
  * rendering test in jsdom (which resolves no custom properties). Only reading
@@ -31,6 +37,10 @@ import { resolve } from 'node:path'
 import { describe, it, expect } from 'vitest'
 
 const PANEL_CSS = readFileSync(resolve(__dirname, 'HtmlPreviewPanel.css'), 'utf8')
+const BAND_CSS = readFileSync(
+  resolve(__dirname, 'components/PreviewChromeBand.css'),
+  'utf8'
+)
 const TOKENS_CSS = readFileSync(
   resolve(__dirname, '../../../styles/design-tokens.css'),
   'utf8'
@@ -88,13 +98,14 @@ describe('HtmlPreviewPanel.css token references', () => {
     expect(missing).toEqual([])
   })
 
-  it('paints a bottom border under the not-Erfana strip', () => {
-    // The seam is the point. Assert the declaration resolves to something that
-    // can paint — a style and a defined colour — rather than asserting one
-    // literal, so the border can be restyled without editing this test.
-    const rule = PANEL_CSS.slice(
-      PANEL_CSS.indexOf('.html-preview-chrome-strip {'),
-      PANEL_CSS.indexOf('}', PANEL_CSS.indexOf('.html-preview-chrome-strip {'))
+  it('paints a bottom border under the preview toolbar', () => {
+    // A line that can PAINT is the point, and that is all this asserts: a style
+    // and a colour token that resolves. It deliberately does not assert the
+    // width or the colour — those went from a 2px accent to a 1px neutral by
+    // decision, and a test that pinned them would have read as a regression.
+    const rule = BAND_CSS.slice(
+      BAND_CSS.indexOf('.erf-band {'),
+      BAND_CSS.indexOf('}', BAND_CSS.indexOf('.erf-band {'))
     )
     const border = /border-bottom:\s*([^;]+);/.exec(rule)?.[1]
 

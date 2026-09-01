@@ -55,14 +55,35 @@ function renderBand(props: Partial<Parameters<typeof PreviewChromeBand>[0]> = {}
 }
 
 describe('PreviewChromeBand', () => {
-  it('is present, and says which side is not Erfana, with nothing blocked', () => {
-    // A trust signal that appears only when something is wrong is not a trust
-    // signal. The band is the marker for the boundary, so it must not be
-    // conditional on there being a problem.
+  it('is present with nothing blocked, and shows both zeroes', () => {
+    // A control that appears only when something is wrong is not a trust signal,
+    // and the counts must never go silent — "0 blocked · 0 allowed" is a state,
+    // not an absence. The band no longer carries any wording about the boundary;
+    // that was removed by owner decision (docs/security.md, residual risk 8), so
+    // this asserts presence and counts only.
     const { container } = renderBand()
     expect(container.querySelector('.erf-band')).not.toBeNull()
-    expect(container.textContent).toContain('content below is not Erfana')
     expect(screen.getByTestId('preview-band-chip')).toHaveTextContent('0 blocked · 0 allowed')
+  })
+
+  it('renders no Find button when the panel gives it nothing to call', () => {
+    // Better an absent control than one that looks live and does nothing. The
+    // panel always passes `onFind`; the design cards and these tests do not.
+    renderBand()
+    expect(screen.queryByTestId('preview-band-find')).toBeNull()
+  })
+
+  it("renders a Find button, named and titled like the markdown toolbar's", async () => {
+    const user = userEvent.setup()
+    const onFind = vi.fn()
+    renderBand({ onFind })
+
+    const find = screen.getByTestId('preview-band-find')
+    expect(find).toHaveAccessibleName('Find')
+    expect(find).toHaveAttribute('title', 'Find (Cmd/Ctrl+F)')
+
+    await user.click(find)
+    expect(onFind).toHaveBeenCalledTimes(1)
   })
 
   it('mounts the live region EMPTY', () => {

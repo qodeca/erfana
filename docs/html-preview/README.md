@@ -61,16 +61,16 @@ The preview watches the page plus every local file it links, and re-subscribes w
 
 For the acceptance corpus, save-to-visible-change stays under 300 ms.
 
-## Colours, zoom, and the "not Erfana" strip
+## Colours, zoom, and the preview toolbar
 
 - **A page is painted in its own colours.** A preview uses the background the page itself resolves to – white for ordinary HTML, dark for a page declaring `color-scheme: dark` – exactly as a browser would. Erfana's own dark colour appears only before the page has painted anything, so the seam between Erfana's panel and the page never flashes.
 - **Zoom applies to the page, not the panel.** Cmd/Ctrl-plus, minus and 0 over a preview, or the **View** menu, zoom the previewed page the way a browser does. Each preview keeps its own zoom level, including across a sleep and wake.
-- **Every live preview carries a "Preview – content below is not Erfana" strip.** A thin band of Erfana's own interface sits above the page, in an area the page cannot draw on. It is a security control, not decoration: a previewed page is untrusted, it paints over everything else in its panel, and it stays on screen while Erfana asks you about it. A prompt appearing inside the preview area is the page imitating Erfana.
+- **Every live preview carries a toolbar above the page.** It is Erfana's own interface, in the same shape as the toolbar above a Markdown file, and it sits in an area the page cannot draw on – the page is laid out below it, not over it. It holds a **Find** button and the permission chip described under [Network allowlist](#network-allowlist), and it is where Erfana asks you about the page: "Approve this host?" is asked in the toolbar, above the page, rather than in a message beside it. The toolbar used to name itself – it read "Preview – content below is not Erfana" and had a bright 2px line under it. Both were removed when it became a conventional toolbar, so **nothing on screen now tells you where Erfana stops and the previewed page starts**. What you can still rely on: Erfana never asks for a password or an API key inside a preview, and anything that appears *inside* the page area – including a dialog that looks like Erfana's – is the page, not Erfana.
 - **Notifications move rather than hide the page.** A message in the corner shifts itself clear of a running preview instead of blanking it, so you can read the page and answer a prompt at the same time. If the window is too small for it to fit clear, the preview hides instead – a prompt must never sit underneath somebody else's page.
 
 ## Find, export, and the off-switch
 
-- **Find-in-page.** The existing search UI matches text inside the running page, reports match counts, and steps through matches – it drives the view's own find, not a DOM search.
+- **Find-in-page.** The existing search UI matches text inside the running page, reports match counts, and steps through matches – it drives the view's own find, not a DOM search. It opens from Cmd/Ctrl-F as it always did, and now also from the **Find** button in the preview's toolbar, so it can be found without knowing the shortcut.
 - **PDF export.** Export produces a PDF of the page as rendered *after* its JavaScript has run.
 - **Global off-switch.** A single setting disables HTML execution entirely. With it off, `.html` files open as source only and no preview process is ever created – existing previews are torn down when the toggle flips.
 

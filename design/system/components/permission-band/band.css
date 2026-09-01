@@ -8,29 +8,38 @@
  * actually ships, and `npm run design -- --check` fails CI on drift. Edit this
  * copy; never the one under design/.
  *
- * This REPLACES a live security control, it is not a new file.
- * HtmlPreviewPanel.css shipped `.html-preview-chrome-strip`, rendered
- * unconditionally, already carrying both properties below — always present, and
- * the same 2px accent seam. What shipped was this band's collapsed bar minus the
- * disclosure. The strip's tests are the ones that must keep passing.
+ * IT IS A TOOLBAR NOW, AND TWO SECURITY CONTROLS WERE WITHDRAWN TO GET THERE.
  *
- * The blocker that gated this move is closed: the preview inset was a fixed 22
- * hardcoded in BOTH HtmlPreviewPanel.css and usePreviewBounds.ts, and this bar is
- * 32px plus a 2px seam. The band is now laid out in flow and the native view
- * tracks the placeholder's own box, so there is no inset constant left to
- * disagree with. (The old 22px was itself under the 24x24 floor Surfaces sets.)
+ * This file used to open by insisting on two properties: a permanent
+ * "Preview - content below is not Erfana" label, and a 2px accent seam that the
+ * previewed page could not paint over. They were the documented mitigation for
+ * UI spoofing (`docs/security.md`, residual risk 8). The project owner removed
+ * the label outright and matched `.markdown-toolbar`'s 1px neutral rule, so the
+ * two previews in this app look like one product.
  *
- * Two properties this file must never lose:
- *   1. The band is ALWAYS present. It is the marker that says the content below
- *      is not Erfana's own UI, so it must not appear only when something is
- *      wrong. A control that is sometimes absent cannot be trusted.
- *   2. The seam at the bottom is the boundary the previewed page provably
- *      cannot paint over, because the page is inset below it.
+ * Read that as a decision with a cost, not as tidying. Nothing on screen names
+ * the boundary any more; the 1px rule measures poorly against a light page,
+ * which is the DEFAULT page paper (`previewBackdrop.ts`). Do not "restore" the
+ * label as a bug fix - it was taken out on purpose and `docs/security.md`
+ * records the residual.
+ *
+ * The one property this file must still never lose: the band is ALWAYS PRESENT
+ * and it is a flow sibling ABOVE the page area, never an overlay on it, so the
+ * page has nowhere to paint that could cover it. That is now the whole of what
+ * separates Erfana's chrome from untrusted content. Making it conditional, or
+ * absolutely positioned, removes the last of it.
+ *
+ * Sizing follows `MarkdownToolbar.css`: a 28px button in 6px/12px padding, so
+ * the bar comes out at the same height as the markdown one rather than the old
+ * 32px row. There is no inset constant to keep in step - the band is laid out in
+ * flow and the native view tracks the placeholder's own box.
  */
 
 .erf-band {
-  background: var(--color-bg-secondary);
-  border-bottom: var(--border-width-thick) solid var(--color-accent-primary);
+  background: var(--color-bg-primary);   /* was --color-bg-secondary */
+  /* 1px neutral, matching `.markdown-toolbar`. Was a 2px accent seam; see the
+     header - that was a security control and its removal was a decision. */
+  border-bottom: var(--border-width) solid var(--color-border-default);
   font-family: var(--font-sans);
   user-select: none;
   /* No transition. The native view moves in one step, so an eased height would
@@ -43,21 +52,48 @@
 .erf-band__bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-8);
-  height: var(--btn-height-md);          /* 32px — fits a 24px target */
-  padding: 0 var(--space-6) 0 var(--space-8);
+  gap: var(--space-1);
+  /* Content-sized like `.markdown-toolbar`, not a fixed height: 28px button plus
+     6px top and bottom. A fixed height here would fight the button. */
+  padding: var(--space-3) var(--space-6);
 }
 
-.erf-band__label {
-  font-size: var(--text-xs);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--color-text-tertiary);     /* 6.33:1 on the band — passes 4.5:1 */
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  pointer-events: none;                  /* only the LABEL ignores clicks */
+/* Pushes the chip to the trailing edge. `justify-content: space-between` did
+   that while the bar held exactly two children; a toolbar grows, and an explicit
+   spacer keeps "Find leads, chip trails" true whatever lands between them - the
+   same device `.toolbar-spacer` uses in the markdown toolbar. */
+.erf-band__spacer {
+  flex: 1 1 auto;
+}
+
+/* An icon button, sized and coloured as `.markdown-toolbar .toolbar-btn`. */
+.erf-band__tool {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: var(--btn-height-md);           /* 32px */
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--border-radius);
+  color: var(--color-text-primary);
+  cursor: pointer;
+}
+
+.erf-band__tool:hover {
+  background: var(--color-bg-hover-solid);
+  color: var(--color-white);
+}
+
+.erf-band__tool:active {
+  background: var(--color-bg-selected);
+}
+
+.erf-band__tool:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: -2px;
 }
 
 /* ---------- the disclosure chip ---------- */
@@ -93,9 +129,60 @@
 
 /* ---------- the expanded list ---------- */
 
-.erf-band__list { padding: 0 var(--space-8) var(--space-6); }
+/*
+ * The trailing padding lives on the SCROLL box, not here, so it sits between the
+ * content and the scrollbar rather than outside the scrollbar. Padding on this
+ * element would push the whole scroll box — bar and all — away from the edge and
+ * leave the rows still touching the thumb.
+ */
+.erf-band__list { padding: 0 0 var(--space-6) var(--space-8); }
 
-.erf-band__scroll { max-height: var(--erf-band-max-list, 240px); overflow-y: auto; }
+/*
+ * THE SCROLLBAR MUST TAKE SPACE, NOT FLOAT OVER THE ALLOW BUTTONS.
+ *
+ * macOS ships overlay scrollbars, which paint on top of content and take no
+ * layout width. In a list of hosts the rightmost column is the Allow button and
+ * the failure text beside it, so the overlay landed directly on the one control
+ * the list exists for.
+ *
+ * Declaring `::-webkit-scrollbar` with a width opts this element out of overlay
+ * scrollbars entirely: Chromium gives it a classic, space-taking bar. That is
+ * the same pattern `ProjectTree.css` and `MarkdownPreview.css` already use, with
+ * the same tokens, so the band does not invent a second scrollbar look.
+ *
+ * `scrollbar-gutter: stable` reserves the width whether or not the list is long
+ * enough to scroll. Without it the rows re-flow every time the list crosses the
+ * threshold — and it crosses constantly here, because approving a host REMOVES
+ * its row. Every Allow click would shift the remaining buttons sideways under
+ * the pointer, which is how a mis-click becomes a one-way permission grant.
+ */
+.erf-band__scroll {
+  max-height: var(--erf-band-max-list, 240px);
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  /* Breathing room between the last Allow button and the thumb. Inside the
+     scroll box, so it is space the scrollbar cannot reclaim. Leaves the rows
+     18px off the band's right edge against 16px on the left — near enough to
+     symmetric that the scrollbar reads as sitting in the margin. */
+  padding-inline-end: var(--space-4);
+}
+
+.erf-band__scroll::-webkit-scrollbar {
+  width: var(--scrollbar-width);
+}
+
+.erf-band__scroll::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
+.erf-band__scroll::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: var(--border-radius);
+}
+
+.erf-band__scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
 
 .erf-band__section {
   padding: var(--space-4) 0 var(--space-2);

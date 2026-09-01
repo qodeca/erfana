@@ -118,11 +118,13 @@
 const STEPS = [
   {
     title: 'Nothing was asked for',
-    text: ['A page with no remote content still gets the band. <strong>It is the marker that says the '
-         + 'content below is not Erfana</strong> — a trust signal that appears only when something is '
-         + 'wrong is not a trust signal.',
+    text: ['A page with no remote content still gets the band. <strong>It is always present</strong> '
+         + '— a control that appears only when something is wrong is not one you can trust, and its '
+         + 'placement above the page is now the only thing separating Erfana from the page.',
            'The counts are always shown, including the two zeroes. Silence is the one state a '
-         + 'permission control must never have.'],
+         + 'permission control must never have.',
+           'It used to carry the words “Preview — content below is not Erfana”. Those were removed '
+         + 'by owner decision when the bar became a toolbar; see the Permission band card.'],
     counts: '0 blocked · 0 allowed', open: false, page: 'clean'
   },
   {
@@ -244,8 +246,14 @@ function band(step) {
   }
 
   return `<div class="erf-band">
-    <div class="erf-band__bar">
-      <span class="erf-band__label">Preview — content below is not Erfana</span>
+    <div class="erf-band__bar" role="toolbar" aria-label="Preview">
+      <button class="erf-band__tool" type="button" aria-label="Find" title="Find (Cmd/Ctrl+F)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path>
+        </svg>
+      </button>
+      <span class="erf-band__spacer"></span>
       <button class="erf-band__chip${step.failed ? ' erf-band__chip--failed' : ''}">
         <span>${step.counts}</span>
         <span class="erf-band__chip-caret" aria-hidden="true">${step.open ? '▾' : '▸'}</span>
