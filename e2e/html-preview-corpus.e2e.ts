@@ -372,7 +372,10 @@ test.describe('HTML preview corpus', () => {
 
     // Allow OPENS the question; it does not answer it. That split is what stops a
     // one-way door being opened by a stray Return.
-    await band.getByRole('button', { name: 'Allow cdn.jsdelivr.net' }).click()
+    // The accessible name carries the whole ORIGIN, not the bare host: a
+    // permission covers scheme, host and port, and the name has to say what is
+    // actually being granted.
+    await band.getByRole('button', { name: 'Allow https://cdn.jsdelivr.net' }).click()
     await expect(band.getByRole('alertdialog')).toBeVisible()
     await expect(band.getByText(/Erfana cannot undo it/)).toBeVisible()
 
