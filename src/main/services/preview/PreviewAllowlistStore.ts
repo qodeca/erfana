@@ -207,31 +207,16 @@ export class PreviewAllowlistStore implements IPreviewAllowlistStore {
     // Step 4: read+parse the RAW object (unknown keys preserved), abort on bad JSON.
     const raw = await this.readRawSettings(settingsPath)
 
-    // Step 5: fail closed if an existing block carries an unsupported version.
+    // Step 5: resolve what is already on disk, through the SAME ladder `load()`
+    // uses. See `resolveExistingOrigins` for why reading raw here was wrong.
     const htmlPreview = isPlainObject(raw.htmlPreview) ? raw.htmlPreview : undefined
     const block = htmlPreview !== undefined ? htmlPreview.allowlist : undefined
-    if (
-      isPlainObject(block) &&
-      block.version !== undefined &&
-      block.version !== PREVIEW_ALLOWLIST_VERSION
-    ) {
-      throw new AppError(
-        'Refusing to write over an unsupported allowlist version',
-        ErrorCode.PROJECT_SETTINGS_VALIDATION_FAILED
-      )
-    }
+    const existingOrigins = this.resolveExistingOrigins(block)
 
-    // Step 6: merge, enforce the cap ACROSS BOTH KEYS. Capping each array on its
-    // own would let a file carry 200 hosts plus 200 origins and put all 400 into
-    // a CSP header, six directives wide.
-    const existingOrigins = readStringArray(block, 'origins')
-    const existingHosts = readStringArray(block, 'hosts')
-    const originSet = new Set<string>([
-      ...existingOrigins,
-      // A legacy host entry means the origin it always meant.
-      ...existingHosts.map(originFromLegacyHost).filter((o): o is string => o !== null)
-    ])
-    originSet.add(canonicalOrigin)
+    // Step 6: add the new grant and enforce the cap. The cap is on the resolved
+    // set, not on each key: `resolveOrigins` picks ONE key, so `hosts` cannot
+    // add to what `origins` already carries.
+    const originSet = new Set<string>([...existingOrigins, canonicalOrigin])
     if (originSet.size > MAX_ALLOWLIST_HOSTS) {
       throw new AppError('The preview host allowlist is full', ErrorCode.PREVIEW_ALLOWLIST_FULL)
     }
@@ -253,6 +238,21 @@ export class PreviewAllowlistStore implements IPreviewAllowlistStore {
       )
     }
 
+    // Step 6c: refuse to write over a `htmlPreview` that is not an object.
+    //
+    // Overwriting it is DATA LOSS: a string, array or number there would be
+    // replaced wholesale by the object built below, and the user would never be
+    // told. There is no third option — this key cannot hold both their value and
+    // an allowlist — so the choice is destroy or refuse, and refusing is the
+    // same answer step 5 gives to a block that does not parse. A malformed
+    // settings file is fixable by hand; a silently deleted value is not.
+    if (raw.htmlPreview !== undefined && htmlPreview === undefined) {
+      throw new AppError(
+        'Refusing to write over a malformed htmlPreview settings block',
+        ErrorCode.PROJECT_SETTINGS_VALIDATION_FAILED
+      )
+    }
+
     // Step 7: mutate the raw object, preserving every unknown key.
     //
     // DUAL-WRITE, and `origins` is the truth. `hosts` is a projection carrying
@@ -260,9 +260,17 @@ export class PreviewAllowlistStore implements IPreviewAllowlistStore {
     // could ever express — so an older build reads a file it fully understands
     // and simply cannot see the rest. The version is deliberately not bumped;
     // see PreviewAllowlistSchema.
+    //
+    // SPREAD THE BLOCK, not just its parent. The file header promises unknown
+    // keys survive a round trip, and until now that held only for keys ABOVE
+    // `allowlist` — the block itself was replaced wholesale, so anything inside
+    // it was dropped. That is also the trap waiting for the next field added
+    // here: this schema deliberately does not bump its version, so a build that
+    // does not know a key must preserve it rather than delete it.
     raw.htmlPreview = {
       ...(htmlPreview ?? {}),
       allowlist: {
+        ...(isPlainObject(block) ? block : {}),
         version: PREVIEW_ALLOWLIST_VERSION,
         hosts: sortedOrigins.map(hostOfOrigin).filter((h): h is string => h !== null),
         origins: sortedOrigins
@@ -287,6 +295,66 @@ export class PreviewAllowlistStore implements IPreviewAllowlistStore {
 
   isWriteBackEnabled(): boolean {
     return this.writeBackEnabled
+  }
+
+  /**
+   * The grants already on disk, resolved through the same three steps `load()`
+   * applies — and the reason this method exists rather than a pair of raw reads.
+   *
+   * The write path used to read `origins` and `hosts` straight off the raw
+   * object, so it inherited NONE of the guarantees the read path establishes.
+   * Three defects came out of that one shortcut:
+   *
+   *   - A block with no `version` key is refused by `load()` (the schema
+   *     requires the literal) but sailed past the version guard, which only
+   *     fires when the key is PRESENT and wrong. Approving one host then adopted
+   *     every origin in the file and stamped `version: 1` on it — so a
+   *     clone-delivered block the badge had already rejected went live on the
+   *     user's next click, and stayed live on every load afterwards.
+   *   - `resolveOrigins`' key-presence precedence was bypassed by an
+   *     unconditional union of both keys, so deleting an entry from `origins` by
+   *     hand was undone by the next approval. Hand-editing is currently the only
+   *     revocation there is (#86).
+   *   - `hostOfOrigin` ran `new URL()` over those raw strings from inside the
+   *     ARGUMENT to the step 6b guard, so one malformed entry threw `TypeError`
+   *     before the guard written to refuse it — and every approval in that
+   *     project failed from then on, reading only "Not saved".
+   *
+   * Reading `this.origins` instead would be shorter and wrong: it is a cache
+   * from the last `load()`, so it would silently drop a grant another window or
+   * a hand edit added since. This re-reads and re-validates disk every call.
+   *
+   * ABSENT BLOCK MEANS EMPTY AND CONTINUE, which is not a formality. A project
+   * with no settings file reaches here with `block === undefined`, and
+   * `PreviewAllowlistSchema.safeParse(undefined)` fails — so throwing on it
+   * would make the FIRST approval in every new project impossible.
+   */
+  private resolveExistingOrigins(block: unknown): readonly string[] {
+    if (block === undefined || block === null) {
+      return []
+    }
+
+    // Fail closed on any unexpected version — a future version may narrow.
+    if (
+      isPlainObject(block) &&
+      block.version !== undefined &&
+      block.version !== PREVIEW_ALLOWLIST_VERSION
+    ) {
+      throw new AppError(
+        'Refusing to write over an unsupported allowlist version',
+        ErrorCode.PROJECT_SETTINGS_VALIDATION_FAILED
+      )
+    }
+
+    const parsed = PreviewAllowlistSchema.safeParse(block)
+    if (!parsed.success) {
+      throw new AppError(
+        'Refusing to write over an allowlist block that does not parse',
+        ErrorCode.PROJECT_SETTINGS_VALIDATION_FAILED
+      )
+    }
+
+    return resolveOrigins(parsed.data)
   }
 
   /** Update in-memory state and return the resolved load result. */
@@ -386,14 +454,6 @@ function resolveOrigins(block: {
   // Dedupe AFTER canonicalisation: `https://x` and `https://x:443` are one origin
   // and would otherwise occupy two slots and two CSP host-sources.
   return [...new Set(resolved)].sort()
-}
-
-/** A string array under `key`, or empty. Unknown shapes are not our business. */
-function readStringArray(block: unknown, key: string): readonly string[] {
-  if (!isPlainObject(block)) return []
-  const value = block[key]
-  if (!Array.isArray(value)) return []
-  return value.filter((entry): entry is string => typeof entry === 'string')
 }
 
 /**

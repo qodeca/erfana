@@ -269,3 +269,181 @@ describe('PreviewAllowlistStore.approveOrigin cap', () => {
     expect(parsed.htmlPreview.allowlist.hosts).not.toContain('overflow.example.com')
   })
 })
+
+describe('PreviewAllowlistStore.approveOrigin — the write path validates like the read path', () => {
+  it('refuses a block with no version key, instead of adopting and versioning it', async () => {
+    // THE ONE THAT MATTERS. `load()` refuses this block because the schema
+    // requires `version: 1` — but the approve path's version guard only fires
+    // when the key is PRESENT and wrong, so a versionless block sailed straight
+    // past it. Approving one CDN then merged every origin in the file and
+    // stamped `version: 1` on the result, making a clone-delivered allowlist the
+    // badge had already rejected go live on the user's next click.
+    await writeSettings(
+      JSON.stringify({
+        htmlPreview: {
+          allowlist: {
+            hosts: ['evil.example.com'],
+            origins: ['https://evil.example.com', 'http://tracker.example:8080']
+          }
+        }
+      })
+    )
+    const store = createPreviewAllowlistStore({ getProjectRoot: () => root })
+
+    // The load half of the guarantee: nothing is approved, write-back is off.
+    const state = await store.load()
+    expect(state.origins).toEqual([])
+    expect(state.writeBackEnabled).toBe(false)
+
+    await expect(store.approveOrigin('https://cdn.jsdelivr.net')).rejects.toMatchObject({
+      code: ErrorCode.PROJECT_SETTINGS_VALIDATION_FAILED
+    })
+
+    // And the file is untouched — still versionless, so it cannot have been
+    // adopted. Reading it back is the point: the old bug's damage was on disk.
+    const settingsPath = join(realRoot, '.erfana', 'settings.json')
+    const parsed = JSON.parse(await readFile(settingsPath, 'utf8'))
+    expect(parsed.htmlPreview.allowlist.version).toBeUndefined()
+    expect(parsed.htmlPreview.allowlist.origins).not.toContain('https://cdn.jsdelivr.net')
+  })
+
+  it('does not resurrect a hand-revoked grant from the legacy hosts key', async () => {
+    // `origins: []` means "deliberately approved nothing". The approve path used
+    // to union both keys unconditionally, so removing an entry from `origins` by
+    // hand was undone by the next approval — and hand-editing is currently the
+    // only revocation there is (#86).
+    await writeSettings(
+      JSON.stringify({
+        htmlPreview: { allowlist: { version: 1, hosts: ['revoked.example.com'], origins: [] } }
+      })
+    )
+    const store = createPreviewAllowlistStore({ getProjectRoot: () => root })
+
+    const origins = await store.approveOrigin('https://cdn.jsdelivr.net')
+
+    expect(origins).toEqual(['https://cdn.jsdelivr.net'])
+    expect(origins).not.toContain('https://revoked.example.com')
+  })
+
+  it('reports a malformed stored origin as a settings error, not an unhandled TypeError', async () => {
+    // `hostOfOrigin` ran `new URL()` over raw strings from inside the ARGUMENT to
+    // the validate-before-write guard, so one bad entry threw `TypeError` before
+    // the guard meant to refuse it. The handler mapped that to UNKNOWN_ERROR, so
+    // every approval in the project failed forever with a bare "Not saved".
+    await writeSettings(
+      JSON.stringify({ htmlPreview: { allowlist: { version: 1, hosts: [], origins: ['not a url'] } } })
+    )
+    const store = createPreviewAllowlistStore({ getProjectRoot: () => root })
+
+    const error = await store.approveOrigin('https://cdn.jsdelivr.net').catch((e: unknown) => e)
+
+    expect(error).toBeInstanceOf(AppError)
+    expect(error).toMatchObject({ code: ErrorCode.PROJECT_SETTINGS_VALIDATION_FAILED })
+  })
+
+  it('refuses a stored origin that is not canonical', async () => {
+    // The schema refines `parsePreviewOrigin(v) === v`, so an upper-case host is
+    // reachable-but-not-canonical and fails the whole block rather than being
+    // silently normalised into a grant the user never wrote.
+    await writeSettings(
+      JSON.stringify({
+        htmlPreview: { allowlist: { version: 1, hosts: [], origins: ['https://EXAMPLE.com'] } }
+      })
+    )
+    const store = createPreviewAllowlistStore({ getProjectRoot: () => root })
+
+    await expect(store.approveOrigin('https://cdn.jsdelivr.net')).rejects.toMatchObject({
+      code: ErrorCode.PROJECT_SETTINGS_VALIDATION_FAILED
+    })
+  })
+
+  it('still approves into a project that has no allowlist block at all', async () => {
+    // THE LANDMINE. A fresh project reaches the resolver with `block ===
+    // undefined`, and `PreviewAllowlistSchema.safeParse(undefined)` fails — so a
+    // literal "validate the block or throw" would make the FIRST approval in
+    // every new project impossible. Absent means empty and CONTINUE.
+    await writeSettings(JSON.stringify({ theme: 'dark' }))
+    const store = createPreviewAllowlistStore({ getProjectRoot: () => root })
+
+    const origins = await store.approveOrigin('https://cdn.jsdelivr.net')
+
+    expect(origins).toEqual(['https://cdn.jsdelivr.net'])
+    // The unrelated key above the block survives, which is the file's promise.
+    const settingsPath = join(realRoot, '.erfana', 'settings.json')
+    const parsed = JSON.parse(await readFile(settingsPath, 'utf8'))
+    expect(parsed.theme).toBe('dark')
+  })
+
+  it('refuses to write over a htmlPreview that is not an object', async () => {
+    // Overwriting it is data loss with no notice: this key cannot hold both the
+    // user's value and an allowlist, so the choice is destroy or refuse.
+    await writeSettings(JSON.stringify({ htmlPreview: 'oops' }))
+    const store = createPreviewAllowlistStore({ getProjectRoot: () => root })
+
+    await expect(store.approveOrigin('https://cdn.jsdelivr.net')).rejects.toMatchObject({
+      code: ErrorCode.PROJECT_SETTINGS_VALIDATION_FAILED
+    })
+
+    const settingsPath = join(realRoot, '.erfana', 'settings.json')
+    const parsed = JSON.parse(await readFile(settingsPath, 'utf8'))
+    expect(parsed.htmlPreview).toBe('oops')
+  })
+
+  it('preserves unknown keys INSIDE the allowlist block across a write', async () => {
+    // The file header promises unknown keys survive a round trip. That held only
+    // for keys ABOVE `allowlist`; the block itself was replaced wholesale. This
+    // schema deliberately never bumps its version, so a build that does not know
+    // a key must preserve it rather than delete it.
+    await writeSettings(
+      JSON.stringify({
+        htmlPreview: {
+          allowlist: { version: 1, hosts: [], origins: [], futureKey: { kept: true } }
+        }
+      })
+    )
+    const store = createPreviewAllowlistStore({ getProjectRoot: () => root })
+
+    await store.approveOrigin('https://cdn.jsdelivr.net')
+
+    const settingsPath = join(realRoot, '.erfana', 'settings.json')
+    const parsed = JSON.parse(await readFile(settingsPath, 'utf8'))
+    expect(parsed.htmlPreview.allowlist.futureKey).toEqual({ kept: true })
+    expect(parsed.htmlPreview.allowlist.origins).toEqual(['https://cdn.jsdelivr.net'])
+  })
+})
+
+describe('PreviewAllowlistStore.load — origins is the truth', () => {
+  it('reads origins:[] as approving nothing, never falling back to hosts', async () => {
+    // Precedence is KEY PRESENT, not array non-empty. Until now this was proven
+    // only by a docblock: a regression to `origins?.length ? … : hosts` would
+    // resurrect every revoked grant and the suite would stay green.
+    await writeSettings(
+      JSON.stringify({
+        htmlPreview: { allowlist: { version: 1, hosts: ['revoked.example.com'], origins: [] } }
+      })
+    )
+    const store = createPreviewAllowlistStore({ getProjectRoot: () => root })
+
+    const state = await store.load()
+
+    expect(state.origins).toEqual([])
+    expect(state.writeBackEnabled).toBe(true)
+  })
+
+  it('loads a stored origin carrying a non-default port from disk', async () => {
+    // Written-then-re-read inside approveOrigin is not the same guarantee as
+    // read from a file this process did not write.
+    await writeSettings(
+      JSON.stringify({
+        htmlPreview: {
+          allowlist: { version: 1, hosts: [], origins: ['https://example.com:8443'] }
+        }
+      })
+    )
+    const store = createPreviewAllowlistStore({ getProjectRoot: () => root })
+
+    const state = await store.load()
+
+    expect(state.origins).toEqual(['https://example.com:8443'])
+  })
+})

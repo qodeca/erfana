@@ -286,6 +286,12 @@ export function approveFailureText(errorCode: ErrorCode): string {
       // approved", because the reader DID something and it did not take — that
       // is a different message from a row that never offered a button.
       return 'Not saved — not allowed'
+    case ErrorCode.PROJECT_SETTINGS_VALIDATION_FAILED:
+      // The project's settings file is malformed, so the write was refused
+      // rather than allowed to destroy what is there. Naming the file matters:
+      // this is the one approval failure the reader can actually fix, and
+      // without it every retry reports a bare "Not saved" forever.
+      return 'Not saved — check settings'
     default:
       return 'Not saved'
   }
