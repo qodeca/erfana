@@ -25,7 +25,6 @@ import type { GlobalSettings } from '../../../shared/ipc/global-settings-schema'
 import { createPreviewRootRegistry } from '../../services/preview/PreviewRootRegistry'
 import { createPreviewAllowlistStore } from '../../services/preview/PreviewAllowlistStore'
 import { createPreviewSessionFactory } from '../../services/preview/PreviewSessionFactory'
-import { createPreviewHostBlockNotifier } from '../../services/preview/PreviewHostBlockNotifier'
 import { createPreviewStillFrameCache } from '../../services/preview/PreviewStillFrameCache'
 import { createPreviewExportController } from '../../services/preview/PreviewExportController'
 import { createGitignoreEvaluator } from '../../services/preview/GitignoreEvaluator'
@@ -221,7 +220,6 @@ export function buildPreviewGraph(deps: BuildPreviewGraphDeps): PreviewGraph {
     allowlistStore,
     previewPagePreloadPath: resolvePreviewPagePreload()
   })
-  const hostBlockNotifier = createPreviewHostBlockNotifier()
   const stillFrameCache = createPreviewStillFrameCache()
   const exportController = createPreviewExportController()
   const gitignore = createGitignoreEvaluator()
@@ -236,7 +234,7 @@ export function buildPreviewGraph(deps: BuildPreviewGraphDeps): PreviewGraph {
       // Bridge the narrow structural session type to electron's own `Session`.
       purge: (session) => purgePreviewSession(session as unknown as Session)
     },
-    hostBlockNotifier,
+    getAllowedHosts: () => [...allowlistStore.getHosts()],
     emit: emitters,
     createWatchCoordinator: (realRoot, onChanged) =>
       createPreviewWatchCoordinator({

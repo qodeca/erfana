@@ -41,7 +41,6 @@ import type {
 import type { IPreviewRootRegistry } from './PreviewRootRegistry'
 import type { IPreviewStillFrameCache } from './PreviewStillFrameCache'
 import type { IPreviewExportController } from './PreviewExportController'
-import type { IPreviewHostBlockNotifier } from './PreviewHostBlockNotifier'
 import type { IPreviewWatchCoordinator } from './PreviewWatchCoordinator'
 import type { IPreviewReloadPolicy, ReloadDecision } from './PreviewReloadPolicy'
 import type {
@@ -118,7 +117,7 @@ export interface PreviewFindExportService {
  * because each binds to per-view data absent at service-construction time (a
  * coordinator to the new project's realRoot, a find controller to the new view's
  * webContents). The built modules ARE such factories, so this is the natural
- * wiring. `registry`, `getProjectPath` and `hostBlockNotifier` are added because
+ * wiring. `registry`, `getProjectPath` and `getAllowedHosts` are added because
  * §5(c)/§5(f)/§5(c-block) route through them and §4.4 omitted them.
  */
 export interface PreviewViewDeps {
@@ -127,7 +126,16 @@ export interface PreviewViewDeps {
   readonly stillFrameCache: IPreviewStillFrameCache
   readonly exportController: IPreviewExportController
   readonly storageSeal: { purge(session: PreviewSessionLike): Promise<void> }
-  readonly hostBlockNotifier: IPreviewHostBlockNotifier
+  /**
+   * The project's approved hosts, read main-side.
+   *
+   * A narrow reader rather than the whole allowlist store: this service only
+   * needs to TELL the renderer what is approved, and handing it `approveHost`
+   * would put the write path within reach of code that has no business writing.
+   * Correct at install time because `PreviewSessionFactory.create` awaits
+   * `allowlistStore.load()` as its very first step.
+   */
+  readonly getAllowedHosts: () => readonly string[]
   readonly emit: PreviewEmitters
   readonly createWatchCoordinator: (
     realRoot: string,
@@ -167,6 +175,14 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
    * tab returns, so a level held on the view would reset every time the reader
    * looked away.
    */
+  /**
+   * Per-panel record of what each blocked host was refused for.
+   *
+   * Lives here rather than in `open()`'s closure only so `applyApprovedHosts`
+   * can clear it across a reload. Entries are dropped with their panel.
+   */
+  private readonly blockedKindsByPanel = new Map<string, Map<string, PreviewBlockedKind[]>>()
+
   private readonly zoomLevels = new Map<string, number>()
   private readonly liveViewDeps: PreviewLiveViewDeps
 
@@ -179,7 +195,6 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
       exportController: deps.exportController,
       registry: deps.registry,
       storageSeal: deps.storageSeal,
-      hostBlockNotifier: deps.hostBlockNotifier,
       createWatchCoordinator: deps.createWatchCoordinator,
       createReloadPolicy: deps.createReloadPolicy,
       createFindController: deps.createFindController,
@@ -221,7 +236,6 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
       // teardown cannot strand the entry.
       this.registry.remove(panelId)
       await existing.view.teardown('immediate')
-      this.releaseProjectIfLast(existing.view.projectPath)
       if (this.registry.isStale(claim)) {
         return { ok: false, errorCode: ErrorCode.PREVIEW_OPEN_SUPERSEDED }
       }
@@ -231,10 +245,16 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
       this.deps.emit.failuresChanged(panelId, failures, truncated)
     )
 
-    // What each host has been refused FOR, accumulated for the life of this
-    // view. One host is commonly refused for several things, and reporting only
-    // the first would label a host that will run scripts as "font".
+    // What each host has been refused FOR. One host is commonly refused for
+    // several things, and reporting only the first would label a host that will
+    // run scripts as "font".
+    //
+    // Held on the SERVICE, keyed by panel, not in this closure — because
+    // `applyApprovedHosts` has to be able to clear it. See the comment there:
+    // an approval reloads the page, the page is refused all over again, and a
+    // dedupe map that outlived the reload would swallow every remaining host.
     const kindsByHost = new Map<string, PreviewBlockedKind[]>()
+    this.blockedKindsByPanel.set(panelId, kindsByHost)
 
     const onBlocked = (
       kind: PreviewFailureType,
@@ -250,24 +270,34 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
       // "first sighting" branch to write here. One used to exist and was
       // unreachable.
       const merged = mergeBlockedKinds(kindsByHost.get(host) ?? [], resourceKind)
-      if (merged !== null) {
-        kindsByHost.set(host, merged)
+
+      // NOTHING NEW TO SAY. The failure log above already recorded the event, so
+      // this is only about the renderer's host list, and that list has not
+      // changed. Without this return a page pulling forty assets from one host
+      // sent forty identical messages — `PreviewRequestFilter` calls back per
+      // blocked REQUEST and de-duplicates nothing — which is the flood the
+      // design's coalescing rule exists to prevent. `failuresChanged` obeyed
+      // that rule; this channel never did.
+      if (merged === null) return
+
+      // THE BOUND. Distinct hosts per view, capped. The three-toast budget that
+      // used to sit here bounded TOASTS, not this list, so once the emit became
+      // unconditional there was no bound at all. A host past the cap is not
+      // listed and therefore not approvable — which is the same one-way door the
+      // old cap had, except this one is stated, matches the CSP path's own
+      // MAX_HOSTS_PER_VIEW, and the renderer is told the list is truncated
+      // instead of silently showing a short one.
+      if (!kindsByHost.has(host) && kindsByHost.size >= PREVIEW.MAX_BLOCKED_HOSTS_PER_VIEW) {
+        return
       }
 
-      // EMIT UNCONDITIONALLY. This used to fire only when the toast budget
-      // allowed, which meant the budget silently gated the DATA and not just the
-      // interruption: past three hosts the renderer was never told a host had
-      // been blocked, so it could not list it and the reader had no way to
-      // approve it. `notify` carries the budget verdict instead, and the
-      // renderer decides whether to interrupt.
-      const notify =
-        approvable && this.deps.hostBlockNotifier.shouldNotify(projectPath, host)
+      kindsByHost.set(host, merged)
       this.deps.emit.hostBlocked(
         panelId,
         host,
         approvable,
-        kindsByHost.get(host) ?? [resourceKind],
-        notify
+        merged,
+        kindsByHost.size >= PREVIEW.MAX_BLOCKED_HOSTS_PER_VIEW
       )
     }
 
@@ -325,6 +355,20 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
     }
 
     this.registry.install(panelId, live, window.id)
+
+    // Seed the renderer with what this project has ALREADY approved.
+    //
+    // Without this the band can only ever show hosts blocked in this session, so
+    // a project whose allowlist was filled yesterday — or one that arrived with a
+    // cloned repository, already carrying approvals nobody in this room made —
+    // shows "0 allowed" and looks untouched. `docs/security.md` residual risk 5
+    // concedes that clone case; this is the first thing anywhere that surfaces it.
+    //
+    // Safe against subscribe ordering for the same reason `loadStateChanged` is:
+    // `preview:open` is an `invoke`, so main cannot reply before the renderer's
+    // mount commit has run its effects, and the band subscribes in that commit.
+    this.deps.emit.allowlistChanged(panelId, this.deps.getAllowedHosts())
+
     // Re-apply a zoom the reader set before this panel last slept. Applied
     // BEFORE the load so the first paint is already at the right scale.
     const remembered = this.zoomLevels.get(panelId)
@@ -344,7 +388,6 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
         this.registry.remove(panelId)
       }
       await live.teardown('immediate')
-      this.releaseProjectIfLast(projectPath)
       return { ok: false, errorCode: ErrorCode.PREVIEW_OPEN_SUPERSEDED }
     }
 
@@ -376,6 +419,11 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
     // and reports `{ ok: true }` for a panel that no longer has a view (lens
     // review F8).
     this.registry.invalidateOpen(panelId)
+    // Drop the panel's blocked-host ledger with the panel. `open()` replaces it
+    // anyway, so this only matters for a panel that is closed and never
+    // reopened — but a map that only ever grows is the kind of leak nobody
+    // notices until a long session.
+    this.blockedKindsByPanel.delete(panelId)
 
     const view = this.registry.remove(panelId)
     if (view === null) {
@@ -401,7 +449,6 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
       // Nothing actionable: the view is being destroyed on the next line.
     }
     await view.teardown('immediate')
-    this.releaseProjectIfLast(view.projectPath)
     this.deps.emit.loadStateChanged(panelId, 'suspended', 0)
   }
 
@@ -431,7 +478,6 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
     const live = this.registry.remove(panelId)
     if (live !== null) {
       await live.teardown('bounded')
-      this.releaseProjectIfLast(live.projectPath)
     }
   }
 
@@ -512,9 +558,42 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
       return
     }
     const targets = this.registry.ofProject(entry.view.projectPath)
+
+    /*
+     * Clear the per-host dedupe BEFORE the reload, for every affected view.
+     *
+     * This is the same defect `cspViolationBridge.reset()` exists for, one layer
+     * up. An approval reloads the page, the CSP refuses the still-unapproved
+     * hosts all over again — and a dedupe map that survived the reload would
+     * swallow every one of them as "already seen", while the failure log they
+     * would have appeared in has just been emptied. Approving one host would
+     * make every other blocked host vanish from the band and become
+     * unapprovable, recoverable only by closing and reopening the panel.
+     *
+     * The network filter cannot compensate: the whole premise of the CSP bridge
+     * is that a refusal in the renderer never reaches `onBeforeRequest`.
+     */
+    for (const target of targets) {
+      this.blockedKindsByPanel.get(target.view.panelId)?.clear()
+    }
     // `allSettled` over a snapshot: one view failing (or being torn down
     // mid-flight) must not stop the others from getting the rebuilt CSP.
     await Promise.allSettled(targets.map((target) => target.view.applyApprovedHosts(hosts)))
+
+    // Tell EVERY view of this project, including one whose rebuild rejected: the
+    // allowlist genuinely did change for the project, and a view that failed to
+    // rebuild is defunct anyway. This is how a second panel learns of an approval
+    // made in the first.
+    //
+    // Known gap, deliberately not closed here: the early return above means that
+    // if the approving panel closes between Confirm and this handler, no sibling
+    // is told. It self-heals on the sibling's next open. The fix is NOT to accept
+    // a project path from the renderer — `allowlist-handlers.ts` resolves the root
+    // main-side on purpose, and widening that would hand an untrusted caller the
+    // choice of which project it is approving for.
+    for (const target of targets) {
+      this.deps.emit.allowlistChanged(target.view.panelId, hosts)
+    }
   }
 
   async destroyAll(_reason: string): Promise<void> {
@@ -545,11 +624,7 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
     for (const entry of entries) {
       this.registry.invalidateOpen(entry.view.panelId)
     }
-    const projects = new Set(entries.map((entry) => entry.view.projectPath))
     await Promise.allSettled(entries.map((entry) => entry.view.teardown('immediate')))
-    for (const projectPath of projects) {
-      this.releaseProjectIfLast(projectPath)
-    }
   }
 
   async onProjectChanged(_oldPath: string | null, _newPath: string | null): Promise<void> {
@@ -586,11 +661,6 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
    * to tear down first, which wiped a sibling preview's dedupe state and let an
    * already-suppressed host toast again (sd-074b §4.5).
    */
-  private releaseProjectIfLast(projectPath: string): void {
-    if (this.registry.countForProject(projectPath) === 0) {
-      this.deps.hostBlockNotifier.clear(projectPath)
-    }
-  }
 
   private async teardownAll(): Promise<void> {
     // Invalidate every in-flight open FIRST: one may be mid-`create` with
@@ -598,11 +668,7 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
     // down.
     this.registry.bumpGeneration()
     const entries = this.registry.drain()
-    const projects = new Set(entries.map((entry) => entry.view.projectPath))
     await Promise.allSettled(entries.map((entry) => entry.view.teardown('immediate')))
-    for (const projectPath of projects) {
-      this.releaseProjectIfLast(projectPath)
-    }
   }
 }
 

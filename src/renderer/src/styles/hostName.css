@@ -1,0 +1,104 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * The hostname primitive — `.erf-host`.
+ *
+ * SOURCE OF TRUTH. scripts/design-sync.mjs copies this file to
+ * design/system/components/row/host.css so the Rows and Permission band cards
+ * render what actually ships, and `npm run design -- --check` fails CI on drift.
+ * Edit this copy; never the one under design/.
+ *
+ * Split out of the Rows card's row.css rather than moving that file whole: the
+ * `.erf-row*` half is a consolidation of five divergent implementations already
+ * in src/ (ProjectTree, three pickers, AppDockLayout) and is a separate job.
+ * This half has no incumbent — today a host reaches the user interpolated raw
+ * into a toast string, with no eliding control at all.
+ *
+ * Class stays `erf-`-prefixed. Not cosmetic: Mermaid emits class="row" on
+ * gitGraph commit labels and the app injects that SVG with innerHTML, so the
+ * whole namespace is quarantined behind the prefix.
+ */
+
+/* ---------- host ---------- */
+
+/*
+ * A host must never lose its TAIL. The registrable domain decides whether it is
+ * safe, so it is the part that has to survive: "…cdn.evil.com" is readable;
+ * "cdn.jsdelivr…" is a trap.
+ *
+ * SO NOTHING IS CUT AT ALL. A host that does not fit WRAPS. Wrapping delivers
+ * the property by removing the mechanism that could violate it — there is no
+ * truncation, so there is no truncated end — and it needs to know nothing about
+ * the host's structure.
+ *
+ * Two earlier designs, both recorded because both will be re-proposed.
+ *
+ * 1. One element, `direction: rtl; unicode-bidi: plaintext`. Wrong in a way that
+ *    mattered. `plaintext` DISCARDS the `direction` value and derives the base
+ *    direction from the content (bidi P2/P3); a hostname starts with a Latin
+ *    letter, so the paragraph came out left-to-right and the elide moved back to
+ *    the tail. The rule delivered the exact trap its own comment said it
+ *    prevented. Three near-miss repairs, all rejected:
+ *      - Drop `plaintext` alone → the element becomes a real RTL paragraph, so an
+ *        IDN with an RTL-script label, a port, or a trailing dot renders with its
+ *        labels REORDERED. Legible and wrong is worse than a misplaced ellipsis.
+ *      - Wrap in `direction: ltr` → puts the end edge back on the right. Trap returns.
+ *      - `<bdi>` alone → bidi P2 skips characters inside an isolate, so P3 defaults
+ *        to LTR. Tail-elide again.
+ *    And the deeper problem: under `plaintext` the elide direction is chosen by
+ *    the attacker's string. A control that behaves differently depending on its
+ *    input is not a control.
+ *
+ * 2. A three-element flex front-elide — prefix shrinks and elides, registrable
+ *    domain refuses to shrink. The bidi objection does not apply to it, and the
+ *    layout worked. It is rejected for a different reason: it has to be told
+ *    where the registrable domain begins, and that boundary is only knowable
+ *    from the Public Suffix List. "Last two labels" is wrong for
+ *    `example.co.uk`, and a front-elide cutting at the WRONG boundary puts the
+ *    invariant in the wrong place — worse than having no invariant, because it
+ *    looks like one. Erfana carries no PSL, and taking on a network-updated
+ *    table to shorten a label is not a trade this band needs to make.
+ *
+ * If a PSL ever arrives for another reason, revisit: one-line rows read better
+ * than wrapped ones, and design 2 becomes available again the day the boundary
+ * is knowable.
+ *
+ *   <span class="erf-host" dir="ltr" aria-label="cdn.evil.com">
+ *     a-very-long-subdomain.<wbr>cdn.<wbr>evil.com
+ *   </span>
+ *
+ * The `<wbr>` after each dot is the component's job, not CSS's: it makes label
+ * boundaries the preferred break points, so a wrapped host breaks at a dot
+ * whenever one fits and only splits a label when a single label is itself too
+ * long for the row.
+ *
+ * Two things CSS cannot decide, which the card states in prose:
+ *   - IDN policy. This defends against truncation, not against `аpple.com` with
+ *     a Cyrillic а. Render the punycode A-label when the U-label mixes scripts.
+ *   - The accessible name carries the FULL host on one element. `title` is
+ *     unreachable by keyboard and by touch, so it is not a substitute for
+ *     aria-label — and the `<wbr>`s must not reach the accessible name.
+ */
+
+/*
+ * `overflow-wrap: anywhere` rather than `break-word`: only `anywhere` reduces the
+ * element's min-content size, which is what lets the host actually shrink inside
+ * a grid or flex row. With `break-word` the longest label still dominates
+ * min-content, the column refuses to narrow, and the row overflows instead of
+ * wrapping — safe, and useless, the same failure the old `min-width: min-content`
+ * attempt had.
+ *
+ * NEVER add `overflow: hidden`, `text-overflow: ellipsis` or `white-space: nowrap`
+ * here. Each one reintroduces a cut end, which is the whole thing this element
+ * exists to prevent.
+ */
+.erf-host {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  direction: ltr;
+  unicode-bidi: isolate;   /* the host never reorders against the row around it */
+  overflow-wrap: anywhere;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}

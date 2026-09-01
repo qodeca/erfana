@@ -78,6 +78,19 @@
     "match": "z-index:\\s*[0-9]",
     "unit": "files"
   },
+  "zindex-js-literals": {
+    "kind": "count",
+    "card": "system/foundations/layering.html",
+    "label": "renderer files mirroring a z-index into TypeScript",
+    "dir": "src/renderer",
+    "ext": [
+      ".ts",
+      ".tsx"
+    ],
+    "excludePath": "\\.test\\.",
+    "match": "[Zz]_?[Ii][Nn][Dd][Ee][Xx]\\s*[:=]\\s*\\{?\\s*-?[0-9]",
+    "unit": "files"
+  },
   "colour-tokens": {
     "kind": "count",
     "card": "system/foundations/colors.html",

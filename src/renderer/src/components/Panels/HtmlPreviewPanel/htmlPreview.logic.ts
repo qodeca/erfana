@@ -266,3 +266,43 @@ export function summarizeFailures(failures: readonly PreviewFailure[]): FailureS
     blockedHosts
   }
 }
+
+/**
+ * How long the previewed page gets to prove it repainted below newly revealed
+ * chrome, in milliseconds.
+ *
+ * Measured on Electron 39 and recorded in `PreviewSetBoundsSchema`: ~17 ms for
+ * an idle page, ~130 ms for a heavy one, and NEVER for a page that refuses to
+ * yield. 300 clears the heavy case with room to spare while staying short enough
+ * that a stuck page does not leave the reader looking at nothing for long.
+ */
+export const PREVIEW_BOUNDS_ACK_TIMEOUT_MS = 300
+
+/**
+ * Below this panel height, the page and an open host list cannot share the space.
+ *
+ * A 64px sliver of page is not a preview, and splitting the panel anyway would
+ * put the list's buttons within a few pixels of an untrusted page's edge.
+ */
+export const PREVIEW_MIN_SPLIT_HEIGHT_PX = 320
+
+/**
+ * Release height for the same rule.
+ *
+ * Hysteresis, not a second opinion: releasing at the same 320 would re-arm a
+ * whole proof cycle on every frame of a drag that hovers on the boundary.
+ */
+export const PREVIEW_MIN_SPLIT_RELEASE_PX = 352
+
+/**
+ * Whether a bounds push has to be proved before Erfana draws controls in it.
+ *
+ * Only GROWTH needs proof. Shrinking is free: the page's stale texture is
+ * strictly inside space it is still allowed to occupy, so nothing Erfana draws
+ * can end up underneath it. That asymmetry is why a window resize, a backdrop
+ * change and the band collapsing never trip the fail-safe, and only the band
+ * opening does.
+ */
+export function needsBoundsAck(topInset: number, provenInset: number): boolean {
+  return topInset > provenInset
+}

@@ -527,8 +527,19 @@ export const PREVIEW = {
   CLOSE_TIMEOUT_MS: 1000,
   /** CSS swap race timeout; any non-`true` outcome falls back to reload (ms) */
   SWAP_TIMEOUT_MS: 1000,
-  /** Max host-block toasts surfaced per project before suppression */
-  MAX_HOST_TOASTS: 3,
+  /**
+   * Max DISTINCT blocked hosts reported to the renderer per view.
+   *
+   * This replaced `MAX_HOST_TOASTS: 3`, which bounded toasts and not the list —
+   * so when the emit became unconditional the list had no bound at all:
+   * `PreviewRequestFilter` calls `onBlocked` per blocked REQUEST, with no
+   * per-host de-duplication of its own.
+   *
+   * 50 matches `MAX_HOSTS_PER_VIEW` in `previewCspViolationBridge.ts`, which
+   * bounds the other of the two paths that feed this. Keep the two equal: a page
+   * should not be able to report more hosts through one path than the other.
+   */
+  MAX_BLOCKED_HOSTS_PER_VIEW: 50,
   /** At most one full post-load pipeline per this interval (ms) */
   RELOAD_MIN_INTERVAL_MS: 750,
   /** Still-frame downscale: longest edge in px before toDataURL */

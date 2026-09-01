@@ -9,6 +9,7 @@
  * no real `window.api` or zustand store is touched.
  */
 import { describe, it, expect, vi } from 'vitest'
+import type { PreviewChromeGateReason } from '../../stores/usePreviewChromeGateStore'
 import { createOverlayGuard, type OverlayGuardDeps } from './OverlayGuardService'
 
 /** A mutable fake environment plus the constructed guard. */
@@ -18,11 +19,18 @@ function makeGuard(overrides: Partial<OverlayGuardDeps> = {}): {
   state: { occluded: boolean; livePanelId: string | null }
   fireOccluded: () => void
   firePreview: () => void
+  fireGate: () => void
 } {
-  const state = { occluded: false, livePanelIds: ['preview-1'] as readonly string[] }
+  const state = {
+    occluded: false,
+    livePanelIds: ['preview-1'] as readonly string[],
+    /** Per-panel gate reasons. Absent means the page may be shown. */
+    gates: new Map<string, PreviewChromeGateReason>()
+  }
   const setVisibility = vi.fn()
   let occludedListener: () => void = () => {}
   let previewListener: () => void = () => {}
+  let gateListener: () => void = () => {}
 
   const deps: OverlayGuardDeps = {
     isOccluded: () => state.occluded,
@@ -35,6 +43,11 @@ function makeGuard(overrides: Partial<OverlayGuardDeps> = {}): {
       previewListener = l
       return () => {}
     },
+    getPanelGate: (panelId) => state.gates.get(panelId) ?? null,
+    subscribeGate: (l) => {
+      gateListener = l
+      return () => {}
+    },
     setVisibility,
     ...overrides
   }
@@ -45,7 +58,8 @@ function makeGuard(overrides: Partial<OverlayGuardDeps> = {}): {
     setVisibility,
     state,
     fireOccluded: () => occludedListener(),
-    firePreview: () => previewListener()
+    firePreview: () => previewListener(),
+    fireGate: () => gateListener()
   }
 }
 
@@ -134,15 +148,45 @@ describe('OverlayGuardService (item 69)', () => {
   it('detaches its store subscriptions on dispose', () => {
     const unsubOccluded = vi.fn()
     const unsubPreview = vi.fn()
+    const unsubGate = vi.fn()
     const { guard } = makeGuard({
       subscribeOccluded: () => unsubOccluded,
-      subscribePreview: () => unsubPreview
+      subscribePreview: () => unsubPreview,
+      subscribeGate: () => unsubGate
     })
 
     guard.dispose()
 
     expect(unsubOccluded).toHaveBeenCalledTimes(1)
     expect(unsubPreview).toHaveBeenCalledTimes(1)
+    expect(unsubGate).toHaveBeenCalledTimes(1)
+  })
+
+  it('hides ONLY the gated panel, not its sibling in a split view', () => {
+    // The reason this gate is per-panel state and not the global occluder store.
+    // A permission band waiting for one page to prove it moved must not blank a
+    // second preview that has nothing to do with it.
+    const { guard, setVisibility, state, fireGate } = makeGuard()
+    state.livePanelIds = ['preview-1', 'preview-2']
+    guard.sync('preview-1')
+    setVisibility.mockClear()
+
+    state.gates.set('preview-1', 'unconfirmed')
+    fireGate()
+
+    expect(setVisibility).toHaveBeenCalledTimes(1)
+    expect(setVisibility).toHaveBeenCalledWith('preview-1', false, 'chrome-unconfirmed')
+  })
+
+  it('names the too-short fail-safe distinctly from occlusion', () => {
+    const { guard, setVisibility, state, fireGate } = makeGuard()
+    guard.sync('preview-1')
+    setVisibility.mockClear()
+
+    state.gates.set('preview-1', 'too-short')
+    fireGate()
+
+    expect(setVisibility).toHaveBeenCalledWith('preview-1', false, 'chrome-too-short')
   })
 })
 

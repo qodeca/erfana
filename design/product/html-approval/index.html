@@ -53,7 +53,7 @@
 </p>
 
 <div class="ds-note">
-  <strong>What this replaces.</strong> Today each blocked host raises its own pop-up, capped at three.
+  <strong>What this replaces.</strong> Each blocked host used to raise its own pop-up, capped at three.
   A page reaching four hosts produces three stacked walls of identical text over your file tree — and
   the fourth host cannot be approved at all, because the app ran out of pop-ups. That cap was the only
   thing bounding the list, so it was load-bearing by accident.
@@ -223,9 +223,9 @@ function band(step) {
       </div></div>`);
   } else if (step.allowedOnly) {
     rows.push(section('Allowed in this project'));
-    for (const [h, k] of [['fonts.googleapis.com','style'],['cdn.jsdelivr.net','script'],
-                          ['cdnjs.cloudflare.com','script'],['placehold.co','image']])
-      rows.push(row(h, k, 'allowed'));
+    for (const h of ['fonts.googleapis.com', 'cdn.jsdelivr.net',
+                     'cdnjs.cloudflare.com', 'placehold.co'])
+      rows.push(row(h, '', 'allowed'));
   } else {
     const blocked = [['fonts.googleapis.com','style'],['cdn.jsdelivr.net','script'],
                      ['cdnjs.cloudflare.com','script'],['placehold.co','image']]
@@ -237,7 +237,7 @@ function band(step) {
     }
     if (step.approved) {
       rows.push(section('Allowed in this project'));
-      rows.push(row(step.approved, 'image', 'allowed'));
+      rows.push(row(step.approved, '', 'allowed'));
     }
   }
 
@@ -258,16 +258,28 @@ function band(step) {
 
 const section = (t) => `<div class="erf-band__section">${t}</div>`;
 
+/* `.erf-host` from ../../system/components/row/row.css — the real primitive, one
+   definition. These rows used to carry a `.erf-band__host` class that exists in
+   no stylesheet, so they had no host treatment at all; the card was drawing a
+   control it did not have. The <wbr>s make label boundaries the preferred break
+   points, and the accessible name carries the raw host. */
+function hostCell(host) {
+  const label = host.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  return `<span class="erf-host" dir="ltr" aria-label="${label}">${label.replace(/\./g, '.<wbr>')}</span>`;
+}
+
 function row(host, kind, state) {
   const right =
-    state === 'allow'   ? '<button class="erf-band__allow">Allow</button>'
-  : state === 'allowed' ? '<span class="erf-band__state">Allowed ✓</span>'
-  : `<button class="erf-band__allow">Allow</button>`;
+    state === 'allowed' ? '<span class="erf-band__state">Allowed ✓</span>'
+  : `<button class="erf-band__allow" aria-label="Allow ${host}">Allow</button>`;
+  // An allowed row's middle cell is EMPTY on purpose: a kind there reads as a
+  // limit on the grant, and there is no limit. See the Permission band card.
   const mid = state === 'failed'
-    ? '<span class="erf-band__state erf-band__state--failed">Not saved — settings file is read-only</span>'
+    ? '<span class="erf-band__state erf-band__state--failed">Not saved</span>'
+  : state === 'allowed'
+    ? '<span class="erf-band__kind"></span>'
     : `<span class="erf-band__kind">${kind}</span>`;
-  return `<div class="erf-band__row" ${state === 'failed' ? 'style="grid-template-columns: minmax(0,1fr) auto auto"' : ''}>
-    <span class="erf-band__host">${host}</span>${mid}${right}</div>`;
+  return `<div class="erf-band__row">${hostCell(host)}${mid}${right}</div>`;
 }
 
 const host = document.getElementById('flow');

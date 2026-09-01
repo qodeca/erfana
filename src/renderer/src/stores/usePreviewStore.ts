@@ -79,6 +79,26 @@ export interface PreviewPanelState {
    * panel, which is right: a fresh panel re-discovers on load.
    */
   blockedHosts: PreviewBlockedHost[]
+  /**
+   * Main stopped listing new hosts for this view because it hit its per-view cap.
+   *
+   * The band says so rather than presenting a truncated list as complete: a
+   * permission surface that quietly omits a host is worse than one that admits
+   * it cannot show them all.
+   */
+  blockedHostsTruncated: boolean
+  /**
+   * Hosts approved for this panel's PROJECT, mirrored from main.
+   *
+   * Per panel although the fact is per project: this store has no notion of a
+   * project, and `PreviewViewService.applyApprovedHosts` already fans an approval
+   * out to every live view of the project, so two panels in one project are kept
+   * in step by main rather than by a shared slice here.
+   *
+   * REPLACE semantics — the on-disk allowlist is the record, so an event carries
+   * the whole set rather than a delta.
+   */
+  allowedHosts: readonly string[]
 }
 
 /** One remote host the preview was refused, and what it wanted. */
@@ -94,6 +114,8 @@ export interface PreviewBlockedHost {
 const DEFAULT_PANEL_STATE: PreviewPanelState = {
   loadState: 'idle',
   blockedHosts: [],
+  blockedHostsTruncated: false,
+  allowedHosts: [],
   dropped: 0,
   failures: [],
   truncated: false,
@@ -187,6 +209,14 @@ export interface PreviewStoreState {
    * font host produces one entry.
    */
   recordBlockedHost: (panelId: string, entry: PreviewBlockedHost) => void
+  /** Main hit its per-view cap; the list this panel shows is incomplete. */
+  markBlockedHostsTruncated: (panelId: string) => void
+  /**
+   * Mirror the project's approved-host set. Replaces, never merges.
+   * @param panelId - Panel to update.
+   * @param hosts - The whole allowlist as main knows it.
+   */
+  setAllowedHosts: (panelId: string, hosts: readonly string[]) => void
   /**
    * Clears a panel's still frame so it falls back to the placeholder colour.
    * @param panelId - Panel to update.
@@ -262,6 +292,21 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
     set((state) => ({
       panels: withPanel(state.panels, panelId, { backdrop: color })
     })),
+  markBlockedHostsTruncated: (panelId) =>
+    set((state) => {
+      if (state.panels.get(panelId)?.blockedHostsTruncated === true) return state
+      return { panels: withPanel(state.panels, panelId, { blockedHostsTruncated: true }) }
+    }),
+  setAllowedHosts: (panelId, hosts) =>
+    set((state) => {
+      const current = state.panels.get(panelId)?.allowedHosts ?? []
+      // Same-value writes must not notify: the band re-renders on every store
+      // write, and main re-seeds this on every open.
+      if (current.length === hosts.length && current.every((h, i) => h === hosts[i])) {
+        return state
+      }
+      return { panels: withPanel(state.panels, panelId, { allowedHosts: [...hosts] }) }
+    }),
   recordBlockedHost: (panelId, entry) =>
     set((state) => {
       const current = state.panels.get(panelId)?.blockedHosts ?? []

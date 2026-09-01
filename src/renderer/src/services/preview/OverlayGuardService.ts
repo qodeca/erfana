@@ -31,6 +31,10 @@
 
 import { useOverlayOccluderStore } from '../../stores/useOverlayOccluderStore'
 import { usePreviewStore } from '../../stores/usePreviewStore'
+import {
+  usePreviewChromeGateStore,
+  type PreviewChromeGateReason
+} from '../../stores/usePreviewChromeGateStore'
 import { logger } from '../../utils/logger'
 
 /**
@@ -47,7 +51,11 @@ const VISIBILITY_REASON = {
   /** Hidden because an overlay (dialog/toast/menu/…) is on screen. */
   occluded: 'occluded',
   /** Hidden because another tab is active. */
-  inactiveTab: 'inactive-tab'
+  inactiveTab: 'inactive-tab',
+  /** Hidden because the page did not prove it moved out of Erfana's chrome. */
+  chromeUnconfirmed: 'chrome-unconfirmed',
+  /** Hidden because the panel is too short to share with an open host list. */
+  chromeTooShort: 'chrome-too-short'
 } as const
 
 /**
@@ -63,6 +71,16 @@ export interface OverlayGuardDeps {
    * Reads the *live* occluder counts (synchronous), matching the store getter.
    */
   isOccluded: () => boolean
+  /**
+   * Why one panel's page must stay hidden, or null.
+   *
+   * REQUIRED, not optional. An optional dep defaulting to "never gated" fails
+   * OPEN — the page stays visible over a permission prompt — and this is the one
+   * input where the safe default is the restrictive one.
+   */
+  getPanelGate: (panelId: string) => PreviewChromeGateReason | null
+  /** Notify on gate changes, so the guard recomputes. Returns an unsubscribe. */
+  subscribeGate: (listener: () => void) => () => void
   /**
    * Subscribe to occluder-count changes.
    * @param listener - Called (no args) after any occluder count changes.
@@ -147,6 +165,7 @@ class OverlayGuardService implements IOverlayGuard {
     // (tab activation), which neither store observes.
     this.unsubscribers.push(deps.subscribeOccluded(() => this.recompute()))
     this.unsubscribers.push(deps.subscribePreview(() => this.recompute()))
+    this.unsubscribers.push(deps.subscribeGate(() => this.recompute()))
   }
 
   sync(activeTabId: string | null): void {
@@ -184,17 +203,28 @@ class OverlayGuardService implements IOverlayGuard {
     let visibleCount = 0
 
     for (const panelId of livePanelIds) {
-      const visible = this.activeTabId === panelId && !occluded
+      // The gate is per PANEL: a band waiting on one preview must not blank a
+      // second preview in a split view, which is exactly what routing this
+      // through the global occluder store would have done.
+      const gate = this.deps.getPanelGate(panelId)
+      const visible = this.activeTabId === panelId && !occluded && gate === null
       if (visible) visibleCount += 1
 
       if (this.lastVisible.get(panelId) === visible) continue
 
       this.lastVisible.set(panelId, visible)
+      // Precedence when several apply: an inactive tab first, because it is the
+      // most basic fact; then the gate, because it is the only one with a
+      // user-visible explanation attached to it; then occlusion.
       const reason = visible
         ? VISIBILITY_REASON.activeTab
-        : occluded
-          ? VISIBILITY_REASON.occluded
-          : VISIBILITY_REASON.inactiveTab
+        : this.activeTabId !== panelId
+          ? VISIBILITY_REASON.inactiveTab
+          : gate === 'unconfirmed'
+            ? VISIBILITY_REASON.chromeUnconfirmed
+            : gate === 'too-short'
+              ? VISIBILITY_REASON.chromeTooShort
+              : VISIBILITY_REASON.occluded
       this.deps.setVisibility(panelId, visible, reason)
     }
 
@@ -277,6 +307,8 @@ export function getOverlayGuard(): IOverlayGuard {
     subscribeOccluded: (listener) => useOverlayOccluderStore.subscribe(listener),
     getLivePreviewPanelIds: readLivePreviewPanelIds,
     subscribePreview: (listener) => usePreviewStore.subscribe(listener),
+    getPanelGate: (panelId) => usePreviewChromeGateStore.getState().getGate(panelId),
+    subscribeGate: (listener) => usePreviewChromeGateStore.subscribe(listener),
     setVisibility: (panelId, visible, reason) =>
       window.api.preview.setVisibility(panelId, visible, reason)
   })

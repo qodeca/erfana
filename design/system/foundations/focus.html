@@ -131,8 +131,17 @@
 
 <div class="ds-note">
   Erfana currently fails row three in two places: the file tree and the right-click menu have no arrow
-  keys and nothing focusable inside them. The file picker, screen picker and window picker all do it
-  correctly — so the pattern to copy is already in the codebase.
+  keys. The file picker, screen picker and window picker all do it correctly — so the pattern to copy
+  is already in the codebase.
+  <br><br>
+  <strong>The tree fails it in the more hostile direction.</strong> This note used to say "nothing
+  focusable inside them", which is wrong about the tree:
+  <code>ProjectTreeNode.tsx</code> spreads dnd-kit's drag attributes onto every row, and
+  <code>useDraggable</code> defaults to <code>tabIndex: 0</code> plus a role. So every row is a tab
+  stop, announcing as a button, responding to no key — 400 files, 400 dead stops. A tree nothing can
+  focus is skipped by Tab and quickly understood; a tree where every row stops you and none answers is
+  a wall. It also means the roving fix is not additive: dnd-kit's <code>tabIndex</code> has to be
+  overridden first, or the two mechanisms fight over the same attribute.
 </div>
 
 </body>

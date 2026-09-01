@@ -17,7 +17,7 @@ import { z } from 'zod'
 
 import { PREVIEW_BLOCKED_KINDS } from './previewBlockedKind'
 import { ErrorCode } from '../errors'
-import { PreviewHostSchema } from './preview-settings-schema'
+import { MAX_ALLOWLIST_HOSTS, PreviewHostSchema } from './preview-settings-schema'
 import type {
   PdfExportResult,
   PreviewApproveResult,
@@ -126,6 +126,46 @@ export type PreviewSetBounds = z.infer<typeof PreviewSetBoundsSchema>
  * heavy one, and never for a page that refuses to yield, which is why every
  * caller needs a timeout and a safe fallback.
  */
+/**
+ * The project's approved hosts, as main knows them.
+ *
+ * Validated with the SAME `PreviewHostSchema` that gates the WRITE path, so this
+ * emitter is a tripwire on anything the load path let through — `load()` already
+ * fails closed to `[]`, so a valid set is the only thing that should reach here.
+ *
+ * The whole set, never a delta: the on-disk allowlist is the record, and a delta
+ * protocol would need the renderer to hold a correct running copy across a
+ * project switch, a reload and a second panel.
+ */
+/**
+ * A visibility change landed. `visible` is what was APPLIED, not what was asked.
+ *
+ * Sent for the hide path only when the hide actually completed — a hide that was
+ * superseded by a show mid-capture emits nothing, so silence continues to mean
+ * "assume the page is still there", which is the only safe reading.
+ */
+export const PreviewVisibilityAppliedPayloadSchema = z
+  .object({
+    panelId: PanelIdSchema,
+    visible: z.boolean()
+  })
+  .strict()
+
+export type PreviewVisibilityAppliedPayload = z.infer<
+  typeof PreviewVisibilityAppliedPayloadSchema
+>
+
+export const PreviewAllowlistChangedPayloadSchema = z
+  .object({
+    panelId: PanelIdSchema,
+    hosts: z.array(PreviewHostSchema).max(MAX_ALLOWLIST_HOSTS)
+  })
+  .strict()
+
+export type PreviewAllowlistChangedPayload = z.infer<
+  typeof PreviewAllowlistChangedPayloadSchema
+>
+
 export const PreviewBoundsAppliedPayloadSchema = z
   .object({
     panelId: PanelIdSchema,
@@ -192,15 +232,17 @@ export const PreviewHostBlockedPayloadSchema = z
      */
     kinds: z.array(z.enum(PREVIEW_BLOCKED_KINDS)).min(1).max(PREVIEW_BLOCKED_KINDS.length),
     /**
-     * Whether this warrants interrupting the reader with a toast.
+     * This view has reached its distinct-host cap; further hosts are not reported.
      *
-     * A HINT, not a gate. This event used to be emitted ONLY when the toast
-     * budget allowed, which meant the budget silently gated the DATA: past
-     * three hosts the renderer was never told a host had been blocked at all,
-     * so it could not list it and the reader could not approve it. Every block
-     * is now reported and the renderer decides what to do about it.
+     * Rides the event for the LAST host that fits, because the events for the
+     * ones that do not fit are exactly what is being suppressed. Without it the
+     * band would present a truncated list as complete, which for a permission
+     * surface is worse than admitting the limit.
+     *
+     * REPLACED `notify`, a three-toast budget verdict. That field was a hint the
+     * renderer could ignore; this one is a fact about completeness it must show.
      */
-    notify: z.boolean()
+    truncated: z.boolean()
   })
   .strict()
 export type PreviewHostBlockedPayload = z.infer<typeof PreviewHostBlockedPayloadSchema>
@@ -384,6 +426,14 @@ export interface PreviewBridge {
   onFailuresChanged(callback: (payload: PreviewFailureListPayload) => void): () => void
   /** Subscribe to host-block events; returns an unsubscribe. */
   onHostBlocked(callback: (payload: PreviewHostBlockedPayload) => void): () => void
+  /** Subscribe to applied visibility changes; returns an unsubscribe. */
+  onVisibilityApplied(
+    callback: (payload: PreviewVisibilityAppliedPayload) => void
+  ): () => void
+  /** Subscribe to the project's approved-host set; returns an unsubscribe. */
+  onAllowlistChanged(
+    callback: (payload: PreviewAllowlistChangedPayload) => void
+  ): () => void
   /** Subscribe to in-page find results; returns an unsubscribe. */
   onFindResult(callback: (result: PreviewFindResult) => void): () => void
   /** Subscribe to still-frame changes; returns an unsubscribe. */

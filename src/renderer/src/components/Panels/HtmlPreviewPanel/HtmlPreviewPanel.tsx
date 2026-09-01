@@ -38,6 +38,9 @@ import { usePreviewStore } from '../../../stores/usePreviewStore'
 import { useSearchStore } from '../../../stores/useSearchStore'
 import { useOverlayOccluderStore } from '../../../stores/useOverlayOccluderStore'
 import { SearchBar } from '../../Search/SearchBar'
+import { PreviewChromeBand } from './components/PreviewChromeBand'
+import { usePreviewChromeGate } from './hooks/usePreviewChromeGate'
+import type { PreviewBlockedHost } from '../../../stores/usePreviewStore'
 import { PreviewBanner, PreviewFallback } from './components'
 import {
   usePreviewBounds,
@@ -85,12 +88,36 @@ const COPY = {
  * })
  * ```
  */
+/** Stable empty lists. A fresh `[]` inside a selector loops `useSyncExternalStore`. */
+const NO_BLOCKED_HOSTS: readonly PreviewBlockedHost[] = []
+const NO_ALLOWED_HOSTS: readonly string[] = []
+
 export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelParams>): JSX.Element {
   const { params, api, containerApi } = props
   const filePath = params?.filePath || ''
   const panelId = params?.panelId || api.id
 
   const placeholderRef = useRef<HTMLDivElement>(null)
+  /**
+   * The band's disclosure chip.
+   *
+   * Held here, not in the band, because the PANEL owns the forwarded Escape: a
+   * key pressed inside the previewed page arrives on this side of the IPC
+   * boundary, and returning focus to the chip is the documented way out of the
+   * page (WCAG SC 2.1.2 asks for an exit that is stated, and the chip's
+   * accessible name states it).
+   */
+  const bandChipRef = useRef<HTMLButtonElement>(null)
+  /** The panel root, measured for the band's too-short fail-safe. */
+  const panelRootRef = useRef<HTMLDivElement>(null)
+  /**
+   * The band wants to expose controls, so the page has to prove it moved.
+   *
+   * Held here rather than inside the band because the fail-safe spans the panel:
+   * the geometry it proves is the panel's, and the visibility it gates belongs to
+   * the overlay guard.
+   */
+  const [bandExpanded, setBandExpanded] = useState(false)
 
   // ========================================
   // Visibility + occlusion
@@ -116,7 +143,10 @@ export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelPara
 
   // The native view is hidden when this tab is inactive OR something occludes it;
   // that is exactly when the still-frame fallback should show (design §1.4).
-  const isViewHidden = !isVisible || isOccluded
+  // NB: the gate's own term is added below, once the hook has run — a gated
+  // panel must show its still frame, not a blank backdrop, and `selectFallback`
+  // reads this flag.
+  const isViewHiddenBase = !isVisible || isOccluded
 
   // ========================================
   // Lifecycle, events, bounds, shortcuts
@@ -154,6 +184,11 @@ export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelPara
   // Main reports the colour it paints behind the page; the placeholder carries
   // the identical value so no seam ever shows a band of the wrong colour.
   const backdrop = panel?.backdrop ?? null
+  // The permission band's data. Both are append-only/replace-only records held
+  // by the store, so the reference is stable between changes.
+  const blockedHosts = panel?.blockedHosts ?? NO_BLOCKED_HOSTS
+  const allowedHosts = panel?.allowedHosts ?? NO_ALLOWED_HOSTS
+  const blockedHostsTruncated = panel?.blockedHostsTruncated ?? false
 
   // The hook owns every push, including the one on becoming visible: a tab
   // switch changes no size, so the `ResizeObserver` alone would not re-emit.
@@ -162,6 +197,27 @@ export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelPara
   // that. It used to be `!limitReached && !openFailed`, which stayed true for a
   // FAILED load: the placeholder was already gone, so nothing could be pushed,
   // and nothing cleared the rect that had been published for it either.
+  /**
+   * Approve one host, and RETURN the result.
+   *
+   * The old toast called this with `void`, so a `{ok: false}` — a read-only
+   * checkout, a full allowlist, a settings file that would not parse — was
+   * thrown away and the prompt simply vanished. The reader had no way to tell a
+   * successful grant from a failed one, and the failure survived a restart.
+   */
+  const approveHost = useCallback(
+    (host: string) => window.api.preview.approveHost(panelId, host),
+    [panelId]
+  )
+
+  const { gate, controlsAllowed, ackController } = usePreviewChromeGate({
+    panelId,
+    needsProof: bandExpanded,
+    panelRef: panelRootRef
+  })
+
+  const isViewHidden = isViewHiddenBase || gate !== null
+
   const view = selectPanelView({
     limitReached,
     loadState: openFailed ? 'failed' : loadState
@@ -169,6 +225,8 @@ export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelPara
 
   usePreviewBounds({
     placeholderRef,
+    panelRef: panelRootRef,
+    ackController,
     panelId,
     // `'normal'` is precisely "there is a placeholder to measure".
     enabled: view === 'normal',
@@ -216,9 +274,13 @@ export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelPara
 
   usePreviewFindShortcuts(panelId, {
     openSearch: openPreviewSearch,
+    // Read at call time, not captured: the actions object is held in a ref by
+    // the hook, so a captured boolean would be the value from first mount.
+    isSearchOpen: () => useSearchStore.getState().isOpen,
     closeSearch: closePreviewSearch,
     exportPdf,
-    closePanel
+    closePanel,
+    focusChrome: () => bandChipRef.current?.focus()
   })
 
   // ========================================
@@ -246,9 +308,7 @@ export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelPara
   // ========================================
 
   return (
-    <div className="html-preview-panel">
-      {/* Find-in-page overlay; only the active tab shows it. */}
-      {isVisible && <SearchBar provider={searchProvider} />}
+    <div className="html-preview-panel" ref={panelRootRef}>
 
       {view === 'limit-reached' && (
         <PreviewBanner
@@ -284,29 +344,49 @@ export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelPara
               without a label a screen reader finds only an unnamed black region. */}
           {/* A permanently visible band of Erfana's OWN chrome, which the page
               cannot paint over because the native view is inset below it
-              (`PREVIEW_CHROME_INSET_PX`). The previewed page is untrusted and
+              — it is a flow sibling ABOVE the page area, not an overlay on it,
+              so the page has nowhere to paint that could cover it and the strip
+              may grow to any height. The previewed page is untrusted and
               paints above all sibling DOM, and it now stays on screen while
               Erfana asks a security question — so this is how a reader tells a
               real Erfana prompt from one the page drew. Was residual risk 8 in
               docs/security.md. Do NOT make it conditional or let it scroll. */}
-          <div className="html-preview-chrome-strip" data-testid="preview-chrome-strip">
-            Preview – content below is not Erfana
-          </div>
-          {/* `role="img"` is correct ONLY while the native view is hidden and the
-              placeholder really is a picture (a still frame) or a flat colour.
-              While the view is live the user is looking at a running, scrollable
-              document, and `role="img"` would both mislabel it and make its
-              subtree presentational. `aria-busy` carries the "not readable yet"
-              state that is otherwise visual-only. */}
-          <div
-            ref={placeholderRef}
-            className="html-preview-placeholder"
-            style={backdrop !== null ? { background: backdrop } : undefined}
-            role={isViewHidden ? 'img' : 'group'}
-            aria-busy={loadState === 'loading' || loadState === 'idle'}
-            aria-label={`HTML preview of ${getBasename(filePath) || 'page'}`}
-          >
-            <PreviewFallback kind={fallbackKind} stillFrame={stillFrame} />
+          <PreviewChromeBand
+            blockedHosts={blockedHosts}
+            allowedHosts={allowedHosts}
+            blockedHostsTruncated={blockedHostsTruncated}
+            chipRef={bandChipRef}
+            controlsAllowed={controlsAllowed}
+            paused={gate !== null}
+            onApprove={approveHost}
+            onExpandedChange={setBandExpanded}
+          />
+          {/* Everything below the strip. This wrapper is the find bar's
+              positioning context, so the bar's offset measures from BELOW the
+              strip — it used to be positioned against the panel root, which put
+              it over the strip's right-hand end the moment the strip grew tall
+              enough to hold a control. */}
+          <div className="html-preview-page-area">
+            {/* Find-in-page overlay; only the active tab shows it. Now scoped to
+                the normal view: in the failed and limit-reached views it was
+                talking to a WebContentsView that does not exist. */}
+            {isVisible && <SearchBar provider={searchProvider} />}
+            {/* `role="img"` is correct ONLY while the native view is hidden and
+                the placeholder really is a picture (a still frame) or a flat
+                colour. While the view is live the user is looking at a running,
+                scrollable document, and `role="img"` would both mislabel it and
+                make its subtree presentational. `aria-busy` carries the "not
+                readable yet" state that is otherwise visual-only. */}
+            <div
+              ref={placeholderRef}
+              className="html-preview-placeholder"
+              style={backdrop !== null ? { background: backdrop } : undefined}
+              role={isViewHidden ? 'img' : 'group'}
+              aria-busy={loadState === 'loading' || loadState === 'idle'}
+              aria-label={`HTML preview of ${getBasename(filePath) || 'page'}`}
+            >
+              <PreviewFallback kind={fallbackKind} stillFrame={stillFrame} />
+            </div>
           </div>
         </div>
       )}

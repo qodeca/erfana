@@ -1,0 +1,297 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+/**
+ * The permission band, one test per state the card renders.
+ *
+ * `design/README.md` § "A card is done when" names the failure mode these guard:
+ * "Most defects here were states the demo never reached — a badge that was
+ * invisible because nothing seeded it, a `failed` flag only ever set to `null`."
+ * A state with no test is the one that regresses.
+ *
+ * @see design/system/components/permission-band/index.html - status="decided"
+ */
+import { render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { describe, expect, it, vi } from 'vitest'
+
+import { PreviewChromeBand } from './PreviewChromeBand'
+import { ErrorCode } from '../../../../../../shared/errors'
+import type { PreviewApproveResult } from '../../../../../../shared/ipc/preview-types'
+import type { PreviewBlockedHost } from '../../../../stores/usePreviewStore'
+
+const host = (
+  name: string,
+  kinds: PreviewBlockedHost['kinds'] = ['image'],
+  approvable = true
+): PreviewBlockedHost => ({ host: name, kinds, approvable })
+
+const ok: PreviewApproveResult = { ok: true, hosts: ['a.example.com'] }
+
+function renderBand(props: Partial<Parameters<typeof PreviewChromeBand>[0]> = {}) {
+  const onApprove = vi.fn(async () => ok)
+  const utils = render(
+    <PreviewChromeBand
+      blockedHosts={[]}
+      allowedHosts={[]}
+      onApprove={onApprove}
+      {...props}
+    />
+  )
+  return { ...utils, onApprove }
+}
+
+describe('PreviewChromeBand', () => {
+  it('is present, and says which side is not Erfana, with nothing blocked', () => {
+    // A trust signal that appears only when something is wrong is not a trust
+    // signal. The band is the marker for the boundary, so it must not be
+    // conditional on there being a problem.
+    const { container } = renderBand()
+    expect(container.querySelector('.erf-band')).not.toBeNull()
+    expect(container.textContent).toContain('content below is not Erfana')
+    expect(screen.getByTestId('preview-band-chip')).toHaveTextContent('0 blocked · 0 allowed')
+  })
+
+  it('mounts the live region EMPTY', () => {
+    // A live region created at the same moment as its content is not announced.
+    // Its existing early is the mechanism, not decoration.
+    const { container } = renderBand()
+    const region = container.querySelector('.erf-band__announce')
+    expect(region).not.toBeNull()
+    expect(region).toHaveAttribute('role', 'status')
+    expect(region?.textContent).toBe('')
+  })
+
+  it('counts four blocked hosts and pops nothing up', () => {
+    // The case that broke the old design: four hosts produced three stacked
+    // toasts and a fourth host that could not be approved at all.
+    const { container } = renderBand({
+      blockedHosts: [host('a.example.com'), host('b.example.com'), host('c.example.com'), host('d.example.com')]
+    })
+    expect(screen.getByTestId('preview-band-chip')).toHaveTextContent('4 blocked · 0 allowed')
+    // Nothing is shown until the reader asks.
+    expect(container.querySelector('.erf-band__list')).toHaveAttribute('hidden')
+  })
+
+  it('does not claim "no remote hosts" when there are some', async () => {
+    // The empty state lives inside the list, which is `hidden` when collapsed —
+    // so asserting it is absent from the DOM proves nothing. What matters is that
+    // it never appears alongside actual rows.
+    const user = userEvent.setup()
+    renderBand({ blockedHosts: [host('a.example.com')] })
+    await user.click(screen.getByTestId('preview-band-chip'))
+    expect(screen.queryByText('No remote hosts requested')).not.toBeInTheDocument()
+  })
+
+  it('lists blocked and allowed hosts under their own headings', async () => {
+    const user = userEvent.setup()
+    renderBand({
+      blockedHosts: [host('blocked.example.com', ['script'])],
+      allowedHosts: ['allowed.example.com']
+    })
+    await user.click(screen.getByTestId('preview-band-chip'))
+
+    expect(screen.getByText('Blocked on load')).toBeInTheDocument()
+    expect(screen.getByText('Allowed in this project')).toBeInTheDocument()
+    expect(screen.getByText('Allowed ✓')).toBeInTheDocument()
+    // The most CAPABLE kind, not the first seen.
+    expect(screen.getByText('script')).toBeInTheDocument()
+  })
+
+  it('offers no Allow on a host that can never be approved', async () => {
+    const user = userEvent.setup()
+    renderBand({ blockedHosts: [host('203.0.113.7', ['image'], false)] })
+    await user.click(screen.getByTestId('preview-band-chip'))
+
+    expect(screen.getByText('Cannot be approved')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Allow/ })).not.toBeInTheDocument()
+  })
+
+  it('names each Allow button after its host', async () => {
+    // Four buttons all reading "Allow" is a screen-reader dead end.
+    const user = userEvent.setup()
+    renderBand({ blockedHosts: [host('a.example.com'), host('b.example.com')] })
+    await user.click(screen.getByTestId('preview-band-chip'))
+
+    expect(screen.getByRole('button', { name: 'Allow a.example.com' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Allow b.example.com' })).toBeInTheDocument()
+  })
+
+  it('keeps the chip in sync with the list', async () => {
+    const user = userEvent.setup()
+    renderBand({ blockedHosts: [host('a.example.com')] })
+    const chip = screen.getByTestId('preview-band-chip')
+
+    expect(chip).toHaveAttribute('aria-expanded', 'false')
+    await user.click(chip)
+    expect(chip).toHaveAttribute('aria-expanded', 'true')
+    expect(chip).toHaveAttribute('aria-controls')
+  })
+
+  it('opening with the KEYBOARD focuses the first Allow; with the mouse it does not', async () => {
+    // Keyboard activation of a <button> reports `detail === 0`; a pointer press
+    // reports 1 or more. That is the only way to tell them apart in one handler.
+    //
+    // TRAP: `fireEvent.click` also reports 0, so it would look like a keyboard
+    // open. These must use `userEvent`.
+    const user = userEvent.setup()
+    const { unmount } = renderBand({ blockedHosts: [host('a.example.com')] })
+
+    await user.click(screen.getByTestId('preview-band-chip'))
+    expect(document.activeElement).toBe(screen.getByTestId('preview-band-chip'))
+    unmount()
+
+    renderBand({ blockedHosts: [host('a.example.com')] })
+    screen.getByTestId('preview-band-chip').focus()
+    await user.keyboard('{Enter}')
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole('button', { name: 'Allow a.example.com' })
+      )
+    )
+  })
+
+  it('Allow opens the question and does not answer it', async () => {
+    const user = userEvent.setup()
+    const { onApprove } = renderBand({ blockedHosts: [host('a.example.com', ['font'])] })
+    await user.click(screen.getByTestId('preview-band-chip'))
+    await user.click(screen.getByRole('button', { name: 'Allow a.example.com' }))
+
+    const box = screen.getByRole('alertdialog')
+    expect(box).toBeInTheDocument()
+    // The honest sentence: the kind says what it was refused FOR, and the body
+    // says the grant is not limited to that.
+    expect(box).toHaveTextContent(/blocked for a font/)
+    expect(box).toHaveTextContent(/run code and send data/)
+    expect(box).toHaveTextContent(/Erfana cannot undo it/)
+    // Nothing has been written.
+    expect(onApprove).not.toHaveBeenCalled()
+  })
+
+  it('focuses the confirm CONTAINER, never the Confirm button', async () => {
+    // Confirm is irreversible, so a stray Return or a key repeat from the press
+    // that opened this must not land on it. Focusing the container also makes a
+    // screen reader read the whole consequence rather than "Confirm, button".
+    const user = userEvent.setup()
+    renderBand({ blockedHosts: [host('a.example.com')] })
+    await user.click(screen.getByTestId('preview-band-chip'))
+    await user.click(screen.getByRole('button', { name: 'Allow a.example.com' }))
+
+    const box = screen.getByRole('alertdialog')
+    await waitFor(() => expect(document.activeElement).toBe(box))
+    expect(document.activeElement).not.toBe(within(box).getByRole('button', { name: 'Confirm' }))
+  })
+
+  it('does NOT claim aria-modal', async () => {
+    // Nothing outside the box is made inert, so the claim would be false — and
+    // the band's live region is a SIBLING of the box, so an aria-modal subtree
+    // would hide the "Approving…" announcement at the moment it matters.
+    const user = userEvent.setup()
+    renderBand({ blockedHosts: [host('a.example.com')] })
+    await user.click(screen.getByTestId('preview-band-chip'))
+    await user.click(screen.getByRole('button', { name: 'Allow a.example.com' }))
+
+    expect(screen.getByRole('alertdialog')).not.toHaveAttribute('aria-modal')
+  })
+
+  it('puts Cancel first, so the first Tab from the container is the safe one', async () => {
+    const user = userEvent.setup()
+    renderBand({ blockedHosts: [host('a.example.com')] })
+    await user.click(screen.getByTestId('preview-band-chip'))
+    await user.click(screen.getByRole('button', { name: 'Allow a.example.com' }))
+
+    const buttons = within(screen.getByRole('alertdialog')).getAllByRole('button')
+    expect(buttons[0]).toHaveTextContent('Cancel')
+    expect(buttons[1]).toHaveTextContent('Confirm')
+  })
+
+  it('steps the other rows aside while a question is open', async () => {
+    // Found by clicking the card: with every row present the confirm block was
+    // clipped by the scroll clamp and its buttons sat off-screen — an
+    // irreversible question with no visible way to answer it.
+    const user = userEvent.setup()
+    renderBand({
+      blockedHosts: [host('a.example.com'), host('b.example.com')],
+      allowedHosts: ['old.example.com']
+    })
+    await user.click(screen.getByTestId('preview-band-chip'))
+    await user.click(screen.getByRole('button', { name: 'Allow a.example.com' }))
+
+    expect(screen.getByText('Approving')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Allow b.example.com' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Allowed in this project')).not.toBeInTheDocument()
+  })
+
+  it('announces the approval and asks main to write it', async () => {
+    const user = userEvent.setup()
+    const { container, onApprove } = renderBand({ blockedHosts: [host('a.example.com')] })
+    await user.click(screen.getByTestId('preview-band-chip'))
+    await user.click(screen.getByRole('button', { name: 'Allow a.example.com' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm' }))
+
+    expect(onApprove).toHaveBeenCalledWith('a.example.com')
+    await waitFor(() =>
+      expect(container.querySelector('.erf-band__announce')?.textContent).toMatch(
+        /is now allowed in this project/
+      )
+    )
+  })
+
+  it('brings the row BACK when the write fails, and keeps the failure on the chip', async () => {
+    // A host shown as allowed but not persisted is a lie that survives a
+    // restart. This state was unreachable in the card until a control was added
+    // to force it — `failed` was only ever assigned null.
+    const user = userEvent.setup()
+    const onApprove = vi.fn(
+      async (): Promise<PreviewApproveResult> => ({
+        ok: false,
+        errorCode: ErrorCode.PREVIEW_ALLOWLIST_FULL
+      })
+    )
+    const { container } = render(
+      <PreviewChromeBand
+        blockedHosts={[host('a.example.com')]}
+        allowedHosts={[]}
+        onApprove={onApprove}
+      />
+    )
+
+    await user.click(screen.getByTestId('preview-band-chip'))
+    await user.click(screen.getByRole('button', { name: 'Allow a.example.com' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm' }))
+
+    await waitFor(() => expect(screen.getByText('Not saved — list full')).toBeInTheDocument())
+    // The row is offerable again.
+    expect(screen.getByRole('button', { name: 'Allow a.example.com' })).toBeInTheDocument()
+    // And the chip carries the failure, so collapsing cannot hide it.
+    const chip = screen.getByTestId('preview-band-chip')
+    expect(chip.className).toContain('erf-band__chip--failed')
+    await user.click(chip)
+    expect(container.querySelector('.erf-band__list')).toHaveAttribute('hidden')
+    expect(chip.className).toContain('erf-band__chip--failed')
+  })
+
+  it('renders the paused strip only when the page is being held back', () => {
+    const { container, rerender } = renderBand()
+    expect(container.querySelector('.erf-band__paused')).toHaveAttribute('hidden')
+
+    rerender(
+      <PreviewChromeBand blockedHosts={[]} allowedHosts={[]} paused onApprove={vi.fn(async () => ok)} />
+    )
+    expect(container.querySelector('.erf-band__paused')).not.toHaveAttribute('hidden')
+    expect(container.textContent).toContain('Paused the page so this list cannot be covered')
+  })
+
+  it('says so when main stopped listing hosts', async () => {
+    const user = userEvent.setup()
+    renderBand({ blockedHosts: [host('a.example.com')], blockedHostsTruncated: true })
+    await user.click(screen.getByTestId('preview-band-chip'))
+    expect(screen.getByText(/Only the first hosts are listed/)).toBeInTheDocument()
+  })
+
+  it('shows the empty state when a page asked for nothing but the list is opened', async () => {
+    const user = userEvent.setup()
+    renderBand()
+    await user.click(screen.getByTestId('preview-band-chip'))
+    expect(screen.getByText('No remote hosts requested')).toBeInTheDocument()
+  })
+})

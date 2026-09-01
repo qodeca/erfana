@@ -30,8 +30,13 @@ window.ERFANA_CLAIMS = {
     "card": "system/components/form/index.html"
   },
   "zindex-css-literals": {
-    "value": 3,
+    "value": 2,
     "label": "stylesheets setting a bare z-index instead of a token",
+    "card": "system/foundations/layering.html"
+  },
+  "zindex-js-literals": {
+    "value": 8,
+    "label": "renderer files mirroring a z-index into TypeScript",
     "card": "system/foundations/layering.html"
   },
   "colour-tokens": {

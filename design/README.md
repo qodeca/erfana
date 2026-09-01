@@ -44,13 +44,15 @@ and a confirm step whose buttons were clipped off-screen.
 | `system/foundations/` | Colours, typography, spacing, surfaces, focus, motion, layering |
 | `system/components/` | Buttons, rows, form controls, feedback, icons, permission band |
 | `product/` | Whole screens and flows, built from the parts above |
-| `tokens.css`, `fonts/`, `index.html` | **Generated.** Written by `scripts/design-sync.mjs` |
+| `tokens.css`, `fonts/`, `claims.js`, `index.html` | **Generated.** Written by `scripts/design-sync.mjs` |
+| `system/components/row/host.css`, `system/components/permission-band/band.css` | **Generated.** Adopted components, synced *from* `src/` — edit the `src/` copy |
 | `ds.css`, `fonts.css` | Hand-written page chrome for the documentation itself |
 
 ## The one rule
 
 **The generated files are committed, and must never be hand-edited:**
-`tokens.css`, `fonts/`, `index.html`.
+`tokens.css`, `fonts/`, `claims.js`, `index.html`, and any adopted component CSS
+(currently `row/host.css` and `permission-band/band.css`).
 
 They are tracked because a design system that does not render on a fresh clone is
 not a reference. They are regenerated, never edited, because a second *editable*
@@ -84,14 +86,63 @@ Not "when it looks finished". All six:
 - **The demo implements every rule the prose states.** If the card promises
   arrow keys, pressing an arrow key does something. A card you cannot tell
   decision from defect in is worse than no card.
-- **No number is typed by hand.** Numbers come from `claims.json` via
-  `<span data-claim="id">`. A number with no ledger entry fails the test.
+- **Every number the card cites as evidence is derived.** A measurement of the
+  codebase — how many files do X, what a contrast ratio is — is declared in
+  `claims.json` with a runnable predicate and written as
+  `<span data-claim="id">`. The test re-derives all of them on every CI run, so
+  a declared number cannot go stale.
+
+  Be precise about the limit here, because it used to be overstated: **nothing
+  scans a card for digits.** The test checks that every `data-claim` id exists,
+  that no ledger entry is unused, and that every committed value is fresh. It
+  cannot see a number you type into a paragraph. That gap is real and it has bitten
+  once — the Layering card said "two files hardcode a z-index in TypeScript" when
+  the answer was eight, and all three CI gates were green. Standards (`4.5:1`,
+  `24 × 24`, SC numbers) and values a card is *deciding* are legitimately literal;
+  a count of the app is not, and belongs in the ledger.
 - **`status` and `reviewed` are honest**, and `reviewed` is the date a human last
   opened it — not the date the file changed.
 - **It is linted**: `npm run lint:css` covers the card's inline `<style>` too.
 - **A human has opened it in a browser and tabbed through it.** This is the rule
   that pays for itself. Every serious defect in this folder was found by
   clicking; every wrong claim came from measuring instead of looking.
+
+### From proposed to decided
+
+Being *done* is necessary, not sufficient. A card can meet all six conditions
+above and still be honestly `proposed` — finished is about the artefact, decided
+is about the commitment.
+
+The test is what kind of rule the card holds:
+
+- **A contract you could write a test against** — a focus order, an ARIA
+  relationship, a keyboard route, a target size, a state that must never be
+  colour-alone. Once such a card is done, promote it. There is a right answer,
+  the card has found it, and leaving it `proposed` only invites the app to keep
+  contradicting itself.
+- **A value still being chosen** — a palette, a type scale, a spacing rhythm, a
+  motion curve. These stay `proposed` however finished they look, because the
+  next screen built from them is still evidence, and calling a value binding
+  before the evidence is in is how a design system starts arguing with itself.
+
+That is why the interaction cards are decided and the token foundations are not.
+
+**A card can hold both, and the status is about the card as a whole.** Motion and
+Surfaces are `proposed`, yet they are what decided
+[#96](https://github.com/qodeca/erfana/issues/96) — reduced-motion coverage and a
+24×24 target floor are contracts, sitting in cards whose durations and sizes are
+still being chosen. The binding rule travels in the issue; the card stays honest
+about the rest.
+
+**Promoting is its own commit**, made by the person who just opened the card in a
+browser. Not a side effect of editing the card, and never a way to end a
+disagreement: `decided` binds every future change, so a card promoted to settle
+an argument makes the next reader inherit it. If you cannot say in one sentence
+why the rule is right, it is not decided yet.
+
+Going the other way is fine and needs no ceremony. A `decided` card the app keeps
+having to deviate from is a card that was wrong, not an app that is
+undisciplined — fix the card, or mark it `superseded` and write the replacement.
 
 ### When the app has to deviate
 
@@ -107,10 +158,23 @@ Then add it to that card's "Exceptions" section. An undocumented deviation is a
 bug; a documented one is a decision the card should probably absorb. What must
 not happen is the first wrong card causing the whole folder to be ignored.
 
-Component CSS lives beside its card. It is **proposed**, not adopted: a file here
-has no home in `src/` yet, and adopting it is a move, not a copy. Once a
-component's CSS is real it lives in `src/` and is synced *into* this folder, the
-way `tokens.css` is — so the card renders what actually ships.
+Component CSS is one of two things, and its header comment says which.
+
+**Proposed** — authored here, no home in `src/` yet. Currently `menu/menu.css`
+and `row/row.css`. (`row.css` is a special case worth knowing: the app already
+ships its rules five times over, under five class names, so adopting it is a
+*consolidation*, not a first implementation. Its header carries the list.)
+
+**Adopted** — the file lives in `src/`, and `scripts/design-sync.mjs` copies it
+back here the way it copies `tokens.css`, so the card renders what actually
+ships. Currently `row/host.css` and `permission-band/band.css`.
+
+Adopting is a **move, not a copy**. Two editable copies is how one of them stays
+wrong — which is exactly how a broken bidi front-elide survived in the Rows card
+for months. A test in `scripts/design-claims.test.mjs` refuses any component
+stylesheet that is neither synced nor explicitly declared proposed, because
+without it a forgotten sync entry leaves `--check` reporting "up to date" while
+the two copies drift.
 
 ## What the cards are waiting on
 

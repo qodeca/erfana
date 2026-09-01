@@ -116,8 +116,12 @@ export interface PreviewEmitters {
     host: string,
     approvable: boolean,
     kinds: readonly PreviewBlockedKind[],
-    notify: boolean
+    truncated: boolean
   ): void
+  /** The project's approved-host set changed, or is being seeded on open. */
+  allowlistChanged(panelId: string, hosts: readonly string[]): void
+  /** A visibility change was APPLIED to the native view. */
+  visibilityApplied(panelId: string, visible: boolean): void
   findResult(r: PreviewFindResult): void
   stillFrameChanged(panelId: string, frame: PreviewStillFrame): void
   loadStateChanged(

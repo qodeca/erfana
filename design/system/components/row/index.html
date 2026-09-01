@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="../../../tokens.css">
 <link rel="stylesheet" href="../../../ds.css">
 <link rel="stylesheet" href="./row.css">
+<link rel="stylesheet" href="./host.css">
 <style>
   .stage { display: flex; gap: var(--space-16); flex-wrap: wrap; align-items: flex-start; }
   .list-frame { width: 340px; background: var(--color-bg-tertiary);
@@ -79,15 +80,26 @@
       unusable — that is why the roving pattern exists: the list holds the tab stop and moves focus
       internally with arrows.
       <br><br>
-      Erfana's file tree has <strong>none</strong> of this today. Nothing in it is focusable — yet it
-      declares <code>role="tree"</code>, so a screen reader switches to application mode and hands the
-      arrow keys to a widget that implements none of them. A wrong role is worse than a missing one.
+      Erfana's file tree has <strong>none</strong> of this today, and gets the inverse instead.
+      It declares <code>role="tree"</code>, so a screen reader switches to application mode and hands
+      the arrow keys to a widget that implements none of them — a wrong role is worse than a missing
+      one. Meanwhile <code>ProjectTreeNode.tsx</code> spreads dnd-kit's drag attributes onto every row,
+      and <code>useDraggable</code> defaults to <code>tabIndex: 0</code> plus a role, so
+      <strong>every row is a tab stop</strong>: a <code>role="button"</code> nested inside a
+      <code>role="treeitem"</code>, activated by an <code>onClick</code> on a div, so Enter and Space
+      open nothing. Exactly the 400-stop tree the rule above forbids, with none of them working.
+      <br><br>
+      This paragraph claimed the opposite until 2026-09-01 — "nothing in it is focusable". The
+      correction changes the fix, not just the fact: adopting the roving pattern means overriding
+      dnd-kit's <code>tabIndex</code> first, because it puts <code>0</code> on every row while roving
+      needs <code>0</code> on exactly one. Tracked on
+      <a href="https://github.com/qodeca/erfana/issues/88" style="color: var(--color-link)">#88</a>.
       The file, screen and window pickers all implement the pattern correctly, so the code to copy exists.
     </div>
   </div>
 </div>
 
-<h2>Truncating a host — the head goes, never the tail</h2>
+<h2>A host that does not fit wraps — nothing is ever cut</h2>
 
 <div class="stage">
   <div>
@@ -100,9 +112,10 @@
   </div>
   <div class="notes">
     <div class="ds-note" style="margin-top:0">
-      <strong>Drag the slider until the hosts cut.</strong> Every one must keep its registrable domain —
-      the part that decides whether you are about to trust <code>evil.com</code>. If any row ends up
-      reading <code>cdn.jsdelivr…</code> instead of <code>…cdn.evil.com</code>, the control is broken.
+      <strong>Drag the slider until the hosts stop fitting.</strong> Every one must still end in its
+      registrable domain — the part that decides whether you are about to trust <code>evil.com</code>.
+      If any row ends up reading <code>cdn.jsdelivr…</code>, the control is broken. Here none can:
+      they wrap onto a second line instead of losing an end.
     </div>
     <div class="ds-note">
       <strong>This used to be one CSS rule, and it was backwards.</strong>
@@ -113,21 +126,24 @@
       It survived because no card ever rendered a host long enough to cut.
     </div>
     <div class="ds-note">
-      <strong>So the guarantee is layout, not text rendering.</strong> The component splits the host at the
-      registrable-domain boundary and only the prefix is allowed to shrink. Worst case the prefix collapses
-      to a bare ellipsis; the domain cannot be cut, because nothing is telling it to.
+      <strong>So nothing is cut at all.</strong> The guarantee is not a cleverer truncation, it is the
+      absence of one: a host that does not fit wraps. There is no truncated end, so there is no wrong end
+      to truncate, and the rule needs to know nothing about the host's structure.
+      <br><br>
+      A three-element flex front-elide was built first and did work — the prefix shrank and elided, the
+      domain refused to. It is rejected for a different reason: it has to be told where the registrable
+      domain begins, and only the Public Suffix List knows that. <code>Last two labels</code> is wrong for
+      <code>example.co.uk</code>, and a front-elide cutting at the <em>wrong</em> boundary is worse than no
+      invariant at all, because it looks like one. Erfana carries no PSL. If one ever arrives for another
+      reason, revisit — one-line rows read better than wrapped ones.
     </div>
     <div class="ds-note">
       <strong>Two things CSS cannot decide.</strong>
       Truncation is not the only way to lie about a host: <code>аpple.com</code> with a Cyrillic <code>а</code>
       truncates perfectly and is still a different domain. Render the punycode form when the label mixes
       scripts. And the accessible name must carry the <em>full</em> host — <code>title</code> is unreachable
-      by keyboard and by touch, so it is not a substitute for <code>aria-label</code>.
-    </div>
-    <div class="ds-note">
-      <strong>The split needs the Public Suffix List, not a dot count.</strong> The demo below takes the
-      last two labels, which is wrong for <code>example.co.uk</code>. Shipping code must use the real list —
-      getting the boundary wrong moves the invariant to the wrong place, which is worse than no invariant.
+      by keyboard and by touch, so it is not a substitute for <code>aria-label</code>. The
+      <code>&lt;wbr&gt;</code> break hints the component inserts after each dot must not reach that name.
     </div>
   </div>
 </div>
@@ -321,19 +337,21 @@ const HOSTS = [
   'evil.com.',
   'xn--80ak6aa92e.com',
   'مثال.إختبار.evil.com',
-  'averyveryverylongregistrabledomainname.example'
+  'averyveryverylongregistrabledomainname.example',
+  'assets.tracking.eu-west-1.metrics.a-very-long-tenant-name.example.co.uk',
+  'onesingleunbreakablelabelwithnodotsatallthatcannotwrapatalabelboundary.example'
 ];
 
-/* DEMO ONLY. Real code must use the Public Suffix List — "last two labels" is
-   wrong for example.co.uk, and a wrong boundary puts the invariant in the wrong
-   place. Stated on the card so nobody copies this function. */
-function splitHost(host) {
-  const bare = host.replace(/\.$/, '').split(':')[0];
-  const port = host.slice(bare.length);
-  const labels = bare.split('.');
-  if (labels.length <= 2) return { prefix: '', registrable: bare + port };
-  const registrable = labels.slice(-2).join('.');
-  return { prefix: bare.slice(0, bare.length - registrable.length), registrable: registrable + port };
+/* Label boundaries are the PREFERRED break points, so a wrapped host breaks at a
+   dot whenever one fits. `overflow-wrap: anywhere` in row.css is the fallback for
+   the last host in the list, which has no dot to break at. This is the whole
+   component — there is no boundary to compute and no list to consult. */
+function hostHtml(host) {
+  return escapeHtml(host).replace(/\./g, '.<wbr>');
+}
+
+function escapeHtml(text) {
+  return text.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 }
 
 const frame = document.getElementById('hostFrame');
@@ -345,13 +363,12 @@ function buildHosts() {
   wval.textContent = `${slider.value}px`;
   frame.innerHTML = '';
   for (const host of HOSTS) {
-    const { prefix, registrable } = splitHost(host);
     const row = document.createElement('div');
     row.className = 'erf-row';
+    // aria-label carries the raw host: the <wbr>s are a layout hint and must not
+    // reach the accessible name.
     row.innerHTML =
-      `<span class="erf-host" dir="ltr" aria-label="Host ${host}, registrable domain ${registrable}">` +
-      `<span class="erf-host__prefix"><bdi>${prefix}</bdi></span>` +
-      `<bdi class="erf-host__registrable">${registrable}</bdi></span>`;
+      `<span class="erf-host" dir="ltr" aria-label="Host ${escapeHtml(host)}">${hostHtml(host)}</span>`;
     frame.appendChild(row);
   }
 }

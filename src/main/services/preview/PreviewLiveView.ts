@@ -32,7 +32,6 @@ import type {
 import type { IPreviewRootRegistry } from './PreviewRootRegistry'
 import type { IPreviewStillFrameCache } from './PreviewStillFrameCache'
 import type { IPreviewExportController } from './PreviewExportController'
-import type { IPreviewHostBlockNotifier } from './PreviewHostBlockNotifier'
 import type { IPreviewWatchCoordinator } from './PreviewWatchCoordinator'
 import type { IPreviewReloadPolicy, ReloadDecision } from './PreviewReloadPolicy'
 import type {
@@ -126,7 +125,6 @@ export interface PreviewLiveViewDeps {
   readonly exportController: IPreviewExportController
   readonly registry: Pick<IPreviewRootRegistry, 'rebuildCsp' | 'revoke'>
   readonly storageSeal: { purge(session: PreviewSessionLike): Promise<void> }
-  readonly hostBlockNotifier: IPreviewHostBlockNotifier
   readonly createWatchCoordinator: (
     realRoot: string,
     onChanged: (paths: readonly string[]) => void
@@ -523,6 +521,7 @@ export class PreviewLiveView {
       // Re-adding an already-present child reorders it topmost (design §5(d)).
       this.window.contentView.addChildView(this.view)
       this.view.setVisible(true)
+      this.deps.emit.visibilityApplied(this.panelId, true)
       return
     }
     // Capture BEFORE hiding — the capturer count keeps the page live mid-capture.
@@ -543,6 +542,12 @@ export class PreviewLiveView {
       this.deps.emit.stillFrameChanged(this.panelId, frame)
     }
     this.view.setVisible(false)
+    // Only now. Everything above can abandon the hide — a defunct view, or a show
+    // that landed while `captureIfStale` was awaited — and in every one of those
+    // cases the page is still on screen. Emitting earlier would tell the renderer
+    // the page had gone when it had not, which is the one direction this signal
+    // must never fail in.
+    this.deps.emit.visibilityApplied(this.panelId, false)
   }
 
   /**

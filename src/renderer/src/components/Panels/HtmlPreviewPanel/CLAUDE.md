@@ -15,6 +15,8 @@ The native `WebContentsView` paints ABOVE all sibling DOM in the panel, regardle
 
 **A toast is the one exception, and it is deliberate** — see "Toasts move, the page does not" below.
 
+**The permission band is a second input to the guard, and it is per panel.** `usePreviewChromeGate` publishes a reason into `stores/usePreviewChromeGateStore.ts`; the guard reads it as a third term (`visible = activeTab && !occluded && gate === null`) and reports `chrome-unconfirmed` / `chrome-too-short`. It is deliberately NOT the occluder store: that one is global, so it would blank the other preview in a split view for a reason belonging to one panel.
+
 - `BaseDialog` pushes the occluder count from its `isOpen` effect, NOT via `useOccluder` (it needs the raw stack length, not a boolean).
 - Occluder counts publish on a `queueMicrotask` flush, so a synchronous unregister→register pair (e.g. a dialog z-index change) coalesces to one notification — no hide/show flap or wasted `capturePage`.
 
@@ -55,7 +57,7 @@ The hook owns EVERY push, including the become-visible one — do not add a `pus
 - **Forwarded accelerators.** The native view swallows renderer keys, so main forwards exactly `f`/`s`/`w`/`Escape` via `preview:forwardedShortcut`; `usePreviewFindShortcuts` routes them to panel actions. Forwarded Escape must run the provider's `clearHighlights()` + restore focus (matching `SearchBar.handleClose`), not just flip the store flag. **Zoom keys are deliberately NOT forwarded** — the View menu owns them (see below). `PREVIEW_FORWARDED_SHORTCUTS` and `PreviewForwardedShortcutSchema` restate the same vocabulary in two layers and are pinned equal by a test in `previewInputForward.test.ts`; they drifted once, and every zoom key was silently dropped at the IPC boundary for it.
 - **Zoom means the page, not the rectangle.** Host zoom is applied geometrically (`clampAndZoomBounds` multiplies the CSS rect), so without `preview:setZoom` calling `setZoomLevel` on the preview's own webContents, Cmd/Ctrl-+ grows the preview *box* while the text stays at 100% — i.e. the text gets relatively smaller. **The View menu is the only route**: `menu.ts` -> `previewZoomHandler` -> `zoomFocused` picks the focused preview and falls through to the host window otherwise; levels are held per panel in `PreviewViewService` and re-applied after `registry.install`, so a zoom survives suspend/resume. Do not also forward the zoom keys — both paths would fire for one keypress and zoom twice, which is why `menu.ts` replaced the built-in zoom roles in the first place.
 - **Empty-badge cleanup.** `PreviewFailureBadge` force-closes when `summary.count` hits 0, in an effect that runs BEFORE its `count === 0` early return — otherwise an open popover's `useOccluder('menu', open)` never releases and the view stays stuck behind its still frame. Keep that effect above the early return (hook ordering).
-- **Chrome strip.** `.html-preview-chrome-strip` ("Preview – content below is not Erfana") is always-DOM and the view is inset below it by `PREVIEW_CHROME_INSET_PX`, through the same `topInset` path the find bar uses. It is a security control, not decoration (was residual risk 8 in `docs/security.md`): a toast now leaves an untrusted page on screen while Erfana asks "Approve this host?", so this band is how a reader tells a real Erfana prompt from one the page drew. Do not make it conditional and do not let it scroll.
+- **Chrome strip.** `.html-preview-chrome-strip` ("Preview – content below is not Erfana") is always-DOM and sits ABOVE `.html-preview-page-area` as a flow sibling in a flex column. It used to be absolutely positioned over the page area, with its height restated as `PREVIEW_CHROME_INSET_PX` in `usePreviewBounds.ts` and added back on when bounds were computed — two numbers only a comment kept in step. Now layout subtracts it: the placeholder's own box already excludes the strip at whatever height it happens to be, which is what lets the strip grow (the permission band opening its list) with no code change. The find bar keeps `SEARCH_BAR_INSET_PX` because it is still an overlay *inside* the page area. It is a security control, not decoration (was residual risk 8 in `docs/security.md`): a toast now leaves an untrusted page on screen while Erfana asks "Approve this host?", so this band is how a reader tells a real Erfana prompt from one the page drew. Do not make it conditional and do not let it scroll.
 
 ## The backdrop is a state machine, not a constant
 
@@ -83,3 +85,25 @@ Now `usePreviewBounds` publishes each live view's CSS-pixel rect into `stores/us
 - **The published rect is keyed on visible + live, NOT on occlusion.** Occlusion is the guard's output and placement is one of its inputs; keying on visibility would make the toast hide the view, the hidden view withdraw its rect, the toast unhide the view, every frame.
 - **Measure at decision time.** `.toast-container` is `position: fixed`, so a window resize moves it without changing its box and no `ResizeObserver` fires. Read `getBoundingClientRect()` when computing, and recompute on `window.resize` too.
 - **Clear the rect on hide and on unmount.** A rect left behind permanently displaces every toast — which looks exactly like the bug this machinery exists to fix.
+
+## The permission band, and the fail-safe under it
+
+`components/PreviewChromeBand.tsx` replaced the chrome strip AND the approve toast. Read `design/system/components/permission-band/index.html` (`status="decided"`) before changing it — the stylesheet lives in `components/PreviewChromeBand.css` and is synced back into `design/` by `scripts/design-sync.mjs`, so **edit the `src/` copy**.
+
+**Never draw a button a page could be sitting on top of.** The previewed page paints above all sibling DOM and takes input over its own rectangle whatever the DOM says. Opening the host list claims space the page held a frame ago, so:
+
+1. The list renders at its **full height with the rows `visibility: hidden`**. Layout reserved, nothing painted, nothing hit-testable, nothing in the a11y tree.
+2. That growth moves the placeholder, so the bounds pump pushes with `{ ack: true }`.
+3. `PreviewLiveView.confirmRepaint` answers from isolated world 997 (a page cannot shadow `rAF`).
+4. On the ack the rows become visible. `visibility` changes no layout, so there is no second push and no loop.
+5. On a 300 ms timeout the page is **hidden** and the band says why.
+
+Three traps, each of which looks like a simplification:
+
+- **`display: none` or conditional rendering instead of `visibility: hidden`** removes the height — which removes the growth the page is meant to react to. No rows, no growth, nothing to prove, no rows. `opacity: 0` keeps the height but still hit-tests, so a click lands on an invisible control that grants a permission.
+- **Asking a hidden page to prove anything.** A hidden page never repaints, so it can never ack. `provenInset()` returns `Infinity` while hidden for exactly this reason.
+- **Re-arming the deadline per push.** A resize drag pushes every frame, so a per-push timer would postpone the fail-safe for as long as the mouse is held. The epoch keys on the *inset*; its deadline is absolute.
+
+`unconfirmed` is **sticky** until the reader collapses the list. A page that yields at 310 ms would otherwise un-pause and re-pause, a flap whose timing the untrusted page controls.
+
+**The blocked-host list is bounded main-side**, at `PREVIEW.MAX_BLOCKED_HOSTS_PER_VIEW` (50, matching the CSP bridge). `PreviewViewService.onBlocked` also returns when `mergeBlockedKinds` reports no change — without that, a page pulling forty assets from one host sent forty identical events. The dedupe ledger is **cleared by `applyApprovedHosts`**: the reload after an approval refuses the remaining hosts all over again, and a ledger that survived it would swallow every one of them while the failure log they would have appeared in has just been emptied.

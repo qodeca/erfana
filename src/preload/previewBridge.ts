@@ -23,6 +23,8 @@ import type {
   PreviewFindRequest,
   PreviewForwardedShortcut,
   PreviewOpenFileRequestedPayload,
+  PreviewAllowlistChangedPayload,
+  PreviewVisibilityAppliedPayload,
   PreviewHostBlockedPayload,
   PreviewBackdropPayload,
   PreviewLoadStatePayload,
@@ -97,6 +99,14 @@ export const previewBridge: PreviewBridge = {
 
   onHostBlocked: (callback: (payload: PreviewHostBlockedPayload) => void): (() => void) =>
     subscribe(PreviewEvents.HOST_BLOCKED, callback),
+
+  onVisibilityApplied: (
+    callback: (payload: PreviewVisibilityAppliedPayload) => void
+  ): (() => void) => subscribe(PreviewEvents.VISIBILITY_APPLIED, callback),
+
+  onAllowlistChanged: (
+    callback: (payload: PreviewAllowlistChangedPayload) => void
+  ): (() => void) => subscribe(PreviewEvents.ALLOWLIST_CHANGED, callback),
 
   onFindResult: (callback: (result: PreviewFindResult) => void): (() => void) =>
     subscribe(PreviewEvents.FIND_RESULT, callback),

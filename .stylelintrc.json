@@ -58,10 +58,13 @@
         "Not cosmetic: Mermaid emits class=\"row\" on gitGraph commit labels and on its",
         "generic label path, and the app injects that SVG with innerHTML \u2014 so a bare",
         "global .row would reach into diagram labels in the preview and in exported",
-        "images. That collision was found by luck, not by review."
+        "images. That collision was found by luck, not by review.",
+        "Adopted files keep the rule when they move to src/. Scoping this to design/ only would silently switch the guard off at the exact moment the CSS became shipping code."
       ],
       "files": [
-        "design/system/components/**/*.css"
+        "design/system/components/**/*.css",
+        "src/renderer/src/styles/hostName.css",
+        "src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewChromeBand.css"
       ],
       "rules": {
         "selector-class-pattern": [

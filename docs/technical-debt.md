@@ -650,7 +650,7 @@ One extra obstacle found since: `PreviewViewService.applyApprovedHosts` returns 
 
 **Recommended Solution**: file a follow-up issue after #74 merges to build the view/revoke UI and its backend.
 
-**Status**: Filed as [#86](https://github.com/qodeca/erfana/issues/86) (2026-08-31). Interim mitigation in `9b139a8`: the consent prompt now states that approval permits remote code and data egress, is saved into the project, reaches anyone who clones it, and cannot be undone from Erfana — so the door is at least labelled. See also [#81](https://github.com/qodeca/erfana/issues/81) for narrowing what a grant covers.
+**Status**: **Half resolved (2026-09-01).** The *seeing* half is built: the permission band (`components/PreviewChromeBand.tsx`) lists every approved host for the project alongside the blocked ones, seeded on open via `preview:allowlistChanged` — so a repository that arrives with hosts already approved by someone else now shows them, which nothing anywhere did before. The consent copy still states that approval permits remote code and data egress, is saved into the project, reaches anyone who clones it, and cannot be undone from Erfana. **What [#86](https://github.com/qodeca/erfana/issues/86) still owes is REVOKE**: `PreviewAllowlistStore` has no remove at any layer, so undoing an approval remains a hand-edit of `.erfana/settings.json`. See also [#81](https://github.com/qodeca/erfana/issues/81) for narrowing what a grant covers.
 
 ---
 

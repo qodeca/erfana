@@ -205,6 +205,9 @@ interface Harness {
   loadStateChanged: ReturnType<
     typeof vi.fn<(panelId: string, state: string, dropped: number) => void>
   >
+  allowlistChanged: ReturnType<
+    typeof vi.fn<(panelId: string, hosts: readonly string[]) => void>
+  >
   hostBlocked: ReturnType<
     typeof vi.fn<
       (
@@ -212,7 +215,7 @@ interface Harness {
         host: string,
         approvable: boolean,
         kinds: readonly string[],
-        notify: boolean
+        truncated: boolean
       ) => void
     >
   >
@@ -306,6 +309,7 @@ function makeHarness(
   }
 
   const loadStateChanged = vi.fn<(panelId: string, state: string, dropped: number) => void>()
+  const allowlistChanged = vi.fn<(panelId: string, hosts: readonly string[]) => void>()
   const hostBlocked =
     vi.fn<
       (
@@ -334,13 +338,13 @@ function makeHarness(
     },
     exportController: { exportToPdf: vi.fn(() => Promise.resolve({ ok: true as const, path: '/x.pdf' })) },
     storageSeal: { purge },
-    hostBlockNotifier: {
-      shouldNotify: vi.fn<(projectPath: string, host: string) => boolean>(() => true),
-      clear: vi.fn<(projectPath?: string) => void>()
-    },
+    getAllowedHosts: vi.fn<() => readonly string[]>(() => []),
     emit: {
       failuresChanged: vi.fn(),
       hostBlocked,
+      allowlistChanged,
+      visibilityApplied: vi.fn(),
+      openFileRequested: vi.fn(),
       findResult: vi.fn(),
       stillFrameChanged: vi.fn(),
       backdropChanged,
@@ -1254,21 +1258,6 @@ describe('PreviewViewService — project-scoped shared state', () => {
     expect(h.rebuildCsp).not.toHaveBeenCalled()
   })
 
-  it('releases the toast budget only when the project loses its LAST view', async () => {
-    const h = makeHarness()
-    const clear = h.deps.hostBlockNotifier.clear as unknown as ReturnType<
-      typeof vi.fn<(projectPath?: string) => void>
-    >
-    await h.service.open(REQUEST_A, h.window)
-    await h.service.open({ ...REQUEST_A, panelId: 'panel-B' }, h.window)
-
-    await h.service.close('panel-A')
-    expect(clear).not.toHaveBeenCalled()
-
-    await h.service.close('panel-B')
-    expect(clear).toHaveBeenCalledWith('/proj')
-  })
-
   it('destroyAll tears down every live view', async () => {
     const h = makeHarness()
     await h.service.open(REQUEST_A, h.window)
@@ -1449,39 +1438,53 @@ describe('PreviewViewService — every blocked host reaches the renderer', () =>
     return context.onBlocked
   }
 
-  it('reports a host even when the toast budget is spent', async () => {
-    // THE DEFECT. `hostBlocked` used to be emitted only when the notifier
-    // allowed a toast, so the 3-toast budget silently gated the DATA: past the
-    // third host the renderer was never told a host had been blocked at all. It
-    // could not list it, and the reader had no way to approve it — observed as a
-    // page with four hosts where the fourth image stayed broken with no prompt
-    // and no route to one.
+  it('reports every distinct host, well past the three the old budget allowed', async () => {
+    // THE DEFECT THIS REPLACED. `hostBlocked` used to be emitted only when a
+    // three-toast-per-project budget allowed it, so the budget silently gated the
+    // DATA: past the third host the renderer was never told a host had been
+    // blocked at all. It could not list it, and the reader had no way to approve
+    // it — observed as a page with four hosts where the fourth image stayed
+    // broken with no prompt and no route to one.
+    //
+    // The bound is now explicit and an order of magnitude higher, and the
+    // renderer is told when it bites (see the next test).
     const h = makeHarness()
     const onBlocked = await blockedSink(h)
-    ;(h.deps.hostBlockNotifier.shouldNotify as ReturnType<typeof vi.fn>).mockReturnValue(false)
     h.hostBlocked.mockClear()
 
-    onBlocked('blocked-host', 'fourth.example.com', 'https://fourth.example.com/a.png', true, 'image')
+    for (let i = 0; i < 10; i += 1) {
+      onBlocked('blocked-host', `h${i}.example.com`, `https://h${i}.example.com/a.png`, true, 'image')
+    }
 
-    expect(h.hostBlocked).toHaveBeenCalledTimes(1)
-    const [panelId, host, approvable, kinds, notify] = h.hostBlocked.mock.calls[0]
+    expect(h.hostBlocked).toHaveBeenCalledTimes(10)
+    const [panelId, host, approvable, kinds, truncated] = h.hostBlocked.mock.calls[3]
     expect(panelId).toBe('panel-A')
-    expect(host).toBe('fourth.example.com')
+    expect(host).toBe('h3.example.com')
     expect(approvable).toBe(true)
     expect(kinds).toEqual(['image'])
-    // The budget verdict survives as a HINT the renderer may act on, rather
-    // than as a gate that decides whether the fact exists.
-    expect(notify).toBe(false)
+    // Well under the cap, so the list is complete.
+    expect(truncated).toBe(false)
   })
 
-  it('passes the budget verdict through when a toast IS allowed', async () => {
+  it('stops at the per-view cap and says the list is truncated', async () => {
+    // A permission surface that quietly omits a host is worse than one that
+    // admits it cannot show them all — the reader would have no way to know a
+    // host exists, let alone approve it, and no way to know they were not shown.
+    //
+    // The flag rides the event for the LAST host that fits, because the events
+    // for the ones that do not fit are exactly what is being suppressed.
     const h = makeHarness()
     const onBlocked = await blockedSink(h)
     h.hostBlocked.mockClear()
 
-    onBlocked('blocked-host', 'first.example.com', 'https://first.example.com/a.js', true, 'script')
+    const cap = PREVIEW.MAX_BLOCKED_HOSTS_PER_VIEW
+    for (let i = 0; i < cap + 5; i += 1) {
+      onBlocked('blocked-host', `h${i}.example.com`, `https://h${i}.example.com/a.png`, true, 'image')
+    }
 
-    expect(h.hostBlocked.mock.calls[0][4]).toBe(true)
+    expect(h.hostBlocked).toHaveBeenCalledTimes(cap)
+    expect(h.hostBlocked.mock.calls[cap - 2][4]).toBe(false)
+    expect(h.hostBlocked.mock.calls[cap - 1][4]).toBe(true)
   })
 
   it('accumulates the kinds one host is refused for', async () => {

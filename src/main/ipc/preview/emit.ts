@@ -24,7 +24,9 @@
  */
 import {
   PreviewFailureListPayloadSchema,
+  PreviewAllowlistChangedPayloadSchema,
   PreviewHostBlockedPayloadSchema,
+  PreviewVisibilityAppliedPayloadSchema,
   PreviewFindResultSchema,
   PreviewStillFrameSchema,
   PreviewBackdropPayloadSchema,
@@ -187,15 +189,29 @@ export function createPreviewEmitters(deps: PreviewEmittersDeps): PreviewEmitter
       host: string,
       approvable: boolean,
       kinds: readonly PreviewBlockedKind[],
-      notify: boolean
+      truncated: boolean
     ): void {
       validateAndSend(PreviewEvents.HOST_BLOCKED, PreviewHostBlockedPayloadSchema, {
         panelId,
         host,
         approvable,
         kinds: [...kinds],
-        notify
+        truncated
       })
+    },
+
+    /*
+     * NOT coalesced, unlike `failuresChanged`. This fires at most twice per view
+     * — once when the view is installed, once per approval — so there is nothing
+     * to batch, and an approval's reload depends on the renderer seeing the new
+     * set promptly.
+     */
+    allowlistChanged(panelId: string, hosts: readonly string[]): void {
+      validateAndSend(
+        PreviewEvents.ALLOWLIST_CHANGED,
+        PreviewAllowlistChangedPayloadSchema,
+        { panelId, hosts: [...hosts] }
+      )
     },
 
     findResult(r: PreviewFindResult): void {
@@ -234,6 +250,18 @@ export function createPreviewEmitters(deps: PreviewEmittersDeps): PreviewEmitter
         panelId,
         color
       })
+    },
+
+    /*
+     * NOT coalesced, for the same reason `boundsApplied` is not: a renderer
+     * waiting for a specific transition must not have it collapsed away.
+     */
+    visibilityApplied(panelId: string, visible: boolean): void {
+      validateAndSend(
+        PreviewEvents.VISIBILITY_APPLIED,
+        PreviewVisibilityAppliedPayloadSchema,
+        { panelId, visible }
+      )
     },
 
     boundsApplied(panelId: string, seq: number): void {

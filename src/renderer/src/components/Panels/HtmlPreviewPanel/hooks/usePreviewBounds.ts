@@ -20,7 +20,7 @@
  */
 
 import { useCallback, useEffect, useRef } from 'react'
-import { deriveBounds } from '../htmlPreview.logic'
+import { deriveBounds, needsBoundsAck } from '../htmlPreview.logic'
 import { usePreviewViewportStore } from '../../../../stores/usePreviewViewportStore'
 
 /**
@@ -31,20 +31,6 @@ import { usePreviewViewportStore } from '../../../../stores/usePreviewViewportSt
  * while native `findInPage` highlights stay visible in the shorter view.
  */
 export const SEARCH_BAR_INSET_PX = 48
-
-/**
- * Height of the always-DOM "Preview – content below is not Erfana" strip above the native view,
- * in CSS pixels.
- *
- * The strip is a security control, not decoration. The previewed page is
- * untrusted and paints above all sibling DOM, and since the toast-placement
- * change it now stays on screen while Erfana asks a security question ("Approve
- * this host?"). A permanently visible band of Erfana's own chrome, which the
- * page provably cannot paint over because the view is inset below it, is how a
- * reader tells a real Erfana prompt from one the page drew. Recorded as residual
- * risk 8 in docs/security.md until now.
- */
-export const PREVIEW_CHROME_INSET_PX = 22
 
 /**
  * How many animation frames the first-rect pump waits for a laid-out
@@ -83,6 +69,22 @@ export interface UsePreviewBoundsOptions {
    * top by {@link SEARCH_BAR_INSET_PX} so the bar is not occluded (UX-002).
    */
   searchOpen: boolean
+  /**
+   * The panel root, used to measure how far down the page area starts.
+   *
+   * Optional so existing callers and tests need no change: without it the
+   * effective inset falls back to the placeholder's own top, which makes every
+   * push look like it needs no proof — the pre-fail-safe behaviour.
+   */
+  panelRef?: React.RefObject<HTMLElement>
+  /**
+   * Records what was pushed so the fail-safe can decide whether Erfana may draw
+   * controls in the space just claimed. Absent ⇒ no proof is ever requested.
+   */
+  ackController?: {
+    provenInset: () => number
+    recordPush: (seq: number, topInset: number, ackRequested: boolean) => void
+  }
 }
 
 /** Result of {@link usePreviewBounds}. */
@@ -112,7 +114,8 @@ export interface UsePreviewBoundsResult {
  * ```
  */
 export function usePreviewBounds(options: UsePreviewBoundsOptions): UsePreviewBoundsResult {
-  const { placeholderRef, panelId, enabled, isVisible, isLive, searchOpen } = options
+  const { placeholderRef, panelId, enabled, isVisible, isLive, searchOpen, panelRef, ackController } =
+    options
 
   // Monotonic sequence so main can drop out-of-order sends (design §4.3). A ref,
   // not state — bumping it must never trigger a render.
@@ -124,6 +127,10 @@ export function usePreviewBounds(options: UsePreviewBoundsOptions): UsePreviewBo
   enabledRef.current = enabled
   const searchOpenRef = useRef(searchOpen)
   searchOpenRef.current = searchOpen
+  const ackControllerRef = useRef(ackController)
+  ackControllerRef.current = ackController
+  const panelTopRef = useRef(panelRef?.current ?? null)
+  panelTopRef.current = panelRef?.current ?? null
 
   const pushBounds = useCallback((): boolean => {
     if (!enabledRef.current) return false
@@ -135,12 +142,42 @@ export function usePreviewBounds(options: UsePreviewBoundsOptions): UsePreviewBo
       usePreviewViewportStore.getState().clearRect(panelId)
       return false
     }
-    // The chrome strip is unconditional; the find bar stacks on top of it.
-    const topInset =
-      PREVIEW_CHROME_INSET_PX + (searchOpenRef.current ? SEARCH_BAR_INSET_PX : 0)
-    const bounds = deriveBounds(el.getBoundingClientRect(), topInset)
+    // ONLY the find bar. The chrome strip above the page area used to be added
+    // here as a second constant, PREVIEW_CHROME_INSET_PX, duplicating the
+    // `height` in HtmlPreviewPanel.css with nothing but comments keeping the two
+    // in step. The strip is now a flow sibling ABOVE `.html-preview-page-area`,
+    // so the placeholder's own box already excludes it — at whatever height it
+    // happens to be, which is what lets the permission band grow when its list
+    // opens without a single number changing here.
+    //
+    // The find bar keeps its inset because it is still an overlay INSIDE the page
+    // area, not a sibling above it.
+    const topInset = searchOpenRef.current ? SEARCH_BAR_INSET_PX : 0
+    const rect = el.getBoundingClientRect()
+    const bounds = deriveBounds(rect, topInset)
     if (!bounds) return false
-    window.api.preview.setBounds(panelId, bounds, seqRef.current++)
+
+    /*
+     * The inset that matters for the fail-safe is the distance from the PANEL's
+     * top edge to the view's top edge — not `topInset`, which is only the find
+     * bar now that the chrome band is subtracted by layout. When the band grows,
+     * `topInset` does not change at all; the placeholder's own box moves down.
+     */
+    const panelTop = panelTopRef.current?.getBoundingClientRect().top ?? rect.top
+    const effectiveInset = bounds.y - panelTop
+
+    const ack = ackControllerRef.current
+    const needsAck = ack !== undefined && needsBoundsAck(effectiveInset, ack.provenInset())
+    // Three arguments, not four-with-undefined, when no proof is wanted: the
+    // steady-state push stays byte-identical to what it always was, and the
+    // ack option appears only on the pushes that actually reveal chrome.
+    if (needsAck) {
+      window.api.preview.setBounds(panelId, bounds, seqRef.current, { ack: true })
+    } else {
+      window.api.preview.setBounds(panelId, bounds, seqRef.current)
+    }
+    ack?.recordPush(seqRef.current, effectiveInset, needsAck)
+    seqRef.current += 1
     // Publish where the native view sits so Erfana's own chrome can place itself
     // beside it instead of hiding it (the toast stack does this). Deliberately
     // NOT keyed on whether the view is currently visible: occlusion is the

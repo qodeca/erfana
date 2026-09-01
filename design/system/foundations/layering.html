@@ -49,6 +49,7 @@
   <div class="rung"><span class="tok">--z-tooltip</span><span class="val">3000</span><span class="use">Tooltips.</span></div>
   <div class="rung"><span class="tok">--z-popover</span><span class="val">2000</span><span class="use">Popovers, the failure-badge panel.</span></div>
   <div class="rung"><span class="tok">--z-modal</span><span class="val">1000</span><span class="use">Full-screen overlays that are not dialogs.</span></div>
+  <div class="rung"><span class="tok">--z-modal-backdrop</span><span class="val">900</span><span class="use">The scrim behind one. Declared and used by nothing — the app's overlays paint their own.</span></div>
   <div class="rung"><span class="tok">--z-fixed / --z-sticky</span><span class="val">500 / 200</span><span class="use">Pinned chrome.</span></div>
   <div class="rung"><span class="tok">--z-dropdown</span><span class="val">100</span><span class="use">Dropdowns — and two hardcoded <code>100</code>s that tie with it.</span></div>
   <div class="rung"><span class="tok">--z-base</span><span class="val">0</span><span class="use">Everything else.</span></div>
@@ -89,8 +90,15 @@
 <h2>The rule</h2>
 <p style="max-width: 76ch; color: var(--color-text-tertiary)">
   Never write a raw z-index. If no rung fits, add one to the scale — do not squeeze a number in between.
-  And never mirror a token into TypeScript: two files currently hardcode <code>10000</code> and
-  <code>1000</code> as JS constants, so changing the CSS silently desynchronises the runtime.
+  And never mirror a token into TypeScript: <strong><span data-claim="zindex-js-literals"></span>
+  renderer files</strong> currently carry a z-index literal in TS — <code>BASE_ZINDEX = 10000</code> in
+  <code>DialogContext</code> and <code>OVERLAY_BASE_ZINDEX = 1000</code> in
+  <code>useOverlayOccluderStore</code> mirror <code>--z-dialog</code> and <code>--z-modal</code>
+  outright, and the rest pass literals in as JSX props. Changing the CSS silently desynchronises the
+  runtime.
+  <br><br>
+  This sentence used to say "two files", counted by hand, and was wrong — it saw the two constants and
+  none of the prop sites. It is now derived, which is the only reason it can stay right.
 </p>
 
 </body>

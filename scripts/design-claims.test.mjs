@@ -28,6 +28,14 @@ import { describe, expect, it } from 'vitest'
 import { contrastRatio, evaluate, walk } from './lib/design-claims.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+
+/**
+ * The generator's own source, read as text so the manifest test below cannot
+ * drift from it. Importing would be cleaner, but design-sync.mjs runs its CLI on
+ * import and does not export its file list; reading the text keeps the test
+ * honest without reshaping the script around it.
+ */
+const SYNC_SOURCE = readFileSync(path.join(ROOT, 'scripts/design-sync.mjs'), 'utf8')
 const DESIGN = path.join(ROOT, 'design')
 
 const LEDGER = (() => {
@@ -133,6 +141,39 @@ describe('design claims ledger', () => {
 })
 
 describe('design folder hygiene', () => {
+  it('accounts for every component stylesheet — adopted ones must be synced', () => {
+    // The gap this closes: `design -- --check` compares only the files
+    // design-sync.mjs lists. Move a component stylesheet into src/ and forget to
+    // add it to COMPONENT_CSS, and the check cheerfully reports "up to date"
+    // while the design/ copy drifts away from the shipping one — the exact
+    // failure the tokens.css comparison exists to prevent, reintroduced one
+    // directory down. So every file under design/system/components/ must be
+    // either synced from src/ or listed here as a proposal with no incumbent.
+    const PROPOSED_NOT_YET_ADOPTED = [
+      'design/system/components/menu/menu.css',
+      'design/system/components/row/row.css'
+    ]
+
+    const synced = SYNC_SOURCE.match(/rel: '([^']+\.css)'/g)
+      .map(m => `design/${m.slice(6, -1)}`)
+
+    const onDisk = walk(ROOT, 'design/system/components', ['.css'])
+    const unaccounted = onDisk.filter(
+      f => !synced.includes(f) && !PROPOSED_NOT_YET_ADOPTED.includes(f)
+    )
+
+    expect(
+      unaccounted,
+      `component CSS neither synced from src/ nor declared proposed: ${unaccounted.join(', ')}. ` +
+        'If it moved to src/, add it to COMPONENT_CSS in scripts/design-sync.mjs.'
+    ).toEqual([])
+
+    // And the reverse: a file listed as proposed must not have quietly gained a
+    // src/ home, which would make its header comment a lie.
+    const stale = PROPOSED_NOT_YET_ADOPTED.filter(f => synced.includes(f))
+    expect(stale, `declared proposed but actually synced: ${stale.join(', ')}`).toEqual([])
+  })
+
   it('has every card carrying its @card marker', () => {
     const missing = CARD_FILES.filter(file => {
       const head = readFileSync(path.join(ROOT, file), 'utf8').split('\n').slice(0, 5).join('\n')

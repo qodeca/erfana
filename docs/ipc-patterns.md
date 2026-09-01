@@ -329,7 +329,9 @@ Channel names come from the `PreviewChannels` / `PreviewEvents` constants in `sr
 | `preview:stopFind` | Stop the active in-page find |
 | `preview:exportPdf` | Export the live previewed page to PDF |
 | `preview:failuresChanged` | Event: the failure log for a panel changed (coalesced) |
-| `preview:hostBlocked` | Event: a remote host was blocked; drives the approve toast (budgeted) |
+| `preview:hostBlocked` | Event: a remote host was blocked, with every kind it was refused for. Drives the permission band's blocked list. De-duplicated main-side (one message per host per *change of kinds*, not per request) and capped at `PREVIEW.MAX_BLOCKED_HOSTS_PER_VIEW`; the `truncated` flag rides the last event that fits |
+| `preview:allowlistChanged` | Event: the project's approved-host set. Seeded on open so a project can show what was granted in an earlier session, and fanned out after an approval to every live view of the project |
+| `preview:visibilityApplied` | Event: a visibility change was APPLIED to the native view. The mirror of `boundsApplied`: `setVisibility` is fire-and-forget and the hide path awaits a `capturePage` first, so anything that reveals Erfana's controls *because* the page was hidden must wait for this |
 | `preview:findResult` | Event: an in-page find produced a final result |
 | `preview:stillFrameChanged` | Event: the still-frame captured on hide changed |
 | `preview:loadStateChanged` | Event: the load state for a panel changed |

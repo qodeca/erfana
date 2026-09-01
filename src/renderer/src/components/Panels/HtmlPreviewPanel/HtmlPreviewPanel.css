@@ -39,34 +39,57 @@
  * ============================================ */
 
 .html-preview-surface {
+  /* A COLUMN, so the chrome strip's height is subtracted from the page area by
+     layout instead of being re-stated as a number in TypeScript. The strip used
+     to be `position: absolute` over the page area, which is why its height had to
+     be duplicated as PREVIEW_CHROME_INSET_PX and added back on when the native
+     view's bounds were computed — two literals that only comments kept in step.
+     In flow there is no literal to duplicate, and a strip whose height changes
+     (the permission band opening its list) needs no code change at all. */
+  display: flex;
+  flex-direction: column;
   position: relative;
   flex: 1;
   min-height: 0;
 }
 
 /*
+ * The page area: everything below the strip. This is the positioning context for
+ * the find bar, so the bar's `top` offset measures from BELOW the strip and it
+ * cannot land on top of the strip's own controls when the strip grows.
+ */
+.html-preview-page-area {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/*
  * The always-DOM "Preview – content below is not Erfana" strip.
  *
- * A SECURITY CONTROL, not a label. The native view is inset below it
- * (`PREVIEW_CHROME_INSET_PX` in hooks/usePreviewBounds.ts), so the untrusted page
- * provably cannot paint over it — which is what lets a reader tell a genuine
- * Erfana prompt from one the page drew. Keep it unconditional, keep it opaque,
- * and keep its height in step with that constant.
+ * A SECURITY CONTROL, not a label. It is a flow sibling ABOVE
+ * `.html-preview-page-area` in a flex column, so the untrusted page has nowhere
+ * to paint that could cover it — which is what lets a reader tell a genuine
+ * Erfana prompt from one the page drew. Keep it unconditional and keep it opaque.
+ *
+ * Its height is now free. The strip used to be `position: absolute` over the page
+ * area, so this `height` had to be restated as PREVIEW_CHROME_INSET_PX in
+ * hooks/usePreviewBounds.ts and added back on when the native view's bounds were
+ * computed; the guarantee held only while those two numbers agreed. In flow the
+ * placeholder's own box excludes the strip whatever it measures, which is what
+ * lets the permission band grow when it opens its list.
  *
  * The wording names WHICH SIDE of the line is which. "Preview – not Erfana"
  * alone read as the strip disowning itself, when the strip IS Erfana and the
  * area below it is not.
  *
- * It must never wrap. A second line would overflow the fixed 22px band that
- * `PREVIEW_CHROME_INSET_PX` reserves, and the page would paint over it — the one
- * thing this control exists to prevent. Clipping to an ellipsis in a narrow
- * panel is the correct degradation.
+ * It must never wrap. Not because a second line would be covered any more — it
+ * would push the page down instead — but because this is a one-line control whose
+ * text has to stay readable at any panel width. Clipping to an ellipsis in a
+ * narrow panel is the correct degradation; a silent reflow is not.
  */
 .html-preview-chrome-strip {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
+  flex: 0 0 auto;
   height: 22px;
   display: flex;
   align-items: center;
@@ -108,13 +131,10 @@
   text-overflow: ellipsis;
   user-select: none;
   pointer-events: none;
-  /* stylelint-disable-next-line declaration-property-value-disallowed-list --
-     Local stacking inside this panel: the strip has to paint above its own
-     sibling backdrop element, nothing more. The z-scale answers "what covers
-     what across the window" and has no rung for two siblings; borrowing one
-     would imply an app-wide claim this element does not make.
-     See design/system/foundations/layering.html. */
-  z-index: 1;
+  /* No z-index. The strip used to need one because it was absolutely positioned
+     OVER the placeholder; in flow it is a sibling above it in the column and
+     nothing overlaps. One fewer stacking claim, and one fewer stylelint
+     exception — see design/system/foundations/layering.html, which counts them. */
 }
 
 /*

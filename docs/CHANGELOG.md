@@ -6,7 +6,21 @@ Per-version release notes for Erfana, v0.9.0 onwards. Earlier: v0.8.0–v0.8.3 i
 
 ## Unreleased
 
+### Changed
+
+- **Approving a remote host in an HTML preview is a completely different experience.** A previewed page that wanted fonts, scripts or images from the internet used to raise one pop-up per host over your file tree, capped at three — so a page reaching four hosts gave you three stacked walls of identical text, and the fourth host **could not be approved at all**, because the app had run out of pop-ups. There is now a strip along the top of every preview showing how many hosts were blocked and how many are already allowed. Click it to see them, each with what it was blocked for, and approve them one at a time. Nothing pops up.
+
+  Four things that were not possible before:
+
+  - **You can see what a project has already approved.** Previously nothing anywhere showed you — which mattered most for a repository you cloned, since it can arrive with hosts already approved by someone else.
+  - **A failed approval says so.** If the settings file cannot be written — a read-only checkout, a full list — the row comes back and tells you, instead of the prompt just disappearing as though it had worked.
+  - **Every blocked host is listed**, not the first three.
+  - **The question is read once**, on the row it belongs to, and answering it takes two steps: Allow opens it, Confirm answers it. The confirm step says plainly that the grant lets that host run code and send data, is written into the project, travels to anyone who clones it, and cannot be undone from inside Erfana.
+
 ### Fixed
+
+- **A previewed page can no longer be sitting under the buttons that grant it permission.** The page is a separate layer that paints over Erfana's own interface, so when the host list opens, the space those buttons occupy was the page's a moment earlier. Erfana now reserves the space, asks the page to confirm it has moved, and gives it 300 ms. A page stuck in a loop never answers — so it is hidden rather than trusted, and the strip says why. The same applies when the panel is too short to show both.
+- **A page asking one host for forty files sent forty identical messages** to the rest of the app. Now it sends one, and the list of blocked hosts has a stated limit instead of an accidental one.
 
 - **Text fields you could not see** – an input's inside was exactly the same colour as the panel behind it, and its border was so faint it measured 1.24:1 against a required 3:1. On a good monitor in a bright room you found the box by clicking where you guessed it was; with low vision you could not find it at all. Fields now draw a boundary you can actually see, on every surface they appear on, and placeholder text went from 2.69:1 to 4.53:1 so it is readable rather than a suggestion of text. This affects every dialog, the rename box, the search bar and the settings panel.
 - **Coloured values in document frontmatter came out plain grey** – a `true` or a `42` at the top of a markdown file was supposed to be colour-coded like the strings beside it. The colours were referenced but never defined, so they silently fell back to body text in every document with frontmatter. Numbers and booleans are now coloured, and the window picker's thumbnail frame – missing for the same reason – is back.

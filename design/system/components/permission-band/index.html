@@ -11,6 +11,7 @@
 <link rel="stylesheet" href="../../../ds.css">
 <script src="../../../claims.js"></script>
 <link rel="stylesheet" href="../row/row.css">
+<link rel="stylesheet" href="../row/host.css">
 <link rel="stylesheet" href="./band.css">
 <style>
   /* Documentation-only chrome. None of this ships. */
@@ -158,19 +159,59 @@
   It also says the grant is written into the project, travels to anyone who clones the repository,
   and cannot be undone from inside Erfana. That is the honest sentence — and it is read once, on the
   row you chose, instead of four times over your file tree.
+  <br><br>
+  <strong>Which is why an allowed row shows no kind at all.</strong> The same word that is a fact on a
+  blocked row — "this was refused, for a font" — becomes a claim about scope on an allowed one, and the
+  scope is not real. The allowlist stores hosts and nothing else, so for a host approved last month the
+  kind is unknowable anyway; filling the column for this session's approvals only would invite the
+  reader to infer a difference in grant that does not exist.
 </div>
+
+<h2>Exceptions</h2>
+<p style="max-width: 72ch; color: var(--color-text-tertiary)">
+  Where the shipping component departs from this card, with the reason. An undocumented deviation is a
+  bug; a documented one is a decision.
+</p>
+<table>
+  <thead><tr><th>Where</th><th>The card</th><th>The component, and why</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Focus after Cancel, and after a failed approval</td>
+      <td>Returns to the chip.</td>
+      <td>Returns to the <em>Allow button that opened the question</em>. The card has no choice: its
+        <code>render()</code> does <code>scroll.innerHTML = ''</code>, so the invoking button no longer
+        exists — the same trap recorded in <code>focusConfirm()</code>. React keeps the row, so the
+        standard dismiss-to-invoker behaviour is available and is what the product card's "steps back
+        one level at a time" describes. After a <em>successful</em> approval the row genuinely is gone,
+        and both agree on the chip.</td>
+    </tr>
+    <tr>
+      <td>Confirm</td>
+      <td>Answers immediately.</td>
+      <td>Is an async IPC round trip, followed by a CSP rebuild and a reload. Confirm carries
+        <code>aria-disabled</code> while the write is in flight, and Escape is ignored in that state —
+        there is no safe way to cancel a write already sent.</td>
+    </tr>
+  </tbody>
+</table>
 
 <script>
 const SEED = {
   blocked: [
     { host: 'fonts.googleapis.com', kind: 'style' },
     { host: 'cdn.jsdelivr.net', kind: 'script' },
-    { host: 'cdnjs.cloudflare.com', kind: 'script' },
-    { host: 'placehold.co', kind: 'image' }
+    // Long enough to wrap at this width. A host that never wraps leaves the
+    // wrapping rule described rather than rendered, which is how the old
+    // front-elide shipped broken for months.
+    { host: 'assets.tracking.eu-west-1.metrics.a-very-long-tenant.example.co.uk', kind: 'connect' },
+    // Not approvable: an IP literal can never be added to the allowlist
+    // (isApprovableHost refuses it), so this row has no Allow button at all.
+    { host: '203.0.113.7', kind: 'image', approvable: false }
   ],
+  // No `kind` here, deliberately — see allowedRow().
   allowed: [
-    { host: 'fonts.gstatic.com', kind: 'font' },
-    { host: 'cdn.example.com', kind: 'image' }
+    { host: 'fonts.gstatic.com' },
+    { host: 'cdn.example.com' }
   ]
 };
 
@@ -219,7 +260,7 @@ function render() {
     for (const item of showBlocked) scroll.appendChild(blockedRow(item));
   }
   if (allowed.length && !confirming) {
-    scroll.appendChild(section('Already allowed in this project'));
+    scroll.appendChild(section('Allowed in this project'));
     for (const item of allowed) scroll.appendChild(allowedRow(item));
   }
   if (!blocked.length && !allowed.length) {
@@ -239,40 +280,27 @@ function section(text) {
   return node;
 }
 
-/* DEMO ONLY — a real split needs the Public Suffix List. "Last two labels" is
-   wrong for example.co.uk, and a wrong boundary puts the invariant in the wrong
-   place, which is worse than having none. See the Rows card. */
-function splitHost(host) {
-  const bare = host.replace(/\.$/, '').split(':')[0];
-  const port = host.slice(bare.length);
-  const labels = bare.split('.');
-  if (labels.length <= 2) return { prefix: '', registrable: bare + port };
-  const registrable = labels.slice(-2).join('.');
-  return { prefix: bare.slice(0, bare.length - registrable.length), registrable: registrable + port };
-}
+/* The host WRAPS; it is never cut, so the registrable domain can never be the
+   part that vanishes. .erf-host comes from ../row/row.css — one primitive, one
+   definition. A front-elide was built first and worked, but it has to be told
+   where the registrable domain begins, and only the Public Suffix List knows
+   that; a cut at the wrong boundary pins `co.uk` and leaves `evil` shrinkable,
+   which is the trap itself. See the Rows card for the full record.
 
-/* The host, front-elided so the registrable domain can never be the part cut
-   off. .erf-host comes from ../row/row.css — one primitive, one definition.
-   The full host goes in the accessible name: `title` is unreachable by keyboard
-   and by touch, so it is not a substitute. */
+   The <wbr> after each dot makes label boundaries the preferred break points.
+   It is a layout hint only and must not reach the accessible name, which
+   carries the raw host: `title` is unreachable by keyboard and by touch, so it
+   is not a substitute. */
 function hostNode(host) {
-  const { prefix, registrable } = splitHost(host);
   const wrap = document.createElement('span');
   wrap.className = 'erf-host';
   wrap.dir = 'ltr';
-  wrap.setAttribute('aria-label', `${host}, registrable domain ${registrable}`);
+  wrap.setAttribute('aria-label', host);
 
-  const pre = document.createElement('span');
-  pre.className = 'erf-host__prefix';
-  const preBdi = document.createElement('bdi');
-  preBdi.textContent = prefix;
-  pre.appendChild(preBdi);
-
-  const reg = document.createElement('bdi');
-  reg.className = 'erf-host__registrable';
-  reg.textContent = registrable;
-
-  wrap.append(pre, reg);
+  host.split('.').forEach((label, i, all) => {
+    wrap.append(document.createTextNode(i === all.length - 1 ? label : label + '.'));
+    if (i < all.length - 1) wrap.appendChild(document.createElement('wbr'));
+  });
   return wrap;
 }
 
@@ -286,9 +314,23 @@ function blockedRow(item) {
   kind.className = 'erf-band__kind';
   kind.textContent = item.kind;
 
+  // A host the allowlist can never accept — an IP literal, a loopback name, a
+  // single label. `isApprovableHost` refuses it on both the read and the write
+  // path, so offering an Allow here would be a button that cannot work.
+  if (item.approvable === false) {
+    const nope = document.createElement('span');
+    nope.className = 'erf-band__state';
+    nope.textContent = 'Cannot be approved';
+    row.append(host, kind, nope);
+    return row;
+  }
+
   const action = document.createElement('button');
   action.className = 'erf-band__allow';
   action.textContent = 'Allow';
+  // Four buttons all named "Allow" is a screen-reader dead end. "Allow" is a
+  // prefix of this name, so label-in-name (SC 2.5.3) still holds.
+  action.setAttribute('aria-label', `Allow ${item.host}`);
   // Allow discloses the confirm step, so it says so.
   action.setAttribute('aria-expanded', String(confirming === item.host));
   if (confirming === item.host) action.setAttribute('aria-controls', 'confirmBox');
@@ -323,9 +365,14 @@ function confirmBlock(item) {
   // The container is the focus target, not the Confirm button — see focusConfirm().
   // alertdialog + these two references are what make a screen reader read the
   // whole consequence before any control is reachable.
+  //
+  // NO `aria-modal="true"`. It would be a false claim twice over: nothing
+  // outside this box is made inert, and `.erf-band__announce` — which
+  // focusConfirm() writes into WHILE the box is open — is a SIBLING of the box,
+  // so an aria-modal subtree would hide that announcement from the
+  // accessibility tree. The Tab trap below is what actually confines focus.
   box.id = 'confirmBox';
   box.setAttribute('role', 'alertdialog');
-  box.setAttribute('aria-modal', 'true');
   box.setAttribute('aria-labelledby', 'confirmTitle');
   box.setAttribute('aria-describedby', 'confirmBody1 confirmBody2');
   box.tabIndex = -1;
@@ -374,21 +421,36 @@ function anArticle(kind) {
   return /^[aeiou]/i.test(kind) ? `an ${kind}` : `a ${kind}`;
 }
 
+/*
+ * NO KIND COLUMN HERE, and the empty cell is the point.
+ *
+ * On a BLOCKED row the kind is a true statement about something that just
+ * happened: this host was refused, for a font. On an ALLOWED row the same word
+ * reads as "this host may only serve a font" — which is exactly the belief the
+ * confirm step exists to destroy. An approved host is added to every CSP
+ * directive the preview builds; it can serve code and receive data.
+ *
+ * The data agrees. `PreviewAllowlistSchema` stores hosts and nothing else, so
+ * for a host approved last month, or one that arrived with a cloned repository,
+ * the kind is simply unknowable. Filling the column for this session's
+ * approvals and leaving it blank for older ones would invite a reader to infer
+ * a difference in grant that does not exist.
+ */
 function allowedRow(item) {
   const row = document.createElement('div');
   row.className = 'erf-band__row';
 
   const host = hostNode(item.host);
 
-  const kind = document.createElement('span');
-  kind.className = 'erf-band__kind';
-  kind.textContent = item.kind;
+  // The 72px cell stays, empty, so allowed and blocked rows share one grid.
+  const gap = document.createElement('span');
+  gap.className = 'erf-band__kind';
 
   const state = document.createElement('span');
   state.className = 'erf-band__state';
   state.textContent = 'Allowed ✓';
 
-  row.append(host, kind, state);
+  row.append(host, gap, state);
   return row;
 }
 

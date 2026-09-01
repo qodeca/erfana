@@ -25,6 +25,7 @@ import { ErrorCode } from '../../../../../shared/errors'
 import type {
   PreviewFailureListPayload,
   PreviewForwardedShortcut,
+  PreviewAllowlistChangedPayload,
   PreviewHostBlockedPayload,
   PreviewLoadStatePayload
 } from '../../../../../shared/ipc/preview-schema'
@@ -40,6 +41,7 @@ interface Listeners {
   loadState: ((p: PreviewLoadStatePayload) => void) | null
   failures: ((p: PreviewFailureListPayload) => void) | null
   hostBlocked: ((p: PreviewHostBlockedPayload) => void) | null
+  allowlist: ((p: PreviewAllowlistChangedPayload) => void) | null
   forwardedShortcut: ((p: PreviewForwardedShortcut) => void) | null
 }
 
@@ -47,6 +49,7 @@ const listeners: Listeners = {
   loadState: null,
   failures: null,
   hostBlocked: null,
+  allowlist: null,
   forwardedShortcut: null
 }
 
@@ -66,6 +69,9 @@ interface MockPreview {
   onBackdropChanged: Mock
   onStillFrameChanged: Mock
   onHostBlocked: Mock
+  onAllowlistChanged: Mock
+  onBoundsApplied: Mock
+  onVisibilityApplied: Mock
   onForwardedShortcut: Mock
 }
 
@@ -120,6 +126,12 @@ beforeEach(() => {
       listeners.hostBlocked = cb
       return vi.fn()
     }),
+    onAllowlistChanged: vi.fn((cb: (p: PreviewAllowlistChangedPayload) => void) => {
+      listeners.allowlist = cb
+      return vi.fn()
+    }),
+    onBoundsApplied: vi.fn(() => vi.fn()),
+    onVisibilityApplied: vi.fn(() => vi.fn()),
     onForwardedShortcut: vi.fn((cb: (p: PreviewForwardedShortcut) => void) => {
       listeners.forwardedShortcut = cb
       return vi.fn()
@@ -165,7 +177,7 @@ describe('HtmlPreviewPanel', () => {
     // is how a reader tells a genuine prompt from one the page drew. It must not
     // be conditional on load state, failures or visibility.
     const { container } = render(<HtmlPreviewPanel {...makeProps('/proj/page.html')} />)
-    const strip = container.querySelector('.html-preview-chrome-strip')
+    const strip = container.querySelector('.erf-band')
     expect(strip).not.toBeNull()
     expect(strip?.textContent).toContain('not Erfana')
   })
@@ -176,7 +188,7 @@ describe('HtmlPreviewPanel', () => {
     // BELOW it is the untrusted page. A reader who cannot tell which side is
     // meant gets no protection from the band being there.
     const { container } = render(<HtmlPreviewPanel {...makeProps('/proj/page.html')} />)
-    const text = container.querySelector('.html-preview-chrome-strip')?.textContent ?? ''
+    const text = container.querySelector('.erf-band')?.textContent ?? ''
     expect(text).toContain('content below')
   })
 
@@ -184,19 +196,54 @@ describe('HtmlPreviewPanel', () => {
     // Read from the shipping stylesheet, the way Dialog.contrast.test.ts does:
     // the rule is the artefact, not a value duplicated in the test.
     //
-    // Why this is not cosmetic. `PREVIEW_CHROME_INSET_PX` reserves a FIXED 22px
-    // band and the native view is inset by exactly that much. A label long
-    // enough to wrap would take a second line the inset does not cover, and the
-    // untrusted page would paint over it — the one thing the strip exists to
-    // prevent. Lengthening the text is fine; letting it wrap is not.
-    const css = readFileSync(resolve(__dirname, 'HtmlPreviewPanel.css'), 'utf8')
+    // The reason changed but the rule did not. It used to be that a wrapped
+    // label would take a second line the FIXED 22px inset did not cover, and the
+    // page would paint over it. There is no fixed inset any more — the strip is
+    // in flow, so a second line would push the page down rather than be covered.
+    // What is still true is that the strip is a one-line control whose text must
+    // stay readable at any panel width; an ellipsis is the intended degradation,
+    // a silent reflow is not. Lengthening the text is fine; letting it wrap is not.
+    const css = readFileSync(resolve(__dirname, 'components/PreviewChromeBand.css'), 'utf8')
     const rule = css.slice(
-      css.indexOf('.html-preview-chrome-strip {'),
-      css.indexOf('}', css.indexOf('.html-preview-chrome-strip {'))
+      css.indexOf('.erf-band__label {'),
+      css.indexOf('}', css.indexOf('.erf-band__label {'))
     )
     expect(rule).toContain('white-space: nowrap')
     expect(rule).toContain('overflow: hidden')
-    expect(rule).toContain('height: 22px')
+  })
+
+  it('puts the page area BELOW the strip, so it cannot overlap it', () => {
+    // This replaces the arithmetic guarantee that PREVIEW_CHROME_INSET_PX used to
+    // give, and it is stronger: the old one held only while two numbers agreed
+    // (the constant in TypeScript and `height` in the stylesheet), so a strip
+    // that grew past its own reservation would be silently painted over by the
+    // untrusted page. Here the strip and the page area are siblings in a flex
+    // column, so "the page cannot cover the strip" is a structural fact rather
+    // than a maintained coincidence — and the strip may grow to any height,
+    // which is what lets the permission band open its list.
+    const { container } = render(<HtmlPreviewPanel {...makeProps('/proj/page.html')} />)
+
+    const surface = container.querySelector('.html-preview-surface')
+    const strip = container.querySelector('.erf-band')
+    const pageArea = container.querySelector('.html-preview-page-area')
+    expect(surface).not.toBeNull()
+    expect(strip).not.toBeNull()
+    expect(pageArea).not.toBeNull()
+
+    // Both are direct children of the surface, strip first.
+    expect(strip?.parentElement).toBe(surface)
+    expect(pageArea?.parentElement).toBe(surface)
+    expect(strip?.nextElementSibling).toBe(pageArea)
+
+    // And the native view's target is inside the page area, never beside the strip.
+    expect(pageArea?.querySelector('.html-preview-placeholder')).not.toBeNull()
+
+    const css = readFileSync(resolve(__dirname, 'HtmlPreviewPanel.css'), 'utf8')
+    const surfaceRule = css.slice(
+      css.indexOf('.html-preview-surface {'),
+      css.indexOf('}', css.indexOf('.html-preview-surface {'))
+    )
+    expect(surfaceRule).toContain('flex-direction: column')
   })
 
   it('closes the preview on unmount', () => {
@@ -356,49 +403,6 @@ describe('HtmlPreviewPanel', () => {
     expect(screen.queryByRole('button', { name: '1 preview issue' })).toBeNull()
   })
 
-  it('raises an approve action toast on an approvable blocked host (UX-001)', async () => {
-    const toastEvents: CustomEvent[] = []
-    const capture = (e: Event): void => {
-      toastEvents.push(e as CustomEvent)
-    }
-    window.addEventListener('app:toast', capture)
-
-    try {
-      render(<HtmlPreviewPanel {...makeProps('/proj/page.html')} />)
-
-      await waitFor(() => expect(listeners.hostBlocked).not.toBeNull())
-      listeners.hostBlocked?.({
-        panelId: 'preview-1',
-        host: 'cdn.example',
-        approvable: true,
-        kinds: ['script'],
-        notify: true
-      })
-
-      await waitFor(() => expect(toastEvents.length).toBe(1))
-      const detail = toastEvents[0].detail
-      expect(detail.message).toContain('cdn.example')
-      expect(detail.action?.label).toBe('Approve for this project')
-
-      // The copy must name the GRANT, not the UI's reaction. It used to say the
-      // preview "will reload and may fetch remote content", which reads as
-      // unblocking one image in one preview — while the host is in fact added
-      // to `script-src` and `connect-src` too, saved into the repository, and
-      // not revocable from Erfana. Asserted as properties rather than as an
-      // exact string so the wording can be improved without editing this test.
-      expect(detail.message).toMatch(/\.erfana\/settings\.json/)
-      expect(detail.message).toMatch(/every preview/i)
-      expect(detail.message).toMatch(/clone/i)
-      expect(detail.message).toMatch(/cannot undo/i)
-
-      // Activating the action approves the host; main reloads on its side.
-      detail.action?.onClick()
-      expect(preview.approveHost).toHaveBeenCalledWith('preview-1', 'cdn.example')
-    } finally {
-      window.removeEventListener('app:toast', capture)
-    }
-  })
-
   it('records a blocked host the toast budget suppressed', async () => {
     // THE DEFECT, from the renderer's side. Host four raises no toast by design,
     // and used not to arrive at all — so it could not be listed and could not be
@@ -470,79 +474,6 @@ describe('HtmlPreviewPanel', () => {
       expect(rows).toHaveLength(1)
       expect(rows[0].kinds).toEqual(['style', 'script'])
     })
-  })
-
-  it('refuses to approve for a panel that is no longer open', async () => {
-    // THE DEFECT. The toast is app-level and, carrying an action, never
-    // auto-dismisses — but this panel's cleanup only unsubscribes IPC. Close
-    // the tab, then click Approve, and the host was still written into
-    // `.erfana/settings.json`: `allowlist-handlers` persists before the view is
-    // consulted, and `applyApprovedHosts` then returns silently for a panel
-    // that does not exist. A permanent, repo-wide grant with nothing on screen.
-    const toastEvents: CustomEvent[] = []
-    const capture = (e: Event): void => {
-      toastEvents.push(e as CustomEvent)
-    }
-    window.addEventListener('app:toast', capture)
-
-    try {
-      const { unmount } = render(<HtmlPreviewPanel {...makeProps('/proj/page.html')} />)
-      await waitFor(() => expect(listeners.hostBlocked).not.toBeNull())
-      listeners.hostBlocked?.({
-        panelId: 'preview-1',
-        host: 'cdn.example',
-        approvable: true,
-        kinds: ['script'],
-        notify: true
-      })
-      await waitFor(() => expect(toastEvents.length).toBe(1))
-      const approve = toastEvents[0].detail.action
-
-      // The control: while the panel IS open, the action approves.
-      approve?.onClick()
-      expect(preview.approveHost).toHaveBeenCalledTimes(1)
-
-      // Now the panel goes away, as closing its tab would do.
-      act(() => {
-        unmount()
-      })
-      usePreviewStore.getState().reset()
-
-      approve?.onClick()
-
-      expect(preview.approveHost).toHaveBeenCalledTimes(1)
-      // And the reader is told, rather than the click doing nothing at all.
-      expect(toastEvents.at(-1)?.detail.title).toBe('Preview closed')
-    } finally {
-      window.removeEventListener('app:toast', capture)
-    }
-  })
-
-  it('raises a non-actionable toast on a non-approvable blocked host (UX-001)', async () => {
-    const toastEvents: CustomEvent[] = []
-    const capture = (e: Event): void => {
-      toastEvents.push(e as CustomEvent)
-    }
-    window.addEventListener('app:toast', capture)
-
-    try {
-      render(<HtmlPreviewPanel {...makeProps('/proj/page.html')} />)
-
-      await waitFor(() => expect(listeners.hostBlocked).not.toBeNull())
-      listeners.hostBlocked?.({
-        panelId: 'preview-1',
-        host: 'evil.example',
-        approvable: false,
-        kinds: ['connect'],
-        notify: true
-      })
-
-      await waitFor(() => expect(toastEvents.length).toBe(1))
-      expect(toastEvents[0].detail.action).toBeUndefined()
-      expect(preview.approveHost).not.toHaveBeenCalled()
-    } finally {
-      window.removeEventListener('app:toast', capture)
-    }
   })
 
   it('ignores a blocked-host event for another panel (UX-001)', async () => {

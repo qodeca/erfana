@@ -339,6 +339,49 @@ test.describe('HTML preview corpus', () => {
       .toContain('CDN blocked')
   })
 
+  test('cdn: the permission band lists the blocked host and can approve it', async ({
+    windowWithTestProject
+  }) => {
+    // The band is DOM chrome, so unlike the previewed page it is reachable from
+    // the Playwright side. This is the only automated cover for the surface that
+    // replaced the approve toast — and for the case that broke the old one: a
+    // host is listed whether or not anything popped up, because nothing pops up.
+    await openPreview(windowWithTestProject, 'cdn/index.html')
+
+    const chip = windowWithTestProject.getByTestId('preview-band-chip')
+    await expect(chip).toBeVisible()
+
+    // Counts are ALWAYS shown, including the zeroes: a trust signal that appears
+    // only when something is wrong is not a trust signal.
+    await expect(chip).toHaveText(/\d+ blocked · \d+ allowed/)
+
+    // The CSP refuses cdn.jsdelivr.net in the renderer, and the violation bridge
+    // reports it — so the band must list it even though the network filter never
+    // saw the request.
+    await expect
+      .poll(async () => (await chip.textContent()) ?? '', {
+        timeout: PREVIEW_BUDGET_MS,
+        message: 'the band never reported the blocked CDN host'
+      })
+      .toMatch(/[1-9]\d* blocked/)
+
+    await chip.click()
+    const band = windowWithTestProject.locator('.erf-band')
+    await expect(band.getByText('Blocked on load')).toBeVisible()
+    await expect(band.locator('.erf-host', { hasText: 'cdn.jsdelivr.net' })).toBeVisible()
+
+    // Allow OPENS the question; it does not answer it. That split is what stops a
+    // one-way door being opened by a stray Return.
+    await band.getByRole('button', { name: 'Allow cdn.jsdelivr.net' }).click()
+    await expect(band.getByRole('alertdialog')).toBeVisible()
+    await expect(band.getByText(/Erfana cannot undo it/)).toBeVisible()
+
+    // Cancel leaves the grant unmade and the host still listed.
+    await band.getByRole('button', { name: 'Cancel' }).click()
+    await expect(band.getByRole('alertdialog')).toHaveCount(0)
+    await expect(band.locator('.erf-host', { hasText: 'cdn.jsdelivr.net' })).toBeVisible()
+  })
+
   test('the native view is sized on open, with no tab switch to prod it (black-panel regression)', async ({
     windowWithTestProject,
     appWithTestProject
@@ -377,8 +420,11 @@ test.describe('HTML preview corpus', () => {
       .toBeGreaterThan(expectedWidth - 4)
 
     const bounds = await previewViewBounds(appWithTestProject)
-    // Height is the placeholder minus the chrome strip the view is inset below,
-    // so it is checked with a wider allowance than the width.
-    expect(bounds?.height).toBeGreaterThan(expectedHeight - 40)
+    // The placeholder now IS the page area: the chrome strip is a flow sibling
+    // above it rather than an overlay on it, so no inset is subtracted here any
+    // more and the height gets the same tight DIP-rounding tolerance as the
+    // width. The old allowance was 40px, wide enough to hide a whole missing
+    // strip's worth of geometry error.
+    expect(bounds?.height).toBeGreaterThan(expectedHeight - 4)
   })
 })

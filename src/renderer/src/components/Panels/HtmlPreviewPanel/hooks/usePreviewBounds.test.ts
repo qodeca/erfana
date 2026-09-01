@@ -25,11 +25,7 @@
 import { renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import {
-  usePreviewBounds,
-  PREVIEW_CHROME_INSET_PX,
-  SEARCH_BAR_INSET_PX
-} from './usePreviewBounds'
+import { usePreviewBounds, SEARCH_BAR_INSET_PX } from './usePreviewBounds'
 import { usePreviewViewportStore } from '../../../../stores/usePreviewViewportStore'
 
 const PANEL_ID = 'preview-panel-1'
@@ -102,15 +98,22 @@ describe('usePreviewBounds — first rect after open', () => {
 
     expect(setBounds).toHaveBeenCalledWith(
       PANEL_ID,
-      { x: 477, y: 41 + PREVIEW_CHROME_INSET_PX, width: 400, height: 827 - PREVIEW_CHROME_INSET_PX },
+      { x: 477, y: 41, width: 400, height: 827 },
       expect.any(Number)
     )
   })
 
-  it('always leaves room for the chrome strip the page cannot paint over', () => {
-    // A security control, not a margin: the strip is how a reader tells a real
-    // Erfana prompt from one an untrusted page drew, so the view must never be
-    // allowed to cover it — including when the find bar is closed.
+  it('adds no inset of its own when the find bar is closed', () => {
+    // The chrome strip's room is no longer reserved here. It used to be:
+    // PREVIEW_CHROME_INSET_PX added 22px and duplicated the strip's CSS `height`,
+    // which is two numbers one comment kept in step. The strip is now a flow
+    // sibling ABOVE `.html-preview-page-area`, so the placeholder this hook
+    // measures already excludes it, at whatever height it happens to be.
+    //
+    // The security property did not weaken, it moved: it is now a DOM-order
+    // invariant asserted in HtmlPreviewPanel.test.tsx ("the page area cannot
+    // overlap the strip"), which is stronger than an arithmetic one because a
+    // strip that grows can no longer outgrow its own reservation.
     const { ref } = makePlaceholder(LAID_OUT)
 
     renderHook(() =>
@@ -125,7 +128,7 @@ describe('usePreviewBounds — first rect after open', () => {
     )
 
     const [, bounds] = setBounds.mock.calls[0] as [string, { y: number; height: number }]
-    expect(bounds.y).toBeGreaterThanOrEqual(LAID_OUT.top + PREVIEW_CHROME_INSET_PX)
+    expect(bounds.y).toBe(LAID_OUT.top)
     expect(bounds.y + bounds.height).toBeLessThanOrEqual(LAID_OUT.top + LAID_OUT.height)
   })
 
@@ -201,8 +204,8 @@ describe('usePreviewBounds — first rect after open', () => {
       PANEL_ID,
       expect.objectContaining({
         // The find bar stacks ON TOP of the always-present chrome strip.
-        y: LAID_OUT.top + PREVIEW_CHROME_INSET_PX + SEARCH_BAR_INSET_PX,
-        height: LAID_OUT.height - PREVIEW_CHROME_INSET_PX - SEARCH_BAR_INSET_PX
+        y: LAID_OUT.top + SEARCH_BAR_INSET_PX,
+        height: LAID_OUT.height - SEARCH_BAR_INSET_PX
       }),
       expect.any(Number)
     )
@@ -261,7 +264,7 @@ describe('usePreviewBounds — first rect after open', () => {
 
     expect(setBounds).toHaveBeenCalledWith(
       PANEL_ID,
-      { x: 477, y: 41 + PREVIEW_CHROME_INSET_PX, width: 400, height: 827 - PREVIEW_CHROME_INSET_PX },
+      { x: 477, y: 41, width: 400, height: 827 },
       expect.any(Number)
     )
   })
@@ -286,9 +289,9 @@ describe('usePreviewBounds — publishing where the view sits', () => {
     // so anything dodging it dodges the real rectangle.
     expect(usePreviewViewportStore.getState().rects.get(PANEL_ID)).toEqual({
       left: 477,
-      top: 41 + PREVIEW_CHROME_INSET_PX,
+      top: 41,
       width: 400,
-      height: 827 - PREVIEW_CHROME_INSET_PX
+      height: 827
     })
   })
 
