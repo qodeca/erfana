@@ -497,21 +497,65 @@ export class PreviewLiveView {
   /**
    * Show or hide the native view.
    *
-   * ORDERING IS THE HARD PART. The hide path captures a still frame first, which
-   * is a real async round trip, while the show path is entirely synchronous. So
-   * a hide that started earlier can finish LATER than a show that started after
-   * it — open an overlay and dismiss it quickly and the late hide wins, leaving
-   * the view hidden while `OverlayGuardService` has already recorded it visible.
-   * Because that guard only re-sends on a CHANGE, nothing corrects it and the
-   * panel stays on its placeholder until some unrelated transition (F10).
+   * THE HIDE IS SYNCHRONOUS, AND THAT IS THE WHOLE POINT.
    *
-   * `wantedVisible` is the last state anyone asked for. The hide re-reads it
-   * after the capture and stands down if a show overtook it. The call is also
-   * fire-and-forget from `ipcMain.on`, so nothing else serialises these.
+   * A native view takes pointer input over its own rectangle, whatever the DOM
+   * says. So every millisecond between "an overlay opened" and
+   * `view.setVisible(false)` is a millisecond in which the previewed page is
+   * eating clicks meant for a dialog that is already drawn on screen.
+   *
+   * This method used to `await` the still-frame capture BEFORE hiding. The
+   * reported symptom was exact: a Delete confirmation appeared over a preview of
+   * a very large page, and none of its buttons could be clicked — Escape worked,
+   * because the keyboard does not route through the view. Trying again worked,
+   * because the first capture was still in flight and `captureIfStale` skips
+   * when one is, so the second hide reached `setVisible(false)` immediately.
+   * A confirm dialog whose buttons respond on the second attempt is the worst
+   * possible failure for a control that deletes a file.
+   *
+   * The capture is still started FIRST, and still not awaited: calling
+   * `capturePage` raises the capturer count, which is what keeps the page
+   * producing frames while the view is hidden, so starting it and hiding in the
+   * same tick captures live pixels without anyone waiting.
+   *
+   * The previous frame is emitted up front so the placeholder is already showing
+   * something at the moment the view disappears. Without it a hide would flash
+   * the backdrop colour until the fresh capture landed.
+   *
+   * THE RACE THIS ALSO REMOVES. The old ordering comment described a real bug: a
+   * hide that started earlier could finish LATER than a show that started after
+   * it, leaving the view hidden while `OverlayGuardService` had recorded it
+   * visible — and because that guard only re-sends on a CHANGE, nothing
+   * corrected it and the panel stayed on its placeholder until some unrelated
+   * transition. A synchronous hide cannot be overtaken, so that window is gone
+   * rather than merely narrowed. `wantedVisible` survives because the capture's
+   * TAIL is still async, and a frame captured for a hide that has since been
+   * superseded must not be published as the panel's current picture.
    */
   private wantedVisible = false
 
-  async setVisibility(visible: boolean): Promise<void> {
+  /**
+   * The still-frame capture started by the most recent hide.
+   *
+   * Nothing on the interactive path waits for this — that is the whole point of
+   * the synchronous hide. It exists for the ONE caller that legitimately must:
+   * eviction, which hides a view and then destroys its `webContents` a line
+   * later. Without somewhere to await, that teardown races the capture and a
+   * suspended panel wakes up with no picture, which is exactly what the frame
+   * was captured for.
+   */
+  private pendingCapture: Promise<void> = Promise.resolve()
+
+  /**
+   * Resolve once the still-frame capture from the last hide has settled.
+   *
+   * For callers about to destroy this view. Never call it from an overlay path.
+   */
+  whenCaptureSettled(): Promise<void> {
+    return this.pendingCapture
+  }
+
+  setVisibility(visible: boolean): void {
     if (this.isDefunct) {
       return
     }
@@ -524,30 +568,37 @@ export class PreviewLiveView {
       this.deps.emit.visibilityApplied(this.panelId, true)
       return
     }
-    // Capture BEFORE hiding — the capturer count keeps the page live mid-capture.
-    await this.deps.stillFrameCache.captureIfStale(
-      this.wc,
-      this.panelId,
-      this.lastBounds ?? { x: 0, y: 0, width: 0, height: 0 }
-    )
 
-    // A show landed while we were capturing, or the view died. Either way this
-    // hide is stale; the frame we just captured is still worth keeping.
-    if (this.wantedVisible || this.isDefunct) {
-      return
+    // Whatever we captured last time, on screen before the view goes — so the
+    // hide is not a flash of empty backdrop.
+    const previous = this.deps.stillFrameCache.get(this.panelId)
+    if (previous !== undefined) {
+      this.deps.emit.stillFrameChanged(this.panelId, previous)
     }
 
-    const frame = this.deps.stillFrameCache.get(this.panelId)
-    if (frame !== undefined) {
-      this.deps.emit.stillFrameChanged(this.panelId, frame)
-    }
+    // Started, NOT awaited. Only the SIZE of `lastBounds` travels: its `x`/`y`
+    // are window-relative DIPs for `setBounds` and mean nothing to
+    // `capturePage`, whose rect is page-relative.
+    const capture = this.deps.stillFrameCache.captureIfStale(this.wc, this.panelId, {
+      width: this.lastBounds?.width ?? 0,
+      height: this.lastBounds?.height ?? 0
+    })
+    this.pendingCapture = capture
+
     this.view.setVisible(false)
-    // Only now. Everything above can abandon the hide — a defunct view, or a show
-    // that landed while `captureIfStale` was awaited — and in every one of those
-    // cases the page is still on screen. Emitting earlier would tell the renderer
-    // the page had gone when it had not, which is the one direction this signal
-    // must never fail in.
     this.deps.emit.visibilityApplied(this.panelId, false)
+
+    void capture.then(() => {
+      // A show landed while the capture ran, or the view died. The frame is
+      // still worth keeping for the next hide — it just must not be published
+      // now, when the panel is showing the live page again.
+      if (this.wantedVisible || this.isDefunct) return
+
+      const frame = this.deps.stillFrameCache.get(this.panelId)
+      if (frame !== undefined && frame !== previous) {
+        this.deps.emit.stillFrameChanged(this.panelId, frame)
+      }
+    })
   }
 
   /**

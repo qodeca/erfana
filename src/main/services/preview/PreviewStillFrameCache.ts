@@ -17,6 +17,13 @@
  * Invalidation is driven by FILE CHANGE, not DOM observation — the caller
  * invalidates on a watched-file change (design §1.4).
  *
+ * The budgets below are all about SIZE. There is deliberately no time budget,
+ * and nothing on an interactive path may await this — `PreviewLiveView` starts a
+ * capture and hides the view in the same tick, precisely because a slow capture
+ * in front of `setVisible(false)` leaves the native view eating clicks meant for
+ * the overlay that just opened. The one caller that waits is eviction, which is
+ * about to destroy the page anyway.
+ *
  * Budget enforcement, in order:
  *   - `isBeingCaptured()` true  ⇒ skip (a capture is already in flight)
  *   - `capturePage` throws      ⇒ NO frame (swallowed, never rethrown)
@@ -63,8 +70,22 @@ export interface IPreviewStillFrameCache {
    * Capture `wc` into `panelId`'s slot if no in-flight capture is running.
    * Never throws and never stores a blank frame: an over-budget, skipped or
    * throwing capture leaves the previous frame (if any) untouched.
+   *
+   * TAKES A SIZE, NOT A RECT, AND THAT IS THE WHOLE POINT. `capturePage`'s rect
+   * is **page-relative** — `(0,0)` is the page's own top-left — while the only
+   * rect a caller has to hand is `PreviewLiveView.lastBounds`, which is
+   * **window-relative** DIPs for `View.setBounds`. Passing that through asked
+   * for a box starting hundreds of pixels INTO the page; Chromium clipped it at
+   * the page edge and returned a narrow off-centre sliver, which
+   * `.html-preview-still-frame`'s `object-fit: contain` then blew up to fill the
+   * height and letterboxed in black. Accepting a size makes the mistake
+   * unspellable: the rect is built here, at the origin, every time.
    */
-  captureIfStale(wc: PreviewCaptureContents, panelId: string, bounds: PreviewBounds): Promise<void>
+  captureIfStale(
+    wc: PreviewCaptureContents,
+    panelId: string,
+    size: { width: number; height: number }
+  ): Promise<void>
   /** The cached frame for `panelId`, or `undefined` (⇒ placeholder colour). */
   get(panelId: string): PreviewStillFrame | undefined
   /** Drop `panelId`'s frame (called on file change / panel close). */
@@ -86,17 +107,28 @@ export class PreviewStillFrameCache implements IPreviewStillFrameCache {
   async captureIfStale(
     wc: PreviewCaptureContents,
     panelId: string,
-    bounds: PreviewBounds
+    size: { width: number; height: number }
   ): Promise<void> {
     // A capture is already in flight — skip rather than stack captures.
     if (wc.isBeingCaptured()) {
       return
     }
 
+    // No rectangle, no picture. A view that has never been laid out reports a
+    // zero size, and asking Chromium to capture nothing is at best a wasted
+    // round trip — at worst an unbounded one, since nothing here imposes a time
+    // budget. Answering it locally is free and certain.
+    if (size.width <= 0 || size.height <= 0) {
+      return
+    }
+
     let image: PreviewNativeImage
     try {
       // `stayHidden: true` lets the capture succeed even as the view is hidden.
-      image = await wc.capturePage(bounds, { stayHidden: true })
+      image = await wc.capturePage(
+        { x: 0, y: 0, width: size.width, height: size.height },
+        { stayHidden: true }
+      )
     } catch {
       // Capture failed ⇒ NO frame. Panel falls back to the placeholder colour.
       return

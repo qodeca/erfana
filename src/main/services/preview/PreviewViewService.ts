@@ -498,22 +498,28 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
     if (view === null) {
       return
     }
-    // Hiding captures the still frame and emits it, so the suspended tab shows
-    // the page as it was rather than an empty placeholder.
+    // Hiding starts the still-frame capture and emits the frame, so the suspended
+    // tab shows the page as it was rather than an empty placeholder.
     //
-    // The capture is real I/O and can reject. The entry is already out of the
-    // registry at this point, so a throw that skipped the teardown would leave a
-    // live renderer process with no owner, unreachable by `close()`, and the
-    // renderer would never see `suspended` — leaving that tab permanently dead
-    // (lens review F8).
+    // The entry is already out of the registry at this point, so anything that
+    // threw past the teardown below would leave a live renderer process with no
+    // owner, unreachable by `close()`, and the renderer would never see
+    // `suspended` — leaving that tab permanently dead (lens review F8). That is
+    // why the wait is wrapped rather than trusted.
+    view.setVisibility(false)
+    // The ONE place that waits for the capture. `setVisibility` no longer does —
+    // a hide must never sit behind I/O, because the native view eats clicks
+    // meant for whatever overlay just opened. Here there is no overlay and no
+    // pointer to steal: `teardown` destroys the `webContents` on the next line,
+    // so without this the capture would race its own subject and a suspended
+    // panel would wake with no picture.
     //
-    // The rejection is SWALLOWED rather than rethrown. Suspending is
-    // housekeeping the caller did not ask for — it happens inside someone else's
-    // `open` — so a failed screenshot must not fail their open. The cost of
-    // losing the frame is a placeholder-coloured tab, which is what a preview
-    // with no frame already shows.
+    // Never rethrown. Suspending is housekeeping the caller did not ask for — it
+    // happens inside someone else's `open` — so a failed screenshot must not
+    // fail their open. Losing the frame costs a placeholder-coloured tab, which
+    // is what a preview with no frame already shows.
     try {
-      await view.setVisibility(false)
+      await view.whenCaptureSettled()
     } catch {
       // Nothing actionable: the view is being destroyed on the next line.
     }

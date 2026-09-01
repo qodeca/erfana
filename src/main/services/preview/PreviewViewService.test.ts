@@ -1154,6 +1154,81 @@ describe('PreviewViewService — live-view budget', () => {
   }
 
   /**
+   * THE BUG: a Delete confirmation whose buttons could not be clicked.
+   *
+   * A native view takes pointer input over its own rectangle whatever the DOM
+   * says, so the moment an overlay opens the view has to go — synchronously.
+   * The hide used to `await` the still-frame capture first, and on a large page
+   * that capture is slow enough that the dialog was drawn, and dead, for as long
+   * as it ran. Escape worked (the keyboard does not route through the view) and
+   * a second attempt worked (`captureIfStale` skips while one is in flight),
+   * which is the worst shape of failure for a control that deletes a file.
+   *
+   * A capture that NEVER resolves is the honest way to pin this: if the hide is
+   * behind the await, `setVisible(false)` never happens at all.
+   */
+  it('hides the view without waiting for the still-frame capture', async () => {
+    const h = makeHarness()
+    const capture = h.deps.stillFrameCache.captureIfStale as unknown as ReturnType<typeof vi.fn>
+    capture.mockReturnValue(new Promise<void>(() => {}))
+
+    await h.service.open(REQUEST_A, h.window)
+    const setVisible = h.view.setVisible as unknown as ReturnType<typeof vi.fn>
+    setVisible.mockClear()
+
+    await h.service.setVisibility('panel-A', false, 'dialog')
+
+    expect(capture).toHaveBeenCalled()
+    expect(setVisible).toHaveBeenCalledWith(false)
+  })
+
+  /**
+   * The other half of the same rule: the renderer must not be told the page has
+   * gone before it has. `visibilityApplied(false)` and `setVisible(false)` now
+   * happen in the same tick, so a slow capture cannot separate them either.
+   */
+  it('reports the hide to the renderer in the same tick it applies it', async () => {
+    const h = makeHarness()
+    const capture = h.deps.stillFrameCache.captureIfStale as unknown as ReturnType<typeof vi.fn>
+    capture.mockReturnValue(new Promise<void>(() => {}))
+
+    await h.service.open(REQUEST_A, h.window)
+    const applied = h.deps.emit.visibilityApplied as unknown as ReturnType<typeof vi.fn>
+    applied.mockClear()
+
+    await h.service.setVisibility('panel-A', false, 'dialog')
+
+    expect(applied).toHaveBeenCalledWith('panel-A', false)
+  })
+
+  /**
+   * The other side of the synchronous hide, and the regression it nearly caused.
+   *
+   * Eviction hides a view and destroys its `webContents` a line later. Once the
+   * hide stopped awaiting the capture, that teardown raced its own subject and a
+   * suspended panel would have woken with no picture — which is the one thing
+   * the frame is captured for. `whenCaptureSettled()` is the seam, and this is
+   * the test that it is actually used: destroy must come after the capture.
+   */
+  it('lets the still-frame capture finish before tearing an evicted view down', async () => {
+    const h = makeHarness()
+    const order: string[] = []
+    const capture = h.deps.stillFrameCache.captureIfStale as unknown as ReturnType<typeof vi.fn>
+    capture.mockImplementation(async () => {
+      await Promise.resolve()
+      order.push('capture')
+    })
+    h.factory.destroy.mockImplementation(() => {
+      order.push('destroy')
+      return Promise.resolve()
+    })
+
+    await openPanels(h, PREVIEW.MAX_LIVE_VIEWS + 1)
+
+    expect(order).toEqual(['capture', 'destroy'])
+  })
+
+  /**
    * The still-frame capture is real I/O and can reject. By that point the entry
    * is already out of the registry, so a throw that skipped the teardown would
    * leave a live renderer with no owner — unreachable by `close()`, and with the
