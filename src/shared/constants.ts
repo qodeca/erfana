@@ -535,11 +535,40 @@ export const PREVIEW = {
    * `PreviewRequestFilter` calls `onBlocked` per blocked REQUEST, with no
    * per-host de-duplication of its own.
    *
-   * 50 matches `MAX_HOSTS_PER_VIEW` in `previewCspViolationBridge.ts`, which
+   * 50 matches `MAX_ORIGINS_PER_VIEW` in `previewCspViolationBridge.ts`, which
    * bounds the other of the two paths that feed this. Keep the two equal: a page
    * should not be able to report more hosts through one path than the other.
+   *
+   * The entry it counts is an ORIGIN now, not a hostname — see
+   * `MAX_BLOCKED_ORIGINS_PER_HOST` below, which is what stops that change from
+   * turning this global budget into something one hostname can eat by itself.
    */
   MAX_BLOCKED_HOSTS_PER_VIEW: 50,
+  /**
+   * Max DISTINCT origins ONE hostname may contribute to the blocked list.
+   *
+   * A sub-cap underneath `MAX_BLOCKED_HOSTS_PER_VIEW`, applied at both places a
+   * blocked entry is recorded main-side — `PreviewViewService.onBlocked` (the
+   * network-filter path) and `previewCspViolationBridge` (the CSP path).
+   *
+   * WHY IT HAD TO EXIST THE MOMENT THE UNIT BECAME AN ORIGIN. Keyed on a
+   * hostname, the global cap was self-limiting: a page hitting one host on fifty
+   * ports collapsed into ONE entry. Keyed on an origin it does not. A page
+   * fetching `http://localhost:1` … `http://localhost:50` fills all fifty slots
+   * before main ever records the real blocked CDN — and that entry is not buried
+   * below the fold, it is dropped and never sent, so the reader cannot approve
+   * the one host they actually needed. Renderer-side trimming cannot repair
+   * that: the event was never emitted.
+   *
+   * WHY 5. One hostname legitimately serves one origin, occasionally two (443
+   * plus an alternate port a dev server is on). Five is generous for the honest
+   * case and cheap against the hostile one: at a tenth of the global budget, at
+   * least ten distinct hostnames always fit, so no single noisy host can make a
+   * different host invisible. The first origin for a hostname is therefore
+   * always reported, which is the property that matters — a host must never be
+   * missing from the list because some other host was loud.
+   */
+  MAX_BLOCKED_ORIGINS_PER_HOST: 5,
   /** At most one full post-load pipeline per this interval (ms) */
   RELOAD_MIN_INTERVAL_MS: 750,
   /** Still-frame downscale: longest edge in px before toDataURL */

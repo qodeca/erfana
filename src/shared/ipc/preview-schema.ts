@@ -17,7 +17,7 @@ import { z } from 'zod'
 
 import { PREVIEW_BLOCKED_KINDS } from './previewBlockedKind'
 import { ErrorCode } from '../errors'
-import { MAX_ALLOWLIST_HOSTS, PreviewHostSchema } from './preview-settings-schema'
+import { MAX_ALLOWLIST_HOSTS, PreviewOriginSchema } from './preview-settings-schema'
 import type {
   PdfExportResult,
   PreviewApproveResult,
@@ -85,9 +85,18 @@ export type PreviewOpenRequest = z.infer<typeof PreviewOpenRequestSchema>
 export const PreviewApproveHostRequestSchema = z
   .object({
     panelId: PanelIdSchema,
-    // Validate approvability (and reject CSP-delimiter / CRLF chars) AT the
-    // boundary via the shared host schema, not only downstream in the store.
-    host: PreviewHostSchema
+    /*
+     * Validate approvability (and reject CSP-delimiter / CRLF chars) AT the
+     * boundary, not only downstream in the store.
+     *
+     * The field is named `host` for wire compatibility but carries an ORIGIN —
+     * scheme, host and port. It MUST be the origin schema: the renderer sends
+     * what it was told was blocked, and that is now `https://example.com:8443`,
+     * which the hostname schema refuses outright. Left as a host schema this
+     * rejects every approval the band can make, and the renderer surfaces that
+     * as a bare "Not saved".
+     */
+    host: PreviewOriginSchema
   })
   .strict()
 export type PreviewApproveHostRequest = z.infer<typeof PreviewApproveHostRequestSchema>
@@ -129,7 +138,7 @@ export type PreviewSetBounds = z.infer<typeof PreviewSetBoundsSchema>
 /**
  * The project's approved hosts, as main knows them.
  *
- * Validated with the SAME `PreviewHostSchema` that gates the WRITE path, so this
+ * Validated with the SAME `PreviewOriginSchema` that gates the WRITE path, so this
  * emitter is a tripwire on anything the load path let through — `load()` already
  * fails closed to `[]`, so a valid set is the only thing that should reach here.
  *
@@ -158,7 +167,15 @@ export type PreviewVisibilityAppliedPayload = z.infer<
 export const PreviewAllowlistChangedPayloadSchema = z
   .object({
     panelId: PanelIdSchema,
-    hosts: z.array(PreviewHostSchema).max(MAX_ALLOWLIST_HOSTS)
+    /*
+     * ORIGINS, under a legacy field name. This is a TRIPWIRE as much as a
+     * validator: the store is the only writer, so anything failing here is
+     * something the load path let through, and the event is dropped rather than
+     * shown. Which is exactly why it has to match what the store now emits —
+     * against the hostname schema every allowlist event would be discarded and
+     * the renderer would never learn that anything had been approved.
+     */
+    hosts: z.array(PreviewOriginSchema).max(MAX_ALLOWLIST_HOSTS)
   })
   .strict()
 
@@ -215,12 +232,18 @@ export type PreviewPanelRequest = z.infer<typeof PreviewPanelRequestSchema>
 
 /**
  * The host here is a REPORTING value, not an approval value (SEC-019).
- * `PreviewHostSchema` gates the APPROVE path only.
+ * `PreviewOriginSchema` gates the APPROVE path only.
+ *
+ * Deliberately loose, because this is what was OBSERVED rather than what may be
+ * granted — a refusal must be reportable even when the thing refused could never
+ * be approved. The length allows a full origin: a 253-character host plus a
+ * scheme and a `:65535`. At the old 253 a long host's blocked event silently
+ * failed to parse and the row never appeared at all.
  */
 export const PreviewHostBlockedPayloadSchema = z
   .object({
     panelId: PanelIdSchema,
-    host: z.string().min(1).max(253),
+    host: z.string().min(1).max(300),
     approvable: z.boolean(),
     /**
      * What the host was refused FOR, accumulated across sightings.

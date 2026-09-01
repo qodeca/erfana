@@ -16,6 +16,7 @@
  */
 import { describe, it, expect, vi } from 'vitest'
 
+import { PREVIEW } from '../../../shared/constants'
 import { createPreviewCspViolationBridge } from './previewCspViolationBridge'
 
 /** A bridge plus the sink it reports to. */
@@ -35,13 +36,13 @@ function violation(blockedURI: string, effectiveDirective = 'img-src'): unknown 
 
 describe('previewCspViolationBridge', () => {
   describe('the signal it exists to carry', () => {
-    it('reports the host of a CSP-refused remote subresource', () => {
+    it('reports the ORIGIN of a CSP-refused remote subresource', () => {
       const { bridge, onBlockedHost } = makeBridge()
 
       bridge.handleViolation(violation('https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js'))
 
       expect(onBlockedHost).toHaveBeenCalledWith(
-        'cdn.jsdelivr.net',
+        'https://cdn.jsdelivr.net',
         'https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js',
         true,
         'image'
@@ -59,26 +60,30 @@ describe('previewCspViolationBridge', () => {
       // carry — but only the first may be offered for approval. That split is
       // the same one the network-filter path makes.
       expect(onBlockedHost.mock.calls.map((call) => [call[0], call[2]])).toEqual([
-        ['fonts.googleapis.com', true],
-        ['localhost', false],
-        ['127.0.0.1', false]
+        ['https://fonts.googleapis.com', true],
+        ['http://localhost:8080', false],
+        ['http://127.0.0.1', false]
       ])
     })
 
-    it('drops the port, because the allowlist has no notion of one', () => {
+    it('KEEPS the port, because the origin is the unit a grant is written for', () => {
+      // The port used to be dropped here, so a page served from `:8443` was
+      // reported as `cdn.example.com` and approving it wrote a grant that the
+      // CSP rendered without a port — matching only `:443`. The row said
+      // allowed, the resource stayed blocked.
       const { bridge, onBlockedHost } = makeBridge()
 
       bridge.handleViolation(violation('https://cdn.example.com:8443/a.js'))
 
       expect(onBlockedHost).toHaveBeenCalledWith(
-        'cdn.example.com',
+        'https://cdn.example.com:8443',
         'https://cdn.example.com:8443/a.js',
         true,
         'image'
       )
     })
 
-    it('lower-cases the host so one host is not reported twice', () => {
+    it('lower-cases the host so one origin is not reported twice', () => {
       const { bridge, onBlockedHost } = makeBridge()
 
       bridge.handleViolation(violation('https://CDN.Example.COM/a.js'))
@@ -86,7 +91,7 @@ describe('previewCspViolationBridge', () => {
 
       expect(onBlockedHost).toHaveBeenCalledTimes(1)
       expect(onBlockedHost).toHaveBeenCalledWith(
-        'cdn.example.com',
+        'https://cdn.example.com',
         'https://CDN.Example.COM/a.js',
         true,
         'image'
@@ -202,7 +207,7 @@ describe('previewCspViolationBridge', () => {
 
       expect(onBlockedHost).toHaveBeenCalledTimes(1)
       // Still RECORDED: it is a genuine refusal the badge should carry.
-      expect(onBlockedHost.mock.calls[0][0]).toBe('cdn.example.com')
+      expect(onBlockedHost.mock.calls[0][0]).toBe('http://cdn.example.com')
       expect(onBlockedHost.mock.calls[0][2]).toBe(false)
     })
 
@@ -215,7 +220,7 @@ describe('previewCspViolationBridge', () => {
       expect(onBlockedHost.mock.calls[0][2]).toBe(true)
     })
 
-    it('stops reporting new hosts past the per-view cap', () => {
+    it('stops reporting new origins past the per-view cap', () => {
       // The clock advances a full second per report so the RATE limit is never
       // the binding constraint — this case is about the distinct-HOST cap, and
       // a version of it on a fixed clock silently measured the rate limiter
@@ -255,7 +260,7 @@ describe('previewCspViolationBridge', () => {
       bridge.handleViolation(violation('https://cdn.jsdelivr.net/x.js', 'script-src'))
 
       expect(onBlockedHost).toHaveBeenCalledTimes(2)
-      expect(onBlockedHost.mock.calls[1][0]).toBe('cdn.jsdelivr.net')
+      expect(onBlockedHost.mock.calls[1][0]).toBe('https://cdn.jsdelivr.net')
     })
 
     it('a report refused by the budget is not recorded, so it can arrive later', () => {
@@ -274,7 +279,7 @@ describe('previewCspViolationBridge', () => {
       bridge.handleViolation(violation('https://burst-35.example.com/a.js'))
 
       expect(onBlockedHost).toHaveBeenCalledTimes(31)
-      expect(onBlockedHost.mock.calls[30][0]).toBe('burst-35.example.com')
+      expect(onBlockedHost.mock.calls[30][0]).toBe('https://burst-35.example.com')
     })
 
     it('still bounds the work a hostile page can force', () => {
@@ -305,6 +310,117 @@ describe('previewCspViolationBridge', () => {
       clock += 1000
       bridge.handleViolation(violation('https://after-the-window.example.com/a.js'))
       expect(onBlockedHost).toHaveBeenCalledTimes(31)
+    })
+  })
+
+  describe('one noisy hostname cannot own the whole list', () => {
+    // THE DEFECT THE SUB-CAP EXISTS FOR. The per-view cap counts DISTINCT
+    // reported entries, and the entry became an origin. Keyed on a hostname the
+    // cap was self-limiting — one host on fifty ports collapsed into one entry.
+    // Keyed on an origin, `http://localhost:1` … `:50` is fifty entries, fills
+    // the whole budget, and the CDN the page actually needs is not buried below
+    // the fold: it is never recorded and never emitted, so the reader cannot
+    // approve the one host that would fix the page.
+    //
+    // A clock that advances a second per violation throughout, so the per-second
+    // report budget can never be the thing doing the limiting.
+    function tickingBridge(): ReturnType<typeof makeBridge> {
+      let clock = 1_000_000
+      return makeBridge(() => {
+        clock += 1000
+        return clock
+      })
+    }
+
+    /** The origins `onBlockedHost` was called with, in order. */
+    function reported(onBlockedHost: ReturnType<typeof vi.fn>): string[] {
+      return onBlockedHost.mock.calls.map((call) => call[0] as string)
+    }
+
+    it('caps how many origins of ONE hostname reach the reader', () => {
+      const { bridge, onBlockedHost } = tickingBridge()
+
+      for (let port = 1; port <= 50; port += 1) {
+        bridge.handleViolation(violation(`http://localhost:${port}/probe`))
+      }
+
+      expect(onBlockedHost).toHaveBeenCalledTimes(PREVIEW.MAX_BLOCKED_ORIGINS_PER_HOST)
+      // The FIRST origins for the hostname, not a random survivor set: a page is
+      // read top to bottom and the earliest refusals are the ones a reader has
+      // any chance of connecting to what they are looking at.
+      expect(reported(onBlockedHost)[0]).toBe('http://localhost:1')
+    })
+
+    it('still reports a quieter host AFTER a noisy one has spent its budget', () => {
+      // The whole point. Before the sub-cap this host was dropped at the door —
+      // no row, no Allow button, and no way for the reader to learn it existed.
+      const { bridge, onBlockedHost } = tickingBridge()
+
+      for (let port = 1; port <= 60; port += 1) {
+        bridge.handleViolation(violation(`http://localhost:${port}/probe`))
+      }
+      bridge.handleViolation(violation('https://cdn.jsdelivr.net/x.js', 'script-src'))
+
+      expect(reported(onBlockedHost)).toContain('https://cdn.jsdelivr.net')
+      expect(onBlockedHost.mock.calls.at(-1)?.[2]).toBe(true)
+    })
+
+    it('leaves room for at least ten hostnames however loud any one of them is', () => {
+      // The arithmetic the number is chosen for: a sub-cap of a tenth of the
+      // per-view budget means ten noisy hostnames cannot between them exclude an
+      // eleventh from having been heard at all.
+      const { bridge, onBlockedHost } = tickingBridge()
+
+      for (let host = 0; host < 10; host += 1) {
+        for (let port = 1; port <= 20; port += 1) {
+          bridge.handleViolation(violation(`https://noisy-${host}.example.com:${port}/a.js`))
+        }
+      }
+
+      const hostnames = new Set(reported(onBlockedHost).map((origin) => new URL(origin).hostname))
+      expect(hostnames.size).toBe(10)
+      expect(onBlockedHost).toHaveBeenCalledTimes(10 * PREVIEW.MAX_BLOCKED_ORIGINS_PER_HOST)
+    })
+
+    it('does not charge a hostname for an origin the rate budget refused', () => {
+      // A report nobody ever saw must not spend the hostname's allowance, for
+      // the same reason it is not written into the dedupe map: it would be
+      // swallowed permanently, which is the failure this budget is meant to be
+      // milder than.
+      let clock = 1_000_000
+      const { bridge, onBlockedHost } = makeBridge(() => clock)
+
+      // 40 origins of one hostname inside a single second. The per-second report
+      // budget (30) bites first for most of them; the sub-cap admits 5.
+      for (let port = 1; port <= 40; port += 1) {
+        bridge.handleViolation(violation(`https://cdn.example.com:${port}/a.js`))
+      }
+      expect(onBlockedHost).toHaveBeenCalledTimes(PREVIEW.MAX_BLOCKED_ORIGINS_PER_HOST)
+
+      // A fresh second, and the hostname has spent exactly its five: nothing
+      // more, because the rate-refused ones never counted against it either way.
+      clock += 1000
+      bridge.handleViolation(violation('https://cdn.example.com:9999/a.js'))
+      expect(onBlockedHost).toHaveBeenCalledTimes(PREVIEW.MAX_BLOCKED_ORIGINS_PER_HOST)
+    })
+
+    it('gives a hostname its budget back on a new page load', () => {
+      // An approval reloads the document and every still-refused origin is news
+      // to the reader again. A sub-cap ledger that survived the reload would bar
+      // the hostname from ever being reported again — the same swallowing defect
+      // `reset` exists to prevent, one level down.
+      const { bridge, onBlockedHost } = tickingBridge()
+
+      for (let port = 1; port <= 20; port += 1) {
+        bridge.handleViolation(violation(`https://cdn.example.com:${port}/a.js`))
+      }
+      expect(onBlockedHost).toHaveBeenCalledTimes(PREVIEW.MAX_BLOCKED_ORIGINS_PER_HOST)
+
+      bridge.reset()
+      bridge.handleViolation(violation('https://cdn.example.com:9999/a.js'))
+
+      expect(onBlockedHost).toHaveBeenCalledTimes(PREVIEW.MAX_BLOCKED_ORIGINS_PER_HOST + 1)
+      expect(onBlockedHost.mock.calls.at(-1)?.[0]).toBe('https://cdn.example.com:9999')
     })
   })
 

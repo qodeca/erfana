@@ -32,7 +32,7 @@ vi.mock('../../services/LoggingService', () => ({
 }))
 
 const event = {} as IpcMainInvokeEvent
-const APPROVED = ['cdn.example.com'] as const
+const APPROVED = ['https://cdn.example.com'] as const
 
 function setup(overrides?: {
   approveOrigin?: ReturnType<typeof vi.fn>
@@ -63,10 +63,10 @@ describe('registerPreviewAllowlistHandlers', () => {
 
     const result = await handlers[PreviewChannels.APPROVE_HOST](event, {
       panelId: 'p1',
-      host: 'cdn.example.com'
+      host: 'https://cdn.example.com'
     })
 
-    expect(approveOrigin).toHaveBeenCalledWith('cdn.example.com')
+    expect(approveOrigin).toHaveBeenCalledWith('https://cdn.example.com')
     expect(applyApprovedHosts).toHaveBeenCalledWith('p1', APPROVED)
     expect(approveOrigin.mock.invocationCallOrder[0]).toBeLessThan(
       applyApprovedHosts.mock.invocationCallOrder[0]
@@ -79,7 +79,7 @@ describe('registerPreviewAllowlistHandlers', () => {
 
     const result = await handlers[PreviewChannels.APPROVE_HOST](event, {
       panelId: 'p1',
-      host: 'cdn.example.com',
+      host: 'https://cdn.example.com',
       projectRoot: '/evil/root'
     })
 
@@ -94,13 +94,13 @@ describe('registerPreviewAllowlistHandlers', () => {
 
     await handlers[PreviewChannels.APPROVE_HOST](event, {
       panelId: 'p1',
-      host: 'cdn.example.com'
+      host: 'https://cdn.example.com'
     })
 
     // approveOrigin is the store's single argument; the store resolves the root
     // itself from ProjectService, so the handler passes no path at all.
     expect(approveOrigin).toHaveBeenCalledTimes(1)
-    expect(approveOrigin.mock.calls[0]).toEqual(['cdn.example.com'])
+    expect(approveOrigin.mock.calls[0]).toEqual(['https://cdn.example.com'])
   })
 
   it('maps an AppError from the store into the result errorCode', async () => {
@@ -124,7 +124,7 @@ describe('registerPreviewAllowlistHandlers', () => {
 
     const result = await handlers[PreviewChannels.APPROVE_HOST](event, {
       panelId: 'p1',
-      host: 'cdn.example.com'
+      host: 'https://cdn.example.com'
     })
 
     expect(approveOrigin).not.toHaveBeenCalled()

@@ -1453,13 +1453,19 @@ describe('PreviewViewService — every blocked host reaches the renderer', () =>
     h.hostBlocked.mockClear()
 
     for (let i = 0; i < 10; i += 1) {
-      onBlocked('blocked-host', `h${i}.example.com`, `https://h${i}.example.com/a.png`, true, 'image')
+      onBlocked(
+        'blocked-host',
+        `https://h${i}.example.com`,
+        `https://h${i}.example.com/a.png`,
+        true,
+        'image'
+      )
     }
 
     expect(h.hostBlocked).toHaveBeenCalledTimes(10)
     const [panelId, host, approvable, kinds, truncated] = h.hostBlocked.mock.calls[3]
     expect(panelId).toBe('panel-A')
-    expect(host).toBe('h3.example.com')
+    expect(host).toBe('https://h3.example.com')
     expect(approvable).toBe(true)
     expect(kinds).toEqual(['image'])
     // Well under the cap, so the list is complete.
@@ -1479,7 +1485,13 @@ describe('PreviewViewService — every blocked host reaches the renderer', () =>
 
     const cap = PREVIEW.MAX_BLOCKED_HOSTS_PER_VIEW
     for (let i = 0; i < cap + 5; i += 1) {
-      onBlocked('blocked-host', `h${i}.example.com`, `https://h${i}.example.com/a.png`, true, 'image')
+      onBlocked(
+        'blocked-host',
+        `https://h${i}.example.com`,
+        `https://h${i}.example.com/a.png`,
+        true,
+        'image'
+      )
     }
 
     expect(h.hostBlocked).toHaveBeenCalledTimes(cap)
@@ -1495,8 +1507,20 @@ describe('PreviewViewService — every blocked host reaches the renderer', () =>
     const onBlocked = await blockedSink(h)
     h.hostBlocked.mockClear()
 
-    onBlocked('blocked-host', 'cdn.example.com', 'https://cdn.example.com/a.css', true, 'style')
-    onBlocked('blocked-host', 'cdn.example.com', 'https://cdn.example.com/a.js', true, 'script')
+    onBlocked(
+      'blocked-host',
+      'https://cdn.example.com',
+      'https://cdn.example.com/a.css',
+      true,
+      'style'
+    )
+    onBlocked(
+      'blocked-host',
+      'https://cdn.example.com',
+      'https://cdn.example.com/a.js',
+      true,
+      'script'
+    )
 
     expect(h.hostBlocked.mock.calls[0][3]).toEqual(['style'])
     expect(h.hostBlocked.mock.calls[1][3]).toEqual(['script', 'style'])
@@ -1507,11 +1531,76 @@ describe('PreviewViewService — every blocked host reaches the renderer', () =>
     const onBlocked = await blockedSink(h)
     h.hostBlocked.mockClear()
 
-    onBlocked('blocked-host', 'localhost', 'http://localhost:9000/x', false, 'connect')
+    onBlocked('blocked-host', 'http://localhost:9000', 'http://localhost:9000/x', false, 'connect')
 
     const [, host, approvable] = h.hostBlocked.mock.calls[0]
-    expect(host).toBe('localhost')
+    expect(host).toBe('http://localhost:9000')
     expect(approvable).toBe(false)
+  })
+
+  it('stops ONE hostname from spending the whole per-view budget', async () => {
+    // THE DEFECT THE SUB-CAP EXISTS FOR. The per-view cap counts distinct
+    // reported entries, and the entry became an ORIGIN. Keyed on a hostname the
+    // cap was self-limiting — one host on fifty ports was one entry. Keyed on an
+    // origin, a page probing `http://localhost:1` … `:50` fills all fifty slots
+    // by itself, and the CDN it blocks next is not buried at the bottom of a
+    // long list: it is never recorded and never emitted, so the reader has no
+    // row to approve and no way to know one is missing.
+    const h = makeHarness()
+    const onBlocked = await blockedSink(h)
+    h.hostBlocked.mockClear()
+
+    for (let port = 1; port <= PREVIEW.MAX_BLOCKED_HOSTS_PER_VIEW; port += 1) {
+      onBlocked('blocked-host', `http://localhost:${port}`, `http://localhost:${port}/x`, false, 'connect')
+    }
+
+    expect(h.hostBlocked).toHaveBeenCalledTimes(PREVIEW.MAX_BLOCKED_ORIGINS_PER_HOST)
+    // The FIRST origins seen for the hostname, not an arbitrary survivor set.
+    expect(h.hostBlocked.mock.calls[0][1]).toBe('http://localhost:1')
+  })
+
+  it('still reports a quieter host after a noisy one has spent its budget', async () => {
+    // The property that actually matters: a host must never be invisible
+    // because a DIFFERENT host was loud. Before the sub-cap this CDN was
+    // dropped at the door, with nothing on screen to explain the broken page.
+    const h = makeHarness()
+    const onBlocked = await blockedSink(h)
+    h.hostBlocked.mockClear()
+
+    for (let port = 1; port <= 60; port += 1) {
+      onBlocked('blocked-host', `http://localhost:${port}`, `http://localhost:${port}/x`, false, 'connect')
+    }
+    onBlocked('blocked-host', 'https://cdn.example.com', 'https://cdn.example.com/a.js', true, 'script')
+
+    const [, host, approvable, kinds, truncated] = h.hostBlocked.mock.calls.at(-1)!
+    expect(host).toBe('https://cdn.example.com')
+    expect(approvable).toBe(true)
+    expect(kinds).toEqual(['script'])
+    // The list is nowhere near the per-view cap — six entries — so the reader is
+    // not told it was truncated. The sub-cap suppressing a noisy host's 55th
+    // port is not the same claim as "there are hosts we cannot show you".
+    expect(truncated).toBe(false)
+  })
+
+  it('gives a hostname its budget back when an approval reloads the page', async () => {
+    // Same reasoning as the dedupe clear beside it: the reload refuses
+    // everything again, so a sub-cap ledger that outlived it would bar a
+    // hostname from ever being reported once it had spent its five — which is
+    // the swallowing defect `applyApprovedHosts` clears the ledger to prevent.
+    const h = makeHarness()
+    const onBlocked = await blockedSink(h)
+    h.hostBlocked.mockClear()
+
+    for (let port = 1; port <= 20; port += 1) {
+      onBlocked('blocked-host', `https://cdn.example.com:${port}`, 'https://cdn.example.com/a.js', true, 'script')
+    }
+    expect(h.hostBlocked).toHaveBeenCalledTimes(PREVIEW.MAX_BLOCKED_ORIGINS_PER_HOST)
+
+    await h.service.applyApprovedHosts('panel-A', ['https://other.example.com'])
+    onBlocked('blocked-host', 'https://cdn.example.com:9999', 'https://cdn.example.com/a.js', true, 'script')
+
+    expect(h.hostBlocked).toHaveBeenCalledTimes(PREVIEW.MAX_BLOCKED_ORIGINS_PER_HOST + 1)
+    expect(h.hostBlocked.mock.calls.at(-1)![1]).toBe('https://cdn.example.com:9999')
   })
 })
 
@@ -1545,7 +1634,7 @@ describe('PreviewViewService — a CSP refusal survives an approval', () => {
     refuse(h, 'https://fonts.gstatic.com/f.woff2', 'font-src')
     refuse(h, 'https://fonts.gstatic.com/g.woff2', 'font-src')
 
-    expect(reportedHosts(h)).toEqual(['fonts.gstatic.com'])
+    expect(reportedHosts(h)).toEqual(['https://fonts.gstatic.com'])
   })
 
   it('re-reports the hosts still blocked after a different host is approved', async () => {
@@ -1565,16 +1654,20 @@ describe('PreviewViewService — a CSP refusal survives an approval', () => {
     refuse(h, 'https://a.example.com/1.png')
     refuse(h, 'https://b.example.com/2.png')
     refuse(h, 'https://c.example.com/3.png')
-    expect(reportedHosts(h)).toEqual(['a.example.com', 'b.example.com', 'c.example.com'])
+    expect(reportedHosts(h)).toEqual([
+      'https://a.example.com',
+      'https://b.example.com',
+      'https://c.example.com'
+    ])
 
     h.hostBlocked.mockClear()
-    await h.service.applyApprovedHosts('panel-A', ['a.example.com'])
+    await h.service.applyApprovedHosts('panel-A', ['https://a.example.com'])
 
     // The reload replays the page, so the CSP refuses B and C all over again.
     refuse(h, 'https://b.example.com/2.png')
     refuse(h, 'https://c.example.com/3.png')
 
-    expect(reportedHosts(h)).toEqual(['b.example.com', 'c.example.com'])
+    expect(reportedHosts(h)).toEqual(['https://b.example.com', 'https://c.example.com'])
   })
 
   it('still de-duplicates within one page load', async () => {
@@ -1588,6 +1681,6 @@ describe('PreviewViewService — a CSP refusal survives an approval', () => {
       refuse(h, `https://cdn.example.com/img-${i}.png`)
     }
 
-    expect(reportedHosts(h)).toEqual(['cdn.example.com'])
+    expect(reportedHosts(h)).toEqual(['https://cdn.example.com'])
   })
 })

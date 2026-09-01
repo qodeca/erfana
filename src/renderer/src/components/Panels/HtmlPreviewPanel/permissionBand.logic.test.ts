@@ -41,22 +41,22 @@ describe('selectBandRows', () => {
     // never edited — `applyApprovedHosts` clears the failure log, so a list built
     // on that log empties the moment the reader approves anything, exactly when
     // they are mid-way through a cascade.
-    const input = [blocked('a.example.com'), blocked('b.example.com')]
-    const rows = selectBandRows(input, ['a.example.com'])
+    const input = [blocked('https://a.example.com'), blocked('https://b.example.com')]
+    const rows = selectBandRows(input, ['https://a.example.com'])
 
-    expect(rows.blocked.map(r => r.host)).toEqual(['b.example.com'])
-    expect(rows.allowed.map(r => r.host)).toEqual(['a.example.com'])
+    expect(rows.blocked.map(r => r.host)).toEqual(['https://b.example.com'])
+    expect(rows.allowed.map(r => r.host)).toEqual(['https://a.example.com'])
     expect(rows.counts).toEqual({ blocked: 1, allowed: 1 })
     // Untouched.
-    expect(input.map(r => r.host)).toEqual(['a.example.com', 'b.example.com'])
+    expect(input.map(r => r.host)).toEqual(['https://a.example.com', 'https://b.example.com'])
   })
 
   it('lists a host approved in an earlier session, never blocked here', () => {
     // The case nothing in the app surfaced before: a cloned repository can arrive
     // with hosts already approved by someone else (docs/security.md residual
     // risk 5), and until now there was no screen anywhere that showed it.
-    const rows = selectBandRows([], ['inherited.example.com'])
-    expect(rows.allowed.map(r => r.host)).toEqual(['inherited.example.com'])
+    const rows = selectBandRows([], ['https://inherited.example.com'])
+    expect(rows.allowed.map(r => r.host)).toEqual(['https://inherited.example.com'])
     expect(rows.counts.allowed).toBe(1)
   })
 
@@ -66,7 +66,7 @@ describe('selectBandRows', () => {
     // the same host list to script-src, style-src, img-src, font-src, media-src
     // and connect-src. The kinds survive on the row DATA because the confirm box
     // reads them, in a sentence that denies the limit in its next clause.
-    const rows = selectBandRows([blocked('a.example.com', ['font', 'script'])], [])
+    const rows = selectBandRows([blocked('https://a.example.com', ['font', 'script'])], [])
     expect(rows.blocked[0].kinds).toEqual(['font', 'script'])
     expect(rows.blocked[0]).not.toHaveProperty('kind')
   })
@@ -74,8 +74,24 @@ describe('selectBandRows', () => {
   it('gives an allowed row no kinds at all', () => {
     // Nothing to carry: the allowlist stores hosts and nothing else, so for a
     // host approved last month the kind is unknowable.
-    const rows = selectBandRows([blocked('a.example.com', ['font'])], ['a.example.com'])
+    const rows = selectBandRows([blocked('https://a.example.com', ['font'])], ['https://a.example.com'])
     expect(rows.allowed[0].kinds).toEqual([])
+  })
+
+  it('treats one host on two ports as two rows, because they are two grants', () => {
+    // The behaviour change a reader will actually notice. Keyed by hostname
+    // these collapsed into one row, and approving it appeared to cover both
+    // while the CSP only ever admitted the default port — so the second one
+    // silently never loaded and no row was left to explain why.
+    const rows = selectBandRows(
+      [blocked('https://example.com'), blocked('https://example.com:8443')],
+      ['https://example.com']
+    )
+    expect(rows.blocked.map(r => r.host)).toEqual(['https://example.com:8443'])
+    expect(rows.allowed.map(r => r.host)).toEqual(['https://example.com'])
+    // And the counts say so, so the chip cannot read "0 blocked" over a page
+    // that is still missing a script.
+    expect(rows.counts).toEqual({ blocked: 1, allowed: 1 })
   })
 
   it('marks a host that can never be approved', () => {
@@ -140,7 +156,7 @@ describe('bandReducer', () => {
 
   it('abandons an open question when the list collapses', () => {
     let s = bandReducer(INITIAL_BAND_STATE, { type: 'toggle', byKeyboard: false })
-    s = bandReducer(s, { type: 'allowClicked', host: 'a.example.com' })
+    s = bandReducer(s, { type: 'allowClicked', host: 'https://a.example.com' })
     expect(s.mode.kind).toBe('confirming')
 
     s = bandReducer(s, { type: 'toggle', byKeyboard: false })
@@ -154,25 +170,25 @@ describe('bandReducer', () => {
     let s = bandReducer(INITIAL_BAND_STATE, { type: 'toggle', byKeyboard: false })
     s = bandReducer(s, {
       type: 'approveFailed',
-      host: 'a.example.com',
+      host: 'https://a.example.com',
       errorCode: ErrorCode.PREVIEW_ALLOWLIST_FULL
     })
     s = bandReducer(s, { type: 'toggle', byKeyboard: false })
-    expect(s.failure?.host).toBe('a.example.com')
+    expect(s.failure?.host).toBe('https://a.example.com')
   })
 
   it('ignores everything except its own resolution while a write is in flight', () => {
     // There is no safe way to cancel a write already sent, and offering a Cancel
     // that cannot cancel is worse than offering none.
     let s = bandReducer(INITIAL_BAND_STATE, { type: 'toggle', byKeyboard: false })
-    s = bandReducer(s, { type: 'allowClicked', host: 'a.example.com' })
-    s = bandReducer(s, { type: 'approveStarted', host: 'a.example.com' })
+    s = bandReducer(s, { type: 'allowClicked', host: 'https://a.example.com' })
+    s = bandReducer(s, { type: 'approveStarted', host: 'https://a.example.com' })
 
     expect(bandReducer(s, { type: 'cancelConfirm' })).toBe(s)
     expect(bandReducer(s, { type: 'collapse' })).toBe(s)
     expect(bandReducer(s, { type: 'toggle', byKeyboard: false })).toBe(s)
 
-    const done = bandReducer(s, { type: 'approveSucceeded', host: 'a.example.com' })
+    const done = bandReducer(s, { type: 'approveSucceeded', host: 'https://a.example.com' })
     expect(done.mode.kind).toBe('idle')
   })
 
@@ -180,7 +196,7 @@ describe('bandReducer', () => {
     let s = bandReducer(INITIAL_BAND_STATE, { type: 'toggle', byKeyboard: false })
     expect(s.announcement).toBe('')
 
-    s = bandReducer(s, { type: 'allowClicked', host: 'a.example.com' })
+    s = bandReducer(s, { type: 'allowClicked', host: 'https://a.example.com' })
     expect(s.announcement).toMatch(/cannot be undone/)
 
     s = bandReducer(s, { type: 'cancelConfirm' })
@@ -191,14 +207,14 @@ describe('bandReducer', () => {
     let s = bandReducer(INITIAL_BAND_STATE, { type: 'toggle', byKeyboard: false })
     s = bandReducer(s, {
       type: 'approveFailed',
-      host: 'a.example.com',
+      host: 'https://a.example.com',
       errorCode: ErrorCode.UNKNOWN_ERROR
     })
 
-    s = bandReducer(s, { type: 'allowClicked', host: 'b.example.com' })
-    expect(s.failure?.host).toBe('a.example.com')
+    s = bandReducer(s, { type: 'allowClicked', host: 'https://b.example.com' })
+    expect(s.failure?.host).toBe('https://a.example.com')
 
-    s = bandReducer(s, { type: 'allowClicked', host: 'a.example.com' })
+    s = bandReducer(s, { type: 'allowClicked', host: 'https://a.example.com' })
     expect(s.failure).toBeNull()
   })
 
@@ -207,9 +223,9 @@ describe('bandReducer', () => {
     // the new allowlist from main — never on optimism here, because a row that
     // moved optimistically would survive a failed write as a lie.
     let s = bandReducer(INITIAL_BAND_STATE, { type: 'toggle', byKeyboard: false })
-    s = bandReducer(s, { type: 'allowClicked', host: 'a.example.com' })
-    s = bandReducer(s, { type: 'approveStarted', host: 'a.example.com' })
-    s = bandReducer(s, { type: 'approveSucceeded', host: 'a.example.com' })
+    s = bandReducer(s, { type: 'allowClicked', host: 'https://a.example.com' })
+    s = bandReducer(s, { type: 'approveStarted', host: 'https://a.example.com' })
+    s = bandReducer(s, { type: 'approveSucceeded', host: 'https://a.example.com' })
     expect(s).not.toHaveProperty('allowed')
     expect(s.announcement).toMatch(/is now allowed in this project/)
   })

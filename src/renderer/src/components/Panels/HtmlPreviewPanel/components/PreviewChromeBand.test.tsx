@@ -19,13 +19,27 @@ import { ErrorCode } from '../../../../../../shared/errors'
 import type { PreviewApproveResult } from '../../../../../../shared/ipc/preview-types'
 import type { PreviewBlockedHost } from '../../../../stores/usePreviewStore'
 
+/**
+ * A blocked entry as MAIN actually sends one: a canonical origin, not a bare
+ * hostname.
+ *
+ * The fixtures used to pass `a.example.com`, and every test still passed —
+ * because `HostName` cannot parse that and falls back to rendering it verbatim.
+ * Visually identical, and it exercised none of the real path: no scheme or port
+ * handling, and no `<wbr>` break hints at all. A fixture in the wrong shape is a
+ * suite that agrees with itself.
+ */
 const host = (
   name: string,
   kinds: PreviewBlockedHost['kinds'] = ['image'],
   approvable = true
-): PreviewBlockedHost => ({ host: name, kinds, approvable })
+): PreviewBlockedHost => ({
+  host: name.includes('://') ? name : `https://${name}`,
+  kinds,
+  approvable
+})
 
-const ok: PreviewApproveResult = { ok: true, hosts: ['a.example.com'] }
+const ok: PreviewApproveResult = { ok: true, hosts: ['https://a.example.com'] }
 
 function renderBand(props: Partial<Parameters<typeof PreviewChromeBand>[0]> = {}) {
   const onApprove = vi.fn(async () => ok)
@@ -86,7 +100,7 @@ describe('PreviewChromeBand', () => {
     const user = userEvent.setup()
     renderBand({
       blockedHosts: [host('blocked.example.com', ['script'])],
-      allowedHosts: ['allowed.example.com']
+      allowedHosts: ['https://allowed.example.com']
     })
     await user.click(screen.getByTestId('preview-band-chip'))
 
@@ -104,7 +118,7 @@ describe('PreviewChromeBand', () => {
     const user = userEvent.setup()
     renderBand({
       blockedHosts: [host('blocked.example.com', ['script', 'image'])],
-      allowedHosts: ['allowed.example.com']
+      allowedHosts: ['https://allowed.example.com']
     })
     await user.click(screen.getByTestId('preview-band-chip'))
 
@@ -128,8 +142,8 @@ describe('PreviewChromeBand', () => {
     renderBand({ blockedHosts: [host('a.example.com'), host('b.example.com')] })
     await user.click(screen.getByTestId('preview-band-chip'))
 
-    expect(screen.getByRole('button', { name: 'Allow a.example.com' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Allow b.example.com' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Allow https://a.example.com' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Allow https://b.example.com' })).toBeInTheDocument()
   })
 
   it('keeps the chip in sync with the list', async () => {
@@ -161,7 +175,7 @@ describe('PreviewChromeBand', () => {
     await user.keyboard('{Enter}')
     await waitFor(() =>
       expect(document.activeElement).toBe(
-        screen.getByRole('button', { name: 'Allow a.example.com' })
+        screen.getByRole('button', { name: 'Allow https://a.example.com' })
       )
     )
   })
@@ -170,7 +184,7 @@ describe('PreviewChromeBand', () => {
     const user = userEvent.setup()
     const { onApprove } = renderBand({ blockedHosts: [host('a.example.com', ['font'])] })
     await user.click(screen.getByTestId('preview-band-chip'))
-    await user.click(screen.getByRole('button', { name: 'Allow a.example.com' }))
+    await user.click(screen.getByRole('button', { name: 'Allow https://a.example.com' }))
 
     const box = screen.getByRole('alertdialog')
     expect(box).toBeInTheDocument()
@@ -190,7 +204,7 @@ describe('PreviewChromeBand', () => {
     const user = userEvent.setup()
     renderBand({ blockedHosts: [host('a.example.com')] })
     await user.click(screen.getByTestId('preview-band-chip'))
-    await user.click(screen.getByRole('button', { name: 'Allow a.example.com' }))
+    await user.click(screen.getByRole('button', { name: 'Allow https://a.example.com' }))
 
     const box = screen.getByRole('alertdialog')
     await waitFor(() => expect(document.activeElement).toBe(box))
@@ -204,7 +218,7 @@ describe('PreviewChromeBand', () => {
     const user = userEvent.setup()
     renderBand({ blockedHosts: [host('a.example.com')] })
     await user.click(screen.getByTestId('preview-band-chip'))
-    await user.click(screen.getByRole('button', { name: 'Allow a.example.com' }))
+    await user.click(screen.getByRole('button', { name: 'Allow https://a.example.com' }))
 
     expect(screen.getByRole('alertdialog')).not.toHaveAttribute('aria-modal')
   })
@@ -213,7 +227,7 @@ describe('PreviewChromeBand', () => {
     const user = userEvent.setup()
     renderBand({ blockedHosts: [host('a.example.com')] })
     await user.click(screen.getByTestId('preview-band-chip'))
-    await user.click(screen.getByRole('button', { name: 'Allow a.example.com' }))
+    await user.click(screen.getByRole('button', { name: 'Allow https://a.example.com' }))
 
     const buttons = within(screen.getByRole('alertdialog')).getAllByRole('button')
     expect(buttons[0]).toHaveTextContent('Cancel')
@@ -230,10 +244,10 @@ describe('PreviewChromeBand', () => {
       allowedHosts: ['old.example.com']
     })
     await user.click(screen.getByTestId('preview-band-chip'))
-    await user.click(screen.getByRole('button', { name: 'Allow a.example.com' }))
+    await user.click(screen.getByRole('button', { name: 'Allow https://a.example.com' }))
 
     expect(screen.getByText('Approving')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Allow b.example.com' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Allow https://b.example.com' })).not.toBeInTheDocument()
     expect(screen.queryByText('Allowed in this project')).not.toBeInTheDocument()
   })
 
@@ -241,10 +255,10 @@ describe('PreviewChromeBand', () => {
     const user = userEvent.setup()
     const { container, onApprove } = renderBand({ blockedHosts: [host('a.example.com')] })
     await user.click(screen.getByTestId('preview-band-chip'))
-    await user.click(screen.getByRole('button', { name: 'Allow a.example.com' }))
+    await user.click(screen.getByRole('button', { name: 'Allow https://a.example.com' }))
     await user.click(screen.getByRole('button', { name: 'Confirm' }))
 
-    expect(onApprove).toHaveBeenCalledWith('a.example.com')
+    expect(onApprove).toHaveBeenCalledWith('https://a.example.com')
     await waitFor(() =>
       expect(container.querySelector('.erf-band__announce')?.textContent).toMatch(
         /is now allowed in this project/
@@ -272,12 +286,12 @@ describe('PreviewChromeBand', () => {
     )
 
     await user.click(screen.getByTestId('preview-band-chip'))
-    await user.click(screen.getByRole('button', { name: 'Allow a.example.com' }))
+    await user.click(screen.getByRole('button', { name: 'Allow https://a.example.com' }))
     await user.click(screen.getByRole('button', { name: 'Confirm' }))
 
     await waitFor(() => expect(screen.getByText('Not saved — list full')).toBeInTheDocument())
     // The row is offerable again.
-    expect(screen.getByRole('button', { name: 'Allow a.example.com' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Allow https://a.example.com' })).toBeInTheDocument()
     // And the chip carries the failure, so collapsing cannot hide it.
     const chip = screen.getByTestId('preview-band-chip')
     expect(chip.className).toContain('erf-band__chip--failed')

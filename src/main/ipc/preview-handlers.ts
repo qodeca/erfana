@@ -17,7 +17,7 @@
  * disposes the service (tearing down any live view).
  *
  * Reconciliation with §4.4's `PreviewHandlerDeps`: the constructed collaborators
- * it lists (service, eligibility, allowlistStore, hostBlockNotifier) live in the
+ * it lists (service, eligibility, allowlistStore) live in the
  * `PreviewGraph` this root builds; the registration deps here are the external
  * singleton surfaces (project path, global settings, sender predicate) plus an
  * injectable `graph` test seam.

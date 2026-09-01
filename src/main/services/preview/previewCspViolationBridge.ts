@@ -36,7 +36,8 @@
  */
 import { z } from 'zod'
 
-import { isApprovableHost } from '../../../shared/ipc/preview-settings-schema'
+import { PREVIEW } from '../../../shared/constants'
+import { parsePreviewOrigin } from '../../../shared/ipc/preview-settings-schema'
 import {
   kindFromDirective,
   mergeBlockedKinds,
@@ -72,13 +73,39 @@ const MAX_PARSES_PER_SECOND = 500
 const MAX_REPORTS_PER_SECOND = 30
 
 /**
- * At most this many DISTINCT hosts are ever reported by one view.
+ * At most this many DISTINCT origins are ever reported by one view.
  *
  * Past this the page is not telling the reader anything they can act on; it is
  * filling the failure badge. The cap is per view and resets when the view is
  * rebuilt, so a legitimate page that genuinely grew past it recovers on reload.
+ *
+ * Kept equal to `PREVIEW.MAX_BLOCKED_HOSTS_PER_VIEW`, which bounds the other of
+ * the two paths that feed the same list — a page must not be able to report more
+ * through one path than the other.
  */
-const MAX_HOSTS_PER_VIEW = 50
+const MAX_ORIGINS_PER_VIEW = PREVIEW.MAX_BLOCKED_HOSTS_PER_VIEW
+
+/**
+ * At most this many DISTINCT origins of ONE hostname are ever reported.
+ *
+ * THE HOLE THIS PLUGS. The cap above used to be keyed on a hostname, which made
+ * it self-limiting: a page referencing one host on fifty ports collapsed into a
+ * single entry. Now that the unit of a grant — and therefore of a report — is an
+ * ORIGIN, it does not. `http://localhost:1` … `http://localhost:50` is fifty
+ * distinct entries and fills the whole per-view budget on its own, so the
+ * genuinely blocked CDN that the page loads afterwards is not merely buried in a
+ * long list: it is never recorded and never emitted, and the reader has no way
+ * to approve the one host they needed. The renderer cannot repair that later —
+ * by the time it sorts and trims rows, the event does not exist.
+ *
+ * Rationale for the number, and for applying it here rather than in the
+ * renderer, lives on `PREVIEW.MAX_BLOCKED_ORIGINS_PER_HOST`.
+ *
+ * The check runs BEFORE the report budget is charged, so a per-host fan-out
+ * costs nothing from the per-second allowance either — the same reasoning that
+ * moved that charge off the arrival path.
+ */
+const MAX_ORIGINS_PER_HOST = PREVIEW.MAX_BLOCKED_ORIGINS_PER_HOST
 
 /**
  * What the preload sends.
@@ -121,14 +148,21 @@ export interface PreviewCspViolationBridge {
 /** What the bridge needs from its owner. */
 export interface PreviewCspViolationBridgeDeps {
   /**
-   * Report a host the CSP refused.
+   * Report an ORIGIN the CSP refused.
    *
    * Deliberately the SAME sink the network filter uses, so a CSP refusal and a
    * filter refusal produce one failure type, one toast budget and one dedupe
-   * rule rather than two half-consistent paths.
+   * rule rather than two half-consistent paths. That sink now carries an origin
+   * from the filter side (`previewFilterDecision` returns one as its blocked
+   * identity), so this side hands it the same vocabulary — two paths feeding one
+   * list with two different notions of identity would show the reader `localhost`
+   * beside `https://cdn.example.com` and dedupe neither against the other.
+   *
+   * The parameter keeps its name because the sink's signature is shared with the
+   * filter path.
    */
   readonly onBlockedHost: (
-    host: string,
+    origin: string,
     url: string,
     approvable: boolean,
     kind: PreviewBlockedKind
@@ -138,13 +172,26 @@ export interface PreviewCspViolationBridgeDeps {
 }
 
 /**
- * The host of a remote URI, or `null` when there is nothing to approve.
+ * The origin of a remote URI, plus its hostname, or `null` when there is nothing
+ * to report.
  *
- * Only `http(s)` carries an approvable host. Everything else — the `inline` and
- * `eval` keywords CSP reports instead of a URL, `data:`, `blob:`, and the
- * preview's own `erfana-preview:` scheme — is dropped here.
+ * Only `http(s)` carries anything a reader could act on. Everything else — the
+ * `inline` and `eval` keywords CSP reports instead of a URL, `data:`, `blob:`,
+ * and the preview's own `erfana-preview:` scheme — is dropped here.
+ *
+ * RE-SERIALISED from the parsed parts, never `parsed.origin`, for the reason
+ * `parsePreviewOrigin` spells out: `new URL('blob:https://evil.com/1').origin`
+ * is the clean-looking `https://evil.com` while its hostname is empty, and
+ * `.origin` silently discards userinfo. The blob branch above already returned,
+ * but this is the second line of defence and reads the three fields itself.
+ *
+ * The HOSTNAME is returned alongside because the per-host sub-cap needs it and
+ * splitting it back out of the origin string afterwards is a parse we already
+ * did — and one that gets IPv6 wrong if it is done with `lastIndexOf(':')`.
  */
-function remoteHostOf(blockedURI: string): { host: string; secure: boolean } | null {
+function remoteOriginOf(
+  blockedURI: string
+): { origin: string; hostname: string; approvable: boolean } | null {
   let parsed: URL
   try {
     parsed = new URL(blockedURI)
@@ -154,14 +201,22 @@ function remoteHostOf(blockedURI: string): { host: string; secure: boolean } | n
   if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
     return null
   }
-  // `hostname`, not `host`: a port is not part of the allowlist's unit. Note it
-  // does NOT strip IPv6 brackets — `isApprovableHost` is what refuses those.
-  const hostname = parsed.hostname
+  // The WHATWG parser already lower-cases an ASCII hostname and punycodes a
+  // Unicode one; the explicit lower-case is belt and braces so one host can
+  // never occupy two entries. It does NOT strip IPv6 brackets —
+  // `parsePreviewOrigin` is what refuses those for approval.
+  const hostname = parsed.hostname.toLowerCase()
   if (hostname === '') return null
-  // An allowlist entry is only ever rendered as an `https://` CSP host-source,
-  // so a host observed over plain http is not eligible for approval — which is
-  // what the network-filter path already decides for the same URL.
-  return { host: hostname.toLowerCase(), secure: parsed.protocol === 'https:' }
+  const origin = `${parsed.protocol}//${hostname}${parsed.port === '' ? '' : `:${parsed.port}`}`
+
+  // APPROVABILITY IS THE ALLOWLIST'S OWN QUESTION, asked of the exact string a
+  // grant would be written for. Asking a hostname predicate instead — as this
+  // did — answers about a different value than the one that would be stored, and
+  // an Approve button the boundary then refuses is worse than no button. It also
+  // keeps the http refusal without restating it: `PREVIEW_ORIGIN_SCHEMES` is
+  // https-only, so a plain-http origin is recorded and never offered, which is
+  // what the network-filter path decides for the same URL.
+  return { origin, hostname, approvable: parsePreviewOrigin(origin) !== null }
 }
 
 /** A fixed one-second window that admits at most `limit` takes. */
@@ -193,10 +248,16 @@ export function createPreviewCspViolationBridge(
   deps: PreviewCspViolationBridgeDeps
 ): PreviewCspViolationBridge {
   const now = deps.now ?? Date.now
-  // Host -> the kinds already reported for it. Not a bare Set of hosts any more:
-  // a host refused first for a font and later for a script must report the
-  // script too, or the row keeps saying "font" for something that will execute.
-  const reportedHosts = new Map<string, PreviewBlockedKind[]>()
+  // Origin -> the kinds already reported for it. Not a bare Set of origins any
+  // more: an origin refused first for a font and later for a script must report
+  // the script too, or the row keeps saying "font" for something that will
+  // execute.
+  const reportedOrigins = new Map<string, PreviewBlockedKind[]>()
+  // Hostname -> how many of its origins have been reported. The sub-cap's whole
+  // ledger. Kept beside the map above rather than derived from it: deriving it
+  // would mean re-parsing every recorded origin on every violation, which is
+  // exactly the per-event cost a hostile fan-out is trying to buy.
+  const originsPerHost = new Map<string, number>()
   let disposed = false
 
   const parseBudget = createRateWindow(MAX_PARSES_PER_SECOND, now)
@@ -210,51 +271,68 @@ export function createPreviewCspViolationBridge(
       const parsed = CspViolationPayloadSchema.safeParse(payload)
       if (!parsed.success) return
 
-      const remote = remoteHostOf(parsed.data.blockedURI)
+      const remote = remoteOriginOf(parsed.data.blockedURI)
       if (remote === null) return
-      const { host } = remote
+      const { origin, hostname } = remote
 
-      // One report per host per KIND. The network-filter path records per
+      // One report per origin per KIND. The network-filter path records per
       // REQUEST, which is right there because each is a distinct attempt the
       // reader may care about; here a single stylesheet can fire twenty
-      // violations for one font host, and twenty identical badge rows would bury
-      // the signal the badge exists to carry.
+      // violations for one font origin, and twenty identical badge rows would
+      // bury the signal the badge exists to carry.
       //
-      // But a NEW kind for a known host is new information the reader is
+      // But a NEW kind for a known origin is new information the reader is
       // entitled to, so it is not deduped away.
       const kind = kindFromDirective(parsed.data.effectiveDirective)
-      const known = reportedHosts.get(host)
-      if (known === undefined && reportedHosts.size >= MAX_HOSTS_PER_VIEW) return
+      const known = reportedOrigins.get(origin)
+
+      // THE TWO CAPS, both charged only for a NEW origin. Order matters only in
+      // that both must be asked before anything is written: the global one keeps
+      // the list finite, the per-host one keeps a single noisy hostname from
+      // being the reason the list is full.
+      const spentForHost = originsPerHost.get(hostname) ?? 0
+      if (known === undefined) {
+        if (reportedOrigins.size >= MAX_ORIGINS_PER_VIEW) return
+        if (spentForHost >= MAX_ORIGINS_PER_HOST) return
+      }
+
       const merged = mergeBlockedKinds(known ?? [], kind)
       if (merged === null) return
 
       // Charged HERE, on a report that is actually going out, and BEFORE the
-      // host is written into the dedupe map. Recording it first would swallow a
-      // rate-refused host permanently; leaving it unrecorded means the next
+      // origin is written into the dedupe map. Recording it first would swallow
+      // a rate-refused origin permanently; leaving it unrecorded means the next
       // violation for it can still arrive, which is the milder failure.
       if (!reportBudget.take()) return
-      reportedHosts.set(host, merged)
 
-      // A non-approvable host (an IP literal, `localhost`, a bare single-label
-      // name) is still recorded as a failure and still never offered for
-      // approval — the same split the filter path makes.
-      deps.onBlockedHost(
-        host,
-        parsed.data.blockedURI,
-        remote.secure && isApprovableHost(host),
-        kind
-      )
+      // Same reasoning for the sub-cap ledger: a rate-refused origin was never
+      // shown to anyone, so it must not spend its hostname's budget either.
+      if (known === undefined) {
+        originsPerHost.set(hostname, spentForHost + 1)
+      }
+      reportedOrigins.set(origin, merged)
+
+      // A non-approvable origin (http, an IP literal, `localhost`, a bare
+      // single-label name) is still recorded as a failure and still never
+      // offered for approval — the same split the filter path makes.
+      deps.onBlockedHost(origin, parsed.data.blockedURI, remote.approvable, kind)
     },
 
     reset(): void {
-      reportedHosts.clear()
+      reportedOrigins.clear()
+      // Cleared WITH the dedupe map, never independently. A page load that is
+      // news to the reader all over again must also be news to the sub-cap, or
+      // one noisy hostname on the first load would keep its successor's origins
+      // out of the list for the life of the view.
+      originsPerHost.clear()
       parseBudget.reset()
       reportBudget.reset()
     },
 
     dispose(): void {
       disposed = true
-      reportedHosts.clear()
+      reportedOrigins.clear()
+      originsPerHost.clear()
     }
   }
 }

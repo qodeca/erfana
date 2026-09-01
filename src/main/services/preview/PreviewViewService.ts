@@ -65,6 +65,46 @@ import { PreviewViewRegistry } from './PreviewViewRegistry'
 
 export type { PreviewWindowLike } from './PreviewLiveView'
 
+/**
+ * One panel's ledger of what has been reported blocked, and at whose expense.
+ *
+ * TWO MAPS, ONE OBJECT, deliberately. They have to be cleared together — see
+ * `applyApprovedHosts` — and a pair of parallel `Map`s on the service was an
+ * invitation to clear one and forget the other, which would leave a hostname
+ * that had spent its sub-budget before an approval unable to report anything
+ * after the reload. Holding them in one record makes "clear the ledger" a single
+ * act rather than a convention.
+ */
+interface PanelBlockedLedger {
+  /** Blocked ORIGIN -> the kinds it has been refused for. */
+  readonly kindsByOrigin: Map<string, PreviewBlockedKind[]>
+  /** Hostname -> how many of its origins are already in `kindsByOrigin`. */
+  readonly originsPerHost: Map<string, number>
+}
+
+/**
+ * The hostname inside a reported blocked identity.
+ *
+ * The identity is normally an origin (`https://cdn.example.com:8443`), but not
+ * always: `previewFilterDecision` still reports a bare hostname for an
+ * `insecure-scheme` refusal, the filter's timeout sweep reports whatever
+ * `hostOf` salvaged from the URL, and either can be the empty string. So this
+ * has to accept both shapes rather than assume the origin form.
+ *
+ * `new URL` rather than string surgery on the last colon: an IPv6 authority is
+ * `https://[::1]:8443`, and `lastIndexOf(':')` on that returns a host of
+ * `[::1]` on a good day and `[:` on a bad one. Anything that does not parse is
+ * already a bare hostname and is used as-is.
+ */
+function hostOfBlockedIdentity(identity: string): string {
+  try {
+    const { hostname } = new URL(identity)
+    return hostname === '' ? identity : hostname
+  } catch {
+    return identity
+  }
+}
+
 /** A `preview:open` request (mirrors `PreviewOpenRequestSchema`, §4.2). */
 export interface PreviewOpenRequest {
   panelId: string
@@ -176,12 +216,13 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
    * looked away.
    */
   /**
-   * Per-panel record of what each blocked host was refused for.
+   * Per-panel record of what each blocked origin was refused for, and of how
+   * much of the per-view budget each hostname has spent.
    *
    * Lives here rather than in `open()`'s closure only so `applyApprovedHosts`
    * can clear it across a reload. Entries are dropped with their panel.
    */
-  private readonly blockedKindsByPanel = new Map<string, Map<string, PreviewBlockedKind[]>>()
+  private readonly blockedByPanel = new Map<string, PanelBlockedLedger>()
 
   private readonly zoomLevels = new Map<string, number>()
   private readonly liveViewDeps: PreviewLiveViewDeps
@@ -245,31 +286,42 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
       this.deps.emit.failuresChanged(panelId, failures, truncated)
     )
 
-    // What each host has been refused FOR. One host is commonly refused for
-    // several things, and reporting only the first would label a host that will
-    // run scripts as "font".
+    // What each blocked ORIGIN has been refused FOR. One origin is commonly
+    // refused for several things, and reporting only the first would label an
+    // origin that will run scripts as "font".
     //
     // Held on the SERVICE, keyed by panel, not in this closure — because
     // `applyApprovedHosts` has to be able to clear it. See the comment there:
     // an approval reloads the page, the page is refused all over again, and a
     // dedupe map that outlived the reload would swallow every remaining host.
-    const kindsByHost = new Map<string, PreviewBlockedKind[]>()
-    this.blockedKindsByPanel.set(panelId, kindsByHost)
+    const ledger: PanelBlockedLedger = {
+      kindsByOrigin: new Map<string, PreviewBlockedKind[]>(),
+      originsPerHost: new Map<string, number>()
+    }
+    this.blockedByPanel.set(panelId, ledger)
 
     const onBlocked = (
       kind: PreviewFailureType,
-      host: string,
+      // An ORIGIN from both feeds now — `previewFilterDecision` returns one as
+      // its blocked identity and the CSP bridge reports the same shape — except
+      // on the `insecure-scheme` and timeout paths, which still carry a bare
+      // hostname. Named for what it can be rather than for the common case.
+      originOrHost: string,
       _url: string,
       approvable: boolean,
       resourceKind: PreviewBlockedKind = 'other'
     ): void => {
-      failureLog.record({ type: kind, resourceUrlOrHost: host, reasonCode: ErrorCode.UNKNOWN_ERROR })
+      failureLog.record({
+        type: kind,
+        resourceUrlOrHost: originOrHost,
+        reasonCode: ErrorCode.UNKNOWN_ERROR
+      })
 
       // `mergeBlockedKinds` returns null only when the set is UNCHANGED, and
       // adding a kind to an empty set always changes it — so there is no
       // "first sighting" branch to write here. One used to exist and was
       // unreachable.
-      const merged = mergeBlockedKinds(kindsByHost.get(host) ?? [], resourceKind)
+      const merged = mergeBlockedKinds(ledger.kindsByOrigin.get(originOrHost) ?? [], resourceKind)
 
       // NOTHING NEW TO SAY. The failure log above already recorded the event, so
       // this is only about the renderer's host list, and that list has not
@@ -280,24 +332,41 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
       // that rule; this channel never did.
       if (merged === null) return
 
-      // THE BOUND. Distinct hosts per view, capped. The three-toast budget that
-      // used to sit here bounded TOASTS, not this list, so once the emit became
-      // unconditional there was no bound at all. A host past the cap is not
-      // listed and therefore not approvable — which is the same one-way door the
-      // old cap had, except this one is stated, matches the CSP path's own
-      // MAX_HOSTS_PER_VIEW, and the renderer is told the list is truncated
-      // instead of silently showing a short one.
-      if (!kindsByHost.has(host) && kindsByHost.size >= PREVIEW.MAX_BLOCKED_HOSTS_PER_VIEW) {
-        return
+      if (!ledger.kindsByOrigin.has(originOrHost)) {
+        // THE BOUND. Distinct entries per view, capped. The three-toast budget
+        // that used to sit here bounded TOASTS, not this list, so once the emit
+        // became unconditional there was no bound at all. An entry past the cap
+        // is not listed and therefore not approvable — which is the same one-way
+        // door the old cap had, except this one is stated, matches the CSP
+        // path's own MAX_ORIGINS_PER_VIEW, and the renderer is told the list is
+        // truncated instead of silently showing a short one.
+        if (ledger.kindsByOrigin.size >= PREVIEW.MAX_BLOCKED_HOSTS_PER_VIEW) {
+          return
+        }
+
+        // THE SUB-BOUND, and the reason the bound above is still worth having.
+        // The entry is an ORIGIN now, so `http://localhost:1` … `:50` are fifty
+        // of them and would fill the per-view budget before the page's real
+        // blocked CDN is ever seen — dropped, never emitted, never approvable.
+        // Capping what one hostname may spend keeps room for the hosts a reader
+        // can actually act on. It has to be here, where the entry is RECORDED:
+        // trimming rows in the renderer is far too late for an event that was
+        // never sent.
+        const hostname = hostOfBlockedIdentity(originOrHost)
+        const spentForHost = ledger.originsPerHost.get(hostname) ?? 0
+        if (spentForHost >= PREVIEW.MAX_BLOCKED_ORIGINS_PER_HOST) {
+          return
+        }
+        ledger.originsPerHost.set(hostname, spentForHost + 1)
       }
 
-      kindsByHost.set(host, merged)
+      ledger.kindsByOrigin.set(originOrHost, merged)
       this.deps.emit.hostBlocked(
         panelId,
-        host,
+        originOrHost,
         approvable,
         merged,
-        kindsByHost.size >= PREVIEW.MAX_BLOCKED_HOSTS_PER_VIEW
+        ledger.kindsByOrigin.size >= PREVIEW.MAX_BLOCKED_HOSTS_PER_VIEW
       )
     }
 
@@ -423,7 +492,7 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
     // anyway, so this only matters for a panel that is closed and never
     // reopened — but a map that only ever grows is the kind of leak nobody
     // notices until a long session.
-    this.blockedKindsByPanel.delete(panelId)
+    this.blockedByPanel.delete(panelId)
 
     const view = this.registry.remove(panelId)
     if (view === null) {
@@ -574,7 +643,13 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
      * is that a refusal in the renderer never reaches `onBeforeRequest`.
      */
     for (const target of targets) {
-      this.blockedKindsByPanel.get(target.view.panelId)?.clear()
+      const targetLedger = this.blockedByPanel.get(target.view.panelId)
+      targetLedger?.kindsByOrigin.clear()
+      // The sub-cap ledger goes with it, always. A hostname that spent its five
+      // origins before the approval would otherwise be barred from reporting
+      // anything after the reload — the same swallowing defect this clear
+      // exists to prevent, one level down.
+      targetLedger?.originsPerHost.clear()
     }
     // `allSettled` over a snapshot: one view failing (or being torn down
     // mid-flight) must not stop the others from getting the rebuilt CSP.
