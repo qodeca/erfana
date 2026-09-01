@@ -155,7 +155,7 @@ const STEPS = [
     text: ['The preview reloads with the new permission, the row moves to <em>Allowed</em>, and the '
          + 'remaining three stay listed. You are not returned to the start.',
            'A hidden live region announces the change, so it is not only visible.'],
-    counts: '3 blocked · 1 allowed', open: true, approved: 'placehold.co', page: 'partial'
+    counts: '3 blocked · 1 allowed', open: true, approved: 'https://placehold.co', page: 'partial'
   },
   {
     title: 'It failed',
@@ -164,7 +164,7 @@ const STEPS = [
          + 'disappear and assumes it worked.',
            'The row comes back with its Allow button and says why. The chip carries the failure too, so '
          + 'closing the list does not hide it.'],
-    counts: '4 blocked · 0 allowed', open: true, failed: 'placehold.co', page: 'gaps'
+    counts: '4 blocked · 0 allowed', open: true, failed: 'https://placehold.co', page: 'gaps'
   },
   {
     title: 'You open the project tomorrow',
@@ -208,9 +208,9 @@ function band(step) {
 
   if (step.confirm) {
     rows.push(section('Approving'));
-    rows.push(row('placehold.co', 'allow'));
+    rows.push(row('https://placehold.co', 'allow'));
     rows.push(`<div class="erf-band__confirm">
-      <p class="erf-band__confirm-title">Let this page load from placehold.co?</p>
+      <p class="erf-band__confirm-title">Let this page load from https://placehold.co?</p>
       <p class="erf-band__confirm-body">It was blocked for an image, but Erfana cannot limit it to
         that — the host will also be able to run code and send data to it.</p>
       <p class="erf-band__confirm-body">Saved in this project's .erfana/settings.json, so it applies
@@ -223,14 +223,14 @@ function band(step) {
       </div></div>`);
   } else if (step.allowedOnly) {
     rows.push(section('Allowed in this project'));
-    for (const h of ['fonts.googleapis.com', 'cdn.jsdelivr.net',
-                     'cdnjs.cloudflare.com', 'placehold.co'])
+    for (const h of ['https://fonts.googleapis.com', 'https://cdn.jsdelivr.net',
+                     'https://cdnjs.cloudflare.com', 'https://placehold.co'])
       rows.push(row(h, 'allowed'));
   } else {
     // Hosts only. The kinds these were refused for are not shown on a row —
     // they belong in the confirm box, and nowhere else.
-    const blocked = ['fonts.googleapis.com', 'cdn.jsdelivr.net',
-                     'cdnjs.cloudflare.com', 'placehold.co']
+    const blocked = ['https://fonts.googleapis.com', 'https://cdn.jsdelivr.net',
+                     'https://cdnjs.cloudflare.com', 'https://placehold.co']
       .filter(h => h !== step.approved);
     if (blocked.length) {
       rows.push(section('Blocked on load'));
@@ -265,9 +265,20 @@ const section = (t) => `<div class="erf-band__section">${t}</div>`;
    no stylesheet, so they had no host treatment at all; the card was drawing a
    control it did not have. The <wbr>s make label boundaries the preferred break
    points, and the accessible name carries the raw host. */
-function hostCell(host) {
-  const label = host.replace(/&/g, '&amp;').replace(/</g, '&lt;');
-  return `<span class="erf-host" dir="ltr" aria-label="${label}">${label.replace(/\./g, '.<wbr>')}</span>`;
+/* A row grants an ORIGIN — scheme, host and port. The scheme and the port are
+   drawn only when they are not the default, so an ordinary https row is exactly
+   what it always was and anything unusual is visible because it is unusual. The
+   accessible name carries the whole origin either way. See the Permission band
+   and Rows cards, which decide this. */
+function hostCell(origin) {
+  const url = new URL(origin);
+  const esc = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  const scheme = url.protocol === 'https:'
+    ? ''
+    : `<span class="erf-host__scheme">${esc(url.protocol)}//</span>`;
+  const host = esc(url.hostname).replace(/\./g, '.<wbr>');
+  const port = url.port === '' ? '' : `<span class="erf-host__port">:${esc(url.port)}</span>`;
+  return `<span class="erf-host" dir="ltr" aria-label="${esc(origin)}">${scheme}${host}${port}</span>`;
 }
 
 function row(host, state) {

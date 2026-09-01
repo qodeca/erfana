@@ -1,4 +1,4 @@
-<!-- @card group="Components" name="Permission band" subtitle="Approve blocked hosts from the preview's own chrome — collapsed, expanded, confirming, fail-safe" status="decided" reviewed="2026-08-31" -->
+<!-- @card group="Components" name="Permission band" subtitle="Approve a blocked origin from the preview's own chrome — collapsed, expanded, confirming, fail-safe" status="decided" reviewed="2026-08-31" -->
 <!-- SPDX-License-Identifier: GPL-3.0-only -->
 <!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
 <!DOCTYPE html>
@@ -149,6 +149,32 @@
   </div>
 </div>
 
+<h2>The unit is an origin, not a hostname</h2>
+<div class="ds-note">
+  A row grants <strong>scheme, host and port</strong> — because that is the unit both chokepoints can
+  compare. A hostname could not carry it. A CSP host-source with no port matches only the scheme's
+  default port, while the network filter compared bare hostnames and ignored the port entirely, so the
+  two gates were answering different questions about the same request.
+  <br><br>
+  <strong>That mismatch was visible, and it was the worst kind of visible.</strong> Approving
+  <code>example.com</code> and then loading <code>https://example.com:8443/x.js</code> got the resource
+  refused by the CSP — while the band, which subtracted every allowed <em>host</em> from the blocked
+  list, dropped the row and reported <code>example.com — Allowed ✓</code>. A permanently broken
+  resource, labelled as working, with no control anywhere that could fix it. Both gates now compare one
+  re-serialised origin, so the two cannot disagree.
+  <br><br>
+  <strong>But an origin printed in full is not scannable</strong>, and a row nobody reads is not a
+  control. So the host stays prominent and the other two parts are drawn only when they are
+  <em>not</em> the default — the scheme when it is not <code>https</code>, the port when it is not the
+  scheme's own. The common case is unchanged; anything unusual is visible because it is unusual.
+  <br><br>
+  De-emphasised is not hidden. The scheme and port use <code>--color-text-tertiary</code>, never
+  <code>--color-text-secondary</code>, which measures 3.72:1 on this surface and fails AA — a part of a
+  security decision may be quietened, not made hard to read. And the accessible name carries the
+  <strong>full origin</strong> whether or not it is drawn, so a screen-reader user and a sighted user
+  are answering the same question.
+</div>
+
 <h2>What the confirm step has to say, and why</h2>
 <div class="ds-note">
   <strong>No row names a resource kind — not a blocked one, not an allowed one.</strong> An earlier
@@ -209,20 +235,28 @@
 <script>
 const SEED = {
   blocked: [
-    { host: 'fonts.googleapis.com', kind: 'style' },
-    { host: 'cdn.jsdelivr.net', kind: 'script' },
+    { host: 'https://fonts.googleapis.com', kind: 'style' },
+    { host: 'https://cdn.jsdelivr.net', kind: 'script' },
+    // A NON-DEFAULT PORT, and the reason the unit had to change. Keyed by
+    // hostname this row could not exist: a CSP host-source with no port matches
+    // only the scheme's default, so approving `example.com` never covered
+    // `:8443` — and because the band subtracted every allowed HOST from the
+    // blocked list, the row vanished and the band reported "Allowed" for a
+    // resource that could never load.
+    { host: 'https://example.com:8443', kind: 'script' },
     // Long enough to wrap at this width. A host that never wraps leaves the
     // wrapping rule described rather than rendered, which is how the old
     // front-elide shipped broken for months.
-    { host: 'assets.tracking.eu-west-1.metrics.a-very-long-tenant.example.co.uk', kind: 'connect' },
-    // Not approvable: an IP literal can never be added to the allowlist
-    // (isApprovableHost refuses it), so this row has no Allow button at all.
-    { host: '203.0.113.7', kind: 'image', approvable: false }
+    { host: 'https://assets.tracking.eu-west-1.metrics.a-very-long-tenant.example.co.uk', kind: 'connect' },
+    // Not approvable YET: an IP literal cannot be added to the allowlist while
+    // `isApprovableHost` still carries its policy clauses. That is the dead end
+    // this card is on its way to deleting — see the Exceptions section.
+    { host: 'https://203.0.113.7', kind: 'image', approvable: false }
   ],
   // No `kind` here, deliberately — see allowedRow().
   allowed: [
-    { host: 'fonts.gstatic.com' },
-    { host: 'cdn.example.com' }
+    { host: 'https://fonts.gstatic.com' },
+    { host: 'https://cdn.example.com' }
   ]
 };
 
@@ -302,16 +336,38 @@ function section(text) {
    It is a layout hint only and must not reach the accessible name, which
    carries the raw host: `title` is unreachable by keyboard and by touch, so it
    is not a substitute. */
-function hostNode(host) {
+function hostNode(origin) {
+  const url = new URL(origin);
   const wrap = document.createElement('span');
   wrap.className = 'erf-host';
   wrap.dir = 'ltr';
-  wrap.setAttribute('aria-label', host);
+  // The accessible name is the FULL origin, always — scheme and port included,
+  // even when they are not drawn. What is de-emphasised for scanning must still
+  // be announced in full, or the two audiences are deciding different questions.
+  wrap.setAttribute('aria-label', origin);
 
-  host.split('.').forEach((label, i, all) => {
+  // Drawn only when NOT the default. The common case stays exactly as it was,
+  // and anything unusual is visible because it is unusual.
+  if (url.protocol !== 'https:') {
+    const scheme = document.createElement('span');
+    scheme.className = 'erf-host__scheme';
+    scheme.textContent = url.protocol + '//';
+    wrap.appendChild(scheme);
+  }
+
+  url.hostname.split('.').forEach((label, i, all) => {
     wrap.append(document.createTextNode(i === all.length - 1 ? label : label + '.'));
+    // No <wbr> after the LAST label, so the port that follows stays attached to
+    // it unless the line genuinely cannot fit.
     if (i < all.length - 1) wrap.appendChild(document.createElement('wbr'));
   });
+
+  if (url.port !== '') {
+    const port = document.createElement('span');
+    port.className = 'erf-host__port';
+    port.textContent = ':' + url.port;
+    wrap.appendChild(port);
+  }
   return wrap;
 }
 
@@ -331,9 +387,14 @@ function blockedRow(item) {
   const kind = document.createElement('span');
   kind.className = 'erf-band__kind';
 
-  // A host the allowlist can never accept — an IP literal, a loopback name, a
-  // single label. `isApprovableHost` refuses it on both the read and the write
-  // path, so offering an Allow here would be a button that cannot work.
+  // A host `isApprovableHost` still refuses on both the read and the write path,
+  // so an Allow here would be a button that cannot work.
+  //
+  // THIS BRANCH IS ON ITS WAY OUT. It is the dead end the whole redesign exists
+  // to delete: no button, no reason, nothing the reader can act on or learn
+  // from. What survives it is one refusal on PHYSICAL grounds — an IPv6 literal
+  // cannot be written as a CSP host-source at all, because `host-char` is
+  // `ALPHA / DIGIT / "-"` — and that one will state its reason. See Exceptions.
   if (item.approvable === false) {
     const nope = document.createElement('span');
     nope.className = 'erf-band__state';

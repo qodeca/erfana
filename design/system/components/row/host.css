@@ -75,7 +75,7 @@
  * Two things CSS cannot decide, which the card states in prose:
  *   - IDN policy. This defends against truncation, not against `аpple.com` with
  *     a Cyrillic а. Render the punycode A-label when the U-label mixes scripts.
- *   - The accessible name carries the FULL host on one element. `title` is
+ *   - The accessible name carries the FULL ORIGIN on one element. `title` is
  *     unreachable by keyboard and by touch, so it is not a substitute for
  *     aria-label — and the `<wbr>`s must not reach the accessible name.
  */
@@ -101,4 +101,41 @@
   overflow-wrap: anywhere;
   font-family: var(--font-mono);
   font-size: var(--text-sm);
+}
+
+/* ---------- the parts of an origin that are not the host ---------- */
+
+/*
+ * A permission is granted to an ORIGIN — scheme, host and port — because that is
+ * the unit both chokepoints can compare. But an origin printed in full is not
+ * scannable, and a row nobody reads is not a control. So the host stays
+ * prominent and the other two parts appear ONLY when they are not the default:
+ * the scheme when it is not `https`, the port when it is not the scheme's own.
+ *
+ * `https://cdn.jsdelivr.net`  ->  cdn.jsdelivr.net
+ * `https://example.com:8443`  ->  example.com:8443
+ * `http://localhost:3000`     ->  http://localhost:3000
+ *
+ * The common case is therefore unchanged, and anything unusual is visible
+ * BECAUSE it is unusual — which is the property a reader can act on.
+ *
+ * DIMMED, NOT HIDDEN, and `--color-text-tertiary` not `--color-text-secondary`:
+ * secondary measures 3.72:1 on this surface and fails AA. A part of a security
+ * decision may be de-emphasised; it may not be made hard to read.
+ *
+ * NO `<wbr>` IS EMITTED AROUND EITHER. Break hints mark PREFERRED break points,
+ * so a scheme or a port with no hint beside it stays attached to the host unless
+ * the line genuinely cannot fit — which is what stops `localhost` and `:3000`
+ * being read as two separate things on two separate lines. `white-space: nowrap`
+ * on the port keeps the number itself intact; it is deliberately NOT applied to
+ * a last-label-plus-port group, because that group could then overflow the row
+ * rather than wrap, and overflowing is how a host stops being fully visible.
+ */
+.erf-host__scheme,
+.erf-host__port {
+  color: var(--color-text-tertiary);
+}
+
+.erf-host__port {
+  white-space: nowrap;
 }

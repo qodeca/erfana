@@ -99,7 +99,7 @@
   </div>
 </div>
 
-<h2>A host that does not fit wraps — nothing is ever cut</h2>
+<h2>An origin that does not fit wraps — nothing is ever cut</h2>
 
 <div class="stage">
   <div>
@@ -136,6 +136,30 @@
       <code>example.co.uk</code>, and a front-elide cutting at the <em>wrong</em> boundary is worse than no
       invariant at all, because it looks like one. Erfana carries no PSL. If one ever arrives for another
       reason, revisit — one-line rows read better than wrapped ones.
+    </div>
+    <div class="ds-note">
+      <strong>A row grants an origin, so a row has to show one — without becoming unreadable.</strong>
+      The scheme and the port are drawn <em>only when they are not the default</em>: the scheme when it
+      is not <code>https</code>, the port when it is not the scheme's own. So the ordinary row is
+      exactly what it always was, and <code>http://localhost:3000</code> is legible <em>because</em> it
+      looks different. Both parts are dimmed with <code>--color-text-tertiary</code> — never
+      <code>--color-text-secondary</code>, which measures 3.72:1 here and fails AA. De-emphasised is
+      not hard to read.
+      <br><br>
+      <strong>Neither gets a <code>&lt;wbr&gt;</code>.</strong> Break hints mark <em>preferred</em>
+      break points, so a part with no hint beside it stays attached to the host unless the line
+      genuinely cannot fit. That is what stops <code>localhost</code> and <code>:3000</code> landing on
+      two lines and reading as two separate things. Only the port carries
+      <code>white-space: nowrap</code>, so the number itself never splits; the last label and the port
+      are deliberately <em>not</em> wrapped together in a nowrap group, because that group could then
+      overflow the row instead of wrapping — and overflowing is how a host stops being fully visible.
+    </div>
+    <div class="ds-note">
+      <strong>A trailing dot is normalised away, not refused.</strong> <code>evil.com.</code> and
+      <code>evil.com</code> are the same name to a resolver, and a CSP host-source has no empty-label
+      production. Refusing it would produce a blocked row that gets an Allow button the boundary then
+      rejects — <strong>a button that lies, which is worse than no button</strong>. One trailing dot is
+      stripped; <code>example.com..</code> is not a host and stays refused.
     </div>
     <div class="ds-note">
       <strong>Two things CSS cannot decide.</strong>
@@ -330,24 +354,59 @@ for (const [state, letter, label] of GIT) {
 
 /* ---- the host elide, with the strings that actually break it ---- */
 
-const HOSTS = [
-  'a-very-long-subdomain.cdn.evil.com',
-  'cdn.jsdelivr.net',
-  'evil.com:8443',
-  'evil.com.',
-  'xn--80ak6aa92e.com',
-  'مثال.إختبار.evil.com',
-  'averyveryverylongregistrabledomainname.example',
-  'assets.tracking.eu-west-1.metrics.a-very-long-tenant-name.example.co.uk',
-  'onesingleunbreakablelabelwithnodotsatallthatcannotwrapatalabelboundary.example'
+const ORIGINS = [
+  'https://a-very-long-subdomain.cdn.evil.com',
+  'https://cdn.jsdelivr.net',
+  // A non-default port, and a plain-http origin. Both are drawn because both are
+  // NOT the default; neither would be drawn on an ordinary https row.
+  'https://evil.com:8443',
+  'http://localhost:3000',
+  // A trailing dot is NORMALISED AWAY, not refused. `evil.com.` and `evil.com`
+  // are the same name to the resolver, and CSP has no empty-label production —
+  // so refusing it would mean a blocked row that gets an Allow button the
+  // boundary then rejects. A button that lies is worse than no button.
+  'https://evil.com./',
+  'https://xn--80ak6aa92e.com',
+  // Enters as a U-label and comes out punycoded, by the parser rather than by
+  // any rule of ours. That is the homograph defence, rendered.
+  'https://مثال.إختبار.evil.com',
+  'https://averyveryverylongregistrabledomainname.example',
+  'https://assets.tracking.eu-west-1.metrics.a-very-long-tenant-name.example.co.uk',
+  'https://onesingleunbreakablelabelwithnodotsatallthatcannotwrapatalabelboundary.example'
 ];
 
 /* Label boundaries are the PREFERRED break points, so a wrapped host breaks at a
    dot whenever one fits. `overflow-wrap: anywhere` in row.css is the fallback for
-   the last host in the list, which has no dot to break at. This is the whole
-   component — there is no boundary to compute and no list to consult. */
-function hostHtml(host) {
-  return escapeHtml(host).replace(/\./g, '.<wbr>');
+   the last host in the list, which has no dot to break at. There is no boundary
+   to compute and no list to consult.
+
+   The SCHEME and PORT are drawn only when they are not the default, and neither
+   gets a <wbr> beside it. Break hints mark preferred break points, so a part with
+   no hint next to it stays attached to the host unless the line genuinely cannot
+   fit — which is what stops `localhost` and `:3000` being read as two separate
+   things on two separate lines. */
+function originHtml(origin) {
+  const url = new URL(origin);
+  const scheme = url.protocol === 'https:'
+    ? ''
+    : `<span class="erf-host__scheme">${escapeHtml(url.protocol)}//</span>`;
+  const host = escapeHtml(stripTrailingDot(url.hostname)).replace(/\./g, '.<wbr>');
+  const port = url.port === ''
+    ? ''
+    : `<span class="erf-host__port">:${escapeHtml(url.port)}</span>`;
+  return scheme + host + port;
+}
+
+/* One trailing dot, and one only — `example.com..` is not a host. */
+function stripTrailingDot(hostname) {
+  return hostname.endsWith('.') ? hostname.slice(0, -1) : hostname;
+}
+
+/* What the row ANNOUNCES: the whole origin, including the parts not drawn. */
+function originLabel(origin) {
+  const url = new URL(origin);
+  const port = url.port === '' ? '' : ':' + url.port;
+  return `${url.protocol}//${stripTrailingDot(url.hostname)}${port}`;
 }
 
 function escapeHtml(text) {
@@ -362,13 +421,14 @@ function buildHosts() {
   frame.style.width = `${slider.value}px`;
   wval.textContent = `${slider.value}px`;
   frame.innerHTML = '';
-  for (const host of HOSTS) {
+  for (const origin of ORIGINS) {
     const row = document.createElement('div');
     row.className = 'erf-row';
-    // aria-label carries the raw host: the <wbr>s are a layout hint and must not
-    // reach the accessible name.
+    // aria-label carries the whole origin: the <wbr>s are a layout hint and must
+    // not reach the accessible name, and a part that is de-emphasised for
+    // scanning must still be announced in full.
     row.innerHTML =
-      `<span class="erf-host" dir="ltr" aria-label="Host ${escapeHtml(host)}">${hostHtml(host)}</span>`;
+      `<span class="erf-host" dir="ltr" aria-label="Host ${escapeHtml(originLabel(origin))}">${originHtml(origin)}</span>`;
     frame.appendChild(row);
   }
 }

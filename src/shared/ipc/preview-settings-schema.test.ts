@@ -11,7 +11,10 @@ import {
   MAX_ALLOWLIST_HOSTS,
   PreviewAllowlistSchema,
   PreviewHostSchema,
-  isApprovableHost
+  PreviewOriginSchema,
+  isApprovableHost,
+  originFromLegacyHost,
+  parsePreviewOrigin
 } from './preview-settings-schema'
 
 describe('isApprovableHost', () => {
@@ -130,5 +133,186 @@ describe('PreviewAllowlistSchema', () => {
   it('accepts exactly MAX_ALLOWLIST_HOSTS entries', () => {
     const hosts = Array.from({ length: MAX_ALLOWLIST_HOSTS }, (_, i) => `h${i}.example.com`)
     expect(PreviewAllowlistSchema.safeParse({ version: 1, hosts }).success).toBe(true)
+  })
+})
+
+describe('parsePreviewOrigin', () => {
+  it('returns the canonical origin for the ordinary case', () => {
+    expect(parsePreviewOrigin('https://cdn.jsdelivr.net')).toBe('https://cdn.jsdelivr.net')
+  })
+
+  it('keeps a non-default port and drops the default one', () => {
+    // The whole reason the unit had to change. A CSP host-source with no port
+    // matches only the scheme's default, so `:8443` had to become part of what
+    // is stored or it could never be granted.
+    expect(parsePreviewOrigin('https://example.com:8443')).toBe('https://example.com:8443')
+    expect(parsePreviewOrigin('https://example.com:443')).toBe('https://example.com')
+  })
+
+  it('is idempotent, which is what makes the schema a round-trip check', () => {
+    for (const input of ['https://a.example.com', 'https://a.example.com:8443']) {
+      const once = parsePreviewOrigin(input)
+      expect(once).not.toBeNull()
+      expect(parsePreviewOrigin(once as string)).toBe(once)
+    }
+  })
+
+  it('strips exactly one trailing dot rather than refusing it', () => {
+    // `example.com.` is reachable, so it produces a blocked row. Refusing it
+    // would put an Allow button on that row which the boundary then rejects —
+    // a button that lies, which is worse than no button.
+    expect(parsePreviewOrigin('https://example.com./')).toBe('https://example.com')
+    // Two dots leave an empty label, which is not a host.
+    expect(parsePreviewOrigin('https://example.com..')).toBeNull()
+  })
+
+  it('refuses a scheme outside the closed set, however well it parses', () => {
+    // Parseability is not the test. Each of these is a perfectly valid URL.
+    expect(parsePreviewOrigin('ws://example.com:1234')).toBeNull()
+    expect(parsePreviewOrigin('ftp://example.com')).toBeNull()
+    expect(parsePreviewOrigin('file:///etc/passwd')).toBeNull()
+    // https-only for now, so a plain http origin is refused at BOTH gates and
+    // therefore must not be storable at either.
+    expect(parsePreviewOrigin('http://example.com')).toBeNull()
+  })
+
+  it('refuses a blob: URL whose .origin looks perfectly respectable', () => {
+    // THE reason nothing here is built from `URL.origin`:
+    //   new URL('blob:https://evil.com/1234').origin === 'https://evil.com'
+    // while its `.hostname` is empty. Reading `.origin` would validate a string
+    // that never described a real fetch target.
+    const smuggled = 'blob:https://evil.com/1234'
+    expect(new URL(smuggled).origin).toBe('https://evil.com')
+    expect(parsePreviewOrigin(smuggled)).toBeNull()
+  })
+
+  it('refuses embedded credentials, which .origin would have discarded silently', () => {
+    expect(new URL('https://user:pw@example.com').origin).toBe('https://example.com')
+    expect(parsePreviewOrigin('https://user:pw@example.com')).toBeNull()
+  })
+
+  it('refuses anything carrying a path, query or fragment', () => {
+    // `pathname` is '/' for a bare origin, so query and fragment need their own
+    // checks — they do not show up in the path.
+    expect(parsePreviewOrigin('https://example.com/path')).toBeNull()
+    expect(parsePreviewOrigin('https://example.com?q=1')).toBeNull()
+    expect(parsePreviewOrigin('https://example.com#f')).toBeNull()
+  })
+
+  it('refuses a control character before the parser can strip it', () => {
+    // The WHATWG parser removes tab, LF and CR from anywhere in its input, so a
+    // guard placed after `new URL` would pass while the byte that can break out
+    // of a CSP directive is still in the value that reached disk.
+    expect(new URL('https://exa\tmple.com').hostname).toBe('example.com')
+    expect(parsePreviewOrigin('https://exa\tmple.com')).toBeNull()
+    expect(parsePreviewOrigin('https://example.com\r\nx')).toBeNull()
+  })
+
+  it('refuses port 0, which is valid everywhere and connects nowhere', () => {
+    expect(new URL('https://example.com:0').port).toBe('0')
+    expect(parsePreviewOrigin('https://example.com:0')).toBeNull()
+  })
+
+  it('refuses IPv6 — the one refusal that is physics, not policy', () => {
+    // CSP3's `host-char` is ALPHA / DIGIT / "-", so a bracketed literal cannot
+    // be written as a host-source at all. Granting one would land it in the
+    // network filter and not in the CSP: a grant that looks live and is
+    // half-refused.
+    expect(parsePreviewOrigin('https://[::1]:3000')).toBeNull()
+  })
+
+  it('refuses a label the URL parser is happy to accept', () => {
+    expect(parsePreviewOrigin('https://foo_bar.com')).toBeNull()
+    expect(parsePreviewOrigin('https://-leading.com')).toBeNull()
+  })
+
+  it('normalises case and IDN through the parser, never by hand', () => {
+    expect(parsePreviewOrigin('https://EXAMPLE.com')).toBe('https://example.com')
+    // A U-label enters and an A-label comes out. This is the homograph defence,
+    // and it is the parser's doing rather than a rule of ours.
+    expect(parsePreviewOrigin('https://münchen.de')).toBe('https://xn--mnchen-3ya.de')
+  })
+
+  it('canonicalises the IPv4 shorthands the old predicate listed by hand', () => {
+    // The rejection table used to enumerate `0x7f.1` and `2130706433`. That
+    // guarantee did not disappear — it MOVED: every shorthand collapses to
+    // 127.0.0.1 before any policy sees it, so one rule now covers a family the
+    // old code had to spell out and could have under-spelled.
+    for (const shorthand of ['http://127.1', 'http://0x7f.1', 'http://2130706433']) {
+      expect(new URL(shorthand).hostname).toBe('127.0.0.1')
+    }
+  })
+})
+
+describe('originFromLegacyHost', () => {
+  it('means exactly what a host entry always meant', () => {
+    // A host grant emitted `https://<host>` into the CSP and matched a hostname
+    // under https in the filter. Both are this origin at the default port.
+    expect(originFromLegacyHost('cdn.jsdelivr.net')).toBe('https://cdn.jsdelivr.net')
+  })
+
+  it('refuses what the host schema refused', () => {
+    expect(originFromLegacyHost('localhost')).toBeNull()
+    expect(originFromLegacyHost('127.0.0.1')).toBeNull()
+  })
+})
+
+describe('PreviewOriginSchema', () => {
+  it('accepts only what is ALREADY canonical', () => {
+    // Validity is canonicality. Anything the parser would rewrite is refused
+    // rather than quietly normalised, so the string on disk, the string in the
+    // CSP and the string the filter compares are provably one string.
+    expect(PreviewOriginSchema.safeParse('https://example.com:8443').success).toBe(true)
+    expect(PreviewOriginSchema.safeParse('https://example.com:443').success).toBe(false)
+    expect(PreviewOriginSchema.safeParse('https://EXAMPLE.com').success).toBe(false)
+    expect(PreviewOriginSchema.safeParse('https://example.com./').success).toBe(false)
+  })
+
+  it('agrees with parsePreviewOrigin in both directions', () => {
+    // The same guard the host schema carries, re-expressed: anything the app
+    // will offer must survive the boundary, or the Allow button is a lie.
+    const cases = [
+      'https://cdn.jsdelivr.net',
+      'https://example.com:8443',
+      'https://example.com:443',
+      'http://example.com',
+      'https://[::1]',
+      'https://localhost',
+      'blob:https://evil.com/1234',
+      'https://user:pw@example.com'
+    ]
+    for (const candidate of cases) {
+      const canonical = parsePreviewOrigin(candidate)
+      const accepted = PreviewOriginSchema.safeParse(candidate).success
+      expect(accepted).toBe(canonical === candidate)
+    }
+  })
+})
+
+describe('PreviewAllowlistSchema forward compatibility', () => {
+  it('parses a block carrying origins WITHOUT bumping the version', () => {
+    // This test is what makes "do not bump the version" enforceable rather than
+    // aspirational. An older build reads this same shape through this same
+    // schema; a bump would leave it with an empty allowlist and every write
+    // refused, recoverable only by hand-editing JSON.
+    const parsed = PreviewAllowlistSchema.safeParse({
+      version: PREVIEW_ALLOWLIST_VERSION,
+      hosts: ['cdn.jsdelivr.net'],
+      origins: ['https://cdn.jsdelivr.net', 'https://example.com:8443']
+    })
+    expect(parsed.success).toBe(true)
+    expect(parsed.success && parsed.data.origins).toEqual([
+      'https://cdn.jsdelivr.net',
+      'https://example.com:8443'
+    ])
+  })
+
+  it('still parses a block written before origins existed', () => {
+    const parsed = PreviewAllowlistSchema.safeParse({
+      version: PREVIEW_ALLOWLIST_VERSION,
+      hosts: ['cdn.jsdelivr.net']
+    })
+    expect(parsed.success).toBe(true)
+    expect(parsed.success && parsed.data.origins).toBeUndefined()
   })
 })
