@@ -24,7 +24,8 @@ import {
   MAX_ALLOWLIST_HOSTS,
   PREVIEW_ALLOWLIST_VERSION,
   PreviewAllowlistSchema,
-  PreviewHostSchema
+  originFromLegacyHost,
+  parsePreviewOrigin
 } from '../../../shared/ipc/preview-settings-schema'
 import { atomicWriteJSON } from '../../utils/atomicWrite'
 import { resolveErfanaDir } from './erfanaDirGate'
@@ -34,8 +35,8 @@ const SETTINGS_FILE_NAME = 'settings.json'
 
 /** Result of loading the on-disk allowlist block. */
 export interface PreviewAllowlistState {
-  /** The approved hosts, sorted; empty on any bad or absent block. */
-  readonly hosts: readonly string[]
+  /** The approved ORIGINS, sorted; empty on any bad or absent block. */
+  readonly origins: readonly string[]
   /** False when the on-disk block is present but bad/unsupported (§3.2). */
   readonly writeBackEnabled: boolean
 }
@@ -63,13 +64,21 @@ export interface IPreviewAllowlistStore {
    */
   load(): Promise<PreviewAllowlistState>
   /**
-   * Approve `host` and persist it via atomic write-back through the `.erfana`
+   * Approve `origin` and persist it via atomic write-back through the `.erfana`
    * gate. Resolves the root from the injected accessor — the caller supplies no
-   * path. Returns the new sorted host set. Serialised per project.
+   * path. Returns the new sorted origin set. Serialised per project.
    */
-  approveHost(host: string): Promise<readonly string[]>
-  /** The current in-memory approved-host set (from the last successful load/approve). */
-  getHosts(): ReadonlySet<string>
+  approveOrigin(origin: string): Promise<readonly string[]>
+  /**
+   * The current in-memory approved-origin set (from the last successful
+   * load/approve).
+   *
+   * THE ONLY ACCESSOR, and that is the point. The CSP used to be built from a
+   * `load()` snapshot array while the network filter read this getter — one
+   * store, two shapes, read at different times, and nothing forcing them to
+   * agree. Both now read this.
+   */
+  getOrigins(): ReadonlySet<string>
   /** True unless the last load found a present-but-bad on-disk block. */
   isWriteBackEnabled(): boolean
 }
@@ -94,7 +103,7 @@ export class PreviewAllowlistStore implements IPreviewAllowlistStore {
   private readonly getProjectRoot: () => string | null
   private readonly onBadge?: (badge: PreviewFailureInput) => void
 
-  private hosts = new Set<string>()
+  private origins = new Set<string>()
   private writeBackEnabled = true
   /** Per-project tail-promise serialising write-backs (§3.3). */
   private writeChain: Promise<unknown> = Promise.resolve()
@@ -162,14 +171,14 @@ export class PreviewAllowlistStore implements IPreviewAllowlistStore {
       return this.applyState([], false)
     }
 
-    return this.applyState(parsed.data.hosts, true)
+    return this.applyState(resolveOrigins(parsed.data), true)
   }
 
-  approveHost(host: string): Promise<readonly string[]> {
+  approveOrigin(origin: string): Promise<readonly string[]> {
     // Serialise behind the per-project tail-promise chain (§3.3).
     const next = this.writeChain.then(
-      () => this.approveHostInner(host),
-      () => this.approveHostInner(host)
+      () => this.approveOriginInner(origin),
+      () => this.approveOriginInner(origin)
     )
     // Keep the chain alive regardless of this call's outcome.
     this.writeChain = next.then(
@@ -179,14 +188,16 @@ export class PreviewAllowlistStore implements IPreviewAllowlistStore {
     return next
   }
 
-  private async approveHostInner(host: string): Promise<readonly string[]> {
+  private async approveOriginInner(origin: string): Promise<readonly string[]> {
     const projectRoot = this.getProjectRoot()
     if (projectRoot === null) {
       throw new AppError('No project is open', ErrorCode.PROJECT_NOT_FOUND)
     }
 
-    // Step 0: normalise (ASCII/punycode) then validate — includes isApprovableHost.
-    const normalisedHost = this.normaliseAndValidateHost(host)
+    // Step 0: canonicalise, or refuse. `parsePreviewOrigin` is the single
+    // definition of both, so what is written here is byte-identical to what the
+    // CSP builder emits and what the network filter compares.
+    const canonicalOrigin = this.normaliseAndValidateOrigin(origin)
 
     // Step 1–3: realpath the root, resolve the gated .erfana, build the path.
     const realRoot = await realpath(projectRoot)
@@ -210,33 +221,68 @@ export class PreviewAllowlistStore implements IPreviewAllowlistStore {
       )
     }
 
-    // Step 6: merge, enforce the cap.
-    const existing = isPlainObject(block) && Array.isArray(block.hosts) ? block.hosts : []
-    const hostSet = new Set<string>(existing.filter((h): h is string => typeof h === 'string'))
-    hostSet.add(normalisedHost)
-    if (hostSet.size > MAX_ALLOWLIST_HOSTS) {
+    // Step 6: merge, enforce the cap ACROSS BOTH KEYS. Capping each array on its
+    // own would let a file carry 200 hosts plus 200 origins and put all 400 into
+    // a CSP header, six directives wide.
+    const existingOrigins = readStringArray(block, 'origins')
+    const existingHosts = readStringArray(block, 'hosts')
+    const originSet = new Set<string>([
+      ...existingOrigins,
+      // A legacy host entry means the origin it always meant.
+      ...existingHosts.map(originFromLegacyHost).filter((o): o is string => o !== null)
+    ])
+    originSet.add(canonicalOrigin)
+    if (originSet.size > MAX_ALLOWLIST_HOSTS) {
       throw new AppError('The preview host allowlist is full', ErrorCode.PREVIEW_ALLOWLIST_FULL)
     }
-    const sortedHosts = [...hostSet].sort()
+    const sortedOrigins = [...originSet].sort()
+
+    // Step 6b: VALIDATE BEFORE WRITING. This used to happen only in step 9, so a
+    // single bad entry already on disk made every approval throw AFTER the write
+    // had landed — the file mutated, the user told "Not saved", and the same
+    // failure on every retry. Refusing to write is fail-closed; writing and then
+    // refusing is neither.
+    if (!PreviewAllowlistSchema.safeParse({
+      version: PREVIEW_ALLOWLIST_VERSION,
+      hosts: sortedOrigins.map(hostOfOrigin).filter((h): h is string => h !== null),
+      origins: sortedOrigins
+    }).success) {
+      throw new AppError(
+        'Refusing to write an allowlist that would not parse back',
+        ErrorCode.PROJECT_SETTINGS_VALIDATION_FAILED
+      )
+    }
 
     // Step 7: mutate the raw object, preserving every unknown key.
+    //
+    // DUAL-WRITE, and `origins` is the truth. `hosts` is a projection carrying
+    // only the default-port https origins, which is exactly what a host entry
+    // could ever express — so an older build reads a file it fully understands
+    // and simply cannot see the rest. The version is deliberately not bumped;
+    // see PreviewAllowlistSchema.
     raw.htmlPreview = {
       ...(htmlPreview ?? {}),
-      allowlist: { version: PREVIEW_ALLOWLIST_VERSION, hosts: sortedHosts }
+      allowlist: {
+        version: PREVIEW_ALLOWLIST_VERSION,
+        hosts: sortedOrigins.map(hostOfOrigin).filter((h): h is string => h !== null),
+        origins: sortedOrigins
+      }
     }
 
     // Step 8: atomic, pretty (2-space + trailing newline) write-back.
     await atomicWriteJSON(settingsPath, raw, 2)
 
-    // Step 9: re-read + re-validate; swap the in-memory set; return it.
-    const verified = await this.verifyWrittenHosts(settingsPath)
-    this.hosts = new Set(verified)
+    // Step 9: re-read + re-validate; swap the in-memory set; return it. Now a
+    // confirmation that the bytes landed, rather than the first time anything
+    // was checked.
+    const verified = await this.verifyWrittenOrigins(settingsPath)
+    this.origins = new Set(verified)
     this.writeBackEnabled = true
     return verified
   }
 
-  getHosts(): ReadonlySet<string> {
-    return this.hosts
+  getOrigins(): ReadonlySet<string> {
+    return this.origins
   }
 
   isWriteBackEnabled(): boolean {
@@ -244,26 +290,30 @@ export class PreviewAllowlistStore implements IPreviewAllowlistStore {
   }
 
   /** Update in-memory state and return the resolved load result. */
-  private applyState(hosts: readonly string[], writeBackEnabled: boolean): PreviewAllowlistState {
-    this.hosts = new Set(hosts)
+  private applyState(
+    origins: readonly string[],
+    writeBackEnabled: boolean
+  ): PreviewAllowlistState {
+    this.origins = new Set(origins)
     this.writeBackEnabled = writeBackEnabled
-    return { hosts: [...this.hosts], writeBackEnabled }
+    return { origins: [...this.origins], writeBackEnabled }
   }
 
-  /** Normalise a host through the URL parser then validate via the schema. */
-  private normaliseAndValidateHost(host: string): string {
-    let normalised: string
-    try {
-      normalised = new URL(`https://${host}`).hostname
-    } catch {
+  /**
+   * Canonicalise an origin, or refuse it.
+   *
+   * One call, because `parsePreviewOrigin` is both the canonicaliser and the
+   * definition of validity. The old pair — `new URL('https://' + host).hostname`
+   * then a schema check — silently DROPPED a port and mangled a scheme, so an
+   * origin arriving here would have been quietly narrowed to something the
+   * caller never asked for.
+   */
+  private normaliseAndValidateOrigin(origin: string): string {
+    const canonical = parsePreviewOrigin(origin)
+    if (canonical === null) {
       throw new AppError('This host cannot be approved', ErrorCode.PREVIEW_HOST_NOT_APPROVABLE)
     }
-    // Strip any bracketing the URL parser adds to IPv6 literals before schema check.
-    const result = PreviewHostSchema.safeParse(normalised)
-    if (!result.success) {
-      throw new AppError('This host cannot be approved', ErrorCode.PREVIEW_HOST_NOT_APPROVABLE)
-    }
-    return result.data
+    return canonical
   }
 
   /** Read and JSON-parse the settings file, returning a fresh object if absent. */
@@ -297,8 +347,8 @@ export class PreviewAllowlistStore implements IPreviewAllowlistStore {
     return parsed
   }
 
-  /** Re-read the written file and re-validate the persisted host set (§3.3 step 9). */
-  private async verifyWrittenHosts(settingsPath: string): Promise<readonly string[]> {
+  /** Re-read the written file and re-validate the persisted set (§3.3 step 9). */
+  private async verifyWrittenOrigins(settingsPath: string): Promise<readonly string[]> {
     const content = await readFile(settingsPath, 'utf8')
     const raw: unknown = JSON.parse(content)
     const block = isPlainObject(raw) && isPlainObject(raw.htmlPreview)
@@ -312,8 +362,52 @@ export class PreviewAllowlistStore implements IPreviewAllowlistStore {
         ErrorCode.PROJECT_SETTINGS_VALIDATION_FAILED
       )
     }
-    return parsed.data.hosts
+    return resolveOrigins(parsed.data)
   }
+}
+
+/**
+ * The ONE place `origins` and `hosts` become a single list.
+ *
+ * Precedence is KEY PRESENT, not array non-empty: a file saying
+ * `origins: []` has deliberately approved nothing, and falling back to `hosts`
+ * there would resurrect grants the writer removed. A file with no `origins` key
+ * at all was written before origins existed, and its hosts mean what they always
+ * meant.
+ */
+function resolveOrigins(block: {
+  hosts: readonly string[]
+  origins?: readonly string[]
+}): readonly string[] {
+  const resolved =
+    block.origins !== undefined
+      ? [...block.origins]
+      : block.hosts.map(originFromLegacyHost).filter((o): o is string => o !== null)
+  // Dedupe AFTER canonicalisation: `https://x` and `https://x:443` are one origin
+  // and would otherwise occupy two slots and two CSP host-sources.
+  return [...new Set(resolved)].sort()
+}
+
+/** A string array under `key`, or empty. Unknown shapes are not our business. */
+function readStringArray(block: unknown, key: string): readonly string[] {
+  if (!isPlainObject(block)) return []
+  const value = block[key]
+  if (!Array.isArray(value)) return []
+  return value.filter((entry): entry is string => typeof entry === 'string')
+}
+
+/**
+ * The `hosts` projection of an origin, or `null` when it has none.
+ *
+ * Only a default-port https origin can be written back as a bare host, because
+ * that is the only thing a host entry could ever have meant. Everything else is
+ * invisible to an older build — which loses grants rather than inventing them,
+ * the safe direction for a one-way door.
+ */
+function hostOfOrigin(origin: string): string | null {
+  const url = new URL(origin)
+  if (url.protocol !== 'https:' || url.port !== '') return null
+  return url.hostname
 }
 
 /** Factory mirroring the project's interface + class + factory convention. */

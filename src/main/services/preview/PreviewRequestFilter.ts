@@ -39,7 +39,7 @@
 
 import type { Session } from 'electron'
 import type { PreviewFailureType } from '../../../shared/ipc/preview-types'
-import { isApprovableHost } from '../../../shared/ipc/preview-settings-schema'
+import { parsePreviewOrigin } from '../../../shared/ipc/preview-settings-schema'
 import {
   kindFromResourceType,
   type PreviewBlockedKind
@@ -171,7 +171,12 @@ export function attach(
         return
       }
 
-      const approvable = verdict.reason === 'blocked-host' && isApprovableHost(verdict.host)
+      // `verdict.host` is an ORIGIN now, so the question is whether that origin
+      // could be written to the allowlist — not whether some hostname could.
+      // Asking the old question here returned false for every origin, because a
+      // hostname predicate rejects anything containing `://`.
+      const approvable =
+        verdict.reason === 'blocked-host' && parsePreviewOrigin(verdict.host) !== null
       ctx.onBlocked(
         verdict.reason,
         verdict.host,

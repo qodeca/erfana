@@ -235,8 +235,13 @@ export class PreviewSessionFactory implements IPreviewSessionFactory {
     const { registry, allowlistStore } = this.deps
 
     // 1–2: load the allowlist, then let the registry mint the token + build the CSP.
-    const state = await allowlistStore.load()
-    const token = await registry.issue(ctx.projectPath, state.hosts)
+    //
+    // The CSP is built from `getOrigins()`, the SAME accessor the network filter
+    // reads below — not from the `load()` return value. Two readers of one store
+    // through two different shapes is how the two chokepoints came to disagree
+    // about ports in the first place; there is one shape now.
+    await allowlistStore.load()
+    const token = await registry.issue(ctx.projectPath, [...allowlistStore.getOrigins()])
     const entry = registry.resolve(token)
     if (entry === undefined) {
       // The registry just issued this token; an absence here is a wiring fault.
@@ -291,7 +296,7 @@ export class PreviewSessionFactory implements IPreviewSessionFactory {
       // 8: the unfiltered network gate, reading the LIVE allowed-host set so an
       // approve does not need the filter re-attached.
       const detachFilter = this.deps.attachFilter(session, {
-        getAllowedHosts: () => allowlistStore.getHosts(),
+        getAllowedHosts: () => allowlistStore.getOrigins(),
         onBlocked: ctx.onBlocked,
         onRequestStarted: () => {},
         onRequestSettled: () => {}

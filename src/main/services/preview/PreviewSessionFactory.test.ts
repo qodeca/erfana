@@ -40,13 +40,15 @@ function makeRegistry(): IPreviewRootRegistry & {
   }
 }
 
-function makeStore(hosts: string[]): IPreviewAllowlistStore {
+function makeStore(origins: string[]): IPreviewAllowlistStore {
   return {
     load: vi.fn<() => Promise<PreviewAllowlistState>>(() =>
-      Promise.resolve({ hosts, writeBackEnabled: true })
+      Promise.resolve({ origins, writeBackEnabled: true })
     ),
-    approveHost: vi.fn<(host: string) => Promise<readonly string[]>>(() => Promise.resolve(hosts)),
-    getHosts: vi.fn<() => ReadonlySet<string>>(() => new Set(hosts)),
+    approveOrigin: vi.fn<(origin: string) => Promise<readonly string[]>>(() =>
+      Promise.resolve(origins)
+    ),
+    getOrigins: vi.fn<() => ReadonlySet<string>>(() => new Set(origins)),
     isWriteBackEnabled: vi.fn<() => boolean>(() => true)
   }
 }

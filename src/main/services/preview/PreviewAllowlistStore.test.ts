@@ -35,7 +35,7 @@ describe('PreviewAllowlistStore.load', () => {
     const store = createPreviewAllowlistStore({ getProjectRoot: () => root })
     const state = await store.load()
 
-    expect(state.hosts).toEqual([])
+    expect(state.origins).toEqual([])
     expect(state.writeBackEnabled).toBe(true)
   })
 
@@ -48,7 +48,10 @@ describe('PreviewAllowlistStore.load', () => {
     const store = createPreviewAllowlistStore({ getProjectRoot: () => root })
     const state = await store.load()
 
-    expect([...state.hosts].sort()).toEqual(['a.example.org', 'cdn.example.com'])
+    expect([...state.origins].sort()).toEqual([
+      'https://a.example.org',
+      'https://cdn.example.com'
+    ])
     expect(state.writeBackEnabled).toBe(true)
   })
 
@@ -62,7 +65,7 @@ describe('PreviewAllowlistStore.load', () => {
 
     const state = await store.load()
 
-    expect(state.hosts).toEqual([])
+    expect(state.origins).toEqual([])
     expect(state.writeBackEnabled).toBe(false)
     expect(onBadge).toHaveBeenCalledTimes(1)
     expect(onBadge.mock.calls[0][0].type).toBe('allowlist-invalid')
@@ -77,7 +80,7 @@ describe('PreviewAllowlistStore.load', () => {
 
     const state = await store.load()
 
-    expect(state.hosts).toEqual([])
+    expect(state.origins).toEqual([])
     expect(state.writeBackEnabled).toBe(false)
     expect(onBadge.mock.calls[0][0].type).toBe('allowlist-unsupported-version')
   })
@@ -89,7 +92,7 @@ describe('PreviewAllowlistStore.load', () => {
 
     const state = await store.load()
 
-    expect(state.hosts).toEqual([])
+    expect(state.origins).toEqual([])
     expect(state.writeBackEnabled).toBe(false)
     expect(onBadge).toHaveBeenCalledTimes(1)
   })
@@ -100,19 +103,19 @@ describe('PreviewAllowlistStore.load', () => {
 
     const state = await store.load()
 
-    expect(state.hosts).toEqual([])
+    expect(state.origins).toEqual([])
     expect(state.writeBackEnabled).toBe(true)
   })
 })
 
-describe('PreviewAllowlistStore.approveHost', () => {
-  it('writes the host as pretty (2-space + trailing newline) JSON atomically', async () => {
+describe('PreviewAllowlistStore.approveOrigin', () => {
+  it('writes the origin as pretty (2-space + trailing newline) JSON atomically', async () => {
     const store = createPreviewAllowlistStore({ getProjectRoot: () => root })
 
-    const hosts = await store.approveHost('cdn.example.com')
+    const origins = await store.approveOrigin('https://cdn.example.com')
 
-    expect(hosts).toEqual(['cdn.example.com'])
-    expect(store.getHosts().has('cdn.example.com')).toBe(true)
+    expect(origins).toEqual(['https://cdn.example.com'])
+    expect(store.getOrigins().has('https://cdn.example.com')).toBe(true)
 
     const settingsPath = join(realRoot, '.erfana', 'settings.json')
     const written = await readFile(settingsPath, 'utf8')
@@ -120,20 +123,47 @@ describe('PreviewAllowlistStore.approveHost', () => {
     expect(written.endsWith('\n')).toBe(true)
     expect(written).toContain('\n  "htmlPreview"')
     const parsed = JSON.parse(written)
-    expect(parsed.htmlPreview.allowlist).toEqual({ version: 1, hosts: ['cdn.example.com'] })
+    // DUAL-WRITE at version 1: `origins` is the truth, `hosts` the projection an
+    // older build reads. The version must NOT move — on an unrecognised one,
+    // load() applies an empty set and every write is refused, so a bump would
+    // leave an older Erfana with no approved hosts and no way to re-approve.
+    expect(parsed.htmlPreview.allowlist).toEqual({
+      version: 1,
+      hosts: ['cdn.example.com'],
+      origins: ['https://cdn.example.com']
+    })
+  })
+
+  it('projects only what a host entry could ever have meant', async () => {
+    const store = createPreviewAllowlistStore({ getProjectRoot: () => root })
+
+    await store.approveOrigin('https://cdn.example.com')
+    await store.approveOrigin('https://example.com:8443')
+
+    const parsed = JSON.parse(
+      await readFile(join(realRoot, '.erfana', 'settings.json'), 'utf8')
+    )
+    // A non-default port has no bare-host form, so it is absent from `hosts` —
+    // an older build loses that grant rather than being handed a wider one it
+    // cannot express. Losing is the safe direction for a one-way door.
+    expect(parsed.htmlPreview.allowlist.hosts).toEqual(['cdn.example.com'])
+    expect(parsed.htmlPreview.allowlist.origins).toEqual([
+      'https://cdn.example.com',
+      'https://example.com:8443'
+    ])
   })
 
   it('preserves unknown keys already present in the file', async () => {
     await writeSettings(JSON.stringify({ editor: { theme: 'dark' }, custom: [1, 2] }))
     const store = createPreviewAllowlistStore({ getProjectRoot: () => root })
 
-    await store.approveHost('cdn.example.com')
+    await store.approveOrigin('https://cdn.example.com')
 
     const settingsPath = join(realRoot, '.erfana', 'settings.json')
     const parsed = JSON.parse(await readFile(settingsPath, 'utf8'))
     expect(parsed.editor).toEqual({ theme: 'dark' })
     expect(parsed.custom).toEqual([1, 2])
-    expect(parsed.htmlPreview.allowlist.hosts).toEqual(['cdn.example.com'])
+    expect(parsed.htmlPreview.allowlist.origins).toEqual(['https://cdn.example.com'])
   })
 
   it('merges into an existing allowlist and keeps the set sorted', async () => {
@@ -142,9 +172,10 @@ describe('PreviewAllowlistStore.approveHost', () => {
     )
     const store = createPreviewAllowlistStore({ getProjectRoot: () => root })
 
-    const hosts = await store.approveHost('a.example.com')
+    const origins = await store.approveOrigin('https://a.example.com')
 
-    expect(hosts).toEqual(['a.example.com', 'b.example.com'])
+    // The legacy `hosts` entry is read as the origin it always meant.
+    expect(origins).toEqual(['https://a.example.com', 'https://b.example.com'])
   })
 
   it('resolves the root from the injected accessor, not from any caller input', async () => {
@@ -152,7 +183,7 @@ describe('PreviewAllowlistStore.approveHost', () => {
     // must be rejected by validation rather than used to steer the write target.
     const store = createPreviewAllowlistStore({ getProjectRoot: () => root })
 
-    await store.approveHost('good.example.com')
+    await store.approveOrigin('https://good.example.com')
 
     // Write landed under the accessor's root, nowhere else.
     const settingsPath = join(realRoot, '.erfana', 'settings.json')
@@ -163,7 +194,7 @@ describe('PreviewAllowlistStore.approveHost', () => {
   it('rejects a non-approvable host with PREVIEW_HOST_NOT_APPROVABLE', async () => {
     const store = createPreviewAllowlistStore({ getProjectRoot: () => root })
 
-    await expect(store.approveHost('127.0.0.1')).rejects.toMatchObject({
+    await expect(store.approveOrigin('https://127.0.0.1')).rejects.toMatchObject({
       code: ErrorCode.PREVIEW_HOST_NOT_APPROVABLE
     })
   })
@@ -172,13 +203,13 @@ describe('PreviewAllowlistStore.approveHost', () => {
     const store = createPreviewAllowlistStore({ getProjectRoot: () => root })
 
     // A slash-bearing value cannot pass the host schema; it must never reach the FS.
-    await expect(store.approveHost('../../etc/passwd')).rejects.toBeInstanceOf(AppError)
+    await expect(store.approveOrigin('../../etc/passwd')).rejects.toBeInstanceOf(AppError)
   })
 
   it('aborts when no project is open', async () => {
     const store = createPreviewAllowlistStore({ getProjectRoot: () => null })
 
-    await expect(store.approveHost('cdn.example.com')).rejects.toMatchObject({
+    await expect(store.approveOrigin('https://cdn.example.com')).rejects.toMatchObject({
       code: ErrorCode.PROJECT_NOT_FOUND
     })
   })
@@ -187,9 +218,9 @@ describe('PreviewAllowlistStore.approveHost', () => {
     const store = createPreviewAllowlistStore({ getProjectRoot: () => root })
 
     await Promise.all([
-      store.approveHost('a.example.com'),
-      store.approveHost('b.example.com'),
-      store.approveHost('c.example.com')
+      store.approveOrigin('https://a.example.com'),
+      store.approveOrigin('https://b.example.com'),
+      store.approveOrigin('https://c.example.com')
     ])
 
     const settingsPath = join(realRoot, '.erfana', 'settings.json')
@@ -202,7 +233,7 @@ describe('PreviewAllowlistStore.approveHost', () => {
   })
 })
 
-describe('PreviewAllowlistStore.approveHost cap', () => {
+describe('PreviewAllowlistStore.approveOrigin cap', () => {
   it('rejects with PREVIEW_ALLOWLIST_FULL past the cap and does not grow the file', async () => {
     // Seed the file at exactly the cap with valid hosts.
     const seeded = Array.from({ length: MAX_ALLOWLIST_HOSTS }, (_, i) => `host-${i}.example.com`)
@@ -212,7 +243,7 @@ describe('PreviewAllowlistStore.approveHost cap', () => {
     const store = createPreviewAllowlistStore({ getProjectRoot: () => root })
 
     // Approving one MORE distinct host would exceed the cap.
-    await expect(store.approveHost('overflow.example.com')).rejects.toMatchObject({
+    await expect(store.approveOrigin('https://overflow.example.com')).rejects.toMatchObject({
       code: ErrorCode.PREVIEW_ALLOWLIST_FULL
     })
 

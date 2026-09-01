@@ -234,7 +234,7 @@ export function buildPreviewGraph(deps: BuildPreviewGraphDeps): PreviewGraph {
       // Bridge the narrow structural session type to electron's own `Session`.
       purge: (session) => purgePreviewSession(session as unknown as Session)
     },
-    getAllowedHosts: () => [...allowlistStore.getHosts()],
+    getAllowedHosts: () => [...allowlistStore.getOrigins()],
     emit: emitters,
     createWatchCoordinator: (realRoot, onChanged) =>
       createPreviewWatchCoordinator({

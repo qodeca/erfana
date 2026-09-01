@@ -18,7 +18,7 @@
  * safe: it degrades to the `erfana-preview:` scheme-source only.
  */
 
-import { PreviewHostSchema } from '../../../shared/ipc/preview-settings-schema'
+import { PreviewOriginSchema } from '../../../shared/ipc/preview-settings-schema'
 
 /**
  * The local scheme as a CSP scheme-source. Used INSTEAD of `'self'`: a page
@@ -28,9 +28,20 @@ import { PreviewHostSchema } from '../../../shared/ipc/preview-settings-schema'
  */
 const PREVIEW_SCHEME_SOURCE = 'erfana-preview:'
 
-/** Render an approved host as an `https://` CSP host-source. */
-function toHostSource(host: string): string {
-  return `https://${host}`
+/**
+ * Render an approved origin as a CSP host-source.
+ *
+ * IDENTITY, and that is the whole point of storing a canonical origin: the
+ * origin serialization IS a valid CSP host-source for every case the schema
+ * admits. Nothing is constructed here, so there is no second opinion about what
+ * the grant covers — `previewFilterDecision` compares the same string.
+ *
+ * This used to be `` `https://${host}` ``, which is why a port could never be
+ * granted: the emitted source carried no port, and a source with no port matches
+ * only the scheme's default.
+ */
+function toHostSource(origin: string): string {
+  return origin
 }
 
 /**
@@ -51,7 +62,7 @@ export function buildPreviewCsp(
     // Explicit CR/LF guard first — a newline could break out of the header line
     // even though the anchored regex already forbids it (JS `$` without `m`
     // matches end-of-input only, so a trailing newline cannot slip the anchor).
-    if (/[\r\n]/.test(host) || !PreviewHostSchema.safeParse(host).success) {
+    if (/[\r\n]/.test(host) || !PreviewOriginSchema.safeParse(host).success) {
       onReject?.(host)
       continue
     }

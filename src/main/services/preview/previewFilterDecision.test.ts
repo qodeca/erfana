@@ -8,7 +8,7 @@
 import { describe, it, expect } from 'vitest'
 import { decideRequest } from './previewFilterDecision'
 
-const allowed = new Set(['cdn.jsdelivr.net', 'fonts.googleapis.com'])
+const allowed = new Set(['https://cdn.jsdelivr.net', 'https://fonts.googleapis.com'])
 
 describe('decideRequest', () => {
   it('allows an https request to an allowlisted host', () => {
@@ -21,7 +21,7 @@ describe('decideRequest', () => {
     expect(decideRequest('https://evil.example/collect', allowed)).toEqual({
       action: 'cancel',
       reason: 'blocked-host',
-      host: 'evil.example'
+      host: 'https://evil.example'
     })
   })
 
@@ -31,7 +31,7 @@ describe('decideRequest', () => {
     expect(decideRequest('https://tracker.example/beacon', allowed)).toEqual({
       action: 'cancel',
       reason: 'blocked-host',
-      host: 'tracker.example'
+      host: 'https://tracker.example'
     })
   })
 
@@ -45,7 +45,7 @@ describe('decideRequest', () => {
   })
 
   it('normalises an IDN host to punycode before the allowlist check', () => {
-    const punycodeAllowed = new Set(['xn--mnchen-3ya.de'])
+    const punycodeAllowed = new Set(['https://xn--mnchen-3ya.de'])
     expect(decideRequest('https://münchen.de/app.js', punycodeAllowed)).toEqual({
       action: 'allow'
     })
@@ -79,6 +79,58 @@ describe('decideRequest', () => {
       action: 'cancel',
       reason: 'insecure-scheme',
       host: ''
+    })
+  })
+})
+
+describe('decideRequest — the port, which the two gates used to disagree about', () => {
+  it('does not treat a non-default port as covered by the bare host', () => {
+    // THE BUG THIS CHANGE EXISTS TO CLOSE. This used to compare `parsed.hostname`
+    // and ignore the port entirely, so it allowed `:8443` while the CSP — whose
+    // host-source carried no port, and a source with no port matches only the
+    // scheme's default — refused it. The band then subtracted the allowed HOST
+    // from the blocked list and reported "Allowed ✓" for a resource that could
+    // never load, with no control anywhere that could fix it.
+    const allowedOrigins = new Set(['https://example.com'])
+    expect(decideRequest('https://example.com:8443/x.js', allowedOrigins)).toEqual({
+      action: 'cancel',
+      reason: 'blocked-host',
+      host: 'https://example.com:8443'
+    })
+  })
+
+  it('allows the port once the port itself has been approved', () => {
+    const allowedOrigins = new Set(['https://example.com:8443'])
+    expect(decideRequest('https://example.com:8443/x.js', allowedOrigins)).toEqual({
+      action: 'allow'
+    })
+    // And approving the port grants nothing on the default one. A grant is the
+    // origin, not the host.
+    expect(decideRequest('https://example.com/x.js', allowedOrigins)).toEqual({
+      action: 'cancel',
+      reason: 'blocked-host',
+      host: 'https://example.com'
+    })
+  })
+
+  it('treats the explicit default port as the same origin', () => {
+    // `:443` is canonicalised away, so a page writing it in full is not a
+    // different grant.
+    const allowedOrigins = new Set(['https://example.com'])
+    expect(decideRequest('https://example.com:443/x.js', allowedOrigins)).toEqual({
+      action: 'allow'
+    })
+  })
+
+  it('never lets a blob: URL borrow an origin it does not have', () => {
+    // `new URL('blob:https://cdn.jsdelivr.net/uuid').origin` is a clean
+    // `https://cdn.jsdelivr.net` while its hostname is empty. The blob branch
+    // returns before the https branch, and the https branch re-serialises from
+    // the parsed parts rather than reading `.origin` — either alone would do,
+    // and both are deliberate.
+    expect(new URL('blob:https://cdn.jsdelivr.net/uuid').origin).toBe('https://cdn.jsdelivr.net')
+    expect(decideRequest('blob:https://cdn.jsdelivr.net/uuid', allowed)).toEqual({
+      action: 'allow'
     })
   })
 })

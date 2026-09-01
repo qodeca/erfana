@@ -3,9 +3,9 @@
 /**
  * Preview allowlist-handler tests (Issue #74, item 46).
  *
- * Covers: `approveHost` ignores any payload-supplied root (root comes from the
+ * Covers: `approveOrigin` ignores any payload-supplied root (root comes from the
  * store's injected accessor, not the request); on success it calls
- * `store.approveHost` THEN `service.applyApprovedHosts` with the returned set;
+ * `store.approveOrigin` THEN `service.applyApprovedHosts` with the returned set;
  * a store failure maps the AppError code into the result; an untrusted sender is
  * rejected.
  */
@@ -35,22 +35,22 @@ const event = {} as IpcMainInvokeEvent
 const APPROVED = ['cdn.example.com'] as const
 
 function setup(overrides?: {
-  approveHost?: ReturnType<typeof vi.fn>
+  approveOrigin?: ReturnType<typeof vi.fn>
   applyApprovedHosts?: ReturnType<typeof vi.fn>
   trusted?: boolean
 }): {
-  approveHost: ReturnType<typeof vi.fn>
+  approveOrigin: ReturnType<typeof vi.fn>
   applyApprovedHosts: ReturnType<typeof vi.fn>
 } {
-  const approveHost = overrides?.approveHost ?? vi.fn(async () => APPROVED)
+  const approveOrigin = overrides?.approveOrigin ?? vi.fn(async () => APPROVED)
   const applyApprovedHosts = overrides?.applyApprovedHosts ?? vi.fn(async () => undefined)
   registerPreviewAllowlistHandlers({
-    allowlistStore: { approveHost },
+    allowlistStore: { approveOrigin },
     service: { applyApprovedHosts },
     isTrustedSender: () => overrides?.trusted ?? true,
     isTrustedAppSender: () => true
   })
-  return { approveHost, applyApprovedHosts }
+  return { approveOrigin, applyApprovedHosts }
 }
 
 beforeEach(() => {
@@ -58,24 +58,24 @@ beforeEach(() => {
 })
 
 describe('registerPreviewAllowlistHandlers', () => {
-  it('calls store.approveHost then service.applyApprovedHosts with the new set', async () => {
-    const { approveHost, applyApprovedHosts } = setup()
+  it('calls store.approveOrigin then service.applyApprovedHosts with the new set', async () => {
+    const { approveOrigin, applyApprovedHosts } = setup()
 
     const result = await handlers[PreviewChannels.APPROVE_HOST](event, {
       panelId: 'p1',
       host: 'cdn.example.com'
     })
 
-    expect(approveHost).toHaveBeenCalledWith('cdn.example.com')
+    expect(approveOrigin).toHaveBeenCalledWith('cdn.example.com')
     expect(applyApprovedHosts).toHaveBeenCalledWith('p1', APPROVED)
-    expect(approveHost.mock.invocationCallOrder[0]).toBeLessThan(
+    expect(approveOrigin.mock.invocationCallOrder[0]).toBeLessThan(
       applyApprovedHosts.mock.invocationCallOrder[0]
     )
     expect(result).toEqual({ ok: true, hosts: APPROVED })
   })
 
   it('ignores a payload-supplied projectRoot (.strict rejects it; store untouched)', async () => {
-    const { approveHost, applyApprovedHosts } = setup()
+    const { approveOrigin, applyApprovedHosts } = setup()
 
     const result = await handlers[PreviewChannels.APPROVE_HOST](event, {
       panelId: 'p1',
@@ -84,31 +84,31 @@ describe('registerPreviewAllowlistHandlers', () => {
     })
 
     // The extra key fails `.strict()`, so nothing runs and no root is honoured.
-    expect(approveHost).not.toHaveBeenCalled()
+    expect(approveOrigin).not.toHaveBeenCalled()
     expect(applyApprovedHosts).not.toHaveBeenCalled()
     expect(result).toMatchObject({ ok: false })
   })
 
-  it('never forwards the payload host as a root — approveHost gets only the host', async () => {
-    const { approveHost } = setup()
+  it('never forwards the payload host as a root — approveOrigin gets only the host', async () => {
+    const { approveOrigin } = setup()
 
     await handlers[PreviewChannels.APPROVE_HOST](event, {
       panelId: 'p1',
       host: 'cdn.example.com'
     })
 
-    // approveHost is the store's single argument; the store resolves the root
+    // approveOrigin is the store's single argument; the store resolves the root
     // itself from ProjectService, so the handler passes no path at all.
-    expect(approveHost).toHaveBeenCalledTimes(1)
-    expect(approveHost.mock.calls[0]).toEqual(['cdn.example.com'])
+    expect(approveOrigin).toHaveBeenCalledTimes(1)
+    expect(approveOrigin.mock.calls[0]).toEqual(['cdn.example.com'])
   })
 
   it('maps an AppError from the store into the result errorCode', async () => {
-    const approveHost = vi.fn(async () => {
+    const approveOrigin = vi.fn(async () => {
       throw new AppError('nope', ErrorCode.PREVIEW_HOST_NOT_APPROVABLE)
     })
     const applyApprovedHosts = vi.fn(async () => undefined)
-    setup({ approveHost, applyApprovedHosts })
+    setup({ approveOrigin, applyApprovedHosts })
 
     const result = await handlers[PreviewChannels.APPROVE_HOST](event, {
       panelId: 'p1',
@@ -120,14 +120,14 @@ describe('registerPreviewAllowlistHandlers', () => {
   })
 
   it('rejects an untrusted sender (store untouched)', async () => {
-    const { approveHost } = setup({ trusted: false })
+    const { approveOrigin } = setup({ trusted: false })
 
     const result = await handlers[PreviewChannels.APPROVE_HOST](event, {
       panelId: 'p1',
       host: 'cdn.example.com'
     })
 
-    expect(approveHost).not.toHaveBeenCalled()
+    expect(approveOrigin).not.toHaveBeenCalled()
     expect(result).toMatchObject({ ok: false })
   })
 })

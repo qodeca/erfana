@@ -26,8 +26,8 @@ import { registerHandle, unregisterHandle } from '../registry'
 
 /** Injected collaborators for the allowlist handler. */
 export interface PreviewAllowlistHandlerDeps {
-  /** Writes the host back to the project allowlist; root resolved internally. */
-  readonly allowlistStore: Pick<IPreviewAllowlistStore, 'approveHost'>
+  /** Writes the origin back to the project allowlist; root resolved internally. */
+  readonly allowlistStore: Pick<IPreviewAllowlistStore, 'approveOrigin'>
   /** Rebuilds the CSP, purges and reloads the live view for the panel. */
   readonly service: Pick<IPreviewViewService, 'applyApprovedHosts'>
   readonly isTrustedSender: (event: IpcMainInvokeEvent) => boolean
@@ -59,9 +59,9 @@ export function registerPreviewAllowlistHandlers(
       }
       try {
         // Root is NOT read from the payload — the store resolves it main-side.
-        const hosts = await allowlistStore.approveHost(parsed.data.host)
-        await service.applyApprovedHosts(parsed.data.panelId, hosts)
-        return { ok: true, hosts }
+        const origins = await allowlistStore.approveOrigin(parsed.data.host)
+        await service.applyApprovedHosts(parsed.data.panelId, origins)
+        return { ok: true, hosts: origins }
       } catch (error) {
         const errorCode = error instanceof AppError ? error.code : ErrorCode.UNKNOWN_ERROR
         logger.error(

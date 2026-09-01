@@ -71,14 +71,30 @@ export function decideRequest(url: string, allowed: ReadonlySet<string>): Filter
     return { action: 'allow' }
   }
 
-  // Only TLS-bearing remote loads to an approved host are eligible. Everything
-  // else (http:, ws:, wss:, ftp:, …) is refused as an insecure scheme — the CSP
-  // only ever emits `https://` host-sources, so this keeps the two chokepoints
-  // consistent.
+  /*
+   * THE ORIGIN, re-serialised from the parsed parts — never `parsed.origin`.
+   *
+   * `new URL('blob:https://evil.com/1234').origin` is the clean-looking
+   * `https://evil.com` while its hostname is empty, so reading `.origin` here
+   * would compare a string that never described a real fetch target. The
+   * blob/data/about branch above already returned, but the ordering is load
+   * bearing and must not be moved: this is the second line of defence, not the
+   * first.
+   *
+   * The allowed set holds canonical origins written by `parsePreviewOrigin`, and
+   * `buildPreviewCsp` emits those same strings verbatim, so the two chokepoints
+   * are now comparing one vocabulary. They used to disagree about the port —
+   * this compared a bare hostname and ignored it, the CSP carried none and so
+   * matched only the default — which is how an approved host serving on `:8443`
+   * came to be reported as allowed and refused at the same time.
+   */
   if (protocol === 'https:') {
     const host = parsed.hostname
-    if (allowed.has(host)) return { action: 'allow' }
-    return { action: 'cancel', reason: 'blocked-host', host }
+    const origin = `${protocol}//${host}${parsed.port === '' ? '' : `:${parsed.port}`}`
+    if (allowed.has(origin)) return { action: 'allow' }
+    // The BLOCKED IDENTITY is the origin, so the row the reader is offered is
+    // the thing that was actually refused.
+    return { action: 'cancel', reason: 'blocked-host', host: origin }
   }
 
   return { action: 'cancel', reason: 'insecure-scheme', host: parsed.hostname }
