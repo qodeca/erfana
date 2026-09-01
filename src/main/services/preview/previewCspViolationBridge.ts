@@ -212,10 +212,14 @@ function remoteOriginOf(
   // APPROVABILITY IS THE ALLOWLIST'S OWN QUESTION, asked of the exact string a
   // grant would be written for. Asking a hostname predicate instead — as this
   // did — answers about a different value than the one that would be stored, and
-  // an Approve button the boundary then refuses is worse than no button. It also
-  // keeps the http refusal without restating it: `PREVIEW_ORIGIN_SCHEMES` is
-  // https-only, so a plain-http origin is recorded and never offered, which is
-  // what the network-filter path decides for the same URL.
+  // an Approve button the boundary then refuses is worse than no button.
+  //
+  // Whatever `parsePreviewOrigin` accepts is offerable, and that set now
+  // includes `http://`, IP literals, `localhost` and single-label names (#108).
+  // This comment used to say the opposite — that `PREVIEW_ORIGIN_SCHEMES` is
+  // https-only, so plain http "is recorded and never offered" — which is exactly
+  // the wrong thing to leave sitting above the line that decides it: a reader
+  // trusting it would take the tests asserting the opposite for the bug.
   return { origin, hostname, approvable: parsePreviewOrigin(origin) !== null }
 }
 
@@ -312,9 +316,12 @@ export function createPreviewCspViolationBridge(
       }
       reportedOrigins.set(origin, merged)
 
-      // A non-approvable origin (http, an IP literal, `localhost`, a bare
-      // single-label name) is still recorded as a failure and still never
-      // offered for approval — the same split the filter path makes.
+      // A non-approvable origin is still recorded as a failure and still never
+      // offered for approval — the same split the filter path makes. Since #108
+      // that set is much smaller than the examples this comment used to list:
+      // http, IP literals, `localhost` and single-label names are all approvable
+      // now. What remains is what the CSP grammar cannot express (IPv6) or what
+      // is not a canonical origin at all.
       deps.onBlockedHost(origin, parsed.data.blockedURI, remote.approvable, kind)
     },
 

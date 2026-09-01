@@ -337,22 +337,6 @@ export const PreviewStillFrameSchema = z
   .strict()
 export type PreviewStillFramePayload = z.infer<typeof PreviewStillFrameSchema>
 
-/**
- * `preview:setZoom` request payload.
- *
- * `step` moves the page's zoom by that many Chromium levels; `reset` returns it
- * to 100%. Deliberately not an absolute level from the renderer: the clamp then
- * lives main-side, where the view is, rather than being restated by every
- * caller.
- */
-export const PreviewSetZoomSchema = z
-  .object({
-    panelId: PanelIdSchema,
-    step: z.number().int().min(-1).max(1)
-  })
-  .strict()
-export type PreviewSetZoom = z.infer<typeof PreviewSetZoomSchema>
-
 /** `preview:loadStateChanged` event payload. */
 export const PreviewLoadStatePayloadSchema = z
   .object({
@@ -462,13 +446,6 @@ export interface PreviewBridge {
   /** Subscribe to still-frame changes; returns an unsubscribe. */
   onStillFrameChanged(callback: (payload: PreviewStillFramePayload) => void): () => void
   /** Subscribe to load-state changes; returns an unsubscribe. */
-  /**
-   * Zoom the previewed PAGE by `step` levels, or back to 100% with `0`.
-   *
-   * Distinct from the host window's zoom, which only scales the view's
-   * rectangle — making the page's text relatively smaller, not larger.
-   */
-  setZoom(panelId: string, step: -1 | 0 | 1): Promise<void>
   onLoadStateChanged(callback: (payload: PreviewLoadStatePayload) => void): () => void
   /** Subscribe to backdrop-colour changes; returns an unsubscribe. */
   onBackdropChanged(callback: (payload: PreviewBackdropPayload) => void): () => void

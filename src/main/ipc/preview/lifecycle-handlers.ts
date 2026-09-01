@@ -26,7 +26,6 @@ import {
   PreviewSetBoundsSchema,
   PreviewSetVisibilitySchema,
   PreviewReloadRequestSchema,
-  PreviewSetZoomSchema,
   type PreviewCheckEligibilityResponse
 } from '../../../shared/ipc/preview-schema'
 import { PreviewChannels } from '../../../shared/ipc/preview-channels'
@@ -41,7 +40,7 @@ import { registerHandle, registerOn, unregisterHandle, unregisterOn } from '../r
 /** The lifecycle service surface (a slice of {@link IPreviewViewService}). */
 export type PreviewLifecycleService = Pick<
   IPreviewViewService,
-  'open' | 'close' | 'setBounds' | 'setVisibility' | 'reload' | 'setZoom'
+  'open' | 'close' | 'setBounds' | 'setVisibility' | 'reload'
 >
 
 /** Injected collaborators for the lifecycle handlers. */
@@ -156,24 +155,6 @@ export function registerPreviewLifecycleHandlers(
     }
   })
 
-  registerHandle(PreviewChannels.SET_ZOOM, async (event, arg: unknown): Promise<void> => {
-    if (rejectUntrusted(PreviewChannels.SET_ZOOM, event)) {
-      return
-    }
-    try {
-      const parsed = PreviewSetZoomSchema.safeParse(arg)
-      if (!parsed.success) {
-        logger.warn('Rejected preview:setZoom with invalid payload', {
-          error: parsed.error.message
-        })
-        return
-      }
-      await service.setZoom(parsed.data.panelId, parsed.data.step)
-    } catch (error) {
-      logger.error('preview:setZoom failed', error instanceof Error ? error : undefined)
-    }
-  })
-
   registerHandle(PreviewChannels.RELOAD, async (event, arg: unknown): Promise<void> => {
     if (rejectUntrusted(PreviewChannels.RELOAD, event)) {
       return
@@ -248,7 +229,6 @@ export function registerPreviewLifecycleHandlers(
     unregisterHandle(PreviewChannels.OPEN)
     unregisterHandle(PreviewChannels.CLOSE)
     unregisterHandle(PreviewChannels.RELOAD)
-    unregisterHandle(PreviewChannels.SET_ZOOM)
     unregisterOn(PreviewChannels.SET_BOUNDS, onSetBounds)
     unregisterOn(PreviewChannels.SET_VISIBILITY, onSetVisibility)
   }

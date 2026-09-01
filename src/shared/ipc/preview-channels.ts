@@ -28,8 +28,6 @@ export const PreviewChannels = {
   SET_BOUNDS: 'preview:setBounds',
   /** Update view visibility with a diagnostic reason (send/on) */
   SET_VISIBILITY: 'preview:setVisibility',
-  /** Zoom the previewed PAGE (not the host window) */
-  SET_ZOOM: 'preview:setZoom',
   /** Reload the previewed page */
   RELOAD: 'preview:reload',
   /** Approve a remote host, writing back to the project allowlist */

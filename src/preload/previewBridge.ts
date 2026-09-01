@@ -73,9 +73,6 @@ export const previewBridge: PreviewBridge = {
   setVisibility: (panelId: string, visible: boolean, reason: string): void =>
     ipcRenderer.send(PreviewChannels.SET_VISIBILITY, { panelId, visible, reason }),
 
-  setZoom: (panelId: string, step: -1 | 0 | 1): Promise<void> =>
-    ipcRenderer.invoke(PreviewChannels.SET_ZOOM, { panelId, step }),
-
   reload: (panelId: string, opts?: { ignoreCache?: boolean }): Promise<void> =>
     ipcRenderer.invoke(PreviewChannels.RELOAD, {
       panelId,

@@ -119,9 +119,15 @@
  * The common case is therefore unchanged, and anything unusual is visible
  * BECAUSE it is unusual — which is the property a reader can act on.
  *
- * DIMMED, NOT HIDDEN, and `--color-text-tertiary` not `--color-text-secondary`:
- * secondary measures 3.72:1 on this surface and fails AA. A part of a security
- * decision may be de-emphasised; it may not be made hard to read.
+ * DIMMED, NOT HIDDEN. A part of a security decision may be de-emphasised; it may
+ * not be made hard to read.
+ *
+ * The tertiary/secondary choice needs re-deciding. This said secondary "measures
+ * 3.72:1 on this surface and fails AA", but that figure was measured against
+ * --color-bg-secondary and the band ships on --color-bg-primary, where secondary
+ * is 5.01:1 and passes. The number was hand-typed in two stylesheets and copied
+ * from a claim belonging to a different card, which is why every gate stayed
+ * green while it was wrong.
  *
  * NO `<wbr>` IS EMITTED AROUND EITHER. Break hints mark PREFERRED break points,
  * so a scheme or a port with no hint beside it stays attached to the host unless

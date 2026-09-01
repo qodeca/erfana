@@ -118,7 +118,6 @@ export function usePreviewEvents(panelId: string): void {
       unsubscribeStillFrame()
       unsubscribeHostBlocked()
       unsubscribeAllowlist()
-      unsubscribeAllowlist()
     }
   }, [panelId])
 }

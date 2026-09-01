@@ -643,15 +643,41 @@ describe('PreviewViewService — page zoom', () => {
     // A preview evicted by the live-view budget is torn down and REBUILT when
     // its tab returns, so a level held on the view itself would silently reset
     // every time the reader looked away.
-    await h.service.close('panel-A')
+    //
+    // Sleeping is EVICTION, not `close()`. This used to drive it with
+    // `close()`, which passed but modelled the wrong thing: `close()` means the
+    // tab is gone — the renderer sends it on every panel unmount — and it now
+    // drops the panel's zoom with it. Filling the budget is what actually puts a
+    // panel to sleep.
+    for (let i = 1; i <= PREVIEW.MAX_LIVE_VIEWS; i += 1) {
+      await h.service.open({ ...REQUEST_A, panelId: `panel-${i}` }, h.window)
+    }
     // The harness shares ONE fake webContents across every view it builds, so
-    // the close leaves it flagged destroyed and the rebuilt view would refuse
+    // the teardown leaves it flagged destroyed and the rebuilt view would refuse
     // every call. Real Electron hands the new view a fresh one.
     h.factory.setDestroyed(false)
     h.factory.setZoomLevel.mockClear()
     await openOne(h)
 
     expect(h.factory.setZoomLevel).toHaveBeenCalledWith(1)
+  })
+
+  /**
+   * The other half, which nothing asserted: a closed tab must not leave its zoom
+   * behind. `zoomLevels` was written on every `setZoom` and deleted nowhere, so
+   * it grew for every file previewed in a session, across project switches.
+   */
+  it('forgets a panel zoom once the tab is closed', async () => {
+    const h = makeHarness()
+    await openOne(h)
+    await h.service.setZoom('panel-A', 1)
+
+    await h.service.close('panel-A')
+    h.factory.setDestroyed(false)
+    h.factory.setZoomLevel.mockClear()
+    await openOne(h)
+
+    expect(h.factory.setZoomLevel).not.toHaveBeenCalled()
   })
 
   it('does not touch zoom on a fresh panel that was never zoomed', async () => {

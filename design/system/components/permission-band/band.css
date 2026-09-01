@@ -235,7 +235,12 @@
    grid. */
 .erf-band__kind {
   font-size: var(--text-sm);
-  color: var(--color-text-tertiary);     /* NOT --color-text-secondary: 3.72:1, fails */
+  /* Tertiary, but the stated reason no longer holds: the "3.72:1, fails" that
+     used to sit here was measured against --color-bg-secondary, and this band
+     moved to --color-bg-primary. On the surface that actually ships, secondary
+     measures 5.01:1 and PASSES. Keeping the choice for now and re-deciding it
+     with the claims ledger, where the number is generated instead of typed. */
+  color: var(--color-text-tertiary);
 }
 
 .erf-band__allow {

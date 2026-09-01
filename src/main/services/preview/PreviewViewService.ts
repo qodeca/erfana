@@ -591,6 +591,13 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
     // the open would install a view for a panel that no longer exists, and
     // nothing would ever reap it (sd-074b §4.1).
     this.registry.invalidateOpen(panelId)
+    // Both per-panel ledgers die with the panel. `suspend()` drops the blocked
+    // hosts but deliberately KEEPS the zoom, so a resumed tab comes back at the
+    // size the reader chose — which meant nothing ever removed a zoom entry, and
+    // `close()` left both behind. Neither is large; both are maps that only ever
+    // grew, across every file previewed in a session and every project switch.
+    this.blockedByPanel.delete(panelId)
+    this.zoomLevels.delete(panelId)
     const live = this.registry.remove(panelId)
     if (live !== null) {
       await live.teardown('bounded')

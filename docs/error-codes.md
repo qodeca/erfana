@@ -177,17 +177,20 @@ Most Phase 4 / issue #165. See also [`docs/windows/whisper-support-runbook.md`](
 
 ---
 
-## Preview (7 codes)
+## Preview (8 codes)
 
-5 `PREVIEW_*` in `src/shared/errors.ts` (#74). See `src/main/services/preview/` and [`docs/html-preview/README.md`](./html-preview/README.md).
+8 `PREVIEW_*` in `src/shared/errors.ts` (#74, extended by sd-074b). See `src/main/services/preview/` and [`docs/html-preview/README.md`](./html-preview/README.md).
 
 | Code | User copy | Notes |
 |------|-----------|-------|
-| `PREVIEW_HOST_NOT_APPROVABLE` | "This host cannot be approved for preview." | `isApprovableHost` gate rejected the host (e.g. non-`http(s)`, IP-literal, or otherwise not eligible for the allowlist) |
+| `PREVIEW_HOST_NOT_APPROVABLE` | "This host cannot be approved for preview." | `parsePreviewOrigin` refused the ORIGIN a grant would be written for. Since #108 this is a much smaller set than it was: `http://`, IP literals, `localhost` and single-label names are all approvable. What remains is what the CSP grammar cannot express (IPv6) or what is not a canonical origin |
 | `PREVIEW_CSP_INVALID` | "The preview security policy is invalid; the page was not served." | `PreviewRequestFilter` refused to serve because the CSP could not be built/enforced |
 | `PREVIEW_LOCAL_FILE_MISSING` | `"<path>" could not be read` | Path stays quoted so `redactUserInput`'s `QUOTED_SPAN` redacts it in logs; the toast keeps the real path |
-| `PREVIEW_VIEW_LIMIT_REACHED` | "A preview is already open." | `PreviewViewService` refused a second live view |
-| `PREVIEW_ALLOWLIST_FULL` | "The preview host allowlist is full." | `PreviewAllowlistStore` at the 200-host cap |
+| `PREVIEW_VIEW_LIMIT_REACHED` | "A preview is already open." | Now a cross-window panel-id collision only. Up to `PREVIEW.MAX_LIVE_VIEWS` previews run at once; going over that SUSPENDS the least recently active one rather than refusing |
+| `PREVIEW_ALLOWLIST_FULL` | "The preview host allowlist is full." | `PreviewAllowlistStore` at the 200-origin cap, counted across the resolved set |
+| `PREVIEW_READ_BUDGET_EXCEEDED` | "The preview asked for too many files at once; some were not loaded." | A page exceeded its bounded read budget |
+| `PREVIEW_LINK_BLOCKED` | "That link was blocked." | `PreviewNavigationPolicy` refused a clicked link — an unconfined path, or a protocol not handed to the OS |
+| `PREVIEW_OPEN_SUPERSEDED` | "The preview was replaced before it finished opening." | An `open` finished against a claim a later open (or a close) had already invalidated |
 
 ---
 

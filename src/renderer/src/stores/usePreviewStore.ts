@@ -300,12 +300,17 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
   setAllowedHosts: (panelId, hosts) =>
     set((state) => {
       const current = state.panels.get(panelId)?.allowedHosts ?? []
+      // Dedupe before comparing. `selectBandRows` maps these straight to rows
+      // keyed by host, so a duplicate that survived main's canonicaliser would
+      // render as two identical "Allowed" rows AND a duplicate React key — in
+      // the one list whose whole job is to be believable.
+      const next = [...new Set(hosts)]
       // Same-value writes must not notify: the band re-renders on every store
       // write, and main re-seeds this on every open.
-      if (current.length === hosts.length && current.every((h, i) => h === hosts[i])) {
+      if (current.length === next.length && current.every((h, i) => h === next[i])) {
         return state
       }
-      return { panels: withPanel(state.panels, panelId, { allowedHosts: [...hosts] }) }
+      return { panels: withPanel(state.panels, panelId, { allowedHosts: next }) }
     }),
   recordBlockedHost: (panelId, entry) =>
     set((state) => {
