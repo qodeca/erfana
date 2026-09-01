@@ -22,12 +22,30 @@ export const PREVIEW_ALLOWLIST_VERSION = 1
 export const MAX_ALLOWLIST_HOSTS = 200
 
 /**
- * True unless `host` is a form that must never be approvable: an IPv4 or IPv6
- * literal (including bracketed and hex/octal shorthands), an all-numeric label
- * set, `localhost`, any `*.localhost` / `*.local` / `*.internal` name, or a bare
- * single-label name (which a DNS search domain can resolve to an internal
- * service — an SSRF surface) — and never a value carrying a `\r` or `\n` (CSP /
- * header-injection guard).
+ * True unless `host` is a form that cannot be written into a CSP host-source.
+ *
+ * WHAT THIS USED TO DO, AND WHY IT STOPPED. It also refused `localhost`,
+ * `*.localhost`, `*.local`, `*.internal`, IPv4 literals, all-numeric and
+ * hex/octal shorthands, and any bare single-label name. Those were POLICY: an
+ * attempt to keep a previewed page away from loopback and LAN services. They are
+ * gone, deliberately, and the reasons are worth keeping.
+ *
+ * The policy did not work. `docs/security.md` conceded it in the same breath as
+ * claiming it: a name that *resolves* to a private address was never detected, so
+ * `127.0.0.1.nip.io` walked straight past every clause above. It stopped the
+ * honest reader and not a hostile page.
+ *
+ * And it was paid for in the worst currency. A refused host rendered as a row
+ * with no button and no reason — a dead end that teaches the reader the
+ * permission band is unreliable, which is a real cost against a control whose
+ * only asset is that it is believed. See #108.
+ *
+ * WHAT SURVIVES IS STRUCTURE, NOT JUDGEMENT. A value carrying `\r` or `\n` could
+ * break out of a header line. An IPv6 literal cannot be written as a CSP
+ * host-source at all — `host-char` is `ALPHA / DIGIT / "-"`, and Chromium proves
+ * it at runtime by reporting "contains an invalid source … It will be ignored",
+ * which would leave a grant live in the network filter and absent from the CSP.
+ * A label that is not a DNS label is not a host. None of those are opinions.
  *
  * Pure and dependency-free so it can run in both the main and renderer bundles.
  */
@@ -37,51 +55,17 @@ export function isApprovableHost(host: string): boolean {
 
   const lower = host.toLowerCase()
 
-  // IPv6 literals (bare or bracketed) always contain a colon or a bracket.
+  // IPv6 literals, bare or bracketed, always carry a colon or a bracket. The one
+  // refusal here that is physics rather than policy.
   if (lower.includes(':') || lower.includes('[') || lower.includes(']')) return false
 
-  // Loopback / link-local / private-use names.
-  if (lower === 'localhost') return false
-  if (lower.endsWith('.localhost') || lower.endsWith('.local') || lower.endsWith('.internal')) {
-    return false
-  }
-
-  const labels = lower.split('.')
-
-  // A bare single-label name (e.g. `intranet`, `wiki`) can resolve to an internal
-  // service via a DNS search domain — refuse anything without a registrable
-  // (dotted) domain shape.
-  if (labels.length < 2) return false
-
-  // IPv4 dotted-decimal literal, e.g. 127.0.0.1.
-  if (labels.length === 4 && labels.every((label) => /^\d{1,3}$/.test(label))) return false
-
-  // Any all-numeric label set: a bare decimal like 2130706433 or a shorthand
-  // IPv4 form such as 1.1.
-  if (labels.every((label) => /^\d+$/.test(label))) return false
-
-  // Hex / octal IPv4 shorthands, e.g. 0x7f.1.
-  if (labels.some((label) => /^0x[\da-f]+$/.test(label))) return false
-
-  // Every label must be a real DNS label: alphanumeric, inner hyphens only.
-  //
-  // Without this the predicate was WIDER than `PreviewHostSchema`, the regex
-  // that actually gates the write. A trailing dot (`example.com.`, whose last
-  // label is empty) or an underscore (`foo_bar.com`) passed here and failed
-  // there, so the reader was offered an Approve button for a host the boundary
-  // then refused — and the renderer discards that refusal, so the toast simply
-  // dismissed and the decision looked made. The two must agree.
   if (lower.length > 253) return false
-  if (!labels.every((label) => /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/.test(label))) return false
 
-  return true
+  // Every label a real DNS label: alphanumeric, inner hyphens only. `localhost`
+  // and `127.0.0.1` both pass this now, and that is the point.
+  return lower.split('.').every((label) => /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/.test(label))
 }
 
-/**
- * A single approvable host. The regex admits no space, `;`, `'`, `"`, `,`,
- * `\r` or `\n`, so a value that passes cannot carry a CSP delimiter; the
- * `isApprovableHost` refinement then removes IP literals and loopback names.
- */
 export const PreviewHostSchema = z
   .string()
   .min(1)
@@ -102,11 +86,19 @@ export const PreviewHostSchema = z
  * `https://evil.com` while its `hostname` is empty, so anything reading `.origin`
  * validates a string that never described a real fetch target.
  *
- * `http:` is absent DELIBERATELY and temporarily: both chokepoints are https-only
- * today, so admitting it here would write a grant that cannot work. It is added
- * when the refusal is removed from both gates at once.
+ * `http:` is admitted, and it genuinely works: measured in Electron 39, a plain
+ * `http://` subresource inside a preview is NOT refused as mixed content, because
+ * the document sits at an opaque origin and mixed content is decided against the
+ * origin's scheme rather than against `isSecureContext`. See
+ * `docs/designs/108-http-and-ipv6-in-the-preview.md` — this was assumed to be
+ * impossible and was measured to be false, which is why the assumption was
+ * measured before anything was built on it.
+ *
+ * What `http:` costs is a different question, and it belongs in the confirm
+ * step's words rather than in a refusal here: the connection is not encrypted,
+ * so anyone positioned on the network can change what the page loads.
  */
-export const PREVIEW_ORIGIN_SCHEMES: readonly string[] = ['https:']
+export const PREVIEW_ORIGIN_SCHEMES: readonly string[] = ['https:', 'http:']
 
 /** Longest storable origin: 253 host + scheme + `:65535`. */
 const MAX_ORIGIN_LENGTH = 300

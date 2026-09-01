@@ -208,5 +208,12 @@
     "label": "--color-border-focus against --color-bg-secondary",
     "foreground": "--color-border-focus",
     "background": "--color-bg-secondary"
+  },
+  "contrast-warning-on-panel": {
+    "kind": "contrast",
+    "card": "system/components/permission-band/index.html",
+    "label": "--color-warning on --color-bg-secondary",
+    "foreground": "--color-warning",
+    "background": "--color-bg-secondary"
   }
 }

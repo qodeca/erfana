@@ -10,12 +10,17 @@ Per-version release notes for Erfana, v0.9.0 onwards. Earlier: v0.8.0–v0.8.3 i
 
 - **Approving a remote host in an HTML preview is a completely different experience.** A previewed page that wanted fonts, scripts or images from the internet used to raise one pop-up per host over your file tree, capped at three — so a page reaching four hosts gave you three stacked walls of identical text, and the fourth host **could not be approved at all**, because the app had run out of pop-ups. There is now a strip along the top of every preview showing how many hosts were blocked and how many are already allowed. Click it to see them and approve them one at a time. Nothing pops up.
 
-  Four things that were not possible before:
+  What was not possible before:
 
   - **You can see what a project has already approved.** Previously nothing anywhere showed you — which mattered most for a repository you cloned, since it can arrive with hosts already approved by someone else.
   - **A failed approval says so.** If the settings file cannot be written — a read-only checkout, a full list — the row comes back and tells you, instead of the prompt just disappearing as though it had worked.
   - **Every blocked host is listed**, not the first three.
   - **The question is read once**, on the row it belongs to, and answering it takes two steps: Allow opens it, Confirm answers it. The confirm step says plainly that the grant lets that host run code and send data, is written into the project, travels to anyone who clones it, and cannot be undone from inside Erfana.
+  - **Every blocked address can now be allowed, and the permission covers exactly what the page asked for.** Erfana used to grant a bare host name, which meant three things quietly did not work. A page loading from a non-standard port — `example.com:8443` — could not be allowed at all: allowing `example.com` covered only the standard port, so the row disappeared into the allowed list and the resource stayed blocked forever with nothing on screen to say so. Addresses like `localhost`, `127.0.0.1` or a printer on your own network showed **"Cannot be approved"** with no button and no reason. And anything loaded over plain `http://` was refused for a third, invisible reason. All three are gone: a permission is now the whole address — `http://localhost:3000` — so what you allow is what the page tried to reach.
+
+    The one exception left is an IPv6 address, and the row says why instead of just refusing: the browser's security rules have no way to write one down. It is the only address shape Erfana cannot express, and it is now the only row without a button.
+
+    Approving something over plain `http://` also says what that costs: the connection is not encrypted, so anyone between you and that address can change what the page loads.
   - **No row claims a host was blocked for one kind of thing.** A blocked host is blocked for everything, and an approved one is allowed everything — Erfana cannot narrow a grant. An earlier draft of the list put "style" or "script" beside each host, which is true of what the page asked for but reads as a limit on what you are granting. The confirm step still names it, in the one sentence that also says the limit is not real.
 
 ### Fixed

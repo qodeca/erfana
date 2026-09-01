@@ -132,7 +132,7 @@ describe('PreviewChromeBand', () => {
     renderBand({ blockedHosts: [host('203.0.113.7', ['image'], false)] })
     await user.click(screen.getByTestId('preview-band-chip'))
 
-    expect(screen.getByText('Cannot be approved')).toBeInTheDocument()
+    expect(screen.getByText('IPv6 cannot be allowed')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^Allow/ })).not.toBeInTheDocument()
   })
 
@@ -323,5 +323,42 @@ describe('PreviewChromeBand', () => {
     renderBand()
     await user.click(screen.getByTestId('preview-band-chip'))
     expect(screen.getByText('No remote hosts requested')).toBeInTheDocument()
+  })
+})
+
+describe('PreviewChromeBand — what an unencrypted origin has to say', () => {
+  it('warns that an http grant is readable and rewritable in transit', async () => {
+    // NOT a prediction that it will fail to load. Measured in Electron 39 an
+    // http subresource inside a preview is not refused as mixed content, because
+    // the document sits at an opaque origin — see
+    // docs/designs/108-http-and-ipv6-in-the-preview.md. So the honest warning is
+    // what plaintext costs, not a guess about whether the grant works.
+    const user = userEvent.setup()
+    renderBand({ blockedHosts: [host('http://dev.example.com:3000')] })
+    await user.click(screen.getByTestId('preview-band-chip'))
+    await user.click(screen.getByRole('button', { name: 'Allow http://dev.example.com:3000' }))
+
+    expect(screen.getByText(/not encrypted/i)).toBeInTheDocument()
+  })
+
+  it('says nothing about encryption for an https origin', async () => {
+    // A warning that appears everywhere is a warning nobody reads.
+    const user = userEvent.setup()
+    renderBand({ blockedHosts: [host('https://cdn.example.com')] })
+    await user.click(screen.getByTestId('preview-band-chip'))
+    await user.click(screen.getByRole('button', { name: 'Allow https://cdn.example.com' }))
+
+    expect(screen.queryByText(/not encrypted/i)).not.toBeInTheDocument()
+  })
+
+  it('explains the one row that still has no button', async () => {
+    // Every policy refusal is gone; this one is the mechanism's limit, so it
+    // states a reason rather than showing a blank "cannot".
+    const user = userEvent.setup()
+    renderBand({ blockedHosts: [host('http://[::1]:9000', ['script'], false)] })
+    await user.click(screen.getByTestId('preview-band-chip'))
+
+    expect(screen.getByText('IPv6 cannot be allowed')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Allow http/ })).not.toBeInTheDocument()
   })
 })

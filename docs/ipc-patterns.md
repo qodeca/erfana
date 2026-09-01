@@ -324,13 +324,13 @@ Channel names come from the `PreviewChannels` / `PreviewEvents` constants in `sr
 | `preview:setBounds` | `ipcMain.on` – update the native view bounds (fire-and-forget; stale seqs dropped) |
 | `preview:setVisibility` | `ipcMain.on` – update view visibility with a diagnostic reason (fire-and-forget) |
 | `preview:reload` | Reload the previewed page |
-| `preview:approveHost` | Approve a remote host, writing back to the project allowlist |
+| `preview:approveHost` | Approve a remote **origin** — scheme, host and port — writing back to the project allowlist. The payload field is still named `host` for wire compatibility, but is validated with `PreviewOriginSchema`: it must already be canonical, so the string stored is the string both chokepoints compare |
 | `preview:find` | Start / advance an in-page find |
 | `preview:stopFind` | Stop the active in-page find |
 | `preview:exportPdf` | Export the live previewed page to PDF |
 | `preview:failuresChanged` | Event: the failure log for a panel changed (coalesced) |
-| `preview:hostBlocked` | Event: a remote host was blocked, with every kind it was refused for. Drives the permission band's blocked list. De-duplicated main-side (one message per host per *change of kinds*, not per request) and capped at `PREVIEW.MAX_BLOCKED_HOSTS_PER_VIEW`; the `truncated` flag rides the last event that fits |
-| `preview:allowlistChanged` | Event: the project's approved-host set. Seeded on open so a project can show what was granted in an earlier session, and fanned out after an approval to every live view of the project |
+| `preview:hostBlocked` | Event: a remote **origin** was blocked, with every kind it was refused for. Drives the permission band's blocked list. Deliberately validated LOOSER than the approve path — something that can never be granted must still be reportable, or a page fails for a reason nothing on screen explains. De-duplicated main-side (one message per origin per *change of kinds*, not per request), capped at `PREVIEW.MAX_BLOCKED_HOSTS_PER_VIEW` with a per-hostname sub-cap of `PREVIEW.MAX_BLOCKED_ORIGINS_PER_HOST` so one noisy host cannot spend the whole budget on ports; the `truncated` flag rides the last event that fits |
+| `preview:allowlistChanged` | Event: the project's approved-**origin** set (field still named `hosts`). Seeded on open so a project can show what was granted in an earlier session, and fanned out after an approval to every live view of the project |
 | `preview:visibilityApplied` | Event: a visibility change was APPLIED to the native view. The mirror of `boundsApplied`: `setVisibility` is fire-and-forget and the hide path awaits a `capturePage` first, so anything that reveals Erfana's controls *because* the page was hidden must wait for this |
 | `preview:findResult` | Event: an in-page find produced a final result |
 | `preview:stillFrameChanged` | Event: the still-frame captured on hide changed |

@@ -56,9 +56,11 @@ describe('PreviewAllowlistStore.load', () => {
   })
 
   it('treats a bad block as empty with write-back disabled and a badge, never throwing', async () => {
-    // A non-approvable host (localhost) makes the block fail safeParse.
+    // An IPv6 literal makes the block fail safeParse. It used to be `localhost`
+    // here, which is a perfectly good host again — the fixture had to move to
+    // something refused for a structural reason rather than a policy one.
     await writeSettings(
-      JSON.stringify({ htmlPreview: { allowlist: { version: 1, hosts: ['localhost'] } } })
+      JSON.stringify({ htmlPreview: { allowlist: { version: 1, hosts: ['[::1]'] } } })
     )
     const onBadge = vi.fn<(badge: PreviewFailureInput) => void>()
     const store = createPreviewAllowlistStore({ getProjectRoot: () => root, onBadge })
@@ -191,10 +193,22 @@ describe('PreviewAllowlistStore.approveOrigin', () => {
     expect(parsed.htmlPreview.allowlist.hosts).toEqual(['good.example.com'])
   })
 
-  it('rejects a non-approvable host with PREVIEW_HOST_NOT_APPROVABLE', async () => {
+  it('accepts a loopback origin now, and still refuses what cannot be expressed', async () => {
     const store = createPreviewAllowlistStore({ getProjectRoot: () => root })
 
-    await expect(store.approveOrigin('https://127.0.0.1')).rejects.toMatchObject({
+    // The policy that refused these is gone (#108). It never worked — a name
+    // resolving to a private address was undetected either way — and it was paid
+    // for with a row that had no button and no reason.
+    await expect(store.approveOrigin('https://127.0.0.1')).resolves.toEqual(['https://127.0.0.1'])
+    await expect(store.approveOrigin('http://localhost:3000')).resolves.toEqual([
+      'http://localhost:3000',
+      'https://127.0.0.1'
+    ])
+
+    // An IPv6 literal is still refused, and for a reason that is not a choice:
+    // Chromium reports "contains an invalid source … It will be ignored", so a
+    // grant would live in the network filter and never reach the CSP.
+    await expect(store.approveOrigin('https://[::1]:3000')).rejects.toMatchObject({
       code: ErrorCode.PREVIEW_HOST_NOT_APPROVABLE
     })
   })

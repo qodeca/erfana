@@ -186,6 +186,15 @@
   color: var(--color-text-tertiary);
 }
 
+/* The one paragraph that is a WARNING rather than a description: an unencrypted
+   origin. It is not louder than the rest of the box - the whole box is a
+   security question, and colouring one line red inside it would suggest the
+   others are safe. It is only distinguished, so the eye can find it again.
+   Contrast is generated, not typed: `contrast-warning-on-panel` in the ledger. */
+.erf-band__confirm-body--warn {
+  color: var(--color-warning);
+}
+
 .erf-band__confirm-body + .erf-band__confirm-body { margin-top: calc(var(--space-4) * -1); }
 
 .erf-band__confirm-actions {

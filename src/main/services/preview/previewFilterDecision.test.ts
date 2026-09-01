@@ -55,11 +55,45 @@ describe('decideRequest', () => {
     expect(decideRequest('https://CDN.jsDelivr.NET/x', allowed)).toEqual({ action: 'allow' })
   })
 
-  it('refuses http (insecure) even to an allowlisted host', () => {
+  /*
+   * DELETED: "refuses http (insecure) even to an allowlisted host".
+   *
+   * The defect it named ceased to exist rather than going untested. http is an
+   * approvable scheme now (#108), so a grant to `https://cdn.jsdelivr.net` no
+   * longer says anything about `http://cdn.jsdelivr.net` — they are two origins
+   * and the second one is simply not on the list. The two assertions that
+   * mattered are both kept below: an http URL is still refused when it has not
+   * been granted, and granting the https origin grants nothing over http.
+   */
+  it('refuses an http origin that has not been granted, and it is not a SCHEME refusal', () => {
     expect(decideRequest('http://cdn.jsdelivr.net/x', allowed)).toEqual({
       action: 'cancel',
-      reason: 'insecure-scheme',
-      host: 'cdn.jsdelivr.net'
+      // `blocked-host`, not `insecure-scheme` — which is what puts an Allow
+      // button on the row instead of a dead end with no reason.
+      reason: 'blocked-host',
+      host: 'http://cdn.jsdelivr.net'
+    })
+  })
+
+  it('does not let an https grant leak to the http origin of the same host', () => {
+    // Two origins, two grants. The scheme is part of what was consented to.
+    const httpAllowed = new Set(['http://cdn.jsdelivr.net'])
+    expect(decideRequest('http://cdn.jsdelivr.net/x', httpAllowed)).toEqual({ action: 'allow' })
+    expect(decideRequest('https://cdn.jsdelivr.net/x', httpAllowed)).toEqual({
+      action: 'cancel',
+      reason: 'blocked-host',
+      host: 'https://cdn.jsdelivr.net'
+    })
+  })
+
+  it('drops the default port per scheme, so :80 on http is the same origin', () => {
+    const httpAllowed = new Set(['http://cdn.jsdelivr.net'])
+    expect(decideRequest('http://cdn.jsdelivr.net:80/x', httpAllowed)).toEqual({ action: 'allow' })
+    // But :80 on HTTPS is a non-default port, and therefore a different grant.
+    expect(decideRequest('https://cdn.jsdelivr.net:80/x', allowed)).toEqual({
+      action: 'cancel',
+      reason: 'blocked-host',
+      host: 'https://cdn.jsdelivr.net:80'
     })
   })
 

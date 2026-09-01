@@ -35,6 +35,13 @@ export function PreviewBandConfirm({
   const titleId = useId()
   const bodyOneId = useId()
   const bodyTwoId = useId()
+  const bodyWarnId = useId()
+
+  /*
+   * A property of the string, not a guess about the network. `host` carries a
+   * canonical origin, so the scheme is simply read off it.
+   */
+  const isUnencrypted = host.startsWith('http://')
 
   /*
    * Focus the CONTAINER, never the Confirm button. Two reasons, both from the
@@ -101,7 +108,11 @@ export function PreviewBandConfirm({
       className="erf-band__confirm"
       role="alertdialog"
       aria-labelledby={titleId}
-      aria-describedby={`${bodyOneId} ${bodyTwoId}`}
+      // The warning joins the description, so a screen-reader user hears the
+      // whole consequence when the box takes focus rather than only part of it.
+      aria-describedby={
+        isUnencrypted ? `${bodyOneId} ${bodyWarnId} ${bodyTwoId}` : `${bodyOneId} ${bodyTwoId}`
+      }
       tabIndex={-1}
       onKeyDown={onKeyDown}
     >
@@ -122,6 +133,21 @@ export function PreviewBandConfirm({
         It was blocked for {describeKinds(kinds)}, but Erfana cannot limit it to
         that — the host will also be able to run code and send data to it.
       </p>
+      {/*
+        ONLY for an unencrypted origin, and it is a statement about the origin
+        rather than a prediction about whether it will load. Erfana deliberately
+        never predicts that: measured in Electron 39 an http subresource is NOT
+        refused as mixed content here, because the preview document sits at an
+        opaque origin — see docs/designs/108-http-and-ipv6-in-the-preview.md. So
+        the honest warning is not "this may not work", it is what plaintext
+        actually costs.
+      */}
+      {isUnencrypted && (
+        <p className="erf-band__confirm-body erf-band__confirm-body--warn" id={bodyWarnId}>
+          This connection is not encrypted. Anyone between you and {host} can change
+          what this page loads, including the code it runs.
+        </p>
+      )}
       <p className="erf-band__confirm-body" id={bodyTwoId}>
         Saved in this project&apos;s .erfana/settings.json, so it applies to every
         preview here, survives restarts, and travels to anyone who clones the

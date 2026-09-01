@@ -238,7 +238,7 @@ describe('approveFailureText', () => {
     // grid; the product card widens it with an inline `grid-template-columns`,
     // which is a card hack and must not reach shipping code.
     expect(approveFailureText(ErrorCode.PREVIEW_ALLOWLIST_FULL)).toBe('Not saved — list full')
-    expect(approveFailureText(ErrorCode.PREVIEW_HOST_NOT_APPROVABLE)).toBe('Cannot be approved')
+    expect(approveFailureText(ErrorCode.PREVIEW_HOST_NOT_APPROVABLE)).toBe('Not saved — not allowed')
     expect(approveFailureText(ErrorCode.UNKNOWN_ERROR)).toBe('Not saved')
     for (const code of [
       ErrorCode.PREVIEW_ALLOWLIST_FULL,

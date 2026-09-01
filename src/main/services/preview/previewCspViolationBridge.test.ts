@@ -49,20 +49,22 @@ describe('previewCspViolationBridge', () => {
       )
     })
 
-    it('marks a real domain approvable and a loopback name not', () => {
+    it('marks every observed origin approvable, loopback included', () => {
       const { bridge, onBlockedHost } = makeBridge()
 
       bridge.handleViolation(violation('https://fonts.googleapis.com/css2?family=Inter'))
       bridge.handleViolation(violation('http://localhost:8080/dev.js'))
       bridge.handleViolation(violation('http://127.0.0.1/probe'))
 
-      // All three are RECORDED — each is a genuine refusal the badge should
-      // carry — but only the first may be offered for approval. That split is
-      // the same one the network-filter path makes.
+      // All three are recorded AND all three are offerable. The policy that
+      // singled out loopback is gone (#108): it never detected a name that
+      // merely RESOLVED to a private address, so it stopped the honest reader
+      // and not a hostile page, and it charged a row with no button and no
+      // reason for the privilege.
       expect(onBlockedHost.mock.calls.map((call) => [call[0], call[2]])).toEqual([
         ['https://fonts.googleapis.com', true],
-        ['http://localhost:8080', false],
-        ['http://127.0.0.1', false]
+        ['http://localhost:8080', true],
+        ['http://127.0.0.1', true]
       ])
     })
 
@@ -195,20 +197,27 @@ describe('previewCspViolationBridge', () => {
       expect(onBlockedHost).toHaveBeenCalledTimes(2)
     })
 
-    it('records an http host but never offers it for approval', () => {
-      // THE MISMATCH. The network-filter path classifies a plain-http request
-      // `insecure-scheme` and NOT approvable; this path marked the same host
-      // approvable. Approving it wrote an `https://` grant into every CSP
-      // directive — bootstrapped off an observation that was never eligible —
-      // while the http resource still would not load.
+    /*
+     * DELETED: "records an http host but never offers it for approval".
+     *
+     * The mismatch it named is gone rather than untested. It existed because a
+     * grant was a bare HOSTNAME, so approving something seen over http wrote an
+     * `https://` grant — a different thing from what was observed. A grant is an
+     * origin now, so approving `http://cdn.example.com` grants exactly that.
+     *
+     * The old comment also assumed the http resource "still would not load".
+     * Measured in Electron 39, it does: the preview document sits at an opaque
+     * origin, so mixed-content restriction never applies. See
+     * docs/designs/108-http-and-ipv6-in-the-preview.md.
+     */
+    it('offers an http origin for approval, because approving it now works', () => {
       const { bridge, onBlockedHost } = makeBridge()
 
       bridge.handleViolation(violation('http://cdn.example.com/a.js'))
 
       expect(onBlockedHost).toHaveBeenCalledTimes(1)
-      // Still RECORDED: it is a genuine refusal the badge should carry.
       expect(onBlockedHost.mock.calls[0][0]).toBe('http://cdn.example.com')
-      expect(onBlockedHost.mock.calls[0][2]).toBe(false)
+      expect(onBlockedHost.mock.calls[0][2]).toBe(true)
     })
 
     it('still offers the same host over https', () => {

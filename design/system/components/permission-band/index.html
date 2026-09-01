@@ -66,6 +66,11 @@
   4.5:1 floor. The obvious-looking <code>--color-text-secondary</code> is
   <span data-claim="contrast-secondary-on-panel"></span>:1 on the same surface and fails, which is why
   it is not used here.
+  <br><br>
+  The one warning line — an unencrypted origin, in the confirm box — uses
+  <code>--color-warning</code> at <strong><span data-claim="contrast-warning-on-panel"></span>:1</strong>,
+  also clear of the floor. It is <em>distinguished</em> rather than louder: the whole box is a security
+  question, and colouring one line inside it would suggest the other lines are safe.
 </div>
 
 <div class="ds-note">
@@ -248,10 +253,11 @@ const SEED = {
     // wrapping rule described rather than rendered, which is how the old
     // front-elide shipped broken for months.
     { host: 'https://assets.tracking.eu-west-1.metrics.a-very-long-tenant.example.co.uk', kind: 'connect' },
-    // Not approvable YET: an IP literal cannot be added to the allowlist while
-    // `isApprovableHost` still carries its policy clauses. That is the dead end
-    // this card is on its way to deleting — see the Exceptions section.
-    { host: 'https://203.0.113.7', kind: 'image', approvable: false }
+    // The ONE row still without a button, and the only one left. Not policy:
+    // a CSP host-source cannot express an IPv6 literal at all, and Chromium
+    // says so out loud — "contains an invalid source … It will be ignored" —
+    // so a grant would live in the network filter and never reach the CSP.
+    { host: 'http://[::1]:9000', kind: 'image', approvable: false }
   ],
   // No `kind` here, deliberately — see allowedRow().
   allowed: [
@@ -398,7 +404,7 @@ function blockedRow(item) {
   if (item.approvable === false) {
     const nope = document.createElement('span');
     nope.className = 'erf-band__state';
-    nope.textContent = 'Cannot be approved';
+    nope.textContent = 'IPv6 cannot be allowed';
     row.append(host, kind, nope);
     return row;
   }

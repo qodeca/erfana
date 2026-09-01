@@ -23,20 +23,51 @@ describe('isApprovableHost', () => {
     expect(isApprovableHost('fonts.googleapis.com')).toBe(true)
   })
 
+  /*
+   * THE POLICY TABLE THAT USED TO BE HERE IS GONE, and this note is the record.
+   *
+   * It asserted refusal for `127.0.0.1`, `0x7f.1`, `localhost`, `db.localhost`,
+   * `printer.local`, `svc.internal`, `10.0.0.1`, `2130706433`, `intranet` and
+   * `wiki`. Every one of those is approvable now (#108), because the policy did
+   * not do what it claimed: `docs/security.md` conceded in the same breath that a
+   * name RESOLVING to a private address was never detected, so `127.0.0.1.nip.io`
+   * walked past all ten. It stopped the honest reader and not a hostile page, and
+   * it was paid for with a row that had no button and no reason.
+   *
+   * Two of those cases were not policy and did not disappear — they MOVED, and
+   * they are re-asserted below rather than deleted:
+   *   - the hex and bare-decimal IPv4 shorthands are canonicalised by the URL
+   *     parser before any predicate sees them, which covers a family the hand-
+   *     written list could only enumerate and could have under-enumerated;
+   *   - `[::1]` is still refused, and now for a reason that is physics rather
+   *     than judgement.
+   */
   it.each([
-    ['IPv4 literal', '127.0.0.1'],
     ['IPv6 literal (bracketed)', '[::1]'],
-    ['hex IPv4 shorthand', '0x7f.1'],
-    ['localhost', 'localhost'],
-    ['*.localhost subdomain', 'db.localhost'],
-    ['*.local mDNS name', 'printer.local'],
-    ['*.internal name', 'svc.internal'],
-    ['all-numeric label set', '10.0.0.1'],
-    ['bare decimal (integer IPv4)', '2130706433'],
-    ['bare single-label name (intranet-SSRF surface, #32)', 'intranet'],
-    ['single-label name (wiki)', 'wiki']
-  ])('rejects %s (%s)', (_label, host) => {
+    ['bare IPv6 literal', 'fe80::1'],
+    ['underscore, not a DNS label', 'foo_bar.com'],
+    ['leading hyphen', '-leading.com'],
+    ['empty label', 'example..com']
+  ])('still rejects %s (%s) — structure, not judgement', (_label, host) => {
     expect(isApprovableHost(host)).toBe(false)
+  })
+
+  it.each([
+    ['localhost', 'localhost'],
+    ['a loopback literal', '127.0.0.1'],
+    ['an mDNS name', 'printer.local'],
+    ['a single-label name', 'intranet']
+  ])('now ACCEPTS %s (%s) — the dead end this deleted', (_label, host) => {
+    expect(isApprovableHost(host)).toBe(true)
+  })
+
+  it('does not need to enumerate the IPv4 shorthands, because the parser folds them', () => {
+    // The old table listed `0x7f.1` and `2130706433` by hand. Both — and every
+    // other shorthand — collapse to 127.0.0.1 in the URL parser, before any
+    // predicate is asked anything.
+    for (const shorthand of ['http://0x7f.1', 'http://2130706433', 'http://127.1']) {
+      expect(new URL(shorthand).hostname).toBe('127.0.0.1')
+    }
   })
 
   it('rejects a host carrying a CR or LF (header/CSP injection guard)', () => {
@@ -44,9 +75,6 @@ describe('isApprovableHost', () => {
     expect(isApprovableHost('evil.example\nfoo')).toBe(false)
   })
 
-  it('rejects a bare IPv6 literal without brackets', () => {
-    expect(isApprovableHost('fe80::1')).toBe(false)
-  })
   it('refuses a hostname the WRITE schema would reject', () => {
     // THE MISMATCH. This predicate decides the `approvable` flag the user sees;
     // `PreviewHostSchema`'s regex decides whether the write is accepted. The
@@ -90,8 +118,11 @@ describe('PreviewHostSchema', () => {
     expect(PreviewHostSchema.parse('cdn.jsdelivr.net')).toBe('cdn.jsdelivr.net')
   })
 
-  it('rejects an IP literal via the refinement', () => {
-    expect(PreviewHostSchema.safeParse('127.0.0.1').success).toBe(false)
+  it('accepts an IP literal now, and still refuses IPv6', () => {
+    // The refinement used to reject both. Only the second refusal was ever
+    // structural: an IPv6 literal cannot be written as a CSP host-source.
+    expect(PreviewHostSchema.safeParse('127.0.0.1').success).toBe(true)
+    expect(PreviewHostSchema.safeParse('[::1]').success).toBe(false)
   })
 
   it('rejects a host with characters the CSP grammar forbids', () => {
@@ -120,9 +151,12 @@ describe('PreviewAllowlistSchema', () => {
     expect(PreviewAllowlistSchema.safeParse({ version: 0, hosts: [] }).success).toBe(false)
   })
 
-  it('rejects a block containing a non-approvable host', () => {
-    const result = PreviewAllowlistSchema.safeParse({ version: 1, hosts: ['localhost'] })
-    expect(result.success).toBe(false)
+  it('accepts a block naming localhost, and refuses one naming an IPv6 literal', () => {
+    // A cloned repository CAN now arrive with localhost approved, and that is a
+    // deliberate, recorded decision rather than an oversight — see
+    // docs/security.md, "Risks knowingly accepted".
+    expect(PreviewAllowlistSchema.safeParse({ version: 1, hosts: ['localhost'] }).success).toBe(true)
+    expect(PreviewAllowlistSchema.safeParse({ version: 1, hosts: ['[::1]'] }).success).toBe(false)
   })
 
   it('rejects more than MAX_ALLOWLIST_HOSTS entries', () => {
@@ -171,9 +205,20 @@ describe('parsePreviewOrigin', () => {
     expect(parsePreviewOrigin('ws://example.com:1234')).toBeNull()
     expect(parsePreviewOrigin('ftp://example.com')).toBeNull()
     expect(parsePreviewOrigin('file:///etc/passwd')).toBeNull()
-    // https-only for now, so a plain http origin is refused at BOTH gates and
-    // therefore must not be storable at either.
-    expect(parsePreviewOrigin('http://example.com')).toBeNull()
+  })
+
+  it('admits http, which was measured to work rather than assumed', () => {
+    // The plan assumed a plain http subresource would be refused as mixed
+    // content before the allowlist was consulted, which would have made an http
+    // grant an irreversible button that does nothing. Measured in Electron 39 it
+    // is not refused — the document sits at an opaque origin, and mixed content
+    // is decided against the origin's scheme, not against isSecureContext.
+    // docs/designs/108-http-and-ipv6-in-the-preview.md
+    expect(parsePreviewOrigin('http://localhost:3000')).toBe('http://localhost:3000')
+    expect(parsePreviewOrigin('http://example.com')).toBe('http://example.com')
+    // The default port for the scheme is still dropped, per scheme.
+    expect(parsePreviewOrigin('http://example.com:80')).toBe('http://example.com')
+    expect(parsePreviewOrigin('https://example.com:80')).toBe('https://example.com:80')
   })
 
   it('refuses a blob: URL whose .origin looks perfectly respectable', () => {
@@ -251,9 +296,14 @@ describe('originFromLegacyHost', () => {
     expect(originFromLegacyHost('cdn.jsdelivr.net')).toBe('https://cdn.jsdelivr.net')
   })
 
-  it('refuses what the host schema refused', () => {
-    expect(originFromLegacyHost('localhost')).toBeNull()
-    expect(originFromLegacyHost('127.0.0.1')).toBeNull()
+  it('migrates what an older build could express, and nothing it could not', () => {
+    // A host entry always meant the https origin at the default port, so that is
+    // what it becomes — including for hosts an older build would have refused to
+    // write but a newer one may.
+    expect(originFromLegacyHost('localhost')).toBe('https://localhost')
+    expect(originFromLegacyHost('127.0.0.1')).toBe('https://127.0.0.1')
+    // Still nothing for a form no CSP host-source can carry.
+    expect(originFromLegacyHost('[::1]')).toBeNull()
   })
 })
 

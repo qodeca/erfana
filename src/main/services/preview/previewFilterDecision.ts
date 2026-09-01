@@ -15,6 +15,7 @@
  * allowed or refused — never executed, never reflected into a response.
  */
 
+import { PREVIEW_ORIGIN_SCHEMES } from '../../../shared/ipc/preview-settings-schema'
 import type { PreviewFailureType } from '../../../shared/ipc/preview-types'
 
 /**
@@ -88,7 +89,7 @@ export function decideRequest(url: string, allowed: ReadonlySet<string>): Filter
    * matched only the default — which is how an approved host serving on `:8443`
    * came to be reported as allowed and refused at the same time.
    */
-  if (protocol === 'https:') {
+  if (PREVIEW_ORIGIN_SCHEMES.includes(protocol)) {
     const host = parsed.hostname
     const origin = `${protocol}//${host}${parsed.port === '' ? '' : `:${parsed.port}`}`
     if (allowed.has(origin)) return { action: 'allow' }
@@ -97,5 +98,8 @@ export function decideRequest(url: string, allowed: ReadonlySet<string>): Filter
     return { action: 'cancel', reason: 'blocked-host', host: origin }
   }
 
+  // ws:, wss:, ftp: and anything else. Not "insecure" in the http sense any
+  // more — simply outside the closed set of schemes an origin may carry, so
+  // there is no grant that could ever admit them.
   return { action: 'cancel', reason: 'insecure-scheme', host: parsed.hostname }
 }

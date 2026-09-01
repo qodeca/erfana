@@ -106,4 +106,25 @@ Three traps, each of which looks like a simplification:
 
 `unconfirmed` is **sticky** until the reader collapses the list. A page that yields at 310 ms would otherwise un-pause and re-pause, a flap whose timing the untrusted page controls.
 
-**The blocked-host list is bounded main-side**, at `PREVIEW.MAX_BLOCKED_HOSTS_PER_VIEW` (50, matching the CSP bridge). `PreviewViewService.onBlocked` also returns when `mergeBlockedKinds` reports no change — without that, a page pulling forty assets from one host sent forty identical events. The dedupe ledger is **cleared by `applyApprovedHosts`**: the reload after an approval refuses the remaining hosts all over again, and a ledger that survived it would swallow every one of them while the failure log they would have appeared in has just been emptied.
+**A permission is an ORIGIN — scheme, host and port.** `parsePreviewOrigin`
+(`src/shared/ipc/preview-settings-schema.ts`) is the single canonicaliser AND the
+definition of validity: a value is valid exactly when it already is what that
+function returns, so the string on disk, the string in the CSP and the string
+`decideRequest` compares are provably one string. Never build one from
+`URL.origin` — `new URL('blob:https://evil.com/1').origin` is a clean-looking
+`https://evil.com` with an empty hostname, and `.origin` silently drops userinfo.
+The row shows the scheme only when it is not `https` and the port only when it is
+not the default, while the accessible name always carries the whole origin.
+
+**The only row without an Allow button is an IPv6 literal**, and it states its
+reason. Every other refusal was policy — `localhost`, IP literals, `.local`,
+single-label names — and all of it is deleted (#108): it never detected a name
+that merely *resolved* to a private address, so it stopped the honest reader and
+not a hostile page. IPv6 is different in kind: a CSP host-source cannot express
+one, and Chromium says so out loud ("contains an invalid source … It will be
+ignored"), which would leave a grant live in the network filter and absent from
+the CSP. See `docs/designs/108-http-and-ipv6-in-the-preview.md`, which also
+records the measurement that `http://` genuinely works here — the preview
+document sits at an opaque origin, so mixed content never applies.
+
+**The blocked-host list is bounded main-side**, at `PREVIEW.MAX_BLOCKED_HOSTS_PER_VIEW` (50, matching the CSP bridge), with a per-hostname sub-cap of `PREVIEW.MAX_BLOCKED_ORIGINS_PER_HOST` (5). Without the sub-cap a page fetching `http://localhost:1..50` exhausts the budget before main reports the real blocked CDN — dropped, not merely buried. `PreviewViewService.onBlocked` also returns when `mergeBlockedKinds` reports no change — without that, a page pulling forty assets from one host sent forty identical events. The dedupe ledger is **cleared by `applyApprovedHosts`**: the reload after an approval refuses the remaining hosts all over again, and a ledger that survived it would swallow every one of them while the failure log they would have appeared in has just been emptied.

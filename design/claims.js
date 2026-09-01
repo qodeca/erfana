@@ -98,6 +98,11 @@ window.ERFANA_CLAIMS = {
     "value": 6.24,
     "label": "--color-border-focus against --color-bg-secondary",
     "card": "system/foundations/focus.html"
+  },
+  "contrast-warning-on-panel": {
+    "value": 5.95,
+    "label": "--color-warning on --color-bg-secondary",
+    "card": "system/components/permission-band/index.html"
   }
 };
 

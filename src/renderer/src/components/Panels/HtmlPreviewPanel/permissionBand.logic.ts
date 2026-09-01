@@ -251,7 +251,12 @@ export function approveFailureText(errorCode: ErrorCode): string {
     case ErrorCode.PREVIEW_ALLOWLIST_FULL:
       return 'Not saved — list full'
     case ErrorCode.PREVIEW_HOST_NOT_APPROVABLE:
-      return 'Cannot be approved'
+      // Reachable only if a row offered an Allow the boundary then refused,
+      // which is the defect the shared canonicaliser exists to make impossible.
+      // It says "Not saved" like every other failure rather than "Cannot be
+      // approved", because the reader DID something and it did not take — that
+      // is a different message from a row that never offered a button.
+      return 'Not saved — not allowed'
     default:
       return 'Not saved'
   }

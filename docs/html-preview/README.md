@@ -41,7 +41,11 @@ Every path is re-checked by Erfana itself before anything opens: the page's own 
 
 ## Network allowlist
 
-Remote subresources – scripts, CSS, fonts, images from other hosts – are **blocked by default**. A page that references a host absent from the project's allowlist has that subresource blocked, and a single toast appears for that host with an **Approve** action.
+Remote subresources – scripts, CSS, fonts, images from other addresses – are **blocked by default**. A page that references an address absent from the project's allowlist has that subresource blocked, and the address is listed in the **permission band** along the top of the preview, with an **Allow** button on its row.
+
+The unit of a permission is an **origin**: scheme, host and port together. `https://cdn.example.com`, `https://cdn.example.com:8443` and `http://cdn.example.com` are three different permissions, because they are three different things to reach. `http://` is allowable and works, and the confirm step says what it costs — the connection is not encrypted, so anyone in between can change what the page loads.
+
+Every blocked address gets a button, `localhost` and IP literals included. **One exception:** an IPv6 literal cannot be allowed at all, because the browser's Content-Security-Policy grammar has no way to write one (`host-char` is `ALPHA / DIGIT / "-"`). That row says so rather than refusing silently.
 
 - **Approving records the host** in `.erfana/settings.json` inside the open project. That file is the only source of truth for which hosts are allowed. On the next load the approved host's subresource loads.
 - **Removing an approval is currently a manual edit.** There is no in-app view or revoke of approved hosts yet – to remove one, edit `.erfana/settings.json` by hand and delete the host. An in-app allowlist view/revoke UI is a planned follow-up (see [Security § HTML preview](../security.md#html-preview) and the technical-debt ledger).
@@ -72,7 +76,7 @@ For the acceptance corpus, save-to-visible-change stays under 300 ms.
 
 ## Failure reporting
 
-Failures – script errors, missing local files, network timeouts, blocked hosts, blocked links, unsupported asset types – accumulate quietly into a badge that carries a count. Opening the badge lists the individual failures with enough detail to identify the cause. Blocked hosts additionally raise the one-time Approve toast described above. Nothing interrupts the page; the badge is the single place failures gather.
+Failures – script errors, missing local files, network timeouts, blocked hosts, blocked links, unsupported asset types – accumulate quietly into a badge that carries a count. Opening the badge lists the individual failures with enough detail to identify the cause. Blocked addresses additionally appear in the permission band described above. Nothing interrupts the page; the badge is the single place failures gather.
 
 ## Accepted risks
 
