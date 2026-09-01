@@ -80,15 +80,23 @@
 </div>
 
 <div class="ds-note">
-  <strong>The band's own text is measured, not assumed.</strong> Its labels use
-  <code>--color-text-tertiary</code>, which is
-  <strong><span data-claim="contrast-tertiary-on-panel"></span>:1</strong> on the band — clear of the
-  4.5:1 floor. The obvious-looking <code>--color-text-secondary</code> is
-  <span data-claim="contrast-secondary-on-panel"></span>:1 on the same surface and fails, which is why
-  it is not used here.
+  <strong>The band's own text is measured, not assumed — and the measurement was wrong.</strong>
+  Its labels use <code>--color-text-tertiary</code>, which is
+  <strong><span data-claim="contrast-tertiary-on-panel"></span>:1</strong> on the band's real surface,
+  <code>--color-bg-primary</code> — clear of the 4.5:1 floor.
+  <br><br>
+  This card used to say <code>--color-text-secondary</code> <em>failed</em> here. It does not:
+  <strong><span data-claim="contrast-secondary-on-band"></span>:1</strong> against the same surface,
+  which passes. The failing figure was measured against <code>--color-bg-secondary</code>, borrowed
+  from a claim that belongs to the <a href="../../foundations/colors.html">colours foundation</a>,
+  and left behind when the band moved to <code>--color-bg-primary</code>. Every gate stayed green
+  throughout, because the number was right about the pair it named and the pair was not this one.
+  <strong>So the tertiary choice currently has no stated reason.</strong> It is kept for now, and
+  re-deciding it is open work rather than a settled rule.
   <br><br>
   The one warning line — an unencrypted origin, in the confirm box — uses
-  <code>--color-warning</code> at <strong><span data-claim="contrast-warning-on-panel"></span>:1</strong>,
+  <code>--color-warning</code> at <strong><span data-claim="contrast-warning-on-panel"></span>:1</strong>
+  against <code>--color-bg-tertiary</code>, the confirm block's own surface rather than the band's,
   also clear of the floor. It is <em>distinguished</em> rather than louder: the whole box is a security
   question, and colouring one line inside it would suggest the other lines are safe.
 </div>

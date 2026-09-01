@@ -202,6 +202,68 @@ describe('PreviewChromeBand', () => {
     expect(screen.queryByRole('button', { name: /^Allow/ })).not.toBeInTheDocument()
   })
 
+  /**
+   * The reason must be REACHABLE, not merely present.
+   *
+   * It used to live in an `aria-label` on a bare `<span>`. A span maps to role
+   * `generic`, where ARIA 1.2 prohibits a name — axe flags `aria-prohibited-attr`
+   * and browse mode announces the child text instead. So the sentence explaining
+   * why a row has no button could simply not be announced, leaving exactly the
+   * blank refusal the copy exists to prevent. Asserting on real text is also what
+   * makes this test able to fail: the old assertion read the attribute, which was
+   * always there whether or not anything would ever speak it.
+   */
+  it('announces the whole refusal reason as text, not as a prohibited attribute', async () => {
+    const user = userEvent.setup()
+    renderBand({ blockedHosts: [host('[2001:db8::1]', ['image'], false)] })
+    await user.click(screen.getByTestId('preview-band-chip'))
+
+    expect(
+      screen.getByText(/IPv6 addresses cannot be allowed: the browser security policy/)
+    ).toBeInTheDocument()
+    // And the short form the eye reads is kept out of the tree, so the reason is
+    // announced once rather than twice in two different wordings.
+    expect(screen.getByText('IPv6 cannot be allowed')).toHaveAttribute('aria-hidden', 'true')
+  })
+
+  /**
+   * THE RESERVATION MUST BE SURVIVABLE, and nothing rendered the band unproven.
+   *
+   * Opening the confirm box grows the band; the growth trips a bounds re-proof;
+   * an unproven band hides its controls with `visibility: hidden`. Hiding the
+   * element that holds focus makes Chromium reset focus to `<body>` — so the
+   * irreversible question went invisible for up to 300 ms and came back with the
+   * Tab trap inert, because the trap only fires on keys the box receives.
+   *
+   * Dropping the confirm from the reservation was the other candidate fix and is
+   * the wrong one: opening the box IS the growth that opens a new epoch, so it
+   * is the element most likely to be sitting over ground the page held one frame
+   * ago — which is exactly where an irreversible Allow must not be clickable.
+   */
+  it('returns focus to the confirm box when the band proves itself again', async () => {
+    const user = userEvent.setup()
+    const props = {
+      blockedHosts: [host('a.example.com')],
+      allowedHosts: [],
+      onApprove: vi.fn(async () => ok)
+    }
+    const { rerender } = render(<PreviewChromeBand {...props} controlsAllowed />)
+
+    await user.click(screen.getByTestId('preview-band-chip'))
+    await user.click(screen.getByRole('button', { name: 'Allow https://a.example.com' }))
+    const box = screen.getByRole('alertdialog')
+    expect(box).toHaveFocus()
+
+    // The band grows, the page has not proved it moved, the controls go hidden.
+    rerender(<PreviewChromeBand {...props} controlsAllowed={false} />)
+    box.blur()
+    expect(box).not.toHaveFocus()
+
+    // The page acks, the controls come back — and so does focus.
+    rerender(<PreviewChromeBand {...props} controlsAllowed />)
+    expect(screen.getByRole('alertdialog')).toHaveFocus()
+  })
+
   it('names each Allow button after its host', async () => {
     // Four buttons all reading "Allow" is a screen-reader dead end.
     const user = userEvent.setup()

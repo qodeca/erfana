@@ -29,6 +29,16 @@ import { HostName } from './HostName'
 afterEach(cleanup)
 
 /** The single `.erf-host` element, which is where every assertion looks. */
+/** What the eye sees: the decorated, wrapping copy. */
+function drawn(el: HTMLElement): string {
+  return el.querySelector('.erf-host__drawn')?.textContent ?? ''
+}
+
+/** What a screen reader reads: the full origin, as real text. */
+function announced(el: HTMLElement): string {
+  return el.querySelector('.erf-host__announced')?.textContent ?? ''
+}
+
 function renderHost(host: string, labelPrefix?: string): HTMLElement {
   const { container } = render(<HostName host={host} labelPrefix={labelPrefix} />)
   const el = container.querySelector<HTMLElement>('.erf-host')
@@ -41,7 +51,7 @@ describe('HostName', () => {
     it('draws an ordinary https origin as a bare host, with no scheme and no port', () => {
       const el = renderHost('https://cdn.jsdelivr.net')
 
-      expect(el.textContent).toBe('cdn.jsdelivr.net')
+      expect(drawn(el)).toBe('cdn.jsdelivr.net')
       expect(el.querySelector('.erf-host__scheme')).toBeNull()
       expect(el.querySelector('.erf-host__port')).toBeNull()
     })
@@ -49,7 +59,7 @@ describe('HostName', () => {
     it('draws a non-default port, inside .erf-host__port', () => {
       const el = renderHost('https://example.com:8443')
 
-      expect(el.textContent).toBe('example.com:8443')
+      expect(drawn(el)).toBe('example.com:8443')
       expect(el.querySelector('.erf-host__port')?.textContent).toBe(':8443')
       // The scheme is still the default, so it stays undrawn even though the
       // port is not: the two parts are decided independently.
@@ -61,14 +71,14 @@ describe('HostName', () => {
       // URL parser drops it, so there is nothing unusual left to show.
       const el = renderHost('https://example.com:443')
 
-      expect(el.textContent).toBe('example.com')
+      expect(drawn(el)).toBe('example.com')
       expect(el.querySelector('.erf-host__port')).toBeNull()
     })
 
     it('draws a non-https scheme, inside .erf-host__scheme', () => {
       const el = renderHost('http://localhost:3000')
 
-      expect(el.textContent).toBe('http://localhost:3000')
+      expect(drawn(el)).toBe('http://localhost:3000')
       expect(el.querySelector('.erf-host__scheme')?.textContent).toBe('http://')
       expect(el.querySelector('.erf-host__port')?.textContent).toBe(':3000')
     })
@@ -80,10 +90,10 @@ describe('HostName', () => {
       // so the two are separate permissions. Drawing them identically would put a
       // working row and a dead one side by side, indistinguishable, in the list a
       // reader uses to decide what to trust.
-      expect(renderHost('https://evil.com./').textContent).toBe('evil.com.')
+      expect(drawn(renderHost('https://evil.com./'))).toBe('evil.com.')
       cleanup()
 
-      expect(renderHost('https://evil.com/').textContent).toBe('evil.com')
+      expect(drawn(renderHost('https://evil.com/'))).toBe('evil.com')
     })
   })
 
@@ -91,11 +101,11 @@ describe('HostName', () => {
     it('NEVER decodes punycode', () => {
       const el = renderHost('https://xn--80ak6aa92e.com')
 
-      expect(el.textContent).toBe('xn--80ak6aa92e.com')
+      expect(drawn(el)).toBe('xn--80ak6aa92e.com')
       // The decoded form, spelled out so the assertion cannot pass by accident:
       // а here is U+0430 CYRILLIC SMALL LETTER A, not U+0061.
       expect(el.textContent).not.toContain('аpple.com')
-      expect(el.getAttribute('aria-label')).toBe('https://xn--80ak6aa92e.com')
+      expect(announced(el)).toBe('https://xn--80ak6aa92e.com')
     })
 
     it('punycodes a U-label on the way in, which is the same defence', () => {
@@ -103,7 +113,7 @@ describe('HostName', () => {
       // therefore still reaches the eye as an A-label.
       const el = renderHost('https://مثال.evil.com')
 
-      expect(el.textContent).toBe('xn--mgbh0fb.evil.com')
+      expect(drawn(el)).toBe('xn--mgbh0fb.evil.com')
     })
   })
 
@@ -111,19 +121,19 @@ describe('HostName', () => {
     it('announces the full origin, including the parts that are not drawn', () => {
       const el = renderHost('https://cdn.jsdelivr.net')
 
-      expect(el.textContent).toBe('cdn.jsdelivr.net')
-      expect(el.getAttribute('aria-label')).toBe('https://cdn.jsdelivr.net')
+      expect(drawn(el)).toBe('cdn.jsdelivr.net')
+      expect(announced(el)).toBe('https://cdn.jsdelivr.net')
     })
 
     it('announces scheme and port together, normalised', () => {
-      expect(renderHost('http://localhost:3000').getAttribute('aria-label')).toBe(
+      expect(announced(renderHost('http://localhost:3000'))).toBe(
         'http://localhost:3000'
       )
       cleanup()
       // The announced origin agrees with the drawn one: same trailing dot kept,
       // no trailing slash the row never showed. A screen-reader user must be able
       // to tell the two grants apart exactly as a sighted one can.
-      expect(renderHost('https://evil.com./').getAttribute('aria-label')).toBe(
+      expect(announced(renderHost('https://evil.com./'))).toBe(
         'https://evil.com.'
       )
     })
@@ -131,7 +141,7 @@ describe('HostName', () => {
     it('prefixes the origin with labelPrefix when one is given', () => {
       const el = renderHost('https://example.com:8443', 'Blocked host')
 
-      expect(el.getAttribute('aria-label')).toBe('Blocked host https://example.com:8443')
+      expect(announced(el)).toBe('Blocked host https://example.com:8443')
     })
 
     it('never uses title, which is unreachable by keyboard and by touch', () => {
@@ -146,18 +156,22 @@ describe('HostName', () => {
 
       expect(el.querySelectorAll('wbr')).toHaveLength(3)
       // One string, no break hints and no whitespace where the hints sit.
-      expect(el.getAttribute('aria-label')).toBe('https://a.b.c.example')
+      expect(announced(el)).toBe('https://a.b.c.example')
     })
   })
 
   describe('break hints', () => {
     it('emits one <wbr> per dot of the host and none after the last label', () => {
       const el = renderHost('https://assets.tracking.example.co.uk')
+      // The hints live in the DRAWN copy. The announced copy is one flat string
+      // on purpose — a break hint is a layout instruction, and a screen reader
+      // has no business hearing the origin chopped into pieces.
+      const d = el.querySelector('.erf-host__drawn')
 
       // Four dots in `assets.tracking.example.co.uk`, so four hints.
       expect(el.querySelectorAll('wbr')).toHaveLength(4)
-      expect(el.lastChild?.nodeType).toBe(Node.TEXT_NODE)
-      expect(el.lastChild?.textContent).toBe('uk')
+      expect(d?.lastChild?.nodeType).toBe(Node.TEXT_NODE)
+      expect(d?.lastChild?.textContent).toBe('uk')
     })
 
     it('emits no <wbr> beside the scheme or the port', () => {
@@ -191,8 +205,8 @@ describe('HostName', () => {
     it('renders an unparseable value exactly as it arrived, without throwing', () => {
       const el = renderHost('not an origin at all')
 
-      expect(el.textContent).toBe('not an origin at all')
-      expect(el.getAttribute('aria-label')).toBe('not an origin at all')
+      expect(drawn(el)).toBe('not an origin at all')
+      expect(announced(el)).toBe('not an origin at all')
       expect(el.querySelector('.erf-host__scheme')).toBeNull()
       expect(el.querySelector('.erf-host__port')).toBeNull()
     })
@@ -203,16 +217,16 @@ describe('HostName', () => {
       // would print `example.com://` as a scheme and lose the port entirely.
       const el = renderHost('example.com:8443')
 
-      expect(el.textContent).toBe('example.com:8443')
+      expect(drawn(el)).toBe('example.com:8443')
       expect(el.querySelector('.erf-host__scheme')).toBeNull()
       expect(el.querySelector('.erf-host__port')).toBeNull()
-      expect(el.getAttribute('aria-label')).toBe('example.com:8443')
+      expect(announced(el)).toBe('example.com:8443')
     })
 
     it('does not escape into markup', () => {
       const el = renderHost('<img src=x onerror=alert(1)>')
 
-      expect(el.textContent).toBe('<img src=x onerror=alert(1)>')
+      expect(drawn(el)).toBe('<img src=x onerror=alert(1)>')
       expect(el.querySelector('img')).toBeNull()
     })
   })

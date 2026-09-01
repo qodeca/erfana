@@ -145,3 +145,28 @@
 .erf-host__port {
   white-space: nowrap;
 }
+
+/*
+ * The full origin, present for a screen reader and not for the eye.
+ *
+ * This used to be an `aria-label` on the `.erf-host` span. A bare span maps to
+ * role `generic`, where ARIA 1.2 PROHIBITS a name — so the scheme and port that
+ * the visual design deliberately de-emphasises were not reliably announced at
+ * all. `role="img"` would have satisfied the rule and announced every host in a
+ * permission list as an image. Real text has no role to argue about.
+ *
+ * `clip: rect(0 0 0 0)` rather than `display: none` or `visibility: hidden`,
+ * both of which remove the node from the accessibility tree along with the
+ * pixels — which is the entire thing being avoided here.
+ */
+.erf-host__announced {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}

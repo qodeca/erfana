@@ -367,6 +367,9 @@ export function PreviewChromeBand({
                   host={row.host}
                   kinds={row.kinds}
                   busy={state.mode.kind === 'approving'}
+                  // Same term the reservation uses, so the box regains focus on
+                  // exactly the render that makes it focusable again.
+                  visible={controlsAllowed}
                   onCancel={() => {
                     dispatch({ type: 'cancelConfirm' })
                     chip.current?.focus()

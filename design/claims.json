@@ -124,9 +124,16 @@
   "contrast-tertiary-on-panel": {
     "kind": "contrast",
     "card": "system/components/permission-band/index.html",
-    "label": "--color-text-tertiary on --color-bg-secondary",
+    "label": "--color-text-tertiary on --color-bg-primary",
     "foreground": "--color-text-tertiary",
-    "background": "--color-bg-secondary"
+    "background": "--color-bg-primary"
+  },
+  "contrast-secondary-on-band": {
+    "kind": "contrast",
+    "card": "system/components/permission-band/index.html",
+    "label": "--color-text-secondary on --color-bg-primary",
+    "foreground": "--color-text-secondary",
+    "background": "--color-bg-primary"
   },
   "contrast-input-border": {
     "kind": "contrast",
@@ -212,8 +219,8 @@
   "contrast-warning-on-panel": {
     "kind": "contrast",
     "card": "system/components/permission-band/index.html",
-    "label": "--color-warning on --color-bg-secondary",
+    "label": "--color-warning on --color-bg-tertiary",
     "foreground": "--color-warning",
-    "background": "--color-bg-secondary"
+    "background": "--color-bg-tertiary"
   }
 }

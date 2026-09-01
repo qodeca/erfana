@@ -84,13 +84,20 @@ export function PreviewBandRow({
        * refusal that names the wrong cause teaches them the band is unreliable,
        * which is worse than saying nothing.
        */
-      <span
-        className="erf-band__state"
-        // Short enough for the column, and the accessible name carries the whole
-        // reason. NOT `title`, which is unreachable by keyboard and by touch.
-        aria-label={reason.detail}
-      >
-        {reason.short}
+      <span className="erf-band__state">
+        {/*
+         * The whole reason as real text, and the short form for the eye.
+         *
+         * This was `aria-label` on a bare span, which maps to role `generic`
+         * where ARIA 1.2 prohibits a name — so the explanation could simply not
+         * be announced, leaving a buttonless row with no reason at all, which is
+         * the exact outcome the copy exists to prevent. `role="img"` would be
+         * worse here than on a host: it wraps a sentence.
+         *
+         * NOT `title` either, which is unreachable by keyboard and by touch.
+         */}
+        <span className="erf-band__reason-full">{reason.detail}</span>
+        <span aria-hidden="true">{reason.short}</span>
       </span>
     ) : (
       <button
