@@ -19,6 +19,14 @@ export interface IFileService {
   getProjectPath(): string | null
 
   /**
+   * Subscribe to project-root changes; the returned function unsubscribes.
+   * Fires only when the path actually differs from the previous one.
+   */
+  onProjectPathChanged(
+    listener: (oldPath: string | null, newPath: string | null) => void
+  ): () => void
+
+  /**
    * Read directory contents recursively
    */
   readDirectory(dirPath: string): Promise<FileNode[]>

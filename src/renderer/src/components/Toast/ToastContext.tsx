@@ -2,7 +2,6 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react'
 import { subscribeGlobalToasts } from './toastService'
-import { useOccluder } from '../../hooks/useOccluder'
 
 /**
  * An optional actionable button rendered inside a toast (design §5(c), item 64).
@@ -48,10 +47,10 @@ export function useToast() {
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([])
 
-  // Occlude the live preview view while any toast is shown (item 64): toasts
-  // paint above the preview at a modal z-index, so the WebContentsView must
-  // hide behind its still frame until the stack clears.
-  useOccluder('toast', toasts.length > 0)
+  // The 'toast' occluder is registered by `ToastNotification`, NOT here: it is
+  // conditional on the stack failing to find a position clear of the live
+  // preview, and only the renderer knows the geometry. Registering it here for
+  // every toast is what used to hide a preview the toast never covered.
 
   const showToast = useCallback((toast: Omit<Toast, 'id'>) => {
     const id = `toast-${Date.now()}-${Math.random()}`

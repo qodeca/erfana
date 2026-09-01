@@ -22,7 +22,7 @@
  *
  * @see docs/designs/216-claude-status-bar.md §3, §4, §8, §10
  */
-import { ipcMain, webContents, BrowserWindow, app } from 'electron'
+import { webContents, BrowserWindow, app } from 'electron'
 import type { IpcMainInvokeEvent } from 'electron'
 import { join } from 'path'
 import { pathToFileURL } from 'url'
@@ -41,6 +41,7 @@ import {
   ClaudeStatusChangePayloadSchema,
   type ClaudeStatusChangePayload
 } from '../../shared/ipc/claude-status-schema'
+import { registerHandle, unregisterHandle } from './registry'
 
 /**
  * Canonical `file://` URL of the bundled renderer entry point. MUST match
@@ -175,7 +176,7 @@ export function registerClaudeStatusHandlers(
    * Register (or re-register) a terminal panel for tracking. Looks up the
    * main-owned pid + cwd; an unknown terminalId (no cwd) is a no-op.
    */
-  ipcMain.handle(
+  registerHandle(
     ClaudeStatusChannels.REGISTER,
     async (event: IpcMainInvokeEvent, arg: unknown): Promise<void> => {
       if (!isTrustedSender(event)) {
@@ -216,7 +217,7 @@ export function registerClaudeStatusHandlers(
   )
 
   /** Unregister a terminal panel (idempotent; safe to double-call). */
-  ipcMain.handle(
+  registerHandle(
     ClaudeStatusChannels.UNREGISTER,
     async (event: IpcMainInvokeEvent, arg: unknown): Promise<void> => {
       if (!isTrustedSender(event)) {
@@ -245,7 +246,7 @@ export function registerClaudeStatusHandlers(
   )
 
   /** Activity-triggered light re-check for a terminal panel. */
-  ipcMain.handle(
+  registerHandle(
     ClaudeStatusChannels.NUDGE,
     async (event: IpcMainInvokeEvent, arg: unknown): Promise<void> => {
       if (!isTrustedSender(event)) {
@@ -280,9 +281,9 @@ export function registerClaudeStatusHandlers(
   return {
     service: statusService,
     dispose: async (): Promise<void> => {
-      ipcMain.removeHandler(ClaudeStatusChannels.REGISTER)
-      ipcMain.removeHandler(ClaudeStatusChannels.UNREGISTER)
-      ipcMain.removeHandler(ClaudeStatusChannels.NUDGE)
+      unregisterHandle(ClaudeStatusChannels.REGISTER)
+      unregisterHandle(ClaudeStatusChannels.UNREGISTER)
+      unregisterHandle(ClaudeStatusChannels.NUDGE)
       unwireWindowCleanup()
       await statusService.dispose()
     }

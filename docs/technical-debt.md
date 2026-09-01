@@ -544,7 +544,9 @@ Resolved by the #73 image-export work. The canonical extension list, the MIME ma
 
 **Severity**: Low
 
-**Impact**: The `subscribeProjectChanged` seam (`preview-handlers.ts`, `PreviewViewService.onProjectChanged`) passes nothing in production — `src/main/index.ts` calls `registerPreviewHandlers` with only `getProjectPath` + `globalSettings`, and no main-side project-changed observable exists (`ProjectService` uses an imperative `setProjectPath`). The renderer's idempotent `preview:close` is the sole teardown owner.
+**Impact**: The `subscribeProjectChanged` seam (`preview-handlers.ts`, `PreviewViewService.onProjectChanged`) passes nothing in production — `src/main/index.ts` calls `registerPreviewHandlers` with only `getProjectPath` + `globalSettings`, and no main-side project-changed observable exists (`ProjectService` uses an imperative `setProjectPath`). The renderer's idempotent `preview:close` is the sole teardown owner **for a project switch**.
+
+**Narrowed (2026-08-29), not closed.** Main now reaps a window's previews when the window itself goes away: `index.ts` subscribes `closed` per window and calls `PreviewViewService.closeWindow`, which drains that window's registry entries, invalidates their in-flight opens and releases the project refcount. That removes the quit-time `removeChildView` warning at source and closes the latent second-window leak. A **project switch** inside a surviving window still has no main-side teardown, which is what this entry remains open for.
 
 **Problem**: A renderer crash or reload **during** a project switch can strand a running preview against the old root and lock new opens with `PREVIEW_VIEW_LIMIT_REACHED`. Edge case.
 
@@ -571,6 +573,8 @@ Resolved by the #73 image-export work. The canonical extension list, the MIME ma
 **Severity**: Low
 
 **Impact**: `previewPathResolve.readExactly` buffers up to `PREVIEW.MAX_ASSET_BYTES` (25 MB) per request with no per-session in-flight-bytes budget. Many parallel subresource fetches to large in-project files can transiently pin hundreds of MB.
+
+  **Narrowed by sd-074b §4.7, not closed.** `MAX_CONCURRENT_ASSET_READS` is now a PROCESS-WIDE limiter with a bounded wait queue, rather than one limiter per session, so opening more previews no longer multiplies the bound; over the queue bound a read is shed with 503 and recorded as a failure instead of parking a URLLoader indefinitely. The per-read 25 MB ceiling and the absence of an in-flight BYTE budget remain.
 
 **Problem**: A self-inflicted DoS on the user's own project — no disclosure, and it aligns with the design's accepted-DoS posture (Erfana bounds its own work per reload, not the page's).
 
@@ -634,15 +638,19 @@ Resolved by the #73 image-export work. The canonical extension list, the MIME ma
 
 ### 43. HTML-preview in-app allowlist view/revoke UI deferred (UX-004, #74, 2026-08)
 
-**Severity**: Low
+**Severity**: Low when filed; **Medium** as of 2026-08-31 — see Impact.
 
 **Impact**: Settings carries a global on/off only; there is no in-app UI to see or revoke the per-project approved hosts. Removing an approval requires hand-editing `.erfana/settings.json`.
 
+Raised from Low because the approve flow was **unreachable** when this was filed: a host absent from the allowlist is refused by the CSP in the renderer, so the network filter never saw it and no prompt could appear. On a project with no approvals yet there was no route to approving anything at all. The #74 follow-up work closed that gap, so the one-way door is now one a reader can actually walk through — and every approval is written into the project, applies project-wide, survives restarts and reaches anyone who clones the repository (`docs/security.md` residual risk 5), with no way back from inside Erfana.
+
 **Problem**: The store/design built **only** `approveHost` (`PreviewAllowlistStore` has `approveHost` + `getHosts`; no revoke method, no list/revoke IPC channel, no bridge). Building the feature is new capability, not unwired plumbing: it needs `store.revokeHost`, `REVOKE`/`LIST` channels + handlers, a preload bridge, a schema, CSP-rebuild-on-revoke, a settings list UI and tests — out of #74 scope. Not release-blocking, since the allowlist is hand-editable.
+
+One extra obstacle found since: `PreviewViewService.applyApprovedHosts` returns early when no live view exists, so a revoke issued from a settings screen with no preview open has no CSP-rebuild path today.
 
 **Recommended Solution**: file a follow-up issue after #74 merges to build the view/revoke UI and its backend.
 
-**Status**: Deferred to a follow-up issue (QG-8 decision).
+**Status**: **Half resolved (2026-09-01).** The *seeing* half is built: the permission band (`components/PreviewChromeBand.tsx`) lists every approved host for the project alongside the blocked ones, seeded on open via `preview:allowlistChanged` — so a repository that arrives with hosts already approved by someone else now shows them, which nothing anywhere did before. The consent copy still states that approval permits remote code and data egress, is saved into the project, reaches anyone who clones it, and cannot be undone from Erfana. **What [#86](https://github.com/qodeca/erfana/issues/86) still owes is REVOKE**: `PreviewAllowlistStore` has no remove at any layer, so undoing an approval remains a hand-edit of `.erfana/settings.json`. See also [#81](https://github.com/qodeca/erfana/issues/81) for narrowing what a grant covers.
 
 ---
 

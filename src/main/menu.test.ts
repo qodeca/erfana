@@ -312,14 +312,27 @@ describe('Application Menu Creation', () => {
       expect(hasRole(viewMenu.submenu, 'toggleDevTools')).toBe(true)
     })
 
-    it('should include zoom controls', async () => {
+    it('should include zoom controls, as handlers rather than roles', async () => {
       const menu = await importMenuWithPlatform('darwin')
       const template = getTemplate(menu)
       const viewMenu = findMenu(template, 'View')
+      const labels = viewMenu.submenu.map((item) => item.label)
 
-      expect(hasRole(viewMenu.submenu, 'resetZoom')).toBe(true)
-      expect(hasRole(viewMenu.submenu, 'zoomIn')).toBe(true)
-      expect(hasRole(viewMenu.submenu, 'zoomOut')).toBe(true)
+      expect(labels).toEqual(expect.arrayContaining(['Actual Size', 'Zoom In', 'Zoom Out']))
+      for (const item of viewMenu.submenu) {
+        if (['Actual Size', 'Zoom In', 'Zoom Out'].includes(item.label ?? '')) {
+          expect(typeof item.click).toBe('function')
+          expect(item.accelerator).toBeTruthy()
+        }
+      }
+
+      // The built-in roles are deliberately gone. A menu accelerator is global to
+      // the app, so with a previewed page focused Cmd/Ctrl-+ would fire the role
+      // AND be forwarded into the page — zooming the host window and the page at
+      // once, in opposite directions as far as the reader is concerned.
+      expect(hasRole(viewMenu.submenu, 'resetZoom')).toBe(false)
+      expect(hasRole(viewMenu.submenu, 'zoomIn')).toBe(false)
+      expect(hasRole(viewMenu.submenu, 'zoomOut')).toBe(false)
     })
 
     it('should include togglefullscreen role', async () => {

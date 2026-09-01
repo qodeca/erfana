@@ -147,7 +147,8 @@ describe('Main Process - Window Creation', () => {
 
     // Mock menu module
     vi.doMock('./menu', () => ({
-      createApplicationMenu: vi.fn(() => ({}))
+      createApplicationMenu: vi.fn(() => ({})),
+      setPreviewZoomHandler: vi.fn()
     }))
 
     // Mock @electron-toolkit/utils
@@ -169,7 +170,10 @@ describe('Main Process - Window Creation', () => {
     // Mock service modules
     vi.doMock('./services/FileService', () => ({
       fileService: {
-        setProjectPath: vi.fn() // issue #59: clear project state on destroy
+        setProjectPath: vi.fn(), // issue #59: clear project state on destroy
+        getProjectPath: vi.fn(() => null),
+        // sd-074b §4.9: the preview handlers subscribe to project changes.
+        onProjectPathChanged: vi.fn(() => () => {})
       }
     }))
     vi.doMock('./services/FileWatcherService', () => ({
@@ -486,7 +490,8 @@ describe('Main Process - Window Creation', () => {
         }))
 
         vi.doMock('./menu', () => ({
-          createApplicationMenu: vi.fn(() => ({}))
+          createApplicationMenu: vi.fn(() => ({})),
+          setPreviewZoomHandler: vi.fn()
         }))
 
         vi.doMock('@electron-toolkit/utils', () => ({

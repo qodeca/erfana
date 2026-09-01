@@ -44,7 +44,7 @@ describe('createPreviewEmitters', () => {
     const target = makeTarget(true)
     const emit = createPreviewEmitters({ resolveTargets: () => [target] })
 
-    emit.hostBlocked('panel-1', 'cdn.example.com', true)
+    emit.hostBlocked('panel-1', 'cdn.example.com', true, ['script'], false)
 
     expect(target.send).not.toHaveBeenCalled()
   })
@@ -53,13 +53,15 @@ describe('createPreviewEmitters', () => {
     const target = makeTarget(false)
     const emit = createPreviewEmitters({ resolveTargets: () => [target] })
 
-    emit.hostBlocked('panel-1', 'cdn.example.com', true)
+    emit.hostBlocked('panel-1', 'cdn.example.com', true, ['script'], false)
 
     expect(target.send).toHaveBeenCalledTimes(1)
     expect(target.send).toHaveBeenCalledWith(PreviewEvents.HOST_BLOCKED, {
       panelId: 'panel-1',
       host: 'cdn.example.com',
-      approvable: true
+      approvable: true,
+      kinds: ['script'],
+      truncated: false
     })
   })
 
@@ -67,7 +69,7 @@ describe('createPreviewEmitters', () => {
     const target = makeTarget(false)
     const emit = createPreviewEmitters({ resolveTargets: () => [target] })
 
-    emit.hostBlocked('', 'cdn.example.com', true)
+    emit.hostBlocked('', 'cdn.example.com', true, ['script'], false)
 
     expect(target.send).not.toHaveBeenCalled()
     expect(mockLoggerWarn).toHaveBeenCalledTimes(1)

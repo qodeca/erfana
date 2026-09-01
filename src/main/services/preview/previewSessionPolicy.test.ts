@@ -73,10 +73,31 @@ describe('buildPreviewWebPreferences', () => {
     expect(withoutSession).toStrictEqual(PREVIEW_WEB_PREFERENCES)
   })
 
-  it('adds `session` as the sole runtime addition', () => {
+  it('adds `session` as the sole runtime addition when no preload is supplied', () => {
     const session = { marker: true } as unknown as Session
     const prefs = buildPreviewWebPreferences(session)
     expect(prefs.session).toBe(session)
+    expect(Object.prototype.hasOwnProperty.call(prefs, 'preload')).toBe(false)
+  })
+
+  it('adds the preview-page preload when the composition root supplies one', () => {
+    // sd-074b §5.1: the sealed page gains a ONE-WAY reporter, wired at the
+    // composition root because the path is environment-dependent.
+    const session = { marker: true } as unknown as Session
+    const prefs = buildPreviewWebPreferences(session, '/out/preload/previewPage.js')
+    expect(prefs.preload).toBe('/out/preload/previewPage.js')
+    // Everything else stays pinned.
+    expect(prefs.sandbox).toBe(true)
+    expect(prefs.contextIsolation).toBe(true)
+    expect(prefs.nodeIntegration).toBe(false)
+  })
+
+  it('omits the preload when the bundle was not found', () => {
+    // Missing bundle degrades to inert links, never to a preview that fails.
+    const session = { marker: true } as unknown as Session
+    expect(
+      Object.prototype.hasOwnProperty.call(buildPreviewWebPreferences(session, null), 'preload')
+    ).toBe(false)
   })
 
   it('pins the security-critical prefs and omits `preload`', () => {
@@ -89,7 +110,8 @@ describe('buildPreviewWebPreferences', () => {
     expect(PREVIEW_WEB_PREFERENCES.webviewTag).toBe(false)
     expect(PREVIEW_WEB_PREFERENCES.experimentalFeatures).toBe(false)
     expect(PREVIEW_WEB_PREFERENCES.devTools).toBe(false)
-    // `preload` is asserted by KEY absence, not by value.
+    // `preload` is still absent from the FROZEN LITERAL: it is environment
+    // dependent, so it is supplied per call instead (sd-074b §5.2).
     expect(Object.prototype.hasOwnProperty.call(PREVIEW_WEB_PREFERENCES, 'preload')).toBe(false)
   })
 

@@ -42,7 +42,7 @@ describe('PreviewRootRegistry', () => {
 
   it('builds the CSP from the supplied hosts', async () => {
     const registry = createPreviewRootRegistry()
-    const token = await registry.issue(root, ['assets.example.com'])
+    const token = await registry.issue(root, ['https://assets.example.com'])
 
     const csp = registry.resolve(token)?.csp
     expect(csp).toContain('https://assets.example.com')
@@ -71,12 +71,12 @@ describe('PreviewRootRegistry', () => {
     expect(before?.csp).toBe(buildPreviewCsp([]))
     expect(before?.csp).not.toContain('https://cdn.example.com')
 
-    registry.rebuildCsp(token, ['cdn.example.com'])
+    registry.rebuildCsp(token, ['https://cdn.example.com'])
 
     const after = registry.resolve(token)
     expect(after?.realRoot).toBe(realRoot)
     expect(after?.projectPath).toBe(root)
-    expect(after?.csp).toBe(buildPreviewCsp(['cdn.example.com']))
+    expect(after?.csp).toBe(buildPreviewCsp(['https://cdn.example.com']))
     expect(after?.csp).toContain('https://cdn.example.com')
   })
 

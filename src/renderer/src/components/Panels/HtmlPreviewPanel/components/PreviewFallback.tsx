@@ -6,8 +6,9 @@
  * The layer painted *behind* the native `WebContentsView`. While the view is
  * visible it paints over this; while it is hidden (inactive tab or an overlay)
  * this is what the user sees — a still frame captured on hide, or nothing (the
- * placeholder container's `var(--color-brand-black)` background shows through),
- * never a blank white rectangle (design §1.4).
+ * placeholder container's backdrop shows through), never a blank rectangle
+ * (design §1.4). That backdrop matches the native view's own: brand black
+ * before the page has painted, the page's paper colour afterwards.
  *
  * @module HtmlPreviewPanel/components/PreviewFallback
  */

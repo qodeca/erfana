@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { ipcMain, clipboard } from 'electron'
+import { clipboard } from 'electron'
 import type { IpcMainInvokeEvent } from 'electron'
 import { logger } from '../services/LoggingService'
 import { CLIPBOARD_CHANNELS } from '../../shared/ipc/clipboard-channels'
@@ -9,6 +9,7 @@ import {
   CLIPBOARD_MAX_TEXT_LENGTH
 } from '../../shared/ipc/clipboard-schema'
 import { isTrustedSender } from './senderValidation'
+import { registerHandle } from './registry'
 
 /**
  * Clipboard IPC Handlers
@@ -40,7 +41,7 @@ export function registerClipboardHandlers(): void {
    *
    * @returns Promise<string> — the clipboard text, or `''` on failure / untrusted sender
    */
-  ipcMain.handle(CLIPBOARD_CHANNELS.readText, async (event: IpcMainInvokeEvent): Promise<string> => {
+  registerHandle(CLIPBOARD_CHANNELS.readText, async (event: IpcMainInvokeEvent): Promise<string> => {
     if (!isTrustedSender(event)) {
       logger.warn('Rejected clipboard:readText from untrusted sender', {
         url: event.senderFrame?.url
@@ -68,7 +69,7 @@ export function registerClipboardHandlers(): void {
    * @param text - text to write (Zod-validated: string, max length bounded)
    * @returns Promise<boolean> — `true` on success, `false` on failure / reject / untrusted sender
    */
-  ipcMain.handle(
+  registerHandle(
     CLIPBOARD_CHANNELS.writeText,
     async (event: IpcMainInvokeEvent, text: unknown): Promise<boolean> => {
       if (!isTrustedSender(event)) {

@@ -44,7 +44,7 @@ Feature specifications live in `specs/`.
 
 Read the card for what you are changing. A card marked `status="decided"` is binding; `status="proposed"` means it is still a sketch — use it as the direction of travel, not as settled law.
 
-**Key rules**: Use `var(--color-*)`, `var(--space-*)`, `var(--text-*)` tokens. No hardcoded values. `border-radius: 0` always. These three are enforced by `npm run lint:css` in the required `Lint` job, so they fail before review rather than during it.
+**Key rules**: Use `var(--color-*)`, `var(--space-*)`, `var(--text-*)` tokens. No hardcoded values. `border-radius: 0` always. `npm run lint:css` in the required `Lint` job enforces **three** of these mechanically — no hex colours, no bare `z-index`, `border-radius` from the token only. **Spacing and typography tokens are convention, not enforcement**: `padding: 11px` and `font-size: 13px` both pass lint, so review for them by hand.
 
 **Numbers in a card are generated**, never typed: they come from `design/claims.json` via a runnable predicate over `src/`, and `scripts/design-claims.test.mjs` re-derives every one on each CI run. Do not hand-edit a number into a card — add a ledger entry.
 

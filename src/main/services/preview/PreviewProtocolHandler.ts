@@ -85,29 +85,45 @@ function errorResponse(status: number, headers?: Record<string, string>): Global
 }
 
 /** Acquire/release token pair bounding concurrent work. */
-interface ConcurrencyLimiter {
-  acquire(): Promise<void>
+export interface ConcurrencyLimiter {
+  /** `false` when the wait queue is full and nothing was acquired. */
+  acquire(): Promise<boolean>
   release(): void
 }
 
 /**
- * A per-session bound on how many asset reads buffer at once. Each read is
- * capped at `MAX_ASSET_BYTES`, so limiting concurrency bounds the peak
- * main-process memory a hostile page can force by fetching many large in-repo
- * assets simultaneously. The token is handed straight to the next waiter on
- * release, so the active count can never exceed `max`.
+ * A PROCESS-WIDE bound on how many asset reads buffer at once, with a bounded
+ * wait queue.
+ *
+ * Each read is capped at `MAX_ASSET_BYTES`, so limiting concurrency bounds the
+ * peak main-process memory a hostile page can force. The bound is global rather
+ * than per session (sd-074b §4.7): with several previews live, a per-session
+ * limit multiplies by the number of previews, which is exactly the amplification
+ * it was meant to prevent.
+ *
+ * The queue is bounded because a global limiter with an unbounded queue lets one
+ * page park every other preview's reads indefinitely. Over the queue bound the
+ * request is shed with 503 and recorded as a failure, so the user sees a badge
+ * entry instead of a page that silently never finishes loading.
+ *
+ * The token is handed straight to the next waiter on release, so the active
+ * count can never exceed `max`.
  */
-function createConcurrencyLimiter(max: number): ConcurrencyLimiter {
+export function createConcurrencyLimiter(max: number, maxQueued: number): ConcurrencyLimiter {
   let active = 0
   const waiters: Array<() => void> = []
   return {
-    async acquire(): Promise<void> {
+    async acquire(): Promise<boolean> {
       if (active < max) {
         active += 1
-        return
+        return true
+      }
+      if (waiters.length >= maxQueued) {
+        return false
       }
       await new Promise<void>((resolve) => waiters.push(resolve))
       // The token was handed over by release(); `active` already counts it.
+      return true
     },
     release(): void {
       const next = waiters.shift()
@@ -119,6 +135,15 @@ function createConcurrencyLimiter(max: number): ConcurrencyLimiter {
     }
   }
 }
+
+/**
+ * The limiter every preview session shares. Module scope is deliberate: the
+ * point of §4.7 is that the bound does NOT scale with the number of previews.
+ */
+const sharedAssetReadLimiter = createConcurrencyLimiter(
+  PREVIEW.MAX_CONCURRENT_ASSET_READS,
+  PREVIEW.MAX_QUEUED_ASSET_READS
+)
 
 /**
  * The request `destination` for step 10, read from the `sec-fetch-dest` request
@@ -202,7 +227,16 @@ async function handleRequestInner(
   // live in `resolveConfined`, which maps every failure to its §2.4 status. The
   // buffering read runs under a per-session concurrency bound so many large
   // in-repo assets fetched at once cannot exhaust main-process memory.
-  await limiter.acquire()
+  if (!(await limiter.acquire())) {
+    // Shed rather than queue without bound: a page that asks for hundreds of
+    // assets at once must not stall every other preview (sd-074b §4.7).
+    ctx.recordFailure({
+      type: 'network-error',
+      resourceUrlOrHost: segments.join('/'),
+      reasonCode: ErrorCode.PREVIEW_READ_BUDGET_EXCEEDED
+    })
+    return errorResponse(503)
+  }
   let resolved: PreviewResolveResult
   try {
     resolved = await resolveConfined(entry.realRoot, segments)
@@ -262,9 +296,11 @@ async function handleRequestInner(
  * reads are served (design §0, §2.5).
  */
 export function attach(session: Session, ctx: PreviewProtocolContext): () => void {
-  // One limiter per session so the bound is scoped to a single preview's reads.
-  const limiter = createConcurrencyLimiter(PREVIEW.MAX_CONCURRENT_ASSET_READS)
-  session.protocol.handle(PREVIEW_SCHEME, (request) => handleRequest(request, ctx, limiter))
+  // The limiter is SHARED across sessions: a per-session bound would multiply by
+  // the number of live previews (sd-074b §4.7).
+  session.protocol.handle(PREVIEW_SCHEME, (request) =>
+    handleRequest(request, ctx, sharedAssetReadLimiter)
+  )
   return () => {
     session.protocol.unhandle(PREVIEW_SCHEME)
   }

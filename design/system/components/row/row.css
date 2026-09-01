@@ -3,11 +3,26 @@
 /**
  * The row primitive — file tree, picker option, permission-band host.
  *
- * PROPOSED — not adopted. There is no home for this in src/ yet. Adopting it is
- * a MOVE, not a copy: the file goes to src/, and scripts/design-sync.mjs then
- * syncs it back here the way it syncs tokens.css, so this card renders what
- * actually ships. Two copies at once is how a design system starts describing an
- * app that no longer exists.
+ * PROPOSED — not adopted, but NOT greenfield either. An earlier version of this
+ * header said "there is no home for this in src/ yet", and that was false in the
+ * direction that matters: the app already ships this primitive, five times, under
+ * five class names.
+ *
+ *   src/renderer/src/components/ProjectTree/ProjectTree.css  .project-tree-item
+ *   src/renderer/src/components/Dialog/FilePickerDialog.css  .file-picker-item
+ *   src/renderer/src/components/Dialog/ScreenSelectDialog.css
+ *   src/renderer/src/components/Dialog/WindowPickerDialog.css
+ *   src/renderer/src/components/DockLayout/AppDockLayout.css
+ *
+ * `.project-tree-item.selected` (ProjectTree.css) is already character-for-
+ * character the selected rule this file decides — same `--color-bg-selected`,
+ * same 2px lime `border-left`. So adoption is a CONSOLIDATION, not a first
+ * implementation: one file moves to src/, four call sites re-point at it, and
+ * scripts/design-sync.mjs syncs it back here the way it syncs tokens.css.
+ * Budget for that, not for a move.
+ *
+ * The MOVE-not-copy rule still stands. Two editable copies at once is how a
+ * design system starts describing an app that no longer exists.
  *
  * Every class is prefixed `erf-`. That is not cosmetic. Mermaid puts
  * class="row" on gitGraph commit labels and on its generic label path, and the
@@ -60,97 +75,11 @@
 /* ---------- host ---------- */
 
 /*
- * A host loses its HEAD, never its tail: the registrable domain decides whether
- * it is safe, so it is the part that must survive. "…cdn.evil.com" is readable;
- * "cdn.jsdelivr…" is a trap.
- *
- * This used to be one element with `direction: rtl; unicode-bidi: plaintext`.
- * That was wrong in a way that mattered. `plaintext` DISCARDS the `direction`
- * value and derives the base direction from the content (bidi P2/P3); a hostname
- * starts with a Latin letter, so the paragraph came out left-to-right and the
- * elide moved back to the tail. The rule delivered the exact trap its own
- * comment said it prevented.
- *
- * Three near-miss repairs, all rejected:
- *   - Drop `plaintext` alone → the element becomes a real RTL paragraph, so an
- *     IDN with an RTL-script label, a port, or a trailing dot renders with its
- *     labels REORDERED. Legible and wrong is worse than a misplaced ellipsis.
- *   - Wrap in `direction: ltr` → puts the end edge back on the right. Trap returns.
- *   - `<bdi>` alone → bidi P2 skips characters inside an isolate, so P3 defaults
- *     to LTR. Tail-elide again.
- *
- * And the deeper problem: under `plaintext` the elide direction is chosen by the
- * attacker's string. A control that behaves differently depending on its input
- * is not a control.
- *
- * So the security property is a LAYOUT INVARIANT instead of a text-rendering
- * side effect. The component splits the host at the registrable-domain boundary;
- * only the prefix is allowed to shrink. No bidi trick is load-bearing.
- *
- *   <span class="erf-host" dir="ltr"
- *         aria-label="Blocked host cdn.evil.com, registrable domain evil.com">
- *     <span class="erf-host__prefix"><bdi>a-very-long-subdomain.cdn.</bdi></span
- *     ><bdi class="erf-host__registrable">evil.com</bdi>
- *   </span>
- *
- * Two things CSS cannot decide, which the card states in prose:
- *   - IDN policy. This defends against truncation, not against `аpple.com` with
- *     a Cyrillic а. Render the punycode A-label when the U-label mixes scripts.
- *   - The accessible name carries the FULL host. `title` is unreachable by
- *     keyboard and by touch, so it is not a substitute for aria-label.
+ * `.erf-host` MOVED to src/renderer/src/components/../styles/hostName.css and is
+ * synced back to ./host.css, which this card links alongside this file. One
+ * primitive, one definition — a second editable copy is how one of them stays
+ * wrong, which is exactly how the old bidi front-elide survived here for months.
  */
-/*
- * `min-width: 0` here, and `flex: 0 0 auto` on the domain, are the whole
- * mechanism. The host is allowed to shrink to nothing; the domain refuses to,
- * so every pixel of shrinking is taken out of the prefix, which elides. Past
- * that the host overflows its row and the PANEL scrolls — scrolling is a layout
- * cost, hiding half a domain is a security one.
- *
- * Two near-misses, both tried and measured here before this line was written:
- *   - `flex-wrap: wrap` — flex breaks lines BEFORE it shrinks items, so the
- *     prefix never gets a chance to elide and every host with a prefix drops
- *     onto two lines even when one would have fitted.
- *   - `min-width: min-content` — the prefix's long unbreakable string dominates
- *     the min-content size, so the host refuses to shrink at all and NOTHING
- *     truncates. Safe, and useless.
- */
-.erf-host {
-  display: inline-flex;
-  min-width: 0;
-  max-width: 100%;
-  direction: ltr;
-  unicode-bidi: isolate;   /* the host never reorders against the row around it */
-  white-space: nowrap;
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-}
-
-/* The only shrinkable part. Worst case it collapses to a bare ellipsis.
-   No `unicode-bidi` here: `plaintext` would restore an LTR base direction and
-   move the ellipsis back to the tail. The <bdi> child keeps the prefix's own
-   characters in order. */
-.erf-host__prefix {
-  flex: 0 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  direction: rtl;          /* end edge on the left → the ellipsis lands in FRONT */
-  text-align: left;
-}
-
-/*
- * Never shrinks, never elided. This is the invariant. `flex: 0 0 auto` is what
- * makes it real — it is the reason `min-width: min-content` on the parent
- * resolves to this element's width, so the host cannot be squeezed past it.
- *
- * Never `overflow: hidden` here, and never `text-overflow: ellipsis`.
- */
-.erf-host__registrable {
-  flex: 0 0 auto;
-  unicode-bidi: isolate;
-  font-weight: var(--font-semibold);   /* a second, non-colour cue */
-}
 
 /* ---------- git badge ---------- */
 

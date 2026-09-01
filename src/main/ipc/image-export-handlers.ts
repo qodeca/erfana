@@ -25,7 +25,7 @@
  * @see src/shared/ipc/image-export-schema.ts for the contract
  * @see src/main/services/imageExport/ImageExportService.ts for the pipeline
  */
-import { BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron'
+import { BrowserWindow, type IpcMainInvokeEvent } from 'electron'
 import { ErrorCode, ERROR_MESSAGES } from '../../shared/errors'
 import { IMAGE_EXPORT_CHANNELS } from '../../shared/ipc/image-export-channels'
 import {
@@ -37,6 +37,7 @@ import { imageExportService } from '../services/imageExport/ImageExportService'
 import { logger } from '../services/LoggingService'
 import { redactPath, redactedLogError } from '../utils/redactUserInput'
 import { isTrustedSender } from './senderValidation'
+import { registerHandle } from './registry'
 
 /** Build the single failure shape this channel returns. */
 function refuse(code: ImageExportErrorCode): ImageExportResponse {
@@ -53,7 +54,7 @@ function refuse(code: ImageExportErrorCode): ImageExportResponse {
  * Call once during app startup from `src/main/index.ts`.
  */
 export function registerImageExportHandlers(): void {
-  ipcMain.handle(
+  registerHandle(
     IMAGE_EXPORT_CHANNELS.RUN,
     async (event: IpcMainInvokeEvent, request: unknown): Promise<ImageExportResponse> => {
       if (!isTrustedSender(event)) {

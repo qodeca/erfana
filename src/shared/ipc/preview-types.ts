@@ -15,6 +15,7 @@
  */
 
 import type { ErrorCode } from '../errors'
+import type { PreviewBlockedKind } from './previewBlockedKind'
 
 /** A rectangle in the coordinate space of the host window content view. */
 export interface PreviewBounds {
@@ -44,6 +45,7 @@ export type PreviewFailureType =
   | 'unresolved-specifier'
   | 'allowlist-invalid'
   | 'allowlist-unsupported-version'
+  | 'blocked-link'
 
 /** What a producer hands to `PreviewFailureLog.record`; `id`/`timestamp` are added there. */
 export interface PreviewFailureInput {
@@ -109,12 +111,51 @@ export interface PreviewEmitters {
     failures: readonly PreviewFailureInput[],
     truncated: boolean
   ): void
-  hostBlocked(panelId: string, host: string, approvable: boolean): void
+  hostBlocked(
+    panelId: string,
+    host: string,
+    approvable: boolean,
+    kinds: readonly PreviewBlockedKind[],
+    truncated: boolean
+  ): void
+  /** The project's approved-host set changed, or is being seeded on open. */
+  allowlistChanged(panelId: string, hosts: readonly string[]): void
+  /** A visibility change was APPLIED to the native view. */
+  visibilityApplied(panelId: string, visible: boolean): void
   findResult(r: PreviewFindResult): void
   stillFrameChanged(panelId: string, frame: PreviewStillFrame): void
   loadStateChanged(
     panelId: string,
-    state: 'idle' | 'loading' | 'ready' | 'failed',
+    state: 'idle' | 'loading' | 'ready' | 'failed' | 'suspended',
     dropped: number
+  ): void
+  /**
+   * The colour behind the page changed. `color` is `#RRGGBB`; the renderer
+   * paints it on the placeholder so the DOM and the native view always carry the
+   * same value (the invariant replacing sd-074 §1.8's "both are brand black").
+   */
+  backdropChanged(panelId: string, color: string): void
+  /**
+   * A bounds push that asked for confirmation has been applied AND the page has
+   * repainted at the new size.
+   *
+   * Only the renderer knows which push it cares about, so the `seq` it sent
+   * comes back with it.
+   */
+  boundsApplied(panelId: string, seq: number): void
+  /**
+   * A link inside the previewed page resolved to a project file that should
+   * open as an Erfana tab (sd-074b §5.4).
+   *
+   * Deliberately carries NO panel kind: main answers only "is this a real,
+   * confined, in-project path", and `resolvePanelKind` in the renderer stays the
+   * single owner of which panel type a file opens in — the same rule the project
+   * tree and the terminal follow.
+   */
+  openFileRequested(
+    sourcePanelId: string,
+    filePath: string,
+    anchor: string | null,
+    windowId?: number
   ): void
 }

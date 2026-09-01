@@ -33,7 +33,7 @@ import { DependencyDetector, converterRegistry, getExtensionsForDependencies } f
 import { FORCE_CRASH_ARG } from '../shared/constants'
 import { IMPORT_CHANNELS } from '../shared/ipc/import-channels'
 import type { DependencyReadyEvent } from '../shared/ipc/import-schema'
-import { createApplicationMenu } from './menu'
+import { createApplicationMenu, setPreviewZoomHandler } from './menu'
 import { fileService } from './services/FileService'
 import { fileWatcherService } from './services/FileWatcherService'
 import { directoryWatcherService } from './services/DirectoryWatcherService'
@@ -131,7 +131,11 @@ function isRendererGone(win: BrowserWindow): boolean {
 let claudeStatusHandlers: { dispose: () => Promise<void> } | null = null
 
 /** HTML preview handler bundle (#74); disposed on app shutdown. */
-let previewHandlers: { dispose: () => Promise<void> } | null = null
+let previewHandlers: {
+  dispose: () => Promise<void>
+  zoomFocused: (step: number) => Promise<boolean>
+  closeWindow: (windowId: number) => Promise<void>
+} | null = null
 
 // WebGL Command Line Switches (originally added for Electron 33+)
 // Fixes WebGL context creation issues and terminal flickering in production builds
@@ -267,6 +271,23 @@ function createWindow(): BrowserWindow {
   // This prevents stale watchers and terminal processes from accumulating
   // CRITICAL: Must also clear project state so new window can re-open the same project
   const webContentsId = mainWindow.webContents.id
+
+  // Previews belong to a WINDOW, so they are reaped when the window goes — the
+  // same rule watchers, terminals and git already follow below. Without this the
+  // only teardown was the app-level disposer at `before-quit`, which runs AFTER
+  // `mainWindowRef.destroy()`: every view was detached from a dead window and
+  // logged a teardown warning on each clean exit, and a second window's views
+  // would simply have leaked.
+  const previewWindowId = mainWindow.id
+  mainWindow.on('closed', () => {
+    void previewHandlers?.closeWindow(previewWindowId).catch((error) => {
+      logger.warn('Preview teardown on window close failed', {
+        windowId: previewWindowId,
+        error: error instanceof Error ? error.message : String(error)
+      })
+    })
+  })
+
   mainWindow.webContents.on('destroyed', () => {
     logger.info('WebContents destroyed, cleaning up services', { webContentsId })
 
@@ -362,7 +383,11 @@ app.whenReady().then(async () => {
     () => gitWatcherService.isWatching()
   )
 
-  // Register IPC handlers
+  // Register IPC handlers. Every global channel is gated on the app's own
+  // top-level renderer by construction: the handlers register through
+  // `src/main/ipc/registry.ts`, and an ESLint rule stops `ipcMain` being
+  // imported anywhere else (sd-074b §7). There is no install step to forget and
+  // no ordering to get wrong.
   registerFileHandlers()
   registerFileWatcherHandlers()
   registerDirectoryWatcherHandlers()
@@ -393,8 +418,19 @@ app.whenReady().then(async () => {
   // built inside the composition root.
   previewHandlers = registerPreviewHandlers({
     getProjectPath: () => fileService.getProjectPath(),
+    // Main-side teardown on project switch. Until now this seam had no
+    // producer, so only the renderer's own `preview:close` tore views down
+    // (sd-074b §4.9).
+    subscribeProjectChanged: (listener) => fileService.onProjectPathChanged(listener),
     globalSettings: globalSettingsService
   })
+
+  // Route View-menu zoom to a focused previewed page. A menu accelerator is
+  // global to the app, so with a preview focused Cmd/Ctrl-+ would otherwise fire
+  // the menu AND be forwarded to the page — zooming the window and the page at
+  // once. The menu holds a late-bound handler because it is installed before this
+  // graph exists.
+  setPreviewZoomHandler((step) => previewHandlers?.zoomFocused(step) ?? Promise.resolve(false))
 
   // RELIABILITY FIX (todo012): Clean up stale projects on startup
   // This runs asynchronously but doesn't block window creation

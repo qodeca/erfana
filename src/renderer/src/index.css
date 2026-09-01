@@ -9,6 +9,10 @@
 /* Project-level utility classes (text selection policy, etc.) - load after tokens, before components */
 @import './styles/utilities.css';
 
+/* The hostname primitive. A shared design-system component, synced back into
+   design/ by scripts/design-sync.mjs — see the file header. */
+@import './styles/hostName.css';
+
 html, body, #root {
   width: 100%;
   height: 100%;

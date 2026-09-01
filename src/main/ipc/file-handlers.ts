@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { ipcMain, dialog, BrowserWindow, shell } from 'electron'
+import { dialog, BrowserWindow, shell } from 'electron'
 import { stat, realpath } from 'fs/promises'
 import path from 'path'
 import { ProjectService } from '../services/ProjectService'
@@ -20,6 +20,7 @@ import { fileExists } from '../utils/fileUtils'
 import { redactedLogError } from '../utils/redactUserInput'
 import { assertInsideProject, assertNoConfinementEscape } from '../utils/projectConfinement'
 import { isTrustedSender } from './senderValidation'
+import { registerHandle } from './registry'
 
 /**
  * Broadcast project change to all renderer processes
@@ -72,7 +73,7 @@ async function openProjectByPath(newProjectPath: string): Promise<string> {
 
 export function registerFileHandlers(): void {
   // Open project folder via dialog
-  ipcMain.handle('file:openProject', async () => {
+  registerHandle('file:openProject', async () => {
     const result = await dialog.showOpenDialog({
       properties: ['openDirectory', 'createDirectory'],
       title: 'Select Project Folder',
@@ -88,7 +89,7 @@ export function registerFileHandlers(): void {
   })
 
   // Open project folder by path (for recent projects, etc.)
-  ipcMain.handle('file:openProjectByPath', async (_event, projectPath: string) => {
+  registerHandle('file:openProjectByPath', async (_event, projectPath: string) => {
     // Input validation
     if (!projectPath || typeof projectPath !== 'string') {
       throw new Error('Invalid project path: must be a non-empty string')
@@ -104,7 +105,7 @@ export function registerFileHandlers(): void {
   })
 
   // Get last opened project path if it still exists
-  ipcMain.handle('file:getLastProjectPath', async () => {
+  registerHandle('file:getLastProjectPath', async () => {
     const lastPath = await settingsService.getLastProjectPath()
     if (!lastPath) {
       return null
@@ -140,7 +141,7 @@ export function registerFileHandlers(): void {
   })
 
   // Read directory structure
-  ipcMain.handle('file:readDirectory', async (_event, dirPath: string) => {
+  registerHandle('file:readDirectory', async (_event, dirPath: string) => {
     try {
       const start = performance.now()
       const result = await fileService.readDirectory(dirPath)
@@ -158,7 +159,7 @@ export function registerFileHandlers(): void {
   // Confined to the open project, symlinks resolved: the file watcher re-reads
   // a watched path automatically now, so a one-shot user-initiated read became
   // a repeating one an outside party can clock (issue #70, security MEDIUM-2).
-  ipcMain.handle('file:readFile', async (_event, filePath: string) => {
+  registerHandle('file:readFile', async (_event, filePath: string) => {
     try {
       await assertInsideProject(filePath, fileService.getProjectPath())
       return await fileService.readFile(filePath)
@@ -169,7 +170,7 @@ export function registerFileHandlers(): void {
   })
 
   // Write file content
-  ipcMain.handle('file:writeFile', async (_event, filePath: string, content: string) => {
+  registerHandle('file:writeFile', async (_event, filePath: string, content: string) => {
     try {
       await fileService.writeFile(filePath, content)
       return true
@@ -187,7 +188,7 @@ export function registerFileHandlers(): void {
   // enforced is that a path that *looks* in-project may not resolve out of it
   // through a symlink, so the watcher's automatic re-stat of a watched file
   // cannot be pointed elsewhere (issue #70).
-  ipcMain.handle('file:getStats', async (_event, filePath: string) => {
+  registerHandle('file:getStats', async (_event, filePath: string) => {
     try {
       await assertNoConfinementEscape(filePath, fileService.getProjectPath())
       const stats = await fileService.getFileStats(filePath)
@@ -215,17 +216,17 @@ export function registerFileHandlers(): void {
   // Existence check that never throws (fs.access). Used by callers that only
   // need a boolean (e.g. markdown link resolution) — avoids the noise and
   // fragile error-string parsing of catching file:getStats' ENOENT.
-  ipcMain.handle('file:exists', async (_event, filePath: string): Promise<boolean> => {
+  registerHandle('file:exists', async (_event, filePath: string): Promise<boolean> => {
     return fileExists(filePath)
   })
 
   // Get current project path
-  ipcMain.handle('file:getProjectPath', async () => {
+  registerHandle('file:getProjectPath', async () => {
     return fileService.getProjectPath()
   })
 
   // Close current project
-  ipcMain.handle('file:closeProject', async () => {
+  registerHandle('file:closeProject', async () => {
     const oldProjectPath = fileService.getProjectPath()
 
     if (!oldProjectPath) return true
@@ -256,7 +257,7 @@ export function registerFileHandlers(): void {
   })
 
   // Create new file
-  ipcMain.handle('file:createFile', async (_event, dirPath: string, fileName: string) => {
+  registerHandle('file:createFile', async (_event, dirPath: string, fileName: string) => {
     try {
       // Validate inputs
       if (!dirPath || typeof dirPath !== 'string') {
@@ -283,7 +284,7 @@ export function registerFileHandlers(): void {
   })
 
   // Create new folder
-  ipcMain.handle('file:createFolder', async (_event, dirPath: string, folderName: string) => {
+  registerHandle('file:createFolder', async (_event, dirPath: string, folderName: string) => {
     try {
       // Validate inputs
       if (!dirPath || typeof dirPath !== 'string') {
@@ -310,7 +311,7 @@ export function registerFileHandlers(): void {
   })
 
   // Delete file
-  ipcMain.handle('file:deleteFile', async (_event, filePath: string) => {
+  registerHandle('file:deleteFile', async (_event, filePath: string) => {
     try {
       // Validate input
       if (!filePath || typeof filePath !== 'string') {
@@ -326,7 +327,7 @@ export function registerFileHandlers(): void {
   })
 
   // Delete folder
-  ipcMain.handle('file:deleteFolder', async (_event, folderPath: string) => {
+  registerHandle('file:deleteFolder', async (_event, folderPath: string) => {
     try {
       // Validate input
       if (!folderPath || typeof folderPath !== 'string') {
@@ -342,7 +343,7 @@ export function registerFileHandlers(): void {
   })
 
   // Rename file or folder
-  ipcMain.handle('file:rename', async (_event, oldPath: string, newName: string) => {
+  registerHandle('file:rename', async (_event, oldPath: string, newName: string) => {
     try {
       // Validate inputs
       if (!oldPath || typeof oldPath !== 'string') {
@@ -369,7 +370,7 @@ export function registerFileHandlers(): void {
   })
 
   // Move file or folder
-  ipcMain.handle('file:moveItem', async (_event, sourcePath: string, targetParentPath: string, newName?: string, replaceExisting?: boolean) => {
+  registerHandle('file:moveItem', async (_event, sourcePath: string, targetParentPath: string, newName?: string, replaceExisting?: boolean) => {
     try {
       // Validate inputs
       if (!sourcePath || typeof sourcePath !== 'string') {
@@ -403,7 +404,7 @@ export function registerFileHandlers(): void {
   })
 
   // Copy file or folder
-  ipcMain.handle('file:copyItem', async (_event, sourcePath: string, targetParentPath: string, newName?: string) => {
+  registerHandle('file:copyItem', async (_event, sourcePath: string, targetParentPath: string, newName?: string) => {
     try {
       // Validate inputs
       if (!sourcePath || typeof sourcePath !== 'string') {
@@ -434,7 +435,7 @@ export function registerFileHandlers(): void {
   })
 
   // Check name conflict
-  ipcMain.handle('file:checkConflict', async (_event, targetParentPath: string, itemName: string) => {
+  registerHandle('file:checkConflict', async (_event, targetParentPath: string, itemName: string) => {
     try {
       // Validate inputs
       if (!targetParentPath || typeof targetParentPath !== 'string') {
@@ -467,7 +468,7 @@ export function registerFileHandlers(): void {
   // The skip exists because the image viewer re-reads on every disk change and
   // the base64 encode blocks the main-process event loop; see
   // src/main/services/file/imageRead.ts for why the version is safe to trust.
-  ipcMain.handle(
+  registerHandle(
     'file:readImage',
     async (_event, filePath: string, knownVersion?: string): Promise<ImageReadResponse> => {
       try {
@@ -505,7 +506,7 @@ export function registerFileHandlers(): void {
   // re-checked against fs.realpath-canonicalized paths so an in-project symlink
   // cannot point the reveal at an out-of-project target. realpath also subsumes
   // the existence check.
-  ipcMain.handle(
+  registerHandle(
     'file:revealInFileManager',
     async (event, filePath: string): Promise<string> => {
       if (!isTrustedSender(event)) {
@@ -564,7 +565,7 @@ export function registerFileHandlers(): void {
   // 1. Terminal output comes from user-initiated commands (not external input)
   // 2. The user can already see and access any file path shown in their terminal
   // 3. This handler only checks existence, it doesn't read or modify files
-  ipcMain.handle('file:validatePath', async (_event, filePath: string, projectRoot?: string) => {
+  registerHandle('file:validatePath', async (_event, filePath: string, projectRoot?: string) => {
     try {
       // Validate input
       if (!filePath || typeof filePath !== 'string') {

@@ -16,14 +16,15 @@
  *
  * @see docs/designs/sd-074-html-preview.md §4.4, §5(a)
  */
-import { BrowserWindow, type Session } from 'electron'
+import { BrowserWindow, dialog, shell, type Session } from 'electron'
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 import type { WatchOptions } from 'chokidar'
 import { PREVIEW } from '../../../shared/constants'
 import type { GlobalSettings } from '../../../shared/ipc/global-settings-schema'
 import { createPreviewRootRegistry } from '../../services/preview/PreviewRootRegistry'
 import { createPreviewAllowlistStore } from '../../services/preview/PreviewAllowlistStore'
 import { createPreviewSessionFactory } from '../../services/preview/PreviewSessionFactory'
-import { createPreviewHostBlockNotifier } from '../../services/preview/PreviewHostBlockNotifier'
 import { createPreviewStillFrameCache } from '../../services/preview/PreviewStillFrameCache'
 import { createPreviewExportController } from '../../services/preview/PreviewExportController'
 import { createGitignoreEvaluator } from '../../services/preview/GitignoreEvaluator'
@@ -87,7 +88,108 @@ const PREVIEW_ENTRY_WATCH_OVERRIDES: Partial<WatchOptions> = {
 function defaultResolveEmitTargets(): readonly PreviewEmitTarget[] {
   return BrowserWindow.getAllWindows()
     .filter((win) => !win.isDestroyed())
-    .map((win) => win.webContents)
+    .map((win) => {
+      // Carry the window id so an acting event (`openFileRequested`) can be sent
+      // to exactly the window whose preview asked for it.
+      const target = win.webContents as unknown as PreviewEmitTarget & { windowId?: number }
+      return Object.assign(target, { windowId: win.id })
+    })
+}
+
+/**
+ * Show where an external link goes, then open it only if the user agrees
+ * (sd-074b §5.5).
+ *
+ * The URL has already been parsed and allow-listed by the navigation policy, and
+ * the click was a genuine user gesture — but a gesture is not informed consent.
+ * A previewed page owns its whole viewport and can move an anchor under the
+ * cursor between mousedown and click, and the preview has no address bar, no
+ * status bar and no hover-URL, so the destination is otherwise invisible.
+ *
+ * The destination shown is the ORIGIN (or the address for `mailto:`), not the
+ * full URL: it is the part that decides where you actually end up, and it keeps
+ * a hostile path or query from filling the dialog.
+ *
+ * Cancel is the default button, so dismissing the dialog opens nothing.
+ *
+ * SERIALISED. Link routing is fire-and-forget (`void routeLinkActivation(…)`),
+ * so without a queue several activations could each open a modal and stack them
+ * on top of one another — consent fatigue at best, an unusable app at worst
+ * (lens review F1). One dialog is in flight at a time, process-wide.
+ */
+let externalConfirmChain: Promise<void> = Promise.resolve()
+
+async function confirmThenOpenExternal(url: string): Promise<void> {
+  const run = externalConfirmChain.then(() => showConfirmAndOpen(url))
+  // Keep the chain alive even if this link's dialog or hand-off rejects; a
+  // failure must not wedge every later external link.
+  externalConfirmChain = run.catch(() => undefined)
+  return run
+}
+
+/**
+ * What the consent dialog names as the destination.
+ *
+ * `URL.origin` is the STRING `"null"` for every non-special scheme — `tel:`,
+ * `sms:`, `mailto:` — and `"null"` is truthy, so `origin || protocol` printed
+ * the literal word "null" as the destination. That dialog is the only thing
+ * between an untrusted page and an OS hand-off, and for those schemes it named
+ * nothing at all.
+ *
+ * Never the full href: it is attacker-controlled, so it is both a leak surface
+ * (a `mailto:` body, a query string) and a log/UI-injection surface. Scheme plus
+ * the addressed target is enough to decide with.
+ */
+export function describeExternalDestination(url: string): string {
+  let parsed: URL
+  try {
+    parsed = new URL(url)
+  } catch {
+    return '(unparseable link)'
+  }
+  if (parsed.origin !== 'null' && parsed.origin !== '') {
+    return parsed.origin
+  }
+  // Opaque-origin scheme: the pathname carries the number or address.
+  const target = parsed.pathname
+  return target === '' ? parsed.protocol : `${parsed.protocol}${target}`
+}
+
+async function showConfirmAndOpen(url: string): Promise<void> {
+  const destination = describeExternalDestination(url)
+
+  const { response } = await dialog.showMessageBox({
+    type: 'question',
+    buttons: ['Cancel', 'Open'],
+    defaultId: 0,
+    cancelId: 0,
+    message: 'Open this link outside Erfana?',
+    detail: `The preview wants to open:\n\n${destination}`
+  })
+
+  if (response === 1) {
+    await shell.openExternal(url)
+  }
+}
+
+/**
+ * Absolute path of the built preview-page preload, or `null` when it is missing.
+ *
+ * Resolved HERE, at the composition root, and existence-checked — the frozen
+ * `PREVIEW_WEB_PREFERENCES` literal must stay environment-independent, and
+ * `__dirname` differs between a build and Vitest (sd-074b §5.2). A missing
+ * bundle is logged loudly and degrades to inert links rather than a preview that
+ * fails to open, mirroring `ScreenshotOverlayWindow`'s existsSync gate.
+ */
+function resolvePreviewPagePreload(): string | null {
+  const preloadPath = join(__dirname, '../preload/previewPage.js')
+  if (!existsSync(preloadPath)) {
+    logger.error('Preview page preload missing; links inside previews will not work', undefined, {
+      preloadPath
+    })
+    return null
+  }
+  return preloadPath
 }
 
 /** The host window's zoom factor, or 1 when no window is available. */
@@ -113,8 +215,11 @@ export function buildPreviewGraph(deps: BuildPreviewGraphDeps): PreviewGraph {
     // and carries no panel context, so it cannot address a per-view failure log.
     onBadge: (badge) => logger.warn('Preview allowlist badge', { type: badge.type })
   })
-  const sessionFactory = createPreviewSessionFactory({ registry, allowlistStore })
-  const hostBlockNotifier = createPreviewHostBlockNotifier()
+  const sessionFactory = createPreviewSessionFactory({
+    registry,
+    allowlistStore,
+    previewPagePreloadPath: resolvePreviewPagePreload()
+  })
   const stillFrameCache = createPreviewStillFrameCache()
   const exportController = createPreviewExportController()
   const gitignore = createGitignoreEvaluator()
@@ -129,7 +234,7 @@ export function buildPreviewGraph(deps: BuildPreviewGraphDeps): PreviewGraph {
       // Bridge the narrow structural session type to electron's own `Session`.
       purge: (session) => purgePreviewSession(session as unknown as Session)
     },
-    hostBlockNotifier,
+    getAllowedHosts: () => [...allowlistStore.getOrigins()],
     emit: emitters,
     createWatchCoordinator: (realRoot, onChanged) =>
       createPreviewWatchCoordinator({
@@ -143,6 +248,8 @@ export function buildPreviewGraph(deps: BuildPreviewGraphDeps): PreviewGraph {
         onChanged
       }),
     createReloadPolicy: (onDecision) => createPreviewReloadPolicy({ onDecision }),
+    // The OS hand-off for an external link, behind a confirmation.
+    openExternal: (url) => confirmThenOpenExternal(url),
     createFindController: (wc, onCount) =>
       createPreviewFindController(wc as unknown as PreviewFindContents, onCount),
     createFailureLog: (onEmit) => createPreviewFailureLog({ onEmit }),

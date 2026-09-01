@@ -224,6 +224,20 @@ export enum ErrorCode {
   PREVIEW_LOCAL_FILE_MISSING = 'PREVIEW_LOCAL_FILE_MISSING',
   PREVIEW_VIEW_LIMIT_REACHED = 'PREVIEW_VIEW_LIMIT_REACHED',
   PREVIEW_ALLOWLIST_FULL = 'PREVIEW_ALLOWLIST_FULL',
+  PREVIEW_READ_BUDGET_EXCEEDED = 'PREVIEW_READ_BUDGET_EXCEEDED',
+  PREVIEW_LINK_BLOCKED = 'PREVIEW_LINK_BLOCKED',
+  /**
+   * An open was abandoned because something newer overtook it — a project
+   * switch, a close, a suspend, or another open for the same panel.
+   *
+   * Distinct from `PROJECT_NOT_FOUND`, which previously carried this meaning as
+   * well as its own. The renderer could not tell "there is no project" from
+   * "your open was superseded", so a benign race — the exact outcome the
+   * staleness guard exists to produce — latched the panel into a failure banner
+   * for the rest of its mount (lens review F27). This is a no-op for the
+   * renderer, not a failure.
+   */
+  PREVIEW_OPEN_SUPERSEDED = 'PREVIEW_OPEN_SUPERSEDED',
 
   // Generic errors
   UNKNOWN_ERROR = 'UNKNOWN_ERROR'
@@ -449,6 +463,10 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.PREVIEW_LOCAL_FILE_MISSING]: '"<path>" could not be read',
   [ErrorCode.PREVIEW_VIEW_LIMIT_REACHED]: 'A preview is already open.',
   [ErrorCode.PREVIEW_ALLOWLIST_FULL]: 'The preview host allowlist is full.',
+  [ErrorCode.PREVIEW_READ_BUDGET_EXCEEDED]:
+    'The preview asked for too many files at once; some were not loaded.',
+  [ErrorCode.PREVIEW_LINK_BLOCKED]: 'That link was blocked.',
+  [ErrorCode.PREVIEW_OPEN_SUPERSEDED]: 'The preview was replaced before it finished opening.',
 
   // Generic errors
   [ErrorCode.UNKNOWN_ERROR]: 'An unexpected error occurred'

@@ -96,7 +96,7 @@ describe('PreviewRequestFilter registration', () => {
 
   it('detach removes all listeners and stops the sweep', () => {
     const s = makeSession()
-    const { ctx, onBlocked } = makeContext(['cdn.example'])
+    const { ctx, onBlocked } = makeContext(['https://cdn.example'])
     const detach = attach(s.session, ctx, FILTER_DEPS)
 
     const listener = s.onBeforeRequest.mock.calls[0][0] as OnBeforeListener
@@ -117,7 +117,7 @@ describe('PreviewRequestFilter registration', () => {
 describe('PreviewRequestFilter gating', () => {
   it('cancels a request to an unapproved host and badges it', () => {
     const s = makeSession()
-    const { ctx, onBlocked, onRequestStarted } = makeContext(['cdn.jsdelivr.net'])
+    const { ctx, onBlocked, onRequestStarted } = makeContext(['https://cdn.jsdelivr.net'])
     attach(s.session, ctx, FILTER_DEPS)
     const listener = s.onBeforeRequest.mock.calls[0][0] as OnBeforeListener
 
@@ -128,15 +128,20 @@ describe('PreviewRequestFilter gating', () => {
     expect(onRequestStarted).not.toHaveBeenCalled()
     expect(onBlocked).toHaveBeenCalledWith(
       'blocked-host',
-      'evil.example',
+      // The blocked IDENTITY is the ORIGIN, so the row the reader is offered is
+      // the thing that was actually refused — port included.
+      'https://evil.example',
       'https://evil.example/collect',
-      true
+      true,
+      // The default `resourceType` in this harness is `xhr`, which maps to
+      // `connect` — what the consent row will say the host wanted to do.
+      'connect'
     )
   })
 
   it('allows an approved host and marks it started (no badge)', () => {
     const s = makeSession()
-    const { ctx, onBlocked, onRequestStarted } = makeContext(['cdn.jsdelivr.net'])
+    const { ctx, onBlocked, onRequestStarted } = makeContext(['https://cdn.jsdelivr.net'])
     attach(s.session, ctx, FILTER_DEPS)
     const listener = s.onBeforeRequest.mock.calls[0][0] as OnBeforeListener
 
@@ -150,7 +155,7 @@ describe('PreviewRequestFilter gating', () => {
 
   it('cancels a redirect hop to a non-allowlisted host', () => {
     const s = makeSession()
-    const { ctx, onBlocked } = makeContext(['cdn.jsdelivr.net'])
+    const { ctx, onBlocked } = makeContext(['https://cdn.jsdelivr.net'])
     attach(s.session, ctx, FILTER_DEPS)
     const listener = s.onBeforeRequest.mock.calls[0][0] as OnBeforeListener
 
@@ -165,9 +170,10 @@ describe('PreviewRequestFilter gating', () => {
     expect(cb2).toHaveBeenCalledWith({ cancel: true })
     expect(onBlocked).toHaveBeenCalledWith(
       'blocked-host',
-      'tracker.example',
+      'https://tracker.example',
       'https://tracker.example/beacon',
-      true
+      true,
+      'connect'
     )
   })
 
@@ -178,7 +184,7 @@ describe('PreviewRequestFilter gating', () => {
     // passes the request through to that handler rather than blanket-cancelling
     // the whole local scheme (which broke the entry page and every subresource).
     const s = makeSession()
-    const { ctx, onBlocked, onRequestStarted } = makeContext(['cdn.jsdelivr.net'])
+    const { ctx, onBlocked, onRequestStarted } = makeContext(['https://cdn.jsdelivr.net'])
     attach(s.session, ctx, FILTER_DEPS)
     const listener = s.onBeforeRequest.mock.calls[0][0] as OnBeforeListener
 
@@ -199,7 +205,7 @@ describe('PreviewRequestFilter gating', () => {
     'allows a local erfana-preview request — %s — so the confining protocol handler serves it',
     (_label, resourceType, url) => {
       const s = makeSession()
-      const { ctx, onBlocked, onRequestStarted } = makeContext(['cdn.jsdelivr.net'])
+      const { ctx, onBlocked, onRequestStarted } = makeContext(['https://cdn.jsdelivr.net'])
       attach(s.session, ctx, FILTER_DEPS)
       const listener = s.onBeforeRequest.mock.calls[0][0] as OnBeforeListener
 
@@ -217,7 +223,7 @@ describe('PreviewRequestFilter gating', () => {
 
   it('still refuses a remote https request to a non-approved host (egress gate intact)', () => {
     const s = makeSession()
-    const { ctx, onBlocked, onRequestStarted } = makeContext(['cdn.jsdelivr.net'])
+    const { ctx, onBlocked, onRequestStarted } = makeContext(['https://cdn.jsdelivr.net'])
     attach(s.session, ctx, FILTER_DEPS)
     const listener = s.onBeforeRequest.mock.calls[0][0] as OnBeforeListener
 
@@ -228,15 +234,20 @@ describe('PreviewRequestFilter gating', () => {
     expect(onRequestStarted).not.toHaveBeenCalled()
     expect(onBlocked).toHaveBeenCalledWith(
       'blocked-host',
-      'tracker.example',
+      'https://tracker.example',
       'https://tracker.example/beacon',
-      true
+      true,
+      // This case passes `script` as the resource type, so it proves the kind
+      // is read from the REQUEST rather than defaulted — the difference
+      // between a consent row saying "wants to run a script" and one saying
+      // "something", which is the difference the reader decides on.
+      'script'
     )
   })
 
   it('cancels but does NOT badge a cspReport/ping to an unapproved host', () => {
     const s = makeSession()
-    const { ctx, onBlocked } = makeContext(['cdn.jsdelivr.net'])
+    const { ctx, onBlocked } = makeContext(['https://cdn.jsdelivr.net'])
     attach(s.session, ctx, FILTER_DEPS)
     const listener = s.onBeforeRequest.mock.calls[0][0] as OnBeforeListener
 
@@ -255,7 +266,7 @@ describe('PreviewRequestFilter gating', () => {
 describe('PreviewRequestFilter timeout accounting', () => {
   it('produces no timeout entry for an allowed request that completes', () => {
     const s = makeSession()
-    const { ctx, onBlocked, onRequestSettled } = makeContext(['cdn.jsdelivr.net'])
+    const { ctx, onBlocked, onRequestSettled } = makeContext(['https://cdn.jsdelivr.net'])
     attach(s.session, ctx, FILTER_DEPS)
 
     const before = s.onBeforeRequest.mock.calls[0][0] as OnBeforeListener
@@ -272,7 +283,7 @@ describe('PreviewRequestFilter timeout accounting', () => {
 
   it('settles an errored request so it is not swept as a timeout', () => {
     const s = makeSession()
-    const { ctx, onBlocked, onRequestSettled } = makeContext(['cdn.jsdelivr.net'])
+    const { ctx, onBlocked, onRequestSettled } = makeContext(['https://cdn.jsdelivr.net'])
     attach(s.session, ctx, FILTER_DEPS)
 
     const before = s.onBeforeRequest.mock.calls[0][0] as OnBeforeListener
@@ -288,7 +299,7 @@ describe('PreviewRequestFilter timeout accounting', () => {
 
   it('badges a genuinely stuck request once as a network-timeout with no toast', () => {
     const s = makeSession()
-    const { ctx, onBlocked, onRequestSettled } = makeContext(['cdn.jsdelivr.net'])
+    const { ctx, onBlocked, onRequestSettled } = makeContext(['https://cdn.jsdelivr.net'])
     attach(s.session, ctx, FILTER_DEPS)
 
     const before = s.onBeforeRequest.mock.calls[0][0] as OnBeforeListener

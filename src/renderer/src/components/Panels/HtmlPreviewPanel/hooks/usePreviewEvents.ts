@@ -18,7 +18,6 @@
 
 import { useEffect } from 'react'
 import { usePreviewStore } from '../../../../stores/usePreviewStore'
-import { showGlobalToast } from '../../../Toast/toastService'
 
 /**
  * Subscribes preview load-state, failure-log, still-frame and blocked-host
@@ -40,11 +39,27 @@ import { showGlobalToast } from '../../../Toast/toastService'
  */
 export function usePreviewEvents(panelId: string): void {
   useEffect(() => {
-    const { setLoadState, pushFailures, setStillFrame } = usePreviewStore.getState()
+    const {
+      setLoadState,
+      pushFailures,
+      setStillFrame,
+      setBackdrop,
+      recordBlockedHost,
+      markBlockedHostsTruncated,
+      setAllowedHosts
+    } =
+      usePreviewStore.getState()
 
     const unsubscribeLoadState = window.api.preview.onLoadStateChanged((payload) => {
       if (payload.panelId !== panelId) return
       setLoadState(panelId, payload.state, payload.dropped)
+    })
+
+    // Main paints this colour behind the page; the placeholder paints the same
+    // value so the two never disagree at a seam.
+    const unsubscribeBackdrop = window.api.preview.onBackdropChanged((payload) => {
+      if (payload.panelId !== panelId) return
+      setBackdrop(panelId, payload.color)
     })
 
     const unsubscribeFailures = window.api.preview.onFailuresChanged((payload) => {
@@ -65,38 +80,44 @@ export function usePreviewEvents(panelId: string): void {
     const unsubscribeHostBlocked = window.api.preview.onHostBlocked((payload) => {
       if (payload.panelId !== panelId) return
 
-      if (payload.approvable) {
-        // Approvable host: offer to load it. The action toast is manual-dismiss
-        // (ToastProvider forces duration 0 when an action is present), giving
-        // the user time to read the host before deciding.
-        showGlobalToast({
-          type: 'warning',
-          title: 'Blocked a remote resource',
-          message: `The preview blocked ${payload.host}. Approve to load resources from it – the preview will reload and may fetch remote content.`,
-          action: {
-            label: 'Approve',
-            // Main rebuilds the CSP, purges storage and reloads on approve, so
-            // the renderer just fires the request (design §5(c)).
-            onClick: () => {
-              void window.api.preview.approveHost(panelId, payload.host)
-            }
-          }
-        })
-      } else {
-        // Not approvable (e.g. an insecure scheme): surface it without an action.
-        showGlobalToast({
-          type: 'warning',
-          title: 'Blocked a remote resource',
-          message: `The preview blocked ${payload.host}. It cannot be approved and was not loaded.`
-        })
-      }
+      // The permission band renders this. NOTHING pops up.
+      //
+      // Each blocked host used to raise its own toast over the file tree, capped
+      // at three — so a page reaching four hosts produced three stacked walls of
+      // identical text and a fourth host that could not be approved at all,
+      // because the app had run out of toasts. The band lists every host in the
+      // preview's own chrome instead, and each decision is read once on the row
+      // it belongs to.
+      //
+      // Deliberately silent: no announcement fires here either. A polite live
+      // region on every block is a toast with extra steps, and the count on the
+      // band's chip is what changes.
+      recordBlockedHost(panelId, {
+        host: payload.host,
+        kinds: payload.kinds,
+        approvable: payload.approvable
+      })
+
+      // Main has stopped listing new hosts for this view. The band says so
+      // rather than presenting a short list as a complete one.
+      if (payload.truncated) markBlockedHostsTruncated(panelId)
+    })
+
+    // What this project has ALREADY approved. Seeded on open and re-sent after
+    // every approval, fanned out to every live view of the project — which is
+    // how a second panel on the same project stays in step without polling.
+    const unsubscribeAllowlist = window.api.preview.onAllowlistChanged((payload) => {
+      if (payload.panelId !== panelId) return
+      setAllowedHosts(panelId, payload.hosts)
     })
 
     return () => {
       unsubscribeLoadState()
+      unsubscribeBackdrop()
       unsubscribeFailures()
       unsubscribeStillFrame()
       unsubscribeHostBlocked()
+      unsubscribeAllowlist()
     }
   }, [panelId])
 }

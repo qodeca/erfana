@@ -90,7 +90,24 @@ export function isSafeSegment(
  * `realRoot` MUST already be the `fsPromises.realpath` of the project root.
  * Returns the fully-resolved target and its root-relative path on success.
  */
-export async function confinePath(realRoot: string, candidate: string): Promise<ConfineVerdict> {
+export async function confinePath(
+  realRoot: string,
+  candidate: string,
+  options: { allowBuildDirs?: boolean } = {}
+): Promise<ConfineVerdict> {
+  // `allowBuildDirs` keeps every ESCAPE rule AND the dot-segment rule, and skips
+  // ONLY the build-directory rule. It exists for link routing (sd-074b §3.2): a
+  // link to `node_modules/x/demo.html` must not be SERVED to the page, but
+  // clicking it should still open the file as source in the editor — which needs
+  // the fully-resolved path, and must still refuse anything outside the root.
+  //
+  // It deliberately does NOT relax `hasDotSegment`. That predicate is what keeps
+  // `.env`, `.git/`, `.erfana/` and friends unreachable, and it guards a
+  // DIFFERENT threat from the build-directory rule: the build-directory rule is
+  // about what is worth previewing, the dot-segment rule is about secrets. An
+  // earlier revision gated both on one flag, which let an untrusted page open
+  // `.env` in the editor by clicking a link (lens review F2).
+  const { allowBuildDirs = false } = options
   // 8a: resolve the parent (native semantics). A missing parent is a 404-class
   // "missing", never an escape.
   let parentReal: string
@@ -107,8 +124,9 @@ export async function confinePath(realRoot: string, candidate: string): Promise<
   if (parentRel === '' || parentRel.startsWith('..') || isAbsolute(parentRel)) {
     return { ok: false, reason: 'escape' }
   }
-  // 8d: exclusion against the parent-based path.
-  if (isInExcludedDirectory(parentRel) || hasDotSegment(parentRel)) {
+  // 8d: exclusion against the parent-based path. The dot-segment rule is
+  // unconditional; only the build-directory rule answers to the flag.
+  if (hasDotSegment(parentRel) || (!allowBuildDirs && isInExcludedDirectory(parentRel))) {
     return { ok: false, reason: 'excluded' }
   }
 
@@ -125,7 +143,7 @@ export async function confinePath(realRoot: string, candidate: string): Promise<
   if (rel === '' || rel.startsWith('..') || isAbsolute(rel)) {
     return { ok: false, reason: 'escape' }
   }
-  if (isInExcludedDirectory(rel) || hasDotSegment(rel)) {
+  if (hasDotSegment(rel) || (!allowBuildDirs && isInExcludedDirectory(rel))) {
     return { ok: false, reason: 'excluded' }
   }
 

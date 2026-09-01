@@ -40,7 +40,7 @@
 
 <h1>Erfana design</h1>
 <p class="ds-lede">
-  15 cards, generated from the folder itself. Every page reads a synced copy of
+  16 cards, generated from the folder itself. Every page reads a synced copy of
   the app's <code>design-tokens.css</code> and the real bundled Cascadia Mono, so no value
   here is transcribed by hand — and <code>npm run design -- --check</code> fails in CI when
   the copy and the app disagree.
@@ -49,6 +49,13 @@
   <strong>Check a card's status before citing it.</strong> <em>decided</em> is binding;
   <em>proposed</em> is a direction of travel, not settled law.
 </p>
+
+<div class="ds-note">
+  <strong>New here? Read <a href="README.md">README.md</a> first.</strong> It carries the rules this
+  page cannot show: what <em>decided</em> binds you to, when a card may be promoted from
+  <em>proposed</em>, the six conditions a card must meet to be done, how to record a deviation, and
+  the list of defects these cards have decided but the app still ships.
+</div>
 
 <div class="ds-note">
   <strong>Rebuild with <code>npm run design</code></strong> after adding a card or changing a token.
@@ -65,12 +72,12 @@
     <a class="card" href="system/foundations/focus.html">
       <span class="card__name">Focus &amp; keyboard</span>
       <span class="card__sub">One ring, one width — and the rule that outline:none needs a named replacement</span>
-      <span class="card__meta" data-status="decided">decided · reviewed 2026-08-31</span>
+      <span class="card__meta" data-status="decided">decided · reviewed 2026-09-01</span>
     </a>
     <a class="card" href="system/foundations/layering.html">
       <span class="card__name">Layering</span>
       <span class="card__sub">The z-index ladder — and the rung above it that no z-index can reach</span>
-      <span class="card__meta" data-status="proposed">proposed · reviewed 2026-08-31</span>
+      <span class="card__meta" data-status="proposed">proposed · reviewed 2026-09-01</span>
     </a>
     <a class="card" href="system/foundations/motion.html">
       <span class="card__name">Motion</span>
@@ -122,21 +129,26 @@
     </a>
     <a class="card" href="system/components/permission-band/index.html">
       <span class="card__name">Permission band</span>
-      <span class="card__sub">Approve blocked hosts from the preview&#x27;s own chrome — collapsed, expanded, confirming, fail-safe</span>
-      <span class="card__meta" data-status="decided">decided · reviewed 2026-08-31</span>
+      <span class="card__sub">Approve a blocked origin from the preview&#x27;s own chrome — collapsed, expanded, confirming, fail-safe</span>
+      <span class="card__meta" data-status="decided">decided · reviewed 2026-09-01</span>
     </a>
     <a class="card" href="system/components/row/index.html">
       <span class="card__name">Rows &amp; lists</span>
       <span class="card__sub">One selected state instead of four, and the arrow-key contract the tree is missing</span>
-      <span class="card__meta" data-status="decided">decided · reviewed 2026-08-31</span>
+      <span class="card__meta" data-status="decided">decided · reviewed 2026-09-01</span>
     </a>
   </div>
-  <h2>HTML preview <span class="count">1</span></h2>
+  <h2>HTML preview <span class="count">2</span></h2>
   <div class="grid">
     <a class="card" href="product/html-approval/index.html">
       <span class="card__name">Approving a remote host</span>
       <span class="card__sub">The whole journey — nine states, from a clean page to a page that will not yield</span>
-      <span class="card__meta" data-status="proposed">proposed · reviewed 2026-08-31</span>
+      <span class="card__meta" data-status="proposed">proposed · reviewed 2026-09-01</span>
+    </a>
+    <a class="card" href="product/html-waiting/index.html">
+      <span class="card__name">Waiting for a page</span>
+      <span class="card__sub">What a preview says between opening and painting, and who it is waiting for</span>
+      <span class="card__meta" data-status="proposed">proposed · reviewed 2026-09-01</span>
     </a>
   </div>
 

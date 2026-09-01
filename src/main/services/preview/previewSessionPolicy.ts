@@ -26,9 +26,14 @@ import { randomUUID } from 'node:crypto'
 import type { Session, WebContents, WebPreferences } from 'electron'
 
 /**
- * Every security-relevant `WebPreferences` value, pinned. `preload` is
- * intentionally omitted (there is no bridge into the sealed box) and is asserted
- * by key-absence, not by value.
+ * Every security-relevant `WebPreferences` value, pinned.
+ *
+ * `preload` is deliberately NOT here. It is environment-dependent — `__dirname`
+ * is `out/main` in a build and the source directory under Vitest — so baking a
+ * path into a frozen module-level literal would make a pure constant depend on
+ * the build layout. It is supplied per call by {@link buildPreviewWebPreferences}
+ * from a path the composition root has resolved and existence-checked
+ * (sd-074b §5.2).
  */
 export const PREVIEW_WEB_PREFERENCES = Object.freeze({
   sandbox: true,
@@ -49,11 +54,19 @@ export const PREVIEW_WEB_PREFERENCES = Object.freeze({
 } as const)
 
 /**
- * The ONLY construction site for preview `WebPreferences`. `session` is the sole
- * runtime addition to the frozen literal (design §1.2).
+ * The ONLY construction site for preview `WebPreferences`.
+ *
+ * @param session - The sealed partition (design §1.2).
+ * @param preloadPath - Absolute path to the built `previewPage.js`. Omitted or
+ * `null` means no preload at all, which is a working preview with inert links —
+ * the deliberate degradation when the bundle is missing, rather than a crash.
  */
-export function buildPreviewWebPreferences(session: Session): WebPreferences {
-  return { ...PREVIEW_WEB_PREFERENCES, session }
+export function buildPreviewWebPreferences(
+  session: Session,
+  preloadPath?: string | null
+): WebPreferences {
+  const base: WebPreferences = { ...PREVIEW_WEB_PREFERENCES, session }
+  return preloadPath ? { ...base, preload: preloadPath } : base
 }
 
 /**

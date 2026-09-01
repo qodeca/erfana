@@ -34,6 +34,10 @@ import {
   type RearmingSingleFileWatchHandle
 } from '../watcher/rearmingSingleFileWatch'
 import { PREVIEW } from '../../../shared/constants'
+import {
+  sharedPreviewWatchBudget,
+  type IPreviewWatchBudget
+} from './previewWatchBudget'
 
 /** The preview-tuned `awaitWriteFinish` overrides layered onto the base options. */
 const PREVIEW_WATCH_OVERRIDES: Partial<WatchOptions> = {
@@ -63,6 +67,13 @@ export interface PreviewWatchPoolDeps {
   readonly createDetector?: () => AtomicSaveDetector
   /** Per-preview watch cap; defaults to `PREVIEW.MAX_WATCHED_FILES`. */
   readonly maxWatched?: number
+  /**
+   * Process-wide watch budget shared by every pool; defaults to
+   * {@link sharedPreviewWatchBudget}. Each live preview builds its own pool, so
+   * the per-preview cap alone would multiply by the number of previews
+   * (sd-074b §4.6).
+   */
+  readonly budget?: IPreviewWatchBudget
 }
 
 export interface IPreviewWatchPool {
@@ -70,8 +81,8 @@ export interface IPreviewWatchPool {
    * Watch `filePath`, invoking `onChange` on every change or unlink. Refcounted:
    * re-acquiring an already-watched path bumps the count and keeps the original
    * handler. Returns `false` (and watches nothing) when acquiring a NEW path
-   * would exceed the per-preview cap; a re-acquire of an existing path always
-   * succeeds because it consumes no new descriptor.
+   * would exceed the per-preview cap OR the process-wide budget; a re-acquire of
+   * an existing path always succeeds because it consumes no new descriptor.
    */
   acquire(filePath: string, onChange: () => void): boolean
   /** Decrement the refcount; close the watcher when it reaches zero. */
@@ -99,10 +110,14 @@ export function createPreviewWatchPool(deps: PreviewWatchPoolDeps = {}): IPrevie
   const isPathConfined = deps.isPathConfined
   const createDetector = deps.createDetector
   const maxWatched = deps.maxWatched ?? PREVIEW.MAX_WATCHED_FILES
+  const budget = deps.budget ?? sharedPreviewWatchBudget
 
   const entries = new Map<string, PoolEntry>()
 
+  // Give the budget slot back in the SAME place the entry is closed, so the take
+  // and the give can never drift apart (sd-074b §4.6).
   const closeEntry = async (entry: PoolEntry): Promise<void> => {
+    budget.give()
     try {
       await entry.watcher.close()
     } catch {
@@ -121,6 +136,10 @@ export function createPreviewWatchPool(deps: PreviewWatchPoolDeps = {}): IPrevie
       if (entries.size >= maxWatched) {
         return false
       }
+      // A NEW path costs a descriptor, so it costs a budget slot.
+      if (!budget.tryTake()) {
+        return false
+      }
       // The handler indirects through the entry so a change/unlink always calls
       // the currently-registered callback.
       const entry: PoolEntry = {
@@ -132,11 +151,22 @@ export function createPreviewWatchPool(deps: PreviewWatchPoolDeps = {}): IPrevie
       // needed", so onChange and onDeleted both fire the signal. The re-arm keeps
       // the watch alive across an atomic save so later edits still reload.
       const fire = (): void => entry.onChange()
-      entry.watcher = createRearmingSingleFileWatcher(
-        filePath,
-        { onChange: fire, onDeleted: fire, onError: () => {} },
-        { createWatcher, isPathConfined, createDetector, overrides: PREVIEW_WATCH_OVERRIDES }
-      )
+      // The slot is taken above but only RETURNED by `closeEntry`, which is
+      // reachable only through `entries`. A throw between the two — chokidar
+      // failing on EMFILE/ENOSPC, or the confinement check rejecting — would
+      // burn the slot permanently, and 64 of those stop auto-refresh for every
+      // preview with no error surfaced anywhere, because `acquire` returning
+      // false is the degrade-quietly branch (lens review F12).
+      try {
+        entry.watcher = createRearmingSingleFileWatcher(
+          filePath,
+          { onChange: fire, onDeleted: fire, onError: () => {} },
+          { createWatcher, isPathConfined, createDetector, overrides: PREVIEW_WATCH_OVERRIDES }
+        )
+      } catch (error) {
+        budget.give()
+        throw error
+      }
       entries.set(filePath, entry)
       return true
     },

@@ -4,10 +4,11 @@
  * usePreviewBounds hook (Issue #74, work item 71).
  *
  * Keeps the native `WebContentsView` aligned with the panel's DOM placeholder.
- * A `ResizeObserver` on the placeholder, plus a window-resize listener and an
- * imperative {@link UsePreviewBoundsResult.pushBounds} the panel calls on a
- * visibility change, feed the placeholder's `getBoundingClientRect()` through
- * `deriveBounds` and send it with `window.api.preview.setBounds`.
+ * A `ResizeObserver` on the placeholder, a window-resize listener, an
+ * animation-frame pump that runs while the tab is visible, and an imperative
+ * {@link UsePreviewBoundsResult.pushBounds} feed the placeholder's
+ * `getBoundingClientRect()` through `deriveBounds` and send it with
+ * `window.api.preview.setBounds`.
  *
  * Throttling and the zoom→DIP conversion happen downstream (the preload bridge
  * and main coalesce per animation frame — design §4.3), so this hook just emits
@@ -19,7 +20,8 @@
  */
 
 import { useCallback, useEffect, useRef } from 'react'
-import { deriveBounds } from '../htmlPreview.logic'
+import { deriveBounds, needsBoundsAck } from '../htmlPreview.logic'
+import { usePreviewViewportStore } from '../../../../stores/usePreviewViewportStore'
 
 /**
  * CSS pixels reserved at the top of the native view while the find bar is open
@@ -29,6 +31,16 @@ import { deriveBounds } from '../htmlPreview.logic'
  * while native `findInPage` highlights stay visible in the shorter view.
  */
 export const SEARCH_BAR_INSET_PX = 48
+
+/**
+ * How many animation frames the first-rect pump waits for a laid-out
+ * placeholder before giving up (≈2s at 60Hz).
+ *
+ * A budget rather than an unbounded retry: a panel whose tab is not active has
+ * no box at all and would otherwise measure forever. Two seconds is far longer
+ * than a dockview activation takes and still bounded if the panel never lands.
+ */
+const FIRST_RECT_FRAME_BUDGET = 120
 
 /** Options for {@link usePreviewBounds}. */
 export interface UsePreviewBoundsOptions {
@@ -42,37 +54,68 @@ export interface UsePreviewBoundsOptions {
    */
   enabled: boolean
   /**
+   * Whether this panel is the visible tab. Only a visible tab has a laid-out
+   * box, so this is one of the two things that arm the first-rect pump.
+   */
+  isVisible: boolean
+  /**
+   * Whether main has a live `WebContentsView` for this panel (the store's load
+   * state has left `'idle'`). Main DROPS a `setBounds` for a panel it has no
+   * view for, so the pump must run again once the view exists.
+   */
+  isLive: boolean
+  /**
    * Whether the find bar is open. When `true` the native view is inset from the
    * top by {@link SEARCH_BAR_INSET_PX} so the bar is not occluded (UX-002).
    */
   searchOpen: boolean
+  /**
+   * The panel root, used to measure how far down the page area starts.
+   *
+   * Optional so existing callers and tests need no change: without it the
+   * effective inset falls back to the placeholder's own top, which makes every
+   * push look like it needs no proof — the pre-fail-safe behaviour.
+   */
+  panelRef?: React.RefObject<HTMLElement>
+  /**
+   * Records what was pushed so the fail-safe can decide whether Erfana may draw
+   * controls in the space just claimed. Absent ⇒ no proof is ever requested.
+   */
+  ackController?: {
+    provenInset: () => number
+    recordPush: (seq: number, topInset: number, ackRequested: boolean) => void
+  }
 }
 
 /** Result of {@link usePreviewBounds}. */
 export interface UsePreviewBoundsResult {
   /**
-   * Recomputes and sends the placeholder rect immediately. The panel calls this
-   * when it becomes visible again — a tab switch changes no size, so the
-   * `ResizeObserver` alone would not re-emit and the view could stay stale.
+   * Recomputes and sends the placeholder rect immediately.
+   *
+   * @returns `true` when a rect was sent, `false` when the placeholder is
+   * missing, disabled or still degenerate — which is what lets the first-rect
+   * pump know whether to keep asking.
    */
-  pushBounds: () => void
+  pushBounds: () => boolean
 }
 
 /**
  * Wires geometry updates from the placeholder to the native preview view.
  *
- * @param options - Placeholder ref, panel id, and whether pushing is enabled.
+ * @param options - Placeholder ref, panel id, enablement, visibility, liveness and find-bar state.
  * @returns An imperative {@link UsePreviewBoundsResult.pushBounds}.
  *
  * @example
  * ```tsx
  * const placeholderRef = useRef<HTMLDivElement>(null)
- * const { pushBounds } = usePreviewBounds({ placeholderRef, panelId, enabled: true })
- * useEffect(() => { if (isVisible) pushBounds() }, [isVisible, pushBounds])
+ * const { pushBounds } = usePreviewBounds({
+ *   placeholderRef, panelId, enabled: true, isVisible, isLive, searchOpen
+ * })
  * ```
  */
 export function usePreviewBounds(options: UsePreviewBoundsOptions): UsePreviewBoundsResult {
-  const { placeholderRef, panelId, enabled, searchOpen } = options
+  const { placeholderRef, panelId, enabled, isVisible, isLive, searchOpen, panelRef, ackController } =
+    options
 
   // Monotonic sequence so main can drop out-of-order sends (design §4.3). A ref,
   // not state — bumping it must never trigger a render.
@@ -84,24 +127,78 @@ export function usePreviewBounds(options: UsePreviewBoundsOptions): UsePreviewBo
   enabledRef.current = enabled
   const searchOpenRef = useRef(searchOpen)
   searchOpenRef.current = searchOpen
+  const ackControllerRef = useRef(ackController)
+  ackControllerRef.current = ackController
+  const panelTopRef = useRef(panelRef?.current ?? null)
+  panelTopRef.current = panelRef?.current ?? null
 
-  const pushBounds = useCallback(() => {
-    if (!enabledRef.current) return
+  const pushBounds = useCallback((): boolean => {
+    if (!enabledRef.current) return false
     const el = placeholderRef.current
-    if (!el) return
+    if (!el) {
+      // No placeholder means no box on screen for this panel. Returning without
+      // clearing left a rect published for a view that is not there — Erfana's
+      // own chrome then placed itself around a rectangle nothing occupies.
+      usePreviewViewportStore.getState().clearRect(panelId)
+      return false
+    }
+    // ONLY the find bar. The chrome strip above the page area used to be added
+    // here as a second constant, PREVIEW_CHROME_INSET_PX, duplicating the
+    // `height` in HtmlPreviewPanel.css with nothing but comments keeping the two
+    // in step. The strip is now a flow sibling ABOVE `.html-preview-page-area`,
+    // so the placeholder's own box already excludes it — at whatever height it
+    // happens to be, which is what lets the permission band grow when its list
+    // opens without a single number changing here.
+    //
+    // The find bar keeps its inset because it is still an overlay INSIDE the page
+    // area, not a sibling above it.
     const topInset = searchOpenRef.current ? SEARCH_BAR_INSET_PX : 0
-    const bounds = deriveBounds(el.getBoundingClientRect(), topInset)
-    if (!bounds) return
-    window.api.preview.setBounds(panelId, bounds, seqRef.current++)
+    const rect = el.getBoundingClientRect()
+    const bounds = deriveBounds(rect, topInset)
+    if (!bounds) return false
+
+    /*
+     * The inset that matters for the fail-safe is the distance from the PANEL's
+     * top edge to the view's top edge — not `topInset`, which is only the find
+     * bar now that the chrome band is subtracted by layout. When the band grows,
+     * `topInset` does not change at all; the placeholder's own box moves down.
+     */
+    const panelTop = panelTopRef.current?.getBoundingClientRect().top ?? rect.top
+    const effectiveInset = bounds.y - panelTop
+
+    const ack = ackControllerRef.current
+    const needsAck = ack !== undefined && needsBoundsAck(effectiveInset, ack.provenInset())
+    // Three arguments, not four-with-undefined, when no proof is wanted: the
+    // steady-state push stays byte-identical to what it always was, and the
+    // ack option appears only on the pushes that actually reveal chrome.
+    if (needsAck) {
+      window.api.preview.setBounds(panelId, bounds, seqRef.current, { ack: true })
+    } else {
+      window.api.preview.setBounds(panelId, bounds, seqRef.current)
+    }
+    ack?.recordPush(seqRef.current, effectiveInset, needsAck)
+    seqRef.current += 1
+    // Publish where the native view sits so Erfana's own chrome can place itself
+    // beside it instead of hiding it (the toast stack does this). Deliberately
+    // NOT keyed on whether the view is currently visible: occlusion is the
+    // overlay guard's OUTPUT and the toast's placement is one of its inputs, so
+    // keying on visibility would oscillate every frame.
+    usePreviewViewportStore.getState().setRect(panelId, {
+      left: bounds.x,
+      top: bounds.y,
+      width: bounds.width,
+      height: bounds.height
+    })
+    return true
   }, [panelId, placeholderRef])
 
+  // Track size changes on the placeholder and the viewport for the whole mount,
+  // visible or not — a background tab must already be the right size when it is
+  // activated.
   useEffect(() => {
     if (!enabled) return
     const el = placeholderRef.current
     if (!el) return
-
-    // Initial rect, then track size changes on the placeholder and viewport.
-    pushBounds()
 
     const observer = new ResizeObserver(() => pushBounds())
     observer.observe(el)
@@ -113,10 +210,70 @@ export function usePreviewBounds(options: UsePreviewBoundsOptions): UsePreviewBo
     }
   }, [enabled, placeholderRef, pushBounds])
 
+  // Push the FIRST real rect as soon as the panel has one.
+  //
+  // This is what makes a freshly opened preview appear immediately (#74 follow-up).
+  // `openFileInPanel` calls `addPanel` and only then `setActive`, so this hook's
+  // first run happens while the panel is still an inactive dockview tab — which
+  // has a 0×0 box. `deriveBounds` correctly refuses that, so nothing is sent and
+  // the native view keeps the 1×1 fallback rect `preview:open` was called with:
+  // a view too small to see, over a brand-black placeholder, i.e. a black panel.
+  //
+  // The `ResizeObserver` above is not a dependable second chance here. Dockview
+  // re-parents an `always`-rendered panel rather than resizing it in place, so
+  // the 0×0 → laid-out transition need not produce a resize callback at all, and
+  // the next push then waited on an unrelated event — a tab switch or a window
+  // resize. That is exactly the "black until you click around the tabs" symptom.
+  //
+  // So while the tab is visible, ask on each animation frame until one real rect
+  // goes out, then stand down and let the observer own the steady state.
+  // A panel that is not the visible tab, has no view, or is unmounting has no
+  // rectangle on screen. Leaving a stale one behind would push the toast around
+  // a view that is not there.
+  useEffect(() => {
+    if (enabled && isVisible && isLive) return
+    usePreviewViewportStore.getState().clearRect(panelId)
+  }, [enabled, isVisible, isLive, panelId])
+
+  useEffect(
+    () => () => {
+      usePreviewViewportStore.getState().clearRect(panelId)
+    },
+    [panelId]
+  )
+
+  useEffect(() => {
+    if (!enabled || !isVisible || !isLive) return
+
+    let frame: number | null = null
+    let attempts = 0
+
+    const pump = (): void => {
+      frame = null
+      if (pushBounds()) return
+      if (attempts >= FIRST_RECT_FRAME_BUDGET) return
+      attempts += 1
+      frame = requestAnimationFrame(pump)
+    }
+    pump()
+
+    return () => {
+      if (frame !== null) cancelAnimationFrame(frame)
+    }
+  }, [enabled, isVisible, isLive, pushBounds])
+
   // Re-push when the find bar opens or closes so the top inset is applied or
   // released immediately (a toggle changes no element size, so the
   // `ResizeObserver` alone would not re-emit).
+  //
+  // Only on a real TOGGLE. The mount run is already covered by the pump above,
+  // and firing here as well sent the same rect twice for every preview opened.
+  const sawFirstSearchState = useRef(false)
   useEffect(() => {
+    if (!sawFirstSearchState.current) {
+      sawFirstSearchState.current = true
+      return
+    }
     pushBounds()
   }, [searchOpen, pushBounds])
 

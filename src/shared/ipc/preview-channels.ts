@@ -46,16 +46,58 @@ export const PreviewChannels = {
 export const PreviewEvents = {
   /** The failure log for a panel changed (coalesced) */
   FAILURES_CHANGED: 'preview:failuresChanged',
-  /** A remote host was blocked; drives the approve toast (budgeted) */
+  /**
+   * A remote host was blocked, with everything it was refused for.
+   *
+   * Drives the permission band's blocked list. De-duplicated main-side: an event
+   * is sent only when a host is new to this view or its set of refused KINDS
+   * grew, so a page pulling forty assets from one host sends one message, not
+   * forty. It used to carry a `notify` flag — the verdict of a three-toast budget
+   * — which went with the toasts it existed to ration.
+   */
   HOST_BLOCKED: 'preview:hostBlocked',
+  /**
+   * The project's approved-host set, as main knows it.
+   *
+   * Sent on open (so a project opened tomorrow can SHOW what was granted
+   * yesterday — nothing anywhere did that before) and after an approval, fanned
+   * out to every live view of the project so a second panel is not stale.
+   */
+  ALLOWLIST_CHANGED: 'preview:allowlistChanged',
   /** An in-page find produced a final result */
   FIND_RESULT: 'preview:findResult',
   /** The still-frame captured on hide changed */
   STILL_FRAME_CHANGED: 'preview:stillFrameChanged',
   /** The load state for a panel changed */
   LOAD_STATE_CHANGED: 'preview:loadStateChanged',
+  /** The colour painted behind the page changed (chrome vs the page's own paper) */
+  BACKDROP_CHANGED: 'preview:backdropChanged',
   /** An enumerated keyboard accelerator was forwarded from the sealed page */
-  FORWARDED_SHORTCUT: 'preview:forwardedShortcut'
+  FORWARDED_SHORTCUT: 'preview:forwardedShortcut',
+  /** A link in the page resolved to a project file the renderer should open */
+  OPEN_FILE_REQUESTED: 'preview:openFileRequested',
+  /**
+   * A bounds push has been APPLIED and the page has repainted at the new size.
+   *
+   * Only sent for a push that asked for it. `setBounds` is otherwise
+   * fire-and-forget, which is fine for the steady state but not for a change
+   * that REVEALS Erfana's own chrome: until the page has actually moved, it is
+   * still painting over the area, and a native view takes input over its rect
+   * whatever the DOM says. Anything that puts controls in newly revealed space
+   * must wait for this.
+   */
+  BOUNDS_APPLIED: 'preview:boundsApplied',
+  /**
+   * A visibility change has been APPLIED — the native view is really hidden.
+   *
+   * The mirror of BOUNDS_APPLIED, and for the same reason. `setVisibility` is
+   * fire-and-forget, and the hide path awaits a `capturePage` before it calls
+   * `setVisible(false)`, so the view can still be on screen tens of milliseconds
+   * after the renderer asked for it to go. Anything that reveals Erfana's own
+   * controls BECAUSE the page was hidden has to wait for this, or it draws them
+   * into space a frozen texture may still occupy.
+   */
+  VISIBILITY_APPLIED: 'preview:visibilityApplied'
 } as const
 
 /**

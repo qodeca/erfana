@@ -78,6 +78,19 @@
     "match": "z-index:\\s*[0-9]",
     "unit": "files"
   },
+  "zindex-js-literals": {
+    "kind": "count",
+    "card": "system/foundations/layering.html",
+    "label": "renderer files mirroring a z-index into TypeScript",
+    "dir": "src/renderer",
+    "ext": [
+      ".ts",
+      ".tsx"
+    ],
+    "excludePath": "\\.test\\.",
+    "match": "[Zz]_?[Ii][Nn][Dd][Ee][Xx]\\s*[:=]\\s*\\{?\\s*-?[0-9]",
+    "unit": "files"
+  },
   "colour-tokens": {
     "kind": "count",
     "card": "system/foundations/colors.html",
@@ -111,9 +124,16 @@
   "contrast-tertiary-on-panel": {
     "kind": "contrast",
     "card": "system/components/permission-band/index.html",
-    "label": "--color-text-tertiary on --color-bg-secondary",
+    "label": "--color-text-tertiary on --color-bg-primary",
     "foreground": "--color-text-tertiary",
-    "background": "--color-bg-secondary"
+    "background": "--color-bg-primary"
+  },
+  "contrast-secondary-on-band": {
+    "kind": "contrast",
+    "card": "system/components/permission-band/index.html",
+    "label": "--color-text-secondary on --color-bg-primary",
+    "foreground": "--color-text-secondary",
+    "background": "--color-bg-primary"
   },
   "contrast-input-border": {
     "kind": "contrast",
@@ -195,5 +215,12 @@
     "label": "--color-border-focus against --color-bg-secondary",
     "foreground": "--color-border-focus",
     "background": "--color-bg-secondary"
+  },
+  "contrast-warning-on-panel": {
+    "kind": "contrast",
+    "card": "system/components/permission-band/index.html",
+    "label": "--color-warning on --color-bg-tertiary",
+    "foreground": "--color-warning",
+    "background": "--color-bg-tertiary"
   }
 }

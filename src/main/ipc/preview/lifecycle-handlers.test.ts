@@ -8,7 +8,8 @@
  * electron's ipcMain is mocked to capture the registered handlers; the service,
  * eligibility, window resolver and sender predicate are injected fakes.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
+import { ipcMain } from 'electron'
 import type { IpcMainEvent, IpcMainInvokeEvent } from 'electron'
 import { PreviewChannels } from '../../../shared/ipc/preview-channels'
 import type { PreviewBoundsPayload } from '../../../shared/ipc/preview-schema'
@@ -41,7 +42,12 @@ vi.mock('../../services/LoggingService', () => ({
 }))
 
 const BOUNDS: PreviewBoundsPayload = { x: 0, y: 0, width: 100, height: 100 }
-const FAKE_WINDOW = { contentView: {}, getContentBounds: () => BOUNDS } as never
+const FAKE_WINDOW = {
+  id: 1,
+  isDestroyed: () => false,
+  contentView: {},
+  getContentBounds: () => BOUNDS
+} as never
 
 function makeService(): PreviewLifecycleService & {
   open: ReturnType<typeof vi.fn>
@@ -63,19 +69,21 @@ function setup(overrides?: Partial<PreviewLifecycleHandlerDeps>): {
   service: ReturnType<typeof makeService>
   eligibilityCheck: ReturnType<typeof vi.fn>
   trusted: { value: boolean }
+  dispose: () => void
 } {
   const service = makeService()
   const eligibilityCheck = vi.fn(async () => ({ eligible: true }) as const)
   const trusted = { value: true }
-  registerPreviewLifecycleHandlers({
+  const dispose = registerPreviewLifecycleHandlers({
     service,
     eligibility: { check: eligibilityCheck },
     getProjectPath: () => '/project',
     isTrustedSender: () => trusted.value,
+    isTrustedAppSender: () => true,
     resolveWindow: () => FAKE_WINDOW,
     ...overrides
   })
-  return { service, eligibilityCheck, trusted }
+  return { service, eligibilityCheck, trusted, dispose }
 }
 
 const event = {} as IpcMainInvokeEvent & IpcMainEvent
@@ -94,6 +102,29 @@ describe('registerPreviewLifecycleHandlers', () => {
     expect(handlers[PreviewChannels.RELOAD]).toBeTypeOf('function')
     expect(listeners[PreviewChannels.SET_BOUNDS]).toBeTypeOf('function')
     expect(listeners[PreviewChannels.SET_VISIBILITY]).toBeTypeOf('function')
+  })
+
+  it('unregisters every channel it registered', () => {
+    // THE GAP. `preview:setZoom` was registered and left behind by the
+    // disposer, whose own doc says it "removes all of them". Latent today —
+    // there is one call site and it disposes only at quit — but the bundle is
+    // modelled as re-registrable, and `ipcMain.handle` THROWS on a second
+    // registration for the same channel, which would abort the find and
+    // allowlist bundles registered after it.
+    //
+    // Derived from what was registered rather than restated, so a channel added
+    // later cannot be forgotten here the way SET_ZOOM was.
+    const { dispose } = setup()
+    const registered = [...Object.keys(handlers), ...Object.keys(listeners)]
+    expect(registered.length).toBeGreaterThan(0)
+
+    dispose()
+
+    const removed = [
+      ...(ipcMain.removeHandler as unknown as Mock).mock.calls.map((c) => c[0] as string),
+      ...(ipcMain.removeListener as unknown as Mock).mock.calls.map((c) => c[0] as string)
+    ]
+    expect([...registered].sort()).toEqual([...new Set(removed)].sort())
   })
 
   it('rejects an untrusted sender on open (service untouched)', async () => {
@@ -161,7 +192,38 @@ describe('registerPreviewLifecycleHandlers', () => {
   it('setBounds delegates panelId, bounds and seq to the service', () => {
     const { service } = setup()
     listeners[PreviewChannels.SET_BOUNDS](event, { panelId: 'p1', bounds: BOUNDS, seq: 5 })
-    expect(service.setBounds).toHaveBeenCalledWith('p1', BOUNDS, 5)
+    // `ack` arrives as `undefined` for an ordinary pump push: the flag is
+    // omitted from the wire payload rather than sent as `false`, so a
+    // steady-state push is byte-identical to what it was before it existed.
+    expect(service.setBounds).toHaveBeenCalledWith('p1', BOUNDS, 5, undefined)
+  })
+
+  it('forwards a request for a bounds confirmation', () => {
+    // The flag is what makes a transition that REVEALS Erfana's chrome wait for
+    // the page to move. Dropped here, the renderer would render controls into
+    // space the page is still painting over — and a native view takes input
+    // over its rect whatever the DOM says.
+    const { service } = setup()
+    listeners[PreviewChannels.SET_BOUNDS](event, {
+      panelId: 'p1',
+      bounds: BOUNDS,
+      seq: 6,
+      ack: true
+    })
+    expect(service.setBounds).toHaveBeenCalledWith('p1', BOUNDS, 6, true)
+  })
+
+  it('refuses a setBounds payload carrying an unknown key', () => {
+    // The schema is `.strict()`. Adding an optional field must not turn the
+    // payload into an open bag.
+    const { service } = setup()
+    listeners[PreviewChannels.SET_BOUNDS](event, {
+      panelId: 'p1',
+      bounds: BOUNDS,
+      seq: 7,
+      smuggled: true
+    })
+    expect(service.setBounds).not.toHaveBeenCalled()
   })
 
   it('setVisibility delegates to the service', () => {

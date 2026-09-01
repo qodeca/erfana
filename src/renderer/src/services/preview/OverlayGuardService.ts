@@ -31,6 +31,11 @@
 
 import { useOverlayOccluderStore } from '../../stores/useOverlayOccluderStore'
 import { usePreviewStore } from '../../stores/usePreviewStore'
+import {
+  usePreviewChromeGateStore,
+  type PreviewChromeGateReason
+} from '../../stores/usePreviewChromeGateStore'
+import { logger } from '../../utils/logger'
 
 /**
  * Reason strings sent alongside `preview:setVisibility` (design §5(d)).
@@ -46,7 +51,11 @@ const VISIBILITY_REASON = {
   /** Hidden because an overlay (dialog/toast/menu/…) is on screen. */
   occluded: 'occluded',
   /** Hidden because another tab is active. */
-  inactiveTab: 'inactive-tab'
+  inactiveTab: 'inactive-tab',
+  /** Hidden because the page did not prove it moved out of Erfana's chrome. */
+  chromeUnconfirmed: 'chrome-unconfirmed',
+  /** Hidden because the panel is too short to share with an open host list. */
+  chromeTooShort: 'chrome-too-short'
 } as const
 
 /**
@@ -63,18 +72,28 @@ export interface OverlayGuardDeps {
    */
   isOccluded: () => boolean
   /**
+   * Why one panel's page must stay hidden, or null.
+   *
+   * REQUIRED, not optional. An optional dep defaulting to "never gated" fails
+   * OPEN — the page stays visible over a permission prompt — and this is the one
+   * input where the safe default is the restrictive one.
+   */
+  getPanelGate: (panelId: string) => PreviewChromeGateReason | null
+  /** Notify on gate changes, so the guard recomputes. Returns an unsubscribe. */
+  subscribeGate: (listener: () => void) => () => void
+  /**
    * Subscribe to occluder-count changes.
    * @param listener - Called (no args) after any occluder count changes.
    * @returns An unsubscribe function.
    */
   subscribeOccluded: (listener: () => void) => () => void
   /**
-   * @returns The panel id of the one live preview (the panel that owns a
-   * `WebContentsView`), or `null` when no preview is live. Derived from the
-   * preview store's per-panel load state — a panel is live once it has left the
-   * `'idle'` state and until it is removed.
+   * @returns The panel ids of every live preview (each owning its own
+   * `WebContentsView`). Derived from the preview store's per-panel load state —
+   * a panel is live once it has left `'idle'` and until it is removed or
+   * suspended.
    */
-  getLivePreviewPanelId: () => string | null
+  getLivePreviewPanelIds: () => readonly string[]
   /**
    * Subscribe to preview-store changes (load state, panel add/remove).
    * @param listener - Called (no args) after any preview-store change.
@@ -89,6 +108,23 @@ export interface OverlayGuardDeps {
    * @param reason - Advisory cause, for main-side logging.
    */
   setVisibility: (panelId: string, visible: boolean, reason: string) => void
+  /**
+   * Subscribe to main's report of what it ACTUALLY did with a view.
+   *
+   * The guard writes `lastVisible` optimistically, at send time, and re-sends
+   * only on a change — so a send that main drops, or that Chromium does not
+   * honour, is permanent. Nothing corrected it until an unrelated transition,
+   * and the symptom is a preview panel that is simply black and stays black.
+   *
+   * This is the reconciliation. Optional, because a caller with no bridge is
+   * strictly no worse off than before it existed.
+   *
+   * @param listener - Called with what main applied, per panel.
+   * @returns An unsubscribe function.
+   */
+  subscribeVisibilityApplied?: (
+    listener: (panelId: string, visible: boolean) => void
+  ) => () => void
 }
 
 /**
@@ -117,23 +153,27 @@ export interface IOverlayGuard {
 /**
  * Owns preview show/hide. Constructed with injected {@link OverlayGuardDeps}.
  *
- * Holds three pieces of state: the active tab id (from {@link sync}), the panel
- * id it is currently tracking as the live preview, and the last visibility it
- * sent for that panel — so `setVisibility` fires ONLY when the value changes.
+ * Holds two pieces of state: the active tab id (from {@link sync}), and the last
+ * visibility sent PER live panel — so `setVisibility` fires only when a value
+ * changes.
+ *
+ * Several previews can be live at once (sd-074b D5), but only one editor tab is
+ * visible at a time: dockview drag-and-drop is disabled and no call site creates
+ * a positioned group, so exactly one live panel computes `true` and the rest
+ * compute `false`. That assumption is not enforced by the layout, so it is
+ * asserted here in development rather than left implicit.
  */
 class OverlayGuardService implements IOverlayGuard {
   /** The active dockview tab id, or `null` before the first {@link sync}. */
   private activeTabId: string | null = null
 
-  /** The live preview panel currently tracked, or `null` when none is live. */
-  private trackedPanelId: string | null = null
-
   /**
-   * Last visibility sent for {@link trackedPanelId}, or `null` when unknown
-   * (before the first send, or right after the tracked panel changed). `null`
-   * guarantees the first computed value is always sent.
+   * Last visibility sent per live panel. A panel absent from the map has never
+   * been sent one, so its first computed value is always sent; entries are
+   * pruned when a panel stops being live, so a re-opened panel is treated as
+   * new rather than inheriting a stale value.
    */
-  private lastVisible: boolean | null = null
+  private readonly lastVisible = new Map<string, boolean>()
 
   private readonly unsubscribers: Array<() => void> = []
 
@@ -142,6 +182,31 @@ class OverlayGuardService implements IOverlayGuard {
     // (tab activation), which neither store observes.
     this.unsubscribers.push(deps.subscribeOccluded(() => this.recompute()))
     this.unsubscribers.push(deps.subscribePreview(() => this.recompute()))
+    this.unsubscribers.push(deps.subscribeGate(() => this.recompute()))
+
+    /*
+     * RECONCILE, because "I sent it" is not "it happened".
+     *
+     * `lastVisible` is written at send time and gates every later send, so one
+     * lost message wedges a panel for the life of the session. Main reports what
+     * it applied; if that disagrees with what this guard believes, the belief is
+     * wrong and must be dropped — the next recompute then sends again.
+     *
+     * Deliberately NOT a retry loop. It corrects the CACHE and asks for a fresh
+     * decision; if the world genuinely wants the other state, the recompute says
+     * so and one more message goes out. If main keeps disagreeing, that is a
+     * main-side fault and hammering it would only hide it.
+     */
+    const subscribeApplied = deps.subscribeVisibilityApplied
+    if (subscribeApplied !== undefined) {
+      this.unsubscribers.push(
+        subscribeApplied((panelId, applied) => {
+          if (this.lastVisible.get(panelId) === applied) return
+          this.lastVisible.delete(panelId)
+          this.recompute()
+        })
+      )
+    }
   }
 
   sync(activeTabId: string | null): void {
@@ -156,35 +221,64 @@ class OverlayGuardService implements IOverlayGuard {
   }
 
   /**
-   * Computes `visible = isActiveTab && !isOccluded()` for the live preview and
-   * sends `setVisibility` only when it differs from the last sent value.
+   * Computes `visible = isActiveTab && !isOccluded()` for EVERY live preview and
+   * sends `setVisibility` only where it differs from the last sent value.
    *
-   * When the live preview panel changes (a new preview opens, or the old one
-   * closes) the last-visibility cache is reset so the new panel gets an initial
-   * send. When no preview is live there is nothing to hide — main destroyed the
-   * view on close — so the method returns without sending.
+   * Panels that are no longer live are pruned from the cache; main destroyed
+   * their views, so there is nothing left to hide.
    */
   private recompute(): void {
-    const panelId = this.deps.getLivePreviewPanelId()
+    const livePanelIds = this.deps.getLivePreviewPanelIds()
 
-    if (panelId !== this.trackedPanelId) {
-      this.trackedPanelId = panelId
-      this.lastVisible = null
+    // Prune panels that stopped being live, so a re-open starts from unknown.
+    const live = new Set(livePanelIds)
+    for (const panelId of [...this.lastVisible.keys()]) {
+      if (!live.has(panelId)) {
+        this.lastVisible.delete(panelId)
+      }
     }
 
-    if (panelId === null) return
+    if (livePanelIds.length === 0) return
 
     const occluded = this.deps.isOccluded()
-    const visible = this.activeTabId === panelId && !occluded
-    if (visible === this.lastVisible) return
+    let visibleCount = 0
 
-    this.lastVisible = visible
-    const reason = visible
-      ? VISIBILITY_REASON.activeTab
-      : occluded
-        ? VISIBILITY_REASON.occluded
-        : VISIBILITY_REASON.inactiveTab
-    this.deps.setVisibility(panelId, visible, reason)
+    for (const panelId of livePanelIds) {
+      // The gate is per PANEL: a band waiting on one preview must not blank a
+      // second preview in a split view, which is exactly what routing this
+      // through the global occluder store would have done.
+      const gate = this.deps.getPanelGate(panelId)
+      const visible = this.activeTabId === panelId && !occluded && gate === null
+      if (visible) visibleCount += 1
+
+      if (this.lastVisible.get(panelId) === visible) continue
+
+      this.lastVisible.set(panelId, visible)
+      // Precedence when several apply: an inactive tab first, because it is the
+      // most basic fact; then the gate, because it is the only one with a
+      // user-visible explanation attached to it; then occlusion.
+      const reason = visible
+        ? VISIBILITY_REASON.activeTab
+        : this.activeTabId !== panelId
+          ? VISIBILITY_REASON.inactiveTab
+          : gate === 'unconfirmed'
+            ? VISIBILITY_REASON.chromeUnconfirmed
+            : gate === 'too-short'
+              ? VISIBILITY_REASON.chromeTooShort
+              : VISIBILITY_REASON.occluded
+      this.deps.setVisibility(panelId, visible, reason)
+    }
+
+    // The one-visible-tab assumption is a consequence of `disableDnd`, not
+    // something the layout enforces. If it ever breaks, two native views would
+    // paint at once and the symptom (a view over the wrong group) is baffling —
+    // so say so loudly here instead.
+    if (visibleCount > 1 && import.meta.env.DEV) {
+      logger.warn('Overlay guard computed more than one visible preview', {
+        visibleCount,
+        livePanelIds: [...livePanelIds]
+      })
+    }
   }
 }
 
@@ -201,7 +295,7 @@ class OverlayGuardService implements IOverlayGuard {
  * const guard = createOverlayGuard({
  *   isOccluded: () => occluded,
  *   subscribeOccluded: () => () => {},
- *   getLivePreviewPanelId: () => 'preview-1',
+ *   getLivePreviewPanelIds: () => ['preview-1'],
  *   subscribePreview: () => () => {},
  *   setVisibility: (id, v) => sent.push([id, v])
  * })
@@ -213,23 +307,27 @@ export function createOverlayGuard(deps: OverlayGuardDeps): IOverlayGuard {
 }
 
 /**
- * Reads the one live preview panel id from the preview store.
+ * Reads every live preview panel id from the preview store.
  *
- * A panel is "live" once it has left the initial `'idle'` load state (main
- * emits `loadStateChanged` on open) and until it is removed. Only one preview
- * is ever live, so the first non-idle panel is returned.
+ * A panel is "live" once it has left the initial `'idle'` load state (main emits
+ * `loadStateChanged` on open) and until it is removed or `suspended`. A
+ * suspended panel has no `WebContentsView` — main tore it down to a still frame
+ * — so it must NOT receive visibility messages.
  *
- * @returns The live preview panel id, or `null` when no preview is live.
+ * Map iteration order is irrelevant here now that every live panel is returned,
+ * which retires the ordering caveat the single-view version carried.
+ *
+ * @returns The live preview panel ids; empty when no preview is live.
  */
-function readLivePreviewPanelId(): string | null {
+function readLivePreviewPanelIds(): readonly string[] {
   const { panels } = usePreviewStore.getState()
+  const livePanelIds: string[] = []
   for (const [panelId, state] of panels) {
-    // Correct only under the single-live-view invariant (design §1.8): at most
-    // one panel is ever non-idle, so the first one found IS the live preview.
-    // A future multi-preview change must not rely on Map iteration order here.
-    if (state.loadState !== 'idle') return panelId
+    if (state.loadState !== 'idle' && state.loadState !== 'suspended') {
+      livePanelIds.push(panelId)
+    }
   }
-  return null
+  return livePanelIds
 }
 
 let singleton: IOverlayGuard | null = null
@@ -248,10 +346,16 @@ export function getOverlayGuard(): IOverlayGuard {
   singleton = createOverlayGuard({
     isOccluded: () => useOverlayOccluderStore.getState().isOccluded(),
     subscribeOccluded: (listener) => useOverlayOccluderStore.subscribe(listener),
-    getLivePreviewPanelId: readLivePreviewPanelId,
+    getLivePreviewPanelIds: readLivePreviewPanelIds,
     subscribePreview: (listener) => usePreviewStore.subscribe(listener),
+    getPanelGate: (panelId) => usePreviewChromeGateStore.getState().getGate(panelId),
+    subscribeGate: (listener) => usePreviewChromeGateStore.subscribe(listener),
     setVisibility: (panelId, visible, reason) =>
-      window.api.preview.setVisibility(panelId, visible, reason)
+      window.api.preview.setVisibility(panelId, visible, reason),
+    subscribeVisibilityApplied: (listener) =>
+      window.api.preview.onVisibilityApplied((payload) =>
+        listener(payload.panelId, payload.visible)
+      )
   })
   return singleton
 }

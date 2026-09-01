@@ -24,6 +24,12 @@ const mockIpcMainHandle = vi.fn()
 const mockClipboardReadText = vi.fn()
 const mockClipboardWriteText = vi.fn()
 
+// This suite exercises the REAL sender predicates: it asserts that an untrusted
+// frame is refused, which is the whole point of the file. `setupTests.main.ts`
+// stubs them true by default so the other handler suites can drive their
+// channels with a stand-in event; opt out here.
+vi.unmock('./senderValidation')
+
 vi.mock('electron', () => ({
   ipcMain: {
     handle: mockIpcMainHandle
@@ -137,71 +143,49 @@ describe('clipboard-handlers', () => {
       expect(result).toBe('clipboard text')
     })
 
-    it("rejects the dev origin when ELECTRON_RENDERER_URL is set but is.dev is false", async () => {
+    /**
+     * TWO gates stand in front of this handler now, and they are not the same
+     * predicate.
+     *
+     * The OUTER one is `src/main/ipc/registry.ts`, which every global channel
+     * registers through. It uses `isTrustedAppSender` and THROWS, so an
+     * untrusted frame never reaches the handler body at all.
+     *
+     * The INNER one is this handler's own `isTrustedSender` call, which is
+     * STRICTER: it requires the exact bundled URL, where the outer predicate
+     * tolerates a route hash or query (the screenshot overlay loads the same
+     * entry with a hash and sends on a global channel). So the inner check is
+     * not dead — it still refuses our own renderer on a non-bare route, which
+     * the last case below pins.
+     */
+    it.each([
+      ['the dev origin while is.dev is false', { url: 'http://localhost:5173/index.html', parent: null }],
+      ['a sub-frame', { url: RENDERER_FILE_URL, parent: {} }],
+      ['a foreign origin', { url: 'https://evil.example/', parent: null }],
+      ['a non-bundled file:// URL', { url: 'file:///tmp/evil/index.html', parent: null }]
+    ])('throws at the outer gate for %s, and never reads the clipboard', async (_label, frame) => {
       // Mirrors index.ts: a production build never loads the dev URL even if the
       // env var leaks in, so the dev trust branch must be unreachable there.
       mockIs.dev = false
       process.env['ELECTRON_RENDERER_URL'] = 'http://localhost:5173'
       const handler = await getHandler(CLIPBOARD_CHANNELS.readText)
 
-      const result = await handler(
-        makeEvent({ url: 'http://localhost:5173/index.html', parent: null })
-      )
-
-      expect(result).toBe('')
+      expect(() => handler(makeEvent(frame))).toThrow(/Untrusted sender/)
       expect(mockClipboardReadText).not.toHaveBeenCalled()
-      expect(mockLogger.warn).toHaveBeenCalledTimes(1)
-      // Assert the read-branch identifier so the read/write rejection branches
-      // cannot collapse into one in a future refactor.
-      expect(mockLogger.warn).toHaveBeenCalledWith(
-        'Rejected clipboard:readText from untrusted sender',
-        expect.objectContaining({ url: 'http://localhost:5173/index.html' })
-      )
     })
 
-    it("returns '' and warns for an untrusted (sub-frame) sender", async () => {
+    it("returns '' from the inner check for our own renderer on a hashed route", async () => {
+      // Passes the hash-tolerant outer gate, fails the exact-match inner one.
+      // This is the case that keeps the handler's own check load-bearing.
       const handler = await getHandler(CLIPBOARD_CHANNELS.readText)
 
-      const result = await handler(makeEvent({ url: RENDERER_FILE_URL, parent: {} }))
+      const result = await handler(makeEvent({ url: `${RENDERER_FILE_URL}#/overlay`, parent: null }))
 
       expect(result).toBe('')
       expect(mockClipboardReadText).not.toHaveBeenCalled()
-      expect(mockLogger.warn).toHaveBeenCalledTimes(1)
       expect(mockLogger.warn).toHaveBeenCalledWith(
         'Rejected clipboard:readText from untrusted sender',
-        expect.objectContaining({ url: RENDERER_FILE_URL })
-      )
-    })
-
-    it("returns '' and warns for a foreign origin sender", async () => {
-      const handler = await getHandler(CLIPBOARD_CHANNELS.readText)
-
-      const result = await handler(makeEvent({ url: 'https://evil.example/', parent: null }))
-
-      expect(result).toBe('')
-      expect(mockClipboardReadText).not.toHaveBeenCalled()
-      expect(mockLogger.warn).toHaveBeenCalledTimes(1)
-      expect(mockLogger.warn).toHaveBeenCalledWith(
-        'Rejected clipboard:readText from untrusted sender',
-        expect.objectContaining({ url: 'https://evil.example/' })
-      )
-    })
-
-    it("returns '' and warns for a non-bundled file:// URL (unanchored file path)", async () => {
-      // Any other file:// origin (e.g. a foreign local HTML file) is rejected;
-      // only the exact bundled renderer URL is trusted.
-      const handler = await getHandler(CLIPBOARD_CHANNELS.readText)
-
-      const result = await handler(
-        makeEvent({ url: 'file:///tmp/evil/index.html', parent: null })
-      )
-
-      expect(result).toBe('')
-      expect(mockClipboardReadText).not.toHaveBeenCalled()
-      expect(mockLogger.warn).toHaveBeenCalledTimes(1)
-      expect(mockLogger.warn).toHaveBeenCalledWith(
-        'Rejected clipboard:readText from untrusted sender',
-        expect.objectContaining({ url: 'file:///tmp/evil/index.html' })
+        expect.objectContaining({ url: `${RENDERER_FILE_URL}#/overlay` })
       )
     })
 
@@ -237,18 +221,27 @@ describe('clipboard-handlers', () => {
       expect(mockClipboardWriteText).toHaveBeenCalledWith('hello')
     })
 
-    it('returns false and warns for an untrusted sender (no clipboard write)', async () => {
+    it('throws at the outer gate for an untrusted sender (no clipboard write)', async () => {
       const handler = await getHandler(CLIPBOARD_CHANNELS.writeText)
 
-      const result = await handler(makeEvent({ url: 'https://evil.example/', parent: null }), 'x')
+      expect(() => handler(makeEvent({ url: 'https://evil.example/', parent: null }), 'x')).toThrow(
+        /Untrusted sender/
+      )
+      expect(mockClipboardWriteText).not.toHaveBeenCalled()
+    })
+
+    it('returns false from the inner check for our own renderer on a hashed route', async () => {
+      // Keeps the write-branch identifier distinct from the invalid-payload
+      // branch below, and keeps the handler's own stricter check covered.
+      const handler = await getHandler(CLIPBOARD_CHANNELS.writeText)
+
+      const result = await handler(makeEvent({ url: `${RENDERER_FILE_URL}#/overlay`, parent: null }), 'x')
 
       expect(result).toBe(false)
       expect(mockClipboardWriteText).not.toHaveBeenCalled()
-      expect(mockLogger.warn).toHaveBeenCalledTimes(1)
-      // Distinct write-branch identifier (vs the invalid-payload branch below).
       expect(mockLogger.warn).toHaveBeenCalledWith(
         'Rejected clipboard:writeText from untrusted sender',
-        expect.objectContaining({ url: 'https://evil.example/' })
+        expect.objectContaining({ url: `${RENDERER_FILE_URL}#/overlay` })
       )
     })
 

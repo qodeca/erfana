@@ -138,6 +138,36 @@ async function previewEval(app: ElectronApplication, expr: string): Promise<stri
   }, expr)
 }
 
+/**
+ * The on-screen rectangle of the live preview's native `WebContentsView`, read
+ * from the main process. `null` when no preview view is attached.
+ *
+ * This is the ONE thing every other assertion in this file misses: they all read
+ * the preview's web contents, which loads and runs its JavaScript whether or not
+ * the view has ever been given a size. A view left at 0x0 executes its page
+ * perfectly and shows the user a black rectangle.
+ */
+async function previewViewBounds(
+  app: ElectronApplication
+): Promise<{ width: number; height: number } | null> {
+  return app.evaluate(({ BrowserWindow }) => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      for (const child of win.contentView.children) {
+        const wc = (child as { webContents?: { getURL(): string } }).webContents
+        try {
+          if (wc && wc.getURL().startsWith('erfana-preview://')) {
+            const b = child.getBounds()
+            return { width: b.width, height: b.height }
+          }
+        } catch {
+          // View mid-teardown; keep scanning.
+        }
+      }
+    }
+    return null
+  })
+}
+
 /** Open the failure-badge popover and return the text of its listed entries. */
 async function failureBadgeEntries(page: Page): Promise<string> {
   await page.locator('.html-preview-badge').first().click()
@@ -307,5 +337,97 @@ test.describe('HTML preview corpus', () => {
         message: 'cdn page never took its blocked-host fallback path'
       })
       .toContain('CDN blocked')
+  })
+
+  test('cdn: the permission band lists the blocked host and can approve it', async ({
+    windowWithTestProject
+  }) => {
+    // The band is DOM chrome, so unlike the previewed page it is reachable from
+    // the Playwright side. This is the only automated cover for the surface that
+    // replaced the approve toast — and for the case that broke the old one: a
+    // host is listed whether or not anything popped up, because nothing pops up.
+    await openPreview(windowWithTestProject, 'cdn/index.html')
+
+    const chip = windowWithTestProject.getByTestId('preview-band-chip')
+    await expect(chip).toBeVisible()
+
+    // Counts are ALWAYS shown, including the zeroes: a trust signal that appears
+    // only when something is wrong is not a trust signal.
+    await expect(chip).toHaveText(/\d+ blocked · \d+ allowed/)
+
+    // The CSP refuses cdn.jsdelivr.net in the renderer, and the violation bridge
+    // reports it — so the band must list it even though the network filter never
+    // saw the request.
+    await expect
+      .poll(async () => (await chip.textContent()) ?? '', {
+        timeout: PREVIEW_BUDGET_MS,
+        message: 'the band never reported the blocked CDN host'
+      })
+      .toMatch(/[1-9]\d* blocked/)
+
+    await chip.click()
+    const band = windowWithTestProject.locator('.erf-band')
+    await expect(band.getByText('Blocked on load')).toBeVisible()
+    await expect(band.locator('.erf-host', { hasText: 'cdn.jsdelivr.net' })).toBeVisible()
+
+    // Allow OPENS the question; it does not answer it. That split is what stops a
+    // one-way door being opened by a stray Return.
+    // The accessible name carries the whole ORIGIN, not the bare host: a
+    // permission covers scheme, host and port, and the name has to say what is
+    // actually being granted.
+    await band.getByRole('button', { name: 'Allow https://cdn.jsdelivr.net' }).click()
+    await expect(band.getByRole('alertdialog')).toBeVisible()
+    await expect(band.getByText(/Erfana cannot undo it/)).toBeVisible()
+
+    // Cancel leaves the grant unmade and the host still listed.
+    await band.getByRole('button', { name: 'Cancel' }).click()
+    await expect(band.getByRole('alertdialog')).toHaveCount(0)
+    await expect(band.locator('.erf-host', { hasText: 'cdn.jsdelivr.net' })).toBeVisible()
+  })
+
+  test('the native view is sized on open, with no tab switch to prod it (black-panel regression)', async ({
+    windowWithTestProject,
+    appWithTestProject
+  }) => {
+    await openPreview(windowWithTestProject, 'self-contained/index.html')
+
+    // The page loading proves nothing about what the user sees: a `WebContentsView`
+    // left at 0x0 still loads and still runs its scripts. Assert the RECTANGLE.
+    //
+    // Deliberately short: the panel measures its placeholder on mount, before
+    // dockview has laid the panel out, so the first measurement is 0x0 and sends
+    // nothing. Before the fix the next send only came from a later tab switch or
+    // window resize, so the preview stayed black until the user clicked around —
+    // which no other test in this suite could see.
+    // Compared against the PLACEHOLDER's real box, not against zero. `> 0` was
+    // satisfied by the exact bug it names: the rect a view keeps when no real
+    // measurement ever reaches it is `{ x: 0, y: 0, width: 1, height: 1 }`
+    // (usePreviewLifecycle seeds `preview:open` with it), and 1 is greater
+    // than 0. The regression this test exists for would have shipped green.
+    const placeholder = await windowWithTestProject
+      .locator('.html-preview-placeholder')
+      .first()
+      .boundingBox()
+    expect(placeholder).not.toBeNull()
+    const expectedWidth = placeholder?.width ?? 0
+    const expectedHeight = placeholder?.height ?? 0
+    expect(expectedWidth).toBeGreaterThan(100)
+
+    // A few pixels of tolerance for DIP rounding; the point is that the view
+    // tracks the panel, not that it is non-degenerate.
+    await expect
+      .poll(async () => (await previewViewBounds(appWithTestProject))?.width ?? 0, {
+        timeout: 5000,
+        message: 'preview view never matched its placeholder without user interaction'
+      })
+      .toBeGreaterThan(expectedWidth - 4)
+
+    const bounds = await previewViewBounds(appWithTestProject)
+    // The placeholder now IS the page area: the chrome strip is a flow sibling
+    // above it rather than an overlay on it, so no inset is subtracted here any
+    // more and the height gets the same tight DIP-rounding tolerance as the
+    // width. The old allowance was 40px, wide enough to hide a whole missing
+    // strip's worth of geometry error.
+    expect(bounds?.height).toBeGreaterThan(expectedHeight - 4)
   })
 })

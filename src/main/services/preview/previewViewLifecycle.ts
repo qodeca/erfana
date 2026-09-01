@@ -29,6 +29,8 @@
 import type { PreviewFailureInput } from '../../../shared/ipc/preview-types'
 import type { PreviewWebContentsHandle } from './PreviewSessionFactory'
 import { logger } from '../LoggingService'
+import { PREVIEW_PAGE_LINK_CHANNEL } from './previewLinkBridge'
+import { PREVIEW_PAGE_CSP_VIOLATION_CHANNEL } from './previewCspViolationBridge'
 import { redactPath } from '../../utils/redactUserInput'
 import { classifyConsoleMessage } from './previewConsoleClassify'
 import { attachInputForwarding } from './previewInputForward'
@@ -44,11 +46,40 @@ export interface PreviewLifecycleHooks {
   onRenderProcessGone(reason?: string): void
   onUnresponsive(): void
   onDidFinishLoad(): void
+  /**
+   * The frame tree started loading. Fires for the initial navigation AND for
+   * every reload, and — because Chromium scopes it to the whole frame tree —
+   * again whenever a subframe begins loading.
+   */
+  onDidStartLoading(): void
+  /**
+   * The frame tree stopped loading, by success, failure or `window.stop()`.
+   *
+   * This is the symmetric counterpart of `did-start-loading`. `did-finish-load`
+   * is NOT: it is scoped to the primary main frame's `onload`, so pairing the
+   * two would leave a page with a lazily-loaded subframe stuck in the loading
+   * state for good.
+   */
+  onDidStopLoading(): void
+  /** The load failed or was cancelled. Belt-and-braces beside `onDidStopLoading`. */
+  onDidFailLoad(): void
   onEntryChange(): void
   onEntryDeleted(): void
   onForwardedShortcut(key: string): void
   /** A page console message already classified as a preview failure. */
   onConsoleMessage(input: PreviewFailureInput): void
+  /**
+   * A link was activated in the page and reported by the preview preload
+   * (sd-074b §5.1). The payload is UNVALIDATED — the bridge parses it.
+   */
+  onLinkActivated?(payload: unknown): void
+  /** The page's CSP refused a subresource (see previewCspViolationBridge). */
+  onCspViolation?(payload: unknown): void
+  /**
+   * The page tried to navigate itself. The navigation is still cancelled; the
+   * URL is handed on so a plain link works even when the preload is absent.
+   */
+  onNavigationAttempt?(url: string): void
 }
 
 /**
@@ -105,8 +136,12 @@ export function wirePreviewLifecycle(
   // No popups: every window-open request is denied.
   wc.setWindowOpenHandler(() => ({ action: 'deny' }))
 
-  const onWillNavigate = (event: PreventableEvent): void => {
+  const onWillNavigate = (event: PreventableEvent, url?: unknown): void => {
+    // The page never navigates itself; Erfana decides what a link means.
     event.preventDefault()
+    if (typeof url === 'string' && url !== '') {
+      hooks.onNavigationAttempt?.(url)
+    }
   }
   // Electron delivers `(event, details)`; `details.reason` distinguishes a crash
   // ('crashed'/'oom'/'killed'/…) from a clean exit — carried through for the badge.
@@ -116,6 +151,9 @@ export function wirePreviewLifecycle(
   }
   const onUnresponsive = (): void => hooks.onUnresponsive()
   const onDidFinishLoad = (): void => hooks.onDidFinishLoad()
+  const onDidStartLoading = (): void => hooks.onDidStartLoading()
+  const onDidStopLoading = (): void => hooks.onDidStopLoading()
+  const onDidFailLoad = (): void => hooks.onDidFailLoad()
   // Page console output is untrusted DATA: it is only classified, never executed.
   const onConsoleMessage = (details: PreviewConsoleMessageDetails): void => {
     const input = classifyConsoleMessage(
@@ -132,7 +170,41 @@ export function wirePreviewLifecycle(
   wc.on('render-process-gone', onRenderProcessGone as (...args: never[]) => void)
   wc.on('unresponsive', onUnresponsive as (...args: never[]) => void)
   wc.on('did-finish-load', onDidFinishLoad as (...args: never[]) => void)
+  // Registered as SIBLINGS of `did-finish-load`, deliberately not routed through
+  // it: `onDidFinishLoad` delegates to the rate-limited post-load pipeline,
+  // which drops events during a save burst. A dropped backdrop transition
+  // leaves the page unreadable, so it must not share that budget.
+  wc.on('did-start-loading', onDidStartLoading as (...args: never[]) => void)
+  wc.on('did-stop-loading', onDidStopLoading as (...args: never[]) => void)
+  wc.on('did-fail-load', onDidFailLoad as (...args: never[]) => void)
   wc.on('console-message', onConsoleMessage as (...args: never[]) => void)
+
+  // Page → main link reports. Registered on the WebContents-scoped `ipc`, never
+  // on the global `ipcMain`: it is invisible to every other handler in the app
+  // and needs no sender predicate, because only this WebContents can reach it.
+  // WebContents-scoped rather than frame-scoped because a `WebFrameMain` is
+  // replaced when a navigated page replaces it (sd-074b §5.3).
+  const onLinkActivated = (event: unknown, payload: unknown): void => {
+    // Sub-frames are not trusted to speak for the page.
+    const senderFrame = (event as { senderFrame?: unknown })?.senderFrame
+    if (senderFrame !== undefined && senderFrame !== wc.mainFrame) {
+      return
+    }
+    hooks.onLinkActivated?.(payload)
+  }
+  wc.ipc?.on(PREVIEW_PAGE_LINK_CHANNEL, onLinkActivated as (...args: never[]) => void)
+
+  // Same channel discipline as the link one above, and the same main-frame gate:
+  // a sub-frame does not speak for the page. This is the CSP half of the
+  // blocked-host signal — the half `onBeforeRequest` structurally cannot see.
+  const onCspViolation = (event: unknown, payload: unknown): void => {
+    const senderFrame = (event as { senderFrame?: unknown })?.senderFrame
+    if (senderFrame !== undefined && senderFrame !== wc.mainFrame) {
+      return
+    }
+    hooks.onCspViolation?.(payload)
+  }
+  wc.ipc?.on(PREVIEW_PAGE_CSP_VIOLATION_CHANNEL, onCspViolation as (...args: never[]) => void)
 
   const detachInput = attachInputForwarding(
     wc as never,
@@ -163,7 +235,18 @@ export function wirePreviewLifecycle(
       wc.removeListener('render-process-gone', onRenderProcessGone as (...args: never[]) => void)
       wc.removeListener('unresponsive', onUnresponsive as (...args: never[]) => void)
       wc.removeListener('did-finish-load', onDidFinishLoad as (...args: never[]) => void)
+      wc.removeListener('did-start-loading', onDidStartLoading as (...args: never[]) => void)
+      wc.removeListener('did-stop-loading', onDidStopLoading as (...args: never[]) => void)
+      wc.removeListener('did-fail-load', onDidFailLoad as (...args: never[]) => void)
       wc.removeListener('console-message', onConsoleMessage as (...args: never[]) => void)
+      wc.ipc?.removeListener(
+        PREVIEW_PAGE_LINK_CHANNEL,
+        onLinkActivated as (...args: never[]) => void
+      )
+      wc.ipc?.removeListener(
+        PREVIEW_PAGE_CSP_VIOLATION_CHANNEL,
+        onCspViolation as (...args: never[]) => void
+      )
       await entryWatcher.close()
     }
   }

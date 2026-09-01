@@ -472,8 +472,47 @@ export const PREVIEW = {
    * page can force by fetching many large in-repo assets at once.
    */
   MAX_CONCURRENT_ASSET_READS: 8,
+  /**
+   * How many asset reads may WAIT for a slot before the protocol handler starts
+   * shedding them with 503.
+   *
+   * The limiter is process-wide (sd-074b §4.7), so without a queue bound one
+   * hostile page could park an unbounded number of Chromium URLLoaders and
+   * starve every other preview — a hang with no error and no failure entry.
+   * Shedding instead is visible: the badge records it.
+   */
+  MAX_QUEUED_ASSET_READS: 64,
+  /**
+   * How many previews stay LIVE at once (sd-074b D5). Beyond this the least
+   * recently active preview is torn down to its still frame and re-opens by
+   * itself when its tab is activated again — the "exit state" whose absence
+   * killed the original LRU proposal (sd-074 §10).
+   *
+   * Each live preview is a separate renderer process with its own session, so
+   * this is the cap that actually bounds CPU and RSS; the byte and descriptor
+   * budgets below are derived from it.
+   */
+  MAX_LIVE_VIEWS: 3,
+  /**
+   * Bounds on the previewed page's own zoom level (Chromium scale, 0 = 100%).
+   *
+   * ±5 covers roughly 30% to 300%, which clears WCAG 2.2 SC 1.4.4's 200%
+   * requirement in both directions while stopping a runaway key-repeat at a
+   * level the page can still be laid out at.
+   */
+  MIN_ZOOM_LEVEL: -5,
+  MAX_ZOOM_LEVEL: 5,
   /** Per-panel watch cap (bounds EMFILE exposure, #146–#151) */
   MAX_WATCHED_FILES: 16,
+  /**
+   * Ceiling on watch acquisitions across ALL previews. Derived from
+   * `MAX_LIVE_VIEWS × MAX_WATCHED_FILES` plus headroom for a view that is mid
+   * teardown while another opens — pools are per view, so this counts
+   * acquisitions rather than distinct descriptors. Over budget degrades
+   * auto-refresh for the newest view and records a failure entry; it never
+   * silently stops watching (sd-074b §4.6).
+   */
+  MAX_WATCHED_FILES_GLOBAL: 64,
   /** Coalesce window for pool change events before a reload/swap (ms) */
   WATCH_COALESCE_MS: 30,
   /** chokidar awaitWriteFinish.stabilityThreshold for preview watches (ms) */
@@ -488,8 +527,48 @@ export const PREVIEW = {
   CLOSE_TIMEOUT_MS: 1000,
   /** CSS swap race timeout; any non-`true` outcome falls back to reload (ms) */
   SWAP_TIMEOUT_MS: 1000,
-  /** Max host-block toasts surfaced per project before suppression */
-  MAX_HOST_TOASTS: 3,
+  /**
+   * Max DISTINCT blocked hosts reported to the renderer per view.
+   *
+   * This replaced `MAX_HOST_TOASTS: 3`, which bounded toasts and not the list —
+   * so when the emit became unconditional the list had no bound at all:
+   * `PreviewRequestFilter` calls `onBlocked` per blocked REQUEST, with no
+   * per-host de-duplication of its own.
+   *
+   * 50 matches `MAX_ORIGINS_PER_VIEW` in `previewCspViolationBridge.ts`, which
+   * bounds the other of the two paths that feed this. Keep the two equal: a page
+   * should not be able to report more hosts through one path than the other.
+   *
+   * The entry it counts is an ORIGIN now, not a hostname — see
+   * `MAX_BLOCKED_ORIGINS_PER_HOST` below, which is what stops that change from
+   * turning this global budget into something one hostname can eat by itself.
+   */
+  MAX_BLOCKED_HOSTS_PER_VIEW: 50,
+  /**
+   * Max DISTINCT origins ONE hostname may contribute to the blocked list.
+   *
+   * A sub-cap underneath `MAX_BLOCKED_HOSTS_PER_VIEW`, applied at both places a
+   * blocked entry is recorded main-side — `PreviewViewService.onBlocked` (the
+   * network-filter path) and `previewCspViolationBridge` (the CSP path).
+   *
+   * WHY IT HAD TO EXIST THE MOMENT THE UNIT BECAME AN ORIGIN. Keyed on a
+   * hostname, the global cap was self-limiting: a page hitting one host on fifty
+   * ports collapsed into ONE entry. Keyed on an origin it does not. A page
+   * fetching `http://localhost:1` … `http://localhost:50` fills all fifty slots
+   * before main ever records the real blocked CDN — and that entry is not buried
+   * below the fold, it is dropped and never sent, so the reader cannot approve
+   * the one host they actually needed. Renderer-side trimming cannot repair
+   * that: the event was never emitted.
+   *
+   * WHY 5. One hostname legitimately serves one origin, occasionally two (443
+   * plus an alternate port a dev server is on). Five is generous for the honest
+   * case and cheap against the hostile one: at a tenth of the global budget, at
+   * least ten distinct hostnames always fit, so no single noisy host can make a
+   * different host invisible. The first origin for a hostname is therefore
+   * always reported, which is the property that matters — a host must never be
+   * missing from the list because some other host was loud.
+   */
+  MAX_BLOCKED_ORIGINS_PER_HOST: 5,
   /** At most one full post-load pipeline per this interval (ms) */
   RELOAD_MIN_INTERVAL_MS: 750,
   /** Still-frame downscale: longest edge in px before toDataURL */

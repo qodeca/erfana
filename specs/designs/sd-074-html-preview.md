@@ -351,8 +351,11 @@ print a live `WebContents`. `PreviewExportController` therefore imports the alre
 
 **Styling**: a plain co-located global CSS file imported by the component (not a CSS module), every
 colour/space/size from `src/renderer/src/styles/design-tokens.css`, `border-radius: 0`. The
-placeholder uses **`var(--color-brand-black)`**, the same value `setBackgroundColor('#FF161312')`
-encodes — R1's seam mitigation is only real if the two agree.
+placeholder's background is **held equal to the native view's backdrop at all times** — R1's seam
+mitigation is only real if the two agree. That is now a moving value, not one constant: brand black
+(`var(--color-brand-black)` / `setBackgroundColor('#FF161312')`) until the page has painted, then the
+page's own resolved paper colour, pushed to the panel over `preview:backdropChanged` and written as an
+inline `background` on the placeholder. See §1.8a.
 
 **The occluder is pushed from `BaseDialog`, not `DialogContext`** (X13). The brief's claim that no
 "is any dialog open" observable exists was wrong: `BaseDialog.tsx:95` holds a module-level
@@ -380,15 +383,102 @@ assertion** fires when an element with `z-index >= BASE_ZINDEX` mounts while the
 `overlayGuard.sync()` also runs from `onDidActivePanelChange` (`EditorAreaSplitPanel.tsx:74`) —
 occluder counts do not change on a tab switch, so without it AC17 case 1 has no trigger (X18).
 
+### 1.8a Backdrop, toast placement and the chrome strip
+
+Added after the feature shipped and was found unusable on a production build. Three rules, each
+normative.
+
+**(a) The backdrop invariant.** *The DOM placeholder's background and the native view's
+`setBackgroundColor` always carry the same value.* The value is a two-phase state machine, kept pure
+in `src/main/services/preview/previewBackdrop.ts`:
+
+| Event | Phase | Note |
+|---|---|---|
+| `constructed` | chrome (`#FF161312`) | matches `var(--color-brand-black)`; nothing has painted yet |
+| `did-start-loading` | chrome **on the first load only** | a reload keeps the previous document on screen, and `setBackgroundColor` is not deferred to the next paint — repainting under it flashes the page dark on every autosave |
+| `did-stop-loading` | page | reads the page's own resolved backdrop, falling back to `#FFFFFFFF` |
+| `did-fail-load` | page | belt-and-braces; `did-stop-loading` already covers it |
+| `render-process-gone` | chrome | the DOM failure banner is what the user should be reading |
+
+Two choices here are load-bearing and must not be "simplified":
+
+- **`did-stop-loading`, never `did-finish-load`.** Chromium scopes `DidStartLoading`/`DidStopLoading`
+  to *any document in the frame tree* but `DidFinishLoad` to the *primary main frame's* `onload`.
+  Pairing the first with the third means one lazily-loaded `<iframe>` flips the backdrop to chrome
+  with nothing to flip it back: the page is unreadable permanently. `did-stop-loading` also fires on
+  a failed or cancelled load, which matters because `window.stop()` is page-callable.
+- **The page's own colour, not white.** Forcing `#FFFFFFFF` breaks any page declaring
+  `color-scheme: dark`, which then renders light text on white — the original defect mirrored. Main
+  reads `getComputedStyle` in an isolated world (id 998, the `previewCssSwap` precedent) so the page
+  cannot shadow it.
+
+The resolved colour is emitted on `preview:backdropChanged` and written by `HtmlPreviewPanel.tsx` as
+an inline `background` on the placeholder. Both halves move together, or the invariant is broken.
+
+These listeners are registered as **siblings** of `did-finish-load` in `previewViewLifecycle.ts`,
+deliberately outside `schedulePipeline()` — that pipeline is rate-limited and drops events during a
+save burst, which would strand the backdrop in the chrome phase.
+
+**(b) The toast moves; the page does not.** A toast used to register an occluder simply by existing,
+which hid every live preview. Combined with `ToastContext`'s forced `duration: 0` for an actionable
+toast, the preview's own blocked-host prompt hid every preview **indefinitely**. Now:
+
+- `usePreviewBounds` publishes each live view's CSS-pixel rect into `stores/usePreviewViewportStore.ts`,
+  keyed on **visible + live, not on occlusion** — occlusion is the guard's output and toast placement
+  is one of its inputs, so keying on visibility would oscillate every frame.
+- The pure `Toast/toastPlacement.ts` tries, in order: stay put, slide right, slide left, rise above.
+  `ToastNotification` applies the winning offset as a `transform`.
+- `useOccluder('toast', …)` moved out of `ToastContext` and into `ToastNotification`, registered
+  **only when placement returns `blocked`**. It therefore **fails safe**: when nothing fits, the old
+  hide-everything behaviour returns, so a consent prompt can never end up under an untrusted page.
+
+**(c) The "Preview – content below is not Erfana" strip.** A permanently visible band of Erfana's own chrome above the
+native view, which is inset below it by `PREVIEW_CHROME_INSET_PX` through the same `topInset` path the
+find bar uses. Rule (b) keeps an untrusted page on screen while Erfana asks a security question, and
+rule (a) gives that page browser-native colours, so this is what lets a reader tell a real Erfana
+prompt from one the page drew. Was residual risk 8 (§2.8). Do **not** make it conditional.
+
+> **Withdrawn 2026-09, by owner decision.** The paragraph above is kept because it is why the control
+> was built, not because it still ships. The bar above a preview is now a conventional **toolbar**
+> matching the Markdown editor's: `var(--border-width) solid var(--color-border-default)` under it,
+> carrying a Find button and the permission chip. The naming label and the 2px accent seam are both
+> gone, and **nothing replaced them** — no substitute wording, no tooltip, no icon.
+>
+> **What did not change:** the bar is still always-DOM Erfana chrome, still rendered unconditionally,
+> and still a flow sibling ABOVE the page area rather than an overlay on it, so the page still cannot
+> paint over it; the view rect is still clamped to the window content area; the security question is
+> still asked inside the bar; and Erfana still never asks for credentials inside a preview. (The
+> `PREVIEW_CHROME_INSET_PX` inset named above is itself historical — layout subtracts the bar's own
+> box now.) **What is lost:** no on-screen text names the boundary any more, and a 1px neutral rule is
+> weak against a light page, so §2.8 risk 8's residual is wider than the entry there originally
+> recorded.
+
 ### 1.9 Keyboard forwarding
 
 ```ts
 /** A ONE-WAY DOOR on what the sealed box lets through. `accel` = Cmd on macOS, Ctrl elsewhere. */
 export const PREVIEW_FORWARDED_SHORTCUTS = Object.freeze([
   { key: 'f', accel: true }, { key: 's', accel: true },
-  { key: 'w', accel: true }, { key: 'Escape', accel: false }
+  { key: 'w', accel: true }, { key: 'Escape', accel: false },
+  // No zoom keys — see below.
 ] as const)
 ```
+
+Page zoom matters, and it is **not** carried by this list. Host zoom is applied geometrically —
+`clampAndZoomBounds` multiplies the CSS rect — so Cmd/Ctrl-+ would enlarge the preview *rectangle*
+while the page's text stayed at 100%, making it relatively **smaller**. WCAG 2.2 SC 1.4.4 requires
+text to reach 200%.
+
+The **View menu** is what delivers it: `menu.ts` -> `previewZoomHandler` -> `zoomFocused` finds the
+focused preview and calls `preview:setZoom`, which is clamped to `MIN_ZOOM_LEVEL`/`MAX_ZOOM_LEVEL` and
+persisted per panel so a zoom survives a suspend/resume. The menu's items are handlers rather than
+Electron's built-in zoom *roles* precisely so the two cannot both fire.
+
+The zoom keys were briefly listed above as well. That was dead in one direction and a hazard in the
+other: `PreviewForwardedShortcutSchema` never enumerated them, so every one was dropped at
+`validateAndSend` and the renderer's zoom branch never ran — and widening that enum to "fix" it would
+have zoomed **twice** per keypress, once from the accelerator and once from the forward. The forwarded
+list and the schema are now pinned equal by a test, in both directions.
 
 Everything else stays with the page. `before-input-event` is Chromium's pre-dispatch input pipeline,
 not a page-callable API.
@@ -631,10 +721,22 @@ the user previews. (T3) A network attacker on an approved host. (T4) A compromis
 6. **Hardlinks defeat path confinement.** `realpath` resolves symlinks but not hardlinks (debt 33).
 7. **A residual realpath→open race.** Narrowed, not closed; Node has no `openat` (debt 32). The 8h
    re-resolve narrows but does not remove it.
-8. **UI spoofing.** Partial mitigation: the rect is clamped to the window content area and the panel
-   keeps tab and toolbar chrome, so the page cannot paint over Erfana's own frame; **Erfana never asks
-   for credentials or API keys inside a preview panel**, and the AC22 page says so. A persistent
-   "Preview — not Erfana" strip is the follow-up.
+8. **UI spoofing.** Mitigated: the rect is clamped to the window content area, the panel keeps tab and
+   toolbar chrome, **Erfana never asks for credentials or API keys inside a preview panel** (the AC22
+   page says so), and a persistent **"Preview – content below is not Erfana" strip** now sits above every live preview
+   in always-DOM chrome with the native view inset below it (`PREVIEW_CHROME_INSET_PX`), so the page
+   cannot cover it. Promoted from follow-up to shipped when toast placement (sd-074b follow-up) stopped
+   hiding the preview during a security prompt: an untrusted page now stays on screen while Erfana asks
+   "Approve this host?", and the strip is what distinguishes a genuine prompt from a drawn one.
+   Residual: the strip proves the panel is a preview, not that a dialog elsewhere is genuine.
+
+   **Amended 2026-09 (owner decision, §1.8(c)).** The naming label and the 2px accent seam were
+   withdrawn when the bar became a conventional toolbar; nothing replaced either. The structural half
+   of this entry stands unchanged — always-DOM Erfana chrome, a flow sibling above the page area, a
+   clamped view rect, no credential prompts in a preview — but the wording that told a reader which
+   side of the line they were looking at is gone. **Widened residual:** nothing on screen names the
+   boundary, and a 1px neutral rule is weak against a light page, so a page drawing a convincing fake
+   Erfana dialog inside its own rectangle meets one fewer cue. Accepted as stated.
 9. **Git config keys beyond `core.fsmonitor`.** The hardened invocation overrides the one key known to
    execute a command during `check-ignore`. Bounded by fail-open and by `check-ignore` being the only
    subcommand run.
@@ -958,7 +1060,7 @@ different ⇒ refuse with `holderPanelId` (NEW-9) → `PreviewSessionFactory`:
 `buildPreviewCsp` and stores it on the entry) → partition → harden → protocol attach → filter attach
 → `assertSealed`** (throws ⇒ no view). Then
 `new WebContentsView({ webPreferences: buildPreviewWebPreferences(session) })` → `addChildView` →
-zoom-converted, clamped `setBounds` → `setBackgroundColor('#FF161312')` → `setWindowOpenHandler` deny
+zoom-converted, clamped `setBounds` → `setBackgroundColor(CHROME_BACKDROP)` (§1.8a) → `setWindowOpenHandler` deny
 → `will-navigate` deny → `attachInputForwarding` → `loadURL`.
 
 `did-finish-load` → **rate-limited pipeline** (§1.4) → read entry HTML → `extractStaticLinks` (uses
@@ -1317,7 +1419,10 @@ behaviour lives main-side or in `src/shared/`.
 | 15 | `SearchBar.countOnly.test.tsx` | R | Label from the pushed count; nav enabled on `count.total>0`; Enter calls `nextMatch()`; whole-word disabled; **no `findInPage` on mount**; **clearing the query resets the label** |
 | 15 | `SearchBar.monaco.regression.test.tsx` | R | Stepping through 17 matches shows "2 of 17", "3 of 17"… — not a frozen "1 of 17" |
 | 15 | `useSearchStore.test.ts` | R | Switching provider twice never pairs one provider's `matches` with another's `capabilities`; the `else` branch resets `count`, `navToken`, `capabilities` |
-| 15 | `previewInputForward.test.ts` | M | Exactly the four shortcuts forwarded with `preventDefault()`; Cmd+R, Cmd+P and plain typing are not |
+| 15 | `previewInputForward.test.ts` | M | Exactly the listed shortcuts forwarded with `preventDefault()` — `f`/`s`/`w`/`Escape` only, and the forwarded set is pinned equal to `PreviewForwardedShortcutSchema`; Cmd+R, Cmd+P and plain typing are not. Zoom keys are NOT forwarded: the View menu owns page zoom, and forwarding them too would zoom twice per keypress |
+| 1.8a | `previewBackdrop.test.ts` | M | The transition table over all five events; a `start`→`stop` burst settles on the page colour; a reload never repaints chrome; a crash does. The readability assertion is a **property, not a literal** — the painted backdrop must reach 4.5:1 against black, which `#161312` (≈1.2:1) cannot pass for the wrong reason |
+| 1.8a | `toastPlacement.test.ts` | R | Hand-built rects (jsdom does no layout): no overlap; partial; full cover ⇒ `blocked`; exact touch yields clearance, not 1 px. Plus: the occluder is registered **only** on `blocked`, and the published rect is cleared on hide and on unmount |
+| 1.8a | `PreviewViewService.test.ts` | M | Closing a window drains its views without warning; the destroyed-window fake's `removeChildView` must **throw**, or the assertion passes against unfixed code |
 | 16 | `PreviewExportController.test.ts` | M | `printToPDF` with `printBackground:true`; `deriveSafeFilename` applied; **`PdfService` not imported** |
 | 17 | `OverlayGuardService.test.ts` | R | One case per trigger — **tab activation**, dialog, settings, toast, context menu, full-screen overlay. Case 4 (tab drag) has **no test**: `EditorAreaSplitPanel.tsx:119` sets `disableDnd`, so it is unreachable; AC17 is three testable cases plus one structurally covered |
 | 17 | `BaseDialog.occluder.test.tsx` | R | Opening any BaseDialog raises the count; nesting two and closing one keeps it raised; **a single `registerOpenDialog` produces exactly ONE occluder notification (not 0 then 1), and a `zIndex` change produces none** (NEW-10); the dev assertion fires for a high-z-index element mounted with count 0 |
@@ -1346,8 +1451,9 @@ floor at 95/95/95/95: `previewPathResolve.ts`, `previewFilterDecision.ts`, `prev
 
 ## 9. Risks and mitigations
 
-**R1 — Bounds-sync tearing** (high/med). rAF coalescing + 120 ms trailing + `seq` + placeholder painted
-`var(--color-brand-black)` matching `#FF161312`. Residual: 1–2 frames of seam under load.
+**R1 — Bounds-sync tearing** (high/med). rAF coalescing + 120 ms trailing + `seq` + the placeholder
+painted with whatever the native view's backdrop currently is, kept in step by `preview:backdropChanged`
+(§1.8a). Residual: 1–2 frames of seam under load.
 
 **R2 — Watcher file descriptors** (med/med). The pool is **additive** to `FileWatcherService`'s
 app-wide `MAX_WATCHED_FILES = 100`. One live view × 16 files ⇒ **116 worst case**. chokidar is pinned
@@ -1386,7 +1492,10 @@ bounded destroy; the post-load pipeline is rate-limited so Erfana's own work per
 is capped.
 
 **R11 — UI spoofing** (med/high). Clamped rect + retained tab/toolbar chrome + "Erfana never asks for
-credentials inside a preview". Residual §2.8 risk 8.
+credentials inside a preview" + the always-DOM Erfana bar the view sits below. **Amended 2026-09**: that
+bar is now a conventional toolbar (Find + permission chip); its "Preview – content below is not Erfana"
+label and 2px accent seam were withdrawn by owner decision, with nothing in their place, so the
+mitigation is structural only and no longer names itself. Widened residual §2.8 risk 8, §1.8(c).
 
 **R12 — Exfiltration channels outside every chokepoint** (med/high). **New, and honestly unmitigated.**
 WebRTC over TURN/TCP-443 and `<link rel=preconnect>` are general-purpose channels that neither the CSP
@@ -1403,7 +1512,7 @@ switch for at the session level, and which would need a Chromium-flag change wit
 
 | Narrowing | Reason |
 |---|---|
-| **One live preview**; same-panelId re-open replaces | No AC asks for concurrency; LRU had no exit state. Replace-on-same-id is required or a renderer reload wedges every panel |
+| ~~**One live preview**~~ **SUPERSEDED by sd-074b D5** | Was: "No AC asks for concurrency; LRU had no exit state." LRU now HAS an exit state — a suspended preview keeps its still frame and re-opens itself when its tab is activated — so several previews run at once, capped by `PREVIEW.MAX_LIVE_VIEWS`. Same-panelId re-open still replaces |
 | **`stream:false`, no `Range`/206** | Electron will not synthesise range responses; large-`<video>` seeking does not work |
 | **Dot-prefixed paths are unservable** | A blanket rule beats a blocklist. Cost: `.well-known` is unreachable |
 | **`~[0-9]` segments rejected on `win32`** | 8.3 alias defence layer 1. Cost: a long name legitimately containing `~1` is unservable **on Windows only** |
@@ -1416,7 +1525,7 @@ switch for at the session level, and which would need a Chromium-flag change wit
 | **AC10 timeout UX is quiet in the badge** | Operator decision; an interrupting message per offline CDN asset is worse than a badge count |
 | **Blocked-host toasts stop after 3 distinct hosts per panel** | Otherwise a page mints unbounded hosts and turns the toast stack into a DoS surface |
 | **A hostile page can defeat its own CSS swap** | Any non-`true` outcome falls back to a full reload; the cost lands on the page |
-| **Markdown links to `.html` open source** | Matches today's `.svg` behaviour; not AC1's "explicit action" |
+| **Markdown links to `.html` open source** — kept, deliberately | Matches today's `.svg` behaviour; not AC1's "explicit action". sd-074b makes the same link RUN when clicked inside an HTML preview, and the divergence is intended: a markdown link is a "show me the source" gesture, an HTML hyperlink is a hyperlink. Unifying them needs the "Open as text" action in technical-debt #455 first, so it is a separate issue |
 | **`getFilePanelId(path)` stays kind-free** | Its only two call sites (`TranscriptionDialog.tsx:216`, `DocumentImportDialog.tsx:146`) pass markdown paths, so `.html` lossiness is **unreachable** |
 | **`PreviewExportController` duplicates PdfService's save-dialog config** | Its save path is private and `IPdfService` exposes only `exportToPdf`; ~10 duplicated lines beat widening a working service. `deriveSafeFilename` is shared, so #161 is not duplicated |
 | **No cross-window allowlist locking** | Two windows on one project is accepted as broken; the kept guarantee is that the file always parses |
@@ -1424,7 +1533,7 @@ switch for at the session level, and which would need a Chromium-flag change wit
 | **Monaco worker-backed services are disabled, not bundled** | AC11 asks for highlighting (Monarch, main-thread); bundling four workers raises a `file://` module-worker question no AC requires |
 | **Hardlinks and the realpath→open race are documented, not fixed** | No proportionate fix without `openat`; debt 32–33 |
 | **No UI trust chrome in v1** | §2.8 risk 8; follow-up |
-| **`alert`/`confirm`/`prompt` and `<a download>` silently no-op** | The `sandbox` token withholds `allow-modals` and `allow-downloads`; granting either re-opens a modal-blocking or file-write surface |
+| **`alert`/`confirm`/`prompt` no-op; `<a download>` is refused and badged** | The `sandbox` token withholds `allow-modals` and `allow-downloads`; granting either re-opens a modal-blocking or file-write surface. sd-074b keeps the refusal but stops it being silent: a download click now records a `blocked-link` failure |
 | **A single CSP application site (no `onHeadersReceived` overwrite)** | Round-4 option b: one owner cannot drift or be left unwired; §2.6's single-ownership claim becomes literal. A CDN subresource's own CSP header is ignored by the browser anyway, so the second site protected nothing |
 | **AC24 is a local gate; AC19b is manual** | Shared CI runners flake on perf floors; visual regression is local-only |
 | **Gate 3's behavioural half is not in CI** | `e2e.yml` is disabled; re-enabling it is out of scope for #74 |

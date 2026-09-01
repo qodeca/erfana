@@ -8,13 +8,21 @@
  * downscaled snapshot of the LIVE page so the inactive tab can paint the last
  * frame instead — with a **defined fallback**: if a frame cannot be produced
  * within budget, NO frame is emitted and the panel falls back to the
- * placeholder colour (`var(--color-brand-black)` / `#161312`). It never emits a
+ * placeholder's current backdrop — brand black before the page has painted, the
+ * page's own paper colour afterwards (`previewBackdrop.ts`). It never emits a
  * blank frame (design §1.4).
  *
  * `captureIfStale` must be called BEFORE the view is hidden, or with a capture
  * that passes `stayHidden: true`, so `capturePage` has live pixels to read.
  * Invalidation is driven by FILE CHANGE, not DOM observation — the caller
  * invalidates on a watched-file change (design §1.4).
+ *
+ * The budgets below are all about SIZE. There is deliberately no time budget,
+ * and nothing on an interactive path may await this — `PreviewLiveView` starts a
+ * capture and hides the view in the same tick, precisely because a slow capture
+ * in front of `setVisible(false)` leaves the native view eating clicks meant for
+ * the overlay that just opened. The one caller that waits is eviction, which is
+ * about to destroy the page anyway.
  *
  * Budget enforcement, in order:
  *   - `isBeingCaptured()` true  ⇒ skip (a capture is already in flight)
@@ -62,8 +70,23 @@ export interface IPreviewStillFrameCache {
    * Capture `wc` into `panelId`'s slot if no in-flight capture is running.
    * Never throws and never stores a blank frame: an over-budget, skipped or
    * throwing capture leaves the previous frame (if any) untouched.
+   *
+   * TAKES A SIZE, NOT A RECT, AND THAT IS THE WHOLE POINT. `capturePage`'s rect
+   * is **page-relative** — `(0,0)` is the page's own top-left — while the only
+   * rect a caller has to hand is `PreviewLiveView.lastBounds`, which is
+   * **window-relative** DIPs for `View.setBounds`. Passing that through asked
+   * for a box starting hundreds of pixels INTO the page; Chromium clipped it at
+   * the page edge and returned a narrow off-centre sliver, which
+   * `.html-preview-still-frame`'s `object-fit: contain` then blew up to fill the
+   * height and letterboxed in black. Accepting a size makes the mistake
+   * unspellable: the rect is built here, at the origin, every time.
    */
-  captureIfStale(wc: PreviewCaptureContents, panelId: string, bounds: PreviewBounds): Promise<void>
+  captureIfStale(
+    wc: PreviewCaptureContents,
+    panelId: string,
+    size: { width: number; height: number },
+    opts?: { shouldKeep?: () => boolean }
+  ): Promise<void>
   /** The cached frame for `panelId`, or `undefined` (⇒ placeholder colour). */
   get(panelId: string): PreviewStillFrame | undefined
   /** Drop `panelId`'s frame (called on file change / panel close). */
@@ -85,17 +108,29 @@ export class PreviewStillFrameCache implements IPreviewStillFrameCache {
   async captureIfStale(
     wc: PreviewCaptureContents,
     panelId: string,
-    bounds: PreviewBounds
+    size: { width: number; height: number },
+    opts: { shouldKeep?: () => boolean } = {}
   ): Promise<void> {
     // A capture is already in flight — skip rather than stack captures.
     if (wc.isBeingCaptured()) {
       return
     }
 
+    // No rectangle, no picture. A view that has never been laid out reports a
+    // zero size, and asking Chromium to capture nothing is at best a wasted
+    // round trip — at worst an unbounded one, since nothing here imposes a time
+    // budget. Answering it locally is free and certain.
+    if (size.width <= 0 || size.height <= 0) {
+      return
+    }
+
     let image: PreviewNativeImage
     try {
       // `stayHidden: true` lets the capture succeed even as the view is hidden.
-      image = await wc.capturePage(bounds, { stayHidden: true })
+      image = await wc.capturePage(
+        { x: 0, y: 0, width: size.width, height: size.height },
+        { stayHidden: true }
+      )
     } catch {
       // Capture failed ⇒ NO frame. Panel falls back to the placeholder colour.
       return
@@ -110,6 +145,24 @@ export class PreviewStillFrameCache implements IPreviewStillFrameCache {
 
     // Over the data-URL budget ⇒ NO frame (never a partial/blank one).
     if (dataUrl.length > this.maxDataUrlChars) {
+      return
+    }
+
+    /*
+     * LAST CHANCE TO THROW THE RESULT AWAY, and it is the only defence against
+     * poisoning a good frame with a bad one.
+     *
+     * `isEmpty()` above catches a ZERO-DIMENSION image and nothing else — an
+     * all-black picture at the right size sails through and overwrites whatever
+     * was cached. So a capture that started while the page was on screen and
+     * finished after it had gone could replace a perfectly good frame with a
+     * black rectangle, and nothing invalidates it afterwards: the only callers
+     * of `invalidate` are a file change, a completed load, and teardown.
+     *
+     * The caller knows whether its subject was still there the whole time. This
+     * asks, at the last possible moment, rather than guessing from the pixels.
+     */
+    if (opts.shouldKeep !== undefined && !opts.shouldKeep()) {
       return
     }
 

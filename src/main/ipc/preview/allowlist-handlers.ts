@@ -14,7 +14,7 @@
  *
  * @see docs/designs/sd-074-html-preview.md §3.3, §5(c)
  */
-import { ipcMain, type IpcMainInvokeEvent } from 'electron'
+import { type IpcMainInvokeEvent } from 'electron'
 import { PreviewApproveHostRequestSchema } from '../../../shared/ipc/preview-schema'
 import { PreviewChannels } from '../../../shared/ipc/preview-channels'
 import type { PreviewApproveResult } from '../../../shared/ipc/preview-types'
@@ -22,11 +22,12 @@ import { AppError, ErrorCode } from '../../../shared/errors'
 import type { IPreviewViewService } from '../../services/preview/PreviewViewService'
 import type { IPreviewAllowlistStore } from '../../services/preview/PreviewAllowlistStore'
 import { logger } from '../../services/LoggingService'
+import { registerHandle, unregisterHandle } from '../registry'
 
 /** Injected collaborators for the allowlist handler. */
 export interface PreviewAllowlistHandlerDeps {
-  /** Writes the host back to the project allowlist; root resolved internally. */
-  readonly allowlistStore: Pick<IPreviewAllowlistStore, 'approveHost'>
+  /** Writes the origin back to the project allowlist; root resolved internally. */
+  readonly allowlistStore: Pick<IPreviewAllowlistStore, 'approveOrigin'>
   /** Rebuilds the CSP, purges and reloads the live view for the panel. */
   readonly service: Pick<IPreviewViewService, 'applyApprovedHosts'>
   readonly isTrustedSender: (event: IpcMainInvokeEvent) => boolean
@@ -40,7 +41,7 @@ export function registerPreviewAllowlistHandlers(
 ): () => void {
   const { allowlistStore, service, isTrustedSender } = deps
 
-  ipcMain.handle(
+  registerHandle(
     PreviewChannels.APPROVE_HOST,
     async (event, arg: unknown): Promise<PreviewApproveResult> => {
       if (!isTrustedSender(event)) {
@@ -58,9 +59,9 @@ export function registerPreviewAllowlistHandlers(
       }
       try {
         // Root is NOT read from the payload — the store resolves it main-side.
-        const hosts = await allowlistStore.approveHost(parsed.data.host)
-        await service.applyApprovedHosts(parsed.data.panelId, hosts)
-        return { ok: true, hosts }
+        const origins = await allowlistStore.approveOrigin(parsed.data.host)
+        await service.applyApprovedHosts(parsed.data.panelId, origins)
+        return { ok: true, hosts: origins }
       } catch (error) {
         const errorCode = error instanceof AppError ? error.code : ErrorCode.UNKNOWN_ERROR
         logger.error(
@@ -73,6 +74,6 @@ export function registerPreviewAllowlistHandlers(
   )
 
   return () => {
-    ipcMain.removeHandler(PreviewChannels.APPROVE_HOST)
+    unregisterHandle(PreviewChannels.APPROVE_HOST)
   }
 }

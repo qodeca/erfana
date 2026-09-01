@@ -30,6 +30,29 @@ const DESIGN = path.join(ROOT, 'design')
 const TOKENS = path.join(ROOT, 'src/renderer/src/styles/design-tokens.css')
 const FONTS = path.join(ROOT, 'src/renderer/src/assets/fonts')
 
+/**
+ * Component CSS that has been ADOPTED: the file lives in src/ and is copied back
+ * into design/ so the card renders what actually ships.
+ *
+ * Adoption is a MOVE, not a copy. A component stylesheet still authored under
+ * design/ is a proposal with no incumbent; once it has one, two editable copies
+ * is how one of them stays wrong — which is exactly how a broken bidi front-elide
+ * survived in the Rows card for months.
+ *
+ * `rel` must keep the path the cards already link, because a card opens over
+ * file:// and cannot reach up into src/.
+ */
+const COMPONENT_CSS = [
+  {
+    src: 'src/renderer/src/styles/hostName.css',
+    rel: 'system/components/row/host.css'
+  },
+  {
+    src: 'src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewChromeBand.css',
+    rel: 'system/components/permission-band/band.css'
+  }
+]
+
 const FONT_FILES = [
   'CascadiaMono-Regular.woff2',
   'CascadiaMono-Bold.woff2',
@@ -221,6 +244,13 @@ function render(groups) {
 </p>
 
 <div class="ds-note">
+  <strong>New here? Read <a href="README.md">README.md</a> first.</strong> It carries the rules this
+  page cannot show: what <em>decided</em> binds you to, when a card may be promoted from
+  <em>proposed</em>, the six conditions a card must meet to be done, how to record a deviation, and
+  the list of defects these cards have decided but the app still ships.
+</div>
+
+<div class="ds-note">
   <strong>Rebuild with <code>npm run design</code></strong> after adding a card or changing a token.
   This index, <code>tokens.css</code> and the fonts are generated — do not edit them.
 </div>
@@ -249,6 +279,15 @@ function generate() {
       process.exit(1)
     }
     files.push({ rel: `fonts/${name}`, bytes: readFileSync(source) })
+  }
+
+  for (const { src, rel } of COMPONENT_CSS) {
+    const source = path.join(ROOT, src)
+    if (!existsSync(source)) {
+      console.error(`design-sync: adopted component CSS not found at ${source}`)
+      process.exit(1)
+    }
+    files.push({ rel, bytes: readFileSync(source) })
   }
 
   files.push({ rel: 'claims.js', bytes: Buffer.from(renderClaims(), 'utf8') })

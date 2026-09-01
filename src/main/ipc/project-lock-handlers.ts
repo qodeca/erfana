@@ -17,7 +17,6 @@
  * @see Spec #010 - Multi-instance support specification
  * @see Issue #27 - Multiple independent instances
  */
-import { ipcMain } from 'electron'
 import { projectLockService } from '../services/ProjectLockService'
 import {
   AcquireLockPayloadSchema,
@@ -27,6 +26,7 @@ import {
 import { validatePath } from '../utils/pathSecurity'
 import { getUserFriendlyMessage } from '../../shared/errors'
 import { logger } from '../services/LoggingService'
+import { registerHandle } from './registry'
 
 /**
  * Registers IPC handlers for project lock operations.
@@ -38,7 +38,7 @@ export function registerProjectLockHandlers(): void {
    * @param payload - { projectPath: string }
    * @returns LockResult - 'acquired', 'already_locked', or 'error'
    */
-  ipcMain.handle('project-lock:acquire', async (_event, payload: unknown) => {
+  registerHandle('project-lock:acquire', async (_event, payload: unknown) => {
     const startTime = Date.now()
 
     // Validate payload schema
@@ -90,7 +90,7 @@ export function registerProjectLockHandlers(): void {
    * @param payload - { projectPath: string }
    * @returns { success: boolean, error?: string }
    */
-  ipcMain.handle('project-lock:release', async (_event, payload: unknown) => {
+  registerHandle('project-lock:release', async (_event, payload: unknown) => {
     const startTime = Date.now()
 
     // Validate payload schema
@@ -137,7 +137,7 @@ export function registerProjectLockHandlers(): void {
    * @param payload - { projectPath: string }
    * @returns LockStatus - 'unlocked', 'locked_by_self', 'locked_by_other', or 'error'
    */
-  ipcMain.handle('project-lock:check', async (_event, payload: unknown) => {
+  registerHandle('project-lock:check', async (_event, payload: unknown) => {
     const startTime = Date.now()
 
     // Validate payload schema
@@ -187,7 +187,7 @@ export function registerProjectLockHandlers(): void {
    * @param payload - { projectPath: string }
    * @returns { success: boolean, error?: string }
    */
-  ipcMain.handle('project-lock:requestFocus', async (_event, payload: unknown) => {
+  registerHandle('project-lock:requestFocus', async (_event, payload: unknown) => {
     const startTime = Date.now()
 
     // Validate payload schema (reusing CheckLockPayloadSchema - same structure)
@@ -236,7 +236,7 @@ export function registerProjectLockHandlers(): void {
    *
    * @returns { success: boolean, removedCount?: number, error?: string }
    */
-  ipcMain.handle('project-lock:cleanup', async () => {
+  registerHandle('project-lock:cleanup', async () => {
     const startTime = Date.now()
 
     logger.trace('project-lock:cleanup invoked')

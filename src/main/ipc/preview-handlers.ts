@@ -17,7 +17,7 @@
  * disposes the service (tearing down any live view).
  *
  * Reconciliation with §4.4's `PreviewHandlerDeps`: the constructed collaborators
- * it lists (service, eligibility, allowlistStore, hostBlockNotifier) live in the
+ * it lists (service, eligibility, allowlistStore) live in the
  * `PreviewGraph` this root builds; the registration deps here are the external
  * singleton surfaces (project path, global settings, sender predicate) plus an
  * injectable `graph` test seam.
@@ -70,6 +70,10 @@ export interface PreviewHandlerDeps {
 
 /** The disposable handler bundle returned to the app entry (item 48). */
 export interface PreviewHandlerBundle {
+  /** Zoom a focused previewed page; `false` when none is focused. */
+  zoomFocused(step: number): Promise<boolean>
+  /** Tear down every preview hosted by a window that is closing. */
+  closeWindow(windowId: number): Promise<void>
   dispose: () => Promise<void>
 }
 
@@ -121,6 +125,14 @@ export function registerPreviewHandlers(deps: PreviewHandlerDeps): PreviewHandle
   logger.info('✅ Preview IPC handlers registered')
 
   return {
+    // Exposed so the composition root can route View-menu zoom here. Deliberately
+    // a bundle member rather than this module importing the menu: the IPC layer
+    // must not reach up into the app shell, and doing so also dragged the real
+    // `electron` module into every test that loads this file.
+    zoomFocused: (step: number): Promise<boolean> => graph.service.zoomFocused(step),
+
+    closeWindow: (windowId: number): Promise<void> => graph.service.closeWindow(windowId),
+
     dispose: async (): Promise<void> => {
       unregisterLifecycle()
       unregisterFind()

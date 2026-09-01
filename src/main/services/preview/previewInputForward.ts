@@ -30,6 +30,17 @@ export const PREVIEW_FORWARDED_SHORTCUTS = Object.freeze([
   { key: 'f', accel: true },
   { key: 's', accel: true },
   { key: 'w', accel: true },
+  // NO zoom keys. Cmd/Ctrl +/-/0 reach a focused preview through the View menu
+  // instead (`menu.ts` -> `zoomFocused` -> `wc.setZoomLevel`), which is a real
+  // PAGE zoom and is what satisfies WCAG 2.2 SC 1.4.4 here.
+  //
+  // They were briefly listed here as well, which was dead weight in one
+  // direction and a hazard in the other: `PreviewForwardedShortcutSchema` never
+  // enumerated them, so every one was dropped at the IPC boundary and the
+  // renderer's zoom branch never ran. Widening that enum to "fix" it would have
+  // made a single keypress zoom TWICE — once from the accelerator and once from
+  // the forward — which is the collision `menu.ts` replaced the built-in zoom
+  // roles to avoid.
   { key: 'Escape', accel: false }
 ] as const satisfies readonly ForwardedShortcut[])
 

@@ -18,13 +18,12 @@
  */
 
 import { useState, useCallback, useMemo, MouseEvent } from 'react'
-import { X, Globe, FileDown } from 'lucide-react'
+import { X, Globe } from 'lucide-react'
 import { IDockviewPanelHeaderProps } from 'dockview'
-import { ContextMenu, type ContextMenuItem } from '../ContextMenu/ContextMenu'
+import { ContextMenu } from '../ContextMenu/ContextMenu'
 import { useTabContextMenu } from './useTabContextMenu'
 import { useTabTitle } from './useTabTitle'
 import { useProjectManagementContext } from '../../context/ProjectManagementContext'
-import { exportPreviewPdf } from '../Panels/HtmlPreviewPanel/previewPdfExport'
 import { PreviewFailureBadge } from '../Panels/HtmlPreviewPanel/components'
 import { summarizeFailures } from '../Panels/HtmlPreviewPanel/htmlPreview.logic'
 import { usePreviewStore } from '../../stores/usePreviewStore'
@@ -77,26 +76,16 @@ export function HtmlPreviewTab(props: IDockviewPanelHeaderProps<HtmlPreviewTabPa
   const failureSummary = useMemo(() => summarizeFailures(failures), [failures])
 
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
-  const closeMenuItems = useTabContextMenu(panelId, () => setContextMenu(null))
-
-  // The visible affordance for PDF export (UX-003): a preview-only menu item
-  // prepended to the shared close items. The panel surface itself is painted
-  // over by the native view, so the tab is the reliable place for this chrome.
-  const contextMenuItems = useMemo<ContextMenuItem[]>(
-    () => [
-      {
-        label: 'Export as PDF',
-        icon: <FileDown size={14} />,
-        action: () => {
-          setContextMenu(null)
-          void exportPreviewPdf(panelId)
-        }
-      },
-      { label: '', action: () => {}, separator: true },
-      ...closeMenuItems
-    ],
-    [panelId, closeMenuItems]
-  )
+  // The same close items every tab gets, and nothing else.
+  //
+  // "Export as PDF" used to be prepended here, because the panel surface is
+  // painted over by the native view and the tab was the only chrome that
+  // survived (UX-003). The preview now has a toolbar of its own above the view,
+  // which is where the markdown editor has always kept its export button — so
+  // the affordance moved there and this menu went back to being the ordinary
+  // one. An export hidden behind a right-click on a tab handle is an export
+  // nobody finds.
+  const contextMenuItems = useTabContextMenu(panelId, () => setContextMenu(null))
 
   // The label comes from the panel's live title, not the path, so the viewer's
   // "(deleted)" marker reaches the screen for a background tab (issue #70/#74).

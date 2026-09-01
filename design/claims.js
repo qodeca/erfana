@@ -15,7 +15,7 @@ window.ERFANA_CLAIMS = {
     "card": "system/foundations/motion.html"
   },
   "icon-registry-bypass": {
-    "value": 49,
+    "value": 50,
     "label": "files importing the icon library directly instead of the registry",
     "card": "system/components/icon/index.html"
   },
@@ -34,6 +34,11 @@ window.ERFANA_CLAIMS = {
     "label": "stylesheets setting a bare z-index instead of a token",
     "card": "system/foundations/layering.html"
   },
+  "zindex-js-literals": {
+    "value": 8,
+    "label": "renderer files mirroring a z-index into TypeScript",
+    "card": "system/foundations/layering.html"
+  },
   "colour-tokens": {
     "value": 108,
     "label": "colour tokens declared in design-tokens.css",
@@ -50,8 +55,13 @@ window.ERFANA_CLAIMS = {
     "card": "system/foundations/colors.html"
   },
   "contrast-tertiary-on-panel": {
-    "value": 6.33,
-    "label": "--color-text-tertiary on --color-bg-secondary",
+    "value": 8.52,
+    "label": "--color-text-tertiary on --color-bg-primary",
+    "card": "system/components/permission-band/index.html"
+  },
+  "contrast-secondary-on-band": {
+    "value": 5.01,
+    "label": "--color-text-secondary on --color-bg-primary",
     "card": "system/components/permission-band/index.html"
   },
   "contrast-input-border": {
@@ -93,6 +103,11 @@ window.ERFANA_CLAIMS = {
     "value": 6.24,
     "label": "--color-border-focus against --color-bg-secondary",
     "card": "system/foundations/focus.html"
+  },
+  "contrast-warning-on-panel": {
+    "value": 6.63,
+    "label": "--color-warning on --color-bg-tertiary",
+    "card": "system/components/permission-band/index.html"
   }
 };
 

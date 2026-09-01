@@ -22,10 +22,15 @@ import type {
   PreviewFailureListPayload,
   PreviewFindRequest,
   PreviewForwardedShortcut,
+  PreviewOpenFileRequestedPayload,
+  PreviewAllowlistChangedPayload,
+  PreviewVisibilityAppliedPayload,
   PreviewHostBlockedPayload,
+  PreviewBackdropPayload,
   PreviewLoadStatePayload,
   PreviewOpenRequest,
-  PreviewStillFramePayload
+  PreviewStillFramePayload,
+  PreviewBoundsAppliedPayload
 } from '../shared/ipc/preview-schema'
 import type {
   PdfExportResult,
@@ -52,8 +57,18 @@ export const previewBridge: PreviewBridge = {
   close: (panelId: string): Promise<void> =>
     ipcRenderer.invoke(PreviewChannels.CLOSE, { panelId }),
 
-  setBounds: (panelId: string, bounds: PreviewBoundsPayload, seq: number): void =>
-    ipcRenderer.send(PreviewChannels.SET_BOUNDS, { panelId, bounds, seq }),
+  setBounds: (
+    panelId: string,
+    bounds: PreviewBoundsPayload,
+    seq: number,
+    options?: { ack?: boolean }
+  ): void =>
+    // `ack` is omitted rather than sent as `false` so a steady-state push stays
+    // byte-identical to what it was before the flag existed.
+    ipcRenderer.send(
+      PreviewChannels.SET_BOUNDS,
+      options?.ack === true ? { panelId, bounds, seq, ack: true } : { panelId, bounds, seq }
+    ),
 
   setVisibility: (panelId: string, visible: boolean, reason: string): void =>
     ipcRenderer.send(PreviewChannels.SET_VISIBILITY, { panelId, visible, reason }),
@@ -82,6 +97,14 @@ export const previewBridge: PreviewBridge = {
   onHostBlocked: (callback: (payload: PreviewHostBlockedPayload) => void): (() => void) =>
     subscribe(PreviewEvents.HOST_BLOCKED, callback),
 
+  onVisibilityApplied: (
+    callback: (payload: PreviewVisibilityAppliedPayload) => void
+  ): (() => void) => subscribe(PreviewEvents.VISIBILITY_APPLIED, callback),
+
+  onAllowlistChanged: (
+    callback: (payload: PreviewAllowlistChangedPayload) => void
+  ): (() => void) => subscribe(PreviewEvents.ALLOWLIST_CHANGED, callback),
+
   onFindResult: (callback: (result: PreviewFindResult) => void): (() => void) =>
     subscribe(PreviewEvents.FIND_RESULT, callback),
 
@@ -91,6 +114,16 @@ export const previewBridge: PreviewBridge = {
   onLoadStateChanged: (callback: (payload: PreviewLoadStatePayload) => void): (() => void) =>
     subscribe(PreviewEvents.LOAD_STATE_CHANGED, callback),
 
+  onBackdropChanged: (callback: (payload: PreviewBackdropPayload) => void): (() => void) =>
+    subscribe(PreviewEvents.BACKDROP_CHANGED, callback),
+
+  onBoundsApplied: (callback: (payload: PreviewBoundsAppliedPayload) => void): (() => void) =>
+    subscribe(PreviewEvents.BOUNDS_APPLIED, callback),
+
   onForwardedShortcut: (callback: (payload: PreviewForwardedShortcut) => void): (() => void) =>
-    subscribe(PreviewEvents.FORWARDED_SHORTCUT, callback)
+    subscribe(PreviewEvents.FORWARDED_SHORTCUT, callback),
+
+  onOpenFileRequested: (
+    callback: (payload: PreviewOpenFileRequestedPayload) => void
+  ): (() => void) => subscribe(PreviewEvents.OPEN_FILE_REQUESTED, callback)
 }

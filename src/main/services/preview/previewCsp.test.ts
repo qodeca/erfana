@@ -16,7 +16,7 @@ describe('buildPreviewCsp', () => {
 
   it('renders exactly the approved hosts as https:// sources', () => {
     // Dotted hosts: a bare single-label name is no longer approvable (#32).
-    const csp = buildPreviewCsp(['a.io', 'b.io'])
+    const csp = buildPreviewCsp(['https://a.io', 'https://b.io'])
     expect(csp).toContain('erfana-preview: https://a.io https://b.io')
     // No bare `https:` scheme-source wildcard: every https: is followed by //.
     expect(csp).not.toMatch(/https:(?!\/\/)/)
@@ -31,18 +31,18 @@ describe('buildPreviewCsp', () => {
   })
 
   it("never emits a 'self' source (opaque origin has no self)", () => {
-    expect(buildPreviewCsp(['cdn.jsdelivr.net'])).not.toContain("'self'")
+    expect(buildPreviewCsp(['https://cdn.jsdelivr.net'])).not.toContain("'self'")
   })
 
   it('skips a host containing a newline and never throws, badging it instead', () => {
     const onReject = vi.fn()
     let csp = ''
     expect(() => {
-      csp = buildPreviewCsp(['good.example', 'bad\nhost.example'], onReject)
+      csp = buildPreviewCsp(['https://good.example', 'https://bad\nhost.example'], onReject)
     }).not.toThrow()
     expect(csp).toContain('https://good.example')
     expect(csp).not.toContain('bad')
-    expect(onReject).toHaveBeenCalledWith('bad\nhost.example')
+    expect(onReject).toHaveBeenCalledWith('https://bad\nhost.example')
   })
 
   it('rejects hosts carrying CSP delimiters or non-ASCII characters', () => {
@@ -56,6 +56,6 @@ describe('buildPreviewCsp', () => {
   })
 
   it('accepts a legitimate CDN host', () => {
-    expect(buildPreviewCsp(['cdn.jsdelivr.net'])).toContain('https://cdn.jsdelivr.net')
+    expect(buildPreviewCsp(['https://cdn.jsdelivr.net'])).toContain('https://cdn.jsdelivr.net')
   })
 })

@@ -91,7 +91,11 @@ export default defineConfig({
         input: {
           index: resolve('src/preload/index.ts'),
           screenshotOverlay: resolve('src/preload/screenshotOverlay.ts'),
-          imageExport: resolve('src/preload/imageExport.ts')
+          imageExport: resolve('src/preload/imageExport.ts'),
+          // The sealed HTML-preview page (#74 / sd-074b §5.1). Exposes nothing;
+          // it only reports link clicks to main. Like the other secondary
+          // entries it must stay self-contained — see the guard above.
+          previewPage: resolve('src/preload/previewPage.ts')
         },
         output: {
           format: 'cjs'

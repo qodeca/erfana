@@ -40,6 +40,7 @@ import type {
   PreviewFailureInput,
   PreviewFailureType
 } from '../../../shared/ipc/preview-types'
+import type { PreviewBlockedKind } from '../../../shared/ipc/previewBlockedKind'
 import type { IPreviewAllowlistStore } from './PreviewAllowlistStore'
 import type { IPreviewRootRegistry } from './PreviewRootRegistry'
 import type { PreviewNativeImage } from './PreviewStillFrameCache'
@@ -71,6 +72,20 @@ export interface PreviewSessionLike {
  * controllers and the input-forwarding target, so one handle flows to them all.
  */
 export interface PreviewWebContentsHandle {
+  /**
+   * WebContents-scoped IPC (sd-074b §5.3). Optional so existing test doubles
+   * stay valid; absent simply means no link channel for that fake.
+   *
+   * Deliberately NOT `mainFrame.ipc`: a `WebFrameMain` is replaced when a
+   * navigated page replaces it, which would silently drop the listener.
+   */
+  readonly ipc?: {
+    on(channel: string, listener: (...args: never[]) => void): void
+    removeListener(channel: string, listener: (...args: never[]) => void): void
+  }
+  /** The top-level frame, used to reject sub-frame senders on that channel. */
+  readonly mainFrame?: unknown
+
   loadURL(url: string): Promise<void>
   reload(): void
   reloadIgnoringCache(): void
@@ -87,6 +102,11 @@ export interface PreviewWebContentsHandle {
     options: { forward: boolean; findNext: boolean; matchCase: boolean }
   ): number
   stopFindInPage(action: 'clearSelection' | 'keepSelection' | 'activateSelection'): void
+  /** Chromium zoom level; 0 is 100%, each step is a ~20% change. */
+  setZoomLevel(level: number): void
+  getZoomLevel(): number
+  /** Whether this web contents currently has keyboard focus. */
+  isFocused(): boolean
   // Event surface: `on`, `once` and `removeListener` are intentionally loose
   // because the wired events (`render-process-gone`, `unresponsive`,
   // `will-navigate`, `did-finish-load`, `destroyed`, `before-input-event`) carry
@@ -115,7 +135,8 @@ export interface PreviewSessionCreateContext {
     kind: PreviewFailureType,
     host: string,
     url: string,
-    approvable: boolean
+    approvable: boolean,
+    resourceKind: PreviewBlockedKind
   ) => void
 }
 
@@ -153,6 +174,15 @@ export interface PreviewSessionFactoryDeps {
   readonly createView?: (webPreferences: unknown) => PreviewViewHandle
   /** Build the frozen web prefs; defaults to `buildPreviewWebPreferences`. */
   readonly buildWebPreferences?: (session: PreviewSessionLike) => unknown
+  /**
+   * Absolute path to the built `previewPage.js` preload (sd-074b §5.2).
+   *
+   * Resolved and existence-checked by the composition root, never by this
+   * factory: a path baked in here would be wrong under Vitest and in a packaged
+   * build. `null` means no preload — links stay inert, which is the deliberate
+   * degradation when the bundle is missing rather than a failure to open.
+   */
+  readonly previewPagePreloadPath?: string | null
   /** A fresh partition name; defaults to `nextPartitionName`. */
   readonly nextPartitionName?: () => string
   /** Harden permissions/downloads/WebRTC; defaults to `hardenPreviewSession`. */
@@ -180,9 +210,14 @@ export class PreviewSessionFactory implements IPreviewSessionFactory {
       allowlistStore: deps.allowlistStore,
       createSession: deps.createSession ?? defaultCreateSession,
       createView: deps.createView ?? defaultCreateView,
+      previewPagePreloadPath: deps.previewPagePreloadPath ?? null,
       buildWebPreferences:
         deps.buildWebPreferences ??
-        ((session) => buildPreviewWebPreferences(session as unknown as Session)),
+        ((session) =>
+          buildPreviewWebPreferences(
+            session as unknown as Session,
+            deps.previewPagePreloadPath ?? null
+          )),
       nextPartitionName: deps.nextPartitionName ?? nextPartitionName,
       hardenSession:
         deps.hardenSession ??
@@ -200,59 +235,88 @@ export class PreviewSessionFactory implements IPreviewSessionFactory {
     const { registry, allowlistStore } = this.deps
 
     // 1–2: load the allowlist, then let the registry mint the token + build the CSP.
-    const state = await allowlistStore.load()
-    const token = await registry.issue(ctx.projectPath, state.hosts)
+    //
+    // The CSP is built from `getOrigins()`, the SAME accessor the network filter
+    // reads below — not from the `load()` return value. Two readers of one store
+    // through two different shapes is how the two chokepoints came to disagree
+    // about ports in the first place; there is one shape now.
+    await allowlistStore.load()
+    const token = await registry.issue(ctx.projectPath, [...allowlistStore.getOrigins()])
     const entry = registry.resolve(token)
     if (entry === undefined) {
       // The registry just issued this token; an absence here is a wiring fault.
       throw new Error('Preview registry lost the token it just issued')
     }
 
-    // 3–5: fresh in-memory partition, web prefs, then the view (before hardening).
-    const session = this.deps.createSession(this.deps.nextPartitionName())
-    const webPreferences = this.deps.buildWebPreferences(session)
-    const view = this.deps.createView(webPreferences)
-
-    // 6: harden — needs the view's webContents for the WebRTC policy.
-    const disposeHarden = this.deps.hardenSession(session, view.webContents)
-
-    // 7: the single `erfana-preview://` application site.
-    const detachProtocol = this.deps.attachProtocol(session, {
-      resolve: (t) => registry.resolve(t) ?? null,
-      recordFailure: ctx.recordFailure
-    })
-
-    // 8: the unfiltered network gate, reading the LIVE allowed-host set so an
-    // approve does not need the filter re-attached.
-    const detachFilter = this.deps.attachFilter(session, {
-      getAllowedHosts: () => allowlistStore.getHosts(),
-      onBlocked: ctx.onBlocked,
-      onRequestStarted: () => {},
-      onRequestSettled: () => {}
-    })
-
-    const teardown = (): void => {
-      detachFilter()
-      detachProtocol()
-      disposeHarden()
+    // Steps 3–9 all run AFTER the token is live, and every one of them can
+    // throw: `createView` allocates a WebContentsView, `hardenSession` touches
+    // the new webContents, and both attach steps install session-level wiring.
+    //
+    // An earlier revision guarded step 9 only, under a comment claiming "no
+    // half-wired view leaks". That was true of the seal tripwire and of nothing
+    // else: a throw in `attachFilter` left the token resolvable and the protocol
+    // handler attached, so it kept serving confined file reads for the life of
+    // the process (lens review F9). The cleanup list is now built incrementally,
+    // so a failure at ANY step unwinds exactly what was built before it.
+    const unwind: Array<() => void> = [() => registry.revoke(token)]
+    const rollback = (): void => {
+      // Last built, first undone. Each step is independently guarded: one
+      // failing disposer must not strand the rest.
+      for (const undo of unwind.reverse()) {
+        try {
+          undo()
+        } catch {
+          // Nothing useful to do while already unwinding a failed build.
+        }
+      }
     }
 
-    // 9: the seal tripwire. A persistent partition throws — tear down everything
-    // built above, revoke the token and rethrow so no half-wired view leaks.
     try {
+      // 3–5: fresh in-memory partition, web prefs, then the view (before hardening).
+      const session = this.deps.createSession(this.deps.nextPartitionName())
+      const webPreferences = this.deps.buildWebPreferences(session)
+      const view = this.deps.createView(webPreferences)
+      unwind.push(() => {
+        if (!view.webContents.isDestroyed()) {
+          view.webContents.destroy()
+        }
+      })
+
+      // 6: harden — needs the view's webContents for the WebRTC policy.
+      const disposeHarden = this.deps.hardenSession(session, view.webContents)
+      unwind.push(disposeHarden)
+
+      // 7: the single `erfana-preview://` application site.
+      const detachProtocol = this.deps.attachProtocol(session, {
+        resolve: (t) => registry.resolve(t) ?? null,
+        recordFailure: ctx.recordFailure
+      })
+      unwind.push(detachProtocol)
+
+      // 8: the unfiltered network gate, reading the LIVE allowed-host set so an
+      // approve does not need the filter re-attached.
+      const detachFilter = this.deps.attachFilter(session, {
+        getAllowedHosts: () => allowlistStore.getOrigins(),
+        onBlocked: ctx.onBlocked,
+        onRequestStarted: () => {},
+        onRequestSettled: () => {}
+      })
+      unwind.push(detachFilter)
+
+      // 9: the seal tripwire. A persistent partition throws.
       this.deps.assertSealed(session)
-    } catch (error) {
-      teardown()
-      // `teardown` only detaches the session wiring; destroy the view built at
-      // step 5 too, or the half-built WebContentsView leaks on a seal failure.
-      if (!view.webContents.isDestroyed()) {
-        view.webContents.destroy()
+
+      const teardown = (): void => {
+        detachFilter()
+        detachProtocol()
+        disposeHarden()
       }
-      registry.revoke(token)
+
+      return { view, session, token, realRoot: entry.realRoot, teardown }
+    } catch (error) {
+      rollback()
       throw error
     }
-
-    return { view, session, token, realRoot: entry.realRoot, teardown }
   }
 }
 

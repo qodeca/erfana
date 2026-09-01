@@ -7,6 +7,7 @@
  * the four enumerated accelerators are forwarded (with preventDefault), and the
  * attach/detach lifecycle.
  */
+import { PreviewForwardedShortcutSchema } from '../../../shared/ipc/preview-schema'
 import { describe, expect, it, vi } from 'vitest'
 import {
   PREVIEW_FORWARDED_SHORTCUTS,
@@ -30,7 +31,7 @@ function keyDown(overrides: Partial<ForwardableInput>): ForwardableInput {
 }
 
 describe('PREVIEW_FORWARDED_SHORTCUTS', () => {
-  it('is a frozen list of exactly the four accelerators', () => {
+  it('is a frozen list of exactly the forwarded accelerators', () => {
     expect(Object.isFrozen(PREVIEW_FORWARDED_SHORTCUTS)).toBe(true)
     expect(PREVIEW_FORWARDED_SHORTCUTS).toEqual([
       { key: 'f', accel: true },
@@ -38,6 +39,40 @@ describe('PREVIEW_FORWARDED_SHORTCUTS', () => {
       { key: 'w', accel: true },
       { key: 'Escape', accel: false }
     ])
+  })
+
+  it('does NOT forward the zoom keys, because the View menu owns them', () => {
+    // Page zoom reaches a focused preview through `menu.ts` -> `zoomFocused` ->
+    // `wc.setZoomLevel`, which is what satisfies WCAG 2.2 SC 1.4.4 here.
+    //
+    // Listing them here as well was dead weight in one direction and a hazard
+    // in the other: the IPC schema never enumerated them, so every one was
+    // dropped at the boundary; and widening the schema to "fix" that would have
+    // zoomed TWICE per keypress, once from the accelerator and once from the
+    // forward. That is the collision `menu.ts` replaced the built-in zoom roles
+    // to avoid.
+    const keys = PREVIEW_FORWARDED_SHORTCUTS.map((s) => s.key)
+    for (const zoomKey of ['=', '+', '-', '_', '0']) {
+      expect(keys).not.toContain(zoomKey)
+    }
+    // The positive control: the list is not simply empty.
+    expect(keys).toEqual(expect.arrayContaining(['f', 's', 'w', 'Escape']))
+  })
+
+  it('carries exactly the keys the IPC schema will accept', () => {
+    // THE DRIFT THAT MADE THIS NECESSARY. This list is documented as "the
+    // complete, frozen set... adding a key here is the ONLY way to widen the
+    // input bridge", but the wire schema restates the same vocabulary by hand.
+    // Five keys were added here and not there, so main called preventDefault on
+    // them inside the page and then dropped every resulting event at
+    // `validateAndSend` with a warning. Nothing failed; the feature was simply
+    // absent.
+    //
+    // Compared as SETS in both directions, so neither list can grow past the
+    // other unnoticed.
+    const forwarded = [...PREVIEW_FORWARDED_SHORTCUTS.map((s) => s.key)].sort()
+    const accepted = [...PreviewForwardedShortcutSchema.shape.key.options].sort()
+    expect(forwarded).toEqual(accepted)
   })
 })
 

@@ -14,6 +14,7 @@ import { WelcomePanel } from '../../Panels/WelcomePanel'
 import { WelcomeTab } from '../../Panels/WelcomeTab'
 import { EditorTab, ImageTab, HtmlPreviewTab } from '../../Tabs'
 import { getOverlayGuard } from '../../../services/preview/OverlayGuardService'
+import { getPreviewLinkRouter } from '../../../services/preview/PreviewLinkRouter'
 import { useActivityBarStore } from '../../../stores/useActivityBarStore'
 import { logger } from '../../../utils/logger'
 import { TEST_IDS } from '../../../constants/testids'
@@ -76,6 +77,12 @@ const HtmlPreviewPanelWithBoundary = (
 export const EditorAreaSplitPanel = (props: ISplitviewPanelProps): JSX.Element => {
   const onEditorReady = (event: DockviewReadyEvent) => {
     logger.info('📝 Editor DockView ready')
+
+    // Route link clicks from previewed pages into editor tabs. Mounted here
+    // beside the overlay guard because this is the layer that owns app-level
+    // preview services; the router itself reads the dockview api from the
+    // project store, so it needs nothing from this closure (sd-074b §5.4).
+    getPreviewLinkRouter()
 
     // Create the welcome/home panel
     const welcomePanel = event.api.addPanel({
