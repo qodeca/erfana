@@ -18,6 +18,10 @@ import { describe, it, expect, vi } from 'vitest'
 
 import { PREVIEW } from '../../../shared/constants'
 import { createPreviewCspViolationBridge } from './previewCspViolationBridge'
+import {
+  PreviewOriginSchema,
+  parsePreviewOrigin
+} from '../../../shared/ipc/preview-settings-schema'
 
 /** A bridge plus the sink it reports to. */
 function makeBridge(now?: () => number): {
@@ -47,6 +51,50 @@ describe('previewCspViolationBridge', () => {
         true,
         'image'
       )
+    })
+
+    /**
+     * THE ROUND TRIP, and the property that actually matters.
+     *
+     * A row's Allow button sends `row.host` verbatim, and the approve request
+     * validates it with `PreviewOriginSchema`, whose refinement is
+     * `parsePreviewOrigin(v) === v`. So anything this bridge reports as
+     * `approvable: true` must already BE canonical — otherwise the row offers a
+     * button the boundary refuses, and the reader gets "Not saved — not allowed"
+     * with no way to fix it.
+     *
+     * The trailing dot broke exactly this: the canonicaliser stripped it, so a
+     * page requesting `cdn.example.com./x` produced a row whose reported origin
+     * did not round-trip. Asserting the invariant over a table is what keeps the
+     * next normalisation from re-opening it somewhere else.
+     */
+    it('never offers an origin the approve boundary would refuse', () => {
+      const { bridge, onBlockedHost } = makeBridge()
+
+      const probes = [
+        'https://cdn.jsdelivr.net/x.js',
+        'https://cdn.example.com./x.js',
+        'https://cdn.example.com.:8443/x.js',
+        'https://EXAMPLE.com/x.js',
+        'https://example.com:443/x.js',
+        'http://localhost:3000/x.js',
+        'http://127.0.0.1/x.js',
+        'https://xn--80ak6aa92e.com/x.js',
+        'https://[::1]:3000/x.js',
+        'https://foo_bar.com/x.js',
+        'https://example.com../x.js'
+      ]
+      for (const probe of probes) bridge.handleViolation(violation(probe))
+
+      const offered = onBlockedHost.mock.calls
+        .filter((call) => call[2] === true)
+        .map((call) => call[0] as string)
+
+      expect(offered.length).toBeGreaterThan(0)
+      for (const origin of offered) {
+        expect(parsePreviewOrigin(origin)).toBe(origin)
+        expect(PreviewOriginSchema.safeParse(origin).success).toBe(true)
+      }
     })
 
     it('marks every observed origin approvable, loopback included', () => {

@@ -45,7 +45,9 @@ Remote subresources – scripts, CSS, fonts, images from other addresses – are
 
 The unit of a permission is an **origin**: scheme, host and port together. `https://cdn.example.com`, `https://cdn.example.com:8443` and `http://cdn.example.com` are three different permissions, because they are three different things to reach. `http://` is allowable and works, and the confirm step says what it costs — the connection is not encrypted, so anyone in between can change what the page loads.
 
-Every blocked address gets a button, `localhost` and IP literals included. **One exception:** an IPv6 literal cannot be allowed at all, because the browser's Content-Security-Policy grammar has no way to write one (`host-char` is `ALPHA / DIGIT / "-"`). That row says so rather than refusing silently.
+Every blocked address gets a button, `localhost` and IP literals included — including a hostname ending in a dot, which is a *different* grant from the same name without one (measured: a CSP host-source matches only its own spelling), so the row draws the dot rather than hiding it.
+
+A row without a button says **why**, and the reason is derived from the address rather than assumed. Two shapes reach it. An **IPv6 literal** cannot be allowed at all, because the browser's Content-Security-Policy grammar has no way to write one (`host-char` is `ALPHA / DIGIT / "-"`). A name that is **not a valid host name** — an underscore, an empty part — cannot have a permission written for it either. The row used to give the IPv6 reason for both.
 
 - **Approving records the host** in `.erfana/settings.json` inside the open project. That file is the only source of truth for which hosts are allowed. On the next load the approved host's subresource loads.
 - **Removing an approval is currently a manual edit.** There is no in-app view or revoke of approved hosts yet – to remove one, edit `.erfana/settings.json` by hand and delete the host. An in-app allowlist view/revoke UI is a planned follow-up (see [Security § HTML preview](../security.md#html-preview) and the technical-debt ledger).

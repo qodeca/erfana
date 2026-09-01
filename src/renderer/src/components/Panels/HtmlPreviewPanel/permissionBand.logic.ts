@@ -266,6 +266,74 @@ export function describeKinds(kinds: readonly PreviewBlockedKind[]): string {
   return `${phrases.slice(0, -1).join(', ')} and ${phrases[phrases.length - 1]}`
 }
 
+/** What a buttonless row says, and the fuller reason it announces. */
+export interface BandRefusal {
+  /** Short enough for the row's fixed middle column. */
+  readonly short: string
+  /** The whole reason, carried by the accessible name. */
+  readonly detail: string
+}
+
+/**
+ * Why this origin cannot be offered an Allow button.
+ *
+ * Derived from the origin the row already holds, NOT carried over IPC. The
+ * canonicaliser is pure and dependency-free precisely so it can run in both
+ * bundles, and adding a `reason` to `PreviewHostBlockedPayloadSchema` would mean
+ * editing seven files across a `.strict()` boundary where a half-landed change
+ * drops the ENTIRE payload rather than one field.
+ *
+ * The row used to hardcode the IPv6 sentence for every refusal, so a host
+ * refused for a different reason was told the wrong cause. Two reviewers found
+ * that independently, and a test pinned it: an IPv4 literal asserted to render
+ * the IPv6 copy.
+ */
+export function describeRefusal(origin: string): BandRefusal {
+  let hostname = ''
+  try {
+    hostname = new URL(origin).hostname
+  } catch {
+    // Not a URL at all. Nothing specific can be said honestly.
+    return {
+      short: 'Cannot be allowed',
+      detail: 'This address cannot be allowed: it is not a form Erfana can record.'
+    }
+  }
+
+  // PHYSICS, not policy: CSP3's `host-char` is `ALPHA / DIGIT / "-"`, so a
+  // bracketed literal cannot be written as a host-source at all. A grant would
+  // live in the network filter and never reach the CSP.
+  if (hostname.startsWith('[') || hostname.includes(':')) {
+    return {
+      short: 'IPv6 cannot be allowed',
+      detail:
+        'IPv6 addresses cannot be allowed: the browser security policy that ' +
+        'carries a permission has no way to write one down.'
+    }
+  }
+
+  // A single trailing dot is the DNS root label and is legal — take it off
+  // before judging the labels, exactly as the canonicaliser does.
+  const namePart = hostname.endsWith('.') ? hostname.slice(0, -1) : hostname
+  const badLabel = namePart
+    .split('.')
+    .some((label) => !/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/.test(label))
+  if (badLabel) {
+    return {
+      short: 'Not a valid host name',
+      detail:
+        `"${hostname}" cannot be allowed: it is not a valid host name. Every ` +
+        'part must be letters, digits or hyphens — an underscore or an empty ' +
+        'part makes it something a permission cannot be written for.'
+    }
+  }
+
+  return {
+    short: 'Cannot be allowed',
+    detail: `"${hostname}" cannot be allowed: it is not a form Erfana can record a permission for.`
+  }
+}
+
 /**
  * What a failed approval says on the row.
  *

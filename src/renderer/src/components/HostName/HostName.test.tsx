@@ -73,15 +73,17 @@ describe('HostName', () => {
       expect(el.querySelector('.erf-host__port')?.textContent).toBe(':3000')
     })
 
-    it('strips exactly one trailing dot from the host', () => {
-      // `evil.com.` and `evil.com` are the same name to the resolver, so the dot
-      // is normalised away rather than refused.
-      expect(renderHost('https://evil.com./').textContent).toBe('evil.com')
+    it('DRAWS a trailing dot rather than hiding it', () => {
+      // This used to strip it, on the reasoning that `evil.com.` and `evil.com`
+      // are the same name to a resolver. They are not the same GRANT: measured in
+      // the Chromium this ships, a CSP host-source matches only its own spelling,
+      // so the two are separate permissions. Drawing them identically would put a
+      // working row and a dead one side by side, indistinguishable, in the list a
+      // reader uses to decide what to trust.
+      expect(renderHost('https://evil.com./').textContent).toBe('evil.com.')
       cleanup()
 
-      // ...but only one. `example.com..` is not a host, and pretending it is
-      // would be the component inventing a name nobody granted.
-      expect(renderHost('https://example.com../').textContent).toBe('example.com.')
+      expect(renderHost('https://evil.com/').textContent).toBe('evil.com')
     })
   })
 
@@ -118,10 +120,11 @@ describe('HostName', () => {
         'http://localhost:3000'
       )
       cleanup()
-      // The announced origin agrees with the drawn one: same dot stripped, no
-      // trailing slash the row never showed.
+      // The announced origin agrees with the drawn one: same trailing dot kept,
+      // no trailing slash the row never showed. A screen-reader user must be able
+      // to tell the two grants apart exactly as a sighted one can.
       expect(renderHost('https://evil.com./').getAttribute('aria-label')).toBe(
-        'https://evil.com'
+        'https://evil.com.'
       )
     })
 

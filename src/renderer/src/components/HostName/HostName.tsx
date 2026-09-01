@@ -63,17 +63,6 @@ interface OriginParts {
 }
 
 /**
- * One trailing dot, and one only — `example.com..` is not a host.
- *
- * A trailing dot is NORMALISED AWAY rather than refused: `evil.com.` and
- * `evil.com` are the same name to the resolver, and CSP has no empty-label
- * production, so refusing it would mean a blocked row that gets an Allow button
- * the boundary then rejects. A button that lies is worse than no button.
- */
-function stripTrailingDot(hostname: string): string {
-  return hostname.endsWith('.') ? hostname.slice(0, -1) : hostname
-}
-
 /**
  * Split an origin into what is drawn and what is announced, without ever decoding
  * punycode.
@@ -102,7 +91,18 @@ function parseOrigin(origin: string): OriginParts | null {
   }
   if (url.hostname === '') return null
 
-  const host = stripTrailingDot(url.hostname)
+  /*
+   * THE TRAILING DOT IS DRAWN, not hidden, and that is a security property
+   * rather than a detail.
+   *
+   * This used to strip it, back when the canonicaliser did too. It no longer
+   * does: measured in the Chromium this ships, `evil.com.` and `evil.com` are
+   * two different hosts to a CSP host-source and never match each other, so they
+   * are two different grants. Two different grants that render as the same
+   * string, in the list a reader uses to decide what to trust, is a spoof — one
+   * row that works and one that does not, indistinguishable.
+   */
+  const host = url.hostname
   const port = url.port === '' ? null : url.port
   return {
     scheme: url.protocol === 'https:' ? null : `${url.protocol}//`,

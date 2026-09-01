@@ -177,12 +177,28 @@ describe('PreviewChromeBand', () => {
     }
   })
 
-  it('offers no Allow on a host that can never be approved', async () => {
+  it('offers no Allow on a host that can never be approved, and says the RIGHT why', async () => {
+    /*
+     * The fixture used to be `203.0.113.7` — an IPv4 literal — asserted to render
+     * the IPv6 copy. It passed for the wrong reason twice over: the row emitted
+     * that sentence for ANY buttonless host, and since #108 an IPv4 literal is
+     * approvable, so `approvable: false` there was a state main can no longer
+     * emit. A fixture that cannot occur, asserting a message about a different
+     * cause.
+     */
     const user = userEvent.setup()
-    renderBand({ blockedHosts: [host('203.0.113.7', ['image'], false)] })
+    renderBand({
+      blockedHosts: [
+        host('[2001:db8::1]', ['image'], false),
+        host('foo_bar.example.com', ['image'], false)
+      ]
+    })
     await user.click(screen.getByTestId('preview-band-chip'))
 
+    // The one refusal that is physics: CSP cannot write an IPv6 host-source.
     expect(screen.getByText('IPv6 cannot be allowed')).toBeInTheDocument()
+    // And one that is not IPv6 must not claim to be.
+    expect(screen.getByText('Not a valid host name')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^Allow/ })).not.toBeInTheDocument()
   })
 

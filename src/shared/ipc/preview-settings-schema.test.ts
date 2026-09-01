@@ -191,13 +191,33 @@ describe('parsePreviewOrigin', () => {
     }
   })
 
-  it('strips exactly one trailing dot rather than refusing it', () => {
-    // `example.com.` is reachable, so it produces a blocked row. Refusing it
-    // would put an Allow button on that row which the boundary then rejects —
-    // a button that lies, which is worse than no button.
-    expect(parsePreviewOrigin('https://example.com./')).toBe('https://example.com')
-    // Two dots leave an empty label, which is not a host.
+  it('KEEPS a trailing dot, because Chromium treats it as a different host', () => {
+    /*
+     * This used to strip it. The argument was that `example.com.` and
+     * `example.com` are the same name to a resolver and that CSP could not
+     * express the dotted form anyway — so the grant had to be written dotless.
+     *
+     * The second half is false, measured in the Chromium this ships
+     * (142.0.7444.265, Electron 39.8.10), one served page per case:
+     *
+     *   CSP `img-src http://localhost:P`   ⇒ `http://localhost:P/x`  LOADS
+     *                                        `http://localhost.:P/x` BLOCKED
+     *   CSP `img-src http://localhost.:P`  ⇒ `http://localhost.:P/x` LOADS
+     *                                        `http://localhost:P/x`  BLOCKED
+     *
+     * Chromium accepts a dotted host-source and never matches it against the
+     * dotless one. So stripping WAS the button that lies: a page requesting
+     * `example.com./x` got a row offering `example.com`, and the grant it wrote
+     * could not apply to the request that produced it.
+     */
+    expect(parsePreviewOrigin('https://example.com./')).toBe('https://example.com.')
+    expect(parsePreviewOrigin('https://example.com/')).toBe('https://example.com')
+    // Still a round trip, which is what the schema's refinement demands.
+    expect(parsePreviewOrigin('https://example.com.')).toBe('https://example.com.')
+    // Two dots leave a genuinely empty label, which is not a host.
     expect(parsePreviewOrigin('https://example.com..')).toBeNull()
+    // And the root label is not a free pass for a bad name.
+    expect(parsePreviewOrigin('https://foo_bar.com.')).toBeNull()
   })
 
   it('refuses a scheme outside the closed set, however well it parses', () => {
@@ -315,7 +335,10 @@ describe('PreviewOriginSchema', () => {
     expect(PreviewOriginSchema.safeParse('https://example.com:8443').success).toBe(true)
     expect(PreviewOriginSchema.safeParse('https://example.com:443').success).toBe(false)
     expect(PreviewOriginSchema.safeParse('https://EXAMPLE.com').success).toBe(false)
+    // Refused for the trailing SLASH, not the dot — the dot is part of the
+    // origin now, and `https://example.com.` on its own is accepted below.
     expect(PreviewOriginSchema.safeParse('https://example.com./').success).toBe(false)
+    expect(PreviewOriginSchema.safeParse('https://example.com.').success).toBe(true)
   })
 
   it('agrees with parsePreviewOrigin in both directions', () => {

@@ -7,7 +7,7 @@
  * @see design/system/components/permission-band/index.html - status="decided"
  */
 import { HostName } from '../../../HostName/HostName'
-import type { BandRow } from '../permissionBand.logic'
+import { describeRefusal, type BandRow } from '../permissionBand.logic'
 
 /** Props for {@link PreviewBandRow}. */
 export interface PreviewBandRowProps {
@@ -55,38 +55,42 @@ export function PreviewBandRow({
     <span className="erf-band__kind" />
   )
 
+  // Derived from the origin the row already holds, so no IPC field is needed and
+  // no payload schema has to change to say something true.
+  const reason = describeRefusal(row.host)
+
   const right =
     row.state === 'allowed' ? (
       <span className="erf-band__state">Allowed ✓</span>
     ) : row.state === 'not-approvable' ? (
       /*
-       * THE LAST ROW WITHOUT A BUTTON, and the only one left.
+       * A ROW WITHOUT A BUTTON SAYS WHY, and it must say the RIGHT why.
        *
-       * Every other refusal was policy — localhost, IP literals, `.local`,
-       * single-label names — and every one of them is gone (#108), because it
-       * never detected a name that merely RESOLVED to a private address and it
+       * Every policy refusal is gone (#108) — localhost, IP literals, `.local`,
+       * single-label names — because none of them detected a name that merely
+       * RESOLVED to a private address, so they stopped the honest reader and
        * charged a dead end for the pretence.
        *
-       * This one is not a choice Erfana made. A CSP host-source cannot express
-       * an IPv6 literal at all: `host-char` is `ALPHA / DIGIT / "-"`, and
-       * Chromium says so out loud — "contains an invalid source … It will be
-       * ignored" — which means a grant would live in the network filter and
-       * never reach the CSP. Half-granted is worse than refused.
+       * What remains is not a choice Erfana made. A CSP host-source cannot
+       * express an IPv6 literal at all: `host-char` is `ALPHA / DIGIT / "-"`,
+       * and Chromium says so out loud — "contains an invalid source … It will be
+       * ignored" — so a grant would live in the network filter and never reach
+       * the CSP. Half-granted is worse than refused.
        *
-       * So it says WHY. A refusal a reader can understand is a different object
-       * from a blank one: the first teaches them something about the web, the
-       * second teaches them the band is unreliable.
+       * This USED TO HARDCODE the IPv6 sentence for every buttonless row, so a
+       * reachable host refused for a different reason — `foo_bar.com`, whose
+       * underscore is not a DNS label — was told it was an IPv6 problem. A
+       * refusal a reader can understand teaches them something about the web; a
+       * refusal that names the wrong cause teaches them the band is unreliable,
+       * which is worse than saying nothing.
        */
       <span
         className="erf-band__state"
         // Short enough for the column, and the accessible name carries the whole
         // reason. NOT `title`, which is unreachable by keyboard and by touch.
-        aria-label={
-          'IPv6 addresses cannot be allowed: the browser security policy that ' +
-          'carries a permission has no way to write one down.'
-        }
+        aria-label={reason.detail}
       >
-        IPv6 cannot be allowed
+        {reason.short}
       </span>
     ) : (
       <button
