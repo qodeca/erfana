@@ -118,7 +118,21 @@
   height: 100%;
   object-fit: cover;
   object-position: top left;
-  background: var(--color-brand-black);
+  /*
+   * TRANSPARENT, so the placeholder's own backdrop shows through.
+   *
+   * `capturePage` returns a PNG WITH ALPHA, and a page that sets no background
+   * on its body paints none — so those pixels come back transparent. Against a
+   * hardcoded brand black they rendered as a dark page with dark text on it,
+   * which is what a reader saw: the words there, the paper gone.
+   *
+   * The placeholder underneath already carries the right colour. It is painted
+   * with the backdrop main reports (`backdropChanged`), which resolves to the
+   * page's own paper once the load settles — so compositing the frame onto it is
+   * correct even when the capture ran before that colour was known, and it stays
+   * correct if the paper changes later.
+   */
+  background: transparent;
   user-select: none;
   pointer-events: none;
 }

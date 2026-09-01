@@ -181,6 +181,22 @@ describe('HtmlPreviewPanel', () => {
     expect(container.querySelector('.erf-band')).not.toBeNull()
   })
 
+  it('lets the placeholder backdrop show through the still frame', () => {
+    // `capturePage` returns a PNG WITH ALPHA. A page that sets no body
+    // background paints none, so those pixels come back transparent — and
+    // against the hardcoded brand black the frame rendered as a dark page with
+    // dark text on it: the words there, the paper gone. The placeholder beneath
+    // already carries the colour main reports, which resolves to the page's own
+    // paper, so the frame must not paint its own.
+    const css = readFileSync(resolve(__dirname, 'HtmlPreviewPanel.css'), 'utf8')
+    const rule = css.slice(
+      css.indexOf('.html-preview-still-frame {'),
+      css.indexOf('}', css.indexOf('.html-preview-still-frame {'))
+    )
+
+    expect(rule).toContain('background: transparent')
+  })
+
   it('carries a Find button that opens the find bar', () => {
     // Find-in-page worked here long before it had a button — Cmd/Ctrl+F, and a
     // forwarded accelerator for when focus is inside the native view, which
