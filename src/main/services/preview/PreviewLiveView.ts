@@ -146,11 +146,12 @@ export interface PreviewLiveViewDeps {
   readonly onForwardedShortcut?: (panelId: string, key: string) => void
   readonly platform?: NodeJS.Platform
   /**
-   * Hand a vetted URL to the OS browser (sd-074b §5.5). Injected rather than
-   * importing `shell` here, so link routing is unit-testable without Electron.
-   * Absent means external links are refused and badged.
+   * Hand a vetted URL to the OS browser (sd-074b §5.5), asking on the window
+   * this view belongs to. Injected rather than importing `shell` here, so link
+   * routing is unit-testable without Electron. Absent means external links are
+   * refused and badged.
    */
-  readonly openExternal?: (url: string) => Promise<void>
+  readonly openExternal?: (url: string, windowId: number) => Promise<void>
 }
 
 /** What the manager hands to a new live view. */
@@ -291,7 +292,8 @@ export class PreviewLiveView {
         requestOpenFile: (sourcePanelId, filePath, anchor, windowId) =>
           this.deps.emit.openFileRequested(sourcePanelId, filePath, anchor, windowId),
         openExternal: (url) =>
-          this.deps.openExternal?.(url) ?? Promise.reject(new Error('No external opener')),
+          this.deps.openExternal?.(url, this.window.id) ??
+          Promise.reject(new Error('No external opener')),
         recordFailure: (input) => this.failureLog.record(input)
       }
     )
@@ -753,7 +755,7 @@ export class PreviewLiveView {
   }
 
   exportPdf(suggestedName: string): Promise<PdfExportResult> {
-    return this.deps.exportController.exportToPdf(this.wc, suggestedName)
+    return this.deps.exportController.exportToPdf(this.wc, suggestedName, this.window.id)
   }
 
   /** Zoom-convert + clamp a CSS-px rect to the window content rect (§4.3). */

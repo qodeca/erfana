@@ -60,6 +60,20 @@ describe('PreviewExportController', () => {
     expect(result).toEqual({ ok: true, path: '/out/report.pdf' })
   })
 
+  it('hands the asking window id to the save dialog so it is parented', async () => {
+    const wc = makeWc()
+    const { controller, showSaveDialog } = makeController({
+      dialogResult: { canceled: true }
+    })
+
+    await controller.exportToPdf(wc, 'report', 7)
+
+    expect(showSaveDialog).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Export preview to PDF' }),
+      7
+    )
+  })
+
   it('does NOT write when the save dialog is cancelled', async () => {
     const wc = makeWc()
     const { controller, writeFile } = makeController({

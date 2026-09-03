@@ -20,7 +20,7 @@
  */
 import { writeFile } from 'node:fs/promises'
 
-import { dialog } from 'electron'
+import { BrowserWindow, dialog } from 'electron'
 
 import { ErrorCode } from '../../../shared/errors'
 import type { PdfExportResult } from '../../../shared/ipc/preview-types'
@@ -50,12 +50,21 @@ export interface PreviewSaveDialogResult {
 
 /** Injectable side effects so the controller is testable without Electron IO. */
 export interface PreviewExportControllerDeps {
-  showSaveDialog?: (options: {
-    title: string
-    defaultPath: string
-    buttonLabel: string
-    filters: { name: string; extensions: string[] }[]
-  }) => Promise<PreviewSaveDialogResult>
+  /**
+   * Show the save dialog, parented to the window `windowId` names when it is
+   * still alive. A file picker (unlike the external-link consent) may fall back
+   * to an unowned dialog when no window is found: it asks nothing security-
+   * relevant, and a lost picker costs one retry.
+   */
+  showSaveDialog?: (
+    options: {
+      title: string
+      defaultPath: string
+      buttonLabel: string
+      filters: { name: string; extensions: string[] }[]
+    },
+    windowId?: number
+  ) => Promise<PreviewSaveDialogResult>
   writeFile?: (path: string, data: Buffer) => Promise<void>
 }
 
@@ -65,7 +74,11 @@ export interface IPreviewExportController {
    * Returns a cancelled result if the user dismisses the dialog and a failed
    * result on any print/write error; never throws.
    */
-  exportToPdf(wc: PreviewPrintContents, suggestedName: string): Promise<PdfExportResult>
+  exportToPdf(
+    wc: PreviewPrintContents,
+    suggestedName: string,
+    windowId?: number
+  ): Promise<PdfExportResult>
 }
 
 export class PreviewExportController implements IPreviewExportController {
@@ -74,13 +87,20 @@ export class PreviewExportController implements IPreviewExportController {
 
   constructor(deps: PreviewExportControllerDeps = {}) {
     this.showSaveDialog =
-      deps.showSaveDialog ?? ((options) => dialog.showSaveDialog(options))
+      deps.showSaveDialog ??
+      ((options, windowId) => {
+        const win = windowId === undefined ? null : BrowserWindow.fromId(windowId)
+        return win !== null && !win.isDestroyed()
+          ? dialog.showSaveDialog(win, options)
+          : dialog.showSaveDialog(options)
+      })
     this.writeFile = deps.writeFile ?? ((path, data) => writeFile(path, data))
   }
 
   async exportToPdf(
     wc: PreviewPrintContents,
-    suggestedName: string
+    suggestedName: string,
+    windowId?: number
   ): Promise<PdfExportResult> {
     // #161: app-derived name → silent transform (reserved basenames, invalid
     // chars, control/bidi) via the shared helper, then length-bounded.
@@ -94,7 +114,7 @@ export class PreviewExportController implements IPreviewExportController {
       defaultPath: `${safeName}.pdf`,
       buttonLabel: 'Export',
       filters: [{ name: 'PDF Documents', extensions: ['pdf'] }]
-    })
+    }, windowId)
 
     if (result.canceled || !result.filePath) {
       return { ok: false, errorCode: ErrorCode.PDF_EXPORT_CANCELLED }

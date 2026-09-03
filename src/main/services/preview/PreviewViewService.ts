@@ -202,8 +202,12 @@ export interface PreviewViewDeps {
   /** Route a forwarded accelerator (§1.9) to the renderer; defaults to a no-op. */
   readonly onForwardedShortcut?: (panelId: string, key: string) => void
   readonly platform?: NodeJS.Platform
-  /** Hand a vetted external URL to the OS browser (sd-074b §5.5). */
-  readonly openExternal?: (url: string) => Promise<void>
+  /**
+   * Hand a vetted external URL to the OS browser (sd-074b §5.5), asking first
+   * on the window whose preview clicked it. Rejects when refused (a question
+   * already open, or the window gone); the live view turns that into a badge.
+   */
+  readonly openExternal?: (url: string, windowId: number) => Promise<void>
 }
 
 export class PreviewViewService implements IPreviewViewService, PreviewFindExportService {

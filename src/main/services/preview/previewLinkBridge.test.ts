@@ -179,6 +179,25 @@ describe('createPreviewLinkBridge — budgets', () => {
 })
 
 describe('createPreviewLinkBridge — de-duplication', () => {
+  it('honours the click when will-navigate reaches main a moment BEFORE the preload report', async () => {
+    // One click reaches main twice, over two different IPC paths, and nothing
+    // orders them. When the navigation half wins the race the old bridge routed
+    // it first — as `navigation`, which an external link refuses with a badge —
+    // and then dropped the real gesture as a duplicate: a click that produced a
+    // "Blocked link" badge instead of the consent dialog.
+    const deps = makeDeps()
+    const bridge = makeBridge(deps)
+
+    bridge.handleWillNavigate(EXTERNAL)
+    bridge.handleActivation(payload(EXTERNAL))
+
+    await vi.waitFor(() => expect(deps.openExternal).toHaveBeenCalledTimes(1))
+    // Give the deferred navigation half time to fire and be dropped.
+    await new Promise((r) => setTimeout(r, 120))
+    expect(deps.recordFailure).not.toHaveBeenCalled()
+    expect(deps.openExternal).toHaveBeenCalledTimes(1)
+  })
+
   it('routes one click once even though both entry points see it', async () => {
     const deps = makeDeps()
     const bridge = makeBridge(deps)
