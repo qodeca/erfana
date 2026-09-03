@@ -214,6 +214,10 @@ export function usePreviewLifecycle(
   }, [loadState])
 
   useEffect(() => {
+    // The one line that would have found the Windows eviction fault in a
+    // minute: it showed `loadState` never leaving 'ready', which pointed at
+    // main never emitting 'suspended' rather than at this gate.
+    logger.debug('Preview resume gate', { panelId, isVisible, loadState, resumeAttempt })
     if (!isVisible || loadState !== 'suspended') return
 
     let cancelled = false

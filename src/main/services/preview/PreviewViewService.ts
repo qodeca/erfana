@@ -32,6 +32,7 @@ import {
 import { ErrorCode } from '../../../shared/errors'
 import { PREVIEW } from '../../../shared/constants'
 import { logger } from '../LoggingService'
+import { withTimeout } from '../../utils/withTimeout'
 import type {
   PdfExportResult,
   PreviewBounds,
@@ -544,7 +545,20 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
     //
     // Cannot reject: `whenCaptureSettled` absorbs a failed capture, because the
     // only question it answers is whether Chromium is still reading this page.
-    await view.whenCaptureSettled()
+    // Bounded all the same: a capture that never settles must cost this tab its
+    // picture, not its suspension.
+    try {
+      await withTimeout(
+        view.whenCaptureSettled(),
+        PREVIEW.CAPTURE_SETTLE_TIMEOUT_MS,
+        'Preview eviction capture wait'
+      )
+    } catch (error) {
+      logger.warn('Preview eviction: capture did not settle; suspending anyway', {
+        panelId,
+        error: error instanceof Error ? error.message : String(error)
+      })
+    }
 
     /*
      * `finally`, because the comment above is only half-true otherwise.

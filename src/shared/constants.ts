@@ -551,6 +551,39 @@ export const PREVIEW = {
    */
   APPROVE_UI_DEADLINE_MS: 10000,
   /**
+   * Bound on one still-frame `capturePage` (ms). A capture that never comes
+   * back must not block every later capture of that panel; the previous frame
+   * is kept.
+   */
+  CAPTURE_TIMEOUT_MS: 1500,
+  /**
+   * Pause before the one retry of a capture that came back EMPTY (ms). Measured
+   * on Windows: the capture taken at `'ready'` was empty for a page that had
+   * only just painted, and the retry a moment later was not.
+   */
+  CAPTURE_RETRY_DELAY_MS: 250,
+  /**
+   * How long eviction waits for an in-flight capture before destroying the
+   * page anyway (ms). The wait exists so a suspended tab wakes with a picture;
+   * it must not be able to stop the tab from being suspended at all.
+   */
+  CAPTURE_SETTLE_TIMEOUT_MS: 1500,
+  /**
+   * Bound on each async step of a view's teardown (ms). On Windows the session
+   * purge inside teardown never settled (2026-09-03): eviction hung, the old
+   * renderer process was never destroyed, and the tab never heard `suspended`.
+   * A step that overruns is logged and skipped; the destroy still happens.
+   */
+  TEARDOWN_STEP_TIMEOUT_MS: 2000,
+  /**
+   * Smallest still frame worth taking (px, either edge). `preview:open` seeds
+   * the view at 1×1 before the placeholder is laid out; a frame captured then is
+   * one pixel stretched over the whole panel. 16 rather than 32 because
+   * `lastBounds` is the zoom-converted rect and a narrow split pane at 200%
+   * scaling is legitimately small.
+   */
+  MIN_STILL_FRAME_PX: 16,
+  /**
    * Max DISTINCT blocked hosts reported to the renderer per view.
    *
    * This replaced `MAX_HOST_TOASTS: 3`, which bounded toasts and not the list —

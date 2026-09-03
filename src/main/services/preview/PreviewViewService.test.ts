@@ -11,6 +11,12 @@
 import { dirname, resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+// A test that switches to fake timers and then fails never reaches its own
+// cleanup; without this every later test in the file inherits the fake clock.
+afterEach(() => {
+  vi.useRealTimers()
+})
+
 import { ErrorCode } from '../../../shared/errors'
 import { PREVIEW } from '../../../shared/constants'
 import type { PreviewFailureInput } from '../../../shared/ipc/preview-types'
@@ -1027,6 +1033,8 @@ describe('PreviewViewService — four lifecycle events', () => {
     h.entryHandlers().onUnlink()
 
     expect(h.loadStateChanged).toHaveBeenCalledWith('panel-A', 'failed', 0)
+    // A deleted file's picture must not be what an evicted tab shows later.
+    expect(h.deps.stillFrameCache.invalidate).toHaveBeenCalledWith('panel-A')
     const last = log.records.at(-1)
     expect(last?.type).toBe('missing-local-file')
     expect(last?.reasonCode).toBe(ErrorCode.PREVIEW_LOCAL_FILE_MISSING)
@@ -1249,6 +1257,23 @@ describe('PreviewViewService — live-view budget', () => {
     expect(opts.shouldKeep()).toBe(true)
   })
 
+  it('keeps the cached still frame when the page reloads while hidden', async () => {
+    // The pipeline used to drop the frame on every run and only recapture while
+    // visible, so a file saved behind a hidden tab left that tab with nothing to
+    // show until it was looked at again — a colour block, not the page.
+    const h = makeHarness()
+    await h.service.open(REQUEST_A, h.window)
+    await h.service.setVisibility('panel-A', false, 'dialog')
+    const invalidate = h.deps.stillFrameCache.invalidate as unknown as ReturnType<typeof vi.fn>
+    invalidate.mockClear()
+    h.loadStateChanged.mockClear()
+
+    h.factory.emit('did-finish-load')
+    await vi.waitFor(() => expect(h.loadStateChanged).toHaveBeenCalledWith('panel-A', 'ready', 0))
+
+    expect(invalidate).not.toHaveBeenCalled()
+  })
+
   it('publishes the cached frame on hide, so the panel is never a blank rectangle', async () => {
     const h = makeHarness()
     const frame = { dataUrl: 'data:image/png;base64,AAAA', width: 4, height: 4, capturedAt: 1 }
@@ -1320,6 +1345,73 @@ describe('PreviewViewService — live-view budget', () => {
    * renderer never told it was suspended, so its resume effect never fires and
    * the tab is permanently dead (lens review F8).
    */
+  it('still reports a panel suspended, and destroys it, when the purge never settles', async () => {
+    // Windows, 2026-09-03: `clearStorageData` on the live session never came
+    // back, so eviction hung inside `teardown`, the old renderer process was
+    // never destroyed, and `'suspended'` never reached the tab — which then
+    // showed a flat colour block for good. Every teardown step is bounded now.
+    vi.useFakeTimers()
+    try {
+      const h = makeHarness()
+      h.purge.mockImplementation(() => new Promise<void>(() => {}))
+
+      const opened = openPanels(h, PREVIEW.MAX_LIVE_VIEWS + 1)
+      for (let i = 0; i < 10; i += 1) {
+        await vi.advanceTimersByTimeAsync(PREVIEW.TEARDOWN_STEP_TIMEOUT_MS / 2)
+      }
+      await opened
+
+      const suspended = h.loadStateChanged.mock.calls
+        .filter(([, state]) => state === 'suspended')
+        .map(([panelId]) => panelId)
+      expect(suspended).toEqual(['panel-1'])
+      expect(h.factory.destroy).toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('suspends anyway when the still-frame capture never settles', async () => {
+    vi.useFakeTimers()
+    try {
+      const h = makeHarness()
+      const capture = h.deps.stillFrameCache.captureIfStale as unknown as ReturnType<typeof vi.fn>
+      capture.mockReturnValue(new Promise<void>(() => {}))
+
+      const opened = openPanels(h, PREVIEW.MAX_LIVE_VIEWS + 1)
+      for (let i = 0; i < 10; i += 1) {
+        await vi.advanceTimersByTimeAsync(PREVIEW.CAPTURE_SETTLE_TIMEOUT_MS / 2)
+      }
+      await opened
+
+      const suspended = h.loadStateChanged.mock.calls
+        .filter(([, state]) => state === 'suspended')
+        .map(([panelId]) => panelId)
+      expect(suspended).toEqual(['panel-1'])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('close() still destroys the view when the purge never settles', async () => {
+    vi.useFakeTimers()
+    try {
+      const h = makeHarness()
+      await h.service.open(REQUEST_A, h.window)
+      h.purge.mockImplementation(() => new Promise<void>(() => {}))
+
+      const closing = h.service.close('panel-A')
+      for (let i = 0; i < 10; i += 1) {
+        await vi.advanceTimersByTimeAsync(PREVIEW.TEARDOWN_STEP_TIMEOUT_MS / 2)
+      }
+      await closing
+
+      expect(h.factory.destroy).toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('still tears the view down when the still-frame capture rejects', async () => {
     const h = makeHarness()
     const capture = h.deps.stillFrameCache.captureIfStale as unknown as ReturnType<typeof vi.fn>

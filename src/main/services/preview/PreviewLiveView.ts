@@ -891,7 +891,12 @@ export class PreviewLiveView {
     if (this.destroyed) {
       return
     }
-    this.deps.stillFrameCache.invalidate(this.panelId)
+    // Drop the old picture only when a new one will follow: `captureWhileVisible`
+    // below captures only while the view is drawn, so invalidating behind a
+    // hidden tab left it with nothing to show until it was looked at again.
+    if (this.wantedVisible) {
+      this.deps.stillFrameCache.invalidate(this.panelId)
+    }
     this.deps.emit.loadStateChanged(this.panelId, 'ready', result.dropped.length)
     // The page has painted and the watch set is established: the one moment we
     // know the view is showing something worth photographing.
@@ -914,6 +919,8 @@ export class PreviewLiveView {
 
   /** Entry-file unlink (and rename, which unlinks the old path): failed + deleted. */
   private onEntryDeleted(): void {
+    // A deleted file's picture must not be what an evicted tab shows later.
+    this.deps.stillFrameCache.invalidate(this.panelId)
     this.recordFailureAndFail(
       'missing-local-file',
       basename(this.entryFilePath),
@@ -980,9 +987,14 @@ export class PreviewLiveView {
         })
       }
     }
+    // Each async step is bounded. On Windows `storageSeal.purge` never settled
+    // (2026-09-03): eviction hung here, the old renderer process was never
+    // destroyed, and the tab never heard `'suspended'`. A step that overruns is
+    // logged like a throw and skipped; the destroy in `teardown`'s `finally`
+    // still happens.
     const asyncStep = async (label: string, run: () => Promise<void>): Promise<void> => {
       try {
-        await run()
+        await withTimeout(run(), PREVIEW.TEARDOWN_STEP_TIMEOUT_MS, `Preview teardown ${label}`)
       } catch (error) {
         logger.warn('Preview teardown step failed', {
           panelId: this.panelId,
