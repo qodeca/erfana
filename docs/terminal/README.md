@@ -428,7 +428,7 @@ class TerminalService extends EventEmitter {
   private terminals: Map<string, TerminalInstance>
 
   // Lifecycle
-  createTerminal(config: TerminalConfig): string | null
+  createTerminal(config?: TerminalConfig, webContentsId?: number): Promise<TerminalCreateResult>
   killTerminal(terminalId: string): boolean
   dispose(): Promise<void>
 

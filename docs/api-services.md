@@ -12,7 +12,7 @@ Supporting service classes for terminal emulation, file operations, file watchin
 
 Manages terminal emulator instances with xterm.js + node-pty. Cross-platform: macOS/Linux (POSIX shells), Windows (Git Bash, PowerShell 7 / pwsh, Windows PowerShell 5.1, cmd.exe). Marker-based bootstrap with three-flag output gating — see [Terminal Bootstrap Pattern](./terminal/bootstrap-pattern.md) for platform-specific shell invocation, cwd validation contract, `WindowsBootstrapBuilder` strategy pattern, `resolveWindowsShell()` fallback chain, and Windows ConPTY resize-reflow mitigation.
 
-**cwd validation contract (Windows)**: cwds containing `" & | ^ < > \r \n` are rejected before bootstrap; `createTerminal` returns `null` and emits `'error'`. Callers must surface this. `(` and `)` are intentionally allowed (unblocks `C:\Program Files (x86)\…`).
+**cwd validation contract (Windows)**: cwds containing `" & | ^ < > \r \n` are rejected before bootstrap; `createTerminal` returns `{ error }` (was `null` before v0.19.0) and emits `'error'`. The handler passes `error` through to the renderer verbatim, so the sentence is what the user reads. `(` and `)` are intentionally allowed (unblocks `C:\Program Files (x86)\…`).
 
 **Resize race safety (Windows)**: `resize()` silently no-ops when the underlying node-pty process has exited between the `resize()` call and the deferred Windows resize execution — the method returns `false` and the stale terminal entry is dropped from the map.
 
@@ -22,7 +22,9 @@ Manages terminal emulator instances with xterm.js + node-pty. Cross-platform: ma
 
 ### Public Methods
 
-#### `async createTerminal(config?: TerminalConfig, webContentsId?: number): Promise<{ terminalId: string; shellKind: ShellKind } | null>`
+#### `async createTerminal(config?: TerminalConfig, webContentsId?: number): Promise<TerminalCreateResult>`
+
+`TerminalCreateResult` is `{ terminalId; shellKind } | { error: string }`. The reason travels in the result because the IPC handler cannot match an `'error'` event to a terminal whose id it never learned; before v0.19.0 every failure was `null` and the renderer saw only "Failed to create terminal". A Windows cwd over 260 chars (`isWindowsLongPath`) is refused before validation with a plain-language sentence.
 Create a new PTY instance. Async because `node-pty` is dynamically imported on first call.
 
 **Parameters** (`config?: TerminalConfig`, all optional — defaults to `{}`):

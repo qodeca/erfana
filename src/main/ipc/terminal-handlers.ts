@@ -66,8 +66,11 @@ export function registerTerminalHandlers() {
       const webContentsId = event.sender.id
       const result = await terminalService.createTerminal(config, webContentsId)
 
-      if (!result) {
-        return { success: false, error: 'Failed to create terminal' }
+      if ('error' in result) {
+        // The service explains itself now (a cwd over MAX_PATH, an unsafe
+        // character, a spawn failure); pass that through instead of the
+        // generic message the renderer used to get for all of them.
+        return { success: false, error: result.error }
       }
 
       return { success: true, terminalId: result.terminalId, shellKind: result.shellKind }

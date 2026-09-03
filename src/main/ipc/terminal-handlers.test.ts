@@ -24,7 +24,7 @@ class MockTerminalService extends EventEmitter {
   private terminals: Map<string, { id: string }> = new Map()
 
   isAvailable = vi.fn(() => ({ available: true, initialized: true }))
-  createTerminal = vi.fn(async () => 'terminal-1')
+  createTerminal = vi.fn(async () => ({ terminalId: 'terminal-1', shellKind: 'posix' as const }))
   write = vi.fn(() => true)
   resize = vi.fn(() => true)
   killTerminal = vi.fn(() => true)
@@ -254,6 +254,21 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
         { cwd: '/tmp' },
         123
       )
+    })
+
+    it('returns the service failure reason to the renderer instead of the generic message', async () => {
+      mockTerminalService.listTerminals.mockReturnValue([])
+      mockTerminalService.createTerminal.mockResolvedValueOnce({ error: 'cwd too long' } as never)
+
+      const { registerTerminalHandlers } = await import('./terminal-handlers')
+      registerTerminalHandlers()
+
+      const createHandler = (mockIpcMain.handle as any).mock.calls.find(
+        (call: any[]) => call[0] === 'terminal:create'
+      )[1]
+      const result = await createHandler({ sender: { id: 7 } }, { cwd: 'C:\\x' })
+
+      expect(result).toEqual({ success: false, error: 'cwd too long' })
     })
   })
 
