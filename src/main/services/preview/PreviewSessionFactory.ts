@@ -241,6 +241,12 @@ export class PreviewSessionFactory implements IPreviewSessionFactory {
     // through two different shapes is how the two chokepoints came to disagree
     // about ports in the first place; there is one shape now.
     await allowlistStore.load()
+    // A malformed allowlist block used to look exactly like an empty one from
+    // the panel: the store logged its badge process-wide and nothing reached
+    // the tab. The factory is the first place that has the panel's log (#115).
+    for (const badge of allowlistStore.drainBadges()) {
+      ctx.recordFailure(badge)
+    }
     const token = await registry.issue(ctx.projectPath, [...allowlistStore.getOrigins()])
     const entry = registry.resolve(token)
     if (entry === undefined) {

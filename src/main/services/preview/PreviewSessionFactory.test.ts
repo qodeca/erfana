@@ -7,6 +7,8 @@
  * sequence is verified with no real `Session`/`WebContentsView`.
  */
 import { describe, expect, it, vi } from 'vitest'
+import { ErrorCode } from '../../../shared/errors'
+import type { PreviewFailureInput } from '../../../shared/ipc/preview-types'
 
 import type { PreviewAllowlistState, IPreviewAllowlistStore } from './PreviewAllowlistStore'
 import type { IPreviewRootRegistry, PreviewRootEntry } from './PreviewRootRegistry'
@@ -49,7 +51,8 @@ function makeStore(origins: string[]): IPreviewAllowlistStore {
       Promise.resolve(origins)
     ),
     getOrigins: vi.fn<() => ReadonlySet<string>>(() => new Set(origins)),
-    isWriteBackEnabled: vi.fn<() => boolean>(() => true)
+    isWriteBackEnabled: vi.fn<() => boolean>(() => true),
+    drainBadges: vi.fn<() => PreviewFailureInput[]>(() => [])
   }
 }
 
@@ -70,6 +73,34 @@ function makeView(): PreviewViewHandle {
 const SESSION = { storagePath: null, isPersistent: () => false } as unknown as PreviewSessionLike
 
 describe('PreviewSessionFactory', () => {
+  it('records the badges a bad allowlist raised at load on the new view (#115)', async () => {
+    // The store logs its parse badge process-wide because it has no panel to
+    // address; the factory is the first place that has the panel's failure log.
+    const store = makeStore([])
+    const badge: PreviewFailureInput = {
+      type: 'allowlist-invalid',
+      resourceUrlOrHost: '.erfana/settings.json',
+      reasonCode: ErrorCode.PROJECT_SETTINGS_VALIDATION_FAILED
+    }
+    ;(store.drainBadges as ReturnType<typeof vi.fn>).mockReturnValueOnce([badge])
+    const factory = new PreviewSessionFactory({
+      registry: makeRegistry(),
+      allowlistStore: store,
+      createSession: vi.fn<(p: string) => PreviewSessionLike>(() => SESSION),
+      buildWebPreferences: vi.fn<() => unknown>(() => ({})),
+      createView: vi.fn<() => PreviewViewHandle>(() => makeView()),
+      hardenSession: vi.fn<() => () => void>(() => () => undefined),
+      attachProtocol: vi.fn<() => () => void>(() => () => undefined),
+      attachFilter: vi.fn<() => () => void>(() => () => undefined),
+      assertSealed: vi.fn<() => void>(() => undefined)
+    })
+    const recordFailure = vi.fn()
+
+    await factory.create({ projectPath: '/proj', recordFailure, onBlocked: vi.fn() })
+
+    expect(recordFailure).toHaveBeenCalledWith(badge)
+  })
+
   it('runs the §5(a) sequence in order and returns a wired session', async () => {
     const order: string[] = []
     const registry = makeRegistry()
