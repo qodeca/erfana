@@ -72,6 +72,14 @@ const NAVIGATION_GRACE_MS = 50
 const LinkActivationPayloadSchema = z
   .object({
     href: z.string().min(1).max(2048),
+    /**
+     * The `href` ATTRIBUTE as the page wrote it, before Chromium resolved it.
+     * Refusal-only input: it never selects a file, it only lets a link that
+     * climbed out of the project be labelled "escaped" rather than "missing"
+     * (Chromium collapses `../` past the root before main ever sees `href`).
+     * Optional because `will-navigate` has no attribute to report.
+     */
+    rawHref: z.string().max(2048).optional(),
     target: z.string().max(64).default(''),
     download: z.boolean().default(false),
     modifiers: z

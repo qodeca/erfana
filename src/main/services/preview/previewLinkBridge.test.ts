@@ -116,6 +116,27 @@ describe('createPreviewLinkBridge — validation', () => {
     expect(deps.openExternal).not.toHaveBeenCalled()
   })
 
+  it('accepts the raw href attribute the preload now reports', async () => {
+    const deps = makeDeps()
+    makeBridge(deps).handleActivation({ ...(payload(IN_PROJECT) as object), rawHref: 'docs/a.html' })
+
+    await vi.waitFor(() => expect(deps.requestOpenFile).toHaveBeenCalled())
+    expect(deps.recordFailure).not.toHaveBeenCalled()
+  })
+
+  it('bounds the raw href attribute like the resolved href', () => {
+    const deps = makeDeps()
+    makeBridge(deps).handleActivation({
+      ...(payload(IN_PROJECT) as object),
+      rawHref: 'a'.repeat(2049)
+    })
+
+    expect(deps.recordFailure).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'blocked-link' })
+    )
+    expect(deps.requestOpenFile).not.toHaveBeenCalled()
+  })
+
   it('applies the same length bound to will-navigate as to the preload', async () => {
     const deps = makeDeps()
     const overlong = `https://example.com/${'a'.repeat(2100)}`

@@ -83,6 +83,13 @@ describe('previewPage preload contract', () => {
     expect(SOURCE).toContain('ipcRenderer.send')
   })
 
+  it('reports the href attribute as written, beside the resolved href', () => {
+    // Main needs the attribute to label a link that climbed out of the project
+    // as an escape; Chromium has collapsed the climb out of `href` by then.
+    expect(SOURCE).toContain('rawHref')
+    expect(SOURCE).toMatch(/getAttribute\('href'\)/)
+  })
+
   it('requires a genuine user gesture', () => {
     expect(SOURCE).toContain('event.isTrusted')
   })

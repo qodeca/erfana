@@ -197,4 +197,25 @@ describe('PreviewProtocolHandler request handling', () => {
     const res = await listener(makeRequest(`erfana-preview://${TOKEN}/does-not-exist.css`))
     expect(res.status).toBe(404)
   })
+
+  it('badges a missing ENTRY document, so a 404 on the page itself is not silent', async () => {
+    // Every subresource failure was badged; the page itself failing to resolve
+    // showed a blank preview and nothing on the tab (Windows verification).
+    const { listener } = install({ realRoot: root, csp: VALID_CSP })
+    const res = await listener(
+      makeRequest(`erfana-preview://${TOKEN}/gone.html`, { dest: 'document' })
+    )
+    expect(res.status).toBe(404)
+    expect(recordFailure).toHaveBeenCalledTimes(1)
+    expect(recordFailure.mock.calls[0][0]).toMatchObject({
+      type: 'missing-local-file',
+      reasonCode: ErrorCode.PREVIEW_LOCAL_FILE_MISSING
+    })
+  })
+
+  it('does not badge a missing subresource (the page console already reports it)', async () => {
+    const { listener } = install({ realRoot: root, csp: VALID_CSP })
+    await listener(makeRequest(`erfana-preview://${TOKEN}/missing.png`, { dest: 'image' }))
+    expect(recordFailure).not.toHaveBeenCalled()
+  })
 })
