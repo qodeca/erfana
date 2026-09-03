@@ -51,6 +51,7 @@ import {
 import { PreviewBandConfirm } from './PreviewBandConfirm'
 import { PreviewBandRow } from './PreviewBandRow'
 import { ErrorCode } from '../../../../../../shared/errors'
+import { PREVIEW } from '../../../../../../shared/constants'
 import type { PreviewApproveResult } from '../../../../../../shared/ipc/preview-types'
 import type { PreviewBlockedHost } from '../../../../stores/usePreviewStore'
 
@@ -67,6 +68,12 @@ export interface PreviewChromeBandProps {
    * way. Renders the fail-safe strip; the hiding itself is not ours.
    */
   readonly paused?: boolean
+  /**
+   * How long the band waits for `onApprove` before telling the reader the grant
+   * is saved but unconfirmed. Defaults to `PREVIEW.APPROVE_UI_DEADLINE_MS`;
+   * injectable so the deadline can be tested without faking the clock.
+   */
+  readonly approveDeadlineMs?: number
   /** Focused by the panel on a forwarded Escape when the find bar is closed. */
   readonly chipRef?: React.RefObject<HTMLButtonElement>
   /**
@@ -109,6 +116,7 @@ export function PreviewChromeBand({
   onExportPdf,
   exportingPdf = false,
   onApprove,
+  approveDeadlineMs = PREVIEW.APPROVE_UI_DEADLINE_MS,
   onExpandedChange
 }: PreviewChromeBandProps): React.JSX.Element {
   const [state, dispatch] = useReducer(bandReducer, INITIAL_BAND_STATE)
@@ -178,10 +186,26 @@ export function PreviewChromeBand({
        * A permanent dead end is too high a price for a narrow path, and the
        * failure branch already exists and says the right thing.
        */
-      const result = await onApprove(host).catch(() => ({
-        ok: false as const,
-        errorCode: ErrorCode.UNKNOWN_ERROR
-      }))
+      /*
+       * And it must not wait forever either. On Windows the invoke was seen to
+       * never settle at all (2026-09-03) — the write had landed, the grant was
+       * live, and the band sat on "Saving…" for good. Main is time-boxed now;
+       * this is the renderer's own deadline, so no main-side path can strand
+       * it again. `Promise.race` means a late answer is simply never looked at,
+       * which is what keeps it from overwriting what the reader was told.
+       */
+      let deadline: ReturnType<typeof setTimeout> | undefined
+      const timedOut = new Promise<PreviewApproveResult>((resolve) => {
+        deadline = setTimeout(
+          () => resolve({ ok: false, errorCode: ErrorCode.PREVIEW_APPROVE_TIMED_OUT }),
+          approveDeadlineMs
+        )
+      })
+      const answer = onApprove(host).catch(
+        (): PreviewApproveResult => ({ ok: false, errorCode: ErrorCode.UNKNOWN_ERROR })
+      )
+      const result = await Promise.race([answer, timedOut])
+      if (deadline !== undefined) clearTimeout(deadline)
       if (result.ok) {
         dispatch({ type: 'approveSucceeded', host })
       } else {
@@ -193,7 +217,7 @@ export function PreviewChromeBand({
       // destination in both cases rather than a guess at identity.
       chip.current?.focus()
     },
-    [onApprove, chip]
+    [onApprove, approveDeadlineMs, chip]
   )
 
   /*

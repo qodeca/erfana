@@ -28,6 +28,9 @@ import {
   parsePreviewOrigin
 } from '../../../shared/ipc/preview-settings-schema'
 import { atomicWriteJSON } from '../../utils/atomicWrite'
+import { TimeoutError, withTimeout } from '../../utils/withTimeout'
+import { logger } from '../LoggingService'
+import { PREVIEW } from '../../../shared/constants'
 import { resolveErfanaDir } from './erfanaDirGate'
 
 const ERFANA_DIR_NAME = '.erfana'
@@ -283,7 +286,24 @@ export class PreviewAllowlistStore implements IPreviewAllowlistStore {
     // Step 9: re-read + re-validate; swap the in-memory set; return it. Now a
     // confirmation that the bytes landed, rather than the first time anything
     // was checked.
-    const verified = await this.verifyWrittenOrigins(settingsPath)
+    // Time-boxed: the bytes are on disk, so a re-read that does not come back
+    // yields the set just written rather than holding the approval hostage
+    // (the Allow freeze on Windows, 2026-09-03). A re-read that DOES come back
+    // and fails validation is still fatal — that is a real finding.
+    let verified: readonly string[]
+    try {
+      verified = await withTimeout(
+        this.verifyWrittenOrigins(settingsPath),
+        PREVIEW.ALLOWLIST_VERIFY_TIMEOUT_MS,
+        'Preview allowlist re-read'
+      )
+    } catch (error) {
+      if (!(error instanceof TimeoutError)) throw error
+      logger.warn('Preview allowlist: re-read did not complete; trusting the written set', {
+        count: sortedOrigins.length
+      })
+      verified = sortedOrigins
+    }
     this.origins = new Set(verified)
     this.writeBackEnabled = true
     return verified

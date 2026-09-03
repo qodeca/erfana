@@ -235,6 +235,13 @@ export enum ErrorCode {
    */
   PREVIEW_OPEN_INVALID_REQUEST = 'PREVIEW_OPEN_INVALID_REQUEST',
   /**
+   * The band's own deadline on `preview:approveHost` passed without an answer.
+   * NOT a refusal: the grant is written before the first await main makes, so
+   * it is saved and takes effect on the next load; only the confirmation and
+   * the automatic reload are missing.
+   */
+  PREVIEW_APPROVE_TIMED_OUT = 'PREVIEW_APPROVE_TIMED_OUT',
+  /**
    * An open was abandoned because something newer overtook it — a project
    * switch, a close, a suspend, or another open for the same panel.
    *
@@ -475,6 +482,7 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
     'The preview asked for too many files at once; some were not loaded.',
   [ErrorCode.PREVIEW_LINK_BLOCKED]: 'That link was blocked.',
   [ErrorCode.PREVIEW_OPEN_INVALID_REQUEST]: 'The preview request was rejected.',
+  [ErrorCode.PREVIEW_APPROVE_TIMED_OUT]: 'Saved, but the preview did not confirm. Reload it.',
   [ErrorCode.PREVIEW_OPEN_SUPERSEDED]: 'The preview was replaced before it finished opening.',
 
   // Generic errors

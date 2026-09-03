@@ -211,6 +211,20 @@ describe('bandReducer', () => {
     expect(s.mode.kind).toBe('idle')
   })
 
+  it('tells the truth when the approval merely timed out: saved, not blocked', () => {
+    let s = bandReducer(INITIAL_BAND_STATE, { type: 'toggle', byKeyboard: false })
+    s = bandReducer(s, { type: 'approveStarted', host: 'https://a.example.com' })
+    s = bandReducer(s, {
+      type: 'approveFailed',
+      host: 'https://a.example.com',
+      errorCode: ErrorCode.PREVIEW_APPROVE_TIMED_OUT
+    })
+    expect(s.mode.kind).toBe('idle')
+    expect(s.announcement).toMatch(/Saved https:\/\/a\.example\.com/)
+    expect(s.announcement).not.toMatch(/still blocked/)
+    expect(s.failure?.text).toBe('Saved — reload to apply')
+  })
+
   it('keeps a failure visible after the list is collapsed', () => {
     // The chip carries a red caret for exactly this reason: closing the list must
     // not hide a write that did not happen.
@@ -287,6 +301,8 @@ describe('approveFailureText', () => {
     expect(approveFailureText(ErrorCode.PREVIEW_ALLOWLIST_FULL)).toBe('Not saved — list full')
     expect(approveFailureText(ErrorCode.PREVIEW_HOST_NOT_APPROVABLE)).toBe('Not saved — not allowed')
     expect(approveFailureText(ErrorCode.UNKNOWN_ERROR)).toBe('Not saved')
+    // Not a refusal: the grant landed and only the confirmation is missing.
+    expect(approveFailureText(ErrorCode.PREVIEW_APPROVE_TIMED_OUT)).toBe('Saved — reload to apply')
     for (const code of [
       ErrorCode.PREVIEW_ALLOWLIST_FULL,
       ErrorCode.PREVIEW_HOST_NOT_APPROVABLE,

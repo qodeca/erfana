@@ -952,6 +952,27 @@ describe('PreviewViewService — applyApprovedHosts', () => {
     await h.service.applyApprovedHosts('other', ['cdn.example.com'])
     expect(h.rebuildCsp).not.toHaveBeenCalled()
   })
+
+  it('still reloads when the storage purge never settles (the Allow freeze, 2026-09-03)', async () => {
+    // On Windows, Allow → Confirm sat on "Saving…" forever: the invoke never
+    // came back because an await inside this path never settled. The purge is
+    // belt-and-braces (the opaque origin is the seal, and the reload bypasses
+    // the cache anyway), so a purge that hangs must not hold the grant hostage.
+    vi.useFakeTimers()
+    try {
+      const h = makeHarness()
+      await h.service.open(REQUEST_A, h.window)
+      h.purge.mockImplementationOnce(() => new Promise<void>(() => {}))
+
+      const apply = h.service.applyApprovedHosts('panel-A', ['cdn.example.com'])
+      await vi.advanceTimersByTimeAsync(PREVIEW.PURGE_TIMEOUT_MS + 1)
+      await apply
+
+      expect(h.factory.reloadIgnoringCache).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })
 
 describe('PreviewViewService — destroyAll', () => {

@@ -528,6 +528,29 @@ export const PREVIEW = {
   /** CSS swap race timeout; any non-`true` outcome falls back to reload (ms) */
   SWAP_TIMEOUT_MS: 1000,
   /**
+   * Bound on the session purge inside an approval (ms). The purge is
+   * belt-and-braces — the opaque origin is the seal and the reload that
+   * follows bypasses the cache — so one that hangs is logged and skipped
+   * rather than allowed to hold the grant hostage (the Allow freeze seen on
+   * Windows, 2026-09-03).
+   */
+  PURGE_TIMEOUT_MS: 2000,
+  /** Bound on the post-write re-read of the allowlist file (ms); same reasoning. */
+  ALLOWLIST_VERIFY_TIMEOUT_MS: 2000,
+  /**
+   * Bound on the whole "apply the grant to the live views" step inside the
+   * `preview:approveHost` invoke (ms). The grant is persisted and the CSP is
+   * rebuilt before the first await, so on timeout the invoke still answers
+   * `ok: true`; only the reload is late.
+   */
+  APPROVE_TIMEOUT_MS: 5000,
+  /**
+   * The renderer's own deadline on that invoke (ms). Defence in depth: however
+   * main misbehaves, the band must leave "Saving…" and give Cancel back. Longer
+   * than `APPROVE_TIMEOUT_MS` so a healthy main always answers first.
+   */
+  APPROVE_UI_DEADLINE_MS: 10000,
+  /**
    * Max DISTINCT blocked hosts reported to the renderer per view.
    *
    * This replaced `MAX_HOST_TOASTS: 3`, which bounded toasts and not the list —

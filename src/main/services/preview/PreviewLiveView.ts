@@ -22,6 +22,7 @@ import { open } from 'node:fs/promises'
 import { ErrorCode } from '../../../shared/errors'
 import { PREVIEW } from '../../../shared/constants'
 import { logger } from '../LoggingService'
+import { withTimeout } from '../../utils/withTimeout'
 import type {
   PdfExportResult,
   PreviewBounds,
@@ -724,7 +725,22 @@ export class PreviewLiveView {
     }
     // §5(c): rebuild the CSP on the registry entry, purge, clear failures, reload.
     this.deps.registry.rebuildCsp(this.token, hosts)
-    await this.deps.storageSeal.purge(this.session)
+    // Time-boxed, and skipped on failure rather than fatal: the purge is
+    // belt-and-braces (the opaque origin is the seal, and the reload below
+    // bypasses the cache), and on Windows an approval was seen to never come
+    // back because this await never settled (2026-09-03).
+    try {
+      await withTimeout(
+        this.deps.storageSeal.purge(this.session),
+        PREVIEW.PURGE_TIMEOUT_MS,
+        'Preview approval purge'
+      )
+    } catch (error) {
+      logger.warn('Preview approval: purge did not complete; reloading anyway', {
+        panelId: this.panelId,
+        error: error instanceof Error ? error.message : String(error)
+      })
+    }
     // Re-check AFTER the await: the purge yields, and a teardown starting in
     // that window would otherwise leave `failureLog.clear()` re-emitting into a
     // dropped log and `reloadIgnoringCache()` reaching a closing WebContents.
@@ -737,6 +753,10 @@ export class PreviewLiveView {
     // swallowed as already-seen on the reload — gone from the badge and
     // unapprovable. See `PreviewCspViolationBridge.reset`.
     this.cspViolationBridge.reset()
+    logger.info('Preview approval: reloading with the new allowlist', {
+      panelId: this.panelId,
+      count: hosts.length
+    })
     this.wc.reloadIgnoringCache()
   }
 

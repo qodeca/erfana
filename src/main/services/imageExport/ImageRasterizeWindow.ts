@@ -28,6 +28,7 @@
  * @see Issue #73 - PNG / PDF / clipboard export controls in the image viewer
  */
 import { BrowserWindow, type IpcMainEvent } from 'electron'
+import { withTimeout } from '../../utils/withTimeout'
 import { existsSync } from 'fs'
 import { randomUUID } from 'crypto'
 import { join } from 'path'
@@ -75,30 +76,6 @@ export const HARNESS_PDF_OPTIONS = {
   margins: { marginType: 'none' as const },
   scale: 1,
   pageRanges: '1-1'
-}
-
-/**
- * Race `promise` against a timer, without leaving an unhandled rejection
- * behind when the timer wins.
- */
-function withTimeout<T>(promise: Promise<T>, ms: number, what: string): Promise<T> {
-  // Belt-and-braces, and honestly labelled: `Promise.race` below already
-  // attaches a rejection handler to `promise`, so a loser that rejects after
-  // the timer won is ALREADY marked handled and cannot reach the process-level
-  // unhandledRejection hook. This no-op handler is what keeps that true if the
-  // race is ever replaced by a wrapper that attaches later. The invariant
-  // itself — a timeout never crashes the main process — is covered by
-  // "leaves NO unhandled rejection when the print rejects AFTER the timeout".
-  promise.catch(() => {})
-
-  let timer: NodeJS.Timeout | undefined
-  const timeout = new Promise<never>((_resolve, reject) => {
-    timer = setTimeout(() => reject(new Error(`${what} timed out after ${ms}ms`)), ms)
-  })
-
-  return Promise.race([promise, timeout]).finally(() => {
-    if (timer) clearTimeout(timer)
-  }) as Promise<T>
 }
 
 /** The narrow capability `exportSinks` needs from a loaded harness page. */

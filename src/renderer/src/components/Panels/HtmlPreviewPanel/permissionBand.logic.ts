@@ -125,7 +125,12 @@ export function bandReducer(
         ...state,
         mode: { kind: 'idle' },
         failure: { host: action.host, text: approveFailureText(action.errorCode) },
-        announcement: `Could not save ${action.host} to this project. It is still blocked.`
+        // A timeout is not a refusal: the grant was written before main's first
+        // await, so saying "still blocked" would be false.
+        announcement:
+          action.errorCode === ErrorCode.PREVIEW_APPROVE_TIMED_OUT
+            ? `Saved ${action.host}, but the preview did not confirm. Reload it.`
+            : `Could not save ${action.host} to this project. It is still blocked.`
       }
 
     default:
@@ -354,6 +359,11 @@ export function approveFailureText(errorCode: ErrorCode): string {
       // approved", because the reader DID something and it did not take — that
       // is a different message from a row that never offered a button.
       return 'Not saved — not allowed'
+    case ErrorCode.PREVIEW_APPROVE_TIMED_OUT:
+      // The band's own deadline passed. The grant is on disk (main writes it
+      // before its first await), so this is "saved" with the reload missing,
+      // and the reader's next move is a reload rather than a retry.
+      return 'Saved — reload to apply'
     case ErrorCode.PROJECT_SETTINGS_VALIDATION_FAILED:
       // The project's settings file is malformed, so the write was refused
       // rather than allowed to destroy what is there. Naming the file matters:
