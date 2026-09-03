@@ -33,7 +33,7 @@ import type {
 import type { IPreviewRootRegistry } from './PreviewRootRegistry'
 import type { IPreviewStillFrameCache } from './PreviewStillFrameCache'
 import type { IPreviewExportController } from './PreviewExportController'
-import type { IPreviewWatchCoordinator } from './PreviewWatchCoordinator'
+import { IPreviewWatchCoordinator, type WatchSetResult } from './PreviewWatchCoordinator'
 import type { IPreviewReloadPolicy, ReloadDecision } from './PreviewReloadPolicy'
 import type {
   IPreviewFindController,
@@ -228,13 +228,13 @@ export class PreviewLiveView {
   private readonly failureLog: IPreviewFailureLog
   private readonly deps: PreviewLiveViewDeps
   private readonly readEntryHtml: (filePath: string) => Promise<string>
-  private readonly watchCoordinator: IPreviewWatchCoordinator
-  private readonly reloadPolicy: IPreviewReloadPolicy
-  private readonly findController: IPreviewFindController
-  private readonly lifecycle: { dispose(): Promise<void> }
+  private watchCoordinator!: IPreviewWatchCoordinator
+  private reloadPolicy!: IPreviewReloadPolicy
+  private findController!: IPreviewFindController
+  private lifecycle!: { dispose(): Promise<void> }
   private readonly factoryTeardown: () => void
-  private readonly linkBridge: PreviewLinkBridge
-  private readonly cspViolationBridge: PreviewCspViolationBridge
+  private linkBridge!: PreviewLinkBridge
+  private cspViolationBridge!: PreviewCspViolationBridge
 
   private lastBoundsSeq = -1
   private lastBounds: PreviewBounds | null = null
@@ -266,6 +266,25 @@ export class PreviewLiveView {
     this.realRoot = params.session.realRoot
     this.factoryTeardown = params.session.teardown
 
+    // Everything from here to the end of the constructor can throw — the
+    // chokidar entry watcher opens eagerly inside `wirePreviewLifecycle`, and
+    // `window.contentView.addChildView` throws "Object has been destroyed"
+    // against a window that closed during the session build (probed on
+    // Electron 39). A throw used to leave the watcher and the coordinator with
+    // no reference and no owner (#83, #112). The collaborators are built in
+    // order and unwound in reverse on failure; the SESSION is the caller's to
+    // discard, as before.
+    try {
+      this.wireCollaborators(params)
+    } catch (error) {
+      this.destroyed = true
+      void this.unwindConstruction()
+      throw error
+    }
+  }
+
+  /** The constructor's fallible half; see the constructor for why it is separate. */
+  private wireCollaborators(params: PreviewLiveViewParams): void {
     this.watchCoordinator = this.deps.createWatchCoordinator(this.realRoot, (paths) =>
       this.onWatchChanged(paths)
     )
@@ -345,6 +364,45 @@ export class PreviewLiveView {
       this.view.setBounds(dip)
     }
     this.applyBackdrop()
+  }
+
+  /**
+   * Dispose whatever the constructor had built when it threw. Only the
+   * view-owned collaborators: the session (token, protocol, filter, purge) is
+   * discarded by the caller, which never learned this object existed.
+   */
+  private async unwindConstruction(): Promise<void> {
+    const partial = this as unknown as Partial<{
+      lifecycle: { dispose(): Promise<void> }
+      watchCoordinator: { dispose(): Promise<void> }
+      linkBridge: { dispose(): void }
+      cspViolationBridge: { dispose(): void }
+      reloadPolicy: { dispose(): void }
+      findController: { dispose(): void }
+    }>
+    const attempt = async (label: string, run: () => void | Promise<void>): Promise<void> => {
+      try {
+        await withTimeout(Promise.resolve(run()), PREVIEW.TEARDOWN_STEP_TIMEOUT_MS, label)
+      } catch (error) {
+        logger.warn('Preview construction unwind step failed', {
+          panelId: this.panelId,
+          step: label,
+          error: error instanceof Error ? error.message : String(error)
+        })
+      }
+    }
+    if (partial.lifecycle) await attempt('lifecycle.dispose', () => partial.lifecycle!.dispose())
+    if (partial.watchCoordinator) {
+      await attempt('watchCoordinator.dispose', () => partial.watchCoordinator!.dispose())
+    }
+    if (partial.linkBridge) await attempt('linkBridge.dispose', () => partial.linkBridge!.dispose())
+    if (partial.cspViolationBridge) {
+      await attempt('cspViolationBridge.dispose', () => partial.cspViolationBridge!.dispose())
+    }
+    if (partial.reloadPolicy) await attempt('reloadPolicy.dispose', () => partial.reloadPolicy!.dispose())
+    if (partial.findController) {
+      await attempt('findController.dispose', () => partial.findController!.dispose())
+    }
   }
 
   /**
@@ -887,7 +945,21 @@ export class PreviewLiveView {
 
     const dir = dirname(this.entryFilePath)
     const candidates = extractStaticLinks(html).map((link) => resolve(dir, link))
-    const result = await this.watchCoordinator.setWatchSet(candidates)
+    let result: WatchSetResult
+    try {
+      result = await this.watchCoordinator.setWatchSet(candidates)
+    } catch (error) {
+      // The page loaded; only auto-refresh is degraded. This used to be an
+      // unhandled rejection that left the panel on 'loading' forever (#112).
+      logger.warn('Preview auto-refresh: could not watch the page files', {
+        panelId: this.panelId,
+        error: error instanceof Error ? error.message : String(error)
+      })
+      result = {
+        watched: [],
+        dropped: candidates.map((candidate) => ({ candidate, reason: 'watch-failed' as const }))
+      }
+    }
     if (this.destroyed) {
       return
     }

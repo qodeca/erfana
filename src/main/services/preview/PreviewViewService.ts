@@ -389,9 +389,12 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
       return { ok: false, errorCode: ErrorCode.PREVIEW_CSP_INVALID }
     }
 
-    if (this.registry.isStale(claim)) {
+    if (this.registry.isStale(claim) || window.isDestroyed()) {
       // Superseded while the session was building (project switch, global-off, a
-      // close, or a newer open): discard it rather than install a stale view.
+      // close, or a newer open) — or the WINDOW closed: `closeWindow` finds no
+      // installed entry for an open still parked here and moves no generation,
+      // so without this check the open resumed and built a view against a
+      // destroyed window (#83). Discard rather than install a stale view.
       failureLog.drop()
       await this.discardSession(session)
       return { ok: false, errorCode: ErrorCode.PREVIEW_OPEN_SUPERSEDED }

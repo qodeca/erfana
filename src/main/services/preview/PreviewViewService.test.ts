@@ -1024,6 +1024,29 @@ describe('PreviewViewService — four lifecycle events', () => {
     expect(h.loadStateChanged).toHaveBeenCalledWith('panel-A', 'failed', 0)
   })
 
+  it('still reports ready when the watch set cannot be established (#112)', async () => {
+    // `setWatchSet` sat outside the pipeline's try/catch: a throw was an
+    // unhandled rejection and the panel stayed on 'loading' with no badge.
+    const h = makeHarness()
+    h.setWatchSet.mockRejectedValueOnce(new Error('EMFILE'))
+    const unhandled = vi.fn()
+    process.on('unhandledRejection', unhandled)
+    try {
+      const result = await h.service.open(REQUEST_A, h.window)
+      expect(result).toEqual({ ok: true })
+      h.loadStateChanged.mockClear()
+
+      h.factory.emit('did-finish-load')
+      await vi.waitFor(() =>
+        expect(h.loadStateChanged).toHaveBeenCalledWith('panel-A', 'ready', expect.any(Number))
+      )
+      await new Promise((r) => setImmediate(r))
+      expect(unhandled).not.toHaveBeenCalled()
+    } finally {
+      process.off('unhandledRejection', unhandled)
+    }
+  })
+
   it('entry-file unlink ⇒ failed + missing-local-file "file deleted" badge', async () => {
     const h = makeHarness()
     await h.service.open(REQUEST_A, h.window)
@@ -1197,6 +1220,51 @@ describe('PreviewViewService — teardown races', () => {
 // Multiple live views, sleep-when-idle, and project-scoped shared state
 // (sd-074b §4.2–4.5)
 // =============================================================================
+
+describe('PreviewViewService — a window that closes mid-open (#83, #112)', () => {
+  it('abandons the open cleanly when the window closed while the session was building', async () => {
+    // `closeWindow` finds no installed entry for an open still parked on
+    // `create()`, and the claim's generation has not moved, so the open used to
+    // resume, construct a live view against a destroyed window and throw.
+    const h = makeHarness()
+    const build = h.sessionCreate.getMockImplementation()
+    h.sessionCreate.mockImplementationOnce(async (ctx) => {
+      h.setWindowDestroyed(true)
+      return build!(ctx)
+    })
+
+    const result = await h.service.open(REQUEST_A, h.window)
+
+    expect(result).toEqual({ ok: false, errorCode: ErrorCode.PREVIEW_OPEN_SUPERSEDED })
+    expect(h.addChildView).not.toHaveBeenCalled()
+    expect(h.factory.destroy).toHaveBeenCalled()
+  })
+
+  it('unwinds the collaborators built before a constructor throw, incl. the entry watcher (#83)', async () => {
+    // The chokidar entry watcher opens eagerly inside `wirePreviewLifecycle`,
+    // BEFORE `addChildView` — which throws against a destroyed window (probed on
+    // Electron 39: "Object has been destroyed"). The throw left the watcher and
+    // the watch coordinator with no reference and no owner.
+    const h = makeHarness()
+    const entryClose = vi.fn<() => Promise<void>>(() => Promise.resolve())
+    ;(h.deps.createEntryWatcher as unknown as ReturnType<typeof vi.fn>).mockImplementationOnce(
+      () => ({ close: entryClose })
+    )
+    h.addChildView.mockImplementationOnce(() => {
+      throw new Error('Object has been destroyed')
+    })
+
+    const result = await h.service.open(REQUEST_A, h.window)
+
+    expect(result).toEqual({ ok: false, errorCode: ErrorCode.PREVIEW_CSP_INVALID })
+    await vi.waitFor(() => expect(entryClose).toHaveBeenCalledTimes(1))
+    const coordinator = (h.deps.createWatchCoordinator as unknown as ReturnType<typeof vi.fn>).mock
+      .results[0]?.value as { dispose: ReturnType<typeof vi.fn> }
+    // The unwind is async and ordered; the coordinator goes after the watcher.
+    await vi.waitFor(() => expect(coordinator.dispose).toHaveBeenCalled())
+    expect(h.factory.destroy).toHaveBeenCalled()
+  })
+})
 
 describe('PreviewViewService — live-view budget', () => {
   /** Open `count` panels named panel-1..panel-N in order. */
