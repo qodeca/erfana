@@ -215,6 +215,12 @@ jobs:
         # the local composite action and the other jobs.
         shell: bash
         run: npm run typecheck
+      - name: Design sync check
+        # The Lint job runs this on Linux; on Windows it used to fail on every
+        # run because two generated files came out of checkout as CRLF (#104).
+        # Running it here keeps that from regressing invisibly.
+        shell: bash
+        run: npm run design -- --check
       - name: Main-process tests
         shell: bash
         run: npm run test:main

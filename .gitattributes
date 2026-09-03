@@ -16,6 +16,14 @@ src/main/utils/__fixtures__/manifest.fixture.json.minisig text eol=lf
 # is applied at install time by the postinstall hook).
 patches/*.patch text eol=lf
 
+# design-sync generated files must stay LF — scripts/design-sync.mjs builds
+# these two from template strings as LF and byte-compares them in --check
+# mode, so a CRLF checkout on Windows makes `npm run design -- --check` fail
+# on every run (#104). Every other generated file under design/ is a byte
+# copy of a src/ file and follows that file's line endings.
+design/claims.js text eol=lf
+design/index.html text eol=lf
+
 # Binary assets — never normalize
 *.png binary
 *.jpg binary
