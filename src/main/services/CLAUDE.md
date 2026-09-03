@@ -28,4 +28,4 @@ catalogue is not: it records what each service is for and which issue drove it.
 - [API Services](../../../docs/api-services.md) — Terminal, File, Settings, Watchers, Clipboard, system actions
 - [API Services – Features](../../../docs/api-services-features.md) — Git status worker architecture, GitWatcher, GitPolling, Camera, ProjectLock, ExternalFile, DOCX, ImageExport, Transcription, LocalWhisper, WhisperModelManager, AudioMetadata, AudioExtraction, ApiKey, HTML preview pointer
 - [HTML preview](../../../docs/html-preview/README.md) — the full preview subsystem write-up (design, security threat model, IPC surface)
-- [Error Codes](../../../docs/error-codes.md) — project-wide `ErrorCode` enum index, incl. the 8 `PREVIEW_*` codes
+- [Error Codes](../../../docs/error-codes.md) — project-wide `ErrorCode` enum index, incl. the 9 `PREVIEW_*` codes

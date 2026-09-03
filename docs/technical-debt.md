@@ -453,7 +453,7 @@ Resolved by the #73 image-export work. The canonical extension list, the MIME ma
 
 **Severity**: Low. Recorded so none of them is later filed as a bug.
 
-- **One panel per path *string*.** `sanitizeFilePath` hashes the raw string, so on a case-insensitive volume `/proj/Icon.svg` and `/proj/icon.svg` still open two panels. Harmless now that watches are subscriber-counted — the second panel gets its own subscription and neither can deafen the other.
+- **One panel per path *string*.** The id is the sanitized path (plus a digest of the raw path past the length budget in `buildPanelId`), so on a case-insensitive volume `/proj/Icon.svg` and `/proj/icon.svg` still open two panels. Harmless now that watches are subscriber-counted — the second panel gets its own subscription and neither can deafen the other.
 - **No way to open an image file as text.** Once file opens route through `utils/openFileInPanel.ts`, an SVG always opens in the viewer. Hand-editing an SVG beside an agent is plausible, so a context-menu "Open as text" is worth a follow-up issue; it becomes a prerequisite if the Markdown-preview link path is migrated to the router as well.
 - **Two visual artefacts on refresh.** The degraded-state banner mounts above the content, so it pushes the image down and the `ResizeObserver` refires in fit mode (a second, small jump); and an animated GIF restarts from frame 0 when the source object is replaced.
 - **No visual-regression coverage for the new surfaces.** The status slot and the banner are transient states; baselines would flake. Descoped deliberately.

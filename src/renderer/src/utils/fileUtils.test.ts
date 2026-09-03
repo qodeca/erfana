@@ -3,6 +3,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   sanitizeFilePath,
+  stablePathDigest,
   isMarkdownFile,
   getBasename,
   getDirname,
@@ -18,6 +19,24 @@ describe('fileUtils', () => {
     expect(sanitizeFilePath('/Users/Name/docs/Notes.md')).toBe('users-name-docs-notes-md')
     expect(sanitizeFilePath('C:/Projects/Test File (1).md')).toBe('c--projects-test-file--1--md')
     expect(sanitizeFilePath('relative/path/file.MARKDOWN')).toBe('relative-path-file-markdown')
+  })
+
+  describe('stablePathDigest', () => {
+    it('is deterministic and 16 lowercase hex characters', () => {
+      const a = stablePathDigest('/proj/a.html')
+      expect(a).toMatch(/^[0-9a-f]{16}$/)
+      expect(stablePathDigest('/proj/a.html')).toBe(a)
+    })
+
+    it('differs for sibling paths and for paths that differ only in case', () => {
+      expect(stablePathDigest('/proj/a.html')).not.toBe(stablePathDigest('/proj/b.html'))
+      expect(stablePathDigest('/proj/Icon.svg')).not.toBe(stablePathDigest('/proj/icon.svg'))
+    })
+
+    it('differs for two long paths that share a long prefix', () => {
+      const prefix = '/proj/' + 'segment/'.repeat(40)
+      expect(stablePathDigest(prefix + 'one.html')).not.toBe(stablePathDigest(prefix + 'two.html'))
+    })
   })
 
   it('detects markdown files by extension', () => {

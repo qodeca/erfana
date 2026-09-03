@@ -118,7 +118,7 @@ export function registerPreviewLifecycleHandlers(
           logger.warn('Rejected preview:open with invalid payload', {
             error: parsed.error.message
           })
-          return { ok: false, errorCode: ErrorCode.UNKNOWN_ERROR }
+          return { ok: false, errorCode: ErrorCode.PREVIEW_OPEN_INVALID_REQUEST }
         }
         const window = resolveWindow(event)
         if (window === null) {

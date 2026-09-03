@@ -26,6 +26,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  PanelIdSchema,
   PreviewAllowlistChangedPayloadSchema,
   PreviewApproveHostRequestSchema,
   PreviewHostBlockedPayloadSchema
@@ -41,6 +42,16 @@ const CANONICAL_ORIGINS = [
 ]
 
 const PANEL_ID = 'preview-1'
+
+describe('the panel-id cap is the safety net, not the budget', () => {
+  // The renderer keeps every id under 200 (openFileInPanel.test.ts); this
+  // pins the boundary it must stay under, so a change to either side is
+  // caught here rather than in a log line nobody reads.
+  it('accepts 256 characters and refuses 257', () => {
+    expect(PanelIdSchema.safeParse('p'.repeat(256)).success).toBe(true)
+    expect(PanelIdSchema.safeParse('p'.repeat(257)).success).toBe(false)
+  })
+})
 
 describe('what the store approves, the approve boundary must accept', () => {
   it.each(CANONICAL_ORIGINS)('accepts %s', (origin) => {
