@@ -142,6 +142,7 @@ path yet.
 | Display | 3456×2168 physical at 200% scaling (1728×1084 logical); one monitor |
 | Electron | 39 |
 | Git | `core.autocrlf=true`, `LongPathsEnabled` (HKLM) = 0 |
+| `npm ci` | **Not exercised here.** The handoff's §3 asks for it, but a full install with the native rebuild does not complete on this box (an emulated x64 VM whose Visual Studio and node-gyp disagree), so the checks were run against the existing `node_modules`. The `npm ci --ignore-scripts` path plus the allowlisted native rebuild is what CI runs on `windows-latest`, and the `Windows checks` job is green on this commit. |
 
 ## 5. What was surprising (not an open issue on 2026-09-03)
 
