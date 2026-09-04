@@ -233,6 +233,8 @@ export class PreviewLiveView {
   private findController!: IPreviewFindController
   private lifecycle!: { dispose(): Promise<void> }
   private readonly factoryTeardown: () => void
+  /** Hands the partition back for reuse; called only once the page is destroyed. */
+  private readonly sessionRelease: () => Promise<void>
   private linkBridge!: PreviewLinkBridge
   private cspViolationBridge!: PreviewCspViolationBridge
 
@@ -265,6 +267,7 @@ export class PreviewLiveView {
     this.token = params.session.token
     this.realRoot = params.session.realRoot
     this.factoryTeardown = params.session.teardown
+    this.sessionRelease = params.session.release
 
     // Everything from here to the end of the constructor can throw — the
     // chokidar entry watcher opens eagerly inside `wirePreviewLifecycle`, and
@@ -1040,6 +1043,16 @@ export class PreviewLiveView {
         this.wc.destroy()
       }
     })
+    // Only now, with the page destroyed, can the partition go back for reuse.
+    // `release` purges (bounded) and never rejects; guarded all the same.
+    try {
+      await this.sessionRelease()
+    } catch (error) {
+      logger.warn('Preview teardown: partition hand-back failed', {
+        panelId: this.panelId,
+        error: error instanceof Error ? error.message : String(error)
+      })
+    }
   }
 
   /**
@@ -1093,7 +1106,9 @@ export class PreviewLiveView {
     step('failureLog.drop', () => this.failureLog.drop())
     step('stillFrameCache.invalidate', () => this.deps.stillFrameCache.invalidate(this.panelId))
     step('registry.revoke', () => this.deps.registry.revoke(this.token))
-    await asyncStep('storageSeal.purge', () => this.deps.storageSeal.purge(this.session))
+    // No purge here any more: the partition's `release` purges AFTER the page
+    // is destroyed, which is both the safe order and the only one that lets the
+    // name be reused. (On Windows the live-session purge never settled at all.)
   }
 
   /** Race `close()` against `CLOSE_TIMEOUT_MS`, then force `destroy()` (X21). */

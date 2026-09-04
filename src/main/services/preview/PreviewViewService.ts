@@ -598,11 +598,8 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
     // A live view revokes its token on teardown; a never-installed session must
     // do it here or the registry entry leaks.
     this.deps.registry.revoke(session.token)
-    try {
-      await this.deps.storageSeal.purge(session.session)
-    } catch {
-      // A purge failure on a session being discarded is not recoverable.
-    }
+    // Purges (bounded) and hands the partition back for reuse; never rejects.
+    await session.release()
   }
 
   async close(panelId: string): Promise<void> {
@@ -784,6 +781,8 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
 
   async onProjectChanged(_oldPath: string | null, _newPath: string | null): Promise<void> {
     await this.teardownAll()
+    // A partition must not carry from project A to project B, purged or not.
+    this.deps.sessionFactory.forgetRecycled()
   }
 
   async dispose(): Promise<void> {

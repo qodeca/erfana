@@ -77,6 +77,9 @@ export function buildPreviewWebPreferences(
 export function nextPartitionName(): string {
   return `erfana-preview-${randomUUID()}`
 }
+// A name is minted only when `PreviewSessionFactory` has no purged partition to
+// reuse: Electron cannot destroy a session, and every new name costs handles for
+// the life of the process (measured on Windows, 2026-09-03: ~16 per partition).
 
 /**
  * Harden a preview session and its WebContents:

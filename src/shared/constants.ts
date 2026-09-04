@@ -576,6 +576,20 @@ export const PREVIEW = {
    */
   TEARDOWN_STEP_TIMEOUT_MS: 2000,
   /**
+   * Bound on the purge that runs when a partition is handed back for reuse
+   * and again before it is handed out (ms). Fail-closed: a purge that fails or
+   * overruns on either side drops the name and a fresh partition is minted.
+   */
+  PARTITION_PURGE_TIMEOUT_MS: 2000,
+  /**
+   * How many purged partition names are kept for reuse. Electron cannot destroy
+   * a session, so every NEW name costs handles for the life of the process
+   * (measured on Windows: ~16 per partition, +0 for re-minting a name). One
+   * per live view plus two in flight around an eviction is enough; more would
+   * only hold storage nobody needs.
+   */
+  MAX_RECYCLED_PARTITIONS: 5,
+  /**
    * Smallest still frame worth taking (px, either edge). `preview:open` seeds
    * the view at 1×1 before the placeholder is laid out; a frame captured then is
    * one pixel stretched over the whole panel. 16 rather than 32 because

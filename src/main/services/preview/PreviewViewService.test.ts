@@ -255,12 +255,15 @@ function makeHarness(
     clearCache: () => Promise.resolve()
   } as unknown as PreviewSessionLike
 
+  const release = vi.fn<() => Promise<void>>(() => Promise.resolve())
   const session: PreviewSession = {
     view,
     session: sessionLike,
     token,
     realRoot: '/proj',
-    teardown: vi.fn<() => void>()
+    partition: 'erfana-preview-test',
+    teardown: vi.fn<() => void>(),
+    release
   }
 
   const sessionCreate = vi.fn<(ctx: unknown) => Promise<PreviewSession>>(() =>
@@ -333,7 +336,10 @@ function makeHarness(
   let capturedEntryHandlers: EntryHandlers | null = null
 
   const deps: PreviewViewDeps = {
-    sessionFactory: { create: sessionCreate as unknown as PreviewViewDeps['sessionFactory']['create'] },
+    sessionFactory: {
+      create: sessionCreate as unknown as PreviewViewDeps['sessionFactory']['create'],
+      forgetRecycled: vi.fn<() => void>()
+    },
     registry: { rebuildCsp, revoke },
     stillFrameCache: {
       captureIfStale: vi.fn(() => Promise.resolve()),
@@ -982,7 +988,7 @@ describe('PreviewViewService — applyApprovedHosts', () => {
 })
 
 describe('PreviewViewService — destroyAll', () => {
-  it('destroys the live view, revokes the token and purges, freeing the slot', async () => {
+  it('destroys the live view, revokes the token and hands the partition back, freeing the slot', async () => {
     const h = makeHarness()
     await h.service.open(REQUEST_A, h.window)
 
@@ -990,7 +996,9 @@ describe('PreviewViewService — destroyAll', () => {
 
     expect(h.factory.destroy).toHaveBeenCalledTimes(1)
     expect(h.revoke).toHaveBeenCalledWith(h.token)
-    expect(h.purge).toHaveBeenCalledWith(h.session.session)
+    // The purge now runs inside the session's own `release()`, after the page
+    // is destroyed, so the partition can be recycled.
+    expect(h.session.release).toHaveBeenCalledTimes(1)
 
     // The slot is free: a different panel now opens rather than being refused.
     const result = await h.service.open({ ...REQUEST_A, panelId: 'panel-B' }, h.window)
@@ -1263,6 +1271,44 @@ describe('PreviewViewService — a window that closes mid-open (#83, #112)', () 
     // The unwind is async and ordered; the coordinator goes after the watcher.
     await vi.waitFor(() => expect(coordinator.dispose).toHaveBeenCalled())
     expect(h.factory.destroy).toHaveBeenCalled()
+  })
+})
+
+describe('PreviewViewService — partition hand-back', () => {
+  it('hands the partition back only after the page is destroyed', async () => {
+    // Releasing earlier would let the next open attach its handler and filter
+    // to a session whose previous page is still running `close()`.
+    const h = makeHarness()
+    await h.service.open(REQUEST_A, h.window)
+
+    await h.service.close('panel-A')
+
+    expect(h.session.release).toHaveBeenCalledTimes(1)
+    const destroyedAt = h.factory.destroy.mock.invocationCallOrder[0]
+    const releasedAt = (h.session.release as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0]
+    expect(destroyedAt).toBeLessThan(releasedAt)
+  })
+
+  it('hands back a session that was built but never installed', async () => {
+    const h = makeHarness()
+    const build = h.sessionCreate.getMockImplementation()
+    h.sessionCreate.mockImplementationOnce(async (ctx) => {
+      h.setWindowDestroyed(true)
+      return build!(ctx)
+    })
+
+    await h.service.open(REQUEST_A, h.window)
+
+    expect(h.session.release).toHaveBeenCalledTimes(1)
+  })
+
+  it('forgets recycled partitions on a project switch, so nothing carries across projects', async () => {
+    const h = makeHarness()
+    await h.service.open(REQUEST_A, h.window)
+
+    await h.service.onProjectChanged('/proj', '/other')
+
+    expect(h.deps.sessionFactory.forgetRecycled).toHaveBeenCalledTimes(1)
   })
 })
 

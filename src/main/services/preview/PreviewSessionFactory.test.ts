@@ -7,6 +7,7 @@
  * sequence is verified with no real `Session`/`WebContentsView`.
  */
 import { describe, expect, it, vi } from 'vitest'
+import { PREVIEW } from '../../../shared/constants'
 import { ErrorCode } from '../../../shared/errors'
 import type { PreviewFailureInput } from '../../../shared/ipc/preview-types'
 
@@ -326,5 +327,106 @@ describe('PreviewSessionFactory', () => {
       expect(registry.revoke).toHaveBeenCalledWith(TOKEN)
       expect(view.webContents.destroy).toHaveBeenCalledTimes(1)
     })
+  })
+})
+
+describe('PreviewSessionFactory — partition recycling', () => {
+  // Electron cannot destroy a session: every `fromPartition` with a NEW name
+  // costs handles for the life of the process (measured on Windows: ~16 per
+  // partition, and +0 for re-minting a name). A partition is handed back after
+  // a bounded purge and reused after another; a purge that fails or overruns
+  // on either side drops the name, so nothing is ever reused un-purged.
+  function makeFactory(overrides: {
+    purge?: ReturnType<typeof vi.fn>
+    nextPartitionName?: ReturnType<typeof vi.fn>
+    createSession?: ReturnType<typeof vi.fn>
+  } = {}): {
+    factory: PreviewSessionFactory
+    purge: ReturnType<typeof vi.fn>
+    nextPartitionName: ReturnType<typeof vi.fn>
+    createSession: ReturnType<typeof vi.fn>
+  } {
+    let minted = 0
+    const nextPartitionName =
+      overrides.nextPartitionName ?? vi.fn<() => string>(() => `erfana-preview-fresh-${++minted}`)
+    const createSession =
+      overrides.createSession ?? vi.fn<(p: string) => PreviewSessionLike>(() => SESSION)
+    const purge = overrides.purge ?? vi.fn<(s: PreviewSessionLike) => Promise<void>>(() => Promise.resolve())
+    const factory = new PreviewSessionFactory({
+      registry: makeRegistry(),
+      allowlistStore: makeStore([]),
+      nextPartitionName,
+      createSession,
+      purge,
+      buildWebPreferences: vi.fn<() => unknown>(() => ({})),
+      createView: vi.fn<() => PreviewViewHandle>(() => makeView()),
+      hardenSession: vi.fn<() => () => void>(() => () => undefined),
+      attachProtocol: vi.fn<() => () => void>(() => () => undefined),
+      attachFilter: vi.fn<() => () => void>(() => () => undefined),
+      assertSealed: vi.fn<() => void>(() => undefined)
+    })
+    return { factory, purge, nextPartitionName, createSession }
+  }
+  const ctx = () => ({ projectPath: '/proj', recordFailure: vi.fn(), onBlocked: vi.fn() })
+
+  it('reuses a released partition instead of minting a new one', async () => {
+    const { factory, nextPartitionName, createSession } = makeFactory()
+
+    const first = await factory.create(ctx())
+    await first.release()
+    const second = await factory.create(ctx())
+
+    expect(second.partition).toBe(first.partition)
+    expect(nextPartitionName).toHaveBeenCalledTimes(1)
+    expect(createSession.mock.calls.map((c) => c[0])).toEqual([first.partition, first.partition])
+  })
+
+  it('purges a recycled partition again before handing it out, and mints fresh when that purge fails', async () => {
+    const purge = vi.fn<(s: PreviewSessionLike) => Promise<void>>(() => Promise.resolve())
+    const { factory, nextPartitionName } = makeFactory({ purge })
+
+    const first = await factory.create(ctx())
+    await first.release()
+    expect(purge).toHaveBeenCalledTimes(1)
+
+    purge.mockRejectedValueOnce(new Error('clearStorageData failed'))
+    const second = await factory.create(ctx())
+
+    // The reuse purge ran, failed, and the name was dropped rather than reused.
+    expect(purge).toHaveBeenCalledTimes(2)
+    expect(second.partition).not.toBe(first.partition)
+    expect(nextPartitionName).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not reuse a partition whose purge after use never completes', async () => {
+    vi.useFakeTimers()
+    try {
+      const purge = vi.fn<(s: PreviewSessionLike) => Promise<void>>(() => Promise.resolve())
+      const { factory, nextPartitionName } = makeFactory({ purge })
+
+      const first = await factory.create(ctx())
+      purge.mockReturnValueOnce(new Promise<void>(() => {}))
+      const releasing = first.release()
+      await vi.advanceTimersByTimeAsync(PREVIEW.PARTITION_PURGE_TIMEOUT_MS + 1)
+      await releasing
+
+      const second = await factory.create(ctx())
+      expect(second.partition).not.toBe(first.partition)
+      expect(nextPartitionName).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('forgets every recycled partition when told to (a project switch)', async () => {
+    const { factory, nextPartitionName } = makeFactory()
+
+    const first = await factory.create(ctx())
+    await first.release()
+    factory.forgetRecycled()
+    const second = await factory.create(ctx())
+
+    expect(second.partition).not.toBe(first.partition)
+    expect(nextPartitionName).toHaveBeenCalledTimes(2)
   })
 })

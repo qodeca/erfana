@@ -161,14 +161,14 @@ export interface PreviewFilterContext {
 }
 ```
 
-**`purge()` is `clearStorageData()` + `clearCache()`**, and it is belt-and-braces, not the seal:
+**`purge()` is `clearStorageData({ storages })` over the seven data-bearing storages + `clearCache()` + the auth, host-resolver and code caches** (v0.19.0; the shader cache is left out because clearing it never completes on Windows), and it is belt-and-braces, not the seal:
 
 | Layer | Mechanism | Covers |
 |---|---|---|
 | Opaque origin (`sandbox allow-scripts`) | Header-only CSP directive | **This is the seal** — storage APIs throw / are unavailable |
-| In-memory partition | `Session.fromPartition` without `persist:` | `storagePath === null` |
+| In-memory partition | `Session.fromPartition` without `persist:`; the NAME is reused after a bounded purge (v0.19.0), because Electron cannot destroy a session | `storagePath === null` |
 | No service workers | `allowServiceWorkers: false` + `worker-src 'none'` | Persistent interception |
-| Purge before Erfana-driven reload | `clearStorageData` + `clearCache` | A cached CDN response surviving an approval reload |
+| Purge before Erfana-driven reload and around a partition reuse | `clearStorageData` over `PURGED_STORAGES` (everything but `shadercache`) + `clearCache` + `clearAuthCache` + `clearHostResolverCache` + `clearCodeCaches`, bounded | A cached CDN response surviving an approval reload; HTTP-level residue reaching the next preview |
 
 Not purged, and acceptable: a page-initiated `location.reload()` (Erfana is not in that path) and
 `window.name` — acceptable *because the opaque origin already makes durable storage unavailable*.
@@ -1251,7 +1251,7 @@ at each step. Phases: **1–19** leaf and pure modules; **20–39** the main-pro
 | 19 | `preview/PreviewAllowlistStore.ts` | new | Independent parse + atomic write-back; root from `ProjectService`; returns the new host set (no registry, no view) | 9 | 10,17,18 |
 | 20 | `preview/PreviewProtocolHandler.ts` | new | `protocol.handle` on the partition session; the ONLY CSP application site via `entry.csp` | 2,4,6 | 11,13,14,15 |
 | 21 | `preview/previewSessionPolicy.ts` | new | Frozen prefs + `buildPreviewWebPreferences(session)`; `hardenPreviewSession` (permissions/downloads/WebRTC; **no header touch**) | 2,3,5 | 12,13 |
-| 22 | `preview/PreviewStorageSeal.ts` | new | `assertSealed`; `purge` = `clearStorageData` + `clearCache` | 5 | 13,21 |
+| 22 | `preview/PreviewStorageSeal.ts` | new | `assertSealed`; `purge` = `clearStorageData` over `PURGED_STORAGES` + `clearCache` + auth/resolver/code caches | 5 | 13,21 |
 | 23 | `preview/PreviewRequestFilter.ts` | new | Unfiltered `onBeforeRequest`; per-hop redirects; started/settled; timeout sweep | 8,10 | 6,15 |
 | 24 | `preview/PreviewHostBlockNotifier.ts` | new | `MAX_HOST_TOASTS` budget | 8 | 3 |
 | 25 | `shared/ipc/project-settings-schema.ts` | mod | `htmlPreview: z.unknown().optional()` **only** | 9 | — |
