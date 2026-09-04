@@ -383,7 +383,7 @@ assertion** fires when an element with `z-index >= BASE_ZINDEX` mounts while the
 `overlayGuard.sync()` also runs from `onDidActivePanelChange` (`EditorAreaSplitPanel.tsx:74`) —
 occluder counts do not change on a tab switch, so without it AC17 case 1 has no trigger (X18).
 
-### 1.8a Backdrop, toast placement and the chrome strip
+### 1.8a Backdrop, toast placement and the preview toolbar (formerly the chrome strip)
 
 Added after the feature shipped and was found unusable on a production build. Three rules, each
 normative.

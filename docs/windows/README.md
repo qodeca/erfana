@@ -46,7 +46,7 @@ The goal is **full Windows parity** — every feature that works on macOS must w
 | [`phase4-binary-spec.md`](phase4-binary-spec.md) | Pinned SHAs for the first published `whisper-build-v1.8.4-erfana1` release (source-of-truth cross-checked against `src/main/services/whisper-assets.ts`). |
 | [`whisper-trust-chain.md`](whisper-trust-chain.md) | 4-layer client-side trust model for the local whisper.cpp subprocess — composition diagram, per-layer guarantees, attacker model. |
 | [`whisper-support-runbook.md`](whisper-support-runbook.md) | Operator playbook for the `WHISPER_*` error codes — diagnostic trails, log paths, stuck-user procedures. |
-| [`../build/windows.md`](../build/windows.md) | Windows dev environment setup (Node 24, Python 3.12, VS 2022 Build Tools, Developer Mode, long paths, troubleshooting, contributor expectations). |
+| [`../build/windows.md`](../build/windows.md) | Windows dev environment setup (Node 24, Python 3.12 known good – 3.14.3 verified 2026-09-03 on Windows 11 – VS 2022 Build Tools, Developer Mode, long paths, troubleshooting, contributor expectations). |
 | [`../build/whisper-binaries.md`](../build/whisper-binaries.md) | Ops runbook for Phase 4 self-hosted whisper.cpp rebuilds: rebuild procedure, upstream SHA diff-review, cert-revocation sub-runbooks, scheduled canary, retention policy, quarterly integrity task, cost model. |
 
 ## Status

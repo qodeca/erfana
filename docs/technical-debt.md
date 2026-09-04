@@ -112,10 +112,10 @@ Resolved – `LanguageSelect` accepts an optional `id` prop and renders it on th
 
 ---
 
-### 7. `docs/security.md` exceeds /doc-update soft cap (661 lines)
+### 7. `docs/security.md` exceeds /doc-update soft cap (752 lines)
 
 **Severity**: Low
-**Impact**: `/doc-update` protocol prefers ≤500-line doc files; `security.md` sits ~176 lines over (~676 lines after the #73 doc sweep on 2026-08-24 added the harness-CSP subsection and three lines to § Sender-frame gating; it was 661 on 2026-08-23, 626 at v0.17.0 and 541 when this item was filed). The trend line is the point: this file gains content on every security-relevant change.
+**Impact**: `/doc-update` protocol prefers ≤500-line doc files; `security.md` sits 252 lines over (752 lines on 2026-09-04, after the HTML-preview section absorbed the partition-recycling and panel-id-digest risks; ~676 after the #73 doc sweep on 2026-08-24 added the harness-CSP subsection and three lines to § Sender-frame gating; 661 on 2026-08-23, 626 at v0.17.0 and 541 when this item was filed). The trend line is the point: this file gains content on every security-relevant change.
 
 **Problem**: Largest natural extraction candidate (`Release signing (v0.9.5+, #174)`, from L566 to the end of the file) is structurally pinned. The pubkey block contains `<!-- minisign-pubkey-{primary,rotation}-{begin,end} -->` fence markers that are actively grepped by:
 
@@ -395,19 +395,49 @@ After the heartbeat hardening (Phase A4 resume-refresh, B1 symlink defense, D3 H
 
 **Severity**: Low
 
-The policy as practised: *a file a change adds behaviour to must come in under 500 lines; a file only read, moved unchanged, or trivially touched keeps its pre-existing debt and is waived.* Line counts re-measured 2026-08-23; only `file-handlers.ts` has moved since the #70 measurement (601 → 626).
+The policy as practised: *a file a change adds behaviour to must come in under 500 lines; a file only read, moved unchanged, or trivially touched keeps its pre-existing debt and is waived.* The #70 table listed five files; the inventory below is the full `wc -l` of every non-test `src/**/*.ts(x)` over 500 lines, re-measured 2026-09-04 (`imageViewer.logic.test.ts`, 693 lines in the #70 table, is a test file and is out of scope here).
 
-| File | Lines | Why it is waived |
+| File | Lines | Note |
 |---|---|---|
-| `src/renderer/src/components/Panels/TerminalPanel.tsx` | 1,352 | Pre-existing; #70 only shrinks it (the panel router replaced its inline open logic) |
-| `src/renderer/src/components/Panels/ImageViewerPanel/imageViewer.logic.test.ts` | 693 | Moved unchanged by `git mv`; not a line was edited |
-| `src/renderer/src/components/Panels/MarkdownEditorPanel.tsx` | 614 | Pre-existing; untouched except by the optional router commit |
-| `src/main/ipc/file-handlers.ts` | 626 | Pre-existing; **grew by 4 lines** in #70 to 601 (the `projectConfinement` import plus two `assert*` calls) and has since reached 626. Adding a security guard to an over-cap file was accepted rather than blocking the fix on a refactor |
-| `src/renderer/src/components/Panels/ImageViewerPanel/imageViewer.logic.ts` | 539 | Moved unchanged by `git mv` |
+| `src/renderer/src/components/ProjectTree/ProjectTree.tsx` | 1,468 | Pre-existing |
+| `src/renderer/src/components/Panels/TerminalPanel.tsx` | 1,362 | Pre-existing; #70 only shrinks it (the panel router replaced its inline open logic) |
+| `src/preload/index.ts` | 1,179 | Pre-existing; the single app bridge grows one block per IPC domain |
+| `src/main/services/preview/PreviewLiveView.ts` | 1,149 | #74 and its follow-ups. sd-074b §3.3 recorded it at 545 against the cap before links landed; the link, CSP-violation and consent code went into sibling modules (`previewLinkBridge.ts`, `previewCspViolationBridge.ts`, `externalLinkConsent.ts`) precisely because of this, and the v0.19.0 bounded-teardown and partition-release changes still added to it |
+| `src/renderer/src/components/Editor/MarkdownPreview.tsx` | 1,032 | Pre-existing (entry 8) |
+| `src/main/services/LocalWhisperService.ts` | 933 | Pre-existing |
+| `src/main/services/ProjectLockService.ts` | 906 | Pre-existing |
+| `src/main/services/DirectoryWatcherService.ts` | 885 | Pre-existing |
+| `src/renderer/src/constants/testids.ts` | 842 | Pre-existing; a flat constant table |
+| `src/main/services/preview/PreviewViewService.ts` | 832 | #74 and its follow-ups; its own header notes the registry was extracted to keep it under the cap, and multi-view, suspend/resume and the v0.19.0 partition hand-back pushed it past anyway |
+| `src/main/services/PdfService.ts` | 821 | Pre-existing |
+| `src/main/services/GitWatcherService.ts` | 795 | Pre-existing |
+| `src/main/services/WhisperModelManager.ts` | 753 | Pre-existing |
+| `src/main/services/TerminalService.ts` | 730 | Pre-existing |
+| `src/main/ipc/transcription-handlers.ts` | 694 | Pre-existing |
+| `src/renderer/src/hooks/useCameraCapture.ts` | 687 | Pre-existing |
+| `src/main/index.ts` | 670 | Pre-existing; the composition root |
+| `src/renderer/src/utils/filePathLinks.logic.ts` | 655 | Pre-existing |
+| `src/shared/constants.ts` | 648 | Pre-existing; comment-heavy constant table |
+| `src/renderer/src/components/Editor/DiagramViewer/ChatBubble.tsx` | 641 | Pre-existing (entry 8) |
+| `src/main/services/claudeStatus/ClaudeStatusService.ts` | 639 | Pre-existing |
+| `src/main/ipc/file-handlers.ts` | 627 | Pre-existing; **grew by 4 lines** in #70 to 601 (the `projectConfinement` import plus two `assert*` calls) and has since reached 627. Adding a security guard to an over-cap file was accepted rather than blocking the fix on a refactor |
+| `src/renderer/src/components/Dialog/BaseDialog.tsx` | 624 | Pre-existing |
+| `src/renderer/src/components/Settings/SettingsOverlay.tsx` | 611 | Pre-existing |
+| `src/main/services/ExternalFileService.ts` | 596 | Pre-existing |
+| `src/main/services/FileService.ts` | 594 | Pre-existing |
+| `src/renderer/src/components/Panels/MarkdownEditorPanel.tsx` | 593 | Pre-existing; untouched by #70 except by the optional router commit |
+| `src/renderer/src/components/Panels/markdownEditorPanel.logic.ts` | 587 | Pre-existing |
+| `src/main/services/LoggingService.ts` | 567 | Pre-existing |
+| `src/renderer/src/components/Dialog/CameraDialog.tsx` | 548 | Pre-existing |
+| `src/renderer/src/components/Panels/ImageViewerPanel/imageViewer.logic.ts` | 539 | Moved unchanged by `git mv` in #70 |
+| `src/shared/errors.ts` | 525 | Pre-existing; one enum plus its message table, growing one line per new code |
+| `src/main/services/preview/PreviewAllowlistStore.ts` | 524 | #74 follow-ups (origins, badge buffering, the v0.19.0 bounded re-read) |
+| `src/main/services/workers/git-status.worker.ts` | 520 | Pre-existing |
+| `src/renderer/src/hooks/useExternalFileDrop.ts` | 518 | Pre-existing |
 
-`FileWatcherService.ts` deliberately stayed under the cap (498 lines) by moving the watch factory, the unlink branch, the send loop and the subscriber counting into `src/main/services/watcher/`.
+`FileWatcherService.ts` deliberately stayed under the cap (498 lines at the #70 measurement) by moving the watch factory, the unlink branch, the send loop and the subscriber counting into `src/main/services/watcher/`.
 
-**Recommended Solution**: `file-handlers.ts` is the one to split first, since it is the only entry actively gaining code — the project/file/stat/CRUD handler groups are independent. The two `imageViewer.logic*` files are candidates for the next pass that genuinely changes them.
+**Recommended Solution**: `PreviewLiveView.ts` and `PreviewViewService.ts` are now the entries gaining code fastest and are the ones to split first – the lifecycle wiring, teardown and still-frame paths in the former and the suspend/resume policy in the latter are separable. `file-handlers.ts` remains a candidate: the project/file/stat/CRUD handler groups are independent. The `imageViewer.logic.ts` file is a candidate for the next pass that genuinely changes it.
 
 **Status**: Accepted for #70; recorded so the next change to any of these files does not re-litigate it.
 
@@ -610,17 +640,15 @@ Resolved by the #73 image-export work. The canonical extension list, the MIME ma
 
 ---
 
-### 41. HTML-preview `onCrash` reuses the `script-error` failure type (#74, 2026-08)
+### 41. HTML-preview `onCrash` reuses the `script-error` failure type (#74, 2026-08) – RESOLVED
 
 **Severity**: Low
 
-**Impact**: The crash-handling path emits a failure of type `script-error`, which is a semantic mislabel — a `render-process-gone`/`unresponsive` crash is not a script error, so the failure badge misattributes the cause.
+**Impact**: The crash-handling path emitted a failure of type `script-error`, which was a semantic mislabel – a `render-process-gone`/`unresponsive` crash is not a script error, so the failure badge misattributed the cause.
 
-**Recommended Solution**: introduce a distinct crash failure type. A `TODO` marks the spot in `PreviewLiveView`.
+**Files**: `PreviewLiveView` (crash handler), `htmlPreview.logic.ts` (badge labels).
 
-**Files**: `PreviewLiveView` (crash handler).
-
-**Status**: Deferred — cosmetic on the badge; recorded so the mislabel is not re-filed as a bug.
+**Status**: Resolved. `PreviewLiveView.onCrash` now records the distinct `render-crash` failure type carrying the crash reason, the badge labels it "Preview crashed", and the `TODO` is gone (`PreviewViewService.test.ts` pins the type on `render-process-gone`).
 
 ---
 
@@ -632,8 +660,6 @@ Resolved by the #73 image-export work. The canonical extension list, the MIME ma
 
 **Files**: `src/renderer/src/components/Tabs/HtmlPreviewTab.tsx`, `src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewFailureBadge.tsx`.
 
-**Status**: Deferred — follow-up to the UX pass.
-
 ---
 
 ### 43. HTML-preview in-app allowlist view/revoke UI deferred (UX-004, #74, 2026-08)
@@ -644,7 +670,7 @@ Resolved by the #73 image-export work. The canonical extension list, the MIME ma
 
 Raised from Low because the approve flow was **unreachable** when this was filed: a host absent from the allowlist is refused by the CSP in the renderer, so the network filter never saw it and no prompt could appear. On a project with no approvals yet there was no route to approving anything at all. The #74 follow-up work closed that gap, so the one-way door is now one a reader can actually walk through — and every approval is written into the project, applies project-wide, survives restarts and reaches anyone who clones the repository (`docs/security.md` residual risk 5), with no way back from inside Erfana.
 
-**Problem**: The store/design built **only** `approveHost` (`PreviewAllowlistStore` has `approveHost` + `getHosts`; no revoke method, no list/revoke IPC channel, no bridge). Building the feature is new capability, not unwired plumbing: it needs `store.revokeHost`, `REVOKE`/`LIST` channels + handlers, a preload bridge, a schema, CSP-rebuild-on-revoke, a settings list UI and tests — out of #74 scope. Not release-blocking, since the allowlist is hand-editable.
+**Problem**: The store built **only** the grant side (`PreviewAllowlistStore` has `approveOrigin` + `getOrigins`, named `approveHost`/`getHosts` when this was filed; no revoke method, no revoke IPC channel, no bridge). Building the feature is new capability, not unwired plumbing: it needs a `store.revokeOrigin`, a `REVOKE` channel + handler, a preload bridge, a schema, CSP-rebuild-on-revoke, a revoke control in the band and tests – out of #74 scope. Not release-blocking, since the allowlist is hand-editable.
 
 One extra obstacle found since: `PreviewViewService.applyApprovedHosts` returns early when no live view exists, so a revoke issued from a settings screen with no preview open has no CSP-rebuild path today.
 

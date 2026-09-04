@@ -197,6 +197,8 @@ Pipeline contributors on Windows:
 
 **Page state is lost when a preview sleeps.** A suspended preview reloads from disk when you return to it: scroll position, typed text and in-memory JavaScript state do not survive.
 
+**Windows: the preview's shader cache is never purged, and a purge timeout in the log is harmless.** On Windows (Electron 39) clearing the `shadercache` storage of a preview's session partition never completes – probed per storage type on 2026-09-04, seven of the eight types settle in 0–5 ms and that one never returns, every time, only inside the full app. It holds compiled GPU programs, not page data, so the purge now names the seven data-bearing storages explicitly (`PURGED_STORAGES` in the storage seal) and leaves the shader cache out; the opaque origin still seals the page's storage. Every purge and teardown step is time-bounded as well (`PREVIEW.PURGE_TIMEOUT_MS`, `TEARDOWN_STEP_TIMEOUT_MS`, `PARTITION_PURGE_TIMEOUT_MS`, all 2 s), so a `... timed out after 2000ms` warn line in `main.log` means one step was skipped after its deadline and the teardown carried on – it is bounded and harmless, not a hang. Since the shader cache was dropped from the purge those lines no longer fire on the verified host; the timeouts stay as belts.
+
 ## Resolved (kept for the trail)
 
 ### v0.9.5 macOS — terminal does not work in the signed DMG (resolved in v0.9.6)

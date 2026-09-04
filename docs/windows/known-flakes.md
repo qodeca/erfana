@@ -58,6 +58,22 @@ below until a dedicated macOS register exists — rows are marked in the
 | `src/renderer/src/components/Search/SearchBar.test.tsx:778` (`advances the "N of M" label`) | Label showed `No results` instead of `3 of 3` on a Windows host (2026-08-24). Reproduced 3/3 - consistently lost, not intermittent. | 2026-08-24 | 🟢 resolved | provider double aligned with seeded matches (2026-08-24) | **A lost race, not a slow wait.** The test seeds `query` and `matches` directly, which makes `SearchBar`'s mount effect schedule a debounced `provider.search` (`SEARCH_DEBOUNCE_MS = 100`). The default provider double resolves to `[]`, so when that timer landed mid-test it called `setMatches([])` and wiped the label. A fast host finishes all four clicks inside 100 ms and never sees it. Fixed by having the double resolve to the SAME matches, which makes the late write idempotent (`setMatches` preserves `currentIndex`) and matches how a real full-match provider behaves - it is the source of those matches. Preferred over fake timers because it removes the race rather than freezing it. |
 | `src/main/index.test.ts:388` (`Window Title Configuration`) | `Test timed out in 5000ms` under the full workspace run on a Windows host (2026-08-24); passes 3/3 in isolation. | 2026-08-24 | 🟢 resolved | file-level `testTimeout` raised (2026-08-24) | **Genuine cost, not a hung promise.** Every test in the file calls `vi.resetModules()` and re-imports `./index`, pulling the entire main-process module graph in again. Under the loaded full-suite run that repeatedly exceeds the 5 s default on this host. Raised to 20 s file-wide via `vi.setConfig`; a genuinely hung test still fails, only the slow-but-progressing import gains room. |
 
+## Untested on the 2026-09-03 Windows verification
+
+Not flakes and not failures: four of the 34 manual checks in the
+[2026-09-03 release-verification handoff](../handoffs/2026-09-03-windows-release-verification.md)
+§5 could not be run on the verifying host (Windows 11, one monitor at 200%
+scaling). They are recorded here as **untested** so that a later reader does not
+count them as passes; the other 30 passed once the `fix/windows-preview-blockers`
+fixes were in.
+
+| Handoff check | Why it was not run |
+|---|---|
+| §5.1 A project on a **second drive letter** (`D:\`) | Impossible on this host – it has no second drive. |
+| §5.1 A **UNC / network path** (`\\server\share\...`) | Impossible on this host – no share was available. |
+| §5.4 **Display scaling** at 125% and 150% | Skipped: only the host's own 200% setting was tested (it passed). Changing scaling needs a system-wide setting on a single-monitor machine with no way back if the desktop breaks, so it was deliberately not attempted. |
+| §5.5 **Zoom In** (View → Zoom In) | Zoom Out and Actual Size passed through the View menu; the automation harness could not press the `CommandOrControl+Plus` accelerator reliably, so Zoom In is unconfirmed. A harness limitation, not an app defect. |
+
 ## Follow-up audit candidates
 
 Areas likely to contain more Windows-host flakes. The advisory

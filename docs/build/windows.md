@@ -19,7 +19,7 @@ Issue references above are bare numbers on purpose — those issue links no long
 |-----------|---------|-------|
 | **Windows** | Windows 11 (or Windows 10 22H2) | Older Windows versions are unsupported. |
 | **Node.js** | 24+ | Match CI. Install from [nodejs.org](https://nodejs.org/) or via `nvm-windows`. |
-| **Python** | **3.12** (NOT 3.13) | `node-pty` fails to build against Python 3.13. If 3.13 is on PATH first, `node-gyp` will pick it up — uninstall it or put 3.12 ahead of it. |
+| **Python** | **3.12** known good; **3.14.3** verified 2026-09-03 on Windows 11 (NOT 3.13) | `node-pty` fails to build against Python 3.13. If 3.13 is on PATH first, `node-gyp` will pick it up — uninstall it or put a working version ahead of it. |
 | **Visual Studio 2022 Build Tools** | "Desktop development with C++" workload + Windows 10 SDK | Required to compile `node-pty` and other native modules. |
 | **Git for Windows** | latest | Git Bash is fully supported for running npm scripts. PowerShell and `cmd.exe` should also work after Phase 0. |
 
@@ -36,15 +36,15 @@ node --version   # should print v24.x or higher
 npm --version
 ```
 
-### 2. Install Python 3.12
+### 2. Install Python (3.12 known good; 3.14.3 verified)
 
-Download Python 3.12 from [python.org](https://www.python.org/downloads/windows/) (NOT 3.13). During installation, tick **"Add python.exe to PATH"**.
+Download Python from [python.org](https://www.python.org/downloads/windows/) – 3.12 is the long-standing known-good version, and 3.14.3 was the Python on the Windows 11 host of the 2026-09-03 release verification, where every automated gate (lint, typecheck, unit, build and the e2e suite that spawns real terminals) ran green. Avoid 3.13. During installation, tick **"Add python.exe to PATH"**.
 
 ```powershell
-python --version   # should print Python 3.12.x
+python --version   # should print Python 3.12.x, or 3.14.x
 ```
 
-> **Why 3.12 specifically?** `node-pty` (which powers Erfana's terminal) ships C++ bindings that the `node-gyp` toolchain compiles at install time. The `node-gyp` shipped with Node 24 does not yet handle Python 3.13's removed `distutils` module, so the build fails. Pinning to 3.12 sidesteps the issue.
+> **Why not 3.13?** `node-pty` (which powers Erfana's terminal) ships C++ bindings that the `node-gyp` toolchain compiles at install time. The `node-gyp` shipped with Node 24 does not handle Python 3.13's removed `distutils` module, so the build fails. 3.12 sidesteps the issue and 3.14.3 has been seen working; if you are on anything else, treat a `node-pty` build failure as the first suspect.
 
 ### 3. Install Visual Studio 2022 Build Tools
 
@@ -149,7 +149,7 @@ A fresh `git clone && npm ci` on a default-hardened Windows 11 box previously fa
 
 **`node-pty` fails to compile during `npm install`**
 - First confirm the patch is present and applied: `patches/node-pty+1.1.0.patch` should exist, and `npm install` output should show `patch-package` applying it (`node-pty@1.1.0 ✔`). If the patch failed to apply, re-run `npx patch-package` and read the error.
-- Check `python --version` is 3.12.x, not 3.13.x.
+- Check `python --version` is 3.12.x (known good) or 3.14.x (3.14.3 verified 2026-09-03), not 3.13.x.
 - Confirm Visual Studio Build Tools 2022 is installed with the "Desktop development with C++" workload.
 - Run `npm config get msvs_version` — should return `2022`.
 - For `'GetCommitHash.bat' is not recognized` or `MSB8040` (Spectre libs), see [node-pty build failures on Windows 11](#node-pty-build-failures-on-windows-11) above — these are handled by the committed patch.

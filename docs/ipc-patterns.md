@@ -14,12 +14,16 @@ contextBridge.exposeInMainWorld('api', api)
 
 **2. Handle in main** (`src/main/ipc/file-handlers.ts`):
 ```typescript
-ipcMain.handle('file:readFile', async (_event, filePath: string) => {
+import { registerHandle } from './registry'
+
+registerHandle('file:readFile', async (_event, filePath: string) => {
   // ALWAYS validate input
   if (!isValidPath(filePath)) throw new Error('Invalid path')
   return await fileService.readFile(filePath)
 })
 ```
+
+Never call `ipcMain.handle(...)` or `ipcMain.on(...)` yourself. `src/main/ipc/registry.ts` (`registerHandle` / `registerHandleOnce` / `registerOn` / `registerOnce`, paired with `unregisterHandle` / `unregisterOn`) is the **only** place a global handler is registered, and every listener it registers is gated on the app's own top-level renderer (`isTrustedAppSender`, `src/main/ipc/senderValidation.ts`) before the payload is seen – an untrusted `invoke` rejects, an untrusted `send` is dropped and logged by origin. Importing `ipcMain` anywhere else under `src/main/**` is an ESLint error (`no-restricted-imports` in `eslint.config.mjs`), so the gate cannot be skipped by forgetting it. Frame-scoped listeners (`webContents.ipc`, `webContents.mainFrame.ipc`) are deliberately outside the registry; they carry their own per-call token or frame check. Why an explicit entry point rather than a wrapped `ipcMain`: see the header of `registry.ts` and [Security § Sender-frame gating](./security.md#sender-frame-gating).
 
 **3. Call from renderer**:
 ```typescript
@@ -54,7 +58,7 @@ write(terminalId: string, data: string): Promise<boolean> {
 
 **2. IPC handler awaits service promise** (`src/main/ipc/terminal-handlers.ts`):
 ```typescript
-ipcMain.handle('terminal:write', async (_event, { terminalId, data }) => {
+registerHandle('terminal:write', async (_event, { terminalId, data }) => {
   try {
     const success = await terminalService.write(terminalId, data)
     return { success }
@@ -89,7 +93,7 @@ if (!writeResult.success) {
 ## Adding New IPC Channel
 
 1. Add to preload API with TypeScript types
-2. Create handler in appropriate `src/main/ipc/*-handlers.ts`
+2. Create handler in appropriate `src/main/ipc/*-handlers.ts`, registered through `registry.ts` (never `ipcMain` directly)
 3. Register handler in `src/main/index.ts`
 4. Call from renderer component
 
@@ -106,12 +110,13 @@ Every channel registered in `src/main/ipc/*.ts` is listed, plus the main → ren
 events those handlers and their services broadcast. Regenerate the handler half with:
 
 ```bash
-grep -rnE "ipcMain\.(handle|on)\(" src/main/ipc --include='*.ts' | grep -v '\.test\.'
+grep -rnE "register(Handle|HandleOnce|On|Once)\(" src/main/ipc --include='*.ts' | grep -v '\.test\.'
 ```
 
 Note that several domains register through channel **constants**
 (`src/shared/ipc/*-channels.ts`) rather than string literals, so a grep for
-`ipcMain.handle('` alone under-reports by roughly a third.
+`registerHandle('` alone under-reports by roughly a third. A grep for
+`ipcMain.handle(` finds only `registry.ts` itself.
 
 ### File operations (`file-handlers.ts`)
 
@@ -228,6 +233,7 @@ Note the `file:` prefix – these are **not** `external-file:*`.
 | `globalSettings:get` | Read the validated global settings object |
 | `globalSettings:set` | Write global settings (Zod-validated main-side) |
 | `globalSettings:reset` | Restore defaults |
+| `globalSettings:changed` | Event: the validated global settings changed (main → renderer). Broadcast to every window by `global-settings-handlers.ts` from `GlobalSettingsService.onSettingsChanged`; not handler-registered |
 
 ### Logging (`logging-handlers.ts`)
 
@@ -292,7 +298,7 @@ Three further `image-export:*` names exist in `src/shared/ipc/image-export-chann
 | `screenshot:getCapabilities` | Per-capturer capability matrix (`supported`, `hasNativeWindowPicker`, `areaCaptureMode`) — renderer hook calls once on mount instead of branching on `process.platform` (#164) |
 | `screenshot:getScreenPermission` | Advisory macOS Screen Recording status (`ScreenRecordingPermission`: `granted` / `denied` / `not-determined` / `restricted` / `unknown`). Read from `systemPreferences.getMediaAccessStatus('screen')`; returns `'unknown'` off macOS, on a handler error, or when the sender is untrusted. Used only to tailor the failure-path dialog copy – **never** to gate a capture |
 | `screenshot:enumerateWindows` | List capturable windows for the in-app picker on Windows; returns `availability`-discriminated union (`'enumerable'` / `'native-picker'` (macOS) / `'unsupported'`) with bounded `thumbnailDataUrl` (#164) |
-| `screenshot:areaSelected` | Overlay-only (frame-IPC): renderer posts the chosen rectangle. Listener attached per-call by `AreaSelectOverlay.selectArea()` via `overlay.webContents.mainFrame.ipc.on`; rejected on token / `senderFrame.url` mismatch. Not registered on the global `ipcMain` (#164) |
+| `screenshot:areaSelected` | Overlay-only (frame-IPC): renderer posts the chosen rectangle. Listener attached per-call by `ScreenshotOverlayWindow` (`src/main/services/screenshot/ScreenshotOverlayWindow.ts`) via `overlay.webContents.mainFrame.ipc.on`; rejected on token / `senderFrame.url` mismatch. Not registered on the global `ipcMain` (#164) |
 | `screenshot:areaCancelled` | Overlay-only (frame-IPC): renderer signals user cancel (Escape / blur / close). Same per-call frame-scoped attachment; not registered globally (#164) |
 | `camera:save` | Persist a captured camera frame into the project |
 
@@ -314,12 +320,12 @@ Three further `image-export:*` names exist in `src/shared/ipc/image-export-chann
 
 ### HTML preview (`preview/*-handlers.ts`, constants in `preview-channels.ts`) (#74)
 
-Channel names come from the `PreviewChannels` / `PreviewEvents` constants in `src/shared/ipc/preview-channels.ts`. Every request is sender-validated main-side via `isTrustedPreviewSender` (`src/main/ipc/preview/isTrustedPreviewSender.ts`); the register payload carries `terminalId`/panel identity only — the previewed page's own trust is resolved main-side and never taken from the renderer. All 10 control channels are `invoke`/`handle` **except** `setBounds` and `setVisibility`, which are high-frequency fire-and-forget `send`/`on`.
+Channel names come from the `PreviewChannels` / `PreviewEvents` constants in `src/shared/ipc/preview-channels.ts`. Every request is sender-validated main-side via `isTrustedPreviewSender` (`src/main/ipc/preview/isTrustedPreviewSender.ts`), on top of the registry gate every channel already has; a payload carries a `panelId` and the request's own arguments, nothing more – the previewed page's own trust is resolved main-side and never taken from the renderer. The 10 control channels (`checkEligibility`, `open`, `close`, `reload`, `approveHost`, `find`, `stopFind`, `exportPdf`, `setBounds`, `setVisibility`) are `invoke`/`handle` **except** `setBounds` and `setVisibility`, which are high-frequency fire-and-forget `send`/`on`. There is no `preview:setZoom`: zoom is driven from the View menu main-side (`menu.ts` → `PreviewViewService`), not over IPC.
 
 | Channel | Purpose |
 |---------|---------|
 | `preview:checkEligibility` | Whether a path may open as a running preview |
-| `preview:open` | Mint the `WebContentsView` and open a preview for a panel (may refuse if one is live) |
+| `preview:open` | Mint the `WebContentsView` and open a preview for a panel. Refuses (`PREVIEW_VIEW_LIMIT_REACHED`) only when the same panel id is already live in *another* window; over `PREVIEW.MAX_LIVE_VIEWS` it suspends the least recently active preview instead. A payload that fails `PreviewOpenRequestSchema` answers `PREVIEW_OPEN_INVALID_REQUEST` |
 | `preview:close` | Close and destroy the preview for a panel (bounded destroy) |
 | `preview:setBounds` | `ipcMain.on` – update the native view bounds (fire-and-forget; stale seqs dropped) |
 | `preview:setVisibility` | `ipcMain.on` – update view visibility with a diagnostic reason (fire-and-forget) |
@@ -335,6 +341,8 @@ Channel names come from the `PreviewChannels` / `PreviewEvents` constants in `sr
 | `preview:findResult` | Event: an in-page find produced a final result |
 | `preview:stillFrameChanged` | Event: the still-frame captured on hide changed |
 | `preview:loadStateChanged` | Event: the load state for a panel changed |
+| `preview:backdropChanged` | Event: the colour painted behind the page changed – Erfana's chrome colour until the page first paints, then the page's own resolved background. The renderer writes it onto the placeholder so the DOM and the native view never disagree (sd-074 §1.8a) |
+| `preview:boundsApplied` | Event: a `setBounds` that asked for confirmation was applied and the page has repainted at the new rect, echoing the request's `seq`. Anything that reveals Erfana's own chrome *because* the page moved (the permission band opening its list) waits for this rather than trusting the send |
 | `preview:forwardedShortcut` | Event: an enumerated keyboard accelerator was forwarded from the sealed page |
 
 ### Project lock (`project-lock-handlers.ts`)
@@ -346,6 +354,7 @@ Channel names come from the `PreviewChannels` / `PreviewEvents` constants in `sr
 | `project-lock:check` | Check lock status for project path |
 | `project-lock:requestFocus` | Request focus from lock holder |
 | `project-lock:cleanup` | Cleanup stale locks |
+| `project-lock:focused` | Event (main → renderer): another Erfana instance asked, via `project-lock:requestFocus`, for the window holding this project to come to the front; sent after main has focused it, with `{ projectPath, requesterPid }`. Broadcast by `ProjectLockService`, not handler-registered |
 
 ### App and OS integration (`system-handlers.ts`, `shell-handlers.ts`, `quit-handlers.ts`)
 
@@ -429,7 +438,8 @@ Applied in services:
 
 ### Preview channels not in this index (sd-074b)
 
-Two preview channels are deliberately absent from the table above:
+Three preview channels are deliberately absent from the table above:
 
-- **`preview-page:linkActivated`** — page → main, registered with `webContents.ipc` on the preview's own WebContents, never on the global `ipcMain`. Only that WebContents can reach it, so it needs no sender predicate; the handler additionally rejects sub-frame senders. WebContents-scoped rather than frame-scoped on purpose: a `WebFrameMain` is replaced when a navigated page replaces it, which would silently drop a `mainFrame.ipc` listener. Same shape of "invisible to the rest of the app" as the `image-export:harness-*` channels, though those are frame-scoped.
+- **`preview-page:linkActivated`** — page → main, registered with `webContents.ipc` on the preview's own WebContents (`previewViewLifecycle.ts`), never on the global `ipcMain`. Only that WebContents can reach it, so it needs no sender predicate; the handler additionally rejects sub-frame senders. WebContents-scoped rather than frame-scoped on purpose: a `WebFrameMain` is replaced when a navigated page replaces it, which would silently drop a `mainFrame.ipc` listener. Same shape of "invisible to the rest of the app" as the `image-export:harness-*` channels, though those are frame-scoped.
+- **`preview-page:cspViolation`** – page → main, the second channel on that same `webContents.ipc` (`previewCspViolationBridge.ts`, mirroring the link bridge). The preview's send-only preload forwards the page's own `securitypolicyviolation` reports, which is the only way a host the CSP refused in the renderer – before the network filter could see it – can reach the permission band. It widens nothing: both gates stay as they are, only the report is added.
 - **`preview:openFileRequested`** — main → renderer, and the only preview event that is **window-scoped** rather than broadcast. Every other preview event carries a `panelId` and is harmless to send everywhere; this one causes a tab to open, so broadcasting it would make every window open a tab for one window's link click.
