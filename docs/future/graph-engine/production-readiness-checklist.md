@@ -266,4 +266,4 @@ GROUP BY src_id, dst_id, type HAVING COUNT(*) > 1;
 - [Architecture](./architecture-overview.md) – System design decisions
 - [Performance](./performance.md) – Benchmarks and optimization
 - [Packaging](./packaging.md) – Native module configuration
-- [Implementation Guide](./implementation-guide.md) – Milestone checklist
+- [Implementation Guide](./implementation-guide/README.md) – Milestone checklist

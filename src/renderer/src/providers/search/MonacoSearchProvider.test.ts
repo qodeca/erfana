@@ -89,6 +89,14 @@ describe('MonacoSearchProvider', () => {
       expect(provider.name).toBe('Monaco Editor')
     })
 
+    it('declares full-match capabilities', () => {
+      expect(provider.capabilities).toEqual({
+        randomAccess: true,
+        matchList: true,
+        wholeWord: true
+      })
+    })
+
     it('stores editor ref', () => {
       expect(editorRef.current).toBe(mockEditorHandle)
     })

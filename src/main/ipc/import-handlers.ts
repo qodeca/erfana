@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { ipcMain, dialog } from 'electron'
+import { dialog } from 'electron'
 import { stat, writeFile, mkdir, cp, rm } from 'fs/promises'
 import { basename, extname, isAbsolute, normalize, join } from 'path'
 import { importService, converterRegistry } from '../services/import'
@@ -17,6 +17,7 @@ import {
 import { ErrorCode, AppError, getUserFriendlyMessage } from '../../shared/errors'
 import { isConfigurableConverter } from '../services/import/types'
 import { changeExtension, sanitizeFileName, findAvailableFileName } from '../utils/fileUtils'
+import { registerHandle } from './registry'
 
 /**
  * File selection result from the native dialog
@@ -44,7 +45,7 @@ export function registerImportHandlers(): void {
    * Shows a unified file dialog with filters for all supported file types.
    * Returns file info or null if cancelled.
    */
-  ipcMain.handle('import:selectFile', async (): Promise<FileSelection | null> => {
+  registerHandle('import:selectFile', async (): Promise<FileSelection | null> => {
     // Build file filters from supported extensions
     const extensions = converterRegistry.getSupportedExtensions()
     const { requiresConversion, passthrough } = converterRegistry.getExtensionsByConversionType()
@@ -100,7 +101,7 @@ export function registerImportHandlers(): void {
    * Returns validation result with any warnings/errors.
    * Warnings (like file too large) don't prevent import but inform the user.
    */
-  ipcMain.handle('import:validate', async (_event, filePath: string): Promise<ValidationResult> => {
+  registerHandle('import:validate', async (_event, filePath: string): Promise<ValidationResult> => {
     // Input validation
     if (!filePath || typeof filePath !== 'string') {
       throw new Error('Invalid file path: must be a non-empty string')
@@ -130,7 +131,7 @@ export function registerImportHandlers(): void {
    * Requires a project to be open.
    * Returns import result with output path or error info.
    */
-  ipcMain.handle('import:process', async (_event, filePath: string): Promise<ImportResult> => {
+  registerHandle('import:process', async (_event, filePath: string): Promise<ImportResult> => {
     // Input validation
     if (!filePath || typeof filePath !== 'string') {
       throw new Error('Invalid file path: must be a non-empty string')
@@ -161,7 +162,7 @@ export function registerImportHandlers(): void {
    * Returns array of extensions (lowercase, without dot).
    * Useful for file dialog filters and validation on renderer side.
    */
-  ipcMain.handle('import:getSupportedExtensions', async (): Promise<string[]> => {
+  registerHandle('import:getSupportedExtensions', async (): Promise<string[]> => {
     return importService.getSupportedExtensions()
   })
 
@@ -171,7 +172,7 @@ export function registerImportHandlers(): void {
    * @param extension - File extension (with or without dot)
    * @returns true if the file type can be imported
    */
-  ipcMain.handle('import:isSupported', async (_event, extension: string): Promise<boolean> => {
+  registerHandle('import:isSupported', async (_event, extension: string): Promise<boolean> => {
     if (!extension || typeof extension !== 'string') {
       return false
     }
@@ -204,7 +205,7 @@ export function registerDocumentImportHandlers(): void {
    * 5. Runs conversion with progress streaming
    * 6. Writes result to import/ directory
    */
-  ipcMain.handle(
+  registerHandle(
     IMPORT_CHANNELS.DOCUMENT,
     async (event, request: unknown): Promise<DocumentImportResult> => {
       // Validate request schema
@@ -377,7 +378,7 @@ export function registerDocumentImportHandlers(): void {
    * Aborts the AbortController (best-effort since LiteParse has no AbortSignal).
    * The import handler checks the abort flag before writing output.
    */
-  ipcMain.handle(
+  registerHandle(
     IMPORT_CHANNELS.DOCUMENT_CANCEL,
     async (): Promise<{ success: boolean; error?: string }> => {
       if (activeDocumentController) {
@@ -396,7 +397,7 @@ export function registerDocumentImportHandlers(): void {
    * Returns the current list of supported document extensions,
    * which may change after DependencyDetector completes.
    */
-  ipcMain.handle(
+  registerHandle(
     IMPORT_CHANNELS.GET_DOCUMENT_EXTENSIONS,
     async (): Promise<string[]> => {
       const { requiresConversion } = converterRegistry.getExtensionsByConversionType()

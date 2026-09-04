@@ -12,7 +12,8 @@ const showItemInFolder = vi.fn()
 const isTrustedSenderMock = vi.fn(() => true)
 
 vi.mock('./senderValidation', () => ({
-  isTrustedSender: isTrustedSenderMock
+  isTrustedSender: isTrustedSenderMock,
+    isTrustedAppSender: () => true
 }))
 
 vi.mock('electron', () => {
@@ -335,5 +336,134 @@ describe('file:revealInFileManager', () => {
 
     expect(await reveal({}, file)).toBe('')
     expect(showItemInFolder).not.toHaveBeenCalled()
+  })
+})
+
+describe('project confinement for read handlers (issue #70)', () => {
+  let tmp: string
+  let outside: string
+
+  beforeEach(async () => {
+    for (const k of Object.keys(handlers)) delete handlers[k]
+    vi.resetModules()
+
+    const { mkdtempSync } = await import('node:fs')
+    const { join } = await import('node:path')
+    const { tmpdir } = await import('node:os')
+    tmp = mkdtempSync(join(tmpdir(), 'erfana-confine-'))
+    outside = mkdtempSync(join(tmpdir(), 'erfana-outside-'))
+
+    const { fileService } = await import('../services/FileService')
+    const { logger } = await import('../services/LoggingService')
+    vi.spyOn(fileService, 'getProjectPath').mockReturnValue(tmp)
+    // Refusals are logged at error by design; keep the suite output readable.
+    vi.spyOn(logger, 'error').mockImplementation(() => {})
+
+    const { registerFileHandlers } = await import('./file-handlers')
+    registerFileHandlers()
+  })
+
+  afterEach(async () => {
+    const { rmSync } = await import('node:fs')
+    rmSync(tmp, { recursive: true, force: true })
+    rmSync(outside, { recursive: true, force: true })
+    vi.restoreAllMocks()
+    vi.resetModules()
+  })
+
+  /** An in-project name whose content lives outside the project. */
+  const plantEscapingSymlink = async (name: string): Promise<string> => {
+    const { writeFileSync, symlinkSync } = await import('node:fs')
+    const { join } = await import('node:path')
+    const target = join(outside, 'secret.txt')
+    writeFileSync(target, 'secret')
+    const link = join(tmp, name)
+    symlinkSync(target, link, 'file')
+    return link
+  }
+
+  describe('file:readFile', () => {
+    it('reads a file inside the project', async () => {
+      const { writeFileSync } = await import('node:fs')
+      const { join } = await import('node:path')
+      const file = join(tmp, 'note.md')
+      writeFileSync(file, '# hi')
+
+      const { fileService } = await import('../services/FileService')
+      const read = vi.spyOn(fileService, 'readFile').mockResolvedValue('# hi')
+
+      await expect(handlers['file:readFile']({}, file)).resolves.toBe('# hi')
+      expect(read).toHaveBeenCalledWith(file)
+    })
+
+    it('rejects a path outside the project without reading it', async () => {
+      const { writeFileSync } = await import('node:fs')
+      const { join } = await import('node:path')
+      const target = join(outside, 'secret.txt')
+      writeFileSync(target, 'secret')
+
+      const { fileService } = await import('../services/FileService')
+      const read = vi.spyOn(fileService, 'readFile').mockResolvedValue('secret')
+
+      await expect(handlers['file:readFile']({}, target)).rejects.toThrow(
+        'Cannot read files outside the project directory'
+      )
+      expect(read).not.toHaveBeenCalled()
+    })
+
+    it.skipIf(process.platform === 'win32')(
+      'rejects an in-project symlink that points outside the project',
+      async () => {
+        const link = await plantEscapingSymlink('innocent.md')
+
+        const { fileService } = await import('../services/FileService')
+        const read = vi.spyOn(fileService, 'readFile').mockResolvedValue('secret')
+
+        await expect(handlers['file:readFile']({}, link)).rejects.toThrow(
+          'Cannot read files outside the project directory'
+        )
+        expect(read).not.toHaveBeenCalled()
+      }
+    )
+
+    it("lets a missing in-project file fail with the reader's own error", async () => {
+      const { join } = await import('node:path')
+      const { fileService } = await import('../services/FileService')
+      vi.spyOn(fileService, 'readFile').mockRejectedValue(
+        Object.assign(new Error('ENOENT: no such file'), { code: 'ENOENT' })
+      )
+
+      await expect(handlers['file:readFile']({}, join(tmp, 'gone.md'))).rejects.toThrow('ENOENT')
+    })
+  })
+
+  // The image read channel's own confinement (out-of-project path, in-project
+  // symlink pointing out, closed project) is covered against `file:readImage`
+  // in file-handlers.readImage.test.ts; the deprecated `file:readAsBase64` it
+  // replaced no longer exists (#70).
+
+  describe('file:getStats', () => {
+    it('still serves a path the user picked outside the project', async () => {
+      // Spec #012: the import shortcut stats native-dialog selections, which
+      // are out-of-project by definition. Confining this handler would disable
+      // its large-file warnings.
+      const { writeFileSync } = await import('node:fs')
+      const { join } = await import('node:path')
+      const picked = join(outside, 'picked.pdf')
+      writeFileSync(picked, 'x')
+
+      await expect(handlers['file:getStats']({}, picked)).resolves.toMatchObject({ size: 1 })
+    })
+
+    it.skipIf(process.platform === 'win32')(
+      'rejects an in-project symlink that points outside the project',
+      async () => {
+        const link = await plantEscapingSymlink('innocent.svg')
+
+        await expect(handlers['file:getStats']({}, link)).rejects.toThrow(
+          'Cannot read files outside the project directory'
+        )
+      }
+    )
   })
 })

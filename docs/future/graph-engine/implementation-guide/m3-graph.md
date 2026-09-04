@@ -17,7 +17,7 @@
 
 **File:** `src/main/services/EntityExtractor.ts`
 
-**Implementation:** See [graph-capabilities-entities.md](./graph-capabilities-entities.md).
+**Implementation:** See [graph-capabilities-entities.md](../graph-capabilities-entities.md).
 
 **Patterns:**
 - `[[wikilinks]]`

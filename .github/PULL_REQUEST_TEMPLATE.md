@@ -16,7 +16,8 @@ SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 ## Checklist
 
 - [ ] Commits follow [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `chore:`, `docs:`).
-- [ ] `npm run lint` and `npm run typecheck` pass.
+- [ ] `npm run lint`, `npm run lint:css` and `npm run typecheck` pass.
+- [ ] `npm run design -- --check` passes (regenerate with `npm run design` and commit if it does not).
 - [ ] `npm run test:ci` passes (added/updated tests where it makes sense).
 - [ ] `npx electron-vite build` succeeds.
 - [ ] `npm run check:headers` and `reuse lint` pass (SPDX headers / REUSE compliance).

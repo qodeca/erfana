@@ -3,6 +3,7 @@
 import { useEffect, useRef, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { TEST_IDS } from '../../constants/testids'
+import { useOccluder } from '../../hooks/useOccluder'
 import './ContextMenu.css'
 
 export interface ContextMenuItem {
@@ -30,6 +31,12 @@ export function ContextMenu({ x, y, items, onClose, containerTestId }: ContextMe
   const menuRef = useRef<HTMLDivElement>(null)
   const openTimeRef = useRef<number>(Date.now())
   const portalRoot = document.getElementById('portal-root')
+
+  // Occlude the live preview view for this menu's whole lifetime (item 66). The
+  // shared ContextMenu is only mounted while open (parents render it behind a
+  // guard), so `active` is `true` until it unmounts. Called before the early
+  // `portalRoot` return so the hook order is stable.
+  useOccluder('menu', true)
 
   // Store onClose in a ref to avoid re-running effect when it changes
   // This prevents openTimeRef from being reset when context value updates

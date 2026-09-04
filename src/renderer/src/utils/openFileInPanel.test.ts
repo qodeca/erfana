@@ -1,0 +1,277 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+/**
+ * Tests for {@link openFileInPanel} and {@link getFilePanelId}.
+ *
+ * @module openFileInPanel.test
+ */
+
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import type { DockviewApi } from 'dockview'
+
+import { getFilePanelId, openFileInPanel } from './openFileInPanel'
+import { useProjectStore } from '../stores/useProjectStore'
+import { PanelIdSchema } from '../../../shared/ipc/preview-schema'
+import { sanitizeFilePath } from './fileUtils'
+
+const registerEditorPanel = vi.fn()
+
+/** Builds a dockview API double whose `getPanel` returns whatever is seeded. */
+function makeApi(existing: Record<string, unknown> = {}) {
+  const setActive = vi.fn()
+  const focus = vi.fn()
+  const addPanel = vi.fn(() => ({ api: { setActive }, group: { focus } }))
+  return {
+    api: {
+      getPanel: vi.fn((id: string) => existing[id]),
+      addPanel
+    } as unknown as DockviewApi,
+    addPanel,
+    setActive,
+    focus
+  }
+}
+
+beforeEach(() => {
+  registerEditorPanel.mockClear()
+  vi.spyOn(useProjectStore, 'getState').mockReturnValue({
+    registerEditorPanel
+  } as unknown as ReturnType<typeof useProjectStore.getState>)
+})
+
+describe('panel ids stay inside the IPC boundary', () => {
+  // A panel id used to be the sanitized path, one character out per
+  // character in, plus a prefix. `PanelIdSchema` caps it at 256, so a file
+  // 249 characters deep on Windows (250 on POSIX) refused to preview with
+  // `too_big, maximum: 256, path: ["panelId"]` in the log and nothing on
+  // screen (Windows verification, 2026-09-03). The id must be bounded.
+  const deep = 'C:\\' + 'folder-name/'.repeat(25) + 'index.html' // 320 chars
+  const sibling = 'C:\\' + 'folder-name/'.repeat(25) + 'other.html'
+
+  it('a 320-char path yields an id the open schema accepts', () => {
+    const id = getFilePanelId(deep)
+    expect(id.length).toBeLessThanOrEqual(200)
+    expect(PanelIdSchema.safeParse(id).success).toBe(true)
+  })
+
+  it('is stable across calls and distinct for a sibling that shares the prefix', () => {
+    expect(getFilePanelId(deep)).toBe(getFilePanelId(deep))
+    expect(getFilePanelId(deep)).not.toBe(getFilePanelId(sibling))
+  })
+
+  it('a short path keeps the exact id it always had (no churn)', () => {
+    // Green before and after by design: pins that ids under the budget are
+    // untouched, so nothing keyed on an existing id moves.
+    const short = '/proj/' + 'a'.repeat(80) + '/notes.md' // ~100 chars
+    expect(getFilePanelId(short)).toBe('editor-' + sanitizeFilePath(short))
+  })
+
+  it('a preview id for a deep path is bounded too', () => {
+    const { api, addPanel } = makeApi()
+    openFileInPanel(api, deep, { kind: 'preview' })
+    const id = (addPanel.mock.calls[0][0] as { id: string }).id
+    expect(id).toMatch(/^preview-/)
+    expect(PanelIdSchema.safeParse(id).success).toBe(true)
+  })
+})
+
+describe('getFilePanelId', () => {
+  it('prefixes image files with image-', () => {
+    expect(getFilePanelId('/proj/logo.png')).toMatch(/^image-/)
+    expect(getFilePanelId('/proj/diagram.svg')).toMatch(/^image-/)
+  })
+
+  it('prefixes everything else with editor-', () => {
+    expect(getFilePanelId('/proj/notes.md')).toMatch(/^editor-/)
+    expect(getFilePanelId('/proj/script.ts')).toMatch(/^editor-/)
+  })
+
+  it('is case-insensitive about the extension', () => {
+    expect(getFilePanelId('/proj/LOGO.PNG')).toMatch(/^image-/)
+  })
+
+  it('agrees with the id openFileInPanel actually creates', () => {
+    const { api, addPanel } = makeApi()
+
+    openFileInPanel(api, '/proj/logo.png')
+
+    expect(addPanel).toHaveBeenCalledWith(
+      expect.objectContaining({ id: getFilePanelId('/proj/logo.png') })
+    )
+  })
+})
+
+describe('openFileInPanel', () => {
+  describe('Routing', () => {
+    it('opens images in the image viewer', () => {
+      const { api, addPanel } = makeApi()
+
+      openFileInPanel(api, '/proj/logo.png')
+
+      expect(addPanel).toHaveBeenCalledWith(
+        expect.objectContaining({
+          component: 'imageViewer',
+          tabComponent: 'imageTab',
+          title: 'logo.png'
+        })
+      )
+    })
+
+    it('opens SVG in the image viewer, not Monaco', () => {
+      const { api, addPanel } = makeApi()
+
+      openFileInPanel(api, '/proj/diagram.svg')
+
+      expect(addPanel).toHaveBeenCalledWith(
+        expect.objectContaining({ component: 'imageViewer' })
+      )
+    })
+
+    it('opens everything else in the editor', () => {
+      const { api, addPanel } = makeApi()
+
+      openFileInPanel(api, '/proj/notes.md')
+
+      expect(addPanel).toHaveBeenCalledWith(
+        expect.objectContaining({ component: 'editor', tabComponent: 'editorTab' })
+      )
+    })
+
+    it('routes an uppercase extension to the viewer', () => {
+      const { api, addPanel } = makeApi()
+
+      openFileInPanel(api, '/proj/PHOTO.JPG')
+
+      expect(addPanel).toHaveBeenCalledWith(
+        expect.objectContaining({ component: 'imageViewer' })
+      )
+    })
+  })
+
+  describe('Explicit kind', () => {
+    it('opens the running preview on the htmlPreview component with renderer "always"', () => {
+      const { api, addPanel } = makeApi()
+
+      openFileInPanel(api, '/proj/page.html', { kind: 'preview', renderer: 'always' })
+
+      expect(addPanel).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: expect.stringMatching(/^preview-/),
+          component: 'htmlPreview',
+          tabComponent: 'htmlPreviewTab',
+          renderer: 'always'
+        })
+      )
+    })
+
+    it('defaults preview panels to renderer "always" without an explicit override', () => {
+      const { api, addPanel } = makeApi()
+
+      openFileInPanel(api, '/proj/page.html', { kind: 'preview' })
+
+      expect(addPanel).toHaveBeenCalledWith(
+        expect.objectContaining({ component: 'htmlPreview', renderer: 'always' })
+      )
+    })
+
+    it('forces the editor for an image path when kind is "editor" (Open as source)', () => {
+      const { api, addPanel } = makeApi()
+
+      openFileInPanel(api, '/proj/diagram.svg', { kind: 'editor' })
+
+      expect(addPanel).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: expect.stringMatching(/^editor-/),
+          component: 'editor',
+          tabComponent: 'editorTab'
+        })
+      )
+    })
+
+    it('leaves non-preview panels on the default renderer (undefined)', () => {
+      const { api, addPanel } = makeApi()
+
+      openFileInPanel(api, '/proj/notes.md', { kind: 'editor' })
+
+      expect(addPanel).toHaveBeenCalledWith(
+        expect.objectContaining({ component: 'editor', renderer: undefined })
+      )
+    })
+  })
+
+  describe('New panels', () => {
+    it('registers the panel, activates it and takes focus', () => {
+      const { api, setActive, focus } = makeApi()
+
+      openFileInPanel(api, '/proj/notes.md')
+
+      expect(registerEditorPanel).toHaveBeenCalledWith(getFilePanelId('/proj/notes.md'))
+      expect(setActive).toHaveBeenCalledTimes(1)
+      expect(focus).toHaveBeenCalledTimes(1)
+    })
+
+    it('forwards extra params alongside filePath and panelId', () => {
+      const { api, addPanel } = makeApi()
+
+      openFileInPanel(api, '/proj/notes.md', { params: { initialLine: 12, initialColumn: 3 } })
+
+      expect(addPanel).toHaveBeenCalledWith(
+        expect.objectContaining({
+          params: {
+            filePath: '/proj/notes.md',
+            panelId: getFilePanelId('/proj/notes.md'),
+            initialLine: 12,
+            initialColumn: 3
+          }
+        })
+      )
+    })
+  })
+
+  describe('Reuse', () => {
+    it('reuses an open panel instead of adding a second one', () => {
+      const setActive = vi.fn()
+      const focus = vi.fn()
+      const panelId = getFilePanelId('/proj/notes.md')
+      const { api, addPanel } = makeApi({
+        [panelId]: { api: { setActive }, group: { focus } }
+      })
+
+      openFileInPanel(api, '/proj/notes.md')
+
+      expect(addPanel).not.toHaveBeenCalled()
+      expect(setActive).toHaveBeenCalledTimes(1)
+      expect(focus).toHaveBeenCalledTimes(1)
+      expect(registerEditorPanel).not.toHaveBeenCalled()
+    })
+
+    it('activates without focusing when focusOnReuse is false', () => {
+      // Terminal file links: reactivating a tab must not pull focus out of the
+      // terminal the user is typing in.
+      const setActive = vi.fn()
+      const focus = vi.fn()
+      const panelId = getFilePanelId('/proj/notes.md')
+      const { api } = makeApi({ [panelId]: { api: { setActive }, group: { focus } } })
+
+      openFileInPanel(api, '/proj/notes.md', { focusOnReuse: false })
+
+      expect(setActive).toHaveBeenCalledTimes(1)
+      expect(focus).not.toHaveBeenCalled()
+    })
+
+    it('returns the reused panel', () => {
+      const panelId = getFilePanelId('/proj/notes.md')
+      const existing = { api: { setActive: vi.fn() }, group: { focus: vi.fn() } }
+      const { api } = makeApi({ [panelId]: existing })
+
+      expect(openFileInPanel(api, '/proj/notes.md')).toBe(existing)
+    })
+  })
+
+  describe('Missing API', () => {
+    it('returns undefined without throwing', () => {
+      expect(openFileInPanel(undefined, '/proj/notes.md')).toBeUndefined()
+      expect(registerEditorPanel).not.toHaveBeenCalled()
+    })
+  })
+})

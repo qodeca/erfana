@@ -1,0 +1,122 @@
+{
+  "//": [
+    "Until this file existed, every token rule design/ states was unenforceable prose:",
+    "`npm run lint` is eslint over .js/.ts only, and `npm run format` never runs in CI.",
+    "'No hardcoded values' and 'border-radius: 0 always' have been in CLAUDE.md for the",
+    "life of the project with nothing checking either.",
+    "",
+    "The cards are in scope too, via postcss-html. Without that the design system would",
+    "be the only CSS in the repo exempt from the design system's own rules."
+  ],
+  "rules": {
+    "color-no-hex": [
+      true,
+      {
+        "message": "Use a token from design-tokens.css, not a raw hex value."
+      }
+    ],
+    "declaration-property-value-disallowed-list": {
+      "z-index": [
+        "/^[0-9]/",
+        "/^-[0-9]/"
+      ]
+    },
+    "declaration-property-value-allowed-list": {
+      "border-radius": [
+        "0",
+        "/^var\\(--border-radius/"
+      ]
+    }
+  },
+  "overrides": [
+    {
+      "//": "The token file IS where literal colours are defined. Exempting it is the point of having it.",
+      "files": [
+        "src/renderer/src/styles/design-tokens.css",
+        "design/tokens.css"
+      ],
+      "rules": {
+        "color-no-hex": null,
+        "declaration-property-value-disallowed-list": null
+      }
+    },
+    {
+      "//": [
+        "design/ cards are HTML with inline <style>. Their documentation chrome (.stage,",
+        ".list-frame, .readout) is not shipped UI, so it is not held to the erf- naming",
+        "rule below \u2014 but it IS held to the token rules, because a card that hardcodes a",
+        "colour to make a point is exactly how the wrong colour gets copied out of it."
+      ],
+      "files": [
+        "design/**/*.html"
+      ],
+      "customSyntax": "postcss-html"
+    },
+    {
+      "//": [
+        "Component CSS under design/ is destined for src/. Every class is prefixed erf-.",
+        "Not cosmetic: Mermaid emits class=\"row\" on gitGraph commit labels and on its",
+        "generic label path, and the app injects that SVG with innerHTML \u2014 so a bare",
+        "global .row would reach into diagram labels in the preview and in exported",
+        "images. That collision was found by luck, not by review.",
+        "Adopted files keep the rule when they move to src/. Scoping this to design/ only would silently switch the guard off at the exact moment the CSS became shipping code."
+      ],
+      "files": [
+        "design/system/components/**/*.css",
+        "src/renderer/src/styles/hostName.css",
+        "src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewChromeBand.css"
+      ],
+      "rules": {
+        "selector-class-pattern": [
+          "^erf-[a-z0-9]+(-[a-z0-9]+)*(__[a-z0-9]+(-[a-z0-9]+)*)?(--[a-z0-9]+(-[a-z0-9]+)*)?$",
+          {
+            "message": "Design-system component classes must be namespaced erf- (see the Mermaid .row collision)."
+          }
+        ]
+      }
+    },
+    {
+      "//": [
+        "ScreenshotOverlay documents its token bypass deliberately (issue #164 / F[36]):",
+        "the overlay paints over arbitrary desktop content, so it needs fixed colours that",
+        "do not follow the app theme. A file-level exemption states that once, instead of",
+        "six line-level disables that each look like an oversight."
+      ],
+      "files": [
+        "src/renderer/src/components/Screenshot/ScreenshotOverlay.css"
+      ],
+      "rules": {
+        "color-no-hex": null,
+        "declaration-property-value-allowed-list": null
+      }
+    },
+    {
+      "//": [
+        "Retired tokens. Each is still referenced in src/, so a repo-wide ban would be a",
+        "red CI rather than a decision - it is enforced where the decision lives, and",
+        "follows into src/ with the migration. --shadow-focus is the sharpest case: over",
+        "--color-bg-primary it composites to 1.63:1, and a focus indicator needs 3:1, so",
+        "it cannot be one of the three competing focus-ring definitions at all."
+      ],
+      "files": [
+        "design/**/*.css",
+        "design/**/*.html"
+      ],
+      "rules": {
+        "declaration-property-value-disallowed-list": {
+          "z-index": [
+            "/^[0-9]/",
+            "/^-[0-9]/"
+          ],
+          "/.*/": [
+            "/var\\(--shadow-focus\\)/",
+            "/var\\(--color-warning-bright\\)/",
+            "/var\\(--color-warning-icon\\)/",
+            "/var\\(--color-error-bright\\)/",
+            "/var\\(--color-error-text-light\\)/"
+          ]
+        }
+      }
+    }
+  ]
+}

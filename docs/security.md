@@ -1,6 +1,6 @@
 # Security Guidelines
 
-**Last Updated**: April 2026 (v0.9.5, Electron 39)
+**Last Updated**: September 2026 (v0.19.0, Electron 39)
 
 ## Security Posture Summary
 
@@ -22,6 +22,7 @@ Erfana follows **2025 Electron security best practices** with comprehensive hard
 - Cookie encryption disabled to avoid macOS keychain prompts (settings stored in plaintext)
 - `scripts/fuses.js` sets 4 of the 6 fuses. Three of them harden the build — RunAsNode, NodeOptions and NodeCliInspect (the last one only in production builds; see below) — while the fourth, EnableCookieEncryption, is deliberately set to `false`
 - Test builds (`ERFANA_TEST_BUILD=true`) enable NodeCliInspect for Playwright E2E testing - see [Test Builds](#test-builds-erfana_test_build)
+- `ERFANA_E2E_FORCE_CRASH=1` injects a renderer crash for the error-boundary E2E scenario. Double-gated on `!app.isPackaged`, so a packaged build ignores it - see [Crash Injection](#crash-injection-erfana_e2e_force_crash)
 
 ---
 
@@ -199,6 +200,33 @@ const isTestBuild = process.env.ERFANA_TEST_BUILD === 'true';
 
 ---
 
+## Crash Injection (ERFANA_E2E_FORCE_CRASH)
+
+**Status**: ✅ DOUBLE-GATED — inert in any packaged build
+
+The E2E suite needs a renderer that throws on demand to exercise the error-boundary recovery screen (#60). Rather than shipping a test hook in the renderer, the flag travels the same path as the screenshot overlay's per-capture token: main → `additionalArguments` → preload → context bridge.
+
+### Mechanism
+
+1. **Main** — `buildAdditionalArguments()` in `src/main/index.ts` appends `FORCE_CRASH_ARG` (`--erfana-force-crash`, `src/shared/constants.ts`) to `webPreferences.additionalArguments` **only** when `!app.isPackaged && process.env.ERFANA_E2E_FORCE_CRASH === '1'`. Otherwise it returns `[]`.
+2. **Preload** — `src/preload/index.ts` reads the flag back off `process.argv` and exposes `window.__ERFANA_FORCE_CRASH__ = true` **only when present**; in every normal run the property is `undefined`, so a `=== true` check in the renderer is the whole contract.
+3. **Renderer** — reads the exposed boolean; it has no other way to learn the flag.
+
+Both spellings come from one shared constant so the two halves of the handshake cannot drift into a flag that silently never fires.
+
+### Security-relevant properties
+
+| Property | Why it holds |
+|----------|--------------|
+| A packaged build ignores the env var outright | `app.isPackaged` is checked *before* the env var; a shipped app can be launched with `ERFANA_E2E_FORCE_CRASH=1` and nothing changes |
+| The renderer cannot set the flag | It arrives as a Chromium command-line argument on the renderer process — only the **process launcher** can add it. Renderer JavaScript cannot write `process.argv`, and the sandboxed renderer has no `process` at all |
+| No new IPC surface | The flag is a boolean on the context bridge, not a channel; there is nothing to send, validate or gate |
+| Same mechanism as shipped code | Identical to the overlay-token path (`ScreenshotOverlayWindow.ts` → `screenshotOverlay.ts`), which is production code — this is not a bespoke test backdoor |
+
+Worst case if the gate were bypassed: the renderer throws and the user sees the recovery screen. No capability is granted.
+
+---
+
 ## ASAR Configuration
 
 **Status**: ❌ DISABLED
@@ -345,8 +373,19 @@ Markdown preview allows HTML rendering with strict sanitization:
 
 - `<img>` tags can load from HTTPS sources (Unsplash, CDNs, etc.)
 - HTTP images are blocked by CSP (security)
-- `data:` URI images are allowed – required by ImageViewerPanel (renders local images as base64 via `FileService.readFileAsBase64`) and DOCX export (SVG-to-PNG canvas pipeline in `svgToImage.ts`). The sandboxed renderer cannot access `file://` URLs, so base64 data URIs are the secure transport mechanism for local image data from the main process.
+- `data:` URI images are allowed – required by ImageViewerPanel (renders local images as base64 via `FileService.readImage`) and DOCX export (SVG-to-PNG canvas pipeline in `svgToImage.ts`). The sandboxed renderer cannot access `file://` URLs, so base64 data URIs are the secure transport mechanism for local image data from the main process.
 - Dangerous tags/attributes sanitized by `rehype-sanitize` + `hast-util-sanitize` (allowlist schema); Mermaid sanitizes its own SVG output via its bundled DOMPurify. The app does not import DOMPurify directly.
+
+### The rasterize harness has its own, stricter CSP (#73)
+
+`src/renderer/imageExport.html` is a second renderer entry — the hidden window that decodes an image for export — and it carries its **own** policy, deliberately not the one above:
+
+```
+default-src 'none'; script-src 'self'; img-src blob:; style-src 'unsafe-inline';
+connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'
+```
+
+Two differences are load-bearing. `img-src blob:` (the app policy has no `blob:`) is what lets an SVG decode at all, since the SVG path loads through `URL.createObjectURL`. `object-src 'none'` closes the `<object>` / `<embed>` route, which loads an SVG **as a document** and does execute script — the harness loads untrusted SVG only as `<img src=blob:…>`, Chromium's secure static mode. That rule is enforced by CSP *and* by lint, so a future one-line change cannot quietly reopen it: an ESLint block scoped to `src/renderer/src/imageExport/**` bans `innerHTML` / `outerHTML` / `insertAdjacentHTML`, `document.write`, `DOMParser`, `eval` and any runtime import from outside the folder (type-only imports are exempt, being erased by the compiler). The matching ban on *creating* an `object` / `embed` / `iframe` element lives in the renderer-wide `no-restricted-syntax` block instead — flat config replaces a rule wholesale rather than merging, so a second `no-restricted-syntax` declaration in the folder block would silently disable that block's other selectors for this folder. The window additionally runs in its own in-memory session with a deny-all `webRequest` allow-list installed before the window exists — see [API services – features § ImageExportService](./api-services-features.md#imageexportservice).
 
 See [HTML Rendering](./rendering/README.md) for details.
 
@@ -442,7 +481,11 @@ Zod answers "is this payload well-formed?". It cannot answer "did this call come
 1. **Top-level frame.** `event.senderFrame` exists and `frame.parent === null` – any iframe or sub-frame is rejected.
 2. **Exact expected origin.** In development (`is.dev && ELECTRON_RENDERER_URL`) the sender's origin must equal the electron-vite dev-server origin. In production the sender URL must equal `RENDERER_FILE_URL` – `pathToFileURL(join(__dirname, '../renderer/index.html'))`, mirroring the exact `mainWindow.loadFile` call in `src/main/index.ts`. An arbitrary `file://` URL is **not** accepted, and the dev branch is unreachable in a production build because it is gated on the same condition that decides which URL the window actually loads.
 
-Consumers: `clipboard-handlers.ts` (`clipboard:readText` / `clipboard:writeText`), `file-handlers.ts` (`file:revealInFileManager`), `claude-status-handlers.ts` (via a local copy of the same predicate), and `system-handlers.ts`.
+Consumers: `clipboard-handlers.ts` (`clipboard:readText` / `clipboard:writeText`), `file-handlers.ts` (`file:revealInFileManager`), `claude-status-handlers.ts` (via a local copy of the same predicate), `system-handlers.ts`, and `image-export-handlers.ts` (`image-export:run`, #73 — the gate runs **first**, before the payload is even parsed, so an untrusted sender never reaches the Zod parser, the filesystem or the save dialog).
+
+**Not** consumers: `pdf-handlers.ts` and `docx-handlers.ts`. The two document-export channels validate their payload but not their sender; the exposure is bounded (the app renders no untrusted remote content and creates no sub-frames) and the retrofit is recorded as entry #32 in [technical-debt.md](./technical-debt.md).
+
+One known limitation, recorded rather than fixed: in **development** rule 2 compares the dev-server *origin*, not the full URL, so any page served from that origin satisfies the predicate — including the image-export rasterize harness. It is not reachable in practice (the harness preload exposes four verbs and no `ipcRenderer` handle, so it has no bridge to a gated channel) and production pins the exact file URL. Entry #33 in [technical-debt.md](./technical-debt.md).
 
 ### Why `system:*` needs it most
 
@@ -460,7 +503,7 @@ No part of that URL comes from the renderer, so there is no arbitrary-URL or pro
 
 `screenshot-handlers.ts` defines its own `validateMainRendererSender`, applying the same top-level-frame + exact-`file://`-URL rule to every public screenshot channel (`capture`, `getDisplays`, `getCapabilities`, `getScreenPermission`, `enumerateWindows`). It is deliberately separate from `isTrustedSender` because it must also exclude the app's **own** per-display area-select overlay windows, which are legitimate `BrowserWindow`s of the same app but must never be able to invoke the public capture API. Rejections fail closed (empty display list, `supported: false`, `'unknown'` permission, `SCREENSHOT_FAILED`) and are logged.
 
-The overlay windows have their own, tighter channel path: `screenshot:areaSelected` / `screenshot:areaCancelled` are attached per capture to each overlay's `webContents.mainFrame.ipc` (never global `ipcMain`) and every payload must carry that round's freshly minted UUID token.
+The overlay windows have their own, tighter channel path: `screenshot:areaSelected` / `screenshot:areaCancelled` are attached per capture to each overlay's `webContents.mainFrame.ipc` (never global `ipcMain`) and every payload must carry that round's freshly minted UUID token — with one deliberate exception, the overlay's one-way `logging:log` forward (#60), which is untokenised because it carries a log record rather than a capture command and is re-validated main-side by the same `LogEntrySchema` as the editor window's entries.
 
 ### macOS usage-description strings
 
@@ -522,6 +565,83 @@ The `afterSign` hook is critical: without it, macOS Sequoia+ rejects `@rpath` li
 
 - **Remote-image SSRF strip** – `@turbodocx/html-to-docx` fetches any `http(s)` image `src` at export time (bundled axios). `docxImageStrip.ts` removes remote `<img>`/`<source>` (any URL scheme or protocol-relative source) with a real parser (parse5) before conversion, so the library never issues the request; `data:` and local/relative images are kept. Fail-closed: anything that is not empty, `data:`, or a relative path is stripped. The renderer shows a warning toast with the count.
 - **Process isolation** – conversion runs in a killable Electron `utilityProcess` child (`DocxConvertProcessAdapter` → `docx-convert.process.ts`), so a synchronous hang (malformed image) is terminated at the timeout and cannot freeze the main process, and a decompression bomb is capped to the child's memory. See [Architecture](./architecture.md) § Process isolation for DOCX conversion.
+
+## HTML preview
+
+The HTML preview (#74) executes a project's real CSS and JavaScript in a live page. Shipping execution is a one-way door, so the feature is built as a **sealed box**: the page runs in its own process on its own in-memory session partition, with no channel to Erfana in either direction. This section transcribes the design threat model (`specs/designs/sd-074-html-preview.md` §2.8). The user-facing feature page is [HTML preview](./html-preview/README.md).
+
+### Assets protected
+
+- **A1** – files inside the open project, outside the excluded set.
+- **A2** – files outside the project root.
+- **A3** – Erfana's IPC surface and the main renderer.
+- **A4** – the user's OS account.
+- **A5** – the integrity of `.erfana/settings.json`.
+- **A6** – the user's trust in what the preview pane shows.
+
+### Trust boundaries and attackers
+
+- **T1 – a malicious `.html` in the project** (the primary attacker). It arrives by clone, agent, or download and runs arbitrary JavaScript, including `unsafe-eval`.
+- **T2 – a malicious repository.** It controls `.gitignore`, `.git/config`, `.erfana/`, symlinks, short-name-aliasable filenames and the directory layout *before* the user previews anything.
+- **T3 – a network attacker on an approved host.**
+- **T4 – a compromised approved CDN.**
+
+The load-bearing boundary is that **Erfana exposes no scripted API to the page**: no `postMessage` endpoint, no bridge into `window`, no file-write path. The page's only outward influence is a bounded set of diagnostic signals (console messages, load failures, request metadata, find-in-page counts, one CSS-swap boolean, four enumerated keystrokes, and one link-click report), each treated as untrusted data – never executed, never reflected into a response header, always length-bounded and control-character-stripped.
+
+**Revised for in-page links (sd-074b).** The page now carries a preload, so the sentence above no longer reads "no preload". What it does and does not change:
+
+- The preload calls no `contextBridge`, so the page's own JavaScript still cannot see or reach it — `contextIsolation` keeps them in separate worlds, and a source-level test pins the absence of `contextBridge`, `webFrame` and any `ipcRenderer.invoke`/`.on`.
+- It is **send-only**, on a channel registered with `webContents.ipc`, never on the global `ipcMain`. Nothing else in the app can be addressed through it, and it carries exactly two message shapes: an activated link, and a CSP violation report (which is what populates the permission band).
+- Main re-parses and re-confines every path before acting. The page's href is a request, never an instruction.
+- The real delta is at the process level: a Chromium or V8 compromise inside the preview now has an IPC path where it previously had none. That is why the **global `ipcMain` sender gate** (`src/main/ipc/registry.ts`, which replaced the original `ipcSenderGate.ts` monkey-patch) landed first, in its own change: every handler in the app is now gated on the app's own top-level renderer by default, instead of the handful that opted in.
+- **External links** are handed to the OS browser only after Erfana shows the destination - the origin, or the scheme plus the addressed target for `mailto:`/`tel:` and the user confirms. A trusted click proves a human clicked; it does not prove they knew where the link went, and the preview has no address bar, status bar or hover-URL of its own.
+- Several previews now run at once, each in its own in-memory partition, capped by `PREVIEW.MAX_LIVE_VIEWS`. Each still asserts `storagePath === null` on creation. Since v0.19.0 a partition NAME is reused after the page is destroyed and a bounded purge has succeeded (`PreviewSessionFactory`), because Electron cannot destroy a session and every new name costs handles for life; a purge that fails or overruns drops the name, and a project switch forgets them all. The isolation between previews is the opaque origin, not the partition; what the purge cannot clear (HSTS state, the GPU shader cache) is accepted risk 16.
+
+### Sealed-box controls in place
+
+| Control | Assets | Effect |
+|---|---|---|
+| Own process + in-memory session partition, frozen `sandbox`/`contextIsolation`/`nodeIntegration:false` preferences asserted on the **constructed** value, and a send-only preload that exposes nothing to the page | A3, A4 | Keeps T1 from reaching Erfana IPC or node |
+| `sandbox allow-scripts` opaque origin (a header-only CSP directive) | A4 | `localStorage`/`sessionStorage` throw, `indexedDB` is unavailable – T1 persists nothing |
+| No persistence: in-memory partition (`storagePath === null`), no service workers, purge (`clearStorageData` over the seven data-bearing storages + `clearCache` + `clearAuthCache` + `clearHostResolverCache` + `clearCodeCaches` + `closeAllConnections`) before any Erfana-driven reload and on both sides of a partition reuse | A4 | Nothing survives a reload, a reuse or an app restart |
+| `erfana-preview://<opaque-token>/<path>` serving, realpath-confined to the project root, `O_NOFOLLOW` + dev/ino identity check + post-resolve exclusion re-check; no filesystem path ever enters a URL | A1, A2 | Defeats symlink escape and the Windows 8.3 short-name alias bypass |
+| Protocol-layer exclusion of dot-prefixed segments and `node_modules`/`dist`/`out`/`coverage`/`.git` | A1 (partial) | Keeps T1 from reading `.git`, `.env`, `.erfana` |
+| Erfana-set CSP built from the project allowlist, applied at a single site, **plus** an independent unfiltered `onBeforeRequest` gating remote egress; per-hop redirect decisions; the local `erfana-preview:` scheme is passed through to the confining protocol handler (the real local-read gate), while every remote **origin** – scheme, host and port – is allowlist-checked | A1 | Two chokepoints gate remote subresources; local reads are gated by the protocol handler's realpath confinement, not by this filter |
+| **Origin** allowlist for remote subresources: the CSP host-source list and the `onBeforeRequest` filter are both built from one re-serialised `URL` origin – scheme, host and port | A1 | One vocabulary at two chokepoints, so neither can admit what the other refuses. It no longer refuses IP literals, `localhost`, `.local`, `.internal` or `http:` – see risks 12 and 13 |
+| Watch-set realpath confinement (same gate as the protocol handler) | A2 | Keeps T2 from planting a watch outside the root |
+| `erfanaDirGate` + non-recursive `mkdir` | A5, A2 | Defeats T2's symlinked `.erfana` |
+| Hardened `git check-ignore` (absolute binary path, safe cwd, env allowlist, `core.fsmonitor=`, `core.hooksPath=<null>`) | A4 | Defeats T2's `.git/config` command-execution vector |
+| `setWebRTCIPHandlingPolicy('disable_non_proxied_udp')` | A1 | Narrows WebRTC local-IP exposure only – see accepted risk 3 |
+| `X-DNS-Prefetch-Control: off` | A1 | Suppresses `dns-prefetch`; does **not** cover `preconnect` – see risk 3 |
+| Enumerated 4-shortcut keyboard forwarding | A3 | Bounds the input bridge to a closed list |
+| Page→main reporting limited to two send-only, `webContents.ipc`-scoped channels (`preview-page:linkActivated`, `preview-page:cspViolation`), never on global `ipcMain`, each re-parsed and re-confined main-side | A3 | The page has a reporting path, not a control path. It cannot address anything else in the app, and neither payload is trusted as an instruction |
+
+### Risks knowingly accepted
+
+These are accepted, not mitigated. The design chose to ship execution with them documented rather than block on closing them.
+
+1. **Any previewed page can read most of your project.** After the exclusion checks, everything under the root whose resolved path has no dot-prefixed segment and is not under `node_modules`/`dist`/`out`/`coverage`/`.git` is readable – all source, docs, notes and data. A secret in `config.json` is readable; one in `.env` is not.
+2. **Exfiltration over an approved host.** The allowlist controls *which* origins, never *what* is sent. A compromised approved CDN (T4) turns any approved host into a channel.
+3. **Exfiltration over channels no chokepoint sees.** `setWebRTCIPHandlingPolicy('disable_non_proxied_udp')` is a local-IP-exposure policy only; it does **not** stop an `RTCPeerConnection` reaching an attacker-controlled TURN server over TCP/443 – no permission gates a data channel, `onBeforeRequest` never observes ICE/TURN traffic, and Chromium does not enforce `connect-src` on WebRTC, so this is a real, unmitigated general-purpose exfiltration channel. `<link rel=preconnect>` opens a real TCP/TLS connection with no HTTP request, so `onBeforeRequest` never fires; ~60 bytes leak per hostname via subdomain labels. DNS prefetch is suppressed by `X-DNS-Prefetch-Control: off`, but a DNS resolution for an allowlist-blocked host may still occur before cancellation. The allowlist is therefore not written as an unqualified guarantee.
+4. **DNS rebinding is not defended.** A name that *resolves* to a private address is not detected – no IP pinning between resolution and connection. The grammar no longer refuses literal IPs or `localhost` either, so a loopback or LAN target need not be disguised at all. The residual is blind, fire-and-forget write-side SSRF to loopback/LAN services: the opaque origin means the page cannot read any response, so this is not a read primitive.
+5. **The allowlist is a speed bump, not a wall.** It lives in `.erfana/settings.json` inside the project, so a cloned repository or an agent edit can pre-approve hosts before a human ever sees the prompt. Risk 13 is the sharp edge of this.
+6. **Hardlinks defeat path confinement.** `realpath` resolves symlinks but not hardlinks.
+7. **A residual `realpath`→open race.** Narrowed by the post-resolve re-check, not closed – Node has no `openat`.
+8. **UI spoofing (structurally mitigated, with a widened residual).** The view rect is clamped to the window content area and the panel keeps its tab and toolbar chrome, so the page cannot paint over Erfana's own frame; Erfana never asks for credentials or API keys inside a preview panel. Above every live preview sits a **toolbar** of Erfana's own always-DOM chrome — a flow sibling above the page area rather than an overlay on it, so the page has nowhere to paint that could cover it — carrying a Find button and the permission chip. (That layout replaced a fixed `PREVIEW_CHROME_INSET_PX` which duplicated the bar's CSS height in TypeScript; the guarantee is now structural rather than a maintained agreement between two numbers, and the bar may grow without outgrowing its own reservation.) The position matters, because an untrusted page stays on screen while Erfana asks a security question ("Approve this host?"), which is asked **inside** that bar rather than in a toast beside it — a stronger position, because the question is drawn in the one region the page provably cannot reach. **And a control is never drawn into space the page might still hold**: opening the host list reserves its height, asks the page to confirm it repainted below it, and gives it 300 ms; silence means "assume it is still covering you", so the page is hidden rather than trusted and the bar says why. The hide itself is confirmed by `preview:visibilityApplied` rather than assumed, because `setVisibility` is fire-and-forget and the hide path awaits a `capturePage` first.
+
+    **What was withdrawn, and what that costs.** The bar used to carry a permanent **"Preview – content below is not Erfana"** label and a 2px accent seam along its lower edge. Both were removed in favour of a conventional toolbar matching the Markdown editor's: the label is gone with nothing standing in for it — no replacement wording, no tooltip, no icon — and the seam is now a 1px `var(--color-border-default)` rule. Everything structural above is unchanged; what is gone is the naming. **Residual, as accepted:** nothing on screen tells a reader where Erfana stops and the page starts, and a 1px neutral line is weak against a light page, so a page that draws a convincing fake Erfana dialog inside its own rectangle has one fewer cue working against it. The bar still proves the *panel* is a preview to a reader who knows what the bar is; it never proved that a given dialog elsewhere on screen is genuine, and it now proves the first only by convention rather than in words.
+9. **Git config keys beyond `core.fsmonitor`.** The hardened invocation overrides the one key known to execute a command during `check-ignore`, bounded by fail-open and by `check-ignore` being the only subcommand run.
+10. **Windows short-name aliases beyond the tested set.** The full-path re-resolve is general, but the alias Windows assigns to a leading-dot name is an unverified implementation-time confirmation item.
+11. **A permanent Chromium attack surface.** Shipping execution makes Chromium advisories a recurring, indefinite obligation for this project.
+12. **`http://` is approvable everywhere.** Every origin a page tried to reach gets an Allow button, plaintext included, and approving one works: measured in Electron 39, an `http://` subresource inside a preview is **not** refused as mixed content, because the document sits at an opaque origin and mixed content is decided against the origin's scheme rather than against `isSecureContext` ([decision record](designs/108-http-and-ipv6-in-the-preview.md)). Two consequences. An approved `http:` origin is cleartext, so T3 reads and rewrites every byte without the host itself being compromised, and risk 2 applies to it unconditionally — the confirm step says so in those words. And an `http:` CSP host-source also matches `https:` on the same host and port (the insecure-to-secure allowance), so an http grant is **wider at the CSP layer than at the network filter**; the two-chokepoint claim above holds for it only because the filter is the narrower of the two.
+13. **An inherited allowlist is live before the first frame is drawn.** The allowlist is baked into the CSP at `PreviewSessionFactory.create` – before the permission band renders, before any click, and with no per-machine confirmation. So `origins: ["http://localhost:3000"]` in a cloned repository fires requests at whatever is listening on the developer's machine the moment a preview opens, and the grammar that used to refuse loopback no longer does. **This is the only risk here that needs neither a human click nor an already-hostile page.** It is made visible in the band's "Allowed in this project" list; it is not gated on being seen. Since v0.19.0 a block the loader REJECTS is also badged on the tab rather than only logged: `PreviewAllowlistStore` buffers the `allowlist-invalid` badge and `PreviewSessionFactory.create` drains it into the panel's failure record (`drainBadges()`, immediately after `allowlistStore.load()`), so a corrupt inherited allowlist no longer looks exactly like an absent one. Deliberate, and the alternative (a confirmation recorded outside the repository) was considered and declined so that a grant travels with the project.
+14. **A downgrade silently drops `http://` and non-default-port grants.** The allowlist block is written whole, and `origins` is the only key that can express them — `hosts` is a projection carrying just the default-port https origins, which is all a host entry could ever have meant. An older Erfana opening the project reads `hosts`, cannot see `origins`, and rewrites the block from what it understood; returning to this build then resolves from `hosts` and the rest is gone. This fails CLOSED — grants are lost, never invented — which is the safe direction for a one-way door, and it is the cost of deliberately not bumping the schema version (a bump makes an older build lose every host AND refuse to re-approve any). Unknown keys inside the block are now preserved across a round trip, so the same trap does not extend to fields added later.
+
+15. **Panel-id digest collisions.** A panel id past 180 sanitized characters is a 150-character head plus a 16-hex FNV-1a digest of the raw path (`buildPanelId`, `stablePathDigest`), which is not collision-resistant: two files over the budget that share their first 150 sanitized characters could be crafted so that clicking one focuses the other's already-open tab. Both files are in the untrusted repository already, so nothing is disclosed that the reader could not open; the cost is a wrong tab. Accepted over an async `crypto.subtle` digest, which dockview cannot wait for.
+
+16. **What a partition purge cannot clear.** A partition name is reused after a bounded purge; the purge also closes every warm socket/TLS connection (`closeAllConnections`), but HSTS state is per network context and cannot be cleared from the session API, so a reused partition may carry a host's HSTS pin from the previous preview. The GPU shader cache is also left in place on purpose: clearing it never completes inside the app on Windows (Electron 39, probed per storage type on 2026-09-04), and it holds compiled GPU programs, not page data. Neither discloses content; the opaque origin still seals storage. A purge that fails or overruns drops the name; a project switch bumps an epoch so every name acquired before it is dropped on release, never pushed – including names still draining when the switch happens. The cage (network filter, protocol handler, permission denials) is detached only after the page is destroyed, so a page never runs uncaged.
+
+Two operational breakages are also accepted for this feature: projects on **external or network volumes** (see #60) and the **same project open in two Erfana windows**. Per repository policy, any vulnerability found in this feature after release goes to private advisory reporting, not a public issue.
 
 ## Worker thread security (v0.9.0)
 

@@ -181,7 +181,15 @@ function createMarkdownComponents(
   filePath?: string,
   handleInternalLink?: (href: string) => Promise<void>,
   resolvedLinks?: Map<string, ResolvedLink | null>,
-  lineOffset = 0
+  lineOffset = 0,
+  /**
+   * Tell the user a link went nowhere.
+   *
+   * `shell:openExternal` REFUSES a malformed or non-allow-listed URL by throwing
+   * rather than by resolving quietly, so without this a refused link is a dead
+   * click with nothing but a log line behind it (lens review F23).
+   */
+  onLinkError?: (message: string) => void
 ): Components {
   // Bind the frontmatter line offset once so every renderer (HOC-based and custom)
   // emits real file line numbers. Using these instead of the bare module-level
@@ -442,6 +450,7 @@ function createMarkdownComponents(
           await window.electron.shell.openExternal(href)
         } catch (error) {
           logger.error('Failed to open external link', error instanceof Error ? error : undefined, { href })
+          onLinkError?.('That link could not be opened.')
         }
         return
       }
@@ -850,9 +859,23 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
     // Memoize markdown components to prevent unnecessary re-renders.
     // frontmatterLineCount shifts body element line attributes back to real file
     // lines (body is rendered frontmatter-stripped, so positions are body-relative).
+    const notifyLinkError = useCallback(
+      (message: string) => {
+        showToast({ title: 'Link', message, type: 'warning', duration: 3000 })
+      },
+      [showToast]
+    )
+
     const markdownComponents = useMemo(
-      () => createMarkdownComponents(filePath, handleInternalLink, resolvedLinks, frontmatterLineCount),
-      [filePath, handleInternalLink, resolvedLinks, frontmatterLineCount]
+      () =>
+        createMarkdownComponents(
+          filePath,
+          handleInternalLink,
+          resolvedLinks,
+          frontmatterLineCount,
+          notifyLinkError
+        ),
+      [filePath, handleInternalLink, resolvedLinks, frontmatterLineCount, notifyLinkError]
     )
 
     // Memoize ReactMarkdown rendering to prevent re-renders when selection state changes

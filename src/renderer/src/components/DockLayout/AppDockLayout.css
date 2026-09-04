@@ -91,6 +91,13 @@
   right: 0;
   height: 2px;
   background: var(--color-brand-lime) !important;
+  /* stylelint-disable-next-line declaration-property-value-disallowed-list --
+     KNOWN DEFECT, documented by design/system/foundations/layering.html: 100 is
+     the exact value of --z-dropdown, so when this underline and a dropdown
+     overlap the winner is decided by DOM order, not intent. Not silently
+     repointed at a token here - the fix is a layering decision (its own rung, or
+     a local stacking context), and making it blind would change what paints over
+     what. */
   z-index: 100;
   pointer-events: none;
   display: block !important;
@@ -106,6 +113,13 @@
   right: 0;
   height: 2px;
   background: var(--color-brand-lime) !important;
+  /* stylelint-disable-next-line declaration-property-value-disallowed-list --
+     KNOWN DEFECT, documented by design/system/foundations/layering.html: 100 is
+     the exact value of --z-dropdown, so when this underline and a dropdown
+     overlap the winner is decided by DOM order, not intent. Not silently
+     repointed at a token here - the fix is a layering decision (its own rung, or
+     a local stacking context), and making it blind would change what paints over
+     what. */
   z-index: 100;
   pointer-events: none;
   display: block !important;

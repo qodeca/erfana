@@ -4,19 +4,25 @@ The Erfana editor subsystem provides a comprehensive markdown editing experience
 
 ## Components
 
-- [Monaco Configuration](./monaco-configuration.md) - Editor settings and keyboard shortcuts
+- [Monaco configuration](#monaco-configuration) - Editor settings and keyboard shortcuts
 - [Markdown Preview](./markdown-preview.md) - Live preview rendering and features
-- [Scroll Synchronization](./scroll-sync.md) - Bidirectional editor-preview sync
-- [Formatting Toolbar](./toolbar.md) - Visual markdown formatting buttons
+- [Scroll synchronization](#scroll-synchronization) - Bidirectional editor-preview sync
+- [Formatting toolbar](#formatting-toolbar) - Visual markdown formatting buttons
 - [Export](./export.md) - PDF and DOCX export pipeline
 - [Mermaid Viewer](./mermaid-viewer.md) - Diagram rendering, zoom and pan
+
+Monaco configuration, scroll synchronization and the formatting toolbar used to
+live in three sibling files (`monaco-configuration.md`, `scroll-sync.md`,
+`toolbar.md`). They were short stubs and are now inlined below.
 
 ## Key Features
 
 ### View Modes
-- **Editor Only** (📝) - Focus on writing
-- **Split View** (⚡) - Side-by-side with synchronized scrolling
-- **Preview Only** (👁️) - Presentation mode
+Four modes, toggled from the toolbar (`MarkdownToolbar.tsx`):
+- **Editor Only** (`editor`) - focus on writing; PDF/DOCX export is disabled in this mode
+- **Split Horizontal** (`split-horizontal`) - preview on top, editor below
+- **Split Vertical** (`split`) - side by side, with synchronized scrolling
+- **Preview Only** (`preview`) - presentation mode
 
 ### Export
 - **PDF Export** - Print-optimized PDF with vector Mermaid diagrams, A4 page size
@@ -93,18 +99,18 @@ Real-time metrics in bottom status bar:
 ## Implementation Files
 
 ### Main Panel (`src/renderer/src/components/Panels/`)
-- `MarkdownEditorPanel.tsx` - Panel orchestration (~900 lines after v0.6.3 refactoring)
+- `MarkdownEditorPanel.tsx` - Panel orchestration (614 lines)
 - `DocumentStatsBar.tsx` - Real-time word/character/line counts
 - `EditorContentLayout.tsx` - Editor/preview layout with resizable divider
 
 ### Modular Components (`src/renderer/src/components/Editor/MarkdownEditorPanel/`)
 *New in v0.6.4 - extracted for better testability and separation of concerns*
 
-**Components:**
+**Components** (`components/`):
 - `MarkdownToolbar.tsx` - Formatting buttons, view mode toggles, export actions
 - `EditorErrorBoundary.tsx` - Error handling wrapper
 
-**Hooks:**
+**Hooks** (`hooks/`):
 - `useScrollSync.ts` - Bidirectional editor-preview scroll synchronization
 - `useExportHandlers.ts` - PDF/DOCX export handlers
 
@@ -121,15 +127,160 @@ Real-time metrics in bottom status bar:
 - `PdfService.ts` - PDF generation via Electron's printToPDF
 - `DocxService.ts` - DOCX generation via `@turbodocx/html-to-docx`
 
-### Pure Logic (`src/renderer/src/components/Editor/`)
-- `markdownEditorPanel.logic.ts` - Pure functions (stats, scroll sync) - 591 lines, 83 tests
+### Pure Logic (`src/renderer/src/components/Panels/`)
+- `markdownEditorPanel.logic.ts` - Pure functions (stats, scroll sync) - 587 lines, 82 tests
 
 ## Related Hooks (`src/renderer/src/hooks/`)
 - `useAutoSave.ts` - Debounced auto-save with React state management
-- `useFileWatcher.ts` - File change detection with race condition protection
+- `useFileWatcher.ts` - File change detection with race condition protection. Since #70 it holds its watch through the shared `fileWatchSlot.ts` (serialised acquire/release, so a start and its stop can never get out of order), and it takes `INDICATOR_DURATION_MS` from `constants/fileWatch.ts` rather than owning it. The read-only sibling for surfaces that never write is `useFileChangeSubscription.ts` — see [File Watching](../file-watching/README.md#single-file-watch-internals-70)
 - `useDividerPosition.ts` - Resizable split pane position management
 - `useEditorContextMenu.ts` - Context menu state and positioning
 - `useKeyboardShortcuts.ts` - Editor keyboard shortcut handling
+
+## Monaco configuration
+
+### Editor settings
+
+Monaco is configured for markdown editing in `MonacoMarkdownEditor.tsx`:
+
+```typescript
+{
+  language: 'markdown',
+  wordWrap: 'on',
+  lineHeight: 20,     // compact
+  fontSize: 13,       // compact
+  padding: { top: 8, bottom: 8 },
+  minimap: { enabled: false },
+  rulers: []
+}
+```
+
+### Keyboard shortcuts
+
+Monaco built-ins (when the editor has focus):
+
+- Text editing: Cmd/Ctrl+C/V/X/Z (copy/paste/cut/undo)
+- Find/replace: Cmd/Ctrl+F, Cmd/Ctrl+H
+- Multi-cursor: Alt+Click, Cmd/Ctrl+Alt+Up/Down
+- Save: Cmd/Ctrl+S
+
+Application-global shortcuts override Monaco's:
+
+- Cmd/Ctrl+B: toggle sidebar
+- Cmd/Ctrl+O: open folder
+- Cmd/Ctrl+N: new file
+- Cmd/Ctrl+Shift+N: new folder
+
+See [Keyboard Shortcuts](../keyboard-shortcuts.md) for the complete list.
+
+### Multi-file editing
+
+Each file gets its own editor instance:
+
+- A React `key` prop forces a remount on file switch
+- Scroll position preserved per file
+- Independent undo/redo stacks
+- Separate modified states
+
+### Imperative handle (`MonacoEditorHandle`)
+
+`MonacoMarkdownEditor` exposes its API through `useImperativeHandle`, which is
+what the toolbar and the scroll-sync hook call:
+
+- Formatting – `formatBold`, `formatItalic`, `formatStrikethrough`, `formatCode`,
+  `formatCodeBlock`, `insertLink`, `insertImage`, `insertHeading(level)`,
+  `insertList(ordered)`
+- Direct access – `getEditor`, `getMonaco`
+- Scroll sync – `getScrollTop`, `setScrollTop`, `getTopForLineNumber`,
+  `setPositionAndReveal`
+
+Note that `formatCodeBlock` is part of the handle but has no toolbar button; it
+is reachable from the editor only.
+
+## Scroll synchronization
+
+Bidirectional scroll sync between editor and preview in the split view modes.
+Implemented by `useScrollSync.ts`
+(`src/renderer/src/components/Editor/MarkdownEditorPanel/hooks/`, 494 lines).
+
+### Features
+
+- Editor to preview: editor scroll updates the preview position
+- Preview to editor: preview scroll updates the editor position
+- Line mapping: preview elements carry data attributes for precise positioning
+- Dynamic content: the scroll map waits for images and Mermaid diagrams
+- Smooth interpolation between known map points
+
+### Position calculation
+
+Viewport-relative positioning via `getBoundingClientRect()`:
+
+```typescript
+const rect = element.getBoundingClientRect()
+const previewOffset = rect.top - containerRect.top + containerScrollTop
+```
+
+This accounts for container padding correctly.
+
+### Dynamic content handling
+
+`buildScrollMap()` is deferred until the preview has settled:
+
+- Images – awaits `load`/`error` on every `img` that is not yet `complete`
+- Mermaid diagrams – detects `.mermaid-wrapper` elements and waits for the
+  render event
+- The map is rebuilt after all async work completes
+
+### Timing constants
+
+Defined at the top of `useScrollSync.ts`:
+
+| Constant | Value | Purpose |
+|---|---|---|
+| `RESIZE_DEBOUNCE_MS` | 150 | Debounce for `ResizeObserver` and window resize |
+| `RENDER_DEBOUNCE_MS` | 120 | Debounce for Mermaid/image render callbacks |
+| `CONTENT_READY_FALLBACK_MS` | 600 | Fallback timeout waiting for preview content |
+| `MERMAID_READY_FALLBACK_MS` | 800 | Fallback timeout for Mermaid render events |
+
+### Accuracy
+
+- Maps editor line numbers to preview elements
+- Uses react-markdown's `node.position` API for line extraction
+- Line-range tracking for multi-line elements
+- Rebuilds on view mode, file, and content changes
+
+## Formatting toolbar
+
+`MarkdownToolbar.tsx`
+(`src/renderer/src/components/Editor/MarkdownEditorPanel/components/`) renders
+the formatting buttons, the view-mode toggles and the export actions.
+
+### Buttons
+
+Formatting buttons are visible in the editor and split-vertical modes only. Each
+one calls the matching method on the `MonacoEditorHandle`:
+
+| Button | Handle method | Result |
+|---|---|---|
+| Bold (Cmd/Ctrl+B) | `formatBold()` | `**text**` |
+| Italic (Cmd/Ctrl+I) | `formatItalic()` | `*text*` |
+| Strikethrough | `formatStrikethrough()` | `~~text~~` |
+| Inline code | `formatCode()` | backtick-wrapped |
+| Insert link (Cmd/Ctrl+K) | `insertLink()` | `[text](url)` |
+| Insert image | `insertImage()` | `![alt](url)` |
+| Heading 1 | `insertHeading(1)` | `# ` prefix |
+| Bullet list | `insertList(false)` | `- ` prefix |
+| Numbered list | `insertList(true)` | incremental numbers |
+
+A Find button (Cmd/Ctrl+F) sits beside them, and is rendered separately in the
+preview and split-horizontal modes where the formatting buttons are hidden.
+
+### Usage
+
+- Click a button to apply the formatting
+- Select text first for the wrapping operations
+- Works with both selections and bare cursor positions
+
 
 ## Related Documentation
 - [Prompt Templates](../prompts/README.md) - AI text operations

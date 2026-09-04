@@ -301,10 +301,10 @@ See [api-services-features.md](../api-services-features.md) for LiteParseConvert
 
 ## Related Files
 
-- **File Service**: [src/main/services/FileService.ts](/src/main/services/FileService.ts)
-- **IPC Handlers**: [src/main/ipc/file-handlers.ts](/src/main/ipc/file-handlers.ts)
-- **Preload**: [src/preload/index.ts](/src/preload/index.ts), [src/preload/index.d.ts](/src/preload/index.d.ts)
-- **Project Tree**: [src/renderer/src/components/ProjectTree/ProjectTree.tsx](/src/renderer/src/components/ProjectTree/ProjectTree.tsx)
-- **Clipboard Store**: [src/renderer/src/stores/useClipboardStore.ts](/src/renderer/src/stores/useClipboardStore.ts)
-- **Tree Hook**: [src/renderer/src/hooks/useDragDropTree.ts](/src/renderer/src/hooks/useDragDropTree.ts)
-- **Pause Controller**: [src/main/utils/PauseController.ts](/src/main/utils/PauseController.ts)
+- **File Service**: [src/main/services/FileService.ts](../../src/main/services/FileService.ts)
+- **IPC Handlers**: [src/main/ipc/file-handlers.ts](../../src/main/ipc/file-handlers.ts)
+- **Preload**: [src/preload/index.ts](../../src/preload/index.ts), [src/preload/index.d.ts](../../src/preload/index.d.ts)
+- **Project Tree**: [src/renderer/src/components/ProjectTree/ProjectTree.tsx](../../src/renderer/src/components/ProjectTree/ProjectTree.tsx)
+- **Clipboard Store**: [src/renderer/src/stores/useClipboardStore.ts](../../src/renderer/src/stores/useClipboardStore.ts)
+- **Tree Hook**: [src/renderer/src/hooks/useDragDropTree.ts](../../src/renderer/src/hooks/useDragDropTree.ts)
+- **Pause Controller**: [src/main/utils/PauseController.ts](../../src/main/utils/PauseController.ts)

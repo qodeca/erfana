@@ -67,7 +67,7 @@ See: [UI Components - Panel toggle](../ui-components.md#panel-toggle-system)
 - Force component remounting with React keys
 - Immediate scroll map building in `handleEditorMount()`
 
-See: [Scroll synchronization](../editor/scroll-sync.md)
+See: [Scroll synchronization](../editor/README.md#scroll-synchronization)
 
 ---
 

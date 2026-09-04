@@ -18,6 +18,26 @@ import {
   normalizeWindowsCwd,
   validateWindowsCwd
 } from './WindowsTerminalBootstrap'
+import { isWindowsLongPath } from './watcher/PlatformConfig'
+
+/**
+ * Outcome of {@link TerminalService.createTerminal}. A failure carries its
+ * reason as plain text for the renderer. It used to be `null` for every
+ * failure, and the IPC handler — which cannot see the `'error'` event for a
+ * terminal whose id it never learned — could only say "Failed to create
+ * terminal".
+ */
+export type TerminalCreateResult =
+  | { terminalId: string; shellKind: ShellKind }
+  | { error: string }
+
+/**
+ * Win32 `CreateProcess` refuses a working directory over MAX_PATH whatever
+ * the long-paths policy says; node-pty surfaces it as ENOENT. Only a shorter
+ * path fixes it, so the message says that.
+ */
+export const TERMINAL_CWD_TOO_LONG_MESSAGE =
+  "This folder's path is longer than Windows allows for a terminal (260 characters). Move the project to a shorter path."
 
 // Dynamic import for node-pty (optional dependency)
 type NodePtyModule = typeof import('node-pty')
@@ -150,8 +170,9 @@ export class TerminalService extends EventEmitter {
    *
    * Returns the new terminal id alongside the resolved {@link ShellKind} so
    * the renderer can quote pasted paths correctly without a follow-up IPC
-   * round-trip (#164 round-2 F#1). Returns `null` if node-pty is unavailable
-   * or the cwd fails validation.
+   * round-trip (#164 round-2 F#1). Returns `{ error }` if node-pty is
+   * unavailable, the cwd fails validation, or the spawn throws — see
+   * {@link TerminalCreateResult} for why the reason travels in the result.
    *
    * @param config - Terminal configuration
    * @param webContentsId - ID of the webContents that owns this terminal (for cleanup on window close)
@@ -159,13 +180,13 @@ export class TerminalService extends EventEmitter {
   async createTerminal(
     config: TerminalConfig = {},
     webContentsId?: number
-  ): Promise<{ terminalId: string; shellKind: ShellKind } | null> {
+  ): Promise<TerminalCreateResult> {
     if (!pty) {
       try {
         pty = await import('node-pty')
       } catch (e) {
         logger.error('❌ Cannot create terminal: node-pty not available', e instanceof Error ? e : undefined)
-        return null
+        return { error: 'Terminal support is not available (node-pty failed to load)' }
       }
     }
 
@@ -195,6 +216,15 @@ export class TerminalService extends EventEmitter {
       let shellKind: ShellKind = 'posix'
 
       if (osPlatform() === 'win32') {
+        // Win32 CreateProcess hard-fails on a cwd over MAX_PATH and node-pty
+        // reports a bare ENOENT. Found on a 320-char project path during the
+        // v0.19.0 Windows verification; the renderer showed only "Failed to
+        // create terminal". The length is logged, never the path.
+        if (isWindowsLongPath(cwd)) {
+          logger.error(`❌ Cannot create terminal ${terminalId}: cwd exceeds MAX_PATH (${cwd.length} chars)`)
+          this.emit('error', { terminalId, error: TERMINAL_CWD_TOO_LONG_MESSAGE })
+          return { error: TERMINAL_CWD_TOO_LONG_MESSAGE }
+        }
         // Validate + normalize the cwd, then dispatch to a registered
         // WindowsBootstrapBuilder. See WindowsTerminalBootstrap.ts for the
         // strategy interface and the dispatch chain.
@@ -202,7 +232,7 @@ export class TerminalService extends EventEmitter {
         if (!validation.ok) {
           logger.error(`❌ Cannot create terminal ${terminalId}: ${validation.reason}`)
           this.emit('error', { terminalId, error: validation.reason })
-          return null
+          return { error: validation.reason }
         }
         const winCwd = normalizeWindowsCwd(cwd)
         const { kind, shellKind: winShellKind, shellArgs: winShellArgs } = buildWindowsBootstrap({
@@ -224,7 +254,7 @@ export class TerminalService extends EventEmitter {
           const reason = 'cwd contains unsupported newline character'
           logger.error(`❌ Cannot create terminal ${terminalId}: ${reason}`)
           this.emit('error', { terminalId, error: reason })
-          return null
+          return { error: reason }
         }
         const posixEscapedCwd = cwd.replace(/'/g, "'\\''")
         // E2E fast-shell mode: exec into /bin/sh -i instead of the user's
@@ -376,7 +406,7 @@ export class TerminalService extends EventEmitter {
       logger.error(`❌ Failed to create terminal`, error instanceof Error ? error : undefined)
       const message = error instanceof Error ? error.message : String(error)
       this.emit('error', { terminalId, error: message })
-      return null
+      return { error: message }
     }
   }
 

@@ -1,0 +1,226 @@
+{
+  "$comment": [
+    "Every number a card states lives here, with the code that derives it.",
+    "A card writes <span data-claim=\"id\"></span> and has nowhere to type a digit.",
+    "Values are computed by scripts/lib/design-claims.mjs into the generated",
+    "design/claims.js, and re-derived by design/claims.test.ts on every CI run.",
+    "Adding a number to a card without an entry here fails that test.",
+    "See scripts/lib/design-claims.mjs for why this is a mechanism and not a rule."
+  ],
+  "spinner-keyframes": {
+    "kind": "count",
+    "card": "system/foundations/motion.html",
+    "label": "spin keyframes in the renderer",
+    "dir": "src/renderer",
+    "ext": [
+      ".css"
+    ],
+    "match": "@keyframes\\s+[A-Za-z0-9_-]*[Ss]pin\\b",
+    "unit": "matches"
+  },
+  "spinner-durations": {
+    "kind": "distinct",
+    "card": "system/foundations/motion.html",
+    "label": "distinct durations those spinners run at",
+    "dir": "src/renderer",
+    "ext": [
+      ".css"
+    ],
+    "match": "animation:\\s*[A-Za-z0-9_-]*[Ss]pin\\s+([0-9.]+m?s)",
+    "group": 1
+  },
+  "icon-registry-bypass": {
+    "kind": "countWithout",
+    "card": "system/components/icon/index.html",
+    "label": "files importing the icon library directly instead of the registry",
+    "dir": "src/renderer",
+    "ext": [
+      ".ts",
+      ".tsx"
+    ],
+    "excludePath": "\\.test\\.|iconRegistry",
+    "match": "from 'lucide-react'",
+    "without": "iconRegistry"
+  },
+  "prefers-color-scheme-blocks": {
+    "kind": "count",
+    "card": "system/foundations/colors.html",
+    "label": "prefers-color-scheme blocks shipping in the renderer",
+    "dir": "src/renderer",
+    "ext": [
+      ".css"
+    ],
+    "match": "@media[^{]*prefers-color-scheme",
+    "unit": "matches"
+  },
+  "aria-invalid-uses": {
+    "kind": "count",
+    "card": "system/components/form/index.html",
+    "label": "places the renderer marks a field invalid to assistive tech",
+    "dir": "src/renderer",
+    "ext": [
+      ".ts",
+      ".tsx"
+    ],
+    "excludePath": "\\.test\\.",
+    "match": "aria-invalid",
+    "unit": "matches"
+  },
+  "zindex-css-literals": {
+    "kind": "count",
+    "card": "system/foundations/layering.html",
+    "label": "stylesheets setting a bare z-index instead of a token",
+    "dir": "src/renderer",
+    "ext": [
+      ".css"
+    ],
+    "excludePath": "design-tokens\\.css",
+    "match": "z-index:\\s*[0-9]",
+    "unit": "files"
+  },
+  "zindex-js-literals": {
+    "kind": "count",
+    "card": "system/foundations/layering.html",
+    "label": "renderer files mirroring a z-index into TypeScript",
+    "dir": "src/renderer",
+    "ext": [
+      ".ts",
+      ".tsx"
+    ],
+    "excludePath": "\\.test\\.",
+    "match": "[Zz]_?[Ii][Nn][Dd][Ee][Xx]\\s*[:=]\\s*\\{?\\s*-?[0-9]",
+    "unit": "files"
+  },
+  "colour-tokens": {
+    "kind": "count",
+    "card": "system/foundations/colors.html",
+    "label": "colour tokens declared in design-tokens.css",
+    "dir": "src/renderer/src/styles",
+    "ext": [
+      ".css"
+    ],
+    "includePath": "design-tokens\\.css",
+    "match": "^\\s*--color-[\\w-]+\\s*:",
+    "unit": "matches"
+  },
+  "reduced-motion-gaps": {
+    "kind": "countWithout",
+    "card": "system/foundations/motion.html",
+    "label": "stylesheets that animate without a reduced-motion escape",
+    "dir": "src/renderer",
+    "ext": [
+      ".css"
+    ],
+    "match": "@keyframes",
+    "without": "prefers-reduced-motion"
+  },
+  "contrast-secondary-on-panel": {
+    "kind": "contrast",
+    "card": "system/foundations/colors.html",
+    "label": "--color-text-secondary on --color-bg-secondary",
+    "foreground": "--color-text-secondary",
+    "background": "--color-bg-secondary"
+  },
+  "contrast-tertiary-on-panel": {
+    "kind": "contrast",
+    "card": "system/components/permission-band/index.html",
+    "label": "--color-text-tertiary on --color-bg-primary",
+    "foreground": "--color-text-tertiary",
+    "background": "--color-bg-primary"
+  },
+  "contrast-secondary-on-band": {
+    "kind": "contrast",
+    "card": "system/components/permission-band/index.html",
+    "label": "--color-text-secondary on --color-bg-primary",
+    "foreground": "--color-text-secondary",
+    "background": "--color-bg-primary"
+  },
+  "contrast-input-border": {
+    "kind": "contrast",
+    "card": "system/components/form/index.html",
+    "label": "--color-border-input against --color-bg-secondary",
+    "foreground": "--color-border-input",
+    "background": "--color-bg-secondary"
+  },
+  "contrast-placeholder": {
+    "kind": "contrast",
+    "card": "system/components/form/index.html",
+    "label": "--color-text-placeholder on --color-bg-input",
+    "foreground": "--color-text-placeholder",
+    "background": "--color-bg-input"
+  },
+  "warning-tokens": {
+    "kind": "count",
+    "card": "system/components/feedback/index.html",
+    "label": "tokens declared for the meaning \"warning\"",
+    "dir": "src/renderer/src/styles",
+    "ext": [
+      ".css"
+    ],
+    "includePath": "design-tokens\\.css",
+    "unit": "matches",
+    "match": "^\\s*--color-warning[\\w-]*\\s*:"
+  },
+  "error-tokens": {
+    "kind": "count",
+    "card": "system/components/feedback/index.html",
+    "label": "tokens declared for the meaning \"error\"",
+    "dir": "src/renderer/src/styles",
+    "ext": [
+      ".css"
+    ],
+    "includePath": "design-tokens\\.css",
+    "unit": "matches",
+    "match": "^\\s*--color-error[\\w-]*\\s*:"
+  },
+  "alert-role-files": {
+    "kind": "count",
+    "card": "system/components/feedback/index.html",
+    "label": "files announcing with role=\"alert\"",
+    "dir": "src/renderer",
+    "ext": [
+      ".tsx"
+    ],
+    "excludePath": "\\.test\\.",
+    "match": "role=\"alert\"",
+    "unit": "files"
+  },
+  "context-menu-dependants": {
+    "kind": "count",
+    "card": "system/components/menu/index.html",
+    "label": "files that import a context menu component",
+    "dir": "src/renderer",
+    "ext": [
+      ".tsx",
+      ".ts"
+    ],
+    "excludePath": "\\.test\\.|components/ContextMenu/",
+    "match": "import[^\n]*ContextMenu",
+    "unit": "files"
+  },
+  "outline-none-unreplaced": {
+    "kind": "countWithout",
+    "card": "system/foundations/focus.html",
+    "label": "stylesheets that remove an outline with no :focus-visible rule in the same file",
+    "dir": "src/renderer",
+    "ext": [
+      ".css"
+    ],
+    "match": "outline:\\s*none",
+    "without": "focus-visible"
+  },
+  "contrast-focus-ring": {
+    "kind": "contrast",
+    "card": "system/foundations/focus.html",
+    "label": "--color-border-focus against --color-bg-secondary",
+    "foreground": "--color-border-focus",
+    "background": "--color-bg-secondary"
+  },
+  "contrast-warning-on-panel": {
+    "kind": "contrast",
+    "card": "system/components/permission-band/index.html",
+    "label": "--color-warning on --color-bg-tertiary",
+    "foreground": "--color-warning",
+    "background": "--color-bg-tertiary"
+  }
+}

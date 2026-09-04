@@ -6,9 +6,10 @@
  * Handles IPC communication for terminal operations using TerminalService.
  */
 
-import { ipcMain, BrowserWindow } from 'electron'
+import { BrowserWindow } from 'electron'
 import { terminalService } from '../services/TerminalService'
 import { logger } from '../services/LoggingService'
+import { registerHandle, registerOn } from './registry'
 
 type TerminalCreateConfig = {
   shell?: string
@@ -45,7 +46,7 @@ export function registerTerminalHandlers() {
    * Check if terminal support is available (node-pty loaded)
    * Optionally check initialization state for a specific terminal
    */
-  ipcMain.handle('terminal:isAvailable', (_event, terminalId?: string) => {
+  registerHandle('terminal:isAvailable', (_event, terminalId?: string) => {
     const result = terminalService.isAvailable(terminalId)
     logger.info(`🔍 Terminal available: ${result.available}, initialized: ${result.initialized ?? 'N/A'}`)
     return { success: true, ...result }
@@ -58,15 +59,18 @@ export function registerTerminalHandlers() {
    * The response carries `shellKind` so the renderer can quote pasted paths
    * correctly without a follow-up IPC round-trip (#164 round-2 F#1).
    */
-  ipcMain.handle('terminal:create', async (event, config?: TerminalCreateConfig) => {
+  registerHandle('terminal:create', async (event, config?: TerminalCreateConfig) => {
     logger.info('🚀 Creating terminal', config)
 
     try {
       const webContentsId = event.sender.id
       const result = await terminalService.createTerminal(config, webContentsId)
 
-      if (!result) {
-        return { success: false, error: 'Failed to create terminal' }
+      if ('error' in result) {
+        // The service explains itself now (a cwd over MAX_PATH, an unsafe
+        // character, a spawn failure); pass that through instead of the
+        // generic message the renderer used to get for all of them.
+        return { success: false, error: result.error }
       }
 
       return { success: true, terminalId: result.terminalId, shellKind: result.shellKind }
@@ -80,7 +84,7 @@ export function registerTerminalHandlers() {
   /**
    * Write data to terminal
    */
-  ipcMain.handle('terminal:write', (_event, { terminalId, data }) => {
+  registerHandle('terminal:write', (_event, { terminalId, data }) => {
     try {
       const success = terminalService.write(terminalId, data)
       return { success }
@@ -94,14 +98,14 @@ export function registerTerminalHandlers() {
   /**
    * Resize terminal
    */
-  ipcMain.on('terminal:resize', (_event, { terminalId, cols, rows }) => {
+  registerOn('terminal:resize', (_event, { terminalId, cols, rows }) => {
     terminalService.resize(terminalId, cols, rows)
   })
 
   /**
    * Kill terminal
    */
-  ipcMain.handle('terminal:kill', async (_event, terminalId: string) => {
+  registerHandle('terminal:kill', async (_event, terminalId: string) => {
     try {
       const success = terminalService.killTerminal(terminalId)
       return { success }
@@ -115,7 +119,7 @@ export function registerTerminalHandlers() {
   /**
    * Get terminal info
    */
-  ipcMain.handle('terminal:getInfo', async (_event, terminalId: string) => {
+  registerHandle('terminal:getInfo', async (_event, terminalId: string) => {
     try {
       const info = terminalService.getTerminalInfo(terminalId)
 
@@ -134,7 +138,7 @@ export function registerTerminalHandlers() {
   /**
    * List all terminals
    */
-  ipcMain.handle('terminal:list', async () => {
+  registerHandle('terminal:list', async () => {
     try {
       const terminals = terminalService.listTerminals()
       return { success: true, terminals }
@@ -196,7 +200,7 @@ export function registerTerminalHandlers() {
   registeredListeners.set('clearTerminal', clearListener as TerminalEventListener)
 
   // Receive confirmation that clear was processed
-  ipcMain.on('terminal:clearComplete', (_event, { terminalId }) => {
+  registerOn('terminal:clearComplete', (_event, { terminalId }) => {
     terminalService.markInitializationComplete(terminalId)
   })
 

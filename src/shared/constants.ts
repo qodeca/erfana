@@ -20,6 +20,35 @@ export { GRAPH, MCP, DEFAULT_GRAPH_EXCLUDE_PATTERNS } from './graph-constants'
 /** Maximum number of recent projects to track */
 export const MAX_RECENT_PROJECTS = 5
 
+/**
+ * Logs directory, relative to the user's home directory.
+ *
+ * Single source of truth: `LoggingService` joins it with `homedir()` to decide
+ * where to write, and the crash fallback's DEGRADED mode (where
+ * `window.api.logging.getLogsDir()` cannot be called) renders this value as
+ * "<this> in your home folder" — prose rather than `~/…`, which would be wrong
+ * on Windows. Moving the logs means editing this line only.
+ *
+ * @see src/main/services/LoggingService.ts - getLogsDir()
+ * @see src/renderer/src/components/RootErrorBoundary/RootErrorFallback.tsx - degraded mode
+ */
+export const LOGS_DIR_RELATIVE = '.erfana/logs'
+
+/**
+ * Renderer-crash injection flag for the E2E error-boundary scenario (#60 §2.8).
+ *
+ * Shared because BOTH sides of the handshake must spell it identically: the
+ * main process appends it to `webPreferences.additionalArguments` (only when
+ * the app is unpackaged AND `ERFANA_E2E_FORCE_CRASH=1`), and the preload reads
+ * it back off `process.argv` to decide whether to expose
+ * `window.__ERFANA_FORCE_CRASH__`. Two literals could drift into a flag that
+ * silently never fires.
+ *
+ * @see src/main/index.ts - buildAdditionalArguments()
+ * @see src/preload/index.ts - forceCrash
+ */
+export const FORCE_CRASH_ARG = '--erfana-force-crash'
+
 /** Toast notification durations in milliseconds */
 export const TOAST_DURATION = {
   ERROR: 5000,
@@ -427,4 +456,209 @@ export const GIT_STATUS = {
 export const PAUSE_CONTROLLER = {
   /** Safety timeout in ms: auto-resume if resume() not called within this window */
   SAFETY_TIMEOUT_MS: 10_000
+} as const
+
+/**
+ * HTML preview constants (Issue #74).
+ *
+ * Caps and timers for the `WebContentsView`-backed HTML preview: the asset
+ * read cap enforced by the protocol handler, the preview-owned watcher pool
+ * timings, failure-log ring-buffer + emission coalescing, bounded close/swap
+ * timeouts, the host-block toast budget, the post-load reload rate limit and
+ * the still-frame downscale caps.
+ *
+ * @see docs designs/sd-074-html-preview.md §1.4, §2.4
+ */
+export const PREVIEW = {
+  /** Max bytes served per asset; a larger file yields HTTP 413 */
+  MAX_ASSET_BYTES: 25 * 1024 * 1024,
+  /**
+   * Max bytes of the entry HTML read for static-link discovery. Bounds both the
+   * read and the synchronous parse5 parse that runs on the main thread, so a
+   * large or generated entry file cannot freeze the UI on every reload. Links
+   * live near the top of a document, so a truncated head still finds them.
+   */
+  MAX_ENTRY_HTML_BYTES: 4 * 1024 * 1024,
+  /**
+   * Max asset reads buffered concurrently per preview session. Each read is
+   * capped at MAX_ASSET_BYTES, so this bounds peak main-process memory a hostile
+   * page can force by fetching many large in-repo assets at once.
+   */
+  MAX_CONCURRENT_ASSET_READS: 8,
+  /**
+   * How many asset reads may WAIT for a slot before the protocol handler starts
+   * shedding them with 503.
+   *
+   * The limiter is process-wide (sd-074b §4.7), so without a queue bound one
+   * hostile page could park an unbounded number of Chromium URLLoaders and
+   * starve every other preview — a hang with no error and no failure entry.
+   * Shedding instead is visible: the badge records it.
+   */
+  MAX_QUEUED_ASSET_READS: 64,
+  /**
+   * How many previews stay LIVE at once (sd-074b D5). Beyond this the least
+   * recently active preview is torn down to its still frame and re-opens by
+   * itself when its tab is activated again — the "exit state" whose absence
+   * killed the original LRU proposal (sd-074 §10).
+   *
+   * Each live preview is a separate renderer process with its own session, so
+   * this is the cap that actually bounds CPU and RSS; the byte and descriptor
+   * budgets below are derived from it.
+   */
+  MAX_LIVE_VIEWS: 3,
+  /**
+   * Bounds on the previewed page's own zoom level (Chromium scale, 0 = 100%).
+   *
+   * ±5 covers roughly 30% to 300%, which clears WCAG 2.2 SC 1.4.4's 200%
+   * requirement in both directions while stopping a runaway key-repeat at a
+   * level the page can still be laid out at.
+   */
+  MIN_ZOOM_LEVEL: -5,
+  MAX_ZOOM_LEVEL: 5,
+  /** Per-panel watch cap (bounds EMFILE exposure, #146–#151) */
+  MAX_WATCHED_FILES: 16,
+  /**
+   * Ceiling on watch acquisitions across ALL previews. Derived from
+   * `MAX_LIVE_VIEWS × MAX_WATCHED_FILES` plus headroom for a view that is mid
+   * teardown while another opens — pools are per view, so this counts
+   * acquisitions rather than distinct descriptors. Over budget degrades
+   * auto-refresh for the newest view and records a failure entry; it never
+   * silently stops watching (sd-074b §4.6).
+   */
+  MAX_WATCHED_FILES_GLOBAL: 64,
+  /** Coalesce window for pool change events before a reload/swap (ms) */
+  WATCH_COALESCE_MS: 30,
+  /** chokidar awaitWriteFinish.stabilityThreshold for preview watches (ms) */
+  WATCH_STABILITY_MS: 50,
+  /** chokidar awaitWriteFinish.pollInterval for preview watches (ms) */
+  WATCH_POLL_INTERVAL_MS: 25,
+  /** Failure-log ring-buffer capacity; older entries drop, sets `truncated` */
+  MAX_FAILURES: 100,
+  /** Failure emission coalescing window with a trailing send (ms) */
+  FAILURE_COALESCE_MS: 250,
+  /** Bounded destroy: await close() this long before webContents.destroy (ms) */
+  CLOSE_TIMEOUT_MS: 1000,
+  /** CSS swap race timeout; any non-`true` outcome falls back to reload (ms) */
+  SWAP_TIMEOUT_MS: 1000,
+  /**
+   * Bound on the session purge inside an approval (ms). The purge is
+   * belt-and-braces — the opaque origin is the seal and the reload that
+   * follows bypasses the cache — so one that hangs is logged and skipped
+   * rather than allowed to hold the grant hostage (the Allow freeze seen on
+   * Windows, 2026-09-03).
+   */
+  PURGE_TIMEOUT_MS: 2000,
+  /** Bound on the post-write re-read of the allowlist file (ms); same reasoning. */
+  ALLOWLIST_VERIFY_TIMEOUT_MS: 2000,
+  /**
+   * Bound on the whole "apply the grant to the live views" step inside the
+   * `preview:approveHost` invoke (ms). The grant is persisted and the CSP is
+   * rebuilt before the first await, so on timeout the invoke still answers
+   * `ok: true`; only the reload is late.
+   */
+  APPROVE_TIMEOUT_MS: 5000,
+  /**
+   * The renderer's own deadline on that invoke (ms). Defence in depth: however
+   * main misbehaves, the band must leave "Saving…" and give Cancel back. Longer
+   * than `APPROVE_TIMEOUT_MS` so a healthy main always answers first.
+   */
+  APPROVE_UI_DEADLINE_MS: 10000,
+  /**
+   * Bound on one still-frame `capturePage` (ms). A capture that never comes
+   * back must not block every later capture of that panel; the previous frame
+   * is kept.
+   */
+  CAPTURE_TIMEOUT_MS: 1500,
+  /**
+   * Pause before the one retry of a capture that came back EMPTY (ms). Measured
+   * on Windows: the capture taken at `'ready'` was empty for a page that had
+   * only just painted, and the retry a moment later was not.
+   */
+  CAPTURE_RETRY_DELAY_MS: 250,
+  /**
+   * How long eviction waits for an in-flight capture before destroying the
+   * page anyway (ms). The wait exists so a suspended tab wakes with a picture;
+   * it must not be able to stop the tab from being suspended at all.
+   */
+  CAPTURE_SETTLE_TIMEOUT_MS: 1500,
+  /**
+   * Bound on each async step of a view's teardown (ms). On Windows the session
+   * purge inside teardown never settled (2026-09-03): eviction hung, the old
+   * renderer process was never destroyed, and the tab never heard `suspended`.
+   * A step that overruns is logged and skipped; the destroy still happens.
+   */
+  TEARDOWN_STEP_TIMEOUT_MS: 2000,
+  /**
+   * Bound on the purge that runs when a partition is handed back for reuse
+   * and again before it is handed out (ms). Fail-closed: a purge that fails or
+   * overruns on either side drops the name and a fresh partition is minted.
+   */
+  PARTITION_PURGE_TIMEOUT_MS: 2000,
+  /**
+   * How many purged partition names are kept for reuse. Electron cannot destroy
+   * a session, so every NEW name costs handles for the life of the process
+   * (measured on Windows: ~16 per partition, +0 for re-minting a name). One
+   * per live view plus two in flight around an eviction is enough; more would
+   * only hold storage nobody needs. A project switch forgets the whole list on
+   * purpose (a partition never carries across projects), which costs up to
+   * this many fresh names — ~80 handles — per switch; the "no growth"
+   * measurement in 41dfee95 covers open/close within one project only.
+   */
+  MAX_RECYCLED_PARTITIONS: 5,
+  /**
+   * Smallest still frame worth taking (px, either edge). `preview:open` seeds
+   * the view at 1×1 before the placeholder is laid out; a frame captured then is
+   * one pixel stretched over the whole panel. 16 rather than 32 because
+   * `lastBounds` is the zoom-converted rect and a narrow split pane at 200%
+   * scaling is legitimately small.
+   */
+  MIN_STILL_FRAME_PX: 16,
+  /**
+   * Max DISTINCT blocked hosts reported to the renderer per view.
+   *
+   * This replaced `MAX_HOST_TOASTS: 3`, which bounded toasts and not the list —
+   * so when the emit became unconditional the list had no bound at all:
+   * `PreviewRequestFilter` calls `onBlocked` per blocked REQUEST, with no
+   * per-host de-duplication of its own.
+   *
+   * 50 matches `MAX_ORIGINS_PER_VIEW` in `previewCspViolationBridge.ts`, which
+   * bounds the other of the two paths that feed this. Keep the two equal: a page
+   * should not be able to report more hosts through one path than the other.
+   *
+   * The entry it counts is an ORIGIN now, not a hostname — see
+   * `MAX_BLOCKED_ORIGINS_PER_HOST` below, which is what stops that change from
+   * turning this global budget into something one hostname can eat by itself.
+   */
+  MAX_BLOCKED_HOSTS_PER_VIEW: 50,
+  /**
+   * Max DISTINCT origins ONE hostname may contribute to the blocked list.
+   *
+   * A sub-cap underneath `MAX_BLOCKED_HOSTS_PER_VIEW`, applied at both places a
+   * blocked entry is recorded main-side — `PreviewViewService.onBlocked` (the
+   * network-filter path) and `previewCspViolationBridge` (the CSP path).
+   *
+   * WHY IT HAD TO EXIST THE MOMENT THE UNIT BECAME AN ORIGIN. Keyed on a
+   * hostname, the global cap was self-limiting: a page hitting one host on fifty
+   * ports collapsed into ONE entry. Keyed on an origin it does not. A page
+   * fetching `http://localhost:1` … `http://localhost:50` fills all fifty slots
+   * before main ever records the real blocked CDN — and that entry is not buried
+   * below the fold, it is dropped and never sent, so the reader cannot approve
+   * the one host they actually needed. Renderer-side trimming cannot repair
+   * that: the event was never emitted.
+   *
+   * WHY 5. One hostname legitimately serves one origin, occasionally two (443
+   * plus an alternate port a dev server is on). Five is generous for the honest
+   * case and cheap against the hostile one: at a tenth of the global budget, at
+   * least ten distinct hostnames always fit, so no single noisy host can make a
+   * different host invisible. The first origin for a hostname is therefore
+   * always reported, which is the property that matters — a host must never be
+   * missing from the list because some other host was loud.
+   */
+  MAX_BLOCKED_ORIGINS_PER_HOST: 5,
+  /** At most one full post-load pipeline per this interval (ms) */
+  RELOAD_MIN_INTERVAL_MS: 750,
+  /** Still-frame downscale: longest edge in px before toDataURL */
+  MAX_FRAME_EDGE_PX: 1024,
+  /** Still-frame dataURL char cap; over budget ⇒ no frame emitted */
+  MAX_FRAME_DATAURL_CHARS: 2 * 1024 * 1024
 } as const

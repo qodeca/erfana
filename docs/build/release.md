@@ -52,7 +52,7 @@ Design summary: one `v*.*.*` tag push from `main` produces one GitHub draft rele
       │                    │                            │
       │                    │              wait for asset list to stabilize
       │                    │              strip leaked latest*.yml
-      │                    │              sha256sum *  →  SHA256SUMS
+      │                    │              sha256sum -- *  →  SHA256SUMS
       │                    │              minisign sign  →  SHA256SUMS.minisig
       │                    │              upload `sha256sums-digest` artifact
       │                    │
@@ -115,7 +115,9 @@ sequenceDiagram
 
 ## Secrets
 
-All secrets live in the GitHub repo `qodeca/erfana` (Settings → Secrets and variables → Actions). Variables (non-secret) live in the same UI under Variables. The signing jobs also require a GitHub Environment named `production-signing` with required reviewers — this is what gates human approval before any credential is touched.
+**Scope of this table: `release.yml` only.** Every secret and variable below is a repo-level Actions secret on `qodeca/erfana` (Settings → Secrets and variables → Actions); variables (non-secret) live in the same UI under Variables. Verified live on **2026-08-23** with `gh api repos/qodeca/erfana/actions/secrets`. The signing jobs also require a GitHub Environment named `production-signing` with required reviewers — this is what gates human approval before any credential is touched.
+
+`whisper-binaries.yml` is a **separate** credential set and is not covered here. It consumes five further names — `APPLE_CERT_P12`, `APPLE_CERT_PASSWORD`, `APPLE_APP_PASSWORD`, `MANIFEST_SIGNING_KEY`, `MANIFEST_SIGNING_KEY_PASSWORD` — which [`whisper-binaries.md`](./whisper-binaries.md) documents as **environment** secrets on `production-signing`, not repo Actions secrets. Provisioning and rotation for those live in that runbook.
 
 | Secret or variable | Scope | Purpose | Rotation policy |
 |---|---|---|---|
@@ -212,11 +214,11 @@ The release asset set is pinned in four places with no automated cross-check bet
 | `.github/workflows/build_win.yml` | signtool-verify + upload globs | `*-setup.exe` in both the verify loop and `gh release upload` |
 | [`.claude/skills/releasing-erfana/SKILL.md`](../../.claude/skills/releasing-erfana/SKILL.md) § Constants | expected asset count | 2 binaries + `SHA256SUMS` + `SHA256SUMS.minisig`, i.e. `EXPECTED_ASSETS=4`. Note this is **not** an equality assertion anywhere: §0.4 uses it as a floor (`[ "$ASSET_COUNT" -ge "$EXPECTED_ASSETS" ]`) to decide a draft is `draft-ready`, and `phase-4-verify.md` carries no count check at all — §4.6 only prints the expected set for the operator |
 
-**Verified in agreement on 2026-08-08.** The published `v0.17.0` release carries exactly four assets — `erfana-0.17.0-arm64.dmg`, `erfana-0.17.0-setup.exe`, `SHA256SUMS`, `SHA256SUMS.minisig` — matching all four definitions above. Adding or removing a build target is therefore a four-file change plus a release-notes/verification-doc sweep, never a one-line `electron-builder.yml` edit.
+**Verified in agreement on 2026-08-12.** The published `v0.17.2` release carries exactly four assets — `erfana-0.17.2-arm64.dmg`, `erfana-0.17.2-setup.exe`, `SHA256SUMS`, `SHA256SUMS.minisig` — matching all four definitions above. Adding or removing a build target is therefore a four-file change plus a release-notes/verification-doc sweep, never a one-line `electron-builder.yml` edit.
 
 ## Hardened-runtime entitlements (known gap)
 
-The main app plist (`build/entitlements.mac.plist`) contains the strictly-required keys: `cs.allow-jit`, `cs.allow-unsigned-executable-memory` (V8 requirement), `device.camera`, `device.audio-input`. The CI guard fails the build if `cs.disable-library-validation` or `cs.allow-dyld-environment-variables` ever leak into either plist — it is Guard 2, the step named `Guard - no forbidden entitlements` in the `release-guards` job (`.github/workflows/checks.yml:243-251`, verified 2026-08-07).
+The main app plist (`build/entitlements.mac.plist`) contains the strictly-required keys: `cs.allow-jit`, `cs.allow-unsigned-executable-memory` (V8 requirement), `device.camera`, `device.audio-input`. The CI guard fails the build if `cs.disable-library-validation` or `cs.allow-dyld-environment-variables` ever leak into either plist — it is Guard 2, the step named `Guard - no forbidden entitlements` in the `release-guards` job of [`.github/workflows/checks.yml`](../../.github/workflows/checks.yml) (cited by step name, not line number, so it survives edits above it; verified 2026-08-23).
 
 The inherit plist (`build/entitlements.mac.inherit.plist`) grants `cs.allow-jit` and `cs.allow-unsigned-executable-memory` to **all helper processes** (Renderer + GPU + Plugin), not just Renderer. This is an upstream-imposed over-grant: electron-builder 26.8.1's `mac.entitlementsInherit` field is a **single plist applied uniformly** to every helper bundle — there is no built-in per-helper-type configuration. The Renderer helper structurally requires both keys for V8 JIT to function; granting them to GPU and Plugin helpers is the unavoidable side-effect.
 
@@ -238,7 +240,7 @@ An end user downloading from the release page should run the following to confir
 
 ### 1. Integrity + aggregate signature (all platforms)
 
-Substitute the version you downloaded for `{version}` throughout — the worked example below uses **v0.17.0**, the current public release. Run the whole block from the directory that holds the downloaded `.dmg` / `.exe`; `SHA256SUMS` lists **both** binaries by bare filename, and two things follow from that:
+Substitute the version you downloaded for `{version}` throughout — the worked example below uses **v0.17.2**, the current public release. Run the whole block from the directory that holds the downloaded `.dmg` / `.exe`; `SHA256SUMS` lists **both** binaries by bare filename, and two things follow from that:
 
 - Most people download **one** platform, so a bare `sha256sum -c SHA256SUMS` reports `FAILED open or read` for the other one and exits 1 on a perfectly good download. The recipe therefore passes `--ignore-missing`, verified working with GNU `sha256sum` (coreutils), macOS's `/sbin/sha256sum`, and Perl `shasum -a 256` (6.x).
 - `--ignore-missing` also means "verified nothing" is a possible outcome — that is what running from the wrong directory looks like. GNU `sha256sum` and `shasum` exit 1 with `no file was verified`, but macOS's `/sbin/sha256sum` exits **0** silently, so the block below additionally requires at least one `OK` line.
@@ -251,7 +253,7 @@ for `return 1`.
 
 ```bash
 #!/usr/bin/env bash
-VERSION=0.17.0   # the v{version} you downloaded, without the leading "v"
+VERSION=0.17.2   # the v{version} you downloaded, without the leading "v"
 
 curl -LO "https://github.com/qodeca/erfana/releases/download/v${VERSION}/SHA256SUMS"
 curl -LO "https://github.com/qodeca/erfana/releases/download/v${VERSION}/SHA256SUMS.minisig"
@@ -361,7 +363,7 @@ $signtool = Join-Path $sdkBin.FullName "x64\signtool.exe"
 if (-not (Test-Path $signtool)) { throw "signtool.exe not found under $sdkRoot" }
 
 # Both signatures must verify independently.
-& $signtool verify /pa /all /tw C:\Path\To\erfana-0.17.0-setup.exe
+& $signtool verify /pa /all /tw C:\Path\To\erfana-0.17.2-setup.exe
 ```
 
 First-time Windows installs will see a SmartScreen warning on a newly provisioned Azure Artifact Signing identity. Reputation accrues organically regardless of EV/OV status — several successful installs will silence the warning. This is expected, not a defect.
@@ -371,7 +373,7 @@ First-time Windows installs will see a SmartScreen warning on a newly provisione
 | State | Remediation |
 |---|---|
 | Tag pushed; `prepare` failed on a repo-content assertion (e.g., release-notes file missing) | **Bump to the next patch version.** The tag ruleset carries a `deletion` rule with no bypass actors, so `git push --delete origin v${version}` is rejected (`push declined due to repository rule violations`) — the version cannot be reused. `gh run rerun` does not help either: it replays the same tagged commit, which still lacks the fix. No draft to clean. |
-| Tag pushed; `prepare` failed on `No green checks.yml run for <sha>` | **Not a red build — a race.** `checks.yml` had not yet reached `completed`/`success` for the tagged SHA when `prepare` queried it. Wait until `gh api "repos/qodeca/erfana/actions/workflows/checks.yml/runs?head_sha=$SHA&status=success"` reports `total_count ≥ 1`, then `gh run rerun <id>` — the same run id, no new tag. **The tag is not burned**: nothing was built, signed, or drafted. Prevention: poll the *workflow run* to completion before tagging, not just the six required check contexts (the advisory `windows-checks` job keeps the run `in_progress` for ~3 min after they go green). See [`docs/release-incidents/v0.17.0-attempt-1.md`](../release-incidents/v0.17.0-attempt-1.md). |
+| Tag pushed; `prepare` failed on `No green checks.yml run for <sha>` | **Not a red build — a race.** `checks.yml` had not yet reached `completed`/`success` for the tagged SHA when `prepare` queried it. Wait until `gh api "repos/qodeca/erfana/actions/workflows/checks.yml/runs?head_sha=$SHA&status=success"` reports `total_count ≥ 1`, then `gh run rerun <id>` — the same run id, no new tag. **The tag is not burned**: nothing was built, signed, or drafted. Prevention: poll the *workflow run* to completion before tagging, not just the seven required check contexts (the advisory `windows-checks` job keeps the run `in_progress` for ~3 min after they go green). See [`docs/release-incidents/v0.17.0-attempt-1.md`](../release-incidents/v0.17.0-attempt-1.md). |
 | Run sits in `waiting`, both build legs unstarted | The `production-signing` environment approval is pending. Approve via **Review deployments** in the Actions UI, or the CLI recipe in [Approval gate](#approval-gate-production-signing) (all three body params — `environment_ids`, `state` **and** `comment` — are required; omitting `comment` returns HTTP 422). Not a failure; the tag is not burned. |
 | Tag pushed; `prepare` succeeded; any matrix leg failed | `cleanup` deletes the draft and exits red. Bump to the next patch — any signed artifact, even in a draft, burns the version. The tag itself cannot be deleted (ruleset `deletion` rule, no bypass actors); `git tag -d v${version}` clears only the local copy. |
 | Tag pushed; build all-green; `finalize` failed | Draft exists with unsigned `SHA256SUMS`. `cleanup` fires. Bump to next patch. |
@@ -534,8 +536,8 @@ Phase I configuration was applied after dry-run `24925269258` validated all 5 jo
 
 **`main` branch protection** (read it with `gh api repos/qodeca/erfana/branches/main/protection` — the bare API URL is not linked because it returns `401` to an unauthenticated browser):
 
-- Required status checks (strict mode — branch must be up to date before merge), read live from the API on **2026-08-07**: `Lint`, `Typecheck`, `Unit tests`, `Build`, `License compliance`, `Secret scan`. Six checks.
-  - `Secret scan` is **app-pinned** (`app_id: 15368`); the other five accept any app (`app_id: null`). This matters when editing the set — see the traps under § Deliberate exclusion below.
+- Required status checks (strict mode — branch must be up to date before merge), read live from the API on **2026-08-23**: `Lint`, `Typecheck`, `Unit tests`, `Build`, `License compliance`, `Secret scan`, `Coverage`. Seven checks.
+  - `Secret scan` and `Coverage` are **app-pinned** (both `app_id: 15368`); the other five accept any app (`app_id: null`). This matters when editing the set — see the traps under § Deliberate exclusion below.
   - `npm audit signatures` and `Release readiness guards` are **not** required checks, despite earlier revisions of this document claiming they were. Both jobs still run on every push via `checks.yml`; they simply do not gate merges to `main`. `Windows checks` is likewise advisory and not required.
 - **No PR review requirement** (`required_pull_request_reviews: null`) — direct push to `main` is the intended solo-developer workflow. The release skill verifies this at Phase 0.4.5 and aborts if the rule is reinstated.
 - `enforce_admins: true` — administrators included.
@@ -556,7 +558,7 @@ Phase I configuration was applied after dry-run `24925269258` validated all 5 jo
 >   -F 'required_pull_request_reviews[dismiss_stale_reviews]=true'
 > ```
 >
-> All other Phase I gates — signed-tag ruleset, the 6 required status checks, `enforce_admins=true`, no force pushes, no deletions — remain intact throughout. Conversation resolution is **not** among them: `required_conversation_resolution` is `false`.
+> All other Phase I gates — signed-tag ruleset, the 7 required status checks, `enforce_admins=true`, no force pushes, no deletions — remain intact throughout. Conversation resolution is **not** among them: `required_conversation_resolution` is `false`.
 
 **Protected tag rulesets.** Two are active, both with `bypass_actors: []` (no exceptions), verified live on 2026-08-07:
 
@@ -583,10 +585,10 @@ gh api repos/qodeca/erfana/branches/main/protection/required_status_checks \
 Traps this form exists to avoid:
 
 - **`--input -` defaults to POST.** `gh api` only switches verb when you say so, so `-X PATCH` is mandatory. Omit it and you are issuing a POST against a PATCH-only endpoint.
-- **Round-trip `checks`, never `contexts`.** The flat `contexts[]` array is the deprecated representation. PATCHing it resets every entry's `app_id` to `null` — and `Secret scan` is app-pinned to `app_id: 15368`, so a `contexts` PATCH would silently un-pin it and let a status from any GitHub App satisfy that gate.
+- **Round-trip `checks`, never `contexts`.** The flat `contexts[]` array is the deprecated representation. PATCHing it resets every entry's `app_id` to `null` — and **two** contexts are app-pinned to `app_id: 15368` (`Secret scan` and `Coverage`), so a `contexts` PATCH would silently un-pin both and let a status from any GitHub App satisfy those gates.
 - **Never send both keys.** `checks` and `contexts` in the same payload is a `422`.
 - **Echo `strict` back explicitly.** A PATCH that omits `strict` does not preserve it; losing it turns off "branch must be up to date before merge".
 - **The context string is the check-run name, not the workflow name.** For `e2e.yml` the check run is named after the job id — `e2e` — while the workflow's display name is `E2E Tests`. Requiring `E2E Tests` would wait forever on a status that is never reported.
-- **Hardcoded lists rot.** The snippet this replaced pinned six contexts: two that were never actually required (`npm audit signatures`, `Release readiness guards`) and, by omission, it would have deleted the two that are (`License compliance`, `Secret scan`).
+- **Hardcoded lists rot.** The snippet this replaced pinned six contexts: two that were never actually required (`npm audit signatures`, `Release readiness guards`) and, by omission, it would have deleted the three that are (`License compliance`, `Secret scan`, `Coverage`).
 
 Rationale (kept for archaeology): flipping branch protection before the new `checks.yml` guards landed green on `develop` would have green-locked the repo. The dry-run gate above served as that validation.

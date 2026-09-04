@@ -1,0 +1,791 @@
+<!-- @card group="HTML preview" name="Waiting for a page" subtitle="What a preview says between opening and painting, and who it is waiting for" status="proposed" reviewed="2026-09-01" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Erfana — waiting for a page</title>
+<link rel="stylesheet" href="../../tokens.css">
+<link rel="stylesheet" href="../../ds.css">
+<link rel="stylesheet" href="../../system/components/row/row.css">
+<link rel="stylesheet" href="../../system/components/permission-band/band.css">
+<style>
+  /* ---------- documentation chrome ---------- */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+          gap: var(--space-16); margin-bottom: var(--space-16); }
+  .case__no { font-family: var(--font-mono); font-size: var(--text-sm);
+              color: var(--color-accent-primary); letter-spacing: 0.1em; margin: 0 0 var(--space-2); }
+  .case__title { margin: 0 0 var(--space-4); font-size: var(--text-md);
+                 font-weight: var(--font-semibold); color: var(--color-text-emphasis); }
+  .case__text { margin: 0 0 var(--space-6); color: var(--color-text-tertiary); font-size: var(--text-sm); }
+  .case__text:last-child { margin-bottom: 0; }
+  .case__text strong { color: var(--color-text-bright); }
+
+  .widths { display: flex; flex-direction: column; gap: var(--space-12);
+            margin-bottom: var(--space-24); }
+  .width__label { margin: 0 0 var(--space-4); font-size: var(--text-xs);
+                  font-family: var(--font-mono); color: var(--color-text-muted); }
+
+  .controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-8);
+              margin-bottom: var(--space-8); }
+  .controls button, .controls select {
+    height: var(--btn-height-md); padding: 0 var(--space-8);
+    border: var(--border-width) solid var(--color-border-default);
+    border-radius: var(--border-radius);
+    background: var(--color-bg-secondary); color: var(--color-text-primary);
+    font-family: inherit; font-size: var(--text-sm);
+  }
+  .controls button:focus-visible, .controls select:focus-visible {
+    outline: var(--border-width-thick) solid var(--color-border-focus); outline-offset: 2px;
+  }
+  .clock { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text-secondary); }
+  .clock b { color: var(--color-text-emphasis); font-weight: var(--font-semibold); }
+
+  /* ---------- a preview panel, drawn to scale ---------- */
+  .panel { border: var(--border-width) solid var(--color-border-subtle);
+           background: var(--color-bg-primary); display: flex; flex-direction: column;
+           height: 260px; overflow: hidden;
+           /* The bar's contents depend on how wide the PANEL is, not the window —
+              a preview can be a narrow side pane in a wide window. */
+           container-type: inline-size; }
+  .panel__body { flex: 1 1 auto; overflow: hidden; position: relative; }
+
+  /*
+   * The BACKDROP body. Not a decorative choice: before the page has painted,
+   * main paints CHROME_BACKDROP behind the native view (previewBackdrop.ts),
+   * and the DOM placeholder already carries the identical token
+   * (HtmlPreviewPanel.css, `.html-preview-placeholder`). Holding the rectangle
+   * in the DOM a little longer therefore changes NO pixel the user has seen —
+   * which is the whole reason this design is free.
+   */
+  .panel__body--backdrop { background: var(--color-brand-black); }
+
+  /* stylelint-disable color-no-hex --
+     These are the PREVIEWED PAGE, not Erfana. Arbitrary third-party HTML in a
+     native view; using Erfana tokens here would make the demo lie about the one
+     boundary this card exists to show. Same reasoning as the Approving a remote
+     host card, which does it for the same reason. */
+  .page { height: 100%; background: #ffffff; padding: 14px 18px; overflow: hidden; }
+  .page h4 { margin: 0 0 8px; font: 600 14px/1.3 Georgia, serif; color: #1a1a1a; }
+  .page p { margin: 0 0 7px; font: 11px/1.55 Georgia, serif; color: #4a4a4a; }
+  .page .gap { display: block; width: 100%; height: 30px; background: #ececec;
+               border: 1px dashed #c4c4c4; }
+  /* stylelint-enable color-no-hex */
+
+  /* A hidden tab shows the still frame, not the live page. Dimmed so the two
+     are never confused by a reader skimming this card. */
+  .panel__body--frame .page { filter: saturate(0.35) brightness(0.82); }
+
+  /* ---------- Surface A: the waiting message, in the placeholder ---------- */
+  .erf-wait {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: flex-start; justify-content: center;
+    gap: var(--space-6); padding: var(--space-16);
+    /* No animation of any kind. See the Reduced motion section — there is
+       deliberately nothing here for prefers-reduced-motion to switch off. */
+  }
+  /*
+   * NOTHING IN THIS COLUMN MAY SHRINK. Found by opening the card: in a short
+   * panel the Stop button rendered 15 px tall while `getComputedStyle` still
+   * reported 32 px, because a flex item's height is a BASIS, not a floor. 15 px
+   * is under the 24 px target floor, so the card was quietly proposing a control
+   * that fails the rule it cites. `flex: 0 0 auto` is the fix and it belongs on
+   * every child, not only the button.
+   */
+  .erf-wait > * { flex: 0 0 auto; }
+  .erf-wait__title { margin: 0; font-size: var(--text-md); font-weight: var(--font-semibold);
+                     color: var(--color-text-emphasis); max-width: 56ch; }
+  .erf-wait__text { margin: 0; font-size: var(--text-sm); color: var(--color-text-tertiary);
+                    max-width: 56ch; line-height: var(--leading-normal); }
+  .erf-wait__aside { margin: 0; font-size: var(--text-xs); color: var(--color-text-muted);
+                     max-width: 56ch; }
+  .erf-wait__stop {
+    height: var(--btn-height-md); padding: 0 var(--space-12);
+    border: var(--border-width) solid var(--color-accent-primary);
+    border-radius: var(--border-radius);
+    background: transparent; color: var(--color-text-primary);
+    font-family: inherit; font-size: var(--text-sm); cursor: pointer;
+  }
+  .erf-wait__stop:hover { background: var(--color-brand-violet-muted); }
+  .erf-wait__stop:focus-visible {
+    outline: var(--border-width-thick) solid var(--color-border-focus); outline-offset: 2px;
+  }
+
+  /* ---------- Surface B: the residual wait, inside the band's own bar ---------- */
+  /*
+   * HORIZONTAL ONLY. The band's bar is `height: var(--btn-height-md)` and it must
+   * stay that height: growing it pushes the native view down, which costs a
+   * bounds push and can cost the 300 ms proof cycle the Permission band card
+   * decides. A slow load does not justify spending that. So this slot clips with
+   * an ellipsis, and never wraps.
+   */
+  .erf-band__wait {
+    flex: 0 1 auto; min-width: 0;
+    font-size: var(--text-xs); color: var(--color-text-tertiary);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    text-align: end;
+  }
+  /*
+   * WHO YIELDS, now that there is no label to argue with.
+   *
+   * This card originally decided a negotiation between three things: a permanent
+   * "Preview — content below is not Erfana" label, this line, and the chip. The
+   * label was removed by owner decision when the bar became a toolbar, so that
+   * rule is gone with it — and the negotiation got simpler rather than moving.
+   *
+   * What is left is Find (fixed), this line (elastic), and the chip (fixed). The
+   * line takes the slack and gives it back; nothing else has to shrink at all.
+   * The measurement that forced the old rule still stands as the reason for the
+   * drop-out below: the chip alone is 150 px.
+   */
+  .erf-band__wait--stopped { color: var(--color-warning); }
+  /*
+   * BELOW 420 px THE LINE DROPS OUT, and this is the honest end of the rule
+   * rather than a fallback. Measured in this card: the chip is 150 px and the
+   * Find button is 32 px, so a 300 px bar has about 90 px left — enough to
+   * render an ellipsis and nothing a person could read. A line that is present
+   * but unreadable is worse than an absent one, because it occupies the space
+   * that would have told you it was missing.
+   *
+   * Nothing is lost that is not one click away: the tab's failure badge still
+   * carries the count, and the chip still opens the band.
+   */
+  @container (max-width: 420px) {
+    .erf-band__wait { display: none; }
+  }
+  .erf-band__reload {
+    height: var(--btn-height-sm); padding: 0 var(--space-8);
+    border: var(--border-width) solid var(--color-border-warning);
+    border-radius: var(--border-radius);
+    background: var(--color-warning-bg); color: var(--color-text-primary);
+    font-family: inherit; font-size: var(--text-xs); cursor: pointer; flex: 0 0 auto;
+  }
+  .erf-band__reload:focus-visible {
+    outline: var(--border-width-thick) solid var(--color-border-focus); outline-offset: 2px;
+  }
+
+  .verdict { font-size: var(--text-sm); }
+  .verdict--suppressed { color: var(--color-text-muted); }
+  .verdict--shown { color: var(--color-brand-lime); }
+</style>
+</head>
+<body>
+
+<h1>Waiting for a page</h1>
+<p class="ds-lede">
+  A user opened a page and got a black rectangle for twenty seconds with no words on it. They
+  filed it as a bug. It was not one — the page was loading. This card decides what that
+  rectangle says, when it starts saying it, and who it names.
+</p>
+
+<div class="ds-note">
+  <strong>The rule.</strong> Erfana keeps the rectangle until the page has something to show.
+  A native view that has painted nothing is not put on screen; until then the rectangle belongs
+  to Erfana's own placeholder, which is where the wait is explained. This costs nothing: before
+  first paint the native view paints the same backdrop colour the placeholder already carries,
+  so no pixel the user has seen changes. What is gained is a surface where text, a focus ring,
+  a button and a live region all work — none of which is possible over a native view.
+</div>
+
+<h2>The irony this exists to cover</h2>
+<p class="ds-lede">
+  A blocked origin is refused <em>instantly</em>. An <strong>approved</strong> one is not: Erfana
+  steps out of the way and the browser really tries to reach it, so a host that never answers now
+  costs a full DNS or TCP timeout. A render-blocking tag in <code>&lt;head&gt;</code> holds the
+  page blank for that whole wait. <strong>Granting the permission is what makes the preview look
+  dead.</strong> And there is no revoke yet
+  (<a href="https://github.com/qodeca/erfana/issues/86">#86</a>), so one bad approval slows that
+  page for good. This card cannot fix that. It can stop the user thinking Erfana broke.
+</p>
+
+<h2>Try it</h2>
+<p class="ds-lede">
+  The real thresholds, running. Pick a scenario and watch the rectangle — the point is to feel
+  600&nbsp;ms and 10&nbsp;s rather than read them. <strong>10×</strong> compresses the wait so you
+  can see the escalation without sitting through it.
+</p>
+
+<div class="controls">
+  <label for="scenario">Scenario</label>
+  <select id="scenario">
+    <option value="fast">Fast page — paints at 300 ms</option>
+    <option value="remote" selected>Approved host that never answers</option>
+    <option value="local">Slow page, no network — paints at 14 s</option>
+  </select>
+  <label for="speed">Speed</label>
+  <select id="speed">
+    <option value="1">1×</option>
+    <option value="10" selected>10×</option>
+  </select>
+  <button type="button" id="restart">Restart</button>
+  <span class="clock">elapsed <b id="elapsed">0.0 s</b> · state <b id="statename">—</b></span>
+</div>
+
+<div id="live" style="max-width: 560px"></div>
+
+<h2>Every state, rendered</h2>
+<p class="ds-lede">
+  Nine, including the two that show <em>nothing</em> and the one that must look identical to
+  another. A card you cannot tell a decision from a defect in is worse than no card, so the empty
+  ones are here on purpose.
+</p>
+
+<h3>Before the page paints — Surface A owns the rectangle</h3>
+<div class="grid" id="cases-a"></div>
+
+<h3>After the page paints — Surface B, and the width where it stops fitting</h3>
+<p class="ds-lede">
+  The same two states at <strong>640</strong>, <strong>460</strong> and <strong>300</strong> px.
+  Read left to right: full, clipped, gone. The drop-out is a decision, and a decision about width
+  is only believable if you can see the width where it happens.
+</p>
+<div id="cases-b"></div>
+
+<h3>Endings, and the two states that must show nothing</h3>
+<div class="grid" id="cases-c"></div>
+
+<h2>The thresholds, and why they are still proposed</h2>
+<table>
+  <tr><th>At</th><th>What changes</th><th>Why this number</th></tr>
+  <tr>
+    <td class="ds-mono">600 ms</td>
+    <td>Quiet line appears</td>
+    <td>Under Nielsen's 1 s flow limit, so the message is up before the user forms the question —
+        and roughly twice an ordinary local open, so a fast page never flashes it.</td>
+  </tr>
+  <tr>
+    <td class="ds-mono">10 s</td>
+    <td>Escalates: names the host, offers Stop</td>
+    <td>Nielsen's attention limit. We escalate <em>before</em> it, not after, because Erfana cannot
+        offer an ETA — so the explanation has to already be on screen when patience runs out.</td>
+  </tr>
+  <tr>
+    <td class="ds-mono">30 s</td>
+    <td>Nothing new here</td>
+    <td>The request filter already records <code>network-timeout</code> and the tab badge already
+        counts it. Do not draw it twice.</td>
+  </tr>
+</table>
+<div class="ds-note">
+  <strong>Both numbers are chosen, not measured</strong>, which is exactly why this card is
+  <code>proposed</code> and not <code>decided</code>. The <em>rule</em> — hold the rectangle,
+  name who you are waiting for, never predict — is a contract. The milliseconds are a value still
+  being chosen, and <code>design/README.md</code> says values stay proposed however finished the
+  card looks.
+</div>
+
+<h2>The words</h2>
+<p class="ds-lede">
+  Every clause has to be verifiable at the instant it renders. Erfana does not know whether the
+  page will ever load, so it must never imply it will.
+</p>
+<table>
+  <tr><th>State</th><th>Copy</th><th>Why it is true</th></tr>
+  <tr>
+    <td>Quiet</td>
+    <td class="ds-mono">Loading this page<br>Nothing has been drawn yet.</td>
+    <td>Two facts, both observed. No promise.</td>
+  </tr>
+  <tr>
+    <td>Remote</td>
+    <td class="ds-mono">Still waiting for cdn.example.com<br>This project allows that host, so
+        Erfana is letting the page reach it and is waiting for a reply. Erfana cannot tell whether
+        it will ever answer.</td>
+    <td>A remote request only ever gets in flight through the allow branch, so "this project allows
+        that host" is true by construction — redirect hops included, since each re-enters the
+        filter on its own. <strong>Not</strong> "you approved it": a checked-in
+        <code>.erfana/settings.json</code> may be a teammate's doing.</td>
+  </tr>
+  <tr>
+    <td>Local</td>
+    <td class="ds-mono">The page has not drawn anything yet<br>Erfana is not waiting on the network.
+        The page's own scripts or styles have not finished.</td>
+    <td>Local file reads go through the same in-flight set, so counting them blindly would let
+        Erfana blame the network for reading a file off disk. This variant is why the signal must
+        say local or remote, not just "busy".</td>
+  </tr>
+  <tr>
+    <td>Residual</td>
+    <td class="ds-mono">Still loading — cdn.example.com</td>
+    <td>The page painted; something is still outstanding. Both halves observed.</td>
+  </tr>
+  <tr>
+    <td>Stopped</td>
+    <td class="ds-mono">Stopped. The page may be missing parts.</td>
+    <td><em>May</em>, not <em>is</em> — Erfana does not know what the page still wanted.</td>
+  </tr>
+</table>
+<div class="ds-note">
+  <strong>The one line that dates fast:</strong> "Allowed hosts are listed in
+  <code>.erfana/settings.json</code>. Removing one is a manual edit for now." True today, and it
+  is the only exit a user has. It comes out the day
+  <a href="https://github.com/qodeca/erfana/issues/86">#86</a> ships. Written here so the next
+  person knows it is a deliberate stopgap, not a permanent instruction.
+</div>
+
+<h2>Where it lives, and why the page cannot reach it</h2>
+<p class="ds-lede">
+  The previewed page is a native view. It paints <strong>above all sibling DOM</strong> over its own
+  rectangle, so you cannot put a spinner on top of it. That single fact rules out most designs and
+  produces these two surfaces.
+</p>
+<table>
+  <tr><th>Surface</th><th>Where</th><th>Why the page cannot touch it</th></tr>
+  <tr>
+    <td><strong>A</strong> — the message</td>
+    <td>Inside the placeholder, the full rectangle</td>
+    <td>It exists <em>only</em> before first paint, when the view is not on screen at all. A page
+        that is not on screen cannot cover anything — the same reasoning the chrome gate already
+        uses when it treats a hidden page as proving nothing.</td>
+  </tr>
+  <tr>
+    <td><strong>B</strong> — the residual line</td>
+    <td>A third slot in the band's existing 32 px bar</td>
+    <td>The band is a flow sibling <em>above</em> the page's rectangle. The page has nowhere to
+        paint that could reach it. Horizontal only — see the note in this card's CSS.</td>
+  </tr>
+</table>
+<div class="ds-note">
+  <strong>Contrast is only knowable on Surface A because of when it exists.</strong> Pre-paint the
+  backdrop is provably the brand black, so the text tokens clear 4.5:1 with room. If this surface
+  were ever allowed to render over the page's own paper — which the page chooses — the contrast
+  would be uncontrollable. That timing is a precondition of the design, not a detail of it.
+</div>
+
+<h2>Precedence: only one thing may own the rectangle</h2>
+<p class="ds-lede">
+  There are three ways a preview can show no page, and they must not blur together.
+</p>
+<table>
+  <tr><th>Situation</th><th>Waiting message?</th><th>Why</th></tr>
+  <tr>
+    <td>Loading, nothing painted</td>
+    <td class="verdict verdict--shown">Shown</td>
+    <td>This is the case the card is for.</td>
+  </tr>
+  <tr>
+    <td>Band's list is open, page paused</td>
+    <td class="verdict verdict--suppressed">Suppressed</td>
+    <td>Not a wait. A finished, deliberate Erfana action with a named cause and a known exit —
+        collapse the list. Calling it "waiting" would suggest Erfana is stuck when it is not, and
+        would bury the one instruction that ends it. It is also a security notice; diluting it into
+        an ambient progress line is a loss.</td>
+  </tr>
+  <tr>
+    <td>Inactive tab showing its still frame</td>
+    <td class="verdict verdict--suppressed">Suppressed</td>
+    <td>The frame already answers "what is here". A panel nobody is looking at has no wait to
+        report, and its live region must stay silent.</td>
+  </tr>
+</table>
+
+<h2>Accessibility</h2>
+<div class="ds-note">
+  <strong>Reuse the band's live region. Do not add a second one.</strong> The band already mounts a
+  <code>role="status" aria-live="polite"</code> node for the life of the panel, which is the
+  mechanism the Feedback card marks correct.
+</div>
+<table>
+  <tr><th>Rule</th><th>Decision</th></tr>
+  <tr><td>Politeness</td><td><code>polite</code> at every stage, never <code>assertive</code>. A slow
+      load is not an error.</td></tr>
+  <tr><td>How often it speaks</td><td><strong>At most twice per load</strong> — once at the 10 s
+      escalation, once when it ends. Nothing at 600 ms: that would fire on ordinary opens, and a
+      region that speaks on every transition is a toast with extra steps.</td></tr>
+  <tr><td>Focus</td><td>Stop is a normal tab stop and is <strong>never</strong> auto-focused —
+      taking focus out of the editor because a page is slow is hostile. When it unmounts while
+      focused, focus moves to the band chip, the destination the band already uses.</td></tr>
+  <tr><td>Target size</td><td>Stop at <code>--btn-height-md</code> (32 px), matching the band's
+      confirm buttons. It is reversible, so it does not need the "never the smallest target"
+      treatment.</td></tr>
+  <tr><td>Wrapping and translation</td><td>Surface A wraps at <code>56ch</code>, absorbing 40 %
+      expansion. Surface B must <em>not</em> wrap — wrapping grows the band, which pushes the page —
+      so it ellipsis-clips rather than reflowing.</td></tr>
+  <tr><td>Host names</td><td>Through the existing <code>.erf-host</code> primitive. Do not
+      re-implement the bidi handling; the band's stylesheet records what happened last time.</td></tr>
+  <tr><td>Reduced motion</td><td><strong>No animation at all</strong> — no spinner, no pulse, no
+      progress bar. Case 9 below renders it, so "there is nothing here to disable" is falsifiable by
+      clicking rather than a claim you have to trust.</td></tr>
+</table>
+<div class="ds-note">
+  <strong>Why no spinner, put plainly.</strong> A spinner says "working". It cannot say
+  <em>how long</em> or <em>on what</em>, and those are the two questions the black rectangle
+  provoked. Words say all three. Erfana also already carries three separate spin keyframes and none
+  of them lives in the shared utilities stylesheet — a fourth would be walking away from where the
+  Motion card is trying to go.
+</div>
+<div class="ds-note">
+  <strong>A bug this design creates unless it is handled.</strong> The panel currently swaps its
+  ARIA role to <code>img</code> whenever the native view is hidden — which pre-paint is exactly when
+  Surface A is up. That would make the whole subtree presentational and put the Stop button out of
+  reach of a screen reader. It must stay <code>group</code> whenever Surface A is showing. Found by
+  reading, not by testing; it needs a test.
+</div>
+
+<h2>Rejected</h2>
+<table>
+  <tr><th>Idea</th><th>Why it loses</th></tr>
+  <tr><td>Grow the permission band into a waiting panel</td>
+      <td>Growth pushes the native view, costing a bounds push and possibly the 300 ms proof cycle —
+          and it puts a changing notice on the one strip whose whole job is to be constant.</td></tr>
+  <tr><td>A spinner on the tab, beside the failure badge</td>
+      <td>Nobody is looking at 41 px of tab chrome while staring at a black rectangle, it cannot say
+          <em>what</em> the wait is for, and it would be Erfana's fourth spinner.</td></tr>
+</table>
+
+<h2>Exceptions</h2>
+<p class="ds-lede">
+  None yet — nothing is built. The first deviation goes here with its
+  <code>/* deviates: … */</code> comment from the code, per <code>design/README.md</code>.
+</p>
+
+<h2>What this card does not know</h2>
+<table>
+  <tr><th>Open question</th><th>Why it is not settled here</th></tr>
+  <tr><td>Does holding the view hidden throttle the page?</td>
+      <td>Whether hiding a native view marks the document hidden and throttles it in this Electron
+          version was <strong>not measured</strong>. Network fetches are not visibility-throttled and
+          the app already hides previews on every tab switch, so the exposure looks small — but it
+          must be measured before this card is promoted.</td></tr>
+  <tr><td>What counts as "can draw"?</td>
+      <td>There is no first-paint event available, so the release signal has to be
+          <code>dom-ready</code>, which is a <em>lower bound</em> on painting, not painting. A bare
+          render-blocking stylesheet can still hold the page blank afterwards. Surface B exists
+          because of that gap — it is the honest shape of the problem, not a patch over it.</td></tr>
+</table>
+
+<script>
+/* SPDX-License-Identifier: GPL-3.0-only */
+
+const LONG_HOST = 'https://assets.tracking.eu-west-1.metrics.a-very-long-tenant.example.co.uk:8443';
+const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+
+/* The real host primitive — one definition, from row.css. Scheme drawn only when
+   it is not https, port only when it is not the default, and the accessible name
+   always carries the whole origin. Decided by the Rows and Permission band cards. */
+function hostCell(origin) {
+  const url = new URL(origin);
+  const scheme = url.protocol === 'https:' ? ''
+    : `<span class="erf-host__scheme">${esc(url.protocol)}//</span>`;
+  const host = esc(url.hostname).replace(/\./g, '.<wbr>');
+  const port = url.port === '' ? '' : `<span class="erf-host__port">:${esc(url.port)}</span>`;
+  return `<span class="erf-host" dir="ltr" aria-label="${esc(origin)}">${scheme}${host}${port}</span>`;
+}
+
+const PAGE = `
+  <div class="page">
+    <h4>Quarterly notes</h4>
+    <p>The revenue line held through the quarter, with the usual seasonal dip in week six.</p>
+    <p>Two of the three regions finished ahead of plan.</p>
+  </div>`;
+
+const PAGE_PARTIAL = `
+  <div class="page">
+    <h4>Quarterly notes</h4>
+    <p>The revenue line held through the quarter, with the usual seasonal dip in week six.</p>
+    <span class="gap"></span>
+  </div>`;
+
+/* Surface A. `role="group"` is deliberate and load-bearing — see the ARIA note
+   above; `img` here would put the Stop button out of a screen reader's reach. */
+function waitA({ title, text, aside, stop = true }) {
+  return `
+    <div class="erf-wait" role="group" aria-label="Preview status">
+      <p class="erf-wait__title">${title}</p>
+      <p class="erf-wait__text">${text}</p>
+      ${stop ? '<button class="erf-wait__stop" type="button">Stop waiting</button>' : ''}
+      ${aside ? `<p class="erf-wait__aside">${aside}</p>` : ''}
+    </div>`;
+}
+
+/* The band. `slot` is Surface B and defaults to empty, which is the ordinary
+   case — the bar keeps its height whether or not anything is waiting. */
+function band({ counts = '0 blocked · 0 allowed', slot = '', paused = false, open = false } = {}) {
+  return `
+    <div class="erf-band">
+      <div class="erf-band__bar" role="toolbar" aria-label="Preview">
+        <button class="erf-band__tool" type="button" aria-label="Find" title="Find (Cmd/Ctrl+F)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path>
+          </svg>
+        </button>
+        <span class="erf-band__spacer"></span>
+        ${slot}
+        <button class="erf-band__chip" type="button">
+          <span>${counts}</span>
+          <span class="erf-band__chip-caret" aria-hidden="true">${open ? '▾' : '▸'}</span>
+        </button>
+      <span class="erf-band__separator" aria-hidden="true"></span>
+      <button class="erf-band__tool" type="button" aria-label="Export to PDF" title="Export to PDF">
+          <!-- lucide `file-down`, 16px — the same button the markdown toolbar has. -->
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path>
+            <path d="M14 2v4a2 2 0 0 0 2 2h4"></path>
+            <path d="M12 18v-6"></path><path d="m9 15 3 3 3-3"></path>
+          </svg>
+        </button>
+      </div>
+      ${paused ? `<div class="erf-band__paused"><span aria-hidden="true">⚠</span>
+        <span>Paused the page so this list cannot be covered.</span></div>` : ''}
+      ${open ? `<div class="erf-band__list"><div class="erf-band__scroll">
+        <div class="erf-band__row">${hostCell('http://localhost:3001')}
+          <span class="erf-band__kind"></span>
+          <button class="erf-band__allow" type="button">Allow</button></div>
+        <div class="erf-band__row">${hostCell('https://cdn.jsdelivr.net:8443')}
+          <span class="erf-band__kind"></span>
+          <button class="erf-band__allow" type="button">Allow</button></div>
+      </div></div>` : ''}
+    </div>`;
+}
+
+function panel({ bandOpts, body, bodyClass = '', extraClass = '' }) {
+  return `<div class="panel ${extraClass}">${band(bandOpts)}
+    <div class="panel__body ${bodyClass}">${body}</div></div>`;
+}
+
+/* ---------- the nine states ---------- */
+
+const REMOTE_TEXT =
+  'This project allows that host, so Erfana is letting the page reach it and is waiting for a ' +
+  'reply. Erfana cannot tell whether it will ever answer.';
+const ASIDE =
+  'Allowed hosts are listed in <code>.erfana/settings.json</code>. Removing one is a manual edit ' +
+  'for now.';
+
+const CASES = [
+  {
+    title: 'Quiet wait',
+    text: 'From <strong>600 ms</strong>. Two observed facts and no promise. Most loads never get ' +
+          'past this, and plenty never reach it at all.',
+    html: panel({
+      bandOpts: { counts: '0 blocked · 5 allowed' },
+      bodyClass: 'panel__body--backdrop',
+      body: waitA({ title: 'Loading this page', text: 'Nothing has been drawn yet.', stop: false })
+    })
+  },
+  {
+    title: 'Explained — a remote host',
+    text: 'From <strong>10 s</strong>. Names who is being waited on. The host is deliberately a ' +
+          'long one, so you can see it elide rather than take the reader’s word for it.',
+    html: panel({
+      bandOpts: { counts: '0 blocked · 6 allowed' },
+      bodyClass: 'panel__body--backdrop',
+      body: waitA({
+        title: `Still waiting for ${hostCell(LONG_HOST)}`,
+        text: REMOTE_TEXT,
+        aside: ASIDE
+      })
+    })
+  },
+  {
+    title: 'Explained — nothing remote outstanding',
+    text: 'The variant that keeps Erfana honest. Local file reads share the same in-flight set, so ' +
+          'without this Erfana would blame the network for reading a file off disk.',
+    html: panel({
+      bandOpts: { counts: '0 blocked · 5 allowed' },
+      bodyClass: 'panel__body--backdrop',
+      body: waitA({
+        title: 'The page has not drawn anything yet',
+        text: 'Erfana is not waiting on the network. The page’s own scripts or styles have ' +
+              'not finished.'
+      })
+    })
+  },
+  {
+    title: 'Settled — nothing left behind',
+    text: 'The empty state the card contract demands. Both surfaces clear completely; the bar is ' +
+          'exactly the bar it always was.',
+    html: panel({ bandOpts: { counts: '0 blocked · 6 allowed' }, body: PAGE })
+  },
+  {
+    title: 'Suppressed — the band paused the page',
+    text: 'The rectangle is empty and there is <strong>no</strong> waiting message. The reason the ' +
+          'page is off screen is now the band, not the load, and the band already says so.',
+    html: panel({
+      bandOpts: { counts: '2 blocked · 6 allowed', paused: true, open: true },
+      bodyClass: 'panel__body--backdrop',
+      body: ''
+    })
+  },
+  {
+    title: 'Suppressed — inactive tab',
+    text: 'A still frame, dimmed here so you can tell it from the live page. Nobody is looking; ' +
+          'nothing is announced.',
+    html: panel({
+      bandOpts: { counts: '0 blocked · 6 allowed' },
+      bodyClass: 'panel__body--frame',
+      body: PAGE
+    })
+  },
+  {
+    title: 'Under prefers-reduced-motion',
+    text: 'Identical to case 2, and that is the claim. Nothing moves in any of these states, so ' +
+          'there is nothing for the setting to switch off. Compare them.',
+    html: panel({
+      bandOpts: { counts: '0 blocked · 6 allowed' },
+      bodyClass: 'panel__body--backdrop',
+      body: waitA({
+        title: `Still waiting for ${hostCell(LONG_HOST)}`,
+        text: REMOTE_TEXT,
+        aside: ASIDE
+      })
+    })
+  }
+];
+
+/* Surface B lives in its own section because its rule is about WIDTH, and a
+   fixed-width grid cell cannot show a width rule. */
+const WIDTH_CASES = [
+  {
+    no: 4,
+    title: 'Residual — the page painted, something is still hanging',
+    text: 'The bar’s height must never change, so the line clips rather than wraps. If it ' +
+          'wrapped, the page below it would be pushed down — a bounds push, for a slow load.',
+    slot: '<span class="erf-band__wait">Still loading — cdn.example.com</span>',
+    body: PAGE
+  },
+  {
+    no: 5,
+    title: 'Stopped',
+    text: '<strong>May</strong> be missing parts, not <em>is</em> — Erfana does not know what the ' +
+          'page still wanted. Reload never drops out, whatever the width: it is the way back.',
+    slot: '<span class="erf-band__wait erf-band__wait--stopped">Stopped. The page may be missing ' +
+          'parts.</span><button class="erf-band__reload" type="button">Reload</button>',
+    body: PAGE_PARTIAL
+  }
+];
+
+const WIDTHS = [
+  { px: 640, note: 'The most room a preview usually gets.' },
+  { px: 460, note: 'Tighter — the line takes what is left and ellipses.' },
+  { px: 300, note: 'Under 420 px the line would be unreadable, so it is not drawn at all.' }
+];
+
+function mount(hostId, items, offset = 0) {
+  const host = document.getElementById(hostId);
+  items.forEach((c, i) => {
+    const el = document.createElement('div');
+    el.innerHTML = `
+      <p class="case__no">CASE ${String(c.no ?? offset + i + 1).padStart(2, '0')}</p>
+      <h3 class="case__title">${c.title}</h3>
+      <p class="case__text">${c.text}</p>
+      ${c.html}`;
+    host.appendChild(el);
+  });
+}
+
+mount('cases-a', CASES.slice(0, 3), 0);
+mount('cases-c', CASES.slice(3), 5);
+
+const hostB = document.getElementById('cases-b');
+WIDTH_CASES.forEach((c) => {
+  const el = document.createElement('div');
+  el.innerHTML = `
+    <p class="case__no">CASE ${String(c.no).padStart(2, '0')}</p>
+    <h3 class="case__title">${c.title}</h3>
+    <p class="case__text">${c.text}</p>
+    <div class="widths">
+      ${WIDTHS.map((w) => `
+        <div class="width">
+          <p class="width__label">${w.px} px — ${w.note}</p>
+          <div style="width: ${w.px}px; max-width: 100%">
+            ${panel({ bandOpts: { counts: '0 blocked · 6 allowed', slot: c.slot }, body: c.body })}
+          </div>
+        </div>`).join('')}
+    </div>`;
+  hostB.appendChild(el);
+});
+
+/* ---------- the runnable timeline ---------- */
+
+const QUIET_AT = 600;
+const EXPLAIN_AT = 10000;
+
+const SCENARIOS = {
+  fast:   { paintsAt: 300,      remote: null },
+  remote: { paintsAt: Infinity, remote: 'https://cdn.example.com' },
+  local:  { paintsAt: 14000,    remote: null }
+};
+
+const live = document.getElementById('live');
+const elapsedEl = document.getElementById('elapsed');
+const stateEl = document.getElementById('statename');
+const scenarioEl = document.getElementById('scenario');
+const speedEl = document.getElementById('speed');
+
+let started = performance.now();
+let lastKey = null;
+
+/*
+ * The whole state machine, as one pure function of elapsed time. Written this
+ * way on purpose: this is the shape `selectWaitingState` should take in
+ * `htmlPreview.logic.ts`, so the card is a specification and not a mock-up.
+ */
+function selectWaitingState(elapsed, s) {
+  if (elapsed >= s.paintsAt) return 'settled';
+  if (elapsed < QUIET_AT) return 'none';
+  if (elapsed < EXPLAIN_AT) return 'quiet';
+  return s.remote ? 'explained-remote' : 'explained-local';
+}
+
+const RENDER = {
+  none: () => panel({
+    bandOpts: { counts: '0 blocked · 6 allowed' },
+    bodyClass: 'panel__body--backdrop', body: ''
+  }),
+  quiet: () => panel({
+    bandOpts: { counts: '0 blocked · 6 allowed' },
+    bodyClass: 'panel__body--backdrop',
+    body: waitA({ title: 'Loading this page', text: 'Nothing has been drawn yet.', stop: false })
+  }),
+  'explained-remote': (s) => panel({
+    bandOpts: { counts: '0 blocked · 6 allowed' },
+    bodyClass: 'panel__body--backdrop',
+    body: waitA({
+      title: `Still waiting for ${hostCell(s.remote)}`, text: REMOTE_TEXT, aside: ASIDE
+    })
+  }),
+  'explained-local': () => panel({
+    bandOpts: { counts: '0 blocked · 6 allowed' },
+    bodyClass: 'panel__body--backdrop',
+    body: waitA({
+      title: 'The page has not drawn anything yet',
+      text: 'Erfana is not waiting on the network. The page’s own scripts or styles have not finished.'
+    })
+  }),
+  settled: () => panel({ bandOpts: { counts: '0 blocked · 6 allowed' }, body: PAGE })
+};
+
+function tick() {
+  const speed = Number(speedEl.value);
+  const s = SCENARIOS[scenarioEl.value];
+  const elapsed = (performance.now() - started) * speed;
+  const key = selectWaitingState(elapsed, s);
+
+  elapsedEl.textContent = (elapsed / 1000).toFixed(1) + ' s';
+  stateEl.textContent = key;
+
+  // Re-render only on a CHANGE. Rebuilding every frame would throw away focus,
+  // which is the bug the Stop button would hit first.
+  if (key !== lastKey) {
+    live.innerHTML = RENDER[key](s);
+    lastKey = key;
+  }
+  requestAnimationFrame(tick);
+}
+
+function restart() {
+  started = performance.now();
+  lastKey = null;
+}
+document.getElementById('restart').addEventListener('click', restart);
+scenarioEl.addEventListener('change', restart);
+speedEl.addEventListener('change', restart);
+tick();
+</script>
+</body>
+</html>

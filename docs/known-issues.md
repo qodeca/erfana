@@ -4,6 +4,31 @@ Current issues and their workarounds. For historical resolved issues, see [archi
 
 ---
 
+## Accessibility
+
+Nine defects found by an audit of the renderer on 2026-08-31, all **shipping
+today**. They are grouped here because they share a cause: a role or an ARIA
+attribute was declared without the behaviour it promises, which is worse than
+declaring nothing — a screen reader changes its own behaviour on the strength of
+that promise and then gets nothing back.
+
+The design system decides the correct pattern for each; the app has not caught up.
+See [`design/README.md`](../design/README.md) for which card governs which defect.
+
+| Issue | What is broken | Workaround |
+|---|---|---|
+| [#88](https://github.com/qodeca/erfana/issues/88) | The file tree cannot be used with a keyboard at all — nothing in it is focusable, and no arrow key does anything. It declares `role="tree"`, so a screen reader hands it the arrow keys and loses its own. | Use the file picker dialog (⌘O / Ctrl+O), which does implement keyboard navigation correctly. |
+| [#89](https://github.com/qodeca/erfana/issues/89) | An expanded folder's announced name includes every visible file inside it. | None. |
+| [#90](https://github.com/qodeca/erfana/issues/90) | The right-click menu is mouse-only. Only Escape is bound; there is no keyboard way to open it. | Use the keyboard shortcuts shown in the menu directly where they exist. |
+| [#91](https://github.com/qodeca/erfana/issues/91) | 10 of 13 dialogs tell assistive technology the background is inert, and then let Tab walk into it. | Use Escape to close, rather than tabbing to a Cancel button. |
+| [#92](https://github.com/qodeca/erfana/issues/92) | The app declares no language, so a screen reader may read the interface with the wrong voice. | Set the reader's default language manually. |
+| [#93](https://github.com/qodeca/erfana/issues/93) | Three places give a keyboard user no visible focus: the editor panel, the welcome panel, and tab close buttons. | None. |
+| [#94](https://github.com/qodeca/erfana/issues/94) | The rename field and the prompt textarea are announced as unlabelled boxes, and no validation error is linked to its field. | None. |
+| [#95](https://github.com/qodeca/erfana/issues/95) | Folder git state is shown by colour alone, and the `M3 U2 D1` counts change without being announced. | The per-file badges carry a letter; read those instead of the folder dot. |
+| [#96](https://github.com/qodeca/erfana/issues/96) | "Reduce motion" is ignored by 12 stylesheets, including a full-screen camera flash. Four controls are smaller than the 24 x 24 minimum. | None for the motion issue. |
+
+---
+
 ## Windows-specific issues
 
 Phases 0–2 of Windows enablement shipped in **v0.9.3** (2026-04-22); Phase 4 (local Whisper trust chain + Windows x64 binary) shipped in **v0.9.4** (merge `110f1b9`, 2026-04-23). The following gaps remain user-visible until Phases 3, 5, and 6 ship. See [`docs/windows/implementation-plan.md`](./windows/implementation-plan.md) for the canonical roadmap.
@@ -20,21 +45,21 @@ Phases 0–2 of Windows enablement shipped in **v0.9.3** (2026-04-22); Phase 4 (
 
 ### `npm run test:cov` exits 1 on Windows
 
-**Issue**: All tests pass but vitest's v8 coverage aggregator hits an `ENOENT` race on Windows NTFS during the `coverage/.tmp` cleanup step. Wrapper exits with code 1 even though the test suite is green.
+**Issue**: Every test passes; what fails are two **per-file** coverage thresholds declared in `vitest.main.ts` — `scripts/fuses.js` (86% lines / 88% functions) and `src/main/utils/tarArchive.ts` (90% each metric). Both suites skip their symlink cases on win32, because a file symlink needs `SeCreateSymbolicLinkPrivilege`: `scripts/fuses.test.mjs` carries ten `skipIf(process.platform === 'win32')` guards, and `src/main/utils/tarArchive.test.ts:77` returns early. The lines those cases would cover never execute, so both file-level floors miss by a few points and vitest exits 1.
 
-**Workaround**: Run `npx vitest --run --config vitest.main.ts --coverage` directly (exits 0). On macOS the wrapper exits 0 normally.
+**Workaround**: None on a Windows host — the run is doing what it is told. Run it on macOS or Linux, or read the CI result: the required `Coverage` job runs on `ubuntu-latest`, where nothing is skipped and it passes.
 
-**Tracking**: #158 (Phase 6 — switch coverage provider to Istanbul OR reduce parallelism on Windows).
+**Tracking**: [`docs/windows/known-flakes.md` § `npm run test:cov` cannot pass on a Windows host](./windows/known-flakes.md#npm-run-testcov-cannot-pass-on-a-windows-host).
 
 ---
 
-### Long paths (>260 chars) require user opt-in
+### Long paths (>260 chars): the terminal cannot start there
 
-**Issue**: File operations on paths longer than 260 chars fail unless the user enabled the Win32 long-paths group-policy setting. The `isWindowsLongPath` helper that would auto-prefix `\\?\` is dead code.
+**Issue**: A project whose path is longer than 260 chars cannot open a terminal. Win32 `CreateProcess` refuses the working directory whatever the long-paths policy says. Since v0.19.0 the Terminal panel says so ("This folder's path is longer than Windows allows for a terminal…") instead of the bare "Failed to create terminal". File operations (open, edit, save, preview) on the same paths worked in the 2026-09-03 Windows verification, so the earlier claim that they fail without the opt-in is withdrawn. The `\\?\` auto-prefixing that `isWindowsLongPath` was written for is still not wired into file I/O.
 
-**Workaround**: Enable Win32 long paths per [`docs/build/windows.md`](./build/windows.md) step 5 + `git config --global core.longpaths true`.
+**Workaround**: Move the project to a shorter path. For file operations, enabling Win32 long paths per [`docs/build/windows.md`](./build/windows.md) step 5 + `git config --global core.longpaths true` remains the safe default.
 
-**Tracking**: #163 (decision-deferred to Phase 6 with promotion criteria recorded inline at `PlatformConfig.ts:194-201`).
+**Tracking**: #163 (the `\\?\` prefixing stays deferred; the helper itself was promoted for the terminal check in v0.19.0).
 
 ---
 
@@ -161,6 +186,21 @@ Pipeline contributors on Windows:
 
 ---
 
+## HTML preview links
+
+**A link can stay dead in two cases** (sd-074b §5.1), both unchanged from before links worked at all:
+
+- The page's own JavaScript calls `stopPropagation()` on the click, which hides the event from Erfana. Nothing happens and no failure is recorded, because Erfana never saw the click.
+- The link lives inside a **closed** shadow root, which `composedPath()` cannot see from outside the page.
+
+**A link out of the preview asks first, and only one question is open at a time.** A link to an external destination raises a native message box naming the destination — the origin, or the scheme plus the addressed target for `mailto:`/`tel:`. That dialog is **owned by the window whose preview asked**, so it is modal to that window and is raised with it rather than sitting behind the app. Only one such question can be open per window: a second external link clicked while the first is still waiting is **refused, not queued**, and shows up in the panel's failure badge as a blocked link. Clicking it again once the first question is answered works normally.
+
+**A page's link opens a tab per click.** Every link opens a new Erfana tab by design, so clicking through a generated documentation site accumulates tabs quickly. Idle previews sleep after `PREVIEW.MAX_LIVE_VIEWS`, so the cost is bounded, but the tabs remain until closed.
+
+**Page state is lost when a preview sleeps.** A suspended preview reloads from disk when you return to it: scroll position, typed text and in-memory JavaScript state do not survive.
+
+**Windows: the preview's shader cache is never purged, and a purge timeout in the log is harmless.** On Windows (Electron 39) clearing the `shadercache` storage of a preview's session partition never completes – probed per storage type on 2026-09-04, seven of the eight types settle in 0–5 ms and that one never returns, every time, only inside the full app. It holds compiled GPU programs, not page data, so the purge now names the seven data-bearing storages explicitly (`PURGED_STORAGES` in the storage seal) and leaves the shader cache out; the opaque origin still seals the page's storage. Every purge and teardown step is time-bounded as well (`PREVIEW.PURGE_TIMEOUT_MS`, `TEARDOWN_STEP_TIMEOUT_MS`, `PARTITION_PURGE_TIMEOUT_MS`, all 2 s), so a `... timed out after 2000ms` warn line in `main.log` means one step was skipped after its deadline and the teardown carried on – it is bounded and harmless, not a hang. Since the shader cache was dropped from the purge those lines no longer fire on the verified host; the timeouts stay as belts.
+
 ## Resolved (kept for the trail)
 
 ### v0.9.5 macOS — terminal does not work in the signed DMG (resolved in v0.9.6)
@@ -229,6 +269,18 @@ See [E2E troubleshooting § Terminal commands not executing](./testing/e2e-troub
 
 ---
 
+### Auto-refresh does not resume by itself after a file is deleted and restored
+
+**Issue**: An image or SVG tab refreshes automatically while the file is being edited or replaced, but if the file is **deleted** and then restored a moment later, the tab keeps showing the last version it loaded. The banner says the file was deleted; the picture does not come back on its own.
+
+**Root cause**: Erfana watches one file at a time, and a watch cannot outlive the file it is attached to. A delete followed quickly by a rename (how most agents and design tools save) is recognised as a replacement and the watch is re-attached — but only inside a 100 ms window. Anything slower than that is treated as a genuine delete, the watch is released, and picking the file back up would need a watch on the whole containing folder, which is a different design.
+
+**Workaround**: Press **Reload** in the banner. It re-reads the file and restarts the watch, and both the banner and the degraded state clear on success. Closing and reopening the tab works too.
+
+**Tracking**: Accepted limitation of #70, deliberately paired with the **Reload** affordance so the viewer never claims freshness it does not have. See [`docs/technical-debt.md`](./technical-debt.md) items 27 and 30, and [`docs/file-watching/README.md`](./file-watching/README.md#single-file-watch-internals-70).
+
+---
+
 ### Git Status: Global .gitignore not supported
 
 **Issue**: Files ignored via global gitignore (`~/.gitignore_global` or `~/.config/git/ignore`) may appear as "untracked" in the project tree git status indicators.
@@ -249,7 +301,9 @@ See [E2E troubleshooting § Terminal commands not executing](./testing/e2e-troub
 
 **Mitigation (v0.9.0)**: Git status now runs in a worker thread (#147) and uses native `git status --porcelain` for repos with `.git/index` > 5 MB. When FD pressure causes EBADF, the worker returns a transient error instead of cascading. The EMFILE restart cascade was also fixed (#146).
 
-**Remaining**: The directory watcher itself still consumes too many FDs on very large repos. Mitigated by `.erfana/settings.json` ignore patterns.
+**Fixed – black window on 100k+ files ([#60](https://github.com/qodeca/erfana/issues/60))**: opening a very large project (reported at 174k nodes on an external volume) used to blank the window outright. The project tree's `flattenTree` built its flat array with `flattened.push(...flattenTree(child))`; spread-into-push is `Function.prototype.apply`, whose argument count is bounded by the engine stack (~10^5 on V8), so the first directory whose *flattened subtree* crossed that bound threw `RangeError: Maximum call stack size exceeded`, React 18 unmounted the entire root, and nothing was left to paint. `flattenTree` is now an explicit-stack loop that pushes exactly one node per iteration – output-identical (pre-order DFS, forward sibling order, `depth` per level, `index` reset per parent) and covered by a 200k-node reproduction. Throws that happen *while Erfana is drawing the interface* now surface a recovery screen with Restart / Copy error details / Open logs folder instead of a black window – or, for the project tree specifically, a "Project tree unavailable" panel with the rest of the app still running. Errors outside drawing (background work, event handlers, rejected promises) are written to the log without interrupting the UI – see [UI Components § Error containment](./ui-components.md#error-containment).
+
+**Remaining – performance, not crashes**: a 100k+-file project still opens slowly. Per the #60 diagnosis the cost is dominated by the directory scan (~2.0 s for 169k files) and the main → renderer IPC clone (~1.2 s); the tree is neither memoized nor virtualized, directories load eagerly, and an open cannot be cancelled. Those limits are owned by **#149** (React memoization) and **#150** (lazy loading + virtualization) – see the [large-project performance plan](./large-project-performance-plan.md). The directory watcher also still consumes too many FDs on very large repos. Mitigated by `.erfana/settings.json` ignore patterns.
 
 **Workaround**: Use `.erfana/settings.json` to ignore large subdirectories:
 ```json

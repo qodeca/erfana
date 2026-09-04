@@ -21,7 +21,7 @@ Project-specific terminology used in Erfana documentation and code.
 | **Project Tree** | File explorer showing project directory structure |
 | **Terminal Panel** | xterm.js terminal at the bottom of the window |
 | **Editor Tabs** | DockviewReact tabs for open markdown files |
-| **Split View** | Side-by-side editor and preview with scroll sync |
+| **Split View** | Editor and preview shown together with scroll sync. Two variants: `split` (side by side) and `split-horizontal` (preview on top) |
 
 ## Features
 

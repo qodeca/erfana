@@ -61,18 +61,27 @@ Cross-platform refactors that happen to also fix a Windows path use the affected
 
 ## Testing expectations
 
-Windows-targeted CI is **live**: `.github/workflows/checks.yml` runs a `windows-checks` job on `windows-latest` (typecheck + `npm run test:main`, `shell: bash`) on every push. It is **advisory** — deliberately not in the branch-protection required-check set until it proves stable — so a red `windows-checks` does not block a merge. Running the full test set on a Windows host before opening a PR therefore remains the contributor's responsibility; the CI job is a safety net, not a gate.
+Windows-targeted CI is **live**: `.github/workflows/checks.yml` runs a `windows-checks` job on `windows-latest` (typecheck + `npm run design -- --check` + `npm run test:main`, `shell: bash`) on every push. It is **advisory** — deliberately not in the branch-protection required-check set until it proves stable — so a red `windows-checks` does not block a merge. Running the full test set on a Windows host before opening a PR therefore remains the contributor's responsibility; the CI job is a safety net, not a gate.
 
 ### Before every Windows PR
 
 On a Windows host:
 
 ```bash
+npm run lint
+npm run lint:css
+npm run design -- --check
 npm run typecheck
 npm run test:main        # baseline drifts per release — see docs/testing/README.md for the current count
 npm run test:renderer
 npm run test:preload
+npx electron-vite build
+npm run test:e2e
 ```
+
+These are the local equivalents of the required CI checks — the root [`CLAUDE.md`](../../CLAUDE.md) and [`CONTRIBUTING.md`](../../CONTRIBUTING.md) ask for all of them, and `lint:css` plus the design-sync check are steps inside the required `Lint` job, so skipping them locally just moves the failure to CI. `npm run test:e2e` matters more here than elsewhere: the E2E workflow is disabled in CI, so a local Windows run is the only coverage Electron-specific paths get.
+
+**Do not expect `npm run test:cov` to pass on a Windows host.** Every test passes, but two per-file coverage floors are missed because the symlink cases they cover are skipped on win32 — see [`known-flakes.md` § `npm run test:cov` cannot pass on a Windows host](known-flakes.md#npm-run-testcov-cannot-pass-on-a-windows-host). Run it on macOS or Linux, or read the `Coverage` CI job.
 
 If the PR touches platform-branched code (`process.platform === 'win32'`, `path.sep`, shell detection, etc.), also run on macOS:
 

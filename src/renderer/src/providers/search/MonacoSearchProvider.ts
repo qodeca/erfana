@@ -12,7 +12,12 @@
  */
 
 import type * as monaco from 'monaco-editor'
-import type { SearchProvider, SearchOptions, SearchMatch } from './SearchProvider'
+import type {
+  SearchProvider,
+  SearchOptions,
+  SearchMatch,
+  SearchCapabilities
+} from './SearchProvider'
 import type { MonacoEditorHandle } from '../../components/Editor/MonacoMarkdownEditor'
 import { logger } from '../../utils/logger'
 
@@ -63,6 +68,17 @@ const CURRENT_MATCH_DECORATION: monaco.editor.IModelDecorationOptions = {
 export class MonacoSearchProvider implements SearchProvider {
   readonly id = 'monaco'
   readonly name = 'Monaco Editor'
+
+  /**
+   * Full-match provider: `search()` returns the authoritative list and
+   * `navigateTo(index)` jumps to any match. Monaco also supports whole-word
+   * matching via `findMatches`' word-separator argument.
+   */
+  readonly capabilities: SearchCapabilities = {
+    randomAccess: true,
+    matchList: true,
+    wholeWord: true
+  }
 
   private editorRef: React.RefObject<MonacoEditorHandle | null>
   private decorations: string[] = []

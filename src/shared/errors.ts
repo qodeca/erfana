@@ -104,6 +104,38 @@ export enum ErrorCode {
   DOCX_EXPORT_NO_CONTENT = 'DOCX_EXPORT_NO_CONTENT',
   DOCX_EXPORT_INVALID_REQUEST = 'DOCX_EXPORT_INVALID_REQUEST',
 
+  // Image export errors (Issue #73)
+  /** Save dialog dismissed. Never surfaced — the renderer suppresses the toast. */
+  IMAGE_EXPORT_CANCELLED = 'IMAGE_EXPORT_CANCELLED',
+  /** Untrusted sender, Zod failure, or an unsupported extension. */
+  IMAGE_EXPORT_INVALID_REQUEST = 'IMAGE_EXPORT_INVALID_REQUEST',
+  /** The single main-side export lock is already held. */
+  IMAGE_EXPORT_BUSY = 'IMAGE_EXPORT_BUSY',
+  /** ENOENT / EACCES on the source, or it is not inside the open project. */
+  IMAGE_EXPORT_SOURCE_UNREADABLE = 'IMAGE_EXPORT_SOURCE_UNREADABLE',
+  /** Source file exceeds the 50 MB read cap. */
+  IMAGE_EXPORT_SOURCE_TOO_LARGE = 'IMAGE_EXPORT_SOURCE_TOO_LARGE',
+  /** Header parse produced no dimensions, or the harness could not decode. */
+  IMAGE_EXPORT_DECODE_FAILED = 'IMAGE_EXPORT_DECODE_FAILED',
+  /** Declared or decoded pixel count exceeds the output cap. */
+  IMAGE_EXPORT_OUTPUT_TOO_LARGE = 'IMAGE_EXPORT_OUTPUT_TOO_LARGE',
+  /** An SVG's intrinsic size multiplied by the 2x factor exceeds the cap. */
+  IMAGE_EXPORT_SVG_TOO_LARGE = 'IMAGE_EXPORT_SVG_TOO_LARGE',
+  /** Either side exceeds the PDF format's 200-inch page limit. */
+  IMAGE_EXPORT_PDF_PAGE_TOO_LARGE = 'IMAGE_EXPORT_PDF_PAGE_TOO_LARGE',
+  /** The produced PDF is not exactly one page of the requested geometry. */
+  IMAGE_EXPORT_PDF_GEOMETRY_FAILED = 'IMAGE_EXPORT_PDF_GEOMETRY_FAILED',
+  /** Decoded dimensions disagree with the largest entry in the .ico directory. */
+  IMAGE_EXPORT_ICO_SIZE_MISMATCH = 'IMAGE_EXPORT_ICO_SIZE_MISMATCH',
+  /** The chosen destination resolves to the source image, or cannot be proven not to. */
+  IMAGE_EXPORT_SOURCE_COLLISION = 'IMAGE_EXPORT_SOURCE_COLLISION',
+  /** Writing the exported file threw. */
+  IMAGE_EXPORT_WRITE_FAILED = 'IMAGE_EXPORT_WRITE_FAILED',
+  /** The OS clipboard rejected the image, or the decoded image was empty. */
+  IMAGE_EXPORT_CLIPBOARD_FAILED = 'IMAGE_EXPORT_CLIPBOARD_FAILED',
+  /** Catch-all, including harness timeout and hidden-window load failure. */
+  IMAGE_EXPORT_FAILED = 'IMAGE_EXPORT_FAILED',
+
   // Screenshot capture errors
   SCREENSHOT_PERMISSION_DENIED = 'SCREENSHOT_PERMISSION_DENIED',
   SCREENSHOT_TIMEOUT = 'SCREENSHOT_TIMEOUT',
@@ -219,6 +251,41 @@ export enum ErrorCode {
   MCP_SERVER_START_FAILED = 'MCP_SERVER_START_FAILED',
   MCP_SERVER_ALREADY_RUNNING = 'MCP_SERVER_ALREADY_RUNNING',
   MCP_TOOL_INVALID_ARGS = 'MCP_TOOL_INVALID_ARGS',
+  // Preview errors (Issue #74)
+  PREVIEW_HOST_NOT_APPROVABLE = 'PREVIEW_HOST_NOT_APPROVABLE',
+  PREVIEW_CSP_INVALID = 'PREVIEW_CSP_INVALID',
+  PREVIEW_LOCAL_FILE_MISSING = 'PREVIEW_LOCAL_FILE_MISSING',
+  PREVIEW_VIEW_LIMIT_REACHED = 'PREVIEW_VIEW_LIMIT_REACHED',
+  PREVIEW_ALLOWLIST_FULL = 'PREVIEW_ALLOWLIST_FULL',
+  PREVIEW_READ_BUDGET_EXCEEDED = 'PREVIEW_READ_BUDGET_EXCEEDED',
+  PREVIEW_LINK_BLOCKED = 'PREVIEW_LINK_BLOCKED',
+  /**
+   * `preview:open` refused the request before it reached the service: the
+   * payload failed `PreviewOpenRequestSchema`. Named, rather than folded into
+   * UNKNOWN_ERROR, so the renderer's log line says why — a 249-char path used
+   * to fail here on Windows with nothing on screen (ids are bounded in the
+   * renderer since v0.19.0, so length is no longer a cause).
+   */
+  PREVIEW_OPEN_INVALID_REQUEST = 'PREVIEW_OPEN_INVALID_REQUEST',
+  /**
+   * The band's own deadline on `preview:approveHost` passed without an answer.
+   * NOT a refusal: the grant is written before the first await main makes, so
+   * it is saved and takes effect on the next load; only the confirmation and
+   * the automatic reload are missing.
+   */
+  PREVIEW_APPROVE_TIMED_OUT = 'PREVIEW_APPROVE_TIMED_OUT',
+  /**
+   * An open was abandoned because something newer overtook it — a project
+   * switch, a close, a suspend, or another open for the same panel.
+   *
+   * Distinct from `PROJECT_NOT_FOUND`, which previously carried this meaning as
+   * well as its own. The renderer could not tell "there is no project" from
+   * "your open was superseded", so a benign race — the exact outcome the
+   * staleness guard exists to produce — latched the panel into a failure banner
+   * for the rest of its mount (lens review F27). This is a no-op for the
+   * renderer, not a failure.
+   */
+  PREVIEW_OPEN_SUPERSEDED = 'PREVIEW_OPEN_SUPERSEDED',
 
   // Generic errors
   UNKNOWN_ERROR = 'UNKNOWN_ERROR'
@@ -355,6 +422,23 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.DOCX_EXPORT_NO_CONTENT]: 'No content to export',
   [ErrorCode.DOCX_EXPORT_INVALID_REQUEST]: 'Invalid DOCX export request',
 
+  // Image export errors (Issue #73)
+  [ErrorCode.IMAGE_EXPORT_CANCELLED]: 'Image export was cancelled',
+  [ErrorCode.IMAGE_EXPORT_INVALID_REQUEST]: 'Invalid image export request',
+  [ErrorCode.IMAGE_EXPORT_BUSY]: 'Another image export is already running',
+  [ErrorCode.IMAGE_EXPORT_SOURCE_UNREADABLE]: 'Could not read this image – it may have been moved or deleted',
+  [ErrorCode.IMAGE_EXPORT_SOURCE_TOO_LARGE]: 'This image is over the 50 MB export limit',
+  [ErrorCode.IMAGE_EXPORT_DECODE_FAILED]: 'Could not decode this image file',
+  [ErrorCode.IMAGE_EXPORT_OUTPUT_TOO_LARGE]: 'Too many pixels to export – Erfana never shrinks an export, so nothing was written',
+  [ErrorCode.IMAGE_EXPORT_SVG_TOO_LARGE]: 'This SVG renders too large at 2x to export, so nothing was written',
+  [ErrorCode.IMAGE_EXPORT_PDF_PAGE_TOO_LARGE]: 'Too big for one PDF page (the limit is 200 inches per side) – export as PNG instead',
+  [ErrorCode.IMAGE_EXPORT_PDF_GEOMETRY_FAILED]: 'The PDF page came out the wrong size, so nothing was written',
+  [ErrorCode.IMAGE_EXPORT_ICO_SIZE_MISMATCH]: 'Could not export the largest size in this icon file',
+  [ErrorCode.IMAGE_EXPORT_SOURCE_COLLISION]: 'That would overwrite the image you are exporting',
+  [ErrorCode.IMAGE_EXPORT_WRITE_FAILED]: 'Could not write to that folder',
+  [ErrorCode.IMAGE_EXPORT_CLIPBOARD_FAILED]: 'The clipboard rejected the image',
+  [ErrorCode.IMAGE_EXPORT_FAILED]: 'Image export failed',
+
   // Screenshot capture errors
   [ErrorCode.SCREENSHOT_PERMISSION_DENIED]: 'Screen recording permission required. Grant access in System Settings > Privacy & Security.',
   [ErrorCode.SCREENSHOT_TIMEOUT]: 'Screenshot capture timed out',
@@ -449,6 +533,20 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.MCP_SERVER_START_FAILED]: 'Erfana could not start its MCP server, so Claude Code cannot query this project. Restart Erfana to try again.',
   [ErrorCode.MCP_SERVER_ALREADY_RUNNING]: 'An MCP server is already running for this Erfana window.',
   [ErrorCode.MCP_TOOL_INVALID_ARGS]: 'The MCP tool was called with invalid arguments. Check the query and try again.',
+  // Preview errors (Issue #74)
+  [ErrorCode.PREVIEW_HOST_NOT_APPROVABLE]: 'This host cannot be approved for preview.',
+  [ErrorCode.PREVIEW_CSP_INVALID]: 'The preview security policy is invalid; the page was not served.',
+  // The path must stay quoted: redactUserInput's QUOTED_SPAN redacts only the
+  // span between the first and last '"', so an unquoted path would survive.
+  [ErrorCode.PREVIEW_LOCAL_FILE_MISSING]: '"<path>" could not be read',
+  [ErrorCode.PREVIEW_VIEW_LIMIT_REACHED]: 'A preview is already open.',
+  [ErrorCode.PREVIEW_ALLOWLIST_FULL]: 'The preview host allowlist is full.',
+  [ErrorCode.PREVIEW_READ_BUDGET_EXCEEDED]:
+    'The preview asked for too many files at once; some were not loaded.',
+  [ErrorCode.PREVIEW_LINK_BLOCKED]: 'That link was blocked.',
+  [ErrorCode.PREVIEW_OPEN_INVALID_REQUEST]: 'The preview request was rejected.',
+  [ErrorCode.PREVIEW_APPROVE_TIMED_OUT]: 'Saved, but the preview did not confirm. Reload it.',
+  [ErrorCode.PREVIEW_OPEN_SUPERSEDED]: 'The preview was replaced before it finished opening.',
 
   // Generic errors
   [ErrorCode.UNKNOWN_ERROR]: 'An unexpected error occurred'

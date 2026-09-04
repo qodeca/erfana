@@ -1,0 +1,591 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * ImageViewerPanel Styles
+ *
+ * CSS Module for the ImageViewerPanel component.
+ * Uses design tokens for consistent theming.
+ * Matches MarkdownToolbar styling pattern.
+ *
+ * @see ImageViewerPanel.tsx for component implementation
+ * @see Spec #015 - Image preview viewer specification
+ */
+
+/* ============================================
+ * Container
+ * ============================================ */
+
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  background: var(--color-bg-primary);
+  overflow: hidden;
+}
+
+/* ============================================
+ * Toolbar (matches MarkdownToolbar style)
+ * ============================================ */
+
+/*
+ * The toolbar SCROLLS rather than clipping (issue #73).
+ *
+ * `.container` is `overflow: hidden`, and the export group pushed the row's
+ * non-shrinkable width from ~335px to ~380px. dockview lets a group go down to
+ * 100px and this app sets no per-panel minimum, so between those two widths the
+ * full-screen button, a separator and then Copy fell past the right edge of the
+ * container and were painted nowhere. Reached by Tab they were still focused,
+ * just invisible - WCAG 2.2 SC 2.4.11 (focus not obscured).
+ *
+ * Three buttons, always visible, is a locked requirement, so nothing may be
+ * hidden, collapsed or conditionally rendered. Making this element the scroll
+ * port instead keeps every control present and, because a browser scrolls a
+ * newly focused element into view inside its nearest scrollable ancestor,
+ * reachable: Tab now brings the control to the user rather than the user to a
+ * control that is not there.
+ */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-6);
+  background-color: var(--color-bg-primary);
+  border-bottom: var(--border-width) solid var(--color-border-default);
+  flex-shrink: 0;
+  overflow-x: auto;
+  /* The row is one line of 24px controls; a vertical bar here would only ever
+     be a rendering artefact of the horizontal one. */
+  overflow-y: hidden;
+  /* No visible scrollbar: at --scrollbar-width (10px) a horizontal bar eats a
+     third of a 32px toolbar row and appears only in the narrow band this rule
+     exists to survive. The repo styles its other scrollbars with the
+     --scrollbar-* tokens; none is hidden today, so this pairing is new here -
+     `scrollbar-width` is the standard property, the pseudo-element is what
+     Chromium (and therefore Electron) actually honours. */
+  scrollbar-width: none;
+}
+
+.toolbar::-webkit-scrollbar {
+  display: none;
+}
+
+.toolbarSpacer {
+  flex: 1;
+  min-width: var(--space-6);
+}
+
+/* Separator between button groups */
+.toolbarSeparator {
+  width: var(--border-width);
+  height: var(--icon-size-lg);
+  background-color: var(--color-border-default);
+  margin: 0 var(--space-4);
+  /* Unshrinkable for the same reason the three clusters beside it are: a 1px
+     rule that flexbox is allowed to shrink collapses to nothing first, and the
+     toolbar loses the "three regions" boundary exactly at the narrow widths
+     where the reading order is hardest to follow. */
+  flex-shrink: 0;
+}
+
+/* ============================================
+ * Metadata Section
+ * ============================================ */
+
+.toolbarMetadata {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  /* UX-8: the metadata group is what gives way in a narrow split layout, so the
+     status slot never shifts the zoom controls sideways mid-click.
+
+     Flexbox shrinks every shrinkable item IN PARALLEL, weighted by basis x
+     shrink factor - there is no "this one first, then that one". The large
+     shrink factor is what actually makes the metadata yield before the status
+     slot does; `min-width: 0` is what lets it shrink past its content. */
+  flex: 0 100 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.metadataItem {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  /* Override dockview's inherited user-select: none (issue #211). */
+  user-select: text;
+}
+
+/* ============================================
+ * Control Buttons (matches MarkdownToolbar .toolbar-btn)
+ * ============================================ */
+
+.controlButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--btn-height-md);
+  height: var(--input-height-sm);
+  padding: 0;
+  background-color: transparent;
+  border: none;
+  border-radius: 0;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: all var(--transition-normal);
+}
+
+.controlButton:hover:not(:disabled) {
+  background-color: var(--color-bg-hover-solid);
+  color: var(--color-white);
+}
+
+.controlButton:active:not(:disabled) {
+  background-color: var(--color-bg-selected);
+}
+
+.controlButton:disabled {
+  opacity: var(--opacity-disabled);
+  cursor: not-allowed;
+}
+
+.controlButton:focus-visible {
+  outline: 1px solid var(--color-border-focus);
+  outline-offset: 1px;
+}
+
+/* ============================================
+ * Zoom Level Button
+ * ============================================ */
+
+.zoomLevel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* L1: min-width ensures consistent button size for zoom percentages (1% to 1000%) */
+  min-width: 50px;
+  height: var(--input-height-sm);
+  padding: 0 var(--space-4);
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition: all var(--transition-normal);
+}
+
+.zoomLevel:hover {
+  background-color: var(--color-bg-hover-solid);
+  color: var(--color-white);
+}
+
+.zoomLevel:active {
+  background-color: var(--color-bg-selected);
+}
+
+.zoomLevel:focus-visible {
+  outline: 1px solid var(--color-border-focus);
+  outline-offset: 1px;
+}
+
+/* ============================================
+ * Toolbar Controls Group
+ * ============================================ */
+
+/* `flex-shrink: 0` on all three groups: a 32px icon button squashed into a
+   sliver is unhittable, so the give comes from the text (metadata first, then
+   the status slot) instead. Once both have given everything, the toolbar
+   scrolls horizontally - see `.toolbar`. Clipping was never the toolbar's own
+   doing: it declares no `overflow` of its own before that rule, and the element
+   that cuts the row off is `.container`. */
+.toolbarControls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-shrink: 0;
+}
+
+.toolbarActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-shrink: 0;
+}
+
+/* Export group (issue #73): PNG, PDF, copy. Same shape as its two siblings. */
+.toolbarExport {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-shrink: 0;
+}
+
+/* ============================================
+ * Content Area (Image Display)
+ * ============================================ */
+
+.content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+  background: var(--color-bg-primary);
+  cursor: grab;
+}
+
+.content:active {
+  cursor: grabbing;
+}
+
+/* ============================================
+ * Image Element
+ * ============================================ */
+
+.image {
+  max-width: none;
+  max-height: none;
+  transition: none; /* No transition for smooth drag */
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* ============================================
+ * Loading State
+ * ============================================ */
+
+.loadingState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: var(--space-6);
+  color: var(--color-text-secondary);
+  font-size: var(--text-base);
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+  color: var(--color-accent-primary);
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ============================================
+ * Error State
+ * ============================================ */
+
+.errorState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: var(--space-6);
+  color: var(--color-error);
+  font-size: var(--text-base);
+}
+
+.errorMessage {
+  /* L2: Use relative units for better scalability with user font preferences */
+  max-width: 25rem;
+  text-align: center;
+  word-wrap: break-word;
+  /* Override dockview's inherited user-select: none (issue #211). */
+  user-select: text;
+}
+
+/*
+ * The error state reuses `.bannerButton` for its Reload action (H1): one
+ * affordance, one visual treatment, wherever the viewer offers a way out. The
+ * error state is a column, so the button carries no inline-row assumptions.
+ */
+.errorState .bannerButton {
+  margin-top: var(--space-2);
+}
+
+/* ============================================
+ * Empty State
+ * ============================================ */
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: var(--space-6);
+  color: var(--color-text-secondary);
+  font-size: var(--text-base);
+}
+
+/* ============================================
+ * Full Screen Overlay
+ * ============================================ */
+
+.fullScreenOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg-primary);
+  z-index: var(--z-modal);
+  animation: fadeIn var(--transition-normal);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Full screen content area */
+.fullScreenOverlay .content {
+  background: transparent;
+}
+
+/* Full screen toolbar */
+.fullScreenOverlay .toolbar {
+  background: var(--color-bg-tertiary-translucent);
+  border-bottom-color: var(--color-border-subtle);
+}
+
+/* ============================================
+ * Refresh Status Slot (issue #70)
+ * ============================================ */
+
+/*
+ * Permanently mounted live region. It is never conditionally rendered: a live
+ * region added to the DOM at the same moment its text appears is not announced.
+ *
+ * The reservation is sized to the longest PERSISTENT string ("Auto-refresh
+ * unavailable", ~137px at --text-sm) so text appearing and disappearing cannot
+ * shift the zoom controls (UX-8) - not to the longest string of all. The old
+ * 13rem reserved ~70px more than any wording needed, and `flex-shrink: 0` then
+ * pushed the fixed-width controls out of a narrow split panel, where
+ * `overflow: hidden` on `.container` cut them off. The slot now yields
+ * before the controls do and truncates rather than mangling them; a transient
+ * failure line that is longer borrows width from the metadata group, which
+ * truncates first.
+ *
+ * Issue #73 turned that reservation from a FLOOR into a preferred width: a flex
+ * BASIS with `min-width: 0`. That keeps the no-shifting invariant exactly while
+ * letting the slot truncate with its own ellipsis rather than clip one of the
+ * three export controls now sharing the row.
+ */
+.statusSlot {
+  /* The 8.75rem basis is not a --space-* token by design: that scale tops out
+     at 48px (--space-24) because it sizes gaps and padding, while this is a
+     text-content width. NOTE: --text-sm is a fixed 11px, so this reservation
+     does NOT track a user font-size preference - it tracks the root font size
+     only. `min-width: 0` is what lets the slot shrink past that basis. */
+  flex: 0 1 8.75rem;
+  min-width: 0;
+  margin-right: var(--space-6);
+  font-size: var(--text-sm);
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* Override dockview's inherited user-select: none (issue #211). */
+  user-select: text;
+}
+
+/* ============================================
+ * Export Controls (issue #73)
+ * ============================================ */
+
+/*
+ * Busy is `aria-disabled`, NEVER the `disabled` attribute: Chromium blurs a
+ * disabled control the instant it is disabled, and the native save dialog then
+ * returns focus to it - dropping a keyboard user on <body> after every export.
+ *
+ * No dimming either. Busy already reads as a state change through the glyph
+ * (icon -> spinner ring) and its colour (text-primary -> accent violet, via
+ * `.spinner`), so it is never signalled by colour alone and the reduced-motion
+ * opt-out below costs nothing.
+ */
+.controlButton[aria-disabled='true'] {
+  cursor: progress;
+}
+
+.controlButton[aria-disabled='true']:hover {
+  background-color: transparent;
+  color: var(--color-text-primary);
+}
+
+/*
+ * Visually hidden export live region, owned by the panel.
+ *
+ * Deliberately local rather than the global `.sr-only`: this is a CSS module,
+ * and CameraDialog.css already records a cross-file class dependency of that
+ * shape as fragile.
+ */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+/* Transient good news: the app's positive signal colour, matching the editor. */
+.statusSlot--positive {
+  color: var(--color-accent-secondary);
+  animation: fadeIn var(--transition-normal);
+}
+
+/*
+ * Every degraded state - dead watch, failed re-read, failed Reload.
+ *
+ * Not --color-text-secondary: that is the exact token, size and row as
+ * `.metadataItem`, so "auto-refresh is broken" read as decorative metadata.
+ * --color-warning (#cca700) measures 8.01:1 against --color-bg-primary
+ * (#161312), comfortably past WCAG 1.4.3's 4.5:1, and is not the lime positive
+ * colour that would make bad news look like good news.
+ */
+.statusSlot--warning {
+  color: var(--color-warning);
+}
+
+/* ============================================
+ * Degraded-State Banner (issue #70)
+ * ============================================ */
+
+.deletedBanner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-6);
+  background-color: var(--color-bg-secondary);
+  border-bottom: var(--border-width) solid var(--color-border-default);
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  flex-shrink: 0;
+  animation: fadeIn var(--transition-normal);
+}
+
+/*
+ * Variant treatments. `data-variant` used to be set and never styled, so a
+ * deleted file and a dead watch looked identical - and neither matched the
+ * Markdown editor, which paints its "this file was deleted" warning in the
+ * error tokens.
+ *
+ * deleted -> the editor's exact tokens (#ffcccb on #3c1f1f = 10.5:1).
+ * unavailable / stale -> warning tokens: the file is still there, only the
+ * freshness guarantee is gone (#dcdcaa on the composited warning background
+ * = 11.2:1).
+ */
+.deletedBanner[data-variant='deleted'] {
+  background-color: var(--color-error-bg);
+  border-bottom-color: var(--color-error-border);
+  color: var(--color-error-text-light);
+}
+
+.deletedBanner[data-variant='unavailable'],
+.deletedBanner[data-variant='stale'] {
+  background-color: var(--color-warning-bg);
+  border-bottom-color: var(--color-warning-border);
+  color: var(--color-warning-icon);
+}
+
+.bannerMessage {
+  flex: 1;
+  min-width: 0;
+  /* Override dockview's inherited user-select: none (issue #211). */
+  user-select: text;
+}
+
+/*
+ * The only action either degraded surface offers, so it has to look like a
+ * button. --color-border-default on the old neutral banner measured 1.24:1 -
+ * invisible, which left Reload reading as plain text.
+ *
+ * Filled + bordered: --color-bg-primary fill against every banner background,
+ * with a --color-text-secondary (#858585) border that measures 4.1:1 on the
+ * deleted banner and 4.4:1 on the warning one, both past WCAG 1.4.11's 3:1 for
+ * a control boundary. The label (#cccccc on #161312) measures 11.5:1.
+ */
+.bannerButton {
+  flex-shrink: 0;
+  height: var(--input-height-sm);
+  padding: 0 var(--space-4);
+  background-color: var(--color-bg-primary);
+  border: var(--border-width) solid var(--color-text-secondary);
+  border-radius: 0;
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: all var(--transition-normal);
+}
+
+.bannerButton:hover:not(:disabled) {
+  background-color: var(--color-bg-hover-solid);
+  color: var(--color-white);
+}
+
+.bannerButton:disabled {
+  opacity: var(--opacity-disabled);
+  cursor: not-allowed;
+}
+
+.bannerButton:focus-visible {
+  outline: 1px solid var(--color-border-focus);
+  outline-offset: 1px;
+}
+
+/* ============================================
+ * Reduced Motion Support
+ * ============================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  .controlButton,
+  .zoomLevel,
+  .bannerButton {
+    transition: none;
+  }
+
+  /* The two `[aria-disabled]` rules above change colour on a transition the
+     control inherits; the spinner's own animation is opted out further down. */
+  .controlButton[aria-disabled='true'],
+  .controlButton[aria-disabled='true']:hover {
+    transition: none;
+  }
+
+  /* UX-10: the #70 surfaces fade in; both opt out here rather than shipping a
+     second, unguarded animation. */
+  .statusSlot--positive,
+  .deletedBanner {
+    animation: none;
+  }
+
+  .spinner {
+    animation: none;
+  }
+
+  .fullScreenOverlay {
+    animation: none;
+  }
+}

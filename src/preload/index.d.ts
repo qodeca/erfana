@@ -9,6 +9,7 @@ import type { DocxExportRequest, DocxExportResponse } from '../shared/ipc/docx-s
 import type { GlobalSettings, GlobalSettingsChanged } from '../shared/ipc/global-settings-schema'
 import type { LogEntry } from '../shared/ipc/logging-schema'
 import type { LockResult, LockStatus } from '../shared/ipc/project-lock-schema'
+import type { ImageReadResponse } from '../shared/ipc/file-image-schema'
 import type {
   ScreenshotCaptureRequest,
   ScreenshotCaptureResponse,
@@ -42,6 +43,8 @@ import type {
 } from '../shared/ipc/import-schema'
 import type { ClipboardBridge } from '../shared/ipc/clipboard-schema'
 import type { ClaudeStatusBridge } from '../shared/ipc/claude-status-schema'
+import type { PreviewBridge } from '../shared/ipc/preview-schema'
+import type { ImageExportBridge } from '../shared/ipc/image-export-schema'
 
 declare global {
   interface Window {
@@ -77,10 +80,11 @@ declare global {
           error?: string
         }>
         /**
-         * Read a file as base64-encoded data URL
+         * Read an image, or learn it has not changed since `knownVersion`
          * @see Spec #015 - Image preview viewer specification
+         * @see Issue #70 - preview tabs show stale content when the file changes
          */
-        readAsBase64: (filePath: string) => Promise<string>
+        readImage: (filePath: string, knownVersion?: string) => Promise<ImageReadResponse>
         /**
          * Validate an external file for drop into project
          * @see Spec #012 - External file drop to project tree
@@ -369,10 +373,20 @@ declare global {
        */
       clipboard: ClipboardBridge
       /**
+       * Image export bridge (PNG / PDF / clipboard)
+       * @see Issue #73 - image viewer export controls
+       */
+      imageExport: ImageExportBridge
+      /**
        * Per-terminal Claude Code context status bridge
        * @see Issue #216 - Per-terminal Claude Code context status bar
        */
       claudeStatus: ClaudeStatusBridge
+      /**
+       * Running HTML preview bridge (WebContentsView-backed)
+       * @see Issue #74 - HTML preview with CSS and JavaScript execution
+       */
+      preview: PreviewBridge
       quit: {
         onQuitRequested: (callback: (data: { reason?: string }) => void) => () => void
         sendQuitResponse: (proceed: boolean) => void
@@ -433,6 +447,21 @@ declare global {
         selection: import('../shared/ipc/screenshot-schema').AreaSelection
       ) => void
       areaCancelled: () => void
+      /**
+       * One-way log forward over the shared `logging:log` channel — the only
+       * evidence trail the overlay window can produce (#60). Optional so a
+       * stale bundle without it still type-checks at the call site.
+       */
+      log?: (entry: LogEntry) => void
     }
+    /**
+     * E2E crash-injection flag, exposed by `src/preload/index.ts` only when the
+     * main process appended `--erfana-force-crash` (unpackaged +
+     * `ERFANA_E2E_FORCE_CRASH=1`). `undefined` in every normal run — declared
+     * optional and literal `true` so callers must test for it explicitly.
+     *
+     * @see docs/design/design-issue-60.md §2.8
+     */
+    __ERFANA_FORCE_CRASH__?: true
   }
 }

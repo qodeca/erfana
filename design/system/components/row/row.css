@@ -1,0 +1,149 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * The row primitive — file tree, picker option, permission-band host.
+ *
+ * PROPOSED — not adopted, but NOT greenfield either. An earlier version of this
+ * header said "there is no home for this in src/ yet", and that was false in the
+ * direction that matters: the app already ships this primitive, five times, under
+ * five class names.
+ *
+ *   src/renderer/src/components/ProjectTree/ProjectTree.css  .project-tree-item
+ *   src/renderer/src/components/Dialog/FilePickerDialog.css  .file-picker-item
+ *   src/renderer/src/components/Dialog/ScreenSelectDialog.css
+ *   src/renderer/src/components/Dialog/WindowPickerDialog.css
+ *   src/renderer/src/components/DockLayout/AppDockLayout.css
+ *
+ * `.project-tree-item.selected` (ProjectTree.css) is already character-for-
+ * character the selected rule this file decides — same `--color-bg-selected`,
+ * same 2px lime `border-left`. So adoption is a CONSOLIDATION, not a first
+ * implementation: one file moves to src/, four call sites re-point at it, and
+ * scripts/design-sync.mjs syncs it back here the way it syncs tokens.css.
+ * Budget for that, not for a move.
+ *
+ * The MOVE-not-copy rule still stands. Two editable copies at once is how a
+ * design system starts describing an app that no longer exists.
+ *
+ * Every class is prefixed `erf-`. That is not cosmetic. Mermaid puts
+ * class="row" on gitGraph commit labels and on its generic label path, and the
+ * app injects that SVG with innerHTML — so a bare global `.row` would restyle
+ * diagram labels in the preview and in exported images. Nothing defines `.row`
+ * in the app today, which is the only reason this has not bitten yet.
+ *
+ * Every state below is carried by a shape or a word as well as a colour.
+ */
+
+.erf-row-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.erf-row-list:focus { outline: none; }
+.erf-row-list:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: calc(var(--space-1) * -1);
+}
+
+.erf-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: var(--space-14);
+  padding: 0 var(--space-8) 0 var(--space-4);
+  border-left: var(--border-width-thick) solid transparent;
+  font-size: var(--text-base);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.erf-row__glyph {
+  flex: 0 0 var(--space-6);
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+}
+
+.erf-row__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;              /* names lose their TAIL */
+}
+
+/* ---------- host ---------- */
+
+/*
+ * `.erf-host` MOVED to src/renderer/src/components/../styles/hostName.css and is
+ * synced back to ./host.css, which this card links alongside this file. One
+ * primitive, one definition — a second editable copy is how one of them stays
+ * wrong, which is exactly how the old bidi front-elide survived here for months.
+ */
+
+/* ---------- git badge ---------- */
+
+.erf-row__badge {
+  flex: 0 0 auto;
+  min-width: var(--space-8);
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+  color: var(--color-brand-black);
+  padding: 0 var(--space-2);
+}
+
+/* All SIX states, not four. A black label on a transparent row measures 1.21:1
+   on --color-bg-tertiary, which is invisible; renamed and conflicted used to do
+   exactly that, and the demo never seeded them so nobody saw it.
+   The app already ships all six (ProjectTree.css) — this was a card defect, and
+   adopting the old four-state version would have REGRESSED the app. */
+.erf-row__badge[data-git="modified"]   { background: var(--color-git-modified-light); }
+.erf-row__badge[data-git="untracked"]  { background: var(--color-git-untracked-light); }
+.erf-row__badge[data-git="deleted"]    { background: var(--color-git-deleted-light); }
+.erf-row__badge[data-git="staged"]     { background: var(--color-git-staged-light); }
+.erf-row__badge[data-git="renamed"]    { background: var(--color-git-renamed-light); }
+.erf-row__badge[data-git="conflicted"] { background: var(--color-git-conflicted-light); }
+
+/* ---------- states ---------- */
+
+.erf-row:hover,
+.erf-row--hover { background: var(--color-bg-hover-solid); }
+
+/* Selected: filled ground PLUS the lime edge. The edge is what separates it
+   from hover, and it survives the list losing focus. */
+.erf-row[aria-selected="true"],
+.erf-row--selected {
+  background: var(--color-bg-selected);
+  border-left-color: var(--color-brand-lime);
+}
+
+.erf-row--focus {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: calc(var(--space-1) * -1);
+}
+
+.erf-row--dragging { opacity: var(--opacity-disabled); cursor: grabbing; }
+
+.erf-row--drop {
+  background: var(--color-accent-drag-bg);
+  border-left-color: var(--color-accent-drag-border);
+}
+
+.erf-row--drop-invalid {
+  background: var(--color-error-bg);
+  border-left-color: var(--color-error);
+  cursor: not-allowed;
+}
+
+/* Cut: fading alone would read as "disabled", so add a shape.
+   Both literals below want tokens — 0.6 sits between --opacity-disabled (0.4)
+   and opaque, and 3px is off the 2px spacing scale. Left as literals rather than
+   quietly restyled: adoption tokenises them, and that is a visual decision, not
+   a side effect of a security fix. */
+.erf-row--cut { opacity: 0.6; }
+.erf-row--cut .erf-row__name {
+  text-decoration: underline dashed;
+  text-underline-offset: 3px;
+}

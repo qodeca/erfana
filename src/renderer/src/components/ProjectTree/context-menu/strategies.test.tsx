@@ -196,5 +196,48 @@ describe('Context Menu Strategies', () => {
         visible.findIndex((item) => item.label === 'Delete')
       )
     })
+
+    it('offers "Open as source" first for an .html node', () => {
+      const node = createMockFileNode('page.html', 'file')
+
+      const items = strategy.build(node as FileNodeFile, ctx)
+      const visible = items.filter((item) => !item.separator)
+
+      expect(visible[0].label).toBe('Open as source')
+    })
+
+    it('offers "Open as source" for an .htm node', () => {
+      const node = createMockFileNode('index.htm', 'file')
+
+      const items = strategy.build(node as FileNodeFile, ctx)
+
+      expect(items.some((item) => item.label === 'Open as source')).toBe(true)
+    })
+
+    it('does not offer "Open as source" for a non-HTML node', () => {
+      const node = createMockFileNode('test.md', 'file')
+
+      const items = strategy.build(node as FileNodeFile, ctx)
+
+      expect(items.some((item) => item.label === 'Open as source')).toBe(false)
+    })
+
+    it('omits "Open as source" when openAsSource is not wired', () => {
+      const node = createMockFileNode('page.html', 'file')
+      const ctxWithoutOpen = createMockMenuContext({ openAsSource: undefined })
+
+      const items = strategy.build(node as FileNodeFile, ctxWithoutOpen)
+
+      expect(items.some((item) => item.label === 'Open as source')).toBe(false)
+    })
+
+    it('routes "Open as source" through the injected callback with the node path', () => {
+      const node = createMockFileNode('page.html', 'file', '/proj/page.html')
+
+      const items = strategy.build(node as FileNodeFile, ctx)
+      items.find((item) => item.label === 'Open as source')?.execute()
+
+      expect(ctx.openAsSource).toHaveBeenCalledWith('/proj/page.html')
+    })
   })
 })

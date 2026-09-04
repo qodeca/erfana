@@ -89,7 +89,7 @@ Contributions are welcome – see [CONTRIBUTING.md](CONTRIBUTING.md) and our [Co
 Build Erfana from source:
 
 ```bash
-npm install      # Node.js 24+; Python 3.12 (not 3.13 – node-pty); see below for Windows
+npm install      # Node.js 24+; Python 3.12 or 3.14.x (not 3.13 – node-pty); see below for Windows
 npm run dev      # development server
 npm run build    # production build
 npm run build:mac   # package for macOS

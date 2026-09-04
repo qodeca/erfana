@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { contextBridge, ipcRenderer, IpcRendererEvent, webUtils } from 'electron'
+import { FORCE_CRASH_ARG } from '../shared/constants'
 import type { ProjectChanged } from '../shared/ipc/schema'
 import type { GitStatusResponse } from '../shared/ipc/git-schema'
 import type { PdfExportRequest, PdfExportResponse } from '../shared/ipc/pdf-schema'
@@ -9,6 +10,7 @@ import type { GlobalSettings, GlobalSettingsChanged } from '../shared/ipc/global
 import type { LogEntry } from '../shared/ipc/logging-schema'
 import type { GitStateChangeEvent, GitWatcherStatus, GitPollTriggeredEvent } from '../shared/ipc/git-watcher-schema'
 import type { LockResult, LockStatus } from '../shared/ipc/project-lock-schema'
+import type { ImageReadResponse } from '../shared/ipc/file-image-schema'
 import type {
   ScreenshotCaptureRequest,
   ScreenshotCaptureResponse,
@@ -31,11 +33,17 @@ import type {
 import { TRANSCRIPTION_CHANNELS } from '../shared/ipc/transcription-channels'
 import { IMPORT_CHANNELS } from '../shared/ipc/import-channels'
 import { CLIPBOARD_CHANNELS } from '../shared/ipc/clipboard-channels'
+import { IMAGE_EXPORT_CHANNELS } from '../shared/ipc/image-export-channels'
+import type {
+  ImageExportRequest,
+  ImageExportResponse
+} from '../shared/ipc/image-export-schema'
 import {
   ClaudeStatusChannels,
   ClaudeStatusEvents
 } from '../shared/ipc/claude-status-channels'
 import type { ClaudeStatusChangePayload } from '../shared/ipc/claude-status-schema'
+import { previewBridge } from './previewBridge'
 import type {
   DocumentImportRequest,
   DocumentImportResult,
@@ -110,19 +118,31 @@ const api = {
     }> => ipcRenderer.invoke('file:validatePath', filePath, projectRoot),
 
     /**
-     * Read a file as base64-encoded data URL
+     * Read an image, or learn that it has not changed
      *
-     * Used by ImageViewerPanel to load images in the sandboxed renderer.
-     * Returns a data URL like: data:image/png;base64,iVBORw0KGgo...
+     * The only image read channel: ImageViewerPanel loads images through it in
+     * the sandboxed renderer, and gets back a data URL like
+     * data:image/png;base64,iVBORw0KGgo...
+     *
+     * Pass the `version` from the previous response as `knownVersion`: an
+     * unchanged file then answers `{ status: 'unchanged', version }` without
+     * re-encoding up to ~67 MB of base64 on the main-process event loop or
+     * sending it across IPC. `unchanged` is a SUCCESS - keep the bytes you
+     * have; it must not be surfaced as a failed refresh.
+     *
+     * Omit `knownVersion` whenever you hold no bytes (first load, remount,
+     * after an error) to force a full read. The version is opaque: store the
+     * one you were given, never parse or construct one.
      *
      * @param filePath - Absolute path to the image file
-     * @returns Data URL string for use in <img src="...">
+     * @param knownVersion - Version the caller already holds bytes for
+     * @returns The bytes plus their version, or `unchanged` plus that version
      * @throws Error if file doesn't exist, is outside project, or unsupported format
      *
-     * @see Spec #015 - Image preview viewer specification
+     * @see Issue #70 - preview tabs show stale content when the file changes
      */
-    readAsBase64: (filePath: string): Promise<string> =>
-      ipcRenderer.invoke('file:readAsBase64', filePath),
+    readImage: (filePath: string, knownVersion?: string): Promise<ImageReadResponse> =>
+      ipcRenderer.invoke('file:readImage', filePath, knownVersion),
 
     // External file drop operations (Spec #012)
     /**
@@ -919,6 +939,23 @@ const api = {
   },
 
   /**
+   * Image export bridge (#73).
+   *
+   * Sends a path and a target; gets back a small structured result. NO IMAGE
+   * BYTES cross this bridge in either direction — the main process reads the
+   * file fresh from disk and writes or copies the output itself, so a 50 MB
+   * source never becomes a ~67 MB base64 payload on the wire.
+   *
+   * Never rejects: failures arrive as the `success: false` branch, carrying a
+   * code and the message to show for it.
+   */
+  imageExport: {
+    /** Export the image at `filePath` as PNG, as PDF, or to the clipboard. */
+    run: (request: ImageExportRequest): Promise<ImageExportResponse> =>
+      ipcRenderer.invoke(IMAGE_EXPORT_CHANNELS.RUN, request)
+  },
+
+  /**
    * Per-terminal Claude Code context status bridge (#216).
    *
    * `register`/`unregister`/`nudge` carry a `terminalId` only — the PTY pid is
@@ -944,6 +981,9 @@ const api = {
       return () => ipcRenderer.removeListener(ClaudeStatusEvents.CHANGED, listener)
     }
   },
+
+  // Running HTML preview bridge (#74): WebContentsView-backed preview control
+  preview: previewBridge,
 
   // Quit confirmation operations
   quit: {
@@ -1104,14 +1144,36 @@ const electron = {
   }
 }
 
+/**
+ * E2E crash-injection flag.
+ *
+ * The main process appends {@link FORCE_CRASH_ARG} to `webPreferences
+ * .additionalArguments` only when the app is UNPACKAGED and
+ * `ERFANA_E2E_FORCE_CRASH=1` is set, so a packaged build can never see it and
+ * the renderer can never set it. Mirrors the shipped overlay-token mechanism
+ * (`ScreenshotOverlayWindow.ts` → `screenshotOverlay.ts`).
+ *
+ * Exposed ONLY when true — absent (`undefined`) in every normal run, so a
+ * `=== true` check in the renderer is the whole contract.
+ *
+ * @see docs/design/design-issue-60.md §2.8
+ */
+const forceCrash = process.argv.includes(FORCE_CRASH_ARG)
+
 if (process.contextIsolated) {
   try {
     contextBridge.exposeInMainWorld('electron', electron)
     contextBridge.exposeInMainWorld('api', api)
+    if (forceCrash) {
+      contextBridge.exposeInMainWorld('__ERFANA_FORCE_CRASH__', true)
+    }
   } catch (error) {
     console.error(error)
   }
 } else {
   ;(window as unknown as { electron: typeof electron }).electron = electron
   ;(window as unknown as { api: typeof api }).api = api
+  if (forceCrash) {
+    ;(window as unknown as { __ERFANA_FORCE_CRASH__: boolean }).__ERFANA_FORCE_CRASH__ = true
+  }
 }

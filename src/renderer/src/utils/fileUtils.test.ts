@@ -3,12 +3,15 @@
 import { describe, it, expect } from 'vitest'
 import {
   sanitizeFilePath,
+  stablePathDigest,
   isMarkdownFile,
   getBasename,
   getDirname,
   getDisplayRelativePath,
   isPathInside,
-  isStrictDescendant
+  isStrictDescendant,
+  sanitizeFileName,
+  MAX_FILENAME_LENGTH
 } from './fileUtils'
 
 describe('fileUtils', () => {
@@ -16,6 +19,24 @@ describe('fileUtils', () => {
     expect(sanitizeFilePath('/Users/Name/docs/Notes.md')).toBe('users-name-docs-notes-md')
     expect(sanitizeFilePath('C:/Projects/Test File (1).md')).toBe('c--projects-test-file--1--md')
     expect(sanitizeFilePath('relative/path/file.MARKDOWN')).toBe('relative-path-file-markdown')
+  })
+
+  describe('stablePathDigest', () => {
+    it('is deterministic and 16 lowercase hex characters', () => {
+      const a = stablePathDigest('/proj/a.html')
+      expect(a).toMatch(/^[0-9a-f]{16}$/)
+      expect(stablePathDigest('/proj/a.html')).toBe(a)
+    })
+
+    it('differs for sibling paths and for paths that differ only in case', () => {
+      expect(stablePathDigest('/proj/a.html')).not.toBe(stablePathDigest('/proj/b.html'))
+      expect(stablePathDigest('/proj/Icon.svg')).not.toBe(stablePathDigest('/proj/icon.svg'))
+    })
+
+    it('differs for two long paths that share a long prefix', () => {
+      const prefix = '/proj/' + 'segment/'.repeat(40)
+      expect(stablePathDigest(prefix + 'one.html')).not.toBe(stablePathDigest(prefix + 'two.html'))
+    })
   })
 
   it('detects markdown files by extension', () => {
@@ -174,5 +195,37 @@ describe('fileUtils', () => {
       expect(isStrictDescendant('C:\\proj', 'C:\\projector\\x')).toBe(false)
     })
   })
-})
 
+  describe('sanitizeFileName', () => {
+    it('returns the basename of a POSIX path', () => {
+      expect(sanitizeFileName('/proj/assets/logo.svg')).toBe('logo.svg')
+    })
+
+    it('returns the basename of a Windows path', () => {
+      // Paths cross IPC with NATIVE separators, so a POSIX-only split would
+      // return the whole path here.
+      expect(sanitizeFileName('C:\\proj\\assets\\logo.svg')).toBe('logo.svg')
+    })
+
+    it('strips C0 control characters and DEL', () => {
+      expect(sanitizeFileName('/proj/lo\u0007g\u007fo.png')).toBe('logo.png')
+    })
+
+    it('cannot escape the basename via traversal segments', () => {
+      expect(sanitizeFileName('/proj/../../etc/passwd')).toBe('passwd')
+    })
+
+    it('truncates an over-long name', () => {
+      const long = `${'a'.repeat(MAX_FILENAME_LENGTH + 40)}.png`
+      expect(sanitizeFileName(`/proj/${long}`)).toHaveLength(MAX_FILENAME_LENGTH)
+    })
+
+    it('falls back to "image" for an empty path', () => {
+      expect(sanitizeFileName('')).toBe('image')
+    })
+
+    it('falls back to "image" when nothing printable is left', () => {
+      expect(sanitizeFileName('/proj/\u0001\u0002')).toBe('image')
+    })
+  })
+})

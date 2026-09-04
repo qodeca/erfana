@@ -93,7 +93,7 @@ Resolved – `LanguageSelect` accepts an optional `id` prop and renders it on th
 
 **Recommended next step**: Fixture instrumentation – capture `document.readyState` and `app.getGPUInfo('basic')` before and after `waitForLoadState`, push once on a temporary re-enable (`gh workflow enable "E2E Tests"`), then form a targeted hypothesis. Re-disable until a fix is in.
 
-**Files**: `.github/workflows/e2e.yml`, `e2e/fixtures.ts` (lines 355–360, 406–410), `e2e/visual-regression.e2e.ts`.
+**Files**: `.github/workflows/e2e.yml`, `e2e/fixtures/index.ts` — the two visual fixtures `visualWindow` and `visualWindowWithProject`, each of which calls `await window.waitForLoadState('domcontentloaded')` immediately after `firstWindow()` — and `e2e/visual-regression.e2e.ts`. (The `e2e/fixtures.ts` cited here until 2026-08-23 no longer exists: the visual fixture set was moved into `e2e/fixtures/index.ts` and the legacy re-export file was deleted, so its old line numbers pointed at nothing.)
 
 **Tracking**: see [docs/ci.md § E2E Tests (disabled)](./ci.md#e2e-tests-e2eyml-disabled) and [docs/known-issues.md § Visual regression E2E suite hangs on GitHub `macos-latest` CI](./known-issues.md#visual-regression-e2e-suite-hangs-on-github-macos-latest-ci).
 
@@ -112,20 +112,22 @@ Resolved – `LanguageSelect` accepts an optional `id` prop and renders it on th
 
 ---
 
-### 7. `docs/security.md` exceeds /doc-update soft cap (626 lines)
+### 7. `docs/security.md` exceeds /doc-update soft cap (752 lines)
 
 **Severity**: Low
-**Impact**: `/doc-update` protocol prefers ≤500-line doc files; `security.md` sits 126 lines over (626 lines, re-measured 2026-08-08 at v0.17.0; it was 541 when this item was filed).
+**Impact**: `/doc-update` protocol prefers ≤500-line doc files; `security.md` sits 252 lines over (752 lines on 2026-09-04, after the HTML-preview section absorbed the partition-recycling and panel-id-digest risks; ~676 after the #73 doc sweep on 2026-08-24 added the harness-CSP subsection and three lines to § Sender-frame gating; 661 on 2026-08-23, 626 at v0.17.0 and 541 when this item was filed). The trend line is the point: this file gains content on every security-relevant change.
 
 **Problem**: Largest natural extraction candidate (`Release signing (v0.9.5+, #174)`, from L566 to the end of the file) is structurally pinned. The pubkey block contains `<!-- minisign-pubkey-{primary,rotation}-{begin,end} -->` fence markers that are actively grepped by:
 
-- `.github/workflows/checks.yml:298–330` — release-pubkey drift detector (Guard 5; the step is `Guard - release pubkey drift across docs` at `:306`) (the `Release readiness guards` job; it runs on every push but is **not** a required status check on `main` — the required set is `Lint`, `Typecheck`, `Unit tests`, `Build`, `License compliance`, `Secret scan`, per [`ci.md`](./ci.md))
-- `.claude/skills/releasing-erfana/phases/phase-4-verify.md:45` — operator-facing canonical-source note
-- `README.md:57` — direct `#release-signing-v095-174` anchor (the file is 101 lines long)
+- `.github/workflows/checks.yml` — release-pubkey drift detector: the `Guard - release pubkey drift across docs` step (Guard 5) of the `Release readiness guards` job. It runs on every push but is **not** a required status check on `main` — the required set is `Lint`, `Typecheck`, `Unit tests`, `Build`, `License compliance`, `Secret scan` and `Coverage`, per [`ci.md`](./ci.md)
+- `.claude/skills/releasing-erfana/phases/phase-4-verify.md` § 4.3 Verify minisign signature — operator-facing canonical-source note
+- `README.md` § Release verification — direct `#release-signing-v095-174` anchor into `docs/security.md`
+
+(Citations de-numbered 2026-08-23: the two line references here had already drifted — Guard 5 sits at `:341–372` today, its step name at `:349`, not the `:298–330` / `:306` recorded when the item was filed. Section and step names are stable; line numbers in this item are not.)
 
 Moving the block would require synchronized edits to checks.yml + skill + README anchor. High blast-radius for cosmetic gain.
 
-**Recommended Solution** (if cap-compliance is wanted later): extract the lower-risk `Test Builds (ERFANA_TEST_BUILD)` section (L137–L201, ~65 lines) to `docs/security/test-builds.md` instead. Single internal cross-ref at L24; no CI implications. That alone drops `security.md` to ~561 lines — still over the cap, so cap-compliance now needs a second extraction as well.
+**Recommended Solution** (if cap-compliance is wanted later): extract the lower-risk `Test Builds (ERFANA_TEST_BUILD)` section (~L138–L201, ~65 lines) to `docs/security/test-builds.md` instead. Single internal cross-ref at L24; no CI implications. That alone drops `security.md` to ~611 lines — still well over the cap, so cap-compliance now needs at least one further extraction.
 
 **Status**: Re-opened 2026-08-08. The item was filed as an accepted constraint on the condition that it be revisited if `security.md` grew; it has, so the condition is spent. Decision needed: either extract two sections (Test Builds plus one more) to clear the cap, or record that the cap does not apply to this file and close the item.
 
@@ -141,6 +143,8 @@ Moving the block would require synchronized edits to checks.yml + skill + README
 
 **Severity**: Low
 **Impact**: `zIndex={10000}` is hardcoded on the TranscriptionDialog instance instead of going through the dialog-stack manager or the `var(--z-dialog)` design token. Diverges from the project's tokens-only rule for spacing/colors/typography and from the dialog stack's contract.
+
+**Note (2026-08-31)**: `npm run lint:css` now bans a bare `z-index` in CSS and runs in the required `Lint` job. This instance is **not** caught by it — the literal is a TSX prop, not a CSS declaration, and stylelint does not read TSX. Bare stacking values in TypeScript stay unenforced; see [`design/system/foundations/layering.html`](../design/system/foundations/layering.html).
 
 **Fix**: Replace the literal with the dialog-stack manager value, or with `var(--z-dialog)` if the dialog is not stack-managed.
 
@@ -189,7 +193,7 @@ After the heartbeat hardening (Phase A4 resume-refresh, B1 symlink defense, D3 H
 ### 13. `scripts/fuses.js` exceeds the 500-line guideline (#43, 2026-08)
 
 **Severity**: Low
-**Impact**: `scripts/fuses.js` is ~1,040 lines against the project's ~500-line-per-file guidance; its suite `scripts/fuses.test.mjs` is ~835.
+**Impact**: `scripts/fuses.js` is ~1,715 lines against the project's ~500-line-per-file guidance; its suite `scripts/fuses.test.mjs` is ~1,758. (Both re-measured 2026-08-23; when this item was filed they were ~1,040 and ~835, so the seam has kept widening.)
 
 **Problem**: The issue #43 packaging-allowlist work added a self-contained `Packaged-contents allowlist` block (~400 lines: `deriveAllowedAppEntries`, `assertConfigMatchesAllowlist`, `assertPackagedAppContents` and their helpers) to a file that already carried the fuse flip, the `spawn-helper` chmod, the two foreign-arch prunes and the media-binary staging.
 
@@ -263,6 +267,455 @@ After the heartbeat hardening (Phase A4 resume-refresh, B1 symlink defense, D3 H
 
 ---
 
+### 18. `useDragDropTree` exposes an API surface production no longer consumes (#60, 2026-08)
+
+**Severity**: Low
+**Impact**: Three of the hook's six returned members — `flattenedItems`, `getProjection`, `validateMove` — have no production consumer. `ProjectTree.tsx`, the hook's only production call site in the files examined, destructures `findNode`, `findNodeWithRoot` and `isDescendant` only; the other three are exercised by `useDragDropTree.test.ts` alone.
+
+**Problem**: The #60 lookup work (deleting `enhancedFlattenedItems`, repointing six linear scans onto the Map-backed named lookups) left the positional members behind. `flattenedItems` is deliberately still returned — it is the flatten result the hook exists to produce, and its docblock warns against reading nodes out of it by path — but `getProjection` / `validateMove` are drag-projection helpers whose ProjectTree wiring predates the current dnd-kit collision handling. Keeping unconsumed members alive means every future change to the hook has to keep them correct against tests only, with no user-visible signal if they drift.
+
+**Recommended Solution**: narrow the return type when #149/#150 next open `ProjectTree.tsx` — either re-wire the drag path onto `getProjection` / `validateMove` (they encode the root-safety and circular-move rules the inline handlers re-derive) or drop them and keep the module-level `getProjection` / `canMoveItem` exports for tests. Do **not** narrow it in isolation: the decision belongs with whoever touches the drag handlers.
+
+**Files**: `src/renderer/src/hooks/useDragDropTree.ts` (return object), `src/renderer/src/components/ProjectTree/ProjectTree.tsx` (the `useDragDropTree` call site).
+
+**Status**: Deferred to #149/#150 — recorded by the #60 change-set review.
+
+---
+
+### 19. `vitest.renderer.ts` coverage block sits outside `test` (inert) (#60, 2026-08)
+
+**Severity**: Medium
+**Impact**: The renderer project has **no enforced coverage thresholds**. `vitest.renderer.ts` declares `coverage` as a sibling of `test` rather than inside it, and vitest ignores a top-level `coverage` key — so the provider, the report directory, the exclude list and the `{ lines: 10, functions: 10, branches: 5, statements: 10 }` thresholds are all dead configuration.
+
+**Problem**: Exactly the misplacement issue #55 F4 fixed for `vitest.main.ts`, which now carries the corrective comment above its `coverage` block. Until it is fixed for the renderer, any renderer coverage target — including the >80 % expectation on the #60 boundary components — is a review-time convention, not a gate.
+
+**Recommended Solution**: move the block under `test:` (one indentation change), then re-measure before choosing thresholds — the current values were never enforced, so they may be either far below or above what the suite actually meets.
+
+**Files**: `vitest.renderer.ts`. Reference fix: `vitest.main.ts`.
+
+**Status**: Open — recorded by the #60 change-set review; also listed as a deferral in [`design/design-issue-60.md`](./design/design-issue-60.md) §8.
+
+---
+
+### 20. `npm run test:cov` runs the whole workspace three times (#60, 2026-08)
+
+**Severity**: Low
+**Impact**: `scripts/test-cov.mjs` invokes vitest once per project config (`vitest.main.ts`, `vitest.preload.ts`, `vitest.renderer.ts`) with `--coverage` but **without** `--project`. `vitest.workspace.ts` is auto-discovered from the repo root, so each invocation expands back to all three projects: the full suite runs three times for one coverage report, and each run's coverage is collected across projects rather than scoped to the config that requested it.
+
+**Problem**: Slow locally, and it makes the per-file floors in `vitest.main.ts` (whisper trust chain, `scripts/fuses.js`, `modelId.ts`, `rendererCrashHandlers.ts`) behave differently on a developer machine than in CI. CI's Coverage job scopes with `--project main` — the reason that flag exists is recorded in a comment in `vitest.main.ts` — so the floors are effectively **CI-only** enforcement today.
+
+**Recommended Solution**: pass `--project main|preload|renderer` on each of the three `run(...)` calls in `scripts/test-cov.mjs`, matching what checks.yml already does. Verify the per-file thresholds still fire afterwards.
+
+**Files**: `scripts/test-cov.mjs` (the three `run(...)` calls), `vitest.workspace.ts`, `.github/workflows/checks.yml` (Coverage job).
+
+**Status**: Open — recorded by the #60 change-set review. Derived from configuration, not from a timed run.
+
+---
+
+### 21. No tsconfig covers `e2e/` (#60, 2026-08)
+
+**Severity**: Low
+**Impact**: TypeScript errors in Playwright specs are **editor-only**. `npm run typecheck` runs `tsconfig.node.json` (`src/main`, `src/preload`, `src/shared`) and `tsconfig.web.json` (`src/renderer`, `src/preload/*.d.ts`); `tsconfig.test.json` covers `src/**` + `tests/**` + `vitest.*.ts` and is not wired into the script at all. `e2e/` appears in no `include` and is explicitly excluded from every vitest project, so nothing in CI ever type-checks it.
+
+**Problem**: A spec, page object or fixture can be committed with a type error and stay green on every required check. Because `e2e.yml` is disabled (item #5), the error surfaces only when a developer runs the suite locally — and a *type* error surfaces even later than a behavioural one, since Playwright transpiles per file.
+
+**Recommended Solution**: add a `tsconfig.e2e.json` (extending `tsconfig.json`, `include: ["e2e/**/*.ts", "playwright.config.ts"]`, `types: ["node"]`) and a `typecheck:e2e` script folded into `typecheck`. Cheap, and it costs no CI minutes beyond one `tsc` pass.
+
+**Files**: `tsconfig.json`, `tsconfig.node.json`, `tsconfig.web.json`, `tsconfig.test.json`, `package.json` (`typecheck` scripts), `e2e/`.
+
+**Status**: Open — recorded by the #60 change-set review.
+
+---
+
+### 22. Shared renderer HTML entry keeps a whole family of CSS-leak guards alive (#60, 2026-08)
+
+**Severity**: Low
+**Impact**: The app window and the screenshot-overlay window share one entry, `src/renderer/index.html`, so any globally-scoped rule in a statically imported stylesheet reaches both. The overlay once inherited a crosshair cursor this way. Four guards exist purely to hold that line: `main.import-isolation.test.ts` (no app CSS imported on the overlay branch), `RootErrorBoundary.css.test.ts` (allowlist: every top-level selector must start with `.root-error`), the `.panel-error` prefix allowlist for `Panels/PanelErrorBoundary.css` — which has **no** stylesheet test file of its own and is instead bolted onto `RootErrorBoundary.contrast.test.ts` (the `scopes every PanelErrorBoundary.css selector to .panel-error` case in its `stylesheet shape` block) — and the standing rule that `src/renderer/src/index.css` must not gain a background rule (`design-issue-60` §2.5).
+
+**Problem**: Every new full-window surface has to re-derive the constraint and, in practice, ship its own allowlist test. The guards are cheap individually and unbounded collectively. The fourth guard **is that prediction happening**: the second crash surface needed the same allowlist, and because a whole test file per stylesheet was too much ceremony it was grafted onto a neighbouring suite instead — so the guard family is now growing sideways as well as in number, and the `.panel-error` rule lives in a file whose name does not mention it.
+
+**Recommended Solution**: give the overlay its own HTML entry, mirroring the existing preload split (`src/preload/screenshotOverlay.ts`). The two windows then have genuinely separate stylesheet graphs and the allowlist tests can be retired rather than multiplied.
+
+**Files**: `src/renderer/index.html`, `electron.vite.config.ts`, `src/main/services/screenshot/ScreenshotOverlayWindow.ts`, `src/renderer/src/main.tsx`, the four guards above (three test files: `main.import-isolation.test.ts`, `RootErrorBoundary.css.test.ts`, `RootErrorBoundary.contrast.test.ts`).
+
+**2026-08-24 update (#73) — the blocker is gone.** The recommended solution assumed the renderer had no multi-entry build, which was true: `electron.vite.config.ts` declared no `renderer.build.rollupOptions.input` at all. The image-export work needed a second renderer page for its rasterize harness and therefore introduced exactly that map, `{ index, imageExport }`, for the same reason stated here — a hash route on the app entry would evaluate the whole app module graph, `window.api` included, inside a window that must not have it. Giving the overlay its own `screenshotOverlay.html` is now adding a third key to an existing map plus one `loadFile` change, not a build-config redesign, and the four guards can then be retired. The preload side has been multi-entry since #164, so both halves of the split now have precedent.
+
+**Status**: Deferred — build-config housekeeping; also listed in [`design/design-issue-60.md`](./design/design-issue-60.md) §8 with the allowlist as the interim control. **Promotion criterion now met**: the multi-entry renderer build exists, so the cost objection no longer holds.
+
+---
+
+### 23. `ThrottledWorker.workMany` carries the same spread-push pattern #60 fixed (#60, 2026-08)
+
+**Severity**: Low
+**Impact**: `this.buffer.push(...items)` in `ThrottledWorker.workMany` is `Function.prototype.apply` under the hood — the exact construct that threw `RangeError: Maximum call stack size exceeded` in `flattenTree` on a 174k-node project. A single `workMany` call with ~10^5 items would throw inside the watcher pipeline.
+
+**Problem**: Latent only: `workMany` was verified to have **no production callers** (two test call sites). Production feeds the buffer one event at a time through `work(item)`, which is unaffected. It becomes real the moment someone batches watcher events — which is a plausible thing to do for exactly the large-project scenario #60 came from.
+
+**Recommended Solution**: replace with a bounded loop (`for (const item of items) this.buffer.push(item)`) — same semantics, no argument-count exposure — or delete `workMany` if it is still unused when the watcher is next opened.
+
+**Files**: `src/main/services/watcher/ThrottledWorker.ts` (`workMany`).
+
+**Status**: Deferred — no production caller; recorded as a follow-up note on #60 (§8 of the design).
+
+---
+
+### 24. `FileWatcherService.watchFile` confinement check is text-only and unresolved (#70, 2026-08)
+
+**Severity**: Medium — it is a main-process security boundary, though a notification-only one.
+
+**Impact**: `watchFile` gates on `filePath.startsWith(this.projectPath)` (`FileWatcherService.ts:112`) — no `path.resolve`, no trailing separator, and no `fs.realpath`. It is wrong in both directions: `/proj-evil/x.png` **passes** when the project is `/proj` (prefix match without a separator), and `/proj/../p2/x.png` fails closed. The read handlers next to it (`file:readFile`, `file:readImage`) went through `assertInsideProject` in #70 and now do the two-stage lexical + canonical check.
+
+**Why it was left alone in #70**: it is a shared boundary used by every watcher consumer and deserves its own tests and review pass rather than a drive-by edit inside a bugfix. The exposure is bounded — watching is a notification side channel, the *content* read behind it goes through the stricter guard, and the atomic re-arm path already re-validates the path with `classifyConfinement` before rebuilding a watcher (`watcher/atomicRearm.ts` → `AtomicRearmDeps.isPathConfined`).
+
+**Recommended Solution**: route `watchFile` through `assertInsideProject` from `src/main/utils/projectConfinement.ts`, keeping the existing "file does not exist" throw (the guard lets a `missing` verdict through on purpose).
+
+**Files**: `src/main/services/FileWatcherService.ts` (`watchFile`), `src/main/utils/projectConfinement.ts`.
+
+**Status**: Open — recorded by the #70 design (§9.1) and its review rounds. **A follow-up issue should be filed.**
+
+---
+
+### 25. `file:getStats` is exempt from project confinement (#70, 2026-08)
+
+**Severity**: Low
+
+**Impact**: `file:getStats` is guarded by `assertNoConfinementEscape`, not `assertInsideProject`: a path that was never in the project is served, and only a path that *looks* in-project while canonically resolving out of it is refused. Every other read channel is fully confined.
+
+**Problem**: The carve-out is load-bearing, not an oversight. The external-file import shortcut (spec #012, `ProjectTree.handleImportShortcut`) stats the paths the user picked in the native file dialog, and those are outside the project by definition — confining the channel would break that flow. The weaker guard still closes the part #70 needed: the watcher's automatic re-stat of a watched, in-project path cannot be redirected through a symlink.
+
+**Recommended Solution** (the clean fix): have `file:selectExternalFiles` return sizes alongside paths, so `ProjectTree` never stats an external path at all. `file:getStats` can then be confined with `assertInsideProject` like the other read handlers and the carve-out disappears rather than being documented forever.
+
+**Files**: `src/main/ipc/file-handlers.ts` (`file:getStats`), `src/main/utils/projectConfinement.ts` (`assertNoConfinementEscape`), `src/main/ipc/external-file-handlers.ts` (`file:selectExternalFiles`), `src/renderer/src/components/ProjectTree/ProjectTree.tsx`.
+
+**Status**: Open — recorded by the #70 security review. See [API Services § Path confinement](./api-services.md#path-confinement-for-the-file-read-ipc-handlers).
+
+---
+
+### 26. Files over the 500-line guideline after #70 (2026-08)
+
+**Severity**: Low
+
+The policy as practised: *a file a change adds behaviour to must come in under 500 lines; a file only read, moved unchanged, or trivially touched keeps its pre-existing debt and is waived.* The #70 table listed five files; the inventory below is the full `wc -l` of every non-test `src/**/*.ts(x)` over 500 lines, re-measured 2026-09-04 (`imageViewer.logic.test.ts`, 693 lines in the #70 table, is a test file and is out of scope here).
+
+| File | Lines | Note |
+|---|---|---|
+| `src/renderer/src/components/ProjectTree/ProjectTree.tsx` | 1,468 | Pre-existing |
+| `src/renderer/src/components/Panels/TerminalPanel.tsx` | 1,362 | Pre-existing; #70 only shrinks it (the panel router replaced its inline open logic) |
+| `src/preload/index.ts` | 1,179 | Pre-existing; the single app bridge grows one block per IPC domain |
+| `src/main/services/preview/PreviewLiveView.ts` | 1,169 | #74 and its follow-ups. sd-074b §3.3 recorded it at 545 against the cap before links landed; the link, CSP-violation and consent code went into sibling modules (`previewLinkBridge.ts`, `previewCspViolationBridge.ts`, `externalLinkConsent.ts`) precisely because of this, and the v0.19.0 bounded-teardown and partition-release changes still added to it |
+| `src/renderer/src/components/Editor/MarkdownPreview.tsx` | 1,032 | Pre-existing (entry 8) |
+| `src/main/services/LocalWhisperService.ts` | 933 | Pre-existing |
+| `src/main/services/ProjectLockService.ts` | 906 | Pre-existing |
+| `src/main/services/DirectoryWatcherService.ts` | 885 | Pre-existing |
+| `src/renderer/src/constants/testids.ts` | 842 | Pre-existing; a flat constant table |
+| `src/main/services/preview/PreviewViewService.ts` | 832 | #74 and its follow-ups; its own header notes the registry was extracted to keep it under the cap, and multi-view, suspend/resume and the v0.19.0 partition hand-back pushed it past anyway |
+| `src/main/services/PdfService.ts` | 821 | Pre-existing |
+| `src/main/services/GitWatcherService.ts` | 795 | Pre-existing |
+| `src/main/services/WhisperModelManager.ts` | 753 | Pre-existing |
+| `src/main/services/TerminalService.ts` | 730 | Pre-existing |
+| `src/main/ipc/transcription-handlers.ts` | 694 | Pre-existing |
+| `src/renderer/src/hooks/useCameraCapture.ts` | 687 | Pre-existing |
+| `src/main/index.ts` | 670 | Pre-existing; the composition root |
+| `src/renderer/src/utils/filePathLinks.logic.ts` | 655 | Pre-existing |
+| `src/shared/constants.ts` | 651 | Pre-existing; comment-heavy constant table |
+| `src/renderer/src/components/Editor/DiagramViewer/ChatBubble.tsx` | 641 | Pre-existing (entry 8) |
+| `src/main/services/claudeStatus/ClaudeStatusService.ts` | 639 | Pre-existing |
+| `src/main/ipc/file-handlers.ts` | 627 | Pre-existing; **grew by 4 lines** in #70 to 601 (the `projectConfinement` import plus two `assert*` calls) and has since reached 627. Adding a security guard to an over-cap file was accepted rather than blocking the fix on a refactor |
+| `src/renderer/src/components/Dialog/BaseDialog.tsx` | 624 | Pre-existing |
+| `src/renderer/src/components/Settings/SettingsOverlay.tsx` | 611 | Pre-existing |
+| `src/main/services/ExternalFileService.ts` | 596 | Pre-existing |
+| `src/main/services/FileService.ts` | 594 | Pre-existing |
+| `src/renderer/src/components/Panels/MarkdownEditorPanel.tsx` | 593 | Pre-existing; untouched by #70 except by the optional router commit |
+| `src/renderer/src/components/Panels/markdownEditorPanel.logic.ts` | 587 | Pre-existing |
+| `src/main/services/LoggingService.ts` | 567 | Pre-existing |
+| `src/renderer/src/components/Dialog/CameraDialog.tsx` | 548 | Pre-existing |
+| `src/renderer/src/components/Panels/ImageViewerPanel/imageViewer.logic.ts` | 539 | Moved unchanged by `git mv` in #70 |
+| `src/shared/errors.ts` | 525 | Pre-existing; one enum plus its message table, growing one line per new code |
+| `src/main/services/preview/PreviewAllowlistStore.ts` | 524 | #74 follow-ups (origins, badge buffering, the v0.19.0 bounded re-read) |
+| `src/main/services/workers/git-status.worker.ts` | 520 | Pre-existing |
+| `src/renderer/src/hooks/useExternalFileDrop.ts` | 518 | Pre-existing |
+
+`FileWatcherService.ts` deliberately stayed under the cap (498 lines at the #70 measurement) by moving the watch factory, the unlink branch, the send loop and the subscriber counting into `src/main/services/watcher/`.
+
+**Recommended Solution**: `PreviewLiveView.ts` and `PreviewViewService.ts` are now the entries gaining code fastest and are the ones to split first – the lifecycle wiring, teardown and still-frame paths in the former and the suspend/resume policy in the latter are separable. `file-handlers.ts` remains a candidate: the project/file/stat/CRUD handler groups are independent. The `imageViewer.logic.ts` file is a candidate for the next pass that genuinely changes it.
+
+**Status**: Accepted for #70; recorded so the next change to any of these files does not re-litigate it.
+
+---
+
+### 27. A genuine delete does not re-arm the watch (#70, 2026-08)
+
+**Severity**: Low
+
+**Impact**: After a real delete, `FileWatcherService` drops the map entry. Restoring the file more than ~100 ms later does **not** resume auto-refresh — the tab keeps showing the last version it loaded until the user presses **Reload**.
+
+**Problem**: The 100 ms atomic-save window is a bound, not a guarantee. A tool that waits longer than that between `unlink` and `rename` is classified as a delete. Re-arming a genuine delete needs a directory-level watch on the parent, which is a different design from a 1 watcher : 1 path service.
+
+**Mitigation shipped**: the renderer re-checks existence via `file:getStats` before it shows the "deleted" banner, so a slow temp-then-rename recovers silently instead of showing a false banner; and the banner carries a **Reload** button, so the UI never claims freshness it does not have.
+
+**Files**: `src/main/services/watcher/atomicRearm.ts`, `src/renderer/src/hooks/useFileChangeSubscription.ts`.
+
+**Status**: Accepted, with the escape hatch in the UI. See [File Watching § Single-file watch internals](./file-watching/README.md#single-file-watch-internals-70).
+
+---
+
+### 28. `useFileWatcher.reloadFromDisk` does not clear its indicator timer on unmount (#70, 2026-08)
+
+**Severity**: Low
+
+**Impact**: The editor hook sets a 1000 ms "Reloaded from disk" timer and never clears it on unmount. Benign under React 18 (the state update on an unmounted component is a no-op, not a warning), but it is a post-teardown timer of exactly the class `flakeGuard` exists to catch.
+
+**Recommended Solution**: mirror what `useFileChangeSubscription` already does — hold the timeout in a ref and clear it in the effect cleanup. One-line alignment when the editor hook is next opened.
+
+**Files**: `src/renderer/src/hooks/useFileWatcher.ts` (`reloadFromDisk`). Reference implementation: `src/renderer/src/hooks/useFileChangeSubscription.ts`.
+
+**Status**: Deferred — recorded by the #70 review.
+
+---
+
+### 29. `IMAGE_EXTENSIONS` is duplicated across the process boundary ✅ Resolved (#73)
+
+Resolved by the #73 image-export work. The canonical extension list, the MIME map and the extension regex derived from it now live in `src/shared/ipc/image-formats.ts`; `src/main/services/file/imageRead.ts` and `src/renderer/src/utils/imageUtils.ts` both import it, and the main-process copy's "Matches IMAGE_EXTENSIONS in renderer/src/utils/imageUtils.ts" drift comment is gone. The MIME map moved to the shared module rather than staying main-side, because the image-export request schema needs it to build its `z.enum` and the rasterize harness needs it to type a `Blob`. See [Resolved Issues](#resolved-issues). The number is kept so existing references to "item #29" stay valid.
+
+---
+
+### 30. Smaller accepted trade-offs from #70 (2026-08)
+
+**Severity**: Low. Recorded so none of them is later filed as a bug.
+
+- **One panel per path *string*.** The id is the sanitized path (plus a digest of the raw path past the length budget in `buildPanelId`), so on a case-insensitive volume `/proj/Icon.svg` and `/proj/icon.svg` still open two panels. Harmless now that watches are subscriber-counted — the second panel gets its own subscription and neither can deafen the other.
+- **No way to open an image file as text.** Once file opens route through `utils/openFileInPanel.ts`, an SVG always opens in the viewer. Hand-editing an SVG beside an agent is plausible, so a context-menu "Open as text" is worth a follow-up issue; it becomes a prerequisite if the Markdown-preview link path is migrated to the router as well.
+- **Two visual artefacts on refresh.** The degraded-state banner mounts above the content, so it pushes the image down and the `ResizeObserver` refires in fit mode (a second, small jump); and an animated GIF restarts from frame 0 when the source object is replaced.
+- **No visual-regression coverage for the new surfaces.** The status slot and the banner are transient states; baselines would flake. Descoped deliberately.
+- **The end-to-end proof of the fix has no CI gate.** `e2e/preview-refresh.e2e.ts` and `e2e/preview-refresh-terminal.e2e.ts` only run locally (item #5 above). The atomic-replace case is covered deterministically on CI by two main-process suites instead — `FileWatcherService.atomicSave.test.ts` (mocked) and `watcher/singleFileWatch.rename.integration.test.ts` (real chokidar, real rename).
+
+**Status**: Accepted; recorded by the #70 design (§9) and its review rounds.
+
+---
+
+### 31. `PdfService` and `DocxService` still carry their own copies of `ExportLock` (#73, 2026-08)
+
+**Severity**: Low
+
+**Impact**: The shared mutex now exists at `src/main/utils/ExportLock.ts` — #73 created it so the image-export path would not become a third verbatim copy. The two older export services were **not** re-pointed at it, so the same eight-line value object is still declared inline in `PdfService` and `DocxService`. Three call sites, two definitions.
+
+**Problem**: This is the long-standing Windows-ledger item [D3](./windows/deferred-work.md#d3--deduplicate-exportlock-pdf--docx) reaching its own promotion criterion — "a third service needs an export lock" — and being only half-acted-on. Half is the right call for a feature PR: re-pointing the two services touches two unrelated export paths that each have their own suites, in a change that is otherwise about the image viewer. But the state it leaves behind is worse than either endpoint, because a future reader now finds three lock declarations instead of two and has to work out which is canonical.
+
+**Recommended Solution**: delete the inline `ExportLock` class from `PdfService.ts` and `DocxService.ts` and import `src/main/utils/ExportLock.ts` in both. Behaviour is identical — the shared class was extracted verbatim — so the existing PDF and DOCX suites are the regression gate. Do it the next time either service is opened for any reason.
+
+**Files**: `src/main/services/PdfService.ts`, `src/main/services/DocxService.ts`, `src/main/utils/ExportLock.ts`.
+
+**Status**: Deferred from #73 (recorded as the scoped half of that design's MED-10 ruling). D3 in [`windows/deferred-work.md`](./windows/deferred-work.md) is amended to match.
+
+---
+
+### 32. `pdf:exportToPdf` and `docx:exportToDocx` have no `isTrustedSender` gate (#73, 2026-08)
+
+**Severity**: Low — a hardening gap, not a live vulnerability.
+
+**Impact**: `image-export:run` checks `isTrustedSender(event)` before it looks at the payload, matching `clipboard:*`, `system:*` and `screenshot:*`. The two older export channels in `src/main/ipc/pdf-handlers.ts` and `src/main/ipc/docx-handlers.ts` do not: they Zod-parse and proceed regardless of which frame sent the request.
+
+**Problem**: The exposure is bounded today — the app renders no untrusted remote content, sub-frames are not created, and the worst outcome is a save dialog the user did not ask for, holding HTML the sender already had. It is nonetheless the only remaining group of privileged handlers outside the gate, so the app's sender-frame story currently has to be stated with an exception rather than as a rule. Retrofitting it inside #73 was deliberately refused as scope discipline: the two handlers have their own suites and their own request shapes.
+
+**Recommended Solution**: add the same first-line `isTrustedSender(event)` check both handlers' newer sibling uses, returning the existing `PDF_EXPORT_INVALID_REQUEST` / `DOCX_EXPORT_INVALID_REQUEST` code plus a `logger.warn` with the sender URL redacted via `redactPath`. Reference implementation: `src/main/ipc/image-export-handlers.ts`.
+
+**Files**: `src/main/ipc/pdf-handlers.ts`, `src/main/ipc/docx-handlers.ts`, `src/main/ipc/senderValidation.ts`. See [Security § Sender-frame gating](./security.md#sender-frame-gating) and [IPC patterns § Export](./ipc-patterns.md#export-pdf-handlersts-docx-handlersts-image-export-handlersts).
+
+**Status**: Open — recorded by the #73 design (LO-14), which held that a security gap noted only in a PR summary is unsearchable.
+
+---
+
+### 33. In development, `isTrustedSender` compares origins, so the rasterize harness satisfies it (#73, 2026-08)
+
+**Severity**: Low — recorded for accuracy; not exploitable as shipped.
+
+**Impact**: `isTrustedSender` accepts the packaged app's exact `file://` renderer URL in production, but in development it accepts **any** URL on the dev-server origin. The image-export rasterize harness is served from that same origin (`${ELECTRON_RENDERER_URL}/imageExport.html`), so during development the harness page counts as a trusted sender for **every** gated channel, not just its own.
+
+**Problem**: Nothing reachable follows from it. The harness runs its own preload, which exposes four verbs (`ready`, `onRender`, `postResult`, `log`) and no `ipcRenderer` handle to build a fifth with, so there is no bridge from that page to a gated channel; and production pins the exact file URL, so the widening does not ship. It is recorded because the *reason* it is safe lives in a different file from the check itself, and a future harness preload that exposed one more verb would silently remove the only thing holding the line.
+
+**Recommended Solution**: tighten the dev branch of the predicate to compare the full URL, not the origin. Not done in #73 because the shared predicate guards every gated channel: narrowing it would ripple into all of them, in dev, for a path with no caller. If it is ever done, the harness needs its own allowance rather than an implicit one.
+
+**Files**: `src/main/ipc/senderValidation.ts`, `src/preload/imageExport.ts`, `src/renderer/imageExport.html`.
+
+**Status**: Accepted as debt by the #73 design (LO-8), which ruled it real but unreachable.
+
+---
+
+### 34. A cross-tab `IMAGE_EXPORT_BUSY` throws away a destination the user already chose (#73, 2026-08)
+
+**Severity**: Low — a narrow race with an annoying, not destructive, outcome.
+
+**Impact**: The process-wide export lock is acquired **after** the native save dialog closes (the MED-12 reordering, so a modal dialog can never hold the lock open indefinitely). The consequence is the mirror image: while image tab A's user is picking a filename and folder, image tab B can start an export and take the lock. Tab A then fails with `IMAGE_EXPORT_BUSY` **after** the user has already navigated to a folder and typed a name, and that choice is gone — the retry starts from a fresh dialog.
+
+**Problem**: The window is small (exports are sub-second, and it needs two image tabs exporting at once), and the per-panel busy state cannot close it because the lock is per-process while the state is per-panel. Nothing is lost but the user's dialog input, and nothing is written. It is recorded because the failure lands at the worst possible moment — after the user has done work — and because the current wording reads as an app-level refusal of an action the UI had just accepted.
+
+**Recommended Solution**: make `ExportLock.acquire()` briefly awaitable — a bounded wait (a second or two) that resolves when the holder releases, and only then falls back to `IMAGE_EXPORT_BUSY`. Deliberately not done in #73: it turns a synchronous value object into a queue with a timeout and a cancellation path, which is more machinery than this race justifies inside a feature PR.
+
+**Files**: `src/main/utils/ExportLock.ts`, `src/main/services/imageExport/ImageExportService.ts`.
+
+**Status**: Open — accepted during the #73 final review as the known cost of acquiring the lock after the dialog.
+
+---
+
+### 35. The image viewer's reduced-motion block repeats `[aria-disabled]` selectors that do nothing (#73, 2026-08)
+
+**Severity**: Low — dead CSS with a comment that describes a mechanism that is not there.
+
+**Impact**: `ImageViewerPanel.module.css`'s `@media (prefers-reduced-motion: reduce)` block lists `.controlButton[aria-disabled='true']` (and its `:hover`) alongside `.spinner`. Those two rules change nothing: `.controlButton` already declares `transition: none` at equal precedence, and the `aria-disabled` rules declare no transition of their own to suppress. The accompanying comment explains a transition-suppression that never applied.
+
+**Problem**: Purely a readability and maintenance cost. A later reader takes the block as load-bearing and preserves it through a refactor, or trusts the comment's account of how the busy state animates. Removing it is safe but is a cosmetic edit, and it was ruled out of scope for #73's final pass rather than mixed into a behavioural change.
+
+**Recommended Solution**: delete the two `[aria-disabled]` selectors from the reduced-motion block and rewrite the comment to state what is actually true — that busy is signalled by glyph, colour and cursor, so only `.spinner` has motion to suppress.
+
+**Files**: `src/renderer/src/components/Panels/ImageViewerPanel/ImageViewerPanel.module.css`.
+
+**Status**: Open — recorded by the #73 final review in place of the edit.
+### 36. Main-side project-switch teardown not wired for HTML preview (#74, 2026-08)
+
+**Severity**: Low
+
+**Impact**: The `subscribeProjectChanged` seam (`preview-handlers.ts`, `PreviewViewService.onProjectChanged`) passes nothing in production — `src/main/index.ts` calls `registerPreviewHandlers` with only `getProjectPath` + `globalSettings`, and no main-side project-changed observable exists (`ProjectService` uses an imperative `setProjectPath`). The renderer's idempotent `preview:close` is the sole teardown owner **for a project switch**.
+
+**Narrowed (2026-08-29), not closed.** Main now reaps a window's previews when the window itself goes away: `index.ts` subscribes `closed` per window and calls `PreviewViewService.closeWindow`, which drains that window's registry entries, invalidates their in-flight opens and releases the project refcount. That removes the quit-time `removeChildView` warning at source and closes the latent second-window leak. A **project switch** inside a surviving window still has no main-side teardown, which is what this entry remains open for.
+
+**Problem**: A renderer crash or reload **during** a project switch can strand a running preview against the old root and lock new opens with `PREVIEW_VIEW_LIMIT_REACHED`. Edge case.
+
+**Recommended Solution**: expose a project-changed event from `ProjectService` and wire the seam so main-side teardown does not depend on the renderer surviving the switch.
+
+**Status**: Accepted at QG-6 — fix cost/scope judged greater than the value for this edge case.
+
+---
+
+### 37. HTML-preview CSP skip-and-badge half-wired on the registry path (#74, 2026-08)
+
+**Severity**: Low
+
+**Impact**: `PreviewRootRegistry.ts` calls `buildPreviewCsp(hosts)` without an `onReject` badge sink, so a host rejected at CSP-build time **on the registry path** emits no `allowlist-invalid` badge.
+
+**Problem**: Unreachable in practice — the `PreviewAllowlistStore` validation gate already rejects such hosts before they reach the registry, so this is belt-and-braces only. Recorded as unreachable rather than fixed.
+
+**Status**: Accepted at QG-6 — document-as-unreachable.
+
+---
+
+### 38. HTML-preview main-process memory amplification (#74, 2026-08)
+
+**Severity**: Low
+
+**Impact**: `previewPathResolve.readExactly` buffers up to `PREVIEW.MAX_ASSET_BYTES` (25 MB) per request with no per-session in-flight-bytes budget. Many parallel subresource fetches to large in-project files can transiently pin hundreds of MB.
+
+  **Narrowed by sd-074b §4.7, not closed.** `MAX_CONCURRENT_ASSET_READS` is now a PROCESS-WIDE limiter with a bounded wait queue, rather than one limiter per session, so opening more previews no longer multiplies the bound; over the queue bound a read is shed with 503 and recorded as a failure instead of parking a URLLoader indefinitely. The per-read 25 MB ceiling and the absence of an in-flight BYTE budget remain.
+
+**Problem**: A self-inflicted DoS on the user's own project — no disclosure, and it aligns with the design's accepted-DoS posture (Erfana bounds its own work per reload, not the page's).
+
+**Recommended Solution**: a per-session in-flight byte ceiling, or streaming the response body instead of buffering.
+
+**Status**: Accepted LOW at QG-7 (security pass).
+
+---
+
+### 39. HTML-preview `about:` allowed for all request types in `decideRequest` (#74, 2026-08)
+
+**Severity**: Low
+
+**Impact**: `previewFilterDecision.decideRequest` allows the `about:` scheme for every request type.
+
+**Problem**: Defense-in-depth only — **not exploitable**: `frame-src 'none'`, the `will-navigate` handler and the sandbox already block it. Narrowing to `data:`/`blob:` only was judged not worth churning security-critical filter code.
+
+**Recommended Solution** (optional): narrow the allowed schemes if this filter is next opened for other reasons.
+
+**Status**: Accepted at QG-7.
+
+---
+
+### 40. HTML-preview `runPipeline` overlapping-run race (#74, 2026-08)
+
+**Severity**: Low
+
+**Impact**: The post-load pipeline (`runPipeline`) can overlap itself when `did-finish-load` events arrive faster than a run completes, despite the reload-interval rate limit.
+
+**Recommended Solution**: add a single-flight guard so a run in progress absorbs a trailing request rather than starting a second concurrent run.
+
+**Status**: Note-and-monitor — surfaced by the QG-8 code review as a LOW race.
+
+---
+
+### 41. HTML-preview `onCrash` reuses the `script-error` failure type (#74, 2026-08) – RESOLVED
+
+**Severity**: Low
+
+**Impact**: The crash-handling path emitted a failure of type `script-error`, which was a semantic mislabel – a `render-process-gone`/`unresponsive` crash is not a script error, so the failure badge misattributed the cause.
+
+**Files**: `PreviewLiveView` (crash handler), `htmlPreview.logic.ts` (badge labels).
+
+**Status**: Resolved. `PreviewLiveView.onCrash` now records the distinct `render-crash` failure type carrying the crash reason, the badge labels it "Preview crashed", and the `TODO` is gone (`PreviewViewService.test.ts` pins the type on `render-process-gone`).
+
+---
+
+### 42. HTML-preview failure badge occluded by the native view (#74, 2026-08) — RESOLVED
+
+**Severity**: Low
+
+**Status**: Resolved (2026-08-24, Phase 9/AC20 remediation). The badge indicator moved to the dockview tab (always-DOM chrome the `WebContentsView` never covers), subscribing to the preview store by panelId; its failure-list popover is portalled to `#portal-root` and registers a `menu` occluder, so the native view hides behind the still frame while the list is open. The `TODO(#74)` is gone and no badge renders inside `HtmlPreviewPanel`.
+
+**Files**: `src/renderer/src/components/Tabs/HtmlPreviewTab.tsx`, `src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewFailureBadge.tsx`.
+
+---
+
+### 43. HTML-preview in-app allowlist view/revoke UI deferred (UX-004, #74, 2026-08)
+
+**Severity**: Low when filed; **Medium** as of 2026-08-31 — see Impact.
+
+**Impact**: Settings carries a global on/off only; there is no in-app UI to see or revoke the per-project approved hosts. Removing an approval requires hand-editing `.erfana/settings.json`.
+
+Raised from Low because the approve flow was **unreachable** when this was filed: a host absent from the allowlist is refused by the CSP in the renderer, so the network filter never saw it and no prompt could appear. On a project with no approvals yet there was no route to approving anything at all. The #74 follow-up work closed that gap, so the one-way door is now one a reader can actually walk through — and every approval is written into the project, applies project-wide, survives restarts and reaches anyone who clones the repository (`docs/security.md` residual risk 5), with no way back from inside Erfana.
+
+**Problem**: The store built **only** the grant side (`PreviewAllowlistStore` has `approveOrigin` + `getOrigins`, named `approveHost`/`getHosts` when this was filed; no revoke method, no revoke IPC channel, no bridge). Building the feature is new capability, not unwired plumbing: it needs a `store.revokeOrigin`, a `REVOKE` channel + handler, a preload bridge, a schema, CSP-rebuild-on-revoke, a revoke control in the band and tests – out of #74 scope. Not release-blocking, since the allowlist is hand-editable.
+
+One extra obstacle found since: `PreviewViewService.applyApprovedHosts` returns early when no live view exists, so a revoke issued from a settings screen with no preview open has no CSP-rebuild path today.
+
+**Recommended Solution**: file a follow-up issue after #74 merges to build the view/revoke UI and its backend.
+
+**Status**: **Half resolved (2026-09-01).** The *seeing* half is built: the permission band (`components/PreviewChromeBand.tsx`) lists every approved host for the project alongside the blocked ones, seeded on open via `preview:allowlistChanged` — so a repository that arrives with hosts already approved by someone else now shows them, which nothing anywhere did before. The consent copy still states that approval permits remote code and data egress, is saved into the project, reaches anyone who clones it, and cannot be undone from Erfana. **What [#86](https://github.com/qodeca/erfana/issues/86) still owes is REVOKE**: `PreviewAllowlistStore` has no remove at any layer, so undoing an approval remains a hand-edit of `.erfana/settings.json`. See also [#81](https://github.com/qodeca/erfana/issues/81) for narrowing what a grant covers.
+
+---
+
+### 44. `isTrustedSender` duplicated across three copies (#74 design §7.1, 2026-08)
+
+**Severity**: Low
+
+**Impact**: The trusted-sender predicate exists in three copies (the shared `senderValidation.ts`, the `claude-status-handlers.ts` local copy, and the new `ipc/preview/isTrustedPreviewSender.ts`). Each must be kept correct independently.
+
+**Recommended Solution**: consolidate onto one shared predicate when the sender-validation surface is next revisited.
+
+**Status**: Pre-existing debt carried into #74; recorded from design §7.1.
+
+---
+
+### 45. Residual `realpath`→open race in local file serving (#74 design §7.1, 2026-08)
+
+**Severity**: Low
+
+**Impact**: Both the `erfana-preview://` protocol handler and the shared file-read handlers resolve a path with `realpath` and then open it in a separate step; a rename between the two can still race. The HTML-preview post-resolve re-check (§2.4 step 8h) narrows the window but does not close it.
+
+**Problem**: Node has no `openat`, so there is no atomic resolve-and-open primitive. The dev/ino compare pins the identity of the *opened* handle, not of a future name resolution.
+
+**Status**: Accepted — recorded from #74 design §7.1; the same residual class as the general file-read path.
+
+---
+
+### 46. Hardlinks defeat path confinement (#74 design §7.1, 2026-08)
+
+**Severity**: Low
+
+**Impact**: `realpath` resolves symlinks but not hardlinks, so a hardlink inside the project pointing at a file outside the excluded set (or, in principle, at content the confinement is meant to keep out) is not detected by the confinement gate.
+
+**Problem**: There is no portable way to detect a hardlink escape at open time; the exposure is bounded by the same read-only, opaque-origin posture as the rest of the preview.
+
+**Status**: Accepted — recorded from #74 design §7.1 and the §2.8 threat model (accepted risk 6).
+
+---
+
 ## Code Quality Improvements
 
 ### Documentation Token Efficiency
@@ -274,11 +727,11 @@ Ongoing effort to keep `docs/` concise and high-value for Claude Code.
 - Condense logging.md (525 → 239 lines) ✅
 - Condense terminal/README.md (code examples → tables) ✅
 - Condense CHANGELOG.md (old versions compressed) ✅
+- Inline the small editor stubs (2026-08-23) ✅ – `docs/editor/{toolbar.md, scroll-sync.md, monaco-configuration.md}` were merged into `docs/editor/README.md` (§ Monaco configuration, § Scroll synchronization, § Formatting toolbar) and deleted; both inbound refs – `docs/rendering/README.md` and `docs/archive/resolved-issues.md` – now point at `../editor/README.md#scroll-synchronization`
 
 **Remaining**:
 - Consolidate troubleshooting files (troubleshooting.md + troubleshooting-advanced.md)
 - Reduce code example verbosity across remaining files
-- Evaluate inlining of small editor stubs — `docs/editor/{toolbar.md, scroll-sync.md, monaco-configuration.md}` (40/53/60 lines). Deferred from Sprint 3: external inbound refs to `scroll-sync.md` from `docs/archive/resolved-issues.md:70` and `docs/rendering/README.md:42` would require anchor repointing; benefit (single file) vs cost (README bloat + link-break risk) currently balanced. Promotion criteria: when touching editor docs for any other reason (Phase 3+ UI work), re-evaluate the consolidation cost.
 
 **Note**: docs/future/ (8,604 lines) preserved for future graph-engine implementation.
 
@@ -286,6 +739,7 @@ Ongoing effort to keep `docs/` concise and high-value for Claude Code.
 
 ## Resolved Issues
 
+- ✅ `IMAGE_EXTENSIONS` duplicated across the process boundary (#73) – the extension list, the MIME map and the regex derived from them moved to `src/shared/ipc/image-formats.ts`; `imageRead.ts` (main) and `imageUtils.ts` (renderer) both import it instead of each declaring their own
 - ✅ LanguageSelect missing `id` for label association (#42) – optional `id` prop on `LanguageSelect`, passed as `id="transcription-lang"` by `TranscriptionDialog`, so clicking the label focuses the select
 - ✅ BaseDialog lacks Tab-cycling focus trap (#42) – Tab cycling, escaped-focus recovery and a `focusout` rescue for controls that become disabled now live in BaseDialog behind the opt-in `trapFocus` prop; the per-dialog `handleFocusTrap` copies were removed
 - ✅ Worker thread statusCache crash (v0.9.2) – persistent isomorphic-git cache caused V8 cppgc assertion after ~42 min; replaced with per-call cache
@@ -340,4 +794,4 @@ Amendment discipline + promotion-rule conventions in [`windows/contributing.md`]
 
 ---
 
-**Last Updated**: #55 extra-content packaging guards (2026-08-09 – entry #14 added: `assertResourcesSiblingsAllowlist` advisory-on-Windows watch item) + #43 packaging allowlist QG-11a remediation (2026-08-09 – entry #13 added: `scripts/fuses.js` size after the allowlist block; `resolvePackedResourcesDir` call-site count corrected to four) + v0.17.0 doc sweep (2026-08-08 – entry #4 resolved: `LanguageSelect` `id` prop; entries #7, #8, #10 re-measured against the v0.17.0 tree) + #42 camera mirror + dialog focus work (2026-08-07 – entry #3 resolved: BaseDialog `trapFocus`) + PR #245 (2026-06-13 – entry #12 live-verification updated: single-panel detection + mid-session model-switch verified on a Windows host) + #217 Windows Claude status bar (2026-06-10 — entry #12 added: Windows v1 detector limitations) + v0.14.0 doc sweep (2026-06-08 — entries #9 + #10 added from `Transcription/CLAUDE.md` eviction) + v0.9.6 release (2026-05-22 — critical macOS terminal fix `ea3eaf1`) + v0.9.5 release (2026-04-25) + Phase I branch protection refinement (PR requirement removed same day) + entry #7 documenting `security.md` cap constraint (2026-04-25)
+**Last Updated**: #74 HTML preview (2026-08-24 – entries #36–#46 added from the Phase 6/7/8 accepted-tech-debt ledger and the design §7.1 pre-existing items: main-side project-switch teardown unwired, CSP skip-and-badge unreachable on the registry path, main-process memory amplification, `about:` allowed for all request types, `runPipeline` overlapping-run race, `onCrash` reusing `script-error`, the failure badge occluded by the native view, the deferred in-app allowlist view/revoke UI, `isTrustedSender` triplication, the residual `realpath`→open race, and hardlinks defeating confinement) + #73 image export (2026-08-24 – entries #31–#33 added from the design's deferred ledger: the un-re-pointed `ExportLock` copies in `PdfService`/`DocxService`, the missing `isTrustedSender` gate on the `pdf:`/`docx:` export handlers, and the dev-mode origin-only sender check that the rasterize harness satisfies; entry #29 marked resolved, since both `IMAGE_EXTENSIONS` copies now re-point to `src/shared/ipc/image-formats.ts`; D3 in `windows/deferred-work.md` amended to record that `src/main/utils/ExportLock.ts` now exists) + doc-sweep follow-up (2026-08-23 – the editor-stub inlining moved from *Remaining* to *Completed* under Documentation Token Efficiency, verified on disk: the three stubs are gone, their content is in `docs/editor/README.md`, and both inbound refs are repointed; entry #7's `checks.yml`, release-skill and `README.md` citations converted from line numbers to section/step names after the checks.yml numbers were found stale) + doc-accuracy sweep (2026-08-23 – entry #5 repointed from the deleted `e2e/fixtures.ts` to `e2e/fixtures/index.ts` and its dead line ranges replaced with fixture names; entries #7, #13 and #26 re-measured: `security.md` 626 → 661, `scripts/fuses.js` ~1,040 → ~1,715, `scripts/fuses.test.mjs` ~835 → ~1,758, `file-handlers.ts` 601 → 626) + #70 stale preview tabs (2026-08-23 – entries #24–#30 added from the design's accepted-debt ledger and the review rounds: text-only `watchFile` confinement, the `file:getStats` carve-out and its clean fix, the post-#70 over-cap file measurements, genuine deletes not re-arming, the `useFileWatcher` indicator timer, duplicated `IMAGE_EXTENSIONS`, and five smaller accepted trade-offs) + #60 large-project crash + error containment (2026-08-11 – entries #18–#23 added from the change-set reviews: dead `useDragDropTree` API surface, inert `vitest.renderer.ts` coverage block, `test:cov` workspace fan-out, no tsconfig over `e2e/`, shared renderer HTML entry, `ThrottledWorker.workMany` spread-push) + #55 extra-content packaging guards (2026-08-09 – entry #14 added: `assertResourcesSiblingsAllowlist` advisory-on-Windows watch item) + #43 packaging allowlist QG-11a remediation (2026-08-09 – entry #13 added: `scripts/fuses.js` size after the allowlist block; `resolvePackedResourcesDir` call-site count corrected to four) + v0.17.0 doc sweep (2026-08-08 – entry #4 resolved: `LanguageSelect` `id` prop; entries #7, #8, #10 re-measured against the v0.17.0 tree) + #42 camera mirror + dialog focus work (2026-08-07 – entry #3 resolved: BaseDialog `trapFocus`) + PR #245 (2026-06-13 – entry #12 live-verification updated: single-panel detection + mid-session model-switch verified on a Windows host) + #217 Windows Claude status bar (2026-06-10 — entry #12 added: Windows v1 detector limitations) + v0.14.0 doc sweep (2026-06-08 — entries #9 + #10 added from `Transcription/CLAUDE.md` eviction) + v0.9.6 release (2026-05-22 — critical macOS terminal fix `ea3eaf1`) + v0.9.5 release (2026-04-25) + Phase I branch protection refinement (PR requirement removed same day) + entry #7 documenting `security.md` cap constraint (2026-04-25)

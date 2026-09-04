@@ -12,7 +12,7 @@ Supporting service classes for terminal emulation, file operations, file watchin
 
 Manages terminal emulator instances with xterm.js + node-pty. Cross-platform: macOS/Linux (POSIX shells), Windows (Git Bash, PowerShell 7 / pwsh, Windows PowerShell 5.1, cmd.exe). Marker-based bootstrap with three-flag output gating — see [Terminal Bootstrap Pattern](./terminal/bootstrap-pattern.md) for platform-specific shell invocation, cwd validation contract, `WindowsBootstrapBuilder` strategy pattern, `resolveWindowsShell()` fallback chain, and Windows ConPTY resize-reflow mitigation.
 
-**cwd validation contract (Windows)**: cwds containing `" & | ^ < > \r \n` are rejected before bootstrap; `createTerminal` returns `null` and emits `'error'`. Callers must surface this. `(` and `)` are intentionally allowed (unblocks `C:\Program Files (x86)\…`).
+**cwd validation contract (Windows)**: cwds containing `" & | ^ < > \r \n` are rejected before bootstrap; `createTerminal` returns `{ error }` (was `null` before v0.19.0) and emits `'error'`. The handler passes `error` through to the renderer verbatim, so the sentence is what the user reads. `(` and `)` are intentionally allowed (unblocks `C:\Program Files (x86)\…`).
 
 **Resize race safety (Windows)**: `resize()` silently no-ops when the underlying node-pty process has exited between the `resize()` call and the deferred Windows resize execution — the method returns `false` and the stale terminal entry is dropped from the map.
 
@@ -22,7 +22,9 @@ Manages terminal emulator instances with xterm.js + node-pty. Cross-platform: ma
 
 ### Public Methods
 
-#### `async createTerminal(config?: TerminalConfig, webContentsId?: number): Promise<{ terminalId: string; shellKind: ShellKind } | null>`
+#### `async createTerminal(config?: TerminalConfig, webContentsId?: number): Promise<TerminalCreateResult>`
+
+`TerminalCreateResult` is `{ terminalId; shellKind } | { error: string }`. The reason travels in the result because the IPC handler cannot match an `'error'` event to a terminal whose id it never learned; before v0.19.0 every failure was `null` and the renderer saw only "Failed to create terminal". A Windows cwd over 260 chars (`isWindowsLongPath`) is refused before validation with a plain-language sentence.
 Create a new PTY instance. Async because `node-pty` is dynamically imported on first call.
 
 **Parameters** (`config?: TerminalConfig`, all optional — defaults to `{}`):
@@ -90,6 +92,8 @@ Watches file content for external changes with auto-reload and conflict detectio
 #### `async watchFile(filePath: string, webContents: WebContents): Promise<void>`
 Start watching file for changes. Watches are refcounted per `webContents`, so the caller must pass the owning window's `WebContents` (the same object is used to push change events back and to clean up via `cleanupForWebContentsId(id)`).
 
+`MAX_WATCHED_FILES` (100) governs **new** entries only: joining a path that is already watched never fails on the cap. A refused join would watch nothing while its later `unwatchFile` still decremented the count, closing the watcher for the consumer that owns it (issue #70).
+
 **Parameters:**
 - `filePath` - Absolute path to file
 - `webContents` - Electron `WebContents` of the subscribing window
@@ -134,21 +138,20 @@ Resume watching after pause. Synchronous.
 
 ---
 
-### Events
+### Renderer notifications
 
-#### `'file-changed'`
-**Payload:** `{ filePath: string }`
+`FileWatcherService` is not an `EventEmitter` — it sends straight to the
+subscribing windows over IPC (`watcher/watchNotifier.ts`, which skips destroyed
+windows and swallows send failures). Two of the three contracts changed in #70.
 
-Emitted when file changes externally (after 300ms debounce).
+| Channel | Payload | When |
+|---|---|---|
+| `file-watch:changed` | `{ filePath }` | Content changed externally, after `awaitWriteFinish` (300 ms) + a 300 ms debounce. **Since #70 this also covers an atomic replace** (write temp + rename): where the platform reports that as an `unlink`, the service re-arms the watch and re-enters the same debounced change path, so the renderer sees a change rather than a delete followed by silence |
+| `file-watch:deleted` | `{ filePath }` | The file is **genuinely** gone — confirmed by one final `stat` after the 100 ms atomic-save window closes |
+| `file-watch:error` | `{ filePath, error }` | A chokidar error, **and since #70 any watch teardown that is not a genuine delete**: the session token was bumped mid-window, the path stopped resolving inside the project, or the replacement watcher could not be created. Sent by `notifyWatchDead`, which deliberately bypasses the session-version guard that `notifyWebContents` applies — a "your watch is dead" message that the guard dropped would leave the renderer showing stale content with no indicator, which is the symptom #70 exists to remove |
 
-**Note:** Not emitted during pause window.
-
----
-
-#### `'file-deleted'`
-**Payload:** `{ filePath: string }`
-
-Emitted when watched file is deleted.
+Neither `changed` nor `deleted` is emitted during a pause window. Full mechanics
+in [File Watching § Single-file watch internals](./file-watching/README.md#single-file-watch-internals-70).
 
 ---
 
@@ -315,6 +318,25 @@ Reveals a file or folder in the native OS file manager (Finder/Explorer) by call
 - **Arg:** absolute path (the right-clicked tree node's `path`).
 - **Returns `Promise<string>`:** `''` on success, otherwise a human-readable error message the renderer surfaces as an error toast (`'Item no longer exists on disk'`, `'Cannot reveal items outside the project'`, `'No project is open'`, `'Invalid path'`).
 - **Security:** validates the IPC sender via the shared `isTrustedSender` (`src/main/ipc/senderValidation.ts`, also used by the clipboard handlers) and confines the path to the open project root (the root itself is allowed so the project-root node can be revealed); an untrusted sender is a silent no-op returning `''`. The path is `fs.realpath`-canonicalized before the boundary check, so an in-project symlink cannot escape the project.
+
+---
+
+### Path confinement for the file-read IPC handlers
+
+**Handlers:** `src/main/ipc/file-handlers.ts` · **Helper:** `src/main/utils/projectConfinement.ts`
+
+`path.resolve` normalises a path string but does not resolve symlinks, so a link planted inside the project used to carry an out-of-project target past the boundary check. Since #70 the file watcher re-reads a watched path automatically, which turns a one-shot user-initiated read into a repeating one, so the read handlers check twice: **lexically** first (no filesystem access, and it never discloses whether an out-of-project path exists), then **canonically** against `fs.realpath` of both the path and the project root. Both sides come from `realpath`, so platform canonicalisation — Windows casing, `/tmp` → `/private/tmp` on macOS — applies to each and an alias is not mistaken for an escape.
+
+`classifyConfinement` returns one of four verdicts: `inside`, `outside`, `missing` (lexically inside but the path does not exist, so the canonical stage could not run) or `unverifiable` (`realpath` failed for a reason other than ENOENT — EACCES, ELOOP, ENOTDIR). Two guards sit on top of it:
+
+| Channel | Guard | Rule when it escapes |
+|---|---|---|
+| `file:readFile`, `file:readImage` | `assertInsideProject` | Requires an open project; throws `Cannot read files outside the project directory`, or `Cannot verify this path is inside the project directory` on an `unverifiable` verdict |
+| `file:getStats` | `assertNoConfinementEscape` | **Deliberately not confined.** A path that was never in the project is left alone; only a path that *looks* in-project and canonically resolves out of it is refused |
+
+**Why `file:getStats` keeps the carve-out.** The external-file import shortcut (spec #012, `ProjectTree.handleImportShortcut`) stats the paths the user picked in the native file dialog, and those are outside the project by definition. Confining the channel would break that flow. What the weaker guard still buys is the part #70 needs: the watcher's automatic re-stat of a watched, in-project path cannot be pointed somewhere else through a symlink. The clean fix — have `file:selectExternalFiles` return sizes so `ProjectTree` stops stat-ing external paths at all, after which `getStats` can be confined like the read handlers — is recorded in [Technical Debt](./technical-debt.md).
+
+A path that simply does not exist passes both guards, so the caller's own ENOENT stays the error the renderer sees rather than this module claiming the file left the project. The same helper backs the file watcher's re-arm re-check (`watcher/atomicRearm.ts`), which re-validates after an unlink because the file was replaced by someone else in between. `file:revealInFileManager` deliberately keeps its own copy of the two-stage check: it needs the canonical path itself to hand to `shell.showItemInFolder`, and it answers with per-verdict user-facing strings instead of throwing.
 
 ---
 
@@ -556,14 +578,17 @@ Get the resolved logs directory path (e.g., `~/.erfana/logs/`).
 
 | Channel | Direction | Description |
 |---------|-----------|-------------|
-| `logging:log` | Renderer → Main | Send log entry from renderer process |
+| `logging:log` | Renderer → Main | Send log entry from renderer process. **Two senders**: the editor window via `api.logging.log` (`src/preload/index.ts`) and the screenshot-overlay window via `overlayApi.log` (`src/preload/screenshotOverlay.ts`, #60). Both are one-way `send`s and both are validated main-side with the same `LogEntrySchema` |
+| `logging:getLevel` | Renderer → Main | Get the current log level (renderer syncs its initial level from this) |
 | `logging:getLogsDir` | Renderer → Main | Get resolved logs directory path |
 | `logging:openLogsFolder` | Renderer → Main | Open logs folder in native file manager |
 
 ### Preload Bridge
 
+- `api.logging.log(entry)` – One-way send; the overlay window's equivalent is `overlayApi.log(entry)` on the same channel
+- `api.logging.getLevel()` – Returns the current log level
 - `api.logging.getLogsDir()` – Returns logs directory path
-- `api.logging.openLogsFolder()` – Opens logs folder via `shell.openPath()`
+- `api.logging.openLogsFolder()` – Opens logs folder via `shell.openPath()`; returns `''` on success or an error string on failure. Called from Settings and from the crash recovery screen's **Open logs folder** button (#60), which is capability-probed like Restart
 
 ### Usage
 The module exports the `LoggingService` class, the `loggingService` singleton, and a convenience `logger` object — `logger` is what main-process code imports.
@@ -620,13 +645,15 @@ See [IPC Patterns § Clipboard channels](./ipc-patterns.md#clipboard-channels--a
 
 ## System actions (`api.system`)
 
-Like the clipboard entry above, this has **no main-process service class** — it is a pair of sender-gated IPC handlers in `src/main/ipc/system-handlers.ts` fronted by a preload bridge. It exists for the macOS Screen Recording grant-and-relaunch flow (`ScreenPermissionDialog`).
+Like the clipboard entry above, this has **no main-process service class** — it is a pair of sender-gated IPC handlers in `src/main/ipc/system-handlers.ts` fronted by a preload bridge. It exists for the macOS Screen Recording grant-and-relaunch flow (`ScreenPermissionDialog`); since #60 `relaunchApp` has a second, platform-independent caller — see below.
 
 ### `api.system.openScreenRecordingSettings(): Promise<void>`
 Opens the macOS Screen Recording privacy pane via `shell.openExternal` on a fixed constant URL. Payload-free. No-ops off `darwin`.
 
 ### `api.system.relaunchApp(): Promise<void>`
 `app.relaunch()` + `app.quit()`. Required because macOS applies a fresh Screen Recording grant **only to a newly-launched process** — an existing process keeps the old denial for its lifetime, so "grant then retry" cannot work without a restart. Payload-free and deliberately **not** platform-gated. Uses `app.quit()` rather than `app.exit()` so the `before-quit` path still releases the project lock, watchers and PTYs.
+
+Second caller (#60): the crash recovery screen's **Restart** button (`src/renderer/src/components/RootErrorBoundary/RootErrorFallback.tsx`), on every platform. It is capability-probed — `typeof window.api?.system?.relaunchApp === 'function'`, so a missing or partially-exposed bridge hides the button instead of rendering a dead control — and bounded by a stall timer that tells the user to quit and reopen manually if the relaunch has not happened in 3 s. The screen also calls `file.closeProject()` best-effort first (raced against a 1.5 s timeout) so a crash caused by the open project cannot be reopened into a loop.
 
 Both handlers validate `event.senderFrame` (`isTrustedSender`) — a compromised child frame must not be able to quit the app or fire OS-level navigations.
 

@@ -67,7 +67,15 @@ export const ProjectSettingsSchema = z.object({
   /** Project tree UI configuration */
   tree: TreeSettingsSchema,
   /** Graph search index configuration */
-  graph: GraphSettingsSchema
+  graph: GraphSettingsSchema,
+  /**
+   * HTML preview block (Issue #74). Deliberately `z.unknown().optional()`:
+   * a malformed preview allowlist must NEVER fail this parse, because
+   * `ProjectSettingsService` throws `PROJECT_SETTINGS_VALIDATION_FAILED` on any
+   * failure and that blocks project load (design §3.1, X1). The block is parsed
+   * independently by `PreviewAllowlistStore` against `PreviewAllowlistSchema`.
+   */
+  htmlPreview: z.unknown().optional()
 })
 export type ProjectSettings = z.infer<typeof ProjectSettingsSchema>
 

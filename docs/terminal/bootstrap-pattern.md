@@ -89,7 +89,7 @@ Before any Windows bootstrap is constructed, the cwd is validated and normalized
 - Rejects any cwd containing characters from the deny-list: `" & | ^ < > \r \n`
 - Reason: `"` can break out of `cd /d "<cwd>"`. `\r` / `\n` terminate PowerShell and bash single-quoted strings. `& | ^ < >` are cmd.exe metacharacters only active *outside* quotes, but are retained as defense-in-depth in case a future bootstrap pathway passes the cwd outside a quoted argument.
 - `(` and `)` are **not** rejected — they are cmd command-grouping metacharacters only outside quotes and are literal inside `cd /d "…"`. Earlier versions rejected parens defensively; that locked out every path under `C:\Program Files (x86)\…` and was relaxed during Phase-2 UAT hardening.
-- On rejection: `TerminalService.createTerminal` returns `null`, logs an error, and emits an `'error'` event. **Hard contract**: callers must surface this to the user, not swallow it.
+- On rejection: `TerminalService.createTerminal` returns `{ error }` (was `null` before v0.19.0), logs an error, and emits an `'error'` event. **Hard contract**: callers must surface this to the user, not swallow it.
 
 **Normalization** — `normalizeWindowsCwd(cwd)`:
 - Strips trailing `\` or `/` separators (preserving drive roots like `C:\` → `C:\`)

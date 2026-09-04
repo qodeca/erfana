@@ -1,0 +1,195 @@
+<!-- @card group="Components" name="Feedback" subtitle="One warning colour, one banner shape, and one way to tell a screen reader something happened" status="proposed" reviewed="2026-08-31" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Erfana — feedback</title>
+<link rel="stylesheet" href="../../../tokens.css">
+<link rel="stylesheet" href="../../../ds.css">
+<script src="../../../claims.js"></script>
+<style>
+  .banner { display: flex; gap: var(--space-8); align-items: flex-start;
+            padding: var(--space-6) var(--space-8);
+            border: var(--border-width) solid; margin-bottom: var(--space-6); }
+  .banner__icon { flex: 0 0 auto; font-size: var(--text-md); line-height: var(--leading-tight); }
+  .banner__body { flex: 1 1 auto; min-width: 0; }
+  .banner__title { margin: 0 0 var(--space-2); font-size: var(--text-base);
+                   font-weight: var(--font-semibold); color: var(--color-text-emphasis); }
+  .banner__text { margin: 0; font-size: var(--text-base); color: var(--color-text-tertiary); }
+  .banner__action { flex: 0 0 auto; height: var(--btn-height-sm); padding: 0 var(--space-8);
+                    background: transparent; border: var(--border-width) solid currentColor;
+                    color: var(--color-text-primary); font: var(--text-sm) var(--font-sans); cursor: pointer; }
+  .banner__action:focus-visible { outline: var(--border-width-thick) solid var(--color-border-focus);
+                                  outline-offset: var(--space-1); }
+
+  .banner--warning { background: var(--color-warning-bg); border-color: var(--color-warning-border); }
+  .banner--warning .banner__icon { color: var(--color-warning); }
+  .banner--error   { background: var(--color-error-bg);   border-color: var(--color-error-border); }
+  .banner--error .banner__icon { color: var(--color-error); }
+  .banner--success { background: var(--color-success-bg); border-color: var(--color-success-border); }
+  .banner--success .banner__icon { color: var(--color-success); }
+  .banner--info    { background: var(--color-brand-violet-muted); border-color: var(--color-accent-primary); }
+  .banner--info .banner__icon { color: var(--color-accent-primary); }
+
+  .swatches { display: flex; gap: var(--space-8); flex-wrap: wrap; margin-bottom: var(--space-8); }
+  .sw { width: 148px; }
+  .sw-chip { height: var(--space-16); border: var(--border-width) solid var(--color-border-subtle); }
+  .sw-name { font-family: var(--font-mono); font-size: var(--text-xs);
+             color: var(--color-text-tertiary); margin-top: var(--space-2); }
+  .sw--out .sw-name { color: var(--color-error); }
+</style>
+</head>
+<body>
+
+<h1>Feedback</h1>
+<p class="ds-lede">
+  How Erfana says <em>that worked</em>, <em>that failed</em>, or <em>this needs you</em>.
+</p>
+
+<h2>Decision one — which amber is "warning"</h2>
+
+<div class="ds-note">
+  Erfana declares <strong><span data-claim="warning-tokens"></span></strong> tokens for the meaning
+  "warning" and <strong><span data-claim="error-tokens"></span></strong> for "error". The toast — the
+  surface users see most — is the odd one out, using an icon tint rather than the warning colour.
+  <strong>The semantic tokens win.</strong> Everything else is retired for this purpose, and the retired
+  ones now say so in <code>design-tokens.css</code>.
+  <br><br>
+  <strong>Those two numbers count declared tokens, and the basis matters.</strong> This card previously
+  said "four warning, three error" with no basis given — it was both wrong and unfalsifiable, because
+  nobody could tell whether it meant tokens, literal values, or foreground hues. A count with no stated
+  denominator is not evidence.
+</div>
+
+<div class="swatches" id="swatches"></div>
+
+<h2>Decision two — one banner</h2>
+
+<p style="max-width: 76ch; color: var(--color-text-tertiary)">
+  Four severities, one shape: an icon, a title, a sentence, and — when there is something the reader can
+  do — one action. Erfana has this pattern duplicated under two class prefixes that have already
+  diverged, plus three unrelated full-panel variants.
+</p>
+
+<div class="banner banner--warning">
+  <span class="banner__icon" aria-hidden="true">⚠</span>
+  <div class="banner__body">
+    <p class="banner__title">This file changed on disk</p>
+    <p class="banner__text">Someone edited it outside Erfana. Reloading discards your unsaved changes.</p>
+  </div>
+  <button class="banner__action">Reload</button>
+</div>
+
+<div class="banner banner--error">
+  <span class="banner__icon" aria-hidden="true">✕</span>
+  <div class="banner__body">
+    <p class="banner__title">Could not save the approved host</p>
+    <p class="banner__text">The project settings file could not be written. Check that the folder is not read-only.</p>
+  </div>
+  <button class="banner__action">Try again</button>
+</div>
+
+<div class="banner banner--success">
+  <span class="banner__icon" aria-hidden="true">✓</span>
+  <div class="banner__body">
+    <p class="banner__title">Exported to PDF</p>
+    <p class="banner__text">Saved to your Downloads folder.</p>
+  </div>
+</div>
+
+<div class="banner banner--info">
+  <span class="banner__icon" aria-hidden="true">i</span>
+  <div class="banner__body">
+    <p class="banner__title">Preview paused</p>
+    <p class="banner__text">The page is hidden while this list is open, so it cannot cover the buttons.</p>
+  </div>
+</div>
+
+<div class="ds-note">
+  <strong>An error names the way out.</strong> "Could not save" is half a message. What went wrong, and
+  what the reader can do about it — no apology, no stack trace, no blame.
+  <br><br>
+  <strong>The same message deserves the same quality everywhere.</strong> Today "this file was deleted on
+  disk" is a proper alert with an icon and a Reload button in the image viewer, and a bare unlabelled
+  <code>&lt;div&gt;</code> with no way to recover in the markdown editor.
+</div>
+
+<h2>Decision three — telling a screen reader</h2>
+
+<div class="ds-note">
+  Erfana has <strong>four incompatible strategies</strong> for this, and three of them are unreliable.
+  <code>role="alert"</code> alone appears in <strong><span data-claim="alert-role-files"></span></strong>
+  files — the most-used of the four, and the one whose own comments call it unreliable.
+  Only one is correct, and it is already in the toast module.
+</div>
+
+<table>
+  <thead><tr><th>Approach</th><th>Verdict</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>A hidden region that is <strong>always mounted</strong> and empty until there is news</td>
+      <td style="color: var(--color-brand-lime)"><strong>This one.</strong> The browser watches the region for changes. It has to exist <em>before</em> the text arrives.</td>
+    </tr>
+    <tr>
+      <td><code>role="alert"</code> on a box that appears at the same moment as its text</td>
+      <td style="color: var(--color-error)">Unreliable. There was nothing to watch until the moment it changed. Erfana's own code comments say so, and five surfaces do it anyway.</td>
+    </tr>
+    <tr>
+      <td>Move focus and hope <code>aria-describedby</code> gets read</td>
+      <td style="color: var(--color-warning)">Works only when focus genuinely should move. Not an announcement mechanism.</td>
+    </tr>
+    <tr>
+      <td>A region that unmounts when idle</td>
+      <td style="color: var(--color-error)">Same failure as the second. It does not exist until it matters.</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="ds-note">
+  <strong>Politeness.</strong> <code>aria-live="polite"</code> for everything — it waits for a pause.
+  <code>assertive</code> interrupts whatever the person is reading, so it is for errors only.
+  <br><br>
+  <strong>Reserve the height.</strong> A message appearing in an empty region shoves the page down. The
+  crash screen reserves two lines for exactly this reason, and nothing else does.
+</div>
+
+<h2>Toast, or banner?</h2>
+<table>
+  <thead><tr><th>Use a toast when</th><th>Use a banner when</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>It is finished and needs no reply — "Exported to PDF". It may vanish because nothing is lost if it is missed.</td>
+      <td>It is about the thing on screen, or the reader has to decide something. It stays until the situation changes.</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="ds-note">
+  <strong>A permission is never a toast.</strong> Approving a remote host is a decision with consequences
+  that outlive the message, so it belongs on the surface it affects — see the Permission band card. This
+  card exists partly because that rule was learned the hard way.
+</div>
+
+<script>
+const KEEP = [['--color-warning','warning'],['--color-error','error'],
+              ['--color-success','success'],['--color-info','info']];
+const DROP = [['--color-warning-icon','retired'],['--color-warning-bright','retired'],
+              ['--color-error-bright','retired'],['--color-error-text-light','retired']];
+const host = document.getElementById('swatches');
+function add(token, label, out){
+  const el = document.createElement('div');
+  el.className = 'sw' + (out ? ' sw--out' : '');
+  el.innerHTML = `<div class="sw-chip"></div><div class="sw-name"></div>`;
+  el.firstElementChild.style.background = `var(${token})`;
+  el.lastElementChild.textContent = `${token} · ${label}`;
+  host.appendChild(el);
+}
+for (const [t,l] of KEEP) add(t,l,false);
+for (const [t,l] of DROP) add(t,l,true);
+</script>
+
+</body>
+</html>

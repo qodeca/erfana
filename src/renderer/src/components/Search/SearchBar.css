@@ -4,7 +4,8 @@
  * SearchBar.css - Unified search overlay styles
  *
  * Uses design tokens ONLY - no hardcoded values.
- * See docs/ui-style-guide.md for token reference.
+ * Governed by design/system/components/form/index.html (input) and
+ * design/system/foundations/focus.html (focus ring).
  */
 
 /* Search bar container - positioned absolutely in parent pane */
@@ -28,7 +29,9 @@
   height: var(--input-height-sm);
   padding: var(--space-2) var(--space-3);
   background: var(--color-bg-input);
-  border: var(--border-width) solid var(--color-border-default);
+  /* --color-border-input, not a divider token: this boundary is the only thing
+     identifying the control (its fill matches the panel). SC 1.4.11 needs 3:1. */
+  border: var(--border-width) solid var(--color-border-input);
   color: var(--color-text-primary);
   font-size: var(--text-base);
   font-family: var(--font-sans);

@@ -17,6 +17,33 @@ export function sanitizeFilePath(filePath: string): string {
 }
 
 /**
+ * A short, stable digest of a path, for a panel id that would otherwise be
+ * too long for the IPC boundary (`PanelIdSchema` caps ids at 256).
+ *
+ * FNV-1a 32-bit run twice with different seeds over the UTF-16 code units,
+ * returned as 16 lowercase hex characters. Deterministic per exact string
+ * (case included). Synchronous on purpose: dockview needs the id before
+ * `addPanel` returns, which rules out `crypto.subtle`. No dependency.
+ *
+ * Not collision-resistant — two paths sharing their first 150 sanitized
+ * characters could be crafted to collide, which is recorded as accepted in
+ * docs/security.md. `openFileInPanel` uses it only past its length budget,
+ * so short paths keep the exact ids they always had.
+ */
+export function stablePathDigest(path: string): string {
+  return fnv1a32Hex(path, 0x811c9dc5) + fnv1a32Hex(path, 0x050c5d1f)
+}
+
+function fnv1a32Hex(text: string, seed: number): string {
+  let hash = seed >>> 0
+  for (let i = 0; i < text.length; i++) {
+    hash ^= text.charCodeAt(i)
+    hash = Math.imul(hash, 0x01000193) >>> 0
+  }
+  return hash.toString(16).padStart(8, '0')
+}
+
+/**
  * Extract the final path segment (folder or file name) from a path, handling
  * both POSIX ('/') and Windows ('\\') separators plus any trailing separators.
  *
@@ -101,9 +128,83 @@ export function isStrictDescendant(parentPath: string, childPath: string): boole
 }
 
 /**
+ * Maximum length of a filename rendered into the accessibility tree.
+ *
+ * Defence in depth: a filename can legally be 255 bytes, and a longer one
+ * (crafted, or produced by a tool that does not check) has no business being
+ * read out in full by a screen reader.
+ */
+export const MAX_FILENAME_LENGTH = 255
+
+/**
+ * Sanitize a filename for DISPLAY in `alt` / `aria-label` attributes.
+ *
+ * Defence in depth against path traversal and control characters that a hostile
+ * filename could carry into the accessibility tree. Takes a full path, returns
+ * the basename with C0 controls and DEL removed, truncated to
+ * {@link MAX_FILENAME_LENGTH}, and never an empty string.
+ *
+ * Display/parse-only — this is NOT filesystem-safety sanitization. The
+ * main-process `sanitizeFileName` in `src/main/utils/fileUtils.ts` is the one
+ * that makes a name safe to write to disk; this one only makes it safe to read
+ * out loud.
+ *
+ * @param filePath - The file path to extract and sanitize a filename from
+ * @returns Sanitized basename, or `'image'` when nothing printable is left
+ *
+ * @example
+ * ```ts
+ * sanitizeFileName('/proj/logo.svg')        // 'logo.svg'
+ * sanitizeFileName('C:\\proj\\logo.svg')    // 'logo.svg'
+ * sanitizeFileName('/proj/lo\u0007go.svg')  // 'logo.svg'
+ * sanitizeFileName('')                      // 'image'
+ * ```
+ */
+export function sanitizeFileName(filePath: string): string {
+  const fileName = getBasename(filePath) || 'image'
+
+  // split/filter/join rather than a regex, to avoid eslint no-control-regex.
+  const sanitized = fileName
+    .split('')
+    .filter((char) => {
+      const code = char.charCodeAt(0)
+      return code >= 32 && code !== 127
+    })
+    .join('')
+    .slice(0, MAX_FILENAME_LENGTH)
+
+  return sanitized || 'image'
+}
+
+/**
  * Check if file is a markdown file by extension
  */
 export function isMarkdownFile(fileName: string): boolean {
   const lower = fileName.toLowerCase()
   return lower.endsWith('.md') || lower.endsWith('.markdown')
+}
+
+/**
+ * Check if a file is an HTML file by extension.
+ *
+ * Case-insensitive match on `.html` / `.htm`. This is a *display/parse* helper
+ * only – it decides whether a path is a candidate for the running preview and
+ * for the "Open as source" affordance. It is NOT an eligibility check: whether
+ * the file may actually run as a preview is decided main-side by
+ * `window.api.preview.checkEligibility` (design §1.5), which `resolvePanelKind`
+ * calls after this cheap extension gate passes.
+ *
+ * @param fileName - File name or full path to check.
+ * @returns `true` when the file has a `.html` or `.htm` extension.
+ *
+ * @example
+ * ```ts
+ * isHtmlFile('page.html')   // true
+ * isHtmlFile('index.HTM')   // true (case-insensitive)
+ * isHtmlFile('notes.md')    // false
+ * ```
+ */
+export function isHtmlFile(fileName: string): boolean {
+  const lower = fileName.toLowerCase()
+  return lower.endsWith('.html') || lower.endsWith('.htm')
 }

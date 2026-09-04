@@ -3,12 +3,15 @@
 /**
  * Visual regression tests for Erfana UI states.
  *
- * Captures and compares screenshots of 5 core UI states:
+ * Captures and compares screenshots of 6 core UI states:
  * (a) Welcome panel – empty project
  * (b) Editor loaded – tree + editor + preview
  * (c) Terminal open – split view with terminal
  * (d) Settings overlay – full-screen settings
  * (e) Confirm dialog – quit confirmation overlay
+ * (f) Image viewer toolbar in a narrow panel – the layout the export controls
+ *     forced (issue #73); the only case here that is about a single row rather
+ *     than a whole window state
  *
  * Each test launches its own Electron instance (5 total):
  * 1 without project (state a), 4 with project (states b–e).
@@ -26,6 +29,34 @@ import {
   terminal,
   clickFileByName
 } from './utils/helpers'
+import { writeImageFixtures, IMAGE_FIXTURES } from './fixtures/images/generateImageFixtures'
+import { ImageViewerNarrowPage } from './pages/image-viewer-narrow.page'
+
+/**
+ * The visual fixture set for state (f), with the image fixtures seeded into the
+ * project.
+ *
+ * A SEPARATE test object, not an override on `visualTest`: states (a)–(e)
+ * screenshot windows that include the project tree, and nine extra files in
+ * that tree invalidate their baselines. Fixture overrides belong to the test
+ * object rather than the file, so scoping the seeding this way leaves the other
+ * five cases byte-identical — verified by running the whole visual project.
+ *
+ * Overriding `visualTestProject` rather than adding a seed constant keeps the
+ * no-binary-files rule intact (every image is generated at test time by the
+ * same `writeImageFixtures` the functional specs use) and puts the files on
+ * disk before Electron opens the project, so the tree is never at the mercy of
+ * the directory watcher.
+ */
+const imageViewerVisualTest = visualTest.extend<Record<string, never>>({
+  visualTestProject: async ({ visualTestProject }, use) => {
+    writeImageFixtures(visualTestProject)
+    await use(visualTestProject)
+  }
+})
+
+/** Panel width for state (f) — inside the band the overflow rule exists for. */
+const NARROW_PANEL_WIDTH = 320
 
 /**
  * Assert that a baseline exists for this platform. Throws to fail the test
@@ -103,6 +134,16 @@ async function stabilizeEditor(page: import('@playwright/test').Page): Promise<v
   await page.waitForTimeout(500)
 }
 
+/**
+ * Page-level captures are clipped to the size the fixture REQUESTS
+ * (`win.setContentSize(1280, 800)` in `e2e/fixtures/index.ts`), because every
+ * Windows host overshoots that request by its own window-chrome and scaling
+ * amount – the committed baselines once disagreed with each other for exactly
+ * that reason (`docs/windows/known-flakes.md`). Clipping makes the captured
+ * size independent of the host; element-level captures need no clip.
+ */
+const PAGE_CLIP = { x: 0, y: 0, width: 1280, height: 800 } as const
+
 // ---------------------------------------------------------------------------
 // (a) Welcome panel – no project loaded
 // ---------------------------------------------------------------------------
@@ -112,7 +153,7 @@ visualTest.describe('Visual regression – no project', () => {
 
   visualTest('(a) welcome panel', async ({ visualWindow }, testInfo) => {
     assertBaselineExists('welcome-empty', testInfo)
-    await expect(visualWindow).toHaveScreenshot({ name: 'welcome-empty.png' })
+    await expect(visualWindow).toHaveScreenshot({ name: 'welcome-empty.png', clip: PAGE_CLIP })
   })
 })
 
@@ -145,7 +186,7 @@ visualTest.describe('Visual regression – with project', () => {
       byTestId(page, TEST_IDS.TOAST_CONTAINER)
     ]
 
-    await expect(page).toHaveScreenshot({ name: 'editor-loaded.png', mask: masks })
+    await expect(page).toHaveScreenshot({ name: 'editor-loaded.png', mask: masks, clip: PAGE_CLIP })
   })
 
   visualTest('(c) terminal open', async ({ visualWindowWithProject }, testInfo) => {
@@ -168,7 +209,7 @@ visualTest.describe('Visual regression – with project', () => {
       byTestId(page, TEST_IDS.TERMINAL_INSTANCE)
     ]
 
-    await expect(page).toHaveScreenshot({ name: 'terminal-open.png', mask: masks })
+    await expect(page).toHaveScreenshot({ name: 'terminal-open.png', mask: masks, clip: PAGE_CLIP })
   })
 
   visualTest('(d) settings overlay', async ({ visualWindowWithProject }, testInfo) => {
@@ -226,5 +267,36 @@ visualTest.describe('Visual regression – with project', () => {
     // Click cancel to keep the app open (fixture cleanup handles closing)
     await byTestId(page, TEST_IDS.DIALOG_BTN_CANCEL).click()
     await expect(dialogOverlay).not.toBeVisible({ timeout: 2000 })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// (f) Image viewer toolbar – narrow panel
+// ---------------------------------------------------------------------------
+
+imageViewerVisualTest.describe('Visual regression – image viewer toolbar', () => {
+  imageViewerVisualTest.slow()
+
+  imageViewerVisualTest('(f) narrow panel toolbar', async ({ visualWindowWithProject }, testInfo) => {
+    assertBaselineExists('image-viewer-toolbar-narrow', testInfo)
+
+    const page = visualWindowWithProject
+    const viewer = new ImageViewerNarrowPage(page, 15000)
+
+    await viewer.openFromTree(IMAGE_FIXTURES.png.fileName)
+    await viewer.constrainPanelWidth(NARROW_PANEL_WIDTH)
+
+    // Element-level, and the element is the toolbar row itself: the image below
+    // it is decoded pixels whose antialiasing has nothing to do with what this
+    // case is guarding, and a whole-window shot would drown a 32px row in
+    // 1280x800 of unrelated chrome.
+    //
+    // Nothing here animates or ticks: the metadata is derived from the file,
+    // the status slot is empty at rest, and the zoom label is the settled
+    // fit-to-view value. `toHaveScreenshot`'s two-pass stability check is the
+    // wait — there is no sleep.
+    await expect(viewer.toolbar()).toHaveScreenshot({
+      name: 'image-viewer-toolbar-narrow.png'
+    })
   })
 })

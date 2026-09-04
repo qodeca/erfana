@@ -58,6 +58,34 @@ vi.mock('electron', () => {
   }
 })
 
+// Global default: treat every IPC sender as the app's own renderer.
+//
+// Handlers register through `src/main/ipc/registry.ts`, which gates each
+// channel on `isTrustedAppSender`. The handler suites drive those channels by
+// pulling the registered listener off the mocked `ipcMain` and calling it with
+// a stand-in event (`{}` in most files) — which is not a trusted frame, so
+// without this default 259 tests across 28 files would fail on the gate rather
+// than on the behaviour they exist to check.
+//
+// This restores the semantics those suites were written against: the previous
+// process-wide gate was installed from `src/main/index.ts` at runtime and so was
+// never in the path of a unit test either. It does NOT leave the gate untested —
+// `src/main/ipc/registry.test.ts` declares its own mock for this module and
+// exercises trusted, untrusted and sub-frame senders against every verb. The
+// per-handler `isTrustedSender` checks (image export, clipboard, system, the
+// preview handlers) are a different predicate and are unaffected.
+// NOTE: this is a wholesale factory, not `importOriginal`. `senderValidation`
+// imports `BrowserWindow` from `electron`, and `importOriginal` loads the module
+// OUTSIDE the mock above — where the real CommonJS `electron` package cannot
+// provide named ESM exports, so the factory throws and takes 245 tests with it.
+// A test file that needs the genuine predicates declares `vi.unmock` and gets
+// them under its own `electron` mock.
+vi.mock('../../src/main/ipc/senderValidation', () => ({
+  isTrustedAppSender: () => true,
+  isTrustedSender: () => true,
+  RENDERER_FILE_URL: 'file:///test/renderer/index.html'
+}))
+
 // Surface intermittent unhandled rejections / uncaught exceptions firing
 // after teardown (e.g. async `worker_threads` cleanup races, leaked
 // `setTimeout` from production code). See `flakeGuard.ts` for rationale.

@@ -27,17 +27,49 @@ import { SearchBar } from './SearchBar'
 import { useSearchStore } from '../../stores/useSearchStore'
 import type { SearchProvider } from '../../providers/search'
 import type { SearchMatch } from '../../stores/useSearchStore'
+import { TEST_IDS } from '../../constants/testids'
 
-// Mock search provider
+// Mock full-match provider (Monaco/preview-DOM shape): random access + match list.
 const createMockProvider = (): SearchProvider => ({
   id: 'mock',
   name: 'Mock Provider',
+  capabilities: { randomAccess: true, matchList: true, wholeWord: true },
   search: vi.fn(async () => []),
   navigateTo: vi.fn(),
   clearHighlights: vi.fn(),
   updateCurrentMatch: vi.fn(),
   dispose: vi.fn()
 })
+
+/**
+ * A count-only provider double (find-in-page shape): no match list, no random
+ * access. `search()` returns [] and results arrive via the count listener,
+ * which the test drives through the returned `emitCount` helper.
+ */
+const createMockCountProvider = (): {
+  provider: SearchProvider
+  emitCount: (count: { total: number; activeOrdinal: number }) => void
+} => {
+  const listeners = new Set<(c: { total: number; activeOrdinal: number }) => void>()
+  const provider: SearchProvider = {
+    id: 'mock-count',
+    name: 'Mock Count Provider',
+    capabilities: { randomAccess: false, matchList: false, wholeWord: false },
+    search: vi.fn(async () => []),
+    nextMatch: vi.fn(),
+    previousMatch: vi.fn(),
+    onCountChange: vi.fn((listener: (c: { total: number; activeOrdinal: number }) => void) => {
+      listeners.add(listener)
+      return () => listeners.delete(listener)
+    }),
+    clearHighlights: vi.fn(),
+    dispose: vi.fn()
+  }
+  return {
+    provider,
+    emitCount: (count) => listeners.forEach((l) => l(count))
+  }
+}
 
 describe('SearchBar', () => {
   let mockProvider: SearchProvider
@@ -52,6 +84,10 @@ describe('SearchBar', () => {
       options: { caseSensitive: false, wholeWord: false },
       matches: [],
       currentIndex: 0,
+      count: { total: 0, activeOrdinal: 0 },
+      capabilities: { randomAccess: true, matchList: true, wholeWord: true },
+      navToken: 0,
+      navDirection: 'next',
       activeProviderId: null,
       providerStates: new Map(),
       previousFocusElement: null
@@ -561,22 +597,17 @@ describe('SearchBar', () => {
       expect(preventDefaultSpy).toHaveBeenCalled()
     })
 
-    it('implements focus trap with Tab key wrapping forward', () => {
+    it('does not trap Tab: the non-modal find bar lets focus move on', () => {
       render(<SearchBar provider={mockProvider} />)
 
       const input = screen.getByPlaceholderText('Search...')
       const closeButton = screen.getByRole('button', { name: /close search/i })
       const container = screen.getByRole('search')
 
-      // Focus the close button directly (last focusable element when nav buttons disabled)
+      // Focus the close button (last focusable element when nav buttons disabled).
       closeButton.focus()
       expect(closeButton).toHaveFocus()
 
-      // Dispatch Tab keydown event on container (where the handler is attached).
-      // Uses direct KeyboardEvent dispatch (matching the Shift+Tab test below)
-      // instead of userEvent.keyboard('{Tab}') because userEvent's Tab
-      // simulation relies on jsdom's tabindex walk, which is platform-dependent
-      // and unreliable on Windows CI runners.
       const tabEvent = new KeyboardEvent('keydown', {
         key: 'Tab',
         bubbles: true,
@@ -584,22 +615,23 @@ describe('SearchBar', () => {
       })
       container.dispatchEvent(tabEvent)
 
-      // Tab from last element should wrap to first (input)
-      expect(input).toHaveFocus()
+      // The bar no longer wraps focus back to the input, and it does not
+      // preventDefault — Tab is free to move focus onward (WCAG 2.2 SC 2.4.3).
+      expect(input).not.toHaveFocus()
+      expect(tabEvent.defaultPrevented).toBe(false)
     })
 
-    it('implements focus trap with Shift+Tab wrapping backward', () => {
+    it('does not trap Shift+Tab: focus is free to leave the find bar', () => {
       render(<SearchBar provider={mockProvider} />)
 
       const input = screen.getByPlaceholderText('Search...')
       const closeButton = screen.getByRole('button', { name: /close search/i })
       const container = screen.getByRole('search')
 
-      // Focus the input (first focusable element)
+      // Focus the input (first focusable element).
       input.focus()
       expect(input).toHaveFocus()
 
-      // Dispatch Shift+Tab keydown event on container (where the handler is attached)
       const shiftTabEvent = new KeyboardEvent('keydown', {
         key: 'Tab',
         shiftKey: true,
@@ -608,8 +640,9 @@ describe('SearchBar', () => {
       })
       container.dispatchEvent(shiftTabEvent)
 
-      // Shift+Tab from first element should wrap to last (close button)
-      expect(closeButton).toHaveFocus()
+      // No wrap to the close button, and no preventDefault — focus is not trapped.
+      expect(closeButton).not.toHaveFocus()
+      expect(shiftTabEvent.defaultPrevented).toBe(false)
     })
   })
 
@@ -737,6 +770,51 @@ describe('SearchBar', () => {
       })
     })
 
+    // Regression (design §6.3 change 1): a naive rewrite that read
+    // count.activeOrdinal for the matchList label froze Monaco at "1 of 17"
+    // because nextMatch never writes count. Stepping via the Next BUTTON (which
+    // calls the store's nextMatch, exercising the randomAccess index path) must
+    // advance the label.
+    it('advances the "N of M" label while stepping a full-match provider', async () => {
+      const user = userEvent.setup()
+      const matches: SearchMatch[] = Array.from({ length: 3 }, (_, i) => ({
+        id: `m-${i}`,
+        line: i + 1,
+        startColumn: 0,
+        endColumn: 4,
+        text: 'test'
+      }))
+
+      // The seeded query makes SearchBar's mount effect schedule a debounced
+      // `provider.search`. The default double resolves to [], so once that
+      // 100 ms timer lands mid-test it would call `setMatches([])` and the label
+      // would flip to "No results" — a race this test loses on a slow host.
+      // Teaching the provider to return the SAME matches makes the late write
+      // idempotent (`setMatches` preserves `currentIndex`), which is also how a
+      // real full-match provider behaves: it is the source of these matches.
+      vi.mocked(mockProvider.search).mockResolvedValue(matches)
+
+      // Route through setMatches so count is derived like production.
+      act(() => {
+        useSearchStore.setState({ query: 'test' })
+        useSearchStore.getState().setMatches(matches)
+      })
+
+      render(<SearchBar provider={mockProvider} />)
+
+      await waitFor(() => expect(screen.getByText('1 of 3')).toBeInTheDocument())
+
+      await user.click(screen.getByTestId(TEST_IDS.SEARCH_BAR_BTN_NEXT))
+      await waitFor(() => expect(screen.getByText('2 of 3')).toBeInTheDocument())
+
+      await user.click(screen.getByTestId(TEST_IDS.SEARCH_BAR_BTN_NEXT))
+      await waitFor(() => expect(screen.getByText('3 of 3')).toBeInTheDocument())
+
+      // Wraps back to the first match.
+      await user.click(screen.getByTestId(TEST_IDS.SEARCH_BAR_BTN_NEXT))
+      await waitFor(() => expect(screen.getByText('1 of 3')).toBeInTheDocument())
+    })
+
     it('shows "No results" when query exists but no matches', () => {
       useSearchStore.setState({ query: 'notfound', matches: [] })
 
@@ -814,6 +892,73 @@ describe('SearchBar', () => {
       // Should not crash
       await new Promise((resolve) => setTimeout(resolve, 200))
       expect(screen.getByRole('search')).toBeInTheDocument()
+    })
+  })
+
+  describe('Count-only provider (find-in-page)', () => {
+    beforeEach(() => {
+      useSearchStore.setState({ isOpen: true })
+    })
+
+    it('renders the pushed count as the "N of M" label', async () => {
+      const { provider, emitCount } = createMockCountProvider()
+
+      render(<SearchBar provider={provider} />)
+
+      // Capabilities synced to the store on mount; a pushed count drives the label.
+      await waitFor(() =>
+        expect(useSearchStore.getState().capabilities.matchList).toBe(false)
+      )
+
+      act(() => {
+        useSearchStore.setState({ query: 'x' })
+        emitCount({ total: 5, activeOrdinal: 2 })
+      })
+
+      await waitFor(() => expect(screen.getByText('2 of 5')).toBeInTheDocument())
+    })
+
+    it('disables the whole-word toggle when unsupported', async () => {
+      const { provider } = createMockCountProvider()
+
+      render(<SearchBar provider={provider} />)
+
+      await waitFor(() =>
+        expect(screen.getByTestId(TEST_IDS.SEARCH_BAR_TOGGLE_WORD)).toBeDisabled()
+      )
+    })
+
+    it('steps the provider once per Next click, keeping currentIndex pinned', async () => {
+      const user = userEvent.setup()
+      const { provider, emitCount } = createMockCountProvider()
+
+      render(<SearchBar provider={provider} />)
+
+      act(() => {
+        useSearchStore.setState({ query: 'x' })
+        emitCount({ total: 3, activeOrdinal: 1 })
+      })
+      await waitFor(() => expect(screen.getByText('1 of 3')).toBeInTheDocument())
+
+      await user.click(screen.getByTestId(TEST_IDS.SEARCH_BAR_BTN_NEXT))
+      await user.click(screen.getByTestId(TEST_IDS.SEARCH_BAR_BTN_NEXT))
+
+      await waitFor(() => expect(provider.nextMatch).toHaveBeenCalledTimes(2))
+      expect(provider.previousMatch).not.toHaveBeenCalled()
+      // currentIndex stays pinned at 0 for a count-only provider.
+      expect(useSearchStore.getState().currentIndex).toBe(0)
+    })
+
+    it('does not step the provider on mount (navToken ref guard)', async () => {
+      const { provider } = createMockCountProvider()
+
+      render(<SearchBar provider={provider} />)
+
+      // Give effects a chance to run.
+      await new Promise((resolve) => setTimeout(resolve, 20))
+
+      expect(provider.nextMatch).not.toHaveBeenCalled()
+      expect(provider.previousMatch).not.toHaveBeenCalled()
     })
   })
 

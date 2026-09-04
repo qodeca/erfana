@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import type { FileNode } from '../../preload/index'
+import type { ImageReadResponse } from '../../shared/ipc/file-image-schema'
 
 /**
  * Interface for file system operations
@@ -16,6 +17,14 @@ export interface IFileService {
    * Get the current project root path
    */
   getProjectPath(): string | null
+
+  /**
+   * Subscribe to project-root changes; the returned function unsubscribes.
+   * Fires only when the path actually differs from the previous one.
+   */
+  onProjectPathChanged(
+    listener: (oldPath: string | null, newPath: string | null) => void
+  ): () => void
 
   /**
    * Read directory contents recursively
@@ -54,10 +63,11 @@ export interface IFileService {
   isImageFile(filePath: string): boolean
 
   /**
-   * Read a file and return it as a base64-encoded data URL.
-   * Used for loading images in the sandboxed renderer.
+   * Read an image as a base64 data URL, or report it as unchanged when the
+   * caller's `knownVersion` still matches the file on disk (#70).
    */
-  readFileAsBase64(filePath: string): Promise<string>
+  readImage(filePath: string, knownVersion?: string): Promise<ImageReadResponse>
+
 
   /**
    * Create a new file

@@ -19,14 +19,24 @@ Project panel displays hierarchical file tree with filtering, visual indicators,
 <ProjectPanel>
   <Header> FolderOpen icon + Label + Chevron toggle </Header>
   <ControlPanel> FilterButtons </ControlPanel>
-  <ProjectTree />
+  <PanelErrorBoundary key={projectPath ?? 'none'} componentName="Project tree">
+    <ProjectTree />
+  </PanelErrorBoundary>
 </ProjectPanel>
 ```
 
 ### Responsibilities
 
-**ProjectPanel**: Header, control panel visibility, filter mode state & persistence
+**ProjectPanel**: Header, control panel visibility, filter mode state & persistence, panel-scoped error containment
 **ProjectTree**: Tree rendering, expansion/collapse, context menu, file opening, recursive filtering
+
+### Error Containment (#60)
+
+The tree is wrapped in `PanelErrorBoundary`, so a render failure degrades to a **"Project tree unavailable. The rest of Erfana still works."** message with a **Reload** button inside the sidebar, instead of blanking the window and taking unsaved Monaco buffers and a live terminal with it. Reload clears the error state and re-renders the tree in place; a second failure changes the copy to "Project tree is still unavailable." The boundary logs at `error` (`[PanelErrorBoundary] Project tree error`), not `fatal` — the window is still usable.
+
+**The `key={projectPath ?? 'none'}` is load-bearing.** The error state survives every re-render and is cleared only by Reload or a remount, so keying by project path is what makes opening a different project remount the boundary. Without the key, a tree that crashed on project A still reads "unavailable" after the user switches to project B, and only Reload would clear it. The panel reads that path from `useProjectManagementContextSafe()` — the safe accessor, because the path is needed only for the key and is not worth making the panel unrenderable outside the provider.
+
+See: [UI Components - Error containment](./ui-components.md#error-containment) for the two-tier root/panel design, and [Troubleshooting - Project tree unavailable](./troubleshooting.md#project-tree-unavailable) for the user-facing procedure.
 
 ## Toolbar
 
@@ -109,7 +119,7 @@ const filterTree = useMemo(() => {
 }, [fileTree, filterMode])
 ```
 
-**Helper**: `isMarkdownFile()` checks `.md`, `.markdown`, `.mdown`, `.mkd`, `.mdx`
+**Helper**: `isMarkdownFile()` checks `.md` and `.markdown` only. Note there are two copies – a local one in `ProjectTree.tsx` (used by this filter) and the exported one in `src/renderer/src/utils/fileUtils.ts`; both accept the same two extensions, so `.mdx`, `.mdown` and `.mkd` files are hidden in Markdown mode.
 
 ### Behavior
 
@@ -150,15 +160,24 @@ See: [Known Issues](./known-issues.md#git-status-global-gitignore-not-supported)
 ### Sensitive Files
 
 **5 Categories**:
-1. Environment: `.env*`, `.npmrc`, `*.pem`, `*.key`
-2. Cloud: `.aws/`, `.azure/`, `.gcloud/`
-3. SSH: `.ssh/`, `id_rsa*`, `known_hosts`
-4. Security: `credentials*`, `secrets*`, `*.keystore`, `*.jks`
-5. Config: `config.json`, `settings.json`, `*.config.js`
+1. Exact filename: `credentials`, `secrets`, `id_rsa`, `id_dsa`, `id_ecdsa`, `id_ed25519`,
+   `known_hosts`, `authorized_keys`
+2. Dotfile prefix (exact, or followed by a dot): `.env`, `.npmrc`, `.netrc`, `.dockercfg`,
+   `.pypirc` – so `.env.production` matches
+3. Directory fragment: `.aws/`, `.ssh/`, `.gnupg/`
+4. Extension: `.key`, `.pem`, `.p12`, `.pfx`, `.keystore`, `.jks`, `.crt`, `.cer`
+5. Password/token files: a name containing `password` or `token` **and** ending `.txt` or `.json`
 
 **Visual**: Color `#d97706` (amber), icon ⚠️ (14px), ARIA label "Sensitive file"
-**Detection**: `isSensitiveFile()` with regex patterns
+**Detection**: `isSensitiveFile()` in `ProjectTreeNode.tsx` – plain string comparison
+(exact match, prefix, `includes`, `endsWith`), not regex
 **Location**: `ProjectTreeNode.tsx`
+
+**Two caveats.** `config.json`, `settings.json` and `*.config.js` are **not** flagged –
+they were never in the implementation. And category 3 is effectively dead: the component
+passes `node.name` (a bare filename) to `isSensitiveFile()`, so a path fragment such as
+`.aws/` can never match. Files inside `.aws/` or `.ssh/` are flagged only when their own
+name matches another category, as `credentials` and `known_hosts` do.
 
 ### Hidden Files
 
@@ -196,8 +215,18 @@ context-menu/
 
 ### Menu Items
 
-**Files**: Rename, ---, Delete
-**Folders**: New File, New Folder, Rename, ---, Delete
+Built by `strategies.tsx` from the command classes in `commands.tsx`, in this order:
+
+**Files**: Cut, Copy, ---, Rename, ---, Delete, ---, Reveal in Finder / Show in Explorer
+**Folders**: Cut, Copy, Paste, ---, New File, New Folder, Rename, Import..., ---, Delete,
+---, Reveal in Finder / Show in Explorer
+**Project root**: the root row is also a valid target; it cannot be moved
+("Cannot move project root")
+
+**Conditional items**: Paste appears only on directories and only when the internal
+clipboard is non-empty. Import... appears only on directories and only when an import
+handler is supplied. The Reveal label switches on `isMacOS()`.
+
 **Separator**: Visual separator before destructive actions
 
 ### Command Classes

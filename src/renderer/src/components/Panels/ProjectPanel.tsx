@@ -11,11 +11,12 @@ import { useState, useEffect, useCallback } from 'react'
 import { ISplitviewPanelProps, DockviewApi } from 'dockview'
 import { FolderOpen, ChevronDown, ChevronLeft } from 'lucide-react'
 import { ProjectTree } from '../ProjectTree/ProjectTree'
+import { PanelErrorBoundary } from './PanelErrorBoundary'
+import { useProjectManagementContextSafe } from '../../context/ProjectManagementContext'
 import type { FilterMode } from '../../types/filters'
-import { sanitizeFilePath, getBasename } from '../../utils/fileUtils'
-import { isImageFile } from '../../utils/imageUtils'
+import { openFileInPanel } from '../../utils/openFileInPanel'
+import { resolvePanelKind } from '../../utils/resolvePanelKind'
 import './ProjectPanel.css'
-import { useProjectStore } from '../../stores/useProjectStore'
 import { logger } from '../../utils/logger'
 
 /**
@@ -28,6 +29,11 @@ function isValidFilterMode(value: unknown): value is FilterMode {
 export function ProjectPanel(props: ISplitviewPanelProps) {
   const [showControlPanel, setShowControlPanel] = useState(false)
   const [filterMode, setFilterMode] = useState<FilterMode>('all')
+
+  // Read via the SAFE accessor: this panel only needs the path to key the error
+  // boundary below, and that is not worth making the panel unrenderable outside
+  // the provider (same reasoning as TerminalPanel).
+  const projectPath = useProjectManagementContextSafe()?.projectPath ?? null
 
   // Load persisted filter mode on mount
   useEffect(() => {
@@ -64,8 +70,17 @@ export function ProjectPanel(props: ISplitviewPanelProps) {
     }
   }, [])
 
-  const handleFileSelect = (filePath: string) => {
-    // Get DockviewApi from params (passed by parent)
+  /**
+   * Opens the selected file in the appropriate panel.
+   *
+   * Resolves the panel kind first (the async step: a `.html` file may open as a
+   * running preview once the main-side eligibility check passes), then delegates
+   * to the shared router. An eligible `.html` opens as a native preview with its
+   * placeholder kept alive across tab switches; everything else keeps its
+   * pre-#74 behaviour – images in the image viewer, anything else in the editor.
+   */
+  const handleFileSelect = async (filePath: string) => {
+    // dockviewApi is passed down by the parent through splitview params.
     const dockviewApi = props.params?.dockviewApi as DockviewApi | undefined
 
     if (!dockviewApi) {
@@ -73,51 +88,13 @@ export function ProjectPanel(props: ISplitviewPanelProps) {
       return
     }
 
-    const fileName = getBasename(filePath) || 'File'
-
-    // Check if the file is an image - open in ImageViewerPanel instead of editor
-    if (isImageFile(filePath)) {
-      const panelId = `image-${sanitizeFilePath(filePath)}`
-
-      // Check if panel already exists
-      let imagePanel = dockviewApi.getPanel(panelId)
-
-      if (!imagePanel) {
-        imagePanel = dockviewApi.addPanel({
-          id: panelId,
-          component: 'imageViewer',
-          title: fileName,
-          tabComponent: 'imageTab',
-          params: { filePath, panelId }
-        })
-        // Track opened panel id for later cleanup
-        useProjectStore.getState().registerEditorPanel(panelId)
-      }
-
-      imagePanel.api.setActive()
-      imagePanel.group.focus()
+    const kind = await resolvePanelKind(filePath)
+    if (kind === 'preview') {
+      openFileInPanel(dockviewApi, filePath, { kind: 'preview', renderer: 'always' })
       return
     }
 
-    // Default: open as markdown editor
-    const panelId = `editor-${sanitizeFilePath(filePath)}`
-
-    let editorPanel = dockviewApi.getPanel(panelId)
-
-    if (!editorPanel) {
-      editorPanel = dockviewApi.addPanel({
-        id: panelId,
-        component: 'editor',
-        title: fileName,
-        tabComponent: 'editorTab',
-        params: { filePath, panelId }
-      })
-      // Track opened editor panel id for later cleanup
-      useProjectStore.getState().registerEditorPanel(panelId)
-    }
-
-    editorPanel.api.setActive()
-    editorPanel.group.focus()
+    openFileInPanel(dockviewApi, filePath, { kind })
   }
 
   return (
@@ -138,12 +115,19 @@ export function ProjectPanel(props: ISplitviewPanelProps) {
         </span>
       </div>
       <div className="sidebar-panel-content">
-        <ProjectTree
-          onFileSelect={handleFileSelect}
-          showControlPanel={showControlPanel}
-          filterMode={filterMode}
-          onFilterModeChange={handleFilterModeChange}
-        />
+        {/* Panel-scoped containment (#60): a tree render failure degrades to
+            "Project tree unavailable" here instead of blanking the window.
+            Keyed by project so opening a different one remounts the boundary:
+            the error belongs to the tree that crashed, and a fresh project must
+            not inherit a stuck fallback. */}
+        <PanelErrorBoundary key={projectPath ?? 'none'} componentName="Project tree">
+          <ProjectTree
+            onFileSelect={handleFileSelect}
+            showControlPanel={showControlPanel}
+            filterMode={filterMode}
+            onFilterModeChange={handleFilterModeChange}
+          />
+        </PanelErrorBoundary>
       </div>
     </div>
   )

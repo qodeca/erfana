@@ -1,0 +1,140 @@
+<!-- @card group="Components" name="Buttons" subtitle="Primary, secondary, danger — rules copied verbatim from Dialog.css" status="proposed" reviewed="2026-08-31" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Erfana — buttons</title>
+<link rel="stylesheet" href="../../../tokens.css">
+<link rel="stylesheet" href="../../../ds.css">
+<style>
+/* ==========================================================================
+   Mirrors src/renderer/src/components/Dialog/Dialog.css. The app owns it; this
+   card renders it.
+
+   This block used to be fenced with "do not improve it here", and the fence was
+   protecting a defect: the focus rule used bare :focus, a hardcoded 2px, and
+   --dialog-btn-primary-bg. The Focus card rules that one ring wins —
+   :focus-visible, --border-width-thick, --color-border-focus — so the two cards
+   gave opposite instructions and neither said which won. It LOOKED fine only
+   because both tokens happen to resolve to the same violet today.
+
+   Fixed in the app first, then here. A fence that stops a card being corrected
+   is how a design system canonises the drift it was built to kill.
+   ========================================================================== */
+:root {
+  --dialog-border: var(--color-border-subtle);
+  --dialog-text-secondary: var(--color-gray-200);
+  --dialog-btn-primary-bg: var(--color-btn-primary-bg);
+  --dialog-btn-primary-hover: var(--color-btn-primary-hover);
+  --dialog-btn-danger-bg: var(--color-btn-danger-bg);
+  --dialog-btn-danger-hover: var(--color-btn-danger-hover);
+  --dialog-btn-secondary-bg: var(--color-btn-secondary-bg);
+}
+
+.dialog-btn {
+  padding: var(--space-5) var(--space-12);
+  border: none;
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  font-size: var(--text-md);
+  font-weight: var(--font-semibold);
+  transition: all var(--transition-normal);
+  letter-spacing: 0.2px;
+}
+.dialog-btn:focus-visible { outline: var(--border-width-thick) solid var(--color-border-focus); outline-offset: var(--space-1); }
+
+.dialog-btn-primary {
+  background-color: var(--dialog-btn-primary-bg);
+  color: var(--color-brand-black);
+  box-shadow: var(--shadow-sm);
+}
+.dialog-btn-primary:hover:not(:disabled) {
+  background-color: var(--dialog-btn-primary-hover);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+.dialog-btn-primary:active:not(:disabled) { transform: translateY(0); box-shadow: var(--shadow-xs); }
+
+.dialog-btn-danger {
+  background-color: var(--dialog-btn-danger-bg);
+  color: var(--color-white);
+  box-shadow: var(--shadow-sm);
+}
+.dialog-btn-danger:hover:not(:disabled) {
+  background-color: var(--dialog-btn-danger-hover);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+.dialog-btn-danger:active:not(:disabled) { transform: translateY(0); box-shadow: var(--shadow-xs); }
+
+.dialog-btn-secondary {
+  background-color: transparent;
+  color: var(--dialog-text-secondary);
+  border: var(--border-width) solid var(--dialog-border);
+}
+.dialog-btn-secondary:hover { background-color: var(--dialog-btn-secondary-bg); border-color: var(--color-gray-700); }
+
+.dialog-btn:disabled { opacity: var(--opacity-disabled); cursor: not-allowed; box-shadow: none; }
+/* ===================== end verbatim ===================== */
+
+.bar { display: flex; gap: var(--space-8); align-items: center; flex-wrap: wrap;
+       padding: var(--space-12); background: var(--color-bg-secondary); margin-bottom: var(--space-12); }
+.bar-label { width: 120px; font-family: var(--font-mono); font-size: var(--text-sm);
+             color: var(--color-text-tertiary); }
+</style>
+</head>
+<body>
+
+<h1>Buttons</h1>
+<p class="ds-lede">
+  Three variants. Hover and click them — the states are the real ones, not screenshots.
+</p>
+
+<div class="ds-note">
+  <strong>The primary button's label is near-black, not white.</strong> The brand violet is a light
+  tint, so white on it measures 2.2:1 and fails WCAG 1.4.3. <code>#161312</code> on the same violet
+  measures 8.4:1. This is guarded by <code>Dialog.contrast.test.ts</code> in the app — if you draw a
+  violet button with a white label in a design, the test will reject the implementation.
+</div>
+
+<h2>Variants</h2>
+
+<div class="bar">
+  <span class="bar-label">resting</span>
+  <button class="dialog-btn dialog-btn-primary">Confirm</button>
+  <button class="dialog-btn dialog-btn-secondary">Cancel</button>
+  <button class="dialog-btn dialog-btn-danger">Delete</button>
+</div>
+
+<div class="bar">
+  <span class="bar-label">disabled</span>
+  <button class="dialog-btn dialog-btn-primary" disabled>Confirm</button>
+  <button class="dialog-btn dialog-btn-secondary" disabled>Cancel</button>
+  <button class="dialog-btn dialog-btn-danger" disabled>Delete</button>
+</div>
+
+<div class="bar">
+  <span class="bar-label">focus ring</span>
+  <button class="dialog-btn dialog-btn-primary" id="focusme">Tab to me</button>
+  <span style="font-size: var(--text-sm); color: var(--color-text-secondary)">
+    2px solid violet, offset 2px. Never remove it.
+  </span>
+</div>
+
+<h2>Order and wording</h2>
+<div class="ds-note">
+  <strong>Destructive action on the right, cancel on its left.</strong> The label says what will
+  happen — "Delete file", not "OK". A button that cannot be undone never gets keyboard focus by
+  default, so pressing Return twice cannot trigger it.
+</div>
+
+<div class="bar" style="justify-content: flex-end">
+  <button class="dialog-btn dialog-btn-secondary">Cancel</button>
+  <button class="dialog-btn dialog-btn-danger">Delete file</button>
+</div>
+
+</body>
+</html>

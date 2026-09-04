@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { showGlobalToast, subscribeGlobalToasts } from './toastService'
 import { ToastNotification } from './ToastNotification'
@@ -104,7 +104,7 @@ describe('ToastNotification', () => {
       })
     })
 
-    it('close button is keyboard focusable with tabIndex', async () => {
+    it('close button is keyboard focusable', async () => {
       render(
         <ToastProvider>
           <ToastNotification />
@@ -117,8 +117,11 @@ describe('ToastNotification', () => {
         expect(screen.getByText('Test')).toBeInTheDocument()
       })
 
+      // A native <button> is inherently keyboard-focusable — no explicit tabIndex
+      // needed (and the redundant onKeyDown that double-handled Enter/Space is gone).
       const closeButton = screen.getByRole('button', { name: 'Close' })
-      expect(closeButton).toHaveAttribute('tabIndex', '0')
+      closeButton.focus()
+      expect(closeButton).toHaveFocus()
     })
 
     it('toast auto-dismisses after timeout if not manually closed', async () => {
@@ -242,6 +245,43 @@ describe('ToastNotification', () => {
       expect(screen.getByTestId('toast-live-alert')).toHaveTextContent('')
     })
 
+    it('does not re-announce an older toast when the newest is dismissed (UX-003)', async () => {
+      // THE DEFECT. Both live-region strings were derived from
+      // `toasts[toasts.length - 1]` on every render, so removing the newest
+      // toast re-evaluated them to the PREVIOUS toast's text and wrote it into
+      // an `aria-atomic` region — which assistive tech announces as new. With a
+      // stack of three, dismissing them one by one reads the stack backwards.
+      render(
+        <ToastProvider>
+          <ToastNotification />
+        </ToastProvider>
+      )
+
+      showGlobalToast({ title: 'First', message: '', type: 'success', duration: 60000 })
+      await waitFor(() => {
+        expect(screen.getByTestId('toast-live-polite')).toHaveTextContent('First')
+      })
+
+      showGlobalToast({ title: 'Second', message: '', type: 'success', duration: 60000 })
+      await waitFor(() => {
+        expect(screen.getByTestId('toast-live-polite')).toHaveTextContent('Second')
+      })
+
+      // Dismiss the newest. The region must not fall back to 'First'.
+      const container = screen.getByTestId('toast-container')
+      const closeButtons = screen.getAllByRole('button', { name: /close/i })
+      expect(closeButtons).toHaveLength(2)
+      fireEvent.click(closeButtons[closeButtons.length - 1])
+
+      // Counted on the VISUAL stack, not by text: the live region legitimately
+      // still holds 'Second' (already announced, unchanged, so silent), and a
+      // text query would find it there.
+      await waitFor(() => {
+        expect(container.childElementCount).toBe(1)
+      })
+      expect(screen.getByTestId('toast-live-polite')).not.toHaveTextContent('First')
+    })
+
     it('visual toast items carry no live role; Close button stays focusable (UX-003)', async () => {
       render(
         <ToastProvider>
@@ -261,7 +301,9 @@ describe('ToastNotification', () => {
 
       const closeButton = screen.getByRole('button', { name: 'Close' })
       expect(closeButton).toBeInTheDocument()
-      expect(closeButton).toHaveAttribute('tabIndex', '0')
+      // Focusable as a native button (no explicit tabIndex needed).
+      closeButton.focus()
+      expect(closeButton).toHaveFocus()
     })
 
     it('can close multiple toasts individually', async () => {

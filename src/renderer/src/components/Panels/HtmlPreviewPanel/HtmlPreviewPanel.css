@@ -1,0 +1,191 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * HtmlPreviewPanel Styles (Issue #74, work item 71).
+ *
+ * Plain co-located global CSS (not a CSS module, per design §1.8). All values
+ * come from design tokens; no rounded corners. Governed by
+ * design/system/foundations/surfaces.html.
+ *
+ * The placeholder's background is the STARTING half of a two-value invariant:
+ * the DOM placeholder and the native view's backdrop always carry the same
+ * colour, so the seam between them never flashes (design §1.8). The value here
+ * is only the chrome phase — `var(--color-brand-black)`, matching main's
+ * `setBackgroundColor('#FF161312')` in the constructor. Once the page settles,
+ * main resolves the page's own paper colour and emits `preview:backdropChanged`;
+ * `HtmlPreviewPanel.tsx` then writes it as an inline `background` on the
+ * placeholder, overriding the rule below. Both halves move together or the
+ * invariant is broken — see `src/main/services/preview/previewBackdrop.ts`.
+ *
+ * @see HtmlPreviewPanel.tsx for the component
+ */
+
+/* ============================================
+ * Panel container
+ * ============================================ */
+
+.html-preview-panel {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-brand-black);
+  overflow: hidden;
+}
+
+/* ============================================
+ * Preview surface (normal state)
+ * ============================================ */
+
+.html-preview-surface {
+  /* A COLUMN, so the chrome strip's height is subtracted from the page area by
+     layout instead of being re-stated as a number in TypeScript. The strip used
+     to be `position: absolute` over the page area, which is why its height had to
+     be duplicated as PREVIEW_CHROME_INSET_PX and added back on when the native
+     view's bounds were computed — two literals that only comments kept in step.
+     In flow there is no literal to duplicate, and a strip whose height changes
+     (the permission band opening its list) needs no code change at all. */
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+/*
+ * The page area: everything below the strip. This is the positioning context for
+ * the find bar, so the bar's `top` offset measures from BELOW the strip and it
+ * cannot land on top of the strip's own controls when the strip grows.
+ */
+.html-preview-page-area {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/*
+ * `.html-preview-chrome-strip` used to live here: a 22px always-DOM strip
+ * reading "Preview – content below is not Erfana", with a 2px accent seam under
+ * it. `PreviewChromeBand` replaced the element long ago and this rule has
+ * rendered nowhere since; it is deleted now rather than left as a second,
+ * divergent description of a bar that is no longer even shaped like this.
+ *
+ * The strip's two security properties did not move with it. The wording and the
+ * accent seam were both withdrawn by owner decision when the band became a
+ * toolbar — see PreviewChromeBand.css and `docs/security.md` residual risk 8.
+ * What survives is placement: the band is a flow sibling ABOVE
+ * `.html-preview-page-area`, so the untrusted page cannot paint over it.
+ */
+
+/*
+ * The sized target the native WebContentsView paints over. Carries whatever
+ * colour main reports painting behind the page (see the `backdrop` inline style
+ * in HtmlPreviewPanel.tsx), so the DOM and the native view never disagree at a
+ * seam; the token below is the pre-first-report default and matches main's
+ * `CHROME_BACKDROP`.
+ */
+/*
+ * Chrome-phase backdrop only. `HtmlPreviewPanel.tsx` replaces this with an
+ * inline `background` once main reports the loaded page's own paper colour, so
+ * this value must stay equal to `CHROME_BACKDROP` in previewBackdrop.ts.
+ */
+.html-preview-placeholder {
+  position: absolute;
+  inset: 0;
+  background: var(--color-brand-black);
+  overflow: hidden;
+}
+
+/*
+ * Still frame shown while the native view is hidden (fills the placeholder).
+ *
+ * `cover`, NOT `contain`. The frame is captured at the view's aspect at hide
+ * time, and the box it lands in is a different shape whenever the band grew to
+ * cause the hide — which is the common case, because opening the permission
+ * band's list is what hides the page. `contain` letterboxes that difference,
+ * and the bars read as a broken panel rather than as a frozen page. `cover`
+ * fills, anchored top-left so the page's own top-left stays put; the frame is
+ * transient and a few cropped pixels at the far edge cost nothing.
+ *
+ * The black below is what shows through only while the image itself is still
+ * decoding, and it matches the pre-paint placeholder backdrop.
+ */
+.html-preview-still-frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top left;
+  /*
+   * TRANSPARENT, so the placeholder's own backdrop shows through.
+   *
+   * `capturePage` returns a PNG WITH ALPHA, and a page that sets no background
+   * on its body paints none — so those pixels come back transparent. Against a
+   * hardcoded brand black they rendered as a dark page with dark text on it,
+   * which is what a reader saw: the words there, the paper gone.
+   *
+   * The placeholder underneath already carries the right colour. It is painted
+   * with the backdrop main reports (`backdropChanged`), which resolves to the
+   * page's own paper once the load settles — so compositing the frame onto it is
+   * correct even when the capture ran before that colour was known, and it stays
+   * correct if the paper changes later.
+   */
+  background: transparent;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* ============================================
+ * Banner (limit-reached / failed)
+ * ============================================ */
+
+.html-preview-banner {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-6);
+  padding: var(--space-16);
+  text-align: center;
+  color: var(--color-text-secondary);
+}
+
+.html-preview-banner-message {
+  font-size: var(--text-md);
+  color: var(--color-text-primary);
+  user-select: text;
+}
+
+.html-preview-banner-button {
+  height: var(--btn-height-md);
+  padding: 0 var(--space-12);
+  border: var(--border-width) solid var(--color-border-default);
+  border-radius: var(--border-radius);
+  background: var(--color-btn-secondary-bg);
+  color: var(--color-text-primary);
+  font-size: var(--text-base);
+  font-weight: var(--font-medium);
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.html-preview-banner-button:hover {
+  background: var(--color-btn-secondary-hover);
+}
+
+.html-preview-banner-button:active {
+  background: var(--color-btn-secondary-hover);
+}
+
+.html-preview-banner-button:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: 1px;
+}
+
+.html-preview-banner-button:disabled {
+  opacity: var(--opacity-disabled);
+  cursor: not-allowed;
+}

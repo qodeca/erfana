@@ -67,7 +67,7 @@ See the full design in [`docs/designs/216-claude-status-bar.md`](../designs/216-
 Terminal panel automatically opens when a project loads, providing immediate shell access.
 
 **Behavior**:
-- Opens automatically on Recent Projects selection or File > Open
+- Opens automatically when a project is opened – via the Project panel's open/change folder button or the Welcome tab's Recent Projects list. There is no File > Open menu item; the File menu contains only New Window (`src/main/menu.ts`)
 - Tracks user intent: if user closes terminal, it stays closed until next project load
 - Ephemeral state (`terminalUserClosed`) resets on project change
 
@@ -102,9 +102,9 @@ Full copy/paste operations with keyboard shortcuts and context menu.
 **Central clipboard service (#203)**: terminal copy/paste now reads and writes through the shared renderer `textClipboard` service (`src/renderer/src/services/textClipboard.ts` → main-process `clipboard` module over IPC), the single transport-error chokepoint for all text surfaces. The SIGINT-vs-copy decision table in `terminalClipboard.logic.ts` (#28/#122) is **unchanged** — only the underlying read/write transport moved. See [API Services § Clipboard service](../api-services.md#clipboard-service-203).
 
 **Files**:
-- `src/renderer/src/components/Panels/Terminal/terminalClipboard.logic.ts`
-- `src/renderer/src/components/Panels/Terminal/useTerminalClipboard.ts`
-- `src/renderer/src/components/Panels/Terminal/TerminalContextMenu.tsx`
+- `src/renderer/src/utils/terminalClipboard.logic.ts`
+- `src/renderer/src/hooks/useTerminalClipboard.ts`
+- `src/renderer/src/components/ContextMenu/TerminalContextMenu.tsx`
 - `src/renderer/src/services/textClipboard.ts` (shared transport)
 
 ### Smart File Path Links (v0.5.0)
@@ -116,7 +116,7 @@ Clickable file path links in terminal output with intelligent path resolution.
 - Supports `@`-prefixed paths from CLI tools (e.g., `@src/main/index.ts`) – the `@` is stripped and the underlying path is opened; `@scope/package` references (e.g., `@types/node`) are preserved and not treated as file paths
 - Supports line:column notation (`:42:10`, `(15,3)`) and `:line-line` range notation (e.g., `:22-24`) – navigates to the first line of the range
 - Path validation with LRU cache (100 entries, 30s TTL)
-- Click to open file in editor at specified location
+- Click to open the file – Markdown and text paths open in the Monaco editor at the given line/column, image paths open in the image viewer instead (`openFileInPanel`, #70)
 - Multi-line link ranges – links span correctly across xterm-wrapped and CLI-wrapped lines
 
 **Smart Resolution**:
@@ -150,9 +150,11 @@ Clickable file path links in terminal output with intelligent path resolution.
 
 **Files**:
 - `src/renderer/src/utils/cliWrapJoin.logic.ts` – Pure logic (no React/xterm deps)
-- `src/renderer/src/utils/cliWrapJoin.logic.test.ts` – 51 tests
+- `src/renderer/src/utils/cliWrapJoin.logic.test.ts` – 56 tests
+- `src/renderer/src/utils/filePathLinks.logic.ts` – Path detection and fallback matchers
+- `src/renderer/src/utils/smartPathResolver.logic.ts` – Resolution orchestration
+- `src/renderer/src/utils/pathScoring.ts` – Candidate ranking
 - `src/renderer/src/hooks/useTerminalFileLinks.ts` – Integration hook
-- `src/renderer/src/components/Panels/Terminal/FileLinks/`
 
 ### Drag-Drop File Path Insertion (v0.6.5)
 
@@ -184,13 +186,13 @@ Drag files or folders from project tree or Finder to insert shell-escaped paths 
 ```
 
 **Architecture**:
-- `useTerminalDrop.ts`: Hook combining @dnd-kit sensor and native event handling
-- `terminalDrop.logic.ts`: Path escaping and formatting logic
+- `useTerminalDragDrop.ts`: Hook combining @dnd-kit sensor and native event handling
+- `shellPathEscape.ts`: Path escaping and formatting logic (`formatPathsForTerminal`)
 - CSS class `.terminal-drop-active`: Visual drop indicator styling
 
 **Files**:
-- `src/renderer/src/components/Panels/Terminal/useTerminalDrop.ts`
-- `src/renderer/src/components/Panels/Terminal/terminalDrop.logic.ts`
+- `src/renderer/src/components/Panels/TerminalPanel/hooks/useTerminalDragDrop.ts`
+- `src/renderer/src/utils/shellPathEscape.ts`
 
 **Related issues**:
 - #85 - Terminal drag-drop file path insertion
@@ -334,8 +336,8 @@ Three complementary mechanisms ensure scroll lock works reliably:
 - Prevents conflict between proactive lock and reactive recovery mechanisms
 
 **Files**:
-- `src/renderer/src/hooks/useScrollLock.ts` (130 lines)
-- `src/renderer/src/hooks/useScrollLock.test.ts` (22 tests)
+- `src/renderer/src/hooks/useScrollLock.ts` (235 lines)
+- `src/renderer/src/hooks/useScrollLock.test.ts` (25 tests)
 
 **Related issues**:
 - #60 - Add scroll-lock button to terminal toolbar
@@ -363,8 +365,8 @@ Automatic scroll to bottom 1 second after executing prompt templates, respecting
 - Rapid execution → Independent scheduling
 
 **Files**:
-- `src/renderer/src/utils/promptScrollScheduler.logic.ts` (141 lines)
-- `src/renderer/src/utils/promptScrollScheduler.logic.test.ts` (871 lines, 66 tests)
+- `src/renderer/src/utils/promptScrollScheduler.logic.ts` (144 lines)
+- `src/renderer/src/utils/promptScrollScheduler.logic.test.ts` (873 lines, 39 tests)
 
 **Integration Points** (6 call sites):
 - PreviewContextMenu (Explain, Modify, Ask)
@@ -382,7 +384,7 @@ See [Scroll Fixes](./scroll-fixes.md) for related scroll preservation features.
 - **WebGL Rendering**: Hardware acceleration with canvas fallback
 - **Bold Font Support**: Renders bold text with proper font weight
 - **Full Environment**: Login shell on macOS/Linux loads user's shell configuration and Homebrew paths
-- **Context Integration**: "Send Selection to Terminal" from markdown preview
+- **Context Integration**: preview and editor context menus send a selection to the terminal through prompt templates (Explain / Modify / Ask / Visualize / Prompt)
 
 ### Terminal Configuration
 
@@ -419,14 +421,14 @@ See [Bootstrap Pattern](./bootstrap-pattern.md) for detailed initialization docu
 
 ### Service Layer
 
-**File**: `src/main/services/TerminalService.ts` (~260 lines)
+**File**: `src/main/services/TerminalService.ts` (~700 lines)
 
 ```typescript
 class TerminalService extends EventEmitter {
   private terminals: Map<string, TerminalInstance>
 
   // Lifecycle
-  createTerminal(config: TerminalConfig): string | null
+  createTerminal(config?: TerminalConfig, webContentsId?: number): Promise<TerminalCreateResult>
   killTerminal(terminalId: string): boolean
   dispose(): Promise<void>
 
@@ -542,11 +544,12 @@ Without bracketed paste, multi-line text or text containing special characters (
 ### Context Menu Integration
 **File**: `src/renderer/src/components/ContextMenu/PreviewContextMenu.tsx`
 
-**"Send Selection to Terminal"** menu item:
-1. Opens terminal panel (if closed)
-2. Waits 100ms for initialization
-3. Calls `sendToTerminal(selectedText)`
-4. Shows success/error toast
+There is **no** "Send selection to terminal" item. Selected text reaches the terminal only
+through a prompt template: right-clicking a selection in the preview (or in the Monaco
+editor) offers **Explain**, **Modify**, **Ask**, **Visualize** and **Prompt**, plus
+**Copy selection**. Each prompt renders its template with the selection, pastes the result
+into the terminal in bracketed-paste mode and presses Enter automatically
+(`autoExecute`). See [Prompt Templates](../prompts/README.md).
 
 ### Keyboard Shortcuts
 **Global**: `Cmd/Ctrl+J` - Toggle terminal panel (works anywhere in app)

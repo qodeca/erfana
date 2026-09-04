@@ -1,0 +1,424 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * PreviewChromeBand — the trust strip above an HTML preview.
+ *
+ * SOURCE OF TRUTH. scripts/design-sync.mjs copies this file to
+ * design/system/components/permission-band/band.css so the card renders what
+ * actually ships, and `npm run design -- --check` fails CI on drift. Edit this
+ * copy; never the one under design/.
+ *
+ * IT IS A TOOLBAR NOW, AND TWO SECURITY CONTROLS WERE WITHDRAWN TO GET THERE.
+ *
+ * This file used to open by insisting on two properties: a permanent
+ * "Preview - content below is not Erfana" label, and a 2px accent seam that the
+ * previewed page could not paint over. They were the documented mitigation for
+ * UI spoofing (`docs/security.md`, residual risk 8). The project owner removed
+ * the label outright and matched `.markdown-toolbar`'s 1px neutral rule, so the
+ * two previews in this app look like one product.
+ *
+ * Read that as a decision with a cost, not as tidying. Nothing on screen names
+ * the boundary any more; the 1px rule measures poorly against a light page,
+ * which is the DEFAULT page paper (`previewBackdrop.ts`). Do not "restore" the
+ * label as a bug fix - it was taken out on purpose and `docs/security.md`
+ * records the residual.
+ *
+ * The one property this file must still never lose: the band is ALWAYS PRESENT
+ * and it is a flow sibling ABOVE the page area, never an overlay on it, so the
+ * page has nowhere to paint that could cover it. That is now the whole of what
+ * separates Erfana's chrome from untrusted content. Making it conditional, or
+ * absolutely positioned, removes the last of it.
+ *
+ * Sizing follows `MarkdownToolbar.css`: a 28px button in 6px/12px padding, so
+ * the bar comes out at the same height as the markdown one rather than the old
+ * 32px row. There is no inset constant to keep in step - the band is laid out in
+ * flow and the native view tracks the placeholder's own box.
+ */
+
+.erf-band {
+  background: var(--color-bg-primary);   /* was --color-bg-secondary */
+  /* 1px neutral, matching `.markdown-toolbar`. Was a 2px accent seam; see the
+     header - that was a security control and its removal was a decision. */
+  border-bottom: var(--border-width) solid var(--color-border-default);
+  font-family: var(--font-sans);
+  user-select: none;
+  /* No transition. The native view moves in one step, so an eased height would
+     race it and expose page pixels under the rows mid-animation. Instant height
+     also sidesteps prefers-reduced-motion entirely. */
+}
+
+/* ---------- the always-visible row ---------- */
+
+.erf-band__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  /* Content-sized like `.markdown-toolbar`, not a fixed height: 28px button plus
+     6px top and bottom. A fixed height here would fight the button. */
+  padding: var(--space-3) var(--space-6);
+}
+
+/* Pushes the chip to the trailing edge. `justify-content: space-between` did
+   that while the bar held exactly two children; a toolbar grows, and an explicit
+   spacer keeps "Find leads, chip trails" true whatever lands between them - the
+   same device `.toolbar-spacer` uses in the markdown toolbar. */
+.erf-band__spacer {
+  flex: 1 1 auto;
+}
+
+/*
+ * The rule between the page's own controls and the one that writes a file
+ * elsewhere. Copied from `.markdown-toolbar .toolbar-separator` — same width,
+ * same 24px height, same token, same 8px margins — because the two toolbars
+ * should not disagree about what a separator looks like.
+ */
+.erf-band__separator {
+  flex: 0 0 auto;
+  width: 1px;
+  height: var(--icon-size-lg);           /* 24px */
+  margin: 0 var(--space-4);
+  background: var(--color-border-default);
+}
+
+/* An icon button, sized and coloured as `.markdown-toolbar .toolbar-btn`. */
+.erf-band__tool {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: var(--btn-height-md);           /* 32px */
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--border-radius);
+  color: var(--color-text-primary);
+  cursor: pointer;
+}
+
+.erf-band__tool:hover {
+  background: var(--color-bg-hover-solid);
+  color: var(--color-white);
+}
+
+.erf-band__tool:active {
+  background: var(--color-bg-selected);
+}
+
+.erf-band__tool:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: -2px;
+}
+
+/* ---------- the disclosure chip ---------- */
+
+.erf-band__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex: 0 0 auto;
+  height: var(--btn-height-sm);          /* 24px — the WCAG 2.5.8 minimum */
+  padding: 0 var(--space-6);
+  background: transparent;
+  border: var(--border-width) solid var(--color-accent-primary);
+  border-radius: var(--border-radius);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.erf-band__chip:hover { background: var(--color-brand-violet-muted); }
+
+.erf-band__chip:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
+}
+
+.erf-band__chip-caret { font-size: var(--text-xs); color: var(--color-accent-primary); }
+
+/* A failed approval must survive collapsing the list. */
+.erf-band__chip--failed { border-color: var(--color-error); }
+.erf-band__chip--failed .erf-band__chip-caret { color: var(--color-error); }
+
+/* ---------- the expanded list ---------- */
+
+/*
+ * The trailing padding lives on the SCROLL box, not here, so it sits between the
+ * content and the scrollbar rather than outside the scrollbar. Padding on this
+ * element would push the whole scroll box — bar and all — away from the edge and
+ * leave the rows still touching the thumb.
+ */
+.erf-band__list { padding: 0 0 var(--space-6) var(--space-8); }
+
+/*
+ * THE SCROLLBAR MUST TAKE SPACE, NOT FLOAT OVER THE ALLOW BUTTONS.
+ *
+ * macOS ships overlay scrollbars, which paint on top of content and take no
+ * layout width. In a list of hosts the rightmost column is the Allow button and
+ * the failure text beside it, so the overlay landed directly on the one control
+ * the list exists for.
+ *
+ * Declaring `::-webkit-scrollbar` with a width opts this element out of overlay
+ * scrollbars entirely: Chromium gives it a classic, space-taking bar. That is
+ * the same pattern `ProjectTree.css` and `MarkdownPreview.css` already use, with
+ * the same tokens, so the band does not invent a second scrollbar look.
+ *
+ * `scrollbar-gutter: stable` reserves the width whether or not the list is long
+ * enough to scroll. Without it the rows re-flow every time the list crosses the
+ * threshold — and it crosses constantly here, because approving a host REMOVES
+ * its row. Every Allow click would shift the remaining buttons sideways under
+ * the pointer, which is how a mis-click becomes a one-way permission grant.
+ */
+.erf-band__scroll {
+  max-height: var(--erf-band-max-list, 240px);
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  /* Breathing room between the last Allow button and the thumb. Inside the
+     scroll box, so it is space the scrollbar cannot reclaim. Leaves the rows
+     18px off the band's right edge against 16px on the left — near enough to
+     symmetric that the scrollbar reads as sitting in the margin. */
+  padding-inline-end: var(--space-4);
+}
+
+.erf-band__scroll::-webkit-scrollbar {
+  width: var(--scrollbar-width);
+}
+
+.erf-band__scroll::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
+.erf-band__scroll::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: var(--border-radius);
+}
+
+.erf-band__scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+
+.erf-band__section {
+  padding: var(--space-4) 0 var(--space-2);
+  font-size: var(--text-xs);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--color-text-tertiary);
+}
+
+.erf-band__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 72px auto;
+  gap: var(--space-8);
+  align-items: center;
+  /*
+   * `min-height` is the 24px target floor plus the padding, and the padding is
+   * what makes the row readable: a 24px button in a 28px row left about 2px
+   * between the button's edge and the separator above it, so the rules read as
+   * boxes drawn around the buttons rather than as lines between rows.
+   */
+  padding-block: var(--space-3);         /* 6px above and below */
+  min-height: var(--space-14);           /* 28px */
+  border-top: var(--border-width) solid var(--color-border-default);
+}
+
+/* The host is NOT defined here. It is .erf-host from ../row/row.css — one
+   primitive, one definition. This file used to carry its own copy with
+   `direction: rtl; unicode-bidi: plaintext`, which cancelled the front-elide and
+   delivered the trap the comment said it prevented. Two copies of a security
+   control is how one of them stays wrong. */
+
+/* The middle cell. It renders EMPTY on every row except a failed approval — it
+   used to name the resource kind, and beside a host and an Allow button that
+   word reads as a scope the grant does not have. The rule stays because the cell
+   still reserves its 72px track, so blocked, allowed and failed rows share one
+   grid. */
+.erf-band__kind {
+  font-size: var(--text-sm);
+  /* Tertiary, but the stated reason no longer holds: the "3.72:1, fails" that
+     used to sit here was measured against --color-bg-secondary, and this band
+     moved to --color-bg-primary. On the surface that actually ships, secondary
+     measures 5.01:1 and PASSES. Keeping the choice for now and re-deciding it
+     with the claims ledger, where the number is generated instead of typed. */
+  color: var(--color-text-tertiary);
+}
+
+.erf-band__allow {
+  height: var(--btn-height-sm);          /* 24px */
+  padding: 0 var(--space-8);
+  background: transparent;
+  border: var(--border-width) solid var(--color-accent-primary);
+  border-radius: var(--border-radius);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.erf-band__allow:hover { background: var(--color-brand-violet-muted); }
+
+.erf-band__allow:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  /* INSET. Allow lives inside .erf-band__scroll, and an outward ring on a
+     scroll-clipped target gets cut off. The chip above is outside the scroller,
+     so its ring stays outward — that is the rule from the Focus card, not two
+     different habits. */
+  outline-offset: calc(var(--space-1) * -1);
+}
+
+/* State is carried by a WORD plus a shape, never by colour alone. */
+.erf-band__state {
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+  white-space: nowrap;
+}
+
+.erf-band__state--failed { color: var(--color-error); }
+
+/* ---------- the confirm step ---------- */
+
+.erf-band__confirm {
+  border-left: var(--border-width-thick) solid var(--color-accent-primary);
+  padding: var(--space-6) var(--space-8) var(--space-8);
+  margin: var(--space-2) 0 var(--space-4);
+  background: var(--color-bg-tertiary);
+}
+
+.erf-band__confirm-title {
+  margin: 0 0 var(--space-4);
+  font-size: var(--text-md);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-emphasis);
+}
+
+.erf-band__confirm-body {
+  margin: 0 0 var(--space-6);
+  max-width: 72ch;
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  color: var(--color-text-tertiary);
+}
+
+/* The one paragraph that is a WARNING rather than a description: an unencrypted
+   origin. It is not louder than the rest of the box - the whole box is a
+   security question, and colouring one line red inside it would suggest the
+   others are safe. It is only distinguished, so the eye can find it again.
+   Contrast is generated, not typed: `contrast-warning-on-panel` in the ledger. */
+.erf-band__confirm-body--warn {
+  color: var(--color-warning);
+}
+
+.erf-band__confirm-body + .erf-band__confirm-body { margin-top: calc(var(--space-4) * -1); }
+
+.erf-band__confirm-actions {
+  display: flex;
+  gap: var(--space-6);
+  justify-content: flex-end;
+}
+
+/*
+ * The confirm step's buttons are TALLER than the ones in the list.
+ *
+ * The rest of the band uses --btn-height-sm (24px), the WCAG 2.2 SC 2.5.8 floor.
+ * That is right for a list of repeated Allow buttons in dense chrome. It is wrong
+ * here: the Surfaces card decides that "a destructive or irreversible action
+ * should never be the smallest target on screen", and Confirm is the most
+ * irreversible control in the app — this card's own copy says "Erfana cannot undo
+ * it". Leaving it at the floor made it simultaneously the smallest target on the
+ * card and the only one-way door on it.
+ */
+.erf-band__confirm-actions .erf-band__allow {
+  height: var(--btn-height-md);
+  padding: 0 var(--space-10);
+}
+
+/* Confirm carries the accent so the two actions are not a coin flip. Cancel
+   stays the plain outline, and stays first in DOM order. */
+.erf-band__allow--primary {
+  background: var(--color-accent-primary);
+  border-color: var(--color-accent-primary);
+  color: var(--color-brand-black);
+  font-weight: var(--font-semibold);
+}
+
+.erf-band__allow--primary:hover { background: var(--color-brand-violet); }
+
+/* A busy Confirm still looks like Confirm; it just stops responding. Using
+   `aria-disabled` rather than `disabled` keeps focus where it is — Chromium
+   blurs a control the instant it becomes disabled, which would drop a keyboard
+   user on <body> in the middle of a write. */
+.erf-band__allow[aria-disabled='true'] {
+  opacity: var(--opacity-disabled);
+  cursor: default;
+}
+
+/* ---------- the fail-safe notice ---------- */
+
+/* Every `display` in this file beats the browser's built-in rule for the
+   `hidden` attribute, so `hidden` silently does nothing without an opt-out.
+   This used to name two classes, which left four more armed — the bar, the chip,
+   a row and the confirm actions. Naming classes is how you miss the fifth.
+   One descendant rule instead, so a new element cannot be forgotten. */
+.erf-band [hidden] { display: none !important; }
+
+.erf-band__paused {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-8);
+  background: var(--color-warning-bg);
+  border-top: var(--border-width) solid var(--color-border-warning);
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+}
+
+/* ---------- the live region ---------- */
+
+/* Present for the panel's whole life and empty until it has something to say.
+   A live region created at the same moment as its content is not announced. */
+.erf-band__announce {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* The whole refusal reason, for a screen reader only. The row draws a short form
+   that fits its fixed middle column; this carries the sentence that explains it.
+   Co-located rather than shared with `.erf-host__announced` — same idiom, but a
+   reason is not a host, and this file owns the band's rules. */
+.erf-band__reason-full {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/*
+ * THE RESERVATION. Between the list opening and the page proving it moved, the
+ * rows take up their full height and paint nothing.
+ *
+ * `visibility: hidden` is load-bearing and the alternatives are not equivalent:
+ * `display: none` removes the height, which removes the growth the page is
+ * supposed to react to — the deadlock. `opacity: 0` keeps the height but stays
+ * hit-testable, so a click lands on an invisible control granting a permission.
+ * `visibility: hidden` reserves the box, paints nothing, takes no input and is
+ * out of the accessibility tree, which is exactly the whole set of properties
+ * needed here.
+ *
+ * It also changes no layout when it flips back, so revealing the rows causes no
+ * second bounds push and no loop.
+ */
+.erf-band__list[data-unproven] .erf-band__row,
+.erf-band__list[data-unproven] .erf-band__section,
+.erf-band__list[data-unproven] .erf-band__confirm {
+  visibility: hidden;
+}

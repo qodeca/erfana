@@ -38,7 +38,9 @@ import {
   ScreenPermissionDialog
 } from '../Dialog'
 import { useScreenshotCapture } from './TerminalPanel/hooks/useScreenshotCapture'
-import { sanitizeFilePath, getBasename } from '../../utils/fileUtils'
+import { getBasename } from '../../utils/fileUtils'
+import { openFileInPanel } from '../../utils/openFileInPanel'
+import { resolvePanelKind } from '../../utils/resolvePanelKind'
 import { formatPathsForTerminal, escapePathForShell, type ShellKind } from '../../utils/shellPathEscape'
 import { logger } from '../../utils/logger'
 import { TEST_IDS } from '../../constants/testids'
@@ -263,40 +265,31 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       return
     }
 
-    // Create panel ID from file path (sanitize for use as ID)
-    const panelId = `editor-${sanitizeFilePath(filePath)}`
-
-    // Check if panel already exists
-    const existingPanel = dockviewApi.getPanel(panelId)
-    if (existingPanel) {
-      existingPanel.api.setActive()
-      // TODO: Set cursor position after panel is active (requires editor API enhancement)
-      // For now, just activate the existing panel
-      logger.info(`Activated existing panel for ${filePath}`, { line, column })
-      return
-    }
-
-    // Create new editor panel
-    const fileName = getBasename(filePath) || 'Untitled'
-    const editorPanel = dockviewApi.addPanel({
-      id: panelId,
-      component: 'editor',
-      title: fileName,
-      tabComponent: 'editorTab',
-      params: {
-        filePath: filePath,
-        panelId,
-        initialLine: line,
-        initialColumn: column
+    // `focusOnReuse: false` preserves this call site's pre-router behaviour:
+    // reactivating an already-open tab must NOT pull focus out of the terminal
+    // the user is typing in (QG-4a finding L-1). A newly created panel still
+    // takes focus, exactly as before.
+    //
+    // Behaviour change, intended: an image path now opens the image viewer
+    // instead of Monaco on binary bytes, and an eligible `.html` link opens the
+    // running preview. The `dockviewApi` readiness toast above stays synchronous
+    // so a link click on a not-ready editor still fails fast; only the kind
+    // resolution (which may await `preview:checkEligibility`) is async.
+    //
+    // TODO(#26): position the cursor on an already-open panel once the editor
+    // API can accept a line/column after activation.
+    void resolvePanelKind(filePath).then((kind) => {
+      if (kind === 'preview') {
+        openFileInPanel(dockviewApi, filePath, { kind: 'preview', renderer: 'always' })
+      } else {
+        openFileInPanel(dockviewApi, filePath, {
+          kind,
+          focusOnReuse: false,
+          params: { initialLine: line, initialColumn: column }
+        })
       }
+      logger.info(`Opened file from terminal link: ${filePath}`, { line, column })
     })
-
-    // Register the panel and activate it
-    useProjectStore.getState().registerEditorPanel(panelId)
-    editorPanel.api.setActive()
-    editorPanel.group.focus()
-
-    logger.info(`Opened new panel for ${filePath}`, { line, column })
   }, [dockviewApi])
 
   // Terminal file links hook - enables clickable file paths with smart resolution

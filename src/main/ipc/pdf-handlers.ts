@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { ipcMain } from 'electron'
 import { pdfService } from '../services/PdfService'
 import { PdfExportRequestSchema, type PdfExportResponse } from '../../shared/ipc/pdf-schema'
 import { ErrorCode } from '../../shared/errors'
 import { logger } from '../services/LoggingService'
+import { registerHandle } from './registry'
 
 /**
  * Register PDF export IPC handlers
@@ -23,7 +23,7 @@ export function registerPdfHandlers(): void {
    * @param request - { html: string, fileName: string }
    * @returns Export result with file path or error
    */
-  ipcMain.handle(
+  registerHandle(
     'pdf:exportToPdf',
     async (_event, request: unknown): Promise<PdfExportResponse> => {
       // Validate request schema

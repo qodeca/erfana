@@ -31,6 +31,17 @@
   margin-right: var(--space-6);
 }
 
+/*
+ * Permanently mounted live region (issue #70 / UX-1). Layout-neutral when
+ * empty: no padding, no min-width, no animation of its own – the inner
+ * `.file-status-indicator` keeps the fade.
+ */
+.markdown-toolbar .file-status-slot {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
 .markdown-toolbar .modified-indicator {
   font-size: var(--text-lg);
   color: var(--color-accent-secondary);

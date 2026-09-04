@@ -1,6 +1,6 @@
 # ASAR packaging
 
-**Last updated**: August 2026 (v0.17.0)
+**Last updated**: August 2026 (v0.17.2)
 
 This document explains why ASAR packaging is disabled and the implications.
 

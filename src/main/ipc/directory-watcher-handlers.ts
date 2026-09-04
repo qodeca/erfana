@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { ipcMain, WebContents } from 'electron'
+import { WebContents } from 'electron'
 import { directoryWatcherService } from '../services/DirectoryWatcherService'
 import { logger } from '../services/LoggingService'
+import { registerHandle } from './registry'
 
 /**
  * Register all directory watcher IPC handlers
  */
 export function registerDirectoryWatcherHandlers(): void {
   // Start watching a directory
-  ipcMain.handle('directory-watch:start', async (event, dirPath: string) => {
+  registerHandle('directory-watch:start', async (event, dirPath: string) => {
     try {
       // Validate input
       if (!dirPath || typeof dirPath !== 'string') {
@@ -28,7 +29,7 @@ export function registerDirectoryWatcherHandlers(): void {
   })
 
   // Stop watching a directory
-  ipcMain.handle('directory-watch:stop', async (event, dirPath: string) => {
+  registerHandle('directory-watch:stop', async (event, dirPath: string) => {
     try {
       if (!dirPath || typeof dirPath !== 'string') {
         return { success: false, error: 'Invalid directory path' }
@@ -46,7 +47,7 @@ export function registerDirectoryWatcherHandlers(): void {
   })
 
   // Stop watching all directories (cleanup)
-  ipcMain.handle('directory-watch:stop-all', async (event) => {
+  registerHandle('directory-watch:stop-all', async (event) => {
     try {
       const webContents = event.sender as WebContents
       await directoryWatcherService.unwatchAll(webContents)
@@ -60,7 +61,7 @@ export function registerDirectoryWatcherHandlers(): void {
   })
 
   // Pause directory watching (during internal operations)
-  ipcMain.handle('directory-watch:pause', async (_event, dirPath: string) => {
+  registerHandle('directory-watch:pause', async (_event, dirPath: string) => {
     try {
       if (!dirPath || typeof dirPath !== 'string') {
         return { success: false, error: 'Invalid directory path' }
@@ -77,7 +78,7 @@ export function registerDirectoryWatcherHandlers(): void {
   })
 
   // Resume directory watching
-  ipcMain.handle('directory-watch:resume', async (_event, dirPath: string) => {
+  registerHandle('directory-watch:resume', async (_event, dirPath: string) => {
     try {
       if (!dirPath || typeof dirPath !== 'string') {
         return { success: false, error: 'Invalid directory path' }
@@ -97,7 +98,7 @@ export function registerDirectoryWatcherHandlers(): void {
   })
 
   // Get statistics (for debugging)
-  ipcMain.handle('directory-watch:get-stats', async () => {
+  registerHandle('directory-watch:get-stats', async () => {
     try {
       const stats = directoryWatcherService.getStats()
       return { success: true, stats }

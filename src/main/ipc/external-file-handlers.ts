@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { ipcMain, dialog } from 'electron'
+import { dialog } from 'electron'
 import { externalFileService } from '../services/ExternalFileService'
 import {
   ExternalFileValidateRequestSchema,
@@ -11,6 +11,7 @@ import {
   type ExternalFileMoveResponse
 } from '../../shared/ipc/external-file-schema'
 import { logger } from '../services/LoggingService'
+import { registerHandle } from './registry'
 
 /**
  * Selected files result from native file picker
@@ -41,7 +42,7 @@ export function registerExternalFileHandlers(): void {
    * - Source is a regular file (not device, pipe, socket)
    * - If symlink, target is not a system directory
    */
-  ipcMain.handle(
+  registerHandle(
     'file:validateExternal',
     async (
       _event,
@@ -94,7 +95,7 @@ export function registerExternalFileHandlers(): void {
    * Validates the file, then copies to target folder within project.
    * Supports conflict resolution strategies: 'replace' or 'keepBoth'.
    */
-  ipcMain.handle(
+  registerHandle(
     'file:copyFromExternal',
     async (
       _event,
@@ -145,7 +146,7 @@ export function registerExternalFileHandlers(): void {
    * Validates the file, copies to target folder, then deletes source.
    * Supports conflict resolution strategies: 'replace' or 'keepBoth'.
    */
-  ipcMain.handle(
+  registerHandle(
     'file:moveFromExternal',
     async (
       _event,
@@ -196,7 +197,7 @@ export function registerExternalFileHandlers(): void {
    * Used when folder is selected and user presses Cmd+Shift+I.
    * Returns array of selected file paths.
    */
-  ipcMain.handle('file:selectExternalFiles', async (): Promise<ExternalFileSelection | null> => {
+  registerHandle('file:selectExternalFiles', async (): Promise<ExternalFileSelection | null> => {
     try {
       const result = await dialog.showOpenDialog({
         properties: ['openFile', 'multiSelections'],

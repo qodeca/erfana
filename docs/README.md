@@ -16,15 +16,16 @@ Erfana is an agent-native Markdown workspace – an Electron app that runs a ter
 - [API Services – Features](./api-services-features.md) - Feature service implementations (Git, Transcription, Camera, etc.)
 - [IPC Patterns](./ipc-patterns.md) - Inter-process communication patterns
 - [Security](./security.md) - Security considerations and implementations
-- [Error Codes](./error-codes.md) - Project-wide `ErrorCode` enum index (~130 codes grouped by category; operator actions for the most-visible ones). Includes the 26-code graph/MCP block, which is contract-only until #23–#32 raise it
+- [Error Codes](./error-codes.md) - Project-wide `ErrorCode` enum index (156 codes grouped by category; operator actions for the most-visible ones). Includes the 26-code graph/MCP block, which is contract-only until #23-#32 raise it
 - [Architecture Decision Records](./adrs/README.md) - Durable rationale for load-bearing design choices (ADR 0001 self-host whisper, 0002 minisign, 0003 dual-pubkey, 0004 TOCTOU close)
 - [Technical Debt](./technical-debt.md) - Technical debt tracking and priorities
 
 ### Feature Documentation
-- [Core features](./features/README.md) - Catalogue of all 14 shipped features (editor, project tree, terminal, prompt templates, export, import, transcription, Claude Code status bar). Referenced from the root `CLAUDE.md` rather than inlined there
+- [Core features](./features/README.md) - Catalogue of all 15 shipped features (editor, project tree, terminal, prompt templates, export, import, transcription, Claude Code status bar). Referenced from the root `CLAUDE.md` rather than inlined there
 - [Editor](./editor/README.md) - Monaco editor, markdown preview, scroll sync, Mermaid diagrams (full-screen viewer), PDF/DOCX export
   - [Export](./editor/export.md) - PDF and DOCX export pipeline
   - [Mermaid Viewer](./editor/mermaid-viewer.md) - Full-screen diagram viewer with zoom and pan
+- [HTML Preview](./html-preview/README.md) - Live `.html` preview running real CSS + JS in a sealed process, with a per-project host allowlist, auto-refresh, find-in-page and PDF export (issue #74). Threat model in [Security § HTML preview](./security.md#html-preview)
 - [Image Viewer](./ui-components.md#image-viewer-panel) - Image preview panel with zoom, pan, and fullscreen
 - [Terminal](./terminal/README.md) - xterm.js terminal integration
   - [Bootstrap Pattern](./terminal/bootstrap-pattern.md) - Clean initialization without artifacts
@@ -45,8 +46,9 @@ Erfana is an agent-native Markdown workspace – an Electron app that runs a ter
 - [Settings](./settings.md) - Editor, git, logging, and transcription configuration
 
 ### UI/UX
-- [UI Style Guide](./ui-style-guide.md) - Design tokens, colors, typography (MANDATORY for UI changes)
-- [UI Style Guide Reference](./ui-style-guide-reference.md) - Quick reference for design tokens
+- **[Design system](../design/index.html)** - the cards that decide colours, type, spacing, surfaces, focus, motion, layering and each component (MANDATORY for UI changes; open it in a browser)
+- [UI Style Guide](./ui-style-guide.md) - text-selection policy and the dark-only stance; its visual sections are stubs pointing at the cards
+- [UI Style Guide Reference](./ui-style-guide-reference.md) - the v0.5.3 token migration table
 - [UI Components](./ui-components.md) - React component architecture
 - [Keyboard Shortcuts](./keyboard-shortcuts.md) - Application keyboard shortcuts
 
@@ -55,6 +57,7 @@ Erfana is an agent-native Markdown workspace – an Electron app that runs a ter
 - [Continuous Integration](./ci.md) - GitHub Actions workflows (`checks.yml` active on every push; `e2e.yml` **disabled** since 2026-04-25 — local-only verification until macos-latest stability is fixed; `release.yml` and `whisper-binaries*.yml` for release flow), retry patterns, visual-on-CI gap
 - [Build](./build/README.md) - electron-builder, ASAR, fuses, troubleshooting
 - [Release signing keys](./release-pubkey.txt) - Published minisign public keys (primary + standby rotation) for verifying release artifacts
+- [Release handoffs](./handoffs/) - Point-in-time release-verification handoffs - a checklist handed to the next session, and the report handed back; each file is dated and anchored on a commit, and is not maintained after that release ships
 - [Windows Enablement](./windows/README.md) - Phases 0–2 shipped in v0.9.3; Phase 4 (local Whisper trust chain + Windows x64 binary) shipped in v0.9.4 on 2026-04-23 per #165; Windows-host test-flake remediation pool (#172) + ThrottledWorker offset-deque refactor (#173) also in v0.9.4; Phase 3 (screenshots, #164) shipped in v0.12.0; Phases 5–6 tracked under #166–#167. Those issue and release numbers predate the public-repo migration and do not resolve on `qodeca/erfana`. The convention is split by location: **outside** `docs/windows/` such numbers are kept as plain text (as on this line) — as of 2026-08-07 that holds for `CHANGELOG.md` too, where 55 dead issue / PR / commit / release links were converted to bare references. **Inside** `docs/windows/` the dead references stay as links behind the provenance banner at the top of each file; note that folder is a deliberate *mix*, since text written after the migration cites bare numbers while the pre-migration history keeps its links. Links written *after* the migration do resolve — the repository root, the `v0.16.3` and `v0.17.0` releases, and the post-migration issue/PR references added in the v0.17.0 entries of `CHANGELOG.md` and `known-issues.md`. **[`implementation-plan.md`](./windows/implementation-plan.md) is the canonical phase status – prefer it over this line**
   - [Implementation Plan](./windows/implementation-plan.md) - Canonical phased roadmap + status snapshot + Phase 4 test inventory
   - [Gap Analysis](./windows/gap-analysis.md) - Feature-parity baseline (P0/P1/P2 with file:line refs)
@@ -69,7 +72,8 @@ Erfana is an agent-native Markdown workspace – an Electron app that runs a ter
 - [Large Project Performance Plan](./large-project-performance-plan.md) - EMFILE mitigation, worker threads, diagnostics
 - [Testing](./testing/README.md) - Testing strategies and coverage
   - [E2E Testing](./testing/e2e-testing.md) - Playwright/Electron E2E guide
-  - [E2E Selectors](./testing/e2e-selectors.md) - 238 testids catalog
+  - [E2E Selectors](./testing/e2e-selectors.md) - 259 testids catalog
+  - [Test Scenarios](./testing/test-scenarios.md) - 10 manual/MCP visual test scenarios
   - [E2E Helpers](./testing/e2e-helpers.md) - Test utility functions
   - [E2E Third-Party](./testing/e2e-third-party.md) - Monaco, xterm.js, Mermaid patterns
   - [E2E Debugging](./testing/e2e-debugging.md) - Debugging and CI/CD
@@ -95,7 +99,14 @@ Erfana is an agent-native Markdown workspace – an Electron app that runs a ter
 - [Terminal Panel Architecture](./architecture-reviews/reviews/terminal-panel-architecture-review.md) - Terminal panel design review
 
 ### Design records and plans
+
+Not to be confused with **[`design/`](../design/index.html)** at the repo root, which is the design system. Design *notes* live in **two** directories here, and that split is historical rather than meaningful: `docs/designs/` (plural) holds the older set and mixes two file-naming conventions (`<issue>-<slug>.md` and `issue-<issue>-<slug>.md`), while `docs/design/` (singular) holds the newer `design-issue-<n>.md` notes. Both are indexed below; check both when looking for the rationale behind a change.
+
+- [Packaging guards for `extraFiles` / `extraResources`](./design/design-issue-55.md) - Build-time leak guards beyond the `files:` allowlist (issue #55)
+- [Renderer crash on very large projects](./design/design-issue-60.md) - `flattenTree` stack overflow, error containment (root + panel boundaries), crash trail (issue #60)
 - [Claude Code status bar](./designs/216-claude-status-bar.md) - Per-terminal context status bar design (issue #216; Windows follow-up #217)
+- [Model capability registry](./designs/41-model-capability-registry.md) - Shared model-id parser + context-window capability table (issue #41)
+- [Context-meter freeze after compaction](./designs/47-context-meter-freeze.md) - Bounded fallback read + per-file-version result cache (issue #47)
 - [Clipboard service](./designs/issue-203-clipboard-service.md) - Central text-clipboard service design (issue #203)
 
 ### Future Features (Planned)
@@ -110,7 +121,7 @@ Erfana is an agent-native Markdown workspace – an Electron app that runs a ter
 
 **New to the project?** Start with [Getting Started](./getting-started.md), then browse [Quick Reference](./quick-reference.md) and [Glossary](./glossary.md).
 
-**Building features?** Read [Architecture](./architecture.md) → pick your area (Editor, Terminal, etc.) → review [IPC Patterns](./ipc-patterns.md) and [UI Style Guide](./ui-style-guide.md).
+**Building features?** Read [Architecture](./architecture.md) → pick your area (Editor, Terminal, etc.) → review [IPC Patterns](./ipc-patterns.md) and, for anything with a UI, the [design system](../design/index.html).
 
 **Testing?** Run `npm run test` for unit tests, `npm run test:e2e` for E2E tests. See [Testing](./testing/README.md) for strategies.
 

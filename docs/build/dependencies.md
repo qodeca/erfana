@@ -1,6 +1,6 @@
 # Dependencies in the packaged build
 
-**Last verified**: 2026-08-09 against v0.17.0 (the `files:` allowlist in `electron-builder.yml`, `package.json`, installed `node_modules`).
+**Last verified**: 2026-08-23 against v0.17.2 (the `files:` allowlist in `electron-builder.yml`, `package.json`, installed `node_modules`).
 
 This document covers what electron-builder excludes from the packaged app, and how the native and heavyweight dependencies that *do* ship are handled.
 

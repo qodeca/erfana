@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { create } from 'zustand'
+import type { SearchCapabilities, SearchCount } from '../providers/search/SearchProvider'
 
 /**
  * Search options for controlling search behavior
@@ -9,6 +10,23 @@ export interface SearchOptions {
   caseSensitive: boolean
   wholeWord: boolean
 }
+
+/**
+ * Full capabilities — the default before any provider is active.
+ *
+ * Chosen so the store behaves exactly like the pre-widening store when no
+ * provider has synced its capabilities yet: `nextMatch`/`previousMatch` do the
+ * modular index arithmetic and the label reads the match list. A count-only
+ * provider overwrites this via `setCapabilities`.
+ */
+const DEFAULT_CAPABILITIES: SearchCapabilities = {
+  randomAccess: true,
+  matchList: true,
+  wholeWord: true
+}
+
+/** A zero count — no matches, no active ordinal. */
+const DEFAULT_COUNT: SearchCount = { total: 0, activeOrdinal: 0 }
 
 /**
  * Represents a single search match result from a provider
@@ -28,12 +46,28 @@ export interface SearchMatch {
 }
 
 /**
- * Cached state for a search provider (for split mode pane switching)
+ * Direction of the most recent relative-navigation request.
+ *
+ * Consumed by SearchBar's navToken effect to know which way to step a
+ * count-only provider.
+ */
+export type NavDirection = 'next' | 'previous'
+
+/**
+ * Cached state for a search provider (for split mode pane switching).
+ *
+ * `count` and `capabilities` are optional so pre-existing callers that build a
+ * bare `{ query, matches, currentIndex }` still typecheck; `cacheProviderState`
+ * always writes them, and `restoreProviderState` falls back to defaults when a
+ * cached entry omits them. Caching `capabilities` is what stops a restored
+ * state from pairing one provider's matches with another's capabilities.
  */
 interface ProviderState {
   query: string
   matches: SearchMatch[]
   currentIndex: number
+  count?: SearchCount
+  capabilities?: SearchCapabilities
 }
 
 /**
@@ -48,6 +82,20 @@ export interface SearchState {
   // Match state
   matches: SearchMatch[]
   currentIndex: number
+
+  // Count-only providers push their totals here (matchList: false).
+  count: SearchCount
+
+  // Capabilities of the active provider; drives next/prev + label branching.
+  capabilities: SearchCapabilities
+
+  // Monotonic navigation counter (X15b). Replaces modular next/prev for
+  // count-only providers, whose currentIndex must stay pinned at 0. SearchBar
+  // diffs it against a ref to know how many relative steps to issue.
+  navToken: number
+
+  // Direction of the most recent next/prev request.
+  navDirection: NavDirection
 
   // Active provider
   activeProviderId: string | null
@@ -65,6 +113,8 @@ export interface SearchState {
   updateQuery: (query: string) => void
   updateOptions: (options: Partial<SearchOptions>) => void
   setMatches: (matches: SearchMatch[]) => void
+  setCount: (count: SearchCount) => void
+  setCapabilities: (capabilities: SearchCapabilities) => void
   nextMatch: () => void
   previousMatch: () => void
   setActiveProvider: (id: string | null) => void
@@ -86,6 +136,10 @@ export const useSearchStore = create<SearchState>((set, get) => ({
   options: { ...DEFAULT_OPTIONS },
   matches: [],
   currentIndex: 0,
+  count: { ...DEFAULT_COUNT },
+  capabilities: { ...DEFAULT_CAPABILITIES },
+  navToken: 0,
+  navDirection: 'next',
   activeProviderId: null,
   providerStates: new Map(),
   previousFocusElement: null,
@@ -107,7 +161,8 @@ export const useSearchStore = create<SearchState>((set, get) => ({
       isOpen: false,
       query: '',
       matches: [],
-      currentIndex: 0
+      currentIndex: 0,
+      count: { ...DEFAULT_COUNT }
     })
   },
 
@@ -119,6 +174,10 @@ export const useSearchStore = create<SearchState>((set, get) => ({
       options: { ...DEFAULT_OPTIONS },
       matches: [],
       currentIndex: 0,
+      count: { ...DEFAULT_COUNT },
+      capabilities: { ...DEFAULT_CAPABILITIES },
+      navToken: 0,
+      navDirection: 'next',
       activeProviderId: null,
       providerStates: new Map(),
       previousFocusElement: null
@@ -131,21 +190,63 @@ export const useSearchStore = create<SearchState>((set, get) => ({
       options: { ...state.options, ...options }
     })),
 
-  setMatches: (matches) => set({ matches }),
+  setMatches: (matches) =>
+    set((state) => {
+      // Derive count ONLY for matchList providers — for a count-only provider
+      // the authoritative count arrives via setCount (onCountChange), and
+      // matches is always []. Overwriting it here would clobber the pushed count.
+      if (!state.capabilities.matchList) {
+        return { matches }
+      }
+      return {
+        matches,
+        count: {
+          total: matches.length,
+          activeOrdinal: matches.length > 0 ? state.currentIndex + 1 : 0
+        }
+      }
+    }),
+
+  setCount: (count) => set({ count }),
+
+  setCapabilities: (capabilities) => set({ capabilities }),
 
   nextMatch: () =>
-    set((state) => ({
-      currentIndex:
-        state.matches.length > 0 ? (state.currentIndex + 1) % state.matches.length : 0
-    })),
+    set((state) => {
+      const base = {
+        navToken: state.navToken + 1,
+        navDirection: 'next' as const
+      }
+      // Full-match providers advance the index (modular wrap); the navToken bump
+      // is harmless because SearchBar's token effect returns early for them.
+      // Count-only providers leave currentIndex pinned and rely on navToken.
+      if (state.capabilities.randomAccess) {
+        return {
+          ...base,
+          currentIndex:
+            state.matches.length > 0 ? (state.currentIndex + 1) % state.matches.length : 0
+        }
+      }
+      return base
+    }),
 
   previousMatch: () =>
-    set((state) => ({
-      currentIndex:
-        state.matches.length > 0
-          ? (state.currentIndex - 1 + state.matches.length) % state.matches.length
-          : 0
-    })),
+    set((state) => {
+      const base = {
+        navToken: state.navToken + 1,
+        navDirection: 'previous' as const
+      }
+      if (state.capabilities.randomAccess) {
+        return {
+          ...base,
+          currentIndex:
+            state.matches.length > 0
+              ? (state.currentIndex - 1 + state.matches.length) % state.matches.length
+              : 0
+        }
+      }
+      return base
+    }),
 
   setActiveProvider: (id) => {
     const state = get()
@@ -171,9 +272,11 @@ export const useSearchStore = create<SearchState>((set, get) => ({
   },
 
   cacheProviderState: (providerId) => {
-    const { query, matches, currentIndex, providerStates } = get()
+    const { query, matches, currentIndex, count, capabilities, providerStates } = get()
     const newCache = new Map(providerStates)
-    newCache.set(providerId, { query, matches, currentIndex })
+    // Cache capabilities + count alongside matches so a later restore never
+    // pairs one provider's matches with another's capabilities.
+    newCache.set(providerId, { query, matches, currentIndex, count, capabilities })
     set({ providerStates: newCache })
   },
 
@@ -181,10 +284,25 @@ export const useSearchStore = create<SearchState>((set, get) => ({
     const { providerStates } = get()
     const cached = providerStates.get(providerId)
     if (cached) {
-      set({ query: cached.query, matches: cached.matches, currentIndex: cached.currentIndex })
+      set({
+        query: cached.query,
+        matches: cached.matches,
+        currentIndex: cached.currentIndex,
+        count: cached.count ?? { ...DEFAULT_COUNT },
+        capabilities: cached.capabilities ?? { ...DEFAULT_CAPABILITIES }
+      })
     } else {
-      // New provider, start fresh but keep search open
-      set({ query: '', matches: [], currentIndex: 0 })
+      // New provider, start fresh but keep search open. Reset count, navToken
+      // AND capabilities — otherwise the fresh matches would be read through the
+      // previous provider's capabilities.
+      set({
+        query: '',
+        matches: [],
+        currentIndex: 0,
+        count: { ...DEFAULT_COUNT },
+        navToken: 0,
+        capabilities: { ...DEFAULT_CAPABILITIES }
+      })
     }
   }
 }))

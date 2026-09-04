@@ -57,7 +57,7 @@ The Erfana Graph Engine solves common documentation challenges:
 ### For Developers (Want to implement the graph engine)
 1. **Read**: [Architecture](./graph-engine/architecture-overview.md) - Understand system design
 2. **Read**: [Data Ingestion](./graph-engine/data-ingestion-discovery.md) - Learn how files are indexed
-3. **Follow**: [Implementation Guide](./graph-engine/implementation-guide.md) - Step-by-step M1-M5 milestones
+3. **Follow**: [Implementation Guide](./graph-engine/implementation-guide/README.md) - Step-by-step M1-M5 milestones
 4. **Test**: [Production Readiness](./graph-engine/production-readiness-checklist.md) - Pre-deployment checklist
 
 ### For Claude Code (Want to understand integration)
@@ -128,7 +128,7 @@ The Erfana Graph Engine solves common documentation challenges:
 
 ### Implementation & Operations
 
-10. **[Implementation Guide](./graph-engine/implementation-guide.md)** 📝 PRACTICAL
+10. **[Implementation Guide](./graph-engine/implementation-guide/README.md)** 📝 PRACTICAL
     - Step-by-step milestones (M1-M5)
     - M1 includes: UI components + event-driven integration + MCP server
     - Code structure and IPC patterns
@@ -401,7 +401,7 @@ When switching embedding models:
 
 1. **Read [Architecture](./graph-engine/architecture-overview.md)** to understand system design
 2. **Review [Data Model](./graph-engine/data-model.md)** for schema details
-3. **Follow [Implementation Guide](./graph-engine/implementation-guide.md)** for M1-M5 milestones
+3. **Follow [Implementation Guide](./graph-engine/implementation-guide/README.md)** for M1-M5 milestones
 4. **Check [Production Readiness](./graph-engine/production-readiness-checklist.md)** before deployment
 
 ---

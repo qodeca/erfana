@@ -1,6 +1,6 @@
 # Electron fuses
 
-**Last updated**: August 2026 (v0.17.0)
+**Last updated**: August 2026 (v0.17.2)
 
 This document explains the Electron fuses configuration and security decisions. `scripts/fuses.js` is the single `afterPack` hook, so it also carries five non-fuse responsibilities: it restores the executable bit on bundled `node-pty` `spawn-helper` binaries (see [afterPack also chmods node-pty spawn-helper](#afterpack-also-chmods-node-pty-spawn-helper)), prunes foreign-arch native binaries, stages and re-verifies the per-arch `ffmpeg` binary, renames the bundle for test builds, and verifies the packed contents — the `app/` tree against the `files:` allowlist plus the `extraFiles`/`extraResources` destinations beside and above it (see [afterPack also verifies the packed app/ contents](#afterpack-also-verifies-the-packed-app-contents)).
 

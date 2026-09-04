@@ -67,23 +67,51 @@ export class TerminalPage {
     await this.page.waitForTimeout(PTY_INIT_DELAY_MS)
   }
 
+  /**
+   * Whether the activity-bar toggle reports the terminal panel as open.
+   *
+   * Reads the app's OWN state, not the panel's geometry: `ActivityBarItem`
+   * renders the `active` class straight from `activePanel === panel.id`, so it
+   * is correct from the first paint. The panel element itself is not — see
+   * `open()` — which is exactly why the toggle is the authority here.
+   */
+  private async isPanelToggleActive(): Promise<boolean> {
+    const className =
+      (await byTestId(this.page, TEST_IDS.ACTIVITY_BAR_BTN_TERMINAL).getAttribute('class')) ?? ''
+    return className.split(/\s+/).includes('active')
+  }
+
+  /**
+   * Open the terminal panel, tolerating the startup auto-open race.
+   *
+   * The panel restores itself a few hundred ms AFTER the window is ready: at
+   * t=0 the activity-bar toggle already carries `active` (state says open) but
+   * `[data-testid="terminal-instance"]` is not in the DOM yet, and once mounted
+   * it needs another beat to lay out. A single `isVisible()` sample landing in
+   * that gap read "closed", clicked the toggle, and thereby CLOSED the terminal
+   * that was about to appear — after which the 15 s visibility wait could never
+   * pass, because nothing was going to reopen it. The closed panel collapses to
+   * width 0, which Playwright reports as `hidden`, so the failure looked like a
+   * never-expanding splitview rather than a toggle the test itself flipped.
+   * (docs/windows/known-flakes.md, entry of 2026-08-12: this confirms candidate
+   * (b) and shows candidate (a)'s 0-width symptom is the same bug.)
+   *
+   * The retry wrapper decides from the toggle state and re-checks it every
+   * attempt, so an accidental close self-heals instead of deadlocking.
+   */
   async open(): Promise<void> {
     const terminalInstance = byTestId(this.page, TEST_IDS.TERMINAL_INSTANCE)
-    const isAlreadyOpen = await terminalInstance.isVisible()
-
-    if (isAlreadyOpen) {
-      // Terminal is already open, wait for PTY initialization
-      await this.waitForPrompt()
-      return
-    }
-
-    // Click the terminal button in the right activity bar
     const terminalBtn = byTestId(this.page, TEST_IDS.ACTIVITY_BAR_BTN_TERMINAL)
     await expect(terminalBtn).toBeVisible({ timeout: 10000 })
-    await terminalBtn.click()
 
-    // Wait for terminal to become visible (handles splitview animation via auto-retry)
-    await expect(terminalInstance).toBeVisible({ timeout: 15000 })
+    await expect(async () => {
+      if (!(await this.isPanelToggleActive())) {
+        await terminalBtn.click()
+      }
+      // Short inner budget: one settle window per attempt, so a wrong decision
+      // is retried rather than burning the whole timeout on a closed panel.
+      await expect(terminalInstance).toBeVisible({ timeout: 5000 })
+    }).toPass({ timeout: 45000, intervals: [250, 500, 1000, 2000] })
 
     // Wait for PTY initialization
     await this.waitForPrompt()

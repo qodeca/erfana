@@ -27,11 +27,15 @@ import { registerProjectLockHandlers } from './ipc/project-lock-handlers'
 import { registerExternalFileHandlers } from './ipc/external-file-handlers'
 import { registerTranscriptionHandlers } from './ipc/transcription-handlers'
 import { registerClipboardHandlers } from './ipc/clipboard-handlers'
+import { registerImageExportHandlers } from './ipc/image-export-handlers'
 import { registerClaudeStatusHandlers } from './ipc/claude-status-handlers'
+import { registerPreviewHandlers } from './ipc/preview-handlers'
+import { registerPreviewScheme } from './services/preview/previewScheme'
 import { DependencyDetector, converterRegistry, getExtensionsForDependencies } from './services/import'
+import { FORCE_CRASH_ARG } from '../shared/constants'
 import { IMPORT_CHANNELS } from '../shared/ipc/import-channels'
 import type { DependencyReadyEvent } from '../shared/ipc/import-schema'
-import { createApplicationMenu } from './menu'
+import { createApplicationMenu, setPreviewZoomHandler } from './menu'
 import { fileService } from './services/FileService'
 import { fileWatcherService } from './services/FileWatcherService'
 import { directoryWatcherService } from './services/DirectoryWatcherService'
@@ -45,10 +49,20 @@ import { projectLockService } from './services/ProjectLockService'
 import { gitStatusService } from './services/GitStatusService'
 import { installSafeConsole } from './utils/safeConsole'
 import { isBenignShutdownTimerError } from './utils/isBenignShutdownTimerError'
+import {
+  registerAppCrashLogging,
+  registerWindowErrorSignals,
+  registerWindowResponsiveness
+} from './utils/rendererCrashHandlers'
 
 // Install safe console logging to prevent EPIPE crashes
 // Must be called before any other code that uses console.log
 installSafeConsole()
+
+// Register the `erfana-preview://` privileged scheme (#74). MUST run before
+// `app.whenReady()`, so it lives here at module scope beside the other pre-ready
+// setup (`registerSchemesAsPrivileged` is a no-op once the app is ready).
+registerPreviewScheme()
 
 // Strip --new-window flag to prevent infinite spawn loops
 // Must happen before any window creation
@@ -60,8 +74,70 @@ if (newWindowArgIndex !== -1) {
 // Quit confirmation state
 let isQuitting = false
 let mainWindowRef: BrowserWindow | null = null
+
+/**
+ * How long the close flow waits for the renderer's `quit:confirmResponse`
+ * before deciding on its own (#60).
+ *
+ * The confirmation is a renderer round-trip, so a dead renderer never answers.
+ * Without a bound the `isQuitting` latch stays set with the window still open:
+ * the first close click appears to do nothing and only the second one — which
+ * short-circuits on the latch — actually closes.
+ *
+ * The deadline only *forces* the close when the renderer is provably gone
+ * ({@link isRendererGone}). Silence from a live renderer means the user is
+ * reading the unsaved-changes dialog, and closing under them would destroy
+ * their work; that case is logged and keeps waiting. Two seconds is long
+ * enough for a healthy renderer to answer the handshake.
+ */
+const QUIT_CONFIRM_TIMEOUT_MS = 2_000
+
+/**
+ * Pending confirmation deadline, cleared as soon as the renderer answers.
+ *
+ * ONE timer for the process, because this app opens ONE main window
+ * (`createWindow` is called once at startup and once from macOS `activate` when
+ * none is open, and `mainWindowRef` is likewise a single slot). Were a second
+ * window ever added, a second close would overwrite this handle and the first
+ * window's deadline would be cancelled instead of its own — at which point this
+ * belongs in per-window state, not a module variable.
+ */
+let quitConfirmTimer: ReturnType<typeof setTimeout> | null = null
+
+/** Cancels the pending confirmation deadline, if any. */
+function cancelQuitConfirmTimeout(): void {
+  if (quitConfirmTimer === null) return
+  clearTimeout(quitConfirmTimer)
+  quitConfirmTimer = null
+}
+
+/**
+ * Whether the window's renderer can no longer run JavaScript, and therefore
+ * can never answer an IPC round trip.
+ *
+ * `isCrashed()` is the discriminator that keeps the close timeout safe: a live
+ * renderer that stays silent is deliberating over the confirm dialog, a gone
+ * one will never reply.
+ *
+ * @param win - The window whose renderer is being checked
+ */
+function isRendererGone(win: BrowserWindow): boolean {
+  // Reading `win.webContents` off a destroyed window throws, so test the
+  // window first.
+  if (win.isDestroyed()) return true
+  const { webContents } = win
+  return webContents.isDestroyed() || webContents.isCrashed()
+}
+
 /** Claude status handler bundle (#216); disposed on app shutdown. */
 let claudeStatusHandlers: { dispose: () => Promise<void> } | null = null
+
+/** HTML preview handler bundle (#74); disposed on app shutdown. */
+let previewHandlers: {
+  dispose: () => Promise<void>
+  zoomFocused: (step: number) => Promise<boolean>
+  closeWindow: (windowId: number) => Promise<void>
+} | null = null
 
 // WebGL Command Line Switches (originally added for Electron 33+)
 // Fixes WebGL context creation issues and terminal flickering in production builds
@@ -69,6 +145,24 @@ let claudeStatusHandlers: { dispose: () => Promise<void> } | null = null
 app.commandLine.appendSwitch('enable-webgl')
 app.commandLine.appendSwitch('enable-webgl2-compute-context')
 app.commandLine.appendSwitch('ignore-gpu-blocklist')
+
+/**
+ * Builds the extra renderer arguments for this launch.
+ *
+ * The flag is read back by the preload script from `process.argv` and re-exposed
+ * to the renderer over the context bridge — the same mechanism the screenshot
+ * overlay uses for its token, so the renderer can never set it, only the process
+ * launcher can.
+ *
+ * Gated on `!app.isPackaged` as well as the env var, so a shipped build ignores
+ * `ERFANA_E2E_FORCE_CRASH` outright.
+ */
+function buildAdditionalArguments(): string[] {
+  if (!app.isPackaged && process.env.ERFANA_E2E_FORCE_CRASH === '1') {
+    return [FORCE_CRASH_ARG]
+  }
+  return []
+}
 
 function createWindow(): BrowserWindow {
   // Create the browser window.
@@ -84,16 +178,29 @@ function createWindow(): BrowserWindow {
     autoHideMenuBar: true,
     title: windowTitle,
     roundedCorners: false,
+    // Paint the app's own background before the renderer's first frame so the
+    // window never flashes white on open (#60 D). Mirrors the renderer's
+    // --color-brand-black; not a fix for the blank-window symptom itself.
+    backgroundColor: '#161312',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       // sandbox: true is the default since Electron 20 (2022)
       // Renderer process is sandboxed for security, preload scripts work correctly
       contextIsolation: true,
       nodeIntegration: false,
-      webgl: true
+      webgl: true,
+      additionalArguments: buildAdditionalArguments()
       // experimentalFeatures removed - not needed for current functionality
     }
   })
+
+  // Log renderer hangs for this window (log-only — see rendererCrashHandlers).
+  registerWindowResponsiveness(mainWindow)
+
+  // Log entry-module failures: renderer console errors and preload errors are
+  // the only trace of a boot failure that happens before any renderer-side
+  // handler exists (log-only — see rendererCrashHandlers).
+  registerWindowErrorSignals(mainWindow)
 
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
@@ -102,12 +209,47 @@ function createWindow(): BrowserWindow {
   // Handle window close with confirmation
   mainWindow.on('close', (event) => {
     if (isQuitting) return
-    // If webContents is already destroyed (e.g., during E2E test teardown),
-    // let the close proceed without attempting to show a confirmation dialog
-    if (mainWindow.webContents.isDestroyed()) return
+    // Nobody can answer a confirmation when the renderer is gone: destroyed
+    // (E2E teardown) or crashed (#60). Let the close proceed instead of
+    // latching the quit state and swallowing the click.
+    if (isRendererGone(mainWindow)) return
     event.preventDefault()
     isQuitting = true
     mainWindow.webContents.send('quit:requested', { reason: 'close' })
+
+    // Bound the wait on the renderer's answer (#60) — see QUIT_CONFIRM_TIMEOUT_MS.
+    cancelQuitConfirmTimeout()
+    quitConfirmTimer = setTimeout(() => {
+      quitConfirmTimer = null
+      // The renderer answered "cancel" in the meantime — nothing to force.
+      if (!isQuitting) return
+
+      // A throw here would be an uncaught exception inside a timer callback,
+      // i.e. a main-process crash on the quit path.
+      try {
+        if (!isRendererGone(mainWindow)) {
+          // The renderer is alive, so the silence is a decision in progress:
+          // the confirm dialog is up and the user is reading it. Forcing the
+          // close here would discard unsaved work, so leave a trail and keep
+          // waiting — the answer still arrives through registerQuitHandlers.
+          logger.warn('Quit confirmation still pending after timeout; renderer is alive', {
+            timeoutMs: QUIT_CONFIRM_TIMEOUT_MS
+          })
+          return
+        }
+
+        logger.warn('No quit confirmation from renderer (renderer gone), closing anyway', {
+          timeoutMs: QUIT_CONFIRM_TIMEOUT_MS
+        })
+        if (!mainWindow.isDestroyed()) mainWindow.destroy()
+        app.quit()
+      } catch (error) {
+        logger.error(
+          'Error closing window after quit-confirmation timeout',
+          error instanceof Error ? error : undefined
+        )
+      }
+    }, QUIT_CONFIRM_TIMEOUT_MS)
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -131,6 +273,23 @@ function createWindow(): BrowserWindow {
   // This prevents stale watchers and terminal processes from accumulating
   // CRITICAL: Must also clear project state so new window can re-open the same project
   const webContentsId = mainWindow.webContents.id
+
+  // Previews belong to a WINDOW, so they are reaped when the window goes — the
+  // same rule watchers, terminals and git already follow below. Without this the
+  // only teardown was the app-level disposer at `before-quit`, which runs AFTER
+  // `mainWindowRef.destroy()`: every view was detached from a dead window and
+  // logged a teardown warning on each clean exit, and a second window's views
+  // would simply have leaked.
+  const previewWindowId = mainWindow.id
+  mainWindow.on('closed', () => {
+    void previewHandlers?.closeWindow(previewWindowId).catch((error) => {
+      logger.warn('Preview teardown on window close failed', {
+        windowId: previewWindowId,
+        error: error instanceof Error ? error.message : String(error)
+      })
+    })
+  })
+
   mainWindow.webContents.on('destroyed', () => {
     logger.info('WebContents destroyed, cleaning up services', { webContentsId })
 
@@ -267,13 +426,22 @@ app.whenReady().then(async () => {
   // Initialize logging service (after global settings so level is loaded)
   await loggingService.initialize()
 
+  // Record renderer / child-process deaths (#60 E). Registered once, app-wide,
+  // so it also covers the overlay windows, the PDF/DOCX render window and the
+  // DOCX utilityProcess. Log-only: no reload, no dialog, no relaunch.
+  registerAppCrashLogging()
+
   // Wire up git polling service coordination with watcher service (DIP pattern)
   gitPollingService.setWatcherCoordination(
     () => gitWatcherService.getLastEventTimestamp(),
     () => gitWatcherService.isWatching()
   )
 
-  // Register IPC handlers
+  // Register IPC handlers. Every global channel is gated on the app's own
+  // top-level renderer by construction: the handlers register through
+  // `src/main/ipc/registry.ts`, and an ESLint rule stops `ipcMain` being
+  // imported anywhere else (sd-074b §7). There is no install step to forget and
+  // no ordering to get wrong.
   registerFileHandlers()
   registerFileWatcherHandlers()
   registerDirectoryWatcherHandlers()
@@ -295,9 +463,28 @@ app.whenReady().then(async () => {
   registerExternalFileHandlers()
   registerTranscriptionHandlers()
   registerClipboardHandlers()
+  registerImageExportHandlers()
   // Per-terminal Claude Code context status bar (#216). Uses the same
   // terminalService singleton so it can look up the main-owned PTY pid + cwd.
   claudeStatusHandlers = registerClaudeStatusHandlers(terminalService)
+  // Running HTML preview (#74). Project path + settings come from main-owned
+  // singletons; the graph (WebContentsView sessions, allowlist, watchers) is
+  // built inside the composition root.
+  previewHandlers = registerPreviewHandlers({
+    getProjectPath: () => fileService.getProjectPath(),
+    // Main-side teardown on project switch. Until now this seam had no
+    // producer, so only the renderer's own `preview:close` tore views down
+    // (sd-074b §4.9).
+    subscribeProjectChanged: (listener) => fileService.onProjectPathChanged(listener),
+    globalSettings: globalSettingsService
+  })
+
+  // Route View-menu zoom to a focused previewed page. A menu accelerator is
+  // global to the app, so with a preview focused Cmd/Ctrl-+ would otherwise fire
+  // the menu AND be forwarded to the page — zooming the window and the page at
+  // once. The menu holds a late-bound handler because it is installed before this
+  // graph exists.
+  setPreviewZoomHandler((step) => previewHandlers?.zoomFocused(step) ?? Promise.resolve(false))
 
   // RELIABILITY FIX (todo012): Clean up stale projects on startup
   // This runs asynchronously but doesn't block window creation
@@ -341,6 +528,8 @@ app.whenReady().then(async () => {
 
   // Register quit confirmation handler
   registerQuitHandlers((proceed) => {
+    // The renderer answered — the close-timeout fallback is no longer needed.
+    cancelQuitConfirmTimeout()
     try {
       if (proceed && mainWindowRef && !mainWindowRef.isDestroyed()) {
         mainWindowRef.destroy()
@@ -405,7 +594,56 @@ app.on('window-all-closed', () => {
 // Pattern B (F11): preventDefault + sequenced shutdown guarantees lock release before exit.
 // isShuttingDown guards against the second before-quit Electron emits after preventDefault.
 const SHUTDOWN_TIMEOUT_MS = 2_000
+
+/**
+ * Bound on the priority lock release (#60).
+ *
+ * The release still runs first — the next launch must not wait out heartbeat
+ * staleness — but a disposer that never settles (an unreachable network share,
+ * a wedged fsync) used to keep `before-quit` awaiting forever, so `app.exit(0)`
+ * was never reached and the app stayed alive with no window. Short, because it
+ * is a local file unlink on the happy path.
+ */
+const LOCK_DISPOSE_TIMEOUT_MS = 1_000
 let isShuttingDown = false
+
+/**
+ * Runs one disposer and returns when it settles or when `timeoutMs` elapses,
+ * whichever is first. Never rejects: shutdown must always reach `app.exit(0)`.
+ *
+ * @param label - Disposer name, used in the log line
+ * @param dispose - The disposer to run
+ * @param timeoutMs - Upper bound on how long to wait
+ */
+async function disposeWithin(
+  label: string,
+  dispose: () => Promise<void>,
+  timeoutMs: number
+): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+
+  const settled = Promise.resolve()
+    .then(dispose)
+    .then(() => 'settled' as const)
+    .catch((err) => {
+      logger.warn(`App quit: ${label} threw`, {
+        error: err instanceof Error ? err.message : String(err)
+      })
+      return 'settled' as const
+    })
+
+  const outcome = await Promise.race([
+    settled,
+    new Promise<'timeout'>((resolve) => {
+      timer = setTimeout(() => resolve('timeout'), timeoutMs)
+    })
+  ])
+
+  if (timer !== undefined) clearTimeout(timer)
+  if (outcome === 'timeout') {
+    logger.warn(`App quit: ${label} timed out`, { timeoutMs })
+  }
+}
 
 /**
  * Shutdown-scoped uncaught-exception guard.
@@ -446,31 +684,35 @@ app.on('before-quit', async (event) => {
 
   logger.info('App quitting, cleaning up services')
 
-  // Critical: lock release must complete before exit so the next launch
-  // can open the project without waiting for heartbeat staleness.
-  try {
-    await projectLockService.dispose()
-  } catch (err) {
-    logger.warn('App quit: projectLockService.dispose() threw', {
-      error: err instanceof Error ? err.message : String(err)
-    })
-  }
+  // Priority: lock release runs first and alone, so the next launch can open
+  // the project without waiting for heartbeat staleness — but bounded, so a
+  // disposer that never settles cannot strand the process short of app.exit(0).
+  await disposeWithin(
+    'projectLockService.dispose()',
+    () => projectLockService.dispose(),
+    LOCK_DISPOSE_TIMEOUT_MS
+  )
 
-  // Best-effort: race remaining disposers against a hard timeout.
-  // Promise.allSettled swallows individual failures so one bad disposer
+  // Best-effort: the remaining disposers run together, bounded by the same
+  // helper the lock release uses — so the timer is cleared on both branches and
+  // a timeout leaves a log line instead of passing silently.
+  // `Promise.allSettled` swallows individual failures so one bad disposer
   // can't cancel the others.
-  const bestEffort = Promise.allSettled([
-    fileWatcherService.dispose(),
-    directoryWatcherService.dispose(),
-    terminalService.dispose(),
-    claudeStatusHandlers ? claudeStatusHandlers.dispose() : Promise.resolve(),
-    gitWatcherService.dispose(),
-    gitStatusService.dispose()
-  ])
-  await Promise.race([
-    bestEffort,
-    new Promise((resolve) => setTimeout(resolve, SHUTDOWN_TIMEOUT_MS))
-  ])
+  await disposeWithin(
+    'best-effort disposers',
+    async () => {
+      await Promise.allSettled([
+        fileWatcherService.dispose(),
+        directoryWatcherService.dispose(),
+        terminalService.dispose(),
+        claudeStatusHandlers ? claudeStatusHandlers.dispose() : Promise.resolve(),
+        previewHandlers ? previewHandlers.dispose() : Promise.resolve(),
+        gitWatcherService.dispose(),
+        gitStatusService.dispose()
+      ])
+    },
+    SHUTDOWN_TIMEOUT_MS
+  )
 
   // Sync disposer — always runs after the race
   gitPollingService.dispose()

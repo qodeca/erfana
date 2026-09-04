@@ -4,11 +4,25 @@
      Existing Title-Case headings are grandfathered to preserve anchor URLs
      referenced elsewhere; do not bulk-rename without coordinating links. -->
 
-> **Version**: 2.0
-> **Last Updated**: November 2025
-> **Design System**: Qodeca brand with dark theme
+> **Version**: 3.0
+> **Last Updated**: August 2026
+> **Design System**: the cards in [`design/`](../design/index.html); this file keeps only what they do not decide
 
-This style guide documents all design decisions for the Erfana application. All new UI code **must** follow these guidelines and use the design tokens defined in `src/renderer/src/styles/design-tokens.css`.
+> **The visual decisions have moved to [`design/`](../design/index.html).**
+> Colours, typography, spacing, surfaces and interactive states are now decided by
+> cards that render each rule live — open `design/index.html`. Those sections
+> below are stubs: they keep their headings so existing links resolve, and they
+> hold no rules, so they cannot contradict a card.
+>
+> They were retired rather than corrected. This file specified the focus ring
+> **three different ways** — a 2px border, a 3px glow and a 1px outline, all
+> normative, with no rule for which applied where — and prescribed `--space-14`,
+> which its own scale omitted. Two documents describing one system is how that
+> happens; the fix is one document, not a better second one.
+
+What is left here is the part `design/` does not decide: the text selection
+policy (a dockview cascade fact with a test behind it), the dark-only stance, and
+the token discipline that `npm run lint:css` now enforces.
 
 ---
 
@@ -21,9 +35,10 @@ This style guide documents all design decisions for the Erfana application. All 
 5. [Borders & Shadows](#borders--shadows)
 6. [Interactive States](#interactive-states)
 7. [Text selection policy](#text-selection-policy)
-8. [Do's and Don'ts](#dos-and-donts)
-9. [Checklist for UI Changes](#checklist-for-ui-changes)
-10. [Quick Reference](#quick-reference)
+8. [CSS class namespacing (`erf-`)](#css-class-namespacing-erf-)
+9. [Do's and Don'ts](#dos-and-donts)
+10. [Checklist for UI Changes](#checklist-for-ui-changes)
+11. [Quick Reference](#quick-reference)
 
 ---
 
@@ -48,358 +63,38 @@ Erfana follows a **Qodeca-branded flat design** with these core principles:
 
 ## Color System
 
-### Qodeca Brand Palette
-
-The primary brand colors that define Erfana's visual identity.
-
-| Token | Hex | Usage |
-|-------|-----|-------|
-| `--color-brand-violet` | `#A0A8FF` | **Primary accent** - Buttons, links, focus |
-| `--color-brand-lime` | `#E3E829` | **Secondary accent** - Success, highlights, markdown files |
-| `--color-brand-black` | `#161312` | **Brand black** - Main background (Smoky Black) |
-| `--color-brand-white` | `#F8FAF8` | **Brand white** - Diagram backgrounds (Powder White) |
-
-**Brand Variants (for interactive states):**
-
-```css
-/* Violet variants */
---color-brand-violet-hover: #8b94ff;   /* Hover state */
---color-brand-violet-active: #7680ff;  /* Pressed state */
---color-brand-violet-muted: rgba(160, 168, 255, 0.2);  /* Backgrounds */
-
-/* Lime variants */
---color-brand-lime-hover: #d6d925;     /* Hover state */
---color-brand-lime-active: #c9cc21;    /* Pressed state */
---color-brand-lime-muted: rgba(227, 232, 41, 0.3);    /* Backgrounds */
-```
-
-### Secondary Accent Palette
-
-Extended brand colors for UI variety (git status, tags, badges, etc.):
-
-| Token | Hex | Name | Usage |
-|-------|-----|------|-------|
-| `--color-brand-amber` | `#FFA335` | **Qodeca Amber** | Warm orange - warnings, modified states |
-| `--color-brand-coral` | `#FF626A` | **Qodeca Coral** | Soft red-pink - errors, deletions |
-| `--color-brand-magenta` | `#FF3381` | **Qodeca Magenta** | Vivid pink - special highlights |
-| `--color-brand-indigo` | `#3F3FBA` | **Qodeca Indigo** | Deep blue-violet - secondary actions |
-
-### Git Status Colors
-
-Git status indicators use brand colors for visual consistency with context-specific lightness:
-
-| Status | Original Token | Light Variant Token | Hex (Light) | Usage Context |
-|--------|---------------|-------------------|-------------|---------------|
-| Modified (M) | `--color-git-modified` (Amber) | `--color-git-modified-light` | `#FFCC99` | Badges, file names, status bar counts |
-| Untracked (U) | `--color-git-untracked` (Lime) | `--color-git-untracked-light` | `#F5F599` | Badges, file names, status bar counts |
-| Deleted (D) | `--color-git-deleted` (Coral) | `--color-git-deleted-light` | `#FFB3B8` | Badges, file names, status bar counts |
-| Staged (A) | `--color-git-staged` (Violet) | `--color-git-staged-light` | `#D4D9FF` | Badges, file names, status bar counts |
-| Renamed (R) | `--color-git-renamed` (Indigo) | `--color-git-renamed-light` | `#8F8FE5` | Badges, file names, status bar counts (improved contrast) |
-| Conflicted (!) | `--color-git-conflicted` (Magenta) | `--color-git-conflicted-light` | `#FF99BF` | Badges, file names, status bar counts |
-
-**Color Strategy:**
-- **Original colors** (vibrant brand colors): Used for folder dots (6px circles) - strong visual hierarchy
-- **Light variants** (40-50% lighter, pastel-like): Used for badges, file names, and status bar - better readability
-- **Indigo special case**: 100% lighter to fix poor contrast on dark backgrounds
-- **Accessibility**: All light variants meet WCAG AA standard (4.5:1), most achieve AAA (7:1)
-
-### Neutral Scale
-
-The grayscale is the foundation of the UI. Use semantic tokens, not raw hex values.
-
-| Token | Hex | Usage |
-|-------|-----|-------|
-| `--color-white` | `#ffffff` | Emphasis text, active states |
-| `--color-gray-100` | `#e8e8e8` | High contrast text |
-| `--color-gray-200` | `#d4d4d4` | Light text |
-| `--color-gray-300` | `#cccccc` | **Primary text** (most common) |
-| `--color-gray-400` | `#b8b8b8` | Muted text |
-| `--color-gray-500` | `#858585` | **Secondary text** (labels, hints) |
-| `--color-gray-600` | `#6e6e6e` | Very muted, placeholders |
-| `--color-gray-700` | `#454545` | Subtle borders |
-| `--color-gray-800` | `#3c3c3c` | **Default borders** |
-| `--color-gray-900` | `#2d2d30` | Panel backgrounds |
-| `--color-gray-950` | `#252526` | Sidebar, tree backgrounds |
-| `--color-gray-1000` | `#161312` | **Main app background** (Smoky Black) |
-| `--color-black` | `#000000` | Overlays, deep shadows |
-
-### Semantic Backgrounds
-
-```css
-/* Use these instead of raw colors */
-background: var(--color-bg-primary);    /* Main content areas (Smoky Black) */
-background: var(--color-bg-secondary);  /* Panels, cards, inputs */
-background: var(--color-bg-tertiary);   /* Sidebar, project tree */
-background: var(--color-bg-elevated);   /* Floating elements */
-background: var(--color-bg-selected);   /* Selected items (violet-tinted) */
-```
-
-### Semantic Text
-
-```css
-color: var(--color-text-primary);    /* Default body text */
-color: var(--color-text-secondary);  /* Labels, hints, metadata */
-color: var(--color-text-muted);      /* Very subtle text */
-color: var(--color-text-emphasis);   /* Headings, important text */
-```
-
-### Interactive Colors (Brand)
-
-| Token | Value | Usage |
-|-------|-------|-------|
-| `--color-accent-primary` | Violet (#A0A8FF) | **Primary** - Focus rings, buttons, CTAs |
-| `--color-accent-secondary` | Lime (#E3E829) | **Secondary** - Success, highlights, markdown files |
-| `--color-accent-tertiary` | Violet (#A0A8FF) | Tertiary accents |
-| `--color-accent-drag` | Violet (#A0A8FF) | Drag-drop highlights |
-
-### Link Colors (Brand)
-
-| Token | Value | Usage |
-|-------|-------|-------|
-| `--color-link` | Violet (#A0A8FF) | Default link color |
-| `--color-link-hover` | Violet hover (#8b94ff) | Link hover state |
-| `--color-link-visited` | `#9d7dd2` | Visited links (purple) |
-
-### Button Colors (Brand)
-
-> **Primary buttons take a dark foreground, never white.** The brand violet is a light tint: white-on-violet measures **2.2:1** and fails WCAG 1.4.3 (4.5:1 required), while `--color-brand-black` (`#161312`) on the same violet measures **8.4:1**. Match `.dialog-btn-primary`; the full snippet is in [`ui-style-guide-reference.md`](./ui-style-guide-reference.md). Danger buttons are the opposite case: their red is dark enough that white foreground is correct.
-
-```css
-/* Primary button (Violet) – foreground is brand black, see note above */
-background: var(--color-btn-primary-bg);      /* Qodeca Violet */
-background: var(--color-btn-primary-hover);   /* Violet hover */
-background: var(--color-btn-primary-active);  /* Violet active */
-color: var(--color-brand-black);              /* #161312 – 8.4:1 on all three; white would be 2.2:1 */
-
-/* Secondary button (gray) */
-background: var(--color-btn-secondary-bg);    /* #3c3c3c */
-background: var(--color-btn-secondary-hover); /* #505050 */
-
-/* Danger button (red) */
-background: var(--color-btn-danger-bg);       /* #c72e0f - 5.49:1 with white */
-background: var(--color-btn-danger-hover);    /* #ad280d - 6.80:1 with white; DARKER
-                                                 than resting. The old lighter
-                                                 #e03e18 measured 4.31:1 and failed
-                                                 WCAG 1.4.3 for normal-size text. */
-```
-
-### Status Colors (Brand + Unchanged)
-
-| Token | Value | Usage |
-|-------|-------|-------|
-| `--color-success` | Lime (#E3E829) | Success messages, valid states |
-| `--color-success-bg` | `rgba(227, 232, 41, 0.1)` | Success container background |
-| `--color-success-border` | `rgba(227, 232, 41, 0.3)` | Success container border |
-| `--color-warning` | `#cca700` | Warnings (unchanged) |
-| `--color-error` | `#f48771` | Errors (unchanged) |
-| `--color-info` | Violet (#A0A8FF) | Informational messages |
-
----
+> **Decided by [`design/system/foundations/colors.html`](../design/system/foundations/colors.html).** Every swatch is painted with the shipping token and every ratio is computed in the page, so a colour that fails is visibly red rather than described as safe.
+>
+> This section is a stub. It keeps its heading so existing links still
+> resolve, and it holds no rule, so it cannot contradict the card.
 
 ## Typography
 
-### Font Stacks
-
-| Token | Stack | Usage |
-|-------|-------|-------|
-| `--font-sans` | System fonts | **Default** for all UI text |
-| `--font-mono` | SF Mono, Monaco... | Code, terminal, technical data |
-| `--font-serif` | Charter, Georgia... | Markdown preview (reading mode) |
-
-```css
-/* Usage */
-font-family: var(--font-sans);  /* Default - don't specify usually */
-font-family: var(--font-mono);  /* Code blocks, character counts */
-font-family: var(--font-serif); /* Markdown preview content */
-```
-
-### Font Sizes
-
-| Token | Size | Usage |
-|-------|------|-------|
-| `--text-xs` | 10px | Tiny labels, hints |
-| `--text-sm` | 11px | Small labels, metadata |
-| `--text-base` | **13px** | Default body text |
-| `--text-md` | 14px | Slightly larger body |
-| `--text-lg` | 16px | Subheadings |
-| `--text-xl` | 18px | Section headings |
-| `--text-2xl` | 20px | Large headings |
-
-```css
-/* Most common usage */
-font-size: var(--text-base);  /* 13px - default */
-font-size: var(--text-sm);    /* 11px - labels */
-font-size: var(--text-xs);    /* 10px - tiny text */
-```
-
-### Font Weights
-
-| Token | Weight | Usage |
-|-------|--------|-------|
-| `--font-normal` | 400 | Default body text |
-| `--font-medium` | 500 | Buttons, emphasized text |
-| `--font-semibold` | 600 | Headings, strong labels |
-| `--font-bold` | 700 | Markdown headings |
-
-### Line Heights
-
-| Token | Value | Usage |
-|-------|-------|-------|
-| `--leading-tight` | 1.25 | Headings, compact text |
-| `--leading-normal` | 1.5 | Default body text |
-| `--leading-relaxed` | 1.6 | Long-form reading |
-
----
+> **Decided by [`design/system/foundations/type.html`](../design/system/foundations/type.html).** Rendered at real size in the real bundled font.
+>
+> This section is a stub. It keeps its heading so existing links still
+> resolve, and it holds no rule, so it cannot contradict the card.
 
 ## Spacing System
 
-### 4px Base Grid
-
-All spacing uses a 4px base grid. Use these tokens, never arbitrary values.
-
-> **Note on Naming**: Token numbers represent scale steps, not pixel values.
-> For example: `--space-4` = 8px (not 4px). This follows Tailwind-style naming.
-
-| Token | Value | Usage |
-|-------|-------|-------|
-| `--space-1` | 2px | Fine-tuning, micro adjustments |
-| `--space-2` | 4px | Tight spacing, inline gaps |
-| `--space-3` | 6px | Small gaps |
-| `--space-4` | **8px** | Standard small spacing |
-| `--space-5` | 10px | Medium-small spacing |
-| `--space-6` | **12px** | Standard medium spacing |
-| `--space-8` | **16px** | Large spacing |
-| `--space-10` | 20px | Extra large spacing |
-| `--space-12` | **24px** | Section spacing |
-| `--space-16` | 32px | Major section breaks |
-
-### Common Patterns
-
-```css
-/* Button padding */
-padding: var(--space-5) var(--space-12);  /* 10px 24px */
-
-/* Input padding */
-padding: var(--space-6) var(--space-6);   /* 12px 12px */
-
-/* Card padding */
-padding: var(--space-8);                   /* 16px */
-
-/* Dialog padding */
-padding: var(--space-14);                  /* 28px */
-
-/* Gap between buttons */
-gap: var(--space-6);                       /* 12px */
-
-/* Gap between form fields */
-gap: var(--space-4);                       /* 8px */
-```
-
----
+> **Decided by [`design/system/foundations/spacing.html`](../design/system/foundations/spacing.html).** Drawn to scale, because the token names mislead: the number is a scale step, not a pixel count, and `--space-2` is 4px.
+>
+> This section is a stub. It keeps its heading so existing links still
+> resolve, and it holds no rule, so it cannot contradict the card.
 
 ## Borders & Shadows
 
-### Border Radius
-
-**Rule: No rounded corners** (flat design)
-
-```css
-/* ALWAYS */
-border-radius: var(--border-radius);      /* 0 */
-
-/* ONLY exception: circular elements */
-border-radius: var(--border-radius-circle); /* 50% - for dots, spinners */
-```
-
-### Border Width
-
-```css
-border: var(--border-width) solid var(--color-border-default);  /* 1px */
-border: var(--border-width-thick) solid ...;                    /* 2px - focus */
-```
-
-### Shadows
-
-| Token | CSS | Usage |
-|-------|-----|-------|
-| `--shadow-sm` | `0 2px 4px rgba(0,0,0,0.2)` | Buttons, small cards |
-| `--shadow-md` | `0 4px 12px rgba(0,0,0,0.3)` | Dropdowns, tooltips |
-| `--shadow-lg` | `0 8px 24px rgba(0,0,0,0.4)` | Modals, large cards |
-| `--shadow-xl` | `0 12px 48px rgba(0,0,0,0.8)` | Dialogs |
-| `--shadow-focus` | `0 0 0 3px rgba(160,168,255,0.25)` | Focus indicators (Qodeca Violet) |
-
-```css
-/* Primary button shadow */
-box-shadow: var(--shadow-sm);
-
-/* Dialog shadow (with edge highlight) */
-box-shadow: var(--shadow-dialog);
-
-/* Focus state (in addition to border) */
-box-shadow: var(--shadow-focus);
-```
-
----
+> **Decided by [`design/system/foundations/surfaces.html`](../design/system/foundations/surfaces.html).** Borders, shadows, control heights and the zero-radius rule, with `npm run lint:css` enforcing the last one.
+>
+> This section is a stub. It keeps its heading so existing links still
+> resolve, and it holds no rule, so it cannot contradict the card.
 
 ## Interactive States
 
-### Hover States (Opacity-Based)
-
-Use white overlays with varying opacity for hover effects:
-
-```css
-/* Subtle hover (list items, tree nodes) */
-background: rgba(255, 255, 255, var(--opacity-hover-subtle));  /* 0.05 */
-
-/* Medium hover (buttons, tabs) */
-background: rgba(255, 255, 255, var(--opacity-hover-medium));  /* 0.1 */
-
-/* Strong hover (important actions) */
-background: rgba(255, 255, 255, var(--opacity-hover-strong));  /* 0.15 */
-```
-
-### Active/Pressed State
-
-```css
-background: rgba(255, 255, 255, var(--opacity-active));  /* 0.2 */
-```
-
-### Focus State
-
-All focusable elements must have visible focus indicators:
-
-```css
-/* Standard focus */
-outline: 1px solid var(--color-border-focus);  /* Qodeca Violet */
-outline-offset: 1px;
-
-/* Enhanced focus (buttons, inputs) */
-box-shadow: var(--shadow-focus);
-```
-
-### Disabled State
-
-```css
-opacity: var(--opacity-disabled);  /* 0.4 */
-cursor: not-allowed;
-pointer-events: none;  /* optional - prevents interaction */
-```
-
-### Native form controls
-
-`:root` in `design-tokens.css` declares `color-scheme: dark`, so the browser paints checkboxes, radios, selects and scrollbars with dark UA defaults instead of the light ones. This is app-wide and is **not** a `prefers-color-scheme` query – Erfana stays dark-only.
-
-`color-scheme` covers the control's chrome; the checked fill still needs a tint:
-
-```css
-input[type='checkbox'] {
-  width: var(--icon-size-sm);          /* intrinsic control size, not a --space-* step */
-  height: var(--icon-size-sm);
-  accent-color: var(--color-accent-primary);
-}
-```
-
----
+> **Decided by [`design/system/foundations/focus.html`](../design/system/foundations/focus.html).** One focus ring. This section specified it three different ways - a 2px border, a 3px glow and a 1px outline - all normative, with no rule for which applied where.
+>
+> This section is a stub. It keeps its heading so existing links still
+> resolve, and it holds no rule, so it cannot contradict the card.
 
 ## Text selection policy
 
@@ -432,11 +127,20 @@ The `-webkit-user-select` prefix is not needed; Erfana ships on Chromium 130+ vi
 
 See [#211](https://github.com/qodeca/erfana/issues/211) for the original audit and per-component policy decisions.
 
+## CSS class namespacing (`erf-`)
+
+Component CSS that belongs to the design system is namespaced `erf-`, and `.stylelintrc.json` enforces it with `selector-class-pattern` – every class must match `^erf-[a-z0-9]+(-[a-z0-9]+)*(__[a-z0-9]+(-[a-z0-9]+)*)?(--[a-z0-9]+(-[a-z0-9]+)*)?$`, i.e. an `erf-` prefix, kebab-case words, an optional BEM `__element` and an optional `--modifier` (`erf-band`, `erf-band__row`, `erf-band--open`). The rule applies to `design/system/components/**/*.css` and follows a file when it is adopted into `src/`: today that is `src/renderer/src/styles/hostName.css` and `src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewChromeBand.css`, listed by path in the config. When a design-system stylesheet moves into `src/`, add its new path to that override – scoping the rule to `design/` alone would switch the guard off at the exact moment the CSS became shipping code.
+
+The prefix is not cosmetic. Mermaid emits `class="row"` on gitGraph commit labels and on its generic label path, and the app injects that SVG with `innerHTML`, so a bare global `.row` reaches into diagram labels in the Markdown preview and in exported images. That collision was found by luck, not by review; the namespace makes it impossible. The cards' own documentation chrome under `design/` (`.stage`, `.list-frame`, `.readout`) is not shipped UI and is exempt from the naming rule, though not from the token rules.
+
 ---
 
 ## Do's and Don'ts
 
-> **More patterns**: See [UI Style Guide Reference](./ui-style-guide-reference.md) for component patterns (buttons, inputs, dialogs), z-index scale, transitions, and migration guide.
+> **Most of these are now checked by a machine.** `npm run lint:css` fails on raw
+> hex outside the token file, on a bare `z-index`, and on any `border-radius`
+> other than `0` or the circle token. They are kept here as the rationale — a rule
+> nobody can explain gets deleted by the next person who finds it inconvenient.
 
 ### Colors
 
@@ -521,18 +225,24 @@ z-index: 10000;
 
 ## Checklist for UI Changes
 
-Before committing any UI changes, verify:
+**A machine checks these — do not spend attention on them.** `npm run lint:css`,
+which runs in the required `Lint` job:
 
-- [ ] All colors use design tokens (`var(--color-*)`)
-- [ ] All spacing uses design tokens (`var(--space-*)`)
-- [ ] All fonts use design tokens (`var(--font-*)`, `var(--text-*)`)
-- [ ] No rounded corners (except `50%` for circles)
-- [ ] Transitions use tokens (`var(--transition-*)`)
-- [ ] Z-index uses tokens (`var(--z-*)`)
-- [ ] Focus states are visible
-- [ ] Disabled states have reduced opacity
-- [ ] Hover states provide feedback
-- [ ] Works in dark mode (only mode supported)
+- Colours use tokens; no raw hex outside `design-tokens.css`
+- No bare `z-index`
+- No `border-radius` other than `0` or `var(--border-radius-circle)`
+- No retired token reaches `design/`
+
+**Nobody checks these but you.** They are the ones that actually break for
+people, and none of them is expressible as a lint rule:
+
+- [ ] The focus ring is **visible** and reaches 3:1 — tab to it and look
+- [ ] Every state has a non-colour cue as well as a colour one
+- [ ] Anything that loops forever stops under `prefers-reduced-motion: reduce`
+- [ ] Every interactive target is at least 24 x 24 (WCAG 2.2 SC 2.5.8)
+- [ ] Any error is linked to its field with `aria-invalid` + `aria-describedby`
+- [ ] A role you declare is a promise: `role="tree"` means arrow keys work
+- [ ] It works keyboard-only, start to finish
 
 ---
 
@@ -540,5 +250,7 @@ Before committing any UI changes, verify:
 
 **Token Source**: `src/renderer/src/styles/design-tokens.css`
 
-**Additional Resources**: Component patterns, z-index scale, transitions, migration guide:
-**[UI Style Guide Reference](./ui-style-guide-reference.md)**
+**The rules**: [`design/index.html`](../design/index.html) — open it in a browser.
+
+**Still here**: the [text selection policy](#text-selection-policy) and the
+[migration guide](./ui-style-guide-reference.md#migration-guide).

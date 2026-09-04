@@ -25,7 +25,7 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
     steps:
       # actions/checkout v7.0.1 — MUST run before the local composite action
@@ -34,11 +34,21 @@ jobs:
       - uses: ./.github/actions/setup-node-with-retry
       - name: Lint
         run: npm run lint
+      # Steps, not a separate job: branch protection matches the JOB name
+      # ("Lint"), so a new job called "Lint CSS" would be advisory only and
+      # nothing would be enforced. Adding steps here needs no protection change.
+      - name: Lint CSS
+        run: npm run lint:css
+      # Everything under design/ is committed, generated files included, so the
+      # folder renders on a fresh clone. This is what stops a stale token copy or
+      # a stale index being trusted by a reader.
+      - name: Design system is in sync
+        run: npm run design -- --check
 
   typecheck:
     name: Typecheck
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
     steps:
       # actions/checkout v7.0.1 — MUST run before the local composite action
@@ -132,9 +142,9 @@ jobs:
     # main` keeps the instrumented set (and therefore the threshold match)
     # unambiguous and deterministic. Do NOT drop `--project main`.
     steps:
-      # actions/checkout v6.0.3 — MUST run before the local composite action
+      # actions/checkout v7.0.1 — MUST run before the local composite action
       # below so the action.yml file can be loaded from the workspace.
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: ./.github/actions/setup-node-with-retry
         with:
           # scripts/fuses.test.mjs + the other main-process tests import the
@@ -179,7 +189,7 @@ jobs:
   license:
     name: License compliance
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
     steps:
       # actions/checkout v7.0.1 — MUST run before the local composite action
@@ -217,6 +227,12 @@ jobs:
         # the local composite action and the other jobs.
         shell: bash
         run: npm run typecheck
+      - name: Design sync check
+        # The Lint job runs this on Linux; on Windows it used to fail on every
+        # run because two generated files came out of checkout as CRLF (#104).
+        # Running it here keeps that from regressing invisibly.
+        shell: bash
+        run: npm run design -- --check
       - name: Main-process tests
         shell: bash
         run: npm run test:main
@@ -224,7 +240,7 @@ jobs:
   audit-signatures:
     name: npm audit signatures
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
     steps:
       # actions/checkout v7.0.1 — MUST run before the local composite action
@@ -267,7 +283,7 @@ jobs:
       # the extraResources: block against the push/PR base commit (issue #55).
       # The default depth-1 checkout has no base to diff against, which would
       # force that guard into its fail-safe warn-always path.
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
 

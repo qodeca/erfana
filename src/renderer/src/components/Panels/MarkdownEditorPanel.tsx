@@ -26,7 +26,8 @@ import { useDialog } from '../Dialog'
 import { useToast } from '../Toast/ToastContext'
 import { useProjectStore } from '../../stores/useProjectStore'
 import { useSearchStore } from '../../stores/useSearchStore'
-import { sanitizeFilePath, getBasename } from '../../utils/fileUtils'
+import { getBasename } from '../../utils/fileUtils'
+import { openFileInPanel } from '../../utils/openFileInPanel'
 import { logger } from '../../utils/logger'
 import { useAutoSave } from '../../hooks/useAutoSave'
 import { useFileWatcher, createFileSaveGuard } from '../../hooks/useFileWatcher'
@@ -47,17 +48,13 @@ import { DocumentStatsBar } from './DocumentStatsBar'
 
 // Types and pure functions
 import type { ViewMode, EditorFile } from '../Editor/MarkdownEditorPanel/types'
-import {
-  calculateStats,
-  extractFileName,
-  formatTabTitle,
-  getDefaultViewMode
-} from './markdownEditorPanel.logic'
+import { calculateStats, extractFileName, getDefaultViewMode } from './markdownEditorPanel.logic'
+import { formatTabTitle } from '../../utils/tabTitle'
+
+// Shared constants
+import { INDICATOR_DURATION_MS } from '../../constants/fileWatch'
 
 import './MarkdownEditorPanel.css'
-
-/** Duration to show auto-save indicator in milliseconds */
-const INDICATOR_DURATION_MS = 1000
 
 /**
  * Props passed to the MarkdownEditorPanel via Dockview.
@@ -430,30 +427,15 @@ export function MarkdownEditorPanel(
       return
     }
 
-    const fileName = extractFileName(targetFilePath)
-    const panelId = `editor-${sanitizeFilePath(targetFilePath)}`
-
-    // Check if already open
-    let editorPanel = dockviewApi.getPanel(panelId)
-
-    if (!editorPanel) {
-      // Create new panel
-      editorPanel = dockviewApi.addPanel({
-        id: panelId,
-        component: 'editor',
-        title: fileName,
-        tabComponent: 'editorTab',
-        params: { filePath: targetFilePath, panelId }
-      })
-      useProjectStore.getState().registerEditorPanel(panelId)
-    }
-
-    // Switch to panel
-    editorPanel.api.setActive()
-    editorPanel.group.focus()
+    // A markdown link is a "show me the source" gesture, so this call site
+    // pins `kind: 'editor'`: `[x](diagram.svg)` or `[x](page.html)` opens in
+    // Monaco, never the image viewer or a running preview. Routing through
+    // `openFileInPanel` retires the renderer's last hand-built panel id (and its
+    // `eslint-disable`) now that #74 ships an explicit "Open as source" path.
+    const editorPanel = openFileInPanel(dockviewApi, targetFilePath, { kind: 'editor' })
 
     // Scroll to anchor if provided
-    if (anchor) {
+    if (anchor && editorPanel) {
       previewHandleRef.current?.scrollToAnchor(anchor)
     }
   }, [showToast])

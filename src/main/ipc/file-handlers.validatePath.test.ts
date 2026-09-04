@@ -23,7 +23,8 @@ const { mockStat } = vi.hoisted(() => ({
 }))
 
 // Mock electron
-vi.mock('./senderValidation', () => ({ isTrustedSender: () => true }))
+vi.mock('./senderValidation', () => ({ isTrustedSender: () => true,
+    isTrustedAppSender: () => true }))
 
 vi.mock('electron', () => ({
   ipcMain: {

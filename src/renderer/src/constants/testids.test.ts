@@ -120,10 +120,10 @@ describe('TEST_IDS', () => {
       expect(gitIds).toHaveLength(4)
     })
 
-    it('should have 20 Settings Overlay IDs', async () => {
+    it('should have 22 Settings Overlay IDs', async () => {
       const { TEST_IDS } = await getTestIds()
       const settingsIds = Object.keys(TEST_IDS).filter((k) => k.startsWith('SETTINGS_'))
-      expect(settingsIds).toHaveLength(20)
+      expect(settingsIds).toHaveLength(22)
     })
 
     it('should have 10 Transcription Dialog IDs', async () => {
@@ -156,6 +156,32 @@ describe('TEST_IDS', () => {
       const { TEST_IDS } = await getTestIds()
       const editorErrorIds = Object.keys(TEST_IDS).filter((k) => k.startsWith('EDITOR_ERROR'))
       expect(editorErrorIds).toHaveLength(1)
+    })
+
+    it('should have 7 Root Error Boundary IDs', async () => {
+      const { TEST_IDS } = await getTestIds()
+      const rootErrorIds = Object.keys(TEST_IDS).filter((k) => k.startsWith('ROOT_ERROR'))
+      expect(rootErrorIds).toHaveLength(7)
+    })
+
+    it('should have 1 Panel Error Boundary ID', async () => {
+      const { TEST_IDS } = await getTestIds()
+      const panelErrorIds = Object.keys(TEST_IDS).filter((k) => k.startsWith('PANEL_ERROR'))
+      expect(panelErrorIds).toHaveLength(1)
+    })
+
+    it('keeps the ROOT_ERROR and PANEL_ERROR prefixes disjoint from EDITOR_ERROR', async () => {
+      // The three boundary families are counted by prefix filters. A rename
+      // that made one a prefix of another would silently inflate two counts.
+      const { TEST_IDS } = await getTestIds()
+      const keys = Object.keys(TEST_IDS)
+      const editorErrorIds = keys.filter((k) => k.startsWith('EDITOR_ERROR'))
+      const rootErrorIds = keys.filter((k) => k.startsWith('ROOT_ERROR'))
+      const panelErrorIds = keys.filter((k) => k.startsWith('PANEL_ERROR'))
+
+      expect(editorErrorIds.some((k) => rootErrorIds.includes(k))).toBe(false)
+      expect(editorErrorIds.some((k) => panelErrorIds.includes(k))).toBe(false)
+      expect(rootErrorIds.some((k) => panelErrorIds.includes(k))).toBe(false)
     })
 
     it('should have 4 File Conflict Notification IDs', async () => {
@@ -262,10 +288,10 @@ describe('TEST_IDS', () => {
       expect(ids).toHaveLength(5)
     })
 
-    it('should have 12 Image Viewer IDs', async () => {
+    it('should have 20 Image Viewer IDs', async () => {
       const { TEST_IDS } = await getTestIds()
       const ids = Object.keys(TEST_IDS).filter((k) => k.startsWith('IMAGE_VIEWER_'))
-      expect(ids).toHaveLength(12)
+      expect(ids).toHaveLength(20)
     })
 
     it('should have 4 Mermaid Toolbar IDs', async () => {
@@ -292,10 +318,10 @@ describe('TEST_IDS', () => {
       expect(ids).toHaveLength(8)
     })
 
-    it('should have 6 Toast Notification IDs', async () => {
+    it('should have 7 Toast Notification IDs', async () => {
       const { TEST_IDS } = await getTestIds()
       const ids = Object.keys(TEST_IDS).filter((k) => k.startsWith('TOAST'))
-      expect(ids).toHaveLength(6)
+      expect(ids).toHaveLength(7)
     })
 
     it('should have 6 Editor Content Layout IDs', async () => {
