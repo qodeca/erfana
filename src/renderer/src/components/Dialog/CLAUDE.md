@@ -2,25 +2,6 @@
 
 All dialogs MUST compose on `BaseDialog`. Never build portals, overlays, or focus management from scratch.
 
-## BaseDialog props
-
-```tsx
-<BaseDialog
-  isOpen={isOpen}
-  onClose={onClose}
-  zIndex={zIndex}                    // from DialogContext or hardcoded
-  closeOnBackdrop={true}             // false for modal operations
-  closeOnEscape={true}               // false if custom Escape handling needed
-  className="my-dialog"              // adds to dialog-container
-  ariaLabelledBy={titleId}           // optional in the type, required by convention – points to title element
-  ariaDescribedBy={descriptionId}    // recommended – points to body element
-  initialFocusRef={captureButtonRef} // optional – focus this instead of the first focusable
-  initialFocusKey={canCapture}       // optional – re-arm focus resolution (primitive!)
-  focusRescueRef={refreshButtonRef}  // optional – where the focusout rescue should land
-  trapFocus                          // optional – cycle Tab/Shift+Tab inside the dialog
->
-```
-
 BaseDialog portals into `#portal-root`.
 
 ## Focus management
@@ -44,24 +25,15 @@ BaseDialog keeps a **module-level stack of every open dialog** (trapping or not,
 
 **Ordering contract: the frontmost dialog is the one with the highest `zIndex`, and registration order only breaks a tie.** Both halves are locked by tests in `BaseDialog.test.tsx` ("stacked dialogs"). The failure this prevents, and why registration order alone is not enough, is in the module comment of `BaseDialog.tsx`.
 
-## Standard CSS classes (from Dialog.css)
+## Dialog buttons (mandatory – never create custom button styles)
 
-### Layout
-- `.dialog-header` – title wrapper (bottom margin only, no background)
-- `.dialog-title` – `h3` element, `var(--text-xl)`, `letter-spacing: -0.2px`
-- `.dialog-body` – body wrapper (bottom margin)
-- `.dialog-actions` – footer buttons (flex, gap, right-aligned)
-
-### Buttons (mandatory – never create custom button styles)
+From `Dialog.css`:
 - `.dialog-btn` – base button class (always required)
 - `.dialog-btn-primary` – confirm/submit (violet)
 - `.dialog-btn-secondary` – cancel/dismiss (transparent with border)
 - `.dialog-btn-danger` – destructive actions (red)
 
-`.dialog-btn` / `-primary` / `-secondary` have an out-of-directory consumer: `RootErrorFallback` (the crash-recovery screen) references them from markup while `RootErrorBoundary.css` deliberately never declares them, relying on `Dialog.css` already being in the entry bundle at crash time – a future "scope these to dialogs only" cleanup would silently break the crash screen.
-
-### Modifiers
-- `.dialog-container.my-dialog` – override container (e.g., `max-width`)
+`.dialog-btn` / `-primary` / `-secondary` have an out-of-directory consumer: `RootErrorFallback` (the crash-recovery screen) references them from markup while `RootErrorBoundary.css` deliberately never declares them, relying on `Dialog.css` already being in the entry bundle at crash time. A future "scope these to dialogs only" cleanup would leave the crash screen with unstyled buttons – caught by the "shared Dialog.css contract" block in `../RootErrorBoundary/RootErrorBoundary.css.test.ts`, which asserts both halves: that `Dialog.css` still declares `.dialog-btn` / `-primary` / `-secondary`, and that `RootErrorBoundary.css` never re-declares them.
 
 ## ARIA requirements
 
@@ -72,7 +44,7 @@ BaseDialog keeps a **module-level stack of every open dialog** (trapping or not,
 
 ## Existing dialogs (only where the filename misleads)
 
-Most dialog files do what their name says. These four do not:
+Most dialog files do what their name says. These five do not:
 
 | File | What is not obvious |
 |------|---------------------|
@@ -80,3 +52,4 @@ Most dialog files do what their name says. These four do not:
 | `CameraDialog.tsx` | Single-shot: the frame is written to a temp file and returned to the caller immediately, with no review/retake state. Mirroring is **preview-only and off by default**: `.camera-preview--mirrored` (`transform: scaleX(-1)`) is applied to the `<video>` only while the per-camera checkbox is on (`useCameraMirrorPreference` → `useCameraMirrorStore`, persisted by `deviceId`), and `captureVideoFrame()` in `useCameraCapture.ts` draws the frame unflipped in every state, so the saved JPEG is never mirrored (#42). Uses `initialFocusRef` + `initialFocusKey={canCapture}` + `trapFocus` – the reference case for all three |
 | `ScreenSelectDialog.tsx` | Not macOS-only and not feature-gated: the TerminalPanel toolbar opens it wherever screenshot capture is supported (macOS + Windows) whenever more than one display is connected |
 | `ScreenPermissionDialog.tsx` | macOS Screen Recording denial – shown only **after** a capture is actually denied, never as a pre-check gate |
+| `WindowPickerDialog.tsx` | The window picker for the cross-platform `desktopCapturer` backend (Windows / Linux) only – macOS uses the OS-native picker and never opens it, so it is dispatched from `TerminalToolbar` behind `hasNativeWindowPicker === false` (#164). Roving tabindex, not `aria-activedescendant`: arrow keys move DOM focus and selection together |

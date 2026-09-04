@@ -57,7 +57,7 @@ Erfana is an agent-native Markdown workspace – an Electron app that runs a ter
 - [Continuous Integration](./ci.md) - GitHub Actions workflows (`checks.yml` active on every push; `e2e.yml` **disabled** since 2026-04-25 — local-only verification until macos-latest stability is fixed; `release.yml` and `whisper-binaries*.yml` for release flow), retry patterns, visual-on-CI gap
 - [Build](./build/README.md) - electron-builder, ASAR, fuses, troubleshooting
 - [Release signing keys](./release-pubkey.txt) - Published minisign public keys (primary + standby rotation) for verifying release artifacts
-- [Release handoffs](./handoffs/) - Point-in-time cross-platform verification checklists handed between sessions before a release; each file is dated and anchored on a commit, and is not maintained after that release ships
+- [Release handoffs](./handoffs/) - Point-in-time release-verification handoffs - a checklist handed to the next session, and the report handed back; each file is dated and anchored on a commit, and is not maintained after that release ships
 - [Windows Enablement](./windows/README.md) - Phases 0–2 shipped in v0.9.3; Phase 4 (local Whisper trust chain + Windows x64 binary) shipped in v0.9.4 on 2026-04-23 per #165; Windows-host test-flake remediation pool (#172) + ThrottledWorker offset-deque refactor (#173) also in v0.9.4; Phase 3 (screenshots, #164) shipped in v0.12.0; Phases 5–6 tracked under #166–#167. Those issue and release numbers predate the public-repo migration and do not resolve on `qodeca/erfana`. The convention is split by location: **outside** `docs/windows/` such numbers are kept as plain text (as on this line) — as of 2026-08-07 that holds for `CHANGELOG.md` too, where 55 dead issue / PR / commit / release links were converted to bare references. **Inside** `docs/windows/` the dead references stay as links behind the provenance banner at the top of each file; note that folder is a deliberate *mix*, since text written after the migration cites bare numbers while the pre-migration history keeps its links. Links written *after* the migration do resolve — the repository root, the `v0.16.3` and `v0.17.0` releases, and the post-migration issue/PR references added in the v0.17.0 entries of `CHANGELOG.md` and `known-issues.md`. **[`implementation-plan.md`](./windows/implementation-plan.md) is the canonical phase status – prefer it over this line**
   - [Implementation Plan](./windows/implementation-plan.md) - Canonical phased roadmap + status snapshot + Phase 4 test inventory
   - [Gap Analysis](./windows/gap-analysis.md) - Feature-parity baseline (P0/P1/P2 with file:line refs)
@@ -72,7 +72,7 @@ Erfana is an agent-native Markdown workspace – an Electron app that runs a ter
 - [Large Project Performance Plan](./large-project-performance-plan.md) - EMFILE mitigation, worker threads, diagnostics
 - [Testing](./testing/README.md) - Testing strategies and coverage
   - [E2E Testing](./testing/e2e-testing.md) - Playwright/Electron E2E guide
-  - [E2E Selectors](./testing/e2e-selectors.md) - 251 testids catalog
+  - [E2E Selectors](./testing/e2e-selectors.md) - 259 testids catalog
   - [Test Scenarios](./testing/test-scenarios.md) - 10 manual/MCP visual test scenarios
   - [E2E Helpers](./testing/e2e-helpers.md) - Test utility functions
   - [E2E Third-Party](./testing/e2e-third-party.md) - Monaco, xterm.js, Mermaid patterns

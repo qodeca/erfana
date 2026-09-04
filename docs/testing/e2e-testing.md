@@ -5,7 +5,7 @@
 Erfana supports automated E2E testing using Playwright with Electron. This guide covers setup, configuration, and test patterns.
 
 **Related documentation**:
-- [E2E Selectors](./e2e-selectors.md) – Complete testid catalog (256 testids)
+- [E2E Selectors](./e2e-selectors.md) – Complete testid catalog (259 testids)
 - [E2E Third-Party](./e2e-third-party.md) – Monaco, xterm.js, Mermaid testing
 - [E2E Helpers](./e2e-helpers.md) – Test utilities and patterns (backward-compatible adapter)
 - [E2E Debugging](./e2e-debugging.md) – Debugging and CI/CD
@@ -80,9 +80,14 @@ Three Playwright projects are configured:
 
 Visual project settings: `snapshotDir: './e2e/screenshots'`, `snapshotPathTemplate: '{snapshotDir}/{arg}-{platform}{ext}'`, `maxDiffPixelRatio: 0.01`, `animations: 'disabled'`.
 
-Baselines are per platform and committed. `image-viewer-toolbar-narrow-darwin.png` (state (f), #73) currently exists for **darwin only** — the `win32`
-baseline has to be generated on a Windows host with `npm run test:e2e:update-screenshots` and committed, until then that one case fails loudly there by
-design (`assertBaselineExists`).
+Page-level captures (welcome, editor, terminal) pass `clip: PAGE_CLIP` — the `1280x800` rectangle the visual fixture asks the window for — so the baseline
+records the app's own layout rather than whatever content size the host window manager granted. Element-level captures (settings overlay, confirm dialog,
+image-viewer toolbar) need no clip: the element bounds are the capture.
+
+Baselines are per platform and committed. Both the **darwin** and the **win32** set exist for all six states; the win32 set was regenerated on 2026-09-04
+after the page-level captures were clipped. A missing baseline is not skipped — `assertBaselineExists` throws, and `playwright.config.ts` sets
+`updateSnapshots: 'none'`, so the auto-write-on-first-run path stays closed. Generate a new platform's set with
+`npm run test:e2e:update-screenshots` and commit it.
 
 See `playwright.config.ts` for the full configuration.
 
@@ -128,6 +133,8 @@ Available fixtures:
 | Fixture | Scope | Description |
 |---------|-------|-------------|
 | `userDataDir` | Worker | Isolated Electron user data directory |
+| `extraLaunchArgs` | Test (option) | Extra Chromium/Electron switches appended to the launch args of `app`, `appWithProject` and `appWithTestProject`; default `[]` |
+| `resetRendererStorage` | Test (option) | Deletes the renderer's persisted `localStorage` / `sessionStorage` before launch; default `false`. Opt in only from a spec whose subject *is* persisted renderer state |
 | `app` | Test | Electron application instance |
 | `window` | Test | First window page |
 | `keyboardHelper` | Test | Platform-aware keyboard shortcuts |
@@ -142,11 +149,14 @@ Additional fixtures for tests that need a project directory, settings, or an ope
 
 | Fixture | Scope | Description |
 |---------|-------|-------------|
+| `appWithProject` | Test | Launches Electron with the repo's default test project (`DEFAULT_TEST_PROJECT`) already loaded |
+| `windowWithProject` | Test | First window page from `appWithProject`, waited for the project tree |
 | `testProject` | Test | Creates an isolated temp directory with configurable seed files; auto-cleanup on teardown |
 | `withSettings` | Test | Writes `.erfana/settings.json` into the project (no teardown – testProject owns cleanup) |
 | `withOpenFile` | Test | Opens a file in the editor, waits for Monaco readiness, provides a `MonacoPage` |
 | `appWithTestProject` | Test | Launches Electron with the `testProject` path as argument |
 | `windowWithTestProject` | Test | First window page from `appWithTestProject` |
+| `localServer` | Test | Ephemeral loopback HTTP server (`http://127.0.0.1:<port>`) serving a probe script and recording every request; closed on teardown. Composed in `e2e/fixtures/localServer.ts`, not in `fixtures/index.ts` — import `test` from there to use it |
 
 Configure via option fixtures with `test.use()`:
 
@@ -383,7 +393,7 @@ Three `ERFANA_E2E_*` variables change app behaviour for tests. They are read by 
 
 ### Test files
 
-All 25 specs in `e2e/`:
+All 30 specs in `e2e/`:
 
 - `app-launch.e2e.ts` – Application launch, activity bar, welcome panel visibility
 - `third-party-components.e2e.ts` – Monaco editor, xterm.js terminal, Mermaid diagrams
@@ -427,6 +437,23 @@ All 25 specs in `e2e/`:
   `ImageViewerPanel.toolbarOverflow.test.ts` can only pin as stylesheet text. All eight controls stay hit-testable at a 300 px panel, and Tab scrolls the
   rightmost control into view by scrolling the TOOLBAR — asserting the panel container's `scrollLeft` stays 0 is what distinguishes the fix from the old
   behaviour, where Chromium scrolled the hidden `.container` instead and the rest of the row left the screen
+- `html-preview-corpus.e2e.ts` – #74: seeds each fixture under `e2e/fixtures/html-preview-corpus/` into an isolated project and asserts its machine sentinel
+  against the REAL native `WebContentsView`, read main-side via `app.evaluate`, not a DOM stand-in. Covers script execution, a runaway loop that must not
+  freeze the host, multi-file relative CSS / JS / image resolution, a page that renders while its load diagnostics are badged, an unapproved remote
+  subresource being blocked (and then approved from the permission band), and the view being sized on open with no tab switch to prod it
+- `html-preview-links.e2e.ts` – sd-074b: link routing inside a previewed page, plus two previews running at once. Synthesised clicks (`clickInPreview`) are
+  untrusted, so they drive the `will-navigate` fallback — plain link, `javascript:` link, a path escaping the project, a same-page anchor. The external-link
+  case needs `clickTrusted` (a real `webContents.sendInputEvent` gesture, the only thing that may reach the OS browser) and asserts the consent dialog's
+  Cancel is logged as the outcome
+- `html-preview-perf.e2e.ts` – sd-074b AC24: the save-to-visible-change budget. The clock starts at the `fs.writeFile` that changes a stylesheet and stops
+  when the running page's computed background reflects it — 20 samples, P95 under 300 ms, measured with one preview open and again with the live-view budget
+  saturated. Local gate only (shared CI runners flake on perf floors)
+- `html-preview-approval.e2e.ts` – #111: the whole approval chain end to end against a real server on an ephemeral loopback port. In order: nothing reaches
+  the socket before approval, the permission band names the whole origin, Allow → Confirm makes the blocked script actually run inside the page, the server
+  records the request, and the grant lands in the project file under `origins`. Uses the `localServer` fixture
+- `html-preview-eviction.e2e.ts` – sd-074b D5: the `PREVIEW.MAX_LIVE_VIEWS` live-view budget. Opening one preview more than the budget tears the least
+  recently active one down to its still frame and marks it `suspended`; clicking that tab wakes it again. Both halves are asserted against the real
+  `erfana-preview://` web contents, because the wake half was seen not to happen on Windows
 - `visual-regression.e2e.ts` – Visual regression for 6 UI states (welcome, editor, terminal, settings, confirm dialog, image viewer toolbar in a narrow
   panel). State (f) uses its own extended test object so the image fixtures it seeds do not change the project tree in states (a)–(e)
 

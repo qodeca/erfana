@@ -22,7 +22,7 @@ Complete guide for testing Erfana. This covers both automated tests (Vitest/Play
 
 #### Key test areas
 
-Run `npm run test` for current totals. The workspace holds **439 test files** — main 208 (`src/main` 191 + `src/shared` 13 + `scripts` 4), renderer 226, preload 5 — and runs **11,178 cases**, all passing. Both figures were measured on 2026-08-31 on the `feature/design-system` branch, which is ahead of `develop`; re-run `npm run test:ci` for the live figure, since the case count moves with every commit while the file count is checkable with a glob. ~78 cases platform-gate on Windows — 77 POSIX-only `pathSecurity.test.ts` + 1 macOS-only `LiteParseConverter.test.ts`. For the version-by-version test-addition history, see [`docs/CHANGELOG.md`](../CHANGELOG.md).
+Run `npm run test` for current totals. The workspace holds **464 test files**, and a full `npm run test:ci` reported **11,649 cases passing with 108 skipped** (11,757 collected). Both figures were counted on 2026-09-04 on a Windows host; re-run `npm run test:ci` for the live figure, since the case count moves with every commit while the file count is checkable with a glob. About **108 cases are skipped on a Windows host**, all of them in the `main` project: 77 in the POSIX-only `pathSecurity.test.ts`, 20 in `scripts/fuses.test.mjs` (the POSIX chmod and symlink cases), 5 in `projectConfinement.test.ts`, 5 across the file handlers, and 1 macOS-only `LiteParseConverter.test.ts` case. (`tarArchive.test.ts` gates its symlink case with an early `return` instead, so it reports as passing rather than skipped — which is why the coverage floors, not the test run, are what fail on Windows.) For the version-by-version test-addition history, see [`docs/CHANGELOG.md`](../CHANGELOG.md).
 
 | Area | Key files | Docs |
 |------|-----------|------|
@@ -54,7 +54,7 @@ Run `npm run test` for current totals. The workspace holds **439 test files** �
 - **Crypto fixture pattern** — `verifyManifest.test.ts` uses a real published manifest + signature as fixture. Don't synthesise test manifests with test keypairs; refresh the fixture when the whisper pin advances. See [ADR 0002](../adrs/0002-minisign-over-cosign-sigstore.md)
 - **Cross-cutting CSS-policy audits** (`*.audit.test.ts`) — verify a stylesheet contract that spans many component files without depending on jsdom's `getComputedStyle` (which is unreliable for non-standard properties like `user-select` — vitest #1689, #8017). Pattern: import each component CSS as raw text via Vite's `?raw` suffix (the renderer vitest project sets `css: true`), then `it.each` over an exported `AUDIT_<N>_SURFACES` constant and assert `new RegExp(escapedSelector + '[\\s\\S]{0,800}?user-select:\\s*text\\s*;')` matches the source. Reference: [`src/renderer/src/styles/userSelect.audit.test.ts`](../../src/renderer/src/styles/userSelect.audit.test.ts) (#211) covers 22 surfaces deterministically. Pair with a small organic E2E rather than per-surface E2E variants (the raw-CSS pass is the cross-cutting gate).
 - **CPU probe mocking** — simulate pre-SSE4.2 CPUs in UI tests via `vi.spyOn(os, 'cpus').mockReturnValue([...])` + `__resetCpuProbeForTests()` before import. Pattern lives in `LocalWhisperService.test.ts` `describe('checkCpuSupport() pre-flight probe')`
-- **Coverage gates and ratchet policy** — aggregate thresholds in the 3 vitest configs (`vitest.{main,preload,renderer}.ts`) currently sit at `lines/functions/statements: 10`, `branches: 5`. They are aggregate (`perFile: false`) and only fire under `--coverage` (`npm run test:cov`), not under `test:ci`. **Trust-chain modules** (`src/main/utils/{verifyManifest,secureDownloader,zipArchive,tarArchive}.ts`) carry per-file 90% floors via glob-keyed thresholds in `vitest.main.ts` — these protect the whisper-binary download verification chain (ADRs 0001–0004). The per-file global gate (`perFile: true`) and a measurement-based floor raise are deferred until a clean coverage measurement is captured. The Windows blocker on that measurement is cleared: `scripts/fuses.test.mjs` has been platform-skipped since 2026-06-04 (`describe.skipIf(process.platform === 'win32')` on both top-level describes), so `npm run test:cov` runs on Windows hosts — see [`docs/windows/known-flakes.md`](../windows/known-flakes.md). **Ratchet pattern**: when raising floors, never set them to the measured value; set them to (measured − 5 percentage points, rounded down to nearest 5) so single-PR coverage dips don't break the build, then ratchet again after each cycle of new tests lands.
+- **Coverage gates and ratchet policy** — aggregate thresholds in the 3 vitest configs (`vitest.{main,preload,renderer}.ts`) currently sit at `lines/functions/statements: 10`, `branches: 5`. They are aggregate (`perFile: false`) and only fire under `--coverage` (`npm run test:cov`), not under `test:ci`. **Trust-chain modules** (`src/main/utils/{verifyManifest,secureDownloader,zipArchive,tarArchive}.ts`) carry per-file 90% floors in `vitest.main.ts` — these protect the whisper-binary download verification chain (ADRs 0001–0004). The threshold keys are **exact repo-relative paths, not globs**, so a per-file floor covers precisely the one file it names; alongside the four trust-chain modules the same block declares `scripts/fuses.js` (86 lines/statements, 88 functions, 93 branches), `src/main/services/claudeStatus/modelId.ts` (95% each metric) and `src/main/utils/rendererCrashHandlers.ts` (90% each metric). The per-file global gate (`perFile: true`) and a measurement-based floor raise are deferred until a clean coverage measurement is captured. The Windows blocker on that measurement is cleared: `scripts/fuses.test.mjs` has been platform-skipped since 2026-06-04 (`describe.skipIf(process.platform === 'win32')` on both top-level describes), so the suite itself runs on Windows hosts - but it still cannot pass there: the per-file floors for `scripts/fuses.js` and `src/main/utils/tarArchive.ts` are missed because both suites skip their symlink cases on win32, so the lines those cases would cover never execute. Run it on macOS or Linux, or read the `Coverage` CI job — see [`docs/windows/known-flakes.md`](../windows/known-flakes.md). **Ratchet pattern**: when raising floors, never set them to the measured value; set them to (measured − 5 percentage points, rounded down to nearest 5) so single-PR coverage dips don't break the build, then ratchet again after each cycle of new tests lands.
 
 ---
 
@@ -77,7 +77,15 @@ npm run test:e2e:visual            # Visual regression tests (visual project) �
 npm run test:e2e:update-screenshots  # Update visual baselines
 ```
 
-**E2E test files** (all 25 specs in `e2e/`):
+**E2E test files** (all 30 specs in `e2e/`):
+- `html-preview-corpus.e2e.ts` - HTML-preview corpus acceptance (#74): the fixture corpus renders, the native view is sized on open, and the process-isolation floor holds
+- `html-preview-links.e2e.ts` - in-page links and independent previews (sd-074b): a new tab per target and reuse on a second click, `javascript:` refused, a link out of the project refused, `#anchor` scrolls; plus the external-link case, where an `https:` link asks first and the cancelled outcome is read back from the main log
+- `html-preview-perf.e2e.ts` - the save-to-visible-change gate (sd-074b AC24), asserting the P95 against its budget
+- `html-preview-approval.e2e.ts` - #111: nothing is fetched before approval, Allow then Confirm reaches a terminal state, the script loads inside the page, and the origin is written under `htmlPreview.allowlist.origins`. Uses the `localServer` fixture
+- `html-preview-eviction.e2e.ts` - the fourth preview evicts the first to a still frame, and clicking its tab wakes it live again
+- `image-export.behaviour.e2e.ts` - how image export behaves rather than what it produces: the viewer zoom must not reach the exported pixels
+- `image-export.matrix.e2e.ts` - the per-format export matrix (#73 AC1): all three actions across the eight supported formats, from the panel
+- `image-export.overlay-matrix.e2e.ts` - the same matrix run from the full-screen overlay, the second surface #73 AC1 requires
 - `app-launch.e2e.ts` – Application launch, activity bar, welcome panel visibility
 - `third-party-components.e2e.ts` – Monaco editor, xterm.js terminal, Mermaid diagrams
 - `directory-watcher.e2e.ts` – Directory watcher pipeline (#104): verifies file creation via terminal appears in Project Tree within latency budget
@@ -132,13 +140,13 @@ Screenshot-based comparison for 6 core UI states:
 - **(c)** Terminal open – split view with terminal
 - **(d)** Settings overlay – full-screen settings
 - **(e)** Confirm dialog – quit confirmation overlay
-- **(f)** Image viewer toolbar – narrow panel (#73); the only case about a single row rather than a whole window, and it seeds its image fixtures through its own extended test object so states (a)–(e) keep byte-identical baselines. Its baseline exists for darwin only — a Windows host has to generate and commit the `win32` one
+- **(f)** Image viewer toolbar – narrow panel (#73); the only case about a single row rather than a whole window, and it seeds its image fixtures through its own extended test object so states (a)–(e) keep byte-identical baselines
 
 **Key details**:
-- Baselines in `e2e/screenshots/` with platform suffix (e.g., `welcome-empty-darwin.png`)
-- Deterministic rendering: 1280x800 window, 1x DPR (`--force-device-scale-factor=1`)
+- Baselines in `e2e/screenshots/` with platform suffix (e.g., `welcome-empty-darwin.png`). Both the `darwin` and the `win32` set are committed for all six states; the `win32` set was regenerated on 2026-09-04 after page-level captures were clipped
+- Deterministic rendering: 1280x800 window, 1x DPR (`--force-device-scale-factor=1`), and page-level captures (a)–(c) pass `clip: PAGE_CLIP` — the same 1280x800 rectangle — so the baseline stops depending on whatever content size the host window manager actually granted. Element-level captures (d)–(f) need no clip
 - Monaco cursor blink disabled; minimap and scrollbar masked
-- Tests skip gracefully when no baseline exists for the current platform
+- A missing baseline does **not** skip: `assertBaselineExists()` throws, and `playwright.config.ts` sets `updateSnapshots: 'none'`, so nothing is auto-written on a first run. Generate a new platform's set with `npm run test:e2e:update-screenshots` and commit it
 - `maxDiffPixelRatio: 0.01`, `retries: 0` (diffs must be investigated, not retried)
 - CI records video on failure for debugging
 

@@ -6,7 +6,7 @@ Erfana runs GitHub Actions workflows on pushes. The author-controlled workflows 
 |----------|------|--------|---------|--------|-----------|---------|
 | Quality Checks | `.github/workflows/checks.yml` | active | push to **any branch** | `ubuntu-latest` | ~3 min | Fast feedback on lint / types / unit tests / build / licensing (see job table below) |
 | Secret Scan | `.github/workflows/secret-scan.yml` | active (**required check**) | push + PR | `ubuntu-latest` | ~1 min | gitleaks (full git history) + trufflehog (verified secrets only). Version-pinned, SHA-256-checksum-verified binary downloads; no third-party actions |
-| E2E Tests | `.github/workflows/e2e.yml` | **disabled** (2026-04-25) | (would be: push to `develop` + PRs) | `macos-latest` | ~5–8 min | Electron integration tests (Playwright) — see [E2E Tests (disabled)](#e2e-tests-e2eyml-disabled) below |
+| E2E Tests | `.github/workflows/e2e.yml` | **disabled** (2026-04-25) | (would be: push to `develop` or `main`, plus all PRs) | `macos-latest` | ~5–8 min | Electron integration tests (Playwright) — see [E2E Tests (disabled)](#e2e-tests-e2eyml-disabled) below |
 | Release | `.github/workflows/release.yml` | active | tag push `v*.*.*` | matrix (mac/win) | ~15–25 min compute + **unbounded approval wait** | Multi-platform release build → `prepare`/`build_*`/`finalize`/`cleanup` (calls `build_mac.yml`, `build_win.yml` reusables; Linux distribution target dropped) |
 | Whisper Binaries | `.github/workflows/whisper-binaries.yml` | active | `workflow_dispatch` only | `ubuntu-latest` (`validate-inputs`, `publish-release`) + `macos-14` (`build-macos`) + `windows-latest` (`build-windows`) | ~25 min | Self-hosted whisper.cpp build, sign, notarize, publish (see [`build/whisper-binaries.md`](./build/whisper-binaries.md)) |
 | Whisper Binaries (Canary) | `.github/workflows/whisper-binaries-canary.yml` | active | monthly schedule | `macos-14` + `windows-latest` + `ubuntu-latest` (`notify-on-failure`) | ~3 min | Credential-health check (Apple notarization, Windows signing) |
@@ -23,17 +23,19 @@ Node 24, `permissions: contents: read`. Every `checks.yml` job that needs depend
 
 Nine jobs run in parallel (all `ubuntu-latest` except `windows-checks`). The **Required check?** column reflects the live branch-protection required set on `main`; the separate `Secret scan` workflow (above) is the seventh required check.
 
+**Time budgets.** Every job declares a `timeout-minutes`, so a hung step fails the run instead of burning a runner for the six-hour default. The budget is **10 minutes** for each job, with two deliberate exceptions: `windows-checks` gets **15** (Windows runners install and compile slower), and `release-guards` gets **3** (checkout-only, awk/grep scripts, no install). A job that starts brushing its budget is a signal to look at what got slower, not to raise the number.
+
 | Job (`name:`) | Command | Required check? | Notes |
 |-----|---------|:---:|-------|
 | `lint` (Lint) | `npm run lint` + `npm run lint:css` + `npm run design -- --check` | yes | Three **steps in one job**, deliberately. Branch protection matches the **job** `name:` (`Lint`), so a separate job called `Lint CSS` would be advisory only and would enforce nothing. `lint:css` is stylelint over `src/**/*.css` plus the `design/` cards' inline `<style>` (via `postcss-html`); `design -- --check` regenerates `design/` in memory and fails when a committed generated file is stale |
 | `typecheck` (Typecheck) | `npm run typecheck` | yes | tsc node + web |
 | `test` (Unit tests) | `npm run test:ci` | yes | full vitest workspace (main / renderer / preload), **no coverage**. Also carries two extra gates — see below |
-| `coverage` (Coverage) | `npx vitest --run --config vitest.main.ts --project main --coverage` | yes | enforces the per-file coverage **floors** in `vitest.main.ts` `test.coverage.thresholds` — `scripts/fuses.js` (the #43/#55 packaging-integrity guards + Electron fuses, floor lines/statements 86, functions 88, branches 93; met at ~88) and the whisper trust-chain modules `verifyManifest` / `secureDownloader` / `zipArchive` / `tarArchive` (90% each) plus the #41 `modelId` registry (95%). Since `test` runs `test:ci` **without** coverage, these floors gate only here. Scoped to `--project main` (with `all: false`) so `scripts/fuses.js` reports a single deterministic row — see the design note below (issue #55, F4). Added to the branch-protection required set on `main` |
+| `coverage` (Coverage) | `npx vitest --run --config vitest.main.ts --project main --coverage` | yes | enforces the per-file coverage **floors** in `vitest.main.ts` `test.coverage.thresholds` — `scripts/fuses.js` (the #43/#55 packaging-integrity guards + Electron fuses, floor lines/statements 86, functions 88, branches 93; met at ~88) and the whisper trust-chain modules `verifyManifest` / `secureDownloader` / `zipArchive` / `tarArchive` (90% each) plus the #41 `modelId` registry (95%) and the #60 `src/main/utils/rendererCrashHandlers.ts` crash trail (90% each metric). Since `test` runs `test:ci` **without** coverage, these floors gate only here. Scoped to `--project main` (with `all: false`) so `scripts/fuses.js` reports a single deterministic row — see the design note below (issue #55, F4). Added to the branch-protection required set on `main` |
 | `build` (Build) | `npx electron-vite build` | yes | also the only gate on the **preload self-containment** guard — see below |
 | `license` (License compliance) | `npm run check:headers` + `pipx run reuse lint` | yes | SPDX headers on all sources + REUSE conformance. `check-spdx-headers.mjs` covers `.ts .tsx .js .mjs .cjs .css .html`; a script that *emits* an SPDX header in a string literal must wrap it in `REUSE-IgnoreStart` / `REUSE-IgnoreEnd`, or `reuse lint` parses the literal as that file's own licensing and fails (see `scripts/design-sync.mjs`, `scripts/check-spdx-headers.mjs`) |
 | `audit-signatures` (npm audit signatures) | `npm audit signatures` | no | also records the `package-lock.json` digest artifact that `release.yml` byte-verifies at tag time |
 | `release-guards` (Release readiness guards) | guard scripts | no | fails the build on a `pull_request_target` trigger, forbidden plist entitlements, legacy signing credentials, release-pubkey drift across docs, and a non-allowlist `files:` block in `electron-builder.yml` (`Guard - electron-builder packaging allowlist`, issue #43 — awk/grep only, since the job is checkout-only; extended in issue #55 to also hard-fail any `extraFiles:` block, at column 0 or indented under `mac:`/`win:`, and warn on `extraResources:` edits). Its checkout uses `fetch-depth: 0` so the `extraResources:` warning can compare against the push/PR base — see the note below |
-| `windows-checks` (Windows checks) | `npm run typecheck` + `npm run test:main` on `windows-latest` | no | advisory Windows gate; excluded from the required set until proven stable |
+| `windows-checks` (Windows checks) | `npm run typecheck` + `npm run design -- --check` + `npm run test:main` on `windows-latest` | no | advisory Windows gate; excluded from the required set until proven stable |
 
 **Required status checks on `main`** (seven): `Lint`, `Typecheck`, `Unit tests`, `Build`, `License compliance`, `Coverage` (from `checks.yml`), and `Secret scan` (from `secret-scan.yml`). Note what `Lint` now blocks beyond ESLint: a raw hex colour, a bare `z-index`, a `border-radius` that is not `0` or the circle token, and a stale `design/` — a token violation or an unregenerated design system fails the merge, not just review. `npm audit signatures`, `Release readiness guards`, and `Windows checks` run on every push but are not required to merge. `Coverage` (issue #55, F4) enforces the per-file coverage floors that the required `test` job — which runs `test:ci` without `--coverage` — does not.
 
@@ -55,8 +57,11 @@ Nine jobs run in parallel (all `ubuntu-latest` except `windows-checks`). The **R
 - **Concurrency cancellation** via `concurrency: group: checks-${{ github.ref }} cancel-in-progress: true`. Rapid pushes / force-pushes to the same ref abort in-flight runs.
 - **`npm ci` retry** — every `npm ci` is wrapped in a 3-attempt loop with backoff to tolerate transient ECONNRESET on GitHub runners:
   ```bash
-  npm ci || (sleep 10 && npm ci) || (sleep 20 && npm ci)
+  npm ci --ignore-scripts \
+    || (sleep 10 && npm ci --ignore-scripts) \
+    || (sleep 20 && npm ci --ignore-scripts)
   ```
+  Every attempt carries `--ignore-scripts`, which is what makes caching `~/.npm` safe: no postinstall runs during the install, so a retry cannot smuggle one in either.
 
 ## Secret scan (`secret-scan.yml`)
 
@@ -87,7 +92,7 @@ npm run test:e2e:update-screenshots  # Update visual baselines
 gh workflow enable "E2E Tests"
 ```
 
-For historical reference, when the workflow was active it ran on `push` to `develop` + all PRs on `macos-latest`, executed `npm ci` (retry-wrapped) → `npx electron-vite build` → `npx playwright test --project=electron`, and uploaded `test-results/` + `playwright-report/` (30-day retention on develop, 14 on PRs). The original root-cause analysis for the visual-suite hang is preserved below since it remains an open investigation.
+For historical reference, when the workflow was active it ran on `push` to `develop` or `main` plus all PRs on `macos-latest`, executed `npm ci` (retry-wrapped) → `npx electron-vite build` → `npx playwright test --project=electron`, and uploaded `test-results/` + `playwright-report/` (30-day retention when the ref is `develop` or `main`, 14 days otherwise). The original root-cause analysis for the visual-suite hang is preserved below since it remains an open investigation.
 
 ## Visual regression on CI
 

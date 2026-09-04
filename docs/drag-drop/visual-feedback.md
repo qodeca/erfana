@@ -293,7 +293,7 @@ Implementation matches VS Code Explorer behavior:
 
 ## Related Files
 
-- **CSS**: [src/renderer/src/components/ProjectTree/ProjectTree.css](/src/renderer/src/components/ProjectTree/ProjectTree.css)
-- **Drag Overlay**: [src/renderer/src/components/ProjectTree/DropIndicator.tsx](/src/renderer/src/components/ProjectTree/DropIndicator.tsx)
-- **Auto-Scroll**: [src/renderer/src/components/ProjectTree/ProjectTree.tsx](/src/renderer/src/components/ProjectTree/ProjectTree.tsx) (lines 177-188)
-- **Accessibility**: [src/renderer/src/components/ProjectTree/ProjectTree.tsx](/src/renderer/src/components/ProjectTree/ProjectTree.tsx) (ARIA live region)
+- **CSS**: [src/renderer/src/components/ProjectTree/ProjectTree.css](../../src/renderer/src/components/ProjectTree/ProjectTree.css)
+- **Drag Overlay**: [src/renderer/src/components/ProjectTree/DropIndicator.tsx](../../src/renderer/src/components/ProjectTree/DropIndicator.tsx)
+- **Auto-Scroll**: [src/renderer/src/components/ProjectTree/ProjectTree.tsx](../../src/renderer/src/components/ProjectTree/ProjectTree.tsx) (lines 177-188)
+- **Accessibility**: [src/renderer/src/components/ProjectTree/ProjectTree.tsx](../../src/renderer/src/components/ProjectTree/ProjectTree.tsx) (ARIA live region)

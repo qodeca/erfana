@@ -154,6 +154,6 @@ See [validation.md](./validation.md) for detailed rules.
 
 ## Related Files
 
-- **Implementation**: [src/renderer/src/stores/useClipboardStore.ts](/src/renderer/src/stores/useClipboardStore.ts)
-- **Tests**: [src/renderer/src/stores/useClipboardStore.test.ts](/src/renderer/src/stores/useClipboardStore.test.ts)
-- **Context Menu**: [src/renderer/src/components/ProjectTree/ProjectTree.tsx](/src/renderer/src/components/ProjectTree/ProjectTree.tsx)
+- **Implementation**: [src/renderer/src/stores/useClipboardStore.ts](../../src/renderer/src/stores/useClipboardStore.ts)
+- **Tests**: [src/renderer/src/stores/useClipboardStore.test.ts](../../src/renderer/src/stores/useClipboardStore.test.ts)
+- **Context Menu**: [src/renderer/src/components/ProjectTree/ProjectTree.tsx](../../src/renderer/src/components/ProjectTree/ProjectTree.tsx)

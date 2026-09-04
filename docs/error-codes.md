@@ -2,7 +2,7 @@
 
 Project-wide index of `ErrorCode` values in `src/shared/errors.ts`, grouped by category. For each code: the enum name, the user-facing message (from `ERROR_MESSAGES` map), and the primary throw site. For whisper + transcription codes, also the operator action on encounter.
 
-**Why this document exists**: Phase 4 introduced 6 new whisper codes (see [ADR 0001](./adrs/0001-self-host-whisper-binaries.md)); the full enum has grown to 125 codes. A single mapping table saves every future maintainer a `grep -r ErrorCode` sweep.
+**Why this document exists**: Phase 4 introduced 6 new whisper codes (see [ADR 0001](./adrs/0001-self-host-whisper-binaries.md)); the full enum has grown to 130 codes. A single mapping table saves every future maintainer a `grep -r ErrorCode` sweep.
 
 **Source of truth**: `src/shared/errors.ts`. If this doc drifts, `errors.ts` wins — file an issue.
 
@@ -11,7 +11,7 @@ Project-wide index of `ErrorCode` values in `src/shared/errors.ts`, grouped by c
 throw new AppError('human-readable message', ErrorCode.XYZ, originalError?)
 ```
 
-IPC layer sanitises raw messages to prevent internal-detail leaks; user sees only the `ERROR_MESSAGES[code]` mapping. See `getUserFriendlyMessage()` in `errors.ts:403`.
+IPC layer sanitises raw messages to prevent internal-detail leaks; user sees only the `ERROR_MESSAGES[code]` mapping. See `getUserFriendlyMessage()` in `errors.ts`.
 
 ---
 
@@ -177,7 +177,7 @@ Most Phase 4 / issue #165. See also [`docs/windows/whisper-support-runbook.md`](
 
 ---
 
-## Preview (8 codes)
+## Preview (10 codes)
 
 10 `PREVIEW_*` in `src/shared/errors.ts` (#74, extended by sd-074b and v0.19.0). See `src/main/services/preview/` and [`docs/html-preview/README.md`](./html-preview/README.md).
 

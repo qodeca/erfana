@@ -246,8 +246,8 @@ See [testing.md](./testing.md) for test coverage details.
 
 ## Related Files
 
-- **Validation**: [src/renderer/src/hooks/useDragDropTree.ts](/src/renderer/src/hooks/useDragDropTree.ts)
-- **File Operations**: [src/main/services/FileService.ts](/src/main/services/FileService.ts)
-- **Symlink Detection**: [src/main/utils/SymlinkDetector.ts](/src/main/utils/SymlinkDetector.ts)
-- **Rollback Handler**: [src/main/utils/RollbackHandler.ts](/src/main/utils/RollbackHandler.ts)
-- **Pause Controller**: [src/main/utils/PauseController.ts](/src/main/utils/PauseController.ts)
+- **Validation**: [src/renderer/src/hooks/useDragDropTree.ts](../../src/renderer/src/hooks/useDragDropTree.ts)
+- **File Operations**: [src/main/services/FileService.ts](../../src/main/services/FileService.ts)
+- **Symlink Detection**: [src/main/utils/SymlinkDetector.ts](../../src/main/utils/SymlinkDetector.ts)
+- **Rollback Handler**: [src/main/utils/RollbackHandler.ts](../../src/main/utils/RollbackHandler.ts)
+- **Pause Controller**: [src/main/utils/PauseController.ts](../../src/main/utils/PauseController.ts)

@@ -6,7 +6,7 @@ The running HTML preview (issue #74): the page renders in a native Electron `Web
 
 The native `WebContentsView` paints ABOVE all sibling DOM in the panel, regardless of z-index. Any DOM that must appear over the running page is invisible unless the native view is hidden first. Two consequences that break if forgotten:
 
-- **The failure badge lives on the tab, not the panel.** `PreviewFailureBadge` is mounted in `HtmlPreviewTab` (`../../Tabs/HtmlPreviewTab.tsx`) — always-DOM tab chrome the view never covers — and subscribes to `usePreviewStore` by `panelId`. Do NOT move it into the panel surface: it would be invisible while the page runs (tech-debt #37, resolved).
+- **The failure badge lives on the tab, not the panel.** `PreviewFailureBadge` is mounted in `HtmlPreviewTab` (`../../Tabs/HtmlPreviewTab.tsx`) — always-DOM tab chrome the view never covers — and subscribes to `usePreviewStore` by `panelId`. Do NOT move it into the panel surface: it would be invisible while the page runs.
 - **The badge popover portals to `#portal-root`** and registers a `menu` occluder while open, so the native view hides behind its still frame and the list is readable. Same class of transient DOM-over-preview as the shared `ContextMenu`.
 
 ## Occluder guard — never toggle the view directly
@@ -15,7 +15,7 @@ The native `WebContentsView` paints ABOVE all sibling DOM in the panel, regardle
 
 **A toast is the one exception, and it is deliberate** — see "Toasts move, the page does not" below.
 
-**The hide must be SYNCHRONOUS, main-side.** `PreviewLiveView.setVisibility(false)` calls `view.setVisible(false)` in the same tick it is invoked, and starts the still-frame capture without awaiting it. It used to `await` the capture first, and the gap that opened was not cosmetic: a native view takes pointer input over its own rectangle whatever the DOM says, so for the length of that capture a dialog was drawn on screen and none of its buttons could be clicked. It surfaced as a Delete confirmation that ignored clicks, worked on Escape, and worked on the second attempt — because `captureIfStale` skips while a capture is in flight. Every occluder kind used the same path, so every overlay had it. Pinned by two tests in `src/main/services/preview/PreviewViewService.test.ts` that feed a capture which never resolves. **Never put I/O in front of `setVisible(false)`.**
+**The hide must be SYNCHRONOUS, main-side.** `PreviewLiveView.setVisibility(false)` calls `view.setVisible(false)` in the same tick it is invoked, and starts NO capture at all — still frames are taken while the view is DRAWN (`captureWhileVisible`, off `did-finish-load`), never on the way out. `PreviewViewService.setVisibility` is a pass-through to it for the same reason: there is nothing there to await. It used to `await` the capture first, and the gap that opened was not cosmetic: a native view takes pointer input over its own rectangle whatever the DOM says, so for the length of that capture a dialog was drawn on screen and none of its buttons could be clicked. It surfaced as a Delete confirmation that ignored clicks, worked on Escape, and worked on the second attempt — because `captureIfStale` skips while a capture is in flight. Every occluder kind used the same path, so every overlay had it. Two sibling tests in `src/main/services/preview/PreviewViewService.test.ts` pin both halves: the hide asserts `expect(capture).not.toHaveBeenCalled()`, and the next one asserts the frame IS captured once the page is ready, while the view is drawn. **Never put I/O in front of `setVisible(false)`.** The ONE legitimate wait is eviction, which hides, then awaits `whenCaptureSettled()` before destroying the `webContents` — otherwise a suspended panel wakes with no picture.
 
 **The permission band is a second input to the guard, and it is per panel.** `usePreviewChromeGate` publishes a reason into `stores/usePreviewChromeGateStore.ts`; the guard reads it as a third term (`visible = activeTab && !occluded && gate === null`) and reports `chrome-unconfirmed` / `chrome-too-short`. It is deliberately NOT the occluder store: that one is global, so it would blank the other preview in a split view for a reason belonging to one panel.
 
@@ -26,22 +26,15 @@ The native `WebContentsView` paints ABOVE all sibling DOM in the panel, regardle
 
 When the search bar opens, the native view's bounds are inset from the top by `SEARCH_BAR_INSET_PX` (48, in `hooks/usePreviewBounds.ts`) so the DOM find bar sits in a strip the view never paints over AND native `findInPage` highlights stay visible in the (shorter) live view. Find deliberately does NOT register an occluder — a still frame can't show live highlights, so the view must stay live.
 
-## Structure — glue panel, pure logic, single-purpose hooks
+## Multiple live previews
 
-Mirrors the `ImageViewerPanel` split:
+**Several previews are live at once** (sd-074b D5). `readLivePreviewPanelIds()` in `OverlayGuardService` returns EVERY non-idle, non-suspended panel, and the guard sends visibility per panel, so map iteration order carries no meaning. Never single out "the" live preview by scanning for a first non-idle panel — there is no such thing.
 
-- **`htmlPreview.logic.ts`** — every decision as a pure function (`deriveBounds`, `selectPanelView`, `selectFallback`, `summarizeFailures`); no React, no `window.api`, no store. Unit-tested in isolation.
-- **`hooks/`** — one concern each: `usePreviewLifecycle` (`preview:open`/`close`, the limit-reached/failed signals, and the re-open of a suspended preview when its tab becomes visible), `usePreviewEvents` (store updates), `usePreviewBounds` (bounds pump), `usePreviewFindShortcuts` (forwarded accelerators).
-- **`components/`** — presentational chrome only (`PreviewBanner`, `PreviewFallback`, `PreviewFailureBadge`).
-- **`HtmlPreviewPanel.tsx`** — glue: wires hooks to chrome, holds no decision logic.
-
-**Several previews are live at once** (sd-074b D5). `readLivePreviewPanelIds()` in `OverlayGuardService` returns EVERY non-idle, non-suspended panel, and the guard sends visibility per panel. Map iteration order no longer matters — the old "first non-idle panel IS the live preview" scan is gone.
-
-The rule per panel is unchanged: `visible = (panel is the active tab) && !occluded`. That yields exactly one `true` only because dockview drag-and-drop is disabled (`EditorAreaSplitPanel.tsx`), which nothing enforces — so `recompute` logs in development if two panels ever compute visible at once. If you re-enable DnD, fix the guard first.
+The rule is per panel and has three terms: `visible = (panel is the active tab) && !occluded && gate === null`. It yields at most one `true` only because dockview drag-and-drop is disabled (`EditorAreaSplitPanel.tsx`), which nothing enforces — so `recompute` logs in development if two panels ever compute visible at once. If you re-enable DnD, fix the guard first.
 
 **Suspended is a fourth load state.** Beyond `PREVIEW.MAX_LIVE_VIEWS`, main tears the least recently active view down and emits `suspended`; the panel keeps showing its still frame, and `usePreviewLifecycle` re-opens it when the tab becomes visible again. A suspended panel has no `WebContentsView`, so it must never be sent visibility.
 
-**Limit-reached now means "open in another window".** The refusal survives only for a cross-window panel-id collision (ids are path-derived, so two windows previewing one file mint the same id). It is not a "one preview at a time" message any more.
+**Limit-reached means "this file is already previewing in another window"**, never "one preview at a time". It is the one surviving refusal, and it exists for a cross-window panel-id collision: ids are derived from the path, so two windows previewing one file mint the same id. That property survives the length budget — a digest-shortened id is still a pure function of the same path, so the two windows still collide.
 
 ## Bounds: the first rect is the one that bites
 
@@ -53,13 +46,17 @@ The `ResizeObserver` is not a dependable second chance either: dockview re-paren
 
 The hook owns EVERY push, including the become-visible one — do not add a `pushBounds()` effect back into the panel. Regression cover: `hooks/usePreviewBounds.test.ts`, plus an e2e test that asserts the real `WebContentsView` has a non-zero rect after an open with no user interaction (`e2e/html-preview-corpus.e2e.ts`). Every other preview test reads the preview's web contents, which loads and runs its scripts perfectly at 0x0 — only the rectangle assertion sees this class of bug.
 
+Every `html-preview-*` e2e spec drives the preview through `HtmlPreviewPage` (`e2e/pages/html-preview.page.ts`) — the corpus spec, the approval spec (`e2e/html-preview-approval.e2e.ts`), the eviction spec (`e2e/html-preview-eviction.e2e.ts`), links and perf. Do NOT re-roll `openPreview` / `previewEval` as a private copy in a new spec: three private copies drifting on whether they called `.first()` is exactly what the page object was created to end. A placeholder is looked up through the panel that owns it (`aria-label="HTML preview of <basename>"`), so an assertion names one preview whether one or four are open.
+
 ## Other gotchas
 
 - **Stable empty-failures sentinel.** Falling back to a fresh `[]` INSIDE a `usePreviewStore` selector loops `useSyncExternalStore`. Select the stored array reference and fall back to a module-level `NO_FAILURES` constant OUTSIDE the selector (see `HtmlPreviewTab`); the panel does the same with `panels.get(panelId)` + `?? 'idle'`/`?? null` fallbacks.
 - **Forwarded accelerators.** The native view swallows renderer keys, so main forwards exactly `f`/`s`/`w`/`Escape` via `preview:forwardedShortcut`; `usePreviewFindShortcuts` routes them to panel actions. Forwarded Escape must run the provider's `clearHighlights()` + restore focus (matching `SearchBar.handleClose`), not just flip the store flag. **Zoom keys are deliberately NOT forwarded** — the View menu owns them (see below). `PREVIEW_FORWARDED_SHORTCUTS` and `PreviewForwardedShortcutSchema` restate the same vocabulary in two layers and are pinned equal by a test in `previewInputForward.test.ts`; they drifted once, and every zoom key was silently dropped at the IPC boundary for it.
 - **Zoom means the page, not the rectangle.** Host zoom is applied geometrically (`clampAndZoomBounds` multiplies the CSS rect), so without `preview:setZoom` calling `setZoomLevel` on the preview's own webContents, Cmd/Ctrl-+ grows the preview *box* while the text stays at 100% — i.e. the text gets relatively smaller. **The View menu is the only route**: `menu.ts` -> `previewZoomHandler` -> `zoomFocused` picks the focused preview and falls through to the host window otherwise; levels are held per panel in `PreviewViewService` and re-applied after `registry.install`, so a zoom survives suspend/resume. Do not also forward the zoom keys — both paths would fire for one keypress and zoom twice, which is why `menu.ts` replaced the built-in zoom roles in the first place.
+- **The external-link consent dialog belongs to the window that asked.** `src/main/ipc/preview/externalLinkConsent.ts` parents the question on the asking window and gates it PER WINDOW. An unowned dialog is not modal, is not raised with the app, and on Windows can sit behind it — a consent question the reader cannot see is a link that silently does nothing. A second activation while a question is open is REFUSED, not queued (a burst of clicks must not become a burst of sequential modals), and so is a click whose window has gone. Every refusal arrives here as a `blocked-link` badge, as does an OS hand-off the shell rejects (no registered handler for `mailto:` / `tel:` — the ordinary Windows outcome).
+- **A refusal label comes from `confinePath`'s reason; `rawHref` only refines the label, never the decision.** Chromium collapses `../` past the root BEFORE main sees `href`, so a link that climbed out of the project arrives as a clean in-root path that is merely `missing` — the raw attribute is what separates `path-escape` from `missing-local-file`. Because it is only a label, `previewLinkBridge` caps `rawHref` at 2048 with `.catch(undefined)`: an over-long one is DROPPED and the activation still routes on the confined path. Never promote it to an input of the decision.
 - **Empty-badge cleanup.** `PreviewFailureBadge` force-closes when `summary.count` hits 0, in an effect that runs BEFORE its `count === 0` early return — otherwise an open popover's `useOccluder('menu', open)` never releases and the view stays stuck behind its still frame. Keep that effect above the early return (hook ordering).
-- **The preview toolbar.** `.erf-band` (`components/PreviewChromeBand.tsx`) is always-DOM and sits ABOVE `.html-preview-page-area` as a flow sibling in a flex column — never absolute. It used to be absolutely positioned over the page area, with its height restated as `PREVIEW_CHROME_INSET_PX` in `usePreviewBounds.ts` and added back on when bounds were computed — two numbers only a comment kept in step. Now layout subtracts it: the placeholder's own box already excludes the bar at whatever height it happens to be, which is what lets it grow (the permission band opening its list) with no code change. The find bar keeps `SEARCH_BAR_INSET_PX` because it is still an overlay *inside* the page area. **It is a toolbar now**, matching `.markdown-toolbar` — 1px `var(--color-border-default)` under it, carrying Find and the permission chip. The "Preview – content below is not Erfana" label and the 2px accent seam were withdrawn by owner decision, with nothing in their place; `docs/security.md` residual risk 8 records the widened residual, and the older class name `.html-preview-chrome-strip` is gone with them. What survives is structural and load-bearing: the bar renders unconditionally (never gated on something being blocked), it never scrolls with the page, and it stays a flow sibling above the page area — that is what keeps Erfana's own security question ("Approve this host?") in a region the page provably cannot paint, now that a toast leaves an untrusted page on screen while the question is asked.
+- **The preview toolbar.** `.erf-band` (`components/PreviewChromeBand.tsx`) is always-DOM and sits ABOVE `.html-preview-page-area` as a flow sibling in a flex column, never absolute, and its height is never restated as a constant in `usePreviewBounds.ts`. Layout subtracts it: the placeholder's own box already excludes the bar at whatever height it happens to be, which is what lets it grow (the permission band opening its list) with no code change. Keep it that way — an absolute bar means two numbers only a comment keeps in step. The find bar keeps `SEARCH_BAR_INSET_PX` because it is still an overlay *inside* the page area. It is styled as a toolbar, matching `.markdown-toolbar` — 1px `var(--color-border-default)` under it, carrying Find and the permission chip, and no provenance label or accent seam (owner decision; `docs/security.md` residual risk 8 records the widened residual). What is load-bearing is structural: the bar renders unconditionally (never gated on something being blocked), it never scrolls with the page, and it stays a flow sibling above the page area — that is what keeps Erfana's own security question ("Approve this host?") in a region the page provably cannot paint, given that a toast leaves an untrusted page on screen while the question is asked.
 
 ## The backdrop is a state machine, not a constant
 
@@ -67,7 +64,7 @@ The hook owns EVERY push, including the become-visible one — do not add a `pus
 
 The value moves. `src/main/services/preview/previewBackdrop.ts` holds it as a pure state machine: brand black (`#FF161312`, matching `var(--color-brand-black)`) until the page has painted, then the page's own resolved paper colour, read via `getComputedStyle` in isolated world 998 and defaulting to `#FFFFFFFF`. Main emits it on `preview:backdropChanged`; the panel writes it as an inline `background` on the placeholder.
 
-The defect it fixes: the colour was set once in the constructor, so a page declaring no background of its own — which is transparent — got Erfana's near-black as its paper while its default text stayed black. Most plain HTML was unreadable.
+Why one constant cannot serve: a page that declares no background of its own is transparent, so any fixed dark value becomes that page's paper while its default text stays black, and most plain HTML is unreadable. Before the first paint the same value must instead match the placeholder exactly, or the seam flashes — two jobs, two values, one state machine.
 
 Three things here look like they could be simplified and cannot:
 
@@ -79,18 +76,18 @@ The listeners are siblings of `did-finish-load` in `previewViewLifecycle.ts`, **
 
 ## Toasts move, the page does not
 
-A toast used to hide every live preview simply by existing. Because `ToastContext` forces `duration: 0` on an actionable toast, the preview's own blocked-host prompt ("Approve this host?") then hid every preview **indefinitely** — a toast raised by the preview, hiding the preview, with no auto-dismiss.
+A toast moves out of a live preview's way instead of hiding it, and that is not cosmetic: `ToastContext` forces `duration: 0` on an actionable toast, so a toast that hid previews would hide them **indefinitely** for the preview's own blocked-host prompt ("Approve this host?") — a toast raised by the preview, hiding the preview, with no auto-dismiss.
 
-Now `usePreviewBounds` publishes each live view's CSS-pixel rect into `stores/usePreviewViewportStore.ts`, and the pure `Toast/toastPlacement.ts` picks the first position clear of them (stay put → slide right → slide left → rise above). `ToastNotification` applies the offset as a `transform`.
+`usePreviewBounds` publishes each live view's CSS-pixel rect into `stores/usePreviewViewportStore.ts`, and the pure `Toast/toastPlacement.ts` picks the first position clear of them (stay put → slide right → slide left → rise above). `ToastNotification` applies the offset as a `transform`.
 
-- **`useOccluder('toast', …)` now lives in `ToastNotification`, not `ToastContext`, and registers only when placement returns `blocked`.** That keeps the guard kind-blind and needs no `isOccluded({ except })`, and it **fails safe**: nothing fits ⇒ the old hide-everything behaviour, so a consent prompt can never sit under an untrusted page.
+- **`useOccluder('toast', …)` lives in `ToastNotification`, not `ToastContext`, and registers only when placement returns `blocked`.** That keeps the guard kind-blind and needs no `isOccluded({ except })`, and it **fails safe**: nothing fits ⇒ hide every preview, so a consent prompt can never sit under an untrusted page.
 - **The published rect is keyed on visible + live, NOT on occlusion.** Occlusion is the guard's output and placement is one of its inputs; keying on visibility would make the toast hide the view, the hidden view withdraw its rect, the toast unhide the view, every frame.
 - **Measure at decision time.** `.toast-container` is `position: fixed`, so a window resize moves it without changing its box and no `ResizeObserver` fires. Read `getBoundingClientRect()` when computing, and recompute on `window.resize` too.
 - **Clear the rect on hide and on unmount.** A rect left behind permanently displaces every toast — which looks exactly like the bug this machinery exists to fix.
 
 ## The permission band, and the fail-safe under it
 
-`components/PreviewChromeBand.tsx` replaced the chrome strip AND the approve toast. Read `design/system/components/permission-band/index.html` (`status="decided"`) before changing it — the stylesheet lives in `components/PreviewChromeBand.css` and is synced back into `design/` by `scripts/design-sync.mjs`, so **edit the `src/` copy**.
+`components/PreviewChromeBand.tsx` is where a host permission is asked: it is both the preview's chrome bar and its approve prompt, and there is no separate approve toast. Read `design/system/components/permission-band/index.html` (`status="decided"`) before changing it — the stylesheet lives in `components/PreviewChromeBand.css` and is synced back into `design/` by `scripts/design-sync.mjs`, so **edit the `src/` copy**.
 
 **Never draw a button a page could be sitting on top of.** The previewed page paints above all sibling DOM and takes input over its own rectangle whatever the DOM says. Opening the host list claims space the page held a frame ago, so:
 
@@ -123,13 +120,14 @@ from the origin (`describeRefusal`), never assumed. It used to hardcode the IPv6
 sentence for every buttonless row, so a host refused for a different cause was
 told the wrong one.
 
-Every policy refusal is deleted (#108) — `localhost`, IP literals, `.local`,
-single-label names — because none of it detected a name that merely *resolved* to
-a private address, so it stopped the honest reader and not a hostile page. Two
-shapes still reach a buttonless row. IPv6 is physics: a CSP host-source cannot
-express one, and Chromium says so out loud ("contains an invalid source … It will
-be ignored"), which would leave a grant live in the network filter and absent
-from the CSP. A name that is not a valid host name — an underscore, an empty
+There is no policy refusal (#108). `localhost`, IP literals, `.local` and
+single-label names are all approvable: refusing them never detected a name that
+merely *resolved* to a private address, so it only ever stopped the honest
+reader. Do not add one back. Exactly two shapes reach a buttonless row, and
+both are mechanical rather than policy. IPv6 is physics: a CSP host-source
+cannot express one, and Chromium says so out loud ("contains an invalid source
+… It will be ignored"), which would leave a grant live in the network filter
+and absent from the CSP. A name that is not a valid host name — an underscore, an empty
 label — cannot have a permission written for it at all.
 
 **A trailing dot is part of the origin**, not noise to normalise away. Measured in

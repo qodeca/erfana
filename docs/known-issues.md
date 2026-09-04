@@ -45,11 +45,11 @@ Phases 0–2 of Windows enablement shipped in **v0.9.3** (2026-04-22); Phase 4 (
 
 ### `npm run test:cov` exits 1 on Windows
 
-**Issue**: All tests pass but vitest's v8 coverage aggregator hits an `ENOENT` race on Windows NTFS during the `coverage/.tmp` cleanup step. Wrapper exits with code 1 even though the test suite is green.
+**Issue**: Every test passes; what fails are two **per-file** coverage thresholds declared in `vitest.main.ts` — `scripts/fuses.js` (86% lines / 88% functions) and `src/main/utils/tarArchive.ts` (90% each metric). Both suites skip their symlink cases on win32, because a file symlink needs `SeCreateSymbolicLinkPrivilege`: `scripts/fuses.test.mjs` carries ten `skipIf(process.platform === 'win32')` guards, and `src/main/utils/tarArchive.test.ts:77` returns early. The lines those cases would cover never execute, so both file-level floors miss by a few points and vitest exits 1.
 
-**Workaround**: Run `npx vitest --run --config vitest.main.ts --coverage` directly (exits 0). On macOS the wrapper exits 0 normally.
+**Workaround**: None on a Windows host — the run is doing what it is told. Run it on macOS or Linux, or read the CI result: the required `Coverage` job runs on `ubuntu-latest`, where nothing is skipped and it passes.
 
-**Tracking**: #158 (Phase 6 — switch coverage provider to Istanbul OR reduce parallelism on Windows).
+**Tracking**: [`docs/windows/known-flakes.md` § `npm run test:cov` cannot pass on a Windows host](./windows/known-flakes.md#npm-run-testcov-cannot-pass-on-a-windows-host).
 
 ---
 
@@ -192,6 +192,8 @@ Pipeline contributors on Windows:
 
 - The page's own JavaScript calls `stopPropagation()` on the click, which hides the event from Erfana. Nothing happens and no failure is recorded, because Erfana never saw the click.
 - The link lives inside a **closed** shadow root, which `composedPath()` cannot see from outside the page.
+
+**A link out of the preview asks first, and only one question is open at a time.** A link to an external destination raises a native message box naming the destination — the origin, or the scheme plus the addressed target for `mailto:`/`tel:`. That dialog is **owned by the window whose preview asked**, so it is modal to that window and is raised with it rather than sitting behind the app. Only one such question can be open per window: a second external link clicked while the first is still waiting is **refused, not queued**, and shows up in the panel's failure badge as a blocked link. Clicking it again once the first question is answered works normally.
 
 **A page's link opens a tab per click.** Every link opens a new Erfana tab by design, so clicking through a generated documentation site accumulates tabs quickly. Idle previews sleep after `PREVIEW.MAX_LIVE_VIEWS`, so the cost is bounded, but the tabs remain until closed.
 

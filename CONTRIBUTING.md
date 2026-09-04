@@ -18,7 +18,7 @@ By participating you agree to abide by our [Code of Conduct](CODE_OF_CONDUCT.md)
 ## Prerequisites
 
 - **Node.js 24+** (Electron 39 bundles Node 22.22.1; the build toolchain needs 24+).
-- **Python 3.12** — **not 3.13** (`node-pty` fails to build on 3.13).
+- **Python 3.12 (known good) or 3.14.x** — **not 3.13** (`node-pty` fails to build on 3.13).
 - **Git**.
 - **On Windows:** VS 2022 Build Tools, Developer Mode enabled, Win32 long paths enabled. See [`docs/build/windows.md`](docs/build/windows.md).
 

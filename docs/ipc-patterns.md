@@ -207,7 +207,7 @@ Note the `file:` prefix – these are **not** `external-file:*`.
 | Channel | Purpose |
 |---------|---------|
 | `terminal:isAvailable` | Whether node-pty loaded and a PTY can be spawned |
-| `terminal:create` | Spawn a PTY, returns the terminal id |
+| `terminal:create` | Spawn a PTY; returns `{ success: true, terminalId, shellKind }` or `{ success: false, error }`, the reason passed through verbatim from `TerminalService.createTerminal` |
 | `terminal:write` | Write to the PTY; resolves when the write completes (see the Promise-based pattern above) |
 | `terminal:resize` | `ipcMain.on` – resize the PTY (fire-and-forget) |
 | `terminal:kill` | Kill a PTY |

@@ -72,10 +72,10 @@ Right-click any file/folder in the project tree:
 
 ## References
 
-- **Main Implementation**: [src/renderer/src/components/ProjectTree/ProjectTree.tsx](/src/renderer/src/components/ProjectTree/ProjectTree.tsx)
-- **Tree Utilities**: [src/renderer/src/hooks/useDragDropTree.ts](/src/renderer/src/hooks/useDragDropTree.ts)
-- **Clipboard Store**: [src/renderer/src/stores/useClipboardStore.ts](/src/renderer/src/stores/useClipboardStore.ts)
-- **File Service**: [src/main/services/FileService.ts](/src/main/services/FileService.ts)
+- **Main Implementation**: [src/renderer/src/components/ProjectTree/ProjectTree.tsx](../../src/renderer/src/components/ProjectTree/ProjectTree.tsx)
+- **Tree Utilities**: [src/renderer/src/hooks/useDragDropTree.ts](../../src/renderer/src/hooks/useDragDropTree.ts)
+- **Clipboard Store**: [src/renderer/src/stores/useClipboardStore.ts](../../src/renderer/src/stores/useClipboardStore.ts)
+- **File Service**: [src/main/services/FileService.ts](../../src/main/services/FileService.ts)
 - **dnd-kit Documentation**: https://docs.dndkit.com/
 - **VS Code File Explorer**: https://code.visualstudio.com/docs/getstarted/userinterface#_explorer
 

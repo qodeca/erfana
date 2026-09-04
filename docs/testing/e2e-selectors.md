@@ -1,6 +1,6 @@
 # E2E selector catalog
 
-All `data-testid` attributes available for E2E testing – **256 testids** across 37 sections.
+All `data-testid` attributes available for E2E testing – **259 testids** across 37 sections.
 
 **Related documentation**:
 - [E2E Testing Guide](./e2e-testing.md) – Main E2E documentation

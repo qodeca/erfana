@@ -402,7 +402,7 @@ The policy as practised: *a file a change adds behaviour to must come in under 5
 | `src/renderer/src/components/ProjectTree/ProjectTree.tsx` | 1,468 | Pre-existing |
 | `src/renderer/src/components/Panels/TerminalPanel.tsx` | 1,362 | Pre-existing; #70 only shrinks it (the panel router replaced its inline open logic) |
 | `src/preload/index.ts` | 1,179 | Pre-existing; the single app bridge grows one block per IPC domain |
-| `src/main/services/preview/PreviewLiveView.ts` | 1,149 | #74 and its follow-ups. sd-074b §3.3 recorded it at 545 against the cap before links landed; the link, CSP-violation and consent code went into sibling modules (`previewLinkBridge.ts`, `previewCspViolationBridge.ts`, `externalLinkConsent.ts`) precisely because of this, and the v0.19.0 bounded-teardown and partition-release changes still added to it |
+| `src/main/services/preview/PreviewLiveView.ts` | 1,169 | #74 and its follow-ups. sd-074b §3.3 recorded it at 545 against the cap before links landed; the link, CSP-violation and consent code went into sibling modules (`previewLinkBridge.ts`, `previewCspViolationBridge.ts`, `externalLinkConsent.ts`) precisely because of this, and the v0.19.0 bounded-teardown and partition-release changes still added to it |
 | `src/renderer/src/components/Editor/MarkdownPreview.tsx` | 1,032 | Pre-existing (entry 8) |
 | `src/main/services/LocalWhisperService.ts` | 933 | Pre-existing |
 | `src/main/services/ProjectLockService.ts` | 906 | Pre-existing |
@@ -417,7 +417,7 @@ The policy as practised: *a file a change adds behaviour to must come in under 5
 | `src/renderer/src/hooks/useCameraCapture.ts` | 687 | Pre-existing |
 | `src/main/index.ts` | 670 | Pre-existing; the composition root |
 | `src/renderer/src/utils/filePathLinks.logic.ts` | 655 | Pre-existing |
-| `src/shared/constants.ts` | 648 | Pre-existing; comment-heavy constant table |
+| `src/shared/constants.ts` | 651 | Pre-existing; comment-heavy constant table |
 | `src/renderer/src/components/Editor/DiagramViewer/ChatBubble.tsx` | 641 | Pre-existing (entry 8) |
 | `src/main/services/claudeStatus/ClaudeStatusService.ts` | 639 | Pre-existing |
 | `src/main/ipc/file-handlers.ts` | 627 | Pre-existing; **grew by 4 lines** in #70 to 601 (the `projectConfinement` import plus two `assert*` calls) and has since reached 627. Adding a security guard to an over-cap file was accepted rather than blocking the fix on a refactor |
