@@ -134,6 +134,16 @@ async function stabilizeEditor(page: import('@playwright/test').Page): Promise<v
   await page.waitForTimeout(500)
 }
 
+/**
+ * Page-level captures are clipped to the size the fixture REQUESTS
+ * (`win.setContentSize(1280, 800)` in `e2e/fixtures/index.ts`), because every
+ * Windows host overshoots that request by its own window-chrome and scaling
+ * amount – the committed baselines once disagreed with each other for exactly
+ * that reason (`docs/windows/known-flakes.md`). Clipping makes the captured
+ * size independent of the host; element-level captures need no clip.
+ */
+const PAGE_CLIP = { x: 0, y: 0, width: 1280, height: 800 } as const
+
 // ---------------------------------------------------------------------------
 // (a) Welcome panel – no project loaded
 // ---------------------------------------------------------------------------
@@ -143,7 +153,7 @@ visualTest.describe('Visual regression – no project', () => {
 
   visualTest('(a) welcome panel', async ({ visualWindow }, testInfo) => {
     assertBaselineExists('welcome-empty', testInfo)
-    await expect(visualWindow).toHaveScreenshot({ name: 'welcome-empty.png' })
+    await expect(visualWindow).toHaveScreenshot({ name: 'welcome-empty.png', clip: PAGE_CLIP })
   })
 })
 
@@ -176,7 +186,7 @@ visualTest.describe('Visual regression – with project', () => {
       byTestId(page, TEST_IDS.TOAST_CONTAINER)
     ]
 
-    await expect(page).toHaveScreenshot({ name: 'editor-loaded.png', mask: masks })
+    await expect(page).toHaveScreenshot({ name: 'editor-loaded.png', mask: masks, clip: PAGE_CLIP })
   })
 
   visualTest('(c) terminal open', async ({ visualWindowWithProject }, testInfo) => {
@@ -199,7 +209,7 @@ visualTest.describe('Visual regression – with project', () => {
       byTestId(page, TEST_IDS.TERMINAL_INSTANCE)
     ]
 
-    await expect(page).toHaveScreenshot({ name: 'terminal-open.png', mask: masks })
+    await expect(page).toHaveScreenshot({ name: 'terminal-open.png', mask: masks, clip: PAGE_CLIP })
   })
 
   visualTest('(d) settings overlay', async ({ visualWindowWithProject }, testInfo) => {
