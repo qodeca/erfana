@@ -131,6 +131,57 @@ describe('PreviewStillFrameCache', () => {
     expect(cache.get(PANEL)?.dataUrl).toBe(SHORT_DATA_URL)
   })
 
+  it('stores the frame on an EMPTY slot even when the caller says to discard it', async () => {
+    // The veto above guards a REPLACEMENT. With nothing cached there is nothing
+    // to protect, and honouring it leaves the tab on a bare backdrop for good —
+    // the fault behind the macOS eviction failure (2026-09-04): the tab was
+    // switched away inside `CAPTURE_RETRY_DELAY_MS`, so `shouldKeep` was already
+    // false by the time the only capture that ever produced pixels came back.
+    const captured = makeImage({ width: 10, height: 10 }, SHORT_DATA_URL)
+    const wc = makeWc(vi.fn(async () => captured))
+    const cache = createPreviewStillFrameCache({ now: () => 9 })
+
+    await cache.captureIfStale(wc, PANEL, SIZE, { shouldKeep: () => false })
+
+    expect(cache.get(PANEL)?.dataUrl).toBe(SHORT_DATA_URL)
+  })
+
+  it('retries an empty first capture on an EMPTY slot even when the view went away', async () => {
+    // The first capture at `'ready'` comes back empty on macOS every time, so
+    // this retry IS the capture. It must survive the tab switch that happens
+    // during `CAPTURE_RETRY_DELAY_MS`.
+    const empty = makeImage({ width: 0, height: 0 }, '')
+    empty.isEmpty.mockReturnValue(true)
+    const good = makeImage({ width: 10, height: 10 }, SHORT_DATA_URL)
+    const capturePage = vi
+      .fn()
+      .mockResolvedValueOnce(empty)
+      .mockResolvedValueOnce(good)
+    const cache = createPreviewStillFrameCache({ now: () => 11 })
+
+    await cache.captureIfStale(makeWc(capturePage), PANEL, SIZE, { shouldKeep: () => false })
+
+    expect(capturePage).toHaveBeenCalledTimes(2)
+    expect(cache.get(PANEL)?.dataUrl).toBe(SHORT_DATA_URL)
+  })
+
+  it('abandons the retry when a frame is already cached and the view went away', async () => {
+    // The other half of the same rule: a panel that HAS a picture must not spend
+    // a second capture, nor risk overwriting it, once its subject has gone.
+    const first = makeImage({ width: 10, height: 10 }, SHORT_DATA_URL)
+    const cache = createPreviewStillFrameCache({ now: () => 7 })
+    await cache.captureIfStale(makeWc(vi.fn(async () => first)), PANEL, SIZE)
+
+    const empty = makeImage({ width: 0, height: 0 }, '')
+    empty.isEmpty.mockReturnValue(true)
+    const capturePage = vi.fn(async () => empty)
+
+    await cache.captureIfStale(makeWc(capturePage), PANEL, SIZE, { shouldKeep: () => false })
+
+    expect(capturePage).toHaveBeenCalledTimes(1)
+    expect(cache.get(PANEL)?.dataUrl).toBe(SHORT_DATA_URL)
+  })
+
   it('emits NO frame, and asks for nothing, when the view has no size', async () => {
     // A view that was never laid out reports 0x0. Capturing that is a wasted
     // round trip with no time budget behind it, and the answer is knowable here.

@@ -30,6 +30,9 @@
  *     which other things raise — on Windows it read true from a fresh preview's
  *     first frame, so no frame was ever taken (2026-09-03).
  *   - either edge under `MIN_STILL_FRAME_PX` ⇒ skip (the 1×1 seed rect)
+ *   - the caller's `shouldKeep` says its subject left mid-capture ⇒ keep the
+ *     frame this panel already had. An EMPTY slot is exempt: a picture taken as
+ *     the tab went away beats the no picture at all that the veto would leave.
  *   - `capturePage` past `CAPTURE_TIMEOUT_MS` ⇒ NO frame, previous kept
  *   - `capturePage` throws      ⇒ NO frame (swallowed, never rethrown)
  *   - downscale to `MAX_FRAME_EDGE_PX` longest edge via `NativeImage.resize`
@@ -86,6 +89,13 @@ export interface IPreviewStillFrameCache {
    * `.html-preview-still-frame`'s `object-fit: cover` then blew up to fill the
    * height and letterboxed in black. Accepting a size makes the mistake
    * unspellable: the rect is built here, at the origin, every time.
+   *
+   * `shouldKeep` VETOES A REPLACEMENT, NOT A FIRST WRITE. It is the caller's
+   * answer to "was my subject on screen the whole time", and a `false` from it
+   * protects a frame this panel already holds from being overwritten by one
+   * captured as the page went away. On an EMPTY slot it is not consulted: there
+   * is nothing to protect, and honouring it there parks the tab on a bare
+   * backdrop for good.
    */
   captureIfStale(
     wc: PreviewCaptureContents,
@@ -144,7 +154,16 @@ export class PreviewStillFrameCache implements IPreviewStillFrameCache {
       // empty answer means the page is genuinely not painting.
       if (image.isEmpty()) {
         await new Promise<void>((resolve) => setTimeout(resolve, PREVIEW.CAPTURE_RETRY_DELAY_MS))
-        if (opts.shouldKeep !== undefined && !opts.shouldKeep()) {
+        // `shouldKeep` protects a frame this panel ALREADY has; with an empty
+        // slot it has nothing to protect and abandoning the retry costs the tab
+        // its only picture. That is not hypothetical: the first capture at
+        // `'ready'` comes back empty on macOS every time, so a tab switched away
+        // inside `CAPTURE_RETRY_DELAY_MS` — opening four `.html` files in a
+        // burst does it — reached this line with `wantedVisible` already false
+        // and parked as a flat colour block for the rest of the session.
+        // `captureOnce` passes `stayHidden: true`, which reads a hidden-but-live
+        // page (verified on macOS 2026-09-04), so the retry is worth running.
+        if (this.frames.has(panelId) && !this.keep(opts)) {
           return
         }
         image = await this.captureOnce(wc, size)
@@ -187,9 +206,18 @@ export class PreviewStillFrameCache implements IPreviewStillFrameCache {
      *
      * The caller knows whether its subject was still there the whole time. This
      * asks, at the last possible moment, rather than guessing from the pixels.
+     *
+     * IT GUARDS A REPLACEMENT, NOT A FIRST WRITE. Every word above is about
+     * overwriting a frame that is already good, and with an empty slot there is
+     * no such frame — refusing the write there does not avoid a black rectangle,
+     * it guarantees no rectangle at all. The tab then parks on its backdrop
+     * colour, which is the documented fallback for a capture that could not be
+     * produced, not for one that was produced and thrown away.
      */
-    if (opts.shouldKeep !== undefined && !opts.shouldKeep()) {
-      logger.debug('Preview still frame: discarded, view went away mid-capture', { panelId })
+    if (this.frames.has(panelId) && !this.keep(opts)) {
+      logger.debug('Preview still frame: kept the existing frame, view went away mid-capture', {
+        panelId
+      })
       return
     }
 
@@ -199,6 +227,11 @@ export class PreviewStillFrameCache implements IPreviewStillFrameCache {
 
   get(panelId: string): PreviewStillFrame | undefined {
     return this.frames.get(panelId)
+  }
+
+  /** The caller's verdict, defaulting to "keep" when it did not supply one. */
+  private keep(opts: { shouldKeep?: () => boolean }): boolean {
+    return opts.shouldKeep === undefined || opts.shouldKeep()
   }
 
   invalidate(panelId: string): void {
