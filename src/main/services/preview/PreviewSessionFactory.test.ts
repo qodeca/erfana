@@ -418,6 +418,57 @@ describe('PreviewSessionFactory — partition recycling', () => {
     }
   })
 
+  it('returns the partition for reuse when a later build step throws (review)', async () => {
+    // `rollback()` unwound the token, the view, the hardening and both attach
+    // points, but never the partition: a build that failed after
+    // `acquirePartition` lost the name for good, holding its handles for the
+    // life of the process on the path most likely to repeat.
+    const createView = vi.fn<() => PreviewViewHandle>(() => makeView())
+    createView.mockImplementationOnce(() => {
+      throw new Error('no view')
+    })
+    const purge = vi.fn<(s: PreviewSessionLike) => Promise<void>>(() => Promise.resolve())
+    const { factory, nextPartitionName, createSession } = makeFactory({ purge })
+    ;(factory as unknown as { deps: { createView: unknown } }).deps.createView = createView
+
+    await expect(factory.create(ctx())).rejects.toThrow('no view')
+    await vi.waitFor(() => expect(purge).toHaveBeenCalledTimes(1))
+    await new Promise((r) => setImmediate(r))
+    const second = await factory.create(ctx())
+
+    expect(nextPartitionName).toHaveBeenCalledTimes(1)
+    expect(createSession.mock.calls.map((c) => c[0])).toEqual([second.partition, second.partition])
+  })
+
+  it('drops a name handed back after forgetRecycled() ran (a project switch mid-drain)', async () => {
+    // `onProjectChanged` awaits the drain of every view and only THEN forgets
+    // the list, while an open for the new project can arrive between two of
+    // those releases and pop a name the old project just used.
+    const { factory, nextPartitionName } = makeFactory()
+
+    const first = await factory.create(ctx())
+    factory.forgetRecycled()
+    await first.release()
+    const second = await factory.create(ctx())
+
+    expect(second.partition).not.toBe(first.partition)
+    expect(nextPartitionName).toHaveBeenCalledTimes(2)
+  })
+
+  it('treats a second release() of the same session as a no-op', async () => {
+    // `fromPartition(name)` returns the same object for a name, so a late
+    // second release would purge the successor's live storage and push the
+    // name back while a preview is using it.
+    const purge = vi.fn<(s: PreviewSessionLike) => Promise<void>>(() => Promise.resolve())
+    const { factory } = makeFactory({ purge })
+
+    const first = await factory.create(ctx())
+    await first.release()
+    await first.release()
+
+    expect(purge).toHaveBeenCalledTimes(1)
+  })
+
   it('forgets every recycled partition when told to (a project switch)', async () => {
     const { factory, nextPartitionName } = makeFactory()
 

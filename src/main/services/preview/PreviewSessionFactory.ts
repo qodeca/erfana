@@ -256,7 +256,16 @@ export class PreviewSessionFactory implements IPreviewSessionFactory {
    */
   private readonly freePartitions: string[] = []
 
+  /**
+   * Bumped by `forgetRecycled()`. A session acquired under an older epoch is
+   * dropped on release instead of pushed: `onProjectChanged` forgets the list
+   * only after the whole drain, and an open for the NEW project can arrive
+   * between two of those releases and pop a name the old project just used.
+   */
+  private switchEpoch = 0
+
   forgetRecycled(): void {
+    this.switchEpoch += 1
     this.freePartitions.length = 0
   }
 
@@ -286,7 +295,15 @@ export class PreviewSessionFactory implements IPreviewSessionFactory {
   }
 
   /** The `release` handed out with every session; see `PreviewSession.release`. */
-  private async releasePartition(partition: string, session: PreviewSessionLike): Promise<void> {
+  private async releasePartition(
+    partition: string,
+    session: PreviewSessionLike,
+    epoch: number
+  ): Promise<void> {
+    if (epoch !== this.switchEpoch) {
+      // Acquired before a project switch: never carry it into the new project.
+      return
+    }
     try {
       await withTimeout(
         this.deps.purge(session),
@@ -357,6 +374,22 @@ export class PreviewSessionFactory implements IPreviewSessionFactory {
       // 3–5: a purged recycled partition (or a fresh one), web prefs, then the
       // view (before hardening).
       const { partition, session } = await this.acquirePartition()
+      const epoch = this.switchEpoch
+      // Latched: `fromPartition(name)` returns the SAME object for a name, so a
+      // second release of a name already reissued would purge the successor's
+      // live storage and push the name back while a preview is using it.
+      let released = false
+      const release = async (): Promise<void> => {
+        if (released) return
+        released = true
+        await this.releasePartition(partition, session, epoch)
+      }
+      // A throw from any later step used to lose the name for good (review):
+      // the ~16-handle cost of a fresh partition, on the path most likely to
+      // repeat. Nothing is attached yet, so the hand-back is safe here.
+      unwind.push(() => {
+        void release()
+      })
       const webPreferences = this.deps.buildWebPreferences(session)
       const view = this.deps.createView(webPreferences)
       unwind.push(() => {
@@ -402,7 +435,7 @@ export class PreviewSessionFactory implements IPreviewSessionFactory {
         realRoot: entry.realRoot,
         partition,
         teardown,
-        release: () => this.releasePartition(partition, session)
+        release
       }
     } catch (error) {
       rollback()

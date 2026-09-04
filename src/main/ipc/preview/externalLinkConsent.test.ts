@@ -131,6 +131,46 @@ describe('createExternalLinkConsent — one question at a time', () => {
     expect(showMessageBox).toHaveBeenCalledTimes(2)
   })
 
+  it('gates per window: a question open on window A does not refuse window B', async () => {
+    // The dialog is modal to ITS window, so a second window's click would be
+    // asked by the OS; refusing it with a "blocked link" badge was a leftover
+    // of the process-wide chain.
+    const other: ConsentWindow = { id: 8, isDestroyed: () => false }
+    let answer: (a: ConsentAnswer) => void = () => undefined
+    const held = new Promise<ConsentAnswer>((resolve) => {
+      answer = resolve
+    })
+    const { ask, showMessageBox, resolveWindow } = makeDeps(() => held)
+    resolveWindow.mockImplementation((id: number) => (id === other.id ? other : id === WINDOW.id ? WINDOW : null))
+
+    const first = ask(URL_, WINDOW.id)
+    const second = ask('https://other.example/', other.id)
+    expect(showMessageBox).toHaveBeenCalledTimes(2)
+    expect(showMessageBox.mock.calls[1][0]).toBe(other)
+
+    answer({ response: 0 })
+    await Promise.all([first, second])
+  })
+
+  it('logs "opened" only after the OS hand-off succeeded, and "open failed" when it rejects', async () => {
+    // `shell.openExternal` rejects when the OS has no handler (mailto:/tel: on
+    // a machine with no mail client); the log said "opened" for exactly the
+    // click the reader saw refused.
+    const { ask, openExternal } = makeDeps({ response: 1 })
+    openExternal.mockRejectedValueOnce(new Error('no handler'))
+
+    await expect(ask(URL_, WINDOW.id)).rejects.toThrow('no handler')
+
+    expect(mockLogger.info).not.toHaveBeenCalledWith('Preview external link: opened', expect.anything())
+    expect(mockLogger.warn).toHaveBeenCalledWith(
+      'Preview external link: open failed',
+      expect.objectContaining({ error: 'no handler' })
+    )
+
+    await ask(URL_, WINDOW.id)
+    expect(mockLogger.info).toHaveBeenCalledWith('Preview external link: opened', expect.anything())
+  })
+
   it('releases the gate when the OS hand-off rejects', async () => {
     const { ask, openExternal, showMessageBox } = makeDeps({ response: 1 })
     openExternal.mockRejectedValueOnce(new Error('no handler'))

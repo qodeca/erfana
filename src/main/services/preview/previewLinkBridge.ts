@@ -79,7 +79,9 @@ const LinkActivationPayloadSchema = z
      * (Chromium collapses `../` past the root before main ever sees `href`).
      * Optional because `will-navigate` has no attribute to report.
      */
-    rawHref: z.string().max(2048).optional(),
+    // Refusal-only label data (never selects a file): an over-long value
+    // costs the label, never the activation — `.catch` drops just this field.
+    rawHref: z.string().max(2048).optional().catch(undefined),
     target: z.string().max(64).default(''),
     download: z.boolean().default(false),
     modifiers: z

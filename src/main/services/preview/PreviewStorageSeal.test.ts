@@ -17,12 +17,14 @@ function makeSessionMock(options: SealMockOptions = {}): {
   clearAuthCache: ReturnType<typeof vi.fn<() => Promise<void>>>
   clearHostResolverCache: ReturnType<typeof vi.fn<() => Promise<void>>>
   clearCodeCaches: ReturnType<typeof vi.fn<() => Promise<void>>>
+  closeAllConnections: ReturnType<typeof vi.fn<() => Promise<void>>>
 } {
   const clearStorageData = vi.fn<() => Promise<void>>(() => Promise.resolve())
   const clearCache = vi.fn<() => Promise<void>>(() => Promise.resolve())
   const clearAuthCache = vi.fn<() => Promise<void>>(() => Promise.resolve())
   const clearHostResolverCache = vi.fn<() => Promise<void>>(() => Promise.resolve())
   const clearCodeCaches = vi.fn<() => Promise<void>>(() => Promise.resolve())
+  const closeAllConnections = vi.fn<() => Promise<void>>(() => Promise.resolve())
   const session = {
     storagePath: options.storagePath ?? null,
     isPersistent: () => options.persistent ?? false,
@@ -30,10 +32,19 @@ function makeSessionMock(options: SealMockOptions = {}): {
     clearCache,
     clearAuthCache,
     clearHostResolverCache,
-    clearCodeCaches
+    clearCodeCaches,
+    closeAllConnections
   } as unknown as Session
 
-  return { session, clearStorageData, clearCache, clearAuthCache, clearHostResolverCache, clearCodeCaches }
+  return {
+    session,
+    clearStorageData,
+    clearCache,
+    clearAuthCache,
+    clearHostResolverCache,
+    clearCodeCaches,
+    closeAllConnections
+  }
 }
 
 describe('assertSealed', () => {
@@ -62,6 +73,14 @@ describe('purge', () => {
     expect(clearAuthCache).toHaveBeenCalledTimes(1)
     expect(clearHostResolverCache).toHaveBeenCalledTimes(1)
     expect(clearCodeCaches).toHaveBeenCalledWith({})
+  })
+
+  it('closes every warm connection too — the socket pools are per network context', async () => {
+    // Recorded as "cannot be cleared from the session API" until the security
+    // review found `Session.closeAllConnections()` in the Electron 39 typings.
+    const { session, closeAllConnections } = makeSessionMock()
+    await purge(session)
+    expect(closeAllConnections).toHaveBeenCalledTimes(1)
   })
 
   it('calls both clearStorageData and clearCache', async () => {

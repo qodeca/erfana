@@ -103,12 +103,14 @@ export function describeExternalDestination(url: string): string {
 export function createExternalLinkConsent(
   deps: ExternalLinkConsentDeps
 ): (url: string, windowId: number) => Promise<void> {
-  let pending = false
+  // Per window: the dialog is modal to ITS window, so a question open on
+  // window A must not refuse a click in window B (the OS would ask there).
+  const pending = new Set<number>()
 
   return async (url: string, windowId: number): Promise<void> => {
     const destination = describeExternalDestination(url)
 
-    if (pending) {
+    if (pending.has(windowId)) {
       logger.info('Preview external link: refused', { destination, reason: 'dialog-open' })
       throw new Error('An external-link question is already open')
     }
@@ -118,7 +120,7 @@ export function createExternalLinkConsent(
       throw new Error('The window that asked is gone')
     }
 
-    pending = true
+    pending.add(windowId)
     try {
       logger.info('Preview external link: asking', { destination, windowId })
       const { response } = await deps.showMessageBox(window, {
@@ -133,10 +135,20 @@ export function createExternalLinkConsent(
         logger.info('Preview external link: cancelled', { destination })
         return
       }
+      try {
+        await deps.openExternal(url)
+      } catch (error) {
+        // The ordinary Windows outcome for mailto:/tel: with no handler
+        // registered; the caller badges it. Say so, do not say "opened".
+        logger.warn('Preview external link: open failed', {
+          destination,
+          error: error instanceof Error ? error.message : String(error)
+        })
+        throw error
+      }
       logger.info('Preview external link: opened', { destination })
-      await deps.openExternal(url)
     } finally {
-      pending = false
+      pending.delete(windowId)
     }
   }
 }

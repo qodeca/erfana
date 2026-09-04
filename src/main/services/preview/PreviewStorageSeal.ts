@@ -15,9 +15,10 @@
  * (`PreviewSessionFactory` recycles partition names, because Electron cannot
  * destroy a session and every new name costs handles for life). The opaque
  * origin seals script-visible storage; the purge covers what it does not: the
- * HTTP cookie jar, the cache, the auth cache, the host-resolver cache and the
- * V8 code caches. HSTS and socket-pool residue cannot be cleared per session and
- * are recorded as accepted in docs/security.md. It is NOT the seal (§1.2 table).
+ * HTTP cookie jar, the cache, the auth cache, the host-resolver cache, the V8
+ * code caches, and every warm socket/TLS connection (`closeAllConnections`).
+ * HSTS state cannot be cleared per session and is recorded as accepted in
+ * docs/security.md. It is NOT the seal (§1.2 table).
  *
  * The storages are named one by one ({@link PURGED_STORAGES}) rather than
  * cleared with the no-argument form, because on Windows (Electron 39) clearing
@@ -79,4 +80,7 @@ export async function purge(session: Session): Promise<void> {
   await session.clearAuthCache()
   await session.clearHostResolverCache()
   await session.clearCodeCaches({})
+  // No page is alive at either recycling call site, and the approve path
+  // reloads ignoring cache right after — so failing in-flight requests is fine.
+  await session.closeAllConnections()
 }

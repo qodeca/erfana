@@ -403,6 +403,31 @@ describe('PreviewChromeBand', () => {
    * main-side path can strand it again. The late answer, when it arrives, must
    * not overwrite what the reader was already told.
    */
+  it('clears its deadline timer when the panel unmounts mid-approval', async () => {
+    // Without this the 10 s timer outlived the component, holding the closure
+    // and dispatching into an unmounted reducer.
+    const user = userEvent.setup()
+    const onApprove = vi.fn(() => new Promise<PreviewApproveResult>(() => undefined))
+    const { unmount } = render(
+      <PreviewChromeBand
+        blockedHosts={[host('a.example.com')]}
+        allowedHosts={[]}
+        onApprove={onApprove}
+        approveDeadlineMs={60000}
+      />
+    )
+    await user.click(screen.getByTestId('preview-band-chip'))
+    await user.click(screen.getByRole('button', { name: 'Allow https://a.example.com' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm' }))
+    expect(onApprove).toHaveBeenCalledTimes(1)
+
+    const clearSpy = vi.spyOn(globalThis, 'clearTimeout')
+    const before = clearSpy.mock.calls.length
+    unmount()
+    expect(clearSpy.mock.calls.length).toBeGreaterThan(before)
+    clearSpy.mockRestore()
+  })
+
   it('gives up waiting after its deadline: says the grant is saved, and the row is back', async () => {
     const user = userEvent.setup()
     let resolveLate: (result: PreviewApproveResult) => void = () => undefined

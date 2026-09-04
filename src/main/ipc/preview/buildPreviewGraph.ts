@@ -109,8 +109,6 @@ const confirmThenOpenExternal = createExternalLinkConsent({
   openExternal: (url) => shell.openExternal(url)
 })
 
-export { describeExternalDestination } from './externalLinkConsent'
-
 /**
  * Absolute path of the built preview-page preload, or `null` when it is missing.
  *

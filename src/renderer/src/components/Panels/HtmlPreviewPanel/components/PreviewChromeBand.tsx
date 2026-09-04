@@ -127,6 +127,14 @@ export function PreviewChromeBand({
   const chip = chipRef ?? fallbackChipRef
   const firstAllowRef = useRef<HTMLButtonElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  /** The approve deadline timer, so an unmount mid-approval can clear it. */
+  const deadlineRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  useEffect(
+    () => () => {
+      if (deadlineRef.current !== undefined) clearTimeout(deadlineRef.current)
+    },
+    []
+  )
 
   const rows = useMemo(
     () => selectBandRows(blockedHosts, allowedHosts),
@@ -194,9 +202,8 @@ export function PreviewChromeBand({
        * it again. `Promise.race` means a late answer is simply never looked at,
        * which is what keeps it from overwriting what the reader was told.
        */
-      let deadline: ReturnType<typeof setTimeout> | undefined
       const timedOut = new Promise<PreviewApproveResult>((resolve) => {
-        deadline = setTimeout(
+        deadlineRef.current = setTimeout(
           () => resolve({ ok: false, errorCode: ErrorCode.PREVIEW_APPROVE_TIMED_OUT }),
           approveDeadlineMs
         )
@@ -205,7 +212,10 @@ export function PreviewChromeBand({
         (): PreviewApproveResult => ({ ok: false, errorCode: ErrorCode.UNKNOWN_ERROR })
       )
       const result = await Promise.race([answer, timedOut])
-      if (deadline !== undefined) clearTimeout(deadline)
+      if (deadlineRef.current !== undefined) {
+        clearTimeout(deadlineRef.current)
+        deadlineRef.current = undefined
+      }
       if (result.ok) {
         dispatch({ type: 'approveSucceeded', host })
       } else {

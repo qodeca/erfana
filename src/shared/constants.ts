@@ -586,7 +586,10 @@ export const PREVIEW = {
    * a session, so every NEW name costs handles for the life of the process
    * (measured on Windows: ~16 per partition, +0 for re-minting a name). One
    * per live view plus two in flight around an eviction is enough; more would
-   * only hold storage nobody needs.
+   * only hold storage nobody needs. A project switch forgets the whole list on
+   * purpose (a partition never carries across projects), which costs up to
+   * this many fresh names — ~80 handles — per switch; the "no growth"
+   * measurement in 41dfee95 covers open/close within one project only.
    */
   MAX_RECYCLED_PARTITIONS: 5,
   /**
