@@ -18,7 +18,7 @@ npm run lint:css         # stylelint: src/ CSS + the design/ cards' inline style
 npm run design           # Rebuild design/ (index, token copy, claims)
 npm run design -- --check # Fail if a generated file under design/ is stale
 npm run test             # All tests (vitest workspace: main + renderer + preload)
-npm run test:main        # vitest.main.ts config: src/main + src/shared + scripts (208 test files: 191 + 13 + 4)
+npm run test:main        # vitest.main.ts config: src/main + src/shared + scripts (223 test files: 204 + 15 + 4)
 npm run test:renderer    # vitest.renderer.ts config: src/renderer/src only (jsdom)
 npm run test:preload     # vitest.preload.ts config: preload tests
 npm run test:cov         # Coverage report (all 3 projects)

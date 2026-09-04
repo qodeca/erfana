@@ -1,6 +1,6 @@
 # Design: HTML preview — in-page link navigation + independent preview tabs
 
-**Revises**: [`sd-074-html-preview.md`](sd-074-html-preview.md) §10 non-goals (concurrency, link navigation) | **Issues**: to be filed (three: IPC sender gating, independent previews, in-page link navigation) | **Tier**: 2 | **Complexity**: complex | **Branch**: `feature/html-preview-navigation` off `develop` | **Status**: revision 2, approved, **shipped in [#79](https://github.com/qodeca/erfana/issues/79) (v0.18.0)**; D7, D8, §4.5 and the code references below were reconciled with what was built on 2026-09-04 (v0.19.0 Windows fixes)
+**Revises**: [`sd-074-html-preview.md`](sd-074-html-preview.md) §10 non-goals (concurrency, link navigation) | **Issues**: to be filed (three: IPC sender gating, independent previews, in-page link navigation) | **Tier**: 2 | **Complexity**: complex | **Branch**: `feature/html-preview-navigation` off `develop` | **Status**: revision 2, approved, **shipped in [#79](https://github.com/qodeca/erfana/issues/79) (v0.18.0)**; D7, D8 and §4.5 were reconciled with what was built on 2026-09-04 (v0.19.0 Windows fixes). The **code references were not** — a 2026-09-04 audit found four of them pointing at lines that had moved (`applyApprovedHosts`, `boundedDestroy`, the `PreviewAllowlistStore` host set, and the `storagePath === null` assertion, which lives in `assertSealed`). Those four now name the symbol instead of a line, which cannot rot. **The remaining `:line` references in this file are unverified** — treat any of them as a hint, and confirm against the symbol before relying on it
 
 Two behaviours are added to the running HTML preview:
 
@@ -120,9 +120,9 @@ Extract `PreviewViewRegistry` from `PreviewViewService` — the service would ot
 
 ### 4.4 Allowlist consistency and fan-out
 
-`PreviewAllowlistStore` holds one in-memory host set (`:97`) that every session's request filter reads live (`PreviewSessionFactory.ts:228-231`), while only the approving panel rebuilds its CSP (`PreviewLiveView.ts:295`). With two previews open, approving a host opens panel B's **network filter** while its **CSP** still forbids it. The fan-out fixes a latent bug, not just a new one.
+`PreviewAllowlistStore` holds one in-memory host set that every session's request filter reads live (`PreviewSessionFactory`), while only the approving panel rebuilds its CSP (`PreviewLiveView`). With two previews open, approving a host opens panel B's **network filter** while its **CSP** still forbids it. The fan-out fixes a latent bug, not just a new one.
 
-Approval therefore rebuilds the CSP of every live view of that project, purges its session and reloads it — but the review found `applyApprovedHosts` re-enters across an `await` with no liveness re-check (`:290-299`), and `boundedDestroy` (`:512-544`) leaves a window of up to `CLOSE_TIMEOUT_MS` in which the contents is *closing* but `isDestroyed()` is still false. Calling into that state is a hard fault, not a no-op (cf. electron/electron#47099).
+Approval therefore rebuilds the CSP of every live view of that project, purges its session and reloads it — but the review found `applyApprovedHosts` re-enters across an `await` with no liveness re-check, and `boundedDestroy` leaves a window of up to `CLOSE_TIMEOUT_MS` in which the contents is *closing* but `isDestroyed()` is still false. Calling into that state is a hard fault, not a no-op (cf. electron/electron#47099).
 
 *Requirements*: add an explicit `closing` flag set by `boundedDestroy` and fold it into `isDefunct`; re-check `isDefunct` after **every** await; make "rebuild CSP → purge → clear → reload" a single per-view method that aborts at any step; snapshot the map and run the fan-out under `Promise.allSettled`. A `rebuildCsp` on a revoked token is a silent no-op (`PreviewRootRegistry.ts:83-87`), so losing that race must be detected rather than assumed benign.
 
@@ -252,7 +252,7 @@ This closes today's silent-failure gap: a clicked link that goes nowhere finally
 | `shell.openExternal` reachable from an untrusted page | A page can lure a click to any URL | Parsed-protocol allow-list, credential rejection, destination shown before hand-off, genuine user gesture required |
 | Erfana opens project files on a page's request | A page could induce navigation of the workspace | Only a confined, eligible path opens, in a normal tab; no file content returns to the page |
 | CSP | unchanged | `sandbox allow-scripts`, `form-action 'none'`, `base-uri 'none'`, `frame-src 'none'` |
-| N sessions instead of 1 | N in-memory partitions, capped at `MAX_LIVE_VIEWS` | Each still asserts `storagePath === null` (`PreviewSessionFactory.ts:243`) |
+| N sessions instead of 1 | N in-memory partitions, capped at `MAX_LIVE_VIEWS` | Each still asserts `storagePath === null` (`assertSealed`, from `PreviewStorageSeal`) |
 
 `docs/security.md:589` currently states "Erfana exposes no scripted API to the page — no preload, no `postMessage` endpoint, no bridge". That sentence must be corrected, and the reason the session permission handler (`previewSessionPolicy.ts:83-84`) no longer covers `openExternal` stated explicitly — that handler is the named mitigation in the Electron advisory for external-protocol launches from sandboxed content, and calling `shell.openExternal` from main deliberately routes around it.
 

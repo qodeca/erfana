@@ -320,4 +320,4 @@ The [[FTS5]] extension provides full-text search.
 - [User guide – features and workflows](./user-guide-features.md) – what the graph engine is, key features, getting started, workflows
 - [Data Ingestion](./data-ingestion-discovery.md) – How files are indexed
 - [MCP Server](./mcp-server-tools.md) – Technical details on Claude Code integration
-- [Implementation Guide](./implementation-guide.md) – For developers building the system
+- [Implementation Guide](./implementation-guide/README.md) – For developers building the system

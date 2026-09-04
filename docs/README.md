@@ -16,12 +16,12 @@ Erfana is an agent-native Markdown workspace – an Electron app that runs a ter
 - [API Services – Features](./api-services-features.md) - Feature service implementations (Git, Transcription, Camera, etc.)
 - [IPC Patterns](./ipc-patterns.md) - Inter-process communication patterns
 - [Security](./security.md) - Security considerations and implementations
-- [Error Codes](./error-codes.md) - Project-wide `ErrorCode` enum index (~100 codes grouped by category; operator actions for the most-visible ones)
+- [Error Codes](./error-codes.md) - Project-wide `ErrorCode` enum index (130 codes grouped by category; operator actions for the most-visible ones)
 - [Architecture Decision Records](./adrs/README.md) - Durable rationale for load-bearing design choices (ADR 0001 self-host whisper, 0002 minisign, 0003 dual-pubkey, 0004 TOCTOU close)
 - [Technical Debt](./technical-debt.md) - Technical debt tracking and priorities
 
 ### Feature Documentation
-- [Core features](./features/README.md) - Catalogue of all 14 shipped features (editor, project tree, terminal, prompt templates, export, import, transcription, Claude Code status bar). Referenced from the root `CLAUDE.md` rather than inlined there
+- [Core features](./features/README.md) - Catalogue of all 15 shipped features (editor, project tree, terminal, prompt templates, export, import, transcription, Claude Code status bar). Referenced from the root `CLAUDE.md` rather than inlined there
 - [Editor](./editor/README.md) - Monaco editor, markdown preview, scroll sync, Mermaid diagrams (full-screen viewer), PDF/DOCX export
   - [Export](./editor/export.md) - PDF and DOCX export pipeline
   - [Mermaid Viewer](./editor/mermaid-viewer.md) - Full-screen diagram viewer with zoom and pan

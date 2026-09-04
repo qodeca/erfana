@@ -32,7 +32,7 @@ body:
     attributes:
       label: Erfana version
       description: Help → About, or the app's version string.
-      placeholder: "0.17.2"
+      placeholder: "0.19.0"
     validations:
       required: true
   - type: dropdown

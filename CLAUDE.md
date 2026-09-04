@@ -53,7 +53,7 @@ Read the card for what you are changing. A card marked `status="decided"` is bin
 
 ## Testing
 - E2E: Playwright with Electron, Page Object Model pattern — POM classes, composed fixtures, and the shared locator/wait helpers are catalogued in [docs/testing/e2e-testing.md](docs/testing/e2e-testing.md)
-  - **Convention**: condition-based waits only in new tests – never `waitForTimeout` (nine legacy uses remain, in `visual-regression.e2e.ts` and the terminal page object). Use the POM waits (`waitForPrompt()`, `waitForOutput()`), `waitForIpcComplete`, or Playwright auto-waiting
+  - **Convention**: condition-based waits only in new tests – never `waitForTimeout` (nine legacy uses remain: four in `visual-regression.e2e.ts` and one each in five other e2e files). Use the POM waits (`waitForPrompt()`, `waitForOutput()`), `waitForIpcComplete`, or Playwright auto-waiting
 - Windows-host flakes: catalogued in [`docs/windows/known-flakes.md`](docs/windows/known-flakes.md) with status legend + remediation-patterns cheat-sheet. `npm run test:cov` cannot pass on a Windows host – two per-file floors miss because their symlink cases skip on win32, so CI runs coverage on Linux. Test-file split policy in [`docs/windows/contributing.md`](docs/windows/contributing.md) §"Test-file split policy" — split when mocks hoist to module scope (reference: `FileService.copyItem.limit.test.ts`, `WhisperModelManager.downgrade.test.ts`); keep in-file for per-describe `vi.useFakeTimers` (reference: `SettingsOverlay.test.tsx` Focus management)
 
 ## Continuous Integration

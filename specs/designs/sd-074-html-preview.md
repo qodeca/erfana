@@ -190,7 +190,7 @@ only producer of `script-error` and `unresolved-specifier`.
 | `preview/PreviewWatchCoordinator.ts` | **Confining** diffing set-watch, per-panel cap |
 | `preview/PreviewReloadPolicy.ts` | **Pure** classify + coalesce |
 | `preview/previewCssSwap.ts` | Swap script builder |
-| `preview/PreviewStillFrameCache.ts` | Capture on hide only, downscaled, defined fallback |
+| `preview/PreviewStillFrameCache.ts` | Capture while DRAWN, downscaled, defined fallback |
 | `preview/PreviewFindController.ts` | `finalUpdate`-only forwarding |
 | `preview/previewInputForward.ts` | The 4 forwarded accelerators (§1.9) |
 | `preview/PreviewExportController.ts` | `printToPDF` of the live `WebContents` |
@@ -234,8 +234,24 @@ non-boolean, `false` — falls back to `reload()`. `oldHrefBase` is the `erfana-
 URL with `?v=` stripped, computed **main-side** from the changed path, never read back from the page.
 
 **Still frames** are downscaled with `NativeImage.resize` to `PREVIEW_MAX_FRAME_EDGE_PX` before
-`toDataURL`, then checked against `PREVIEW_MAX_FRAME_DATAURL_CHARS`. Over budget, `isBeingCaptured()`
-skip, or a throw ⇒ **no frame emitted**, panel falls back to the placeholder colour. Never blank.
+`toDataURL`, then checked against `PREVIEW_MAX_FRAME_DATAURL_CHARS`. Over budget, an in-flight skip, or
+a throw ⇒ **no frame emitted**, panel falls back to the placeholder colour. Never blank.
+
+Three points where this section describes a design the code has since moved off, each for a measured
+reason rather than drift:
+
+- **Not `isBeingCaptured()`.** That reads Chromium's capturer count, which other things raise; on
+  Windows it returned true for a fresh preview's very first frame, so no frame was ever taken. The
+  cache keeps its own in-flight ledger instead.
+- **Captures are taken while the view is DRAWN, not on hide** (the table above said "on hide only").
+  A capture in front of `setVisible(false)` leaves the native view eating clicks meant for whatever
+  overlay just opened, so the hide starts nothing and publishes what is already cached.
+- **An empty first capture is retried once, and the retry may outlive the hide.** On macOS the capture
+  at `'ready'` comes back empty every time, so the retry is the one that produces pixels. The caller's
+  `shouldKeep` veto — "was my subject on screen throughout" — therefore guards a REPLACEMENT only; on
+  an empty slot it is not consulted, because refusing the write there does not avoid a bad frame, it
+  guarantees no frame at all. `capturePage` runs with `stayHidden: true`, which reads a hidden-but-live
+  page.
 
 **Four lifecycle events**: `render-process-gone` and `unresponsive` ⇒ `loadState:'failed'` + badge,
 Reload stays live; entry-file unlink ⇒ `failed` + "file deleted" banner; entry-file rename ⇒ treated

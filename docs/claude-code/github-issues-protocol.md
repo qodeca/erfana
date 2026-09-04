@@ -179,7 +179,7 @@ gh issue create \
 1. …
 
 ## Erfana version
-0.17.2
+0.19.0
 
 ## Operating system
 macOS

@@ -84,8 +84,12 @@ Page-level captures (welcome, editor, terminal) pass `clip: PAGE_CLIP` — the `
 records the app's own layout rather than whatever content size the host window manager granted. Element-level captures (settings overlay, confirm dialog,
 image-viewer toolbar) need no clip: the element bounds are the capture.
 
-Baselines are per platform and committed. Both the **darwin** and the **win32** set exist for all six states; the win32 set was regenerated on 2026-09-04
-after the page-level captures were clipped. A missing baseline is not skipped — `assertBaselineExists` throws, and `playwright.config.ts` sets
+Baselines are per platform and committed. Both the **darwin** and the **win32** set exist for all six states; the three page-level captures were
+regenerated in both sets on 2026-09-04, after the clip above was introduced. **A capture-geometry change invalidates every platform's baselines, not just
+the host you are sitting at** — the clip landed with only the win32 set regenerated, and the three darwin baselines then failed on dimensions alone
+(`Expected an image 1400px by 868px, received 1280px by 800px`) until they were regenerated on a macOS host. Only that host can regenerate its own set, so
+a clip change is finished when every platform has been visited. The two element-level baselines were not regenerated and still carry each host's own window
+size. A missing baseline is not skipped — `assertBaselineExists` throws, and `playwright.config.ts` sets
 `updateSnapshots: 'none'`, so the auto-write-on-first-run path stays closed. Generate a new platform's set with
 `npm run test:e2e:update-screenshots` and commit it.
 

@@ -1,6 +1,6 @@
 # Preload Script Bundling
 
-**Last updated**: August 2026 (v0.17.2 + the unreleased #73 image-export work)
+**Last updated**: August 2026 (v0.17.2 + the #73 image-export work, shipped in v0.18.0)
 
 This document explains why the preload script must be bundled for sandbox compatibility.
 
