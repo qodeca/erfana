@@ -17,7 +17,10 @@ By participating you agree to abide by our [Code of Conduct](CODE_OF_CONDUCT.md)
 
 ## Prerequisites
 
-- **Node.js 24+** (Electron 39 bundles Node 22.22.1; the build toolchain needs 24+).
+- **Node.js 24+** (Electron 39 bundles Node 22.22.1; the build toolchain needs 24+). The major is pinned in
+  [`.nvmrc`](.nvmrc), so `nvm use` in the repo root selects it, and CI installs the same one — a local check and a
+  CI check are then running the same Node. Worth confirming with `node --version` before you trust a green local
+  run: a `node` earlier on your `PATH` than your version manager will silently win.
 - **Python 3.12 (known good) or 3.14.x** — **not 3.13** (`node-pty` fails to build on 3.13).
 - **Git**.
 - **On Windows:** VS 2022 Build Tools, Developer Mode enabled, Win32 long paths enabled. See [`docs/build/windows.md`](docs/build/windows.md).
@@ -29,9 +32,23 @@ git clone https://github.com/qodeca/erfana.git
 cd erfana
 git checkout develop          # the integration branch – branch off this, not main
 git checkout -b feature/my-change
-npm install
+npm ci                        # NOT `npm install` — see below
 npm run dev                   # start the development app
 ```
+
+**Use `npm ci`, and do not commit a `package-lock.json` that `npm install` rewrote.** The two commands do not
+agree here: `npm install` under npm 11 drops `encoding@0.1.13`, an optional peer of `node-fetch`, from the lock,
+while `npm ci` — locally and on every CI runner — requires it. A lock written by `npm install` therefore installs
+with `npm install` and fails everywhere else:
+
+```
+npm error `npm ci` can only install packages when your package.json and package-lock.json are in sync.
+npm error Missing: encoding@0.1.13 from lock file
+```
+
+If you need to change dependencies, run `npm install` deliberately, then check `git diff package-lock.json` and
+keep only the change you meant to make. If the diff shows `encoding` disappearing and a shuffle of `peer` /
+`optional` flags and nothing else, discard it — that is this quirk, not your change.
 
 `main` is the stable release branch. Most work goes through `develop`, the day-to-day integration branch: cut your `feature/...` branch from `develop` and open your PR against `develop`.
 

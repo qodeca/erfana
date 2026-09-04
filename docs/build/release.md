@@ -87,10 +87,10 @@ sequenceDiagram
   participant GH as GitHub
   participant CI as release.yml
   O->>S: "release v0.9.5"
-  S->>S: Phase 0 — branch gate, semver, CHANGELOG, checks.yml green
+  S->>S: Phase 0 — branch gate, semver, lock==package.json, CHANGELOG, checks.yml green
   S->>O: AskUserQuestion: summary bullets
   O-->>S: bullets
-  S->>GH: push commit (bump+CHANGELOG+notes)
+  S->>GH: push commit (bump+lock+CHANGELOG+notes)
   GH-->>S: checks.yml runs; S polls for green
   S->>GH: push signed tag v0.9.5
   GH->>CI: trigger release.yml

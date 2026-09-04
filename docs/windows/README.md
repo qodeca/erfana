@@ -15,12 +15,12 @@ This folder tracks the work to bring Erfana to full Windows parity with macOS.
 
 ```bash
 # Windows 11 host (PowerShell or Git Bash)
-npm install
+npm ci
 npm run test:main        # baseline drifts per release — see docs/testing/README.md for the current count
 npm run dev              # smoke-test Electron + terminal
 
 # macOS host (regression check for cross-platform changes)
-npm install
+npm ci
 npm run test:cov         # all 3 projects with coverage
 npm run build:mac        # produces .dmg
 ```

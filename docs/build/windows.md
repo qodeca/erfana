@@ -18,7 +18,7 @@ Issue references above are bare numbers on purpose — those issue links no long
 | Component | Version | Notes |
 |-----------|---------|-------|
 | **Windows** | Windows 11 (or Windows 10 22H2) | Older Windows versions are unsupported. |
-| **Node.js** | 24+ | Match CI. Install from [nodejs.org](https://nodejs.org/) or via `nvm-windows`. |
+| **Node.js** | 24+ | Match CI. `.nvmrc` pins the major. Install from [nodejs.org](https://nodejs.org/) or via `nvm-windows`. |
 | **Python** | **3.12** known good; **3.14.3** verified 2026-09-03 on Windows 11 (NOT 3.13) | `node-pty` fails to build against Python 3.13. If 3.13 is on PATH first, `node-gyp` will pick it up — uninstall it or put a working version ahead of it. |
 | **Visual Studio 2022 Build Tools** | "Desktop development with C++" workload + Windows 10 SDK | Required to compile `node-pty` and other native modules. |
 | **Git for Windows** | latest | Git Bash is fully supported for running npm scripts. PowerShell and `cmd.exe` should also work after Phase 0. |
@@ -105,10 +105,10 @@ New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" `
 ```powershell
 git clone https://github.com/qodeca/erfana.git
 cd erfana
-npm install
+npm ci
 ```
 
-`npm install` runs the `postinstall` hook, which is `patch-package && electron-builder install-app-deps`. `patch-package` first applies the committed `patches/node-pty+1.1.0.patch`, then `electron-builder install-app-deps` rebuilds `node-pty` against Electron's bundled Node.js. If the rebuild step fails, you almost always have the wrong Python or are missing the C++ workload — re-check steps 2 and 3.
+`npm ci` runs the `postinstall` hook, which is `patch-package && electron-builder install-app-deps`. `patch-package` first applies the committed `patches/node-pty+1.1.0.patch`, then `electron-builder install-app-deps` rebuilds `node-pty` against Electron's bundled Node.js. If the rebuild step fails, you almost always have the wrong Python or are missing the C++ workload — re-check steps 2 and 3.
 
 > **Why the patch?** A fresh `npm ci` on a default-hardened Windows 11 box used to fail in two ways during the `node-pty` build; `patch-package` now fixes both automatically. See the [node-pty build failures on Windows 11](#node-pty-build-failures-on-windows-11) note below.
 
@@ -147,8 +147,8 @@ A fresh `git clone && npm ci` on a default-hardened Windows 11 box previously fa
 
 ## Troubleshooting
 
-**`node-pty` fails to compile during `npm install`**
-- First confirm the patch is present and applied: `patches/node-pty+1.1.0.patch` should exist, and `npm install` output should show `patch-package` applying it (`node-pty@1.1.0 ✔`). If the patch failed to apply, re-run `npx patch-package` and read the error.
+**`node-pty` fails to compile during install**
+- First confirm the patch is present and applied: `patches/node-pty+1.1.0.patch` should exist, and the install output should show `patch-package` applying it (`node-pty@1.1.0 ✔`). If the patch failed to apply, re-run `npx patch-package` and read the error.
 - Check `python --version` is 3.12.x (known good) or 3.14.x (3.14.3 verified 2026-09-03), not 3.13.x.
 - Confirm Visual Studio Build Tools 2022 is installed with the "Desktop development with C++" workload.
 - Run `npm config get msvs_version` — should return `2022`.

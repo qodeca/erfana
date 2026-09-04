@@ -238,8 +238,7 @@ Build fails during `npm run typecheck`
 1. Check TypeScript version: `npx tsc --version` (should be 6.0.x; `package.json` declares `typescript: ^6.0.3`)
 2. Clean and reinstall:
    ```bash
-   rm -rf node_modules/
-   npm install
+   npm ci   # replaces node_modules itself; not `npm install`
    ```
 3. Check for type errors: `npm run typecheck`
 
