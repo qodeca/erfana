@@ -25,7 +25,7 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
     steps:
       # actions/checkout v6.0.3 — MUST run before the local composite action
@@ -48,7 +48,7 @@ jobs:
   typecheck:
     name: Typecheck
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
     steps:
       # actions/checkout v6.0.3 — MUST run before the local composite action
@@ -177,7 +177,7 @@ jobs:
   license:
     name: License compliance
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
     steps:
       # actions/checkout v6.0.3 — MUST run before the local composite action
@@ -228,7 +228,7 @@ jobs:
   audit-signatures:
     name: npm audit signatures
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
     steps:
       # actions/checkout v6.0.3 — MUST run before the local composite action
