@@ -14,7 +14,7 @@
  */
 import { describe, it, expect } from 'vitest'
 
-import { describeExternalDestination } from './buildPreviewGraph'
+import { describeExternalDestination } from './externalLinkConsent'
 
 describe('describeExternalDestination', () => {
   it('names the number for a tel: link, never "null"', () => {

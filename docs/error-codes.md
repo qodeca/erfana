@@ -179,7 +179,7 @@ Most Phase 4 / issue #165. See also [`docs/windows/whisper-support-runbook.md`](
 
 ## Preview (8 codes)
 
-8 `PREVIEW_*` in `src/shared/errors.ts` (#74, extended by sd-074b). See `src/main/services/preview/` and [`docs/html-preview/README.md`](./html-preview/README.md).
+10 `PREVIEW_*` in `src/shared/errors.ts` (#74, extended by sd-074b and v0.19.0). See `src/main/services/preview/` and [`docs/html-preview/README.md`](./html-preview/README.md).
 
 | Code | User copy | Notes |
 |------|-----------|-------|
@@ -191,6 +191,8 @@ Most Phase 4 / issue #165. See also [`docs/windows/whisper-support-runbook.md`](
 | `PREVIEW_READ_BUDGET_EXCEEDED` | "The preview asked for too many files at once; some were not loaded." | A page exceeded its bounded read budget |
 | `PREVIEW_LINK_BLOCKED` | "That link was blocked." | `PreviewNavigationPolicy` refused a clicked link — an unconfined path, or a protocol not handed to the OS |
 | `PREVIEW_OPEN_SUPERSEDED` | "The preview was replaced before it finished opening." | An `open` finished against a claim a later open (or a close) had already invalidated |
+| `PREVIEW_OPEN_INVALID_REQUEST` | "The preview request was rejected." | The `preview:open` payload failed `PreviewOpenRequestSchema` before reaching the service. Named so the renderer log says why; a 249-char path used to land here as `UNKNOWN_ERROR` until panel ids were bounded in `buildPanelId` (v0.19.0) |
+| `PREVIEW_APPROVE_TIMED_OUT` | "Saved, but the preview did not confirm. Reload it." | Renderer-side only: the band's `APPROVE_UI_DEADLINE_MS` passed with no answer from `preview:approveHost`. Not a refusal — the grant is written before main's first await. The band shows "Saved — reload to apply" (v0.19.0) |
 
 ---
 

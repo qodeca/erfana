@@ -35,6 +35,9 @@
  */
 
 import { WebContentsView, session as electronSession, type Session, type WebContents } from 'electron'
+import { PREVIEW } from '../../../shared/constants'
+import { logger } from '../LoggingService'
+import { withTimeout } from '../../utils/withTimeout'
 import type {
   PreviewBounds,
   PreviewFailureInput,
@@ -53,7 +56,7 @@ import {
   hardenPreviewSession,
   nextPartitionName
 } from './previewSessionPolicy'
-import { assertSealed } from './PreviewStorageSeal'
+import { assertSealed, purge as purgePreviewSession } from './PreviewStorageSeal'
 
 /**
  * The slice of an electron `Session` the preview needs. Structural so tests
@@ -146,6 +149,15 @@ export interface PreviewSession {
   readonly view: PreviewViewHandle
   /** The in-memory partition session. */
   readonly session: PreviewSessionLike
+  /** The partition name, for the recycle ledger. */
+  readonly partition: string
+  /**
+   * Hand the partition back for reuse — ONLY once the page is destroyed, or
+   * the next open attaches its handler and filter to a session whose previous
+   * page is still running `close()`. Purges first, bounded; a purge that fails
+   * or overruns drops the name instead. Never rejects.
+   */
+  readonly release: () => Promise<void>
   /** The opaque root token (the `erfana-preview://` URL host). */
   readonly token: string
   /** The realpath of the project root — the URL-building + confinement anchor. */
@@ -157,6 +169,8 @@ export interface PreviewSession {
 export interface IPreviewSessionFactory {
   /** Build one sealed session + view for `ctx.projectPath`. Throws ⇒ no view. */
   create(ctx: PreviewSessionCreateContext): Promise<PreviewSession>
+  /** Drop every recycled partition name (a project switch: nothing carries across). */
+  forgetRecycled(): void
 }
 
 /**
@@ -185,6 +199,8 @@ export interface PreviewSessionFactoryDeps {
   readonly previewPagePreloadPath?: string | null
   /** A fresh partition name; defaults to `nextPartitionName`. */
   readonly nextPartitionName?: () => string
+  /** Purge a partition before reuse and after use; defaults to `PreviewStorageSeal.purge`. */
+  readonly purge?: (session: PreviewSessionLike) => Promise<void>
   /** Harden permissions/downloads/WebRTC; defaults to `hardenPreviewSession`. */
   readonly hardenSession?: (
     session: PreviewSessionLike,
@@ -219,6 +235,7 @@ export class PreviewSessionFactory implements IPreviewSessionFactory {
             deps.previewPagePreloadPath ?? null
           )),
       nextPartitionName: deps.nextPartitionName ?? nextPartitionName,
+      purge: deps.purge ?? ((session) => purgePreviewSession(session as unknown as Session)),
       hardenSession:
         deps.hardenSession ??
         ((session, wc) =>
@@ -228,6 +245,82 @@ export class PreviewSessionFactory implements IPreviewSessionFactory {
       attachFilter:
         deps.attachFilter ?? ((session, ctx) => attachRequestFilter(session as never, ctx)),
       assertSealed: deps.assertSealed ?? ((session) => assertSealed(session as unknown as Session))
+    }
+  }
+
+  /**
+   * Purged partition names waiting to be reused. Electron cannot destroy a
+   * session, so every NEW name costs handles for the life of the process
+   * (measured on Windows: ~16 per partition, +0 for re-minting a name) — the
+   * last third of the per-preview handle leak once teardown was bounded.
+   */
+  private readonly freePartitions: string[] = []
+
+  /**
+   * Bumped by `forgetRecycled()`. A session acquired under an older epoch is
+   * dropped on release instead of pushed: `onProjectChanged` forgets the list
+   * only after the whole drain, and an open for the NEW project can arrive
+   * between two of those releases and pop a name the old project just used.
+   */
+  private switchEpoch = 0
+
+  forgetRecycled(): void {
+    this.switchEpoch += 1
+    this.freePartitions.length = 0
+  }
+
+  /**
+   * A purged recycled partition, or a fresh one. Fail-closed: a recycled name
+   * whose purge fails or overruns is dropped, never handed out un-purged.
+   */
+  private async acquirePartition(): Promise<{ partition: string; session: PreviewSessionLike }> {
+    while (this.freePartitions.length > 0) {
+      const partition = this.freePartitions.pop() as string
+      const session = this.deps.createSession(partition)
+      try {
+        await withTimeout(
+          this.deps.purge(session),
+          PREVIEW.PARTITION_PURGE_TIMEOUT_MS,
+          'Preview partition purge before reuse'
+        )
+        return { partition, session }
+      } catch (error) {
+        logger.warn('Preview partition: purge before reuse failed; minting a fresh one', {
+          error: error instanceof Error ? error.message : String(error)
+        })
+      }
+    }
+    const partition = this.deps.nextPartitionName()
+    return { partition, session: this.deps.createSession(partition) }
+  }
+
+  /** The `release` handed out with every session; see `PreviewSession.release`. */
+  private async releasePartition(
+    partition: string,
+    session: PreviewSessionLike,
+    epoch: number
+  ): Promise<void> {
+    if (epoch !== this.switchEpoch) {
+      // Acquired before a project switch: never carry it into the new project.
+      return
+    }
+    try {
+      await withTimeout(
+        this.deps.purge(session),
+        PREVIEW.PARTITION_PURGE_TIMEOUT_MS,
+        'Preview partition purge after use'
+      )
+    } catch (error) {
+      logger.warn('Preview partition: purge after use failed; not reusing it', {
+        error: error instanceof Error ? error.message : String(error)
+      })
+      return
+    }
+    if (
+      this.freePartitions.length < PREVIEW.MAX_RECYCLED_PARTITIONS &&
+      !this.freePartitions.includes(partition)
+    ) {
+      this.freePartitions.push(partition)
     }
   }
 
@@ -241,6 +334,12 @@ export class PreviewSessionFactory implements IPreviewSessionFactory {
     // through two different shapes is how the two chokepoints came to disagree
     // about ports in the first place; there is one shape now.
     await allowlistStore.load()
+    // A malformed allowlist block used to look exactly like an empty one from
+    // the panel: the store logged its badge process-wide and nothing reached
+    // the tab. The factory is the first place that has the panel's log (#115).
+    for (const badge of allowlistStore.drainBadges()) {
+      ctx.recordFailure(badge)
+    }
     const token = await registry.issue(ctx.projectPath, [...allowlistStore.getOrigins()])
     const entry = registry.resolve(token)
     if (entry === undefined) {
@@ -272,8 +371,25 @@ export class PreviewSessionFactory implements IPreviewSessionFactory {
     }
 
     try {
-      // 3–5: fresh in-memory partition, web prefs, then the view (before hardening).
-      const session = this.deps.createSession(this.deps.nextPartitionName())
+      // 3–5: a purged recycled partition (or a fresh one), web prefs, then the
+      // view (before hardening).
+      const { partition, session } = await this.acquirePartition()
+      const epoch = this.switchEpoch
+      // Latched: `fromPartition(name)` returns the SAME object for a name, so a
+      // second release of a name already reissued would purge the successor's
+      // live storage and push the name back while a preview is using it.
+      let released = false
+      const release = async (): Promise<void> => {
+        if (released) return
+        released = true
+        await this.releasePartition(partition, session, epoch)
+      }
+      // A throw from any later step used to lose the name for good (review):
+      // the ~16-handle cost of a fresh partition, on the path most likely to
+      // repeat. Nothing is attached yet, so the hand-back is safe here.
+      unwind.push(() => {
+        void release()
+      })
       const webPreferences = this.deps.buildWebPreferences(session)
       const view = this.deps.createView(webPreferences)
       unwind.push(() => {
@@ -312,7 +428,15 @@ export class PreviewSessionFactory implements IPreviewSessionFactory {
         disposeHarden()
       }
 
-      return { view, session, token, realRoot: entry.realRoot, teardown }
+      return {
+        view,
+        session,
+        token,
+        realRoot: entry.realRoot,
+        partition,
+        teardown,
+        release
+      }
     } catch (error) {
       rollback()
       throw error

@@ -22,7 +22,7 @@
 import type { DockviewApi, DockviewPanelRenderer, IDockviewPanel } from 'dockview'
 
 import type { FilePanelKind } from '../../../shared/ipc/preview-types'
-import { getBasename, sanitizeFilePath } from './fileUtils'
+import { getBasename, sanitizeFilePath, stablePathDigest } from './fileUtils'
 import { isImageFile } from './imageUtils'
 import { logger } from './logger'
 import { useProjectStore } from '../stores/useProjectStore'
@@ -113,13 +113,35 @@ export interface OpenFileInPanelOptions {
  * `openFileInPanel` decide the kind once and use that one answer for the id,
  * the component and the tab component together.
  *
+ * The id is bounded. `PanelIdSchema` (src/shared/ipc/preview-schema.ts) caps
+ * a panel id at 256 and `sanitizeFilePath` is one character out per character
+ * in, so a file 249 characters deep on Windows (250 on POSIX) used to refuse
+ * to preview with `too_big, maximum: 256, path: ["panelId"]` in the log and
+ * nothing on screen (Windows verification, 2026-09-03). Past
+ * {@link PANEL_ID_PATH_BUDGET} the id keeps a readable head of the sanitized
+ * path and pins identity with {@link stablePathDigest} of the WHOLE raw path;
+ * under it the id is exactly what it always was, so nothing keyed on an
+ * existing id moves. Every id stays under 200 characters.
+ *
  * @param kind - The resolved panel kind.
  * @param filePath - Absolute path to the file.
- * @returns `preview-…` / `image-…` / `editor-…` followed by the sanitized path.
+ * @returns `preview-…` / `image-…` / `editor-…` followed by the sanitized path,
+ *   shortened past the budget to a 150-character head plus a 16-character digest.
  */
 function buildPanelId(kind: FilePanelKind, filePath: string): string {
-  return `${PANEL_KIND_DESCRIPTORS[kind].idPrefix}-${sanitizeFilePath(filePath)}`
+  const prefix = PANEL_KIND_DESCRIPTORS[kind].idPrefix
+  const sanitized = sanitizeFilePath(filePath)
+  if (sanitized.length <= PANEL_ID_PATH_BUDGET) {
+    return `${prefix}-${sanitized}`
+  }
+  return `${prefix}-${sanitized.slice(0, PANEL_ID_PATH_KEEP)}-${stablePathDigest(filePath)}`
 }
+
+/** Sanitized-path length above which {@link buildPanelId} shortens the id. */
+const PANEL_ID_PATH_BUDGET = 180
+
+/** How much of the sanitized path a shortened id keeps, for readability. */
+const PANEL_ID_PATH_KEEP = 150
 
 /**
  * Builds the dockview panel id for a file, choosing between the image viewer
@@ -132,10 +154,11 @@ function buildPanelId(kind: FilePanelKind, filePath: string): string {
  * which is exactly what those call sites want. Any `.html` "lossiness" is
  * therefore unreachable; do not add a kind-aware overload for it.
  *
- * Panel identity is per **path string**: `sanitizeFilePath` hashes the raw
- * path, so `/proj/Icon.svg` and `/proj/icon.svg` are two panels even on a
- * case-insensitive volume. Harmless – the watcher keys by path too, and watches
- * are subscriber-counted.
+ * Panel identity is per **path string**: the id is the sanitized path (plus
+ * a digest of the raw path once it passes the length budget, see
+ * {@link buildPanelId}), so `/proj/Icon.svg` and `/proj/icon.svg` are two
+ * panels even on a case-insensitive volume. Harmless – the watcher keys by
+ * path too, and watches are subscriber-counted.
  *
  * @param filePath - Absolute path to the file.
  * @returns `image-…` for image files, `editor-…` otherwise.

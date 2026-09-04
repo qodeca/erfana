@@ -31,7 +31,7 @@ import type { IPreviewWatchPool } from './PreviewWatchPool'
 import { PREVIEW } from '../../../shared/constants'
 
 /** Why a candidate was not watched. */
-export type WatchDropReason = 'out-of-root' | 'over-cap'
+export type WatchDropReason = 'out-of-root' | 'over-cap' | 'watch-failed'
 
 /** A candidate that was dropped rather than watched. */
 export interface DroppedCandidate {
@@ -186,10 +186,24 @@ export function createPreviewWatchCoordinator(
     if (disposed) return { watched: [], dropped }
 
     // Acquire the added watches. A watch already held is a no-op refcount bump.
-    for (const target of desired) {
-      if (!watched.has(target)) {
-        deps.pool.acquire(target, () => recordChange(target))
+    // `watched` is assigned only on success, so a throw partway through this
+    // loop (chokidar on EMFILE — the pool rethrows on purpose) used to strand
+    // every watch acquired before it: absent from `watched`, unreachable by
+    // `dispose()`, holding its slot in the shared budget for the life of the
+    // process (#112). Release what THIS call acquired before rethrowing.
+    const acquired: string[] = []
+    try {
+      for (const target of desired) {
+        if (!watched.has(target)) {
+          deps.pool.acquire(target, () => recordChange(target))
+          acquired.push(target)
+        }
       }
+    } catch (error) {
+      for (const target of acquired) {
+        await deps.pool.release(target)
+      }
+      throw error
     }
 
     watched = desiredSet
@@ -215,6 +229,10 @@ export function createPreviewWatchCoordinator(
         await deps.pool.release(target)
       }
       watched = new Set<string>()
+      // The pool is this view's own (built per coordinator at the composition
+      // root) and had no production caller for `close()` at all (#112): anything
+      // it still holds would outlive the view.
+      await deps.pool.close()
     }
   }
 }

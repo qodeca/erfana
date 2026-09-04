@@ -290,12 +290,24 @@ function generate() {
     files.push({ rel, bytes: readFileSync(source) })
   }
 
-  files.push({ rel: 'claims.js', bytes: Buffer.from(renderClaims(), 'utf8') })
+  files.push({ rel: 'claims.js', bytes: lfBytes(renderClaims()) })
 
   // PARITY: write LF explicitly. Python's write_text() translates newlines on
   // Windows; .gitattributes normalises on the way in, but do not rely on it.
-  files.push({ rel: 'index.html', bytes: Buffer.from(render(collect()), 'utf8') })
+  files.push({ rel: 'index.html', bytes: lfBytes(render(collect())) })
   return files
+}
+
+/**
+ * Encode a generated text as LF bytes, whatever line endings its inputs
+ * carried. `Buffer.from(str, 'utf8')` performs no newline translation, so
+ * this only matters when a template mixes a CRLF fragment (a card file read
+ * on a Windows checkout, say) into an LF string — but the two files built
+ * here are byte-compared in `--check` mode, so they must be deterministic
+ * across hosts (#104).
+ */
+function lfBytes(text) {
+  return Buffer.from(text.replace(/\r\n/g, '\n'), 'utf8')
 }
 
 /**

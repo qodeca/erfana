@@ -244,6 +244,21 @@ async function handleRequestInner(
     limiter.release()
   }
   if (!resolved.ok) {
+    // The ENTRY document failing to resolve used to leave no trace: a 404 on
+    // the page itself showed a blank preview and no badge, while every
+    // subresource failure was badged. The resolver already names the reason;
+    // record it for the main frame only — a missing image is the page's own
+    // console's business, and would badge every broken `<img>` twice.
+    if (readDestination(request) === 'document') {
+      ctx.recordFailure({
+        type: resolved.reason,
+        resourceUrlOrHost: url.pathname,
+        reasonCode:
+          resolved.reason === 'missing-local-file'
+            ? ErrorCode.PREVIEW_LOCAL_FILE_MISSING
+            : ErrorCode.PREVIEW_LINK_BLOCKED
+      })
+    }
     return errorResponse(resolved.status)
   }
 

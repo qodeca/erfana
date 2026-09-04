@@ -32,6 +32,7 @@ import {
 import { ErrorCode } from '../../../shared/errors'
 import { PREVIEW } from '../../../shared/constants'
 import { logger } from '../LoggingService'
+import { withTimeout } from '../../utils/withTimeout'
 import type {
   PdfExportResult,
   PreviewBounds,
@@ -202,8 +203,12 @@ export interface PreviewViewDeps {
   /** Route a forwarded accelerator (§1.9) to the renderer; defaults to a no-op. */
   readonly onForwardedShortcut?: (panelId: string, key: string) => void
   readonly platform?: NodeJS.Platform
-  /** Hand a vetted external URL to the OS browser (sd-074b §5.5). */
-  readonly openExternal?: (url: string) => Promise<void>
+  /**
+   * Hand a vetted external URL to the OS browser (sd-074b §5.5), asking first
+   * on the window whose preview clicked it. Rejects when refused (a question
+   * already open, or the window gone); the live view turns that into a badge.
+   */
+  readonly openExternal?: (url: string, windowId: number) => Promise<void>
 }
 
 export class PreviewViewService implements IPreviewViewService, PreviewFindExportService {
@@ -384,9 +389,12 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
       return { ok: false, errorCode: ErrorCode.PREVIEW_CSP_INVALID }
     }
 
-    if (this.registry.isStale(claim)) {
+    if (this.registry.isStale(claim) || window.isDestroyed()) {
       // Superseded while the session was building (project switch, global-off, a
-      // close, or a newer open): discard it rather than install a stale view.
+      // close, or a newer open) — or the WINDOW closed: `closeWindow` finds no
+      // installed entry for an open still parked here and moves no generation,
+      // so without this check the open resumed and built a view against a
+      // destroyed window (#83). Discard rather than install a stale view.
       failureLog.drop()
       await this.discardSession(session)
       return { ok: false, errorCode: ErrorCode.PREVIEW_OPEN_SUPERSEDED }
@@ -540,7 +548,20 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
     //
     // Cannot reject: `whenCaptureSettled` absorbs a failed capture, because the
     // only question it answers is whether Chromium is still reading this page.
-    await view.whenCaptureSettled()
+    // Bounded all the same: a capture that never settles must cost this tab its
+    // picture, not its suspension.
+    try {
+      await withTimeout(
+        view.whenCaptureSettled(),
+        PREVIEW.CAPTURE_SETTLE_TIMEOUT_MS,
+        'Preview eviction capture wait'
+      )
+    } catch (error) {
+      logger.warn('Preview eviction: capture did not settle; suspending anyway', {
+        panelId,
+        error: error instanceof Error ? error.message : String(error)
+      })
+    }
 
     /*
      * `finally`, because the comment above is only half-true otherwise.
@@ -577,11 +598,8 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
     // A live view revokes its token on teardown; a never-installed session must
     // do it here or the registry entry leaks.
     this.deps.registry.revoke(session.token)
-    try {
-      await this.deps.storageSeal.purge(session.session)
-    } catch {
-      // A purge failure on a session being discarded is not recoverable.
-    }
+    // Purges (bounded) and hands the partition back for reuse; never rejects.
+    await session.release()
   }
 
   async close(panelId: string): Promise<void> {
@@ -763,6 +781,8 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
 
   async onProjectChanged(_oldPath: string | null, _newPath: string | null): Promise<void> {
     await this.teardownAll()
+    // A partition must not carry from project A to project B, purged or not.
+    this.deps.sessionFactory.forgetRecycled()
   }
 
   async dispose(): Promise<void> {

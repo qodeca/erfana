@@ -11,6 +11,8 @@ import type { DockviewApi } from 'dockview'
 
 import { getFilePanelId, openFileInPanel } from './openFileInPanel'
 import { useProjectStore } from '../stores/useProjectStore'
+import { PanelIdSchema } from '../../../shared/ipc/preview-schema'
+import { sanitizeFilePath } from './fileUtils'
 
 const registerEditorPanel = vi.fn()
 
@@ -35,6 +37,42 @@ beforeEach(() => {
   vi.spyOn(useProjectStore, 'getState').mockReturnValue({
     registerEditorPanel
   } as unknown as ReturnType<typeof useProjectStore.getState>)
+})
+
+describe('panel ids stay inside the IPC boundary', () => {
+  // A panel id used to be the sanitized path, one character out per
+  // character in, plus a prefix. `PanelIdSchema` caps it at 256, so a file
+  // 249 characters deep on Windows (250 on POSIX) refused to preview with
+  // `too_big, maximum: 256, path: ["panelId"]` in the log and nothing on
+  // screen (Windows verification, 2026-09-03). The id must be bounded.
+  const deep = 'C:\\' + 'folder-name/'.repeat(25) + 'index.html' // 320 chars
+  const sibling = 'C:\\' + 'folder-name/'.repeat(25) + 'other.html'
+
+  it('a 320-char path yields an id the open schema accepts', () => {
+    const id = getFilePanelId(deep)
+    expect(id.length).toBeLessThanOrEqual(200)
+    expect(PanelIdSchema.safeParse(id).success).toBe(true)
+  })
+
+  it('is stable across calls and distinct for a sibling that shares the prefix', () => {
+    expect(getFilePanelId(deep)).toBe(getFilePanelId(deep))
+    expect(getFilePanelId(deep)).not.toBe(getFilePanelId(sibling))
+  })
+
+  it('a short path keeps the exact id it always had (no churn)', () => {
+    // Green before and after by design: pins that ids under the budget are
+    // untouched, so nothing keyed on an existing id moves.
+    const short = '/proj/' + 'a'.repeat(80) + '/notes.md' // ~100 chars
+    expect(getFilePanelId(short)).toBe('editor-' + sanitizeFilePath(short))
+  })
+
+  it('a preview id for a deep path is bounded too', () => {
+    const { api, addPanel } = makeApi()
+    openFileInPanel(api, deep, { kind: 'preview' })
+    const id = (addPanel.mock.calls[0][0] as { id: string }).id
+    expect(id).toMatch(/^preview-/)
+    expect(PanelIdSchema.safeParse(id).success).toBe(true)
+  })
 })
 
 describe('getFilePanelId', () => {

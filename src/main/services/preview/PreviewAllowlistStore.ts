@@ -28,6 +28,9 @@ import {
   parsePreviewOrigin
 } from '../../../shared/ipc/preview-settings-schema'
 import { atomicWriteJSON } from '../../utils/atomicWrite'
+import { TimeoutError, withTimeout } from '../../utils/withTimeout'
+import { logger } from '../LoggingService'
+import { PREVIEW } from '../../../shared/constants'
 import { resolveErfanaDir } from './erfanaDirGate'
 
 const ERFANA_DIR_NAME = '.erfana'
@@ -81,6 +84,14 @@ export interface IPreviewAllowlistStore {
   getOrigins(): ReadonlySet<string>
   /** True unless the last load found a present-but-bad on-disk block. */
   isWriteBackEnabled(): boolean
+  /**
+   * The badges the last `load()` raised, handed over ONCE. `onBadge` fires at
+   * parse time into whatever the composition root wired (a logger), because the
+   * store has no panel to address; the session factory, which does, drains
+   * this right after `load()` and records each on the new view's failure log
+   * (#115). Without it a malformed allowlist looked exactly like an empty one.
+   */
+  drainBadges(): PreviewFailureInput[]
 }
 
 /** True for a non-null, non-array plain object. */
@@ -102,6 +113,8 @@ function makeBadge(
 export class PreviewAllowlistStore implements IPreviewAllowlistStore {
   private readonly getProjectRoot: () => string | null
   private readonly onBadge?: (badge: PreviewFailureInput) => void
+  /** Badges raised by the last `load()`, until `drainBadges()` takes them. */
+  private pendingBadges: PreviewFailureInput[] = []
 
   private origins = new Set<string>()
   private writeBackEnabled = true
@@ -114,6 +127,7 @@ export class PreviewAllowlistStore implements IPreviewAllowlistStore {
   }
 
   async load(): Promise<PreviewAllowlistState> {
+    this.pendingBadges = []
     const projectRoot = this.getProjectRoot()
     if (projectRoot === null) {
       return this.applyState([], true)
@@ -130,7 +144,7 @@ export class PreviewAllowlistStore implements IPreviewAllowlistStore {
         return this.applyState([], true)
       }
       // Unreadable file is a bad block: fail safe, do not throw up to load.
-      this.onBadge?.(makeBadge('allowlist-invalid'))
+      this.raiseBadge(makeBadge('allowlist-invalid'))
       return this.applyState([], false)
     }
 
@@ -138,12 +152,12 @@ export class PreviewAllowlistStore implements IPreviewAllowlistStore {
     try {
       raw = JSON.parse(content)
     } catch {
-      this.onBadge?.(makeBadge('allowlist-invalid'))
+      this.raiseBadge(makeBadge('allowlist-invalid'))
       return this.applyState([], false)
     }
 
     if (!isPlainObject(raw)) {
-      this.onBadge?.(makeBadge('allowlist-invalid'))
+      this.raiseBadge(makeBadge('allowlist-invalid'))
       return this.applyState([], false)
     }
 
@@ -161,13 +175,13 @@ export class PreviewAllowlistStore implements IPreviewAllowlistStore {
       block.version !== undefined &&
       block.version !== PREVIEW_ALLOWLIST_VERSION
     ) {
-      this.onBadge?.(makeBadge('allowlist-unsupported-version'))
+      this.raiseBadge(makeBadge('allowlist-unsupported-version'))
       return this.applyState([], false)
     }
 
     const parsed = PreviewAllowlistSchema.safeParse(block)
     if (!parsed.success) {
-      this.onBadge?.(makeBadge('allowlist-invalid'))
+      this.raiseBadge(makeBadge('allowlist-invalid'))
       return this.applyState([], false)
     }
 
@@ -283,7 +297,24 @@ export class PreviewAllowlistStore implements IPreviewAllowlistStore {
     // Step 9: re-read + re-validate; swap the in-memory set; return it. Now a
     // confirmation that the bytes landed, rather than the first time anything
     // was checked.
-    const verified = await this.verifyWrittenOrigins(settingsPath)
+    // Time-boxed: the bytes are on disk, so a re-read that does not come back
+    // yields the set just written rather than holding the approval hostage
+    // (the Allow freeze on Windows, 2026-09-03). A re-read that DOES come back
+    // and fails validation is still fatal — that is a real finding.
+    let verified: readonly string[]
+    try {
+      verified = await withTimeout(
+        this.verifyWrittenOrigins(settingsPath),
+        PREVIEW.ALLOWLIST_VERIFY_TIMEOUT_MS,
+        'Preview allowlist re-read'
+      )
+    } catch (error) {
+      if (!(error instanceof TimeoutError)) throw error
+      logger.warn('Preview allowlist: re-read did not complete; trusting the written set', {
+        count: sortedOrigins.length
+      })
+      verified = sortedOrigins
+    }
     this.origins = new Set(verified)
     this.writeBackEnabled = true
     return verified
@@ -291,6 +322,18 @@ export class PreviewAllowlistStore implements IPreviewAllowlistStore {
 
   getOrigins(): ReadonlySet<string> {
     return this.origins
+  }
+
+  drainBadges(): PreviewFailureInput[] {
+    const badges = this.pendingBadges
+    this.pendingBadges = []
+    return badges
+  }
+
+  /** Forward a badge to the wired sink AND keep it for the next drain. */
+  private raiseBadge(badge: PreviewFailureInput): void {
+    this.pendingBadges.push(badge)
+    this.onBadge?.(badge)
   }
 
   isWriteBackEnabled(): boolean {

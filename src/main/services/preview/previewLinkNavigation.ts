@@ -17,7 +17,7 @@
 import { resolve } from 'node:path'
 
 import { ErrorCode } from '../../../shared/errors'
-import type { PreviewFailureInput } from '../../../shared/ipc/preview-types'
+import type { PreviewFailureInput, PreviewFailureType } from '../../../shared/ipc/preview-types'
 import { decideLinkIntent, type LinkActivation } from './PreviewNavigationPolicy'
 import { confinePath } from './previewPathResolve'
 
@@ -83,6 +83,48 @@ function describeLink(href: string): string {
   }
 }
 
+/**
+ * Whether a RELATIVE href, resolved the way a browser would against the
+ * document's own path, climbs above the project root at any point.
+ *
+ * URL maths, not `path.resolve`: on Windows `path.resolve(dir, '..\\x')`
+ * escapes while this `standard: true` scheme treats `\` as `/`, and a `<base
+ * href>` the page inserted is deliberately ignored — this only ever softens a
+ * label ("escaped" instead of "missing"), never a decision, so a false
+ * positive costs one word on a badge. Absolute references (any scheme, or
+ * protocol-relative) cannot climb and answer `false`.
+ */
+function rawHrefEscapesDocument(rawHref: string, currentUrl: string): boolean {
+  if (/^[a-z][a-z0-9+.-]*:/i.test(rawHref) || rawHref.startsWith('//')) {
+    return false
+  }
+  const pathPart = rawHref.split(/[?#]/, 1)[0].replace(/\\/g, '/')
+  let depth = 0
+  if (!pathPart.startsWith('/')) {
+    try {
+      // The document's DIRECTORY depth: `/a/b/page.html` → 2.
+      depth = Math.max(0, new URL(currentUrl).pathname.split('/').filter(Boolean).length - 1)
+    } catch {
+      return false
+    }
+  }
+  for (const segment of pathPart.split('/')) {
+    let decoded = segment
+    try {
+      decoded = decodeURIComponent(segment)
+    } catch {
+      // Keep the raw segment; a bad escape is not a climb.
+    }
+    if (decoded === '..') {
+      depth -= 1
+      if (depth < 0) return true
+    } else if (decoded !== '' && decoded !== '.') {
+      depth += 1
+    }
+  }
+  return false
+}
+
 /** Strip control characters, so a crafted href cannot forge log or badge lines. */
 function sanitize(value: string): string {
   // eslint-disable-next-line no-control-regex
@@ -106,7 +148,11 @@ function sanitize(value: string): string {
  * ```
  */
 export async function routeLinkActivation(
-  activation: Omit<LinkActivation, 'currentUrl' | 'token'> & { provenance: LinkProvenance },
+  activation: Omit<LinkActivation, 'currentUrl' | 'token'> & {
+    provenance: LinkProvenance
+    /** The `href` attribute as written; see `LinkActivationPayloadSchema`. */
+    rawHref?: string
+  },
   context: PreviewLinkContext,
   deps: PreviewLinkNavigationDeps
 ): Promise<void> {
@@ -169,13 +215,28 @@ export async function routeLinkActivation(
       const verdict = await confine(context.realRoot, candidate, { allowBuildDirs: true })
 
       if (!verdict.ok) {
+        // One label per reason, and the raw attribute gets a say: Chromium
+        // collapses `../` past the root BEFORE main sees `href`, so a link that
+        // climbed out of the project arrives as a clean in-root path that is
+        // merely missing. The attribute still shows the climb. It only ever
+        // changes the LABEL — the decision above was made on the confined path.
+        const climbedOut =
+          verdict.reason === 'missing' &&
+          activation.rawHref !== undefined &&
+          rawHrefEscapesDocument(activation.rawHref, context.currentUrl)
+        const type: PreviewFailureType =
+          verdict.reason === 'escape' || climbedOut
+            ? 'path-escape'
+            : verdict.reason === 'excluded'
+              ? 'excluded-path'
+              : 'missing-local-file'
         deps.recordFailure({
-          type: verdict.reason === 'escape' ? 'path-escape' : 'missing-local-file',
+          type,
           resourceUrlOrHost: sanitize(intent.relPath),
           reasonCode:
-            verdict.reason === 'escape'
-              ? ErrorCode.PREVIEW_LINK_BLOCKED
-              : ErrorCode.PREVIEW_LOCAL_FILE_MISSING
+            type === 'missing-local-file'
+              ? ErrorCode.PREVIEW_LOCAL_FILE_MISSING
+              : ErrorCode.PREVIEW_LINK_BLOCKED
         })
         return
       }

@@ -50,6 +50,7 @@ import {
 import type { IPreviewEligibilityService } from '../../services/preview/PreviewEligibilityService'
 import type { IPreviewAllowlistStore } from '../../services/preview/PreviewAllowlistStore'
 import { createPreviewEmitters, type PreviewEmitTarget } from './emit'
+import { createExternalLinkConsent } from './externalLinkConsent'
 import { logger } from '../../services/LoggingService'
 
 /** The composed service surface the handlers drive (lifecycle + find/export). */
@@ -96,81 +97,17 @@ function defaultResolveEmitTargets(): readonly PreviewEmitTarget[] {
     })
 }
 
-/**
- * Show where an external link goes, then open it only if the user agrees
- * (sd-074b §5.5).
- *
- * The URL has already been parsed and allow-listed by the navigation policy, and
- * the click was a genuine user gesture — but a gesture is not informed consent.
- * A previewed page owns its whole viewport and can move an anchor under the
- * cursor between mousedown and click, and the preview has no address bar, no
- * status bar and no hover-URL, so the destination is otherwise invisible.
- *
- * The destination shown is the ORIGIN (or the address for `mailto:`), not the
- * full URL: it is the part that decides where you actually end up, and it keeps
- * a hostile path or query from filling the dialog.
- *
- * Cancel is the default button, so dismissing the dialog opens nothing.
- *
- * SERIALISED. Link routing is fire-and-forget (`void routeLinkActivation(…)`),
- * so without a queue several activations could each open a modal and stack them
- * on top of one another — consent fatigue at best, an unusable app at worst
- * (lens review F1). One dialog is in flight at a time, process-wide.
- */
-let externalConfirmChain: Promise<void> = Promise.resolve()
-
-async function confirmThenOpenExternal(url: string): Promise<void> {
-  const run = externalConfirmChain.then(() => showConfirmAndOpen(url))
-  // Keep the chain alive even if this link's dialog or hand-off rejects; a
-  // failure must not wedge every later external link.
-  externalConfirmChain = run.catch(() => undefined)
-  return run
-}
-
-/**
- * What the consent dialog names as the destination.
- *
- * `URL.origin` is the STRING `"null"` for every non-special scheme — `tel:`,
- * `sms:`, `mailto:` — and `"null"` is truthy, so `origin || protocol` printed
- * the literal word "null" as the destination. That dialog is the only thing
- * between an untrusted page and an OS hand-off, and for those schemes it named
- * nothing at all.
- *
- * Never the full href: it is attacker-controlled, so it is both a leak surface
- * (a `mailto:` body, a query string) and a log/UI-injection surface. Scheme plus
- * the addressed target is enough to decide with.
- */
-export function describeExternalDestination(url: string): string {
-  let parsed: URL
-  try {
-    parsed = new URL(url)
-  } catch {
-    return '(unparseable link)'
-  }
-  if (parsed.origin !== 'null' && parsed.origin !== '') {
-    return parsed.origin
-  }
-  // Opaque-origin scheme: the pathname carries the number or address.
-  const target = parsed.pathname
-  return target === '' ? parsed.protocol : `${parsed.protocol}${target}`
-}
-
-async function showConfirmAndOpen(url: string): Promise<void> {
-  const destination = describeExternalDestination(url)
-
-  const { response } = await dialog.showMessageBox({
-    type: 'question',
-    buttons: ['Cancel', 'Open'],
-    defaultId: 0,
-    cancelId: 0,
-    message: 'Open this link outside Erfana?',
-    detail: `The preview wants to open:\n\n${destination}`
-  })
-
-  if (response === 1) {
-    await shell.openExternal(url)
-  }
-}
+/** The consent step for an external link, wired to the real Electron surfaces. */
+const confirmThenOpenExternal = createExternalLinkConsent({
+  resolveWindow: (windowId) => {
+    const win = BrowserWindow.fromId(windowId)
+    return win !== null && !win.isDestroyed() ? win : null
+  },
+  // `ConsentWindow` is a structural slice of `BrowserWindow`; `resolveWindow`
+  // above only ever hands back a real one.
+  showMessageBox: (win, options) => dialog.showMessageBox(win as BrowserWindow, options),
+  openExternal: (url) => shell.openExternal(url)
+})
 
 /**
  * Absolute path of the built preview-page preload, or `null` when it is missing.
@@ -248,8 +185,9 @@ export function buildPreviewGraph(deps: BuildPreviewGraphDeps): PreviewGraph {
         onChanged
       }),
     createReloadPolicy: (onDecision) => createPreviewReloadPolicy({ onDecision }),
-    // The OS hand-off for an external link, behind a confirmation.
-    openExternal: (url) => confirmThenOpenExternal(url),
+    // The OS hand-off for an external link, behind a confirmation owned by
+    // the window whose preview asked.
+    openExternal: confirmThenOpenExternal,
     createFindController: (wc, onCount) =>
       createPreviewFindController(wc as unknown as PreviewFindContents, onCount),
     createFailureLog: (onEmit) => createPreviewFailureLog({ onEmit }),

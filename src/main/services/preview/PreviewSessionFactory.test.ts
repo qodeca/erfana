@@ -7,6 +7,9 @@
  * sequence is verified with no real `Session`/`WebContentsView`.
  */
 import { describe, expect, it, vi } from 'vitest'
+import { PREVIEW } from '../../../shared/constants'
+import { ErrorCode } from '../../../shared/errors'
+import type { PreviewFailureInput } from '../../../shared/ipc/preview-types'
 
 import type { PreviewAllowlistState, IPreviewAllowlistStore } from './PreviewAllowlistStore'
 import type { IPreviewRootRegistry, PreviewRootEntry } from './PreviewRootRegistry'
@@ -49,7 +52,8 @@ function makeStore(origins: string[]): IPreviewAllowlistStore {
       Promise.resolve(origins)
     ),
     getOrigins: vi.fn<() => ReadonlySet<string>>(() => new Set(origins)),
-    isWriteBackEnabled: vi.fn<() => boolean>(() => true)
+    isWriteBackEnabled: vi.fn<() => boolean>(() => true),
+    drainBadges: vi.fn<() => PreviewFailureInput[]>(() => [])
   }
 }
 
@@ -70,6 +74,34 @@ function makeView(): PreviewViewHandle {
 const SESSION = { storagePath: null, isPersistent: () => false } as unknown as PreviewSessionLike
 
 describe('PreviewSessionFactory', () => {
+  it('records the badges a bad allowlist raised at load on the new view (#115)', async () => {
+    // The store logs its parse badge process-wide because it has no panel to
+    // address; the factory is the first place that has the panel's failure log.
+    const store = makeStore([])
+    const badge: PreviewFailureInput = {
+      type: 'allowlist-invalid',
+      resourceUrlOrHost: '.erfana/settings.json',
+      reasonCode: ErrorCode.PROJECT_SETTINGS_VALIDATION_FAILED
+    }
+    ;(store.drainBadges as ReturnType<typeof vi.fn>).mockReturnValueOnce([badge])
+    const factory = new PreviewSessionFactory({
+      registry: makeRegistry(),
+      allowlistStore: store,
+      createSession: vi.fn<(p: string) => PreviewSessionLike>(() => SESSION),
+      buildWebPreferences: vi.fn<() => unknown>(() => ({})),
+      createView: vi.fn<() => PreviewViewHandle>(() => makeView()),
+      hardenSession: vi.fn<() => () => void>(() => () => undefined),
+      attachProtocol: vi.fn<() => () => void>(() => () => undefined),
+      attachFilter: vi.fn<() => () => void>(() => () => undefined),
+      assertSealed: vi.fn<() => void>(() => undefined)
+    })
+    const recordFailure = vi.fn()
+
+    await factory.create({ projectPath: '/proj', recordFailure, onBlocked: vi.fn() })
+
+    expect(recordFailure).toHaveBeenCalledWith(badge)
+  })
+
   it('runs the §5(a) sequence in order and returns a wired session', async () => {
     const order: string[] = []
     const registry = makeRegistry()
@@ -295,5 +327,157 @@ describe('PreviewSessionFactory', () => {
       expect(registry.revoke).toHaveBeenCalledWith(TOKEN)
       expect(view.webContents.destroy).toHaveBeenCalledTimes(1)
     })
+  })
+})
+
+describe('PreviewSessionFactory — partition recycling', () => {
+  // Electron cannot destroy a session: every `fromPartition` with a NEW name
+  // costs handles for the life of the process (measured on Windows: ~16 per
+  // partition, and +0 for re-minting a name). A partition is handed back after
+  // a bounded purge and reused after another; a purge that fails or overruns
+  // on either side drops the name, so nothing is ever reused un-purged.
+  function makeFactory(overrides: {
+    purge?: ReturnType<typeof vi.fn>
+    nextPartitionName?: ReturnType<typeof vi.fn>
+    createSession?: ReturnType<typeof vi.fn>
+  } = {}): {
+    factory: PreviewSessionFactory
+    purge: ReturnType<typeof vi.fn>
+    nextPartitionName: ReturnType<typeof vi.fn>
+    createSession: ReturnType<typeof vi.fn>
+  } {
+    let minted = 0
+    const nextPartitionName =
+      overrides.nextPartitionName ?? vi.fn<() => string>(() => `erfana-preview-fresh-${++minted}`)
+    const createSession =
+      overrides.createSession ?? vi.fn<(p: string) => PreviewSessionLike>(() => SESSION)
+    const purge = overrides.purge ?? vi.fn<(s: PreviewSessionLike) => Promise<void>>(() => Promise.resolve())
+    const factory = new PreviewSessionFactory({
+      registry: makeRegistry(),
+      allowlistStore: makeStore([]),
+      nextPartitionName,
+      createSession,
+      purge,
+      buildWebPreferences: vi.fn<() => unknown>(() => ({})),
+      createView: vi.fn<() => PreviewViewHandle>(() => makeView()),
+      hardenSession: vi.fn<() => () => void>(() => () => undefined),
+      attachProtocol: vi.fn<() => () => void>(() => () => undefined),
+      attachFilter: vi.fn<() => () => void>(() => () => undefined),
+      assertSealed: vi.fn<() => void>(() => undefined)
+    })
+    return { factory, purge, nextPartitionName, createSession }
+  }
+  const ctx = () => ({ projectPath: '/proj', recordFailure: vi.fn(), onBlocked: vi.fn() })
+
+  it('reuses a released partition instead of minting a new one', async () => {
+    const { factory, nextPartitionName, createSession } = makeFactory()
+
+    const first = await factory.create(ctx())
+    await first.release()
+    const second = await factory.create(ctx())
+
+    expect(second.partition).toBe(first.partition)
+    expect(nextPartitionName).toHaveBeenCalledTimes(1)
+    expect(createSession.mock.calls.map((c) => c[0])).toEqual([first.partition, first.partition])
+  })
+
+  it('purges a recycled partition again before handing it out, and mints fresh when that purge fails', async () => {
+    const purge = vi.fn<(s: PreviewSessionLike) => Promise<void>>(() => Promise.resolve())
+    const { factory, nextPartitionName } = makeFactory({ purge })
+
+    const first = await factory.create(ctx())
+    await first.release()
+    expect(purge).toHaveBeenCalledTimes(1)
+
+    purge.mockRejectedValueOnce(new Error('clearStorageData failed'))
+    const second = await factory.create(ctx())
+
+    // The reuse purge ran, failed, and the name was dropped rather than reused.
+    expect(purge).toHaveBeenCalledTimes(2)
+    expect(second.partition).not.toBe(first.partition)
+    expect(nextPartitionName).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not reuse a partition whose purge after use never completes', async () => {
+    vi.useFakeTimers()
+    try {
+      const purge = vi.fn<(s: PreviewSessionLike) => Promise<void>>(() => Promise.resolve())
+      const { factory, nextPartitionName } = makeFactory({ purge })
+
+      const first = await factory.create(ctx())
+      purge.mockReturnValueOnce(new Promise<void>(() => {}))
+      const releasing = first.release()
+      await vi.advanceTimersByTimeAsync(PREVIEW.PARTITION_PURGE_TIMEOUT_MS + 1)
+      await releasing
+
+      const second = await factory.create(ctx())
+      expect(second.partition).not.toBe(first.partition)
+      expect(nextPartitionName).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('returns the partition for reuse when a later build step throws (review)', async () => {
+    // `rollback()` unwound the token, the view, the hardening and both attach
+    // points, but never the partition: a build that failed after
+    // `acquirePartition` lost the name for good, holding its handles for the
+    // life of the process on the path most likely to repeat.
+    const createView = vi.fn<() => PreviewViewHandle>(() => makeView())
+    createView.mockImplementationOnce(() => {
+      throw new Error('no view')
+    })
+    const purge = vi.fn<(s: PreviewSessionLike) => Promise<void>>(() => Promise.resolve())
+    const { factory, nextPartitionName, createSession } = makeFactory({ purge })
+    ;(factory as unknown as { deps: { createView: unknown } }).deps.createView = createView
+
+    await expect(factory.create(ctx())).rejects.toThrow('no view')
+    await vi.waitFor(() => expect(purge).toHaveBeenCalledTimes(1))
+    await new Promise((r) => setImmediate(r))
+    const second = await factory.create(ctx())
+
+    expect(nextPartitionName).toHaveBeenCalledTimes(1)
+    expect(createSession.mock.calls.map((c) => c[0])).toEqual([second.partition, second.partition])
+  })
+
+  it('drops a name handed back after forgetRecycled() ran (a project switch mid-drain)', async () => {
+    // `onProjectChanged` awaits the drain of every view and only THEN forgets
+    // the list, while an open for the new project can arrive between two of
+    // those releases and pop a name the old project just used.
+    const { factory, nextPartitionName } = makeFactory()
+
+    const first = await factory.create(ctx())
+    factory.forgetRecycled()
+    await first.release()
+    const second = await factory.create(ctx())
+
+    expect(second.partition).not.toBe(first.partition)
+    expect(nextPartitionName).toHaveBeenCalledTimes(2)
+  })
+
+  it('treats a second release() of the same session as a no-op', async () => {
+    // `fromPartition(name)` returns the same object for a name, so a late
+    // second release would purge the successor's live storage and push the
+    // name back while a preview is using it.
+    const purge = vi.fn<(s: PreviewSessionLike) => Promise<void>>(() => Promise.resolve())
+    const { factory } = makeFactory({ purge })
+
+    const first = await factory.create(ctx())
+    await first.release()
+    await first.release()
+
+    expect(purge).toHaveBeenCalledTimes(1)
+  })
+
+  it('forgets every recycled partition when told to (a project switch)', async () => {
+    const { factory, nextPartitionName } = makeFactory()
+
+    const first = await factory.create(ctx())
+    await first.release()
+    factory.forgetRecycled()
+    const second = await factory.create(ctx())
+
+    expect(second.partition).not.toBe(first.partition)
+    expect(nextPartitionName).toHaveBeenCalledTimes(2)
   })
 })

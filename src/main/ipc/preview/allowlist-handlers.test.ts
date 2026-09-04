@@ -13,6 +13,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { IpcMainInvokeEvent } from 'electron'
 import { AppError, ErrorCode } from '../../../shared/errors'
 import { PreviewChannels } from '../../../shared/ipc/preview-channels'
+import { PREVIEW } from '../../../shared/constants'
 import { registerPreviewAllowlistHandlers } from './allowlist-handlers'
 
 type Handler = (event: unknown, arg: unknown) => unknown
@@ -72,6 +73,29 @@ describe('registerPreviewAllowlistHandlers', () => {
       applyApprovedHosts.mock.invocationCallOrder[0]
     )
     expect(result).toEqual({ ok: true, hosts: APPROVED })
+  })
+
+  it('answers ok:true when applying the grant does not complete in time — the grant is saved', async () => {
+    // The write has landed and the CSP is rebuilt synchronously before the
+    // first await, so the grant is already effective; only the reload is late.
+    // The band must hear back, or it sits on "Saving…" with Cancel dead.
+    vi.useFakeTimers()
+    try {
+      const { applyApprovedHosts } = setup({
+        applyApprovedHosts: vi.fn(() => new Promise<void>(() => {}))
+      })
+
+      const pending = handlers[PreviewChannels.APPROVE_HOST](event, {
+        panelId: 'p1',
+        host: 'https://cdn.example.com'
+      }) as Promise<unknown>
+      await vi.advanceTimersByTimeAsync(PREVIEW.APPROVE_TIMEOUT_MS + 1)
+
+      await expect(pending).resolves.toEqual({ ok: true, hosts: APPROVED })
+      expect(applyApprovedHosts).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('ignores a payload-supplied projectRoot (.strict rejects it; store untouched)', async () => {

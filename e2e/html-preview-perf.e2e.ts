@@ -25,17 +25,13 @@ import * as fsp from 'fs/promises'
 import * as path from 'path'
 
 import { test, expect } from './fixtures/index'
-import { ProjectTreePage } from './pages/project-tree.page'
-import type { ElectronApplication, Page } from '@playwright/test'
+import { HtmlPreviewPage, PREVIEW_BUDGET_MS } from './pages/html-preview.page'
 
 const CORPUS_DIR = path.join(__dirname, 'fixtures', 'html-preview-corpus')
 
 function corpus(relPath: string): string {
   return fs.readFileSync(path.join(CORPUS_DIR, relPath), 'utf-8')
 }
-
-/** Generous budget for opening a preview; unrelated to the measured budget. */
-const PREVIEW_BUDGET_MS = 20_000
 
 /** AC24: save-to-visible-change, 95th percentile. */
 const AC24_P95_BUDGET_MS = 300
@@ -46,36 +42,12 @@ const SAMPLE_COUNT = 20
 /** Longest a single save is allowed to take before the run is abandoned. */
 const SAMPLE_TIMEOUT_MS = 5_000
 
-/** Read the live preview page's computed body background, main-side. */
-async function bodyBackground(app: ElectronApplication): Promise<string> {
-  return app.evaluate(async ({ webContents }) => {
-    const previews = webContents.getAllWebContents().filter((wc) => {
-      try {
-        return wc.getURL().includes('multi-file') && !wc.isDestroyed()
-      } catch {
-        return false
-      }
-    })
-    if (previews.length === 0) return ''
-    try {
-      return await previews[0].executeJavaScript(
-        'getComputedStyle(document.body).backgroundColor'
-      )
-    } catch {
-      return ''
-    }
-  })
-}
+/** The measured page, addressed by its project-relative path (several are open). */
+const MEASURED = HtmlPreviewPage.target('multi-file/index.html')
 
-/** Open a project-relative `.html` file as a running preview. */
-async function openPreview(page: Page, relPath: string): Promise<void> {
-  const tree = new ProjectTreePage(page)
-  await tree.expandTo([relPath.split('/')[0]])
-  await tree.fileRow(relPath).click()
-  await page.locator('.html-preview-placeholder').first().waitFor({
-    state: 'attached',
-    timeout: PREVIEW_BUDGET_MS
-  })
+/** Read the measured preview page's computed body background, main-side. */
+async function bodyBackground(preview: HtmlPreviewPage): Promise<string> {
+  return (await preview.eval('getComputedStyle(document.body).backgroundColor', MEASURED)) ?? ''
 }
 
 /** The 95th-percentile value of a sample set, nearest-rank. */
@@ -90,7 +62,7 @@ function percentile95(samples: readonly number[]): number {
  * computed background matches. Returns the elapsed milliseconds.
  */
 async function timeOneCssSave(
-  app: ElectronApplication,
+  preview: HtmlPreviewPage,
   cssPath: string,
   colour: { hex: string; rgb: string }
 ): Promise<number> {
@@ -102,7 +74,7 @@ async function timeOneCssSave(
 
   const deadline = startedAt + SAMPLE_TIMEOUT_MS
   for (;;) {
-    if ((await bodyBackground(app)) === colour.rgb) {
+    if ((await bodyBackground(preview)) === colour.rgb) {
       return Date.now() - startedAt
     }
     if (Date.now() > deadline) {
@@ -135,24 +107,25 @@ test.describe('HTML preview — AC24 save-to-visible-change', () => {
     appWithTestProject,
     testProject
   }) => {
-    await openPreview(windowWithTestProject, 'multi-file/index.html')
+    const preview = new HtmlPreviewPage(windowWithTestProject, appWithTestProject)
+    await preview.open('multi-file/index.html')
     const cssPath = path.join(testProject.path, 'multi-file', 'styles.css')
 
     // Settle: the first swap after load also warms the watch set.
     await expect
-      .poll(async () => (await bodyBackground(appWithTestProject)).length > 0, {
+      .poll(async () => (await bodyBackground(preview)).length > 0, {
         timeout: PREVIEW_BUDGET_MS
       })
       .toBe(true)
-    await timeOneCssSave(appWithTestProject, cssPath, COLOURS[0])
+    await timeOneCssSave(preview, cssPath, COLOURS[0])
 
     const samples: number[] = []
     for (let i = 0; i < SAMPLE_COUNT; i += 1) {
-      samples.push(await timeOneCssSave(appWithTestProject, cssPath, COLOURS[i % 2]))
+      samples.push(await timeOneCssSave(preview, cssPath, COLOURS[i % 2]))
     }
 
     const p95 = percentile95(samples)
-     
+
     console.log(`[AC24] 1 preview — P95 ${p95} ms over ${samples.length} saves`)
     expect(p95).toBeLessThan(AC24_P95_BUDGET_MS)
   })
@@ -166,26 +139,27 @@ test.describe('HTML preview — AC24 save-to-visible-change', () => {
     // Open the measured one FIRST so it is the least recently used, then open two
     // more — this is the worst realistic case for the shared watcher pool and the
     // shared asset-read limiter.
-    await openPreview(windowWithTestProject, 'multi-file/index.html')
-    await openPreview(windowWithTestProject, 'self-contained/index.html')
-    await openPreview(windowWithTestProject, 'links/index.html')
+    const preview = new HtmlPreviewPage(windowWithTestProject, appWithTestProject)
+    await preview.open('multi-file/index.html')
+    await preview.open('self-contained/index.html')
+    await preview.open('links/index.html')
 
     const cssPath = path.join(testProject.path, 'multi-file', 'styles.css')
 
     await expect
-      .poll(async () => (await bodyBackground(appWithTestProject)).length > 0, {
+      .poll(async () => (await bodyBackground(preview)).length > 0, {
         timeout: PREVIEW_BUDGET_MS
       })
       .toBe(true)
-    await timeOneCssSave(appWithTestProject, cssPath, COLOURS[0])
+    await timeOneCssSave(preview, cssPath, COLOURS[0])
 
     const samples: number[] = []
     for (let i = 0; i < SAMPLE_COUNT; i += 1) {
-      samples.push(await timeOneCssSave(appWithTestProject, cssPath, COLOURS[i % 2]))
+      samples.push(await timeOneCssSave(preview, cssPath, COLOURS[i % 2]))
     }
 
     const p95 = percentile95(samples)
-     
+
     console.log(`[AC24] 3 previews — P95 ${p95} ms over ${samples.length} saves`)
     expect(p95).toBeLessThan(AC24_P95_BUDGET_MS)
   })

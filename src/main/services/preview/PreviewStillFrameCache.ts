@@ -25,7 +25,12 @@
  * about to destroy the page anyway.
  *
  * Budget enforcement, in order:
- *   - `isBeingCaptured()` true  ⇒ skip (a capture is already in flight)
+ *   - a capture of this panel that THIS cache started is still in flight ⇒ skip.
+ *     Not Electron's `isBeingCaptured()`: that is Chromium's capturer count,
+ *     which other things raise — on Windows it read true from a fresh preview's
+ *     first frame, so no frame was ever taken (2026-09-03).
+ *   - either edge under `MIN_STILL_FRAME_PX` ⇒ skip (the 1×1 seed rect)
+ *   - `capturePage` past `CAPTURE_TIMEOUT_MS` ⇒ NO frame, previous kept
  *   - `capturePage` throws      ⇒ NO frame (swallowed, never rethrown)
  *   - downscale to `MAX_FRAME_EDGE_PX` longest edge via `NativeImage.resize`
  *   - `toDataURL` over `MAX_FRAME_DATAURL_CHARS` ⇒ NO frame
@@ -33,6 +38,8 @@
  * @see specs/designs/sd-074-html-preview.md §1.4
  */
 import { PREVIEW } from '../../../shared/constants'
+import { logger } from '../LoggingService'
+import { withTimeout } from '../../utils/withTimeout'
 import type { PreviewBounds, PreviewStillFrame } from '../../../shared/ipc/preview-types'
 
 /**
@@ -52,7 +59,6 @@ export interface PreviewNativeImage {
  * `WebContentsView`.
  */
 export interface PreviewCaptureContents {
-  isBeingCaptured(): boolean
   capturePage(rect?: PreviewBounds, opts?: { stayHidden?: boolean }): Promise<PreviewNativeImage>
 }
 
@@ -77,7 +83,7 @@ export interface IPreviewStillFrameCache {
    * **window-relative** DIPs for `View.setBounds`. Passing that through asked
    * for a box starting hundreds of pixels INTO the page; Chromium clipped it at
    * the page edge and returned a narrow off-centre sliver, which
-   * `.html-preview-still-frame`'s `object-fit: contain` then blew up to fill the
+   * `.html-preview-still-frame`'s `object-fit: cover` then blew up to fill the
    * height and letterboxed in black. Accepting a size makes the mistake
    * unspellable: the rect is built here, at the origin, every time.
    */
@@ -95,6 +101,8 @@ export interface IPreviewStillFrameCache {
 
 export class PreviewStillFrameCache implements IPreviewStillFrameCache {
   private readonly frames = new Map<string, PreviewStillFrame>()
+  /** Panels whose capture THIS cache started and has not yet settled. */
+  private readonly inFlight = new Set<string>()
   private readonly now: () => number
   private readonly maxEdgePx: number
   private readonly maxDataUrlChars: number
@@ -111,32 +119,50 @@ export class PreviewStillFrameCache implements IPreviewStillFrameCache {
     size: { width: number; height: number },
     opts: { shouldKeep?: () => boolean } = {}
   ): Promise<void> {
-    // A capture is already in flight — skip rather than stack captures.
-    if (wc.isBeingCaptured()) {
+    // A capture of this panel is already in flight — skip rather than stack.
+    // Our own ledger, not `wc.isBeingCaptured()`: see the header.
+    if (this.inFlight.has(panelId)) {
       return
     }
 
-    // No rectangle, no picture. A view that has never been laid out reports a
-    // zero size, and asking Chromium to capture nothing is at best a wasted
-    // round trip — at worst an unbounded one, since nothing here imposes a time
-    // budget. Answering it locally is free and certain.
-    if (size.width <= 0 || size.height <= 0) {
+    // No rectangle, no picture — and no picture worth having below the
+    // minimum either. A view that has never been laid out reports the 1×1 seed
+    // rect `preview:open` was called with, and a one-pixel frame stretched over
+    // the panel is the flat colour block a suspended tab used to show.
+    if (size.width < PREVIEW.MIN_STILL_FRAME_PX || size.height < PREVIEW.MIN_STILL_FRAME_PX) {
       return
     }
 
     let image: PreviewNativeImage
+    this.inFlight.add(panelId)
     try {
-      // `stayHidden: true` lets the capture succeed even as the view is hidden.
-      image = await wc.capturePage(
-        { x: 0, y: 0, width: size.width, height: size.height },
-        { stayHidden: true }
-      )
-    } catch {
-      // Capture failed ⇒ NO frame. Panel falls back to the placeholder colour.
+      image = await this.captureOnce(wc, size)
+      // An EMPTY image is Chromium saying the surface has not produced a frame
+      // yet — measured on Windows: the capture at `'ready'` came back empty for
+      // a page that had just finished loading, and a parked tab then showed a
+      // flat colour block. One retry after a short pause is enough; a second
+      // empty answer means the page is genuinely not painting.
+      if (image.isEmpty()) {
+        await new Promise<void>((resolve) => setTimeout(resolve, PREVIEW.CAPTURE_RETRY_DELAY_MS))
+        if (opts.shouldKeep !== undefined && !opts.shouldKeep()) {
+          return
+        }
+        image = await this.captureOnce(wc, size)
+      }
+    } catch (error) {
+      // Capture failed or timed out ⇒ NO frame. The panel keeps what it had.
+      // Said out loud: a tab that wakes without a picture is otherwise silent.
+      logger.warn('Preview still frame: capture failed', {
+        panelId,
+        error: error instanceof Error ? error.message : String(error)
+      })
       return
+    } finally {
+      this.inFlight.delete(panelId)
     }
 
     if (image.isEmpty()) {
+      logger.debug('Preview still frame: empty capture, no frame stored', { panelId })
       return
     }
 
@@ -163,6 +189,7 @@ export class PreviewStillFrameCache implements IPreviewStillFrameCache {
      * asks, at the last possible moment, rather than guessing from the pixels.
      */
     if (opts.shouldKeep !== undefined && !opts.shouldKeep()) {
+      logger.debug('Preview still frame: discarded, view went away mid-capture', { panelId })
       return
     }
 
@@ -176,6 +203,22 @@ export class PreviewStillFrameCache implements IPreviewStillFrameCache {
 
   invalidate(panelId: string): void {
     this.frames.delete(panelId)
+  }
+
+  /**
+   * One `capturePage`, page-relative at the origin, `stayHidden` so it also
+   * works for a view that is hiding, and bounded — a capture that never comes
+   * back must not hold this panel's slot (or eviction's settle wait) hostage.
+   */
+  private captureOnce(
+    wc: PreviewCaptureContents,
+    size: { width: number; height: number }
+  ): Promise<PreviewNativeImage> {
+    return withTimeout(
+      wc.capturePage({ x: 0, y: 0, width: size.width, height: size.height }, { stayHidden: true }),
+      PREVIEW.CAPTURE_TIMEOUT_MS,
+      'Preview still-frame capture'
+    )
   }
 
   /**

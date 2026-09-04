@@ -150,7 +150,9 @@ describe('registerPreviewLifecycleHandlers', () => {
     })
 
     expect(service.open).not.toHaveBeenCalled()
-    expect(result).toMatchObject({ ok: false })
+    // A named code, so a renderer log line says WHY (a 249-char path used to
+    // fail here as UNKNOWN_ERROR with nothing on screen, 2026-09-03).
+    expect(result).toEqual({ ok: false, errorCode: 'PREVIEW_OPEN_INVALID_REQUEST' })
   })
 
   it('rejects an open payload carrying a forbidden projectPath key (.strict)', async () => {

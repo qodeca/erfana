@@ -29,7 +29,7 @@ This is deliberately not the web's rule. On the web a plain link replaces the pa
 | a `.md`, an image, any other project file | opens in its usual panel |
 | a file under `node_modules/`, `dist/`, `out/`, `coverage/`, `.git/`, or gitignored | opens as **source** |
 | a path outside the project, or a missing file | refused, and listed in the failure badge |
-| `https:`, `http:`, `mailto:` | Erfana shows you the destination and asks before handing it to your browser |
+| `https:`, `http:`, `mailto:`, `tel:`, `ftp:` | Erfana shows you the destination and asks before handing it to the operating system (your browser, mail or phone app) |
 | anything else, and `<a download>` | blocked, and listed in the failure badge |
 
 Every path is re-checked by Erfana itself before anything opens: the page's own idea of where a link points is never trusted.
@@ -49,8 +49,8 @@ Every blocked address gets a button, `localhost` and IP literals included — in
 
 A row without a button says **why**, and the reason is derived from the address rather than assumed. Two shapes reach it. An **IPv6 literal** cannot be allowed at all, because the browser's Content-Security-Policy grammar has no way to write one (`host-char` is `ALPHA / DIGIT / "-"`). A name that is **not a valid host name** — an underscore, an empty part — cannot have a permission written for it either. The row used to give the IPv6 reason for both.
 
-- **Approving records the host** in `.erfana/settings.json` inside the open project. That file is the only source of truth for which hosts are allowed. On the next load the approved host's subresource loads.
-- **Removing an approval is currently a manual edit.** There is no in-app view or revoke of approved hosts yet – to remove one, edit `.erfana/settings.json` by hand and delete the host. An in-app allowlist view/revoke UI is a planned follow-up (see [Security § HTML preview](../security.md#html-preview) and the technical-debt ledger).
+- **Approving records the origin** in `.erfana/settings.json` inside the open project, under `origins`. (An older `hosts` field may sit beside it: it is a projection kept for builds that predate origins, and `origins` is the truth.) That file is the only source of truth for what is allowed. The preview reloads and the approved origin's subresource loads.
+- **You can see what is approved, but not yet revoke it in-app.** The permission band lists every origin the project has already allowed alongside the blocked ones, so a cloned repository that arrives with approvals shows them. Removing one is still a manual edit – open `.erfana/settings.json` and delete the entry. In-app revoke is tracked as [#86](https://github.com/qodeca/erfana/issues/86) (see also [Security § HTML preview](../security.md#html-preview) and the technical-debt ledger).
 
 The allowlist controls *which* origins a page may reach, never *what* it sends. It raises the cost of an attack; it is a speed bump, not a wall – the accepted risks section spells out why.
 

@@ -9,6 +9,8 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
+import { PREVIEW } from '../../../shared/constants'
+
 import {
   createPreviewStillFrameCache,
   type PreviewCaptureContents,
@@ -142,12 +144,99 @@ describe('PreviewStillFrameCache', () => {
     expect(cache.get(PANEL)).toBeUndefined()
   })
 
-  it('emits NO frame when isBeingCaptured() is true (skip)', async () => {
-    const capturePage = vi.fn()
+  it('captures even when Electron reports the page as captured by something else', async () => {
+    // `isBeingCaptured()` is Chromium's capturer count, and other things raise
+    // it. On Windows it read true from the first frame of a fresh preview, so
+    // no still frame was ever taken and an evicted tab showed a flat colour
+    // block (2026-09-03). Only a capture THIS cache started may skip the next.
+    const capturePage = vi.fn(async () => makeImage({ width: 64, height: 32 }, SHORT_DATA_URL))
     const wc = makeWc(capturePage, true)
     const cache = createPreviewStillFrameCache()
 
     await cache.captureIfStale(wc, PANEL, SIZE)
+
+    expect(capturePage).toHaveBeenCalledTimes(1)
+    expect(cache.get(PANEL)).toBeDefined()
+  })
+
+  it('skips only while its own capture of that panel is in flight', async () => {
+    let finish: () => void = () => undefined
+    const capturePage = vi.fn(
+      () =>
+        new Promise<PreviewNativeImage>((resolve) => {
+          finish = () => resolve(makeImage({ width: 64, height: 32 }, SHORT_DATA_URL))
+        })
+    )
+    const wc = makeWc(capturePage)
+    const cache = createPreviewStillFrameCache()
+
+    const first = cache.captureIfStale(wc, PANEL, SIZE)
+    await cache.captureIfStale(wc, PANEL, SIZE)
+    expect(capturePage).toHaveBeenCalledTimes(1)
+
+    finish()
+    await first
+    await cache.captureIfStale(wc, PANEL, SIZE)
+    expect(capturePage).toHaveBeenCalledTimes(2)
+  })
+
+  it('abandons a capture that never resolves after the bound, keeps the previous frame, and recovers', async () => {
+    vi.useFakeTimers()
+    try {
+      const good = vi.fn(async () => makeImage({ width: 64, height: 32 }, SHORT_DATA_URL))
+      const cache = createPreviewStillFrameCache()
+      await cache.captureIfStale(makeWc(good), PANEL, SIZE)
+      const before = cache.get(PANEL)
+      expect(before).toBeDefined()
+
+      const hang = vi.fn(() => new Promise<PreviewNativeImage>(() => {}))
+      const pending = cache.captureIfStale(makeWc(hang), PANEL, SIZE)
+      await vi.advanceTimersByTimeAsync(PREVIEW.CAPTURE_TIMEOUT_MS + 1)
+      await pending
+
+      expect(cache.get(PANEL)).toBe(before)
+      // The panel is capturable again: the hung capture no longer blocks it.
+      await cache.captureIfStale(makeWc(good), PANEL, SIZE)
+      expect(good).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('retries once, after a pause, when the first capture comes back empty', async () => {
+    // Windows, 2026-09-03: the capture taken at 'ready' was an empty image for
+    // three pages in a row — Chromium had not produced a frame yet — and each
+    // of those tabs later parked as a flat colour block.
+    vi.useFakeTimers()
+    try {
+      const empty = makeImage({ width: 800, height: 600 }, SHORT_DATA_URL)
+      empty.isEmpty.mockReturnValue(true)
+      const good = makeImage({ width: 64, height: 32 }, SHORT_DATA_URL)
+      const capturePage = vi.fn().mockResolvedValueOnce(empty).mockResolvedValueOnce(good)
+      const cache = createPreviewStillFrameCache()
+
+      const pending = cache.captureIfStale(makeWc(capturePage), PANEL, SIZE)
+      await vi.advanceTimersByTimeAsync(PREVIEW.CAPTURE_RETRY_DELAY_MS + 1)
+      await pending
+
+      expect(capturePage).toHaveBeenCalledTimes(2)
+      expect(cache.get(PANEL)?.width).toBe(64)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('asks for nothing below the minimum frame size (the 1×1 seed rect)', async () => {
+    // `preview:open` seeds the view at 1×1 before the placeholder is laid out;
+    // a frame taken then is a single pixel stretched over the whole panel.
+    const capturePage = vi.fn(async () => makeImage({ width: 1, height: 1 }, SHORT_DATA_URL))
+    const cache = createPreviewStillFrameCache()
+
+    await cache.captureIfStale(makeWc(capturePage), PANEL, { width: 1, height: 1 })
+    await cache.captureIfStale(makeWc(capturePage), PANEL, {
+      width: PREVIEW.MIN_STILL_FRAME_PX - 1,
+      height: 600
+    })
 
     expect(capturePage).not.toHaveBeenCalled()
     expect(cache.get(PANEL)).toBeUndefined()

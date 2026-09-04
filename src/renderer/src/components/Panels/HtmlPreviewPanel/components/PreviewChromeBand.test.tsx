@@ -10,7 +10,7 @@
  *
  * @see design/system/components/permission-band/index.html - status="decided"
  */
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -392,6 +392,76 @@ describe('PreviewChromeBand', () => {
         /is now allowed in this project/
       )
     )
+  })
+
+  /**
+   * The same rule when the call never comes back at all.
+   *
+   * On Windows the `approveHost` invoke did not settle (2026-09-03): the write
+   * had landed, the grant was live, and the band still sat on "Saving…" for
+   * good. Main is time-boxed now, but the renderer keeps its own deadline so no
+   * main-side path can strand it again. The late answer, when it arrives, must
+   * not overwrite what the reader was already told.
+   */
+  it('clears its deadline timer when the panel unmounts mid-approval', async () => {
+    // Without this the 10 s timer outlived the component, holding the closure
+    // and dispatching into an unmounted reducer.
+    const user = userEvent.setup()
+    const onApprove = vi.fn(() => new Promise<PreviewApproveResult>(() => undefined))
+    const { unmount } = render(
+      <PreviewChromeBand
+        blockedHosts={[host('a.example.com')]}
+        allowedHosts={[]}
+        onApprove={onApprove}
+        approveDeadlineMs={60000}
+      />
+    )
+    await user.click(screen.getByTestId('preview-band-chip'))
+    await user.click(screen.getByRole('button', { name: 'Allow https://a.example.com' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm' }))
+    expect(onApprove).toHaveBeenCalledTimes(1)
+
+    const clearSpy = vi.spyOn(globalThis, 'clearTimeout')
+    const before = clearSpy.mock.calls.length
+    unmount()
+    expect(clearSpy.mock.calls.length).toBeGreaterThan(before)
+    clearSpy.mockRestore()
+  })
+
+  it('gives up waiting after its deadline: says the grant is saved, and the row is back', async () => {
+    const user = userEvent.setup()
+    let resolveLate: (result: PreviewApproveResult) => void = () => undefined
+    const onApprove = vi.fn(
+      () =>
+        new Promise<PreviewApproveResult>((resolve) => {
+          resolveLate = resolve
+        })
+    )
+    const { container } = render(
+      <PreviewChromeBand
+        blockedHosts={[host('a.example.com')]}
+        allowedHosts={[]}
+        onApprove={onApprove}
+        approveDeadlineMs={40}
+      />
+    )
+    await user.click(screen.getByTestId('preview-band-chip'))
+    await user.click(screen.getByRole('button', { name: 'Allow https://a.example.com' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm' }))
+    expect(onApprove).toHaveBeenCalledTimes(1)
+
+    await waitFor(() =>
+      expect(container.querySelector('.erf-band__announce')?.textContent).toMatch(/did not confirm/)
+    )
+    expect(screen.getByText('Saved — reload to apply')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Allow https://a.example.com' })).toBeInTheDocument()
+
+    // The late answer must not overwrite what the reader was already told.
+    await act(async () => {
+      resolveLate(ok)
+      await Promise.resolve()
+    })
+    expect(container.querySelector('.erf-band__announce')?.textContent).toMatch(/did not confirm/)
   })
 
   /**

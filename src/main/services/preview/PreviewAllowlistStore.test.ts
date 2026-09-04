@@ -73,6 +73,26 @@ describe('PreviewAllowlistStore.load', () => {
     expect(onBadge.mock.calls[0][0].type).toBe('allowlist-invalid')
   })
 
+  it('buffers each badge until the next drain, so a view can record it (#115)', async () => {
+    // `onBadge` fires at parse time into a process-wide logger — the store has
+    // no panel to address. The session factory, which does, drains the buffer
+    // right after `load()` and records each badge on the new view's failure log.
+    // Without this a malformed allowlist looked exactly like an empty one.
+    await writeSettings(
+      JSON.stringify({ htmlPreview: { allowlist: { version: 1, hosts: ['[::1]'] } } })
+    )
+    const store = createPreviewAllowlistStore({ getProjectRoot: () => root, onBadge: vi.fn() })
+
+    await store.load()
+    const first = store.drainBadges()
+    expect(first.map((badge) => badge.type)).toEqual(['allowlist-invalid'])
+    expect(store.drainBadges()).toEqual([])
+
+    // A second load (another view opening on the same project) refills it.
+    await store.load()
+    expect(store.drainBadges()).toHaveLength(1)
+  })
+
   it('fails closed with a badge on an unsupported version', async () => {
     await writeSettings(
       JSON.stringify({ htmlPreview: { allowlist: { version: 2, hosts: ['cdn.example.com'] } } })

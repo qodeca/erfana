@@ -22,6 +22,8 @@ import { AppError, ErrorCode } from '../../../shared/errors'
 import type { IPreviewViewService } from '../../services/preview/PreviewViewService'
 import type { IPreviewAllowlistStore } from '../../services/preview/PreviewAllowlistStore'
 import { logger } from '../../services/LoggingService'
+import { TimeoutError, withTimeout } from '../../utils/withTimeout'
+import { PREVIEW } from '../../../shared/constants'
 import { registerHandle, unregisterHandle } from '../registry'
 
 /** Injected collaborators for the allowlist handler. */
@@ -59,8 +61,27 @@ export function registerPreviewAllowlistHandlers(
       }
       try {
         // Root is NOT read from the payload — the store resolves it main-side.
+        logger.info('preview:approveHost: approving', { origin: parsed.data.host })
         const origins = await allowlistStore.approveOrigin(parsed.data.host)
-        await service.applyApprovedHosts(parsed.data.panelId, origins)
+        logger.info('preview:approveHost: allowlist written', { count: origins.length })
+        // Time-boxed. The grant is on disk and the CSP is rebuilt before the
+        // first await inside `applyApprovedHosts`, so on timeout it is already
+        // effective and only the reload is late: answer ok, so the band leaves
+        // "Saving…" (the Allow freeze on Windows, 2026-09-03). The late
+        // continuation, if any, is guarded by the view's own `isDefunct` checks.
+        try {
+          await withTimeout(
+            service.applyApprovedHosts(parsed.data.panelId, origins),
+            PREVIEW.APPROVE_TIMEOUT_MS,
+            'Preview approval apply'
+          )
+        } catch (error) {
+          if (!(error instanceof TimeoutError)) throw error
+          logger.error(
+            'preview:approveHost: applying the grant did not complete; it is saved and takes effect on reload',
+            error
+          )
+        }
         return { ok: true, hosts: origins }
       } catch (error) {
         const errorCode = error instanceof AppError ? error.code : ErrorCode.UNKNOWN_ERROR

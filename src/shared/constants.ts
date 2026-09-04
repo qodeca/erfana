@@ -528,6 +528,79 @@ export const PREVIEW = {
   /** CSS swap race timeout; any non-`true` outcome falls back to reload (ms) */
   SWAP_TIMEOUT_MS: 1000,
   /**
+   * Bound on the session purge inside an approval (ms). The purge is
+   * belt-and-braces — the opaque origin is the seal and the reload that
+   * follows bypasses the cache — so one that hangs is logged and skipped
+   * rather than allowed to hold the grant hostage (the Allow freeze seen on
+   * Windows, 2026-09-03).
+   */
+  PURGE_TIMEOUT_MS: 2000,
+  /** Bound on the post-write re-read of the allowlist file (ms); same reasoning. */
+  ALLOWLIST_VERIFY_TIMEOUT_MS: 2000,
+  /**
+   * Bound on the whole "apply the grant to the live views" step inside the
+   * `preview:approveHost` invoke (ms). The grant is persisted and the CSP is
+   * rebuilt before the first await, so on timeout the invoke still answers
+   * `ok: true`; only the reload is late.
+   */
+  APPROVE_TIMEOUT_MS: 5000,
+  /**
+   * The renderer's own deadline on that invoke (ms). Defence in depth: however
+   * main misbehaves, the band must leave "Saving…" and give Cancel back. Longer
+   * than `APPROVE_TIMEOUT_MS` so a healthy main always answers first.
+   */
+  APPROVE_UI_DEADLINE_MS: 10000,
+  /**
+   * Bound on one still-frame `capturePage` (ms). A capture that never comes
+   * back must not block every later capture of that panel; the previous frame
+   * is kept.
+   */
+  CAPTURE_TIMEOUT_MS: 1500,
+  /**
+   * Pause before the one retry of a capture that came back EMPTY (ms). Measured
+   * on Windows: the capture taken at `'ready'` was empty for a page that had
+   * only just painted, and the retry a moment later was not.
+   */
+  CAPTURE_RETRY_DELAY_MS: 250,
+  /**
+   * How long eviction waits for an in-flight capture before destroying the
+   * page anyway (ms). The wait exists so a suspended tab wakes with a picture;
+   * it must not be able to stop the tab from being suspended at all.
+   */
+  CAPTURE_SETTLE_TIMEOUT_MS: 1500,
+  /**
+   * Bound on each async step of a view's teardown (ms). On Windows the session
+   * purge inside teardown never settled (2026-09-03): eviction hung, the old
+   * renderer process was never destroyed, and the tab never heard `suspended`.
+   * A step that overruns is logged and skipped; the destroy still happens.
+   */
+  TEARDOWN_STEP_TIMEOUT_MS: 2000,
+  /**
+   * Bound on the purge that runs when a partition is handed back for reuse
+   * and again before it is handed out (ms). Fail-closed: a purge that fails or
+   * overruns on either side drops the name and a fresh partition is minted.
+   */
+  PARTITION_PURGE_TIMEOUT_MS: 2000,
+  /**
+   * How many purged partition names are kept for reuse. Electron cannot destroy
+   * a session, so every NEW name costs handles for the life of the process
+   * (measured on Windows: ~16 per partition, +0 for re-minting a name). One
+   * per live view plus two in flight around an eviction is enough; more would
+   * only hold storage nobody needs. A project switch forgets the whole list on
+   * purpose (a partition never carries across projects), which costs up to
+   * this many fresh names — ~80 handles — per switch; the "no growth"
+   * measurement in 41dfee95 covers open/close within one project only.
+   */
+  MAX_RECYCLED_PARTITIONS: 5,
+  /**
+   * Smallest still frame worth taking (px, either edge). `preview:open` seeds
+   * the view at 1×1 before the placeholder is laid out; a frame captured then is
+   * one pixel stretched over the whole panel. 16 rather than 32 because
+   * `lastBounds` is the zoom-converted rect and a narrow split pane at 200%
+   * scaling is legitimately small.
+   */
+  MIN_STILL_FRAME_PX: 16,
+  /**
    * Max DISTINCT blocked hosts reported to the renderer per view.
    *
    * This replaced `MAX_HOST_TOASTS: 3`, which bounded toasts and not the list —

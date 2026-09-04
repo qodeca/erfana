@@ -186,7 +186,12 @@ Windows breaks. Test each of these with a real project:
       next/previous work.
 - [ ] **Export to PDF** — the Windows save dialog opens, the file is written where
       you chose, and the PDF opens correctly.
-- [ ] **Zoom** — `Ctrl` + `+` / `-` changes the previewed page's zoom.
+- [ ] **Zoom** – **View → Zoom In / Zoom Out / Actual Size** changes the previewed
+      page's zoom: the page text grows or shrinks while Erfana's own chrome stays
+      the same size. The View menu owns zoom (`src/main/menu.ts`); its `Ctrl`
+      accelerators reach the preview *through the menu*, and the keys are
+      deliberately not forwarded into the page (commit `d95aade4`), so test through
+      the menu rather than by pressing keys over the page.
 
 ### 5.6 File watching
 

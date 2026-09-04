@@ -13,6 +13,7 @@
  * The preview page runs in its own sealed `WebContentsView` in a separate web
  * contents, so its `<title>` / liveness are read main-side by finding the
  * `erfana-preview://` web contents — the same identity the app serves it under.
+ * Those reads live in `HtmlPreviewPage` (e2e/pages/html-preview.page.ts).
  *
  * NOTE: the E2E suite is disabled in CI (macos instability), so these guard
  * regressions on a local `npm run test:e2e` run, not on every PR.
@@ -27,153 +28,13 @@ import * as fs from 'fs'
 import * as path from 'path'
 
 import { test, expect } from './fixtures/index'
-import { ProjectTreePage } from './pages/project-tree.page'
-import type { ElectronApplication, Page } from '@playwright/test'
+import { HtmlPreviewPage, PREVIEW_BUDGET_MS } from './pages/html-preview.page'
 
 const CORPUS_DIR = path.join(__dirname, 'fixtures', 'html-preview-corpus')
 
 /** Read one corpus file's real content so the tests exercise the shipped input. */
 function corpus(relPath: string): string {
   return fs.readFileSync(path.join(CORPUS_DIR, relPath), 'utf-8')
-}
-
-/** Generous budget: an Electron `WebContentsView` load + native paint + IPC. */
-const PREVIEW_BUDGET_MS = 20_000
-
-/** A snapshot of the live preview's own web contents, read from the main process. */
-interface PreviewSnapshot {
-  /** `webContents.getTitle()` — may fall back to the URL until the doc is read. */
-  title: string
-  /** `document.title` read inside the page — the authoritative title sentinel. */
-  docTitle: string
-  /** True once the inline script has run (its `#js-output.pending` marker is gone). */
-  jsRan: boolean
-  url: string
-  destroyed: boolean
-}
-
-/**
- * Find the running preview's `WebContentsView` web contents (served under the
- * `erfana-preview://` scheme) and read its title/liveness from the main process.
- * `null` when no preview is live.
- *
- * The document title is read via `executeJavaScript` (the page's own DOM), not
- * `getTitle()` — for a sealed, custom-protocol `WebContentsView`, `getTitle()`
- * can stay the URL, so it is not a reliable sentinel. Injection from the main
- * process is not subject to the page CSP, so it reads the real `document.title`.
- */
-async function previewSnapshot(app: ElectronApplication): Promise<PreviewSnapshot | null> {
-  return app.evaluate(async ({ webContents }) => {
-    const previews = webContents.getAllWebContents().filter((wc) => {
-      try {
-        return wc.getURL().startsWith('erfana-preview://')
-      } catch {
-        return false
-      }
-    })
-    if (previews.length === 0) return null
-    const wc = previews[0]
-    let docTitle = ''
-    let jsRan = false
-    try {
-      docTitle = await wc.executeJavaScript('document.title')
-      // The self-contained fixture drops the `pending` class on DOMContentLoaded.
-      jsRan = await wc.executeJavaScript('!document.querySelector("#js-output.pending")')
-    } catch {
-      // Page may be mid-load / navigating — leave the defaults, the caller polls.
-    }
-    return { title: wc.getTitle(), docTitle, jsRan, url: wc.getURL(), destroyed: wc.isDestroyed() }
-  })
-}
-
-/** Open a project-relative `.html` file as a running preview. */
-async function openPreview(page: Page, relPath: string): Promise<void> {
-  // The test-project fixtures mount with the tree panel already open — do NOT
-  // click the Files activity-bar button, which would toggle it shut.
-  const tree = new ProjectTreePage(page)
-  const folder = relPath.split('/')[0]
-  await tree.expandTo([folder])
-  await tree.fileRow(relPath).click()
-  // The panel chrome mounts a `.html-preview-placeholder` — a sized, brand-black
-  // target the native `WebContentsView` paints OVER. Because the native view sits
-  // above it (and its own a11y/layout tree is separate), the placeholder reads as
-  // "hidden" to the DOM once the view paints, so wait for it to be ATTACHED, not
-  // visible. Actual preview readiness is asserted by each test via
-  // `previewSnapshot` (the real `erfana-preview://` web contents).
-  await page.locator('.html-preview-placeholder').waitFor({
-    state: 'attached',
-    timeout: PREVIEW_BUDGET_MS
-  })
-}
-
-/**
- * The number shown on the tab's failure badge (`.html-preview-badge-count`), or
- * 0 when no badge is present. The badge lives in always-DOM tab chrome (the
- * native view never occludes it), so it is readable even while the page runs.
- */
-async function failureBadgeCount(page: Page): Promise<number> {
-  const count = page.locator('.html-preview-badge-count')
-  if ((await count.count()) === 0) return 0
-  const text = (await count.first().textContent())?.trim() ?? ''
-  const n = Number.parseInt(text, 10)
-  return Number.isNaN(n) ? 0 : n
-}
-
-/** Evaluate an expression inside the live preview page's DOM (main-process read). */
-async function previewEval(app: ElectronApplication, expr: string): Promise<string | null> {
-  return app.evaluate(async ({ webContents }, e) => {
-    const wc = webContents.getAllWebContents().find((c) => {
-      try {
-        return c.getURL().startsWith('erfana-preview://')
-      } catch {
-        return false
-      }
-    })
-    if (!wc) return null
-    try {
-      return await wc.executeJavaScript(e)
-    } catch {
-      return null
-    }
-  }, expr)
-}
-
-/**
- * The on-screen rectangle of the live preview's native `WebContentsView`, read
- * from the main process. `null` when no preview view is attached.
- *
- * This is the ONE thing every other assertion in this file misses: they all read
- * the preview's web contents, which loads and runs its JavaScript whether or not
- * the view has ever been given a size. A view left at 0x0 executes its page
- * perfectly and shows the user a black rectangle.
- */
-async function previewViewBounds(
-  app: ElectronApplication
-): Promise<{ width: number; height: number } | null> {
-  return app.evaluate(({ BrowserWindow }) => {
-    for (const win of BrowserWindow.getAllWindows()) {
-      for (const child of win.contentView.children) {
-        const wc = (child as { webContents?: { getURL(): string } }).webContents
-        try {
-          if (wc && wc.getURL().startsWith('erfana-preview://')) {
-            const b = child.getBounds()
-            return { width: b.width, height: b.height }
-          }
-        } catch {
-          // View mid-teardown; keep scanning.
-        }
-      }
-    }
-    return null
-  })
-}
-
-/** Open the failure-badge popover and return the text of its listed entries. */
-async function failureBadgeEntries(page: Page): Promise<string> {
-  await page.locator('.html-preview-badge').first().click()
-  const popover = page.locator('.html-preview-badge-popover')
-  await popover.waitFor({ state: 'visible', timeout: 5000 })
-  return (await popover.textContent()) ?? ''
 }
 
 test.use({
@@ -196,19 +57,20 @@ test.describe('HTML preview corpus', () => {
     windowWithTestProject,
     appWithTestProject
   }) => {
-    await openPreview(windowWithTestProject, 'self-contained/index.html')
+    const preview = new HtmlPreviewPage(windowWithTestProject, appWithTestProject)
+    await preview.open('self-contained/index.html')
 
     // The sentinel is the preview page's own <title> ("-OK-1"), read from its
     // live DOM in the main process. Its inline script also drops the `pending`
     // marker on DOMContentLoaded, so a satisfied `jsRan` proves JS executed.
     await expect
-      .poll(async () => (await previewSnapshot(appWithTestProject))?.docTitle, {
+      .poll(async () => (await preview.snapshot())?.docTitle, {
         timeout: PREVIEW_BUDGET_MS,
         message: 'preview <title> never gained the -OK-1 sentinel (page did not load?)'
       })
       .toContain('-OK-1')
 
-    const snapshot = await previewSnapshot(appWithTestProject)
+    const snapshot = await preview.snapshot()
     // The untrusted inline JS ran (AC25) and the page is still alive after it.
     expect(snapshot?.jsRan).toBe(true)
     expect(snapshot?.destroyed).toBe(false)
@@ -218,11 +80,12 @@ test.describe('HTML preview corpus', () => {
     windowWithTestProject,
     appWithTestProject
   }) => {
-    await openPreview(windowWithTestProject, 'runaway-loop/index.html')
+    const preview = new HtmlPreviewPage(windowWithTestProject, appWithTestProject)
+    await preview.open('runaway-loop/index.html')
 
     // The preview view is live and serving the runaway page.
     await expect
-      .poll(async () => (await previewSnapshot(appWithTestProject))?.url, {
+      .poll(async () => (await preview.snapshot())?.url, {
         timeout: PREVIEW_BUDGET_MS,
         message: 'runaway-loop preview never became live'
       })
@@ -237,9 +100,9 @@ test.describe('HTML preview corpus', () => {
 
     // And the tab still closes promptly (bounded destroy): closing the preview
     // tab tears the view down, so no `erfana-preview://` web contents remains.
-    await windowWithTestProject.locator('.html-preview-tab-close').first().click()
+    await preview.tabClose().click()
     await expect
-      .poll(async () => previewSnapshot(appWithTestProject), {
+      .poll(async () => preview.snapshot(), {
         timeout: PREVIEW_BUDGET_MS,
         message: 'preview view was not torn down promptly on tab close'
       })
@@ -250,37 +113,39 @@ test.describe('HTML preview corpus', () => {
     windowWithTestProject,
     appWithTestProject
   }) => {
-    await openPreview(windowWithTestProject, 'multi-file/index.html')
+    const preview = new HtmlPreviewPage(windowWithTestProject, appWithTestProject)
+    await preview.open('multi-file/index.html')
 
     // app.js sets `-OK-2` ONLY after the relative stylesheet applied AND the
     // relative logo.svg loaded — so the sentinel proves all three relative refs
     // (styles.css, app.js, logo.svg) were served through the confined scheme.
     await expect
-      .poll(async () => (await previewSnapshot(appWithTestProject))?.docTitle, {
+      .poll(async () => (await preview.snapshot())?.docTitle, {
         timeout: PREVIEW_BUDGET_MS,
         message: 'preview <title> never gained -OK-2 (a relative asset did not resolve?)'
       })
       .toContain('-OK-2')
 
-    expect((await previewSnapshot(appWithTestProject))?.destroyed).toBe(false)
+    expect((await preview.snapshot())?.destroyed).toBe(false)
   })
 
   test('error: page renders while its non-fatal load diagnostics are badged (AC20, AC25)', async ({
     windowWithTestProject,
     appWithTestProject
   }) => {
-    await openPreview(windowWithTestProject, 'error/index.html')
+    const preview = new HtmlPreviewPage(windowWithTestProject, appWithTestProject)
+    await preview.open('error/index.html')
 
     // The page renders despite an uncaught script error, an unresolved module
     // specifier and an unsupported-asset-type link — errors are non-fatal, so the
     // document loads and the view is NOT destroyed by them.
     await expect
-      .poll(async () => (await previewSnapshot(appWithTestProject))?.docTitle, {
+      .poll(async () => (await preview.snapshot())?.docTitle, {
         timeout: PREVIEW_BUDGET_MS,
         message: 'error page never loaded its title'
       })
       .toBe('Error corpus page')
-    expect((await previewSnapshot(appWithTestProject))?.destroyed).toBe(false)
+    expect((await preview.snapshot())?.destroyed).toBe(false)
 
     // The failure badge collects the page's load-time diagnostics. Verified
     // behaviour: the uncaught script error and the unresolved bare-module import
@@ -290,14 +155,14 @@ test.describe('HTML preview corpus', () => {
     // `style`/`script`, which Chromium does not populate for a privileged
     // custom-scheme subresource in this build, so that diagnostic never records.
     await expect
-      .poll(() => failureBadgeCount(windowWithTestProject), {
+      .poll(() => preview.failureBadgeCount(), {
         timeout: PREVIEW_BUDGET_MS,
         message: 'failure badge never reached the expected ≥2 diagnostics'
       })
       .toBeGreaterThanOrEqual(2)
 
     // Both diagnostics name their cause in the popover.
-    const entries = await failureBadgeEntries(windowWithTestProject)
+    const entries = await preview.failureBadgeEntries()
     expect(entries).toContain('deliberate uncaught script error')
     expect(entries).toContain('nonexistent-package')
   })
@@ -306,18 +171,19 @@ test.describe('HTML preview corpus', () => {
     windowWithTestProject,
     appWithTestProject
   }) => {
-    await openPreview(windowWithTestProject, 'cdn/index.html')
+    const preview = new HtmlPreviewPage(windowWithTestProject, appWithTestProject)
+    await preview.open('cdn/index.html')
 
     // Host is NOT approved, so the request filter refuses the cdn.jsdelivr.net
     // stylesheet (deterministic — refused before any network). The page keeps its
     // fallback title and never gains -OK-3, and the view survives.
     await expect
-      .poll(async () => (await previewSnapshot(appWithTestProject))?.docTitle, {
+      .poll(async () => (await preview.snapshot())?.docTitle, {
         timeout: PREVIEW_BUDGET_MS,
         message: 'cdn fallback page never loaded'
       })
       .toBe('CDN corpus page (fallback)')
-    const snapshot = await previewSnapshot(appWithTestProject)
+    const snapshot = await preview.snapshot()
     expect(snapshot?.docTitle).not.toContain('-OK-3')
     expect(snapshot?.destroyed).toBe(false)
 
@@ -327,28 +193,31 @@ test.describe('HTML preview corpus', () => {
     // blocked-host failure badge is raised — the page's fallback text is the
     // observable AC7 signal here.
     await expect
-      .poll(() =>
-        previewEval(
-          appWithTestProject,
-          'document.getElementById("cdn-status") && document.getElementById("cdn-status").textContent'
-        )
-      , {
-        timeout: PREVIEW_BUDGET_MS,
-        message: 'cdn page never took its blocked-host fallback path'
-      })
+      .poll(
+        () =>
+          preview.eval(
+            'document.getElementById("cdn-status") && document.getElementById("cdn-status").textContent'
+          ),
+        {
+          timeout: PREVIEW_BUDGET_MS,
+          message: 'cdn page never took its blocked-host fallback path'
+        }
+      )
       .toContain('CDN blocked')
   })
 
   test('cdn: the permission band lists the blocked host and can approve it', async ({
-    windowWithTestProject
+    windowWithTestProject,
+    appWithTestProject
   }) => {
     // The band is DOM chrome, so unlike the previewed page it is reachable from
     // the Playwright side. This is the only automated cover for the surface that
     // replaced the approve toast — and for the case that broke the old one: a
     // host is listed whether or not anything popped up, because nothing pops up.
-    await openPreview(windowWithTestProject, 'cdn/index.html')
+    const preview = new HtmlPreviewPage(windowWithTestProject, appWithTestProject)
+    await preview.open('cdn/index.html')
 
-    const chip = windowWithTestProject.getByTestId('preview-band-chip')
+    const chip = preview.chip()
     await expect(chip).toBeVisible()
 
     // Counts are ALWAYS shown, including the zeroes: a trust signal that appears
@@ -365,31 +234,34 @@ test.describe('HTML preview corpus', () => {
       })
       .toMatch(/[1-9]\d* blocked/)
 
-    await chip.click()
-    const band = windowWithTestProject.locator('.erf-band')
-    await expect(band.getByText('Blocked on load')).toBeVisible()
-    await expect(band.locator('.erf-host', { hasText: 'cdn.jsdelivr.net' })).toBeVisible()
+    await preview.openBand()
+    await expect(preview.band().getByText('Blocked on load')).toBeVisible()
+    await expect(preview.hostRow('cdn.jsdelivr.net')).toBeVisible()
 
     // Allow OPENS the question; it does not answer it. That split is what stops a
     // one-way door being opened by a stray Return.
     // The accessible name carries the whole ORIGIN, not the bare host: a
     // permission covers scheme, host and port, and the name has to say what is
     // actually being granted.
-    await band.getByRole('button', { name: 'Allow https://cdn.jsdelivr.net' }).click()
-    await expect(band.getByRole('alertdialog')).toBeVisible()
-    await expect(band.getByText(/Erfana cannot undo it/)).toBeVisible()
+    await preview.allowButton('https://cdn.jsdelivr.net').click()
+    await expect(preview.confirmDialog()).toBeVisible()
+    await expect(preview.band().getByText(/Erfana cannot undo it/)).toBeVisible()
 
-    // Cancel leaves the grant unmade and the host still listed.
-    await band.getByRole('button', { name: 'Cancel' }).click()
-    await expect(band.getByRole('alertdialog')).toHaveCount(0)
-    await expect(band.locator('.erf-host', { hasText: 'cdn.jsdelivr.net' })).toBeVisible()
+    // Cancel leaves the grant unmade and the host still listed. (The completed
+    // grant — Allow → Confirm against a real server — is
+    // html-preview-approval.e2e.ts; this fixture points at the public CDN, so
+    // confirming here would either hit the network or fail offline.)
+    await preview.cancelButton().click()
+    await expect(preview.confirmDialog()).toHaveCount(0)
+    await expect(preview.hostRow('cdn.jsdelivr.net')).toBeVisible()
   })
 
   test('the native view is sized on open, with no tab switch to prod it (black-panel regression)', async ({
     windowWithTestProject,
     appWithTestProject
   }) => {
-    await openPreview(windowWithTestProject, 'self-contained/index.html')
+    const preview = new HtmlPreviewPage(windowWithTestProject, appWithTestProject)
+    await preview.open('self-contained/index.html')
 
     // The page loading proves nothing about what the user sees: a `WebContentsView`
     // left at 0x0 still loads and still runs its scripts. Assert the RECTANGLE.
@@ -404,10 +276,7 @@ test.describe('HTML preview corpus', () => {
     // measurement ever reaches it is `{ x: 0, y: 0, width: 1, height: 1 }`
     // (usePreviewLifecycle seeds `preview:open` with it), and 1 is greater
     // than 0. The regression this test exists for would have shipped green.
-    const placeholder = await windowWithTestProject
-      .locator('.html-preview-placeholder')
-      .first()
-      .boundingBox()
+    const placeholder = await preview.placeholderBox('index.html')
     expect(placeholder).not.toBeNull()
     const expectedWidth = placeholder?.width ?? 0
     const expectedHeight = placeholder?.height ?? 0
@@ -416,13 +285,13 @@ test.describe('HTML preview corpus', () => {
     // A few pixels of tolerance for DIP rounding; the point is that the view
     // tracks the panel, not that it is non-degenerate.
     await expect
-      .poll(async () => (await previewViewBounds(appWithTestProject))?.width ?? 0, {
+      .poll(async () => (await preview.viewBounds())?.width ?? 0, {
         timeout: 5000,
         message: 'preview view never matched its placeholder without user interaction'
       })
       .toBeGreaterThan(expectedWidth - 4)
 
-    const bounds = await previewViewBounds(appWithTestProject)
+    const bounds = await preview.viewBounds()
     // The placeholder now IS the page area: the chrome strip is a flow sibling
     // above it rather than an overlay on it, so no inset is subtracted here any
     // more and the height gets the same tight DIP-rounding tolerance as the

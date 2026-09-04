@@ -228,6 +228,48 @@ describe('createPreviewWatchCoordinator.setWatchSet', () => {
     expect(pool.size).toBe(0)
   })
 
+  it('releases the watches it acquired when a later acquire throws (#112)', async () => {
+    // `watched` used to be assigned only on success, and `dispose()` releases
+    // only what is in `watched`: a throw partway through the acquire loop
+    // (chokidar on EMFILE) stranded every watch acquired before it, for the
+    // life of the process, and burned its slot in the shared budget.
+    const pool = makeFakePool()
+    const acquire = pool.acquire.bind(pool)
+    let calls = 0
+    pool.acquire = (filePath, onChange) => {
+      calls += 1
+      if (calls === 2) throw new Error('EMFILE')
+      return acquire(filePath, onChange)
+    }
+    const coordinator = createPreviewWatchCoordinator({
+      realRoot: REAL_ROOT,
+      pool,
+      onChanged: vi.fn(),
+      confine: makeConfine()
+    })
+
+    await expect(coordinator.setWatchSet(['/proj/a.css', '/proj/b.css'])).rejects.toThrow('EMFILE')
+
+    expect(pool.log).toContain('release-done:/proj/a.css')
+    expect(pool.size).toBe(0)
+  })
+
+  it('dispose closes its pool, so nothing the pool still holds outlives the view', async () => {
+    const pool = makeFakePool()
+    const close = vi.spyOn(pool, 'close')
+    const coordinator = createPreviewWatchCoordinator({
+      realRoot: REAL_ROOT,
+      pool,
+      onChanged: vi.fn(),
+      confine: makeConfine()
+    })
+    await coordinator.setWatchSet(['/proj/a.css'])
+
+    await coordinator.dispose()
+
+    expect(close).toHaveBeenCalledTimes(1)
+  })
+
   it('drops over-cap candidates in input priority order', async () => {
     const pool = makeFakePool()
     const coord = createPreviewWatchCoordinator({

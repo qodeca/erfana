@@ -1,6 +1,6 @@
 # Design: HTML preview — in-page link navigation + independent preview tabs
 
-**Revises**: [`sd-074-html-preview.md`](sd-074-html-preview.md) §10 non-goals (concurrency, link navigation) | **Issues**: to be filed (three: IPC sender gating, independent previews, in-page link navigation) | **Tier**: 2 | **Complexity**: complex | **Branch**: `feature/html-preview-navigation` off `develop` | **Status**: revision 2, approved, not yet implemented
+**Revises**: [`sd-074-html-preview.md`](sd-074-html-preview.md) §10 non-goals (concurrency, link navigation) | **Issues**: to be filed (three: IPC sender gating, independent previews, in-page link navigation) | **Tier**: 2 | **Complexity**: complex | **Branch**: `feature/html-preview-navigation` off `develop` | **Status**: revision 2, approved, **shipped in [#79](https://github.com/qodeca/erfana/issues/79) (v0.18.0)**; D7, D8, §4.5 and the code references below were reconciled with what was built on 2026-09-04 (v0.19.0 Windows fixes)
 
 Two behaviours are added to the running HTML preview:
 
@@ -21,13 +21,15 @@ Two behaviours are added to the running HTML preview:
 | D4 | **Every link opens a new tab.** No in-place navigation in this version | Operator decision. `target="_self"`, `_top`, `_parent` and `<base target>` are all documented as behaving like a new tab. See §3.3 for what this drops and why |
 | D5 | **Previews sleep when idle**: the 3 most recently active stay live; the rest tear down to a still frame and re-open automatically when their tab is activated | Replaces revision 1's uncapped "keep every preview alive". Caps live renderer processes. The still frame plus auto-reopen is exactly the exit state whose absence killed LRU in the original design (`sd-074-html-preview.md:1406`) |
 | D6 | External `http(s)` / `mailto:` links **open in the OS browser, after the destination is shown** | Matches Markdown preview (`MarkdownPreview.tsx:440-447`); the destination readout answers the review's point that a trusted click is not informed consent |
-| D7 | One in-memory session partition **per view** | `previewSessionPolicy.ts:64-66`. N previews get N isolated sessions. Shared state to reconcile is the allowlist and the toast budget (§4.5, §4.6) |
-| D8 | **Keep** `PREVIEW_VIEW_LIMIT_REACHED`, repurposed as a configurable hard ceiling above the sleep threshold | Revision 1 deleted it. A wired-but-rarely-hit refusal costs one `if` and preserves a backstop; deleting it removes the only refusal path and its tested UI branch |
+| D7 | One in-memory session partition **per view**, its name recycled after a bounded purge (v0.19.0) | `previewSessionPolicy.ts:64-66`. N previews get N isolated sessions. Shared state to reconcile is the allowlist (§4.4) and the watcher budget (§4.6); the blocked-host toast budget §4.5 once named went with the toast |
+| D8 | **Keep** `PREVIEW_VIEW_LIMIT_REACHED`, as the refusal for a **cross-window panel-id collision** only | Revision 1 deleted it. As built (`PreviewViewService.open`), the same panel id arriving from a *different* window is refused with it, because panel ids are path-derived and replacing would destroy the other window's running view. There is no hard ceiling and nothing is configurable: past `PREVIEW.MAX_LIVE_VIEWS` the service suspends the least recently active preview, it never refuses. Keeping the code preserves the one refusal path and its tested UI branch |
 | D9 | **Harden the global IPC surface before any preload exists** (phase 0) | ~118 `ipcMain` registrations, sender checks in 8 files. Today the sealed page has no channel at all; after D1 its *process* does, and a renderer compromise then reaches ungated handlers |
 
 ---
 
 ## 2. Current state (verified)
+
+> This section describes the code **as it stood at v0.18.0**, before this design was built. The line numbers and names in it (`forPanel()`, the single `live` field, `openEpoch`) are historical: `PreviewViewService` now delegates to `PreviewViewRegistry` (§4.2), and the per-panel lookup those call sites went through no longer exists.
 
 **Links are inert.** `previewViewLifecycle.ts:106-110` denies `setWindowOpenHandler` and `preventDefault`s `will-navigate`; `previewCsp.ts:78-86` serves `sandbox allow-scripts` with `form-action 'none'` and `base-uri 'none'`.
 
@@ -73,7 +75,7 @@ This inverts the HTML default (`_self`). The consequence is accepted deliberatel
 
 Main re-resolves every path through `previewPathResolve.ts` and `PreviewEligibilityService.ts`. Nothing trusts the string the page supplied.
 
-`decideNavigation` is an exhaustive switch whose **default arm returns `blocked`**, so an unlisted scheme (`intent:`, `ms-msdt:`, `search-ms:`, `smb:`) is refused without appearing on any list. The preload sends `anchor.href` — the URL-parsed IDL property, never `getAttribute('href')` — because the WHATWG parser strips tabs and newlines, so `java\nscript:` would defeat a raw prefix check.
+`decideLinkIntent` (`PreviewNavigationPolicy.ts`; planned here as `decideNavigation`) is an exhaustive switch whose **default arm returns `blocked`**, so an unlisted scheme (`intent:`, `ms-msdt:`, `search-ms:`, `smb:`) is refused without appearing on any list. The preload sends `anchor.href` — the URL-parsed IDL property, never `getAttribute('href')` — because the WHATWG parser strips tabs and newlines, so `java\nscript:` would defeat a raw prefix check.
 
 ### 3.3 What is deliberately not built
 
@@ -112,7 +114,7 @@ Extract `PreviewViewRegistry` from `PreviewViewService` — the service would ot
 - Keep the **3** most recently active previews live (`PREVIEW.MAX_LIVE_VIEWS`, configurable).
 - On eviction: capture the still frame through the existing `PreviewStillFrameCache`, tear the view down through the §4.1 path, set the panel's store state to `suspended`.
 - On activation of a suspended panel: re-open automatically. Page state is lost by design; the still frame covers the gap so the tab is never blank.
-- `PREVIEW_VIEW_LIMIT_REACHED` (D8) stays wired for a configurable hard ceiling well above the sleep threshold.
+- `PREVIEW_VIEW_LIMIT_REACHED` (D8) stays wired only for the cross-window panel-id collision. There is no hard ceiling: over `MAX_LIVE_VIEWS` the service suspends, it never refuses.
 
 **Measure before assuming a sleeping tab was free.** Electron documents `backgroundThrottling` as throttling when *the page* is backgrounded, and `View.getVisible()` as distinct from being visible on screen; nothing documents a hidden child view inside a foreground window counting as backgrounded. Measure a hidden preview's page-visibility state first. If it is not throttled, drive `webContents.setBackgroundThrottling()` from the visibility signal `OverlayGuardService` already computes.
 
@@ -124,11 +126,9 @@ Approval therefore rebuilds the CSP of every live view of that project, purges i
 
 *Requirements*: add an explicit `closing` flag set by `boundedDestroy` and fold it into `isDefunct`; re-check `isDefunct` after **every** await; make "rebuild CSP → purge → clear → reload" a single per-view method that aborts at any step; snapshot the map and run the fan-out under `Promise.allSettled`. A `rebuildCsp` on a revoked token is a silent no-op (`PreviewRootRegistry.ts:83-87`), so losing that race must be detected rather than assumed benign.
 
-### 4.5 Blocked-host toast budget
+### 4.5 Blocked-host reporting budget
 
-Keyed by project (`PreviewHostBlockNotifier.ts:44`) and cleared by any view teardown (`PreviewLiveView.ts:496`). Refcount it, released only when the project's last view goes.
-
-Take the reference **where the session is created**, not where a view is installed: the `onBlocked` closure is wired into the session at `PreviewSessionFactory.ts:227-232`, before the epoch re-check, so a superseded open that is discarded can already have consumed toast budget with no view to hold a reference and no decrement on that path. Release in both `discardSession` and teardown's `finally`.
+*Revised after the build.* The blocked-host **toast** and its project-keyed budget (`PreviewHostBlockNotifier.ts`) were deleted when the permission band replaced the toast, so the refcount this section originally specified has nothing to count. What ships instead is **per view**, with no shared state: each blocked origin is reported once per change of kinds on `preview:hostBlocked`, capped at `PREVIEW.MAX_BLOCKED_HOSTS_PER_VIEW` (50) with a per-hostname sub-cap of `PREVIEW.MAX_BLOCKED_ORIGINS_PER_HOST` (5) so one host cannot spend the budget on ports (`src/shared/constants.ts`; applied in `PreviewViewService` and `previewCspViolationBridge.ts`). The ledger lives and dies with its view, so a superseded open that is discarded holds nothing.
 
 ### 4.6 Watcher budget
 
@@ -149,10 +149,10 @@ Instead: make `MAX_CONCURRENT_ASSET_READS` a **global** limiter across sessions,
 ### 4.8 Renderer
 
 - Delete `holderPanelId` and its actions (`usePreviewStore.ts:78,219-221`); add `suspended` to the panel state.
-- `OverlayGuardService`: `getLivePreviewPanelId()` → `getLivePreviewPanelIds()`; `readLivePreviewPanelId` (`:224-233`, first-non-idle scan) → a full-set reader, which retires the Map-iteration-order caveat in its own comment; `trackedPanelId` + `lastVisible` (`:129,136`) → a map pruned when a panel leaves the live set. The rule per panel stays `visible = panelId === activeTabId && !occluded`.
+- `OverlayGuardService`: `getLivePreviewPanelId()` → `getLivePreviewPanelIds()`; `readLivePreviewPanelId` (`:224-233`, first-non-idle scan) → a full-set reader, which retires the Map-iteration-order caveat in its own comment; the v0.18.0 `trackedPanelId` + `lastVisible` scalars (`:129,136`) → a single `lastVisible: Map<panelId, boolean>` pruned when a panel leaves the live set (as built in `src/renderer/src/services/preview/OverlayGuardService.ts`; there is no `trackedPanelId` any more). The rule per panel stays `visible = panelId === activeTabId && !occluded`.
 - **Make the one-visible-tab assumption executable.** It holds only because `disableDnd` is set (`EditorAreaSplitPanel.tsx:161`) and nothing asserts it — the same file already anticipates DnD returning (`:154-160`). Add a dev-mode invariant in `recompute` that logs when more than one live panel computes `true`.
-- Delete the `limit-reached` view state from `selectPanelView` only if D8's ceiling is unreachable in the UI; otherwise keep the branch and re-point its copy at the ceiling.
-- The service remains the sole `api.preview.setVisibility` caller; the ESLint guard and `scripts/preview-eslint-guard.test.ts` are unchanged.
+- Keep the `limit-reached` view state in `selectPanelView`: it is reachable through the D8 cross-window refusal (`htmlPreview.logic.ts`), which is the only refusal left.
+- The service remains the sole `api.preview.setVisibility` caller; the ESLint `no-restricted-syntax` guard in `eslint.config.mjs` is unchanged. (An earlier revision named a `scripts/preview-eslint-guard.test.ts`; no such file was ever written and the guard has no dedicated test.)
 
 ### 4.9 Events, project switch, and tests
 
@@ -210,11 +210,14 @@ Main-side validation: strict zod, `href` ≤ 2048 chars, `target` ≤ 64 chars, 
 New `src/main/services/preview/PreviewNavigationPolicy.ts`:
 
 ```
-decideNavigation({ href, target, modifiers, download }, { realRoot, projectPath, currentFilePath })
-  → { kind: 'new-tab',  filePath, anchor? }
-  | { kind: 'external', url }
-  | { kind: 'blocked',  failure: PreviewFailureInput }
+decideLinkIntent({ href, currentUrl, token, target?, download? })
+  → { kind: 'in-project',    relPath, anchor }   // relPath still untrusted; confined by the caller
+  | { kind: 'external',      url }
+  | { kind: 'same-document' }
+  | { kind: 'blocked',       reason: LinkBlockReason }
 ```
+
+(As built. The planned name was `decideNavigation`; path resolution moved to the caller, `previewLinkNavigation.ts`, which confines `relPath` and maps a refusal to its failure entry.)
 
 Parse with `new URL(href)` in try/catch. Match `url.protocol` against an exact `Set`; reject non-empty `url.username` / `url.password`. `ftp:` and `tel:` are excluded unless a requirement names them. Deny-lists remain only as a redundant second check, never as the decision. The default arm is `blocked` (§3.2).
 

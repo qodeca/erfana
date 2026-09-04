@@ -51,12 +51,37 @@ const MAX_ACTIVATIONS_PER_SECOND: Record<LinkProvenance, number> = {
 const DEDUPE_WINDOW_MS = 1000
 
 /**
+ * How long a `will-navigate` report waits for the preload's report of the same
+ * click before it is routed on its own.
+ *
+ * One click reaches main twice: the preload's `ipcRenderer.send` and Chromium's
+ * `will-navigate`, over two different pipes that nothing orders. Measured on
+ * Windows the navigation half lands ~10 ms after the gesture half, but nothing
+ * guarantees it, and when it won the race the bridge routed the click as
+ * `navigation` — refused for an external link, with a badge — and then dropped
+ * the genuine gesture as its duplicate. Holding the navigation half for a
+ * moment lets the gesture claim the href first whichever order they arrive in;
+ * a page that navigates itself (no preload, no click) is merely 50 ms slower.
+ */
+const NAVIGATION_GRACE_MS = 50
+
+/**
  * What the preload sends. Strict and bounded: an over-long href is refused
  * outright rather than truncated into something that might parse differently.
  */
 const LinkActivationPayloadSchema = z
   .object({
     href: z.string().min(1).max(2048),
+    /**
+     * The `href` ATTRIBUTE as the page wrote it, before Chromium resolved it.
+     * Refusal-only input: it never selects a file, it only lets a link that
+     * climbed out of the project be labelled "escaped" rather than "missing"
+     * (Chromium collapses `../` past the root before main ever sees `href`).
+     * Optional because `will-navigate` has no attribute to report.
+     */
+    // Refusal-only label data (never selects a file): an over-long value
+    // costs the label, never the activation — `.catch` drops just this field.
+    rawHref: z.string().max(2048).optional().catch(undefined),
     target: z.string().max(64).default(''),
     download: z.boolean().default(false),
     modifiers: z
@@ -97,6 +122,7 @@ export function createPreviewLinkBridge(
     navigation: { startedAt: now(), used: 0 }
   }
   let disposed = false
+  const pendingNavigations = new Set<ReturnType<typeof setTimeout>>()
 
   /** `false` when this activation exceeds its provenance's per-second allowance. */
   const withinRateLimit = (provenance: LinkProvenance): boolean => {
@@ -157,9 +183,20 @@ export function createPreviewLinkBridge(
       deps.recordFailure(rateLimitedFailure())
       return
     }
-    if (isDuplicate(parsed.data.href)) return
-
-    void routeLinkActivation({ ...parsed.data, provenance }, context, deps)
+    const dispatch = (): void => {
+      if (disposed) return
+      if (isDuplicate(parsed.data.href)) return
+      void routeLinkActivation({ ...parsed.data, provenance }, context, deps)
+    }
+    if (provenance === 'gesture') {
+      dispatch()
+      return
+    }
+    const timer = setTimeout(() => {
+      pendingNavigations.delete(timer)
+      dispatch()
+    }, NAVIGATION_GRACE_MS)
+    pendingNavigations.add(timer)
   }
 
   return {
@@ -173,6 +210,8 @@ export function createPreviewLinkBridge(
 
     dispose(): void {
       disposed = true
+      for (const timer of pendingNavigations) clearTimeout(timer)
+      pendingNavigations.clear()
       recentHrefs.clear()
     }
   }

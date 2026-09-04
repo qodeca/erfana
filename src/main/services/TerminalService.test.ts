@@ -79,12 +79,13 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
  * variable as the terminal id, so this helper unwraps to preserve them
  * unchanged. Tests that care about `shellKind` call `createTerminal` directly.
  */
+type CreateResult = { terminalId: string; shellKind: string } | { error: string }
 async function createId(
-  service: { createTerminal: (...args: never[]) => Promise<{ terminalId: string; shellKind: string } | null> },
+  service: { createTerminal: (...args: never[]) => Promise<CreateResult> },
   ...args: unknown[]
 ): Promise<string | null> {
-  const result = await (service.createTerminal as (...a: unknown[]) => Promise<{ terminalId: string; shellKind: string } | null>)(...args)
-  return result?.terminalId ?? null
+  const result = await (service.createTerminal as (...a: unknown[]) => Promise<CreateResult>)(...args)
+  return 'terminalId' in result ? result.terminalId : null
 }
 
 ;(isRendererEnv ? describe.skip : describe)('TerminalService - Bootstrap Pattern', () => {
@@ -1109,6 +1110,24 @@ async function createId(
       return (await import('./TerminalService')).terminalService
     }
 
+    it('refuses a cwd over 260 characters with a plain-language reason, before any spawn', async () => {
+      // Win32 CreateProcess hard-fails on a cwd over MAX_PATH; the renderer
+      // used to show the bare "Failed to create terminal" for it. The reason
+      // must travel in the RESULT, not a throw: createTerminal's catch
+      // swallows throws into `null`, which the handler maps to that bare
+      // message (verified on Windows 11, 2026-09-03).
+      const svc = await importWin32()
+      const errSpy = vi.fn()
+      svc.on('error', errSpy)
+      const cwd = 'C:\\' + 'a'.repeat(300)
+      const result = await svc.createTerminal({ cwd })
+      expect(result).toEqual({ error: expect.stringContaining('longer than Windows allows') })
+      expect(errSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ error: expect.stringContaining('260') })
+      )
+      expect(spawnedPTYs).toHaveLength(0)
+    })
+
     const denyListCases: ReadonlyArray<readonly [string, string]> = [
       ['ampersand', 'C:\\a&b'],
       ['pipe', 'C:\\a|b'],
@@ -1127,7 +1146,7 @@ async function createId(
         const errSpy = vi.fn()
         svc.on('error', errSpy)
         const tid = await svc.createTerminal({ cwd })
-        expect(tid).toBeNull()
+        expect(tid).toHaveProperty('error')
         // Pin the SPECIFIC rejected character so a regression that flags
         // the wrong char (or rejects everything via an upstream check)
         // would fail this assertion. The validator embeds the offending
@@ -1328,7 +1347,7 @@ async function createId(
       const errSpy = vi.fn()
       svc.on('error', errSpy)
       const tid = await svc.createTerminal({ cwd: '/tmp/with\rreturn' })
-      expect(tid).toBeNull()
+      expect(tid).toHaveProperty('error')
       expect(errSpy).toHaveBeenCalledWith(
         expect.objectContaining({ error: expect.stringContaining('newline') })
       )
@@ -1340,7 +1359,7 @@ async function createId(
       const errSpy = vi.fn()
       svc.on('error', errSpy)
       const tid = await svc.createTerminal({ cwd: '/tmp/with\nnewline' })
-      expect(tid).toBeNull()
+      expect(tid).toHaveProperty('error')
       expect(errSpy).toHaveBeenCalledWith(
         expect.objectContaining({ error: expect.stringContaining('newline') })
       )

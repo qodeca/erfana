@@ -147,6 +147,10 @@ function onLinkActivation(event: MouseEvent): void {
 
     ipcRenderer.send(LINK_ACTIVATED_CHANNEL, {
       href,
+      // The attribute as written, so main can tell "climbed out of the
+      // project" from "file not found" — `href` above is already resolved and
+      // has had any `../` past the root collapsed by Chromium.
+      rawHref: link.getAttribute('href') ?? '',
       target,
       download,
       modifiers: {

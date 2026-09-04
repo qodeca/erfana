@@ -116,6 +116,30 @@ describe('createPreviewLinkBridge — validation', () => {
     expect(deps.openExternal).not.toHaveBeenCalled()
   })
 
+  it('accepts the raw href attribute the preload now reports', async () => {
+    const deps = makeDeps()
+    makeBridge(deps).handleActivation({ ...(payload(IN_PROJECT) as object), rawHref: 'docs/a.html' })
+
+    await vi.waitFor(() => expect(deps.requestOpenFile).toHaveBeenCalled())
+    expect(deps.recordFailure).not.toHaveBeenCalled()
+  })
+
+  it('an over-long raw href costs only the label, never the activation', async () => {
+    // `rawHref` is refusal-only label data. URL resolution collapses dot
+    // segments, so a page can make the attribute exceed the bound while the
+    // resolved href is short and legal; failing the WHOLE payload turned that
+    // into "(malformed link message)" — the label defect this field exists to
+    // remove, page-triggerable.
+    const deps = makeDeps()
+    makeBridge(deps).handleActivation({
+      ...(payload(IN_PROJECT) as object),
+      rawHref: 'a'.repeat(2049)
+    })
+
+    await vi.waitFor(() => expect(deps.requestOpenFile).toHaveBeenCalled())
+    expect(deps.recordFailure).not.toHaveBeenCalled()
+  })
+
   it('applies the same length bound to will-navigate as to the preload', async () => {
     const deps = makeDeps()
     const overlong = `https://example.com/${'a'.repeat(2100)}`
@@ -179,6 +203,25 @@ describe('createPreviewLinkBridge — budgets', () => {
 })
 
 describe('createPreviewLinkBridge — de-duplication', () => {
+  it('honours the click when will-navigate reaches main a moment BEFORE the preload report', async () => {
+    // One click reaches main twice, over two different IPC paths, and nothing
+    // orders them. When the navigation half wins the race the old bridge routed
+    // it first — as `navigation`, which an external link refuses with a badge —
+    // and then dropped the real gesture as a duplicate: a click that produced a
+    // "Blocked link" badge instead of the consent dialog.
+    const deps = makeDeps()
+    const bridge = makeBridge(deps)
+
+    bridge.handleWillNavigate(EXTERNAL)
+    bridge.handleActivation(payload(EXTERNAL))
+
+    await vi.waitFor(() => expect(deps.openExternal).toHaveBeenCalledTimes(1))
+    // Give the deferred navigation half time to fire and be dropped.
+    await new Promise((r) => setTimeout(r, 120))
+    expect(deps.recordFailure).not.toHaveBeenCalled()
+    expect(deps.openExternal).toHaveBeenCalledTimes(1)
+  })
+
   it('routes one click once even though both entry points see it', async () => {
     const deps = makeDeps()
     const bridge = makeBridge(deps)

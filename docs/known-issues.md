@@ -53,13 +53,13 @@ Phases 0–2 of Windows enablement shipped in **v0.9.3** (2026-04-22); Phase 4 (
 
 ---
 
-### Long paths (>260 chars) require user opt-in
+### Long paths (>260 chars): the terminal cannot start there
 
-**Issue**: File operations on paths longer than 260 chars fail unless the user enabled the Win32 long-paths group-policy setting. The `isWindowsLongPath` helper that would auto-prefix `\\?\` is dead code.
+**Issue**: A project whose path is longer than 260 chars cannot open a terminal. Win32 `CreateProcess` refuses the working directory whatever the long-paths policy says. Since v0.19.0 the Terminal panel says so ("This folder's path is longer than Windows allows for a terminal…") instead of the bare "Failed to create terminal". File operations (open, edit, save, preview) on the same paths worked in the 2026-09-03 Windows verification, so the earlier claim that they fail without the opt-in is withdrawn. The `\\?\` auto-prefixing that `isWindowsLongPath` was written for is still not wired into file I/O.
 
-**Workaround**: Enable Win32 long paths per [`docs/build/windows.md`](./build/windows.md) step 5 + `git config --global core.longpaths true`.
+**Workaround**: Move the project to a shorter path. For file operations, enabling Win32 long paths per [`docs/build/windows.md`](./build/windows.md) step 5 + `git config --global core.longpaths true` remains the safe default.
 
-**Tracking**: #163 (decision-deferred to Phase 6 with promotion criteria recorded inline at `PlatformConfig.ts:194-201`).
+**Tracking**: #163 (the `\\?\` prefixing stays deferred; the helper itself was promoted for the terminal check in v0.19.0).
 
 ---
 
@@ -196,6 +196,8 @@ Pipeline contributors on Windows:
 **A page's link opens a tab per click.** Every link opens a new Erfana tab by design, so clicking through a generated documentation site accumulates tabs quickly. Idle previews sleep after `PREVIEW.MAX_LIVE_VIEWS`, so the cost is bounded, but the tabs remain until closed.
 
 **Page state is lost when a preview sleeps.** A suspended preview reloads from disk when you return to it: scroll position, typed text and in-memory JavaScript state do not survive.
+
+**Windows: the preview's shader cache is never purged, and a purge timeout in the log is harmless.** On Windows (Electron 39) clearing the `shadercache` storage of a preview's session partition never completes – probed per storage type on 2026-09-04, seven of the eight types settle in 0–5 ms and that one never returns, every time, only inside the full app. It holds compiled GPU programs, not page data, so the purge now names the seven data-bearing storages explicitly (`PURGED_STORAGES` in the storage seal) and leaves the shader cache out; the opaque origin still seals the page's storage. Every purge and teardown step is time-bounded as well (`PREVIEW.PURGE_TIMEOUT_MS`, `TEARDOWN_STEP_TIMEOUT_MS`, `PARTITION_PURGE_TIMEOUT_MS`, all 2 s), so a `... timed out after 2000ms` warn line in `main.log` means one step was skipped after its deadline and the teardown carried on – it is bounded and harmless, not a hang. Since the shader cache was dropped from the purge those lines no longer fire on the verified host; the timeouts stay as belts.
 
 ## Resolved (kept for the trail)
 

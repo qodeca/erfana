@@ -35,9 +35,10 @@ the token discipline that `npm run lint:css` now enforces.
 5. [Borders & Shadows](#borders--shadows)
 6. [Interactive States](#interactive-states)
 7. [Text selection policy](#text-selection-policy)
-8. [Do's and Don'ts](#dos-and-donts)
-9. [Checklist for UI Changes](#checklist-for-ui-changes)
-10. [Quick Reference](#quick-reference)
+8. [CSS class namespacing (`erf-`)](#css-class-namespacing-erf-)
+9. [Do's and Don'ts](#dos-and-donts)
+10. [Checklist for UI Changes](#checklist-for-ui-changes)
+11. [Quick Reference](#quick-reference)
 
 ---
 
@@ -125,6 +126,12 @@ The `-webkit-user-select` prefix is not needed; Erfana ships on Chromium 130+ vi
 **Cascade assumption.** These overrides rely on app stylesheets loading after `dockview-core/dist/styles/dockview.css` in the Vite bundle. Don't change CSS import order without re-running `src/renderer/src/styles/userSelect.audit.test.ts`, which asserts every audited selector still declares `user-select: text` in its source file.
 
 See [#211](https://github.com/qodeca/erfana/issues/211) for the original audit and per-component policy decisions.
+
+## CSS class namespacing (`erf-`)
+
+Component CSS that belongs to the design system is namespaced `erf-`, and `.stylelintrc.json` enforces it with `selector-class-pattern` – every class must match `^erf-[a-z0-9]+(-[a-z0-9]+)*(__[a-z0-9]+(-[a-z0-9]+)*)?(--[a-z0-9]+(-[a-z0-9]+)*)?$`, i.e. an `erf-` prefix, kebab-case words, an optional BEM `__element` and an optional `--modifier` (`erf-band`, `erf-band__row`, `erf-band--open`). The rule applies to `design/system/components/**/*.css` and follows a file when it is adopted into `src/`: today that is `src/renderer/src/styles/hostName.css` and `src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewChromeBand.css`, listed by path in the config. When a design-system stylesheet moves into `src/`, add its new path to that override – scoping the rule to `design/` alone would switch the guard off at the exact moment the CSS became shipping code.
+
+The prefix is not cosmetic. Mermaid emits `class="row"` on gitGraph commit labels and on its generic label path, and the app injects that SVG with `innerHTML`, so a bare global `.row` reaches into diagram labels in the Markdown preview and in exported images. That collision was found by luck, not by review; the namespace makes it impossible. The cards' own documentation chrome under `design/` (`.stage`, `.list-frame`, `.readout`) is not shipped UI and is exempt from the naming rule, though not from the token rules.
 
 ---
 

