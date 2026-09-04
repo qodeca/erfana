@@ -60,19 +60,36 @@ below until a dedicated macOS register exists — rows are marked in the
 
 ## Untested on the 2026-09-03 Windows verification
 
-Not flakes and not failures: four of the 34 manual checks in the
+Not flakes and not failures. Four of the 34 manual checks in the
 [2026-09-03 release-verification handoff](../handoffs/2026-09-03-windows-release-verification.md)
-§5 could not be run on the verifying host (Windows 11, one monitor at 200%
-scaling). They are recorded here as **untested** so that a later reader does not
-count them as passes; the other 30 passed once the `fix/windows-preview-blockers`
-fixes were in.
+§5 were recorded as unrun on the verifying host (Windows 11, one monitor at 200%
+scaling), so that a later reader would not count them as passes.
 
-| Handoff check | Why it was not run |
+A re-audit on **2026-09-04** found two of the four were testable after all, and
+both pass — the rows say how. What is left is one check that needs a system-wide
+display setting, and one keystroke no automation on this host can deliver
+(its route is covered in CI instead). Every other §5 check passed once the
+`fix/windows-preview-blockers` fixes were in.
+
+| Handoff check | Status |
 |---|---|
-| §5.1 A project on a **second drive letter** (`D:\`) | Impossible on this host – it has no second drive. |
-| §5.1 A **UNC / network path** (`\\server\share\...`) | Impossible on this host – no share was available. |
+| §5.1 A project on a **second drive letter** (`D:\`) | ~~Impossible on this host~~ – **retested 2026-09-04 and it passes.** The host has `X:`/`Y:`/`Z:` mapped to the Mac that runs this VM, and `subst P: C:\Users\marcinobel\erfana-wintest` gives a local one; the project opened from `P:` and rendered its CSS, JS and image. |
+| §5.1 A **UNC / network path** (`\\server\share\...`) | ~~Impossible on this host~~ – **retested 2026-09-04 and it passes.** `\\localhost\c$\...` is reachable without elevation, so no share had to be created; the project opened there and previewed correctly. |
 | §5.4 **Display scaling** at 125% and 150% | Skipped: only the host's own 200% setting was tested (it passed). Changing scaling needs a system-wide setting on a single-monitor machine with no way back if the desktop breaks, so it was deliberately not attempted. |
-| §5.5 **Zoom In** (View → Zoom In) | Zoom Out and Actual Size passed through the View menu; the automation harness could not press the `CommandOrControl+Plus` accelerator reliably, so Zoom In is unconfirmed. A harness limitation, not an app defect. |
+| §5.5 **Zoom In** (View → Zoom In) | Zoom Out and Actual Size passed through the View menu. The harness can press neither the accelerator nor `Alt` (the menu bar is auto-hidden), so the keystroke stays unconfirmed – but since 2026-09-04 the route is covered in CI: `src/main/menu.test.ts` invokes the real menu item's click handler and pins the step it sends (+1 / -1 / 0), that the host window does not zoom as well, and the fall-through clamp. Flipping the Zoom In step to -1 fails two of those tests. |
+
+### `e2e/html-preview-eviction.e2e.ts` — "Object has been destroyed" under full-suite load
+
+Seen twice on 2026-09-04, both times in a **full** `npm run test:e2e` run and
+never in a focused one (14 consecutive focused passes across three runs, one of
+them 8× with two workers). The error came from the page object, not the app:
+`HtmlPreviewPage.livePreviews()` enumerates preview web contents in the main
+process, and eviction can destroy one between the filter and any read that
+follows — including the synchronous `getURL()`. Hardened on 2026-09-04 so a view
+that vanishes mid-read is skipped rather than failing the call; the full suite
+then passed 121/121. Left here because the second sighting happened after the
+first hardening attempt, so the register should carry it until a few more full
+runs come back clean. Status: 🟡 under observation.
 
 ## Follow-up audit candidates
 

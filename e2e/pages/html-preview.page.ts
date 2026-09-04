@@ -263,24 +263,30 @@ export class HtmlPreviewPage {
       })
       if (previews.length === 0) return null
       const wc = previews[0]
-      // Read before the awaits: a destroyed web contents throws on `getURL()`.
-      const url = wc.getURL()
-      let docTitle = ''
-      let jsRan = false
+      // Every read can throw "Object has been destroyed" — eviction can take
+      // this view at any point, including on the synchronous `getURL()`. A
+      // snapshot of a view that vanished is `null`, which the caller polls on.
       try {
-        docTitle = await wc.executeJavaScript('document.title')
-        // The self-contained fixture drops the `pending` class on DOMContentLoaded.
-        jsRan = await wc.executeJavaScript('!document.querySelector("#js-output.pending")')
+        const url = wc.getURL()
+        let docTitle = ''
+        let jsRan = false
+        try {
+          docTitle = await wc.executeJavaScript('document.title')
+          // The self-contained fixture drops the `pending` class on DOMContentLoaded.
+          jsRan = await wc.executeJavaScript('!document.querySelector("#js-output.pending")')
+        } catch {
+          // Page may be mid-load / navigating — leave the defaults, the caller polls.
+        }
+        const destroyed = wc.isDestroyed()
+        return {
+          title: destroyed ? '' : wc.getTitle(),
+          docTitle,
+          jsRan,
+          url,
+          destroyed
+        }
       } catch {
-        // Page may be mid-load / navigating — leave the defaults, the caller polls.
-      }
-      const destroyed = wc.isDestroyed()
-      return {
-        title: destroyed ? '' : wc.getTitle(),
-        docTitle,
-        jsRan,
-        url,
-        destroyed
+        return null
       }
     }, target.urlIncludes)
   }
@@ -297,18 +303,24 @@ export class HtmlPreviewPage {
       })
       const out: Array<{ url: string; docTitle: string }> = []
       for (const wc of previews) {
-        // Read the URL BEFORE the await: an eviction can destroy this web
-        // contents while the title read is in flight, and `getURL()` on a
-        // destroyed object throws. A view that vanished mid-read is not live.
-        const url = wc.getURL()
-        let docTitle = ''
+        // EVERY read here can throw "Object has been destroyed": eviction runs
+        // on its own schedule and can take this view between the filter above
+        // and any line below, including the synchronous `getURL()` — seen once
+        // in a full-suite run under load. A view that vanished mid-read is not
+        // live, so skip it and let the caller poll again.
         try {
-          docTitle = await wc.executeJavaScript('document.title')
+          const url = wc.getURL()
+          let docTitle = ''
+          try {
+            docTitle = await wc.executeJavaScript('document.title')
+          } catch {
+            // Mid-load; the caller polls.
+          }
+          if (wc.isDestroyed()) continue
+          out.push({ url, docTitle })
         } catch {
-          // Mid-load; the caller polls.
+          continue
         }
-        if (wc.isDestroyed()) continue
-        out.push({ url, docTitle })
       }
       return out
     })

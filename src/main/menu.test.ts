@@ -2,6 +2,8 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
+import { PREVIEW } from '../shared/constants'
+
 // Mock spawnNewInstance before importing menu
 vi.mock('./utils/spawnNewInstance', () => ({
   spawnNewInstance: vi.fn()
@@ -379,5 +381,87 @@ describe('Application Menu Creation', () => {
       expect(menu._template).toBeDefined()
       expect(Array.isArray(menu._template)).toBe(true)
     })
+  })
+})
+
+/**
+ * The View menu owns preview zoom (`d95aade4`): the accelerators are NOT
+ * forwarded into the page, so the menu item's own click handler is the whole
+ * route. The 2026-09-03 Windows verification could exercise Zoom Out and
+ * Actual Size by hand but never Zoom In — no harness on that host could press
+ * `CommandOrControl+Plus`, and `Alt` does not open the menu bar either
+ * (`autoHideMenuBar: true`). These pin the step each item sends and the
+ * fall-through, so the one item nobody could press is covered where it counts.
+ */
+describe('View menu zoom — what the item actually does', () => {
+  async function loadMenu(focused: { getZoomLevel: () => number; setZoomLevel: (n: number) => void } | null) {
+    vi.resetModules()
+    Object.defineProperty(process, 'platform', { value: 'win32', writable: true, configurable: true })
+    vi.doMock('electron', () => ({
+      Menu: { buildFromTemplate: vi.fn((template) => ({ _template: template })) },
+      app: { name: 'ERFANA' },
+      BrowserWindow: {
+        getFocusedWindow: () => (focused === null ? undefined : { webContents: focused })
+      }
+    }))
+    const mod = await import('./menu')
+    const menu = mod.createApplicationMenu() as unknown as { _template: Array<Record<string, unknown>> }
+    const view = menu._template.find((m) => m.label === 'View') as { submenu: Array<Record<string, unknown>> }
+    const item = (label: string): { click: () => void } =>
+      view.submenu.find((i) => i.label === label) as unknown as { click: () => void }
+    return { mod, item }
+  }
+
+  afterEach(() => {
+    vi.resetModules()
+  })
+
+  it('Zoom In asks the focused preview for one step up, and stops there when it takes it', async () => {
+    const setZoomLevel = vi.fn()
+    const { mod, item } = await loadMenu({ getZoomLevel: () => 0, setZoomLevel })
+    const preview = vi.fn(async () => true)
+    mod.setPreviewZoomHandler(preview)
+
+    item('Zoom In').click()
+    await vi.waitFor(() => expect(preview).toHaveBeenCalledWith(1))
+
+    // The page zoomed, so the host window must NOT zoom as well — that is the
+    // "chrome stays the same size" half of the check.
+    expect(setZoomLevel).not.toHaveBeenCalled()
+    mod.setPreviewZoomHandler(null)
+  })
+
+  it('Zoom Out sends one step down and Actual Size sends zero', async () => {
+    const { mod, item } = await loadMenu({ getZoomLevel: () => 0, setZoomLevel: vi.fn() })
+    const preview = vi.fn(async () => true)
+    mod.setPreviewZoomHandler(preview)
+
+    item('Zoom Out').click()
+    await vi.waitFor(() => expect(preview).toHaveBeenCalledWith(-1))
+    item('Actual Size').click()
+    await vi.waitFor(() => expect(preview).toHaveBeenCalledWith(0))
+    mod.setPreviewZoomHandler(null)
+  })
+
+  it('falls through to the focused window when no preview takes the step', async () => {
+    const setZoomLevel = vi.fn()
+    const { mod, item } = await loadMenu({ getZoomLevel: () => 2, setZoomLevel })
+    const preview = vi.fn(async () => false)
+    mod.setPreviewZoomHandler(preview)
+
+    item('Zoom In').click()
+    await vi.waitFor(() => expect(setZoomLevel).toHaveBeenCalledWith(3))
+    mod.setPreviewZoomHandler(null)
+  })
+
+  it('clamps the window fall-through to the zoom bounds, and Actual Size resets to 0', async () => {
+    const setZoomLevel = vi.fn()
+    const { mod, item } = await loadMenu({ getZoomLevel: () => 99, setZoomLevel })
+    mod.setPreviewZoomHandler(null)
+
+    item('Zoom In').click()
+    await vi.waitFor(() => expect(setZoomLevel).toHaveBeenCalledWith(PREVIEW.MAX_ZOOM_LEVEL))
+    item('Actual Size').click()
+    await vi.waitFor(() => expect(setZoomLevel).toHaveBeenCalledWith(0))
   })
 })
