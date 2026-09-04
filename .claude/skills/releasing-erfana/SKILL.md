@@ -159,9 +159,16 @@ grep -q "^## $VERSION" docs/CHANGELOG.md || {
   echo "FAIL: docs/CHANGELOG.md is missing a '## $VERSION' section"
   exit 1
 }
+LOCK_VERSION=$(node -p "JSON.parse(require('fs').readFileSync('package-lock.json','utf8')).version")
+if [ "$LOCK_VERSION" != "$VERSION" ]; then
+  echo "FAIL: package-lock.json says '$LOCK_VERSION', package.json says '$VERSION'"
+  echo "Remediation: npm install --package-lock-only --ignore-scripts, then commit the lock."
+  exit 1
+fi
 ```
 
 - [ ] `package.json` version is strict semver
+- [ ] `package-lock.json` version matches `package.json` (both copies are rewritten by `npm install`)
 - [ ] `docs/CHANGELOG.md` contains `## {version}` heading
 - [ ] Proposed version > last tag
 
@@ -342,9 +349,17 @@ Present the generated `docs/release-notes/v${VERSION}.md` and ask whether to acc
 Pre-flight check before §1.5 commit bundle: see [`./guides/git-signing.md`](./guides/git-signing.md) (added per #174 reviewer finding — verifies `user.signingkey` and `gpg.format`; soft-warns on missing `gpg.ssh.allowedSignersFile`).
 
 ```bash
+# The version lives in TWO files. `package-lock.json` carries its own copy of
+# `version` (twice: root and the "" package entry), and editing package.json alone
+# leaves it behind — v0.19.0 shipped with the lock still reading 0.18.0. The field
+# is metadata and changes no dependency resolution, so nothing fails; it just
+# rewrites itself under the next person who runs `npm install`, as a stray diff
+# they did not ask for. `--package-lock-only` touches no node_modules.
+npm install --package-lock-only --ignore-scripts
+
 # One commit bundles: package.json bump (already done pre-skill or done here),
-# CHANGELOG append (pre-skill), release notes file.
-git add package.json docs/CHANGELOG.md "docs/release-notes/v${VERSION}.md"
+# the lockfile's copy of it, CHANGELOG append (pre-skill), release notes file.
+git add package.json package-lock.json docs/CHANGELOG.md "docs/release-notes/v${VERSION}.md"
 
 # Pick the commit message based on what is actually staged. If the bump
 # already shipped earlier (e.g., develop→main merge), this commit only
