@@ -9,14 +9,17 @@
  *
  * Everything is asserted against the REAL `erfana-preview://` web contents read
  * from the main process, never a DOM stand-in — the page runs in its own sealed
- * `WebContentsView`, so the renderer's DOM cannot see it.
+ * `WebContentsView`, so the renderer's DOM cannot see it. Those reads live in
+ * `HtmlPreviewPage` (e2e/pages/html-preview.page.ts).
  *
  * Clicks land inside that sealed view, which Playwright cannot reach, so they
- * are dispatched main-side with `executeJavaScript`. Those synthesised clicks
- * are UNTRUSTED (`isTrusted === false`) — which is precisely what the preload
- * refuses — so the tests drive the `will-navigate` path, the fallback that keeps
- * plain links working when the preload is absent. The trusted path is covered by
- * unit tests and by the manual bench.
+ * are dispatched main-side. `clickInPreview` uses `executeJavaScript`, and those
+ * synthesised clicks are UNTRUSTED (`isTrusted === false`) — which is precisely
+ * what the preload refuses — so those tests drive the `will-navigate` path, the
+ * fallback that keeps plain links working when the preload is absent. The
+ * external-link case needs the TRUSTED path (a gesture is the only thing that
+ * may reach the OS browser), so it uses `clickTrusted`, a real input event via
+ * `webContents.sendInputEvent`.
  *
  * Condition-based waits only — never a sleep.
  *
@@ -24,92 +27,22 @@
  * @see specs/designs/sd-074b-preview-navigation-and-multiview.md
  */
 
+import * as crypto from 'crypto'
 import * as fs from 'fs'
+import * as fsp from 'fs/promises'
 import * as path from 'path'
 
+import type { BaseWindow, MessageBoxOptions } from 'electron'
+
 import { test, expect } from './fixtures/index'
-import { ProjectTreePage } from './pages/project-tree.page'
-import type { ElectronApplication, Page } from '@playwright/test'
+import { LogTail } from './fixtures/logTail'
+import { HtmlPreviewPage, PREVIEW_BUDGET_MS } from './pages/html-preview.page'
 
 const CORPUS_DIR = path.join(__dirname, 'fixtures', 'html-preview-corpus')
 
 /** Read one corpus file's real content so the tests exercise the shipped input. */
 function corpus(relPath: string): string {
   return fs.readFileSync(path.join(CORPUS_DIR, relPath), 'utf-8')
-}
-
-/** Generous budget: an Electron `WebContentsView` load + native paint + IPC. */
-const PREVIEW_BUDGET_MS = 20_000
-
-/** Every live preview's URL and document title, read from the main process. */
-async function livePreviews(
-  app: ElectronApplication
-): Promise<Array<{ url: string; docTitle: string }>> {
-  return app.evaluate(async ({ webContents }) => {
-    const previews = webContents.getAllWebContents().filter((wc) => {
-      try {
-        return wc.getURL().startsWith('erfana-preview://') && !wc.isDestroyed()
-      } catch {
-        return false
-      }
-    })
-    const out: Array<{ url: string; docTitle: string }> = []
-    for (const wc of previews) {
-      let docTitle = ''
-      try {
-        docTitle = await wc.executeJavaScript('document.title')
-      } catch {
-        // Mid-load; the caller polls.
-      }
-      out.push({ url: wc.getURL(), docTitle })
-    }
-    return out
-  })
-}
-
-/**
- * Click an element by id inside the live preview page whose title matches.
- *
- * @returns `true` only when the page WAS found and the element WAS clicked.
- *
- * The return value is the point. This used to swallow every failure — the
- * `catch` wrapped the click itself — and return normally, so a renamed fixture
- * id, or an element that never rendered, produced a test that quietly clicked
- * nothing. Every caller here then asserted only that something bad had not
- * happened, which is equally true of a click that never occurred. The three
- * security cases in this file proved nothing at all.
- */
-async function clickInPreview(
-  app: ElectronApplication,
-  docTitle: string,
-  elementId: string
-): Promise<boolean> {
-  return app.evaluate(
-    async ({ webContents }, { title, id }) => {
-      for (const wc of webContents.getAllWebContents()) {
-        if (!wc.getURL().startsWith('erfana-preview://')) continue
-        let found = ''
-        try {
-          found = await wc.executeJavaScript('document.title')
-        } catch {
-          // Mid-load or already gone: this is not the page we are looking for.
-          // Only the IDENTIFICATION probe is allowed to fail quietly.
-          continue
-        }
-        if (!found.includes(title)) continue
-        return await wc.executeJavaScript(
-          `(() => {
-             const el = document.getElementById(${JSON.stringify(id)})
-             if (!el) return false
-             el.click()
-             return true
-           })()`
-        )
-      }
-      return false
-    },
-    { title: docTitle, id: elementId }
-  )
 }
 
 /**
@@ -126,40 +59,28 @@ async function clickInPreview(
  * order, so once the second has visibly landed the first has had its full
  * chance. The negative is then asserted once, on settled state.
  */
-async function clickThenSettle(app: ElectronApplication, elementId: string): Promise<void> {
-  expect(await clickInPreview(app, '-LINKS-1', elementId)).toBe(true)
-  expect(await clickInPreview(app, '-LINKS-1', 'plain')).toBe(true)
-  await waitForPreviewTitled(app, '-LINKS-TARGET-')
-}
-
-/** Open a project-relative `.html` file as a running preview. */
-async function openPreview(page: Page, relPath: string): Promise<void> {
-  const tree = new ProjectTreePage(page)
-  await tree.expandTo([relPath.split('/')[0]])
-  await tree.fileRow(relPath).click()
-  await page.locator('.html-preview-placeholder').first().waitFor({
-    state: 'attached',
-    timeout: PREVIEW_BUDGET_MS
-  })
+async function clickThenSettle(preview: HtmlPreviewPage, elementId: string): Promise<void> {
+  expect(await preview.clickInPreview('-LINKS-1', elementId)).toBe(true)
+  expect(await preview.clickInPreview('-LINKS-1', 'plain')).toBe(true)
+  await preview.waitForTitled('-LINKS-TARGET-')
 }
 
 /**
- * Wait until a live preview's document title CONTAINS this sentinel.
- *
- * Substring, not equality: the shared corpus fixtures carry a descriptive title
- * with the sentinel embedded (`Self-contained corpus page -OK-1`).
+ * The page behind the external-link case. Written at runtime with a host that
+ * is unique to this run, because the assertion reads `main.log`, which every
+ * Erfana process on the machine appends to — a fixed host could match a line
+ * written by a sibling worker. `.invalid` is reserved (RFC 2606): even if the
+ * dialog were somehow accepted, nothing resolves.
  */
-async function waitForPreviewTitled(app: ElectronApplication, sentinel: string): Promise<void> {
-  await expect
-    .poll(async () => (await livePreviews(app)).some((p) => p.docTitle.includes(sentinel)), {
-      timeout: PREVIEW_BUDGET_MS
-    })
-    .toBe(true)
-}
-
-/** Every live preview title, joined — for `toContain` assertions on the set. */
-async function liveTitles(app: ElectronApplication): Promise<string> {
-  return (await livePreviews(app)).map((p) => p.docTitle).join(' | ')
+function externalLinkPage(host: string): string {
+  return `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>External link page -EXTERNAL-1</title></head>
+<body>
+  <p><a id="ext" href="https://${host}/page">Open the outside</a></p>
+</body>
+</html>
+`
 }
 
 test.use({
@@ -167,6 +88,8 @@ test.use({
     'links/index.html': corpus('links/index.html'),
     'links/target.html': corpus('links/target.html'),
     'self-contained/index.html': corpus('self-contained/index.html'),
+    // Placeholder; the test rewrites it with a run-unique host before opening it.
+    'external/index.html': externalLinkPage('placeholder.invalid'),
     'notes.md': '# Notes\n'
   }
 })
@@ -176,11 +99,12 @@ test.describe('HTML preview — independent previews', () => {
     windowWithTestProject,
     appWithTestProject
   }) => {
-    await openPreview(windowWithTestProject, 'links/index.html')
-    await waitForPreviewTitled(appWithTestProject, '-LINKS-1')
+    const preview = new HtmlPreviewPage(windowWithTestProject, appWithTestProject)
+    await preview.open('links/index.html')
+    await preview.waitForTitled('-LINKS-1')
 
-    await openPreview(windowWithTestProject, 'self-contained/index.html')
-    await waitForPreviewTitled(appWithTestProject, '-OK-1')
+    await preview.open('self-contained/index.html')
+    await preview.waitForTitled('-OK-1')
 
     // The refusal that used to appear for a second preview is gone.
     await expect(
@@ -188,7 +112,7 @@ test.describe('HTML preview — independent previews', () => {
     ).toHaveCount(0)
 
     // Both pages are alive at once — the whole point of the change.
-    const titles = await liveTitles(appWithTestProject)
+    const titles = await preview.liveTitles()
     expect(titles).toContain('-LINKS-1')
     expect(titles).toContain('-OK-1')
   })
@@ -199,14 +123,15 @@ test.describe('HTML preview — link routing', () => {
     windowWithTestProject,
     appWithTestProject
   }) => {
-    await openPreview(windowWithTestProject, 'links/index.html')
-    await waitForPreviewTitled(appWithTestProject, '-LINKS-1')
+    const preview = new HtmlPreviewPage(windowWithTestProject, appWithTestProject)
+    await preview.open('links/index.html')
+    await preview.waitForTitled('-LINKS-1')
 
-    expect(await clickInPreview(appWithTestProject, '-LINKS-1', 'plain')).toBe(true)
+    expect(await preview.clickInPreview('-LINKS-1', 'plain')).toBe(true)
 
     // The target opens as its OWN running preview; the source page stays open.
-    await waitForPreviewTitled(appWithTestProject, '-LINKS-TARGET-')
-    expect(await liveTitles(appWithTestProject)).toContain('-LINKS-1')
+    await preview.waitForTitled('-LINKS-TARGET-')
+    expect(await preview.liveTitles()).toContain('-LINKS-1')
   })
 
   test('a javascript: link cannot navigate the preview or open anything', async ({
@@ -236,20 +161,21 @@ test.describe('HTML preview — link routing', () => {
     //
     // So this asserts the invariants that DO hold and that do matter: the view
     // does not navigate, and nothing new is opened.
-    await openPreview(windowWithTestProject, 'links/index.html')
-    await waitForPreviewTitled(appWithTestProject, '-LINKS-1')
-    const before = await livePreviews(appWithTestProject)
+    const preview = new HtmlPreviewPage(windowWithTestProject, appWithTestProject)
+    await preview.open('links/index.html')
+    await preview.waitForTitled('-LINKS-1')
+    const before = await preview.livePreviews()
     const sourceUrl = before[0].url
 
-    expect(await clickInPreview(appWithTestProject, '-LINKS-1', 'dangerous')).toBe(true)
+    expect(await preview.clickInPreview('-LINKS-1', 'dangerous')).toBe(true)
 
     // The barrier cannot be another click on this page — the payload replaced
     // its document, so there is no `-LINKS-1` left to click. Drive a real UI
     // action instead and wait for it, which drains the same pipeline.
-    await openPreview(windowWithTestProject, 'self-contained/index.html')
-    await waitForPreviewTitled(appWithTestProject, '-OK-1')
+    await preview.open('self-contained/index.html')
+    await preview.waitForTitled('-OK-1')
 
-    const after = await livePreviews(appWithTestProject)
+    const after = await preview.livePreviews()
     // The sealed view stayed on its own document: no navigation escaped.
     expect(after.map((p) => p.url)).toContain(sourceUrl)
     // Only the preview this test opened on purpose is new.
@@ -260,31 +186,106 @@ test.describe('HTML preview — link routing', () => {
     windowWithTestProject,
     appWithTestProject
   }) => {
-    await openPreview(windowWithTestProject, 'links/index.html')
-    await waitForPreviewTitled(appWithTestProject, '-LINKS-1')
+    const preview = new HtmlPreviewPage(windowWithTestProject, appWithTestProject)
+    await preview.open('links/index.html')
+    await preview.waitForTitled('-LINKS-1')
 
-    const before = (await livePreviews(appWithTestProject)).length
-    await clickThenSettle(appWithTestProject, 'escape')
+    const before = (await preview.livePreviews()).length
+    await clickThenSettle(preview, 'escape')
 
     // Nothing new is ever shown for a path outside the project. The barrier's
     // own target accounts for exactly one new preview; a third would be the
     // escaped file.
-    expect((await livePreviews(appWithTestProject)).length).toBe(before + 1)
-    expect(await liveTitles(appWithTestProject)).not.toContain('hosts')
+    expect((await preview.livePreviews()).length).toBe(before + 1)
+    expect(await preview.liveTitles()).not.toContain('hosts')
   })
 
   test('a same-page anchor scrolls instead of opening a tab', async ({
     windowWithTestProject,
     appWithTestProject
   }) => {
-    await openPreview(windowWithTestProject, 'links/index.html')
-    await waitForPreviewTitled(appWithTestProject, '-LINKS-1')
+    const preview = new HtmlPreviewPage(windowWithTestProject, appWithTestProject)
+    await preview.open('links/index.html')
+    await preview.waitForTitled('-LINKS-1')
 
-    const before = (await livePreviews(appWithTestProject)).length
-    await clickThenSettle(appWithTestProject, 'anchor')
+    const before = (await preview.livePreviews()).length
+    await clickThenSettle(preview, 'anchor')
 
     // A fragment on the same document is a scroll, so only the barrier's own
     // target may appear.
-    expect((await livePreviews(appWithTestProject)).length).toBe(before + 1)
+    expect((await preview.livePreviews()).length).toBe(before + 1)
+  })
+})
+
+test.describe('HTML preview — external links', () => {
+  test('an https: link asks before opening, and Cancel is logged as the outcome', async ({
+    windowWithTestProject,
+    appWithTestProject,
+    testProject
+  }) => {
+    // The question is a NATIVE message box parented to the window
+    // (`dialog.showMessageBox` in externalLinkConsent.ts). Playwright cannot
+    // click it and a CDP key press goes to the renderer, not to the box, so the
+    // outcome is observed where the app records it: `main.log` gains one line
+    // per step — `asking`, then `cancelled` / `opened` / `refused`.
+    //
+    // To answer the box, the test wraps `dialog.showMessageBox` so the REAL box
+    // still opens with the app's own options, plus Electron's documented
+    // `signal`: aborting it closes the box "as if it was cancelled by the user"
+    // and the unmodified consent code then logs `cancelled`. No button is
+    // stubbed and no result is invented; only the dismissal is driven.
+    const host = `e2e-${crypto.randomBytes(6).toString('hex')}.invalid`
+    await fsp.writeFile(
+      path.join(testProject.path, 'external', 'index.html'),
+      externalLinkPage(host),
+      'utf-8'
+    )
+
+    const preview = new HtmlPreviewPage(windowWithTestProject, appWithTestProject)
+    await preview.open('external/index.html')
+    await preview.waitForTitled('-EXTERNAL-1')
+
+    await appWithTestProject.evaluate(({ dialog }) => {
+      const original = dialog.showMessageBox.bind(dialog)
+      const controller = new AbortController()
+      ;(globalThis as { __erfanaE2eExternalDialog?: AbortController }).__erfanaE2eExternalDialog =
+        controller
+      // The app always calls the parented form (externalLinkConsent.ts:
+      // "always parented"), so only that overload is wrapped.
+      dialog.showMessageBox = ((window: BaseWindow, options: MessageBoxOptions) =>
+        original(window, { ...options, signal: controller.signal })) as typeof dialog.showMessageBox
+    })
+
+    const log = new LogTail()
+    await log.mark()
+
+    // A trusted click: the preload reports a gesture, main routes it as
+    // `external`, and only a gesture may reach the consent step.
+    expect(await preview.clickTrusted('ext', HtmlPreviewPage.target('external/index.html'))).toBe(
+      true
+    )
+
+    const asking = new RegExp(`Preview external link: asking.*https://${host}`)
+    await log.waitFor(asking, {
+      timeout: PREVIEW_BUDGET_MS,
+      message: 'main.log never recorded the external-link question being asked'
+    })
+    // Dismiss the real box the way Electron lets a caller cancel it.
+    await appWithTestProject.evaluate(() => {
+      ;(globalThis as { __erfanaE2eExternalDialog?: AbortController }).__erfanaE2eExternalDialog?.abort()
+    })
+
+    const cancelled = new RegExp(`Preview external link: cancelled.*https://${host}`)
+    await log.waitFor(cancelled, {
+      timeout: PREVIEW_BUDGET_MS,
+      message: 'main.log never recorded the external-link question being cancelled'
+    })
+
+    // The whole outcome, in order, and nothing was handed to the OS.
+    const trail = await log.appended()
+    expect(trail).not.toMatch(new RegExp(`Preview external link: opened.*https://${host}`))
+    expect(trail.indexOf('external link: asking')).toBeLessThan(
+      trail.indexOf('external link: cancelled')
+    )
   })
 })
