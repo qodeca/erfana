@@ -91,6 +91,23 @@ then passed 121/121. Left here because the second sighting happened after the
 first hardening attempt, so the register should carry it until a few more full
 runs come back clean. Status: 🟡 under observation.
 
+### `npm run test:cov` cannot pass on a Windows host
+
+Not a flake and not a regression: it fails the same way every time, and only
+here. Every test passes (464 files, 11,649 tests on 2026-09-04); what fails are
+two **per-file** coverage thresholds in `vitest.main.ts` — `scripts/fuses.js`
+(86% lines / 88% functions) and `src/main/utils/tarArchive.ts` (90%). Both
+suites skip their symlink cases on win32 — `fuses.test.mjs` carries ten
+`skipIf(process.platform === 'win32')` guards (see the row above for why: file
+symlinks need `SeCreateSymbolicLinkPrivilege`), and `tarArchive.test.ts:77`
+returns early — so the lines those cases would cover never execute, and the
+file-level floors miss by a few points. The `Coverage` CI job runs on
+`ubuntu-latest`, where nothing is skipped and it passes.
+
+`test:cov` is deliberately **not** one of the nine commands the Windows
+release-verification handoff asks for. Run it on Linux or macOS, or read the CI
+job. Status: 🚫 wontfix while the symlink fixtures need a Windows privilege.
+
 ## Follow-up audit candidates
 
 Areas likely to contain more Windows-host flakes. The advisory

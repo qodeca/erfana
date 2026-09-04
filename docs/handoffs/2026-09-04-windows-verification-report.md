@@ -26,11 +26,19 @@ The preview did not pass on Windows as shipped on `develop @ ae2527d2`: two bloc
 | 8 | `npm run test:e2e` | pass – 118 passed | pass | 121 passed, 6.7 min. The first run of the day failed one test — the eviction spec, on a page-object read racing eviction, not on app behaviour; the helper was hardened and the suite re-run clean. See the flake register |
 | 9 | `npx playwright test --project=visual` | **fail** – 6 (baseline size drift + one missing win32 baseline) | pass | 6 passed against the regenerated win32 baselines (`6dd32d08`) |
 
-Also green on this commit, and not in the handoff's list because they cannot run
-locally here: `npm run test:cov` (coverage floors) and the two CI jobs that cover
-the §2 items macOS could not run — `License compliance` (REUSE) and `Secret scan`
-(gitleaks over every ref, plus trufflehog). All nine `Quality Checks` jobs are
-green on `main` at `06149d99`.
+Two more, neither in the handoff's §4 list:
+
+- The §2 items the macOS session could not run are covered by CI on this commit
+  — `License compliance` (REUSE) and `Secret scan` (gitleaks over every ref plus
+  trufflehog). All nine `Quality Checks` jobs are green on `main` at `06149d99`.
+- **`npm run test:cov` fails on a Windows host, by construction, and that is not
+  a regression.** All 464 files and 11,649 tests pass; the per-file coverage
+  floors for `scripts/fuses.js` and `src/main/utils/tarArchive.ts` do not, because
+  both suites skip their symlink cases on win32 (`fuses.test.mjs` has ten
+  `skipIf(process.platform === 'win32')`, `tarArchive.test.ts:77` returns early),
+  so the lines those tests would cover are never executed here. CI runs the
+  Coverage job on `ubuntu-latest`, where it passes. Recorded in the flake
+  register.
 
 The #104 failure was deterministic, not a path bug: `core.autocrlf=true` checked out `design/claims.js` and `design/index.html` as CRLF while the check regenerates LF and byte-compares. Fixed in `0cc448cc` (`.gitattributes` pin plus a CRLF-tolerant compare).
 
