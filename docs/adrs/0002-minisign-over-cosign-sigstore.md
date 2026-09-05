@@ -71,7 +71,7 @@ Every future security-minded contributor will ask "why not cosign / Sigstore, it
 
 ## References
 
-- `src/main/utils/verifyManifest.ts` — the verifier implementation (detects Ed/ED variants at lines 91-97, reverses key-ID bytes at lines 84-88)
+- `src/main/utils/verifyManifest.ts` — the verifier implementation (`detectAlg()` distinguishes the legacy `Ed` and prehashed `ED` variants; `verifyManifest()` reverses the key-ID bytes into `sigKeyIdHex` and, for `ed-prehashed` signatures, verifies over BLAKE2b-512 of the content in `signedMessage`)
 - `src/main/utils/verifyManifest.test.ts` — test file uses a real published `manifest.json` + signature as fixture (see "crypto fixture pattern" note in `docs/testing/README.md`)
 - `src/main/services/whisper-pubkeys.ts` — embedded primary + rotation pubkeys
 - [minisign reference](https://jedisct1.github.io/minisign/) — Frank Denis' original C implementation

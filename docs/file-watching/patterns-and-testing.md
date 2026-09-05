@@ -11,11 +11,12 @@ This document covers common implementation patterns, session token guards, and c
 Used to prevent double-refresh when internal operations trigger external file system events.
 
 ```typescript
-// ProjectTree.tsx - Internal CRUD operation using withWatcherPause utility
-import { withWatcherPause } from './withWatcherPause'
+// hooks/useFileOperations.ts (and the drop/paste handlers in ProjectTree.tsx) -
+// internal CRUD operations wrapped in the withWatcherPause utility
+import { withWatcherPause } from '../components/ProjectTree/withWatcherPause'
 
-const handleCreateFile = async () => {
-  const result = await withWatcherPause(
+const createFile = async () => {
+  const createdFilePath = await withWatcherPause(
     projectPath,
     isInternalOperationRef,
     setLoading,
@@ -44,39 +45,39 @@ const handleCreateFile = async () => {
 
 Standard pattern for listening to file system events in React components.
 
+The editor does not call `window.api.fileWatch.start/stop` directly. `useFileWatcher` (`src/renderer/src/hooks/useFileWatcher.ts`, used by the Markdown editor) and `useFileChangeSubscription` (the read-only image-viewer hook) both hold their watch through a **slot** from `src/renderer/src/hooks/fileWatchSlot.ts`, because `fileWatch.start` is a counting acquire main-side and start/stop must stay balanced and ordered.
+
 ```typescript
-// MarkdownEditorPanel.tsx - File content watching
+// hooks/useFileWatcher.ts (simplified) - file content watching through the slot
+import { createFileWatchSlot, acquireFileWatch, releaseFileWatch } from './fileWatchSlot'
+
 useEffect(() => {
-  if (!currentFile?.path) return
+  if (!filePath) return
 
-  // Start watching
-  window.api.fileWatch.start(currentFile.path)
+  // Acquire this consumer's single hold on the main-process watch
+  void acquireFileWatch(slot, filePath).then(({ started, error, cause }) => {
+    // started === false → surface `cause` (deleted / outside project / ...)
+  })
 
-  // Listen for changes
+  // Listen for changes and deletion
   const unsubscribeChanged = window.api.fileWatch.onFileChanged((data) => {
-    if (data.filePath === currentFile.path) {
-      handleExternalChange()
-    }
+    if (data.filePath === filePath) handleExternalChange()
   })
-
-  // Listen for deletion
   const unsubscribeDeleted = window.api.fileWatch.onFileDeleted((data) => {
-    if (data.filePath === currentFile.path) {
-      setIsFileDeleted(true)
-    }
+    if (data.filePath === filePath) setIsFileDeleted(true)
   })
 
-  // Cleanup
+  // Cleanup: release the slot (balanced stop), then drop the listeners
   return () => {
-    window.api.fileWatch.stop(currentFile.path)
+    void releaseFileWatch(slot, filePath)
     unsubscribeChanged()
     unsubscribeDeleted()
   }
-}, [currentFile?.path])
+}, [filePath])
 ```
 
 **Key Points**:
-- Watch starts when file is opened
+- Watch starts when file is opened (via `acquireFileWatch`, never a raw `fileWatch.start`)
 - Multiple event listeners can be attached
 - Each listener returns an unsubscribe function
 - All listeners and watchers are cleaned up on unmount
@@ -201,11 +202,11 @@ git checkout feature-branch
 
 **Test 8: Internal CRUD (no double refresh)**
 ```typescript
-// 1. Enable debug logging in ProjectTree.tsx
+// 1. Open the main-process log (Help → Open logs folder)
 // 2. Create file via Erfana's "New File" button
-// 3. Check console logs
+// 3. Check the log
 
-// Expected console output:
+// Expected main-process log output (DirectoryWatcherService):
 // "⏸️  Paused directory watch for: /path/to/project"
 // "▶️  Resumed directory watch for: /path/to/project"
 // NO "📁 Directory changed" message (watcher was paused)
@@ -240,7 +241,7 @@ rm -rf /path/to/project
 
 ## Automated Test Suites
 
-The directory and git watcher pipelines are covered by 72 automated tests added in v0.7.2, verifying all 18 acceptance criteria from [spec T3-016](../../specs/archived/spec-t3-016-project-tree-refresh/requirements/03-acceptance.md). For the full test breakdown (file names, test counts, AC coverage), see [Testing – spec 016 verification](../testing/README.md).
+The directory and git watcher pipelines are covered by 78 automated tests added in v0.7.2, verifying all 18 acceptance criteria from [spec T3-016](../../specs/archived/spec-t3-016-project-tree-refresh/requirements/03-acceptance.md). The breakdown below (file names, test counts, AC coverage) is the reference for that suite; the general testing guide is [Testing](../testing/README.md).
 
 Key test files:
 - `DirectoryWatcherService.pipeline.test.ts` – directory refresh pipeline (17 tests, AC-001/002/003/007/008/010/013)

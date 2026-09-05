@@ -65,7 +65,7 @@ Reference: [Dockview Documentation](https://dockview.dev/)
 
 ## Directory Structure
 
-The tree below covers `src/` and is annotated rather than exhaustive: `services/`, `interfaces/`, `ipc/` and `components/` are listed in full, everything else (`utils/`, `hooks/`, `stores/`, …) shows representative entries only. Run `ls` for the authoritative listing.
+The tree below covers `src/` and is annotated rather than exhaustive: `interfaces/`, `ipc/` and `components/` are listed in full, `services/` lists every top-level module but summarises its subdirectories, and everything else (`utils/`, `hooks/`, `stores/`, …) shows representative entries only. Run `ls` for the authoritative listing.
 
 Two tracked trees sit outside `src/` and are not shown below:
 
@@ -114,6 +114,12 @@ src/
 │   │   │                        #   ClaudeWindowDetector, encodeCwd, modelId, friendlyModelName, thresholds,
 │   │   │                        #   process/ (Mac/Win detectors + createProcessDetector)
 │   │   ├── workers/             # worker_threads scripts (git-status.worker.ts)
+│   │   ├── file/                # imageRead.ts (bounded image read for the viewer)
+│   │   ├── imageExport/         # ImageExportService, ImageRasterizeWindow, rasterizeSession, exportSinks,
+│   │   │                        #   exportPaths, imageMetadata, declaredDimensions, pdfGeometry
+│   │   ├── preview/             # HTML preview engine (39 modules): PreviewViewService, PreviewViewRegistry,
+│   │   │                        #   PreviewLiveView, PreviewSessionFactory, PreviewProtocolHandler, previewCsp,
+│   │   │                        #   PreviewAllowlistStore, PreviewWatchCoordinator, PreviewFindController, …
 │   │   ├── docx/                # DOCX conversion isolation: docxImageStrip (parse5 SSRF strip),
 │   │   │                        #   DocxConvertProcessAdapter (utilityProcess lifecycle), docx-convert.process (child)
 │   │   ├── watcher/             # ThrottledWorker (offset-deque, #173), EventCoalescer, GitEventCoalescer,
@@ -124,13 +130,15 @@ src/
 │   │   ├── IFileService.ts, IFileWatcherService.ts, IDirectoryWatcherService.ts
 │   │   ├── IGitStatusWorker.ts, IGitWatcherService.ts, IGitPollingService.ts
 │   │   └── IProjectLockService.ts, IProjectSettingsService.ts, ISettingsService.ts
-│   ├── ipc/                     # 22 handler modules + senderValidation.ts (frame/origin gate)
+│   ├── ipc/                     # 24 handler modules + registry.ts (registerHandle gate) + senderValidation.ts (frame/origin gate)
 │   │   ├── file-handlers.ts, file-watcher-handlers.ts, directory-watcher-handlers.ts
 │   │   ├── terminal-handlers.ts, shell-handlers.ts, quit-handlers.ts, system-handlers.ts
 │   │   ├── settings-handlers.ts, global-settings-handlers.ts, logging-handlers.ts
 │   │   ├── git-handlers.ts, git-watcher-handlers.ts, project-lock-handlers.ts, external-file-handlers.ts
 │   │   ├── screenshot-handlers.ts, camera-handlers.ts, clipboard-handlers.ts, claude-status-handlers.ts
-│   │   └── import-handlers.ts, transcription-handlers.ts, docx-handlers.ts, pdf-handlers.ts
+│   │   ├── import-handlers.ts, transcription-handlers.ts, docx-handlers.ts, pdf-handlers.ts
+│   │   ├── image-export-handlers.ts, preview-handlers.ts
+│   │   └── preview/             # Preview IPC split: lifecycle-, allowlist-, find-handlers, isTrustedPreviewSender, emit
 │   └── utils/
 │       ├── PauseController.ts   # Pause/resume with safety timeout
 │       ├── RateLimitedLogger.ts # Cooldown-based log deduplication
@@ -142,7 +150,7 @@ src/
 └── renderer/
     └── src/
         ├── assets/              # Vendored fonts (Cascadia Mono) and static assets
-        ├── components/          # 19 directories
+        ├── components/          # 20 directories
         │   ├── ActivityBar/     # Vertical activity bars (left/right) + activityBarConfig.ts
         │   ├── ContextMenu/     # Right-click menus (tree, editor, preview, terminal)
         │   ├── Dialog/          # Unified dialog system (Context + Provider + Hook) – inventory in Dialog/CLAUDE.md
@@ -150,6 +158,7 @@ src/
         │   ├── DocumentImport/  # DocumentImportDialog, OcrLanguageSelect
         │   ├── Editor/          # Monaco + Preview + formatting toolbar
         │   ├── FileConflictNotification/  # External-change conflict banner
+        │   ├── HostName/        # Renders a preview origin with scheme/port de-emphasised (preview chrome)
         │   ├── Panels/          # Panel implementations (Project, Terminal, Editor, ImageViewer) + WelcomePanel
         │   ├── ProjectTree/     # Project tree with context menu
         │   ├── RootErrorBoundary/  # Crash boundary of last resort + FallbackGuard, recovery screen, errorDetails
@@ -176,12 +185,15 @@ src/
         │   └── types.ts         # TypeScript interfaces
         ├── providers/           # React provider components
         ├── services/            # Renderer-side services (textClipboard transport)
-        ├── stores/              # 12 Zustand stores: ActivityBar, ClaudeStatus, Clipboard, DiagramViewer,
-        │                        #   DocumentImport, Git, GlobalSettings, Project, Search, Settings,
+        ├── imageExport/         # harness.ts – rasterize pixel pump loaded in the hidden image-export window
+        ├── stores/              # 17 Zustand stores: ActivityBar, CameraMirror, ClaudeStatus, Clipboard,
+        │                        #   DiagramViewer, DocumentImport, Git, GlobalSettings, OverlayOccluder,
+        │                        #   Preview, PreviewChromeGate, PreviewViewport, Project, Search, Settings,
         │                        #   Terminal, Transcription
         ├── styles/              # Global stylesheets
         │   ├── fonts.css            # @font-face declarations (Cascadia Mono)
         │   ├── design-tokens.css    # Design tokens - governed by the cards in design/
+        │   ├── hostName.css         # HostName badge styles
         │   ├── utilities.css        # Cross-cutting CSS policies (text-selection, etc.)
         │   └── userSelect.audit.test.ts  # Raw-CSS policy audit (#211/#228)
         ├── test-utils/          # Vitest helpers for renderer-side tests
@@ -346,7 +358,7 @@ See also: [IPC](./ipc-patterns.md) - [UI](./ui-components.md) - [Security](./sec
 
 ## ProjectTree Modularization
 
-**v0.3.7 refactoring**: cut ProjectTree.tsx from 1,338 to 824 lines (38.4%) by applying SOLID principles and design patterns. That was the state at v0.3.7 – the file has grown back since (1,457 lines today) as features landed, so treat the figures below as the record of that refactoring, not a current measurement.
+**v0.3.7 refactoring**: cut ProjectTree.tsx from 1,338 to 824 lines (38.4%) by applying SOLID principles and design patterns. That was the state at v0.3.7 – the file has grown back past its pre-refactoring size since, as features landed, so treat the figures below as the record of that refactoring, not a current measurement.
 
 **Key Achievements**:
 - Applied Strategy + Command + Factory patterns for context menus

@@ -1,6 +1,6 @@
 # Electron fuses
 
-**Last updated**: August 2026 (v0.17.2)
+**Last updated**: September 2026 (v0.19.0)
 
 This document explains the Electron fuses configuration and security decisions. `scripts/fuses.js` is the single `afterPack` hook, so it also carries five non-fuse responsibilities: it restores the executable bit on bundled `node-pty` `spawn-helper` binaries (see [afterPack also chmods node-pty spawn-helper](#afterpack-also-chmods-node-pty-spawn-helper)), prunes foreign-arch native binaries, stages and re-verifies the per-arch `ffmpeg` binary, renames the bundle for test builds, and verifies the packed contents — the `app/` tree against the `files:` allowlist plus the `extraFiles`/`extraResources` destinations beside and above it (see [afterPack also verifies the packed app/ contents](#afterpack-also-verifies-the-packed-app-contents)).
 
@@ -119,7 +119,7 @@ Unsupported ffmpeg target arches (`universal`, `armv7l`, `ia32`) are skipped, or
 
 ## afterPack also verifies the packed app/ contents
 
-Until [issue #43](https://github.com/qodeca/erfana/issues/43) the `files:` list in `electron-builder.yml` was negation-only, which app-builder-lib reads as "no includes given" and answers by packaging the **entire repository root** into `Contents/Resources/app/`. The list itself is now an allowlist ([electron-builder.md](./electron-builder.md#files-allowlist)); this hook is the check that the packed artifact actually matches it. It runs as the **last statement of `afterPack`** — after the prunes, the media staging and the fuse flip, so it sees the final tree, and still before signing, so a bad tree never becomes a trusted artifact and no notarization minutes are spent on it.
+Until [issue #43](https://github.com/qodeca/erfana/issues/43) the `files:` list in `electron-builder.yml` was negation-only, which app-builder-lib reads as "no includes given" and answers by packaging the **entire repository root** into `Contents/Resources/app/`. The list itself is now an allowlist ([electron-builder.md](./electron-builder.md#files-allowlist)); this hook is the check that the packed artifact actually matches it. It runs **after the fuse flip and before the extra-content guards** at the end of `afterPack` — after the prunes, the media staging and the fuse flip, so it sees the final tree; the only statement after it is `verifyExtraContent()`, which touches nothing under `app/`. Both run before signing, so a bad tree never becomes a trusted artifact and no notarization minutes are spent on it.
 
 Two functions run, both refusing to ship rather than warning:
 

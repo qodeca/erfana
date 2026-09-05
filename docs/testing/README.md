@@ -2,6 +2,8 @@
 
 Complete guide for testing Erfana. This covers both automated tests (Vitest/Playwright) and visual/manual testing using Circuit Electron MCP.
 
+> **Note**: bare issue numbers below without a `github.com/qodeca/erfana` link (#104, #137, #157, #159, #168, #211, #237) predate the 2026-06 open-source migration and no longer resolve on `qodeca/erfana`; they are retained as provenance. A pre-migration number at or below #120 now points at an unrelated public issue, so do not follow it.
+
 ## 📚 Documentation Index
 
 ### Automated Tests (Unit/Integration)
@@ -64,11 +66,11 @@ Run `npm run test` for current totals. The workspace holds **464 test files**. A
 
 - Playwright setup and configuration for Electron (three projects in `playwright.config.ts`: `electron` functional, `transcription` env-gated, `visual` regression)
 - Testing patterns for third-party components (Monaco, xterm.js, Mermaid)
-- Complete selector catalog (256 testids) – see [e2e-selectors.md](./e2e-selectors.md)
+- Complete selector catalog (259 testids) – see [e2e-selectors.md](./e2e-selectors.md)
 - Test helper utilities documentation
 - Troubleshooting guide
 
-**E2E workflow is currently disabled on CI** (2026-04-25, commit `997ba65`) — both the functional `electron` and `visual` suites run locally only until the `macos-latest` instability is root-caused. See [docs/ci.md § E2E Tests (disabled)](../ci.md#e2e-tests-e2eyml-disabled) for the disable rationale and re-enable command.
+**E2E workflow is currently disabled on CI** (2026-04-25, pre-migration commit `997ba65`, which does not resolve on `qodeca/erfana`) — both the functional `electron` and `visual` suites run locally only until the `macos-latest` instability is root-caused. See [docs/ci.md § E2E Tests (disabled)](../ci.md#e2e-tests-e2eyml-disabled) for the disable rationale and re-enable command.
 
 **Commands**:
 ```bash

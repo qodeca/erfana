@@ -3,7 +3,7 @@
     "Every number a card states lives here, with the code that derives it.",
     "A card writes <span data-claim=\"id\"></span> and has nowhere to type a digit.",
     "Values are computed by scripts/lib/design-claims.mjs into the generated",
-    "design/claims.js, and re-derived by design/claims.test.ts on every CI run.",
+    "design/claims.js, and re-derived by scripts/design-claims.test.mjs on every CI run.",
     "Adding a number to a card without an entry here fails that test.",
     "See scripts/lib/design-claims.mjs for why this is a mechanism and not a rule."
   ],

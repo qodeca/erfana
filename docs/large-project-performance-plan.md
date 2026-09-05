@@ -4,6 +4,7 @@
 > Status: In progress (4 of 6 done)
 > Scope: Issues #146, #147, #148, #149, #150, #151
 > Related: #60 – renderer crash on very large projects, landed (section below)
+> Provenance: the issue numbers #146–#151 and #136, and the commit SHAs quoted in this plan, are **pre-migration** – they belong to the private tracker and history that were rewritten at the 2026-06 repository migration, so they do not resolve in `qodeca/erfana` or in this repo's `git log`. They are kept as provenance, not as links. #60 is a current-repo issue.
 
 ## Context
 
@@ -78,6 +79,8 @@ Design of record: [`docs/design/design-issue-60.md`](./design/design-issue-60.md
 | Tree-rebuild dedup, once the trigger above fires | #149/#150 |
 
 ## Dependency graph
+
+(Issue numbers below are pre-migration provenance – see the note at the top.)
 
 ```
 #151 Logging ──→ #146 EMFILE fix ──→ #148 GitWatcher fix

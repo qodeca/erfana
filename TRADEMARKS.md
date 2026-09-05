@@ -27,7 +27,7 @@ The repository ships the Erfana application icon (`resources/icon.png`) so the a
 Erfana names third-party tools descriptively (nominative use) and is not affiliated with, sponsored by, or endorsed by their owners.
 
 - **Anthropic / "Claude" / "Claude Code"** – "Claude" and "Claude Code" are trademarks of Anthropic. Erfana is not affiliated with, sponsored by, or endorsed by Anthropic; it simply runs the `claude` CLI like any other terminal program.
-- **OpenAI / "Whisper"** – "OpenAI" and "Whisper" are trademarks of OpenAI. Erfana is not affiliated with, sponsored by, or endorsed by OpenAI; it optionally calls the OpenAI API for transcription and bundles `whisper.cpp` (an independent open-source project, MIT-licensed, not produced by OpenAI) for offline transcription.
+- **OpenAI / "Whisper"** – "OpenAI" and "Whisper" are trademarks of OpenAI. Erfana is not affiliated with, sponsored by, or endorsed by OpenAI; it optionally calls the OpenAI API for transcription and downloads and runs `whisper.cpp` (an independent open-source project, MIT-licensed, not produced by OpenAI) on demand for offline transcription.
 - **LlamaIndex / "LiteParse"** – "LiteParse" is a product of LlamaIndex. Erfana is not affiliated with, sponsored by, or endorsed by LlamaIndex; it bundles the `@llamaindex/liteparse` library to import documents.
 - **Open-source components and external tools** – Erfana also names the Monaco Editor (Microsoft), xterm.js, Mermaid, LibreOffice (The Document Foundation), and ImageMagick (ImageMagick Studio LLC) descriptively. These names are the trademarks or marks of their respective owners; Erfana uses them as independent open-source components or external tools and is not affiliated with, sponsored by, or endorsed by their owners.
 

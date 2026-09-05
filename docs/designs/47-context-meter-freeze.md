@@ -1,5 +1,6 @@
 # SD-047 — Context-meter freeze after compaction (fallback-read bound + version guard)
 
+**Status:** shipped – issue #47 closed 2026-08-09 (`d437ef9` "fix(claude-status): bound the post-compaction transcript re-read"). The single `recordFallbackResult()` sketched in §5 shipped as a four-function API in `fallbackGuard.ts`: `getFallbackResult`, `recordFallbackProvisional`, `finalizeFallbackResult`, `rollbackFallbackProvisional` (plus `__resetFallbackGuardForTests` / `__fallbackGuardSizeForTests`).
 **Issue:** #47 — Claude Code context-window meter freezes the UI after a compaction.
 **Phase:** 4 (Architecture / design only — no source changes here).
 **Scope:** `src/main/services/claudeStatus/ClaudeTranscriptParser.ts` (fallback control-flow behaviour change) + the extracted `src/main/services/claudeStatus/fallbackGuard.ts` cache module + their tests.
@@ -214,18 +215,12 @@ genuine no-turn version — freeze fixed **and** meter preserved.
  */
 const fallbackGuard = new Map<string, { version: string; turn: ParsedTurn | null }>()
 
-/** Record/overwrite the fallback result for `filePath`, evicting oldest at cap. */
-function recordFallbackResult(
-  filePath: string,
-  entry: { version: string; turn: ParsedTurn | null }
-): void {
-  // Evict oldest-by-insertion only when adding a genuinely NEW filePath key.
-  if (!fallbackGuard.has(filePath) && fallbackGuard.size >= MAX_FALLBACK_GUARD_ENTRIES) {
-    const oldest = fallbackGuard.keys().next().value
-    if (oldest !== undefined) fallbackGuard.delete(oldest)
-  }
-  fallbackGuard.set(filePath, entry)
-}
+/** Design-time sketch. Shipped as four exported functions in fallbackGuard.ts: */
+export function getFallbackResult(filePath: string, version: string): FallbackResult | undefined
+export function recordFallbackProvisional(filePath: string, version: string): void   // dedup insert before the await
+export function finalizeFallbackResult(filePath: string, version: string, turn: ParsedTurn | null): void
+export function rollbackFallbackProvisional(filePath: string, version: string): void // read threw – drop the placeholder
+// Eviction at MAX_FALLBACK_GUARD_ENTRIES (256) is oldest-by-insertion, applied when a NEW filePath key is added.
 ```
 
 | Aspect | Choice |

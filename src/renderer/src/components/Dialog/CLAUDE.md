@@ -27,11 +27,7 @@ BaseDialog keeps a **module-level stack of every open dialog** (trapping or not,
 
 ## Dialog buttons (mandatory – never create custom button styles)
 
-From `Dialog.css`:
-- `.dialog-btn` – base button class (always required)
-- `.dialog-btn-primary` – confirm/submit (violet)
-- `.dialog-btn-secondary` – cancel/dismiss (transparent with border)
-- `.dialog-btn-danger` – destructive actions (red)
+Use the `.dialog-btn` classes from `Dialog.css` (`.dialog-btn` is always required, plus one of `-primary` / `-secondary` / `-danger`).
 
 `.dialog-btn` / `-primary` / `-secondary` have an out-of-directory consumer: `RootErrorFallback` (the crash-recovery screen) references them from markup while `RootErrorBoundary.css` deliberately never declares them, relying on `Dialog.css` already being in the entry bundle at crash time. A future "scope these to dialogs only" cleanup would leave the crash screen with unstyled buttons – caught by the "shared Dialog.css contract" block in `../RootErrorBoundary/RootErrorBoundary.css.test.ts`, which asserts both halves: that `Dialog.css` still declares `.dialog-btn` / `-primary` / `-secondary`, and that `RootErrorBoundary.css` never re-declares them.
 
@@ -44,12 +40,9 @@ From `Dialog.css`:
 
 ## Existing dialogs (only where the filename misleads)
 
-Most dialog files do what their name says. These five do not:
+Most dialog files do what their name says. These two do not:
 
 | File | What is not obvious |
 |------|---------------------|
 | `FileSystemDialog.tsx` | Shared base for file/folder create **and** rename – validation, character count, keyboard shortcuts. `NewFileDialog` / `NewFolderDialog` / `RenameDialog` are thin wrappers on it (`operation="create"` / `"rename"`) |
 | `CameraDialog.tsx` | Single-shot: the frame is written to a temp file and returned to the caller immediately, with no review/retake state. Mirroring is **preview-only and off by default**: `.camera-preview--mirrored` (`transform: scaleX(-1)`) is applied to the `<video>` only while the per-camera checkbox is on (`useCameraMirrorPreference` → `useCameraMirrorStore`, persisted by `deviceId`), and `captureVideoFrame()` in `useCameraCapture.ts` draws the frame unflipped in every state, so the saved JPEG is never mirrored (#42). Uses `initialFocusRef` + `initialFocusKey={canCapture}` + `trapFocus` – the reference case for all three |
-| `ScreenSelectDialog.tsx` | Not macOS-only and not feature-gated: the TerminalPanel toolbar opens it wherever screenshot capture is supported (macOS + Windows) whenever more than one display is connected |
-| `ScreenPermissionDialog.tsx` | macOS Screen Recording denial – shown only **after** a capture is actually denied, never as a pre-check gate |
-| `WindowPickerDialog.tsx` | The window picker for the cross-platform `desktopCapturer` backend (Windows / Linux) only – macOS uses the OS-native picker and never opens it, so it is dispatched from `TerminalToolbar` behind `hasNativeWindowPicker === false` (#164). Roving tabindex, not `aria-activedescendant`: arrow keys move DOM focus and selection together |

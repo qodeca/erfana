@@ -17,9 +17,9 @@ Project-specific terminology used in Erfana documentation and code.
 | Term | Definition |
 |------|------------|
 | **Activity bar** | Vertical icon bar on the far left (project, settings icons) |
-| **Sidebar** | Left panel containing Project Tree and Settings |
+| **Sidebar** | Left panel containing the Project Tree; Settings is a full-window overlay (`SettingsOverlay`), not a sidebar panel |
 | **Project Tree** | File explorer showing project directory structure |
-| **Terminal Panel** | xterm.js terminal at the bottom of the window |
+| **Terminal Panel** | xterm.js terminal in the right-hand panel (`activityBarConfig.ts`, `side: 'right'`) |
 | **Editor Tabs** | DockviewReact tabs for open markdown files |
 | **Split View** | Editor and preview shown together with scroll sync. Two variants: `split` (side by side) and `split-horizontal` (preview on top) |
 
@@ -46,7 +46,7 @@ Project-specific terminology used in Erfana documentation and code.
 | **TerminalService** | Manages PTY instances for terminal emulation |
 | **DirectoryWatcherService** | Monitors file system changes for auto-refresh |
 | **FileWatcherService** | Watches individual files for external changes |
-| **GitStatusService** | Tracks git status using isomorphic-git |
+| **GitStatusService** | Tracks git status via a worker thread (`git-status.worker.ts`); native git when a binary is found, isomorphic-git as the fallback |
 | **SettingsService** | Application-level state persisted with electron-store – `lastProjectPath`, `recentProjects`, `projectFilterMode`, `directoryWatchDepth`. Not per-project settings |
 | **ProjectSettingsService** | Per-project settings loaded and Zod-validated from `<project>/.erfana/settings.json` |
 | **GlobalSettingsService** | Application-wide settings in `~/.erfana/` |
@@ -72,7 +72,7 @@ Project-specific terminology used in Erfana documentation and code.
 | Term | Definition |
 |------|------------|
 | **Zustand** | Lightweight React state management library |
-| **Store** | Zustand state container (e.g., `useEditorStore`) |
+| **Store** | Zustand state container (e.g., `useProjectStore`) |
 | **Persist middleware** | Zustand middleware for localStorage persistence |
 
 ## Testing

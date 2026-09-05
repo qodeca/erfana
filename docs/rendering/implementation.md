@@ -4,9 +4,11 @@
 
 ### Plugin Setup
 ```typescript
-const rehypePlugins = [
+// MarkdownPreview.tsx – sanitizationSchema spreads hast-util-sanitize's defaultSchema
+// and extends it (e.g. tel:/ftp: href protocols)
+const rehypePlugins: PluggableList = [
   rehypeRaw,  // Parse HTML in markdown
-  [rehypeSanitize, defaultSchema]  // Security sanitization
+  [rehypeSanitize, sanitizationSchema]  // Security sanitization
 ]
 ```
 
@@ -15,7 +17,7 @@ const rehypePlugins = [
 const components = {
   div: withLineRange('div'),
   section: withLineRange('section'),
-  img: customImageHandler,
+  img({ node, src, alt, title, width, height, ...props }) { /* inline handler with explicit attribute handling */ },
   // ... more components
 }
 ```
@@ -122,9 +124,9 @@ const customSchema = {
 
 ## Files
 
-- `MarkdownPreview.tsx:109-112` - Plugin configuration
-- `MarkdownPreview.tsx:256-271` - Image handler
-- `MarkdownPreview.tsx:266-295` - Component support
+- `MarkdownPreview.tsx` – `sanitizationSchema` and the `rehypePlugins` list (plugin configuration)
+- `MarkdownPreview.tsx` – the inline `img(...)` component handler
+- `MarkdownPreview.tsx` – `withLineRange()` and the `components` map (component support)
 - `src/renderer/index.html` - CSP headers
 
 ## References

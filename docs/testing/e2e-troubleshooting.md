@@ -10,11 +10,10 @@ Common issues and solutions for Playwright E2E tests with Electron.
 
 ## Tests timeout on launch
 
-Ensure dev server is running:
+No dev server is involved: `npm run test:e2e` is `electron-vite build && playwright test --project=electron`, so it builds `out/` first and launches the built app. If a launch times out, make sure the build step succeeded (run `npx electron-vite build` on its own and read its output), and that no stale `out/` from a different branch is being launched – `npm run test:e2e:no-build` skips the build and is only safe right after a fresh one:
 
 ```bash
-npm run dev &
-sleep 5
+npx electron-vite build
 npm run test:e2e
 ```
 
@@ -99,15 +98,17 @@ await monaco.setContent(page, '# Hello World')
 Terminal PTY needs time to initialize:
 
 ```typescript
-// Wait for terminal ready
-await waitForTestId(window, TEST_IDS.TERMINAL_INSTANCE)
-await window.waitForTimeout(1000)  // PTY initialization
+import { terminal } from '../utils/helpers'
 
-// Now send command
-await sendTerminalInput(window, 'echo test')
+// Opens the panel and waits for the prompt (xterm textarea present + PTY delay)
+await terminal.open(page)
+
+// Now send the command and wait for its output
+await terminal.sendCommand(page, 'echo test')
+await terminal.waitForOutput(page, 'test')
 ```
 
-The newer `terminal.open()` POM (`e2e/pages/terminal.page.ts`) wraps this with `PTY_INIT_DELAY_MS = 1500`. This is still a blind sleep, not a real readiness probe — on a dev machine with a heavy `.zshrc`, zsh's `source ~/.zshrc` can take longer than 1500 ms and the typed command sits in the kernel PTY buffer without ever being read by the shell. The kernel TTY line discipline echoes each character back to xterm (giving the impression that input is being processed), but no command executes and the shell prompt never appears.
+`terminal.*` in `e2e/utils/helpers.ts` delegates to `TerminalPage` (`e2e/pages/terminal.page.ts`); there is no `waitForTerminal()` / `sendTerminalInput()` helper. `TerminalPage.waitForPrompt()` (called by `open()`) polls for the xterm textarea and then applies `PTY_INIT_DELAY_MS = 1500`. This is still a blind sleep, not a real readiness probe — on a dev machine with a heavy `.zshrc`, zsh's `source ~/.zshrc` can take longer than 1500 ms and the typed command sits in the kernel PTY buffer without ever being read by the shell. The kernel TTY line discipline echoes each character back to xterm (giving the impression that input is being processed), but no command executes and the shell prompt never appears.
 
 If a terminal-driven test fails consistently on your machine while passing on CI, time your shell init (e.g. `time zsh -i -c exit`) before suspecting a code regression. See [known issues § E2E terminal-driven tests sensitive to user's shell init speed](../known-issues.md#e2e-terminal-driven-tests-sensitive-to-users-shell-init-speed) for the full root-cause analysis and the two candidate fixes.
 
@@ -143,8 +144,9 @@ await expect(element).toBeVisible()
 await expect(element).toBeEnabled()
 await element.click()
 
-// Fix: Wait for animation
-await window.waitForTimeout(300)  // Match animation duration
+// Fix: Wait for the animated element to settle – a condition, not a sleep
+await expect(window.locator('[data-testid="settings-overlay"]')).toBeVisible()
+// If a sleep is truly unavoidable, annotate it: // KNOWN_WAIT: <reason>
 
 // Fix: More specific selector
 const firstTab = window.locator('[data-testid^="tab-item-"]').first()

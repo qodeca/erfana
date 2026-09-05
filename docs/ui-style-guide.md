@@ -44,20 +44,16 @@ the token discipline that `npm run lint:css` now enforces.
 
 ## Design Philosophy
 
-Erfana follows a **Qodeca-branded flat design** with these core principles:
-
-1. **Brand Identity** - Qodeca Violet (#A0A8FF) as primary, Lime (#E3E829) as secondary accent.
-2. **Sharp Corners** - No border-radius (except circles). Clean, professional aesthetic.
-3. **Subtle Depth** - Use shadows sparingly to create hierarchy without being dramatic.
-4. **Dark First** - Optimized for dark mode with Smoky Black (#161312) background.
-5. **Consistency** - Same patterns everywhere. If unsure, check existing components.
-6. **Accessibility** - Sufficient contrast (WCAG AA), focus indicators, keyboard navigation.
+> **Decided by the cards in [`design/`](../design/index.html)** – brand colours by [`colors.html`](../design/system/foundations/colors.html), corners, shadows and depth by [`surfaces.html`](../design/system/foundations/surfaces.html), focus by [`focus.html`](../design/system/foundations/focus.html).
+>
+> This section is a stub. It keeps its heading so existing links still
+> resolve, and it holds no visual rule, so it cannot contradict the cards.
 
 ### Not Supported
 
 - **Light Mode** - Erfana is dark-mode only. Do not add `prefers-color-scheme` queries.
-- **Rounded Corners** - Use `--border-radius: 0` (flat design). Only exception: circles (`50%`).
-- **Custom Scrollbars in Firefox** - Webkit-only. Firefox uses default scrollbars.
+
+> Everything else this list used to hold (corner radius, browser scrollbar support) is decided by the `design/` cards above.
 
 ---
 
@@ -110,7 +106,7 @@ Erfana follows a **Qodeca-branded flat design** with these core principles:
 
 **Scope rule.** Opt in at the data-text element, not at a click-target or drag-target ancestor. A row container with both `cursor: pointer` and `user-select: text` creates a gesture conflict (drag-to-select competes with click-to-pick). FilePicker is the worked example – the override lives on `.file-picker-filename` and `.file-picker-path` (data), not on `.file-picker-item` (the clickable row). Use container scope (`.dialog-body`, `.markdown-preview-content`) only when no descendant is interactive. When a container has both selectable content and chrome children (welcome panel's recent-project rows mix data text with action buttons), enumerate the data selectors explicitly – do not blanket the container.
 
-**Canonical override** lives in `src/renderer/src/styles/utilities.css`. To make a new surface selectable, add its selector to the grouped rule there (and add a row to `src/renderer/src/styles/userSelect.audit.test.ts`). Two CSS-module surfaces (`.metadataItem`, `.errorMessage` in `ImageViewerPanel.module.css`) declare the rule in-place because the build-time class-name hashing prevents the central selector from matching them at runtime — for any other new surface, add it to `utilities.css`, not to the component file.
+**Canonical override** lives in `src/renderer/src/styles/utilities.css`. To make a new surface selectable, add its selector to the grouped rule there (and add a row to `src/renderer/src/styles/userSelect.audit.test.ts`). Four CSS-module surfaces (`.metadataItem`, `.errorMessage`, `.statusSlot`, `.bannerMessage` in `ImageViewerPanel.module.css`) declare the rule in-place because the build-time class-name hashing prevents the central selector from matching them at runtime — for any other new surface, add it to `utilities.css`, not to the component file.
 
 ```css
 /* src/renderer/src/styles/utilities.css */
@@ -121,11 +117,11 @@ Erfana follows a **Qodeca-branded flat design** with these core principles:
 }
 ```
 
-The `-webkit-user-select` prefix is not needed; Erfana ships on Chromium 130+ via Electron 39 and unprefixed `user-select` has been honored in Chromium since v54.
+The `-webkit-user-select` prefix is not needed; Erfana ships on Chromium 142 via Electron 39.8.x and unprefixed `user-select` has been honored in Chromium since v54.
 
 **Cascade assumption.** These overrides rely on app stylesheets loading after `dockview-core/dist/styles/dockview.css` in the Vite bundle. Don't change CSS import order without re-running `src/renderer/src/styles/userSelect.audit.test.ts`, which asserts every audited selector still declares `user-select: text` in its source file.
 
-See [#211](https://github.com/qodeca/erfana/issues/211) for the original audit and per-component policy decisions.
+See #211 (pre-migration issue number; it does not resolve in the current repository) for the original audit and per-component policy decisions.
 
 ## CSS class namespacing (`erf-`)
 

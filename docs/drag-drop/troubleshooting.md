@@ -7,8 +7,7 @@
 ## Performance Considerations
 
 ### Tree Flattening
-- **Memoized** via `useMemo(() => flattenTree(files), [files])`
-- Only recalculates when files array changes (after operations)
+- **Memoized** inside `useDragDropTree` – a single `flattenInto` pass builds the flattened list and the path→node index together, recomputed only when `files` changes (after operations)
 - Typical project (500 files) flattens in <5ms
 
 ### Watcher Pause/Resume
@@ -17,13 +16,13 @@
 - Alternative (no pause): Risk of stale data, ghost files, duplicate entries
 
 ### Drag Sensor Configuration
-- **Activation distance**: 5px (prevents accidental drags on click)
-- **Collision detection**: closestCenter (better performance than closestCorners)
+- **Activation distance**: `DRAG_DROP.ACTIVATION_DISTANCE` (5px, `ProjectTree/constants.ts`) – prevents accidental drags on click
+- **Collision detection**: a custom `treeCollisionDetection` function in `ProjectTree.tsx`, passed to `DndContext` (not dnd-kit's `closestCenter`)
 
 ```typescript
-// ProjectTree.tsx:530-532
+// ProjectTree.tsx – sensor setup
 const sensors = useSensors(
-  useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  useSensor(PointerSensor, { activationConstraint: { distance: DRAG_DROP.ACTIVATION_DISTANCE } })
 )
 ```
 
@@ -35,7 +34,7 @@ const sensors = useSensors(
 ## Known Limitations
 
 1. **No undo/redo** - File operations are immediate and permanent
-2. **No drag preview customization** - Uses default browser drag image
+2. **Drag preview** - A custom dnd-kit `<DragOverlay>` ghost (`.drag-overlay`, the dragged item's name) follows the cursor; it is not further customisable (no icon, no multi-item count)
 3. **No multi-select drag** - Can only drag one item at a time
 4. **No drop between items** - Only drop into folders or at root level
 5. **No drag reordering** - File order determined by alphabetical sort, not manual position

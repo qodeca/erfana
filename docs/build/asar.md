@@ -1,6 +1,6 @@
 # ASAR packaging
 
-**Last updated**: August 2026 (v0.17.2)
+**Last updated**: September 2026 (`asar: false` re-verified in `electron-builder.yml` at v0.19.0)
 
 This document explains why ASAR packaging is disabled and the implications.
 

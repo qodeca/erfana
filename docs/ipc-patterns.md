@@ -30,37 +30,40 @@ Never call `ipcMain.handle(...)` or `ipcMain.on(...)` yourself. `src/main/ipc/re
 const content = await window.api.file.readFile('/path/to/file.md')
 ```
 
-## Promise-Based Pattern with Completion Callback (v0.3.3)
+## Invoke round-trip for terminal writes (v0.3.3)
 
-For operations requiring confirmation of completion (e.g., terminal write operations), use Promise-based IPC with completion callbacks:
+`terminal:write` is an `invoke`/`handle` channel, but the only promise in the chain is the IPC round-trip itself. The service write is **synchronous**: `TerminalService.write()` returns a boolean that says whether the PTY accepted the data, and the handler returns that boolean as `{ success }` without awaiting anything.
 
-**1. Service layer with completion callback** (`src/main/services/TerminalService.ts`):
+**1. Service layer – synchronous write** (`src/main/services/TerminalService.ts`):
 ```typescript
-write(terminalId: string, data: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    const terminal = this.terminals.get(terminalId)
-    if (!terminal) {
-      resolve(false)
-      return
+write(terminalId: string, data: string): boolean {
+  const terminal = this.terminals.get(terminalId)
+  if (!terminal) {
+    logger.error(`Terminal ${terminalId} not found`)
+    return false
+  }
+  try {
+    terminal.ptyProcess.write(data)   // node-pty buffers internally; no callback
+    return true
+  } catch (error) {
+    const code = (error as { code?: unknown }).code
+    if (code === 'EPIPE') {
+      // PTY already closed – drop the entry and report it as an exit
+      this.terminals.delete(terminalId)
+      this.emit('exit', { terminalId, exitCode: 0 })
+      return false
     }
-    try {
-      // node-pty callback API - resolves when write completes
-      ;(terminal.ptyProcess.write as (data: string, callback?: () => void) => void)(
-        data,
-        () => resolve(true)
-      )
-    } catch (error) {
-      resolve(false)
-    }
-  })
+    this.emit('error', { terminalId, error: String(error) })
+    return false
+  }
 }
 ```
 
-**2. IPC handler awaits service promise** (`src/main/ipc/terminal-handlers.ts`):
+**2. IPC handler returns the boolean** (`src/main/ipc/terminal-handlers.ts`):
 ```typescript
-registerHandle('terminal:write', async (_event, { terminalId, data }) => {
+registerHandle('terminal:write', (_event, { terminalId, data }) => {
   try {
-    const success = await terminalService.write(terminalId, data)
+    const success = terminalService.write(terminalId, data)
     return { success }
   } catch (error) {
     return { success: false, error: String(error) }
@@ -68,27 +71,25 @@ registerHandle('terminal:write', async (_event, { terminalId, data }) => {
 })
 ```
 
-**3. Preload exposes Promise API** (`src/preload/index.ts`):
+**3. Preload exposes the invoke** (`src/preload/index.ts`):
 ```typescript
 write: (terminalId: string, data: string): Promise<{ success: boolean; error?: string }> =>
   ipcRenderer.invoke('terminal:write', { terminalId, data })
 ```
 
-**4. Renderer awaits completion** (`src/renderer/src/stores/useTerminalStore.ts`):
+**4. Renderer awaits the round-trip** (for example `src/renderer/src/components/ProjectTree/switchHelpers.ts`, which `await`s the write before sending a follow-up signal):
 ```typescript
-const writeResult = await window.api.terminal.write(terminalId, text)
-if (!writeResult.success) {
-  console.error('Write failed:', writeResult.error)
-  return false
+const result = await window.api.terminal.write(terminalId, text)
+if (!result.success) {
+  // the PTY was gone or refused the write – result.error carries the reason
 }
-// Write confirmed complete, safe to send Enter key
 ```
 
-**Benefits**:
-- Guarantees operation completion before proceeding
-- Prevents race conditions (e.g., sending Enter before text is written)
-- Enables reliable sequential operations
-- See [AutoExecute Reference](./prompts/autoexecute-reference.md) for full autoExecute implementation
+**What the promise does and does not guarantee**:
+- Resolving means main has handed the bytes to node-pty (or refused to). It does **not** mean the shell has consumed them – node-pty buffers the write internally and no completion callback is used.
+- `{ success: false }` without `error` means the terminal id was unknown or the PTY was already closed (EPIPE); `error` is set only when the write threw something else.
+- Sequencing (write text, then send Enter) is ordered by the `invoke` calls themselves, not by a write-complete signal.
+- See [AutoExecute Reference](./prompts/autoexecute-reference.md) for the autoExecute flow that relies on this ordering
 
 ## Adding New IPC Channel
 
@@ -183,8 +184,8 @@ Note the `file:` prefix – these are **not** `external-file:*`.
 | `directory-watch:changed` | Event: directory changed externally |
 | `directory-watch:project-deleted` | Event: project folder deleted |
 | `directory-watch:error` | Event: watcher error |
-| `directory-watch:recovered` | Event: watcher recovered after a recoverable ENOENT |
-| `directory-watch:restart-failed` | Event: watcher restart gave up |
+| `directory-watch:recovered` | Event: watcher recovered after a recoverable ENOENT. Sent by main (`DirectoryWatcherService`) but **not exposed by preload** – no renderer consumer |
+| `directory-watch:restart-failed` | Event: watcher restart gave up. Sent by main (`DirectoryWatcherService`) but **not exposed by preload** – no renderer consumer |
 
 ### Git (`git-handlers.ts`, `git-watcher-handlers.ts`)
 
@@ -208,7 +209,7 @@ Note the `file:` prefix – these are **not** `external-file:*`.
 |---------|---------|
 | `terminal:isAvailable` | Whether node-pty loaded and a PTY can be spawned |
 | `terminal:create` | Spawn a PTY; returns `{ success: true, terminalId, shellKind }` or `{ success: false, error }`, the reason passed through verbatim from `TerminalService.createTerminal` |
-| `terminal:write` | Write to the PTY; resolves when the write completes (see the Promise-based pattern above) |
+| `terminal:write` | Write to the PTY; returns `{ success, error? }` from a synchronous PTY write – the promise is only the invoke round-trip (see the invoke round-trip section above) |
 | `terminal:resize` | `ipcMain.on` – resize the PTY (fire-and-forget) |
 | `terminal:kill` | Kill a PTY |
 | `terminal:getInfo` | Metadata for one terminal |

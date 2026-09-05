@@ -232,7 +232,7 @@ Global settings are stored in:
 
 - **Settings file**: Edit `~/.erfana/settings.json` → `{ "logging": { "level": "debug" } }`. Applied immediately (no restart).
 - **Settings UI**: Gear icon → Logging section → dropdown. Applied immediately.
-- **Programmatically**: `globalSettingsService.updateSetting('logging', { level: 'debug' })`
+- **Programmatically**: `globalSettingsService.setSetting('logging', { level: 'debug' })` (`GlobalSettingsService.setSetting` – there is no `updateSetting`)
 
 ### Default level
 

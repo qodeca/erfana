@@ -13,7 +13,7 @@ new flake gets re-triaged from scratch and historical context is lost. This
 index lets future contributors recognise known patterns and apply proven
 remediations. The `windows-latest` CI job (`windows-checks` in
 `.github/workflows/checks.yml`) is now live but **advisory** — it runs
-typecheck + `test:main` on every push and is deliberately excluded from the
+typecheck + `test:main` + `npm run design -- --check` on every push and is deliberately excluded from the
 branch-protection required checks until it proves stable, so a flake here
 surfaces as a warning rather than a blocked merge.
 
@@ -97,7 +97,7 @@ Not a flake and not a regression: it fails the same way every time, and only
 here. Every test passes (464 files, 11,649 tests on 2026-09-04); what fails are
 two **per-file** coverage thresholds in `vitest.main.ts` — `scripts/fuses.js`
 (86% lines / 88% functions) and `src/main/utils/tarArchive.ts` (90%). Both
-suites skip their symlink cases on win32 — `fuses.test.mjs` carries ten
+suites skip their symlink cases on win32 — `fuses.test.mjs` carries six
 `skipIf(process.platform === 'win32')` guards (see the row above for why: file
 symlinks need `SeCreateSymbolicLinkPrivilege`), and `tarArchive.test.ts:77`
 returns early — so the lines those cases would cover never execute, and the

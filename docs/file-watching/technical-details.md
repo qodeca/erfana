@@ -12,14 +12,15 @@ Performance considerations, security measures, edge case handling, and integrati
 - Optimized for individual file saves
 - Handles rapid successive writes (e.g., auto-save in external editor)
 
-**Directory Watcher**: Adaptive delay
-- Single events: 300ms (responsive for individual operations)
-- Bulk operations: 1000ms (batches git/npm operations)
-- Threshold: 5+ events per second triggers bulk mode
+**Directory Watcher**: Fixed-stage pipeline (VS Code values), not an adaptive delay
+- chokidar runs with `awaitWriteFinish: false` (lower latency for editor saves)
+- `ThrottledWorker` (`src/main/services/watcher/ThrottledWorker.ts`): 75 ms collection window, then chunks of up to 500 events dispatched with a 200 ms throttle between chunks (`collectionDelay: 75`, `throttleDelay: 200` in `DirectoryWatcherService.watchDirectory`)
+- `AtomicSaveDetector`: a delete is held ~100 ms so an atomic write (unlink + rename) coalesces into a change instead of a delete
+- Renderer: `directory-watch:changed` is debounced a further 250 ms (`DIRECTORY_WATCHER.DEBOUNCE_DELAY`, `ProjectTree/constants.ts`)
 
 ### Event Batching
 
-Directory watcher accumulates events during debounce period. Example: Git checkout with 50 file additions triggers single refresh after 1000ms.
+The worker accumulates events during the collection window and coalesces them per path. Example: a git checkout with 50 file additions arrives as one or a few chunks and produces a single tree refresh after the renderer debounce.
 
 ### Resource Limits
 
@@ -36,14 +37,19 @@ Directory watcher accumulates events during debounce period. Example: Git checko
 All file paths are validated against the project root:
 
 ```typescript
-// DirectoryWatcherService.ts
-async watchDirectory(dirPath: string, webContents: WebContents) {
-  // Security: Prevent watching files outside project
-  if (this.projectPath && !dirPath.startsWith(this.projectPath)) {
-    throw new Error('Cannot watch directories outside the project directory')
-  }
+// DirectoryWatcherService.watchDirectory (paths normalized first)
+// Security: Prevent watching directories outside project
+// Uses normalized paths with separator check to prevent bypasses like /project/../sensitive
+if (
+  normalizedProjectPath &&
+  !normalizedDirPath.startsWith(normalizedProjectPath + sep) &&
+  normalizedDirPath !== normalizedProjectPath
+) {
+  throw new AppError('Cannot watch directories outside the project directory', ErrorCode.PATH_OUTSIDE_PROJECT)
 }
 ```
+
+The appended `path.sep` is what stops `/proj-evil` from passing as a prefix of `/proj`; a system-directory check (`isSystemDirectory`) runs before it.
 
 ### Input Sanitization
 

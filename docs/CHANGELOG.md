@@ -4,6 +4,13 @@ Per-version release notes for Erfana, v0.9.0 onwards. Earlier: v0.8.0–v0.8.3 i
 
 > **Note:** In v0.7.2, BRS (Business Requirements Specifications) were renamed to "specs" and relocated from `specs/business-reqs/` to `specs/spec-t{tier}-{id}-{slug}/`. All references in code and docs now use `Spec #XXX`. Historical entries below have been updated accordingly.
 
+## [Unreleased]
+
+### Internal
+
+- **Node 24 is now recorded in `.nvmrc`** – CI has run on Node 24 since the `setup-node-with-retry` action defaulted to it, but nothing in the repository said so, and a local machine could run every check on a different major without noticing. `nvm use` in the project directory now picks 24. Note for npm 11 users: a bare `npm install` drops `encoding@0.1.13` from `package-lock.json` and `npm ci` then refuses the lock – install with `npm ci` and never commit that diff (see [CONTRIBUTING](../CONTRIBUTING.md#local-setup)).
+- **The release flow now gates the `package-lock.json` version** – the v0.19.0 bump edited `package.json` only, so the tag shipped with the lock still reading 0.18.0. The field is metadata (no dependency resolution changed and the signed artifacts are correct), but the next `npm install` on any machine rewrote it and produced an unasked-for diff. The lock now reads 0.19.0, and the `releasing-erfana` skill syncs it before staging the version commit (§1.5) and asserts that the two files agree before a tag is cut (§0.3).
+
 ## 0.19.0
 
 *Released 2026-09-04. Tag `v0.19.0`.*
@@ -273,6 +280,8 @@ Per-version release notes for Erfana, v0.9.0 onwards. Earlier: v0.8.0–v0.8.3 i
 ## 0.11.2
 
 *Released 2026-06-01. Tag `v0.11.2`.*
+
+*v0.11.1 (tag `v0.11.1`, published the same day) already carried the clipboard fix (#203) and the slimmer distribution listed below; it has no section of its own and is folded into this entry. Its release notes are in [release-notes/v0.11.1.md](./release-notes/v0.11.1.md).*
 
 ### Changes
 

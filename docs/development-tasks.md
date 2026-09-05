@@ -39,7 +39,7 @@
 
 ### Adding Splitview Panel (Sidebar)
 
-For fixed sidebars (Project, Git, Terminal) that don't need tabbing:
+For fixed sidebars (Project, Terminal) that don't need tabbing:
 
 **Wrapper Pattern** (recommended for panels with headers/controls):
 
@@ -214,53 +214,50 @@ ipcMain.handle('file:getLastProjectPath', async () => {
 
 ## Working with Panel State
 
+Sidebar state lives in `useActivityBarStore` (`src/renderer/src/stores/useActivityBarStore.ts`), a Zustand store with the `persist` middleware. The localStorage key is `erfana-activity-bar-state`; `partialize` persists only `leftActivePanel`, `rightActivePanel`, `leftWidth` and `rightWidth` (`null` for an active panel means that sidebar is hidden). `terminalUserClosed` and `terminalExpanded` are ephemeral and never written.
+
 ### Reading Panel State
 
 ```typescript
-// Get current state from localStorage
-const state = localStorage.getItem('erfana-sidebar-state')
-const parsed = JSON.parse(state)
+// Inside a component – subscribe to the store
+const leftActivePanel = useActivityBarStore((s) => s.leftActivePanel) // 'project' | null
+const leftWidth = useActivityBarStore((s) => s.leftWidth)             // number (px)
 
-console.log(parsed.leftSidebar.visible)  // boolean
-console.log(parsed.leftSidebar.width)    // number (px)
+// Outside React (tests, devtools) – read the persisted slice directly
+const raw = localStorage.getItem('erfana-activity-bar-state')
+const { state } = JSON.parse(raw) // zustand/persist wraps the slice in { state, version }
+console.log(state.rightActivePanel) // 'terminal' | null
+console.log(state.rightWidth)       // number (px)
 ```
 
 ### Updating Panel State
 
 ```typescript
-// Update state programmatically
-const updateSidebarState = (sidebarId: string, updates: any) => {
-  setSidebarStates((prev) => {
-    const newState = {
-      ...prev,
-      [sidebarId]: { ...prev[sidebarId], ...updates }
-    }
-    localStorage.setItem('erfana-sidebar-state', JSON.stringify(newState))
-    return newState
-  })
-}
+// Use the store actions – they persist automatically
+const { togglePanel, setActivePanel, setSidebarWidth } = useActivityBarStore.getState()
+
+togglePanel('project', 'left')        // open/close the left sidebar
+setActivePanel('terminal', 'right')   // open the terminal on the right
+setSidebarWidth(360, 'left')          // width in px (no-op when unchanged)
 ```
+
+`AppDockLayout` mirrors the store into the splitview: it calls `panel.api.setVisible(...)` on the `left-sidebar` / `terminal-panel` splitview panels when an activity-bar button is clicked, and writes resize events back with `setSidebarWidth`.
 
 ### Resetting Panel State
 
 ```typescript
 // Clear state to force defaults on next load
-localStorage.removeItem('erfana-sidebar-state')
+// (left: 'project' open at 300px; right: hidden at 300px)
+localStorage.removeItem('erfana-activity-bar-state')
 ```
 
 ### Adding New Protected Panel
 
-1. Add panel ID to `protectedPanels` array:
-   ```typescript
-   const protectedPanels = ['project', 'terminal', 'git', 'myNewPanel']
-   ```
+There is no `protectedPanels` / `protectedTitles` list any more. A sidebar panel is "protected" by being driven from the activity bar instead of a dockview tab:
 
-2. Add panel title to `protectedTitles` array:
-   ```typescript
-   const protectedTitles = ['Project', 'Terminal', 'Git', 'My New Panel']
-   ```
-
-Protection is automatic - click interception and auto-restore work immediately.
+1. Add an entry to `activityBarPanels` in `src/renderer/src/components/ActivityBar/activityBarConfig.ts` (`id`, `icon`, `label`, `side`, `dockviewPanelId`, `order`, optional `keyboardShortcut`, `requiresProject`, `badge`).
+2. Register the matching splitview panel in `AppDockLayout` and extend `handleActivityBarClick` so the new `side`/`id` pair toggles it with `panel.api.setVisible(...)` and `togglePanel(id, side)`.
+3. Persistence and keyboard toggling then come from the store and the activity bar for free.
 
 See: [UI Components](./ui-components.md#panel-toggle-system)
 

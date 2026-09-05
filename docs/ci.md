@@ -7,7 +7,7 @@ Erfana runs GitHub Actions workflows on pushes. The author-controlled workflows 
 | Quality Checks | `.github/workflows/checks.yml` | active | push to **any branch** | `ubuntu-latest` | ~3 min | Fast feedback on lint / types / unit tests / build / licensing (see job table below) |
 | Secret Scan | `.github/workflows/secret-scan.yml` | active (**required check**) | push + PR | `ubuntu-latest` | ~1 min | gitleaks (full git history) + trufflehog (verified secrets only). Version-pinned, SHA-256-checksum-verified binary downloads; no third-party actions |
 | E2E Tests | `.github/workflows/e2e.yml` | **disabled** (2026-04-25) | (would be: push to `develop` or `main`, plus all PRs) | `macos-latest` | ~5–8 min | Electron integration tests (Playwright) — see [E2E Tests (disabled)](#e2e-tests-e2eyml-disabled) below |
-| Release | `.github/workflows/release.yml` | active | tag push `v*.*.*` | matrix (mac/win) | ~15–25 min compute + **unbounded approval wait** | Multi-platform release build → `prepare`/`build_*`/`finalize`/`cleanup` (calls `build_mac.yml`, `build_win.yml` reusables; Linux distribution target dropped) |
+| Release | `.github/workflows/release.yml` | active | tag push `v[0-9]+.[0-9]+.[0-9]+`, or `workflow_dispatch` (input `dry-run`, default `true` – skips draft creation and asset uploads) | matrix (mac/win) | ~15–25 min compute + **unbounded approval wait** | Multi-platform release build → `prepare`/`build_*`/`finalize`/`cleanup` (calls `build_mac.yml`, `build_win.yml` reusables; Linux distribution target dropped) |
 | Whisper Binaries | `.github/workflows/whisper-binaries.yml` | active | `workflow_dispatch` only | `ubuntu-latest` (`validate-inputs`, `publish-release`) + `macos-14` (`build-macos`) + `windows-latest` (`build-windows`) | ~25 min | Self-hosted whisper.cpp build, sign, notarize, publish (see [`build/whisper-binaries.md`](./build/whisper-binaries.md)) |
 | Whisper Binaries (Canary) | `.github/workflows/whisper-binaries-canary.yml` | active | monthly schedule | `macos-14` + `windows-latest` + `ubuntu-latest` (`notify-on-failure`) | ~3 min | Credential-health check (Apple notarization, Windows signing) |
 
@@ -76,7 +76,7 @@ Runs gitleaks over the **full git history**, then trufflehog for verified secret
 
 ## E2E Tests (`e2e.yml`, disabled)
 
-**Disabled 2026-04-25** via `gh workflow disable "E2E Tests"` (see commit `997ba65`). The disabled state is also documented inline at the top of `e2e.yml` so it's visible without the Actions UI.
+**Disabled 2026-04-25** via `gh workflow disable "E2E Tests"` (pre-migration commit `997ba65`, which does not resolve on `qodeca/erfana` – retained as provenance). The disabled state is also documented inline at the top of `e2e.yml` so it's visible without the Actions UI.
 
 **Why disabled**: Playwright + Electron tests do not run reliably on `macos-latest` hosted runners. The visual suite hangs at `page.waitForLoadState('domcontentloaded')` (root-cause analysis below); the functional `--project=electron` suite was previously the workaround, but is also unstable on hosted runners. E2E was already excluded from branch-protection required checks, so disabling does not block any merges or releases.
 

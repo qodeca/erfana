@@ -68,7 +68,7 @@ Two mutually exclusive radio buttons:
 - **All Files** - Show all
 - **Markdown Only** - Show only .md files + folders containing them
 
-**Visual**: Radio with checkmark icons, gray text (blue when active #007acc), 12px spacing
+**Visual**: Radio with checkmark icons, gray text (`var(--color-accent-drag)` when active), 12px spacing
 **Persistence**: electron-store, survives restarts
 
 See: [IPC Patterns](./ipc-patterns.md) for filter persistence channels
@@ -146,7 +146,7 @@ VS Code-style git status badges on files and folders.
 
 **Architecture**:
 - `GitStatusService.ts` - isomorphic-git statusMatrix()
-- `useGitStatus.ts` - Hook with 1s debounce, 2s cooldown
+- `useGitStatus.ts` - Hook with 250 ms debounce, 500 ms cooldown (`GIT_STATUS` in `ProjectTree/constants.ts`)
 - `useGitStore.ts` - Zustand store for git state
 - `GitStatusBadge.tsx` - File/folder badge component
 - `GitStatusBar.tsx` - Branch + counts footer
@@ -168,7 +168,7 @@ See: [Known Issues](./known-issues.md#git-status-global-gitignore-not-supported)
 4. Extension: `.key`, `.pem`, `.p12`, `.pfx`, `.keystore`, `.jks`, `.crt`, `.cer`
 5. Password/token files: a name containing `password` or `token` **and** ending `.txt` or `.json`
 
-**Visual**: Color `#d97706` (amber), icon ⚠️ (14px), ARIA label "Sensitive file"
+**Visual**: Color `var(--color-warning-bright)` (amber – a RETIRED token; new code should use `var(--color-warning)`), icon ⚠️ (14px), ARIA label "Sensitive file"
 **Detection**: `isSensitiveFile()` in `ProjectTreeNode.tsx` – plain string comparison
 (exact match, prefix, `includes`, `endsWith`), not regex
 **Location**: `ProjectTreeNode.tsx`
@@ -201,14 +201,14 @@ Files/folders starting with `.`
 
 **Patterns**:
 - **Strategy**: Node type-specific menus (FileStrategy, FolderStrategy)
-- **Command**: Testable command objects (11 classes)
+- **Command**: Testable command objects (12 classes)
 - **Factory**: Automatic strategy selection
 
 **Structure**:
 ```
 context-menu/
 ├── types.ts        # Interfaces
-├── commands.tsx    # 11 command classes
+├── commands.tsx    # 12 command classes
 ├── strategies.tsx  # FileStrategy, FolderStrategy
 └── factory.ts      # createContextMenu(context, nodeType)
 ```
@@ -217,7 +217,7 @@ context-menu/
 
 Built by `strategies.tsx` from the command classes in `commands.tsx`, in this order:
 
-**Files**: Cut, Copy, ---, Rename, ---, Delete, ---, Reveal in Finder / Show in Explorer
+**Files**: Open as source (HTML files only, when the tree can reach the editor), ---, Cut, Copy, ---, Rename, ---, Delete, ---, Reveal in Finder / Show in Explorer
 **Folders**: Cut, Copy, Paste, ---, New File, New Folder, Rename, Import..., ---, Delete,
 ---, Reveal in Finder / Show in Explorer
 **Project root**: the root row is also a valid target; it cannot be moved
@@ -231,18 +231,23 @@ handler is supplied. The Reveal label switches on `isMacOS()`.
 
 ### Command Classes
 
-Each implements `IMenuCommand` interface:
+Each command's `toMenuItem()` produces an `IMenuItem`, and each strategy implements `IContextMenuStrategy` (`context-menu/types.ts`):
 ```typescript
-interface IMenuCommand {
+interface IMenuItem {
   label: string
-  icon?: LucideIcon
-  onClick: () => void | Promise<void>
+  icon?: ReactNode
   danger?: boolean
   separator?: boolean
+  execute: () => void | Promise<void>
+}
+
+interface IContextMenuStrategy {
+  supports(node: FileNode): boolean
+  build(node: FileNode, ctx: MenuContext): IMenuItem[]
 }
 ```
 
-**Available**: NewFileCommand, NewFolderCommand, RenameFileCommand, RenameFolderCommand, DeleteFileCommand, DeleteFolderCommand, SeparatorCommand
+**Available** (`commands.tsx`): CutCommand, CopyCommand, PasteIntoDirectoryCommand, OpenAsSourceCommand, RenameFileCommand, RenameDirectoryCommand, DeleteFileCommand, DeleteDirectoryCommand, NewFileInDirectoryCommand, NewFolderInDirectoryCommand, ImportCommand, RevealInFileManagerCommand
 
 ### Extensibility
 
@@ -258,7 +263,7 @@ interface IMenuCommand {
 
 ### Benefits
 
-Single Responsibility, Open/Closed, Testable (87 tests), Maintainable, Flexible
+Single Responsibility, Open/Closed, Testable (96 tests across `commands.test.tsx`, `strategies.test.tsx` and `factory.test.ts`), Maintainable, Flexible
 
 ### Dialog Integration
 
@@ -288,26 +293,28 @@ See: [Architecture - ProjectTree](./architecture.md#projecttree-modularization) 
 
 Prevents double-refresh during internal CRUD operations.
 
-**Pattern**:
-1. Set `isInternalOperation.current = true`
-2. Pause: `window.api.directoryWatch.pause()`
-3. Perform operation
-4. Refresh tree manually
-5. Resume: `window.api.directoryWatch.resume()`
-6. Set `isInternalOperation.current = false`
+**Pattern** – all of it lives in `withWatcherPause()` (`ProjectTree/withWatcherPause.ts`), which callers wrap their operation in:
+1. Sets `isInternalOperationRef.current = true` and `setLoading(true)`
+2. Pause: `window.api.directoryWatch.pause(projectPath)`
+3. Runs the operation (create, rename, delete, paste, import)
+4. Resets `isInternalOperationRef.current = false` before resuming
+5. Resume: `window.api.directoryWatch.resume(projectPath)`
+6. `setLoading(false)` in a `finally` block, even on error
 
 **Race Prevention**: Debounced events during pause are ignored
 
-**Example**:
+**Example** (`hooks/useFileOperations.ts`):
 ```typescript
-const handleCreateFile = async () => {
-  isInternalOperation.current = true
-  await window.api.directoryWatch.pause(projectPath)
-  await window.api.file.createFile(targetPath, fileName)
-  await refreshFileTree()
-  await window.api.directoryWatch.resume(projectPath)
-  isInternalOperation.current = false
-}
+const createdFilePath = await withWatcherPause(
+  projectPath,
+  isInternalOperationRef,
+  setLoading,
+  async () => {
+    const path = await window.api.file.createFile(targetPath, fileName)
+    await refreshFileTree()
+    return path
+  }
+)
 ```
 
 ### Tree State Preservation
@@ -326,7 +333,7 @@ const handleDirectoryChanged = async () => {
 
 **Benefits**: External changes (git, npm, IDE) don't collapse folders
 
-See: [File Watching](./file-watching/README.md#directory-watching)
+See: [File Watching](./file-watching/README.md#directorywatcherservice-directory-watching)
 
 ## File Opening
 
@@ -336,18 +343,17 @@ See: [File Watching](./file-watching/README.md#directory-watching)
 3. If open: activate panel
 4. If closed: add panel with `dockviewApi.addPanel()`
 
-**Panel ID**: Sanitized path (replace `/` with `_`)
+**Panel ID**: From `getFilePanelId()` / `openFileInPanel()` in `utils/openFileInPanel.ts` – never hand-built (an id past the length budget is a shortened head plus a digest, so a path cannot be read back out of it)
 **Tab Title**: Basename (e.g., `README.md`)
-**Component**: `markdownEditor` - Monaco + preview
+**Component**: `editor` – the `MarkdownEditorPanel` registry key in `DockLayout/components/EditorAreaSplitPanel.tsx` (Monaco + preview)
 
-See: [UI Components](./ui-components.md#panel-communication-pattern)
+See: [UI Components](./ui-components.md#panel-communication)
 
 ## Keyboard Navigation
 
-**Arrow Keys**: Navigate nodes
-**Enter**: Open file
-**Space**: Expand/collapse folder
 **Cmd/Ctrl+Alt+R**: Refresh tree and git status
+
+Arrow-key, Enter and Space navigation of the tree is not implemented – the tree declares `role="tree"` but has no keyboard handler; tracked in [#88](https://github.com/qodeca/erfana/issues/88).
 **Right-Click**: Context menu
 **Accessibility**: ARIA labels, roles, focus indicators
 

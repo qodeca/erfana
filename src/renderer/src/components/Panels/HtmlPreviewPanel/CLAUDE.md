@@ -15,11 +15,11 @@ The native `WebContentsView` paints ABOVE all sibling DOM in the panel, regardle
 
 **A toast is the one exception, and it is deliberate** — see "Toasts move, the page does not" below.
 
-**The hide must be SYNCHRONOUS, main-side.** `PreviewLiveView.setVisibility(false)` calls `view.setVisible(false)` in the same tick it is invoked, and starts NO capture at all — still frames are taken while the view is DRAWN (`captureWhileVisible`, off `did-finish-load`), never on the way out. `PreviewViewService.setVisibility` is a pass-through to it for the same reason: there is nothing there to await. It used to `await` the capture first, and the gap that opened was not cosmetic: a native view takes pointer input over its own rectangle whatever the DOM says, so for the length of that capture a dialog was drawn on screen and none of its buttons could be clicked. It surfaced as a Delete confirmation that ignored clicks, worked on Escape, and worked on the second attempt — because `captureIfStale` skips while a capture is in flight. Every occluder kind used the same path, so every overlay had it. Two sibling tests in `src/main/services/preview/PreviewViewService.test.ts` pin both halves: the hide asserts `expect(capture).not.toHaveBeenCalled()`, and the next one asserts the frame IS captured once the page is ready, while the view is drawn. **Never put I/O in front of `setVisible(false)`.** The ONE legitimate wait is eviction, which hides, then awaits `whenCaptureSettled()` before destroying the `webContents` — otherwise a suspended panel wakes with no picture. **"Never on the way out" is about STARTING a capture, not finishing one.** A capture started while drawn can still settle after the hide, and it is now allowed to store its result when the panel has no frame yet: on macOS the first `capturePage` at `'ready'` is always empty, so the 250 ms retry is the only one that ever produces pixels, and gating it on "still visible" meant a burst of opens left the first tab on a flat colour permanently. The `shouldKeep` veto still applies wherever a frame already exists, which is the case it was written for.
+**The hide must be SYNCHRONOUS, main-side.** `PreviewLiveView.setVisibility(false)` calls `view.setVisible(false)` in the same tick it is invoked, and starts NO capture at all — still frames are taken while the view is DRAWN (`captureWhileVisible`, off `did-finish-load`), never on the way out. `PreviewViewService.setVisibility` is a pass-through to it for the same reason: there is nothing there to await. A native view takes pointer input over its own rectangle whatever the DOM says, so any wait before the hide leaves an overlay drawn on screen that cannot be clicked. Two sibling tests in `src/main/services/preview/PreviewViewService.test.ts` pin both halves: the hide asserts `expect(capture).not.toHaveBeenCalled()`, and the next one asserts the frame IS captured once the page is ready, while the view is drawn. **Never put I/O in front of `setVisible(false)`.** The ONE legitimate wait is eviction, which hides, then awaits `whenCaptureSettled()` before destroying the `webContents` — otherwise a suspended panel wakes with no picture. **"Never on the way out" is about STARTING a capture, not finishing one.** A capture started while drawn can still settle after the hide and may store its result when the panel has no frame yet (on macOS the first `capturePage` at `'ready'` is always empty, so the 250 ms retry is the only one that produces pixels). The `shouldKeep` veto applies wherever a frame already exists.
 
 **The permission band is a second input to the guard, and it is per panel.** `usePreviewChromeGate` publishes a reason into `stores/usePreviewChromeGateStore.ts`; the guard reads it as a third term (`visible = activeTab && !occluded && gate === null`) and reports `chrome-unconfirmed` / `chrome-too-short`. It is deliberately NOT the occluder store: that one is global, so it would blank the other preview in a split view for a reason belonging to one panel.
 
-- `BaseDialog` pushes the occluder count from its `isOpen` effect, NOT via `useOccluder` (it needs the raw stack length, not a boolean).
+- `BaseDialog` calls `useOccluder('dialog', isOpen)` for the occluder count; its separate `isOpen` effect pushes dialog-stack membership (`registerOpenDialog`), which is what needs the raw stack length.
 - Occluder counts publish on a `queueMicrotask` flush, so a synchronous unregister→register pair (e.g. a dialog z-index change) coalesces to one notification — no hide/show flap or wasted `capturePage`.
 
 ## Find bar insets the view — it is NOT hidden for find
@@ -46,13 +46,13 @@ The `ResizeObserver` is not a dependable second chance either: dockview re-paren
 
 The hook owns EVERY push, including the become-visible one — do not add a `pushBounds()` effect back into the panel. Regression cover: `hooks/usePreviewBounds.test.ts`, plus an e2e test that asserts the real `WebContentsView` has a non-zero rect after an open with no user interaction (`e2e/html-preview-corpus.e2e.ts`). Every other preview test reads the preview's web contents, which loads and runs its scripts perfectly at 0x0 — only the rectangle assertion sees this class of bug.
 
-Every `html-preview-*` e2e spec drives the preview through `HtmlPreviewPage` (`e2e/pages/html-preview.page.ts`) — the corpus spec, the approval spec (`e2e/html-preview-approval.e2e.ts`), the eviction spec (`e2e/html-preview-eviction.e2e.ts`), links and perf. Do NOT re-roll `openPreview` / `previewEval` as a private copy in a new spec: three private copies drifting on whether they called `.first()` is exactly what the page object was created to end. A placeholder is looked up through the panel that owns it (`aria-label="HTML preview of <basename>"`), so an assertion names one preview whether one or four are open.
+Every `html-preview-*` e2e spec drives the preview through `HtmlPreviewPage` (`e2e/pages/html-preview.page.ts`) — the corpus spec, the approval spec (`e2e/html-preview-approval.e2e.ts`), the eviction spec (`e2e/html-preview-eviction.e2e.ts`), links and perf. Do NOT re-roll `open()` / `eval()` as a private copy in a new spec. A placeholder is looked up through the panel that owns it (`aria-label="HTML preview of <basename>"`), so an assertion names one preview whether one or four are open.
 
 ## Other gotchas
 
 - **Stable empty-failures sentinel.** Falling back to a fresh `[]` INSIDE a `usePreviewStore` selector loops `useSyncExternalStore`. Select the stored array reference and fall back to a module-level `NO_FAILURES` constant OUTSIDE the selector (see `HtmlPreviewTab`); the panel does the same with `panels.get(panelId)` + `?? 'idle'`/`?? null` fallbacks.
-- **Forwarded accelerators.** The native view swallows renderer keys, so main forwards exactly `f`/`s`/`w`/`Escape` via `preview:forwardedShortcut`; `usePreviewFindShortcuts` routes them to panel actions. Forwarded Escape must run the provider's `clearHighlights()` + restore focus (matching `SearchBar.handleClose`), not just flip the store flag. **Zoom keys are deliberately NOT forwarded** — the View menu owns them (see below). `PREVIEW_FORWARDED_SHORTCUTS` and `PreviewForwardedShortcutSchema` restate the same vocabulary in two layers and are pinned equal by a test in `previewInputForward.test.ts`; they drifted once, and every zoom key was silently dropped at the IPC boundary for it.
-- **Zoom means the page, not the rectangle.** Host zoom is applied geometrically (`clampAndZoomBounds` multiplies the CSS rect), so without `preview:setZoom` calling `setZoomLevel` on the preview's own webContents, Cmd/Ctrl-+ grows the preview *box* while the text stays at 100% — i.e. the text gets relatively smaller. **The View menu is the only route**: `menu.ts` -> `previewZoomHandler` -> `zoomFocused` picks the focused preview and falls through to the host window otherwise; levels are held per panel in `PreviewViewService` and re-applied after `registry.install`, so a zoom survives suspend/resume. Do not also forward the zoom keys — both paths would fire for one keypress and zoom twice, which is why `menu.ts` replaced the built-in zoom roles in the first place.
+- **Forwarded accelerators.** The native view swallows renderer keys, so main forwards exactly `f`/`s`/`w`/`Escape` via `preview:forwardedShortcut`; `usePreviewFindShortcuts` routes them to panel actions. Forwarded Escape must run the provider's `clearHighlights()` + restore focus (matching `SearchBar.handleClose`), not just flip the store flag. **Zoom keys are deliberately NOT forwarded** — the View menu owns them (see below). `PREVIEW_FORWARDED_SHORTCUTS` and `PreviewForwardedShortcutSchema` restate the same vocabulary in two layers and are pinned equal by a test in `previewInputForward.test.ts`.
+- **Zoom means the page, not the rectangle.** Host zoom is applied geometrically (`clampAndZoomBounds` multiplies the CSS rect), so without `PreviewViewService` calling `setZoomLevel` on the preview's own webContents, Cmd/Ctrl-+ grows the preview *box* while the text stays at 100% — i.e. the text gets relatively smaller. **The View menu is the only route**: `menu.ts` -> `previewZoomHandler` -> `zoomFocused` picks the focused preview and falls through to the host window otherwise; levels are held per panel in `PreviewViewService` and re-applied after `registry.install`, so a zoom survives suspend/resume. Do not also forward the zoom keys — both paths would fire for one keypress and zoom twice.
 - **The external-link consent dialog belongs to the window that asked.** `src/main/ipc/preview/externalLinkConsent.ts` parents the question on the asking window and gates it PER WINDOW. An unowned dialog is not modal, is not raised with the app, and on Windows can sit behind it — a consent question the reader cannot see is a link that silently does nothing. A second activation while a question is open is REFUSED, not queued (a burst of clicks must not become a burst of sequential modals), and so is a click whose window has gone. Every refusal arrives here as a `blocked-link` badge, as does an OS hand-off the shell rejects (no registered handler for `mailto:` / `tel:` — the ordinary Windows outcome).
 - **A refusal label comes from `confinePath`'s reason; `rawHref` only refines the label, never the decision.** Chromium collapses `../` past the root BEFORE main sees `href`, so a link that climbed out of the project arrives as a clean in-root path that is merely `missing` — the raw attribute is what separates `path-escape` from `missing-local-file`. Because it is only a label, `previewLinkBridge` caps `rawHref` at 2048 with `.catch(undefined)`: an over-long one is DROPPED and the activation still routes on the confined path. Never promote it to an input of the decision.
 - **Empty-badge cleanup.** `PreviewFailureBadge` force-closes when `summary.count` hits 0, in an effect that runs BEFORE its `count === 0` early return — otherwise an open popover's `useOccluder('menu', open)` never releases and the view stays stuck behind its still frame. Keep that effect above the early return (hook ordering).
@@ -60,11 +60,7 @@ Every `html-preview-*` e2e spec drives the preview through `HtmlPreviewPage` (`e
 
 ## The backdrop is a state machine, not a constant
 
-**The invariant: the DOM placeholder's background and the native view's `setBackgroundColor` always carry the same value.** Break either half and the seam flashes at the view's edge on every bounds update.
-
-The value moves. `src/main/services/preview/previewBackdrop.ts` holds it as a pure state machine: brand black (`#FF161312`, matching `var(--color-brand-black)`) until the page has painted, then the page's own resolved paper colour, read via `getComputedStyle` in isolated world 998 and defaulting to `#FFFFFFFF`. Main emits it on `preview:backdropChanged`; the panel writes it as an inline `background` on the placeholder.
-
-Why one constant cannot serve: a page that declares no background of its own is transparent, so any fixed dark value becomes that page's paper while its default text stays black, and most plain HTML is unreadable. Before the first paint the same value must instead match the placeholder exactly, or the seam flashes — two jobs, two values, one state machine.
+**The invariant: the DOM placeholder's background and the native view's `setBackgroundColor` always carry the same value.** Break either half and the seam flashes at the view's edge on every bounds update. The state machine itself, and why one constant cannot serve, is documented in `src/main/services/preview/previewBackdrop.ts`.
 
 Three things here look like they could be simplified and cannot:
 
@@ -108,36 +104,24 @@ Three traps, each of which looks like a simplification:
 **A permission is an ORIGIN — scheme, host and port.** `parsePreviewOrigin`
 (`src/shared/ipc/preview-settings-schema.ts`) is the single canonicaliser AND the
 definition of validity: a value is valid exactly when it already is what that
-function returns, so the string on disk, the string in the CSP and the string
-`decideRequest` compares are provably one string. Never build one from
-`URL.origin` — `new URL('blob:https://evil.com/1').origin` is a clean-looking
-`https://evil.com` with an empty hostname, and `.origin` silently drops userinfo.
-The row shows the scheme only when it is not `https` and the port only when it is
-not the default, while the accessible name always carries the whole origin.
+function returns. Never build one from `URL.origin` —
+`new URL('blob:https://evil.com/1').origin` is a clean-looking `https://evil.com`
+with an empty hostname, and `.origin` silently drops userinfo. The accessible
+name of a row always carries the whole origin.
 
 **A row without an Allow button states its reason, and the reason is DERIVED**
-from the origin (`describeRefusal`), never assumed. It used to hardcode the IPv6
-sentence for every buttonless row, so a host refused for a different cause was
-told the wrong one.
+from the origin (`describeRefusal`), never assumed.
 
-There is no policy refusal (#108). `localhost`, IP literals, `.local` and
-single-label names are all approvable: refusing them never detected a name that
-merely *resolved* to a private address, so it only ever stopped the honest
-reader. Do not add one back. Exactly two shapes reach a buttonless row, and
-both are mechanical rather than policy. IPv6 is physics: a CSP host-source
-cannot express one, and Chromium says so out loud ("contains an invalid source
-… It will be ignored"), which would leave a grant live in the network filter
-and absent from the CSP. A name that is not a valid host name — an underscore, an empty
-label — cannot have a permission written for it at all.
+There is no policy refusal (#108): `localhost`, IP literals, `.local` and
+single-label names are all approvable. Do not add one back. Exactly two shapes
+reach a buttonless row, both mechanical rather than policy: an IPv6 literal (a
+CSP host-source cannot express one) and a name that is not a valid host name.
 
-**A trailing dot is part of the origin**, not noise to normalise away. Measured in
-the shipping Chromium: a CSP host-source matches only its own spelling, so
-`evil.com.` and `evil.com` are two separate grants that never match each other.
-Stripping it was the defect — a page requesting `evil.com./x` got a row offering
-`evil.com`, whose grant could not apply to the request that produced it. The dot
-is kept by the canonicaliser and DRAWN by `HostName`, because two grants that
-render identically in a permission list is a spoof. See `docs/designs/108-http-and-ipv6-in-the-preview.md`, which also
-records the measurement that `http://` genuinely works here — the preview
-document sits at an opaque origin, so mixed content never applies.
+**A trailing dot is part of the origin**, not noise to normalise away: a CSP
+host-source matches only its own spelling, so `evil.com.` and `evil.com` are two
+separate grants that never match each other. The dot is kept by the canonicaliser
+and DRAWN by `HostName`, because two grants that render identically in a
+permission list is a spoof. Rationale and measurements:
+`docs/designs/108-http-and-ipv6-in-the-preview.md`.
 
 **The blocked-host list is bounded main-side**, at `PREVIEW.MAX_BLOCKED_HOSTS_PER_VIEW` (50, matching the CSP bridge), with a per-hostname sub-cap of `PREVIEW.MAX_BLOCKED_ORIGINS_PER_HOST` (5). Without the sub-cap a page fetching `http://localhost:1..50` exhausts the budget before main reports the real blocked CDN — dropped, not merely buried. `PreviewViewService.onBlocked` also returns when `mergeBlockedKinds` reports no change — without that, a page pulling forty assets from one host sent forty identical events. The dedupe ledger is **cleared by `applyApprovedHosts`**: the reload after an approval refuses the remaining hosts all over again, and a ledger that survived it would swallow every one of them while the failure log they would have appeared in has just been emptied.

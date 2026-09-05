@@ -46,18 +46,17 @@ Collapsible panels with chevron toggle (VS Code pattern).
 
 Header with ChevronDown/ChevronLeft icon (8px spacing). Click toggles visibility with 150ms rotation transition.
 
-**Implementation**:
+**Implementation** (`ProjectPanel.tsx` swaps the icon rather than rotating one):
 ```typescript
 const [show, setShow] = useState(true)
 
-<ChevronDown
-  className={`chevron-toggle ${show ? '' : 'collapsed'}`}
-  onClick={() => setShow(!show)}
-/>
+<button className="control-panel-chevron" onClick={() => setShow(!show)}>
+  {show ? <ChevronDown size={16} strokeWidth={2} /> : <ChevronLeft size={16} strokeWidth={2} />}
+</button>
 {show && <div className="control-panel">{/* Controls */}</div>}
 ```
 
-**CSS**: `.chevron-toggle.collapsed { transform: rotate(-90deg); transition: transform 0.15s; }`
+**CSS**: `.control-panel-chevron` (plus `:hover` / `:active`) in `ProjectPanel.css`
 
 **Example**: ProjectPanel file filtering - see [Project Panel](./project-panel.md#control-panel)
 
@@ -69,16 +68,16 @@ Hierarchical file tree with filtering, visual indicators, context menu operation
 
 **Features**:
 - File filtering (All Files | Markdown Only) with recursive logic
-- Sensitive file detection (credentials, keys, configs)
+- Sensitive file detection (credentials, keys, certificates, dotfile secrets)
 - Hidden file styling (dotfiles, 70% opacity)
-- Context menu (New, Rename, Delete)
+- Context menu (Open as source, Cut, Copy, Paste, New File, New Folder, Rename, Import…, Delete, Reveal in Finder / Show in Explorer – built per node type by `context-menu/strategies.tsx`)
 - Auto-refresh via directory watching
 
 📚 **Full docs**: [Project Panel](./project-panel.md)
 
 ### Visual Indicators
 
-**Sensitive** (amber + warning icon): `.env*`, `.npmrc`, `*.pem`, `.aws/`, `.ssh/`, `credentials*`, `config.json`
+**Sensitive** (amber + warning icon): `.env*`, `.npmrc`, `*.pem`, `*.key`, `.aws/`, `.ssh/`, `credentials`, `secrets`, `id_rsa` and the other SSH key names – see `isSensitiveFile()` in `ProjectTreeNode.tsx` (`config.json` is not on the list)
 **Hidden** (70% opacity, italic): Files starting with `.` (`.git/`, `.gitignore`)
 
 ## Terminal Panel
@@ -167,8 +166,11 @@ interface ContextMenuItem {
   label: string
   icon?: ReactNode
   action: () => void
+  danger?: boolean    // Destructive styling (e.g. Delete)
   separator?: boolean
-  disabled?: boolean  // NEW: Grays out item, prevents click
+  disabled?: boolean  // Grays out item, prevents click
+  shortcut?: string   // Right-aligned shortcut hint
+  testId?: string     // Optional test ID for automated UI testing
 }
 ```
 
@@ -254,9 +256,9 @@ Home icon tab (41px fixed, non-draggable, no scaling).
 
 ### Hover
 
-**Inactive**: `#3a3d41` background
-**Active**: `#2d2d30` with 0.9 opacity
-**EditorTab**: `rgba(255, 255, 255, 0.05)` on hover
+**Inactive**: `var(--color-bg-hover-solid)` background (`AppDockLayout.css`, `.dv-inactive-tab:hover .dv-default-tab`)
+**Active**: `var(--color-bg-secondary)` with 0.9 opacity (`.dv-active-tab:hover .dv-default-tab`)
+**EditorTab**: `var(--color-bg-hover)` on hover; `var(--color-bg-hover-solid)` when the tab is active (`EditorTab.css`)
 
 ### Active Indicator
 
@@ -270,7 +272,7 @@ Auto-focus on tab change ensures the active indicator shows immediately, so a pa
 
 ## Welcome Tab & Panel
 
-**Location**: `WelcomePanel.tsx`, `WelcomeTab.tsx`
+**Location**: `WelcomePanel.tsx`, `components/Panels/WelcomeTab.tsx`
 
 Home-icon tab (41px square, non-draggable). The welcome screen is the central **home view** shown when no file is open:
 

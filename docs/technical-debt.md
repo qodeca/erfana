@@ -7,11 +7,11 @@ Concise summary of unresolved technical issues and improvement opportunities in 
 ### 1. node-pty Build Failure on Python 3.13
 
 **Severity**: Medium
-**Impact**: Terminal functionality unavailable on Python 3.13+
+**Impact**: Terminal functionality unavailable on Python 3.13 (3.14.3 is verified working – see [docs/build/windows.md](./build/windows.md))
 
 **Problem**: node-pty dependency requires `distutils` module, removed in Python 3.13.
 
-**Workaround**: Downgrade to Python 3.12 or earlier.
+**Workaround**: Use Python 3.12 (long-standing known-good) or 3.14.x (verified 2026-09-03 on Windows 11).
 
 **Solution**: Wait for upstream node-pty update or contribute fix.
 
@@ -24,14 +24,14 @@ Concise summary of unresolved technical issues and improvement opportunities in 
 **Severity**: Low
 **Impact**: Template name changes break code references
 
-**Problem**: Template IDs are derived from slugified display names:
+**Problem**: Template IDs fall back to slugified display names when a template carries no explicit `id`:
 
 ```typescript
 // parser.ts
-const id = slugify(result.data.name)  // "Mermaid Bug Report" → "mermaid-bug-report"
+const id = result.data.id || slugify(result.data.name)  // "Mermaid Bug Report" → "mermaid-bug-report"
 ```
 
-**Issues**:
+**Issues** (for the templates still relying on the fallback):
 - Changing template name breaks all code references
 - Fragile coupling between display name and programmatic identifier
 - No compile-time safety for ID references
@@ -49,19 +49,19 @@ const config = PROMPT_REGISTRY['mermaid-bug-report']  // Returns undefined!
 ```
 
 **Recommended Solution**:
-1. Add explicit `id` field to frontmatter schema
-2. Update parser to use explicit ID instead of slugify
+1. ✅ Add explicit `id` field to frontmatter schema – done: `PromptFrontmatterSchema` carries an optional `id`
+2. ✅ Update parser to use explicit ID instead of slugify – done: `parser.ts` uses `result.data.id || slugify(result.data.name)`
 3. Add uniqueness validation in registry
-4. Migrate all existing templates (explain, improve, rewrite, simplify, mermaid-bug-report)
-5. Remove slugify function
+4. Migrate all existing templates – partial: 5 of the 14 templates in `src/renderer/src/prompts/templates/` declare an `id`; the other 9 still rely on the slugify fallback
+5. Remove slugify function (only once step 4 is complete)
 
 **Implementation Files**:
-- `src/renderer/src/prompts/schema.ts` - Add `id` field to `PromptFrontmatterSchema`
-- `src/renderer/src/prompts/parser.ts` - Use explicit ID
+- `src/renderer/src/prompts/schema.ts` - `id` field on `PromptFrontmatterSchema` (done)
+- `src/renderer/src/prompts/parser.ts` - explicit ID with slugify fallback (done)
 - `src/renderer/src/prompts/registry.ts` - Add uniqueness validation
-- Template files in `resources/prompts/*.md` - Add `id` field
+- Template files in `src/renderer/src/prompts/templates/*.md` - Add `id` field to the remaining templates
 
-**Status**: Architecture review complete, implementation pending.
+**Status**: Steps 1–2 shipped; uniqueness validation, the full template migration and the slugify removal remain open (re-verified 2026-09-05).
 
 ---
 
@@ -80,7 +80,7 @@ Resolved – `LanguageSelect` accepts an optional `id` prop and renders it on th
 ### 5. E2E workflow disabled on CI
 
 **Severity**: Medium
-**Impact**: The entire `e2e.yml` workflow is disabled (2026-04-25, commit `997ba65`). Neither the functional `electron` suite nor the 5 visual screenshot tests run on CI; both regression classes can merge undetected until a developer runs `npm run test:e2e` / `npm run test:e2e:visual` locally. E2E was already excluded from branch-protection required checks, so disabling does not block any merges or releases — but it removes a safety net.
+**Impact**: The entire `e2e.yml` workflow is disabled (2026-04-25, commit `997ba65` – pre-migration; no longer resolvable, that history was rewritten at the 2026-06 migration). Neither the functional `electron` suite nor the 5 visual screenshot tests run on CI; both regression classes can merge undetected until a developer runs `npm run test:e2e` / `npm run test:e2e:visual` locally. E2E was already excluded from branch-protection required checks, so disabling does not block any merges or releases — but it removes a safety net.
 
 **Problem**: The visual suite was the original blocker — all 5 tests time out at `page.waitForLoadState('domcontentloaded')` (30s) on GitHub `macos-latest` runners while passing 5/5 locally (including with `CI=true`). The earlier workaround scoped CI to `--project=electron` only, but the functional suite is also unstable on hosted runners; full disable is now the working state until the root cause is isolated.
 
@@ -106,9 +106,9 @@ Resolved – `LanguageSelect` accepts an optional `id` prop and renders it on th
 
 **Root cause**: Monaco's `.cursor` element blinks every 500ms by default. A 2s `toBeVisible` timeout can miss the visible half-cycle under CPU contention.
 
-**Fix pattern exists in codebase**: `e2e/visual-regression.e2e.ts:45` `disableCursorBlink()` helper patches `cursorBlinking: 'solid'`. Apply the same helper to the third-party-components test.
+**Fix pattern exists in codebase**: the `disableCursorBlink()` helper in `e2e/visual-regression.e2e.ts` patches `cursorBlinking: 'solid'`. Apply the same helper to the third-party-components test.
 
-**Files**: `e2e/pages/monaco.page.ts:29`, `e2e/third-party-components.e2e.ts:38`.
+**Files**: `e2e/pages/monaco.page.ts` (the `expect(cursor).toBeVisible({ timeout: 2000 })` in `MonacoPage.focus()`), `e2e/third-party-components.e2e.ts` (the `Monaco editor: Set content via keyboard and verify in preview` test).
 
 ---
 
@@ -135,7 +135,7 @@ Moving the block would require synchronized edits to checks.yml + skill + README
 
 ### 8. Renderer components exceed the 500-line guideline
 
-**Severity**: Low — `MarkdownPreview.tsx` (1,009 lines) and `ChatBubble.tsx` (641 lines) exceed the 500-line-per-file guideline (pre-existing; out of scope for the issue #203 clipboard change). Candidates for a future decomposition pass.
+**Severity**: Low — `MarkdownPreview.tsx` (1,032 lines) and `ChatBubble.tsx` (641 lines) exceed the 500-line-per-file guideline (pre-existing; out of scope for the issue #203 clipboard change). Candidates for a future decomposition pass.
 
 ---
 
@@ -159,7 +159,7 @@ Moving the block would require synchronized edits to checks.yml + skill + README
 
 **Fix**: Extract the arrow background (image + size) to a shared utility class or design token so the size lives in one place.
 
-**Files** (re-verified 2026-08-08): `Settings/SettingsOverlay.css:171`, `DocumentImport/DocumentImportDialog.css:117`, `Transcription/TranscriptionDialog.css:71`, `Dialog/CameraDialog.css:54`, `Dialog/Dialog.css:555` — all under `src/renderer/src/components/`. Note `LanguageSelect.tsx`, named here originally, carries no such rule; the language select is styled by `TranscriptionDialog.css`. `SettingsOverlay.css:240` also sets `background-size: 12px` but for the checkbox tick, a different icon — out of scope for this item.
+**Files** (re-verified 2026-09-05): `Settings/SettingsOverlay.css:171`, `DocumentImport/DocumentImportDialog.css:117`, `Transcription/TranscriptionDialog.css:71`, `Dialog/CameraDialog.css:56`, `Dialog/Dialog.css:573` — all under `src/renderer/src/components/`. Note `LanguageSelect.tsx`, named here originally, carries no such rule; the language select is styled by `TranscriptionDialog.css`. `SettingsOverlay.css:240` also sets `background-size: 12px` but for the checkbox tick, a different icon — out of scope for this item.
 
 ---
 
@@ -225,7 +225,7 @@ After the heartbeat hardening (Phase A4 resume-refresh, B1 symlink defense, D3 H
 **Severity**: Low
 **Impact**: The issue #55 packaging guard `assertResourcesSiblingsAllowlist` (L2a-2) — the full Electron-owned sibling enumeration beside `app/` — is **fatal on macOS but advisory (`console.warn`) on Windows**. On win32 an unexpected sibling only warns; it cannot block a release.
 
-**Problem**: `EXPECTED_RESOURCES_ENTRIES` (the Electron-owned names `app`/`app.asar`/`icon.icns`/`elevate.exe` plus the config slots) was enumerated on a **macOS-only** packed-tree baseline, and CI never runs an electron-builder pack on Windows (`windows-checks` runs only typecheck + `test:main`). Keeping the enumeration fatal on win32 would rest a release-blocking gate on an unverified baseline and risk a first-Windows-release false-fail. The softening touches **only** this enumeration; the config leak vector — `assertResourcesDestNoRepoLeak` (L2a-1, leak-name tripwire) and `assertExtraFilesDestNoRepoLeak` (L2b) — stays both-platforms-fatal.
+**Problem**: `EXPECTED_RESOURCES_ENTRIES` (the Electron-owned names `app`/`app.asar`/`icon.icns`/`elevate.exe` plus the config slots) was enumerated on a **macOS-only** packed-tree baseline, and CI never runs an electron-builder pack on Windows (the `Windows checks` job runs only typecheck, the design-sync check and `test:main`; the separate `npm audit signatures` job does not pack either). Keeping the enumeration fatal on win32 would rest a release-blocking gate on an unverified baseline and risk a first-Windows-release false-fail. The softening touches **only** this enumeration; the config leak vector — `assertResourcesDestNoRepoLeak` (L2a-1, leak-name tripwire) and `assertExtraFilesDestNoRepoLeak` (L2b) — stays both-platforms-fatal.
 
 **Recommended Solution**: capture a real Windows electron-builder packed-tree baseline, reconcile `EXPECTED_RESOURCES_ENTRIES` against it, then promote L2a-2 to fatal on win32.
 
@@ -570,19 +570,15 @@ Resolved by the #73 image-export work. The canonical extension list, the MIME ma
 **Files**: `src/renderer/src/components/Panels/ImageViewerPanel/ImageViewerPanel.module.css`.
 
 **Status**: Open — recorded by the #73 final review in place of the edit.
-### 36. Main-side project-switch teardown not wired for HTML preview (#74, 2026-08)
+### 36. Main-side project-switch teardown not wired for HTML preview (#74, 2026-08) ✅ Resolved (v0.19.0)
 
 **Severity**: Low
 
-**Impact**: The `subscribeProjectChanged` seam (`preview-handlers.ts`, `PreviewViewService.onProjectChanged`) passes nothing in production — `src/main/index.ts` calls `registerPreviewHandlers` with only `getProjectPath` + `globalSettings`, and no main-side project-changed observable exists (`ProjectService` uses an imperative `setProjectPath`). The renderer's idempotent `preview:close` is the sole teardown owner **for a project switch**.
+**Impact (when filed)**: The `subscribeProjectChanged` seam (`preview-handlers.ts`, `PreviewViewService.onProjectChanged`) passed nothing in production — `src/main/index.ts` called `registerPreviewHandlers` with only `getProjectPath` + `globalSettings`, and no main-side project-changed observable existed. The renderer's idempotent `preview:close` was the sole teardown owner **for a project switch**, so a renderer crash or reload **during** a switch could strand a running preview against the old root and lock new opens with `PREVIEW_VIEW_LIMIT_REACHED`.
 
-**Narrowed (2026-08-29), not closed.** Main now reaps a window's previews when the window itself goes away: `index.ts` subscribes `closed` per window and calls `PreviewViewService.closeWindow`, which drains that window's registry entries, invalidates their in-flight opens and releases the project refcount. That removes the quit-time `removeChildView` warning at source and closes the latent second-window leak. A **project switch** inside a surviving window still has no main-side teardown, which is what this entry remains open for.
+**Narrowed (2026-08-29).** Main reaps a window's previews when the window itself goes away: `index.ts` subscribes `closed` per window and calls `PreviewViewService.closeWindow`, which drains that window's registry entries, invalidates their in-flight opens and releases the project refcount. That removed the quit-time `removeChildView` warning at source and closed the latent second-window leak.
 
-**Problem**: A renderer crash or reload **during** a project switch can strand a running preview against the old root and lock new opens with `PREVIEW_VIEW_LIMIT_REACHED`. Edge case.
-
-**Recommended Solution**: expose a project-changed event from `ProjectService` and wire the seam so main-side teardown does not depend on the renderer surviving the switch.
-
-**Status**: Accepted at QG-6 — fix cost/scope judged greater than the value for this edge case.
+**Resolved (v0.19.0).** `FileService.onProjectPathChanged(listener)` is the producer the seam was missing, and `src/main/index.ts` now passes `subscribeProjectChanged: (listener) => fileService.onProjectPathChanged(listener)` to `registerPreviewHandlers` (sd-074b §4.9). Main-side teardown on a project switch no longer depends on the renderer surviving the switch. The number is kept so existing references to "item #36" stay valid.
 
 ---
 
@@ -733,7 +729,7 @@ Ongoing effort to keep `docs/` concise and high-value for Claude Code.
 - Consolidate troubleshooting files (troubleshooting.md + troubleshooting-advanced.md)
 - Reduce code example verbosity across remaining files
 
-**Note**: docs/future/ (8,604 lines) preserved for future graph-engine implementation.
+**Note**: docs/future/ (10,957 lines, re-measured 2026-09-05) preserved for future graph-engine implementation.
 
 ---
 
@@ -757,13 +753,13 @@ Ongoing effort to keep `docs/` concise and high-value for Claude Code.
 
 ## Future Enhancements
 
-### Graph Engine (Planned)
+### Graph Engine (in progress on the `graph` branch)
 
-**Status**: Research complete, implementation pending
+**Status**: The R1 contract freeze has landed on the `graph` branch – the analysis and architecture issues #19, #20 and #21 are closed, and the implementation chain #22–#32 (DB layer, preprocessing, indexing, search API, UI surfaces, MCP server, testing) is open. Graph work branches off `graph`, not `develop`; see [ROADMAP.md § Graph engine chain](../ROADMAP.md#graph-engine-chain-on-the-graph-branch) for the authoritative status.
 
 **Overview**: SQLite-based knowledge graph with hybrid search for markdown documents.
 
-**Documentation**: See [docs/future/graph-engine.md](./future/graph-engine.md) for complete design.
+**Documentation**: See [docs/future/graph-engine.md](./future/graph-engine.md) for the original design; the frozen contracts and refreshed spec requirements live on the `graph` branch.
 
 **Key Features**:
 - Full-text search with FTS5
@@ -794,4 +790,4 @@ Amendment discipline + promotion-rule conventions in [`windows/contributing.md`]
 
 ---
 
-**Last Updated**: #74 HTML preview (2026-08-24 – entries #36–#46 added from the Phase 6/7/8 accepted-tech-debt ledger and the design §7.1 pre-existing items: main-side project-switch teardown unwired, CSP skip-and-badge unreachable on the registry path, main-process memory amplification, `about:` allowed for all request types, `runPipeline` overlapping-run race, `onCrash` reusing `script-error`, the failure badge occluded by the native view, the deferred in-app allowlist view/revoke UI, `isTrustedSender` triplication, the residual `realpath`→open race, and hardlinks defeating confinement) + #73 image export (2026-08-24 – entries #31–#33 added from the design's deferred ledger: the un-re-pointed `ExportLock` copies in `PdfService`/`DocxService`, the missing `isTrustedSender` gate on the `pdf:`/`docx:` export handlers, and the dev-mode origin-only sender check that the rasterize harness satisfies; entry #29 marked resolved, since both `IMAGE_EXTENSIONS` copies now re-point to `src/shared/ipc/image-formats.ts`; D3 in `windows/deferred-work.md` amended to record that `src/main/utils/ExportLock.ts` now exists) + doc-sweep follow-up (2026-08-23 – the editor-stub inlining moved from *Remaining* to *Completed* under Documentation Token Efficiency, verified on disk: the three stubs are gone, their content is in `docs/editor/README.md`, and both inbound refs are repointed; entry #7's `checks.yml`, release-skill and `README.md` citations converted from line numbers to section/step names after the checks.yml numbers were found stale) + doc-accuracy sweep (2026-08-23 – entry #5 repointed from the deleted `e2e/fixtures.ts` to `e2e/fixtures/index.ts` and its dead line ranges replaced with fixture names; entries #7, #13 and #26 re-measured: `security.md` 626 → 661, `scripts/fuses.js` ~1,040 → ~1,715, `scripts/fuses.test.mjs` ~835 → ~1,758, `file-handlers.ts` 601 → 626) + #70 stale preview tabs (2026-08-23 – entries #24–#30 added from the design's accepted-debt ledger and the review rounds: text-only `watchFile` confinement, the `file:getStats` carve-out and its clean fix, the post-#70 over-cap file measurements, genuine deletes not re-arming, the `useFileWatcher` indicator timer, duplicated `IMAGE_EXTENSIONS`, and five smaller accepted trade-offs) + #60 large-project crash + error containment (2026-08-11 – entries #18–#23 added from the change-set reviews: dead `useDragDropTree` API surface, inert `vitest.renderer.ts` coverage block, `test:cov` workspace fan-out, no tsconfig over `e2e/`, shared renderer HTML entry, `ThrottledWorker.workMany` spread-push) + #55 extra-content packaging guards (2026-08-09 – entry #14 added: `assertResourcesSiblingsAllowlist` advisory-on-Windows watch item) + #43 packaging allowlist QG-11a remediation (2026-08-09 – entry #13 added: `scripts/fuses.js` size after the allowlist block; `resolvePackedResourcesDir` call-site count corrected to four) + v0.17.0 doc sweep (2026-08-08 – entry #4 resolved: `LanguageSelect` `id` prop; entries #7, #8, #10 re-measured against the v0.17.0 tree) + #42 camera mirror + dialog focus work (2026-08-07 – entry #3 resolved: BaseDialog `trapFocus`) + PR #245 (2026-06-13 – entry #12 live-verification updated: single-panel detection + mid-session model-switch verified on a Windows host) + #217 Windows Claude status bar (2026-06-10 — entry #12 added: Windows v1 detector limitations) + v0.14.0 doc sweep (2026-06-08 — entries #9 + #10 added from `Transcription/CLAUDE.md` eviction) + v0.9.6 release (2026-05-22 — critical macOS terminal fix `ea3eaf1`) + v0.9.5 release (2026-04-25) + Phase I branch protection refinement (PR requirement removed same day) + entry #7 documenting `security.md` cap constraint (2026-04-25)
+**Last Updated**: doc-accuracy sweep (2026-09-05 – entry #2 updated: schema `id` and parser fallback shipped, template path corrected to `src/renderer/src/prompts/templates/`; entry #36 resolved: `FileService.onProjectPathChanged` wired into `registerPreviewHandlers` in v0.19.0; entries #6, #8, #10 and the `docs/future/` line count re-measured; entry #5's `997ba65` marked pre-migration; Graph Engine status repointed at ROADMAP § Graph engine chain) + #74 HTML preview (2026-08-24 – entries #36–#46 added from the Phase 6/7/8 accepted-tech-debt ledger and the design §7.1 pre-existing items: main-side project-switch teardown unwired, CSP skip-and-badge unreachable on the registry path, main-process memory amplification, `about:` allowed for all request types, `runPipeline` overlapping-run race, `onCrash` reusing `script-error`, the failure badge occluded by the native view, the deferred in-app allowlist view/revoke UI, `isTrustedSender` triplication, the residual `realpath`→open race, and hardlinks defeating confinement) + #73 image export (2026-08-24 – entries #31–#33 added from the design's deferred ledger: the un-re-pointed `ExportLock` copies in `PdfService`/`DocxService`, the missing `isTrustedSender` gate on the `pdf:`/`docx:` export handlers, and the dev-mode origin-only sender check that the rasterize harness satisfies; entry #29 marked resolved, since both `IMAGE_EXTENSIONS` copies now re-point to `src/shared/ipc/image-formats.ts`; D3 in `windows/deferred-work.md` amended to record that `src/main/utils/ExportLock.ts` now exists) + doc-sweep follow-up (2026-08-23 – the editor-stub inlining moved from *Remaining* to *Completed* under Documentation Token Efficiency, verified on disk: the three stubs are gone, their content is in `docs/editor/README.md`, and both inbound refs are repointed; entry #7's `checks.yml`, release-skill and `README.md` citations converted from line numbers to section/step names after the checks.yml numbers were found stale) + doc-accuracy sweep (2026-08-23 – entry #5 repointed from the deleted `e2e/fixtures.ts` to `e2e/fixtures/index.ts` and its dead line ranges replaced with fixture names; entries #7, #13 and #26 re-measured: `security.md` 626 → 661, `scripts/fuses.js` ~1,040 → ~1,715, `scripts/fuses.test.mjs` ~835 → ~1,758, `file-handlers.ts` 601 → 626) + #70 stale preview tabs (2026-08-23 – entries #24–#30 added from the design's accepted-debt ledger and the review rounds: text-only `watchFile` confinement, the `file:getStats` carve-out and its clean fix, the post-#70 over-cap file measurements, genuine deletes not re-arming, the `useFileWatcher` indicator timer, duplicated `IMAGE_EXTENSIONS`, and five smaller accepted trade-offs) + #60 large-project crash + error containment (2026-08-11 – entries #18–#23 added from the change-set reviews: dead `useDragDropTree` API surface, inert `vitest.renderer.ts` coverage block, `test:cov` workspace fan-out, no tsconfig over `e2e/`, shared renderer HTML entry, `ThrottledWorker.workMany` spread-push) + #55 extra-content packaging guards (2026-08-09 – entry #14 added: `assertResourcesSiblingsAllowlist` advisory-on-Windows watch item) + #43 packaging allowlist QG-11a remediation (2026-08-09 – entry #13 added: `scripts/fuses.js` size after the allowlist block; `resolvePackedResourcesDir` call-site count corrected to four) + v0.17.0 doc sweep (2026-08-08 – entry #4 resolved: `LanguageSelect` `id` prop; entries #7, #8, #10 re-measured against the v0.17.0 tree) + #42 camera mirror + dialog focus work (2026-08-07 – entry #3 resolved: BaseDialog `trapFocus`) + PR #245 (2026-06-13 – entry #12 live-verification updated: single-panel detection + mid-session model-switch verified on a Windows host) + #217 Windows Claude status bar (2026-06-10 — entry #12 added: Windows v1 detector limitations) + v0.14.0 doc sweep (2026-06-08 — entries #9 + #10 added from `Transcription/CLAUDE.md` eviction) + v0.9.6 release (2026-05-22 — critical macOS terminal fix `ea3eaf1`) + v0.9.5 release (2026-04-25) + Phase I branch protection refinement (PR requirement removed same day) + entry #7 documenting `security.md` cap constraint (2026-04-25)

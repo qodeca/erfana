@@ -153,8 +153,8 @@ npm rebuild node-pty --build-from-source
 **Debug Steps:**
 1. Check if file watcher is active:
    ```typescript
-   // In main process console, should see:
-   👁️ Watching file: /path/to/file.md
+   // In the main-process log, should see (FileWatcherService.ts):
+   👁️  Starting watch for: /path/to/file.md
    ```
 
 2. Check for debounce timing (300ms for files):
@@ -163,7 +163,7 @@ npm rebuild node-pty --build-from-source
    echo "test" >> file.md
 
    # Wait 400ms
-   # Should see: 📝 File changed: /path/to/file.md
+   # Should see: 📝 File changed externally: /path/to/file.md
    ```
 
 **Common Causes:**
@@ -173,11 +173,11 @@ npm rebuild node-pty --build-from-source
 
 **Solution for Network FS:**
 ```typescript
-// In FileWatcherService.ts
+// In src/main/services/watcher/singleFileWatch.ts (SINGLE_FILE_WATCH_OPTIONS)
 const watcher = chokidar.watch(filePath, {
   ignoreInitial: true,
   awaitWriteFinish: { stabilityThreshold: 300 },
-  usePolling: true,  // ADD THIS for network file systems
+  usePolling: true,  // ADD THIS for network file systems (shipped value: false)
   interval: 1000     // Poll interval in ms
 })
 ```
@@ -190,29 +190,22 @@ const watcher = chokidar.watch(filePath, {
 
 **Debug Steps:**
 1. Check directory watcher is active
-2. Verify debounce period (1000ms for directories)
-3. Check ignored patterns (node_modules, .git, .next, dist, build)
+2. Verify the debounce: the main-process directory watcher runs with `awaitWriteFinish: false` (`DirectoryWatcherService.ts`); the renderer debounces the resulting `directory-watch:changed` events by `DIRECTORY_WATCHER.DEBOUNCE_DELAY` (250 ms, `ProjectTree/constants.ts`)
+3. Check ignored patterns (`node_modules`, `.git`, build output, virtualenvs, …)
 
 **Solution:**
-If file is in ignored directory, create it elsewhere or update ignore patterns:
+If the file is in an ignored directory, create it elsewhere or update the ignore patterns. The default list is `DEFAULT_WATCHER_IGNORE_PATTERNS` in `src/shared/constants.ts`; `DirectoryWatcherService.ts` applies it through a function-based `ignored` predicate (`shouldIgnorePath`), not an inline array:
 ```typescript
-// In DirectoryWatcherService.ts
+// src/main/services/DirectoryWatcherService.ts
 const watcher = chokidar.watch(dirPath, {
-  ignored: /(^|[/\\])\../, // hidden files
-  ignoreInitial: true,
   persistent: true,
-  awaitWriteFinish: { stabilityThreshold: 1000 },
-  // EDIT THESE PATTERNS:
-  ignored: [
-    '**/node_modules/**',
-    '**/.git/**',
-    '**/.next/**',
-    '**/dist/**',
-    '**/build/**',
-    '**/.DS_Store'
-  ]
+  ignoreInitial: true,
+  ignored: (path) => this.shouldIgnorePath(path), // backed by DEFAULT_WATCHER_IGNORE_PATTERNS
+  awaitWriteFinish: false,
+  // ...
 })
 ```
+Per-project overrides go in `.erfana/settings.json` ignore patterns.
 
 ---
 
@@ -220,25 +213,24 @@ const watcher = chokidar.watch(dirPath, {
 
 **Symptom:** Project tree refreshes twice when creating file via UI
 
-**Cause:** Missing pause/resume pattern around CRUD operation.
+**Cause:** CRUD operation not wrapped in `withWatcherPause()`.
 
-**Solution:**
+**Solution:** wrap the operation in `withWatcherPause()` (`src/renderer/src/components/ProjectTree/withWatcherPause.ts`), which pauses the directory watcher, runs the operation, and resumes it in a `finally` block:
 ```typescript
-const handleCreateFile = async () => {
-  // CRITICAL: Pause before operation
-  await window.api.directoryWatch.pause(projectPath)
-
-  await window.api.file.createFile(targetPath, fileName)
-  await refreshFileTree()
-
-  // CRITICAL: Resume after operation
-  await window.api.directoryWatch.resume(projectPath)
-
-  // Now: only ONE refresh (manual), not two
-}
+const createdFilePath = await withWatcherPause(
+  projectPath,
+  isInternalOperationRef,
+  setLoading,
+  async () => {
+    const path = await window.api.file.createFile(targetPath, fileName)
+    await refreshFileTree()
+    return path
+  }
+)
+// Now: only ONE refresh (manual), not two
 ```
 
-**Files:** `src/renderer/src/components/ProjectTree/ProjectTree.tsx`
+**Files:** `src/renderer/src/components/ProjectTree/withWatcherPause.ts`, callers in `src/renderer/src/hooks/useFileOperations.ts` and `src/renderer/src/components/ProjectTree/ProjectTree.tsx`
 
 ---
 
@@ -251,15 +243,16 @@ const handleCreateFile = async () => {
 **Cause:** React key prop missing or incorrect.
 
 **Solution:**
-Ensure `MonacoMarkdownEditor` has file path as key:
+Ensure `MonacoMarkdownEditor` is keyed by the view mode so it remounts when the layout changes (the file path is passed as a prop, not as the key):
 ```tsx
 <MonacoMarkdownEditor
-  key={currentFile.path}  // Forces remount on file change
+  key={`editor-${viewMode}`}  // Forces remount on view-mode change
+  filePath={currentFile.path}
   // ...
 />
 ```
 
-**Files:** `src/renderer/src/components/Editor/MarkdownEditorPanel.tsx`
+**Files:** `src/renderer/src/components/Panels/EditorContentLayout.tsx`
 
 ---
 
@@ -270,8 +263,8 @@ Ensure `MonacoMarkdownEditor` has file path as key:
 **Debug Steps:**
 1. Check scroll map is built:
    ```typescript
-   // In console, should see:
-   📊 Scroll map: 296 entries
+   // In the renderer debug log, should see (useScrollSync.ts):
+   Scroll map rebuilt: 296 entries
    ```
 
 2. Verify data-line attributes in preview:
@@ -280,18 +273,14 @@ Ensure `MonacoMarkdownEditor` has file path as key:
    ```
 
 **Common Causes:**
-- React ref not initialized (check `viewRef.current`)
+- React refs not initialized (check `editorRef.current` and `previewRef.current`)
 - Scroll map empty (not built)
-- View mode not split view
+- View mode not a split view
 
 **Solution:**
-Ensure scroll map builds after view mode change:
+`useScrollSync` (`src/renderer/src/components/Editor/MarkdownEditorPanel/hooks/useScrollSync.ts`) exposes `rebuildScrollMap()`, which bails out unless both refs are set and the view is a split mode, then rebuilds after a double `requestAnimationFrame`. Ensure it is called after a view-mode or content change:
 ```typescript
-useEffect(() => {
-  if (viewMode === 'split' && viewRef.current) {
-    buildScrollMap()
-  }
-}, [viewMode, content])
+const { rebuildScrollMap } = useScrollSync({ editorRef, previewRef, viewMode, currentFilePath, currentContent })
 ```
 
 ---
@@ -315,7 +304,7 @@ Syntax error in graph
    known exception: it is listed in `mermaidDirections.ts` but its package is not a
    dependency, so it always errors)
 3. Check for typos in keywords
-4. Use bug report button (🐛) in error message to send formatted report to Terminal panel
+4. Use the bug report button (Lucide `Bug` icon in `MermaidDiagram.tsx`) in the error message – it runs the `mermaid-bug-report` prompt template and sends the formatted report to the Terminal panel
 
 **Example Fix:**
 ```mermaid

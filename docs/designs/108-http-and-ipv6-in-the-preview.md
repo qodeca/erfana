@@ -3,6 +3,8 @@
 
 # What Chromium actually does with `http://` and IPv6 in a preview
 
+> **Status (2026-09-05)**: the code this record argues for has shipped on `develop` and `main` (`previewCspViolationBridge.ts` treats `http://`, IP literals, `localhost` and single-label names as approvable origins, citing #108); the issue [#108](https://github.com/qodeca/erfana/issues/108) itself is still **open** on the public tracker.
+
 Decision record for [#108](https://github.com/qodeca/erfana/issues/108). Measured
 in a throwaway Electron harness that mirrors the preview: the same scheme
 privileges as `previewScheme.ts` (`standard`, `secure`, `supportFetchAPI`,

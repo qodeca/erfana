@@ -34,7 +34,7 @@ Virtual scrolling for Monaco editor (planned).
 1. Close unused editor tabs
 2. Clear terminal buffers:
    ```typescript
-   terminalRef.current?.terminal.clear()
+   xterm.clear()  // TerminalPanel.tsx – the xterm.js Terminal instance
    ```
 3. Restart Erfana if memory continues to grow
 
@@ -62,7 +62,7 @@ Ensure using SplitviewReact (outer) + DockviewReact (center):
 </Splitview>
 ```
 
-**See:** [Known Issues - Panel Resizing](./known-issues.md#panel-resizing-resolved-in-v010-commit-4ff94cb)
+**See:** [Resolved issues – Panel resizing (v0.1.0)](./archive/resolved-issues.md#panel-resizing-v010)
 
 ---
 
@@ -94,23 +94,19 @@ Use Monaco's command palette (F1) or formatting toolbar for editor commands.
 1. Check localStorage:
    ```javascript
    // In DevTools Console
-   localStorage.getItem('erfana-sidebar-state')
+   localStorage.getItem('erfana-activity-bar-state')
    ```
 
 2. Clear state to reset:
    ```javascript
-   localStorage.removeItem('erfana-sidebar-state')
+   localStorage.removeItem('erfana-activity-bar-state')
    // Reload app
    ```
 
-3. Verify state saves on change:
+3. Verify state saves on change – `useActivityBarStore` (`src/renderer/src/stores/useActivityBarStore.ts`) is a Zustand store wrapped in `persist` under the key `erfana-activity-bar-state`; its `partialize` writes only `leftActivePanel`, `rightActivePanel`, `leftWidth` and `rightWidth`. Widths change through the store's `setSidebarWidth(width, side)` action:
    ```typescript
-   // In useActivityBarStore
-   setSidebarStates((prev) => {
-     const newState = { ...prev, ...updates }
-     localStorage.setItem('erfana-sidebar-state', JSON.stringify(newState))
-     return newState
-   })
+   useActivityBarStore.getState().setSidebarWidth(320, 'left')
+   // persist middleware writes the partialized state to localStorage
    ```
 
 **Files:** `src/renderer/src/stores/useActivityBarStore.ts`
@@ -160,9 +156,9 @@ npm run build
 
 **Impact:** None (warnings only, doesn't affect functionality).
 
-**Cause:** ESLint 9 vs ESLint 8 peer dependencies in electron-toolkit.
+**Cause:** ESLint 9 vs ESLint 8 peer dependencies in electron-toolkit – historical.
 
-**Action:** Ignore warnings. electron-toolkit will update in future releases.
+**Action:** Resolved – `@electron-toolkit/eslint-config-ts` and `@electron-toolkit/eslint-config-prettier` now declare `eslint >=9.0.0` as their peer, so no warning is expected on a current `npm ci`.
 
 ---
 
@@ -240,5 +236,4 @@ When reporting bugs, include:
 - [Architecture](./architecture.md) - System design and component overview
 - [Development Tasks](./development-tasks.md) - Common development patterns
 - [API Services](./api-services.md) - Service class documentation
-- [API Services](./api-services.md) - Supporting services documentation
  

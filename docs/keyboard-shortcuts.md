@@ -18,8 +18,11 @@ Work anywhere, override editor shortcuts:
 | Shortcut | Action |
 |----------|--------|
 | `Cmd/Ctrl+Shift+N` | New Window (File menu, `src/main/menu.ts`) |
+| `Cmd/Ctrl+0` | Actual Size (View menu) |
+| `Cmd/Ctrl+Plus` | Zoom In (View menu) |
+| `Cmd/Ctrl+-` | Zoom Out (View menu) |
 
-Everything else in the menu uses Electron's standard roles (undo/redo, cut/copy/paste/select-all, reload, DevTools, zoom, fullscreen, minimize/zoom, and quit/close), so those accelerators are whatever the platform assigns.
+The three zoom items are explicit accelerators, not Electron zoom roles: `menu.ts` builds them with `zoomItem()` and routes each through `setPreviewZoomHandler` – a focused HTML preview takes the step first, otherwise the focused window's own web contents is zoomed (the header comment in `menu.ts` explains why `role: 'zoomIn'` cannot be used). Everything else in the menu uses Electron's standard roles (undo/redo, cut/copy/paste/select-all, reload/force-reload, `toggleDevTools`, fullscreen, minimize, the Window-menu `zoom` role, and quit/close), so those accelerators are whatever the platform assigns.
 
 ## Monaco Editor
 
@@ -34,7 +37,10 @@ When editor is focused. Full Monaco shortcuts: [Monaco Editor Docs](https://code
 | `Cmd/Ctrl+F` | Open the app search bar |
 | `Cmd/Ctrl+G` | Next search match |
 | `Cmd/Ctrl+Shift+G` | Previous search match |
+| `Cmd/Ctrl+B` | Bold – wraps the selection in `**` (see [Conflicts](#conflicts)) |
+| `Cmd/Ctrl+I` | Italic – wraps the selection in `*` |
 | `Cmd/Ctrl+K` | Insert link |
+| `Cmd/Ctrl+C` / `X` / `V` | Copy/cut/paste – re-registered over the main-process clipboard, not the browser clipboard (see below) |
 | `Cmd/Ctrl+Z` / `Shift+Z` | Undo/Redo |
 | `Cmd/Ctrl+/` | Toggle comment |
 | `Alt+↑/↓` | Move line |
@@ -45,6 +51,8 @@ When editor is focused. Full Monaco shortcuts: [Monaco Editor Docs](https://code
 **Find is not Monaco's find.** `MonacoMarkdownEditor.tsx` registers `CtrlCmd|KeyF` as an explicit no-op so the window-level capture handler (`useSearchKeyboard`) can open Erfana's unified search bar instead; `CtrlCmd|KeyG` and `CtrlCmd|Shift|KeyG` are likewise re-pointed at that search store. Monaco's own find widget is therefore not reachable by keyboard.
 
 **There is no Replace shortcut in Erfana.** No replace keybinding is registered anywhere in `src/`. Monaco's built-in replace default is `Ctrl+H` on Windows and `Cmd+Alt+F` on macOS – on macOS `Cmd+H` is the OS Hide role registered in `src/main/menu.ts`, so it never reaches the editor.
+
+**Clipboard is not Monaco's clipboard.** `MonacoMarkdownEditor.tsx` calls `registerClipboardActions` from `src/renderer/src/utils/monacoClipboardCommands.ts`, which re-registers `Cmd/Ctrl+C`, `Cmd/Ctrl+X` and `Cmd/Ctrl+V` as Monaco actions backed by the central `textClipboard` service (IPC to Electron's main-process clipboard), so they work under the sandbox where `navigator.clipboard` would throw `NotAllowedError`.
 
 `Cmd/Ctrl+S` and `Cmd/Ctrl+W` come from `useKeyboardShortcuts.ts`, mounted by `MarkdownEditorPanel`. The `Cmd+W` entry under [Window Management](#window-management) is the OS window-close role – a different binding on a different surface.
 
@@ -77,12 +85,7 @@ See: [Prompt Templates](./prompts/README.md)
 
 ### Navigation
 
-| Shortcut | Action |
-|----------|--------|
-| `↑/↓` | Navigate |
-| `→/←` | Expand/collapse folder |
-| `Enter` | Open file |
-| `Space` | Preview |
+Arrow-key, `Enter` and `Space` navigation is **not implemented**: `ProjectTree.tsx` and `ProjectTreeNode.tsx` register no key handlers for tree navigation, so the tree is mouse-only (open a11y issue [#88](https://github.com/qodeca/erfana/issues/88)).
 
 `Cmd/Ctrl+Alt+R` refreshes the tree. It is registered by `ProjectTree.tsx` as a `window` listener, so it fires from anywhere in the app, but it is ignored while a refresh is already running or while focus sits in an input, textarea, or contenteditable.
 
@@ -93,6 +96,7 @@ See: [Prompt Templates](./prompts/README.md)
 | `Cmd/Ctrl+X` | Cut (dimmed with dashed underline) |
 | `Cmd/Ctrl+C` | Copy (repeatable paste) |
 | `Cmd/Ctrl+V` | Paste into folder |
+| `Cmd/Ctrl+Shift+I` | Import external files into the selected folder (`handleImportShortcut` in `ProjectTree.tsx`; ignored unless a folder is selected or while focus is in an input, textarea or contenteditable) |
 
 **Context Menu**: Right-click → New File, New Folder, Rename, Delete, Cut, Copy, Paste
 
@@ -206,9 +210,10 @@ When image viewer panel is focused:
 
 | Shortcut | Action |
 |----------|--------|
-| `F12` or `Cmd/Ctrl+Shift+I` | Toggle DevTools |
-| `Cmd/Ctrl+Shift+C` | Inspect element |
-| `Cmd/Ctrl+R` | Reload |
+| platform default for `toggleDevTools` | Toggle DevTools – Electron's `toggleDevTools` role in the View menu (`src/main/menu.ts`); Erfana binds no `F12` |
+| platform default for `reload` / `forceReload` | Reload – Electron's `reload` and `forceReload` roles |
+
+There is no `Cmd/Ctrl+Shift+I` DevTools binding and no `Cmd/Ctrl+Shift+C` inspect-element binding in `src/`. `Cmd/Ctrl+Shift+I` is the Project Panel's external-file import shortcut (see [File Operations](#file-operations)).
 
 ## Conflicts
 

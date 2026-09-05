@@ -78,7 +78,7 @@ The GPL covers Erfana's **code**, not its **name or branding**. "Erfana" and "Qo
 
 "Claude" and "Claude Code" are trademarks of Anthropic. Erfana is not affiliated with, sponsored by, or endorsed by Anthropic – it simply runs the `claude` CLI like any other terminal program.
 
-"OpenAI" and "Whisper" are trademarks of OpenAI. Erfana is not affiliated with, sponsored by, or endorsed by OpenAI – it optionally calls the OpenAI API for transcription and bundles `whisper.cpp` (an independent open-source project, not produced by OpenAI) for offline use. See [TRADEMARKS.md](TRADEMARKS.md) for the full third-party trademark notice.
+"OpenAI" and "Whisper" are trademarks of OpenAI. Erfana is not affiliated with, sponsored by, or endorsed by OpenAI – it optionally calls the OpenAI API for transcription and downloads and runs `whisper.cpp` (an independent open-source project, not produced by OpenAI) on demand for offline use. See [TRADEMARKS.md](TRADEMARKS.md) for the full third-party trademark notice.
 
 ## Contributing
 

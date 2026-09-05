@@ -1,5 +1,7 @@
 # Design: Central text-clipboard service (issue #203) — v2 (post lens-review)
 
+> **Status**: shipped. #203 is a pre-migration issue numbers – the public `qodeca/erfana` tracker renumbered from #1 at the 2026-06 open-source migration, so these resolve to unrelated public issues; treat them as provenance only. Deviations from the design as shipped: no `useTextClipboard` hook was ever created (the §2 table already records this; §4, §11 and §12 below still mention it); the handlers use the shared `isTrustedSender` guard and `registerHandle` (`src/main/ipc/clipboard-handlers.ts`), not a local `assertSender` over raw `ipcMain.handle`; the **read** path is also capped (`clipboard.readText().slice(0, CLIPBOARD_MAX_TEXT_LENGTH)`); an over-`maxLength` paste in `useTextareaClipboard` **truncates** to what fits (surrogate-safe) rather than silently rejecting; and `monacoClipboardCommands.ts` is not purely pure – besides `clipboardCopy` / `clipboardCut` / `clipboardPaste` it exports `buildMonacoClipboardDeps` and `registerClipboardActions`, which calls `editor.addAction` itself.
+
 Phase 4 architecture for GitHub issue #203 (Erfana — Electron 39 + React 18 + TypeScript, electron-vite; sandbox ON, contextIsolation ON, nodeIntegration OFF).
 
 > **v2 changes** fold in the lens-review findings. Headline: the bridge is now **asynchronous** (`ipcRenderer.invoke`/`ipcMain.handle`), reversing the issue's literal "synchronous" wording on the evidence that Monaco does not need a sync clipboard and `sendSync` freezes the renderer (lens finding [3], 4 lenses). All must-fix + should-fix findings are incorporated; the changelog is at the end.
@@ -24,8 +26,8 @@ A single central renderer text-clipboard service that all in-scope text surfaces
 MAIN: electron `clipboard`
   ▲ readText() / writeText(s)
   src/main/ipc/clipboard-handlers.ts
-    ipcMain.handle('clipboard:readText',  e => { assertSender(e); return clipboard.readText() })   [ASYNC]
-    ipcMain.handle('clipboard:writeText', (e, t) => { assertSender(e); clipboard.writeText(parse(t)); return true }) [ASYNC]
+    registerHandle('clipboard:readText',  e => { if (!isTrustedSender(e)) return ''; return clipboard.readText().slice(0, MAX) })   [ASYNC, shipped]
+    registerHandle('clipboard:writeText', (e, t) => { if (!isTrustedSender(e)) return false; clipboard.writeText(parse(t)); return true }) [ASYNC, shipped]
     registerClipboardHandlers()  (called from index.ts)
   ▲ ipcRenderer.invoke(channel, payload) → Promise
 PRELOAD (sandbox-safe, no electron `clipboard`):
@@ -51,12 +53,12 @@ Native Edit menu (`src/main/menu.ts` role-based cut/copy/paste/selectAll) stays 
 
 | Path | Responsibility | Est. lines |
 |------|----------------|------------|
-| `src/main/ipc/clipboard-handlers.ts` | `registerClipboardHandlers()` — two async `ipcMain.handle` handlers wrapping electron `clipboard`, sender validation, Zod parse, try/catch → `logger.error` | ~70 |
+| `src/main/ipc/clipboard-handlers.ts` | `registerClipboardHandlers()` — two async handlers (shipped via `registerHandle`) wrapping electron `clipboard`, `isTrustedSender` validation, Zod parse, read-side length cap, try/catch → `logger.error` | ~70 |
 | `src/shared/ipc/clipboard-channels.ts` | `CLIPBOARD_CHANNELS` const (`readText`, `writeText`) | ~15 |
 | `src/shared/ipc/clipboard-schema.ts` | Zod `ClipboardWriteTextSchema` (`z.string().max(N)`), `CLIPBOARD_MAX_TEXT_LENGTH`, and `ClipboardBridge` TS contract type imported by preload + handler (nice-to-fix [10]) | ~30 |
 | `src/renderer/src/services/textClipboard.ts` | `TextClipboardService` singleton: async `writeText`/`readText`, retry-once + debounced toast + log chokepoint | ~110 |
 | ~~`src/renderer/src/hooks/useTextClipboard.ts`~~ | **dropped in review** — no consumer used the hook; the test seam is the exported `textClipboard` singleton + module-level `vi.mock` | — |
-| `src/renderer/src/utils/monacoClipboardCommands.ts` | **pure** copy/cut/paste command logic (deps injected: `{ getSelection, getValueInRange, executeEdits, isReadOnly, textClipboard }`), mirrors `terminalClipboard.logic.ts` (must-fix [2]) | ~90 |
+| `src/renderer/src/utils/monacoClipboardCommands.ts` | pure copy/cut/paste command logic (deps injected: `{ getSelection, getValueInRange, executeEdits, isReadOnly, textClipboard }`), mirrors `terminalClipboard.logic.ts` (must-fix [2]). *Shipped* alongside two non-pure helpers, `buildMonacoClipboardDeps(editor)` and `registerClipboardActions(editor)`, the latter calling `editor.addAction` | ~90 |
 | `src/renderer/src/services/textClipboard.test.ts` | service unit tests (mock `window.api.clipboard`; assert retry, debounce, toast+log) | ~170 |
 | `src/renderer/src/utils/monacoClipboardCommands.test.ts` | pure-logic tests: single-fire copy/cut/paste, read-only guard, empty-selection no-op | ~150 |
 | `src/main/ipc/clipboard-handlers.test.ts` | main handler tests (mock electron `clipboard`; sender validation; Zod reject; error path) | ~120 |
@@ -69,7 +71,7 @@ Native Edit menu (`src/main/menu.ts` role-based cut/copy/paste/selectAll) stays 
 | `src/preload/index.ts` | add `clipboard: { readText, writeText }` to `api` (uses `ipcRenderer.invoke`) |
 | `src/preload/index.d.ts` | add `clipboard: ClipboardBridge` typing to `Window.api` |
 | `src/renderer/src/hooks/useTerminalClipboard.ts` | swap `navigator.clipboard.*` → service (async, already Promise-based); keep `logic.ts` + `xterm.paste()` verbatim; verify `onError` callers before removing |
-| `src/renderer/src/hooks/useTextareaClipboard.ts` | rebuild cut/copy/paste on service; remove silent catches; keep `maxLength` reject as a silent product rule (no toast) |
+| `src/renderer/src/hooks/useTextareaClipboard.ts` | rebuild cut/copy/paste on service; remove silent catches; `maxLength` handling stays silent (no toast). *Shipped*: an over-limit paste **truncates** to the remaining room (surrogate-safe) and inserts that, rather than rejecting |
 | `src/renderer/src/hooks/useEditorContextMenu.ts` | paste reads via service (await) |
 | `src/renderer/src/components/ContextMenu/EditorContextMenu.tsx` | cut/copy write via service; cut deletes only on `writeText === true` |
 | `src/renderer/src/components/Editor/MonacoMarkdownEditor.tsx` | register copy/cut/paste via `editor.addAction` (keybindings + `contextMenuGroupId:'9_cutcopypaste'`) delegating to `monacoClipboardCommands.ts` |
@@ -88,10 +90,10 @@ Channels (`src/shared/ipc/clipboard-channels.ts`): `readText: 'clipboard:readTex
 
 | Channel | Request | Resolves to |
 |---------|---------|-------------|
-| `clipboard:readText` | none | `Promise<string>` (`''` on failure) |
+| `clipboard:readText` | none | `Promise<string>` (`''` on failure; *shipped* result is sliced to `CLIPBOARD_MAX_TEXT_LENGTH`) |
 | `clipboard:writeText` | `text: string` (Zod `z.string().max(CLIPBOARD_MAX_TEXT_LENGTH)`) | `Promise<boolean>` (`false` on failure/reject) |
 
-Handler shape (both): `assertSender(event)` first → on mismatch return safe value + `logger.warn`; then `safeParse` the payload (writeText) → on failure return `false` + `logger.warn`; then call electron `clipboard` in try/catch → `logger.error` + safe return on throw. `CLIPBOARD_MAX_TEXT_LENGTH` is a named constant in `clipboard-schema.ts` (proposed 5 MB of text; revisit in review). This is the codebase's first dedicated clipboard IPC; it follows the standard `invoke`+Zod convention (`logging-schema.ts` precedent) — no special deviation needed now that the bridge is async (corrects v1's inaccurate `getPlatform`/`getArch` precedent claim, lens finding [3]).
+Handler shape (both): sender check first (*shipped*: `isTrustedSender(event)` from `senderValidation.ts`, registered through `registerHandle`) → on mismatch return safe value + `logger.warn`; then `safeParse` the payload (writeText) → on failure return `false` + `logger.warn`; then call electron `clipboard` in try/catch → `logger.error` + safe return on throw. `CLIPBOARD_MAX_TEXT_LENGTH` is a named constant in `clipboard-schema.ts` (proposed 5 MB of text; revisit in review). This is the codebase's first dedicated clipboard IPC; it follows the standard `invoke`+Zod convention (`logging-schema.ts` precedent) — no special deviation needed now that the bridge is async (corrects v1's inaccurate `getPlatform`/`getArch` precedent claim, lens finding [3]).
 
 ## 4. Renderer service API — ASYNC surface
 
@@ -101,8 +103,8 @@ class TextClipboardService {
   async readText(): Promise<string>                  // '' on failure
 }
 export const textClipboard = new TextClipboardService()
-// test/DI seam:
-export function useTextClipboard(): TextClipboardService  // returns the singleton
+// test/DI seam (design-time; never shipped – tests `vi.mock` the module and use the singleton):
+// export function useTextClipboard(): TextClipboardService
 ```
 
 Async matches the consumers (terminal/textarea hooks are already `Promise`-based; the v1 "sync-wrapped-in-Promise" code smell disappears). No `cut`/`paste` helpers in the service — those are composite (clipboard primitive + surface-specific text mutation); the service owns only the primitive. **readText return is untrusted plain text** — documented on the method: consumers MUST treat as data (no `innerHTML`/`eval`/`dangerouslySetInnerHTML`); current consumers insert via `executeEdits`/`xterm.paste`/textarea value, all data sinks (cosmetic [13]).
@@ -132,7 +134,7 @@ The context-menu paste path (`useEditorContextMenu`) and `EditorContextMenu` cut
 
 ## 7. Textarea hook consolidation
 
-`useTextareaClipboard.ts` rebuilt on the service (same public API + `maxLength`). `maxLength` over-limit reject stays a silent product rule (no toast). Silent `catch {}` removed. The 3 inline dupes migrate to the hook: `PromptDialog` (textarea), `FileSystemDialog` (input — hook supports `HTMLInputElement`; extra cursor-position check), `ChatBubble` (textarea). One-shot copies go to the service directly: `MarkdownPreview` Cmd+C, `PreviewContextMenu`, `FilePickerDialog` copy-path, `EditorContextMenu` cut/copy.
+`useTextareaClipboard.ts` rebuilt on the service (same public API + `maxLength`). Over-limit paste stays silent (no toast); *shipped* behaviour is to truncate the pasted text to what fits (`sliceSurrogateSafe`) and insert that, not to reject. Silent `catch {}` removed. The 3 inline dupes migrate to the hook: `PromptDialog` (textarea), `FileSystemDialog` (input — hook supports `HTMLInputElement`; extra cursor-position check), `ChatBubble` (textarea). One-shot copies go to the service directly: `MarkdownPreview` Cmd+C, `PreviewContextMenu`, `FilePickerDialog` copy-path, `EditorContextMenu` cut/copy.
 
 ## 8. Error handling — transport-error chokepoint
 
@@ -166,7 +168,7 @@ Coverage target ≥80% for new service + handlers + `monacoClipboardCommands`; n
 1. `clipboard-channels.ts` + `clipboard-schema.ts` (channels, Zod, max-length const, `ClipboardBridge` type).
 2. `clipboard-handlers.ts` (async `handle`, sender validation, Zod parse) + register in `index.ts` + tests → main serves clipboard.
 3. `api.clipboard` in preload (`invoke`) + `index.d.ts` + preload bridge test → bridge live.
-4. `textClipboard.ts` + `useTextClipboard.ts` + tests (retry/debounce/toast) → renderer chokepoint live.
+4. `textClipboard.ts` + tests (retry/debounce/toast) → renderer chokepoint live (`useTextClipboard.ts` was dropped – see §2).
 5. `monacoClipboardCommands.ts` + tests → migrate `MonacoMarkdownEditor` to `addAction` + `useEditorContextMenu` + `EditorContextMenu`; smoke-test single-fire + IME. (Extract keeps editor file ≤500.)
 6. Migrate `useTerminalClipboard` (logic untouched) + verify terminal tests green + add hook tests.
 7. Rebuild `useTextareaClipboard` + migrate 3 inline dupes (cursor check on FileSystemDialog).
@@ -181,7 +183,7 @@ Coverage target ≥80% for new service + handlers + `monacoClipboardCommands`; n
 - `writeText` Zod-validated + length cap: required (should-fix [4]).
 - Monaco override via `addAction` + pure `monacoClipboardCommands.ts` with single-fire test + read-only/empty-selection guards: required (must-fix [2], should-fix [5]).
 - Toast on failure with retry-once + debounce; always log: user-confirmed intent, noise-hardened (should-fix [6]).
-- `useTextClipboard()` hook test seam over bare singleton: adopted (should-fix [7]).
+- `useTextClipboard()` hook test seam over bare singleton: adopted at v2, then dropped in review (see §2 and [7] below) – the shipped seam is the exported singleton + `vi.mock`.
 - "Transport-error chokepoint" framing (semantics stay per-surface): corrected (should-fix [8]).
 - Keep native Edit menu as-is (§9); migrate FileSystemDialog `<input>` to shared hook with cursor check.
 

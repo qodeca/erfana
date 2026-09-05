@@ -37,9 +37,9 @@ npx vitest run \
 
 ## Gaps
 
-- **No end-to-end drag-drop spec.** None of the 20 files in `e2e/` drives an
+- **No end-to-end drag-drop spec.** None of the 30 spec files in `e2e/` drives an
   actual drag gesture over the project tree, so the pointer-level interaction
-  (drop indicator, drag overlay, ARIA announcements) is only covered by the unit
+  (folder highlight, drag overlay, result toasts) is only covered by the unit
   tests behind it. The scenarios below therefore stay manual.
 - **Terminal drag-drop** (dropping paths into the terminal) is a separate
   feature with its own coverage in

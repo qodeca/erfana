@@ -11,34 +11,25 @@
 **Solution**: Pause watcher → execute operation → refresh tree → resume watcher
 
 ```typescript
-// ProjectTree.tsx:560-586
+// ProjectTree.tsx – handleDragEnd (shape; the pause/resume pair lives in withWatcherPause.ts)
 const handleDragEnd = async (event: DragEndEvent) => {
   // Calculate target and validate...
 
-  try {
-    // Pause watcher to prevent race conditions
-    await window.api.directoryWatch.pause(projectPath)
-
+  const result = await withWatcherPause(projectPath, isInternalOperation, setFileOperationLoading, async () => {
     // Execute move operation
-    const newPath = await window.api.file.moveItem(sourcePath, targetParent)
+    return window.api.file.moveItem(sourcePath, targetParent)
+  })
+  // withWatcherPause pauses the directory watcher before `op`, marks the mutation as
+  // internal, and always resumes in its own finally block.
 
-    // Refresh tree from disk
-    const fileTree = await window.api.file.readDirectory(projectPath)
-    setFiles(fileTree)
+  // Refresh tree from disk, then report through the toast service – there is no
+  // screen-reader announcer (see visual-feedback.md § Accessibility)
+  await refreshProjectTree()
+  showGlobalToast({ title: 'Success', message: 'Moved 1 file', type: 'success' })
+  // failures: showGlobalToast({ title: 'Move failed', message: error.message, type: 'error' })
 
-    announceToScreenReader(`Moved ${sourceName} to ${targetName}`)
-  } catch (error) {
-    showGlobalToast({
-      title: 'Move Failed',
-      message: error instanceof Error ? error.message : 'Unknown error',
-      type: 'error'
-    })
-  } finally {
-    // Always resume watcher
-    await window.api.directoryWatch.resume(projectPath)
-    setActiveId(null)
-    setOverId(null)
-  }
+  setActiveId(null)
+  setOverId(null)
 }
 ```
 
@@ -50,85 +41,77 @@ const handleDragEnd = async (event: DragEndEvent) => {
 
 ### Pause Controller
 
-Reference-counting pause/resume for nested operations:
+Reference-counting pause/resume for nested operations, with a safety timeout so a missed `resume()` cannot leave the watcher paused forever (#103):
 
 ```typescript
-// PauseController.ts
+// src/main/utils/PauseController.ts
+export interface PauseControllerOptions {
+  timeoutMs?: number        // auto-resume if resume() is not called within this window
+  onTimeout?: () => void    // invoked when the safety timeout fires
+}
+
 export class PauseController {
-  private pauseCount = 0
-
-  pause(): void {
-    this.pauseCount++
-  }
-
-  resume(): void {
-    if (this.pauseCount > 0) {
-      this.pauseCount--
-    }
-  }
-
-  isPaused(): boolean {
-    return this.pauseCount > 0
-  }
-
-  getCount(): number {
-    return this.pauseCount
-  }
+  constructor(options?: PauseControllerOptions)
+  pause(): number           // increments the count, (re)starts the safety timer; returns the new count
+  resume(): boolean         // decrements (floored at 0); returns true when fully resumed
+  isPaused(): boolean
+  getCount(): number
+  reset(): void             // force count to 0 and clear the timer
+  dispose(): void           // clear any pending timer
 }
 ```
+
+`DirectoryWatcherService` constructs one per watched directory with `{ timeoutMs: PAUSE_CONTROLLER.SAFETY_TIMEOUT_MS, onTimeout: () => this.handlePauseTimeout(dirPath) }`.
 
 **Benefits**:
 - Supports nested operations (copy multiple items)
 - Prevents premature watcher resume
-- Thread-safe reference counting
-- Zero configuration needed
+- Safety timeout recovers from a missed `resume()` (uncaught exception mid-operation)
+- Single-threaded main-process counter – no locking needed
 
 ## IPC Security
 
 All file operations go through secure IPC handlers with input sanitization:
 
 ```typescript
-// file-handlers.ts:132-145
-ipcMain.handle('file:moveItem', async (_event, sourcePath: string, targetParentPath: string, newName?: string) => {
+// src/main/ipc/file-handlers.ts – the 'file:moveItem' handler (registered via registerHandle)
+registerHandle('file:moveItem', async (_event, sourcePath: string, targetParentPath: string, newName?: string, replaceExisting?: boolean) => {
+  // Validate inputs: sourcePath / targetParentPath must be non-empty strings,
+  // newName a string if present, replaceExisting a boolean if present
+
   // Sanitize new name - prevent path traversal
   let sanitizedNewName: string | undefined = newName
   if (newName) {
     sanitizedNewName = newName.replace(/[/\\]/g, '')
     if (!sanitizedNewName) {
-      throw new Error('Invalid new name: cannot contain path separators')
+      throw new Error('Invalid new name')
     }
   }
-
-  const newPath = await fileService.moveItem(sourcePath, targetParentPath, sanitizedNewName)
-  return newPath
+  // ... fileService.moveItem(sourcePath, targetParentPath, sanitizedNewName, replaceExisting)
 })
 ```
 
 **Security measures**:
 - Strip path separators (`/` and `\`) from user-provided names
-- Validate all paths stay within project directory (FileService.ts:271-279)
+- Validate all paths stay within project directory (`FileService.moveItem` / `copyItem` guards, below)
 - No direct filesystem access from renderer process
 - All operations go through contextBridge API
 
 ### Path Traversal Prevention
 
 ```typescript
-// FileService.ts:271-279
-if (this.projectPath) {
-  const normalizedSource = normalize(sourcePath)
-  const normalizedTarget = normalize(targetPath)
-  const normalizedProject = normalize(this.projectPath)
-
-  if (!normalizedSource.startsWith(normalizedProject) ||
-      !normalizedTarget.startsWith(normalizedProject)) {
-    throw new Error('Operation outside project directory')
-  }
+// src/main/services/FileService.ts – moveItem guards (copyItem has the same pair with "copy" wording)
+if (this.projectPath && !sourcePath.startsWith(this.projectPath)) {
+  throw new Error('Cannot move items outside the project directory')
+}
+if (this.projectPath && !targetParentPath.startsWith(this.projectPath)) {
+  throw new Error('Cannot move items to outside the project directory')
 }
 ```
 
 **Validation ensures**:
-- Both source and target must be within project directory
-- Normalized paths prevent `../` traversal attacks
+- Both source and target parent must be within project directory
+- The check is a plain `startsWith` on the paths as received – there is no `path.normalize()` step here, so it is a boundary check rather than a `../` canonicaliser. Real filesystem confinement (with `realpath`) lives main-side in `ExternalFileService`; see [CLAUDE.md § Renderer path handling](../../CLAUDE.md)
 - Project boundary enforced at multiple layers
 
 ## Context Menu Integration
@@ -136,50 +119,37 @@ if (this.projectPath) {
 Cut/Copy/Paste added to file/folder context menus:
 
 ```typescript
-// ProjectTree.tsx:210-235
-const handleContextMenu = (e: React.MouseEvent, node: FileNode) => {
-  // ... existing menu items ...
+// src/renderer/src/components/ProjectTree/context-menu/commands.tsx
+export class CutCommand extends CommandBase {
+  label = 'Cut'
+  icon = <Scissors size={14} strokeWidth={2} />
+  execute(): void {
+    this.ctx.clipboard.cut(this.node.path, this.node.name, this.node.type)
+    this.ctx.toast({ type: 'info', title: 'Cut', message: `"${this.node.name}" ready to move` })
+  }
+}
 
-  // Separator before clipboard operations
-  { type: 'separator' },
+export class CopyCommand extends CommandBase {
+  label = 'Copy'
+  icon = <Copy size={14} strokeWidth={2} />
+  // same shape; toast title 'Copied'
+}
 
-  // Cut operation
-  {
-    label: 'Cut',
-    icon: <Scissors size={14} />,
-    onClick: () => {
-      clipboard.cut(node.path, node.name, node.type)
-      announceToScreenReader(`Cut ${node.name}`)
-    },
-    shortcut: isMac ? '⌘X' : 'Ctrl+X'
-  },
-
-  // Copy operation
-  {
-    label: 'Copy',
-    icon: <Copy size={14} />,
-    onClick: () => {
-      clipboard.copy(node.path, node.name, node.type)
-      announceToScreenReader(`Copied ${node.name}`)
-    },
-    shortcut: isMac ? '⌘C' : 'Ctrl+C'
-  },
-
-  // Paste operation (only if clipboard has content)
-  ...(clipboard.hasClipboard() ? [{
-    label: 'Paste',
-    icon: <ClipboardPaste size={14} />,
-    onClick: handlePaste,
-    shortcut: isMac ? '⌘V' : 'Ctrl+V'
-  }] : [])
+export class PasteIntoDirectoryCommand extends CommandBase {
+  label = 'Paste'
+  icon = <ClipboardIcon size={14} strokeWidth={2} />   // lucide `Clipboard`
+  // directory nodes only; conflict pre-check + "Replace item?" confirm for cut,
+  // then clipboard.paste(targetPath, replaceExisting) inside ctx.withWatcherPause
 }
 ```
 
+The menu is assembled by `ContextMenuFactory` (`context-menu/`) from these command classes; `ProjectTree.tsx` supplies the `MenuContext` (`clipboard`, `toast`, `dialogs`, `withWatcherPause`, `refreshProjectTree`, …).
+
 **Context-aware menu**:
 - Cut/Copy always available
-- Paste only shown when clipboard has content
-- Keyboard shortcuts displayed in menu
-- Icons for visual clarity
+- Paste offered on directory nodes when the clipboard has content
+- Feedback is a toast, not a screen-reader announcement
+- Icons for visual clarity; the commands carry no `shortcut` label – the keyboard shortcuts are handled by the tree's keydown handler in `ProjectTree.tsx`
 
 ## Integration Points
 
@@ -217,7 +187,7 @@ const handleContextMenu = (e: React.MouseEvent, node: FileNode) => {
 - **Location**: `src/renderer/src/hooks/useDragDropTree.ts`
 - **Functions**: flattenTree, buildTree, getProjection, isDescendant, canMoveItem
 - **Purpose**: Tree manipulation logic separated from UI
-- **Tests**: 379 lines of comprehensive test coverage
+- **Tests**: `useDragDropTree.test.ts` – 46 tests (see [testing.md](./testing.md))
 
 ## Data Flow
 
@@ -271,11 +241,14 @@ Errors propagate through layers:
 3. **Renderer** receives error, shows toast notification
 4. **Watcher** always resumes in finally block
 
-**User-facing errors**:
-- "Cannot move folder into its own subfolder"
-- "File already exists at destination"
-- "Permission denied"
+**User-facing errors** (verbatim from `FileService.moveItem`):
+- "Cannot move a folder into its own subfolder"
+- "An item named "<name>" already exists in the target location"
+- "Cannot move items outside the project directory" / "Cannot move items to outside the project directory"
+- "Cannot move the project root directory"
 - "Source and target paths are the same"
+- "Move failed: Could not delete source file. Operation rolled back." (cross-filesystem copy+delete, from `RollbackHandler`)
+- Permission errors surface as the raw Node `EACCES` message
 
 ## Document import integration
 

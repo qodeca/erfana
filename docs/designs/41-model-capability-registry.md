@@ -5,7 +5,8 @@
 > **Why Rev 6 exists.** Guard 1 parses only §7.1/§7.1.1, so every prose section is unguarded — and nine of them had drifted past the post-lens-review rework (the `modelNativelySupportsExtended` deletion, the `inferred` field, the sanitizer rework, the merged-env fix). A document whose stated job is to be the oracle of record, wrong in the sections nobody checks, is precisely the failure this change set was built to prevent. §18.2 records the structural lesson.
 >
 > **Citation policy.** Source references name a **file and symbol**, not a line number (decision (i)).
-> Issue: https://github.com/qodeca/erfana/issues/41 · Related: [#216](https://github.com/qodeca/erfana/issues/216), [#217](https://github.com/qodeca/erfana/issues/217)
+> Issue: https://github.com/qodeca/erfana/issues/41 · Related: #216, #217 (pre-migration issue numbers – the public `qodeca/erfana` tracker renumbered from #1 at the 2026-06 open-source migration, so these resolve to unrelated public issues; treat them as provenance only)
+> **Coverage-floor update (2026-09-05)**: the `modelId.ts` per-file floor that §9.5, §12, §14, §15 and §18 describe as INERT has been **active since #55** (its F4 finding moved the `thresholds` block under `test.coverage` in `vitest.main.ts` and added the required `Coverage` CI job) – 95% on lines/functions/branches/statements, enforced on every push. The follow-up issue §16 mentions for live-process probing / `resolvedModel` is [#48](https://github.com/qodeca/erfana/issues/48).
 
 > **Supersedes** the Opus-only registry in [`216-claude-status-bar.md`](216-claude-status-bar.md) §2, §4 and §10.
 
@@ -422,7 +423,7 @@ Independently re-derived on 2026-08-08 from Revision 3, with `modelId.ts`, `frie
 
 ### 9.5 Coverage
 
-The `modelId.ts` per-file floor exists in `vitest.main.ts` but is **INERT**: the whole `thresholds` block sits under a top-level `coverage:` key, a sibling of `test:`, and vitest reads coverage options from `test.coverage`. Nothing in that block applies — including four pre-existing whisper trust-chain floors dormant since they were added. **User-deferred**: relocating it would activate all five at once, and the four whisper floors currently fail.
+The `modelId.ts` per-file floor exists in `vitest.main.ts` and was **INERT at the time of writing**: the whole `thresholds` block sat under a top-level `coverage:` key, a sibling of `test:`, and vitest reads coverage options from `test.coverage`. Nothing in that block applied — including four pre-existing whisper trust-chain floors dormant since they were added. **User-deferred** then: relocating it would activate all five at once, and the four whisper floors failed. *Superseded (2026-09-05)*: #55 (F4) moved the block under `test.coverage` and the `Coverage` job now enforces the `modelId.ts` floor at 95% on every metric (see `docs/ci.md`).
 
 **To enforce later:** move the `coverage` object under `test.coverage`, then either raise the four whisper modules to their declared floors or adjust those floors to measured values in the same change.
 
@@ -491,7 +492,7 @@ Coverage is in any case a weak oracle for a data table: the pre-correction table
 | `shared/ipc/claude-status-schema.test.ts` | modify — `inferred` and the new bounds |
 | `renderer/…/ClaudeStatusBar.test.tsx` | modify — `aria-valuetext` placement |
 | `renderer/…/stores/useClaudeStatusStore.test.ts` | modify — `inferred` in fixtures |
-| `vitest.main.ts` | modify — inert coverage floor (§9.5) |
+| `vitest.main.ts` | modify — coverage floor (§9.5; inert when written, active since #55) |
 
 ### Documentation (Phase 10 scope)
 
@@ -540,7 +541,7 @@ Coverage is in any case a weak oracle for a data table: the pre-correction table
 | **R13** | Doc/code drift | **materialised four times** | high | Rev 2 structural, Rev 3 semantic, Rev 5 file-plan and citation rot, **Rev 6 nine prose contradictions in unguarded sections**. §18.2 records why the existing controls did not catch it and what would. |
 | R14 | Injected `/model …[1m]` line stays effective longer under canonical keying | low | medium | The backward scan accepts only the newest pre-turn override; latching requires corroboration. |
 | R15 | Scope growth destabilises a bug fix | materialised, contained | medium | R_ENV's withdrawal reversed part of it; §12 reconciled and its false completeness claim withdrawn. |
-| R16 | The `modelId.ts` coverage floor reads as enforced but is inert | certain | low | Documented in §9.5, §18 and in `vitest.main.ts`; user-deferred. |
+| R16 | The `modelId.ts` coverage floor reads as enforced but is inert | certain | low | Documented in §9.5, §18 and in `vitest.main.ts`; user-deferred. *Closed by #55* – the floor is active. |
 | R17 | Guards trusted without evidence | **closed** | high | All three injected faults executed and their failures observed (§18 criterion 12). |
 | R18 | Guard 1 line-scans and binds a number out of a Note cell | **closed** | high | §7.1's parsing contract plus the synthetic-decoy fault. |
 | **R19** | **Guard coverage is mistaken for document correctness** | **materialised** | **high** | Guard 1 parses §7.1/§7.1.1 only; every other section is unguarded prose, and nine drifted. Recorded at §9.4.2 and §18.2 so no future reader infers "the guards pass" means "the document is right". |
@@ -572,7 +573,7 @@ Coverage is in any case a weak oracle for a data table: the pre-correction table
 | F21 | Dropped trim leaks a control char | **Resolved, and extended**: the sanitizer's class now covers zero-width and bidi code points (§11). |
 | F22 | Sanitize pin cannot fail | **Resolved.** |
 | F23 | Harness duplication tests a different system | **Resolved** — and it is what made decision (c)'s deletion safe. |
-| F24 | Manual coverage target | **Partially resolved.** Floor declared but inert; user-deferred. |
+| F24 | Manual coverage target | **Partially resolved** at the time; floor declared but inert; user-deferred. *Resolved by #55* – the floor is active. |
 | F25 | Canonical keying widens injected-override effect | **Resolved as documented risk R14.** |
 
 ## 16. What got bigger, what shrank, and what is out of scope
@@ -581,9 +582,9 @@ Coverage is in any case a weak oracle for a data table: the pre-correction table
 
 **Out of scope, with reasons.**
 
-- **Live-process environment probing.** The authoritative replacement for the withdrawn R_ENV; macOS-only with the current architecture. **Follow-up issue** — it must also settle §2.0.3's unverified names first.
+- **Live-process environment probing.** The authoritative replacement for the withdrawn R_ENV; macOS-only with the current architecture. **Follow-up issue: [#48](https://github.com/qodeca/erfana/issues/48)** (open) — it must also settle §2.0.3's unverified names first.
 - **The Models API route.** Rejected by binding decision 4.
-- **Reading `resolvedModel`.** Verified present carrying the `[1m]` suffix (§2.2), the strongest cheap follow-up — but undocumented, and the registry fix satisfies AC1 without it. **Follow-up issue.**
+- **Reading `resolvedModel`.** Verified present carrying the `[1m]` suffix (§2.2), the strongest cheap follow-up — but undocumented, and the registry fix satisfies AC1 without it. **Follow-up issue: [#48](https://github.com/qodeca/erfana/issues/48).**
 - **Activating the coverage thresholds.** User-deferred (§9.5).
 - **Extending guard 1 beyond §7.1/§7.1.1** (§18.2). The nine Rev 6 corrections were caught by human review, not by a control.
 - **Reducing `ClaudeStatusService.ts` below 500 lines.** Pre-existing, now worse.
@@ -605,7 +606,7 @@ Coverage is in any case a weak oracle for a data table: the pre-correction table
 10. Service changes: corroborated-only latching, sticky key, unconditional four-argument call, **`inferred` on the snapshot**, wire-`modelId` sanitization.
 11. Schema `inferred` + bounds; renderer `aria-valuetext` composition (§5.4).
 12. `TerminalService.cleanEnvironment` on the merged env (§5.2), plus its test.
-13. `vitest.main.ts` floor (inert); docs.
+13. `vitest.main.ts` floor (inert when written; active since #55); docs.
 14. Gates: `npm run lint && npm run typecheck && npm run test && npm run check:headers && npx electron-vite build`.
 15. Manual UAT on a live `claude` session.
 

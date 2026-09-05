@@ -590,7 +590,7 @@ DOCX generation from HTML content.
 - Word format export
 - Mermaid diagrams as high-resolution PNG
 - Uses the `@turbodocx/html-to-docx` npm package
-- Conversion runs in a **killable `utilityProcess` child** (`src/main/services/docx/`): `HtmlToDocxConverter` strips remote images and wraps the HTML in the main process, then `DocxConvertProcessAdapter` forks `docx-convert.process` to run `HTMLtoDOCX`, killing it on timeout. The library decodes images synchronously, so an in-thread timeout could not interrupt a hang; a separate process also caps memory against decompression bombs.
+- Conversion runs in a **killable `utilityProcess` child**: `HtmlToDocxConverter` (`src/main/services/HtmlToDocxConverter.ts`) strips remote images and wraps the HTML in the main process, then `DocxConvertProcessAdapter` (`src/main/services/docx/`) forks `docx-convert.process` to run `HTMLtoDOCX`, killing it on timeout. The library decodes images synchronously, so an in-thread timeout could not interrupt a hang; a separate process also caps memory against decompression bombs.
 - **Remote-image SSRF strip** (`docxImageStrip.ts`, parse5): before conversion, `<img>`/`<source>` with an `http(s)`/`file:`/`ftp:`/protocol-relative `src` (or remote `srcset`) are removed so the bundled library never fetches them; empty, `data:`, and relative sources are kept.
 
 ### Public Methods
@@ -602,7 +602,7 @@ Export HTML content to DOCX. As with PDF, `fileName` is a suggested name run thr
 
 ## HTML preview (#74)
 
-The sandboxed HTML-preview subsystem is a service *family* under `src/main/services/preview/` (WebContentsView lifecycle, `erfana-preview://` protocol handler, request/host filter, per-project allowlist store, sealed session, watch pool, PDF/find controllers), not a single service, so it is documented in its own doc rather than duplicated here. For the full write-up see [HTML preview](./html-preview/README.md); for the per-service catalogue see [`src/main/services/CLAUDE.md`](../src/main/services/CLAUDE.md) § "HTML preview (#74)". IPC surface: [IPC patterns § HTML preview](./ipc-patterns.md#html-preview-previewhandlersts-constants-in-preview-channelsts-74).
+The sandboxed HTML-preview subsystem is a service *family* under `src/main/services/preview/` (WebContentsView lifecycle, `erfana-preview://` protocol handler, request/host filter, per-project allowlist store, sealed session, watch pool, PDF/find controllers), not a single service, so it is documented in its own doc rather than duplicated here. For the full write-up see [HTML preview](./html-preview/README.md); for the per-service catalogue see [`src/main/services/CLAUDE.md`](../src/main/services/CLAUDE.md) § "HTML preview (#74)". IPC surface: [IPC patterns § HTML preview](./ipc-patterns.md#html-preview-preview-handlersts-constants-in-preview-channelsts-74).
 
 ## ImageExportService
 

@@ -31,7 +31,7 @@ See [`design/README.md`](../design/README.md) for which card governs which defec
 
 ## Windows-specific issues
 
-Phases 0–2 of Windows enablement shipped in **v0.9.3** (2026-04-22); Phase 4 (local Whisper trust chain + Windows x64 binary) shipped in **v0.9.4** (merge `110f1b9`, 2026-04-23). The following gaps remain user-visible until Phases 3, 5, and 6 ship. See [`docs/windows/implementation-plan.md`](./windows/implementation-plan.md) for the canonical roadmap.
+Phases 0–2 of Windows enablement shipped in **v0.9.3** (2026-04-22); Phase 4 (local Whisper trust chain + Windows x64 binary) shipped in **v0.9.4** (merge `110f1b9` – pre-migration; no longer resolvable, that history was rewritten at the 2026-06 migration; 2026-04-23); Phase 3 (screenshots) shipped in **v0.12.0**. The following gaps remain user-visible until Phases 5 and 6 ship. See [`docs/windows/implementation-plan.md`](./windows/implementation-plan.md) for the canonical roadmap.
 
 ### SmartScreen warning on first launch
 
@@ -257,7 +257,7 @@ Re-enable with `gh workflow enable "E2E Tests"` once the root cause is isolated.
 
 ### E2E terminal-driven tests sensitive to user's shell init speed
 
-**Issue**: E2E tests that drive the terminal via `terminal.sendCommand` assume the PTY's interactive shell will be ready 1500 ms after the panel becomes visible. The 1500 ms is a blind sleep in `TerminalPage.waitForPrompt` (`e2e/pages/terminal.page.ts:29` `PTY_INIT_DELAY_MS`), not a real readiness probe. On a developer machine with a heavy `.zshrc` (oh-my-zsh, slow plugins, async work), `exec -l "$SHELL" -i` in `TerminalService` can take >1500 ms to source startup files, leaving the typed command in the kernel PTY buffer with no shell to execute it; CI runners and clean dev machines have well under 500 ms init and pass the test, hiding the dependency.
+**Issue**: E2E tests that drive the terminal via `terminal.sendCommand` assume the PTY's interactive shell will be ready 1500 ms after the panel becomes visible. The 1500 ms is a blind sleep in `TerminalPage.waitForPrompt` (the `PTY_INIT_DELAY_MS` constant in `e2e/pages/terminal.page.ts`), not a real readiness probe. On a developer machine with a heavy `.zshrc` (oh-my-zsh, slow plugins, async work), `exec -l "$SHELL" -i` in `TerminalService` can take >1500 ms to source startup files, leaving the typed command in the kernel PTY buffer with no shell to execute it; CI runners and clean dev machines have well under 500 ms init and pass the test, hiding the dependency.
 
 **Symptom** (pre-fix): `e2e/directory-watcher.e2e.ts` times out at its 2000 ms budget with the new file never appearing in the tree on macOS dev machines with a heavy `.zshrc`. Instrumented PTY tracing showed the keystrokes reach the kernel PTY buffer and the kernel TTY line discipline echoes each character back, but no shell prompt is rendered and no command executes. The shell's first real output (e.g. an `(eval):N: warning: 1 jobs SIGHUPed` line) only arrives 5–6 s later, after the test has given up and `closeApp` has torn the PTY down.
 
@@ -323,7 +323,7 @@ Error:
 ModuleNotFoundError: No module named 'distutils'
 ```
 
-Solution: downgrade to Python 3.12 (the `node-gyp` shipped with Node 24 doesn't yet handle Python 3.13's removed `distutils`). Not auto-fixable — see [`docs/build/windows.md`](./build/windows.md) step 2.
+Solution: use Python 3.12 (long-standing known-good) or 3.14.x – 3.14.3 was verified on the 2026-09-03 Windows 11 release check; only 3.13 fails (the `node-gyp` shipped with Node 24 doesn't handle Python 3.13's removed `distutils`). Not auto-fixable — see [`docs/build/windows.md`](./build/windows.md) step 2.
 
 **2. Windows 11 — `cmd.exe` current-directory hardening (resolved by #213)**
 
@@ -341,15 +341,15 @@ Symptom: `MSB8040: Spectre-mitigated libraries are required for this project`. n
 
 ### Template ID System
 
-**Issue**: Template IDs derived from slugified display names is fragile.
+**Issue**: Template IDs fall back to slugified display names when a template carries no explicit `id`, which is fragile for the templates still relying on the fallback.
 
 **Current Implementation**:
 ```typescript
 // parser.ts
-const id = slugify(result.data.name)  // Derives ID from name
+const id = result.data.id || slugify(result.data.name)  // Explicit id, else derived from name
 ```
 
-**Problem**:
+**Problem** (for templates without an explicit `id`):
 - Changing template name breaks all code references
 - `name: "Mermaid Bug Report"` → `id: "mermaid-bug-report"`
 - Code must look up by derived ID: `PROMPT_REGISTRY['mermaid-bug-report']`
@@ -378,13 +378,13 @@ name: Mermaid Bug Report  # Display name (can change freely)
 ```
 
 **Implementation Steps**:
-1. Add `id` field to `PromptFrontmatterSchema` (schema.ts)
-2. Update parser to use explicit ID instead of slugify
+1. ✅ Add `id` field to `PromptFrontmatterSchema` (schema.ts) – done, optional `id`
+2. ✅ Update parser to use explicit ID instead of slugify – done, with slugify as the fallback
 3. Add uniqueness validation in registry
-4. Migrate all existing templates (explain, improve, rewrite, simplify, mermaid-bug-report)
-5. Remove slugify function
+4. Migrate all existing templates – partial: 5 of the 14 templates in `src/renderer/src/prompts/templates/` declare an `id`
+5. Remove slugify function (only once step 4 is complete)
 
-**Status**: Architecture review complete, implementation pending.
+**Status**: Steps 1–2 shipped; uniqueness validation, the full template migration and the slugify removal remain open (re-verified 2026-09-05). Same item as [technical-debt.md § 2](./technical-debt.md).
 
 **See**: [Prompt Templates](./prompts/README.md)
 
@@ -410,9 +410,9 @@ name: Mermaid Bug Report  # Display name (can change freely)
 
 ---
 
-## ESLint Peer Dependency Warnings
+## ESLint Peer Dependency Warnings (resolved)
 
-**Issue**: ESLint 9 vs ESLint 8 peer dependencies. **Impact**: None (warnings only). Ignore.
+**Issue**: `npm ci` used to warn about ESLint 9 vs ESLint 8 peer dependencies from `@electron-toolkit/eslint-config-*`. **Resolved**: both `@electron-toolkit/eslint-config-ts` and `@electron-toolkit/eslint-config-prettier` now declare `eslint >=9.0.0` as their peer, matching the project's `eslint ^9.16.0`, so the warning no longer appears.
 
 ---
 

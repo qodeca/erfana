@@ -1,6 +1,6 @@
 # Build Documentation
 
-**Last updated**: August 2026 (v0.17.2)
+**Last updated**: September 2026 (v0.19.0)
 
 This directory contains detailed documentation for Erfana's production build configuration.
 
@@ -45,9 +45,9 @@ npm run build:mac
   ```
 
 **Python** (for node-pty native compilation):
-- Python 3.12 or earlier (NOT 3.13 - node-pty fails to build)
+- Python 3.12 known good; 3.14.3 verified 2026-09-03 (NOT 3.13 – node-pty fails to build)
 - Check version: `python3 --version`
-- If using Python 3.13, downgrade to 3.12
+- If using Python 3.13, switch to 3.12 or 3.14.3
 
 ### Install Dependencies
 

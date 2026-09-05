@@ -99,7 +99,7 @@ Real-time metrics in bottom status bar:
 ## Implementation Files
 
 ### Main Panel (`src/renderer/src/components/Panels/`)
-- `MarkdownEditorPanel.tsx` - Panel orchestration (614 lines)
+- `MarkdownEditorPanel.tsx` - Panel orchestration (593 lines)
 - `DocumentStatsBar.tsx` - Real-time word/character/line counts
 - `EditorContentLayout.tsx` - Editor/preview layout with resizable divider
 
@@ -160,16 +160,17 @@ Monaco is configured for markdown editing in `MonacoMarkdownEditor.tsx`:
 Monaco built-ins (when the editor has focus):
 
 - Text editing: Cmd/Ctrl+C/V/X/Z (copy/paste/cut/undo)
-- Find/replace: Cmd/Ctrl+F, Cmd/Ctrl+H
+- Find/replace: Cmd/Ctrl+H (Cmd/Ctrl+F is intercepted app-wide by `useSearchKeyboard.ts` and opens the app search bar instead of Monaco's find widget)
 - Multi-cursor: Alt+Click, Cmd/Ctrl+Alt+Up/Down
 - Save: Cmd/Ctrl+S
 
 Application-global shortcuts override Monaco's:
 
-- Cmd/Ctrl+B: toggle sidebar
-- Cmd/Ctrl+O: open folder
-- Cmd/Ctrl+N: new file
-- Cmd/Ctrl+Shift+N: new folder
+- Cmd/Ctrl+B: toggle sidebar (`AppDockLayout.tsx`; Monaco's Bold binding loses – see the Conflicts section of the shortcuts doc)
+- Cmd/Ctrl+F: open the app search bar (`useSearchKeyboard.ts`)
+- Cmd/Ctrl+Shift+N: New Window – the only `accelerator` declared in `src/main/menu.ts` besides the View-menu zoom items
+
+There are no Cmd/Ctrl+O (open folder) or Cmd/Ctrl+N (new file) shortcuts.
 
 See [Keyboard Shortcuts](../keyboard-shortcuts.md) for the complete list.
 

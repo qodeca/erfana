@@ -50,8 +50,7 @@ When the main process sees `process.env.ERFANA_E2E_FAST_SHELL === '1'`, the POSI
 ### PowerShell
 
 - `-NoProfile`: Skip profile loading (faster bootstrap; isolates from user RC)
-- `-NoExit`: Keep the PowerShell session open after the command completes (PowerShell doesn't have a POSIX `exec` equivalent, so the command *is* the interactive shell)
-- `-Command`: Execute the bootstrap script
+- `-Command`: Execute the bootstrap script. `-NoExit` is **not** emitted (`PowerShellBootstrapBuilder.build` returns `['-NoProfile', '-Command', script]`): PowerShell has no POSIX `exec` equivalent, so the script's last step `& '<shell>' -NoLogo` launches the interactive session itself, and the bootstrap process stays alive as its parent
 - `Set-Location -LiteralPath`: `-LiteralPath` disables wildcard expansion and variable interpolation. Single-quoting the path further disables `$`-expansion. cwd apostrophes are doubled (`'` → `''`).
 - `Write-Output '<marker>'` with the marker also single-quoted: defensive — protects against marker format changes that might include shell-sensitive characters.
 
@@ -90,6 +89,7 @@ Before any Windows bootstrap is constructed, the cwd is validated and normalized
 - Reason: `"` can break out of `cd /d "<cwd>"`. `\r` / `\n` terminate PowerShell and bash single-quoted strings. `& | ^ < >` are cmd.exe metacharacters only active *outside* quotes, but are retained as defense-in-depth in case a future bootstrap pathway passes the cwd outside a quoted argument.
 - `(` and `)` are **not** rejected — they are cmd command-grouping metacharacters only outside quotes and are literal inside `cd /d "…"`. Earlier versions rejected parens defensively; that locked out every path under `C:\Program Files (x86)\…` and was relaxed during Phase-2 UAT hardening.
 - On rejection: `TerminalService.createTerminal` returns `{ error }` (was `null` before v0.19.0), logs an error, and emits an `'error'` event. **Hard contract**: callers must surface this to the user, not swallow it.
+- **Long-path refusal (v0.19.0)**: before the deny-list runs, `isWindowsLongPath(cwd)` rejects a cwd over Win32 `MAX_PATH` with `TERMINAL_CWD_TOO_LONG_MESSAGE` ("This folder's path is longer than Windows allows for a terminal (260 characters). Move the project to a shorter path."), through the same `{ error }` + `'error'`-event path. Win32 `CreateProcess` hard-fails on such a cwd and node-pty reports only a bare `ENOENT`; the length is logged, never the path.
 
 **Normalization** — `normalizeWindowsCwd(cwd)`:
 - Strips trailing `\` or `/` separators (preserving drive roots like `C:\` → `C:\`)
@@ -103,16 +103,16 @@ Before any Windows bootstrap is constructed, the cwd is validated and normalized
 
 - Buffers all PTY output until the unique `__ERFANA_PWD_MARKER_<nonce>__` sentinel appears
 - When detected, parses the **line immediately preceding** the marker as the cwd (from `cd`, `pwd`, or `Get-Location`)
-- Emits `terminal-clear` on a bypass channel to the renderer
-- Awaits renderer confirmation (`markClearComplete`) before unblocking output forwarding
+- Emits `terminal:clear` on a bypass channel to the renderer
+- Awaits renderer confirmation (`markClearComplete`, which sends `terminal:clearComplete`) before unblocking output forwarding
 
 **Renderer-Side Clear** (`TerminalPanel.tsx`):
 
-- Listens for `terminal-clear` on the bypass channel
+- Listens for `terminal:clear` on the bypass channel (`window.api.terminal.onClear`)
 - Clears xterm buffer and screen (`\x1b[2J\x1b[H`)
 - Confirms via `window.api.terminal.markClearComplete(terminalId)`
 
-**Bypass channel**: `terminal-clear` events are separate from the data stream — the marker never appears in the rendered terminal.
+**Bypass channel**: `terminal:clear` events are separate from the data stream — the marker never appears in the rendered terminal.
 
 ### 4. ConPTY resize-reflow mitigation (Windows)
 
@@ -126,7 +126,7 @@ Before any Windows bootstrap is constructed, the cwd is validated and normalized
 | PowerShell / pwsh | `[Console]::Write([char]27 + '[2J' + [char]27 + '[3J' + [char]27 + '[H')` | Viewport + scrollback + cursor home |
 | cmd.exe | `cls` | Viewport + cursor home only (no scrollback clear – see [Known issues](../known-issues.md#cmdexe-terminals-can-leak-pre-bootstrap-text-into-scrollback-after-aggressive-resizing)) |
 
-The xterm.js-side handshake (§ 5) is unaffected — xterm still clears its own buffer via `\x1b[2J\x1b[3J\x1b[H` when the renderer receives `terminal-clear`.
+The xterm.js-side handshake (§ 5) is unaffected — xterm still clears its own buffer via `\x1b[2J\x1b[3J\x1b[H` when the renderer receives `terminal:clear`.
 
 ### 5. Three-Flag Gating System
 
@@ -174,22 +174,26 @@ Windows shell bootstrap is implemented via a strategy pattern in `src/main/servi
 
 **Interface**:
 ```typescript
+export type WindowsBootstrapKind = 'powershell' | 'git-bash' | 'cmd.exe'
+
 export interface WindowsBootstrapBuilder {
-  readonly kind: string
+  readonly kind: WindowsBootstrapKind
+  readonly shellKind: ShellKind // 'posix' | 'cmd' | 'powershell' – quoting flavour (#164)
   canHandle(shell: string): boolean
   build(args: { shell: string; cwd: string; marker: string }): string[]
 }
 ```
 
-- `kind` is a stable identifier (`'powershell'`, `'git-bash'`, `'cmd.exe'`) used in logging (see `🔵 Windows shell kind: …` log line) and for diagnostics.
-- `build()` returns the raw `shellArgs` passed to node-pty. The `kind` is surfaced separately via `buildWindowsBootstrap()`'s return value: `{ kind, shellArgs }`.
+- `kind` is a stable identifier (`'powershell'`, `'git-bash'`, `'cmd.exe'`, typed as the `WindowsBootstrapKind` union so a `switch` on it is exhaustively checked) used in logging (see `🔵 Windows shell kind: …` log line) and for diagnostics.
+- `shellKind` is the quoting flavour the spawned shell speaks (`ShellKind` from `src/shared/shellKind.ts`); it is recorded on the `TerminalInstance` and returned to the renderer in the `terminal:create` response so pasted paths can be quoted per terminal (#164).
+- `build()` returns the raw `shellArgs` passed to node-pty. `kind` and `shellKind` are surfaced separately via `buildWindowsBootstrap()`'s return value: `{ kind, shellKind, shellArgs }`.
 
 **Default builders** (`DEFAULT_WINDOWS_BOOTSTRAP_BUILDERS`, **precedence order matters**):
 1. `PowerShellBootstrapBuilder` — matches `pwsh`, `pwsh-preview`, `powershell` (regex covers forward-slash Git Bash paths)
 2. `GitBashBootstrapBuilder` — matches `bash` and `bash.exe` after a path separator; emits POSIX-style bootstrap with absolute shell path (so `$SHELL` doesn't need to be set inside the spawned bash)
 3. `CmdExeBootstrapBuilder` — catch-all fallback
 
-**Dispatch**: `buildWindowsBootstrap({ shell, cwd, marker })` iterates builders, returns `{ kind, shellArgs }` for the first `canHandle(shell) === true`.
+**Dispatch**: `buildWindowsBootstrap({ shell, cwd, marker })` iterates builders, returns `{ kind, shellKind, shellArgs }` for the first `canHandle(shell) === true`.
 
 **Shell-kind detection regexes**:
 - PowerShell: `/(?:^|[/\\])(pwsh(?:-preview)?|powershell)(?:\.exe)?$/i` — handles forward slashes, `pwsh-preview.exe`, and missing `.exe` extension.

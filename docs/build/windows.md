@@ -168,7 +168,7 @@ A fresh `git clone && npm ci` on a default-hardened Windows 11 box previously fa
 
 ## Contributor expectations
 
-Windows CI **exists**: `.github/workflows/checks.yml` runs a `windows-checks` job on `windows-latest` for every push, executing `npm run typecheck` and `npm run test:main` under `shell: bash`.
+Windows CI **exists**: `.github/workflows/checks.yml` runs a `windows-checks` job on `windows-latest` for every push, executing `npm run typecheck`, `npm run test:main` and `npm run design -- --check` (the CRLF regression guard for the design-system sync, #104) under `shell: bash`.
 
 It is deliberately **advisory** — excluded from the branch-protection required-checks set until it proves stable, mirroring how `e2e` is kept out. A red `windows-checks` job therefore blocks nothing automatically, so **contributors are still responsible for running the main-process tests locally before merging any PR that touches `src/main/` or test configuration**:
 

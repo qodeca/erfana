@@ -407,4 +407,4 @@ When switching embedding models:
 
 **Last Updated:** October 2025
 **Research Validated:** Extensive online research across 8 key technical areas
-**Status:** Ready for M1 implementation with documented mitigations for known issues
+**Status:** M1 in progress on the `graph` branch – see [ROADMAP.md § Graph engine chain](../../ROADMAP.md#graph-engine-chain-on-the-graph-branch); the mitigations for known issues documented above still apply

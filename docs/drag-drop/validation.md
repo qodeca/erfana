@@ -9,20 +9,14 @@
 ### Circular Move Prevention
 
 ```typescript
-// useDragDropTree.ts:91-102
+// useDragDropTree.ts – isDescendant
 export function isDescendant(possibleDescendant: string, possibleAncestor: string): boolean {
-  if (possibleDescendant === possibleAncestor) {
-    return false
-  }
-
-  const ancestorWithSep = possibleAncestor.endsWith('/')
-    ? possibleAncestor
-    : possibleAncestor + '/'
-
-  return possibleDescendant.startsWith(ancestorWithSep)
+  // isStrictDescendant(parent, child): equal paths return false, and it handles
+  // native separators on both platforms (no POSIX-only string math in the renderer)
+  return isStrictDescendant(possibleAncestor, possibleDescendant)
 }
 
-// useDragDropTree.ts:186-187
+// useDragDropTree.ts – canMoveItem
 if (projection.parentId && isDescendant(projection.parentId, activeId)) {
   return { valid: false, reason: 'Cannot move folder into its own subfolder' }
 }
@@ -70,7 +64,7 @@ Cannot drag the project root folder itself.
 | Root protection | `sourcePath === projectPath` | "Cannot move the project root directory" |
 | Move conflict | `checkNameConflict()` | Confirm dialog shown |
 | Copy conflict | `checkNameConflict()` | Auto-numbered name |
-| Copy overflow | `copyNumber > 1000` | "Too many copies with the same name" |
+| Copy overflow | `copyNumber > MAX_COPY_ATTEMPTS` (1000) | "Cannot create more than 1000 copies with the same name" |
 
 ## Edge Cases
 
@@ -103,12 +97,12 @@ if (sourceStats.isDirectory()) {
 ### Auto-Numbering Overflow
 
 **Problem**: What if user has `file (999).md` and creates another copy?
-**Solution**: Safety limit at 1000 copies
+**Solution**: Safety limit at `MAX_COPY_ATTEMPTS` (1000, exported from `FileService.ts`)
 
 ```typescript
-// FileService.ts:356-359
-if (copyNumber > 1000) {
-  throw new Error('Too many copies with the same name')
+// FileService.ts – copyItem
+if (copyNumber > MAX_COPY_ATTEMPTS) {
+  throw new Error(`Cannot create more than ${MAX_COPY_ATTEMPTS} copies with the same name`)
 }
 ```
 
@@ -135,18 +129,15 @@ async checkNameConflict(targetParentPath: string, itemName: string): Promise<boo
 **Solution**: Detect symlinks and handle appropriately
 
 ```typescript
-// SymlinkDetector.ts
+// src/main/utils/SymlinkDetector.ts
 export class SymlinkDetector {
-  async isSymlink(path: string): Promise<boolean> {
-    try {
-      const stats = await lstat(path)
-      return stats.isSymbolicLink()
-    } catch {
-      return false
-    }
-  }
+  async checkPath(filePath: string): Promise<boolean>   // lstat-based; false on error
+  checkDirent(entry: Dirent): boolean                    // no I/O – used while reading directories
+  toOptionalFlag(isSymlink: boolean): boolean | undefined // true → true, false → undefined (omitted from IPC results)
 }
 ```
+
+`FileService.moveItem` / `copyItem` call `checkPath(sourcePath)` and return `{ path, isSymlink: toOptionalFlag(isSymlink) }`; the renderer uses the flag for its "Symlink Moved / Copied" toast.
 
 **Behavior**:
 - Symlinks are copied as symlinks (not their targets)
@@ -166,29 +157,22 @@ See [Dialog System](../architecture.md#dialog-system) for validation details.
 **Solution**: Watcher pause/resume with reference counting
 
 ```typescript
-// PauseController.ts
+// src/main/utils/PauseController.ts
 export class PauseController {
-  private pauseCount = 0
-
-  pause(): void {
-    this.pauseCount++
-  }
-
-  resume(): void {
-    if (this.pauseCount > 0) {
-      this.pauseCount--
-    }
-  }
-
-  isPaused(): boolean {
-    return this.pauseCount > 0
-  }
+  constructor(options?: { timeoutMs?: number; onTimeout?: () => void })
+  pause(): number      // returns the new count
+  resume(): boolean    // returns true once the count reaches 0
+  isPaused(): boolean
+  getCount(): number
+  reset(): void
+  dispose(): void
 }
 ```
 
 **Behavior**:
 - Each operation increments pause count
 - Watcher resumes only when count reaches 0
+- A safety timeout (`timeoutMs`, restarted on every `pause()`) auto-resumes and calls `onTimeout` if `resume()` never arrives
 - Prevents race conditions during nested operations
 
 See [integration.md](./integration.md#watcher-synchronization) for details.
@@ -211,36 +195,26 @@ Common errors and their handling:
 ### Rollback Strategy
 
 ```typescript
-// RollbackHandler.ts
+// src/main/utils/RollbackHandler.ts
 export class RollbackHandler {
-  private operations: Array<() => Promise<void>> = []
+  // Cross-filesystem move (copy + delete): if deleting the source fails, remove the
+  // copy, log, and throw 'Move failed: Could not delete source file. Operation rolled back.'
+  async rollbackCopyOnDeleteFailure(_sourcePath: string, targetPath: string, deleteError: unknown): Promise<void>
 
-  addRollback(operation: () => Promise<void>): void {
-    this.operations.push(operation)
-  }
-
-  async rollback(): Promise<void> {
-    // Execute rollback operations in reverse order
-    for (const operation of this.operations.reverse()) {
-      try {
-        await operation()
-      } catch (error) {
-        console.error('Rollback operation failed:', error)
-      }
-    }
-  }
+  // Generic clean-up of a failed operation's partial output; throws if the rollback itself fails
+  async rollbackDelete(path: string, operationDescription: string): Promise<void>
 }
 ```
 
-**Usage**: Atomic file operations that rollback on partial failure.
+**Usage**: `FileService.moveItem` calls `rollbackCopyOnDeleteFailure` in its EXDEV copy+delete path. There is no generic operation stack – each rollback is an explicit call.
 
 ## Testing
 
 Validation and edge cases are covered by:
-- **useDragDropTree.test.ts**: Validation logic (379 lines)
-- **FileService.moveItem.test.ts**: Move edge cases (330 lines)
-- **FileService.copyItem.test.ts**: Copy edge cases (290 lines)
-- **DirectoryWatcherService.concurrency.test.ts**: Concurrent operations (206 lines)
+- **useDragDropTree.test.ts**: Validation logic (46 tests)
+- **FileService.moveItem.test.ts**: Move edge cases
+- **FileService.copyItem.test.ts** and **FileService.copyItem.limit.test.ts**: Copy edge cases and the `MAX_COPY_ATTEMPTS` cap
+- **DirectoryWatcherService.concurrency.test.ts**: Concurrent operations
 
 See [testing.md](./testing.md) for test coverage details.
 

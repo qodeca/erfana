@@ -40,6 +40,9 @@ prompts/
 ├── helpers.ts       # Template helpers
 ├── applyFooter.ts   # Canonical apply-to-document footer (v0.10.0)
 ├── validation.ts    # Per-template variable requirements
+├── executionQueue.ts # FIFO execution queue – serialises concurrent prompt runs
+├── observability.ts # Optional execution tracing (timing, success/failure logs)
+├── variableFactory.ts # Builds PromptVariables with consistent defaults and computed fields
 └── types.ts         # TypeScript types
 ```
 

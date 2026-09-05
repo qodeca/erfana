@@ -8,8 +8,8 @@ See `docs/windows/phase4-binary-spec.md` for the currently pinned upstream SHA a
 
 Two **separate** release streams in the same GitHub repo:
 
-- **`v{semver}`** — Erfana application releases. These set `electron-updater`'s "latest".
-- **`whisper-build-{upstream_label}-erfana{rev}`** — whisper binary releases. **Always marked pre-release** so `electron-updater` ignores them.
+- **`v{semver}`** — Erfana application releases. These are the GitHub "Latest" release (there is no in-app auto-updater: `electron-builder.yml` sets `publish: null`, so nothing consumes a "latest" feed).
+- **`whisper-build-{upstream_label}-erfana{rev}`** — whisper binary releases. **Always marked pre-release** so they never become the GitHub "Latest" release.
 
 The Erfana client (`src/main/services/whisper-assets.ts`) pins a specific `whisper-build-*` tag + per-platform SHA-256. App releases and whisper-builds evolve independently.
 
@@ -89,7 +89,7 @@ Verify anytime:
 gh api repos/qodeca/erfana/environments/production-signing --jq '.protection_rules'
 ```
 
-`can_admins_bypass` is `true`, so a repo admin can still skip the wait — the gate is an anti-mistake control, not a defence against a compromised admin account. The underlying trust boundary is unchanged: only repo admins can edit `.github/workflows/`, the same trust model as every other repo secret (e.g. `CLAUDE_CODE_OAUTH_TOKEN`).
+`can_admins_bypass` is `true`, so a repo admin can still skip the wait — the gate is an anti-mistake control, not a defence against a compromised admin account. The underlying trust boundary is unchanged: only repo admins can edit `.github/workflows/`, the same trust model as every other repo secret (e.g. `MINISIGN_KEY_PASSWORD`).
 
 ### 5. Tag protection on whisper-build-* tags
 

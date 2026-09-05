@@ -191,5 +191,5 @@ Transcription can take several minutes. If the user switches projects during tra
 - [OpenAI Whisper API Documentation](https://platform.openai.com/docs/guides/speech-to-text)
 - [whisper.cpp Repository](https://github.com/ggerganov/whisper.cpp)
 - [fluent-ffmpeg Documentation](https://github.com/fluent-ffmpeg/node-fluent-ffmpeg)
-- [Erfana Import System](../../docs/architecture.md)
+- [Erfana Import System](../../../../docs/architecture.md)
 - [opentts Implementation](reference project with chunking patterns)

@@ -10,9 +10,10 @@
  *
  * This is the producer used by the standalone overlays the design lists —
  * `SettingsOverlay`, `ToastContext`, the shared `ContextMenu`, and the
- * image-viewer full-screen overlay (items 64, 66, 67). `BaseDialog` deliberately
- * does NOT use this hook: it pushes the count from its `isOpen` effect instead
- * (item 63, §1.8 NEW-10), because it needs the raw stack length, not a boolean.
+ * image-viewer full-screen overlay (items 64, 66, 67), and by `BaseDialog`
+ * (item 63, §1.8 NEW-10). `BaseDialog` additionally registers on the dialog
+ * stack from its `isOpen` effect, because it needs the raw stack length for
+ * z-index ordering, not a boolean.
  */
 
 import { useEffect } from 'react'

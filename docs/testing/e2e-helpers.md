@@ -160,26 +160,17 @@ await monaco.executeCommand(page, 'Format Document')
 
 ### Terminal helpers
 
-```typescript
-/**
- * Wait for terminal to be ready
- */
-export const waitForTerminal = async (window: Page) => {
-  await waitForTestId(window, TEST_IDS.TERMINAL_INSTANCE)
-  // Give terminal time to initialize PTY
-  await window.waitForTimeout(1000)
-}
+There is no `waitForTerminal()` / `sendTerminalInput()` pair. `e2e/utils/helpers.ts` exports a `terminal` object whose methods take the `page` and delegate to `TerminalPage` (`e2e/pages/terminal.page.ts`), so the two styles are interchangeable:
 
-/**
- * Send input to terminal
- */
-export const sendTerminalInput = async (window: Page, input: string) => {
-  const terminal = byTestId(window, TEST_IDS.TERMINAL_INSTANCE)
-  await terminal.click()
-  await window.keyboard.type(input)
-  await window.keyboard.press('Enter')
-}
+```typescript
+import { terminal } from '../utils/helpers'
+
+await terminal.open(page)                 // opens the panel, then waitForPrompt()
+await terminal.sendCommand(page, 'echo test')
+await terminal.waitForOutput(page, 'test')
 ```
+
+`terminal.*` methods (each takes `page` first): `getTerminal`, `open`, `close`, `focus`, `sendCommand(command, pressEnter = true)`, `waitForOutput(text, { timeout })`, `interrupt`, `clear`, `scrollToBottom`, `restart`, `toggleScrollLock`, `waitForReady`, `waitForPrompt({ timeout })`. `waitForPrompt()` is the readiness wait: it polls for the xterm textarea, then applies the one annotated `KNOWN_WAIT` (`PTY_INIT_DELAY_MS`) for shell start-up – see [e2e-troubleshooting.md § Terminal commands not executing](./e2e-troubleshooting.md#terminal-commands-not-executing).
 
 ### Settings helpers
 

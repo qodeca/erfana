@@ -18,7 +18,7 @@ Manages terminal emulator instances with xterm.js + node-pty. Cross-platform: ma
 
 **Constructor DI seam**: `new TerminalService(fsExists?)` — defaults to `fs.existsSync`; tests inject fakes to cover the shell fallback chain without module mocking.
 
-**EPIPE handling:** Uses `safeConsole` utility to prevent EPIPE crashes during cleanup. See [EPIPE Error Handling](./epipe-error-handling.md).
+**EPIPE handling:** `TerminalService` does not use `safeConsole` itself – it catches `EPIPE` (in `write()`) and `EPIPE`/`ESRCH` (in `killTerminal()` and `dispose()`) around the node-pty calls and records them through `logger` (`LoggingService`). `safeConsole` is installed globally once, by `installSafeConsole()` in `src/main/index.ts`, and covers console output app-wide. See [EPIPE Error Handling](./epipe-error-handling.md).
 
 ### Public Methods
 
@@ -36,7 +36,7 @@ Create a new PTY instance. Async because `node-pty` is dynamically imported on f
 **Parameters** (top-level):
 - `webContentsId?: number` — Owning webContents ID; used by `cleanupForWebContentsId(id)` to kill orphaned PTYs when the window closes
 
-**Returns:** `{ terminalId, shellKind }` — the generated terminal ID (`terminal-N`) plus the `ShellKind` resolved at create time, so the renderer can quote pasted paths for the right shell flavour without a follow-up IPC round-trip (#164). Returns `null` if `node-pty` is unavailable, the cwd failed Windows deny-list validation, or the shell could not be resolved.
+**Returns:** `{ terminalId, shellKind }` — the generated terminal ID (`terminal-N`) plus the `ShellKind` resolved at create time, so the renderer can quote pasted paths for the right shell flavour without a follow-up IPC round-trip (#164). Never returns `null`: if `node-pty` is unavailable, the cwd failed Windows deny-list validation, or the shell could not be resolved, the result is `{ error: string }` with the reason as plain text.
 
 **Side Effects:**
 - Spawns new PTY process (platform-resolved shell)
@@ -56,7 +56,7 @@ Resize PTY dimensions. Returns `false` if the terminal is not found.
 ---
 
 #### `killTerminal(terminalId: string): boolean`
-Synchronously kill PTY process and remove from internal map. Returns `false` if the terminal is not found. Emits `'exit'` with `{ terminalId, exitCode: 0 }` on success.
+Synchronously kill PTY process and remove from internal map. Returns `false` if the terminal is not found. Emits nothing itself on success – the PTY's own `onExit` callback (registered in `createTerminal`) emits `'exit'` with the real `{ terminalId, exitCode, signal }`. If `kill()` throws `EPIPE`/`ESRCH` (process already gone) the entry is dropped and `true` is returned; any other throw emits `'error'` and returns `false`.
 
 ---
 
@@ -100,7 +100,7 @@ Start watching file for changes. Watches are refcounted per `webContents`, so th
 
 **Side Effects:**
 - Creates chokidar watcher (300ms debounce)
-- Emits 'file-changed' events
+- Sends `file-watch:changed` with `{ filePath }` over IPC to the subscribing window (no EventEmitter event is emitted)
 
 ---
 
@@ -443,17 +443,17 @@ Clear the entire recent-projects list. Mutex-guarded.
 ```typescript
 import { terminalService } from './services/TerminalService'
 
-// Create terminal — returns { terminalId, shellKind }, or null on failure
+// Create terminal – returns { terminalId, shellKind }, or { error } on failure (never null)
 const created = await terminalService.createTerminal({
   cwd: '/path/to/project',
   cols: 80,
   rows: 24,
 }, webContentsId)
 
-if (created === null) {
+if ('error' in created) {
   // node-pty unavailable, cwd validation failed (Windows deny-list),
-  // or the shell could not be resolved.
-  // Inspect the most recent 'error' event for details.
+  // or the shell could not be resolved. `created.error` is the reason as
+  // plain text – the IPC handler passes it to the renderer verbatim.
   return
 }
 

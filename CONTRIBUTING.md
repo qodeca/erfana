@@ -18,8 +18,9 @@ By participating you agree to abide by our [Code of Conduct](CODE_OF_CONDUCT.md)
 ## Prerequisites
 
 - **Node.js 24+** (Electron 39 bundles Node 22.22.1; the build toolchain needs 24+). The major is pinned in
-  [`.nvmrc`](.nvmrc), so `nvm use` in the repo root selects it, and CI installs the same one — a local check and a
-  CI check are then running the same Node. Worth confirming with `node --version` before you trust a green local
+  [`.nvmrc`](.nvmrc), so `nvm use` in the repo root selects it, and CI pins the same major (hard-coded in
+  `.github/actions/setup-node-with-retry/action.yml`, not read from `.nvmrc`) – a local check and a CI check are
+  then running the same Node major. Worth confirming with `node --version` before you trust a green local
   run: a `node` earlier on your `PATH` than your version manager will silently win.
 - **Python 3.12 (known good) or 3.14.x** — **not 3.13** (`node-pty` fails to build on 3.13).
 - **Git**.
