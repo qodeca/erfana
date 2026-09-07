@@ -106,6 +106,14 @@ export function MarkdownEditorPanel(
   const [viewMode, setViewMode] = useState<ViewMode>('preview')
   const [selectedText, setSelectedText] = useState<string>('')
   const [activePaneId, setActivePaneId] = useState<'editor' | 'preview'>('editor')
+  /**
+   * Whether this panel is the tab the user is looking at.
+   *
+   * Dockview keeps every opened panel mounted, so background editors are live
+   * React trees with live `window` listeners. This flag is what stops them
+   * acting on keystrokes aimed at the foreground tab.
+   */
+  const [isActivePanel, setIsActivePanel] = useState<boolean>(() => props.api.isActive)
 
   // =========================================================================
   // Refs
@@ -342,12 +350,26 @@ export function MarkdownEditorPanel(
   // =========================================================================
   // Keyboard Shortcuts Hook
   // =========================================================================
+  // Keep the active flag in step with dockview. Re-read `isActive` on
+  // subscribe as well as on the event: a panel can become active between
+  // render and effect, and the event would never fire for that transition.
+  useEffect(() => {
+    setIsActivePanel(props.api.isActive)
+    const disposable = props.api.onDidActiveChange((event) => {
+      setIsActivePanel(event.isActive)
+    })
+    return () => disposable.dispose()
+  }, [props.api])
+
   useKeyboardShortcuts({
     onSave: () => handleSave(false),
     onClose: () => props.api.close(),
     isModified: currentFile?.modified ?? false,
     showConfirm,
-    fileName: currentFile?.path ? getBasename(currentFile.path) : null
+    fileName: currentFile?.path ? getBasename(currentFile.path) : null,
+    // Without this, one ⌘W closed every open tab and one ⌘S wrote every open
+    // buffer — each mounted panel handled the same keypress.
+    enabled: isActivePanel
   })
 
   // =========================================================================
