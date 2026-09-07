@@ -14,8 +14,8 @@
 | Audio/video transcription | TranscriptionService (OpenAI + local whisper) | **Implemented** |
 | Prompt templates with file context | 14 templates with `{{fileRef}}`, `{{selectedText}}` | **Implemented** |
 | Terminal integration for Claude Code | xterm.js PTY with Claude Code optimizations | **Implemented** |
-| 12 Claude Code agents | `.claude/agents/` (bug-investigator, code-reviewer, etc.) | **Implemented** |
-| MCP server infrastructure | `.mcp.json` with circuit-electron, time | **Implemented** |
+| 14 Claude Code agents | `.claude/agents/` (bug-investigator, code-reviewer, etc.) | **Implemented** |
+| MCP server infrastructure | `.mcp.json` with circuit-electron | **Implemented** |
 
 ### What the Graph Engine specs cover
 

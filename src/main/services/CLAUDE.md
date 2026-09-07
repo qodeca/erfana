@@ -14,6 +14,10 @@ Rules for `src/main/services/` that are not readable from a module's own header.
 - `imageExport/ImageExportService` reads the file fresh from disk on every run – the output follows the file, never the panel. `imageMetadata` + `declaredDimensions` are bounded, never-throwing parsers over untrusted bytes; the declared-dimension preflight refuses a decompression bomb before any byte reaches a decoder. The `exportPaths` self-overwrite guard is fail-closed. `pdfGeometry` runs before the PDF is written and shares its tolerance constant with the e2e assertion.
 - `ImageRasterizeWindow` (via `rasterizeSession`): own in-memory partition, deny-all `webRequest` allow-list installed before the window exists, per-run UUID token and sender-frame check, guaranteed destroy, and every wait time-boxed by `withTimeout` (`src/main/utils/withTimeout.ts`).
 
+**Whisper** (`WhisperModelManager`, `LocalWhisperService`)
+
+- The per-spawn TOCTOU re-hash in `WhisperModelManager` is a *spawn-time* check ([ADR 0004](../../../docs/adrs/0004-per-spawn-toctou-rehash.md)), not a ninth step of the 8-step binary install flow. Do not fold it into the install sequence.
+
 **Claude status** (`claudeStatus/`)
 
 - `modelId` is the single model-id parser and the single window-policy entry point.

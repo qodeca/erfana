@@ -441,7 +441,7 @@ Full-window crash recovery screen (issue #60). Action buttons are capability-gat
 
 ---
 
-## Toast notifications (6 testids)
+## Toast notifications (7 testids)
 
 | Testid | Element | Type |
 |--------|---------|------|
@@ -449,12 +449,13 @@ Full-window crash recovery screen (issue #60). Action buttons are capability-gat
 | `toast` | Individual toast | static |
 | `toast-message` | Toast message | static |
 | `toast-btn-dismiss` | Dismiss button | static |
+| `toast-btn-action` | Action button (present only on a toast carrying an action; such a toast never auto-dismisses) | static |
 | `toast-live-polite` | Persistent visually-hidden polite live region (info/success/warning) | static |
 | `toast-live-alert` | Persistent visually-hidden alert live region (errors) | static |
 
 ---
 
-## Settings overlay (20 testids)
+## Settings overlay (22 testids)
 
 | Testid | Element | Type |
 |--------|---------|------|
@@ -478,6 +479,8 @@ Full-window crash recovery screen (issue #60). Action buttons are capability-gat
 | `settings-btn-whisper-model` | Whisper model download/status | static |
 | `settings-whisper-model-status` | Whisper model status text | static |
 | `settings-whisper-download-error` | Whisper download error | static |
+| `settings-section-html-preview` | HTML preview settings section | static |
+| `settings-toggle-html-preview` | HTML preview enabled toggle | static |
 
 ---
 

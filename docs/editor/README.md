@@ -99,7 +99,7 @@ Real-time metrics in bottom status bar:
 ## Implementation Files
 
 ### Main Panel (`src/renderer/src/components/Panels/`)
-- `MarkdownEditorPanel.tsx` - Panel orchestration (593 lines)
+- `MarkdownEditorPanel.tsx` - Panel orchestration (615 lines)
 - `DocumentStatsBar.tsx` - Real-time word/character/line counts
 - `EditorContentLayout.tsx` - Editor/preview layout with resizable divider
 

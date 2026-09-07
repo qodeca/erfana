@@ -65,10 +65,18 @@ npm run lint:css        # stylelint over src/ CSS and the design/ cards
 npm run design -- --check   # fails if a generated file under design/ is stale
 npm run typecheck       # tsc (node + web projects)
 npm run test:ci         # vitest workspace (main / renderer / preload)
+npm run test:cov        # coverage floors - a REQUIRED check that test:ci does not run
 npx electron-vite build # production build
 npm run check:headers   # every source file must carry the SPDX header
+npm audit signatures    # advisory in CI, but it catches a lockfile written by the wrong npm
 pipx run --spec "reuse[charset-normalizer]" reuse lint   # REUSE compliance
 ```
+
+`npm run test:ci` runs without coverage, so the per-file floors in
+`vitest.main.ts` cannot fire locally - `npm run test:cov` is the only way to
+reproduce the `Coverage` job before pushing. It cannot pass on a Windows host
+(two floors miss because their symlink cases skip on win32); CI runs it on
+Linux.
 
 For changes touching Electron-specific paths, also run the end-to-end suite locally (CI does not currently run it):
 
