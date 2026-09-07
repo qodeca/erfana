@@ -77,6 +77,81 @@ export class ProjectTreePage {
     await btn.click()
   }
 
+  /** The toolbar "New file" button. */
+  newFileButton(): Locator {
+    return byTestId(this.page, TEST_IDS.PROJECT_TREE_BTN_NEW_FILE)
+  }
+
+  /** The toolbar "New folder" button. */
+  newFolderButton(): Locator {
+    return byTestId(this.page, TEST_IDS.PROJECT_TREE_BTN_NEW_FOLDER)
+  }
+
+  /** The toolbar "Refresh" button. */
+  refreshButton(): Locator {
+    return byTestId(this.page, TEST_IDS.PROJECT_TREE_BTN_REFRESH)
+  }
+
+  /** The toolbar "Close project" button. */
+  closeProjectButton(): Locator {
+    return byTestId(this.page, TEST_IDS.PROJECT_TREE_BTN_CLOSE)
+  }
+
+  /** The empty state shown when no project is open, or when a filter matches nothing. */
+  emptyState(): Locator {
+    return byTestId(this.page, TEST_IDS.PROJECT_TREE_EMPTY)
+  }
+
+  /** Wait until the tree lists a file at the given project-relative path. */
+  async waitForFile(relPath: string): Promise<void> {
+    await expect(this.fileRow(relPath)).toBeVisible({ timeout: 10_000 })
+  }
+
+  /** Wait until the tree no longer lists the given project-relative file. */
+  async waitForFileGone(relPath: string): Promise<void> {
+    await expect(this.fileRow(relPath)).toHaveCount(0, { timeout: 10_000 })
+  }
+
+  // ---------------------------------------------------------------------------
+  // Context menu
+  //
+  // The tree renders the shared `ContextMenu` primitive with no custom
+  // container testid, so it appears under `TEST_IDS.CONTEXT_MENU` in
+  // `#portal-root` — page-scoped, never scoped to the tree.
+  // ---------------------------------------------------------------------------
+
+  /** The open context menu, whichever row raised it. */
+  contextMenu(): Locator {
+    return byTestId(this.page, TEST_IDS.CONTEXT_MENU)
+  }
+
+  /** A context-menu entry addressed by its visible label. */
+  contextMenuItem(label: string): Locator {
+    return this.contextMenu().getByRole('menuitem').filter({ hasText: label })
+  }
+
+  /**
+   * Right-click a row and wait for its menu.
+   *
+   * `ContextMenu` ignores outside clicks for the first 50 ms so the opening
+   * click cannot immediately dismiss it; waiting for the menu to be visible
+   * before returning keeps callers clear of that window.
+   */
+  async openContextMenu(row: Locator): Promise<void> {
+    await expect(row).toBeVisible()
+    await row.click({ button: 'right' })
+    await expect(this.contextMenu()).toBeVisible({ timeout: 5000 })
+  }
+
+  /** Right-click a row and invoke one of its menu entries. */
+  async runContextMenuAction(row: Locator, label: string): Promise<void> {
+    await this.openContextMenu(row)
+    const item = this.contextMenuItem(label)
+    await expect(item).toBeVisible()
+    await item.click()
+    await expect(this.contextMenu()).toHaveCount(0, { timeout: 5000 })
+  }
+
   // ---------------------------------------------------------------------------
   // Git status decorations (badges on files, dots on folders)
   //
