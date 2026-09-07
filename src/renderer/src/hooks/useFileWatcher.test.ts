@@ -7,6 +7,7 @@
  * - isEchoEvent pure function (self-save echo detection)
  * - createFileSaveGuard helper
  * - useFileWatcher hook via renderHook (external change handling, ref-based guards)
+ * - reloadFromDisk argument hardening (it doubles as a DOM click handler)
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -271,6 +272,39 @@ describe('useFileWatcher', () => {
       mocks: defaults
     }
   }
+
+  describe('reloadFromDisk argument hardening', () => {
+    // `reloadFromDisk` is also handed to a button as its click handler, so
+    // React calls it with a synthetic mouse event. Adopting that event as the
+    // file's content crashed the editor panel on the next render. Only a
+    // string may be treated as prefetched content.
+    it('should read from disk when called with a non-string argument', async () => {
+      mockReadFile.mockResolvedValue('# From disk')
+      const onContentUpdate = vi.fn()
+      const { result } = renderFileWatcher({ onContentUpdate })
+
+      const clickEvent = { type: 'click', preventDefault: vi.fn() }
+      await act(async () => {
+        await (result.current.reloadFromDisk as (arg?: unknown) => Promise<void>)(clickEvent)
+      })
+
+      expect(mockReadFile).toHaveBeenCalledWith(TEST_PATH)
+      expect(onContentUpdate).toHaveBeenCalledWith('# From disk')
+      expect(onContentUpdate).not.toHaveBeenCalledWith(clickEvent)
+    })
+
+    it('should use a string argument as prefetched content without reading disk', async () => {
+      const onContentUpdate = vi.fn()
+      const { result } = renderFileWatcher({ onContentUpdate })
+
+      await act(async () => {
+        await (result.current.reloadFromDisk as (arg?: unknown) => Promise<void>)('# Prefetched')
+      })
+
+      expect(mockReadFile).not.toHaveBeenCalled()
+      expect(onContentUpdate).toHaveBeenCalledWith('# Prefetched')
+    })
+  })
 
   describe('notifySaveComplete', () => {
     it('should expose notifySaveComplete in return value', () => {
