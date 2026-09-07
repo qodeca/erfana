@@ -88,6 +88,18 @@ When a file has both external changes and unsaved local changes, an orange confl
 - **Keep My Version**: Ignore external changes, keep local edits
 - **Dismiss**: Acknowledge conflict, decide later
 
+**Wrap `reloadFromDisk`, never pass it as a bare `onClick` reference.** Its
+signature is `reloadFromDisk(prefetchedContent?: string)`, so React hands a
+click handler its synthetic mouse event as that first argument. Wiring
+`onClick={onReload}` therefore adopted the event as the file's new content and
+crashed the editor panel on the next render (`content.split is not a
+function`). Write `onClick={() => onReload()}`.
+
+TypeScript cannot catch a recurrence: a zero-argument signature is assignable
+to a one-argument DOM handler. `reloadFromDisk` now also ignores any argument
+that is not a string and re-reads from disk instead, but that guard is the
+second line of defence, not a licence to skip the wrapper.
+
 ---
 
 ## Single-file watch internals (#70)

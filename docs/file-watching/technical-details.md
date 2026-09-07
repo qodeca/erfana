@@ -101,6 +101,12 @@ ipcMain.handle('file-watch:start', async (event, filePath: string) => {
 
 ### MarkdownEditorPanel (File Watching)
 
+> Dockview keeps **every** opened editor panel mounted, so a background tab is a
+> live React tree with a live watcher and live `window` listeners. "Unmounted"
+> below means the tab was closed, not that the user switched away from it.
+> Anything window-scoped added to this panel needs an active-panel gate - see
+> [keyboard shortcuts](../keyboard-shortcuts.md).
+
 - Starts file watcher when file is opened
 - Stops watcher when panel is unmounted
 - Shows conflict bar when needed

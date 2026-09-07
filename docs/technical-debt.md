@@ -425,7 +425,7 @@ The policy as practised: *a file a change adds behaviour to must come in under 5
 | `src/renderer/src/components/Settings/SettingsOverlay.tsx` | 611 | Pre-existing |
 | `src/main/services/ExternalFileService.ts` | 596 | Pre-existing |
 | `src/main/services/FileService.ts` | 594 | Pre-existing |
-| `src/renderer/src/components/Panels/MarkdownEditorPanel.tsx` | 593 | Pre-existing; untouched by #70 except by the optional router commit |
+| `src/renderer/src/components/Panels/MarkdownEditorPanel.tsx` | 615 | Pre-existing; grew 24 lines in 2026-09 for the per-panel keyboard gate (dockview `onDidActiveChange` -> `useKeyboardShortcuts({ enabled })`) |
 | `src/renderer/src/components/Panels/markdownEditorPanel.logic.ts` | 587 | Pre-existing |
 | `src/main/services/LoggingService.ts` | 567 | Pre-existing |
 | `src/renderer/src/components/Dialog/CameraDialog.tsx` | 548 | Pre-existing |

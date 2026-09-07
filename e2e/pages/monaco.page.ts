@@ -102,6 +102,32 @@ export class MonacoPage {
     return this.getEditor().locator('.monaco-editor textarea')
   }
 
+  /**
+   * The rendered editor text, read straight from Monaco's own line elements.
+   *
+   * Prefer this over {@link getContent} whenever the assertion is about
+   * content that the APP changed (a reload from disk, a tab switch, a
+   * programmatic edit). `getContent` routes through select-all + copy, and
+   * this app deliberately remaps copy to the MAIN-process clipboard
+   * (`monacoClipboardCommands`, so the sandbox stays on) — which means the
+   * renderer's `navigator.clipboard.readText()` can hand back the PREVIOUS
+   * copy. A stale read makes an assertion pass against the old buffer, which
+   * is worse than failing.
+   *
+   * The trade-off is that Monaco virtualizes: only lines near the viewport are
+   * in the DOM. That is fine for asserting a phrase in a short fixture, and
+   * wrong for asserting a whole long document.
+   *
+   * @returns Visible line text, newline-joined
+   */
+  async visibleText(): Promise<string> {
+    // Monaco pads with non-breaking spaces; normalise them so a plain-text
+    // assertion matches. Written as an escape, not a literal — a raw NBSP in
+    // source trips the `no-irregular-whitespace` lint rule.
+    const text = await this.getEditor().locator('.view-lines').innerText()
+    return text.replace(/\u00a0/g, ' ')
+  }
+
   async waitForCursor(): Promise<void> {
     const cursor = this.getEditor().locator('.monaco-editor .cursor')
     await expect(cursor).toBeVisible({ timeout: 2000 })

@@ -79,7 +79,7 @@ npm run test:e2e:visual            # Visual regression tests (visual project) �
 npm run test:e2e:update-screenshots  # Update visual baselines
 ```
 
-**E2E test files** (all 30 specs in `e2e/`):
+**E2E test files** (all 37 specs in `e2e/`):
 - `html-preview-corpus.e2e.ts` - HTML-preview corpus acceptance (#74): the fixture corpus renders, the native view is sized on open, and the process-isolation floor holds
 - `html-preview-links.e2e.ts` - in-page links and independent previews (sd-074b): a new tab per target and reuse on a second click, `javascript:` refused, a link out of the project refused, `#anchor` scrolls; plus the external-link case, where an `https:` link asks first and the cancelled outcome is read back from the main log
 - `html-preview-perf.e2e.ts` - the save-to-visible-change gate (sd-074b AC24), asserting the P95 against its budget
@@ -89,6 +89,13 @@ npm run test:e2e:update-screenshots  # Update visual baselines
 - `image-export.matrix.e2e.ts` - the per-format export matrix (#73 AC1): all three actions across the eight supported formats, from the panel
 - `image-export.overlay-matrix.e2e.ts` - the same matrix run from the full-screen overlay, the second surface #73 AC1 requires
 - `app-launch.e2e.ts` – Application launch, activity bar, welcome panel visibility
+- `file-operations.e2e.ts` – Project tree file management (New File / New Folder / Rename / Delete / Copy + Paste), asserted against both the tree and the filesystem
+- `tab-lifecycle.e2e.ts` – Editor tabs: open, switch, dirty state, and the unsaved-changes gate on every close path (button, Cmd/Ctrl+W, Close Others, Close All)
+- `editor-save.e2e.ts` – Autosave and manual save reaching real disk, and the file-changed-on-disk conflict (Reload from Disk / Keep My Version)
+- `markdown-toolbar.e2e.ts` – The four view modes, the formatting commands against the real editor, and the document statistics footer
+- `search-bar.e2e.ts` – Find in document: opening, match counting, next/prev with wrap, case sensitivity, closing, and reset on file change
+- `settings-persistence.e2e.ts` – Settings overlay controls plus four settings asserted across a real restart (isolated `HOME`, because `~/.erfana/settings.json` is not covered by `--user-data-dir`)
+- `workspace-layout.e2e.ts` – Activity-bar toggles, the Cmd/Ctrl+B and Cmd/Ctrl+J shortcuts, the markdown-only filter, recent projects, and the empty states
 - `third-party-components.e2e.ts` – Monaco editor, xterm.js terminal, Mermaid diagrams
 - `directory-watcher.e2e.ts` – Directory watcher pipeline (#104): verifies file creation via terminal appears in Project Tree within latency budget
 - `context-menu-explain.e2e.ts` – Context menu Explain prompt flow: preview (selection gating, menu items, click-outside dismiss, Explain → terminal) and editor (disabled state, enabled after selection, Explain → terminal)

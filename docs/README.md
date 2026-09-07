@@ -111,7 +111,7 @@ Not to be confused with **[`design/`](../design/index.html)** at the repo root, 
 - [`http://` and IPv6 in the preview](./designs/108-http-and-ipv6-in-the-preview.md) - What Chromium does with `http://` and IPv6 hosts in the HTML preview (issue #108)
 
 ### Future Features (Planned)
-- [Graph Engine](./future/graph-engine.md) – SQLite + vec + FTS5 knowledge graph (not yet implemented)
+- [Graph Engine](./future/graph-engine.md) – SQLite + vec + FTS5 knowledge graph (not yet implemented). The full specification lives in [`future/graph-engine/`](./future/graph-engine/) – 30 files covering the data model, embeddings, hybrid search, MCP server, packaging and performance, plus a milestone-by-milestone [implementation guide](./future/graph-engine/implementation-guide/) and [wireframes](./future/graph-engine/wireframes/)
 - [Source Grounding](./future/source-grounding/README.md) – NotebookLM-style source grounding research for audit document generation
 
 ## Quick Start

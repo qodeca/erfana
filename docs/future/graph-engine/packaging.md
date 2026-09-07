@@ -318,6 +318,7 @@ npm run build:mac
 **Build:**
 
 ```bash
+# No Linux build exists today (see README.md); this is what one would run
 npm run build:linux
 ```
 

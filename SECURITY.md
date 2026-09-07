@@ -21,6 +21,7 @@ Please include: the affected component or file(s), the Erfana version (Help → 
 In scope:
 
 - The Electron **main process** services (`src/main/`) — file, terminal/PTY, project, settings, git-status, watcher, screenshot, camera, transcription, and import services.
+- The **HTML preview** (`PreviewViewService` and `src/main/ipc/preview/`) — it runs untrusted third-party HTML in a sealed `WebContentsView` and owns the per-host network allowlist. Threat model in [`docs/security.md`](docs/security.md#html-preview).
 - The **preload** context bridge (`src/preload/`) and the **IPC** layer (`src/shared/ipc/`, `src/main/ipc/`) — sender validation, schema validation, and channel exposure.
 - The **renderer** (`src/renderer/`) — CSP, sandboxing, and any HTML/markdown rendering surface.
 - The **local Whisper trust chain**: minisign dual-key manifest verification, artifact SHA-256 pinning, per-spawn TOCTOU re-hash, the `secureDownloader` hostname allowlist, and argv hardening (`validateAudioPath`).

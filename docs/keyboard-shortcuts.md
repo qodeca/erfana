@@ -54,7 +54,16 @@ When editor is focused. Full Monaco shortcuts: [Monaco Editor Docs](https://code
 
 **Clipboard is not Monaco's clipboard.** `MonacoMarkdownEditor.tsx` calls `registerClipboardActions` from `src/renderer/src/utils/monacoClipboardCommands.ts`, which re-registers `Cmd/Ctrl+C`, `Cmd/Ctrl+X` and `Cmd/Ctrl+V` as Monaco actions backed by the central `textClipboard` service (IPC to Electron's main-process clipboard), so they work under the sandbox where `navigator.clipboard` would throw `NotAllowedError`.
 
-`Cmd/Ctrl+S` and `Cmd/Ctrl+W` come from `useKeyboardShortcuts.ts`, mounted by `MarkdownEditorPanel`. The `Cmd+W` entry under [Window Management](#window-management) is the OS window-close role – a different binding on a different surface.
+`Cmd/Ctrl+S` and `Cmd/Ctrl+W` come from `useKeyboardShortcuts.ts`, mounted by `MarkdownEditorPanel`.
+
+**Only the foreground tab acts.** The hook registers its listener on `window`,
+and dockview keeps every opened panel mounted - so with N tabs open, one
+keypress reaches N copies of the hook. Until this was fixed, a single
+`Cmd/Ctrl+W` closed *every* tab and a single `Cmd/Ctrl+S` wrote *every* open
+buffer to disk, including files the user had not chosen to save. The hook
+therefore takes an `enabled` flag, and `MarkdownEditorPanel` wires it to the
+panel's dockview active state (`props.api.isActive`, kept in step via
+`onDidActiveChange`). Any future panel-level shortcut needs the same gate. The `Cmd+W` entry under [Window Management](#window-management) is the OS window-close role – a different binding on a different surface.
 
 ## Markdown Formatting Toolbar
 

@@ -156,7 +156,7 @@ await monaco.executeCommand(page, 'Format Document')
 | `getTextArea(page)` | Returns Monaco's internal textarea locator |
 | `waitForCursor(page)` | Waits for cursor to be visible (focus verification) |
 | `setContent(page, content)` | Clears editor and types new content |
-| `getContent(page)` | Copies all content and reads from clipboard |
+| `getContent(page)` | Copies all content and reads from clipboard. Can return a STALE value - the app remaps copy to the main-process clipboard, so the renderer clipboard may hold the previous copy. When asserting content the app changed, use `MonacoPage.visibleText()` instead; it is on the POM class only, not on this adapter |
 
 ### Terminal helpers
 
@@ -204,6 +204,22 @@ const dialog = window.locator('[data-testid="dialog-overlay"]')
 const contextMenu = window.locator('[data-testid="context-menu"]')
 const toast = window.locator('[data-testid="toast-container"]')
 ```
+
+**Toasts need `e2e/utils/toast.ts`, not a bare `toast` testid.**
+`ToastNotification` suffixes each toast's testid with its type
+(`toast-success`, `toast-error`, `toast-info`, `toast-warning`), so
+`[data-testid="toast"]` matches nothing at all. The container id above is real;
+the individual toasts are not addressable without the suffix. Use the helpers:
+
+```typescript
+import { anyToast, toastOfType, toastWithText } from '../utils/toast'
+
+await expect(toastWithText(window, 'already exists')).toBeVisible()
+await expect(toastOfType(window, 'error')).toHaveCount(1)
+```
+
+`e2e/utils/image-export-helpers.ts` carries an older, narrower `ANY_TOAST`
+covering success and error only; new specs should use `utils/toast.ts`.
 
 **Why portals matter**:
 

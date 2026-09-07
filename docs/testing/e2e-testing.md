@@ -109,9 +109,13 @@ Located in `e2e/pages/`:
 |-------|---------|
 | `KeyboardHelper` | Platform-aware keyboard shortcuts (Cmd/Ctrl abstraction) |
 | `TerminalPage` | Terminal interactions – `waitForPrompt()`, `sendCommand()`, `waitForOutput()` |
-| `MonacoPage` | Editor interactions – `waitForReady()`, `focus()`, `setContent()`, `getContent()` |
+| `MonacoPage` | Editor interactions – `waitForReady()`, `focus()`, `setContent()`, `getContent()`, `visibleText()` |
 | `MermaidPage` | Mermaid diagram interactions |
-| `ProjectTreePage` | Project tree navigation and file operations |
+| `ProjectTreePage` | Project tree navigation, git decorations, toolbar buttons, and the row context menu – `fileRow()` / `folderRow()`, `waitForFile()` / `waitForFileGone()`, `newFileButton()` / `newFolderButton()` / `refreshButton()` / `closeProjectButton()`, `emptyState()`, `openContextMenu()` / `contextMenuItem()` / `runContextMenuAction()` |
+| `DialogPage` | The modal surfaces – `ConfirmDialog` (`waitForConfirm()`, `accept()`, `decline()`) and the shared name-entry dialog behind New File / New Folder / Rename (`waitForNameEntry()`, `nameInput()`, `submitName()`, `validationError()`). The confirm dialog has testids; `FileSystemDialog` has none, so its controls are addressed by role and visible label |
+| `TabBarPage` | Editor tab bar – `tab(fileName)`, `activeTab()`, `dirtyDot()`, `closeButton()`, `welcomeTab()`, `waitForTab()` / `waitForTabGone()`, `expectActive()`, `activate()`, `runContextMenuAction()` (Close / Close Others / Close All). Tabs are addressed by the filename they display, not by their path-hashed testid |
+| `EditorPanelPage` | Markdown editor panel – the four view modes (`setViewMode()`, `isViewModeActive()`), the formatting buttons (`format()`), the status indicators (`modifiedIndicator()`, `autosaveIndicator()`, `reloadIndicator()`), the stats bar, and the file-conflict notification |
+| `SearchBarPage` | Find bar – `waitForOpen()` / `waitForClosed()`, `search()`, `matchCount()` / `waitForTotal()` / `waitForOrdinal()`, the case and whole-word toggles, next/prev/close |
 | `ImageViewerPage` | Image viewer tab (#70, extended for #73) – `openFromTree()`, `waitForReady()`, `marker()` / `waitForMarker()`, `zoomIn()`, `transformStyle()`, `expectStatusState()`, `expectBanner()` / `expectNoBanner()`, `clickReload()`, `enterFullScreen()` / `exitFullScreen()`. Export (#73): three panel-scoped locators `exportPngButton()` / `exportPdfButton()` / `copyButton()`, their overlay-scoped twins `fullScreenExportPngButton()` / `fullScreenExportPdfButton()` / `fullScreenCopyButton()`, the `exportStatus()` polite live region (the assertive `image-viewer-export-alert` region has no POM locator — query it directly), plus `clickExport()`, `expectExportBusy()` and `expectExportAnnouncement()` |
 | `ImageViewerNarrowPage` | Extends the above for the narrow-width toolbar contract (#73) – `toolbar()`, `controls()`, `constrainPanelWidth()`, `toolbarScrollMetrics()`, `panelScrollLeft()`, `focusedTestId()`, `expectWithinPanel()`. A separate file only because the base POM is near the 500-line cap |
 | `HtmlPreviewPage` | HTML preview (#111) – takes `(page, app)` because the previewed page runs in a sealed `WebContentsView` and is read main-side: `open()` (path-exact, waits for the `erfana-preview://` web contents), `snapshot()` / `eval()` / `livePreviews()` / `waitForTitled()` (address one of several with `HtmlPreviewPage.target(relPath)`), `clickInPreview()` (untrusted, `will-navigate` path) vs `clickTrusted()` (real input event – the only way to a gesture-gated path such as an external link), `viewBounds()`; DOM chrome: `placeholder()` / `panel()` / `stillFrame()` / `tab()` scoped by basename, the failure badge, and the permission band (`chip()`, `openBand()`, `hostRow()`, `allowButton(origin)`, `confirmDialog()` / `confirmButton()` / `cancelButton()`, `allowedSection()`). Not a composed fixture – construct it in the test. Companions: `e2e/fixtures/localServer.ts` (ephemeral loopback server + `localServer` fixture) and `e2e/fixtures/logTail.ts` (condition-based read of what `~/.erfana/logs/main.log` gains after a mark) |
@@ -158,7 +162,7 @@ Additional fixtures for tests that need a project directory, settings, or an ope
 | `testProject` | Test | Creates an isolated temp directory with configurable seed files; auto-cleanup on teardown |
 | `withSettings` | Test | Writes `.erfana/settings.json` into the project (no teardown – testProject owns cleanup) |
 | `withOpenFile` | Test | Opens a file in the editor, waits for Monaco readiness, provides a `MonacoPage` |
-| `appWithTestProject` | Test | Launches Electron with the `testProject` path as argument |
+| `appWithTestProject` | Test | Launches Electron with **no** project argument, then opens `testProject` over IPC (`window.api.file.openProjectByPath`). The main process does not parse a project path from argv, so the older argv form silently fell back to electron-store's last-opened project |
 | `windowWithTestProject` | Test | First window page from `appWithTestProject` |
 | `localServer` | Test | Ephemeral loopback HTTP server (`http://127.0.0.1:<port>`) serving a probe script and recording every request; closed on teardown. Composed in `e2e/fixtures/localServer.ts`, not in `fixtures/index.ts` — import `test` from there to use it |
 
@@ -255,6 +259,55 @@ await waitForTestIdHidden(page, 'dialog-overlay')
 ```
 
 ---
+
+### Test-data isolation: what `--user-data-dir` does NOT cover
+
+Every fixture launches Electron with its own `--user-data-dir`, which isolates
+electron-store data (recent projects, project filter mode) and the renderer's
+`localStorage` (sidebar widths, active panel, divider positions).
+
+It does **not** isolate `~/.erfana/`. `GlobalSettingsService` derives its path
+from `os.homedir()`, so `~/.erfana/settings.json` — log level, editor line
+breaks, git-status polling, transcription backend, HTML-preview enabled — is a
+single machine-wide file shared by the app, every worker, and the developer's
+own install. A test that CHANGES a global setting will rewrite that file and
+race the other worker.
+
+If your spec changes a global setting, give each launch its own home:
+
+```typescript
+const app = await electron.launch({
+  args: [APP_ROOT, `--user-data-dir=${userDataDir}`],
+  env: {
+    ...process.env,
+    NODE_ENV: 'development',
+    // os.homedir() reads HOME on POSIX and USERPROFILE on Windows
+    HOME: fakeHome,
+    USERPROFILE: fakeHome
+  }
+})
+```
+
+`settings-persistence.e2e.ts` does exactly this. The shared fixtures deliberately
+do **not**, because `e2e/fixtures/logTail.ts` reads `~/.erfana/logs/main.log`
+from the real home — a global HOME redirect would break every spec that tails
+the log. Reading a global setting is fine through the normal fixtures; writing
+one is not.
+
+### Reading editor content: `getContent()` vs `visibleText()`
+
+`MonacoPage.getContent()` selects all, copies, and reads
+`navigator.clipboard.readText()`. This app remaps copy to the **main-process**
+clipboard (`monacoClipboardCommands`, so the sandbox stays on), so the
+renderer-side clipboard can return the PREVIOUS copy. When the assertion is
+about content the APP changed — a reload from disk, a tab switch, a
+programmatic edit — a stale read makes the test pass against the old buffer.
+
+Use `MonacoPage.visibleText()` for those: it reads Monaco's own `.view-lines`
+DOM. The trade-off is virtualization — only lines near the viewport are in the
+DOM, so it fits a phrase in a short fixture, not a whole long document. Pair it
+with `expect.poll`, since `waitForReady()` only proves the editor is attached
+and Monaco paints its lines a frame or two later.
 
 ## Test structure
 
@@ -397,9 +450,17 @@ Three `ERFANA_E2E_*` variables change app behaviour for tests. They are read by 
 
 ### Test files
 
-All 30 specs in `e2e/`:
+All 37 specs in `e2e/`:
 
 - `app-launch.e2e.ts` – Application launch, activity bar, welcome panel visibility
+- `file-operations.e2e.ts` – Project tree file management: New File / New Folder from the toolbar, Rename and Delete from the row context menu, Copy + Paste, and the cancel path of each. Every assertion is made twice — against the tree AND against the filesystem — because a tree that disagrees with disk is the failure this file exists to catch. Two named behaviours are pinned rather than assumed: `createFile` appends `.md` when the typed name has no markdown extension, and it refuses to overwrite an existing file (the test asserts the existing bytes survive)
+- `tab-lifecycle.e2e.ts` – Editor tabs: open / reuse / switch, the per-panel dirty dot, and the unsaved-changes gate in front of **every** close path (close button, ⌘W, Close Others, Close All). Each "closed a dirty tab" case asserts on disk as well as on screen. Carries the regression guard for the multi-panel keyboard bug — dockview keeps every opened panel mounted, so one ⌘W used to be handled once per open tab and closed them all
+- `editor-save.e2e.ts` – Autosave reaching real disk, manual save (⌘S) writing only the ACTIVE file, and the file-changed-on-disk conflict: banner, "Reload from Disk", "Keep My Version", and the absence of a conflict for the app's own save. The reload case also asserts `RootErrorBoundary` is absent — that button used to crash the renderer
+- `markdown-toolbar.e2e.ts` – The four view modes (a file opens in **preview**, so Monaco is not mounted until the view is switched), a document surviving a full round trip of modes, the wrap/heading/list formatting commands against the real editor, and the document statistics footer including selection stats
+- `search-bar.e2e.ts` – Find in document: opening via ⌘F (capture phase, so Monaco's own widget never wins) and via the toolbar, match counting, next/prev with wrap-around, the case-sensitivity toggle changing the total, closing, and the query resetting when a different file is opened. Covers both the Monaco and the rendered-preview providers
+- `settings-persistence.e2e.ts` – Settings overlay sections and control dependencies, plus four settings asserted across a genuine restart (the app is launched twice against one user-data dir). Owns its launches, and gives each one an isolated `HOME` — see the isolation note below
+- `workspace-layout.e2e.ts` – The workspace shell: activity-bar toggles, ⌘B / ⌘J panel shortcuts (and ⌘J being inert with no project), the markdown-only tree filter, the recent-projects list and its remove button, and four empty states
+
 - `third-party-components.e2e.ts` – Monaco editor, xterm.js terminal, Mermaid diagrams
 - `directory-watcher.e2e.ts` – Directory watcher pipeline verification
 - `audio-transcription.e2e.ts` – Full audio import transcription lifecycle (real OpenAI API; `transcription` project, gated by `ERFANA_E2E_TRANSCRIPTION=1` + `OPENAI_API_KEY`)

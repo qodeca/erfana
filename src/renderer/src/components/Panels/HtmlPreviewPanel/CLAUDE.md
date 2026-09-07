@@ -46,7 +46,7 @@ The `ResizeObserver` is not a dependable second chance either: dockview re-paren
 
 The hook owns EVERY push, including the become-visible one — do not add a `pushBounds()` effect back into the panel. Regression cover: `hooks/usePreviewBounds.test.ts`, plus an e2e test that asserts the real `WebContentsView` has a non-zero rect after an open with no user interaction (`e2e/html-preview-corpus.e2e.ts`). Every other preview test reads the preview's web contents, which loads and runs its scripts perfectly at 0x0 — only the rectangle assertion sees this class of bug.
 
-Every `html-preview-*` e2e spec drives the preview through `HtmlPreviewPage` (`e2e/pages/html-preview.page.ts`) — the corpus spec, the approval spec (`e2e/html-preview-approval.e2e.ts`), the eviction spec (`e2e/html-preview-eviction.e2e.ts`), links and perf. Do NOT re-roll `open()` / `eval()` as a private copy in a new spec. A placeholder is looked up through the panel that owns it (`aria-label="HTML preview of <basename>"`), so an assertion names one preview whether one or four are open.
+Every `html-preview-*` e2e spec drives the preview through `HtmlPreviewPage` (`e2e/pages/html-preview.page.ts`; method surface in [docs/testing/e2e-testing.md](../../../../../../docs/testing/e2e-testing.md)). Do NOT re-roll `open()` / `eval()` as a private copy in a new spec. A placeholder is looked up through the panel that owns it (`aria-label="HTML preview of <basename>"`), so an assertion names one preview whether one or four are open.
 
 ## Other gotchas
 
