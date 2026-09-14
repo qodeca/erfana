@@ -421,7 +421,7 @@ All IPC handlers validate inputs using **Zod schemas** (`src/shared/ipc/*-schema
 
 ### electron-builder Version
 
-**Current**: 26.8.1 (`package.json` devDependency), with workaround for dependency scanning bug
+**Current**: 26.15.3 (`package.json` devDependency), with workaround for dependency scanning bug
 
 **Known Issue**: electron-builder 26.0.0 has a [known bug](https://github.com/electron-userland/electron-builder/issues/8068) with npm's dependency flattening that causes builds to fail with:
 

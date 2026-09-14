@@ -12,7 +12,7 @@ This document explains the electron-builder version choice, the `aproba` build-t
 
 ```json
 // package.json → devDependencies
-"electron-builder": "26.8.1"
+"electron-builder": "26.15.3"
 ```
 
 The version is pinned **exactly** — no caret. electron-builder minors have repeatedly changed schema shape (the `win.signtoolOptions` nesting below is one example), and a release build is not the place to discover that. Bumps are deliberate.
