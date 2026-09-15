@@ -57,7 +57,10 @@ export function removeProjects(): void {
  * through an alias is.
  */
 function makeProject(symlinked: boolean): { realRoot: string; projectPath: string } {
-  const dir = realpathSync(mkdtempSync(join(tmpdir(), 'erfana-nav-')))
+  // `.native` is load-bearing: it expands a Windows 8.3 short tmpdir name
+  // (`C:\Users\MARCIN~1\...`) so this root matches what the resolver's
+  // `fsPromises.realpath` returns. Full explanation in PreviewProtocolHandler.test.ts.
+  const dir = realpathSync.native(mkdtempSync(join(tmpdir(), 'erfana-nav-')))
   projects.push(dir)
   const realRoot = join(dir, 'real')
   mkdirSync(realRoot)
