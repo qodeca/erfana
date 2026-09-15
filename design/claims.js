@@ -108,6 +108,31 @@ window.ERFANA_CLAIMS = {
     "value": 6.63,
     "label": "--color-warning on --color-bg-tertiary",
     "card": "system/components/permission-band/index.html"
+  },
+  "contrast-band-icon": {
+    "value": 11.51,
+    "label": "--color-text-primary on --color-bg-primary",
+    "card": "system/components/permission-band/index.html"
+  },
+  "contrast-pressed-edge": {
+    "value": 13.94,
+    "label": "--color-brand-lime on --color-bg-primary",
+    "card": "system/components/permission-band/index.html"
+  },
+  "contrast-focus-ring-on-band": {
+    "value": 8.4,
+    "label": "--color-border-focus on --color-bg-primary, the ring a disabled or busy control keeps",
+    "card": "system/components/permission-band/index.html"
+  },
+  "contrast-focus-ring-on-confirm": {
+    "value": 6.96,
+    "label": "--color-border-focus on --color-bg-tertiary, where Confirm's outward ring lands",
+    "card": "system/components/permission-band/index.html"
+  },
+  "contrast-focus-ring-on-confirm-fill": {
+    "value": 1,
+    "label": "--color-border-focus on --color-accent-primary, the ring Confirm used to draw inside its own fill",
+    "card": "system/components/permission-band/index.html"
   }
 };
 

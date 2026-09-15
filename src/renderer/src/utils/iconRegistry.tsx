@@ -26,10 +26,12 @@ import {
   MessageCircle,
   FileText,
   AlertCircle,
+  AlertTriangle,
   ArrowRight,
   ArrowDown,
   ArrowUp,
   ArrowLeft,
+  MousePointerClick,
   LucideProps
 } from 'lucide-react'
 
@@ -63,10 +65,12 @@ export type IconName =
   | 'message-circle'
   | 'file-text'
   | 'alert-circle'
+  | 'alert-triangle'
   | 'arrow-right'
   | 'arrow-down'
   | 'arrow-up'
   | 'arrow-left'
+  | 'mouse-pointer-click'
 
 /**
  * Icon registry mapping names to Lucide components
@@ -82,10 +86,12 @@ const ICON_REGISTRY: Record<IconName, ComponentType<LucideProps>> = {
   'message-circle': MessageCircle,
   'file-text': FileText,
   'alert-circle': AlertCircle,
+  'alert-triangle': AlertTriangle,
   'arrow-right': ArrowRight,
   'arrow-down': ArrowDown,
   'arrow-up': ArrowUp,
-  'arrow-left': ArrowLeft
+  'arrow-left': ArrowLeft,
+  'mouse-pointer-click': MousePointerClick
 }
 
 /**

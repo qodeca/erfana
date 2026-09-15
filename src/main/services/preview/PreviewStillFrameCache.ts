@@ -25,25 +25,47 @@
  * about to destroy the page anyway.
  *
  * Budget enforcement, in order:
- *   - a capture of this panel that THIS cache started is still in flight ⇒ skip.
- *     Not Electron's `isBeingCaptured()`: that is Chromium's capturer count,
- *     which other things raise — on Windows it read true from a fresh preview's
- *     first frame, so no frame was ever taken (2026-09-03).
+ *   - a capture of this panel that THIS cache started is still in flight, and no
+ *     `invalidate` has overtaken it ⇒ skip. Not Electron's `isBeingCaptured()`:
+ *     that is Chromium's capturer count, which other things raise — on Windows
+ *     it read true from a fresh preview's first frame, so no frame was ever
+ *     taken (2026-09-03).
  *   - either edge under `MIN_STILL_FRAME_PX` ⇒ skip (the 1×1 seed rect)
  *   - the caller's `shouldKeep` says its subject left mid-capture ⇒ keep the
  *     frame this panel already had. An EMPTY slot is exempt: a picture taken as
  *     the tab went away beats the no picture at all that the veto would leave.
+ *   - an `invalidate` overtook the capture ⇒ NO frame: it shows a page, or a
+ *     version of it, that is gone – a same-tab move's old page (RS2-8).
  *   - `capturePage` past `CAPTURE_TIMEOUT_MS` ⇒ NO frame, previous kept
  *   - `capturePage` throws      ⇒ NO frame (swallowed, never rethrown)
  *   - downscale to `MAX_FRAME_EDGE_PX` longest edge via `NativeImage.resize`
  *   - `toDataURL` over `MAX_FRAME_DATAURL_CHARS` ⇒ NO frame
  *
+ * Two facts ride with a stored frame (issue #124, part 1 §1.5): the view's CSS
+ * size at capture (`cssWidth`, `cssHeight`), which the renderer draws the still
+ * at, and `stale` once real input reached the page after the capture
+ * (`markStale`; omitted while false). Input that arrives while a capture runs
+ * may be missing from it, so that frame is stored stale.
+ *
  * @see specs/designs/sd-074-html-preview.md §1.4
  */
 import { PREVIEW } from '../../../shared/constants'
+import { stablePathDigest } from '../../../shared/stablePathDigest'
 import { logger } from '../LoggingService'
 import { withTimeout } from '../../utils/withTimeout'
 import type { PreviewBounds, PreviewStillFrame } from '../../../shared/ipc/preview-types'
+
+/**
+ * An error as a log line carries it: its name, plus `code` when it has one.
+ * Never the message, which can quote a path or a preview URL (QG-7 S3).
+ */
+function errorFieldsOf(error: unknown): { error: string; code?: string } {
+  if (!(error instanceof Error)) {
+    return { error: typeof error }
+  }
+  const { code } = error as NodeJS.ErrnoException
+  return typeof code === 'string' ? { error: error.name, code } : { error: error.name }
+}
 
 /**
  * The `NativeImage` surface this cache uses. Structural so tests inject a fake
@@ -82,8 +104,8 @@ export interface IPreviewStillFrameCache {
    *
    * TAKES A SIZE, NOT A RECT, AND THAT IS THE WHOLE POINT. `capturePage`'s rect
    * is **page-relative** — `(0,0)` is the page's own top-left — while the only
-   * rect a caller has to hand is `PreviewLiveView.lastBounds`, which is
-   * **window-relative** DIPs for `View.setBounds`. Passing that through asked
+   * rect a caller has to hand is `lastRect()` from `previewLiveBounds.ts`, which
+   * is **window-relative** DIPs for `View.setBounds`. Passing that through asked
    * for a box starting hundreds of pixels INTO the page; Chromium clipped it at
    * the page edge and returned a narrow off-centre sliver, which
    * `.html-preview-still-frame`'s `object-fit: cover` then blew up to fill the
@@ -96,23 +118,53 @@ export interface IPreviewStillFrameCache {
    * captured as the page went away. On an EMPTY slot it is not consulted: there
    * is nothing to protect, and honouring it there parks the tab on a bare
    * backdrop for good.
+   *
+   * `cssSize` is the view's size in CSS px at the start of the capture; the
+   * stored frame carries it as `cssWidth` × `cssHeight` (issue #124).
    */
   captureIfStale(
     wc: PreviewCaptureContents,
     panelId: string,
     size: { width: number; height: number },
-    opts?: { shouldKeep?: () => boolean }
+    opts?: PreviewCaptureOptions
   ): Promise<void>
   /** The cached frame for `panelId`, or `undefined` (⇒ placeholder colour). */
   get(panelId: string): PreviewStillFrame | undefined
-  /** Drop `panelId`'s frame (called on file change / panel close). */
+  /**
+   * Drop `panelId`'s frame, and the result of any capture of it still running
+   * (called on file change, a new page, panel close).
+   */
   invalidate(panelId: string): void
+  /**
+   * Real input reached `panelId`'s page (issue #124, RU3): its cached frame no
+   * longer shows what the page does, and a capture running now may miss it.
+   *
+   * Optional HERE only so test doubles typed against this interface stay
+   * valid; {@link PreviewStillFrameCache} always has it.
+   */
+  markStale?(panelId: string): void
+}
+
+/** Options of {@link IPreviewStillFrameCache.captureIfStale}. */
+export interface PreviewCaptureOptions {
+  /** The caller's "was my subject on screen the whole time" (see `captureIfStale`). */
+  shouldKeep?: () => boolean
+  /** The view's CSS size when the capture started; stored as `cssWidth` / `cssHeight`. */
+  cssSize?: { width: number; height: number }
+}
+
+/** One capture this cache started and has not yet settled. */
+interface PreviewCaptureRun {
+  /** An `invalidate` ran meanwhile: the picture shows what was declared gone. */
+  superseded: boolean
+  /** Real input reached the page meanwhile: the picture may miss it. */
+  inputDuring: boolean
 }
 
 export class PreviewStillFrameCache implements IPreviewStillFrameCache {
   private readonly frames = new Map<string, PreviewStillFrame>()
-  /** Panels whose capture THIS cache started and has not yet settled. */
-  private readonly inFlight = new Set<string>()
+  /** Each panel's capture THIS cache started, not yet settled and not overtaken. */
+  private readonly inFlight = new Map<string, PreviewCaptureRun>()
   private readonly now: () => number
   private readonly maxEdgePx: number
   private readonly maxDataUrlChars: number
@@ -127,7 +179,7 @@ export class PreviewStillFrameCache implements IPreviewStillFrameCache {
     wc: PreviewCaptureContents,
     panelId: string,
     size: { width: number; height: number },
-    opts: { shouldKeep?: () => boolean } = {}
+    opts: PreviewCaptureOptions = {}
   ): Promise<void> {
     // A capture of this panel is already in flight — skip rather than stack.
     // Our own ledger, not `wc.isBeingCaptured()`: see the header.
@@ -144,7 +196,8 @@ export class PreviewStillFrameCache implements IPreviewStillFrameCache {
     }
 
     let image: PreviewNativeImage
-    this.inFlight.add(panelId)
+    const run: PreviewCaptureRun = { superseded: false, inputDuring: false }
+    this.inFlight.set(panelId, run)
     try {
       image = await this.captureOnce(wc, size)
       // An EMPTY image is Chromium saying the surface has not produced a frame
@@ -163,7 +216,7 @@ export class PreviewStillFrameCache implements IPreviewStillFrameCache {
         // and parked as a flat colour block for the rest of the session.
         // `captureOnce` passes `stayHidden: true`, which reads a hidden-but-live
         // page (verified on macOS 2026-09-04), so the retry is worth running.
-        if (this.frames.has(panelId) && !this.keep(opts)) {
+        if (run.superseded || (this.frames.has(panelId) && !this.keep(opts))) {
           return
         }
         image = await this.captureOnce(wc, size)
@@ -172,16 +225,30 @@ export class PreviewStillFrameCache implements IPreviewStillFrameCache {
       // Capture failed or timed out ⇒ NO frame. The panel keeps what it had.
       // Said out loud: a tab that wakes without a picture is otherwise silent.
       logger.warn('Preview still frame: capture failed', {
-        panelId,
-        error: error instanceof Error ? error.message : String(error)
+        panelId: stablePathDigest(panelId),
+        ...errorFieldsOf(error)
       })
       return
     } finally {
-      this.inFlight.delete(panelId)
+      // An overtaken run has already handed the panel to its next capture.
+      if (this.inFlight.get(panelId) === run) {
+        this.inFlight.delete(panelId)
+      }
+    }
+
+    // A page that is gone must never fill the slot its going emptied: a move's
+    // commit invalidates while page A may still be being captured (RS2-8).
+    if (run.superseded) {
+      logger.debug('Preview still frame: dropped a capture an invalidate overtook', {
+        panelId: stablePathDigest(panelId)
+      })
+      return
     }
 
     if (image.isEmpty()) {
-      logger.debug('Preview still frame: empty capture, no frame stored', { panelId })
+      logger.debug('Preview still frame: empty capture, no frame stored', {
+        panelId: stablePathDigest(panelId)
+      })
       return
     }
 
@@ -216,13 +283,36 @@ export class PreviewStillFrameCache implements IPreviewStillFrameCache {
      */
     if (this.frames.has(panelId) && !this.keep(opts)) {
       logger.debug('Preview still frame: kept the existing frame, view went away mid-capture', {
-        panelId
+        panelId: stablePathDigest(panelId)
       })
       return
     }
 
     const { width, height } = downscaled.getSize()
-    this.frames.set(panelId, { dataUrl, width, height, capturedAt: this.now() })
+    // The #124 fields are added only when there is something to say, so a frame
+    // without them is exactly the frame it always was.
+    this.frames.set(panelId, {
+      dataUrl,
+      width,
+      height,
+      capturedAt: this.now(),
+      ...(opts.cssSize !== undefined
+        ? { cssWidth: opts.cssSize.width, cssHeight: opts.cssSize.height }
+        : {}),
+      // Input the page got while this capture ran may be missing from it.
+      ...(run.inputDuring ? { stale: true } : {})
+    })
+  }
+
+  markStale(panelId: string): void {
+    const frame = this.frames.get(panelId)
+    if (frame !== undefined && frame.stale !== true) {
+      this.frames.set(panelId, { ...frame, stale: true })
+    }
+    const run = this.inFlight.get(panelId)
+    if (run !== undefined) {
+      run.inputDuring = true
+    }
   }
 
   get(panelId: string): PreviewStillFrame | undefined {
@@ -230,12 +320,19 @@ export class PreviewStillFrameCache implements IPreviewStillFrameCache {
   }
 
   /** The caller's verdict, defaulting to "keep" when it did not supply one. */
-  private keep(opts: { shouldKeep?: () => boolean }): boolean {
+  private keep(opts: PreviewCaptureOptions): boolean {
     return opts.shouldKeep === undefined || opts.shouldKeep()
   }
 
   invalidate(panelId: string): void {
     this.frames.delete(panelId)
+    // A capture still running shows what was just declared gone: it stores
+    // nothing, and the next capture need not wait for it.
+    const run = this.inFlight.get(panelId)
+    if (run !== undefined) {
+      run.superseded = true
+      this.inFlight.delete(panelId)
+    }
   }
 
   /**

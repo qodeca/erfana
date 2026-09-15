@@ -21,6 +21,14 @@
  * Without that key a tree that crashed on project A still reads "unavailable"
  * after the user opens project B, and only Reload would clear it.
  *
+ * A caller whose content must NOT remount when its scope changes keys by its
+ * identity and passes the scope as `resetKey` instead. An HTML preview tab is
+ * the case (issue #124): moving the tab to another page keeps its native view
+ * and its history, so the boundary is keyed by the panel id, and
+ * `resetKey={params.filePath}` clears a stuck fallback when the tab shows
+ * another page. That clear moves no focus and counts no retry – the user did
+ * not press Reload.
+ *
  * FOCUS CONTRACT. Swapping the subtree drops focus to `<body>`, so the boundary
  * moves it deliberately — but only when the user was standing in this panel:
  * to the Reload button when the panel dies with focus inside it (a failed
@@ -56,6 +64,13 @@ interface PanelErrorBoundaryProps {
   fallback?: ReactNode
   /** Human-readable panel name, used in the fallback copy and the log line */
   componentName?: string
+  /**
+   * What the content is currently scoped to, for content that must keep its
+   * mount when that scope changes (see the MOUNT-SITE CONTRACT). When it
+   * changes while the fallback shows, the error clears with no focus move and
+   * no retry counted. Compared with `Object.is`; omit it to opt out.
+   */
+  resetKey?: string | number | null
 }
 
 /** State for {@link PanelErrorBoundary}. */
@@ -66,6 +81,8 @@ interface PanelErrorBoundaryState {
   error: Error | null
   /** How many times the user has pressed Reload on this mount */
   reloadAttempts: number
+  /** The `resetKey` this state was derived for, to spot a change */
+  resetKey: PanelErrorBoundaryProps['resetKey']
 }
 
 /** What the commit phase knew about focus before the DOM was mutated. */
@@ -110,9 +127,30 @@ export class PanelErrorBoundary extends Component<
 
   constructor(props: PanelErrorBoundaryProps) {
     super(props)
-    this.state = { hasError: false, error: null, reloadAttempts: 0 }
+    this.state = { hasError: false, error: null, reloadAttempts: 0, resetKey: props.resetKey }
     boundaryInstanceCount += 1
     this.messageId = `panel-error-message-${boundaryInstanceCount}`
+  }
+
+  /**
+   * Clear a stuck fallback when the content's scope moved on.
+   *
+   * Derived during render rather than in `componentDidUpdate`, so the new
+   * scope's content renders in the same pass instead of the stale fallback
+   * painting once first. `reloadAttempts` is left alone: this is not a retry.
+   *
+   * @param props - The incoming props
+   * @param state - The current state
+   * @returns The state patch, or `null` when `resetKey` did not change
+   */
+  static getDerivedStateFromProps(
+    props: PanelErrorBoundaryProps,
+    state: PanelErrorBoundaryState
+  ): Partial<PanelErrorBoundaryState> | null {
+    if (Object.is(props.resetKey, state.resetKey)) return null
+    return state.hasError
+      ? { resetKey: props.resetKey, hasError: false, error: null }
+      : { resetKey: props.resetKey }
   }
 
   static getDerivedStateFromError(error: Error): Pick<
@@ -156,7 +194,10 @@ export class PanelErrorBoundary extends Component<
 
     // Reload worked. The fallback the user was standing on is gone, so park
     // focus on the recovered content instead of dropping it to <body>.
-    if (prevState.hasError && !hasError && reloadAttempts > 0) {
+    // Only a Reload counts – it is the one path that raises the attempt count
+    // as it clears the error. A `resetKey` clear raises nothing and moves no
+    // focus (a tab that moved to another page is not something the user fixed).
+    if (prevState.hasError && !hasError && reloadAttempts > prevState.reloadAttempts) {
       this.contentRef.current?.focus()
       return
     }

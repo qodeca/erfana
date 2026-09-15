@@ -5,8 +5,8 @@
  *
  * Extracted from `PreviewViewService` so the service stays an orchestrator: the
  * map, the two-part staleness guard and the least-recently-active ordering all
- * live here, and `PreviewLiveView.ts` (already at the file-size cap) grows
- * nothing.
+ * live here, and `PreviewLiveView.ts` (near the file-size cap when this was
+ * extracted) grows nothing.
  *
  * WHAT THIS REPLACES: a single `live: PreviewLiveView | null` field plus one
  * monotonic `openEpoch`. That epoch was global, so two legitimate concurrent

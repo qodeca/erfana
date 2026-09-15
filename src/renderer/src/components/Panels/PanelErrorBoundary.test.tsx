@@ -13,7 +13,7 @@
  * @see docs/design/design-issue-60.md §5 (`PanelErrorBoundary` row)
  */
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -68,6 +68,16 @@ function CrashesWhileFocused(): JSX.Element {
       tree
     </button>
   )
+}
+
+/** Counts mounts, to tell a remount from a re-render. */
+const mountCount = { value: 0 }
+
+function CountsMounts(): JSX.Element {
+  useEffect(() => {
+    mountCount.value += 1
+  }, [])
+  return <div data-testid="page-content">page</div>
 }
 
 function Sibling(): JSX.Element {
@@ -382,6 +392,106 @@ describe('PanelErrorBoundary', () => {
 
       expect(screen.getByTestId('tree-content')).toBeInTheDocument()
       expect(screen.queryByTestId(TEST_IDS.PANEL_ERROR_BOUNDARY)).not.toBeInTheDocument()
+    })
+  })
+
+  describe('resetKey (issue #124 – a preview tab keeps its mount across pages)', () => {
+    it('clears a stuck fallback when the scope changes, without a key', () => {
+      const { rerender } = render(
+        <PanelErrorBoundary resetKey="/proj/a.html" componentName="HTML preview">
+          <ControlledPanel />
+        </PanelErrorBoundary>
+      )
+      expect(screen.getByTestId(TEST_IDS.PANEL_ERROR_BOUNDARY)).toBeInTheDocument()
+
+      panelControl.shouldThrow = false
+      rerender(
+        <PanelErrorBoundary resetKey="/proj/b.html" componentName="HTML preview">
+          <ControlledPanel />
+        </PanelErrorBoundary>
+      )
+
+      expect(screen.getByTestId('tree-content')).toBeInTheDocument()
+      expect(screen.queryByTestId(TEST_IDS.PANEL_ERROR_BOUNDARY)).not.toBeInTheDocument()
+    })
+
+    it('leaves healthy content mounted when the scope changes', () => {
+      // The whole point of `resetKey` over `key`: a preview that moves to
+      // another page must keep its native view, so no remount.
+      mountCount.value = 0
+      const { rerender } = render(
+        <PanelErrorBoundary resetKey="/proj/a.html" componentName="HTML preview">
+          <CountsMounts />
+        </PanelErrorBoundary>
+      )
+
+      rerender(
+        <PanelErrorBoundary resetKey="/proj/b.html" componentName="HTML preview">
+          <CountsMounts />
+        </PanelErrorBoundary>
+      )
+
+      expect(screen.getByTestId('page-content')).toBeInTheDocument()
+      expect(mountCount.value).toBe(1)
+    })
+
+    it('moves no focus when the scope change clears the fallback', () => {
+      const outside = document.createElement('button')
+      document.body.appendChild(outside)
+      try {
+        const { rerender } = render(
+          <PanelErrorBoundary resetKey="/proj/a.html" componentName="HTML preview">
+            <ControlledPanel />
+          </PanelErrorBoundary>
+        )
+        outside.focus()
+
+        panelControl.shouldThrow = false
+        rerender(
+          <PanelErrorBoundary resetKey="/proj/b.html" componentName="HTML preview">
+            <ControlledPanel />
+          </PanelErrorBoundary>
+        )
+
+        expect(outside).toHaveFocus()
+      } finally {
+        outside.remove()
+      }
+    })
+
+    it('counts no retry: a new page that also fails still reads as a first failure', () => {
+      const { rerender } = render(
+        <PanelErrorBoundary resetKey="/proj/a.html" componentName="HTML preview">
+          <ControlledPanel />
+        </PanelErrorBoundary>
+      )
+
+      // Still throwing on the new page.
+      rerender(
+        <PanelErrorBoundary resetKey="/proj/b.html" componentName="HTML preview">
+          <ControlledPanel />
+        </PanelErrorBoundary>
+      )
+
+      expect(
+        screen.getByText('HTML preview unavailable. The rest of Erfana still works.')
+      ).toBeInTheDocument()
+    })
+
+    it('still parks focus on the content after a Reload that works', async () => {
+      // Regression cover for the stricter "Reload worked" test: only a Reload
+      // raises the attempt count, and it must still move focus.
+      const user = userEvent.setup()
+      render(
+        <PanelErrorBoundary resetKey="/proj/a.html" componentName="HTML preview">
+          <ControlledPanel />
+        </PanelErrorBoundary>
+      )
+
+      panelControl.shouldThrow = false
+      await user.click(screen.getByRole('button', { name: 'Reload html preview' }))
+
+      expect(screen.getByTestId('tree-content').parentElement).toHaveFocus()
     })
   })
 })

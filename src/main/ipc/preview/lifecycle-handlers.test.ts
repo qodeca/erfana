@@ -4,7 +4,8 @@
  * Preview lifecycle-handler tests (Issue #74, item 44).
  *
  * Covers: an untrusted sender is rejected (service untouched); a malformed
- * payload is rejected; and open / close / setBounds delegate to the service.
+ * payload is rejected; open / close / setBounds delegate to the service; and
+ * the setBounds channel's rate-capped drop lines (issue #124, M1–M3).
  * electron's ipcMain is mocked to capture the registered handlers; the service,
  * eligibility, window resolver and sender predicate are injected fakes.
  */
@@ -13,6 +14,11 @@ import { ipcMain } from 'electron'
 import type { IpcMainEvent, IpcMainInvokeEvent } from 'electron'
 import { PreviewChannels } from '../../../shared/ipc/preview-channels'
 import type { PreviewBoundsPayload } from '../../../shared/ipc/preview-schema'
+import { BOUNDS_DROP_MESSAGE } from '../../../shared/dropReporter'
+import { PREVIEW_LIMITS } from '../../../shared/preview-limits'
+import { stablePathDigest } from '../../../shared/stablePathDigest'
+import { logger } from '../../services/LoggingService'
+import { SET_BOUNDS_DROP_REASON } from '../../services/preview/previewBoundsDropLog'
 import {
   registerPreviewLifecycleHandlers,
   type PreviewLifecycleHandlerDeps,
@@ -194,10 +200,10 @@ describe('registerPreviewLifecycleHandlers', () => {
   it('setBounds delegates panelId, bounds and seq to the service', () => {
     const { service } = setup()
     listeners[PreviewChannels.SET_BOUNDS](event, { panelId: 'p1', bounds: BOUNDS, seq: 5 })
-    // `ack` arrives as `undefined` for an ordinary pump push: the flag is
-    // omitted from the wire payload rather than sent as `false`, so a
-    // steady-state push is byte-identical to what it was before it existed.
-    expect(service.setBounds).toHaveBeenCalledWith('p1', BOUNDS, 5, undefined)
+    // `ack` and `settled` arrive as `undefined` for an ordinary pump push: the
+    // flags are omitted from the wire payload rather than sent as `false`, so a
+    // steady-state push is byte-identical to what it was before they existed.
+    expect(service.setBounds).toHaveBeenCalledWith('p1', BOUNDS, 5, undefined, undefined)
   })
 
   it('forwards a request for a bounds confirmation', () => {
@@ -212,7 +218,20 @@ describe('registerPreviewLifecycleHandlers', () => {
       seq: 6,
       ack: true
     })
-    expect(service.setBounds).toHaveBeenCalledWith('p1', BOUNDS, 6, true)
+    expect(service.setBounds).toHaveBeenCalledWith('p1', BOUNDS, 6, true, undefined)
+  })
+
+  it('forwards the settled push that ends a window-edge resize hold (issue #124)', () => {
+    // Main shows a held view again once this push is applied. Dropped here,
+    // every window-edge drag would end on the hold's timeouts instead.
+    const { service } = setup()
+    listeners[PreviewChannels.SET_BOUNDS](event, {
+      panelId: 'p1',
+      bounds: BOUNDS,
+      seq: 8,
+      settled: true
+    })
+    expect(service.setBounds).toHaveBeenCalledWith('p1', BOUNDS, 8, undefined, true)
   })
 
   it('refuses a setBounds payload carrying an unknown key', () => {
@@ -254,5 +273,211 @@ describe('registerPreviewLifecycleHandlers', () => {
     })
     expect(eligibilityCheck).not.toHaveBeenCalled()
     expect(result).toEqual({ eligible: false, reason: 'outside-project' })
+  })
+})
+
+describe('setBounds drop lines (issue #124, M1–M3)', () => {
+  let clock = 0
+  const now = (): number => clock
+  /** {@link BOUNDS} as a drop line carries it. */
+  const LOGGED_RECT = { x: 0, y: 0, w: 100, h: 100 }
+
+  beforeEach(() => {
+    clock = 0
+    vi.mocked(logger.warn).mockClear()
+    vi.mocked(logger.error).mockClear()
+    vi.mocked(logger.info).mockClear()
+  })
+
+  it('M1: logs an untrusted sender with fixed fields only – no sender URL', () => {
+    const { service, trusted } = setup({ now })
+    trusted.value = false
+
+    listeners[PreviewChannels.SET_BOUNDS](
+      { senderFrame: { url: 'erfana-preview://token/secret/a.html' } },
+      { panelId: 'p1', bounds: BOUNDS, seq: 1 }
+    )
+
+    expect(service.setBounds).not.toHaveBeenCalled()
+    expect(vi.mocked(logger.warn).mock.calls).toEqual([
+      [BOUNDS_DROP_MESSAGE, { source: 'main', reason: SET_BOUNDS_DROP_REASON.untrustedSender }]
+    ])
+  })
+
+  it('M2: logs a malformed push with its panel id when that field is valid', () => {
+    const { service } = setup({ now })
+
+    listeners[PreviewChannels.SET_BOUNDS](event, { panelId: 'p1', bounds: BOUNDS, seq: -1 })
+
+    expect(service.setBounds).not.toHaveBeenCalled()
+    expect(vi.mocked(logger.warn).mock.calls).toEqual([
+      [
+        BOUNDS_DROP_MESSAGE,
+        {
+          source: 'main',
+          reason: SET_BOUNDS_DROP_REASON.invalidPayload,
+          panelId: stablePathDigest('p1')
+        }
+      ]
+    ])
+  })
+
+  it.each([
+    ['no payload', null],
+    ['a number', 42],
+    ['an empty panel id', { panelId: '', bounds: BOUNDS, seq: 1 }],
+    ['a panel id that is not a string', { panelId: 7, bounds: BOUNDS, seq: 1 }]
+  ])('M2: names no panel for %s', (_case, payload) => {
+    setup({ now })
+
+    listeners[PreviewChannels.SET_BOUNDS](event, payload)
+
+    expect(vi.mocked(logger.warn).mock.calls).toEqual([
+      [BOUNDS_DROP_MESSAGE, { source: 'main', reason: SET_BOUNDS_DROP_REASON.invalidPayload }]
+    ])
+  })
+
+  it('M3: logs a throwing handler at error, with the push and the error', () => {
+    const { service } = setup({ now })
+    const failure = new Error('view gone')
+    service.setBounds.mockImplementation(() => {
+      throw failure
+    })
+
+    listeners[PreviewChannels.SET_BOUNDS](event, { panelId: 'p1', bounds: BOUNDS, seq: 9 })
+
+    expect(vi.mocked(logger.error).mock.calls).toEqual([
+      [
+        BOUNDS_DROP_MESSAGE,
+        failure,
+        {
+          source: 'main',
+          reason: SET_BOUNDS_DROP_REASON.handlerThrew,
+          panelId: stablePathDigest('p1'),
+          seq: 9,
+          rect: LOGGED_RECT
+        }
+      ]
+    ])
+  })
+
+  it('M3: logs a thrown non-error without an error object', () => {
+    const { service } = setup({ now })
+    service.setBounds.mockImplementation(() => {
+      throw 'not an Error'
+    })
+
+    listeners[PreviewChannels.SET_BOUNDS](event, { panelId: 'p1', bounds: BOUNDS, seq: 9 })
+
+    expect(vi.mocked(logger.error).mock.calls).toEqual([
+      [
+        BOUNDS_DROP_MESSAGE,
+        undefined,
+        expect.objectContaining({ reason: SET_BOUNDS_DROP_REASON.handlerThrew })
+      ]
+    ])
+  })
+
+  it('caps repeats: one line per reason per window, the next saying how many were swallowed', () => {
+    const { trusted } = setup({ now })
+    trusted.value = false
+
+    for (let i = 0; i < 3; i += 1) {
+      listeners[PreviewChannels.SET_BOUNDS](event, {})
+    }
+    clock += PREVIEW_LIMITS.BOUNDS_DROP_LOG_WINDOW_MS
+    listeners[PreviewChannels.SET_BOUNDS](event, {})
+
+    expect(vi.mocked(logger.warn).mock.calls).toEqual([
+      [BOUNDS_DROP_MESSAGE, { source: 'main', reason: SET_BOUNDS_DROP_REASON.untrustedSender }],
+      [
+        BOUNDS_DROP_MESSAGE,
+        { source: 'main', reason: SET_BOUNDS_DROP_REASON.untrustedSender, suppressed: 2 }
+      ]
+    ])
+  })
+
+  it('writes the first line of every reason inside one window', () => {
+    const { service, trusted } = setup({ now })
+    service.setBounds.mockImplementation(() => {
+      throw new Error('boom')
+    })
+
+    trusted.value = false
+    listeners[PreviewChannels.SET_BOUNDS](event, {})
+    trusted.value = true
+    listeners[PreviewChannels.SET_BOUNDS](event, {})
+    listeners[PreviewChannels.SET_BOUNDS](event, { panelId: 'p1', bounds: BOUNDS, seq: 1 })
+
+    expect(vi.mocked(logger.warn)).toHaveBeenCalledTimes(2)
+    expect(vi.mocked(logger.error)).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('log lines carry no path and no sender URL (QG-8 T4, T5)', () => {
+  const HOME = '/Users/alice'
+  const PANEL = { panelId: 'p1' }
+  const OPEN = { ...PANEL, filePath: '/a.html', bounds: BOUNDS }
+  const VISIBILITY = { ...PANEL, visible: false, reason: 'dialog' }
+  const PUSH = { ...PANEL, bounds: BOUNDS, seq: 1 }
+  type Failing = [string, 'throws' | 'rejects', unknown, (s: ReturnType<typeof setup>) => Mock]
+  const invoke = (channel: string, sender: unknown, request: unknown): unknown =>
+    (handlers[channel] ?? listeners[channel])(sender, request)
+
+  beforeEach(() => {
+    vi.mocked(logger.warn).mockClear()
+    vi.mocked(logger.error).mockClear()
+  })
+
+  /** Channel, how the service fails, the request, and the service call that fails. */
+  const failing: Failing[] = [
+    [PreviewChannels.CHECK_ELIGIBILITY, 'rejects', { filePath: '/a' }, (s) => s.eligibilityCheck],
+    [PreviewChannels.OPEN, 'rejects', OPEN, (s) => s.service.open],
+    [PreviewChannels.CLOSE, 'rejects', PANEL, (s) => s.service.close],
+    [PreviewChannels.RELOAD, 'rejects', PANEL, (s) => s.service.reload],
+    [PreviewChannels.SET_VISIBILITY, 'rejects', VISIBILITY, (s) => s.service.setVisibility],
+    [PreviewChannels.SET_VISIBILITY, 'throws', VISIBILITY, (s) => s.service.setVisibility],
+    [PreviewChannels.SET_BOUNDS, 'throws', PUSH, (s) => s.service.setBounds]
+  ]
+
+  it.each(failing)('%s, service %s: logs a Node error, path cut', async (channel, how, req, fn) => {
+    const error = Object.assign(new Error(`EACCES: permission denied, open '${HOME}/a.html'`), {
+      code: 'EACCES',
+      errno: -13,
+      syscall: 'open'
+    })
+    const mock = fn(setup())
+    if (how === 'rejects') {
+      mock.mockRejectedValue(error)
+    } else {
+      mock.mockImplementation(() => {
+        throw error
+      })
+    }
+
+    await invoke(channel, event, req)
+
+    await vi.waitFor(() => expect(logger.error).toHaveBeenCalledTimes(1))
+    const [, logged, fields] = vi.mocked(logger.error).mock.calls[0]
+    expect(logged?.message).toBe('EACCES: permission denied, open [redacted-path]')
+    // The stack repeats the message: neither may hold the user's folders.
+    expect(`${logged?.stack}\n${JSON.stringify(fields ?? {})}`).not.toContain(HOME)
+  })
+
+  it.each([
+    PreviewChannels.CHECK_ELIGIBILITY,
+    PreviewChannels.OPEN,
+    PreviewChannels.CLOSE,
+    PreviewChannels.RELOAD,
+    PreviewChannels.SET_VISIBILITY
+  ])('%s: logs an untrusted sender with no URL in the line', async (channel) => {
+    const { trusted } = setup()
+    trusted.value = false
+
+    await invoke(channel, { senderFrame: { url: `file://${HOME}/a.html` } }, {})
+
+    expect(vi.mocked(logger.warn).mock.calls).toEqual([
+      [`Rejected ${channel} from untrusted sender`]
+    ])
   })
 })

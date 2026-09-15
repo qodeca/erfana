@@ -40,6 +40,7 @@ import { useExportHandlers } from '../Editor/MarkdownEditorPanel/hooks/useExport
 import { useEditorContextMenu } from '../../hooks/useEditorContextMenu'
 import { useDividerPosition } from '../../hooks/useDividerPosition'
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts'
+import { useEditorSaveRegistration } from '../../hooks/useEditorSaveRegistration'
 
 // Extracted components
 import { MarkdownToolbar, EditorErrorBoundary } from '../Editor/MarkdownEditorPanel/components'
@@ -209,9 +210,10 @@ export function MarkdownEditorPanel(
    * 8. finally: resumeWatch + unmarkSaving
    *
    * @param isAutoSave - Whether this is an auto-save (shows indicator) or manual save
+   * @returns `true` when the write succeeded (issue #124: a save by id reads it)
    */
-  const handleSave = useCallback(async (isAutoSave: boolean = false) => {
-    if (!currentFile) return
+  const handleSave = useCallback(async (isAutoSave: boolean = false): Promise<boolean> => {
+    if (!currentFile) return false
 
     // Step 1: Mark saving via hook to prevent race conditions with file watcher
     markSaving()
@@ -263,9 +265,11 @@ export function MarkdownEditorPanel(
         // Show auto-save indicator briefly
         setTimeout(() => setIsAutoSaving(false), INDICATOR_DURATION_MS)
       }
+      return true
     } catch (error) {
       logger.error('Error saving file', error instanceof Error ? error : undefined)
       setIsAutoSaving(false)
+      return false
     } finally {
       // Step 8: Resume file watching after save completes
       await saveGuardRef.current?.resumeWatch()
@@ -276,11 +280,15 @@ export function MarkdownEditorPanel(
   // =========================================================================
   // Auto-Save Hook
   // =========================================================================
-  const { isAutoSaving, setIsAutoSaving, signalChange } = useAutoSave(
+  const { isAutoSaving, setIsAutoSaving, cancelAutoSave, signalChange } = useAutoSave(
     currentFile?.modified ?? false,
-    () => handleSave(true),
+    async () => { await handleSave(true) },
     { delay: 2000, enabled: true, maxInterval: 30000 }
   )
+  useEditorSaveRegistration(panelIdRef.current, () => handleSave(false), externalChangeDetected, () => {
+    cancelAutoSave()
+    return () => signalChange()
+  })
 
   // =========================================================================
   // Scroll Sync Hook

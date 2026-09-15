@@ -17,11 +17,18 @@
  *      WebRTC policy call
  *   6. `hardenPreviewSession(session, view.webContents)` — permissions/downloads/WebRTC
  *   7. `protocolHandler.attach(session, ctx)` — the ONLY `erfana-preview://` site,
- *      resolving the token through the registry and recording failures to the caller
+ *      resolving the token through the registry and recording failures into the
+ *      view's page scopes
  *   8. `requestFilter.attach(session, ctx)` — the unfiltered network gate, reading
- *      the live allowed-host set from the store
+ *      the live allowed-host set from the store and refusing a frame on any
+ *      token but this session's
  *   9. `assertSealed(session)` — a wiring tripwire: a persistent partition throws
  *      here, and the factory tears down everything it built and rethrows (⇒ no view)
+ *
+ * The two contexts of steps 7 and 8 are built afresh in every `create`, with the
+ * session's token and one shared request-kind ledger, in
+ * `previewSessionFilterContext.ts` (issue #124, WI-12): partition names are
+ * recycled, so the previous view's token must fail closed (RX9).
  *
  * Every electron surface is injected through narrow structural interfaces so the
  * factory is testable without a real `Session`/`WebContentsView`; the defaults at
@@ -38,11 +45,7 @@ import { WebContentsView, session as electronSession, type Session, type WebCont
 import { PREVIEW } from '../../../shared/constants'
 import { logger } from '../LoggingService'
 import { withTimeout } from '../../utils/withTimeout'
-import type {
-  PreviewBounds,
-  PreviewFailureInput,
-  PreviewFailureType
-} from '../../../shared/ipc/preview-types'
+import type { PreviewBounds, PreviewFailureType } from '../../../shared/ipc/preview-types'
 import type { PreviewBlockedKind } from '../../../shared/ipc/previewBlockedKind'
 import type { IPreviewAllowlistStore } from './PreviewAllowlistStore'
 import type { IPreviewRootRegistry } from './PreviewRootRegistry'
@@ -57,6 +60,24 @@ import {
   nextPartitionName
 } from './previewSessionPolicy'
 import { assertSealed, purge as purgePreviewSession } from './PreviewStorageSeal'
+import {
+  buildPreviewSessionContexts,
+  type PreviewSessionPageScopes
+} from './previewSessionFilterContext'
+
+export type { PreviewSessionPageScopes } from './previewSessionFilterContext'
+
+/**
+ * An error as a log line carries it: its name, plus `code` when it has one.
+ * Never the message, which can quote a path or a preview URL (QG-7 S3).
+ */
+function errorFieldsOf(error: unknown): { error: string; code?: string } {
+  if (!(error instanceof Error)) {
+    return { error: typeof error }
+  }
+  const { code } = error as NodeJS.ErrnoException
+  return typeof code === 'string' ? { error: error.name, code } : { error: error.name }
+}
 
 /**
  * The slice of an electron `Session` the preview needs. Structural so tests
@@ -110,6 +131,8 @@ export interface PreviewWebContentsHandle {
   getZoomLevel(): number
   /** Whether this web contents currently has keyboard focus. */
   isFocused(): boolean
+  /** Take keyboard focus (#124, QG-8 U1). Optional like `ipc`: test doubles stay valid. */
+  focus?(): void
   // Event surface: `on`, `once` and `removeListener` are intentionally loose
   // because the wired events (`render-process-gone`, `unresponsive`,
   // `will-navigate`, `did-finish-load`, `destroyed`, `before-input-event`) carry
@@ -131,8 +154,8 @@ export interface PreviewViewHandle {
 export interface PreviewSessionCreateContext {
   /** The project path, resolved main-side (NEVER a renderer parameter, NEW-8). */
   readonly projectPath: string
-  /** Sink for a protocol-layer diagnostic (`csp-missing`, `unsupported-asset-type`). */
-  readonly recordFailure: (input: PreviewFailureInput) => void
+  /** The view's page scopes, asked at every write (`PreviewSessionPageScopes`). */
+  readonly pageScopes: () => PreviewSessionPageScopes
   /** Sink for a network-layer refusal (`blocked-host`, `network-timeout`, …). */
   readonly onBlocked: (
     kind: PreviewFailureType,
@@ -286,7 +309,7 @@ export class PreviewSessionFactory implements IPreviewSessionFactory {
         return { partition, session }
       } catch (error) {
         logger.warn('Preview partition: purge before reuse failed; minting a fresh one', {
-          error: error instanceof Error ? error.message : String(error)
+          ...errorFieldsOf(error)
         })
       }
     }
@@ -312,7 +335,7 @@ export class PreviewSessionFactory implements IPreviewSessionFactory {
       )
     } catch (error) {
       logger.warn('Preview partition: purge after use failed; not reusing it', {
-        error: error instanceof Error ? error.message : String(error)
+        ...errorFieldsOf(error)
       })
       return
     }
@@ -337,8 +360,9 @@ export class PreviewSessionFactory implements IPreviewSessionFactory {
     // A malformed allowlist block used to look exactly like an empty one from
     // the panel: the store logged its badge process-wide and nothing reached
     // the tab. The factory is the first place that has the panel's log (#115).
+    // The badge is the view's, not a page's, so a reload keeps it.
     for (const badge of allowlistStore.drainBadges()) {
-      ctx.recordFailure(badge)
+      ctx.pageScopes().recordViewFailure(badge)
     }
     const token = await registry.issue(ctx.projectPath, [...allowlistStore.getOrigins()])
     const entry = registry.resolve(token)
@@ -346,6 +370,15 @@ export class PreviewSessionFactory implements IPreviewSessionFactory {
       // The registry just issued this token; an absence here is a wiring fault.
       throw new Error('Preview registry lost the token it just issued')
     }
+    // Built afresh for this session, with its own token and ledger (WI-12,
+    // RX9). Every write in them asks the page scopes when it is made (WI-29).
+    const contexts = buildPreviewSessionContexts({
+      token,
+      resolve: (t) => registry.resolve(t) ?? null,
+      getAllowedHosts: () => allowlistStore.getOrigins(),
+      pageScopes: ctx.pageScopes,
+      onBlocked: ctx.onBlocked
+    })
 
     // Steps 3–9 all run AFTER the token is live, and every one of them can
     // throw: `createView` allocates a WebContentsView, `hardenSession` touches
@@ -403,20 +436,12 @@ export class PreviewSessionFactory implements IPreviewSessionFactory {
       unwind.push(disposeHarden)
 
       // 7: the single `erfana-preview://` application site.
-      const detachProtocol = this.deps.attachProtocol(session, {
-        resolve: (t) => registry.resolve(t) ?? null,
-        recordFailure: ctx.recordFailure
-      })
+      const detachProtocol = this.deps.attachProtocol(session, contexts.protocol)
       unwind.push(detachProtocol)
 
       // 8: the unfiltered network gate, reading the LIVE allowed-host set so an
       // approve does not need the filter re-attached.
-      const detachFilter = this.deps.attachFilter(session, {
-        getAllowedHosts: () => allowlistStore.getOrigins(),
-        onBlocked: ctx.onBlocked,
-        onRequestStarted: () => {},
-        onRequestSettled: () => {}
-      })
+      const detachFilter = this.deps.attachFilter(session, contexts.filter)
       unwind.push(detachFilter)
 
       // 9: the seal tripwire. A persistent partition throws.

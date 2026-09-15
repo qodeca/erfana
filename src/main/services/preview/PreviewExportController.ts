@@ -19,6 +19,7 @@
  * @see specs/designs/sd-074-html-preview.md §1.7
  */
 import { writeFile } from 'node:fs/promises'
+import { basename, extname } from 'node:path'
 
 import { BrowserWindow, dialog } from 'electron'
 
@@ -31,6 +32,19 @@ const DEFAULT_EXPORT_NAME = 'preview'
 
 /** Leave headroom for the `.pdf` extension and OS path limits (matches PdfService). */
 const MAX_FILENAME_LENGTH = 200
+
+/**
+ * The name a page suggests in the save dialog: its file name without the
+ * extension, so `pricing.html` suggests `pricing.pdf` (#124, P3-AC2).
+ * `fallback` when there is no page. `exportToPdf` still makes the result safe
+ * as a file name (#161).
+ */
+export function exportNameForPage(pagePath: string | null, fallback: string): string {
+  if (!pagePath) {
+    return fallback
+  }
+  return basename(pagePath, extname(pagePath)) || fallback
+}
 
 /** The `printToPDF` options subset this controller sets. */
 export interface PreviewPrintToPdfOptions {

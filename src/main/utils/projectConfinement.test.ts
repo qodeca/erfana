@@ -14,7 +14,8 @@ import {
   assertNoConfinementEscape,
   classifyConfinement,
   isLexicallyInside,
-  OUTSIDE_PROJECT_MESSAGE
+  OUTSIDE_PROJECT_MESSAGE,
+  resolveInsideProject
 } from './projectConfinement'
 
 const skipOnWindows = process.platform === 'win32'
@@ -101,6 +102,68 @@ describe('classifyConfinement', () => {
   it('reports outside, not missing, for a non-existent path out of the project', async () => {
     // Otherwise the verdict would answer "does /Users/x/.ssh/id_rsa exist?".
     expect(await classifyConfinement(join(outside, 'nope', 'gone.md'), project)).toBe('outside')
+  })
+})
+
+describe('resolveInsideProject', () => {
+  it('returns the canonical path of a real file in the project', async () => {
+    const file = join(project, 'page.html')
+    writeFileSync(file, '<p>hi</p>')
+    expect(await resolveInsideProject(file, project)).toEqual({
+      verdict: 'inside',
+      realPath: await realpath(file)
+    })
+  })
+
+  it.skipIf(skipOnWindows)('returns the target of an in-project link, not the link', async () => {
+    const target = join(project, 'real.html')
+    writeFileSync(target, '<p>hi</p>')
+    const link = join(project, 'alias.html')
+    symlinkSync(target, link, 'file')
+
+    expect(await resolveInsideProject(link, project)).toEqual({
+      verdict: 'inside',
+      realPath: await realpath(target)
+    })
+  })
+
+  it.skipIf(skipOnWindows)('gives no path for an in-project link that points outside', async () => {
+    const target = join(outside, 'secret.html')
+    writeFileSync(target, 'secret')
+    const link = join(project, 'innocent.html')
+    symlinkSync(target, link, 'file')
+
+    expect(await resolveInsideProject(link, project)).toEqual({ verdict: 'outside' })
+  })
+
+  it('gives no path for a missing in-project file', async () => {
+    expect(await resolveInsideProject(join(project, 'gone.html'), project)).toEqual({
+      verdict: 'missing'
+    })
+  })
+
+  it('stays outside, not missing, for a missing path out of the project', async () => {
+    expect(await resolveInsideProject(join(outside, 'gone.html'), project)).toEqual({
+      verdict: 'outside'
+    })
+  })
+
+  it.skipIf(skipOnWindows)('gives no path when realpath fails for a reason other than ENOENT', async () => {
+    const file = join(project, 'note.md')
+    writeFileSync(file, '# hi')
+    expect(await resolveInsideProject(join(file, 'child.html'), project)).toEqual({
+      verdict: 'unverifiable'
+    })
+  })
+
+  it('agrees with classifyConfinement', async () => {
+    const file = join(project, 'page.html')
+    writeFileSync(file, '<p>hi</p>')
+    for (const candidate of [file, join(project, 'gone.html'), join(outside, 'x.html')]) {
+      expect((await resolveInsideProject(candidate, project)).verdict).toBe(
+        await classifyConfinement(candidate, project)
+      )
+    }
   })
 })
 

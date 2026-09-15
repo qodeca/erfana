@@ -123,15 +123,21 @@ jobs:
   coverage:
     name: Coverage
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # 15, not 10: the job runs three coverage passes (main, preload, renderer);
+    # the renderer suite is the largest in the repo.
+    timeout-minutes: 15
     if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
-    # Enforces the per-file coverage FLOORS declared in vitest.main.ts under
-    # test.coverage.thresholds: scripts/fuses.js (the issue #43/#55 packaging-
-    # integrity guards + Electron fuses) and the whisper trust-chain modules
+    # Enforces the coverage FLOORS declared in all three vitest configs. Main
+    # (vitest.main.ts, test.coverage.thresholds) carries the per-file floors for
+    # scripts/fuses.js (the issue #43/#55 packaging-integrity guards + Electron
+    # fuses) and the whisper trust-chain modules
     # (verifyManifest / secureDownloader / zipArchive / tarArchive) + the #41
     # model-id registry. The required `test` job runs `test:ci` WITHOUT coverage,
     # so these floors fire ONLY here — this job is what makes them a gate rather
     # than a local-only `npm run test:cov` nicety (issue #55, F4 residual).
+    # Preload and renderer floors (#124) run as extra steps in this same job, not
+    # as new jobs: branch protection matches the `Coverage` check name, so a new
+    # job would enforce nothing until it was added to the required set.
     #
     # Scoped to the main project (`--project main`) on purpose: only the main
     # project's tests load scripts/fuses.js (via scripts/fuses.test.mjs), so the
@@ -156,6 +162,18 @@ jobs:
         # (vitest exits non-zero on a threshold miss). --coverage activates the
         # thresholds; --config supplies them; --project main scopes the run.
         run: npx vitest --run --config vitest.main.ts --project main --coverage
+      - name: Preload-project coverage (enforces the vitest.preload.ts floors)
+        # Global floors for src/preload (previewBridge.ts + index.ts), added in
+        # #124 QG-8. Scoped with --project preload for the same reason as the
+        # main step: vitest.workspace.ts is auto-discovered, so without it the
+        # run would expand to all three projects. Reports go to coverage/preload,
+        # so the three steps never share an output directory.
+        run: npx vitest --run --config vitest.preload.ts --project preload --coverage
+      - name: Renderer-project coverage (enforces the #124 HTML-preview floors)
+        # Per-file floors in vitest.renderer.ts for usePreviewBounds, previewClip,
+        # previewDragFreeze and previewTabMove (#124 QG-8), plus the project-wide
+        # floor. None of them depend on symlink cases, so they hold on Linux.
+        run: npx vitest --run --config vitest.renderer.ts --project renderer --coverage
 
   build:
     name: Build

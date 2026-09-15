@@ -64,7 +64,8 @@
       "files": [
         "design/system/components/**/*.css",
         "src/renderer/src/styles/hostName.css",
-        "src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewChromeBand.css"
+        "src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewChromeBand.css",
+        "src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewNavControls.css"
       ],
       "rules": {
         "selector-class-pattern": [

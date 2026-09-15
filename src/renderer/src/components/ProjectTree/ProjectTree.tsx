@@ -13,6 +13,7 @@ import { showGlobalToast } from '../Toast/toastService'
 import { isPointInElement } from '../../utils/domGeometry'
 import { getBasename, getDirname } from '../../utils/fileUtils'
 import { openFileInPanel } from '../../utils/openFileInPanel'
+import { openInDefaultBrowser } from '../Panels/HtmlPreviewPanel/previewOpenInBrowser'
 import { useProjectStore } from '../../stores/useProjectStore'
 import type { MenuContext } from './context-menu/types'
 import { ContextMenuFactory } from './context-menu/factory'
@@ -1248,7 +1249,9 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
       openFileInPanel(useProjectStore.getState().dockviewApi ?? undefined, filePath, {
         kind: 'editor'
       })
-    }
+    },
+    // The same action as the preview toolbar's button, so both raise the same toasts (#124).
+    openInBrowser: openInDefaultBrowser
   })
 
   /**

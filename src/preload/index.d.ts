@@ -45,6 +45,7 @@ import type { ClipboardBridge } from '../shared/ipc/clipboard-schema'
 import type { ClaudeStatusBridge } from '../shared/ipc/claude-status-schema'
 import type { PreviewBridge } from '../shared/ipc/preview-schema'
 import type { ImageExportBridge } from '../shared/ipc/image-export-schema'
+import type { BrowserBridge } from '../shared/ipc/browser-schema'
 
 declare global {
   interface Window {
@@ -377,6 +378,11 @@ declare global {
        * @see Issue #73 - image viewer export controls
        */
       imageExport: ImageExportBridge
+      /**
+       * Open a project `.html` / `.htm` file in the default browser
+       * @see Issue #124 - part 4
+       */
+      browser: BrowserBridge
       /**
        * Per-terminal Claude Code context status bridge
        * @see Issue #216 - Per-terminal Claude Code context status bar

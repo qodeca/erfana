@@ -144,5 +144,30 @@
   overridden first, or the two mechanisms fight over the same attribute.
 </div>
 
+<h2>Exceptions</h2>
+<p style="max-width: 72ch; color: var(--color-text-tertiary)">
+  Where the shipping component departs from this card, with the reason. An undocumented deviation is a
+  bug; a documented one is a decision.
+</p>
+<table>
+  <thead><tr><th>Where</th><th>The card</th><th>The component, and why</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>HTML-preview placeholder ring</td>
+      <td>Offset 2px outward, or inset inside a scroller – the only permitted variation.</td>
+      <td>Outward at offset 0, and only the top edge shows: the page's native view paints over the
+        placeholder box, and the panel clips the other three sides. A visible 2px edge still meets
+        SC 2.4.7. Accepted at #124 QG-8 U2; see <code>HtmlPreviewPanel.css</code>.</td>
+    </tr>
+    <tr>
+      <td>Escape from a previewed page</td>
+      <td>Escape returns focus to whatever opened it.</td>
+      <td>Returns to the permission band's chip, not to the placeholder that entered the page. The chip's
+        accessible name states that exit ("Press Escape in the previewed page to return here", decided
+        band card), and a page can also be entered with the mouse, where there is no opener.</td>
+    </tr>
+  </tbody>
+</table>
+
 </body>
 </html>

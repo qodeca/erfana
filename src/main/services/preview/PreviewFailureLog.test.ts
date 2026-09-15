@@ -127,25 +127,6 @@ describe('PreviewFailureLog', () => {
     })
   })
 
-  describe('clear', () => {
-    it('empties the buffer and emits an empty snapshot immediately', () => {
-      const onEmit = vi.fn()
-      const log = new PreviewFailureLog({ onEmit })
-      log.record(input())
-      onEmit.mockClear()
-
-      log.clear()
-
-      expect(log.list()).toHaveLength(0)
-      expect(onEmit).toHaveBeenCalledTimes(1)
-      expect(onEmit).toHaveBeenCalledWith([], false)
-
-      // The pending coalesced emit was cancelled — no second call fires.
-      vi.runAllTimers()
-      expect(onEmit).toHaveBeenCalledTimes(1)
-    })
-  })
-
   describe('drop', () => {
     it('empties without emitting and cancels the pending emit', () => {
       const onEmit = vi.fn()

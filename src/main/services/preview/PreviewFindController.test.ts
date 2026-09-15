@@ -77,7 +77,37 @@ describe('PreviewFindController', () => {
     const [text, options] = wc.findInPage.mock.calls[0]
     expect(text).toBe('needle')
     expect(Object.keys(options as object).sort()).toEqual(['findNext', 'forward', 'matchCase'])
-    expect(options).toEqual({ forward: true, findNext: false, matchCase: true })
+  })
+
+  // Electron's `findNext` means "begin a new find session" (`FindInPageOptions`):
+  // true for a query's first request, false for a step to the next match. Ours
+  // means "step within the current session", so it is inverted at this
+  // boundary. Passed through unchanged, a fresh query was a step in a session
+  // that did not exist, and Chromium reported no matches (#124, WI-25).
+  it('starts a new Chromium find session for a fresh query', () => {
+    const { wc, onCount } = harness
+    const controller = createPreviewFindController(wc, onCount)
+
+    controller.find('needle', { forward: true, findNext: false, matchCase: true })
+
+    expect(wc.findInPage).toHaveBeenCalledWith('needle', {
+      forward: true,
+      findNext: true,
+      matchCase: true
+    })
+  })
+
+  it('steps within the current Chromium find session for next and previous', () => {
+    const { wc, onCount } = harness
+    const controller = createPreviewFindController(wc, onCount)
+
+    controller.find('needle', { forward: false, findNext: true, matchCase: false })
+
+    expect(wc.findInPage).toHaveBeenCalledWith('needle', {
+      forward: false,
+      findNext: false,
+      matchCase: false
+    })
   })
 
   it('clearHighlights pushes a zero count BEFORE stopFindInPage(clearSelection)', () => {

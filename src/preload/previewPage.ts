@@ -153,6 +153,8 @@ function onLinkActivation(event: MouseEvent): void {
       rawHref: link.getAttribute('href') ?? '',
       target,
       download,
+      // Main's link table opens a middle click in a new tab (issue #124).
+      button: event.button,
       modifiers: {
         meta: event.metaKey,
         ctrl: event.ctrlKey,

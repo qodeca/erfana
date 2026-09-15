@@ -11,7 +11,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   wirePreviewLifecycle,
-  type PreviewFileWatcherHandle,
   type PreviewLifecycleHooks,
   type PreviewLifecycleParams
 } from './previewViewLifecycle'
@@ -79,22 +78,15 @@ function makeHooks(): PreviewLifecycleHooks {
     onRenderProcessGone: vi.fn(),
     onUnresponsive: vi.fn(),
     onDidFinishLoad: vi.fn(),
-    onEntryChange: vi.fn(),
-    onEntryDeleted: vi.fn(),
     onForwardedShortcut: vi.fn(),
     onConsoleMessage: vi.fn(),
     onCspViolation: vi.fn()
   }
 }
 
+/** The page's own file watcher is `previewEntryWatch.ts` now (issue #124, WI-17b). */
 function makeParams(wc: PreviewWebContentsHandle): PreviewLifecycleParams {
-  const watcher: PreviewFileWatcherHandle = { close: vi.fn().mockResolvedValue(undefined) }
-  return {
-    webContents: wc,
-    entryFilePath: '/project/index.html',
-    createEntryWatcher: () => watcher,
-    platform: 'darwin'
-  }
+  return { webContents: wc, platform: 'darwin' }
 }
 
 /** Electron 39 `console-message` details (level is the STRING severity). */
@@ -280,5 +272,39 @@ describe('wirePreviewLifecycle navigation guards', () => {
     const event = { preventDefault: vi.fn() }
     emit('will-navigate', event, 'https://example.com/')
     expect(event.preventDefault).not.toHaveBeenCalled()
+  })
+})
+
+describe('wirePreviewLifecycle did-fail-load (issue #124, RX2-3)', () => {
+  function makeLoadHooks(): PreviewLifecycleHooks & { onDidFailLoad: ReturnType<typeof vi.fn> } {
+    return {
+      ...makeHooks(),
+      onDidStartLoading: vi.fn(),
+      onDidStopLoading: vi.fn(),
+      onDidFailLoad: vi.fn()
+    }
+  }
+
+  it("does not settle the page's load on a frame's did-fail-load", () => {
+    const { wc, emit } = makeWebContents()
+    const hooks = makeLoadHooks()
+    wirePreviewLifecycle(makeParams(wc), hooks)
+
+    // S10: a refused frame, as Electron reports it.
+    emit('did-fail-load', {}, -30, 'ERR_BLOCKED_BY_CSP', 'https://example.com/', false, 6, 6)
+    expect(hooks.onDidFailLoad).not.toHaveBeenCalled()
+
+    emit('did-fail-load', {}, -3, 'ERR_ABORTED', 'erfana-preview://token/index.html', true, 6, 4)
+    expect(hooks.onDidFailLoad).toHaveBeenCalledTimes(1)
+  })
+
+  it('still settles on an event that carries no frame flag', () => {
+    const { wc, emit } = makeWebContents()
+    const hooks = makeLoadHooks()
+    wirePreviewLifecycle(makeParams(wc), hooks)
+
+    emit('did-fail-load')
+
+    expect(hooks.onDidFailLoad).toHaveBeenCalledTimes(1)
   })
 })

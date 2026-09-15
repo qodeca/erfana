@@ -222,5 +222,40 @@
     "label": "--color-warning on --color-bg-tertiary",
     "foreground": "--color-warning",
     "background": "--color-bg-tertiary"
+  },
+  "contrast-band-icon": {
+    "kind": "contrast",
+    "card": "system/components/permission-band/index.html",
+    "label": "--color-text-primary on --color-bg-primary",
+    "foreground": "--color-text-primary",
+    "background": "--color-bg-primary"
+  },
+  "contrast-pressed-edge": {
+    "kind": "contrast",
+    "card": "system/components/permission-band/index.html",
+    "label": "--color-brand-lime on --color-bg-primary",
+    "foreground": "--color-brand-lime",
+    "background": "--color-bg-primary"
+  },
+  "contrast-focus-ring-on-band": {
+    "kind": "contrast",
+    "card": "system/components/permission-band/index.html",
+    "label": "--color-border-focus on --color-bg-primary, the ring a disabled or busy control keeps",
+    "foreground": "--color-border-focus",
+    "background": "--color-bg-primary"
+  },
+  "contrast-focus-ring-on-confirm": {
+    "kind": "contrast",
+    "card": "system/components/permission-band/index.html",
+    "label": "--color-border-focus on --color-bg-tertiary, where Confirm's outward ring lands",
+    "foreground": "--color-border-focus",
+    "background": "--color-bg-tertiary"
+  },
+  "contrast-focus-ring-on-confirm-fill": {
+    "kind": "contrast",
+    "card": "system/components/permission-band/index.html",
+    "label": "--color-border-focus on --color-accent-primary, the ring Confirm used to draw inside its own fill",
+    "foreground": "--color-border-focus",
+    "background": "--color-accent-primary"
   }
 }

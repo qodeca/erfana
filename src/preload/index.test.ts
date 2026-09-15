@@ -3,6 +3,7 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
 import { CLIPBOARD_CHANNELS } from '../shared/ipc/clipboard-channels'
 import { IMAGE_EXPORT_CHANNELS } from '../shared/ipc/image-export-channels'
+import { BROWSER_CHANNELS } from '../shared/ipc/browser-channels'
 
 // Mock electron + toolkit before importing preload
 const listeners: Record<string, Array<(e: unknown, d: any) => void>> = {}
@@ -245,6 +246,40 @@ describe('imageExport bridge', () => {
     const surface = JSON.stringify(Object.keys(window.api))
     expect(surface).not.toContain('harness')
     expect(window.api).not.toHaveProperty('imageExportApi')
+  })
+})
+
+/**
+ * Tests for the open-in-browser bridge (#124, part 4).
+ *
+ * The shape is the contract: one verb, and it sends a file path wrapped as
+ * `{ filePath }` – never an address. Main confines the path and launches it.
+ */
+describe('browser bridge', () => {
+  it('exposes a browser namespace with a single openFile verb', () => {
+    expect(window.api.browser).toBeDefined()
+    expect(Object.keys(window.api.browser)).toEqual(['openFile'])
+    expect(typeof window.api.browser.openFile).toBe('function')
+  })
+
+  it('invokes browser:openFile with the path wrapped as { filePath }', async () => {
+    const { ipcRenderer } = await import('electron')
+
+    await window.api.browser.openFile('/project/site/index.html')
+
+    expect(ipcRenderer.invoke as any).toHaveBeenCalledWith(BROWSER_CHANNELS.OPEN_FILE, {
+      filePath: '/project/site/index.html'
+    })
+  })
+
+  it('passes a Windows path through unchanged', async () => {
+    const { ipcRenderer } = await import('electron')
+
+    await window.api.browser.openFile('C:\\Users\\a\\site\\index.HTM')
+
+    expect(ipcRenderer.invoke as any).toHaveBeenCalledWith(BROWSER_CHANNELS.OPEN_FILE, {
+      filePath: 'C:\\Users\\a\\site\\index.HTM'
+    })
   })
 })
 

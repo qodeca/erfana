@@ -10,8 +10,10 @@ import { describe, it, expect } from 'vitest'
 import type { PreviewFailure } from '../../../../../shared/ipc/preview-schema'
 import type { PreviewFailureType } from '../../../../../shared/ipc/preview-types'
 import { ErrorCode } from '../../../../../shared/errors'
+import { SRCDOC_TOO_DEEP_ENTRY } from '../../../../../shared/previewFrameBadgeText'
 import {
   deriveBounds,
+  previewPlaceholderLabel,
   selectPanelView,
   selectFallback,
   summarizeFailures,
@@ -146,5 +148,48 @@ describe('summarizeFailures', () => {
       makeFailure('script-error', 'app.js', '4')
     ]
     expect(summarizeFailures(failures).blockedHosts).toEqual(['cdn.example', 'fonts.example'])
+  })
+})
+
+describe('frame failure labels (issue #124, part 2 §2.12)', () => {
+  it.each([
+    ['frame-remote', 'Blocked remote frame'],
+    ['frame-escape', 'Frame escaped the project'],
+    ['frame-excluded', 'Excluded frame'],
+    ['frame-too-deep', 'Frame nested too deep'],
+    ['frame-over-limit', 'Too many frames'],
+    ['frame-link-blocked', 'Blocked link in frame']
+  ] as const)('labels %s "%s"', (type, label) => {
+    expect(FAILURE_TYPE_LABELS[type]).toBe(label)
+  })
+
+  it('groups frame refusals under their own labels', () => {
+    const { groups } = summarizeFailures([
+      makeFailure('frame-remote', 'https://cdn.example/frame.html', 'a'),
+      makeFailure('frame-too-deep', SRCDOC_TOO_DEEP_ENTRY, 'b'),
+      makeFailure('frame-remote', 'data:', 'c')
+    ])
+    expect(groups.map((g) => [g.label, g.entries.length])).toEqual([
+      ['Blocked remote frame', 2],
+      ['Frame nested too deep', 1]
+    ])
+  })
+})
+
+describe('previewPlaceholderLabel (issue #124, QG-8 U1)', () => {
+  it('is the panel identity alone while the page cannot be entered', () => {
+    expect(previewPlaceholderLabel('page.html', false)).toBe('HTML preview of page.html')
+  })
+
+  it('states the way in and the way back out while it can', () => {
+    expect(previewPlaceholderLabel('page.html', true)).toBe(
+      'HTML preview of page.html – press Enter to enter the page, Escape to come back'
+    )
+  })
+
+  it('keeps the identity as a prefix, which the e2e locators find a preview by', () => {
+    expect(previewPlaceholderLabel('index.html', true).startsWith('HTML preview of index.html – ')).toBe(
+      true
+    )
   })
 })

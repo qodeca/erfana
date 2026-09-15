@@ -15,7 +15,9 @@ import type {
   DropModeDialogConfig,
   DropModeDialogResult,
   ConflictDialogConfig,
-  ConflictDialogResult
+  ConflictDialogResult,
+  UnsavedChangesDialogConfig,
+  UnsavedChangesDialogResult
 } from './types'
 
 const DialogContext = createContext<DialogContextType | undefined>(undefined)
@@ -32,6 +34,20 @@ export function useDialog() {
   return context
 }
 
+/**
+ * The dialog system, or `undefined` outside a {@link DialogProvider}.
+ *
+ * For a component that must still mount without a provider and has a safe
+ * answer for "no dialogs": the preview link router, which refuses any move
+ * that would need the unsaved-changes prompt when it has none (issue #124,
+ * part 3 §3.6). Everything else should call {@link useDialog}, which throws.
+ *
+ * @returns The dialog context, or `undefined`
+ */
+export function useOptionalDialog(): DialogContextType | undefined {
+  return useContext(DialogContext)
+}
+
 // Provider component
 export function DialogProvider({ children }: { children: ReactNode }) {
   const [dialogs, setDialogs] = useState<Dialog[]>([])
@@ -39,6 +55,22 @@ export function DialogProvider({ children }: { children: ReactNode }) {
   // Use ref-based counter to prevent race conditions when multiple dialogs open rapidly
   // This ensures each dialog gets a unique z-index even if opened in the same render cycle
   const zIndexCounter = useRef(0)
+
+  // Cancels for the unsaved-changes prompts still waiting for an answer. Kept
+  // outside `dialogs` state so the unmount cleanup below sees a prompt opened
+  // in the same tick as the unmount, before any render committed it.
+  const pendingUnsavedCancels = useRef(new Set<() => void>())
+
+  // A prompt whose provider goes away counts as Cancel (issue #124, RX2-5):
+  // the move coordinator holds its per-panel lock until the prompt settles,
+  // so a promise left pending forever would block that tab's moves for good.
+  useEffect(() => {
+    const pending = pendingUnsavedCancels.current
+    return () => {
+      for (const cancel of Array.from(pending)) cancel()
+      pending.clear()
+    }
+  }, [])
 
   // Generate unique ID for dialogs
   const generateId = useCallback(() => {
@@ -249,6 +281,36 @@ export function DialogProvider({ children }: { children: ReactNode }) {
     [generateId, getNextZIndex]
   )
 
+  // Show the unsaved-changes prompt (issue #124, part 3 §3.6). Resolves, never
+  // rejects: a close without an answer and a provider unmount are 'cancel'.
+  const showUnsavedChanges = useCallback(
+    (config: Omit<UnsavedChangesDialogConfig, 'id'>): Promise<UnsavedChangesDialogResult> => {
+      return new Promise((resolve) => {
+        const id = generateId()
+        const zIndex = getNextZIndex()
+        const pending = pendingUnsavedCancels.current
+        const settle = (result: UnsavedChangesDialogResult): void => {
+          pending.delete(cancel)
+          resolve(result)
+        }
+        const cancel = (): void => settle('cancel')
+        pending.add(cancel)
+
+        const dialog: Dialog = {
+          id,
+          type: 'unsavedChanges',
+          config: { ...config, id },
+          zIndex,
+          resolve: settle as (value: unknown) => void,
+          reject: cancel as (reason?: unknown) => void
+        }
+
+        setDialogs((prev) => [...prev, dialog])
+      })
+    },
+    [generateId, getNextZIndex]
+  )
+
   // Close specific dialog
   const closeDialog = useCallback((id: string) => {
     setDialogs((prev) => {
@@ -305,6 +367,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
         showNewFolder,
         showDropMode,
         showConflict,
+        showUnsavedChanges,
         closeDialog,
         closeAll
       }}

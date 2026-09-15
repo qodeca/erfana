@@ -90,6 +90,36 @@ There is no Improve, Simplify, Rewrite or "Send to Terminal" entry.
 
 See: [Prompt Templates](./prompts/README.md)
 
+## HTML preview
+
+The running page is a native view that swallows every key, so the preview's shortcuts reach Erfana two ways: main forwards a closed list from inside the page (`PREVIEW_FORWARDED_SHORTCUTS` in `src/main/services/preview/previewInputForward.ts`, sent as `preview:forwardedShortcut` and routed by `usePreviewFindShortcuts`), and the panel root handles the Back and Forward keys while focus is in the panel's own chrome – its toolbar, find bar or banner (`usePreviewNavigation`).
+
+### Getting in and out of the page (#124)
+
+| Shortcut | Where | Action |
+|----------|-------|--------|
+| `Tab` | App | The page area (placeholder) is a tab stop only on the **active** tab with a live, drawn page |
+| `Enter` / `Space` | Page area focused | Puts keyboard focus in the page (`preview:focusPage`); `Space` does not scroll the panel |
+| `Esc` | Inside the page | Closes the find bar if it is open; otherwise returns focus to the toolbar's permission chip. Main first hands native keyboard focus back to the window (`previewHostFocus.ts`) – a DOM focus alone cannot take it back from the page's view |
+
+`usePreviewPageEntry` follows the panel's dockview active state (`api.isActive`, via `onDidActiveChange`), so an inactive tab's placeholder – dockview keeps it mounted – is never in the tab order. The placeholder's accessible name says both ways: "HTML preview of page.html – press Enter to enter the page, Escape to come back". Focus moves only on that key press, never on a load.
+
+### Inside the page, or in the panel's chrome
+
+| Shortcut | Action |
+|----------|--------|
+| `Cmd/Ctrl+F` | Open the find bar |
+| `Cmd/Ctrl+S` | Export the page to PDF |
+| `Cmd/Ctrl+W` | Close the preview tab |
+| `Cmd+[` (macOS) / `Alt+Left Arrow` (Windows; also Linux when run from source) | Back – the tab's previous page (#124) |
+| `Cmd+]` (macOS) / `Alt+Right Arrow` (Windows; also Linux when run from source) | Forward (#124) |
+
+`Cmd/Ctrl+F`, `S` and `W` are forwarded only from inside the page; with focus in Erfana's own chrome the app-level handlers apply as usual.
+
+**Back and Forward** come from one table for both processes, `src/shared/previewNavKeys.ts`, so main and the panel cannot disagree about which key is Back. They match the **physical** key (`KeyboardEvent.code`), not the typed character, so the key right of P is Back on every keyboard layout, and no other modifier may be down. They act only with focus inside the page or inside the panel's chrome: the panel root's `onKeyDown` is not a `window` listener, which meets the active-panel gate by construction – Monaco's `Cmd+[` and the terminal's `Alt+arrows` never reach it. The toolbar has a Back button but no Forward button (settled design): Back's tooltip names both keys, and its `aria-keyshortcuts` carries the Back key.
+
+**Zoom is not forwarded.** `Cmd/Ctrl+Plus`, `-` and `0` reach a focused preview through the View menu (see [Application Menu](#application-menu)).
+
 ## Project Panel
 
 ### Navigation
@@ -187,7 +217,7 @@ Note: Clipboard shortcuts use native browser behavior for better undo/redo integ
 
 ## Platform
 
-Erfana ships for macOS and Windows only – there is no Linux build.
+Erfana ships for macOS and Windows only – there is no Linux build. Linux is supported only as a development environment (`npm run dev`); where a shortcut row on this page names Linux, it means that setup.
 
 **macOS**: `Cmd` for shortcuts, `Option` = Alt
 **Windows**: `Ctrl` for shortcuts

@@ -36,6 +36,10 @@ import {
   PreviewOpenFileRequestedSchema,
   type PreviewFailure
 } from '../../../shared/ipc/preview-schema'
+import {
+  PreviewPageChangedPayloadSchema,
+  PreviewResizeHoldPayloadSchema
+} from '../../../shared/ipc/preview-navigation-schema'
 import type { PreviewBlockedKind } from '../../../shared/ipc/previewBlockedKind'
 import { PreviewEvents } from '../../../shared/ipc/preview-channels'
 import { PREVIEW_FORWARDED_SHORTCUTS } from '../../services/preview/previewInputForward'
@@ -43,6 +47,8 @@ import type {
   PreviewEmitters,
   PreviewFailureInput,
   PreviewFindResult,
+  PreviewLinkDisposition,
+  PreviewPageChange,
   PreviewStillFrame
 } from '../../../shared/ipc/preview-types'
 import { logger } from '../../services/LoggingService'
@@ -85,6 +91,10 @@ export interface PreviewEmittersDeps {
  * a `dispose` that cancels any pending coalesced flush.
  */
 export interface PreviewEmitterBundle extends PreviewEmitters {
+  /** Required here: the real bundle always tells the renderer about a resize hold (issue #124). */
+  resizeHold(panelId: string, held: boolean): void
+  /** Required here: the real bundle always tells the renderer a tab's page changed (issue #124). */
+  pageChanged(panelId: string, change: PreviewPageChange): void
   /** Forward one of the four enumerated accelerators (§1.9) to the renderer. */
   forwardedShortcut(panelId: string, key: string): void
   /** Cancel a pending coalesced flush; drop buffered snapshots without sending. */
@@ -229,7 +239,13 @@ export function createPreviewEmitters(deps: PreviewEmittersDeps): PreviewEmitter
         dataUrl: frame.dataUrl,
         width: frame.width,
         height: frame.height,
-        capturedAt: frame.capturedAt
+        capturedAt: frame.capturedAt,
+        // Issue #124: the CSS size the still is drawn at, and whether real input
+        // made it stale. Each travels only when present, so a frame without them
+        // is the payload it always was.
+        ...(frame.cssWidth !== undefined ? { cssWidth: frame.cssWidth } : {}),
+        ...(frame.cssHeight !== undefined ? { cssHeight: frame.cssHeight } : {}),
+        ...(frame.stale === true ? { stale: true } : {})
       })
     },
 
@@ -274,16 +290,47 @@ export function createPreviewEmitters(deps: PreviewEmittersDeps): PreviewEmitter
       })
     },
 
+    /*
+     * NOT coalesced, like `visibilityApplied`: the renderer answers every end of
+     * a hold with a settled push, so no transition may be collapsed away.
+     */
+    resizeHold(panelId: string, held: boolean): void {
+      validateAndSend(PreviewEvents.RESIZE_HOLD, PreviewResizeHoldPayloadSchema, { panelId, held })
+    },
+
+    /*
+     * NOT coalesced: the renderer matches each one to the move it announced
+     * (issue #124, part 3 §3.8), so none may be collapsed away. A page drives
+     * the in-page ones, but Chromium throttles same-document navigations, and
+     * each is one small message.
+     */
+    pageChanged(panelId: string, change: PreviewPageChange): void {
+      validateAndSend(PreviewEvents.PAGE_CHANGED, PreviewPageChangedPayloadSchema, {
+        panelId,
+        filePath: change.filePath,
+        anchor: change.anchor,
+        sameDocument: change.sameDocument,
+        canGoBack: change.canGoBack,
+        canGoForward: change.canGoForward,
+        backTarget: change.backTarget,
+        forwardTarget: change.forwardTarget,
+        generation: change.generation,
+        failed: change.failed
+      })
+    },
+
     openFileRequested(
       sourcePanelId: string,
       filePath: string,
       anchor: string | null,
-      windowId?: number
+      windowId?: number,
+      disposition?: PreviewLinkDisposition
     ): void {
       validateAndSend(
         PreviewEvents.OPEN_FILE_REQUESTED,
         PreviewOpenFileRequestedSchema,
-        { sourcePanelId, filePath, anchor },
+        // Absent means `new-tab` in the contract, so it travels only when set.
+        { sourcePanelId, filePath, anchor, ...(disposition !== undefined ? { disposition } : {}) },
         windowId
       )
     },

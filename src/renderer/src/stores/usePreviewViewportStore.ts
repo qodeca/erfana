@@ -67,8 +67,9 @@ export const usePreviewViewportStore = create<PreviewViewportState>((set) => ({
         current.width === rect.width &&
         current.height === rect.height
       ) {
-        // The bounds pump re-sends the same rect on every observer fire; not
-        // publishing an identical value keeps subscribers from re-rendering.
+        // `usePreviewBounds` can publish the same rect again (a forced or settled
+        // push); not publishing an identical value keeps subscribers from
+        // re-rendering.
         return state
       }
       const rects = new Map(state.rects)

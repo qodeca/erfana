@@ -46,6 +46,7 @@ export interface PreviewFindContents {
 /** Options accepted by {@link IPreviewFindController.find}. */
 export interface PreviewFindOptions {
   forward: boolean
+  /** Step to the next or previous match of the current query; `false` starts a new search. */
   findNext: boolean
   matchCase: boolean
 }
@@ -92,9 +93,15 @@ export class PreviewFindController implements IPreviewFindController {
       this.clearHighlights()
       return
     }
+    // Electron's `findNext` means "begin a new find session": true for a
+    // query's first request, false for a step to the next or previous match
+    // (`FindInPageOptions`). Ours means the opposite – step within the current
+    // session – so it is inverted here, at the one Electron boundary. Passed
+    // through unchanged, every fresh query was a step in a session that did not
+    // exist, and Chromium reported no matches (#124, WI-25).
     this.wc.findInPage(text, {
       forward: options.forward,
-      findNext: options.findNext,
+      findNext: !options.findNext,
       matchCase: options.matchCase
     })
   }

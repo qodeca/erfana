@@ -16,7 +16,7 @@
  *    also attempts the navigation and `will-navigate` fires for the SAME click.
  *    Without this, one click would open two tabs.
  *
- * Extracted from `PreviewLiveView`, which is already at the file-size cap.
+ * Extracted from `PreviewLiveView`, so the live view holds no link rules.
  */
 import { z } from 'zod'
 
@@ -84,6 +84,12 @@ const LinkActivationPayloadSchema = z
     rawHref: z.string().max(2048).optional().catch(undefined),
     target: z.string().max(64).default(''),
     download: z.boolean().default(false),
+    /**
+     * `MouseEvent.button`: 0 primary, 1 middle (issue #124). The link table
+     * opens anything but a primary click in a new tab. Absent – as from
+     * `will-navigate` – means primary.
+     */
+    button: z.number().int().min(0).max(4).default(0),
     modifiers: z
       .object({
         meta: z.boolean(),

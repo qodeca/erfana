@@ -26,14 +26,17 @@ import type { PdfExportResult } from '../../../shared/ipc/preview-types'
 import { ErrorCode } from '../../../shared/errors'
 import type { PreviewFindExportService } from '../../services/preview/PreviewViewService'
 import { logger } from '../../services/LoggingService'
+import { redactedLogError } from '../../utils/redactUserInput'
 import { registerHandle, unregisterHandle } from '../registry'
 
 /**
- * Default suggested export filename. The strict `exportPdf` schema carries no
- * filename (only `panelId`), so the handler supplies a stable default that the
- * export controller's `deriveSafeFilename` further sanitises (#161).
+ * The name the save dialog falls back to. The strict `exportPdf` schema
+ * carries only `panelId`, so no name ever comes from the renderer: the view
+ * names the export after the page on screen (`PreviewLiveView.exportPdf`,
+ * #124) and uses this only when there is no page name. The export
+ * controller's `deriveSafeFilename` makes either safe (#161).
  */
-const DEFAULT_EXPORT_SUGGESTED_NAME = 'preview'
+const FALLBACK_EXPORT_NAME = 'preview'
 
 /** Injected collaborators for the find/export handlers. */
 export interface PreviewFindHandlerDeps {
@@ -51,7 +54,8 @@ export function registerPreviewFindHandlers(deps: PreviewFindHandlerDeps): () =>
     if (isTrustedSender(event)) {
       return false
     }
-    logger.warn(`Rejected ${channel} from untrusted sender`, { url: event.senderFrame?.url })
+    // No sender URL in the line: main's drop lines carry fixed fields only.
+    logger.warn(`Rejected ${channel} from untrusted sender`)
     return true
   }
 
@@ -68,7 +72,7 @@ export function registerPreviewFindHandlers(deps: PreviewFindHandlerDeps): () =>
       const { panelId, text, forward, findNext, matchCase } = parsed.data
       service.find(panelId, text, { forward, findNext, matchCase })
     } catch (error) {
-      logger.error('preview:find failed', error instanceof Error ? error : undefined)
+      logger.error('preview:find failed', redactedLogError(error))
     }
   })
 
@@ -86,7 +90,7 @@ export function registerPreviewFindHandlers(deps: PreviewFindHandlerDeps): () =>
       }
       service.stopFind(parsed.data.panelId)
     } catch (error) {
-      logger.error('preview:stopFind failed', error instanceof Error ? error : undefined)
+      logger.error('preview:stopFind failed', redactedLogError(error))
     }
   })
 
@@ -104,9 +108,9 @@ export function registerPreviewFindHandlers(deps: PreviewFindHandlerDeps): () =>
           })
           return { ok: false, errorCode: ErrorCode.UNKNOWN_ERROR }
         }
-        return await service.exportPdf(parsed.data.panelId, DEFAULT_EXPORT_SUGGESTED_NAME)
+        return await service.exportPdf(parsed.data.panelId, FALLBACK_EXPORT_NAME)
       } catch (error) {
-        logger.error('preview:exportPdf failed', error instanceof Error ? error : undefined)
+        logger.error('preview:exportPdf failed', redactedLogError(error))
         return { ok: false, errorCode: ErrorCode.PDF_EXPORT_FAILED }
       }
     }

@@ -19,6 +19,7 @@ import { useProjectStore } from '../../stores/useProjectStore'
 import { getPanelById } from '../ActivityBar/activityBarConfig'
 import { useProjectManagementContext } from '../../context/ProjectManagementContext'
 import { useAutoOpenTerminal } from '../../hooks/useAutoOpenTerminal'
+import { useSplitterDragFreeze } from '../../hooks/useSplitterDragFreeze'
 import { logger } from '../../utils/logger'
 import { isMacOS } from '../../utils/platform'
 import { EditorAreaSplitPanel } from './components'
@@ -70,6 +71,10 @@ export function AppDockLayout() {
 
   // Auto-open terminal when project loads (Issue #55)
   useAutoOpenTerminal()
+
+  // Any splitter here can move a live HTML preview: hide the page behind its
+  // still picture while one is dragged (issue #124, part 1 §1.5).
+  useSplitterDragFreeze()
 
   // Use Zustand store for activity bar state — per-slice selectors so this component
   // only re-renders on the slices it consumes (not on every store change).
