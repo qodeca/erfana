@@ -124,7 +124,7 @@ await monaco.waitForReady(page)
 // Focus editor (handles overlapping layers, verifies cursor visibility)
 await monaco.focus(page)
 
-// Set content (clears existing, types new)
+// Set content (clears existing, inserts new as one input event)
 await monaco.setContent(page, '# Hello World')
 
 // Get content via clipboard
@@ -155,7 +155,7 @@ await monaco.executeCommand(page, 'Format Document')
 | `focus(page)` | Clicks with `force: true`, verifies cursor visibility |
 | `getTextArea(page)` | Returns Monaco's internal textarea locator |
 | `waitForCursor(page)` | Waits for cursor to be visible (focus verification) |
-| `setContent(page, content)` | Clears editor and types new content |
+| `setContent(content)` | Selects all, then inserts the new content with `keyboard.insertText` — never `keyboard.type`, which Monaco drops characters from during re-layout (#129) |
 | `getContent(page)` | Copies all content and reads from clipboard. Can return a STALE value - the app remaps copy to the main-process clipboard, so the renderer clipboard may hold the previous copy. When asserting content the app changed, use `MonacoPage.visibleText()` instead; it is on the POM class only, not on this adapter |
 
 ### Terminal helpers

@@ -237,7 +237,9 @@ Order-only dependencies (shared files, not logic): WI-9 → WI-10 (`previewLiveB
 |---|---|---|---|
 | unit – main and shared | Vitest, `vitest.main.ts` | `npm run test:ci` | pure decisions; wiring with fakes |
 | unit – renderer | Vitest, `vitest.renderer.ts` | `npm run test:ci` | stores, hooks, components |
-| integration | Vitest, `vitest.main.ts` | `npm run test:main` (and `npm run test:ci`): `*.integration.test.ts` under `src/main` match the main include – no separate command | real temp folders and symlinks; the symlink cases skip on win32 |
+| integration | Vitest, `vitest.main.ts` | `npm run test:main` (and `npm run test:ci`): `*.integration.test.ts` under `src/main` match the main include – no separate command | real temp folders and symlinks; the symlink cases skip on win32 [^win32-skips] |
+
+[^win32-skips]: **Superseded 2026-09-15 (#130).** Three of these suites carried a whole-file `describe.skipIf(win32)`, not just skipped symlink cases. The first Windows run showed 54 of those tests pass there, so the skips were narrowed: `previewNavigation.integration.test.ts` runs in full, `previewFrames.integration.test.ts` and `BrowserLaunchService.integration.test.ts` skip one case each, and `previewRequestKind.integration.test.ts` keeps only its inner `symlinks` describe. Recorded here because this table reads as if the narrow skip was always the shape.
 | e2e | Playwright with Electron | `npm run test:e2e`; one spec: `npx electron-vite build && npx playwright test --project=electron <spec>` | one spec per part plus the drag freeze |
 | manual | a person | – | §5.5 |
 

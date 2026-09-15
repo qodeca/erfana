@@ -91,7 +91,9 @@ A page can show other pages from the same project in an `<iframe>`.
 
 **Gitignored pages can run inside a frame.** The gitignore rule decides only how a click in the tree or a link opens a file. A gitignored `.html` framed by a page runs there, while a link to the same file still opens it as source.
 
-**A file that is itself a symlink is not served.** A frame whose `src` names a symlink – whether it points inside the project or out of it – is listed as a **Missing local file**, and a stylesheet, script or image the page asks for by a symlinked name does not load either. The target is never read. A symlinked *folder* inside the project works, and one that leads out of the project is still refused as an escape. On Windows the same frame is expected to be listed as "Frame escaped the project" instead; that has not yet been checked on Windows.
+**A file that is itself a symlink is not served.** A frame whose `src` names a symlink is refused either way, and a stylesheet, script or image the page asks for by a symlinked name does not load either. A symlinked *folder* inside the project works, and one that leads out of the project is still refused as an escape.
+
+**The label differs by platform, and both are correct.** On macOS, `O_NOFOLLOW` stops the open outright, so the frame is listed as a **Missing local file** whichever way the link points and the target is never read. Windows has no `O_NOFOLLOW`: it follows the link, resolves the target, and measures it against the project root — so a leaf symlink pointing OUT of the project is listed as **Frame escaped the project**, which names the real problem more accurately. Confirmed on both platforms on 2026-09-15; `previewFrames.integration.test.ts` asserts the macOS labelling and skips that one case on win32 for this reason. The in-project leaf-symlink case on Windows has not been checked.
 
 Markdown previews still show no frames at all.
 

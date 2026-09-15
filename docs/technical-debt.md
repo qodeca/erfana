@@ -303,7 +303,7 @@ After the heartbeat hardening (Phase A4 resume-refresh, B1 symlink defense, D3 H
 
 **Files**: `scripts/test-cov.mjs` (the three `run(...)` calls), `vitest.workspace.ts`, `.github/workflows/checks.yml` (Coverage job).
 
-**Status**: Open — recorded by the #60 change-set review. Derived from configuration, not from a timed run.
+**Status**: Open — recorded by the #60 change-set review. **Observed directly on 2026-09-15** and promoted to [#133](https://github.com/qodeca/erfana/issues/133): `vitest --run --config vitest.main.ts --coverage` reports 562 files / 13,847 tests (the whole workspace), while adding `--project main` gives 287 files / 6,972 tests. The same issue carries a second defect this entry did not know about — the script's `spawnSync(…, {stdio: 'inherit'})` output never reaches a redirected log on Windows, so a failing run prints only `Command failed (1): …` and never names the floor that missed.
 
 ---
 
@@ -843,7 +843,7 @@ One extra obstacle found since: `PreviewViewService.applyApprovedHosts` returns 
 
 **Impact**: `BrowserLaunchService` refuses a Windows alternate-data-stream spelling such as `C:\p\tool.exe:x.html` (`namesAlternateDataStream`), but the preview's own page gate, `isPreviewPagePath` in `previewLinkDisposition.ts`, still accepts it. Content stays confined, and the file has to be named with stream syntax for it to matter.
 
-**Recommended Solution**: share one `isHtmlName` between the two. Deferred because it edits the preview's path gate, the most security-sensitive code on the branch. On the Windows UAT list.
+**Recommended Solution**: share one `isHtmlName` between the two. Deferred because it edits the preview's path gate, the most security-sensitive code on the branch. **Windows UAT update 2026-09-15**: the `BrowserLaunchService` half was exercised on a Windows host (#130) — the `namesAlternateDataStream` table cases and the `NOT_HTML` refusal run and pass there, and a real alternate data stream was created on disk to confirm the shape. The gate *disagreement* itself was not re-examined, so this entry stays open.
 
 **Status**: Accepted at #124 QG-8 (T6).
 
@@ -977,6 +977,22 @@ One extra obstacle found since: `PreviewViewService.applyApprovedHosts` returns 
 - **`previewStillFrameFreshness.ts` also owns the history gesture clock** (Q9). Its header says so; its name does not. Fix: rename it to `previewInputWatch.ts`, with its tests and its per-file floor key in `vitest.main.ts`, when it is next edited.
 
 **Status**: Accepted at #124 QG-11a (Q6, Q7, Q9) – refactors with no behaviour change.
+
+---
+
+### 64. `BrowserLaunchService` answers LAUNCH_FAILED on Windows for a forced-darwin launcher (#130, 2026-09)
+
+**Severity**: Medium
+
+**Impact**: One case in `BrowserLaunchService.integration.test.ts` ("runs /usr/bin/open on macOS with the real path as one argument") builds a darwin launcher by hand — `createBrowserLauncher({ platform: 'darwin', … })` with a mocked `execFile` that resolves — and calls `service.openFile(…)` on a project opened through a symlinked folder. On macOS and Linux it returns `{success: true}`. On a Windows host it returns `OPEN_IN_BROWSER_LAUNCH_FAILED`, so the mocked launcher is never reached.
+
+**Problem**: **The cause is not understood.** The launcher's platform is passed as a pure argument, so the divergence is upstream of it, somewhere in `BrowserLaunchService.openFile`'s own path handling. A sibling case at the same fixture opens the identical non-ASCII filename through the gated IPC handler and passes on Windows, so the filename is not the trigger. This is an unexplained platform divergence in the service that hands a URL to the operating system, which is worth more than a test skip.
+
+**Recommended Solution**: instrument `openFile` on a Windows host and find where the darwin-launcher path diverges — most likely the symlinked-project resolution or the launcher-selection branch. Then either fix the service or replace the skip with an assertion that documents the real Windows behaviour.
+
+**Files**: `src/main/services/browserLaunch/BrowserLaunchService.ts`, `src/main/services/browserLaunch/browserLauncher.ts`, `src/main/services/browserLaunch/BrowserLaunchService.integration.test.ts` (the `it.skipIf` and its comment).
+
+**Status**: Open — found on 2026-09-15 while narrowing three over-broad `describe.skipIf(win32)` blocks in #130. The skip is now scoped to this one case, with the reason recorded at the skip; the other 18 cases in that file run on Windows.
 
 ---
 

@@ -122,7 +122,7 @@ Three of the four rows that used to sit here have shipped and moved to the ✅ t
 | AC | Status / notes |
 |---|---|
 | #1 `npm run test:cov` completes on Windows | ⚠️ Tests pass (238 files / 7405 tests / 0 failures at the time); recorded then as a v8 aggregator race → [#158](https://github.com/qodeca/erfana/issues/158). **Superseded 2026-09-04**: the real cause is two per-file coverage floors missed because the win32-skipped symlink cases never execute — see [`known-flakes.md` § `npm run test:cov` cannot pass on a Windows host](known-flakes.md#npm-run-testcov-cannot-pass-on-a-windows-host) |
-| #2 `npm run build:win` produces NSIS installer | ✅ Met (Developer Mode required; documented) |
+| #2 `npm run build:win` produces NSIS installer | ⚠️ Met 2026-04-20 (Developer Mode required; documented), **regressed by 2026-09-15** — a local build now stops on the unconditional Azure signing config, see [#132](https://github.com/qodeca/erfana/issues/132). CI still builds the installer on `windows-latest`. |
 | #3 `docs/build/windows.md` exists, linked, includes contributor guidance | ✅ Met |
 | #4 macOS `test:cov` + `build:mac` regression check | ✅ **Met — verified 2026-04-20** (7532/7532 pass, both DMGs built; separate flake tracked in [#159](https://github.com/qodeca/erfana/issues/159)) |
 | #5 `devDependencies` includes portability packages | ✅ Met (`rimraf`, `shx`) |
@@ -329,7 +329,7 @@ Phase 4's ~55 new tests span 8 files. Table below is the authoritative coverage 
 - ~~Fix auto-updater URL~~ — `electron-builder.yml` now uses `publish: null` (auto-update is an explicit non-goal).
 - ~~Code signing config~~ — Azure Artifact Signing configured in `electron-builder.yml` `win.azureSignOptions`. `.pfx`-in-secret path abandoned.
 
-**Manual validation:** `npm run build:win` locally produces unsigned output (signing happens in CI); NSIS installs cleanly on Windows 11; end-to-end signed flow verified via `release.yml` runs since v0.9.5.
+**Manual validation:** NSIS installs cleanly on Windows 11; end-to-end signed flow verified via `release.yml` runs since v0.9.5. **Correction 2026-09-15**: `npm run build:win` does *not* produce unsigned output locally — it produces nothing. `win.azureSignOptions` is declared unconditionally, so a machine without Azure credentials stops at `Unable to find valid azure env field AZURE_TENANT_ID for signing`, and `build:unpack` fails the same way. Tracked as [#132](https://github.com/qodeca/erfana/issues/132). The CI release path is unaffected.
 
 ---
 
