@@ -180,7 +180,9 @@ async function dirtyPricingThenOverview(h: Nav): Promise<void> {
   await monaco.focus()
   // To the end of the file (Cmd+Down in Monaco on macOS), so the text lands after </html>.
   await h.page.keyboard.press(process.platform === 'darwin' ? 'Meta+ArrowDown' : 'Control+End')
-  await h.page.keyboard.type('E2EUNSAVED')
+  // `insertText`, not `keyboard.type`: Monaco drops individual keystrokes during
+  // re-layout, so on Windows this marker arrived as 'E2ENSAVED'. See monaco.page.ts.
+  await h.page.keyboard.insertText('E2EUNSAVED')
   await expect(h.tabs.dirtyDot('pricing.html')).toBeVisible()
   await openPage(h, INDEX)
   await turnSameTabOn(h.preview, 'index.html')

@@ -169,14 +169,19 @@ test.describe('Recent projects', () => {
       `[data-testid^="${TEST_IDS.WELCOME_RECENT_PROJECT}-"]` +
         `:not([data-testid^="${TEST_IDS.WELCOME_RECENT_PROJECT_BTN_REMOVE}-"])`
     )
-    await expect(entries).toHaveCount(1, { timeout: 10_000 })
+    // `userDataDir` is WORKER-scoped while the app fixtures are TEST-scoped, so
+    // every project an earlier test in this worker opened is still on the list.
+    // Assert the drop, not an absolute count: expecting exactly one entry only
+    // holds when this test happens to run first in its worker.
+    await expect.poll(() => entries.count(), { timeout: 10_000 }).toBeGreaterThan(0)
+    const before = await entries.count()
 
     await windowWithTestProject
       .locator(`[data-testid^="${TEST_IDS.WELCOME_RECENT_PROJECT_BTN_REMOVE}-"]`)
       .first()
       .click()
 
-    await expect(entries).toHaveCount(0, { timeout: 10_000 })
+    await expect(entries).toHaveCount(before - 1, { timeout: 10_000 })
   })
 })
 

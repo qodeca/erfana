@@ -31,17 +31,23 @@ export class MonacoPage {
     await expect(cursor).toBeVisible({ timeout: 2000 })
   }
 
+  // Both writers use `insertText`, NOT `keyboard.type`. `type()` sends one
+  // keystroke per character, and Monaco drops some of them during its re-layout
+  // cycles — reliably so on Windows, where a run of this suite turned
+  // 'manually saved' into 'mnulysvd'. `insertText` delivers the whole string as
+  // a single input event, the way a paste does. Same reasoning, and the same
+  // remedy, as third-party-components.e2e.ts.
   async setContent(content: string): Promise<void> {
     await this.focus()
     await this.keyboard.selectAll()
-    await this.page.keyboard.type(content)
+    await this.page.keyboard.insertText(content)
   }
 
   async appendContent(content: string): Promise<void> {
     await this.focus()
     const modifier = await this.keyboard.getModifier()
     await this.page.keyboard.press(`${modifier}+End`)
-    await this.page.keyboard.type(content)
+    await this.page.keyboard.insertText(content)
   }
 
   async getContent(): Promise<string> {
