@@ -95,7 +95,7 @@ beforeAll(() => {
   gated = mockIpcHandle.mock.calls.find((call) => call[0] === BROWSER_CHANNELS.OPEN_FILE)![1]
 })
 
-describe.skipIf(process.platform === 'win32')('open in default browser (P4-AC4)', () => {
+describe('open in default browser (P4-AC4)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     // Deliberately NOT realpath'd: on macOS the temp folder is itself behind `/var`.
@@ -201,7 +201,12 @@ describe.skipIf(process.platform === 'win32')('open in default browser (P4-AC4)'
       expect(logged).not.toContain(project)
     })
 
-    it('runs /usr/bin/open on macOS with the real path as one argument', async () => {
+    // The only case in this file that does not hold on a Windows host: it builds
+    // a darwin launcher by hand, and the service answers LAUNCH_FAILED there for
+    // a reason not yet run down. The skip used to sit on the whole `describe`,
+    // which hid the other 18 cases — the sender gating among them — from every
+    // Windows run. Narrow it to the one case that needs it, and keep the rest.
+    it.skipIf(process.platform === 'win32')('runs /usr/bin/open on macOS with the real path as one argument', async () => {
       const execFile = vi.fn(async (_file: string, _args: readonly string[]) => {})
       const launcher = createBrowserLauncher({
         platform: 'darwin',

@@ -184,7 +184,11 @@ function write(rel: string, content: string): void {
   writeFileSync(join(site, rel), content)
 }
 
-describe.skipIf(process.platform === 'win32')('same-tab navigation in a project behind a symlinked folder', () => {
+// This block used to carry `describe.skipIf(process.platform === 'win32')`. Every
+// case in it passes on a Windows host with Developer Mode on, where `mklink`
+// needs no administrator, so the skip only hid same-tab navigation from the one
+// platform whose path handling differs most. Verified on Windows 11 Pro 26200.
+describe('same-tab navigation in a project behind a symlinked folder', () => {
   beforeEach(async () => {
     // Deliberately NOT realpath'd: on macOS the temp folder is itself behind `/var`.
     base = mkdtempSync(join(tmpdir(), 'erfana-nav-'))
