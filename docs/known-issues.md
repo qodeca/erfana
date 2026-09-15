@@ -45,11 +45,35 @@ Phases 0–2 of Windows enablement shipped in **v0.9.3** (2026-04-22); Phase 4 (
 
 ---
 
+### No local Windows package can be built
+
+**Issue**: Both `npm run build:win` and `npm run build:unpack` stop with `Error: Unable to find valid azure env field AZURE_TENANT_ID for signing`. `electron-builder.yml` declares `win.azureSignOptions` unconditionally and hooks `afterSign: ./scripts/resign.js`; CI supplies the Azure values at invocation, and a developer machine has none. There is no unsigned fallback — `--dir` fails the same way. Older notes describing local Windows builds as merely "unsigned" are wrong.
+
+**Workaround**: None today. Use CI: `release.yml` builds and signs Windows on `windows-latest`, and that path is healthy. Observed on Windows 11 Pro 26200 on 2026-09-15; inferred but not exercised for a Windows target cross-built from macOS or Linux.
+
+**Tracking**: [#132](https://github.com/qodeca/erfana/issues/132).
+
+---
+
+### The e2e suite never deletes its temp folders
+
+**Issue**: Playwright fixture teardown fails with `EBUSY: resource busy or locked, rmdir '.e2e-temp\test-…'` because files are still held when cleanup runs. The line repeats for nearly every test. One validation session left 419 folders and 6.1 MB under `.e2e-temp`.
+
+**Workaround**: Delete `.e2e-temp` by hand between runs. The directory is git-ignored, so this is unbounded litter and log noise rather than breakage — but the repeated teardown line does bury real failures in the e2e output.
+
+**Tracking**: [#134](https://github.com/qodeca/erfana/issues/134).
+
+---
+
 ### `npm run test:cov` exits 1 on Windows
 
-**Issue**: Every test passes; what fails are two **per-file** coverage thresholds declared in `vitest.main.ts` — `scripts/fuses.js` (86% lines / 88% functions) and `src/main/utils/tarArchive.ts` (90% each metric). Both suites skip their symlink cases on win32, because a file symlink needs `SeCreateSymbolicLinkPrivilege`: `scripts/fuses.test.mjs` carries ten `skipIf(process.platform === 'win32')` guards, and `src/main/utils/tarArchive.test.ts:77` returns early. The lines those cases would cover never execute, so both file-level floors miss by a few points and vitest exits 1.
+**Issue**: Every test passes; what fails are two **per-file** coverage thresholds declared in `vitest.main.ts` — `scripts/fuses.js` (86% lines / 88% functions) and `src/main/utils/tarArchive.ts` (90% each metric). Both suites skip their symlink cases on win32, because a file symlink needs `SeCreateSymbolicLinkPrivilege`: `scripts/fuses.test.mjs` carries six `skipIf(process.platform === 'win32')` guards, and `src/main/utils/tarArchive.test.ts:77` returns early. The lines those cases would cover never execute, so both file-level floors miss by a few points and vitest exits 1.
 
-**Workaround**: None on a Windows host — the run is doing what it is told. Run it on macOS or Linux, or read the CI result: the required `Coverage` job runs on `ubuntu-latest`, where nothing is skipped and it passes.
+Measured on a Windows host on 2026-09-15: those two are the **only** misses. All twelve #124 per-file preview floors pass there, and so do the renderer and preload floors.
+
+**The script itself has two further defects**, tracked as [#133](https://github.com/qodeca/erfana/issues/133): `scripts/test-cov.mjs` runs each config without `--project`, so `vitest.workspace.ts` auto-discovery expands every pass to all three projects and the suite runs about three times per invocation; and its `spawnSync(…, {stdio: 'inherit'})` output does not reach a redirected log on Windows, so a failing run shows only `Command failed (1): …` with no threshold lines at all.
+
+**Workaround**: None on a Windows host for the floors themselves — the run is doing what it is told. Run it on macOS or Linux, or read the CI result: the required `Coverage` job runs on `ubuntu-latest`, where nothing is skipped and it passes. To see *which* floor missed on Windows, run the underlying command directly rather than through the script: `npx vitest --run --config vitest.main.ts --project main --coverage`.
 
 **Tracking**: [`docs/windows/known-flakes.md` § `npm run test:cov` cannot pass on a Windows host](./windows/known-flakes.md#npm-run-testcov-cannot-pass-on-a-windows-host).
 
@@ -337,7 +361,7 @@ Symptom: `'GetCommitHash.bat' is not recognized` during the winpty build. When W
 
 Symptom: `MSB8040: Spectre-mitigated libraries are required for this project`. node-pty's gyp requests `SpectreMitigation: 'Spectre'`, which fails on a default MSVC install that lacks those libs.
 
-**Status of (2) and (3)**: both are now handled automatically by the committed `patches/node-pty+1.1.0.patch`, applied via `patch-package` in the `postinstall` hook, so a fresh `npm ci` on a default-hardened Windows 11 box succeeds. The patch is keyed to the resolved version — when `node-pty` is bumped it must be regenerated (see [`docs/build/README.md`](./build/README.md#install-dependencies) and [`docs/build/windows.md` § node-pty build failures on Windows 11](./build/windows.md#node-pty-build-failures-on-windows-11)). A follow-up will evaluate node-pty `1.2.0-beta.7+`, which removes the winpty build step and eliminates failure (2) at the root.
+**Status of (2) and (3)**: both are handled automatically by the committed `patches/node-pty+1.1.0.patch`, applied via `patch-package` in the `postinstall` hook. **A third, unrelated `npm ci` failure is still open**, so a fresh install on a default-hardened Windows 11 box does *not* currently succeed: `postinstall` dies with `node-gyp failed to rebuild node-pty` and `MSBuild.exe failed with exit code: 1` (`failedTask=installAppDeps`), with the documented toolchain in place. Observed 2026-09-15 on Windows 11 Pro 26200 (Node 24.14.1, Python 3.14.3), and on the previous Windows host before it. Workaround is `npm ci --ignore-scripts`, which leaves the terminal non-functional in that tree. See [`docs/build/windows.md` § node-pty build failures on Windows 11](./build/windows.md#node-pty-build-failures-on-windows-11). The patch is keyed to the resolved version — when `node-pty` is bumped it must be regenerated (see [`docs/build/README.md`](./build/README.md#install-dependencies) and [`docs/build/windows.md` § node-pty build failures on Windows 11](./build/windows.md#node-pty-build-failures-on-windows-11)). A follow-up will evaluate node-pty `1.2.0-beta.7+`, which removes the winpty build step and eliminates failure (2) at the root.
 
 **Tracking**: #213 (Windows 11 build fix, resolved); https://github.com/microsoft/node-pty/issues (upstream).
 

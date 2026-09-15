@@ -192,7 +192,7 @@ The same was true of the previous Windows host. Every check in this report there
 
 **Consequence: #125's electron-builder bump is not verified on Windows.** It rests on CI's `build_win.yml`. Nothing else in the drift affects this report — electron-builder is used by exactly one command, and `electron`, `vitest`, `zod` and `playwright` all match the lockfile.
 
-**A second finding: no local Windows packaging is possible at all**, on any platform, without Azure credentials.
+**A second finding: no local Windows packaging is possible at all** without Azure credentials. Observed on this Windows host; the `azureSignOptions` block is declared unconditionally under `win:`, so the same is **inferred** for a Windows target built from macOS or Linux, but that was not exercised.
 
 ```
 Error: Unable to find valid azure env field AZURE_TENANT_ID for signing.

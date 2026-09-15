@@ -128,7 +128,9 @@ npm run test:cov     # should produce coverage/ output
 npm run build:win
 ```
 
-This produces an NSIS installer in `release/{version}/`. The build runs `prebuild` (the aproba shim) and `electron-builder --win` automatically.
+> **This does not work on a developer machine today — see [#132](https://github.com/qodeca/erfana/issues/132).** `electron-builder.yml` declares `win.azureSignOptions` unconditionally, so signing is attempted even locally and the build stops with `Error: Unable to find valid azure env field AZURE_TENANT_ID for signing`. `npm run build:unpack` (`electron-builder --dir`) fails the same way, so there is no unsigned fallback. Verified on Windows 11 Pro 26200 on 2026-09-15; inferred, but not exercised, for a Windows target cross-built from macOS or Linux. Windows installers come from `release.yml` only, which builds on `windows-latest` and supplies the Azure values at invocation — **the release path is healthy and unaffected**. Older notes describing local builds as merely "unsigned" are wrong: they cannot be produced at all. The newest artifact under `release/` is v0.9.4 from 2026-04-23, which is consistent with that.
+
+When it worked, this produced an NSIS installer in `release/{version}/`. The build runs `prebuild` (the aproba shim) and `electron-builder --win` automatically.
 
 > The installer produced here runs the full user-visible feature surface. Phases 1–2 + 4 (terminal parity, dependency detection, reserved-filename guard, local Whisper) shipped in v0.9.3 / v0.9.4, and Phase 3 screenshot capture shipped in v0.12.0 — no feature is gated off on Windows any more. What remains open is installer UX polish (Phase 5, issue #166). Per-feature status lives in [`implementation-plan.md`](../windows/implementation-plan.md) §"Feature status on Windows today".
 
@@ -136,7 +138,16 @@ This produces an NSIS installer in `release/{version}/`. The build runs `prebuil
 
 ## node-pty build failures on Windows 11
 
-A fresh `git clone && npm ci` on a default-hardened Windows 11 box previously failed in two ways while compiling `node-pty`. Both are now fixed automatically by the committed `patches/node-pty+1.1.0.patch`, applied via `patch-package` in the `postinstall` hook — no manual intervention required.
+A fresh `git clone && npm ci` on a default-hardened Windows 11 box previously failed in two ways while compiling `node-pty`. Both are fixed automatically by the committed `patches/node-pty+1.1.0.patch`, applied via `patch-package` in the `postinstall` hook — no manual intervention required.
+
+> **A third, unrelated failure is open.** On Windows 11 Pro 26200 with the documented toolchain in place (Node 24.14.1, npm 11.11.0, Python 3.14.3), `npm ci` still dies in `postinstall`:
+>
+> ```
+> ⨯ node-gyp failed to rebuild '…\node_modules\node-pty'
+> Error: `…\MSBuild.exe` failed with exit code: 1   failedTask=installAppDeps
+> ```
+>
+> This is not the `.bat` or Spectre failure the patch fixes, and it is not a wrong Python or a missing C++ workload. Observed 2026-09-15 and on the previous Windows host before it. Workaround: `npm ci --ignore-scripts`, which skips the native rebuild — note the terminal will not work in that tree, so use it only for tests that do not spawn a PTY. To test whether a reinstall would work at all without risking a working tree, copy `package.json`, `package-lock.json`, `patches/` and `electron-builder.yml` into a scratch directory and run `npm ci` there.
 
 - **`'GetCommitHash.bat' is not recognized`** – node-pty's `deps/winpty/src/winpty.gyp` invokes `cmd /c "cd shared && GetCommitHash.bat"` / `UpdateGenVersion.bat`. When Windows sets `NoDefaultCurrentDirectoryInExePath=1` (a security-hardening flag, often applied via enterprise / Group Policy baselines), `cmd.exe` no longer searches the current directory, so the `.bat` is "not recognized" and the build aborts. The patch prefixes the calls with `.\` to force current-directory resolution (per Microsoft's `NeedCurrentDirectoryForExePath` contract).
 - **`MSB8040: Spectre-mitigated libraries are required for this project`** – node-pty's gyp requests `SpectreMitigation: 'Spectre'`, which fails on a default MSVC install that lacks the Spectre-mitigated libs. The patch sets `SpectreMitigation: 'false'` for node-pty's builds. This is an accepted residual risk: node-pty wraps an operator-driven PTY rather than adversarial cross-boundary input, and the flag is kept off everywhere (local / CI / release) for consistency.
@@ -158,8 +169,11 @@ A fresh `git clone && npm ci` on a default-hardened Windows 11 box previously fa
 - Verify long paths are enabled in both Git and Windows (step 5).
 - Reboot after enabling the group policy — it doesn't apply to running shells.
 
+**`build:win` (or `build:unpack`) fails with "Unable to find valid azure env field AZURE_TENANT_ID for signing"**
+- Expected on any machine without the Azure signing credentials, which is every developer machine. There is no supported local workaround today. Tracked as [#132](https://github.com/qodeca/erfana/issues/132). Use CI: `release.yml` builds and signs on `windows-latest`.
+
 **`build:win` fails with "Cannot create symbolic link : A required privilege is not held by the client"**
-- Developer Mode is not enabled. See step 4.
+- Developer Mode is not enabled. See step 4. Note this is now the *second* failure you would hit, not the first — the Azure signing error above stops the build earlier.
 
 **`npm run test:cov` complains about missing `out/` directory**
 - Run `npm run build` once first. The script preserves an existing `out/` between runs but expects either none or a valid one.

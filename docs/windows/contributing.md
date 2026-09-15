@@ -107,6 +107,19 @@ import os from 'node:os'
 const fixtureDir = path.join(os.tmpdir(), 'erfana-test', 'my-scope')
 ```
 
+**Resolve a temp fixture with `realpathSync.native`, not `realpathSync`.** On Windows, `os.tmpdir()` comes back as an 8.3 short name (`C:\Users\MARCIN~1\AppData\Local\Temp`). `fs.realpathSync` does **not** expand it; `fs.realpathSync.native` and `fs/promises.realpath` both do. So a fixture root built with the plain form, compared against a production path resolved by `fsPromises.realpath`, lands in a different namespace: `relative()` returns a `..`-prefixed path and every confinement check refuses.
+
+```ts
+// wrong on Windows — root stays MARCIN~1 while the target expands
+const root = realpathSync(mkdtempSync(join(tmpdir(), 'erfana-x-')))
+// right — same namespace as the production resolver
+const root = realpathSync.native(mkdtempSync(join(tmpdir(), 'erfana-x-')))
+```
+
+This is not theoretical: it broke six #124 suites, 28 tests, on the first Windows CI run and was fixed in #128. The full explanation lives at `src/main/services/preview/PreviewProtocolHandler.test.ts`, and `previewPathResolve.win32ShortName.test.ts` covers the behaviour directly.
+
+**Never assert an absolute count of persisted app state.** `userDataDir` is **worker**-scoped while the app fixtures are **test**-scoped, so anything the app stores — recent projects above all — carries over from every earlier test in that worker. Assert the change you caused, not the total. A test that expected exactly one recent project passed only when it happened to run first, and failed on Windows where it ran fifth (#129).
+
 In **renderer** runtime code (not just fixtures), never derive a basename, dirname, or relative path with `filePath.split('/')` / `lastIndexOf('/')` — the main process passes native separators across IPC, so a path can contain `\` on Windows. Use the cross-platform helpers in [`src/renderer/src/utils/fileUtils.ts`](../../src/renderer/src/utils/fileUtils.ts) (`getBasename`, `getDirname`, `getDisplayRelativePath`, `isPathInside`, `isStrictDescendant`); a renderer-scoped ESLint `no-restricted-syntax` rule enforces this. These helpers are display/parse-only — filesystem confinement stays main-side in `ExternalFileService` via `realpath` ([#238](https://github.com/qodeca/erfana/issues/238)).
 
 ### Platform overrides in tests
