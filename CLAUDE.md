@@ -5,7 +5,7 @@ An agent-native Markdown workspace (Electron): integrated terminal for CLI codin
 - **Repository**: `qodeca/erfana` (GitHub, public)
 - **License and legal**: `GPL-3.0-only` with REUSE-style SPDX headers – see [LICENSE](LICENSE), [`REUSE.toml`](REUSE.toml), [TRADEMARKS.md](TRADEMARKS.md) (forks must rebrand) and [CLA.md](CLA.md). `"private": true` in package.json is a publish guard for the desktop app, not a license statement.
 - **Node Version**: 24+ (development), Electron 39 bundles Node.js 22.22.1
-- **Current version**: v0.19.0 (see [docs/CHANGELOG.md](docs/CHANGELOG.md); bump this line at release)
+- **Current version**: v0.20.0 (see [docs/CHANGELOG.md](docs/CHANGELOG.md); bump this line at release)
 
 ## Branching model
 - `main` — released code only. Protected (required status checks, `enforce_admins`, signed `v*.*.*` tags); direct push is the intended solo-dev workflow, no PR required.
