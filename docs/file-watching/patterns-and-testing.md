@@ -146,7 +146,7 @@ echo "# Conflict" >> /path/to/project/test.md
 rm /path/to/project/test.md
 
 # Expected:
-# - Red warning banner: "This file has been deleted externally"
+# - Red warning banner: "This file was deleted on disk. Save to restore it."
 # - Editor content remains (not cleared)
 # - Can still save to recreate file
 ```

@@ -172,7 +172,7 @@ Rare edges: a suspend between the commit and `did-navigate` leaves T on A after 
 
 ## 3.9 Corrections to the UX spec
 
-Written into `temp/124-ux-spec.md` too, marked inline.
+Written into `124-ux-spec` run notes (not in repo) too, marked inline.
 
 | UX spec | Was | Now | Finding |
 |---|---|---|---|

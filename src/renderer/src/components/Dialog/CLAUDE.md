@@ -2,8 +2,6 @@
 
 All dialogs MUST compose on `BaseDialog`. Never build portals, overlays, or focus management from scratch.
 
-BaseDialog portals into `#portal-root`.
-
 ## Focus management
 
 The focusable selector **excludes `:disabled` controls**, so a Start/Capture button that is disabled while work is pending is never picked as the auto-focus target and never acts as a Tab boundary.
@@ -40,9 +38,10 @@ Use the `.dialog-btn` classes from `Dialog.css` (`.dialog-btn` is always require
 
 ## Existing dialogs (only where the filename misleads)
 
-Most dialog files do what their name says. These two do not:
+Most dialog files do what their name says. These do not:
 
 | File | What is not obvious |
 |------|---------------------|
 | `FileSystemDialog.tsx` | Shared base for file/folder create **and** rename – validation, character count, keyboard shortcuts. `NewFileDialog` / `NewFolderDialog` / `RenameDialog` are thin wrappers on it (`operation="create"` / `"rename"`) |
 | `CameraDialog.tsx` | Single-shot: the frame is written to a temp file and returned to the caller immediately, with no review/retake state. Mirroring is **preview-only and off by default**: `.camera-preview--mirrored` (`transform: scaleX(-1)`) is applied to the `<video>` only while the per-camera checkbox is on (`useCameraMirrorPreference` → `useCameraMirrorStore`, persisted by `deviceId`), and `captureVideoFrame()` in `useCameraCapture.ts` draws the frame unflipped in every state, so the saved JPEG is never mirrored (#42). Uses `initialFocusRef` + `initialFocusKey={canCapture}` + `trapFocus` – the reference case for all three |
+| `UnsavedChangesDialog.tsx` | Not the tab-close prompt: it asks about *another* tab's unsaved edits before a preview tab moves to that page (#124), in a `save` or a `conflict` (file changed on disk – no Save offered) variant. `initialFocusRef` is set on the choice that loses nothing, because first-in-DOM-order is the destructive button, and there is deliberately no Enter handler. The caller holds that tab's autosave while it is open (`editorSaveRegistry.holdAutosave`) |

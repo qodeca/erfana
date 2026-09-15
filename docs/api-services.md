@@ -4,8 +4,6 @@
 
 Supporting service classes for terminal emulation, file operations, file watching, and persistent settings.
 
-## Overview
-
 ## TerminalService
 
 **File:** `src/main/services/TerminalService.ts`
@@ -228,7 +226,9 @@ Resume watching after pause. Synchronous. Decrements the pause reference count; 
 
 ---
 
-### Events
+### Renderer notifications (IPC)
+
+`DirectoryWatcherService` is a plain class, not an event emitter: it pushes these channels to the owning window with `webContents.send`. The renderer subscribes through the preload bridge (`window.api.directoryWatch.onDirectoryChanged`, `onProjectDeleted`, `onDirectoryError`).
 
 #### `'directory-watch:changed'`
 **Payload:**
@@ -247,6 +247,15 @@ Emitted when files or folders change anywhere in the watched project tree. Main 
 **Event types:** `'add'`, `'addDir'`, `'unlink'`, `'unlinkDir'`, `'change'`. The `'change'` listener was added in #241 — in-place editor saves (Monaco autosave, terminal commands, external editors) now also wake the renderer. `'change'` events whose path is inside `.git/` are suppressed at the source listener (`GitWatcherService` is the canonical publisher for git internals).
 
 **Note:** Not emitted during pause window. The `'directory-watch:changed'` payload is also used by the PauseController auto-resume safety timeout (#103) to issue a compensating refresh after a stuck pause.
+
+#### `'directory-watch:project-deleted'`
+**Payload:** `{ dirPath: string }`. Sent when the project root is gone (`ENOENT`) and the restart attempts are used up; the service then stops all watchers. Bridge: `onProjectDeleted`.
+
+#### `'directory-watch:error'`
+**Payload:** `{ dirPath: string; error: string; errorType }`. Sent for any other watcher error that is not retried – a non-transient type, or a transient one (`EACCES`, `ESTALE`) whose restart attempts are used up. `EMFILE` never reaches it: that path always tears down and schedules a restart. Bridge: `onDirectoryError` (typed without `errorType`).
+
+#### `'directory-watch:recovered'` and `'directory-watch:restart-failed'`
+**Payloads:** `{ dirPath }` after a successful automatic restart; `{ dirPath, attempts, message }` once `MAX_RESTART_ATTEMPTS` is reached. Both are sent from main, but the preload bridge exposes no listener for either.
 
 ---
 
@@ -482,12 +491,11 @@ import { directoryWatcherService } from './services/DirectoryWatcherService'
 // Start watching — the owning window's WebContents is required
 await directoryWatcherService.watchDirectory('/path/to/project', webContents)
 
-// Listen for changes (renderer subscribes via preload bridge:
-//   window.api.directoryWatch.onDirectoryChanged((data) => …))
-directoryWatcherService.on('directory-watch:changed', ({ dirPath, eventCount, summary }) => {
-  console.log(`${eventCount} events: ${JSON.stringify(summary)}`)
-  refreshProjectTree()
-})
+// Changes reach the renderer over IPC – the service has no `.on()`.
+// Renderer side:
+//   window.api.directoryWatch.onDirectoryChanged(({ dirPath, eventCount, summary }) => {
+//     refreshProjectTree()
+//   })
 
 // Internal operation pattern
 async function createNewFile(fileName: string) {
@@ -665,7 +673,7 @@ The paired read side lives with the screenshot API: `api.screenshot.getScreenPer
 
 ## See Also
 
-- [API Services - Feature Services](./api-services-features.md) - Git, Lock, Screenshot, Camera, External, PDF, DOCX, Transcription, AudioMetadata, ApiKey
+- [API Services - Feature Services](./api-services-features.md) - Git, Lock, Screenshot, Camera, External, PDF, DOCX, Transcription, AudioMetadata, ApiKey, [Import](./api-services-features.md#importservice), [ImageExport](./api-services-features.md#imageexportservice), [HTML preview](./api-services-features.md#html-preview-74), [BrowserLaunch](./api-services-features.md#browserlaunchservice)
 - [Architecture](./architecture.md) - Service class overview
 - [IPC Patterns](./ipc-patterns.md) - IPC handler integration
 - [Terminal](./terminal/README.md) - Terminal panel implementation

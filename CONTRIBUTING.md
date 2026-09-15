@@ -72,11 +72,14 @@ npm audit signatures    # advisory in CI, but it catches a lockfile written by t
 pipx run --spec "reuse[charset-normalizer]" reuse lint   # REUSE compliance
 ```
 
-`npm run test:ci` runs without coverage, so the per-file floors in
-`vitest.main.ts` cannot fire locally - `npm run test:cov` is the only way to
-reproduce the `Coverage` job before pushing. It cannot pass on a Windows host
-(two floors miss because their symlink cases skip on win32); CI runs it on
-Linux.
+`npm run test:ci` runs without coverage, so the coverage floors cannot fire
+locally. They sit in all three vitest configs: per-file floors in
+`vitest.main.ts`, global floors in `vitest.preload.ts`, and per-file floors for
+the HTML-preview modules (#124) in `vitest.renderer.ts`. `npm run test:cov` runs
+all three and is the only way to reproduce the `Coverage` job before pushing.
+It cannot pass on a Windows host (at least two `vitest.main.ts` floors miss
+because their symlink cases skip on win32, and the #124 floors have not been run
+there); CI runs it on Linux.
 
 For changes touching Electron-specific paths, also run the end-to-end suite locally (CI does not currently run it):
 
@@ -109,7 +112,7 @@ Never commit a real secret, even to history — rewrite it out and rotate the cr
 
 - [ ] Work is on a `feature/...` branch cut from the right integration branch, and the PR targets that same branch (not `main`) — `develop` for general work, `graph` for graph-engine work.
 - [ ] Commits follow [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `docs:`, `chore:`).
-- [ ] All quality gates pass locally (lint, lint:css, design -- --check, typecheck, test:ci, build, check:headers, reuse lint).
+- [ ] All quality gates pass locally (lint, lint:css, design -- --check, typecheck, test:ci, test:cov, build, check:headers, reuse lint).
 - [ ] No secrets introduced — `gitleaks` and `trufflehog` are clean locally.
 - [ ] Docs updated if behavior or project shape changed.
 - [ ] You agree to the project [CLA](CLA.md) (opening this PR records your agreement).

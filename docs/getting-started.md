@@ -82,29 +82,9 @@ src/
 - No rounded corners (`border-radius: 0`)
 - Test focus states for accessibility
 
-## Key Commands
+## Commands and file locations
 
-| Command | Purpose |
-|---------|---------|
-| `npm run dev` | Development server with hot reload |
-| `npm run build` | Production build |
-| `npm run build:mac` | macOS package |
-| `npm run test` | Run all tests (Vitest) |
-| `npm run test:renderer` | Renderer tests only |
-| `npm run test:main` | Main process tests only |
-| `npm run test:e2e` | Playwright E2E tests |
-| `npm run test:cov` | Coverage report |
-| `npm run typecheck` | TypeScript check |
-| `npm run lint` | ESLint |
-
-## Quick Reference
-
-- **Design tokens**: `src/renderer/src/styles/design-tokens.css`
-- **IPC schemas**: `src/shared/ipc/*.ts`
-- **Main services**: `src/main/services/`
-- **React components**: `src/renderer/src/components/`
-- **Zustand stores**: `src/renderer/src/stores/`
-- **Test files**: `*.test.ts` or `*.test.tsx` alongside source
+The npm scripts, keyboard shortcuts and key source locations are in [Quick Reference](./quick-reference.md).
 
 ## Documentation Index
 

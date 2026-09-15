@@ -9,7 +9,7 @@ Parent: [design-issue-124.md](design-issue-124.md). Where what each Phase 5 grou
 
 The G1 and G2 blocks moved here from the parent §3 at the G3 reconcile, when the parent reached its line cap. Their text is unchanged, except that the G1 block's "the tables above" now names the parent's §3.
 
-> Trust note: written from `temp/124-phase10-notes.md` and the code in the working tree, read on 2026-09-15. Line counts are measured, not estimated. Where a note and the code disagreed, the code won and the entry says so.
+> Trust note: written from `124-phase10-notes` run notes (not in repo) and the code in the working tree, read on 2026-09-15. Line counts are measured, not estimated. Where a note and the code disagreed, the code won and the entry says so.
 
 ## G1
 
@@ -38,7 +38,7 @@ The G1 and G2 blocks moved here from the parent §3 at the G3 reconcile, when th
 - WI-29 (§3, part 2 §2.3): the CSP bridge and the refusal sink live in each page scope, and the service's `onBlocked` writes `committed().reportBlocked`; `PreviewLiveViewParams.failureLog` became `pageScopes` and `onBlockedHost` is gone, as is the wiring's CSP bridge; the session context swaps `recordFailure` for a `pageScopes` getter (`PreviewSessionPageScopes`: `committed()`, `forMainDocument()`).
 - WI-29: `previewLivePage` attaches its own `did-navigate`, `did-navigate-in-page` and `did-stop-loading` listeners (`previewViewLifecycle.ts` untouched); five load kinds – `initial`, `reload`, `open`, `back`, `forward` – where `initial`, and a move onto the document on screen, get no pending scope; rule 2 never ends a reload; a load that throws synchronously ends its pending load and rethrows; `failed` is computed but only logged until WI-17b.
 - WI-29: a pending scope emits nothing until its commit and a disposed one ignores late writes; the refusal set also strips U+2028/U+2029 and logs its overflow once at page end; `samePreviewDocument` compares scheme, host and path, ignoring query and fragment. User-visible: a committed reload resets the badge to the new page's failures (after an approval, tens of ms later), and a closed view's late snapshot can no longer reach a reopened one.
-- S16 (`temp/124-spikes.md`) measured the end rules: rule 4 holds, and part 2 §2.14's early-stop risk is resolved.
+- S16 (`124-spikes` run notes, not in repo) measured the end rules: rule 4 holds, and part 2 §2.14's early-stop risk is resolved.
 - Line counts after G2: `PreviewSessionFactory.ts` 489 (WI-12 makes the split), `PreviewSessionFactory.test.ts` 554 (over the cap; split pending), `usePreviewBounds.test.ts` 485 (WI-11 splits), `PanelErrorBoundary.test.tsx` 497.
 - WI-29 follow-up (option B view-level badges, factory test split, dead-code removal) – pending.
 
@@ -134,7 +134,7 @@ The G1 and G2 blocks moved here from the parent §3 at the G3 reconcile, when th
 
 ## QG-6 to QG-8 – the review fix rounds (as built)
 
-Reconciled in Phase 10 from `temp/124-phase10-notes.md` (QG-6 judge, B0–B5, QG-8 fixes), `temp/124-qg6-judgment.md`, `temp/124-qg7-review.md` and the code; line counts measured with `wc -l`. The files are in the [G6/G7 files doc](design-issue-124-files-g6g7.md), QG-6 to QG-8. Gates: after B0–B5, `test:ci` 550 files / 13 564 tests and html-preview e2e 97/97; after QG-8, `test:cov` 557 files / 13 787 tests with every per-file floor met and html-preview e2e 98/98.
+Reconciled in Phase 10 from run notes not in the repo – `124-phase10-notes` (QG-6 judge, B0–B5, QG-8 fixes), `124-qg6-judgment` and `124-qg7-review` – and the code; line counts measured with `wc -l`. The files are in the [G6/G7 files doc](design-issue-124-files-g6g7.md), QG-6 to QG-8. Gates: after B0–B5, `test:ci` 550 files / 13 564 tests and html-preview e2e 97/97; after QG-8, `test:cov` 557 files / 13 787 tests with every per-file floor met and html-preview e2e 98/98.
 
 - **B0 (QG-6 A2 prerequisite, QG-7 S3).** `stablePathDigest` moved to `src/shared/stablePathDigest.ts` (48; `fileUtils.ts` re-exports it), so main and the renderer digest a panel id the same way; `toProjectPath(projectPath, realRoot, realTarget, pathApi?)` in `previewUrl.ts` (109) is the one project-space conversion, called by the wiring (`previewLiveWiring.ts:125`) and the gate (`previewViewNavigation.ts:193`).
 - **B1 – the navigator (A3, A6, S1, S2).** `PREVIEW_LIMITS.NAV_MAX_ANCHOR_CHARS` (1024) is read by the schema and the navigator's cut; `isNavigationKind` is exported from `previewLivePage.ts` and used by the wiring and the navigator. S1: an in-page step pushes history only after a real gesture, else replaces (part 3 §3.5). S2: the `pushedFile` branch, its decoder, `MAX_PATH_LENGTH` and the navigator's `projectPath` dep were deleted – an in-page step to another document is not recorded; e2e: a real-input `pushState`, an S1 replace case, an S2 tripwire (`pushState` to `other.html` → `SecurityError`). A thrown listener in `previewLivePage.ts` logs name and code only.

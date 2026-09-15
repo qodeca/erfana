@@ -20,7 +20,7 @@ better reference.
 Full CI pipeline documentation is in [docs/ci.md](../ci.md). Quick E2E-specific summary:
 
 - **`e2e.yml` is currently disabled** (2026-04-25, pre-migration commit `997ba65`, which does not resolve on `qodeca/erfana`) — see [docs/ci.md § E2E Tests (disabled)](../ci.md#e2e-tests-e2eyml-disabled) for the rationale (macos-latest instability) and re-enable command. E2E verification is local-only until the workflow is restored.
-- **`checks.yml`** (separate workflow) runs lint / typecheck / unit tests / build on every push to any branch — see [docs/ci.md § Quality Checks](../ci.md#quality-checks-checksyml). It is unaffected by the E2E disable.
+- **`checks.yml`** (separate workflow) runs lint / typecheck / unit tests / coverage / build / license compliance (plus advisory Windows, npm audit signatures and release-readiness jobs) on every push to any branch – see [docs/ci.md § Quality Checks](../ci.md#quality-checks-checksyml). It is unaffected by the E2E disable.
 - **Historical config** (applies if/when `e2e.yml` is re-enabled): runs on `push` to `develop` and all PRs; pipeline = `npm ci` → `electron-vite build` → `playwright test --project=electron` → upload `test-results/` + `playwright-report/` (30-day retention on `develop` or `main`, 14-day on PRs); visual suite was scoped out via `--project=electron` due to the macos-latest `waitForLoadState('domcontentloaded')` hang — see [docs/ci.md § Visual regression on CI](../ci.md#visual-regression-on-ci) for root-cause notes.
 
 ### E2E-specific CI notes (apply when workflow is re-enabled)

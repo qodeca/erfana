@@ -2,6 +2,8 @@
 
 Current issues and their workarounds. For historical resolved issues, see [archive/resolved-issues.md](./archive/resolved-issues.md).
 
+**Issue numbers**: a number written as a link (for example [#60](https://github.com/qodeca/erfana/issues/60)) is on the public `qodeca/erfana` tracker. A bare number without a link (#146, #147, #149, #150, #163, #164, #166, #177, #213, #241) is from the private pre-migration tracker: it does not resolve on `qodeca/erfana`, and a pre-migration number that the public tracker has since reached points at an unrelated issue. Treat bare numbers as provenance only – see [`docs/windows/implementation-plan.md`](./windows/implementation-plan.md).
+
 ---
 
 ## Accessibility
@@ -35,11 +37,11 @@ Phases 0–2 of Windows enablement shipped in **v0.9.3** (2026-04-22); Phase 4 (
 
 ### SmartScreen warning on first launch
 
-**Issue**: First-time launch of the NSIS installer triggers a Windows SmartScreen warning (`Windows protected your PC`) because Erfana is not yet code-signed.
+**Issue**: First-time launch of the NSIS installer can trigger a Windows SmartScreen warning (`Windows protected your PC`). The installer **is** code-signed – Azure Artifact Signing shipped in v0.9.5 (`azureSignOptions` in `electron-builder.yml`) – but SmartScreen also weighs download reputation, which a signing identity builds up over time.
 
 **Workaround**: Right-click the `.exe` → Properties → Unblock; OR click "More info → Run anyway" in the SmartScreen dialog.
 
-**Tracking**: #166 (Phase 5 — code-signing).
+**Tracking**: #177 (SmartScreen reputation). Phase 5 (#166) is now NSIS UX only – see [`docs/windows/implementation-plan.md`](./windows/implementation-plan.md).
 
 ---
 
@@ -195,7 +197,9 @@ Pipeline contributors on Windows:
 
 **A link out of the preview asks first, and only one question is open at a time.** A link to an external destination raises a native message box naming the destination — the origin, or the scheme plus the addressed target for `mailto:`/`tel:`. That dialog is **owned by the window whose preview asked**, so it is modal to that window and is raised with it rather than sitting behind the app. Only one such question can be open per window: a second external link clicked while the first is still waiting is **refused, not queued**, and shows up in the panel's failure badge as a blocked link. Clicking it again once the first question is answered works normally.
 
-**A page's link opens a tab per click.** Every link opens a new Erfana tab by design, so clicking through a generated documentation site accumulates tabs quickly. Idle previews sleep after `PREVIEW.MAX_LIVE_VIEWS`, so the cost is bounded, but the tabs remain until closed.
+**A page's link opens a new tab by default.** Out of the box every plain link opens a new Erfana tab, so clicking through a generated documentation site accumulates tabs quickly. Idle previews sleep after `PREVIEW.MAX_LIVE_VIEWS`, so the cost is bounded, but the tabs remain until closed. To avoid that, switch the tab's **Open links in this tab** toggle on: a plain link to another previewed page then replaces the page in the same tab, with Back and Forward. The mode is per tab and in memory only, so after a restart tabs open links in new tabs again – see [HTML preview § Links](./html-preview/README.md#links) and [§ Back and Forward](./html-preview/README.md#back-and-forward).
+
+**A link inside a frame with `target="_top"` or `_blank` does nothing.** Links inside a frame move that frame, not the tab. A frame link that asks for the whole tab or a new tab is dropped, and because nothing outside the page sees that click, it is not listed in the failure badge either – see [HTML preview § Frames](./html-preview/README.md#frames).
 
 **Page state is lost when a preview sleeps.** A suspended preview reloads from disk when you return to it: scroll position, typed text and in-memory JavaScript state do not survive.
 
@@ -283,9 +287,9 @@ See [E2E troubleshooting § Terminal commands not executing](./testing/e2e-troub
 
 ### Git Status: Global .gitignore not supported
 
-**Issue**: Files ignored via global gitignore (`~/.gitignore_global` or `~/.config/git/ignore`) may appear as "untracked" in the project tree git status indicators.
+**Issue**: When no `git` binary is available, files ignored via global gitignore (`~/.gitignore_global` or `~/.config/git/ignore`) may appear as "untracked" in the project tree git status indicators.
 
-**Root cause**: isomorphic-git only reads local `.gitignore` files. Does not support global gitignore. Known library limitation.
+**Root cause**: The git status worker prefers native `git` and falls back to isomorphic-git only when no git binary is found (`GitStatusService.ts`, `git-status.worker.ts`). isomorphic-git reads only local `.gitignore` files – a known library limitation – so the gap applies to that fallback. With native `git`, ignore rules are git's own.
 
 **Workaround**: Add patterns to the project's local `.gitignore` file instead of global config.
 
@@ -299,7 +303,7 @@ See [E2E troubleshooting § Terminal commands not executing](./testing/e2e-troub
 
 **Root cause**: chokidar directory watcher + git watcher + terminal PTY together consume most available FDs. On large repos, this exceeds the system FD limit (~10K on macOS).
 
-**Mitigation (v0.9.0)**: Git status now runs in a worker thread (#147) and uses native `git status --porcelain` for repos with `.git/index` > 5 MB. When FD pressure causes EBADF, the worker returns a transient error instead of cascading. The EMFILE restart cascade was also fixed (#146).
+**Mitigation (v0.9.0)**: Git status now runs in a worker thread (#147). It always prefers native `git status --porcelain`, whatever the repo size, and falls back to isomorphic-git only when no git binary is found, when the binary fails to start (ENOENT or EACCES), or after three consecutive transient native failures (`GitStatusService.ts`, `workers/git-status.worker.ts`). When FD pressure makes native git fail (e.g. EBADF), the worker returns a "temporarily unavailable" result instead of cascading, and only the third failure in a row falls back. The EMFILE restart cascade was also fixed (#146).
 
 **Fixed – black window on 100k+ files ([#60](https://github.com/qodeca/erfana/issues/60))**: opening a very large project (reported at 174k nodes on an external volume) used to blank the window outright. The project tree's `flattenTree` built its flat array with `flattened.push(...flattenTree(child))`; spread-into-push is `Function.prototype.apply`, whose argument count is bounded by the engine stack (~10^5 on V8), so the first directory whose *flattened subtree* crossed that bound threw `RangeError: Maximum call stack size exceeded`, React 18 unmounted the entire root, and nothing was left to paint. `flattenTree` is now an explicit-stack loop that pushes exactly one node per iteration – output-identical (pre-order DFS, forward sibling order, `depth` per level, `index` reset per parent) and covered by a 200k-node reproduction. Throws that happen *while Erfana is drawing the interface* now surface a recovery screen with Restart / Copy error details / Open logs folder instead of a black window – or, for the project tree specifically, a "Project tree unavailable" panel with the rest of the app still running. Errors outside drawing (background work, event handlers, rejected promises) are written to the log without interrupting the UI – see [UI Components § Error containment](./ui-components.md#error-containment).
 
@@ -387,32 +391,6 @@ name: Mermaid Bug Report  # Display name (can change freely)
 **Status**: Steps 1–2 shipped; uniqueness validation, the full template migration and the slugify removal remain open (re-verified 2026-09-05). Same item as [technical-debt.md § 2](./technical-debt.md).
 
 **See**: [Prompt Templates](./prompts/README.md)
-
----
-
-## Dockview CSS Import Path
-
-**Issue**: Vite cannot resolve `dockview/dist/styles.css`
-
-**Solution**: Use `import 'dockview/dist/styles/dockview.css'` (note the `/styles/` in path).
-
----
-
-## electron-store ES Module Import
-
-**Issue**: electron-store v11+ is an ES Module and cannot be imported with `require()` in CommonJS.
-
-**Solution**: Use dynamic `import()`. All SettingsService methods are async to handle this.
-
-**Pattern**: `constructor()` calls `import('electron-store')`, stores the promise. All methods await `ensureStore()` before accessing the store.
-
-**Files**: `src/main/services/SettingsService.ts`, `src/main/ipc/file-handlers.ts`
-
----
-
-## ESLint Peer Dependency Warnings (resolved)
-
-**Issue**: `npm ci` used to warn about ESLint 9 vs ESLint 8 peer dependencies from `@electron-toolkit/eslint-config-*`. **Resolved**: both `@electron-toolkit/eslint-config-ts` and `@electron-toolkit/eslint-config-prettier` now declare `eslint >=9.0.0` as their peer, matching the project's `eslint ^9.16.0`, so the warning no longer appears.
 
 ---
 

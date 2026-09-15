@@ -16,7 +16,7 @@ Erfana is an agent-native Markdown workspace – an Electron app that runs a ter
 - [API Services – Features](./api-services-features.md) - Feature service implementations (Git, Transcription, Camera, etc.)
 - [IPC Patterns](./ipc-patterns.md) - Inter-process communication patterns
 - [Security](./security.md) - Security considerations and implementations
-- [Error Codes](./error-codes.md) - Project-wide `ErrorCode` enum index (130 codes grouped by category; operator actions for the most-visible ones)
+- [Error Codes](./error-codes.md) - Project-wide `ErrorCode` enum index (140 codes grouped by category; operator actions for the most-visible ones)
 - [Architecture Decision Records](./adrs/README.md) - Durable rationale for load-bearing design choices (ADR 0001 self-host whisper, 0002 minisign, 0003 dual-pubkey, 0004 TOCTOU close)
 - [Technical Debt](./technical-debt.md) - Technical debt tracking and priorities
 
@@ -25,7 +25,7 @@ Erfana is an agent-native Markdown workspace – an Electron app that runs a ter
 - [Editor](./editor/README.md) - Monaco editor, markdown preview, scroll sync, Mermaid diagrams (full-screen viewer), PDF/DOCX export
   - [Export](./editor/export.md) - PDF and DOCX export pipeline
   - [Mermaid Viewer](./editor/mermaid-viewer.md) - Full-screen diagram viewer with zoom and pan
-- [HTML Preview](./html-preview/README.md) - Live `.html` preview running real CSS + JS in a sealed process, with a per-project host allowlist, auto-refresh, find-in-page and PDF export (issue #74). Threat model in [Security § HTML preview](./security.md#html-preview)
+- [HTML Preview](./html-preview/README.md) - Live `.html` preview running real CSS + JS in a sealed process, with a per-project host allowlist, auto-refresh, find-in-page and PDF export (issue #74), plus same-project frames, same-tab links with Back and Forward, Open in default browser, and keyboard entry into the page (issue #124). Threat model in [Security § HTML preview](./security.md#html-preview)
 - [Image Viewer](./ui-components.md#image-viewer-panel) - Image preview panel with zoom, pan, and fullscreen
 - [Terminal](./terminal/README.md) - xterm.js terminal integration
   - [Bootstrap Pattern](./terminal/bootstrap-pattern.md) - Clean initialization without artifacts
@@ -37,7 +37,7 @@ Erfana is an agent-native Markdown workspace – an Electron app that runs a ter
 - [File Watching](./file-watching/README.md) - Auto-refresh and file monitoring
   - [Patterns & Testing](./file-watching/patterns-and-testing.md) - Implementation patterns and test scenarios
   - [Technical Details](./file-watching/technical-details.md) - Performance, security, edge cases
-- [Prompt Templates](./prompts/README.md) - AI-powered text operations (v0.3.4)
+- [Prompt Templates](./prompts/README.md) - context-menu templates that send a selection to the CLI agent in the terminal (v0.3.4)
   - [AutoExecute Overview](./prompts/autoexecute-overview.md) - Feature overview and architecture
   - [AutoExecute Technical](./prompts/autoexecute-technical.md) - Write pipeline and 200ms delay rationale
   - [AutoExecute Testing](./prompts/autoexecute-testing.md) - Test coverage and mocking strategy
@@ -48,7 +48,7 @@ Erfana is an agent-native Markdown workspace – an Electron app that runs a ter
 ### UI/UX
 - **[Design system](../design/index.html)** - the cards that decide colours, type, spacing, surfaces, focus, motion, layering and each component (MANDATORY for UI changes; open it in a browser)
 - [UI Style Guide](./ui-style-guide.md) - text-selection policy and the dark-only stance; its visual sections are stubs pointing at the cards
-- [UI Style Guide Reference](./ui-style-guide-reference.md) - the v0.5.3 token migration table
+- [UI Style Guide Reference](./ui-style-guide-reference.md) - common token gotchas left over from the v0.5.3 token migration
 - [UI Components](./ui-components.md) - React component architecture
 - [Keyboard Shortcuts](./keyboard-shortcuts.md) - Application keyboard shortcuts
 
@@ -104,6 +104,13 @@ Not to be confused with **[`design/`](../design/index.html)** at the repo root, 
 
 - [Packaging guards for `extraFiles` / `extraResources`](./design/design-issue-55.md) - Build-time leak guards beyond the `files:` allowlist (issue #55)
 - [Renderer crash on very large projects](./design/design-issue-60.md) - `flattenTree` stack overflow, error containment (root + panel boundaries), crash trail (issue #60)
+- [Multi-page HTML preview](./design/design-issue-124.md) - Frames, same-tab links with history, and Open in default browser (issue #124)
+  - [Part 1: the preview stays inside its panel](./design/design-issue-124-part1.md)
+  - [Part 2: frames show pages from the same project](./design/design-issue-124-part2.md)
+  - [Part 3: links can open in the same tab](./design/design-issue-124-part3.md)
+  - [Part 4: open in default browser](./design/design-issue-124-part4.md)
+  - [Phase 5 as built – deviations log](./design/design-issue-124-impl.md)
+  - [Planned files](./design/design-issue-124-files.md) and [planned files, G6 and G7](./design/design-issue-124-files-g6g7.md)
 - [Claude Code status bar](./designs/216-claude-status-bar.md) - Per-terminal context status bar design (issue #216; Windows follow-up #217)
 - [Model capability registry](./designs/41-model-capability-registry.md) - Shared model-id parser + context-window capability table (issue #41)
 - [Context-meter freeze after compaction](./designs/47-context-meter-freeze.md) - Bounded fallback read + per-file-version result cache (issue #47)

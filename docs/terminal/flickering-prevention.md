@@ -48,7 +48,7 @@ const width = Math.round(cols * charWidth * devicePixelRatio)
 
 ### 1. Electron WebGL Command Line Switches
 
-**File**: `src/main/index.ts` (the `app.commandLine.appendSwitch` block above `buildRendererArgs`)
+**File**: `src/main/index.ts` (the `app.commandLine.appendSwitch` block above `buildAdditionalArguments`)
 
 ```typescript
 // WebGL Command Line Switches (originally added for Electron 33+)
@@ -108,7 +108,7 @@ webglAddon.onContextLoss(() => {
 
 ### 3. Integer Dimension Enforcement
 
-**File**: `TerminalPanel/terminalPanel.logic.ts` (`shouldResize` and the `RESIZE_COL_THRESHOLD` / `RESIZE_ROW_THRESHOLD` constants), called from the resize path in `TerminalPanel.tsx`
+**File**: `TerminalPanel/terminalPanel.logic.ts` (`shouldApplyResize` and the `RESIZE_COL_THRESHOLD` / `RESIZE_ROW_THRESHOLD` constants), called from the resize path in `TerminalPanel.tsx`
 
 **Strategy**: Force integer dimensions to prevent fractional oscillation
 

@@ -187,9 +187,3 @@ await window.keyboard.press('Meta+A')  // Fails on Windows/Linux
 - Use `Control` key for keyboard shortcuts
 - UAC prompts may appear for certain operations
 - File paths use backslashes (but testid hashes normalize paths)
-
-### Linux
-
-- Use `Control` key for keyboard shortcuts
-- May need X11/Wayland configuration for headed tests
-- Sandbox may require `--no-sandbox` flag in some environments

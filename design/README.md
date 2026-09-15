@@ -42,7 +42,7 @@ and a confirm step whose buttons were clipped off-screen.
 | Path | What it is |
 |---|---|
 | `system/foundations/` | Colours, typography, spacing, surfaces, focus, motion, layering |
-| `system/components/` | Buttons, rows, form controls, feedback, icons, permission band |
+| `system/components/` | Buttons, rows, form controls, feedback, icons, menus, permission band |
 | `product/` | Whole screens and flows, built from the parts above |
 | `tokens.css`, `fonts/`, `claims.js`, `index.html` | **Generated.** Written by `scripts/design-sync.mjs` |
 | `system/components/row/host.css`, `system/components/permission-band/band.css`, `system/components/permission-band/nav.css` | **Generated.** Adopted components, synced *from* `src/` — edit the `src/` copy |

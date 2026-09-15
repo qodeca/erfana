@@ -29,7 +29,7 @@ if (projection.parentId && isDescendant(projection.parentId, activeId)) {
 **Case-insensitive** comparison for cross-platform compatibility:
 
 ```typescript
-// FileService.ts:223-232
+// FileService.ts – checkNameConflict
 async checkNameConflict(targetParentPath: string, itemName: string): Promise<boolean> {
   try {
     const entries = await readdir(targetParentPath)
@@ -47,7 +47,7 @@ async checkNameConflict(targetParentPath: string, itemName: string): Promise<boo
 ### Project Root Protection
 
 ```typescript
-// FileService.ts:267-269
+// FileService.ts – moveItem
 if (this.projectPath && sourcePath === this.projectPath) {
   throw new Error('Cannot move the project root directory')
 }
@@ -74,7 +74,7 @@ Cannot drag the project root folder itself.
 **Solution**: Early validation check, no operation performed
 
 ```typescript
-// FileService.ts:262-264
+// FileService.ts – moveItem
 if (sourcePath === targetPath) {
   throw new Error('Source and target paths are the same')
 }
@@ -86,7 +86,7 @@ if (sourcePath === targetPath) {
 **Solution**: Direct copy operation (no rename needed)
 
 ```typescript
-// FileService.ts:362-368
+// FileService.ts – copyItem (moveItem uses the same copy on an EXDEV fallback)
 if (sourceStats.isDirectory()) {
   await cp(sourcePath, targetPath, { recursive: true, preserveTimestamps: true })
 } else {
@@ -112,7 +112,7 @@ if (copyNumber > MAX_COPY_ATTEMPTS) {
 **Solution**: `checkNameConflict` returns false if directory unreadable
 
 ```typescript
-// FileService.ts:228-231
+// FileService.ts – checkNameConflict
 async checkNameConflict(targetParentPath: string, itemName: string): Promise<boolean> {
   try {
     const entries = await readdir(targetParentPath)

@@ -116,32 +116,7 @@ if (this.projectPath && !targetParentPath.startsWith(this.projectPath)) {
 
 ## Context Menu Integration
 
-Cut/Copy/Paste added to file/folder context menus:
-
-```typescript
-// src/renderer/src/components/ProjectTree/context-menu/commands.tsx
-export class CutCommand extends CommandBase {
-  label = 'Cut'
-  icon = <Scissors size={14} strokeWidth={2} />
-  execute(): void {
-    this.ctx.clipboard.cut(this.node.path, this.node.name, this.node.type)
-    this.ctx.toast({ type: 'info', title: 'Cut', message: `"${this.node.name}" ready to move` })
-  }
-}
-
-export class CopyCommand extends CommandBase {
-  label = 'Copy'
-  icon = <Copy size={14} strokeWidth={2} />
-  // same shape; toast title 'Copied'
-}
-
-export class PasteIntoDirectoryCommand extends CommandBase {
-  label = 'Paste'
-  icon = <ClipboardIcon size={14} strokeWidth={2} />   // lucide `Clipboard`
-  // directory nodes only; conflict pre-check + "Replace item?" confirm for cut,
-  // then clipboard.paste(targetPath, replaceExisting) inside ctx.withWatcherPause
-}
-```
+Cut, Copy and Paste are on the file and folder context menus. The command classes (`CutCommand`, `CopyCommand`, `PasteIntoDirectoryCommand`) are shown in [Clipboard operations § Context menu integration](./clipboard.md#context-menu-integration).
 
 The menu is assembled by `ContextMenuFactory` (`context-menu/`) from these command classes; `ProjectTree.tsx` supplies the `MenuContext` (`clipboard`, `toast`, `dialogs`, `withWatcherPause`, `refreshProjectTree`, …).
 

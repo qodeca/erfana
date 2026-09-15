@@ -107,6 +107,14 @@ returns early — so the lines those cases would cover never execute, and the
 file-level floors miss by a few points. The `Coverage` CI job runs on
 `ubuntu-latest`, where nothing is skipped and it passes.
 
+Since #124, `test:cov` also enforces the global floors in `vitest.preload.ts`,
+the per-file HTML-preview floors in `vitest.renderer.ts`, and new #124 per-file
+floors in `vitest.main.ts` (the `services/preview/` and
+`services/browserLaunch/` modules and `src/shared/ipc/browser-schema.ts`). None
+of these has been run on a Windows host. The `BrowserLaunchService` suites skip
+their symlink cases on win32 (the integration suite skips entirely), so its
+floor may miss there as well – unmeasured.
+
 `test:cov` is deliberately **not** one of the nine commands the Windows
 release-verification handoff asks for. Run it on Linux or macOS, or read the CI
 job. Status: 🚫 wontfix while the symlink fixtures need a Windows privilege.
@@ -132,6 +140,22 @@ attribute failures:
 - **Tests with `{ timeout: NNNN }` overrides** — grep for these; each is a
   tacit acknowledgement that the test is slow. Review whether mocking or
   fake timers can eliminate the need.
+- **Multi-page HTML preview (#124)** – win32-only paths that have not been
+  run on a Windows host:
+  - a frame whose `src` names a leaf symlink is expected to be listed as
+    "Frame escaped the project" rather than "Missing local file", because
+    Windows has no `O_NOFOLLOW` (see
+    [HTML preview § Frames](../html-preview/README.md#frames));
+  - Open in default browser refuses a name that points at an NTFS alternate
+    data stream (`BrowserLaunchService.ts`), a win32-only branch;
+  - the Windows default-browser lookup and detached launch in
+    `src/main/services/browserLaunch/browserLauncher.ts`;
+  - Back and Forward on Alt+Left Arrow and Alt+Right Arrow
+    (`src/shared/previewNavKeys.ts`);
+  - the win32 skips #124 added in the `main` project
+    (`BrowserLaunchService.integration.test.ts`, the `previewFrames`,
+    `previewNavigation` and `previewRequestKind` integration suites), so those
+    cases never run on a Windows host.
 
 ## Remediation patterns cheat-sheet
 

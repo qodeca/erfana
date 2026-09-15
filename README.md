@@ -22,7 +22,7 @@ It is free software under **GPL-3.0-only**.
 | 📝 **Markdown editor** | Monaco editor, live preview with scroll sync, Mermaid diagrams (22 types, zoom/pan/full-screen), YAML frontmatter, unified in-file search |
 | 📁 **Project tree** | Real-time git status (worker-thread offloaded), drag-drop reorganization, Markdown filtering, Reveal in Finder/Explorer |
 | 📄 **Import & export** | Import via LiteParse (which handles 50+ formats) with local OCR – Office/image formats need LibreOffice/ImageMagick; print-optimized PDF and Word (DOCX) export with Mermaid diagrams |
-| 🌐 **HTML preview** | Open a `.html` file and it runs as a live page in its own tab, with links, find, PDF export, and a per-host permission band that asks before any remote request |
+| 🌐 **HTML preview** | Open a `.html` file and it runs as a live page in its own tab, with frames from the same project, links in a new tab or in place with Back/Forward, find, PDF export, open in your default browser, and a per-host permission band that asks before any remote request |
 | 🖼️ **Image viewer** | Zoom, pan and full-screen viewing that repaints when the file changes on disk, plus PNG / PDF / clipboard export |
 | 🎙️ **Media transcription** | Audio/video → text via the OpenAI API or fully offline `whisper.cpp` |
 

@@ -133,24 +133,10 @@ The prefix is not cosmetic. Mermaid emits `class="row"` on gitGraph commit label
 
 ## Do's and Don'ts
 
-> **Most of these are now checked by a machine.** `npm run lint:css` fails on raw
-> hex outside the token file, on a bare `z-index`, and on any `border-radius`
-> other than `0` or the circle token. They are kept here as the rationale — a rule
-> nobody can explain gets deleted by the next person who finds it inconvenient.
-
-### Colors
-
-```css
-/* ✅ DO: Use semantic tokens */
-color: var(--color-text-primary);
-background: var(--color-bg-secondary);
-border-color: var(--color-border-default);
-
-/* ❌ DON'T: Use hardcoded colors */
-color: #cccccc;
-background: #2d2d30;
-border-color: #3c3c3c;
-```
+> **Colour, border-radius and z-index examples are gone from this list** because
+> `npm run lint:css` enforces them (see the checklist below). What is left is not
+> linted: `padding: 11px`, `font-size: 13px` and a hardcoded transition all pass,
+> so review for them by hand.
 
 ### Spacing
 
@@ -180,20 +166,6 @@ font-weight: 500;
 font-family: Monaco, monospace;
 ```
 
-### Borders
-
-```css
-/* ✅ DO: Sharp corners */
-border-radius: var(--border-radius);  /* 0 */
-
-/* ✅ DO: Circle exception */
-border-radius: var(--border-radius-circle);  /* 50% for dots/spinners */
-
-/* ❌ DON'T: Rounded corners */
-border-radius: 4px;
-border-radius: 8px;
-```
-
 ### Transitions
 
 ```css
@@ -203,18 +175,6 @@ transition: var(--transition-normal);
 /* ❌ DON'T: Hardcode timing */
 transition: all 0.2s ease;
 transition: 150ms;
-```
-
-### Z-Index
-
-```css
-/* ✅ DO: Use z-index tokens */
-z-index: var(--z-modal);
-z-index: var(--z-tooltip);
-
-/* ❌ DON'T: Use arbitrary values */
-z-index: 999;
-z-index: 10000;
 ```
 
 ---
@@ -249,4 +209,4 @@ people, and none of them is expressible as a lint rule:
 **The rules**: [`design/index.html`](../design/index.html) — open it in a browser.
 
 **Still here**: the [text selection policy](#text-selection-policy) and the
-[migration guide](./ui-style-guide-reference.md#migration-guide).
+[token gotchas](./ui-style-guide-reference.md#common-gotchas).

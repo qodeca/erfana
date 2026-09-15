@@ -25,7 +25,7 @@ Monitors open files for external content modifications.
 - **Scope**: Per-file watching (on-demand when file is opened)
 - **Limit**: 100 files maximum, app-wide (security). The cap governs **new** map entries only — joining a path that is already watched can never fail on it (#70)
 - **Symlinks**: `followSymlinks: false` — the watch is on the path itself, never on what a link at that path points at (#70)
-- **Consumers**: two renderer hooks — `useFileWatcher` (Markdown editor, read/write) and `useFileChangeSubscription` (read-only surfaces, #70). Both hold a `fileWatchSlot`
+- **Consumers**: two renderer hooks – `useFileWatcher` (Markdown editor, read/write) and `useFileChangeSubscription` (read-only surfaces, #70). Both hold a `fileWatchSlot`. Separately, the HTML preview keeps its own main-process pool, `src/main/services/preview/PreviewWatchPool.ts`, built on the same `createSingleFileWatcher` factory with a shorter write-finish wait and capped at 16 files per preview on top of the app-wide cap – see [HTML preview § Auto-refresh](../html-preview/README.md#auto-refresh)
 
 ### Use Cases
 
@@ -67,7 +67,7 @@ Monitors open files for external content modifications.
 - **Integration**: `src/renderer/src/components/Panels/MarkdownEditorPanel.tsx`, `src/renderer/src/components/Panels/ImageViewerPanel/`
 - **UI Component**: `src/renderer/src/components/FileConflictNotification/`
 
-### Self-Save Echo Detection (v0.9.1, #124)
+### Self-Save Echo Detection (v0.9.1)
 
 The `useFileWatcher` hook prevents autosave-triggered file change events from being treated as external modifications. Three-layer defense:
 
@@ -79,6 +79,7 @@ The `MarkdownEditorPanel` coordinates via:
 - Reading content from Monaco editor model (not React state) to avoid stale closure overwrites
 - Calling `notifySaveComplete(savedContent)` after a successful write, which adds the content to `pendingSavedContentsRef`
 - Post-save dirty re-detection: checks if Monaco buffer diverged from saved content during the save, re-marks as modified if so
+- Save by panel id (#124): the panel registers its save, its conflict flag and an autosave hold in `services/editorSaveRegistry.ts` through `useEditorSaveRegistration`, so the HTML preview's tab move can save another tab when the user answers Save in the unsaved-changes prompt. The save is the panel's own `handleSave`, so every guard above still applies. While the prompt is open the move holds the tab's autosave (`cancelAutoSave`, re-armed by `signalChange` on release). It fails safe: a panel id with no entry, or a save that throws, answers `false`, and the move is abandoned with the edits kept in their tab
 
 ### Conflict Resolution UI
 
@@ -188,7 +189,7 @@ still released on unmount would decrement a count it never incremented.
 - **`hooks/useFileChangeSubscription.ts`** — a read-only subscription for
   surfaces that only *display* a file. Deliberately **not** an option on
   `useFileWatcher`: that hook is structurally text-coupled (it reads the file as
-  UTF-8 and hands a `string` to `onContentUpdate`), and its #124 echo/conflict
+  UTF-8 and hands a `string` to `onContentUpdate`), and its v0.9.1 echo/conflict
   machinery is dead weight for a surface that never writes. It returns
   `{ isReloading, isFileDeleted, isWatchUnavailable, unavailableReason,
   markReloaded, recover }`, depends on `[filePath]` only (callbacks live in

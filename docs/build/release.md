@@ -195,7 +195,7 @@ gh api repos/qodeca/erfana/environments/production-signing --jq '.protection_rul
 | Platform | Runner | Time budget | Notes |
 |---|---|---|---|
 | macOS | `macos-latest` (arm64 default) | ~60 min | Builds arm64 only (`--arm64`) — Apple Silicon is the sole macOS target. Intel (x64) and the `.zip` target were dropped. |
-| Windows | `windows-latest` (x64) | ~45 min | Azure Artifact Signing via app-reg certificate auth (OIDC unsupported by electron-builder 26). The NSIS installer `.exe` is signed. |
+| Windows | `windows-latest` (x64) | ~45 min | Azure Artifact Signing via app-reg certificate auth (OIDC possible since electron-builder 26.9.1 but untested; certificate auth in use). The NSIS installer `.exe` is signed. |
 
 Those budgets are `timeout-minutes` on the build jobs, and the clock starts only **after** the [approval gate](#approval-gate-production-signing) is cleared. End-to-end wall-clock is therefore approval latency + build time.
 
@@ -407,7 +407,7 @@ Each trust anchor has a revocation + communication procedure.
 
 #### B.1 Routine cleanup of unused federated credentials
 
-Independent of compromise: if the app registration `erfana-github-ci` has any federated credentials left over from the abandoned OIDC path (electron-builder 26 doesn't support OIDC; we use cert auth instead), they're dead code that's a live attack surface. Remove them:
+Independent of compromise: if the app registration `erfana-github-ci` has any federated credentials left over from the abandoned OIDC path (OIDC was blocked before electron-builder 26.9.1; we use cert auth), they're dead code that's a live attack surface. Remove them:
 
 ```bash
 APP_ID=45f70db0-2163-4ac6-80b6-1580d7c45b00  # erfana-github-ci

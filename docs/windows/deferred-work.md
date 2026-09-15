@@ -375,7 +375,7 @@ The Phase 2 plan (#161 step 4) called for "IPC serialization verification" of `A
 ### Cost when promoted
 
 ~30 minutes (only if D4 is itself deferred indefinitely):
-- Write `docs/adrs/0001-ipc-error-marker-vs-structured.md` documenting:
+- Write an ADR under `docs/adrs/` (number 0001 is taken; use the next free number, 0005 at the time of writing), for example `docs/adrs/0005-ipc-error-marker-vs-structured.md`, documenting:
   - The two options considered
   - Why marker-constant was chosen (smaller blast radius, preserves existing handler shape)
   - Promotion criteria for switching to structured errors (mirrors D4's criteria)

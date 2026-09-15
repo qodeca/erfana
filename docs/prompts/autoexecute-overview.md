@@ -14,34 +14,11 @@
 
 The prompt template system enables AI-powered text operations through context menu actions. This guide documents the technical implementation of the **autoExecute feature**, which automatically presses Enter after pasting a prompt into the terminal.
 
-### What Was Fixed
+### Lesson kept from the v0.3.x fixes
 
-#### v0.3.3 - Initial autoExecute Implementation
+Waiting on node-pty's write callback hung the IPC reply ("reply was never sent"): the callback only means the socket buffer flushed, not that the shell or the renderer is ready, and it did not fire reliably. Writes are fire-and-forget, followed by a fixed 200ms delay before Enter – do not bring the callback back. For why 200ms and the alternatives considered, see [AutoExecute Technical](./autoexecute-technical.md#why-200ms).
 
-**Problem**: The "Explain", "Modify", and "Ask" context menu actions inconsistently executed the Enter key after pasting prompts to the terminal.
-
-**Root Causes**:
-- Fire-and-forget terminal writes (no completion confirmation)
-- No terminal initialization state checking
-- Race conditions between terminal bootstrap and prompt execution
-- Insufficient delay (100ms) between text write and Enter key
-- IPC writes had no ordering guarantees
-
-**Solution**: Implemented Promise-based writes with completion callbacks, terminal initialization polling, enhanced error handling, and increased reliability delays.
-
-#### v0.3.4 - Simplified Fire-and-Forget (Current)
-
-**Problem**: The v0.3.3 solution was over-engineered - Promise-based writes with callbacks caused IPC handler hangs ("reply was never sent" errors) because node-pty's write callback wasn't firing reliably.
-
-**Root Cause**: The node-pty write callback only indicates socket buffer flush, NOT completion of rendering or shell readiness. This made it unreliable for synchronization.
-
-**Research Findings**:
-- Fire-and-forget writes are the industry standard (VSCode, Hyper, all major terminals)
-- Write ordering is guaranteed by TCP/socket FIFO semantics
-- 200ms delay is well-calibrated: PTY buffering (1-20ms) + shell processing (1-50ms) + GPU rendering (10-100ms) + system load margin
-- No simpler reliable alternative exists
-
-**Solution**: Reverted to synchronous fire-and-forget writes, removed initialization polling complexity, kept the 200ms delay which is sufficient and necessary.
+The version-by-version fix history now lives in [AutoExecute v0.3 history](../archive/autoexecute-v0.3-history.md).
 
 ### Key Architectural Changes
 
@@ -59,8 +36,8 @@ The prompt template system enables AI-powered text operations through context me
 ### What It Does
 
 When `autoExecute: true` is set in a prompt template's YAML frontmatter, the system:
-1. Pastes the rendered prompt text into the active terminal
-2. Waits for write completion
+1. Pastes the rendered prompt text into the active terminal (multi-line text as one bracketed paste)
+2. Waits for the write IPC call to return
 3. Waits 200ms for text rendering
 4. Sends Enter key (`\r`) to execute the command
 
@@ -80,8 +57,10 @@ In template YAML frontmatter:
 
 ```yaml
 ---
-id: explain-selection
-label: Explain
+area: markdown-preview
+subArea: context-menu
+name: Explain
+icon: maximize2
 autoExecute: true  # ← Enables automatic Enter key press
 ---
 ```

@@ -2,38 +2,75 @@
 
 ## Adding New IPC Channel
 
-1. Define in `src/preload/index.ts`:
+Never import `ipcMain` in a handler module: ESLint (`no-restricted-imports` in `eslint.config.mjs`) allows it only in `src/main/ipc/registry.ts`, whose `registerHandle` / `registerOn` wrappers reject any sender that is not the app's own top-level renderer. The newest complete example is `browser:openFile` (#124) – copy its shape.
+
+1. Name the channel in `src/shared/ipc/<domain>-channels.ts`:
    ```typescript
-   const api = {
-     myFeature: {
-       doSomething: (arg: string) => ipcRenderer.invoke('my:action', arg)
-     }
+   export const MY_CHANNELS = {
+     /** renderer → main, `ipcMain.handle` → `MyResponse`. */
+     DO_SOMETHING: 'my:doSomething'
+   } as const
+   ```
+   (Model: `src/shared/ipc/browser-channels.ts`.)
+
+2. Define the payloads with Zod in `src/shared/ipc/<domain>-schema.ts` – `.strict()` so extra keys are rejected, plus the bridge interface the preload will expose:
+   ```typescript
+   export const MyRequestSchema = z.object({ filePath: z.string().min(1).max(4096) }).strict()
+
+   export type MyResponse =
+     | { success: true }
+     | { success: false; errorCode: MyErrorCode; error: string }
+
+   export interface MyBridge {
+     doSomething(filePath: string): Promise<MyResponse>
    }
    ```
+   (Model: `src/shared/ipc/browser-schema.ts` – request schema, a closed list of error codes, a `.strict()` response union and `BrowserBridge`.)
 
-2. Add handler in `src/main/ipc/my-handlers.ts`:
+3. Add the handler in `src/main/ipc/<domain>-handlers.ts`. Gate the sender **before** parsing the payload, validate with `safeParse`, and return a code plus its `ERROR_MESSAGES` text – never a raw error, which may carry a path:
    ```typescript
-   export function registerMyHandlers() {
-     ipcMain.handle('my:action', async (_event, arg: string) => {
-       // Validate arg
-       return result
+   import { registerHandle } from './registry'
+   import { isTrustedSender } from './senderValidation'
+
+   function refuse(code: MyErrorCode): MyResponse {
+     return { success: false, errorCode: code, error: ERROR_MESSAGES[code] }
+   }
+
+   export function registerMyHandlers(): void {
+     registerHandle(MY_CHANNELS.DO_SOMETHING, async (event, request: unknown): Promise<MyResponse> => {
+       if (!isTrustedSender(event)) return refuse(ErrorCode.MY_INVALID_REQUEST)
+
+       const parsed = MyRequestSchema.safeParse(request)
+       if (!parsed.success) return refuse(ErrorCode.MY_INVALID_REQUEST)
+
+       try {
+         return await myService.doSomething(parsed.data.filePath)
+       } catch (error) {
+         logger.error('My handler error', redactedLogError(error))
+         return refuse(ErrorCode.MY_FAILED)
+       }
      })
    }
    ```
+   `registerHandle` already applies the process-wide app-sender gate; `isTrustedSender` (`senderValidation.ts`) adds the exact renderer URL, top-level frame only. Use `registerOn` for fire-and-forget `send` channels. (Model: `src/main/ipc/browser-handlers.ts`.)
 
-3. Register in `src/main/index.ts`:
+4. Call the register function once at startup in `src/main/index.ts`, beside the others (`registerBrowserHandlers()` is there).
+
+5. Expose it in `src/preload/index.ts`, sending the channel constant:
    ```typescript
-   import { registerMyHandlers } from './ipc/my-handlers'
+   my: {
+     doSomething: (filePath: string): Promise<MyResponse> =>
+       ipcRenderer.invoke(MY_CHANNELS.DO_SOMETHING, { filePath })
+   }
+   ```
+   and type it on `window.api` in `src/preload/index.d.ts` (`my: MyBridge`).
 
-   app.whenReady().then(() => {
-     registerMyHandlers()
-   })
+6. Call from the renderer:
+   ```typescript
+   const result = await window.api.my.doSomething(filePath)
    ```
 
-4. Call from renderer:
-   ```typescript
-   await window.api.myFeature.doSomething('value')
-   ```
+7. Add the channel to the index in [IPC patterns](./ipc-patterns.md) and any new codes to [Error codes](./error-codes.md).
 
 ## Adding Panels
 
@@ -105,6 +142,8 @@ For editor tabs that should appear in the center area:
 
    > Note: dockview panels are **not** contained by default – a throw here escalates straight to the root error boundary and replaces the whole window with the recovery screen. Wrap the panel's content in `PanelErrorBoundary` as above, keyed by whatever scopes it (the file path for a document panel), so the failure degrades to that one tab; without the key a tab that failed on file A still reads "unavailable" after the user opens file B in it. Same rule and rationale as the Splitview path above (#60) – see [UI Components – Error containment](./ui-components.md#error-containment).
 
+   > **Content that must keep its mount** when its scope changes keys the boundary by its own identity and passes the scope as `resetKey` instead. The HTML preview tab is the case (#124): a tab moves to another page inside the same native view, so a key on the file would remount it and destroy the view and its history. `EditorAreaSplitPanel.tsx` therefore renders `<PanelErrorBoundary key={props.params?.panelId || props.api.id} resetKey={props.params?.filePath ?? null} …>`. A changed `resetKey` clears a stuck fallback without a remount, a focus move or a counted retry.
+
    > Note: panel content is non-selectable by default – dockview applies `user-select: none` to panel chrome and the rule cascades into your component. To make a data-bearing surface inside your panel selectable, add its selector to the grouped rule in `src/renderer/src/styles/utilities.css` and add a row to `src/renderer/src/styles/userSelect.audit.test.ts`. See [Text selection policy](./ui-style-guide.md#text-selection-policy) for the decision rules and the CSS-module exception (`.metadataItem` / `.errorMessage` in `ImageViewerPanel.module.css` stay in-place because build-time class-name hashing prevents the central selector from matching them).
 
 2. Register in `editorComponents` inside `EditorAreaSplitPanel`
@@ -134,6 +173,17 @@ For editor tabs that should appear in the center area:
    Add a new constant beside it if your panel needs the same treatment. Ids for
    ordinary file panels are derived, not hard-coded: see
    `src/renderer/src/utils/openFileInPanel.ts`.
+
+5. If your panel holds a **savable buffer**, register it with
+   `useEditorSaveRegistration(panelId, save, hasConflict, holdAutosave)`
+   (`src/renderer/src/hooks/useEditorSaveRegistration.ts`), as
+   `MarkdownEditorPanel` does. The preview move coordinator saves other tabs by
+   panel id through `editorSaveRegistry`
+   (`src/renderer/src/services/editorSaveRegistry.ts`) when the user answers
+   **Save** in the `UnsavedChangesDialog`. The registry is fail-safe: an
+   unregistered id saves nothing and answers `false`, so the move is abandoned
+   and the edits stay in their tab – a same-tab page move can never complete
+   past an unregistered dirty editor.
 
 **Note**: The center `EditorAreaSplitPanel` contains the DockviewReact instance. File opening happens via `dockviewApi` passed through params.
 
@@ -179,38 +229,30 @@ SettingsService provides persistent storage using electron-store.
 **Pattern**: All methods are async due to dynamic ES Module import.
 
 ```typescript
-// In IPC handler
+// In an IPC handler module (simplified from src/main/ipc/file-handlers.ts)
 import { settingsService } from '../services/SettingsService'
+import { registerHandle } from './registry'
 
-ipcMain.handle('file:openProject', async () => {
-  const projectPath = result.filePaths[0]
-
-  // Save to settings (async)
-  await settingsService.setLastProjectPath(projectPath)
-
-  return projectPath
-})
-
-ipcMain.handle('file:getLastProjectPath', async () => {
+registerHandle('file:getLastProjectPath', async () => {
   // Retrieve from settings (async)
   const lastPath = await settingsService.getLastProjectPath()
+  if (!lastPath) return null
 
-  if (lastPath) {
-    // Verify folder still exists
+  try {
+    // Verify the folder still exists
     const stats = await stat(lastPath)
-    if (stats.isDirectory()) {
-      return lastPath
-    } else {
-      // Clean up invalid path
-      await settingsService.clearLastProjectPath()
-    }
+    if (stats.isDirectory()) return lastPath
+  } catch {
+    // Folder is gone – clean up the stale setting
+    await settingsService.clearLastProjectPath()
   }
-
   return null
 })
 ```
 
-**Why Dynamic Import**: electron-store v11+ is an ES Module. See [Known Issues](./known-issues.md#electron-store-es-module-import).
+Writing the last project path is not done in a handler: `ProjectService` calls `settingsService.setLastProjectPath(newPath)` when a project opens (`src/main/services/ProjectService.ts`).
+
+**Why Dynamic Import**: electron-store v11+ is an ES Module. See [Troubleshooting – electron-store import error](./troubleshooting.md#electron-store-import-error).
 
 ## Working with Panel State
 
@@ -263,7 +305,7 @@ See: [UI Components](./ui-components.md#panel-toggle-system)
 
 ## Creating Prompt Templates
 
-Add new AI-powered prompts for markdown preview context menu.
+Add prompt templates to the markdown preview context menu. A template renders text and sends it to the CLI agent running in the terminal; Erfana itself adds no AI.
 
 ### 1. Create Template File
 
@@ -290,12 +332,15 @@ sendDirectly: false
 ### 2. Validate Schema
 
 Template automatically validates against Zod schema:
-- `area` (required): Context area (e.g., "markdown-preview")
-- `subArea` (required): Specific location (e.g., "context-menu")
+- `area` (required): one of `markdown-preview`, `code-editor`, `global`, `diagram-viewer`
+- `subArea` (optional): specific location – `context-menu`, `toolbar`, `command-palette`, `mermaid-error`, `mermaid-direction` or `chat`
+- `id` (optional): stable identifier; without it the id is slugified from `name` (see [Known issues – Template ID system](./known-issues.md#template-id-system))
 - `name` (required): Display name in UI
 - `icon` (required): Lucide icon name (e.g., "list", "sparkles", "maximize2")
 - `targetPanel` (optional): "terminal" (default: "terminal")
 - `sendDirectly` (optional): Send immediately without review (default: false)
+- `autoExecute` (optional): press Enter after pasting into the terminal (default: false)
+- `requiresInput` (optional): ask the user for input before rendering (default: false); `inputLabel` and `inputPlaceholder` label the field
 - `mutatesDocument` (optional, v0.10.0): Set to `true` if the template edits the source file in place; otherwise omit. When `true`, the canonical apply-to-document footer is composed onto the rendered prompt at the render funnel (`panelUtils.executePromptTemplate` → `withApplyFooter` from `prompts/applyFooter.ts`) — the body must NOT also say "return only the code block" / "no commentary" / "no explanation" or the competing instruction will re-introduce the non-determinism the footer exists to prevent. Also add `'filePath'` to the template's entry in `PROMPT_REQUIREMENTS` (`prompts/validation.ts`) so the footer's `{{fileRef}}` can never render empty. See [docs/prompts/README.md § Mutation prompts and the apply-to-document footer](./prompts/README.md#mutation-prompts-and-the-apply-to-document-footer).
 
 ### 3. Use Template Variables
@@ -409,7 +454,7 @@ Get template IDs dynamically:
 import { getAllPromptIds, getPromptsForArea } from '../prompts/registry'
 
 // All templates
-const allIds = getAllPromptIds()  // ['explain', 'modify', 'mermaid-bug-report']
+const allIds = getAllPromptIds()  // e.g. ['editor-explain', 'editor-modify', 'mermaid-bug-report', …]
 
 // Templates for specific area
 const contextMenuPrompts = getPromptsForArea('markdown-preview', 'context-menu')

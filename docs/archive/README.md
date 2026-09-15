@@ -9,6 +9,7 @@ This directory contains historical specification documents that are not part of 
 - [changelog-v03-v05.md](./changelog-v03-v05.md) – Changelog entries for v0.3.0–v0.5.4
 - [changelog-v08.md](./changelog-v08.md) – Changelog entries for the v0.8.x series (archived from `docs/CHANGELOG.md` during the Phase 2 Windows enablement trim)
 - [phase2-closure-2026-04.md](./phase2-closure-2026-04.md) – Seven-stream closure plan for Windows enablement Phase 2 (v0.9.3, April 2026), archived from `docs/windows/` on 2026-08-07
+- [autoexecute-v0.3-history.md](./autoexecute-v0.3-history.md) – Point-in-time record of the prompt autoExecute changes from v0.3.2 to v0.3.4 (fix history, write-operation evolution, modified files, migration guide, v0.3.4 coverage snapshot), archived from `docs/prompts/` on 2026-09-15
 
 ## Restoring Archived Documentation
 

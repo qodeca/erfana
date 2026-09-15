@@ -5,7 +5,7 @@ SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 
 # Design – issue #124, part 2: frames show pages from the same project
 
-Parent: [design-issue-124.md](design-issue-124.md). Covers P2-AC1 to P2-AC5 and user answers 5 (the request-type bug) and 9 (`srcdoc` frames past the caps). Work items WI-7 (types), WI-12 to WI-16, WI-29 and WI-24. Spike facts are from `temp/124-spikes.md` (S1–S13 and S15–S17, Electron 39.8.10, macOS).
+Parent: [design-issue-124.md](design-issue-124.md). Covers P2-AC1 to P2-AC5 and user answers 5 (the request-type bug) and 9 (`srcdoc` frames past the caps). Work items WI-7 (types), WI-12 to WI-16, WI-29 and WI-24. Spike facts are from the `124-spikes` run notes, not in repo (S1–S13 and S15–S17, Electron 39.8.10, macOS).
 
 ## 2.1 Content-security policy
 
@@ -116,7 +116,7 @@ S11: `will-frame-navigate` never fires for `srcdoc` frames (0 events over a four
 - **No preload in frames.** `nodeIntegrationInSubFrames` stays `false` (`previewSessionPolicy.ts:43`), so frames get no IPC and the link channel stays main-frame only. `previewSessionPolicy.test.ts:108` stays as it is.
 - **Main-side detection.** S9: a CSP violation inside a frame reaches main as `console-message` with `details.frame` set to the real subframe (flag off). `previewFrameCspConsole.ts`: only `level === 'error'`, only a frame that is not `wc.mainFrame` and whose parent walk reaches `wc.mainFrame` within 4 steps (frames of this view only).
 - **Arrival cap (RX2).** Before truncating or matching, each view admits at most `FRAME_CONSOLE_MAX_PER_SECOND` (100) such messages per second; the rest are dropped and counted, and the count is logged at most once per window. As built (WI-14), `Framing` lines and main-frame lines are dropped before the cap, so a flood of refused frames spends none of it; the depth walk comes after it. Then the message is truncated to `FRAME_CSP_CONSOLE_MAX_CHARS` (4096) and matched by anchored, backtracking-free patterns – the quoted URL at most 2048 characters, the directive `[a-z-]{1,64}`:
-  - Electron 39 format, captured in `temp/spike-124/logs/s9.log`: `Loading the <kind> '<url>' violates the following Content Security Policy directive: "<directive> …`
+  - Electron 39 format, captured in the S9 spike run log (a run note, not kept in the repo): `Loading the <kind> '<url>' violates the following Content Security Policy directive: "<directive> …`
   - the older `Refused to load the <kind> '<url>' because it violates the following Content Security Policy directive: "<directive> …`
   - S17 (WI-14): `Loading media from  '<url>' violates …` (with the two spaces Chromium prints; audio and video) and `Connecting to '<url>' violates …` (fetch and XHR); the directive-less `Fetch API cannot load …` line that follows is ignored.
   - `Framing '<url>' violates …` lines (S10) are **ignored**: a refused frame is a badge entry (§2.6), never a band row.

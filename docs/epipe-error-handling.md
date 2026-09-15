@@ -63,15 +63,11 @@ import { installSafeConsole } from './utils/safeConsole'
 installSafeConsole()
 ```
 
-### 2. PTY Stream Protection
+### 2. TerminalService PTY protection
 
 **Location**: `src/main/services/TerminalService.ts`
 
 Protects against EPIPE when writing to a terminal PTY that has closed.
-
-### 3. TerminalService PTY Protection
-
-**Location**: `src/main/services/TerminalService.ts`
 
 **Methods Enhanced**:
 - `write()`: Suppress EPIPE, emit exit event, clean up terminal
@@ -148,42 +144,6 @@ try {
 - Create terminal session
 - Force-close processes
 - Verify no crashes in logs
-
-## Benefits
-
-### Stability Improvements
-
-1. **Crash Prevention**: Eliminates EPIPE crashes during normal operations
-2. **Graceful Degradation**: Failed writes become logged info, not errors
-3. **Cleanup Reliability**: Services dispose successfully even with dead child processes
-
-### User Experience
-
-1. **No Data Loss**: Application closes cleanly without crashes
-2. **Transparent**: Users unaware of suppressed EPIPE errors
-3. **Better Logging**: Clear distinction between expected shutdown and real errors
-
-### Development Experience
-
-1. **Clear Patterns**: Consistent error handling across services
-2. **Easy Debugging**: EPIPE suppression logged with context
-3. **Maintainable**: Centralized console safety in single utility
-
-## Future Enhancements
-
-### Potential Improvements
-
-1. **Stream State Tracking**: Track stdin/stdout state to avoid write attempts
-2. **Graceful Write Queue**: Buffer writes and drain on stream availability
-3. **Health Checks**: Periodic stream availability checks before writes
-4. **Metrics**: Track EPIPE occurrences for monitoring
-
-### Error Recovery
-
-Current implementation suppresses EPIPE but could be enhanced with:
-- Automatic session restart detection
-- User notification for unexpected terminations
-- Retry logic for transient stream issues
 
 ## Related Issues
 

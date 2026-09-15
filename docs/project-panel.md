@@ -119,7 +119,7 @@ const filterTree = useMemo(() => {
 }, [fileTree, filterMode])
 ```
 
-**Helper**: `isMarkdownFile()` checks `.md` and `.markdown` only. Note there are two copies – a local one in `ProjectTree.tsx` (used by this filter) and the exported one in `src/renderer/src/utils/fileUtils.ts`; both accept the same two extensions, so `.mdx`, `.mdown` and `.mkd` files are hidden in Markdown mode.
+**Helper**: `isMarkdownFile()` checks `.md` and `.markdown` only. Note there are three copies – a local one in `ProjectTree.tsx` (used by this filter), the exported one in `src/renderer/src/utils/fileUtils.ts`, and another in `components/Panels/markdownEditorPanel.logic.ts`; all accept the same two extensions, so `.mdx`, `.mdown` and `.mkd` files are hidden in Markdown mode.
 
 ### Behavior
 
@@ -145,7 +145,7 @@ VS Code-style git status badges on files and folders.
 **Status Bar**: Footer showing branch name + colored status counts
 
 **Architecture**:
-- `GitStatusService.ts` - isomorphic-git statusMatrix()
+- `GitStatusService.ts` - runs git status in a worker thread (`workers/git-status.worker.ts`): native `git status` first, isomorphic-git `statusMatrix()` only when no git binary is found
 - `useGitStatus.ts` - Hook with 250 ms debounce, 500 ms cooldown (`GIT_STATUS` in `ProjectTree/constants.ts`)
 - `useGitStore.ts` - Zustand store for git state
 - `GitStatusBadge.tsx` - File/folder badge component
@@ -153,7 +153,7 @@ VS Code-style git status badges on files and folders.
 
 **Auto-refresh**: On file changes, pauses when tab unfocused
 
-**Known Limitation**: Global `.gitignore` not supported (isomorphic-git limitation)
+**Known Limitation**: Global `.gitignore` not supported when the isomorphic-git fallback runs (no git binary found); the native path runs the user's own `git status`
 
 See: [Known Issues](./known-issues.md#git-status-global-gitignore-not-supported)
 
@@ -200,32 +200,34 @@ Files/folders starting with `.`
 ### Architecture
 
 **Patterns**:
-- **Strategy**: Node type-specific menus (FileStrategy, FolderStrategy)
-- **Command**: Testable command objects (12 classes)
+- **Strategy**: Node type-specific menus (`FileContextMenuStrategy`, `DirectoryContextMenuStrategy`)
+- **Command**: Testable command objects (13 classes)
 - **Factory**: Automatic strategy selection
 
 **Structure**:
 ```
 context-menu/
 ├── types.ts        # Interfaces
-├── commands.tsx    # 12 command classes
-├── strategies.tsx  # FileStrategy, FolderStrategy
-└── factory.ts      # createContextMenu(context, nodeType)
+├── commands.tsx    # 13 command classes
+├── strategies.tsx  # FileContextMenuStrategy, DirectoryContextMenuStrategy
+└── factory.ts      # ContextMenuFactory.build(node, ctx)
 ```
 
 ### Menu Items
 
 Built by `strategies.tsx` from the command classes in `commands.tsx`, in this order:
 
-**Files**: Open as source (HTML files only, when the tree can reach the editor), ---, Cut, Copy, ---, Rename, ---, Delete, ---, Reveal in Finder / Show in Explorer
-**Folders**: Cut, Copy, Paste, ---, New File, New Folder, Rename, Import..., ---, Delete,
+**Files**: Open as source, Open in default browser (HTML files only, each under its own gate), ---, Cut, Copy, ---, Rename, ---, Delete, ---, Reveal in Finder / Show in Explorer
+**Folders**: Cut, Copy, Paste, ---, New File, New Folder, Rename, ---, Import..., ---, Delete,
 ---, Reveal in Finder / Show in Explorer
 **Project root**: the root row is also a valid target; it cannot be moved
 ("Cannot move project root")
 
 **Conditional items**: Paste appears only on directories and only when the internal
 clipboard is non-empty. Import... appears only on directories and only when an import
-handler is supplied. The Reveal label switches on `isMacOS()`.
+handler is supplied; it gets its own separator. The Reveal label switches on `isMacOS()`.
+
+**Gates for the HTML open group**: Open as source appears only when `ctx.openAsSource` is wired (the tree can reach the editor), and Open in default browser only when `ctx.openInBrowser` is wired (`MenuContext` in `context-menu/types.ts`). The separator follows the group only when it holds at least one item. `openInBrowser` raises its own toasts and never rejects.
 
 **Separator**: Visual separator before destructive actions
 
@@ -247,23 +249,25 @@ interface IContextMenuStrategy {
 }
 ```
 
-**Available** (`commands.tsx`): CutCommand, CopyCommand, PasteIntoDirectoryCommand, OpenAsSourceCommand, RenameFileCommand, RenameDirectoryCommand, DeleteFileCommand, DeleteDirectoryCommand, NewFileInDirectoryCommand, NewFolderInDirectoryCommand, ImportCommand, RevealInFileManagerCommand
+**Available** (`commands.tsx`): CutCommand, CopyCommand, PasteIntoDirectoryCommand, OpenAsSourceCommand, OpenInBrowserCommand, RenameFileCommand, RenameDirectoryCommand, DeleteFileCommand, DeleteDirectoryCommand, NewFileInDirectoryCommand, NewFolderInDirectoryCommand, ImportCommand, RevealInFileManagerCommand
 
 ### Extensibility
 
-**Add Menu Item**:
-1. Create command class in `commands.tsx`
-2. Implement `IMenuCommand`
-3. Add to strategy in `strategies.tsx`
+**Add Menu Item** (including a new file operation):
+1. Create a command class in `commands.tsx` that extends `CommandBase` (a `label`, optional `icon` / `danger`, and `execute()`)
+2. Reach everything through the injected `MenuContext` (`this.ctx`), never through `window.api` or a store directly: `ctx.api` for file IPC, `ctx.dialogs` and `ctx.toast` for the UI. Wrap any filesystem change in `ctx.withWatcherPause(...)` (see [Pause/Resume Pattern](#pauseresume-pattern)), then call `ctx.refreshProjectTree()` inside it and `ctx.onGitRefresh?.()` after it
+3. If the command needs something `MenuContext` does not carry yet, add an optional field in `context-menu/types.ts` and wire it in `buildMenuContext()` in `ProjectTree.tsx`
+4. If it needs a new main-process operation, add the IPC channel first – see [Development Tasks](./development-tasks.md) and [IPC Patterns](./ipc-patterns.md)
+5. Add it to the strategy in `strategies.tsx`
 
 **New Node Type**:
 1. Create strategy in `strategies.tsx`
-2. Implement `IMenuStrategy`
-3. Update factory
+2. Implement `IContextMenuStrategy` (`supports(node)` and `build(node, ctx)`)
+3. Register it in the `ContextMenuFactory` constructor (`factory.ts`)
 
 ### Benefits
 
-Single Responsibility, Open/Closed, Testable (96 tests across `commands.test.tsx`, `strategies.test.tsx` and `factory.test.ts`), Maintainable, Flexible
+Single Responsibility, Open/Closed, Testable (`commands.test.tsx`, `strategies.test.tsx` and `factory.test.ts`), Maintainable, Flexible
 
 ### Dialog Integration
 
@@ -338,14 +342,15 @@ See: [File Watching](./file-watching/README.md#directorywatcherservice-directory
 ## File Opening
 
 **Flow**:
-1. User clicks file → receives `dockviewApi` via params
-2. Check if already open (find by ID)
-3. If open: activate panel
-4. If closed: add panel with `dockviewApi.addPanel()`
+1. User clicks file → `openFileInPanel()` with the editor-area `dockviewApi`
+2. Decide the panel kind: images open in the image viewer; an eligible `.html` / `.htm` file opens as a running preview (the caller awaits `resolvePanelKind()` and passes `kind: 'preview'`); everything else opens in the Markdown editor
+3. Check if already open: editor and image tabs by panel id; a preview tab by the page it shows now, via `findPreviewTabShowing()` (reads `params.filePath`), because a preview tab that moved to another page keeps its original id
+4. If open: activate panel
+5. If closed: add panel with `dockviewApi.addPanel()`
 
 **Panel ID**: From `getFilePanelId()` / `openFileInPanel()` in `utils/openFileInPanel.ts` – never hand-built (an id past the length budget is a shortened head plus a digest, so a path cannot be read back out of it)
 **Tab Title**: Basename (e.g., `README.md`)
-**Component**: `editor` – the `MarkdownEditorPanel` registry key in `DockLayout/components/EditorAreaSplitPanel.tsx` (Monaco + preview)
+**Component** (registry keys in `DockLayout/components/EditorAreaSplitPanel.tsx`): `editor` – `MarkdownEditorPanel` (Monaco + preview), id prefix `editor-`; `imageViewer`, id prefix `image-`; `htmlPreview`, id prefix `preview-`
 
 See: [UI Components](./ui-components.md#panel-communication)
 
@@ -368,10 +373,7 @@ Arrow-key, Enter and Space navigation of the tree is not implemented – the tre
 
 ### Add File Operation
 
-1. Add menu item to context menu config
-2. Add handler in ProjectTree
-3. Implement IPC channel in main
-4. Add pause/resume around operation
+Follow **Add Menu Item** under [Context Menu Operations – Extensibility](#extensibility).
 
 ### Add Visual Indicator
 

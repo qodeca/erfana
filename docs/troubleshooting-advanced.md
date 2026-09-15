@@ -16,9 +16,6 @@ This guide covers advanced troubleshooting topics. For basic troubleshooting (In
 1. Use preview-only mode for very large files
 2. Consider splitting large files into smaller chunks
 
-**Future Enhancement:**
-Virtual scrolling for Monaco editor (planned).
-
 ---
 
 ### High Memory Usage
@@ -42,40 +39,11 @@ Virtual scrolling for Monaco editor (planned).
 
 ## UI/Layout
 
-### Panel Won't Resize
-
-**Symptom:** Resize cursor shows but dragging does nothing
-
-**Cause:** This was a known issue, resolved in v0.1.0 with hybrid layout refactoring.
-
-**Verification:**
-Ensure using SplitviewReact (outer) + DockviewReact (center):
-```tsx
-<Splitview>  {/* Outer 3-column layout */}
-  <Panel id="left">Project</Panel>
-  <Panel id="center">
-    <Dockview>  {/* Editor tabs only */}
-      ...
-    </Dockview>
-  </Panel>
-  <Panel id="right">Terminal/Git</Panel>
-</Splitview>
-```
-
-**See:** [Resolved issues – Panel resizing (v0.1.0)](./archive/resolved-issues.md#panel-resizing-v010)
-
----
-
 ### Keyboard Shortcuts Not Working
 
 **Symptom:** Cmd/Ctrl+B doesn't toggle sidebar
 
-**Cause:** Global shortcuts override Monaco shortcuts.
-
-**Expected Behavior:**
-- `Cmd/Ctrl+B` = Toggle left sidebar (NOT Monaco bold)
-- `Cmd/Ctrl+J` = Toggle terminal panel
- 
+**Cause:** `Cmd/Ctrl+B` is registered twice – the global sidebar toggle and Monaco's Bold. Which one wins while the editor is focused is **unverified**; see [Keyboard shortcuts – Conflicts](./keyboard-shortcuts.md#conflicts).
 
 **Workaround:**
 Use Monaco's command palette (F1) or formatting toolbar for editor commands.
@@ -138,7 +106,7 @@ npm run dev
 
 **Symptom:** Build fails with type errors, but dev mode works
 
-**Cause:** Stricter checks in production build.
+**Cause:** `npm run build` runs `npm run typecheck` before `electron-vite build`; `npm run dev` (`electron-vite dev`) does not type-check.
 
 **Solution:**
 Run type check locally:
@@ -147,18 +115,6 @@ npm run typecheck
 # Fix all errors before building
 npm run build
 ```
-
----
-
-### ESLint Peer Dependency Warnings
-
-**Symptom:** `npm install` shows ESLint version warnings
-
-**Impact:** None (warnings only, doesn't affect functionality).
-
-**Cause:** ESLint 9 vs ESLint 8 peer dependencies in electron-toolkit – historical.
-
-**Action:** Resolved – `@electron-toolkit/eslint-config-ts` and `@electron-toolkit/eslint-config-prettier` now declare `eslint >=9.0.0` as their peer, so no warning is expected on a current `npm ci`.
 
 ---
 

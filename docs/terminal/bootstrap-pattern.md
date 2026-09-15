@@ -34,7 +34,7 @@ pwsh.exe -NoProfile -Command "Set-Location -LiteralPath 'C:\Users\me\Dev\proj' ;
 cmd.exe /D /K "@echo off && cd /d "C:\Users\me\Dev\proj" && cd && echo __ERFANA_PWD_MARKER_... && cls"
 ```
 
-The trailing screen-clear step (`printf`, `[Console]::Write`, or `cls`) is Windows-specific and exists purely to wipe the ConPTY internal screen buffer before the interactive shell takes over – see [ConPTY resize-reflow mitigation](#conpty-resize-reflow-mitigation-windows) below.
+The trailing screen-clear step (`printf`, `[Console]::Write`, or `cls`) is Windows-specific and exists purely to wipe the ConPTY internal screen buffer before the interactive shell takes over – see [ConPTY resize-reflow mitigation](#4-conpty-resize-reflow-mitigation-windows) below.
 
 ## Why the specific shell flags
 
@@ -291,7 +291,7 @@ Handles: `C:\tools\pwsh\pwsh.exe`, `/c/Program Files/PowerShell/7/pwsh.exe` (Git
 
 ## Implementation Files
 
-- `src/main/services/TerminalService.ts` — service, bootstrap dispatch, marker detection, three-flag gating, `resolve­WindowsShell` fallback chain
+- `src/main/services/TerminalService.ts` – service, bootstrap dispatch, marker detection, three-flag gating, `resolveWindowsShell` fallback chain
 - `src/main/services/WindowsTerminalBootstrap.ts` — strategy interface + `PowerShellBootstrapBuilder` / `GitBashBootstrapBuilder` / `CmdExeBootstrapBuilder` + `validateWindowsCwd` / `normalizeWindowsCwd` helpers
 - `src/main/services/WindowsTerminalBootstrap.test.ts` — unit tests for the strategy layer (added during Phase-2 UAT hardening)
 - `src/renderer/src/components/Panels/TerminalPanel.tsx` — clear handler + `markClearComplete` confirmation

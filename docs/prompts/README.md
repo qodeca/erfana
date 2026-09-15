@@ -104,29 +104,38 @@ Templates can include thinking triggers for Claude Code to enable deeper analysi
 | "ultrathink" | ~32,000 | Very complex problems |
 
 **Applied in templates:**
-- `explain.md`: "Think about the content..."
-- `ask.md`: "Think about the question..."
-- `visualize.md`: "Think hard about how to best represent..."
+- `ask.md` and `editor-ask.md`: "Think about the question..."
+- `visualize.md` and `editor-visualize.md`: "Think hard about how to best represent..."
 
 ## Available Templates
 
 A `Mutates?` column flags templates that set `mutatesDocument: true` and apply their result to the file in place. Read-only templates produce a terminal response only.
 
-### Preview context menu (area: markdown-preview)
+### Markdown preview (area: markdown-preview)
+
+| Template | Sub-area | Registry id | Purpose | Input Required | Mutates? |
+|----------|----------|-------------|---------|----------------|----------|
+| `explain.md` | `context-menu` | `explain` | Explain selected text | No | No |
+| `modify.md` | `context-menu` | `modify` | Apply modifications | Yes (instruction) | Yes – replace selection |
+| `ask.md` | `context-menu` | `ask` | Answer questions | Yes (question) | No |
+| `visualize.md` | `context-menu` | `visualize` | Generate Mermaid diagrams | Yes (diagram type dropdown) | Yes – insert after selection |
+| `prompt.md` | `context-menu` | `prompt` | Generic prompt | Yes (instruction) | No |
+| `mermaid-bug-report.md` | `mermaid-error` | `mermaid-bug-report` | Fix syntax errors | No | Yes – edit diagram in place |
+| `mermaid-change-direction.md` | `mermaid-direction` | `change-mermaid-direction` | Change diagram direction | No | Yes – replace direction keyword |
+
+### Diagram viewer (area: diagram-viewer)
+
+| Template | Sub-area | Registry id | Purpose | Input Required | Mutates? |
+|----------|----------|-------------|---------|----------------|----------|
+| `mermaid-chat.md` | `chat` | `diagram-chat` | Modify diagrams | Yes (instruction) | Yes – edit diagram in place |
+
+### Global (area: global)
 
 | Template | Registry id | Purpose | Input Required | Mutates? |
 |----------|-------------|---------|----------------|----------|
-| `explain.md` | `explain` | Explain selected text | No | No |
-| `modify.md` | `modify` | Apply modifications | Yes (instruction) | Yes — replace selection |
-| `ask.md` | `ask` | Answer questions | Yes (question) | No |
-| `visualize.md` | `visualize` | Generate Mermaid diagrams | Yes (diagram type dropdown) | Yes — insert after selection |
-| `prompt.md` | `prompt` | Generic prompt | Yes (instruction) | No |
-| `mermaid-chat.md` | `diagram-chat` | Modify diagrams | Yes (instruction) | Yes — edit diagram in place |
-| `mermaid-bug-report.md` | `mermaid-bug-report` | Fix syntax errors | No | Yes — edit diagram in place |
-| `mermaid-change-direction.md` | `change-mermaid-direction` | Change diagram direction | No | Yes — replace direction keyword |
 | `organize-import.md` | `organize-import` | Organize imported files | No | No (interactive move/rename) |
 
-> The id is derived from `frontmatter.id || slugify(name)` in `parser.ts:72`. Filenames are not the IDs — `mermaid-chat.md` registers as `diagram-chat`, `mermaid-change-direction.md` as `change-mermaid-direction`. Call sites and tests must key off the IDs.
+> The id is derived from `frontmatter.id || slugify(name)` in `parser.ts` (`parseTemplate`). Filenames are not the IDs – `mermaid-chat.md` registers as `diagram-chat`, `mermaid-change-direction.md` as `change-mermaid-direction`. Call sites and tests must key off the IDs.
 
 ### Editor context menu (area: code-editor) - v0.6.4-beta
 

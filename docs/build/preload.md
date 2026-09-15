@@ -1,6 +1,6 @@
 # Preload Script Bundling
 
-**Last updated**: August 2026 (v0.17.2 + the #73 image-export work, shipped in v0.18.0)
+**Last updated**: September 2026 (adds the fourth entry, `previewPage`, from the HTML preview work)
 
 This document explains why the preload script must be bundled for sandbox compatibility.
 
@@ -17,11 +17,13 @@ preload: {
     rollupOptions: {
       // Multi-entry preload: the main editor window loads `index.js`, each
       // per-display area-select overlay window loads `screenshotOverlay.js`,
-      // and the hidden image-export rasterize window loads `imageExport.js`.
+      // the hidden image-export rasterize window loads `imageExport.js`, and
+      // the sealed HTML-preview page loads `previewPage.js`.
       input: {
         index: resolve('src/preload/index.ts'),
         screenshotOverlay: resolve('src/preload/screenshotOverlay.ts'),
-        imageExport: resolve('src/preload/imageExport.ts')
+        imageExport: resolve('src/preload/imageExport.ts'),
+        previewPage: resolve('src/preload/previewPage.ts')
       },
       output: {
         format: 'cjs'
@@ -33,7 +35,7 @@ preload: {
 
 In electron-vite v5, dependency externalization is enabled by default for all targets. The preload must explicitly disable it with `externalizeDeps: false` to bundle dependencies inline.
 
-**Three entry points, not one.** Each privileged window gets the smallest bridge that does its job: the screenshot overlays get the overlay-only IPC verbs, and the image-export harness gets four (`ready`, `onRender`, `postResult`, `log`) and deliberately **not** `imageExport.run` — so a page whose whole purpose is decoding untrusted image bytes has no reachable route to the channel that writes files. All three entries are bundled the same way; all three must stay sandbox-safe.
+**Four entry points, not one.** Each privileged window gets the smallest bridge that does its job: the screenshot overlays get the overlay-only IPC verbs, and the image-export harness gets four (`ready`, `onRender`, `postResult`, `log`) and deliberately **not** `imageExport.run` – so a page whose whole purpose is decoding untrusted image bytes has no reachable route to the channel that writes files. The sealed HTML-preview page's preload exposes nothing to the page at all – it only tells main about link clicks and CSP refusals. All four entries are bundled the same way; all four must stay sandbox-safe.
 
 ---
 
@@ -94,9 +96,9 @@ The trigger is ordinary and easy to reintroduce: **two preload entries importing
 To verify bundling works correctly:
 
 1. Build the app: `npm run build`
-2. Check all three preload bundles were emitted and none has external requires for non-builtins:
+2. Check all four preload bundles were emitted and none has external requires for non-builtins:
    ```bash
-   ls -l out/preload/index.js out/preload/screenshotOverlay.js out/preload/imageExport.js
+   ls -l out/preload/index.js out/preload/screenshotOverlay.js out/preload/imageExport.js out/preload/previewPage.js
 
    grep 'require("@electron-toolkit' out/preload/*.js
    # Should return nothing (all bundled inline)

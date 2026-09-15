@@ -298,6 +298,15 @@ A **second, unrelated** limiter, in `src/main/utils/rendererCrashHandlers.ts` �
 - **Length bound**: renderer-supplied strings (console `message`, `sourceId`, preload-error text) are untrusted — a rendered document can log whatever it likes — so each is truncated at `MAX_UNTRUSTED_TEXT_LENGTH` (1000 chars) with a `[truncated]` marker and passed as structured context, never interpolated into the message
 - **Why**: a renderer stuck in an error loop emits thousands of `console.error` calls a second. Copied one-for-one, that loop pushes the crash that *started* it out of the rotation window — it destroys the evidence the handlers exist to preserve. Length bounds the size of one record; the cap bounds how many
 
+### Preview bounds-drop reporter (#124)
+
+A **third** limiter, `createDropReporter()` in `src/shared/dropReporter.ts`. It is pure (clock and sink injected, no logger import), so the renderer's bounds hook and main's preview handlers and services share it. Every point that throws away an HTML-preview bounds update reports through one, so a page left over Erfana's own chrome leaves a trail naming the step that dropped the update.
+
+- **Message**: every line is `Preview bounds update dropped`; `source` (`renderer` / `main`) and `reason` travel as structured context
+- **First drop always logged**: the first drop of each reason is emitted; later drops of that reason are emitted at most once per `PREVIEW_LIMITS.BOUNDS_DROP_LOG_WINDOW_MS` (5 s), and that line carries `suppressed` – how many were swallowed since the previous one
+- **Bounded slots**: at most `BOUNDS_DROP_MAX_REASONS` (16) reasons get their own slot; any further reason shares one overflow slot under the same rule
+- **No path**: a line carries `stablePathDigest` of the panel id (never the id, which spells the file path), sequence numbers and a rect rounded to whole pixels
+
 ## Related documentation
 
 - [IPC patterns](./ipc-patterns.md) – IPC communication patterns

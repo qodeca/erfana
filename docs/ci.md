@@ -23,7 +23,7 @@ Node 24, `permissions: contents: read`. Every `checks.yml` job that needs depend
 
 Nine jobs run in parallel (all `ubuntu-latest` except `windows-checks`). The **Required check?** column reflects the live branch-protection required set on `main`; the separate `Secret scan` workflow (above) is the seventh required check.
 
-**Time budgets.** Every job declares a `timeout-minutes`, so a hung step fails the run instead of burning a runner for the six-hour default. The budget is **10 minutes** for each job, with two deliberate exceptions: `windows-checks` gets **15** (Windows runners install and compile slower), and `release-guards` gets **3** (checkout-only, awk/grep scripts, no install). A job that starts brushing its budget is a signal to look at what got slower, not to raise the number.
+**Time budgets.** Every job declares a `timeout-minutes`, so a hung step fails the run instead of burning a runner for the six-hour default. The budget is **10 minutes** for each job, with three deliberate exceptions: `windows-checks` gets **15** (Windows runners install and compile slower), `coverage` gets **15** (it runs three per-project coverage passes), and `release-guards` gets **3** (checkout-only, awk/grep scripts, no install). A job that starts brushing its budget is a signal to look at what got slower, not to raise the number.
 
 | Job (`name:`) | Command | Required check? | Notes |
 |-----|---------|:---:|-------|
@@ -135,7 +135,6 @@ npm run test:e2e:visual   # visual project — local-only today (visual hang on 
 | `npm error code ECONNRESET` / "network aborted" | Transient GitHub runner → npmjs.org | Retry wrapper usually recovers it. If persistent, escalate to `nick-fields/retry` action. |
 | E2E never appears in PR checks | Workflow is intentionally disabled (see [E2E Tests (disabled)](#e2e-tests-e2eyml-disabled)) | Run E2E locally before merging anything sensitive: `npm run test:e2e` |
 | E2E electron passes locally, fails on CI (historical) | Usually flake (Monaco cursor blink, timing). Playwright retries twice on CI (`retries: process.env.CI ? 2 : 0`); see flaky count in run summary | Fix with `disableCursorBlink()` / condition-based waits — applies if the workflow is re-enabled |
-| Visual test fails on CI only (historical) | See [Visual regression on CI](#visual-regression-on-ci) above | Run locally; CI visual coverage is a known gap |
 
 ## Related documentation
 

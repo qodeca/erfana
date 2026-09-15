@@ -16,7 +16,7 @@ Rules for `src/main/services/` that are not readable from a module's own header.
 
 **Whisper** (`WhisperModelManager`, `LocalWhisperService`)
 
-- The per-spawn TOCTOU re-hash in `WhisperModelManager` is a *spawn-time* check ([ADR 0004](../../../docs/adrs/0004-per-spawn-toctou-rehash.md)), not a ninth step of the 8-step binary install flow. Do not fold it into the install sequence.
+- The per-spawn TOCTOU re-hash in `WhisperModelManager` is a *spawn-time* check ([ADR 0004](../../../docs/adrs/0004-per-spawn-toctou-rehash.md)), separate from the install-time re-hash (step 8 of the 9-step `ensureBinary()` flow in [docs/api-services-features.md](../../../docs/api-services-features.md#whispermodelmanager)). Do not fold it into the install sequence.
 
 **Claude status** (`claudeStatus/`)
 
@@ -31,4 +31,4 @@ Rules for `src/main/services/` that are not readable from a module's own header.
 - `previewSessionPolicy` is the single construction site for the view's `WebPreferences`, the runtime session hardening and the partition naming; it never touches response headers, so the CSP keeps one owner.
 - `PreviewStillFrameCache`: a still-frame capture is STARTED only while the view is drawn, but its retry after an empty first capture may land after the tab was switched away. The caller's `shouldKeep` veto guards a REPLACEMENT only; an empty slot is exempt, because on macOS the first capture is always empty.
 - `previewWatchBudget` is the process-wide watch ceiling shared by every per-view pool.
-- IPC handlers live in `src/main/ipc/preview/`, not here.
+- IPC handlers live outside this directory: the composition root `src/main/ipc/preview-handlers.ts` (builds the preview graph and registers the handler bundles, including `preview:navigate` and `preview:focusPage`) and the bundles in `src/main/ipc/preview/`.

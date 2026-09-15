@@ -17,10 +17,10 @@ This guide covers basic troubleshooting for installation, file system, markdown 
 ModuleNotFoundError: No module named 'distutils'
 ```
 
-**Cause:** node-pty doesn't support Python 3.13 (missing `distutils` module).
+**Cause:** node-pty fails to build on Python 3.13 (its `distutils` module was removed). Only 3.13 fails.
 
 **Solution:**
-1. Downgrade to Python 3.12 or earlier:
+1. Use Python 3.12 (known good) or 3.14.x (3.14.3 verified):
    ```bash
    brew install python@3.12
    brew link python@3.12
@@ -30,7 +30,7 @@ ModuleNotFoundError: No module named 'distutils'
    npm rebuild node-pty
    ```
 
-**Workaround:** Use system terminal for command-line operations until node-pty updates.
+See [Known issues – node-pty build failure](./known-issues.md#node-pty-build-failure) and [CONTRIBUTING](../CONTRIBUTING.md#local-setup) for the full setup notes.
 
 **Tracking:** https://github.com/microsoft/node-pty/issues
 
@@ -52,7 +52,7 @@ import 'dockview/dist/styles.css'
 import 'dockview/dist/styles/dockview.css'
 ```
 
-**Files:** `src/renderer/src/App.tsx`, `src/renderer/src/components/DockLayout/AppDockLayout.tsx`
+**Files:** `src/renderer/src/components/DockLayout/AppDockLayout.tsx`
 
 ---
 
@@ -77,9 +77,9 @@ const lastPath = await settingsService.getLastProjectPath()
 const lastPath = settingsService.getLastProjectPath()
 ```
 
-**Files:** `src/main/services/SettingsService.ts`, all IPC handlers using settings
+**Pattern:** the constructor starts `import('electron-store')` and keeps the promise; every method awaits `ensureStore()` before touching the store.
 
----
+**Files:** `src/main/services/SettingsService.ts`, all IPC handlers using settings
 
 ---
 
@@ -230,7 +230,7 @@ const createdFilePath = await withWatcherPause(
 // Now: only ONE refresh (manual), not two
 ```
 
-**Files:** `src/renderer/src/components/ProjectTree/withWatcherPause.ts`, callers in `src/renderer/src/hooks/useFileOperations.ts` and `src/renderer/src/components/ProjectTree/ProjectTree.tsx`
+**Files:** `src/renderer/src/components/ProjectTree/withWatcherPause.ts`, callers in `src/renderer/src/hooks/useFileOperations.ts`, `src/renderer/src/components/ProjectTree/ProjectTree.tsx` and `src/renderer/src/components/ProjectTree/context-menu/commands.tsx` (through `ctx.withWatcherPause`)
 
 ---
 
@@ -329,4 +329,5 @@ flowchart, sequenceDiagram, classDiagram, stateDiagram-v2, erDiagram, journey, g
 - [Architecture](./architecture.md) - System design and component overview
 - [Development Tasks](./development-tasks.md) - Common development patterns
 - [API Services](./api-services.md) - Service class overview
+- [HTML preview](./html-preview/README.md) - links, [Back and Forward](./html-preview/README.md#back-and-forward), [Open in default browser](./html-preview/README.md#open-in-default-browser), keyboard entry into the page; the preview and open-in-browser toasts are listed in [Error codes](./error-codes.md)
  
