@@ -204,8 +204,15 @@ afterEach(() => {
   rmSync(base, { recursive: true, force: true })
 })
 
-describe.skipIf(process.platform === 'win32')('frames on a preview page (P2-AC3)', () => {
-  it('lists every refused frame of refused.html once, under its label, and loads the gitignored frame', async () => {
+describe('frames on a preview page (P2-AC3)', () => {
+  // The one case here that is macOS-shaped. It expects `/frames/escape.html`
+  // under `missing-local-file`, which is what `O_NOFOLLOW` produces: the open of
+  // the leaf symlink is refused outright, so the frame reads as missing. Windows
+  // has no `O_NOFOLLOW`, follows the link, resolves the target outside the root
+  // and files it under `frame-escape` instead — the label known-flakes.md
+  // predicted, and the more accurate of the two. Skipped here rather than at the
+  // `describe`, which hid the other 21 cases from every Windows run.
+  it.skipIf(process.platform === 'win32')('lists every refused frame of refused.html once, under its label, and loads the gitignored frame', async () => {
     const page = await openPage()
     const foreign = `erfana-preview://${await registry.issue(join(base, 'other'), [])}/index.html`
     const blob = `blob:erfana-preview://${page.token}/5f0c7a1e-0000-4000-8000-000000000000`
