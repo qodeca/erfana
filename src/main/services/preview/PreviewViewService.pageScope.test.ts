@@ -431,7 +431,10 @@ describe('PreviewViewService — page scopes (WI-29)', () => {
   })
 
   it('an approval during a same-tab move replaces it: the move ends, history stays, the next move is accepted (RS3-3)', async () => {
-    const root = realpathSync(mkdtempSync(join(tmpdir(), 'erfana-rs3-3-')))
+    // `.native` is load-bearing: it expands a Windows 8.3 short tmpdir name
+    // (`C:\Users\MARCIN~1\...`) so this root matches what the resolver's
+    // `fsPromises.realpath` returns. Full explanation in PreviewProtocolHandler.test.ts.
+    const root = realpathSync.native(mkdtempSync(join(tmpdir(), 'erfana-rs3-3-')))
     onTestFinished(() => rmSync(root, { recursive: true, force: true }))
     for (const name of ['page.html', 'b.html']) {
       writeFileSync(join(root, name), '<p>')

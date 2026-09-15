@@ -304,10 +304,13 @@ describe('MarkdownEditorPanel Integration', () => {
     // without a render: on the panel's source. The registry's behaviour is
     // covered in editorSaveRegistry.test.ts.
     // Vitest runs from the repository root; jsdom's import.meta.url is not a file URL.
+    // Normalise the line endings: `.gitattributes` carries `* text=auto`, so this
+    // file is CRLF on a Windows checkout while the needles below are written with
+    // `\n`. Without this, the multi-line `toContain` assertions can never match.
     const source = readFileSync(
       join(process.cwd(), 'src/renderer/src/components/Panels/MarkdownEditorPanel.tsx'),
       'utf8'
-    )
+    ).replace(/\r\n/g, '\n')
     const handleSave = source.slice(
       source.indexOf('const handleSave = useCallback'),
       source.indexOf('}, [currentFile, dismissConflict')

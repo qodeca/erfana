@@ -183,7 +183,10 @@ describe('preview:navigate — the handler', () => {
 
 /** A real project: pages, a note, a dot folder, and a file outside with a symlink to it. */
 function makeProject(): string {
-  const dir = realpathSync(mkdtempSync(join(tmpdir(), 'erfana-navigate-')))
+  // `.native` is load-bearing: it expands a Windows 8.3 short tmpdir name
+  // (`C:\Users\MARCIN~1\...`) so this root matches what the resolver's
+  // `fsPromises.realpath` returns. Full explanation in PreviewProtocolHandler.test.ts.
+  const dir = realpathSync.native(mkdtempSync(join(tmpdir(), 'erfana-navigate-')))
   directories.push(dir)
   const root = join(dir, 'site')
   for (const rel of ['a.html', 'b.html', 'x.html', 'notes.md', '.private/page.html']) {
