@@ -8,7 +8,7 @@
  *
  * Strategies:
  * - DirectoryContextMenuStrategy: Cut, Copy, Paste, New File, New Folder, Rename, Delete
- * - FileContextMenuStrategy: Cut, Copy, Rename, Delete
+ * - FileContextMenuStrategy: (HTML only: Open as source, Open in default browser), Cut, Copy, Rename, Delete
  *
  * All strategies implement IContextMenuStrategy and use Command pattern for actions.
  */
@@ -27,6 +27,7 @@ import {
   NewFolderInDirectoryCommand,
   ImportCommand,
   OpenAsSourceCommand,
+  OpenInBrowserCommand,
   RevealInFileManagerCommand,
   separatorItem
 } from './commands'
@@ -92,13 +93,20 @@ export class FileContextMenuStrategy implements IContextMenuStrategy {
     const fileNode = node as FileNodeFile
     const items: IMenuItem[] = []
 
-    // "Open as source" is the explicit escape hatch for HTML files, which open
-    // as a running preview on a plain click (#74). Offered only when the tree
-    // can reach the editor (ctx.openAsSource wired) so a bare click always has
-    // a source fallback. Placed first as the primary open action.
-    if (ctx.openAsSource && isHtmlFile(fileNode.name)) {
-      items.push(new OpenAsSourceCommand(ctx, fileNode).toMenuItem())
-      items.push(separatorItem())
+    // The open group, HTML files only (UX spec #124 §2): 1. Open as source,
+    // 2. Open in default browser. Each has its own gate, and the separator
+    // closes the group whenever it holds at least one item.
+    if (isHtmlFile(fileNode.name)) {
+      const openGroup: IMenuItem[] = []
+      // "Open as source" is the explicit escape hatch for HTML files, which open
+      // as a running preview on a plain click (#74). Offered only when the tree
+      // can reach the editor (ctx.openAsSource wired) so a bare click always has
+      // a source fallback. Placed first as the primary open action.
+      if (ctx.openAsSource) openGroup.push(new OpenAsSourceCommand(ctx, fileNode).toMenuItem())
+      // Offered whatever the preview would do with the file – HTML execution
+      // off, gitignored, excluded folder (settled, design part 4 §4.2 RX1).
+      if (ctx.openInBrowser) openGroup.push(new OpenInBrowserCommand(ctx, fileNode).toMenuItem())
+      if (openGroup.length > 0) items.push(...openGroup, separatorItem())
     }
 
     // Clipboard operations

@@ -12,6 +12,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { PREVIEW } from '../../../shared/constants'
 
 import {
+  PreviewStillFrameCache,
   createPreviewStillFrameCache,
   type PreviewCaptureContents,
   type PreviewNativeImage
@@ -85,8 +86,8 @@ describe('PreviewStillFrameCache', () => {
   })
 
   it('captures from the PAGE origin, never from the view position in the window', async () => {
-    // The caller's only rect is `PreviewLiveView.lastBounds` — window-relative
-    // DIPs. `capturePage`'s rect is page-relative, so an offset origin asks for
+    // The caller's only rect is `lastRect()` (`previewLiveBounds.ts`) — window-
+    // relative DIPs. `capturePage`'s rect is page-relative, so an offset origin asks for
     // a box past the page edge; Chromium clips it and returns a narrow sliver,
     // which the still-frame `<img>` then stretches and letterboxes in black.
     // The size-only signature is the fix; this pins what it produces.
@@ -231,6 +232,28 @@ describe('PreviewStillFrameCache', () => {
     expect(capturePage).toHaveBeenCalledTimes(2)
   })
 
+  it("drops a capture an invalidate overtook, and lets the next one start at once (RS2-8)", async () => {
+    // A same-tab move commits while page A is still being captured: the slot
+    // the commit emptied is page B's, never A's late picture.
+    const finishes: Array<(image: PreviewNativeImage) => void> = []
+    const capturePage = vi.fn(
+      () => new Promise<PreviewNativeImage>((resolve) => finishes.push(resolve))
+    )
+    const cache = createPreviewStillFrameCache()
+
+    const pageA = cache.captureIfStale(makeWc(capturePage), PANEL, SIZE)
+    cache.invalidate(PANEL)
+    const pageB = cache.captureIfStale(makeWc(capturePage), PANEL, SIZE)
+    expect(capturePage).toHaveBeenCalledTimes(2)
+
+    finishes[0](makeImage({ width: 64, height: 32 }, 'data:image/png;base64,AAAA'))
+    await pageA
+    expect(cache.get(PANEL)).toBeUndefined()
+    finishes[1](makeImage({ width: 64, height: 32 }, 'data:image/png;base64,BBBB'))
+    await pageB
+    expect(cache.get(PANEL)?.dataUrl).toBe('data:image/png;base64,BBBB')
+  })
+
   it('abandons a capture that never resolves after the bound, keeps the previous frame, and recovers', async () => {
     vi.useFakeTimers()
     try {
@@ -332,5 +355,89 @@ describe('PreviewStillFrameCache', () => {
 
     cache.invalidate(PANEL)
     expect(cache.get(PANEL)).toBeUndefined()
+  })
+})
+
+describe('PreviewStillFrameCache – the CSS size and the stale flag (issue #124)', () => {
+  const goodWc = (): WcMock =>
+    makeWc(vi.fn(async () => makeImage({ width: 64, height: 32 }, SHORT_DATA_URL)))
+
+  it('stores the CSS size it is given with the frame, and no such keys when it is not', async () => {
+    const cache = new PreviewStillFrameCache()
+
+    await cache.captureIfStale(goodWc(), PANEL, SIZE, { cssSize: { width: 640.5, height: 480 } })
+    await cache.captureIfStale(goodWc(), 'panel-2', SIZE)
+
+    expect(cache.get(PANEL)).toMatchObject({ cssWidth: 640.5, cssHeight: 480 })
+    expect(Object.keys(cache.get('panel-2') ?? {}).sort()).toEqual([
+      'capturedAt',
+      'dataUrl',
+      'height',
+      'width'
+    ])
+  })
+
+  it('marks the cached frame stale on real input; a fresh frame carries no stale key', async () => {
+    const cache = new PreviewStillFrameCache()
+    await cache.captureIfStale(goodWc(), PANEL, SIZE)
+    expect(cache.get(PANEL)).not.toHaveProperty('stale')
+
+    cache.markStale(PANEL)
+    const marked = cache.get(PANEL)
+    cache.markStale(PANEL)
+
+    expect(marked?.stale).toBe(true)
+    expect(cache.get(PANEL)).toBe(marked)
+  })
+
+  it('a new capture replaces a stale frame with a fresh one', async () => {
+    const cache = new PreviewStillFrameCache()
+    await cache.captureIfStale(goodWc(), PANEL, SIZE)
+    cache.markStale(PANEL)
+
+    await cache.captureIfStale(goodWc(), PANEL, SIZE)
+
+    expect(cache.get(PANEL)).not.toHaveProperty('stale')
+  })
+
+  it('stores a frame stale when input reached the page while it was being captured', async () => {
+    let finish: () => void = () => undefined
+    const capturePage = vi.fn(
+      () =>
+        new Promise<PreviewNativeImage>((resolve) => {
+          finish = () => resolve(makeImage({ width: 64, height: 32 }, SHORT_DATA_URL))
+        })
+    )
+    const cache = new PreviewStillFrameCache()
+
+    const pending = cache.captureIfStale(makeWc(capturePage), PANEL, SIZE)
+    cache.markStale(PANEL)
+    finish()
+    await pending
+    expect(cache.get(PANEL)?.stale).toBe(true)
+
+    // The next capture, with no input during it, is fresh.
+    await cache.captureIfStale(goodWc(), PANEL, SIZE)
+    expect(cache.get(PANEL)).not.toHaveProperty('stale')
+  })
+
+  it('input on an empty slot marks nothing', async () => {
+    const cache = new PreviewStillFrameCache()
+
+    cache.markStale(PANEL)
+    expect(cache.get(PANEL)).toBeUndefined()
+    await cache.captureIfStale(goodWc(), PANEL, SIZE)
+
+    expect(cache.get(PANEL)).not.toHaveProperty('stale')
+  })
+
+  it('keeps a stale frame stale when a hide vetoes the capture that would replace it', async () => {
+    const cache = new PreviewStillFrameCache()
+    await cache.captureIfStale(goodWc(), PANEL, SIZE)
+    cache.markStale(PANEL)
+
+    await cache.captureIfStale(goodWc(), PANEL, SIZE, { shouldKeep: () => false })
+
+    expect(cache.get(PANEL)?.stale).toBe(true)
   })
 })

@@ -50,6 +50,11 @@ const COMPONENT_CSS = [
   {
     src: 'src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewChromeBand.css',
     rel: 'system/components/permission-band/band.css'
+  },
+  {
+    // Back, the link-mode toggle and the band's narrow-width tiers (issue #124).
+    src: 'src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewNavControls.css',
+    rel: 'system/components/permission-band/nav.css'
   }
 ]
 

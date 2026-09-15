@@ -34,6 +34,8 @@ import { TRANSCRIPTION_CHANNELS } from '../shared/ipc/transcription-channels'
 import { IMPORT_CHANNELS } from '../shared/ipc/import-channels'
 import { CLIPBOARD_CHANNELS } from '../shared/ipc/clipboard-channels'
 import { IMAGE_EXPORT_CHANNELS } from '../shared/ipc/image-export-channels'
+import { BROWSER_CHANNELS } from '../shared/ipc/browser-channels'
+import type { BrowserOpenFileResponse } from '../shared/ipc/browser-schema'
 import type {
   ImageExportRequest,
   ImageExportResponse
@@ -953,6 +955,15 @@ const api = {
     /** Export the image at `filePath` as PNG, as PDF, or to the clipboard. */
     run: (request: ImageExportRequest): Promise<ImageExportResponse> =>
       ipcRenderer.invoke(IMAGE_EXPORT_CHANNELS.RUN, request)
+  },
+
+  /**
+   * Open in default browser (#124). Sends a file path, never an address: main
+   * confines it to the open project and launches the real path. Never rejects.
+   */
+  browser: {
+    openFile: (filePath: string): Promise<BrowserOpenFileResponse> =>
+      ipcRenderer.invoke(BROWSER_CHANNELS.OPEN_FILE, { filePath })
   },
 
   /**

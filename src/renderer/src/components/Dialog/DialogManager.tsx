@@ -9,6 +9,7 @@ import { NewFileDialog } from './NewFileDialog'
 import { NewFolderDialog } from './NewFolderDialog'
 import { DropModeDialog } from './DropModeDialog'
 import { ConflictDialog } from './ConflictDialog'
+import { UnsavedChangesDialog } from './UnsavedChangesDialog'
 import { logger } from '../../utils/logger'
 import type {
   DialogType,
@@ -21,7 +22,9 @@ import type {
   DropModeDialogConfig,
   ConflictDialogConfig,
   DropModeDialogResult,
-  ConflictDialogResult
+  ConflictDialogResult,
+  UnsavedChangesDialogConfig,
+  UnsavedChangesDialogResult
 } from './types'
 
 /**
@@ -37,6 +40,7 @@ type DialogConfigUnion =
   | NewFolderDialogConfig
   | DropModeDialogConfig
   | ConflictDialogConfig
+  | UnsavedChangesDialogConfig
 
 /**
  * Component registry for dialog types
@@ -54,6 +58,7 @@ const DIALOG_COMPONENTS: Record<DialogType, React.ComponentType<any> | null> = {
   newFolder: NewFolderDialog,
   dropMode: DropModeDialog,
   conflict: ConflictDialog,
+  unsavedChanges: UnsavedChangesDialog,
   custom: null // Custom dialogs handled separately
 }
 
@@ -122,6 +127,13 @@ export function DialogManager() {
           closeDialog(dialog.id)
         }
 
+        // Handler for UnsavedChangesDialog - resolves with the chosen answer
+        // (issue #124). Its cancel is an answer too, so it never resolves null.
+        const handleUnsavedChangesSelect = (result: UnsavedChangesDialogResult) => {
+          dialog.resolve(result)
+          closeDialog(dialog.id)
+        }
+
         // Get component from registry
         const DialogComponent = DIALOG_COMPONENTS[dialog.type]
 
@@ -137,6 +149,7 @@ export function DialogManager() {
                              dialog.type === 'newFile' || dialog.type === 'newFolder'
         const isDropModeType = dialog.type === 'dropMode'
         const isConflictType = dialog.type === 'conflict'
+        const isUnsavedChangesType = dialog.type === 'unsavedChanges'
 
         return (
           <DialogComponent
@@ -147,12 +160,14 @@ export function DialogManager() {
             onCancel={
               isDropModeType ? handleDropModeCancel :
               isConflictType ? handleConflictCancel :
+              isUnsavedChangesType ? () => handleUnsavedChangesSelect('cancel') :
               !isAlertType ? handleCancel : undefined
             }
             onSubmit={isSubmitType ? handleSubmit : undefined}
             onSelect={
               isDropModeType ? handleDropModeSelect :
               isConflictType ? handleConflictSelect :
+              isUnsavedChangesType ? handleUnsavedChangesSelect :
               undefined
             }
           />

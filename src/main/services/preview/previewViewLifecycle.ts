@@ -14,13 +14,15 @@
  *   - `render-process-gone`  ⇒ `onRenderProcessGone` (design: `failed` + badge)
  *   - `unresponsive`         ⇒ `onUnresponsive`      (design: `failed` + badge)
  *   - `did-finish-load`      ⇒ `onDidFinishLoad`     (the rate-limited pipeline)
+ *   - `did-fail-load`        ⇒ `onDidFailLoad`, the main frame's only — a
+ *     frame's failure is not the page's (issue #124, RX2-3)
  *   - `console-message`      ⇒ `onConsoleMessage`    (classified page diagnostics:
  *     uncaught exceptions ⇒ `script-error`, bad ES-module specifiers ⇒
  *     `unresolved-specifier`; design §0/§1.3)
  *   - `before-input-event`   ⇒ the 4 forwarded accelerators (§1.9) via item 36
- *   - entry-file `change`    ⇒ `onEntryChange` (reload the page)
- *   - entry-file `unlink`    ⇒ `onEntryDeleted` (design: `failed` + "file deleted";
- *     a rename fires `unlink` on the old path, so rename is treated as delete)
+ *
+ * The page's own file watcher lived here too, until a same-tab move made it
+ * follow the page (issue #124, WI-17b): it is `previewEntryWatch.ts` now.
  *
  * Trust model: `before-input-event` is Chromium's pre-dispatch pipeline, not a
  * page-callable API, and only the 4 enumerated accelerators cross it.
@@ -28,14 +30,12 @@
 
 import type { PreviewFailureInput } from '../../../shared/ipc/preview-types'
 import type { PreviewWebContentsHandle } from './PreviewSessionFactory'
-import { logger } from '../LoggingService'
 import { PREVIEW_PAGE_LINK_CHANNEL } from './previewLinkBridge'
 import { PREVIEW_PAGE_CSP_VIOLATION_CHANNEL } from './previewCspViolationBridge'
-import { redactPath } from '../../utils/redactUserInput'
 import { classifyConsoleMessage } from './previewConsoleClassify'
 import { attachInputForwarding } from './previewInputForward'
 
-/** The disposable single-file watcher the service uses for the entry HTML. */
+/** The disposable single-file watcher the service uses for the page's HTML (`previewEntryWatch.ts`). */
 export interface PreviewFileWatcherHandle {
   close(): Promise<void>
 }
@@ -61,10 +61,11 @@ export interface PreviewLifecycleHooks {
    * state for good.
    */
   onDidStopLoading(): void
-  /** The load failed or was cancelled. Belt-and-braces beside `onDidStopLoading`. */
+  /**
+   * The page's load failed or was cancelled – the main frame's, never a
+   * frame's (issue #124). Belt-and-braces beside `onDidStopLoading`.
+   */
   onDidFailLoad(): void
-  onEntryChange(): void
-  onEntryDeleted(): void
   onForwardedShortcut(key: string): void
   /** A page console message already classified as a preview failure. */
   onConsoleMessage(input: PreviewFailureInput): void
@@ -109,11 +110,6 @@ const CONSOLE_LEVEL_TO_NUMBER: Readonly<Record<string, number>> = {
 /** Everything the wiring needs beyond the hooks. */
 export interface PreviewLifecycleParams {
   readonly webContents: PreviewWebContentsHandle
-  readonly entryFilePath: string
-  readonly createEntryWatcher: (
-    filePath: string,
-    handlers: { onChange: () => void; onUnlink: () => void; onError: (error: unknown) => void }
-  ) => PreviewFileWatcherHandle
   readonly platform?: NodeJS.Platform
 }
 
@@ -123,9 +119,8 @@ interface PreventableEvent {
 }
 
 /**
- * Wire every lifecycle listener + guard onto `params.webContents` and start the
- * entry-file watcher. Returns an async disposer that removes the listeners and
- * closes the watcher.
+ * Wire every lifecycle listener + guard onto `params.webContents`. Returns an
+ * async disposer that removes the listeners.
  */
 export function wirePreviewLifecycle(
   params: PreviewLifecycleParams,
@@ -153,7 +148,17 @@ export function wirePreviewLifecycle(
   const onDidFinishLoad = (): void => hooks.onDidFinishLoad()
   const onDidStartLoading = (): void => hooks.onDidStartLoading()
   const onDidStopLoading = (): void => hooks.onDidStopLoading()
-  const onDidFailLoad = (): void => hooks.onDidFailLoad()
+  // Only the page's own failure settles its load (issue #124, RX2-3). Every
+  // refused frame fires a `did-fail-load` (S10), and each would otherwise step
+  // the backdrop and run the isolated-world colour read. Electron passes
+  // `(event, code, description, url, isMainFrame, …)`; an event without the
+  // flag still counts, so only an explicit `isMainFrame: false` is a frame's.
+  const onDidFailLoad = (...args: unknown[]): void => {
+    if (args[4] === false) {
+      return
+    }
+    hooks.onDidFailLoad()
+  }
   // Page console output is untrusted DATA: it is only classified, never executed.
   const onConsoleMessage = (details: PreviewConsoleMessageDetails): void => {
     const input = classifyConsoleMessage(
@@ -212,22 +217,6 @@ export function wirePreviewLifecycle(
     params.platform
   )
 
-  const entryWatcher = params.createEntryWatcher(params.entryFilePath, {
-    onChange: () => hooks.onEntryChange(),
-    // A rename fires `unlink` on the old path — treat it as a delete.
-    onUnlink: () => hooks.onEntryDeleted(),
-    onError: (error) => {
-      // A watcher error is not itself a page failure (the next load surfaces a
-      // genuinely missing file), so it is still swallowed to avoid crashing
-      // teardown — but it is logged now, filename redacted, so an EMFILE or
-      // permission fault on the entry watch leaves a diagnostic trail.
-      logger.warn('Preview entry watcher error', {
-        path: redactPath(params.entryFilePath),
-        error: error instanceof Error ? error.message : String(error)
-      })
-    }
-  })
-
   return {
     async dispose(): Promise<void> {
       detachInput()
@@ -247,7 +236,6 @@ export function wirePreviewLifecycle(
         PREVIEW_PAGE_CSP_VIOLATION_CHANNEL,
         onCspViolation as (...args: never[]) => void
       )
-      await entryWatcher.close()
     }
   }
 }

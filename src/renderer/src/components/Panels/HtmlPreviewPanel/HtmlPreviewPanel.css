@@ -98,26 +98,49 @@
 }
 
 /*
- * Still frame shown while the native view is hidden (fills the placeholder).
+ * THE PAGE'S FOCUS RING IS DRAWN OUTSIDE THE PLACEHOLDER — the only place it can
+ * be seen at all.
  *
- * `cover`, NOT `contain`. The frame is captured at the view's aspect at hide
- * time, and the box it lands in is a different shape whenever the band grew to
- * cause the hide — which is the common case, because opening the permission
- * band's list is what hides the page. `contain` letterboxes that difference,
- * and the bars read as a broken panel rather than as a frozen page. `cover`
- * fills, anchored top-left so the page's own top-left stays put; the frame is
- * transient and a few cropped pixels at the far edge cost nothing.
+ * While the page can be entered from the keyboard the placeholder is a focusable
+ * button (issue #124, QG-8 U1). But the native view is laid over exactly this
+ * box and paints above every DOM pixel in it, so an ordinary or inset ring is
+ * drawn underneath a running page: focus would land on a control with no visible
+ * indicator (SC 2.4.7).
  *
- * The black below is what shows through only while the image itself is still
- * decoding, and it matches the pre-paint placeholder backdrop.
+ * Outward, at offset 0, so the ring starts where the native view ends. HONESTLY,
+ * ONLY ITS TOP EDGE SURVIVES in the normal layout. The page area is flush with
+ * the panel's left, right and bottom edges and `.html-preview-panel` clips with
+ * `overflow: hidden`, so those three sides are cut off; there is no gutter to
+ * draw them in. The top edge lies over the band's bottom rule — the 1px rule
+ * plus 1px of the bar's 6px padding, never a control — and reads as that rule
+ * turning focus-coloured, right under the toolbar. It measures against the band
+ * background, `contrast-focus-ring-on-band` in design/claims.json.
+ *
+ * Do not make this inset, and do not add `overflow: hidden` or a stacking
+ * context to `.html-preview-page-area` or `.html-preview-surface`: any of those
+ * hides the last visible edge. The placeholder paints over the band only because
+ * it is positioned and the band is not.
+ */
+/* deviates: design/system/foundations/focus.html — outward ring at offset 0, top edge only; the native view covers the box (see the card's Exceptions) */
+.html-preview-placeholder:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: 0;
+}
+
+/*
+ * Still frame shown while the native view is hidden.
+ *
+ * Drawn at the CSS size the view had when it was captured (issue #124, part 1
+ * §1.5): the `--sized` rule below, with the size itself set inline from the
+ * frame, because it is per-capture data. Anchored top-left and never scaled – a
+ * narrower panel crops it (the placeholder is `overflow: hidden`), a wider one
+ * shows the placeholder's backdrop in the new space. Scaling it to fill read as
+ * the page zooming while a splitter moved.
  */
 .html-preview-still-frame {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: top left;
+  top: 0;
+  left: 0;
   /*
    * TRANSPARENT, so the placeholder's own backdrop shows through.
    *
@@ -135,6 +158,29 @@
   background: transparent;
   user-select: none;
   pointer-events: none;
+}
+
+/* At its captured CSS size (set inline), whatever the panel's size is now. */
+.html-preview-still-frame--sized {
+  max-width: none;
+  max-height: none;
+}
+
+/*
+ * A frame captured before its CSS size was recorded has none to draw at, so it
+ * fills the placeholder as it always did.
+ *
+ * `cover`, NOT `contain`. The frame is captured at the view's aspect at hide
+ * time, and the box it lands in is a different shape whenever the band grew to
+ * cause the hide. `contain` letterboxes that difference, and the bars read as a
+ * broken panel rather than as a frozen page. `cover` fills, anchored top-left so
+ * the page's own top-left stays put.
+ */
+.html-preview-still-frame--fill {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top left;
 }
 
 /* ============================================
@@ -188,4 +234,36 @@
 .html-preview-banner-button:disabled {
   opacity: var(--opacity-disabled);
   cursor: not-allowed;
+}
+
+/* Busy (a return move in flight) is aria-disabled, not disabled, so the button
+   keeps focus. It looks like :disabled, but hover and press add no fill. */
+.html-preview-banner-button[aria-disabled='true'],
+.html-preview-banner-button[aria-disabled='true']:hover,
+.html-preview-banner-button[aria-disabled='true']:active {
+  background: var(--color-btn-secondary-bg);
+  cursor: default;
+}
+
+/*
+ * THE DIM GOES ON THE LABEL, NEVER ON THE BUTTON.
+ *
+ * `opacity` on the button makes a group that the button's own focus OUTLINE is
+ * inside. The ring is `--color-border-focus`, 8.4:1 against this panel's
+ * backdrop and about 2.3:1 once composited at `--opacity-disabled`: under the
+ * 3:1 SC 1.4.11 requires of a focus indicator, and under "visible" (SC 2.4.7).
+ * No ring colour repairs it, because the dim is applied after the colour. Busy
+ * is not an inactive component either, so the disabled-state exception does not
+ * cover it — and this is a focus target by design: the failed banner's return
+ * button takes focus on mount, so the ring was dimmed exactly where a keyboard
+ * reader is standing.
+ *
+ * `PreviewBanner.tsx` wraps the label in a span for this rule to have something
+ * to select. That span is the whole content, so the button reads as busy while
+ * focused, and its accessible name is unchanged. The band's icon tools use the
+ * same shape. `:disabled` above keeps the plain element dim: a disabled button
+ * cannot be focused, so no ring is inside that group.
+ */
+.html-preview-banner-button[aria-disabled='true'] > * {
+  opacity: var(--opacity-disabled);
 }

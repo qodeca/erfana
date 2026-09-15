@@ -19,6 +19,8 @@
  */
 
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 
 describe('MarkdownEditorPanel Integration', () => {
   describe('Component Orchestration', () => {
@@ -293,6 +295,61 @@ describe('MarkdownEditorPanel Integration', () => {
 
       expect(isSplitMode('editor')).toBe(false)
       expect(isSplitMode('preview')).toBe(false)
+    })
+  })
+
+  describe('Save by id (issue #124, part 3 §3.6)', () => {
+    // Rendering the panel needs monaco-editor, which does not resolve in this
+    // environment, so – like the rest of this suite – the wiring is pinned
+    // without a render: on the panel's source. The registry's behaviour is
+    // covered in editorSaveRegistry.test.ts.
+    // Vitest runs from the repository root; jsdom's import.meta.url is not a file URL.
+    const source = readFileSync(
+      join(process.cwd(), 'src/renderer/src/components/Panels/MarkdownEditorPanel.tsx'),
+      'utf8'
+    )
+    const handleSave = source.slice(
+      source.indexOf('const handleSave = useCallback'),
+      source.indexOf('}, [currentFile, dismissConflict')
+    )
+
+    it('useEditorSaveRegistration hook is imported correctly', async () => {
+      const { useEditorSaveRegistration } = await import('../../hooks/useEditorSaveRegistration')
+      expect(typeof useEditorSaveRegistration).toBe('function')
+    })
+
+    it('registers the tab once: a manual save, the conflict flag, and an autosave hold', () => {
+      const calls = source.match(/useEditorSaveRegistration\(/g) ?? []
+      expect(calls).toHaveLength(1)
+      expect(source).toContain(
+        'useEditorSaveRegistration(panelIdRef.current, () => handleSave(false), externalChangeDetected, () => {\n' +
+          '    cancelAutoSave()\n    return () => signalChange()\n  })'
+      )
+      // Registered below useAutoSave, whose cancelAutoSave and signalChange it uses.
+      expect(source.indexOf('useEditorSaveRegistration(panelIdRef')).toBeGreaterThan(source.indexOf('= useAutoSave('))
+    })
+
+    it('handleSave answers true after a write and false with no file or a failed write', () => {
+      expect(handleSave).toContain('async (isAutoSave: boolean = false): Promise<boolean> =>')
+      expect(handleSave).toContain('if (!currentFile) return false')
+      expect(handleSave.match(/return true/g)).toHaveLength(1)
+      expect(handleSave).toMatch(/catch \(error\) \{[\s\S]*return false\s*\} finally/)
+    })
+
+    it('keeps the autosave guard order unchanged', () => {
+      const order = [
+        'markSaving()',
+        'pauseWatch()',
+        'getValue()',
+        'writeFile(',
+        'notifySaveComplete(contentToSave)',
+        'setEditorDirty(panelIdRef.current, false)',
+        'resumeWatch()',
+        'unmarkSaving()'
+      ].map((step) => handleSave.indexOf(step))
+
+      expect(order.every((index) => index >= 0)).toBe(true)
+      expect([...order].sort((a, b) => a - b)).toEqual(order)
     })
   })
 })

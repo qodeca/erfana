@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+import { useEffect } from 'react'
 import {
   DockviewReact,
   DockviewReadyEvent,
@@ -13,9 +14,13 @@ import { PanelErrorBoundary } from '../../Panels/PanelErrorBoundary'
 import { WelcomePanel } from '../../Panels/WelcomePanel'
 import { WelcomeTab } from '../../Panels/WelcomeTab'
 import { EditorTab, ImageTab, HtmlPreviewTab } from '../../Tabs'
+import { closePanel } from '../../Tabs/tabOperations'
+import { useOptionalDialog } from '../../Dialog/DialogContext'
 import { getOverlayGuard } from '../../../services/preview/OverlayGuardService'
-import { getPreviewLinkRouter } from '../../../services/preview/PreviewLinkRouter'
+import { mountPreviewLinkRouter } from '../../../services/preview/PreviewLinkRouter'
 import { useActivityBarStore } from '../../../stores/useActivityBarStore'
+import { useProjectStore } from '../../../stores/useProjectStore'
+import { usePreviewTabStore } from '../../../stores/usePreviewTabStore'
 import { logger } from '../../../utils/logger'
 import { TEST_IDS } from '../../../constants/testids'
 import { WELCOME_PANEL_ID } from '../../../constants/panels'
@@ -50,18 +55,43 @@ const ImageViewerPanelWithBoundary = (
  *
  * Same rationale as {@link ImageViewerPanelWithBoundary}: the error boundary is
  * mounted at the registration site so it can catch the panel's own hook errors
- * (bounds pump, lifecycle open/close, the find provider), and it is keyed by
- * `filePath` so a panel that failed on one page recovers when pointed at
- * another. Declared at module scope so it is not a new component type each
- * render — a remount would tear down and re-open the native `WebContentsView`.
+ * (bounds loop, lifecycle open/close, the find provider). Declared at module
+ * scope so it is not a new component type each render — a remount would tear
+ * down and re-open the native `WebContentsView`.
+ *
+ * KEYED BY PANEL ID, NOT BY FILE (issue #124, part 3 §3.4) – unlike the image
+ * viewer. A preview tab moves to another page inside the same view, and
+ * `params.filePath` changes with it; a key on the file would remount the panel
+ * on every move, destroying the view and the tab's history. The page goes in
+ * as `resetKey` instead, so a panel stuck on its fallback recovers when the tab
+ * shows another page, with no remount while it is healthy. After a crash,
+ * Retry remounts the panel, which opens `params.filePath` – the page the tab
+ * shows now, not the one it was opened on.
  */
 const HtmlPreviewPanelWithBoundary = (
   props: IDockviewPanelProps<HtmlPreviewPanelParams>
 ): JSX.Element => (
-  <PanelErrorBoundary key={props.params?.filePath ?? 'none'} componentName="HTML preview">
+  <PanelErrorBoundary
+    key={props.params?.panelId || props.api.id}
+    resetKey={props.params?.filePath ?? null}
+    componentName="HTML preview"
+  >
     <HtmlPreviewPanel {...props} />
   </PanelErrorBoundary>
 )
+
+/**
+ * Closes a tab by id for the preview move coordinator: the one-file-one-tab
+ * rule closes the other tabs showing a page once main accepted the move.
+ * `closePanel` clears the dirty flag first, which is how a "Don't save"
+ * answer drops the edits – only after the commit (issue #124, part 3 §3.6).
+ *
+ * @param panelId - The tab to close
+ */
+function closeTabById(panelId: string): void {
+  const api = useProjectStore.getState().dockviewApi
+  if (api) closePanel(api, panelId)
+}
 
 /**
  * Center splitview panel that hosts the nested DockviewReact instance holding
@@ -75,14 +105,19 @@ const HtmlPreviewPanelWithBoundary = (
  * @returns The editor-area dockview container
  */
 export const EditorAreaSplitPanel = (props: ISplitviewPanelProps): JSX.Element => {
+  // The ONLY creator of the preview link router and its move coordinator
+  // (issue #124, RA2-5): mounted here with the unsaved-changes prompt and
+  // `closePanel`, disposed on unmount, so a remounted dialog provider binds its
+  // own prompt. Optional on purpose: outside a provider the router still
+  // routes, and refuses any move that would need the prompt.
+  const prompt = useOptionalDialog()?.showUnsavedChanges
+  useEffect(() => {
+    const router = mountPreviewLinkRouter({ prompt, closePanel: closeTabById })
+    return () => router.dispose()
+  }, [prompt])
+
   const onEditorReady = (event: DockviewReadyEvent) => {
     logger.info('📝 Editor DockView ready')
-
-    // Route link clicks from previewed pages into editor tabs. Mounted here
-    // beside the overlay guard because this is the layer that owns app-level
-    // preview services; the router itself reads the dockview api from the
-    // project store, so it needs nothing from this closure (sd-074b §5.4).
-    getPreviewLinkRouter()
 
     // Create the welcome/home panel
     const welcomePanel = event.api.addPanel({
@@ -96,6 +131,14 @@ export const EditorAreaSplitPanel = (props: ISplitviewPanelProps): JSX.Element =
     if (welcomePanel) {
       welcomePanel.group.locked = true
     }
+
+    // A preview tab's UI state (its link mode, its Back and Forward state)
+    // lives as long as the TAB, not its React tree: the error boundary
+    // remounts a crashed panel, and that must not reset the mode (part 3 §3.4).
+    // So it is dropped here, when dockview removes the panel, and nowhere else.
+    event.api.onDidRemovePanel((panel) => {
+      usePreviewTabStore.getState().removePanel(panel.id)
+    })
 
     // Listen for active panel changes and focus the panel content
     event.api.onDidActivePanelChange((panel) => {

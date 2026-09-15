@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * usePreviewBounds — the first-rect pump (issue #74 follow-up).
+ * usePreviewBounds — the first rect after open (issue #74 follow-up).
  *
  * THE BUG THIS PINS. `openFileInPanel` calls dockview's `addPanel` and only then
  * `setActive`, so this hook first runs while the panel is still an INACTIVE tab,
@@ -14,19 +14,30 @@
  * AND THE SECOND RACE. `preview:open` is still in flight while this hook mounts,
  * and `PreviewViewService.setBounds` silently DROPS a rect for a panel it has no
  * view for. A rect sent that early looks like success in the renderer and
- * vanishes main-side, so the pump must run again once the view is live.
+ * vanishes main-side, so the measure loop must push again once the view is live.
  *
  * The `ResizeObserver` is deliberately inert in these tests (the renderer test
  * setup's `MockResizeObserver` never invokes its callback). That is not a
  * convenience: dockview re-parents an `always`-rendered panel rather than
  * resizing it in place, so the 0×0 → laid-out transition need not produce a
- * resize callback at all. The pump has to hold on its own.
+ * resize callback at all. The loop has to hold on its own.
+ *
+ * The last block pins drop-point logging (issue #124, P1-AC1). The loop itself
+ * (#124 C1) is pinned in `usePreviewBounds.loop.test.ts`, the clip check (C2) in
+ * `usePreviewBounds.clip.test.ts`.
  */
 import { renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { usePreviewBounds, SEARCH_BAR_INSET_PX } from './usePreviewBounds'
+import { usePreviewBounds, SEARCH_BAR_INSET_PX, type UsePreviewBoundsOptions } from './usePreviewBounds'
 import { usePreviewViewportStore } from '../../../../stores/usePreviewViewportStore'
+import { BOUNDS_DROP_MESSAGE } from '../../../../../../shared/dropReporter'
+import { stablePathDigest } from '../../../../../../shared/stablePathDigest'
+import { PREVIEW_LIMITS } from '../../../../../../shared/preview-limits'
+
+/** The renderer logger, where the hook's drop reporter writes. */
+const log = vi.hoisted(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() }))
+vi.mock('../../../../utils/logger', () => ({ logger: log }))
 
 const PANEL_ID = 'preview-panel-1'
 
@@ -38,6 +49,8 @@ const NO_BOX = { left: 0, top: 0, width: 0, height: 0 }
 /** Queue of pending animation-frame callbacks, flushed explicitly by `frame()`. */
 let rafQueue: FrameRequestCallback[] = []
 let setBounds: ReturnType<typeof vi.fn>
+/** What `performance.now()` returns – the drop reporter's clock. */
+let clock = 0
 
 /** Run every currently-queued animation frame once. */
 function frame(): void {
@@ -62,6 +75,9 @@ function makePlaceholder(initial: typeof NO_BOX): {
 
 beforeEach(() => {
   rafQueue = []
+  clock = 0
+  vi.spyOn(performance, 'now').mockImplementation(() => clock)
+  for (const fn of Object.values(log)) fn.mockClear()
   vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback): number => {
     rafQueue.push(cb)
     return rafQueue.length
@@ -76,6 +92,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  vi.restoreAllMocks()
   vi.unstubAllGlobals()
   usePreviewViewportStore.setState({ rects: new Map() })
 })
@@ -132,7 +149,7 @@ describe('usePreviewBounds — first rect after open', () => {
     expect(bounds.y + bounds.height).toBeLessThanOrEqual(LAID_OUT.top + LAID_OUT.height)
   })
 
-  it('stops asking once a real rect has gone out', () => {
+  it('sends nothing more once a real rect has gone out and the panel is still', () => {
     const { ref } = makePlaceholder(LAID_OUT)
 
     renderHook(() =>
@@ -140,24 +157,24 @@ describe('usePreviewBounds — first rect after open', () => {
     )
 
     expect(setBounds).toHaveBeenCalledTimes(1)
-    // The pump stood down on the first success rather than re-queueing itself.
-    expect(rafQueue).toHaveLength(0)
+    // The loop keeps measuring (#124 C1), but an unchanged rect is not re-sent.
+    frame()
     frame()
     expect(setBounds).toHaveBeenCalledTimes(1)
   })
 
-  it('gives up rather than measuring forever when the panel never gets a box', () => {
+  it('keeps measuring a panel that never gets a box, and sends nothing', () => {
     const { ref } = makePlaceholder(NO_BOX)
 
     renderHook(() =>
       usePreviewBounds({ placeholderRef: ref, panelId: PANEL_ID, enabled: true, isVisible: true, isLive: true, searchOpen: false })
     )
 
-    // Far more frames than the budget allows.
     for (let i = 0; i < 200; i += 1) frame()
 
     expect(setBounds).not.toHaveBeenCalled()
-    expect(rafQueue).toHaveLength(0)
+    // No budget to spend: the loop stays armed while the tab is visible and live.
+    expect(rafQueue).toHaveLength(1)
   })
 
   it('does not pump for a background tab', () => {
@@ -374,5 +391,98 @@ describe('usePreviewBounds — publishing where the view sits', () => {
     )
 
     expect(usePreviewViewportStore.getState().rects.has(PANEL_ID)).toBe(false)
+  })
+})
+
+describe('usePreviewBounds — drop-point logging (#124 P1-AC1)', () => {
+  /** Mounts the hook with every gate open; `props` overrides any of them. */
+  function mountHook(ref: React.RefObject<HTMLElement>, props: Partial<UsePreviewBoundsOptions> = {}) {
+    return renderHook(
+      (p: Partial<UsePreviewBoundsOptions>) =>
+        usePreviewBounds({ placeholderRef: ref, panelId: PANEL_ID, enabled: true, isVisible: true, isLive: true, searchOpen: false, ...p }),
+      { initialProps: props }
+    )
+  }
+
+  /** The structured context of every drop line written at `level`. */
+  const lines = (level: 'info' | 'warn'): unknown[] =>
+    log[level].mock.calls.filter(([message]) => message === BOUNDS_DROP_MESSAGE).map(([, context]) => context)
+
+  it('R1: a push while disabled is one info line with the panel, and no seq before any send', () => {
+    const { result } = mountHook(makePlaceholder(LAID_OUT).ref, { enabled: false })
+
+    expect(result.current.pushBounds()).toBe(false)
+    expect(lines('info')).toEqual([{ source: 'renderer', reason: 'disabled', panelId: stablePathDigest(PANEL_ID) }])
+  })
+
+  it('R2: a missing placeholder is one info line', () => {
+    mountHook({ current: null })
+
+    expect(lines('info')).toEqual([{ source: 'renderer', reason: 'no-placeholder', panelId: stablePathDigest(PANEL_ID) }])
+  })
+
+  it('R3: a degenerate rect is logged with the measured rect, rounded to whole pixels', () => {
+    // A find inset taller than the box: the one R3 cause whose rect is not 0×0.
+    const { ref } = makePlaceholder({ left: 10.4, top: 20.6, width: 300, height: 30 })
+    mountHook(ref, { searchOpen: true })
+
+    expect(lines('info')).toEqual([
+      { source: 'renderer', reason: 'degenerate-rect', panelId: stablePathDigest(PANEL_ID), rect: { x: 10, y: 21, w: 300, h: 30 } }
+    ])
+    expect(log.info.mock.calls[0]?.[0]).toBe(BOUNDS_DROP_MESSAGE)
+  })
+
+  it('R3 covers a box that never lands (R6 retired): 200 still frames log one line and no warn', () => {
+    mountHook(makePlaceholder(NO_BOX).ref)
+    for (let i = 0; i < 200; i += 1) frame()
+
+    expect(lines('info')).toHaveLength(1)
+    expect(lines('warn')).toEqual([])
+  })
+
+  it('caps repeats: the next line after the window carries how many were swallowed', () => {
+    // A background tab: no pump, so every push below is the test's own.
+    const { result } = mountHook(makePlaceholder(NO_BOX).ref, { isVisible: false })
+    result.current.pushBounds()
+    result.current.pushBounds()
+    result.current.pushBounds()
+    clock = PREVIEW_LIMITS.BOUNDS_DROP_LOG_WINDOW_MS - 1
+    result.current.pushBounds()
+    expect(lines('info')).toHaveLength(1)
+
+    clock = PREVIEW_LIMITS.BOUNDS_DROP_LOG_WINDOW_MS
+    result.current.pushBounds()
+    expect(lines('info')).toEqual([
+      expect.objectContaining({ reason: 'degenerate-rect' }),
+      expect.objectContaining({ reason: 'degenerate-rect', suppressed: 3 })
+    ])
+  })
+
+  it('gives each reason its own first line and, after a send, the last seq sent', () => {
+    const { ref, layout } = makePlaceholder(LAID_OUT)
+    const { result, rerender } = mountHook(ref)
+    // A sent rect is not a drop.
+    expect(log.info).not.toHaveBeenCalled()
+    expect(log.warn).not.toHaveBeenCalled()
+
+    layout(NO_BOX)
+    result.current.pushBounds()
+    rerender({ enabled: false })
+    result.current.pushBounds()
+
+    const [lastSeq] = setBounds.mock.calls[0]?.slice(2) as [number]
+    expect(lines('info')).toEqual([
+      expect.objectContaining({ reason: 'degenerate-rect', lastSeq }),
+      expect.objectContaining({ reason: 'disabled', lastSeq })
+    ])
+    expect(lines('info')[0]).not.toHaveProperty('seq')
+  })
+
+  it('treats each mount as its own scope, so a remount logs its first drop again', () => {
+    const { ref } = makePlaceholder(NO_BOX)
+    mountHook(ref).unmount()
+    mountHook(ref)
+
+    expect(lines('info')).toHaveLength(2)
   })
 })

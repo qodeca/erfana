@@ -12,8 +12,13 @@ import { resolve } from 'node:path'
 
 import { describe, expect, it, vi } from 'vitest'
 import { ErrorCode } from '../../../shared/errors'
+import { logger } from '../LoggingService'
 import { routeLinkActivation, type PreviewLinkNavigationDeps } from './previewLinkNavigation'
 import type { ConfineVerdict } from './previewPathResolve'
+
+vi.mock('../LoggingService', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }
+}))
 
 // A fake 32-hex preview root token. Not a credential: the real one is minted
 // per view by PreviewRootRegistry and never leaves the main process.
@@ -57,7 +62,8 @@ describe('routeLinkActivation', () => {
       'preview-1',
       `${REAL_ROOT}/other.html`,
       null,
-      7
+      7,
+      'new-tab'
     )
     expect(deps.recordFailure).not.toHaveBeenCalled()
   })
@@ -75,7 +81,8 @@ describe('routeLinkActivation', () => {
       'preview-1',
       `${REAL_ROOT}/other.html`,
       'part-2',
-      7
+      7,
+      'new-tab'
     )
   })
 
@@ -297,5 +304,167 @@ describe('routeLinkActivation', () => {
     expect(deps.recordFailure).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'blocked-link' })
     )
+  })
+})
+
+describe('routeLinkActivation — external routing needs provenance gesture (SECURITY INVARIANT, RX11)', () => {
+  // The OS hand-off is the highest-consequence thing a link can do, and only
+  // the preload can prove a click. Nothing a report carries besides its
+  // provenance may unlock it – not a target, not a button.
+  it.each([
+    { target: '', button: 0 },
+    { target: '_self', button: 0 },
+    { target: '_blank', button: 1 }
+  ])('refuses a navigation-provenance external link (target "$target", button $button)', async (extra) => {
+    const deps = makeDeps()
+
+    await routeLinkActivation(
+      { href: 'https://example.com/docs', provenance: 'navigation', ...extra },
+      CONTEXT,
+      deps
+    )
+
+    expect(deps.openExternal).not.toHaveBeenCalled()
+    expect(deps.recordFailure).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'blocked-link' })
+    )
+  })
+
+  it('leaves external links to the browser hand-off whatever the button', async () => {
+    const deps = makeDeps()
+
+    await routeLinkActivation(
+      { href: 'https://example.com/docs', provenance: 'gesture', button: 1, target: '_self' },
+      CONTEXT,
+      deps
+    )
+
+    expect(deps.openExternal).toHaveBeenCalledWith('https://example.com/docs')
+    expect(deps.requestOpenFile).not.toHaveBeenCalled()
+  })
+})
+
+describe('routeLinkActivation — where an in-project page opens (issue #124, part 3 §3.2)', () => {
+  const PAGE_HREF = `erfana-preview://${TOKEN}/other.html`
+  const NO_KEYS = { meta: false, ctrl: false, shift: false, alt: false }
+
+  type EligibleDeps = SpiedDeps & { runsAsPreview: ReturnType<typeof vi.fn> }
+
+  /** Deps whose eligibility check answers `eligible` (or fails with `error`). */
+  function eligibleDeps(
+    eligible = true,
+    verdict?: ConfineVerdict,
+    platform: NodeJS.Platform = 'darwin'
+  ): EligibleDeps {
+    return {
+      ...makeDeps(verdict),
+      runsAsPreview: vi.fn().mockResolvedValue(eligible),
+      platform
+    } as EligibleDeps
+  }
+
+  /** The disposition handed to the renderer with the last open request. */
+  function lastDisposition(deps: SpiedDeps): unknown {
+    return deps.requestOpenFile.mock.calls.at(-1)?.[4]
+  }
+
+  it('opens every page in a new tab while no eligibility check is wired (no change before WI-17b)', async () => {
+    const deps = makeDeps()
+
+    await routeLinkActivation({ href: PAGE_HREF, provenance: 'gesture', target: '_self' }, CONTEXT, deps)
+
+    expect(lastDisposition(deps)).toBe('new-tab')
+  })
+
+  it.each([
+    { label: 'a plain click', extra: {}, expected: 'by-mode' },
+    { label: 'a _self click', extra: { target: '_self' }, expected: 'same-tab' },
+    { label: 'a _blank click', extra: { target: '_blank' }, expected: 'new-tab' },
+    { label: 'a middle click', extra: { button: 1 }, expected: 'new-tab' },
+    { label: 'a Cmd-click', extra: { modifiers: { ...NO_KEYS, meta: true } }, expected: 'new-tab' }
+  ])('on an eligible page, $label opens as $expected', async ({ extra, expected }) => {
+    const deps = eligibleDeps()
+
+    await routeLinkActivation({ href: PAGE_HREF, provenance: 'gesture', ...extra }, CONTEXT, deps)
+
+    expect(lastDisposition(deps)).toBe(expected)
+  })
+
+  it('SECURITY INVARIANT (RX11): a page that navigates itself never stays in its tab', async () => {
+    const deps = eligibleDeps()
+
+    await routeLinkActivation(
+      { href: PAGE_HREF, provenance: 'navigation', target: '_self' },
+      CONTEXT,
+      deps
+    )
+
+    expect(lastDisposition(deps)).toBe('new-tab')
+    // Not even asked: nothing the check says could change the answer.
+    expect(deps.runsAsPreview).not.toHaveBeenCalled()
+  })
+
+  it('asks about the confined real target, never the path the page wrote', async () => {
+    const deps = eligibleDeps()
+
+    await routeLinkActivation({ href: PAGE_HREF, provenance: 'gesture' }, CONTEXT, deps)
+
+    expect(deps.runsAsPreview).toHaveBeenCalledWith(`${REAL_ROOT}/other.html`)
+  })
+
+  it('opens a page that runs as source in a new tab', async () => {
+    const deps = eligibleDeps(false)
+
+    await routeLinkActivation({ href: PAGE_HREF, provenance: 'gesture', target: '_top' }, CONTEXT, deps)
+
+    expect(lastDisposition(deps)).toBe('new-tab')
+  })
+
+  it('does not ask about a file that is not HTML', async () => {
+    const deps = eligibleDeps(true, { ok: true, realTarget: `${REAL_ROOT}/notes.md`, rel: 'notes.md' })
+
+    await routeLinkActivation(
+      { href: `erfana-preview://${TOKEN}/notes.md`, provenance: 'gesture' },
+      CONTEXT,
+      deps
+    )
+
+    expect(lastDisposition(deps)).toBe('new-tab')
+    expect(deps.runsAsPreview).not.toHaveBeenCalled()
+  })
+
+  it('fails closed to a new tab when the eligibility check throws, and logs no path', async () => {
+    const deps = eligibleDeps()
+    deps.runsAsPreview.mockRejectedValue(new Error(`${REAL_ROOT}/secret-plans.html is unreadable`))
+    vi.mocked(logger.warn).mockClear()
+
+    await routeLinkActivation({ href: PAGE_HREF, provenance: 'gesture' }, CONTEXT, deps)
+
+    expect(lastDisposition(deps)).toBe('new-tab')
+    expect(logger.warn).toHaveBeenCalledTimes(1)
+    expect(JSON.stringify(vi.mocked(logger.warn).mock.calls)).not.toContain('secret-plans')
+  })
+
+  it('fails closed as well when the check rejects with something that is not an Error', async () => {
+    const deps = eligibleDeps()
+    deps.runsAsPreview.mockRejectedValue('no git')
+    vi.mocked(logger.warn).mockClear()
+
+    await routeLinkActivation({ href: PAGE_HREF, provenance: 'gesture' }, CONTEXT, deps)
+
+    expect(lastDisposition(deps)).toBe('new-tab')
+    expect(logger.warn).toHaveBeenCalledWith(expect.any(String), { error: 'string' })
+  })
+
+  it('reads the accelerator of the injected platform', async () => {
+    const ctrlClick = { ...NO_KEYS, ctrl: true }
+    const onWindows = eligibleDeps(true, undefined, 'win32')
+    const onMac = eligibleDeps(true, undefined, 'darwin')
+
+    await routeLinkActivation({ href: PAGE_HREF, provenance: 'gesture', modifiers: ctrlClick }, CONTEXT, onWindows)
+    await routeLinkActivation({ href: PAGE_HREF, provenance: 'gesture', modifiers: ctrlClick }, CONTEXT, onMac)
+
+    expect(lastDisposition(onWindows)).toBe('new-tab')
+    expect(lastDisposition(onMac)).toBe('by-mode')
   })
 })

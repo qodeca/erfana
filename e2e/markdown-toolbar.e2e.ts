@@ -56,6 +56,39 @@ async function openDoc(page: Page): Promise<{
   return { panel, monaco }
 }
 
+/**
+ * Put the caret in Monaco, retrying the click until the editor really has it.
+ *
+ * Switching to a mode with an editor mounts Monaco, and for a moment after the
+ * mount a click lands on its DOM without Monaco taking focus. The browser then
+ * focuses the nearest focusable ancestor – the `tabIndex={0}` panel container –
+ * so the caret never appears and every keystroke that follows (select-all,
+ * typing) goes to the wrong element. `MonacoPage.focus()` clicks once and
+ * asserts the caret; re-running it until that assertion holds is the
+ * condition-based wait for "Monaco is ready to take input".
+ */
+async function focusEditor(monaco: MonacoPage): Promise<void> {
+  await monaco.waitForReady()
+  await expect(async () => {
+    await monaco.focus()
+  }).toPass({ timeout: 15_000 })
+}
+
+/** Open the fixture, switch to a mode with an editor, and focus Monaco. */
+async function openInEditor(
+  page: Page,
+  mode: 'editor' | 'split' = 'editor'
+): Promise<{ panel: EditorPanelPage; monaco: MonacoPage }> {
+  const { panel, monaco } = await openDoc(page)
+  await panel.setViewMode(mode)
+  await focusEditor(monaco)
+  return { panel, monaco }
+}
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 test.describe('View modes', () => {
   test('should open a file in preview, with no editor mounted', async ({
     windowWithTestProject
@@ -91,10 +124,7 @@ test.describe('View modes', () => {
   test('should carry the document through a full round trip of modes', async ({
     windowWithTestProject
   }) => {
-    const { panel, monaco } = await openDoc(windowWithTestProject)
-
-    await panel.setViewMode('editor')
-    await monaco.waitForReady()
+    const { panel, monaco } = await openInEditor(windowWithTestProject)
     await monaco.appendContent('\nround trip line\n')
 
     // Unmounting Monaco must not drop the buffer.
@@ -102,9 +132,9 @@ test.describe('View modes', () => {
     await expect(panel.previewPane()).toContainText('round trip line')
 
     await panel.setViewMode('editor')
-    await monaco.waitForReady()
-    // Poll rather than read once: `waitForReady` only proves the editor is
-    // attached, and Monaco paints its lines a frame or two later.
+    await focusEditor(monaco)
+    // Poll rather than read once: a focused editor can still be a frame or
+    // two away from painting its lines.
     await expect
       .poll(async () => monaco.visibleText(), { timeout: 10_000 })
       .toContain('round trip line')
@@ -113,10 +143,7 @@ test.describe('View modes', () => {
   test('should render the edit live in the preview half of a split', async ({
     windowWithTestProject
   }) => {
-    const { panel, monaco } = await openDoc(windowWithTestProject)
-
-    await panel.setViewMode('split')
-    await monaco.waitForReady()
+    const { panel, monaco } = await openInEditor(windowWithTestProject, 'split')
     await monaco.appendContent('\nlive rendered\n')
 
     await expect(panel.previewPane()).toContainText('live rendered')
@@ -135,10 +162,9 @@ test.describe('Formatting buttons', () => {
     panel: EditorPanelPage,
     monaco: MonacoPage,
     action: FormatAction
-  ): Promise<string> {
+  ): Promise<void> {
     await monaco.selectAll()
     await panel.format(action)
-    return monaco.visibleText()
   }
 
   const WRAPPERS: ReadonlyArray<{ action: FormatAction; marker: string }> = [
@@ -152,23 +178,23 @@ test.describe('Formatting buttons', () => {
     test(`should wrap the selection in ${marker} for ${action}`, async ({
       windowWithTestProject
     }) => {
-      const { panel, monaco } = await openDoc(windowWithTestProject)
-      await panel.setViewMode('editor')
-      await monaco.waitForReady()
+      const { panel, monaco } = await openInEditor(windowWithTestProject)
 
-      const after = await applyToSelection(panel, monaco, action)
+      await applyToSelection(panel, monaco, action)
 
       // Markers land at the edges of the selection, and the text itself
-      // survives in between.
-      expect(after).toContain(`${marker}plainword`)
-      expect(after.trimEnd().endsWith(marker)).toBe(true)
+      // survives in between. Select-all takes the trailing newline too, so the
+      // closing marker may sit on the next line. Poll: Monaco paints the edit
+      // a frame after the click, so a single read can still see the old text.
+      const m = escapeRegExp(marker)
+      await expect
+        .poll(async () => monaco.visibleText(), { timeout: 10_000 })
+        .toMatch(new RegExp(`${m}plainword[\\s\\S]*${m}\\s*$`))
     })
   }
 
   test('should build a heading out of the selected text', async ({ windowWithTestProject }) => {
-    const { panel, monaco } = await openDoc(windowWithTestProject)
-    await panel.setViewMode('editor')
-    await monaco.waitForReady()
+    const { panel, monaco } = await openInEditor(windowWithTestProject)
 
     await monaco.selectAll()
     await panel.format('heading')
@@ -181,11 +207,15 @@ test.describe('Formatting buttons', () => {
   test('should insert a placeholder heading when nothing is selected', async ({
     windowWithTestProject
   }) => {
-    const { panel, monaco } = await openDoc(windowWithTestProject)
-    await panel.setViewMode('editor')
-    await monaco.waitForReady()
+    const { panel, monaco } = await openInEditor(windowWithTestProject)
 
-    await monaco.focus()
+    // Park the caret with the keyboard, not the mouse, and prove the
+    // precondition: a stray selection would turn "insert" into "wrap" and
+    // fail below as a misleading text mismatch instead of here.
+    const keyboard = new KeyboardHelper(windowWithTestProject)
+    await windowWithTestProject.keyboard.press(`${await keyboard.getModifier()}+End`)
+    await expect(panel.statSelection()).toHaveCount(0)
+
     await panel.format('heading')
 
     // Heading INSERTS, it does not convert the current line — the document's
@@ -197,9 +227,7 @@ test.describe('Formatting buttons', () => {
   })
 
   test('should build a list out of the selected text', async ({ windowWithTestProject }) => {
-    const { panel, monaco } = await openDoc(windowWithTestProject)
-    await panel.setViewMode('editor')
-    await monaco.waitForReady()
+    const { panel, monaco } = await openInEditor(windowWithTestProject)
 
     await monaco.selectAll()
     await panel.format('list')
@@ -212,9 +240,7 @@ test.describe('Formatting buttons', () => {
   test('should build a numbered list out of the selected text', async ({
     windowWithTestProject
   }) => {
-    const { panel, monaco } = await openDoc(windowWithTestProject)
-    await panel.setViewMode('editor')
-    await monaco.waitForReady()
+    const { panel, monaco } = await openInEditor(windowWithTestProject)
 
     await monaco.selectAll()
     await panel.format('orderedList')
@@ -228,9 +254,7 @@ test.describe('Formatting buttons', () => {
     windowWithTestProject
   }) => {
     const tabs = new TabBarPage(windowWithTestProject)
-    const { panel, monaco } = await openDoc(windowWithTestProject)
-    await panel.setViewMode('editor')
-    await monaco.waitForReady()
+    const { panel, monaco } = await openInEditor(windowWithTestProject)
 
     await monaco.selectAll()
     await panel.format('bold')
@@ -257,9 +281,7 @@ test.describe('Document statistics', () => {
   })
 
   test('should grow the counts as the document grows', async ({ windowWithTestProject }) => {
-    const { panel, monaco } = await openDoc(windowWithTestProject)
-    await panel.setViewMode('editor')
-    await monaco.waitForReady()
+    const { panel, monaco } = await openInEditor(windowWithTestProject)
 
     const digits = async (text: string | null): Promise<number> =>
       Number((text ?? '').replace(/\D/g, '') || '0')
@@ -275,9 +297,7 @@ test.describe('Document statistics', () => {
   test('should report a selection only while text is selected', async ({
     windowWithTestProject
   }) => {
-    const { panel, monaco } = await openDoc(windowWithTestProject)
-    await panel.setViewMode('editor')
-    await monaco.waitForReady()
+    const { panel, monaco } = await openInEditor(windowWithTestProject)
 
     await expect(panel.statSelection()).toHaveCount(0)
 

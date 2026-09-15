@@ -12,7 +12,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ErrorCode } from '../../../shared/errors'
 import { PreviewEvents } from '../../../shared/ipc/preview-channels'
-import type { PreviewFailureInput } from '../../../shared/ipc/preview-types'
+import type {
+  PreviewFailureInput,
+  PreviewPageChange,
+  PreviewStillFrame
+} from '../../../shared/ipc/preview-types'
 import { createPreviewEmitters, type PreviewEmitTarget } from './emit'
 
 const mockLoggerWarn = vi.fn()
@@ -27,6 +31,26 @@ interface FakeTarget extends PreviewEmitTarget {
 
 function makeTarget(destroyed = false): FakeTarget {
   return { isDestroyed: () => destroyed, send: vi.fn() }
+}
+
+const FRAME: PreviewStillFrame = {
+  dataUrl: 'data:image/png;base64,AAAA',
+  width: 4,
+  height: 4,
+  capturedAt: 1
+}
+
+/** A move to b.html with Back to a.html (issue #124). */
+const PAGE_CHANGE: PreviewPageChange = {
+  filePath: '/proj/b.html',
+  anchor: null,
+  sameDocument: false,
+  canGoBack: true,
+  canGoForward: false,
+  backTarget: { filePath: '/proj/a.html', anchor: null },
+  forwardTarget: null,
+  generation: 1,
+  failed: false
 }
 
 const FAILURE: PreviewFailureInput = {
@@ -138,6 +162,116 @@ describe('createPreviewEmitters', () => {
     captured!()
 
     expect(target.send).not.toHaveBeenCalled()
+  })
+
+  it('sends a resize hold on its own channel, every transition, never coalesced', () => {
+    const target = makeTarget(false)
+    const emit = createPreviewEmitters({ resolveTargets: () => [target] })
+
+    emit.resizeHold('panel-1', true)
+    emit.resizeHold('panel-1', false)
+
+    expect(target.send.mock.calls).toEqual([
+      [PreviewEvents.RESIZE_HOLD, { panelId: 'panel-1', held: true }],
+      [PreviewEvents.RESIZE_HOLD, { panelId: 'panel-1', held: false }]
+    ])
+  })
+
+  it('sends a page change, not coalesced, from the gated entry (issue #124)', () => {
+    const target = makeTarget(false)
+    const emit = createPreviewEmitters({ resolveTargets: () => [target] })
+
+    emit.pageChanged('panel-1', PAGE_CHANGE)
+    emit.pageChanged('panel-1', { ...PAGE_CHANGE, anchor: 'pricing', sameDocument: true })
+
+    expect(target.send.mock.calls).toEqual([
+      [PreviewEvents.PAGE_CHANGED, { panelId: 'panel-1', ...PAGE_CHANGE }],
+      [
+        PreviewEvents.PAGE_CHANGED,
+        { panelId: 'panel-1', ...PAGE_CHANGE, anchor: 'pricing', sameDocument: true }
+      ]
+    ])
+  })
+
+  it('drops a page change whose anchor is past the contract and logs it', () => {
+    const target = makeTarget(false)
+    const emit = createPreviewEmitters({ resolveTargets: () => [target] })
+
+    emit.pageChanged('panel-1', { ...PAGE_CHANGE, anchor: 'x'.repeat(1025) })
+
+    expect(target.send).not.toHaveBeenCalled()
+    expect(mockLoggerWarn).toHaveBeenCalledTimes(1)
+  })
+
+  it('carries a link disposition, and leaves it out when there is none (issue #124)', () => {
+    const target = makeTarget(false)
+    const emit = createPreviewEmitters({ resolveTargets: () => [target] })
+
+    emit.openFileRequested('panel-1', '/proj/b.html', 'top', undefined, 'by-mode')
+    emit.openFileRequested('panel-1', '/proj/c.html', null)
+
+    expect(target.send.mock.calls).toEqual([
+      [
+        PreviewEvents.OPEN_FILE_REQUESTED,
+        {
+          sourcePanelId: 'panel-1',
+          filePath: '/proj/b.html',
+          anchor: 'top',
+          disposition: 'by-mode'
+        }
+      ],
+      [
+        PreviewEvents.OPEN_FILE_REQUESTED,
+        { sourcePanelId: 'panel-1', filePath: '/proj/c.html', anchor: null }
+      ]
+    ])
+  })
+
+  it('re-validates a resize hold and drops a malformed one (empty panelId)', () => {
+    const target = makeTarget(false)
+    const emit = createPreviewEmitters({ resolveTargets: () => [target] })
+
+    emit.resizeHold('', true)
+
+    expect(target.send).not.toHaveBeenCalled()
+    expect(mockLoggerWarn).toHaveBeenCalledTimes(1)
+  })
+
+  it('sends a still frame with its CSS size and stale flag when it has them (issue #124)', () => {
+    const target = makeTarget(false)
+    const emit = createPreviewEmitters({ resolveTargets: () => [target] })
+
+    emit.stillFrameChanged('panel-1', {
+      ...FRAME,
+      cssWidth: 640.5,
+      cssHeight: 480,
+      stale: true
+    })
+
+    expect(target.send).toHaveBeenCalledWith(PreviewEvents.STILL_FRAME_CHANGED, {
+      panelId: 'panel-1',
+      ...FRAME,
+      cssWidth: 640.5,
+      cssHeight: 480,
+      stale: true
+    })
+  })
+
+  it('omits a missing CSS size and a false stale flag, so an older frame is the payload it always was', () => {
+    const target = makeTarget(false)
+    const emit = createPreviewEmitters({ resolveTargets: () => [target] })
+
+    emit.stillFrameChanged('panel-1', { ...FRAME, stale: false })
+
+    const [channel, payload] = target.send.mock.calls[0]
+    expect(channel).toBe(PreviewEvents.STILL_FRAME_CHANGED)
+    expect(Object.keys(payload as object).sort()).toEqual([
+      'capturedAt',
+      'dataUrl',
+      'height',
+      'panelId',
+      'width'
+    ])
   })
 
   it('adds a schema-valid id + timestamp to each forwarded failure', () => {

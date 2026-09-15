@@ -17,6 +17,7 @@
  */
 
 import { ErrorCode } from '../../../../../shared/errors'
+import type { PdfExportResult } from '../../../../../shared/ipc/preview-types'
 import { getBasename } from '../../../utils/fileUtils'
 import { showGlobalToast } from '../../Toast/toastService'
 
@@ -32,7 +33,16 @@ import { showGlobalToast } from '../../Toast/toastService'
  * ```
  */
 export async function exportPreviewPdf(panelId: string): Promise<void> {
-  const result = await window.api.preview.exportPdf(panelId)
+  let result: PdfExportResult
+  try {
+    result = await window.api.preview.exportPdf(panelId)
+  } catch {
+    // A rejected invoke (IPC gate refusal, no handler) is still a failed
+    // export to the reader – toast it and resolve, so callers chaining
+    // `.finally` do not surface an unhandled rejection (Q19).
+    showExportFailedToast()
+    return
+  }
 
   if (result.ok) {
     showGlobalToast({
@@ -47,6 +57,11 @@ export async function exportPreviewPdf(panelId: string): Promise<void> {
   // silent so the user is not nagged for dismissing the picker.
   if (result.errorCode === ErrorCode.PDF_EXPORT_CANCELLED) return
 
+  showExportFailedToast()
+}
+
+/** The one failure toast, shared by a refusal from main and a rejected invoke. */
+function showExportFailedToast(): void {
   showGlobalToast({
     type: 'error',
     title: 'Export failed',

@@ -41,7 +41,7 @@ import {
 export interface PreviewAckController {
   /** Largest top inset the page has proved it repainted below. */
   provenInset: () => number
-  /** Called synchronously by the bounds pump, right after `setBounds`. */
+  /** Called synchronously by `usePreviewBounds`, right after `setBounds`. */
   recordPush: (seq: number, topInset: number, ackRequested: boolean) => void
 }
 
@@ -82,7 +82,7 @@ export function usePreviewChromeGate({
   const [tooShort, setTooShort] = useState(false)
 
   // Refs, not state: none of these may cause a render on their own write, and
-  // the bounds pump reads them synchronously from a stable callback.
+  // `usePreviewBounds` reads them synchronously from a stable callback.
   const provenInsetRef = useRef<number>(Number.POSITIVE_INFINITY)
   const hasBaselineRef = useRef(false)
   const epochRef = useRef<{ inset: number; firstSeq: number } | null>(null)
@@ -90,7 +90,7 @@ export function usePreviewChromeGate({
   const pageHiddenRef = useRef(false)
   /**
    * The same fact as `pageHiddenRef`, as state, because `controlsAllowed` has to
-   * RE-RENDER on it. The ref is read synchronously by the bounds pump; this is
+   * RE-RENDER on it. The ref is read synchronously by `usePreviewBounds`; this is
    * read by the render.
    */
   const [hideConfirmed, setHideConfirmed] = useState(false)
@@ -201,7 +201,7 @@ export function usePreviewChromeGate({
   /*
    * The too-short rule, measured from the PANEL ROOT.
    *
-   * Deliberately its own observer rather than a branch in the bounds pump: when
+   * Deliberately its own observer rather than a branch in `usePreviewBounds`: when
    * the band is paused it can take the whole panel, `deriveBounds` then returns
    * null, no push happens, and a push-driven check would never run again — the
    * gate would latch with no way to notice the panel had grown.

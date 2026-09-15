@@ -5,13 +5,16 @@
  *
  * Covers design §1.7: printToPDF with printBackground:true, its own save
  * dialog + writeFile, `deriveSafeFilename` applied to the suggested name, and
- * a cancelled dialog writing nothing.
+ * a cancelled dialog writing nothing. Also the name a page suggests (#124).
  */
+import { join } from 'node:path'
+
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 import { ErrorCode } from '../../../shared/errors'
 import {
   createPreviewExportController,
+  exportNameForPage,
   type PreviewExportControllerDeps,
   type PreviewPrintContents,
   type PreviewSaveDialogResult
@@ -134,5 +137,16 @@ describe('PreviewExportController', () => {
 
     expect(writeFile).not.toHaveBeenCalled()
     expect(result).toEqual({ ok: false, errorCode: ErrorCode.PDF_EXPORT_FAILED })
+  })
+})
+
+describe('exportNameForPage', () => {
+  it("is the page's file name without its extension", () => {
+    expect(exportNameForPage(join('proj', 'design-set', 'pricing.html'), 'preview')).toBe('pricing')
+  })
+
+  it('is the fallback when there is no page', () => {
+    expect(exportNameForPage(null, 'preview')).toBe('preview')
+    expect(exportNameForPage('', 'preview')).toBe('preview')
   })
 })

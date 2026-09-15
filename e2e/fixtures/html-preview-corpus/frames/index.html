@@ -1,0 +1,91 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<!--
+  Part 2 corpus (issue #124, P2-AC1): frames show pages from the same project.
+  A src frame (child.html) and a srcdoc frame, each running script, applying
+  child.css and showing child.svg. Every preview document has its own opaque
+  origin (sandbox allow-scripts), so neither frame can read its parent and the
+  parent can read neither frame. Each frame posts one report; the title gains
+  -FRAMES-1- once both are in.
+
+  Live reload (WI-15): saving child.html, child.css, child.svg or shared.css
+  (used by this page and the src frame) reloads the preview; saving page.css,
+  which only this top page uses, swaps it in place.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Frames index (pending)</title>
+    <link rel="stylesheet" href="page.css" />
+    <link rel="stylesheet" href="shared.css" />
+    <script>
+      window.__frameReports = {}
+      window.addEventListener('message', (event) => {
+        const data = event.data
+        if (!data || data.kind !== 'frame-report') return
+        const frame = document.getElementById(data.from === 'src' ? 'src-frame' : 'srcdoc-frame')
+        if (!frame || frame.contentWindow !== event.source) return
+        let parentCanRead
+        try {
+          void event.source.document.title
+          parentCanRead = true
+        } catch (e) {
+          parentCanRead = false
+        }
+        window.__frameReports[data.from] = Object.assign({}, data, { parentCanRead })
+        if (window.__frameReports.src && window.__frameReports.srcdoc) {
+          document.title = 'Frames index -FRAMES-1-'
+        }
+      })
+    </script>
+  </head>
+  <body>
+    <h1>Frames: same-project src and srcdoc</h1>
+    <p>
+      You should see two frames, each with a tinted background, a blue square and
+      its own text. The tab title gains -FRAMES-1- once both frames have reported.
+    </p>
+    <iframe id="src-frame" title="src frame" src="child.html" width="320" height="180"></iframe>
+    <iframe
+      id="srcdoc-frame"
+      title="srcdoc frame"
+      width="320"
+      height="180"
+      srcdoc="<!DOCTYPE html>
+    <html lang='en'>
+    <head><meta charset='utf-8'><title>srcdoc child</title><link rel='stylesheet' href='child.css'></head>
+    <body>
+    <p>srcdoc frame: script, child.css and child.svg</p>
+    <img id='child-img' src='child.svg' alt='' width='48' height='48'>
+    <script>
+    window.addEventListener('load', () => {
+      const img = document.getElementById('child-img')
+      let canReadParent
+      try {
+        void parent.document.title
+        canReadParent = true
+      } catch (e) {
+        canReadParent = false
+      }
+      const style = getComputedStyle(document.body)
+      parent.postMessage(
+        {
+          kind: 'frame-report',
+          from: 'srcdoc',
+          js: true,
+          version: document.body.dataset.version || '',
+          css: style.getPropertyValue('--child-mark').trim(),
+          shared: style.getPropertyValue('--shared-mark').trim(),
+          img: img.complete &amp;&amp; img.naturalWidth > 0,
+          canReadParent
+        },
+        '*'
+      )
+    })
+    </script>
+    </body>
+    </html>"
+    ></iframe>
+  </body>
+</html>

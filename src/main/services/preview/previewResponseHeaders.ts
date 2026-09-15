@@ -11,6 +11,16 @@
  * 12). No requested path, decoded segment, filename, query string or request
  * header ever reaches a header name or value.
  *
+ * No framing header (issue #124 WI-13, design part 2 §2.1): the set carries no
+ * `X-Frame-Options`, and the CSP carries no `frame-ancestors`. A preview page is
+ * sandboxed to an opaque origin, and such a parent can frame a same-project page
+ * only when the child names no `frame-ancestors` at all (spike S2).
+ * `X-Frame-Options` would refuse it too: `DENY` refuses every parent, and an
+ * opaque parent is never same-origin for `SAMEORIGIN`. Who may frame a preview
+ * page is bounded elsewhere: the scheme is handled only on preview sessions
+ * (`previewSchemeScope.test.ts`), and the framing page's own `frame-src` names
+ * only its own token (`buildPreviewCsp`). Do not add either.
+ *
  * `mimeForExtension` reads a NULL-PROTOTYPE, `hasOwn`-guarded table so a lookup
  * of an inherited key (`.constructor`, `.__proto__`, `.toString`) returns the
  * `application/octet-stream` default rather than a function that would then flow,

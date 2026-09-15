@@ -5,6 +5,12 @@
  * Shared utilities for file operations in the renderer process
  */
 
+import { getRendererPlatform, isWindows } from './platform'
+
+// Moved to src/shared/ so main computes the same digest for its log lines
+// (issue #124, QG-7 S3); re-exported so renderer imports keep this path.
+export { stablePathDigest } from '../../../shared/stablePathDigest'
+
 /**
  * Sanitize file path for use as a panel ID
  * Converts: /Users/name/docs/notes.md → users-name-docs-notes-md
@@ -14,33 +20,6 @@ export function sanitizeFilePath(filePath: string): string {
     .replace(/^\//, '')              // Remove leading slash
     .replace(/[^a-zA-Z0-9]/g, '-')  // Replace special chars with dash
     .toLowerCase()                   // Lowercase for consistency
-}
-
-/**
- * A short, stable digest of a path, for a panel id that would otherwise be
- * too long for the IPC boundary (`PanelIdSchema` caps ids at 256).
- *
- * FNV-1a 32-bit run twice with different seeds over the UTF-16 code units,
- * returned as 16 lowercase hex characters. Deterministic per exact string
- * (case included). Synchronous on purpose: dockview needs the id before
- * `addPanel` returns, which rules out `crypto.subtle`. No dependency.
- *
- * Not collision-resistant — two paths sharing their first 150 sanitized
- * characters could be crafted to collide, which is recorded as accepted in
- * docs/security.md. `openFileInPanel` uses it only past its length budget,
- * so short paths keep the exact ids they always had.
- */
-export function stablePathDigest(path: string): string {
-  return fnv1a32Hex(path, 0x811c9dc5) + fnv1a32Hex(path, 0x050c5d1f)
-}
-
-function fnv1a32Hex(text: string, seed: number): string {
-  let hash = seed >>> 0
-  for (let i = 0; i < text.length; i++) {
-    hash ^= text.charCodeAt(i)
-    hash = Math.imul(hash, 0x01000193) >>> 0
-  }
-  return hash.toString(16).padStart(8, '0')
 }
 
 /**
@@ -125,6 +104,46 @@ export function isStrictDescendant(parentPath: string, childPath: string): boole
     normalizePathForCompare(childPath) !== normalizePathForCompare(parentPath) &&
     isPathInside(parentPath, childPath)
   )
+}
+
+/**
+ * Whether two paths name the same file, as far as the renderer can tell
+ * without touching the disk (issue #124, part 3 §3.4).
+ *
+ * Separators are normalised – `/` and `\\` both count, runs collapse, a
+ * trailing one is ignored – and on Windows only the case is folded, because
+ * `B.html` and `b.html` are one file there. POSIX paths compare
+ * case-sensitively, the rule panel ids already follow.
+ *
+ * Both sides must come from the same path space. Main reports every page as a
+ * project-space path, the space the project tree uses, so a tree path and a
+ * reported page compare equal even when the project is reached through a
+ * symlink. Nothing is resolved here – no `realpath`, no `..` – so a file opened
+ * through a symlink alias is NOT matched (recorded as technical debt, RS12).
+ *
+ * Display/parse-only — not for security confinement.
+ *
+ * @param a - First path; `null`, `undefined` or `''` never matches
+ * @param b - Second path; `null`, `undefined` or `''` never matches
+ * @param platform - Whose case rule applies; defaults to the renderer's own
+ * @returns `true` when both paths are non-empty and name the same file
+ *
+ * @example
+ * ```ts
+ * pathsEqual('/proj/site/a.html', '/proj//site/a.html/')      // true
+ * pathsEqual('C:\\proj\\B.html', 'c:/proj/b.html', 'win32')  // true
+ * pathsEqual('/proj/B.html', '/proj/b.html', 'darwin')        // false
+ * ```
+ */
+export function pathsEqual(
+  a: string | null | undefined,
+  b: string | null | undefined,
+  platform: NodeJS.Platform = getRendererPlatform()
+): boolean {
+  if (!a || !b) return false
+  const left = normalizePathForCompare(a)
+  const right = normalizePathForCompare(b)
+  return isWindows(platform) ? left.toLowerCase() === right.toLowerCase() : left === right
 }
 
 /**

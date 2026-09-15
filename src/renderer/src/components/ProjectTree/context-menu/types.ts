@@ -118,6 +118,12 @@ export interface MenuContext {
    * nodes only when this is wired.
    */
   openAsSource?: (filePath: string) => void
+  /**
+   * Opens an `.html`/`.htm` file in the default browser (issue #124, part 4) and
+   * raises its own toasts; never rejects. The "Open in default browser" item is
+   * offered only when this is wired, under its own gate.
+   */
+  openInBrowser?: (filePath: string) => void | Promise<void>
 }
 
 /**

@@ -136,6 +136,14 @@ export enum ErrorCode {
   /** Catch-all, including harness timeout and hidden-window load failure. */
   IMAGE_EXPORT_FAILED = 'IMAGE_EXPORT_FAILED',
 
+  // Open in default browser errors (Issue #124) – `browser:openFile` refusals
+  OPEN_IN_BROWSER_INVALID_REQUEST = 'OPEN_IN_BROWSER_INVALID_REQUEST',
+  OPEN_IN_BROWSER_NO_PROJECT = 'OPEN_IN_BROWSER_NO_PROJECT',
+  OPEN_IN_BROWSER_OUTSIDE_PROJECT = 'OPEN_IN_BROWSER_OUTSIDE_PROJECT',
+  OPEN_IN_BROWSER_NOT_HTML = 'OPEN_IN_BROWSER_NOT_HTML',
+  OPEN_IN_BROWSER_MISSING = 'OPEN_IN_BROWSER_MISSING',
+  OPEN_IN_BROWSER_LAUNCH_FAILED = 'OPEN_IN_BROWSER_LAUNCH_FAILED',
+
   // Screenshot capture errors
   SCREENSHOT_PERMISSION_DENIED = 'SCREENSHOT_PERMISSION_DENIED',
   SCREENSHOT_TIMEOUT = 'SCREENSHOT_TIMEOUT',
@@ -253,6 +261,12 @@ export enum ErrorCode {
    * renderer, not a failure.
    */
   PREVIEW_OPEN_SUPERSEDED = 'PREVIEW_OPEN_SUPERSEDED',
+  // `preview:navigate` refusals (Issue #124): target gone; target refused (outside,
+  // not HTML, opens as source); no view here or suspended; stale or already pending
+  PREVIEW_NAV_TARGET_MISSING = 'PREVIEW_NAV_TARGET_MISSING',
+  PREVIEW_NAV_TARGET_REFUSED = 'PREVIEW_NAV_TARGET_REFUSED',
+  PREVIEW_NAV_UNAVAILABLE = 'PREVIEW_NAV_UNAVAILABLE',
+  PREVIEW_NAV_SKIPPED = 'PREVIEW_NAV_SKIPPED',
 
   // Generic errors
   UNKNOWN_ERROR = 'UNKNOWN_ERROR'
@@ -406,6 +420,14 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.IMAGE_EXPORT_CLIPBOARD_FAILED]: 'The clipboard rejected the image',
   [ErrorCode.IMAGE_EXPORT_FAILED]: 'Image export failed',
 
+  // Open in default browser (Issue #124); the renderer's toasts add the file name
+  [ErrorCode.OPEN_IN_BROWSER_INVALID_REQUEST]: 'The request to open this file in a browser was rejected.',
+  [ErrorCode.OPEN_IN_BROWSER_NO_PROJECT]: 'Open a project first – only its files open in a browser.',
+  [ErrorCode.OPEN_IN_BROWSER_OUTSIDE_PROJECT]: 'This file leads outside the open project, so Erfana will not open it in a browser.',
+  [ErrorCode.OPEN_IN_BROWSER_NOT_HTML]: 'This is not an HTML page. Only .html and .htm files can be opened in a browser.',
+  [ErrorCode.OPEN_IN_BROWSER_MISSING]: 'This file is no longer there – it may have been moved or deleted.',
+  [ErrorCode.OPEN_IN_BROWSER_LAUNCH_FAILED]: 'Your browser did not start. Try again, or reveal the file and open it yourself.',
+
   // Screenshot capture errors
   [ErrorCode.SCREENSHOT_PERMISSION_DENIED]: 'Screen recording permission required. Grant access in System Settings > Privacy & Security.',
   [ErrorCode.SCREENSHOT_TIMEOUT]: 'Screenshot capture timed out',
@@ -484,6 +506,11 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.PREVIEW_OPEN_INVALID_REQUEST]: 'The preview request was rejected.',
   [ErrorCode.PREVIEW_APPROVE_TIMED_OUT]: 'Saved, but the preview did not confirm. Reload it.',
   [ErrorCode.PREVIEW_OPEN_SUPERSEDED]: 'The preview was replaced before it finished opening.',
+  // Same-tab navigation (Issue #124); the renderer's toasts add the file names
+  [ErrorCode.PREVIEW_NAV_TARGET_MISSING]: 'That page is no longer there – it may have been moved or deleted.',
+  [ErrorCode.PREVIEW_NAV_TARGET_REFUSED]: 'That page cannot be shown as a preview here.',
+  [ErrorCode.PREVIEW_NAV_UNAVAILABLE]: 'This preview is not ready. Try again in a moment.',
+  [ErrorCode.PREVIEW_NAV_SKIPPED]: 'This tab was still loading another page.',
 
   // Generic errors
   [ErrorCode.UNKNOWN_ERROR]: 'An unexpected error occurred'

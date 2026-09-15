@@ -7,6 +7,8 @@ Two behaviours are added to the running HTML preview:
 1. **Links work.** A link inside a previewed page opens its target inside Erfana, in a new tab.
 2. **Previews are ordinary tabs.** Every `.html` file opens in its own tab and runs independently; idle previews sleep rather than being refused.
 
+> **Superseded in part by [#124](https://github.com/qodeca/erfana/issues/124)** (multi-page HTML preview, design in [`docs/design/design-issue-124.md`](../../docs/design/design-issue-124.md)). D4 and the §3.1 target mapping no longer describe the build: a tab can open links in place, with its own Back and Forward history (part 3 of that design). The §6 CSP row's `frame-src 'none'` is now `frame-src erfana-preview://<own-token>`, so same-project frames run (part 2). The sections below are left as written for #79; the notes marked "#124" point at what changed.
+
 > **Revision 2.** Revision 1 was reviewed through four lenses (security, Electron/Chromium platform behaviour, concurrency correctness, architecture) and returned 6 must-fix and 16 should-fix findings. Three decisions changed: in-place navigation is dropped, unbounded live previews became sleep-when-idle, and the app's IPC surface is hardened in its own phase *before* the preview page gains any channel. The findings are folded into the sections below rather than listed separately.
 
 ---
@@ -18,7 +20,7 @@ Two behaviours are added to the running HTML preview:
 | D1 | Read the anchor's `target` via a **one-way preload** in the preview session | `will-navigate` does not carry `target`; a plain link and `target="_self"` are indistinguishable there. The attribute exists only in the DOM. Revises the "no preload in the sealed box" rule (`previewSessionPolicy.ts:14-17`) |
 | D2 | The preload exposes **nothing** to the page — no `contextBridge`, no globals | Page script cannot reach `ipcRenderer` under `contextIsolation: true`. The channel is page→main only, WebContents-scoped, never on global `ipcMain` |
 | D3 | **The CSP is not relaxed** | Erfana drives navigation with `loadURL`; the page never navigates itself |
-| D4 | **Every link opens a new tab.** No in-place navigation in this version | Operator decision. `target="_self"`, `_top`, `_parent` and `<base target>` are all documented as behaving like a new tab. See §3.3 for what this drops and why |
+| D4 | ~~**Every link opens a new tab.** No in-place navigation in this version~~ **SUPERSEDED by #124**: new tab stays the default, and a per-tab "Open links in this tab" mode opens a plain link or `_self` / `_top` / `_parent` in place | Operator decision. `target="_self"`, `_top`, `_parent` and `<base target>` are all documented as behaving like a new tab. See §3.3 for what this drops and why |
 | D5 | **Previews sleep when idle**: the 3 most recently active stay live; the rest tear down to a still frame and re-open automatically when their tab is activated | Replaces revision 1's uncapped "keep every preview alive". Caps live renderer processes. The still frame plus auto-reopen is exactly the exit state whose absence killed LRU in the original design (`sd-074-html-preview.md:1406`) |
 | D6 | External `http(s)` / `mailto:` links **open in the OS browser, after the destination is shown** | Matches Markdown preview (`MarkdownPreview.tsx:440-447`); the destination readout answers the review's point that a trusted click is not informed consent |
 | D7 | One in-memory session partition **per view**, its name recycled after a bounded purge (v0.19.0) | `previewSessionPolicy.ts:64-66`. N previews get N isolated sessions. Shared state to reconcile is the allowlist (§4.4) and the watcher budget (§4.6); the blocked-host toast budget §4.5 once named went with the toast |
@@ -56,6 +58,8 @@ A clicked link today produces no navigation, no badge entry and no toast — `pr
 | absent, `_blank`, named, `_self`, `_top`, `_parent` | **new tab** |
 | any value, with Cmd/Ctrl held, or middle-click | **new tab** |
 
+> **#124:** this table no longer holds. `_self`, `_top` and `_parent` open in the same tab, and a link with no `target` follows the tab's link mode; `_blank`, named targets, Cmd/Ctrl-click and middle-click still open a new tab. Current table: `previewLinkDisposition.ts` and design-issue-124 part 3 §3.2.
+
 Every link opens a new tab; "new tab" means the app's existing rule — reuse the tab already showing that file, otherwise create one (`openFileInPanel.ts:210-233`).
 
 This inverts the HTML default (`_self`). The consequence is accepted deliberately: a generated documentation site mints a tab per click. D5's sleep policy is what makes that affordable, and it is the reason D5 is not optional.
@@ -83,7 +87,7 @@ Main re-resolves every path through `previewPathResolve.ts` and `PreviewEligibil
 
 Dropping it also removes three dependent problems: the forwarded-accelerator contract cannot express `Alt+Left` (`previewInputForward.ts:88-101` ignores `alt` on the accel branch and forbids it on the other, and `PreviewForwardedShortcutSchema` is a strict 4-key enum that would drop new keys at emit with only a warning); an Erfana-owned history stack silently diverges from Chromium's and misses fragment hops (`will-navigate` does not fire for in-page navigation); and `PreviewLiveView.ts`, already 545 lines against a 500-line cap, would grow further.
 
-If in-place is wanted later it needs a renderer-side current-document index that `openFileInPanel` consults, store-driven paths for title/tooltip/boundary key, `did-navigate-in-page` subscription, and a redesigned accelerator contract. That is a separate issue.
+If in-place is wanted later it needs a renderer-side current-document index that `openFileInPanel` consults, store-driven paths for title/tooltip/boundary key, `did-navigate-in-page` subscription, and a redesigned accelerator contract. That is a separate issue. (#124 is that issue: see design-issue-124 part 3.)
 
 ---
 
@@ -251,7 +255,7 @@ This closes today's silent-failure gap: a clicked link that goes nowhere finally
 | A preload runs in the page's process | Preload code is privileged relative to the page | Exposes nothing; the build-output test forbids `contextBridge`, `webFrame` and `ipcRenderer.invoke`/`.on` |
 | `shell.openExternal` reachable from an untrusted page | A page can lure a click to any URL | Parsed-protocol allow-list, credential rejection, destination shown before hand-off, genuine user gesture required |
 | Erfana opens project files on a page's request | A page could induce navigation of the workspace | Only a confined, eligible path opens, in a normal tab; no file content returns to the page |
-| CSP | unchanged | `sandbox allow-scripts`, `form-action 'none'`, `base-uri 'none'`, `frame-src 'none'` |
+| CSP | unchanged | `sandbox allow-scripts`, `form-action 'none'`, `base-uri 'none'`, `frame-src 'none'` (#124: now `frame-src erfana-preview://<own-token>`, and `frame-ancestors` is no longer sent) |
 | N sessions instead of 1 | N in-memory partitions, capped at `MAX_LIVE_VIEWS` | Each still asserts `storagePath === null` (`assertSealed`, from `PreviewStorageSeal`) |
 
 `docs/security.md:589` currently states "Erfana exposes no scripted API to the page — no preload, no `postMessage` endpoint, no bridge". That sentence must be corrected, and the reason the session permission handler (`previewSessionPolicy.ts:83-84`) no longer covers `openExternal` stated explicitly — that handler is the named mitigation in the Electron advisory for external-protocol launches from sandboxed content, and calling `shell.openExternal` from main deliberately routes around it.

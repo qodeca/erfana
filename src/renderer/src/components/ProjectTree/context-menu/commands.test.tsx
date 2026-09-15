@@ -26,6 +26,7 @@ import {
   NewFileInDirectoryCommand,
   NewFolderInDirectoryCommand,
   RevealInFileManagerCommand,
+  OpenInBrowserCommand,
   separatorItem
 } from './commands'
 import { createMockMenuContext, createMockFileNode } from '../__test__/testUtils'
@@ -841,5 +842,38 @@ describe('RevealInFileManagerCommand', () => {
       title: 'Reveal failed',
       message: 'Item no longer exists on disk'
     })
+  })
+})
+
+describe('OpenInBrowserCommand (#124)', () => {
+  it('is labelled "Open in default browser", with no ellipsis, and has an icon', () => {
+    const ctx = createMockMenuContext({ openInBrowser: vi.fn() })
+    const cmd = new OpenInBrowserCommand(ctx, createMockFileNode('page.html', 'file'))
+
+    expect(cmd.label).toBe('Open in default browser')
+    expect(cmd.icon).toBeDefined()
+  })
+
+  it('hands the node path to the injected action and returns its promise', async () => {
+    let settled = false
+    const openInBrowser = vi.fn(async () => {
+      settled = true
+    })
+    const ctx = createMockMenuContext({ openInBrowser })
+    const node = createMockFileNode('page.html', 'file', '/proj/site/page.html')
+
+    await new OpenInBrowserCommand(ctx, node).toMenuItem().execute()
+
+    expect(openInBrowser).toHaveBeenCalledWith('/proj/site/page.html')
+    expect(settled).toBe(true)
+    // The action raises its own toasts; the menu's toast is never used.
+    expect(ctx.toast).not.toHaveBeenCalled()
+  })
+
+  it('does nothing when the action is not wired', () => {
+    const ctx = createMockMenuContext()
+    const cmd = new OpenInBrowserCommand(ctx, createMockFileNode('page.html', 'file'))
+
+    expect(cmd.execute()).toBeUndefined()
   })
 })

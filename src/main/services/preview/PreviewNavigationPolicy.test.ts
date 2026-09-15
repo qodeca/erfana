@@ -9,6 +9,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import { decideLinkIntent } from './PreviewNavigationPolicy'
+import { decideLinkDisposition } from './previewLinkDisposition'
 
 // A fake 32-hex preview root token. Not a credential: the real one is minted
 // per view by PreviewRootRegistry and never leaves the main process.
@@ -172,13 +173,28 @@ describe('decideLinkIntent — refusals', () => {
   })
 })
 
-describe('decideLinkIntent — target is advisory only', () => {
-  it.each(['', '_blank', '_self', '_top', '_parent', 'named-frame'])(
-    'opens a new tab for target="%s"',
-    (target) => {
-      expect(decide(`erfana-preview://${TOKEN}/other.html`, { target })).toMatchObject({
-        kind: 'in-project'
-      })
-    }
-  )
+describe('decideLinkIntent — target leaves the intent alone; the link table places the page', () => {
+  // Changed on purpose by issue #124 (part 3 §3.2): `_self`, `_top` and
+  // `_parent` used to open a new tab like every other link. The intent is still
+  // the same for every target; where the page opens is `decideLinkDisposition`'s
+  // call, and for these three it is now the same tab.
+  it.each([
+    ['', 'by-mode'],
+    ['_blank', 'new-tab'],
+    ['_self', 'same-tab'],
+    ['_top', 'same-tab'],
+    ['_parent', 'same-tab'],
+    ['named-frame', 'new-tab']
+  ] as const)('target="%s" is in-project and opens %s', (target, disposition) => {
+    expect(decide(`erfana-preview://${TOKEN}/other.html`, { target })).toMatchObject({
+      kind: 'in-project'
+    })
+    expect(
+      decideLinkDisposition(
+        { provenance: 'gesture', button: 0, target },
+        { filePath: '/projects/site/other.html', eligible: true },
+        { platform: 'darwin' }
+      )
+    ).toBe(disposition)
+  })
 })

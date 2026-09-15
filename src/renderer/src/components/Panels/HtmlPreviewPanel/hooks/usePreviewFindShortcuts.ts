@@ -5,14 +5,18 @@
  *
  * When the preview is the active tab its native `WebContentsView` sits on top
  * and receives keystrokes, so a renderer-level Cmd/Ctrl+F never fires. Main's
- * `before-input-event` forwarding sends the four enumerated accelerators
- * (design §1.9) back as `preview:forwardedShortcut`; this hook routes each one
- * to a panel-supplied action:
+ * `before-input-event` forwarding sends the enumerated keys (design §1.9, and
+ * issue #124 part 3 §3.7) back as `preview:forwardedShortcut`; this hook routes
+ * each one to a panel-supplied action:
  *
  * - **Cmd/Ctrl+F** → open the find bar.
  * - **Cmd/Ctrl+S** → export the preview to PDF (UX-003).
  * - **Cmd/Ctrl+W** → close the panel (UX-006).
  * - **Escape** → close the find bar with full cleanup (UX-007).
+ * - **Back / Forward** (Cmd+[ / Cmd+] on macOS, Alt+Left / Alt+Right elsewhere)
+ *   → step the tab's history. Routed on `payload.key` ALONE: main matched them
+ *   through the shared `previewNavKeys` table, whose modifier is Alt on Windows
+ *   and Linux, so `accel` is `false` for both on every platform.
  *
  * The panel owns the actions because the find close must run the *provider's*
  * `clearHighlights()` and restore focus — exactly like `SearchBar.handleClose`,
@@ -52,6 +56,10 @@ export interface PreviewShortcutActions {
    * previewed page to return here".
    */
   focusChrome: () => void
+  /** Step the tab back (a forwarded Back key, focus in the page). */
+  goBack: () => void
+  /** Step the tab forward (a forwarded Forward key, focus in the page). */
+  goForward: () => void
 }
 
 /**
@@ -64,7 +72,9 @@ export interface PreviewShortcutActions {
  * @example
  * ```tsx
  * usePreviewFindShortcuts(panelId, {
- *   openSearch, closeSearch, exportPdf, closePanel
+ *   openSearch, isSearchOpen, closeSearch, exportPdf, closePanel, focusChrome,
+ *   goBack: () => void step('back', 'page'),
+ *   goForward: () => void step('forward', 'page')
  * })
  * ```
  */
@@ -91,6 +101,10 @@ export function usePreviewFindShortcuts(
         current.exportPdf()
       } else if (payload.key === 'w' && payload.accel) {
         current.closePanel()
+      } else if (payload.key === 'back') {
+        current.goBack()
+      } else if (payload.key === 'forward') {
+        current.goForward()
       } else if (payload.key === 'Escape') {
         // Escape does ONE thing at a time, innermost first. With the find bar
         // open it closes the find bar; with the bar closed it is the way out of

@@ -18,12 +18,6 @@ import { z } from 'zod'
 import { PREVIEW_BLOCKED_KINDS } from './previewBlockedKind'
 import { ErrorCode } from '../errors'
 import { MAX_ALLOWLIST_HOSTS, PreviewOriginSchema } from './preview-settings-schema'
-import type {
-  PdfExportResult,
-  PreviewApproveResult,
-  PreviewFindResult,
-  PreviewOpenResult
-} from './preview-types'
 
 /** A panel id: non-empty, bounded. */
 export const PanelIdSchema = z.string().min(1).max(256)
@@ -45,7 +39,7 @@ export type PreviewBoundsPayload = z.infer<typeof PreviewBoundsSchema>
  */
 export const PreviewCheckEligibilityRequestSchema = z
   .object({
-    filePath: z.string().min(1)
+    filePath: z.string().min(1).max(4096)
   })
   .strict()
 export type PreviewCheckEligibilityRequest = z.infer<typeof PreviewCheckEligibilityRequestSchema>
@@ -75,7 +69,7 @@ export type PreviewCheckEligibilityResponse = z.infer<
 export const PreviewOpenRequestSchema = z
   .object({
     panelId: PanelIdSchema,
-    filePath: z.string().min(1),
+    filePath: z.string().min(1).max(4096),
     bounds: PreviewBoundsSchema
   })
   .strict()
@@ -112,11 +106,17 @@ export const PreviewSetBoundsSchema = z
      * new size.
      *
      * OPTIONAL, and set only on the pushes that need it — a transition that
-     * reveals Erfana's chrome. The bounds pump sends one of these per frame
+     * reveals Erfana's chrome. The bounds loop sends one of these per frame
      * while a panel is resizing, and confirming every one would cost a round
      * trip into the page for each. Absent means today's fire-and-forget.
      */
-    ack: z.boolean().optional()
+    ack: z.boolean().optional(),
+    /**
+     * The forced push that ends a window-edge resize hold (issue #124, part 1
+     * §1.5): sent even when the rect is unchanged, and main releases the hold
+     * once it is applied. Absent on every other push.
+     */
+    settled: z.boolean().optional()
   })
   .strict()
 export type PreviewSetBounds = z.infer<typeof PreviewSetBoundsSchema>
@@ -290,7 +290,14 @@ export const PreviewFailureSchema = z
       'unresolved-specifier',
       'allowlist-invalid',
       'allowlist-unsupported-version',
-      'blocked-link'
+      'blocked-link',
+      // Frame refusals (issue #124, part 2 §2.12)
+      'frame-remote',
+      'frame-escape',
+      'frame-excluded',
+      'frame-too-deep',
+      'frame-over-limit',
+      'frame-link-blocked'
     ]),
     // Page-influenced value. The `record()` producer strips control chars; this
     // regex is the emit-time tripwire that actually enforces "no CR/LF", so a
@@ -332,7 +339,12 @@ export const PreviewStillFrameSchema = z
     dataUrl: z.string(),
     width: z.number().int().nonnegative(),
     height: z.number().int().nonnegative(),
-    capturedAt: z.number().int().nonnegative()
+    capturedAt: z.number().int().nonnegative(),
+    /** The view's CSS size at capture; the still is drawn at it, top-left (issue #124). */
+    cssWidth: z.number().nonnegative().optional(),
+    cssHeight: z.number().nonnegative().optional(),
+    /** Real input reached the page after the capture. Omitted when false. */
+    stale: z.boolean().optional()
   })
   .strict()
 export type PreviewStillFramePayload = z.infer<typeof PreviewStillFrameSchema>
@@ -380,82 +392,33 @@ export const PreviewOpenFileRequestedSchema = z
   .object({
     sourcePanelId: PanelIdSchema,
     filePath: z.string().min(1).max(4096),
-    anchor: z.string().max(512).nullable()
+    anchor: z.string().max(512).nullable(),
+    /**
+     * Where the link may open (issue #124, part 3 §3.2). Optional in the
+     * contract: absent means `new-tab`, which is every link before #124.
+     */
+    disposition: z.enum(['same-tab', 'new-tab', 'by-mode']).optional()
   })
   .strict()
 export type PreviewOpenFileRequestedPayload = z.infer<typeof PreviewOpenFileRequestedSchema>
 
-/** `preview:forwardedShortcut` event payload — the 4 accelerators of §1.9. */
+/**
+ * `preview:forwardedShortcut` event payload — the 4 accelerators of §1.9, plus
+ * Back and Forward (issue #124, part 3 §3.7). Exactly the keys of
+ * `PREVIEW_FORWARDED_SHORTCUTS`; `previewInputForward.test.ts` compares them.
+ */
 export const PreviewForwardedShortcutSchema = z
   .object({
     panelId: PanelIdSchema,
-    key: z.enum(['f', 's', 'w', 'Escape']),
+    key: z.enum(['f', 's', 'w', 'Escape', 'back', 'forward']),
     accel: z.boolean()
   })
   .strict()
 export type PreviewForwardedShortcut = z.infer<typeof PreviewForwardedShortcutSchema>
 
 /**
- * Shared contract for the preload preview bridge (`window.api.preview`).
- *
- * Single source of truth consumed by both the preload implementation and the
- * renderer typing, mirroring {@link ClaudeStatusBridge}. `setBounds` /
- * `setVisibility` are fire-and-forget sends; the rest are invoke round-trips.
+ * The preload bridge contract lives in `preview-bridge-types.ts` since issue
+ * #124, because this file is at its size cap; re-exported so every existing
+ * import keeps its path.
  */
-export interface PreviewBridge {
-  /** Check whether a path may open as a running preview. */
-  checkEligibility(filePath: string): Promise<PreviewCheckEligibilityResponse>
-  /** Open a preview for a panel; may refuse when a preview is already live. */
-  open(req: PreviewOpenRequest): Promise<PreviewOpenResult>
-  /** Close and destroy the preview for a panel. */
-  close(panelId: string): Promise<void>
-  /** Update the native view bounds (fire-and-forget; stale seqs dropped). */
-  setBounds(
-    panelId: string,
-    bounds: PreviewBoundsPayload,
-    seq: number,
-    /** Ask for a `boundsApplied` confirmation; see {@link PreviewSetBoundsSchema}. */
-    options?: { ack?: boolean }
-  ): void
-  /** Update view visibility with a diagnostic reason (fire-and-forget). */
-  setVisibility(panelId: string, visible: boolean, reason: string): void
-  /** Reload the previewed page. */
-  reload(panelId: string, opts?: { ignoreCache?: boolean }): Promise<void>
-  /** Approve a remote host, writing back to the project allowlist. */
-  approveHost(panelId: string, host: string): Promise<PreviewApproveResult>
-  /** Start / advance an in-page find. */
-  find(req: PreviewFindRequest): Promise<void>
-  /** Stop the active in-page find. */
-  stopFind(panelId: string): Promise<void>
-  /** Export the live previewed page to PDF. */
-  exportPdf(panelId: string): Promise<PdfExportResult>
-  /** Subscribe to failure-log changes; returns an unsubscribe. */
-  onFailuresChanged(callback: (payload: PreviewFailureListPayload) => void): () => void
-  /** Subscribe to host-block events; returns an unsubscribe. */
-  onHostBlocked(callback: (payload: PreviewHostBlockedPayload) => void): () => void
-  /** Subscribe to applied visibility changes; returns an unsubscribe. */
-  onVisibilityApplied(
-    callback: (payload: PreviewVisibilityAppliedPayload) => void
-  ): () => void
-  /** Subscribe to the project's approved-host set; returns an unsubscribe. */
-  onAllowlistChanged(
-    callback: (payload: PreviewAllowlistChangedPayload) => void
-  ): () => void
-  /** Subscribe to in-page find results; returns an unsubscribe. */
-  onFindResult(callback: (result: PreviewFindResult) => void): () => void
-  /** Subscribe to still-frame changes; returns an unsubscribe. */
-  onStillFrameChanged(callback: (payload: PreviewStillFramePayload) => void): () => void
-  /** Subscribe to load-state changes; returns an unsubscribe. */
-  onLoadStateChanged(callback: (payload: PreviewLoadStatePayload) => void): () => void
-  /** Subscribe to backdrop-colour changes; returns an unsubscribe. */
-  onBackdropChanged(callback: (payload: PreviewBackdropPayload) => void): () => void
-  /** The page has repainted at the size a prior `ack` push asked about. */
-  onBoundsApplied(callback: (payload: PreviewBoundsAppliedPayload) => void): () => void
-  /** Subscribe to forwarded keyboard accelerators; returns an unsubscribe. */
-  onForwardedShortcut(callback: (payload: PreviewForwardedShortcut) => void): () => void
-  /**
-   * A link in a previewed page resolved to a project file. The renderer decides
-   * the panel kind and opens the tab (sd-074b §5.4).
-   */
-  onOpenFileRequested(callback: (payload: PreviewOpenFileRequestedPayload) => void): () => void
-}
+export type { PreviewBridge } from './preview-bridge-types'

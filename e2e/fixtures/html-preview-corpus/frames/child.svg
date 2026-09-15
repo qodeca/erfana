@@ -1,0 +1,6 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" role="img" aria-label="Frame child image">
+  <rect width="48" height="48" fill="#2b6cb0" />
+  <circle cx="24" cy="24" r="14" fill="#ffffff" />
+</svg>

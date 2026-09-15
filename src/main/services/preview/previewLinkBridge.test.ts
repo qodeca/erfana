@@ -64,7 +64,7 @@ function makeBridge(deps: SpiedDeps): PreviewLinkBridge {
 
 /** A well-formed payload from the preload. */
 function payload(href: string): unknown {
-  return { href, target: '', download: false }
+  return { href, target: '', download: false, button: 0 }
 }
 
 const EXTERNAL = 'https://example.com/docs'
@@ -263,5 +263,102 @@ describe('createPreviewLinkBridge — dispose', () => {
     await new Promise((r) => setImmediate(r))
     expect(deps.requestOpenFile).not.toHaveBeenCalled()
     expect(deps.openExternal).not.toHaveBeenCalled()
+  })
+})
+
+describe('createPreviewLinkBridge — the click button (issue #124)', () => {
+  /** Deps whose eligibility check says every page runs as a preview. */
+  function eligibleDeps(): SpiedDeps {
+    return { ...makeDeps(), runsAsPreview: vi.fn().mockResolvedValue(true), platform: 'darwin' }
+  }
+
+  /** The disposition handed to the renderer with the last open request. */
+  function lastDisposition(deps: SpiedDeps): unknown {
+    return deps.requestOpenFile.mock.calls.at(-1)?.[4]
+  }
+
+  it('carries the button to the link table: a middle click opens a new tab', async () => {
+    const deps = eligibleDeps()
+    makeBridge(deps).handleActivation({ ...(payload(IN_PROJECT) as object), button: 1 })
+
+    await vi.waitFor(() => expect(deps.requestOpenFile).toHaveBeenCalled())
+    expect(lastDisposition(deps)).toBe('new-tab')
+  })
+
+  it('leaves a primary click on a page that can stay to the tab’s mode', async () => {
+    const deps = eligibleDeps()
+    makeBridge(deps).handleActivation(payload(IN_PROJECT))
+
+    await vi.waitFor(() => expect(deps.requestOpenFile).toHaveBeenCalled())
+    expect(lastDisposition(deps)).toBe('by-mode')
+  })
+
+  it('treats a report without a button as a primary click', async () => {
+    const deps = eligibleDeps()
+    makeBridge(deps).handleActivation({ href: IN_PROJECT, target: '', download: false })
+
+    await vi.waitFor(() => expect(deps.requestOpenFile).toHaveBeenCalled())
+    expect(lastDisposition(deps)).toBe('by-mode')
+  })
+
+  it.each([-1, 5, 1.5, '1', null])(
+    'refuses button %s as a malformed message and routes nothing',
+    (button) => {
+      const deps = eligibleDeps()
+      makeBridge(deps).handleActivation({ ...(payload(IN_PROJECT) as object), button })
+
+      expect(deps.recordFailure).toHaveBeenCalledWith(
+        expect.objectContaining({ resourceUrlOrHost: '(malformed link message)' })
+      )
+      expect(deps.requestOpenFile).not.toHaveBeenCalled()
+    }
+  )
+
+  it('SECURITY INVARIANT: a will-navigate report opens a new tab even for a page that could stay', async () => {
+    const deps = eligibleDeps()
+    makeBridge(deps).handleWillNavigate(IN_PROJECT)
+
+    await vi.waitFor(() => expect(deps.requestOpenFile).toHaveBeenCalled())
+    expect(lastDisposition(deps)).toBe('new-tab')
+  })
+
+  it('opens every page in a new tab while no eligibility check is wired', async () => {
+    const deps = makeDeps()
+    makeBridge(deps).handleActivation(payload(IN_PROJECT))
+
+    await vi.waitFor(() => expect(deps.requestOpenFile).toHaveBeenCalled())
+    expect(lastDisposition(deps)).toBe('new-tab')
+  })
+})
+
+describe('createPreviewLinkBridge — the page on screen (issue #124, WI-17b)', () => {
+  it('reads the page on screen at every click, so a same-tab move changes what a scroll is', async () => {
+    const INDEX = `erfana-preview://${TOKEN}/index.html`
+    let onScreen = INDEX
+    const context: PreviewLinkContext = {
+      ...CONTEXT,
+      get currentUrl(): string {
+        return onScreen
+      }
+    }
+    const deps = makeDeps()
+    const bridge = createPreviewLinkBridge(context, deps)
+
+    // On index.html, a link to it is a scroll, which Chromium handles itself.
+    bridge.handleActivation(payload(`${INDEX}#top`))
+    await new Promise((r) => setImmediate(r))
+    expect(deps.requestOpenFile).not.toHaveBeenCalled()
+
+    // The tab moved to docs/a.html: the same link now opens index.html…
+    onScreen = IN_PROJECT
+    clock += 2_000
+    bridge.handleActivation(payload(`${INDEX}#top`))
+    await vi.waitFor(() => expect(deps.requestOpenFile).toHaveBeenCalledTimes(1))
+
+    // …and a link into docs/a.html is the scroll.
+    clock += 2_000
+    bridge.handleActivation(payload(`${IN_PROJECT}#faq`))
+    await new Promise((r) => setImmediate(r))
+    expect(deps.requestOpenFile).toHaveBeenCalledTimes(1)
   })
 })

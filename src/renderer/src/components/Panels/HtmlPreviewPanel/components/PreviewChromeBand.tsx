@@ -5,9 +5,10 @@
  *
  * TWO JOBS.
  *
- * 1. It is the preview's toolbar: Find on the left, the permission chip on the
- *    right, laid out and styled like `MarkdownToolbar` so the two previews in
- *    this app do not look like two different products.
+ * 1. It is the preview's toolbar: Back, the link-mode toggle and Find on the
+ *    left, the permission chip on the right, laid out and styled like
+ *    `MarkdownToolbar`. The tools either side of the chip come through two
+ *    slots (defaults: `PreviewToolbarTools.tsx`; the panel leads with Back).
  * 2. It is where a blocked remote host is approved. A permission decision
  *    outlives the message that raised it, so it belongs on the preview's own
  *    chrome rather than floating over an unrelated part of the app.
@@ -36,27 +37,28 @@
  * @see design/system/components/permission-band/index.html - status="decided"
  * @see design/product/html-approval/index.html - the nine-state journey
  */
-import { FileDown, Search } from 'lucide-react'
 import { useCallback, useEffect, useId, useMemo, useReducer, useRef } from 'react'
 
 import './PreviewChromeBand.css'
 
 import {
   INITIAL_BAND_STATE,
+  type BandRow,
   bandReducer,
   chipAccessibleName,
-  countsLabel,
   selectBandRows
 } from '../permissionBand.logic'
 import { PreviewBandConfirm } from './PreviewBandConfirm'
 import { PreviewBandRow } from './PreviewBandRow'
+import { PreviewFindTool, PreviewToolbarTools } from './PreviewToolbarTools'
+import type { PreviewFindToolProps, PreviewToolbarToolsProps } from './PreviewToolbarTools'
 import { ErrorCode } from '../../../../../../shared/errors'
 import { PREVIEW } from '../../../../../../shared/constants'
 import type { PreviewApproveResult } from '../../../../../../shared/ipc/preview-types'
 import type { PreviewBlockedHost } from '../../../../stores/usePreviewStore'
 
-/** Props for {@link PreviewChromeBand}. */
-export interface PreviewChromeBandProps {
+/** Props for {@link PreviewChromeBand}. The tool props feed the default slots only. */
+export interface PreviewChromeBandProps extends PreviewFindToolProps, PreviewToolbarToolsProps {
   /** Every host this panel has seen refused, in first-seen order. */
   readonly blockedHosts: readonly PreviewBlockedHost[]
   /** Hosts approved for this panel's PROJECT, mirrored from main. */
@@ -89,20 +91,41 @@ export interface PreviewChromeBandProps {
    */
   readonly controlsAllowed?: boolean
   /**
-   * Open find-in-page. Optional only so the band can be rendered in isolation by
-   * tests and by the design cards; the panel always supplies it, and the button
-   * is not rendered without it rather than rendering a control that does nothing.
+   * What leads the bar, before the spacer. Left `undefined` it is
+   * {@link PreviewFindTool} built from `onFind`; `null` empties the slot.
    */
-  readonly onFind?: () => void
-  /** Export the previewed page to PDF. Optional for the same reason as `onFind`. */
-  readonly onExportPdf?: () => void
-  /** An export is in flight — the button is disabled so a second click cannot
-   * open a second save dialog behind the first. */
-  readonly exportingPdf?: boolean
+  readonly leadingTools?: React.ReactNode
+  /**
+   * What follows the chip. Left `undefined` it is {@link PreviewToolbarTools}
+   * built from the export and open-in-browser props; `null` empties the slot.
+   */
+  readonly trailingTools?: React.ReactNode
   /** Approve one host. Resolves with the IPC result — the band renders failure. */
   readonly onApprove: (host: string) => Promise<PreviewApproveResult>
   /** The list opened or closed, so the panel can re-measure. */
   readonly onExpandedChange?: (expanded: boolean) => void
+  /**
+   * Filled with a function that collapses the host list – focus inside it
+   * moves to the chip – for the panel to call when the tab moves to another
+   * page, whose hosts these were not (UX spec #124 §1.6). Emptied on unmount.
+   */
+  readonly collapseRef?: React.MutableRefObject<(() => void) | null>
+}
+
+/** A row with nothing to act on: allowed already, or with no Allow button to offer. */
+function renderSettledRow(row: BandRow): React.JSX.Element {
+  return (
+    <PreviewBandRow
+      key={row.host}
+      row={row}
+      failureText={null}
+      confirming={false}
+      confirmId={null}
+      isRovingTarget={false}
+      allowRef={undefined}
+      onAllow={() => {}}
+    />
+  )
 }
 
 export function PreviewChromeBand({
@@ -115,9 +138,22 @@ export function PreviewChromeBand({
   onFind,
   onExportPdf,
   exportingPdf = false,
+  onOpenInBrowser,
+  openingInBrowser = false,
+  // A default applies to `undefined` only, so a caller can pass `null` to empty a slot.
+  leadingTools = <PreviewFindTool onFind={onFind} />,
+  trailingTools = (
+    <PreviewToolbarTools
+      onExportPdf={onExportPdf}
+      exportingPdf={exportingPdf}
+      onOpenInBrowser={onOpenInBrowser}
+      openingInBrowser={openingInBrowser}
+    />
+  ),
   onApprove,
   approveDeadlineMs = PREVIEW.APPROVE_UI_DEADLINE_MS,
-  onExpandedChange
+  onExpandedChange,
+  collapseRef
 }: PreviewChromeBandProps): React.JSX.Element {
   const [state, dispatch] = useReducer(bandReducer, INITIAL_BAND_STATE)
   const listId = useId()
@@ -164,6 +200,18 @@ export function PreviewChromeBand({
   useEffect(() => {
     onExpandedChange?.(state.expanded)
   }, [state.expanded, onExpandedChange])
+
+  useEffect(() => {
+    if (!collapseRef) return
+    collapseRef.current = () => {
+      const hadFocus = scrollRef.current?.contains(document.activeElement) ?? false
+      dispatch({ type: 'collapse' })
+      if (hadFocus) chip.current?.focus()
+    }
+    return () => {
+      collapseRef.current = null
+    }
+  }, [collapseRef, chip])
 
   /*
    * Opening with the keyboard moves focus to the first Allow; opening with the
@@ -285,29 +333,7 @@ export function PreviewChromeBand({
       </div>
 
       <div className="erf-band__bar" role="toolbar" aria-label="Preview">
-        {/*
-          Find, matching MarkdownToolbar's search button exactly — same icon at
-          the same size, same accessible name, same shortcut in the tooltip. The
-          find bar itself is shared: both panels open the same `SearchBar`, this
-          one over a Chromium `findInPage` provider.
-
-          The keyboard route existed long before this button did. Cmd/Ctrl+F has
-          always worked here, including while focus is inside the native view,
-          which swallows renderer keys and needs the accelerator forwarded. The
-          button only makes a working feature discoverable.
-        */}
-        {onFind !== undefined && (
-          <button
-            type="button"
-            className="erf-band__tool"
-            aria-label="Find"
-            title="Find (Cmd/Ctrl+F)"
-            data-testid="preview-band-find"
-            onClick={onFind}
-          >
-            <Search size={16} strokeWidth={2} aria-hidden="true" />
-          </button>
-        )}
+        {leadingTools}
         <span className="erf-band__spacer" />
         <button
           ref={chip}
@@ -324,43 +350,18 @@ export function PreviewChromeBand({
             dispatch({ type: 'toggle', byKeyboard: event.detail === 0 })
           }}
         >
-          <span>{countsLabel(rows.counts)}</span>
+          {/* `countsLabel`, in two parts: a compact band hides the tail
+              (PreviewNavControls.css), and what stays visible is still the
+              start of the accessible name (SC 2.5.3). */}
+          <span>
+            {rows.counts.blocked} blocked
+            <span className="erf-band__chip-allowed"> · {rows.counts.allowed} allowed</span>
+          </span>
           <span className="erf-band__chip-caret" aria-hidden="true">
             {state.expanded ? '▾' : '▸'}
           </span>
         </button>
-
-        {/*
-          Export to PDF, LAST and behind a rule — the same position, separator
-          and button `MarkdownToolbar` gives it, so the two previews in this app
-          put the same control in the same corner.
-
-          It lived on the TAB's context menu because the panel surface is painted
-          over by the native view and the tab was the only chrome that survived.
-          This bar is that chrome now, so an export nobody could find behind a
-          right-click is an ordinary button again.
-
-          The rule is not decoration: everything to its left is about THIS PAGE —
-          find inside it, what it was blocked from reaching — and the export is
-          the one control that writes a file somewhere else. Grouping is what the
-          separator is for.
-        */}
-        {onExportPdf !== undefined && (
-          <>
-            <span className="erf-band__separator" aria-hidden="true" />
-            <button
-              type="button"
-              className="erf-band__tool"
-              aria-label="Export to PDF"
-              title="Export to PDF"
-              data-testid="preview-band-export-pdf"
-              disabled={exportingPdf}
-              onClick={onExportPdf}
-            >
-              <FileDown size={16} strokeWidth={2} aria-hidden="true" />
-            </button>
-          </>
-        )}
+        {trailingTools}
       </div>
 
       {/*
@@ -423,18 +424,7 @@ export function PreviewChromeBand({
           {visibleAllowed.length > 0 && (
             <div className="erf-band__section">Allowed in this project</div>
           )}
-          {visibleAllowed.map(row => (
-            <PreviewBandRow
-              key={row.host}
-              row={row}
-              failureText={null}
-              confirming={false}
-              confirmId={null}
-              isRovingTarget={false}
-              allowRef={undefined}
-              onAllow={() => {}}
-            />
-          ))}
+          {visibleAllowed.map(renderSettledRow)}
 
           {/*
             LAST, and behind its own heading. These are blocked too, but there is
@@ -449,18 +439,7 @@ export function PreviewChromeBand({
           {visibleUnapprovable.length > 0 && (
             <div className="erf-band__section">Cannot be allowed</div>
           )}
-          {visibleUnapprovable.map(row => (
-            <PreviewBandRow
-              key={row.host}
-              row={row}
-              failureText={null}
-              confirming={false}
-              confirmId={null}
-              isRovingTarget={false}
-              allowRef={undefined}
-              onAllow={() => {}}
-            />
-          ))}
+          {visibleUnapprovable.map(renderSettledRow)}
 
           {rows.blocked.length === 0 &&
             rows.allowed.length === 0 &&

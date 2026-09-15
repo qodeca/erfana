@@ -22,6 +22,7 @@ import { AppError, ErrorCode } from '../../../shared/errors'
 import type { IPreviewViewService } from '../../services/preview/PreviewViewService'
 import type { IPreviewAllowlistStore } from '../../services/preview/PreviewAllowlistStore'
 import { logger } from '../../services/LoggingService'
+import { redactedLogError } from '../../utils/redactUserInput'
 import { TimeoutError, withTimeout } from '../../utils/withTimeout'
 import { PREVIEW } from '../../../shared/constants'
 import { registerHandle, unregisterHandle } from '../registry'
@@ -46,10 +47,9 @@ export function registerPreviewAllowlistHandlers(
   registerHandle(
     PreviewChannels.APPROVE_HOST,
     async (event, arg: unknown): Promise<PreviewApproveResult> => {
+      // No sender URL in the line: main's drop lines carry fixed fields only.
       if (!isTrustedSender(event)) {
-        logger.warn('Rejected preview:approveHost from untrusted sender', {
-          url: event.senderFrame?.url
-        })
+        logger.warn('Rejected preview:approveHost from untrusted sender')
         return { ok: false, errorCode: ErrorCode.UNKNOWN_ERROR }
       }
       const parsed = PreviewApproveHostRequestSchema.safeParse(arg)
@@ -85,10 +85,7 @@ export function registerPreviewAllowlistHandlers(
         return { ok: true, hosts: origins }
       } catch (error) {
         const errorCode = error instanceof AppError ? error.code : ErrorCode.UNKNOWN_ERROR
-        logger.error(
-          'preview:approveHost failed',
-          error instanceof Error ? error : undefined
-        )
+        logger.error('preview:approveHost failed', redactedLogError(error))
         return { ok: false, errorCode }
       }
     }

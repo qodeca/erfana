@@ -8,7 +8,7 @@
  */
 
 /** Dialog type discriminator */
-export type DialogType = 'confirm' | 'prompt' | 'alert' | 'custom' | 'rename' | 'newFile' | 'newFolder' | 'dropMode' | 'conflict'
+export type DialogType = 'confirm' | 'prompt' | 'alert' | 'custom' | 'rename' | 'newFile' | 'newFolder' | 'dropMode' | 'conflict' | 'unsavedChanges'
 
 /**
  * Mode for handling dropped external files
@@ -61,6 +61,31 @@ export interface ConflictDialogResult {
   /** How to resolve the conflict */
   resolution: 'replace' | 'keepBoth'
 }
+
+/**
+ * Configuration for the unsaved-changes prompt (issue #124, part 3 §3.6).
+ *
+ * Shown when showing a page in a preview tab would close another tab that has
+ * unsaved edits to that page.
+ */
+export interface UnsavedChangesDialogConfig {
+  /** Unique identifier (auto-generated if not provided) */
+  id?: string
+  /** File name of the page, shown in the title and body (e.g. `pricing.html`) */
+  fileName: string
+  /**
+   * `save` offers Save / Don't save / Cancel. `conflict` is for a tab whose
+   * file changed on disk: Save would overwrite the newer file, so only
+   * "Discard my changes" and Cancel are offered.
+   */
+  variant: 'save' | 'conflict'
+}
+
+/**
+ * Answer from the unsaved-changes prompt. `discard` is both "Don't save" and
+ * "Discard my changes"; Escape, a dismissal and a provider unmount are `cancel`.
+ */
+export type UnsavedChangesDialogResult = 'save' | 'discard' | 'cancel'
 
 /**
  * Base configuration shared by all dialog types
@@ -209,6 +234,7 @@ export type DialogConfig =
   | NewFolderDialogConfig
   | DropModeDialogConfig
   | ConflictDialogConfig
+  | UnsavedChangesDialogConfig
 
 // Internal dialog state (used by DialogContext)
 // Uses unknown for resolve/reject to support all dialog types (contravariance)
@@ -236,6 +262,13 @@ export interface DialogContextType {
   showNewFolder: (config: Omit<NewFolderDialogConfig, 'id'>) => Promise<string | null>
   showDropMode: (config: Omit<DropModeDialogConfig, 'id'>) => Promise<DropModeDialogResult | null>
   showConflict: (config: Omit<ConflictDialogConfig, 'id'>) => Promise<ConflictDialogResult | null>
+  /**
+   * Ask what to do with another tab's unsaved edits. Never rejects: Escape, a
+   * dismissal and the provider unmounting all resolve `'cancel'`.
+   */
+  showUnsavedChanges: (
+    config: Omit<UnsavedChangesDialogConfig, 'id'>
+  ) => Promise<UnsavedChangesDialogResult>
   closeDialog: (id: string) => void
   closeAll: () => void
 }

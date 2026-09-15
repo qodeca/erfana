@@ -20,6 +20,13 @@
  * cannot clip it. Grouping and the blocked-host extraction are pure
  * (`htmlPreview.logic.ts`); this component is presentation + open/close state.
  *
+ * Entries are shown exactly as main wrote them. For refused frames (issue #124,
+ * part 2 §2.12) an entry is sometimes a finished sentence rather than an
+ * address – the `srcdoc` and "too many frames" texts come from
+ * `src/shared/previewFrameBadgeText.ts`, written main-side – so this component
+ * never builds, shortens or rewrites entry text. The value is page-influenced,
+ * so it is rendered only as a React text node, never as markup.
+ *
  * @module HtmlPreviewPanel/components/PreviewFailureBadge
  */
 

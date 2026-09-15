@@ -4,7 +4,7 @@
  * Preload preview bridge (Issue #74, work item 49; design §4).
  *
  * The whole `window.api.preview` surface in its own module, typed as
- * {@link PreviewBridge} (the shared contract in `preview-schema.ts`). `setBounds`
+ * {@link PreviewBridge} (the shared contract in `preview-bridge-types.ts`). `setBounds`
  * / `setVisibility` are fire-and-forget `send`s (high-frequency, no round-trip);
  * the rest are `invoke` round-trips. Event subscriptions wrap the callback so the
  * returned unsubscribe removes the SAME listener reference (identity never
@@ -15,8 +15,13 @@
  */
 import { ipcRenderer } from 'electron'
 import { PreviewChannels, PreviewEvents } from '../shared/ipc/preview-channels'
+import type { PreviewBridge } from '../shared/ipc/preview-bridge-types'
 import type {
-  PreviewBridge,
+  PreviewNavigateRequest,
+  PreviewPageChangedPayload,
+  PreviewResizeHoldPayload
+} from '../shared/ipc/preview-navigation-schema'
+import type {
   PreviewBoundsPayload,
   PreviewCheckEligibilityResponse,
   PreviewFailureListPayload,
@@ -36,6 +41,8 @@ import type {
   PdfExportResult,
   PreviewApproveResult,
   PreviewFindResult,
+  PreviewFocusPageResult,
+  PreviewNavigateResult,
   PreviewOpenResult
 } from '../shared/ipc/preview-types'
 
@@ -61,14 +68,18 @@ export const previewBridge: PreviewBridge = {
     panelId: string,
     bounds: PreviewBoundsPayload,
     seq: number,
-    options?: { ack?: boolean }
+    options?: { ack?: boolean; settled?: boolean }
   ): void =>
-    // `ack` is omitted rather than sent as `false` so a steady-state push stays
-    // byte-identical to what it was before the flag existed.
-    ipcRenderer.send(
-      PreviewChannels.SET_BOUNDS,
-      options?.ack === true ? { panelId, bounds, seq, ack: true } : { panelId, bounds, seq }
-    ),
+    // `ack` and `settled` are omitted rather than sent as `false` so a
+    // steady-state push stays byte-identical to what it was before either flag
+    // existed.
+    ipcRenderer.send(PreviewChannels.SET_BOUNDS, {
+      panelId,
+      bounds,
+      seq,
+      ...(options?.ack === true ? { ack: true } : {}),
+      ...(options?.settled === true ? { settled: true } : {})
+    }),
 
   setVisibility: (panelId: string, visible: boolean, reason: string): void =>
     ipcRenderer.send(PreviewChannels.SET_VISIBILITY, { panelId, visible, reason }),
@@ -90,6 +101,12 @@ export const previewBridge: PreviewBridge = {
 
   exportPdf: (panelId: string): Promise<PdfExportResult> =>
     ipcRenderer.invoke(PreviewChannels.EXPORT_PDF, { panelId }),
+
+  navigate: (req: PreviewNavigateRequest): Promise<PreviewNavigateResult> =>
+    ipcRenderer.invoke(PreviewChannels.NAVIGATE, req),
+
+  focusPage: (panelId: string): Promise<PreviewFocusPageResult> =>
+    ipcRenderer.invoke(PreviewChannels.FOCUS_PAGE, { panelId }),
 
   onFailuresChanged: (callback: (payload: PreviewFailureListPayload) => void): (() => void) =>
     subscribe(PreviewEvents.FAILURES_CHANGED, callback),
@@ -125,5 +142,11 @@ export const previewBridge: PreviewBridge = {
 
   onOpenFileRequested: (
     callback: (payload: PreviewOpenFileRequestedPayload) => void
-  ): (() => void) => subscribe(PreviewEvents.OPEN_FILE_REQUESTED, callback)
+  ): (() => void) => subscribe(PreviewEvents.OPEN_FILE_REQUESTED, callback),
+
+  onPageChanged: (callback: (payload: PreviewPageChangedPayload) => void): (() => void) =>
+    subscribe(PreviewEvents.PAGE_CHANGED, callback),
+
+  onResizeHold: (callback: (payload: PreviewResizeHoldPayload) => void): (() => void) =>
+    subscribe(PreviewEvents.RESIZE_HOLD, callback)
 }

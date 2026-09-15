@@ -1,0 +1,34 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<!--
+  The frame of cdn.html (P2-AC2). Reports to its parent whether its remote
+  script loaded ('loaded') or was refused ('blocked'). The e2e points the script
+  at a loopback server so the approval can complete offline.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>CDN frame child</title>
+    <script>
+      function report(state) {
+        parent.postMessage({ kind: 'remote', state }, '*')
+      }
+      // A look-alike of Chromium's CSP console line, printed by the frame itself. It
+      // names a host nothing requests and must never become a band row.
+      console.log(
+        "Loading the script 'https://console-lookalike.example/x.js' violates the following Content Security Policy directive: \"script-src 'none'\"."
+      )
+      // A fetch inside the frame: refused by connect-src, listed as a network request.
+      fetch('https://fetch.example.com/data.json').catch(() => {})
+    </script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"
+      onload="report('loaded')"
+      onerror="report('blocked')"
+    ></script>
+  </head>
+  <body>
+    <p>This frame loads one remote script from a CDN host.</p>
+  </body>
+</html>

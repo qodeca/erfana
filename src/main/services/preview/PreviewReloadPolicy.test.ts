@@ -4,7 +4,8 @@
  * Tests for the reload-policy classify + coalesce (Issue #74, work item 32).
  *
  * classify: `.css` (single file) ⇒ swap; HTML/JS/other ⇒ reload; mixed/multi
- * burst ⇒ reload. coalesce: a burst of `record` calls collapses to one decision.
+ * burst ⇒ reload; a `.css` a frame uses too ⇒ reload (issue #124, WI-15).
+ * coalesce: a burst of `record` calls collapses to one decision.
  */
 import { describe, it, expect, vi } from 'vitest'
 import {
@@ -44,6 +45,32 @@ describe('classifyReload', () => {
 
   it('reloads on a multi-css burst (cannot swap two sheets)', () => {
     expect(classifyReload(['a.css', 'b.css'])).toEqual({ action: 'reload' })
+  })
+})
+
+describe('classifyReload — frame assets (issue #124, WI-15)', () => {
+  const FRAME_ASSETS: ReadonlySet<string> = new Set(['/proj/shared.css', '/proj/frame.html'])
+
+  it('reloads a single .css change that a frame uses too', () => {
+    expect(classifyReload(['/proj/shared.css'], FRAME_ASSETS)).toEqual({ action: 'reload' })
+  })
+
+  it('still swaps a single .css change no frame uses', () => {
+    expect(classifyReload(['/proj/top.css'], FRAME_ASSETS)).toEqual({
+      action: 'swap',
+      changedPath: '/proj/top.css'
+    })
+  })
+
+  it('reloads a frame document change, as any HTML change', () => {
+    expect(classifyReload(['/proj/frame.html'], FRAME_ASSETS)).toEqual({ action: 'reload' })
+  })
+
+  it('swaps as before when the page has no frame assets', () => {
+    expect(classifyReload(['/proj/shared.css'], new Set())).toEqual({
+      action: 'swap',
+      changedPath: '/proj/shared.css'
+    })
   })
 })
 

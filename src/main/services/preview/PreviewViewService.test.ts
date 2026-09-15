@@ -170,7 +170,6 @@ function makeFakeWc(): FakeWc {
 /** A fake failure log capturing its records. */
 function makeFailureLog(): IPreviewFailureLog & {
   records: PreviewFailureInput[]
-  clear: ReturnType<typeof vi.fn<() => void>>
   drop: ReturnType<typeof vi.fn<() => void>>
 } {
   const records: PreviewFailureInput[] = []
@@ -180,7 +179,6 @@ function makeFailureLog(): IPreviewFailureLog & {
       records.push(input)
     }),
     list: vi.fn<() => never[]>(() => []),
-    clear: vi.fn<() => void>(),
     drop: vi.fn<() => void>()
   }
 }
@@ -676,8 +674,8 @@ describe('PreviewViewService — page zoom', () => {
 
   /**
    * The other half, which nothing asserted: a closed tab must not leave its zoom
-   * behind. `zoomLevels` was written on every `setZoom` and deleted nowhere, so
-   * it grew for every file previewed in a session, across project switches.
+   * behind. The zoom map (`previewPanelState.ts`) was written on every `setZoom`
+   * and deleted nowhere, so it grew for every file previewed, across project switches.
    */
   it('forgets a panel zoom once the tab is closed', async () => {
     const h = makeHarness()
@@ -945,7 +943,7 @@ describe('PreviewViewService — bounded destroy', () => {
 })
 
 describe('PreviewViewService — applyApprovedHosts', () => {
-  it('rebuilds the CSP, purges, clears failures and reloads ignoring cache', async () => {
+  it('rebuilds the CSP, purges and reloads through startPageLoad: the log is replaced, not cleared', async () => {
     const h = makeHarness()
     await h.service.open(REQUEST_A, h.window)
     const log = h.failureLog()
@@ -954,7 +952,7 @@ describe('PreviewViewService — applyApprovedHosts', () => {
 
     expect(h.rebuildCsp).toHaveBeenCalledWith(h.token, ['cdn.example.com'])
     expect(h.purge).toHaveBeenCalledWith(h.session.session)
-    expect(log.clear).toHaveBeenCalledTimes(1)
+    expect(h.failureLog()).not.toBe(log) // the reload's pending page has its own log
     expect(h.factory.reloadIgnoringCache).toHaveBeenCalledTimes(1)
   })
 
@@ -1573,7 +1571,7 @@ describe('PreviewViewService — live-view budget', () => {
   /**
    * The worse half of the same fault, and the one the `try/catch` above missed.
    *
-   * `teardown` can reject too — `disposeCollaborators` is guarded, but the
+   * `teardown` can reject too — `teardownCollaborators` is guarded, but the
    * `.finally` that calls `wc.destroy()` is not. By then the registry entry is
    * gone, so `close()` cannot reach the view; if `'suspended'` never arrives the
    * renderer's `loadState` stays `'ready'` and its resume effect never fires,
@@ -1601,12 +1599,11 @@ describe('PreviewViewService — live-view budget', () => {
   /**
    * And the caller must not wear it either.
    *
-   * `enforceLiveViewBudget` runs AFTER this panel is installed and loaded, so a
-   * failure while tidying up someone else's view used to come back as
-   * `{ ok: false, UNKNOWN_ERROR }`. The renderer then took its `openFailed`
+   * The budget (`previewViewEviction.ts`) runs AFTER this panel is installed and
+   * loaded, so a failure while tidying up someone else's view used to come back
+   * as `{ ok: false, UNKNOWN_ERROR }`. The renderer then took its `openFailed`
    * branch — which does not send `preview:close` — so a live, visible
-   * `WebContentsView` went on painting over a panel whose renderer believed the
-   * open had failed.
+   * `WebContentsView` went on painting over a panel whose renderer believed the open had failed.
    */
   it('does not fail an open because housekeeping for another panel threw', async () => {
     const h = makeHarness()
@@ -2031,10 +2028,9 @@ describe('PreviewViewService — every blocked host reaches the renderer', () =>
   })
 
   it('gives a hostname its budget back when an approval reloads the page', async () => {
-    // Same reasoning as the dedupe clear beside it: the reload refuses
-    // everything again, so a sub-cap ledger that outlived it would bar a
-    // hostname from ever being reported once it had spent its five — which is
-    // the swallowing defect `applyApprovedHosts` clears the ledger to prevent.
+    // Same reasoning as the dedupe reset beside it: a sub-cap ledger that outlived
+    // the reload would bar a hostname that spent its five from ever reporting
+    // again. The reload's new page (WI-29) brings a fresh ledger when it commits.
     const h = makeHarness()
     const onBlocked = await blockedSink(h)
     h.hostBlocked.mockClear()
@@ -2045,6 +2041,7 @@ describe('PreviewViewService — every blocked host reaches the renderer', () =>
     expect(h.hostBlocked).toHaveBeenCalledTimes(PREVIEW.MAX_BLOCKED_ORIGINS_PER_HOST)
 
     await h.service.applyApprovedHosts('panel-A', ['https://other.example.com'])
+    h.factory.emit('did-navigate', {}, `erfana-preview://${h.token}/page.html`, 200, 'OK')
     onBlocked('blocked-host', 'https://cdn.example.com:9999', 'https://cdn.example.com/a.js', true, 'script')
 
     expect(h.hostBlocked).toHaveBeenCalledTimes(PREVIEW.MAX_BLOCKED_ORIGINS_PER_HOST + 1)
@@ -2058,7 +2055,7 @@ describe('PreviewViewService — a CSP refusal survives an approval', () => {
    *
    * Goes through the real `wc.ipc` channel rather than the bridge's API, so
    * these cases cover the WIRING — preload channel → main-frame gate → bridge →
-   * `onBlockedHost` → `hostBlocked` — and not just the bridge in isolation.
+   * the page scope's `reportBlocked` → `hostBlocked` — and not just the bridge in isolation.
    */
   function refuse(
     h: ReturnType<typeof makeHarness>,
@@ -2110,8 +2107,8 @@ describe('PreviewViewService — a CSP refusal survives an approval', () => {
 
     h.hostBlocked.mockClear()
     await h.service.applyApprovedHosts('panel-A', ['https://a.example.com'])
-
-    // The reload replays the page, so the CSP refuses B and C all over again.
+    // The reload commits, and its new page's CSP refuses B and C all over again.
+    h.factory.emit('did-navigate', {}, `erfana-preview://${h.token}/page.html`, 200, 'OK')
     refuse(h, 'https://b.example.com/2.png')
     refuse(h, 'https://c.example.com/3.png')
 
