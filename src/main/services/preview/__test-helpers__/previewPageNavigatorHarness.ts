@@ -18,7 +18,7 @@ import { createPreviewPageNavigator, type PreviewNativeHistory } from '../previe
 import { createTabHistory, pushEntry, type PreviewTabHistory } from '../previewTabHistory'
 import { buildPreviewUrl } from '../previewUrl'
 
-export const TOKEN = '0123456789abcdef0123456789abcdef'
+export const TOKEN = '0123456789abcdef0123456789abcdef' // gitleaks:allow
 export const PANEL_ID = 'panel-A'
 export const ROOT = '/proj'
 export const A = '/proj/a.html'

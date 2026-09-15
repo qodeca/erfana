@@ -12,8 +12,8 @@ import { describe, it, expect, vi } from 'vitest'
 import { buildPreviewCsp, type PreviewCspOptions } from './previewCsp'
 
 /** A root token of the shape `PreviewRootRegistry` mints. */
-const TOKEN = '0123456789abcdef0123456789abcdef'
-const OTHER_TOKEN = 'fedcba9876543210fedcba9876543210'
+const TOKEN = '0123456789abcdef0123456789abcdef' // gitleaks:allow
+const OTHER_TOKEN = 'fedcba9876543210fedcba9876543210' // gitleaks:allow
 const OPTIONS: PreviewCspOptions = { ownToken: TOKEN }
 
 /** The policy's directives named `name`, each as written. */

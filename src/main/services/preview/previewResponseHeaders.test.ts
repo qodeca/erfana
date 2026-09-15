@@ -16,7 +16,7 @@ import { buildPreviewCsp } from './previewCsp'
 
 const VALID_CSP = "default-src 'none'; script-src erfana-preview:; sandbox allow-scripts"
 /** A root token of the shape the registry mints (issue #124 WI-13). */
-const TOKEN = '0123456789abcdef0123456789abcdef'
+const TOKEN = '0123456789abcdef0123456789abcdef' // gitleaks:allow
 
 describe('mimeForExtension', () => {
   it.each([

@@ -31,6 +31,12 @@ const MIXED_DOCUMENT = `<html>
  * milliseconds.
  */
 const DEEP_NESTING = 10_000
+/**
+ * parse5 is quadratic in nesting depth, so this one test is slow on a loaded
+ * CI runner with coverage on (over 5 s seen on Linux). The budget is for the
+ * parse, not the walk under test.
+ */
+const DEEP_NESTING_TIMEOUT_MS = 30_000
 
 describe('extractStaticLinks', () => {
   it('collects <link href>', () => {
@@ -128,7 +134,7 @@ describe('extractStaticLinks', () => {
   it(`walks a ${DEEP_NESTING}-deep nest without overflowing the stack`, () => {
     const html = `${'<div>'.repeat(DEEP_NESTING)}<img src="a.png">`
     expect(extractStaticLinks(html)).toEqual(['a.png'])
-  })
+  }, DEEP_NESTING_TIMEOUT_MS)
 })
 
 /** Frame `src` values that name no project file, as `[label, src]`. */

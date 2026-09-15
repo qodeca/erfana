@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 import { buildPreviewUrl, samePreviewDocument, toProjectPath } from './previewUrl'
 
-const TOKEN = '0123456789abcdef0123456789abcdef'
+const TOKEN = '0123456789abcdef0123456789abcdef' // gitleaks:allow
 
 describe('buildPreviewUrl', () => {
   it('serves a file at the root under the token host', () => {

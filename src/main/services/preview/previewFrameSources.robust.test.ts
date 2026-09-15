@@ -34,6 +34,8 @@ const PAGE = resolve(SITE, 'index.html')
 
 /** Nesting that overflowed the old recursive walk; see `linkExtract.test.ts`. */
 const DEEP_NESTING = 10_000
+/** parse5 is quadratic in depth: slow on a loaded CI runner with coverage on. */
+const DEEP_NESTING_TIMEOUT_MS = 30_000
 
 /** A stack overflow whose message names a path, which must not reach the log. */
 const OVERFLOW = new RangeError(`Maximum call stack size exceeded in ${PAGE}`)
@@ -100,7 +102,7 @@ describe('collectPreviewFrameSources – a document the extractor throws on', ()
 
     expect(result.candidates).toEqual([at('a.png')])
     expect(vi.mocked(logger.warn)).not.toHaveBeenCalled()
-  })
+  }, DEEP_NESTING_TIMEOUT_MS)
 
   it('resolves with no candidates when the page itself cannot be scanned', async () => {
     const entry = '<img src="a.png"><iframe src="child.html"></iframe>'

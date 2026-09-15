@@ -45,7 +45,7 @@ vi.mock('../LoggingService', () => ({
   }
 }))
 
-const TOKEN = '0123456789abcdef0123456789abcdef'
+const TOKEN = '0123456789abcdef0123456789abcdef' // gitleaks:allow
 const PANEL = 'panel-A'
 /** The project as the user opened it – through a link – and the folder it resolves to. */
 const LINKED = join('/', 'links', 'site')

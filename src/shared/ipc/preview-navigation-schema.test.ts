@@ -97,7 +97,7 @@ describe('preview:navigate request', () => {
   it('is strict: the renderer never supplies a URL, a token or a project root', () => {
     for (const extra of [
       { url: 'erfana-preview://0123456789abcdef0123456789abcdef/pricing.html' },
-      { token: '0123456789abcdef0123456789abcdef' },
+      { token: '0123456789abcdef0123456789abcdef' }, // gitleaks:allow
       { projectPath: '/project' }
     ]) {
       expect(accepts(PreviewNavigateRequestSchema, openRequest(extra))).toBe(false)

@@ -22,7 +22,7 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-const TOKEN = '0123456789abcdef0123456789abcdef'
+const TOKEN = '0123456789abcdef0123456789abcdef' // gitleaks:allow
 const PAGE_A = '/proj/a.html'
 const PAGE_B = '/proj/b.html'
 const PAGE_C = '/proj/c.html'
