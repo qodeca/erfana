@@ -147,24 +147,26 @@ test.describe('HTML preview corpus', () => {
       .toBe('Error corpus page')
     expect((await preview.snapshot())?.destroyed).toBe(false)
 
-    // The failure badge collects the page's load-time diagnostics. Verified
-    // behaviour: the uncaught script error and the unresolved bare-module import
-    // both register. Note: the README's third sentinel (an `unsupported-asset-type`
-    // badge for `data.unknownext`) does NOT fire here — the file IS served (200,
-    // octet-stream), but the badge needs the request `destination` to be
-    // `style`/`script`, which Chromium does not populate for a privileged
-    // custom-scheme subresource in this build, so that diagnostic never records.
+    // The failure badge collects all three of the page's load-time diagnostics:
+    // the uncaught script error, the unresolved bare-module import, and an
+    // `unsupported-asset-type` entry for `data.unknownext` (served 200 as
+    // octet-stream to a stylesheet request). The third fires since #124 (WI-12):
+    // the request kind now comes from the session's request-kind ledger, fed by
+    // `webRequest`, instead of a `destination` / `sec-fetch-dest` Chromium never
+    // set for this custom scheme.
     await expect
       .poll(() => preview.failureBadgeCount(), {
         timeout: PREVIEW_BUDGET_MS,
-        message: 'failure badge never reached the expected ≥2 diagnostics'
+        message: 'failure badge never reached the expected ≥3 diagnostics'
       })
-      .toBeGreaterThanOrEqual(2)
+      .toBeGreaterThanOrEqual(3)
 
-    // Both diagnostics name their cause in the popover.
+    // Each diagnostic names its cause in the popover.
     const entries = await preview.failureBadgeEntries()
     expect(entries).toContain('deliberate uncaught script error')
     expect(entries).toContain('nonexistent-package')
+    expect(entries).toContain('Unsupported asset type')
+    expect(entries).toContain('data.unknownext')
   })
 
   test('cdn: an unapproved remote subresource is blocked and the page degrades gracefully (AC7)', async ({

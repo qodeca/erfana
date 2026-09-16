@@ -375,7 +375,7 @@ The Phase 2 plan (#161 step 4) called for "IPC serialization verification" of `A
 ### Cost when promoted
 
 ~30 minutes (only if D4 is itself deferred indefinitely):
-- Write `docs/adrs/0001-ipc-error-marker-vs-structured.md` documenting:
+- Write an ADR under `docs/adrs/` (number 0001 is taken; use the next free number, 0005 at the time of writing), for example `docs/adrs/0005-ipc-error-marker-vs-structured.md`, documenting:
   - The two options considered
   - Why marker-constant was chosen (smaller blast radius, preserves existing handler shape)
   - Promotion criteria for switching to structured errors (mirrors D4's criteria)
@@ -397,7 +397,7 @@ The Phase 2 plan (#161 step 4) called for "IPC serialization verification" of `A
 ### What is NOT in this list
 
 - **Phase 1 manual UAT** — tracked under `#154`, separate from review findings
-- **#158 v8 coverage race** — pre-existing, tracked separately, deferred to Phase 6
+- **#158 v8 coverage race** — pre-existing, tracked separately, deferred to Phase 6. **Superseded 2026-09-04**: the aggregator race is not the cause. Two per-file coverage floors miss on Windows because the win32-skipped symlink cases never execute — see [`known-flakes.md` § `npm run test:cov` cannot pass on a Windows host](known-flakes.md#npm-run-testcov-cannot-pass-on-a-windows-host). Confirmed by direct measurement on 2026-09-15: `scripts/fuses.js` and `src/main/utils/tarArchive.ts` are the only misses.
 - **Phase 0–1 documentation drift** — already addressed in `docs/windows/implementation-plan.md` updates
 
 ### Triage cadence

@@ -7,8 +7,8 @@ name: E2E Tests
 # Background + remediation tracking: docs/ci.md § Visual regression on CI.
 # Re-enable when stable:  gh workflow enable "E2E Tests"
 #
-# Re-enable strategy (Phase G of the test-infrastructure plan,
-# C:\Users\marcinobel\.claude\plans\synchronous-napping-rain.md):
+# Re-enable strategy (the full plan is the G.0-G.4 steps below; they are
+# reproduced here in full so this file is self-contained):
 #
 # G.0  Spike the macOS-latest hang first on a feature branch:
 #        (i)  pass `--disable-gpu` to electron.launch in

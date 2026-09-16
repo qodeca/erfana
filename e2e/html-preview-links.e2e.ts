@@ -23,6 +23,12 @@
  *
  * Condition-based waits only — never a sleep.
  *
+ * Since #124 (part 3) a tab has a link mode; off by default. The last block
+ * clicks with REAL input (`clickLink`) and pins the new-tab mode (P3-AC5):
+ * every row but `_self` opens a new tab, and a click with no gesture proof
+ * never moves a tab, whatever the mode. The same-tab mode is
+ * `html-preview-same-tab.e2e.ts`.
+ *
  * @see docs/html-preview/README.md#links
  * @see specs/designs/sd-074b-preview-navigation-and-multiview.md
  */
@@ -37,6 +43,14 @@ import type { BaseWindow, MessageBoxOptions } from 'electron'
 import { test, expect } from './fixtures/index'
 import { LogTail } from './fixtures/logTail'
 import { HtmlPreviewPage, PREVIEW_BUDGET_MS } from './pages/html-preview.page'
+import {
+  clickLink,
+  linkModeToggle,
+  previewTabs,
+  turnSameTabOn,
+  waitForLivePages,
+  type LinkClick
+} from './pages/html-preview.navigation'
 
 const CORPUS_DIR = path.join(__dirname, 'fixtures', 'html-preview-corpus')
 
@@ -87,6 +101,7 @@ test.use({
   testProjectFiles: {
     'links/index.html': corpus('links/index.html'),
     'links/target.html': corpus('links/target.html'),
+    'links/base-self.html': corpus('links/base-self.html'),
     'self-contained/index.html': corpus('self-contained/index.html'),
     // Placeholder; the test rewrites it with a run-unique host before opening it.
     'external/index.html': externalLinkPage('placeholder.invalid'),
@@ -287,5 +302,80 @@ test.describe('HTML preview — external links', () => {
     expect(trail.indexOf('external link: asking')).toBeLessThan(
       trail.indexOf('external link: cancelled')
     )
+  })
+})
+
+test.describe('HTML preview — the link table in new-tab mode (#124, P3-AC5)', () => {
+  const INDEX = 'links/index.html'
+  const TARGET = 'links/target.html'
+
+  const NEW_TAB_ROWS: Array<{ name: string; id: string; how?: LinkClick }> = [
+    { name: 'a plain link', id: 'plain' },
+    { name: 'a _blank link', id: 'blank' },
+    { name: 'a link with a named target', id: 'named' },
+    { name: 'a Cmd/Ctrl-click', id: 'cmd-click', how: { accel: true } },
+    { name: 'a middle-click', id: 'middle-click', how: { button: 'middle' } }
+  ]
+  for (const row of NEW_TAB_ROWS) {
+    test(`should open ${row.name} in a new tab while the mode is off`, async ({
+      windowWithTestProject,
+      appWithTestProject
+    }) => {
+      const preview = new HtmlPreviewPage(windowWithTestProject, appWithTestProject)
+      await preview.open(INDEX)
+      await preview.waitForTitled('-LINKS-1')
+      await expect(linkModeToggle(preview, 'index.html')).toHaveAttribute('aria-pressed', 'false')
+
+      expect(await clickLink(appWithTestProject, row.id, HtmlPreviewPage.target(INDEX), row.how)).toBe(true)
+
+      await waitForLivePages(appWithTestProject, [INDEX, TARGET])
+      await expect(previewTabs(windowWithTestProject)).toHaveCount(2)
+    })
+  }
+
+  test('should show a _self link in the same tab even while the mode is off', async ({
+    windowWithTestProject,
+    appWithTestProject
+  }) => {
+    const preview = new HtmlPreviewPage(windowWithTestProject, appWithTestProject)
+    await preview.open(INDEX)
+    await preview.waitForTitled('-LINKS-1')
+
+    expect(await clickLink(appWithTestProject, 'self', HtmlPreviewPage.target(INDEX))).toBe(true)
+
+    await waitForLivePages(appWithTestProject, [TARGET])
+    await expect(previewTabs(windowWithTestProject)).toHaveCount(1)
+  })
+
+  test('should show a link in the same tab when the page sets <base target="_self">', async ({
+    windowWithTestProject,
+    appWithTestProject
+  }) => {
+    const preview = new HtmlPreviewPage(windowWithTestProject, appWithTestProject)
+    await preview.open('links/base-self.html')
+    await preview.waitForTitled('-LINKS-BASE-SELF-')
+
+    expect(await clickLink(appWithTestProject, 'plain', HtmlPreviewPage.target('links/base-self.html'))).toBe(true)
+
+    await waitForLivePages(appWithTestProject, [TARGET])
+    await expect(previewTabs(windowWithTestProject)).toHaveCount(1)
+  })
+
+  test('should open a link with no click proof in a new tab even with the mode on', async ({
+    windowWithTestProject,
+    appWithTestProject
+  }) => {
+    // Row 1 of the link table, a security invariant: a navigation the preload
+    // did not report as a gesture (here an untrusted `el.click()`, which only
+    // `will-navigate` sees) never moves a tab.
+    const preview = new HtmlPreviewPage(windowWithTestProject, appWithTestProject)
+    await preview.open(INDEX)
+    await preview.waitForTitled('-LINKS-1')
+    await turnSameTabOn(preview, 'index.html')
+
+    expect(await preview.clickInPreview('-LINKS-1', 'plain')).toBe(true)
+
+    await waitForLivePages(appWithTestProject, [INDEX, TARGET])
+    await expect(previewTabs(windowWithTestProject)).toHaveCount(2)
   })
 })

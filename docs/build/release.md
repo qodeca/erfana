@@ -87,10 +87,10 @@ sequenceDiagram
   participant GH as GitHub
   participant CI as release.yml
   O->>S: "release v0.9.5"
-  S->>S: Phase 0 — branch gate, semver, CHANGELOG, checks.yml green
+  S->>S: Phase 0 — branch gate, semver, lock==package.json, CHANGELOG, checks.yml green
   S->>O: AskUserQuestion: summary bullets
   O-->>S: bullets
-  S->>GH: push commit (bump+CHANGELOG+notes)
+  S->>GH: push commit (bump+lock+CHANGELOG+notes)
   GH-->>S: checks.yml runs; S polls for green
   S->>GH: push signed tag v0.9.5
   GH->>CI: trigger release.yml
@@ -139,7 +139,7 @@ sequenceDiagram
 
 **Notarization note:** this project uses the **user-auth mode of notarytool** (Apple ID + app-specific password + Team ID). The `.p8` App Store Connect API key path is also supported by electron-builder 26 but not used here because the app-specific password was already provisioned before the release pipeline was built. Only the **altool CLI** was deprecated by Apple; notarytool itself accepts both auth modes.
 
-**Azure auth note:** this project uses **certificate-based auth** against the app registration, not OIDC federation. electron-builder 26.8.1's `WindowsSignAzureManager.initialize()` hard-rejects `AZURE_FEDERATED_TOKEN_FILE` — its pre-flight validator only accepts `AZURE_CLIENT_SECRET`, `AZURE_CLIENT_CERTIFICATE_PATH`, or `AZURE_USERNAME`+`AZURE_PASSWORD`. Certificate auth is the security-equivalent of OIDC here: no shared secret in transit (only the public cert lives on the app registration); the private key is a rotatable GitHub Secret. Revisit OIDC when upstream adds `AZURE_FEDERATED_TOKEN_FILE` support.
+**Azure auth note:** this project uses **certificate-based auth** against the app registration, not OIDC federation. That choice was forced: before 26.9.1, electron-builder's `WindowsSignAzureManager.initialize()` hard-rejected `AZURE_FEDERATED_TOKEN_FILE` – its pre-flight validator only accepted `AZURE_CLIENT_SECRET`, `AZURE_CLIENT_CERTIFICATE_PATH`, or `AZURE_USERNAME`+`AZURE_PASSWORD`. 26.9.1 removed that validator ([electron-builder#9687](https://github.com/electron-userland/electron-builder/pull/9687)), so the pinned 26.15.3 no longer blocks OIDC; which credentials work is now up to the `TrustedSigning` PowerShell module that electron-builder installs. Certificate auth is the security-equivalent of OIDC here: no shared secret in transit (only the public cert lives on the app registration); the private key is a rotatable GitHub Secret. Moving to OIDC is now possible in principle but untested – prove a federated-token sign on a Windows runner before switching.
 
 **`AZ_CLIENT_SECRET` is explicitly excluded.** This is the legacy Azure CLI 1.x env var name; `checks.yml` has a guard that fails the build if any workflow references it or `altool`. The modern `AZURE_CLIENT_SECRET` (used by `@azure/identity`) is permitted as a fallback auth path but unused here.
 
@@ -172,9 +172,13 @@ ENV_ID=$(gh api "repos/qodeca/erfana/actions/runs/$RUN_ID/pending_deployments" -
 # Guard: if the run is not actually waiting, ENV_ID is the literal "null" and
 # the POST below fails with an opaque 422.
 [ -n "$ENV_ID" ] && [ "$ENV_ID" != "null" ] || { echo "no pending deployment on run $RUN_ID"; exit 1; }
-# All three body params are required by the API; omitting `comment` returns 422.
-gh api -X POST "repos/qodeca/erfana/actions/runs/$RUN_ID/pending_deployments" \
-  -f state=approved -f comment="release approved" -F "environment_ids[]=$ENV_ID"
+# `environment_ids` must be a JSON array of integers, so the body goes in as JSON.
+# The `-f`/`-F` form cannot express it: `-F "environment_ids[]=$ENV_ID"` is rejected
+# with `422 Invalid request. For 'items', "<id>" is not an integer` (observed on the
+# v0.20.0 release, gh 2.9x). All three params are required; omitting `comment`
+# returns 422 as well, with a different message.
+printf '{"environment_ids":[%s],"state":"approved","comment":"release approved"}' "$ENV_ID" \
+  | gh api -X POST "repos/qodeca/erfana/actions/runs/$RUN_ID/pending_deployments" --input -
 ```
 
 Inspect the rule anytime:
@@ -195,7 +199,7 @@ gh api repos/qodeca/erfana/environments/production-signing --jq '.protection_rul
 | Platform | Runner | Time budget | Notes |
 |---|---|---|---|
 | macOS | `macos-latest` (arm64 default) | ~60 min | Builds arm64 only (`--arm64`) — Apple Silicon is the sole macOS target. Intel (x64) and the `.zip` target were dropped. |
-| Windows | `windows-latest` (x64) | ~45 min | Azure Artifact Signing via app-reg certificate auth (OIDC unsupported by electron-builder 26). The NSIS installer `.exe` is signed. |
+| Windows | `windows-latest` (x64) | ~45 min | Azure Artifact Signing via app-reg certificate auth (OIDC possible since electron-builder 26.9.1 but untested; certificate auth in use). The NSIS installer `.exe` is signed. |
 
 Those budgets are `timeout-minutes` on the build jobs, and the clock starts only **after** the [approval gate](#approval-gate-production-signing) is cleared. End-to-end wall-clock is therefore approval latency + build time.
 
@@ -214,13 +218,13 @@ The release asset set is pinned in four places with no automated cross-check bet
 | `.github/workflows/build_win.yml` | signtool-verify + upload globs | `*-setup.exe` in both the verify loop and `gh release upload` |
 | [`.claude/skills/releasing-erfana/SKILL.md`](../../.claude/skills/releasing-erfana/SKILL.md) § Constants | expected asset count | 2 binaries + `SHA256SUMS` + `SHA256SUMS.minisig`, i.e. `EXPECTED_ASSETS=4`. Note this is **not** an equality assertion anywhere: §0.4 uses it as a floor (`[ "$ASSET_COUNT" -ge "$EXPECTED_ASSETS" ]`) to decide a draft is `draft-ready`, and `phase-4-verify.md` carries no count check at all — §4.6 only prints the expected set for the operator |
 
-**Verified in agreement on 2026-08-12.** The published `v0.17.2` release carries exactly four assets — `erfana-0.17.2-arm64.dmg`, `erfana-0.17.2-setup.exe`, `SHA256SUMS`, `SHA256SUMS.minisig` — matching all four definitions above. Adding or removing a build target is therefore a four-file change plus a release-notes/verification-doc sweep, never a one-line `electron-builder.yml` edit.
+**Verified in agreement on 2026-09-16.** The published `v0.20.0` release carries exactly four assets — `erfana-0.20.0-arm64.dmg`, `erfana-0.20.0-setup.exe`, `SHA256SUMS`, `SHA256SUMS.minisig` — matching all four definitions above. Adding or removing a build target is therefore a four-file change plus a release-notes/verification-doc sweep, never a one-line `electron-builder.yml` edit.
 
 ## Hardened-runtime entitlements (known gap)
 
 The main app plist (`build/entitlements.mac.plist`) contains the strictly-required keys: `cs.allow-jit`, `cs.allow-unsigned-executable-memory` (V8 requirement), `device.camera`, `device.audio-input`. The CI guard fails the build if `cs.disable-library-validation` or `cs.allow-dyld-environment-variables` ever leak into either plist — it is Guard 2, the step named `Guard - no forbidden entitlements` in the `release-guards` job of [`.github/workflows/checks.yml`](../../.github/workflows/checks.yml) (cited by step name, not line number, so it survives edits above it; verified 2026-08-23).
 
-The inherit plist (`build/entitlements.mac.inherit.plist`) grants `cs.allow-jit` and `cs.allow-unsigned-executable-memory` to **all helper processes** (Renderer + GPU + Plugin), not just Renderer. This is an upstream-imposed over-grant: electron-builder 26.8.1's `mac.entitlementsInherit` field is a **single plist applied uniformly** to every helper bundle — there is no built-in per-helper-type configuration. The Renderer helper structurally requires both keys for V8 JIT to function; granting them to GPU and Plugin helpers is the unavoidable side-effect.
+The inherit plist (`build/entitlements.mac.inherit.plist`) grants `cs.allow-jit` and `cs.allow-unsigned-executable-memory` to **all helper processes** (Renderer + GPU + Plugin), not just Renderer. This is an upstream-imposed over-grant: electron-builder 26.15.3's `mac.entitlementsInherit` field is a **single plist applied uniformly** to every helper bundle – there is no built-in per-helper-type configuration. The Renderer helper structurally requires both keys for V8 JIT to function; granting them to GPU and Plugin helpers is the unavoidable side-effect.
 
 **Trigger to revisit**: electron-builder ships per-helper-type entitlement support (`mac.binaries[].entitlements` or equivalent), or we adopt a custom `signFn` callback that signs each helper bundle with a tighter plist. Until then, the over-grant is documented and the CI guard prevents it from getting worse.
 
@@ -240,7 +244,7 @@ An end user downloading from the release page should run the following to confir
 
 ### 1. Integrity + aggregate signature (all platforms)
 
-Substitute the version you downloaded for `{version}` throughout — the worked example below uses **v0.17.2**, the current public release. Run the whole block from the directory that holds the downloaded `.dmg` / `.exe`; `SHA256SUMS` lists **both** binaries by bare filename, and two things follow from that:
+Substitute the version you downloaded for `{version}` throughout — the worked example below uses **v0.20.0**, the current public release (2026-09-16). Run the whole block from the directory that holds the downloaded `.dmg` / `.exe`; `SHA256SUMS` lists **both** binaries by bare filename, and two things follow from that:
 
 - Most people download **one** platform, so a bare `sha256sum -c SHA256SUMS` reports `FAILED open or read` for the other one and exits 1 on a perfectly good download. The recipe therefore passes `--ignore-missing`, verified working with GNU `sha256sum` (coreutils), macOS's `/sbin/sha256sum`, and Perl `shasum -a 256` (6.x).
 - `--ignore-missing` also means "verified nothing" is a possible outcome — that is what running from the wrong directory looks like. GNU `sha256sum` and `shasum` exit 1 with `no file was verified`, but macOS's `/sbin/sha256sum` exits **0** silently, so the block below additionally requires at least one `OK` line.
@@ -253,7 +257,7 @@ for `return 1`.
 
 ```bash
 #!/usr/bin/env bash
-VERSION=0.17.2   # the v{version} you downloaded, without the leading "v"
+VERSION=0.20.0   # the v{version} you downloaded, without the leading "v"
 
 curl -LO "https://github.com/qodeca/erfana/releases/download/v${VERSION}/SHA256SUMS"
 curl -LO "https://github.com/qodeca/erfana/releases/download/v${VERSION}/SHA256SUMS.minisig"
@@ -363,7 +367,7 @@ $signtool = Join-Path $sdkBin.FullName "x64\signtool.exe"
 if (-not (Test-Path $signtool)) { throw "signtool.exe not found under $sdkRoot" }
 
 # Both signatures must verify independently.
-& $signtool verify /pa /all /tw C:\Path\To\erfana-0.17.2-setup.exe
+& $signtool verify /pa /all /tw C:\Path\To\erfana-0.20.0-setup.exe
 ```
 
 First-time Windows installs will see a SmartScreen warning on a newly provisioned Azure Artifact Signing identity. Reputation accrues organically regardless of EV/OV status — several successful installs will silence the warning. This is expected, not a defect.
@@ -374,7 +378,7 @@ First-time Windows installs will see a SmartScreen warning on a newly provisione
 |---|---|
 | Tag pushed; `prepare` failed on a repo-content assertion (e.g., release-notes file missing) | **Bump to the next patch version.** The tag ruleset carries a `deletion` rule with no bypass actors, so `git push --delete origin v${version}` is rejected (`push declined due to repository rule violations`) — the version cannot be reused. `gh run rerun` does not help either: it replays the same tagged commit, which still lacks the fix. No draft to clean. |
 | Tag pushed; `prepare` failed on `No green checks.yml run for <sha>` | **Not a red build — a race.** `checks.yml` had not yet reached `completed`/`success` for the tagged SHA when `prepare` queried it. Wait until `gh api "repos/qodeca/erfana/actions/workflows/checks.yml/runs?head_sha=$SHA&status=success"` reports `total_count ≥ 1`, then `gh run rerun <id>` — the same run id, no new tag. **The tag is not burned**: nothing was built, signed, or drafted. Prevention: poll the *workflow run* to completion before tagging, not just the seven required check contexts (the advisory `windows-checks` job keeps the run `in_progress` for ~3 min after they go green). See [`docs/release-incidents/v0.17.0-attempt-1.md`](../release-incidents/v0.17.0-attempt-1.md). |
-| Run sits in `waiting`, both build legs unstarted | The `production-signing` environment approval is pending. Approve via **Review deployments** in the Actions UI, or the CLI recipe in [Approval gate](#approval-gate-production-signing) (all three body params — `environment_ids`, `state` **and** `comment` — are required; omitting `comment` returns HTTP 422). Not a failure; the tag is not burned. |
+| Run sits in `waiting`, both build legs unstarted | The `production-signing` environment approval is pending. Approve via **Review deployments** in the Actions UI, or the CLI recipe in [Approval gate](#approval-gate-production-signing) (send the body as JSON via `--input -`; the `-F "environment_ids[]=…"` form returns HTTP 422 `not an integer`, and omitting `comment` returns 422 too). Not a failure; the tag is not burned. |
 | Tag pushed; `prepare` succeeded; any matrix leg failed | `cleanup` deletes the draft and exits red. Bump to the next patch — any signed artifact, even in a draft, burns the version. The tag itself cannot be deleted (ruleset `deletion` rule, no bypass actors); `git tag -d v${version}` clears only the local copy. |
 | Tag pushed; build all-green; `finalize` failed | Draft exists with unsigned `SHA256SUMS`. `cleanup` fires. Bump to next patch. |
 | Build all-green; operator rejects at skill Phase 4 (verify-then-approve) | `gh release delete v${version} --yes --cleanup-tag=false`. Bump to next patch. |
@@ -407,7 +411,7 @@ Each trust anchor has a revocation + communication procedure.
 
 #### B.1 Routine cleanup of unused federated credentials
 
-Independent of compromise: if the app registration `erfana-github-ci` has any federated credentials left over from the abandoned OIDC path (electron-builder 26 doesn't support OIDC; we use cert auth instead), they're dead code that's a live attack surface. Remove them:
+Independent of compromise: if the app registration `erfana-github-ci` has any federated credentials left over from the abandoned OIDC path (OIDC was blocked before electron-builder 26.9.1; we use cert auth), they're dead code that's a live attack surface. Remove them:
 
 ```bash
 APP_ID=45f70db0-2163-4ac6-80b6-1580d7c45b00  # erfana-github-ci
@@ -540,6 +544,17 @@ Phase I configuration was applied after dry-run `24925269258` validated all 5 jo
   - `Secret scan` and `Coverage` are **app-pinned** (both `app_id: 15368`); the other five accept any app (`app_id: null`). This matters when editing the set — see the traps under § Deliberate exclusion below.
   - `npm audit signatures` and `Release readiness guards` are **not** required checks, despite earlier revisions of this document claiming they were. Both jobs still run on every push via `checks.yml`; they simply do not gate merges to `main`. `Windows checks` is likewise advisory and not required.
 - **No PR review requirement** (`required_pull_request_reviews: null`) — direct push to `main` is the intended solo-developer workflow. The release skill verifies this at Phase 0.4.5 and aborts if the rule is reinstated.
+  - **Direct push still is not unconditional.** Required status checks are enforced on *push*, not only on merge, and they must already have **completed successfully for that exact commit SHA**. Pushing a brand-new commit straight to `main` is therefore rejected — `remote: error: GH006: Protected branch update failed for refs/heads/main` / `7 of 7 required status checks have not succeeded` — because no run has produced those checks for the SHA yet (observed twice during the v0.20.0 release). The working sequence is **develop-first**: push the commit to `develop`, wait for that SHA's `checks.yml` run to reach `completed`/`success`, then push the same SHA to `main`, which now passes instantly.
+    ```bash
+    git push origin main:develop                     # same commit, lands on develop
+    SHA=$(git rev-parse HEAD)
+    gh run list --branch develop --limit 10 \
+      --json name,status,conclusion,headSha \
+      --jq "[.[] | select(.headSha==\"$SHA\")] | .[] | \"\(.name): \(.status) \(.conclusion)\""
+    # poll until both Quality Checks and Secret Scan read completed/success, then:
+    git push origin main
+    ```
+    Waiting for the **run** (not just the seven check contexts) also avoids the tag-side race in the Failure-recovery table below, where `prepare` reports `No green checks.yml run for <sha>`.
 - `enforce_admins: true` — administrators included.
 - `allow_force_pushes: false`, `allow_deletions: false`.
 - `required_conversation_resolution: false` — **not** enforced. With no PR flow there are no review conversations to resolve, so the setting is off.

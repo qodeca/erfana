@@ -4,10 +4,12 @@
  * previewInputForward tests (Issue #74, work item 36).
  *
  * Covers the frozen shortcut list, per-platform accelerator matching, that only
- * the four enumerated accelerators are forwarded (with preventDefault), and the
- * attach/detach lifecycle.
+ * the four enumerated accelerators and Back / Forward are forwarded (with
+ * preventDefault), and the attach/detach lifecycle. Back and Forward (issue
+ * #124) come from the shared `previewNavKeys` table and count on key down only.
  */
 import { PreviewForwardedShortcutSchema } from '../../../shared/ipc/preview-schema'
+import { previewNavKeyRows } from '../../../shared/previewNavKeys'
 import { describe, expect, it, vi } from 'vitest'
 import {
   PREVIEW_FORWARDED_SHORTCUTS,
@@ -22,6 +24,7 @@ function keyDown(overrides: Partial<ForwardableInput>): ForwardableInput {
   return {
     type: 'keyDown',
     key: '',
+    code: '',
     control: false,
     meta: false,
     alt: false,
@@ -37,7 +40,9 @@ describe('PREVIEW_FORWARDED_SHORTCUTS', () => {
       { key: 'f', accel: true },
       { key: 's', accel: true },
       { key: 'w', accel: true },
-      { key: 'Escape', accel: false }
+      { key: 'Escape', accel: false },
+      { key: 'back', accel: false, nav: true },
+      { key: 'forward', accel: false, nav: true }
     ])
   })
 
@@ -124,6 +129,96 @@ describe('matchForwardedShortcut', () => {
   })
 })
 
+describe('matchForwardedShortcut — Back and Forward (issue #124, part 3 §3.7)', () => {
+  const PLATFORMS = ['darwin', 'win32', 'linux'] as const
+
+  it('takes its Back and Forward rows from previewNavKeys, not from a table of its own', () => {
+    const navKeys = PREVIEW_FORWARDED_SHORTCUTS.filter((s) => 'nav' in s).map((s) => s.key)
+    for (const platform of PLATFORMS) {
+      expect(navKeys).toEqual(previewNavKeyRows(platform).map((row) => row.action))
+    }
+  })
+
+  it.each(PLATFORMS)('forwards every row of the shared table on %s', (platform) => {
+    for (const row of previewNavKeyRows(platform)) {
+      const modifier = row.modifier === 'meta' ? { meta: true } : { alt: true }
+      const input = keyDown({ code: row.code, key: 'Unidentified', ...modifier })
+      expect(matchForwardedShortcut(input, platform)).toBe(row.action)
+    }
+  })
+
+  it('macOS: Cmd+[ is Back and Cmd+] is Forward', () => {
+    expect(
+      matchForwardedShortcut(keyDown({ code: 'BracketLeft', key: '[', meta: true }), 'darwin')
+    ).toBe('back')
+    expect(
+      matchForwardedShortcut(keyDown({ code: 'BracketRight', key: ']', meta: true }), 'darwin')
+    ).toBe('forward')
+  })
+
+  it.each(['win32', 'linux'] as const)('%s: Alt+Left is Back and Alt+Right is Forward', (platform) => {
+    expect(
+      matchForwardedShortcut(keyDown({ code: 'ArrowLeft', key: 'ArrowLeft', alt: true }), platform)
+    ).toBe('back')
+    expect(
+      matchForwardedShortcut(keyDown({ code: 'ArrowRight', key: 'ArrowRight', alt: true }), platform)
+    ).toBe('forward')
+  })
+
+  it('matches the physical key, whatever the layout types on it (spike S8)', () => {
+    // German layout: the key right of P types `ü`; it is still Back.
+    expect(
+      matchForwardedShortcut(keyDown({ code: 'BracketLeft', key: 'ü', meta: true }), 'darwin')
+    ).toBe('back')
+    // A `[` typed on another physical key is not Back.
+    expect(
+      matchForwardedShortcut(keyDown({ code: 'Digit5', key: '[', meta: true }), 'darwin')
+    ).toBeNull()
+  })
+
+  it.each(['keyUp', 'char'])('forwards a press only, never a %s', (type) => {
+    expect(
+      matchForwardedShortcut(keyDown({ type, code: 'BracketLeft', meta: true }), 'darwin')
+    ).toBeNull()
+    expect(
+      matchForwardedShortcut(keyDown({ type, code: 'ArrowLeft', alt: true }), 'win32')
+    ).toBeNull()
+  })
+
+  it('forwards nothing with another modifier down', () => {
+    const back = { code: 'BracketLeft', meta: true }
+    expect(matchForwardedShortcut(keyDown({ ...back, shift: true }), 'darwin')).toBeNull()
+    expect(matchForwardedShortcut(keyDown({ ...back, alt: true }), 'darwin')).toBeNull()
+    expect(matchForwardedShortcut(keyDown({ ...back, control: true }), 'darwin')).toBeNull()
+    expect(
+      matchForwardedShortcut(keyDown({ code: 'ArrowLeft', alt: true, shift: true }), 'win32')
+    ).toBeNull()
+  })
+
+  it('leaves the other platform’s binding with the page', () => {
+    // Alt+Left moves by word in a macOS text field; it must stay the page's.
+    expect(matchForwardedShortcut(keyDown({ code: 'ArrowLeft', alt: true }), 'darwin')).toBeNull()
+    expect(matchForwardedShortcut(keyDown({ code: 'BracketLeft', meta: true }), 'win32')).toBeNull()
+    expect(
+      matchForwardedShortcut(keyDown({ code: 'BracketLeft', control: true }), 'win32')
+    ).toBeNull()
+  })
+
+  it('never matches a Back or Forward row on its name', () => {
+    expect(matchForwardedShortcut(keyDown({ key: 'back', meta: true }), 'darwin')).toBeNull()
+    expect(matchForwardedShortcut(keyDown({ key: 'forward', alt: true }), 'win32')).toBeNull()
+  })
+
+  it('emits every row in a shape the wire schema accepts', () => {
+    // `emit.ts` builds the payload from this list; a row the schema refuses
+    // would be dropped at the boundary with only a warning.
+    for (const shortcut of PREVIEW_FORWARDED_SHORTCUTS) {
+      const payload = { panelId: 'preview-1', key: shortcut.key, accel: shortcut.accel }
+      expect(PreviewForwardedShortcutSchema.safeParse(payload).success).toBe(true)
+    }
+  })
+})
+
 describe('attachInputForwarding', () => {
   function makeTarget(): {
     target: InputForwardTarget
@@ -171,6 +266,16 @@ describe('attachInputForwarding', () => {
     const event = h.fire(keyDown({ key: 'r', meta: true }))
     expect(event.preventDefault).not.toHaveBeenCalled()
     expect(onShortcut).not.toHaveBeenCalled()
+  })
+
+  it('hides a Back press from the page and reports it', () => {
+    const onShortcut = vi.fn()
+    const h = makeTarget()
+    attachInputForwarding(h.target, onShortcut, 'darwin')
+
+    const event = h.fire(keyDown({ code: 'BracketLeft', key: '[', meta: true }))
+    expect(event.preventDefault).toHaveBeenCalledTimes(1)
+    expect(onShortcut).toHaveBeenCalledWith('back')
   })
 
   it('detaches the listener', () => {

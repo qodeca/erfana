@@ -28,8 +28,9 @@
  * own refusals, with the full `blockedURI` and `isTrusted === true`, while
  * `onBeforeRequest` sees nothing for the same resources.
  *
- * Mirrors `previewLinkBridge.ts` — same trust posture, same reasons, and
- * likewise a separate module because `PreviewLiveView` is at the file-size cap.
+ * Mirrors `previewLinkBridge.ts` — same trust posture, same reasons. Since
+ * issue #124 it also takes the refusals of a page's frames, which get no
+ * preload, parsed from the console (`previewFrameCspConsole.ts`).
  *
  * @see previewLinkBridge.ts - the other page→main channel
  * @see PreviewRequestFilter.ts - the network-layer half of the same signal
@@ -48,7 +49,7 @@ import {
 export const PREVIEW_PAGE_CSP_VIOLATION_CHANNEL = 'preview-page:cspViolation'
 
 /**
- * At most this many violations are PARSED per second, per view.
+ * At most this many violations are PARSED per second, per page.
  *
  * Unlike a click, a violation is NOT a human action: a hostile page can emit
  * thousands by referencing thousands of hosts, and every one costs a URL parse.
@@ -60,7 +61,7 @@ export const PREVIEW_PAGE_CSP_VIOLATION_CHANNEL = 'preview-page:cspViolation'
 const MAX_PARSES_PER_SECOND = 500
 
 /**
- * At most this many DISTINCT reports are forwarded per second, per view.
+ * At most this many DISTINCT reports are forwarded per second, per page.
  *
  * Charged only for a report that actually reaches the reader — a new host, or a
  * new kind for a known host. It used to be charged on ARRIVAL instead, which
@@ -76,8 +77,9 @@ const MAX_REPORTS_PER_SECOND = 30
  * At most this many DISTINCT origins are ever reported by one view.
  *
  * Past this the page is not telling the reader anything they can act on; it is
- * filling the failure badge. The cap is per view and resets when the view is
- * rebuilt, so a legitimate page that genuinely grew past it recovers on reload.
+ * filling the failure badge. The cap is per page load, because every page gets
+ * its own bridge, so a legitimate page that genuinely grew past it recovers on
+ * reload.
  *
  * Kept equal to `PREVIEW.MAX_BLOCKED_HOSTS_PER_VIEW`, which bounds the other of
  * the two paths that feed the same list — a page must not be able to report more
@@ -122,25 +124,16 @@ const CspViolationPayloadSchema = z
   })
   .strict()
 
-/** The bridge a live view holds. */
+/**
+ * The bridge one page holds. Its dedupe and budgets are scoped to a PAGE LOAD:
+ * a reload re-runs the document, so every host it still cannot reach is refused
+ * again and is news to the reader all over again. Each page therefore gets its
+ * own bridge from its page scope (`previewPageScope.ts`, issue #124, WI-29),
+ * and a burst spent on one page cannot silence the first reports of the next.
+ */
 export interface PreviewCspViolationBridge {
   /** Handle a payload from the preview page's preload. */
   handleViolation(payload: unknown): void
-  /**
-   * Forget everything reported so far, because the page is about to be replaced.
-   *
-   * Called when an approval reloads the view. The dedupe below is scoped to a
-   * PAGE LOAD, not to the view: a reload re-runs the document, so every host it
-   * still cannot reach is refused again and is news to the reader all over
-   * again. Without this the approve-one-host cascade silently ate the rest —
-   * `applyApprovedHosts` clears the failure log, the reload re-refused the
-   * remaining hosts, and this map swallowed every one of them, so they vanished
-   * from the badge AND became unapprovable until the panel was reopened.
-   *
-   * The rate-limit window is reset with it: a burst spent on the previous
-   * document must not silence the first reports of the new one.
-   */
-  reset(): void
   /** Stop reporting; called on teardown. */
   dispose(): void
 }
@@ -227,7 +220,7 @@ function remoteOriginOf(
 function createRateWindow(
   limit: number,
   now: () => number
-): { take(): boolean; reset(): void } {
+): { take(): boolean } {
   let startedAt = now()
   let used = 0
   return {
@@ -239,15 +232,11 @@ function createRateWindow(
       }
       used += 1
       return used <= limit
-    },
-    reset(): void {
-      startedAt = now()
-      used = 0
     }
   }
 }
 
-/** Build the bridge for one live view. */
+/** Build the bridge for one page. */
 export function createPreviewCspViolationBridge(
   deps: PreviewCspViolationBridgeDeps
 ): PreviewCspViolationBridge {
@@ -275,6 +264,16 @@ export function createPreviewCspViolationBridge(
       const parsed = CspViolationPayloadSchema.safeParse(payload)
       if (!parsed.success) return
 
+      // A refused FRAME is a failure-badge entry – the failed-load writer lists
+      // it (issue #124, part 2 §2.6) – never a band row: an approved host loads
+      // as a subresource, never as a frame, so its Allow could never work, and
+      // the row would come back after the reload. Dropped right after the parse,
+      // before any origin cap or report budget is charged, so a flood of refused
+      // frames cannot fill the list and hide a real host (RX2-7). That holds for
+      // the preload's reports and the frame console path alike.
+      const kind = kindFromDirective(parsed.data.effectiveDirective)
+      if (kind === 'frame') return
+
       const remote = remoteOriginOf(parsed.data.blockedURI)
       if (remote === null) return
       const { origin, hostname } = remote
@@ -287,7 +286,6 @@ export function createPreviewCspViolationBridge(
       //
       // But a NEW kind for a known origin is new information the reader is
       // entitled to, so it is not deduped away.
-      const kind = kindFromDirective(parsed.data.effectiveDirective)
       const known = reportedOrigins.get(origin)
 
       // THE TWO CAPS, both charged only for a NEW origin. Order matters only in
@@ -323,17 +321,6 @@ export function createPreviewCspViolationBridge(
       // now. What remains is what the CSP grammar cannot express (IPv6) or what
       // is not a canonical origin at all.
       deps.onBlockedHost(origin, parsed.data.blockedURI, remote.approvable, kind)
-    },
-
-    reset(): void {
-      reportedOrigins.clear()
-      // Cleared WITH the dedupe map, never independently. A page load that is
-      // news to the reader all over again must also be news to the sub-cap, or
-      // one noisy hostname on the first load would keep its successor's origins
-      // out of the list for the life of the view.
-      originsPerHost.clear()
-      parseBudget.reset()
-      reportBudget.reset()
     },
 
     dispose(): void {

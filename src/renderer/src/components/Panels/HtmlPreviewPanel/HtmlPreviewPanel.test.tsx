@@ -1,159 +1,52 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Tests for {@link HtmlPreviewPanel} (Issue #74, work item 71).
+ * Tests for {@link HtmlPreviewPanel} (Issue #74, work item 71): the views and
+ * the lifecycle.
  *
  * Covers the three top-level views (normal placeholder, limit-reached refusal,
- * failed banner) and the failure badge, driving main→renderer state through the
- * captured bridge event listeners. The native `WebContentsView` never exists in
- * jsdom, so these assert the renderer chrome only.
+ * failed banner), the toolbar's placement, open/close and resume, and the
+ * published rect, driving main→renderer state through the captured bridge event
+ * listeners. The native `WebContentsView` never exists in jsdom, so these
+ * assert the renderer chrome only.
+ *
+ * Split by concern (issue #124, 500-line cap): the event feed lives in
+ * `HtmlPreviewPanel.events.test.tsx`, forwarded shortcuts in
+ * `HtmlPreviewPanel.shortcuts.test.tsx`, the shared fake bridge in
+ * `__test__/panelHarness.ts`.
  *
  * @see HtmlPreviewPanel.tsx
  */
 
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from 'vitest'
-import { render, screen, fireEvent, waitFor, cleanup, act } from '@testing-library/react'
-import type { IDockviewPanelProps } from 'dockview'
+import { afterEach, describe, it, expect, vi } from 'vitest'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 
-import { HtmlPreviewPanel, type HtmlPreviewPanelParams } from './HtmlPreviewPanel'
-import { usePreviewStore } from '../../../stores/usePreviewStore'
+import { HtmlPreviewPanel } from './HtmlPreviewPanel'
 import { usePreviewViewportStore } from '../../../stores/usePreviewViewportStore'
 import { useSearchStore } from '../../../stores/useSearchStore'
 import { ErrorCode } from '../../../../../shared/errors'
-import type {
-  PreviewFailureListPayload,
-  PreviewForwardedShortcut,
-  PreviewAllowlistChangedPayload,
-  PreviewHostBlockedPayload,
-  PreviewLoadStatePayload
-} from '../../../../../shared/ipc/preview-schema'
+import { installHtmlPreviewPanelHarness } from './__test__/panelHarness'
 
-// NOTE: no local ResizeObserver stub. `tests/setup/setupTests.renderer.ts`
-// installs one that records its callback; a second, divergent no-op here meant
-// the two files silently disagreed about what an observer does.
+// The bounds hook logs its drop lines through the renderer logger, which has no
+// bridge here; mocked, as in the other renderer suites, so a run stays quiet.
+// Declared per file: `vi.mock` is hoisted per test file, so the shared harness
+// cannot carry it.
+const mockLogger = vi.hoisted(() => ({
+  trace: vi.fn(),
+  debug: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  fatal: vi.fn()
+}))
+vi.mock('../../../utils/logger', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  logger: mockLogger
+}))
 
-const CONTAINER_BOX = { width: 800, height: 600, top: 0, left: 0, right: 800, bottom: 600 }
-
-/** Captured bridge event listeners so a test can drive main→renderer state. */
-interface Listeners {
-  loadState: ((p: PreviewLoadStatePayload) => void) | null
-  failures: ((p: PreviewFailureListPayload) => void) | null
-  hostBlocked: ((p: PreviewHostBlockedPayload) => void) | null
-  allowlist: ((p: PreviewAllowlistChangedPayload) => void) | null
-  forwardedShortcut: ((p: PreviewForwardedShortcut) => void) | null
-}
-
-const listeners: Listeners = {
-  loadState: null,
-  failures: null,
-  hostBlocked: null,
-  allowlist: null,
-  forwardedShortcut: null
-}
-
-/** The fake `window.api.preview` bridge. */
-interface MockPreview {
-  open: Mock
-  close: Mock
-  reload: Mock
-  setBounds: Mock
-  find: Mock
-  stopFind: Mock
-  approveHost: Mock
-  exportPdf: Mock
-  onFindResult: Mock
-  onLoadStateChanged: Mock
-  onFailuresChanged: Mock
-  onBackdropChanged: Mock
-  onStillFrameChanged: Mock
-  onHostBlocked: Mock
-  onAllowlistChanged: Mock
-  onBoundsApplied: Mock
-  onVisibilityApplied: Mock
-  onForwardedShortcut: Mock
-}
-
-let preview: MockPreview
-let addPanel: Mock
-
-function makeProps(filePath: string, panelId = 'preview-1'): IDockviewPanelProps<HtmlPreviewPanelParams> {
-  const api = {
-    id: panelId,
-    isVisible: true,
-    isActive: true,
-    title: undefined as string | undefined,
-    close: vi.fn(),
-    setTitle: vi.fn(),
-    onDidVisibilityChange: vi.fn(() => ({ dispose: vi.fn() }))
-  }
-  const containerApi = {
-    getPanel: vi.fn(() => undefined),
-    addPanel
-  }
-  return { params: { filePath, panelId }, api, containerApi } as unknown as IDockviewPanelProps<HtmlPreviewPanelParams>
-}
-
-beforeEach(() => {
-  listeners.loadState = null
-  listeners.failures = null
-  listeners.hostBlocked = null
-  listeners.forwardedShortcut = null
-  addPanel = vi.fn(() => ({ api: { setActive: vi.fn() }, group: { focus: vi.fn() } }))
-
-  preview = {
-    open: vi.fn().mockResolvedValue({ ok: true }),
-    close: vi.fn().mockResolvedValue(undefined),
-    reload: vi.fn().mockResolvedValue(undefined),
-    setBounds: vi.fn(),
-    find: vi.fn().mockResolvedValue(undefined),
-    stopFind: vi.fn().mockResolvedValue(undefined),
-    approveHost: vi.fn().mockResolvedValue({ ok: true, hosts: [] }),
-    exportPdf: vi.fn().mockResolvedValue({ ok: true, path: '/out/page.pdf' }),
-    onFindResult: vi.fn(() => vi.fn()),
-    onLoadStateChanged: vi.fn((cb: (p: PreviewLoadStatePayload) => void) => {
-      listeners.loadState = cb
-      return vi.fn()
-    }),
-    onFailuresChanged: vi.fn((cb: (p: PreviewFailureListPayload) => void) => {
-      listeners.failures = cb
-      return vi.fn()
-    }),
-    onBackdropChanged: vi.fn(() => vi.fn()),
-    onStillFrameChanged: vi.fn(() => vi.fn()),
-    onHostBlocked: vi.fn((cb: (p: PreviewHostBlockedPayload) => void) => {
-      listeners.hostBlocked = cb
-      return vi.fn()
-    }),
-    onAllowlistChanged: vi.fn((cb: (p: PreviewAllowlistChangedPayload) => void) => {
-      listeners.allowlist = cb
-      return vi.fn()
-    }),
-    onBoundsApplied: vi.fn(() => vi.fn()),
-    onVisibilityApplied: vi.fn(() => vi.fn()),
-    onForwardedShortcut: vi.fn((cb: (p: PreviewForwardedShortcut) => void) => {
-      listeners.forwardedShortcut = cb
-      return vi.fn()
-    })
-  }
-
-  ;(window as unknown as { api: unknown }).api = { preview }
-
-  Element.prototype.getBoundingClientRect = vi.fn(
-    () => CONTAINER_BOX as DOMRect
-  ) as unknown as typeof Element.prototype.getBoundingClientRect
-})
-
-afterEach(() => {
-  cleanup()
-  usePreviewStore.getState().reset()
-  // Seeded by the published-rect cases; a leaked rect would place the next
-  // test's toasts around a preview that is not in that test at all.
-  usePreviewViewportStore.setState({ rects: new Map() })
-  useSearchStore.getState().resetSearch()
-  vi.clearAllMocks()
-})
+const { listeners, preview, addPanel, makeProps } = installHtmlPreviewPanelHarness()
 
 describe('HtmlPreviewPanel', () => {
   it('opens the preview on mount with the panel id and file path', async () => {
@@ -371,161 +264,123 @@ describe('HtmlPreviewPanel', () => {
 
     expect(usePreviewViewportStore.getState().rects.get('preview-1')).toBeDefined()
   })
+})
 
-  it('routes failures into the store and renders no in-panel badge (AC20, §1.8)', async () => {
-    // The badge lives in the tab now — the native view paints over this panel,
-    // so a badge here would be invisible. The panel only feeds the store the
-    // tab reads from; see HtmlPreviewTab.test.tsx for the indicator itself.
-    render(<HtmlPreviewPanel {...makeProps('/proj/page.html')} />)
-
-    await waitFor(() => expect(listeners.failures).not.toBeNull())
-    listeners.failures?.({
-      panelId: 'preview-1',
-      truncated: false,
-      failures: [
-        {
-          id: '1',
-          type: 'blocked-host',
-          resourceUrlOrHost: 'cdn.example',
-          reasonCode: ErrorCode.PREVIEW_HOST_NOT_APPROVABLE,
-          timestamp: 1
-        }
-      ]
-    })
-
-    await waitFor(() =>
-      expect(usePreviewStore.getState().getFailureCount('preview-1')).toBe(1)
-    )
-    // No badge is rendered inside the panel itself.
-    expect(screen.queryByRole('button', { name: '1 preview issue' })).toBeNull()
-  })
-
-  it('records a blocked host the toast budget suppressed', async () => {
-    // THE DEFECT, from the renderer's side. Host four raises no toast by design,
-    // and used not to arrive at all — so it could not be listed and could not be
-    // approved. It must now be recorded whatever `notify` says.
-    render(<HtmlPreviewPanel {...makeProps('/proj/page.html')} />)
-    await waitFor(() => expect(listeners.hostBlocked).not.toBeNull())
-
-    listeners.hostBlocked?.({
-      panelId: 'preview-1',
-      host: 'fourth.example',
-      approvable: true,
-      kinds: ['image'],
-      notify: false
-    })
-
-    await waitFor(() =>
-      expect(usePreviewStore.getState().panels.get('preview-1')?.blockedHosts).toEqual([
-        { host: 'fourth.example', kinds: ['image'], approvable: true }
-      ])
-    )
-  })
-
-  it('keeps the blocked-host list when the failure log is cleared', async () => {
-    // Approving runs `applyApprovedHosts`, which clears the failure log and
-    // reloads. A list derived from failures would empty under the reader's hands
-    // precisely mid-cascade — as they are about to approve the next host.
-    render(<HtmlPreviewPanel {...makeProps('/proj/page.html')} />)
-    await waitFor(() => expect(listeners.hostBlocked).not.toBeNull())
-
-    listeners.hostBlocked?.({
-      panelId: 'preview-1',
-      host: 'cdn.example',
-      approvable: true,
-      kinds: ['script'],
-      notify: true
-    })
-    await waitFor(() =>
-      expect(usePreviewStore.getState().panels.get('preview-1')?.blockedHosts).toHaveLength(1)
-    )
-
+describe('HtmlPreviewPanel – the drag freeze (issue #124, part 1 §1.5)', () => {
+  let queued = new Map<number, FrameRequestCallback>()
+  let nextFrameId = 1
+  // Inside `act`: a frame runs the bounds loop, whose push feeds the chrome gate.
+  const frame = (): void =>
     act(() => {
-      usePreviewStore.getState().clearFailures('preview-1')
+      const due = [...queued.values()]
+      queued = new Map()
+      for (const callback of due) callback(0)
     })
-
-    expect(usePreviewStore.getState().panels.get('preview-1')?.blockedHosts).toHaveLength(1)
+  const stubFrames = (): void => {
+    queued = new Map()
+    nextFrameId = 1
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback): number => {
+      const id = nextFrameId++
+      queued.set(id, callback)
+      return id
+    })
+    vi.stubGlobal('cancelAnimationFrame', (id: number) => {
+      queued.delete(id)
+    })
+  }
+  afterEach(() => {
+    vi.unstubAllGlobals()
   })
 
-  it('merges a repeat sighting instead of listing the host twice', async () => {
-    render(<HtmlPreviewPanel {...makeProps('/proj/page.html')} />)
-    await waitFor(() => expect(listeners.hostBlocked).not.toBeNull())
+  /** Renders a live preview whose event feed is subscribed. */
+  async function renderLive() {
+    const view = render(<HtmlPreviewPanel {...makeProps('/proj/page.html')} />)
+    await waitFor(() => expect(listeners.resizeHold).not.toBeNull())
+    act(() => {
+      listeners.loadState?.({ panelId: 'preview-1', state: 'ready', dropped: 0 })
+    })
+    return view
+  }
+  const hold = (held: boolean): void => act(() => listeners.resizeHold?.({ panelId: 'preview-1', held }))
+  const applied = (visible: boolean): void =>
+    act(() => listeners.visibilityApplied?.({ panelId: 'preview-1', visible }))
+  const lastSettled = (): boolean =>
+    preview.setBounds.mock.calls.some((call) => (call[3] as { settled?: boolean } | undefined)?.settled === true)
 
-    listeners.hostBlocked?.({
-      panelId: 'preview-1',
-      host: 'cdn.example',
-      approvable: true,
-      kinds: ['style'],
-      notify: true
-    })
-    listeners.hostBlocked?.({
-      panelId: 'preview-1',
-      host: 'cdn.example',
-      approvable: true,
-      kinds: ['style', 'script'],
-      notify: false
-    })
+  it('answers the end of a window-edge hold with a settled push two frames later', async () => {
+    stubFrames()
+    await renderLive()
 
-    await waitFor(() => {
-      const rows = usePreviewStore.getState().panels.get('preview-1')?.blockedHosts ?? []
-      expect(rows).toHaveLength(1)
-      expect(rows[0].kinds).toEqual(['style', 'script'])
-    })
+    hold(true)
+    hold(false)
+    frame()
+    expect(lastSettled()).toBe(false)
+    frame()
+
+    expect(lastSettled()).toBe(true)
+    expect(preview.setBounds.mock.calls.at(-1)?.[3]).toEqual({ settled: true })
   })
 
-  it('ignores a blocked-host event for another panel (UX-001)', async () => {
-    const toastEvents: CustomEvent[] = []
-    const capture = (e: Event): void => {
-      toastEvents.push(e as CustomEvent)
-    }
-    window.addEventListener('app:toast', capture)
+  it('drops a pending settled push when the edge moves again', async () => {
+    stubFrames()
+    await renderLive()
 
-    try {
-      render(<HtmlPreviewPanel {...makeProps('/proj/page.html')} />)
-      await waitFor(() => expect(listeners.hostBlocked).not.toBeNull())
-      listeners.hostBlocked?.({
-        panelId: 'preview-other',
-        host: 'cdn.example',
-        approvable: true,
-        kinds: ['script'],
-        notify: true
+    hold(false)
+    hold(true)
+    frame()
+    frame()
+
+    expect(lastSettled()).toBe(false)
+  })
+
+  it('counts a held view as hidden and draws its still at the captured size, until the release', async () => {
+    const { container } = await renderLive()
+    const placeholder = container.querySelector('.html-preview-placeholder')
+    act(() => {
+      listeners.stillFrame?.({
+        panelId: 'preview-1',
+        dataUrl: 'data:image/png;base64,AAA',
+        width: 320,
+        height: 240,
+        capturedAt: 1,
+        cssWidth: 640,
+        cssHeight: 480
       })
-      // A microtask settle is enough; no toast must be dispatched.
-      await Promise.resolve()
-      expect(toastEvents.length).toBe(0)
-    } finally {
-      window.removeEventListener('app:toast', capture)
-    }
+    })
+    // `button` while the page is live on the active tab: it is the keyboard's
+    // way into the page (issue #124, QG-8 U1). `img` is the hidden case.
+    expect(placeholder?.getAttribute('role')).toBe('button')
+
+    hold(true)
+    expect(placeholder?.getAttribute('role')).toBe('img')
+    const img = container.querySelector<HTMLImageElement>('img.html-preview-still-frame')
+    expect(img?.style.width).toBe('640px')
+    expect(img?.style.height).toBe('480px')
+
+    applied(true)
+    expect(placeholder?.getAttribute('role')).toBe('button')
+    expect(container.querySelector('img.html-preview-still-frame')).toBeNull()
   })
 
-  it('exports to PDF on a forwarded Cmd/Ctrl+S (UX-003)', async () => {
-    render(<HtmlPreviewPanel {...makeProps('/proj/page.html')} />)
+  it('shows the backdrop for a stale still during a hold, through a release that stays hidden', async () => {
+    const { container } = await renderLive()
+    act(() => {
+      listeners.stillFrame?.({
+        panelId: 'preview-1',
+        dataUrl: 'data:image/png;base64,AAA',
+        width: 320,
+        height: 240,
+        capturedAt: 1,
+        stale: true
+      })
+    })
 
-    await waitFor(() => expect(listeners.forwardedShortcut).not.toBeNull())
-    listeners.forwardedShortcut?.({ panelId: 'preview-1', key: 's', accel: true })
-
-    await waitFor(() => expect(preview.exportPdf).toHaveBeenCalledWith('preview-1'))
-  })
-
-  it('closes the panel on a forwarded Cmd/Ctrl+W (UX-006)', async () => {
-    const props = makeProps('/proj/page.html')
-    render(<HtmlPreviewPanel {...props} />)
-
-    await waitFor(() => expect(listeners.forwardedShortcut).not.toBeNull())
-    act(() => listeners.forwardedShortcut?.({ panelId: 'preview-1', key: 'w', accel: true }))
-
-    expect(props.api.close).toHaveBeenCalledTimes(1)
-  })
-
-  it('opens find on a forwarded Cmd/Ctrl+F and closes it on Escape (UX-007)', async () => {
-    render(<HtmlPreviewPanel {...makeProps('/proj/page.html')} />)
-
-    await waitFor(() => expect(listeners.forwardedShortcut).not.toBeNull())
-
-    act(() => listeners.forwardedShortcut?.({ panelId: 'preview-1', key: 'f', accel: true }))
-    await waitFor(() => expect(useSearchStore.getState().isOpen).toBe(true))
-
-    act(() => listeners.forwardedShortcut?.({ panelId: 'preview-1', key: 'Escape', accel: false }))
-    await waitFor(() => expect(useSearchStore.getState().isOpen).toBe(false))
+    hold(true)
+    expect(container.querySelector('img.html-preview-still-frame')).toBeNull()
+    applied(false)
+    expect(container.querySelector('img.html-preview-still-frame')).toBeNull()
+    // Another panel's report is not this panel's release.
+    act(() => listeners.visibilityApplied?.({ panelId: 'preview-2', visible: true }))
+    expect(container.querySelector('img.html-preview-still-frame')).toBeNull()
   })
 })

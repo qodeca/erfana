@@ -16,9 +16,6 @@ This guide covers advanced troubleshooting topics. For basic troubleshooting (In
 1. Use preview-only mode for very large files
 2. Consider splitting large files into smaller chunks
 
-**Future Enhancement:**
-Virtual scrolling for Monaco editor (planned).
-
 ---
 
 ### High Memory Usage
@@ -34,7 +31,7 @@ Virtual scrolling for Monaco editor (planned).
 1. Close unused editor tabs
 2. Clear terminal buffers:
    ```typescript
-   terminalRef.current?.terminal.clear()
+   xterm.clear()  // TerminalPanel.tsx – the xterm.js Terminal instance
    ```
 3. Restart Erfana if memory continues to grow
 
@@ -42,40 +39,11 @@ Virtual scrolling for Monaco editor (planned).
 
 ## UI/Layout
 
-### Panel Won't Resize
-
-**Symptom:** Resize cursor shows but dragging does nothing
-
-**Cause:** This was a known issue, resolved in v0.1.0 with hybrid layout refactoring.
-
-**Verification:**
-Ensure using SplitviewReact (outer) + DockviewReact (center):
-```tsx
-<Splitview>  {/* Outer 3-column layout */}
-  <Panel id="left">Project</Panel>
-  <Panel id="center">
-    <Dockview>  {/* Editor tabs only */}
-      ...
-    </Dockview>
-  </Panel>
-  <Panel id="right">Terminal/Git</Panel>
-</Splitview>
-```
-
-**See:** [Known Issues - Panel Resizing](./known-issues.md#panel-resizing-resolved-in-v010-commit-4ff94cb)
-
----
-
 ### Keyboard Shortcuts Not Working
 
 **Symptom:** Cmd/Ctrl+B doesn't toggle sidebar
 
-**Cause:** Global shortcuts override Monaco shortcuts.
-
-**Expected Behavior:**
-- `Cmd/Ctrl+B` = Toggle left sidebar (NOT Monaco bold)
-- `Cmd/Ctrl+J` = Toggle terminal panel
- 
+**Cause:** `Cmd/Ctrl+B` is registered twice – the global sidebar toggle and Monaco's Bold. Which one wins while the editor is focused is **unverified**; see [Keyboard shortcuts – Conflicts](./keyboard-shortcuts.md#conflicts).
 
 **Workaround:**
 Use Monaco's command palette (F1) or formatting toolbar for editor commands.
@@ -94,23 +62,19 @@ Use Monaco's command palette (F1) or formatting toolbar for editor commands.
 1. Check localStorage:
    ```javascript
    // In DevTools Console
-   localStorage.getItem('erfana-sidebar-state')
+   localStorage.getItem('erfana-activity-bar-state')
    ```
 
 2. Clear state to reset:
    ```javascript
-   localStorage.removeItem('erfana-sidebar-state')
+   localStorage.removeItem('erfana-activity-bar-state')
    // Reload app
    ```
 
-3. Verify state saves on change:
+3. Verify state saves on change – `useActivityBarStore` (`src/renderer/src/stores/useActivityBarStore.ts`) is a Zustand store wrapped in `persist` under the key `erfana-activity-bar-state`; its `partialize` writes only `leftActivePanel`, `rightActivePanel`, `leftWidth` and `rightWidth`. Widths change through the store's `setSidebarWidth(width, side)` action:
    ```typescript
-   // In useActivityBarStore
-   setSidebarStates((prev) => {
-     const newState = { ...prev, ...updates }
-     localStorage.setItem('erfana-sidebar-state', JSON.stringify(newState))
-     return newState
-   })
+   useActivityBarStore.getState().setSidebarWidth(320, 'left')
+   // persist middleware writes the partialized state to localStorage
    ```
 
 **Files:** `src/renderer/src/stores/useActivityBarStore.ts`
@@ -142,7 +106,7 @@ npm run dev
 
 **Symptom:** Build fails with type errors, but dev mode works
 
-**Cause:** Stricter checks in production build.
+**Cause:** `npm run build` runs `npm run typecheck` before `electron-vite build`; `npm run dev` (`electron-vite dev`) does not type-check.
 
 **Solution:**
 Run type check locally:
@@ -151,18 +115,6 @@ npm run typecheck
 # Fix all errors before building
 npm run build
 ```
-
----
-
-### ESLint Peer Dependency Warnings
-
-**Symptom:** `npm install` shows ESLint version warnings
-
-**Impact:** None (warnings only, doesn't affect functionality).
-
-**Cause:** ESLint 9 vs ESLint 8 peer dependencies in electron-toolkit.
-
-**Action:** Ignore warnings. electron-toolkit will update in future releases.
 
 ---
 
@@ -240,5 +192,4 @@ When reporting bugs, include:
 - [Architecture](./architecture.md) - System design and component overview
 - [Development Tasks](./development-tasks.md) - Common development patterns
 - [API Services](./api-services.md) - Service class documentation
-- [API Services](./api-services.md) - Supporting services documentation
  

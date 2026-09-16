@@ -520,5 +520,20 @@ describe('useAutoSave', () => {
 
       expect(onSave).not.toHaveBeenCalled()
     })
+
+    // #124 Q2: the preview move prompt holds autosave with cancelAutoSave and
+    // releases it with signalChange, so a Cancel still gets the edits written.
+    it('a signalChange after cancelAutoSave re-arms the debounce', () => {
+      const onSave = vi.fn()
+      const { result } = renderHook(() => useAutoSave(true, onSave, { delay: 2000, maxInterval: 30000 }))
+
+      act(() => result.current.cancelAutoSave())
+      act(() => void vi.advanceTimersByTime(2500))
+      expect(onSave).not.toHaveBeenCalled()
+
+      act(() => result.current.signalChange())
+      act(() => void vi.advanceTimersByTime(2000))
+      expect(onSave).toHaveBeenCalledTimes(1)
+    })
   })
 })

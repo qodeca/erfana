@@ -1,5 +1,7 @@
 # Windows verification report – v0.19.0 preview on Windows 11
 
+> **Historical – all §6 actions taken.** v0.19.0 shipped on 2026-09-04; #112, #117, #118 and #119 are closed as planned and only the #120 follow-up stays open.
+
 > **Point-in-time document.** The reply to §8 of [2026-09-03-windows-release-verification.md](2026-09-03-windows-release-verification.md). Commit SHAs, counts and issue states were true on 2026-09-04 and go stale immediately.
 
 **Date**: 2026-09-04

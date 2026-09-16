@@ -8,16 +8,21 @@
  * sized, background-coloured DOM **placeholder** the native view paints over,
  * and the chrome around it:
  *
- * - a `ResizeObserver`-driven bounds pump keeping the native view aligned with
- *   the placeholder (via {@link usePreviewBounds});
+ * - a per-frame measure loop keeping the native view aligned with the
+ *   placeholder (via {@link usePreviewBounds});
  * - `preview:open` on mount / `preview:close` on unmount (via
  *   {@link usePreviewLifecycle});
  * - the still-frame/placeholder fallback, the limit-reached refusal and the
  *   failed banner — all selected by pure functions in `htmlPreview.logic.ts`
  *   (the failure badge lives in `HtmlPreviewTab`, which is always-DOM chrome
  *   the native view never occludes);
+ * - the drag freeze's panel half (issue #124): a window-edge hold counts as
+ *   hidden, a drag's picture or backdrop stays until the page is back, and the
+ *   release pushes the settled rect (via `useSplitterDragFreeze`);
  * - a memoised {@link PreviewPageSearchProvider} rendered against the shared
- *   {@link SearchBar} for find-in-page.
+ *   {@link SearchBar} for find-in-page;
+ * - Back, the link-mode toggle and the Back/Forward keys, and the polite region
+ *   a same-tab move is announced in (via {@link usePreviewNavigation}).
  *
  * This file is deliberately glue only: state lives in `hooks/`, chrome lives in
  * `components/`, and every decision lives in `htmlPreview.logic.ts` — mirroring
@@ -27,50 +32,49 @@
  * @see Issue #74 - HTML preview with CSS and JavaScript execution
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { IDockviewPanelProps } from 'dockview'
 
 import { getBasename } from '../../../utils/fileUtils'
-import { openFileInPanel } from '../../../utils/openFileInPanel'
+import { usePreviewDragFreezeTarget } from '../../../hooks/useSplitterDragFreeze'
 import { useSearchKeyboard } from '../../../hooks/useSearchKeyboard'
 import { PreviewPageSearchProvider } from '../../../providers/search'
 import { usePreviewStore } from '../../../stores/usePreviewStore'
+import { usePreviewTabStore, type PreviewLinkMode } from '../../../stores/usePreviewTabStore'
 import { useSearchStore } from '../../../stores/useSearchStore'
 import { useOverlayOccluderStore } from '../../../stores/useOverlayOccluderStore'
 import { SearchBar } from '../../Search/SearchBar'
 import { PreviewChromeBand } from './components/PreviewChromeBand'
 import { usePreviewChromeGate } from './hooks/usePreviewChromeGate'
 import type { PreviewBlockedHost } from '../../../stores/usePreviewStore'
-import { PreviewBanner, PreviewFallback } from './components'
+import { PreviewBanner, PreviewFallback, PreviewFindTool, PreviewNavControls } from './components'
 import {
   usePreviewBounds,
   usePreviewEvents,
-  usePreviewFindShortcuts,
-  usePreviewLifecycle
+  usePreviewLifecycle,
+  usePreviewNavigation,
+  usePreviewPageEntry,
+  usePreviewPanelActions
 } from './hooks'
-import { exportPreviewPdf } from './previewPdfExport'
-import { selectFallback, selectPanelView } from './htmlPreview.logic'
+import { previewPlaceholderLabel, selectFallback, selectPanelView } from './htmlPreview.logic'
 import './HtmlPreviewPanel.css'
 
 /** Parameters passed to {@link HtmlPreviewPanel} via dockview. */
 export interface HtmlPreviewPanelParams {
-  /** Absolute path to the previewed `.html` file. */
+  /**
+   * The page this tab shows NOW (issue #124). It changes on a same-tab move –
+   * main's `pageChanged` writes it through `updateParameters` – while the panel
+   * id and the native view stay.
+   */
   filePath: string
-  /** Unique panel identifier. */
+  /** Unique panel identifier; never changes, and never names the page. */
   panelId?: string
+  /**
+   * The link mode a tab opened by a link inherits from its source tab. Seeds
+   * the tab store once; after that the store is the record.
+   */
+  linkMode?: PreviewLinkMode
 }
-
-/** User-facing copy, centralised so a change is one edit (sentence case, en dashes). */
-const COPY = {
-  /** Failed-state banner headline. */
-  failed: 'The preview stopped running.',
-  /** Failed-state primary action. */
-  reload: 'Reload',
-  /** Limit-reached banner headline (this file is previewed in another window). */
-  limitReached: 'This file is already previewed in another window.',
-  /** Limit-reached primary action. */
-  openAsSource: 'Open as source'
-} as const
 
 /**
  * Running HTML preview panel.
@@ -110,6 +114,8 @@ export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelPara
   const bandChipRef = useRef<HTMLButtonElement>(null)
   /** The panel root, measured for the band's too-short fail-safe. */
   const panelRootRef = useRef<HTMLDivElement>(null)
+  /** The band fills this with its host-list collapse; a page change calls it. */
+  const bandCollapseRef = useRef<(() => void) | null>(null)
   /**
    * The band wants to expose controls, so the page has to prove it moved.
    *
@@ -159,7 +165,13 @@ export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelPara
     isVisible
   })
 
-  usePreviewEvents(panelId)
+  // Seed this tab's UI state. A no-op when the entry exists – the store
+  // outlives an error-boundary remount, so a crash never resets the mode.
+  const seedLinkMode = params?.linkMode
+  useEffect(() => {
+    usePreviewTabStore.getState().seed(panelId, seedLinkMode)
+  }, [panelId, seedLinkMode])
+
   // Renderer-focus Cmd/Ctrl+F (view hidden). The sealed-page case is forwarded
   // by usePreviewFindShortcuts; both converge on the search store.
   useSearchKeyboard()
@@ -189,6 +201,19 @@ export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelPara
   const blockedHosts = panel?.blockedHosts ?? NO_BLOCKED_HOSTS
   const allowedHosts = panel?.allowedHosts ?? NO_ALLOWED_HOSTS
   const blockedHostsTruncated = panel?.blockedHostsTruncated ?? false
+  // The drag freeze (issue #124, part 1 §1.5). Main hides the view for a
+  // window-edge hold without the guard knowing, so it counts as hidden here;
+  // the latch keeps what a drag's hide showed until the page is confirmed back.
+  const resizeHeld = panel?.resizeHeld ?? false
+  const dragHideLatched = panel?.dragHideLatched ?? false
+
+  const { gate, controlsAllowed, ackController } = usePreviewChromeGate({
+    panelId,
+    needsProof: bandExpanded,
+    panelRef: panelRootRef
+  })
+
+  const isViewHidden = isViewHiddenBase || gate !== null || resizeHeld
 
   // The hook owns every push, including the one on becoming visible: a tab
   // switch changes no size, so the `ResizeObserver` alone would not re-emit.
@@ -197,33 +222,12 @@ export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelPara
   // that. It used to be `!limitReached && !openFailed`, which stayed true for a
   // FAILED load: the placeholder was already gone, so nothing could be pushed,
   // and nothing cleared the rect that had been published for it either.
-  /**
-   * Approve one host, and RETURN the result.
-   *
-   * The old toast called this with `void`, so a `{ok: false}` — a read-only
-   * checkout, a full allowlist, a settings file that would not parse — was
-   * thrown away and the prompt simply vanished. The reader had no way to tell a
-   * successful grant from a failed one, and the failure survived a restart.
-   */
-  const approveHost = useCallback(
-    (host: string) => window.api.preview.approveHost(panelId, host),
-    [panelId]
-  )
-
-  const { gate, controlsAllowed, ackController } = usePreviewChromeGate({
-    panelId,
-    needsProof: bandExpanded,
-    panelRef: panelRootRef
-  })
-
-  const isViewHidden = isViewHiddenBase || gate !== null
-
   const view = selectPanelView({
     limitReached,
     loadState: openFailed ? 'failed' : loadState
   })
 
-  usePreviewBounds({
+  const { pushBounds } = usePreviewBounds({
     placeholderRef,
     panelRef: panelRootRef,
     ackController,
@@ -239,7 +243,22 @@ export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelPara
     isLive: loadState !== 'idle' && loadState !== 'suspended',
     searchOpen: isVisible && isSearchOpen
   })
+  // A splitter drag's release pushes the settled rect before the page returns.
+  usePreviewDragFreezeTarget(panelId, pushBounds)
   const fallbackKind = selectFallback({ hasFrame: stillFrame !== null, isViewHidden })
+
+  // The keyboard's way into the page (issue #124, QG-8 U1). Offered only while
+  // there IS a drawn, running page to enter: the `isLive` term the bounds loop
+  // uses, and the hidden term the fallback uses.
+  const pageEntry = usePreviewPageEntry({
+    panelId,
+    api,
+    pageLive:
+      view === 'normal' && !isViewHidden && loadState !== 'idle' && loadState !== 'suspended'
+  })
+
+  // After `view`: focus goes to Back only once the band that holds it exists.
+  const navigation = usePreviewNavigation({ panelId, filePath, view, containerApi })
 
   // ========================================
   // Find provider (X15b: memoised on panelId)
@@ -252,45 +271,38 @@ export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelPara
   useEffect(() => () => searchProvider.dispose(), [searchProvider])
 
   // ========================================
-  // Forwarded-accelerator actions (view on top swallows renderer keys)
+  // Actions: toolbar, banners and forwarded accelerators (the view on top
+  // swallows renderer keys, so main forwards them)
   // ========================================
 
-  // Forwarded Escape must close the find bar the SAME way SearchBar.handleClose
-  // does — clear the provider's highlights and restore focus — not just flip the
-  // store flag (UX-007). A no-op when the bar is already closed.
-  const closePreviewSearch = useCallback(() => {
-    const { isOpen, closeSearch, restoreFocus } = useSearchStore.getState()
-    if (!isOpen) return
-    searchProvider.clearHighlights()
-    closeSearch()
-    restoreFocus()
-  }, [searchProvider])
-
-  const openPreviewSearch = useCallback(() => useSearchStore.getState().openSearch(), [])
-  // A save dialog is modal to the OS, so a second click while the first is open
-  // would queue a second one behind it. `MarkdownToolbar` disables its button the
-  // same way; the shortcut route is guarded by the same flag.
-  const [exportingPdf, setExportingPdf] = useState(false)
-  const exportPdf = useCallback(() => {
-    setExportingPdf(current => {
-      if (current) return current
-      void exportPreviewPdf(panelId).finally(() => setExportingPdf(false))
-      return true
-    })
-  }, [panelId])
-  // Cmd/Ctrl+W closes the panel via the dockview api, matching how the tab
-  // close button and MarkdownEditorPanel close a panel (UX-006).
-  const closePanel = useCallback(() => api.close(), [api])
-
-  usePreviewFindShortcuts(panelId, {
-    openSearch: openPreviewSearch,
-    // Read at call time, not captured: the actions object is held in a ref by
-    // the hook, so a captured boolean would be the value from first mount.
-    isSearchOpen: () => useSearchStore.getState().isOpen,
-    closeSearch: closePreviewSearch,
+  const {
+    approveHost,
+    openSearch,
     exportPdf,
-    closePanel,
-    focusChrome: () => bandChipRef.current?.focus()
+    exportingPdf,
+    openInBrowser,
+    openingInBrowser,
+    limitReachedBanner,
+    failedBanner,
+    leavePage
+  } = usePreviewPanelActions({
+    panelId,
+    filePath,
+    api,
+    containerApi,
+    searchProvider,
+    chipRef: bandChipRef,
+    navigation,
+    panelRootRef,
+    bandCollapseRef
+  })
+
+  usePreviewEvents(panelId, {
+    api,
+    filePath,
+    onLeavePage: leavePage,
+    onPageChanged: navigation.onPageChanged,
+    pushSettledBounds: () => pushBounds({ settled: true })
   })
 
   // ========================================
@@ -303,39 +315,24 @@ export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelPara
   }, [api, filePath])
 
   // ========================================
-  // Actions
-  // ========================================
-
-  const openAsSource = (): void => {
-    openFileInPanel(containerApi, filePath, { kind: 'editor' })
-  }
-  const reload = (): void => {
-    void window.api.preview.reload(panelId)
-  }
-
-  // ========================================
   // Render
   // ========================================
 
   return (
-    <div className="html-preview-panel" ref={panelRootRef}>
+    // Back/Forward keys with focus anywhere in THIS panel's chrome – a React
+    // handler on the root, so another panel's keys never reach it (§3.7).
+    <div className="html-preview-panel" ref={panelRootRef} onKeyDown={navigation.onRootKeyDown}>
+      {/* Move announcements (part 3 §3.8, RU3-1). On the ROOT, mounted in every
+          view: a move started from the failed banner mounts the band in the
+          same render it lands, and a live region created with its text is not
+          announced. The band's own visually-hidden class, same idiom. */}
+      <div className="erf-band__announce" role="status" aria-live="polite" data-testid="preview-move-announcement">
+        {navigation.announcement}
+      </div>
 
-      {view === 'limit-reached' && (
-        <PreviewBanner
-          message={COPY.limitReached}
-          actionLabel={COPY.openAsSource}
-          onAction={openAsSource}
-        />
-      )}
+      {view === 'limit-reached' && <PreviewBanner {...limitReachedBanner} />}
 
-      {view === 'failed' && (
-        <PreviewBanner
-          message={COPY.failed}
-          actionLabel={COPY.reload}
-          onAction={reload}
-          autoFocusAction
-        />
-      )}
+      {view === 'failed' && <PreviewBanner {...failedBanner} />}
 
       {view === 'normal' && (
         <div className="html-preview-surface">
@@ -352,7 +349,8 @@ export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelPara
           {/* Name the surface for assistive tech: while the native view is hidden
               (inactive tab, overlay, pre-paint) its own a11y tree is gone, so
               without a label a screen reader finds only an unnamed black region. */}
-          {/* The preview's toolbar — Find, and the permission chip. Always
+          {/* The preview's toolbar — Back, the link-mode toggle, Find, and the
+              permission chip. Always
               rendered, and a flow sibling ABOVE the page area rather than an
               overlay on it, so the untrusted page has nowhere to paint that
               could cover it and the bar may grow to any height.
@@ -370,11 +368,20 @@ export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelPara
             chipRef={bandChipRef}
             controlsAllowed={controlsAllowed}
             paused={gate !== null}
-            onFind={openPreviewSearch}
+            onFind={openSearch}
             onExportPdf={exportPdf}
             exportingPdf={exportingPdf}
+            onOpenInBrowser={openInBrowser}
+            openingInBrowser={openingInBrowser}
             onApprove={approveHost}
             onExpandedChange={setBandExpanded}
+            collapseRef={bandCollapseRef}
+            leadingTools={
+              <>
+                <PreviewNavControls {...navigation.controls} />
+                <PreviewFindTool onFind={openSearch} />
+              </>
+            }
           />
           {/* Everything below the strip. This wrapper is the find bar's
               positioning context, so the bar's offset measures from BELOW the
@@ -391,16 +398,32 @@ export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelPara
                 colour. While the view is live the user is looking at a running,
                 scrollable document, and `role="img"` would both mislabel it and
                 make its subtree presentational. `aria-busy` carries the "not
-                readable yet" state that is otherwise visual-only. */}
+                readable yet" state that is otherwise visual-only.
+
+                While the page can be ENTERED (issue #124, QG-8 U1) the element
+                is also the keyboard's only way in, activated by Enter or Space,
+                so it is a `button` for as long as that is true: the page's own
+                accessibility tree lives in the native view and no DOM role here
+                reaches it, while "there is something here you can activate" is
+                exactly what a reader needs to be told. The name states the way
+                back out too, because Escape is the only one. */}
             <div
               ref={placeholderRef}
               className="html-preview-placeholder"
               style={backdrop !== null ? { background: backdrop } : undefined}
-              role={isViewHidden ? 'img' : 'group'}
+              role={isViewHidden ? 'img' : pageEntry.enabled ? 'button' : 'group'}
+              // -1, not absent: out of the tab order, yet focusable from code, so
+              // a closing dialog's synchronous focus restore still lands here
+              // before the page is offered again (QG-11a Q26).
+              tabIndex={pageEntry.enabled ? 0 : -1}
               aria-busy={loadState === 'loading' || loadState === 'idle'}
-              aria-label={`HTML preview of ${getBasename(filePath) || 'page'}`}
+              aria-label={previewPlaceholderLabel(
+                getBasename(filePath) || 'page',
+                pageEntry.enabled
+              )}
+              onKeyDown={pageEntry.onKeyDown}
             >
-              <PreviewFallback kind={fallbackKind} stillFrame={stillFrame} />
+              <PreviewFallback kind={fallbackKind} stillFrame={stillFrame} dragLatched={dragHideLatched} />
             </div>
           </div>
         </div>

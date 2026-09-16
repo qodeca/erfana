@@ -1,0 +1,15 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+
+/*
+ * Used by index.html (the top page) AND by child.html (a frame): saving it
+ * must reload the preview so the frame is never left stale (WI-15).
+ */
+:root {
+  --shared-mark: shared-v1;
+}
+
+h1 {
+  font-size: 1.3rem;
+  color: #2b6cb0;
+}

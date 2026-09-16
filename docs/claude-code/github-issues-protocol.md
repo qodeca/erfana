@@ -140,9 +140,11 @@ form. Fill the form's fields; do not invent your own heading structure.
 | Bug report | [`bug_report.yml`](../../.github/ISSUE_TEMPLATE/bug_report.yml) | `[Bug]: ` | `bug` |
 | Feature request | [`feature_request.yml`](../../.github/ISSUE_TEMPLATE/feature_request.yml) | `[Feature]: ` | `enhancement` |
 
-`config.yml` also routes three cases away from the issue tracker entirely: security
+`config.yml` also offers three contact links away from the issue tracker entirely: security
 vulnerabilities go to [private advisory reporting](https://github.com/qodeca/erfana/security/advisories/new),
-never a public issue; questions and open-ended ideas go to Discussions.
+never a public issue; the [security policy](https://github.com/qodeca/erfana/blob/main/SECURITY.md)
+explains how reports are handled; and questions and open-ended ideas go to
+[Discussions](https://github.com/qodeca/erfana/discussions).
 
 ### Bug report — fields
 
@@ -179,7 +181,7 @@ gh issue create \
 1. …
 
 ## Erfana version
-0.19.0
+0.20.0
 
 ## Operating system
 macOS
@@ -203,15 +205,16 @@ gh issue view <number>  # Read acceptance criteria
 ### During development
 ```bash
 # Reference in commits
-git commit -m "Add feature X
+git commit -m "feat: add feature X
 
 Implements the core functionality for #123"
 ```
 
 ### Creating pull requests
 ```bash
-# Link to issue in PR body
-gh pr create --title "Add feature X" --body "Closes #123
+# Link to issue in PR body; target the integration branch, never main
+# (--base develop for general work, --base graph for graph-engine work)
+gh pr create --base develop --title "feat: add feature X" --body "Closes #123
 
 ## Changes
 - Added X

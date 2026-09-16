@@ -16,14 +16,14 @@ This document provides a step-by-step implementation roadmap for the Erfana Grap
 ## Table of Contents
 
 1. [Implementation Philosophy](#implementation-philosophy)
-2. [Milestone 1: Foundation (FTS5 + Keyword Search)](#milestone-1-foundation-fts5--keyword-search)
-3. [Milestone 2: Vector Search (Hybrid Retrieval)](#milestone-2-vector-search-hybrid-retrieval)
-4. [Milestone 3: Graph Capabilities (Entities & Relations)](#milestone-3-graph-capabilities-entities--relations)
-5. [Milestone 4: Temporal Features (Time-Aware Queries)](#milestone-4-temporal-features-time-aware-queries)
-6. [Milestone 5: Advanced Features (Polish & Maintenance)](#milestone-5-advanced-features-polish--maintenance)
-7. [Code Structure](#code-structure)
-8. [Testing Strategy](#testing-strategy)
-9. [Migration Path](#migration-path)
+2. [Milestone 1: Foundation (FTS5 + Keyword Search)](./m1-backend.md#milestone-1-foundation-fts5--keyword-search) (frontend: [m1-frontend.md](./m1-frontend.md))
+3. [Milestone 2: Vector Search (Hybrid Retrieval)](./m2-vector-search.md#milestone-2-vector-search-hybrid-retrieval)
+4. [Milestone 3: Graph Capabilities (Entities & Relations)](./m3-graph.md#milestone-3-graph-capabilities-entities--relations)
+5. [Milestone 4: Temporal Features (Time-Aware Queries)](./m4-temporal.md#milestone-4-temporal-features-time-aware-queries)
+6. [Milestone 5: Advanced Features (Polish & Maintenance)](./m5-advanced.md#milestone-5-advanced-features-polish--maintenance)
+7. [Code Structure](./m5-advanced.md#code-structure)
+8. [Testing Strategy](./m5-advanced.md#testing-strategy)
+9. [Migration Path](./m5-advanced.md#migration-path)
 
 ---
 

@@ -16,8 +16,21 @@
  * `URIError`) → `resolveConfined` (which owns steps 6–9: safe-segment,
  * realpath confinement and the bounded read, mapping to 400/403/404/413) →
  * `unsupported-asset-type` badge on a MIME fallthrough for a `script`/`style`
- * destination (still 200) → `buildResponseHeaders(contentType, entry.csp)` as
+ * request (still 200) → `buildResponseHeaders(contentType, entry.csp)` as
  * the SINGLE CSP application site → `new Response(body, { headers })`.
+ *
+ * The request KIND (issue #124 WI-12, design part 2 §2.2) comes from the
+ * session's request-kind ledger, never from the request: `protocol.handle` sees
+ * no `sec-fetch-dest` and an empty `destination` (spike S1), so the header read
+ * this handler used to do returned `''` in the real app and its document and
+ * asset-type badges never fired. The request filter notes each preview-scheme
+ * URL with webRequest's `resourceType`; the handler takes that note once per
+ * request. What a refusal records depends on the kind: the page's own document
+ * is badged on the page it belongs to (`recordDocumentFailure` – the page main
+ * is loading, which still commits with its error status, S15); a frame's
+ * document is listed as a frame refusal on the page on screen; any other
+ * subresource is left to the page's console. An unknown kind badges nothing –
+ * the bytes and the confinement never depend on it.
  *
  * `buildResponseHeaders` throws `PREVIEW_CSP_INVALID` on an empty or unwired
  * CSP; the handler catches it, records a `csp-missing` failure entry and
@@ -34,8 +47,15 @@ import type { Session } from 'electron'
 import { AppError, ErrorCode } from '../../../shared/errors'
 import { PREVIEW } from '../../../shared/constants'
 import { logger } from '../LoggingService'
-import type { PreviewFailureInput } from '../../../shared/ipc/preview-types'
+import { redactedLogError } from '../../utils/redactUserInput'
+import type { PreviewFailureInput, PreviewFailureType } from '../../../shared/ipc/preview-types'
+import type { PreviewFrameRefusalType } from './previewFrameRefusals'
 import { resolveConfined, type PreviewResolveResult } from './previewPathResolve'
+import {
+  requestKind,
+  type PreviewRequestKind,
+  type PreviewRequestKindLedger
+} from './PreviewRequestKindLedger'
 import {
   buildResponseHeaders,
   isKnownAssetType,
@@ -75,8 +95,23 @@ export interface PreviewProtocolContext {
    * unknown or revoked token — a revoked token yields 404, not 403 (design §2.1).
    */
   resolve(token: string): PreviewRootEntryLike | null
-  /** Record a diagnostic failure (a `csp-missing` or `unsupported-asset-type`). */
+  /**
+   * Record a diagnostic on the page on screen: a subresource's `csp-missing`,
+   * read-budget shed or `unsupported-asset-type`.
+   */
   recordFailure(input: PreviewFailureInput): void
+  /**
+   * Record why a MAIN-FRAME document was not served, on the page that document
+   * belongs to – the page main is loading, else the page on screen (the page
+   * scopes' `forMainDocument()`, issue #124 WI-29). A refused page still
+   * commits, with its error status (S15), so its badge must outlive the page it
+   * replaces.
+   */
+  recordDocumentFailure(input: PreviewFailureInput): void
+  /** List a refused frame document on the page on screen, one entry per address. */
+  recordFrameRefusal(type: PreviewFrameRefusalType, address: string): void
+  /** The session's request-kind notes, left by the request filter (S1). */
+  readonly ledger: Pick<PreviewRequestKindLedger, 'take'>
 }
 
 /** Build a bodyless error response for a non-2xx status (no CSP, no leak). */
@@ -146,18 +181,68 @@ const sharedAssetReadLimiter = createConcurrencyLimiter(
 )
 
 /**
- * The request `destination` for step 10, read from the `sec-fetch-dest` request
- * header (the authoritative signal), falling back to `request.destination`.
- * Reading a REQUEST header is safe — it is classified, never reflected into a
- * response (design §2.4 step 10 note).
+ * Record a diagnostic about the request itself: a main-frame document's goes
+ * to the page that document belongs to, anything else to the page on screen.
  */
-function readDestination(request: GlobalRequest): string {
-  const header = request.headers.get('sec-fetch-dest')
-  if (header) {
-    return header
+function recordForRequest(
+  kind: PreviewRequestKind,
+  ctx: PreviewProtocolContext,
+  input: PreviewFailureInput
+): void {
+  if (kind === 'document') {
+    ctx.recordDocumentFailure(input)
+  } else {
+    ctx.recordFailure(input)
   }
-  const dest = (request as { destination?: string }).destination
-  return typeof dest === 'string' ? dest : ''
+}
+
+/**
+ * The frame form of a resolver refusal (part 2 §2.2), or `null` for a reason a
+ * frame entry has no form for.
+ */
+function frameRefusalType(reason: PreviewFailureType): PreviewFrameRefusalType | null {
+  switch (reason) {
+    case 'path-escape':
+      return 'frame-escape'
+    case 'excluded-path':
+      return 'frame-excluded'
+    case 'missing-local-file':
+    case 'asset-too-large':
+      return reason
+    default:
+      return null
+  }
+}
+
+/**
+ * Record why the resolver refused a request. The ENTRY document failing to
+ * resolve used to leave no trace (a blank preview, no badge); a frame's
+ * document is listed once per address. A missing image, stylesheet or script
+ * is not recorded, and nothing else badges it either: the console classifier
+ * (`previewConsoleClassify.ts`) takes only uncaught errors and unresolved module
+ * specifiers, so a broken `<img>` leaves no badge entry – by design (#124).
+ */
+function recordRefusal(
+  kind: PreviewRequestKind,
+  ctx: PreviewProtocolContext,
+  pathname: string,
+  reason: PreviewFailureType
+): void {
+  if (kind === 'document') {
+    ctx.recordDocumentFailure({
+      type: reason,
+      resourceUrlOrHost: pathname,
+      reasonCode:
+        reason === 'missing-local-file'
+          ? ErrorCode.PREVIEW_LOCAL_FILE_MISSING
+          : ErrorCode.PREVIEW_LINK_BLOCKED
+    })
+    return
+  }
+  const frameType = kind === 'iframe' ? frameRefusalType(reason) : null
+  if (frameType !== null) {
+    ctx.recordFrameRefusal(frameType, pathname)
+  }
 }
 
 /**
@@ -174,10 +259,8 @@ async function handleRequest(
   try {
     return await handleRequestInner(request, ctx, limiter)
   } catch (error) {
-    logger.error(
-      'Preview protocol handler error',
-      error instanceof Error ? error : undefined
-    )
+    // A Node error quotes the path it failed on; the logged copy has it cut.
+    logger.error('Preview protocol handler error', redactedLogError(error))
     return errorResponse(500)
   }
 }
@@ -188,6 +271,11 @@ async function handleRequestInner(
   ctx: PreviewProtocolContext,
   limiter: ConcurrencyLimiter
 ): Promise<GlobalResponse> {
+  // The request's kind, from the note the request filter left (S1). Taken
+  // first and exactly once, whatever the outcome below, so the ledger's queue
+  // for this URL stays in step with the requests that reach the handler.
+  const kind = requestKind(ctx.ledger.take(request.url))
+
   // Step 1: parse the URL. A URL the platform cannot parse is a 404.
   let url: URL
   try {
@@ -230,7 +318,7 @@ async function handleRequestInner(
   if (!(await limiter.acquire())) {
     // Shed rather than queue without bound: a page that asks for hundreds of
     // assets at once must not stall every other preview (sd-074b §4.7).
-    ctx.recordFailure({
+    recordForRequest(kind, ctx, {
       type: 'network-error',
       resourceUrlOrHost: segments.join('/'),
       reasonCode: ErrorCode.PREVIEW_READ_BUDGET_EXCEEDED
@@ -244,35 +332,20 @@ async function handleRequestInner(
     limiter.release()
   }
   if (!resolved.ok) {
-    // The ENTRY document failing to resolve used to leave no trace: a 404 on
-    // the page itself showed a blank preview and no badge, while every
-    // subresource failure was badged. The resolver already names the reason;
-    // record it for the main frame only — a missing image is the page's own
-    // console's business, and would badge every broken `<img>` twice.
-    if (readDestination(request) === 'document') {
-      ctx.recordFailure({
-        type: resolved.reason,
-        resourceUrlOrHost: url.pathname,
-        reasonCode:
-          resolved.reason === 'missing-local-file'
-            ? ErrorCode.PREVIEW_LOCAL_FILE_MISSING
-            : ErrorCode.PREVIEW_LINK_BLOCKED
-      })
-    }
+    // The resolver already names the reason; what gets recorded depends on
+    // what the request was.
+    recordRefusal(kind, ctx, url.pathname, resolved.reason)
     return errorResponse(resolved.status)
   }
 
-  // Step 10: a MIME fallthrough (octet-stream) for a script/style destination is
+  // Step 10: a MIME fallthrough (octet-stream) for a script/style request is
   // the "needs a bundler" case (AC7). Badge it, but still serve the bytes (200).
-  if (!isKnownAssetType(resolved.ext)) {
-    const destination = readDestination(request)
-    if (destination === 'script' || destination === 'style') {
-      ctx.recordFailure({
-        type: 'unsupported-asset-type',
-        resourceUrlOrHost: url.pathname,
-        reasonCode: ErrorCode.UNKNOWN_ERROR
-      })
-    }
+  if (!isKnownAssetType(resolved.ext) && (kind === 'script' || kind === 'style')) {
+    ctx.recordFailure({
+      type: 'unsupported-asset-type',
+      resourceUrlOrHost: url.pathname,
+      reasonCode: ErrorCode.UNKNOWN_ERROR
+    })
   }
 
   // Step 11: the SINGLE CSP application site. An empty or unwired CSP throws
@@ -287,7 +360,7 @@ async function handleRequestInner(
     if (!(error instanceof AppError) || error.code !== ErrorCode.PREVIEW_CSP_INVALID) {
       throw error
     }
-    ctx.recordFailure({
+    recordForRequest(kind, ctx, {
       type: 'csp-missing',
       resourceUrlOrHost: url.pathname,
       reasonCode: ErrorCode.PREVIEW_CSP_INVALID

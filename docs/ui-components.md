@@ -46,18 +46,17 @@ Collapsible panels with chevron toggle (VS Code pattern).
 
 Header with ChevronDown/ChevronLeft icon (8px spacing). Click toggles visibility with 150ms rotation transition.
 
-**Implementation**:
+**Implementation** (`ProjectPanel.tsx` swaps the icon rather than rotating one):
 ```typescript
 const [show, setShow] = useState(true)
 
-<ChevronDown
-  className={`chevron-toggle ${show ? '' : 'collapsed'}`}
-  onClick={() => setShow(!show)}
-/>
+<button className="control-panel-chevron" onClick={() => setShow(!show)}>
+  {show ? <ChevronDown size={16} strokeWidth={2} /> : <ChevronLeft size={16} strokeWidth={2} />}
+</button>
 {show && <div className="control-panel">{/* Controls */}</div>}
 ```
 
-**CSS**: `.chevron-toggle.collapsed { transform: rotate(-90deg); transition: transform 0.15s; }`
+**CSS**: `.control-panel-chevron` (plus `:hover` / `:active`) in `ProjectPanel.css`
 
 **Example**: ProjectPanel file filtering - see [Project Panel](./project-panel.md#control-panel)
 
@@ -69,16 +68,16 @@ Hierarchical file tree with filtering, visual indicators, context menu operation
 
 **Features**:
 - File filtering (All Files | Markdown Only) with recursive logic
-- Sensitive file detection (credentials, keys, configs)
+- Sensitive file detection (credentials, keys, certificates, dotfile secrets)
 - Hidden file styling (dotfiles, 70% opacity)
-- Context menu (New, Rename, Delete)
+- Context menu (Open as source, Open in default browser (both HTML files only), Cut, Copy, Paste, New File, New Folder, Rename, Import…, Delete, Reveal in Finder / Show in Explorer – built per node type by `context-menu/strategies.tsx`)
 - Auto-refresh via directory watching
 
 📚 **Full docs**: [Project Panel](./project-panel.md)
 
 ### Visual Indicators
 
-**Sensitive** (amber + warning icon): `.env*`, `.npmrc`, `*.pem`, `.aws/`, `.ssh/`, `credentials*`, `config.json`
+**Sensitive** (amber + warning icon): `.env*`, `.npmrc`, `*.pem`, `*.key`, `.aws/`, `.ssh/`, `credentials`, `secrets`, `id_rsa` and the other SSH key names – see `isSensitiveFile()` in `ProjectTreeNode.tsx` (`config.json` is not on the list)
 **Hidden** (70% opacity, italic): Files starting with `.` (`.git/`, `.gitignore`)
 
 ## Terminal Panel
@@ -147,6 +146,7 @@ The maintained inventory – BaseDialog API, focus trap, ESC/backdrop handling, 
 | `FilePickerDialog` | Disambiguate multiple file matches during smart path resolution |
 | `DropModeDialog` | Choose move / copy / import for dropped external files |
 | `ConflictDialog` | Resolve a name conflict at the drop target – replace or keep both; cancel skips the file |
+| `UnsavedChangesDialog` | Shown before an HTML preview tab moves to a page that has unsaved edits in another tab (#124), via `showUnsavedChanges()` from `useDialog()`. Variant `save`: Don't save / Cancel / Save, focus on Save. Variant `conflict` (the file changed on disk): Discard my changes / Cancel, focus on Cancel. Escape is Cancel; a click outside does nothing |
 | `TranscriptionDialog`, `DocumentImportDialog` | Media and document import – documented in their own sections below |
 
 ## Context Menu
@@ -167,8 +167,11 @@ interface ContextMenuItem {
   label: string
   icon?: ReactNode
   action: () => void
+  danger?: boolean    // Destructive styling (e.g. Delete)
   separator?: boolean
-  disabled?: boolean  // NEW: Grays out item, prevents click
+  disabled?: boolean  // Grays out item, prevents click
+  shortcut?: string   // Right-aligned shortcut hint
+  testId?: string     // Optional test ID for automated UI testing
 }
 ```
 
@@ -254,9 +257,9 @@ Home icon tab (41px fixed, non-draggable, no scaling).
 
 ### Hover
 
-**Inactive**: `#3a3d41` background
-**Active**: `#2d2d30` with 0.9 opacity
-**EditorTab**: `rgba(255, 255, 255, 0.05)` on hover
+**Inactive**: `var(--color-bg-hover-solid)` background (`AppDockLayout.css`, `.dv-inactive-tab:hover .dv-default-tab`)
+**Active**: `var(--color-bg-secondary)` with 0.9 opacity (`.dv-active-tab:hover .dv-default-tab`)
+**EditorTab**: `var(--color-bg-hover)` on hover; `var(--color-bg-hover-solid)` when the tab is active (`EditorTab.css`)
 
 ### Active Indicator
 
@@ -270,7 +273,7 @@ Auto-focus on tab change ensures the active indicator shows immediately, so a pa
 
 ## Welcome Tab & Panel
 
-**Location**: `WelcomePanel.tsx`, `WelcomeTab.tsx`
+**Location**: `WelcomePanel.tsx`, `components/Panels/WelcomeTab.tsx`
 
 Home-icon tab (41px square, non-draggable). The welcome screen is the central **home view** shown when no file is open:
 
@@ -371,7 +374,7 @@ Added by [#60](https://github.com/qodeca/erfana/issues/60), where a `RangeError`
 
 ### Two-tier boundary contract
 
-**Tier 1 – `PanelErrorBoundary`** wraps one panel. `ProjectPanel.tsx` wraps `<ProjectTree/>` with it, so a tree defect degrades to *"Project tree unavailable. The rest of Erfana still works."* inside the sidebar while editor buffers and the live terminal keep running. It logs at `error`, not `fatal` – the window is still usable, so this is not the crash of last resort. A failed Reload reads *"Project tree is still unavailable."*
+**Tier 1 – `PanelErrorBoundary`** wraps one panel or tab. It has three mount sites: `ProjectPanel.tsx` (the project tree), and in `DockLayout/components/EditorAreaSplitPanel.tsx` the image viewer (keyed by file path) and the HTML preview (keyed by panel id, with `resetKey={params.filePath}`). In the project tree case a tree defect degrades to *"Project tree unavailable. The rest of Erfana still works."* inside the sidebar while editor buffers and the live terminal keep running. It logs at `error`, not `fatal` – the window is still usable, so this is not the crash of last resort. A failed Reload reads *"Project tree is still unavailable."*
 
 **Focus contract**: swapping the subtree drops focus to `<body>`, so the boundary moves it deliberately – but only when the user was standing in this panel. Focus returns to the Reload button after a failed retry **or** any panel death with focus inside the panel (including an async re-throw after a reload succeeded, where no attempt counter changes); after a successful Reload it lands on the recovered panel container. A panel that throws while the user is in the editor never steals focus.
 
@@ -379,13 +382,15 @@ Added by [#60](https://github.com/qodeca/erfana/issues/60), where a `RangeError`
 
 **Mount-site contract**: the error state survives every re-render and is cleared only by Reload or by a remount, so a caller whose content is scoped to something the user can switch must **key** the boundary by it – `<PanelErrorBoundary key={projectPath ?? 'none'} componentName="Project tree">`. Without the key, a tree that crashed on project A still reads "unavailable" after the user opens project B.
 
+**`resetKey`, for content that must keep its mount**: a key change remounts the subtree, which an HTML preview tab cannot afford – moving the tab to another page would destroy its native view and its history. So the preview boundary is keyed by the panel id and receives the page as `resetKey`. When `resetKey` changes while the fallback is showing, `getDerivedStateFromProps` clears the error without a remount; that clear moves no focus and counts no retry, because the user did not press Reload.
+
 **Tier 2 – `RootErrorBoundary`** is the boundary of last resort. It wraps only the `<App/>` branch in `main.tsx`; the screenshot-overlay branch is deliberately unwrapped, having no recovery UI to show. It renders `{hasError ? <FallbackGuard><RootErrorFallback/></FallbackGuard> : children}`, where `FallbackGuard` is a **distinct** boundary class (colocated, never merged) – React never routes an error thrown by a boundary's own fallback back into that boundary, so the guard cannot live in the class it protects. The guard's fallback is dependency-free static JSX (no stylesheet, no `TEST_IDS`, no `window.api`, no detail extraction) and it appends an inline-styled **sibling** to `document.body` – never a write into `#root`, which React owns during commit. That sibling never becomes a second live region, and it takes focus **only** when no guard alert reached the document (it queries for `[role="alert"][data-erfana-guard-alert]`): with the React alert on screen, focusing the sibling would read the same copy twice, so it stays as silent visual insurance. `logger.fatal` is level-independent: in production an error caught by `componentDidCatch` does not reach `window.onerror`, so that line is the only record of the crash.
 
 **Layer-coverage rule** – "no blank window" holds only for the failure classes a boundary can intercept, and each layer is scoped to one class:
 
 | Failure class | Caught by | User sees | Record |
 |---|---|---|---|
-| Throw during render/lifecycle inside the project tree | `PanelErrorBoundary` (panel-scoped) | "Project tree unavailable" in the sidebar; editor and terminal keep running | `logger.error` |
+| Throw during render/lifecycle inside the project tree, an image viewer or an HTML preview | `PanelErrorBoundary` (panel-scoped) | "… unavailable" inside that panel or tab; the rest of the window keeps running | `logger.error` |
 | Throw during render/lifecycle anywhere else under `<App/>` | `RootErrorBoundary` | Full-window recovery screen | `logger.fatal` |
 | Throw inside the recovery screen itself | `FallbackGuard` (distinct inner boundary) | Dependency-free static text | best-effort `logger.fatal`, then an inline-styled `document.body` sibling |
 | Async throw, event-handler throw, unhandled rejection | `installGlobalErrorTrail()` | Nothing – the UI stays as it is | `logger.fatal`, boundary payload shape |
@@ -474,6 +479,21 @@ Opens when clicking image files (PNG, JPG, GIF, WebP, SVG, BMP, ICO) in the proj
 **Two live regions, panel-owned.** `role="status"` for busy and success, `role="alert"` for failures, both visually hidden and both rendered into whichever surface is on top — the overlay when full screen, the panel otherwise — so exactly one element carries each id at a time. The assertive half exists because the full-screen overlay is `aria-modal="true"`, which lets a screen reader suppress the toast that lives outside it; while full screen, the settled sentence is written into the region instead of being left to the toast alone.
 
 📚 **Keyboard shortcuts**: [Keyboard Shortcuts](./keyboard-shortcuts.md#image-viewer)
+
+---
+
+## HTML preview panel
+
+**Location**: `src/renderer/src/components/Panels/HtmlPreviewPanel/`
+
+Runs an `.html` / `.htm` file as a live page in a native view. Registered in `DockLayout/components/EditorAreaSplitPanel.tsx` as the `htmlPreview` component (tab component `htmlPreviewTab`), inside a `PanelErrorBoundary` keyed by panel id (see § Error containment above).
+
+**Toolbar controls from #124** (`components/PreviewNavControls.tsx`, `components/PreviewToolbarTools.tsx`):
+- **Back** – the tab's previous page. There is no Forward button; Back's tooltip names the Forward key
+- **Open links in this tab** – a toggle (`aria-pressed`). Off, the default, opens a link in a new tab; on, a plain link to another previewed page in the project replaces the page in this tab. Per tab, in memory only
+- **Open in default browser** – hands the file to the system browser, the same action as the project tree's context-menu item
+
+**Full docs**: [HTML preview](./html-preview/README.md) · **Keyboard shortcuts**: [Keyboard Shortcuts § HTML preview](./keyboard-shortcuts.md#html-preview)
 
 ---
 

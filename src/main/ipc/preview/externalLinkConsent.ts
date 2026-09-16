@@ -67,6 +67,19 @@ export interface ExternalLinkConsentDeps {
 /** Index of the "Open" button; Cancel is 0 and is also the escape/close answer. */
 const OPEN_BUTTON = 1
 
+/** Only the error's name: its message can quote a path or the full link (QG-8 T4). */
+function nameOf(error: unknown): string {
+  return error instanceof Error ? error.name : typeof error
+}
+
+/** A Node errno code such as `EACCES`, when the error carries one as a string. */
+function codeOf(error: unknown): string | undefined {
+  if (typeof error !== 'object' || error === null || !('code' in error)) {
+    return undefined
+  }
+  return typeof error.code === 'string' ? error.code : undefined
+}
+
 /**
  * What the consent dialog names as the destination.
  *
@@ -142,7 +155,8 @@ export function createExternalLinkConsent(
         // registered; the caller badges it. Say so, do not say "opened".
         logger.warn('Preview external link: open failed', {
           destination,
-          error: error instanceof Error ? error.message : String(error)
+          error: nameOf(error),
+          code: codeOf(error)
         })
         throw error
       }

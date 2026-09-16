@@ -241,3 +241,79 @@ describe('Context Menu Strategies', () => {
     })
   })
 })
+
+describe('FileContextMenuStrategy – Open in default browser (#124)', () => {
+  const strategy = new FileContextMenuStrategy()
+  const withBrowser = (overrides?: Partial<MenuContext>): MenuContext =>
+    createMockMenuContext({ openInBrowser: vi.fn(), ...overrides })
+  const has = (items: { label: string }[]): boolean =>
+    items.some((item) => item.label === 'Open in default browser')
+
+  it('offers it second, after "Open as source", then closes the group with a separator', () => {
+    const node = createMockFileNode('page.html', 'file')
+
+    const items = strategy.build(node as FileNodeFile, withBrowser())
+    const visible = items.filter((item) => !item.separator)
+
+    expect(visible[0].label).toBe('Open as source')
+    expect(visible[1].label).toBe('Open in default browser')
+    expect(items[2].separator).toBe(true)
+    expect(items[3].label).toBe('Cut')
+  })
+
+  it('offers it for an .HTM node in any letter case', () => {
+    const node = createMockFileNode('INDEX.HTM', 'file')
+
+    expect(has(strategy.build(node as FileNodeFile, withBrowser()))).toBe(true)
+  })
+
+  it('does not offer it for a .md node', () => {
+    const node = createMockFileNode('notes.md', 'file')
+
+    expect(has(strategy.build(node as FileNodeFile, withBrowser()))).toBe(false)
+  })
+
+  it('does not offer it for a folder, even one named like a page', () => {
+    const node = createMockFileNode('site.html', 'directory')
+    const ctx = withBrowser()
+
+    expect(strategy.supports(node as FileNodeDirectory)).toBe(false)
+    expect(has(new DirectoryContextMenuStrategy().build(node as FileNodeDirectory, ctx))).toBe(false)
+  })
+
+  it('omits it when openInBrowser is not wired', () => {
+    const node = createMockFileNode('page.html', 'file')
+
+    expect(has(strategy.build(node as FileNodeFile, createMockMenuContext()))).toBe(false)
+  })
+
+  it('keeps its own gate: alone in the group when "Open as source" is not wired', () => {
+    const node = createMockFileNode('page.html', 'file')
+
+    const items = strategy.build(node as FileNodeFile, withBrowser({ openAsSource: undefined }))
+
+    expect(items[0].label).toBe('Open in default browser')
+    expect(items[1].separator).toBe(true)
+    expect(items[2].label).toBe('Cut')
+  })
+
+  it('adds no stray separator when neither open item is wired', () => {
+    const node = createMockFileNode('page.html', 'file')
+
+    const items = strategy.build(node as FileNodeFile, createMockMenuContext({ openAsSource: undefined }))
+
+    expect(items[0].label).toBe('Cut')
+  })
+
+  it('routes through the injected action with the node path', () => {
+    const node = createMockFileNode('page.html', 'file', '/proj/site/page.html')
+    const ctx = withBrowser()
+
+    strategy
+      .build(node as FileNodeFile, ctx)
+      .find((item) => item.label === 'Open in default browser')
+      ?.execute()
+
+    expect(ctx.openInBrowser).toHaveBeenCalledWith('/proj/site/page.html')
+  })
+})

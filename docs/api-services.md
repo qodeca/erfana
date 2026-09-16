@@ -4,8 +4,6 @@
 
 Supporting service classes for terminal emulation, file operations, file watching, and persistent settings.
 
-## Overview
-
 ## TerminalService
 
 **File:** `src/main/services/TerminalService.ts`
@@ -18,7 +16,7 @@ Manages terminal emulator instances with xterm.js + node-pty. Cross-platform: ma
 
 **Constructor DI seam**: `new TerminalService(fsExists?)` — defaults to `fs.existsSync`; tests inject fakes to cover the shell fallback chain without module mocking.
 
-**EPIPE handling:** Uses `safeConsole` utility to prevent EPIPE crashes during cleanup. See [EPIPE Error Handling](./epipe-error-handling.md).
+**EPIPE handling:** `TerminalService` does not use `safeConsole` itself – it catches `EPIPE` (in `write()`) and `EPIPE`/`ESRCH` (in `killTerminal()` and `dispose()`) around the node-pty calls and records them through `logger` (`LoggingService`). `safeConsole` is installed globally once, by `installSafeConsole()` in `src/main/index.ts`, and covers console output app-wide. See [EPIPE Error Handling](./epipe-error-handling.md).
 
 ### Public Methods
 
@@ -36,7 +34,7 @@ Create a new PTY instance. Async because `node-pty` is dynamically imported on f
 **Parameters** (top-level):
 - `webContentsId?: number` — Owning webContents ID; used by `cleanupForWebContentsId(id)` to kill orphaned PTYs when the window closes
 
-**Returns:** `{ terminalId, shellKind }` — the generated terminal ID (`terminal-N`) plus the `ShellKind` resolved at create time, so the renderer can quote pasted paths for the right shell flavour without a follow-up IPC round-trip (#164). Returns `null` if `node-pty` is unavailable, the cwd failed Windows deny-list validation, or the shell could not be resolved.
+**Returns:** `{ terminalId, shellKind }` — the generated terminal ID (`terminal-N`) plus the `ShellKind` resolved at create time, so the renderer can quote pasted paths for the right shell flavour without a follow-up IPC round-trip (#164). Never returns `null`: if `node-pty` is unavailable, the cwd failed Windows deny-list validation, or the shell could not be resolved, the result is `{ error: string }` with the reason as plain text.
 
 **Side Effects:**
 - Spawns new PTY process (platform-resolved shell)
@@ -56,7 +54,7 @@ Resize PTY dimensions. Returns `false` if the terminal is not found.
 ---
 
 #### `killTerminal(terminalId: string): boolean`
-Synchronously kill PTY process and remove from internal map. Returns `false` if the terminal is not found. Emits `'exit'` with `{ terminalId, exitCode: 0 }` on success.
+Synchronously kill PTY process and remove from internal map. Returns `false` if the terminal is not found. Emits nothing itself on success – the PTY's own `onExit` callback (registered in `createTerminal`) emits `'exit'` with the real `{ terminalId, exitCode, signal }`. If `kill()` throws `EPIPE`/`ESRCH` (process already gone) the entry is dropped and `true` is returned; any other throw emits `'error'` and returns `false`.
 
 ---
 
@@ -100,7 +98,7 @@ Start watching file for changes. Watches are refcounted per `webContents`, so th
 
 **Side Effects:**
 - Creates chokidar watcher (300ms debounce)
-- Emits 'file-changed' events
+- Sends `file-watch:changed` with `{ filePath }` over IPC to the subscribing window (no EventEmitter event is emitted)
 
 ---
 
@@ -228,7 +226,9 @@ Resume watching after pause. Synchronous. Decrements the pause reference count; 
 
 ---
 
-### Events
+### Renderer notifications (IPC)
+
+`DirectoryWatcherService` is a plain class, not an event emitter: it pushes these channels to the owning window with `webContents.send`. The renderer subscribes through the preload bridge (`window.api.directoryWatch.onDirectoryChanged`, `onProjectDeleted`, `onDirectoryError`).
 
 #### `'directory-watch:changed'`
 **Payload:**
@@ -247,6 +247,15 @@ Emitted when files or folders change anywhere in the watched project tree. Main 
 **Event types:** `'add'`, `'addDir'`, `'unlink'`, `'unlinkDir'`, `'change'`. The `'change'` listener was added in #241 — in-place editor saves (Monaco autosave, terminal commands, external editors) now also wake the renderer. `'change'` events whose path is inside `.git/` are suppressed at the source listener (`GitWatcherService` is the canonical publisher for git internals).
 
 **Note:** Not emitted during pause window. The `'directory-watch:changed'` payload is also used by the PauseController auto-resume safety timeout (#103) to issue a compensating refresh after a stuck pause.
+
+#### `'directory-watch:project-deleted'`
+**Payload:** `{ dirPath: string }`. Sent when the project root is gone (`ENOENT`) and the restart attempts are used up; the service then stops all watchers. Bridge: `onProjectDeleted`.
+
+#### `'directory-watch:error'`
+**Payload:** `{ dirPath: string; error: string; errorType }`. Sent for any other watcher error that is not retried – a non-transient type, or a transient one (`EACCES`, `ESTALE`) whose restart attempts are used up. `EMFILE` never reaches it: that path always tears down and schedules a restart. Bridge: `onDirectoryError` (typed without `errorType`).
+
+#### `'directory-watch:recovered'` and `'directory-watch:restart-failed'`
+**Payloads:** `{ dirPath }` after a successful automatic restart; `{ dirPath, attempts, message }` once `MAX_RESTART_ATTEMPTS` is reached. Both are sent from main, but the preload bridge exposes no listener for either.
 
 ---
 
@@ -443,17 +452,17 @@ Clear the entire recent-projects list. Mutex-guarded.
 ```typescript
 import { terminalService } from './services/TerminalService'
 
-// Create terminal — returns { terminalId, shellKind }, or null on failure
+// Create terminal – returns { terminalId, shellKind }, or { error } on failure (never null)
 const created = await terminalService.createTerminal({
   cwd: '/path/to/project',
   cols: 80,
   rows: 24,
 }, webContentsId)
 
-if (created === null) {
+if ('error' in created) {
   // node-pty unavailable, cwd validation failed (Windows deny-list),
-  // or the shell could not be resolved.
-  // Inspect the most recent 'error' event for details.
+  // or the shell could not be resolved. `created.error` is the reason as
+  // plain text – the IPC handler passes it to the renderer verbatim.
   return
 }
 
@@ -482,12 +491,11 @@ import { directoryWatcherService } from './services/DirectoryWatcherService'
 // Start watching — the owning window's WebContents is required
 await directoryWatcherService.watchDirectory('/path/to/project', webContents)
 
-// Listen for changes (renderer subscribes via preload bridge:
-//   window.api.directoryWatch.onDirectoryChanged((data) => …))
-directoryWatcherService.on('directory-watch:changed', ({ dirPath, eventCount, summary }) => {
-  console.log(`${eventCount} events: ${JSON.stringify(summary)}`)
-  refreshProjectTree()
-})
+// Changes reach the renderer over IPC – the service has no `.on()`.
+// Renderer side:
+//   window.api.directoryWatch.onDirectoryChanged(({ dirPath, eventCount, summary }) => {
+//     refreshProjectTree()
+//   })
 
 // Internal operation pattern
 async function createNewFile(fileName: string) {
@@ -665,7 +673,7 @@ The paired read side lives with the screenshot API: `api.screenshot.getScreenPer
 
 ## See Also
 
-- [API Services - Feature Services](./api-services-features.md) - Git, Lock, Screenshot, Camera, External, PDF, DOCX, Transcription, AudioMetadata, ApiKey
+- [API Services - Feature Services](./api-services-features.md) - Git, Lock, Screenshot, Camera, External, PDF, DOCX, Transcription, AudioMetadata, ApiKey, [Import](./api-services-features.md#importservice), [ImageExport](./api-services-features.md#imageexportservice), [HTML preview](./api-services-features.md#html-preview-74), [BrowserLaunch](./api-services-features.md#browserlaunchservice)
 - [Architecture](./architecture.md) - Service class overview
 - [IPC Patterns](./ipc-patterns.md) - IPC handler integration
 - [Terminal](./terminal/README.md) - Terminal panel implementation

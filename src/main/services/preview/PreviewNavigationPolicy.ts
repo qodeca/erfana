@@ -21,10 +21,12 @@
  *     preload bundle degrades to "plain links still work" rather than to today's
  *     total silence.
  *
- * NOTE ON `target`. Under D4 every link opens a new Erfana tab, so the attribute
- * does not change the outcome; it is carried through for logging and so that a
- * future in-place mode has it. What the preload actually buys is the click
- * INTERCEPTION, the gesture check, and the popup cases above.
+ * NOTE ON `target`. It does not change the intent: an in-project link is
+ * `in-project` whatever its target. Where that page then opens – this tab or
+ * another – is the link table's call (`previewLinkDisposition`, issue #124),
+ * which reads `target` along with the button and the modifier keys. What the
+ * preload buys HERE is the click INTERCEPTION, the gesture check, and the popup
+ * cases above.
  *
  * TRUST: `href` is attacker-controlled. Everything here is parsing and
  * classification; the resulting path is re-resolved and re-confined by the
@@ -75,7 +77,7 @@ export interface LinkActivation {
   currentUrl: string
   /** This preview's root token — the expected `erfana-preview://` host. */
   token: string
-  /** The anchor's `target`, after `<base target>` fallback. Advisory only. */
+  /** The anchor's `target`, after `<base target>` fallback. Not read here; the link table reads it. */
   target?: string
   /** `true` when the anchor carried a `download` attribute. */
   download?: boolean

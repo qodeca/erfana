@@ -1,6 +1,6 @@
 # Visual Feedback & UX Patterns
 
-> CSS styling, visual indicators, and accessibility for drag-drop operations
+> CSS styling, visual indicators, and user feedback for drag-drop operations. The CSS below is quoted from the tokenised `ProjectTree.css` (design-system rules: `var(--color-*)` / `var(--space-*)` only, `border-radius: var(--border-radius)` = 0)
 
 [← Back to Drag-Drop Overview](./README.md)
 
@@ -10,45 +10,39 @@
 
 **Dragging item** (opacity reduction):
 ```css
-/* ProjectTree.css:292-295 */
+/* ProjectTree.css – "Dragging state" */
 .project-tree-item[data-dragging="true"] {
-  opacity: 0.4;
+  opacity: var(--opacity-disabled);
   cursor: grabbing !important;
 }
 ```
 
 **Drop target folder** (VS Code-style blue highlight):
 ```css
-/* ProjectTree.css:308-312 */
+/* ProjectTree.css – "Highlight the folder row when it's a drop target" */
 .project-tree-item[data-drop-target="true"].directory {
-  background-color: rgba(79, 193, 255, 0.2);
-  border-radius: 4px;
+  background-color: var(--color-accent-drag-bg);
+  border-radius: var(--border-radius);
   position: relative;
 }
 ```
 
-**Auto-expand pulse animation** (indicates 1s countdown):
+**Auto-expand highlight** (shown during the 1s countdown – there is no pulse keyframe; the `dropPulse` animation from the original design was never shipped):
 ```css
-/* ProjectTree.css:315-319 */
+/* ProjectTree.css – "Folder highlighting during drag (auto-expand countdown)" */
 .project-tree-node[data-drop-highlight="true"] > .project-tree-item.directory {
-  background-color: rgba(79, 193, 255, 0.2);
-  border-radius: 4px;
-  animation: dropPulse 1s ease-in-out;
-}
-
-@keyframes dropPulse {
-  0%, 100% { background-color: rgba(79, 193, 255, 0.2); }
-  50% { background-color: rgba(79, 193, 255, 0.3); }
+  background-color: var(--color-accent-drag-bg);
+  border-radius: var(--border-radius);
 }
 ```
 
 **Children area highlight** (expanded folders):
 ```css
-/* ProjectTree.css:331-346 */
+/* ProjectTree.css – "Highlight the children area for expanded folders" */
 .project-tree-node[data-drop-highlight="true"] > .project-tree-children {
   position: relative;
-  background-color: rgba(79, 193, 255, 0.05);
-  border-radius: 0 0 4px 0;
+  background-color: var(--color-accent-drag-bg-subtle);
+  border-radius: var(--border-radius);
 }
 
 /* Visual left border using pseudo-element (no layout shift) */
@@ -58,8 +52,8 @@
   left: 0;
   top: 0;
   bottom: 0;
-  width: 2px;
-  background-color: rgba(79, 193, 255, 0.3);
+  width: var(--border-width-thick);
+  background-color: var(--color-accent-drag-border);
 }
 ```
 
@@ -67,17 +61,17 @@
 
 **Invalid drop** (red background):
 ```css
-/* ProjectTree.css:349-352 */
+/* ProjectTree.css – "Invalid drop target" */
 .project-tree-item[data-drop-invalid="true"] {
-  background-color: rgba(244, 135, 113, 0.2);
-  border-radius: 4px;
+  background-color: var(--color-error-bg);
+  border-radius: var(--border-radius);
   cursor: not-allowed;
 }
 ```
 
 **Cut item** (dimmed with dashed underline):
 ```css
-/* ProjectTree.css:347-366 */
+/* ProjectTree.css – "Cut operation - dim item until paste" */
 .project-tree-item[data-clipboard-cut="true"] {
   opacity: 0.6;
   position: relative;
@@ -89,11 +83,11 @@
   left: 0;
   right: 0;
   bottom: 0;
-  height: 1px;
+  height: var(--border-width);
   background: repeating-linear-gradient(
     90deg,
-    #858585,
-    #858585 4px,
+    var(--color-text-secondary),
+    var(--color-text-secondary) 4px,
     transparent 4px,
     transparent 8px
   );
@@ -145,27 +139,29 @@
 - Zero layout shifts or horizontal movement
 - Common CSS technique for overlays that don't affect layout flow
 
-**Reference**: Commit `11d015a` (Nov 1, 2025)
+**Reference**: Commit `11d015a` (Nov 1, 2025) – pre-migration commit; it does not resolve in the public `qodeca/erfana` history, so treat it as provenance only. The `rgba(...)` / `4px` values in this before/after pair are the v0.3.6-era literals; the shipped rules now use the tokens quoted under § Drag States.
 
 ### Drag Overlay
 
-Ghost element following cursor during drag:
+Ghost element following the cursor during drag. It is rendered inline in `ProjectTree.tsx` as a dnd-kit `<DragOverlay dropAnimation={null}>` containing a `.drag-overlay` div with the dragged item's name (`DropIndicator.tsx` and `FolderDropHighlight.tsx` exist in the same folder but are rendered nowhere):
 
 ```css
-/* ProjectTree.css:369-382 */
+/* ProjectTree.css – "Drag overlay (ghost element)" */
 .drag-overlay {
-  background: #252526;
-  border: 1px solid #4fc1ff;
-  border-radius: 4px;
-  padding: 4px 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  background: var(--color-bg-tertiary);
+  border: var(--border-width) solid var(--color-accent-drag);
+  border-radius: var(--border-radius);
+  padding: var(--space-2) var(--space-4);
+  box-shadow: var(--shadow-md);
   cursor: grabbing;
   opacity: 0.95;
+  /* Allow elementFromPoint() to see through overlay to elements underneath (issue #85) */
+  pointer-events: none;
 }
 
 .drag-overlay .file-name {
-  color: #cccccc;
-  font-weight: 500;
+  color: var(--color-text-primary);
+  font-weight: var(--font-medium);
 }
 ```
 
@@ -174,16 +170,14 @@ Ghost element following cursor during drag:
 Smooth scrolling when dragging near edges:
 
 ```typescript
-// ProjectTree.tsx:177-188
+// ProjectTree.tsx – startAutoScroll (constants from ProjectTree/constants.ts AUTO_SCROLL)
 const startAutoScroll = (direction: 'up' | 'down') => {
-  if (autoScrollIntervalRef.current) return
-  const container = treeContainerRef.current
-  if (!container) return
-
+  if (autoScrollIntervalRef.current) return // Already scrolling
+  // ...
   autoScrollIntervalRef.current = window.setInterval(() => {
-    const scrollAmount = direction === 'up' ? -5 : 5
+    const scrollAmount = direction === 'up' ? -AUTO_SCROLL.SCROLL_AMOUNT : AUTO_SCROLL.SCROLL_AMOUNT
     container.scrollTop += scrollAmount
-  }, 16) // ~60fps
+  }, AUTO_SCROLL.SCROLL_INTERVAL) // ~60fps
 }
 ```
 
@@ -195,52 +189,24 @@ const startAutoScroll = (direction: 'up' | 'down') => {
 
 ## Accessibility
 
-### ARIA Live Announcements
+### Operation feedback (toasts, not ARIA announcements)
 
-Screen reader announcements for all operations:
+There is **no** screen-reader announcer for drag-drop: no `announceToScreenReader` helper, no `#drag-drop-announcer` element and no `aria-live` region are rendered by `ProjectTree.tsx`. The only remnant of that design is an orphan `.drag-announcements` rule in `ProjectTree.css` that nothing references.
 
-```typescript
-// ProjectTree.tsx:48-57
-const announceToScreenReader = (message: string) => {
-  const liveRegion = document.getElementById('drag-drop-announcer')
-  if (liveRegion) {
-    liveRegion.textContent = '' // Clear first to force re-announcement
-    setTimeout(() => {
-      liveRegion.textContent = message
-    }, 100)
-  }
-}
-```
+Feedback goes through the global toast service (`showGlobalToast` from `components/Toast/toastService`), from `ProjectTree.tsx` and the context-menu commands:
 
-**Announcements**:
-- "Dragging [filename]" on drag start
-- "Moved [filename] to [folder]" on successful drop
-- "Cut [filename]" on keyboard cut
-- "Copied [filename]" on keyboard copy
-- "Pasted [filename] into [folder]" on paste
-- "Invalid drop: cannot move folder into itself" on validation failure
-
-### ARIA Live Region
-
-```typescript
-// ProjectTree.tsx (in render):
-<div
-  id="drag-drop-announcer"
-  role="status"
-  aria-live="polite"
-  aria-atomic="true"
-  style={{ position: 'absolute', left: '-10000px', width: '1px', height: '1px' }}
-/>
-```
-
-**Why off-screen?** Visually hidden but accessible to screen readers.
+- "Cut" – `"<name>" ready to move` (keyboard cut and `CutCommand`)
+- "Copied" – `"<name>" ready to paste` (keyboard copy and `CopyCommand`)
+- "Success" – `Moved N file(s)` / `Copied N file(s)` after a drop, with `(N failed)` appended and a warning type when part of the batch failed
+- "Symlink Moved" / "Symlink Copied" – info toast when the operated item was a symlink
+- "Move failed" and other error toasts carry the `FileService` error message
 
 ### Keyboard Navigation
 
-Full keyboard support matching mouse operations:
-- `Ctrl+X` / `Cmd+X` - Cut (announces "Cut [filename]")
-- `Ctrl+C` / `Cmd+C` - Copy (announces "Copied [filename]")
-- `Ctrl+V` / `Cmd+V` - Paste (announces "Pasted [filename] into [folder]")
+Keyboard support matching mouse operations:
+- `Ctrl+X` / `Cmd+X` - Cut (toast "Cut")
+- `Ctrl+C` / `Cmd+C` - Copy (toast "Copied")
+- `Ctrl+V` / `Cmd+V` - Paste into the selected folder
 - `Escape` - Cancel drag or close dialog
 
 See [clipboard.md](./clipboard.md) for keyboard shortcut details.
@@ -267,11 +233,11 @@ Implementation matches VS Code Explorer behavior:
 - Background highlight on entire folder row (not just outline)
 - Expanded folders highlight children area too
 - Blue color scheme matching VS Code's accent color
-- Subtle pulse during auto-expand countdown
+- Same highlight held during the auto-expand countdown (no pulse animation ships)
 
 ### Auto-Expand
 - 1 second hover delay before auto-expand
-- Pulse animation indicates countdown
+- Folder highlight indicates the countdown
 - Prevents accidental expansions on quick drags
 - Matches VS Code timing
 
@@ -285,15 +251,15 @@ Implementation matches VS Code Explorer behavior:
 | State | Visual Indicator | CSS Class | User Action |
 |-------|-----------------|-----------|-------------|
 | Dragging | 40% opacity, grabbing cursor | `data-dragging="true"` | Drag started |
-| Drop target | Blue background, pulse animation | `data-drop-target="true"` | Hovering over valid folder |
+| Drop target | Accent-drag background | `data-drop-target="true"` | Hovering over valid folder |
 | Invalid drop | Red background, not-allowed cursor | `data-drop-invalid="true"` | Hovering over invalid location |
 | Cut | 60% opacity, dashed underline | `data-clipboard-cut="true"` | Ctrl+X pressed |
-| Auto-expand | Pulse animation (1s) | `data-drop-highlight="true"` | Hovering over folder for 1s |
+| Auto-expand | Accent-drag background during the 1s countdown | `data-drop-highlight="true"` | Hovering over folder for 1s |
 | Children highlight | Light blue background, left border | `data-drop-highlight="true"` | Folder expanded during drag |
 
 ## Related Files
 
 - **CSS**: [src/renderer/src/components/ProjectTree/ProjectTree.css](../../src/renderer/src/components/ProjectTree/ProjectTree.css)
-- **Drag Overlay**: [src/renderer/src/components/ProjectTree/DropIndicator.tsx](../../src/renderer/src/components/ProjectTree/DropIndicator.tsx)
-- **Auto-Scroll**: [src/renderer/src/components/ProjectTree/ProjectTree.tsx](../../src/renderer/src/components/ProjectTree/ProjectTree.tsx) (lines 177-188)
-- **Accessibility**: [src/renderer/src/components/ProjectTree/ProjectTree.tsx](../../src/renderer/src/components/ProjectTree/ProjectTree.tsx) (ARIA live region)
+- **Drag Overlay**: [src/renderer/src/components/ProjectTree/ProjectTree.tsx](../../src/renderer/src/components/ProjectTree/ProjectTree.tsx) (inline `<DragOverlay>`; `DropIndicator.tsx` / `FolderDropHighlight.tsx` are unused)
+- **Auto-Scroll**: [src/renderer/src/components/ProjectTree/ProjectTree.tsx](../../src/renderer/src/components/ProjectTree/ProjectTree.tsx) (`startAutoScroll`) and [constants.ts](../../src/renderer/src/components/ProjectTree/constants.ts) (`AUTO_SCROLL`)
+- **Feedback toasts**: [src/renderer/src/components/ProjectTree/ProjectTree.tsx](../../src/renderer/src/components/ProjectTree/ProjectTree.tsx) and [context-menu/commands.tsx](../../src/renderer/src/components/ProjectTree/context-menu/commands.tsx)

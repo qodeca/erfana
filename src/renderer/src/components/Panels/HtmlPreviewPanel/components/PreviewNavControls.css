@@ -1,0 +1,119 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * PreviewNavControls - Back and the link-mode toggle, which lead the preview
+ * toolbar, and the band's narrow-width tiers (issue #124, UX spec §1.1-§1.5).
+ *
+ * SOURCE OF TRUTH. scripts/design-sync.mjs copies this file to
+ * design/system/components/permission-band/nav.css so the card renders what
+ * actually ships, and `npm run design -- --check` fails CI on drift. Edit this
+ * copy; never the one under design/.
+ *
+ * A second file rather than more rules in PreviewChromeBand.css, which is at
+ * its line budget. Every selector here starts at `.erf-band`: this file can load
+ * before the band's own, and one extra class makes these rules win whatever the
+ * order, where equal specificity would leave it to the bundler.
+ *
+ * Back has no rules of its own. Its disabled look is the band's
+ * `.erf-band__tool[aria-disabled='true']`, shared with the busy Open in default
+ * browser, so the two dimmed tools cannot drift apart.
+ */
+
+/* ---------- the link-mode toggle ---------- */
+
+.erf-band .erf-band__tool--toggle {
+  /* BOTH states carry the 2px edge - transparent when off - and a matching
+     transparent one on top, so the icon sits exactly where every other tool's
+     sits and never moves when the state flips. A border, not a shadow: it
+     survives forced colours, which drop box-shadow. */
+  border-block: var(--border-width-thick) solid transparent;
+  /* The group gap. Back and the toggle act on this tab, Find on this page;
+     proximity separates them, because the width budget has no room for a
+     second 17px rule. */
+  margin-inline-end: var(--space-4);
+}
+
+/* On = same-tab mode: the Rows card's "selected" signature, a fill plus a lime
+   edge. The edge is a SHAPE appearing, so the state is never colour alone
+   (SC 1.4.1). Pressed+hover keeps the fill; pressed+focus draws the band's own
+   inset ring over it. */
+.erf-band .erf-band__tool--toggle[aria-pressed='true'],
+.erf-band .erf-band__tool--toggle[aria-pressed='true']:hover,
+.erf-band .erf-band__tool--toggle[aria-pressed='true']:active {
+  background: var(--color-bg-selected);
+  border-block-end-color: var(--color-brand-lime);
+}
+
+@media (forced-colors: active) {
+  /* The fill is dropped in a Windows contrast theme; the edge must not be. */
+  .erf-band .erf-band__tool--toggle[aria-pressed='true'] {
+    border-block-end-color: Highlight;
+  }
+}
+
+/* ---------- narrow panels: the row never wraps and never changes height ---------- */
+
+/*
+ * A taller band pushes the native page down, which costs a bounds push and the
+ * 300 ms proof cycle, so the row degrades in steps instead of wrapping:
+ *
+ *   full     everything (UX spec §1.1)
+ *   compact  below the width the full row needs
+ *   minimal  below the width the compact row needs
+ *
+ * Each threshold is the width the next-wider row NEEDS, measured on the
+ * permission-band card with a two-digit chip ("12 blocked · 34 allowed"); the
+ * card prints that measurement beside every demo width, so a drift shows there.
+ * They are literal px because a custom property cannot be used in a container
+ * condition. Change a tool, a gap or the chip and re-measure on the card; do
+ * not adjust by guesswork.
+ */
+.erf-band {
+  container-type: inline-size;
+}
+
+/* Whatever still does not fit - a three-digit chip, a panel narrower than the
+   minimal row - scrolls sideways instead of being clipped, with no visible
+   scrollbar, which would add height. Focus scrolls a control into view, so
+   nothing focusable is ever off-screen (SC 2.4.11). The rings stay whole: the
+   tools' are inset, and the chip's outward one fits inside the bar's padding. */
+.erf-band .erf-band__bar {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+/* Compact. Tighter padding and gaps, and the chip drops its "· 34 allowed"
+   tail. What stays visible is the START of the chip's accessible name, so
+   label-in-name (SC 2.5.3) still holds. Buttons keep their 32 x 28. */
+@container (width < 385px) {
+  .erf-band .erf-band__bar {
+    padding-inline: var(--space-3);
+  }
+
+  .erf-band .erf-band__separator {
+    margin-inline: var(--space-2);
+  }
+
+  .erf-band .erf-band__tool--toggle {
+    margin-inline-end: var(--space-1);
+  }
+
+  .erf-band .erf-band__chip-allowed {
+    display: none;
+  }
+}
+
+/* Minimal. Find and Export to PDF leave the row - `display: none`, so they
+   leave the Tab order too - while Cmd/Ctrl+F and Cmd/Ctrl+S keep working with
+   focus in the page, which is reachable by keyboard, so a keyboard reader loses
+   the buttons but not the actions. Open
+   in default browser stays: it has no shortcut, and it is the natural way out
+   of a panel too small to use. Matched by their accessible names because
+   PreviewToolbarTools owns those buttons; the names are pinned by its tests and
+   by the UX spec. */
+@container (width < 293px) {
+  .erf-band .erf-band__tool[aria-label='Find'],
+  .erf-band .erf-band__tool[aria-label='Export to PDF'] {
+    display: none;
+  }
+}

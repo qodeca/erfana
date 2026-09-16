@@ -2,7 +2,7 @@
 
 Project-wide index of `ErrorCode` values in `src/shared/errors.ts`, grouped by category. For each code: the enum name, the user-facing message (from `ERROR_MESSAGES` map), and the primary throw site. For whisper + transcription codes, also the operator action on encounter.
 
-**Why this document exists**: Phase 4 introduced 6 new whisper codes (see [ADR 0001](./adrs/0001-self-host-whisper-binaries.md)) and issue #21 another 26 graph/MCP codes; the full enum has grown to 156 codes. A single mapping table saves every future maintainer a `grep -r ErrorCode` sweep.
+**Why this document exists**: Phase 4 introduced 6 new whisper codes (see [ADR 0001](./adrs/0001-self-host-whisper-binaries.md)) and issue #21 another 26 graph/MCP codes; the full enum has grown to 166 codes. A single mapping table saves every future maintainer a `grep -r ErrorCode` sweep.
 
 **Source of truth**: `src/shared/errors.ts`. If this doc drifts, `errors.ts` wins — file an issue.
 
@@ -211,9 +211,9 @@ Not every code is thrown: `GRAPH_INDEX_CANCELLED` is emitted as a terminal `last
 | `MCP_SERVER_START_FAILED` | "Erfana could not start its MCP server..." | `McpEndpoint` socket / named-pipe listen failure |
 | `MCP_SERVER_ALREADY_RUNNING` | "An MCP server is already running for this Erfana window." | Second `McpEndpoint` start — one endpoint per process |
 | `MCP_TOOL_INVALID_ARGS` | "The MCP tool was called with invalid arguments..." | Tool-input schema rejection at the MCP boundary |
-## Preview (10 codes)
+## Preview (14 codes)
 
-10 `PREVIEW_*` in `src/shared/errors.ts` (#74, extended by sd-074b and v0.19.0). See `src/main/services/preview/` and [`docs/html-preview/README.md`](./html-preview/README.md).
+14 `PREVIEW_*` in `src/shared/errors.ts` (#74, extended by sd-074b, v0.19.0 and #124's four `PREVIEW_NAV_*` codes). See `src/main/services/preview/` and [`docs/html-preview/README.md`](./html-preview/README.md).
 
 | Code | User copy | Notes |
 |------|-----------|-------|
@@ -227,6 +227,35 @@ Not every code is thrown: `GRAPH_INDEX_CANCELLED` is emitted as a terminal `last
 | `PREVIEW_OPEN_SUPERSEDED` | "The preview was replaced before it finished opening." | An `open` finished against a claim a later open (or a close) had already invalidated |
 | `PREVIEW_OPEN_INVALID_REQUEST` | "The preview request was rejected." | The `preview:open` payload failed `PreviewOpenRequestSchema` before reaching the service. Named so the renderer log says why; a 249-char path used to land here as `UNKNOWN_ERROR` until panel ids were bounded in `buildPanelId` (v0.19.0) |
 | `PREVIEW_APPROVE_TIMED_OUT` | "Saved, but the preview did not confirm. Reload it." | Renderer-side only: the band's `APPROVE_UI_DEADLINE_MS` passed with no answer from `preview:approveHost`. Not a refusal — the grant is written before main's first await. The band shows "Saved — reload to apply" (v0.19.0) |
+| `PREVIEW_NAV_TARGET_MISSING` | "That page is no longer there – it may have been moved or deleted." | `preview:navigate` (#124, same-tab links and Back/Forward): the target page is gone. On a Back or Forward step main also drops that entry from the tab's history and returns the new history state |
+| `PREVIEW_NAV_TARGET_REFUSED` | "That page cannot be shown as a preview here." | `preview:navigate`: the target failed the gate in `previewViewNavigation.ts` – outside the view's real root, not `.html` / `.htm`, or not eligible (opens as source). Also a failed resume whose fallback page is refused |
+| `PREVIEW_NAV_UNAVAILABLE` | "This preview is not ready. Try again in a moment." | `preview:navigate`: no live view for the panel in the sender's window (or suspended), a view that changed while the check awaited, or a load that did not start. `navigation-handlers.ts` also answers it for an untrusted sender, a bad payload or a thrown error; the renderer uses it when the bridge call itself fails |
+| `PREVIEW_NAV_SKIPPED` | "This tab was still loading another page." | `preview:navigate`: a stale history `generation`, no entry in that direction, or a navigation main started is still pending. The renderer shows no toast unless the user answered an unsaved-changes prompt for that move |
+
+Every `PREVIEW_NAV_*` code comes back in the `{ ok: false, errorCode }` answer; the renderer builds its own toast from the code and the file names (`previewTabMove.ts`), so the toast wording differs from the texts above.
+
+---
+
+## Open in default browser (6 codes)
+
+6 `OPEN_IN_BROWSER_*` in `src/shared/errors.ts`, all from issue #124 ("Open in default browser" in the project tree and the HTML preview toolbar). User guide: [HTML preview § Open in default browser](./html-preview/README.md#open-in-default-browser).
+
+Like image export, these never travel as a thrown `AppError`: `browser:openFile` answers `{ success: false, errorCode, error: ERROR_MESSAGES[errorCode] }` (`src/shared/ipc/browser-schema.ts`). The checks run in `src/main/services/browserLaunch/BrowserLaunchService.ts` in the order below; the handler is `src/main/ipc/browser-handlers.ts`.
+
+The renderer (`previewOpenInBrowser.ts`) does not show the `error` text. Every refusal raises an error toast titled "Could not open in browser" with its own message, naming the file where the code is about the file.
+
+| Code | `ERROR_MESSAGES` text | Toast message | Raised when |
+|------|-----------|-------------|-------------|
+| `OPEN_IN_BROWSER_INVALID_REQUEST` | "The request to open this file in a browser was rejected." | the launch-failure text (below) | Handler: untrusted sender (`isTrustedSender`), or the payload failed `BrowserOpenFileRequestSchema` |
+| `OPEN_IN_BROWSER_NO_PROJECT` | "Open a project first – only its files open in a browser." | the launch-failure text | Check 1: no project is open |
+| `OPEN_IN_BROWSER_NOT_HTML` | "This is not an HTML page. Only .html and .htm files can be opened in a browser." | "`<file>` is not an HTML page. Only .html and .htm files can be opened in a browser." | Check 2: the requested name does not end `.html` / `.htm` (any case); check 5: the real name behind a symlink does not either. On Windows both also refuse a name that points at an NTFS alternate data stream (`C:\p\tool.exe:x.html`) |
+| `OPEN_IN_BROWSER_OUTSIDE_PROJECT` | "This file leads outside the open project, so Erfana will not open it in a browser." | "`<file>` leads outside the open project, so Erfana will not open it in a browser." | Check 3: not lexically inside the project path; check 4: `resolveInsideProject` says outside or unverifiable. A project opened through a symlinked folder refuses the same file named through the real folder (known behaviour) |
+| `OPEN_IN_BROWSER_MISSING` | "This file is no longer there – it may have been moved or deleted." | "`<file>` is no longer there – it may have been moved or deleted." | Check 4: the file does not exist; check 6: the real path is not a regular file (a folder named `x.html`), or vanished before `stat` |
+| `OPEN_IN_BROWSER_LAUNCH_FAILED` | "Your browser did not start. Try again, or reveal the file and open it yourself." | "Your browser did not start. Try again, or use Reveal in Finder / Reveal in Explorer / Reveal in File Manager to open the file yourself." | Check 7: the launch failed – spawn error, non-zero exit, a 10 s timeout (`BROWSER_LAUNCH_TIMEOUT_MS`), or the `.html`-app fallback reporting an error. Also the handler's catch-all. A failed launch never falls back |
+
+The launch-failure text is also what the renderer shows when the `invoke` rejects or the reply does not match `BrowserOpenFileResponseSchema`; its log then carries `INVOKE_REJECTED` or `INVALID_RESPONSE` instead of a code.
+
+Not an error: when the default-browser lookup fails, times out or returns an unusable path – and on Linux, always – the file opens in the system's `.html` app and the reply is `{ success: true, usedFallback: true }`, shown as an info toast "Opened in the app for .html files".
 
 ---
 

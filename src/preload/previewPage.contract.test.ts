@@ -90,6 +90,12 @@ describe('previewPage preload contract', () => {
     expect(SOURCE).toMatch(/getAttribute\('href'\)/)
   })
 
+  it('reports the click button, so main can open a middle click in a new tab', () => {
+    // The link table (issue #124) keeps only a primary click in its tab;
+    // without the button a middle click would look like one.
+    expect(SOURCE).toMatch(/button:\s*event\.button/)
+  })
+
   it('requires a genuine user gesture', () => {
     expect(SOURCE).toContain('event.isTrusted')
   })

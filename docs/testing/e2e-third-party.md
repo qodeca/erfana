@@ -60,7 +60,7 @@ await page.keyboard.insertText('# Hello World\n\nContent here')
 | Wait for ready | `monaco.waitForReady(page)` |
 | Focus editor | `monaco.focus(page)` |
 | Set content | `keyboard.selectAll()` + `keyboard.insertText()` |
-| Get content | `monaco.getContent(page)` |
+| Get content | `monaco.getContent(page)` – clipboard-backed. Use `MonacoPage.visibleText()` instead when asserting content the APP changed (a reload from disk, a tab switch, a programmatic edit); see [e2e-testing.md § Reading editor content](./e2e-testing.md#reading-editor-content-getcontent-vs-visibletext) |
 | Insert text | `page.keyboard.insertText(text)` (preferred over `type()`) |
 | Select all | `Cmd/Ctrl+A` |
 | Copy | `Cmd/Ctrl+C` |

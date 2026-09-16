@@ -33,7 +33,14 @@ export function FileConflictNotification({
       <div className="file-conflict-actions">
         <button
           className="file-conflict-btn file-conflict-btn-primary"
-          onClick={onReload}
+          // Wrapped, not passed straight through: React hands `onClick` the
+          // synthetic mouse event, and `onReload` is backed by
+          // `useFileWatcher.reloadFromDisk(prefetchedContent?)`. Passing the
+          // reference directly fed that event in as the file's new content,
+          // and the panel crashed on the next `calculateStats(content)`.
+          // TypeScript cannot catch it — a zero-arg signature is assignable to
+          // a one-arg handler.
+          onClick={() => onReload()}
           title="Reload file from disk and discard local changes"
           data-testid={TEST_IDS.FILE_CONFLICT_BTN_RELOAD}
         >

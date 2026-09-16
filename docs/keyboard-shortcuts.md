@@ -18,8 +18,11 @@ Work anywhere, override editor shortcuts:
 | Shortcut | Action |
 |----------|--------|
 | `Cmd/Ctrl+Shift+N` | New Window (File menu, `src/main/menu.ts`) |
+| `Cmd/Ctrl+0` | Actual Size (View menu) |
+| `Cmd/Ctrl+Plus` | Zoom In (View menu) |
+| `Cmd/Ctrl+-` | Zoom Out (View menu) |
 
-Everything else in the menu uses Electron's standard roles (undo/redo, cut/copy/paste/select-all, reload, DevTools, zoom, fullscreen, minimize/zoom, and quit/close), so those accelerators are whatever the platform assigns.
+The three zoom items are explicit accelerators, not Electron zoom roles: `menu.ts` builds them with `zoomItem()` and routes each through `setPreviewZoomHandler` – a focused HTML preview takes the step first, otherwise the focused window's own web contents is zoomed (the header comment in `menu.ts` explains why `role: 'zoomIn'` cannot be used). Everything else in the menu uses Electron's standard roles (undo/redo, cut/copy/paste/select-all, reload/force-reload, `toggleDevTools`, fullscreen, minimize, the Window-menu `zoom` role, and quit/close), so those accelerators are whatever the platform assigns.
 
 ## Monaco Editor
 
@@ -34,7 +37,10 @@ When editor is focused. Full Monaco shortcuts: [Monaco Editor Docs](https://code
 | `Cmd/Ctrl+F` | Open the app search bar |
 | `Cmd/Ctrl+G` | Next search match |
 | `Cmd/Ctrl+Shift+G` | Previous search match |
+| `Cmd/Ctrl+B` | Bold – wraps the selection in `**` (see [Conflicts](#conflicts)) |
+| `Cmd/Ctrl+I` | Italic – wraps the selection in `*` |
 | `Cmd/Ctrl+K` | Insert link |
+| `Cmd/Ctrl+C` / `X` / `V` | Copy/cut/paste – re-registered over the main-process clipboard, not the browser clipboard (see below) |
 | `Cmd/Ctrl+Z` / `Shift+Z` | Undo/Redo |
 | `Cmd/Ctrl+/` | Toggle comment |
 | `Alt+↑/↓` | Move line |
@@ -46,7 +52,18 @@ When editor is focused. Full Monaco shortcuts: [Monaco Editor Docs](https://code
 
 **There is no Replace shortcut in Erfana.** No replace keybinding is registered anywhere in `src/`. Monaco's built-in replace default is `Ctrl+H` on Windows and `Cmd+Alt+F` on macOS – on macOS `Cmd+H` is the OS Hide role registered in `src/main/menu.ts`, so it never reaches the editor.
 
-`Cmd/Ctrl+S` and `Cmd/Ctrl+W` come from `useKeyboardShortcuts.ts`, mounted by `MarkdownEditorPanel`. The `Cmd+W` entry under [Window Management](#window-management) is the OS window-close role – a different binding on a different surface.
+**Clipboard is not Monaco's clipboard.** `MonacoMarkdownEditor.tsx` calls `registerClipboardActions` from `src/renderer/src/utils/monacoClipboardCommands.ts`, which re-registers `Cmd/Ctrl+C`, `Cmd/Ctrl+X` and `Cmd/Ctrl+V` as Monaco actions backed by the central `textClipboard` service (IPC to Electron's main-process clipboard), so they work under the sandbox where `navigator.clipboard` would throw `NotAllowedError`.
+
+`Cmd/Ctrl+S` and `Cmd/Ctrl+W` come from `useKeyboardShortcuts.ts`, mounted by `MarkdownEditorPanel`.
+
+**Only the foreground tab acts.** The hook registers its listener on `window`,
+and dockview keeps every opened panel mounted - so with N tabs open, one
+keypress reaches N copies of the hook. Until this was fixed, a single
+`Cmd/Ctrl+W` closed *every* tab and a single `Cmd/Ctrl+S` wrote *every* open
+buffer to disk, including files the user had not chosen to save. The hook
+therefore takes an `enabled` flag, and `MarkdownEditorPanel` wires it to the
+panel's dockview active state (`props.api.isActive`, kept in step via
+`onDidActiveChange`). Any future panel-level shortcut needs the same gate. The `Cmd+W` entry under [Window Management](#window-management) is the OS window-close role – a different binding on a different surface.
 
 ## Markdown Formatting Toolbar
 
@@ -73,16 +90,41 @@ There is no Improve, Simplify, Rewrite or "Send to Terminal" entry.
 
 See: [Prompt Templates](./prompts/README.md)
 
+## HTML preview
+
+The running page is a native view that swallows every key, so the preview's shortcuts reach Erfana two ways: main forwards a closed list from inside the page (`PREVIEW_FORWARDED_SHORTCUTS` in `src/main/services/preview/previewInputForward.ts`, sent as `preview:forwardedShortcut` and routed by `usePreviewFindShortcuts`), and the panel root handles the Back and Forward keys while focus is in the panel's own chrome – its toolbar, find bar or banner (`usePreviewNavigation`).
+
+### Getting in and out of the page (#124)
+
+| Shortcut | Where | Action |
+|----------|-------|--------|
+| `Tab` | App | The page area (placeholder) is a tab stop only on the **active** tab with a live, drawn page |
+| `Enter` / `Space` | Page area focused | Puts keyboard focus in the page (`preview:focusPage`); `Space` does not scroll the panel |
+| `Esc` | Inside the page | Closes the find bar if it is open; otherwise returns focus to the toolbar's permission chip. Main first hands native keyboard focus back to the window (`previewHostFocus.ts`) – a DOM focus alone cannot take it back from the page's view |
+
+`usePreviewPageEntry` follows the panel's dockview active state (`api.isActive`, via `onDidActiveChange`), so an inactive tab's placeholder – dockview keeps it mounted – is never in the tab order. The placeholder's accessible name says both ways: "HTML preview of page.html – press Enter to enter the page, Escape to come back". Focus moves only on that key press, never on a load.
+
+### Inside the page, or in the panel's chrome
+
+| Shortcut | Action |
+|----------|--------|
+| `Cmd/Ctrl+F` | Open the find bar |
+| `Cmd/Ctrl+S` | Export the page to PDF |
+| `Cmd/Ctrl+W` | Close the preview tab |
+| `Cmd+[` (macOS) / `Alt+Left Arrow` (Windows; also Linux when run from source) | Back – the tab's previous page (#124) |
+| `Cmd+]` (macOS) / `Alt+Right Arrow` (Windows; also Linux when run from source) | Forward (#124) |
+
+`Cmd/Ctrl+F`, `S` and `W` are forwarded only from inside the page; with focus in Erfana's own chrome the app-level handlers apply as usual.
+
+**Back and Forward** come from one table for both processes, `src/shared/previewNavKeys.ts`, so main and the panel cannot disagree about which key is Back. They match the **physical** key (`KeyboardEvent.code`), not the typed character, so the key right of P is Back on every keyboard layout, and no other modifier may be down. They act only with focus inside the page or inside the panel's chrome: the panel root's `onKeyDown` is not a `window` listener, which meets the active-panel gate by construction – Monaco's `Cmd+[` and the terminal's `Alt+arrows` never reach it. The toolbar has a Back button but no Forward button (settled design): Back's tooltip names both keys, and its `aria-keyshortcuts` carries the Back key.
+
+**Zoom is not forwarded.** `Cmd/Ctrl+Plus`, `-` and `0` reach a focused preview through the View menu (see [Application Menu](#application-menu)).
+
 ## Project Panel
 
 ### Navigation
 
-| Shortcut | Action |
-|----------|--------|
-| `↑/↓` | Navigate |
-| `→/←` | Expand/collapse folder |
-| `Enter` | Open file |
-| `Space` | Preview |
+Arrow-key, `Enter` and `Space` navigation is **not implemented**: `ProjectTree.tsx` and `ProjectTreeNode.tsx` register no key handlers for tree navigation, so the tree is mouse-only (open a11y issue [#88](https://github.com/qodeca/erfana/issues/88)).
 
 `Cmd/Ctrl+Alt+R` refreshes the tree. It is registered by `ProjectTree.tsx` as a `window` listener, so it fires from anywhere in the app, but it is ignored while a refresh is already running or while focus sits in an input, textarea, or contenteditable.
 
@@ -93,6 +135,7 @@ See: [Prompt Templates](./prompts/README.md)
 | `Cmd/Ctrl+X` | Cut (dimmed with dashed underline) |
 | `Cmd/Ctrl+C` | Copy (repeatable paste) |
 | `Cmd/Ctrl+V` | Paste into folder |
+| `Cmd/Ctrl+Shift+I` | Import external files into the selected folder (`handleImportShortcut` in `ProjectTree.tsx`; ignored unless a folder is selected or while focus is in an input, textarea or contenteditable) |
 
 **Context Menu**: Right-click → New File, New Folder, Rename, Delete, Cut, Copy, Paste
 
@@ -174,7 +217,7 @@ Note: Clipboard shortcuts use native browser behavior for better undo/redo integ
 
 ## Platform
 
-Erfana ships for macOS and Windows only – there is no Linux build.
+Erfana ships for macOS and Windows only – there is no Linux build. Linux is supported only as a development environment (`npm run dev`); where a shortcut row on this page names Linux, it means that setup.
 
 **macOS**: `Cmd` for shortcuts, `Option` = Alt
 **Windows**: `Ctrl` for shortcuts
@@ -206,9 +249,10 @@ When image viewer panel is focused:
 
 | Shortcut | Action |
 |----------|--------|
-| `F12` or `Cmd/Ctrl+Shift+I` | Toggle DevTools |
-| `Cmd/Ctrl+Shift+C` | Inspect element |
-| `Cmd/Ctrl+R` | Reload |
+| platform default for `toggleDevTools` | Toggle DevTools – Electron's `toggleDevTools` role in the View menu (`src/main/menu.ts`); Erfana binds no `F12` |
+| platform default for `reload` / `forceReload` | Reload – Electron's `reload` and `forceReload` roles |
+
+There is no `Cmd/Ctrl+Shift+I` DevTools binding and no `Cmd/Ctrl+Shift+C` inspect-element binding in `src/`. `Cmd/Ctrl+Shift+I` is the Project Panel's external-file import shortcut (see [File Operations](#file-operations)).
 
 ## Conflicts
 

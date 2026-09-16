@@ -6,6 +6,12 @@
  * Manages global keyboard shortcuts for the markdown editor panel.
  * Handles Cmd/Ctrl+S (save) and Cmd/Ctrl+W (close tab with confirmation).
  *
+ * The listener is registered on `window`, and dockview keeps EVERY opened
+ * editor panel mounted — so without a gate, one keypress is handled once per
+ * open tab. That is not theoretical: ⌘W used to close every tab at once, and
+ * ⌘S wrote every open buffer to disk. `enabled` is how a panel says "this
+ * keystroke is mine"; callers pass their dockview active state.
+ *
  * @module useKeyboardShortcuts
  */
 
@@ -41,6 +47,14 @@ export interface UseKeyboardShortcutsOptions {
   showConfirm: (options: ConfirmOptions) => Promise<boolean>
   /** Current file name (for dialog message) */
   fileName: string | null
+  /**
+   * Whether this instance should handle keystrokes at all.
+   *
+   * Every mounted panel shares one `window` keydown stream, so exactly one of
+   * them may act on a given press — pass the panel's dockview active state.
+   * Defaults to `true` so a single-instance caller needs no extra wiring.
+   */
+  enabled?: boolean
 }
 
 /**
@@ -96,6 +110,11 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions): void
 
   useEffect(() => {
     const handleKeyDown = async (e: KeyboardEvent): Promise<void> => {
+      // Only the active panel acts. Read through the ref so toggling this
+      // never re-registers the listener (and never drops a keypress while it
+      // is being swapped).
+      if (optionsRef.current.enabled === false) return
+
       // Detect platform for correct modifier key
       const isMac = isMacOS()
       const modKey = isMac ? e.metaKey : e.ctrlKey

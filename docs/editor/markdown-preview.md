@@ -87,12 +87,12 @@ Expand Mermaid diagrams to full-screen overlay for detailed examination.
 - `-`: Zoom out
 - `0`: Reset zoom to 100%
 - `F`: Fit to screen
-- `Escape`: Close viewer
 
 **Close Methods:**
-- X button in toolbar
-- Escape key
+- X button (top-right)
 - Click backdrop (outside diagram)
+
+Escape does not close the viewer (`diagramViewer.logic.ts` maps it to no action); it only collapses the chat bubble.
 
 **Accessibility:**
 - ARIA labels on all controls
@@ -143,7 +143,7 @@ GitHub-inspired professional design:
 - Font: Charter, Georgia serif stack
 - Body: 15px, line-height 1.5
 - Max width: 860px centered
-- Dark theme with `#1e1e1e` background
+- Dark theme with `var(--color-bg-preview)` background (`MarkdownPreview.css`)
 
 ## Line Tracking
 
@@ -160,8 +160,8 @@ Attributes:
 ## Implementation
 - Component: `MarkdownPreview.tsx`
 - Mermaid: `MermaidDiagram.tsx`
-- Line tracking: Lines 21-28, 143-207
-- HTML support: Lines 266-295
+- Line tracking: `extractLineRange()` and `withLineRange()` in `MarkdownPreview.tsx`
+- HTML support: `sanitizationSchema`, the `rehypePlugins` list and the `components` map in `MarkdownPreview.tsx`
 
 ## Complete Mermaid Diagram Types
 1. Flowcharts (`flowchart`)

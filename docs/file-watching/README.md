@@ -9,7 +9,7 @@ Erfana automatically detects and responds to external file system changes using 
 
 Both use [Chokidar](https://github.com/paulmillr/chokidar) for cross-platform file system monitoring with intelligent debouncing and race condition prevention.
 
-> **Chokidar is pinned to exact `3.6.0` (v3 line; do not upgrade to v4).** v3 uses a single macOS FSEvents stream (~0 file descriptors per watched file); v4 dropped FSEvents and watches each file via kqueue (one FD per file), which exhausts the process FD table on large projects and breaks spawning child processes – PDF export's hidden render window crashed with `Failed to initialize sandbox` on a 20k-file folder (commit `68cfab8`, shipped in v0.12.0). The rationale is also in `DirectoryWatcherService.ts:202-206`.
+> **Chokidar is pinned to exact `3.6.0` (v3 line; do not upgrade to v4).** v3 uses a single macOS FSEvents stream (~0 file descriptors per watched file); v4 dropped FSEvents and watches each file via kqueue (one FD per file), which exhausts the process FD table on large projects and breaks spawning child processes – PDF export's hidden render window crashed with `Failed to initialize sandbox` on a 20k-file folder (commit `68cfab8` – pre-migration; no longer resolvable, that history was rewritten at the 2026-06 migration – shipped in v0.12.0). The rationale is also in the comment above `disableGlobbing` in the `chokidar.watch(...)` options of `DirectoryWatcherService.watchDirectory`.
 
 ---
 
@@ -25,7 +25,7 @@ Monitors open files for external content modifications.
 - **Scope**: Per-file watching (on-demand when file is opened)
 - **Limit**: 100 files maximum, app-wide (security). The cap governs **new** map entries only — joining a path that is already watched can never fail on it (#70)
 - **Symlinks**: `followSymlinks: false` — the watch is on the path itself, never on what a link at that path points at (#70)
-- **Consumers**: two renderer hooks — `useFileWatcher` (Markdown editor, read/write) and `useFileChangeSubscription` (read-only surfaces, #70). Both hold a `fileWatchSlot`
+- **Consumers**: two renderer hooks – `useFileWatcher` (Markdown editor, read/write) and `useFileChangeSubscription` (read-only surfaces, #70). Both hold a `fileWatchSlot`. Separately, the HTML preview keeps its own main-process pool, `src/main/services/preview/PreviewWatchPool.ts`, built on the same `createSingleFileWatcher` factory with a shorter write-finish wait and capped at 16 files per preview on top of the app-wide cap – see [HTML preview § Auto-refresh](../html-preview/README.md#auto-refresh)
 
 ### Use Cases
 
@@ -67,7 +67,7 @@ Monitors open files for external content modifications.
 - **Integration**: `src/renderer/src/components/Panels/MarkdownEditorPanel.tsx`, `src/renderer/src/components/Panels/ImageViewerPanel/`
 - **UI Component**: `src/renderer/src/components/FileConflictNotification/`
 
-### Self-Save Echo Detection (v0.9.1, #124)
+### Self-Save Echo Detection (v0.9.1)
 
 The `useFileWatcher` hook prevents autosave-triggered file change events from being treated as external modifications. Three-layer defense:
 
@@ -79,6 +79,7 @@ The `MarkdownEditorPanel` coordinates via:
 - Reading content from Monaco editor model (not React state) to avoid stale closure overwrites
 - Calling `notifySaveComplete(savedContent)` after a successful write, which adds the content to `pendingSavedContentsRef`
 - Post-save dirty re-detection: checks if Monaco buffer diverged from saved content during the save, re-marks as modified if so
+- Save by panel id (#124): the panel registers its save, its conflict flag and an autosave hold in `services/editorSaveRegistry.ts` through `useEditorSaveRegistration`, so the HTML preview's tab move can save another tab when the user answers Save in the unsaved-changes prompt. The save is the panel's own `handleSave`, so every guard above still applies. While the prompt is open the move holds the tab's autosave (`cancelAutoSave`, re-armed by `signalChange` on release). It fails safe: a panel id with no entry, or a save that throws, answers `false`, and the move is abandoned with the edits kept in their tab
 
 ### Conflict Resolution UI
 
@@ -87,6 +88,18 @@ When a file has both external changes and unsaved local changes, an orange confl
 - **Reload from Disk**: Discard local changes, load external version
 - **Keep My Version**: Ignore external changes, keep local edits
 - **Dismiss**: Acknowledge conflict, decide later
+
+**Wrap `reloadFromDisk`, never pass it as a bare `onClick` reference.** Its
+signature is `reloadFromDisk(prefetchedContent?: string)`, so React hands a
+click handler its synthetic mouse event as that first argument. Wiring
+`onClick={onReload}` therefore adopted the event as the file's new content and
+crashed the editor panel on the next render (`content.split is not a
+function`). Write `onClick={() => onReload()}`.
+
+TypeScript cannot catch a recurrence: a zero-argument signature is assignable
+to a one-argument DOM handler. `reloadFromDisk` now also ignores any argument
+that is not a string and re-reads from disk instead, but that guard is the
+second line of defence, not a licence to skip the wrapper.
 
 ---
 
@@ -176,7 +189,7 @@ still released on unmount would decrement a count it never incremented.
 - **`hooks/useFileChangeSubscription.ts`** — a read-only subscription for
   surfaces that only *display* a file. Deliberately **not** an option on
   `useFileWatcher`: that hook is structurally text-coupled (it reads the file as
-  UTF-8 and hands a `string` to `onContentUpdate`), and its #124 echo/conflict
+  UTF-8 and hands a `string` to `onContentUpdate`), and its v0.9.1 echo/conflict
   machinery is dead weight for a surface that never writes. It returns
   `{ isReloading, isFileDeleted, isWatchUnavailable, unavailableReason,
   markReloaded, recover }`, depends on `[filePath]` only (callbacks live in
@@ -272,6 +285,8 @@ Recommended:
 | `directory-watch:stop` | Renderer → Main | Stop watching directory |
 | `directory-watch:pause` | Renderer → Main | Pause watching during internal CRUD |
 | `directory-watch:resume` | Renderer → Main | Resume watching after CRUD completes |
+| `directory-watch:stop-all` | Renderer → Main | Stop every directory watch held by the calling window (cleanup) |
+| `directory-watch:get-stats` | Renderer → Main | Watcher statistics (debugging) |
 | `directory-watch:changed` | Main → Renderer | Event: Directory structure changed |
 | `directory-watch:project-deleted` | Main → Renderer | Event: Project folder deleted |
 | `directory-watch:error` | Main → Renderer | Event: Watcher error (transient/permanent) |
@@ -373,6 +388,7 @@ Monitors git repository state files for real-time status updates in the Project 
 |---------|-----------|---------|
 | `git-watcher:start` | Renderer → Main | Start watching git state files |
 | `git-watcher:stop` | Renderer → Main | Stop git watching |
+| `git-watcher:status` | Renderer → Main | Get current watcher status |
 | `git:state-changed` | Main → Renderer | Event: Git state changed |
 
 ### Implementation Location
@@ -434,8 +450,9 @@ Users can configure polling via Settings overlay:
 |---------|-----------|---------|
 | `git-polling:start` | Renderer → Main | Start polling |
 | `git-polling:stop` | Renderer → Main | Stop polling |
+| `git-polling:set-interval` | Renderer → Main | Update the polling interval at runtime |
 | `git-polling:set-enabled` | Renderer → Main | Enable/disable at runtime |
-| `git-polling:git-poll-triggered` | Main → Renderer | Event: Poll detected changes |
+| `git:poll-triggered` | Main → Renderer | Event: Poll detected changes (`GIT_EVENT_CHANNELS.POLL_TRIGGERED` in `src/shared/ipc/git-watcher-channels.ts`) |
 
 ### Implementation Location
 

@@ -1,0 +1,19 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<!--
+  Part 2 corpus (P2-AC4, depth): a chain of src frames four levels deep.
+  Levels 1 to 3 load and set their own title sentinel (-CHAIN-1- to -CHAIN-3-);
+  level 4 (chain-4.html) is past the depth limit of 3, stays empty and is listed
+  in the failure badge as /frames/chain-4.html.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Frame chain -CHAIN-0-</title>
+  </head>
+  <body>
+    <h1>Frame chain</h1>
+    <iframe title="level 1" src="chain-1.html" width="640" height="420"></iframe>
+  </body>
+</html>

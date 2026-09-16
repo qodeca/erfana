@@ -4,22 +4,35 @@
  * HTML preview keyboard forwarding (Issue #74, work item 36).
  *
  * A ONE-WAY DOOR on what the sealed preview box lets through to Erfana. The
- * previewed page owns its own keyboard, EXCEPT for a closed, frozen list of four
- * accelerators that Erfana needs for its own chrome (find, save, close, escape).
+ * previewed page owns its own keyboard, EXCEPT for a closed, frozen list of keys
+ * that Erfana needs for its own chrome: four accelerators (find, save, close,
+ * escape) and, since issue #124, Back and Forward.
  * `before-input-event` is Chromium's pre-dispatch input pipeline — NOT a
  * page-callable API — so the page cannot forge or observe this channel.
  *
- * `accel` is Cmd on macOS and Ctrl elsewhere. Nothing outside the frozen list is
- * ever forwarded (design §1.9): Cmd+R, Cmd+P and plain typing all stay with the
- * page.
+ * `accel` is Cmd on macOS and Ctrl elsewhere. Back and Forward are bound
+ * differently – Cmd+[ / Cmd+] on macOS, Alt+Left / Alt+Right elsewhere, on the
+ * PHYSICAL key – by the one table in `previewNavKeys`, which the panel root
+ * reads too, so the two can never disagree about which key is Back. Nothing
+ * outside the frozen list is ever forwarded (design §1.9): Cmd+R, Cmd+P and
+ * plain typing all stay with the page.
  *
  * @see docs/designs/sd-074-html-preview.md §1.9, §0 (Enumerated keystrokes)
+ * @see docs/design/design-issue-124-part3.md §3.7
  */
 
-/** A forwarded accelerator. `accel` true ⇒ requires Cmd (macOS) / Ctrl (else). */
+import { matchPreviewNavKey, type PreviewNavAction } from '../../../shared/previewNavKeys'
+
+/** A forwarded key. `accel` true ⇒ requires Cmd (macOS) / Ctrl (else). */
 export interface ForwardedShortcut {
   readonly key: string
   readonly accel: boolean
+  /**
+   * A history step (issue #124). Matched on the physical key through the
+   * shared table in `previewNavKeys`, never on `key`, which names the action;
+   * `accel` is always `false` on such a row.
+   */
+  readonly nav?: true
 }
 
 /**
@@ -41,7 +54,12 @@ export const PREVIEW_FORWARDED_SHORTCUTS = Object.freeze([
   // made a single keypress zoom TWICE — once from the accelerator and once from
   // the forward — which is the collision `menu.ts` replaced the built-in zoom
   // roles to avoid.
-  { key: 'Escape', accel: false }
+  { key: 'Escape', accel: false },
+  // Back and Forward (issue #124, part 3 §3.7). Their binding is not the
+  // Cmd/Ctrl rule – it is Alt on Windows and Linux – so `accel` is `false` for
+  // both, and the renderer routes them on `key` alone.
+  { key: 'back', accel: false, nav: true },
+  { key: 'forward', accel: false, nav: true }
 ] as const satisfies readonly ForwardedShortcut[])
 
 /**
@@ -52,6 +70,8 @@ export const PREVIEW_FORWARDED_SHORTCUTS = Object.freeze([
 export interface ForwardableInput {
   type: string
   key: string
+  /** The physical key (`KeyboardEvent.code`); Back and Forward match on it (spike S8). */
+  code: string
   control: boolean
   meta: boolean
   alt: boolean
@@ -86,7 +106,9 @@ export interface InputForwardTarget {
  * Only `keyDown` is considered. For an `accel` shortcut the platform accelerator
  * (Cmd on `darwin`, Ctrl elsewhere) must be down. For a non-`accel` shortcut
  * (Escape) NO accelerator, meta or alt may be down, so Cmd+Escape or Alt+Escape
- * are not forwarded.
+ * are not forwarded. A `nav` row (Back, Forward) matches when the shared table
+ * in `previewNavKeys` names its action: the physical key, its one modifier, and
+ * nothing else down.
  */
 export function matchForwardedShortcut(
   input: ForwardableInput,
@@ -97,21 +119,31 @@ export function matchForwardedShortcut(
   }
 
   const accelDown = platform === 'darwin' ? input.meta : input.control
+  const navAction = matchPreviewNavKey(input, platform)
 
   for (const shortcut of PREVIEW_FORWARDED_SHORTCUTS) {
-    if (input.key.toLowerCase() !== shortcut.key.toLowerCase()) {
-      continue
-    }
-    if (shortcut.accel) {
-      if (accelDown) {
-        return shortcut.key
-      }
-    } else if (!input.meta && !input.control && !input.alt) {
+    if (matchesShortcut(shortcut, input, accelDown, navAction)) {
       return shortcut.key
     }
   }
 
   return null
+}
+
+/** One row of the frozen list against one key press. */
+function matchesShortcut(
+  shortcut: ForwardedShortcut,
+  input: ForwardableInput,
+  accelDown: boolean,
+  navAction: PreviewNavAction | null
+): boolean {
+  if (shortcut.nav === true) {
+    return navAction === shortcut.key
+  }
+  if (input.key.toLowerCase() !== shortcut.key.toLowerCase()) {
+    return false
+  }
+  return shortcut.accel ? accelDown : !input.meta && !input.control && !input.alt
 }
 
 /**

@@ -28,3 +28,17 @@ e5ec5f9714543b6e9f71c39212b7349cf19f28f6:src/shared/ipc/graph-mcp-schema.test.ts
 e42a931a80ddd4a8d1185bf3b5ba4c0fb439855c:src/main/services/preview/PreviewNavigationPolicy.test.ts:generic-api-key:13
 e42a931a80ddd4a8d1185bf3b5ba4c0fb439855c:src/main/services/preview/previewLinkNavigation.test.ts:generic-api-key:16
 555a0732576efaa0fdc93f14e5560c81ec923e4e:src/main/services/preview/previewLinkBridge.test.ts:generic-api-key:25
+
+# #124 HTML preview tests: fake 32-hex preview root tokens
+# (`erfana-preview://<32-hex>/…`) used as fixtures in commit 8576397d. They
+# are random identifiers for a local custom scheme, not credentials (see the
+# PreviewRootRegistry.ts header). The lines also carry inline `gitleaks:allow`.
+8576397d9aa8777a9329b7b7100fa93c54037597:src/main/services/preview/__test-helpers__/previewPageNavigatorHarness.ts:generic-api-key:21
+8576397d9aa8777a9329b7b7100fa93c54037597:src/main/services/preview/previewResponseHeaders.test.ts:generic-api-key:19
+8576397d9aa8777a9329b7b7100fa93c54037597:src/main/services/preview/previewViewNavigation.test.ts:generic-api-key:48
+8576397d9aa8777a9329b7b7100fa93c54037597:src/main/services/preview/previewLivePage.outcome.test.ts:generic-api-key:25
+8576397d9aa8777a9329b7b7100fa93c54037597:src/main/services/preview/previewLivePage.test.ts:generic-api-key:24
+8576397d9aa8777a9329b7b7100fa93c54037597:src/main/services/preview/previewCsp.test.ts:generic-api-key:15
+8576397d9aa8777a9329b7b7100fa93c54037597:src/main/services/preview/previewCsp.test.ts:generic-api-key:16
+8576397d9aa8777a9329b7b7100fa93c54037597:src/main/services/preview/previewUrl.test.ts:generic-api-key:8
+8576397d9aa8777a9329b7b7100fa93c54037597:src/shared/ipc/preview-navigation-schema.test.ts:generic-api-key:100

@@ -1,5 +1,7 @@
 # Handoff to the Windows session — verify Erfana before the v0.19.0 release
 
+> **Historical – executed.** Every §7 step was carried out and v0.19.0 shipped on 2026-09-04; the §6 issues marked open here (#115, #116, #111, #112, #104) are all closed. Outcome in [2026-09-04-windows-verification-report.md](2026-09-04-windows-verification-report.md).
+
 > **Point-in-time document.** Written for one release and not maintained afterwards. Commit SHAs, test counts and issue states below were true on the date given and go stale immediately.
 
 **Date**: 2026-09-03

@@ -17,7 +17,11 @@ By participating you agree to abide by our [Code of Conduct](CODE_OF_CONDUCT.md)
 
 ## Prerequisites
 
-- **Node.js 24+** (Electron 39 bundles Node 22.22.1; the build toolchain needs 24+).
+- **Node.js 24+** (Electron 39 bundles Node 22.22.1; the build toolchain needs 24+). The major is pinned in
+  [`.nvmrc`](.nvmrc), so `nvm use` in the repo root selects it, and CI pins the same major (hard-coded in
+  `.github/actions/setup-node-with-retry/action.yml`, not read from `.nvmrc`) – a local check and a CI check are
+  then running the same Node major. Worth confirming with `node --version` before you trust a green local
+  run: a `node` earlier on your `PATH` than your version manager will silently win.
 - **Python 3.12 (known good) or 3.14.x** — **not 3.13** (`node-pty` fails to build on 3.13).
 - **Git**.
 - **On Windows:** VS 2022 Build Tools, Developer Mode enabled, Win32 long paths enabled. See [`docs/build/windows.md`](docs/build/windows.md).
@@ -29,9 +33,23 @@ git clone https://github.com/qodeca/erfana.git
 cd erfana
 git checkout develop          # the integration branch – branch off this, not main
 git checkout -b feature/my-change
-npm install
+npm ci                        # NOT `npm install` — see below
 npm run dev                   # start the development app
 ```
+
+**Use `npm ci`, and do not commit a `package-lock.json` that `npm install` rewrote.** The two commands do not
+agree here: `npm install` under npm 11 drops `encoding@0.1.13`, an optional peer of `node-fetch`, from the lock,
+while `npm ci` — locally and on every CI runner — requires it. A lock written by `npm install` therefore installs
+with `npm install` and fails everywhere else:
+
+```
+npm error `npm ci` can only install packages when your package.json and package-lock.json are in sync.
+npm error Missing: encoding@0.1.13 from lock file
+```
+
+If you need to change dependencies, run `npm install` deliberately, then check `git diff package-lock.json` and
+keep only the change you meant to make. If the diff shows `encoding` disappearing and a shuffle of `peer` /
+`optional` flags and nothing else, discard it — that is this quirk, not your change.
 
 `main` is the stable release branch. Most work goes through `develop`, the day-to-day integration branch: cut your `feature/...` branch from `develop` and open your PR against `develop`.
 
@@ -47,10 +65,21 @@ npm run lint:css        # stylelint over src/ CSS and the design/ cards
 npm run design -- --check   # fails if a generated file under design/ is stale
 npm run typecheck       # tsc (node + web projects)
 npm run test:ci         # vitest workspace (main / renderer / preload)
+npm run test:cov        # coverage floors - a REQUIRED check that test:ci does not run
 npx electron-vite build # production build
 npm run check:headers   # every source file must carry the SPDX header
+npm audit signatures    # advisory in CI, but it catches a lockfile written by the wrong npm
 pipx run --spec "reuse[charset-normalizer]" reuse lint   # REUSE compliance
 ```
+
+`npm run test:ci` runs without coverage, so the coverage floors cannot fire
+locally. They sit in all three vitest configs: per-file floors in
+`vitest.main.ts`, global floors in `vitest.preload.ts`, and per-file floors for
+the HTML-preview modules (#124) in `vitest.renderer.ts`. `npm run test:cov` runs
+all three and is the only way to reproduce the `Coverage` job before pushing.
+It cannot pass on a Windows host (at least two `vitest.main.ts` floors miss
+because their symlink cases skip on win32, and the #124 floors have not been run
+there); CI runs it on Linux.
 
 For changes touching Electron-specific paths, also run the end-to-end suite locally (CI does not currently run it):
 
@@ -83,7 +112,7 @@ Never commit a real secret, even to history — rewrite it out and rotate the cr
 
 - [ ] Work is on a `feature/...` branch cut from the right integration branch, and the PR targets that same branch (not `main`) — `develop` for general work, `graph` for graph-engine work.
 - [ ] Commits follow [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `docs:`, `chore:`).
-- [ ] All quality gates pass locally (lint, lint:css, design -- --check, typecheck, test:ci, build, check:headers, reuse lint).
+- [ ] All quality gates pass locally (lint, lint:css, design -- --check, typecheck, test:ci, test:cov, build, check:headers, reuse lint).
 - [ ] No secrets introduced — `gitleaks` and `trufflehog` are clean locally.
 - [ ] Docs updated if behavior or project shape changed.
 - [ ] You agree to the project [CLA](CLA.md) (opening this PR records your agreement).

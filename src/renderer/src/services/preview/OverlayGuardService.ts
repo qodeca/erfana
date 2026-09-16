@@ -3,26 +3,48 @@
 /**
  * Overlay guard service (Issue #74, work item 69; design §1.8, §5(d)).
  *
- * The SINGLE owner of preview show/hide. It watches two renderer signals — the
- * occluder store (any dialog/settings/toast/menu/full-screen overlay on screen)
- * and the preview store (which panel holds the one live `WebContentsView`) —
- * and the active dockview tab (fed in via {@link IOverlayGuard.sync}). It sends
- * `preview:setVisibility` for the live preview panel whenever the computed
- * visibility changes:
+ * The SINGLE owner of preview show/hide. It watches the occluder store (any
+ * dialog/settings/toast/menu/full-screen overlay on screen), the preview store
+ * (which panels are live – several can be at once, each with its own
+ * `WebContentsView`), the per-panel gate stores, and the active dockview tab
+ * (fed in via {@link IOverlayGuard.sync}). Visibility is decided and sent per
+ * panel: `preview:setVisibility` goes out for each live preview whose computed
+ * visibility changed:
  *
  * ```
- * visible = (live preview is the active tab) && !isOccluded()
+ * visible = (live preview is the active tab) && !isOccluded() && gate === null
  * ```
+ *
+ * `gate` is per panel ({@link PreviewPanelGate}): the permission band's chrome
+ * gate, else `'collapsed'` while the panel's page area is clipped away (issue
+ * #124 C2 – the terminal expanded over the editor).
  *
  * **This is the ONLY file in `src/renderer/**` allowed to call
  * `api.preview.setVisibility`.** An ESLint `no-restricted-syntax` rule (item 84,
  * a separate batch) enforces that every other renderer module goes through this
- * guard rather than poking main-side visibility directly, so hide/show ordering
- * (capture-before-hide, single application site) has exactly one owner.
+ * guard rather than poking main-side visibility directly, so show/hide has
+ * exactly one application site.
  *
- * Why this must be the sole owner (design §5(d)): main captures a still frame
- * *before* hiding, and re-adds the child view topmost on show. A second caller
- * racing `setVisibility` would flap the view, waste a `capturePage`, and flash.
+ * Why this must be the sole owner (design §5(d)): main applies each call at
+ * once – a hide is synchronous and shows the cached still frame, a show re-adds
+ * the child view topmost – and this guard sends only on a change, against its
+ * own per-panel cache. A second caller racing `setVisibility` would flap the
+ * view, flash, and leave that cache disagreeing with what main shows.
+ *
+ * **The drag freeze (issue #124, part 1 §1.5) goes through this guard, with one
+ * stated exception.**
+ * - A splitter drag registers the `drag` occluder (`previewDragFreeze.ts`), so
+ *   this guard hides and shows the page exactly as for a dialog. Main's report
+ *   then agrees with the cache below, and the reconcile never fires.
+ * - **The one sanctioned bypass: the window-edge resize hold.** While a window
+ *   edge is dragged, main hides that window's shown views itself
+ *   (`previewResizeHold.ts` → `visibility.hold()`) WITHOUT a
+ *   `visibilityApplied`, so this guard keeps believing "visible" and never
+ *   re-syncs against the hold. A `setVisibility` sent meanwhile is recorded by
+ *   main, not applied; the hold ends through main's one `release()`, which
+ *   applies the LATEST wish and reports it – so a dialog opened mid-hold stays
+ *   covered. The renderer mirrors the hold in the preview store's `resizeHeld`,
+ *   for the still picture only; nothing here reads it.
  *
  * Dependency-injected so it is unit-testable with no real `window.api` or
  * zustand store: {@link createOverlayGuard} takes an {@link OverlayGuardDeps};
@@ -35,6 +57,7 @@ import {
   usePreviewChromeGateStore,
   type PreviewChromeGateReason
 } from '../../stores/usePreviewChromeGateStore'
+import { usePreviewCollapsedStore } from '../../stores/usePreviewCollapsedStore'
 import { logger } from '../../utils/logger'
 
 /**
@@ -55,8 +78,22 @@ const VISIBILITY_REASON = {
   /** Hidden because the page did not prove it moved out of Erfana's chrome. */
   chromeUnconfirmed: 'chrome-unconfirmed',
   /** Hidden because the panel is too short to share with an open host list. */
-  chromeTooShort: 'chrome-too-short'
+  chromeTooShort: 'chrome-too-short',
+  /**
+   * Hidden because the panel's page area is clipped away by a collapsed
+   * ancestor (issue #124 C2), so the page would paint over something else.
+   */
+  collapsed: 'collapsed'
 } as const
+
+/**
+ * Why one panel's page must stay hidden: a chrome-gate reason from the
+ * permission band, or `'collapsed'` from the bounds hook (issue #124 C2).
+ *
+ * One term, two stores: each has a single writer, so neither can overwrite or
+ * lift the other's hide (see `usePreviewCollapsedStore`).
+ */
+export type PreviewPanelGate = PreviewChromeGateReason | 'collapsed'
 
 /**
  * Everything the guard needs from the outside world.
@@ -77,9 +114,15 @@ export interface OverlayGuardDeps {
    * REQUIRED, not optional. An optional dep defaulting to "never gated" fails
    * OPEN — the page stays visible over a permission prompt — and this is the one
    * input where the safe default is the restrictive one.
+   *
+   * When both apply, the chrome gate is returned: it is the one with a
+   * user-visible explanation in the band.
    */
-  getPanelGate: (panelId: string) => PreviewChromeGateReason | null
-  /** Notify on gate changes, so the guard recomputes. Returns an unsubscribe. */
+  getPanelGate: (panelId: string) => PreviewPanelGate | null
+  /**
+   * Notify on gate changes – either store behind {@link getPanelGate} – so the
+   * guard recomputes. Returns an unsubscribe.
+   */
   subscribeGate: (listener: () => void) => () => void
   /**
    * Subscribe to occluder-count changes.
@@ -146,6 +189,17 @@ export interface IOverlayGuard {
    * @param activeTabId - The active tab's panel id, or `null` when none.
    */
   sync: (activeTabId: string | null) => void
+  /**
+   * The live panel this guard last told main to SHOW, or `null` when it shows
+   * none. The splitter drag freeze asks, so it hides only a page that is on
+   * screen (issue #124, part 1 §1.5).
+   *
+   * The guard's belief, not main's: a lost message is corrected by the
+   * reconcile against `visibilityApplied`, not here.
+   *
+   * @returns The shown panel's id, or `null`
+   */
+  visiblePanelId: () => string | null
   /** Detaches both store subscriptions. Idempotent. */
   dispose: () => void
 }
@@ -214,6 +268,14 @@ class OverlayGuardService implements IOverlayGuard {
     this.recompute()
   }
 
+  visiblePanelId(): string | null {
+    // At most one entry is `true` (the one-visible-tab assumption below).
+    for (const [panelId, visible] of this.lastVisible) {
+      if (visible) return panelId
+    }
+    return null
+  }
+
   dispose(): void {
     while (this.unsubscribers.length > 0) {
       this.unsubscribers.pop()?.()
@@ -221,7 +283,8 @@ class OverlayGuardService implements IOverlayGuard {
   }
 
   /**
-   * Computes `visible = isActiveTab && !isOccluded()` for EVERY live preview and
+   * Computes `visible = isActiveTab && !isOccluded() && gate === null` for EVERY
+   * live preview (`gate` from {@link OverlayGuardDeps.getPanelGate}) and
    * sends `setVisibility` only where it differs from the last sent value.
    *
    * Panels that are no longer live are pruned from the cache; main destroyed
@@ -265,7 +328,9 @@ class OverlayGuardService implements IOverlayGuard {
             ? VISIBILITY_REASON.chromeUnconfirmed
             : gate === 'too-short'
               ? VISIBILITY_REASON.chromeTooShort
-              : VISIBILITY_REASON.occluded
+              : gate === 'collapsed'
+                ? VISIBILITY_REASON.collapsed
+                : VISIBILITY_REASON.occluded
       this.deps.setVisibility(panelId, visible, reason)
     }
 
@@ -304,6 +369,34 @@ class OverlayGuardService implements IOverlayGuard {
  */
 export function createOverlayGuard(deps: OverlayGuardDeps): IOverlayGuard {
   return new OverlayGuardService(deps)
+}
+
+/**
+ * The production gate read: the permission band's chrome gate first, then the
+ * bounds hook's collapsed flag.
+ *
+ * @param panelId - The live preview panel to ask about
+ * @returns Why the panel's page must stay hidden, or `null`
+ */
+function readPanelGate(panelId: string): PreviewPanelGate | null {
+  const chromeGate = usePreviewChromeGateStore.getState().getGate(panelId)
+  if (chromeGate !== null) return chromeGate
+  return usePreviewCollapsedStore.getState().isCollapsed(panelId) ? 'collapsed' : null
+}
+
+/**
+ * Subscribes to both stores behind {@link readPanelGate}.
+ *
+ * @param listener - Called (no args) after either store changes
+ * @returns One unsubscribe that detaches both
+ */
+function subscribePanelGate(listener: () => void): () => void {
+  const unsubscribeChrome = usePreviewChromeGateStore.subscribe(listener)
+  const unsubscribeCollapsed = usePreviewCollapsedStore.subscribe(listener)
+  return () => {
+    unsubscribeChrome()
+    unsubscribeCollapsed()
+  }
 }
 
 /**
@@ -348,8 +441,8 @@ export function getOverlayGuard(): IOverlayGuard {
     subscribeOccluded: (listener) => useOverlayOccluderStore.subscribe(listener),
     getLivePreviewPanelIds: readLivePreviewPanelIds,
     subscribePreview: (listener) => usePreviewStore.subscribe(listener),
-    getPanelGate: (panelId) => usePreviewChromeGateStore.getState().getGate(panelId),
-    subscribeGate: (listener) => usePreviewChromeGateStore.subscribe(listener),
+    getPanelGate: readPanelGate,
+    subscribeGate: subscribePanelGate,
     setVisibility: (panelId, visible, reason) =>
       window.api.preview.setVisibility(panelId, visible, reason),
     subscribeVisibilityApplied: (listener) =>

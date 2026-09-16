@@ -11,10 +11,6 @@ The Erfana editor subsystem provides a comprehensive markdown editing experience
 - [Export](./export.md) - PDF and DOCX export pipeline
 - [Mermaid Viewer](./mermaid-viewer.md) - Diagram rendering, zoom and pan
 
-Monaco configuration, scroll synchronization and the formatting toolbar used to
-live in three sibling files (`monaco-configuration.md`, `scroll-sync.md`,
-`toolbar.md`). They were short stubs and are now inlined below.
-
 ## Key Features
 
 ### View Modes
@@ -92,14 +88,14 @@ Real-time metrics in bottom status bar:
 - Selection character count
 
 ### Auto-Save
-- Triggers 2 seconds after last edit
+- Triggers 2 seconds after last edit, and at least every 30 seconds during continuous typing
 - Visual indicator during save
 - Manual save with Cmd/Ctrl+S
 
 ## Implementation Files
 
 ### Main Panel (`src/renderer/src/components/Panels/`)
-- `MarkdownEditorPanel.tsx` - Panel orchestration (614 lines)
+- `MarkdownEditorPanel.tsx` - Panel orchestration
 - `DocumentStatsBar.tsx` - Real-time word/character/line counts
 - `EditorContentLayout.tsx` - Editor/preview layout with resizable divider
 
@@ -135,7 +131,8 @@ Real-time metrics in bottom status bar:
 - `useFileWatcher.ts` - File change detection with race condition protection. Since #70 it holds its watch through the shared `fileWatchSlot.ts` (serialised acquire/release, so a start and its stop can never get out of order), and it takes `INDICATOR_DURATION_MS` from `constants/fileWatch.ts` rather than owning it. The read-only sibling for surfaces that never write is `useFileChangeSubscription.ts` — see [File Watching](../file-watching/README.md#single-file-watch-internals-70)
 - `useDividerPosition.ts` - Resizable split pane position management
 - `useEditorContextMenu.ts` - Context menu state and positioning
-- `useKeyboardShortcuts.ts` - Editor keyboard shortcut handling
+- `useKeyboardShortcuts.ts` - Cmd/Ctrl+S (save) and Cmd/Ctrl+W (close tab, confirming unsaved changes). The listener sits on `window` and every open editor tab stays mounted, so it takes an `enabled` flag that `MarkdownEditorPanel` wires to `props.api.isActive` (kept in step via `onDidActiveChange`) – only the active tab acts on a press
+- `useEditorSaveRegistration.ts` - Registers the tab's save, conflict flag and autosave hold in `services/editorSaveRegistry.ts` under its panel id while the panel is mounted, so the HTML preview's tab move (#124) can save another tab by id. See [File Watching](../file-watching/README.md)
 
 ## Monaco configuration
 
@@ -160,16 +157,17 @@ Monaco is configured for markdown editing in `MonacoMarkdownEditor.tsx`:
 Monaco built-ins (when the editor has focus):
 
 - Text editing: Cmd/Ctrl+C/V/X/Z (copy/paste/cut/undo)
-- Find/replace: Cmd/Ctrl+F, Cmd/Ctrl+H
+- Find/replace: Cmd/Ctrl+H (Cmd/Ctrl+F is intercepted app-wide by `useSearchKeyboard.ts` and opens the app search bar instead of Monaco's find widget)
 - Multi-cursor: Alt+Click, Cmd/Ctrl+Alt+Up/Down
-- Save: Cmd/Ctrl+S
 
 Application-global shortcuts override Monaco's:
 
-- Cmd/Ctrl+B: toggle sidebar
-- Cmd/Ctrl+O: open folder
-- Cmd/Ctrl+N: new file
-- Cmd/Ctrl+Shift+N: new folder
+- Cmd/Ctrl+B: toggle sidebar (`AppDockLayout.tsx`; Monaco's Bold binding loses – see the Conflicts section of the shortcuts doc)
+- Cmd/Ctrl+F: open the app search bar (`useSearchKeyboard.ts`)
+- Cmd/Ctrl+S: save, and Cmd/Ctrl+W: close the tab (`useKeyboardShortcuts.ts`, not Monaco; gated to the active editor tab)
+- Cmd/Ctrl+Shift+N: New Window – the only `accelerator` declared in `src/main/menu.ts` besides the View-menu zoom items
+
+There are no Cmd/Ctrl+O (open folder) or Cmd/Ctrl+N (new file) shortcuts.
 
 See [Keyboard Shortcuts](../keyboard-shortcuts.md) for the complete list.
 

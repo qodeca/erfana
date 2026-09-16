@@ -19,9 +19,9 @@ Claude CLI causes terminal buffer redraws during streaming output, overriding xt
 
 ### Multi-Layered Solution
 
-#### 1. Scroll Position Tracking (TerminalPanel.tsx:300-314)
+#### 1. Scroll Position Tracking (`TerminalPanel.tsx`, the `dataHandler` in the terminal-data effect)
 
-Intelligent detection of user scroll position using xterm.js Buffer API:
+Intelligent detection of user scroll position using xterm.js Buffer API. The v0.3.1 snippet below is historical: today the data handler is wrapped by `wrapOnDataHandler` from `useScrollAnomalyRecovery` (see § Parser Hooks below), which owns the position tracking.
 - Compares `buffer.active.viewportY` vs `buffer.active.baseY` to determine if user is scrolled up
 - Preserves position when user is reading scrollback
 - Allows auto-scroll when user is at bottom
@@ -42,7 +42,7 @@ const unsubscribeData = window.api.terminal.onData((data) => {
 })
 ```
 
-#### 2. Terminal Configuration (TerminalPanel.tsx:142-143)
+#### 2. Terminal Configuration (`TerminalPanel.tsx`, the `new Terminal({...})` options in the xterm init effect)
 
 - `scrollOnUserInput: false` - Prevents auto-scroll when user types
 - `smoothScrollDuration: 0` - Eliminates animation lag for instant response
@@ -50,14 +50,14 @@ const unsubscribeData = window.api.terminal.onData((data) => {
 ```typescript
 const xterm = new Terminal({
   fontSize: 12,
-  fontFamily: 'SF Mono, Monaco, Inconsolata, Courier New, monospace',
+  fontFamily: "'Cascadia Mono', 'SF Mono', 'Monaco', Consolas, 'Courier New', monospace",
   // ... other options
   scrollOnUserInput: false,
   smoothScrollDuration: 0
 })
 ```
 
-#### 3. CSS Viewport Fix (TerminalPanel.css:69)
+#### 3. CSS Viewport Fix (`TerminalPanel.css`, the `.terminal-container .xterm-viewport` rule)
 
 Changed `overflow-y: scroll !important` to `overflow-y: hidden` (updated in v6 upgrade):
 - xterm v6 uses DomScrollableElement for scrolling – native scrollbar is no longer needed
@@ -99,8 +99,8 @@ it('should preserve scroll position when user is scrolled up', async () => {
 
 ### Implementation Files
 
-- `src/renderer/src/components/Panels/TerminalPanel.tsx:300-314` - Scroll tracking logic
-- `src/renderer/src/components/Panels/TerminalPanel.css:69` - Viewport styling
+- `src/renderer/src/components/Panels/TerminalPanel.tsx` (`dataHandler` / `wrapOnDataHandler`) - Scroll tracking logic
+- `src/renderer/src/components/Panels/TerminalPanel.css` (`.terminal-container .xterm-viewport`) - Viewport styling
 - `src/renderer/src/components/Panels/TerminalPanel.scroll.test.tsx` - Test coverage
 
 ## Scroll to Bottom Button (v0.3.2)
@@ -249,7 +249,7 @@ new Terminal({
 **Related Issues**:
 - [Claude Code #826](https://github.com/anthropics/claude-code/issues/826) (183+ upvotes)
 - [Claude Code #10769](https://github.com/anthropics/claude-code/issues/10769)
-- [Internal #12](https://github.com/user/erfana/issues/12), [#22](https://github.com/user/erfana/issues/22)
+- Internal #12 and #22 – pre-migration issue numbers (the public `qodeca/erfana` tracker renumbered from #1 at the 2026-06 open-source migration, so these resolve to unrelated public issues; treat them as provenance only)
 
 ### Root Cause
 
@@ -358,7 +358,7 @@ if (parserHandledRef?.current) {
 
 **Parser Hooks (Primary)**:
 - `src/renderer/src/hooks/useTerminalParserHooks.ts` - CSI handler registration
-- `src/renderer/src/hooks/useTerminalParserHooks.test.ts` - 24 pure logic tests
+- `src/renderer/src/hooks/useTerminalParserHooks.test.ts` - 29 pure logic tests
 
 **Fallback System**:
 - `src/renderer/src/utils/scrollAnomalyDetector.ts` - Pure detection logic

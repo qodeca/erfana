@@ -5,7 +5,9 @@
  *
  * `PreviewNavigationPolicy` decides WHAT a link means with no I/O; this module
  * does the I/O that follows — realpath confinement, the renderer hand-off, the
- * OS-browser hand-off, and the failure entry when a link goes nowhere.
+ * OS-browser hand-off, and the failure entry when a link goes nowhere. For an
+ * in-project page it also asks the link table (`previewLinkDisposition`, issue
+ * #124) where that page may open.
  *
  * The split matters: the decision table is exhaustively unit-tested as pure
  * data, and everything with a side effect lives here behind injected seams.
@@ -17,8 +19,20 @@
 import { resolve } from 'node:path'
 
 import { ErrorCode } from '../../../shared/errors'
-import type { PreviewFailureInput, PreviewFailureType } from '../../../shared/ipc/preview-types'
+import type {
+  PreviewFailureInput,
+  PreviewFailureType,
+  PreviewLinkDisposition
+} from '../../../shared/ipc/preview-types'
+import { logger } from '../LoggingService'
 import { decideLinkIntent, type LinkActivation } from './PreviewNavigationPolicy'
+import {
+  decideLinkDisposition,
+  isPreviewPagePath,
+  requestedLinkDisposition,
+  type LinkDispositionInput,
+  type LinkModifiers
+} from './previewLinkDisposition'
 import { confinePath } from './previewPathResolve'
 
 /**
@@ -52,12 +66,16 @@ export interface PreviewLinkContext {
 
 /** Injected side effects, so the routing itself stays testable. */
 export interface PreviewLinkNavigationDeps {
-  /** Ask the owning renderer to open a project file in a tab. */
+  /**
+   * Ask the owning renderer to open a project file. `disposition` is where the
+   * link table says it may open (issue #124, part 3 §3.2).
+   */
   readonly requestOpenFile: (
     sourcePanelId: string,
     filePath: string,
     anchor: string | null,
-    windowId: number
+    windowId: number,
+    disposition: PreviewLinkDisposition
   ) => void
   /** Hand a vetted URL to the OS browser. */
   readonly openExternal: (url: string) => Promise<void>
@@ -65,6 +83,15 @@ export interface PreviewLinkNavigationDeps {
   readonly recordFailure: (input: PreviewFailureInput) => void
   /** Confinement, injectable for tests; defaults to {@link confinePath}. */
   readonly confine?: typeof confinePath
+  /**
+   * Whether a confined `.html` / `.htm` target runs as a preview here: the
+   * main-side eligibility check (part 3 §3.2, row 6). Asked only when the link
+   * could stay in its tab. Absent, or rejecting, means no – so until it is
+   * wired every link opens a new tab, as before #124.
+   */
+  readonly runsAsPreview?: (realTarget: string) => Promise<boolean>
+  /** Picks the new-tab accelerator (Cmd or Ctrl); defaults to `process.platform`. */
+  readonly platform?: NodeJS.Platform
 }
 
 /**
@@ -152,6 +179,10 @@ export async function routeLinkActivation(
     provenance: LinkProvenance
     /** The `href` attribute as written; see `LinkActivationPayloadSchema`. */
     rawHref?: string
+    /** `MouseEvent.button`; absent for `will-navigate`, which counts as primary. */
+    button?: number
+    /** The keys held during the click; absent for `will-navigate`. */
+    modifiers?: LinkModifiers
   },
   context: PreviewLinkContext,
   deps: PreviewLinkNavigationDeps
@@ -241,8 +272,50 @@ export async function routeLinkActivation(
         return
       }
 
-      deps.requestOpenFile(context.panelId, verdict.realTarget, intent.anchor, context.windowId)
+      const disposition = await resolveDisposition(activation, verdict.realTarget, deps)
+      deps.requestOpenFile(
+        context.panelId,
+        verdict.realTarget,
+        intent.anchor,
+        context.windowId,
+        disposition
+      )
       return
     }
+  }
+}
+
+/**
+ * Where a confined in-project page may open (part 3 §3.2). The eligibility
+ * check, which may run `git`, is asked only when its answer could matter.
+ */
+async function resolveDisposition(
+  link: LinkDispositionInput,
+  realTarget: string,
+  deps: PreviewLinkNavigationDeps
+): Promise<PreviewLinkDisposition> {
+  const tableDeps = { platform: deps.platform ?? process.platform }
+  if (requestedLinkDisposition(link, tableDeps) === 'new-tab' || !isPreviewPagePath(realTarget)) {
+    return 'new-tab'
+  }
+  const eligible = await targetRunsAsPreview(realTarget, deps)
+  return decideLinkDisposition(link, { filePath: realTarget, eligible }, tableDeps)
+}
+
+/** The injected eligibility check; absent or failing means no, so a new tab. */
+async function targetRunsAsPreview(
+  realTarget: string,
+  deps: PreviewLinkNavigationDeps
+): Promise<boolean> {
+  if (deps.runsAsPreview === undefined) return false
+  try {
+    return await deps.runsAsPreview(realTarget)
+  } catch (error) {
+    // Fail closed to what every link did before #124. Only the error's name is
+    // logged: its message may carry the path.
+    logger.warn('Preview link eligibility check failed; opening the page in a new tab', {
+      error: error instanceof Error ? error.name : typeof error
+    })
+    return false
   }
 }

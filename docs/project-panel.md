@@ -68,7 +68,7 @@ Two mutually exclusive radio buttons:
 - **All Files** - Show all
 - **Markdown Only** - Show only .md files + folders containing them
 
-**Visual**: Radio with checkmark icons, gray text (blue when active #007acc), 12px spacing
+**Visual**: Radio with checkmark icons, gray text (`var(--color-accent-drag)` when active), 12px spacing
 **Persistence**: electron-store, survives restarts
 
 See: [IPC Patterns](./ipc-patterns.md) for filter persistence channels
@@ -119,7 +119,7 @@ const filterTree = useMemo(() => {
 }, [fileTree, filterMode])
 ```
 
-**Helper**: `isMarkdownFile()` checks `.md` and `.markdown` only. Note there are two copies – a local one in `ProjectTree.tsx` (used by this filter) and the exported one in `src/renderer/src/utils/fileUtils.ts`; both accept the same two extensions, so `.mdx`, `.mdown` and `.mkd` files are hidden in Markdown mode.
+**Helper**: `isMarkdownFile()` checks `.md` and `.markdown` only. Note there are three copies – a local one in `ProjectTree.tsx` (used by this filter), the exported one in `src/renderer/src/utils/fileUtils.ts`, and another in `components/Panels/markdownEditorPanel.logic.ts`; all accept the same two extensions, so `.mdx`, `.mdown` and `.mkd` files are hidden in Markdown mode.
 
 ### Behavior
 
@@ -145,15 +145,15 @@ VS Code-style git status badges on files and folders.
 **Status Bar**: Footer showing branch name + colored status counts
 
 **Architecture**:
-- `GitStatusService.ts` - isomorphic-git statusMatrix()
-- `useGitStatus.ts` - Hook with 1s debounce, 2s cooldown
+- `GitStatusService.ts` - runs git status in a worker thread (`workers/git-status.worker.ts`): native `git status` first, isomorphic-git `statusMatrix()` only when no git binary is found
+- `useGitStatus.ts` - Hook with 250 ms debounce, 500 ms cooldown (`GIT_STATUS` in `ProjectTree/constants.ts`)
 - `useGitStore.ts` - Zustand store for git state
 - `GitStatusBadge.tsx` - File/folder badge component
 - `GitStatusBar.tsx` - Branch + counts footer
 
 **Auto-refresh**: On file changes, pauses when tab unfocused
 
-**Known Limitation**: Global `.gitignore` not supported (isomorphic-git limitation)
+**Known Limitation**: Global `.gitignore` not supported when the isomorphic-git fallback runs (no git binary found); the native path runs the user's own `git status`
 
 See: [Known Issues](./known-issues.md#git-status-global-gitignore-not-supported)
 
@@ -168,7 +168,7 @@ See: [Known Issues](./known-issues.md#git-status-global-gitignore-not-supported)
 4. Extension: `.key`, `.pem`, `.p12`, `.pfx`, `.keystore`, `.jks`, `.crt`, `.cer`
 5. Password/token files: a name containing `password` or `token` **and** ending `.txt` or `.json`
 
-**Visual**: Color `#d97706` (amber), icon ⚠️ (14px), ARIA label "Sensitive file"
+**Visual**: Color `var(--color-warning-bright)` (amber – a RETIRED token; new code should use `var(--color-warning)`), icon ⚠️ (14px), ARIA label "Sensitive file"
 **Detection**: `isSensitiveFile()` in `ProjectTreeNode.tsx` – plain string comparison
 (exact match, prefix, `includes`, `endsWith`), not regex
 **Location**: `ProjectTreeNode.tsx`
@@ -200,65 +200,74 @@ Files/folders starting with `.`
 ### Architecture
 
 **Patterns**:
-- **Strategy**: Node type-specific menus (FileStrategy, FolderStrategy)
-- **Command**: Testable command objects (11 classes)
+- **Strategy**: Node type-specific menus (`FileContextMenuStrategy`, `DirectoryContextMenuStrategy`)
+- **Command**: Testable command objects (13 classes)
 - **Factory**: Automatic strategy selection
 
 **Structure**:
 ```
 context-menu/
 ├── types.ts        # Interfaces
-├── commands.tsx    # 11 command classes
-├── strategies.tsx  # FileStrategy, FolderStrategy
-└── factory.ts      # createContextMenu(context, nodeType)
+├── commands.tsx    # 13 command classes
+├── strategies.tsx  # FileContextMenuStrategy, DirectoryContextMenuStrategy
+└── factory.ts      # ContextMenuFactory.build(node, ctx)
 ```
 
 ### Menu Items
 
 Built by `strategies.tsx` from the command classes in `commands.tsx`, in this order:
 
-**Files**: Cut, Copy, ---, Rename, ---, Delete, ---, Reveal in Finder / Show in Explorer
-**Folders**: Cut, Copy, Paste, ---, New File, New Folder, Rename, Import..., ---, Delete,
+**Files**: Open as source, Open in default browser (HTML files only, each under its own gate), ---, Cut, Copy, ---, Rename, ---, Delete, ---, Reveal in Finder / Show in Explorer
+**Folders**: Cut, Copy, Paste, ---, New File, New Folder, Rename, ---, Import..., ---, Delete,
 ---, Reveal in Finder / Show in Explorer
 **Project root**: the root row is also a valid target; it cannot be moved
 ("Cannot move project root")
 
 **Conditional items**: Paste appears only on directories and only when the internal
 clipboard is non-empty. Import... appears only on directories and only when an import
-handler is supplied. The Reveal label switches on `isMacOS()`.
+handler is supplied; it gets its own separator. The Reveal label switches on `isMacOS()`.
+
+**Gates for the HTML open group**: Open as source appears only when `ctx.openAsSource` is wired (the tree can reach the editor), and Open in default browser only when `ctx.openInBrowser` is wired (`MenuContext` in `context-menu/types.ts`). The separator follows the group only when it holds at least one item. `openInBrowser` raises its own toasts and never rejects.
 
 **Separator**: Visual separator before destructive actions
 
 ### Command Classes
 
-Each implements `IMenuCommand` interface:
+Each command's `toMenuItem()` produces an `IMenuItem`, and each strategy implements `IContextMenuStrategy` (`context-menu/types.ts`):
 ```typescript
-interface IMenuCommand {
+interface IMenuItem {
   label: string
-  icon?: LucideIcon
-  onClick: () => void | Promise<void>
+  icon?: ReactNode
   danger?: boolean
   separator?: boolean
+  execute: () => void | Promise<void>
+}
+
+interface IContextMenuStrategy {
+  supports(node: FileNode): boolean
+  build(node: FileNode, ctx: MenuContext): IMenuItem[]
 }
 ```
 
-**Available**: NewFileCommand, NewFolderCommand, RenameFileCommand, RenameFolderCommand, DeleteFileCommand, DeleteFolderCommand, SeparatorCommand
+**Available** (`commands.tsx`): CutCommand, CopyCommand, PasteIntoDirectoryCommand, OpenAsSourceCommand, OpenInBrowserCommand, RenameFileCommand, RenameDirectoryCommand, DeleteFileCommand, DeleteDirectoryCommand, NewFileInDirectoryCommand, NewFolderInDirectoryCommand, ImportCommand, RevealInFileManagerCommand
 
 ### Extensibility
 
-**Add Menu Item**:
-1. Create command class in `commands.tsx`
-2. Implement `IMenuCommand`
-3. Add to strategy in `strategies.tsx`
+**Add Menu Item** (including a new file operation):
+1. Create a command class in `commands.tsx` that extends `CommandBase` (a `label`, optional `icon` / `danger`, and `execute()`)
+2. Reach everything through the injected `MenuContext` (`this.ctx`), never through `window.api` or a store directly: `ctx.api` for file IPC, `ctx.dialogs` and `ctx.toast` for the UI. Wrap any filesystem change in `ctx.withWatcherPause(...)` (see [Pause/Resume Pattern](#pauseresume-pattern)), then call `ctx.refreshProjectTree()` inside it and `ctx.onGitRefresh?.()` after it
+3. If the command needs something `MenuContext` does not carry yet, add an optional field in `context-menu/types.ts` and wire it in `buildMenuContext()` in `ProjectTree.tsx`
+4. If it needs a new main-process operation, add the IPC channel first – see [Development Tasks](./development-tasks.md) and [IPC Patterns](./ipc-patterns.md)
+5. Add it to the strategy in `strategies.tsx`
 
 **New Node Type**:
 1. Create strategy in `strategies.tsx`
-2. Implement `IMenuStrategy`
-3. Update factory
+2. Implement `IContextMenuStrategy` (`supports(node)` and `build(node, ctx)`)
+3. Register it in the `ContextMenuFactory` constructor (`factory.ts`)
 
 ### Benefits
 
-Single Responsibility, Open/Closed, Testable (87 tests), Maintainable, Flexible
+Single Responsibility, Open/Closed, Testable (`commands.test.tsx`, `strategies.test.tsx` and `factory.test.ts`), Maintainable, Flexible
 
 ### Dialog Integration
 
@@ -288,26 +297,28 @@ See: [Architecture - ProjectTree](./architecture.md#projecttree-modularization) 
 
 Prevents double-refresh during internal CRUD operations.
 
-**Pattern**:
-1. Set `isInternalOperation.current = true`
-2. Pause: `window.api.directoryWatch.pause()`
-3. Perform operation
-4. Refresh tree manually
-5. Resume: `window.api.directoryWatch.resume()`
-6. Set `isInternalOperation.current = false`
+**Pattern** – all of it lives in `withWatcherPause()` (`ProjectTree/withWatcherPause.ts`), which callers wrap their operation in:
+1. Sets `isInternalOperationRef.current = true` and `setLoading(true)`
+2. Pause: `window.api.directoryWatch.pause(projectPath)`
+3. Runs the operation (create, rename, delete, paste, import)
+4. Resets `isInternalOperationRef.current = false` before resuming
+5. Resume: `window.api.directoryWatch.resume(projectPath)`
+6. `setLoading(false)` in a `finally` block, even on error
 
 **Race Prevention**: Debounced events during pause are ignored
 
-**Example**:
+**Example** (`hooks/useFileOperations.ts`):
 ```typescript
-const handleCreateFile = async () => {
-  isInternalOperation.current = true
-  await window.api.directoryWatch.pause(projectPath)
-  await window.api.file.createFile(targetPath, fileName)
-  await refreshFileTree()
-  await window.api.directoryWatch.resume(projectPath)
-  isInternalOperation.current = false
-}
+const createdFilePath = await withWatcherPause(
+  projectPath,
+  isInternalOperationRef,
+  setLoading,
+  async () => {
+    const path = await window.api.file.createFile(targetPath, fileName)
+    await refreshFileTree()
+    return path
+  }
+)
 ```
 
 ### Tree State Preservation
@@ -326,28 +337,28 @@ const handleDirectoryChanged = async () => {
 
 **Benefits**: External changes (git, npm, IDE) don't collapse folders
 
-See: [File Watching](./file-watching/README.md#directory-watching)
+See: [File Watching](./file-watching/README.md#directorywatcherservice-directory-watching)
 
 ## File Opening
 
 **Flow**:
-1. User clicks file → receives `dockviewApi` via params
-2. Check if already open (find by ID)
-3. If open: activate panel
-4. If closed: add panel with `dockviewApi.addPanel()`
+1. User clicks file → `openFileInPanel()` with the editor-area `dockviewApi`
+2. Decide the panel kind: images open in the image viewer; an eligible `.html` / `.htm` file opens as a running preview (the caller awaits `resolvePanelKind()` and passes `kind: 'preview'`); everything else opens in the Markdown editor
+3. Check if already open: editor and image tabs by panel id; a preview tab by the page it shows now, via `findPreviewTabShowing()` (reads `params.filePath`), because a preview tab that moved to another page keeps its original id
+4. If open: activate panel
+5. If closed: add panel with `dockviewApi.addPanel()`
 
-**Panel ID**: Sanitized path (replace `/` with `_`)
+**Panel ID**: From `getFilePanelId()` / `openFileInPanel()` in `utils/openFileInPanel.ts` – never hand-built (an id past the length budget is a shortened head plus a digest, so a path cannot be read back out of it)
 **Tab Title**: Basename (e.g., `README.md`)
-**Component**: `markdownEditor` - Monaco + preview
+**Component** (registry keys in `DockLayout/components/EditorAreaSplitPanel.tsx`): `editor` – `MarkdownEditorPanel` (Monaco + preview), id prefix `editor-`; `imageViewer`, id prefix `image-`; `htmlPreview`, id prefix `preview-`
 
-See: [UI Components](./ui-components.md#panel-communication-pattern)
+See: [UI Components](./ui-components.md#panel-communication)
 
 ## Keyboard Navigation
 
-**Arrow Keys**: Navigate nodes
-**Enter**: Open file
-**Space**: Expand/collapse folder
 **Cmd/Ctrl+Alt+R**: Refresh tree and git status
+
+Arrow-key, Enter and Space navigation of the tree is not implemented – the tree declares `role="tree"` but has no keyboard handler; tracked in [#88](https://github.com/qodeca/erfana/issues/88).
 **Right-Click**: Context menu
 **Accessibility**: ARIA labels, roles, focus indicators
 
@@ -362,10 +373,7 @@ See: [UI Components](./ui-components.md#panel-communication-pattern)
 
 ### Add File Operation
 
-1. Add menu item to context menu config
-2. Add handler in ProjectTree
-3. Implement IPC channel in main
-4. Add pause/resume around operation
+Follow **Add Menu Item** under [Context Menu Operations – Extensibility](#extensibility).
 
 ### Add Visual Indicator
 

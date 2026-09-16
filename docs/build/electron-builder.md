@@ -1,6 +1,6 @@
 # Electron Builder configuration
 
-**Last updated**: August 2026 (v0.17.2)
+**Last updated**: September 2026 (v0.20.0, electron-builder 26.15.3)
 
 This document explains the electron-builder version choice, the `aproba` build-time shim, and the parts of `electron-builder.yml` that are easy to get wrong.
 
@@ -12,7 +12,7 @@ This document explains the electron-builder version choice, the `aproba` build-t
 
 ```json
 // package.json → devDependencies
-"electron-builder": "26.8.1"
+"electron-builder": "26.15.3"
 ```
 
 The version is pinned **exactly** — no caret. electron-builder minors have repeatedly changed schema shape (the `win.signtoolOptions` nesting below is one example), and a release build is not the place to discover that. Bumps are deliberate.
@@ -20,7 +20,7 @@ The version is pinned **exactly** — no caret. electron-builder minors have rep
 ### Why version 26?
 
 - Current major, with the newest features and security fixes
-- Supports the Electron the app builds against (`electron: ^39.2.4` in `package.json`; `39.8.9` installed at the time of writing)
+- Supports the Electron the app builds against (`electron: ^39.8.10` in `package.json`; `39.8.10` installed at the time of writing)
 - Correctly applies fuses via the `afterPack` hook
 - Ships the Azure Artifact Signing integration the Windows leg depends on
 

@@ -2,6 +2,8 @@
 
 Current issues and their workarounds. For historical resolved issues, see [archive/resolved-issues.md](./archive/resolved-issues.md).
 
+**Issue numbers**: a number written as a link (for example [#60](https://github.com/qodeca/erfana/issues/60)) is on the public `qodeca/erfana` tracker. A bare number without a link (#146, #147, #149, #150, #163, #164, #166, #177, #213, #241) is from the private pre-migration tracker: it does not resolve on `qodeca/erfana`, and a pre-migration number that the public tracker has since reached points at an unrelated issue. Treat bare numbers as provenance only – see [`docs/windows/implementation-plan.md`](./windows/implementation-plan.md).
+
 ---
 
 ## Accessibility
@@ -31,23 +33,47 @@ See [`design/README.md`](../design/README.md) for which card governs which defec
 
 ## Windows-specific issues
 
-Phases 0–2 of Windows enablement shipped in **v0.9.3** (2026-04-22); Phase 4 (local Whisper trust chain + Windows x64 binary) shipped in **v0.9.4** (merge `110f1b9`, 2026-04-23). The following gaps remain user-visible until Phases 3, 5, and 6 ship. See [`docs/windows/implementation-plan.md`](./windows/implementation-plan.md) for the canonical roadmap.
+Phases 0–2 of Windows enablement shipped in **v0.9.3** (2026-04-22); Phase 4 (local Whisper trust chain + Windows x64 binary) shipped in **v0.9.4** (merge `110f1b9` – pre-migration; no longer resolvable, that history was rewritten at the 2026-06 migration; 2026-04-23); Phase 3 (screenshots) shipped in **v0.12.0**. The following gaps remain user-visible until Phases 5 and 6 ship. See [`docs/windows/implementation-plan.md`](./windows/implementation-plan.md) for the canonical roadmap.
 
 ### SmartScreen warning on first launch
 
-**Issue**: First-time launch of the NSIS installer triggers a Windows SmartScreen warning (`Windows protected your PC`) because Erfana is not yet code-signed.
+**Issue**: First-time launch of the NSIS installer can trigger a Windows SmartScreen warning (`Windows protected your PC`). The installer **is** code-signed – Azure Artifact Signing shipped in v0.9.5 (`azureSignOptions` in `electron-builder.yml`) – but SmartScreen also weighs download reputation, which a signing identity builds up over time.
 
 **Workaround**: Right-click the `.exe` → Properties → Unblock; OR click "More info → Run anyway" in the SmartScreen dialog.
 
-**Tracking**: #166 (Phase 5 — code-signing).
+**Tracking**: #177 (SmartScreen reputation). Phase 5 (#166) is now NSIS UX only – see [`docs/windows/implementation-plan.md`](./windows/implementation-plan.md).
+
+---
+
+### No local Windows package can be built
+
+**Issue**: Both `npm run build:win` and `npm run build:unpack` stop with `Error: Unable to find valid azure env field AZURE_TENANT_ID for signing`. `electron-builder.yml` declares `win.azureSignOptions` unconditionally and hooks `afterSign: ./scripts/resign.js`; CI supplies the Azure values at invocation, and a developer machine has none. There is no unsigned fallback — `--dir` fails the same way. Older notes describing local Windows builds as merely "unsigned" are wrong.
+
+**Workaround**: None today. Use CI: `release.yml` builds and signs Windows on `windows-latest`, and that path is healthy. Observed on Windows 11 Pro 26200 on 2026-09-15; inferred but not exercised for a Windows target cross-built from macOS or Linux.
+
+**Tracking**: [#132](https://github.com/qodeca/erfana/issues/132).
+
+---
+
+### The e2e suite never deletes its temp folders
+
+**Issue**: Playwright fixture teardown fails with `EBUSY: resource busy or locked, rmdir '.e2e-temp\test-…'` because files are still held when cleanup runs. The line repeats for nearly every test. One validation session left 419 folders and 6.1 MB under `.e2e-temp`.
+
+**Workaround**: Delete `.e2e-temp` by hand between runs. The directory is git-ignored, so this is unbounded litter and log noise rather than breakage — but the repeated teardown line does bury real failures in the e2e output.
+
+**Tracking**: [#134](https://github.com/qodeca/erfana/issues/134).
 
 ---
 
 ### `npm run test:cov` exits 1 on Windows
 
-**Issue**: Every test passes; what fails are two **per-file** coverage thresholds declared in `vitest.main.ts` — `scripts/fuses.js` (86% lines / 88% functions) and `src/main/utils/tarArchive.ts` (90% each metric). Both suites skip their symlink cases on win32, because a file symlink needs `SeCreateSymbolicLinkPrivilege`: `scripts/fuses.test.mjs` carries ten `skipIf(process.platform === 'win32')` guards, and `src/main/utils/tarArchive.test.ts:77` returns early. The lines those cases would cover never execute, so both file-level floors miss by a few points and vitest exits 1.
+**Issue**: Every test passes; what fails are two **per-file** coverage thresholds declared in `vitest.main.ts` — `scripts/fuses.js` (86% lines / 88% functions) and `src/main/utils/tarArchive.ts` (90% each metric). Both suites skip their symlink cases on win32, because a file symlink needs `SeCreateSymbolicLinkPrivilege`: `scripts/fuses.test.mjs` carries six `skipIf(process.platform === 'win32')` guards, and `src/main/utils/tarArchive.test.ts:77` returns early. The lines those cases would cover never execute, so both file-level floors miss by a few points and vitest exits 1.
 
-**Workaround**: None on a Windows host — the run is doing what it is told. Run it on macOS or Linux, or read the CI result: the required `Coverage` job runs on `ubuntu-latest`, where nothing is skipped and it passes.
+Measured on a Windows host on 2026-09-15: those two are the **only** misses. All twelve #124 per-file preview floors pass there, and so do the renderer and preload floors.
+
+**The script itself has two further defects**, tracked as [#133](https://github.com/qodeca/erfana/issues/133): `scripts/test-cov.mjs` runs each config without `--project`, so `vitest.workspace.ts` auto-discovery expands every pass to all three projects and the suite runs about three times per invocation; and its `spawnSync(…, {stdio: 'inherit'})` output does not reach a redirected log on Windows, so a failing run shows only `Command failed (1): …` with no threshold lines at all.
+
+**Workaround**: None on a Windows host for the floors themselves — the run is doing what it is told. Run it on macOS or Linux, or read the CI result: the required `Coverage` job runs on `ubuntu-latest`, where nothing is skipped and it passes. To see *which* floor missed on Windows, run the underlying command directly rather than through the script: `npx vitest --run --config vitest.main.ts --project main --coverage`.
 
 **Tracking**: [`docs/windows/known-flakes.md` § `npm run test:cov` cannot pass on a Windows host](./windows/known-flakes.md#npm-run-testcov-cannot-pass-on-a-windows-host).
 
@@ -195,7 +221,9 @@ Pipeline contributors on Windows:
 
 **A link out of the preview asks first, and only one question is open at a time.** A link to an external destination raises a native message box naming the destination — the origin, or the scheme plus the addressed target for `mailto:`/`tel:`. That dialog is **owned by the window whose preview asked**, so it is modal to that window and is raised with it rather than sitting behind the app. Only one such question can be open per window: a second external link clicked while the first is still waiting is **refused, not queued**, and shows up in the panel's failure badge as a blocked link. Clicking it again once the first question is answered works normally.
 
-**A page's link opens a tab per click.** Every link opens a new Erfana tab by design, so clicking through a generated documentation site accumulates tabs quickly. Idle previews sleep after `PREVIEW.MAX_LIVE_VIEWS`, so the cost is bounded, but the tabs remain until closed.
+**A page's link opens a new tab by default.** Out of the box every plain link opens a new Erfana tab, so clicking through a generated documentation site accumulates tabs quickly. Idle previews sleep after `PREVIEW.MAX_LIVE_VIEWS`, so the cost is bounded, but the tabs remain until closed. To avoid that, switch the tab's **Open links in this tab** toggle on: a plain link to another previewed page then replaces the page in the same tab, with Back and Forward. The mode is per tab and in memory only, so after a restart tabs open links in new tabs again – see [HTML preview § Links](./html-preview/README.md#links) and [§ Back and Forward](./html-preview/README.md#back-and-forward).
+
+**A link inside a frame with `target="_top"` or `_blank` does nothing.** Links inside a frame move that frame, not the tab. A frame link that asks for the whole tab or a new tab is dropped, and because nothing outside the page sees that click, it is not listed in the failure badge either – see [HTML preview § Frames](./html-preview/README.md#frames).
 
 **Page state is lost when a preview sleeps.** A suspended preview reloads from disk when you return to it: scroll position, typed text and in-memory JavaScript state do not survive.
 
@@ -257,7 +285,7 @@ Re-enable with `gh workflow enable "E2E Tests"` once the root cause is isolated.
 
 ### E2E terminal-driven tests sensitive to user's shell init speed
 
-**Issue**: E2E tests that drive the terminal via `terminal.sendCommand` assume the PTY's interactive shell will be ready 1500 ms after the panel becomes visible. The 1500 ms is a blind sleep in `TerminalPage.waitForPrompt` (`e2e/pages/terminal.page.ts:29` `PTY_INIT_DELAY_MS`), not a real readiness probe. On a developer machine with a heavy `.zshrc` (oh-my-zsh, slow plugins, async work), `exec -l "$SHELL" -i` in `TerminalService` can take >1500 ms to source startup files, leaving the typed command in the kernel PTY buffer with no shell to execute it; CI runners and clean dev machines have well under 500 ms init and pass the test, hiding the dependency.
+**Issue**: E2E tests that drive the terminal via `terminal.sendCommand` assume the PTY's interactive shell will be ready 1500 ms after the panel becomes visible. The 1500 ms is a blind sleep in `TerminalPage.waitForPrompt` (the `PTY_INIT_DELAY_MS` constant in `e2e/pages/terminal.page.ts`), not a real readiness probe. On a developer machine with a heavy `.zshrc` (oh-my-zsh, slow plugins, async work), `exec -l "$SHELL" -i` in `TerminalService` can take >1500 ms to source startup files, leaving the typed command in the kernel PTY buffer with no shell to execute it; CI runners and clean dev machines have well under 500 ms init and pass the test, hiding the dependency.
 
 **Symptom** (pre-fix): `e2e/directory-watcher.e2e.ts` times out at its 2000 ms budget with the new file never appearing in the tree on macOS dev machines with a heavy `.zshrc`. Instrumented PTY tracing showed the keystrokes reach the kernel PTY buffer and the kernel TTY line discipline echoes each character back, but no shell prompt is rendered and no command executes. The shell's first real output (e.g. an `(eval):N: warning: 1 jobs SIGHUPed` line) only arrives 5–6 s later, after the test has given up and `closeApp` has torn the PTY down.
 
@@ -283,9 +311,9 @@ See [E2E troubleshooting § Terminal commands not executing](./testing/e2e-troub
 
 ### Git Status: Global .gitignore not supported
 
-**Issue**: Files ignored via global gitignore (`~/.gitignore_global` or `~/.config/git/ignore`) may appear as "untracked" in the project tree git status indicators.
+**Issue**: When no `git` binary is available, files ignored via global gitignore (`~/.gitignore_global` or `~/.config/git/ignore`) may appear as "untracked" in the project tree git status indicators.
 
-**Root cause**: isomorphic-git only reads local `.gitignore` files. Does not support global gitignore. Known library limitation.
+**Root cause**: The git status worker prefers native `git` and falls back to isomorphic-git only when no git binary is found (`GitStatusService.ts`, `git-status.worker.ts`). isomorphic-git reads only local `.gitignore` files – a known library limitation – so the gap applies to that fallback. With native `git`, ignore rules are git's own.
 
 **Workaround**: Add patterns to the project's local `.gitignore` file instead of global config.
 
@@ -299,7 +327,7 @@ See [E2E troubleshooting § Terminal commands not executing](./testing/e2e-troub
 
 **Root cause**: chokidar directory watcher + git watcher + terminal PTY together consume most available FDs. On large repos, this exceeds the system FD limit (~10K on macOS).
 
-**Mitigation (v0.9.0)**: Git status now runs in a worker thread (#147) and uses native `git status --porcelain` for repos with `.git/index` > 5 MB. When FD pressure causes EBADF, the worker returns a transient error instead of cascading. The EMFILE restart cascade was also fixed (#146).
+**Mitigation (v0.9.0)**: Git status now runs in a worker thread (#147). It always prefers native `git status --porcelain`, whatever the repo size, and falls back to isomorphic-git only when no git binary is found, when the binary fails to start (ENOENT or EACCES), or after three consecutive transient native failures (`GitStatusService.ts`, `workers/git-status.worker.ts`). When FD pressure makes native git fail (e.g. EBADF), the worker returns a "temporarily unavailable" result instead of cascading, and only the third failure in a row falls back. The EMFILE restart cascade was also fixed (#146).
 
 **Fixed – black window on 100k+ files ([#60](https://github.com/qodeca/erfana/issues/60))**: opening a very large project (reported at 174k nodes on an external volume) used to blank the window outright. The project tree's `flattenTree` built its flat array with `flattened.push(...flattenTree(child))`; spread-into-push is `Function.prototype.apply`, whose argument count is bounded by the engine stack (~10^5 on V8), so the first directory whose *flattened subtree* crossed that bound threw `RangeError: Maximum call stack size exceeded`, React 18 unmounted the entire root, and nothing was left to paint. `flattenTree` is now an explicit-stack loop that pushes exactly one node per iteration – output-identical (pre-order DFS, forward sibling order, `depth` per level, `index` reset per parent) and covered by a 200k-node reproduction. Throws that happen *while Erfana is drawing the interface* now surface a recovery screen with Restart / Copy error details / Open logs folder instead of a black window – or, for the project tree specifically, a "Project tree unavailable" panel with the rest of the app still running. Errors outside drawing (background work, event handlers, rejected promises) are written to the log without interrupting the UI – see [UI Components § Error containment](./ui-components.md#error-containment).
 
@@ -323,7 +351,7 @@ Error:
 ModuleNotFoundError: No module named 'distutils'
 ```
 
-Solution: downgrade to Python 3.12 (the `node-gyp` shipped with Node 24 doesn't yet handle Python 3.13's removed `distutils`). Not auto-fixable — see [`docs/build/windows.md`](./build/windows.md) step 2.
+Solution: use Python 3.12 (long-standing known-good) or 3.14.x – 3.14.3 was verified on the 2026-09-03 Windows 11 release check; only 3.13 fails (the `node-gyp` shipped with Node 24 doesn't handle Python 3.13's removed `distutils`). Not auto-fixable — see [`docs/build/windows.md`](./build/windows.md) step 2.
 
 **2. Windows 11 — `cmd.exe` current-directory hardening (resolved by #213)**
 
@@ -333,7 +361,7 @@ Symptom: `'GetCommitHash.bat' is not recognized` during the winpty build. When W
 
 Symptom: `MSB8040: Spectre-mitigated libraries are required for this project`. node-pty's gyp requests `SpectreMitigation: 'Spectre'`, which fails on a default MSVC install that lacks those libs.
 
-**Status of (2) and (3)**: both are now handled automatically by the committed `patches/node-pty+1.1.0.patch`, applied via `patch-package` in the `postinstall` hook, so a fresh `npm ci` on a default-hardened Windows 11 box succeeds. The patch is keyed to the resolved version — when `node-pty` is bumped it must be regenerated (see [`docs/build/README.md`](./build/README.md#install-dependencies) and [`docs/build/windows.md` § node-pty build failures on Windows 11](./build/windows.md#node-pty-build-failures-on-windows-11)). A follow-up will evaluate node-pty `1.2.0-beta.7+`, which removes the winpty build step and eliminates failure (2) at the root.
+**Status of (2) and (3)**: both are handled automatically by the committed `patches/node-pty+1.1.0.patch`, applied via `patch-package` in the `postinstall` hook. **A third, unrelated `npm ci` failure is still open**, so a fresh install on a default-hardened Windows 11 box does *not* currently succeed: `postinstall` dies with `node-gyp failed to rebuild node-pty` and `MSBuild.exe failed with exit code: 1` (`failedTask=installAppDeps`), with the documented toolchain in place. Observed 2026-09-15 on Windows 11 Pro 26200 (Node 24.14.1, Python 3.14.3), and on the previous Windows host before it. Workaround is `npm ci --ignore-scripts`, which leaves the terminal non-functional in that tree. See [`docs/build/windows.md` § node-pty build failures on Windows 11](./build/windows.md#node-pty-build-failures-on-windows-11). The patch is keyed to the resolved version — when `node-pty` is bumped it must be regenerated (see [`docs/build/README.md`](./build/README.md#install-dependencies) and [`docs/build/windows.md` § node-pty build failures on Windows 11](./build/windows.md#node-pty-build-failures-on-windows-11)). A follow-up will evaluate node-pty `1.2.0-beta.7+`, which removes the winpty build step and eliminates failure (2) at the root.
 
 **Tracking**: #213 (Windows 11 build fix, resolved); https://github.com/microsoft/node-pty/issues (upstream).
 
@@ -341,15 +369,15 @@ Symptom: `MSB8040: Spectre-mitigated libraries are required for this project`. n
 
 ### Template ID System
 
-**Issue**: Template IDs derived from slugified display names is fragile.
+**Issue**: Template IDs fall back to slugified display names when a template carries no explicit `id`, which is fragile for the templates still relying on the fallback.
 
 **Current Implementation**:
 ```typescript
 // parser.ts
-const id = slugify(result.data.name)  // Derives ID from name
+const id = result.data.id || slugify(result.data.name)  // Explicit id, else derived from name
 ```
 
-**Problem**:
+**Problem** (for templates without an explicit `id`):
 - Changing template name breaks all code references
 - `name: "Mermaid Bug Report"` → `id: "mermaid-bug-report"`
 - Code must look up by derived ID: `PROMPT_REGISTRY['mermaid-bug-report']`
@@ -378,41 +406,15 @@ name: Mermaid Bug Report  # Display name (can change freely)
 ```
 
 **Implementation Steps**:
-1. Add `id` field to `PromptFrontmatterSchema` (schema.ts)
-2. Update parser to use explicit ID instead of slugify
+1. ✅ Add `id` field to `PromptFrontmatterSchema` (schema.ts) – done, optional `id`
+2. ✅ Update parser to use explicit ID instead of slugify – done, with slugify as the fallback
 3. Add uniqueness validation in registry
-4. Migrate all existing templates (explain, improve, rewrite, simplify, mermaid-bug-report)
-5. Remove slugify function
+4. Migrate all existing templates – partial: 5 of the 14 templates in `src/renderer/src/prompts/templates/` declare an `id`
+5. Remove slugify function (only once step 4 is complete)
 
-**Status**: Architecture review complete, implementation pending.
+**Status**: Steps 1–2 shipped; uniqueness validation, the full template migration and the slugify removal remain open (re-verified 2026-09-05). Same item as [technical-debt.md § 2](./technical-debt.md).
 
 **See**: [Prompt Templates](./prompts/README.md)
-
----
-
-## Dockview CSS Import Path
-
-**Issue**: Vite cannot resolve `dockview/dist/styles.css`
-
-**Solution**: Use `import 'dockview/dist/styles/dockview.css'` (note the `/styles/` in path).
-
----
-
-## electron-store ES Module Import
-
-**Issue**: electron-store v11+ is an ES Module and cannot be imported with `require()` in CommonJS.
-
-**Solution**: Use dynamic `import()`. All SettingsService methods are async to handle this.
-
-**Pattern**: `constructor()` calls `import('electron-store')`, stores the promise. All methods await `ensureStore()` before accessing the store.
-
-**Files**: `src/main/services/SettingsService.ts`, `src/main/ipc/file-handlers.ts`
-
----
-
-## ESLint Peer Dependency Warnings
-
-**Issue**: ESLint 9 vs ESLint 8 peer dependencies. **Impact**: None (warnings only). Ignore.
 
 ---
 

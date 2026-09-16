@@ -9,7 +9,7 @@
  * - Rendering (2 tests)
  * - Test IDs (4 tests)
  * - Accessibility (2 tests)
- * - Callbacks (3 tests)
+ * - Callbacks (4 tests)
  */
 
 import { describe, it, expect, vi } from 'vitest'
@@ -102,6 +102,20 @@ describe('FileConflictNotification', () => {
 
       fireEvent.click(screen.getByTestId(TEST_IDS.FILE_CONFLICT_BTN_DISMISS))
       expect(onDismiss).toHaveBeenCalledOnce()
+    })
+
+    it('should call onReload with no arguments, never the click event', () => {
+      const onReload = vi.fn()
+      renderComponent({ onReload })
+
+      fireEvent.click(screen.getByTestId(TEST_IDS.FILE_CONFLICT_BTN_RELOAD))
+
+      // `onReload` is backed by `useFileWatcher.reloadFromDisk(prefetched?)`.
+      // Wiring it straight into `onClick` handed the synthetic mouse event in
+      // as the file's new content, and the editor panel crashed rendering it.
+      // The "called once" assertion above passes either way, so the argument
+      // list is the part that actually guards the defect.
+      expect(onReload).toHaveBeenCalledWith()
     })
   })
 })

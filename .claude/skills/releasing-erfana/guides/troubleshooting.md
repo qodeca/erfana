@@ -126,6 +126,33 @@ This is the canonical cookbook for `release.yml` failures. Each row below is a r
 - **Platform:** All
 - **First seen:** run 31264941055 (v0.17.0 attempt 1) — see `docs/release-incidents/v0.17.0-attempt-1.md`
 
+## Operator-side failures (not `release.yml`)
+
+These happen on the operator's machine or against the REST API, so no CI log carries them and the analyzer never matches them. They are kept here because they stop a release just as hard.
+
+### `git push origin main` rejected with `GH006`
+
+- **Symptom:** `remote: error: GH006: Protected branch update failed for refs/heads/main` followed by `7 of 7 required status checks have not succeeded`. Nothing is wrong with the commit; it is signed, the tree is clean and `main` is not behind.
+- **Root cause:** required status checks on `main` are enforced on **push**, not only on merge, and they must already have reached `completed`/`success` **for that exact SHA**. A brand-new release-prep commit has no runs yet, so the push is refused. This is the push-side half of the same timing problem as Row 12 above (the tag-side half).
+- **Fix:** land the same SHA on `develop` first, let it earn its checks, then push `main`:
+  ```bash
+  git push origin main:develop
+  SHA=$(git rev-parse HEAD)
+  # poll until both runs for this SHA read completed/success
+  gh run list --branch develop --limit 10 --json name,status,conclusion,headSha \
+    --jq "[.[] | select(.headSha==\"$SHA\")] | .[] | \"\(.name): \(.status) \(.conclusion)\""
+  git push origin main
+  ```
+  Waiting on the **runs** (not on the seven check contexts) also clears Row 12 before Phase 2 tags. Keeping `develop` on the same SHA is a side benefit, not a detour: release-prep commits would otherwise live only on `main`.
+- **First seen:** v0.20.0 release prep, twice (the version-bump commit and the release-notes commit).
+
+### Approving `production-signing` returns HTTP 422 `not an integer`
+
+- **Symptom:** `gh api -X POST repos/qodeca/erfana/actions/runs/<id>/pending_deployments -f state=approved -f comment=… -F "environment_ids[]=<id>"` fails with `422 Invalid request. For 'items', "<id>" is not an integer`.
+- **Root cause:** `environment_ids` is a JSON array of integers. `-f`/`-F` can only send scalars and form fields, so the array arrives as a string.
+- **Fix:** send the body as JSON: `printf '{"environment_ids":[%s],"state":"approved","comment":"release approved"}' "$ENV_ID" | gh api -X POST repos/qodeca/erfana/actions/runs/$RUN_ID/pending_deployments --input -`. A missing `comment` also returns 422, with a different message. The Actions UI route ("Review deployments") is unaffected.
+- **First seen:** v0.20.0 release, run 35058594403.
+
 ### Adding a new row (template)
 
 Copy this template, fill in each field, and insert at the end of the row list. Do not skip fields — the analyzer parser depends on every row having all six.

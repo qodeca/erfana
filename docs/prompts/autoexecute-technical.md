@@ -5,7 +5,6 @@
 ## Table of Contents
 1. [Terminal Write Pipeline](#terminal-write-pipeline)
 2. [The 200ms Delay: Why It's Necessary](#the-200ms-delay-why-its-necessary)
-3. [Write Operations Evolution](#write-operations-evolution)
 
 ---
 
@@ -22,16 +21,16 @@
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │              PreviewContextMenu.tsx                              │
-│  - Retrieve template config from PROMPT_REGISTRY                │
-│  - Render template with variables (selectedText, filePath, etc.)│
+│  - Build variables (selectedText, filePath, fileRef, etc.)      │
 │  - Call executePromptTemplate(config.id, variables)             │
 └────────────────────────────┬─────────────────────────────────────┘
                              │
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │              utils/panelUtils.ts                                 │
+│  - executePromptTemplate: registry lookup, validate, render     │
 │  - openPanelAndSendContent(rendered, autoExecute)               │
-│  - Wait 100ms for panel initialization                          │
+│  - waitForTerminalReady (event-based, 5 s timeout)              │
 │  - Call sendToTerminal(content, autoExecute)                    │
 └────────────────────────────┬─────────────────────────────────────┘
                              │
@@ -39,9 +38,10 @@
 ┌─────────────────────────────────────────────────────────────────┐
 │         stores/useTerminalStore.ts                               │
 │  - sendToTerminal(text, autoExecute)                            │
-│  - AWAIT window.api.terminal.write(terminalId, text)            │
+│  - Multi-line text: wrap in bracketed paste, \n → \r            │
+│  - AWAIT terminalOps.write(terminalId, text)  (injected)        │
 │  - If autoExecute: wait 200ms (rendering delay)                 │
-│  - If autoExecute: AWAIT window.api.terminal.write(id, '\r')    │
+│  - If autoExecute: AWAIT terminalOps.write(id, '\r')            │
 └────────────────────────────┬─────────────────────────────────────┘
                              │
                              ▼
@@ -82,15 +82,18 @@
 
 **Context Menu** (`PreviewContextMenu.tsx`)
 - Triggers template execution
-- Passes template config (includes `autoExecute`)
+- Builds the variables and passes the template id to `executePromptTemplate`
 
 **Panel Utils** (`utils/panelUtils.ts`)
+- Looks up the template in `PROMPT_REGISTRY`, validates the variables and renders it (adding the apply-to-document footer for mutation prompts)
 - Ensures terminal panel is visible
-- 100ms wait for panel initialization
+- Waits for an active terminal with `waitForTerminalReady` – event-based through the terminal manager's `waitForReady` when available, otherwise polling every 50 ms – and fails with a toast after 5 s
 - Delegates to terminal store
 
 **Terminal Store** (`stores/useTerminalStore.ts`)
 - **CRITICAL LAYER**: Handles write coordination and timing
+- Receives its terminal operations by injection (`createTerminalStore(terminalOps)`; the default store passes `window.api.terminal`)
+- Wraps multi-line text in bracketed paste mode (`\x1b[200~` … `\x1b[201~`, line endings converted to `\r`) so the receiving CLI treats it as one paste
 - Awaits both text write and Enter key write for error handling
 - Implements 200ms delay between text and Enter (rendering time)
 - Simple, reliable fire-and-forget approach
@@ -166,137 +169,7 @@ Write Call → Socket Buffer → PTY Buffer → Shell Input → Terminal Render 
 
 ---
 
-## Write Operations Evolution
-
-### v0.3.2 - Original Fire-and-Forget (Unreliable)
-
-```typescript
-// Terminal Store - No await, no confirmation
-window.api.terminal.write(terminalId, text)
-
-// Preload - Fire-and-forget
-write: (id: string, data: string): void => {
-  ipcRenderer.send('terminal:write', {id, data})
-}
-
-// IPC Handler - No return
-ipcMain.on('terminal:write', (_, {id, data}) => {
-  terminalService.write(id, data)
-})
-
-// Terminal Service - Sync return
-write(id: string, data: string): boolean {
-  pty.write(data)
-  return true // Optimistic
-}
-```
-
-**Problems**:
-- ❌ No write completion confirmation
-- ❌ Enter could be sent before text fully buffered
-- ❌ 100ms delay insufficient
-- ❌ No error propagation
-
-### v0.3.3 - Promise with Callback (Over-engineered)
-
-```typescript
-// Terminal Service - Promise-based with callback
-write(terminalId: string, data: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    const terminal = this.terminals.get(terminalId)
-    if (!terminal) {
-      resolve(false)
-      return
-    }
-
-    try {
-      // node-pty callback parameter
-      ;(terminal.ptyProcess.write as (data: string, cb?: () => void) => void)(
-        data,
-        () => resolve(true) // Callback fires when socket flushed
-      )
-    } catch (error) {
-      resolve(false)
-    }
-  })
-}
-
-// IPC Handler - Awaitable
-ipcMain.handle('terminal:write', async (_, {terminalId, data}) => {
-  const success = await terminalService.write(terminalId, data)
-  return {success}
-})
-```
-
-**Problems Discovered**:
-- ❌ Callback didn't fire reliably → IPC hangs ("reply was never sent")
-- ❌ Callback indicates socket flush, NOT render completion
-- ❌ Added initialization polling complexity (overkill)
-- ⚠️ Over-engineered for the actual use case
-
-### v0.3.4 - Simplified Fire-and-Forget (Current, Reliable)
-
-```typescript
-// Terminal Service - Synchronous fire-and-forget
-write(terminalId: string, data: string): boolean {
-  const terminal = this.terminals.get(terminalId)
-  if (!terminal) return false
-
-  try {
-    terminal.ptyProcess.write(data) // Synchronous
-    return true
-  } catch (error) {
-    // Handle EPIPE (terminal closed)
-    if ((error as {code?: string}).code === 'EPIPE') {
-      this.terminals.delete(terminalId)
-      this.emit('exit', {terminalId, exitCode: 0})
-      return false
-    }
-    console.error(`Failed to write:`, error)
-    return false
-  }
-}
-
-// IPC Handler - Synchronous (no async needed)
-ipcMain.handle('terminal:write', (_, {terminalId, data}) => {
-  try {
-    const success = terminalService.write(terminalId, data)
-    return {success}
-  } catch (error) {
-    return {success: false, error: String(error)}
-  }
-})
-
-// Terminal Store - Simple with 200ms delay
-const writeResult = await window.api.terminal.write(terminalId, text)
-if (!writeResult.success) return false
-
-if (autoExecute) {
-  // 200ms delay for rendering (PTY + shell + GPU)
-  await new Promise(resolve => setTimeout(resolve, 200))
-
-  const enterResult = await window.api.terminal.write(terminalId, '\r')
-  if (!enterResult.success) return false
-}
-```
-
-### Why v0.3.4 Is Better
-
-**Simplicity**:
-- ✅ No callback complexity
-- ✅ No initialization polling
-- ✅ Industry-standard approach
-
-**Reliability**:
-- ✅ Fire-and-forget is proven (VSCode, Hyper, iTerm2)
-- ✅ Write ordering guaranteed by TCP FIFO
-- ✅ 200ms delay is well-calibrated
-- ✅ No IPC hangs
-
-**Maintainability**:
-- ✅ Less code (100+ lines removed)
-- ✅ Easier to understand
-- ✅ Easier to debug
+The v0.3.2–v0.3.4 write-operation evolution is archived in [AutoExecute v0.3 history](../archive/autoexecute-v0.3-history.md#write-operations-evolution).
 
 ---
 

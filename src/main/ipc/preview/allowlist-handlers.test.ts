@@ -14,6 +14,7 @@ import type { IpcMainInvokeEvent } from 'electron'
 import { AppError, ErrorCode } from '../../../shared/errors'
 import { PreviewChannels } from '../../../shared/ipc/preview-channels'
 import { PREVIEW } from '../../../shared/constants'
+import { logger } from '../../services/LoggingService'
 import { registerPreviewAllowlistHandlers } from './allowlist-handlers'
 
 type Handler = (event: unknown, arg: unknown) => unknown
@@ -153,5 +154,52 @@ describe('registerPreviewAllowlistHandlers', () => {
 
     expect(approveOrigin).not.toHaveBeenCalled()
     expect(result).toMatchObject({ ok: false })
+  })
+})
+
+describe('log lines carry no path and no sender URL (QG-8 T4, T5)', () => {
+  const HOME = '/Users/alice'
+
+  beforeEach(() => {
+    vi.mocked(logger.warn).mockClear()
+    vi.mocked(logger.error).mockClear()
+  })
+
+  it('logs a Node error from the store with its quoted path cut', async () => {
+    const eacces = Object.assign(
+      new Error(`EACCES: permission denied, open '${HOME}/project/.erfana/settings.json'`),
+      { code: 'EACCES', errno: -13, syscall: 'open' }
+    )
+    setup({
+      approveOrigin: vi.fn(async () => {
+        throw eacces
+      })
+    })
+
+    const result = await handlers[PreviewChannels.APPROVE_HOST](event, {
+      panelId: 'p1',
+      host: 'https://cdn.example.com'
+    })
+
+    expect(result).toEqual({ ok: false, errorCode: ErrorCode.UNKNOWN_ERROR })
+    expect(logger.error).toHaveBeenCalledTimes(1)
+    const [line, logged] = vi.mocked(logger.error).mock.calls[0]
+    expect(line).toBe('preview:approveHost failed')
+    expect(logged?.message).toBe('EACCES: permission denied, open [redacted-path]')
+    // The stack repeats the message: neither may hold the user's folders.
+    expect(`${logged?.message}\n${logged?.stack}`).not.toContain(HOME)
+  })
+
+  it('logs an untrusted sender with no URL in the line', async () => {
+    setup({ trusted: false })
+
+    await handlers[PreviewChannels.APPROVE_HOST](
+      { senderFrame: { url: `file://${HOME}/site/evil.html` } },
+      { panelId: 'p1', host: 'https://cdn.example.com' }
+    )
+
+    expect(vi.mocked(logger.warn).mock.calls).toEqual([
+      ['Rejected preview:approveHost from untrusted sender']
+    ])
   })
 })

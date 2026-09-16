@@ -1,6 +1,6 @@
 # API Services - Feature Services
 
-**Location:** `src/main/services/`. Feature-specific: git (worker), multi-instance, media capture, transcription, audio extraction, file import, document and image export. Core services (Terminal, File, Settings, Watchers): see [api-services.md](./api-services.md).
+**Location:** `src/main/services/`. Feature-specific: git (worker), multi-instance, media capture, transcription, audio extraction, file import, document and image export, open in default browser. Core services (Terminal, File, Settings, Watchers): see [api-services.md](./api-services.md).
 
 ---
 
@@ -16,12 +16,12 @@ Orchestrates git status retrieval via worker thread, keeping the main Electron t
 - Delegates all computation to `IGitStatusWorker` (worker thread)
 - Per-project operation queuing (prevents concurrent worker calls per project; different projects can query in parallel)
 - Circuit breaker integration – disables worker after repeated crashes
-- Strategy selection – chooses isomorphic-git or native git based on repo size
+- Strategy – always requests native git; the worker falls back to isomorphic-git only when no git binary is found, the binary fails to start (ENOENT/EACCES), or native git fails transiently three times in a row
 - Timing instrumentation with structured logging
 - Per-call fresh cache for isomorphic-git (no persistent state in worker)
 
 ### Known limitations
-- Global `.gitignore` not supported (isomorphic-git limitation)
+- Global `.gitignore` not supported when the isomorphic-git fallback runs (isomorphic-git limitation); native git honours it
 
 ---
 
@@ -590,7 +590,7 @@ DOCX generation from HTML content.
 - Word format export
 - Mermaid diagrams as high-resolution PNG
 - Uses the `@turbodocx/html-to-docx` npm package
-- Conversion runs in a **killable `utilityProcess` child** (`src/main/services/docx/`): `HtmlToDocxConverter` strips remote images and wraps the HTML in the main process, then `DocxConvertProcessAdapter` forks `docx-convert.process` to run `HTMLtoDOCX`, killing it on timeout. The library decodes images synchronously, so an in-thread timeout could not interrupt a hang; a separate process also caps memory against decompression bombs.
+- Conversion runs in a **killable `utilityProcess` child**: `HtmlToDocxConverter` (`src/main/services/HtmlToDocxConverter.ts`) strips remote images and wraps the HTML in the main process, then `DocxConvertProcessAdapter` (`src/main/services/docx/`) forks `docx-convert.process` to run `HTMLtoDOCX`, killing it on timeout. The library decodes images synchronously, so an in-thread timeout could not interrupt a hang; a separate process also caps memory against decompression bombs.
 - **Remote-image SSRF strip** (`docxImageStrip.ts`, parse5): before conversion, `<img>`/`<source>` with an `http(s)`/`file:`/`ftp:`/protocol-relative `src` (or remote `srcset`) are removed so the bundled library never fetches them; empty, `data:`, and relative sources are kept.
 
 ### Public Methods
@@ -602,7 +602,40 @@ Export HTML content to DOCX. As with PDF, `fileName` is a suggested name run thr
 
 ## HTML preview (#74)
 
-The sandboxed HTML-preview subsystem is a service *family* under `src/main/services/preview/` (WebContentsView lifecycle, `erfana-preview://` protocol handler, request/host filter, per-project allowlist store, sealed session, watch pool, PDF/find controllers), not a single service, so it is documented in its own doc rather than duplicated here. For the full write-up see [HTML preview](./html-preview/README.md); for the per-service catalogue see [`src/main/services/CLAUDE.md`](../src/main/services/CLAUDE.md) § "HTML preview (#74)". IPC surface: [IPC patterns § HTML preview](./ipc-patterns.md#html-preview-previewhandlersts-constants-in-preview-channelsts-74).
+The sandboxed HTML-preview subsystem is a service *family* under `src/main/services/preview/` (WebContentsView lifecycle, `erfana-preview://` protocol handler, request/host filter, per-project allowlist store, sealed session, watch pool, PDF/find controllers; since #124 also same-tab navigation with its own Back/Forward history – `previewPageNavigator`, `previewTabHistory` – the frame guard `previewFrameGuard`, the window-edge resize hold `previewResizeHold` and keyboard focus return `previewHostFocus`), not a single service, so it is documented in its own doc rather than duplicated here. For the full write-up see [HTML preview](./html-preview/README.md); for the per-service catalogue see [`src/main/services/CLAUDE.md`](../src/main/services/CLAUDE.md) § "HTML preview (#74)". IPC surface: [IPC patterns § HTML preview](./ipc-patterns.md#html-preview-preview-handlersts-constants-in-preview-channelsts-74).
+
+## BrowserLaunchService
+
+**Location:** `src/main/services/browserLaunch/` – `BrowserLaunchService.ts` (the checks) and `browserLauncher.ts` (the per-platform launch). Singleton export: `browserLaunchService`.
+
+"Open in default browser" for one `.html` / `.htm` file in the open project (#124). Callers: the project tree context menu and the HTML preview toolbar, both through `browser:openFile` (`src/main/ipc/browser-handlers.ts`, which checks the sender and the Zod payload before calling the service).
+
+### Public method
+
+#### `openFile(filePath: string, projectPath: string | null): Promise<BrowserOpenFileResponse>`
+Never rejects for a refusal or a failed launch: the answer is `{ success: true, usedFallback }` or a code plus its `ERROR_MESSAGES` text. Runs seven checks in order:
+
+1. A project is open – `OPEN_IN_BROWSER_NO_PROJECT`.
+2. The requested name ends `.html` / `.htm` (any case) and, on Windows, names no NTFS alternate data stream – `OPEN_IN_BROWSER_NOT_HTML`.
+3. Lexically inside the project – `OPEN_IN_BROWSER_OUTSIDE_PROJECT`.
+4. Canonically inside (`resolveInsideProject`) – `OPEN_IN_BROWSER_MISSING` when missing, otherwise `OPEN_IN_BROWSER_OUTSIDE_PROJECT`.
+5. The real name passes check 2 as well – `OPEN_IN_BROWSER_NOT_HTML`.
+6. The real path is a regular file – `OPEN_IN_BROWSER_MISSING`.
+7. The launcher starts it – `OPEN_IN_BROWSER_LAUNCH_FAILED`.
+
+The sixth code, `OPEN_IN_BROWSER_INVALID_REQUEST`, comes from the IPC handler (untrusted sender or bad payload), not from the service.
+
+### Launch
+
+- The launcher gets the checked real path, never a `file://` URL, and passes it as one argument with no shell.
+- The default browser comes from `app.getApplicationInfoForProtocol('https://example.com')` (3 s bound). macOS runs `/usr/bin/open -a <app> <file>`; Windows runs the browser's `.exe` with the file. Each launch is bounded at 10 s.
+- **Fallback:** only when the lookup fails, times out or gives no usable path – or the platform has no lookup (Linux) – the file goes to `shell.openPath` and the answer carries `usedFallback: true`. A browser launch that fails does not fall back.
+- Logs name files through `redactPath`.
+
+### Testing seams
+The constructor takes a partial `BrowserLaunchServiceDeps`: `resolveLauncher`, `stat` and `platform` (so a test can set `win32` on any host).
+
+See also: [Security § Frames, same-tab links and open in browser](./security.md#frames-same-tab-links-and-open-in-browser-124), [Error codes § Open in default browser](./error-codes.md#open-in-default-browser-6-codes), [IPC patterns § Open in default browser](./ipc-patterns.md#open-in-default-browser-browser-handlersts-constants-in-browser-channelsts-124).
 
 ## ImageExportService
 

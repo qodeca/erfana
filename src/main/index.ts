@@ -28,6 +28,7 @@ import { registerExternalFileHandlers } from './ipc/external-file-handlers'
 import { registerTranscriptionHandlers } from './ipc/transcription-handlers'
 import { registerClipboardHandlers } from './ipc/clipboard-handlers'
 import { registerImageExportHandlers } from './ipc/image-export-handlers'
+import { registerBrowserHandlers } from './ipc/browser-handlers'
 import { registerClaudeStatusHandlers } from './ipc/claude-status-handlers'
 import { registerPreviewHandlers } from './ipc/preview-handlers'
 import { registerPreviewScheme } from './services/preview/previewScheme'
@@ -137,6 +138,7 @@ let previewHandlers: {
   dispose: () => Promise<void>
   zoomFocused: (step: number) => Promise<boolean>
   closeWindow: (windowId: number) => Promise<void>
+  setResizeHold: (windowId: number, held: boolean) => void
 } | null = null
 
 // WebGL Command Line Switches (originally added for Electron 33+)
@@ -289,6 +291,9 @@ function createWindow(): BrowserWindow {
       })
     })
   })
+  // A window-edge drag hides this window's previews until they settle (#124).
+  mainWindow.on('will-resize', () => previewHandlers?.setResizeHold(previewWindowId, true))
+  mainWindow.on('resized', () => previewHandlers?.setResizeHold(previewWindowId, false))
 
   mainWindow.webContents.on('destroyed', () => {
     logger.info('WebContents destroyed, cleaning up services', { webContentsId })
@@ -464,6 +469,8 @@ app.whenReady().then(async () => {
   registerTranscriptionHandlers()
   registerClipboardHandlers()
   registerImageExportHandlers()
+  // Open in default browser (#124): sender-gated, confined to the open project.
+  registerBrowserHandlers()
   // Per-terminal Claude Code context status bar (#216). Uses the same
   // terminalService singleton so it can look up the main-owned PTY pid + cwd.
   claudeStatusHandlers = registerClaudeStatusHandlers(terminalService)

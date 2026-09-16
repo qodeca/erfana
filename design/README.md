@@ -42,17 +42,17 @@ and a confirm step whose buttons were clipped off-screen.
 | Path | What it is |
 |---|---|
 | `system/foundations/` | Colours, typography, spacing, surfaces, focus, motion, layering |
-| `system/components/` | Buttons, rows, form controls, feedback, icons, permission band |
+| `system/components/` | Buttons, rows, form controls, feedback, icons, menus, permission band |
 | `product/` | Whole screens and flows, built from the parts above |
 | `tokens.css`, `fonts/`, `claims.js`, `index.html` | **Generated.** Written by `scripts/design-sync.mjs` |
-| `system/components/row/host.css`, `system/components/permission-band/band.css` | **Generated.** Adopted components, synced *from* `src/` — edit the `src/` copy |
+| `system/components/row/host.css`, `system/components/permission-band/band.css`, `system/components/permission-band/nav.css` | **Generated.** Adopted components, synced *from* `src/` — edit the `src/` copy |
 | `ds.css`, `fonts.css` | Hand-written page chrome for the documentation itself |
 
 ## The one rule
 
 **The generated files are committed, and must never be hand-edited:**
 `tokens.css`, `fonts/`, `claims.js`, `index.html`, and any adopted component CSS
-(currently `row/host.css` and `permission-band/band.css`).
+(currently `row/host.css`, `permission-band/band.css` and `permission-band/nav.css`).
 
 They are tracked because a design system that does not render on a fresh clone is
 not a reference. They are regenerated, never edited, because a second *editable*
@@ -167,7 +167,8 @@ ships its rules five times over, under five class names, so adopting it is a
 
 **Adopted** — the file lives in `src/`, and `scripts/design-sync.mjs` copies it
 back here the way it copies `tokens.css`, so the card renders what actually
-ships. Currently `row/host.css` and `permission-band/band.css`.
+ships. Currently `row/host.css`, `permission-band/band.css` and
+`permission-band/nav.css`.
 
 Adopting is a **move, not a copy**. Two editable copies is how one of them stays
 wrong — which is exactly how a broken bidi front-elide survived in the Rows card

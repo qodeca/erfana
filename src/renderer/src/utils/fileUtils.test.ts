@@ -10,6 +10,7 @@ import {
   getDisplayRelativePath,
   isPathInside,
   isStrictDescendant,
+  pathsEqual,
   sanitizeFileName,
   MAX_FILENAME_LENGTH
 } from './fileUtils'
@@ -26,6 +27,7 @@ describe('fileUtils', () => {
       const a = stablePathDigest('/proj/a.html')
       expect(a).toMatch(/^[0-9a-f]{16}$/)
       expect(stablePathDigest('/proj/a.html')).toBe(a)
+      expect(stablePathDigest('/proj/a.html')).toBe('0e379b04476970ae')
     })
 
     it('differs for sibling paths and for paths that differ only in case', () => {
@@ -193,6 +195,45 @@ describe('fileUtils', () => {
 
     it('returns false for a Windows partial prefix match', () => {
       expect(isStrictDescendant('C:\\proj', 'C:\\projector\\x')).toBe(false)
+    })
+  })
+
+  describe('pathsEqual', () => {
+    it('matches one path across separators, doubled separators and a trailing one', () => {
+      expect(pathsEqual('/proj/site/a.html', '/proj//site/a.html/', 'darwin')).toBe(true)
+      expect(pathsEqual('C:\\proj\\site\\a.html', 'C:/proj/site/a.html', 'win32')).toBe(true)
+    })
+
+    it('folds case on Windows, where B.html and b.html are one file', () => {
+      expect(pathsEqual('C:\\Proj\\B.html', 'c:\\proj\\b.HTML', 'win32')).toBe(true)
+    })
+
+    it('keeps case on macOS and Linux, the rule panel ids already follow', () => {
+      expect(pathsEqual('/proj/B.html', '/proj/b.html', 'darwin')).toBe(false)
+      expect(pathsEqual('/proj/B.html', '/proj/b.html', 'linux')).toBe(false)
+    })
+
+    it('tells a sibling and a longer name apart', () => {
+      expect(pathsEqual('/proj/a.html', '/proj/b.html', 'win32')).toBe(false)
+      expect(pathsEqual('/proj/a.html', '/proj/a.html.bak', 'darwin')).toBe(false)
+    })
+
+    it('never matches an empty or missing path', () => {
+      expect(pathsEqual('', '', 'darwin')).toBe(false)
+      expect(pathsEqual('/proj/a.html', '', 'darwin')).toBe(false)
+      expect(pathsEqual(null, '/proj/a.html', 'darwin')).toBe(false)
+      expect(pathsEqual('/proj/a.html', undefined, 'darwin')).toBe(false)
+    })
+
+    it('uses the renderer platform when none is given', () => {
+      const host = window as unknown as { api?: unknown }
+      const saved = host.api
+      host.api = { utils: { getPlatform: () => 'win32' } }
+      try {
+        expect(pathsEqual('C:\\Proj\\B.html', 'c:\\proj\\b.html')).toBe(true)
+      } finally {
+        host.api = saved
+      }
     })
   })
 

@@ -8,11 +8,13 @@
  * the same split the image viewer uses (`imageViewer.logic.ts`). No React, no
  * `window.api`, no store.
  *
- * The four decisions this module owns:
+ * The five decisions this module owns:
  * - {@link deriveBounds} — placeholder rect → the `PreviewBounds` pushed to main.
  * - {@link selectPanelView} — limit-reached vs failed vs normal top-level state.
  * - {@link selectFallback} — still-frame `<img>` vs placeholder colour.
  * - {@link summarizeFailures} — failure list → badge count + grouped popover data.
+ * - {@link previewPlaceholderLabel} — the placeholder's accessible name, which
+ *   states the keyboard way into the page and back out of it (QG-8 U1).
  *
  * @module htmlPreview.logic
  * @see Issue #74 - HTML preview with CSS and JavaScript execution
@@ -196,7 +198,14 @@ export const FAILURE_TYPE_LABELS: Readonly<Record<PreviewFailureType, string>> =
   'render-crash': 'Preview crashed',
   'unresolved-specifier': 'Unresolved import',
   'allowlist-invalid': 'Invalid allowlist host',
-  'allowlist-unsupported-version': 'Unsupported allowlist version'
+  'allowlist-unsupported-version': 'Unsupported allowlist version',
+  // Frame refusals (issue #124, part 2 §2.12)
+  'frame-remote': 'Blocked remote frame',
+  'frame-escape': 'Frame escaped the project',
+  'frame-excluded': 'Excluded frame',
+  'frame-too-deep': 'Frame nested too deep',
+  'frame-over-limit': 'Too many frames',
+  'frame-link-blocked': 'Blocked link in frame'
 }
 
 /** One grouped bucket of failures sharing a type, in first-seen order. */
@@ -265,6 +274,27 @@ export function summarizeFailures(failures: readonly PreviewFailure[]): FailureS
     groups: Array.from(groupsByType.values()),
     blockedHosts
   }
+}
+
+/**
+ * The placeholder's accessible name (issue #124, QG-8 U1).
+ *
+ * While the page cannot be entered this is what it always was – the panel's
+ * identity, and the prefix the e2e locators find a preview by. While it CAN be
+ * entered the name also carries the way in and the way back out, because the
+ * name is the only place a keyboard reader is told either: the target is a
+ * region the native view paints over, with no visible words of its own (WCAG SC
+ * 2.1.1, with SC 2.1.2's stated exit – the same exit the band chip names).
+ *
+ * @param pageName - The page's file name, or `page` when there is none.
+ * @param enterable - Whether the placeholder is a keyboard target right now.
+ * @returns The `aria-label` for the placeholder.
+ */
+export function previewPlaceholderLabel(pageName: string, enterable: boolean): string {
+  const identity = `HTML preview of ${pageName}`
+  return enterable
+    ? `${identity} – press Enter to enter the page, Escape to come back`
+    : identity
 }
 
 /**

@@ -22,6 +22,8 @@ It is free software under **GPL-3.0-only**.
 | 📝 **Markdown editor** | Monaco editor, live preview with scroll sync, Mermaid diagrams (22 types, zoom/pan/full-screen), YAML frontmatter, unified in-file search |
 | 📁 **Project tree** | Real-time git status (worker-thread offloaded), drag-drop reorganization, Markdown filtering, Reveal in Finder/Explorer |
 | 📄 **Import & export** | Import via LiteParse (which handles 50+ formats) with local OCR – Office/image formats need LibreOffice/ImageMagick; print-optimized PDF and Word (DOCX) export with Mermaid diagrams |
+| 🌐 **HTML preview** | Open a `.html` file and it runs as a live page in its own tab, with frames from the same project, links in a new tab or in place with Back/Forward, find, PDF export, open in your default browser, and a per-host permission band that asks before any remote request |
+| 🖼️ **Image viewer** | Zoom, pan and full-screen viewing that repaints when the file changes on disk, plus PNG / PDF / clipboard export |
 | 🎙️ **Media transcription** | Audio/video → text via the OpenAI API or fully offline `whisper.cpp` |
 
 ## Platforms
@@ -78,7 +80,7 @@ The GPL covers Erfana's **code**, not its **name or branding**. "Erfana" and "Qo
 
 "Claude" and "Claude Code" are trademarks of Anthropic. Erfana is not affiliated with, sponsored by, or endorsed by Anthropic – it simply runs the `claude` CLI like any other terminal program.
 
-"OpenAI" and "Whisper" are trademarks of OpenAI. Erfana is not affiliated with, sponsored by, or endorsed by OpenAI – it optionally calls the OpenAI API for transcription and bundles `whisper.cpp` (an independent open-source project, not produced by OpenAI) for offline use. See [TRADEMARKS.md](TRADEMARKS.md) for the full third-party trademark notice.
+"OpenAI" and "Whisper" are trademarks of OpenAI. Erfana is not affiliated with, sponsored by, or endorsed by OpenAI – it optionally calls the OpenAI API for transcription and downloads and runs `whisper.cpp` (an independent open-source project, not produced by OpenAI) on demand for offline use. See [TRADEMARKS.md](TRADEMARKS.md) for the full third-party trademark notice.
 
 ## Contributing
 
@@ -89,7 +91,8 @@ Contributions are welcome – see [CONTRIBUTING.md](CONTRIBUTING.md) and our [Co
 Build Erfana from source:
 
 ```bash
-npm install      # Node.js 24+; Python 3.12 or 3.14.x (not 3.13 – node-pty); see below for Windows
+npm ci           # NOT `npm install` – see CONTRIBUTING.md. Node.js 24+ (pinned in .nvmrc);
+                 # Python 3.12 or 3.14.x (not 3.13 – node-pty); see below for Windows
 npm run dev      # development server
 npm run build    # production build
 npm run build:mac   # package for macOS
@@ -97,5 +100,7 @@ npm run build:win   # package for Windows
 ```
 
 **On Windows:** VS 2022 Build Tools, Developer Mode, and Win32 long paths are required – see [`docs/build/windows.md`](docs/build/windows.md).
+
+**Branch off `develop`, not `main`.** `main` holds released code only and lags behind; `develop` is the integration branch for day-to-day work, and a pull request targets whichever integration branch it was cut from. Graph-engine work branches off `graph` instead. Full model in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 Architecture, services, IPC patterns, testing, and the full contributor workflow are documented in **[docs/](docs/README.md)** · [Architecture](docs/architecture.md) · [Build](docs/build/README.md) · [Testing](docs/testing/README.md) · [Changelog](docs/CHANGELOG.md).

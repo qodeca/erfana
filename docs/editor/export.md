@@ -8,7 +8,7 @@ Converts markdown preview to print-optimized PDF using Electron's print-to-PDF.
 
 ### Features
 
-- **A4 page size** with print margins (20mm top/bottom, 15mm sides)
+- **A4 page size** with print margins (`margin: 20mm 15mm 25mm 15mm` – 20mm top, 25mm bottom, 15mm sides; `PdfService.ts`)
 - **Print-friendly styling**: White background, serif fonts, dark text
 - **Vector Mermaid diagrams**: Diagrams remain scalable (not rasterized)
 - **Page break control**: Headings stay with following content

@@ -18,7 +18,7 @@ npm run lint:css         # stylelint: src/ CSS + the design/ cards' inline style
 npm run design           # Rebuild design/ (index, token copy, claims)
 npm run design -- --check # Fail if a generated file under design/ is stale
 npm run test             # All tests (vitest workspace: main + renderer + preload)
-npm run test:main        # vitest.main.ts config: src/main + src/shared + scripts (223 test files: 204 + 15 + 4)
+npm run test:main        # vitest.main.ts config: src/main + src/shared + scripts
 npm run test:renderer    # vitest.renderer.ts config: src/renderer/src only (jsdom)
 npm run test:preload     # vitest.preload.ts config: preload tests
 npm run test:cov         # Coverage report (all 3 projects)
@@ -44,6 +44,7 @@ npm run test:e2e:update-screenshots # Refresh visual baselines
 | New window | `Cmd+Shift+N` | `Ctrl+Shift+N` |
 | Comment line | `Cmd+/` | `Ctrl+/` |
 | Multi-cursor | `Option+Click` | `Alt+Click` |
+| HTML preview back / forward | `Cmd+[` / `Cmd+]` | `Alt+Left` / `Alt+Right` |
 
 Settings has no keyboard shortcut – open it with the gear icon at the bottom of the left activity bar (`Esc` closes it). Erfana ships for macOS and Windows only.
 

@@ -42,7 +42,7 @@ Full-screen settings dialog for app-wide configuration.
 |---------|-------------|---------|
 | Backend | Transcription backend selection – OpenAI (cloud API) or Local (whisper.cpp, offline) | openai |
 | OpenAI API key | API key for OpenAI transcription (stored encrypted via Electron safeStorage in `~/.erfana/`). Shown when backend is 'openai'. | – |
-| Whisper model | Model size for local transcription: tiny, base, small, medium, large. Shown when backend is 'local'. | – |
+| Whisper model | Model size for local transcription: tiny, base, small, medium, large. Shown when backend is 'local'. | base |
 | Model status | Status text for the selected model – "Ready", "Model not downloaded", or "Downloading... (N%)" – next to a "Download model" button. Percentage text only; there is no progress bar. Shown when backend is 'local'. | – |
 
 **API key security**: Keys are encrypted using platform-native keychain (macOS Keychain, Linux libsecret, Windows DPAPI). The global settings JSON only stores a boolean `openaiApiKeyStored` flag, never the key itself. Plaintext fallback with warning if safeStorage unavailable.

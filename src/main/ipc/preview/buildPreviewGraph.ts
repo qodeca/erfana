@@ -45,7 +45,8 @@ import {
   PreviewViewService,
   type IPreviewViewService,
   type PreviewFindExportService,
-  type PreviewViewDeps
+  type PreviewViewDeps,
+  type PreviewWindowLike
 } from '../../services/preview/PreviewViewService'
 import type { IPreviewEligibilityService } from '../../services/preview/PreviewEligibilityService'
 import type { IPreviewAllowlistStore } from '../../services/preview/PreviewAllowlistStore'
@@ -64,8 +65,11 @@ export interface BuildPreviewGraphDeps {
   readonly getSettings: () => GlobalSettings
   /** Live renderer targets for main→renderer emissions. */
   readonly resolveEmitTargets?: () => readonly PreviewEmitTarget[]
-  /** Host-window zoom factor for bounds conversion (§4.3). */
-  readonly getZoomFactor?: () => number
+  /**
+   * The zoom a view is sized with, read from the window it is handed – its host
+   * (§4.3; issue #124, C3). Defaults to that window's own zoom.
+   */
+  readonly getZoomFactor?: PreviewViewDeps['getZoomFactor']
 }
 
 /** The constructed graph the composition root registers handlers against. */
@@ -129,10 +133,13 @@ function resolvePreviewPagePreload(): string | null {
   return preloadPath
 }
 
-/** The host window's zoom factor, or 1 when no window is available. */
-function defaultZoomFactor(): number {
-  const win = BrowserWindow.getAllWindows().find((w) => !w.isDestroyed())
-  return win?.webContents.getZoomFactor() ?? 1
+/**
+ * The zoom factor of the window a view lives in (issue #124, C3). It used to be
+ * the first of `BrowserWindow.getAllWindows()`, but Electron lists the newest
+ * window first, so any second window sized the page with the wrong zoom.
+ */
+function defaultZoomFactor(window: Pick<PreviewWindowLike, 'webContents'>): number {
+  return window.webContents.getZoomFactor()
 }
 
 /**
@@ -213,6 +220,9 @@ export function buildPreviewGraph(deps: BuildPreviewGraphDeps): PreviewGraph {
       ),
     getProjectPath,
     getZoomFactor,
+    // Same-tab links, `preview:navigate` and a resume run as a preview only
+    // when this says so (issue #124, part 3 §3.5).
+    checkEligibility: (filePath, projectPath) => eligibility.check(filePath, projectPath),
     now: Date.now,
     onForwardedShortcut: (panelId, key) => emitters.forwardedShortcut(panelId, key)
   }

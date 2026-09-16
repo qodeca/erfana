@@ -37,7 +37,22 @@ export const PreviewChannels = {
   /** Stop the active in-page find */
   STOP_FIND: 'preview:stopFind',
   /** Export the live previewed page to PDF */
-  EXPORT_PDF: 'preview:exportPdf'
+  EXPORT_PDF: 'preview:exportPdf',
+  /**
+   * Show another page in a tab, or step its history (issue #124). An invoke in
+   * two phases: `check` before anything happens, `commit` once the renderer has
+   * resolved the other tabs showing the target.
+   */
+  NAVIGATE: 'preview:navigate',
+  /**
+   * Put keyboard focus in the previewed page (issue #124, QG-8 U1).
+   *
+   * The keyboard's only way into a page that a pointer reaches by clicking it:
+   * the native view is not in the renderer's tab order, and every forwarded
+   * accelerator needs focus to be inside the page already. Escape is the way
+   * back out (`preview:forwardedShortcut`).
+   */
+  FOCUS_PAGE: 'preview:focusPage'
 } as const
 
 /**
@@ -97,7 +112,19 @@ export const PreviewEvents = {
    * controls BECAUSE the page was hidden has to wait for this, or it draws them
    * into space a frozen texture may still occupy.
    */
-  VISIBILITY_APPLIED: 'preview:visibilityApplied'
+  VISIBILITY_APPLIED: 'preview:visibilityApplied',
+  /**
+   * A load main started has committed: the tab shows another page, or another
+   * place in the same one (issue #124). The page named here always comes from
+   * main's gated history entry, never from the URL that committed.
+   */
+  PAGE_CHANGED: 'preview:pageChanged',
+  /**
+   * A window-edge resize hid this panel's view (`held: true`) or ended
+   * (`held: false`, issue #124). The renderer answers the end with a settled
+   * bounds push, and main shows the view again once that push is applied.
+   */
+  RESIZE_HOLD: 'preview:resizeHold'
 } as const
 
 /**

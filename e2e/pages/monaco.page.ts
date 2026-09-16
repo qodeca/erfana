@@ -31,17 +31,23 @@ export class MonacoPage {
     await expect(cursor).toBeVisible({ timeout: 2000 })
   }
 
+  // Both writers use `insertText`, NOT `keyboard.type`. `type()` sends one
+  // keystroke per character, and Monaco drops some of them during its re-layout
+  // cycles — reliably so on Windows, where a run of this suite turned
+  // 'manually saved' into 'mnulysvd'. `insertText` delivers the whole string as
+  // a single input event, the way a paste does. Same reasoning, and the same
+  // remedy, as third-party-components.e2e.ts.
   async setContent(content: string): Promise<void> {
     await this.focus()
     await this.keyboard.selectAll()
-    await this.page.keyboard.type(content)
+    await this.page.keyboard.insertText(content)
   }
 
   async appendContent(content: string): Promise<void> {
     await this.focus()
     const modifier = await this.keyboard.getModifier()
     await this.page.keyboard.press(`${modifier}+End`)
-    await this.page.keyboard.type(content)
+    await this.page.keyboard.insertText(content)
   }
 
   async getContent(): Promise<string> {
@@ -100,6 +106,32 @@ export class MonacoPage {
 
   getTextArea(): Locator {
     return this.getEditor().locator('.monaco-editor textarea')
+  }
+
+  /**
+   * The rendered editor text, read straight from Monaco's own line elements.
+   *
+   * Prefer this over {@link getContent} whenever the assertion is about
+   * content that the APP changed (a reload from disk, a tab switch, a
+   * programmatic edit). `getContent` routes through select-all + copy, and
+   * this app deliberately remaps copy to the MAIN-process clipboard
+   * (`monacoClipboardCommands`, so the sandbox stays on) — which means the
+   * renderer's `navigator.clipboard.readText()` can hand back the PREVIOUS
+   * copy. A stale read makes an assertion pass against the old buffer, which
+   * is worse than failing.
+   *
+   * The trade-off is that Monaco virtualizes: only lines near the viewport are
+   * in the DOM. That is fine for asserting a phrase in a short fixture, and
+   * wrong for asserting a whole long document.
+   *
+   * @returns Visible line text, newline-joined
+   */
+  async visibleText(): Promise<string> {
+    // Monaco pads with non-breaking spaces; normalise them so a plain-text
+    // assertion matches. Written as an escape, not a literal — a raw NBSP in
+    // source trips the `no-irregular-whitespace` lint rule.
+    const text = await this.getEditor().locator('.view-lines').innerText()
+    return text.replace(/\u00a0/g, ' ')
   }
 
   async waitForCursor(): Promise<void> {

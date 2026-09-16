@@ -356,7 +356,7 @@
 
 <h2>Precedence: only one thing may own the rectangle</h2>
 <p class="ds-lede">
-  There are three ways a preview can show no page, and they must not blur together.
+  There are four ways a preview can show no page, and they must not blur together.
 </p>
 <table>
   <tr><th>Situation</th><th>Waiting message?</th><th>Why</th></tr>
@@ -378,6 +378,14 @@
     <td class="verdict verdict--suppressed">Suppressed</td>
     <td>The frame already answers "what is here". A panel nobody is looking at has no wait to
         report, and its live region must stay silent.</td>
+  </tr>
+  <tr>
+    <td>Splitter or window-edge drag, page frozen</td>
+    <td class="verdict verdict--suppressed">Suppressed</td>
+    <td>Not a wait: the page is being resized, and returns the moment the drag ends. The still
+        picture holds the rectangle at its captured size, top-left – or the page's own paper when
+        the picture is out of date – and stays until the page is confirmed back on screen. No text,
+        no spinner, no "Resizing" label, nothing announced (issue #124, UX §4).</td>
   </tr>
 </table>
 

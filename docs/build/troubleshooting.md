@@ -1,6 +1,6 @@
 # Build Troubleshooting
 
-**Last updated**: August 2026 (v0.17.2)
+**Last updated**: September 2026 (v0.20.0)
 
 This document provides solutions to common build errors.
 
@@ -238,8 +238,7 @@ Build fails during `npm run typecheck`
 1. Check TypeScript version: `npx tsc --version` (should be 6.0.x; `package.json` declares `typescript: ^6.0.3`)
 2. Clean and reinstall:
    ```bash
-   rm -rf node_modules/
-   npm install
+   npm ci   # replaces node_modules itself; not `npm install`
    ```
 3. Check for type errors: `npm run typecheck`
 
@@ -278,7 +277,7 @@ Tests fail, preventing build
    npm run test:renderer
    ```
 2. Fix failing tests before building
-3. All tests must pass – `npm run test:ci` reported **356 test files, 10,057 cases, all passing** on `develop` on 2026-08-23 (v0.17.2). The vitest workspace has three projects, and the `main` project covers more than `src/main`: main 152 files (`src/main` 139 · `src/shared` 11 · `scripts` 2) · renderer 200 · preload 4. Run `npm run test:ci` for the live figure – see [Testing overview](../testing/README.md#key-test-areas)
+3. All tests must pass – `npm run test:ci` reported **563 test files, 13,853 cases passing with 5 skipped** on a macOS host on 2026-09-16 (v0.20.0). The vitest workspace has three projects, and the `main` project covers more than `src/main` (`src/main` + `src/shared` + `scripts`); the per-project split was last counted at v0.19.0 (main 223 · renderer 235 · preload 6, total 464) and has not been re-counted since the file total reached 563. Run `npm run test:ci` for the live figure – see [Testing overview](../testing/README.md#key-test-areas)
 
 ---
 

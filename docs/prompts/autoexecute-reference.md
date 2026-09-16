@@ -13,7 +13,7 @@
 
 ## Error Handling Strategy
 
-The simplified v0.3.4 implementation uses a **fail-fast approach** for all error conditions.
+The implementation uses a **fail-fast approach** for all error conditions.
 
 ### Philosophy
 
@@ -21,39 +21,41 @@ The simplified v0.3.4 implementation uses a **fail-fast approach** for all error
 
 ### Implementation
 
+`createTerminalStore(terminalOps)` receives the terminal operations by injection (the default store passes `window.api.terminal`). Excerpt of `sendToTerminal` in `src/renderer/src/stores/useTerminalStore.ts`, with the logging lines left out:
+
 ```typescript
 sendToTerminal: async (text: string, autoExecute = false): Promise<boolean> => {
   const terminalId = get().activeTerminalId
 
   if (!terminalId) {
-    console.warn('❌ No active terminal available')
     return false
   }
 
   try {
-    // Write text to terminal
-    const writeResult = await window.api.terminal.write(terminalId, text)
+    // Multi-line text goes in as one bracketed paste, with line endings
+    // converted to \r, so a CLI such as Claude Code sees a single paste
+    const isMultiLine = /[\r\n]/.test(text)
+    const textToWrite = isMultiLine
+      ? `\x1b[200~${text.replace(/\r?\n/g, '\r')}\x1b[201~`
+      : text
 
+    const writeResult = await terminalOps.write(terminalId, textToWrite)
     if (!writeResult.success) {
-      console.error(`❌ Write failed: ${writeResult.error}`)
       return false
     }
 
-    // If autoExecute, send Enter after delay
+    // If autoExecute, send Enter after the 200ms delay
     if (autoExecute) {
       await new Promise(resolve => setTimeout(resolve, 200))
 
-      const enterResult = await window.api.terminal.write(terminalId, '\r')
-
+      const enterResult = await terminalOps.write(terminalId, '\r')
       if (!enterResult.success) {
-        console.error(`❌ Failed to send Enter: ${enterResult.error}`)
         return false
       }
     }
 
     return true
   } catch (error) {
-    console.error('❌ Unexpected error:', error)
     return false
   }
 }
@@ -83,7 +85,7 @@ sendToTerminal: async (text: string, autoExecute = false): Promise<boolean> => {
 
 ### Terminal Lifecycle States
 
-The v0.3.4 simplified implementation relies on the terminal bootstrap pattern for initialization, eliminating the need for explicit polling.
+The terminal bootstrap pattern gates writes until the terminal is ready; before sending, `openPanelAndSendContent` also waits for the store to report an active terminal (`waitForTerminalReady`).
 
 ```
 ┌─────────────────┐
@@ -115,7 +117,7 @@ The v0.3.4 simplified implementation relies on the terminal bootstrap pattern fo
 ### Why Race Conditions Are Prevented
 
 1. **Terminal bootstrap ensures ready state** - Three-flag gating system (hasReceivedMarker, initializationComplete, isClearing) prevents writes before terminal is ready
-2. **Panel initialization delay** - 100ms wait in `panelUtils.ts` ensures panel is visible before writing
+2. **Terminal readiness wait** - `waitForTerminalReady` in `panelUtils.ts` waits for an active terminal – event-based through the terminal manager's `waitForReady` when available, otherwise polling every 50 ms – and gives up after 5 s with a `PROMPT_TERMINAL_TIMEOUT` error toast
 3. **Write ordering guaranteed** - TCP FIFO semantics ensure sequential writes arrive in order
 4. **Fire-and-forget simplicity** - No async coordination needed between layers
 
@@ -125,51 +127,25 @@ See [Terminal Bootstrap Pattern](../terminal/bootstrap-pattern.md) for detailed 
 
 ## Implementation Files Reference
 
-### Modified Files
-
-#### v0.3.3 (Complex Implementation)
-
-| File | Lines Changed | Purpose |
-|------|---------------|---------|
-| **TerminalService.ts** | +79 / -42 | Async writes with callbacks, enhanced isAvailable() |
-| **terminal-handlers.ts** | +20 / -14 | Changed `on` → `handle` for awaitable IPC |
-| **useTerminalStore.ts** | +87 / -36 | Polling, error handling, awaited writes |
-| **preload/index.ts** | +9 / -4 | Promise API, type updates |
-| **useTerminalStore.autoExecute.test.ts** | +290 / 0 | Comprehensive test suite |
-
-**Total**: +500 / -104 lines (+396 net)
-
-#### v0.3.4 (Simplified Implementation)
-
-| File | Lines Changed | Purpose |
-|------|---------------|---------|
-| **TerminalService.ts** | -37 / +21 | Reverted to sync writes, EPIPE handling |
-| **terminal-handlers.ts** | -4 / +1 | Removed async from handler |
-| **useTerminalStore.ts** | -38 / +14 | Removed polling, kept 200ms delay |
-| **useTerminalStore.autoExecute.test.ts** | -5 / +2 | Removed polling tests, added coverage tests |
-| **registry.ts** | -18 / +0 | Removed verbose logging |
-| **panelUtils.ts** | -8 / +0 | Removed verbose logging |
-| **PreviewContextMenu.tsx** | -11 / +0 | Removed verbose logging |
-
-**Total**: -121 / +38 lines (-83 net from v0.3.3)
+The per-version modified-files tables (v0.3.3 and v0.3.4) are archived in [AutoExecute v0.3 history](../archive/autoexecute-v0.3-history.md#modified-files).
 
 ---
 
 ## Key Code Locations
 
-### v0.3.4 (Current Implementation)
+### Current implementation
 
 **Fire-and-Forget Write**:
-- `src/main/services/TerminalService.ts:313-342` - Synchronous write with EPIPE handling
+- `src/main/services/TerminalService.ts` – `TerminalService.write`: synchronous write with EPIPE handling
 
 **IPC Handler**:
-- `src/main/ipc/terminal-handlers.ts:55-64` - Synchronous `ipcMain.handle`
+- `src/main/ipc/terminal-handlers.ts` – the `terminal:write` handler: synchronous `registerHandle`, returns `{ success }`
 
 **200ms Delay Implementation**:
-- `src/renderer/src/stores/useTerminalStore.ts:91-95` - Comment explaining delay rationale
+- `src/renderer/src/stores/useTerminalStore.ts` – the comment above the `autoExecute` branch in `sendToTerminal` explains the delay
 
 **AutoExecute Flow**:
-- `src/renderer/src/stores/useTerminalStore.ts:73-111` - Complete sendToTerminal implementation
+- `src/renderer/src/stores/useTerminalStore.ts` – `sendToTerminal` (bracketed paste, write, delay, Enter)
 
 **Template Configuration**:
 - `src/renderer/src/prompts/templates/modify.md` - `autoExecute: true` example
@@ -177,16 +153,16 @@ See [Terminal Bootstrap Pattern](../terminal/bootstrap-pattern.md) for detailed 
 - `src/renderer/src/prompts/templates/ask.md` - `autoExecute: true` example
 
 **Context Menu Integration**:
-- `src/renderer/src/components/ContextMenu/PreviewContextMenu.tsx:93-148` - Template execution trigger
+- `src/renderer/src/components/ContextMenu/PreviewContextMenu.tsx` – builds the variables and calls `executePromptTemplate`
 
 **Panel Utils**:
-- `src/renderer/src/utils/panelUtils.ts:32-68` - Panel opening and content sending
+- `src/renderer/src/utils/panelUtils.ts` – `executePromptTemplate` (registry lookup, validation, rendering with the apply footer), `openPanelAndSendContent` and `waitForTerminalReady`
 
 **Template Registry**:
-- `src/renderer/src/prompts/registry.ts` - Prompt template registration
+- `src/renderer/src/prompts/registry.ts` - Prompt template registration (auto-discovers `templates/*.md`)
 
 **Test Suite**:
-- `src/renderer/src/stores/useTerminalStore.autoExecute.test.ts` - Comprehensive 10-test suite
+- `src/renderer/src/stores/useTerminalStore.autoExecute.test.ts` - 15 tests
 
 ---
 
@@ -221,8 +197,10 @@ See [Terminal Bootstrap Pattern](../terminal/bootstrap-pattern.md) for detailed 
 **Template with AutoExecute**:
 ```markdown
 ---
-id: custom-operation
-label: My Custom Operation
+area: markdown-preview
+subArea: context-menu
+name: My Custom Operation
+icon: sparkles
 autoExecute: true  # Automatically press Enter
 ---
 
@@ -233,8 +211,10 @@ Please process this content:
 **Template without AutoExecute**:
 ```markdown
 ---
-id: review-operation
-label: Review This
+area: markdown-preview
+subArea: context-menu
+name: Review This
+icon: sparkles
 autoExecute: false  # User must press Enter manually
 ---
 
@@ -274,54 +254,7 @@ await window.api.terminal.write(terminalId, '\r')
 
 ---
 
-## Migration Guide
-
-### From v0.3.2 to v0.3.4
-
-**Before (v0.3.2)**:
-```typescript
-// Fire-and-forget, no error handling
-window.api.terminal.write(terminalId, text)
-setTimeout(() => {
-  window.api.terminal.write(terminalId, '\r')
-}, 100) // Too short!
-```
-
-**After (v0.3.4)**:
-```typescript
-// Proper error handling and timing
-const writeResult = await window.api.terminal.write(terminalId, text)
-if (!writeResult.success) return
-
-await new Promise(resolve => setTimeout(resolve, 200))
-
-const enterResult = await window.api.terminal.write(terminalId, '\r')
-if (!enterResult.success) return
-```
-
-### From v0.3.3 to v0.3.4
-
-**Before (v0.3.3)**:
-```typescript
-// Complex polling and callbacks
-const available = await waitForTerminalInit(terminalId, 5000)
-if (!available) return false
-
-const writeResult = await window.api.terminal.write(terminalId, text)
-// ... more complexity
-```
-
-**After (v0.3.4)**:
-```typescript
-// Simple and reliable
-const writeResult = await window.api.terminal.write(terminalId, text)
-if (!writeResult.success) return false
-
-await new Promise(resolve => setTimeout(resolve, 200))
-
-const enterResult = await window.api.terminal.write(terminalId, '\r')
-return enterResult.success
-```
+The v0.3.2→v0.3.4 migration guide is archived in [AutoExecute v0.3 history](../archive/autoexecute-v0.3-history.md#migration-guide).
 
 ---
 
@@ -343,14 +276,7 @@ return enterResult.success
 
 ### Debug Logging
 
-Enable debug logging to trace write operations:
-
-```typescript
-// In useTerminalStore.ts
-console.log(`📝 Writing to terminal ${terminalId}:`, text.substring(0, 50))
-console.log(`⏱️  Waiting 200ms for rendering...`)
-console.log(`↩️  Sending Enter key`)
-```
+`sendToTerminal` already logs each step through the renderer `logger` – the `autoExecute` flag, terminal id and text length, the 200ms wait, and whether Enter was sent – and `openPanelAndSendContent` / `executePromptTemplate` log the flag they pass on. Read them in the renderer log rather than adding `console.log` calls.
 
 ### Performance Monitoring
 

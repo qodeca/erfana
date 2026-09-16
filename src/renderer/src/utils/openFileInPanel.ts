@@ -14,6 +14,13 @@
  * `panelHandlerRegistry` – that registry routes IPC-driven panel actions, not
  * user-initiated file opens.
  *
+ * PREVIEW TABS ARE FOUND BY THEIR PAGE, NOT THEIR ID (issue #124). A preview
+ * tab can move to another page and keep its id, so `preview-<A>` may be showing
+ * B. The "is this file already open" question for a preview is answered by
+ * {@link findPreviewTabShowing}, which reads `params.filePath`; a new preview
+ * whose usual id is still held by a tab that moved away gets a variant id. No
+ * path is ever read back out of an id.
+ *
  * @module openFileInPanel
  * @see Issue #70 - preview tabs show stale content when the file changes
  * @see Issue #74 - HTML preview with CSS and JavaScript execution
@@ -22,7 +29,7 @@
 import type { DockviewApi, DockviewPanelRenderer, IDockviewPanel } from 'dockview'
 
 import type { FilePanelKind } from '../../../shared/ipc/preview-types'
-import { getBasename, sanitizeFilePath, stablePathDigest } from './fileUtils'
+import { getBasename, pathsEqual, sanitizeFilePath, stablePathDigest } from './fileUtils'
 import { isImageFile } from './imageUtils'
 import { logger } from './logger'
 import { useProjectStore } from '../stores/useProjectStore'
@@ -70,7 +77,12 @@ const PANEL_KIND_DESCRIPTORS: Record<
 
 /** Options for {@link openFileInPanel}. */
 export interface OpenFileInPanelOptions {
-  /** Extra params merged into the panel params (e.g. `initialLine`, `initialColumn`). */
+  /**
+   * Extra params merged into the panel params (e.g. `initialLine`,
+   * `initialColumn`, or a preview's `linkMode`). Applied to a NEW panel only: a
+   * reused panel keeps its own, which is how a reused preview tab keeps its
+   * link mode (part 3 §3.3).
+   */
   params?: Record<string, unknown>
   /**
    * Whether to move keyboard focus to the panel's group when an already-open
@@ -123,18 +135,27 @@ export interface OpenFileInPanelOptions {
  * under it the id is exactly what it always was, so nothing keyed on an
  * existing id moves. Every id stays under 200 characters.
  *
+ * A `variant` above 0 appends `-v<n>` (issue #124): a preview tab that moved to
+ * another page keeps the id it was minted with, so a new preview of that first
+ * file needs a different one. The suffix counts against the budget, so a
+ * variant id is shortened exactly when it would outgrow it. Variant 0 is the id
+ * the path always had.
+ *
  * @param kind - The resolved panel kind.
  * @param filePath - Absolute path to the file.
+ * @param variant - Which variant of the id; `0` (the default) is the plain id.
  * @returns `preview-…` / `image-…` / `editor-…` followed by the sanitized path,
- *   shortened past the budget to a 150-character head plus a 16-character digest.
+ *   shortened past the budget to a 150-character head plus a 16-character digest,
+ *   then `-v<n>` for a variant above 0.
  */
-function buildPanelId(kind: FilePanelKind, filePath: string): string {
+function buildPanelId(kind: FilePanelKind, filePath: string, variant = 0): string {
   const prefix = PANEL_KIND_DESCRIPTORS[kind].idPrefix
   const sanitized = sanitizeFilePath(filePath)
-  if (sanitized.length <= PANEL_ID_PATH_BUDGET) {
-    return `${prefix}-${sanitized}`
+  const suffix = variant > 0 ? `-v${variant}` : ''
+  if (sanitized.length + suffix.length <= PANEL_ID_PATH_BUDGET) {
+    return `${prefix}-${sanitized}${suffix}`
   }
-  return `${prefix}-${sanitized.slice(0, PANEL_ID_PATH_KEEP)}-${stablePathDigest(filePath)}`
+  return `${prefix}-${sanitized.slice(0, PANEL_ID_PATH_KEEP)}-${stablePathDigest(filePath)}${suffix}`
 }
 
 /** Sanitized-path length above which {@link buildPanelId} shortens the id. */
@@ -174,6 +195,103 @@ export function getFilePanelId(filePath: string): string {
 }
 
 /**
+ * The path a panel shows, from its params – never from its id.
+ *
+ * @param panel - Any dockview panel.
+ * @returns `params.filePath` when it is a string, otherwise `undefined`.
+ */
+function readFilePathParam(panel: IDockviewPanel): string | undefined {
+  const value = (panel.params as { filePath?: unknown } | undefined)?.filePath
+  return typeof value === 'string' ? value : undefined
+}
+
+/**
+ * Finds the preview tab in this window that shows a file (issue #124, part 3 §3.4).
+ *
+ * Reads each preview panel's `params.filePath` – the page the tab shows now –
+ * and never its id, because a tab that moved keeps the id it was minted with.
+ * Paths compare with {@link pathsEqual}: separators normalised, case-folded on
+ * Windows. Only panels on the preview component count; an editor tab showing
+ * the same file is a different kind of tab.
+ *
+ * One dockview api per window, so other windows are never searched.
+ *
+ * @param dockviewApi - The editor-area dockview API.
+ * @param filePath - Project-space path of the page.
+ * @returns The first preview panel showing the file, or `undefined`.
+ *
+ * @example
+ * ```ts
+ * // After tab `preview-…-a-html` moved to b.html:
+ * findPreviewTabShowing(api, '/proj/b.html')?.id  // 'preview-…-a-html'
+ * findPreviewTabShowing(api, '/proj/a.html')      // undefined
+ * ```
+ */
+export function findPreviewTabShowing(
+  dockviewApi: Pick<DockviewApi, 'panels'>,
+  filePath: string
+): IDockviewPanel | undefined {
+  const component = PANEL_KIND_DESCRIPTORS.preview.component
+  return dockviewApi.panels.find(
+    (panel) =>
+      panel.view.contentComponent === component &&
+      pathsEqual(readFilePathParam(panel), filePath)
+  )
+}
+
+/**
+ * Finds every editor tab in this window that shows a file (issue #124, part 3 §3.6).
+ *
+ * The editor-side twin of {@link findPreviewTabShowing}, with the same rules:
+ * it reads `params.filePath`, never the id, compares with {@link pathsEqual},
+ * and counts only panels on the editor component – a preview or an image tab of
+ * the same file is a different kind of tab. Unlike previews, a file can be open
+ * in more than one editor tab, so it returns them all.
+ *
+ * @param dockviewApi - The editor-area dockview API, or any panel pool.
+ * @param filePath - Project-space path of the file.
+ * @returns The editor panels showing the file, in dockview's order; empty when none.
+ *
+ * @example
+ * ```ts
+ * // Before a same-tab move to b.html: which editors would have to close?
+ * findEditorTabsShowing(api, '/proj/b.html').map((panel) => panel.id)
+ * ```
+ */
+export function findEditorTabsShowing(
+  dockviewApi: Pick<DockviewApi, 'panels'>,
+  filePath: string
+): IDockviewPanel[] {
+  const component = PANEL_KIND_DESCRIPTORS.editor.component
+  return dockviewApi.panels.filter(
+    (panel) =>
+      panel.view.contentComponent === component &&
+      pathsEqual(readFilePathParam(panel), filePath)
+  )
+}
+
+/**
+ * Mints the id for a NEW preview of a file: the smallest variant that no panel
+ * in this window holds.
+ *
+ * Variant 0 is the id a preview of this path has always had; it is taken only
+ * when a tab minted for this file has since moved to another page. Bounded: n
+ * panels hold at most n ids, so one of the first n + 1 variants is free.
+ *
+ * @param dockviewApi - The editor-area dockview API.
+ * @param filePath - Absolute path to the file.
+ * @returns A preview panel id no panel in this window holds.
+ */
+function mintPreviewPanelId(dockviewApi: DockviewApi, filePath: string): string {
+  const limit = dockviewApi.panels.length
+  for (let variant = 0; variant < limit; variant++) {
+    const id = buildPanelId('preview', filePath, variant)
+    if (!dockviewApi.getPanel(id)) return id
+  }
+  return buildPanelId('preview', filePath, limit)
+}
+
+/**
  * Opens a file in the right panel type, reusing an existing tab when there is one.
  *
  * Without a `kind` option the routing is synchronous: images open in the image
@@ -182,6 +300,10 @@ export function getFilePanelId(filePath: string): string {
  * the async eligibility check) and pass the resolved `kind: 'preview'` here.
  * Newly created panels are registered with the project store so they are
  * cleaned up on a project switch.
+ *
+ * "An existing tab" means, for a preview, the tab that shows the file NOW
+ * ({@link findPreviewTabShowing}); for an editor or an image, the panel with
+ * the file's id.
  *
  * Callers keep their own tails: this function does not toast, does not scroll
  * to an anchor, and does not decide what "not ready" should look like.
@@ -228,15 +350,22 @@ export function openFileInPanel(
   // the id prefix, the component and the tab component cannot drift apart.
   const kind: FilePanelKind = kindOption ?? (isImageFile(filePath) ? 'image' : 'editor')
   const descriptor = PANEL_KIND_DESCRIPTORS[kind]
-  const panelId = buildPanelId(kind, filePath)
 
-  const existing = dockviewApi.getPanel(panelId)
+  // One file, one preview tab – and the tab that shows it may carry another
+  // file's id after a same-tab move, so previews are found by their page.
+  const existing =
+    kind === 'preview'
+      ? findPreviewTabShowing(dockviewApi, filePath)
+      : dockviewApi.getPanel(buildPanelId(kind, filePath))
   if (existing) {
     existing.api.setActive()
     if (focusOnReuse) existing.group.focus()
-    logger.info('Activated existing panel', { filePath, panelId })
+    logger.info('Activated existing panel', { filePath, panelId: existing.id })
     return existing
   }
+
+  const panelId =
+    kind === 'preview' ? mintPreviewPanelId(dockviewApi, filePath) : buildPanelId(kind, filePath)
 
   const panel = dockviewApi.addPanel({
     id: panelId,

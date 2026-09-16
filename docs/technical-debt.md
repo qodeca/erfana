@@ -7,11 +7,11 @@ Concise summary of unresolved technical issues and improvement opportunities in 
 ### 1. node-pty Build Failure on Python 3.13
 
 **Severity**: Medium
-**Impact**: Terminal functionality unavailable on Python 3.13+
+**Impact**: Terminal functionality unavailable on Python 3.13 (3.14.3 is verified working – see [docs/build/windows.md](./build/windows.md))
 
 **Problem**: node-pty dependency requires `distutils` module, removed in Python 3.13.
 
-**Workaround**: Downgrade to Python 3.12 or earlier.
+**Workaround**: Use Python 3.12 (long-standing known-good) or 3.14.x (verified 2026-09-03 on Windows 11).
 
 **Solution**: Wait for upstream node-pty update or contribute fix.
 
@@ -24,14 +24,14 @@ Concise summary of unresolved technical issues and improvement opportunities in 
 **Severity**: Low
 **Impact**: Template name changes break code references
 
-**Problem**: Template IDs are derived from slugified display names:
+**Problem**: Template IDs fall back to slugified display names when a template carries no explicit `id`:
 
 ```typescript
 // parser.ts
-const id = slugify(result.data.name)  // "Mermaid Bug Report" → "mermaid-bug-report"
+const id = result.data.id || slugify(result.data.name)  // "Mermaid Bug Report" → "mermaid-bug-report"
 ```
 
-**Issues**:
+**Issues** (for the templates still relying on the fallback):
 - Changing template name breaks all code references
 - Fragile coupling between display name and programmatic identifier
 - No compile-time safety for ID references
@@ -49,19 +49,19 @@ const config = PROMPT_REGISTRY['mermaid-bug-report']  // Returns undefined!
 ```
 
 **Recommended Solution**:
-1. Add explicit `id` field to frontmatter schema
-2. Update parser to use explicit ID instead of slugify
+1. ✅ Add explicit `id` field to frontmatter schema – done: `PromptFrontmatterSchema` carries an optional `id`
+2. ✅ Update parser to use explicit ID instead of slugify – done: `parser.ts` uses `result.data.id || slugify(result.data.name)`
 3. Add uniqueness validation in registry
-4. Migrate all existing templates (explain, improve, rewrite, simplify, mermaid-bug-report)
-5. Remove slugify function
+4. Migrate all existing templates – partial: 5 of the 14 templates in `src/renderer/src/prompts/templates/` declare an `id`; the other 9 still rely on the slugify fallback
+5. Remove slugify function (only once step 4 is complete)
 
 **Implementation Files**:
-- `src/renderer/src/prompts/schema.ts` - Add `id` field to `PromptFrontmatterSchema`
-- `src/renderer/src/prompts/parser.ts` - Use explicit ID
+- `src/renderer/src/prompts/schema.ts` - `id` field on `PromptFrontmatterSchema` (done)
+- `src/renderer/src/prompts/parser.ts` - explicit ID with slugify fallback (done)
 - `src/renderer/src/prompts/registry.ts` - Add uniqueness validation
-- Template files in `resources/prompts/*.md` - Add `id` field
+- Template files in `src/renderer/src/prompts/templates/*.md` - Add `id` field to the remaining templates
 
-**Status**: Architecture review complete, implementation pending.
+**Status**: Steps 1–2 shipped; uniqueness validation, the full template migration and the slugify removal remain open (re-verified 2026-09-05).
 
 ---
 
@@ -80,7 +80,7 @@ Resolved – `LanguageSelect` accepts an optional `id` prop and renders it on th
 ### 5. E2E workflow disabled on CI
 
 **Severity**: Medium
-**Impact**: The entire `e2e.yml` workflow is disabled (2026-04-25, commit `997ba65`). Neither the functional `electron` suite nor the 5 visual screenshot tests run on CI; both regression classes can merge undetected until a developer runs `npm run test:e2e` / `npm run test:e2e:visual` locally. E2E was already excluded from branch-protection required checks, so disabling does not block any merges or releases — but it removes a safety net.
+**Impact**: The entire `e2e.yml` workflow is disabled (2026-04-25, commit `997ba65` – pre-migration; no longer resolvable, that history was rewritten at the 2026-06 migration). Neither the functional `electron` suite nor the 5 visual screenshot tests run on CI; both regression classes can merge undetected until a developer runs `npm run test:e2e` / `npm run test:e2e:visual` locally. E2E was already excluded from branch-protection required checks, so disabling does not block any merges or releases — but it removes a safety net.
 
 **Problem**: The visual suite was the original blocker — all 5 tests time out at `page.waitForLoadState('domcontentloaded')` (30s) on GitHub `macos-latest` runners while passing 5/5 locally (including with `CI=true`). The earlier workaround scoped CI to `--project=electron` only, but the functional suite is also unstable on hosted runners; full disable is now the working state until the root cause is isolated.
 
@@ -106,16 +106,16 @@ Resolved – `LanguageSelect` accepts an optional `id` prop and renders it on th
 
 **Root cause**: Monaco's `.cursor` element blinks every 500ms by default. A 2s `toBeVisible` timeout can miss the visible half-cycle under CPU contention.
 
-**Fix pattern exists in codebase**: `e2e/visual-regression.e2e.ts:45` `disableCursorBlink()` helper patches `cursorBlinking: 'solid'`. Apply the same helper to the third-party-components test.
+**Fix pattern exists in codebase**: the `disableCursorBlink()` helper in `e2e/visual-regression.e2e.ts` patches `cursorBlinking: 'solid'`. Apply the same helper to the third-party-components test.
 
-**Files**: `e2e/pages/monaco.page.ts:29`, `e2e/third-party-components.e2e.ts:38`.
+**Files**: `e2e/pages/monaco.page.ts` (the `expect(cursor).toBeVisible({ timeout: 2000 })` in `MonacoPage.focus()`), `e2e/third-party-components.e2e.ts` (the `Monaco editor: Set content via keyboard and verify in preview` test).
 
 ---
 
-### 7. `docs/security.md` exceeds /doc-update soft cap (752 lines)
+### 7. `docs/security.md` exceeds /doc-update soft cap (772 lines)
 
 **Severity**: Low
-**Impact**: `/doc-update` protocol prefers ≤500-line doc files; `security.md` sits 252 lines over (752 lines on 2026-09-04, after the HTML-preview section absorbed the partition-recycling and panel-id-digest risks; ~676 after the #73 doc sweep on 2026-08-24 added the harness-CSP subsection and three lines to § Sender-frame gating; 661 on 2026-08-23, 626 at v0.17.0 and 541 when this item was filed). The trend line is the point: this file gains content on every security-relevant change.
+**Impact**: `/doc-update` protocol prefers ≤500-line doc files; `security.md` sits 272 lines over (772 lines on 2026-09-15, after #124 added its frames, same-tab and open-in-browser subsection and three accepted risks; 752 lines on 2026-09-04, after the HTML-preview section absorbed the partition-recycling and panel-id-digest risks; ~676 after the #73 doc sweep on 2026-08-24 added the harness-CSP subsection and three lines to § Sender-frame gating; 661 on 2026-08-23, 626 at v0.17.0 and 541 when this item was filed). The trend line is the point: this file gains content on every security-relevant change.
 
 **Problem**: Largest natural extraction candidate (`Release signing (v0.9.5+, #174)`, from L566 to the end of the file) is structurally pinned. The pubkey block contains `<!-- minisign-pubkey-{primary,rotation}-{begin,end} -->` fence markers that are actively grepped by:
 
@@ -135,7 +135,7 @@ Moving the block would require synchronized edits to checks.yml + skill + README
 
 ### 8. Renderer components exceed the 500-line guideline
 
-**Severity**: Low — `MarkdownPreview.tsx` (1,009 lines) and `ChatBubble.tsx` (641 lines) exceed the 500-line-per-file guideline (pre-existing; out of scope for the issue #203 clipboard change). Candidates for a future decomposition pass.
+**Severity**: Low — `MarkdownPreview.tsx` (1,032 lines) and `ChatBubble.tsx` (641 lines) exceed the 500-line-per-file guideline (pre-existing; out of scope for the issue #203 clipboard change). Candidates for a future decomposition pass.
 
 ---
 
@@ -159,7 +159,7 @@ Moving the block would require synchronized edits to checks.yml + skill + README
 
 **Fix**: Extract the arrow background (image + size) to a shared utility class or design token so the size lives in one place.
 
-**Files** (re-verified 2026-08-08): `Settings/SettingsOverlay.css:171`, `DocumentImport/DocumentImportDialog.css:117`, `Transcription/TranscriptionDialog.css:71`, `Dialog/CameraDialog.css:54`, `Dialog/Dialog.css:555` — all under `src/renderer/src/components/`. Note `LanguageSelect.tsx`, named here originally, carries no such rule; the language select is styled by `TranscriptionDialog.css`. `SettingsOverlay.css:240` also sets `background-size: 12px` but for the checkbox tick, a different icon — out of scope for this item.
+**Files** (re-verified 2026-09-05): `Settings/SettingsOverlay.css:171`, `DocumentImport/DocumentImportDialog.css:117`, `Transcription/TranscriptionDialog.css:71`, `Dialog/CameraDialog.css:56`, `Dialog/Dialog.css:573` — all under `src/renderer/src/components/`. Note `LanguageSelect.tsx`, named here originally, carries no such rule; the language select is styled by `TranscriptionDialog.css`. `SettingsOverlay.css:240` also sets `background-size: 12px` but for the checkbox tick, a different icon — out of scope for this item.
 
 ---
 
@@ -225,7 +225,7 @@ After the heartbeat hardening (Phase A4 resume-refresh, B1 symlink defense, D3 H
 **Severity**: Low
 **Impact**: The issue #55 packaging guard `assertResourcesSiblingsAllowlist` (L2a-2) — the full Electron-owned sibling enumeration beside `app/` — is **fatal on macOS but advisory (`console.warn`) on Windows**. On win32 an unexpected sibling only warns; it cannot block a release.
 
-**Problem**: `EXPECTED_RESOURCES_ENTRIES` (the Electron-owned names `app`/`app.asar`/`icon.icns`/`elevate.exe` plus the config slots) was enumerated on a **macOS-only** packed-tree baseline, and CI never runs an electron-builder pack on Windows (`windows-checks` runs only typecheck + `test:main`). Keeping the enumeration fatal on win32 would rest a release-blocking gate on an unverified baseline and risk a first-Windows-release false-fail. The softening touches **only** this enumeration; the config leak vector — `assertResourcesDestNoRepoLeak` (L2a-1, leak-name tripwire) and `assertExtraFilesDestNoRepoLeak` (L2b) — stays both-platforms-fatal.
+**Problem**: `EXPECTED_RESOURCES_ENTRIES` (the Electron-owned names `app`/`app.asar`/`icon.icns`/`elevate.exe` plus the config slots) was enumerated on a **macOS-only** packed-tree baseline, and CI never runs an electron-builder pack on Windows (the `Windows checks` job runs only typecheck, the design-sync check and `test:main`; the separate `npm audit signatures` job does not pack either). Keeping the enumeration fatal on win32 would rest a release-blocking gate on an unverified baseline and risk a first-Windows-release false-fail. The softening touches **only** this enumeration; the config leak vector — `assertResourcesDestNoRepoLeak` (L2a-1, leak-name tripwire) and `assertExtraFilesDestNoRepoLeak` (L2b) — stays both-platforms-fatal.
 
 **Recommended Solution**: capture a real Windows electron-builder packed-tree baseline, reconcile `EXPECTED_RESOURCES_ENTRIES` against it, then promote L2a-2 to fatal on win32.
 
@@ -282,18 +282,13 @@ After the heartbeat hardening (Phase A4 resume-refresh, B1 symlink defense, D3 H
 
 ---
 
-### 19. `vitest.renderer.ts` coverage block sits outside `test` (inert) (#60, 2026-08)
+### 19. `vitest.renderer.ts` coverage block sits outside `test` (inert) (#60, 2026-08) ✅ Resolved (#124)
 
 **Severity**: Medium
-**Impact**: The renderer project has **no enforced coverage thresholds**. `vitest.renderer.ts` declares `coverage` as a sibling of `test` rather than inside it, and vitest ignores a top-level `coverage` key — so the provider, the report directory, the exclude list and the `{ lines: 10, functions: 10, branches: 5, statements: 10 }` thresholds are all dead configuration.
 
-**Problem**: Exactly the misplacement issue #55 F4 fixed for `vitest.main.ts`, which now carries the corrective comment above its `coverage` block. Until it is fixed for the renderer, any renderer coverage target — including the >80 % expectation on the #60 boundary components — is a review-time convention, not a gate.
+**Impact (when filed)**: The renderer project had **no enforced coverage thresholds**. `vitest.renderer.ts` declared `coverage` as a sibling of `test` rather than inside it, and vitest ignores a top-level `coverage` key — so the provider, the report directory, the exclude list and the thresholds were all dead configuration.
 
-**Recommended Solution**: move the block under `test:` (one indentation change), then re-measure before choosing thresholds — the current values were never enforced, so they may be either far below or above what the suite actually meets.
-
-**Files**: `vitest.renderer.ts`. Reference fix: `vitest.main.ts`.
-
-**Status**: Open — recorded by the #60 change-set review; also listed as a deferral in [`design/design-issue-60.md`](./design/design-issue-60.md) §8.
+**Resolved (#124, QG-8).** The same misplacement turned out to affect `vitest.preload.ts` as well. In both configs the `coverage` block now sits inside `test`, like `vitest.main.ts`, so the thresholds, includes and reporters apply; per-file floors were added for the #124 modules, and `__test__/` and `__test-helpers__/` joined `coverage.exclude` in all three configs. `npm run test:cov` passes with them. **CI enforces them too (#124, QG-11a):** the required `Coverage` job in `.github/workflows/checks.yml` originally ran only `--project main`, so the new renderer and preload floors fired only locally; it now runs two more steps, `npx vitest --run --config vitest.preload.ts --project preload --coverage` and `npx vitest --run --config vitest.renderer.ts --project renderer --coverage`, so a breach of either fails a required check. The number is kept so existing references to "item #19" stay valid.
 
 ---
 
@@ -302,13 +297,13 @@ After the heartbeat hardening (Phase A4 resume-refresh, B1 symlink defense, D3 H
 **Severity**: Low
 **Impact**: `scripts/test-cov.mjs` invokes vitest once per project config (`vitest.main.ts`, `vitest.preload.ts`, `vitest.renderer.ts`) with `--coverage` but **without** `--project`. `vitest.workspace.ts` is auto-discovered from the repo root, so each invocation expands back to all three projects: the full suite runs three times for one coverage report, and each run's coverage is collected across projects rather than scoped to the config that requested it.
 
-**Problem**: Slow locally, and it makes the per-file floors in `vitest.main.ts` (whisper trust chain, `scripts/fuses.js`, `modelId.ts`, `rendererCrashHandlers.ts`) behave differently on a developer machine than in CI. CI's Coverage job scopes with `--project main` — the reason that flag exists is recorded in a comment in `vitest.main.ts` — so the floors are effectively **CI-only** enforcement today.
+**Problem**: Slow locally, and it means the coverage floors in all three configs – the per-file floors in `vitest.main.ts` (whisper trust chain, `scripts/fuses.js`, `modelId.ts`, `rendererCrashHandlers.ts`) and `vitest.renderer.ts` (the #124 HTML-preview modules), and the project-wide floors in `vitest.preload.ts` – are measured on a differently scoped run on a developer machine than in CI. CI's required Coverage job runs three steps, each scoped with `--project main`, `--project preload` or `--project renderer` (the reason is recorded in comments in `vitest.main.ts` and `.github/workflows/checks.yml`), so the CI result is the authoritative one, and a local `npm run test:cov` can disagree with it.
 
 **Recommended Solution**: pass `--project main|preload|renderer` on each of the three `run(...)` calls in `scripts/test-cov.mjs`, matching what checks.yml already does. Verify the per-file thresholds still fire afterwards.
 
 **Files**: `scripts/test-cov.mjs` (the three `run(...)` calls), `vitest.workspace.ts`, `.github/workflows/checks.yml` (Coverage job).
 
-**Status**: Open — recorded by the #60 change-set review. Derived from configuration, not from a timed run.
+**Status**: Open — recorded by the #60 change-set review. **Observed directly on 2026-09-15** and promoted to [#133](https://github.com/qodeca/erfana/issues/133): `vitest --run --config vitest.main.ts --coverage` reports 562 files / 13,847 tests (the whole workspace), while adding `--project main` gives 287 files / 6,972 tests. The same issue carries a second defect this entry did not know about — the script's `spawnSync(…, {stdio: 'inherit'})` output never reaches a redirected log on Windows, so a failing run prints only `Command failed (1): …` and never names the floor that missed.
 
 ---
 
@@ -402,13 +397,13 @@ The policy as practised: *a file a change adds behaviour to must come in under 5
 | `src/renderer/src/components/ProjectTree/ProjectTree.tsx` | 1,468 | Pre-existing |
 | `src/renderer/src/components/Panels/TerminalPanel.tsx` | 1,362 | Pre-existing; #70 only shrinks it (the panel router replaced its inline open logic) |
 | `src/preload/index.ts` | 1,179 | Pre-existing; the single app bridge grows one block per IPC domain |
-| `src/main/services/preview/PreviewLiveView.ts` | 1,169 | #74 and its follow-ups. sd-074b §3.3 recorded it at 545 against the cap before links landed; the link, CSP-violation and consent code went into sibling modules (`previewLinkBridge.ts`, `previewCspViolationBridge.ts`, `externalLinkConsent.ts`) precisely because of this, and the v0.19.0 bounded-teardown and partition-release changes still added to it |
+| `src/main/services/preview/PreviewLiveView.ts` | ~~1,169~~ 439 | **Back under the cap (#124).** The live view was split into `previewLiveVisibility.ts`, `previewLiveBounds.ts`, `previewLiveWiring.ts`, `previewLivePipeline.ts`, `previewLiveTeardown.ts` and siblings before #124 added behaviour |
 | `src/renderer/src/components/Editor/MarkdownPreview.tsx` | 1,032 | Pre-existing (entry 8) |
 | `src/main/services/LocalWhisperService.ts` | 933 | Pre-existing |
 | `src/main/services/ProjectLockService.ts` | 906 | Pre-existing |
 | `src/main/services/DirectoryWatcherService.ts` | 885 | Pre-existing |
 | `src/renderer/src/constants/testids.ts` | 842 | Pre-existing; a flat constant table |
-| `src/main/services/preview/PreviewViewService.ts` | 832 | #74 and its follow-ups; its own header notes the registry was extracted to keep it under the cap, and multi-view, suspend/resume and the v0.19.0 partition hand-back pushed it past anyway |
+| `src/main/services/preview/PreviewViewService.ts` | ~~832~~ 493 | **Back under the cap (#124)**, but only just – see entry #47. Navigation, eviction, panel state and the resize-hold registry moved into their own modules |
 | `src/main/services/PdfService.ts` | 821 | Pre-existing |
 | `src/main/services/GitWatcherService.ts` | 795 | Pre-existing |
 | `src/main/services/WhisperModelManager.ts` | 753 | Pre-existing |
@@ -425,7 +420,7 @@ The policy as practised: *a file a change adds behaviour to must come in under 5
 | `src/renderer/src/components/Settings/SettingsOverlay.tsx` | 611 | Pre-existing |
 | `src/main/services/ExternalFileService.ts` | 596 | Pre-existing |
 | `src/main/services/FileService.ts` | 594 | Pre-existing |
-| `src/renderer/src/components/Panels/MarkdownEditorPanel.tsx` | 593 | Pre-existing; untouched by #70 except by the optional router commit |
+| `src/renderer/src/components/Panels/MarkdownEditorPanel.tsx` | 615 | Pre-existing; grew 24 lines in 2026-09 for the per-panel keyboard gate (dockview `onDidActiveChange` -> `useKeyboardShortcuts({ enabled })`) |
 | `src/renderer/src/components/Panels/markdownEditorPanel.logic.ts` | 587 | Pre-existing |
 | `src/main/services/LoggingService.ts` | 567 | Pre-existing |
 | `src/renderer/src/components/Dialog/CameraDialog.tsx` | 548 | Pre-existing |
@@ -437,7 +432,7 @@ The policy as practised: *a file a change adds behaviour to must come in under 5
 
 `FileWatcherService.ts` deliberately stayed under the cap (498 lines at the #70 measurement) by moving the watch factory, the unlink branch, the send loop and the subscriber counting into `src/main/services/watcher/`.
 
-**Recommended Solution**: `PreviewLiveView.ts` and `PreviewViewService.ts` are now the entries gaining code fastest and are the ones to split first – the lifecycle wiring, teardown and still-frame paths in the former and the suspend/resume policy in the latter are separable. `file-handlers.ts` remains a candidate: the project/file/stat/CRUD handler groups are independent. The `imageViewer.logic.ts` file is a candidate for the next pass that genuinely changes it.
+**Recommended Solution**: (#124 made the split below for both preview files; the rest stands.) `PreviewLiveView.ts` and `PreviewViewService.ts` were the entries gaining code fastest and the ones to split first – the lifecycle wiring, teardown and still-frame paths in the former and the suspend/resume policy in the latter are separable. `file-handlers.ts` remains a candidate: the project/file/stat/CRUD handler groups are independent. The `imageViewer.logic.ts` file is a candidate for the next pass that genuinely changes it.
 
 **Status**: Accepted for #70; recorded so the next change to any of these files does not re-litigate it.
 
@@ -570,19 +565,15 @@ Resolved by the #73 image-export work. The canonical extension list, the MIME ma
 **Files**: `src/renderer/src/components/Panels/ImageViewerPanel/ImageViewerPanel.module.css`.
 
 **Status**: Open — recorded by the #73 final review in place of the edit.
-### 36. Main-side project-switch teardown not wired for HTML preview (#74, 2026-08)
+### 36. Main-side project-switch teardown not wired for HTML preview (#74, 2026-08) ✅ Resolved (v0.19.0)
 
 **Severity**: Low
 
-**Impact**: The `subscribeProjectChanged` seam (`preview-handlers.ts`, `PreviewViewService.onProjectChanged`) passes nothing in production — `src/main/index.ts` calls `registerPreviewHandlers` with only `getProjectPath` + `globalSettings`, and no main-side project-changed observable exists (`ProjectService` uses an imperative `setProjectPath`). The renderer's idempotent `preview:close` is the sole teardown owner **for a project switch**.
+**Impact (when filed)**: The `subscribeProjectChanged` seam (`preview-handlers.ts`, `PreviewViewService.onProjectChanged`) passed nothing in production — `src/main/index.ts` called `registerPreviewHandlers` with only `getProjectPath` + `globalSettings`, and no main-side project-changed observable existed. The renderer's idempotent `preview:close` was the sole teardown owner **for a project switch**, so a renderer crash or reload **during** a switch could strand a running preview against the old root and lock new opens with `PREVIEW_VIEW_LIMIT_REACHED`.
 
-**Narrowed (2026-08-29), not closed.** Main now reaps a window's previews when the window itself goes away: `index.ts` subscribes `closed` per window and calls `PreviewViewService.closeWindow`, which drains that window's registry entries, invalidates their in-flight opens and releases the project refcount. That removes the quit-time `removeChildView` warning at source and closes the latent second-window leak. A **project switch** inside a surviving window still has no main-side teardown, which is what this entry remains open for.
+**Narrowed (2026-08-29).** Main reaps a window's previews when the window itself goes away: `index.ts` subscribes `closed` per window and calls `PreviewViewService.closeWindow`, which drains that window's registry entries, invalidates their in-flight opens and releases the project refcount. That removed the quit-time `removeChildView` warning at source and closed the latent second-window leak.
 
-**Problem**: A renderer crash or reload **during** a project switch can strand a running preview against the old root and lock new opens with `PREVIEW_VIEW_LIMIT_REACHED`. Edge case.
-
-**Recommended Solution**: expose a project-changed event from `ProjectService` and wire the seam so main-side teardown does not depend on the renderer surviving the switch.
-
-**Status**: Accepted at QG-6 — fix cost/scope judged greater than the value for this edge case.
+**Resolved (v0.19.0).** `FileService.onProjectPathChanged(listener)` is the producer the seam was missing, and `src/main/index.ts` now passes `subscribeProjectChanged: (listener) => fileService.onProjectPathChanged(listener)` to `registerPreviewHandlers` (sd-074b §4.9). Main-side teardown on a project switch no longer depends on the renderer surviving the switch. The number is kept so existing references to "item #36" stay valid.
 
 ---
 
@@ -620,11 +611,11 @@ Resolved by the #73 image-export work. The canonical extension list, the MIME ma
 
 **Impact**: `previewFilterDecision.decideRequest` allows the `about:` scheme for every request type.
 
-**Problem**: Defense-in-depth only — **not exploitable**: `frame-src 'none'`, the `will-navigate` handler and the sandbox already block it. Narrowing to `data:`/`blob:` only was judged not worth churning security-critical filter code.
+**Problem**: Defense-in-depth only. When filed, the reason it was not exploitable was `frame-src 'none'`, the `will-navigate` handler and the sandbox. **#124 removed the first of those**: `frame-src` now names the page's own root token, so frames load. The reason must be re-verified rather than assumed – what still holds, read in code: `frame-src` admits no `about:` source, the frame guard allows only `about:blank` and `about:srcdoc` (documents the page itself writes, which carry nothing from outside it), and the sandbox and the `will-navigate` handler are unchanged. Narrowing to `data:`/`blob:` only was judged not worth churning security-critical filter code.
 
 **Recommended Solution** (optional): narrow the allowed schemes if this filter is next opened for other reasons.
 
-**Status**: Accepted at QG-7.
+**Status**: Accepted at QG-7 (#74); reasoning to re-verify after #124 (see Problem).
 
 ---
 
@@ -716,6 +707,295 @@ One extra obstacle found since: `PreviewViewService.applyApprovedHosts` returns 
 
 ---
 
+### 47. Files at or over the size caps after #124 (2026-09)
+
+**Severity**: Low
+
+**Impact**: The rule for a file a change adds behaviour to is "under 500 lines" (entry #26). #124 kept every new module under it, but left a set of files with no headroom, some grown past it, and three of its own tighter design targets missed.
+
+**Over 500 and grown by #124** (pre-existing debt, accepted because each growth was a few wiring lines):
+
+| File | Before #124 | Now |
+|---|---|---|
+| `src/renderer/src/components/ProjectTree/ProjectTree.tsx` | 1,468 | 1,471 |
+| `src/preload/index.ts` | 1,179 | 1,190 |
+| `src/renderer/src/components/ProjectTree/context-menu/commands.test.tsx` | 845 | 879 |
+| `design/system/components/permission-band/index.html` | 759 | 1,109 (a design card is one self-contained page; accepted) |
+| `design/product/html-waiting/index.html` | 791 | 799 |
+| `src/main/index.ts` | 670 | 677 |
+| `src/renderer/src/components/Panels/MarkdownEditorPanel.tsx` | 615 | 623 |
+| `src/renderer/src/hooks/useAutoSave.test.ts` | 524 | 539 |
+| `src/shared/errors.ts` | 525 | 552 |
+
+`src/shared/constants.ts` (651) was not grown: #124's constants went to `src/shared/preview-limits.ts` instead (see entry #58).
+
+**At the cap – the next edit that grows one splits it first:**
+
+| File | Lines | Planned split |
+|---|---|---|
+| `src/main/services/preview/previewResizeHold.test.ts` | 500 | `<name>.<topic>.test.ts` |
+| `src/renderer/src/services/preview/previewTabMove.test.ts` | 500 | `<name>.<topic>.test.ts` |
+| `src/main/services/preview/PreviewViewService.pageScope.test.ts` | 499 | `<name>.<topic>.test.ts` |
+| `src/renderer/src/components/Panels/HtmlPreviewPanel/hooks/usePreviewBounds.ts` | 496 | the drop-log block moves to a hook module of its own |
+| `src/preload/previewBridge.test.ts` | 496 | `<name>.<topic>.test.ts` |
+| `src/main/services/preview/previewPageScope.test.ts` | 495 | `<name>.<topic>.test.ts` |
+| `src/main/services/preview/PreviewSessionFactory.ts` | 494 | – |
+| `src/main/services/preview/PreviewViewService.ts` | 493 | – |
+| `src/renderer/src/stores/usePreviewStore.ts` | 492 | `usePreviewStillStore.ts` |
+
+**Split done:** `src/renderer/src/services/preview/previewTabMove.ts` (491 at Phase 10) gave its message helpers to `previewTabMoveMessages.ts` (87 lines) at QG-11a and is now 450 lines.
+
+**Over #124's own design targets** (the design's §3 table, tighter than 500):
+
+| File | Target | Now |
+|---|---|---|
+| `components/PreviewChromeBand.css` | ≤ 440, "frozen" | 485 – the QG-8 focus-ring fixes added the last 53 |
+| `components/PreviewChromeBand.tsx` | 420 | 453 |
+| `HtmlPreviewPanel.tsx` | 340 | 433 |
+
+(all under `src/renderer/src/components/Panels/HtmlPreviewPanel/`)
+
+**Recommended Solution**: split on the next behaviour change, as planned above; do not grow the band stylesheet further without moving a block (the nav controls already live in `PreviewNavControls.css`).
+
+**Status**: Accepted for #124 (QG-6 A4, refreshed at Phase 10).
+
+---
+
+### 48. Test files are not type-checked (#124, 2026-09)
+
+**Severity**: Medium
+
+**Impact**: `npx tsc -p tsconfig.test.json` stops at TypeScript 6 deprecation errors (TS5107 / TS5101) before it checks anything, so **no test file is type-checked, locally or in CI**. A fake that drifts from the interface it stands in for compiles silently – #124's QG-8 found exactly that: the hand-written preview bridge mock had lost two members.
+
+**Problem**: With `--ignoreDeprecations 6.0` the check runs and reports pre-existing errors: 391 at the base commit of #124 (`02387c57`) and 367 at #124's last gate, where each group gate compared the files the branch touched against their base counts by hand. Nothing automated holds the line.
+
+**Recommended Solution**: fix the deprecated options in `tsconfig.test.json`, burn the error list down per folder, then add the check to the required `Typecheck` job.
+
+**Status**: Open — recorded by the #124 group gates.
+
+---
+
+### 49. One error-logging rule, a dozen implementations (#124, 2026-09)
+
+**Severity**: Low
+
+**Impact**: The rule "log an error's name and code, never its message" (a Node error quotes the path or URL it failed on) is correct at every site #124 touched, but each module writes its own helper: local `nameOf` / `codeOf` / `messageOf` / `errorFieldsOf`-style functions in `externalLinkConsent.ts`, `previewLivePipeline.ts`, `previewFrameEvents.ts`, `previewLiveTeardown.ts`, `PreviewLiveView.ts`, `previewLivePage.ts`, `previewViewEviction.ts`, `PreviewStillFrameCache.ts`, `PreviewSessionFactory.ts` and `previewEntryWatch.ts` (main), plus `previewTabMove.ts` (renderer). A new site copies whichever neighbour it lands next to.
+
+**Problem**: `redactedLogError` (`src/main/utils/redactUserInput.ts`) is not the shared answer as it stands: it rewrites only `INVALID_FILENAME` app errors and syscall-shaped errors with a quoted absolute path, and leaves a plain `Error` message untouched.
+
+**Recommended Solution**: export one `errorLogFields(error)` beside `redactedLogError` and import it at the main-process sites the next time each file is opened for another reason – a standalone sweep re-touches a dozen freshly re-pinned files for no behaviour change.
+
+**Status**: Accepted at #124 QG-8 (AA1).
+
+---
+
+### 50. The HTML-preview navigation contract states its bounds in more than one place (#124, 2026-09)
+
+**Severity**: Low
+
+**Impact**: The 4096-character path bound is a bare literal in `preview-schema.ts` (three schemas) and `preview-navigation-schema.ts`. The **anchor** bound is three different things: `PreviewNavigationPolicy.ts` takes the URL's fragment unbounded, `PreviewOpenFileRequestedSchema` caps it at 512, and the navigation contract at `PREVIEW_LIMITS.NAV_MAX_ANCHOR_CHARS` (1024). A click on a link whose fragment is 513 to 1024 characters is dropped when `emit.ts` validates the event – warn-logged, and nothing happens on screen.
+
+**Recommended Solution**: add `PREVIEW_LIMITS.NAV_MAX_PATH_CHARS` and use it at all four literals; point the link schema's anchor at `NAV_MAX_ANCHOR_CHARS` and cut an over-long fragment where the link intent is built, as the navigator already does for `pushState`.
+
+**Status**: Accepted at #124 QG-8 (AA4, T8) – no realistic producer of such a fragment.
+
+---
+
+### 51. Two #124 main modules have no direct unit test (#124, 2026-09)
+
+**Severity**: Low
+
+**Impact**: `src/main/services/preview/previewLiveVisibility.ts` (334 lines) and `previewLiveWiring.ts` (371) are reached only through the `PreviewLiveView` / `PreviewViewService` tests and e2e. `previewLiveVisibility.ts` owns the synchronous-hide invariant that keeps an untrusted page from covering Erfana's own permission prompt.
+
+**Recommended Solution**: a direct test file for each, behind a per-file coverage floor.
+
+**Status**: Accepted at #124 QG-8 (C2).
+
+---
+
+### 52. In-page `preview:pageChanged` events are not coalesced (#124, 2026-09)
+
+**Severity**: Low
+
+**Impact**: `emit.ts` sends one `preview:pageChanged` per same-document step (a hash change, `pushState`), with no ceiling of its own. Its comment relies on Chromium throttling same-document navigations; **that has not been verified for `location.hash`**. A page looping hash changes can drive one IPC message and one store update per step. The history half is closed – a step with no recent gesture replaces the entry rather than adding one.
+
+**Recommended Solution**: verify the throttle, then coalesce same-document events only – carefully, because the renderer matches each `pageChanged` to the move it announced, so a collapsed event loses an announcement.
+
+**Status**: Accepted at #124 QG-8 (C6, T2).
+
+---
+
+### 53. A replaced history entry bumps the generation, so Back can silently do nothing (#124, 2026-09)
+
+**Severity**: Low
+
+**Impact**: `replaceCurrent` in `src/main/services/preview/previewTabHistory.ts` bumps `generation` on a replace as well as a push. The generation is the check/commit token of `preview:navigate`, so a scroll-spy page that changes `location.hash` between a Back check and its commit makes the commit answer `PREVIEW_NAV_SKIPPED`, and the press appears to do nothing; a second press works. The window is one IPC round trip.
+
+**Recommended Solution**: decide whether a replace should carry the generation forward – which re-cuts the renderer's history-sync contract.
+
+**Status**: Accepted at #124 QG-8 (T3).
+
+---
+
+### 54. The two `.html` path gates disagree about NTFS alternate data streams (#124, 2026-09)
+
+**Severity**: Low
+
+**Impact**: `BrowserLaunchService` refuses a Windows alternate-data-stream spelling such as `C:\p\tool.exe:x.html` (`namesAlternateDataStream`), but the preview's own page gate, `isPreviewPagePath` in `previewLinkDisposition.ts`, still accepts it. Content stays confined, and the file has to be named with stream syntax for it to matter.
+
+**Recommended Solution**: share one `isHtmlName` between the two. Deferred because it edits the preview's path gate, the most security-sensitive code on the branch. **Windows UAT update 2026-09-15**: the `BrowserLaunchService` half was exercised on a Windows host (#130) — the `namesAlternateDataStream` table cases and the `NOT_HTML` refusal run and pass there, and a real alternate data stream was created on disk to confirm the shape. The gate *disagreement* itself was not re-examined, so this entry stays open.
+
+**Status**: Accepted at #124 QG-8 (T6).
+
+---
+
+### 55. `role="toolbar"` without roving tabindex, app-wide (#124, 2026-09)
+
+**Severity**: Low
+
+**Impact**: The preview toolbar (`PreviewChromeBand.tsx`) puts its controls in a `role="toolbar"` with one tab stop each and no arrow-key navigation – as do `ActivityBar.tsx`, `MarkdownToolbar.tsx`, `MermaidToolbar.tsx`, `ImageViewerToolbar.tsx` and `ChatBubble.tsx`. The ARIA toolbar pattern expects one tab stop plus arrow keys.
+
+**Recommended Solution**: one shared roving-tabindex hook applied to all of them, or downgrade the role to `group` everywhere. Changing only the preview toolbar would make the app inconsistent.
+
+**Status**: Accepted at #124 QG-8 (U3) – a repo-wide task.
+
+---
+
+### 56. HTML preview: Forward has no button (#124, 2026-09)
+
+**Severity**: Low
+
+**Impact**: By design the toolbar renders Back and the link-mode toggle only. Forward exists as a key (Cmd+] / Alt+Right Arrow, named in Back's tooltip) and as the failed banner's return button, so a mouse-only reader who went Back cannot go forward again.
+
+**Recommended Solution**: a product decision – add a Forward control, or keep the keys documented ([keyboard-shortcuts.md § HTML preview](./keyboard-shortcuts.md#html-preview)). Raised for UAT.
+
+**Status**: Accepted at #124 QG-8 (U5).
+
+---
+
+### 57. HTML preview: the failed banner moves focus as its alert mounts, and badge copy reads like the design (#124, 2026-09)
+
+**Severity**: Low
+
+**Impact**:
+- `PreviewBanner.tsx` focuses its action button in the same commit its `role="alert"` region mounts, so a screen reader may drop the message. Focus lands inside the region, so the text stays reachable. (U7)
+- Failure-badge entries such as "srcdoc frame – shown anyway; the depth limit covers src frames only" read as design-document language, and a group heading counts entries, not frames ("Too many frames (1)" above "12 frames over the limit of 50 were left empty"). (U11)
+
+**Recommended Solution**: delay the banner focus by one animation frame, as `usePreviewMoveAnnouncer` does – but only after a real screen-reader check, since no automated test proves the delay changes what is announced. Agree the badge wording at UAT, then change it in `src/shared/previewFrameBadgeText.ts`.
+
+**Status**: Accepted at #124 QG-8 (U7, U11); both on the UAT list.
+
+---
+
+### 58. Smaller accepted trade-offs from #124 (2026-09)
+
+**Severity**: Low
+
+- **`preview:open` checks no page type or eligibility for a tab's first page** (RX2-6). The renderer checks eligibility before it makes the tab, and the page is re-confined on the real root, so contents stay project-confined; a first open of a page that became ineligible in between is not refused main-side. The resume half of this entry (RX3-1) is closed: a resume whose saved page fails the gate now checks `.html` and eligibility and fails closed (QG-7 item 11, `previewViewNavigation.ts`). Fix: one eligibility check in `preview:open`.
+- **Cross-token subresource reach** (RX4, pre-existing). The CSP's `script-src`, `style-src`, `img-src` and friends name the `erfana-preview:` scheme, not the page's own token, so a page that knows another live view's token can load a subresource under it; the protocol handler still confines every request to that token's root, and tokens are unguessable 32-hex values. #124 narrowed only `frame-src` to the own token.
+- **`srcdoc` frames past the caps still run** (user answer 9). `will-frame-navigate` never fires for them, so one past `MAX_FRAME_DEPTH` or `MAX_FRAMES_PER_PAGE` is shown and listed rather than stopped. The caps are a robustness limit, not a security boundary ([security.md](./security.md) accepted risk 18).
+- **An approval that lands during a same-tab move cancels the move** (RS3-3 residual). Allow reloads the old page through `startPageLoad`, which replaces the move's pending load; the tab stays on the old page while the other tabs showing the target were already closed. The window is tens of milliseconds. Fix: while a navigation is pending, rebuild the CSP at once and run the approval reload after the pending load ends.
+- **Preview constants live in two files** (RA13). #124's limits are in `src/shared/preview-limits.ts` because `constants.ts` is past the cap; the older `PREVIEW` block stays in `constants.ts`.
+- **An editor opened through a symlink alias is not matched** (RS12). "One file, one tab" compares project-space paths (`pathsEqual`), so an editor tab opened by another spelling of the same file is not closed by a move.
+- **Multi-window keys** (RA11). Preview panel ids are unique per window only; anything that must span windows needs a (`windowId`, `panelId`) key. The app ships one window today.
+- **Linux has no default-browser detection.** "Open in default browser" always takes the fallback there (`shell.openPath`, the system's `.html` app).
+- **No renderer-side busy timeout for "Open in default browser".** The button stays busy until main answers, relying on main's 10 s launch limit.
+- **Export to PDF shows busy with `disabled`, not `aria-disabled`**, unlike the toolbar's other tools – Chromium drops focus from a control the moment it becomes `disabled`.
+- **The design claims ledger cannot composite translucent colours.** `--color-bg-selected` is translucent, so two pressed-fill contrast pairs on the permission-band card are checked by hand at the walk-through instead of generated.
+- **The preview toolbar row has no overflow cue** (QG-11a Q29). At the minimal toolbar tier, or with a three-digit chip, the row scrolls sideways with no visible scrollbar and nothing that says more is there (`PreviewNavControls.css`, the `.erf-band__bar` rule: `overflow-x: auto`, `scrollbar-width: none`). Keyboard focus scrolls a control into view, but a mouse user may not know the chip and Open in default browser are there. Fix: an edge fade or an overflow menu, decided at the permission-band card walk-through.
+- **Releasing an autosave hold does not re-arm the 30 s safety net** (QG-11a). While the unsaved-changes prompt of a preview move is open, the editor's autosave is held: `cancelAutoSave()` clears both `useAutoSave` timers, the 2 s debounce and the 30 s maximum. The release (`MarkdownEditorPanel.tsx`, through `useEditorSaveRegistration`) calls `signalChange()`, which re-arms only the 2 s debounce; the 30 s timer starts again only when the buffer next turns modified. The debounce still writes the edits, so nothing is lost – but until that next save, continuous typing that never pauses for 2 s has no 30 s cap. Fix: a `useAutoSave` re-arm that restarts both timers while the buffer is modified.
+- **A window-edge resize hold takes no fresh still picture on release** (QG-11a). `release()` in `previewLiveVisibility.ts` only shows the view again; nothing captures. The cached picture therefore keeps the pre-resize layout until the next pipeline run, or the idle refresh that follows real input to the page (`previewStillFrameFreshness.ts`), captures again. A load that finishes *during* the hold is worse off: the pipeline drops the picture because `isWanted()` ignores the hold, and its `captureWhileVisible()` then refuses because the view is not drawn, so the tab has no picture until the next capture. Relatedly, the comment above that check (`previewLivePipeline.ts`, "Drop the old picture only when a new one will follow") is inaccurate: a watched-file save already drops the picture unconditionally in `handleReloadDecision`, hidden tab or not. Fix: start a capture once `release()` shows the view, and either gate the pipeline's drop on `isDrawn()` or rewrite the comment to match what the code does.
+- **An autosave already in flight can still land while the unsaved-changes prompt is open** (QG-11a round 2). The hold only cancels the `useAutoSave` timers (`cancelAutoSave()`); it does not stop a save that has already started. If the 2 s debounce fired just before the move's check IPC, `handleSave` in `MarkdownEditorPanel.tsx` is still awaiting `pauseWatch()` and `writeFile` before it clears the dirty flag, so the edits can reach disk while the prompt says they will be lost – a tens-of-milliseconds window. Fix: let the hold wait for a save in flight (the panel's `markSaving` state), or re-check `isDirty` after the answer.
+- **Unverified: focus may stay on the hidden page while the unsaved-changes prompt is open** (QG-11a round 2). When an in-page keyboard link activation or a forwarded Back/Forward opens the prompt, nothing in main returns native focus to the host: the only main-side `.focus()` calls for the preview are `previewHostFocus.ts` (for f/w/Escape) and `PreviewLiveView.ts` `focusPage`. If Chromium does not move focus away when the view is hidden, Enter or Tab may still reach the hidden page instead of the dialog. Needs an e2e or UAT check (UAT P3-15).
+
+**Status**: Accepted — recorded from the #124 design reviews (§12), the Phase 5 journal and QG-11a.
+
+---
+
+### 59. HTML-preview production contracts have optional members only for test fakes (#124, 2026-09)
+
+**Severity**: Low
+
+**Impact**: `PreviewEmitters.resizeHold` and `pageChanged`, `IPreviewStillFrameCache.markStale`, and `checkEligibility` in the service and live-view deps are optional so older test fakes stay valid. The one composition root, `buildPreviewGraph.ts`, passes all four, but a new wiring would compile without them and silently drop page changes, resize-hold asks or stale marking; a missing eligibility check fails closed.
+
+`PreviewWebContentsHandle.focus?()` (`PreviewSessionFactory.ts`) is optional for the same reason (QG-11a Q8). The composition root passes a real `webContents`, which has `focus`; a wiring without it makes `PreviewLiveView.focusPage` answer `false` silently, which turns the keyboard route into the page off.
+
+**Recommended Solution**: make them required behind shared fakes in `src/main/services/preview/__test-helpers__/` when those test files next split.
+
+**Status**: Accepted at #124 QG-6 (A1).
+
+---
+
+### 60. Dependency direction is convention only (#124, 2026-09)
+
+**Severity**: Low
+
+**Impact**: Nothing lint-blocks `src/shared/**` from importing `src/main`, `src/renderer` or `electron`, or `src/main/ipc/**` from reaching preview internals past the `PreviewViewService` facade. No violation exists today.
+
+**Recommended Solution**: `@typescript-eslint/no-restricted-imports` blocks. The `src/main/ipc/**` block must repeat the existing `ipcMain` rule, because flat config replaces a rule per file – which means restructuring the config against the warning in `eslint.config.mjs`.
+
+**Status**: Accepted at #124 QG-6 (A9) – a repo-wide lint policy.
+
+---
+
+### 61. Tooling and test follow-ups from #124 (2026-09)
+
+**Severity**: Low (the preload coverage gap: Medium)
+
+- **`src/preload/index.ts` is barely covered.** Measured at #124 QG-8: 54 % lines, 12.5 % functions. The preload project as a whole is at 64.45 % lines / 30.40 % functions, below the 80 % line target, entirely because of this file; #124's own `previewBridge.ts` is at 100 %. The preload floors were raised only to what is met today.
+- **Prettier config and code disagree on arrow parentheses.** `.prettierrc.json` says `"arrowParens": "avoid"`, while most single-parameter arrows in `src/` are written with parentheses. Nothing runs `prettier --check` in CI, so the mismatch is invisible until someone runs `npm run format`, which would rewrite a large share of the tree. Decide which way, then either change the setting or reformat in one commit.
+- **The vitest advisory** (GHSA-82fw-gwwq-j7x9, three moderate dev-only findings in `vitest`, `@vitest/mocker` and `@vitest/coverage-v8`) needs a major upgrade and is tracked in [#126](https://github.com/qodeca/erfana/issues/126). Not shipped in the app.
+- **electron-builder 26.16.1**, a non-major release after the pinned 26.15.3, was flagged by the #124 audit and not yet evaluated: recheck whether it clears any of the accepted baseline findings before the next dependency pass.
+- **`MonacoPage.focus()` clicks once, too early after mount** (`e2e/pages/monaco.page.ts`), so focus can land on the panel instead of the editor – the root cause of the pre-existing `markdown-toolbar.e2e.ts` flake. #124 fixed that spec locally (a `focusEditor()` retry); the shared page object still lacks the retry.
+- **Four small review carry-overs:** `createMockMenuContext` (`ProjectTree/__test__/testUtils.ts`) has no `openInBrowser`, so tests pass an override; the `suggestedName` parameter of `exportPdf` in `PreviewViewService.ts` / `previewViewTypes.ts` is now a fallback and should be renamed `fallbackName`; the same-tab Find e2e checks the match total, not the "1 of 1" text; `e2e/pages/html-preview.navigation.ts` keeps its own `dismissAllToasts` copy instead of importing the shared one from `html-preview.browser.ts`.
+- **Main coverage instruments one shared file** (QG-11a Q10). The `vitest.main.ts` coverage `include` names `src/shared/ipc/browser-schema.ts` and no other `src/shared` module, so #124's shared modules (`src/shared/ipc/preview-navigation-schema.ts`, `dropReporter.ts`, `stablePathDigest.ts`, `previewNavKeys.ts`) cannot carry per-file floors. Fix: include `src/shared/**/*.ts` and add floors for those modules.
+
+**Status**: Open — recorded at #124 Phases 8–10 and QG-11a.
+
+---
+
+### 62. HTML preview: untrusted page HTML is parsed on the main process (#124, 2026-09)
+
+**Severity**: Medium
+
+**Impact**: To find what a previewed page loads (for auto-refresh) and the frames it contains, the post-load pipeline parses the page's HTML with parse5 synchronously in the main process, on every load and save – the entry page, bounded at `PREVIEW.MAX_ENTRY_HTML_BYTES` (4 MiB), and since #124 also the documents of its frames. Parsing cost can grow much faster than file size for some markup, so a hostile or generated project file can block the whole app for a long time. Availability only: no confinement or egress impact.
+
+**Problem**: The entry-page parse predates #124 (#74). A cap on the new frame walk alone would not remove the worst case, because the entry parse already allows it, and a cap tight enough to matter on the entry would stop auto-refresh on large legitimate pages.
+
+**Recommended Solution**: parse off the main thread with a hard timeout, as `HtmlToDocxConverter` already does with its killable utilityProcess, and treat a timeout as "no links".
+
+**Status**: Open — accepted at #124 QG-11a (Q11); the follow-up is tracked in a private security advisory.
+
+---
+
+### 63. HTML-preview main process: three structure follow-ups (#124, 2026-09)
+
+**Severity**: Low
+
+- **The gated IPC handler shape is hand-copied** (Q6). Sender gate (`isTrustedSender`) → `safeParse` → service call → `redactedLogError` is written out in `focus-handlers.ts`, `navigation-handlers.ts`, `find-handlers.ts` and `lifecycle-handlers.ts` (all in `src/main/ipc/preview/`), and the `BrowserWindow.fromWebContents` default for the sender's window is repeated in three of them. A new channel can reorder the gate or drop the redaction. Fix: one `registerGatedPreviewHandle(channel, schema, run)` plus a `senderWindow` helper, when the next preview channel is added.
+- **"A view belongs to one window" is checked in four places** (Q7): `previewViewFocus.ts`, `previewViewNavigation.ts` and twice in `PreviewViewService.ts`, so the (`windowId`, `panelId`) key of entry #58 (RA11) would touch all four. Fix: one `PreviewViewRegistry.entryIn(panelId, windowId)`.
+- **`previewStillFrameFreshness.ts` also owns the history gesture clock** (Q9). Its header says so; its name does not. Fix: rename it to `previewInputWatch.ts`, with its tests and its per-file floor key in `vitest.main.ts`, when it is next edited.
+
+**Status**: Accepted at #124 QG-11a (Q6, Q7, Q9) – refactors with no behaviour change.
+
+---
+
+### 64. `BrowserLaunchService` answers LAUNCH_FAILED on Windows for a forced-darwin launcher (#130, 2026-09)
+
+**Severity**: Medium
+
+**Impact**: One case in `BrowserLaunchService.integration.test.ts` ("runs /usr/bin/open on macOS with the real path as one argument") builds a darwin launcher by hand — `createBrowserLauncher({ platform: 'darwin', … })` with a mocked `execFile` that resolves — and calls `service.openFile(…)` on a project opened through a symlinked folder. On macOS and Linux it returns `{success: true}`. On a Windows host it returns `OPEN_IN_BROWSER_LAUNCH_FAILED`, so the mocked launcher is never reached.
+
+**Problem**: **The cause is not understood.** The launcher's platform is passed as a pure argument, so the divergence is upstream of it, somewhere in `BrowserLaunchService.openFile`'s own path handling. A sibling case at the same fixture opens the identical non-ASCII filename through the gated IPC handler and passes on Windows, so the filename is not the trigger. This is an unexplained platform divergence in the service that hands a URL to the operating system, which is worth more than a test skip.
+
+**Recommended Solution**: instrument `openFile` on a Windows host and find where the darwin-launcher path diverges — most likely the symlinked-project resolution or the launcher-selection branch. Then either fix the service or replace the skip with an assertion that documents the real Windows behaviour.
+
+**Files**: `src/main/services/browserLaunch/BrowserLaunchService.ts`, `src/main/services/browserLaunch/browserLauncher.ts`, `src/main/services/browserLaunch/BrowserLaunchService.integration.test.ts` (the `it.skipIf` and its comment).
+
+**Status**: Open — found on 2026-09-15 while narrowing three over-broad `describe.skipIf(win32)` blocks in #130. The skip is now scoped to this one case, with the reason recorded at the skip; the other 18 cases in that file run on Windows.
+
+---
+
 ## Code Quality Improvements
 
 ### Documentation Token Efficiency
@@ -733,7 +1013,7 @@ Ongoing effort to keep `docs/` concise and high-value for Claude Code.
 - Consolidate troubleshooting files (troubleshooting.md + troubleshooting-advanced.md)
 - Reduce code example verbosity across remaining files
 
-**Note**: docs/future/ (8,604 lines) preserved for future graph-engine implementation.
+**Note**: docs/future/ (10,957 lines, re-measured 2026-09-05) preserved for future graph-engine implementation.
 
 ---
 
@@ -757,13 +1037,13 @@ Ongoing effort to keep `docs/` concise and high-value for Claude Code.
 
 ## Future Enhancements
 
-### Graph Engine (Planned)
+### Graph Engine (in progress on the `graph` branch)
 
-**Status**: Research complete, implementation pending
+**Status**: The R1 contract freeze has landed on the `graph` branch – the analysis and architecture issues #19, #20 and #21 are closed, and the implementation chain #22–#32 (DB layer, preprocessing, indexing, search API, UI surfaces, MCP server, testing) is open. Graph work branches off `graph`, not `develop`; see [ROADMAP.md § Graph engine chain](../ROADMAP.md#graph-engine-chain-on-the-graph-branch) for the authoritative status.
 
 **Overview**: SQLite-based knowledge graph with hybrid search for markdown documents.
 
-**Documentation**: See [docs/future/graph-engine.md](./future/graph-engine.md) for complete design.
+**Documentation**: See [docs/future/graph-engine.md](./future/graph-engine.md) for the original design; the frozen contracts and refreshed spec requirements live on the `graph` branch.
 
 **Key Features**:
 - Full-text search with FTS5
@@ -794,4 +1074,4 @@ Amendment discipline + promotion-rule conventions in [`windows/contributing.md`]
 
 ---
 
-**Last Updated**: #74 HTML preview (2026-08-24 – entries #36–#46 added from the Phase 6/7/8 accepted-tech-debt ledger and the design §7.1 pre-existing items: main-side project-switch teardown unwired, CSP skip-and-badge unreachable on the registry path, main-process memory amplification, `about:` allowed for all request types, `runPipeline` overlapping-run race, `onCrash` reusing `script-error`, the failure badge occluded by the native view, the deferred in-app allowlist view/revoke UI, `isTrustedSender` triplication, the residual `realpath`→open race, and hardlinks defeating confinement) + #73 image export (2026-08-24 – entries #31–#33 added from the design's deferred ledger: the un-re-pointed `ExportLock` copies in `PdfService`/`DocxService`, the missing `isTrustedSender` gate on the `pdf:`/`docx:` export handlers, and the dev-mode origin-only sender check that the rasterize harness satisfies; entry #29 marked resolved, since both `IMAGE_EXTENSIONS` copies now re-point to `src/shared/ipc/image-formats.ts`; D3 in `windows/deferred-work.md` amended to record that `src/main/utils/ExportLock.ts` now exists) + doc-sweep follow-up (2026-08-23 – the editor-stub inlining moved from *Remaining* to *Completed* under Documentation Token Efficiency, verified on disk: the three stubs are gone, their content is in `docs/editor/README.md`, and both inbound refs are repointed; entry #7's `checks.yml`, release-skill and `README.md` citations converted from line numbers to section/step names after the checks.yml numbers were found stale) + doc-accuracy sweep (2026-08-23 – entry #5 repointed from the deleted `e2e/fixtures.ts` to `e2e/fixtures/index.ts` and its dead line ranges replaced with fixture names; entries #7, #13 and #26 re-measured: `security.md` 626 → 661, `scripts/fuses.js` ~1,040 → ~1,715, `scripts/fuses.test.mjs` ~835 → ~1,758, `file-handlers.ts` 601 → 626) + #70 stale preview tabs (2026-08-23 – entries #24–#30 added from the design's accepted-debt ledger and the review rounds: text-only `watchFile` confinement, the `file:getStats` carve-out and its clean fix, the post-#70 over-cap file measurements, genuine deletes not re-arming, the `useFileWatcher` indicator timer, duplicated `IMAGE_EXTENSIONS`, and five smaller accepted trade-offs) + #60 large-project crash + error containment (2026-08-11 – entries #18–#23 added from the change-set reviews: dead `useDragDropTree` API surface, inert `vitest.renderer.ts` coverage block, `test:cov` workspace fan-out, no tsconfig over `e2e/`, shared renderer HTML entry, `ThrottledWorker.workMany` spread-push) + #55 extra-content packaging guards (2026-08-09 – entry #14 added: `assertResourcesSiblingsAllowlist` advisory-on-Windows watch item) + #43 packaging allowlist QG-11a remediation (2026-08-09 – entry #13 added: `scripts/fuses.js` size after the allowlist block; `resolvePackedResourcesDir` call-site count corrected to four) + v0.17.0 doc sweep (2026-08-08 – entry #4 resolved: `LanguageSelect` `id` prop; entries #7, #8, #10 re-measured against the v0.17.0 tree) + #42 camera mirror + dialog focus work (2026-08-07 – entry #3 resolved: BaseDialog `trapFocus`) + PR #245 (2026-06-13 – entry #12 live-verification updated: single-panel detection + mid-session model-switch verified on a Windows host) + #217 Windows Claude status bar (2026-06-10 — entry #12 added: Windows v1 detector limitations) + v0.14.0 doc sweep (2026-06-08 — entries #9 + #10 added from `Transcription/CLAUDE.md` eviction) + v0.9.6 release (2026-05-22 — critical macOS terminal fix `ea3eaf1`) + v0.9.5 release (2026-04-25) + Phase I branch protection refinement (PR requirement removed same day) + entry #7 documenting `security.md` cap constraint (2026-04-25)
+**Last Updated**: v0.20.0 release (2026-09-16 – #124 shipped, so entries #47–#61 below are released debt, not in-flight debt; no entry contents changed) + #124 multi-page HTML preview (2026-09-15 – entry #19 resolved: the coverage blocks in `vitest.renderer.ts` and `vitest.preload.ts` moved inside `test`; entry #26's two preview rows re-measured after the #124 splits; entry #39's reasoning reopened because `frame-src` is no longer `'none'`; entries #47–#61 added from the QG-6 and QG-8 judgments, the QG-9 carry-forward and the design's Phase 10 list) + doc-accuracy sweep (2026-09-05 – entry #2 updated: schema `id` and parser fallback shipped, template path corrected to `src/renderer/src/prompts/templates/`; entry #36 resolved: `FileService.onProjectPathChanged` wired into `registerPreviewHandlers` in v0.19.0; entries #6, #8, #10 and the `docs/future/` line count re-measured; entry #5's `997ba65` marked pre-migration; Graph Engine status repointed at ROADMAP § Graph engine chain) + #74 HTML preview (2026-08-24 – entries #36–#46 added from the Phase 6/7/8 accepted-tech-debt ledger and the design §7.1 pre-existing items: main-side project-switch teardown unwired, CSP skip-and-badge unreachable on the registry path, main-process memory amplification, `about:` allowed for all request types, `runPipeline` overlapping-run race, `onCrash` reusing `script-error`, the failure badge occluded by the native view, the deferred in-app allowlist view/revoke UI, `isTrustedSender` triplication, the residual `realpath`→open race, and hardlinks defeating confinement) + #73 image export (2026-08-24 – entries #31–#33 added from the design's deferred ledger: the un-re-pointed `ExportLock` copies in `PdfService`/`DocxService`, the missing `isTrustedSender` gate on the `pdf:`/`docx:` export handlers, and the dev-mode origin-only sender check that the rasterize harness satisfies; entry #29 marked resolved, since both `IMAGE_EXTENSIONS` copies now re-point to `src/shared/ipc/image-formats.ts`; D3 in `windows/deferred-work.md` amended to record that `src/main/utils/ExportLock.ts` now exists) + doc-sweep follow-up (2026-08-23 – the editor-stub inlining moved from *Remaining* to *Completed* under Documentation Token Efficiency, verified on disk: the three stubs are gone, their content is in `docs/editor/README.md`, and both inbound refs are repointed; entry #7's `checks.yml`, release-skill and `README.md` citations converted from line numbers to section/step names after the checks.yml numbers were found stale) + doc-accuracy sweep (2026-08-23 – entry #5 repointed from the deleted `e2e/fixtures.ts` to `e2e/fixtures/index.ts` and its dead line ranges replaced with fixture names; entries #7, #13 and #26 re-measured: `security.md` 626 → 661, `scripts/fuses.js` ~1,040 → ~1,715, `scripts/fuses.test.mjs` ~835 → ~1,758, `file-handlers.ts` 601 → 626) + #70 stale preview tabs (2026-08-23 – entries #24–#30 added from the design's accepted-debt ledger and the review rounds: text-only `watchFile` confinement, the `file:getStats` carve-out and its clean fix, the post-#70 over-cap file measurements, genuine deletes not re-arming, the `useFileWatcher` indicator timer, duplicated `IMAGE_EXTENSIONS`, and five smaller accepted trade-offs) + #60 large-project crash + error containment (2026-08-11 – entries #18–#23 added from the change-set reviews: dead `useDragDropTree` API surface, inert `vitest.renderer.ts` coverage block, `test:cov` workspace fan-out, no tsconfig over `e2e/`, shared renderer HTML entry, `ThrottledWorker.workMany` spread-push) + #55 extra-content packaging guards (2026-08-09 – entry #14 added: `assertResourcesSiblingsAllowlist` advisory-on-Windows watch item) + #43 packaging allowlist QG-11a remediation (2026-08-09 – entry #13 added: `scripts/fuses.js` size after the allowlist block; `resolvePackedResourcesDir` call-site count corrected to four) + v0.17.0 doc sweep (2026-08-08 – entry #4 resolved: `LanguageSelect` `id` prop; entries #7, #8, #10 re-measured against the v0.17.0 tree) + #42 camera mirror + dialog focus work (2026-08-07 – entry #3 resolved: BaseDialog `trapFocus`) + PR #245 (2026-06-13 – entry #12 live-verification updated: single-panel detection + mid-session model-switch verified on a Windows host) + #217 Windows Claude status bar (2026-06-10 — entry #12 added: Windows v1 detector limitations) + v0.14.0 doc sweep (2026-06-08 — entries #9 + #10 added from `Transcription/CLAUDE.md` eviction) + v0.9.6 release (2026-05-22 — critical macOS terminal fix `ea3eaf1`) + v0.9.5 release (2026-04-25) + Phase I branch protection refinement (PR requirement removed same day) + entry #7 documenting `security.md` cap constraint (2026-04-25)

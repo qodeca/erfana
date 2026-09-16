@@ -1,11 +1,13 @@
 # Design — Issue #216: Per-terminal Claude Code context status bar
 
-> Status: APPROVED — implemented (macOS v1; **Windows added via [#217](https://github.com/qodeca/erfana/issues/217)** — see §10 "Follow-up issue — Windows support"). Architecture design for the managing-issues implement workflow.
-> Issue: https://github.com/qodeca/erfana/issues/216 · Branch: `feat/216-terminal-claude-status-bar`
+> Status: shipped (macOS v1; **Windows added via #217** — see §10 "Follow-up issue — Windows support"). Architecture design for the managing-issues implement workflow.
+> Issue: #216 · Branch: `feat/216-terminal-claude-status-bar`
+> **Provenance note**: #216 and #217 are pre-migration issue numbers – the public `qodeca/erfana` tracker renumbered from #1 at the 2026-06 open-source migration, so these resolve to unrelated public issues; treat them as provenance only. The `#216`/`#217` links elsewhere in this file and the commit `da5637c` cited in §10.1 likewise predate the migration and do not resolve in the public repository.
+> **Known drift from the shipped code (2026-09-05)**: the rail is `height: var(--header-height)` (41px, matching the project sidebar footer), not the ~26px designed below, and no `--terminal-statusbar-height` token was added; `terminal.create` returns `shellKind`, not `pid` (§10 already records that the pid never crosses IPC); the channel set gained `claude-status:nudge`; and `ClaudeStatusBar.css` still uses the RETIRED `--color-warning-bright` / `--color-error-bright` tokens despite the §5 token note – open code drift, not corrected here.
 
 ## 1. Summary
 
-A thin (~26px) status bar pinned to the bottom of an individual terminal panel, visible **only** while Claude Code (`claude` CLI) is actively running in **that** panel; hidden otherwise. It shows the friendly model name, a 200k-vs-1M context-window badge, the context-used percentage, and a green/amber/red progress bar; hovering reveals exact token counts (e.g. `84k / 200k`). Always on, display-only. Data is read **non-invasively** from Claude Code's own transcript JSONL; Erfana never modifies the user's Claude Code config/settings. On any detection/parse failure the bar hides gracefully — no error, no stale data.
+A thin status bar (designed at ~26px; shipped at `var(--header-height)` = 41px) pinned to the bottom of an individual terminal panel, visible **only** while Claude Code (`claude` CLI) is actively running in **that** panel; hidden otherwise. It shows the friendly model name, a 200k-vs-1M context-window badge, the context-used percentage, and a green/amber/red progress bar; hovering reveals exact token counts (e.g. `84k / 200k`). Always on, display-only. Data is read **non-invasively** from Claude Code's own transcript JSONL; Erfana never modifies the user's Claude Code config/settings. On any detection/parse failure the bar hides gracefully — no error, no stale data.
 
 > **Scope (v1) — macOS only.** Per the QG-4 decision, v1 ships a fully-verified macOS implementation. The per-OS process-detector strategy is preserved, but only `MacClaudeProcessDetector` is implemented; on every non-macOS platform `createProcessDetector` returns a no-op detector (`{running:false}`), so the bar simply never appears (graceful). **Windows is deferred to a follow-up issue** — its cwd→ENC encoding and ConPTY process-chain must be verified against a live Windows host before implementation. The issue's Windows acceptance criterion is moved to that follow-up.
 
@@ -29,7 +31,7 @@ All filesystem, process-inspection and parsing work lives in the **main process*
 ```
 RENDERER (per TerminalPanel)
   TerminalPanel.tsx
-    ├─ window.api.terminal.create(...) now returns { terminalId, pid }
+    ├─ window.api.terminal.create(...) returns { terminalId, shellKind }  (design said pid; shipped: pid never leaves main – §10)
     ├─ <ClaudeStatusBar terminalId={terminalId}/>  (sibling AFTER <TerminalStatusContent>)
     └─ useClaudeStatusStore: Map<terminalId, ClaudeStatusSnapshot|null>
           ▲ push (api.claudeStatus.onChanged)     │ subscribe(terminalId)
@@ -55,7 +57,7 @@ MAIN
 ## 4. File plan (every file ≤500 LOC)
 
 ### Shared IPC
-- `src/shared/ipc/claude-status-channels.ts` (create, ~35) — channel constants (`claude-status:register/unregister/changed`).
+- `src/shared/ipc/claude-status-channels.ts` (create, ~35) — channel constants (`claude-status:register/unregister/changed`; shipped also carries `claude-status:nudge`, the debounced output-driven re-check sent from `TerminalPanel`).
 - `src/shared/ipc/claude-status-schema.ts` (create, ~90) — Zod `ClaudeStatusSnapshot {terminalId, modelId, friendlyName, windowSize:200000|1000000, usedTokens, percent, level:'green'|'amber'|'red', tooltip}`, `ClaudeStatusChangePayload {terminalId, snapshot|null}`.
 
 ### Main — pure utils
@@ -79,17 +81,17 @@ MAIN
 ### Main — IPC handler + wiring
 - `src/main/ipc/claude-status-handlers.ts` (create, ~130) — `register`/`unregister` invoke handlers; validate sender frame + numeric pid; no-throw.
 - `src/main/index.ts` (modify, +6) — register handlers; `cleanupForWebContentsId` on window close; `dispose()` on shutdown.
-- `src/main/services/TerminalService.ts` (modify, +25) — store `ptyProcess.pid`; `getPid(id)`; return `pid` in create; on PTY exit notify status service.
-- `src/main/ipc/terminal-handlers.ts` (modify, +20) — include `pid` in create response; register/unregister panel.
+- `src/main/services/TerminalService.ts` (modify, +25) — store `ptyProcess.pid`; `getPid(id)`; on PTY exit notify status service. *Shipped*: create returns `{ terminalId, shellKind }`, never `pid` (§10).
+- `src/main/ipc/terminal-handlers.ts` (modify, +20) — register/unregister panel. *Shipped*: no `pid` in the create response.
 
 ### Preload
-- `src/preload/index.ts` (modify, +30) — `api.claudeStatus = { register, unregister, onChanged(cb)→unsubscribe }`; `pid` on create result.
-- preload types (modify, +20) — `ClaudeStatusBridge` + `pid`.
+- `src/preload/index.ts` (modify, +30) — `api.claudeStatus = { register, unregister, onChanged(cb)→unsubscribe }`. *Shipped*: `shellKind`, not `pid`, on the create result.
+- preload types (modify, +20) — `ClaudeStatusBridge`.
 
 ### Renderer
 - `src/renderer/src/stores/useClaudeStatusStore.ts` (create, ~90) — Zustand `byTerminalId` map; single global `onChanged` subscription. Solves the multi-panel gap (existing `useTerminalStore` tracks only one `activeTerminalId`).
 - `TerminalPanel/components/ClaudeStatusBar.tsx` (create, ~160) — display-only; renders nothing when snapshot null; name + badge + percent + bar + `title` tooltip. Per UX spec.
-- `TerminalPanel/components/ClaudeStatusBar.css` (create, ~90) — ~26px strip, design tokens only, `border-radius:0`.
+- `TerminalPanel/components/ClaudeStatusBar.css` (create, ~90) — strip at `var(--header-height)` (41px; designed as ~26px), design tokens only, `border-radius:0`.
 - `TerminalPanel.tsx` (modify, +15) — render `<ClaudeStatusBar/>` after `<TerminalStatusContent>`; activity nudge.
 - `src/renderer/src/constants/testids.ts` (modify, +10) — add bar/badge/fill ids; bump count-asserted test.
 
@@ -98,9 +100,9 @@ encodeCwd, locator, parser, window-detector, friendlyName, thresholds, Mac/Win d
 
 ## 5. UX specification (from ux-designer)
 
-- **Placement:** new sibling inside `.terminal-panel` after `<TerminalStatusContent>`. Stack = header (41px) → xterm (flex:1) → ccbar (26px). Hidden by **unmounting** (xterm reclaims height; accepted reflow).
+- **Placement:** new sibling inside `.terminal-panel` after `<TerminalStatusContent>`. Stack = header (41px) → xterm (flex:1) → ccbar (designed 26px; shipped 41px via `var(--header-height)`). Hidden by **unmounting** (xterm reclaims height; accepted reflow).
 - **Order (single flex row):** model name (primary, `--text-sm`/`--font-medium`/`--color-text-primary`) · window badge chip (`--text-xs`/`--font-semibold`/**`--color-text-primary`** on `--color-bg-tertiary`) · spacer · percentage (primary, `--text-sm`/`--font-semibold`, state-colored) · progress bar (64px track `--color-bg-tertiary`, 4px high).
-- **Rail:** `height:26px; box-sizing:border-box`, background `--color-bg-secondary`, top border `1px solid var(--color-border-subtle)`, padding-inline `--space-6`.
+- **Rail:** `height:26px; box-sizing:border-box` (*shipped*: `height: var(--header-height)`), background `--color-bg-secondary`, top border `1px solid var(--color-border-subtle)`, padding-inline `--space-6`.
 - **States:** green `<30%` (fill `--color-success`, % text neutral `--color-text-primary`); amber `30–<60%` (fill+text `--color-warning`); red `≥60%` (fill+text `--color-error`). Track constant. Comparisons `pct>=30`, `pct>=60`. (On 1M these are 300k/600k tokens; on 200k, 60k/120k.) The meter fills the available width between the badge and the percentage.
 
   > Token note (2026-08-31): this design originally specified `--color-warning-bright`
@@ -108,10 +110,13 @@ encodeCwd, locator, parser, window-detector, friendlyName, thresholds, Mac/Win d
   > `--color-warning` / `--color-error`, and are marked RETIRED in
   > `design-tokens.css`. Corrected above so the note cannot be implemented as
   > written; the rest of the design is unchanged.
+  > **Open drift (2026-09-05)**: `ClaudeStatusBar.css` still sets the amber/red
+  > fill and text with `--color-warning-bright` / `--color-error-bright`. The CSS
+  > has not been migrated; recorded here, not changed by this doc pass.
 - **Tooltip:** entire row is hover target (still non-interactive); content `"84k / 200k"` / `"95k / 1M"` mono; anchored above; 400ms open / 0ms close.
 - **Edge cases:** 0% green; >100% clamps fill + headline % to 100 but tooltip shows raw used; unknown window defaults 200k silently (if used unknown → hide whole bar); narrow-panel degradation order = drop bar+track first, then badge, then ellipsize name — **percentage never dropped**.
 - **A11y (WCAG 2.2 AA):** container `role="status" aria-live="polite"` throttled to band changes only; `aria-label` exposes exact counts without focus (`"Opus 4.8, Claude Code context: 48% used, 84k of 200k tokens"`) since v1 has no keyboard-reachable tooltip trigger; progressbar role with valuenow; color never sole indicator (% text always present). **Badge must use `--color-text-primary`** (not `--color-text-secondary`, which fails 4.5:1). `prefers-reduced-motion` disables the fill width transition. Dark-only product → no `prefers-color-scheme`.
-- **Proposed new component tokens:** `--terminal-statusbar-height: 26px`, `--terminal-ccbar-track-width: 64px` (or documented literals).
+- **Proposed new component tokens:** `--terminal-statusbar-height: 26px`, `--terminal-ccbar-track-width: 64px` (or documented literals). *Shipped*: neither token exists – the height reuses `--header-height` and the 64px track width is a documented literal in `ClaudeStatusBar.css`.
 - **Motion:** instant mount/unmount (no height animation — would fight FitAddon); only the fill-width change uses `--transition-normal`, gated by reduced-motion.
 
 ## 6. Implementation sequence (TDD)
@@ -225,6 +230,6 @@ A 6-lens review of the #217 code (all findings non-blocking; security posture ve
 
 - **Shared detector base.** `AbstractClaudeProcessDetector` now owns the descendant BFS, `isValidPid`, and the liveness cache; `Mac`/`Win` detectors supply only their OS-specific probe + match. Removes the prior near-verbatim duplication (drift risk).
 - **Liveness cache correctness.** The cache is now **single-flight** (concurrent callers on one pid share one probe instead of dog-piling the PowerShell/ps spawn), **transient-error-aware** (a spawn/timeout failure is NOT cached for the full TTL — the next call retries; only a completed snapshot's negative is cached), and **bounded** (`forget(pid)` is called on `unregisterPanel`, plus a size-cap sweep). Per-OS TTL divergence (macOS 4s, Windows 8s for cold-start) is intentional and now expressed as a subclass field.
-- **Post-compaction display.** Two fixes: (a) the bar shows ~0% after a compaction (existing #217 fix); (b) **sticky 1M window** — once a session is observed at the 1M window, a post-compaction token reset can no longer shrink the badge 1M→200k. The sticky bit was later **scoped to the current model** (`da5637c`): it is a per-terminal bit reset on pid change, a model-id switch, or an explicit standard `/model` override, so a mid-session model switch (Opus 1M → Sonnet 200k → Opus 1M) still re-evaluates the window in both directions while an unchanged model keeps the no-flicker guarantee. Window *detection* still runs on the real pre-compaction token count. The parser also retries a **full read** once when a large compaction summary evicts the relevant turn from the 256 KB tail window, so `justCompacted` degrades only when even the full file has no post-compaction turn.
+- **Post-compaction display.** Two fixes: (a) the bar shows ~0% after a compaction (existing #217 fix); (b) **sticky 1M window** — once a session is observed at the 1M window, a post-compaction token reset can no longer shrink the badge 1M→200k. The sticky bit was later **scoped to the current model** (`da5637c`, a pre-migration commit that does not resolve in the public history): it is a per-terminal bit reset on pid change, a model-id switch, or an explicit standard `/model` override, so a mid-session model switch (Opus 1M → Sonnet 200k → Opus 1M) still re-evaluates the window in both directions while an unchanged model keeps the no-flicker guarantee. Window *detection* still runs on the real pre-compaction token count. The parser also retries a **full read** once when a large compaction summary evicts the relevant turn from the 256 KB tail window, so `justCompacted` degrades only when even the full file has no post-compaction turn.
 - **Inferred Windows cwd→ENC encoding.** The win32 `/ \ : . → -` rule is INFERRED from on-disk observation, not a documented Claude Code contract, and is lossy/non-injective. The locator now tries the primary encoding plus a normalized alternate (trailing-separator-stripped) via `candidateProjectDirs`, so a trailing-separator cwd no longer silently hides the bar. All alternates derive from the same cwd (no cross-project mismatch).
 - **PowerShell query robustness.** The per-row `StartMs` projection is UTC-explicit (`.ToUniversalTime()`) and wrapped in try/catch so one unparseable `CreationDate` yields a null `StartMs` rather than blanking the whole snapshot. Array shape is guaranteed by `parseWin32Processes` normalization, not the `@(...)` wrapper (5.1 unrolls single-element arrays).

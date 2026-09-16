@@ -1,6 +1,6 @@
 # Build Documentation
 
-**Last updated**: August 2026 (v0.17.2)
+**Last updated**: September 2026 (v0.20.0)
 
 This directory contains detailed documentation for Erfana's production build configuration.
 
@@ -12,7 +12,7 @@ This directory contains detailed documentation for Erfana's production build con
 
 **TL;DR** - Build command:
 ```bash
-# Prerequisites: macOS 12+, Node.js 24+, Python 3.12, npm install completed
+# Prerequisites: macOS 12+, Node.js 24+, Python 3.12 or 3.14.3 (NOT 3.13), npm ci completed
 
 # Build the macOS arm64 DMG (Apple Silicon only)
 npm run build:mac
@@ -35,23 +35,25 @@ npm run build:mac
 - Linux or Windows can build for those platforms, but not for macOS
 
 **Development Tools**:
-- Node.js 24+ (CI and development use Node 24)
-- npm 9+ or compatible package manager
+- Node.js 24+ — `.nvmrc` pins the major, so `nvm use` in the repo root selects it. CI installs the same major
+  (`node-version: "24"` in `.github/actions/setup-node-with-retry`), so a local run and a CI run agree
+- npm 11 (ships with Node 24). See the lockfile note in [CONTRIBUTING](../../CONTRIBUTING.md#local-setup) before
+  committing anything `npm install` writes to `package-lock.json`
 - Xcode Command Line Tools (macOS only):
   ```bash
   xcode-select --install
   ```
 
 **Python** (for node-pty native compilation):
-- Python 3.12 or earlier (NOT 3.13 - node-pty fails to build)
+- Python 3.12 known good; 3.14.3 verified 2026-09-03 (NOT 3.13 – node-pty fails to build)
 - Check version: `python3 --version`
-- If using Python 3.13, downgrade to 3.12
+- If using Python 3.13, switch to 3.12 or 3.14.3
 
 ### Install Dependencies
 
 ```bash
-# Install all dependencies
-npm install
+# Install all dependencies (npm ci, not npm install — see CONTRIBUTING.md § Local setup)
+npm ci
 
 # This will:
 # - Install production dependencies (node_modules/)
@@ -78,9 +80,8 @@ rm -rf release/
 # Clean compiled code
 rm -rf out/
 
-# Optional: Clean node_modules (if dependencies changed)
-rm -rf node_modules/
-npm install
+# Clean reinstall (npm ci replaces node_modules itself, so no rm needed)
+npm ci
 ```
 
 ---
@@ -93,8 +94,8 @@ npm install
    - Main process, entry `index`: ~319 kB minified, `out/main/index.js` (externalized dependencies), plus a shared chunk under `out/main/chunks/` (`git-schema-*.js`, ~3.5 kB)
    - Main process, entry `git-status.worker`: ~7.5 kB, `out/main/git-status.worker.js` — the `worker_threads` worker that runs git status off the main thread (see [../api-services-features.md](../api-services-features.md) § GitStatusService)
    - Main process, entry `docx/docx-convert.process`: ~1.4 kB, `out/main/docx/docx-convert.process.js` — the isolated, killable `utilityProcess` child that runs DOCX conversion out-of-thread (see [../api-services-features.md](../api-services-features.md) DocxService and the process-isolation decision in [../architecture.md](../architecture.md))
-   - Preload, two entries: ~38 kB `out/preload/index.js` (main editor window) plus ~1.3 kB `out/preload/screenshotOverlay.js` (per-display area-select overlay windows) — both bundled, see [preload.md](./preload.md)
-   - Renderer: ~35 MB across `out/renderer/` (Monaco, Mermaid, xterm.js included)
+   - Preload, four entries (re-measured 2026-09-15 at `e578f71f`): ~48 kB `out/preload/index.js` (main editor window), ~1.8 kB `out/preload/screenshotOverlay.js` (per-display area-select overlay windows), ~1.5 kB `out/preload/imageExport.js` (hidden image-export rasterize window) and ~2.6 kB `out/preload/previewPage.js` (the sealed HTML-preview page) – all bundled, see [preload.md](./preload.md)
+   - Renderer, two entries: ~36 MB across `out/renderer/` (Monaco, Mermaid, xterm.js included; re-measured 2026-09-15). `index.html` is the app window; `imageExport.html` is the hidden rasterize harness for image export, a page of its own so it never loads the app or `window.api`
 4. **beforePack hook (v0.10.0)**: `scripts/ensure-media-binaries.js` downloads a hardcoded per-platform arch set of `ffmpeg-static` binaries — `x64` **and** `arm64` on macOS, `process.arch` on every other platform, independent of the configured build target — into a build cache at `release/.media-cache/<platform>-<arch>/`. Each is verified against a ~1 MB size floor and, where `FFMPEG_SHA256` carries a pin, a SHA-256. Only `darwin-x64` and `darwin-arm64` are pinned today; `win32-x64` falls back to size-only verification (see [fuses.md](./fuses.md#afterpack-also-stages-and-verifies-the-media-binaries)). This replaces the single-arch download-at-install pattern that produced the v0.9.6 video-transcription ENOENT. The cache is **not** `extraResources` — the copy into the bundle happens later, in `afterPack`.
 5. **electron-builder Package**: Create platform packages. `extraResources` holds exactly three things: `resources/tessdata` (offline OCR language data), `LICENSE`, and `THIRD-PARTY-LICENSES.md` (shipped to meet the GPL-3.0-only and third-party attribution obligations)
 6. **afterPack Hook** (`scripts/fuses.js`, before signing):
@@ -106,7 +107,7 @@ npm install
    - Each prune is keep-then-verify (fails the build rather than shipping a binary-less bundle)
    - Verify the packed `app/` tree against the `files:` allowlist — depth-1 entries, symlink containment, main-entry presence — and refuse to continue if it does not match (issue #43; see [fuses.md](./fuses.md#afterpack-also-verifies-the-packed-app-contents))
    - Last, verify the `extraFiles`/`extraResources` destinations beside and above `app/` (issue #55): a merged-config shape check (folding platform-scoped `--config.win.*` overrides), a fatal leak-name tripwire on both platforms, a full-sibling enumeration (fatal on macOS, advisory on Windows pending a real Windows packed-tree baseline), and a coarse repo-leak tripwire at the `extraFiles` dest. The Windows-advisory softening is deliberate — the Electron-owned sibling names were enumerated on macOS and CI never packs on Windows, so a fatal both-platforms enumeration could false-fail the first Windows release. See [fuses.md § Extra-content destinations](./fuses.md#extra-content-destinations--extrafiles--extraresources-issue-55)
-7. **Code Signing**: electron-builder ad-hoc signs all binaries
+7. **Code Signing**: on macOS, electron-builder ad-hoc signs all binaries (`scripts/resign.js` returns early unless `electronPlatformName === 'darwin'`). Windows signing is Azure Artifact Signing, configured unconditionally under `win.azureSignOptions` and supplied only in CI — which is why a local Windows package cannot be built at all, see [#132](https://github.com/qodeca/erfana/issues/132)
 8. **afterSign Hook**: Deep re-sign bundle for consistent identity (`scripts/resign.js`)
 9. **DMG Creation**: Package for distribution (arm64 only; the `.zip` target was dropped with auto-update disabled)
 

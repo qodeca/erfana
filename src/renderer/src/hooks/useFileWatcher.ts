@@ -221,7 +221,13 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcherRe
 
     setIsReloading(true)
     try {
-      const content = prefetchedContent ?? await window.api.file.readFile(filePath)
+      // Only a string counts as prefetched content. This function is also used
+      // directly as a click handler, and React passes the synthetic event as
+      // the first argument — which used to be adopted as the file's content
+      // and crashed the panel. A zero-arg signature is assignable to a one-arg
+      // DOM handler, so the type system never saw it.
+      const prefetched = typeof prefetchedContent === 'string' ? prefetchedContent : undefined
+      const content = prefetched ?? await window.api.file.readFile(filePath)
       onContentUpdate(content)
       pendingSavedContentsRef.current.clear() // Disk content is now authoritative
       setExternalChangeDetected(false)

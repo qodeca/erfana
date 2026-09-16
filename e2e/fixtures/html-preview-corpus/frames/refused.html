@@ -1,0 +1,51 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<!--
+  Part 2 corpus (P2-AC3): frames that must stay empty, each listed once in the
+  failure badge, and none of them in the permission band.
+    remote       https://example.com/frame.html       Blocked remote frame (full URL)
+    other token  erfana-preview://<other token>/…     Frame escaped the project (full URL)
+    data:        a data: URL                          Blocked remote frame ("data:")
+    blob:        a script-made blob: URL              Blocked remote frame ("blob:")
+    node_modules node_modules/x.html                  Excluded frame
+    dot folder   .hidden/x.html                       Excluded frame
+    missing      missing.html (never exists)          Missing local file
+    escape       escape.html (a symlink out)          Missing local file on macOS/Linux (the
+                                                      resolver opens with O_NOFOLLOW, step 8e);
+                                                      Frame escaped the project on Windows (step 8g)
+  private.html is gitignored and still loads (-PRIVATE-): the gitignore decides how
+  a tree click opens a file, never what a frame may show (part 2 §2.10).
+  node_modules/x.html, .hidden/x.html, escape.html and frames/.gitignore are made
+  by the e2e in its temp copy of the project, never committed.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Refused frames -REFUSED-</title>
+    <link rel="stylesheet" href="page.css" />
+  </head>
+  <body>
+    <h1>Refused frames</h1>
+    <iframe id="remote-frame" title="remote" src="https://example.com/frame.html" width="160" height="90"></iframe>
+    <iframe
+      id="foreign-frame"
+      title="another token"
+      src="erfana-preview://0123456789abcdef0123456789abcdef/frames/child.html"
+      width="160"
+      height="90"
+    ></iframe>
+    <iframe id="data-frame" title="data" src="data:text/html,%3Cp%3Einline%3C%2Fp%3E" width="160" height="90"></iframe>
+    <iframe id="blob-frame" title="blob" width="160" height="90"></iframe>
+    <iframe id="node-modules-frame" title="node_modules" src="node_modules/x.html" width="160" height="90"></iframe>
+    <iframe id="hidden-frame" title="dot folder" src=".hidden/x.html" width="160" height="90"></iframe>
+    <iframe id="missing-frame" title="missing" src="missing.html" width="160" height="90"></iframe>
+    <iframe id="escape-frame" title="escape" src="escape.html" width="160" height="90"></iframe>
+    <iframe id="private-frame" title="gitignored" src="private.html" width="160" height="90"></iframe>
+    <script>
+      // A script-made blob: frame. Its URL is its content, so only the scheme is listed.
+      const blob = new Blob(['<!DOCTYPE html><title>-BLOB-</title><p>blob</p>'], { type: 'text/html' })
+      document.getElementById('blob-frame').src = URL.createObjectURL(blob)
+    </script>
+  </body>
+</html>

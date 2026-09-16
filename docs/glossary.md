@@ -16,11 +16,11 @@ Project-specific terminology used in Erfana documentation and code.
 
 | Term | Definition |
 |------|------------|
-| **Activity bar** | Vertical icon bar on the far left (project, settings icons) |
-| **Sidebar** | Left panel containing Project Tree and Settings |
+| **Activity bar** | Two vertical icon bars: the left one (Project panel, Settings gear) and the right one (Terminal) |
+| **Sidebar** | Left panel containing the Project Tree; Settings is a full-window overlay (`SettingsOverlay`), not a sidebar panel |
 | **Project Tree** | File explorer showing project directory structure |
-| **Terminal Panel** | xterm.js terminal at the bottom of the window |
-| **Editor Tabs** | DockviewReact tabs for open markdown files |
+| **Terminal Panel** | xterm.js terminal in the right-hand panel (`activityBarConfig.ts`, `side: 'right'`) |
+| **Editor Tabs** | DockviewReact tabs for any open file: Markdown editor, image viewer or HTML preview |
 | **Split View** | Editor and preview shown together with scroll sync. Two variants: `split` (side by side) and `split-horizontal` (preview on top) |
 
 ## Features
@@ -30,13 +30,15 @@ Project-specific terminology used in Erfana documentation and code.
 | **Bootstrap pattern** | Clean terminal initialization without visible artifacts |
 | **Scroll sync** | Bidirectional scrolling between editor and preview |
 | **Design tokens** | CSS custom properties defining colors, spacing, typography |
-| **Prompt templates** | AI-powered text operations via context menu |
+| **Prompt templates** | Context-menu templates that send a selection to the CLI agent running in the terminal (Erfana has no built-in AI) |
 | **AutoExecute** | Automatically run prompt in terminal after generation |
-| **Git status indicators** | VS Code-style badges (M/U/D/A/!) on files |
+| **Git status indicators** | VS Code-style badges (M/U/D/A/R/!) on files |
 | **LiteParse** | @llamaindex/liteparse – parser library for 50+ document formats with spatial text extraction |
 | **OCR** | Optical character recognition – text extraction from images/scanned documents via Tesseract.js |
 | **Tesseract.js** | JavaScript OCR engine used by LiteParse for local text extraction (no external API calls) |
 | **tessdata** | Pre-trained Tesseract language models bundled in `resources/tessdata/` for offline OCR |
+| **Preview tab** | A dockview tab showing an HTML preview. It opens with a `preview-` panel id and keeps that id when it moves to another page, so never read a path back out of it |
+| **Same-tab navigation** | Per-tab **Open links in this tab** mode of the HTML preview (#124): a plain link to another project page replaces the page in the same tab, which then has its own Back and Forward history. Off by default and kept in memory only |
 
 ## Services
 
@@ -46,7 +48,7 @@ Project-specific terminology used in Erfana documentation and code.
 | **TerminalService** | Manages PTY instances for terminal emulation |
 | **DirectoryWatcherService** | Monitors file system changes for auto-refresh |
 | **FileWatcherService** | Watches individual files for external changes |
-| **GitStatusService** | Tracks git status using isomorphic-git |
+| **GitStatusService** | Tracks git status via a worker thread (`git-status.worker.ts`); native git when a binary is found, isomorphic-git as the fallback |
 | **SettingsService** | Application-level state persisted with electron-store – `lastProjectPath`, `recentProjects`, `projectFilterMode`, `directoryWatchDepth`. Not per-project settings |
 | **ProjectSettingsService** | Per-project settings loaded and Zod-validated from `<project>/.erfana/settings.json` |
 | **GlobalSettingsService** | Application-wide settings in `~/.erfana/` |
@@ -65,6 +67,9 @@ Project-specific terminology used in Erfana documentation and code.
 | **ApiKeyService** | Encrypts/decrypts API keys using Electron safeStorage |
 | **ImportService** | Orchestrates document import – routes files to converters, manages progress and cancellation |
 | **LiteParseConverter** | Document converter backed by @llamaindex/liteparse for 50+ formats (PDF, Office, images) with local OCR |
+| **BrowserLaunchService** | `src/main/services/browserLaunch/` – opens a project `.html` / `.htm` file in the default browser after seven ordered checks; never rejects, answers with an `OPEN_IN_BROWSER_*` code (#124) |
+| **editorSaveRegistry** | `src/renderer/src/services/editorSaveRegistry.ts` – saves an editor tab by panel id, so a preview tab move can save another tab's edits; editors register through `useEditorSaveRegistration`. An unregistered id answers `false` (#124) |
+| **stablePathDigest** | `src/shared/stablePathDigest.ts` – 16-hex FNV-1a digest of a path, shared by main and renderer, for over-long panel ids and log lines. Not cryptographic (#124) |
 | **DependencyDetector** | Async detection of optional system tools (LibreOffice, ImageMagick) with 5s timeout and session caching |
 
 ## State Management
@@ -72,7 +77,7 @@ Project-specific terminology used in Erfana documentation and code.
 | Term | Definition |
 |------|------------|
 | **Zustand** | Lightweight React state management library |
-| **Store** | Zustand state container (e.g., `useEditorStore`) |
+| **Store** | Zustand state container (e.g., `useProjectStore`) |
 | **Persist middleware** | Zustand middleware for localStorage persistence |
 
 ## Testing

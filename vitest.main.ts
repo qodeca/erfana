@@ -35,7 +35,11 @@ export default defineConfig({
       reportsDirectory: 'coverage/main',
       // `scripts/**` is instrumented so the packaging-integrity guards in
       // scripts/fuses.js (issue #43 / #55) carry a real per-file floor (F4).
-      include: ['src/main/**/*.{ts,tsx}', 'scripts/**/*.{js,mjs}'],
+      // `src/shared/ipc/browser-schema.ts` is instrumented explicitly (not the
+      // whole of src/shared) so the #124 browser-launch IPC payload validator can
+      // carry a per-file floor below; the shared tests that exercise it already
+      // run in this project.
+      include: ['src/main/**/*.{ts,tsx}', 'scripts/**/*.{js,mjs}', 'src/shared/ipc/browser-schema.ts'],
       // `all: false` is load-bearing for the required Coverage job's determinism:
       // with `all: true`, an included-but-untested file (any script the main
       // suite does not execute) emits a synthetic 0%-baseline row, which for
@@ -83,6 +87,38 @@ export default defineConfig({
         // The module is small and fully unit-reachable; measured at 100% when
         // this entry landed. See: docs/design/design-issue-60.md §2.6, §5
         'src/main/utils/rendererCrashHandlers.ts': { lines: 90, functions: 90, branches: 90, statements: 90 },
+        // Multi-page HTML preview (#124). These modules decide what the preview
+        // BrowserView is allowed to load and where it may navigate — frame/scheme
+        // gating, request filtering, URL normalisation, page and tab scope — plus
+        // the external-browser launch path, which hands a URL to the OS. A silent
+        // coverage regression here is a security regression, so each floor is
+        // pinned ~2 points under the value measured when this entry landed
+        // (see the QG-8 review, finding TQ2). Never raise a floor above what the
+        // Coverage job actually measures.
+        // measured 100/100/96.55/100
+        'src/main/services/preview/previewFrameGuard.ts': { lines: 98, functions: 98, branches: 94, statements: 98 },
+        // measured 96.99/100/93.75/96.99
+        'src/main/services/preview/PreviewRequestFilter.ts': { lines: 94, functions: 98, branches: 91, statements: 94 },
+        // measured 100/100/100/100
+        'src/main/services/preview/previewUrl.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/preview/previewPageScope.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/preview/previewFrameSources.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/preview/previewPageNavigator.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/96/100
+        'src/main/services/preview/previewViewNavigation.ts': { lines: 98, functions: 98, branches: 94, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/preview/previewTabHistory.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/preview/previewStillFrameFreshness.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browserLaunch/browserLauncher.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browserLaunch/BrowserLaunchService.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/shared/ipc/browser-schema.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
       },
       exclude: [
         'node_modules/**',
@@ -94,6 +130,8 @@ export default defineConfig({
         '**/temp/**',
         '**/*.test.*',
         '**/__tests__/**',
+        '**/__test__/**',
+        '**/__test-helpers__/**',
         'vitest.*.ts',
         'electron.vite.config.ts'
       ],

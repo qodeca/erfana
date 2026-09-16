@@ -24,6 +24,13 @@
  * re-opens it (sd-074b §4.3). That round trip is what makes the sleep policy
  * invisible to the user.
  *
+ * KEYED BY PANEL ID ONLY (issue #124, part 3 §3.4). A tab can move to another
+ * page in the same native view; `params.filePath` then changes, and so does the
+ * `filePath` this hook receives. Closing and re-opening on that change would
+ * tear down the view and lose the tab's history. So the open/close effect runs
+ * once per panel id, and `filePath` is read at the moment of each `open` – which
+ * is what makes a crash retry and a resume open the page the tab shows NOW.
+ *
  * @module usePreviewLifecycle
  * @see Issue #74 - HTML preview with CSS and JavaScript execution
  */
@@ -33,13 +40,17 @@ import { ErrorCode } from '../../../../../../shared/errors'
 import { usePreviewStore } from '../../../../stores/usePreviewStore'
 import { deriveBounds } from '../htmlPreview.logic'
 import { logger } from '../../../../utils/logger'
-import { getBasename } from '../../../../utils/fileUtils'
+import { getBasename, stablePathDigest } from '../../../../utils/fileUtils'
 
 /** Options for {@link usePreviewLifecycle}. */
 export interface UsePreviewLifecycleOptions {
   /** The preview panel id. */
   panelId: string
-  /** Absolute path of the `.html` file to preview. */
+  /**
+   * The page the tab shows now (`params.filePath`). Read when an `open` is
+   * sent, never a reason to close and re-open: after a same-tab move it
+   * changes while the view stays.
+   */
   filePath: string
   /** Ref to the placeholder, read once to seed the initial `open` bounds. */
   placeholderRef: React.RefObject<HTMLElement>
@@ -105,9 +116,16 @@ export function usePreviewLifecycle(
   const [openFailed, setOpenFailed] = useState(false)
 
   // `placeholderRef` is read once at open time only; excluding it from deps
-  // keeps the open/close to exactly one run per (panelId, filePath).
+  // keeps the open/close to exactly one run per panel id.
   const placeholderRefStable = useRef(placeholderRef)
   placeholderRefStable.current = placeholderRef
+
+  // The same for the page: a same-tab move changes `filePath` under a live
+  // view, and an open/close keyed on it would destroy that view and its
+  // history. Main is authoritative for the page of a live view; the renderer's
+  // value matters only when an `open` is sent (first open, crash retry, resume).
+  const filePathRef = useRef(filePath)
+  filePathRef.current = filePath
 
   /**
    * Ask main to open this preview. Shared by the mount effect and the resume
@@ -122,6 +140,7 @@ export function usePreviewLifecycle(
       setOpenFailed(false)
       setLimitReached(false)
 
+      const filePath = filePathRef.current
       try {
         const result = await window.api.preview.open({
           panelId,
@@ -163,7 +182,7 @@ export function usePreviewLifecycle(
           // black rectangle and reported nothing anywhere. Basename only — the
           // absolute path carries the user's home directory.
           logger.debug('Preview open superseded', {
-            panelId,
+            panelId: stablePathDigest(panelId),
             file: getBasename(filePath)
           })
           return
@@ -171,17 +190,19 @@ export function usePreviewLifecycle(
 
         // Any other refusal: no view exists, so show the failed banner.
         setOpenFailed(true)
-        logger.warn('Preview open failed', { panelId, filePath, errorCode: result.errorCode })
+        logger.warn('Preview open failed', {
+          panelId: stablePathDigest(panelId),
+          errorCode: result.errorCode
+        })
       } catch (error) {
         if (isCancelled()) return
         setOpenFailed(true)
         logger.error('Preview open threw', error instanceof Error ? error : undefined, {
-          panelId,
-          filePath
+          panelId: stablePathDigest(panelId)
         })
       }
     },
-    [panelId, filePath]
+    [panelId]
   )
 
   useEffect(() => {
@@ -197,7 +218,7 @@ export function usePreviewLifecycle(
       store.removePanel(panelId)
       if (store.holderPanelId === panelId) store.clearHolder()
     }
-  }, [panelId, filePath, requestOpen])
+  }, [panelId, requestOpen])
 
   // Resume a suspended preview when its tab becomes visible again. Main emits
   // `suspended` after evicting the least recently active view; the still frame
@@ -217,7 +238,12 @@ export function usePreviewLifecycle(
     // The one line that would have found the Windows eviction fault in a
     // minute: it showed `loadState` never leaving 'ready', which pointed at
     // main never emitting 'suspended' rather than at this gate.
-    logger.debug('Preview resume gate', { panelId, isVisible, loadState, resumeAttempt })
+    logger.debug('Preview resume gate', {
+      panelId: stablePathDigest(panelId),
+      isVisible,
+      loadState,
+      resumeAttempt
+    })
     if (!isVisible || loadState !== 'suspended') return
 
     let cancelled = false

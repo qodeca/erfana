@@ -13,7 +13,7 @@ rehypeRaw (Parse embedded HTML, preserve line info)
     ↓
 rehypeSanitize (Filter dangerous content)
     ↓
-rehype-react (Convert to React components)
+hast-util-to-jsx-runtime (react-markdown 10 converts the hast tree to React elements)
     ↓
 React Component Rendering (with custom handlers)
     ↓

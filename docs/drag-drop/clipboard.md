@@ -9,19 +9,22 @@
 State management for cut/copy/paste operations using Zustand:
 
 ```typescript
-// useClipboardStore.ts:8-26
+// useClipboardStore.ts – ClipboardStore
 interface ClipboardStore {
   itemPath: string | null
-  operation: 'cut' | 'copy' | null
+  operation: ClipboardOperation | null   // 'cut' | 'copy'
   itemName: string | null
   itemType: 'file' | 'directory' | null
 
   cut: (path: string, name: string, type: 'file' | 'directory') => void
   copy: (path: string, name: string, type: 'file' | 'directory') => void
-  paste: (targetPath: string) => Promise<{ success: boolean; newPath?: string; error?: string }>
+  paste: (targetPath: string, replaceExisting?: boolean) => Promise<{ success: boolean; newPath?: string; isSymlink?: boolean; error?: string }>
   clear: () => void
   hasClipboard: () => boolean
+  getOperation: () => ClipboardOperation | null
 }
+
+// Built by createClipboardStore(fileOps: IFileOperations) so file operations are injected for tests
 ```
 
 **Key behavior**:
@@ -52,11 +55,11 @@ interface ClipboardStore {
   left: 0;
   right: 0;
   bottom: 0;
-  height: 1px;
+  height: var(--border-width);
   background: repeating-linear-gradient(
     90deg,
-    #858585,
-    #858585 4px,
+    var(--color-text-secondary),
+    var(--color-text-secondary) 4px,
     transparent 4px,
     transparent 8px
   );
@@ -121,24 +124,27 @@ paste: async (targetPath: string) => {
 
 ## Context Menu Integration
 
-Right-click context menu operations map directly to clipboard:
+Right-click context menu operations are command classes in `src/renderer/src/components/ProjectTree/context-menu/commands.tsx`, assembled by `ContextMenuFactory`:
 
 ```typescript
-// ProjectTree.tsx
-<ContextMenu>
-  <ContextMenuItem onClick={() => clipboard.cut(node.path, node.name, node.type)}>
-    Cut
-  </ContextMenuItem>
-  <ContextMenuItem onClick={() => clipboard.copy(node.path, node.name, node.type)}>
-    Copy
-  </ContextMenuItem>
-  <ContextMenuItem
-    onClick={() => clipboard.paste(selectedFolder)}
-    disabled={!clipboard.hasClipboard() || !selectedFolder}
-  >
-    Paste
-  </ContextMenuItem>
-</ContextMenu>
+// context-menu/commands.tsx
+export class CutCommand extends CommandBase {
+  label = 'Cut'
+  icon = <Scissors size={14} strokeWidth={2} />
+  execute(): void {
+    this.ctx.clipboard.cut(this.node.path, this.node.name, this.node.type)
+    this.ctx.toast({ type: 'info', title: 'Cut', message: `"${this.node.name}" ready to move` })
+  }
+}
+
+export class CopyCommand extends CommandBase { /* same shape; toast title 'Copied' */ }
+
+export class PasteIntoDirectoryCommand extends CommandBase {
+  label = 'Paste'
+  // Only offered on directory nodes. For a cut, checks `api.checkConflict` first and asks
+  // "Replace item?" via `dialogs.showConfirm`; then runs `clipboard.paste(targetPath, replaceExisting)`
+  // inside `ctx.withWatcherPause` and refreshes the project tree on success.
+}
 ```
 
 ## Validation
@@ -156,4 +162,4 @@ See [validation.md](./validation.md) for detailed rules.
 
 - **Implementation**: [src/renderer/src/stores/useClipboardStore.ts](../../src/renderer/src/stores/useClipboardStore.ts)
 - **Tests**: [src/renderer/src/stores/useClipboardStore.test.ts](../../src/renderer/src/stores/useClipboardStore.test.ts)
-- **Context Menu**: [src/renderer/src/components/ProjectTree/ProjectTree.tsx](../../src/renderer/src/components/ProjectTree/ProjectTree.tsx)
+- **Context Menu**: [src/renderer/src/components/ProjectTree/context-menu/commands.tsx](../../src/renderer/src/components/ProjectTree/context-menu/commands.tsx) (`CutCommand`, `CopyCommand`, `PasteIntoDirectoryCommand`)

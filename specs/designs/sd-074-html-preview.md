@@ -637,6 +637,8 @@ form-action 'none'; base-uri 'none';
 sandbox allow-scripts
 ```
 
+> **#124:** `frame-src 'none'` above no longer describes the build. The policy now carries `frame-src erfana-preview://<own-token>` (a malformed token still degrades to `'none'`) and no `frame-ancestors`, so a page can frame pages from its own project; remote, `data:`, `blob:` and other-token frames stay refused. See `previewCsp.ts` and `docs/design/design-issue-124-part2.md` §2.1.
+
 `'unsafe-inline'`/`'unsafe-eval'` are deliberate: agent-built single-file tools *are* inline scripts.
 Isolation comes from the process, the opaque origin and the absent bridge — not from `script-src`.
 
@@ -1127,7 +1129,7 @@ returns the new host set) → then `service.applyApprovedHosts(panelId, hosts)`,
 **`registry.rebuildCsp` → `storageSeal.purge` awaited → `failureLog.clear()` → `reloadIgnoringCache()`**.
 Keeping the rebuild+reload behind one service method is what lets the approve handler depend on the
 service alone, not on the registry (§4.4). Page state is lost; the reload *is* the retry AC9's wording
-permits — stated on the AC22 page or it gets filed as an AC14 bug.
+permits — stated on the AC22 page or it gets filed as an AC14 bug. (#124: nothing is cleared by hand any more – `PreviewFailureLog.clear()` is gone. Each view reloads through `startPageLoad`, and the reload's new page scope brings its own empty failure log, host ledger and CSP dedupe; `previewPageScope.ts`.)
 
 **The Approve toast does not exist yet** (X16): `ToastContext.tsx:6-12` `Toast` is
 `{id,title,message,type,duration}` with no action field, and `showToast` (`:38`) defaults `duration`
@@ -1155,7 +1157,7 @@ resolves `[]` — correct for `matchList:false`. `found-in-page` fires repeatedl
 `watchCoordinator.release` / find + input detach → filter and protocol detach →
 `hostBlockNotifier.clear()` → `rootRegistry.revoke(oldPath)` (token **and CSP** die together) →
 `clearStorageData` + `clearCache` → release the partition. **One partition, because there is one
-view** (X20). Renderer: `clearAllEditorTabs()`; `usePreviewLifecycle` cleanup calls `preview:close`,
+view** (X20). (#124: `failureLog.clear` in this chain is now the disposal of the view's page scopes – `pageScopes.dispose` in the live view's teardown.) Renderer: `clearAllEditorTabs()`; `usePreviewLifecycle` cleanup calls `preview:close`,
 idempotent.
 
 ---

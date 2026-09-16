@@ -1,0 +1,29 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Overview -DS-OVERVIEW-</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <h1>Design set – overview</h1>
+  <p>A small multi-page mockup. Every link has a stable id a test can click.</p>
+  <nav>
+    <p><a id="to-pricing" href="pricing.html">Pricing (plain link)</a></p>
+    <p><a id="to-pricing-blank" href="pricing.html" target="_blank">Pricing in a new tab (_blank)</a></p>
+    <p><a id="to-about-self" href="about.html" target="_self">About (_self)</a></p>
+    <p><a id="to-contact" href="contact.html">Contact</a></p>
+    <p><a id="to-huge" href="huge.html">A page too large to serve (made by the test)</a></p>
+  </nav>
+  <p>Overview-only wording: kestrel.</p>
+  <figure class="phone">
+    <iframe id="phone" src="pricing.html" width="375" height="667" title="Pricing at phone width"></iframe>
+    <figcaption>Pricing at phone width</figcaption>
+  </figure>
+  <div class="spacer"></div>
+  <h2 id="features">Features</h2>
+  <p><a id="to-pricing-bottom" href="pricing.html">Pricing, from the bottom of the page</a></p>
+</body>
+</html>

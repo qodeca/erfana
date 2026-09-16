@@ -25,14 +25,22 @@ inputPlaceholder: e.g...    # Optional: Input placeholder
 
 | Field | Type | Required | Values |
 |-------|------|----------|--------|
-| `area` | enum | ✅ | `markdown-preview`, `code-editor`, `global` |
-| `subArea` | enum | ❌ | `context-menu`, `toolbar`, `command-palette`, `mermaid-error` |
+| `area` | enum | ✅ | `markdown-preview`, `code-editor`, `global`, `diagram-viewer` |
+| `subArea` | enum | ❌ | `context-menu`, `toolbar`, `command-palette`, `mermaid-error`, `mermaid-direction`, `chat` |
+| `id` | string | ❌ | Unique identifier; generated from `name` when omitted |
 | `name` | string | ✅ | Display name |
-| `icon` | string | ✅ | Lucide icon name |
+| `icon` | string | ✅ | One of the names in [Icon selection](#icon-selection); any other name falls back to `sparkles` |
 | `targetPanel` | enum | ❌ | `terminal` |
 | `sendDirectly` | bool | ❌ | Send immediately |
 | `autoExecute` | bool | ❌ | Auto-execute command |
+| `order` | number | ❌ | Sort order in menus (lower first, decimals allowed); default `0` |
+| `enabled` | bool | ❌ | Show in UI; default `true` |
 | `requiresInput` | bool | ❌ | Show input dialog |
+| `inputLabel` | string | ❌ | Input field label |
+| `inputPlaceholder` | string | ❌ | Input field placeholder |
+| `dropdown` | object | ❌ | Dropdown configuration for selection-based prompts |
+| `textareaOptional` | bool | ❌ | Allow submitting an empty text field when a dropdown is present |
+| `mutatesDocument` | bool | ❌ | Add the "apply to document" footer so the agent edits the file in place; default `false` |
 
 ## Template Variables
 
@@ -104,14 +112,9 @@ Templates use custom regex-based rendering (no eval):
 
 ## Icon Selection
 
-Common Lucide icons:
-- `maximize2` - Expand/explain
-- `minimize2` - Simplify
-- `refresh` - Rewrite
-- `sparkles` - Improve
-- `list` - Summarize
-- `message-square` - Custom
-- `bug` - Report issue
+Only the 16 names in `src/renderer/src/utils/iconRegistry.tsx` render their own icon; any other name silently falls back to `sparkles`:
+
+`maximize2`, `minimize2`, `refresh`, `sparkles`, `copy`, `edit-3`, `help-circle`, `message-circle`, `file-text`, `alert-circle`, `alert-triangle`, `arrow-right`, `arrow-down`, `arrow-up`, `arrow-left`, `mouse-pointer-click`
 
 ## Advanced Features
 

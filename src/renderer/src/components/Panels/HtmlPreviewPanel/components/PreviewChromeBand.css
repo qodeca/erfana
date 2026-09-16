@@ -58,10 +58,9 @@
   padding: var(--space-3) var(--space-6);
 }
 
-/* Pushes the chip to the trailing edge. `justify-content: space-between` did
-   that while the bar held exactly two children; a toolbar grows, and an explicit
-   spacer keeps "Find leads, chip trails" true whatever lands between them - the
-   same device `.toolbar-spacer` uses in the markdown toolbar. */
+/* Pushes the chip to the trailing edge. An explicit spacer, as `.toolbar-spacer`
+   in the markdown toolbar, keeps "Back leads, chip trails" true whatever lands
+   between them; `justify-content: space-between` held only for two children. */
 .erf-band__spacer {
   flex: 1 1 auto;
 }
@@ -103,6 +102,38 @@
 
 .erf-band__tool:active {
   background: var(--color-bg-selected);
+}
+
+/* Back with nowhere to go, Open in default browser while busy: `aria-disabled`,
+   never `disabled`, which blurs the control. After :hover and :active, so no fill. */
+.erf-band__tool[aria-disabled='true'] {
+  background: transparent;
+  color: var(--color-text-primary);
+  cursor: default;
+}
+
+/*
+ * THE DIM GOES ON THE CONTENT, NEVER ON THE BUTTON.
+ *
+ * `opacity` on the button makes a group that includes the button's own focus
+ * OUTLINE, and this is precisely where focus gets parked: the panel moves focus
+ * to Back after a banner-started move and after a move closes a focused find bar
+ * (`hooks/usePreviewNavigation.ts`) — the moments Back has nowhere to go and is
+ * `aria-disabled`. Dimmed with everything else the ring measured about 2.3:1
+ * against the band, under the 3:1 SC 1.4.11 requires of a focus indicator and
+ * under "visible" (SC 2.4.7). No ring colour repairs that, because the dim is
+ * applied after the colour; the ring has to sit outside the group instead.
+ * Undimmed it is the band's ordinary ring — `contrast-focus-ring-on-band` in
+ * design/claims.json.
+ *
+ * Same pixels as before in every other state: these buttons paint no background
+ * and no border of their own, so the only thing the old rule dimmed was the icon
+ * this one dims. It selects an element child, not a bare text node — the band's
+ * tools are icon-only (the card shows all of them), and a label added to one
+ * would need its own element to stay dimmed.
+ */
+.erf-band__tool[aria-disabled='true'] > * {
+  opacity: var(--opacity-disabled);
 }
 
 .erf-band__tool:focus-visible {
@@ -343,13 +374,43 @@
 
 .erf-band__allow--primary:hover { background: var(--color-brand-violet); }
 
+/*
+ * THE PRIMARY'S FOCUS RING GOES OUTWARD, and that is a correction, not a taste.
+ *
+ * `--color-border-focus` and `--color-accent-primary` are the same colour — both
+ * resolve to brand violet. The shared ring above is drawn INSIDE the border box,
+ * which on this variant means on top of its own fill: violet on violet, 1:1.
+ * Confirm is the most irreversible control in the app and it had no visible
+ * focus ring at all (SC 2.4.7), dimmed or not.
+ *
+ * Outward, at the chip's offset, so it lands on the confirm block's surface
+ * instead — `contrast-focus-ring-on-confirm` in design/claims.json. Every other
+ * `.erf-band__allow` keeps the inset ring: they are transparent, so the ring
+ * never lands on a fill, and a row's Allow sits at the edge of
+ * `.erf-band__scroll`, where an outward ring is clipped. This button is inside
+ * that scroller too, but inside `.erf-band__confirm`'s own 16px padding, and the
+ * ring needs 4px of it — so it cannot reach the clip. Keep that padding if you
+ * move this rule.
+ */
+.erf-band__allow--primary:focus-visible {
+  outline-offset: var(--space-1);
+}
+
 /* A busy Confirm still looks like Confirm; it just stops responding. Using
    `aria-disabled` rather than `disabled` keeps focus where it is — Chromium
    blurs a control the instant it becomes disabled, which would drop a keyboard
    user on <body> in the middle of a write. */
 .erf-band__allow[aria-disabled='true'] {
-  opacity: var(--opacity-disabled);
   cursor: default;
+}
+
+/* The dim goes on the LABEL, never on the button, for the reason given on the
+   tools above: `opacity` on the button dims its focus ring with everything else,
+   to about 2.3:1 — under SC 1.4.11's 3:1. `PreviewBandConfirm.tsx` wraps the
+   label in a span for this rule to find, so a focused, busy Confirm still reads
+   as busy and keeps a full-strength (outward) ring. */
+.erf-band__allow[aria-disabled='true'] > * {
+  opacity: var(--opacity-disabled);
 }
 
 /* ---------- the fail-safe notice ---------- */

@@ -63,8 +63,6 @@ export interface IPreviewFailureLog {
   record(input: PreviewFailureInput): void
   /** A copy of the current entries, oldest first. */
   list(): readonly PreviewFailureEntry[]
-  /** Empty the buffer and emit an empty snapshot (used on the approve-path reload). */
-  clear(): void
   /** Tear down: cancel any pending emit and drop all entries WITHOUT emitting. */
   drop(): void
 }
@@ -127,16 +125,6 @@ export class PreviewFailureLog implements IPreviewFailureLog {
 
   list(): readonly PreviewFailureEntry[] {
     return this.entries.slice()
-  }
-
-  clear(): void {
-    this.entries = []
-    this.truncated = false
-    // An explicit clear must reach the renderer immediately (it is the
-    // approve-path retry signal), so cancel any pending coalesced emit and
-    // emit the empty snapshot synchronously.
-    this.cancelPending()
-    this.onEmit([], false)
   }
 
   drop(): void {

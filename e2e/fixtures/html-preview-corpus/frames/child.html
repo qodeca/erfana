@@ -1,0 +1,47 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<!--
+  The src frame of index.html (and the page frame-nav-b.html links to).
+  Posts one report to its parent: script ran, child.css and shared.css applied,
+  child.svg decoded, and whether it could read its parent (it must not).
+  data-version is the change surface for the "save the framed page" reload.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Frames child -CHILD-</title>
+    <link rel="stylesheet" href="child.css" />
+    <link rel="stylesheet" href="shared.css" />
+  </head>
+  <body data-version="1">
+    <p>src frame: script, child.css and child.svg</p>
+    <img id="child-img" src="child.svg" alt="" width="48" height="48" />
+    <script>
+      window.addEventListener('load', () => {
+        const img = document.getElementById('child-img')
+        let canReadParent
+        try {
+          void parent.document.title
+          canReadParent = true
+        } catch (e) {
+          canReadParent = false
+        }
+        const style = getComputedStyle(document.body)
+        parent.postMessage(
+          {
+            kind: 'frame-report',
+            from: 'src',
+            js: true,
+            version: document.body.dataset.version || '',
+            css: style.getPropertyValue('--child-mark').trim(),
+            shared: style.getPropertyValue('--shared-mark').trim(),
+            img: img.complete && img.naturalWidth > 0,
+            canReadParent
+          },
+          '*'
+        )
+      })
+    </script>
+  </body>
+</html>

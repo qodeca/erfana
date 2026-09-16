@@ -30,37 +30,40 @@ Never call `ipcMain.handle(...)` or `ipcMain.on(...)` yourself. `src/main/ipc/re
 const content = await window.api.file.readFile('/path/to/file.md')
 ```
 
-## Promise-Based Pattern with Completion Callback (v0.3.3)
+## Invoke round-trip for terminal writes (v0.3.3)
 
-For operations requiring confirmation of completion (e.g., terminal write operations), use Promise-based IPC with completion callbacks:
+`terminal:write` is an `invoke`/`handle` channel, but the only promise in the chain is the IPC round-trip itself. The service write is **synchronous**: `TerminalService.write()` returns a boolean that says whether the PTY accepted the data, and the handler returns that boolean as `{ success }` without awaiting anything.
 
-**1. Service layer with completion callback** (`src/main/services/TerminalService.ts`):
+**1. Service layer – synchronous write** (`src/main/services/TerminalService.ts`):
 ```typescript
-write(terminalId: string, data: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    const terminal = this.terminals.get(terminalId)
-    if (!terminal) {
-      resolve(false)
-      return
+write(terminalId: string, data: string): boolean {
+  const terminal = this.terminals.get(terminalId)
+  if (!terminal) {
+    logger.error(`Terminal ${terminalId} not found`)
+    return false
+  }
+  try {
+    terminal.ptyProcess.write(data)   // node-pty buffers internally; no callback
+    return true
+  } catch (error) {
+    const code = (error as { code?: unknown }).code
+    if (code === 'EPIPE') {
+      // PTY already closed – drop the entry and report it as an exit
+      this.terminals.delete(terminalId)
+      this.emit('exit', { terminalId, exitCode: 0 })
+      return false
     }
-    try {
-      // node-pty callback API - resolves when write completes
-      ;(terminal.ptyProcess.write as (data: string, callback?: () => void) => void)(
-        data,
-        () => resolve(true)
-      )
-    } catch (error) {
-      resolve(false)
-    }
-  })
+    this.emit('error', { terminalId, error: String(error) })
+    return false
+  }
 }
 ```
 
-**2. IPC handler awaits service promise** (`src/main/ipc/terminal-handlers.ts`):
+**2. IPC handler returns the boolean** (`src/main/ipc/terminal-handlers.ts`):
 ```typescript
-registerHandle('terminal:write', async (_event, { terminalId, data }) => {
+registerHandle('terminal:write', (_event, { terminalId, data }) => {
   try {
-    const success = await terminalService.write(terminalId, data)
+    const success = terminalService.write(terminalId, data)
     return { success }
   } catch (error) {
     return { success: false, error: String(error) }
@@ -68,27 +71,25 @@ registerHandle('terminal:write', async (_event, { terminalId, data }) => {
 })
 ```
 
-**3. Preload exposes Promise API** (`src/preload/index.ts`):
+**3. Preload exposes the invoke** (`src/preload/index.ts`):
 ```typescript
 write: (terminalId: string, data: string): Promise<{ success: boolean; error?: string }> =>
   ipcRenderer.invoke('terminal:write', { terminalId, data })
 ```
 
-**4. Renderer awaits completion** (`src/renderer/src/stores/useTerminalStore.ts`):
+**4. Renderer awaits the round-trip** (for example `src/renderer/src/components/ProjectTree/switchHelpers.ts`, which `await`s the write before sending a follow-up signal):
 ```typescript
-const writeResult = await window.api.terminal.write(terminalId, text)
-if (!writeResult.success) {
-  console.error('Write failed:', writeResult.error)
-  return false
+const result = await window.api.terminal.write(terminalId, text)
+if (!result.success) {
+  // the PTY was gone or refused the write – result.error carries the reason
 }
-// Write confirmed complete, safe to send Enter key
 ```
 
-**Benefits**:
-- Guarantees operation completion before proceeding
-- Prevents race conditions (e.g., sending Enter before text is written)
-- Enables reliable sequential operations
-- See [AutoExecute Reference](./prompts/autoexecute-reference.md) for full autoExecute implementation
+**What the promise does and does not guarantee**:
+- Resolving means main has handed the bytes to node-pty (or refused to). It does **not** mean the shell has consumed them – node-pty buffers the write internally and no completion callback is used.
+- `{ success: false }` without `error` means the terminal id was unknown or the PTY was already closed (EPIPE); `error` is set only when the write threw something else.
+- Sequencing (write text, then send Enter) is ordered by the `invoke` calls themselves, not by a write-complete signal.
+- See [AutoExecute Reference](./prompts/autoexecute-reference.md) for the autoExecute flow that relies on this ordering
 
 ## Adding New IPC Channel
 
@@ -183,8 +184,8 @@ Note the `file:` prefix – these are **not** `external-file:*`.
 | `directory-watch:changed` | Event: directory changed externally |
 | `directory-watch:project-deleted` | Event: project folder deleted |
 | `directory-watch:error` | Event: watcher error |
-| `directory-watch:recovered` | Event: watcher recovered after a recoverable ENOENT |
-| `directory-watch:restart-failed` | Event: watcher restart gave up |
+| `directory-watch:recovered` | Event: watcher recovered after a recoverable ENOENT. Sent by main (`DirectoryWatcherService`) but **not exposed by preload** – no renderer consumer |
+| `directory-watch:restart-failed` | Event: watcher restart gave up. Sent by main (`DirectoryWatcherService`) but **not exposed by preload** – no renderer consumer |
 
 ### Git (`git-handlers.ts`, `git-watcher-handlers.ts`)
 
@@ -208,7 +209,7 @@ Note the `file:` prefix – these are **not** `external-file:*`.
 |---------|---------|
 | `terminal:isAvailable` | Whether node-pty loaded and a PTY can be spawned |
 | `terminal:create` | Spawn a PTY; returns `{ success: true, terminalId, shellKind }` or `{ success: false, error }`, the reason passed through verbatim from `TerminalService.createTerminal` |
-| `terminal:write` | Write to the PTY; resolves when the write completes (see the Promise-based pattern above) |
+| `terminal:write` | Write to the PTY; returns `{ success, error? }` from a synchronous PTY write – the promise is only the invoke round-trip (see the invoke round-trip section above) |
 | `terminal:resize` | `ipcMain.on` – resize the PTY (fire-and-forget) |
 | `terminal:kill` | Kill a PTY |
 | `terminal:getInfo` | Metadata for one terminal |
@@ -320,7 +321,7 @@ Three further `image-export:*` names exist in `src/shared/ipc/image-export-chann
 
 ### HTML preview (`preview/*-handlers.ts`, constants in `preview-channels.ts`) (#74)
 
-Channel names come from the `PreviewChannels` / `PreviewEvents` constants in `src/shared/ipc/preview-channels.ts`. Every request is sender-validated main-side via `isTrustedPreviewSender` (`src/main/ipc/preview/isTrustedPreviewSender.ts`), on top of the registry gate every channel already has; a payload carries a `panelId` and the request's own arguments, nothing more – the previewed page's own trust is resolved main-side and never taken from the renderer. The 10 control channels (`checkEligibility`, `open`, `close`, `reload`, `approveHost`, `find`, `stopFind`, `exportPdf`, `setBounds`, `setVisibility`) are `invoke`/`handle` **except** `setBounds` and `setVisibility`, which are high-frequency fire-and-forget `send`/`on`. There is no `preview:setZoom`: zoom is driven from the View menu main-side (`menu.ts` → `PreviewViewService`), not over IPC.
+Channel names come from the `PreviewChannels` / `PreviewEvents` constants in `src/shared/ipc/preview-channels.ts`. Every request is sender-validated main-side via `isTrustedPreviewSender` (`src/main/ipc/preview/isTrustedPreviewSender.ts`), on top of the registry gate every channel already has; a payload carries a `panelId` and the request's own arguments, nothing more – the previewed page's own trust is resolved main-side and never taken from the renderer. The 12 control channels (`checkEligibility`, `open`, `close`, `reload`, `approveHost`, `find`, `stopFind`, `exportPdf`, `navigate`, `focusPage`, `setBounds`, `setVisibility`) are `invoke`/`handle` **except** `setBounds` and `setVisibility`, which are high-frequency fire-and-forget `send`/`on`. `navigate` and `focusPage` (#124) run the sender gate before the payload is read. Main re-validates every event against its schema before it sends (`validateAndSend` in `src/main/ipc/preview/emit.ts`); the preload bridge (`src/preload/previewBridge.ts`) is a plain pipe and validates nothing in either direction, so each renderer consumer owns its own defence. There is no `preview:setZoom`: zoom is driven from the View menu main-side (`menu.ts` → `PreviewViewService`), not over IPC.
 
 | Channel | Purpose |
 |---------|---------|
@@ -334,6 +335,8 @@ Channel names come from the `PreviewChannels` / `PreviewEvents` constants in `sr
 | `preview:find` | Start / advance an in-page find |
 | `preview:stopFind` | Stop the active in-page find |
 | `preview:exportPdf` | Export the live previewed page to PDF |
+| `preview:navigate` | Show another page in this tab, or step its history (#124). One invoke in two phases: `check` before anything happens, `commit` once the renderer has resolved the other tabs showing the target. The request (`PreviewNavigateRequestSchema`, strict) names a panel plus either `open` with a project `filePath` and an `anchor` (a fragment without its `#`, or `null`), or `back` / `forward` with main's own history `generation` – never a URL or a token. The service runs every other gate in the sender's window (the panel's view, real-root confinement, `.html` / `.htm`, eligibility, a navigation already pending). Answers `{ ok: true, target, generation }` or `{ ok: false, errorCode }`, re-validated before it goes back; a refusal carries the tab's new `history` only when main dropped a Back or Forward entry whose page is gone. A stale generation is refused with `PREVIEW_NAV_SKIPPED`; an untrusted sender, a bad payload or a failure reads `PREVIEW_NAV_UNAVAILABLE`, never a throw |
+| `preview:focusPage` | Put keyboard focus in the previewed page (issue #124, QG-8 U1) – the keyboard's only way into a page the renderer's tab order cannot reach. Sender-gated before the payload is read; `PreviewPanelRequestSchema` (a bounded `panelId`, strict); the view is looked up in the sender's own window. Answers a plain `{ ok }`: `false` for no live view (closed, suspended), a view that is not drawn, another window's view, or anything it cannot serve – never a throw. Called only on the reader's Enter or Space on the panel's placeholder; Escape in the page is the way back |
 | `preview:failuresChanged` | Event: the failure log for a panel changed (coalesced) |
 | `preview:hostBlocked` | Event: a remote **origin** was blocked, with every kind it was refused for. Drives the permission band's blocked list. Deliberately validated LOOSER than the approve path — something that can never be granted must still be reportable, or a page fails for a reason nothing on screen explains. De-duplicated main-side (one message per origin per *change of kinds*, not per request), capped at `PREVIEW.MAX_BLOCKED_HOSTS_PER_VIEW` with a per-hostname sub-cap of `PREVIEW.MAX_BLOCKED_ORIGINS_PER_HOST` so one noisy host cannot spend the whole budget on ports; the `truncated` flag rides the last event that fits |
 | `preview:allowlistChanged` | Event: the project's approved-**origin** set (field still named `hosts`). Seeded on open so a project can show what was granted in an earlier session, and fanned out after an approval to every live view of the project |
@@ -343,7 +346,15 @@ Channel names come from the `PreviewChannels` / `PreviewEvents` constants in `sr
 | `preview:loadStateChanged` | Event: the load state for a panel changed |
 | `preview:backdropChanged` | Event: the colour painted behind the page changed – Erfana's chrome colour until the page first paints, then the page's own resolved background. The renderer writes it onto the placeholder so the DOM and the native view never disagree (sd-074 §1.8a) |
 | `preview:boundsApplied` | Event: a `setBounds` that asked for confirmation was applied and the page has repainted at the new rect, echoing the request's `seq`. Anything that reveals Erfana's own chrome *because* the page moved (the permission band opening its list) waits for this rather than trusting the send |
-| `preview:forwardedShortcut` | Event: an enumerated keyboard accelerator was forwarded from the sealed page |
+| `preview:forwardedShortcut` | Event: an enumerated keyboard accelerator was forwarded from the sealed page – `f` / `s` / `w` / `Escape`, plus `back` / `forward` since #124 (matched on the physical key through `src/shared/previewNavKeys.ts`, so `accel` is `false` for both). For `f`, `w` and `Escape`, whose action moves focus out of the page, main gives the host window's contents native focus BEFORE sending (`previewHostFocus.ts`) |
+| `preview:pageChanged` | Event (#124): a load main started has committed – the tab shows another page, or another place in the same one. `filePath` and `anchor` come from main's gated history entry, never from the URL that committed; also carries `sameDocument`, the tab's Back / Forward state (`canGoBack`, `canGoForward`, `backTarget`, `forwardTarget`, `generation`) and `failed` (the committing load answered 400 or above – a refused page still commits) |
+| `preview:resizeHold` | Event (#124): a window-edge resize hid this panel's view (`held: true`) or ended (`held: false`). The renderer answers the end with a settled bounds push, and main shows the view again once that push is applied |
+
+### Open in default browser (`browser-handlers.ts`, constants in `browser-channels.ts`) (#124)
+
+| Channel | Purpose |
+|---------|---------|
+| `browser:openFile` | Open one `.html` / `.htm` project file in the default browser. Its own domain on purpose: not `shell:openExternal` (whose allow-list must stay web-only) and not `preview:` (the project tree uses it too, even with HTML execution off). `isTrustedSender` runs before the payload is read; the request is `{ filePath }` (strict, at most `MAX_BROWSER_OPEN_PATH_LENGTH` = 4096) – a file path, never an address. `BrowserLaunchService` then runs the project and real-path checks (see [security.md § HTML preview](security.md#html-preview)) and launches the real path it checked. Answers `{ success: true, usedFallback }` (`true` when no default browser was found and the file went to the system's `.html` app) or `{ success: false, errorCode, error }` with one of the six `OPEN_IN_BROWSER_*` codes and its `ERROR_MESSAGES` text; no raw error crosses IPC |
 
 ### Project lock (`project-lock-handlers.ts`)
 
@@ -405,7 +416,8 @@ To keep IPC payloads consistent across processes, shared zod schemas live at `sr
 - Image export schemas — `ImageExportRequestSchema` (`.strict()`, with the supported-extension allow-list expressed in the schema itself, so "unsupported format" needs no error code of its own) and the `success`-discriminated `ImageExportResponse`, whose failure branch **requires** both `errorCode` and `error`; plus the main-only harness render/result union (see `src/shared/ipc/image-export-schema.ts`); channel constants in `src/shared/ipc/image-export-channels.ts` (#73). The supported extensions and their MIME map are shared across the process boundary by `src/shared/ipc/image-formats.ts`, which both `main/services/file/imageRead.ts` and `renderer/src/utils/imageUtils.ts` import rather than re-declaring
 - Clipboard schemas — `ClipboardWriteTextSchema`, `CLIPBOARD_MAX_TEXT_LENGTH`, and the `ClipboardBridge` contract shared by the preload bridge and renderer service (see `src/shared/ipc/clipboard-schema.ts`); channel constants in `src/shared/ipc/clipboard-channels.ts`
 - Claude Code status schemas — the per-`terminalId` `ClaudeStatusSnapshot` contract consumed by `useClaudeStatusStore` and the register/nudge payloads (see `src/shared/ipc/claude-status-schema.ts`); channel constants in `src/shared/ipc/claude-status-channels.ts` (#216)
-- HTML preview schemas — the open/close/find/export and host-approval payloads plus the push-event shapes (see `src/shared/ipc/preview-schema.ts`), the versioned per-project allowlist contract (`src/shared/ipc/preview-settings-schema.ts`), and the `htmlPreview.enabled` global switch (`src/shared/ipc/global-settings-schema.ts`); channel constants in `src/shared/ipc/preview-channels.ts` (#74)
+- HTML preview schemas — the open/close/find/export and host-approval payloads plus the push-event shapes (see `src/shared/ipc/preview-schema.ts`), the versioned per-project allowlist contract (`src/shared/ipc/preview-settings-schema.ts`), and the `htmlPreview.enabled` global switch (`src/shared/ipc/global-settings-schema.ts`); channel constants in `src/shared/ipc/preview-channels.ts` (#74). Since #124 the same-tab navigation and resize-hold shapes live in `src/shared/ipc/preview-navigation-schema.ts` and the bridge contract in `src/shared/ipc/preview-bridge-types.ts`, because `preview-schema.ts` is at its size cap
+- Open in default browser schemas — the strict `{ filePath }` request and the `success`-discriminated response, whose failure branch carries one of the six `OPEN_IN_BROWSER_*` codes (see `src/shared/ipc/browser-schema.ts`); channel constant in `src/shared/ipc/browser-channels.ts` (#124)
 - System schemas – OS-integration actions with no payload, so there is nothing for Zod to validate and sender-frame gating is the sole guard. `system:openScreenRecordingSettings` opens the macOS Screen Recording privacy pane and is the **only** one of the two that is platform-gated (it no-ops off `darwin`). `system:relaunchApp` restarts the app on every platform; the macOS Screen Recording grant is merely the reason the flow exists, since macOS applies a fresh grant only to a newly-launched process. Channel constants in `src/shared/ipc/system-channels.ts`; both handlers are sender-gated main-side in `src/main/ipc/system-handlers.ts` via `isTrustedSender` (see [security.md § Sender-frame gating](./security.md#sender-frame-gating))
 - Graph engine schemas — request/response contracts for search, explain, reindex, corpus stats and status (see `src/shared/ipc/graph-schema.ts` plus the `graph-error-`, `graph-status-`, `graph-worker-` and `graph-mcp-schema.ts` splits); channel constants in `src/shared/ipc/graph-channels.ts` (#21). **Contract-only** — schema-frozen and typechecked, but no handler is registered, no preload bridge exists and no renderer calls them; #26 wires the handlers and adds `api.graph`. Requests use `strictObject` (unknown keys are rejected, not stripped), every payload carries a `correlationId`, and paths are project-relative and confinement-checked
 
@@ -443,4 +455,4 @@ Three preview channels are deliberately absent from the table above:
 
 - **`preview-page:linkActivated`** — page → main, registered with `webContents.ipc` on the preview's own WebContents (`previewViewLifecycle.ts`), never on the global `ipcMain`. Only that WebContents can reach it, so it needs no sender predicate; the handler additionally rejects sub-frame senders. WebContents-scoped rather than frame-scoped on purpose: a `WebFrameMain` is replaced when a navigated page replaces it, which would silently drop a `mainFrame.ipc` listener. Same shape of "invisible to the rest of the app" as the `image-export:harness-*` channels, though those are frame-scoped.
 - **`preview-page:cspViolation`** – page → main, the second channel on that same `webContents.ipc` (`previewCspViolationBridge.ts`, mirroring the link bridge). The preview's send-only preload forwards the page's own `securitypolicyviolation` reports, which is the only way a host the CSP refused in the renderer – before the network filter could see it – can reach the permission band. It widens nothing: both gates stay as they are, only the report is added.
-- **`preview:openFileRequested`** — main → renderer, and the only preview event that is **window-scoped** rather than broadcast. Every other preview event carries a `panelId` and is harmless to send everywhere; this one causes a tab to open, so broadcasting it would make every window open a tab for one window's link click.
+- **`preview:openFileRequested`** — main → renderer, and the only preview event that is **window-scoped** rather than broadcast. Every other preview event carries a `panelId` and is harmless to send everywhere; this one causes a tab to open, so broadcasting it would make every window open a tab for one window's link click. Since #124 its payload carries an optional `disposition` – `same-tab`, `new-tab` or `by-mode` (the tab's link-mode toggle decides); absent means `new-tab`, which is every link before #124.

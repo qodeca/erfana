@@ -8,15 +8,23 @@
  * ONLY on a change, and `sync()` recomputes on active-tab change. All fakes —
  * no real `window.api` or zustand store is touched.
  */
-import { describe, it, expect, vi } from 'vitest'
-import type { PreviewChromeGateReason } from '../../stores/usePreviewChromeGateStore'
-import { createOverlayGuard, type OverlayGuardDeps } from './OverlayGuardService'
+import { afterEach, describe, it, expect, vi } from 'vitest'
+import { usePreviewChromeGateStore } from '../../stores/usePreviewChromeGateStore'
+import { usePreviewCollapsedStore } from '../../stores/usePreviewCollapsedStore'
+import { usePreviewStore } from '../../stores/usePreviewStore'
+import {
+  createOverlayGuard,
+  getOverlayGuard,
+  resetOverlayGuard,
+  type OverlayGuardDeps,
+  type PreviewPanelGate
+} from './OverlayGuardService'
 
 /** A mutable fake environment plus the constructed guard. */
 function makeGuard(overrides: Partial<OverlayGuardDeps> = {}): {
   guard: ReturnType<typeof createOverlayGuard>
   setVisibility: ReturnType<typeof vi.fn>
-  state: { occluded: boolean; livePanelId: string | null }
+  state: { occluded: boolean; livePanelIds: readonly string[]; gates: Map<string, PreviewPanelGate> }
   fireOccluded: () => void
   firePreview: () => void
   fireGate: () => void
@@ -25,7 +33,7 @@ function makeGuard(overrides: Partial<OverlayGuardDeps> = {}): {
     occluded: false,
     livePanelIds: ['preview-1'] as readonly string[],
     /** Per-panel gate reasons. Absent means the page may be shown. */
-    gates: new Map<string, PreviewChromeGateReason>()
+    gates: new Map<string, PreviewPanelGate>()
   }
   const setVisibility = vi.fn()
   let occludedListener: () => void = () => {}
@@ -278,5 +286,136 @@ describe('OverlayGuardService — several live previews (sd-074b §4.8)', () => 
     state.livePanelIds = ['preview-1']
     firePreview()
     expect(setVisibility).toHaveBeenCalledWith('preview-1', true, 'active-tab')
+  })
+})
+
+describe('OverlayGuardService — the collapsed gate (#124 C2)', () => {
+  it('hides a collapsed panel with the reason `collapsed`, and shows it once the flag clears', () => {
+    const { guard, setVisibility, state, fireGate } = makeGuard()
+    guard.sync('preview-1')
+
+    state.gates.set('preview-1', 'collapsed')
+    fireGate()
+    expect(setVisibility).toHaveBeenLastCalledWith('preview-1', false, 'collapsed')
+
+    state.gates.delete('preview-1')
+    fireGate()
+    expect(setVisibility).toHaveBeenLastCalledWith('preview-1', true, 'active-tab')
+  })
+
+  it('still names an inactive tab first', () => {
+    const { guard, setVisibility, state } = makeGuard()
+    state.gates.set('preview-1', 'collapsed')
+
+    guard.sync('editor-2')
+
+    expect(setVisibility).toHaveBeenLastCalledWith('preview-1', false, 'inactive-tab')
+  })
+})
+
+describe('OverlayGuardService — production wiring of the panel gate', () => {
+  const setVisibility = vi.fn()
+
+  /** The real singleton over the real stores, with a live active preview. */
+  function liveGuard(): void {
+    setVisibility.mockClear()
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: { preview: { setVisibility, onVisibilityApplied: () => () => {} } }
+    })
+    usePreviewStore.getState().setLoadState('preview-1', 'ready')
+    getOverlayGuard().sync('preview-1')
+  }
+
+  afterEach(() => {
+    resetOverlayGuard()
+    usePreviewStore.setState({ panels: new Map() })
+    usePreviewChromeGateStore.setState({ gates: new Map() })
+    usePreviewCollapsedStore.setState({ collapsed: new Set() })
+  })
+
+  it('hides on the collapsed store and shows when it clears', () => {
+    liveGuard()
+    expect(setVisibility).toHaveBeenLastCalledWith('preview-1', true, 'active-tab')
+
+    usePreviewCollapsedStore.getState().setCollapsed('preview-1')
+    expect(setVisibility).toHaveBeenLastCalledWith('preview-1', false, 'collapsed')
+
+    usePreviewCollapsedStore.getState().clearCollapsed('preview-1')
+    expect(setVisibility).toHaveBeenLastCalledWith('preview-1', true, 'active-tab')
+  })
+
+  it('names the chrome gate first when both apply, and stays hidden until both clear', () => {
+    usePreviewChromeGateStore.getState().setGate('preview-1', 'unconfirmed')
+    usePreviewCollapsedStore.getState().setCollapsed('preview-1')
+    liveGuard()
+    expect(setVisibility).toHaveBeenLastCalledWith('preview-1', false, 'chrome-unconfirmed')
+
+    usePreviewChromeGateStore.getState().clearGate('preview-1')
+    expect(setVisibility).toHaveBeenCalledTimes(1)
+
+    usePreviewCollapsedStore.getState().clearCollapsed('preview-1')
+    expect(setVisibility).toHaveBeenLastCalledWith('preview-1', true, 'active-tab')
+  })
+
+  it('detaches from both gate stores on dispose', () => {
+    liveGuard()
+    resetOverlayGuard()
+    setVisibility.mockClear()
+
+    usePreviewCollapsedStore.getState().setCollapsed('preview-1')
+    usePreviewChromeGateStore.getState().setGate('preview-1', 'too-short')
+
+    expect(setVisibility).not.toHaveBeenCalled()
+  })
+})
+
+describe('OverlayGuardService — visiblePanelId (#124 drag freeze)', () => {
+  // The splitter drag freeze asks this before hiding anything, so a page that is
+  // not on screen is never waited on for a hide confirmation that cannot come.
+  it('returns null while no panel is shown', () => {
+    const { guard, state } = makeGuard()
+    expect(guard.visiblePanelId()).toBeNull() // before the first sync
+
+    state.livePanelIds = []
+    guard.sync('preview-1')
+    expect(guard.visiblePanelId()).toBeNull()
+  })
+
+  it('returns the one visible live panel, not its hidden siblings', () => {
+    const { guard, state } = makeGuard()
+    state.livePanelIds = ['preview-1', 'preview-2']
+    guard.sync('preview-2')
+    expect(guard.visiblePanelId()).toBe('preview-2')
+  })
+
+  it('does not return a panel that is hidden or gated', () => {
+    const { guard, state, fireOccluded, fireGate } = makeGuard()
+    guard.sync('editor-1') // another tab is active
+    expect(guard.visiblePanelId()).toBeNull()
+
+    guard.sync('preview-1')
+    state.occluded = true
+    fireOccluded()
+    expect(guard.visiblePanelId()).toBeNull()
+
+    state.occluded = false
+    state.gates.set('preview-1', 'unconfirmed')
+    fireGate()
+    expect(guard.visiblePanelId()).toBeNull()
+  })
+
+  it('excludes a collapsed panel, and returns it once the flag clears', () => {
+    const { guard, state, fireGate } = makeGuard()
+    guard.sync('preview-1')
+    expect(guard.visiblePanelId()).toBe('preview-1')
+
+    state.gates.set('preview-1', 'collapsed')
+    fireGate()
+    expect(guard.visiblePanelId()).toBeNull()
+
+    state.gates.delete('preview-1')
+    fireGate()
+    expect(guard.visiblePanelId()).toBe('preview-1')
   })
 })

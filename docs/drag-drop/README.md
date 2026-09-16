@@ -8,7 +8,7 @@ Erfana's project tree supports VS Code-style drag-drop file reorganization with:
 - **Keyboard shortcuts** - Ctrl+X/C/V for cut/copy/paste operations
 - **Cross-filesystem support** - Automatic fallback for moves across volumes
 - **Conflict resolution** - Automatic numbering for copy operations, confirm dialog for moves
-- **Accessibility** - ARIA live announcements for all operations
+- **Feedback** - Toast notifications (`showGlobalToast`) confirm cut, copy, move and copy results and report failures; there is no ARIA live announcer (see [visual-feedback.md § Accessibility](./visual-feedback.md#accessibility))
 
 ## Quick Start
 

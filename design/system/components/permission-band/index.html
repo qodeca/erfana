@@ -13,6 +13,9 @@
 <link rel="stylesheet" href="../row/row.css">
 <link rel="stylesheet" href="../row/host.css">
 <link rel="stylesheet" href="./band.css">
+<!-- Back, the link-mode toggle and the narrow-width tiers: synced from
+     PreviewNavControls.css, like band.css. Never edit the copy here. -->
+<link rel="stylesheet" href="./nav.css">
 <style>
   /* Documentation-only chrome. None of this ships. */
   .stage { display: flex; gap: var(--space-16); align-items: flex-start; flex-wrap: wrap; }
@@ -48,6 +51,20 @@
   .readout b { color: var(--color-brand-lime); font-weight: var(--font-normal); }
   .readout b.over { color: var(--color-error); }
   .ctl-btn { margin-bottom: var(--space-6); }
+
+  /* Issue #124 sections: documentation chrome, not shipped. */
+  .state-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+                gap: var(--space-8); margin-bottom: var(--space-16); }
+  .state { margin: 0; border: var(--border-width) solid var(--color-border-subtle); }
+  .state figcaption { padding: var(--space-4) var(--space-6); font-size: var(--text-sm);
+                      color: var(--color-text-secondary);
+                      border-top: var(--border-width) solid var(--color-border-subtle); }
+  .widths { display: flex; flex-direction: column; gap: var(--space-10);
+            margin-bottom: var(--space-16); }
+  .width-demo { border: var(--border-width) solid var(--color-border-subtle); }
+  .width-demo .readout { padding: var(--space-3) var(--space-6); }
+  .width-label { font-size: var(--text-sm); color: var(--color-text-tertiary); }
+  .width-label input { display: block; width: 320px; }
 </style>
 </head>
 <body>
@@ -115,28 +132,38 @@
       <div class="erf-band__announce" role="status" aria-live="polite" id="announce"></div>
 
       <div class="erf-band__bar" role="toolbar" aria-label="Preview">
+        <!-- Back leads (issue #124), as in every browser, Finder and Explorer.
+             aria-disabled, never disabled: see Exceptions. Its title is set by
+             renderBack(), which names the page it would go to. -->
+        <button class="erf-band__tool" type="button" id="back" aria-label="Back"
+                aria-keyshortcuts="Meta+[" data-preview-nav="back">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>
+        </button>
+        <!-- A toggle button: the name never changes, the state is aria-pressed. -->
+        <button class="erf-band__tool erf-band__tool--toggle" type="button" id="linkMode"
+                aria-label="Open links in this tab" aria-pressed="false"
+                title="Open links in this tab – off: links open a new tab">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4.1 12 6"></path><path d="m5.1 8-2.9-.8"></path><path d="m6 12-1.9 2"></path><path d="M7.2 2.2 8 5.1"></path><path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"></path></svg>
+        </button>
         <button class="erf-band__tool" type="button" aria-label="Find" title="Find (Cmd/Ctrl+F)">
           <!-- lucide `search`, 16px, matching MarkdownToolbar's button exactly.
                Inline here so the card needs no script tag from a CDN. -->
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path>
-          </svg>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
         </button>
         <span class="erf-band__spacer"></span>
         <button class="erf-band__chip" id="chip" aria-expanded="false">
-          <span id="chipCounts">0 blocked · 0 allowed</span>
+          <!-- Two parts, as in the app: a compact band hides the tail. -->
+          <span><span id="chipBlocked">0 blocked</span><span class="erf-band__chip-allowed" id="chipAllowed"> · 0 allowed</span></span>
           <span class="erf-band__chip-caret" id="chipCaret" aria-hidden="true">▸</span>
         </button>
-      <span class="erf-band__separator" aria-hidden="true"></span>
-      <button class="erf-band__tool" type="button" aria-label="Export to PDF" title="Export to PDF">
+        <span class="erf-band__separator" aria-hidden="true"></span>
+        <button class="erf-band__tool" type="button" id="openBrowser"
+                aria-label="Open in default browser" title="Open in default browser">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg>
+        </button>
+        <button class="erf-band__tool" type="button" aria-label="Export to PDF" title="Export to PDF">
           <!-- lucide `file-down`, 16px — the same button the markdown toolbar has. -->
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path>
-            <path d="M14 2v4a2 2 0 0 0 2 2h4"></path>
-            <path d="M12 18v-6"></path><path d="m9 15 3 3 3-3"></path>
-          </svg>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M12 18v-6"></path><path d="m9 15 3 3 3-3"></path></svg>
         </button>
       </div>
 
@@ -200,6 +227,148 @@
   </div>
 </div>
 
+<h2>The toolbar row: Back leads, chip trails</h2>
+<div class="ds-note">
+  <strong>Issue #124 put two controls in front of Find</strong>, because they act on this <em>tab</em> – where
+  its history goes, and what a plain link does in it – while Find acts on the page. Back leads the row, as it
+  does in every browser, in Finder and in Explorer; the link-mode toggle follows it; an 8px gap, not a second
+  rule, separates the pair from Find. The spacer still pushes the chip to the trailing edge, so the rule this
+  card used to state as "Find leads, chip trails" is now <strong>"Back leads, chip trails"</strong>. Open in
+  default browser sits behind the separator with Export to PDF: both act outside the page. There is no Forward
+  button – Back's tooltip names the Forward key, and Back's <code>aria-keyshortcuts</code> carries the Back key.
+  <br><br>
+  <strong>Try it in the band above.</strong> Back steps a two-page history (overview.html, then pricing.html).
+  One press and it is at the first page: <code>aria-disabled</code>, still focused, its tooltip saying why, and
+  "Showing overview.html." in the live region. With focus anywhere in the panel, <kbd>Cmd</kbd>+<kbd>[</kbd> and
+  <kbd>Cmd</kbd>+<kbd>]</kbd> (macOS) or <kbd>Alt</kbd>+<kbd>←</kbd> and <kbd>Alt</kbd>+<kbd>→</kbd> (Windows, Linux)
+  step it too – the card takes both, matched on the physical key as the app does. The toggle flips its pressed
+  state. Open in default browser goes busy for a moment and keeps focus.
+  <br><br>
+  <strong>The pressed state is a shape, not a colour</strong> (SC 1.4.1): the Rows card's "selected" signature,
+  a fill plus a 2px lime edge along the bottom. Both states carry the edge – transparent when off, with a
+  matching transparent one on top – so the icon sits where every other tool's sits and never moves. It is a
+  border, so it survives a Windows contrast theme, where a <code>forced-colors</code> rule turns it
+  <code>Highlight</code>.
+  <br><br>
+  <strong>Contrast, derived:</strong> the icons, <code>--color-text-primary</code> on
+  <code>--color-bg-primary</code>, are <strong><span data-claim="contrast-band-icon"></span>:1</strong>; the lime
+  edge against the band is <strong><span data-claim="contrast-pressed-edge"></span>:1</strong> – both clear of the
+  3:1 a control needs. <strong>Not derived yet:</strong> the icon and the focus ring on the pressed fill.
+  <code>--color-bg-selected</code> is translucent, and the ledger's contrast predicate reads opaque hex only, so
+  it cannot composite the fill over the band. Those two pairs are checked at the walk-through; if the inset ring
+  falls under 3:1 on the fill, the toggle's ring moves outward and gets an Exceptions row.
+  <br><br>
+  <strong>A control that is dimmed still shows a full-strength focus ring.</strong> The dim lives on the
+  <em>icon</em>, never on the button: <code>opacity</code> on the button makes a group that the focus outline is
+  inside, and the ring came out at roughly 2.3:1 there – under the 3:1 SC 1.4.11 asks of a focus indicator,
+  and under "visible" (SC 2.4.7). No ring colour repairs that, because the dim is applied after the colour.
+  Outside the group it is the band's ordinary ring:
+  <strong><span data-claim="contrast-focus-ring-on-band"></span>:1</strong> against
+  <code>--color-bg-primary</code>. This is the common case rather than an edge one – the panel moves focus
+  to Back after a move, which is the moment Back has nowhere to go. <strong>Tab to the disabled Back below:</strong>
+  the arrow stays dim, the ring does not. Where a control's whole content is a bare text node there is no box to
+  dim. So the confirm step's Confirm and the failed banner's buttons (not on this card) wrap their label in a
+  span and take this same shape: focused and busy, they still read as busy.
+</div>
+
+<div class="state-grid">
+  <figure class="state">
+    <div class="erf-band"><div class="erf-band__bar">
+      <button class="erf-band__tool" type="button" aria-label="Back" title="Back to overview.html (Cmd+[)&#10;Forward: Cmd+]"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg></button>
+    </div></div>
+    <figcaption>Back – an earlier page exists; the tooltip names it</figcaption>
+  </figure>
+  <figure class="state">
+    <div class="erf-band"><div class="erf-band__bar">
+      <button class="erf-band__tool" type="button" aria-label="Back" aria-disabled="true" title="Back (Cmd+[) – no earlier page in this tab&#10;Forward: Cmd+]"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg></button>
+    </div></div>
+    <figcaption>Back – nowhere to go: <code>aria-disabled</code>, still focusable, tooltip says why. <em>Tab to it</em>: the icon is dim, the ring is not</figcaption>
+  </figure>
+  <figure class="state">
+    <div class="erf-band"><div class="erf-band__bar">
+      <button class="erf-band__tool erf-band__tool--toggle" type="button" aria-label="Open links in this tab" aria-pressed="false" title="Open links in this tab – off: links open a new tab"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4.1 12 6"></path><path d="m5.1 8-2.9-.8"></path><path d="m6 12-1.9 2"></path><path d="M7.2 2.2 8 5.1"></path><path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"></path></svg></button>
+    </div></div>
+    <figcaption>Link mode off – links open a new tab (every tab starts here)</figcaption>
+  </figure>
+  <figure class="state">
+    <div class="erf-band"><div class="erf-band__bar">
+      <button class="erf-band__tool erf-band__tool--toggle" type="button" aria-label="Open links in this tab" aria-pressed="true" title="Open links in this tab – on: links replace this page"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4.1 12 6"></path><path d="m5.1 8-2.9-.8"></path><path d="m6 12-1.9 2"></path><path d="M7.2 2.2 8 5.1"></path><path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"></path></svg></button>
+    </div></div>
+    <figcaption>Link mode on – fill plus the lime edge</figcaption>
+  </figure>
+  <figure class="state">
+    <div class="erf-band"><div class="erf-band__bar">
+      <button class="erf-band__tool erf-band__tool--toggle" type="button" aria-label="Open links in this tab" aria-pressed="true" title="Open links in this tab – on: links replace this page"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4.1 12 6"></path><path d="m5.1 8-2.9-.8"></path><path d="m6 12-1.9 2"></path><path d="M7.2 2.2 8 5.1"></path><path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"></path></svg></button>
+    </div></div>
+    <figcaption>On + hover – <em>hover it</em>: the fill stays</figcaption>
+  </figure>
+  <figure class="state">
+    <div class="erf-band"><div class="erf-band__bar">
+      <button class="erf-band__tool erf-band__tool--toggle" type="button" aria-label="Open links in this tab" aria-pressed="true" title="Open links in this tab – on: links replace this page"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4.1 12 6"></path><path d="m5.1 8-2.9-.8"></path><path d="m6 12-1.9 2"></path><path d="M7.2 2.2 8 5.1"></path><path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"></path></svg></button>
+    </div></div>
+    <figcaption>On + focus – <em>Tab to it</em>: the band's inset ring draws over the fill</figcaption>
+  </figure>
+  <figure class="state">
+    <div class="erf-band"><div class="erf-band__bar">
+      <button class="erf-band__tool" type="button" aria-label="Open in default browser" aria-disabled="true" title="Open in default browser"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg></button>
+    </div></div>
+    <figcaption>Open in default browser – busy: <code>aria-disabled</code>, keeps focus</figcaption>
+  </figure>
+  <figure class="state">
+    <div class="erf-band"><div class="erf-band__bar">
+      <button class="erf-band__tool" type="button" aria-label="Export to PDF" title="Export to PDF" disabled><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M12 18v-6"></path><path d="m9 15 3 3 3-3"></path></svg></button>
+    </div></div>
+    <figcaption>Export to PDF – exporting: <code>disabled</code> (see Exceptions)</figcaption>
+  </figure>
+</div>
+
+<h2>Narrow panels: the row never wraps</h2>
+<div class="ds-note">
+  A taller band pushes the native page down – a bounds push and the 300 ms proof cycle – so the row never wraps
+  and never changes height. It steps down instead, by a container query on <code>.erf-band</code>.
+  <strong>Compact</strong>, below the width the full row needs: tighter padding and gaps, and the chip keeps
+  "12 blocked" but drops "· 34 allowed", so what stays visible is still the start of its accessible name
+  (SC 2.5.3). <strong>Minimal</strong>, below the width the compact row needs: Find and Export to PDF leave the row
+  and the Tab order, while their shortcuts keep working with focus in the page, which is reachable by keyboard;
+  Open in default browser stays, because it has none.
+  Anything that still does not fit scrolls sideways with no visible scrollbar, and focus brings a control into
+  view (SC 2.4.11).
+  <br><br>
+  <strong>The thresholds in <code>nav.css</code> are literal px, and they are measured here</strong> – a custom
+  property cannot be used in a container condition. Every band below carries a two-digit chip and prints what its
+  row needs at the tier it is in; a tier's threshold is the need of the tier above it. Change a tool, a gap or the
+  chip, and read these numbers again before touching the CSS.
+  <div class="readout" id="tierNeeds"></div>
+</div>
+
+<div class="widths">
+  <div class="width-demo" data-width="640"></div>
+  <div class="width-demo" data-width="400"></div>
+  <div class="width-demo" data-width="300"></div>
+  <label class="width-label">Any width – drag it through the tiers
+    <input type="range" id="freeWidth" min="160" max="700" value="340">
+  </label>
+  <div class="width-demo" id="freeDemo" data-width="340"></div>
+</div>
+
+<template id="rowTemplate">
+  <div class="erf-band"><div class="erf-band__bar" role="toolbar" aria-label="Preview at this width">
+    <button class="erf-band__tool" type="button" aria-label="Back" title="Back to overview.html (Cmd+[)&#10;Forward: Cmd+]"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg></button>
+    <button class="erf-band__tool erf-band__tool--toggle" type="button" aria-label="Open links in this tab" aria-pressed="false" title="Open links in this tab – off: links open a new tab"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4.1 12 6"></path><path d="m5.1 8-2.9-.8"></path><path d="m6 12-1.9 2"></path><path d="M7.2 2.2 8 5.1"></path><path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"></path></svg></button>
+    <button class="erf-band__tool" type="button" aria-label="Find" title="Find (Cmd/Ctrl+F)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg></button>
+    <span class="erf-band__spacer"></span>
+    <button class="erf-band__chip" type="button" aria-expanded="false"
+            aria-label="12 blocked · 34 allowed. Remote hosts in this preview. Press Escape in the previewed page to return here.">
+      <span>12 blocked<span class="erf-band__chip-allowed"> · 34 allowed</span></span>
+      <span class="erf-band__chip-caret" aria-hidden="true">▸</span>
+    </button>
+    <span class="erf-band__separator" aria-hidden="true"></span>
+    <button class="erf-band__tool" type="button" aria-label="Open in default browser" title="Open in default browser"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg></button>
+    <button class="erf-band__tool" type="button" aria-label="Export to PDF" title="Export to PDF"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M12 18v-6"></path><path d="m9 15 3 3 3-3"></path></svg></button>
+  </div></div>
+  <div class="readout"></div>
+</template>
+
 <h2>The unit is an origin, not a hostname</h2>
 <div class="ds-note">
   A row grants <strong>scheme, host and port</strong> — because that is the unit both chokepoints can
@@ -255,6 +424,50 @@
   change first.
 </div>
 
+<h2>The confirm step's focus ring goes outward</h2>
+<div class="ds-note">
+  <strong>Confirm is filled with <code>--color-accent-primary</code>, and <code>--color-border-focus</code>
+  is the same colour.</strong> The band draws its focus rings <em>inside</em> the control — a ring on a row's
+  Allow would be clipped by the host list's scroller — and inside this button means on top of its own fill:
+  <strong><span data-claim="contrast-focus-ring-on-confirm-fill"></span>:1</strong>. Not dim, not subtle:
+  absent, on the most irreversible control in the app (SC 2.4.7). It was invisible whether or not the button
+  was busy, so it is a second defect rather than part of the dimming one above.
+  <br><br>
+  <strong>Decided: the filled variant alone takes an outward ring</strong>, at the chip's offset, so it lands
+  on the confirm block's own surface —
+  <strong><span data-claim="contrast-focus-ring-on-confirm"></span>:1</strong> against
+  <code>--color-bg-tertiary</code>, clear of the 3:1 a focus indicator needs. Every other
+  <code>.erf-band__allow</code> keeps the inset ring: those are transparent, so their ring never lands on a
+  fill. This button is inside the scroller too, but it sits within the confirm block's 16px padding and the
+  ring needs 4px of it, so the clip cannot reach it — <strong>keep that padding if the rule moves</strong>.
+  <br><br>
+  A second ring <em>colour</em> for one button was the alternative and was rejected: one ring colour is the
+  <a href="../../foundations/focus.html">Focus foundation's</a> decision, and a per-variant exception is a
+  second rule to keep in step for a case that placement already solves.
+</div>
+
+<div class="state-grid">
+  <figure class="state">
+    <div class="erf-band"><div class="erf-band__confirm"><div class="erf-band__confirm-actions">
+      <button class="erf-band__allow" type="button">Cancel</button>
+      <button class="erf-band__allow erf-band__allow--primary" type="button">Confirm</button>
+    </div></div></div>
+    <figcaption>Confirm – resting: the accent fill marks the one-way door, Cancel stays the plain outline</figcaption>
+  </figure>
+  <figure class="state">
+    <div class="erf-band"><div class="erf-band__confirm"><div class="erf-band__confirm-actions">
+      <button class="erf-band__allow erf-band__allow--primary" type="button">Confirm</button>
+    </div></div></div>
+    <figcaption>Confirm + focus – <em>Tab to it</em>: the ring sits outside the fill, on the confirm surface</figcaption>
+  </figure>
+  <figure class="state">
+    <div class="erf-band"><div class="erf-band__confirm"><div class="erf-band__confirm-actions">
+      <button class="erf-band__allow erf-band__allow--primary" type="button" aria-disabled="true" aria-busy="true"><span>Saving…</span></button>
+    </div></div></div>
+    <figcaption>Confirm – busy: <code>aria-disabled</code>, keeps focus, label says so. <em>Tab to it</em>: the label stays dim, the ring does not</figcaption>
+  </figure>
+</div>
+
 <h2>Exceptions</h2>
 <p style="max-width: 72ch; color: var(--color-text-tertiary)">
   Where the shipping component departs from this card, with the reason. An undocumented deviation is a
@@ -279,6 +492,22 @@
       <td>Is an async IPC round trip, followed by a CSP rebuild and a reload. Confirm carries
         <code>aria-disabled</code> while the write is in flight, and Escape is ignored in that state —
         there is no safe way to cancel a write already sent.</td>
+    </tr>
+    <tr>
+      <td>A toolbar tool that cannot act right now</td>
+      <td>Is <code>aria-disabled</code>: it ignores presses, keeps focus and keeps its tooltip – Back with no
+        earlier page, Open in default browser while it waits for main.</td>
+      <td>Export to PDF still takes <code>disabled</code> while an export runs
+        (<code>PreviewToolbarTools.tsx</code>), which Chromium blurs, so focus falls to the page body when the save
+        dialog closes. Recorded rather than silently different; moving it to <code>aria-disabled</code> is
+        follow-up work.</td>
+    </tr>
+    <tr>
+      <td>Find and Export to PDF, narrow panels</td>
+      <td>Every control keeps its place in the row.</td>
+      <td>Below the compact row's width both leave the row with <code>display: none</code> – out of the Tab order
+        rather than clipped while still focusable. Their shortcuts, Cmd/Ctrl+F and Cmd/Ctrl+S, keep working with focus in the page, which is
+        reachable by keyboard.</td>
     </tr>
   </tbody>
 </table>
@@ -340,7 +569,11 @@ const el = (id) => document.getElementById(id);
 function announce(text) { el('announce').textContent = text; }
 
 function render() {
-  el('chipCounts').textContent = `${blocked.length} blocked · ${allowed.length} allowed`;
+  el('chipBlocked').textContent = `${blocked.length} blocked`;
+  el('chipAllowed').textContent = ` · ${allowed.length} allowed`;
+  // The app's accessible name: the visible text first (SC 2.5.3), then the way out.
+  el('chip').setAttribute('aria-label', `${blocked.length} blocked · ${allowed.length} allowed. `
+    + 'Remote hosts in this preview. Press Escape in the previewed page to return here.');
   el('chip').setAttribute('aria-expanded', String(open));
   el('chipCaret').textContent = open ? '▾' : '▸';
   el('chip').classList.toggle('erf-band__chip--failed', failed !== null);
@@ -570,13 +803,15 @@ function confirmBlock(item) {
   cancel.textContent = 'Cancel';
   cancel.addEventListener('click', () => { confirming = null; render(); el('chip').focus(); });
 
+  // THE SHIPPING CLASS, not three inline styles. This demo used to paint the
+  // accent fill by hand, which meant it rendered something the app does not have:
+  // no `--primary` class, so none of that variant's rules - including the outward
+  // focus ring decided below - applied here. A card that hand-draws a variant
+  // cannot show that variant's bugs.
   const confirm = document.createElement('button');
-  confirm.className = 'erf-band__allow';
+  confirm.className = 'erf-band__allow erf-band__allow--primary';
   confirm.id = 'confirmBtn';
   confirm.textContent = 'Confirm';
-  confirm.style.background = 'var(--color-accent-primary)';
-  confirm.style.color = 'var(--color-brand-black)';
-  confirm.style.fontWeight = 'var(--font-semibold)';
   confirm.addEventListener('click', () => approve(item.host));
 
   actions.append(cancel, confirm);
@@ -749,11 +984,126 @@ el('reset').addEventListener('click', () => {
   failed = null;
   failNext = false;
   el('failNext').textContent = 'Make the next approval fail to save';
+  page = 1;
+  renderBack();
   render();
+});
+
+/* ---------- issue #124: Back, the link-mode toggle, Open in default browser ---------- */
+
+// Two pages are enough to show both of Back's states: one press and Back is at
+// the first page, aria-disabled, and still holding focus.
+const PAGES = ['overview.html', 'pricing.html'];
+let page = 1;
+
+function renderBack() {
+  const back = el('back');
+  const canGoBack = page > 0;
+  if (canGoBack) back.removeAttribute('aria-disabled');
+  else back.setAttribute('aria-disabled', 'true');
+  back.title = canGoBack
+    ? `Back to ${PAGES[page - 1]} (Cmd+[)\nForward: Cmd+]`
+    : 'Back (Cmd+[) – no earlier page in this tab\nForward: Cmd+]';
+}
+
+function stepHistory(delta) {
+  const next = page + delta;
+  // Nowhere to go: nothing happens, and no sound.
+  if (next < 0 || next >= PAGES.length) return;
+  page = next;
+  renderBack();
+  announce(`Showing ${PAGES[page]}.`);
+}
+
+el('back').addEventListener('click', () => stepHistory(-1));
+
+// Keys only while focus is in this panel, as in the app: a listener on the panel,
+// never on the window. The physical key (`code`), with exactly one modifier.
+el('panel').addEventListener('keydown', (event) => {
+  const onlyMeta = event.metaKey && !event.altKey && !event.ctrlKey && !event.shiftKey;
+  const onlyAlt = event.altKey && !event.metaKey && !event.ctrlKey && !event.shiftKey;
+  let delta = 0;
+  if ((onlyMeta && event.code === 'BracketLeft') || (onlyAlt && event.code === 'ArrowLeft')) delta = -1;
+  if ((onlyMeta && event.code === 'BracketRight') || (onlyAlt && event.code === 'ArrowRight')) delta = 1;
+  if (delta === 0) return;
+  event.preventDefault();
+  stepHistory(delta);
+});
+
+el('linkMode').addEventListener('click', () => {
+  const on = el('linkMode').getAttribute('aria-pressed') !== 'true';
+  el('linkMode').setAttribute('aria-pressed', String(on));
+  el('linkMode').title = on
+    ? 'Open links in this tab – on: links replace this page'
+    : 'Open links in this tab – off: links open a new tab';
+});
+
+// Busy from the press until main answers; presses are ignored, focus stays.
+el('openBrowser').addEventListener('click', () => {
+  const button = el('openBrowser');
+  if (button.getAttribute('aria-disabled') === 'true') return;
+  button.setAttribute('aria-disabled', 'true');
+  setTimeout(() => button.removeAttribute('aria-disabled'), 1200);
+});
+
+/* ---------- narrow panels: measured, not asserted ---------- */
+
+/* What a bar's row needs: every visible control, the gaps between them and the
+   bar's own padding. The spacer counts as nothing – it is what gives way first. */
+function rowNeeds(bar) {
+  const style = getComputedStyle(bar);
+  const gap = parseFloat(style.columnGap) || 0;
+  const kids = [...bar.children].filter((node) => getComputedStyle(node).display !== 'none');
+  let total = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight) + gap * (kids.length - 1);
+  for (const node of kids) {
+    if (node.classList.contains('erf-band__spacer')) continue;
+    const box = getComputedStyle(node);
+    total += node.getBoundingClientRect().width + parseFloat(box.marginLeft) + parseFloat(box.marginRight);
+  }
+  return Math.ceil(total);
+}
+
+function tierOf(band) {
+  const find = band.querySelector(".erf-band__tool[aria-label='Find']");
+  if (getComputedStyle(find).display === 'none') return 'minimal';
+  const tail = band.querySelector('.erf-band__chip-allowed');
+  return getComputedStyle(tail).display === 'none' ? 'compact' : 'full';
+}
+
+function measureWidths() {
+  const needs = {};
+  for (const demo of document.querySelectorAll('.width-demo')) {
+    if (!demo.firstElementChild) demo.append(el('rowTemplate').content.cloneNode(true));
+    demo.style.width = `${demo.dataset.width}px`;
+    const band = demo.querySelector('.erf-band');
+    const bar = band.querySelector('.erf-band__bar');
+    const need = rowNeeds(bar);
+    const tier = tierOf(band);
+    const fits = need <= bar.clientWidth;
+    needs[tier] = need;
+    const out = demo.querySelector('.readout');
+    out.textContent = '';
+    const tierNode = document.createElement('b');
+    tierNode.textContent = tier;
+    const needNode = document.createElement('b');
+    needNode.textContent = `${need}px`;
+    needNode.classList.toggle('over', !fits);
+    out.append(`${demo.dataset.width}px wide · `, tierNode, ' · this row needs ', needNode,
+      fits ? ' – fits' : ' – scrolls sideways');
+  }
+  el('tierNeeds').textContent = ['full', 'compact', 'minimal']
+    .map((tier) => `${tier} row needs ${needs[tier] === undefined ? '– (drag the slider)' : `${needs[tier]}px`}`)
+    .join(' · ');
+}
+
+el('freeWidth').addEventListener('input', (event) => {
+  el('freeDemo').dataset.width = event.target.value;
+  measureWidths();
 });
 
 el('panel').style.height = '520px';
 el('reset').click();
+measureWidths();
 </script>
 </body>
 </html>

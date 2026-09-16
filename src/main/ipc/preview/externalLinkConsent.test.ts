@@ -164,8 +164,10 @@ describe('createExternalLinkConsent — one question at a time', () => {
     expect(mockLogger.info).not.toHaveBeenCalledWith('Preview external link: opened', expect.anything())
     expect(mockLogger.warn).toHaveBeenCalledWith(
       'Preview external link: open failed',
-      expect.objectContaining({ error: 'no handler' })
+      expect.objectContaining({ error: 'Error' })
     )
+    // The error's name only: its message never reaches the log (QG-8 T4).
+    expect(JSON.stringify(mockLogger.warn.mock.calls)).not.toContain('no handler')
 
     await ask(URL_, WINDOW.id)
     expect(mockLogger.info).toHaveBeenCalledWith('Preview external link: opened', expect.anything())
@@ -179,6 +181,29 @@ describe('createExternalLinkConsent — one question at a time', () => {
 
     await ask(URL_, WINDOW.id)
     expect(showMessageBox).toHaveBeenCalledTimes(2)
+  })
+
+  it('logs a failed hand-off by name and code, never its message (QG-8 T4)', async () => {
+    // A Node or shell error can quote the path or the full link it failed on.
+    const { ask, openExternal } = makeDeps({ response: 1 })
+    const eacces = Object.assign(
+      new Error(`EACCES: permission denied, open '/Users/alice/handler' for ${URL_}`),
+      { code: 'EACCES', errno: -13, syscall: 'open' }
+    )
+    openExternal.mockRejectedValueOnce(eacces)
+
+    await expect(ask(URL_, WINDOW.id)).rejects.toBe(eacces)
+
+    const failed = mockLogger.warn.mock.calls.filter(
+      ([line]) => line === 'Preview external link: open failed'
+    )
+    expect(failed).toEqual([
+      [
+        'Preview external link: open failed',
+        { destination: 'https://example.com', error: 'Error', code: 'EACCES' }
+      ]
+    ])
+    expect(JSON.stringify(failed)).not.toMatch(/\/Users\/alice|token=secret/)
   })
 })
 

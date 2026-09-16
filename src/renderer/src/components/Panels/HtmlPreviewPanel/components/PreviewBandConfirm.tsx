@@ -116,13 +116,20 @@ export function PreviewBandConfirm({
     const box = boxRef.current
     if (!box) return
 
-    const stops = box.querySelectorAll<HTMLElement>('button:not([aria-disabled="true"])')
+    // Every button is a stop, busy Confirm included: an `aria-disabled` button
+    // still holds focus, and leaving it out let Tab walk out of the box (Q25).
+    const stops = Array.from(box.querySelectorAll<HTMLElement>('button'))
     if (stops.length === 0) return
     const first = stops[0]
     const last = stops[stops.length - 1]
     const active = document.activeElement
 
-    if (event.shiftKey && (active === first || active === box)) {
+    // Focus on something inside the box that is not a stop would otherwise let
+    // the browser's own Tab order carry it past the last button and out.
+    if (active !== box && !stops.includes(active as HTMLElement)) {
+      event.preventDefault()
+      ;(event.shiftKey ? last : first).focus()
+    } else if (event.shiftKey && (active === first || active === box)) {
       event.preventDefault()
       last.focus()
     } else if (!event.shiftKey && active === last) {
@@ -185,7 +192,16 @@ export function PreviewBandConfirm({
       <div className="erf-band__confirm-actions">
         {/* Cancel is FIRST in DOM order, so the first Tab from the container is
             the safe one. */}
-        <button type="button" className="erf-band__allow" onClick={onCancel}>
+        {/* A write already sent cannot be cancelled: while busy Cancel does
+            nothing, as Escape does, rather than moving focus to the chip. */}
+        <button
+          type="button"
+          className="erf-band__allow"
+          onClick={() => {
+            if (busy) return
+            onCancel()
+          }}
+        >
           Cancel
         </button>
         {/*
@@ -204,7 +220,15 @@ export function PreviewBandConfirm({
             onConfirm()
           }}
         >
-          {busy ? 'Saving…' : 'Confirm'}
+          {/*
+            THE SPAN IS LOAD-BEARING. Busy is drawn by dimming the button's
+            CONTENT (`.erf-band__allow[aria-disabled='true'] > *` in
+            PreviewChromeBand.css). A bare text node has no box to dim, and
+            dimming the button itself dims its focus ring too - about 2.3:1,
+            under the 3:1 of WCAG 1.4.11. It adds no semantics; the accessible
+            name is still the text.
+          */}
+          <span>{busy ? 'Saving…' : 'Confirm'}</span>
         </button>
       </div>
     </div>

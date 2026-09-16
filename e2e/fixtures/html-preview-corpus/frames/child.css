@@ -1,0 +1,18 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+
+/*
+ * Used only by frames (child.html and index.html's srcdoc frame): saving it
+ * must reload the preview, never swap in place (WI-15). --child-mark is what
+ * each frame reports back.
+ */
+:root {
+  --child-mark: child-v1;
+}
+
+body {
+  margin: 0.5rem;
+  font: 13px/1.4 system-ui, sans-serif;
+  color: #1b1b1f;
+  background: #fdf6e3;
+}

@@ -96,7 +96,7 @@ Full copy/paste operations with keyboard shortcuts and context menu.
 
 **Behavior**:
 - Selection preserved after copy (VS Code behavior)
-- Toast notification on copy success
+- No success toast on copy; a transport failure surfaces one debounced, persistent error toast via the shared `textClipboard` service (#203)
 - Pure logic extraction pattern: `terminalClipboard.logic.ts` for testability
 
 **Central clipboard service (#203)**: terminal copy/paste now reads and writes through the shared renderer `textClipboard` service (`src/renderer/src/services/textClipboard.ts` → main-process `clipboard` module over IPC), the single transport-error chokepoint for all text surfaces. The SIGINT-vs-copy decision table in `terminalClipboard.logic.ts` (#28/#122) is **unchanged** — only the underlying read/write transport moved. See [API Services § Clipboard service](../api-services.md#clipboard-service-203).
@@ -390,8 +390,8 @@ See [Scroll Fixes](./scroll-fixes.md) for related scroll preservation features.
 
 - **Font**: **Cascadia Mono**, 12px, bold support — bundled with the app (`src/renderer/src/assets/fonts/`, declared in `src/renderer/src/styles/fonts.css`, SIL OFL 1.1) so the terminal renders identically on every platform. SF Mono / Monaco / Consolas remain as fallbacks. Apple's SF Mono cannot be redistributed, so Cascadia Mono is the closest freely-licensable match. The font is awaited via the CSS Font Loading API (`ensureTerminalFontLoaded`) **before** `xterm.open()` — xterm measures glyph metrics on a canvas at open time, so a not-yet-loaded web font would cache fallback metrics and misalign the grid.
 - **Theme**: High contrast – black background (`#000000`), white foreground (`#ffffff`), cyan cursor (`#4fc1ff`)
-- **Scrollbar**: 16px wide, dark gray thumb (`#555555`) on `#1e1e1e` track, custom WebKit styling
-- **Container**: `padding: 0` on container, `padding: 8px` on `.xterm`
+- **Scrollbar**: xterm v6 uses VS Code's `DomScrollableElement` widget; the native `.xterm-viewport` scrollbar is hidden and the `.xterm-scrollable-element > .scrollbar > .slider` thumb is styled with `var(--color-gray-700)` (hover `--color-gray-600`, active `--color-gray-500`) in `TerminalPanel.css`
+- **Container**: `padding: 0` on container, `padding: var(--space-4)` on `.xterm`
 
 ### Shell Configuration
 
@@ -408,7 +408,7 @@ See [Scroll Fixes](./scroll-fixes.md) for related scroll preservation features.
 
 **Shell Arguments** (Platform-Specific):
 - **macOS/Linux**: `-l` (login shell) - Sources RC files (.zprofile, .bash_profile) to load environment, Homebrew paths, and user configuration
-- **Windows (PowerShell)**: `-NoProfile` - Loads full environment profile
+- **Windows (PowerShell)**: `-NoProfile` - Skips the user profile for a fast, isolated bootstrap; the bootstrap then launches the interactive `pwsh`/`powershell` with `-NoLogo` (see [Bootstrap Pattern](./bootstrap-pattern.md))
 - **Windows (cmd.exe)**: No arguments - Uses default environment
 
 ### Terminal Initialization
@@ -428,12 +428,12 @@ class TerminalService extends EventEmitter {
   private terminals: Map<string, TerminalInstance>
 
   // Lifecycle
-  createTerminal(config?: TerminalConfig, webContentsId?: number): Promise<TerminalCreateResult>
+  createTerminal(config?: TerminalConfig, webContentsId?: number): Promise<{ terminalId: string; shellKind: ShellKind } | { error: string }>  // never null; the IPC handler passes `error` through verbatim
   killTerminal(terminalId: string): boolean
   dispose(): Promise<void>
 
   // Operations
-  write(terminalId: string, data: string): Promise<boolean>  // v0.3.3: Promise-based with completion callback
+  write(terminalId: string, data: string): boolean  // synchronous; true if the PTY write was initiated
   resize(terminalId: string, cols: number, rows: number): boolean
 
   // Info
@@ -446,35 +446,41 @@ export const terminalService = new TerminalService()
 
 **Pattern**: OOP service with singleton instance (follows FileService pattern)
 
-**v0.3.3 Enhancement**: The `write()` method now returns a Promise that resolves when the write operation completes. This enables reliable autoExecute behavior for prompt templates, preventing race conditions between text write and Enter key. See [AutoExecute Reference](../prompts/autoexecute-reference.md) for details.
+**History note**: v0.3.3 made `write()` Promise-based with a completion callback to support autoExecute for prompt templates. That change was later reverted – `write()` is a plain synchronous boolean today, and autoExecute reliability comes from the renderer's fixed 200 ms delay before sending Enter (`useTerminalStore.sendToTerminal`). The renderer-facing `window.api.terminal.write()` still returns a Promise because it is an `ipcRenderer.invoke` round-trip. See [AutoExecute Reference](../prompts/autoexecute-reference.md).
 
 ### IPC Handlers
 
-**File**: `src/main/ipc/terminal-handlers.ts` (~120 lines)
+**File**: `src/main/ipc/terminal-handlers.ts`
 
 **Exposed via contextBridge**:
 ```typescript
 window.api.terminal = {
   isAvailable: (terminalId?) => Promise<{success, available, initialized?}>
-  create: (config) => Promise<{success, terminalId?, error?}>
-  write: (terminalId, data) => Promise<{success, error?}>  // v0.3.3: Promise-based
+  create: (config) => Promise<{success, terminalId?, shellKind?, error?}>  // shellKind: 'posix' | 'cmd' | 'powershell' (#164)
+  write: (terminalId, data) => Promise<{success, error?}>  // invoke round-trip; main-side write() is synchronous
   resize: (terminalId, cols, rows) => void
-  kill: (terminalId) => void
+  kill: (terminalId) => Promise<{success, error?}>
+  getInfo: (terminalId) => Promise<{success, info?: {id, cwd, title}, error?}>
+  list: () => Promise<{success, terminals?: Array<{id, title}>, error?}>
 
   // Events
   onData: (callback) => unsubscribe
   onExit: (callback) => unsubscribe
   onError: (callback) => unsubscribe
+
+  // Bootstrap clear handshake (see bootstrap-pattern.md)
+  onClear: (callback) => unsubscribe
+  markClearComplete: (terminalId) => void
 }
 ```
 
 ### UI Component (Modular Architecture, v0.6.5)
 
-**Main Component**: `src/renderer/src/components/Panels/TerminalPanel.tsx` (~250 lines)
+**Main Component**: `src/renderer/src/components/Panels/TerminalPanel.tsx`
 
 **Extracted Hooks** (`src/renderer/src/components/Panels/TerminalPanel/hooks/`):
 - `useTerminalDragDrop.ts` - External file drag-drop handling
-- `useScreenshotCapture.ts` - macOS screenshot capture workflow
+- `useScreenshotCapture.ts` - Cross-platform screenshot capture workflow (full-screen, window and area modes; #164)
 - `useTerminalResize.ts` - ResizeObserver-based terminal resize
 - `useTerminalPortal.ts` - DOM portal management for xterm
 
@@ -511,7 +517,7 @@ interface TerminalStore {
 
 **Purpose**: Cross-component communication (PreviewContextMenu → Terminal Panel)
 
-**v0.3.3 Enhancement**: `sendToTerminal()` now supports `autoExecute` parameter to automatically send Enter key after text. Includes initialization polling (5s timeout, 50ms intervals) to prevent race conditions. See [AutoExecute Reference](../prompts/autoexecute-reference.md).
+**v0.3.3 Enhancement**: `sendToTerminal()` supports an `autoExecute` parameter to send the Enter key 200 ms after the text. The store itself does no readiness polling; the readiness helper is `waitForTerminalReady()` in `src/renderer/src/utils/panelUtils.ts` (event-based via `waitForReady` when available, otherwise polling with a 5 s timeout and 50 ms interval). See [AutoExecute Reference](../prompts/autoexecute-reference.md).
 
 ### Bracketed Paste Mode (v0.7.2+, #108)
 

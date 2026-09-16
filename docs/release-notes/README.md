@@ -87,4 +87,4 @@ The first Erfana release using this two-tier format is **v0.9.5** — the releas
 - [`.claude/skills/releasing-erfana/SKILL.md`](../../.claude/skills/releasing-erfana/SKILL.md) — the skill that drives the release.
 - [`.claude/agents/release-notes-drafter.md`](../../.claude/agents/release-notes-drafter.md) — agent that composes the two-tier markdown.
 - [`cliff.toml`](../../cliff.toml) — git-cliff config producing the technical section.
-- [`docs/CHANGELOG.md`](../CHANGELOG.md) — historical changelog (pre-v0.9.5).
+- [`docs/CHANGELOG.md`](../CHANGELOG.md) — the running per-version changelog, covering every release (the files in this directory are the GitHub release bodies; the changelog is the fuller record).

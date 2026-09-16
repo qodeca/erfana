@@ -24,7 +24,8 @@ miss is enough: the policy needs a gate rather than a convention.
 - **The snapshot is deliberately written ahead of the tag.** Re-anchoring on a version
   that is not yet released is not a documentation lie; it is part of release prep.
 - **The re-anchor does NOT ride the §1.5 commit bundle.** §1.5 stages exactly
-  `package.json`, `docs/CHANGELOG.md` and `docs/release-notes/v{version}.md` —
+  `package.json`, `package-lock.json`, `docs/CHANGELOG.md`,
+  `docs/release-notes/v{version}.md` and `CLAUDE.md` —
   `docs/windows/implementation-plan.md` is not in that list, and this gate runs at
   §0.4.6, i.e. *after* §0.2's clean-tree gate. So remediating a failure mid-release
   dirties the tree and §0.2 will refuse on the next run. The remediation is its own

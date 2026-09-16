@@ -16,7 +16,7 @@
  * All commands are testable via dependency injection (MenuContext).
  */
 
-import { Copy, Scissors, Clipboard as ClipboardIcon, Edit, Trash, FilePlus, FolderPlus, FileUp, FolderOpen, FileCode } from 'lucide-react'
+import { Copy, Scissors, Clipboard as ClipboardIcon, Edit, Trash, FilePlus, FolderPlus, FileUp, FolderOpen, FileCode, ExternalLink } from 'lucide-react'
 import type { IMenuItem, MenuContext, FileNode, FileNodeDirectory, FileNodeFile } from './types'
 import { isMacOS, isWindows } from '../../../utils/platform'
 import { getDirname } from '../../../utils/fileUtils'
@@ -184,6 +184,22 @@ export class OpenAsSourceCommand extends CommandBase {
 
   execute(): void {
     this.ctx.openAsSource?.((this.node as FileNodeFile).path)
+  }
+}
+
+/**
+ * Open-in-default-browser command – hands an `.html`/`.htm` file to the system
+ * browser (issue #124, part 4). No confirmation: it acts at once, so no ellipsis.
+ * Routes through {@link MenuContext.openInBrowser}, the same action the preview
+ * toolbar calls, so both raise the same toasts; the promise is returned so the
+ * menu can await it. Main confines the path – nothing here is a check.
+ */
+export class OpenInBrowserCommand extends CommandBase {
+  label = 'Open in default browser'
+  icon = <ExternalLink size={14} strokeWidth={2} />
+
+  execute(): Promise<void> | void {
+    return this.ctx.openInBrowser?.(this.node.path)
   }
 }
 

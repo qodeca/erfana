@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 // Unified Dialog Framework - Main exports
 
-export { DialogProvider, useDialog } from './DialogContext'
+export { DialogProvider, useDialog, useOptionalDialog } from './DialogContext'
 export { DialogManager } from './DialogManager'
 export { BaseDialog } from './BaseDialog'
 export { ConfirmDialog } from './ConfirmDialog'
@@ -13,6 +13,7 @@ export { NewFileDialog } from './NewFileDialog'
 export { NewFolderDialog } from './NewFolderDialog'
 export { DropModeDialog } from './DropModeDialog'
 export { ConflictDialog } from './ConflictDialog'
+export { UnsavedChangesDialog } from './UnsavedChangesDialog'
 export { ScreenSelectDialog } from './ScreenSelectDialog'
 export { WindowPickerDialog } from './WindowPickerDialog'
 export { CameraDialog } from './CameraDialog'
@@ -39,6 +40,8 @@ export type {
   DropModeDialogResult,
   ConflictDialogConfig,
   ConflictDialogResult,
+  UnsavedChangesDialogConfig,
+  UnsavedChangesDialogResult,
   DialogConfig,
   Dialog,
   DialogContextType,

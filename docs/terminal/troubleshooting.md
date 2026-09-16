@@ -46,7 +46,7 @@ Known issues, common problems, and solutions for Erfana's terminal panel.
 
 ### node-pty Build Failure (Python 3.13)
 
-**Status**: Terminal feature deferred until resolved
+**Status**: Build prerequisite, not a product defect – the terminal has shipped; this only bites at `npm ci` time on a development machine
 
 **Issue**: node-pty fails to build with Python 3.13 due to native module compilation
 
@@ -55,9 +55,9 @@ Known issues, common problems, and solutions for Erfana's terminal panel.
 ModuleNotFoundError: No module named 'distutils'
 ```
 
-**Current State**: Terminal panel implemented but may not work if node-pty build failed
+**Current State**: The terminal panel shows its "unavailable" state if the node-pty build failed on this machine
 
-**Workaround**: Use Python 3.12 or earlier for development
+**Workaround**: Use Python 3.12 (known good) or 3.14.x for development – see [CONTRIBUTING § Local setup](../../CONTRIBUTING.md#local-setup)
 
 ```bash
 # Check if node-pty is available
@@ -141,13 +141,14 @@ const terminalIdRef = useRef<string | null>(null)
 - Uses a ResizeObserver + visibility check to initialize once visible
 
 #### CWD Verification
-- After spawn, TerminalService explicitly sets and verifies cwd to ensure shells that override startup directories are corrected
-- Implementation: sends platform-specific `cd` + prints `pwd` followed by a unique marker; updates cached cwd when detected
+- The shell is spawned with a non-interactive bootstrap script that `cd`s to the project root, prints the working directory, then prints a unique marker; `markerDetector` parses the line before the marker as the cwd and updates the cached value
+- Implementation: the POSIX branch of `TerminalService.createTerminal` and the `WindowsBootstrapBuilder` strategies in `WindowsTerminalBootstrap.ts` – see [Bootstrap Pattern](./bootstrap-pattern.md)
 
-**Platform Details**:
-- macOS/Linux: `cd "<projectRoot>" && printf "%s\n" "$(pwd)" && echo <MARKER>`
-- Windows (PowerShell): `Set-Location -Path "<projectRoot>" ; Write-Output (Get-Location).Path ; Write-Output <MARKER>`
-- Windows (cmd.exe): `cd /d "<projectRoot>" & cd & echo <MARKER>`
+**Platform Details** (cwd escaping omitted):
+- macOS/Linux: `cd '<projectRoot>'; pwd; echo <MARKER>; exec -l "$SHELL" -i`
+- Windows (Git Bash): `cd '<projectRoot>'; pwd; echo <MARKER>; printf '\033[2J\033[3J\033[H'; exec -l '<bash.exe>' -i`
+- Windows (PowerShell): `-NoProfile -Command "Set-Location -LiteralPath '<projectRoot>'; (Get-Location).Path; Write-Output '<MARKER>'; [Console]::Write(<clear>); & '<pwsh.exe>' -NoLogo"`
+- Windows (cmd.exe): `/D /K "@echo off && cd /d "<projectRoot>" && cd && echo <MARKER> && cls"`
 
 **References**:
 - Main: `src/main/services/TerminalService.ts`
@@ -253,7 +254,7 @@ new Terminal({
 
 **Solutions**:
 1. Check WebGL is enabled (see [Flickering Prevention](./flickering-prevention.md))
-2. Clear scrollback: `Cmd/Ctrl+K` or restart terminal
+2. Restart the terminal (toolbar restart button) – there is no dedicated clear-scrollback shortcut in the panel
 3. Reduce buffer size in terminal options (if needed)
 
 **Debug**:
@@ -313,7 +314,7 @@ console.log('[TerminalPanel] Resized:', cols, rows)
 
 ```typescript
 // Get terminal instance
-const info = await window.api.terminal.getTerminalInfo(terminalId)
+const info = await window.api.terminal.getInfo(terminalId)
 console.log('Terminal info:', info)
 
 // Check xterm state
