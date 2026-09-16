@@ -6,7 +6,7 @@ Per-version release notes for Erfana, v0.9.0 onwards. Earlier: v0.8.0–v0.8.3 i
 
 ## 0.20.0
 
-*Released 2026-09-15. Tag `v0.20.0`.*
+*Released 2026-09-16. Tag `v0.20.0`.*
 
 ### Added
 
