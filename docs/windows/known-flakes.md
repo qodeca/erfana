@@ -92,7 +92,8 @@ that vanishes mid-read is skipped rather than failing the call; the full suite
 then passed 121/121 (the suite was 121 tests on that date; it is **289 as of
 2026-09-15**, on the same two-worker pool, so the load this entry describes has
 gone up again and the observation window should be treated as restarted once
-more — a full Windows run on that date passed 289/289 with 1 skipped). Left here
+more — a full Windows run on that date passed 289/289 with 1 skipped; a macOS
+run at v0.20.0 on 2026-09-16 passed 290/290). Left here
 because the second sighting happened after the
 first hardening attempt, so the register should carry it until a few more full
 runs come back clean. Status: 🟡 under observation.
