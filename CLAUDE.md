@@ -8,7 +8,7 @@ An agent-native Markdown workspace (Electron): integrated terminal for CLI codin
 - **Current version**: v0.20.0 (see [docs/CHANGELOG.md](docs/CHANGELOG.md); bump this line at release)
 
 ## Branching model
-- `main` — released code only. Protected (required status checks, `enforce_admins`, signed `v*.*.*` tags); direct push is the intended solo-dev workflow, no PR required.
+- `main` — released code only. Protected (required status checks, `enforce_admins`, signed `v*.*.*` tags); direct push is the intended solo-dev workflow, no PR required. The checks are enforced **on push**, so a commit whose checks have not yet finished green for that SHA is rejected with `GH006` — push it to `develop` first, wait for the run, then push `main` ([release.md § Branch protection](docs/build/release.md#branch-protection-phase-i--done-2026-04-25)).
 - `develop` — the day-to-day integration branch, and the base for small features and bugfixes. Branch general work off `develop`, **not** `main` (main lags).
 - `graph` — "develop for the graph engine": the integration branch for spec 004 and the [#21](https://github.com/qodeca/erfana/issues/21) contract chain (#22–#32) plus related functionality. Do **not** start graph-engine work from `develop`; branch off `graph` (`git checkout -b feature/<name> graph`) or the already-frozen R1 contracts will be re-implemented from scratch. Inventory of what is frozen there: [ROADMAP.md](ROADMAP.md) § Graph engine chain.
 - Graph-engine work merges back into `graph`; `graph` merges into `develop` only when the engine is shippable. Merge `develop` **into** `graph` periodically to limit drift — never the reverse until the chain lands.

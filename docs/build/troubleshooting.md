@@ -1,6 +1,6 @@
 # Build Troubleshooting
 
-**Last updated**: September 2026 (v0.19.0)
+**Last updated**: September 2026 (v0.20.0)
 
 This document provides solutions to common build errors.
 
@@ -277,7 +277,7 @@ Tests fail, preventing build
    npm run test:renderer
    ```
 2. Fix failing tests before building
-3. All tests must pass – `npm run test:ci` reported **464 test files, 11,766 cases, all passing** on a macOS host on 2026-09-04 (v0.19.0). The vitest workspace has three projects, and the `main` project covers more than `src/main`: main 223 files (`src/main` 204 · `src/shared` 15 · `scripts` 4) · renderer 235 · preload 6. Run `npm run test:ci` for the live figure – see [Testing overview](../testing/README.md#key-test-areas)
+3. All tests must pass – `npm run test:ci` reported **563 test files, 13,853 cases passing with 5 skipped** on a macOS host on 2026-09-16 (v0.20.0). The vitest workspace has three projects, and the `main` project covers more than `src/main` (`src/main` + `src/shared` + `scripts`); the per-project split was last counted at v0.19.0 (main 223 · renderer 235 · preload 6, total 464) and has not been re-counted since the file total reached 563. Run `npm run test:ci` for the live figure – see [Testing overview](../testing/README.md#key-test-areas)
 
 ---
 

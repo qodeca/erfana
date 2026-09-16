@@ -210,6 +210,16 @@ Ask via `AskUserQuestion`:
 | Leave as draft | Skip final edit; instruct operator to publish manually after additional review |
 | Abort and delete | `gh release delete "v${VERSION}" --yes --cleanup-tag=false` and exit |
 
+**Confirming the publish.** `gh release view --json isLatest` does **not** work — `isLatest` is a `gh release list` field, not a `gh release view` one, so the call fails with `Unknown JSON field: "isLatest"` regardless of `gh` version (seen on 2.9x during v0.20.0). Confirm with two reads instead:
+
+```bash
+gh release view "v${VERSION}" --json url,isDraft,isPrerelease,publishedAt \
+  --jq '"url=\(.url) draft=\(.isDraft) prerelease=\(.isPrerelease) published=\(.publishedAt)"'
+gh api repos/qodeca/erfana/releases/latest --jq '"latest_tag=\(.tag_name) draft=\(.draft)"'
+```
+
+The draft's URL is an opaque `releases/tag/untagged-<hash>` until publish; after `--draft=false` it canonicalises to `releases/tag/v${VERSION}`.
+
 ## Checkpoint 4.A
 
 - [ ] Operator explicitly chose Publish or Leave-as-draft

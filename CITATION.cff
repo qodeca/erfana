@@ -14,7 +14,7 @@ authors:
 repository-code: "https://github.com/qodeca/erfana"
 url: "https://qodeca.com"
 license: GPL-3.0-only
-version: 0.16.3
+version: 0.20.0
 keywords:
   - markdown
   - electron

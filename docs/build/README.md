@@ -1,6 +1,6 @@
 # Build Documentation
 
-**Last updated**: September 2026 (v0.19.0)
+**Last updated**: September 2026 (v0.20.0)
 
 This directory contains detailed documentation for Erfana's production build configuration.
 
