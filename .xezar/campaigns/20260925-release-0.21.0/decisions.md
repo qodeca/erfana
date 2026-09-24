@@ -25,3 +25,5 @@ Owner decisions in the owner's exact words, dated, append-only.
   Standing rule for these two issues: design is approved by a reviewer agent on a different model, not by the owner.
 - 2026-09-25 00:14 CEST - chat - "start immediately, do not wait for the loop if there is work you can kick off"
   Standing rule: when ready work and headroom exist, the leader dispatches at once instead of waiting for the L3 tick. Every other L3 check (ceilings, overlap, route.mjs, budget) still applies.
+- 2026-09-25 00:23 CEST - direct question (xez-unattended-on contract read back) - "Yes, turn it on"
+  Unattended mode on since 2026-09-24T22:23:07Z. Hard stops: release go, deleting a record, opening a campaign. Parked: account or provider lane switch, scope trim, third repair round. Accepted costs: overnight metered spend; stops are instructions, not a hook.
