@@ -159,3 +159,5 @@ A folder appears when its first document does, so some of these do not exist yet
 | `deprecations/` | what goes, its replacement, the dates | callers of what goes |
 | `performance/` | how a number was measured, and the baselines | whoever changes a hot path |
 | `migrations/` | one page per schema, data or format move, with a `reversibility:` line | whoever runs or reviews the move |
+
+<!-- xezar onboarding smoke test – this branch is deleted after the test -->
