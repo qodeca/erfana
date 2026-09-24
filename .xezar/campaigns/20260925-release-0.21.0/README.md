@@ -1,6 +1,6 @@
 # Campaign release-0.21.0
 
-Updated: 2026-09-25 00:15 CEST
+Updated: 2026-09-25 00:17 CEST
 
 ## State
 - Base: `develop` at `9fe8a3f0`. Merges so far: 0. Checkpoints met: none.
@@ -17,7 +17,7 @@ Empty.
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| 9f1fd373 | #138 | plan-and-spec | claude/opus | qodeca |
+| 9f1fd373 | #138 | plan-and-spec (repair round 1) | claude/opus | qodeca |
 | 68affd8b | #139 | plan-and-spec | claude/opus | gmail |
 | 9cabe946 | #138 | research (2nd opinion, advisory) | pi/deepseek-flash | – |
 | c83ebddf | #139 | research (2nd opinion, advisory) | pi/deepseek-flash | – |
@@ -50,7 +50,7 @@ Counts: gate runs 0/2, tasks 4/10 (only 2 run at once: machine-wide xezar maxPar
 - Label issues with `release-0.21.0` to put them in scope.
 
 ## Rules that bit
-None yet.
+- A step agent must not end its turn while its own background work runs (XEZ:MONITORING fails the step). Say "finish in the foreground" in every brief.
 
 ## Restart and re-attach
 Start with `./scripts/xezar-leader.sh`, then follow the session-start list in `.xezar/docs/leader-guide.md`.
