@@ -1,6 +1,6 @@
 # Campaign release-0.21.0
 
-Updated: 2026-09-25 00:14 CEST
+Updated: 2026-09-25 00:15 CEST
 
 ## State
 - Base: `develop` at `9fe8a3f0`. Merges so far: 0. Checkpoints met: none.
@@ -22,7 +22,7 @@ Empty.
 | 9cabe946 | #138 | research (2nd opinion, advisory) | pi/deepseek-flash | – |
 | c83ebddf | #139 | research (2nd opinion, advisory) | pi/deepseek-flash | – |
 
-Counts: gate runs 0/2, tasks 4/10, metered 2/4 (pi, assumed metered), load 1.94/18.
+Counts: gate runs 0/2, tasks 4/10 (only 2 run at once: machine-wide xezar maxParallel=2, so the two pi tasks are queued), metered 2/4 (pi, assumed metered), load 1.94/18.
 
 ## File-ownership table
 - 9f1fd373 owns docs/features/*user-guide*, docs/designs/*user-guide*
