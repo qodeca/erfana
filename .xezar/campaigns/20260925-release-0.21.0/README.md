@@ -4,7 +4,7 @@ Updated: 2026-09-25 00:03 CEST
 
 ## State
 - Base: `develop` at `9fe8a3f0`. Merges so far: 0. Checkpoints met: none.
-- Scope: not yet given by the owner. Nothing is dispatched until it is.
+- Scope: open issues labelled `release-0.21.0` (owner marks them). None labelled yet.
 - Unattended mode: off (`.xezar/unattended.json` absent).
 - The campaign name does not approve a release. The release go stays owner-only.
 
@@ -36,7 +36,7 @@ None running.
 None.
 
 ## Owner items
-- Give the scope: which issues and PRs belong in 0.21.0.
+- Label issues with `release-0.21.0` to put them in scope.
 
 ## Rules that bit
 None yet.
