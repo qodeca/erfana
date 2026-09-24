@@ -1,6 +1,6 @@
 # Campaign release-0.21.0
 
-Updated: 2026-09-25 01:39 CEST
+Updated: 2026-09-25 01:43 CEST
 
 ## State
 - Base: `develop` at `9fe8a3f0`. Merges so far: 0. Checkpoints met: none.
@@ -9,22 +9,18 @@ Updated: 2026-09-25 01:39 CEST
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
-- #141 draft, head b7864e20 – #138 design spec. Next: design review running.
-- #140 draft, head 68d292ae – #139 design spec. Verdict REQUEST CHANGES (4 Major, 7 Minor/Nit). Fix waits for the #141 verdict, because findings 2-4 need both specs to agree.
+- #141 draft, head b7864e20 – #138 design spec. Verdict REQUEST CHANGES (1 Major: demo format vs #140; 1 Minor). Fix queued on load ceiling.
+- #140 draft, head 68d292ae – #139 design spec. Verdict REQUEST CHANGES (4 Major, 7 Minor/Nit). Fix queued on load ceiling; leader reconciliation is in the timeline at 01:43.
 Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 
 ## Serial merge line
 Empty.
 
 ## Running tasks per lane
-| Run | Issue | Workflow | Lane | Login |
-|---|---|---|---|---|
-| 5d9f579d | #141 (#138) | code-review (design) | claude/sonnet | gmail |
-
-Counts: gate runs 0/2, tasks 1/10, metered 0/4, load 15.5/18.
+None.
 
 ## File-ownership table
-- 5d9f579d owns nothing (read-only review)
+None running.
 
 ## Accounts (from `read_quota` at 2026-09-24T23:13:13Z)
 | Runner | Login | State | Resets (UTC) |
