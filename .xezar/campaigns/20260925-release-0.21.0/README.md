@@ -1,6 +1,6 @@
 # Campaign release-0.21.0
 
-Updated: 2026-09-25 00:12 CEST
+Updated: 2026-09-25 00:14 CEST
 
 ## State
 - Base: `develop` at `9fe8a3f0`. Merges so far: 0. Checkpoints met: none.
@@ -15,10 +15,20 @@ Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 Empty.
 
 ## Running tasks per lane
-None.
+| Run | Issue | Workflow | Lane | Login |
+|---|---|---|---|---|
+| 9f1fd373 | #138 | plan-and-spec | claude/opus | qodeca |
+| 68affd8b | #139 | plan-and-spec | claude/opus | gmail |
+| 9cabe946 | #138 | research (2nd opinion, advisory) | pi/deepseek-flash | – |
+| c83ebddf | #139 | research (2nd opinion, advisory) | pi/deepseek-flash | – |
+
+Counts: gate runs 0/2, tasks 4/10, metered 2/4 (pi, assumed metered), load 1.94/18.
 
 ## File-ownership table
-None running.
+- 9f1fd373 owns docs/features/*user-guide*, docs/designs/*user-guide*
+- 68affd8b owns docs/features/*readme*, docs/designs/*readme*
+- 9cabe946 owns nothing in the repo (research, no PR)
+- c83ebddf owns nothing in the repo (research, no PR)
 
 ## Accounts (from `read_quota` at 2026-09-24T22:02:49Z)
 | Runner | Login | State | Resets (UTC) |
@@ -33,8 +43,8 @@ None running.
 | pi | – | no logins | – |
 
 ## Held or queued work
-- #138 user guide + capture tooling – ready for design. Goes first.
-- #139 README redesign – design can run beside #138; build waits for #138's fixture and capture script.
+- #138 build – waits for its design verdict.
+- #139 build – waits for its design verdict and #138's fixture and capture script.
 
 ## Owner items
 - Label issues with `release-0.21.0` to put them in scope.

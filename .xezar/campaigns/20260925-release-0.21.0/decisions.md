@@ -23,3 +23,5 @@ Owner decisions in the owner's exact words, dated, append-only.
   - Design gate: "No need to review, decide yourself and trust reviewers"
   - Existing user docs: "Fold into the guide (Recommended)"
   Standing rule for these two issues: design is approved by a reviewer agent on a different model, not by the owner.
+- 2026-09-25 00:14 CEST - chat - "start immediately, do not wait for the loop if there is work you can kick off"
+  Standing rule: when ready work and headroom exist, the leader dispatches at once instead of waiting for the L3 tick. Every other L3 check (ceilings, overlap, route.mjs, budget) still applies.
