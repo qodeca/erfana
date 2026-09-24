@@ -1,6 +1,6 @@
 # Campaign release-0.21.0
 
-Updated: 2026-09-25 01:31 CEST
+Updated: 2026-09-25 01:39 CEST
 
 ## State
 - Base: `develop` at `9fe8a3f0`. Merges so far: 0. Checkpoints met: none.
@@ -10,7 +10,7 @@ Updated: 2026-09-25 01:31 CEST
 
 ## Open pull requests
 - #141 draft, head b7864e20 – #138 design spec. Next: design review running.
-- #140 draft, head 68d292ae – #139 design spec. Next: design review running.
+- #140 draft, head 68d292ae – #139 design spec. Verdict REQUEST CHANGES (4 Major, 7 Minor/Nit). Fix waits for the #141 verdict, because findings 2-4 need both specs to agree.
 Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 
 ## Serial merge line
@@ -19,13 +19,11 @@ Empty.
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| bc298d1d | #140 (#139) | code-review (design) | claude/sonnet | qodeca |
 | 5d9f579d | #141 (#138) | code-review (design) | claude/sonnet | gmail |
 
-Counts: gate runs 0/2, tasks 2/10, metered 0/4, load 15.5/18.
+Counts: gate runs 0/2, tasks 1/10, metered 0/4, load 15.5/18.
 
 ## File-ownership table
-- bc298d1d owns nothing (read-only review)
 - 5d9f579d owns nothing (read-only review)
 
 ## Accounts (from `read_quota` at 2026-09-24T23:13:13Z)
