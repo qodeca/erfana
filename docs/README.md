@@ -148,6 +148,8 @@ Archived documentation is located in [`./archive/`](./archive/):
 
 ## Folders added by the Xezar pipeline
 
+The pipeline's process documents sit at the repository root: [SDLC.md](../SDLC.md) (how work moves), [AGENTS.md](../AGENTS.md) (what every agent runs), [CODE_REVIEW.md](../CODE_REVIEW.md) and [BACKWARD_COMPATIBILITY.md](../BACKWARD_COMPATIBILITY.md). New pipeline designs go in `designs/<feature>/`; the single-file notes already in `designs/` and `design/` stay as they are.
+
 A folder appears when its first document does, so some of these do not exist yet.
 
 | Path | What lands there | Who it is for |

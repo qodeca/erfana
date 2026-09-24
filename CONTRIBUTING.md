@@ -67,7 +67,7 @@ npm run typecheck       # tsc (node + web projects)
 npm run test:ci         # vitest workspace (main / renderer / preload)
 npm run test:cov        # coverage floors - a REQUIRED check that test:ci does not run
 npx electron-vite build # production build
-npm run check:headers   # every source file must carry the SPDX header
+npm run check:headers   # every source file must carry the SPDX header (the MIT Xezar kit in .xezar/ is exempt)
 npm audit signatures    # advisory in CI, but it catches a lockfile written by the wrong npm
 pipx run --spec "reuse[charset-normalizer]" reuse lint   # REUSE compliance
 ```
@@ -106,7 +106,7 @@ Never commit a real secret, even to history — rewrite it out and rotate the cr
 - IPC pattern: `shared/ipc` schemas → `main/services` → `main/ipc` handlers → preload bridge → renderer.
 - UI: open the design system first — [`design/index.html`](design/index.html) — and use design tokens (`var(--color-*)`, `var(--space-*)`, `var(--text-*)`); `border-radius: 0` always. `npm run lint:css` enforces the token rules. (`design/` is the design system; `docs/design*/` are per-issue notes.)
 - Prose: **sentence case**, en dashes (not em dashes).
-- New source files must carry the SPDX header (`npm run check:headers` enforces it); new binary assets are covered by the `REUSE.toml` catch-all — add a `.license` sidecar only to *override* it (e.g. a third-party asset). `reuse lint` must pass.
+- New source files must carry the SPDX header (`npm run check:headers` enforces it; the Xezar kit under `.xezar/` is MIT and exempt, see `REUSE.toml`); new binary assets are covered by the `REUSE.toml` catch-all — add a `.license` sidecar only to *override* it (e.g. a third-party asset). `reuse lint` must pass.
 
 ## Pull-request checklist
 

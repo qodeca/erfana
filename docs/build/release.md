@@ -584,6 +584,8 @@ Phase I configuration was applied after dry-run `24925269258` validated all 5 jo
 
 Both rulesets were created on 2026-06-16, the day the repository was made public. The single ruleset id cited by earlier revisions of this document predates that and no longer resolves — always read ids from `gh api repos/qodeca/erfana/rulesets` rather than trusting a pasted one.
 
+**`develop` branch protection** (added with the Xezar pipeline, PR #136): the same seven required checks in strict mode, `enforce_admins: false`, no review requirement. `develop` is also the repository's default branch since then. Because administrators are not enforced, the develop-first push above is not blocked by it; read it with `gh api repos/qodeca/erfana/branches/develop/protection`.
+
 ### Deliberate exclusion: `e2e`
 
 `e2e` is **not** in the required-checks list. The workflow is currently `disabled_manually` (local-only until the `macos-latest` hang at `waitForLoadState('domcontentloaded')` is root-caused — see [docs/ci.md](../ci.md)), so requiring it would green-lock the repo.
