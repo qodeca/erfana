@@ -1,6 +1,6 @@
 # Campaign release-0.21.0
 
-Updated: 2026-09-25 00:55 CEST
+Updated: 2026-09-25 01:13 CEST
 
 ## State
 - Base: `develop` at `9fe8a3f0`. Merges so far: 0. Checkpoints met: none.
@@ -26,13 +26,13 @@ Counts: gate runs 0/2, tasks 4/10 (only 2 run at once: machine-wide xezar maxPar
 ## File-ownership table
 - c83ebddf owns nothing in the repo (research, no PR)
 
-## Accounts (from `read_quota` at 2026-09-24T22:02:49Z)
+## Accounts (from `read_quota` at 2026-09-24T23:13:13Z)
 | Runner | Login | State | Resets (UTC) |
 |---|---|---|---|
 | claude | default | reserved leader login, runs no tasks | – |
-| claude | qodeca | ok (weekly 45%) | 2026-09-28 16:59 |
+| claude | qodeca | ok (weekly 46%) | 2026-09-28 16:59 |
 | claude | gmail | ok (weekly 34%) | 2026-09-25 19:00 |
-| claude | eqamana | out | 2026-09-26 15:59 |
+| claude | eqamana | out | 2026-09-26 16:00 |
 | claude | westagilelabs | out | 2026-09-25 07:00 |
 | codex | default | unknown (quota format changed in 0.156.1) | – |
 | codex | qodeca-2 | ok (weekly 24%) | 2026-09-29 12:45 |
