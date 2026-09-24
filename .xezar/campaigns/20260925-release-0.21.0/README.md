@@ -1,6 +1,6 @@
 # Campaign release-0.21.0
 
-Updated: 2026-09-25 00:04 CEST
+Updated: 2026-09-25 00:12 CEST
 
 ## State
 - Base: `develop` at `9fe8a3f0`. Merges so far: 0. Checkpoints met: none.
@@ -33,7 +33,8 @@ None running.
 | pi | – | no logins | – |
 
 ## Held or queued work
-None.
+- #138 user guide + capture tooling – ready for design. Goes first.
+- #139 README redesign – design can run beside #138; build waits for #138's fixture and capture script.
 
 ## Owner items
 - Label issues with `release-0.21.0` to put them in scope.
