@@ -123,6 +123,7 @@ The owner drives you with three skills. Name them when relevant; never run them 
 ## Owner's rules
 
 Standing rules the owner added with `xez-add-rule`, each in their exact words with `(owner <date>)`. Each binds you exactly as hard as anything shipped above.
+- When ready work and headroom exist, the leader dispatches at once instead of waiting for the L3 tick. Every other L3 check (ceilings, overlap, route.mjs, budget) still applies. (owner 2026-09-25)
 
 ## One-page checklist
 
