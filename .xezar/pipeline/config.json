@@ -1,0 +1,111 @@
+{
+  "baseBranch": "develop",
+  "tracker": "github",
+  "browser": {
+    "provider": "playwright"
+  },
+  "validation": {
+    "commands": [
+      "npm ci",
+      "npm run lint",
+      "npm run lint:css",
+      "npm run design -- --check",
+      "npm run typecheck",
+      "npm run test:ci",
+      "npm run test:cov",
+      "npx electron-vite build",
+      "npm run check:headers"
+    ]
+  },
+  "labels": {
+    "enabled": true,
+    "pipeline": [
+      "review",
+      "changes-requested",
+      "qa",
+      "qa-failed",
+      "merge-queue",
+      "blocked",
+      "do-not-merge",
+      "design",
+      "design-failed"
+    ],
+    "category": [
+      "bug",
+      "feature",
+      "refactor",
+      "security",
+      "dependencies",
+      "documentation"
+    ],
+    "meta": [
+      "needs-qa",
+      "skip-qa",
+      "qa-approved",
+      "qa-self-verified",
+      "in-progress",
+      "ci-monitoring",
+      "needs-design",
+      "design-approved",
+      "skip-design"
+    ],
+    "priority": [
+      "priority-low",
+      "priority-medium",
+      "priority-high",
+      "priority-extreme"
+    ],
+    "risk": [
+      "risk-low",
+      "risk-medium",
+      "risk-high"
+    ]
+  },
+  "qaGate": true,
+  "ci": {
+    "maxWaitMinutes": 40,
+    "requiredChecks": [
+      "Lint",
+      "Typecheck",
+      "Unit tests",
+      "Build",
+      "Coverage",
+      "License compliance",
+      "Secret scan"
+    ]
+  },
+  "gates": {
+    "failClosed": false,
+    "requireVerdictHead": true,
+    "designGate": true
+  },
+  "toolchain": {
+    "providers": [
+      "npm"
+    ]
+  },
+  "paths": {
+    "runs": ".xezar/pipeline/runs",
+    "specs": ".xezar/pipeline/specs",
+    "scripts": ".xezar/pipeline/scripts",
+    "qa": ".local/xezar/qa",
+    "designs": "docs/designs",
+    "architecture": "docs/adrs",
+    "spikes": "docs/spikes",
+    "runbooks": "docs/runbooks",
+    "deprecations": "docs/deprecations",
+    "performance": "docs/performance",
+    "migrations": "docs/migrations",
+    "designSystem": "design"
+  },
+  "deploy": {
+    "environments": [],
+    "rollback": []
+  },
+  "performance": {
+    "budgets": []
+  },
+  "localisation": {
+    "locales": []
+  }
+}

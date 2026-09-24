@@ -117,6 +117,22 @@ Never commit a real secret, even to history — rewrite it out and rotate the cr
 - [ ] Docs updated if behavior or project shape changed.
 - [ ] You agree to the project [CLA](CLA.md) (opening this PR records your agreement).
 
+## Automation in this repository
+
+This repository runs an agent pipeline (Xezar, `.xezar/`). **You start none of its workflows**: the
+project leader dispatches them. Nothing is broken when none of them runs on your pull request.
+
+- **What gates your pull request** is only the required GitHub checks: `Lint`, `Typecheck`,
+  `Unit tests`, `Build`, `Coverage`, `License compliance` and `Secret scan`.
+- **Labels**: you may suggest a category (`bug`, `feature`, `refactor`, `security`, `dependencies`,
+  `documentation`) and a `priority-*`. Every other label is applied by the pipeline or a
+  maintainer - never apply those yourself.
+- **Documents** go under `docs/`, by subject; [docs/README.md](docs/README.md) lists the folders.
+- **Pull request titles** follow Conventional Commits: the pipeline squash-merges, so the title
+  becomes the commit on `develop`.
+- **How work moves**, stage by stage, is in [SDLC.md](SDLC.md). You do not need the pipeline to
+  contribute: branch from `develop`, open a pull request, and a maintainer takes it from there.
+
 ## Reporting bugs and security issues
 
 - **Bugs / features:** open a GitHub issue. For anything non-trivial, open an issue first to discuss the approach.

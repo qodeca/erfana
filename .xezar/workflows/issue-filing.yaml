@@ -1,0 +1,24 @@
+# Issue filing creates ONE new issue from a brief that names what to file, through the
+# xezar-issue-create role. It is apart from issue-triage on purpose: triage reads an issue that
+# already exists and is a reading step, whose gh-write.sh only comments and moves labels; routing
+# filing there left the job unable to file, and the leader filed by hand.
+#
+# `Write` is listed because the role keeps its receipt and the approved body bytes as a file in the
+# task's evidence directory and passes the body to the tracker as a file. `Edit` is left out:
+# nothing here edits a file. The filing step is the last step, so it stays interactive.
+name: issue-filing
+description: File one new issue in this repository from a brief that names what to file, after a duplicate search. Never edits an existing issue. No code, no PR.
+steps:
+  - id: kit
+    name: Snapshot the local project kit
+    command: 'bash "$(git rev-parse --path-format=absolute --git-common-dir)/../.xezar/checks/bootstrap.sh"'
+    resultScope: routine
+  - id: preflight
+    name: Verify worktree isolation
+    command: ".xezar/checks/worktree-preflight.sh"
+    resultScope: routine
+  - id: file
+    name: Search, draft and file one issue
+    prompt: "{{task}}"
+    skill: xezar-issue-create
+    allowedTools: [Read, Grep, Glob, Bash, Write]

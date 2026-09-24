@@ -1,0 +1,21 @@
+# Reviews a change that touches a trust boundary, for what a scanner cannot decide: whether an
+# authorisation decision is correct, whether untrusted input reaches a sink. Read-only: no setup, no
+# gates, no commits. The verdict is one PR comment headed "## Security review" naming the exact
+# head SHA, and it is void when the head moves.
+name: security-review
+description: "Review a change that touches a trust boundary – authorisation, untrusted input to sink, secrets, failure paths, new trust – as the human-judgement half of reviewerRequired. One comment naming the exact head SHA. Never by the author's lane. Read-only."
+steps:
+  - id: kit
+    name: Snapshot the local project kit
+    command: 'bash "$(git rev-parse --path-format=absolute --git-common-dir)/../.xezar/checks/bootstrap.sh"'
+    resultScope: routine
+  - id: preflight
+    name: Report the checkout
+    command: ".xezar/checks/worktree-preflight.sh --allow-root"
+    resultScope: routine
+  - id: review
+    name: Security review
+    prompt: "Security review: {{task}}. Follow xezar-security-review instructions. A clean security scan is not your verdict. Read SECURITY.md and the trust boundaries CODE_REVIEW.md names, then work from the diff outward: who can reach each changed entry point, where each untrusted value lands, where secrets can leak, what fails open, what the change newly trusts or quietly weakens. Name the attacker's path, never a category, and never a working exploit or a secret. The launch text names the author's lane, login and vendor: report independence as confirmed, not confirmed or unknown, never confirmed without that text, and where it names you say so and stop; a high-risk change that shares your vendor is 'confirmed, same vendor', said in the first line. Read git only through .xezar/checks/git-read.sh and GitHub only through gh pr view and gh pr diff. Post exactly one comment headed '## Security review' with the full head SHA; never edit, approve, merge or label."
+    skill: xezar-security-review
+    allowedTools: [Read, Grep, Glob, Bash]
+    bashAllowlist: ["gh pr view", "gh pr diff", "gh pr checks", "gh pr list", "gh issue view", "gh issue list", "gh label list", "gh repo view", "jq -n", "bash .xezar/checks/git-read.sh", "bash .xezar/checks/gh-write.sh", "bash .xezar/checks/verdict-write.sh", "bash .xezar/checks/phase-record.sh", "bash .xezar/checks/worktree-setup.sh --readonly-init"]

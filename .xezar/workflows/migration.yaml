@@ -1,0 +1,43 @@
+# A migration run moves data, a schema or a hand-written config format to a new shape. Code can
+# be reverted and a migration that ran cannot, so the way back is decided first: a real reverse,
+# or the words one-way with the owner's recorded word. Proved on a copy, never run against live
+# data, handed over as a runbook.
+name: migration
+description: "Move data, a schema or a config format to a new shape – the way back decided first, expand-migrate-contract, idempotent and resumable, a dry-run record on a realistic copy, a runbook – then gates and a draft PR. Never run against live data."
+steps:
+  - id: kit
+    name: Snapshot the local project kit
+    command: 'bash "$(git rev-parse --path-format=absolute --git-common-dir)/../.xezar/checks/bootstrap.sh"'
+    resultScope: routine
+  - id: preflight
+    name: Verify worktree isolation
+    command: ".xezar/checks/worktree-preflight.sh"
+    resultScope: routine
+  - id: setup
+    name: Prepare the worktree
+    command: ".xezar/checks/worktree-setup.sh"
+    resultScope: routine
+  - id: migrate
+    name: Prepare the migration
+    prompt: "Prepare the migration for: {{task}}. Follow xezar-migration instructions: decide the way back first – a real reverse, or the mark one-way with the owner's recorded word quoted. Expand, migrate and contract as separate changes; make it idempotent, resumable and batched; keep the code working on both shapes. Dry-run it forward and back on a realistic copy and record counts, duration and everything that would not convert. Update BACKWARD_COMPATIBILITY.md in the same change. Never run it against production or shared data: hand over a runbook. Say in the handoff text that a security review is required and why. Finish focused checks and commits before the existing readiness, gates, evidence and PR handoff stages."
+    skill: xezar-migration
+    timeout: 2h
+  - id: readiness
+    name: Confirm the phase record is complete and nothing blocks
+    command: ".xezar/checks/worktree-preflight.sh --readiness"
+    resultScope: stage
+  - id: gates
+    name: Quality gates
+    command: ".xezar/checks/repo-gates.sh --fast --producer gates"
+    resultScope: stage
+    onFail:
+      retry: migrate
+      max: 2
+  - id: evidence
+    name: Seal the gate evidence
+    command: ".xezar/checks/worktree-preflight.sh --record-gate-evidence"
+    resultScope: stage
+  - id: handoff
+    name: Draft PR into the base branch
+    prompt: "Hand off the migration for: {{task}}. Verify the sealed head and open the draft PR; make no content changes here. The body leads with what changes shape, whether there is a way back or the move is one-way and on whose word, the dry-run numbers, and the runbook. A different account and a different vendor review this: it is high risk by its nature."
+    skill: xezar-handoff-draft-pr

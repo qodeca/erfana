@@ -33,6 +33,26 @@ Out of scope:
 - A user's local environment configuration (OS, shell, installed binaries) and third-party tools invoked from the terminal.
 - Vulnerabilities solely in upstream dependencies with no Erfana-specific exposure — report those upstream, though we appreciate a heads-up.
 
+## What is not a vulnerability here
+
+These are designed behaviour, and a report that names only one of them is closed as such:
+
+- The integrated terminal runs the user's own shell with the user's own rights. What a command or a
+  coding agent started there can do is not an Erfana vulnerability.
+- Erfana reads and writes any file inside the project folder the user opened.
+- The context meter reads Claude Code transcripts under `~/.claude`, read-only.
+
+## What Erfana promises
+
+The surfaces listed under **Scope** are the ones Erfana will not weaken: the renderer sandbox and
+context isolation, IPC sender and schema validation, the sealed HTML preview and its per-host
+allowlist, and the Whisper and release-artifact trust chains. A change that weakens one of them is
+a security bug even when nothing is exploitable yet.
+
+If a private report gets no answer within a week, contact the repository owner,
+[qodeca](https://github.com/qodeca), to ask for a reply. This is an escalation of last resort, not a
+second way to report: the report itself still goes through private vulnerability reporting.
+
 ## Security documentation
 
 For Electron fuses, sandboxing, context isolation, CSP configuration, and audit history, see **[docs/security.md](docs/security.md)**.

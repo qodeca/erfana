@@ -1,0 +1,45 @@
+{
+  "$comment": "Standing loops for the project leader, shipped as DATA so they can be compared, not as prose that drifts. At every session start, resume and compaction the leader lists what is actually scheduled, compares this whole file against it by schedule AND by prompt, and re-creates anything missing or drifted. See .xezar/docs/leader-context-loading.md.",
+  "version": 1,
+  "compare": "whole-file",
+  "loops": [
+    {
+      "id": "L1",
+      "role": "unblock",
+      "mechanism": "cron",
+      "schedule": "*/10 * * * *",
+      "mayDispatch": false,
+      "prompt": "Check whether anything is waiting on you: a task in a blocked or question state, a review verdict you have not acted on, a PR that is mergeable now, or a finished task whose result you have not read. Act on what you find, one item at a time. Never start new work here - that is the pacing loop's job alone. If work finished and there is ready work to follow it, wake the pacing loop now instead of waiting for its clock; keep at most one such wake pending, replacing any earlier one. If nothing is waiting, do nothing and say so."
+    },
+    {
+      "id": "L2",
+      "role": "budget",
+      "mechanism": "cron",
+      "schedule": "7 * * * *",
+      "mayDispatch": false,
+      "prompt": "Walk the budget table. It is in the live campaign's README.md, keyed by runner and login: call `project_config` action `read_quota` and copy its rows into the table, status and reset time; never call `check_quota` and never start a probe task here. A lane is a tool plus a model, and it is out only while EVERY login in its tool's rotation is out. If work is paused only because every preferred lane was out, and a login is now `unknown` or available, wake the pacing loop so it can resume that work - never start it yourself; keep at most one such wake pending, replacing any earlier one. Read each tool's rotation from .xezar/routing.json, and skip the logins it lists under unlimitedLogins entirely. If nothing changed, do nothing and say so."
+    },
+    {
+      "id": "L3",
+      "role": "pace",
+      "mechanism": "cron",
+      "schedule": "*/30 * * * *",
+      "mayDispatch": true,
+      "prompt": "Decide whether to start more work. Count what is running: full gate runs, total tasks, tasks on the metered agent tool, and machine load. Start another task only while ALL of these hold: at most 2 gate runs, at most 10 tasks, at most 4 metered-tool tasks, machine load at or below 18. If there is ready work and headroom, pick the next item by least file overlap against every running task, using priority only to break a tie, then classify it against `node .xezar/checks/route.mjs --rows` and run `node .xezar/checks/route.mjs <row id>`: dispatch the first listed lane with budget that is not the author's, as .xezar/docs/routing.md says. A `wait` line means the item waits; never pick a lane the script did not list. If you are at a ceiling, queue and name which ceiling. If there is no ready work, do nothing and say so."
+    }
+  ],
+  "ceilings": {
+    "$comment": "Measured from real runs, not guessed. Attempt failure is about 20% at 1 concurrent gate run, 37% at 3, 90% at 4-5, and 100% at 6 or more.",
+    "concurrentGateRuns": 2,
+    "totalTasks": 10,
+    "meteredToolTasks": 4,
+    "machineLoad": 18
+  },
+  "rules": [
+    "L3 is the only loop that may dispatch. L1 and L2 wake it instead of starting work themselves.",
+    "At most one wake of L3 is pending at a time; re-waking replaces the pending one.",
+    "A tick that changes nothing is a noop, and every prompt states its own no-op condition.",
+    "A cron job expires after seven days, so the schedule and the prompt live here, not in the job.",
+    "The owner asks for a loop; the leader only re-creates what this file already names. Never invent recurring work."
+  ]
+}

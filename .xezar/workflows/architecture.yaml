@@ -1,0 +1,43 @@
+# An architecture run decides one thing that outlives a feature and records it: a decision record,
+# the pages and diagrams it changes, the index. It writes no product code. The gates still run
+# because a project may lint its documents and check its links, and a record that breaks either is
+# not ready for the owner to read.
+name: architecture
+description: "Decide one architecture question and record it – a decision record with real options and consequences, the pages and diagrams it changes – under the folder paths.architecture names, then gates and a draft PR. No product code."
+steps:
+  - id: kit
+    name: Snapshot the local project kit
+    command: 'bash "$(git rev-parse --path-format=absolute --git-common-dir)/../.xezar/checks/bootstrap.sh"'
+    resultScope: routine
+  - id: preflight
+    name: Verify worktree isolation
+    command: ".xezar/checks/worktree-preflight.sh"
+    resultScope: routine
+  - id: setup
+    name: Prepare the worktree
+    command: ".xezar/checks/worktree-setup.sh"
+    resultScope: routine
+  - id: decide
+    name: Decide and record
+    prompt: "Decide and record the architecture question in: {{task}}. Follow xezar-architecture authoring instructions: read the accepted records and pages under paths.architecture in .xezar/pipeline/config.json first, write one decision record with at least two real options and how anybody would notice the decision has gone wrong, update the pages, diagrams and index it changes, and mark the record Proposed – only the owner accepts. If the request is one feature's plan, say so and stop. Finish focused checks and commits before the existing readiness, gates, evidence and PR handoff stages."
+    skill: xezar-architecture
+    timeout: 2h
+  - id: readiness
+    name: Confirm the phase record is complete and nothing blocks
+    command: ".xezar/checks/worktree-preflight.sh --readiness"
+    resultScope: stage
+  - id: gates
+    name: Quality gates
+    command: ".xezar/checks/repo-gates.sh --fast --producer gates"
+    resultScope: stage
+    onFail:
+      retry: decide
+      max: 2
+  - id: evidence
+    name: Seal the gate evidence
+    command: ".xezar/checks/worktree-preflight.sh --record-gate-evidence"
+    resultScope: stage
+  - id: handoff
+    name: Draft PR into the base branch
+    prompt: "Hand off the architecture decision for: {{task}}. Verify the sealed head and open the draft PR; the body leads with the question, the decision and what it closes off, in words the owner can accept or refuse. The record stays Proposed until the owner's words are recorded. Make no content changes here. Independent architecture review remains pending."
+    skill: xezar-handoff-draft-pr

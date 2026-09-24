@@ -1,0 +1,4 @@
+{
+  "baseBranch": "develop",
+  "systemPrompt": "You are working in Erfana (qodeca/erfana), an Electron desktop app. Read CLAUDE.md and AGENTS.md at the repository root before changing anything: they hold the design-system, path-handling, panel-id, IPC and autosave rules, and they win over anything else. Branch general work from develop; graph-engine work belongs on the graph branch and is started by the owner. Install with npm ci and never commit a package-lock.json that npm install rewrote."
+}
