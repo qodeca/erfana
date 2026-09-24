@@ -1,0 +1,45 @@
+# Maintained files are versionable by default; only project-local runtime is excluded.
+# Paths are rooted here so docs about runs/cache remain ordinary maintained documents.
+/runs.json
+/runs.json.tmp
+/runs/
+/worktrees/
+/tmp/
+/todos.json
+/todos.json.tmp
+/launch-key
+/automations.json
+/automations.json.tmp
+/automation-state.json
+/automation-state.json.tmp
+/automation-receipts.ndjson
+/automation-receipts.ndjson.tmp
+/automation-log.ndjson
+/automation-log.ndjson.tmp
+/automation-poll.lock
+/ui-state.json
+/ui-state.json.tmp
+/cache/
+/.cache/
+/credentials/
+/credentials.json
+/auth.json
+/tokens.json
+/agent-home/
+/evidence/
+/snapshots/
+/.kit-snapshot.json
+/.kit-bootstrap-lock
+/.kit-stage-*
+/.env
+/.env.local
+
+# Machine-level state, set once per operator – never committed. `agent-accounts.json` keys its
+# selections by the absolute path of the checkout, so committing it hands every clone a path that
+# does not exist there.
+/agent-accounts.json
+/workspace.json
+/workspace-ui.json
+/workspace.json.*
+/workspace-ui.json.*
+/agent-accounts.json.*

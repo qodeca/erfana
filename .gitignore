@@ -62,3 +62,9 @@ playwright-report/
 # Scratch space for local experiments, never committed. Previously matched only
 # by the `*.local` pattern above, which caught this directory by accident.
 .local/
+
+# --- Xezar pipeline: skills are installed per machine, never committed ---
+/.agents/skills/xez-*
+/.claude/skills/xez-*
+/skills-lock.json
+/.claude/CLAUDE.md

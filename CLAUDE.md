@@ -79,3 +79,10 @@ The full channel index is [docs/ipc-patterns.md](docs/ipc-patterns.md) § Curren
 ## Important Notes
 - node-pty may fail to build on Python 3.13 (use 3.12; 3.14.3 also verified) — this one is worth keeping here because it fails at install time, before any doc gets read
 - **Install with `npm ci`, and never commit a `package-lock.json` that `npm install` rewrote.** Under npm 11 `npm install` drops `encoding@0.1.13` (an optional peer of `node-fetch`) from the lock; `npm ci` requires it, so such a lock fails every CI job that installs — `Missing: encoding@0.1.13 from lock file`. This is here for the same reason as the line above: it bites before any doc gets read, and the resulting diff looks like harmless metadata churn. Detail in [CONTRIBUTING](CONTRIBUTING.md#local-setup)
+
+## Xezar pipeline
+Added by `xez-onboard-opinionated`. How work moves: [SDLC.md](SDLC.md); what every agent runs: [AGENTS.md](AGENTS.md); review rules: [CODE_REVIEW.md](CODE_REVIEW.md).
+- The project leader is started with `./scripts/xezar-leader.sh`; only that session leads. Every other Claude Code session here is an ordinary session.
+- The pipeline's base branch is `develop`. Graph-engine work stays on `graph` and is started by the owner, not dispatched by the leader.
+- The pipeline adds these `docs/` folders, each created with its first document: `spikes/`, `runbooks/`, `deprecations/`, `performance/`, `migrations/`. Designs go in `docs/designs/`, decision records in `docs/adrs/`, and the design system stays in `design/`.
+- Pipeline files: `.xezar/` (kit files are MIT, see `REUSE.toml`). Agent-kit rules: @.xezar/CLAUDE.md

@@ -1,0 +1,42 @@
+# An integration test run authors tests where two real parts of the system meet: a handler and
+# its database, a client and an API, a command and the file system. Both sides are real. It is
+# not the merge workflow (`integration.yaml`), and it is not contract testing.
+name: integration-tests
+description: "Build or maintain tests that exercise two real parts of the system across their boundary – real dependencies, positive and negative controls, failure paths – then gates and a draft PR."
+steps:
+  - id: kit
+    name: Snapshot the local project kit
+    command: 'bash "$(git rev-parse --path-format=absolute --git-common-dir)/../.xezar/checks/bootstrap.sh"'
+    resultScope: routine
+  - id: preflight
+    name: Verify worktree isolation
+    command: ".xezar/checks/worktree-preflight.sh"
+    resultScope: routine
+  - id: setup
+    name: Prepare the worktree
+    command: ".xezar/checks/worktree-setup.sh"
+    resultScope: routine
+  - id: author
+    name: Author the integration tests
+    prompt: "Author integration tests for: {{task}}. Follow xezar-integration-tests instructions: both sides of the boundary are real, the boundary is what you assert – shape, slowness, absence, a half-failed call – every acceptance has a refusal beside it that you watched fail, and every test owns and removes its data. A dependency that cannot be started here is reported as unavailable, never replaced quietly with a stand-in. Use the installed pinned runner. Finish focused checks and commits before the existing readiness, gates, evidence and PR handoff stages."
+    skill: xezar-integration-tests
+    timeout: 2h
+  - id: readiness
+    name: Confirm the phase record is complete and nothing blocks
+    command: ".xezar/checks/worktree-preflight.sh --readiness"
+    resultScope: stage
+  - id: gates
+    name: Quality gates
+    command: ".xezar/checks/repo-gates.sh --fast --producer gates"
+    resultScope: stage
+    onFail:
+      retry: author
+      max: 2
+  - id: evidence
+    name: Seal the gate evidence
+    command: ".xezar/checks/worktree-preflight.sh --record-gate-evidence"
+    resultScope: stage
+  - id: handoff
+    name: Draft PR into the base branch
+    prompt: "Hand off the integration tests for: {{task}}. Verify the sealed head and open the draft PR; make no content changes here. The body names each boundary and failure covered, how the real dependency is started, and what could not be exercised."
+    skill: xezar-handoff-draft-pr

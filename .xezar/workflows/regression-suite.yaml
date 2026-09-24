@@ -1,0 +1,42 @@
+# A regression-suite run curates the tests that pin past bugs: each cites its issue and was
+# watched failing without the fix. It finds fixes that landed with no such test, finds tests that
+# guard nothing, and retires a test only on the owner's recorded word.
+name: regression-suite
+description: "Curate the regression suite – every past bug pinned by a test that cites its issue and fails without the fix, false guards found, gaps listed, retirements only on the owner's word – then gates and a draft PR."
+steps:
+  - id: kit
+    name: Snapshot the local project kit
+    command: 'bash "$(git rev-parse --path-format=absolute --git-common-dir)/../.xezar/checks/bootstrap.sh"'
+    resultScope: routine
+  - id: preflight
+    name: Verify worktree isolation
+    command: ".xezar/checks/worktree-preflight.sh"
+    resultScope: routine
+  - id: setup
+    name: Prepare the worktree
+    command: ".xezar/checks/worktree-setup.sh"
+    resultScope: routine
+  - id: curate
+    name: Curate the regression suite
+    prompt: "Curate the regression suite for: {{task}}. Follow xezar-regression-suite instructions: every member cites the issue it guards and was watched failing on the code without the fix; find fixes that landed with no such test and tests that pass either way; assert the behaviour a person saw break. Never lower a threshold or loosen an assertion, and retire a test only when the behaviour was removed on purpose and the owner's word is quoted. Use the installed pinned runner. Finish focused checks and commits before the existing readiness, gates, evidence and PR handoff stages."
+    skill: xezar-regression-suite
+    timeout: 2h
+  - id: readiness
+    name: Confirm the phase record is complete and nothing blocks
+    command: ".xezar/checks/worktree-preflight.sh --readiness"
+    resultScope: stage
+  - id: gates
+    name: Quality gates
+    command: ".xezar/checks/repo-gates.sh --fast --producer gates"
+    resultScope: stage
+    onFail:
+      retry: curate
+      max: 2
+  - id: evidence
+    name: Seal the gate evidence
+    command: ".xezar/checks/worktree-preflight.sh --record-gate-evidence"
+    resultScope: stage
+  - id: handoff
+    name: Draft PR into the base branch
+    prompt: "Hand off the regression suite work for: {{task}}. Verify the sealed head and open the draft PR; make no content changes here. The body lists the tests added, the false guards found, the gaps that remain, and every retired test with the authority for it."
+    skill: xezar-handoff-draft-pr

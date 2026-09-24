@@ -1,0 +1,42 @@
+# A hotfix run repairs a fault that is live: the narrowest change that stops the harm, red test
+# first, plus a mandatory follow-up issue for the full fix. It runs the bug-investigation skill in
+# its hotfix mode. Nothing is skipped to go faster: the gates run, and review still applies.
+name: hotfix
+description: "Repair a live fault with the narrowest change that stops the harm – red test first, a mandatory follow-up issue for the full fix, gates and review intact – then a draft PR into the base branch."
+steps:
+  - id: kit
+    name: Snapshot the local project kit
+    command: 'bash "$(git rev-parse --path-format=absolute --git-common-dir)/../.xezar/checks/bootstrap.sh"'
+    resultScope: routine
+  - id: preflight
+    name: Verify worktree isolation
+    command: ".xezar/checks/worktree-preflight.sh"
+    resultScope: routine
+  - id: setup
+    name: Prepare the worktree
+    command: ".xezar/checks/worktree-setup.sh"
+    resultScope: routine
+  - id: fix
+    name: Stop the harm
+    prompt: "Hotfix (see '## Hotfix mode' in your skill): {{task}}. Reproduce the live fault, add the red test, apply the narrowest change that stops the harm and say which kind it is, and commit. File the follow-up issue for the full fix exactly once: read the receipt hotfix/follow-up.json in the evidence directory first, and only when it is absent create the issue through the tracker's create-issue operation and write the receipt at once. A gate retry re-reads the receipt and files nothing. Skip no gate and grant yourself no deferral of review: that is the owner's decision, quoted by name. If the fault lives on a release branch other than the configured base, write the BLOCKED file saying so and end the turn. Finish focused checks and commits before the existing readiness, gates, evidence and PR handoff stages."
+    skill: xezar-bug-investigation
+    timeout: 2h
+  - id: readiness
+    name: Confirm the phase record is complete and nothing blocks
+    command: ".xezar/checks/worktree-preflight.sh --readiness"
+    resultScope: stage
+  - id: gates
+    name: Quality gates
+    command: ".xezar/checks/repo-gates.sh --fast --producer gates"
+    resultScope: stage
+    onFail:
+      retry: fix
+      max: 2
+  - id: evidence
+    name: Seal the gate evidence
+    command: ".xezar/checks/worktree-preflight.sh --record-gate-evidence"
+    resultScope: stage
+  - id: handoff
+    name: Draft PR into the base branch
+    prompt: "Hand off the hotfix for: {{task}}. Verify the sealed head and open the draft PR; make no content changes here. The body leads with what harm this stops and what it deliberately leaves unsolved, and names the follow-up issue from the receipt hotfix/follow-up.json; then add one comment on that issue linking this PR. Cold review applies, and security review where a trust boundary is touched; record any owner-granted deferral by name."
+    skill: xezar-handoff-draft-pr

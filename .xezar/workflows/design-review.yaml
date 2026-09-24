@@ -1,0 +1,21 @@
+# Reviews a <designs>/<feature>/ folder (paths.designs) or a PR's UI against this project's design system.
+# Read-only like code-review: no setup, no gates, no commits. The verdict is posted with
+# `gh` as a PR comment headed "## Design review", never written into the tree. There is
+# no readiness step, so `branch.has-own-commits` never applies to this role.
+name: design-review
+description: "Review a mockup under the folder paths.designs names, or a PR's UI against the design system and the accessibility bar. Verdict PASS / PASS WITH FOLLOW-UPS / FAIL. Read-only."
+steps:
+  - id: kit
+    name: Snapshot the local project kit
+    command: 'bash "$(git rev-parse --path-format=absolute --git-common-dir)/../.xezar/checks/bootstrap.sh"'
+    resultScope: routine
+  - id: preflight
+    name: Report the checkout
+    command: ".xezar/checks/worktree-preflight.sh --allow-root"
+    resultScope: routine
+  - id: review
+    name: Design review
+    prompt: "Design review (see '## Review mode' in your skill): {{task}}. Follow the design system named by paths.designSystem in .xezar/pipeline/config.json through usage, recipes, verification, lifecycle and storage; where this project has none, judge against its existing screens and say so. Own only the read-only verdict and review evidence at the identified revision; the author owns mockup, README handoff and index updates. Preserve label authority and report unavailable checks honestly. Report independence as confirmed, not confirmed or unknown, from the author the launch text names; never confirmed without that text."
+    skill: xezar-ux-design
+    verdictRole: design-review
+    allowedTools: [Read, Grep, Glob, Bash, mcp__chrome-devtools__navigate_page, mcp__chrome-devtools__new_page, mcp__chrome-devtools__list_pages, mcp__chrome-devtools__select_page, mcp__chrome-devtools__close_page, mcp__chrome-devtools__take_snapshot, mcp__chrome-devtools__take_screenshot, mcp__chrome-devtools__list_console_messages, mcp__chrome-devtools__get_console_message, mcp__chrome-devtools__list_network_requests, mcp__chrome-devtools__get_network_request, mcp__chrome-devtools__click, mcp__chrome-devtools__fill, mcp__chrome-devtools__fill_form, mcp__chrome-devtools__hover, mcp__chrome-devtools__press_key, mcp__chrome-devtools__type_text, mcp__chrome-devtools__wait_for, mcp__chrome-devtools__handle_dialog, mcp__chrome-devtools__resize_page, mcp__chrome-devtools__get_css_styles]

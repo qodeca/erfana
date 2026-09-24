@@ -1,0 +1,47 @@
+# A localisation run makes text translatable and adds or maintains a locale the owner listed in
+# localisation.locales. The guard step refuses before the install when the list is empty: which
+# languages a product speaks is the owner's decision. A translation the run wrote is a machine
+# draft and is marked as one.
+name: localisation
+description: "Make text translatable and add or maintain a locale from localisation.locales – whole-sentence messages, real plural rules, locale formatting, machine drafts marked as drafts, a missing-key check – then gates and a draft PR. Refuses where no locale is listed."
+steps:
+  - id: kit
+    name: Snapshot the local project kit
+    command: 'bash "$(git rev-parse --path-format=absolute --git-common-dir)/../.xezar/checks/bootstrap.sh"'
+    resultScope: routine
+  - id: preflight
+    name: Verify worktree isolation
+    command: ".xezar/checks/worktree-preflight.sh"
+    resultScope: routine
+  - id: guard
+    name: Refuse where no locale is listed
+    command: ".xezar/checks/config-guard.sh localisation.locales"
+    resultScope: routine
+  - id: setup
+    name: Prepare the worktree
+    command: ".xezar/checks/worktree-setup.sh"
+    resultScope: routine
+  - id: localise
+    name: Localise the surface
+    prompt: "Localise: {{task}}. Follow xezar-localisation instructions: work only with locales listed in localisation.locales in .xezar/pipeline/config.json and never invent one. Extract every user-facing string into the project's existing catalogue under a meaning-named key, one message per sentence with named placeholders, plurals and formatting through the locale's own rules, context for the translator. Mark every translation you wrote as a machine draft and list legal and consent text for the owner. Add the missing-key check if there is none. Check the changed screens in the longest locale, and a right-to-left one where listed, through the browser descriptor where this project has an interface and a descriptor; otherwise in the output itself. Finish focused checks and commits before the existing readiness, gates, evidence and PR handoff stages."
+    skill: xezar-localisation
+    timeout: 2h
+  - id: readiness
+    name: Confirm the phase record is complete and nothing blocks
+    command: ".xezar/checks/worktree-preflight.sh --readiness"
+    resultScope: stage
+  - id: gates
+    name: Quality gates
+    command: ".xezar/checks/repo-gates.sh --fast --producer gates"
+    resultScope: stage
+    onFail:
+      retry: localise
+      max: 2
+  - id: evidence
+    name: Seal the gate evidence
+    command: ".xezar/checks/worktree-preflight.sh --record-gate-evidence"
+    resultScope: stage
+  - id: handoff
+    name: Draft PR into the base branch
+    prompt: "Hand off the localisation work for: {{task}}. Verify the sealed head and open the draft PR; make no content changes here. The body says which locales changed, which strings are machine drafts awaiting a fluent reviewer, which text must not ship on a draft, and what the browser or output check showed."
+    skill: xezar-handoff-draft-pr
