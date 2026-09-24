@@ -1,6 +1,6 @@
 # Campaign release-0.21.0
 
-Updated: 2026-09-25 01:13 CEST
+Updated: 2026-09-25 01:14 CEST
 
 ## State
 - Base: `develop` at `9fe8a3f0`. Merges so far: 0. Checkpoints met: none.
@@ -17,14 +17,10 @@ Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 Empty.
 
 ## Running tasks per lane
-| Run | Issue | Workflow | Lane | Login |
-|---|---|---|---|---|
-| c83ebddf | #139 | research (2nd opinion, advisory) | pi/deepseek-flash | – |
-
-Counts: gate runs 0/2, tasks 4/10 (only 2 run at once: machine-wide xezar maxParallel=2, so the two pi tasks are queued), metered 2/4 (pi, assumed metered), load 1.94/18.
+None.
 
 ## File-ownership table
-- c83ebddf owns nothing in the repo (research, no PR)
+None running.
 
 ## Accounts (from `read_quota` at 2026-09-24T23:13:13Z)
 | Runner | Login | State | Resets (UTC) |
