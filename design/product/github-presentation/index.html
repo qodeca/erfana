@@ -15,6 +15,10 @@
   /* The artwork below is an IMAGE at a fixed canvas, not app UI: scripts/capture/brand.mjs
      screenshots each #gp-* element at deviceScaleFactor 2. Every colour is a token. */
 
+  /* deviates: design/README.md — the gp- classes are not erf- namespaced. The erf- rule is for
+     component CSS destined for src/; this artwork only ever becomes a PNG, and its #gp-* ids
+     are the contract brand.mjs and brand.test.mjs read. See Exceptions. */
+
   /* deviates: design/system/foundations/colors.html — Erfana is dark-only, but GitHub has a
      light theme, so the README banner needs a light variant. It is an asset on github.com,
      never app chrome; the app rule is unchanged. See Exceptions. */
@@ -42,7 +46,7 @@
     border-radius: var(--border-radius);
   }
   /* deviates: design/system/foundations/type.html — the banner is drawn at image scale, so
-     its icon (88px) and wordmark (60px, 30px in the social card) sit outside the UI type
+     its icon (88px) and wordmark (60px, 38px in the social card) sit outside the UI type
      scale. They are values this card decides; see Exceptions. */
   .gp-banner { width: 800px; height: 200px; padding: 0 var(--space-16); }
   .gp-social { width: 640px; height: 320px; padding: var(--space-20); gap: var(--space-12); }
@@ -228,6 +232,7 @@ text everything the banner shows.</p>
   <tbody>
     <tr><td><code>.gp-art--light</code> in this card</td><td>Colours – Erfana is dark-only</td><td>GitHub has a light theme, and the banner is a page asset on github.com, not app chrome. The app rule does not change.</td></tr>
     <tr><td><code>.gp-banner</code>, <code>.gp-social</code> in this card</td><td>Type – the UI type scale</td><td>The icon (88px) and the wordmark (60px, 38px in the social card) are drawn at image scale, which the UI scale does not reach.</td></tr>
+    <tr><td>Every <code>gp-</code> class and <code>#gp-*</code> id in this card</td><td>Naming – the <code>erf-</code> namespace (<code>design/README.md</code>, <code>.stylelintrc.json</code>)</td><td>The namespace guards component CSS that moves into <code>src/</code>, where a bare class can collide with Mermaid's. This artwork never ships as CSS; it is rendered to PNG by <code>scripts/capture/brand.mjs</code>, which, with its test, reads the <code>#gp-*</code> ids.</td></tr>
   </tbody>
 </table>
 
