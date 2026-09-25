@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { randomUUID } from 'node:crypto'
 import { writeFakeNpx, isAlive } from './lib/mcp-stand-in.mjs'
-import { isMcpLauncher, findOrphans, listProcesses, stopOrphanMcp } from './stop-orphan-mcp.mjs'
+import { isMcpLauncher, isSameProcess, findOrphans, listProcesses, stopOrphanMcp } from './stop-orphan-mcp.mjs'
 
 const TIMEOUT_MS = 10_000
 
@@ -16,6 +16,29 @@ describe('isMcpLauncher', () => {
     expect(isMcpLauncher('npm exec @snowfort/circuit-electron@latest HOME=/Users/x PATH=/usr/bin')).toBe(true)
     expect(isMcpLauncher('npm exec @snowfort/circuit-electron@0.0.18')).toBe(true)
     expect(isMcpLauncher('node /usr/local/bin/npx -y @snowfort/circuit-electron')).toBe(true)
+    expect(isMcpLauncher('/usr/local/bin/npx --yes @snowfort/circuit-electron@latest')).toBe(true)
+    expect(isMcpLauncher('npx @snowfort/circuit-electron')).toBe(true)
+  })
+
+  it('rejects a command that only mentions npx and the package as arguments (S-1)', () => {
+    expect(isMcpLauncher('viewer --topic npx @snowfort/circuit-electron')).toBe(false)
+    expect(isMcpLauncher('node viewer.js npx @snowfort/circuit-electron')).toBe(false)
+    expect(isMcpLauncher('grep npm exec @snowfort/circuit-electron')).toBe(false)
+    expect(isMcpLauncher('npm run exec @snowfort/circuit-electron')).toBe(false)
+  })
+
+  it('rejects a launcher whose package argument is not the listed package (S-1)', () => {
+    expect(isMcpLauncher('npx -y other-pkg @snowfort/circuit-electron')).toBe(false)
+    expect(isMcpLauncher('npm exec other-pkg @snowfort/circuit-electron')).toBe(false)
+    expect(isMcpLauncher('npx @snowfort/circuit-electron-evil')).toBe(false)
+    expect(isMcpLauncher('npx @snowfort/circuit-electron@latest;rm')).toBe(false)
+  })
+
+  it('rejects ambiguous command lines: unknown options before the package, or a split executable path (S-1)', () => {
+    expect(isMcpLauncher('npx --package=@snowfort/circuit-electron circuit-electron')).toBe(false)
+    expect(isMcpLauncher('npx -p evil @snowfort/circuit-electron')).toBe(false)
+    expect(isMcpLauncher('/opt/my tools/npx @snowfort/circuit-electron')).toBe(false)
+    expect(isMcpLauncher('')).toBe(false)
   })
 
   it('rejects other packages, lookalike names and non-launchers', () => {
@@ -37,6 +60,107 @@ describe('findOrphans', () => {
       { pid: 30, ppid: 1, age: '1:00', command: 'npm exec some-other-server' },
     ]
     expect(findOrphans(processes).map((proc) => proc.pid)).toEqual([10, 11, 12])
+  })
+})
+
+describe('isSameProcess', () => {
+  const target = { pid: 10, ppid: 1, start: 'Thu Sep 25 13:00:00 2026', command: 'npx @snowfort/circuit-electron' }
+
+  it('confirms the same PID, start time, command and parent', () => {
+    expect(isSameProcess(target, { ...target })).toBe(true)
+    // a descendant re-parented to the orphan parent is still the same process
+    expect(isSameProcess({ ...target, ppid: 10 }, { ...target, ppid: 1 })).toBe(true)
+  })
+
+  it('refuses a reused PID, a new parent or an unconfirmable identity', () => {
+    expect(isSameProcess(target, { ...target, start: 'Thu Sep 25 13:00:05 2026' })).toBe(false)
+    expect(isSameProcess(target, { ...target, command: 'vim' })).toBe(false)
+    expect(isSameProcess(target, { ...target, ppid: 500 })).toBe(false)
+    expect(isSameProcess(target, undefined)).toBe(false)
+    expect(isSameProcess({ ...target, start: undefined }, { ...target, start: undefined })).toBe(false)
+  })
+})
+
+describe('stopOrphanMcp against mocked process snapshots (S-2)', () => {
+  const LAUNCHER = 'npm exec @snowfort/circuit-electron@latest'
+  const T0 = 'Thu Sep 25 13:00:00 2026'
+  const T1 = 'Thu Sep 25 13:00:01 2026'
+  const proc = (pid, ppid, start, command) => ({ pid, ppid, start, age: '1:00', command })
+
+  /** `snapshots` answer successive `ps` calls (the last repeats); `alive` answers kill(pid, 0). */
+  async function run(snapshots, alive) {
+    const signals = []
+    const lines = []
+    let call = 0
+    const exitCode = await stopOrphanMcp({
+      graceMs: 0,
+      log: (line) => lines.push(line),
+      list: () => snapshots[Math.min(call++, snapshots.length - 1)],
+      signal: (pid, sig) => signals.push([pid, sig]),
+      isAlive: (pid) => alive.has(pid),
+    })
+    return { exitCode, signals, lines, calls: call }
+  }
+
+  it('does not SIGTERM a PID reused between the scan and the signal', async () => {
+    const scan = [proc(10, 1, T0, LAUNCHER), proc(11, 10, T0, 'node .bin/circuit-electron')]
+    // 10 exited and its PID now runs the same command, started later
+    const beforeTerm = [proc(10, 1, T1, LAUNCHER), proc(11, 1, T0, 'node .bin/circuit-electron')]
+    const { exitCode, signals, lines } = await run([scan, beforeTerm, [proc(10, 1, T1, LAUNCHER)]], new Set([10]))
+    expect(signals).toEqual([[11, 'SIGTERM']])
+    expect(exitCode).toBe(0)
+    expect(lines[0]).toMatch(/^gone before stop, not signalled pid=10 /)
+    expect(lines[1]).toMatch(/^stopped pid=11 /)
+  })
+
+  it('does not SIGTERM a PID now held by a live-session launcher', async () => {
+    const scan = [proc(10, 1, T0, LAUNCHER)]
+    const { signals } = await run([scan, [proc(10, 500, T1, LAUNCHER)]], new Set([10]))
+    expect(signals).toEqual([])
+  })
+
+  it('does not SIGKILL a PID reused by the same command after SIGTERM', async () => {
+    const scan = [proc(10, 1, T0, LAUNCHER)]
+    const reused = [proc(10, 1, T1, LAUNCHER)]
+    // kill(10, 0) keeps succeeding: the PID is alive, but it is a new process
+    const { exitCode, signals, lines } = await run([scan, scan, reused, reused], new Set([10]))
+    expect(signals).toEqual([[10, 'SIGTERM']])
+    expect(exitCode).toBe(0)
+    expect(lines[0]).toMatch(/^stopped pid=10 /)
+  })
+
+  it('does not SIGKILL a survivor whose parent became a live session', async () => {
+    const scan = [proc(10, 1, T0, LAUNCHER), proc(11, 10, T0, 'electron')]
+    const adopted = [proc(11, 500, T0, 'electron')]
+    const { exitCode, signals, lines } = await run([scan, scan, adopted, adopted], new Set([11]))
+    expect(signals).toEqual([
+      [10, 'SIGTERM'],
+      [11, 'SIGTERM'],
+    ])
+    expect(exitCode).toBe(1)
+    expect(lines[1]).toMatch(/^FAILED to stop pid=11 /)
+  })
+
+  it('SIGKILLs a confirmed survivor, including a descendant re-parented to PID 1 (control)', async () => {
+    const scan = [proc(10, 1, T0, LAUNCHER), proc(11, 10, T0, 'electron')]
+    const survived = [proc(10, 1, T0, LAUNCHER), proc(11, 1, T0, 'electron')]
+    const { exitCode, signals } = await run([scan, scan, survived, []], new Set([10, 11]))
+    expect(signals).toEqual([
+      [10, 'SIGTERM'],
+      [11, 'SIGTERM'],
+      [10, 'SIGKILL'],
+      [11, 'SIGKILL'],
+    ])
+    expect(exitCode).toBe(0)
+  })
+
+  it('signals nothing when a start time is missing, and reports it still running', async () => {
+    const scan = [proc(10, 1, undefined, LAUNCHER)]
+    const { exitCode, signals, lines } = await run([scan], new Set([10]))
+    expect(signals).toEqual([])
+    // no identity can be confirmed, so it cannot be shown to be gone either
+    expect(lines[0]).toMatch(/^NOT stopped \(identity not confirmed\) pid=10 /)
+    expect(exitCode).toBe(1)
   })
 })
 

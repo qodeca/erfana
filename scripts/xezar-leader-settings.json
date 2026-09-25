@@ -11,7 +11,7 @@
     "allow": [
       "$defaults",
       "Merging a pull request of this repository with `gh pr merge` is allowed in this session: it is the project leader. Every agent it coordinates uses one GitHub account, so a formal GitHub approval is impossible; the leader guide lets it merge only when every required check on the PR head is green and an agent review by a different model approved that head.",
-      "Running exactly `node scripts/stop-orphan-mcp.mjs` or `node scripts/stop-orphan-mcp.mjs --dry-run` is allowed in this session: it stops only orphaned MCP server launchers whose parent is PID 1, which each spin a CPU core, and never touches a live session's server (#145)."
+      "Running exactly `node scripts/stop-orphan-mcp.mjs` or `node scripts/stop-orphan-mcp.mjs --dry-run` is allowed in this session: it signals only an `npx`/`npm exec` launcher of a listed MCP package whose parent is PID 1, and that launcher's descendants, and it re-confirms each process's PID, start time, parent and command right before each signal, skipping any it cannot confirm (#145). This allows no other cleanup command."
     ]
   }
 }
