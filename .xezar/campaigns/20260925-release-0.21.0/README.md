@@ -5,7 +5,7 @@ Updated: 2026-09-25 09:13 CEST
 ## State
 - Base: `develop` at `9fe8a3f0`. Merges so far: 0. Checkpoints met: none.
 - Scope: open issues labelled `release-0.21.0`, plus new work the owner discusses with the leader (the leader files it as an issue with that label). None labelled yet.
-- Unattended mode: ON since 2026-09-24T22:23:07Z (restarts 0 of 3). Parked calls go to parked.md.
+- Unattended mode: off (was on 2026-09-24T22:23:07Z to 2026-09-25T08:09:46Z, restarts 0, nothing parked).
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
