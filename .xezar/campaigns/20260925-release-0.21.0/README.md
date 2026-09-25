@@ -20,10 +20,12 @@ Empty.
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
+| 2a1e4316 | #154 Windows test fix (round 3) | address-review-findings (author) | claude/opus | qodeca |
 
-Counts at dispatch (19:08): tasks 2/10, gate runs 1/2 (2a1e4316), metered 1/4, load 2.9/18.
+Counts at dispatch (19:28): tasks 2/10, gate runs 0/2, metered 1/4, load 1.7/18.
 
 ## File-ownership table
+- 2a1e4316 owns scripts/capture/sandbox.mjs, scripts/capture/*.test.mjs
 - Reviews own nothing.
 
 ## Accounts (from `read_quota` at 2026-09-25T17:13:17Z)
@@ -40,7 +42,7 @@ Counts at dispatch (19:08): tasks 2/10, gate runs 1/2 (2a1e4316), metered 1/4, l
 
 ## Held or queued work
 - #144 – ready; held behind the #138 build: both edit docs/features/README.md, docs/keyboard-shortcuts.md, docs/settings.md.
-- #138 build – split: part A (plan steps 2-4) merged (#150); step 1 spike done (#149); part B (steps 5, 5b, 6) is PR #154: code review REQUEST CHANGES (1 major, run.mjs readLogin can empty the privacy deny-list); design review FAIL (7 privacy/state blockers B-1..B-10, 5 non-blocking); round 2 done at 46600c39, re-reviews next (code recheck + image review); steps 7-8 follow.
+- #138 build – split: part A (plan steps 2-4) merged (#150); step 1 spike done (#149); part B (steps 5, 5b, 6) is PR #154: code review REQUEST CHANGES (1 major, run.mjs readLogin can empty the privacy deny-list); design review FAIL (7 privacy/state blockers B-1..B-10, 5 non-blocking); round 2 done at 46600c39; code recheck APPROVE at b543da12 with 1 minor (Windows test, run.test.mjs:220 vs sandbox.mjs:46; advisory Windows checks red); image re-review PASS WITH FOLLOW-UPS (2 guide-copy notes for step 7); Windows test fix running (round 3, no re-capture); steps 7-8 follow.
 - #139 build – design merged; waits for #138's capture script (part B).
 
 ## Owner items

@@ -13,3 +13,9 @@ Calls the leader made alone while the owner was away.
 - Why: S-1 is fixed; S-2 is now one narrow, fixture-verified gap in the same 3 files. The fix is a few lines and tests.
 - Rejected: merge #155 with S-2 open as an accepted risk (the owner has to accept a security finding, not the leader), or split the script fix into its own PR (one more review cycle, same files).
 - Undo: stop 4458b282 and ask for the split; until #155 merges the leader keeps asking before running the cleanup script.
+
+## 2026-09-25 19:56 – third repair round on PR #154
+- Chose: continued the author 2a1e4316 for one small fix: the Windows test failure in scripts/capture (sandbox.mjs:46, run.test.mjs:220), no re-capture of any image.
+- Why: code and image reviews both pass; only the advisory Windows checks job is red. Merging would turn develop's Windows checks red for every later PR.
+- Rejected: merge now and file a follow-up issue for the Windows test (quicker, but leaves develop red on Windows).
+- Undo: stop 2a1e4316, merge #154 at b543da12 as reviewed, and file the Windows test as an issue.
