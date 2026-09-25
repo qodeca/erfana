@@ -9,30 +9,24 @@ Updated: 2026-09-25 11:06 CEST
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
-- #148 ready, head 97d632ea – #142 fix by 8d85e234 (pi/deepseek-flash). All checks green incl. Windows. Review aa8e12b4 queued (full-cold-review, claude/opus, qodeca).
+- #150 ready, head 4e1e992c – #138 part A. Review eb3b8cf0 REQUEST CHANGES: 1 Major (shebang in scripts/check-links.mjs, Windows load), 1 Nit (coverage number). Back to author a410722c (repair round 1).
+- #149 draft, head e57b8db6 – #138 spike note (320bec53). Login part stopped (needs a browser sign-in); owner makes the token. Q8: terminal text below the 7 px bar at 800 px; leader decision: capture-only zoom (#139 option).
+- #148 ready, head 02d9c56c – #142 fix. Re-check 77285cdf APPROVE, no new defects, all checks green. Merge line: being brought up to date.
 - #140 ready, head c442a15b – #139 spec. Re-check 12b29be1 APPROVE at c442a15b, all 11 findings fixed, no new defects. Labels design-approved + merge-queue; #139 labelled design-approved. Next in the merge line after #141: bring up to date, wait for green, squash-merge.
 Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 
 ## Serial merge line
-1. #140 – conflict in docs/README.md; repair 19b6c719 queued (conflict-repair, codex/gpt-5.6-terra, default).
+1. #148 (bringing up to date)
 
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| a410722c | #138 part A | feature-implementation | claude/opus | qodeca |
-| 320bec53 | #138 spike | spike | claude/opus | qodeca |
-| aa8e12b4 | #148 | code-review (full-cold-review) | claude/opus | qodeca |
-| 19b6c719 | #140 | address-review-findings (conflict-repair) | codex/gpt-5.6-terra | default |
-| 8d85e234 | #142 | bug-fix (bounded-bug-fix) | pi/deepseek-api/deepseek-flash | – |
-| 63ac9ab2 | #146 | code-review (full-cold-review) | claude/sonnet | gmail |
+| a410722c (fix round 1) | #150 | feature-implementation (continue) | claude/opus | qodeca |
 
-Counts at dispatch (12:38): tasks 6/10 (xezar runs 2 at once, 4 queued), gate runs 0/2, metered 1/4 (pi), load 4.5/18.
+Counts at dispatch (14:36): tasks 2/10, gate runs 0/2, metered 0/4, load 3.6/18.
 
 ## File-ownership table
-- a410722c owns scripts/capture/demo-project/**, scripts/check-links*.mjs, package.json, vitest.main.ts, e2e/fixtures/launch-helpers.ts, e2e/fixtures/index.ts
-- 320bec53 owns docs/spikes/138-capture-spike.md
-- 19b6c719 owns docs/README.md (on the #140 branch)
-- 8d85e234 owns src/renderer/src/components/Search/SearchBar.tsx, SearchBar.test.tsx, docs/keyboard-shortcuts.md (find-bar lines only)
+- a410722c owns scripts/check-links.mjs, vitest.main.ts (one comment)
 
 ## Accounts (from `read_quota` at 2026-09-25T07:13:22Z)
 | Runner | Login | State | Resets (UTC) |
@@ -50,16 +44,18 @@ Counts at dispatch (12:38): tasks 6/10 (xezar runs 2 at once, 4 queued), gate ru
 - #143 – ready; held so it does not collide with #142 on tooltip code.
 - #144 – ready; held behind the #138 build: both edit docs/features/README.md, docs/keyboard-shortcuts.md, docs/settings.md.
 - #138 build – split: part A (plan steps 2-4) running as a410722c; step 1 spike running as 320bec53 (owner chose a subscription login, westagilelabs tried first); steps 5-8 follow.
-- #139 build – design approved 11:29; waits for #138's fixture and capture script.
+- #139 build – design merged; waits for #138's capture script (part B).
 
 ## Owner items
 - Label issues with `release-0.21.0` to put them in scope.
 - Leader runs `node scripts/stop-orphan-mcp.mjs` at each L1 tick (worked at 12:39). Allow-rule PR for it still to do (owner-approved).
+- Make the Claude Code token for the #138 capture (steps given 13:10).
 - Decide whether to hide or delete the reviewer's junk test comments on PR #146.
 - After #145 merges: leader adds the allow rule for `node scripts/stop-orphan-mcp.mjs` (approved).
 - PR #140 open decisions, needed before #139 is built, not before its review: (1) go to apply repo description, topics, social preview; (2) extend TRADEMARKS.md to the new banner, wordmark, social image; (3) CI link check as a follow-up issue; (4) light-theme banner vs dark-only rule – owner only if the reviewer disagrees; (5) demo format WebP (after a spike) vs MP4.
 
 ## Rules that bit
+- Never dispatch while the checkout holds unpushed campaign commits: the task's worktree is cut from the local develop and carries them into its PR (#148).
 - Load over 18 for more than one tick: check `pgrep -fl circuit-electron` for launchers with parent PID 1 before anything else. They ignore SIGTERM. Tell the owner at once; after #145 merges use `node scripts/stop-orphan-mcp.mjs`.
 - xezar ack can fail with "no longer owns the project" while status says owner (seen 00:45-00:47, load over 130). Reads still work; retry ack later, never re-dispatch on it.
 - A step agent must not end its turn while its own background work runs (XEZ:MONITORING fails the step). Say "finish in the foreground" in every brief.
