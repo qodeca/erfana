@@ -20,11 +20,13 @@ Empty.
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
+| 4458b282 | #155 fix S-2 same-second PID reuse (round 4) | address-review-findings (author) | claude/opus | gmail |
 | 2a1e4316 | #154 fix code + image findings (round 2) | address-review-findings (author) | claude/opus | qodeca |
 
-Counts at dispatch (18:17): tasks 3/10, gate runs 0/2, metered 0/4, load 2.8/18.
+Counts at dispatch (18:49): tasks 2/10, gate runs 1/2 (2a1e4316), metered 1/4, load 6.5/18.
 
 ## File-ownership table
+- 4458b282 owns scripts/stop-orphan-mcp.mjs, scripts/stop-orphan-mcp*.test.mjs, scripts/xezar-leader-settings.json
 - 2a1e4316 owns scripts/capture/**, docs/user-guide/**/images, docs/assets/readme/, docs/designs/138-user-guide/README.md (screenshot rows)
 - Reviews own nothing.
 
