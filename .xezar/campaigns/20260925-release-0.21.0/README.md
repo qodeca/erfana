@@ -20,7 +20,6 @@ Empty.
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| 8a2b2c0f | #159 QA (live github.com checks) | qa (browser-qa) | claude/sonnet | gmail |
 
 Counts at dispatch (23:58): tasks 2/10, gate runs 0/2, metered 1/4, load 1.5/18.
 
@@ -42,9 +41,10 @@ Counts at dispatch (23:58): tasks 2/10, gate runs 0/2, metered 1/4, load 1.5/18.
 ## Held or queued work
 - #144 – ready; held behind #139: both edit docs/features/README.md (item 12).
 - #138 build – split: part A (plan steps 2-4) merged (#150); step 1 spike done (#149); part B (steps 5, 5b, 6) is PR #154: code review REQUEST CHANGES (1 major, run.mjs readLogin can empty the privacy deny-list); design review FAIL (7 privacy/state blockers B-1..B-10, 5 non-blocking); round 2 done at 46600c39; code recheck APPROVE at b543da12 with 1 minor (Windows test, run.test.mjs:220 vs sandbox.mjs:46; advisory Windows checks red); image re-review PASS WITH FOLLOW-UPS (2 guide-copy notes for step 7); merged 2026-09-25 as c1b1ad21; steps 7-8 follow.
-- #139 build – PR #159: code review APPROVE, design review FAIL (B-1 account name in QA screenshots); round 1 done at 1f924f73 (B-1 masked, NB-1 stated as a limit, NB-2 documented deviation); design recheck PASS at 9203f493; QA running.
+- #139 build – PR #159: code review APPROVE, design review FAIL (B-1 account name in QA screenshots); round 1 done at 1f924f73 (B-1 masked, NB-1 stated as a limit, NB-2 documented deviation); design recheck PASS at 9203f493; QA FAIL only because 3 checks could not run (chrome-devtools emulate + evaluate_script denied in the QA session): dark mode, theme switch, reduced motion unverified live. Waiting for the owner.
 
 ## Owner items
+- **#159 blocked on 3 unrun QA checks** (dark theme, banner theme switch, reduced-motion still). Both QA and design sessions were denied the chrome-devtools emulate/evaluate_script tools. Options: (a) owner checks them by hand on github.com in ~2 minutes (branch feature/139-readme-redesign: switch OS dark mode, turn on Reduce motion), or (b) allow those two tools for review sessions and re-run QA. Leader recommends (a).
 - `npm audit` on develop's lockfile (run by the #159 author, 2026-09-25 23:51): 16 advisories – 1 critical, 12 high, 3 moderate – none added by #159. Not triaged. Dependabot PRs #63-#68 are open and out of this campaign's scope. Decide: triage now (a new issue in 0.21.0) or later.
 - PR #159 QA screenshots at 56ba01bb showed the GitHub account name; being replaced, but the old files stay in the branch history (squash-merge keeps them out of develop). Decide if that history matters.
 - Two Windows flakes seen on #158 (docs-only): useImageSource.test.ts 'keeps the last good image…' and check-shebangs.test.mjs 5000 ms timeout. Not in docs/windows/known-flakes.md yet; file or catalogue them?
