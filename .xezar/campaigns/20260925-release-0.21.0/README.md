@@ -9,6 +9,7 @@ Updated: 2026-09-25 11:06 CEST
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
+- #146 ready, head 1f4f5c33 – #145 fix. Required checks green. Advisory Windows checks red: scripts/stop-orphan-mcp.test.mjs fails to load (SyntaxError at 10:1). Next: full-cold-review, not claude/opus, not login qodeca (queued on load).
 - #141 draft, head 0c6ad3a0 – #138 spec, round-1 fixes pushed. Next: short re-review on claude/sonnet, not login qodeca (queued on load).
 - #140 draft, head c442a15b – #139 spec, round-1 fixes pushed. Next: short re-review on claude/sonnet, not login gmail (queued on load).
 Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
@@ -19,12 +20,12 @@ Empty.
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| 2a80ec06 | #145 | feature-implementation | claude/opus | qodeca |
+| – | – | – | – | – |
 
 Counts at dispatch: tasks 3/10 (xezar runs 2 at once), metered 0/4, load 15.8/18.
 
 ## File-ownership table
-- 2a80ec06 owns scripts/run-mcp.js, scripts/stop-orphan-mcp.mjs, .mcp.json, their tests
+- Nothing owned. 2a80ec06 (#145) finished 11:13; its files (scripts/run-mcp.js, scripts/stop-orphan-mcp.mjs, tests) stay with PR #146.
 
 ## Accounts (from `read_quota` at 2026-09-25T07:13:22Z)
 | Runner | Login | State | Resets (UTC) |
@@ -45,7 +46,7 @@ Counts at dispatch: tasks 3/10 (xezar runs 2 at once), metered 0/4, load 15.8/18
 
 ## Owner items
 - Label issues with `release-0.21.0` to put them in scope.
-- Run /xez-add-rule for the orphan-check rule (text proposed at 10:44 in chat).
+- Stop orphaned circuit-electron servers by hand until #146 merges (see timeline for PIDs).
 - After #145 merges: leader adds the allow rule for `node scripts/stop-orphan-mcp.mjs` (approved).
 - PR #140 open decisions, needed before #139 is built, not before its review: (1) go to apply repo description, topics, social preview; (2) extend TRADEMARKS.md to the new banner, wordmark, social image; (3) CI link check as a follow-up issue; (4) light-theme banner vs dark-only rule – owner only if the reviewer disagrees; (5) demo format WebP (after a spike) vs MP4.
 
