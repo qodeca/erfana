@@ -9,7 +9,9 @@ Updated: 2026-09-25 11:06 CEST
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
-- #149 draft – #138 spike note. Owner made the token (.local/capture/claude-token, checked by size and prefix only). Continued 320bec53 at 15:25 for Q4/Q5/Q7. Q8 leader decision: capture-only zoom.
+- #152 ready, head 51b6e052 – #151 shebang guard (455166db). All checks green. Review 06e118c8 running (claude/sonnet, westagilelabs).
+- #153 ready, head 77b5c7e8 – #143 platform tooltip labels (322010ff). All checks green. Review 483d6b31 running (claude/sonnet, gmail).
+- #149 ready, head dbbb88bb – #138 spike note, all 8 questions answered: login works with the token, 0 emails or identifiers on screen, Stop hook and acceptEdits work, Electron needs SHELL. Review 08eda96c running.
 - #140 ready, head c442a15b – #139 spec. Re-check 12b29be1 APPROVE at c442a15b, all 11 findings fixed, no new defects. Labels design-approved + merge-queue; #139 labelled design-approved. Next in the merge line after #141: bring up to date, wait for green, squash-merge.
 Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 
@@ -19,16 +21,18 @@ Empty.
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| 320bec53 (login part) | #138 spike | spike (continue) | claude/opus | qodeca |
-| 455166db | #151 | feature-implementation | claude/opus | qodeca |
-| 322010ff | #143 | feature-implementation (ui-implementation) | claude/opus | qodeca |
+| 4458b282 | allow rule | feature-implementation | claude/opus | gmail |
+| 483d6b31 | #153 | code-review | claude/sonnet | gmail |
+| 06e118c8 | #152 | code-review | claude/sonnet | westagilelabs |
+| 08eda96c | #149 | code-review | claude/sonnet | gmail |
+| 2a1e4316 | #138 part B | feature-implementation | claude/opus | qodeca |
 
-Counts at dispatch (15:03): tasks 4/10 (xezar runs 2 at once, 2 queued), gate runs 0/2, metered 0/4, load 4.7/18.
+Counts at dispatch (15:48): tasks 5/10 (xezar runs 2 at once), gate runs 1/2 (4458b282), metered 0/4, load 3.4/18.
 
 ## File-ownership table
-- 455166db owns scripts/*.mjs|js shebang lines, a new lint check script, package.json lint chain
-- 4458b282 owns .claude/settings.json, one doc line for stop-orphan-mcp
-- 322010ff owns src/renderer/** tooltip strings, one new helper in src/renderer/src/utils/, their tests
+- 4458b282 owns .claude/settings.json, scripts/stop-orphan-mcp.mjs (header comment)
+- 2a1e4316 owns scripts/capture/** (except demo-project), package.json (capture entry), eslint.config.mjs (one block), docs/user-guide/**/images, docs/assets/readme/
+- Reviews own nothing.
 
 ## Accounts (from `read_quota` at 2026-09-25T07:13:22Z)
 | Runner | Login | State | Resets (UTC) |
@@ -45,7 +49,7 @@ Counts at dispatch (15:03): tasks 4/10 (xezar runs 2 at once, 2 queued), gate ru
 ## Held or queued work
 - #151 – running as 455166db.
 - #144 – ready; held behind the #138 build: both edit docs/features/README.md, docs/keyboard-shortcuts.md, docs/settings.md.
-- #138 build – split: part A (plan steps 2-4) merged (#150); step 1 spike running as 320bec53 (owner chose a subscription login, westagilelabs tried first); steps 5-8 follow.
+- #138 build – split: part A (plan steps 2-4) merged (#150); step 1 spike done (#149); part B (steps 5, 5b, 6) running as 2a1e4316; steps 7-8 follow.
 - #139 build – design merged; waits for #138's capture script (part B).
 
 ## Owner items
