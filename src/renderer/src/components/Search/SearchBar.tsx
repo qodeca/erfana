@@ -5,6 +5,7 @@ import { ChevronUp, ChevronDown, X } from 'lucide-react'
 import type { SearchProvider } from '../../providers/search'
 import { useSearchStore, type SearchOptions } from '../../stores/useSearchStore'
 import { TEST_IDS } from '../../constants/testids'
+import { isMacOS } from '../../utils/platform'
 import './SearchBar.css'
 
 /** Debounce delay for search execution in milliseconds */
@@ -196,9 +197,46 @@ export function SearchBar({ provider }: SearchBarProps) {
     restoreFocus()
   }, [provider, closeSearch, restoreFocus])
 
+  // The two option buttons answer to a platform shortcut, matching their
+  // tooltips: Cmd+Option+C / Cmd+Option+W on macOS, Alt+C / Alt+W elsewhere.
+  // macOS takes the Cmd chord so a bare Option+C is left to the keyboard layout
+  // (a Polish user types ć with it); Windows and Linux exclude Cmd and Ctrl so
+  // AltGr (reported as Ctrl+Alt) still types ć there. The keys match the
+  // physical key (`event.code`), not `event.key`, because those chords do not
+  // produce a plain 'c'/'w' character.
+  const isMac = isMacOS()
+  const caseShortcutLabel = isMac ? '⌥⌘C' : 'Alt+C'
+  const wordShortcutLabel = isMac ? '⌥⌘W' : 'Alt+W'
+
+  const handleOptionShortcut = useCallback(
+    (e: React.KeyboardEvent): boolean => {
+      const modifierHeld = isMac
+        ? e.metaKey && e.altKey && !e.ctrlKey
+        : e.altKey && !e.metaKey && !e.ctrlKey
+      if (!modifierHeld) return false
+      const option =
+        e.code === 'KeyC' ? 'caseSensitive' : e.code === 'KeyW' ? 'wholeWord' : null
+      if (!option) return false
+      // Consume the chord even when it does not toggle — a key repeat, or whole
+      // word where the view does not support it — so nothing is typed into the
+      // input.
+      e.preventDefault()
+      if (e.repeat) return true
+      if (option === 'wholeWord' && !capabilities.wholeWord) return true
+      // Read current state directly from store to avoid stale closure
+      const currentOptions = useSearchStore.getState().options
+      updateOptions({ [option]: !currentOptions[option] })
+      return true
+    },
+    [isMac, capabilities.wholeWord, updateOptions]
+  )
+
   // Keyboard handlers for input
   const handleInputKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (handleOptionShortcut(e)) {
+        return
+      }
       if (e.key === 'Escape') {
         e.preventDefault()
         handleClose()
@@ -211,7 +249,7 @@ export function SearchBar({ provider }: SearchBarProps) {
         }
       }
     },
-    [handleClose, nextMatch, previousMatch]
+    [handleClose, nextMatch, previousMatch, handleOptionShortcut]
   )
 
   // Stop all keyboard events from bubbling to Monaco editor
@@ -224,12 +262,18 @@ export function SearchBar({ provider }: SearchBarProps) {
   // NON-modal chrome, so Tab must move focus onward like anywhere else (Escape
   // still closes it). Trapping Tab here was an unexpected focus-order constraint
   // (WCAG 2.2 SC 2.4.3).
-  const handleContainerKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
-    // Only stop for keys Monaco might capture (not Space, which triggers button clicks).
-    if (e.key !== ' ') {
-      e.stopPropagation()
-    }
-  }, [])
+  const handleContainerKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      // The input stops propagation, so this only runs for the bar's own chrome
+      // (the toggle buttons, or the container itself).
+      handleOptionShortcut(e)
+      // Only stop for keys Monaco might capture (not Space, which triggers button clicks).
+      if (e.key !== ' ') {
+        e.stopPropagation()
+      }
+    },
+    [handleOptionShortcut]
+  )
 
   // Handle toggle button Enter key (Space is handled natively by button click)
   const handleToggleKeyDown = useCallback(
@@ -290,7 +334,7 @@ export function SearchBar({ provider }: SearchBarProps) {
           onClick={() => updateOptions({ caseSensitive: !options.caseSensitive })}
           onKeyDown={(e) => handleToggleKeyDown(e, 'caseSensitive')}
           aria-pressed={options.caseSensitive}
-          title="Case sensitive (Alt+C)"
+          title={`Case sensitive (${caseShortcutLabel})`}
           data-testid={TEST_IDS.SEARCH_BAR_TOGGLE_CASE}
         >
           Aa
@@ -304,7 +348,7 @@ export function SearchBar({ provider }: SearchBarProps) {
           disabled={!capabilities.wholeWord}
           title={
             capabilities.wholeWord
-              ? 'Whole word (Alt+W)'
+              ? `Whole word (${wordShortcutLabel})`
               : 'Whole word (not supported by this view)'
           }
           data-testid={TEST_IDS.SEARCH_BAR_TOGGLE_WORD}
