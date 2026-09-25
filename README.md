@@ -2,7 +2,7 @@
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/banner-dark.png">
     <source media="(prefers-color-scheme: light)" srcset="docs/assets/readme/banner-light.png">
-    <img alt="Erfana" src="docs/assets/readme/banner-light.png" width="480">
+    <img alt="Erfana" src="docs/assets/readme/banner-light.png" width="440">
   </picture>
 </h1>
 
