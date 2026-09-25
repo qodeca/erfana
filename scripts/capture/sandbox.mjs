@@ -100,7 +100,9 @@ export function shellQuote(s) {
  * install in `~/.local/bin`, else the first `claude` on PATH that is not in a
  * temporary folder (wrappers some terminals put there).
  */
-export function findClaude(env = process.env, { fsApi = fs, home = os.homedir(), tmp = os.tmpdir() } = {}) {
+export const TEMP_DIRS = [os.tmpdir(), '/var/folders', '/private/var/folders', '/tmp', '/private/tmp']
+
+export function findClaude(env = process.env, { fsApi = fs, home = os.homedir(), tempDirs = TEMP_DIRS } = {}) {
   const isExe = (p) => {
     try {
       fsApi.accessSync(p, fs.constants.X_OK)
@@ -112,9 +114,8 @@ export function findClaude(env = process.env, { fsApi = fs, home = os.homedir(),
   if (env.ERFANA_CAPTURE_CLAUDE_BIN) return isExe(env.ERFANA_CAPTURE_CLAUDE_BIN) ? fsApi.realpathSync(env.ERFANA_CAPTURE_CLAUDE_BIN) : null
   const native = path.join(home, '.local', 'bin', 'claude')
   if (isExe(native)) return fsApi.realpathSync(native)
-  const tmpReal = [tmp, '/var/folders', '/private/var/folders', '/tmp', '/private/tmp']
   for (const dir of String(env.PATH || '').split(path.delimiter)) {
-    if (!dir || tmpReal.some((t) => dir.startsWith(t))) continue
+    if (!dir || tempDirs.some((t) => dir === t || dir.startsWith(t + path.sep))) continue
     const p = path.join(dir, 'claude')
     if (isExe(p)) return fsApi.realpathSync(p)
   }

@@ -139,7 +139,9 @@ describe('reportLines', () => {
 })
 
 describe('sandbox guard (exit 4)', () => {
-  it('absent is fine; a symlink, a file, or a folder without the marker is refused (break: deleting any folder of that name)', () => {
+  // POSIX-only: the capture refuses to run anywhere but macOS (exit 2) before
+  // the sandbox is touched, and Windows has no process.getuid.
+  it.skipIf(process.platform === 'win32')('absent is fine; a symlink, a file, or a folder without the marker is refused (break: deleting any folder of that name)', () => {
     const root = path.join(tmp, 'sb')
     expect(sandboxProblem(root)).toBeNull()
     fs.mkdirSync(root)
@@ -182,7 +184,11 @@ describe('sandbox settings', () => {
     fs.mkdirSync(real)
     for (const d of [shim, real]) fs.writeFileSync(path.join(d, 'claude'), '', { mode: 0o755 })
     const home = path.join(tmp, 'home')
-    expect(findClaude({ PATH: `${shim}:${real}` }, { home, tmp: shim })).toBe(fs.realpathSync(path.join(real, 'claude')))
+    // The temporary-folder list is passed in: the test's own folders live in
+    // the OS temp folder (/tmp on Linux), which the default list skips.
+    const PATH = [shim, real].join(path.delimiter)
+    expect(findClaude({ PATH }, { home, tempDirs: [shim] })).toBe(fs.realpathSync(path.join(real, 'claude')))
+    expect(findClaude({ PATH: shim }, { home, tempDirs: [shim] })).toBeNull()
     expect(findClaude({ ERFANA_CAPTURE_CLAUDE_BIN: path.join(real, 'claude'), PATH: '' }, { home })).toBe(fs.realpathSync(path.join(real, 'claude')))
     expect(findClaude({ PATH: '' }, { home })).toBeNull()
   })
