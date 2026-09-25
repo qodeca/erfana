@@ -10,7 +10,7 @@ Updated: 2026-09-25 11:06 CEST
 
 ## Open pull requests
 - #146 ready, head 1f4f5c33 – #145 fix. Required checks green. Advisory Windows checks red: scripts/stop-orphan-mcp.test.mjs fails to load (SyntaxError at 10:1). Review 63ac9ab2 running (full-cold-review, claude/sonnet, gmail).
-- #141 draft, head 0c6ad3a0 – #138 spec, round-1 fixes pushed. Re-check 9f406ac3 dispatched (scoped-recheck, claude/sonnet, gmail).
+- #141 ready, head 749110db (develop merged in) – #138 spec. Re-check 9f406ac3 APPROVE at 0c6ad3a0, 0 findings. Labels design-approved + merge-queue; #138 labelled design-approved. Next: squash-merge when required checks are green at 749110db.
 - #140 draft, head c442a15b – #139 spec, round-1 fixes pushed. Re-check 12b29be1 dispatched (scoped-recheck, claude/sonnet, westagilelabs).
 Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 
@@ -21,7 +21,6 @@ Empty.
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
 | 63ac9ab2 | #146 | code-review (full-cold-review) | claude/sonnet | gmail |
-| 9f406ac3 | #141 | code-review (scoped-recheck) | claude/sonnet | gmail |
 | 12b29be1 | #140 | code-review (scoped-recheck) | claude/sonnet | westagilelabs |
 
 Counts at dispatch (11:17): tasks 3/10 (xezar runs 2 at once, 1 queued), gate runs 0/2, metered 0/4, load 5.3/18.
@@ -43,7 +42,7 @@ Counts at dispatch (11:17): tasks 3/10 (xezar runs 2 at once, 1 queued), gate ru
 
 ## Held or queued work
 - #142, #143, #144 – filed from the #141 inventory; ready, not yet triaged into order.
-- #138 build – waits for its design verdict.
+- #138 build – design approved 11:22; starts after #141 merges.
 - #139 build – waits for its design verdict and #138's fixture and capture script.
 
 ## Owner items
