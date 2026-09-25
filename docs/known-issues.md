@@ -257,7 +257,7 @@ Pipeline contributors on Windows:
 tccutil reset ScreenCapture com.erfana.app
 ```
 
-Then relaunch Erfana and grant the permission again when prompted. A relaunch is genuinely required – macOS applies a fresh Screen Recording grant only to a newly-launched process – which is why the in-app dialog offers a *Relaunch* button next to *Open settings*.
+Then relaunch Erfana and grant the permission again when prompted. A relaunch is genuinely required – macOS applies a fresh Screen Recording grant only to a newly-launched process – which is why the in-app dialog offers a *Relaunch Erfana* button next to *Open Screen Recording settings*.
 
 **Tracking**: Accepted OS behaviour; no code fix planned.
 

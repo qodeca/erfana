@@ -35,8 +35,8 @@ Global setting to preserve single line breaks in markdown preview:
 - Toggle in Settings overlay under "Editor" section
 - Changes apply immediately without reload
 
-### Context Menu with AI Prompts (v0.6.4-beta)
-Right-click with text selected in Monaco editor shows context menu with AI prompt actions.
+### Context Menu with Prompt Templates (v0.6.4-beta)
+Right-click with text selected in Monaco editor shows a context menu of prompt templates sent to the CLI agent in the terminal.
 
 **Features:**
 - Prompts filtered by `area: code-editor`, `subArea: context-menu`
@@ -281,6 +281,6 @@ preview and split-horizontal modes where the formatting buttons are hidden.
 
 
 ## Related Documentation
-- [Prompt Templates](../prompts/README.md) - AI text operations
+- [Prompt Templates](../prompts/README.md) - templates sent to the CLI agent in the terminal
 - [UI Components](../ui-components.md) - Component architecture
 - [Keyboard Shortcuts](../keyboard-shortcuts.md) - Application shortcuts

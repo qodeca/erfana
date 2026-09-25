@@ -98,7 +98,7 @@ Unlike most domains, these never travel as a thrown `AppError`. `ImageExportServ
 
 | Code | User copy | Notes |
 |------|-----------|-------|
-| `SCREENSHOT_PERMISSION_DENIED` | "Screen recording permission required..." | macOS only (Windows desktopCapturer needs no extra grant). **Surfaced as a dialog, not a toast**: on macOS the renderer shows `ScreenPermissionDialog` (Open settings / Relaunch) for this code; every other platform falls back to the usual error toast |
+| `SCREENSHOT_PERMISSION_DENIED` | "Screen recording permission required..." | macOS only (Windows desktopCapturer needs no extra grant). **Surfaced as a dialog, not a toast**: on macOS the renderer shows `ScreenPermissionDialog` (Open Screen Recording settings / Relaunch Erfana / Close) for this code; every other platform falls back to the usual error toast |
 | `SCREENSHOT_TIMEOUT` | "Screenshot capture timed out" | 30s for macOS screencapture; 60s for the cross-platform overlay |
 | `SCREENSHOT_CANCELLED` | "Screenshot capture was cancelled" | User ESC during selection. On macOS this code is **reclassified** to `SCREENSHOT_PERMISSION_DENIED` when the capture produced no file *and* `systemPreferences.getMediaAccessStatus('screen') === 'denied'` – a denied `screencapture` exits 0 with no file, so cancel and denial are otherwise indistinguishable |
 | `SCREENSHOT_FAILED` | "Failed to capture screenshot" | Generic fallback |

@@ -1,19 +1,19 @@
 # Prompt Templates
 
-Dynamic, extensible AI prompts for context menu actions using YAML frontmatter + XML-structured content with Handlebars interpolation.
+Dynamic, extensible prompt templates for the CLI agent in the terminal, sent from context menu actions, using YAML frontmatter + XML-structured content with Handlebars interpolation.
 
 ## Overview
 
 **Location:** `src/renderer/src/prompts/`
 
-The template system enables AI-powered text operations through right-click context menus in markdown preview and editor.
+Prompt templates send the selected text, with instructions, to the CLI agent running in the terminal, from right-click context menus in the markdown preview and editor.
 
 ## Quick Start
 
 1. Right-click selected text in preview or editor
 2. Choose action: **Explain**, **Modify**, **Ask**, **Visualize**, or custom template
 3. Prompt sent to Terminal panel
-4. Review/edit before execution (unless auto-execute enabled)
+4. The prompt runs immediately: every shipped template sets `autoExecute: true`, so Erfana pastes it into the terminal and presses Enter
 
 Templates split into two categories: **read-only** prompts (Explain, Ask, Prompt) produce a terminal response and leave the document untouched, and **mutation** prompts (Modify, Visualize, the three Mermaid templates) edit the file in place via the CLI agent's Edit tool — see [Mutation prompts and the apply-to-document footer](#mutation-prompts-and-the-apply-to-document-footer) (v0.10.0).
 
@@ -203,8 +203,8 @@ Introduced in v0.10.0. Mutation templates set `mutatesDocument: true` in their f
 ## Target Behavior
 
 All templates target Terminal panel:
-- `sendDirectly: false` - User can edit before running
-- `autoExecute: true` - Auto-press Enter after paste
+- `sendDirectly: false` (the default in every template; the terminal path does not act on it)
+- `autoExecute: true` - the prompt is pasted and Enter is pressed after 200 ms
 - `mutatesDocument: false` (default) — read-only prompt; **true** composes the apply-footer (v0.10.0)
 - **Auto-scroll (v0.5.4)** - Terminal scrolls to bottom 1 second after execution
 
