@@ -20,7 +20,6 @@ Empty.
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| cce96098 | #160 scoped recheck at 38e62dd8 | code-review (scoped-recheck) | claude/sonnet | westagilelabs |
 
 Counts at dispatch (01:28): tasks 1/10, gate runs 0/2, metered 0/4, load 2.9/18.
 
@@ -40,7 +39,7 @@ Counts at dispatch (01:28): tasks 1/10, gate runs 0/2, metered 0/4, load 2.9/18.
 | pi | – | no logins | – |
 
 ## Held or queued work
-- #144 – PR #160: review REQUEST CHANGES (AI wording left in prompts/README.md:3,9 and 5 contributor docs); round 1 done at 6621c17c (all 5 findings fixed; leader grep clean; 11/11 CI green); scoped recheck next.
+- #144 – merged 2026-09-26 as a61b7517 (PR #160).
 - #138 build – split: part A (plan steps 2-4) merged (#150); step 1 spike done (#149); part B (steps 5, 5b, 6) is PR #154: code review REQUEST CHANGES (1 major, run.mjs readLogin can empty the privacy deny-list); design review FAIL (7 privacy/state blockers B-1..B-10, 5 non-blocking); round 2 done at 46600c39; code recheck APPROVE at b543da12 with 1 minor (Windows test, run.test.mjs:220 vs sandbox.mjs:46; advisory Windows checks red); image re-review PASS WITH FOLLOW-UPS (2 guide-copy notes for step 7); merged 2026-09-25 as c1b1ad21; steps 7-8 follow.
 - #139 build – PR #159: code review APPROVE, design review FAIL (B-1 account name in QA screenshots); round 1 done at 1f924f73 (B-1 masked, NB-1 stated as a limit, NB-2 documented deviation); design recheck PASS at 9203f493; QA FAIL only because 3 checks could not run (chrome-devtools emulate + evaluate_script denied in the QA session): dark mode, theme switch, reduced motion unverified live. Waiting for the owner.
 
