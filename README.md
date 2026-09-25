@@ -2,7 +2,7 @@
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/banner-dark.png">
     <source media="(prefers-color-scheme: light)" srcset="docs/assets/readme/banner-light.png">
-    <img alt="Erfana" src="docs/assets/readme/banner-light.png" width="800">
+    <img alt="Erfana" src="docs/assets/readme/banner-light.png" width="480">
   </picture>
 </h1>
 
@@ -11,10 +11,9 @@ Editor, live preview, project tree and a terminal running Claude Code – or any
 
 <p align="center">
   <a href="https://github.com/qodeca/erfana/releases/latest"><img alt="Download Erfana for macOS or Windows" src="https://img.shields.io/badge/Download-macOS%20%C2%B7%20Windows-E3E829?style=for-the-badge&labelColor=161312"></a><br>
-  <sub>macOS (Apple silicon) · Windows · no Linux build · free and open source (GPL-3.0-only)</sub>
+  <sub>macOS (Apple silicon) · Windows · no Linux build · free and open source (GPL-3.0-only)</sub><br>
+  <a href="docs/user-guide/README.md">User guide</a> · <a href="docs/CHANGELOG.md">Changelog</a> · <a href="https://github.com/qodeca/erfana/discussions">Discussions</a> · <a href="CONTRIBUTING.md">Contributing</a>
 </p>
-
-<p align="center"><a href="docs/user-guide/README.md">User guide</a> · <a href="docs/CHANGELOG.md">Changelog</a> · <a href="https://github.com/qodeca/erfana/discussions">Discussions</a> · <a href="CONTRIBUTING.md">Contributing</a></p>
 
 <p align="center">
   <picture>
