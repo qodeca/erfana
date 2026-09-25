@@ -21,11 +21,15 @@ Empty.
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
 | 7b67a933 | #150 | code-review (scoped-recheck) | claude/sonnet | westagilelabs |
+| 455166db | #151 | feature-implementation | claude/opus | qodeca |
+| 4458b282 | allow rule | feature-implementation | claude/opus | gmail |
 | 322010ff | #143 | feature-implementation (ui-implementation) | claude/opus | qodeca |
 
-Counts at dispatch (15:00): tasks 2/10, gate runs 0/2, metered 0/4, load 8.7/18.
+Counts at dispatch (15:03): tasks 4/10 (xezar runs 2 at once, 2 queued), gate runs 0/2, metered 0/4, load 4.7/18.
 
 ## File-ownership table
+- 455166db owns scripts/*.mjs|js shebang lines, a new lint check script, package.json lint chain
+- 4458b282 owns .claude/settings.json, one doc line for stop-orphan-mcp
 - 322010ff owns src/renderer/** tooltip strings, one new helper in src/renderer/src/utils/, their tests
 
 ## Accounts (from `read_quota` at 2026-09-25T07:13:22Z)
@@ -41,14 +45,14 @@ Counts at dispatch (15:00): tasks 2/10, gate runs 0/2, metered 0/4, load 8.7/18.
 | pi | – | no logins | – |
 
 ## Held or queued work
-- #151 – filed 15:01: guard against shebangs in test-imported scripts. Ready.
+- #151 – running as 455166db.
 - #144 – ready; held behind the #138 build: both edit docs/features/README.md, docs/keyboard-shortcuts.md, docs/settings.md.
 - #138 build – split: part A (plan steps 2-4) running as a410722c; step 1 spike running as 320bec53 (owner chose a subscription login, westagilelabs tried first); steps 5-8 follow.
 - #139 build – design merged; waits for #138's capture script (part B).
 
 ## Owner items
 - Label issues with `release-0.21.0` to put them in scope.
-- Leader runs `node scripts/stop-orphan-mcp.mjs` at each L1 tick (worked at 12:39). Allow-rule PR for it still to do (owner-approved).
+- Leader runs `node scripts/stop-orphan-mcp.mjs` at each L1 tick (worked at 12:39). Allow-rule PR running as 4458b282 (owner-approved).
 - Make the Claude Code token for the #138 capture (steps given 13:10).
 - Decide whether to hide or delete the reviewer's junk test comments on PR #146.
 - After #145 merges: leader adds the allow rule for `node scripts/stop-orphan-mcp.mjs` (approved).
