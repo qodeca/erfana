@@ -21,6 +21,7 @@
     "test:renderer": "vitest --run --config vitest.renderer.ts",
     "test:cov": "node scripts/test-cov.mjs",
     "check:headers": "node scripts/check-spdx-headers.mjs",
+    "check:links": "node scripts/check-links.mjs",
     "design": "node scripts/design-sync.mjs",
     "start": "electron-vite preview",
     "dev": "electron-vite dev",
