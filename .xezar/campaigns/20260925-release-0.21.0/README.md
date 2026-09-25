@@ -14,7 +14,7 @@ Updated: 2026-09-25 11:06 CEST
 Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 
 ## Serial merge line
-1. #140 (brought up to date 11:39, checks running)
+1. #140 – conflicts with develop in docs/README.md only (both design PRs added index lines). Needs a conflict-repair task (L3).
 
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
