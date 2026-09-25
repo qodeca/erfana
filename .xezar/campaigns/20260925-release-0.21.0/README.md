@@ -9,24 +9,30 @@ Updated: 2026-09-25 11:06 CEST
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
-- #146 ready, head 1f4f5c33 – #145 fix. Required checks green. Advisory Windows checks red: scripts/stop-orphan-mcp.test.mjs fails to load (SyntaxError at 10:1). Review 63ac9ab2 running (full-cold-review, claude/sonnet, gmail).
-- #141 ready, head 749110db (develop merged in) – #138 spec. Re-check 9f406ac3 APPROVE at 0c6ad3a0, 0 findings. Labels design-approved + merge-queue; #138 labelled design-approved. Next: squash-merge when required checks are green at 749110db.
+- #148 ready, head 97d632ea – #142 fix by 8d85e234 (pi/deepseek-flash). All checks green incl. Windows. Review aa8e12b4 queued (full-cold-review, claude/opus, qodeca).
 - #140 ready, head c442a15b – #139 spec. Re-check 12b29be1 APPROVE at c442a15b, all 11 findings fixed, no new defects. Labels design-approved + merge-queue; #139 labelled design-approved. Next in the merge line after #141: bring up to date, wait for green, squash-merge.
 Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 
 ## Serial merge line
-1. #141 (checks running at 749110db)
-2. #140 (update after #141 merges)
+1. #140 – conflict in docs/README.md; repair 19b6c719 queued (conflict-repair, codex/gpt-5.6-terra, default).
 
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
+| a410722c | #138 part A | feature-implementation | claude/opus | qodeca |
+| 320bec53 | #138 spike | spike | claude/opus | qodeca |
+| aa8e12b4 | #148 | code-review (full-cold-review) | claude/opus | qodeca |
+| 19b6c719 | #140 | address-review-findings (conflict-repair) | codex/gpt-5.6-terra | default |
+| 8d85e234 | #142 | bug-fix (bounded-bug-fix) | pi/deepseek-api/deepseek-flash | – |
 | 63ac9ab2 | #146 | code-review (full-cold-review) | claude/sonnet | gmail |
 
-Counts at dispatch (11:17): tasks 3/10 (xezar runs 2 at once, 1 queued), gate runs 0/2, metered 0/4, load 5.3/18.
+Counts at dispatch (12:38): tasks 6/10 (xezar runs 2 at once, 4 queued), gate runs 0/2, metered 1/4 (pi), load 4.5/18.
 
 ## File-ownership table
-- Reviews write no files. 63ac9ab2, 9f406ac3, 12b29be1 own nothing.
+- a410722c owns scripts/capture/demo-project/**, scripts/check-links*.mjs, package.json, vitest.main.ts, e2e/fixtures/launch-helpers.ts, e2e/fixtures/index.ts
+- 320bec53 owns docs/spikes/138-capture-spike.md
+- 19b6c719 owns docs/README.md (on the #140 branch)
+- 8d85e234 owns src/renderer/src/components/Search/SearchBar.tsx, SearchBar.test.tsx, docs/keyboard-shortcuts.md (find-bar lines only)
 
 ## Accounts (from `read_quota` at 2026-09-25T07:13:22Z)
 | Runner | Login | State | Resets (UTC) |
@@ -41,13 +47,15 @@ Counts at dispatch (11:17): tasks 3/10 (xezar runs 2 at once, 1 queued), gate ru
 | pi | – | no logins | – |
 
 ## Held or queued work
-- #142, #143, #144 – filed from the #141 inventory; ready, not yet triaged into order.
-- #138 build – design approved 11:22; starts after #141 merges.
+- #143 – ready; held so it does not collide with #142 on tooltip code.
+- #144 – ready; held behind the #138 build: both edit docs/features/README.md, docs/keyboard-shortcuts.md, docs/settings.md.
+- #138 build – split: part A (plan steps 2-4) running as a410722c; step 1 spike running as 320bec53 (owner chose a subscription login, westagilelabs tried first); steps 5-8 follow.
 - #139 build – design approved 11:29; waits for #138's fixture and capture script.
 
 ## Owner items
 - Label issues with `release-0.21.0` to put them in scope.
-- Stop orphaned circuit-electron servers by hand until #146 merges (see timeline for PIDs).
+- Leader runs `node scripts/stop-orphan-mcp.mjs` at each L1 tick (worked at 12:39). Allow-rule PR for it still to do (owner-approved).
+- Decide whether to hide or delete the reviewer's junk test comments on PR #146.
 - After #145 merges: leader adds the allow rule for `node scripts/stop-orphan-mcp.mjs` (approved).
 - PR #140 open decisions, needed before #139 is built, not before its review: (1) go to apply repo description, topics, social preview; (2) extend TRADEMARKS.md to the new banner, wordmark, social image; (3) CI link check as a follow-up issue; (4) light-theme banner vs dark-only rule – owner only if the reviewer disagrees; (5) demo format WebP (after a spike) vs MP4.
 
