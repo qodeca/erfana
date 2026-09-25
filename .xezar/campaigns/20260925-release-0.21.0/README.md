@@ -16,7 +16,7 @@ Updated: 2026-09-25 11:06 CEST
 Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 
 ## Serial merge line
-1. #140 – conflict fixed by 19b6c719 (head c1bcea87, spec unchanged since the approval at c442a15b). Being brought up to date, then merge.
+Empty.
 
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
@@ -45,7 +45,7 @@ Counts at dispatch (14:36): tasks 2/10, gate runs 0/2, metered 0/4, load 3.6/18.
 - #143 – ready; held so it does not collide with #142 on tooltip code.
 - #144 – ready; held behind the #138 build: both edit docs/features/README.md, docs/keyboard-shortcuts.md, docs/settings.md.
 - #138 build – split: part A (plan steps 2-4) running as a410722c; step 1 spike running as 320bec53 (owner chose a subscription login, westagilelabs tried first); steps 5-8 follow.
-- #139 build – design approved 11:29; waits for #138's fixture and capture script.
+- #139 build – design merged; waits for #138's capture script (part B).
 
 ## Owner items
 - Label issues with `release-0.21.0` to put them in scope.
