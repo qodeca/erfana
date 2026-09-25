@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { Scissors, Copy, ClipboardPaste } from 'lucide-react'
 import { ContextMenu, type ContextMenuItem } from './ContextMenu'
-import { isMacOS } from '../../utils/platform'
+import { formatShortcut } from '../../utils/shortcutLabel'
 
 interface TextareaContextMenuProps {
   x: number
@@ -27,10 +27,9 @@ export function TextareaContextMenu({
   onPaste,
   onClose
 }: TextareaContextMenuProps): JSX.Element {
-  const isMac = isMacOS()
-  const cutShortcut = isMac ? '⌘X' : 'Ctrl+X'
-  const copyShortcut = isMac ? '⌘C' : 'Ctrl+C'
-  const pasteShortcut = isMac ? '⌘V' : 'Ctrl+V'
+  const cutShortcut = formatShortcut('X', { mod: true })
+  const copyShortcut = formatShortcut('C', { mod: true })
+  const pasteShortcut = formatShortcut('V', { mod: true })
 
   // Standard order: Cut, Copy, Paste
   const items: ContextMenuItem[] = [
