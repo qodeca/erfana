@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { randomUUID } from 'node:crypto'
 import { writeFakeNpx, isAlive } from './lib/mcp-stand-in.mjs'
-import { isMcpLauncher, isSameProcess, findOrphans, listProcesses, stopOrphanMcp } from './stop-orphan-mcp.mjs'
+import { isMcpLauncher, isSameProcess, parseStart, findOrphans, listProcesses, stopOrphanMcp } from './stop-orphan-mcp.mjs'
 
 const TIMEOUT_MS = 10_000
 
@@ -63,8 +63,21 @@ describe('findOrphans', () => {
   })
 })
 
+describe('parseStart', () => {
+  it('reads a UTC lstart value, including a space-padded day', () => {
+    expect(parseStart('Fri Sep 25 16:00:00 2026')).toBe(Date.UTC(2026, 8, 25, 16, 0, 0))
+    expect(parseStart('Sat Sep  5 07:08:09 2026')).toBe(Date.UTC(2026, 8, 5, 7, 8, 9))
+  })
+
+  it('returns NaN for anything else', () => {
+    for (const bad of [undefined, '', 'Fri Sept 25 16:00:00 2026', 'Fri Sep 25 16:00 2026', '25/09/2026 16:00:00']) {
+      expect(parseStart(bad)).toBeNaN()
+    }
+  })
+})
+
 describe('isSameProcess', () => {
-  const target = { pid: 10, ppid: 1, start: 'Thu Sep 25 13:00:00 2026', command: 'npx @snowfort/circuit-electron' }
+  const target = { pid: 10, ppid: 1, start: 'Fri Sep 25 13:00:00 2026', command: 'npx @snowfort/circuit-electron' }
 
   it('confirms the same PID, start time, command and parent', () => {
     expect(isSameProcess(target, { ...target })).toBe(true)
@@ -73,7 +86,7 @@ describe('isSameProcess', () => {
   })
 
   it('refuses a reused PID, a new parent or an unconfirmable identity', () => {
-    expect(isSameProcess(target, { ...target, start: 'Thu Sep 25 13:00:05 2026' })).toBe(false)
+    expect(isSameProcess(target, { ...target, start: 'Fri Sep 25 13:00:05 2026' })).toBe(false)
     expect(isSameProcess(target, { ...target, command: 'vim' })).toBe(false)
     expect(isSameProcess(target, { ...target, ppid: 500 })).toBe(false)
     expect(isSameProcess(target, undefined)).toBe(false)
@@ -83,17 +96,23 @@ describe('isSameProcess', () => {
 
 describe('stopOrphanMcp against mocked process snapshots (S-2)', () => {
   const LAUNCHER = 'npm exec @snowfort/circuit-electron@latest'
-  const T0 = 'Thu Sep 25 13:00:00 2026'
-  const T1 = 'Thu Sep 25 13:00:01 2026'
+  const T0 = 'Fri Sep 25 13:00:00 2026'
+  const T1 = 'Fri Sep 25 13:00:01 2026'
+  const T0_MS = Date.UTC(2026, 8, 25, 13, 0, 0)
   const proc = (pid, ppid, start, command) => ({ pid, ppid, start, age: '1:00', command })
 
-  /** `snapshots` answer successive `ps` calls (the last repeats); `alive` answers kill(pid, 0). */
-  async function run(snapshots, alive) {
+  /**
+   * `snapshots` answer successive `ps` calls (the last repeats); `alive` answers kill(pid, 0);
+   * `scannedAt` is the wall clock when the first snapshot is taken (default: 10 s after T0).
+   */
+  async function run(snapshots, alive, { scannedAt = T0_MS + 10_000, dryRun = false } = {}) {
     const signals = []
     const lines = []
     let call = 0
     const exitCode = await stopOrphanMcp({
+      dryRun,
       graceMs: 0,
+      clock: () => scannedAt,
       log: (line) => lines.push(line),
       list: () => snapshots[Math.min(call++, snapshots.length - 1)],
       signal: (pid, sig) => signals.push([pid, sig]),
@@ -113,10 +132,47 @@ describe('stopOrphanMcp against mocked process snapshots (S-2)', () => {
     expect(lines[1]).toMatch(/^stopped pid=11 /)
   })
 
-  it('does not SIGTERM a PID now held by a live-session launcher', async () => {
+  it('does not SIGTERM a PID now held by a live-session launcher (same start second: the parent check alone)', async () => {
     const scan = [proc(10, 1, T0, LAUNCHER)]
-    const { signals } = await run([scan, [proc(10, 500, T1, LAUNCHER)]], new Set([10]))
+    const { signals } = await run([scan, [proc(10, 500, T0, LAUNCHER)]], new Set([10]))
     expect(signals).toEqual([])
+  })
+
+  it('does not SIGTERM a same-second PID reuse: a process younger than 2 s at the scan is refused', async () => {
+    // The scan runs 0.5 s into T0's second; the pre-SIGTERM snapshot shows an identical tuple,
+    // which may be a replacement that started in the same second.
+    const same = [proc(10, 1, T0, LAUNCHER)]
+    const { exitCode, signals, lines } = await run([same, same, same], new Set([10]), { scannedAt: T0_MS + 500 })
+    expect(signals).toEqual([])
+    expect(exitCode).toBe(1)
+    expect(lines[0]).toMatch(/^NOT stopped \(too young to confirm identity\) pid=10 /)
+  })
+
+  it('does not SIGKILL a same-second PID reuse after SIGTERM', async () => {
+    // Everything identical in every snapshot: without the age rule this would be SIGTERM then SIGKILL.
+    const same = [proc(10, 1, T0, LAUNCHER), proc(11, 10, T0, 'electron')]
+    const { signals } = await run([same, same, same, same], new Set([10, 11]), { scannedAt: T0_MS + 900 })
+    expect(signals.filter(([, sig]) => sig === 'SIGKILL')).toEqual([])
+    expect(signals).toEqual([])
+  })
+
+  it('refuses a process 1999 ms old at the scan and signals one 2000 ms old (boundary)', async () => {
+    const scan = [proc(10, 1, T0, LAUNCHER)]
+    const young = await run([scan, scan, []], new Set(), { scannedAt: T0_MS + 1999 })
+    expect(young.signals).toEqual([])
+    const old = await run([scan, scan, []], new Set(), { scannedAt: T0_MS + 2000 })
+    expect(old.signals).toEqual([[10, 'SIGTERM']])
+    expect(old.exitCode).toBe(0)
+  })
+
+  it('--dry-run marks a too-young process as refused', async () => {
+    const scan = [proc(10, 1, T0, LAUNCHER)]
+    const { signals, lines } = await run([scan], new Set([10]), { scannedAt: T0_MS + 500, dryRun: true })
+    expect(signals).toEqual([])
+    expect(lines).toEqual([
+      expect.stringMatching(/^would NOT stop \(too young to confirm identity\) pid=10 /),
+      '0 process(es) would be stopped, 1 refused (dry run, nothing stopped).',
+    ])
   })
 
   it('does not SIGKILL a PID reused by the same command after SIGTERM', async () => {
@@ -230,6 +286,8 @@ describe.skipIf(process.platform === 'win32')('stopOrphanMcp against real proces
     const exitCode = await stopOrphanMcp({
       packages: [pkg],
       orphanParentPid: orphan.orphanParentPid,
+      // the stand-ins are milliseconds old; the age rule is pinned by the mocked tests
+      minAgeMs: 0,
       graceMs: 500,
       log: (line) => lines.push(line),
     })
@@ -256,6 +314,7 @@ describe.skipIf(process.platform === 'win32')('stopOrphanMcp against real proces
       dryRun: true,
       packages: [pkg],
       orphanParentPid: orphan.orphanParentPid,
+      minAgeMs: 0,
       log: (line) => lines.push(line),
     })
 

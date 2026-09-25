@@ -14,11 +14,20 @@
  * Recognition is by argument position, never by substring: the executable is
  * `npx` (or `node <path>/npx`) or `npm exec`, and the listed package is the
  * package argument itself. A command line that does not parse that way is not
- * a launcher. Each target's identity is its PID, start time, parent and
- * command; a fresh `ps` snapshot re-confirms it right before SIGTERM and again
- * before SIGKILL, and a process that no longer matches is skipped, so a PID
- * reused in between is never signalled. (What remains is the window between
- * one `ps` call and the signal it gates; Node offers no pidfd to close it.)
+ * a launcher.
+ *
+ * Each target's identity is its PID, start time, parent and command. `ps`
+ * reports the start time only to the second, so a PID reused within the same
+ * second by the same command would look identical; therefore a process is a
+ * target only if it started at least MIN_AGE_MS before the first snapshot was
+ * taken. It was alive in that snapshot, so any process that later reuses its
+ * PID starts after the snapshot – in a later second – and no longer matches.
+ * A younger process is refused and reported NOT stopped. One fresh snapshot
+ * per signal batch re-confirms the identity of every target before the SIGTERM
+ * batch and again before the SIGKILL batch; a process that no longer matches is
+ * skipped. Limits that remain: the gap between each snapshot and the signals it
+ * gates (Node offers no pidfd to close it), and a wall-clock step backwards of
+ * more than a second during the run, which would weaken the age rule.
  *
  * Usage:
  *   node scripts/stop-orphan-mcp.mjs            stop the orphans
@@ -39,18 +48,21 @@ import { fileURLToPath } from 'node:url'
 
 export const MCP_PACKAGES = ['@snowfort/circuit-electron']
 const GRACE_MS = 2000
+// Two whole seconds, not one: one second is the lstart resolution, the second is margin.
+const MIN_AGE_MS = 2000
 const POLL_MS = 50
 const COMMAND_WIDTH = 100
 
 /**
  * Every process as { pid, ppid, start, age, command }, from one `ps` call.
- * `start` (lstart, five words, 1-second resolution) is the start-time half of
- * a process's identity; a line without one is dropped, so it can never be a target.
+ * `start` (lstart, five words, 1-second resolution, in UTC so no clock change
+ * repeats a local hour) is the start-time half of a process's identity; a line
+ * without one is dropped, so it can never be a target.
  */
 export function listProcesses() {
   const out = execFileSync('ps', ['-A', '-o', 'pid=,ppid=,lstart=,etime=,command='], {
     encoding: 'utf8',
-    env: { ...process.env, LC_ALL: 'C' },
+    env: { ...process.env, LC_ALL: 'C', TZ: 'UTC' },
     maxBuffer: 16 * 1024 * 1024,
   })
   const processes = []
@@ -67,6 +79,17 @@ export function listProcesses() {
     }
   }
   return processes
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+/** A UTC lstart value (`Fri Sep 25 16:00:00 2026`) as epoch ms, or NaN when it does not parse. */
+export function parseStart(start) {
+  const match = /^[A-Z][a-z]{2} ([A-Z][a-z]{2}) {1,2}(\d{1,2}) (\d{2}):(\d{2}):(\d{2}) (\d{4})$/.exec(start ?? '')
+  const month = match ? MONTHS.indexOf(match[1]) : -1
+  if (month < 0) return NaN
+  const [day, hours, minutes, seconds, year] = match.slice(2).map(Number)
+  return Date.UTC(year, month, day, hours, minutes, seconds)
 }
 
 // Options that may stand between the launcher and its package argument. Any
@@ -164,8 +187,9 @@ const describe = ({ pid, ppid, age, command }) => {
 
 /**
  * Find and stop the orphans. Returns the process exit code: 0 when every
- * target is gone (or nothing was found), 1 when one survived SIGKILL.
- * `list`, `signal` and `isAlive` are seams for deterministic tests.
+ * target is gone (or nothing was found), 1 when one survived SIGKILL or was
+ * refused (too young, or no start time) and is still there.
+ * `list`, `signal`, `isAlive`, `clock` and `minAgeMs` are seams for tests.
  */
 export async function stopOrphanMcp({
   dryRun = false,
@@ -176,20 +200,34 @@ export async function stopOrphanMcp({
   list = listProcesses,
   signal = sendSignal,
   isAlive = pidIsAlive,
+  clock = Date.now,
+  minAgeMs = MIN_AGE_MS,
 } = {}) {
+  // Taken before `ps` runs: every process it lists was alive at or after this instant.
+  const scannedAt = clock()
   const targets = findOrphans(list(), { packages, orphanParentPid })
   if (targets.length === 0) {
     log('No orphaned MCP launchers found.')
     return 0
   }
+  const refusal = (proc) => {
+    const startMs = parseStart(proc.start)
+    if (!Number.isFinite(startMs)) return 'identity not confirmed'
+    return startMs <= scannedAt - minAgeMs ? null : 'too young to confirm identity'
+  }
+  const eligible = targets.filter((proc) => refusal(proc) === null)
   if (dryRun) {
-    for (const proc of targets) log(`would stop ${describe(proc)}`)
-    log(`${targets.length} process(es) would be stopped (dry run, nothing stopped).`)
+    for (const proc of targets) {
+      const reason = refusal(proc)
+      log(reason ? `would NOT stop (${reason}) ${describe(proc)}` : `would stop ${describe(proc)}`)
+    }
+    const refused = targets.length - eligible.length
+    log(`${eligible.length} process(es) would be stopped${refused > 0 ? `, ${refused} refused` : ''} (dry run, nothing stopped).`)
     return 0
   }
 
-  // Each signal is gated on a fresh snapshot that re-confirms the target's
-  // identity, so a PID reused since the last look is skipped, never signalled.
+  // One fresh snapshot per signal batch re-confirms every target's identity,
+  // so a PID reused since the last look is skipped, never signalled.
   const confirmedNow = () => {
     const byPid = new Map(list().map((proc) => [proc.pid, proc]))
     return (target) => isSameProcess(target, byPid.get(target.pid), orphanParentPid)
@@ -199,7 +237,7 @@ export async function stopOrphanMcp({
     while (procs.some(({ pid }) => isAlive(pid)) && Date.now() < deadline) await waitFor(POLL_MS)
   }
 
-  const termed = targets.filter(confirmedNow())
+  const termed = eligible.filter(confirmedNow())
   for (const { pid } of termed) signal(pid, 'SIGTERM')
   await waitForExit(termed)
 
@@ -212,8 +250,9 @@ export async function stopOrphanMcp({
   let gone = 0
   let failed = 0
   for (const proc of targets) {
-    // no start time means no identity: while its PID is present, it may still be running
-    const running = sameStart(proc, now.get(proc.pid)) || (!proc.start && now.has(proc.pid))
+    // no parsable start time means no identity: while its PID is present, it may still be running
+    const running =
+      sameStart(proc, now.get(proc.pid)) || (!Number.isFinite(parseStart(proc.start)) && now.has(proc.pid))
     if (termed.includes(proc)) {
       if (running) {
         failed++
@@ -224,7 +263,7 @@ export async function stopOrphanMcp({
       }
     } else if (running) {
       failed++
-      log(`NOT stopped (identity not confirmed) ${describe(proc)}`)
+      log(`NOT stopped (${refusal(proc) ?? 'identity not confirmed'}) ${describe(proc)}`)
     } else {
       gone++
       log(`gone before stop, not signalled ${describe(proc)}`)
