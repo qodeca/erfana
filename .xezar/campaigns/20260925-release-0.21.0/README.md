@@ -1,6 +1,6 @@
 # Campaign release-0.21.0
 
-Updated: 2026-09-25 02:13 CEST
+Updated: 2026-09-25 09:13 CEST
 
 ## State
 - Base: `develop` at `9fe8a3f0`. Merges so far: 0. Checkpoints met: none.
@@ -22,14 +22,14 @@ None.
 ## File-ownership table
 None running.
 
-## Accounts (from `read_quota` at 2026-09-25T00:13:21Z)
+## Accounts (from `read_quota` at 2026-09-25T07:13:22Z)
 | Runner | Login | State | Resets (UTC) |
 |---|---|---|---|
 | claude | default | reserved leader login, runs no tasks | – |
 | claude | qodeca | ok (weekly 46%) | 2026-09-28 16:59 |
 | claude | gmail | ok (weekly 34%) | 2026-09-25 19:00 |
 | claude | eqamana | out | 2026-09-26 16:00 |
-| claude | westagilelabs | out | 2026-09-25 06:59 |
+| claude | westagilelabs | ok (weekly 0%) | 2026-10-02 07:00 |
 | codex | default | ok (weekly 0%) | 2026-10-02 00:13 |
 | codex | qodeca-2 | ok (weekly 24%) | 2026-09-29 12:45 |
 | pi | – | no logins | – |
