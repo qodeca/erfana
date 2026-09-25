@@ -28,15 +28,15 @@ Counts at dispatch (20:49): tasks 1/10, gate runs 0/2, metered 1/4, load 4.5/18.
 - bb9b584c owns docs/user-guide/*.md, docs/keyboard-shortcuts.md, docs/troubleshooting.md, docs/settings.md, docs/quick-reference.md, docs/getting-started.md, docs/README.md, docs/features/README.md, docs/features/138-user-guide.md, docs/designs/138-user-guide/README.md, BACKWARD_COMPATIBILITY.md
 - Reviews own nothing.
 
-## Accounts (from `read_quota` at 2026-09-25T18:13:10Z)
+## Accounts (from `read_quota` at 2026-09-25T19:13:09Z)
 | Runner | Login | State | Resets (UTC) |
 |---|---|---|---|
-| claude | default | reserved leader login, runs no tasks; ok but weekly 96% | 2026-09-28 22:59 |
+| claude | default | reserved leader login, runs no tasks; ok but weekly 97% | 2026-09-28 23:00 |
 | claude | qodeca | ok (weekly 51%) | 2026-09-28 17:00 |
-| claude | gmail | ok (weekly 37%) | 2026-09-25 18:59 |
+| claude | gmail | ok (weekly 0%, reset) | 2026-10-02 19:00 |
 | claude | eqamana | out | 2026-09-26 16:00 |
-| claude | westagilelabs | ok (weekly 3%) | 2026-10-02 07:00 |
-| codex | default | ok (weekly 5%) | 2026-10-02 10:44 |
+| claude | westagilelabs | ok (weekly 4%) | 2026-10-02 06:59 |
+| codex | default | ok (weekly 7%) | 2026-10-02 10:44 |
 | codex | qodeca-2 | ok (weekly 26%) | 2026-09-29 12:45 |
 | pi | – | no logins | – |
 
