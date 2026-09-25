@@ -1,0 +1,55 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+ */
+
+body {
+  margin: 0;
+  font-family: Georgia, 'Times New Roman', serif;
+  background: #f4f1e8;
+  color: #2d3a2e;
+}
+
+header {
+  padding: 32px 40px;
+  background: #3d6b45;
+  color: #fdfbf5;
+}
+
+header h1 {
+  margin: 0 0 8px;
+  font-size: 40px;
+}
+
+main {
+  max-width: 720px;
+  padding: 24px 40px;
+}
+
+.highlights {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.highlights div {
+  padding: 16px;
+  background: #fdfbf5;
+  border-left: 4px solid #d9a441;
+}
+
+button {
+  padding: 8px 16px;
+  font: inherit;
+  background: #d9a441;
+  border: none;
+  cursor: pointer;
+}
+
+#hours[hidden] {
+  display: none;
+}
+
+a {
+  color: #3d6b45;
+}

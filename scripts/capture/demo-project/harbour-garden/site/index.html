@@ -1,0 +1,37 @@
+<!--
+SPDX-License-Identifier: GPL-3.0-only
+SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+-->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Open day 2026 – Harbour Street Community Garden</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Open day 2026</h1>
+      <p>Harbour Street Community Garden · Saturday 13 June</p>
+    </header>
+    <main>
+      <p>Come and see what twelve shared plots can grow. Everyone is welcome, and entry is free.</p>
+      <div class="highlights">
+        <div><strong>Garden tours</strong><br />Every hour from 11:00</div>
+        <div><strong>Seed swap</strong><br />Bring some, take some</div>
+        <div><strong>Tea and cake</strong><br />In the community hall</div>
+      </div>
+      <p><button id="toggle-hours" type="button">Show opening hours</button></p>
+      <p id="hours" hidden>Gates open 10:00 to 16:00. The last tour starts at 15:00.</p>
+      <p><a href="events.html">See the full programme</a> · <a href="partners.html">Our partners</a></p>
+    </main>
+    <script>
+      const button = document.getElementById('toggle-hours')
+      const hours = document.getElementById('hours')
+      button.addEventListener('click', () => {
+        hours.hidden = !hours.hidden
+        button.textContent = hours.hidden ? 'Show opening hours' : 'Hide opening hours'
+      })
+    </script>
+  </body>
+</html>

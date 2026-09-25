@@ -9,24 +9,29 @@ Updated: 2026-09-25 11:06 CEST
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
-- #150 ready, head e566ed14 – #138 part A. Round-1 fixes pushed by a410722c (shebang removed, coverage number 94.65); all checks green incl. Windows. Re-check 7b67a933 running (scoped-recheck, claude/sonnet, westagilelabs).
-- #149 draft, head e57b8db6 – #138 spike note (320bec53). Login part stopped (needs a browser sign-in); owner makes the token. Q8: terminal text below the 7 px bar at 800 px; leader decision: capture-only zoom (#139 option).
+- #152 ready, head 51b6e052 – #151 shebang guard. Review 06e118c8 APPROVE (1 nit: pasted gate log is one commit old; live checks green). Merge line 1.
+- #153 ready, head 77b5c7e8 – #143 tooltips. Review 483d6b31 APPROVE (1 minor: no test for TextareaContextMenu shortcut labels; output verified identical). Merge line 2.
+- #149 ready, head dbbb88bb – spike note. Review 08eda96c REQUEST CHANGES: Q8 fallback claim is an inference. Back to 320bec53 to relabel it (repair round 1).
 - #140 ready, head c442a15b – #139 spec. Re-check 12b29be1 APPROVE at c442a15b, all 11 findings fixed, no new defects. Labels design-approved + merge-queue; #139 labelled design-approved. Next in the merge line after #141: bring up to date, wait for green, squash-merge.
 Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 
 ## Serial merge line
-Empty.
+1. #152
+2. #153
 
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| 7b67a933 | #150 | code-review (scoped-recheck) | claude/sonnet | westagilelabs |
-| 322010ff | #143 | feature-implementation (ui-implementation) | claude/opus | qodeca |
+| 2a1e4316 | #138 part B | feature-implementation | claude/opus | qodeca |
+| 320bec53 (fix round 1) | #149 | spike (continue) | claude/opus | qodeca |
+| 4458b282 (stopped, waits for owner undo) | allow rule | feature-implementation | claude/opus | gmail |
 
-Counts at dispatch (15:00): tasks 2/10, gate runs 0/2, metered 0/4, load 8.7/18.
+Counts at dispatch (15:48): tasks 5/10 (xezar runs 2 at once), gate runs 1/2 (4458b282), metered 0/4, load 3.4/18.
 
 ## File-ownership table
-- 322010ff owns src/renderer/** tooltip strings, one new helper in src/renderer/src/utils/, their tests
+- 4458b282 owns .claude/settings.json, scripts/stop-orphan-mcp.mjs (header comment)
+- 2a1e4316 owns scripts/capture/** (except demo-project), package.json (capture entry), eslint.config.mjs (one block), docs/user-guide/**/images, docs/assets/readme/
+- Reviews own nothing.
 
 ## Accounts (from `read_quota` at 2026-09-25T07:13:22Z)
 | Runner | Login | State | Resets (UTC) |
@@ -41,15 +46,14 @@ Counts at dispatch (15:00): tasks 2/10, gate runs 0/2, metered 0/4, load 8.7/18.
 | pi | – | no logins | – |
 
 ## Held or queued work
-- #151 – filed 15:01: guard against shebangs in test-imported scripts. Ready.
+- #151 – running as 455166db.
 - #144 – ready; held behind the #138 build: both edit docs/features/README.md, docs/keyboard-shortcuts.md, docs/settings.md.
-- #138 build – split: part A (plan steps 2-4) running as a410722c; step 1 spike running as 320bec53 (owner chose a subscription login, westagilelabs tried first); steps 5-8 follow.
+- #138 build – split: part A (plan steps 2-4) merged (#150); step 1 spike done (#149); part B (steps 5, 5b, 6) running as 2a1e4316; steps 7-8 follow.
 - #139 build – design merged; waits for #138's capture script (part B).
 
 ## Owner items
 - Label issues with `release-0.21.0` to put them in scope.
-- Leader runs `node scripts/stop-orphan-mcp.mjs` at each L1 tick (worked at 12:39). Allow-rule PR for it still to do (owner-approved).
-- Make the Claude Code token for the #138 capture (steps given 13:10).
+- Leader runs `node scripts/stop-orphan-mcp.mjs` at each L1 tick (worked at 12:39). Allow-rule: repository-checks refuses permissions in .claude/settings.json (every read-only agent would get them). Owner chose the leader-only file scripts/xezar-leader-settings.json. Waits for the owner to undo the settings edit in the main checkout and the 4458b282 worktree; leader restart after merge.
 - Decide whether to hide or delete the reviewer's junk test comments on PR #146.
 - After #145 merges: leader adds the allow rule for `node scripts/stop-orphan-mcp.mjs` (approved).
 - PR #140 open decisions, needed before #139 is built, not before its review: (1) go to apply repo description, topics, social preview; (2) extend TRADEMARKS.md to the new banner, wordmark, social image; (3) CI link check as a follow-up issue; (4) light-theme banner vs dark-only rule – owner only if the reviewer disagrees; (5) demo format WebP (after a spike) vs MP4.
