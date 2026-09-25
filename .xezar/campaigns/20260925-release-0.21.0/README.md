@@ -50,8 +50,7 @@ Counts at dispatch (15:03): tasks 4/10 (xezar runs 2 at once, 2 queued), gate ru
 
 ## Owner items
 - Label issues with `release-0.21.0` to put them in scope.
-- Leader runs `node scripts/stop-orphan-mcp.mjs` at each L1 tick (worked at 12:39). Allow-rule task 4458b282 stopped (XEZ:ASK: settings edit refused); owner adds the two rules by hand in its worktree, then the task continues.
-- Paste the allow rules into the 4458b282 worktree's .claude/settings.json (steps given 15:28).
+- Leader runs `node scripts/stop-orphan-mcp.mjs` at each L1 tick (worked at 12:39). Allow-rule task 4458b282 stopped (XEZ:ASK: settings edit refused); owner added the two rules by hand (main checkout, uncommitted, and copied into the 4458b282 worktree); task continued 15:40 to commit and open the PR. At merge: drop the identical local change in the main checkout before pulling.
 - Decide whether to hide or delete the reviewer's junk test comments on PR #146.
 - After #145 merges: leader adds the allow rule for `node scripts/stop-orphan-mcp.mjs` (approved).
 - PR #140 open decisions, needed before #139 is built, not before its review: (1) go to apply repo description, topics, social preview; (2) extend TRADEMARKS.md to the new banner, wordmark, social image; (3) CI link check as a follow-up issue; (4) light-theme banner vs dark-only rule – owner only if the reviewer disagrees; (5) demo format WebP (after a spike) vs MP4.
