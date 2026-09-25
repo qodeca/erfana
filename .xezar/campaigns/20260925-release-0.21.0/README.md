@@ -21,7 +21,7 @@ Empty.
 |---|---|---|---|---|
 | 15d570cd | #149 | code-review (scoped-recheck) | claude/sonnet | gmail |
 | 2a1e4316 | #138 part B | feature-implementation | claude/opus | qodeca |
-| 4458b282 (stopped, waits for owner undo) | allow rule | feature-implementation | claude/opus | gmail |
+| 4458b282 (repair 2) | allow rule | feature-implementation | claude/opus | gmail |
 
 Counts at dispatch (17:42): tasks 2/10, gate runs 0/2, metered 0/4, load 8.3/18.
 
@@ -50,7 +50,7 @@ Counts at dispatch (17:42): tasks 2/10, gate runs 0/2, metered 0/4, load 8.3/18.
 
 ## Owner items
 - Label issues with `release-0.21.0` to put them in scope.
-- Leader runs `node scripts/stop-orphan-mcp.mjs` at each L1 tick (worked at 12:39). Allow-rule: repository-checks refuses permissions in .claude/settings.json (every read-only agent would get them). Owner chose the leader-only file scripts/xezar-leader-settings.json. Waits for the owner to undo the settings edit in the main checkout and the 4458b282 worktree; leader restart after merge.
+- Leader runs `node scripts/stop-orphan-mcp.mjs` at each L1 tick (worked at 12:39). Allow-rule: repository-checks refuses permissions in .claude/settings.json (every read-only agent would get them). Owner chose the leader-only file scripts/xezar-leader-settings.json. Owner undid the edit in both places (17:55); 4458b282 continued to move the rules into the leader-only file (gate repair 2 of 2). Leader restart after merge.
 - Decide whether to hide or delete the reviewer's junk test comments on PR #146.
 - After #145 merges: leader adds the allow rule for `node scripts/stop-orphan-mcp.mjs` (approved).
 - PR #140 open decisions, needed before #139 is built, not before its review: (1) go to apply repo description, topics, social preview; (2) extend TRADEMARKS.md to the new banner, wordmark, social image; (3) CI link check as a follow-up issue; (4) light-theme banner vs dark-only rule – owner only if the reviewer disagrees; (5) demo format WebP (after a spike) vs MP4.
