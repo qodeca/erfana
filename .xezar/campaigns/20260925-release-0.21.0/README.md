@@ -20,12 +20,10 @@ Empty.
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| bb9b584c | #158 fix review findings (round 1) | docs-maintenance (author) | codex/gpt-6-sol | default |
 
 Counts at dispatch (21:18): tasks 1/10, gate runs 0/2, metered 0/4, load 1.5/18.
 
 ## File-ownership table
-- bb9b584c owns docs/user-guide/*.md, docs/keyboard-shortcuts.md, docs/troubleshooting.md, docs/settings.md, docs/quick-reference.md, docs/getting-started.md, docs/README.md, docs/features/README.md, docs/designs/138-user-guide/README.md, BACKWARD_COMPATIBILITY.md
 - Reviews own nothing.
 
 ## Accounts (from `read_quota` at 2026-09-25T19:13:09Z)
