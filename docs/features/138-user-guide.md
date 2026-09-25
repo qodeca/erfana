@@ -113,7 +113,7 @@ report a missing README link before #139 lands.
 
 ### 3.3 Capture sandbox
 
-- **Location:** `/tmp/erfana-capture/`, a fixed path so the paths shown on screen are stable.
+- **Location:** `/Users/Shared/erfana-capture/`, a fixed path so the paths shown on screen are stable; the demo project is on the `/Volumes/HarbourGarden` disk image.
 - **Created fresh each run.** The script refuses the path if it is a symlink or not owned by the
   current user.
 - **Contents:**

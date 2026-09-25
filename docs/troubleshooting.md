@@ -1,5 +1,7 @@
 # Troubleshooting Guide
 
+For app recovery, terminal availability, preview, and Mermaid problems, read the [user-guide troubleshooting reference](./user-guide/reference/troubleshooting.md). This page keeps contributor troubleshooting details and the inbound anchors below.
+
 Centralized troubleshooting reference for common Erfana issues and their solutions.
 
 ## Overview

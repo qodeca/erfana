@@ -1,4 +1,6 @@
-# Getting Started
+# Getting started (developers)
+
+For using Erfana, read the [user guide](./user-guide/README.md).
 
 Quick onboarding guide for new developers working on Erfana.
 

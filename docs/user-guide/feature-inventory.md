@@ -271,7 +271,7 @@ observes it.
 6. **Tooltips on Windows** (#143). They show ⌘ symbols ("Project (⌘B)") on Windows too.
 7. **Auto-execute** (#144). `docs/prompts/README.md` mentions a review step "unless auto-execute enabled";
    every template has `autoExecute: true`.
-8. **"AI prompts"** (#144, first there: a live rule breach). `docs/features/README.md` #1 says "context menu with AI prompts", which breaks
+8. **"Terminal-agent prompts"** (#144, first there: a live rule breach). `docs/features/README.md` #1 says "context menu with terminal-agent prompts", which breaks
    the no-built-in-AI rule. If #144 has not fixed it by then, the plan does.
 9. **Cmd+B in the editor.** Whether it makes text bold or toggles the sidebar is unverified. A
    capture scene observes it, and the guide states what happens.

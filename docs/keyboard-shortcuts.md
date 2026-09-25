@@ -1,4 +1,6 @@
-# Keyboard Shortcuts
+# Keyboard shortcuts – implementation notes
+
+For the user-facing shortcut list, see the [keyboard shortcuts reference](./user-guide/reference/keyboard-shortcuts.md).
 
 ## Global App Shortcuts
 

@@ -29,6 +29,8 @@ npm run test:e2e:update-screenshots # Refresh visual baselines
 
 ## Keyboard Shortcuts
 
+The user-facing shortcut table is in the [keyboard shortcuts reference](./user-guide/reference/keyboard-shortcuts.md).
+
 | Action | macOS | Windows |
 |--------|-------|---------|
 | Save | `Cmd+S` | `Ctrl+S` |
