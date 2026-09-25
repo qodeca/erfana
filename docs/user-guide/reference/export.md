@@ -1,7 +1,17 @@
-<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!--
+SPDX-License-Identifier: GPL-3.0-only
+SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+-->
+
 # Export a document
 
 Erfana exports Markdown as PDF or Word, an HTML preview as PDF, and viewed images as PNG, PDF or clipboard content. Export creates a separate output; it does not replace the project source file.
+
+**On this page**
+
+- [Markdown to PDF or Word](#markdown-to-pdf-or-word)
+- [HTML page to PDF](#html-page-to-pdf)
+- [Image to PNG, PDF or clipboard](#image-to-png-pdf-or-clipboard)
 
 ## Markdown to PDF or Word
 

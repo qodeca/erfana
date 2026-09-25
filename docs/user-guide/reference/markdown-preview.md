@@ -1,7 +1,17 @@
-<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!--
+SPDX-License-Identifier: GPL-3.0-only
+SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+-->
+
 # Read the Markdown preview
 
 Preview renders GitHub-style Markdown, frontmatter, links and Mermaid diagrams beside or instead of the editor. Raw HTML is handled by the Markdown renderer's safety rules.
+
+**On this page**
+
+- [Markdown and frontmatter](#markdown-and-frontmatter)
+- [Links](#links)
+- [Mermaid diagrams](#mermaid-diagrams)
 
 ## Markdown and frontmatter
 

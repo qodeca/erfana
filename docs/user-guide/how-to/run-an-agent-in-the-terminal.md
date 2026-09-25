@@ -1,4 +1,8 @@
-<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!--
+SPDX-License-Identifier: GPL-3.0-only
+SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+-->
+
 # Run an agent in the terminal
 
 Use the terminal to run Claude Code or another CLI agent in your project. Review its edits in the editor or preview.
@@ -20,7 +24,8 @@ By default, Claude Code asks before an edit. These capture screenshots used an i
 
 1. Watch the editor or preview after the agent finishes.
 2. Open the changed file from the project tree if it is not already open.
-3. Select **Maximise terminal** when you need more terminal space.
+3. Select **Maximize terminal** when you need more terminal space.
+
 ![Screenshot of an agent edit landing in the preview beside its terminal summary.](../images/run-an-agent/edit-lands.png)
 ![Screenshot of the maximised terminal over the editor.](../images/run-an-agent/terminal-maximized.png)
 

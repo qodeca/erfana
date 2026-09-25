@@ -1,13 +1,17 @@
-<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!--
+SPDX-License-Identifier: GPL-3.0-only
+SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+-->
+
 # Transcribe audio or video
 
 Select an audio or video file and choose the transcription backend. OpenAI processing sends audio to its API; a supported local whisper.cpp model works offline.
 
-**Before you start:** select a supported media file in an open project.
+**Before you start:** open a project and choose **Import** from the project tree. The system file picker accepts supported audio and video files.
 
 ## Transcribe media
 
-1. Open the transcription dialog for the file.
+1. Select **Import**, then choose one audio or video file in the system picker. Erfana opens the transcription dialog for that selection.
 2. Choose a language or automatic detection.
 3. In Settings, choose **OpenAI** or **Local**, then provide an API key or download a model.
 4. Start transcription and open the resulting Markdown file.

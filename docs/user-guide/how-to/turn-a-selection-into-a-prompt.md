@@ -1,4 +1,8 @@
-<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!--
+SPDX-License-Identifier: GPL-3.0-only
+SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+-->
+
 # Turn a selection into a prompt
 
 Select text in the editor or preview, then use its context menu to send a prompt template to the terminal. **Modify** and **Visualize** can change the document; **Explain**, **Ask**, and **Prompt** do not.

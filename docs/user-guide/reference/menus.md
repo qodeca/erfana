@@ -1,15 +1,31 @@
-<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!--
+SPDX-License-Identifier: GPL-3.0-only
+SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+-->
+
 # Use menus
 
 The app menu provides window, editing and view commands. Right-click menus act on the tab, tree item or selected text beneath the pointer; unavailable actions are disabled.
 
+**On this page**
+
+- [Erfana menu (macOS)](#erfana-menu-macos)
+- [File menu](#file-menu)
+- [Edit menu](#edit-menu)
+- [View menu](#view-menu)
+- [Window menu](#window-menu)
+- [Tab context menu](#tab-context-menu)
+- [Project tree context menus](#project-tree-context-menus)
+- [Editor and preview context menus](#editor-and-preview-context-menus)
+- [Terminal and text-box context menus](#terminal-and-text-box-context-menus)
+
 ## Erfana menu (macOS)
 
-**What it does:** **About** shows app information; **Hide**, **Hide Others**, **Show All**, and **Quit** use macOS window management. **How to reach it:** the **Erfana** menu in the system menu bar. **Limits:** macOS only; Windows puts **Quit** in **File**.
+**What it does:** **About** shows app information; **Hide**, **Hide Others**, **Show All**, and **Quit** use macOS window management. **How to reach it:** the **Erfana** menu in the system menu bar. **Limits:** macOS only; Windows puts **Exit** in **File**.
 
 ## File menu
 
-**What it does:** **New Window** opens another Erfana window; on Windows, **Quit** exits. **How to reach it:** **File > New Window**, <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd> (Windows: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd>). A project already open in another window focuses that window.
+**What it does:** **New Window** opens another Erfana window; on Windows, **Exit** quits the app. **How to reach it:** **File > New Window**, <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd> (Windows: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd>). A project already open in another window focuses that window.
 
 ## Edit menu
 
@@ -31,7 +47,7 @@ The app menu provides window, editing and view commands. Right-click menus act o
 
 ## Project tree context menus
 
-**What they do:** Folder menus offer **Cut**, **Copy**, **Paste** (when the clipboard has items), **New File**, **New Folder**, **Rename**, **Import…**, **Delete**, and **Reveal in Finder** or **Reveal in File Explorer**. File menus offer **Cut**, **Copy**, **Rename**, **Delete**, and **Reveal**. The HTML-file menu also offers **Open as source** and **Open in default browser**. **How to reach them:** right-click a file or folder in the tree. **Delete** asks for confirmation because it cannot be undone.
+**What they do:** Folder menus offer **Cut**, **Copy**, **Paste** (when the clipboard has items), **New File**, **New Folder**, **Rename**, **Import…**, **Delete**, and **Reveal in Finder** or **Reveal in Explorer**. File menus offer **Cut**, **Copy**, **Rename**, **Delete**, and the same platform-specific **Reveal** action. The HTML-file menu also offers **Open as source** and **Open in default browser**. **How to reach them:** right-click a file or folder in the tree. **Delete** asks for confirmation because it cannot be undone.
 
 ![Screenshot of the folder context menu.](../images/organise-files/folder-menu.png)
 ![Screenshot of the HTML-file context menu.](../images/organise-files/html-file-menu.png)

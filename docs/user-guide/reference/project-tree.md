@@ -1,7 +1,19 @@
-<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!--
+SPDX-License-Identifier: GPL-3.0-only
+SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+-->
+
 # Use the project tree
 
 The left project panel shows files and folders in the open project. It offers creation, import, filtering and Git status; tree navigation currently needs a mouse.
+
+**On this page**
+
+- [Toolbar and filter](#toolbar-and-filter)
+- [Git badges and status](#git-badges-and-status)
+- [Special files and visibility](#special-files-and-visibility)
+- [File actions](#file-actions)
+- [Navigation limit](#navigation-limit)
 
 ## Toolbar and filter
 
@@ -19,7 +31,7 @@ The left project panel shows files and folders in the open project. It offers cr
 
 ## File actions
 
-**What they do:** Drag an item to another folder to move it; use Cut, Copy and Paste for file operations. Drop from Finder or File Explorer and choose **Move**, **Copy** or **Import**. A name clash offers **Skip**, **Keep both** or **Replace**; deletion requires confirmation. **How to reach them:** Drag onto the tree or use the [file and folder menus](menus.md#project-tree-context-menus). **Reveal in Finder** is labeled **Reveal in File Explorer** on Windows.
+**What they do:** Drag an item to another folder to move it; use Cut, Copy and Paste for file operations. Drop from Finder or File Explorer and choose **Move**, **Copy** or **Import**. A name clash offers **Skip**, **Keep both** or **Replace**; deletion requires confirmation. **How to reach them:** Drag onto the tree or use the [file and folder menus](menus.md#project-tree-context-menus). **Reveal in Finder** is labeled **Reveal in Explorer** on Windows.
 
 ## Navigation limit
 

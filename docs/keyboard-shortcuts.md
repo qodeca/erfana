@@ -1,6 +1,21 @@
+<!--
+SPDX-License-Identifier: GPL-3.0-only
+SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+-->
+
 # Keyboard shortcuts – implementation notes
 
 The complete user list is the [keyboard shortcuts reference](./user-guide/reference/keyboard-shortcuts.md).
+
+## Monaco editor
+
+`MonacoMarkdownEditor.tsx` owns Bold, Italic and Insert Link keybindings. It registers `Cmd/Ctrl+F` as a no-op so `useSearchKeyboard` opens Erfana's find bar, and redirects `Cmd/Ctrl+G` and `Cmd/Ctrl+Shift+G` to the shared search store. Monaco's own find widget is not the user-facing search path.
+
+`registerClipboardActions` in `monacoClipboardCommands.ts` re-registers Copy, Cut and Paste as Monaco actions backed by `textClipboard`, which reaches Electron's main-process clipboard under the renderer sandbox. `Cmd/Ctrl+S` and `Cmd/Ctrl+W` are panel shortcuts from `useKeyboardShortcuts`, with the [active-panel gate](#active-panel-gate) below.
+
+## Find bar
+
+`SearchBar.tsx` handles its option chords on the find-bar input. The handler matches physical `KeyC` and `KeyW`, consumes key repeats, and leaves `AltGr` text entry alone on Windows. The [user shortcut table](./user-guide/reference/keyboard-shortcuts.md#editor-and-markdown-preview) records the macOS `Cmd+Option+C/W` and Windows `Alt+C/W` bindings; Whole word does nothing where a view does not support it.
 
 ## Application menu
 
@@ -39,6 +54,10 @@ The running page is a native view that swallows every key, so the preview's shor
 ## Image Viewer
 
 The image panel handles its own keys in `imageViewer.logic.ts`; the [user-facing bindings](./user-guide/reference/keyboard-shortcuts.md#image-and-diagram-viewers) live in the guide. The implementation uses `0` for 100% and `F` for Fit. Full-screen exit is handled by Escape.
+
+## Dialog shortcuts
+
+`BaseDialog` owns Escape and focus trapping where enabled. Native focus determines what Enter activates, so a focused Cancel button cancels. `CameraDialog` keeps shutter-on-Enter only when focus is outside a button, select or input; it checks that target before calling `preventDefault()`. `PromptDialog` submits on `Cmd/Ctrl+Enter`, leaving plain Enter for textarea newlines. `FilePickerDialog` handles arrows, Enter, Escape and copying the selected path; `ChatBubble` uses `Cmd/Ctrl+Enter` to send. User bindings are in the [dialog shortcut reference](./user-guide/reference/keyboard-shortcuts.md#dialogs-and-file-picker).
 
 ## DevTools
 

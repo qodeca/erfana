@@ -1,3 +1,8 @@
+<!--
+SPDX-License-Identifier: GPL-3.0-only
+SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+-->
+
 # Quick Reference
 
 One-page cheat sheet for common tasks.
@@ -28,8 +33,6 @@ npm run test:e2e:update-screenshots # Refresh visual baselines
 ```
 
 ## Keyboard Shortcuts
-
-The user-facing shortcut table is in the [keyboard shortcuts reference](./user-guide/reference/keyboard-shortcuts.md).
 
 See the complete [user shortcut reference](./user-guide/reference/keyboard-shortcuts.md).
 

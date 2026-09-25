@@ -1,7 +1,19 @@
-<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!--
+SPDX-License-Identifier: GPL-3.0-only
+SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+-->
+
 # Find files Erfana keeps
 
 Project documents stay in the folder you open. Erfana also keeps app settings and short-lived logs outside that folder; per-project settings live inside it.
+
+**On this page**
+
+- [Autosave](#autosave)
+- [Global settings](#global-settings)
+- [Project settings and lock](#project-settings-and-lock)
+- [Logs](#logs)
+- [New versions](#new-versions)
 
 ## Autosave
 

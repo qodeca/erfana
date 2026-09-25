@@ -1,4 +1,8 @@
-<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!--
+SPDX-License-Identifier: GPL-3.0-only
+SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+-->
+
 # Open a project
 
 Open a folder to show its files and terminal. Select **Open project** on Home, then use **Change project** or **Close project** in the project header when needed.

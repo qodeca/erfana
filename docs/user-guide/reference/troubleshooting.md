@@ -1,7 +1,21 @@
-<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!--
+SPDX-License-Identifier: GPL-3.0-only
+SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+-->
+
 # Recover from problems
 
 Erfana shows a recovery screen or a local panel message when a part of the interface fails. Saved project files remain on disk; an unsaved editor buffer can be lost after a whole-window crash.
+
+**On this page**
+
+- [Erfana stopped unexpectedly](#erfana-stopped-unexpectedly)
+- [Project tree unavailable](#project-tree-unavailable)
+- [Panel unavailable](#panel-unavailable)
+- [Terminal not available](#terminal-not-available)
+- [HTML preview stopped or reports issues](#html-preview-stopped-or-reports-issues)
+- [Mermaid diagram rendering error](#mermaid-diagram-rendering-error)
+- [File changed on disk](#file-changed-on-disk)
 
 ## Erfana stopped unexpectedly
 
@@ -29,7 +43,7 @@ Erfana shows a recovery screen or a local panel message when a part of the inter
 
 ## Mermaid diagram rendering error
 
-**What it does:** Invalid diagram syntax shows an error box instead of a diagram. **How to reach it:** Open Markdown Preview on a file with a Mermaid block. Check syntax and diagram type; the bug icon labeled **Report this error to Claude Code** sends a prepared report to the terminal, where Claude Code can help if it is running. The report does not repair the source by itself.
+**What it does:** Invalid diagram syntax shows an error box instead of a diagram. **How to reach it:** Open Markdown Preview on a file with a Mermaid block. Check syntax and diagram type; the bug icon labeled **Report this error to Claude Code** sends a document-changing prompt to the terminal. With an agent running, it can edit the source file in place. Review those edits before saving or relying on them.
 
 ![Screenshot of a Mermaid diagram error.](../images/mermaid/diagram-error.png)
 

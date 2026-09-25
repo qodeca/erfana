@@ -1,4 +1,8 @@
-<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!--
+SPDX-License-Identifier: GPL-3.0-only
+SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+-->
+
 # Start with Erfana
 
 In ten minutes you can open a folder, preview a Markdown file and use the terminal with a CLI agent you already have installed. Erfana hosts the agent in its terminal; it does not provide an agent account or model.

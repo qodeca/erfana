@@ -1,4 +1,8 @@
-<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!--
+SPDX-License-Identifier: GPL-3.0-only
+SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+-->
+
 # Organise project files
 
 Use the project tree to create, move, rename, import, or delete files.
@@ -8,7 +12,7 @@ Use the project tree to create, move, rename, import, or delete files.
 ## Manage files
 
 1. Use the tree toolbar for **New markdown file**, **New folder**, **Import**, and **Refresh**.
-2. Right-click a file or folder for **Cut**, **Copy**, **Paste**, **Rename**, **Reveal**, and **Delete**.
+2. Right-click a file or folder for **Cut**, **Copy**, **Rename**, **Reveal in Finder** (Windows: **Reveal in Explorer**), and **Delete**. **Paste** appears on folders when the clipboard has items.
 3. Drag a file to a folder to move it. For a Finder or File Explorer drop, choose Move, Copy, or Import.
 
 ![Screenshot of the project tree with git badges.](../images/organise-files/tree.png)

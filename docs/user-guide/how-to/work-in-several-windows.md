@@ -1,7 +1,13 @@
-<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!--
+SPDX-License-Identifier: GPL-3.0-only
+SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+-->
+
 # Work in several windows
 
 Select **File > New Window** to open another window. A project already open elsewhere focuses its existing window.
+
+On macOS, the Erfana Dock menu also offers **New Window**. On Windows, select **New Window** from Erfana's taskbar jump list. Both routes open a separate Erfana instance, like **File > New Window**.
 
 **Before you start:** save work you do not want to lose before quitting.
 

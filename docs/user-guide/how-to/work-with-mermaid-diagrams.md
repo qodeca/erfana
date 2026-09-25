@@ -1,4 +1,8 @@
-<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!--
+SPDX-License-Identifier: GPL-3.0-only
+SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+-->
+
 # Work with Mermaid diagrams
 
 Write a Mermaid code block in Markdown, then use the diagram toolbar to change direction or open the viewer.
@@ -18,7 +22,7 @@ Write a Mermaid code block in Markdown, then use the diagram toolbar to change d
 
 ## What happens next / If something goes wrong
 
-Use the error box to send a bug-report template to the terminal agent, then correct the source block. See [troubleshooting](../reference/troubleshooting.md).
+The error-box bug-report action sends a document-changing prompt to the terminal. An agent can edit the source block in place; review its edits and the rendered result. See [troubleshooting](../reference/troubleshooting.md).
 
 ## Related
 

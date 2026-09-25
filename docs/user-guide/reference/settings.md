@@ -1,7 +1,20 @@
-<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!--
+SPDX-License-Identifier: GPL-3.0-only
+SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+-->
+
 # Configure Erfana
 
 Open **Settings** with the gear at the bottom of the left activity bar. <kbd>Esc</kbd> closes the overlay. Settings apply across projects unless a section says otherwise; there is no Settings keyboard shortcut.
+
+**On this page**
+
+- [Editor](#editor)
+- [Git status](#git-status)
+- [Logging](#logging)
+- [Transcription](#transcription)
+- [HTML preview](#html-preview)
+- [Per-project settings](#per-project-settings)
 
 ![Screenshot of the Settings overlay.](../images/settings/overlay.png)
 
@@ -39,7 +52,7 @@ Open **Settings** with the gear at the bottom of the left activity bar. <kbd>Esc
 
 | Option | Default | Effect |
 | --- | --- | --- |
-| **Backend** | OpenAI | Choose OpenAI API, which sends audio to that service, or Local whisper.cpp, which runs offline. Local is unavailable on Windows ARM64. |
+| **Backend** | OpenAI | Choose OpenAI API, which sends audio to that service, or **Local (whisper.cpp)**, which runs offline. Local is unavailable on Windows ARM64. |
 | **OpenAI API key** | Empty | Enter a key for the OpenAI backend; **Remove key** deletes the stored key. |
 | **Whisper model** | Base | For Local, choose Tiny, Base, Small, Medium or Large. |
 | **Model status** / **Download model** | Model not downloaded until installed | Shows Ready or download progress for the selected local model; download it before using Local. |
@@ -69,7 +82,9 @@ Remote-host approvals belong to each project. An approved host is saved to `.erf
 The two pattern settings accept `mode: "extend"` (the default, add to built-in patterns) or `mode: "replace"` (use only the listed patterns), with a `patterns` string array. For example:
 
 ```json
-{ "tree": { "hiddenPatterns": { "mode": "extend", "patterns": ["*.tmp"] } }
+{ "tree": { "hiddenPatterns": { "mode": "extend", "patterns": ["notes.tmp"] } } }
 ```
+
+Tree hidden patterns match entry names exactly: `notes.tmp` hides that name, while `*.tmp` does not act as a wildcard.
 
 See [the contributor implementation notes](../../settings.md#storage) for storage details.

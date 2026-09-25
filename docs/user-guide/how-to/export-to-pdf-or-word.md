@@ -1,4 +1,8 @@
-<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!--
+SPDX-License-Identifier: GPL-3.0-only
+SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+-->
+
 # Export to PDF or Word
 
 Open Markdown in Split or Preview view, then select **Export to PDF** or **Export to Word**.
@@ -9,7 +13,7 @@ Open Markdown in Split or Preview view, then select **Export to PDF** or **Expor
 
 1. Select **Export to PDF** or **Export to Word** on the toolbar.
 2. Choose a destination in the system save dialog.
-3. Open the resulting document.
+3. Find the saved document at the destination you chose. Erfana does not open it automatically.
 
 ![Screenshot of the Markdown toolbar with Export to PDF and Export to Word buttons.](../images/export/toolbar-export-buttons.png)
 

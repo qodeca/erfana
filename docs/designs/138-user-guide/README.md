@@ -288,8 +288,9 @@ The default path regenerates **all** rows, the #139 rows included; there is no d
    ffmpeg (`ffmpeg-static`, already a dependency) and `tesseract.js` resolvable; the sandbox path
    `/Users/Shared/erfana-capture` is absent, or a real directory owned by the user (never a symlink).
 2. **Build.** `npx electron-vite build` (same as `npm run test:e2e`).
-3. **Sandbox.** Recreate `/Users/Shared/erfana-capture/`: `home/` (a fake `HOME`); the demo project is on the `/Volumes/HarbourGarden` disk image.
-   (fixture copy plus `git init`), `user-data/`, `raw/`. The fake home holds a `.zshrc` that sets a
+3. **Sandbox.** Recreate `/Users/Shared/erfana-capture/`: `home/` (a fake `HOME`),
+   `user-data/`, and `raw/`. Copy the demo project to the `/Volumes/HarbourGarden` disk image,
+   then run `git init` in that copy. The fake home holds a `.zshrc` that sets a
    neutral prompt (`%~ %# `, no user or host name) and a `.claude/settings.json` whose only content
    is a `Stop` hook that touches a marker file, used as the "agent finished" condition – so the
    operator's own status line, hooks and plugins are never loaded. The `.zshrc` also unsets

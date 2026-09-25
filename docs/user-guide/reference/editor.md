@@ -1,11 +1,24 @@
-<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!--
+SPDX-License-Identifier: GPL-3.0-only
+SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+-->
+
 # Edit Markdown
 
 Erfana uses a Monaco text editor with Markdown formatting, a separate Find bar, live preview and document statistics. New Markdown tabs open in Preview mode; select a toolbar mode to edit.
 
+**On this page**
+
+- [Editor commands](#editor-commands)
+- [View modes and scroll sync](#view-modes-and-scroll-sync)
+- [Formatting toolbar](#formatting-toolbar)
+- [Find bar](#find-bar)
+- [Statistics bar](#statistics-bar)
+- [Save and close](#save-and-close)
+
 ## Editor commands
 
-**What they do:** Monaco supports its command palette, multiple cursors, undo and redo, selection and line operations. **How to reach them:** Focus the editor; press <kbd>F1</kbd> for the palette. Use <kbd>Alt</kbd>+<kbd>↑/↓</kbd> to move a line, <kbd>Cmd</kbd>+<kbd>D</kbd> (Windows: <kbd>Ctrl</kbd>+<kbd>D</kbd>) to select the next match, and <kbd>Alt</kbd>+select (Windows: <kbd>Ctrl</kbd>+select) to add a cursor. Erfana provides its own Find bar, not Monaco's find widget.
+**What they do:** Monaco supports its command palette, multiple cursors, undo and redo, selection and line operations. **How to reach them:** Focus the editor; press <kbd>F1</kbd> for the palette. Use <kbd>Alt</kbd>+<kbd>↑/↓</kbd> to move a line, <kbd>Cmd</kbd>+<kbd>D</kbd> (Windows: <kbd>Ctrl</kbd>+<kbd>D</kbd>) to select the next match, and <kbd>Alt</kbd>+select on both platforms to add a cursor. Erfana provides its own Find bar, not Monaco's find widget.
 
 ## View modes and scroll sync
 
@@ -13,13 +26,13 @@ Erfana uses a Monaco text editor with Markdown formatting, a separate Find bar, 
 
 ## Formatting toolbar
 
-**What it does:** Apply **Bold**, **Italic**, **Strikethrough**, **Inline Code**, block formatting, **Link**, **Image**, **Heading 1**, bulleted and numbered lists to the selection. **How to reach it:** Switch to Editor or Split mode, then select the toolbar control. <kbd>Cmd</kbd>+<kbd>I</kbd> and <kbd>Cmd</kbd>+<kbd>K</kbd> (Windows: <kbd>Ctrl</kbd>) also apply italic and link. The Bold key overlaps the global sidebar binding; use the toolbar if needed.
+**What it does:** Apply **Bold**, **Italic**, **Strikethrough**, **Inline Code**, **Insert Link**, **Insert Image**, **Heading 1**, **Bullet List**, or **Numbered List** to the selection. **How to reach it:** Switch to Editor or Split mode, then select the toolbar control. <kbd>Cmd</kbd>+<kbd>I</kbd> and <kbd>Cmd</kbd>+<kbd>K</kbd> (Windows: <kbd>Ctrl</kbd>) also apply italic and link. The Bold key overlaps the global sidebar binding; use the toolbar if needed.
 
 ![Screenshot of the Markdown formatting toolbar.](../images/edit-and-preview/formatting-toolbar.png)
 
 ## Find bar
 
-**What it does:** Searches the open document; use next and previous controls, **Case sensitive**, and **Whole word**. **How to reach it:** <kbd>Cmd</kbd>+<kbd>F</kbd> (Windows: <kbd>Ctrl</kbd>+<kbd>F</kbd>). <kbd>Enter</kbd> and <kbd>Shift</kbd>+<kbd>Enter</kbd> move between matches, <kbd>Esc</kbd> closes it. The option-button shortcut tooltips have a tracked mismatch in [#142](https://github.com/qodeca/erfana/issues/142); select the buttons directly.
+**What it does:** Searches the open document; use next and previous controls, **Case sensitive**, and **Whole word**. **How to reach it:** <kbd>Cmd</kbd>+<kbd>F</kbd> (Windows: <kbd>Ctrl</kbd>+<kbd>F</kbd>). <kbd>Enter</kbd> and <kbd>Shift</kbd>+<kbd>Enter</kbd> move between matches, <kbd>Esc</kbd> closes it. With the find bar focused, <kbd>Cmd</kbd>+<kbd>Option</kbd>+<kbd>C</kbd>/<kbd>W</kbd> (Windows: <kbd>Alt</kbd>+<kbd>C</kbd>/<kbd>W</kbd>) toggle case sensitivity and whole word. See the [find-bar shortcut table](keyboard-shortcuts.md#editor-and-markdown-preview).
 
 ## Statistics bar
 

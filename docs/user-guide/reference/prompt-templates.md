@@ -1,7 +1,32 @@
-<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!--
+SPDX-License-Identifier: GPL-3.0-only
+SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+-->
+
 # Use prompt templates
 
 A prompt template formats selected text or a dialog instruction and sends it to the CLI agent running in Erfana's terminal. Every shipped template is submitted and executed immediately; check the agent's result before accepting file edits.
+
+**On this page**
+
+- [Explain](#explain)
+- [Modify](#modify)
+- [Ask](#ask)
+- [Visualize](#visualize)
+- [Prompt](#prompt)
+- [Mermaid bug report](#mermaid-bug-report)
+- [Change Mermaid direction](#change-mermaid-direction)
+- [Diagram chat](#diagram-chat)
+- [Organize import](#organize-import)
+
+> [!WARNING]
+> **Modify**, **Visualize**, **Mermaid bug report**, **Change Mermaid direction**, and **Diagram chat** ask an agent to edit the document. **Organize Import** can move, rename, or delete an imported file after asking you. Erfana opens the terminal for these prompts even when it was closed; without an agent running, the shell receives the prompt as a command. Start and check your agent before using a template, then review its changes.
+
+| Template | Changes the file? |
+| --- | --- |
+| **Explain**, **Ask**, **Prompt** | No edit requested |
+| **Modify**, **Visualize**, **Mermaid bug report**, **Change Mermaid direction**, **Diagram chat** | Yes, the agent may edit the document |
+| **Organize Import** | Can move, rename, or delete the imported file after your decisions |
 
 ## Explain
 
@@ -17,7 +42,7 @@ A prompt template formats selected text or a dialog instruction and sends it to 
 
 ## Visualize
 
-**What it does:** Asks the agent to add a Mermaid diagram based on selected text; it can change the file. **How to reach it:** selection context menu > **Visualize**, then choose a diagram type. **Options:** Architecture, Block, C4, Class, Entity Relationship, Flowchart, Gantt, Git Graph, Kanban, Mindmap, Packet, Pie, Quadrant, Radar, Requirement, Sankey, Sequence, State, Timeline, Treemap, User Journey and XY chart. The list in [the screenshot](../how-to/turn-a-selection-into-a-prompt.md) is illustrative.
+**What it does:** Asks the agent to add a Mermaid diagram based on selected text; it can change the file. **How to reach it:** selection context menu > **Visualize**, then choose a diagram type. **Options:** Architecture, Block Diagrams, C4 Diagrams, Class Diagrams, Entity Relationship, Flowcharts, Gantt Charts, Git Graphs, Kanban Boards, Mindmaps, Packet Diagrams, Pie Charts, Quadrant Charts, Radar Charts, Requirement Diagrams, Sankey Diagrams, Sequence Diagrams, State Diagrams, Timelines, Treemaps, User Journey and XY Charts. The list in [the screenshot](../how-to/turn-a-selection-into-a-prompt.md) is illustrative.
 
 ## Prompt
 
@@ -25,7 +50,7 @@ A prompt template formats selected text or a dialog instruction and sends it to 
 
 ## Mermaid bug report
 
-**What it does:** Sends a diagram error and source context to the agent, which may repair the document. **How to reach it:** select the bug-report control in a Mermaid error box. It needs a running terminal agent.
+**What it does:** Sends a diagram error and source context with instructions to repair the document in place. **How to reach it:** select the bug-report control in a Mermaid error box. Check that an agent is running first; a bare shell receives the submitted prompt too.
 
 ## Change Mermaid direction
 
@@ -37,4 +62,4 @@ A prompt template formats selected text or a dialog instruction and sends it to 
 
 ## Organize import
 
-**What it does:** After an import or transcription, sends the resulting document to the terminal agent with a request to organize it; an agent may edit the document. **How to reach it:** complete an import or transcription while an agent is running. See [import and transcription](import-and-transcription.md).
+**What it does:** After a single-file import, or when you select **Done** after transcription, sends and submits a request to organize the result. Erfana opens the terminal if closed. An agent can move or rename the file and ask whether to delete the original; a bare shell instead runs the prompt text as a command. **How to reach it:** complete a single-file import or select **Done** after transcription. Start an agent first if you want it to handle the prompt. See [import and transcription](import-and-transcription.md).

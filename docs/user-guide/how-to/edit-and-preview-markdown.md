@@ -1,7 +1,11 @@
-<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!--
+SPDX-License-Identifier: GPL-3.0-only
+SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+-->
+
 # Edit and preview Markdown
 
-Use the view-mode buttons to work in the editor, preview, or both. Erfana autosaves after typing stops; when a file changes outside Erfana, choose **Reload from Disk** or **Keep My Version**.
+Use the view-mode buttons to work in the editor, preview, or both. Erfana autosaves after typing stops; if a file changes outside Erfana while you have unsaved edits, choose **Reload from Disk** or **Keep My Version**. With no local edits, Erfana reloads the disk change automatically.
 
 **Before you start:** select a Markdown file in the project tree.
 

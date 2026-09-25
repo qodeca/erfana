@@ -1,7 +1,18 @@
-<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!--
+SPDX-License-Identifier: GPL-3.0-only
+SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+-->
+
 # View an image
 
 The image viewer opens project images in a tab, reports file details, and offers zoom, fit, full screen and export.
+
+**On this page**
+
+- [Supported formats and information](#supported-formats-and-information)
+- [Zoom, pan and full screen](#zoom-pan-and-full-screen)
+- [Export](#export)
+- [File changes](#file-changes)
 
 ## Supported formats and information
 

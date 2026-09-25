@@ -35,8 +35,8 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 | APP-02 | Recent projects: up to 5, open, remove from list | all | WelcomePanel.tsx, S/constants.ts | [how-to/open-a-project](./how-to/open-a-project.md#open-a-folder) |
 | APP-03 | Home tab | all | R/components/Panels/WelcomeTab.tsx | [reference/the-erfana-window](./reference/the-erfana-window.md#welcome-and-home) |
 | APP-04 | Open, change and close a project (project panel header) | all | R/components/ProjectTree/ProjectTree.tsx | [how-to/open-a-project](./how-to/open-a-project.md#open-a-folder) |
-| APP-05 | Terminal opens when a project loads; stays closed if the user closes it | all | R/hooks/useAutoOpenTerminal.ts | [reference/terminal](./reference/terminal.md#opening-and-session-state) |
-| APP-06 | Left activity bar: Project, Settings (the Search button is disabled, "coming soon", and not documented) | all | R/components/ActivityBar/activityBarConfig.ts | [reference/the-erfana-window](./reference/the-erfana-window.md#activity-bars) |
+| APP-05 | Terminal opens on each project load; may stay closed after user closes it during that project | all | R/hooks/useAutoOpenTerminal.ts | [reference/terminal](./reference/terminal.md#opening-and-session-state) |
+| APP-06 | Left activity bar: Project, Settings; Search is hidden | all | R/components/ActivityBar/activityBarConfig.ts | [reference/the-erfana-window](./reference/the-erfana-window.md#activity-bars) |
 | APP-07 | Right activity bar: Terminal (hidden without a project) | all | activityBarConfig.ts | [reference/the-erfana-window](./reference/the-erfana-window.md#activity-bars) |
 | APP-08 | New Window: a separate instance; a project already open elsewhere focuses that window | all | M/utils/spawnNewInstance.ts, M/services/ProjectLockService.ts | [how-to/work-in-several-windows](./how-to/work-in-several-windows.md#open-and-close-windows) |
 | APP-09 | Dock menu New Window | M | M/index.ts | [how-to/work-in-several-windows](./how-to/work-in-several-windows.md#open-and-close-windows) |
@@ -46,9 +46,9 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 | APP-13 | File changed on disk: Reload from Disk / Keep My Version | all | R/components/FileConflictNotification/ | [how-to/edit-and-preview-markdown](./how-to/edit-and-preview-markdown.md#choose-a-view) |
 | APP-14 | Crash screen: Restart Erfana, Open logs folder, error details, copy | all | R/components/RootErrorBoundary/RootErrorFallback.tsx | [reference/troubleshooting](./reference/troubleshooting.md#erfana-stopped-unexpectedly) |
 | APP-15 | Panel "unavailable" state after a panel error | all | PanelErrorBoundary | [reference/troubleshooting](./reference/troubleshooting.md#panel-unavailable) |
-| APP-16 | Logs in `~/.erfana/logs/`, kept 7 days; Open from Settings | all | M/services/LoggingService.ts | [reference/files-erfana-keeps](./reference/files-erfana-keeps.md#autosave) |
+| APP-16 | Logs in `~/.erfana/logs/`, kept 7 days; Open from Settings | all | M/services/LoggingService.ts | [reference/files-erfana-keeps](./reference/files-erfana-keeps.md#logs) |
 | APP-17 | Tabs: close, middle-click close, unsaved marker, "(deleted)" | all | R/components/Tabs/ | [reference/the-erfana-window](./reference/the-erfana-window.md#tabs) |
-| APP-18 | No auto-update: new versions come from GitHub Releases | all | (no updater in M/) | [reference/files-erfana-keeps](./reference/files-erfana-keeps.md#autosave) |
+| APP-18 | No auto-update: new versions come from GitHub Releases | all | (no updater in M/) | [reference/files-erfana-keeps](./reference/files-erfana-keeps.md#new-versions) |
 
 ## Project tree
 
@@ -65,10 +65,10 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 | TREE-09 | Cut / copy / paste files | all | ProjectTree.tsx | [how-to/organise-project-files](./how-to/organise-project-files.md#manage-files) |
 | TREE-10 | Folder right-click menu (Cut, Copy, Paste, New File, New Folder, Rename, Import…, Delete, Reveal) | all | ProjectTree/context-menu/strategies.tsx, commands.tsx | [reference/menus](./reference/menus.md#project-tree-context-menus) |
 | TREE-11 | File right-click menu; HTML files add Open as source, Open in default browser | all | same | [reference/menus](./reference/menus.md#project-tree-context-menus) |
-| TREE-12 | Reveal in Finder / Reveal in File Explorer | all (label per OS) | commands.tsx | [reference/project-tree](./reference/project-tree.md#file-actions) |
+| TREE-12 | Reveal in Finder / Reveal in Explorer | all (label per OS) | commands.tsx | [reference/project-tree](./reference/project-tree.md#file-actions) |
 | TREE-13 | Delete confirmation ("cannot be undone") | all | commands.tsx | [how-to/organise-project-files](./how-to/organise-project-files.md#manage-files) |
 | TREE-14 | Mouse only: no keyboard navigation of the tree yet (#88) | all | docs/keyboard-shortcuts.md | [reference/project-tree](./reference/project-tree.md#navigation-limit) |
-| TREE-15 | Hidden patterns and watcher ignore list (per-project settings) | all | S/ipc/project-settings-schema.ts | [reference/settings](./reference/settings.md#editor) |
+| TREE-15 | Hidden patterns and watcher ignore list (per-project settings) | all | S/ipc/project-settings-schema.ts | [reference/settings](./reference/settings.md#per-project-settings) |
 
 ## Editor
 
@@ -124,14 +124,14 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 | HP-09 | Page zoom (View menu, Cmd/Ctrl + / - / 0) | all | M/menu.ts | [reference/html-preview](./reference/html-preview.md#zoom-and-pdf) |
 | HP-10 | Stopped preview with Reload | all | PreviewFallback.tsx | [reference/troubleshooting](./reference/troubleshooting.md#html-preview-stopped-or-reports-issues) |
 | HP-11 | Keyboard into and out of the page (Enter/Space, Esc); Back/Forward keys | all (keys differ) | S/previewNavKeys.ts | [reference/keyboard-shortcuts](./reference/keyboard-shortcuts.md#html-preview) |
-| HP-12 | Off-switch: **Run HTML files** setting | all | Settings/sections/HtmlPreviewSection.tsx | [reference/settings](./reference/settings.md#editor) |
+| HP-12 | Off-switch: **Run HTML files** setting | all | Settings/sections/HtmlPreviewSection.tsx | [reference/settings](./reference/settings.md#html-preview) |
 
 ## Terminal
 
 | ID | Feature | Platforms | Source | Guide section |
 |---|---|---|---|---|
 | TERM-01 | Built-in terminal running your shell and any CLI agent; bundled Cascadia Mono font | all | R/components/Panels/TerminalPanel.tsx | [how-to/run-an-agent-in-the-terminal](./how-to/run-an-agent-in-the-terminal.md#start-an-agent) |
-| TERM-02 | Header buttons: scroll to bottom, restart, lock scroll, maximise | all | TerminalPanel.tsx | [reference/terminal](./reference/terminal.md#header-controls) |
+| TERM-02 | Header buttons: Scroll to bottom, Restart terminal, Lock scroll to bottom, Maximize terminal | all | TerminalPanel.tsx | [reference/terminal](./reference/terminal.md#header-controls) |
 | TERM-03 | Screen / window / area capture; path pasted into the terminal | M, W | M/services/screenshot/ | [how-to/send-a-screenshot-or-photo-to-the-agent](./how-to/send-a-screenshot-or-photo-to-the-agent.md#capture-an-image) |
 | TERM-04 | macOS Screen Recording permission dialog: Close / Relaunch Erfana / Open Screen Recording settings | M | Dialog/ScreenPermissionDialog.tsx | [how-to/send-a-screenshot-or-photo-to-the-agent](./how-to/send-a-screenshot-or-photo-to-the-agent.md#capture-an-image) |
 | TERM-05 | Windows window picker, display picker, area overlay | W | Dialog/WindowPickerDialog.tsx, ScreenSelectDialog.tsx | [reference/windows-differences](./reference/windows-differences.md#keyboard-and-menus) |
@@ -170,7 +170,7 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 
 | ID | Feature | Platforms | Source | Guide section |
 |---|---|---|---|---|
-| IMP-01 | Import dialog: OCR on/off, 31 languages, page screenshots, DPI 72/150/300, first 100 pages; options kept for the session | all | R/components/DocumentImport/DocumentImportDialog.tsx | [how-to/import-a-document](./how-to/import-a-document.md#import-a-file) |
+| IMP-01 | Import dialog: OCR on/off, 31 languages, page screenshots, DPI 72/150/300; parse at most 1,000 pages, screenshot first 100; options kept for the session | all | R/components/DocumentImport/DocumentImportDialog.tsx | [how-to/import-a-document](./how-to/import-a-document.md#import-a-file) |
 | IMP-02 | Supported formats (LiteParse; the "50+" list to confirm while writing) | all | M/services import | [reference/import-and-transcription](./reference/import-and-transcription.md#import-documents) |
 | IMP-03 | LibreOffice / ImageMagick required dialogs | all | R/hooks/useImport.ts | [how-to/import-a-document](./how-to/import-a-document.md#import-a-file) |
 | IMP-04 | Large-file warning: Import anyway / Skip | all | useImport.ts | [reference/import-and-transcription](./reference/import-and-transcription.md#import-documents) |
@@ -205,32 +205,32 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 Every row goes into `reference/keyboard-shortcuts.md` with macOS and Windows columns.
 
 | ID | Keys (macOS / Windows) | Action | Scope | Guide section |
-|---|---|---|---|
-| KEY-01 | Cmd+B / Ctrl+B | Show or hide the Project sidebar (in the editor, Bold may win – to observe) | global [Shortcuts](./reference/keyboard-shortcuts.md#app-and-windows) |
-| KEY-02 | Cmd+J / Ctrl+J | Show or hide the terminal | global [Shortcuts](./reference/keyboard-shortcuts.md#app-and-windows) |
-| KEY-03 | Cmd+Shift+M / Ctrl+Shift+M | Maximise the terminal | global [Shortcuts](./reference/keyboard-shortcuts.md#app-and-windows) |
-| KEY-04 | Cmd+Alt+R / Ctrl+Alt+R | Refresh the project tree | global [Shortcuts](./reference/keyboard-shortcuts.md#app-and-windows) |
-| KEY-05 | Cmd+Shift+I / Ctrl+Shift+I | Import into the selected folder | tree [Shortcuts](./reference/keyboard-shortcuts.md#project-tree) |
-| KEY-06 | Cmd+X/C/V / Ctrl+X/C/V | Cut, copy, paste files | tree [Shortcuts](./reference/keyboard-shortcuts.md#project-tree) |
-| KEY-07 | Cmd+S / Ctrl+S | Save; in an HTML preview, export PDF | active tab [Shortcuts](./reference/keyboard-shortcuts.md#editor-and-markdown-preview) |
-| KEY-08 | Cmd+W / Ctrl+W | Close tab | active tab [Shortcuts](./reference/keyboard-shortcuts.md#editor-and-markdown-preview) |
-| KEY-09 | Cmd+F / Ctrl+F | Find | editor, preview, HTML page [Shortcuts](./reference/keyboard-shortcuts.md#editor-and-markdown-preview) |
-| KEY-10 | Cmd+G, Shift+Cmd+G / Ctrl+G, Shift+Ctrl+G | Next, previous match | editor [Shortcuts](./reference/keyboard-shortcuts.md#editor-and-markdown-preview) |
-| KEY-11 | Enter, Shift+Enter, Esc | Next, previous, close in the find bar | find bar [Shortcuts](./reference/keyboard-shortcuts.md#editor-and-markdown-preview) |
-| KEY-12 | Cmd+I, Cmd+K / Ctrl+I, Ctrl+K | Italic, insert link | editor [Shortcuts](./reference/keyboard-shortcuts.md#editor-and-markdown-preview) |
-| KEY-13 | Cmd+C/X/V / Ctrl+C/X/V | Copy, cut, paste text | editor [Shortcuts](./reference/keyboard-shortcuts.md#editor-and-markdown-preview) |
-| KEY-14 | F1, Cmd+/, Alt+↑/↓, Cmd+D, Alt+Click (Ctrl on Windows) | Monaco commands | editor [Shortcuts](./reference/keyboard-shortcuts.md#editor-and-markdown-preview) |
-| KEY-15 | Cmd+C; Ctrl+C with a selection / Ctrl+Shift+C, Ctrl+Shift+V | Terminal copy and paste (Ctrl+C without a selection interrupts) | terminal [Shortcuts](./reference/keyboard-shortcuts.md#terminal) |
-| KEY-16 | Cmd+[ / Cmd+] (macOS); Alt+← / Alt+→ (Windows) | HTML preview Back / Forward | HTML preview [Shortcuts](./reference/keyboard-shortcuts.md#html-preview) |
-| KEY-17 | Enter or Space, then Esc | Into the HTML page and back out | HTML preview [Shortcuts](./reference/keyboard-shortcuts.md#html-preview) |
-| KEY-18 | + = - 0 F arrows Esc | Image zoom, reset, fit, pan, leave full screen | image viewer [Shortcuts](./reference/keyboard-shortcuts.md#image-and-diagram-viewers) |
-| KEY-19 | + - 0 F | Diagram zoom, reset, fit | diagram viewer [Shortcuts](./reference/keyboard-shortcuts.md#image-and-diagram-viewers) |
-| KEY-20 | Cmd+Enter / Ctrl+Enter | Submit prompt dialog, send diagram chat | dialogs [Shortcuts](./reference/keyboard-shortcuts.md#dialogs-and-file-picker) |
-| KEY-21 | ↑ ↓ Enter Esc | File picker | file picker [Shortcuts](./reference/keyboard-shortcuts.md#dialogs-and-file-picker) |
-| KEY-22 | Esc | Close settings, dialogs, full screen | – [Shortcuts](./reference/keyboard-shortcuts.md#dialogs-and-file-picker) |
-| KEY-23 | Cmd+Shift+N / Ctrl+Shift+N | New Window | menu [Shortcuts](./reference/keyboard-shortcuts.md#app-and-windows) |
-| KEY-24 | Cmd+0, Cmd+Plus, Cmd+- / Ctrl+… | Actual size, zoom in, zoom out | menu [Shortcuts](./reference/keyboard-shortcuts.md#app-and-windows) |
-| KEY-25 | Cmd+M, Cmd+H, Cmd+Q (macOS); Alt+F4, F11 (Windows) | Window management | OS [Shortcuts](./reference/keyboard-shortcuts.md#app-and-windows) |
+|---|---|---|---|---|
+| KEY-01 | Cmd+B / Ctrl+B | Show or hide the Project sidebar (in the editor, Bold may win – to observe) | global | [Shortcuts](./reference/keyboard-shortcuts.md#app-and-windows) |
+| KEY-02 | Cmd+J / Ctrl+J | Show or hide the terminal | global | [Shortcuts](./reference/keyboard-shortcuts.md#app-and-windows) |
+| KEY-03 | Cmd+Shift+M / Ctrl+Shift+M | Maximize the terminal | global | [Shortcuts](./reference/keyboard-shortcuts.md#app-and-windows) |
+| KEY-04 | Cmd+Alt+R / Ctrl+Alt+R | Refresh the project tree | global | [Shortcuts](./reference/keyboard-shortcuts.md#app-and-windows) |
+| KEY-05 | Cmd+Shift+I / Ctrl+Shift+I | Import into the selected folder | tree | [Shortcuts](./reference/keyboard-shortcuts.md#project-tree) |
+| KEY-06 | Cmd+X/C/V / Ctrl+X/C/V | Cut, copy, paste files | tree | [Shortcuts](./reference/keyboard-shortcuts.md#project-tree) |
+| KEY-07 | Cmd+S / Ctrl+S | Save; in an HTML preview, export PDF | active tab | [Shortcuts](./reference/keyboard-shortcuts.md#editor-and-markdown-preview) |
+| KEY-08 | Cmd+W / Ctrl+W | Close tab | active tab | [Shortcuts](./reference/keyboard-shortcuts.md#editor-and-markdown-preview) |
+| KEY-09 | Cmd+F / Ctrl+F | Find | editor, preview, HTML page | [Shortcuts](./reference/keyboard-shortcuts.md#editor-and-markdown-preview) |
+| KEY-10 | Cmd+G, Shift+Cmd+G / Ctrl+G, Shift+Ctrl+G | Next, previous match | editor | [Shortcuts](./reference/keyboard-shortcuts.md#editor-and-markdown-preview) |
+| KEY-11 | Enter, Shift+Enter, Esc; Cmd+Option+C/W or Alt+C/W | Next, previous, close, case-sensitive and whole-word toggles in the find bar | find bar | [Shortcuts](./reference/keyboard-shortcuts.md#editor-and-markdown-preview) |
+| KEY-12 | Cmd+I, Cmd+K / Ctrl+I, Ctrl+K | Italic, insert link | editor | [Shortcuts](./reference/keyboard-shortcuts.md#editor-and-markdown-preview) |
+| KEY-13 | Cmd+C/X/V / Ctrl+C/X/V | Copy, cut, paste text | editor | [Shortcuts](./reference/keyboard-shortcuts.md#editor-and-markdown-preview) |
+| KEY-14 | F1, Cmd+/, Alt+↑/↓, Cmd+D, Alt+Click (also Windows) | Monaco commands | editor | [Shortcuts](./reference/keyboard-shortcuts.md#editor-and-markdown-preview) |
+| KEY-15 | Cmd+C; Ctrl+C with a selection / Ctrl+Shift+C, Ctrl+Shift+V | Terminal copy and paste (Ctrl+C without a selection interrupts) | terminal | [Shortcuts](./reference/keyboard-shortcuts.md#terminal) |
+| KEY-16 | Cmd+[ / Cmd+] (macOS); Alt+← / Alt+→ (Windows) | HTML preview Back / Forward | HTML preview | [Shortcuts](./reference/keyboard-shortcuts.md#html-preview) |
+| KEY-17 | Enter or Space, then Esc | Into the HTML page and back out | HTML preview | [Shortcuts](./reference/keyboard-shortcuts.md#html-preview) |
+| KEY-18 | + = - 0 F arrows Esc | Image zoom, reset, fit, pan, leave full screen | image viewer | [Shortcuts](./reference/keyboard-shortcuts.md#image-and-diagram-viewers) |
+| KEY-19 | + = - 0 F | Diagram zoom, reset, fit | diagram viewer | [Shortcuts](./reference/keyboard-shortcuts.md#image-and-diagram-viewers) |
+| KEY-20 | Cmd+Enter / Ctrl+Enter | Submit prompt dialog, send diagram chat | dialogs | [Shortcuts](./reference/keyboard-shortcuts.md#dialogs-and-file-picker) |
+| KEY-21 | ↑ ↓ Enter Esc | File picker | file picker | [Shortcuts](./reference/keyboard-shortcuts.md#dialogs-and-file-picker) |
+| KEY-22 | Esc | Close settings, dialogs, full screen | – | [Shortcuts](./reference/keyboard-shortcuts.md#dialogs-and-file-picker) |
+| KEY-23 | Cmd+Shift+N / Ctrl+Shift+N | New Window | menu | [Shortcuts](./reference/keyboard-shortcuts.md#app-and-windows) |
+| KEY-24 | Cmd+0, Cmd+Plus, Cmd+- / Ctrl+… | Actual size, zoom in, zoom out | menu | [Shortcuts](./reference/keyboard-shortcuts.md#app-and-windows) |
+| KEY-25 | Cmd+M, Cmd+H, Cmd+Q (macOS); Ctrl+M, Alt+F4, F11 (Windows) | Window management | OS | [Shortcuts](./reference/keyboard-shortcuts.md#app-and-windows) |
 
 
 ## Menus and dialogs
@@ -238,7 +238,7 @@ Every row goes into `reference/keyboard-shortcuts.md` with macOS and Windows col
 | ID | Feature | Platforms | Source | Guide section |
 |---|---|---|---|---|
 | MENU-01 | Erfana menu: About, Hide, Hide Others, Show All, Quit | M | M/menu.ts | [reference/menus](./reference/menus.md#erfana-menu-macos) |
-| MENU-02 | File: New Window; Quit (Windows) | all | M/menu.ts | [reference/menus](./reference/menus.md#file-menu) |
+| MENU-02 | File: New Window; Exit (Windows) | all | M/menu.ts | [reference/menus](./reference/menus.md#file-menu) |
 | MENU-03 | Edit: Undo, Redo, Cut, Copy, Paste, Select All | all | M/menu.ts | [reference/menus](./reference/menus.md#edit-menu) |
 | MENU-04 | View: Reload, Force Reload, Toggle DevTools, zoom, full screen | all | M/menu.ts | [reference/menus](./reference/menus.md#view-menu) |
 | MENU-05 | Window: Minimize, Zoom, Bring All to Front (macOS) / Close (Windows) | all | M/menu.ts | [reference/menus](./reference/menus.md#window-menu) |
@@ -249,15 +249,14 @@ Every row goes into `reference/keyboard-shortcuts.md` with macOS and Windows col
 
 ## Mismatches
 
-Found while building the inventory. The guide documents what the **code** does. Items 1–8 are
-filed as issues (leader, 2026-09-25) and are fixed there, not in #138: item 1 is
-[#142](https://github.com/qodeca/erfana/issues/142), item 6 is
-[#143](https://github.com/qodeca/erfana/issues/143), and items 2–5, 7 and 8 are
-[#144](https://github.com/qodeca/erfana/issues/144). Item 9 is not an issue yet: a capture scene
-observes it.
+Found while building the inventory. The guide documents what the **code** does. Items 1 and 6
+were resolved in [#142](https://github.com/qodeca/erfana/issues/142) and
+[#143](https://github.com/qodeca/erfana/issues/143). [#144](https://github.com/qodeca/erfana/issues/144)
+tracks the remaining older-document corrections in items 2–5, 7 and 8; the guide itself uses
+current source behavior. Item 9 remains unverified.
 
-1. **Find bar keys** (#142). The tooltips say "Case sensitive (Alt+C)" and "Whole word (Alt+W)", but no
-   handler exists for those keys (`R/components/Search/SearchBar.tsx`).
+1. **Find bar keys** (#142, resolved). `R/components/Search/SearchBar.tsx` now handles the
+   platform-specific case-sensitive and whole-word chords named by its tooltips.
 2. **Image viewer keys** (#144).
    - `docs/keyboard-shortcuts.md` lists `Home` for reset; the code handles `0` only.
    - `docs/features/README.md` #12 says F is full screen; in the code F is **Fit**, and there is no
@@ -268,10 +267,12 @@ observes it.
    **Open Screen Recording settings** / **Relaunch Erfana** / **Close**.
 5. **Tree right-click menu** (#144). The docs omit Import…, Reveal, Open as source and Open in default
    browser.
-6. **Tooltips on Windows** (#143). They show ⌘ symbols ("Project (⌘B)") on Windows too.
+6. **Tooltips on Windows** (#143, resolved). Activity-bar tooltips use `formatShortcut` for
+   platform-specific modifier glyphs.
 7. **Auto-execute** (#144). `docs/prompts/README.md` mentions a review step "unless auto-execute enabled";
    every template has `autoExecute: true`.
-8. **"Terminal-agent prompts"** (#144, first there: a live rule breach). `docs/features/README.md` #1 says "context menu with terminal-agent prompts", which breaks
-   the no-built-in-AI rule. If #144 has not fixed it by then, the plan does.
+8. **Agent wording** (#144). `docs/features/README.md` item 1 now says prompt templates are sent to
+   the terminal agent. Item 4 still calls them "AI text operations"; #144 tracks that older-document
+   wording. The guide attributes prompts to the CLI agent in the terminal.
 9. **Cmd+B in the editor.** Whether it makes text bold or toggles the sidebar is unverified. A
    capture scene observes it, and the guide states what happens.

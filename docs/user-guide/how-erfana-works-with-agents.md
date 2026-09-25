@@ -1,11 +1,15 @@
-<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!--
+SPDX-License-Identifier: GPL-3.0-only
+SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+-->
+
 # Understand how Erfana works with your agent
 
 Erfana is a Markdown workspace with an integrated terminal. It runs the shell and CLI agent you choose; the agent supplies its own model, account and edit decisions. Erfana does not include an AI assistant.
 
 ## Start your own agent
 
-Open a project, open **Terminal**, and type your installed agent's command. The session runs as a top-level terminal session in the project context. If you close the terminal, reopen it from the right activity bar when you need it; [terminal controls](reference/terminal.md) let you restart or maximise it.
+Open a project, open **Terminal**, and type your installed agent's command. The session runs as a top-level terminal session in the project context. If you close the terminal, reopen it from the right activity bar when you need it; [terminal controls](reference/terminal.md) let you restart it or select **Maximize terminal**.
 
 ## Send selected text
 

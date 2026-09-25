@@ -1,7 +1,20 @@
-<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!--
+SPDX-License-Identifier: GPL-3.0-only
+SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+-->
+
 # Preview an HTML page
 
 HTML preview runs a project page with its CSS and JavaScript in a sandboxed view. It is on by default; [**Run HTML files**](settings.md#html-preview) can turn it off so files open as source.
+
+**On this page**
+
+- [Opening and limits](#opening-and-limits)
+- [Toolbar and navigation](#toolbar-and-navigation)
+- [Remote-host permission](#remote-host-permission)
+- [Live refresh and frames](#live-refresh-and-frames)
+- [Find, issues and stopped state](#find-issues-and-stopped-state)
+- [Zoom and PDF](#zoom-and-pdf)
 
 ## Opening and limits
 

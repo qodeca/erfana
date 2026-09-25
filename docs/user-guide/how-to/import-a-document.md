@@ -1,4 +1,8 @@
-<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!--
+SPDX-License-Identifier: GPL-3.0-only
+SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+-->
+
 # Import a document
 
 Select **Import** in the project tree, choose a file, then set OCR and page options before importing.
@@ -9,7 +13,7 @@ Select **Import** in the project tree, choose a file, then set OCR and page opti
 
 1. Select **Import** from the tree toolbar or folder context menu.
 2. Choose the source document.
-3. Set OCR, language, DPI, page screenshots, and pages.
+3. Set OCR, language, DPI, and optional page screenshots. Parsing covers at most 1,000 pages; screenshots cover the first 100.
 4. Start import, then open the resulting Markdown file.
 
 ![Screenshot of the import dialog with OCR enabled.](../images/import/import-dialog.png)
@@ -17,7 +21,7 @@ Select **Import** in the project tree, choose a file, then set OCR and page opti
 
 ## What happens next / If something goes wrong
 
-A large-file warning lets you import anyway or skip. Install a converter when the dialog says one is required.
+A plain-text file over 50 MB shows an **Import anyway** or **Skip** warning. Install a converter when the dialog says one is required.
 
 ## Related
 

@@ -1,4 +1,8 @@
-<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!--
+SPDX-License-Identifier: GPL-3.0-only
+SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+-->
+
 # Maintain this guide
 
 The guide is Markdown in this repository. Each inventory row should link to the section that explains its feature. Confirm UI labels and defaults in `src/**` before changing behavior descriptions; preserve observations from earlier captures as dated evidence.

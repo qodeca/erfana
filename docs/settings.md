@@ -1,6 +1,15 @@
+<!--
+SPDX-License-Identifier: GPL-3.0-only
+SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+-->
+
 # Settings overlay – implementation notes
 
 User controls, defaults and project options are in the [settings reference](./user-guide/reference/settings.md).
+
+## Focus management
+
+`SettingsOverlay.tsx` remembers the previously focused element when it opens, focuses the close button after the overlay renders, closes on Escape using a capture-phase document listener, and restores the earlier focus when it closes. This keeps keyboard users at their original place after inspecting settings.
 
 ## Credential and local model storage
 

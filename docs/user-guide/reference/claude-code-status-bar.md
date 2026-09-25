@@ -1,7 +1,16 @@
-<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!--
+SPDX-License-Identifier: GPL-3.0-only
+SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+-->
+
 # Read Claude Code status
 
 The terminal's context meter appears only while Claude Code runs. It reads Claude Code's transcripts and does not write Claude Code configuration; Erfana's terminal can run other CLI agents without this meter.
+
+**On this page**
+
+- [Model and context meter](#model-and-context-meter)
+- [Tooltip and limits](#tooltip-and-limits)
 
 ## Model and context meter
 
