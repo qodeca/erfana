@@ -9,7 +9,7 @@
 import { expect, test } from '@playwright/test'
 import { TEST_IDS } from '../../../src/renderer/src/constants/testids'
 import { blurAll, launch, openFile, openProject, visible } from '../lib/app'
-import { anySelected, shot } from '../lib/shots'
+import { anySelected, drawTitleTooltip, removeDrawnTooltips, shot } from '../lib/shots'
 import { ptyLength, typeLine, waitForShellPrompt } from '../lib/terminal'
 
 const ROWS = ['several-windows/quit-confirmation', 'the-window/tab-menu', 'the-window/activity-bars']
@@ -23,7 +23,12 @@ test('window', async () => {
     await openFile(cap, 'handbook/getting-involved.md')
     await openFile(cap, 'handbook/compost-guide.md')
     await blurAll(page)
-    await shot(cap, 'the-window/activity-bars')
+    // Both activity-bar tooltips at once, for the picture (the app shows one
+    // at a time; the row's state says so). Drawn: see drawTitleTooltip.
+    await drawTitleTooltip(page, page.getByTestId(TEST_IDS.ACTIVITY_BAR_BTN_TERMINAL), 'capture-tip-terminal')
+    await drawTitleTooltip(page, page.getByTestId(TEST_IDS.ACTIVITY_BAR_BTN_FILES), 'capture-tip-project')
+    await shot(cap, 'the-window/activity-bars', { keepHover: true })
+    await removeDrawnTooltips(page)
 
     const tab = page.locator('.editor-tab', { hasText: 'compost-guide.md' })
     await tab.click({ button: 'right' })

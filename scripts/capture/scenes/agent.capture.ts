@@ -14,7 +14,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { TEST_IDS } from '../../../src/renderer/src/constants/testids'
 import { blurAll, launch, openFile, openProject, visible } from '../lib/app'
-import { anySelected, shot } from '../lib/shots'
+import { anySelected, drawTitleTooltip, removeDrawnTooltips, shot } from '../lib/shots'
 import { focusTerminal, runAgentTurn, startClaude } from '../lib/terminal'
 
 const ROWS = [
@@ -64,7 +64,9 @@ test('agent', async () => {
     await preview.getByRole('cell', { name: 'Carrots' }).scrollIntoViewIfNeeded()
     await blurAll(page)
     await shot(cap, 'index/overview')
-    await shot(cap, 'claude-code-status-bar/status-bar', { crop: statusBar, pad: 12 })
+    const statusTip = await drawTitleTooltip(page, statusBar, 'capture-tip-status')
+    await shot(cap, 'claude-code-status-bar/status-bar', { crop: [statusBar, statusTip], pad: 12, keepHover: true })
+    await removeDrawnTooltips(page)
 
     // The edit landing, with the project panel folded away so the file and
     // the agent's summary have the room.

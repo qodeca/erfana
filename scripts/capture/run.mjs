@@ -372,19 +372,31 @@ async function processDemo(loops, sb, encodedDir, ocr, denyList, privacy, out) {
   const framesDir = path.join(sb.raw, 'demo-frames')
   fs.mkdirSync(framesDir, { recursive: true })
   let framesRead = 0
+  const headerFrames = []
   for (const { row, ext, file } of files) {
     const frames = await extractSampledFrames(sharp, ext, file, framesDir, plan.duration)
     for (const f of frames) {
-      const kinds = scanText((await ocr.read(f)).text, denyList)
+      const text = (await ocr.read(f)).text
+      const kinds = scanText(text, denyList)
       framesRead++
       if (kinds.length) privacy.push({ id: row.id, layer: `frame ${path.basename(f)}`, kinds })
+      if (showsStartupHeader(text)) headerFrames.push(`demo.${ext} ${path.basename(f)}`)
     }
+  }
+  // NB-4: Claude Code's start-up header must not survive the S0→S1 cut.
+  if (headerFrames.length) {
+    throw new CaptureError(`readme-demo: Claude Code's start-up header is visible after the cut in ${headerFrames.length} frame(s): ${headerFrames.slice(0, 5).join(', ')}`, EXIT.SCENE)
   }
   // The DOM text at the end and the whole PTY stream of the recording.
   for (const { row } of files) checkTexts(row.id, sb, denyList, privacy, 'readme-demo')
   const sheet = path.join(sb.raw, 'demo-contact-sheet.png')
   await runFfmpeg(contactSheetArgs(files.find((f) => f.ext === 'mp4')?.file ?? source, sheet))
   return { duration: plan.duration, zoom: demo.zoom, legibility, framesRead, contactSheet: sheet, syncVideo }
+}
+
+/** Claude Code's start-up header reads "Claude Code v<version>". */
+export function showsStartupHeader(ocrText) {
+  return /claude\s*code\s*v\s*\d/i.test(ocrText)
 }
 
 async function frameAt(sharp, ext, file, t) {

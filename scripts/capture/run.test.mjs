@@ -13,7 +13,7 @@ import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { CaptureError } from './manifest.mjs'
-import { EXIT, parseArgs, readLogin, reportLines, runCheck, safeTarget } from './run.mjs'
+import { EXIT, parseArgs, readLogin, reportLines, runCheck, safeTarget, showsStartupHeader } from './run.mjs'
 import { MARKER, VOLUME_ROOT, attachedImages, claudeJson, findClaude, layout, projectClaudeSettings, sandboxProblem, shellQuote, userClaudeSettings, volumeProblem } from './sandbox.mjs'
 import { capitalHeight, judgeFrame, normalise } from './legibility.mjs'
 
@@ -231,6 +231,14 @@ describe('demo drive (B-7)', () => {
     expect(volumeProblem(l, [{ image: l.image, mounts: [VOLUME_ROOT] }], () => true)).toBeNull()
     expect(volumeProblem(l, [], () => false)).toBeNull()
     expect(volumeProblem(l, [{ image: '/elsewhere.dmg', mounts: [VOLUME_ROOT] }], () => true)).toMatch(/did not mount/)
+  })
+})
+
+describe('start-up header check (NB-4)', () => {
+  it('finds Claude Code\'s header in OCR text, and nothing else (break: a check that never fires)', () => {
+    expect(showsStartupHeader('▐▛███▜▌ Claude Code v2.1.282\nSonnet 5 · Claude API')).toBe(true)
+    expect(showsStartupHeader('Claude Code  v 2.1')).toBe(true)
+    expect(showsStartupHeader('Read 1 file\nUpdate(handbook/open-day-plan.md)')).toBe(false)
   })
 })
 

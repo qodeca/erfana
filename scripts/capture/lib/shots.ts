@@ -293,3 +293,59 @@ export async function visibleText(page: Page, clip: Rect, masks: Rect[] = []): P
     { clip, masks }
   )
 }
+
+/**
+ * Draw a control's tooltip for a shot. Every tooltip in the app is a native
+ * `title`, which macOS draws outside the page, so neither a page screenshot
+ * nor `capturePage()` holds it, and `screencapture` needs Screen Recording
+ * permission this capture does not have. The box shows the control's own
+ * `title` text, placed where macOS puts a tooltip (below the pointer), and is
+ * removed after the shot (`removeDrawnTooltips`). Rows that use it say so in
+ * their manifest state.
+ */
+export async function drawTitleTooltip(page: Page, target: Locator, id: string): Promise<Locator> {
+  const title = await target.getAttribute('title')
+  if (!title) throw new Error(`no title to draw for ${target.toString()}`)
+  await target.hover()
+  const box = await target.boundingBox()
+  if (!box) throw new Error(`tooltip target not visible: ${target.toString()}`)
+  await page.evaluate(
+    ({ title, id, box }) => {
+      const el = document.createElement('div')
+      el.id = id
+      el.setAttribute('data-capture-tooltip', '')
+      el.textContent = title
+      el.style.cssText = [
+        'position:fixed',
+        'z-index:2147483646',
+        'background:#323232',
+        'color:#ececec',
+        'border:1px solid #5a5a5a',
+        'border-radius:4px',
+        'padding:3px 7px',
+        'font:12px -apple-system, BlinkMacSystemFont, sans-serif',
+        'white-space:pre',
+        'box-shadow:0 2px 8px rgba(0,0,0,0.45)',
+        'pointer-events:none'
+      ].join(';')
+      document.body.appendChild(el)
+      const w = el.offsetWidth
+      const h = el.offsetHeight
+      let left = box.x + box.width / 2 - 4
+      let top = box.y + box.height / 2 + 18
+      if (left + w > window.innerWidth - 4) left = window.innerWidth - w - 4
+      if (top + h > window.innerHeight - 4) top = box.y - h - 6
+      el.style.left = `${Math.max(4, left)}px`
+      el.style.top = `${Math.max(4, top)}px`
+    },
+    { title, id, box }
+  )
+  const tip = page.locator(`#${id}`)
+  await expect(tip).toBeVisible()
+  return tip
+}
+
+/** Remove every tooltip `drawTitleTooltip` added. */
+export async function removeDrawnTooltips(page: Page): Promise<void> {
+  await page.evaluate(() => document.querySelectorAll('[data-capture-tooltip]').forEach((e) => e.remove()))
+}

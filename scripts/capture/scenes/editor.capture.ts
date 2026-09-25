@@ -12,7 +12,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { TEST_IDS } from '../../../src/renderer/src/constants/testids'
 import { launch, openFile, openProject, setViewMode, visible, type Capture } from '../lib/app'
-import { anySelected, shot } from '../lib/shots'
+import { anySelected, drawTitleTooltip, removeDrawnTooltips, shot } from '../lib/shots'
 
 const ROWS = [
   'edit-and-preview/view-modes',
@@ -56,10 +56,13 @@ test('editor', async () => {
       crop: buttons([TEST_IDS.VIEW_MODE_BTN_EDITOR, TEST_IDS.VIEW_MODE_BTN_SPLIT_HORIZONTAL, TEST_IDS.VIEW_MODE_BTN_SPLIT, TEST_IDS.VIEW_MODE_BTN_PREVIEW]),
       pad: 10
     })
+    const boldTip = await drawTitleTooltip(page, visible(page, TEST_IDS.TOOLBAR_BTN_BOLD), 'capture-tip-bold')
     await shot(cap, 'edit-and-preview/formatting-toolbar', {
-      crop: buttons([TEST_IDS.TOOLBAR_BTN_BOLD, TEST_IDS.TOOLBAR_BTN_LIST_ORDERED]),
-      pad: 10
+      crop: [...buttons([TEST_IDS.TOOLBAR_BTN_BOLD, TEST_IDS.TOOLBAR_BTN_LIST_ORDERED]), boldTip],
+      pad: 10,
+      keepHover: true
     })
+    await removeDrawnTooltips(page)
 
     // Split horizontal: preview on top, editor below.
     await setViewMode(page, 'split-horizontal')
@@ -73,13 +76,14 @@ test('editor', async () => {
     await expect(visible(page, TEST_IDS.STATS_SELECTION)).toBeVisible()
     await shot(cap, 'edit-and-preview/stats-bar', { crop: visible(page, TEST_IDS.DOCUMENT_STATS_BAR), pad: 0 })
 
-    // Find: "compost" in the compost guide.
-    await openFile(cap, 'handbook/compost-guide.md', 'split')
+    // Find: "compost" in the volunteer guide (three matches), in Editor Only
+    // view so the find bar has the editor's full width and is not clipped.
+    await openFile(cap, 'handbook/getting-involved.md', 'editor')
     await visible(page, TEST_IDS.TOOLBAR_BTN_SEARCH).click()
     const input = visible(page, TEST_IDS.SEARCH_BAR_INPUT)
     await expect(input).toBeVisible()
     await input.fill('compost')
-    await expect(visible(page, TEST_IDS.SEARCH_BAR_COUNT)).toHaveText(/\d/)
+    await expect(visible(page, TEST_IDS.SEARCH_BAR_COUNT)).toHaveText(/of 3/)
     await shot(cap, 'edit-and-preview/find-bar', { crop: page.locator('.markdown-editor-panel').filter({ visible: true }), pad: 0 })
     await page.keyboard.press('Escape')
 

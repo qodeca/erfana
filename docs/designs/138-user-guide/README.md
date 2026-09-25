@@ -216,7 +216,7 @@ which is drawn by a separate Electron view and is not in a normal page screensho
 | 44 | `send-a-screenshot/capture-buttons.png` | send-a-screenshot-or-photo | Terminal header buttons, tooltip on Capture area | terminal header | | |
 | 45 | `send-a-screenshot/camera-dialog.png` | send-a-screenshot-or-photo | Camera dialog showing Chromium's fake camera test pattern (`--use-fake-device-for-media-stream`), never a real camera | dialog | | |
 | 46 | `several-windows/quit-confirmation.png` | work-in-several-windows | Quit with an unsaved file and a running terminal: quit dialog | dialog | | |
-| 47 | `several-windows/unsaved-changes.png` | edit-and-preview-markdown | Close a tab with unsaved changes: Save / Don't save / Cancel | dialog | | |
+| 47 | `several-windows/unsaved-changes.png` | edit-and-preview-markdown | Close a tab with unsaved changes: Unsaved Changes dialog, Close Without Saving / Cancel (closing a tab has no Save action; Save / Don't save / Cancel appears only when an HTML preview moves in its tab) | dialog | | |
 | 48 | `the-window/tab-menu.png` | reference/the-erfana-window, reference/menus | Right-click menu on a tab (Close, Close Others, Close All) | tab bar | | |
 | 49 | `the-window/activity-bars.png` | reference/the-erfana-window | Left and right activity bars with tooltips on Project and Terminal | window | | |
 | 50 | `settings/overlay.png` | reference/settings | Settings overlay, top (Editor, Git status) | window | | |

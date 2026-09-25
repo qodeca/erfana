@@ -56,7 +56,17 @@ test('selection-prompts', async () => {
     await expect(editorMenu).toBeVisible()
     await editorMenu.getByRole('menuitem', { name: 'Visualize' }).click()
     await expect(dialog).toBeVisible()
-    await page.getByTestId(TEST_IDS.DIALOG_PROMPT_DROPDOWN).selectOption('flowchart')
+    const dropdown = page.getByTestId(TEST_IDS.DIALOG_PROMPT_DROPDOWN)
+    await dropdown.selectOption('flowchart')
+    // The diagram-type list is a native <select>; macOS draws its open list
+    // outside the page, where no capture sees it. For the picture the same
+    // element is shown as an open in-page list (size = 8), Flowcharts chosen.
+    await dropdown.evaluate((el) => {
+      const sel = el as HTMLSelectElement
+      sel.size = 8
+      sel.style.height = 'auto'
+      sel.options[sel.selectedIndex]?.scrollIntoView({ block: 'center' })
+    })
     await shot(cap, 'turn-a-selection/visualize-dialog', { crop: dialog, pad: 16 })
     await page.getByTestId(TEST_IDS.DIALOG_BTN_CANCEL).click()
     await expect(dialog).toHaveCount(0)
@@ -93,10 +103,15 @@ test('selection-prompts', async () => {
     const before = fs.readFileSync(file, 'utf8')
     await page.getByTestId(TEST_IDS.DIALOG_BTN_CONFIRM).click()
     await waitForPty(page, 'Pasted text', { from })
+    // The agent at work: it has read the file and has not finished its turn.
+    // Its spinner never holds still, so this one shot is taken without the
+    // settle loop.
+    await waitForPty(page, 'Read 1 file', { from, timeout: 5 * 60_000 })
+    expect(stopHookCount(sb.stopLog)).toBe(turns)
+    await blurAll(page)
+    await shot(cap, 'turn-a-selection/prompt-in-terminal', { noSettle: true })
     await expect.poll(() => stopHookCount(sb.stopLog), { timeout: 5 * 60_000, intervals: [250, 500, 1000] }).toBeGreaterThan(turns)
     await expect.poll(() => fs.readFileSync(file, 'utf8') !== before, { timeout: 30_000 }).toBe(true)
-    await blurAll(page)
-    await shot(cap, 'turn-a-selection/prompt-in-terminal')
   } finally {
     await cap.close()
   }

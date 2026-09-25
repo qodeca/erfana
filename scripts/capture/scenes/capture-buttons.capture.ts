@@ -9,7 +9,7 @@
 import { expect, test } from '@playwright/test'
 import { TEST_IDS } from '../../../src/renderer/src/constants/testids'
 import { launch, openProject } from '../lib/app'
-import { anySelected, shot } from '../lib/shots'
+import { anySelected, drawTitleTooltip, removeDrawnTooltips, shot } from '../lib/shots'
 
 const ROWS = ['send-a-screenshot/capture-buttons', 'send-a-screenshot/camera-dialog']
 
@@ -20,8 +20,11 @@ test('capture-buttons', async () => {
   try {
     await openProject(cap)
     const header = page.getByTestId(TEST_IDS.TERMINAL_PANEL).locator('.sidebar-panel-header')
-    await expect(page.getByTestId(TEST_IDS.TERMINAL_BTN_CAPTURE_AREA)).toBeVisible()
-    await shot(cap, 'send-a-screenshot/capture-buttons', { crop: header, pad: 0 })
+    const area = page.getByTestId(TEST_IDS.TERMINAL_BTN_CAPTURE_AREA)
+    await expect(area).toBeVisible()
+    const areaTip = await drawTitleTooltip(page, area, 'capture-tip-area')
+    await shot(cap, 'send-a-screenshot/capture-buttons', { crop: [header, areaTip], pad: 4, keepHover: true })
+    await removeDrawnTooltips(page)
 
     await page.getByTestId(TEST_IDS.TERMINAL_BTN_CAMERA).click()
     const dialog = page.getByTestId(TEST_IDS.CAMERA_DIALOG)

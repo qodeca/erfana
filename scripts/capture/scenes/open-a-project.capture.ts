@@ -9,7 +9,7 @@
 import { expect, test } from '@playwright/test'
 import { TEST_IDS, getDynamicTestId } from '../../../src/renderer/src/constants/testids'
 import { blurAll, closeProject, launch, openProject } from '../lib/app'
-import { anySelected, shot } from '../lib/shots'
+import { anySelected, drawTitleTooltip, removeDrawnTooltips, shot } from '../lib/shots'
 import { ensureTerminalOpen, ptyLength, waitForShellPrompt } from '../lib/terminal'
 
 const ROWS = ['open-a-project/welcome', 'open-a-project/project-open', 'open-a-project/project-header']
@@ -36,13 +36,17 @@ test('open-a-project', async () => {
     await shot(cap, 'open-a-project/project-open')
 
     // The project panel's header: project name, Change project, Close project
-    // and the file buttons. (Their tooltips are native and do not show in a
-    // screenshot; the guide names them in words.)
-    await expect(page.getByTestId(TEST_IDS.PROJECT_TREE_BTN_CLOSE)).toBeVisible()
+    // and the file buttons, with the Close project tooltip (drawn: see
+    // drawTitleTooltip).
+    const close = page.getByTestId(TEST_IDS.PROJECT_TREE_BTN_CLOSE)
+    await expect(close).toBeVisible()
+    const tip = await drawTitleTooltip(page, close, 'capture-tip-close')
     await shot(cap, 'open-a-project/project-header', {
-      crop: [page.locator('.project-panel .control-panel-chevron'), page.locator('.project-tree-path')],
-      pad: 10
+      crop: [page.locator('.project-panel .control-panel-chevron'), page.locator('.project-tree-path'), tip],
+      pad: 10,
+      keepHover: true
     })
+    await removeDrawnTooltips(page)
   } finally {
     await cap.close()
   }

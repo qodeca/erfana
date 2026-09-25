@@ -13,7 +13,7 @@ import path from 'node:path'
 import { TEST_IDS } from '../../../src/renderer/src/constants/testids'
 import { ProjectTreePage } from '../../../e2e/pages/project-tree.page'
 import { launch, openFile, openProject, setViewMode, stubOpenDialog, visible } from '../lib/app'
-import { anySelected, shot } from '../lib/shots'
+import { anySelected, drawTitleTooltip, removeDrawnTooltips, shot } from '../lib/shots'
 
 const ROWS = ['export/toolbar-export-buttons', 'import/import-dialog', 'import/imported-file']
 
@@ -25,10 +25,13 @@ test('export-import', async () => {
   try {
     await openProject(cap)
     await openFile(cap, 'README.md', 'split')
+    const pdfTip = await drawTitleTooltip(page, visible(page, TEST_IDS.TOOLBAR_BTN_EXPORT_PDF), 'capture-tip-pdf')
     await shot(cap, 'export/toolbar-export-buttons', {
-      crop: [visible(page, TEST_IDS.TOOLBAR_BTN_EXPORT_PDF), visible(page, TEST_IDS.TOOLBAR_BTN_EXPORT_DOCX)],
-      pad: 12
+      crop: [visible(page, TEST_IDS.TOOLBAR_BTN_EXPORT_PDF), visible(page, TEST_IDS.TOOLBAR_BTN_EXPORT_DOCX), pdfTip],
+      pad: 12,
+      keepHover: true
     })
+    await removeDrawnTooltips(page)
     if (!anySelected(['import/import-dialog', 'import/imported-file'])) return
 
     await stubOpenDialog(cap, path.join(sb.project, 'inbox', 'seed-order.pdf'))

@@ -27,7 +27,7 @@ import path from 'node:path'
 import { TEST_IDS, getDynamicTestId } from '../../../src/renderer/src/constants/testids'
 import { blurAll, closeProject, launch, openFile, openProject, visible } from '../lib/app'
 import { anySelected, clearToasts, shot, stableWindowCapture } from '../lib/shots'
-import { ensureTerminalOpen, ptyContains, ptyLength, readPty, runAgentTurn, startClaude, stopHookCount, waitForPty, waitForShellPrompt } from '../lib/terminal'
+import { ensureTerminalOpen, ptyContains, ptyLength, readPty, startClaude, stopHookCount, waitForPty, waitForShellPrompt } from '../lib/terminal'
 
 const ROWS = ['readme/demo-webp', 'readme/demo-gif', 'readme/demo-mp4', 'readme/demo-still']
 
@@ -114,15 +114,31 @@ test('readme-demo', async () => {
     await stableWindowCapture(cap)
     marks.projectOpen = await painted(page)
 
-    // The cut. Claude Code starts and answers one short question off camera
-    // (Erfana's status bar appears only after a finished turn). Claude Code
-    // keeps its header (version, model, folder) at the top of its screen and
-    // repaints it after any clear, so S1 shows that header; the start-up
-    // itself is cut (runbook: README demo).
+    // The cut. Claude Code starts and answers a first prompt off camera:
+    // Erfana's status bar appears only after a finished turn, and Claude Code
+    // keeps its start-up header at the top of its screen until enough output
+    // has pushed it off (it repaints it after any clear). The first prompt is
+    // Erfana's own Explain on the plan's list: its expanded prompt is taller
+    // than the terminal, so by S1 the header is gone. run.mjs checks every
+    // frame of the loop for it.
     await roomForTheAgent(page)
     await startClaude(page)
-    await runAgentTurn(page, sb.stopLog, 'Reply with the single word: ready')
+    const editorForExplain = visible(page, TEST_IDS.EDITOR_MONACO)
+    const listStart = editorForExplain.locator('.view-line', { hasText: /1\.\s*Book/ })
+    await listStart.click({ position: { x: 1, y: 4 } })
+    await page.keyboard.press('Meta+ArrowLeft')
+    await page.keyboard.press('Meta+Shift+ArrowDown')
+    await listStart.click({ button: 'right' })
+    const explainMenu = page.getByTestId(TEST_IDS.CONTEXT_MENU_EDITOR)
+    await expect(explainMenu).toBeVisible()
+    const explainTurns = stopHookCount(sb.stopLog)
+    await explainMenu.getByTestId(TEST_IDS.CONTEXT_MENU_ITEM_EXPLAIN).click()
+    await expect.poll(() => stopHookCount(sb.stopLog), { timeout: 5 * 60_000, intervals: [250, 500, 1000] }).toBeGreaterThan(explainTurns)
     await expect(page.getByTestId(TEST_IDS.CLAUDE_STATUS_BAR)).toBeVisible({ timeout: 60_000 })
+    // Clear the selection: the caret to the top of the file.
+    await listStart.click({ position: { x: 1, y: 4 } })
+    await page.keyboard.press('Meta+ArrowUp')
+    await expect(editorForExplain.locator('.selected-text')).toHaveCount(0)
     await blurAll(page)
     await stableWindowCapture(cap)
     marks.claudeIdle = await painted(page)
