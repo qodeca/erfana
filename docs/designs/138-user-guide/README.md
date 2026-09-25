@@ -11,7 +11,7 @@ addressed, waiting for re-review (the owner waived owner approval for this issue
 
 Companion documents:
 
-- [Feature inventory](feature-inventory.md) – the checklist the guide is reviewed against.
+- [Feature inventory](../../user-guide/feature-inventory.md) – the checklist the guide is reviewed against.
 - [Research notes](research.md) – sources, with URLs and read dates.
 - [Spec and implementation plan](../../features/138-user-guide.md) – steps, files, verification, risks.
 
@@ -286,9 +286,9 @@ The default path regenerates **all** rows, the #139 rows included; there is no d
 
 1. **Preflight.** macOS only; `claude` on `PATH`; an agent login option available (below); bundled
    ffmpeg (`ffmpeg-static`, already a dependency) and `tesseract.js` resolvable; the sandbox path
-   `/tmp/erfana-capture` is absent, or a real directory owned by the user (never a symlink).
+   `/Users/Shared/erfana-capture` is absent, or a real directory owned by the user (never a symlink).
 2. **Build.** `npx electron-vite build` (same as `npm run test:e2e`).
-3. **Sandbox.** Recreate `/tmp/erfana-capture/`: `home/` (a fake `HOME`), `home/Projects/harbour-garden/`
+3. **Sandbox.** Recreate `/Users/Shared/erfana-capture/`: `home/` (a fake `HOME`); the demo project is on the `/Volumes/HarbourGarden` disk image.
    (fixture copy plus `git init`), `user-data/`, `raw/`. The fake home holds a `.zshrc` that sets a
    neutral prompt (`%~ %# `, no user or host name) and a `.claude/settings.json` whose only content
    is a `Stop` hook that touches a marker file, used as the "agent finished" condition – so the
@@ -443,7 +443,7 @@ The owner's rule: real Claude Code, scrubbed; if no Claude login is available, s
 never fake the output. Layers:
 
 1. **Construction.**
-   - A fake `HOME` in `/tmp/erfana-capture/home`, so paths read `~/Projects/harbour-garden`.
+   - A fake `HOME` in `/Users/Shared/erfana-capture/home`, so paths read `~/Projects/harbour-garden`.
    - A neutral shell prompt: Erfana injects `PROMPT='%n %~ $ '`, and `%n` is the real user name, so
      the sandbox `.zshrc` overrides it.
    - Fictional project data.
@@ -573,7 +573,7 @@ States of the capture script itself (what an operator sees):
 | Success | 0 | Report: 52 guide images and the 4 README demo files, sizes, totals, demo duration, Claude Code version. |
 | Not macOS | 2 | "docs:screenshots runs on macOS only." |
 | No agent login | 3 | "No Claude Code login for the capture sandbox: set ANTHROPIC_API_KEY or ERFANA_CAPTURE_CLAUDE_TOKEN_FILE. Screenshots were not changed." |
-| Sandbox path unsafe | 4 | "/tmp/erfana-capture is a symlink or not yours; remove it and retry." |
+| Sandbox path unsafe | 4 | "/Users/Shared/erfana-capture is a symlink or not yours; remove it and retry." |
 | Privacy hit | 5 | "Row 7 refused: deny-list match (kind: email). Nothing copied." |
 | Over budget | 6 | "Row 1 is 512 KB (limit 400 KB)." |
 | Scene failed | 1 | Playwright's own failure with the row id; raw shots stay in the sandbox for inspection. Also "demo not legible at 800 px" from the legibility check. |
@@ -595,7 +595,7 @@ leader decided them that way (2026-09-25).
    to security review and does not ride along in a docs PR. The build PR files the follow-up issue.
 3. **Pixel density.** **Decided: 2×**, within the 12 MB budget. If the spike measures more than
    12 MB, the fallback is 1× for full-window shots only.
-4. **Code/doc mismatches found by the inventory** (see [feature-inventory.md](feature-inventory.md#mismatches)).
+4. **Code/doc mismatches found by the inventory** (see [feature-inventory.md](../../user-guide/feature-inventory.md#mismatches)).
    **Decided: filed as issues**, and not fixed here. The guide documents what the code does.
    - [#142](https://github.com/qodeca/erfana/issues/142) – the find-bar tooltips promise Alt+C and
      Alt+W, which do nothing;

@@ -11,7 +11,7 @@ SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 - **Release verification.** Users verify downloads against the minisign-signed `SHA256SUMS` and the
   published key (`docs/release-pubkey.txt`, `docs/security.md`). A key rotation follows the
   dual-key procedure in `docs/adrs/`.
-- **Keyboard shortcuts** documented in `docs/keyboard-shortcuts.md`: a change to one is a
+- **Keyboard shortcuts** documented in `docs/user-guide/reference/keyboard-shortcuts.md`: a change to one is a
   deliberate, noted change.
 - **Reading Claude Code transcripts** under `~/.claude` for the context meter: read-only, and a
   format Erfana does not own, so an unknown shape degrades the meter, never the app.
