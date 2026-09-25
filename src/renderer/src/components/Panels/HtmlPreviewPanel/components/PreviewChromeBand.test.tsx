@@ -18,6 +18,14 @@ import { PreviewChromeBand } from './PreviewChromeBand'
 import { ErrorCode } from '../../../../../../shared/errors'
 import type { PreviewApproveResult } from '../../../../../../shared/ipc/preview-types'
 import type { PreviewBlockedHost } from '../../../../stores/usePreviewStore'
+import { isMacOS } from '../../../../utils/platform'
+
+vi.mock('../../../../utils/platform', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../utils/platform')>()),
+  isMacOS: vi.fn(() => true)
+}))
+
+const mockIsMacOS = vi.mocked(isMacOS)
 
 /**
  * A blocked entry as MAIN actually sends one: a canonical origin, not a bare
@@ -105,14 +113,24 @@ describe('PreviewChromeBand', () => {
   it("renders a Find button, named and titled like the markdown toolbar's", async () => {
     const user = userEvent.setup()
     const onFind = vi.fn()
+    mockIsMacOS.mockReturnValue(true)
     renderBand({ onFind })
 
     const find = screen.getByTestId('preview-band-find')
     expect(find).toHaveAccessibleName('Find')
-    expect(find).toHaveAttribute('title', 'Find (Cmd/Ctrl+F)')
+    expect(find).toHaveAttribute('title', 'Find (⌘F)')
 
     await user.click(find)
     expect(onFind).toHaveBeenCalledTimes(1)
+  })
+
+  it('titles the Find button Ctrl+F, with no ⌘ or "Cmd", on Windows (#143)', () => {
+    mockIsMacOS.mockReturnValue(false)
+    renderBand({ onFind: vi.fn() })
+
+    const find = screen.getByTestId('preview-band-find')
+    expect(find).toHaveAttribute('title', 'Find (Ctrl+F)')
+    expect(find.getAttribute('title')).not.toMatch(/[⌘⌥⇧⌃]|Cmd/)
   })
 
   it('mounts the live region EMPTY', () => {
