@@ -1,12 +1,17 @@
 {
   "permissions": {
-    "allow": ["Bash(gh pr merge *)"],
+    "allow": [
+      "Bash(gh pr merge *)",
+      "Bash(node scripts/stop-orphan-mcp.mjs)",
+      "Bash(node scripts/stop-orphan-mcp.mjs --dry-run)"
+    ],
     "deny": ["Bash(gh pr merge *--admin*)", "Bash(gh pr merge *--repo*)", "Bash(gh pr merge *-R *)"]
   },
   "autoMode": {
     "allow": [
       "$defaults",
-      "Merging a pull request of this repository with `gh pr merge` is allowed in this session: it is the project leader. Every agent it coordinates uses one GitHub account, so a formal GitHub approval is impossible; the leader guide lets it merge only when every required check on the PR head is green and an agent review by a different model approved that head."
+      "Merging a pull request of this repository with `gh pr merge` is allowed in this session: it is the project leader. Every agent it coordinates uses one GitHub account, so a formal GitHub approval is impossible; the leader guide lets it merge only when every required check on the PR head is green and an agent review by a different model approved that head.",
+      "Running exactly `node scripts/stop-orphan-mcp.mjs` or `node scripts/stop-orphan-mcp.mjs --dry-run` is allowed in this session: it signals only an `npx`/`npm exec` launcher of a listed MCP package whose parent is PID 1, and that launcher's descendants, and only when it started at least 2 seconds before the first scan; one fresh scan per signal batch re-confirms each process's PID, start time, parent and command, and any process it cannot confirm is skipped and reported (#145). This allows no other cleanup command."
     ]
   }
 }
