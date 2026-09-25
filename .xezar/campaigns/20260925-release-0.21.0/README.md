@@ -1,6 +1,6 @@
 # Campaign release-0.21.0
 
-Updated: 2026-09-25 10:18 CEST
+Updated: 2026-09-25 10:39 CEST
 
 ## State
 - Base: `develop` at `9fe8a3f0`. Merges so far: 0. Checkpoints met: none.
@@ -17,10 +17,18 @@ Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 Empty.
 
 ## Running tasks per lane
-None.
+| Run | Issue | Workflow | Lane | Login |
+|---|---|---|---|---|
+| 2a80ec06 | #145 | feature-implementation | claude/opus | qodeca |
+| 9ea693bf | #140 (#139) | address-review-findings | claude/opus | gmail |
+| 731c0a75 | #141 (#138) | address-review-findings | claude/opus | qodeca |
+
+Counts at dispatch: tasks 3/10 (xezar runs 2 at once), metered 0/4, load 15.8/18.
 
 ## File-ownership table
-None running.
+- 2a80ec06 owns scripts/run-mcp.js, .mcp.json, its new test
+- 9ea693bf owns docs/designs/139-readme-redesign/**
+- 731c0a75 owns docs/designs/138-user-guide/**, docs/features/138-user-guide.md
 
 ## Accounts (from `read_quota` at 2026-09-25T07:13:22Z)
 | Runner | Login | State | Resets (UTC) |
@@ -35,14 +43,12 @@ None running.
 | pi | – | no logins | – |
 
 ## Held or queued work
-- #145 MCP launcher leak – FIRST in the queue (owner). Touches scripts/run-mcp.js and .mcp.json only.
 - #142, #143, #144 – filed from the #141 inventory; ready, not yet triaged into order.
 - #138 build – waits for its design verdict.
 - #139 build – waits for its design verdict and #138's fixture and capture script.
 
 ## Owner items
 - Label issues with `release-0.21.0` to put them in scope.
-- Load: 17 orphaned circuit-electron servers block all dispatch. Owner said stop them; the leader's kill was refused by the auto-mode permission check. Owner runs it.
 - PR #140 open decisions, needed before #139 is built, not before its review: (1) go to apply repo description, topics, social preview; (2) extend TRADEMARKS.md to the new banner, wordmark, social image; (3) CI link check as a follow-up issue; (4) light-theme banner vs dark-only rule – owner only if the reviewer disagrees; (5) demo format WebP (after a spike) vs MP4.
 
 ## Rules that bit
