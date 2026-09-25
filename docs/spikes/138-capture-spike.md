@@ -34,8 +34,10 @@ All eight questions now have an observation. The design holds, with **four chang
    `.zshrc`.** Erfana strips it from the environment it gives the terminal. The design's option (b),
    `ERFANA_CAPTURE_CLAUDE_TOKEN_FILE` read by `.zshrc`, works (Q4).
 3. **At 800 px, terminal text is about 6–6.7 px tall in every encode and in the raw frame**, under
-   the 7 px bar. The cause is the scale-down, not the recorder, so switching to the fallback recorder
-   will not fix it (Q8). #139's capture-only zoom or a wider display is needed.
+   the 7 px bar. The cause is the scale-down, not the recorder. Whether the `Page.startScreencast`
+   fallback recorder would fix it was not observed. It is inferred not to, because the unencoded
+   `recordVideo` frame fails the same way once scaled to 800 px (Q8). #139's capture-only zoom or a
+   wider display is needed.
 4. **Electron must be given `SHELL`.** With a minimal environment and no `SHELL`, the terminal showed
    only a cursor and sent no output at all. Adding `SHELL=/bin/zsh` fixed it (Q4, second run).
 
@@ -372,7 +374,9 @@ settings loaded.
 
 ### Q8 – A 3-second `recordVideo` clip passes the legibility check at 800 px
 
-**No, and the fallback recorder would not change it.**
+**No.** Whether the `Page.startScreencast` fallback recorder would change that was not observed: the
+fallback was not run. The spike infers that it would not, because the unencoded `recordVideo` frame
+already misses the bar once scaled to 800 px (table below), so the loss comes from the scale-down.
 
 `recordVideo` produced `vp8, yuv420p, 1280x800, 25 fps`, 6.72 s, 533,081 bytes. A 3.0 s section
 showing `claude --help | head -30` output in the terminal was encoded at 12 fps, 1280×800:
@@ -429,6 +433,9 @@ first use. The capture preflight needs network access or a cached language file.
 - **Longer sessions**: two tiny turns, one model (`Sonnet 5`). Other tools, tips or plan prompts that
   appear later in a session were not seen.
 - **`ANTHROPIC_API_KEY`**: not tried, by the owner's decision.
+- **The `Page.startScreencast` fallback clip was not measured.** Q8's "it would not help" is an
+  inference. The leader chose the design's capture-only zoom for the README demo, so the fallback is
+  still built in part B and measured there.
 - **On-screen pixel comparison for the preview overlay**: `screencapture` needs Screen Recording
   permission, which only a person can grant.
 - **Full-length demo encodes**: only a 3 s clip. GIF size and legibility of a real 10–20 s loop with
