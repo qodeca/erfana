@@ -21,12 +21,14 @@ Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
+| 8d85e234 | #142 | bug-fix (bounded-bug-fix) | pi/deepseek-api/deepseek-flash | – |
 | 63ac9ab2 | #146 | code-review (full-cold-review) | claude/sonnet | gmail |
 
-Counts at dispatch (11:17): tasks 3/10 (xezar runs 2 at once, 1 queued), gate runs 0/2, metered 0/4, load 5.3/18.
+Counts at dispatch (11:35): tasks 2/10, gate runs 0/2, metered 1/4 (pi), load 14.4/18.
 
 ## File-ownership table
-- Reviews write no files. 63ac9ab2, 9f406ac3, 12b29be1 own nothing.
+- 8d85e234 owns src/renderer/src/components/Search/SearchBar.tsx, SearchBar.test.tsx, docs/keyboard-shortcuts.md (find-bar lines only)
+- 63ac9ab2 (review) owns nothing.
 
 ## Accounts (from `read_quota` at 2026-09-25T07:13:22Z)
 | Runner | Login | State | Resets (UTC) |
@@ -41,7 +43,8 @@ Counts at dispatch (11:17): tasks 3/10 (xezar runs 2 at once, 1 queued), gate ru
 | pi | – | no logins | – |
 
 ## Held or queued work
-- #142, #143, #144 – filed from the #141 inventory; ready, not yet triaged into order.
+- #143 – ready; held so it does not collide with #142 on tooltip code.
+- #144 – ready; held behind the #138 build: both edit docs/features/README.md, docs/keyboard-shortcuts.md, docs/settings.md.
 - #138 build – design approved 11:22; starts after #141 merges.
 - #139 build – design approved 11:29; waits for #138's fixture and capture script.
 
