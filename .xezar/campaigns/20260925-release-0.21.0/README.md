@@ -9,13 +9,13 @@ Updated: 2026-09-25 11:06 CEST
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
-- #148 – #142 fix by 8d85e234 (pi/deepseek-flash), in handoff. Next: review, not pi.
+- #148 ready, head 97d632ea – #142 fix by 8d85e234 (pi/deepseek-flash). All checks green incl. Windows. Review aa8e12b4 queued (full-cold-review, claude/opus, qodeca).
 - #146 ready, head 202ace7b – #145 fix. Round-1 finding (shebang) fixed by 2a80ec06, unit tests green per its PR reply. Re-check ecac3c11 running (scoped-recheck, claude/sonnet, gmail). Reviewer left ~6 junk test comments on the PR ("ping", "xxxx"); left in place for the owner.
 - #140 ready, head c442a15b – #139 spec. Re-check 12b29be1 APPROVE at c442a15b, all 11 findings fixed, no new defects. Labels design-approved + merge-queue; #139 labelled design-approved. Next in the merge line after #141: bring up to date, wait for green, squash-merge.
 Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 
 ## Serial merge line
-1. #140 – conflicts with develop in docs/README.md only (both design PRs added index lines). Needs a conflict-repair task (L3).
+1. #140 – conflict in docs/README.md; repair 19b6c719 queued (conflict-repair, codex/gpt-5.6-terra, default).
 
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
@@ -23,14 +23,17 @@ Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 | ecac3c11 | #146 | code-review (scoped-recheck) | claude/sonnet | gmail |
 | a410722c | #138 part A | feature-implementation | claude/opus | qodeca |
 | 320bec53 | #138 spike | spike | claude/opus | qodeca |
+| aa8e12b4 | #148 | code-review (full-cold-review) | claude/opus | qodeca |
+| 19b6c719 | #140 | address-review-findings (conflict-repair) | codex/gpt-5.6-terra | default |
 | 8d85e234 | #142 | bug-fix (bounded-bug-fix) | pi/deepseek-api/deepseek-flash | – |
 | 63ac9ab2 | #146 | code-review (full-cold-review) | claude/sonnet | gmail |
 
-Counts at dispatch (12:33): tasks 3/10 (xezar runs 2 at once), gate runs 0/2, metered 1/4 (pi), load 13.9/18.
+Counts at dispatch (12:38): tasks 6/10 (xezar runs 2 at once, 4 queued), gate runs 0/2, metered 1/4 (pi), load 4.5/18.
 
 ## File-ownership table
 - a410722c owns scripts/capture/demo-project/**, scripts/check-links*.mjs, package.json, vitest.main.ts, e2e/fixtures/launch-helpers.ts, e2e/fixtures/index.ts
 - 320bec53 owns docs/spikes/138-capture-spike.md
+- 19b6c719 owns docs/README.md (on the #140 branch)
 - 8d85e234 owns src/renderer/src/components/Search/SearchBar.tsx, SearchBar.test.tsx, docs/keyboard-shortcuts.md (find-bar lines only)
 
 ## Accounts (from `read_quota` at 2026-09-25T07:13:22Z)
