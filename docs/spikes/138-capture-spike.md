@@ -1,0 +1,399 @@
+<!--
+SPDX-License-Identifier: GPL-3.0-only
+SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+-->
+
+# Spike: what the #138 capture design assumes
+
+- **Issue:** [#138](https://github.com/qodeca/erfana/issues/138), plan step 1 of
+  [`docs/features/138-user-guide.md`](../features/138-user-guide.md#step-1--spike-confirm-what-the-design-assumes-no-committed-code).
+- **Design:** [docs/designs/138-user-guide/](../designs/138-user-guide/README.md).
+- **Date:** 2026-09-25. **Time box:** about 3 hours; used about 1.5.
+
+## The question and the answer
+
+**Question.** Do the eight assumptions in step 1 hold on this Mac? And the one the owner cares about
+most: can Claude Code, started in the Erfana terminal with `HOME` in a sandbox and `CLAUDE_CONFIG_DIR`
+unset, be logged in with the `westagilelabs` Claude subscription without the account email appearing
+on screen?
+
+**Answer: not answered for the login – it stops at a person.** A subscription token for the sandbox can
+only be made by `claude setup-token`, which opens a browser and waits for a person to sign in and paste
+a code (Q4). As the owner instructed, the spike stops there: no token was made, no credential was
+copied, and the two questions that need a real agent turn (Q5 Stop hook, Q7 `acceptEdits`) are
+**not answered**. Whether the email shows with a real subscription token is **unknown**.
+
+Everything that does not need a login was measured. The design holds, with **three changes it needs**:
+
+1. **The sandbox cannot live in `/tmp`.** Erfana refuses `/tmp` and `/private` as project folders
+   (Q3 setup). `/Users/Shared/erfana-capture/` worked.
+2. **The token variable is `CLAUDE_CODE_OAUTH_TOKEN`, and it must be exported by the sandbox
+   `.zshrc`.** Erfana strips it from the environment it gives the terminal. The design's option (b),
+   `ERFANA_CAPTURE_CLAUDE_TOKEN_FILE` read by `.zshrc`, works (Q4).
+3. **At 800 px, terminal text is about 6–6.7 px tall in every encode and in the raw frame**, under
+   the 7 px bar. The cause is the scale-down, not the recorder, so switching to the fallback recorder
+   will not fix it (Q8). #139's capture-only zoom or a wider display is needed.
+
+## Versions and machine
+
+| Thing | Version |
+|---|---|
+| macOS | 26.5.1 (build 25F80), arm64, primary display scale factor 2 |
+| Claude Code | 2.1.282 |
+| Electron | 39.8.10 |
+| Playwright (`@playwright/test`) | 1.59.1 |
+| ffmpeg (`ffmpeg-static`) | 6.0 |
+| Node.js (script) | 24.21.0 |
+| `tesseract.js` / `sharp` | 7.0.0 / 0.34.5, both installed through `@llamaindex/liteparse` 1.4.1 |
+| Erfana | 0.20.0, `npx electron-vite build` of `develop` at `2d059647` |
+
+## How to repeat it
+
+The throwaway scripts lived in `/Users/Shared/erfana-spike-138/` and were deleted afterwards. The
+snippets worth keeping are quoted in [Snippets](#snippets-worth-keeping). The sandbox was:
+
+- `home/` – passed as `HOME` to Electron, with only a `.zshrc` (below) and `Projects/demo/`
+  (`index.html` with a coloured page, `README.md`);
+- `ud/` – passed with `--user-data-dir`;
+- Electron started with `electron.launch({ args: [repoRoot, '--force-device-scale-factor=2',
+  '--force-color-profile=srgb', '--force-prefers-reduced-motion', '--user-data-dir=…'], env,
+  recordVideo: { dir, size: { width: 1280, height: 800 } } })`, with every `CLAUDE*` variable removed
+  from `env`, then `setSize` / `setContentSize(1280, 800)`;
+- the project opened with `window.api.file.openProjectByPath`, the terminal opened from the activity
+  bar, and the PTY stream kept in a page variable through `window.api.terminal.onData`.
+
+Every Electron and `claude` process was stopped by the PID the script started. `pgrep` showed none
+left at the end.
+
+## Findings, question by question
+
+### Q1 – `--force-device-scale-factor=2` gives 2560×1600 for a 1280×800 content area
+
+**Yes.**
+
+```text
+window {"content":[1280,800],"size":[1280,832],"sf":2,"mediaId":"window:3708:0"}
+page {"dpr":2,"iw":1280,"ih":800}
+Q1 welcome png {"w":2560,"h":1600} bytes 1821781
+```
+
+The outer window is 1280×832: macOS adds a 32 px title bar, which page screenshots do not include.
+
+### Q2 – `page.screenshot` shows the WebGL terminal's text
+
+**Yes.** After `echo HELLO LEGIBLE CAPS $((4000+96))` the 2× page screenshot shows
+`HELLO LEGIBLE CAPS 4096` and the prompt `demo ~/Projects/demo $` in the terminal (viewed). OCR of the
+terminal column in a 2× screenshot read the known Claude Code help lines back (Q8 table, last row).
+
+The "shell ready" condition in the design works: `waitForFunction` on the ANSI-stripped PTY stream
+ending with the neutral prompt fired about 0.1 s after the project opened.
+
+**New constraint:** `page.waitForFunction` with a **string** predicate fails inside Erfana:
+
+```text
+page.waitForFunction: EvalError: Evaluating a string as JavaScript violates the following Content
+Security Policy directive because 'unsafe-eval' is not an allowed source of script: script-src 'self'".
+```
+
+Condition waits must pass a function and an argument: `page.waitForFunction(({ needle }) => …, { needle })`.
+
+A second trap for the condition: the typed command echoes back character by character, so the needle
+has to be something only the output contains. `$((4000+96))` → `4096` does that.
+
+### Q3 – `capturePage()` of the preview's `WebContentsView` plus an ffmpeg `overlay` matches the on-screen window
+
+**Yes for the geometry; not compared with the real screen.**
+
+- The preview view's bounds were `{"x":442,"y":82,"width":502,"height":718}`, and `capturePage()`
+  returned **1004×1436**, exactly 2× the bounds, so it overlays with no scaling at `x=884:y=164`.
+- The page screenshot alone shows the preview area as a flat fill, with none of the page's content.
+  The composite (`[0][1]overlay=x=884:y=164`) shows the page's heading and striped bar in place,
+  aligned with the toolbar above and the terminal beside it (viewed). The PSNR of the preview area,
+  screenshot against composite, was 14.25 dB: they really differ, so the overlay is needed.
+- **The on-screen comparison was not possible.** `screencapture -x -o -l 3708 …` printed
+  `could not create image from window`. The likely cause is that the terminal running the script has
+  no Screen Recording permission. That is an inference: granting the permission needs a person.
+- `recordVideo` does not see the preview's content either (contact sheet of the recording: the
+  preview area is a flat fill), as the design already says.
+
+**New constraint (found while setting up):** Erfana will not open a project under `/tmp`:
+
+```text
+page.evaluate: Error: Error invoking remote method 'file:openProjectByPath': Error: Security
+validation failed: Cannot open system or sensitive directories as projects
+```
+
+`SYSTEM_DIRECTORIES` in `src/main/utils/pathSecurity.ts` lists `/tmp` and `/private`. The design's
+`/tmp/erfana-capture/` has to move. The e2e suite avoids this by using `.e2e-temp/` inside the repo,
+but a sandbox inside the repo is wrong for Claude Code (Q4). `/Users/Shared/erfana-spike-138/`
+worked, and it has no user name in its path.
+
+### Q4 – Agent login in the sandbox
+
+**Stopped at a browser sign-in.** Sub-answers:
+
+**Where the `westagilelabs` login lives.** The folder `~/.claude.westagilelabs.priv` has no credentials
+file. The login is in the macOS login keychain, as the generic password
+`Claude Code-credentials-939ae271`. The suffix is the first 8 hex characters of the SHA-256 of the
+config folder path, observed as `printf '%s' ~/.claude.westagilelabs.priv | shasum -a 256 | cut -c1-8`
+→ `939ae271`. Only the entry's metadata was read, never its secret. That entry is an ordinary refresh
+login tied to that config folder. Using it for the sandbox would mean copying a credential, which this
+spike does not do.
+
+**Making a long-lived subscription token needs a person.**
+
+```text
+$ HOME=<sandbox> claude setup-token          # CLAUDE_CONFIG_DIR unset, BROWSER=/usr/bin/true
+Welcome to Claude Code v2.1.282
+This will guide you through long-lived (1-year) auth token setup for your Claude account.
+Claude subscription required.
+· Opening browser to sign in…
+Browser didn't open? Use the url below to sign in (c to copy)
+<one-time authorize URL, not copied here>
+Paste code here if prompted >
+```
+
+This is the stop point the owner set. **To go on, a person runs `claude setup-token` once, signs in as
+`westagilelabs` in the browser, and saves the printed token to a file only they can read (`chmod 600`).
+The path of that file goes in `ERFANA_CAPTURE_CLAUDE_TOKEN_FILE`.** The token lasts one year, per the
+screen above.
+
+**Which variable Claude Code honours.** `CLAUDE_CODE_OAUTH_TOKEN`. With `HOME` in the sandbox and
+`CLAUDE_CONFIG_DIR` unset:
+
+```text
+$ claude auth status --json | jq -c '{loggedIn,authMethod,apiProvider}'
+{"loggedIn":false,"authMethod":"none","apiProvider":"firstParty"}          # no token
+{"loggedIn":true,"authMethod":"oauth_token","apiProvider":"firstParty"}    # CLAUDE_CODE_OAUTH_TOKEN=<dummy>
+```
+
+`auth status` only reads the variable and does not validate the token; the dummy was not a real token.
+
+**How it reaches Claude Code inside Erfana.** Three launches of Erfana, each running this in its
+terminal: `echo TOK=…/CFG=…` (value masked) and then `claude auth status --json`. Electron was given
+`CLAUDE_CONFIG_DIR=<sandbox>/should-not-be-used` every time:
+
+| Electron environment | In the terminal | `claude auth status` |
+|---|---|---|
+| nothing extra | `TOK=unset CFG=unset` | `{"loggedIn":false,"authMethod":"none"}` |
+| `CLAUDE_CODE_OAUTH_TOKEN=<dummy>` | `TOK=unset CFG=unset` | `{"loggedIn":false,"authMethod":"none"}` |
+| `ERFANA_CAPTURE_CLAUDE_TOKEN_FILE=<file>` | `TOK=set CFG=unset` | `{"loggedIn":true,"authMethod":"oauth_token"}` |
+
+This shows three things:
+
+- Erfana strips `CLAUDE_CODE_OAUTH_TOKEN`, as `TerminalService.cleanEnvironment` does with every
+  `CLAUDE_CODE_*` name.
+- The `.zshrc` export works.
+- The `.zshrc` `unset CLAUDE_CONFIG_DIR` works. Erfana does **not** strip that variable itself.
+
+The first row also shows that the operator's own keychain login (`Claude Code-credentials`) is not
+picked up with `HOME` in the sandbox.
+
+The `.zshrc` used:
+
+```sh
+unset CLAUDE_CONFIG_DIR
+[ -n "$ERFANA_CAPTURE_CLAUDE_TOKEN_FILE" ] && export CLAUDE_CODE_OAUTH_TOKEN="$(cat "$ERFANA_CAPTURE_CLAUDE_TOKEN_FILE")"
+PROMPT='demo %~ $ '
+PS1="$PROMPT"
+```
+
+**First-run screens in a fresh `HOME`** (Claude Code run under `script`, with a dummy token):
+
+1. **Theme picker**: "Let's get started. Choose the text style that looks best with your terminal".
+2. **Folder trust**: "Accessing workspace: <full path> … Is this a project you created or one you
+   trust?" It prints the **full working-folder path**.
+3. No login-method screen appeared while the token variable was set.
+
+Both screens were skipped by pre-seeding the sandbox `~/.claude.json`:
+
+```json
+{ "theme": "dark", "hasCompletedOnboarding": true,
+  "projects": { "<project path>": { "hasTrustDialogAccepted": true },
+                "<realpath of the project path>": { "hasTrustDialogAccepted": true } } }
+```
+
+Both path spellings were seeded, so which one Claude Code keys on was not isolated.
+
+**What the start banner shows.** With the dummy token: `Sonnet 5 · Claude API`, then the working
+folder's real path, then `⚠ Remote managed settings failed to load (authentication rejected (401)) ·
+no remote policy applied`. The 401 is caused by the dummy token. **What it shows with a real
+subscription token – including whether it shows the account email or organisation – is unknown.**
+Neither `/status` nor any login type other than "token variable present" was observed.
+
+**Found by accident: the sandbox must not sit inside a repository.** With the sandbox under
+`.local/xezar/scratch/` in the Erfana checkout, the trust screen said "This folder pre-approves 22
+tool permissions in .claude/settings.local.json" and listed the repository's own `mcp__…`
+permissions. Claude Code walks up from the working folder and loaded the checkout's
+`.claude/settings.local.json`. From `/tmp` and `/Users/Shared` the warning did not appear.
+
+`ANTHROPIC_API_KEY` was not tried: the owner chose a subscription login (2026-09-25).
+
+### Q5 – A `Stop` hook in the sandbox `~/.claude/settings.json` fires after each agent turn
+
+**Not answered.** It needs a real agent turn, which needs the login from Q4.
+
+### Q6 – Size of a quantised 2× full-window PNG of the welcome screen
+
+**Within budget: 247,085 bytes (241 KB) against the 400 KB limit** for the design's setting.
+
+| File | Size (bytes) | Pixels |
+|---|---|---|
+| raw 2× page screenshot | 1,821,781 | 2560×1600 |
+| scaled to 1600 wide, not quantised | 1,141,525 | 1600×1000 |
+| **1600 wide, `palettegen` 256 + `paletteuse=dither=none`** (the design's setting) | **247,085** | 1600×1000 |
+| 1600 wide, 128 colours, no dither | 194,275 | 1600×1000 |
+| 1600 wide, 256 colours, `sierra2_4a` dither | 295,201 | 1600×1000 |
+| 1280 wide (1× fallback), 256 colours, no dither | 171,637 | 1280×800 |
+| for comparison: 2× window with the HTML preview, quantised | 97,539 | 1600×1000 |
+| for comparison: 2× window with terminal output, quantised | 126,734 | 1600×1000 |
+
+The quantised welcome screen was viewed: slight banding in the photo's gradient, text crisp. This
+was the "No project open" welcome state. A Recent projects list adds a small panel.
+
+### Q7 – `acceptEdits` is honoured, and nothing from the operator's configuration loads
+
+**Edit approval: not answered** – it needs a real agent turn, which needs the login from Q4.
+
+**Isolation: partly observed**:
+
+- The operator's keychain login is not picked up (Q4 table, row 1).
+- `CLAUDE_CONFIG_DIR` set on Electron is cleared by the `.zshrc` (Q4 table).
+- Erfana wrote its own `~/.erfana` into the sandbox `HOME`, not the operator's.
+- A sandbox inside a repository **does** load that repository's `.claude/settings.local.json` (Q4).
+
+Whether any user-level hook, status line or plugin would load during a real session was not observed.
+
+### Q8 – A 3-second `recordVideo` clip passes the legibility check at 800 px
+
+**No, and the fallback recorder would not change it.**
+
+`recordVideo` produced `vp8, yuv420p, 1280x800, 25 fps`, 6.72 s, 533,081 bytes. A 3.0 s section
+showing `claude --help | head -30` output in the terminal was encoded at 12 fps, 1280×800:
+
+| File | Encoder settings | Size (bytes) |
+|---|---|---|
+| `clip.webp` | `libwebp_anim -lossless 0 -q:v 75 -loop 0` | 219,982 (24 frames) |
+| `clip.gif` | `palettegen` / `paletteuse`, `-loop 0` | 1,589,880 |
+| `clip.mp4` | `libx264 -pix_fmt yuv420p -crf 23 -movflags +faststart` | 141,928 |
+
+The check took one frame near the end of each file, scaled it to 800 px wide (lanczos) and cropped the
+terminal column. It then ran OCR on the crop (`tesseract.js` `eng`, upscaled 3× for OCR only) against
+three lines the terminal really showed, and took the height of the words `Additional` and `Render`
+(capitals and ascenders, no descenders) from the OCR word boxes, divided back by 3:
+
+| Frame | Known lines read | Capital height (px) |
+|---|---|---|
+| WebP → 800 px | 2 of 3 | 6.7, 6.0 |
+| GIF → 800 px | 2 of 3 | 6.7, 6.0 |
+| MP4 → 800 px | 2 of 3 | 6.7, 6.0 |
+| raw `recordVideo` frame → 800 px | 2 of 3 | 6.7, 6.0 |
+| raw `recordVideo` frame at 1280 px | 3 of 3 | 9.3, 9.3 |
+| 2× page screenshot (2560 px) | 2 of 3 | 18.3, 18.3 |
+
+What this means:
+
+- **Every file misses the 7 px bar at 800 px**, and so does the unencoded recording. The loss comes
+  from scaling 1280 → 800, not from `recordVideo`'s JPEG and VP8 steps or from our encoders.
+- At 1280 px the raw `recordVideo` frame read all three lines, so `recordVideo` is sharp enough and is
+  **the chosen recorder**. The design's fallback trigger ("legible in the raw frame, not after
+  `recordVideo`") does not fire.
+- The missed line in every row is `--append-system-prompt <prompt>`. The OCR did not read it even from
+  the 2× screenshot, so that miss belongs to the OCR, not to blur. The check's known line should be
+  plain words.
+- The 7 px bar needs the text about 17 % larger at 800 px. That means #139's capture-only zoom (about
+  1.2×) or a display width near 940 px. This is arithmetic from the table, not a measurement.
+- The GIF is 1.59 MB for 3 s. At that rate a 15 s loop would be about 8 MB, over #139's 5 MiB cap. That
+  is an extrapolation: the real demo has more still frames.
+
+**New constraint: the bundled ffmpeg 6.0 cannot read frames back out of an animated WebP.** Extracting
+a frame from `clip.webp` printed `[webp @ …] image data not found`. `sharp` (already installed)
+decoded it: `sharp(file, { animated: true }).metadata()` → `pages 24 w 1280 pageH 800 loop 0`, then
+`sharp(file, { page: n })`. So the legibility and privacy checks on `demo.webp` need `sharp` (or
+another decoder), not ffmpeg.
+
+**Also observed:** `tesseract.js` downloaded `eng.traineddata` (5,199,098 bytes) from the network on
+first use. The capture preflight needs network access or a cached language file.
+
+## What was not tested, and what would change the answer
+
+- **Anything with a real login**: the banner with a real subscription token, `/status`, whether the
+  email or organisation name appears, the Stop hook (Q5), and `acceptEdits` (Q7). Each of these could
+  still stop the capture. The stop rule stays in force until they are seen.
+- **`ANTHROPIC_API_KEY`**: not tried, by the owner's decision.
+- **On-screen pixel comparison for the preview overlay**: `screencapture` needs Screen Recording
+  permission, which only a person can grant.
+- **Full-length demo encodes**: only a 3 s clip. GIF size and legibility of a real 10–20 s loop with
+  an agent's output were not measured.
+- **Other machines**: one Mac, scale factor 2, one run of each measurement.
+- **A Recent projects list on the welcome screen** (Q6 used the empty state).
+- **Which `hasTrustDialogAccepted` key** (path or realpath) Claude Code reads.
+
+## What it means for the decision
+
+The login is the gate. Options:
+
+| Option | What it takes | Cost | Risk |
+|---|---|---|---|
+| **A. A person makes a `westagilelabs` setup-token once** (recommended) | Someone signs in once in the browser via `claude setup-token` and stores the token in a `chmod 600` file outside the repo; the capture reads it through `ERFANA_CAPTURE_CLAUDE_TOKEN_FILE` | A few minutes of a person's time, once a year | The banner and `/status` with that token are still unseen; the stop rule applies at the next run |
+| B. `ANTHROPIC_API_KEY` | An API key in the operator's environment (Erfana passes `ANTHROPIC_*` through) | Pay-per-use billing; the owner chose not to | Same unseen-banner risk |
+| C. Ship the guide without agent images | Drop rows 1, 6–9, 14 and #139's demo for now | Weaker guide and README | None to privacy |
+
+**Recommendation: A.** It is the path the owner asked for, and everything around it was confirmed: the
+variable, the `.zshrc` export, the isolation from the operator's login, and the first-run
+pre-seeding. After the token exists, rerun only the unanswered part of this spike (banner, `/status`,
+Q5, Q7) before step 5 is built.
+
+Design changes this spike asks for, independent of the login:
+
+1. Sandbox location: not `/tmp` (Erfana refuses it) and not inside a repository (Claude Code loads its
+   `.claude/settings.local.json`). `/Users/Shared/erfana-capture/` works.
+2. Token: `CLAUDE_CODE_OAUTH_TOKEN`, exported by the sandbox `.zshrc` from
+   `ERFANA_CAPTURE_CLAUDE_TOKEN_FILE`. Exit 3's message names that file variable.
+3. Pre-seed the sandbox `~/.claude.json` with `theme`, `hasCompletedOnboarding` and
+   `projects[<path>].hasTrustDialogAccepted`. Otherwise the theme picker and the trust screen (which
+   prints the full path) appear.
+4. Condition waits pass functions, never strings (Erfana's CSP).
+5. Legibility: `recordVideo` stays; #139 needs the capture-only zoom or a wider display. The OCR known
+   line should be plain words.
+6. Decode WebP frames with `sharp` for the legibility and privacy checks.
+
+These change the design's § Capture pipeline and the spec's § 3.3. They are part of #138, not an
+architecture decision.
+
+## Snippets worth keeping
+
+Keep the PTY stream and wait on it with a function predicate (a string predicate trips the CSP):
+
+```js
+await page.evaluate(() => {
+  window.__pty = ''
+  window.api.terminal.onData(({ data }) => { window.__pty += data })
+})
+const waitPty = (needle) => page.waitForFunction(({ needle }) => {
+  const s = window.__pty.replace(/\x1b\[[0-9;?]*[ -\/]*[@-~]/g, '').replace(/\x1b\][^\x07]*\x07/g, '')
+  return s.includes(needle)
+}, { needle }, { timeout: 30000 })
+await page.keyboard.type('clear; echo HELLO LEGIBLE CAPS $((4000+96))\n')
+await waitPty('HELLO LEGIBLE CAPS 4096') // only the output contains 4096
+```
+
+Capture the preview's native view (2× of its bounds):
+
+```js
+const b64 = await app.evaluate(async ({ BrowserWindow }) => {
+  for (const win of BrowserWindow.getAllWindows()) for (const c of win.contentView.children) {
+    const wc = c.webContents
+    if (wc && wc.getURL().startsWith('erfana-preview://')) return (await wc.capturePage()).toPNG().toString('base64')
+  }
+  return null
+})
+// ffmpeg -i page.png -i preview.png -filter_complex "[0][1]overlay=x=<2*bounds.x>:y=<2*bounds.y>" out.png
+```
+
+Read a frame out of an animated WebP (ffmpeg 6.0 cannot):
+
+```js
+const { pages } = await sharp('demo.webp', { animated: true }).metadata()
+await sharp('demo.webp', { page: pages - 1 }).resize(800).png().toFile('last-800.png')
+```
