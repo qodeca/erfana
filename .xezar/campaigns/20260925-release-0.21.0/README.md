@@ -1,6 +1,6 @@
 # Campaign release-0.21.0
 
-Updated: 2026-09-25 09:13 CEST
+Updated: 2026-09-25 10:14 CEST
 
 ## State
 - Base: `develop` at `9fe8a3f0`. Merges so far: 0. Checkpoints met: none.
@@ -35,12 +35,13 @@ None running.
 | pi | – | no logins | – |
 
 ## Held or queued work
+- #142, #143, #144 – filed from the #141 inventory; ready, not yet triaged into order.
 - #138 build – waits for its design verdict.
 - #139 build – waits for its design verdict and #138's fixture and capture script.
 
 ## Owner items
 - Label issues with `release-0.21.0` to put them in scope.
-- Load: 11 orphaned circuit-electron MCP servers spin at ~85% CPU each (PIDs 1508 2414 3071 3355 4158 10880 12589 16262 61860 88589 99970 at 00:54). Leader may not kill PIDs it did not start. Until they stop, load stays over 18 and nothing new is dispatched.
+- Load: 17 orphaned circuit-electron servers block all dispatch. Owner said stop them; the leader's kill was refused by the auto-mode permission check. Owner runs it.
 - PR #140 open decisions, needed before #139 is built, not before its review: (1) go to apply repo description, topics, social preview; (2) extend TRADEMARKS.md to the new banner, wordmark, social image; (3) CI link check as a follow-up issue; (4) light-theme banner vs dark-only rule – owner only if the reviewer disagrees; (5) demo format WebP (after a spike) vs MP4.
 
 ## Rules that bit
