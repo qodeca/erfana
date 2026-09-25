@@ -20,8 +20,10 @@ Empty.
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
+| 16a444e0 | #159 design recheck at 9203f493 | design-review | codex/gpt-6-sol | qodeca-2 |
+| 8a2b2c0f | #159 QA (live github.com checks) | qa (browser-qa) | claude/sonnet | gmail |
 
-Counts at dispatch (23:28): tasks 2/10, gate runs 0/2, metered 1/4, load 2.9/18.
+Counts at dispatch (23:58): tasks 2/10, gate runs 0/2, metered 1/4, load 1.5/18.
 
 ## File-ownership table
 - Reviews own nothing.
