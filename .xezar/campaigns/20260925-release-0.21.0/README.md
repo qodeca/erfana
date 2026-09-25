@@ -20,13 +20,14 @@ Empty.
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| 837cb50a | #155 security review | security-review | codex/gpt-6-astra | default |
+| 4458b282 | #155 fix security findings S-1, S-2 | address-review-findings (author) | claude/opus | gmail |
 | 52bf81ce | #154 code review | code-review | claude/sonnet | westagilelabs |
 | 72f679cf | #154 image and privacy review | design-review | codex/gpt-6-sol | qodeca-2 |
 
 Counts at dispatch (18:17): tasks 3/10, gate runs 0/2, metered 0/4, load 2.8/18.
 
 ## File-ownership table
+- 4458b282 owns scripts/stop-orphan-mcp.mjs, scripts/stop-orphan-mcp*.test.mjs, scripts/xezar-leader-settings.json
 - Reviews own nothing.
 
 ## Accounts (from `read_quota` at 2026-09-25T07:13:22Z)
