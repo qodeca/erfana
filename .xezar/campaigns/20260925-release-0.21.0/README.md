@@ -20,14 +20,12 @@ Empty.
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| 4458b282 | #155 fix security findings S-1, S-2 | address-review-findings (author) | claude/opus | gmail |
-| 52bf81ce | #154 code review | code-review | claude/sonnet | westagilelabs |
-| 72f679cf | #154 image and privacy review | design-review | codex/gpt-6-sol | qodeca-2 |
+| 2a1e4316 | #154 fix code + image findings (round 2) | address-review-findings (author) | claude/opus | qodeca |
 
 Counts at dispatch (18:17): tasks 3/10, gate runs 0/2, metered 0/4, load 2.8/18.
 
 ## File-ownership table
-- 4458b282 owns scripts/stop-orphan-mcp.mjs, scripts/stop-orphan-mcp*.test.mjs, scripts/xezar-leader-settings.json
+- 2a1e4316 owns scripts/capture/**, docs/user-guide/**/images, docs/assets/readme/, docs/designs/138-user-guide/README.md (screenshot rows)
 - Reviews own nothing.
 
 ## Accounts (from `read_quota` at 2026-09-25T07:13:22Z)
@@ -44,7 +42,7 @@ Counts at dispatch (18:17): tasks 3/10, gate runs 0/2, metered 0/4, load 2.8/18.
 
 ## Held or queued work
 - #144 – ready; held behind the #138 build: both edit docs/features/README.md, docs/keyboard-shortcuts.md, docs/settings.md.
-- #138 build – split: part A (plan steps 2-4) merged (#150); step 1 spike done (#149); part B (steps 5, 5b, 6) is PR #154, in review; steps 7-8 follow.
+- #138 build – split: part A (plan steps 2-4) merged (#150); step 1 spike done (#149); part B (steps 5, 5b, 6) is PR #154: code review REQUEST CHANGES (1 major, run.mjs readLogin can empty the privacy deny-list); design review FAIL (7 privacy/state blockers B-1..B-10, 5 non-blocking); both sent to author 2a1e4316 (round 2); steps 7-8 follow.
 - #139 build – design merged; waits for #138's capture script (part B).
 
 ## Owner items
