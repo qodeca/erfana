@@ -20,7 +20,6 @@ Empty.
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| de78759b | #158 scoped recheck at ee20ff5b | code-review (scoped-recheck) | claude/sonnet | westagilelabs |
 
 Counts at dispatch (22:07): tasks 1/10, gate runs 0/2, metered 0/4, load 10.5/18.
 
