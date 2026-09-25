@@ -9,7 +9,7 @@ Updated: 2026-09-25 11:06 CEST
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
-- #146 ready, head 1f4f5c33 – #145 fix. Review 63ac9ab2 REQUEST CHANGES: 1 Major (shebang + CRLF breaks the Windows test load). Sent back to author 2a80ec06 (repair round 2 of 2 before owner/park). Reviewer left ~6 junk test comments on the PR ("ping", "xxxx"); left in place for the owner.
+- #146 ready, head 202ace7b – #145 fix. Round-1 finding (shebang) fixed by 2a80ec06, unit tests green per its PR reply. Next: scoped-recheck, not claude/opus, not login qodeca (queued on load). Reviewer left ~6 junk test comments on the PR ("ping", "xxxx"); left in place for the owner.
 - #140 ready, head c442a15b – #139 spec. Re-check 12b29be1 APPROVE at c442a15b, all 11 findings fixed, no new defects. Labels design-approved + merge-queue; #139 labelled design-approved. Next in the merge line after #141: bring up to date, wait for green, squash-merge.
 Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 
@@ -19,7 +19,6 @@ Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| 2a80ec06 | #146 | review fix (continue) | claude/opus | qodeca |
 | 8d85e234 | #142 | bug-fix (bounded-bug-fix) | pi/deepseek-api/deepseek-flash | – |
 | 63ac9ab2 | #146 | code-review (full-cold-review) | claude/sonnet | gmail |
 
@@ -27,7 +26,6 @@ Counts at dispatch (11:35): tasks 2/10, gate runs 0/2, metered 1/4 (pi), load 14
 
 ## File-ownership table
 - 8d85e234 owns src/renderer/src/components/Search/SearchBar.tsx, SearchBar.test.tsx, docs/keyboard-shortcuts.md (find-bar lines only)
-- 2a80ec06 owns scripts/run-mcp.js, scripts/stop-orphan-mcp.mjs, their tests
 
 ## Accounts (from `read_quota` at 2026-09-25T07:13:22Z)
 | Runner | Login | State | Resets (UTC) |
