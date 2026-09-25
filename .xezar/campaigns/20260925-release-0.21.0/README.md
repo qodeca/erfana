@@ -1,6 +1,6 @@
 # Campaign release-0.21.0
 
-Updated: 2026-09-25 10:42 CEST
+Updated: 2026-09-25 10:52 CEST
 
 ## State
 - Base: `develop` at `9fe8a3f0`. Merges so far: 0. Checkpoints met: none.
@@ -10,7 +10,7 @@ Updated: 2026-09-25 10:42 CEST
 
 ## Open pull requests
 - #141 draft, head b7864e20 – #138 design spec. Verdict REQUEST CHANGES (1 Major: demo format vs #140; 1 Minor). Fix queued on load ceiling.
-- #140 draft, head 68d292ae – #139 design spec. Verdict REQUEST CHANGES (4 Major, 7 Minor/Nit). Fix queued on load ceiling; leader reconciliation is in the timeline at 01:43.
+- #140 draft, head c442a15b – #139 spec, round-1 fixes pushed. Next: short re-review on claude/sonnet, not login gmail (queued on load).
 Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 
 ## Serial merge line
@@ -20,14 +20,12 @@ Empty.
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
 | 2a80ec06 | #145 | feature-implementation | claude/opus | qodeca |
-| 9ea693bf | #140 (#139) | address-review-findings | claude/opus | gmail |
 | 731c0a75 | #141 (#138) | address-review-findings | claude/opus | qodeca |
 
 Counts at dispatch: tasks 3/10 (xezar runs 2 at once), metered 0/4, load 15.8/18.
 
 ## File-ownership table
 - 2a80ec06 owns scripts/run-mcp.js, scripts/stop-orphan-mcp.mjs, .mcp.json, their tests
-- 9ea693bf owns docs/designs/139-readme-redesign/**
 - 731c0a75 owns docs/designs/138-user-guide/**, docs/features/138-user-guide.md
 
 ## Accounts (from `read_quota` at 2026-09-25T07:13:22Z)
