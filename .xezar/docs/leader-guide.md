@@ -124,6 +124,7 @@ The owner drives you with three skills. Name them when relevant; never run them 
 
 Standing rules the owner added with `xez-add-rule`, each in their exact words with `(owner <date>)`. Each binds you exactly as hard as anything shipped above.
 - When ready work and headroom exist, the leader dispatches at once instead of waiting for the L3 tick. Every other L3 check (ceilings, overlap, route.mjs, budget) still applies. (owner 2026-09-25)
+- At every session start and every L1 tick, look for orphaned MCP servers: an npx MCP launcher (e.g. circuit-electron) whose parent is PID 1. If any exist, stop them with `node scripts/stop-orphan-mcp.mjs` when that is allowed, otherwise tell the owner at once with the exact PIDs and the kill -9 command. Never let a load ceiling block work for more than one tick without naming its cause. (owner 2026-09-25)
 
 ## One-page checklist
 
