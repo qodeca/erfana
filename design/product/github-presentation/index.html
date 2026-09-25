@@ -57,7 +57,8 @@
   .gp-social .gp-brand img { width: 56px; height: 56px; }
   .gp-social .gp-wordmark { font-size: 38px; }
   .gp-pitch { margin: 0; font-size: var(--text-lg); font-weight: 400; line-height: 1.4;
-              color: var(--gp-fg); max-width: 26ch; }
+              color: var(--gp-fg); max-width: 22ch; }
+  .gp-nowrap { white-space: nowrap; }
 
   /* The abstract window: tree, editor with one selected line, preview with a two-node flow,
      and a terminal strip that is dark in both variants because the app's terminal is. */
@@ -180,7 +181,7 @@ only – it is not theme-aware. Uploaded by hand in Settings after the README me
         <img src="../../../resources/icon.png" alt="">
         <p class="gp-wordmark">Erfana</p>
       </div>
-      <p class="gp-pitch">The open-source, agent-native Markdown workspace.</p>
+      <p class="gp-pitch">The open-source, <span class="gp-nowrap">agent-native</span> Markdown workspace.</p>
     </div>
     <div class="gp-window" aria-hidden="true">
       <div class="gp-panes">
