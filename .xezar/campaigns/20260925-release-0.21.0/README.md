@@ -9,7 +9,7 @@ Updated: 2026-09-25 11:06 CEST
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
-- #149 draft, head e57b8db6 – #138 spike note (320bec53). Login part stopped (needs a browser sign-in); owner makes the token. Q8: terminal text below the 7 px bar at 800 px; leader decision: capture-only zoom (#139 option).
+- #149 draft – #138 spike note. Owner made the token (.local/capture/claude-token, checked by size and prefix only). Continued 320bec53 at 15:25 for Q4/Q5/Q7. Q8 leader decision: capture-only zoom.
 - #140 ready, head c442a15b – #139 spec. Re-check 12b29be1 APPROVE at c442a15b, all 11 findings fixed, no new defects. Labels design-approved + merge-queue; #139 labelled design-approved. Next in the merge line after #141: bring up to date, wait for green, squash-merge.
 Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 
@@ -19,6 +19,7 @@ Empty.
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
+| 320bec53 (login part) | #138 spike | spike (continue) | claude/opus | qodeca |
 | 455166db | #151 | feature-implementation | claude/opus | qodeca |
 | 4458b282 | allow rule | feature-implementation | claude/opus | gmail |
 | 322010ff | #143 | feature-implementation (ui-implementation) | claude/opus | qodeca |
@@ -51,7 +52,6 @@ Counts at dispatch (15:03): tasks 4/10 (xezar runs 2 at once, 2 queued), gate ru
 ## Owner items
 - Label issues with `release-0.21.0` to put them in scope.
 - Leader runs `node scripts/stop-orphan-mcp.mjs` at each L1 tick (worked at 12:39). Allow-rule PR running as 4458b282 (owner-approved).
-- Make the Claude Code token for the #138 capture (steps given 13:10).
 - Decide whether to hide or delete the reviewer's junk test comments on PR #146.
 - After #145 merges: leader adds the allow rule for `node scripts/stop-orphan-mcp.mjs` (approved).
 - PR #140 open decisions, needed before #139 is built, not before its review: (1) go to apply repo description, topics, social preview; (2) extend TRADEMARKS.md to the new banner, wordmark, social image; (3) CI link check as a follow-up issue; (4) light-theme banner vs dark-only rule – owner only if the reviewer disagrees; (5) demo format WebP (after a spike) vs MP4.
