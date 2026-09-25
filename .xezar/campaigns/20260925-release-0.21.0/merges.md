@@ -1,3 +1,5 @@
 # Merges
 
 One line per day: `#PR -> sha`.
+- 2026-09-25: #141 -> 42f3d36d
+- 2026-09-25: #146 -> d09d164d

@@ -116,6 +116,7 @@ Not to be confused with **[`design/`](../design/index.html)** at the repo root, 
 - [Context-meter freeze after compaction](./designs/47-context-meter-freeze.md) - Bounded fallback read + per-file-version result cache (issue #47)
 - [Clipboard service](./designs/issue-203-clipboard-service.md) - Central text-clipboard service design (issue #203)
 - [`http://` and IPv6 in the preview](./designs/108-http-and-ipv6-in-the-preview.md) - What Chromium does with `http://` and IPv6 hosts in the HTML preview (issue #108)
+- [Illustrated user guide](./designs/138-user-guide/README.md) - Guide outline, screenshot list, demo project and capture script (issue #138, proposed); [feature inventory](./designs/138-user-guide/feature-inventory.md), [research](./designs/138-user-guide/research.md), [spec and plan](./features/138-user-guide.md)
 - [README and GitHub presentation](./designs/139-readme-redesign/README.md) - Banner, demo loop, page structure and fact audit for the README redesign (issue #139, draft)
 
 ### Future Features (Planned)
