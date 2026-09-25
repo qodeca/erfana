@@ -9,25 +9,24 @@ Updated: 2026-09-25 11:06 CEST
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
-- #150 ready, head 4e1e992c – #138 part A (a410722c). Windows checks red: shebang in scripts/check-links.mjs (same as #146). Review eb3b8cf0 running (full-cold-review, claude/sonnet, westagilelabs).
+- #150 ready, head 4e1e992c – #138 part A. Review eb3b8cf0 REQUEST CHANGES: 1 Major (shebang in scripts/check-links.mjs, Windows load), 1 Nit (coverage number). Back to author a410722c (repair round 1).
 - #149 draft, head e57b8db6 – #138 spike note (320bec53). Login part stopped (needs a browser sign-in); owner makes the token. Q8: terminal text below the 7 px bar at 800 px; leader decision: capture-only zoom (#139 option).
-- #148 ready, head 02d9c56c – #142 fix, round-1 fixes pushed, all checks green. Re-check 77285cdf running (scoped-recheck, claude/sonnet, gmail).
+- #148 ready, head 02d9c56c – #142 fix. Re-check 77285cdf APPROVE, no new defects, all checks green. Merge line: being brought up to date.
 - #140 ready, head c442a15b – #139 spec. Re-check 12b29be1 APPROVE at c442a15b, all 11 findings fixed, no new defects. Labels design-approved + merge-queue; #139 labelled design-approved. Next in the merge line after #141: bring up to date, wait for green, squash-merge.
 Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 
 ## Serial merge line
-Empty.
+1. #148 (bringing up to date)
 
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| 77285cdf | #148 | code-review (scoped-recheck) | claude/sonnet | gmail |
-| eb3b8cf0 | #150 | code-review (full-cold-review) | claude/sonnet | westagilelabs |
+| a410722c (fix round 1) | #150 | feature-implementation (continue) | claude/opus | qodeca |
 
 Counts at dispatch (14:36): tasks 2/10, gate runs 0/2, metered 0/4, load 3.6/18.
 
 ## File-ownership table
-- Reviews write no files. 77285cdf and eb3b8cf0 own nothing.
+- a410722c owns scripts/check-links.mjs, vitest.main.ts (one comment)
 
 ## Accounts (from `read_quota` at 2026-09-25T07:13:22Z)
 | Runner | Login | State | Resets (UTC) |
