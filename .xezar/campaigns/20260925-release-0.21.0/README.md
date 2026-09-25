@@ -20,10 +20,12 @@ Empty.
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
+| 3f8af2d8 | #160 fix review findings (round 1) | docs-maintenance (author) | pi/deepseek-flash | – |
 
-Counts at dispatch (23:58): tasks 2/10, gate runs 0/2, metered 1/4, load 1.5/18.
+Counts at dispatch (00:58): tasks 1/10, gate runs 0/2, metered 0/4, load 1.5/18.
 
 ## File-ownership table
+- 3f8af2d8 owns docs/prompts/*.md, docs/editor/README.md, docs/architecture.md, docs/getting-started.md, docs/user-guide/feature-inventory.md, docs/features/README.md (item 2 line)
 - Reviews own nothing.
 
 ## Accounts (from `read_quota` at 2026-09-25T20:13:09Z)
@@ -39,7 +41,7 @@ Counts at dispatch (23:58): tasks 2/10, gate runs 0/2, metered 1/4, load 1.5/18.
 | pi | – | no logins | – |
 
 ## Held or queued work
-- #144 – ready; held behind #139: both edit docs/features/README.md (item 12).
+- #144 – PR #160: review REQUEST CHANGES (AI wording left in prompts/README.md:3,9 and 5 contributor docs); fix round 1 running.
 - #138 build – split: part A (plan steps 2-4) merged (#150); step 1 spike done (#149); part B (steps 5, 5b, 6) is PR #154: code review REQUEST CHANGES (1 major, run.mjs readLogin can empty the privacy deny-list); design review FAIL (7 privacy/state blockers B-1..B-10, 5 non-blocking); round 2 done at 46600c39; code recheck APPROVE at b543da12 with 1 minor (Windows test, run.test.mjs:220 vs sandbox.mjs:46; advisory Windows checks red); image re-review PASS WITH FOLLOW-UPS (2 guide-copy notes for step 7); merged 2026-09-25 as c1b1ad21; steps 7-8 follow.
 - #139 build – PR #159: code review APPROVE, design review FAIL (B-1 account name in QA screenshots); round 1 done at 1f924f73 (B-1 masked, NB-1 stated as a limit, NB-2 documented deviation); design recheck PASS at 9203f493; QA FAIL only because 3 checks could not run (chrome-devtools emulate + evaluate_script denied in the QA session): dark mode, theme switch, reduced motion unverified live. Waiting for the owner.
 
@@ -56,6 +58,7 @@ Counts at dispatch (23:58): tasks 2/10, gate runs 0/2, metered 1/4, load 1.5/18.
 - PR #140 open decisions, needed before #139 is built, not before its review: (1) go to apply repo description, topics, social preview; (2) extend TRADEMARKS.md to the new banner, wordmark, social image; (3) CI link check as a follow-up issue; (4) light-theme banner vs dark-only rule – owner only if the reviewer disagrees; (5) demo format WebP (after a spike) vs MP4.
 
 ## Rules that bit
+- claude/opus review sessions (gmail a873f32c, westagilelabs ab0c9d7f) get `gh-write.sh` and/or `verdict-write.sh` refused; claude/sonnet review sessions post fine. Read the verdict from the PR comment or the task history, close the session, relay.
 - A review task can finish its review but be refused the GitHub post by its own permission check (a873f32c, 4 refusals). Do not work around it: relay the verdict to the author, who quotes it in the response comment, and say so.
 - Never dispatch while the checkout holds unpushed campaign commits: the task's worktree is cut from the local develop and carries them into its PR (#148).
 - Load over 18 for more than one tick: check `pgrep -fl circuit-electron` for launchers with parent PID 1 before anything else. They ignore SIGTERM. Tell the owner at once; after #145 merges use `node scripts/stop-orphan-mcp.mjs`.
