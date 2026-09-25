@@ -31,3 +31,4 @@ Owner decisions in the owner's exact words, dated, append-only.
 - 2026-09-25 10:12 CEST - direct question - repo description, topics, social preview from PR #140: "After README merges (Recommended)". Leader shows the exact values before applying.
 - 2026-09-25 10:12 CEST - direct question - extend TRADEMARKS.md to the new banner, wordmark and social image: "Yes, add them (Recommended)". Lands in the #139 build PR.
 - 2026-09-25 10:12 CEST - direct question - code/doc mismatches from the #141 inventory: "File in 0.21.0 (Recommended)". Separate small issues with the release-0.21.0 label.
+- 2026-09-25 10:18 CEST - direct question - #145 circuit-electron leak: "Yes, in 0.21.0, first (Recommended)". Labelled release-0.21.0; dispatched before the #140 and #141 design fixes.

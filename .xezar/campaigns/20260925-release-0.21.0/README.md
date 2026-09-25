@@ -1,6 +1,6 @@
 # Campaign release-0.21.0
 
-Updated: 2026-09-25 10:14 CEST
+Updated: 2026-09-25 10:18 CEST
 
 ## State
 - Base: `develop` at `9fe8a3f0`. Merges so far: 0. Checkpoints met: none.
@@ -35,6 +35,7 @@ None running.
 | pi | – | no logins | – |
 
 ## Held or queued work
+- #145 MCP launcher leak – FIRST in the queue (owner). Touches scripts/run-mcp.js and .mcp.json only.
 - #142, #143, #144 – filed from the #141 inventory; ready, not yet triaged into order.
 - #138 build – waits for its design verdict.
 - #139 build – waits for its design verdict and #138's fixture and capture script.
