@@ -29,16 +29,16 @@ Counts at dispatch (19:08): tasks 2/10, gate runs 1/2 (2a1e4316), metered 1/4, l
 - 2a1e4316 owns scripts/capture/**, docs/user-guide/**/images, docs/assets/readme/, docs/designs/138-user-guide/README.md (screenshot rows)
 - Reviews own nothing.
 
-## Accounts (from `read_quota` at 2026-09-25T07:13:22Z)
+## Accounts (from `read_quota` at 2026-09-25T17:13:17Z)
 | Runner | Login | State | Resets (UTC) |
 |---|---|---|---|
-| claude | default | reserved leader login, runs no tasks | – |
-| claude | qodeca | ok (weekly 46%) | 2026-09-28 16:59 |
-| claude | gmail | ok (weekly 34%) | 2026-09-25 19:00 |
+| claude | default | reserved leader login, runs no tasks; ok but weekly 95% | 2026-09-28 22:59 |
+| claude | qodeca | ok (weekly 51%) | 2026-09-28 17:00 |
+| claude | gmail | ok (weekly 36%) | 2026-09-25 19:00 |
 | claude | eqamana | out | 2026-09-26 16:00 |
-| claude | westagilelabs | ok (weekly 0%) | 2026-10-02 07:00 |
-| codex | default | ok (weekly 0%) | 2026-10-02 00:13 |
-| codex | qodeca-2 | ok (weekly 24%) | 2026-09-29 12:45 |
+| claude | westagilelabs | ok (weekly 3%) | 2026-10-02 07:00 |
+| codex | default | ok (weekly 4%) | 2026-10-02 10:44 |
+| codex | qodeca-2 | ok (weekly 26%) | 2026-09-29 12:45 |
 | pi | – | no logins | – |
 
 ## Held or queued work
