@@ -20,12 +20,12 @@ Empty.
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| e4f1cb10 | #159 full cold review at 56ba01bb | code-review | claude/sonnet | westagilelabs |
-| f14bc7c4 | #159 design review at 56ba01bb | design-review | codex/gpt-6-sol | qodeca-2 |
+| 7b28e450 | #159 fix design findings (round 1) | feature-implementation (author) | claude/opus | qodeca |
 
 Counts at dispatch (23:28): tasks 2/10, gate runs 0/2, metered 1/4, load 2.9/18.
 
 ## File-ownership table
+- 7b28e450 owns docs/designs/139-readme-redesign/**, design/product/github-presentation/**, README.md
 - Reviews own nothing.
 
 ## Accounts (from `read_quota` at 2026-09-25T20:13:09Z)
@@ -43,9 +43,10 @@ Counts at dispatch (23:28): tasks 2/10, gate runs 0/2, metered 1/4, load 2.9/18.
 ## Held or queued work
 - #144 – ready; held behind #139: both edit docs/features/README.md (item 12).
 - #138 build – split: part A (plan steps 2-4) merged (#150); step 1 spike done (#149); part B (steps 5, 5b, 6) is PR #154: code review REQUEST CHANGES (1 major, run.mjs readLogin can empty the privacy deny-list); design review FAIL (7 privacy/state blockers B-1..B-10, 5 non-blocking); round 2 done at 46600c39; code recheck APPROVE at b543da12 with 1 minor (Windows test, run.test.mjs:220 vs sandbox.mjs:46; advisory Windows checks red); image re-review PASS WITH FOLLOW-UPS (2 guide-copy notes for step 7); merged 2026-09-25 as c1b1ad21; steps 7-8 follow.
-- #139 build – draft PR #159 (14e183c7): needs code review, design review, QA (needs-qa).
+- #139 build – PR #159: code review APPROVE, design review FAIL (B-1 account name in QA screenshots); fix round 1 running; QA after.
 
 ## Owner items
+- PR #159 QA screenshots at 56ba01bb showed the GitHub account name; being replaced, but the old files stay in the branch history (squash-merge keeps them out of develop). Decide if that history matters.
 - Two Windows flakes seen on #158 (docs-only): useImageSource.test.ts 'keeps the last good image…' and check-shebangs.test.mjs 5000 ms timeout. Not in docs/windows/known-flakes.md yet; file or catalogue them?
 - Review task a873f32c (claude/opus, gmail) was refused `jq … | bash .xezar/checks/gh-write.sh` 4 times (don't-ask mode), so it could not post its #158 verdict; earlier reviews on other logins posted. Look at why, or accept relaying.
 - Label issues with `release-0.21.0` to put them in scope.
