@@ -5,7 +5,7 @@ SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 
 # README and GitHub presentation redesign (#139)
 
-> Status: **Draft** – design and implementation plan only. Nothing in this folder changes the README yet.
+> Status: **Implemented** – built by the #139 build PR; see [§ Implementation notes](#implementation-notes).
 > Issue: [#139](https://github.com/qodeca/erfana/issues/139) · depends on [#138](https://github.com/qodeca/erfana/issues/138) (user guide, demo fixture, capture script) · campaign `release-0.21.0`.
 > Approval: by a reviewer agent on a different model, not by the owner (owner decision, campaign `decisions.md`, 2026-09-25).
 
@@ -567,3 +567,14 @@ Not touched: `SECURITY.md` (its anchor is preserved), `.github/workflows/` (no n
 Pending. Approval is by a reviewer agent on a different model from the author, not by the owner (owner decision, campaign `release-0.21.0`, 2026-09-25).
 
 - Round 1: REQUEST CHANGES at `68d292ae` ([PR #140](https://github.com/qodeca/erfana/pull/140)), eleven findings; all eleven addressed in the following commit, with the leader's cross-spec decisions shared with #141 (one 1280×800 size, WebP from #138's `encode.mjs`, R138-1…11).
+
+## Implementation notes
+
+Measured during the build (2026-09-25), logged out, Playwright Chromium on github.com.
+
+- **Demo format**: animated WebP. On github.com it animated in Chromium, WebKit (Safari's engine, not Safari itself) and Firefox, and `prefers-reduced-motion: reduce` swapped in `demo-still.png` in all three (step 1).
+- **Banner width 440, not 800.** At `width="800"` the demo's top edge was at 799 px on the unscrolled README file view at 1440×900, and at 703 px with the banner at 480. At 440 it is at **693 px** (banner 386–496, pitch 531–579, Download 595–623). GitHub's chrome above the article is 386 px; the `<h1>` rule adds 9.6 px padding and a 1 px border. The link row now shares the Download paragraph, which saves one paragraph margin.
+- **Home page**: the unscrolled home page shows the file list first (article top at 2,849 px). Scrolled to the article top, the demo starts at 308 px.
+- **375 px**: no horizontal scroll; images scale to 309 px; the platform line and link row wrap.
+- **Canvas edge**: the banner's solid background is faintly visible against both GitHub canvases as a flat rectangle, as expected from the 1.02:1 and 1.05:1 ratios.
+- QA screenshots of both themes at 1440×900, downscaled: [light](qa/readme-1440x900-light.png), [dark](qa/readme-1440x900-dark.png).
