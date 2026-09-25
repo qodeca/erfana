@@ -68,6 +68,7 @@ npm run test:ci         # vitest workspace (main / renderer / preload)
 npm run test:cov        # coverage floors - a REQUIRED check that test:ci does not run
 npx electron-vite build # production build
 npm run check:headers   # every source file must carry the SPDX header (the MIT Xezar kit in .xezar/ is exempt)
+npm run check:links     # relative links, anchors and user-guide wording (local gate only, not yet a CI step)
 npm audit signatures    # advisory in CI, but it catches a lockfile written by the wrong npm
 pipx run --spec "reuse[charset-normalizer]" reuse lint   # REUSE compliance
 ```
