@@ -20,10 +20,12 @@ Empty.
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
+| 7b28e450 | #139 README build (plan steps 0-10) | feature-implementation (multi-file-implementation) | claude/opus | qodeca |
 
-Counts at dispatch (22:07): tasks 1/10, gate runs 0/2, metered 0/4, load 10.5/18.
+Counts at dispatch (22:55): tasks 1/10, gate runs 0/2, metered 0/4, load 1.7/18.
 
 ## File-ownership table
+- 7b28e450 owns README.md, TRADEMARKS.md, REUSE.toml, docs/about.md, docs/README.md, docs/features/README.md, docs/CHANGELOG.md, docs/assets/readme/**, docs/designs/139-readme-redesign/**, design/product/github-presentation/**, design/claims.json, design/index.html, design/claims.js, scripts/capture/brand.mjs, package.json
 - Reviews own nothing.
 
 ## Accounts (from `read_quota` at 2026-09-25T20:13:09Z)
@@ -39,9 +41,9 @@ Counts at dispatch (22:07): tasks 1/10, gate runs 0/2, metered 0/4, load 10.5/18
 | pi | – | no logins | – |
 
 ## Held or queued work
-- #144 – ready now (#158 merged).
+- #144 – ready; held behind #139: both edit docs/features/README.md (item 12).
 - #138 build – split: part A (plan steps 2-4) merged (#150); step 1 spike done (#149); part B (steps 5, 5b, 6) is PR #154: code review REQUEST CHANGES (1 major, run.mjs readLogin can empty the privacy deny-list); design review FAIL (7 privacy/state blockers B-1..B-10, 5 non-blocking); round 2 done at 46600c39; code recheck APPROVE at b543da12 with 1 minor (Windows test, run.test.mjs:220 vs sandbox.mjs:46; advisory Windows checks red); image re-review PASS WITH FOLLOW-UPS (2 guide-copy notes for step 7); merged 2026-09-25 as c1b1ad21; steps 7-8 follow.
-- #139 build – design merged; waits for #138's capture script (part B).
+- #139 build – running as 7b28e450.
 
 ## Owner items
 - Two Windows flakes seen on #158 (docs-only): useImageSource.test.ts 'keeps the last good image…' and check-shebangs.test.mjs 5000 ms timeout. Not in docs/windows/known-flakes.md yet; file or catalogue them?
