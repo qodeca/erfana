@@ -249,25 +249,29 @@ Every row goes into `reference/keyboard-shortcuts.md` with macOS and Windows col
 
 ## Mismatches
 
-Found while building the inventory. The guide documents what the **code** does. The leader decides
-which of these become issues.
+Found while building the inventory. The guide documents what the **code** does. Items 1–8 are
+filed as issues (leader, 2026-09-25) and are fixed there, not in #138: item 1 is
+[#142](https://github.com/qodeca/erfana/issues/142), item 6 is
+[#143](https://github.com/qodeca/erfana/issues/143), and items 2–5, 7 and 8 are
+[#144](https://github.com/qodeca/erfana/issues/144). Item 9 is not an issue yet: a capture scene
+observes it.
 
-1. **Find bar keys.** The tooltips say "Case sensitive (Alt+C)" and "Whole word (Alt+W)", but no
+1. **Find bar keys** (#142). The tooltips say "Case sensitive (Alt+C)" and "Whole word (Alt+W)", but no
    handler exists for those keys (`R/components/Search/SearchBar.tsx`).
-2. **Image viewer keys.**
+2. **Image viewer keys** (#144).
    - `docs/keyboard-shortcuts.md` lists `Home` for reset; the code handles `0` only.
    - `docs/features/README.md` #12 says F is full screen; in the code F is **Fit**, and there is no
      key to enter full screen.
-3. **HTML preview setting label.** `docs/settings.md` calls it "Enable HTML preview"; the app says
+3. **HTML preview setting label** (#144). `docs/settings.md` calls it "Enable HTML preview"; the app says
    **Run HTML files**.
-4. **Screen permission buttons.** The terminal docs say "Open settings" / "Relaunch"; the app says
+4. **Screen permission buttons** (#144). The terminal docs say "Open settings" / "Relaunch"; the app says
    **Open Screen Recording settings** / **Relaunch Erfana** / **Close**.
-5. **Tree right-click menu.** The docs omit Import…, Reveal, Open as source and Open in default
+5. **Tree right-click menu** (#144). The docs omit Import…, Reveal, Open as source and Open in default
    browser.
-6. **Tooltips on Windows.** They show ⌘ symbols ("Project (⌘B)") on Windows too.
-7. **Auto-execute.** `docs/prompts/README.md` mentions a review step "unless auto-execute enabled";
+6. **Tooltips on Windows** (#143). They show ⌘ symbols ("Project (⌘B)") on Windows too.
+7. **Auto-execute** (#144). `docs/prompts/README.md` mentions a review step "unless auto-execute enabled";
    every template has `autoExecute: true`.
-8. **"AI prompts".** `docs/features/README.md` #1 says "context menu with AI prompts", which breaks
-   the no-built-in-AI rule. The plan fixes the wording.
+8. **"AI prompts"** (#144, first there: a live rule breach). `docs/features/README.md` #1 says "context menu with AI prompts", which breaks
+   the no-built-in-AI rule. If #144 has not fixed it by then, the plan does.
 9. **Cmd+B in the editor.** Whether it makes text bold or toggles the sidebar is unverified. A
    capture scene observes it, and the guide states what happens.

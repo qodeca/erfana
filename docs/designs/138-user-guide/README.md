@@ -5,8 +5,9 @@ SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 
 # Illustrated user guide with automated screenshots (#138)
 
-Status: **proposed** – waiting for design review by a reviewer agent on a different model (the owner
-waived owner approval for this issue; see [decisions](../../../.xezar/campaigns/20260925-release-0.21.0/decisions.md)).
+Status: **proposed** – round 1 of the design review (a reviewer agent on a different model) is
+addressed, waiting for re-review (the owner waived owner approval for this issue; see
+[decisions](../../../.xezar/campaigns/20260925-release-0.21.0/decisions.md)).
 
 Companion documents:
 
@@ -67,7 +68,7 @@ docs/user-guide/
   how-erfana-works-with-agents.md   explanation
   how-to/
     open-a-project.md               welcome screen, open / change / close, recent projects
-    run-an-agent-in-the-terminal.md start Claude Code (or any CLI agent), watch the edit land, context meter
+    run-an-agent-in-the-terminal.md start Claude Code (or any CLI agent), approve its edits, watch the edit land, context meter
     turn-a-selection-into-a-prompt.md  Explain / Modify / Ask / Visualize / Prompt, editor and preview
     edit-and-preview-markdown.md    view modes, formatting toolbar, find, autosave, external changes
     work-with-mermaid-diagrams.md   render, change direction, full-screen viewer, diagram chat, fix an error
@@ -228,9 +229,14 @@ capture), the LibreOffice/ImageMagick "required" dialogs (they depend on what th
 has installed), and the drop-from-Finder dialog (a native drag cannot be scripted reliably; the
 dialog is described from its labels).
 
-Shots reserved for #139 (same script, output folder chosen by #139): `readme/hero.png` (state of
-row 1 at README width) and the demo loop `readme/demo.{gif,mp4}` (storyboard owned by #139: open
-the project, run the agent, see the edit land).
+Rows for #139 (same script, same manifest, scenario id `readme-demo`, output folder
+`docs/assets/readme/`): the demo loop `demo.webp`, `demo.gif` and `demo.mp4` from one recording,
+and `demo-still.png`, the S5 frame of #139's storyboard (editor with the new Mermaid block, the
+preview rendering it, the terminal showing the finished agent turn). The storyboard – open the
+project, run the agent, see the edit land – is #139's; the recording, encoding and scrubbing are
+this design's ([Loop for #139](#loop-for-139)). Which file the README embeds is #139's decision.
+The requirements #139 hands to this design are listed in the plan as R138-1…11
+([spec § 3.6](../../features/138-user-guide.md#36-requirements-from-139-r138-111)).
 
 ### Demo project (fixture)
 
@@ -248,6 +254,7 @@ domains (`example.org`, `example.com`). It is realistic enough to show every fea
 | `handbook/compost-guide.md` | Prose plus a Mermaid flowchart (TB) of the compost steps | diagram toolbar, direction, viewer, chat |
 | `handbook/season-plan.md` | Mermaid gantt of the season | a second diagram type |
 | `meetings/2026-03-14-spring-meeting.md` | Minutes with frontmatter; a paragraph used for selection-to-prompt | prompt templates |
+| `handbook/open-day-plan.md` | A short plan for the open day: one intro line, then a 6-step numbered list (book the hall → … → thank the volunteers) and **no diagram**, so Visualize > Flowchart visibly adds one | the #139 demo loop (R138-1) |
 | `drafts/broken-diagram.md` | A Mermaid block with a deliberate syntax error | the error state |
 | `images/garden-map.svg` | Hand-written SVG plan of the plots | image viewer, live refresh |
 | `images/seedlings.png` | Small raster drawing rendered once from an SVG during implementation (no photos) | a raster image |
@@ -270,9 +277,10 @@ them); the SVG, PNG, PDF, M4A and Markdown files are covered by the `path = "**"
 ### Capture script
 
 **Entry point:** `npm run docs:screenshots` → `node scripts/capture/run.mjs`. Flags:
-`--only <id,…>` (iterate on some shots), `--check` (no capture: verify that the manifest, the image
-files and the guide's image links agree, and that the size budget holds). The default path
-regenerates **all** rows; there is no default-on skip.
+`--only <id,…>` (iterate on some shots; each id is a row id or a scenario id, so
+`--only readme-demo` runs every row of #139's demo scenario), `--check` (no capture: verify that
+the manifest, the image files and the guide's image links agree, and that the size budget holds).
+The default path regenerates **all** rows, the #139 rows included; there is no default-on skip.
 
 **Stages** (each fails closed with a named reason):
 
@@ -283,13 +291,20 @@ regenerates **all** rows; there is no default-on skip.
 3. **Sandbox.** Recreate `/tmp/erfana-capture/`: `home/` (a fake `HOME`), `home/Projects/harbour-garden/`
    (fixture copy plus `git init`), `user-data/`, `raw/`. The fake home holds a `.zshrc` that sets a
    neutral prompt (`%~ %# `, no user or host name) and a `.claude/settings.json` whose only content
-   is a `Stop` hook that touches a marker file, used as the "agent finished" condition.
+   is a `Stop` hook that touches a marker file, used as the "agent finished" condition – so the
+   operator's own status line, hooks and plugins are never loaded. The `.zshrc` also unsets
+   `CLAUDE_CONFIG_DIR`, which would otherwise point Claude Code back at the operator's real
+   configuration. The sandbox copy of the project gets its own `.claude/settings.json` with
+   `permissions.defaultMode: "acceptEdits"` ([edit approval](#edit-approval-during-agent-scenes)).
+   Both files are written by `sandbox.mjs`; neither is committed.
 4. **Scenes.** `playwright test --config scripts/capture/playwright.capture.config.ts`: its own
    config (workers 1, retries 0, no trace), so the e2e config is untouched. One scene file per page
    group under `scripts/capture/scenes/`; the rows come from `scripts/capture/shots.json`, the
    single manifest (id, file, page, state description, crop, agent, native).
-5. **Post-process.** Encode, check privacy, check budget, then copy into `docs/user-guide/images/`.
-   Nothing reaches `docs/` unless every check passed for that image.
+5. **Post-process.** Encode, check privacy, check budget, then copy into the row's folder – one of
+   the two on the output allow-list at the top of `run.mjs`: `docs/user-guide/images/` and
+   `docs/assets/readme/`. Nothing reaches `docs/` unless every check passed for that file; for the
+   loop, every check on every one of its files.
 6. **Report.** Per-image size, total size, which shots needed the agent, and the Claude Code
    version – pasted into the PR (AC: total size stated).
 
@@ -336,12 +351,91 @@ image, no dithering) – checked locally: `ffmpeg-static` 6.0 here has the `png`
 ≤ 400 KB per full-window image, ≤ 200 KB per crop, **≤ 12 MB for all guide images**. No Git LFS: at
 that size it would add a clone-time tool for every contributor for no gain.
 
-**Loop for #139.** `recordVideo` on `electron.launch` (already used by the `visualTest` fixture). The
-scene logs marks (project open, prompt sent, agent finished, preview updated); ffmpeg trims to the
-marks and speeds up only the agent-thinking part to fit 10–20 s. The speed-up is shown in the
-README caption ("agent wait shortened"), so nothing is misrepresented. Output: `demo.gif`
-(palettegen/paletteuse, 12 fps, 960 px wide, ≤ 5 MB) and `demo.mp4` (H.264, ≤ 3 MB). Which one the
-README embeds is #139's decision. Animated WebP is not offered (not in GitHub's documented list).
+The guide's stills stay PNG. The #139 loop is the one place WebP is emitted (below): the owner
+picked "GIF or WebP" for it, and #139's own spike checks that it plays on github.com.
+
+#### Loop for #139
+
+The `readme-demo` scenario follows #139's storyboard (S0 open a project … S6 hold). It starts at
+Erfana's start screen, with the demo project as the only Recent projects entry (the sandbox opens
+it once with `openProjectByPath` and closes it before recording starts), and opens it from there –
+never the native folder dialog. S2 selects the list in `handbook/open-day-plan.md` and sends
+**Visualize > Flowchart**.
+
+**Recorder.** Playwright `recordVideo` on `electron.launch` (already used by the `visualTest`
+fixture), `size: { width: 1280, height: 800 }` – the window's content size, the one size #138 and
+#139 share, so the recording holds the app window only: no desktop, menu bar or clock. What it
+produces, read from the installed `playwright-core` 1.59.1 source (`lib/server/videoRecorder.js`,
+2026-09-25): **25 fps** WebM, **VP8** at a **1 Mbit/s** target (`-crf 8 -qmax 50`), built from
+the browser's JPEG screencast frames. Two lossy steps before our own encode is a real risk for 12 px
+terminal text, so the legibility check below decides whether it is good enough. Fallback recorder,
+chosen here: Chromium's DevTools `Page.startScreencast` with `format: "png"` through Electron's
+`webContents.debugger`, frames written to `raw/` and assembled by ffmpeg – lossless frames, same
+window-only framing, no Screen Recording permission. `screencapture -l <windowId> -V` is the second
+fallback. Neither recorder sees the HTML preview's native view; the demo shows none.
+
+**Edit.** The scene logs marks (project open, Claude Code at its prompt, prompt sent, agent
+finished, preview updated). ffmpeg trims to the marks, **cuts** from S0 to S1 so Claude Code's
+start-up screen (which can show account details) never reaches an encoded frame, and speeds up
+only the agent-working part (S4) to fit 10–20 s. #139's caption says the agent's time is sped up,
+so nothing is misrepresented. The recording is 1280×800; before encoding, the terminal can be
+enlarged with a capture-only Electron zoom factor if #139's legibility decision asks for it (a
+scenario option, not an app change).
+
+**Encode.** From the one trimmed source, `encode.mjs` writes, at 1280×800 and 12 fps:
+
+| File | Encoder | Budget |
+|---|---|---|
+| `demo.webp` | `libwebp_anim`, `-loop 0` | target ≤ 3 MiB, hard cap 5 MiB |
+| `demo.gif` | `palettegen` / `paletteuse`, `-loop 0` | target ≤ 3 MiB, hard cap 5 MiB |
+| `demo.mp4` | `libx264`, `yuv420p`, `+faststart` | ≤ 3 MiB |
+| `demo-still.png` | the S5 frame, from the lossless source frame where there is one | ≤ 400 KB |
+
+All four encoders are in the bundled `ffmpeg-static` 6.0 ([research.md](research.md#formats)). The
+caps are #139's; over a hard cap is exit 6.
+
+**Legibility check at the final encode.** After encoding, one frame from S3 (the prompt arriving in
+the terminal) and one from the end of S4 are taken **from each encoded file**, scaled to #139's
+README display width (800 px unless #139 says otherwise), and checked two ways:
+
+- OCR of the terminal region must read back the prompt line the scene actually sent (known text,
+  compared after whitespace normalisation);
+- the terminal's capital-letter height, measured on the scaled frame, is at least 7 px.
+
+A miss fails the run (exit 1, "demo not legible at 800 px") and keeps the frames in the sandbox for
+#139 to decide between the capture-only zoom and a wider display. The first failure caused by the
+recorder itself (legible in the raw frame, not after `recordVideo`) switches the scenario to the
+fallback recorder.
+
+**Privacy over the frames.** The PTY-stream and DOM-text checks cover the whole scene as for any
+agent scene. On top, the OCR and deny-list pass runs over the **demo's frames**, not only over
+stills: at least one frame per second of each encoded file, plus its first and last frame. A hit is
+exit 5 and nothing is copied. The frames are also tiled into a 1-fps contact sheet in the sandbox
+for #139's frame-by-frame human review; it is never committed.
+
+The demo scene never runs `/status`, `/usage` or `/cost`, and never hovers the context meter (its
+tooltip shows token counts).
+
+#### Edit approval during agent scenes
+
+By default Claude Code asks before it edits a file, so S4 of the demo and the guide's agent rows
+would stop at a prompt. **Decision: the sandbox project's `.claude/settings.json` sets
+`permissions.defaultMode: "acceptEdits"`** (R138-8, option a). Why:
+
+- the demo's S4 has 5 s of screen time; an approval dialog and its keypress would take part of it
+  and add a frame the viewer has to read;
+- it is deterministic – no scene has to detect the prompt in a WebGL terminal and race it;
+- it applies only inside the sandbox copy, which is deleted after a successful run, and it is not
+  committed in the fixture, so opening Claude Code in `scripts/capture/demo-project/` never gets
+  relaxed permissions;
+- the mode is not an account detail; Claude Code's footer may show it on screen, and that is true.
+
+Because a reader's own Claude Code will ask, the how-to page on running an agent says so in words:
+by default the agent asks before each edit, and the screenshots were taken with edits accepted
+automatically. Option b (the keypress as a visible S4 step) is not used. The spike confirms
+Claude Code honours the setting in the sandbox; if it does not, `claude --permission-mode
+acceptEdits` typed in the terminal is the fallback, and it is cut from the loop with the start-up
+screen.
 
 ### Privacy: scrub by construction, then check
 
@@ -371,7 +465,8 @@ never fake the output. Layers:
      "usage limit", "weekly limit").
    - Erfana's own context-meter percentage is a feature, not account usage, and is allowed.
 3. **Image check.** OCR every final image with `tesseract.js` (already installed as a dependency
-   of the import feature; the script resolves it and fails closed if it is missing). The OCR text
+   of the import feature; the script resolves it and fails closed if it is missing), and at least
+   one frame per second of every encoded demo file ([Loop for #139](#loop-for-139)). The OCR text
    goes through the same deny-list.
 4. **Fallback masking.** Only if something unavoidable remains after layer 1: a solid box drawn
    before encoding (`mask`/`maskColor` for DOM elements, ffmpeg `drawbox` for terminal rows). It
@@ -394,11 +489,13 @@ kind (never the matched value).
 
 `BACKWARD_COMPATIBILITY.md` says the protected shortcuts are those "documented in
 `docs/keyboard-shortcuts.md`". After the move, the tables live in the guide. The plan updates that
-line to name `docs/user-guide/reference/keyboard-shortcuts.md`; the guarantee itself stays the same.
-Because this edits a root rule file, it is listed under [Open decisions](#open-decisions).
+line to name `docs/user-guide/reference/keyboard-shortcuts.md`; the guarantee itself stays the same
+([decision 1](#decisions)).
 
 `docs/features/README.md` item 1 says "context menu with AI prompts", which breaks the no-built-in-AI
-rule. The plan rewords it to "prompt templates sent to the terminal agent".
+rule. It is filed as [#144](https://github.com/qodeca/erfana/issues/144) (item 6 there), which can
+land before this work. If it has not, the plan rewords it to "prompt templates sent to the terminal
+agent"; whichever lands second finds it done.
 
 ### UX design (the guide as a surface)
 
@@ -473,37 +570,42 @@ States of the capture script itself (what an operator sees):
 
 | State | Exit | What the operator reads |
 |---|---|---|
-| Success | 0 | Report: 52 images, sizes, total, Claude Code version. |
+| Success | 0 | Report: 52 guide images and the 4 README demo files, sizes, totals, demo duration, Claude Code version. |
 | Not macOS | 2 | "docs:screenshots runs on macOS only." |
 | No agent login | 3 | "No Claude Code login for the capture sandbox: set ANTHROPIC_API_KEY or ERFANA_CAPTURE_CLAUDE_TOKEN_FILE. Screenshots were not changed." |
 | Sandbox path unsafe | 4 | "/tmp/erfana-capture is a symlink or not yours; remove it and retry." |
 | Privacy hit | 5 | "Row 7 refused: deny-list match (kind: email). Nothing copied." |
 | Over budget | 6 | "Row 1 is 512 KB (limit 400 KB)." |
-| Scene failed | 1 | Playwright's own failure with the row id; raw shots stay in the sandbox for inspection. |
+| Scene failed | 1 | Playwright's own failure with the row id; raw shots stay in the sandbox for inspection. Also "demo not legible at 800 px" from the legibility check. |
 | `--check` drift | 7 | Lists manifest rows without a file, files without a row, and guide links to missing images. |
 
-## Open decisions
+## Decisions
 
-For the reviewer and the leader. None of them needs the owner, unless the leader decides otherwise.
+All four were open in the first draft; the design review agreed with each recommendation and the
+leader decided them that way (2026-09-25).
 
 1. **Edit `BACKWARD_COMPATIBILITY.md`** to name `docs/user-guide/reference/keyboard-shortcuts.md` as
-   the documented shortcut list. The guarantee stays the same; only the pointer changes.
-   Recommended: yes. The alternative keeps the full tables in `docs/keyboard-shortcuts.md` and
-   duplicates them in the guide; two tables drift.
-2. **Link check in CI.** The new `scripts/check-links.mjs` runs in the local gate automatically
+   the documented shortcut list. **Decided: yes.** The guarantee stays the same; only the pointer
+   changes. The alternative kept the full tables in `docs/keyboard-shortcuts.md` and duplicated
+   them in the guide; two tables drift.
+2. **Link check in CI.** **Decided: local gate now, CI step as a follow-up issue.** The new
+   `scripts/check-links.mjs` runs in the local gate automatically
    (`.xezar/checks/repository-checks.sh` already calls it if it exists). Adding it as a step in the
-   required `Lint` job needs a change to `.github/workflows/checks.yml`, which is a trust boundary
-   and goes to security review. Recommended: local gate now, CI step as a follow-up issue.
-3. **Pixel density.** 2× captures (crisp on Retina, larger files) against 1× (half the linear size,
-   soft text). Recommended: 2×, within the 12 MB budget. If the spike measures more than 12 MB, the
-   fallback is 1× for full-window shots only.
+   required `Lint` job needs a change to `.github/workflows/checks.yml`, a trust boundary that goes
+   to security review and does not ride along in a docs PR. The build PR files the follow-up issue.
+3. **Pixel density.** **Decided: 2×**, within the 12 MB budget. If the spike measures more than
+   12 MB, the fallback is 1× for full-window shots only.
 4. **Code/doc mismatches found by the inventory** (see [feature-inventory.md](feature-inventory.md#mismatches)).
-   The guide documents what the code does. The leader decides whether to file issues for these:
-   - the find-bar tooltips promise Alt+C and Alt+W, which do nothing;
-   - the ⌘ symbols in tooltips also show on Windows;
-   - `docs/prompts/README.md` mentions an auto-execute review step that no template uses;
-   - whether <kbd>Cmd</kbd>+<kbd>B</kbd> in the editor makes text bold or toggles the sidebar is
-     unverified; a capture scene will observe it.
+   **Decided: filed as issues**, and not fixed here. The guide documents what the code does.
+   - [#142](https://github.com/qodeca/erfana/issues/142) – the find-bar tooltips promise Alt+C and
+     Alt+W, which do nothing;
+   - [#143](https://github.com/qodeca/erfana/issues/143) – the ⌘ symbols in tooltips also show on
+     Windows;
+   - [#144](https://github.com/qodeca/erfana/issues/144) – six user docs that no longer match the
+     app, including the "AI prompts" wording (a live rule breach, first in that issue) and the
+     auto-execute step in `docs/prompts/README.md`;
+   - not filed: whether <kbd>Cmd</kbd>+<kbd>B</kbd> in the editor makes text bold or toggles the
+     sidebar is unverified; a capture scene observes it and the guide states what happens.
 
 ## Developer handoff
 
@@ -512,5 +614,13 @@ Implementation order, file list, per-step verification and risks are in the
 
 ## Design review
 
-Pending. The reviewer agent posts a `## Design review` comment on the draft PR; its link and the
-disposition of each finding go here.
+- Round 1: REQUEST CHANGES at `b7864e20` ([PR #141](https://github.com/qodeca/erfana/pull/141)),
+  two findings.
+  1. (major) Demo-loop format conflicted with #139's spec – **fixed**: WebP is emitted beside GIF
+     and MP4, `docs/assets/readme/` is on the output allow-list, the privacy pass covers the demo's
+     frames, the recorder and a legibility check are stated, and #139's requirements are taken in
+     as R138-1…11 (same leader decisions as #140).
+  2. (minor) The wording checker rejected correct negations such as "does not have built-in AI" –
+     **fixed**: a negation window in the same sentence ([spec § 3.4](../../features/138-user-guide.md#34-link-and-wording-checker-scriptscheck-linksmjs)).
+
+  The four open decisions were decided as recommended ([Decisions](#decisions)).

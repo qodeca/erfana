@@ -96,6 +96,13 @@ What the design takes from these:
   reports version 6.0 with `png`, `apng`, `gif`, `libwebp`, `libwebp_anim`, `libx264`, `libvpx-vp9`
   and `libaom-av1`. So every encoding step here uses a binary the repo already installs, with no
   Homebrew needed.
+- **Animated WebP for #139's loop.** Not in GitHub's documented list above, so the guide's stills
+  stay PNG. The loop emits it anyway (owner's pick "GIF or WebP", leader decision 2026-09-25);
+  whether it plays on github.com is checked by #139's own spike, not assumed here.
+- **Playwright `recordVideo`** (*local*, 2026-09-25). `playwright-core` 1.59.1,
+  `lib/server/videoRecorder.js`: `fps = 25`, and the ffmpeg arguments `-c:v mjpeg -i pipe:0 … -r 25
+  -c:v vp8 -qmin 0 -qmax 50 -crf 8 -deadline realtime -speed 8 -b:v 1M`. So each frame is a JPEG
+  screencast frame re-encoded as VP8 at a 1 Mbit/s target – two lossy steps before ours.
 - **tesseract.js** (*local*, 2026-09-25). Version 7.0.0 is installed as a transitive dependency
   (`node_modules/tesseract.js`). It is not in `package.json`.
 
