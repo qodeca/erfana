@@ -22,6 +22,7 @@ Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 |---|---|---|---|---|
 | ecac3c11 | #146 | code-review (scoped-recheck) | claude/sonnet | gmail |
 | a410722c | #138 part A | feature-implementation | claude/opus | qodeca |
+| 320bec53 | #138 spike | spike | claude/opus | qodeca |
 | 8d85e234 | #142 | bug-fix (bounded-bug-fix) | pi/deepseek-api/deepseek-flash | – |
 | 63ac9ab2 | #146 | code-review (full-cold-review) | claude/sonnet | gmail |
 
@@ -29,6 +30,7 @@ Counts at dispatch (12:33): tasks 3/10 (xezar runs 2 at once), gate runs 0/2, me
 
 ## File-ownership table
 - a410722c owns scripts/capture/demo-project/**, scripts/check-links*.mjs, package.json, vitest.main.ts, e2e/fixtures/launch-helpers.ts, e2e/fixtures/index.ts
+- 320bec53 owns docs/spikes/138-capture-spike.md
 - 8d85e234 owns src/renderer/src/components/Search/SearchBar.tsx, SearchBar.test.tsx, docs/keyboard-shortcuts.md (find-bar lines only)
 
 ## Accounts (from `read_quota` at 2026-09-25T07:13:22Z)
@@ -46,14 +48,13 @@ Counts at dispatch (12:33): tasks 3/10 (xezar runs 2 at once), gate runs 0/2, me
 ## Held or queued work
 - #143 – ready; held so it does not collide with #142 on tooltip code.
 - #144 – ready; held behind the #138 build: both edit docs/features/README.md, docs/keyboard-shortcuts.md, docs/settings.md.
-- #138 build – split: part A (plan steps 2-4) running as a410722c; step 1 spike needs the owner's choice of agent login; steps 5-8 follow.
+- #138 build – split: part A (plan steps 2-4) running as a410722c; step 1 spike running as 320bec53 (owner chose a subscription login, westagilelabs tried first); steps 5-8 follow.
 - #139 build – design approved 11:29; waits for #138's fixture and capture script.
 
 ## Owner items
 - Label issues with `release-0.21.0` to put them in scope.
 - Decide whether to hide or delete the reviewer's junk test comments on PR #146.
 - Stop orphaned circuit-electron servers by hand until #146 merges (see timeline for PIDs).
-- Choose the Claude Code login for the #138 capture spike (plan step 1).
 - After #145 merges: leader adds the allow rule for `node scripts/stop-orphan-mcp.mjs` (approved).
 - PR #140 open decisions, needed before #139 is built, not before its review: (1) go to apply repo description, topics, social preview; (2) extend TRADEMARKS.md to the new banner, wordmark, social image; (3) CI link check as a follow-up issue; (4) light-theme banner vs dark-only rule – owner only if the reviewer disagrees; (5) demo format WebP (after a spike) vs MP4.
 
