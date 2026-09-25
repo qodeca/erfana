@@ -37,3 +37,5 @@ Owner decisions in the owner's exact words, dated, append-only.
 - 2026-09-25 10:42 CEST - direct question - standing leader rule on orphan checks: no option picked; note "use /xez-add-rule for that". The owner runs /xez-add-rule; the leader never runs it (leader guide, "The owner's controls").
 - 2026-09-25 10:48 - direct question - stopgap until #145 merges: "Keep going, you kill them". No settings change; the leader reports new orphans at each L1 tick with the exact kill -9 line.
 - 2026-09-25 11:01 CEST - direct question - #145 version pin refused by Claude Code permissions: "Split it out (Recommended)". Pin filed as #147; the owner commits it by hand. PR #146 ships without it.
+- 2026-09-25 11:10 CEST - direct question (xez-unattended-on contract read back, with the orphan-load risk until #146 merges) - "Yes, turn it on"
+  Unattended mode on since 2026-09-25T09:10:38Z. Hard stops: release go, deleting a record, opening a campaign. Parked: account or provider lane switch, scope trim, third repair round. Accepted costs: metered spend while away; stops are instructions, not a hook; orphaned MCP servers may block work until #146 merges.
