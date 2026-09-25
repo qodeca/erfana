@@ -20,8 +20,10 @@ Empty.
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
+| ec5c20df | #154 code recheck at b543da12 | code-review (scoped-recheck) | claude/sonnet | westagilelabs |
+| 1407af65 | #154 image re-review at b543da12 | design-review | codex/gpt-6-sol | qodeca-2 |
 
-Counts at dispatch (19:08): tasks 2/10, gate runs 1/2 (2a1e4316), metered 1/4, load 2.9/18.
+Counts at dispatch (19:28): tasks 2/10, gate runs 0/2, metered 1/4, load 1.7/18.
 
 ## File-ownership table
 - Reviews own nothing.
