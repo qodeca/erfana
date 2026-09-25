@@ -1,6 +1,6 @@
 # Campaign release-0.21.0
 
-Updated: 2026-09-25 10:39 CEST
+Updated: 2026-09-25 10:42 CEST
 
 ## State
 - Base: `develop` at `9fe8a3f0`. Merges so far: 0. Checkpoints met: none.
@@ -26,7 +26,7 @@ Empty.
 Counts at dispatch: tasks 3/10 (xezar runs 2 at once), metered 0/4, load 15.8/18.
 
 ## File-ownership table
-- 2a80ec06 owns scripts/run-mcp.js, .mcp.json, its new test
+- 2a80ec06 owns scripts/run-mcp.js, scripts/stop-orphan-mcp.mjs, .mcp.json, their tests
 - 9ea693bf owns docs/designs/139-readme-redesign/**
 - 731c0a75 owns docs/designs/138-user-guide/**, docs/features/138-user-guide.md
 
@@ -49,9 +49,12 @@ Counts at dispatch: tasks 3/10 (xezar runs 2 at once), metered 0/4, load 15.8/18
 
 ## Owner items
 - Label issues with `release-0.21.0` to put them in scope.
+- Run /xez-add-rule for the orphan-check rule (text proposed at 10:44 in chat).
+- After #145 merges: leader adds the allow rule for `node scripts/stop-orphan-mcp.mjs` (approved).
 - PR #140 open decisions, needed before #139 is built, not before its review: (1) go to apply repo description, topics, social preview; (2) extend TRADEMARKS.md to the new banner, wordmark, social image; (3) CI link check as a follow-up issue; (4) light-theme banner vs dark-only rule – owner only if the reviewer disagrees; (5) demo format WebP (after a spike) vs MP4.
 
 ## Rules that bit
+- Load over 18 for more than one tick: check `pgrep -fl circuit-electron` for launchers with parent PID 1 before anything else. They ignore SIGTERM. Tell the owner at once; after #145 merges use `node scripts/stop-orphan-mcp.mjs`.
 - xezar ack can fail with "no longer owns the project" while status says owner (seen 00:45-00:47, load over 130). Reads still work; retry ack later, never re-dispatch on it.
 - A step agent must not end its turn while its own background work runs (XEZ:MONITORING fails the step). Say "finish in the foreground" in every brief.
 

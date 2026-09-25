@@ -32,3 +32,6 @@ Owner decisions in the owner's exact words, dated, append-only.
 - 2026-09-25 10:12 CEST - direct question - extend TRADEMARKS.md to the new banner, wordmark and social image: "Yes, add them (Recommended)". Lands in the #139 build PR.
 - 2026-09-25 10:12 CEST - direct question - code/doc mismatches from the #141 inventory: "File in 0.21.0 (Recommended)". Separate small issues with the release-0.21.0 label.
 - 2026-09-25 10:18 CEST - direct question - #145 circuit-electron leak: "Yes, in 0.21.0, first (Recommended)". Labelled release-0.21.0; dispatched before the #140 and #141 design fixes.
+- 2026-09-25 10:42 CEST - chat - "Ensure circuit-electron won't stop you from moving forward in the future, apply required changes to your processess and save them so future sessions won't end up in the same situation"
+- 2026-09-25 10:42 CEST - direct question - leader stops orphaned MCP servers itself: "Yes, via a narrow script (Recommended)". #145 adds scripts/stop-orphan-mcp.mjs; after it merges, the leader adds one allow rule for exactly `node scripts/stop-orphan-mcp.mjs` to the project .claude/settings.json.
+- 2026-09-25 10:42 CEST - direct question - standing leader rule on orphan checks: no option picked; note "use /xez-add-rule for that". The owner runs /xez-add-rule; the leader never runs it (leader guide, "The owner's controls").
