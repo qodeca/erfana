@@ -43,7 +43,8 @@ export function layout(root = SANDBOX_ROOT) {
   return {
     root,
     home,
-    project: path.join(VOLUME_ROOT, PROJECT_NAME),
+    // A macOS path on every platform: path.join would turn it into backslashes on Windows.
+    project: path.posix.join(VOLUME_ROOT, PROJECT_NAME),
     image: path.join(root, 'demo-drive.sparseimage'),
     userData: path.join(root, 'user-data'),
     raw: path.join(root, 'raw'),
