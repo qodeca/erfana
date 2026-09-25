@@ -64,7 +64,8 @@ describe('scanText', () => {
   })
 
   it('token shapes, money and usage phrases (break: dropping a pattern kind)', () => {
-    expect(scanText('key sk-ant-abcdefghijklmnop1234', deny)).toContain('token-shape')
+    // An invented key shape, the input this check exists to catch; not a credential.
+    expect(scanText('key sk-ant-abcdefghijklmnop1234', deny)).toContain('token-shape') // security-scan:allow
     expect(scanText('a task-list item', deny)).toEqual([])
     expect(scanText('Total cost: $0.42', deny)).toContain('money')
     expect(scanText('You have hit your weekly limit', deny)).toContain('usage')
