@@ -1,46 +1,61 @@
 # Campaign release-0.21.0
 
-Updated: 2026-09-25 00:12 CEST
+Updated: 2026-09-25 11:06 CEST
 
 ## State
 - Base: `develop` at `9fe8a3f0`. Merges so far: 0. Checkpoints met: none.
 - Scope: open issues labelled `release-0.21.0`, plus new work the owner discusses with the leader (the leader files it as an issue with that label). None labelled yet.
-- Unattended mode: off (`.xezar/unattended.json` absent).
+- Unattended mode: ON since 2026-09-25T09:10:38Z (restarts 0 of 3). Parked calls go to parked.md.
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
+- #146 ready, head 1f4f5c33 – #145 fix. Required checks green. Advisory Windows checks red: scripts/stop-orphan-mcp.test.mjs fails to load (SyntaxError at 10:1). Review 63ac9ab2 running (full-cold-review, claude/sonnet, gmail).
+- #141 draft, head 0c6ad3a0 – #138 spec, round-1 fixes pushed. Re-check 9f406ac3 dispatched (scoped-recheck, claude/sonnet, gmail).
+- #140 draft, head c442a15b – #139 spec, round-1 fixes pushed. Re-check 12b29be1 dispatched (scoped-recheck, claude/sonnet, westagilelabs).
 Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 
 ## Serial merge line
 Empty.
 
 ## Running tasks per lane
-None.
+| Run | Issue | Workflow | Lane | Login |
+|---|---|---|---|---|
+| 63ac9ab2 | #146 | code-review (full-cold-review) | claude/sonnet | gmail |
+| 9f406ac3 | #141 | code-review (scoped-recheck) | claude/sonnet | gmail |
+| 12b29be1 | #140 | code-review (scoped-recheck) | claude/sonnet | westagilelabs |
+
+Counts at dispatch (11:17): tasks 3/10 (xezar runs 2 at once, 1 queued), gate runs 0/2, metered 0/4, load 5.3/18.
 
 ## File-ownership table
-None running.
+- Reviews write no files. 63ac9ab2, 9f406ac3, 12b29be1 own nothing.
 
-## Accounts (from `read_quota` at 2026-09-24T22:02:49Z)
+## Accounts (from `read_quota` at 2026-09-25T07:13:22Z)
 | Runner | Login | State | Resets (UTC) |
 |---|---|---|---|
 | claude | default | reserved leader login, runs no tasks | – |
-| claude | qodeca | ok (weekly 45%) | 2026-09-28 16:59 |
+| claude | qodeca | ok (weekly 46%) | 2026-09-28 16:59 |
 | claude | gmail | ok (weekly 34%) | 2026-09-25 19:00 |
-| claude | eqamana | out | 2026-09-26 15:59 |
-| claude | westagilelabs | out | 2026-09-25 07:00 |
-| codex | default | unknown (quota format changed in 0.156.1) | – |
+| claude | eqamana | out | 2026-09-26 16:00 |
+| claude | westagilelabs | ok (weekly 0%) | 2026-10-02 07:00 |
+| codex | default | ok (weekly 0%) | 2026-10-02 00:13 |
 | codex | qodeca-2 | ok (weekly 24%) | 2026-09-29 12:45 |
 | pi | – | no logins | – |
 
 ## Held or queued work
-- #138 user guide + capture tooling – ready for design. Goes first.
-- #139 README redesign – design can run beside #138; build waits for #138's fixture and capture script.
+- #142, #143, #144 – filed from the #141 inventory; ready, not yet triaged into order.
+- #138 build – waits for its design verdict.
+- #139 build – waits for its design verdict and #138's fixture and capture script.
 
 ## Owner items
 - Label issues with `release-0.21.0` to put them in scope.
+- Stop orphaned circuit-electron servers by hand until #146 merges (see timeline for PIDs).
+- After #145 merges: leader adds the allow rule for `node scripts/stop-orphan-mcp.mjs` (approved).
+- PR #140 open decisions, needed before #139 is built, not before its review: (1) go to apply repo description, topics, social preview; (2) extend TRADEMARKS.md to the new banner, wordmark, social image; (3) CI link check as a follow-up issue; (4) light-theme banner vs dark-only rule – owner only if the reviewer disagrees; (5) demo format WebP (after a spike) vs MP4.
 
 ## Rules that bit
-None yet.
+- Load over 18 for more than one tick: check `pgrep -fl circuit-electron` for launchers with parent PID 1 before anything else. They ignore SIGTERM. Tell the owner at once; after #145 merges use `node scripts/stop-orphan-mcp.mjs`.
+- xezar ack can fail with "no longer owns the project" while status says owner (seen 00:45-00:47, load over 130). Reads still work; retry ack later, never re-dispatch on it.
+- A step agent must not end its turn while its own background work runs (XEZ:MONITORING fails the step). Say "finish in the foreground" in every brief.
 
 ## Restart and re-attach
 Start with `./scripts/xezar-leader.sh`, then follow the session-start list in `.xezar/docs/leader-guide.md`.

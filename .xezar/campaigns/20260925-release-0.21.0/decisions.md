@@ -23,3 +23,19 @@ Owner decisions in the owner's exact words, dated, append-only.
   - Design gate: "No need to review, decide yourself and trust reviewers"
   - Existing user docs: "Fold into the guide (Recommended)"
   Standing rule for these two issues: design is approved by a reviewer agent on a different model, not by the owner.
+- 2026-09-25 00:14 CEST - chat - "start immediately, do not wait for the loop if there is work you can kick off"
+  Standing rule: when ready work and headroom exist, the leader dispatches at once instead of waiting for the L3 tick. Every other L3 check (ceilings, overlap, route.mjs, budget) still applies.
+- 2026-09-25 00:23 CEST - direct question (xez-unattended-on contract read back) - "Yes, turn it on"
+  Unattended mode on since 2026-09-24T22:23:07Z. Hard stops: release go, deleting a record, opening a campaign. Parked: account or provider lane switch, scope trim, third repair round. Accepted costs: overnight metered spend; stops are instructions, not a hook.
+- 2026-09-25 10:12 CEST - direct question - orphaned circuit-electron servers: "You may stop them (Recommended)". Scope: only orphans (ppid 1), by exact PID after checking each; keep any with a live parent.
+- 2026-09-25 10:12 CEST - direct question - repo description, topics, social preview from PR #140: "After README merges (Recommended)". Leader shows the exact values before applying.
+- 2026-09-25 10:12 CEST - direct question - extend TRADEMARKS.md to the new banner, wordmark and social image: "Yes, add them (Recommended)". Lands in the #139 build PR.
+- 2026-09-25 10:12 CEST - direct question - code/doc mismatches from the #141 inventory: "File in 0.21.0 (Recommended)". Separate small issues with the release-0.21.0 label.
+- 2026-09-25 10:18 CEST - direct question - #145 circuit-electron leak: "Yes, in 0.21.0, first (Recommended)". Labelled release-0.21.0; dispatched before the #140 and #141 design fixes.
+- 2026-09-25 10:42 CEST - chat - "Ensure circuit-electron won't stop you from moving forward in the future, apply required changes to your processess and save them so future sessions won't end up in the same situation"
+- 2026-09-25 10:42 CEST - direct question - leader stops orphaned MCP servers itself: "Yes, via a narrow script (Recommended)". #145 adds scripts/stop-orphan-mcp.mjs; after it merges, the leader adds one allow rule for exactly `node scripts/stop-orphan-mcp.mjs` to the project .claude/settings.json.
+- 2026-09-25 10:42 CEST - direct question - standing leader rule on orphan checks: no option picked; note "use /xez-add-rule for that". The owner runs /xez-add-rule; the leader never runs it (leader guide, "The owner's controls").
+- 2026-09-25 10:48 - direct question - stopgap until #145 merges: "Keep going, you kill them". No settings change; the leader reports new orphans at each L1 tick with the exact kill -9 line.
+- 2026-09-25 11:01 CEST - direct question - #145 version pin refused by Claude Code permissions: "Split it out (Recommended)". Pin filed as #147; the owner commits it by hand. PR #146 ships without it.
+- 2026-09-25 11:10 CEST - direct question (xez-unattended-on contract read back, with the orphan-load risk until #146 merges) - "Yes, turn it on"
+  Unattended mode on since 2026-09-25T09:10:38Z. Hard stops: release go, deleting a record, opening a campaign. Parked: account or provider lane switch, scope trim, third repair round. Accepted costs: metered spend while away; stops are instructions, not a hook; orphaned MCP servers may block work until #146 merges.
