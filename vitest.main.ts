@@ -105,6 +105,12 @@ export default defineConfig({
         'src/main/services/browserLaunch/BrowserLaunchService.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
         'src/shared/ipc/browser-schema.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // Offline link and wording check (#138). It reads contributor-controlled
+        // Markdown in the local gate, and its path walk is what keeps a link from
+        // probing or reading files outside the repository, so it carries the
+        // trust-chain floor (spec: 90). measured 99.52/100/94.58/99.52.
+        // See: docs/features/138-user-guide.md § 3.4
+        'scripts/check-links.mjs': { lines: 90, functions: 90, branches: 90, statements: 90 },
       },
       exclude: [
         'node_modules/**',
