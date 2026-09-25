@@ -20,10 +20,12 @@ Empty.
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
+| 03de6de3 | #138 steps 7-8: guide pages + fold-in | docs-maintenance (docs-writing) | codex/gpt-5.6-terra | default |
 
-Counts at dispatch (19:28): tasks 2/10, gate runs 0/2, metered 1/4, load 1.7/18.
+Counts at dispatch (20:16): tasks 1/10, gate runs 0/2, metered 1/4, load 1.8/18.
 
 ## File-ownership table
+- 03de6de3 owns docs/user-guide/*.md, docs/keyboard-shortcuts.md, docs/troubleshooting.md, docs/settings.md, docs/quick-reference.md, docs/getting-started.md, docs/README.md, docs/features/README.md, docs/features/138-user-guide.md, docs/designs/138-user-guide/README.md, BACKWARD_COMPATIBILITY.md
 - Reviews own nothing.
 
 ## Accounts (from `read_quota` at 2026-09-25T18:13:10Z)
