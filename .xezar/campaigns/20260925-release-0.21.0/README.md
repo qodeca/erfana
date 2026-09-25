@@ -20,9 +20,10 @@ Empty.
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
+| 97a5352d | #155 security recheck 2 at bfd5803d | security-review | codex/gpt-6-astra | default |
 | 2a1e4316 | #154 fix code + image findings (round 2) | address-review-findings (author) | claude/opus | qodeca |
 
-Counts at dispatch (18:49): tasks 2/10, gate runs 1/2 (2a1e4316), metered 1/4, load 6.5/18.
+Counts at dispatch (19:08): tasks 2/10, gate runs 1/2 (2a1e4316), metered 1/4, load 2.9/18.
 
 ## File-ownership table
 - 2a1e4316 owns scripts/capture/**, docs/user-guide/**/images, docs/assets/readme/, docs/designs/138-user-guide/README.md (screenshot rows)
