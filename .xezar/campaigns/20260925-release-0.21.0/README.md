@@ -20,12 +20,10 @@ Empty.
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| 3f8af2d8 | #144 correct six user docs | docs-maintenance (mechanical-docs) | pi/deepseek-flash | – |
 
 Counts at dispatch (00:32): tasks 1/10, gate runs 0/2, metered 0/4, load 1.8/18.
 
 ## File-ownership table
-- 3f8af2d8 owns docs/user-guide/**/*.md, docs/keyboard-shortcuts.md, docs/settings.md, docs/prompts/README.md, docs/features/README.md (item 1 lines only; #159 owns item 12), docs/features/138-user-guide.md, docs/designs/138-user-guide/feature-inventory.md
 - Reviews own nothing.
 
 ## Accounts (from `read_quota` at 2026-09-25T20:13:09Z)
@@ -41,7 +39,7 @@ Counts at dispatch (00:32): tasks 1/10, gate runs 0/2, metered 0/4, load 1.8/18.
 | pi | – | no logins | – |
 
 ## Held or queued work
-- #144 – running as 3f8af2d8 (edits kept to exact lines; #159 also edits docs/features/README.md).
+- #144 – PR #160 (7 files, +28/-28), checks green; review next.
 - #138 build – split: part A (plan steps 2-4) merged (#150); step 1 spike done (#149); part B (steps 5, 5b, 6) is PR #154: code review REQUEST CHANGES (1 major, run.mjs readLogin can empty the privacy deny-list); design review FAIL (7 privacy/state blockers B-1..B-10, 5 non-blocking); round 2 done at 46600c39; code recheck APPROVE at b543da12 with 1 minor (Windows test, run.test.mjs:220 vs sandbox.mjs:46; advisory Windows checks red); image re-review PASS WITH FOLLOW-UPS (2 guide-copy notes for step 7); merged 2026-09-25 as c1b1ad21; steps 7-8 follow.
 - #139 build – PR #159: code review APPROVE, design review FAIL (B-1 account name in QA screenshots); round 1 done at 1f924f73 (B-1 masked, NB-1 stated as a limit, NB-2 documented deviation); design recheck PASS at 9203f493; QA FAIL only because 3 checks could not run (chrome-devtools emulate + evaluate_script denied in the QA session): dark mode, theme switch, reduced motion unverified live. Waiting for the owner.
 
