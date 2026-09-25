@@ -9,7 +9,7 @@ Updated: 2026-09-25 11:06 CEST
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
-- #149 ready, head a7eeeaa0 – spike note. Q8 relabelled as an inference, fallback added to 'not tested' (320bec53). Next: scoped-recheck, claude/sonnet, not qodeca (after #153 merges).
+- #149 ready, head a7eeeaa0 – spike note. Q8 relabelled as an inference, fallback added to 'not tested' (320bec53). Re-check 15d570cd running (scoped-recheck, claude/sonnet, gmail).
 - #140 ready, head c442a15b – #139 spec. Re-check 12b29be1 APPROVE at c442a15b, all 11 findings fixed, no new defects. Labels design-approved + merge-queue; #139 labelled design-approved. Next in the merge line after #141: bring up to date, wait for green, squash-merge.
 Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 
@@ -19,10 +19,11 @@ Empty.
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
+| 15d570cd | #149 | code-review (scoped-recheck) | claude/sonnet | gmail |
 | 2a1e4316 | #138 part B | feature-implementation | claude/opus | qodeca |
 | 4458b282 (stopped, waits for owner undo) | allow rule | feature-implementation | claude/opus | gmail |
 
-Counts at dispatch (15:48): tasks 5/10 (xezar runs 2 at once), gate runs 1/2 (4458b282), metered 0/4, load 3.4/18.
+Counts at dispatch (17:42): tasks 2/10, gate runs 0/2, metered 0/4, load 8.3/18.
 
 ## File-ownership table
 - 4458b282 owns .claude/settings.json, scripts/stop-orphan-mcp.mjs (header comment)
