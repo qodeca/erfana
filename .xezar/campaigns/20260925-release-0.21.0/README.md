@@ -20,8 +20,9 @@ Empty.
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
+| ab0c9d7f | #160 full cold review at 4b70f3f1 | code-review (full-cold-review) | claude/opus | westagilelabs |
 
-Counts at dispatch (00:32): tasks 1/10, gate runs 0/2, metered 0/4, load 1.8/18.
+Counts at dispatch (00:58): tasks 1/10, gate runs 0/2, metered 0/4, load 1.5/18.
 
 ## File-ownership table
 - Reviews own nothing.
