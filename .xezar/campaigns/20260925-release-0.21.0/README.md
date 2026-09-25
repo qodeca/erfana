@@ -20,11 +20,12 @@ Empty.
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| a873f32c | #158 full cold review at bcc9bf2e | code-review (full-cold-review) | claude/opus | gmail |
+| bb9b584c | #158 fix review findings (round 1) | docs-maintenance (author) | codex/gpt-6-sol | default |
 
 Counts at dispatch (21:18): tasks 1/10, gate runs 0/2, metered 0/4, load 1.5/18.
 
 ## File-ownership table
+- bb9b584c owns docs/user-guide/*.md, docs/keyboard-shortcuts.md, docs/troubleshooting.md, docs/settings.md, docs/quick-reference.md, docs/getting-started.md, docs/README.md, docs/features/README.md, docs/designs/138-user-guide/README.md, BACKWARD_COMPATIBILITY.md
 - Reviews own nothing.
 
 ## Accounts (from `read_quota` at 2026-09-25T19:13:09Z)
@@ -45,6 +46,7 @@ Counts at dispatch (21:18): tasks 1/10, gate runs 0/2, metered 0/4, load 1.5/18.
 - #139 build – design merged; waits for #138's capture script (part B).
 
 ## Owner items
+- Review task a873f32c (claude/opus, gmail) was refused `jq … | bash .xezar/checks/gh-write.sh` 4 times (don't-ask mode), so it could not post its #158 verdict; earlier reviews on other logins posted. Look at why, or accept relaying.
 - Label issues with `release-0.21.0` to put them in scope.
 - Leader runs `node scripts/stop-orphan-mcp.mjs` at each L1 tick (worked at 12:39). Allow-rule: repository-checks refuses permissions in .claude/settings.json (every read-only agent would get them). Owner chose the leader-only file scripts/xezar-leader-settings.json. Owner undid the edit in both places (17:55); 4458b282 continued to move the rules into the leader-only file (gate repair 2 of 2). Leader restart after merge.
 - Decide whether to hide or delete the reviewer's junk test comments on PR #146.
@@ -52,6 +54,7 @@ Counts at dispatch (21:18): tasks 1/10, gate runs 0/2, metered 0/4, load 1.5/18.
 - PR #140 open decisions, needed before #139 is built, not before its review: (1) go to apply repo description, topics, social preview; (2) extend TRADEMARKS.md to the new banner, wordmark, social image; (3) CI link check as a follow-up issue; (4) light-theme banner vs dark-only rule – owner only if the reviewer disagrees; (5) demo format WebP (after a spike) vs MP4.
 
 ## Rules that bit
+- A review task can finish its review but be refused the GitHub post by its own permission check (a873f32c, 4 refusals). Do not work around it: relay the verdict to the author, who quotes it in the response comment, and say so.
 - Never dispatch while the checkout holds unpushed campaign commits: the task's worktree is cut from the local develop and carries them into its PR (#148).
 - Load over 18 for more than one tick: check `pgrep -fl circuit-electron` for launchers with parent PID 1 before anything else. They ignore SIGTERM. Tell the owner at once; after #145 merges use `node scripts/stop-orphan-mcp.mjs`.
 - xezar ack can fail with "no longer owns the project" while status says owner (seen 00:45-00:47, load over 130). Reads still work; retry ack later, never re-dispatch on it.
