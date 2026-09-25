@@ -63,9 +63,12 @@ test('selection-prompts', async () => {
     // element is shown as an open in-page list (size = 8), Flowcharts chosen.
     await dropdown.evaluate((el) => {
       const sel = el as HTMLSelectElement
-      sel.size = 8
+      sel.size = 6
       sel.style.height = 'auto'
-      sel.options[sel.selectedIndex]?.scrollIntoView({ block: 'center' })
+      // Scroll inside the list only, so the dialog keeps its title in view.
+      const row = sel.scrollHeight / sel.options.length
+      sel.scrollTop = Math.max(0, (sel.selectedIndex - 2) * row)
+      for (let p = sel.parentElement; p; p = p.parentElement) p.scrollTop = 0
     })
     await shot(cap, 'turn-a-selection/visualize-dialog', { crop: dialog, pad: 16 })
     await page.getByTestId(TEST_IDS.DIALOG_BTN_CANCEL).click()
