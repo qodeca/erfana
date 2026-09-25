@@ -43,13 +43,18 @@ describe('scanText', () => {
     expect(hits.join()).not.toMatch(/jdoe|SECRET/)
   })
 
-  it('the real user name inside the sandbox path is not masked away by an allow rule (break: stripping allowed paths or addresses before the literal checks)', () => {
-    // The sandbox path and an example.org address are both allowed on their own…
-    expect(scanText('/Users/Shared/erfana-capture/home/Projects/harbour-garden', deny)).toEqual([])
-    expect(scanText('committee@example.org', deny)).toEqual([])
-    // …but a user name inside either is still reported.
+  it('the real user name is reported even inside a path or an address (break: stripping paths or addresses before the literal checks)', () => {
     expect(scanText('/Users/Shared/erfana-capture/jdoe/Projects', deny)).toContain('username')
     expect(scanText('jdoe@example.org', deny)).toContain('username')
+  })
+
+  it('any absolute path under /Users/ or the sandbox is reported (B-5..B-7; break: allowing the sandbox path)', () => {
+    const d = buildDenyList({ ...fakeMachine, paths: ['/Volumes/Capture-Sandbox'] })
+    expect(scanText('Logs folder /Users/Shared/erfana-capture/home/.erfana/logs', d)).toContain('absolute-path')
+    expect(scanText('Read @/users/shared/x.md', d)).toContain('absolute-path')
+    expect(scanText('/Volumes/Capture-Sandbox/raw', d)).toContain('absolute-path')
+    expect(scanText('~/Projects/harbour-garden %', d)).toEqual([])
+    expect(scanText('/Volumes/HarbourGarden/harbour-garden', d)).toEqual([])
   })
 
   it('name parts match whole words only (break: "Doe" matching inside "Doer")', () => {
@@ -57,10 +62,11 @@ describe('scanText', () => {
     expect(scanText('by Jane, today', deny)).toContain('name-part')
   })
 
-  it('any email outside example.org / example.com is reported, subdomains of those are allowed', () => {
+  it('any email-shaped text is reported, reserved example domains included (B-4; break: an allow-list of domains)', () => {
     expect(scanText('mail someone@gmail.com', deny)).toContain('email')
-    expect(scanText('orders@example.com and x@cdn.example.org', deny)).toEqual([])
-    expect(scanText('x@example.org.evil.test', deny)).toContain('email')
+    expect(scanText('orders@example.com', deny)).toContain('email')
+    expect(scanText('x@cdn.example.org', deny)).toContain('email')
+    expect(scanText('Harbour Street Community Garden', deny)).toEqual([])
   })
 
   it('token shapes, money and usage phrases (break: dropping a pattern kind)', () => {

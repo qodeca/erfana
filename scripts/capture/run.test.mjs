@@ -14,7 +14,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { CaptureError } from './manifest.mjs'
 import { EXIT, parseArgs, readLogin, reportLines, runCheck, safeTarget } from './run.mjs'
-import { MARKER, claudeJson, findClaude, projectClaudeSettings, sandboxProblem, shellQuote, userClaudeSettings } from './sandbox.mjs'
+import { MARKER, VOLUME_ROOT, attachedImages, claudeJson, findClaude, layout, projectClaudeSettings, sandboxProblem, shellQuote, userClaudeSettings, volumeProblem } from './sandbox.mjs'
 import { capitalHeight, judgeFrame, normalise } from './legibility.mjs'
 
 let tmp
@@ -210,6 +210,27 @@ describe('sandbox settings', () => {
     expect(findClaude({ PATH: shim }, { home, tempDirs: [shim] })).toBeNull()
     expect(findClaude({ ERFANA_CAPTURE_CLAUDE_BIN: path.join(real, 'claude'), PATH: '' }, { home })).toBe(fs.realpathSync(path.join(real, 'claude')))
     expect(findClaude({ PATH: '' }, { home })).toBeNull()
+  })
+})
+
+describe('demo drive (B-7)', () => {
+  const l = layout('/Users/Shared/erfana-capture')
+
+  it('the project lives on the demo drive, not under /Users/ or the sandbox (break: a project path the app would show)', () => {
+    expect(l.project.startsWith(`${VOLUME_ROOT}/`)).toBe(true)
+    expect(l.project.startsWith('/Users/')).toBe(false)
+  })
+
+  it('reads mount points from hdiutil info', () => {
+    const info = { images: [{ 'image-path': l.image, 'system-entities': [{ 'content-hint': 'GUID' }, { 'mount-point': VOLUME_ROOT }] }] }
+    expect(attachedImages(info)).toEqual([{ image: l.image, mounts: [VOLUME_ROOT] }])
+    expect(attachedImages({})).toEqual([])
+  })
+
+  it('refuses a mount point it did not make (break: writing into someone else\'s drive)', () => {
+    expect(volumeProblem(l, [{ image: l.image, mounts: [VOLUME_ROOT] }], () => true)).toBeNull()
+    expect(volumeProblem(l, [], () => false)).toBeNull()
+    expect(volumeProblem(l, [{ image: '/elsewhere.dmg', mounts: [VOLUME_ROOT] }], () => true)).toMatch(/did not mount/)
   })
 })
 

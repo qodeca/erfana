@@ -202,7 +202,7 @@ async function main(argv) {
   }
   const unsafe = sandboxProblem(SANDBOX_ROOT)
   if (unsafe) throw new CaptureError(`${unsafe}; remove it and retry.`, EXIT.UNSAFE_SANDBOX)
-  const denyList = buildDenyList({ secrets })
+  const denyList = buildDenyList({ secrets, paths: [SANDBOX_ROOT] })
 
   // 2. Build
   if (!opts.skipBuild) {
@@ -237,6 +237,7 @@ async function main(argv) {
   fs.mkdirSync(encodedDir, { recursive: true })
   const ocr = await createOcr(REPO_ROOT)
   const out = new Map() // row id → encoded file
+  const masked = new Map() // row id → number of masks (design § Privacy, layer 4)
   const privacy = [] // { id, layer, kinds }
   const report = { demo: null }
   try {
@@ -244,6 +245,7 @@ async function main(argv) {
       const meta = JSON.parse(readText(path.join(sb.raw, `${stemOf(row.id)}.json`)) ?? 'null')
       if (!meta) throw new CaptureError(`${row.id}: the scene wrote no shot`, EXIT.SCENE)
       checkTexts(row.id, sb, denyList, privacy)
+      if (meta.masks) masked.set(row.id, meta.masks)
       const target = path.join(encodedDir, `${stemOf(row.id)}.png`)
       await runFfmpeg(stillArgs({ input: meta.png, overlay: meta.overlay, crop: meta.crop, scaleWidth: meta.scaleWidth, output: target }))
       // OCR the final image, and the full-resolution window it came from:
@@ -298,7 +300,7 @@ async function main(argv) {
 
   // 7. Report
   const version = await claudeVersion(claudeBin, sb)
-  const lines = reportLines({ rows: selected, sizes, partial, version, demo: report.demo, guideTotal: budget.guideTotal })
+  const lines = reportLines({ rows: selected, sizes, partial, version, demo: report.demo, guideTotal: budget.guideTotal, masked })
   console.log(lines.join('\n'))
   keepEvidence(sb, lines)
   removeSandbox(sb.root)
@@ -436,7 +438,7 @@ function keepEvidence(sb, lines) {
   console.log(`evidence kept in ${out}`)
 }
 
-export function reportLines({ rows, sizes, partial, version, demo, guideTotal }) {
+export function reportLines({ rows, sizes, partial, version, demo, guideTotal, masked = new Map() }) {
   const out = [`capture report${partial ? ' (partial run)' : ''}`]
   out.push(`Claude Code: ${version}`)
   out.push('Chromium switches: --force-device-scale-factor=2 --force-color-profile=srgb --force-prefers-reduced-motion')
@@ -444,7 +446,8 @@ export function reportLines({ rows, sizes, partial, version, demo, guideTotal })
   for (const r of rows) {
     const b = sizes.get(r.id)
     total += b
-    out.push(`  ${formatKB(b).padStart(8)}  ${r.file}${r.agent ? '  (agent)' : ''}`)
+    const m = masked.get(r.id)
+    out.push(`  ${formatKB(b).padStart(8)}  ${r.file}${r.agent ? '  (agent)' : ''}${m ? `  (${m} mask${m > 1 ? 's' : ''})` : ''}`)
   }
   const guide = rows.filter((r) => r.file.startsWith(GUIDE_IMAGES_DIR)).length
   out.push(`${guide} guide image(s), ${rows.length - guide} README demo file(s); this run ${formatKB(total)}; all guide images ${formatKB(guideTotal)} of 12288 KB`)

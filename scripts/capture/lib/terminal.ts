@@ -21,7 +21,7 @@ type CaptureWindow = Window & {
 }
 
 /** The neutral prompt the sandbox `.zshrc` sets, as it reads in the project. */
-export const SHELL_PROMPT = '~/Projects/harbour-garden %'
+export const SHELL_PROMPT = 'harbour-garden %'
 
 /** Start keeping the PTY stream. Call before the project opens. */
 export async function installPtyRecorder(page: Page): Promise<void> {

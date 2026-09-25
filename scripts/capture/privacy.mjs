@@ -18,8 +18,12 @@ import path from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { createRequire } from 'node:module'
 
-/** Mail domains the fixture may show (RFC 2606 reserved names). */
-export const ALLOWED_MAIL_DOMAINS = ['example.org', 'example.com']
+/**
+ * Absolute-path prefixes no image may show (PR #154 design review, B-5..B-7):
+ * a home folder or the capture sandbox. Matched case-insensitively anywhere
+ * in the text. The sandbox root is added by `buildDenyList`.
+ */
+export const PATH_PREFIXES = ['/users/']
 
 /** Phrases that describe account usage (design § Privacy, layer 2). */
 export const USAGE_PHRASES = ['usage limit', 'weekly limit', 'rate limit']
@@ -33,6 +37,7 @@ const MIN_LITERAL = 3
  * @param {object} [o]
  * @param {Record<string, string|undefined>} [o.env]
  * @param {string[]} [o.secrets] - values that must never be shown (token, key)
+ * @param {string[]} [o.paths] - absolute folders whose path must never be shown (the sandbox)
  * @param {() => {username: string, homedir: string}} [o.userInfo]
  * @param {() => string} [o.hostname]
  * @param {(args: string[]) => string} [o.git] - `git config --get …`, '' if unset
@@ -42,6 +47,7 @@ const MIN_LITERAL = 3
 export function buildDenyList({
   env = process.env,
   secrets = [],
+  paths = [],
   userInfo = () => os.userInfo(),
   hostname = () => os.hostname(),
   git = defaultGit,
@@ -71,6 +77,7 @@ export function buildDenyList({
     for (const part of String(name || '').split(/[\s,.]+/)) add('name-part', part, true)
   }
   for (const secret of secrets) add('secret', secret)
+  for (const p of paths) add('absolute-path', p)
   if (env.ANTHROPIC_API_KEY) add('secret', env.ANTHROPIC_API_KEY)
   // Extra terms the operator names (an organisation or account label).
   for (const term of String(env.ERFANA_CAPTURE_DENY_EXTRA || '').split(',')) add('operator-term', term, true)
@@ -138,9 +145,6 @@ export function findEmails(text) {
   return found
 }
 
-function isAllowedMailDomain(domain) {
-  return ALLOWED_MAIL_DOMAINS.some((d) => domain === d || domain.endsWith(`.${d}`))
-}
 
 /** `sk-ant-…` / `sk-…` key shapes: at least 16 key characters after the prefix. */
 const TOKEN_SHAPE = /(?:^|[^A-Za-z0-9])sk-[A-Za-z0-9_-]{16}/
@@ -161,9 +165,10 @@ export function scanText(text, denyList) {
   for (const entry of denyList) {
     if (findLiteral(hay, entry.value.toLowerCase(), entry.word)) kinds.add(entry.kind)
   }
-  for (const email of findEmails(String(text))) {
-    if (!isAllowedMailDomain(email.domain)) kinds.add('email')
-  }
+  // Any email-shaped text, reserved example domains included (B-4): a
+  // published image shows no address at all.
+  if (findEmails(String(text)).length) kinds.add('email')
+  for (const prefix of PATH_PREFIXES) if (hay.includes(prefix)) kinds.add('absolute-path')
   if (TOKEN_SHAPE.test(String(text))) kinds.add('token-shape')
   if (MONEY.test(String(text))) kinds.add('money')
   for (const phrase of USAGE_PHRASES) if (hay.includes(phrase)) kinds.add('usage')

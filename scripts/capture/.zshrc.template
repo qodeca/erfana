@@ -18,8 +18,9 @@ unset ERFANA_CAPTURE_CLAUDE_TOKEN_FILE
 # `claude` is linked into the sandbox's own ~/.local/bin.
 export PATH="$HOME/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 
-# A neutral prompt: no user or host name (Erfana's default prompt shows %n).
+# A neutral prompt: the folder name only, no user or host name and no
+# absolute path (Erfana's default prompt shows %n).
 unsetopt PROMPT_SP
-PROMPT='%~ %# '
+PROMPT='%1~ %# '
 PS1="$PROMPT"
 RPROMPT=''

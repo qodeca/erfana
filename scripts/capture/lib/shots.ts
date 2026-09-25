@@ -81,7 +81,20 @@ export interface ShotOptions {
   keepHover?: boolean
   /** Cut the crop to this many CSS px from its top (a tall, mostly empty panel). */
   maxHeight?: number
+  /**
+   * Elements to cover with a solid box (design § Privacy, layer 4: only for
+   * something unavoidable, such as the Logs folder path, which is always an
+   * absolute path in the sandbox home). Listed in the shot's record and the
+   * report; their text is left out of the DOM check because the image does
+   * not show it.
+   */
+  mask?: Locator[]
+  /** Take one screenshot without waiting for the window to settle (an agent still working). */
+  noSettle?: boolean
 }
+
+/** Solid mask colour: the app's panel grey, fully opaque, never a blur. */
+export const MASK_COLOR = '#2b2b2b'
 
 /** The window as Electron draws it, as PNG, at the device scale. */
 async function captureWindow(cap: Capture): Promise<Buffer> {
@@ -135,10 +148,10 @@ export async function diffPixels(a: Buffer, b: Buffer): Promise<number> {
 }
 
 /** Take screenshots until two consecutive ones are the same (within MAX_DIFF_PIXELS). */
-export async function stableScreenshot(page: Page): Promise<Buffer> {
+export async function stableScreenshot(page: Page, mask: Locator[] = []): Promise<Buffer> {
   let prev: Buffer | null = null
   for (let i = 0; i < MAX_ATTEMPTS; i++) {
-    const buf = await page.screenshot({ animations: 'disabled', caret: 'hide', scale: 'device', type: 'png', style: SHOT_STYLE })
+    const buf = await page.screenshot({ animations: 'disabled', caret: 'hide', scale: 'device', type: 'png', style: SHOT_STYLE, mask, maskColor: MASK_COLOR })
     if (prev && (prev.equals(buf) || (await diffPixels(prev, buf)) <= MAX_DIFF_PIXELS)) return buf
     if (i === MAX_ATTEMPTS - 1 && prev && process.env.ERFANA_CAPTURE_SANDBOX) {
       // Keep the last two for whoever looks at the failure (the sandbox stays).
@@ -207,7 +220,12 @@ export async function shot(cap: Capture, id: string, opts: ShotOptions = {}): Pr
   // Park the mouse on the empty strip at the bottom of the right activity
   // bar, so no button keeps a hover highlight.
   if (!opts.keepHover) await page.mouse.move(WIDTH - 4, HEIGHT - 60)
-  const png = opts.windowCapture ? await stableWindowCapture(cap) : await stableScreenshot(page)
+  if (opts.mask && opts.windowCapture) throw new Error('mask is not supported with windowCapture')
+  const png = opts.windowCapture
+    ? await stableWindowCapture(cap)
+    : opts.noSettle
+      ? await page.screenshot({ caret: 'hide', scale: 'device', type: 'png', style: SHOT_STYLE, mask: opts.mask ?? [], maskColor: MASK_COLOR })
+      : await stableScreenshot(page, opts.mask ?? [])
   const file = (ext: string): string => path.join(sb.raw, `${stem}${ext}`)
   fs.mkdirSync(sb.raw, { recursive: true })
   fs.writeFileSync(file('.png'), png)
@@ -226,15 +244,52 @@ export async function shot(cap: Capture, id: string, opts: ShotOptions = {}): Pr
       overlay = { file: file('.native.png'), x: view.bounds.x * SCALE, y: view.bounds.y * SCALE }
     }
   }
+  const maskRects: Rect[] = []
+  for (const m of opts.mask ?? []) {
+    const b = await m.boundingBox()
+    if (b) maskRects.push(b)
+  }
   const isWindow = crop === null
   const meta = {
     id,
     png: file('.png'),
     crop,
     overlay,
-    scaleWidth: isWindow ? (opts.scaleWidth ?? 1600) : null
+    scaleWidth: isWindow ? (opts.scaleWidth ?? 1600) : null,
+    masks: maskRects.length
   }
   fs.writeFileSync(file('.json'), `${JSON.stringify(meta, null, 2)}\n`)
-  fs.writeFileSync(file('.dom.txt'), await page.evaluate(() => document.body.innerText))
+  const cssClip = crop ? { x: crop.x / SCALE, y: crop.y / SCALE, width: crop.width / SCALE, height: crop.height / SCALE } : { x: 0, y: 0, width: WIDTH, height: HEIGHT }
+  fs.writeFileSync(file('.dom.txt'), await visibleText(page, cssClip, maskRects))
   fs.writeFileSync(file('.pty.txt'), await readPty(page))
+}
+
+/**
+ * The text a shot shows: every rendered text node with a box inside the clip
+ * (CSS px) and not wholly under a mask. Unlike `document.body.innerText` it
+ * leaves out text scrolled away or outside a crop, so the deny-list judges
+ * what the image holds; truncated text still counts in full.
+ */
+export async function visibleText(page: Page, clip: Rect, masks: Rect[] = []): Promise<string> {
+  return page.evaluate(
+    ({ clip, masks }) => {
+      const hits = (r: DOMRect, a: { x: number; y: number; width: number; height: number }): boolean =>
+        r.left < a.x + a.width && r.right > a.x && r.top < a.y + a.height && r.bottom > a.y
+      const covered = (r: DOMRect): boolean =>
+        masks.some((m) => r.left >= m.x - 1 && r.right <= m.x + m.width + 1 && r.top >= m.y - 1 && r.bottom <= m.y + m.height + 1)
+      const out: string[] = []
+      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT)
+      for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+        const text = n.textContent ?? ''
+        const parent = n.parentElement
+        if (!text.trim() || !parent || !parent.checkVisibility({ opacityProperty: true, visibilityProperty: true })) continue
+        const range = document.createRange()
+        range.selectNodeContents(n)
+        const rects = [...range.getClientRects()].filter((r) => r.width > 0 && r.height > 0)
+        if (rects.some((r) => hits(r, clip) && !covered(r))) out.push(text)
+      }
+      return out.join('\n')
+    },
+    { clip, masks }
+  )
 }
