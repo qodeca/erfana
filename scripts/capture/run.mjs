@@ -95,7 +95,13 @@ export function runCheck({ root = REPO_ROOT, rows, log = console.log, listFiles 
  * The agent login inputs. Returns the secret values for the deny-list; they
  * are held in memory only and never printed or written.
  */
-export function readLogin(env = process.env, fsApi = fs) {
+/**
+ * A login input that is set but unusable always stops the run (exit 3), even
+ * when another input works and even when no selected row needs the agent: a
+ * broken input must never quietly leave a secret off the deny-list.
+ * `required: false` (no agent row selected) only allows "nothing set at all".
+ */
+export function readLogin(env = process.env, fsApi = fs, { required = true } = {}) {
   const secrets = []
   if (env.ANTHROPIC_API_KEY) secrets.push(env.ANTHROPIC_API_KEY)
   const file = env.ERFANA_CAPTURE_CLAUDE_TOKEN_FILE
@@ -113,7 +119,7 @@ export function readLogin(env = process.env, fsApi = fs) {
     if (!token) throw new CaptureError('ERFANA_CAPTURE_CLAUDE_TOKEN_FILE is empty. Screenshots were not changed.', EXIT.NO_LOGIN)
     secrets.push(token)
   }
-  if (secrets.length === 0) {
+  if (secrets.length === 0 && required) {
     throw new CaptureError(
       'No Claude Code login for the capture sandbox: set ANTHROPIC_API_KEY or ERFANA_CAPTURE_CLAUDE_TOKEN_FILE. Screenshots were not changed.',
       EXIT.NO_LOGIN
@@ -184,7 +190,7 @@ async function main(argv) {
   if (process.platform !== 'darwin') throw new CaptureError('docs:screenshots runs on macOS only.', EXIT.NOT_MACOS)
   const { rows: selected, partial } = resolveOnly(rows, opts.only)
   const needsAgent = selected.some((r) => r.agent)
-  const secrets = needsAgent ? readLogin() : readLoginIfAny()
+  const secrets = readLogin(process.env, fs, { required: needsAgent })
   const claudeBin = findClaude()
   if (needsAgent && !claudeBin) throw new CaptureError('`claude` (Claude Code) was not found; install it or set ERFANA_CAPTURE_CLAUDE_BIN.', EXIT.NO_LOGIN)
   resolveTesseract(REPO_ROOT)
@@ -297,14 +303,6 @@ async function main(argv) {
   keepEvidence(sb, lines)
   removeSandbox(sb.root)
   return EXIT.OK
-}
-
-function readLoginIfAny() {
-  try {
-    return readLogin()
-  } catch {
-    return []
-  }
 }
 
 /** Deny-list over the scene's DOM text and PTY stream for one row. */

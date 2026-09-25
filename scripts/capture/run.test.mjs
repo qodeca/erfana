@@ -59,6 +59,25 @@ describe('readLogin (exit 3)', () => {
     expect(() => readLogin({ ERFANA_CAPTURE_CLAUDE_TOKEN_FILE: path.join(tmp, 'nope') })).toThrow(/cannot be read/)
   })
 
+  it('a broken token file with a working API key still stops the run (break: returning only the secrets read so far)', () => {
+    const env = { ANTHROPIC_API_KEY: 'invented-key-value', ERFANA_CAPTURE_CLAUDE_TOKEN_FILE: path.join(tmp, 'rotated-away') }
+    for (const required of [true, false]) {
+      let err
+      try {
+        readLogin(env, fs, { required })
+      } catch (e) {
+        err = e
+      }
+      expect(err, `required: ${required}`).toBeInstanceOf(CaptureError)
+      expect(err.exitCode).toBe(EXIT.NO_LOGIN)
+    }
+  })
+
+  it('a run with no agent row may have no login at all, but keeps every secret that is set (break: an empty deny-list)', () => {
+    expect(readLogin({}, fs, { required: false })).toEqual([])
+    expect(readLogin({ ANTHROPIC_API_KEY: 'invented-key-value' }, fs, { required: false })).toEqual(['invented-key-value'])
+  })
+
   it('the error never contains the token (break: echoing the file content in a message)', () => {
     const f = path.join(tmp, 'token')
     fs.writeFileSync(f, 'x'.repeat(20000))
