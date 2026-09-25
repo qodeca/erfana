@@ -126,7 +126,7 @@ Every fact in the current `README.md` (106 lines, read at `e21cadf3`), with wher
 | ID | Line | Fact | Ends up in |
 |---|---|---|---|
 | F-01 | 1 | Name "Erfana" | README – `<h1>` whose content is the banner, alt text "Erfana" |
-| F-02 | 3 | Open-source, agent-native Markdown workspace | README – pitch |
+| F-02 | 3 | Open-source, agent-native Markdown workspace | README – pitch (both words kept, see [Pitch](#pitch)); repository description (proposed value keeps "agent-native") |
 | F-03 | 3 | Run a terminal coding agent like Claude Code right beside the editor | README – pitch sub-line |
 | F-04 | 5 | CI status badge (`checks.yml`, branch `main`) | README – badge row |
 | F-05 | 6 | Latest release badge | README – badge row |
@@ -232,19 +232,25 @@ The README is one screen with two regions: the **hero** (everything above "How i
 
 ### First-screen budget (AC-1)
 
-Measured at a **1440×900 viewport**, scrolled so the README article's top edge is at the top of the viewport (the file list above a repository's README is GitHub's and outside our control; the same measurement on the README file view is recorded too).
+Measured at a **1440×900 viewport**. On the repository home page GitHub draws the file list above the README, so the literal first screen of `github.com/qodeca/erfana` shows **no** banner; that is GitHub's layout and outside our control, and the PR says so plainly. Two measurements are therefore taken:
+
+- **Pass measurement – the README file view, unscrolled** (`github.com/qodeca/erfana/blob/<branch>/README.md`, the page a "README" link opens). GitHub's own chrome (header, repository tabs, file header) sits above the article; its height is *unverified* here and is read in step 9.
+- **Recorded, not pass/fail – the repository home page, scrolled** so the README article's top edge is at the top of the viewport. This is what a visitor sees after one scroll.
+
+Heights inside the article (approximate, before step 9 measures them):
 
 | Block | Displayed height (px, approx.) |
 |---|---|
 | Banner (`width="800"`, 4:1) | 200 |
+| Rule GitHub draws under an `<h1>`, with its padding (*unverified*, seen in step 9) | 10 |
 | Pitch + sub-line | 80 |
 | Download button + platform line | 70 |
 | Link row | 30 |
 | Gaps | 60 |
-| **Demo top edge at** | **≈ 440** |
+| **Demo top edge at** | **≈ 450 from the article top** |
 | Demo (`width="800"`, 16:10) | 500 |
 
-Pass rule: banner, pitch, Download button fully visible, and the demo's top edge at or above **450 px** from the article top (so at least half the demo is visible at 900 px). The check reads `getBoundingClientRect()` of each element, not a visual guess.
+Pass rule, on the unscrolled README file view at 1440×900: banner, pitch and Download button fully inside the viewport, and the demo's top edge at or above **700 px** from the viewport top (at least 200 px of the demo visible). On the scrolled home page the same blocks are recorded with the demo top expected at about 450 px from the article top. The check reads `getBoundingClientRect()` of each element, not a visual guess. If the file view misses the rule, the banner height is the first thing reduced (the adjustable part, see [Risks](#risks)).
 
 ### Hero markup (shape, not final copy)
 
@@ -257,7 +263,7 @@ Pass rule: banner, pitch, Download button fully visible, and the demo's top edge
   </picture>
 </h1>
 
-<p align="center"><strong>An open-source Markdown workspace for terminal coding agents.</strong><br>
+<p align="center"><strong>The open-source, agent-native Markdown workspace.</strong><br>
 Editor, live preview, project tree and a terminal running Claude Code – or any CLI agent – in one window.</p>
 
 <p align="center">
@@ -282,15 +288,15 @@ Editor, live preview, project tree and a terminal running Claude Code – or any
 
 ### Pitch
 
-Recommended: **"An open-source Markdown workspace for terminal coding agents."** (nine words, category-framed, research pattern 2). The sub-line names what is in the window and says "Claude Code – or any CLI agent", so the pitch never implies Erfana has its own AI.
+Recommended: **"The open-source, agent-native Markdown workspace."** (five words, category-framed, research pattern 2). It keeps "agent-native", the term `CLAUDE.md` and the current README and repository description use for the project (F-02). The sub-line says what "agent-native" means – what is in the window and "Claude Code – or any CLI agent" – so the pitch never implies Erfana has its own AI.
 
-Alternatives the reviewer may prefer (all pass AC-7): "Write Markdown beside your coding agent." / "Your Markdown and your terminal coding agent, in one window."
+Alternatives the reviewer may prefer (all pass AC-7 and keep F-02): "An agent-native Markdown workspace for terminal coding agents." / "Agent-native Markdown: your editor and your terminal coding agent, in one window."
 
 Words the README must not use about Erfana itself: "AI-powered", "built-in AI", "AI editor", "AI assistant", "smart", "intelligent", or any phrasing where Erfana, not the hosted agent, does the thinking. The context meter is always introduced as "for a Claude Code session".
 
 ### Banner and wordmark
 
-**Source of truth is a design-system card**, not an image editor: `design/product/github-presentation/banner.html` (status `proposed`), built only from `design/tokens.css` (the synced copy of `design-tokens.css`) and `design/fonts.css`. A script rasterises it (plan step 3). So the banner's colours are the shipping tokens, `npm run lint:css` rejects a hex colour in it, and a token change is one re-run away from a new banner.
+**Source of truth is a design-system card**, not an image editor: `design/product/github-presentation/index.html` (status `proposed`, the same layout as the existing `design/product/html-approval/index.html`), built only from `design/tokens.css` (the synced copy of `design-tokens.css`) and `design/fonts.css`. A script rasterises it (plan step 3). So the banner's colours are the shipping tokens, `npm run lint:css` rejects a hex colour in it, and a token change is one re-run away from a new banner.
 
 Composition, 1600×400 px (4:1), exported at 2× of an 800×200 layout:
 
@@ -301,13 +307,13 @@ Composition, 1600×400 px (4:1), exported at 2× of an 800×200 layout:
 │  └────┘                        │ ▪ ▪  │ ▬▬▬▬ ▬▬ ▬▬▬    │ ▬▬▬▬         │ │
 │  icon.png  wordmark            │ ▪ ▪  │ ████ selected  │ ┌─┐→┌─┐      │ │
 │  (unmodified) Cascadia Mono    ├──────┴────────────────┴──────────────┤ │
-│              Bold               │ ❯ claude ▌                           │ │
+│              Bold               │ ❯ ▌                                  │ │
 │                                 └──────────────────────────────────────┘ │
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
 - **Left**: `resources/icon.png`, unmodified (no recolour, crop, outline or effect – `TRADEMARKS.md`), at 88 px layout size, then the wordmark **"Erfana"** in Cascadia Mono Bold at 60 px layout size (`--font-mono`). The name keeps its capital E as written in `TRADEMARKS.md`.
-- **Right**: a flat, abstract window – project tree, editor with one line in the selection colour, preview with a two-node flowchart, and a terminal strip with a `❯ claude` prompt and a lime block cursor. It tells the same story as the demo (select → agent → diagram) without a screenshot's detail. Borders 1 px, `border-radius: 0`, no shadow, no gradient.
+- **Right**: a flat, abstract window – project tree, editor with one line in the selection colour, preview with a two-node flowchart, and a terminal strip with a bare `❯` prompt glyph and a lime block cursor – no command name, so no third-party name or mark appears in the banner or the social preview. It tells the same story as the demo (select → agent → diagram) without a screenshot's detail. Borders 1 px, `border-radius: 0`, no shadow, no gradient.
 - **Why Cascadia Mono for every glyph in the image**: it is bundled and OFL-licensed, so the banner renders identically on any machine and ties the brand to the terminal. The system sans (`--font-sans`) would rasterise as SF Pro on the macOS capture machine, whose licence is not ours to redistribute in marketing images.
 
 | Element | Dark variant | Light variant | Contrast (computed) |
@@ -318,10 +324,12 @@ Composition, 1600×400 px (4:1), exported at 2× of an 800×200 layout:
 | Pane text bars | `--color-gray-700` | `--color-gray-300` | decorative |
 | Selected line | `--color-brand-violet-muted` | `--color-brand-violet-muted` | decorative |
 | Terminal strip | `--color-brand-black` fill in **both** variants (the app's terminal is always dark) | same | – |
-| Prompt `❯ claude` | `--color-text-primary` (gray-300) on brand-black | same | 11.51:1 |
+| Prompt glyph `❯` | `--color-text-primary` (gray-300) on brand-black | same | 11.51:1 |
 | Cursor | `--color-brand-lime` | `--color-brand-lime` (on the dark strip) | 13.94:1 |
 
 Lime is never placed on a light surface: lime on `#F8FAF8` is **1.26:1**. Violet on light is 2.10:1, so violet only appears as a muted fill. Where the light variant needs an accent line, it uses `--color-brand-indigo` (7.61:1 on brand-white).
+
+The ratios in this section were computed by hand for the design. In the card they are **not typed**: each one the card shows is a `contrast` entry in `design/claims.json` written as `<span data-claim="…">` (`design/README.md` § A card is done when), so the design-claims test re-derives them from the tokens on every CI run.
 
 **Solid backgrounds, not transparent**: the fallback `<img>` (light) and any viewer that ignores `<picture>` stay legible, and the edge still vanishes against both GitHub canvases. On GitHub's dimmed dark theme (#22272e) the dark banner shows as a flat rectangle – acceptable and consistent with the flat design; recorded in QA.
 
@@ -329,34 +337,44 @@ Lime is never placed on a light surface: lime on `#F8FAF8` is **1.26:1**. Violet
 
 ### Social preview
 
-`docs/assets/readme/social-preview.png`, **1280×640** (GitHub's recommended size), rendered from the same card: dark variant, icon and wordmark centred-left, the pitch in Cascadia Mono Regular beneath, the abstract window on the right. Content stays inside a 1200×560 safe area (a 40 px margin, so crops by other sites do not cut the wordmark – common practice, *unverified* for each site). Solid background, no Claude or Anthropic mark. Budget ≤ 300 KB (GitHub's limit is 1 MB). It is uploaded only through Settings → Social preview, which is the owner's call (see [Repository metadata](#repository-metadata-owners-go-required)).
+`docs/assets/readme/social-preview.png`, **1280×640** (GitHub's recommended size), rendered from the same card: dark variant, icon and wordmark centred-left, the pitch in Cascadia Mono Regular beneath, the abstract window on the right. Content stays inside a 1200×560 safe area (a 40 px margin, so crops by other sites do not cut the wordmark – common practice, *unverified* for each site). Solid background, no third-party name or mark (no Claude, Anthropic or `claude` text). Budget ≤ 300 KB (GitHub's limit is 1 MB). It is uploaded only through Settings → Social preview, after the README merges and after the owner has seen it (see [Repository metadata](#repository-metadata-applied-after-merge)).
 
 ### Demo loop
 
-**Format.** Within the owner's choice ("GIF or animated WebP"): animated **WebP**, falling back to **GIF** only if plan step 1 shows WebP does not play on github.com in current Chrome, Safari and Firefox. WebP is preferred because GIF's 256-colour limit bands the app's UI and costs several times the bytes (research, "Against animated GIF").
+**Format** (decided – owner's pick "A 10–20 second loop (GIF or WebP)", leader decision 2026-09-25): animated **WebP** if plan step 1 shows it plays on github.com in current Chrome, Safari and Firefox; otherwise **GIF**. WebP is preferred because GIF's 256-colour limit bands the app's UI and costs several times the bytes (research, "Against animated GIF"). Both come from **#138's** capture pipeline: its `encode.mjs` emits animated WebP beside the GIF and MP4 it already produces, and its output allow-list admits `docs/assets/readme/` (R138-9, R138-10). #139 writes no encoder of its own.
 
-**Video, considered and not chosen without the owner.** Style guides favour MP4 over any animated image, and GitHub plays `.mp4`/`.webm`. But in a README a video plays only as a `user-attachments` URL uploaded through the web editor: `<video>` is stripped and a committed `.mp4` does not play. That means the file lives outside the repository, a person must re-upload it after every re-recording (no CLI path was found), it shows as a player rather than a silent loop, and it does not travel with a fork. Its gains are real – a much smaller file, full colour, and a pause control. Because it departs from the owner's "GIF or animated WebP", it is [open decision 5](#open-decisions), not a silent switch.
+**Video, considered and not chosen without the owner.** Style guides favour MP4 over any animated image, and GitHub plays `.mp4`/`.webm`. But in a README a video plays only as a `user-attachments` URL uploaded through the web editor: `<video>` is stripped and a committed `.mp4` does not play. That means the file lives outside the repository, a person must re-upload it after every re-recording (no CLI path was found), it shows as a player rather than a silent loop, and it does not travel with a fork. Its gains are real – a much smaller file, full colour, and a pause control. Because it departs from the owner's "GIF or WebP", it is not used in the hero (see [open decision 5](#open-decisions)). #138's MP4 of the same scenario exists anyway and may be linked from the user guide.
 
-**Size and timing.** 1280×800 encoded (16:10, displayed at `width="800"`, so 1.6× – sharp on most retina screens at a fraction of 2×'s weight), 12 fps, **16 s** loop (AC-3 range 10–20 s). Budget: **target ≤ 3 MiB, hard cap 5 MiB** (the Camo default and a sensible first-load ceiling). The PR states the measured duration and size.
+**Size and timing.** Recorded and encoded at **1280×800** – the window's content size, the one size both #138 and #139 use (#138 sets it with `setContentSize(1280, 800)`). 16:10, displayed at `width="800"`, so 1.6× – sharp on most retina screens at a fraction of 2×'s weight. 12 fps, **18 s** loop (AC-3 range 10–20 s). Budget: **target ≤ 3 MiB, hard cap 5 MiB** – a first-load ceiling (about 4 s on a 10 Mbit/s link, see UX item 9). The images are repository-relative, so they are served from the repository, not through the Camo proxy for external images; 5 MiB also happens to be open-source Camo's cap, which is not claimed to apply here. The PR states the measured duration and size.
+
+**Terminal legibility.** Displayed at 800 px the 1280 px window is scaled to 62.5 %. The terminal's font size is fixed at 12 px (`TERMINAL_OPTIONS` in `src/renderer/src/components/Panels/TerminalPanel/terminalPanel.logic.ts`; not a user setting), so terminal text comes out at 7.5 px – too small to read. Two levers, neither of which changes the app:
+
+1. a **capture-only zoom** – the capture script sets the window's Electron zoom factor (about 1.3) after launch, so the 1280×800 content shows the UI larger; costs less visible content per pane;
+2. a **wider display** – `width` above 800 up to the README column; costs first-screen height (AC-1 budget).
+
+Plan step 4 picks between them with a short test clip taken **through the final encode**, before the scenario is built on it. Pass: every character of the prompt line and the agent's last lines is readable in a frame from the encoded file shown at its README display width, and the terminal's capital-letter height is at least 7 CSS px at that width (measured on the frame). The same clip is the evidence for R138-3's recorder quality: if Playwright `recordVideo` blurs the text, R138-3's fallback applies.
 
 **Storyboard** (times are in the final, edited loop):
 
 | Shot | Time | On screen | Why |
 |---|---|---|---|
-| S0 Establish | 0.0–2.0 s | Erfana window with the #138 demo project open: tree left, a Markdown plan in the editor, live preview right, terminal below with Claude Code idle at its prompt; the context status bar visible | The whole product in one frame |
-| S1 Select | 2.0–4.5 s | A 5–7-step list in the editor is selected; right-click opens the context menu with the prompt templates; "Visualize" → "Flowchart" is chosen | Shows Markdown-to-prompt, the step no other editor has |
-| S2 Hand-off | 4.5–6.0 s | The prompt appears in the terminal and is submitted to Claude Code | Makes clear the agent is Claude Code in the terminal, not Erfana |
-| S3 Agent works | 6.0–11.0 s | Claude Code reads and edits the file (real output, **sped up**); the context meter moves | The feedback loop; the only sped-up segment |
-| S4 Edit lands | 11.0–14.0 s | A ` ```mermaid ` block appears in the editor; the preview renders the flowchart | "See the edit land" (owner's words) |
-| S5 Hold | 14.0–16.0 s | Final state held still, then the loop restarts | A calm cut; gives the eye time to read the diagram |
+| S0 Open a project | 0.0–2.5 s | Erfana's start screen in the capture sandbox; the #138 demo project is opened from inside Erfana (its only recent-projects entry – never the native folder dialog, whose sidebar shows the user's name and home). The tree, a Markdown plan in the editor, the live preview and the terminal appear | "Open a project" (owner's words) |
+| S1 Establish | 2.5–4.0 s | **Cut** (the terminal's Claude Code start-up screen is not shown, see R138-4): the same window with Claude Code idle at its prompt in the terminal; the context status bar visible | The whole product in one frame; "run the agent" |
+| S2 Select | 4.0–6.5 s | A 5–7-step list in the editor is selected; right-click opens the context menu with the prompt templates; "Visualize" → "Flowchart" is chosen | Shows Markdown-to-prompt, the step no other editor has |
+| S3 Hand-off | 6.5–8.0 s | The prompt appears in the terminal and is submitted to Claude Code | Makes clear the agent is Claude Code in the terminal, not Erfana |
+| S4 Agent works | 8.0–13.0 s | Claude Code reads and edits the file (real output, **sped up**); no approval prompt stops it (R138-8); the context meter moves | The feedback loop; the only sped-up segment |
+| S5 Edit lands | 13.0–16.0 s | A ` ```mermaid ` block appears in the editor; the preview renders the flowchart | "See the edit land" (owner's words) |
+| S6 Hold | 16.0–18.0 s | Final state held still, then the loop restarts | A calm cut; gives the eye time to read the diagram |
+
+The three steps the owner named – open a project, run the agent, see the edit land – are S0, S1–S4 and S5. The loop has one cut (S0→S1) and one speed-up (inside S4), nothing else edited.
 
 The caption under the demo says it is a real Claude Code session with the agent's working time sped up, so the loop does not overstate speed. No text is burned into the frames.
 
-**Alt text**: "Erfana demo: a list in a Markdown file is selected, sent to Claude Code in the built-in terminal with the Visualize prompt, and the agent's edit lands as a flowchart in the live preview."
+**Alt text**: "Erfana demo: a project is opened, a list in a Markdown file is selected and sent to Claude Code in the integrated terminal with the Visualize prompt, and the agent's edit lands as a flowchart in the live preview."
 
 **Scrubbing** (owner decision: real Claude Code, scrubbed). The loop must show no email address, account or organisation name, username or home path, token, API key, plan or usage figures (`/usage`, `/cost`, rate-limit messages), and no client data. The context meter's model name and percentage are session context, not account usage, and may show; its exact token counts only appear on hover, so the recording never hovers the meter. How the capture guarantees this is a requirement on #138 (below); how it is checked is plan step 5 (a one-frame-per-second contact sheet reviewed frame by frame).
 
-**Still** (`demo-still.png`): the S4 frame at 1280×800 as PNG, used for `prefers-reduced-motion` and as the fallback if the demo cannot be recorded.
+**Still** (`demo-still.png`): the S5 frame at 1280×800 as PNG, used for `prefers-reduced-motion` and as the fallback if the demo cannot be recorded.
 
 ### Features list
 
@@ -396,13 +414,13 @@ Each is 2–3 lines and links the full text. Wording is the implementer's, bound
 
 `docs/about.md` (new) holds the full "Why open source, and how it's licensed" and "Built by Qodeca" text **verbatim** from the current README, plus a link back. Moving text verbatim is what makes "no legal fact lost" checkable by diff.
 
-### Repository metadata (owner's go required)
+### Repository metadata (applied after merge)
 
-Changing repository settings is outward-facing. **The implementer proposes these values in the PR; the leader applies them only after the owner says go.** Nothing below is applied by this design or by the implementation PR itself.
+Changing repository settings is outward-facing. **Decided by the owner (2026-09-25): the description, topics and social preview are applied only after the README merges, with the values shown to the owner first.** The implementer proposes the values in the PR; after the merge the leader shows them to the owner and applies them. Nothing below is applied by this design or by the implementation PR itself.
 
-| Setting | Current | Proposed | Command (for the leader, after the go) |
+| Setting | Current | Proposed | Command (for the leader, after the merge and the owner has seen the values) |
 |---|---|---|---|
-| Description | "An agent-native, open-source Markdown workspace – run Claude Code and other terminal coding agents right beside your editor. macOS & Windows." | "An open-source Markdown workspace for terminal coding agents – editor, live preview, project tree and a terminal running Claude Code or any CLI agent. macOS & Windows." | `gh repo edit qodeca/erfana --description "…"` |
+| Description | "An agent-native, open-source Markdown workspace – run Claude Code and other terminal coding agents right beside your editor. macOS & Windows." | "An agent-native, open-source Markdown workspace – editor, live preview, project tree and a terminal running Claude Code or any CLI agent. macOS & Windows." | `gh repo edit qodeca/erfana --description "…"` |
 | Topics (18 → 19) | as listed above | remove `ai` (on its own it reads as "an AI app"); add `agentic-coding`, `markdown-preview` | `gh repo edit qodeca/erfana --remove-topic ai --add-topic agentic-coding --add-topic markdown-preview` |
 | Homepage | `https://qodeca.com` | unchanged | – |
 | Social preview | GitHub's generated card | `docs/assets/readme/social-preview.png` | Settings → General → Social preview → Edit (UI only; no API) |
@@ -417,7 +435,7 @@ Written to the `xezar-ux-design` authoring questions.
 4. **The distinction that matters most.** Erfana **hosts** an agent; it is not one. Said in words in the sub-line ("a terminal running Claude Code – or any CLI agent"), in the demo (the prompt visibly goes to the terminal), in the caption and in the Trademarks line. Colour and imagery only reinforce it.
 5. **States.** See [States](#states).
 6. **Deliberately not built.** No docs website, no video, no language switcher (there are no translations), no table of contents (the page is short), no contributor grid, no sponsor block, no per-platform direct-download links (asset names carry the version), no Linux instructions (there is no Linux build – said once, plainly).
-7. **Accessibility bar.** Every image has meaningful alt text (banner "Erfana"; demo described; Download button "Download Erfana for macOS or Windows"). Meaning never sits in an image alone – pitch, platforms and features are text. Motion: the demo honours `prefers-reduced-motion` through the still; the loop is 16 s with no flashing. Contrast figures are in the banner table. Keyboard and focus are GitHub's; our content adds only ordinary links. At 375 px: images scale to width, the link row and the platform line wrap, the features are a list, and nothing scrolls sideways (checked in plan step 9).
+7. **Accessibility bar.** Every image has meaningful alt text (banner "Erfana"; demo described; Download button "Download Erfana for macOS or Windows"). Meaning never sits in an image alone – pitch, platforms and features are text. Motion: the demo honours `prefers-reduced-motion` through the still; the loop is 18 s with no flashing. Contrast figures are in the banner table. Keyboard and focus are GitHub's; our content adds only ordinary links. At 375 px: images scale to width, the link row and the platform line wrap, the features are a list, and nothing scrolls sideways (checked in plan step 9).
 8. **What gets cut.** On a narrow screen nothing is removed – images shrink. If the first screen must shrink further, the order of sacrifice is: link row wraps → demo drops below the fold. Banner, pitch and Download never move below the demo.
 9. **Worst case, measured.** Longest line: the platform line (~80 characters) wraps at 375 px. Heaviest asset: the demo at its 5 MiB cap takes about 4 s on a 10 Mbit/s link (about 2.5 s at the 3 MiB target); the alt text and the pitch carry the meaning while it loads. The page stays well under GitHub's 500 KiB README limit (today 8.8 KB). Longest viewport: 1440×900 is the first-screen reference; 1280×800 is recorded as a second measurement.
 
@@ -439,25 +457,31 @@ Written to the `xezar-ux-design` authoring questions.
 
 Only decisions that are genuinely the owner's, or that this design cannot settle alone. Design choices themselves (pitch, layout, banner, storyboard) are for the reviewer agent to approve, per the owner.
 
-1. **Apply the repository metadata** (description, topics, social preview) – owner's go required (#139 step 4). Recommendation: apply after the README merges, so the social preview and description match the page.
-2. **Extend `TRADEMARKS.md` § Logos and brand assets** to name the new banner, wordmark and social-preview files (`docs/assets/readme/banner-*.png`, `social-preview.png`) as Erfana marks that a renamed fork must replace. This edits a legal document, so it is the owner's call. Recommendation: yes – it only adds the new files to the existing rule.
-3. **A permanent link check in CI** (lychee or similar) would be a new workflow job – a trust-boundary change (`.github/workflows/`) and outside #139's scope. Recommendation: run the check locally for this PR (AC-6) and file a follow-up issue; #138 needs the same check, so one issue serves both.
+1. **Apply the repository metadata** (description, topics, social preview) – **decided** by the owner (2026-09-25): applied only after the README merges, with the values shown to the owner first (see [Repository metadata](#repository-metadata-applied-after-merge)).
+2. **Extend `TRADEMARKS.md` § Logos and brand assets** – **decided** by the owner (2026-09-25): `TRADEMARKS.md` will be extended to name the new banner, wordmark and social image (`docs/assets/readme/banner-*.png`, `social-preview.png`) as Erfana marks that a renamed fork must replace. Done in the build PR (plan step 7).
+3. **A permanent external-link check in CI.** Internal links, anchors and the wording rule are already covered: #138's `scripts/check-links.mjs` (`npm run check:links`) runs in the gate once #138 adds it (`.xezar/checks/repository-checks.sh` runs it whenever the file exists) and its scope reaches `README.md`, which links into `docs/user-guide/`. External URLs and badge fetches are not; a CI job for them would be a new workflow job – a trust-boundary change (`.github/workflows/`) and outside #139's scope. Recommendation: fetch them by hand for this PR (AC-5, AC-6) and file a follow-up issue.
 4. **Recording the light-theme deviation.** The app is dark-only by rule; the banner card renders a light variant because GitHub has a light theme. Recommendation: the card says so in its Exceptions section (`/* deviates: … */` convention); no change to the app rule. Reviewer confirms; owner only if the reviewer disagrees.
-5. **Demo format: animated image or video.** The owner chose "GIF or animated WebP". Style guides (Google, web.dev) favour MP4 video, which GitHub can play in a README only as a `user-attachments` upload (see [Demo loop](#demo-loop)). Options: (a) **animated WebP, GIF fallback** – in the repository, regenerated by one command, silent autoplay loop, larger file, no pause control beyond reduced motion; (b) **MP4 via `user-attachments`** – smallest and sharpest, with a pause control, but hosted outside the repository and re-uploaded by hand after each recording; (c) both – the WebP loop in the hero and the MP4 linked beneath it. Recommendation: **(a)**, as the owner chose, provided the step-1 spike shows WebP plays in Chrome, Safari and Firefox on github.com; ask again only if the spike fails for WebP *and* the GIF misses the 5 MiB cap.
+5. **Demo format** – **decided** (owner's pick "A 10–20 second loop (GIF or WebP)"; leader decision 2026-09-25): animated WebP if the step-1 spike shows it plays in Chrome, Safari and Firefox on github.com, otherwise GIF; both produced by #138's `encode.mjs` (R138-9). MP4 via a `user-attachments` upload is not used in the hero (hosted outside the repository, re-uploaded by hand after each recording). This comes back to the owner only if the spike fails for WebP *and* the GIF misses the 5 MiB cap.
 
 ## Requirements on #138
 
-#138 owns the demo fixture project and the capture script (owner decision). This design **does not** design either; it states what the README needs from them. If #138 lands without one of these, #139 adds it **inside #138's script and fixture**, never as a second copy.
+#138 owns the demo fixture project and the capture script (owner decision). This design **does not** design either; it states what the README needs from them. The leader hands this table to #138's design fix (draft PR #141) as-is (2026-09-25). If #138 lands without one of these, #139 adds it **inside #138's script and fixture**, never as a second copy.
+
+State at #141 head `b7864e20` (from the review of this spec): R138-5 and R138-7 are met, R138-4 partly; the rest are open there.
 
 | ID | Requirement |
 |---|---|
-| R138-1 | The fixture contains a Markdown file suited to the demo: a short, fictional plan with a 5–7-item list that the Visualize prompt can turn into a flowchart; neutral project and file names. |
-| R138-2 | The capture script can run the README demo as a **named scenario** from the one documented command (for example `npm run docs:screenshots -- --only readme-demo`), with condition-based waits only. |
-| R138-3 | A **recording mode** for that scenario: the app window only (no desktop, menu bar or clock), fixed window size 1440×900 logical or larger, at least 15 fps, lossless frames or high-bitrate video, written to a git-ignored working directory. (The #138 research names Playwright's `page.screencast` (v1.59, installed) and `recordVideo` as candidates, and `screencapture -l -V` as the macOS fallback; the choice is #138's.) |
-| R138-4 | Scrubbing: the fixture opens from a path with no username or home directory in it; the capture's Claude Code runs with the capture machine's personal status line and hooks disabled; the scenario never runs `/status`, `/usage` or `/cost`, never hovers the context meter, and starts recording after any welcome screen that could show account details. |
+| R138-1 | The fixture contains a Markdown file suited to the demo: a short, fictional plan with a 5–7-item list that the Visualize prompt can turn into a flowchart, and **no diagram yet** (so Visualize visibly adds one); neutral project and file names. |
+| R138-2 | The capture script can run the README demo as a **named scenario** from the one documented command (for example `npm run docs:screenshots -- --only readme-demo`, if `--only` accepts a scenario id; otherwise the manifest row id that selects it), with condition-based waits only. The scenario starts at Erfana's start screen so S0 (open a project) is recorded. |
+| R138-3 | A **recording mode** for that scenario: the app window only (no desktop, menu bar or clock), at the **1280×800 content size** #138 already uses (`setContentSize(1280, 800)`) – one size for both specs – written to a git-ignored working directory. Recorder: Playwright `recordVideo`, as #138 uses. It must pass #139's terminal-legibility check (plan step 4) through the final encode; if it does not, #138 switches that scenario to a sharper source (Playwright `page.screencast`, or `screencapture -l -V` on macOS, both named by the #138 research) – the choice of fallback is #138's. |
+| R138-4 | Scrubbing: the fixture opens from a path with no username or home directory in it (#138's `/tmp/erfana-capture/`), from Erfana's own recent-projects list, never the native folder dialog; the capture's Claude Code runs with the capture machine's personal status line and hooks disabled; the scenario never runs `/status`, `/usage` or `/cost` and never hovers the context meter; Claude Code's start-up screen, which can show account details, is **cut** from the edited loop (the S0→S1 cut) and never reaches a committed file. |
 | R138-5 | Real Claude Code with a real login; if none is available, stop and report – never fake output (#138's own rule, restated because the README inherits it). |
-| R138-6 | A still of the S4 state (editor with the new Mermaid block, preview rendering it, terminal showing the finished agent turn) at the recording's resolution, as `demo-still.png`. |
+| R138-6 | A still of the S5 state (editor with the new Mermaid block, preview rendering it, terminal showing the finished agent turn) at the recording's resolution, as `demo-still.png`. |
 | R138-7 | The user guide index at `docs/user-guide/README.md` (or the path #138 chooses – the README links whatever exists) with section anchors the Features list can link. |
+| R138-8 | **Edit approval during the recording.** By default Claude Code asks before it edits a file, and the sandbox's `.claude/settings.json` holds only a Stop hook, so S4 would stop at a prompt. #138 handles it one of two ways: (a) the sandbox project's `.claude/settings.json` sets an edit-accepting permission mode (Claude Code's `acceptEdits`), scoped to the sandbox only; or (b) the scenario answers the prompt with its keypress and the storyboard shows it in S4. Recommendation: (a) – it keeps S4 short and is not an account detail; the mode shown in Claude Code's footer may appear on screen. |
+| R138-9 | `encode.mjs` also emits **animated WebP** (`libwebp_anim`, looping) beside the GIF and MP4 it already produces, from the same trimmed and sped-up source; the size budget applies to each. |
+| R138-10 | Manifest validation (`manifest.mjs`) accepts a `file` ending in `.webp`, and the output allow-list at the top of `run.mjs` includes `docs/assets/readme/`. |
+| R138-11 | The privacy deny-list and OCR pass (`privacy.mjs`) also runs over the **demo's frames** – one frame per second of the final encode at least – not only over stills; a hit fails the run like any other (exit 5). |
 
 ## Developer handoff
 
@@ -465,33 +489,33 @@ Only decisions that are genuinely the owner's, or that this design cannot settle
 
 Ordered; each step lists its files and its verification. Evidence (screenshots, contact sheets, logs) goes to the task's evidence directory, never into the repository, except the downscaled QA screenshots named in step 9.
 
-**Step 0 – Preconditions.** #138's fixture, capture script and user-guide index are merged into `develop` (R138-1…7). Rebase on `develop`. *Verify*: the paths exist; `npm run docs:screenshots` (or #138's command) runs.
+**Step 0 – Preconditions.** #138's fixture, capture script, `check-links.mjs` and user-guide index are merged into `develop` (R138-1…11). Rebase on `develop`. *Verify*: the paths exist; `npm run docs:screenshots -- --check` and `npm run check:links` run; each R138 row is ticked against #138's merged code, and any row #138 did not deliver is added inside #138's files here (never a second copy).
 
-**Step 1 – Spike: animated WebP on github.com.** Encode a 3-second test clip with `ffmpeg-static` (`-c:v libwebp_anim -loop 0`), commit it on the working branch with a scratch Markdown file, and view it on github.com in Chrome, Safari and Firefox, in both themes, and with reduced motion emulated. Remove the scratch files before review. *Verify*: a short note in the PR: plays / does not play per browser; the chosen format. *Files*: none kept.
+**Step 1 – Spike: animated WebP on github.com.** Encode a 3-second test clip with #138's `encode.mjs` WebP output (R138-9; `ffmpeg-static` with `-c:v libwebp_anim -loop 0` directly only if #138 has not landed it yet), commit it on the working branch with a scratch Markdown file, and view it on github.com in Chrome, Safari and Firefox, in both themes, and with reduced motion emulated. Remove the scratch files before review. *Verify*: a short note in the PR: plays / does not play per browser; the chosen format. *Files*: none kept.
 
-**Step 2 – Banner card.** `design/product/github-presentation/banner.html` (card marker `group="Product" name="GitHub presentation" status="proposed"`, SPDX header), rendering the dark banner, the light banner and the social preview at layout size. It links `../../tokens.css`, `../../fonts.css` and `../../ds.css` (the depth `design/README.md` prescribes for a folder under `product/`), loads the icon from `../../../resources/icon.png`, and has an Exceptions section for the light variant. Run `npm run design` (regenerates `design/index.html`). *Verify*: `npm run lint:css`, `npm run design -- --check`, open the card in a browser and tab through it; contrast of every text element re-measured in the page.
+**Step 2 – Banner card.** `design/product/github-presentation/index.html`. Line 1 is the card marker with all four required attributes (`design/README.md` § Adding a card), e.g. `<!-- @card group="Product" name="GitHub presentation" subtitle="README banner, wordmark and social preview" status="proposed" reviewed="<authoring date>" -->`; lines 2–3 the SPDX header. It renders the dark banner, the light banner and the social preview at layout size, links `../../tokens.css`, `../../fonts.css` and `../../ds.css` (the depth for a folder under `product/`), loads the icon from `../../../resources/icon.png`, and has an Exceptions section for the light variant. Every contrast ratio it shows is a `data-claim` span backed by a `contrast` entry added to `design/claims.json` (foreground and background tokens as in the banner table). Run `npm run design` (regenerates `design/index.html` and `design/claims.js`). *Verify*: `npm run lint:css`, `npm run design -- --check`, the design-claims test (`scripts/design-claims.test.mjs`, in `test:ci`) green; open the card in a browser and tab through it.
 
 **Step 3 – Render script for brand assets.** A script in #138's capture folder (proposed `scripts/capture/brand.mjs`, SPDX header) that opens the card in Playwright Chromium at `deviceScaleFactor: 2` and screenshots the three elements to `docs/assets/readme/banner-dark.png`, `banner-light.png` (1600×400) and `social-preview.png` (1280×640 at 1×). An npm script (`docs:brand`). *Verify*: pixel dimensions (`file`), sizes within budget (≤ 150 KB, ≤ 150 KB, ≤ 300 KB), two runs produce the same dimensions; view each PNG.
 
-**Step 4 – Demo scenario.** The `readme-demo` scenario in #138's capture script per the storyboard (R138-2…4). *Verify*: the scenario runs twice from a clean checkout; no `waitForTimeout`; lint and typecheck clean.
+**Step 4 – Legibility check, then the demo scenario.** First, before any scenario work: record a 3-second clip of the terminal showing Claude Code output with #138's recorder (R138-3), run it through `encode.mjs` at the final settings, and apply the [terminal legibility](#demo-loop) pass rule to a frame of the result at its README display width; choose the capture-only zoom or the wider display from it, and if the recorder itself blurs text, stop and hand R138-3's fallback back to #138. Then the `readme-demo` scenario in #138's capture script per the storyboard (R138-2…4, R138-8). *Verify*: the legibility frame and its measured cap height in the evidence directory; the scenario runs twice from a clean checkout; no `waitForTimeout`; no approval prompt left waiting in S4; lint and typecheck clean.
 
-**Step 5 – Encode and check the demo.** A script beside the capture script (proposed `scripts/capture/encode-demo.mjs`) that trims and speeds up the S3 segment, scales to 1280×800 and encodes with `ffmpeg-static` to `docs/assets/readme/demo.webp` (or `.gif` with `palettegen`/`paletteuse` if step 1 said so), plus `demo-still.png`; and writes a 1-fps contact sheet (`tile` filter) to the evidence directory. *Verify*: duration 10–20 s and file size read from ffmpeg's output and stated in the PR (AC-3); the reviewer checks every contact-sheet frame against the scrub list (AC-3; #138's "no personal data" check).
+**Step 5 – Encode and check the demo.** No new script: the `readme-demo` manifest row makes #138's pipeline trim, speed up the S4 segment and encode through `encode.mjs` at 1280×800 to `docs/assets/readme/demo.webp` (or `.gif` if step 1 said so) plus `demo-still.png` (R138-6, R138-9, R138-10), and runs the privacy pass over the demo's frames (R138-11). A 1-fps contact sheet for human review is made with one `ffmpeg-static` `tile` command into the evidence directory (recorded there, not committed). *Verify*: duration 10–20 s and file size read from ffmpeg's output and stated in the PR (AC-3); the privacy pass is clean; the reviewer checks every contact-sheet frame against the scrub list (AC-3; #138's "no personal data" check), including that no Claude Code start-up screen survives the S0→S1 cut.
 
 **Step 6 – Relocate text.** Create `docs/about.md` (SPDX header; the two sections verbatim, with links for F-44); add the image-export sentence to `docs/features/README.md` item 12 (F-30); confirm F-50's "validation on every channel" in `docs/security.md` and F-65's build commands in `docs/build/README.md` – add only what is missing; add `docs/about.md` to the `docs/README.md` index. *Verify*: `git diff` shows the moved text byte-for-byte; the fact-audit rows marked "add" now hold.
 
-**Step 7 – REUSE.** Add a `[[annotations]]` block to `REUSE.toml` for `docs/assets/readme/**` (`SPDX-FileCopyrightText = "2025-2026 Qodeca sp. z o.o."`, `SPDX-License-Identifier = "GPL-3.0-only"`, with a comment that the files are Erfana brand assets under `TRADEMARKS.md`). The blanket `**` annotation already covers them; the explicit block records the trademark note next to the files (AC-8). If the owner says yes to open decision 2, add the file names to `TRADEMARKS.md`. *Verify*: CI `License compliance` (the local gate does not run `reuse lint`; run `pipx run reuse lint` if available and say so if not).
+**Step 7 – REUSE.** Add a `[[annotations]]` block to `REUSE.toml` for `docs/assets/readme/**` (`SPDX-FileCopyrightText = "2025-2026 Qodeca sp. z o.o."`, `SPDX-License-Identifier = "GPL-3.0-only"`, with a comment that the files are Erfana brand assets under `TRADEMARKS.md`). The blanket `**` annotation already covers them; the explicit block records the trademark note next to the files (AC-8). Extend `TRADEMARKS.md` § Logos and brand assets to name the banner, wordmark and social image files (open decision 2, decided yes by the owner). *Verify*: CI `License compliance` (the local gate does not run `reuse lint`; run `pipx run reuse lint` if available and say so if not).
 
 **Step 8 – Rewrite `README.md`.** Per [Screens](#screens). *Verify*:
 - the fact audit re-run as a checklist, every F-id ticked with where it now lives (AC-4) – included in the PR description;
 - each badge and image URL fetched and answers 200 (AC-5);
-- a link check over `README.md`, `docs/about.md` and every file this PR touches, internal and external, including anchors (AC-6) – with lychee or `markdown-link-check` run through `npx`; the tool and its output go in the PR;
-- a wording check: `grep -inE "ai-powered|built-in ai|ai editor|ai assistant|intelligent|smart "` over the changed Markdown returns nothing about Erfana itself, and "context" meter sentences name Claude Code (AC-7);
+- `npm run check:links` (#138's checker: relative links, anchors, image links and the no-built-in-AI wording rule; its scope reaches `README.md` because it links into `docs/user-guide/`) green, and `docs/about.md` checked by it too (in scope if it links the guide; otherwise its `--all` report is read for that file) (AC-6, AC-7); plus each **external** URL in the changed Markdown fetched and answering 200 – the one thing `check:links` does not do. The output of both goes in the PR;
+- beyond `check:links`' wording rule, a read of every sentence: nothing says "AI-powered", "built-in AI", "AI editor", "AI assistant", "intelligent" or "smart" about Erfana itself, and "context" meter sentences name Claude Code (AC-7);
 - no `^RW[A-Za-z0-9+/=]+$` line in the README (Guard 5);
 - `SECURITY.md`'s `#release-verification` link still resolves.
 
-**Step 9 – Rendered QA on github.com.** Push the branch; open the README on github.com with the Chrome DevTools tools at 1440×900, emulating `prefers-color-scheme: light` and `dark` (logged-out GitHub follows the system theme), and additionally at 1280×800, at 375 px, with `prefers-reduced-motion: reduce`, and in the dark-dimmed theme if a logged-in session is available. Measure the first-screen rule (demo top ≤ 450 px from the article top; banner, pitch and Download fully visible) with `getBoundingClientRect()`. *Verify*: screenshots of light and dark at 1440×900 (AC-1, AC-2) downscaled and committed under `docs/designs/139-readme-redesign/qa/` so the design review can see them (they contain only public GitHub content); the rest in the evidence directory. Update this document's "Design review" section with the reviewer's verdict link.
+**Step 9 – Rendered QA on github.com.** Push the branch; open the README on github.com with the Chrome DevTools tools at 1440×900, emulating `prefers-color-scheme: light` and `dark` (logged-out GitHub follows the system theme), and additionally at 1280×800, at 375 px, with `prefers-reduced-motion: reduce`, and in the dark-dimmed theme if a logged-in session is available. Measure the [first-screen rule](#first-screen-budget-ac-1) with `getBoundingClientRect()`: the pass measurement on the unscrolled README file view (banner, pitch and Download fully visible; demo top ≤ 700 px from the viewport top), and the recorded one on the home page scrolled to the article top; also read the height of GitHub's chrome above the article and of the `<h1>` rule. The PR states that the unscrolled home page shows the file list first. *Verify*: screenshots of light and dark at 1440×900 (AC-1, AC-2) downscaled and committed under `docs/designs/139-readme-redesign/qa/` so the design review can see them (they contain only public GitHub content); the rest in the evidence directory. Update this document's "Design review" section with the reviewer's verdict link.
 
-**Step 10 – Gates and handoff.** The workflow's gate step runs `.xezar/checks/repo-gates.sh --fast`; CI's seven required checks (AC-9). The PR description carries: the measured sizes and duration, the fact-audit checklist, the proposed repository metadata marked **owner's go required**, the open decisions, and the statement that design approval is by a reviewer agent on a different model, not the owner. Labels: `needs-design`, `needs-qa`.
+**Step 10 – Gates and handoff.** The workflow's gate step runs `.xezar/checks/repo-gates.sh --fast`; CI's seven required checks (AC-9). The PR description carries: the measured sizes and duration, the fact-audit checklist, the proposed repository metadata marked **applied after merge, values shown to the owner first**, the open decisions, and the statement that design approval is by a reviewer agent on a different model, not the owner. Labels: `needs-design`, `needs-qa`.
 
 ### Files
 
@@ -499,16 +523,20 @@ Ordered; each step lists its files and its verification. Evidence (screenshots, 
 |---|---|
 | `docs/designs/139-readme-redesign/README.md` | This design (this PR) |
 | `docs/README.md` | Index entry for this design (this PR); `docs/about.md` entry (implementation) |
-| `design/product/github-presentation/banner.html` | New card |
-| `design/index.html` | Regenerated by `npm run design` |
-| `scripts/capture/brand.mjs`, `scripts/capture/encode-demo.mjs` (names follow #138's folder) | New scripts, SPDX headers |
-| `package.json` | Two npm scripts (`docs:brand`, `docs:demo`); no dependency change |
+| `design/product/github-presentation/index.html` | New card |
+| `design/claims.json` | `contrast` entries for every ratio the card shows |
+| `design/index.html`, `design/claims.js` | Regenerated by `npm run design` |
+| `scripts/capture/brand.mjs` (name follows #138's folder) | New script, SPDX header – renders the card; nothing in #138 does this |
+| `scripts/capture/encode.mjs` | **#138's file.** Animated WebP output beside GIF and MP4 (R138-9). Lands in #138; changed here only if #138 merged without it |
+| `scripts/capture/manifest.mjs`, `scripts/capture/run.mjs` | **#138's files.** Accept `.webp`; add `docs/assets/readme/` to the output allow-list (R138-10); the `readme-demo` row and scenario (R138-2). Same rule |
+| `scripts/capture/privacy.mjs` | **#138's file.** Deny-list and OCR over the demo's frames (R138-11). Same rule |
+| `package.json` | One npm script (`docs:brand`); no dependency change. The demo runs through #138's `docs:screenshots` |
 | `docs/assets/readme/banner-dark.png`, `banner-light.png`, `social-preview.png`, `demo.webp` (or `.gif`), `demo-still.png` | New images |
 | `docs/about.md` | New – relocated text, verbatim |
 | `docs/features/README.md` | Item 12: image export sentence |
 | `docs/security.md`, `CONTRIBUTING.md` | Only if the step-6 confirmation finds a gap |
 | `REUSE.toml` | Explicit annotation for `docs/assets/readme/**` |
-| `TRADEMARKS.md` | Only with the owner's yes (open decision 2) |
+| `TRADEMARKS.md` | § Logos and brand assets names the banner, wordmark and social image (open decision 2, owner decided yes) |
 | `README.md` | Rewritten |
 | `docs/CHANGELOG.md` | Unreleased entry: README redesign |
 | `docs/designs/139-readme-redesign/qa/*.png` | Downscaled QA screenshots |
@@ -520,18 +548,22 @@ Not touched: `SECURITY.md` (its anchor is preserved), `.github/workflows/` (no n
 | Risk | Effect | Mitigation |
 |---|---|---|
 | Animated WebP does not play on github.com in some browser (it is not in GitHub's documented media list; Safari animation support is not in Google's FAQ) | Blank or static demo | Step 1 spike before any recording; GIF fallback with the same budget; open decision 5 if both fail |
-| Real Claude Code output varies run to run and can take long | Unstable loop length; a different diagram each time | Only S3 is sped up; the storyboard fixes timing at the edit, not the agent; re-record until S4 shows a readable diagram; the caption discloses the speed-up |
+| Real Claude Code output varies run to run and can take long | Unstable loop length; a different diagram each time | Only S4 is sped up; the storyboard fixes timing at the edit, not the agent; re-record until S5 shows a readable diagram; the caption discloses the speed-up |
 | Personal data leaks into a frame | Privacy breach, published | R138-4 at capture; frame-by-frame contact-sheet review before commit; never commit an unreviewed recording |
 | No Claude login on the capture machine | No demo | Stop and report; the still-only fallback is the leader's call, not the implementer's |
-| #138 slips or changes paths | README links break; scripts duplicated | Step 0 precondition; requirements R138-1…7 raised on #138 now |
-| Demo too heavy | Slow first load, Camo refusal for external embeds | 5 MiB hard cap; 12 fps; 1280×800; measured in step 5 |
+| #138 slips or changes paths | README links break; scripts duplicated | Step 0 precondition; requirements R138-1…11 handed to #141 by the leader (2026-09-25), each ticked in step 0 |
+| Terminal text unreadable at the display width, or blurred by the recorder | The loop's key moment (the hand-off to the agent) cannot be read | Legibility check through the final encode in step 4, before the scenario is built; capture-only zoom or wider display; R138-3's recorder fallback |
+| Claude Code stops at an edit-approval prompt | S4 stalls or the scenario times out | R138-8: edit-accepting mode in the sandbox settings, or the keypress shown in S4 |
+| Demo too heavy | Slow first load | 5 MiB hard cap; 12 fps; 1280×800; measured in step 5 |
 | GitHub layout differs from the budget (column width, spacing) | AC-1 fails | Measured on github.com, not assumed; banner and demo heights are the adjustable parts |
 | Banner drifts from tokens later | Off-brand banner | The card is the source; `docs:brand` re-renders it; the card sits in `design/` under the same lint |
-| Trademark misuse (icon modified, Claude marks in the banner) | Legal exposure | Icon used unmodified; no third-party marks in banner or social preview; the Anthropic notice stays on the page |
-| Anchor or link breakage | Broken links from `SECURITY.md` and outside | Kept headings; link check in step 8 |
+| Trademark misuse (icon modified, a third-party name in the banner) | Legal exposure | Icon used unmodified; no third-party name or mark in banner or social preview (the terminal strip shows a bare `❯` glyph); the Anthropic notice stays on the page; `TRADEMARKS.md` names the new brand files (open decision 2) |
+| Anchor or link breakage | Broken links from `SECURITY.md` and outside | Kept headings; `npm run check:links` and the external fetch in step 8 |
 | Guard 5 trips | Required check fails | No key values in the README |
 | An overclaim slips into copy | Violates `CLAUDE.md` | Banned-phrase check in step 8; reviewer reads every sentence against AC-7 |
 
 ## Design review
 
 Pending. Approval is by a reviewer agent on a different model from the author, not by the owner (owner decision, campaign `release-0.21.0`, 2026-09-25).
+
+- Round 1: REQUEST CHANGES at `68d292ae` ([PR #140](https://github.com/qodeca/erfana/pull/140)), eleven findings; all eleven addressed in the following commit, with the leader's cross-spec decisions shared with #141 (one 1280×800 size, WebP from #138's `encode.mjs`, R138-1…11).
