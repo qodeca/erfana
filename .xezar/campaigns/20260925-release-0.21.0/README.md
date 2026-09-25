@@ -10,7 +10,7 @@ Updated: 2026-09-25 11:06 CEST
 
 ## Open pull requests
 - #153 ready, head 77b5c7e8 – #143 tooltips. Review 483d6b31 APPROVE (1 minor: no test for TextareaContextMenu shortcut labels; output verified identical). Merge line 2.
-- #149 ready, head dbbb88bb – spike note. Review 08eda96c REQUEST CHANGES: Q8 fallback claim is an inference. Back to 320bec53 to relabel it (repair round 1).
+- #149 ready, head a7eeeaa0 – spike note. Q8 relabelled as an inference, fallback added to 'not tested' (320bec53). Next: scoped-recheck, claude/sonnet, not qodeca (after #153 merges).
 - #140 ready, head c442a15b – #139 spec. Re-check 12b29be1 APPROVE at c442a15b, all 11 findings fixed, no new defects. Labels design-approved + merge-queue; #139 labelled design-approved. Next in the merge line after #141: bring up to date, wait for green, squash-merge.
 Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 
@@ -21,7 +21,6 @@ Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
 | 2a1e4316 | #138 part B | feature-implementation | claude/opus | qodeca |
-| 320bec53 (fix round 1) | #149 | spike (continue) | claude/opus | qodeca |
 | 4458b282 (stopped, waits for owner undo) | allow rule | feature-implementation | claude/opus | gmail |
 
 Counts at dispatch (15:48): tasks 5/10 (xezar runs 2 at once), gate runs 1/2 (4458b282), metered 0/4, load 3.4/18.
