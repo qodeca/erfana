@@ -1,12 +1,12 @@
 # Prompt Templates
 
-Dynamic, extensible AI prompts for context menu actions using YAML frontmatter + XML-structured content with Handlebars interpolation.
+Dynamic, extensible prompt templates for the CLI agent in the terminal, sent from context menu actions, using YAML frontmatter + XML-structured content with Handlebars interpolation.
 
 ## Overview
 
 **Location:** `src/renderer/src/prompts/`
 
-The template system enables AI-powered text operations through right-click context menus in markdown preview and editor.
+Prompt templates send the selected text, with instructions, to the CLI agent running in the terminal, from right-click context menus in the markdown preview and editor.
 
 ## Quick Start
 
