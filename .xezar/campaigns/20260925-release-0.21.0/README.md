@@ -9,15 +9,13 @@ Updated: 2026-09-25 11:06 CEST
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
-- #152 ready, head 51b6e052 – #151 shebang guard. Review 06e118c8 APPROVE (1 nit: pasted gate log is one commit old; live checks green). Merge line 1.
 - #153 ready, head 77b5c7e8 – #143 tooltips. Review 483d6b31 APPROVE (1 minor: no test for TextareaContextMenu shortcut labels; output verified identical). Merge line 2.
 - #149 ready, head dbbb88bb – spike note. Review 08eda96c REQUEST CHANGES: Q8 fallback claim is an inference. Back to 320bec53 to relabel it (repair round 1).
 - #140 ready, head c442a15b – #139 spec. Re-check 12b29be1 APPROVE at c442a15b, all 11 findings fixed, no new defects. Labels design-approved + merge-queue; #139 labelled design-approved. Next in the merge line after #141: bring up to date, wait for green, squash-merge.
 Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 
 ## Serial merge line
-1. #152
-2. #153
+1. #153 (brought up to date, fa2ca356, checks running)
 
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
