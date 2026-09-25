@@ -257,5 +257,54 @@
     "label": "--color-border-focus on --color-accent-primary, the ring Confirm used to draw inside its own fill",
     "foreground": "--color-border-focus",
     "background": "--color-accent-primary"
+  },
+  "contrast-gp-wordmark-dark": {
+    "kind": "contrast",
+    "card": "product/github-presentation/index.html",
+    "label": "--color-brand-white on --color-brand-black, the wordmark on the dark banner",
+    "foreground": "--color-brand-white",
+    "background": "--color-brand-black"
+  },
+  "contrast-gp-wordmark-light": {
+    "kind": "contrast",
+    "card": "product/github-presentation/index.html",
+    "label": "--color-brand-black on --color-brand-white, the wordmark on the light banner",
+    "foreground": "--color-brand-black",
+    "background": "--color-brand-white"
+  },
+  "contrast-gp-prompt": {
+    "kind": "contrast",
+    "card": "product/github-presentation/index.html",
+    "label": "--color-text-primary on --color-brand-black, the prompt glyph on the terminal strip",
+    "foreground": "--color-text-primary",
+    "background": "--color-brand-black"
+  },
+  "contrast-gp-cursor": {
+    "kind": "contrast",
+    "card": "product/github-presentation/index.html",
+    "label": "--color-brand-lime on --color-brand-black, the cursor on the terminal strip",
+    "foreground": "--color-brand-lime",
+    "background": "--color-brand-black"
+  },
+  "contrast-gp-indigo-light": {
+    "kind": "contrast",
+    "card": "product/github-presentation/index.html",
+    "label": "--color-brand-indigo on --color-brand-white, the light banner accent",
+    "foreground": "--color-brand-indigo",
+    "background": "--color-brand-white"
+  },
+  "contrast-gp-lime-light": {
+    "kind": "contrast",
+    "card": "product/github-presentation/index.html",
+    "label": "--color-brand-lime on --color-brand-white, why lime never sits on the light banner",
+    "foreground": "--color-brand-lime",
+    "background": "--color-brand-white"
+  },
+  "contrast-gp-violet-light": {
+    "kind": "contrast",
+    "card": "product/github-presentation/index.html",
+    "label": "--color-brand-violet on --color-brand-white, why violet is only a muted fill on light",
+    "foreground": "--color-brand-violet",
+    "background": "--color-brand-white"
   }
 }
