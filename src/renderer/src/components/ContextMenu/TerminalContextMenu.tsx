@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { Copy, ClipboardPaste } from 'lucide-react'
 import { ContextMenu, type ContextMenuItem } from './ContextMenu'
-import { isMacOS } from '../../utils/platform'
+import { formatShortcut } from '../../utils/shortcutLabel'
 import { TEST_IDS } from '../../constants/testids'
 
 interface TerminalContextMenuProps {
@@ -26,9 +26,8 @@ export function TerminalContextMenu({
   onPaste,
   onClose
 }: TerminalContextMenuProps): JSX.Element {
-  const isMac = isMacOS()
-  const copyShortcut = isMac ? '⌘C' : 'Ctrl+C'
-  const pasteShortcut = isMac ? '⌘V' : 'Ctrl+V'
+  const copyShortcut = formatShortcut('C', { mod: true })
+  const pasteShortcut = formatShortcut('V', { mod: true })
 
   const items: ContextMenuItem[] = [
     {

@@ -19,6 +19,7 @@
  * @see design/system/components/permission-band/index.html - status="decided"
  */
 import { ExternalLink, FileDown, Search } from 'lucide-react'
+import { formatShortcut } from '../../../../utils/shortcutLabel'
 
 /** Props for {@link PreviewFindTool}. */
 export interface PreviewFindToolProps {
@@ -58,7 +59,7 @@ export function PreviewFindTool({ onFind }: PreviewFindToolProps): React.JSX.Ele
       type="button"
       className="erf-band__tool"
       aria-label="Find"
-      title="Find (Cmd/Ctrl+F)"
+      title={`Find (${formatShortcut('F', { mod: true })})`}
       data-testid="preview-band-find"
       onClick={onFind}
     >
