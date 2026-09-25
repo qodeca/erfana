@@ -5,6 +5,12 @@
     "xezar",
     "chrome-devtools"
   ],
+ "permissions": {
+    "allow": [
+      "Bash(node scripts/stop-orphan-mcp.mjs)",
+      "Bash(node scripts/stop-orphan-mcp.mjs --dry-run)"
+    ]
+  },
   "hooks": {
     "SessionStart": [
       {

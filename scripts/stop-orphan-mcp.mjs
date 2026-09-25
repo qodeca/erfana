@@ -16,6 +16,10 @@
  *   node scripts/stop-orphan-mcp.mjs --dry-run  list what would be stopped
  *
  * macOS and Linux only (reads `ps`); on Windows it prints "not supported".
+ *
+ * .claude/settings.json allows exactly these two commands (exact-match rules, no wildcard), so the
+ * Xezar project leader can clear orphans at each tick without a permission prompt – leaked
+ * launchers each spin a CPU core and hold the machine over its load ceiling (#145).
  */
 import { execFileSync } from 'node:child_process'
 import { realpathSync } from 'node:fs'
