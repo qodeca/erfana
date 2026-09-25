@@ -10,17 +10,17 @@ Updated: 2026-09-25 11:06 CEST
 
 ## Open pull requests
 - #148 ready, head 97d632ea – #142 fix by 8d85e234 (pi/deepseek-flash). All checks green incl. Windows. Review aa8e12b4 queued (full-cold-review, claude/opus, qodeca).
-- #146 ready, head 202ace7b – #145 fix. Round-1 finding (shebang) fixed by 2a80ec06, unit tests green per its PR reply. Re-check ecac3c11 running (scoped-recheck, claude/sonnet, gmail). Reviewer left ~6 junk test comments on the PR ("ping", "xxxx"); left in place for the owner.
+- #146 ready, head 58d2cb87 (develop merged in) – #145 fix. Re-check ecac3c11 APPROVE at 202ace7b, finding 1 closed, Windows checks green. Labelled merge-queue; squash-merge when required checks are green at 58d2cb87.
 - #140 ready, head c442a15b – #139 spec. Re-check 12b29be1 APPROVE at c442a15b, all 11 findings fixed, no new defects. Labels design-approved + merge-queue; #139 labelled design-approved. Next in the merge line after #141: bring up to date, wait for green, squash-merge.
 Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 
 ## Serial merge line
+0. #146 (checks running at 58d2cb87) – first, it stops the orphan leak.
 1. #140 – conflict in docs/README.md; repair 19b6c719 queued (conflict-repair, codex/gpt-5.6-terra, default).
 
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| ecac3c11 | #146 | code-review (scoped-recheck) | claude/sonnet | gmail |
 | a410722c | #138 part A | feature-implementation | claude/opus | qodeca |
 | 320bec53 | #138 spike | spike | claude/opus | qodeca |
 | aa8e12b4 | #148 | code-review (full-cold-review) | claude/opus | qodeca |
