@@ -39,6 +39,7 @@ import { withWatcherPause } from './withWatcherPause'
 import { logger } from '../../utils/logger'
 import { useTerminalStore } from '../../stores/useTerminalStore'
 import { formatPathsForTerminal } from '../../utils/shellPathEscape'
+import { formatShortcut } from '../../utils/shortcutLabel'
 import { TEST_IDS as TERMINAL_TEST_IDS } from '../../constants/testids'
 import { useDirectoryWatcher } from '../../hooks/useDirectoryWatcher'
 import { useProjectManagementContext, useProjectChangedEffect } from '../../context/ProjectManagementContext'
@@ -1362,7 +1363,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
                 className="icon-btn"
                 onClick={handleRefresh}
                 disabled={isAnyRefreshing}
-                title="Refresh (Cmd/Ctrl+Alt+R)"
+                title={`Refresh (${formatShortcut('R', { mod: true, alt: true })})`}
                 aria-label="Refresh project tree and git status"
                 data-testid={TEST_IDS.PROJECT_TREE_BTN_REFRESH}
               >

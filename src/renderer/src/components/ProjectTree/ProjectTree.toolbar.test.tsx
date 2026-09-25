@@ -21,6 +21,16 @@ import { DialogProvider } from '../Dialog'
 import { ProjectManagementProvider } from '../../context/ProjectManagementContext'
 import { TEST_IDS } from '../../constants/testids'
 import type { FileNode } from '../../../../preload/index'
+import { isMacOS } from '../../utils/platform'
+
+// Defaults to false: with no preload bridge the tree already resolved to a
+// non-macOS platform here, so every other test keeps its old behaviour.
+vi.mock('../../utils/platform', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../utils/platform')>()),
+  isMacOS: vi.fn(() => false)
+}))
+
+const mockIsMacOS = vi.mocked(isMacOS)
 
 // Controllable useImport mock (factory reads these lazily at call time)
 const importState = { isImporting: false }
@@ -118,6 +128,7 @@ async function renderWithProjectOpen() {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mockIsMacOS.mockReturnValue(false)
   onProjectChangedCallback = null
   importState.isImporting = false
   ;(window as any).api = undefined
@@ -168,5 +179,23 @@ describe('ProjectTree toolbar Import button', () => {
 
     fireEvent.click(screen.getByTestId(TEST_IDS.PROJECT_TREE_BTN_IMPORT))
     expect(mockImportFile).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('ProjectTree toolbar Refresh tooltip (#143)', () => {
+  it('shows Ctrl+Alt+R, not ⌘ or "Cmd", on Windows', async () => {
+    mockIsMacOS.mockReturnValue(false)
+    await renderWithProjectOpen()
+
+    const refresh = screen.getByTestId(TEST_IDS.PROJECT_TREE_BTN_REFRESH)
+    expect(refresh).toHaveAttribute('title', 'Refresh (Ctrl+Alt+R)')
+    expect(refresh.getAttribute('title')).not.toMatch(/[⌘⌥⇧⌃]|Cmd/)
+  })
+
+  it('shows ⌥⌘R on macOS', async () => {
+    mockIsMacOS.mockReturnValue(true)
+    await renderWithProjectOpen()
+
+    expect(screen.getByTestId(TEST_IDS.PROJECT_TREE_BTN_REFRESH)).toHaveAttribute('title', 'Refresh (⌥⌘R)')
   })
 })

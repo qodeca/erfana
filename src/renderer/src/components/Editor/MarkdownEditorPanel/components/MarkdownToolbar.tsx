@@ -33,6 +33,7 @@ import type { ViewMode, EditorFile } from '../types'
 import { useSearchStore } from '../../../../stores/useSearchStore'
 import { getSelectedText } from '../../../../utils/selectionHelpers'
 import { TEST_IDS } from '../../../../constants/testids'
+import { formatShortcut } from '../../../../utils/shortcutLabel'
 import './MarkdownToolbar.css'
 
 // Re-export types for convenience
@@ -133,7 +134,7 @@ export function MarkdownToolbar({
           <button
             className="toolbar-btn"
             onClick={() => editorRef.current?.formatBold()}
-            title="Bold (Cmd/Ctrl+B)"
+            title={`Bold (${formatShortcut('B', { mod: true })})`}
             aria-label="Bold"
             data-testid={TEST_IDS.TOOLBAR_BTN_BOLD}
           >
@@ -142,7 +143,7 @@ export function MarkdownToolbar({
           <button
             className="toolbar-btn"
             onClick={() => editorRef.current?.formatItalic()}
-            title="Italic (Cmd/Ctrl+I)"
+            title={`Italic (${formatShortcut('I', { mod: true })})`}
             aria-label="Italic"
             data-testid={TEST_IDS.TOOLBAR_BTN_ITALIC}
           >
@@ -172,7 +173,7 @@ export function MarkdownToolbar({
           <button
             className="toolbar-btn"
             onClick={() => editorRef.current?.insertLink()}
-            title="Insert Link (Cmd/Ctrl+K)"
+            title={`Insert Link (${formatShortcut('K', { mod: true })})`}
             aria-label="Insert link"
             data-testid={TEST_IDS.TOOLBAR_BTN_LINK}
           >
@@ -223,7 +224,7 @@ export function MarkdownToolbar({
           <button
             className="toolbar-btn"
             onClick={handleOpenSearch}
-            title="Find (Cmd/Ctrl+F)"
+            title={`Find (${formatShortcut('F', { mod: true })})`}
             aria-label="Find"
             data-testid={TEST_IDS.TOOLBAR_BTN_SEARCH}
           >
@@ -237,7 +238,7 @@ export function MarkdownToolbar({
         <button
           className="toolbar-btn"
           onClick={handleOpenSearch}
-          title="Find (Cmd/Ctrl+F)"
+          title={`Find (${formatShortcut('F', { mod: true })})`}
           aria-label="Find"
           data-testid={TEST_IDS.TOOLBAR_BTN_SEARCH}
         >

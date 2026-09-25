@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 // Portable cross-platform replacement for the former bash `test:cov` script.
