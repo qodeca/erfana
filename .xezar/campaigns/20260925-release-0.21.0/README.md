@@ -20,11 +20,13 @@ Empty.
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
+| 837cb50a | #155 security review | security-review | codex/gpt-6-astra | default |
+| 52bf81ce | #154 code review | code-review | claude/sonnet | westagilelabs |
+| 72f679cf | #154 image and privacy review | design-review | codex/gpt-6-sol | qodeca-2 |
 
-Counts at dispatch (17:42): tasks 2/10, gate runs 0/2, metered 0/4, load 8.3/18.
+Counts at dispatch (18:17): tasks 3/10, gate runs 0/2, metered 0/4, load 2.8/18.
 
 ## File-ownership table
-- 4458b282 owns .claude/settings.json, scripts/stop-orphan-mcp.mjs (header comment)
 - Reviews own nothing.
 
 ## Accounts (from `read_quota` at 2026-09-25T07:13:22Z)
@@ -40,9 +42,8 @@ Counts at dispatch (17:42): tasks 2/10, gate runs 0/2, metered 0/4, load 8.3/18.
 | pi | – | no logins | – |
 
 ## Held or queued work
-- #151 – running as 455166db.
 - #144 – ready; held behind the #138 build: both edit docs/features/README.md, docs/keyboard-shortcuts.md, docs/settings.md.
-- #138 build – split: part A (plan steps 2-4) merged (#150); step 1 spike done (#149); part B (steps 5, 5b, 6) running as 2a1e4316; steps 7-8 follow.
+- #138 build – split: part A (plan steps 2-4) merged (#150); step 1 spike done (#149); part B (steps 5, 5b, 6) is PR #154, in review; steps 7-8 follow.
 - #139 build – design merged; waits for #138's capture script (part B).
 
 ## Owner items
