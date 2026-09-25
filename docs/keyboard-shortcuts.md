@@ -65,6 +65,15 @@ therefore takes an `enabled` flag, and `MarkdownEditorPanel` wires it to the
 panel's dockview active state (`props.api.isActive`, kept in step via
 `onDidActiveChange`). Any future panel-level shortcut needs the same gate. The `Cmd+W` entry under [Window Management](#window-management) is the OS window-close role – a different binding on a different surface.
 
+## Find Bar
+
+While the find bar has focus, its two option buttons answer to the keys their tooltips name. The handler is on the find bar itself (not a `window` listener), so no other panel sees the keys. They match the physical key (`event.code`), so `Option+C` and `Option+W` work on macOS even though those keys type "ç" and "∑":
+
+| Shortcut | Action |
+|----------|--------|
+| `Alt+C` | Toggle case sensitive |
+| `Alt+W` | Toggle whole word (no effect where the view does not support it) |
+
 ## Markdown Formatting Toolbar
 
 Alternative to shortcuts - toolbar buttons in Editor/Split View modes:

@@ -196,9 +196,37 @@ export function SearchBar({ provider }: SearchBarProps) {
     restoreFocus()
   }, [provider, closeSearch, restoreFocus])
 
+  // Alt+C / Alt+W toggle the two option buttons, matching their tooltips. Match
+  // the physical key (`event.code`), not `event.key`: on macOS Option+C and
+  // Option+W type "ç" and "∑", so `event.key` never equals 'c'/'w'. Cmd/Ctrl
+  // disqualifies the shortcut, and preventDefault keeps the Option character out
+  // of the input. The whole-word toggle respects the provider capability the same
+  // way the disabled button does.
+  const handleOptionShortcut = useCallback(
+    (e: React.KeyboardEvent): boolean => {
+      if (!e.altKey || e.metaKey || e.ctrlKey) return false
+      const option =
+        e.code === 'KeyC'
+          ? 'caseSensitive'
+          : e.code === 'KeyW' && capabilities.wholeWord
+            ? 'wholeWord'
+            : null
+      if (!option) return false
+      e.preventDefault()
+      // Read current state directly from store to avoid stale closure
+      const currentOptions = useSearchStore.getState().options
+      updateOptions({ [option]: !currentOptions[option] })
+      return true
+    },
+    [capabilities.wholeWord, updateOptions]
+  )
+
   // Keyboard handlers for input
   const handleInputKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (handleOptionShortcut(e)) {
+        return
+      }
       if (e.key === 'Escape') {
         e.preventDefault()
         handleClose()
@@ -211,7 +239,7 @@ export function SearchBar({ provider }: SearchBarProps) {
         }
       }
     },
-    [handleClose, nextMatch, previousMatch]
+    [handleClose, nextMatch, previousMatch, handleOptionShortcut]
   )
 
   // Stop all keyboard events from bubbling to Monaco editor
@@ -224,12 +252,18 @@ export function SearchBar({ provider }: SearchBarProps) {
   // NON-modal chrome, so Tab must move focus onward like anywhere else (Escape
   // still closes it). Trapping Tab here was an unexpected focus-order constraint
   // (WCAG 2.2 SC 2.4.3).
-  const handleContainerKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
-    // Only stop for keys Monaco might capture (not Space, which triggers button clicks).
-    if (e.key !== ' ') {
-      e.stopPropagation()
-    }
-  }, [])
+  const handleContainerKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      // The input stops propagation, so this only runs for the bar's own chrome
+      // (the toggle buttons, or the container itself).
+      handleOptionShortcut(e)
+      // Only stop for keys Monaco might capture (not Space, which triggers button clicks).
+      if (e.key !== ' ') {
+        e.stopPropagation()
+      }
+    },
+    [handleOptionShortcut]
+  )
 
   // Handle toggle button Enter key (Space is handled natively by button click)
   const handleToggleKeyDown = useCallback(

@@ -12,12 +12,13 @@
  * - Navigation controls (6 tests)
  * - Options toggles (7 tests) - includes regression test for stale closure fix
  * - Keyboard interactions (6 tests)
+ * - Option shortcuts (5 tests)
  * - Focus management (3 tests)
  * - Match count display (4 tests)
  * - Provider integration (4 tests)
  * - Accessibility (6 tests)
  *
- * Total: 53 tests
+ * Total: 64 tests
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
@@ -643,6 +644,85 @@ describe('SearchBar', () => {
       // No wrap to the close button, and no preventDefault — focus is not trapped.
       expect(closeButton).not.toHaveFocus()
       expect(shiftTabEvent.defaultPrevented).toBe(false)
+    })
+  })
+
+  describe('Option shortcuts (Alt+C / Alt+W)', () => {
+    beforeEach(() => {
+      useSearchStore.setState({ isOpen: true })
+    })
+
+    // The keys are matched on the physical key (`event.code`), not `event.key`,
+    // because on macOS Option+C and Option+W type "ç" and "∑".
+    it('toggles case sensitive on Alt+C while the input is focused', () => {
+      render(<SearchBar provider={mockProvider} />)
+
+      const input = screen.getByPlaceholderText('Search...')
+      input.focus()
+
+      fireEvent.keyDown(input, { key: 'ç', code: 'KeyC', altKey: true })
+
+      expect(useSearchStore.getState().options.caseSensitive).toBe(true)
+    })
+
+    it('toggles whole word on Alt+W while the input is focused', () => {
+      render(<SearchBar provider={mockProvider} />)
+
+      const input = screen.getByPlaceholderText('Search...')
+      input.focus()
+
+      fireEvent.keyDown(input, { key: '∑', code: 'KeyW', altKey: true })
+
+      expect(useSearchStore.getState().options.wholeWord).toBe(true)
+    })
+
+    it('does nothing on Alt+W when the view does not support whole word', async () => {
+      const { provider } = createMockCountProvider()
+      render(<SearchBar provider={provider} />)
+
+      // The provider's capabilities reach the store on mount; the whole-word
+      // button is disabled from then on, and the shortcut must match it.
+      await waitFor(() => expect(useSearchStore.getState().capabilities.wholeWord).toBe(false))
+
+      const input = screen.getByPlaceholderText('Search...')
+      input.focus()
+
+      fireEvent.keyDown(input, { key: '∑', code: 'KeyW', altKey: true })
+
+      expect(useSearchStore.getState().options.wholeWord).toBe(false)
+    })
+
+    it('does nothing on Alt+C when Cmd is held', () => {
+      render(<SearchBar provider={mockProvider} />)
+
+      const input = screen.getByPlaceholderText('Search...')
+      input.focus()
+
+      fireEvent.keyDown(input, { key: 'ç', code: 'KeyC', altKey: true, metaKey: true })
+
+      expect(useSearchStore.getState().options.caseSensitive).toBe(false)
+    })
+
+    it('prevents the Option character from being typed into the input', () => {
+      render(<SearchBar provider={mockProvider} />)
+
+      const input = screen.getByPlaceholderText('Search...')
+      input.focus()
+
+      const event = new KeyboardEvent('keydown', {
+        key: 'ç',
+        code: 'KeyC',
+        altKey: true,
+        bubbles: true,
+        cancelable: true
+      })
+      const preventDefaultSpy = vi.spyOn(event, 'preventDefault')
+
+      act(() => {
+        input.dispatchEvent(event)
+      })
+
+      expect(preventDefaultSpy).toHaveBeenCalled()
     })
   })
 
