@@ -10,12 +10,10 @@ Updated: 2026-09-25 11:06 CEST
 
 ## Open pull requests
 - #148 ready, head 97d632ea – #142 fix by 8d85e234 (pi/deepseek-flash). All checks green incl. Windows. Review aa8e12b4 queued (full-cold-review, claude/opus, qodeca).
-- #146 ready, head 58d2cb87 (develop merged in) – #145 fix. Re-check ecac3c11 APPROVE at 202ace7b, finding 1 closed, Windows checks green. Labelled merge-queue; squash-merge when required checks are green at 58d2cb87.
 - #140 ready, head c442a15b – #139 spec. Re-check 12b29be1 APPROVE at c442a15b, all 11 findings fixed, no new defects. Labels design-approved + merge-queue; #139 labelled design-approved. Next in the merge line after #141: bring up to date, wait for green, squash-merge.
 Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 
 ## Serial merge line
-0. #146 (checks running at 58d2cb87) – first, it stops the orphan leak.
 1. #140 – conflict in docs/README.md; repair 19b6c719 queued (conflict-repair, codex/gpt-5.6-terra, default).
 
 ## Running tasks per lane
@@ -56,8 +54,8 @@ Counts at dispatch (12:38): tasks 6/10 (xezar runs 2 at once, 4 queued), gate ru
 
 ## Owner items
 - Label issues with `release-0.21.0` to put them in scope.
+- Leader runs `node scripts/stop-orphan-mcp.mjs` at each L1 tick (worked at 12:39). Allow-rule PR for it still to do (owner-approved).
 - Decide whether to hide or delete the reviewer's junk test comments on PR #146.
-- Stop orphaned circuit-electron servers by hand until #146 merges (see timeline for PIDs).
 - After #145 merges: leader adds the allow rule for `node scripts/stop-orphan-mcp.mjs` (approved).
 - PR #140 open decisions, needed before #139 is built, not before its review: (1) go to apply repo description, topics, social preview; (2) extend TRADEMARKS.md to the new banner, wordmark, social image; (3) CI link check as a follow-up issue; (4) light-theme banner vs dark-only rule – owner only if the reviewer disagrees; (5) demo format WebP (after a spike) vs MP4.
 
