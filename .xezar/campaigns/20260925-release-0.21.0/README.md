@@ -20,7 +20,6 @@ Empty.
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| 16a444e0 | #159 design recheck at 9203f493 | design-review | codex/gpt-6-sol | qodeca-2 |
 | 8a2b2c0f | #159 QA (live github.com checks) | qa (browser-qa) | claude/sonnet | gmail |
 
 Counts at dispatch (23:58): tasks 2/10, gate runs 0/2, metered 1/4, load 1.5/18.
@@ -43,7 +42,7 @@ Counts at dispatch (23:58): tasks 2/10, gate runs 0/2, metered 1/4, load 1.5/18.
 ## Held or queued work
 - #144 – ready; held behind #139: both edit docs/features/README.md (item 12).
 - #138 build – split: part A (plan steps 2-4) merged (#150); step 1 spike done (#149); part B (steps 5, 5b, 6) is PR #154: code review REQUEST CHANGES (1 major, run.mjs readLogin can empty the privacy deny-list); design review FAIL (7 privacy/state blockers B-1..B-10, 5 non-blocking); round 2 done at 46600c39; code recheck APPROVE at b543da12 with 1 minor (Windows test, run.test.mjs:220 vs sandbox.mjs:46; advisory Windows checks red); image re-review PASS WITH FOLLOW-UPS (2 guide-copy notes for step 7); merged 2026-09-25 as c1b1ad21; steps 7-8 follow.
-- #139 build – PR #159: code review APPROVE, design review FAIL (B-1 account name in QA screenshots); round 1 done at 1f924f73 (B-1 masked, NB-1 stated as a limit, NB-2 documented deviation); design recheck + QA next.
+- #139 build – PR #159: code review APPROVE, design review FAIL (B-1 account name in QA screenshots); round 1 done at 1f924f73 (B-1 masked, NB-1 stated as a limit, NB-2 documented deviation); design recheck PASS at 9203f493; QA running.
 
 ## Owner items
 - `npm audit` on develop's lockfile (run by the #159 author, 2026-09-25 23:51): 16 advisories – 1 critical, 12 high, 3 moderate – none added by #159. Not triaged. Dependabot PRs #63-#68 are open and out of this campaign's scope. Decide: triage now (a new issue in 0.21.0) or later.
