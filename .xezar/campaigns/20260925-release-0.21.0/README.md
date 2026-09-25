@@ -9,28 +9,25 @@ Updated: 2026-09-25 11:06 CEST
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
+- #150 ready, head 4e1e992c – #138 part A (a410722c). Windows checks red: shebang in scripts/check-links.mjs (same as #146). Review eb3b8cf0 running (full-cold-review, claude/sonnet, westagilelabs).
 - #149 draft, head e57b8db6 – #138 spike note (320bec53). Login part stopped (needs a browser sign-in); owner makes the token. Q8: terminal text below the 7 px bar at 800 px; leader decision: capture-only zoom (#139 option).
-- #148 – #142 fix. Review aa8e12b4 REQUEST CHANGES: stray campaign files (leader's unpushed commits in the worktree), whole-word preventDefault, container-path test, repeat. Leader decision on D1: macOS uses Cmd+Option+C/W (Option+C types ć on Polish Pro), Alt+C/W elsewhere. Back to author 8d85e234 (repair round 1).
+- #148 ready, head 02d9c56c – #142 fix, round-1 fixes pushed, all checks green. Re-check 77285cdf running (scoped-recheck, claude/sonnet, gmail).
 - #140 ready, head c442a15b – #139 spec. Re-check 12b29be1 APPROVE at c442a15b, all 11 findings fixed, no new defects. Labels design-approved + merge-queue; #139 labelled design-approved. Next in the merge line after #141: bring up to date, wait for green, squash-merge.
 Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 
 ## Serial merge line
-1. #140 – conflict in docs/README.md; repair 19b6c719 queued (conflict-repair, codex/gpt-5.6-terra, default).
+1. #140 – conflict fixed by 19b6c719 (head c1bcea87, spec unchanged since the approval at c442a15b). Being brought up to date, then merge.
 
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| a410722c | #138 part A | feature-implementation | claude/opus | qodeca |
-| 19b6c719 | #140 | address-review-findings (conflict-repair) | codex/gpt-5.6-terra | default |
-| 8d85e234 (fix round 1) | #142 | bug-fix (bounded-bug-fix) | pi/deepseek-api/deepseek-flash | – |
-| 63ac9ab2 | #146 | code-review (full-cold-review) | claude/sonnet | gmail |
+| 77285cdf | #148 | code-review (scoped-recheck) | claude/sonnet | gmail |
+| eb3b8cf0 | #150 | code-review (full-cold-review) | claude/sonnet | westagilelabs |
 
-Counts at dispatch (12:38): tasks 6/10 (xezar runs 2 at once, 4 queued), gate runs 0/2, metered 1/4 (pi), load 4.5/18.
+Counts at dispatch (14:36): tasks 2/10, gate runs 0/2, metered 0/4, load 3.6/18.
 
 ## File-ownership table
-- a410722c owns scripts/capture/demo-project/**, scripts/check-links*.mjs, package.json, vitest.main.ts, e2e/fixtures/launch-helpers.ts, e2e/fixtures/index.ts
-- 19b6c719 owns docs/README.md (on the #140 branch)
-- 8d85e234 owns src/renderer/src/components/Search/SearchBar.tsx, SearchBar.test.tsx, docs/keyboard-shortcuts.md (find-bar lines only)
+- Reviews write no files. 77285cdf and eb3b8cf0 own nothing.
 
 ## Accounts (from `read_quota` at 2026-09-25T07:13:22Z)
 | Runner | Login | State | Resets (UTC) |
