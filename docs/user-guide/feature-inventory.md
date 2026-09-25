@@ -258,7 +258,8 @@ current source behavior. Item 9 remains unverified.
 1. **Find bar keys** (#142, resolved). `R/components/Search/SearchBar.tsx` now handles the
    platform-specific case-sensitive and whole-word chords named by its tooltips.
 2. **Image viewer keys** (#144, resolved). `docs/keyboard-shortcuts.md` and
-   `docs/features/README.md` #12 now say `0` resets, `F` fits, and no key enters full screen (`Esc`
+   `docs/features/README.md` #12 now say `0` resets and `F` fits; the guide's
+   [`reference/image-viewer.md`](./reference/image-viewer.md) says no key enters full screen (`Esc`
    only exits one).
 3. **HTML preview setting label** (#144, resolved). The user-guide settings reference and the app both
    say **Run HTML files**; `docs/settings.md` no longer names a label.
@@ -271,8 +272,8 @@ current source behavior. Item 9 remains unverified.
    platform-specific modifier glyphs.
 7. **Auto-execute** (#144, resolved). `docs/prompts/README.md` no longer describes a review step;
    every template has `autoExecute: true`, so the prompt runs at once.
-8. **Agent wording** (#144, resolved). `docs/features/README.md` items 1 and 4 now send prompt
-   templates to the terminal agent rather than claiming AI text operations. The guide attributes
-   prompts to the CLI agent in the terminal.
+8. **Agent wording** (#144, resolved). `docs/features/README.md` items 1 and 4, `docs/prompts/README.md`
+   and the other contributor pages now send prompt templates to the CLI agent in the terminal rather
+   than claiming AI text operations. The guide attributes prompts to the CLI agent in the terminal.
 9. **Cmd+B in the editor.** Whether it makes text bold or toggles the sidebar is unverified. A
    capture scene observes it, and the guide states what happens.
