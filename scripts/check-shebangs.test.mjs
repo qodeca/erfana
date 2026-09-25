@@ -10,8 +10,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { findShebangs, main, startsWithShebang, trackedCandidates } from './check-shebangs.mjs'
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const SHEBANG = '#!/usr/bin/env node\r\n// SPDX-License-Identifier: GPL-3.0-only\n'
-const PLAIN = '// SPDX-License-Identifier: GPL-3.0-only\nexport {}\n'
+const SHEBANG = '#!/usr/bin/env node\r\n// fixture\n'
+const PLAIN = '// fixture\nexport {}\n'
 const quiet = { log: () => {}, error: () => {} }
 
 let dir
