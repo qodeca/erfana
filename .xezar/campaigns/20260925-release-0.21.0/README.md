@@ -9,9 +9,9 @@ Updated: 2026-09-25 11:06 CEST
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
-- #146 ready, head 1f4f5c33 – #145 fix. Required checks green. Advisory Windows checks red: scripts/stop-orphan-mcp.test.mjs fails to load (SyntaxError at 10:1). Next: full-cold-review, not claude/opus, not login qodeca (queued on load).
-- #141 draft, head 0c6ad3a0 – #138 spec, round-1 fixes pushed. Next: short re-review on claude/sonnet, not login qodeca (queued on load).
-- #140 draft, head c442a15b – #139 spec, round-1 fixes pushed. Next: short re-review on claude/sonnet, not login gmail (queued on load).
+- #146 ready, head 1f4f5c33 – #145 fix. Required checks green. Advisory Windows checks red: scripts/stop-orphan-mcp.test.mjs fails to load (SyntaxError at 10:1). Review 63ac9ab2 running (full-cold-review, claude/sonnet, gmail).
+- #141 draft, head 0c6ad3a0 – #138 spec, round-1 fixes pushed. Re-check 9f406ac3 dispatched (scoped-recheck, claude/sonnet, gmail).
+- #140 draft, head c442a15b – #139 spec, round-1 fixes pushed. Re-check 12b29be1 dispatched (scoped-recheck, claude/sonnet, westagilelabs).
 Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 
 ## Serial merge line
@@ -20,12 +20,14 @@ Empty.
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| – | – | – | – | – |
+| 63ac9ab2 | #146 | code-review (full-cold-review) | claude/sonnet | gmail |
+| 9f406ac3 | #141 | code-review (scoped-recheck) | claude/sonnet | gmail |
+| 12b29be1 | #140 | code-review (scoped-recheck) | claude/sonnet | westagilelabs |
 
-Counts at dispatch: tasks 3/10 (xezar runs 2 at once), metered 0/4, load 15.8/18.
+Counts at dispatch (11:17): tasks 3/10 (xezar runs 2 at once, 1 queued), gate runs 0/2, metered 0/4, load 5.3/18.
 
 ## File-ownership table
-- Nothing owned. 2a80ec06 (#145) finished 11:13; its files (scripts/run-mcp.js, scripts/stop-orphan-mcp.mjs, tests) stay with PR #146.
+- Reviews write no files. 63ac9ab2, 9f406ac3, 12b29be1 own nothing.
 
 ## Accounts (from `read_quota` at 2026-09-25T07:13:22Z)
 | Runner | Login | State | Resets (UTC) |
