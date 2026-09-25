@@ -1,3 +1,8 @@
+<!--
+SPDX-License-Identifier: GPL-3.0-only
+SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+-->
+
 # Quick Reference
 
 One-page cheat sheet for common tasks.
@@ -29,26 +34,7 @@ npm run test:e2e:update-screenshots # Refresh visual baselines
 
 ## Keyboard Shortcuts
 
-| Action | macOS | Windows |
-|--------|-------|---------|
-| Save | `Cmd+S` | `Ctrl+S` |
-| Search | `Cmd+F` | `Ctrl+F` |
-| Next / previous match | `Cmd+G` / `Cmd+Shift+G` | `Ctrl+G` / `Ctrl+Shift+G` |
-| Close editor tab | `Cmd+W` | `Ctrl+W` |
-| Insert link | `Cmd+K` | `Ctrl+K` |
-| Command palette | `F1` | `F1` |
-| Toggle sidebar | `Cmd+B` | `Ctrl+B` |
-| Toggle terminal | `Cmd+J` | `Ctrl+J` |
-| Maximize terminal | `Cmd+Shift+M` | `Ctrl+Shift+M` |
-| Refresh project tree | `Cmd+Option+R` | `Ctrl+Alt+R` |
-| New window | `Cmd+Shift+N` | `Ctrl+Shift+N` |
-| Comment line | `Cmd+/` | `Ctrl+/` |
-| Multi-cursor | `Option+Click` | `Alt+Click` |
-| HTML preview back / forward | `Cmd+[` / `Cmd+]` | `Alt+Left` / `Alt+Right` |
-
-Settings has no keyboard shortcut – open it with the gear icon at the bottom of the left activity bar (`Esc` closes it). Erfana ships for macOS and Windows only.
-
-Full list: [Keyboard Shortcuts](./keyboard-shortcuts.md)
+See the complete [user shortcut reference](./user-guide/reference/keyboard-shortcuts.md).
 
 ## Design Tokens (UI)
 
