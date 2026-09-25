@@ -108,7 +108,7 @@ export default defineConfig({
         // Offline link and wording check (#138). It reads contributor-controlled
         // Markdown in the local gate, and its path walk is what keeps a link from
         // probing or reading files outside the repository, so it carries the
-        // trust-chain floor (spec: 90). measured 99.52/100/94.58/99.52.
+        // trust-chain floor (spec: 90). measured 99.52/100/94.65/99.52.
         // See: docs/features/138-user-guide.md § 3.4
         'scripts/check-links.mjs': { lines: 90, functions: 90, branches: 90, statements: 90 },
       },
