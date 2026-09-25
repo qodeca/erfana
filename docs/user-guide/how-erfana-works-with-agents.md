@@ -1,6 +1,16 @@
 <!-- SPDX-License-Identifier: GPL-3.0-only -->
 # Understand how Erfana works with your agent
 
-Erfana runs your shell in its terminal, so you choose and start the CLI agent. Prompt templates send selected text to that terminal; Erfana does not include an AI assistant.
+Erfana is a Markdown workspace with an integrated terminal. It runs the shell and CLI agent you choose; the agent supplies its own model, account and edit decisions. Erfana does not include an AI assistant.
 
-Claude Code sessions can show a context meter. It reads Claude Code transcripts only, never writes Claude Code configuration, and is not a meter for other agents.
+## Start your own agent
+
+Open a project, open **Terminal**, and type your installed agent's command. The session runs as a top-level terminal session in the project context. If you close the terminal, reopen it from the right activity bar when you need it; [terminal controls](reference/terminal.md) let you restart or maximise it.
+
+## Send selected text
+
+Select text in the Markdown editor or preview, right-click, and choose a [prompt template](reference/prompt-templates.md). Erfana formats and sends the prompt to the terminal immediately. **Explain**, **Ask** and **Prompt** request information; **Modify** and **Visualize** can lead to file edits. The agent may still make other changes according to its own permissions, so review its output and your files.
+
+## Read Claude Code status
+
+While Claude Code runs, its [context meter](reference/claude-code-status-bar.md) can show model and context use. It reads Claude Code's transcripts only and does not write its configuration. Other CLI agents run in the same terminal without that meter.
