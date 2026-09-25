@@ -19,3 +19,9 @@ Calls the leader made alone while the owner was away.
 - Why: code and image reviews both pass; only the advisory Windows checks job is red. Merging would turn develop's Windows checks red for every later PR.
 - Rejected: merge now and file a follow-up issue for the Windows test (quicker, but leaves develop red on Windows).
 - Undo: stop 2a1e4316, merge #154 at b543da12 as reviewed, and file the Windows test as an issue.
+
+## 2026-09-25 20:47 – lane switch for #138 steps 7-8 (PR #157)
+- Chose: give the guide pages to the route's next docs-writing lane, codex/gpt-6-sol, to finish on PR #157's branch, instead of a second repair round on codex/gpt-5.6-terra.
+- Why: two passes on gpt-5.6-terra produced stub reference pages (5-9 lines each) and a fold-in that only adds a pointer line; the design asks for full reference content moved from the old docs.
+- Rejected: a third pass on gpt-5.6-terra (same model, same result likely); claude/opus (third lane, more costly, and keeps a non-Anthropic author for a Claude reviewer).
+- Undo: stop the gpt-6-sol task and continue 03de6de3 instead; PR #157 keeps both lanes' commits.
