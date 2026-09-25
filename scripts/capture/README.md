@@ -44,7 +44,7 @@ check has passed.
 export ERFANA_CAPTURE_CLAUDE_TOKEN_FILE="$PWD/.local/capture/claude-token"
 npm run docs:screenshots                                 # every row
 npm run docs:screenshots -- --only open-a-project/welcome   # one row
-npm run docs:screenshots -- --only agent                 # one scene
+npm run docs:screenshots -- --only readme-demo           # one scene: the README demo's 4 files
 npm run docs:screenshots -- --check                      # no app: manifest, files, links, budget
 ```
 
@@ -138,6 +138,42 @@ committed.
 4. **A person** looks at every image (below).
 
 A hit in any layer stops the run with exit 5 before anything is copied.
+
+## README demo (`--only readme-demo`)
+
+The storyboard is #139's
+([design § Demo loop](../../docs/designs/139-readme-redesign/README.md#demo-loop)): open the project
+from Recent projects, then Claude Code idle, select the plan's list, Visualize > Flowcharts, the
+prompt reaches the terminal, the agent works (sped up), the Mermaid block lands and renders, then a
+hold.
+
+- **Recorder.** Playwright `recordVideo`, 1280×800. The scene starts with a one-colour sync flash, and
+  the post-process finds its first frame, so every mark lands on the video's own timeline.
+- **Edit.** There is one cut, from the opened project to Claude Code idle: the start-up, one short
+  warm-up turn and the folding of the project panel happen off camera. The warm-up is needed because
+  Erfana's status bar appears only after a finished turn. There is one speed-up, the agent's work, to
+  about 5 s. Holds are cloned frames, not waits. The loop comes out at about 18 s, at 12 fps.
+- **Header after the cut.** Claude Code keeps its header (logo, version, model, `~/Projects/…`) at
+  the top of its screen and repaints it after any clear, so S1 shows it. It holds no account details.
+  The privacy pass reads every frame. Whether that header is acceptable in the loop is #139's call.
+- **Encode.** `demo.webp` (`libwebp_anim`, `-loop 0`), `demo.gif` and `demo.mp4` come from one
+  lossless edited source. `demo-still.png` is the S5 window at 1280×800. The GIF uses a 32-colour
+  palette: with 256 colours it measured 7.7 MB, over the 5 MiB cap (64 colours: 5.2 MB; 32: 3.8 MB).
+- **Capture-only zoom.** The window's Electron zoom factor is set to **1.25** for this scene only, and
+  reset before the app closes. The app's defaults are not changed. Playwright's page screenshot clips
+  the layout under a zoom factor, so this scene's shots use Electron's own `capturePage()`.
+- **Legibility.** From each encoded file, the frame where the prompt has reached the terminal and the
+  frame at the end of the agent's work are scaled to 800 px wide. The terminal region is read by OCR.
+  Pass: the known line (`Pasted text`, from Claude Code's `[Pasted text #1 +N lines]`) is read back,
+  and the capital-letter height is at least 7 px. Measured on 2026-09-25 at zoom 1.25 over five runs
+  (six frames each): **7.3 px** in almost every frame, 7.5 px at most and **7.0 px** at least (two
+  frames of one run). The known line was read back in every file. The margin over the bar is thin; if
+  a run fails it, raise `DEMO_ZOOM` in `scenes/readme-demo.capture.ts`, but check the layout first:
+  at 1.3 the default panel widths no longer fit the window. Without the zoom the spike measured
+  6.0–6.7 px.
+- **Review.** With `ERFANA_CAPTURE_EVIDENCE_DIR` set, the 1-fps contact sheet and the legibility
+  frames are kept. Check them frame by frame: no Claude Code start-up screen, no `/status`, `/usage`
+  or `/cost` output, and no context-meter tooltip.
 
 ## Reviewing the images
 
