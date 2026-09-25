@@ -23,6 +23,7 @@
     "test:cov": "node scripts/test-cov.mjs",
     "check:headers": "node scripts/check-spdx-headers.mjs",
     "check:links": "node scripts/check-links.mjs",
+    "docs:screenshots": "node scripts/capture/run.mjs",
     "design": "node scripts/design-sync.mjs",
     "start": "electron-vite preview",
     "dev": "electron-vite dev",

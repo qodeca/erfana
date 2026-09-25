@@ -34,4 +34,4 @@ helps out can suggest a change.
 - [Garden map](images/garden-map.svg)
 - [Open day flyer](site/index.html)
 
-Questions go to the committee at [committee@example.org](mailto:committee@example.org).
+Questions go to the committee at the Saturday work morning.
