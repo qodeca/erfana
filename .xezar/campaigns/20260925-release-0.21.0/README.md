@@ -10,7 +10,7 @@ Updated: 2026-09-25 11:06 CEST
 
 ## Open pull requests
 - #155 ready, head d4fb29e7 – allow rule in scripts/xezar-leader-settings.json (4458b282): exactly 2 exact-match rules + one autoMode reason; all checks green. Next: security-review (widens tool access).
-- #154 ready, head 0635ae06 – #138 part B (2a1e4316): capture script, README demo, 52 images, +4486 lines, 91 files. Unit tests + Coverage red: scripts/capture/run.test.mjs findClaude test uses /tmp, which it skips on Linux. 2a1e4316 hit the 2 h step limit before gates; continued to fix (repair round 1). Review after green; must include an image privacy check.
+- #154 ready, head 5fce83d5 – #138 part B (2a1e4316): test fixed, workflow gates sealed, CI all green incl. Windows. Next: full-cold-review + design-review of the 52 images and demo (privacy).
 - #140 ready, head c442a15b – #139 spec. Re-check 12b29be1 APPROVE at c442a15b, all 11 findings fixed, no new defects. Labels design-approved + merge-queue; #139 labelled design-approved. Next in the merge line after #141: bring up to date, wait for green, squash-merge.
 Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 
@@ -20,13 +20,11 @@ Empty.
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| 2a1e4316 (fix round 1, gates) | #138 part B | feature-implementation | claude/opus | qodeca |
 
 Counts at dispatch (17:42): tasks 2/10, gate runs 0/2, metered 0/4, load 8.3/18.
 
 ## File-ownership table
 - 4458b282 owns .claude/settings.json, scripts/stop-orphan-mcp.mjs (header comment)
-- 2a1e4316 owns scripts/capture/** (except demo-project), package.json (capture entry), eslint.config.mjs (one block), docs/user-guide/**/images, docs/assets/readme/
 - Reviews own nothing.
 
 ## Accounts (from `read_quota` at 2026-09-25T07:13:22Z)
