@@ -17,9 +17,10 @@
  *
  * macOS and Linux only (reads `ps`); on Windows it prints "not supported".
  *
- * .claude/settings.json allows exactly these two commands (exact-match rules, no wildcard), so the
- * Xezar project leader can clear orphans at each tick without a permission prompt – leaked
- * launchers each spin a CPU core and hold the machine over its load ceiling (#145).
+ * The leader-only scripts/xezar-leader-settings.json allows exactly these two commands (exact-match
+ * rules, no wildcard), so the Xezar project leader can clear orphans at each tick without a
+ * permission prompt – leaked launchers each spin a CPU core and hold the machine over its load
+ * ceiling (#145). Not in .claude/settings.json: a rule there would reach every read-only agent too.
  */
 import { execFileSync } from 'node:child_process'
 import { realpathSync } from 'node:fs'
