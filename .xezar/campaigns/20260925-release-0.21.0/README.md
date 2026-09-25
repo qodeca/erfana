@@ -9,13 +9,12 @@ Updated: 2026-09-25 11:06 CEST
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
-- #150 ready, head f2b7508e (develop merged in) – #138 part A. Re-check 7b67a933 APPROVE at e566ed14. merge-queue; squash-merge when required checks are green.
 - #149 draft, head e57b8db6 – #138 spike note (320bec53). Login part stopped (needs a browser sign-in); owner makes the token. Q8: terminal text below the 7 px bar at 800 px; leader decision: capture-only zoom (#139 option).
 - #140 ready, head c442a15b – #139 spec. Re-check 12b29be1 APPROVE at c442a15b, all 11 findings fixed, no new defects. Labels design-approved + merge-queue; #139 labelled design-approved. Next in the merge line after #141: bring up to date, wait for green, squash-merge.
 Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 
 ## Serial merge line
-1. #150 (checks running at f2b7508e)
+Empty.
 
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
@@ -46,7 +45,7 @@ Counts at dispatch (15:03): tasks 4/10 (xezar runs 2 at once, 2 queued), gate ru
 ## Held or queued work
 - #151 – running as 455166db.
 - #144 – ready; held behind the #138 build: both edit docs/features/README.md, docs/keyboard-shortcuts.md, docs/settings.md.
-- #138 build – split: part A (plan steps 2-4) running as a410722c; step 1 spike running as 320bec53 (owner chose a subscription login, westagilelabs tried first); steps 5-8 follow.
+- #138 build – split: part A (plan steps 2-4) merged (#150); step 1 spike running as 320bec53 (owner chose a subscription login, westagilelabs tried first); steps 5-8 follow.
 - #139 build – design merged; waits for #138's capture script (part B).
 
 ## Owner items
