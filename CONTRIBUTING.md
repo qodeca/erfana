@@ -60,7 +60,7 @@ The one exception is the **graph engine** (spec 004 and the [#21](https://github
 Run the same checks CI runs before opening a PR:
 
 ```bash
-npm run lint            # eslint --fix
+npm run lint            # eslint --fix, then the no-shebang check (lint:shebang)
 npm run lint:css        # stylelint over src/ CSS and the design/ cards
 npm run design -- --check   # fails if a generated file under design/ is stale
 npm run typecheck       # tsc (node + web projects)

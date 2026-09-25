@@ -41,6 +41,7 @@ import { useScreenshotCapture } from './TerminalPanel/hooks/useScreenshotCapture
 import { getBasename } from '../../utils/fileUtils'
 import { openFileInPanel } from '../../utils/openFileInPanel'
 import { resolvePanelKind } from '../../utils/resolvePanelKind'
+import { formatShortcut } from '../../utils/shortcutLabel'
 import { formatPathsForTerminal, escapePathForShell, type ShellKind } from '../../utils/shellPathEscape'
 import { logger } from '../../utils/logger'
 import { TEST_IDS } from '../../constants/testids'
@@ -1309,7 +1310,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
                 <button
                   className={`icon-btn${terminalExpanded ? ' icon-btn--active' : ''}`}
                   onClick={toggleTerminalExpanded}
-                  title="Maximize terminal (⌘⇧M)"
+                  title={`Maximize terminal (${formatShortcut('M', { mod: true, shift: true })})`}
                   aria-label="Maximize terminal over the editor"
                   aria-pressed={terminalExpanded}
                   data-testid={TEST_IDS.TERMINAL_BTN_EXPAND}
