@@ -13,6 +13,8 @@
  * GitHub's recommended 1280×640. Paths are fixed; the script takes no input.
  */
 
+/* global document, window -- the page.evaluate callbacks run in the card's page */
+
 import { mkdirSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
