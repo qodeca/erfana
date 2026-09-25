@@ -5,6 +5,7 @@ import { ChevronUp, ChevronDown, X } from 'lucide-react'
 import type { SearchProvider } from '../../providers/search'
 import { useSearchStore, type SearchOptions } from '../../stores/useSearchStore'
 import { TEST_IDS } from '../../constants/testids'
+import { isMacOS } from '../../utils/platform'
 import './SearchBar.css'
 
 /** Debounce delay for search execution in milliseconds */
@@ -196,29 +197,38 @@ export function SearchBar({ provider }: SearchBarProps) {
     restoreFocus()
   }, [provider, closeSearch, restoreFocus])
 
-  // Alt+C / Alt+W toggle the two option buttons, matching their tooltips. Match
-  // the physical key (`event.code`), not `event.key`: on macOS Option+C and
-  // Option+W type "ç" and "∑", so `event.key` never equals 'c'/'w'. Cmd/Ctrl
-  // disqualifies the shortcut, and preventDefault keeps the Option character out
-  // of the input. The whole-word toggle respects the provider capability the same
-  // way the disabled button does.
+  // The two option buttons answer to a platform shortcut, matching their
+  // tooltips: Cmd+Option+C / Cmd+Option+W on macOS, Alt+C / Alt+W elsewhere.
+  // macOS takes the Cmd chord so a bare Option+C is left to the keyboard layout
+  // (a Polish user types ć with it); Windows and Linux exclude Cmd and Ctrl so
+  // AltGr (reported as Ctrl+Alt) still types ć there. The keys match the
+  // physical key (`event.code`), not `event.key`, because those chords do not
+  // produce a plain 'c'/'w' character.
+  const isMac = isMacOS()
+  const caseShortcutLabel = isMac ? '⌥⌘C' : 'Alt+C'
+  const wordShortcutLabel = isMac ? '⌥⌘W' : 'Alt+W'
+
   const handleOptionShortcut = useCallback(
     (e: React.KeyboardEvent): boolean => {
-      if (!e.altKey || e.metaKey || e.ctrlKey) return false
+      const modifierHeld = isMac
+        ? e.metaKey && e.altKey && !e.ctrlKey
+        : e.altKey && !e.metaKey && !e.ctrlKey
+      if (!modifierHeld) return false
       const option =
-        e.code === 'KeyC'
-          ? 'caseSensitive'
-          : e.code === 'KeyW' && capabilities.wholeWord
-            ? 'wholeWord'
-            : null
+        e.code === 'KeyC' ? 'caseSensitive' : e.code === 'KeyW' ? 'wholeWord' : null
       if (!option) return false
+      // Consume the chord even when it does not toggle — a key repeat, or whole
+      // word where the view does not support it — so nothing is typed into the
+      // input.
       e.preventDefault()
+      if (e.repeat) return true
+      if (option === 'wholeWord' && !capabilities.wholeWord) return true
       // Read current state directly from store to avoid stale closure
       const currentOptions = useSearchStore.getState().options
       updateOptions({ [option]: !currentOptions[option] })
       return true
     },
-    [capabilities.wholeWord, updateOptions]
+    [isMac, capabilities.wholeWord, updateOptions]
   )
 
   // Keyboard handlers for input
@@ -324,7 +334,7 @@ export function SearchBar({ provider }: SearchBarProps) {
           onClick={() => updateOptions({ caseSensitive: !options.caseSensitive })}
           onKeyDown={(e) => handleToggleKeyDown(e, 'caseSensitive')}
           aria-pressed={options.caseSensitive}
-          title="Case sensitive (Alt+C)"
+          title={`Case sensitive (${caseShortcutLabel})`}
           data-testid={TEST_IDS.SEARCH_BAR_TOGGLE_CASE}
         >
           Aa
@@ -338,7 +348,7 @@ export function SearchBar({ provider }: SearchBarProps) {
           disabled={!capabilities.wholeWord}
           title={
             capabilities.wholeWord
-              ? 'Whole word (Alt+W)'
+              ? `Whole word (${wordShortcutLabel})`
               : 'Whole word (not supported by this view)'
           }
           data-testid={TEST_IDS.SEARCH_BAR_TOGGLE_WORD}
