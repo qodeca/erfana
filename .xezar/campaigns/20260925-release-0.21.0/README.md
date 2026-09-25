@@ -20,8 +20,9 @@ Empty.
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
+| cce96098 | #160 scoped recheck at 38e62dd8 | code-review (scoped-recheck) | claude/sonnet | westagilelabs |
 
-Counts at dispatch (00:58): tasks 1/10, gate runs 0/2, metered 0/4, load 1.5/18.
+Counts at dispatch (01:28): tasks 1/10, gate runs 0/2, metered 0/4, load 2.9/18.
 
 ## File-ownership table
 - Reviews own nothing.
