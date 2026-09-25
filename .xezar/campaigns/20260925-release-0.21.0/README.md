@@ -9,18 +9,17 @@ Updated: 2026-09-25 11:06 CEST
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
-- #150 ready, head e566ed14 – #138 part A. Round-1 fixes pushed by a410722c (shebang removed, coverage number 94.65); all checks green incl. Windows. Re-check 7b67a933 running (scoped-recheck, claude/sonnet, westagilelabs).
+- #150 ready, head f2b7508e (develop merged in) – #138 part A. Re-check 7b67a933 APPROVE at e566ed14. merge-queue; squash-merge when required checks are green.
 - #149 draft, head e57b8db6 – #138 spike note (320bec53). Login part stopped (needs a browser sign-in); owner makes the token. Q8: terminal text below the 7 px bar at 800 px; leader decision: capture-only zoom (#139 option).
 - #140 ready, head c442a15b – #139 spec. Re-check 12b29be1 APPROVE at c442a15b, all 11 findings fixed, no new defects. Labels design-approved + merge-queue; #139 labelled design-approved. Next in the merge line after #141: bring up to date, wait for green, squash-merge.
 Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 
 ## Serial merge line
-Empty.
+1. #150 (checks running at f2b7508e)
 
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| 7b67a933 | #150 | code-review (scoped-recheck) | claude/sonnet | westagilelabs |
 | 455166db | #151 | feature-implementation | claude/opus | qodeca |
 | 4458b282 | allow rule | feature-implementation | claude/opus | gmail |
 | 322010ff | #143 | feature-implementation (ui-implementation) | claude/opus | qodeca |
