@@ -125,6 +125,23 @@ export default [
       '@typescript-eslint/no-require-imports': 'off'
     }
   },
+  // Documentation capture (#138, AC4): condition-based waits only. A fixed
+  // sleep makes a screenshot of whatever state the app happens to be in; the
+  // scenes wait on the PTY stream, the Stop hook's file, the DOM or two
+  // identical screenshots instead (scripts/capture/lib/). No other block sets
+  // `no-restricted-properties` for these files.
+  {
+    files: ['scripts/capture/**/*.{ts,mjs,js}'],
+    rules: {
+      'no-restricted-properties': [
+        'error',
+        {
+          property: 'waitForTimeout',
+          message: 'No fixed waits in the capture (#138 AC4). Wait on a condition: the PTY stream, a locator, a file, or a stable screenshot.'
+        }
+      ]
+    }
+  },
   // The image-export rasterize harness (#73) is a hidden Chromium page that is
   // handed image bytes straight from the user's project — SVG included, which
   // is a document format with a script model. It is safe ONLY because an SVG
