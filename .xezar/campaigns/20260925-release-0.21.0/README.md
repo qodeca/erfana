@@ -10,13 +10,11 @@ Updated: 2026-09-25 11:06 CEST
 
 ## Open pull requests
 - #146 ready, head 1f4f5c33 – #145 fix. Required checks green. Advisory Windows checks red: scripts/stop-orphan-mcp.test.mjs fails to load (SyntaxError at 10:1). Review 63ac9ab2 running (full-cold-review, claude/sonnet, gmail).
-- #141 ready, head 749110db (develop merged in) – #138 spec. Re-check 9f406ac3 APPROVE at 0c6ad3a0, 0 findings. Labels design-approved + merge-queue; #138 labelled design-approved. Next: squash-merge when required checks are green at 749110db.
 - #140 ready, head c442a15b – #139 spec. Re-check 12b29be1 APPROVE at c442a15b, all 11 findings fixed, no new defects. Labels design-approved + merge-queue; #139 labelled design-approved. Next in the merge line after #141: bring up to date, wait for green, squash-merge.
 Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 
 ## Serial merge line
-1. #141 (checks running at 749110db)
-2. #140 (update after #141 merges)
+1. #140 (brought up to date 11:39, checks running)
 
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
@@ -45,7 +43,7 @@ Counts at dispatch (11:35): tasks 2/10, gate runs 0/2, metered 1/4 (pi), load 14
 ## Held or queued work
 - #143 – ready; held so it does not collide with #142 on tooltip code.
 - #144 – ready; held behind the #138 build: both edit docs/features/README.md, docs/keyboard-shortcuts.md, docs/settings.md.
-- #138 build – design approved 11:22; starts after #141 merges.
+- #138 build – design merged (42f3d36d); ready. Waits for load under 18.
 - #139 build – design approved 11:29; waits for #138's fixture and capture script.
 
 ## Owner items
