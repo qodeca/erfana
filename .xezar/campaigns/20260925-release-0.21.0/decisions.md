@@ -27,3 +27,7 @@ Owner decisions in the owner's exact words, dated, append-only.
   Standing rule: when ready work and headroom exist, the leader dispatches at once instead of waiting for the L3 tick. Every other L3 check (ceilings, overlap, route.mjs, budget) still applies.
 - 2026-09-25 00:23 CEST - direct question (xez-unattended-on contract read back) - "Yes, turn it on"
   Unattended mode on since 2026-09-24T22:23:07Z. Hard stops: release go, deleting a record, opening a campaign. Parked: account or provider lane switch, scope trim, third repair round. Accepted costs: overnight metered spend; stops are instructions, not a hook.
+- 2026-09-25 10:12 CEST - direct question - orphaned circuit-electron servers: "You may stop them (Recommended)". Scope: only orphans (ppid 1), by exact PID after checking each; keep any with a live parent.
+- 2026-09-25 10:12 CEST - direct question - repo description, topics, social preview from PR #140: "After README merges (Recommended)". Leader shows the exact values before applying.
+- 2026-09-25 10:12 CEST - direct question - extend TRADEMARKS.md to the new banner, wordmark and social image: "Yes, add them (Recommended)". Lands in the #139 build PR.
+- 2026-09-25 10:12 CEST - direct question - code/doc mismatches from the #141 inventory: "File in 0.21.0 (Recommended)". Separate small issues with the release-0.21.0 label.
