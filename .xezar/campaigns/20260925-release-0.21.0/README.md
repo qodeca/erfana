@@ -20,29 +20,27 @@ Empty.
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| 2a1e4316 | #154 fix code + image findings (round 2) | address-review-findings (author) | claude/opus | qodeca |
 
-Counts at dispatch (18:17): tasks 3/10, gate runs 0/2, metered 0/4, load 2.8/18.
+Counts at dispatch (19:08): tasks 2/10, gate runs 1/2 (2a1e4316), metered 1/4, load 2.9/18.
 
 ## File-ownership table
-- 2a1e4316 owns scripts/capture/**, docs/user-guide/**/images, docs/assets/readme/, docs/designs/138-user-guide/README.md (screenshot rows)
 - Reviews own nothing.
 
-## Accounts (from `read_quota` at 2026-09-25T07:13:22Z)
+## Accounts (from `read_quota` at 2026-09-25T17:13:17Z)
 | Runner | Login | State | Resets (UTC) |
 |---|---|---|---|
-| claude | default | reserved leader login, runs no tasks | – |
-| claude | qodeca | ok (weekly 46%) | 2026-09-28 16:59 |
-| claude | gmail | ok (weekly 34%) | 2026-09-25 19:00 |
+| claude | default | reserved leader login, runs no tasks; ok but weekly 95% | 2026-09-28 22:59 |
+| claude | qodeca | ok (weekly 51%) | 2026-09-28 17:00 |
+| claude | gmail | ok (weekly 36%) | 2026-09-25 19:00 |
 | claude | eqamana | out | 2026-09-26 16:00 |
-| claude | westagilelabs | ok (weekly 0%) | 2026-10-02 07:00 |
-| codex | default | ok (weekly 0%) | 2026-10-02 00:13 |
-| codex | qodeca-2 | ok (weekly 24%) | 2026-09-29 12:45 |
+| claude | westagilelabs | ok (weekly 3%) | 2026-10-02 07:00 |
+| codex | default | ok (weekly 4%) | 2026-10-02 10:44 |
+| codex | qodeca-2 | ok (weekly 26%) | 2026-09-29 12:45 |
 | pi | – | no logins | – |
 
 ## Held or queued work
 - #144 – ready; held behind the #138 build: both edit docs/features/README.md, docs/keyboard-shortcuts.md, docs/settings.md.
-- #138 build – split: part A (plan steps 2-4) merged (#150); step 1 spike done (#149); part B (steps 5, 5b, 6) is PR #154: code review REQUEST CHANGES (1 major, run.mjs readLogin can empty the privacy deny-list); design review FAIL (7 privacy/state blockers B-1..B-10, 5 non-blocking); both sent to author 2a1e4316 (round 2); steps 7-8 follow.
+- #138 build – split: part A (plan steps 2-4) merged (#150); step 1 spike done (#149); part B (steps 5, 5b, 6) is PR #154: code review REQUEST CHANGES (1 major, run.mjs readLogin can empty the privacy deny-list); design review FAIL (7 privacy/state blockers B-1..B-10, 5 non-blocking); round 2 done at 46600c39, re-reviews next (code recheck + image review); steps 7-8 follow.
 - #139 build – design merged; waits for #138's capture script (part B).
 
 ## Owner items
