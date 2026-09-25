@@ -9,9 +9,8 @@ Updated: 2026-09-25 11:06 CEST
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
-- #150 ready, head 4e1e992c – #138 part A (a410722c). Windows checks red: shebang in scripts/check-links.mjs (same as #146). Review eb3b8cf0 running (full-cold-review, claude/sonnet, westagilelabs).
+- #150 ready, head e566ed14 – #138 part A. Round-1 fixes pushed by a410722c (shebang removed, coverage number 94.65); all checks green incl. Windows. Re-check 7b67a933 running (scoped-recheck, claude/sonnet, westagilelabs).
 - #149 draft, head e57b8db6 – #138 spike note (320bec53). Login part stopped (needs a browser sign-in); owner makes the token. Q8: terminal text below the 7 px bar at 800 px; leader decision: capture-only zoom (#139 option).
-- #148 ready, head 02d9c56c – #142 fix, round-1 fixes pushed, all checks green. Re-check 77285cdf running (scoped-recheck, claude/sonnet, gmail).
 - #140 ready, head c442a15b – #139 spec. Re-check 12b29be1 APPROVE at c442a15b, all 11 findings fixed, no new defects. Labels design-approved + merge-queue; #139 labelled design-approved. Next in the merge line after #141: bring up to date, wait for green, squash-merge.
 Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 
@@ -21,13 +20,17 @@ Empty.
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| 77285cdf | #148 | code-review (scoped-recheck) | claude/sonnet | gmail |
-| eb3b8cf0 | #150 | code-review (full-cold-review) | claude/sonnet | westagilelabs |
+| 7b67a933 | #150 | code-review (scoped-recheck) | claude/sonnet | westagilelabs |
+| 455166db | #151 | feature-implementation | claude/opus | qodeca |
+| 4458b282 | allow rule | feature-implementation | claude/opus | gmail |
+| 322010ff | #143 | feature-implementation (ui-implementation) | claude/opus | qodeca |
 
-Counts at dispatch (14:36): tasks 2/10, gate runs 0/2, metered 0/4, load 3.6/18.
+Counts at dispatch (15:03): tasks 4/10 (xezar runs 2 at once, 2 queued), gate runs 0/2, metered 0/4, load 4.7/18.
 
 ## File-ownership table
-- Reviews write no files. 77285cdf and eb3b8cf0 own nothing.
+- 455166db owns scripts/*.mjs|js shebang lines, a new lint check script, package.json lint chain
+- 4458b282 owns .claude/settings.json, one doc line for stop-orphan-mcp
+- 322010ff owns src/renderer/** tooltip strings, one new helper in src/renderer/src/utils/, their tests
 
 ## Accounts (from `read_quota` at 2026-09-25T07:13:22Z)
 | Runner | Login | State | Resets (UTC) |
@@ -42,14 +45,14 @@ Counts at dispatch (14:36): tasks 2/10, gate runs 0/2, metered 0/4, load 3.6/18.
 | pi | – | no logins | – |
 
 ## Held or queued work
-- #143 – ready; held so it does not collide with #142 on tooltip code.
+- #151 – running as 455166db.
 - #144 – ready; held behind the #138 build: both edit docs/features/README.md, docs/keyboard-shortcuts.md, docs/settings.md.
 - #138 build – split: part A (plan steps 2-4) running as a410722c; step 1 spike running as 320bec53 (owner chose a subscription login, westagilelabs tried first); steps 5-8 follow.
 - #139 build – design merged; waits for #138's capture script (part B).
 
 ## Owner items
 - Label issues with `release-0.21.0` to put them in scope.
-- Leader runs `node scripts/stop-orphan-mcp.mjs` at each L1 tick (worked at 12:39). Allow-rule PR for it still to do (owner-approved).
+- Leader runs `node scripts/stop-orphan-mcp.mjs` at each L1 tick (worked at 12:39). Allow-rule PR running as 4458b282 (owner-approved).
 - Make the Claude Code token for the #138 capture (steps given 13:10).
 - Decide whether to hide or delete the reviewer's junk test comments on PR #146.
 - After #145 merges: leader adds the allow rule for `node scripts/stop-orphan-mcp.mjs` (approved).
