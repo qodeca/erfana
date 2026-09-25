@@ -251,28 +251,28 @@ Every row goes into `reference/keyboard-shortcuts.md` with macOS and Windows col
 
 Found while building the inventory. The guide documents what the **code** does. Items 1 and 6
 were resolved in [#142](https://github.com/qodeca/erfana/issues/142) and
-[#143](https://github.com/qodeca/erfana/issues/143). [#144](https://github.com/qodeca/erfana/issues/144)
-tracks the remaining older-document corrections in items 2–5, 7 and 8; the guide itself uses
+[#143](https://github.com/qodeca/erfana/issues/143); items 2–5, 7 and 8 in
+[#144](https://github.com/qodeca/erfana/issues/144). The guide itself uses
 current source behavior. Item 9 remains unverified.
 
 1. **Find bar keys** (#142, resolved). `R/components/Search/SearchBar.tsx` now handles the
    platform-specific case-sensitive and whole-word chords named by its tooltips.
-2. **Image viewer keys** (#144).
-   - `docs/keyboard-shortcuts.md` lists `Home` for reset; the code handles `0` only.
-   - `docs/features/README.md` #12 says F is full screen; in the code F is **Fit**, and there is no
-     key to enter full screen.
-3. **HTML preview setting label** (#144). `docs/settings.md` calls it "Enable HTML preview"; the app says
-   **Run HTML files**.
-4. **Screen permission buttons** (#144). The terminal docs say "Open settings" / "Relaunch"; the app says
-   **Open Screen Recording settings** / **Relaunch Erfana** / **Close**.
-5. **Tree right-click menu** (#144). The docs omit Import…, Reveal, Open as source and Open in default
-   browser.
+2. **Image viewer keys** (#144, resolved). `docs/keyboard-shortcuts.md` and
+   `docs/features/README.md` #12 now say `0` resets, `F` fits, and no key enters full screen (`Esc`
+   only exits one).
+3. **HTML preview setting label** (#144, resolved). The user-guide settings reference and the app both
+   say **Run HTML files**; `docs/settings.md` no longer names a label.
+4. **Screen permission buttons** (#144, resolved). `docs/terminal/README.md` and
+   `docs/features/README.md` #3 now name **Open Screen Recording settings**, **Relaunch Erfana** and
+   **Close**.
+5. **Tree right-click menu** (#144, resolved). `docs/features/README.md` #2 now names Import…, Reveal,
+   Open as source and Open in default browser; `docs/project-panel.md` and the guide already did.
 6. **Tooltips on Windows** (#143, resolved). Activity-bar tooltips use `formatShortcut` for
    platform-specific modifier glyphs.
-7. **Auto-execute** (#144). `docs/prompts/README.md` mentions a review step "unless auto-execute enabled";
-   every template has `autoExecute: true`.
-8. **Agent wording** (#144). `docs/features/README.md` item 1 now says prompt templates are sent to
-   the terminal agent. Item 4 still calls them "AI text operations"; #144 tracks that older-document
-   wording. The guide attributes prompts to the CLI agent in the terminal.
+7. **Auto-execute** (#144, resolved). `docs/prompts/README.md` no longer describes a review step;
+   every template has `autoExecute: true`, so the prompt runs at once.
+8. **Agent wording** (#144, resolved). `docs/features/README.md` items 1 and 4 now send prompt
+   templates to the terminal agent rather than claiming AI text operations. The guide attributes
+   prompts to the CLI agent in the terminal.
 9. **Cmd+B in the editor.** Whether it makes text bold or toggles the sidebar is unverified. A
    capture scene observes it, and the guide states what happens.

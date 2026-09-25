@@ -57,7 +57,7 @@ The IDs are used in the rest of this page.
 - fixing the code/doc mismatches in the inventory: they are filed as
   [#142](https://github.com/qodeca/erfana/issues/142),
   [#143](https://github.com/qodeca/erfana/issues/143) and
-  [#144](https://github.com/qodeca/erfana/issues/144).
+  [#144](https://github.com/qodeca/erfana/issues/144) (the #144 corrections landed separately).
 
 ## 3. Contracts
 
