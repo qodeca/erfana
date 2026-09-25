@@ -6,6 +6,7 @@ import { BaseDialog } from './BaseDialog'
 import { TextareaContextMenu } from '../ContextMenu/TextareaContextMenu'
 import { CharacterCount } from '../shared'
 import { validateTextInput } from '../../utils/textInputValidation'
+import { formatShortcut } from '../../utils/shortcutLabel'
 import { useTextareaClipboard } from '../../hooks/useTextareaClipboard'
 import { TEXT_INPUT_LIMITS } from '../../../../shared/constants'
 import { TEST_IDS } from '../../constants/testids'
@@ -341,7 +342,7 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
                 aria-hidden={!showTooltip}
               >
                 <div className="dialog-tooltip-content">
-                  <kbd>Cmd/Ctrl+Enter</kbd> to submit
+                  <kbd>{formatShortcut('Enter', { mod: true })}</kbd> to submit
                   <br />
                   <kbd>Esc</kbd> to cancel
                 </div>

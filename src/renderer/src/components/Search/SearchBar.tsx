@@ -6,6 +6,7 @@ import type { SearchProvider } from '../../providers/search'
 import { useSearchStore, type SearchOptions } from '../../stores/useSearchStore'
 import { TEST_IDS } from '../../constants/testids'
 import { isMacOS } from '../../utils/platform'
+import { formatShortcut } from '../../utils/shortcutLabel'
 import './SearchBar.css'
 
 /** Debounce delay for search execution in milliseconds */
@@ -205,8 +206,8 @@ export function SearchBar({ provider }: SearchBarProps) {
   // physical key (`event.code`), not `event.key`, because those chords do not
   // produce a plain 'c'/'w' character.
   const isMac = isMacOS()
-  const caseShortcutLabel = isMac ? '⌥⌘C' : 'Alt+C'
-  const wordShortcutLabel = isMac ? '⌥⌘W' : 'Alt+W'
+  const caseShortcutLabel = formatShortcut('C', { mod: isMac, alt: true })
+  const wordShortcutLabel = formatShortcut('W', { mod: isMac, alt: true })
 
   const handleOptionShortcut = useCallback(
     (e: React.KeyboardEvent): boolean => {
