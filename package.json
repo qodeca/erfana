@@ -8,7 +8,8 @@
   "private": true,
   "scripts": {
     "format": "prettier --write .",
-    "lint": "eslint . --ext .js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix",
+    "lint": "eslint . --ext .js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix && npm run lint:shebang",
+    "lint:shebang": "node scripts/check-shebangs.mjs",
     "lint:css": "stylelint \"src/**/*.css\" \"design/**/*.css\" \"design/**/*.html\"",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
@@ -21,6 +22,7 @@
     "test:renderer": "vitest --run --config vitest.renderer.ts",
     "test:cov": "node scripts/test-cov.mjs",
     "check:headers": "node scripts/check-spdx-headers.mjs",
+    "check:links": "node scripts/check-links.mjs",
     "design": "node scripts/design-sync.mjs",
     "start": "electron-vite preview",
     "dev": "electron-vite dev",

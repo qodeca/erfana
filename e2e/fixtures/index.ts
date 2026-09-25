@@ -42,6 +42,7 @@ import { TerminalPage } from '../pages/terminal.page'
 import { MonacoPage } from '../pages/monaco.page'
 import { MermaidPage } from '../pages/mermaid.page'
 import { ProjectTreePage } from '../pages/project-tree.page'
+import { buildVisualLaunchOptions, forceCloseApp, resizeBrowserWindow } from './launch-helpers'
 
 const PROJECT_ROOT = path.join(__dirname, '..', '..')
 const DEFAULT_TEST_PROJECT = process.env.ERFANA_TEST_PROJECT || PROJECT_ROOT
@@ -473,66 +474,6 @@ console.log(greeting)
 
 > A blockquote for visual variety.
 `
-}
-
-function buildVisualLaunchOptions(
-  userDataDir: string,
-  projectPath?: string
-): {
-  args: string[]
-  env: Record<string, string>
-  recordVideo?: { dir: string; size: { width: number; height: number } }
-} {
-  const args = [PROJECT_ROOT, '--force-device-scale-factor=1', `--user-data-dir=${userDataDir}`]
-  if (projectPath) {
-    args.splice(1, 0, projectPath)
-  }
-  const opts: ReturnType<typeof buildVisualLaunchOptions> = {
-    args,
-    env: { ...process.env, NODE_ENV: 'development' }
-  }
-  if (process.env.CI) {
-    opts.recordVideo = {
-      dir: path.join(__dirname, '..', '..', 'test-results', 'videos'),
-      size: { width: 1280, height: 720 }
-    }
-  }
-  return opts
-}
-
-async function forceCloseApp(app: ElectronApplication): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, 100))
-  try {
-    await app.evaluate(({ BrowserWindow }) => {
-      for (const win of BrowserWindow.getAllWindows()) {
-        win.destroy()
-      }
-    })
-  } catch (e) {
-    if (process.env.CI) console.warn('forceCloseApp: window destroy failed –', e)
-  }
-  try {
-    await app.close()
-  } catch (e) {
-    if (process.env.CI) console.warn('forceCloseApp: app.close() failed –', e)
-  }
-}
-
-async function resizeBrowserWindow(
-  app: ElectronApplication,
-  width: number,
-  height: number
-): Promise<void> {
-  await app.evaluate(
-    ({ BrowserWindow }, size) => {
-      const win = BrowserWindow.getAllWindows()[0]
-      if (win) {
-        win.setSize(size.width, size.height)
-        win.setContentSize(size.width, size.height)
-      }
-    },
-    { width, height }
-  )
 }
 
 export const visualTest = base.extend<VisualTestFixtures, WorkerFixtures>({

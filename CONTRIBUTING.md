@@ -60,7 +60,7 @@ The one exception is the **graph engine** (spec 004 and the [#21](https://github
 Run the same checks CI runs before opening a PR:
 
 ```bash
-npm run lint            # eslint --fix
+npm run lint            # eslint --fix, then the no-shebang check (lint:shebang)
 npm run lint:css        # stylelint over src/ CSS and the design/ cards
 npm run design -- --check   # fails if a generated file under design/ is stale
 npm run typecheck       # tsc (node + web projects)
@@ -68,6 +68,7 @@ npm run test:ci         # vitest workspace (main / renderer / preload)
 npm run test:cov        # coverage floors - a REQUIRED check that test:ci does not run
 npx electron-vite build # production build
 npm run check:headers   # every source file must carry the SPDX header (the MIT Xezar kit in .xezar/ is exempt)
+npm run check:links     # relative links, anchors and user-guide wording (local gate only, not yet a CI step)
 npm audit signatures    # advisory in CI, but it catches a lockfile written by the wrong npm
 pipx run --spec "reuse[charset-normalizer]" reuse lint   # REUSE compliance
 ```
