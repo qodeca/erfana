@@ -8,7 +8,8 @@ SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 - **Issue:** [#138](https://github.com/qodeca/erfana/issues/138), plan step 1 of
   [`docs/features/138-user-guide.md`](../features/138-user-guide.md#step-1--spike-confirm-what-the-design-assumes-no-committed-code).
 - **Design:** [docs/designs/138-user-guide/](../designs/138-user-guide/README.md).
-- **Date:** 2026-09-25. **Time box:** about 3 hours; used about 1.5.
+- **Date:** 2026-09-25. **Time box:** about 3 hours; used about 1.5, plus a second run the same day
+  once the owner had made the subscription token (Q4 real token, Q5, Q7).
 
 ## The question and the answer
 
@@ -17,13 +18,15 @@ most: can Claude Code, started in the Erfana terminal with `HOME` in a sandbox a
 unset, be logged in with the `westagilelabs` Claude subscription without the account email appearing
 on screen?
 
-**Answer: not answered for the login – it stops at a person.** A subscription token for the sandbox can
-only be made by `claude setup-token`, which opens a browser and waits for a person to sign in and paste
-a code (Q4). As the owner instructed, the spike stops there: no token was made, no credential was
-copied, and the two questions that need a real agent turn (Q5 Stop hook, Q7 `acceptEdits`) are
-**not answered**. Whether the email shows with a real subscription token is **unknown**.
+**Answer: yes.** With the owner's `westagilelabs` token passed as `CLAUDE_CODE_OAUTH_TOKEN`, Claude Code
+in the Erfana terminal was logged in. No email, name or organisation appeared on screen at the start
+banner, during two agent turns or on `/status` (Q4). The `Stop` hook fired once per turn (Q5).
+`acceptEdits` applied an edit without asking, and only the sandbox's settings loaded (Q7).
 
-Everything that does not need a login was measured. The design holds, with **three changes it needs**:
+Making the token needs a person once: `claude setup-token` opens a browser and waits for someone to
+sign in (Q4, first run). The owner did that; the spike never saw the token's value.
+
+All eight questions now have an observation. The design holds, with **four changes it needs**:
 
 1. **The sandbox cannot live in `/tmp`.** Erfana refuses `/tmp` and `/private` as project folders
    (Q3 setup). `/Users/Shared/erfana-capture/` worked.
@@ -33,6 +36,8 @@ Everything that does not need a login was measured. The design holds, with **thr
 3. **At 800 px, terminal text is about 6–6.7 px tall in every encode and in the raw frame**, under
    the 7 px bar. The cause is the scale-down, not the recorder, so switching to the fallback recorder
    will not fix it (Q8). #139's capture-only zoom or a wider display is needed.
+4. **Electron must be given `SHELL`.** With a minimal environment and no `SHELL`, the terminal showed
+   only a cursor and sent no output at all. Adding `SHELL=/bin/zsh` fixed it (Q4, second run).
 
 ## Versions and machine
 
@@ -45,7 +50,7 @@ Everything that does not need a login was measured. The design holds, with **thr
 | ffmpeg (`ffmpeg-static`) | 6.0 |
 | Node.js (script) | 24.21.0 |
 | `tesseract.js` / `sharp` | 7.0.0 / 0.34.5, both installed through `@llamaindex/liteparse` 1.4.1 |
-| Erfana | 0.20.0, `npx electron-vite build` of `develop` at `2d059647` |
+| Erfana | 0.20.0, `npx electron-vite build` of `develop` at `2d059647` (first run); of this branch after merging `develop` at `e1216a57` (second run) |
 
 ## How to repeat it
 
@@ -130,7 +135,9 @@ worked, and it has no user name in its path.
 
 ### Q4 – Agent login in the sandbox
 
-**Stopped at a browser sign-in.** Sub-answers:
+**Works, and no personal identifier appears on screen.** The first run stopped at the browser
+sign-in. The owner then made the token, and the second run (at the end of this section) observed the
+banner, two turns and `/status` with it. Sub-answers:
 
 **Where the `westagilelabs` login lives.** The folder `~/.claude.westagilelabs.priv` has no credentials
 file. The login is in the macOS login keychain, as the generic password
@@ -229,9 +236,89 @@ permissions. Claude Code walks up from the working folder and loaded the checkou
 
 `ANTHROPIC_API_KEY` was not tried: the owner chose a subscription login (2026-09-25).
 
+#### Second run: the real `westagilelabs` token
+
+The owner made the token with `claude setup-token` and saved it as a one-line, mode 600, git-ignored
+file under `.local/capture/`. Electron was given `ERFANA_CAPTURE_CLAUDE_TOKEN_FILE=<that file>`, the
+sandbox `.zshrc` above read it at run time, and the value was never printed, copied or logged. The
+sandbox was `/Users/Shared/erfana-spike-138c/` (outside any repository), with the `.zshrc` above, the
+pre-seeded `~/.claude.json` (theme, onboarding, trust for the project path, which here equals its
+realpath) and this `~/.claude/settings.json`:
+
+```json
+{ "permissions": { "defaultMode": "acceptEdits" },
+  "hooks": { "Stop": [ { "hooks": [ { "type": "command",
+    "command": "date +%s >> /Users/Shared/erfana-spike-138c/home/stop-hook.log" } ] } ] } }
+```
+
+Electron's environment was only `HOME` (sandbox), `SHELL`, `USER`, `LOGNAME`, `TMPDIR`, `TERM`,
+`LANG`, a fixed `PATH` (without the cmux `claude` wrapper, so the real `claude` binary ran),
+`ERFANA_CAPTURE_CLAUDE_TOKEN_FILE`, and `CLAUDE_CONFIG_DIR=<sandbox>/should-not-be-used`.
+
+**`SHELL` is required.** The first two attempts left it out. The terminal showed only a cursor and
+`window.api.terminal.onData` delivered 0 bytes in 30 s (`pty len 0 termVisible true`). With
+`SHELL=/bin/zsh` the `demo ~/Projects/demo $` prompt appeared within 4 s.
+
+**What `claude auth status` returns for this token** (same `HOME` and token, outside Erfana):
+
+```text
+{"loggedIn":true,"authMethod":"oauth_token","apiProvider":"firstParty",
+ "keys":["loggedIn","authMethod","apiProvider","analyticsDisabled","projectsDirectory","configDirectory"]}
+```
+
+It holds no email, organisation or account field, so the script could not learn the account's email to
+search for. The privacy check therefore looked for **any** email-shaped text
+(`[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}`), and for the operator's user name, first name, last
+name, home path and the account label `westagilelabs`. Each stage was checked twice: in the PTY
+stream since the stage began (escape codes removed; this is a superset of what is on screen) and in a
+Tesseract OCR of a 2× window screenshot. The script printed only counts and labels:
+
+| Stage | PTY: email-like / identifier hits | OCR: email-like / identifier hits |
+|---|---|---|
+| Start banner (`claude`) | 0 / none | 0 / none |
+| Turn 1 (edit README.md) | 0 / none | 0 / none |
+| Turn 2 (reply "ok") | 0 / none | 0 / none |
+| `/status`, Status tab | 0 / none | 0 / none |
+
+The company name `qodeca` appears in Erfana's own welcome-screen artwork, so the OCR hit on it was
+not counted. It is product branding, not an account identifier.
+
+**The start banner**, read from the screenshot: `Claude Code v2.1.282`, `Sonnet 5`, `Claude API`,
+`~/Projects/demo`, then the tip "Get to finished work sooner with Opus 5.5. Switch anytime with
+/model." The footer showed `● high · /effort` and `⏵⏵ accept edits on`. The first run's `401` remote
+settings warning did not appear; the sandbox `~/.claude` now held `remote-settings.json` and
+`policy-limits.json`. The banner says **"Claude API" even with a subscription token**, so a caption
+must not describe the plan from the banner.
+
+**`/status`, Status tab**, read from the screenshot. The fields shown, in order: Version (`2.1.282`),
+Session name, Session ID, Session kind (`interactive`), Peer address (`uds:/tmp/cc-socks/<pid>.sock`),
+cwd (the sandbox project path), **Auth token: `CLAUDE_CODE_OAUTH_TOKEN`** (the variable's name, not its
+value), Model (`Default (Sonnet 5 · Efficient for routine tasks)`), Setting sources (`User settings`),
+Auto mode server (`Disabled`), then System diagnostics. There was **no** email, organisation or login
+line. The diagnostics warned twice: "Native installation exists but ~/.local/bin is not in your PATH".
+This is because `PATH` named the operator's absolute `~/.local/bin`, not the sandbox's. The Usage tab
+was not opened.
+
+Erfana's own context meter under the terminal read `Sonnet 5 · 1M · 4%`. It read the transcript in
+the sandbox's `~/.claude/projects/`.
+
+The screenshots stayed in the sandbox, which was deleted afterwards. Electron and every process under
+it were stopped by PID; `pgrep -fl erfana-spike-138c` then printed nothing.
+
 ### Q5 – A `Stop` hook in the sandbox `~/.claude/settings.json` fires after each agent turn
 
-**Not answered.** It needs a real agent turn, which needs the login from Q4.
+**Yes, once per turn.** Second run of Q4, with the hook shown there. The script counted lines in
+`stop-hook.log` and waited for each new one:
+
+```text
+turn1 hook fired true hookCount 1 README ends with hello true
+turn2 hook fired true hookCount 2
+$ wc -l < <sandbox>/home/stop-hook.log      # after /status and /exit
+       2
+```
+
+Two prompts, two lines. Opening `/status` and leaving with `/exit` added none. The script used the
+hook file as its end-of-turn signal, and it worked for both turns.
 
 ### Q6 – Size of a quantised 2× full-window PNG of the welcome screen
 
@@ -253,16 +340,35 @@ was the "No project open" welcome state. A Recent projects list adds a small pan
 
 ### Q7 – `acceptEdits` is honoured, and nothing from the operator's configuration loads
 
-**Edit approval: not answered** – it needs a real agent turn, which needs the login from Q4.
+**Edit approval: honoured.** The prompt was "Add a line with the word hello at the end of README.md. Do
+nothing else." Claude Code read the file and showed `Update(README.md)` / `Added 2 lines`, with `+` and
+`+hello` as lines 4–5. It then said "Added "hello" as a new line at the end of README.md." There was no
+approval prompt: the PTY text of the turn had no "Do you want to", "make this edit" or "Yes, allow".
+The footer showed `⏵⏵ accept edits on` from the first banner on. The file on disk ended in
+`p r o j e c t . \n \n h e l l o \n` (`od -c`).
 
-**Isolation: partly observed**:
+**Isolation: observed**, second run:
+
+- `/status` → **Setting sources: `User settings`** only. The sandbox had no project settings, so this
+  is the sandbox `~/.claude/settings.json`, which is also the file whose hook fired (Q5).
+- Claude Code wrote its transcript folder only in the sandbox:
+  `<sandbox>/home/.claude/projects/-Users-Shared-erfana-spike-138c-home-Projects-demo`. Listing
+  `projects/` for that name in `~/.claude`, `~/.claude.qodeca.priv` and `~/.claude.westagilelabs.priv`
+  found nothing (`no transcript for sandbox`, three times).
+- The folder in `CLAUDE_CONFIG_DIR` that Electron was given was never created
+  (`should-not-be-used exists false`).
+- No operator status line, hook output or MCP server appeared in the screenshots, and the `/status`
+  Status tab had no MCP line.
+
+First run, still valid:
 
 - The operator's keychain login is not picked up (Q4 table, row 1).
 - `CLAUDE_CONFIG_DIR` set on Electron is cleared by the `.zshrc` (Q4 table).
 - Erfana wrote its own `~/.erfana` into the sandbox `HOME`, not the operator's.
 - A sandbox inside a repository **does** load that repository's `.claude/settings.local.json` (Q4).
 
-Whether any user-level hook, status line or plugin would load during a real session was not observed.
+The second run above answers what the first could not: during a real session only the sandbox's user
+settings loaded.
 
 ### Q8 – A 3-second `recordVideo` clip passes the legibility check at 800 px
 
@@ -317,32 +423,31 @@ first use. The capture preflight needs network access or a cached language file.
 
 ## What was not tested, and what would change the answer
 
-- **Anything with a real login**: the banner with a real subscription token, `/status`, whether the
-  email or organisation name appears, the Stop hook (Q5), and `acceptEdits` (Q7). Each of these could
-  still stop the capture. The stop rule stays in force until they are seen.
+- **The Usage tab of `/status`, `/login`, `/logout` and other account screens**: never opened. The
+  capture must not open them. The privacy check at step 5 should still scan every frame, because a
+  future Claude Code release could add account details to the banner or the Status tab.
+- **Longer sessions**: two tiny turns, one model (`Sonnet 5`). Other tools, tips or plan prompts that
+  appear later in a session were not seen.
 - **`ANTHROPIC_API_KEY`**: not tried, by the owner's decision.
 - **On-screen pixel comparison for the preview overlay**: `screencapture` needs Screen Recording
   permission, which only a person can grant.
 - **Full-length demo encodes**: only a 3 s clip. GIF size and legibility of a real 10–20 s loop with
   an agent's output were not measured.
 - **Other machines**: one Mac, scale factor 2, one run of each measurement.
-- **A Recent projects list on the welcome screen** (Q6 used the empty state).
+- **The PNG size with a Recent projects list on the welcome screen** (Q6 used the empty state). The
+  second run showed the list; it shows the project name and the start of its path
+  (`/Users/Shared/erfana-spike-138c/…`), so the sandbox path must not contain a personal name.
 - **Which `hasTrustDialogAccepted` key** (path or realpath) Claude Code reads.
 
 ## What it means for the decision
 
-The login is the gate. Options:
+The login gate is passed. Option A (a person makes a `westagilelabs` token once with
+`claude setup-token`; the capture reads it through `ERFANA_CAPTURE_CLAUDE_TOKEN_FILE`) worked end to end,
+and no personal identifier was seen on screen. The spec's stop rule did not trigger. The token lasts one
+year, so the owner has to make a new one each year.
 
-| Option | What it takes | Cost | Risk |
-|---|---|---|---|
-| **A. A person makes a `westagilelabs` setup-token once** (recommended) | Someone signs in once in the browser via `claude setup-token` and stores the token in a `chmod 600` file outside the repo; the capture reads it through `ERFANA_CAPTURE_CLAUDE_TOKEN_FILE` | A few minutes of a person's time, once a year | The banner and `/status` with that token are still unseen; the stop rule applies at the next run |
-| B. `ANTHROPIC_API_KEY` | An API key in the operator's environment (Erfana passes `ANTHROPIC_*` through) | Pay-per-use billing; the owner chose not to | Same unseen-banner risk |
-| C. Ship the guide without agent images | Drop rows 1, 6–9, 14 and #139's demo for now | Weaker guide and README | None to privacy |
-
-**Recommendation: A.** It is the path the owner asked for, and everything around it was confirmed: the
-variable, the `.zshrc` export, the isolation from the operator's login, and the first-run
-pre-seeding. After the token exists, rerun only the unanswered part of this spike (banner, `/status`,
-Q5, Q7) before step 5 is built.
+Options B (`ANTHROPIC_API_KEY`) and C (ship without agent images) are no longer needed for the login.
+Q8's legibility result still needs a decision on #139's capture-only zoom or a wider display.
 
 Design changes this spike asks for, independent of the login:
 
@@ -357,6 +462,11 @@ Design changes this spike asks for, independent of the login:
 5. Legibility: `recordVideo` stays; #139 needs the capture-only zoom or a wider display. The OCR known
    line should be plain words.
 6. Decode WebP frames with `sharp` for the legibility and privacy checks.
+7. Give Electron `SHELL` (with a minimal environment the terminal never starts), and put `claude` on
+   the sandbox's own `PATH` (for example `$HOME/.local/bin`), or `/status` shows a "not in your PATH"
+   warning.
+8. Wait for the end of each agent turn on the `Stop` hook's file, not on a timer.
+9. Never label the plan from the banner: it says "Claude API" with a subscription token.
 
 These change the design's § Capture pipeline and the spec's § 3.3. They are part of #138, not an
 architecture decision.
