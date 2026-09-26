@@ -82,6 +82,12 @@ It cannot pass on a Windows host (at least two `vitest.main.ts` floors miss
 because their symlink cases skip on win32, and the #124 floors have not been run
 there); CI runs it on Linux.
 
+Every vitest run uses at most half the machine's cores (at least two), set in
+`vitest.workers.ts` (#171), so several agents or terminals running tests at once
+do not saturate the machine. Raise or lower it for one run or one machine with
+`VITEST_MAX_WORKERS`, as a count (`VITEST_MAX_WORKERS=8`) or a share of the cores
+(`VITEST_MAX_WORKERS=75%`).
+
 For changes touching Electron-specific paths, also run the end-to-end suite locally (CI does not currently run it):
 
 ```bash
