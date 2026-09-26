@@ -135,7 +135,7 @@ Standing rules the owner added with `xez-add-rule`, each in their exact words wi
 - [ ] Lane taken from `route.mjs <row id>`, first with budget, never the author's; `wait` waits.
 - [ ] Every login verified before dispatch — **never** fall back to the reserved leader login,
       which runs no tasks. A missing login is a stop, not a reason to substitute.
-- [ ] Ceilings respected: 2 gate runs, 10 tasks, 4 metered-tool tasks, load at or below 18.
+- [ ] Ceilings respected: 2 gate runs, 10 tasks, 4 metered-tool tasks, load at or below 40 (owner 2026-09-26, was 18).
 - [ ] Nothing dispatched from L1 or L2.
 - [ ] Records written and committed **before** reporting.
 - [ ] No owner-only decision taken alone.

@@ -76,3 +76,4 @@ Owner decisions in the owner's exact words, dated, append-only.
 - 2026-09-26 (channel: AskUserQuestion, leader session) "Open PRs fall behind develop after every merge … How should we fix that?" -> "Merge queue (Recommended)"
 - 2026-09-26 (same channel) "Proposal F: … tasks waiting for me to say 'continue' … What should it include?" -> "Alert + safe auto-continue (Recommended)"
 - 2026-09-26 (channel: AskUserQuestion, leader session) "Plan v3 drops two items you picked earlier … OK to drop both?" -> "Drop both (Recommended)"
+- 2026-09-26T17:22:47Z (channel: typed in the leader session) "bump load ceiling from 24 to 40". Note: the ceiling on record was 18 (leader-guide.md:138, loops.json L3), not 24; applied as 40.
