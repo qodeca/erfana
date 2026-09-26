@@ -43,3 +43,11 @@ Owner decisions in the owner's exact words, dated, append-only.
 - 2026-09-25 13:10 CEST - direct question (AskUserQuestion: the #138 spike, PR #149, stopped because a subscription token needs a browser sign-in by a person) - "Yes, I make it (Recommended)". The owner runs `claude setup-token` as westagilelabs and stores the token in a chmod 600 file outside the repo; the leader then re-runs only the login part of the spike.
 - 2026-09-25 15:28 CEST - direct question (AskUserQuestion: allow-rule task 4458b282 stopped, Claude Code refuses a task edit of .claude/settings.json) - "I add it by hand". The owner pastes the two rules into the task worktree; the task then adds the doc line, runs the checks and opens the PR.
 - 2026-09-25 17:22 CEST - direct question (AskUserQuestion: allow rule refused by the kit check in .claude/settings.json; where should it go?) - "Leader-only file (Recommended)". Rules go in scripts/xezar-leader-settings.json; the owner undoes the manual .claude/settings.json edit in both places.
+- 2026-09-26 08:40 CEST - direct question (xez-unattended-off, parked 1 of 4: third repair round on PR #155, same-PR fix of S-1/S-2) - "Keep it (Recommended)"
+  Parked by the leader 2026-09-25 18:27; owner kept it. #155 already merged (0c8cc10a).
+- 2026-09-26 08:40 CEST - direct question (xez-unattended-off, parked 2 of 4: fourth repair round on PR #155, S-2 fail-closed fix) - "Keep it (Recommended)"
+  Parked by the leader 2026-09-25 18:56; owner kept it.
+- 2026-09-26 08:40 CEST - direct question (xez-unattended-off, parked 3 of 4: third repair round on PR #154, Windows test fix before merge) - "Keep it (Recommended)"
+  Parked by the leader 2026-09-25 19:56; owner kept it. #154 already merged (c1b1ad21).
+- 2026-09-26 08:40 CEST - direct question (xez-unattended-off, parked 4 of 4: lane switch for #138 steps 7-8 to codex/gpt-6-sol) - "Keep it (Recommended)"
+  Parked by the leader 2026-09-25 20:47; owner kept it. #158 already merged (8949413e).
