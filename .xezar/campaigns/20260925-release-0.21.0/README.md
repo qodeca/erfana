@@ -38,15 +38,15 @@ Counts at dispatch (16:05): tasks 3/10, gate runs 0/2, metered 3/4 (all pi), loa
 - 03cbd155 owns scripts/test-cov.mjs, package.json scripts lines, docs/ci.md (#133 para). 29df4b5a owns .github/workflows/checks.yml, secret-scan.yml, docs/ci.md (triggers/merge queue). 79cad1a5 owns .github/workflows/windows-native-smoke.yml (new), docs/ci.md (short section). 5bf6cc9a owns .xezar/docs/briefs.md, .xezar/docs/README.md, leader-guide-detail.md, .xezar/LOCAL-PATCHES.md. Accepted overlap: docs/ci.md across 3 tasks (different sections; later ones merge develop in).
 - Reviews own nothing.
 
-## Accounts (from `read_quota` at 2026-09-26T13:52:35Z)
+## Accounts (from `read_quota` at 2026-09-26T16:13:00Z)
 | Runner | Login | State | Resets (UTC) |
 |---|---|---|---|
-| claude | default | reserved leader login, runs no tasks; ok (weekly 7%; now reports plan max – was team at 99% until 06:13Z, so the login behind `default` changed) | 2026-10-02 06:59 |
-| claude | qodeca | ok (weekly 52%) | 2026-09-28 16:59 |
-| claude | gmail | ok (weekly 6%) | 2026-10-02 18:59 |
-| claude | eqamana | out | 2026-09-26 16:00 |
-| claude | westagilelabs | ok (weekly 7%) | 2026-10-02 06:59 |
-| codex | default | ok (weekly 11%; flapped to unknown at 03:13Z and 05:13Z–06:13Z) | 2026-10-02 10:44 |
+| claude | default | reserved leader login, runs no tasks; ok (weekly 10%, plan max; same numbers as westagilelabs – owner item) | 2026-10-02 06:59 |
+| claude | qodeca | ok (weekly 53%) | 2026-09-28 16:59 |
+| claude | gmail | ok (weekly 8%) | 2026-10-02 19:00 |
+| claude | eqamana | ok (weekly 0%, back from out at 16:00Z) | 2026-10-03 16:00 |
+| claude | westagilelabs | ok (weekly 10%) | 2026-10-02 06:59 |
+| codex | default | ok (weekly 13%) | 2026-10-02 10:44 |
 | codex | qodeca-2 | ok (weekly 27%) | 2026-09-29 12:45 |
 | pi | – | no logins | – |
 
