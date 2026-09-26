@@ -180,11 +180,6 @@ const READ_ONLY_WORKFLOWS = new Set([
 // never touch the author's branch; that, not a shell limit, is their guarantee.
 const RUNS_CODE_WORKFLOWS = new Set(["acceptance-verification", "design-review", "qa"]);
 
-// The one way a RUNS_CODE step that carries a bashAllowlist may run code (local patch, #177): the
-// safe app start, which checks the PR head, refuses the primary checkout and confines `npm ci` and
-// the dev server under sandbox-exec. An exact entry, not a prefix family: no git, npm or npx.
-const RUNS_CODE_BASH_ENTRY = "node .xezar/checks/review-run-app.mjs";
-
 // the engine's `configSchema`.
 const CONFIG_KEYS = new Set([
   "skillsRepos",
@@ -344,7 +339,7 @@ function checkReaderStep(at, workflow, step) {
     return;
   }
   for (const entry of list) {
-    if (!READER_BASH_PREFIXES.has(entry) && !(RUNS_CODE_WORKFLOWS.has(workflow) && entry === RUNS_CODE_BASH_ENTRY)) {
+    if (!READER_BASH_PREFIXES.has(entry)) {
       err(at, `bashAllowlist entry "${entry}" is not a reading prefix; git goes through git-read.sh, comments and labels through gh-write.sh, files through verdict-write.sh`);
     }
   }
