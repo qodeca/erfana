@@ -9,6 +9,9 @@ Updated: 2026-09-25 11:06 CEST
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
+- #182 (#175 brief templates), draft, head c71592b9. Review d2e3aca9 running.
+- #181 (#178 Windows native smoke), draft, head 73880f37, gate sealed. Reviews running. Then run on #168 branch.
+- #180 (#173 merge queue triggers), draft, head 094c5e17, gate sealed. Reviews running.
 - #168 (#163 lift @electron/rebuild override + electron-builder 26.16.1), draft, head d4043abc, labels dependencies + do-not-merge. Gate passed; npm audit 16 -> 7; node-pty rebuilt (@electron/rebuild 4.2.0); `electron-builder --dir` green; packed app opened a working terminal. Security review 35479ba2 (opus): APPROVE-level + nit S-1; leader posted it (comment 5847266523). Code review 84cbb123 (sonnet, gmail, posted itself): REQUEST CHANGES – Windows checks job never runs @electron/rebuild, so no Windows evidence for the changed path (leader's brief wrongly named it). Round 1 relayed to 43131e43: fix PR body, list Windows-proof options, BLOCKED for owner; S-1 after #162 lands.
 - #167 (#164 liteparse 2.14.7), draft, head 0fa58e18, do-not-merge until v0.21.0 ships. Round 1 fixed; recheck 0b92cbf1 (sonnet/gmail) APPROVE, posted itself.
 - #155 ready, head d4fb29e7 – allow rule in scripts/xezar-leader-settings.json (4458b282): exactly 2 exact-match rules + one autoMode reason; all checks green. Next: security-review (widens tool access).
@@ -25,11 +28,11 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| 43131e43 | #168 S-1 (security.md row) after #162; Windows proof BLOCKED on separate PR (#163) | dependency-maintenance (continued) | pi/deepseek-api/deepseek-flash | – |
+| 43131e43 | #168 S-1 done (164d93b9); told to stop polling; waits for #181 run | dependency-maintenance (continued) | pi/deepseek-api/deepseek-flash | – |
 | 03cbd155 | #133 test:cov --project | bug-fix | pi/deepseek-api/deepseek-flash | – |
-| 29df4b5a | #173 merge queue triggers | feature-implementation (kit-refactor) | claude/opus | gmail |
-| 79cad1a5 | #178 Windows native smoke workflow | feature-implementation (kit-refactor) | claude/opus | qodeca |
-| 5bf6cc9a | #175 brief templates | docs-maintenance | codex/gpt-5.6-terra | default |
+| 7d1e5077 | #181 security-review | security-review | codex/gpt-6-astra | qodeca-2 |
+| 5dc219c2 | #181 full-cold-review | code-review | claude/sonnet | westagilelabs |
+| d2e3aca9 | #182 full-cold-review | code-review | claude/opus | gmail |
 
 Counts at dispatch (16:05): tasks 3/10, gate runs 0/2, metered 3/4 (all pi), load 2.8/18. xezar workspace maxParallel 5 (owner, 16:07).
 
@@ -38,15 +41,15 @@ Counts at dispatch (16:05): tasks 3/10, gate runs 0/2, metered 3/4 (all pi), loa
 - 03cbd155 owns scripts/test-cov.mjs, package.json scripts lines, docs/ci.md (#133 para). 29df4b5a owns .github/workflows/checks.yml, secret-scan.yml, docs/ci.md (triggers/merge queue). 79cad1a5 owns .github/workflows/windows-native-smoke.yml (new), docs/ci.md (short section). 5bf6cc9a owns .xezar/docs/briefs.md, .xezar/docs/README.md, leader-guide-detail.md, .xezar/LOCAL-PATCHES.md. Accepted overlap: docs/ci.md across 3 tasks (different sections; later ones merge develop in).
 - Reviews own nothing.
 
-## Accounts (from `read_quota` at 2026-09-26T13:52:35Z)
+## Accounts (from `read_quota` at 2026-09-26T16:13:00Z)
 | Runner | Login | State | Resets (UTC) |
 |---|---|---|---|
-| claude | default | reserved leader login, runs no tasks; ok (weekly 7%; now reports plan max – was team at 99% until 06:13Z, so the login behind `default` changed) | 2026-10-02 06:59 |
-| claude | qodeca | ok (weekly 52%) | 2026-09-28 16:59 |
-| claude | gmail | ok (weekly 6%) | 2026-10-02 18:59 |
-| claude | eqamana | out | 2026-09-26 16:00 |
-| claude | westagilelabs | ok (weekly 7%) | 2026-10-02 06:59 |
-| codex | default | ok (weekly 11%; flapped to unknown at 03:13Z and 05:13Z–06:13Z) | 2026-10-02 10:44 |
+| claude | default | reserved leader login, runs no tasks; ok (weekly 10%, plan max; same numbers as westagilelabs – owner item) | 2026-10-02 06:59 |
+| claude | qodeca | ok (weekly 53%) | 2026-09-28 16:59 |
+| claude | gmail | ok (weekly 8%) | 2026-10-02 19:00 |
+| claude | eqamana | ok (weekly 0%, back from out at 16:00Z) | 2026-10-03 16:00 |
+| claude | westagilelabs | ok (weekly 10%) | 2026-10-02 06:59 |
+| codex | default | ok (weekly 13%) | 2026-10-02 10:44 |
 | codex | qodeca-2 | ok (weekly 27%) | 2026-09-29 12:45 |
 | pi | – | no logins | – |
 
