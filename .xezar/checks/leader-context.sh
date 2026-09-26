@@ -176,9 +176,9 @@ timeline_tail() {
     [ -n "$newest_timeline" ] && timeline_tail "${campaign}${newest_timeline}" "${campaign}${newest_timeline} (newest day timeline)"
     note_tail "${campaign}parked.md" "${campaign}parked.md (decisions the leader made alone, waiting for the owner)"
     # Whole, never truncated - see NOTE_TAIL_BYTES above. Same symlink refusal as note_tail. The one
-    # thing left out is an entry whose exact block is also in archive-decisions.md (the leader
-    # archived it as resolved with decisions-archive.mjs); the file on disk is never changed, and an
-    # entry that differs by one byte is injected. If the filter cannot run, the whole file is.
+    # thing left out is an occurrence that a complete, hash-checked record in archive-decisions.md
+    # names exactly (the leader archived it as resolved with decisions-archive.mjs); the file on
+    # disk is never changed. A malformed record, or a filter that cannot run, hides nothing.
     d="${campaign}decisions.md"
     a="${campaign}archive-decisions.md"
     if [ -f "$d" ] && [ ! -L "$d" ] && [ -r "$d" ]; then
@@ -189,15 +189,22 @@ timeline_tail() {
       fi
       filtered="$(mktemp "${TMPDIR:-/tmp}/leader-decisions.XXXXXX" 2>/dev/null || true)"
       hidden=""
+      fallback=""
+      status=""
       if [ -n "$filtered" ] && [ -f "$a" ] && [ ! -L "$a" ] && [ -f "$SCRIPT_DIR/decisions-archive.mjs" ] \
         && node "$SCRIPT_DIR/decisions-archive.mjs" --visible "$d" "$a" > "$filtered" 2> "$filtered.count"; then
-        hidden="$(tr -cd '0-9' < "$filtered.count")"
-        strip_fences < "$filtered"
-      else
-        strip_fences < "$d"
+        status="$(head -n 1 "$filtered.count" | head -c 200)"
       fi
+      case "$status" in
+        "hidden "*) hidden="$(printf '%s' "${status#hidden }" | tr -cd '0-9')"; strip_fences < "$filtered" ;;
+        "fallback "*) fallback="$(printf '%s' "${status#fallback }" | tr -cd 'A-Za-z0-9 :._-')"; strip_fences < "$d" ;;
+        *) strip_fences < "$d" ;;
+      esac
       if [ -n "$hidden" ] && [ "$hidden" != "0" ]; then
-        printf '\n[%s entries of %s are left out above because the identical entry is in %s (archived as resolved). They are still in decisions.md on disk.]\n' "$hidden" "$d" "$a"
+        printf '\n[%s entries of %s are left out above: each is named, by the sha256 of its exact bytes and its occurrence, in a complete record in %s (archived as resolved). They are still in decisions.md on disk.]\n' "$hidden" "$d" "$a"
+      fi
+      if [ -n "$fallback" ]; then
+        printf '\n[%s has a bad record (%s), so nothing was left out above: decisions.md is injected whole. Fix the archive from git.]\n' "$a" "$fallback"
       fi
       [ -n "$filtered" ] && rm -f "$filtered" "$filtered.count"
     else
@@ -208,7 +215,7 @@ timeline_tail() {
     # printed, so a committed file name cannot carry text into the session.
     archives="$(ls -1 "$campaign" 2>/dev/null | grep -E '^archive-[A-Za-z0-9._-]+\.md$' | LC_ALL=C sort | tr '\n' ' ' || true)"
     if [ -n "$archives" ]; then
-      printf '\n\n[Not loaded, read on demand from %s: %s(archive-decisions.md holds copies of resolved decisions; the originals stay in decisions.md)]\n' "$campaign" "$archives"
+      printf '\n\n[Not loaded, read on demand from %s: %s(archive-decisions.md holds records of resolved decisions; the originals stay in decisions.md)]\n' "$campaign" "$archives"
     fi
     printf '\n\n--- %s: END UNTRUSTED CAMPAIGN RECORD ---\n' "$NONCE"
   fi

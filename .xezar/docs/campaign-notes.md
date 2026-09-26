@@ -33,7 +33,7 @@ Everything else goes through a pull request.
 | `merges.md` | one line per day: every merge as `#PR -> sha` | no, read on demand |
 | `plan.md` | the owner-approved plan, copied in once, never edited | on demand |
 | `timeline-YYYY-MM-DD.md` | one file per day, append-only | newest day only, newest 40 entries |
-| `archive-*.md` | stale blocks, and copies of resolved decisions | never (only named) |
+| `archive-*.md` | stale blocks, and records of resolved decisions | never (only named) |
 
 - **`README.md`** — live state. Rewritten, not appended, at every milestone, as the last act of
   handling that event and before reporting to the owner. Stamp `Updated:` from `date`. Keep: a
@@ -53,8 +53,10 @@ Everything else goes through a pull request.
   small, archive a **resolved** entry – never cut one – with `node .xezar/checks/decisions-archive.mjs
   <campaign-dir> --move <numbers> --apply` (`--list` numbers the entries; without `--apply` it only
   previews). Archiving hides an entry from the leader's context; it never removes it from
-  `decisions.md`: the script only appends a verbatim copy to `archive-decisions.md`, and the loader
-  leaves out any entry whose exact text is there. Edit an archived entry and it is loaded again.
+  `decisions.md`: the script only appends a record to `archive-decisions.md` naming that one
+  occurrence (SHA-256 of its exact bytes plus its ordinal among identical entries), and the loader
+  leaves out only occurrences a complete record names. Edit an archived entry and it is loaded
+  again; never edit a record – a malformed one makes the loader hide nothing.
   Standing rules stay visible.
 
 - **`parked.md`** — one entry per decision the leader made on the owner's behalf during unattended
@@ -74,8 +76,9 @@ Everything else goes through a pull request.
   Never read this file whole; read its tail. Only its newest 40 entries are injected at session
   start, after a line naming the full file on disk.
 
-- **`archive-*.md`** — stale blocks kept for history, and verbatim copies of resolved
-  `decisions.md` entries (`archive-decisions.md`), which the loader leaves out of `decisions.md`. Never loaded at session start; the loader prints one line
+- **`archive-*.md`** — stale blocks kept for history, and records of resolved
+  `decisions.md` entries (`archive-decisions.md`), each naming one exact occurrence that the loader
+  leaves out of its copy of `decisions.md`. Never loaded at session start; the loader prints one line
   naming them, so the leader knows they exist.
 
 ## `future-campaign/`
