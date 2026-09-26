@@ -32,9 +32,7 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| b9b1012d | #186 full-cold-review | code-review | claude/opus | eqamana |
 | b5d01d5e | #168 scoped-recheck (Windows proof, S-1) | code-review | claude/sonnet | gmail |
-| 7c7e6ae8 | #184 spike doc review | code-review | claude/sonnet | qodeca |
 | 44b16d0c | #185 spike doc review | code-review | claude/sonnet | westagilelabs |
 | 974c210b | #171 vitest worker cap | feature-implementation | claude/opus | westagilelabs |
 | 9a85cf2c | #176 Dependabot groups | feature-implementation | claude/opus | gmail |
