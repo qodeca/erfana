@@ -9,8 +9,8 @@ Updated: 2026-09-25 11:06 CEST
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
-- #183 (#133 test:cov --project), draft, head 76835964. Review 9c9fb976 running.
-- #182 (#175 brief templates), draft, head 10ee22ee, Refs #175. Round 1 fixed; recheck 7417ad8b running.
+- #183 (#133) merged 2026-09-26 as 6b763b38.
+- #182 (#175) merged 2026-09-26 as 97d5c17c. #175 stays open for the remaining rows.
 - #181 (#178 Windows native smoke), draft, head 73880f37, gate sealed. Reviews running. Then run on #168 branch.
 - #180 (#173) merged 2026-09-26 as db105aab. Owner: enable Require merge queue on develop.
 - #168 (#163 lift @electron/rebuild override + electron-builder 26.16.1), draft, head d4043abc, labels dependencies + do-not-merge. Gate passed; npm audit 16 -> 7; node-pty rebuilt (@electron/rebuild 4.2.0); `electron-builder --dir` green; packed app opened a working terminal. Security review 35479ba2 (opus): APPROVE-level + nit S-1; leader posted it (comment 5847266523). Code review 84cbb123 (sonnet, gmail, posted itself): REQUEST CHANGES – Windows checks job never runs @electron/rebuild, so no Windows evidence for the changed path (leader's brief wrongly named it). Round 1 relayed to 43131e43: fix PR body, list Windows-proof options, BLOCKED for owner; S-1 after #162 lands.
@@ -30,8 +30,6 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
 | 43131e43 | #168 S-1 done (164d93b9); told to stop polling; waits for #181 run | dependency-maintenance (continued) | pi/deepseek-api/deepseek-flash | – |
-| 5dc219c2 | #181 full-cold-review | code-review | claude/sonnet | westagilelabs |
-| 9c9fb976 | #183 full-cold-review | code-review | claude/opus | eqamana |
 | 919fea77 | #172 spike verdict posting | spike | claude/opus | westagilelabs |
 | 4aee4aa1 | #179 spike leader liveness | spike | claude/opus | gmail |
 | 04cb9379 | #169 gate lanes + lint without --fix | feature-implementation (kit-refactor) | codex/gpt-6-sol | qodeca-2 |
