@@ -475,7 +475,7 @@ gate_phase() {
     for (let i = 0; i < args.length; i += 3) entries.push({index: Number(args[i]), name: args[i+1], command: args[i+2]});
     process.stdout.write(JSON.stringify(entries));
   ' "${args[@]}")" || return 1
-  node "$SCRIPT_DIR/lib/gate-parallel.mjs" "$SCRIPT_DIR/lib/gate-record.sh" "$mode" "$entries" &
+  node "$SCRIPT_DIR/lib/gate-parallel.mjs" "$SCRIPT_DIR/lib/gate-record.sh" "$mode" "$entries" "$GATE_APPLICATION_SCHEDULE_JSON" &
   GATE_SCHEDULER_PID=$!
   wait "$GATE_SCHEDULER_PID"
   local scheduler_rc=$?

@@ -34,7 +34,7 @@ function configuredLanes() {
 }
 
 const describing = process.argv[2] === '--describe';
-const [library, mode, rawEntries] = describing
+const [library, mode, rawEntries, expectedScheduleJson] = describing
   ? [null, 'application', process.argv[3]]
   : process.argv.slice(2);
 const entries = JSON.parse(rawEntries);
@@ -63,6 +63,10 @@ if (mode === 'application') {
   const coverage = entries.find(e => e.name === 'npm run test:cov')?.index;
   const build = entries.find(e => e.name === 'npx electron-vite build')?.index;
   const unit = entries.find(e => e.name === 'npm run test:ci')?.index;
+  const known = [coverage, build, unit].filter(index => index !== undefined).length;
+  if (known > 0 && known < 3) {
+    throw new Error('a guarded application command was renamed or removed; update the schedule constraints');
+  }
   if (coverage !== undefined && build !== undefined &&
       !APPLICATION_LANES.some(lane => lane.indexOf(coverage) >= 0 && lane.indexOf(build) > lane.indexOf(coverage))) {
     throw new Error('coverage and build must share a lane, with coverage before build');
@@ -72,9 +76,17 @@ if (mode === 'application') {
     throw new Error('coverage and unit tests must share a lane to avoid test fixture collisions');
   }
 }
+const resolvedSchedule = {source: laneSource, raw: laneRaw, lanes: APPLICATION_LANES};
 if (describing) {
-  process.stdout.write(`${JSON.stringify({source: laneSource, raw: laneRaw, lanes: APPLICATION_LANES})}\n`);
+  process.stdout.write(`${JSON.stringify(resolvedSchedule)}\n`);
   process.exit(0);
+}
+if (mode === 'application') {
+  let expected;
+  try { expected = JSON.parse(expectedScheduleJson); } catch { throw new Error('missing or invalid recorded application schedule'); }
+  if (JSON.stringify(expected) !== JSON.stringify(resolvedSchedule)) {
+    throw new Error('application schedule changed after it was recorded; refusing to run');
+  }
 }
 if (process.platform === 'win32') throw new Error('gate process-group supervision requires a POSIX host');
 const directory = join(process.env.GATE_ATTEMPT_DIR, 'workers');
