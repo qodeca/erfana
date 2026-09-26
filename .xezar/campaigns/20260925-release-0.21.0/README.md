@@ -10,10 +10,10 @@ Updated: 2026-09-25 11:06 CEST
 
 ## Open pull requests
 - #190 (#179 silence alert, from 392e7c9b), draft, head 0fdf50e1, gate sealed. Next: cold review 0ac0f4e6 + codex security eab95ae4 (running). Owner installs launchd by hand after merge.
-- #189 (owner decision: load ceiling 40 in .xezar/loops.json, from 7d5d7fc6), draft, head eb97bd69, gate sealed. Review ac9e7f48 running.
+- #189 (owner decision: load ceiling 40 in .xezar/loops.json, from 7d5d7fc6), draft, head eb97bd69, gate sealed. Review ac9e7f48 APPROVE. In merge line after #186.
 - #188 (#171 vitest worker cap) merged 2026-09-26 as c27b399b (one CI unit-test crash before, rerun green).
 - #187 (#176 Dependabot groups, from 9a85cf2c), draft, head 9717d461, gate sealed. Code review dfa7c67f REQUEST CHANGES (overrides-only pins, pre-1.0 deps, actions limit); security 5cba1e38 NO FINDINGS. Round 1 done at bdf8dd53 (author gate green). Code recheck 375e7414 + codex security recheck 6031cb2b running.
-- #186 (#169 gate lanes, lint:check), draft, head 0ef1c1a3, round 2 fixed by 04cb9379 (author gate 133.7 s green, not sealed). Code recheck 839f072f APPROVE; security recheck 31c5f2ec S-1, S-2 fixed, S-3 + S-4 fixed in round 2; security recheck 69734780 running. After merge: leader-guide.md:149 lint -> lint:check.
+- #186 (#169 gate lanes, lint:check), draft, head 0ef1c1a3, round 2 fixed by 04cb9379 (author gate 133.7 s green, not sealed). Code recheck 839f072f APPROVE; security recheck 31c5f2ec S-1, S-2 fixed, S-3 + S-4 fixed in round 2 (69734780), S-5 nit left → follow-up issue proposed. In merge line. After merge: leader-guide.md:149 lint -> lint:check.
 - #185 (#179 spike) merged 2026-09-26 as 5f285011. Result: build the silence alert (+ line-86 doc fix); auto-continue deferred (parked).
 - #184 (#172 spike) merged 2026-09-26 as 4d874fa7; #172 build held for owner.
 - #183 (#133) merged 2026-09-26 as 6b763b38.
@@ -36,10 +36,8 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| 69734780 | #186 security recheck S-3/S-4 | security-review | claude/opus | eqamana |
 | 375e7414 | #187 code recheck | code-review | claude/sonnet | westagilelabs |
 | 6031cb2b | #187 security recheck | security-review | codex/gpt-6-astra | qodeca-2 |
-| ac9e7f48 | #189 review | code-review | claude/sonnet | qodeca |
 | 0ac0f4e6 | #190 cold review | code-review | claude/sonnet | gmail |
 | eab95ae4 | #190 security review | security-review | codex/gpt-6-astra | default |
 
@@ -67,6 +65,7 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 - #139 build – PR #159: code review APPROVE, design review FAIL (B-1 account name in QA screenshots); round 1 done at 1f924f73 (B-1 masked, NB-1 stated as a limit, NB-2 documented deviation); design recheck PASS at 9203f493; QA FAIL only because 3 checks could not run (chrome-devtools emulate + evaluate_script denied in the QA session): dark mode, theme switch, reduced motion unverified live. Waiting for the owner.
 
 ## Owner items
+- **#186 S-5 follow-up issue (nit):** gate-parallel.mjs:67 – if all three guarded command names change together, the ordering guards turn off silently. Leader proposes filing it as an issue (title: "gate-parallel: refuse when no guarded command name is found"). Needs your word to create it.
 - **#172 review posting (spike PR #184):** fix needs either (a) an upstream xezar engine change (pass --settings to reading steps, or a verdict-body field) – recommended, file upstream; or (b) a user-scope PreToolUse hook in ~/.claude/settings.json on this machine (tested: 12k-char verdict posts, 0 denials; but it runs for every Claude session and is outside repo review). Interim rule (short plain-text verdicts) works today. Build held until the owner picks.
 - **#159: owner checks by hand (answered 2026-09-26 08:40)** – dark theme, banner theme switch, reduced-motion still on github.com, branch feature/139-readme-redesign. Leader merges on the owner's word with green checks. Earlier note: (dark theme, banner theme switch, reduced-motion still). Both QA and design sessions were denied the chrome-devtools emulate/evaluate_script tools. Options: (a) owner checks them by hand on github.com in ~2 minutes (branch feature/139-readme-redesign: switch OS dark mode, turn on Reduce motion), or (b) allow those two tools for review sessions and re-run QA. Leader recommends (a).
 - `npm audit` on develop's lockfile (run by the #159 author, 2026-09-25 23:51): 16 advisories – 1 critical, 12 high, 3 moderate – none added by #159. Owner chose triage in 0.21.0: issue #161, task d71e7bf0.
