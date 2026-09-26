@@ -34,7 +34,6 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| 8077d7ff | #202 round 4 code recheck | code-review | claude/sonnet | westagilelabs |
 | 253ba433 | #175 remaining brief templates | docs-maintenance | codex/gpt-5.6-terra | default |
 
 ## File-ownership table
