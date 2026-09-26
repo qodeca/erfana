@@ -41,9 +41,7 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 | 9a85cf2c | #176 Dependabot groups | feature-implementation | claude/opus | gmail |
 
 ## File-ownership table
-- Overlap accepted: 347fc1ce and 43131e43 share package.json/package-lock.json; both merge after v0.21.0, one at a time, the second rebased. Neither edits docs/security.md (#162 owns it).
-- 03cbd155 owns scripts/test-cov.mjs, package.json scripts lines, docs/ci.md (#133 para). 29df4b5a owns .github/workflows/checks.yml, secret-scan.yml, docs/ci.md (triggers/merge queue). 79cad1a5 owns .github/workflows/windows-native-smoke.yml (new), docs/ci.md (short section). 5bf6cc9a owns .xezar/docs/briefs.md, .xezar/docs/README.md, leader-guide-detail.md, .xezar/LOCAL-PATCHES.md. Accepted overlap: docs/ci.md across 3 tasks (different sections; later ones merge develop in).
-- 919fea77 owns docs/spikes/172-*.md; 4aee4aa1 owns docs/spikes/179-*.md; 04cb9379 owns .xezar/checks/repo-gates.sh, lib/gate-parallel.mjs, lib/gate-results.mjs, .xezar/pipeline/config.json, package.json lint script line, AGENTS.md gate list. Accepted overlap: package.json with #183 (different lines).
+- 974c210b owns vitest.main.ts, vitest.preload.ts, vitest.renderer.ts (pool/worker lines), docs/ci.md (test parallelism note), CONTRIBUTING.md (if it mentions parallelism). 9a85cf2c owns .github/dependabot.yml (+ its docs note). No overlap between them; #170 (gate list) waits for #186.
 - Reviews own nothing.
 
 ## Accounts (from `read_quota` at 2026-09-26T16:13:00Z)
