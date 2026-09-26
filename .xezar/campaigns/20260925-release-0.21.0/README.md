@@ -79,7 +79,7 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 - Review sessions get `gh-write.sh` / `verdict-write.sh` refused: claude/opus (a873f32c, ab0c9d7f, 612e0cf9, 35479ba2, 76be37d0) and, since 2026-09-26 16:55, claude/sonnet too (0d8a560d). Read the verdict from the task's final message; the leader posts an APPROVE verbatim on the PR, and relays a REQUEST CHANGES to the author. Read the verdict from the PR comment or the task history, close the session, relay.
 - A review task can finish its review but be refused the GitHub post by its own permission check (a873f32c, 4 refusals). Do not work around it: relay the verdict to the author, who quotes it in the response comment, and say so.
 - Never dispatch while the checkout holds unpushed campaign commits: the task's worktree is cut from the local develop and carries them into its PR (#148).
-- Load over 18 for more than one tick: check `pgrep -fl circuit-electron` for launchers with parent PID 1 before anything else. They ignore SIGTERM. Tell the owner at once; after #145 merges use `node scripts/stop-orphan-mcp.mjs`.
+- Load over 40 (owner raised from 18 on 2026-09-26) for more than one tick: check `pgrep -fl circuit-electron` for launchers with parent PID 1 before anything else. They ignore SIGTERM. Tell the owner at once; after #145 merges use `node scripts/stop-orphan-mcp.mjs`.
 - xezar ack can fail with "no longer owns the project" while status says owner (seen 00:45-00:47, load over 130). Reads still work; retry ack later, never re-dispatch on it.
 - A step agent must not end its turn while its own background work runs (XEZ:MONITORING fails the step). Say "finish in the foreground" in every brief.
 
