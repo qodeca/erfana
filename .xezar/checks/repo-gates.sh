@@ -49,11 +49,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 # anyone gives a quality verdict, and putting it in the list's order is what makes the runner
 # execute the rule rather than ask people to remember it. It is a kit check, like
 # `repository-checks.sh`, so `.xezar/pipeline/config.json`'s `validation.commands` — the nine npm
-# commands a person runs by hand — is unchanged and still matches this list in order.
+# commands a person runs by hand — matches this list in order.
 GATE_NAMES=(
   "npm ci"
   ".xezar/checks/security-scan.sh"
-  "npm run lint"
+  "npm run lint:check"
   "npm run lint:css"
   "npm run design -- --check"
   "npm run typecheck"
@@ -66,7 +66,7 @@ GATE_NAMES=(
 GATE_COMMANDS=(
   "npm ci"
   ".xezar/checks/security-scan.sh"
-  "npm run lint"
+  "npm run lint:check"
   "npm run lint:css"
   "npm run design -- --check"
   "npm run typecheck"
@@ -78,10 +78,9 @@ GATE_COMMANDS=(
 )
 # Which application gates may run side by side, as one-based positions in the list above: lanes
 # separated by `;`, gates inside a lane by `,` and run in that order. A gate that needs another's
-# output (a package test that needs the build) goes after it in the same lane. Empty means one
-# lane, every application gate in list order — slower, and never wrong.
-GATE_APPLICATION_LANES="${GATE_APPLICATION_LANES-}"
-export GATE_APPLICATION_LANES
+# output (a package test that needs the build) goes after it in the same lane. The committed
+# default is validation.applicationLanes in .xezar/pipeline/config.json. An environment override
+# still works; an explicitly empty override requests one serial lane.
 
 # The list as JSON, and its digest. Both derived from the arrays above, so they cannot drift
 # from what actually runs.
@@ -158,8 +157,8 @@ fi
 # machine's numbers on that machine's suite, and the two worst buckets rest on single-digit
 # samples - do not quote them as a law. What they establish is the SHAPE: the cliff is steep and
 # it arrives early. This kit makes it arrive earlier than most, because one gate run of its own
-# already fans out - `GATE_APPLICATION_LANES` defaults to three lanes, so two runs is six
-# processes.
+# already fans out into two application lanes by committed default, so two runs can launch four
+# application workers at once.
 #
 # So the whole run re-executes itself once, holding one of the machine's gate slots. How many run
 # together is the engine's `resources.gateSlots`, default 1; the wait is bounded at 20 minutes and
@@ -416,8 +415,31 @@ git rev-parse --verify --quiet "refs/remotes/origin/$BASE_BRANCH" >/dev/null 2>&
 GATE_BASE_SHA="$(git merge-base HEAD "$GATE_BASE_REF" 2>/dev/null || printf '')"
 export GATE_BASE_REF GATE_BASE_SHA
 
+# Resolve the exact application schedule before starting the attempt. The scheduler's own
+# parser validates both the committed default and any environment override; the same resolved
+# lanes are recorded in attempt.json and carried into result.json.
+GATE_LAST=${#GATE_NAMES[@]}
+GATE_APPLICATION=()
+gate_schedule_args=()
+for ((gate_i = 3; gate_i < GATE_LAST; gate_i++)); do
+  GATE_APPLICATION+=("$gate_i")
+  gate_schedule_args+=("$gate_i" "${GATE_NAMES[$((gate_i - 1))]}" "${GATE_COMMANDS[$((gate_i - 1))]}")
+done
+if [ "${#GATE_APPLICATION[@]}" -gt 0 ]; then
+  gate_schedule_entries="$(node -e '
+    const args = process.argv.slice(1), entries = [];
+    for (let i = 0; i < args.length; i += 3) entries.push({index: Number(args[i]), name: args[i+1], command: args[i+2]});
+    process.stdout.write(JSON.stringify(entries));
+  ' "${gate_schedule_args[@]}")" || exit 1
+  GATE_APPLICATION_SCHEDULE_JSON="$(node "$SCRIPT_DIR/lib/gate-parallel.mjs" --describe "$gate_schedule_entries")" || exit 1
+else
+  GATE_APPLICATION_SCHEDULE_JSON='null'
+fi
+export GATE_APPLICATION_SCHEDULE_JSON
+
 printf '=== repo gates ===\n'
 printf 'producer       %s\n' "$GATE_PRODUCER"
+printf 'application    %s\n' "$GATE_APPLICATION_SCHEDULE_JSON"
 if ! gate_attempt_begin "$(gate_names_json)" "$(gate_list_id)"; then
   printf '\nGATES ABORTED: the attempt could not be recorded, so nothing here could become evidence.\n' >&2
   exit 1
@@ -453,7 +475,7 @@ gate_phase() {
     for (let i = 0; i < args.length; i += 3) entries.push({index: Number(args[i]), name: args[i+1], command: args[i+2]});
     process.stdout.write(JSON.stringify(entries));
   ' "${args[@]}")" || return 1
-  node "$SCRIPT_DIR/lib/gate-parallel.mjs" "$SCRIPT_DIR/lib/gate-record.sh" "$mode" "$entries" &
+  node "$SCRIPT_DIR/lib/gate-parallel.mjs" "$SCRIPT_DIR/lib/gate-record.sh" "$mode" "$entries" "$GATE_APPLICATION_SCHEDULE_JSON" &
   GATE_SCHEDULER_PID=$!
   wait "$GATE_SCHEDULER_PID"
   local scheduler_rc=$?
@@ -547,9 +569,6 @@ esac
 # The phases are derived from the list, never numbered by hand: gate 1 is the install, gate 2 the
 # security stage, the LAST gate the repository-check tail, and everything between is the
 # application phase. A project with five application gates or nine gets the same three lines.
-GATE_LAST=${#GATE_NAMES[@]}
-GATE_APPLICATION=()
-for ((gate_i = 3; gate_i < GATE_LAST; gate_i++)); do GATE_APPLICATION+=("$gate_i"); done
 if [ "${#GATE_APPLICATION[@]}" -gt 0 ]; then
   gate_phase application "${GATE_APPLICATION[@]}" || exit 1
 fi
