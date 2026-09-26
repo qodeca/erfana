@@ -175,56 +175,19 @@ timeline_tail() {
     newest_timeline="$(ls -1 "$campaign" 2>/dev/null | grep -E '^timeline-.*\.md$' | LC_ALL=C sort | tail -n 1 || true)"
     [ -n "$newest_timeline" ] && timeline_tail "${campaign}${newest_timeline}" "${campaign}${newest_timeline} (newest day timeline)"
     note_tail "${campaign}parked.md" "${campaign}parked.md (decisions the leader made alone, waiting for the owner)"
-    # Whole, never truncated - see NOTE_TAIL_BYTES above. Same symlink refusal as note_tail. The one
-    # thing left out is an entry that a complete record in archive-decisions.md names by its exact
-    # byte offsets, its hash and the hash of the file up to it (the leader archived it as resolved
-    # with decisions-archive.mjs); the file on disk is never changed. A stale record hides nothing;
-    # a malformed record, or a filter that cannot run, hides nothing at all.
+    # Whole, never truncated - see NOTE_TAIL_BYTES above. Same symlink refusal as note_tail. A
+    # missing or unreadable decisions.md is said out loud: silently loading nothing would drop every
+    # standing decision with no visible failure.
     d="${campaign}decisions.md"
-    a="${campaign}archive-decisions.md"
     if [ -f "$d" ] && [ ! -L "$d" ] && [ -r "$d" ]; then
       dsize="$(wc -c < "$d" 2>/dev/null | tr -d '[:space:]')"
-      printf '\n\n--- %s: %s ---\n\n' "$NONCE" "$d (owner decisions, exact words - complete except archived entries)"
+      printf '\n\n--- %s: %s ---\n\n' "$NONCE" "$d (owner decisions, exact words - complete)"
       if [ "${dsize:-0}" -gt "$DECISIONS_WARN_BYTES" ]; then
-        printf '[%s is %s bytes and is injected WHOLE at every start and every compaction. It is not cut, because an old decision still binds. Archive resolved entries with .xezar/checks/decisions-archive.mjs to leave them out.]\n\n' "$d" "$dsize"
+        printf '[%s is %s bytes and is injected WHOLE at every start and every compaction. It is not cut, because an old decision still binds. Archiving decisions out of it is not supported yet.]\n\n' "$d" "$dsize"
       fi
-      filtered="$(mktemp "${TMPDIR:-/tmp}/leader-decisions.XXXXXX" 2>/dev/null || true)"
-      hidden=""
-      stale=""
-      fallback=""
-      status=""
-      if [ -n "$filtered" ] && [ -f "$a" ] && [ ! -L "$a" ] && [ -f "$SCRIPT_DIR/decisions-archive.mjs" ] \
-        && node "$SCRIPT_DIR/decisions-archive.mjs" --visible "$d" "$a" > "$filtered" 2> "$filtered.count"; then
-        status="$(head -n 1 "$filtered.count" | head -c 200)"
-      fi
-      case "$status" in
-        "hidden "*)
-          counts="${status#hidden }"
-          hidden="$(printf '%s' "${counts%% *}" | tr -cd '0-9')"
-          stale="$(printf '%s' "${counts##* stale }" | tr -cd '0-9')"
-          strip_fences < "$filtered" ;;
-        "fallback "*) fallback="$(printf '%s' "${status#fallback }" | tr -cd 'A-Za-z0-9 :._-')"; strip_fences < "$d" ;;
-        *) strip_fences < "$d" ;;
-      esac
-      if [ -n "$hidden" ] && [ "$hidden" != "0" ]; then
-        printf '\n[%s entries of %s are left out above: each is named, by its byte offsets and the sha256 of its bytes and of the file up to it, in a complete record in %s (archived as resolved). They are still in decisions.md on disk.]\n' "$hidden" "$d" "$a"
-      fi
-      if [ -n "$stale" ] && [ "$stale" != "0" ]; then
-        printf '\n[%s stale archive records in %s were ignored: they no longer match decisions.md byte for byte (an entry at or before them was edited, inserted or moved), so the entries they named are shown above.]\n' "$stale" "$a"
-      fi
-      if [ -n "$fallback" ]; then
-        printf '\n[%s has a bad record (%s), so nothing was left out above: decisions.md is injected whole. Fix the archive from git.]\n' "$a" "$fallback"
-      fi
-      [ -n "$filtered" ] && rm -f "$filtered" "$filtered.count"
+      strip_fences < "$d"
     else
       printf '\n\n[WARNING: %s is missing, a symlink or unreadable - the owner decisions were NOT loaded. Tell the owner and restore it from git before acting on any decision.]\n' "$d"
-    fi
-    # Archives are never injected, but the leader is told they exist, so an archived decision is
-    # one read away rather than forgotten. Names are filtered to a fixed shape before they are
-    # printed, so a committed file name cannot carry text into the session.
-    archives="$(ls -1 "$campaign" 2>/dev/null | grep -E '^archive-[A-Za-z0-9._-]+\.md$' | LC_ALL=C sort | tr '\n' ' ' || true)"
-    if [ -n "$archives" ]; then
-      printf '\n\n[Not loaded, read on demand from %s: %s(archive-decisions.md holds records of resolved decisions; the originals stay in decisions.md)]\n' "$campaign" "$archives"
     fi
     printf '\n\n--- %s: END UNTRUSTED CAMPAIGN RECORD ---\n' "$NONCE"
   fi

@@ -28,12 +28,12 @@ Everything else goes through a pull request.
 | File | Shape | Loaded at session start |
 |---|---|---|
 | `README.md` | live state, **rewritten** at every milestone | yes |
-| `decisions.md` | owner's exact words, dated, **append-only** | yes, **whole** less archived entries |
+| `decisions.md` | owner's exact words, dated, **append-only** | yes, **whole** |
 | `parked.md` | calls the leader made alone while the owner was away | yes |
 | `merges.md` | one line per day: every merge as `#PR -> sha` | no, read on demand |
 | `plan.md` | the owner-approved plan, copied in once, never edited | on demand |
 | `timeline-YYYY-MM-DD.md` | one file per day, append-only | newest day only, newest 40 entries |
-| `archive-*.md` | stale blocks, and records of resolved decisions | never (only named) |
+| `archive-*.md` | stale blocks kept for history | never |
 
 - **`README.md`** — live state. Rewritten, not appended, at every milestone, as the last act of
   handling that event and before reporting to the owner. Stamp `Updated:` from `date`. Keep: a
@@ -49,16 +49,9 @@ Everything else goes through a pull request.
 - **`decisions.md`** — owner decisions in the owner's exact words, with the date and the channel
   (chat or a direct question), plus the campaign's standing rules. **Append-only**: never edit or
   reorder a past entry. This file is injected **whole** at session start, never truncated, because
-  the oldest entry binds the leader exactly as hard as the newest one. To keep the injected copy
-  small, archive a **resolved** entry – never cut one – with `node .xezar/checks/decisions-archive.mjs
-  <campaign-dir> --move <numbers> --apply` (`--list` numbers the entries; without `--apply` it only
-  previews). Archiving hides an entry from the leader's context; it never removes it from
-  `decisions.md`: the script only appends a record to `archive-decisions.md` naming that one
-  entry (its byte offsets, the SHA-256 of its bytes and of the file up to it), and the loader leaves
-  out only entries a valid record names. Keep `decisions.md` append-only: editing, inserting or
-  reordering anything at or before an archived entry makes its record stale, and the entry is
-  loaded again. Never edit a record – a malformed one makes the loader hide nothing.
-  Standing rules stay visible.
+  the oldest entry binds the leader exactly as hard as the newest one. A missing or unreadable
+  `decisions.md` is a loud warning, never a silent skip. Archiving decisions out of the injected
+  copy is not supported yet; a future issue may add it with a trusted proof of archival.
 
 - **`parked.md`** — one entry per decision the leader made on the owner's behalf during unattended
   mode. Each entry records what it chose, why, the alternative it rejected, and how to undo it.
@@ -77,10 +70,7 @@ Everything else goes through a pull request.
   Never read this file whole; read its tail. Only its newest 40 entries are injected at session
   start, after a line naming the full file on disk.
 
-- **`archive-*.md`** — stale blocks kept for history, and records of resolved
-  `decisions.md` entries (`archive-decisions.md`), each naming one entry by byte offsets and hashes;
-  the loader leaves it out of its copy of `decisions.md` while the record still matches. Never loaded at session start; the loader prints one line
-  naming them, so the leader knows they exist.
+- **`archive-*.md`** — stale blocks kept for history. Never loaded at session start.
 
 ## `future-campaign/`
 
@@ -112,8 +102,8 @@ leave the folder in place. Campaigns are never deleted.
 ## Loading
 
 The leader's session-start hook injects `README.md`, the newest 40 entries of the newest
-`timeline-*.md`, `parked.md` and the whole of `decisions.md` less its archived entries (a missing `decisions.md` is a loud warning). `plan.md`, older timelines and the
-archives are read on demand. Agent memory holds a
+`timeline-*.md`, `parked.md` and the whole of `decisions.md` (a missing `decisions.md` is a loud
+warning). `plan.md`, older timelines and the archives are read on demand. Agent memory holds a
 pointer to the folder, never a copy of its content.
 
 ## Writing rules
