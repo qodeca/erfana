@@ -2,13 +2,36 @@
 //
 // THE INDEXES ARE POSITIONS IN `repo-gates.sh`'s canonical list, one-based. Nothing here knows
 // which gates a project has: `repo-gates.sh` passes the application phase's entries, and the
-// lanes come from `GATE_APPLICATION_LANES` beside the list (`3,6,7;4;5` — lanes split by `;`,
-// a lane's gates by `,`, run in that order). Unset or empty means one lane in list order. The
+// lanes come from committed pipeline config, with `GATE_APPLICATION_LANES` overriding it.
+// Lanes split by `;`, a lane's gates by `,`, run in that order. An explicitly empty override
+// means one lane in list order. The
 // lanes must name every application gate exactly once, or the phase is refused: a gate that
 // silently never ran is the one failure this file exists to prevent.
 import { spawn } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { constants, closeSync, fstatSync, mkdirSync, openSync, readFileSync, readSync, realpathSync, writeFileSync } from 'node:fs';
+import { isAbsolute, join, relative, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+function configuredLanes() {
+  // Fixed path, confined to this checkout. Bound the JSON and lane input before parsing;
+  // there is no recursive walk, path probing from input, or regular-expression matching.
+  const root = realpathSync(fileURLToPath(new URL('../../../', import.meta.url)));
+  const file = realpathSync(fileURLToPath(new URL('../../pipeline/config.json', import.meta.url)));
+  const rel = relative(root, file);
+  if (!rel || rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel)) throw new Error('gate config escapes repository');
+  const fd = openSync(file, constants.O_RDONLY | constants.O_NOFOLLOW);
+  try {
+    const size = fstatSync(fd).size;
+    if (size > 65536) throw new Error('gate config exceeds 64 KiB');
+    const bytes = Buffer.alloc(65537);
+    const count = readSync(fd, bytes, 0, bytes.length, 0);
+    if (count > 65536) throw new Error('gate config exceeds 64 KiB');
+    const lanes = JSON.parse(bytes.subarray(0, count).toString('utf8')).validation?.applicationLanes;
+    if (lanes == null) return '';
+    if (typeof lanes !== 'string' || lanes.length > 256) throw new Error('invalid configured application lanes');
+    return lanes;
+  } finally { closeSync(fd); }
+}
 
 const [library, mode, rawEntries] = process.argv.slice(2);
 const entries = JSON.parse(rawEntries);
@@ -19,7 +42,7 @@ if (!['application', 'serial'].includes(mode) || !entries.length || byIndex.size
 }
 const APPLICATION_LANES = (() => {
   if (mode !== 'application') return [];
-  const raw = (process.env.GATE_APPLICATION_LANES ?? '').trim();
+  const raw = (process.env.GATE_APPLICATION_LANES ?? configuredLanes()).trim();
   if (!raw) return [entries.map((e) => e.index)];
   const lanes = raw.split(';').map((l) => l.split(',').map((n) => Number(n.trim())));
   const named = lanes.flat();

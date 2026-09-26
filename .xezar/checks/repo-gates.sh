@@ -49,11 +49,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 # anyone gives a quality verdict, and putting it in the list's order is what makes the runner
 # execute the rule rather than ask people to remember it. It is a kit check, like
 # `repository-checks.sh`, so `.xezar/pipeline/config.json`'s `validation.commands` — the nine npm
-# commands a person runs by hand — is unchanged and still matches this list in order.
+# commands a person runs by hand — matches this list in order.
 GATE_NAMES=(
   "npm ci"
   ".xezar/checks/security-scan.sh"
-  "npm run lint"
+  "npm run lint:check"
   "npm run lint:css"
   "npm run design -- --check"
   "npm run typecheck"
@@ -66,7 +66,7 @@ GATE_NAMES=(
 GATE_COMMANDS=(
   "npm ci"
   ".xezar/checks/security-scan.sh"
-  "npm run lint"
+  "npm run lint:check"
   "npm run lint:css"
   "npm run design -- --check"
   "npm run typecheck"
@@ -78,10 +78,9 @@ GATE_COMMANDS=(
 )
 # Which application gates may run side by side, as one-based positions in the list above: lanes
 # separated by `;`, gates inside a lane by `,` and run in that order. A gate that needs another's
-# output (a package test that needs the build) goes after it in the same lane. Empty means one
-# lane, every application gate in list order — slower, and never wrong.
-GATE_APPLICATION_LANES="${GATE_APPLICATION_LANES-}"
-export GATE_APPLICATION_LANES
+# output (a package test that needs the build) goes after it in the same lane. The committed
+# default is validation.applicationLanes in .xezar/pipeline/config.json. An environment override
+# still works; an explicitly empty override requests one serial lane.
 
 # The list as JSON, and its digest. Both derived from the arrays above, so they cannot drift
 # from what actually runs.
@@ -158,8 +157,8 @@ fi
 # machine's numbers on that machine's suite, and the two worst buckets rest on single-digit
 # samples - do not quote them as a law. What they establish is the SHAPE: the cliff is steep and
 # it arrives early. This kit makes it arrive earlier than most, because one gate run of its own
-# already fans out - `GATE_APPLICATION_LANES` defaults to three lanes, so two runs is six
-# processes.
+# already fans out into two application lanes by committed default, so two runs can launch four
+# application workers at once.
 #
 # So the whole run re-executes itself once, holding one of the machine's gate slots. How many run
 # together is the engine's `resources.gateSlots`, default 1; the wait is bounded at 20 minutes and
