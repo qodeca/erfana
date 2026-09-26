@@ -63,3 +63,8 @@ if [ -f "$SCRIPT_DIR/xezar-contract.test.mjs" ]; then
 else
   skip xezar-contract "no contract test installed beside these checks"
 fi
+if [ -f "$SCRIPT_DIR/lib/gate-parallel.test.mjs" ]; then
+  node --test "$SCRIPT_DIR/lib/gate-parallel.test.mjs"
+else
+  skip gate-parallel "no scheduler test installed beside these checks"
+fi

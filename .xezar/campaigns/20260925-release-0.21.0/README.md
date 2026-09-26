@@ -9,14 +9,18 @@ Updated: 2026-09-25 11:06 CEST
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
-- #186 (#169 gate lanes, lint:check), draft, head 9aa4f208, gate sealed. Next: security + cold review (queued on load).
-- #185 (#179 spike report), draft. Result: build the silence alert; auto-continue deferred (parked).
-- #184 (#172 spike report), draft. Needs a light review; build of #172 held for owner.
+- #190 (#179 silence alert, from 392e7c9b), draft, head 0fdf50e1, gate sealed. Codex security eab95ae4: S-1 minor (lstat errors leak paths); cold review 0ac0f4e6 APPROVE + 1 runbook minor (leader posted). Round 1 with 392e7c9b. Owner installs launchd by hand after merge.
+- #189 (load ceiling 40) merged 2026-09-26 as 25adc9a7.
+- #188 (#171 vitest worker cap) merged 2026-09-26 as c27b399b (one CI unit-test crash before, rerun green).
+- #187 (#176 Dependabot groups, from 9a85cf2c), draft, head 9717d461, gate sealed. Code review dfa7c67f REQUEST CHANGES (overrides-only pins, pre-1.0 deps, actions limit); security 5cba1e38 NO FINDINGS. Round 1 done at bdf8dd53 (author gate green). Code recheck 375e7414 APPROVE + codex security recheck 6031cb2b NO FINDINGS at bdf8dd53. In merge line after #189.
+- #186 (#169 gate lanes, lint:check) merged 2026-09-26 as 7cfa65bc. S-5 nit → proposed follow-up issue (owner item).
+- #185 (#179 spike) merged 2026-09-26 as 5f285011. Result: build the silence alert (+ line-86 doc fix); auto-continue deferred (parked).
+- #184 (#172 spike) merged 2026-09-26 as 4d874fa7; #172 build held for owner.
 - #183 (#133) merged 2026-09-26 as 6b763b38.
 - #182 (#175) merged 2026-09-26 as 97d5c17c. #175 stays open for the remaining rows.
 - #181 (#178) merged 2026-09-26 as a9792f3c.
 - #180 (#173) merged 2026-09-26 as db105aab. Owner: enable Require merge queue on develop.
-- #168 (#163 lift @electron/rebuild override + electron-builder 26.16.1), draft, head d4043abc, labels dependencies + do-not-merge. Gate passed; npm audit 16 -> 7; node-pty rebuilt (@electron/rebuild 4.2.0); `electron-builder --dir` green; packed app opened a working terminal. Security review 35479ba2 (opus): APPROVE-level + nit S-1; leader posted it (comment 5847266523). Code review 84cbb123 (sonnet, gmail, posted itself): REQUEST CHANGES – Windows checks job never runs @electron/rebuild, so no Windows evidence for the changed path (leader's brief wrongly named it). Round 1 relayed to 43131e43: fix PR body, list Windows-proof options, BLOCKED for owner; S-1 after #162 lands.
+- #168 (#163 lift @electron/rebuild override + electron-builder 26.16.1), draft, head 164d93b9, do-not-merge until v0.21.0 ships. Security APPROVE (35479ba2); code review round 1 fixed – Windows Native Smoke run 36256339721 green on this branch (negative control failed as expected); recheck b5d01d5e APPROVE. Review-complete.
 - #167 (#164 liteparse 2.14.7), draft, head 0fa58e18, do-not-merge until v0.21.0 ships. Round 1 fixed; recheck 0b92cbf1 (sonnet/gmail) APPROVE, posted itself.
 - #155 ready, head d4fb29e7 – allow rule in scripts/xezar-leader-settings.json (4458b282): exactly 2 exact-match rules + one autoMode reason; all checks green. Next: security-review (widens tool access).
 - #154 ready, head 5fce83d5 – #138 part B (2a1e4316): test fixed, workflow gates sealed, CI all green incl. Windows. Next: full-cold-review + design-review of the 52 images and demo (privacy).
@@ -32,28 +36,26 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| 0443825e | #186 security-review | security-review | claude/opus | qodeca |
-| b9b1012d | #186 full-cold-review | code-review | claude/opus | eqamana |
-| b5d01d5e | #168 scoped-recheck (Windows proof, S-1) | code-review | claude/sonnet | gmail |
-| 7c7e6ae8 | #184 spike doc review | code-review | claude/sonnet | qodeca |
-| 44b16d0c | #185 spike doc review | code-review | claude/sonnet | westagilelabs |
-| 974c210b | #171 vitest worker cap | feature-implementation | claude/opus | westagilelabs |
-| 9a85cf2c | #176 Dependabot groups | feature-implementation | claude/opus | gmail |
+| 392e7c9b | #190 round 1 (continue) | feature-implementation | claude/opus | eqamana |
+| 994fb3e5 | #170 drop test:ci | feature-implementation | claude/opus | eqamana |
 
 ## File-ownership table
-- 974c210b owns vitest.main.ts, vitest.preload.ts, vitest.renderer.ts (pool/worker lines), docs/ci.md (test parallelism note), CONTRIBUTING.md (if it mentions parallelism). 9a85cf2c owns .github/dependabot.yml (+ its docs note). No overlap between them; #170 (gate list) waits for #186.
+- 974c210b done (PR #188); vitest configs released.
+- 7d5d7fc6 done (PR #189); .xezar/loops.json released.
+- 392e7c9b (round 1) owns scripts/leader-watch.mjs + test + fixture, docs/runbooks/leader-watch.md. Reviews own nothing.
+- 994fb3e5 owns .xezar/checks/repo-gates.sh, .xezar/checks/lib/gate-parallel.mjs + test, gate-results.mjs (if needed), .xezar/pipeline/config.json, AGENTS.md, CLAUDE.md (Before pushing line), .xezar/LOCAL-PATCHES.md. (9a85cf2c done; .github/dependabot.yml released, PR #187.) #170 (gate list) is unblocked: #186 merged.
 - Reviews own nothing.
 
-## Accounts (from `read_quota` at 2026-09-26T16:13:00Z)
+## Accounts (from `read_quota` at 2026-09-26T17:13:08Z)
 | Runner | Login | State | Resets (UTC) |
 |---|---|---|---|
-| claude | default | reserved leader login, runs no tasks; ok (weekly 10%, plan max; same numbers as westagilelabs – owner item) | 2026-10-02 06:59 |
+| claude | default | reserved leader login, runs no tasks; ok (weekly 11%, plan max; same numbers as westagilelabs – owner item) | 2026-10-02 06:59 |
 | claude | qodeca | ok (weekly 53%) | 2026-09-28 16:59 |
-| claude | gmail | ok (weekly 8%) | 2026-10-02 19:00 |
-| claude | eqamana | ok (weekly 0%, back from out at 16:00Z) | 2026-10-03 16:00 |
-| claude | westagilelabs | ok (weekly 10%) | 2026-10-02 06:59 |
-| codex | default | ok (weekly 13%) | 2026-10-02 10:44 |
-| codex | qodeca-2 | ok (weekly 27%) | 2026-09-29 12:45 |
+| claude | gmail | ok (weekly 9%) | 2026-10-02 19:00 |
+| claude | eqamana | ok (weekly 0%) | 2026-10-03 16:00 |
+| claude | westagilelabs | ok (weekly 11%) | 2026-10-02 06:59 |
+| codex | default | ok (weekly 15%) | 2026-10-02 10:44 |
+| codex | qodeca-2 | ok (weekly 0%) | 2026-10-03 16:58 |
 | pi | – | no logins | – |
 
 ## Held or queued work
@@ -62,6 +64,7 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 - #139 build – PR #159: code review APPROVE, design review FAIL (B-1 account name in QA screenshots); round 1 done at 1f924f73 (B-1 masked, NB-1 stated as a limit, NB-2 documented deviation); design recheck PASS at 9203f493; QA FAIL only because 3 checks could not run (chrome-devtools emulate + evaluate_script denied in the QA session): dark mode, theme switch, reduced motion unverified live. Waiting for the owner.
 
 ## Owner items
+- **#186 S-5 follow-up issue (nit):** gate-parallel.mjs:67 – if all three guarded command names change together, the ordering guards turn off silently. Leader proposes filing it as an issue (title: "gate-parallel: refuse when no guarded command name is found"). Needs your word to create it.
 - **#172 review posting (spike PR #184):** fix needs either (a) an upstream xezar engine change (pass --settings to reading steps, or a verdict-body field) – recommended, file upstream; or (b) a user-scope PreToolUse hook in ~/.claude/settings.json on this machine (tested: 12k-char verdict posts, 0 denials; but it runs for every Claude session and is outside repo review). Interim rule (short plain-text verdicts) works today. Build held until the owner picks.
 - **#159: owner checks by hand (answered 2026-09-26 08:40)** – dark theme, banner theme switch, reduced-motion still on github.com, branch feature/139-readme-redesign. Leader merges on the owner's word with green checks. Earlier note: (dark theme, banner theme switch, reduced-motion still). Both QA and design sessions were denied the chrome-devtools emulate/evaluate_script tools. Options: (a) owner checks them by hand on github.com in ~2 minutes (branch feature/139-readme-redesign: switch OS dark mode, turn on Reduce motion), or (b) allow those two tools for review sessions and re-run QA. Leader recommends (a).
 - `npm audit` on develop's lockfile (run by the #159 author, 2026-09-25 23:51): 16 advisories – 1 critical, 12 high, 3 moderate – none added by #159. Owner chose triage in 0.21.0: issue #161, task d71e7bf0.
@@ -79,7 +82,7 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 - Review sessions get `gh-write.sh` / `verdict-write.sh` refused: claude/opus (a873f32c, ab0c9d7f, 612e0cf9, 35479ba2, 76be37d0) and, since 2026-09-26 16:55, claude/sonnet too (0d8a560d). Read the verdict from the task's final message; the leader posts an APPROVE verbatim on the PR, and relays a REQUEST CHANGES to the author. Read the verdict from the PR comment or the task history, close the session, relay.
 - A review task can finish its review but be refused the GitHub post by its own permission check (a873f32c, 4 refusals). Do not work around it: relay the verdict to the author, who quotes it in the response comment, and say so.
 - Never dispatch while the checkout holds unpushed campaign commits: the task's worktree is cut from the local develop and carries them into its PR (#148).
-- Load over 18 for more than one tick: check `pgrep -fl circuit-electron` for launchers with parent PID 1 before anything else. They ignore SIGTERM. Tell the owner at once; after #145 merges use `node scripts/stop-orphan-mcp.mjs`.
+- Load over 40 (owner raised from 18 on 2026-09-26) for more than one tick: check `pgrep -fl circuit-electron` for launchers with parent PID 1 before anything else. They ignore SIGTERM. Tell the owner at once; after #145 merges use `node scripts/stop-orphan-mcp.mjs`.
 - xezar ack can fail with "no longer owns the project" while status says owner (seen 00:45-00:47, load over 130). Reads still work; retry ack later, never re-dispatch on it.
 - A step agent must not end its turn while its own background work runs (XEZ:MONITORING fails the step). Say "finish in the foreground" in every brief.
 
