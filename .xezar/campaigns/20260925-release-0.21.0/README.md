@@ -12,7 +12,7 @@ Updated: 2026-09-25 11:06 CEST
 - #189 (owner decision: load ceiling 40 in .xezar/loops.json, from 7d5d7fc6), draft, head eb97bd69, gate sealed. Next: code review (not opus).
 - #188 (#171 vitest worker cap) merged 2026-09-26 as c27b399b (one CI unit-test crash before, rerun green).
 - #187 (#176 Dependabot groups, from 9a85cf2c), draft, head 9717d461, gate sealed. Code review dfa7c67f REQUEST CHANGES (overrides-only pins, pre-1.0 deps, actions limit); security 5cba1e38 NO FINDINGS. Round 1 done at bdf8dd53 (author gate green). Next: code recheck + codex security recheck.
-- #186 (#169 gate lanes, lint:check), draft, head 58640590, round 1 fixed by 04cb9379 (author gate green, not sealed). Code recheck 839f072f APPROVE; security recheck 31c5f2ec S-1, S-2 fixed, new S-3 minor + S-4 nit → round 2 with 04cb9379. After merge: leader-guide.md:149 lint -> lint:check.
+- #186 (#169 gate lanes, lint:check), draft, head 0ef1c1a3, round 2 fixed by 04cb9379 (author gate 133.7 s green, not sealed). Code recheck 839f072f APPROVE; security recheck 31c5f2ec S-1, S-2 fixed, S-3 + S-4 fixed in round 2. Next: scoped security recheck. After merge: leader-guide.md:149 lint -> lint:check.
 - #185 (#179 spike) merged 2026-09-26 as 5f285011. Result: build the silence alert (+ line-86 doc fix); auto-continue deferred (parked).
 - #184 (#172 spike) merged 2026-09-26 as 4d874fa7; #172 build held for owner.
 - #183 (#133) merged 2026-09-26 as 6b763b38.
@@ -35,12 +35,11 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| 04cb9379 | #186 round 2 (continue) | feature-implementation | codex/gpt-6-sol | qodeca-2 |
 | 392e7c9b | #179 silence alert build | feature-implementation | claude/opus | eqamana |
 
 ## File-ownership table
 - 974c210b done (PR #188); vitest configs released.
-- 7d5d7fc6 done (PR #189); .xezar/loops.json released. 04cb9379 owns gate-parallel.mjs + test, repo-gates.sh, gate-record.sh.
+- 7d5d7fc6 done (PR #189); .xezar/loops.json released.
 - 392e7c9b owns the new alert script + test under scripts/, a launchd plist template, its install doc, docs/spikes/179-leader-liveness.md (line 86 only). (9a85cf2c done; .github/dependabot.yml released, PR #187.) No overlap between them; #170 (gate list) waits for #186.
 - Reviews own nothing.
 
