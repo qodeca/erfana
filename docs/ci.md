@@ -10,8 +10,9 @@ Erfana runs GitHub Actions workflows on pushes (and, for the required checks, on
 | Release | `.github/workflows/release.yml` | active | tag push `v[0-9]+.[0-9]+.[0-9]+`, or `workflow_dispatch` (input `dry-run`, default `true` – skips draft creation and asset uploads) | matrix (mac/win) | ~15–25 min compute + **unbounded approval wait** | Multi-platform release build → `prepare`/`build_*`/`finalize`/`cleanup` (calls `build_mac.yml`, `build_win.yml` reusables; Linux distribution target dropped) |
 | Whisper Binaries | `.github/workflows/whisper-binaries.yml` | active | `workflow_dispatch` only | `ubuntu-latest` (`validate-inputs`, `publish-release`) + `macos-14` (`build-macos`) + `windows-latest` (`build-windows`) | ~25 min | Self-hosted whisper.cpp build, sign, notarize, publish (see [`build/whisper-binaries.md`](./build/whisper-binaries.md)) |
 | Whisper Binaries (Canary) | `.github/workflows/whisper-binaries-canary.yml` | active | monthly schedule | `macos-14` + `windows-latest` + `ubuntu-latest` (`notify-on-failure`) | ~3 min | Credential-health check (Apple notarization, Windows signing) |
+| Windows Native Smoke | `.github/workflows/windows-native-smoke.yml` | active (advisory, never required) | `workflow_dispatch` only (inputs `ref`, `skip_rebuild`) | `windows-latest` | ~10–15 min (estimate, not yet measured) | Proves `electron-builder install-app-deps` rebuilds node-pty for Electron's ABI on Windows and that it spawns a pty under Electron – see [Windows native smoke](#windows-native-smoke-windows-native-smokeyml) |
 
-Two of the eight files in [`.github/workflows/`](../.github/workflows/) have no row above: `build_mac.yml` and `build_win.yml` are `workflow_call` reusables with no standalone trigger of their own — they run only as jobs of the Release workflow, so they are documented there rather than as separate entries.
+Two of the nine files in [`.github/workflows/`](../.github/workflows/) have no row above: `build_mac.yml` and `build_win.yml` are `workflow_call` reusables with no standalone trigger of their own — they run only as jobs of the Release workflow, so they are documented there rather than as separate entries.
 
 The Release row's wall-clock needs a caveat: both build legs sit behind the `production-signing` environment approval, which is a required human review with no time limit. Compute time is 15–25 minutes; end-to-end is that plus however long the approval takes. See [release.md § Approval gate](./build/release.md#approval-gate-production-signing).
 
@@ -43,7 +44,7 @@ Nine jobs run in parallel (all `ubuntu-latest` except `windows-checks`). The **R
 
 **Why a separate `Coverage` job** (issue #55, F4): the per-file floors in `vitest.main.ts` fire only under `--coverage`, and the required `test` job runs `test:ci` without it — so before this job the `scripts/fuses.js` floor (and the whisper floors) were enforced only by a local `npm run test:cov`, never in required CI. The job runs the **main project only** (`--project main`): just the main suite loads `scripts/fuses.js` (via `scripts/fuses.test.mjs`), so the v8 report carries exactly one `fuses.js` row at its real coverage. Combined with `all: false` in `vitest.main.ts` (which suppresses the synthetic 0%-baseline row an untested-but-included file would otherwise emit), the threshold match is deterministic; a full-workspace coverage run could instead surface a second 0% `fuses.js` row and fail the gate spuriously. The preload and renderer floors (#124) run as two more **steps** in this job rather than as new jobs, because branch protection matches the `Coverage` check name; each step keeps its own `--project` flag (the auto-discovered `vitest.workspace.ts` would otherwise expand every run to all three projects) and writes to its own `coverage/<project>` directory.
 
-**The local `npm run test:cov` does NOT carry that flag.** `scripts/test-cov.mjs` runs each config bare, so every one of its three passes expands to all three projects and the whole suite executes about three times per invocation. Its `spawnSync(…, {stdio: 'inherit'})` output also fails to reach a redirected log on Windows, so a failing local run prints only `Command failed (1): …` and never says which floor missed. Both are tracked in [#133](https://github.com/qodeca/erfana/issues/133). Until that lands, reproduce a coverage failure with the CI-shaped command instead: `npx vitest --run --config vitest.main.ts --project main --coverage`.
+**The local `npm run test:cov` carries the same `--project` flags** (issue #133). `scripts/test-cov.mjs` runs the three configs scoped as `--project main|preload|renderer`, matching the three CI steps, so each project's suite runs once instead of the whole workspace three times. It runs **all three passes before it exits**, so one project's missed floor cannot hide the other two's: a failing pass prints `FAILED: <project> coverage …`, and the run ends with `Coverage FAILED for project(s): <names>` naming every project that missed a floor, then exits non-zero (the vitest threshold lines above it name the file and axis). The per-area scripts `test:main`, `test:preload` and `test:renderer` carry the same `--project` flag for the same reason. One #133 defect remains open: `spawnSync(…, {stdio: 'inherit'})` child output still does not reach a redirected log on Windows, so there the vitest threshold lines may be absent from the log — the script's own summary line still names the failing project, and `npx vitest --run --config vitest.main.ts --project main --coverage` remains the way to see the full per-file detail.
 
 **Two extra gates live inside the `test` job** — one runs before the tests, one wraps them:
 
@@ -94,6 +95,37 @@ Runs gitleaks over the **full git history**, then trufflehog for verified secret
 - Therefore `.gitleaksignore` must carry the fingerprint on **every** branch whose CI you need green — including branches where the offending file does not exist. Rewinding or rebasing a branch does not shrink what the scan sees, so an allowlist entry dropped by a history rewrite will fail a branch that never contained the secret.
 
 `.gitleaksignore` holds one finding fingerprint per line (`commit:file:rule:line`), each a reviewed non-secret — test fixtures that resemble high-entropy tokens. Add the fingerprint from the failing run's output; where the file is on the current branch, also mark the line with an inline `gitleaks:allow` comment so future commits of the same line do not re-trigger.
+
+## Windows native smoke (`windows-native-smoke.yml`)
+
+A manual, advisory proof ([#178](https://github.com/qodeca/erfana/issues/178)) that native modules rebuild and load under Electron on Windows. It exercises the one path no other Windows job runs – the package `postinstall`'s `electron-builder install-app-deps`, which drives `@electron/rebuild` and node-gyp over node-pty. `Windows checks` runs `npm rebuild node-pty` (node-pty's own node-gyp) instead, and packaging skips the rebuild because `electron-builder.yml` sets `npmRebuild: false`. Run it whenever the rebuild toolchain changes (`electron-builder`, `@electron/rebuild`, `node-gyp`, node-pty, Electron).
+
+**Run it.** The workflow file and the checker are read from `--ref`; the code under test comes from the `ref` input, checked out into `tested/`, so a branch that predates the workflow can still be tested:
+
+```bash
+# Positive run – must be green
+gh workflow run windows-native-smoke.yml --ref develop -f ref=<branch-or-sha>
+# Negative control – must FAIL at the smoke step
+gh workflow run windows-native-smoke.yml --ref develop -f ref=<branch-or-sha> -f skip_rebuild=true
+```
+
+**What it does.** Two checkouts: the workflow's own commit at the workspace root (sparse – only [`scripts/native-smoke.cjs`](../scripts/native-smoke.cjs), the checker) and the `ref` input in `tested/`. In `tested/` it runs `npm ci --ignore-scripts`, Electron's download script, `patch-package --error-on-fail`, records a start time, then `npx --no-install electron-builder install-app-deps` with `DEBUG=electron-rebuild`. Finally it runs the trusted checker from the root checkout, with the Electron binary and `ELECTRON_RUN_AS_NODE=1`, inside `tested/`, so node-pty comes from the tested tree and the judgement does not. The script fails unless all of these hold:
+
+- it is running under Electron (`process.versions.electron` is set);
+- `node_modules/node-pty/build/Release/conpty.node` exists and is newer than the recorded start time;
+- `build/Release/.forge-meta`, written by `@electron/rebuild`, reads `<arch>--<ABI>` for this Electron;
+- node-pty's own loader resolves the binary from `build/Release`, not from a prebuild;
+- a `cmd.exe` pty spawns, prints a marker and exits 0.
+
+**Why the negative control fails.** node-pty ships N-API prebuilds and falls back to them when `build/Release` is absent, so a pty still spawns with no rebuild at all. The provenance checks above are what catch a skipped rebuild; `skip_rebuild=true` proves they do. Caveat: with no rebuild, `build/Release` never exists (node-pty's own install script is blocked by `--ignore-scripts`), so the negative control always fails at the first check – binary missing. The `.forge-meta` ABI check and the timestamp check are not exercised by either CI run; they were only exercised locally.
+
+**Lifecycle allowlist.** `npm ci --ignore-scripts` blocks every dependency's install script. Exactly three named steps then run install-time code, and nothing else does:
+
+1. **Electron's download script** (`node node_modules/electron/install.js`). It cannot be avoided: the checker must run under the real Electron, and the `electron` npm package ships no binary – this script fetches it. So it runs on every path, the negative control included. It runs straight after `npm ci`, before `patch-package`, so only lockfile-verified bytes execute: npm checks the package against the lockfile's `integrity` hash, and the script checks the downloaded zip against the `checksums.json` inside that package (the step clears `electron_use_remote_checksums`, so the check stays local).
+2. **`patch-package --error-on-fail`** – the postinstall's first half; node-pty's Windows gyp fixes must be in place before it compiles.
+3. **`npx --no-install electron-builder install-app-deps`** – the path under test; skipped when `skip_rebuild=true`.
+
+**Trust boundary.** Top-level `permissions: {}`; the job holds only `contents: read` for checkout, both checkouts with `persist-credentials: false`. No secrets, no environment, no cache read or write (`package-manager-cache: false`), no artifacts, SHA-pinned actions. The `ref` input can name code nobody has reviewed (anyone with write access can dispatch), and that ref controls its own lockfile, patches and dependency tree – so `install-app-deps` compiles, and Electron's script downloads, what that ref says. The two checkouts separate the checker from the code under test, so an ordinary or outdated ref cannot change how it is judged; they are **not** a sandbox. Everything runs as one user on one runner, and build code from a hostile ref could rewrite the checker before it runs. The job therefore deliberately holds nothing worth taking – the checkout token is not persisted and no secret is in scope – and its result is only as trustworthy as the ref: dispatch it on refs you have read. It is never a required check.
 
 ## E2E Tests (`e2e.yml`, disabled)
 
