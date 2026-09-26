@@ -2,6 +2,12 @@
 # package ecosystems to update and where the package manifests are located.
 # Please see the documentation for all configuration options:
 # https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+#
+# Grouping (#176): minor and patch updates land as one PR per group, so a
+# weekly run costs one CI run and one review instead of one per package.
+# Major updates match no group, so each still opens its own PR and a
+# breaking upgrade is reviewed on its own. Groups apply to version updates
+# only; security updates keep their own PRs.
 
 version: 2
 updates:
@@ -10,6 +16,26 @@ updates:
     target-branch: "develop"
     schedule:
       interval: "weekly"
+    # Two group PRs plus one PR per major; the default of 5 would let a
+    # handful of majors crowd out the grouped minor/patch PRs.
+    open-pull-requests-limit: 10
+    groups:
+      npm-production:
+        dependency-type: "production"
+        update-types:
+          - "minor"
+          - "patch"
+      npm-development:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      # chokidar is pinned to exact 3.6.0 (package.json dependency and
+      # override): v4 removed `disableGlobbing`, which the file watchers
+      # rely on, and the `Guard - chokidar v3 pinned` step in checks.yml
+      # fails on any drift. See docs/security.md § Dependency overrides.
+      - dependency-name: "chokidar"
 
   # Keep SHA-pinned third-party actions in .github/workflows/* and
   # .github/actions/*/action.yml fresh. Without this block, a SHA-pinned
@@ -20,3 +46,10 @@ updates:
     target-branch: "develop"
     schedule:
       interval: "weekly"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
