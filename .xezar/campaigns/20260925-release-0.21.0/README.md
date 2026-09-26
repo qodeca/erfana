@@ -11,7 +11,6 @@ Updated: 2026-09-25 11:06 CEST
 ## Open pull requests
 - #202 (#177 browser grant, from e1c555ca), draft, head 82938dae, gate passed. emulate granted; evaluate_script stays denied (wiring options → owner). Cold review 04b8155b REQUEST CHANGES (2 major, 1 minor, 1 nit); codex security 864506c8 BLOCKING (S-1 = same guard defect as code M-1). Round 1 relayed to e1c555ca.
 - #201 (#174 leader context, from 8dadb69a), draft, head 6b3798bf, gate sealed. Reviews 9c5505e0 (sonnet) + 1b108196 (codex security) running. Shares repository-checks.sh with #191.
-- #191 (#170 drop test:ci, from 994fb3e5), draft, head abc25817, gate sealed at a99c2605. Cold review 6513c636 APPROVE; codex security fed841b8 FINDINGS (S-1 minor, S-2 nit = #186 S-5, test wiring). Round 1 done at abc25817 (author gate green, 1m44s). Codex recheck 189d6325: S-1 still open, S-3 nit → round 2 (allowlist design) with 994fb3e5; a third round would be parked. After merge: leader-guide.md:150 drop test:ci.
 - #189 (load ceiling 40) merged 2026-09-26 as 25adc9a7.
 - #188 (#171 vitest worker cap) merged 2026-09-26 as c27b399b (one CI unit-test crash before, rerun green).
 - #187 (#176 Dependabot groups) merged 2026-09-26 as 80a8c032; #176 closed.
@@ -44,7 +43,7 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 - 392e7c9b done. Reviews own nothing.
 - e1c555ca owns .xezar/workflows/qa.yaml, .xezar/workflows/design-review.yaml, scripts/devtools-evaluate-guard*, one chrome-devtools.md line, .xezar/LOCAL-PATCHES.md (PR #202 round 1).
 - 8dadb69a owns .xezar/checks/decisions-archive.mjs and its tests, its own repository-checks.sh block (PR #201 round 1).
-- 994fb3e5 done (PR #191); gate files released. (9a85cf2c done; .github/dependabot.yml released, PR #187.) #170 (gate list) is unblocked: #186 merged.
+- 994fb3e5 done (PR #191 merged); gate files released. (9a85cf2c done; .github/dependabot.yml released, PR #187.) #170 (gate list) is unblocked: #186 merged.
 - Reviews own nothing.
 
 ## Accounts (from `read_quota` at 2026-09-26T18:13:01Z)
