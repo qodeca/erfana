@@ -34,7 +34,6 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| a4be7a38 | #203 round 2 recheck | code-review | claude/sonnet | westagilelabs |
 
 ## File-ownership table
 - 974c210b done (PR #188); vitest configs released.
