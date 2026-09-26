@@ -141,6 +141,12 @@ export class LiteParseConverter implements IConverter, IConfigurableConverter {
       dpi,
       outputFormat: 'text' as const,
       maxPages: MAX_PARSE_PAGES,
+      // 2.x defaults `ocrFailureFatal` to true: when OCR fails on every text-sparse page the
+      // whole parse rejects. 1.x caught OCR errors page by page and kept the text it had
+      // already recovered, so a text PDF with one unscannable page still imported. Keep that
+      // user-visible behaviour: a systemic OCR failure now yields partial text instead of a
+      // hard IMPORT_CONVERSION_FAILED. (Review finding 1, PR #167.)
+      ocrFailureFatal: false,
       ...(tessdataPath ? { tessdataPath } : {})
     })
 

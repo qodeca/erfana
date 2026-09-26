@@ -80,7 +80,10 @@ Full detail in [fuses.md](./fuses.md#afterpack-also-prunes-foreign-arch-native-b
 platform-specific native binary ships as an optional dependency (`@llamaindex/liteparse-<platform>`,
 e.g. `@llamaindex/liteparse-darwin-arm64`) alongside `libpdfium`. It no longer drags in `sharp`
 (with its `@img/*` platform binaries), `@hyzyla/pdfium` or `tesseract.js`; OCR is built into the
-native binary and still reads the shipped `resources/tessdata` directory. `sharp` and `tesseract.js`
+native binary. English traineddata is the only language shipped in `resources/tessdata`; any other
+`ocrLanguage` downloads that language's traineddata on first use — from
+`github.com/tesseract-ocr/tessdata_best` (1.x used the Tesseract.js jsdelivr CDN) — into
+`tessdataPath`, the same source-and-cache contract FR-027 describes. `sharp` and `tesseract.js`
 remain **devDependencies** because the documentation-capture pipeline (`scripts/capture/`) uses them
 at build time.
 
