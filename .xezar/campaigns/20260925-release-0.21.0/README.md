@@ -13,7 +13,7 @@ Updated: 2026-09-25 11:06 CEST
 - #189 (owner decision: load ceiling 40 in .xezar/loops.json, from 7d5d7fc6), draft, head eb97bd69, gate sealed. Review ac9e7f48 APPROVE. In merge line after #186.
 - #188 (#171 vitest worker cap) merged 2026-09-26 as c27b399b (one CI unit-test crash before, rerun green).
 - #187 (#176 Dependabot groups, from 9a85cf2c), draft, head 9717d461, gate sealed. Code review dfa7c67f REQUEST CHANGES (overrides-only pins, pre-1.0 deps, actions limit); security 5cba1e38 NO FINDINGS. Round 1 done at bdf8dd53 (author gate green). Code recheck 375e7414 APPROVE + codex security recheck 6031cb2b NO FINDINGS at bdf8dd53. In merge line after #189.
-- #186 (#169 gate lanes, lint:check), draft, head 0ef1c1a3, round 2 fixed by 04cb9379 (author gate 133.7 s green, not sealed). Code recheck 839f072f APPROVE; security recheck 31c5f2ec S-1, S-2 fixed, S-3 + S-4 fixed in round 2 (69734780), S-5 nit left → follow-up issue proposed. In merge line. After merge: leader-guide.md:149 lint -> lint:check.
+- #186 (#169 gate lanes, lint:check) merged 2026-09-26 as 7cfa65bc. S-5 nit → proposed follow-up issue (owner item).
 - #185 (#179 spike) merged 2026-09-26 as 5f285011. Result: build the silence alert (+ line-86 doc fix); auto-continue deferred (parked).
 - #184 (#172 spike) merged 2026-09-26 as 4d874fa7; #172 build held for owner.
 - #183 (#133) merged 2026-09-26 as 6b763b38.
@@ -41,7 +41,7 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 ## File-ownership table
 - 974c210b done (PR #188); vitest configs released.
 - 7d5d7fc6 done (PR #189); .xezar/loops.json released.
-- 392e7c9b done (PR #190). Reviews own nothing; no file is owned right now. (9a85cf2c done; .github/dependabot.yml released, PR #187.) No overlap between them; #170 (gate list) waits for #186.
+- 392e7c9b done (PR #190). Reviews own nothing; no file is owned right now. (9a85cf2c done; .github/dependabot.yml released, PR #187.) #170 (gate list) is unblocked: #186 merged.
 - Reviews own nothing.
 
 ## Accounts (from `read_quota` at 2026-09-26T17:13:08Z)
