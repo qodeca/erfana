@@ -12,7 +12,7 @@ Updated: 2026-09-25 11:06 CEST
 - #190 (#179 silence alert, from 392e7c9b), draft, head 0fdf50e1, gate sealed. Next: cold review 0ac0f4e6 + codex security eab95ae4 (running). Owner installs launchd by hand after merge.
 - #189 (owner decision: load ceiling 40 in .xezar/loops.json, from 7d5d7fc6), draft, head eb97bd69, gate sealed. Review ac9e7f48 APPROVE. In merge line after #186.
 - #188 (#171 vitest worker cap) merged 2026-09-26 as c27b399b (one CI unit-test crash before, rerun green).
-- #187 (#176 Dependabot groups, from 9a85cf2c), draft, head 9717d461, gate sealed. Code review dfa7c67f REQUEST CHANGES (overrides-only pins, pre-1.0 deps, actions limit); security 5cba1e38 NO FINDINGS. Round 1 done at bdf8dd53 (author gate green). Code recheck 375e7414 + codex security recheck 6031cb2b running.
+- #187 (#176 Dependabot groups, from 9a85cf2c), draft, head 9717d461, gate sealed. Code review dfa7c67f REQUEST CHANGES (overrides-only pins, pre-1.0 deps, actions limit); security 5cba1e38 NO FINDINGS. Round 1 done at bdf8dd53 (author gate green). Code recheck 375e7414 APPROVE + codex security recheck 6031cb2b NO FINDINGS at bdf8dd53. In merge line after #189.
 - #186 (#169 gate lanes, lint:check), draft, head 0ef1c1a3, round 2 fixed by 04cb9379 (author gate 133.7 s green, not sealed). Code recheck 839f072f APPROVE; security recheck 31c5f2ec S-1, S-2 fixed, S-3 + S-4 fixed in round 2 (69734780), S-5 nit left → follow-up issue proposed. In merge line. After merge: leader-guide.md:149 lint -> lint:check.
 - #185 (#179 spike) merged 2026-09-26 as 5f285011. Result: build the silence alert (+ line-86 doc fix); auto-continue deferred (parked).
 - #184 (#172 spike) merged 2026-09-26 as 4d874fa7; #172 build held for owner.
@@ -36,8 +36,6 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| 375e7414 | #187 code recheck | code-review | claude/sonnet | westagilelabs |
-| 6031cb2b | #187 security recheck | security-review | codex/gpt-6-astra | qodeca-2 |
 | 0ac0f4e6 | #190 cold review | code-review | claude/sonnet | gmail |
 | eab95ae4 | #190 security review | security-review | codex/gpt-6-astra | default |
 
