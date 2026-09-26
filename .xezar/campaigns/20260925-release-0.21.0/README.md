@@ -15,7 +15,7 @@ Updated: 2026-09-25 11:06 CEST
 Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 
 ## Serial merge line
-- #162 (#161): d71e7bf0 done, all 11 checks pass at 5c6c0c5f. Queued: full-cold-review on claude/opus (author pi), held by load (28.6 > 18, npm ci in 43131e43's worktree). L3 wake 16:23.
+- #162 (#161): d71e7bf0 done, all 11 checks pass at 5c6c0c5f. Queued: full-cold-review on claude/opus (author pi), held by load (122 at 16:23: a cmplus-project Codex task plus 347fc1ce tests). L1 wakes L3 when load < 18.
 
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
