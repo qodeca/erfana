@@ -26,11 +26,16 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
 | 43131e43 | #168 S-1 (security.md row) after #162; Windows proof BLOCKED on separate PR (#163) | dependency-maintenance (continued) | pi/deepseek-api/deepseek-flash | – |
+| 03cbd155 | #133 test:cov --project | bug-fix | pi/deepseek-api/deepseek-flash | – |
+| 29df4b5a | #173 merge queue triggers | feature-implementation (kit-refactor) | claude/opus | gmail |
+| 79cad1a5 | #178 Windows native smoke workflow | feature-implementation (kit-refactor) | claude/opus | qodeca |
+| 5bf6cc9a | #175 brief templates | docs-maintenance | codex/gpt-5.6-terra | default |
 
 Counts at dispatch (16:05): tasks 3/10, gate runs 0/2, metered 3/4 (all pi), load 2.8/18. xezar workspace maxParallel 5 (owner, 16:07).
 
 ## File-ownership table
 - Overlap accepted: 347fc1ce and 43131e43 share package.json/package-lock.json; both merge after v0.21.0, one at a time, the second rebased. Neither edits docs/security.md (#162 owns it).
+- 03cbd155 owns scripts/test-cov.mjs, package.json scripts lines, docs/ci.md (#133 para). 29df4b5a owns .github/workflows/checks.yml, secret-scan.yml, docs/ci.md (triggers/merge queue). 79cad1a5 owns .github/workflows/windows-native-smoke.yml (new), docs/ci.md (short section). 5bf6cc9a owns .xezar/docs/briefs.md, .xezar/docs/README.md, leader-guide-detail.md, .xezar/LOCAL-PATCHES.md. Accepted overlap: docs/ci.md across 3 tasks (different sections; later ones merge develop in).
 - Reviews own nothing.
 
 ## Accounts (from `read_quota` at 2026-09-26T13:52:35Z)
