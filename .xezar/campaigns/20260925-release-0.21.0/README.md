@@ -34,7 +34,7 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| 253ba433 | #203 (#175 part 2) round 1 | docs-maintenance | codex/gpt-5.6-terra | default |
+| a4be7a38 | #203 round 2 recheck | code-review | claude/sonnet | westagilelabs |
 
 ## File-ownership table
 - 974c210b done (PR #188); vitest configs released.
@@ -43,7 +43,7 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 - e1c555ca done (PR #202 round 4 at d5c8fbd2, cost about 125 USD); files released.
 - 8dadb69a done (PR #201 merged as d4fc1d61); files released.
 - 994fb3e5 done (PR #191 merged); gate files released. (9a85cf2c done; .github/dependabot.yml released, PR #187.) #170 (gate list) is unblocked: #186 merged.
-- 253ba433 owns .xezar/docs/briefs.md, briefs-check.mjs + test, repository-checks.sh wiring, one LOCAL-PATCHES.md entry (PR #203 round 1).
+- 253ba433 done (PR #203 round 2 at 37eed85a); files released.
 - Reviews own nothing.
 
 ## Accounts (from `read_quota` at 2026-09-26T21:13:04Z)
