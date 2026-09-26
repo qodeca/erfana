@@ -57,7 +57,8 @@ To see what it would say without a notification:
 `LEADER_WATCH_REPO="$REPO" node scripts/leader-watch.mjs --dry-run`.
 
 `NODE` is written into the plist as an absolute path: after a Node upgrade that moves it (nvm, Homebrew),
-install again.
+run the `launchctl bootout` line from [Uninstall](#uninstall) first – `launchctl bootstrap` fails while the
+old agent is still loaded – then run the install block above again.
 
 ## Uninstall
 

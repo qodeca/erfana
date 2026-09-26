@@ -238,16 +238,25 @@ export function main(argv, env, deps = {}) {
     err(`leader-watch: no ${CAMPAIGNS} commit readable on ${BRANCH}; nothing checked`)
     return 1
   }
-  const leaderAtMs = Math.max(commitMs, newestCampaignFileMs(path.join(repo, CAMPAIGNS), fs))
   const nowMs = now()
-  const lastAlertMs = env.LEADER_WATCH_LOG ? lastAlertFrom(tail(env.LEADER_WATCH_LOG)) : null
-  const alert = evaluate({
-    nowMs,
-    leaderAtMs,
-    runs: listRuns(path.join(repo, RUNS), fs),
-    limitMs: limitMin * 60_000,
-    lastAlertMs,
-  })
+  let alert
+  try {
+    const leaderAtMs = Math.max(commitMs, newestCampaignFileMs(path.join(repo, CAMPAIGNS), fs))
+    const lastAlertMs = env.LEADER_WATCH_LOG ? lastAlertFrom(tail(env.LEADER_WATCH_LOG)) : null
+    alert = evaluate({
+      nowMs,
+      leaderAtMs,
+      runs: listRuns(path.join(repo, RUNS), fs),
+      limitMs: limitMin * 60_000,
+      lastAlertMs,
+    })
+  } catch {
+    // A file that is listed but cannot be read (EACCES) leaves the leader's
+    // last sign of life unknown: never alert on a guess, and never print the
+    // error, whose message and stack name local paths and so the login name.
+    err('leader-watch: metadata unavailable; nothing checked')
+    return 1
+  }
   if (!alert) return 0
 
   if (dryRun) {
@@ -265,5 +274,11 @@ export function main(argv, env, deps = {}) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-  process.exitCode = main(process.argv.slice(2), process.env)
+  try {
+    process.exitCode = main(process.argv.slice(2), process.env)
+  } catch {
+    // Last resort, for the same reason: fixed text only, never the error.
+    process.stderr.write('leader-watch: unexpected failure; nothing checked\n')
+    process.exitCode = 1
+  }
 }

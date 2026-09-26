@@ -392,4 +392,46 @@ describe('main', () => {
     expect(out).toEqual([])
     expect(err).toEqual(['leader-watch: osascript failed; no notification shown'])
   })
+
+  it('reports unreadable metadata in fixed text, without the path or a stack, and never alerts', () => {
+    const secretPath = '/Users/some-login/erfana/.xezar/campaigns/c1/timeline.md'
+    for (const failing of ['/c1', 'timeline.md', '.ndjson']) {
+      const base = fakeFs(now - 40 * MIN)
+      const fs = {
+        readdirSync: base.readdirSync,
+        lstatSync: (p, opts) => {
+          if (p.endsWith(failing)) {
+            const e = new Error(`EACCES: permission denied, lstat '${secretPath}'`)
+            e.code = 'EACCES'
+            e.path = secretPath
+            throw e
+          }
+          return base.lstatSync(p, opts)
+        },
+      }
+      const out = []
+      const err = []
+      const calls = []
+      const code = main([], { LEADER_WATCH_REPO: '/repo' }, {
+        now: () => now,
+        out: (s) => out.push(s),
+        err: (s) => err.push(s),
+        exec: (cmd) => {
+          calls.push(cmd)
+          return commitAt(now - 50 * MIN)
+        },
+        fs,
+        tail: () => '',
+        platform: 'darwin',
+      })
+      expect(code).toBe(1)
+      expect(calls).toEqual(['git'])
+      expect(out).toEqual([])
+      expect(err).toEqual(['leader-watch: metadata unavailable; nothing checked'])
+      const printed = [...out, ...err].join('\n')
+      expect(printed).not.toContain('/repo')
+      expect(printed).not.toContain('some-login')
+      expect(printed).not.toMatch(/\bat \S+ \(|EACCES/)
+    }
+  })
 })
