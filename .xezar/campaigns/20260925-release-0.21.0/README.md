@@ -34,14 +34,14 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| 8dadb69a | #201 round 2 (continue) | feature-implementation | claude/opus | gmail |
+| e2c93217 | #201 round 2 security recheck | security-review | codex/gpt-6-astra | qodeca-2 |
 
 ## File-ownership table
 - 974c210b done (PR #188); vitest configs released.
 - 7d5d7fc6 done (PR #189); .xezar/loops.json released.
 - 392e7c9b done. Reviews own nothing.
 - e1c555ca done (PR #202 round 1 at e2bc1a5d); files released.
-- 8dadb69a owns .xezar/checks/decisions-archive.mjs and tests, its repository-checks.sh block, campaign-notes.md (PR #201 round 2).
+- 8dadb69a done (PR #201 round 2 at 7265bafc); files released.
 - 994fb3e5 done (PR #191 merged); gate files released. (9a85cf2c done; .github/dependabot.yml released, PR #187.) #170 (gate list) is unblocked: #186 merged.
 - Reviews own nothing.
 
