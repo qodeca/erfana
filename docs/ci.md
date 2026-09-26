@@ -2,6 +2,8 @@
 
 Erfana runs GitHub Actions workflows on pushes (and, for the required checks, on the `develop` merge queue – see [Merge queue](#merge-queue-develop)). The author-controlled workflows are listed below; vendor-installed workflows (Dependabot, Copilot review, Security Risk Assessment) are managed by their respective GitHub Apps and not covered here.
 
+**Dependabot configuration** ([`.github/dependabot.yml`](../.github/dependabot.yml), #176): weekly npm and GitHub Actions updates against `develop`. Minor and patch updates are grouped – one PR for npm production dependencies, one for npm development dependencies, one for actions – while every major update opens its own PR so a breaking upgrade is reviewed alone. Groups cover version updates only; security updates still arrive one per PR. Pre-1.0 packages (`async-mutex`, the `@xterm/addon-*` packages, `lucide-react`, `monaco-editor`, `shx`) are excluded from the groups, because a 0.x to 0.(x+1) bump is breaking by convention but counts as minor, so each still opens its own PR. `chokidar` (exact 3.6.0) and the `overrides` pins (`lodash`, `lodash-es`, `@electron/rebuild`, `dompurify`) are ignored, so no update moves a pin (see [security.md § Dependency overrides](./security.md#dependency-overrides-packagejson)); bump them by hand when a pin is lifted.
+
 | Workflow | File | Status | Trigger | Runner | Wall-clock | Purpose |
 |----------|------|--------|---------|--------|-----------|---------|
 | Quality Checks | `.github/workflows/checks.yml` | active | push to **any branch**, plus `merge_group` (the `develop` merge queue) | `ubuntu-latest` | ~3 min | Fast feedback on lint / types / unit tests / build / licensing (see job table below) |
