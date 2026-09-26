@@ -729,7 +729,7 @@ describe('LiteParseConverter', () => {
   })
 
   // ==========================================================================
-  // convert() – validation gate (blocks before parsing; sharp/libvips DoS bound)
+  // convert() – validation gate (blocks before parsing; native-parser DoS bound)
   // ==========================================================================
 
   describe('convert() – validation gate', () => {

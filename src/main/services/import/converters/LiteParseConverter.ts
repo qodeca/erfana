@@ -113,7 +113,7 @@ export class LiteParseConverter implements IConverter, IConfigurableConverter {
 
     // Enforce the blocking size cap before any parsing. The document-import IPC
     // path calls convert() directly (bypassing ImportService validation), so this
-    // is the guard that bounds memory-bomb inputs to sharp/libvips on this path.
+    // is the guard that bounds memory-bomb inputs to the native parser on this path.
     const validation = await this.validate(filePath)
     if (!validation.valid) {
       // `validateFileForImport` always sets `error` on an invalid result; the `??`

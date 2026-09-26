@@ -7,7 +7,7 @@
  * actual PDF fixtures. These tests verify end-to-end parsing behavior
  * without mocking the LiteParse library.
  *
- * Skips gracefully when native modules (Sharp, pdfium) fail to load,
+ * Skips gracefully when liteparse's native NAPI binary fails to load,
  * satisfying AC-036 (CI integration test guard).
  *
  * @see Spec #021 – LiteParse document import
@@ -36,8 +36,8 @@ vi.mock('electron', () => ({
 let liteparseAvailable = false
 
 try {
-  // Attempt to load the real module – this will fail if native binaries
-  // (Sharp, @hyzyla/pdfium) are missing or incompatible
+  // Attempt to load the real module – this will fail if liteparse's
+  // platform-specific native NAPI binary is missing or incompatible
   await import('@llamaindex/liteparse')
   liteparseAvailable = true
 } catch {
@@ -50,7 +50,7 @@ try {
 
 const PDF_FIXTURE = join(__dirname, '../../../../../tests/fixtures/documents/hello-world.pdf')
 
-// Integration tests invoke native modules (pdfium, Sharp, Tesseract). These
+// Integration tests invoke liteparse's native parser (NAPI + PDFium). These
 // are noticeably slower on Windows hosts than macOS – the default 5s timeout
 // is insufficient. Raise to 30s. See #157.
 describe.skipIf(!liteparseAvailable)('LiteParseConverter integration (real LiteParse)', { timeout: 30000 }, () => {
