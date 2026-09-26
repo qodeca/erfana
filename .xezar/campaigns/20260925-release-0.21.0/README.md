@@ -20,10 +20,12 @@ Empty.
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
+| d71e7bf0 | #161 npm audit triage + electron-builder 26.16.1 | dependency-maintenance | pi/deepseek-api/deepseek-flash | – |
 
-Counts at dispatch (01:28): tasks 1/10, gate runs 0/2, metered 0/4, load 2.9/18.
+Counts at dispatch (08:45): tasks 1/10, gate runs 0/2 (1 when its gate step runs), metered 1/4, load 11.9/18 (a node process not started by the leader).
 
 ## File-ownership table
+- d71e7bf0 owns package.json, package-lock.json.
 - Reviews own nothing.
 
 ## Accounts (from `read_quota` at 2026-09-26T05:13:10Z)
@@ -44,8 +46,8 @@ Counts at dispatch (01:28): tasks 1/10, gate runs 0/2, metered 0/4, load 2.9/18.
 - #139 build – PR #159: code review APPROVE, design review FAIL (B-1 account name in QA screenshots); round 1 done at 1f924f73 (B-1 masked, NB-1 stated as a limit, NB-2 documented deviation); design recheck PASS at 9203f493; QA FAIL only because 3 checks could not run (chrome-devtools emulate + evaluate_script denied in the QA session): dark mode, theme switch, reduced motion unverified live. Waiting for the owner.
 
 ## Owner items
-- **#159 blocked on 3 unrun QA checks** (dark theme, banner theme switch, reduced-motion still). Both QA and design sessions were denied the chrome-devtools emulate/evaluate_script tools. Options: (a) owner checks them by hand on github.com in ~2 minutes (branch feature/139-readme-redesign: switch OS dark mode, turn on Reduce motion), or (b) allow those two tools for review sessions and re-run QA. Leader recommends (a).
-- `npm audit` on develop's lockfile (run by the #159 author, 2026-09-25 23:51): 16 advisories – 1 critical, 12 high, 3 moderate – none added by #159. Not triaged. Dependabot PRs #63-#68 are open and out of this campaign's scope. Decide: triage now (a new issue in 0.21.0) or later.
+- **#159: owner checks by hand (answered 2026-09-26 08:40)** – dark theme, banner theme switch, reduced-motion still on github.com, branch feature/139-readme-redesign. Leader merges on the owner's word with green checks. Earlier note: (dark theme, banner theme switch, reduced-motion still). Both QA and design sessions were denied the chrome-devtools emulate/evaluate_script tools. Options: (a) owner checks them by hand on github.com in ~2 minutes (branch feature/139-readme-redesign: switch OS dark mode, turn on Reduce motion), or (b) allow those two tools for review sessions and re-run QA. Leader recommends (a).
+- `npm audit` on develop's lockfile (run by the #159 author, 2026-09-25 23:51): 16 advisories – 1 critical, 12 high, 3 moderate – none added by #159. Owner chose triage in 0.21.0: issue #161, task d71e7bf0.
 - PR #159 QA screenshots at 56ba01bb showed the GitHub account name; being replaced, but the old files stay in the branch history (squash-merge keeps them out of develop). Decide if that history matters.
 - Two Windows flakes seen on #158 (docs-only): useImageSource.test.ts 'keeps the last good image…' and check-shebangs.test.mjs 5000 ms timeout. Not in docs/windows/known-flakes.md yet; file or catalogue them?
 - Review task a873f32c (claude/opus, gmail) was refused `jq … | bash .xezar/checks/gh-write.sh` 4 times (don't-ask mode), so it could not post its #158 verdict; earlier reviews on other logins posted. Look at why, or accept relaying.
