@@ -41,11 +41,13 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 | fed841b8 | #191 security review | security-review | codex/gpt-6-astra | qodeca-2 |
 | 6bd5518f | #190 code recheck | code-review | claude/sonnet | westagilelabs |
 | 8dadb69a | #174 leader context | feature-implementation | claude/opus | gmail |
+| e1c555ca | #177 browser grant | feature-implementation | claude/opus | eqamana |
 
 ## File-ownership table
 - 974c210b done (PR #188); vitest configs released.
 - 7d5d7fc6 done (PR #189); .xezar/loops.json released.
 - 392e7c9b done. Reviews own nothing.
+- e1c555ca owns .xezar/workflows/qa.yaml, .xezar/workflows/design-review.yaml, a new evaluate_script origin hook + tests, LOCAL-PATCHES.md entry.
 - 8dadb69a owns the leader-context loader + session-start hook, their tests/fixtures, .xezar/docs/leader-context-loading.md, .xezar/docs/campaign-notes.md, LOCAL-PATCHES.md entry.
 - 994fb3e5 done (PR #191); gate files released. (9a85cf2c done; .github/dependabot.yml released, PR #187.) #170 (gate list) is unblocked: #186 merged.
 - Reviews own nothing.
