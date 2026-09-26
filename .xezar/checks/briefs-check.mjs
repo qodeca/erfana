@@ -6,12 +6,13 @@ import { fileURLToPath } from 'node:url';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = resolve(process.argv[2] ?? resolve(scriptDir, '..', '..'));
+const briefsPath = resolve(process.argv[3] ?? resolve(repositoryRoot, '.xezar/docs/briefs.md'));
 const routeOutput = execFileSync(process.execPath, [resolve(scriptDir, 'route.mjs'), '--rows'], {
   cwd: repositoryRoot,
   encoding: 'utf8',
 });
 const routing = JSON.parse(routeOutput.slice(routeOutput.indexOf('{')));
-const briefs = readFileSync(resolve(repositoryRoot, '.xezar/docs/briefs.md'), 'utf8');
+const briefs = readFileSync(briefsPath, 'utf8');
 const headingIds = [...briefs.matchAll(/^## .+?\(([^)]+)\)$/gm)]
   .flatMap((match) => [...match[1].matchAll(/`([^`]+)`/g)].map((id) => id[1]));
 const counts = new Map();

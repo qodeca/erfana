@@ -80,3 +80,8 @@ if [ -f "$SCRIPT_DIR/leader-context.test.mjs" ]; then
 else
   skip leader-context "no leader-context fixture test installed beside these checks"
 fi
+if [ -f "$SCRIPT_DIR/briefs-check.test.mjs" ]; then
+  node --test "$SCRIPT_DIR/briefs-check.test.mjs"
+else
+  skip briefs-check-test "no briefs-check fixture test installed beside these checks"
+fi

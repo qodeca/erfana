@@ -193,7 +193,7 @@ Keep the verdict under 3,000 characters, plain text, no backticks or dollar sign
 
 ## Tracker only (`tracker-only`)
 
-Use when the whole change is tracker state and no repository file changes.
+Use when the whole change is tracker state and no repository file changes; it produces no review verdict.
 
 ```text
 Update <issue/PR> tracker state from <authorized source>; make no repository changes.
@@ -203,7 +203,7 @@ Do not touch: <repository files, unrelated tracker state, or parallel-task paths
 Outcome: <the requested labels or comment reflect the authorized decision>.
 
 Finish in the foreground.
-Run targeted tests while working. The workflow's gates step runs the full gate once, so do not run it yourself. In a standalone task with no gates step, run the gate once after the final commit.
+Do not run the gate; judge the authorized tracker state. Run a focused check only when it is needed to support the update.
 Do not poll CI; the leader watches it.
 Do not print, commit, upload, or put secrets in evidence; redact sensitive values in diagnostics.
 Never stop a process by command-line pattern.
@@ -212,7 +212,7 @@ If a real decision comes up, write BLOCKED with the options.
 
 ## Issue filing (`issue-filing`)
 
-Use when a problem or proposal needs one new issue and no repository change.
+Use when a problem or proposal needs one new issue and no repository change; it produces no review verdict.
 
 ```text
 File one issue for <problem or proposal> from <authorized brief>, with the required title and fields.
@@ -222,7 +222,7 @@ Do not touch: <repository files, existing issues, or labels beyond the brief>.
 Outcome: <one complete issue makes the problem or proposal actionable>.
 
 Finish in the foreground.
-Run targeted tests while working. The workflow's gates step runs the full gate once, so do not run it yourself. In a standalone task with no gates step, run the gate once after the final commit.
+Do not run the gate; judge the authorized filing brief. Run a focused check only when it is needed to support the filing.
 Do not poll CI; the leader watches it.
 Do not print, commit, upload, or put secrets in evidence; redact sensitive values in diagnostics.
 Never stop a process by command-line pattern.
@@ -261,7 +261,7 @@ Do not touch: <author checkout, product files, prior evidence, or workflow state
 Evidence boundary: <completed events and sources to record>.
 
 Finish in the foreground.
-Do not run the gate; judge the author's gate evidence. Run a focused check only in your own prepared isolated checkout when a finding needs it.
+Run targeted tests while working. The workflow's gates step runs the full gate once, so do not run it yourself. In a standalone task with no gates step, run the gate once after the final commit.
 Do not poll CI; the leader watches it.
 Do not print, commit, upload, or put secrets in evidence; redact sensitive values in diagnostics.
 Never stop a process by command-line pattern.
@@ -290,22 +290,7 @@ If a real decision comes up, write BLOCKED with the options.
 
 ## Root-sync (`root-sync`)
 
-Use when the checkout only needs a fast-forward to the moved base branch.
-
-```text
-Fast-forward <checkout> to <base branch/SHA>; do not change its content.
-
-Owned paths: <checkout history only>.
-Do not touch: <working-tree files, merge resolution, or parallel-task paths>.
-Outcome: <checkout matches the base through a fast-forward only>.
-
-Finish in the foreground.
-Run targeted tests while working. The workflow's gates step runs the full gate once, so do not run it yourself. In a standalone task with no gates step, run the gate once after the final commit.
-Do not poll CI; the leader watches it.
-Do not print, commit, upload, or put secrets in evidence; redact sensitive values in diagnostics.
-Never stop a process by command-line pattern.
-If a real decision comes up, write BLOCKED with the options.
-```
+Use when the checkout only needs a fast-forward to the moved base branch; the leader performs this itself and sends no brief.
 
 ## Analysis, specs, research (`analysis-specs-research`)
 
@@ -328,7 +313,7 @@ If a real decision comes up, write BLOCKED with the options.
 
 ## Business analysis (`business-analysis`)
 
-Use when the question is what to build or why rather than how.
+Use when the question is what to build or why rather than how; it produces no review verdict.
 
 ```text
 Analyze <what to build or why> for <audience/context> using <evidence>.
@@ -338,7 +323,7 @@ Do not touch: <technical design, product implementation, or parallel-task paths>
 Outcome: <a supported product or business judgement>.
 
 Finish in the foreground.
-Run targeted tests while working. The workflow's gates step runs the full gate once, so do not run it yourself. In a standalone task with no gates step, run the gate once after the final commit.
+Do not run the gate; judge the supplied question and evidence. Run a focused check only when it is needed to support the analysis.
 Do not poll CI; the leader watches it.
 Do not print, commit, upload, or put secrets in evidence; redact sensitive values in diagnostics.
 Never stop a process by command-line pattern.
@@ -385,10 +370,10 @@ If a real decision comes up, write BLOCKED with the options.
 
 ## Deprecation plan (`deprecation-plan`)
 
-Use when a dependency must be retired before anything is removed.
+Use when something people depend on — a feature, an API, or a dependency — must be retired before anything is removed.
 
 ```text
-Plan retirement of <dependency> by documenting affected people, replacement, and dates.
+Plan retirement of <feature/API/dependency> by documenting affected people, replacement, and dates.
 
 Owned paths: <deprecation plan and affected documentation>.
 Do not touch: <removal implementation, consumer data, or parallel-task paths>.
