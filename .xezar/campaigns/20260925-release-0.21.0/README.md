@@ -9,10 +9,11 @@ Updated: 2026-09-25 11:06 CEST
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
-- #189 (owner decision: load ceiling 40 in .xezar/loops.json, from 7d5d7fc6), draft, head eb97bd69, gate sealed. Next: code review (not opus).
+- #190 (#179 silence alert, from 392e7c9b), draft, head 0fdf50e1, gate sealed. Next: cold review 0ac0f4e6 + codex security eab95ae4 (running). Owner installs launchd by hand after merge.
+- #189 (owner decision: load ceiling 40 in .xezar/loops.json, from 7d5d7fc6), draft, head eb97bd69, gate sealed. Review ac9e7f48 running.
 - #188 (#171 vitest worker cap) merged 2026-09-26 as c27b399b (one CI unit-test crash before, rerun green).
-- #187 (#176 Dependabot groups, from 9a85cf2c), draft, head 9717d461, gate sealed. Code review dfa7c67f REQUEST CHANGES (overrides-only pins, pre-1.0 deps, actions limit); security 5cba1e38 NO FINDINGS. Round 1 done at bdf8dd53 (author gate green). Next: code recheck + codex security recheck.
-- #186 (#169 gate lanes, lint:check), draft, head 0ef1c1a3, round 2 fixed by 04cb9379 (author gate 133.7 s green, not sealed). Code recheck 839f072f APPROVE; security recheck 31c5f2ec S-1, S-2 fixed, S-3 + S-4 fixed in round 2. Next: scoped security recheck. After merge: leader-guide.md:149 lint -> lint:check.
+- #187 (#176 Dependabot groups, from 9a85cf2c), draft, head 9717d461, gate sealed. Code review dfa7c67f REQUEST CHANGES (overrides-only pins, pre-1.0 deps, actions limit); security 5cba1e38 NO FINDINGS. Round 1 done at bdf8dd53 (author gate green). Code recheck 375e7414 + codex security recheck 6031cb2b running.
+- #186 (#169 gate lanes, lint:check), draft, head 0ef1c1a3, round 2 fixed by 04cb9379 (author gate 133.7 s green, not sealed). Code recheck 839f072f APPROVE; security recheck 31c5f2ec S-1, S-2 fixed, S-3 + S-4 fixed in round 2; security recheck 69734780 running. After merge: leader-guide.md:149 lint -> lint:check.
 - #185 (#179 spike) merged 2026-09-26 as 5f285011. Result: build the silence alert (+ line-86 doc fix); auto-continue deferred (parked).
 - #184 (#172 spike) merged 2026-09-26 as 4d874fa7; #172 build held for owner.
 - #183 (#133) merged 2026-09-26 as 6b763b38.
@@ -35,12 +36,17 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| 392e7c9b | #179 silence alert build | feature-implementation | claude/opus | eqamana |
+| 69734780 | #186 security recheck S-3/S-4 | security-review | claude/opus | eqamana |
+| 375e7414 | #187 code recheck | code-review | claude/sonnet | westagilelabs |
+| 6031cb2b | #187 security recheck | security-review | codex/gpt-6-astra | qodeca-2 |
+| ac9e7f48 | #189 review | code-review | claude/sonnet | qodeca |
+| 0ac0f4e6 | #190 cold review | code-review | claude/sonnet | gmail |
+| eab95ae4 | #190 security review | security-review | codex/gpt-6-astra | default |
 
 ## File-ownership table
 - 974c210b done (PR #188); vitest configs released.
 - 7d5d7fc6 done (PR #189); .xezar/loops.json released.
-- 392e7c9b owns the new alert script + test under scripts/, a launchd plist template, its install doc, docs/spikes/179-leader-liveness.md (line 86 only). (9a85cf2c done; .github/dependabot.yml released, PR #187.) No overlap between them; #170 (gate list) waits for #186.
+- 392e7c9b done (PR #190). Reviews own nothing; no file is owned right now. (9a85cf2c done; .github/dependabot.yml released, PR #187.) No overlap between them; #170 (gate list) waits for #186.
 - Reviews own nothing.
 
 ## Accounts (from `read_quota` at 2026-09-26T17:13:08Z)
