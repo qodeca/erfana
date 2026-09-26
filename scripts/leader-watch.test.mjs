@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { describe, it, expect } from 'vitest'
 import { mkdtempSync, mkdirSync, rmSync, symlinkSync, utimesSync, writeFileSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import path, { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { URL } from 'node:url'
 import {
@@ -294,144 +294,173 @@ describe('launchd template', () => {
   })
 })
 
-describe('main', () => {
-  const now = Date.parse('2026-09-26T08:00:00Z')
-  const runsDir = '/repo/.local/xezar/runs'
-  const fakeFs = (runMs, campaignMs = 0) => ({
-    readdirSync: (p) => {
-      if (p === runsDir) return [UUID('d71e7bf0')]
-      if (p === '/repo/.xezar/campaigns') return ['c1']
-      if (p === '/repo/.xezar/campaigns/c1') return ['timeline.md']
-      throw new Error('ENOENT')
-    },
-    lstatSync: (p) => {
-      if (p.endsWith('/c1')) return { isFile: () => false, isDirectory: () => true, mtimeMs: 0 }
-      if (p.endsWith('timeline.md')) return { isFile: () => true, isDirectory: () => false, mtimeMs: campaignMs }
-      return { isFile: () => true, isDirectory: () => false, mtimeMs: runMs }
-    },
-  })
-  const commitAt = (ms) => String(Math.floor(ms / 1000))
-
-  function run({ env = {}, argv = [], runMs = now - 40 * MIN, commitMs = now - 50 * MIN, campaignMs = 0, tail = '' } = {}) {
-    const out = []
-    const err = []
-    const calls = []
-    const exec = (cmd, args) => {
-      calls.push([cmd, args])
-      return cmd === 'git' ? commitAt(commitMs) : ''
-    }
-    const code = main(argv, { LEADER_WATCH_REPO: '/repo', ...env }, {
-      now: () => now,
-      out: (s) => out.push(s),
-      err: (s) => err.push(s),
-      exec,
-      fs: fakeFs(runMs, campaignMs),
-      tail: () => tail,
-      platform: 'darwin',
-    })
-    return { code, out, err, calls }
-  }
-
-  it('notifies once and writes one log line when a run waits on a silent leader', () => {
-    const r = run()
-    expect(r.code).toBe(0)
-    expect(r.calls.map((c) => c[0])).toEqual(['git', 'osascript'])
-    expect(r.out).toEqual(['2026-09-26T08:00:00.000Z alert run=d71e7bf0 leader-silent=50m'])
-    expect(r.err).toEqual([])
-  })
-
-  it('stays quiet when the leader ticked in the campaign folder after the run stopped', () => {
-    const r = run({ campaignMs: now - 20 * MIN })
-    expect(r.calls.map((c) => c[0])).toEqual(['git'])
-    expect(r.out).toEqual([])
-  })
-
-  it('does not repeat an alert logged within the limit', () => {
-    const r = run({ env: { LEADER_WATCH_LOG: '/log' }, tail: `${new Date(now - 10 * MIN).toISOString()} alert run=d71e7bf0 leader-silent=40m\n` })
-    expect(r.calls.map((c) => c[0])).toEqual(['git'])
-    expect(r.out).toEqual([])
-  })
-
-  it('prints instead of notifying on --dry-run, on any platform', () => {
-    const r = run({ argv: ['--dry-run'] })
-    expect(r.calls.map((c) => c[0])).toEqual(['git'])
-    expect(r.out[0]).toContain('(dry run) Run d71e7bf0 has waited 40 min')
-  })
-
-  it('refuses a missing or relative repository, a bad limit, and a non-macOS notification', () => {
-    expect(run({ env: { LEADER_WATCH_REPO: '' } }).code).toBe(2)
-    expect(run({ env: { LEADER_WATCH_REPO: 'erfana' } }).code).toBe(2)
-    expect(run({ env: { LEADER_WATCH_MINUTES: 'soon' } }).code).toBe(2)
-    const linux = main([], { LEADER_WATCH_REPO: '/repo' }, { err: () => {}, platform: 'linux', exec: () => { throw new Error('must not run') } })
-    expect(linux).toBe(2)
-  })
-
-  it('checks nothing when git cannot give the leader commit time', () => {
-    const r = run({ commitMs: 0 })
-    expect(r.code).toBe(1)
-    expect(r.calls.map((c) => c[0])).toEqual(['git'])
-    expect(r.err[0]).toContain('nothing checked')
-  })
-
-  it('logs a failed notification to stderr and writes no alert line, so the next poll retries', () => {
-    const out = []
-    const err = []
-    const code = main([], { LEADER_WATCH_REPO: '/repo' }, {
-      now: () => now,
-      out: (s) => out.push(s),
-      err: (s) => err.push(s),
-      exec: (cmd) => {
-        if (cmd === 'git') return commitAt(now - 50 * MIN)
-        throw new Error('osascript: not allowed')
+// main() joins paths with the separator of the path module it is given, so
+// each separator is pinned here rather than taken from the host: the same
+// assertions run under POSIX and Windows paths on macOS, Linux and Windows.
+for (const [sep, paths, repo] of [
+  ['posix', path.posix, '/repo'],
+  ['win32', path.win32, 'C:\\repo'],
+]) {
+  describe(`main (${sep} paths)`, () => {
+    const now = Date.parse('2026-09-26T08:00:00Z')
+    const runsDir = paths.join(repo, '.local/xezar/runs')
+    const campaignsDir = paths.join(repo, '.xezar/campaigns')
+    const c1 = paths.join(campaignsDir, 'c1')
+    const fakeFs = (runMs, campaignMs = 0) => ({
+      readdirSync: (p) => {
+        if (p === runsDir) return [UUID('d71e7bf0')]
+        if (p === campaignsDir) return ['c1']
+        if (p === c1) return ['timeline.md']
+        throw new Error('ENOENT')
       },
-      fs: fakeFs(now - 40 * MIN),
-      tail: () => '',
-      platform: 'darwin',
+      lstatSync: (p) => {
+        if (p === c1) return { isFile: () => false, isDirectory: () => true, mtimeMs: 0 }
+        if (p === paths.join(c1, 'timeline.md')) return { isFile: () => true, isDirectory: () => false, mtimeMs: campaignMs }
+        if (p === paths.join(runsDir, UUID('d71e7bf0'))) return { isFile: () => true, isDirectory: () => false, mtimeMs: runMs }
+        throw new Error('ENOENT')
+      },
     })
-    expect(code).toBe(1)
-    expect(out).toEqual([])
-    expect(err).toEqual(['leader-watch: osascript failed; no notification shown'])
-  })
+    const commitAt = (ms) => String(Math.floor(ms / 1000))
 
-  it('reports unreadable metadata in fixed text, without the path or a stack, and never alerts', () => {
-    const secretPath = '/Users/some-login/erfana/.xezar/campaigns/c1/timeline.md'
-    for (const failing of ['/c1', 'timeline.md', '.ndjson']) {
-      const base = fakeFs(now - 40 * MIN)
-      const fs = {
-        readdirSync: base.readdirSync,
-        lstatSync: (p, opts) => {
-          if (p.endsWith(failing)) {
-            const e = new Error(`EACCES: permission denied, lstat '${secretPath}'`)
-            e.code = 'EACCES'
-            e.path = secretPath
-            throw e
-          }
-          return base.lstatSync(p, opts)
-        },
-      }
+    function run({ env = {}, argv = [], runMs = now - 40 * MIN, commitMs = now - 50 * MIN, campaignMs = 0, tail = '' } = {}) {
       const out = []
       const err = []
       const calls = []
-      const code = main([], { LEADER_WATCH_REPO: '/repo' }, {
+      const exec = (cmd, args) => {
+        calls.push([cmd, args])
+        return cmd === 'git' ? commitAt(commitMs) : ''
+      }
+      const code = main(argv, { LEADER_WATCH_REPO: repo, ...env }, {
+        now: () => now,
+        out: (s) => out.push(s),
+        err: (s) => err.push(s),
+        exec,
+        fs: fakeFs(runMs, campaignMs),
+        paths,
+        tail: () => tail,
+        platform: 'darwin',
+      })
+      return { code, out, err, calls }
+    }
+
+    it('notifies once and writes one log line when a run waits on a silent leader', () => {
+      const r = run()
+      expect(r.code).toBe(0)
+      expect(r.calls.map((c) => c[0])).toEqual(['git', 'osascript'])
+      expect(r.out).toEqual(['2026-09-26T08:00:00.000Z alert run=d71e7bf0 leader-silent=50m'])
+      expect(r.err).toEqual([])
+    })
+
+    it('stays quiet when the leader ticked in the campaign folder after the run stopped', () => {
+      const r = run({ campaignMs: now - 20 * MIN })
+      expect(r.calls.map((c) => c[0])).toEqual(['git'])
+      expect(r.out).toEqual([])
+    })
+
+    it('does not repeat an alert logged within the limit', () => {
+      const r = run({ env: { LEADER_WATCH_LOG: '/log' }, tail: `${new Date(now - 10 * MIN).toISOString()} alert run=d71e7bf0 leader-silent=40m\n` })
+      expect(r.calls.map((c) => c[0])).toEqual(['git'])
+      expect(r.out).toEqual([])
+    })
+
+    it('prints instead of notifying on --dry-run, on any platform', () => {
+      const r = run({ argv: ['--dry-run'] })
+      expect(r.calls.map((c) => c[0])).toEqual(['git'])
+      expect(r.out).toHaveLength(1)
+      expect(r.out[0]).toContain('(dry run) Run d71e7bf0 has waited 40 min')
+    })
+
+    it('refuses a missing or relative repository, a bad limit, and a non-macOS notification', () => {
+      expect(run({ env: { LEADER_WATCH_REPO: '' } }).code).toBe(2)
+      expect(run({ env: { LEADER_WATCH_REPO: 'erfana' } }).code).toBe(2)
+      expect(run({ env: { LEADER_WATCH_MINUTES: 'soon' } }).code).toBe(2)
+      for (const platform of ['linux', 'win32']) {
+        const calls = []
+        const err = []
+        const code = main([], { LEADER_WATCH_REPO: repo }, {
+          err: (s) => err.push(s),
+          platform,
+          paths,
+          exec: (cmd) => {
+            calls.push(cmd)
+            throw new Error('must not run')
+          },
+        })
+        expect(code).toBe(2)
+        expect(calls).toEqual([])
+        expect(err).toEqual(['leader-watch: notifications need macOS; use --dry-run elsewhere'])
+      }
+    })
+
+    it('checks nothing when git cannot give the leader commit time', () => {
+      const r = run({ commitMs: 0 })
+      expect(r.code).toBe(1)
+      expect(r.calls.map((c) => c[0])).toEqual(['git'])
+      expect(r.err[0]).toContain('nothing checked')
+    })
+
+    it('logs a failed notification to stderr and writes no alert line, so the next poll retries', () => {
+      const out = []
+      const err = []
+      const code = main([], { LEADER_WATCH_REPO: repo }, {
         now: () => now,
         out: (s) => out.push(s),
         err: (s) => err.push(s),
         exec: (cmd) => {
-          calls.push(cmd)
-          return commitAt(now - 50 * MIN)
+          if (cmd === 'git') return commitAt(now - 50 * MIN)
+          throw new Error('osascript: not allowed')
         },
-        fs,
+        fs: fakeFs(now - 40 * MIN),
+        paths,
         tail: () => '',
         platform: 'darwin',
       })
       expect(code).toBe(1)
-      expect(calls).toEqual(['git'])
       expect(out).toEqual([])
-      expect(err).toEqual(['leader-watch: metadata unavailable; nothing checked'])
-      const printed = [...out, ...err].join('\n')
-      expect(printed).not.toContain('/repo')
-      expect(printed).not.toContain('some-login')
-      expect(printed).not.toMatch(/\bat \S+ \(|EACCES/)
-    }
+      expect(err).toEqual(['leader-watch: osascript failed; no notification shown'])
+    })
+
+    it('reports unreadable metadata in fixed text, without the path or a stack, and never alerts', () => {
+      const secretPath = '/Users/some-login/erfana/.xezar/campaigns/c1/timeline.md'
+      for (const failing of [c1, paths.join(c1, 'timeline.md'), paths.join(runsDir, UUID('d71e7bf0'))]) {
+        const base = fakeFs(now - 40 * MIN)
+        const fs = {
+          readdirSync: base.readdirSync,
+          lstatSync: (p, opts) => {
+            if (p === failing) {
+              const e = new Error(`EACCES: permission denied, lstat '${secretPath}'`)
+              e.code = 'EACCES'
+              e.path = secretPath
+              throw e
+            }
+            return base.lstatSync(p, opts)
+          },
+        }
+        const out = []
+        const err = []
+        const calls = []
+        const code = main([], { LEADER_WATCH_REPO: repo }, {
+          now: () => now,
+          out: (s) => out.push(s),
+          err: (s) => err.push(s),
+          exec: (cmd) => {
+            calls.push(cmd)
+            return commitAt(now - 50 * MIN)
+          },
+          fs,
+          paths,
+          tail: () => '',
+          platform: 'darwin',
+        })
+        expect(code).toBe(1)
+        expect(calls).toEqual(['git'])
+        expect(out).toEqual([])
+        expect(err).toEqual(['leader-watch: metadata unavailable; nothing checked'])
+        const printed = [...out, ...err].join('\n')
+        expect(printed).not.toContain(repo)
+        expect(printed).not.toContain('some-login')
+        expect(printed).not.toMatch(/\bat \S+ \(|EACCES/)
+      }
+    })
   })
-})
+}

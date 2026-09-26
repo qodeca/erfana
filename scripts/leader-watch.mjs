@@ -103,7 +103,7 @@ export function lastAlertFrom(text) {
 }
 
 /** Run logs as `{ id, mtimeMs }`, id being the first eight hex digits. */
-export function listRuns(runsDir, fs = { readdirSync, lstatSync }) {
+export function listRuns(runsDir, fs = { readdirSync, lstatSync }, paths = path) {
   let names
   try {
     names = fs.readdirSync(runsDir)
@@ -114,14 +114,14 @@ export function listRuns(runsDir, fs = { readdirSync, lstatSync }) {
   for (const name of names.slice(0, MAX_ENTRIES)) {
     const m = RUN_LOG.exec(name)
     if (!m) continue
-    const st = fs.lstatSync(path.join(runsDir, name), { throwIfNoEntry: false })
+    const st = fs.lstatSync(paths.join(runsDir, name), { throwIfNoEntry: false })
     if (st?.isFile()) runs.push({ id: m[1], mtimeMs: st.mtimeMs })
   }
   return runs
 }
 
 /** Newest modification time of a file one level inside the campaign folder, or 0. */
-export function newestCampaignFileMs(campaignsDir, fs = { readdirSync, lstatSync }) {
+export function newestCampaignFileMs(campaignsDir, fs = { readdirSync, lstatSync }, paths = path) {
   let newest = 0
   let folders
   try {
@@ -130,7 +130,7 @@ export function newestCampaignFileMs(campaignsDir, fs = { readdirSync, lstatSync
     return 0
   }
   for (const folder of folders.slice(0, MAX_ENTRIES)) {
-    const dir = path.join(campaignsDir, folder)
+    const dir = paths.join(campaignsDir, folder)
     if (!fs.lstatSync(dir, { throwIfNoEntry: false })?.isDirectory()) continue
     let names
     try {
@@ -139,7 +139,7 @@ export function newestCampaignFileMs(campaignsDir, fs = { readdirSync, lstatSync
       continue
     }
     for (const name of names.slice(0, MAX_ENTRIES)) {
-      const st = fs.lstatSync(path.join(dir, name), { throwIfNoEntry: false })
+      const st = fs.lstatSync(paths.join(dir, name), { throwIfNoEntry: false })
       if (st?.isFile() && st.mtimeMs > newest) newest = st.mtimeMs
     }
   }
@@ -205,7 +205,9 @@ export function parseLimit(value) {
 
 /**
  * One poll. Returns the exit code. `deps` exists for tests; the defaults are
- * the real clock, file system, git and osascript.
+ * the real clock, file system, path module, platform, git and osascript.
+ * `paths` lets a test pin the separator (`path.posix` or `path.win32`), so the
+ * same fake file system matches on every host.
  */
 export function main(argv, env, deps = {}) {
   const {
@@ -214,12 +216,13 @@ export function main(argv, env, deps = {}) {
     err = (s) => process.stderr.write(`${s}\n`),
     exec = execFileSync,
     fs = { readdirSync, lstatSync },
+    paths = path,
     tail = readTail,
     platform = process.platform,
   } = deps
   const dryRun = argv.includes('--dry-run')
   const repo = env.LEADER_WATCH_REPO
-  if (!repo || !path.isAbsolute(repo)) {
+  if (!repo || !paths.isAbsolute(repo)) {
     err('leader-watch: set LEADER_WATCH_REPO to the absolute path of the main checkout')
     return 2
   }
@@ -241,12 +244,12 @@ export function main(argv, env, deps = {}) {
   const nowMs = now()
   let alert
   try {
-    const leaderAtMs = Math.max(commitMs, newestCampaignFileMs(path.join(repo, CAMPAIGNS), fs))
+    const leaderAtMs = Math.max(commitMs, newestCampaignFileMs(paths.join(repo, CAMPAIGNS), fs, paths))
     const lastAlertMs = env.LEADER_WATCH_LOG ? lastAlertFrom(tail(env.LEADER_WATCH_LOG)) : null
     alert = evaluate({
       nowMs,
       leaderAtMs,
-      runs: listRuns(path.join(repo, RUNS), fs),
+      runs: listRuns(paths.join(repo, RUNS), fs, paths),
       limitMs: limitMin * 60_000,
       lastAlertMs,
     })
