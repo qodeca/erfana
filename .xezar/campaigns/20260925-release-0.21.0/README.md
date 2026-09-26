@@ -17,12 +17,12 @@ Updated: 2026-09-25 11:06 CEST
 Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 
 ## Serial merge line
-- #162 (#161): review 612e0cf9 (claude/opus, gmail) REQUEST CHANGES at 8d7cb84d: 2 major (extract-zip row credits Electron 44; guard omits symlink-entry gap), 2 minor (size cap vs decoder flaws; line range), 2 nits. Post refused again (opus pattern); relayed to author d71e7bf0 (round 1), who also runs both audits for check 1. Next: scoped recheck on claude/sonnet.
+- #162 (#161): round 1 fixed at e8aa8665 (all 6 findings answered; author ran both audits: 16 total, 4 prod high, 4 GHSA ids quoted). Scoped recheck 0d8a560d on claude/sonnet running. Record pushes held until the verdict.
 
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| d71e7bf0 | #162 review round 1 (#161) | dependency-maintenance (continued) | pi/deepseek-api/deepseek-flash | – |
+| 0d8a560d | #162 scoped recheck (#161) | code-review | claude/sonnet | westagilelabs |
 | 76be37d0 | #167 full-cold-review (#164) | code-review | claude/opus | westagilelabs |
 | 35479ba2 | #168 security-review (#163) | security-review | claude/opus | qodeca |
 | 84cbb123 | #168 full-cold-review (#163, also= of security-review) | code-review | claude/sonnet | gmail |
@@ -31,7 +31,6 @@ Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 Counts at dispatch (16:05): tasks 3/10, gate runs 0/2, metered 3/4 (all pi), load 2.8/18. xezar workspace maxParallel 5 (owner, 16:07).
 
 ## File-ownership table
-- d71e7bf0 owns docs/security.md (round 1).
 - Overlap accepted: 347fc1ce and 43131e43 share package.json/package-lock.json; both merge after v0.21.0, one at a time, the second rebased. Neither edits docs/security.md (#162 owns it).
 - Reviews own nothing.
 
