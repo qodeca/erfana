@@ -78,3 +78,4 @@ Owner decisions in the owner's exact words, dated, append-only.
 - 2026-09-26 (channel: AskUserQuestion, leader session) "Plan v3 drops two items you picked earlier … OK to drop both?" -> "Drop both (Recommended)"
 - 2026-09-26T17:22:47Z (channel: typed in the leader session) "bump load ceiling from 24 to 40". Note: the ceiling on record was 18 (leader-guide.md:138, loops.json L3), not 24; applied as 40.
 - 2026-09-26T19:43:08Z (channel: AskUserQuestion in the leader session) #202 S-2 – owner picked "B: safe app start" (build a locked sandbox so testers start the PR's app only in their own folder, with no access to the owner's folder or logins), over the recommended A (no app start).
+- 2026-09-26T19:44:41Z (channel: AskUserQuestion in the leader session) #201 third repair round – owner picked "Fix the script again" over the recommended "Drop the script" (replace it with a written how-to).
