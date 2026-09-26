@@ -9,6 +9,7 @@ Updated: 2026-09-25 11:06 CEST
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
+- #201 (#174 leader context, from 8dadb69a), draft, head 6b3798bf, gate sealed. Next: code review (not opus) + codex security (kit loader); held on load. Shares repository-checks.sh with #191.
 - #191 (#170 drop test:ci, from 994fb3e5), draft, head abc25817, gate sealed at a99c2605. Cold review 6513c636 APPROVE; codex security fed841b8 FINDINGS (S-1 minor, S-2 nit = #186 S-5, test wiring). Round 1 done at abc25817 (author gate green, 1m44s). Codex security recheck running. After merge: leader-guide.md:150 drop test:ci.
 - #190 (#179 silence alert, from 392e7c9b), draft, head 0fdf50e1, gate sealed. Codex security eab95ae4: S-1 minor (lstat errors leak paths); cold review 0ac0f4e6 APPROVE + 1 runbook minor (leader posted). Round 1 done at 211803b5 (author gate green). Security recheck d6354c72 NO FINDINGS; code recheck 6bd5518f APPROVE. Windows checks fail (4 darwin-only tests) → round 2 with 392e7c9b. Owner installs launchd by hand after merge.
 - #189 (load ceiling 40) merged 2026-09-26 as 25adc9a7.
@@ -26,7 +27,7 @@ Updated: 2026-09-25 11:06 CEST
 - #155 ready, head d4fb29e7 – allow rule in scripts/xezar-leader-settings.json (4458b282): exactly 2 exact-match rules + one autoMode reason; all checks green. Next: security-review (widens tool access).
 - #154 ready, head 5fce83d5 – #138 part B (2a1e4316): test fixed, workflow gates sealed, CI all green incl. Windows. Next: full-cold-review + design-review of the 52 images and demo (privacy).
 - #140 ready, head c442a15b – #139 spec. Re-check 12b29be1 APPROVE at c442a15b, all 11 findings fixed, no new defects. Labels design-approved + merge-queue; #139 labelled design-approved. Next in the merge line after #141: bring up to date, wait for green, squash-merge.
-Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
+Dependabot PRs, not in scope: #63-#68 (old config) and #192-#200 (new grouped config, opened 2026-09-26 ~20:10; #196 duplicates #167).
 
 ## Process speed-up plan v3 (owner-approved 2026-09-26)
 Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #173 merge queue, #178 Windows smoke, #175 brief templates. Wave 2 (after spikes): #169, #170, #172, #179. Wave 3: #174, #176, #177, #171 (only if ps shows vitest load). Dropped by owner: records branch, docs-only fast path. Interim rules in force: short plain-text verdicts in review briefs; batched record pushes.
@@ -39,7 +40,6 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 |---|---|---|---|---|
 | 392e7c9b | #190 round 2 (continue) | feature-implementation | claude/opus | eqamana |
 | 189d6325 | #191 security recheck | security-review | codex/gpt-6-astra | qodeca-2 |
-| 8dadb69a | #174 leader context | feature-implementation | claude/opus | gmail |
 | e1c555ca | #177 browser grant | feature-implementation | claude/opus | eqamana |
 
 ## File-ownership table
@@ -47,7 +47,7 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 - 7d5d7fc6 done (PR #189); .xezar/loops.json released.
 - 392e7c9b done. Reviews own nothing.
 - e1c555ca owns .xezar/workflows/qa.yaml, .xezar/workflows/design-review.yaml, a new evaluate_script origin hook + tests, LOCAL-PATCHES.md entry.
-- 8dadb69a owns the leader-context loader + session-start hook, their tests/fixtures, .xezar/docs/leader-context-loading.md, .xezar/docs/campaign-notes.md, LOCAL-PATCHES.md entry.
+- 8dadb69a done (PR #201); leader-context files released.
 - 994fb3e5 done (PR #191); gate files released. (9a85cf2c done; .github/dependabot.yml released, PR #187.) #170 (gate list) is unblocked: #186 merged.
 - Reviews own nothing.
 
