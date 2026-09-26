@@ -17,7 +17,7 @@ Updated: 2026-09-25 11:06 CEST
 Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 
 ## Serial merge line
-- #162 (#161): recheck 0d8a560d (claude/sonnet) APPROVE at e8aa8665 (6/6 fixed; PR-body follow-up (c) wording is a non-blocking nit). Post refused, leader posted it verbatim (issuecomment-5847260193). Branch updated to 8ee1f1e0; waiting for checks, then ready + squash-merge.
+- #162 merged 2026-09-26 as c0cbc66f.
 
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
