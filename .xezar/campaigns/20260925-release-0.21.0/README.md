@@ -9,6 +9,7 @@ Updated: 2026-09-25 11:06 CEST
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
+- #185 (#179 spike report), draft. Result: build the silence alert; auto-continue deferred (parked).
 - #184 (#172 spike report), draft. Needs a light review; build of #172 held for owner.
 - #183 (#133) merged 2026-09-26 as 6b763b38.
 - #182 (#175) merged 2026-09-26 as 97d5c17c. #175 stays open for the remaining rows.
@@ -31,7 +32,6 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
 | 43131e43 | #168 S-1 done (164d93b9); told to stop polling; waits for #181 run | dependency-maintenance (continued) | pi/deepseek-api/deepseek-flash | – |
-| 4aee4aa1 | #179 spike leader liveness | spike | claude/opus | gmail |
 | 04cb9379 | #169 gate lanes + lint without --fix | feature-implementation (kit-refactor) | codex/gpt-6-sol | qodeca-2 |
 
 Counts at dispatch (16:05): tasks 3/10, gate runs 0/2, metered 3/4 (all pi), load 2.8/18. xezar workspace maxParallel 5 (owner, 16:07).
