@@ -17,12 +17,11 @@ Updated: 2026-09-25 11:06 CEST
 Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 
 ## Serial merge line
-- #162 (#161): round 1 fixed at e8aa8665 (all 6 findings answered; author ran both audits: 16 total, 4 prod high, 4 GHSA ids quoted). Scoped recheck 0d8a560d on claude/sonnet running. Record pushes held until the verdict.
+- #162 (#161): recheck 0d8a560d (claude/sonnet) APPROVE at e8aa8665 (6/6 fixed; PR-body follow-up (c) wording is a non-blocking nit). Post refused, leader posted it verbatim (issuecomment-5847260193). Branch updated to 8ee1f1e0; waiting for checks, then ready + squash-merge.
 
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| 0d8a560d | #162 scoped recheck (#161) | code-review | claude/sonnet | westagilelabs |
 | 347fc1ce | #167 review round 1 (#164) | dependency-maintenance (continued) | pi/deepseek-api/deepseek-flash | – |
 | 84cbb123 | #168 full-cold-review (#163, also= of security-review) | code-review | claude/sonnet | gmail |
 | 43131e43 | #163 lift @electron/rebuild override + electron-builder 26.16.1 (post-release, do-not-merge) | dependency-maintenance | pi/deepseek-api/deepseek-flash | – |
@@ -64,7 +63,7 @@ Counts at dispatch (16:05): tasks 3/10, gate runs 0/2, metered 3/4 (all pi), loa
 - PR #140 open decisions, needed before #139 is built, not before its review: (1) go to apply repo description, topics, social preview; (2) extend TRADEMARKS.md to the new banner, wordmark, social image; (3) CI link check as a follow-up issue; (4) light-theme banner vs dark-only rule – owner only if the reviewer disagrees; (5) demo format WebP (after a spike) vs MP4.
 
 ## Rules that bit
-- claude/opus review sessions (gmail a873f32c, westagilelabs ab0c9d7f) get `gh-write.sh` and/or `verdict-write.sh` refused; claude/sonnet review sessions post fine. Read the verdict from the PR comment or the task history, close the session, relay.
+- Review sessions get `gh-write.sh` / `verdict-write.sh` refused: claude/opus (a873f32c, ab0c9d7f, 612e0cf9, 35479ba2, 76be37d0) and, since 2026-09-26 16:55, claude/sonnet too (0d8a560d). Read the verdict from the task's final message; the leader posts an APPROVE verbatim on the PR, and relays a REQUEST CHANGES to the author. Read the verdict from the PR comment or the task history, close the session, relay.
 - A review task can finish its review but be refused the GitHub post by its own permission check (a873f32c, 4 refusals). Do not work around it: relay the verdict to the author, who quotes it in the response comment, and say so.
 - Never dispatch while the checkout holds unpushed campaign commits: the task's worktree is cut from the local develop and carries them into its PR (#148).
 - Load over 18 for more than one tick: check `pgrep -fl circuit-electron` for launchers with parent PID 1 before anything else. They ignore SIGTERM. Tell the owner at once; after #145 merges use `node scripts/stop-orphan-mcp.mjs`.
