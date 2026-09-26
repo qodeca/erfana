@@ -1,7 +1,7 @@
 // Fixed application-gate dependency schedule. Workers never mutate attempt.json.
 //
 // THE INDEXES ARE POSITIONS IN `repo-gates.sh`'s canonical list, one-based. The caller passes
-// the application phase's entries; known test/build commands carry ordering constraints, and the
+// the application phase's entries; the coverage and build commands carry ordering constraints, and the
 // lanes come from committed pipeline config, with `GATE_APPLICATION_LANES` overriding it.
 // Lanes split by `;`, a lane's gates by `,`, run in that order. An explicitly empty override
 // means one lane in list order. The
@@ -62,18 +62,19 @@ const APPLICATION_LANES = (() => {
 if (mode === 'application') {
   const coverage = entries.find(e => e.name === 'npm run test:cov')?.index;
   const build = entries.find(e => e.name === 'npx electron-vite build')?.index;
-  const unit = entries.find(e => e.name === 'npm run test:ci')?.index;
-  const known = [coverage, build, unit].filter(index => index !== undefined).length;
-  if (known > 0 && known < 3) {
+  // #170 removed the separate unit-test gate on purpose: `test:cov` runs every unit test once and
+  // enforces the floors. Naming it again would run the suite twice, and beside coverage it would
+  // collide on test fixtures, so a list that brings it back is refused rather than scheduled.
+  if (entries.some(e => e.name === 'npm run test:ci')) {
+    throw new Error('npm run test:ci was dropped from the gate by #170 (test:cov runs every unit test); remove it or update the schedule constraints');
+  }
+  const known = [coverage, build].filter(index => index !== undefined).length;
+  if (known === 1) {
     throw new Error('a guarded application command was renamed or removed; update the schedule constraints');
   }
   if (coverage !== undefined && build !== undefined &&
       !APPLICATION_LANES.some(lane => lane.indexOf(coverage) >= 0 && lane.indexOf(build) > lane.indexOf(coverage))) {
     throw new Error('coverage and build must share a lane, with coverage before build');
-  }
-  if (coverage !== undefined && unit !== undefined &&
-      !APPLICATION_LANES.some(lane => lane.includes(coverage) && lane.includes(unit))) {
-    throw new Error('coverage and unit tests must share a lane to avoid test fixture collisions');
   }
 }
 const resolvedSchedule = {source: laneSource, raw: laneRaw, lanes: APPLICATION_LANES};
