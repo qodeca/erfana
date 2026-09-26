@@ -34,27 +34,28 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| e2c93217 | #201 round 2 security recheck | security-review | codex/gpt-6-astra | qodeca-2 |
-| e1c555ca | #202 round 2 (continue) | feature-implementation | claude/opus | eqamana |
+| cf57f59b | #201 round 4 security recheck | security-review | codex/gpt-6-astra | qodeca-2 |
+| 2bb41519 | #201 round 4 code recheck | code-review | claude/sonnet | westagilelabs |
+| cf9bba13 | #202 round 2 code recheck | code-review | claude/sonnet | gmail |
 
 ## File-ownership table
 - 974c210b done (PR #188); vitest configs released.
 - 7d5d7fc6 done (PR #189); .xezar/loops.json released.
 - 392e7c9b done. Reviews own nothing.
-- e1c555ca owns qa.yaml, design-review.yaml, catalog-check.mjs + tests, the new review-run-app wrapper + sandbox profile, guard files, LOCAL-PATCHES.md (PR #202 round 2).
-- 8dadb69a done (PR #201 round 2 at 7265bafc); files released.
+- e1c555ca done (PR #202 round 2 at f78a4a0c); files released.
+- 8dadb69a done (PR #201 round 4 at 2a3e4be9); files released.
 - 994fb3e5 done (PR #191 merged); gate files released. (9a85cf2c done; .github/dependabot.yml released, PR #187.) #170 (gate list) is unblocked: #186 merged.
 - Reviews own nothing.
 
-## Accounts (from `read_quota` at 2026-09-26T19:41:41Z)
+## Accounts (from `read_quota` at 2026-09-26T20:18:35Z)
 | Runner | Login | State | Resets (UTC) |
 |---|---|---|---|
-| claude | default | reserved leader login, runs no tasks; ok (weekly 12%, plan max; same numbers as westagilelabs – owner item) | 2026-10-02 07:00 |
-| claude | qodeca | ok (weekly 54%) | 2026-09-28 17:00 |
-| claude | gmail | ok (weekly 12%) | 2026-10-02 19:00 |
-| claude | eqamana | ok (weekly 1%) | 2026-10-03 15:59 |
-| claude | westagilelabs | ok (weekly 12%) | 2026-10-02 06:59 |
-| codex | default | ok (weekly 10%) | 2026-10-03 17:10 |
+| claude | default | reserved leader login, runs no tasks; ok (weekly 13%, plan max; same numbers as westagilelabs – owner item) | 2026-10-02 06:59 |
+| claude | qodeca | ok (weekly 56%) | 2026-09-28 16:59 |
+| claude | gmail | ok (weekly 12%) | 2026-10-02 18:59 |
+| claude | eqamana | ok (weekly 2%) | 2026-10-03 16:00 |
+| claude | westagilelabs | ok (weekly 13%) | 2026-10-02 07:00 |
+| codex | default | ok (weekly 12%) | 2026-10-03 17:10 |
 | codex | qodeca-2 | ok (weekly 1%) | 2026-10-03 16:58 |
 | pi | – | no logins | – |
 
