@@ -20,8 +20,10 @@ node "$SCRIPT_DIR/catalog-check.mjs" "$REPO_ROOT"
 # The routing file is checked as the working tree holds it, so a pull request that breaks it fails.
 if [ -f "$REPO_ROOT/.xezar/routing.json" ]; then
   node "$SCRIPT_DIR/route.mjs" --check "$REPO_ROOT/.xezar/routing.json"
+  node "$SCRIPT_DIR/briefs-check.mjs" "$REPO_ROOT"
 else
   skip route-check "no .xezar/routing.json in this project"
+  skip briefs-check "no .xezar/routing.json in this project"
 fi
 
 # The ad-hoc browser's MCP entry changes only through a security review, never through this gate.
