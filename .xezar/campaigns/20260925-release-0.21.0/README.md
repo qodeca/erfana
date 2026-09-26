@@ -24,7 +24,6 @@ Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 |---|---|---|---|---|
 | 347fc1ce | #167 review round 1 (#164) | dependency-maintenance (continued) | pi/deepseek-api/deepseek-flash | – |
 | 43131e43 | #168 review round 1 (#163) | dependency-maintenance (continued) | pi/deepseek-api/deepseek-flash | – |
-| 43131e43 | #163 lift @electron/rebuild override + electron-builder 26.16.1 (post-release, do-not-merge) | dependency-maintenance | pi/deepseek-api/deepseek-flash | – |
 
 Counts at dispatch (16:05): tasks 3/10, gate runs 0/2, metered 3/4 (all pi), load 2.8/18. xezar workspace maxParallel 5 (owner, 16:07).
 
