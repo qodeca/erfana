@@ -9,7 +9,7 @@ Updated: 2026-09-25 11:06 CEST
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
-- #202 (#177 browser grant, from e1c555ca), draft, head 82938dae, gate passed. emulate granted; evaluate_script stays denied (wiring options → owner). Reviews 04b8155b (sonnet) + 864506c8 (codex security) running.
+- #202 (#177 browser grant, from e1c555ca), draft, head 82938dae, gate passed. emulate granted; evaluate_script stays denied (wiring options → owner). Cold review 04b8155b REQUEST CHANGES (2 major, 1 minor, 1 nit); codex security 864506c8 running; relay together.
 - #201 (#174 leader context, from 8dadb69a), draft, head 6b3798bf, gate sealed. Reviews 9c5505e0 (sonnet) + 1b108196 (codex security) running. Shares repository-checks.sh with #191.
 - #191 (#170 drop test:ci, from 994fb3e5), draft, head abc25817, gate sealed at a99c2605. Cold review 6513c636 APPROVE; codex security fed841b8 FINDINGS (S-1 minor, S-2 nit = #186 S-5, test wiring). Round 1 done at abc25817 (author gate green, 1m44s). Codex recheck 189d6325: S-1 still open, S-3 nit → round 2 (allowlist design) with 994fb3e5; a third round would be parked. After merge: leader-guide.md:150 drop test:ci.
 - #190 (#179 silence alert, from 392e7c9b), draft, head 0fdf50e1, gate sealed. Codex security eab95ae4: S-1 minor (lstat errors leak paths); cold review 0ac0f4e6 APPROVE + 1 runbook minor (leader posted). Round 1 done at 211803b5 (author gate green). Security recheck d6354c72 NO FINDINGS; code recheck 6bd5518f APPROVE. Windows checks fail (4 darwin-only tests) → round 2 with 392e7c9b. Owner installs launchd by hand after merge.
@@ -41,7 +41,6 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 |---|---|---|---|---|
 | 392e7c9b | #190 round 2 (continue) | feature-implementation | claude/opus | eqamana |
 | 994fb3e5 | #191 round 2 (continue) | feature-implementation | claude/opus | eqamana |
-| 04b8155b | #202 cold review | code-review | claude/sonnet | qodeca |
 | 864506c8 | #202 security review | security-review | codex/gpt-6-astra | default |
 | 9c5505e0 | #201 cold review | code-review | claude/sonnet | westagilelabs |
 | 1b108196 | #201 security review | security-review | codex/gpt-6-astra | qodeca-2 |
