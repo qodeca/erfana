@@ -35,6 +35,7 @@ const {
   ALLOWED_EXTRA_RESOURCES_DESTS,
   ALLOWED_EXTRA_RESOURCES_FROM,
   ALLOWED_EXTRA_FILES_DESTS,
+  ELECTRON_OWNED_RESOURCES_ENTRIES,
   EXPECTED_RESOURCES_ENTRIES,
   REPO_ROOT_SENTINELS,
   SUSPICIOUS_SIBLING_NAMES,
@@ -1376,6 +1377,20 @@ describe('assertResourcesSiblingsAllowlist (L2a-2)', () => {
     fs.mkdirSync(path.join(tmpRoot, 'tessdata'));
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     expect(() => assertResourcesSiblingsAllowlist(tmpRoot, { platform: 'win32' })).not.toThrow();
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("accepts Electron's relocated licence files and pins the Electron-owned allowlist (#163)", () => {
+    // app-builder-lib 26.16.1 (electron-builder#9407) moves Electron's own
+    // licence files into Contents/Resources beside app/. They are Electron-owned,
+    // so the sibling allowlist accepts exactly these two names and nothing more —
+    // this is a security control, so the whole set is pinned rather than probed.
+    expect([...ELECTRON_OWNED_RESOURCES_ENTRIES].sort()).toEqual([
+      'LICENSE.electron.txt', 'LICENSES.chromium.html', 'app', 'app.asar', 'elevate.exe', 'icon.icns',
+    ]);
+    makeResourcesDir(tmpRoot, ['LICENSE.electron.txt', 'LICENSES.chromium.html']);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(() => assertResourcesSiblingsAllowlist(tmpRoot, { platform: 'darwin' })).not.toThrow();
     expect(warn).not.toHaveBeenCalled();
   });
 
