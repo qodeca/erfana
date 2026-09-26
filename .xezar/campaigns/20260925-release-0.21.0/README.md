@@ -15,19 +15,17 @@ Updated: 2026-09-25 11:06 CEST
 Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 
 ## Serial merge line
-Empty.
+- #162 (#161): d71e7bf0 done, all 11 checks pass at 5c6c0c5f. Queued: full-cold-review on claude/opus (author pi), held by load (28.6 > 18, npm ci in 43131e43's worktree). L3 wake 16:23.
 
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| d71e7bf0 | #161 triage + v0.21.0 exceptions, PR #162 (handoff step) | dependency-maintenance | pi/deepseek-api/deepseek-flash | – |
 | 347fc1ce | #164 liteparse 1 -> 2 (post-release, do-not-merge) | dependency-maintenance | pi/deepseek-api/deepseek-flash | – |
 | 43131e43 | #163 lift @electron/rebuild override + electron-builder 26.16.1 (post-release, do-not-merge) | dependency-maintenance | pi/deepseek-api/deepseek-flash | – |
 
 Counts at dispatch (16:05): tasks 3/10, gate runs 0/2, metered 3/4 (all pi), load 2.8/18. xezar workspace maxParallel 5 (owner, 16:07).
 
 ## File-ownership table
-- d71e7bf0 owns package.json, package-lock.json (revert only), docs/security.md.
 - 347fc1ce owns package.json, package-lock.json, src/main/services/import/converters/LiteParseConverter.ts (+ tests), scripts/capture/legibility.mjs.
 - 43131e43 owns package.json, package-lock.json, scripts/fuses.js, docs/build/dependencies.md.
 - Overlap accepted: 347fc1ce and 43131e43 share package.json/package-lock.json; both merge after v0.21.0, one at a time, the second rebased. Neither edits docs/security.md (#162 owns it).
@@ -57,7 +55,6 @@ Counts at dispatch (16:05): tasks 3/10, gate runs 0/2, metered 3/4 (all pi), loa
 - Two Windows flakes seen on #158 (docs-only): useImageSource.test.ts 'keeps the last good image…' and check-shebangs.test.mjs 5000 ms timeout. Not in docs/windows/known-flakes.md yet; file or catalogue them?
 - Review task a873f32c (claude/opus, gmail) was refused `jq … | bash .xezar/checks/gh-write.sh` 4 times (don't-ask mode), so it could not post its #158 verdict; earlier reviews on other logins posted. Look at why, or accept relaying.
 - codex/default quota read flaps between ok and unknown ("Codex 0.156.1 changed its quota format"), while codex/qodeca-2 on the same version reads fine. Unknown is never out and never fine; qodeca-2 takes Codex work meanwhile. Look at the xezar quota reader for this login, or accept.
-- Push events do not reach the leader (2026-09-26 16:10): leader_events status says a Claude Code leader is attached but no MCP session owns the project (`no-owner-session`); attach refused with `not-owner`. Events stay in the journal; the leader reads them at every L1 tick, so the cost is up to 10 min delay. Fix: restart the leader (`./scripts/xezar-leader.sh`), which also loads the #155 allow rule.
 - Label issues with `release-0.21.0` to put them in scope.
 - Leader runs `node scripts/stop-orphan-mcp.mjs` at each L1 tick (worked at 12:39). Allow-rule: repository-checks refuses permissions in .claude/settings.json (every read-only agent would get them). Owner chose the leader-only file scripts/xezar-leader-settings.json. Owner undid the edit in both places (17:55); 4458b282 continued to move the rules into the leader-only file (gate repair 2 of 2). Leader restart after merge.
 - Decide whether to hide or delete the reviewer's junk test comments on PR #146.
