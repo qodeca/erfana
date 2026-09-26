@@ -180,6 +180,12 @@ const READ_ONLY_WORKFLOWS = new Set([
 // never touch the author's branch; that, not a shell limit, is their guarantee.
 const RUNS_CODE_WORKFLOWS = new Set(["acceptance-verification", "design-review", "qa"]);
 
+// The narrow way to run code (local patch, #177): a RUNS_CODE step that does carry a bashAllowlist
+// may add only these, to put its own detached worktree on the head under review and run it. The
+// engine's read-only lock still refuses `fetch --upload-pack|--exec`, `checkout ... -- <path>` and
+// `npm --prefix` under them. Nothing else – no build, no test runner, no npx – is admitted here.
+const RUNS_CODE_BASH_PREFIXES = new Set(["git fetch origin", "git checkout --detach", "npm ci", "npm run dev"]);
+
 // the engine's `configSchema`.
 const CONFIG_KEYS = new Set([
   "skillsRepos",
@@ -339,7 +345,7 @@ function checkReaderStep(at, workflow, step) {
     return;
   }
   for (const entry of list) {
-    if (!READER_BASH_PREFIXES.has(entry)) {
+    if (!READER_BASH_PREFIXES.has(entry) && !(RUNS_CODE_WORKFLOWS.has(workflow) && RUNS_CODE_BASH_PREFIXES.has(entry))) {
       err(at, `bashAllowlist entry "${entry}" is not a reading prefix; git goes through git-read.sh, comments and labels through gh-write.sh, files through verdict-write.sh`);
     }
   }
