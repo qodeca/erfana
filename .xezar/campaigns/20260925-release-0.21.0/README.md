@@ -11,7 +11,7 @@ Updated: 2026-09-25 11:06 CEST
 ## Open pull requests
 - #186 (#169 gate lanes, lint:check), draft, head 9aa4f208, gate sealed. Next: security + cold review (queued on load).
 - #185 (#179 spike report), draft. Result: build the silence alert; auto-continue deferred (parked).
-- #184 (#172 spike report), draft. Needs a light review; build of #172 held for owner.
+- #184 (#172 spike) merged 2026-09-26 as 4d874fa7; #172 build held for owner.
 - #183 (#133) merged 2026-09-26 as 6b763b38.
 - #182 (#175) merged 2026-09-26 as 97d5c17c. #175 stays open for the remaining rows.
 - #181 (#178) merged 2026-09-26 as a9792f3c.
