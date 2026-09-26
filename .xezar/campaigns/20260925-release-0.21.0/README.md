@@ -12,7 +12,7 @@ Updated: 2026-09-25 11:06 CEST
 - #190 (#179 silence alert, from 392e7c9b), draft, head 0fdf50e1, gate sealed. Codex security eab95ae4: S-1 minor (lstat errors leak paths); cold review 0ac0f4e6 APPROVE + 1 runbook minor (leader posted). Round 1 with 392e7c9b. Owner installs launchd by hand after merge.
 - #189 (load ceiling 40) merged 2026-09-26 as 25adc9a7.
 - #188 (#171 vitest worker cap) merged 2026-09-26 as c27b399b (one CI unit-test crash before, rerun green).
-- #187 (#176 Dependabot groups, from 9a85cf2c), draft, head 9717d461, gate sealed. Code review dfa7c67f REQUEST CHANGES (overrides-only pins, pre-1.0 deps, actions limit); security 5cba1e38 NO FINDINGS. Round 1 done at bdf8dd53 (author gate green). Code recheck 375e7414 APPROVE + codex security recheck 6031cb2b NO FINDINGS at bdf8dd53. In merge line after #189.
+- #187 (#176 Dependabot groups) merged 2026-09-26 as 80a8c032; #176 closed.
 - #186 (#169 gate lanes, lint:check) merged 2026-09-26 as 7cfa65bc. S-5 nit → proposed follow-up issue (owner item).
 - #185 (#179 spike) merged 2026-09-26 as 5f285011. Result: build the silence alert (+ line-86 doc fix); auto-continue deferred (parked).
 - #184 (#172 spike) merged 2026-09-26 as 4d874fa7; #172 build held for owner.
