@@ -9,7 +9,7 @@ Updated: 2026-09-25 11:06 CEST
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
-- #202 (#177 browser grant, from e1c555ca), draft, head 82938dae, gate passed. emulate granted; evaluate_script stays denied (wiring options → owner). Cold review 04b8155b REQUEST CHANGES (2 major, 1 minor, 1 nit); codex security 864506c8 BLOCKING (S-1 = same guard defect as code M-1). Round 1 done at e2bc1a5d (syntax-tree guard; 4 run-code bash entries + catalog-check RUNS_CODE_BASH_PREFIXES – a kit-check loosening). Code recheck ce9b18e4 APPROVE (leader posted). Security recheck 9672867b BLOCKING: S-1 fixed; S-2 major – npm ci / npm run dev on an untrusted PR head runs contributor code, preflight still allows the primary checkout (pre-existing on develop, which has unrestricted Bash). Owner picked B (safe app start). Round 2 relayed to e1c555ca: one trusted wrapper, SHA-bound, task worktree only, scrubbed env + macOS sandbox.
+- #202 (#177 browser grant: emulate for QA/design review, unwired evaluate_script guard; safe app start split out – parked) merged 2026-09-26 as 0b95160e; #177 closed.
 - #201 (#174 leader context: timeline bound, archiving dropped – parked) merged 2026-09-26 as d4fc1d61.
 - #189 (load ceiling 40) merged 2026-09-26 as 25adc9a7.
 - #188 (#171 vitest worker cap) merged 2026-09-26 as c27b399b (one CI unit-test crash before, rerun green).
@@ -63,6 +63,7 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 - #139 build – PR #159: code review APPROVE, design review FAIL (B-1 account name in QA screenshots); round 1 done at 1f924f73 (B-1 masked, NB-1 stated as a limit, NB-2 documented deviation); design recheck PASS at 9203f493; QA FAIL only because 3 checks could not run (chrome-devtools emulate + evaluate_script denied in the QA session): dark mode, theme switch, reduced motion unverified live. Waiting for the owner.
 
 ## Owner items
+- **#202 follow-up (not filed):** safe app start for QA/design review (round 3 design at eec611b1 plus open S-3 detached descendants and S-4 PID reuse). File an issue if wanted – issue creation needs your word.
 - **#201 follow-up S-9 (minor, not filed):** the 64 KB timeline tail can cut one oversized timeline entry mid-way (timeline only; decisions.md stays whole). File an issue if wanted – issue creation needs your word.
 - **#179 alert (merged #190 as ded31966):** install the launchd agent by hand, per the PR body.
 - **#177 evaluate_script wiring (PR #202):** emulate is granted; evaluate_script stays denied because the guard hook cannot be registered per workflow. Options in the PR body: user-scope settings for the xezar profile, a filtering proxy in .mcp.json, or leave denied. Leader recommends leave denied until a QA run proves it is needed.
