@@ -26,7 +26,7 @@ Counts at dispatch (01:28): tasks 1/10, gate runs 0/2, metered 0/4, load 2.9/18.
 ## File-ownership table
 - Reviews own nothing.
 
-## Accounts (from `read_quota` at 2026-09-26T04:13:09Z)
+## Accounts (from `read_quota` at 2026-09-26T05:13:10Z)
 | Runner | Login | State | Resets (UTC) |
 |---|---|---|---|
 | claude | default | reserved leader login, runs no tasks; ok but weekly 99% | 2026-09-28 23:00 |
@@ -34,7 +34,7 @@ Counts at dispatch (01:28): tasks 1/10, gate runs 0/2, metered 0/4, load 2.9/18.
 | claude | gmail | ok (weekly 4%) | 2026-10-02 18:59 |
 | claude | eqamana | out | 2026-09-26 15:59 |
 | claude | westagilelabs | ok (weekly 6%) | 2026-10-02 06:59 |
-| codex | default | ok (weekly 9%) | 2026-10-02 10:44 |
+| codex | default | unknown, flapping (read fails "Codex 0.156.1 changed its quota format" at 03:13Z and 05:13Z, ok at 04:13Z; qodeca-2 on the same version reads fine) | – |
 | codex | qodeca-2 | ok (weekly 27%) | 2026-09-29 12:45 |
 | pi | – | no logins | – |
 
@@ -49,6 +49,7 @@ Counts at dispatch (01:28): tasks 1/10, gate runs 0/2, metered 0/4, load 2.9/18.
 - PR #159 QA screenshots at 56ba01bb showed the GitHub account name; being replaced, but the old files stay in the branch history (squash-merge keeps them out of develop). Decide if that history matters.
 - Two Windows flakes seen on #158 (docs-only): useImageSource.test.ts 'keeps the last good image…' and check-shebangs.test.mjs 5000 ms timeout. Not in docs/windows/known-flakes.md yet; file or catalogue them?
 - Review task a873f32c (claude/opus, gmail) was refused `jq … | bash .xezar/checks/gh-write.sh` 4 times (don't-ask mode), so it could not post its #158 verdict; earlier reviews on other logins posted. Look at why, or accept relaying.
+- codex/default quota read flaps between ok and unknown ("Codex 0.156.1 changed its quota format"), while codex/qodeca-2 on the same version reads fine. Unknown is never out and never fine; qodeca-2 takes Codex work meanwhile. Look at the xezar quota reader for this login, or accept.
 - Label issues with `release-0.21.0` to put them in scope.
 - Leader runs `node scripts/stop-orphan-mcp.mjs` at each L1 tick (worked at 12:39). Allow-rule: repository-checks refuses permissions in .claude/settings.json (every read-only agent would get them). Owner chose the leader-only file scripts/xezar-leader-settings.json. Owner undid the edit in both places (17:55); 4458b282 continued to move the rules into the leader-only file (gate repair 2 of 2). Leader restart after merge.
 - Decide whether to hide or delete the reviewer's junk test comments on PR #146.
