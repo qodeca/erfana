@@ -11,19 +11,25 @@
 //      git dir, and the top level must be a task worktree under
 //      <repo>/.local/xezar/worktrees/<run>.
 //   3. `gh` must report the PR head as exactly <head-sha>.
-//   4. That commit is fetched by the task worktree and extracted with
-//      `git archive` (no .git inside) into /private/tmp/xezar-review-app-<run>-
-//      <sha>/app, a 0700 folder this user owns. Not under the task worktree:
-//      that lies inside the primary checkout, which the sandbox denies whole,
-//      and build tools (browserslist, babel) stat every parent folder. The
-//      session's own checkout is never moved, so this file keeps resolving to
-//      the copy the kit snapshot took from the primary checkout, not to the
-//      PR's version.
-//   5. `npm ci` and `npm run dev` run under a sandbox profile that lets them
-//      write only that private folder, denies every read of the primary
-//      checkout and of the owner's credential and Erfana app-data paths, and
-//      gives them an allowlisted environment: no tokens, no agent variables,
-//      HOME and Electron's user-data folder inside the private folder.
+//   4. Every start gets a fresh, unpredictable 0700 parent from mkdtemp under
+//      /private/tmp (not under the task worktree: that lies inside the primary
+//      checkout, which the sandbox denies whole, and build tools stat every
+//      parent folder). It holds two siblings: control/, where the wrapper
+//      writes the sandbox profile (O_EXCL | O_NOFOLLOW) before any child
+//      exists and which no child can read or write, and work/, the only folder
+//      a child may write. The exact commit is extracted with `git archive` (no
+//      .git) into work/app on every start – no cache, no marker. The session's
+//      own checkout is never moved, so this file keeps resolving to the copy
+//      the kit snapshot took from the primary checkout, not the PR's version.
+//   5. The extraction, `npm ci` and `npm run dev` run under that profile: no
+//      write outside work/, no read of the owner home (except the Node.js
+//      install), the credential paths, the Erfana app data or the primary
+//      checkout; an allowlisted environment with HOME, TMPDIR and Electron's
+//      user data inside work/.
+//   6. Every descendant is tracked while it runs and swept by folder at the
+//      end; on stop all are killed, checked gone, and the parent is removed.
+//      After a child has run, the wrapper never writes or trusts anything in
+//      work/.
 //
 // Network stays open – `npm ci` needs it – so the confined code can still send
 // anything it can read to the internet. It cannot read the denied paths.
@@ -81,12 +87,13 @@ function foldersBetween(root, target) {
   return parts.map((_, i) => path.join(root, ...parts.slice(0, i)))
 }
 
-// The sandbox profile. Later rules win in SBPL: the credential denies come last
-// so nothing above can re-open them.
-export function buildProfile({ appDir, tmpDir, ownerHome, primaryRoot, nodePrefix }) {
-  const inside = path.relative(tmpDir, appDir)
-  if (inside.startsWith('..') || path.isAbsolute(inside)) throw new Refusal('the app folder must be inside the private folder.')
-  const intoPrimary = path.relative(primaryRoot, tmpDir)
+// The sandbox profile. Later rules win in SBPL: the control-folder and
+// credential denies come last so nothing above can re-open them.
+export function buildProfile({ workDir, controlDir, ownerHome, primaryRoot, nodePrefix }) {
+  if (path.dirname(workDir) !== path.dirname(controlDir) || workDir === controlDir) {
+    throw new Refusal('the work and control folders must be siblings under one parent.')
+  }
+  const intoPrimary = path.relative(primaryRoot, path.dirname(workDir))
   if (!intoPrimary.startsWith('..') && !path.isAbsolute(intoPrimary)) {
     throw new Refusal('the private folder must not be inside the primary checkout.')
   }
@@ -97,9 +104,9 @@ export function buildProfile({ appDir, tmpDir, ownerHome, primaryRoot, nodePrefi
   return [
     '(version 1)',
     '(allow default)',
-    ';; Writes: only the private folder (app, HOME, temp, Electron user data) and tty/null devices.',
+    ';; Writes: only the work folder (app, HOME, temp, Electron user data) and tty/null devices.',
     '(deny file-write*)',
-    `(allow file-write* (subpath ${sbString(tmpDir)})`,
+    `(allow file-write* (subpath ${sbString(workDir)})`,
     '  (literal "/dev/null") (literal "/dev/zero") (literal "/dev/dtracehelper") (regex #"^/dev/tty") (regex #"^/dev/fd/"))',
     ';; Reads: nothing of the owner home except the Node.js install that runs npm (and the',
     ';; metadata of the folders above it, which realpath stats), so no dotfile, browser profile',
@@ -112,6 +119,8 @@ export function buildProfile({ appDir, tmpDir, ownerHome, primaryRoot, nodePrefi
         ]
       : []),
     `(deny file-read* (subpath ${sbString(primaryRoot)}))`,
+    ';; The control folder (this profile) is neither writable nor readable from inside.',
+    `(deny file-read* file-write* (subpath ${sbString(controlDir)}))`,
     ';; Reads: never the owner credential paths.',
     `(deny file-read* file-write*\n  ${denyHome.join('\n  ')})`,
     ''
@@ -182,73 +191,201 @@ function ghPrHead(pr, cwd) {
   }
 }
 
-function confinedCommand(argv, { appDir, tmpDir, ownerHome, primaryRoot, nodePrefix, parentEnv = process.env }) {
-  const home = path.join(tmpDir, 'home')
-  fs.mkdirSync(home, { recursive: true })
-  const profile = path.join(tmpDir, 'review-run-app.sb')
-  fs.writeFileSync(profile, buildProfile({ appDir, tmpDir, ownerHome, primaryRoot, nodePrefix }), { mode: 0o600 })
-  return { file: SANDBOX_EXEC, args: ['-f', profile, ...argv], env: buildEnv(parentEnv, { home, tmpDir, nodePrefix }) }
-}
-
-// Runs argv under the profile with the scrubbed environment and returns its
-// output. Exported so the tests can prove what the confinement stops.
-export function runConfined(argv, opts) {
-  const { file, args, env } = confinedCommand(argv, opts)
-  return spawnSync(file, args, { cwd: opts.cwd ?? opts.appDir, env, input: opts.input, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
-}
-
-// The confined process group running now. Stopping the wrapper stops all of it:
-// Electron and its helpers otherwise outlive their parent, keep the dev port
-// and hold the app's single-instance lock, so the next start talks to a stale app.
-let running = null
-function stopRunning(signal = 'SIGTERM') {
-  if (!running) return
-  try {
-    process.kill(-running.pid, signal)
-  } catch {
-    // Already gone.
-  }
-}
-let stopping = false
-function installStopHandlers() {
-  for (const [name, code] of [['SIGINT', 130], ['SIGTERM', 143], ['SIGHUP', 129]]) {
-    process.on(name, () => {
-      if (stopping) return
-      stopping = true
-      stopRunning('SIGTERM')
-      setTimeout(() => {
-        stopRunning('SIGKILL')
-        process.exit(code)
-      }, 3000).unref()
-    })
-  }
-  process.on('exit', () => stopRunning('SIGKILL'))
-}
-
-// The same, streaming, in its own process group. Output always goes through
-// pipes: a confined process that inherits a descriptor to a file it may not
-// read (the wrapper's own log inside the primary checkout) aborts at start-up.
-function streamConfined(argv, opts, input) {
-  const { file, args, env } = confinedCommand(argv, opts)
-  return new Promise((resolveExit) => {
-    const child = spawn(file, args, { cwd: opts.appDir, env, detached: true, stdio: [input ? 'pipe' : 'ignore', 'pipe', 'pipe'] })
-    running = child
-    child.stdout.pipe(process.stdout)
-    child.stderr.pipe(process.stderr)
-    if (input) child.stdin.end(input)
-    child.on('error', (error) => resolveExit({ error }))
-    child.on('close', (status, signal) => {
-      stopRunning('SIGKILL')
-      running = null
-      resolveExit({ status, signal })
-    })
-  })
-}
-
 // The install folder of the node running this wrapper (bin/node's grandparent),
 // the one part of the owner home the confined npm must read.
 export function nodeInstallPrefix(execPath = process.execPath) {
   return path.dirname(path.dirname(realpath(execPath)))
+}
+
+// Writes a new file and refuses to follow or reuse anything already at the
+// path: O_EXCL fails on an existing entry, O_NOFOLLOW on a symlink.
+export function writeNewFile(file, text) {
+  const fd = fs.openSync(file, fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_NOFOLLOW, 0o400)
+  try {
+    fs.writeSync(fd, text)
+  } finally {
+    fs.closeSync(fd)
+  }
+}
+
+// One start: a fresh, unpredictable 0700 parent from mkdtemp, holding two
+// siblings. control/ is written by the wrapper only, and only here, before any
+// child exists: the profile. work/ is the only folder a child may write; after
+// a child has run the wrapper never writes, trusts or follows anything in it –
+// it only removes the whole parent when every process is gone.
+export function createSession({ base = realpath('/tmp'), ownerHome, primaryRoot, nodePrefix }) {
+  const parent = realpath(fs.mkdtempSync(path.join(base, 'xezar-review-app-')))
+  const controlDir = path.join(parent, 'control')
+  const workDir = path.join(parent, 'work')
+  fs.mkdirSync(controlDir, { mode: 0o700 })
+  fs.mkdirSync(workDir, { mode: 0o700 })
+  const session = {
+    parent,
+    controlDir,
+    workDir,
+    appDir: path.join(workDir, 'app'),
+    home: path.join(workDir, 'home'),
+    tmpDir: path.join(workDir, 'tmp'),
+    userDataDir: path.join(workDir, 'electron-user-data'),
+    profile: path.join(controlDir, 'review-run-app.sb'),
+    nodePrefix,
+    known: new Set()
+  }
+  for (const dir of [session.appDir, session.home, session.tmpDir]) fs.mkdirSync(dir, { mode: 0o700 })
+  writeNewFile(session.profile, buildProfile({ workDir, controlDir, ownerHome, primaryRoot, nodePrefix }))
+  return session
+}
+
+function confinedCommand(argv, session, parentEnv) {
+  return {
+    file: SANDBOX_EXEC,
+    args: ['-f', session.profile, ...argv],
+    env: buildEnv(parentEnv, { home: session.home, tmpDir: session.tmpDir, nodePrefix: session.nodePrefix })
+  }
+}
+
+// Runs argv confined and returns its output. Exported so the tests can prove
+// what the confinement stops.
+export function runConfined(argv, session, { parentEnv = process.env, input } = {}) {
+  const { file, args, env } = confinedCommand(argv, session, parentEnv)
+  return spawnSync(file, args, { cwd: session.appDir, env, input, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+}
+
+// --- Containing every descendant -------------------------------------------------------
+// A child may leave its process group (setsid) or be re-parented to launchd
+// when its parent exits. Two nets catch it: every process seen descending from
+// a confined child while it runs is remembered (polled every 250 ms), and a
+// final sweep finds any process of this user whose working directory or
+// executable is inside this start's parent folder. What escapes both – a
+// process that forks away, changes directory out of the folder and runs a
+// system binary, all within one poll interval – is still inside the sandbox:
+// it cannot write outside work/ (removed on stop) or read the denied paths,
+// but it can keep the network.
+
+function processTable() {
+  const out = spawnSync('/bin/ps', ['-axo', 'pid=,ppid='], { encoding: 'utf8' }).stdout ?? ''
+  return out
+    .trim()
+    .split('\n')
+    .map((line) => line.trim().split(/\s+/).map(Number))
+    .filter(([pid, ppid]) => Number.isInteger(pid) && Number.isInteger(ppid))
+}
+
+export function trackDescendants(session, rootPid) {
+  session.known.add(rootPid)
+  const table = processTable()
+  let grew = true
+  while (grew) {
+    grew = false
+    for (const [pid, ppid] of table) {
+      if (session.known.has(ppid) && !session.known.has(pid)) {
+        session.known.add(pid)
+        grew = true
+      }
+    }
+  }
+}
+
+// Processes of this user whose cwd or executable lies inside the parent folder.
+export function sweepFolder(session) {
+  const out = spawnSync('/usr/sbin/lsof', ['-w', '-n', '-u', String(process.getuid()), '-a', '-d', 'cwd,txt', '-F', 'pn'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).stdout ?? ''
+  const found = new Set()
+  let pid = null
+  const prefix = `${session.parent}${path.sep}`
+  for (const line of out.split('\n')) {
+    if (line.startsWith('p')) pid = Number(line.slice(1))
+    else if (line.startsWith('n') && pid && pid !== process.pid && (line.slice(1) + path.sep).startsWith(prefix)) found.add(pid)
+  }
+  return found
+}
+
+// Zombies – exited, not yet reaped (the wrapper's own direct child is one until
+// the event loop runs again) – are dead: they run nothing and hold no files.
+function zombies() {
+  const out = spawnSync('/bin/ps', ['-axo', 'pid=,stat='], { encoding: 'utf8' }).stdout ?? ''
+  const found = new Set()
+  for (const line of out.trim().split('\n')) {
+    const [pid, stat] = line.trim().split(/\s+/)
+    if (stat?.startsWith('Z')) found.add(Number(pid))
+  }
+  return found
+}
+
+function alive(pid, dead = new Set()) {
+  if (dead.has(pid)) return false
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (error) {
+    return error.code === 'EPERM'
+  }
+}
+
+function signalAll(pids, signal) {
+  for (const pid of pids) {
+    if (pid === process.pid) continue
+    try {
+      process.kill(pid, signal)
+    } catch {
+      // Already gone.
+    }
+  }
+}
+
+function pause(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
+}
+
+// Stops every process this start produced and returns the ones still alive
+// (an empty array means contained). Synchronous, so it also runs on exit.
+export function stopAll(session, { graceMs = 2000 } = {}) {
+  for (const pid of [...session.known]) if (alive(pid)) trackDescendants(session, pid)
+  const targets = () => {
+    const dead = zombies()
+    return new Set([...session.known, ...sweepFolder(session)].filter((pid) => pid !== process.pid && alive(pid, dead)))
+  }
+  signalAll(targets(), 'SIGTERM')
+  const deadline = Date.now() + graceMs
+  while (targets().size && Date.now() < deadline) pause(100)
+  for (let round = 0; round < 5 && targets().size; round++) {
+    signalAll(targets(), 'SIGKILL')
+    pause(200)
+  }
+  return [...targets()]
+}
+
+// Stops everything, then removes the whole parent. The parent is left in place
+// (and reported) only when a process survived, since removing a folder under a
+// live process is a race the process could win.
+export function endSession(session) {
+  const survivors = stopAll(session)
+  if (survivors.length === 0) fs.rmSync(session.parent, { recursive: true, force: true })
+  return survivors
+}
+
+// Streams one confined step, tracking its descendants while it runs and
+// stopping any left behind when it ends. Output always goes through pipes: a
+// confined process that inherits a descriptor to a file it may not read (the
+// wrapper's own log inside the primary checkout) aborts at start-up.
+function streamConfined(argv, session, parentEnv, input) {
+  const { file, args, env } = confinedCommand(argv, session, parentEnv)
+  return new Promise((resolveExit) => {
+    const child = spawn(file, args, { cwd: session.appDir, env, detached: true, stdio: [input ? 'pipe' : 'ignore', 'pipe', 'pipe'] })
+    session.known.add(child.pid)
+    const poll = setInterval(() => trackDescendants(session, child.pid), 250)
+    child.stdout.pipe(process.stdout)
+    child.stderr.pipe(process.stderr)
+    if (input) child.stdin.end(input)
+    child.on('error', (error) => {
+      clearInterval(poll)
+      resolveExit({ error })
+    })
+    child.on('close', (status, signal) => {
+      clearInterval(poll)
+      const survivors = stopAll(session)
+      resolveExit({ status, signal, survivors })
+    })
+  })
 }
 
 function must(result, what) {
@@ -256,23 +393,35 @@ function must(result, what) {
   if (result.status !== 0) throw new Refusal(`${what} failed with exit ${result.status ?? result.signal}.`)
 }
 
-// The private folder: created 0700, or reused only when it is a real folder
-// (not a symlink) this user owns that nobody else can reach. /tmp is shared,
-// so a folder someone else planted there is refused.
-export function privateFolder(dir) {
-  try {
-    fs.mkdirSync(dir, { mode: 0o700 })
-  } catch (error) {
-    if (error.code !== 'EEXIST') throw new Refusal(`cannot create ${dir}.`)
+// Signals stop everything and remove the parent; returns the uninstaller.
+function installStopHandlers(session) {
+  const handlers = []
+  for (const [name, code] of [['SIGINT', 130], ['SIGTERM', 143], ['SIGHUP', 129]]) {
+    const handler = () => {
+      finishSession(session)
+      process.exit(code)
+    }
+    process.on(name, handler)
+    handlers.push([name, handler])
   }
-  const stat = fs.lstatSync(dir)
-  if (!stat.isDirectory() || stat.isSymbolicLink() || stat.uid !== process.getuid() || (stat.mode & 0o077) !== 0) {
-    throw new Refusal(`${dir} is not a private folder of this user; remove it and retry.`)
+  const onExit = () => finishSession(session)
+  process.on('exit', onExit)
+  handlers.push(['exit', onExit])
+  return () => {
+    for (const [name, handler] of handlers) process.off(name, handler)
   }
-  return dir
 }
 
-export async function main(argv, { platform = process.platform, cwd = process.cwd(), env = process.env, ghHead = ghPrHead } = {}) {
+function finishSession(session) {
+  if (session.ended) return
+  session.ended = true
+  const survivors = endSession(session)
+  if (survivors.length) {
+    process.stderr.write(`review-run-app: ${survivors.length} process(es) survived the stop: ${survivors.join(', ')}; ${session.parent} kept.\n`)
+  }
+}
+
+export async function main(argv, { platform = process.platform, cwd = process.cwd(), env = process.env, ghHead = ghPrHead, onSession } = {}) {
   if (platform !== 'darwin') {
     throw new Refusal(`the safe app start needs macOS sandbox-exec; this host is ${platform}, so the PR's app is not started here.`)
   }
@@ -288,30 +437,28 @@ export async function main(argv, { platform = process.platform, cwd = process.cw
     throw new Refusal(`could not fetch commit ${sha} of PR #${pr}.`)
   }
 
-  installStopHandlers()
-  const tmpDir = privateFolder(path.join(realpath('/tmp'), `xezar-review-app-${path.basename(top)}-${sha}`))
-  const appDir = path.join(tmpDir, 'app')
-  const confined = (args, input) =>
-    streamConfined(args, { appDir, tmpDir, ownerHome: realpath(os.homedir()), primaryRoot, nodePrefix: nodeInstallPrefix(), parentEnv: env }, input)
-
-  const done = path.join(appDir, '.review-app-installed')
-  if (!fs.existsSync(done)) {
-    fs.rmSync(appDir, { recursive: true, force: true })
-    fs.mkdirSync(appDir, { mode: 0o700 })
+  const session = createSession({ ownerHome: realpath(os.homedir()), primaryRoot, nodePrefix: nodeInstallPrefix() })
+  const uninstall = installStopHandlers(session)
+  onSession?.(session)
+  const confined = (args, input) => streamConfined(args, session, env, input)
+  try {
+    // Every start extracts the exact commit and installs afresh: nothing from an
+    // earlier start is reused, so a PR cannot seed what the next start trusts.
     const archive = spawnSync('git', ['archive', '--format=tar', sha], { cwd: top, maxBuffer: 1024 * 1024 * 1024 })
     must(archive, 'git archive')
-    // Extract confined too: a symlink in the PR tree cannot steer a write outside the folder.
-    must(await confined(['/usr/bin/tar', '-x', '-f', '-', '-C', appDir], archive.stdout), 'extracting the PR tree')
+    // Extract confined too: a symlink in the PR tree cannot steer a write outside the work folder.
+    must(await confined(['/usr/bin/tar', '-x', '-f', '-', '-C', session.appDir], archive.stdout), 'extracting the PR tree')
     must(await confined(['/usr/bin/env', 'npm', 'ci']), 'npm ci')
-    fs.writeFileSync(done, `${sha}\n`)
+    process.stdout.write(`review-run-app: PR #${pr} at ${sha} in ${session.appDir}; starting the dev server (confined, network open)\n`)
+    // macOS refuses a sandbox inside a sandbox, so Chromium's own (GPU, network,
+    // renderer) cannot start here; the outer profile is the confinement instead.
+    // Electron's own user data goes to the work folder, never the owner's.
+    const dev = await confined(['/usr/bin/env', 'npm', 'run', 'dev', '--', '--noSandbox', '--', `--user-data-dir=${session.userDataDir}`])
+    return dev.status ?? 1
+  } finally {
+    finishSession(session)
+    uninstall()
   }
-  process.stdout.write(`review-run-app: PR #${pr} at ${sha} in ${appDir}; starting the dev server (confined, network open)\n`)
-  // macOS refuses a sandbox inside a sandbox, so Chromium's own (GPU, network,
-  // renderer) cannot start here; the outer profile is the confinement instead.
-  // Electron's own user data goes to the private folder, never the owner's.
-  const userData = `--user-data-dir=${path.join(tmpDir, 'electron-user-data')}`
-  const dev = await confined(['/usr/bin/env', 'npm', 'run', 'dev', '--', '--noSandbox', '--', userData])
-  return dev.status ?? 1
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
