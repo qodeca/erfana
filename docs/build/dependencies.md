@@ -119,9 +119,9 @@ These are **CVE pins**, forced onto transitive consumers. 4.18.1 is a real publi
 
 ### Other overrides
 
-`@electron/rebuild` is pinned to `3.7.1` and `dompurify` floored at `^3.4.1`, both forced through the tree.
+`dompurify` is floored at `^3.4.1`, forced through the tree. The `@electron/rebuild` pin that used to sit beside it was lifted in [#163](https://github.com/qodeca/erfana/issues/163).
 
-- **`@electron/rebuild`** — the pin was added in v0.8.0 to fix a CI build failure ([changelog](../archive/changelog-v08.md)); [security.md](../security.md#dependency-overrides-packagejson) records the reason as node-pty toolchain compatibility.
+- **`@electron/rebuild`** — the `3.7.1` override was added in v0.8.0 ([changelog](../archive/changelog-v08.md), commit `291caa02`) to fix a CI build failure. The lockfile refresh had pulled in `@electron/rebuild` 4.x, whose `node-gyp` 12 requires Node `^20.17.0 || >=22.9.0` (`@electron/rebuild` 4.0.4 itself requires `>=22.12.0`), while the e2e job still ran Node 18; the same commit moved that job to Node 24. Every CI job and local development now runs Node 24 (`.nvmrc`, the `setup-node-with-retry` action default), so the engine constraint no longer applies. The override was removed and `app-builder-lib` 26.16.1's `@electron/rebuild ^4.0.4` resolves normally (currently 4.2.0, which uses `node-gyp` 12 and `tar` 7.x). **Do not re-add the pin without downgrading Node below 22.12.**
 - **`dompurify`** — nothing in the repo records why. What is verifiable from `package-lock.json`: `dompurify` is not a direct dependency; `monaco-editor` requests exactly `3.2.7` and `mermaid` requests `^3.3.1`, and the override lifts both to the installed `3.4.10`. **The rationale is unverified** — treat the floor as load-bearing until someone confirms it, and record the reason here when they do.
 
 ---
