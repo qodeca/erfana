@@ -34,7 +34,8 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| 8dadb69a | #201 round 5 (continue, parked call) | feature-implementation | claude/opus | gmail |
+| 7e71adc1 | #201 round 5 security recheck | security-review | codex/gpt-6-astra | qodeca-2 |
+| def6f71e | #201 round 5 code recheck | code-review | claude/sonnet | westagilelabs |
 | e1c555ca | #202 round 3 (continue, owner-approved) | feature-implementation | claude/opus | eqamana |
 
 ## File-ownership table
@@ -42,7 +43,7 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 - 7d5d7fc6 done (PR #189); .xezar/loops.json released.
 - 392e7c9b done. Reviews own nothing.
 - e1c555ca owns qa.yaml, design-review.yaml, catalog-check.mjs + tests, review-run-app.mjs + tests, guard files, LOCAL-PATCHES.md (PR #202 round 3).
-- 8dadb69a owns decisions-archive.mjs, leader-context.sh, tests, its repository-checks.sh block, the two docs (PR #201 round 5).
+- 8dadb69a done (PR #201 round 5 at 42110df6); files released.
 - 994fb3e5 done (PR #191 merged); gate files released. (9a85cf2c done; .github/dependabot.yml released, PR #187.) #170 (gate list) is unblocked: #186 merged.
 - Reviews own nothing.
 
