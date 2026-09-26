@@ -51,16 +51,16 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 - 994fb3e5 done (PR #191); gate files released. (9a85cf2c done; .github/dependabot.yml released, PR #187.) #170 (gate list) is unblocked: #186 merged.
 - Reviews own nothing.
 
-## Accounts (from `read_quota` at 2026-09-26T17:13:08Z)
+## Accounts (from `read_quota` at 2026-09-26T18:13:01Z)
 | Runner | Login | State | Resets (UTC) |
 |---|---|---|---|
 | claude | default | reserved leader login, runs no tasks; ok (weekly 11%, plan max; same numbers as westagilelabs – owner item) | 2026-10-02 06:59 |
 | claude | qodeca | ok (weekly 53%) | 2026-09-28 16:59 |
-| claude | gmail | ok (weekly 9%) | 2026-10-02 19:00 |
-| claude | eqamana | ok (weekly 0%) | 2026-10-03 16:00 |
+| claude | gmail | ok (weekly 11%) | 2026-10-02 19:00 |
+| claude | eqamana | ok (weekly 1%) | 2026-10-03 16:00 |
 | claude | westagilelabs | ok (weekly 11%) | 2026-10-02 06:59 |
-| codex | default | ok (weekly 15%) | 2026-10-02 10:44 |
-| codex | qodeca-2 | ok (weekly 0%) | 2026-10-03 16:58 |
+| codex | default | ok (weekly 2%, window reset) | 2026-10-03 17:10 |
+| codex | qodeca-2 | ok (weekly 1%) | 2026-10-03 16:58 |
 | pi | – | no logins | – |
 
 ## Held or queued work
