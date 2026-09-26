@@ -68,3 +68,8 @@ if [ -f "$SCRIPT_DIR/lib/gate-parallel.test.mjs" ]; then
 else
   skip gate-parallel "no scheduler test installed beside these checks"
 fi
+if [ -f "$SCRIPT_DIR/lib/gate-results.test.mjs" ]; then
+  node --test "$SCRIPT_DIR/lib/gate-results.test.mjs"
+else
+  skip gate-results "no sealing test installed beside these checks"
+fi

@@ -25,11 +25,14 @@ It reports these steps in canonical order:
 4. npm run lint:css
 5. npm run design -- --check
 6. npm run typecheck
-7. npm run test:ci
-8. npm run test:cov
-9. npx electron-vite build
-10. npm run check:headers
-11. .xezar/checks/repository-checks.sh
+7. npm run test:cov
+8. npx electron-vite build
+9. npm run check:headers
+10. .xezar/checks/repository-checks.sh
+
+`npm run test:cov` runs every unit test in the main, preload and renderer projects once and checks
+every coverage floor, so the gate has no separate `npm run test:ci` step (#170). CI still runs
+`test:ci` as the required `Unit tests` check.
 
 The GitHub checks that gate a pull request are `Lint`, `Typecheck`, `Unit tests`, `Build`,
 `Coverage`, `License compliance` (`.github/workflows/checks.yml`) and `Secret scan`
