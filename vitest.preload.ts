@@ -2,10 +2,13 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { defineConfig } from 'vitest/config'
 import path from 'node:path'
+import { maxWorkers } from './vitest.workers'
 
 export default defineConfig({
   test: {
     name: 'preload',
+    // Worker cap (issue #171); only read when this file is the root `--config`.
+    maxWorkers,
     environment: 'jsdom',
     include: ['src/preload/**/*.test.{ts,tsx}'],
     exclude: ['node_modules', 'dist', 'out', 'e2e', 'tests/fixtures'],

@@ -135,7 +135,7 @@ Standing rules the owner added with `xez-add-rule`, each in their exact words wi
 - [ ] Lane taken from `route.mjs <row id>`, first with budget, never the author's; `wait` waits.
 - [ ] Every login verified before dispatch — **never** fall back to the reserved leader login,
       which runs no tasks. A missing login is a stop, not a reason to substitute.
-- [ ] Ceilings respected: 2 gate runs, 10 tasks, 4 metered-tool tasks, load at or below 18.
+- [ ] Ceilings respected: 2 gate runs, 10 tasks, 4 metered-tool tasks, load at or below 40 (owner 2026-09-26, was 18).
 - [ ] Nothing dispatched from L1 or L2.
 - [ ] Records written and committed **before** reporting.
 - [ ] No owner-only decision taken alone.
@@ -146,8 +146,8 @@ Base branch `develop`. `main` holds released code only; `graph` is the integrati
 graph engine, and graph-engine work branches from `graph` only when the owner starts it.
 Source in `src/main`, `src/preload`, `src/renderer`, `src/shared`; unit tests beside the code
 (`*.test.ts(x)`), e2e in `e2e/`; documents in `docs/`; the design system in `design/`.
-Gate: `.xezar/checks/repo-gates.sh` - npm ci, security scan, lint, lint:css, design sync check,
-typecheck, test:ci, test:cov, electron-vite build, check:headers, then the repository checks.
+Gate: `.xezar/checks/repo-gates.sh` - npm ci, security scan, lint:check (no --fix), lint:css, design sync check,
+typecheck, test:ci, test:cov, electron-vite build, check:headers, then the repository checks. Since #186 the application steps run in two lanes (coverage, unit tests, build in one; lint, css, design, typecheck, headers in the other).
 Required GitHub checks: Lint, Typecheck, Unit tests, Build, Coverage, License compliance, Secret scan.
 CI does not run e2e: a change to Electron-specific paths needs `npm run test:e2e` run locally.
 Project rules that bind every dispatch: `CLAUDE.md` (design system, paths, panel ids, IPC, autosave).

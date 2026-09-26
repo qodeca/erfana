@@ -1,25 +1,55 @@
 // Fixed application-gate dependency schedule. Workers never mutate attempt.json.
 //
-// THE INDEXES ARE POSITIONS IN `repo-gates.sh`'s canonical list, one-based. Nothing here knows
-// which gates a project has: `repo-gates.sh` passes the application phase's entries, and the
-// lanes come from `GATE_APPLICATION_LANES` beside the list (`3,6,7;4;5` — lanes split by `;`,
-// a lane's gates by `,`, run in that order). Unset or empty means one lane in list order. The
+// THE INDEXES ARE POSITIONS IN `repo-gates.sh`'s canonical list, one-based. The caller passes
+// the application phase's entries; known test/build commands carry ordering constraints, and the
+// lanes come from committed pipeline config, with `GATE_APPLICATION_LANES` overriding it.
+// Lanes split by `;`, a lane's gates by `,`, run in that order. An explicitly empty override
+// means one lane in list order. The
 // lanes must name every application gate exactly once, or the phase is refused: a gate that
 // silently never ran is the one failure this file exists to prevent.
 import { spawn } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { constants, closeSync, fstatSync, mkdirSync, openSync, readFileSync, readSync, realpathSync, writeFileSync } from 'node:fs';
+import { isAbsolute, join, relative, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const [library, mode, rawEntries] = process.argv.slice(2);
+function configuredLanes() {
+  // Fixed path, confined to this checkout. Bound the JSON and lane input before parsing;
+  // there is no recursive walk, path probing from input, or regular-expression matching.
+  const root = realpathSync(fileURLToPath(new URL('../../../', import.meta.url)));
+  const file = realpathSync(fileURLToPath(new URL('../../pipeline/config.json', import.meta.url)));
+  const rel = relative(root, file);
+  if (!rel || rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel)) throw new Error('gate config escapes repository');
+  const fd = openSync(file, constants.O_RDONLY | constants.O_NOFOLLOW);
+  try {
+    const size = fstatSync(fd).size;
+    if (size > 65536) throw new Error('gate config exceeds 64 KiB');
+    const bytes = Buffer.alloc(65537);
+    const count = readSync(fd, bytes, 0, bytes.length, 0);
+    if (count > 65536) throw new Error('gate config exceeds 64 KiB');
+    const lanes = JSON.parse(bytes.subarray(0, count).toString('utf8')).validation?.applicationLanes;
+    if (lanes == null) return '';
+    if (typeof lanes !== 'string' || lanes.length > 256) throw new Error('invalid configured application lanes');
+    return lanes;
+  } finally { closeSync(fd); }
+}
+
+const describing = process.argv[2] === '--describe';
+const [library, mode, rawEntries, expectedScheduleJson] = describing
+  ? [null, 'application', process.argv[3]]
+  : process.argv.slice(2);
 const entries = JSON.parse(rawEntries);
 const byIndex = new Map(entries.map((entry) => [entry.index, entry]));
 if (!['application', 'serial'].includes(mode) || !entries.length || byIndex.size !== entries.length ||
     entries.some(e => !Number.isInteger(e.index) || e.index < 1 || typeof e.name !== 'string' || !e.name || typeof e.command !== 'string' || !e.command)) {
   throw new Error('invalid gate phase');
 }
+const laneSource = process.env.GATE_APPLICATION_LANES === undefined ? 'config' : 'environment';
+const laneRaw = mode === 'application'
+  ? (process.env.GATE_APPLICATION_LANES ?? configuredLanes()).trim()
+  : '';
 const APPLICATION_LANES = (() => {
   if (mode !== 'application') return [];
-  const raw = (process.env.GATE_APPLICATION_LANES ?? '').trim();
+  const raw = laneRaw;
   if (!raw) return [entries.map((e) => e.index)];
   const lanes = raw.split(';').map((l) => l.split(',').map((n) => Number(n.trim())));
   const named = lanes.flat();
@@ -29,6 +59,35 @@ const APPLICATION_LANES = (() => {
   }
   return lanes;
 })();
+if (mode === 'application') {
+  const coverage = entries.find(e => e.name === 'npm run test:cov')?.index;
+  const build = entries.find(e => e.name === 'npx electron-vite build')?.index;
+  const unit = entries.find(e => e.name === 'npm run test:ci')?.index;
+  const known = [coverage, build, unit].filter(index => index !== undefined).length;
+  if (known > 0 && known < 3) {
+    throw new Error('a guarded application command was renamed or removed; update the schedule constraints');
+  }
+  if (coverage !== undefined && build !== undefined &&
+      !APPLICATION_LANES.some(lane => lane.indexOf(coverage) >= 0 && lane.indexOf(build) > lane.indexOf(coverage))) {
+    throw new Error('coverage and build must share a lane, with coverage before build');
+  }
+  if (coverage !== undefined && unit !== undefined &&
+      !APPLICATION_LANES.some(lane => lane.includes(coverage) && lane.includes(unit))) {
+    throw new Error('coverage and unit tests must share a lane to avoid test fixture collisions');
+  }
+}
+const resolvedSchedule = {source: laneSource, raw: laneRaw, lanes: APPLICATION_LANES};
+if (describing) {
+  process.stdout.write(`${JSON.stringify(resolvedSchedule)}\n`);
+  process.exit(0);
+}
+if (mode === 'application') {
+  let expected;
+  try { expected = JSON.parse(expectedScheduleJson); } catch { throw new Error('missing or invalid recorded application schedule'); }
+  if (JSON.stringify(expected) !== JSON.stringify(resolvedSchedule)) {
+    throw new Error('application schedule changed after it was recorded; refusing to run');
+  }
+}
 if (process.platform === 'win32') throw new Error('gate process-group supervision requires a POSIX host');
 const directory = join(process.env.GATE_ATTEMPT_DIR, 'workers');
 mkdirSync(directory, { recursive: true });
