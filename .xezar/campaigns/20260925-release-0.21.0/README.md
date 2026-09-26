@@ -9,7 +9,7 @@ Updated: 2026-09-25 11:06 CEST
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
-- #190 (#179 silence alert, from 392e7c9b), draft, head 0fdf50e1, gate sealed. Codex security eab95ae4: S-1 minor (lstat errors leak paths); cold review 0ac0f4e6 APPROVE + 1 runbook minor (leader posted). Round 1 with 392e7c9b. Owner installs launchd by hand after merge.
+- #190 (#179 silence alert, from 392e7c9b), draft, head 0fdf50e1, gate sealed. Codex security eab95ae4: S-1 minor (lstat errors leak paths); cold review 0ac0f4e6 APPROVE + 1 runbook minor (leader posted). Round 1 done at 211803b5 (author gate green). Next: security + code recheck. Owner installs launchd by hand after merge.
 - #189 (load ceiling 40) merged 2026-09-26 as 25adc9a7.
 - #188 (#171 vitest worker cap) merged 2026-09-26 as c27b399b (one CI unit-test crash before, rerun green).
 - #187 (#176 Dependabot groups) merged 2026-09-26 as 80a8c032; #176 closed.
@@ -36,13 +36,12 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| 392e7c9b | #190 round 1 (continue) | feature-implementation | claude/opus | eqamana |
 | 994fb3e5 | #170 drop test:ci | feature-implementation | claude/opus | eqamana |
 
 ## File-ownership table
 - 974c210b done (PR #188); vitest configs released.
 - 7d5d7fc6 done (PR #189); .xezar/loops.json released.
-- 392e7c9b (round 1) owns scripts/leader-watch.mjs + test + fixture, docs/runbooks/leader-watch.md. Reviews own nothing.
+- 392e7c9b done. Reviews own nothing.
 - 994fb3e5 owns .xezar/checks/repo-gates.sh, .xezar/checks/lib/gate-parallel.mjs + test, gate-results.mjs (if needed), .xezar/pipeline/config.json, AGENTS.md, CLAUDE.md (Before pushing line), .xezar/LOCAL-PATCHES.md. (9a85cf2c done; .github/dependabot.yml released, PR #187.) #170 (gate list) is unblocked: #186 merged.
 - Reviews own nothing.
 
