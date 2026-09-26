@@ -10,7 +10,7 @@ Updated: 2026-09-25 11:06 CEST
 
 ## Open pull requests
 - #191 (#170 drop test:ci, from 994fb3e5), draft, head a99c2605, gate sealed. Reviews 6513c636 (sonnet) + fed841b8 (codex security) running. After merge: leader-guide.md:150 drop test:ci.
-- #190 (#179 silence alert, from 392e7c9b), draft, head 0fdf50e1, gate sealed. Codex security eab95ae4: S-1 minor (lstat errors leak paths); cold review 0ac0f4e6 APPROVE + 1 runbook minor (leader posted). Round 1 done at 211803b5 (author gate green). Rechecks d6354c72 (codex) + 6bd5518f (sonnet) running. Owner installs launchd by hand after merge.
+- #190 (#179 silence alert, from 392e7c9b), draft, head 0fdf50e1, gate sealed. Codex security eab95ae4: S-1 minor (lstat errors leak paths); cold review 0ac0f4e6 APPROVE + 1 runbook minor (leader posted). Round 1 done at 211803b5 (author gate green). Security recheck d6354c72 NO FINDINGS; code recheck 6bd5518f running. Owner installs launchd by hand after merge.
 - #189 (load ceiling 40) merged 2026-09-26 as 25adc9a7.
 - #188 (#171 vitest worker cap) merged 2026-09-26 as c27b399b (one CI unit-test crash before, rerun green).
 - #187 (#176 Dependabot groups) merged 2026-09-26 as 80a8c032; #176 closed.
@@ -39,7 +39,6 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 |---|---|---|---|---|
 | 6513c636 | #191 cold review | code-review | claude/sonnet | qodeca |
 | fed841b8 | #191 security review | security-review | codex/gpt-6-astra | qodeca-2 |
-| d6354c72 | #190 security recheck | security-review | codex/gpt-6-astra | default |
 | 6bd5518f | #190 code recheck | code-review | claude/sonnet | westagilelabs |
 | 8dadb69a | #174 leader context | feature-implementation | claude/opus | gmail |
 
