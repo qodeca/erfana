@@ -95,7 +95,7 @@
     "electron-builder": "26.15.3",
     "electron-playwright-helpers": "^2.0.1",
     "electron-vite": "^5.0.0",
-    "eslint": "^9.16.0",
+    "eslint": "^10.11.0",
     "eslint-plugin-react": "^7.37.2",
     "hast-util-sanitize": "^5.0.2",
     "jsdom": "^25.0.1",
