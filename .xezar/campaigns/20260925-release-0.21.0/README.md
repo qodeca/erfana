@@ -46,16 +46,16 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 - 253ba433 owns .xezar/docs/briefs.md, a new briefs check/test, its line in repository-checks.sh (#175 part 2).
 - Reviews own nothing.
 
-## Accounts (from `read_quota` at 2026-09-26T20:18:35Z)
+## Accounts (from `read_quota` at 2026-09-26T21:13:04Z)
 | Runner | Login | State | Resets (UTC) |
 |---|---|---|---|
 | claude | default | reserved leader login, runs no tasks; ok (weekly 13%, plan max; same numbers as westagilelabs – owner item) | 2026-10-02 06:59 |
 | claude | qodeca | ok (weekly 56%) | 2026-09-28 16:59 |
-| claude | gmail | ok (weekly 12%) | 2026-10-02 18:59 |
+| claude | gmail | ok (weekly 13%) | 2026-10-02 18:59 |
 | claude | eqamana | ok (weekly 2%) | 2026-10-03 16:00 |
 | claude | westagilelabs | ok (weekly 13%) | 2026-10-02 07:00 |
-| codex | default | ok (weekly 12%) | 2026-10-03 17:10 |
-| codex | qodeca-2 | ok (weekly 1%) | 2026-10-03 16:58 |
+| codex | default | ok (weekly 16%) | 2026-10-03 17:10 |
+| codex | qodeca-2 | ok (weekly 2%) | 2026-10-03 16:58 |
 | pi | – | no logins | – |
 
 ## Held or queued work
