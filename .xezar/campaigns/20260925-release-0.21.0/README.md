@@ -10,7 +10,7 @@ Updated: 2026-09-25 11:06 CEST
 
 ## Open pull requests
 - #187 (#176 Dependabot groups, from 9a85cf2c), draft, head 9717d461, gate sealed. Next: cold review dfa7c67f (sonnet) + security review 5cba1e38 (codex/astra, other vendor) (running).
-- #186 (#169 gate lanes, lint:check), draft, head 58640590, round 1 fixed by 04cb9379 (author gate green, not sealed). Next: code recheck 839f072f + security recheck 31c5f2ec (running). After merge: leader-guide.md:149 lint -> lint:check.
+- #186 (#169 gate lanes, lint:check), draft, head 58640590, round 1 fixed by 04cb9379 (author gate green, not sealed). Security recheck 31c5f2ec: S-1, S-2 fixed; new S-3 minor, S-4 nit. Code recheck 839f072f running; then relay together. After merge: leader-guide.md:149 lint -> lint:check.
 - #185 (#179 spike) merged 2026-09-26 as 5f285011. Result: build the silence alert (+ line-86 doc fix); auto-continue deferred (parked).
 - #184 (#172 spike) merged 2026-09-26 as 4d874fa7; #172 build held for owner.
 - #183 (#133) merged 2026-09-26 as 6b763b38.
@@ -35,7 +35,6 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 |---|---|---|---|---|
 | 974c210b | #171 vitest worker cap | feature-implementation | claude/opus | westagilelabs |
 | 839f072f | #186 code recheck | code-review | claude/sonnet | gmail |
-| 31c5f2ec | #186 security recheck | security-review | claude/opus | eqamana |
 | dfa7c67f | #187 cold review | code-review | claude/sonnet | westagilelabs |
 | 5cba1e38 | #187 security review | security-review | codex/gpt-6-astra | qodeca-2 |
 
