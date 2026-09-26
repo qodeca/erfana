@@ -10,7 +10,7 @@ Updated: 2026-09-25 11:06 CEST
 
 ## Open pull requests
 - #168 (#163 lift @electron/rebuild override + electron-builder 26.16.1), draft, head d4043abc, labels dependencies + do-not-merge. Gate passed; npm audit 16 -> 7; node-pty rebuilt (@electron/rebuild 4.2.0); `electron-builder --dir` green; packed app opened a working terminal. Security review 35479ba2 (claude/opus, qodeca): APPROVE-level, 1 nit S-1 (docs/security.md override row for @electron/rebuild 3.7.1 must go when #168 lands; true until then, so #168 deletes it after #162 merges). Post refused (opus pattern); relay with the code review verdict (84cbb123) to 43131e43. Merge after v0.21.0, after #167 (both change package.json/lock).
-- #167 (#164 liteparse 2.14.7), draft, head 41d87f42, labels review + do-not-merge. Gate 11/11 on the head; npm audit --omit=dev 4 -> 2 high. Needs review after the release-line reviews; merge after v0.21.0.
+- #167 (#164 liteparse 2.14.7), draft, head 41d87f42, do-not-merge. Review 76be37d0 (claude/opus, westagilelabs) REQUEST CHANGES: 2 major (OCR failure now fatal in 2.x; OCR language data maybe only 15 languages), 4 minor (no real-engine tests; stale ImageMagick gate; Linux binaries shipped; THIRD-PARTY-LICENSES stale), 2 nits. Post refused (opus). Relayed to author 347fc1ce, round 1; finding 2 may need an owner decision (BLOCKED if languages drop).
 - #155 ready, head d4fb29e7 – allow rule in scripts/xezar-leader-settings.json (4458b282): exactly 2 exact-match rules + one autoMode reason; all checks green. Next: security-review (widens tool access).
 - #154 ready, head 5fce83d5 – #138 part B (2a1e4316): test fixed, workflow gates sealed, CI all green incl. Windows. Next: full-cold-review + design-review of the 52 images and demo (privacy).
 - #140 ready, head c442a15b – #139 spec. Re-check 12b29be1 APPROVE at c442a15b, all 11 findings fixed, no new defects. Labels design-approved + merge-queue; #139 labelled design-approved. Next in the merge line after #141: bring up to date, wait for green, squash-merge.
@@ -23,7 +23,7 @@ Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
 | 0d8a560d | #162 scoped recheck (#161) | code-review | claude/sonnet | westagilelabs |
-| 76be37d0 | #167 full-cold-review (#164) | code-review | claude/opus | westagilelabs |
+| 347fc1ce | #167 review round 1 (#164) | dependency-maintenance (continued) | pi/deepseek-api/deepseek-flash | – |
 | 84cbb123 | #168 full-cold-review (#163, also= of security-review) | code-review | claude/sonnet | gmail |
 | 43131e43 | #163 lift @electron/rebuild override + electron-builder 26.16.1 (post-release, do-not-merge) | dependency-maintenance | pi/deepseek-api/deepseek-flash | – |
 
