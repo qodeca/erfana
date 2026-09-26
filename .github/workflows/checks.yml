@@ -9,8 +9,13 @@ name: Quality Checks
 # checks need macOS). Node version matches e2e.yml (24). npm download cache
 # enabled via setup-node-with-retry.
 
+# merge_group: the develop merge queue (#173). Branch protection matches check
+# NAMES, so every required job below must also run on the queue's
+# gh-readonly-queue/... ref or the queued PR waits forever. The repository
+# guard on each job holds there: a merge group always runs in qodeca/erfana.
 on:
   push:
+  merge_group:
 
 permissions:
   contents: read
@@ -422,9 +427,10 @@ jobs:
       - name: Guard - electron-builder packaging allowlist
         env:
           # Resolved here, not interpolated into the script body, so no github.*
-          # value is ever spliced into shell source. Empty on non-push/PR events;
-          # the guard treats empty as "no base" and falls back to warning.
-          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          # value is ever spliced into shell source. A merge group compares against
+          # the queue's base commit (it has no event.before). Empty on any other
+          # event; the guard treats empty as "no base" and falls back to warning.
+          BASE_SHA: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
         run: |
           set -euo pipefail
           # $1 is never passed by the `run:` step (it always defaults); it exists
