@@ -34,16 +34,17 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| e1c555ca | #202 round 4 (split app start out, parked call) | feature-implementation | claude/opus | eqamana |
-| c7259038 | #202 round 3 code recheck | code-review | claude/sonnet | gmail |
+| 8077d7ff | #202 round 4 code recheck | code-review | claude/sonnet | westagilelabs |
+| 253ba433 | #175 remaining brief templates | docs-maintenance | codex/gpt-5.6-terra | default |
 
 ## File-ownership table
 - 974c210b done (PR #188); vitest configs released.
 - 7d5d7fc6 done (PR #189); .xezar/loops.json released.
 - 392e7c9b done. Reviews own nothing.
-- e1c555ca owns qa.yaml, design-review.yaml, catalog-check.mjs + tests, review-run-app.mjs (removing), guard files, LOCAL-PATCHES.md (PR #202 round 4).
+- e1c555ca done (PR #202 round 4 at d5c8fbd2, cost about 125 USD); files released.
 - 8dadb69a done (PR #201 merged as d4fc1d61); files released.
 - 994fb3e5 done (PR #191 merged); gate files released. (9a85cf2c done; .github/dependabot.yml released, PR #187.) #170 (gate list) is unblocked: #186 merged.
+- 253ba433 owns .xezar/docs/briefs.md, a new briefs check/test, its line in repository-checks.sh (#175 part 2).
 - Reviews own nothing.
 
 ## Accounts (from `read_quota` at 2026-09-26T20:18:35Z)
