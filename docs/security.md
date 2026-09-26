@@ -515,7 +515,18 @@ The overlay windows have their own, tighter channel path: `screenshot:areaSelect
 
 Run `npm audit` to check. **Policy**: zero high/critical production advisories at release. Pre-release: `npm audit --omit=dev --json` and diff against the table below.
 
-**Current state** (audited 2026-06-04, re-verified during the v0.12.0 release): production **0 vulnerabilities** (`npm audit --omit=dev`). The former `mermaid → langium → chevrotain` moderate advisories no longer count against production because Monaco and Mermaid moved to `devDependencies` in v0.11.0 (#206 — pre-migration PR, no longer resolves on the public repo); `axios` and `fast-uri` high-severity advisories were patched in v0.11.2. Dev-only advisories remain (notably a `vitest` UI-server critical that needs a breaking 3→4 bump) but do not ship in production builds.
+**Current state** (audited 2026-09-26, pre-0.21.0): `npm audit --omit=dev` reports **4 high** production advisories — `electron`, `extract-zip`, `@llamaindex/liteparse` and `sharp` — accepted for v0.21.0 under the dated exception below. The full tree (`npm audit`) reports 16 (1 critical, 12 high, 3 moderate); the other 12 run only while dependencies install or the app builds, or under the test runner, and never ship. The former `mermaid → langium → chevrotain` moderate advisories no longer count against production because Monaco and Mermaid moved to `devDependencies` in v0.11.0 (#206 — pre-migration PR, no longer resolves on the public repo); `axios` and `fast-uri` high-severity advisories were patched in v0.11.2.
+
+### Accepted exceptions for v0.21.0 (owner decision 2026-09-26)
+
+A dated exception to the policy above: v0.21.0 ships with these four production highs open, and they are fixed after the release.
+
+| Package | GHSA id(s) | Where Erfana reaches it | Guard that limits it | Follow-up that clears it |
+|---|---|---|---|---|
+| `extract-zip` 2.0.1 | GHSA-jmr9-qjv8-65gv, GHSA-7pqw-9j4j-h8q3 | `src/main/utils/zipArchive.ts:21,45` (`extract()`), called from `src/main/services/WhisperModelManager.ts:373` | Archive is SHA-256-pinned (`src/main/services/whisper-assets.ts:90-134`) with a minisign-verified manifest, and `zipArchive.ts:48-88` rejects absolute, drive-letter, UNC, ADS-colon and `..`-traversal entry names before extraction | Electron 39 → 44 (no standalone `extract-zip` > 2.0.1 exists) |
+| `@llamaindex/liteparse` 1.4.1 | via `sharp` | `src/main/services/import/converters/LiteParseConverter.ts:131,153` on user-selected PDF/Office/image imports | Blocking size cap before any parsing (`LiteParseConverter.ts:114-117`, `validateFileForImport`) | `@llamaindex/liteparse` 1.x → 2.x |
+| `sharp` 0.34.5 | GHSA-f88m-g3jw-g9cj (libvips), GHSA-rgj7-g3m4-5g8c (libheif) | transitive of `@llamaindex/liteparse` on the same parse path; build-time only in `scripts/capture/legibility.mjs:29` | Same input size cap; reached only through liteparse, on a document the user chose to import | `@llamaindex/liteparse` 1.x → 2.x (pulls a fixed `sharp`) |
+| `electron` 39.8.10 | GHSA-jmr9-qjv8-65gv, GHSA-7pqw-9j4j-h8q3 (via `extract-zip`) | Electron is the runtime, but the flagged code is Electron's install-time `extract-zip` dependency, used only to unzip the binary at `npm install`; no Erfana runtime path calls it | Binary downloaded over TLS from the official release and checksum-verified by `@electron/get` | Electron 39 → 44 |
 
 ### Dependency overrides (package.json)
 
