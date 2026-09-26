@@ -1,0 +1,110 @@
+name: Windows Native Smoke
+
+# Manual proof that native modules rebuild and load under Electron on Windows
+# (#178). It exercises the path no other Windows job runs: the package
+# postinstall's `electron-builder install-app-deps`, i.e. @electron/rebuild
+# driving node-gyp over node-pty. `Windows checks` runs `npm rebuild node-pty`
+# (node-pty's own node-gyp) instead, and packaging skips the rebuild because
+# electron-builder.yml sets `npmRebuild: false`.
+#
+# Advisory only: dispatch-only, never a required check. No secrets, no
+# environment, no cache (read or write), no artifacts, read-only token.
+#
+# Run it (the workflow file comes from --ref; the code under test from `ref`):
+#   gh workflow run windows-native-smoke.yml --ref develop -f ref=<branch-or-sha>
+# Negative control – must FAIL, proving the smoke check detects a skipped rebuild:
+#   gh workflow run windows-native-smoke.yml --ref develop -f ref=<branch-or-sha> -f skip_rebuild=true
+# See docs/ci.md § Windows native smoke.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch, tag or SHA to test (empty = the ref the workflow was dispatched on)
+        required: false
+        default: ''
+        type: string
+      skip_rebuild:
+        description: Negative control – skip install-app-deps; the run is expected to fail
+        required: false
+        default: false
+        type: boolean
+
+permissions: {}
+
+jobs:
+  native-smoke:
+    name: Windows native smoke
+    runs-on: windows-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read # actions/checkout only
+    defaults:
+      run:
+        shell: bash
+    steps:
+      # actions/checkout v6.0.3
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+
+      # The smoke script comes from the workflow's own commit, not from the
+      # tested ref, so a branch that predates it (e.g. PR #168) can be tested.
+      # actions/checkout v6.0.3
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          ref: ${{ github.sha }}
+          path: .native-smoke
+          sparse-checkout: scripts/native-smoke.cjs
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      # actions/setup-node v6.4.0 – no `cache:`, and automatic package-manager
+      # caching off, so this run neither reads nor writes a shared npm cache.
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Install dependencies (npm ci, no scripts)
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts \
+            || (sleep 10 && npm ci --ignore-scripts) \
+            || (sleep 20 && npm ci --ignore-scripts)
+
+      - name: Apply patches and fetch the Electron binary
+        # The two install-time steps the smoke needs that --ignore-scripts
+        # skipped: the postinstall's patch-package (node-pty's Windows gyp
+        # fixes must be in place before it compiles) and electron's own
+        # download script, so the smoke can run under the real Electron.
+        run: |
+          set -euo pipefail
+          npx --no-install patch-package --error-on-fail
+          node node_modules/electron/install.js
+
+      - name: Toolchain versions
+        run: |
+          node --version
+          npm ls @electron/rebuild node-gyp node-pty electron --all || true
+
+      - name: Record rebuild start time
+        run: echo "NATIVE_SMOKE_REBUILT_AFTER=$(date +%s)" >> "$GITHUB_ENV"
+
+      - name: Rebuild native modules (electron-builder install-app-deps)
+        if: ${{ !inputs.skip_rebuild }}
+        env:
+          DEBUG: electron-rebuild
+        run: npx --no-install electron-builder install-app-deps
+
+      - name: Negative control – rebuild skipped
+        if: ${{ inputs.skip_rebuild }}
+        run: echo "::warning::skip_rebuild=true – install-app-deps did not run; the smoke step below is expected to fail"
+
+      - name: Smoke – load node-pty and spawn a pty under Electron
+        env:
+          ELECTRON_RUN_AS_NODE: '1'
+        run: |
+          set -euo pipefail
+          "$(node -p "require('electron')")" .native-smoke/scripts/native-smoke.cjs
