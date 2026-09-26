@@ -59,30 +59,41 @@ const APPLICATION_LANES = (() => {
   }
   return lanes;
 })();
+// The only application gates this scheduler will run: canonical identities, a label and its exact
+// command string, as `repo-gates.sh` ships them. Matching is exact after trimming outer whitespace –
+// no word splitting, no shell parsing, no guessing at npm aliases – so any other entry is refused,
+// whatever it is called. #170 dropped `npm run test:ci` on purpose (`test:cov` runs every unit test
+// once and enforces the floors); a second suite beside coverage would run the tests twice and
+// collide on fixtures, and an allowlist refuses it under any spelling (`npm test`, a quoted
+// script name, a new label). Adding an application gate is therefore an explicit edit here.
+const APPLICATION_GATES = Object.freeze([
+  {name: 'npm run lint:check', command: 'npm run lint:check'},
+  {name: 'npm run lint:css', command: 'npm run lint:css'},
+  {name: 'npm run design -- --check', command: 'npm run design -- --check'},
+  {name: 'npm run typecheck', command: 'npm run typecheck'},
+  {name: 'npm run test:cov', command: 'npm run test:cov'},
+  {name: 'npx electron-vite build', command: 'npx electron-vite build'},
+  {name: 'npm run check:headers', command: 'npm run check:headers'},
+]);
 if (mode === 'application') {
-  // The guards bind to gate identities – the executable command, not only its display label –
-  // and compare whitespace-normalised words, so a relabel or respacing cannot slip past them.
-  const words = (text) => text.trim().split(/\s+/);
-  const normal = (text) => words(text).join(' ');
-  // #170 removed the separate unit-test gate on purpose: `test:cov` runs every unit test once and
-  // enforces the floors. Naming it again would run the suite twice, and beside coverage it would
-  // collide on test fixtures, so a list that brings it back – under any label, spelling or npm
-  // alias (`run-script`) – is refused rather than scheduled.
-  if (entries.some(e => words(e.name).includes('test:ci') || words(e.command).includes('test:ci'))) {
-    throw new Error('npm run test:ci was dropped from the gate by #170 (test:cov runs every unit test); remove it or update the schedule constraints');
+  const allowed = APPLICATION_GATES.map(gate => `"${gate.command}"`).join(', ');
+  const seen = new Set();
+  for (const entry of entries) {
+    const name = entry.name.trim();
+    const command = entry.command.trim();
+    const gate = APPLICATION_GATES.find(g => g.name === name && g.command === command);
+    if (!gate) {
+      throw new Error(`application gate ${JSON.stringify(name)} (command ${JSON.stringify(command)}) is not a canonical gate identity; the application gates allowed by lib/gate-parallel.mjs APPLICATION_GATES are ${allowed} – add a new gate there deliberately`);
+    }
+    if (seen.has(gate.command)) throw new Error(`application gate "${gate.command}" is named more than once`);
+    seen.add(gate.command);
   }
   // Both are mandatory whenever application gates run: coverage deletes and rewrites out/, which
   // the build also writes, so they must share a lane with coverage first. A list missing either
   // identity is refused, never scheduled with the ordering guard switched off.
-  const guarded = (identity) => {
-    const matches = entries.filter(e => normal(e.name) === identity || normal(e.command) === identity);
-    if (matches.length !== 1) {
-      throw new Error(`guarded application gate "${identity}" is ${matches.length ? 'named more than once' : 'missing (renamed or removed)'}; update the schedule constraints`);
-    }
-    const [entry] = matches;
-    if (normal(entry.name) !== identity || normal(entry.command) !== identity) {
-      throw new Error(`guarded application gate "${identity}" has a label/command mismatch; update the schedule constraints`);
-    }
+  const guarded = (command) => {
+    const entry = entries.find(e => e.command.trim() === command);
+    if (!entry) throw new Error(`guarded application gate "${command}" is missing (renamed or removed); update the schedule constraints`);
     return entry.index;
   };
   const coverage = guarded('npm run test:cov');

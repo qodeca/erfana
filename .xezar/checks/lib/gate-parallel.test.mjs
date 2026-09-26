@@ -9,14 +9,22 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
 const scheduler = fileURLToPath(new URL('./gate-parallel.mjs', import.meta.url));
+const repoGates = fileURLToPath(new URL('../repo-gates.sh', import.meta.url));
 const indices = [3, 4, 5, 6, 7, 8, 9];
-const gateName = (index) => index === 7 ? 'npm run test:cov' : index === 8 ? 'npx electron-vite build' : `gate-${index}`;
-// The guarded gates are bound to their executable commands, so the harness runs them for real
-// through stand-in npm and npx scripts on PATH that only record their start and end.
-const fakeTools = (events) => ({
-  npm: `#!/bin/sh\n[ "$*" = "run test:cov" ] || exit 9\nprintf 'start 7\\n' >> '${events}'; sleep 0.2; printf 'end 7\\n' >> '${events}'\n`,
-  npx: `#!/bin/sh\n[ "$*" = "electron-vite build" ] || exit 9\nprintf 'start 8\\n' >> '${events}'; sleep 0.2; printf 'end 8\\n' >> '${events}'\n`,
-});
+// The shipped application gates, by their one-based position in repo-gates.sh.
+const shipped = {
+  3: 'npm run lint:check', 4: 'npm run lint:css', 5: 'npm run design -- --check', 6: 'npm run typecheck',
+  7: 'npm run test:cov', 8: 'npx electron-vite build', 9: 'npm run check:headers',
+};
+const gateName = (index) => shipped[index] ?? `gate-${index}`;
+// The scheduler only runs canonical commands, so the harness runs them for real through
+// stand-in npm and npx scripts on PATH that record which gate started and ended.
+const fakeTool = (tool, events) => `#!/bin/sh
+i=
+${Object.entries(shipped).filter(([, c]) => c.startsWith(`${tool} `)).map(([i, c]) => `[ "$*" = "${c.slice(tool.length + 1)}" ] && i=${i}`).join('\n')}
+[ -n "$i" ] || exit 9
+printf 'start %s\\n' "$i" >> '${events}'; sleep 0.2; printf 'end %s\\n' "$i" >> '${events}'
+`;
 
 function runSchedule(override, expectedStatus = 0, options = {}) {
   const directory = mkdtempSync(join(tmpdir(), 'gate-lanes-'));
@@ -25,17 +33,12 @@ function runSchedule(override, expectedStatus = 0, options = {}) {
   writeFileSync(library, `gate_run() {\n  local name="$1"; shift\n  "$@"\n  local code=$?\n  printf '{"status":"%s","exitCode":%s}\\n' "$([ "$code" -eq 0 ] && echo passed || echo failed)" "$code" > "$GATE_WORKER_RESULT"\n  return "$code"\n}\n`);
   const bin = join(directory, 'bin');
   mkdirSync(bin);
-  for (const [tool, body] of Object.entries(fakeTools(events))) writeFileSync(join(bin, tool), body, { mode: 0o755 });
-  const entries = (options.indices ?? indices).map((index) => {
-    const name = options.names?.[index] ?? gateName(index);
-    return {
-      index,
-      name: options.renameIndex === index ? `renamed gate-${index}` : name,
-      command: options.commands?.[index] ?? (index === 7 || index === 8
-        ? gateName(index)
-        : `printf 'start ${index}\\n' >> '${events}'; sleep 0.2; printf 'end ${index}\\n' >> '${events}'`),
-    };
-  });
+  for (const tool of ['npm', 'npx']) writeFileSync(join(bin, tool), fakeTool(tool, events), { mode: 0o755 });
+  const entries = (options.indices ?? indices).map((index) => ({
+    index,
+    name: options.renameIndex === index ? `renamed gate-${index}` : options.names?.[index] ?? gateName(index),
+    command: options.commands?.[index] ?? gateName(index),
+  }));
   const env = { ...process.env, GATE_ATTEMPT_DIR: directory, PATH: `${bin}:${process.env.PATH}` };
   if (override === undefined) delete env.GATE_APPLICATION_LANES;
   else env.GATE_APPLICATION_LANES = override;
@@ -84,7 +87,7 @@ test('bringing test:ci back into the gate is refused, even sharing the coverage 
   const events = runSchedule('3,4,5,6,9;7,10,8', 1, {
     indices: [...indices, 10],
     names: {10: 'npm run test:ci'},
-    error: 'dropped from the gate by #170',
+    error: 'not a canonical gate identity',
   });
   assert.deepEqual(events, []);
 });
@@ -94,39 +97,66 @@ test('application run refuses a schedule changed after recording', () => {
   assert.deepEqual(events, []);
 });
 
-test('test:ci is refused under an alias, a respaced name or another label', () => {
-  const cases = [
-    {names: {10: 'npm run-script test:ci'}, commands: {10: 'npm run-script test:ci'}},
-    {names: {10: 'npm  run   test:ci '}, commands: {10: ' npm run\ttest:ci'}},
-    {names: {10: 'unit tests'}, commands: {10: 'npm run test:ci'}},
-  ];
-  for (const options of cases) {
-    const events = runSchedule('3,4,5,6,9,10;7,8', 1, {...options, indices: [...indices, 10], error: 'dropped from the gate by #170'});
-    assert.deepEqual(events, []);
+test('any application gate outside the allowlist is refused, whatever it is called', () => {
+  const cases = {
+    'quoted script name': ['unit tests', `npm run 'test:ci'`],
+    'npm test': ['npm test', 'npm test'],
+    'npm run test': ['npm run test', 'npm run test'],
+    'npm run-script alias': ['npm run-script test:ci', 'npm run-script test:ci'],
+    'inner whitespace': ['npm run  test:cov', 'npm run  test:cov'],
+    'unknown command': ['npm run lint:fix', 'npm run lint:fix'],
+    'harmless label mention': ['document test:ci removal', 'npm run check:headers'],
+  };
+  for (const [label, [name, command]] of Object.entries(cases)) {
+    const events = runSchedule('3,4,5,6,9,10;7,8', 1, {
+      indices: [...indices, 10], names: {10: name}, commands: {10: command},
+      error: 'not a canonical gate identity; the application gates allowed by lib/gate-parallel.mjs APPLICATION_GATES are',
+    });
+    assert.deepEqual(events, [], label);
   }
 });
 
-test('renaming coverage or build does not disable their ordering guard', () => {
+test('outer whitespace is trimmed, so a padded canonical entry still runs', () => {
+  const events = runSchedule(undefined, 0, {names: {3: ' npm run lint:check '}, commands: {3: 'npm run lint:check\n'}});
+  assert.ok(events.includes('start 3'), events.join(', '));
+});
+
+test('a canonical gate named twice is refused', () => {
+  const events = runSchedule('3,4,5,6,9,10;7,8', 1, {indices: [...indices, 10], names: {10: 'npm run typecheck'}, commands: {10: 'npm run typecheck'}, error: 'named more than once'});
+  assert.deepEqual(events, []);
+});
+
+test('renaming coverage or build is refused, as is a label over another canonical command', () => {
   for (const renameIndex of [7, 8]) {
-    const events = runSchedule(undefined, 1, {renameIndex, error: 'label/command mismatch'});
+    const events = runSchedule(undefined, 1, {renameIndex, error: 'not a canonical gate identity'});
     assert.deepEqual(events, []);
   }
-});
-
-test('a guarded label over a different command is refused', () => {
-  const events = runSchedule(undefined, 1, {commands: {7: 'true'}, error: 'guarded application gate "npm run test:cov" has a label/command mismatch'});
+  const events = runSchedule(undefined, 1, {commands: {7: 'npm run typecheck'}, error: 'not a canonical gate identity'});
   assert.deepEqual(events, []);
 });
 
-test('renaming both coverage and build refuses instead of switching the ordering guard off', () => {
-  const names = {7: 'coverage', 8: 'build'};
-  const commands = {7: 'true', 8: 'true'};
-  const events = runSchedule('3,4,5,6,9;8,7', 1, {names, commands, error: 'guarded application gate "npm run test:cov" is missing'});
-  assert.deepEqual(events, []);
+test('renaming or removing both coverage and build refuses instead of switching the ordering guard off', () => {
+  const renamed = runSchedule('3,4,5,6,9;8,7', 1, {names: {7: 'coverage', 8: 'build'}, commands: {7: 'true', 8: 'true'}, error: 'not a canonical gate identity'});
+  assert.deepEqual(renamed, []);
+  const removed = runSchedule('3,4,5,6,9', 1, {indices: [3, 4, 5, 6, 9], error: 'guarded application gate "npm run test:cov" is missing'});
+  assert.deepEqual(removed, []);
+});
+
+test('every application gate repo-gates.sh ships is accepted', () => {
+  const listed = spawnSync('bash', [repoGates, '--list', '--json'], { encoding: 'utf8' });
+  assert.equal(listed.status, 0, listed.stderr);
+  const gates = JSON.parse(listed.stdout).gates;
+  // Application gates are positions 3 to the one before last, as repo-gates.sh selects them.
+  const entries = gates.map((gate, i) => ({index: i + 1, ...gate})).slice(2, -1);
+  assert.deepEqual(Object.fromEntries(entries.map(e => [e.index, e.command])), shipped);
+  const env = { ...process.env };
+  delete env.GATE_APPLICATION_LANES;
+  const result = spawnSync(process.execPath, [scheduler, '--describe', JSON.stringify(entries)], { env, encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr);
 });
 
 test('schedule description records the default source and resolved lanes', () => {
-  const entries = indices.map(index => ({index, name: gateName(index), command: index === 7 || index === 8 ? gateName(index) : 'true'}));
+  const entries = indices.map(index => ({index, name: gateName(index), command: gateName(index)}));
   const env = { ...process.env };
   delete env.GATE_APPLICATION_LANES;
   const result = spawnSync(process.execPath, [scheduler, '--describe', JSON.stringify(entries)], { env, encoding: 'utf8' });
