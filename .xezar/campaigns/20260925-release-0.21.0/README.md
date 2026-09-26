@@ -9,7 +9,7 @@ Updated: 2026-09-25 11:06 CEST
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
-- #168 (#163 lift @electron/rebuild override + electron-builder 26.16.1), draft, head d4043abc, labels dependencies + do-not-merge. Gate passed; npm audit 16 -> 7; node-pty rebuilt (@electron/rebuild 4.2.0); `electron-builder --dir` green; packed app opened a working terminal. Security review 35479ba2 (claude/opus, qodeca): APPROVE-level, 1 nit S-1 (docs/security.md override row for @electron/rebuild 3.7.1 must go when #168 lands; true until then, so #168 deletes it after #162 merges). Post refused (opus pattern); relay with the code review verdict (84cbb123) to 43131e43. Merge after v0.21.0, after #167 (both change package.json/lock).
+- #168 (#163 lift @electron/rebuild override + electron-builder 26.16.1), draft, head d4043abc, labels dependencies + do-not-merge. Gate passed; npm audit 16 -> 7; node-pty rebuilt (@electron/rebuild 4.2.0); `electron-builder --dir` green; packed app opened a working terminal. Security review 35479ba2 (opus): APPROVE-level + nit S-1; leader posted it (comment 5847266523). Code review 84cbb123 (sonnet, gmail, posted itself): REQUEST CHANGES – Windows checks job never runs @electron/rebuild, so no Windows evidence for the changed path (leader's brief wrongly named it). Round 1 relayed to 43131e43: fix PR body, list Windows-proof options, BLOCKED for owner; S-1 after #162 lands.
 - #167 (#164 liteparse 2.14.7), draft, head 41d87f42, do-not-merge. Review 76be37d0 (claude/opus, westagilelabs) REQUEST CHANGES: 2 major (OCR failure now fatal in 2.x; OCR language data maybe only 15 languages), 4 minor (no real-engine tests; stale ImageMagick gate; Linux binaries shipped; THIRD-PARTY-LICENSES stale), 2 nits. Post refused (opus). Relayed to author 347fc1ce, round 1; finding 2 may need an owner decision (BLOCKED if languages drop).
 - #155 ready, head d4fb29e7 – allow rule in scripts/xezar-leader-settings.json (4458b282): exactly 2 exact-match rules + one autoMode reason; all checks green. Next: security-review (widens tool access).
 - #154 ready, head 5fce83d5 – #138 part B (2a1e4316): test fixed, workflow gates sealed, CI all green incl. Windows. Next: full-cold-review + design-review of the 52 images and demo (privacy).
@@ -23,7 +23,7 @@ Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
 | 347fc1ce | #167 review round 1 (#164) | dependency-maintenance (continued) | pi/deepseek-api/deepseek-flash | – |
-| 84cbb123 | #168 full-cold-review (#163, also= of security-review) | code-review | claude/sonnet | gmail |
+| 43131e43 | #168 review round 1 (#163) | dependency-maintenance (continued) | pi/deepseek-api/deepseek-flash | – |
 | 43131e43 | #163 lift @electron/rebuild override + electron-builder 26.16.1 (post-release, do-not-merge) | dependency-maintenance | pi/deepseek-api/deepseek-flash | – |
 
 Counts at dispatch (16:05): tasks 3/10, gate runs 0/2, metered 3/4 (all pi), load 2.8/18. xezar workspace maxParallel 5 (owner, 16:07).
