@@ -13,3 +13,9 @@ Calls the leader made alone while the owner was away.
 - **Why:** the owner chose "fix" twice tonight (rounds 3 and 4). Code review approves; only S-8 remains, and a prefix-hash binding makes any edit/insert/reorder invalidate the record (fail open) instead of moving it onto an open entry.
 - **Rejected:** dropping archiving and merging only the timeline bound (my earlier recommendation, turned down by the owner at round 4).
 - **Undo:** tell the leader to drop archiving; round 6 removes decisions-archive.mjs and the loader filter and keeps the timeline bound.
+
+## 2026-09-26T20:45:30Z – #201 scope trim: drop decision archiving, keep the timeline bound (owner asleep)
+- **Chose:** round 6 removes decisions-archive.mjs and the loader's archive filter; decisions.md is injected whole again (plus the new missing-file warning); the timeline bound (newest 40 entries + pointer) stays. Most of the size saving (88.7 KB -> about 53 KB) comes from the timeline bound.
+- **Why:** after five rounds the security review still finds a way to hide an open decision (S-8: a committed record can predict a future entry). Nothing in the repo can prove a record was written after its entry existed. Round 5 was announced as the last try.
+- **Rejected:** a sixth attempt at archiving (needs a trusted proof of archival, for example signed records or leader-only writes – a bigger design).
+- **Undo:** reopen archiving as its own issue with a trusted-proof design; the removed code is in PR #201's history (heads 2a3e4be9, 42110df6).
