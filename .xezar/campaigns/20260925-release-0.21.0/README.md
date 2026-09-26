@@ -22,8 +22,8 @@ Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| 347fc1ce | #167 review round 1 (#164) | dependency-maintenance (continued) | pi/deepseek-api/deepseek-flash | – |
-| 43131e43 | #168 review round 1 (#163) | dependency-maintenance (continued) | pi/deepseek-api/deepseek-flash | – |
+| 0b92cbf1 | #167 scoped recheck at 0fa58e18 (#164) | code-review | claude/sonnet | gmail |
+| 43131e43 | #168 S-1 (security.md row) after #162; Windows proof BLOCKED on separate PR (#163) | dependency-maintenance (continued) | pi/deepseek-api/deepseek-flash | – |
 
 Counts at dispatch (16:05): tasks 3/10, gate runs 0/2, metered 3/4 (all pi), load 2.8/18. xezar workspace maxParallel 5 (owner, 16:07).
 
