@@ -39,14 +39,15 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
 | e1c555ca | #202 round 1 (continue) | feature-implementation | claude/opus | eqamana |
-| 9c5505e0 | #201 cold review | code-review | claude/sonnet | westagilelabs |
+| 8dadb69a | #201 round 1 (continue) | feature-implementation | claude/opus | gmail |
+| b6a2d893 | #191 round 2 security recheck | security-review | codex/gpt-6-astra | default |
 
 ## File-ownership table
 - 974c210b done (PR #188); vitest configs released.
 - 7d5d7fc6 done (PR #189); .xezar/loops.json released.
 - 392e7c9b done. Reviews own nothing.
 - e1c555ca owns .xezar/workflows/qa.yaml, .xezar/workflows/design-review.yaml, scripts/devtools-evaluate-guard*, one chrome-devtools.md line, .xezar/LOCAL-PATCHES.md (PR #202 round 1).
-- 8dadb69a done (PR #201); leader-context files released.
+- 8dadb69a owns .xezar/checks/decisions-archive.mjs and its tests, its own repository-checks.sh block (PR #201 round 1).
 - 994fb3e5 done (PR #191); gate files released. (9a85cf2c done; .github/dependabot.yml released, PR #187.) #170 (gate list) is unblocked: #186 merged.
 - Reviews own nothing.
 
@@ -68,6 +69,7 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 - #139 build – PR #159: code review APPROVE, design review FAIL (B-1 account name in QA screenshots); round 1 done at 1f924f73 (B-1 masked, NB-1 stated as a limit, NB-2 documented deviation); design recheck PASS at 9203f493; QA FAIL only because 3 checks could not run (chrome-devtools emulate + evaluate_script denied in the QA session): dark mode, theme switch, reduced motion unverified live. Waiting for the owner.
 
 ## Owner items
+- **#179 alert (merged #190 as ded31966):** install the launchd agent by hand, per the PR body.
 - **#177 evaluate_script wiring (PR #202):** emulate is granted; evaluate_script stays denied because the guard hook cannot be registered per workflow. Options in the PR body: user-scope settings for the xezar profile, a filtering proxy in .mcp.json, or leave denied. Leader recommends leave denied until a QA run proves it is needed.
 - **#172 review posting (spike PR #184):** fix needs either (a) an upstream xezar engine change (pass --settings to reading steps, or a verdict-body field) – recommended, file upstream; or (b) a user-scope PreToolUse hook in ~/.claude/settings.json on this machine (tested: 12k-char verdict posts, 0 denials; but it runs for every Claude session and is outside repo review). Interim rule (short plain-text verdicts) works today. Build held until the owner picks.
 - **#159: owner checks by hand (answered 2026-09-26 08:40)** – dark theme, banner theme switch, reduced-motion still on github.com, branch feature/139-readme-redesign. Leader merges on the owner's word with green checks. Earlier note: (dark theme, banner theme switch, reduced-motion still). Both QA and design sessions were denied the chrome-devtools emulate/evaluate_script tools. Options: (a) owner checks them by hand on github.com in ~2 minutes (branch feature/139-readme-redesign: switch OS dark mode, turn on Reduce motion), or (b) allow those two tools for review sessions and re-run QA. Leader recommends (a).
