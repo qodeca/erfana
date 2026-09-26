@@ -10,7 +10,7 @@ Updated: 2026-09-25 11:06 CEST
 
 ## Open pull requests
 - #202 (#177 browser grant, from e1c555ca), draft, head 82938dae, gate passed. emulate granted; evaluate_script stays denied (wiring options → owner). Cold review 04b8155b REQUEST CHANGES (2 major, 1 minor, 1 nit); codex security 864506c8 BLOCKING (S-1 = same guard defect as code M-1). Round 1 done at e2bc1a5d (syntax-tree guard; 4 run-code bash entries + catalog-check RUNS_CODE_BASH_PREFIXES – a kit-check loosening). Code recheck ce9b18e4 APPROVE (leader posted). Security recheck 9672867b BLOCKING: S-1 fixed; S-2 major – npm ci / npm run dev on an untrusted PR head runs contributor code, preflight still allows the primary checkout (pre-existing on develop, which has unrestricted Bash). Owner picked B (safe app start). Round 2 relayed to e1c555ca: one trusted wrapper, SHA-bound, task worktree only, scrubbed env + macOS sandbox.
-- #201 (#174 leader context, from 8dadb69a), draft, head 6b3798bf, gate sealed. Reviews 9c5505e0 (sonnet) + 1b108196 (codex security) running. Shares repository-checks.sh with #191.
+- #201 (#174 leader context: timeline bound, archiving dropped – parked) merged 2026-09-26 as d4fc1d61.
 - #189 (load ceiling 40) merged 2026-09-26 as 25adc9a7.
 - #188 (#171 vitest worker cap) merged 2026-09-26 as c27b399b (one CI unit-test crash before, rerun green).
 - #187 (#176 Dependabot groups) merged 2026-09-26 as 80a8c032; #176 closed.
@@ -42,7 +42,7 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 - 7d5d7fc6 done (PR #189); .xezar/loops.json released.
 - 392e7c9b done. Reviews own nothing.
 - e1c555ca owns qa.yaml, design-review.yaml, catalog-check.mjs + tests, review-run-app.mjs (removing), guard files, LOCAL-PATCHES.md (PR #202 round 4).
-- 8dadb69a done (PR #201 round 6 at 457d06b8); files released.
+- 8dadb69a done (PR #201 merged as d4fc1d61); files released.
 - 994fb3e5 done (PR #191 merged); gate files released. (9a85cf2c done; .github/dependabot.yml released, PR #187.) #170 (gate list) is unblocked: #186 merged.
 - Reviews own nothing.
 
