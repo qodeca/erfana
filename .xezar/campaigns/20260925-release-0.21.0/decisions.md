@@ -59,3 +59,7 @@ Owner decisions in the owner's exact words, dated, append-only.
   Leader files one triage issue with the release-0.21.0 label and dispatches it.
 - 2026-09-26 08:49 CEST - direct question (xez-unattended-on contract read back, with pi/deepseek-flash task d71e7bf0 running on metered spend) - "Yes, turn it on"
   Unattended mode on since 2026-09-26T06:49:11Z. Hard stops: release go, deleting a record, opening a campaign. Parked: account or provider lane switch, scope trim, third repair round. Accepted costs: metered spend while away; stops are instructions, not a hook.
+- 2026-09-26 15:51 CEST - direct question (AskUserQuestion: #161 task d71e7bf0 asked; electron-builder 26.16.1 clears 0 of 16 while the @electron/rebuild 3.7.1 override stands, and breaks the macOS package build without a scripts/fuses.js allowlist change) - "Undo upgrade, triage only (Recommended)"
+  PR carries the triage only; override removal + electron-builder upgrade becomes a follow-up with a node-pty build test.
+- 2026-09-26 15:51 CEST - direct question (AskUserQuestion: docs/security.md policy "zero high/critical production advisories at release"; develop has 4 production highs: electron, extract-zip, @llamaindex/liteparse, sharp; all need majors) - "Except all 4, fix later"
+  0.21.0 ships with a written, dated exception for all 4. liteparse 2 and Electron 44 filed as issues after the release.
