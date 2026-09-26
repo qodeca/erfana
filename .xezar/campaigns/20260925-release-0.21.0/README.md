@@ -9,7 +9,8 @@ Updated: 2026-09-25 11:06 CEST
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
-- #182 (#175 brief templates), draft, head c71592b9. Review d2e3aca9 running.
+- #183 (#133 test:cov --project), draft, head 76835964. Review 9c9fb976 running.
+- #182 (#175 brief templates), draft, head 10ee22ee, Refs #175. Round 1 fixed; recheck 7417ad8b running.
 - #181 (#178 Windows native smoke), draft, head 73880f37, gate sealed. Reviews running. Then run on #168 branch.
 - #180 (#173) merged 2026-09-26 as db105aab. Owner: enable Require merge queue on develop.
 - #168 (#163 lift @electron/rebuild override + electron-builder 26.16.1), draft, head d4043abc, labels dependencies + do-not-merge. Gate passed; npm audit 16 -> 7; node-pty rebuilt (@electron/rebuild 4.2.0); `electron-builder --dir` green; packed app opened a working terminal. Security review 35479ba2 (opus): APPROVE-level + nit S-1; leader posted it (comment 5847266523). Code review 84cbb123 (sonnet, gmail, posted itself): REQUEST CHANGES – Windows checks job never runs @electron/rebuild, so no Windows evidence for the changed path (leader's brief wrongly named it). Round 1 relayed to 43131e43: fix PR body, list Windows-proof options, BLOCKED for owner; S-1 after #162 lands.
@@ -30,12 +31,18 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 |---|---|---|---|---|
 | 43131e43 | #168 S-1 done (164d93b9); told to stop polling; waits for #181 run | dependency-maintenance (continued) | pi/deepseek-api/deepseek-flash | – |
 | 5dc219c2 | #181 full-cold-review | code-review | claude/sonnet | westagilelabs |
+| 9c9fb976 | #183 full-cold-review | code-review | claude/opus | eqamana |
+| 7417ad8b | #182 scoped-recheck | code-review | claude/sonnet | qodeca |
+| 919fea77 | #172 spike verdict posting | spike | claude/opus | westagilelabs |
+| 4aee4aa1 | #179 spike leader liveness | spike | claude/opus | gmail |
+| 04cb9379 | #169 gate lanes + lint without --fix | feature-implementation (kit-refactor) | codex/gpt-6-sol | qodeca-2 |
 
 Counts at dispatch (16:05): tasks 3/10, gate runs 0/2, metered 3/4 (all pi), load 2.8/18. xezar workspace maxParallel 5 (owner, 16:07).
 
 ## File-ownership table
 - Overlap accepted: 347fc1ce and 43131e43 share package.json/package-lock.json; both merge after v0.21.0, one at a time, the second rebased. Neither edits docs/security.md (#162 owns it).
 - 03cbd155 owns scripts/test-cov.mjs, package.json scripts lines, docs/ci.md (#133 para). 29df4b5a owns .github/workflows/checks.yml, secret-scan.yml, docs/ci.md (triggers/merge queue). 79cad1a5 owns .github/workflows/windows-native-smoke.yml (new), docs/ci.md (short section). 5bf6cc9a owns .xezar/docs/briefs.md, .xezar/docs/README.md, leader-guide-detail.md, .xezar/LOCAL-PATCHES.md. Accepted overlap: docs/ci.md across 3 tasks (different sections; later ones merge develop in).
+- 919fea77 owns docs/spikes/172-*.md; 4aee4aa1 owns docs/spikes/179-*.md; 04cb9379 owns .xezar/checks/repo-gates.sh, lib/gate-parallel.mjs, lib/gate-results.mjs, .xezar/pipeline/config.json, package.json lint script line, AGENTS.md gate list. Accepted overlap: package.json with #183 (different lines).
 - Reviews own nothing.
 
 ## Accounts (from `read_quota` at 2026-09-26T16:13:00Z)
