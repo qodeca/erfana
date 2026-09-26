@@ -9,10 +9,14 @@ Updated: 2026-09-25 11:06 CEST
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
-- #182 (#175 brief templates), draft, head c71592b9. Review d2e3aca9 running.
-- #181 (#178 Windows native smoke), draft, head 73880f37, gate sealed. Reviews running. Then run on #168 branch.
+- #186 (#169 gate lanes, lint:check), draft, head 9aa4f208, gate sealed. Next: security + cold review (queued on load).
+- #185 (#179 spike report), draft. Result: build the silence alert; auto-continue deferred (parked).
+- #184 (#172 spike) merged 2026-09-26 as 4d874fa7; #172 build held for owner.
+- #183 (#133) merged 2026-09-26 as 6b763b38.
+- #182 (#175) merged 2026-09-26 as 97d5c17c. #175 stays open for the remaining rows.
+- #181 (#178) merged 2026-09-26 as a9792f3c.
 - #180 (#173) merged 2026-09-26 as db105aab. Owner: enable Require merge queue on develop.
-- #168 (#163 lift @electron/rebuild override + electron-builder 26.16.1), draft, head d4043abc, labels dependencies + do-not-merge. Gate passed; npm audit 16 -> 7; node-pty rebuilt (@electron/rebuild 4.2.0); `electron-builder --dir` green; packed app opened a working terminal. Security review 35479ba2 (opus): APPROVE-level + nit S-1; leader posted it (comment 5847266523). Code review 84cbb123 (sonnet, gmail, posted itself): REQUEST CHANGES – Windows checks job never runs @electron/rebuild, so no Windows evidence for the changed path (leader's brief wrongly named it). Round 1 relayed to 43131e43: fix PR body, list Windows-proof options, BLOCKED for owner; S-1 after #162 lands.
+- #168 (#163 lift @electron/rebuild override + electron-builder 26.16.1), draft, head 164d93b9, do-not-merge until v0.21.0 ships. Security APPROVE (35479ba2); code review round 1 fixed – Windows Native Smoke run 36256339721 green on this branch (negative control failed as expected); recheck b5d01d5e APPROVE. Review-complete.
 - #167 (#164 liteparse 2.14.7), draft, head 0fa58e18, do-not-merge until v0.21.0 ships. Round 1 fixed; recheck 0b92cbf1 (sonnet/gmail) APPROVE, posted itself.
 - #155 ready, head d4fb29e7 – allow rule in scripts/xezar-leader-settings.json (4458b282): exactly 2 exact-match rules + one autoMode reason; all checks green. Next: security-review (widens tool access).
 - #154 ready, head 5fce83d5 – #138 part B (2a1e4316): test fixed, workflow gates sealed, CI all green incl. Windows. Next: full-cold-review + design-review of the 52 images and demo (privacy).
@@ -28,14 +32,11 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| 43131e43 | #168 S-1 done (164d93b9); told to stop polling; waits for #181 run | dependency-maintenance (continued) | pi/deepseek-api/deepseek-flash | – |
-| 5dc219c2 | #181 full-cold-review | code-review | claude/sonnet | westagilelabs |
-
-Counts at dispatch (16:05): tasks 3/10, gate runs 0/2, metered 3/4 (all pi), load 2.8/18. xezar workspace maxParallel 5 (owner, 16:07).
+| 974c210b | #171 vitest worker cap | feature-implementation | claude/opus | westagilelabs |
+| 9a85cf2c | #176 Dependabot groups | feature-implementation | claude/opus | gmail |
 
 ## File-ownership table
-- Overlap accepted: 347fc1ce and 43131e43 share package.json/package-lock.json; both merge after v0.21.0, one at a time, the second rebased. Neither edits docs/security.md (#162 owns it).
-- 03cbd155 owns scripts/test-cov.mjs, package.json scripts lines, docs/ci.md (#133 para). 29df4b5a owns .github/workflows/checks.yml, secret-scan.yml, docs/ci.md (triggers/merge queue). 79cad1a5 owns .github/workflows/windows-native-smoke.yml (new), docs/ci.md (short section). 5bf6cc9a owns .xezar/docs/briefs.md, .xezar/docs/README.md, leader-guide-detail.md, .xezar/LOCAL-PATCHES.md. Accepted overlap: docs/ci.md across 3 tasks (different sections; later ones merge develop in).
+- 974c210b owns vitest.main.ts, vitest.preload.ts, vitest.renderer.ts (pool/worker lines), docs/ci.md (test parallelism note), CONTRIBUTING.md (if it mentions parallelism). 9a85cf2c owns .github/dependabot.yml (+ its docs note). No overlap between them; #170 (gate list) waits for #186.
 - Reviews own nothing.
 
 ## Accounts (from `read_quota` at 2026-09-26T16:13:00Z)
@@ -56,6 +57,7 @@ Counts at dispatch (16:05): tasks 3/10, gate runs 0/2, metered 3/4 (all pi), loa
 - #139 build – PR #159: code review APPROVE, design review FAIL (B-1 account name in QA screenshots); round 1 done at 1f924f73 (B-1 masked, NB-1 stated as a limit, NB-2 documented deviation); design recheck PASS at 9203f493; QA FAIL only because 3 checks could not run (chrome-devtools emulate + evaluate_script denied in the QA session): dark mode, theme switch, reduced motion unverified live. Waiting for the owner.
 
 ## Owner items
+- **#172 review posting (spike PR #184):** fix needs either (a) an upstream xezar engine change (pass --settings to reading steps, or a verdict-body field) – recommended, file upstream; or (b) a user-scope PreToolUse hook in ~/.claude/settings.json on this machine (tested: 12k-char verdict posts, 0 denials; but it runs for every Claude session and is outside repo review). Interim rule (short plain-text verdicts) works today. Build held until the owner picks.
 - **#159: owner checks by hand (answered 2026-09-26 08:40)** – dark theme, banner theme switch, reduced-motion still on github.com, branch feature/139-readme-redesign. Leader merges on the owner's word with green checks. Earlier note: (dark theme, banner theme switch, reduced-motion still). Both QA and design sessions were denied the chrome-devtools emulate/evaluate_script tools. Options: (a) owner checks them by hand on github.com in ~2 minutes (branch feature/139-readme-redesign: switch OS dark mode, turn on Reduce motion), or (b) allow those two tools for review sessions and re-run QA. Leader recommends (a).
 - `npm audit` on develop's lockfile (run by the #159 author, 2026-09-25 23:51): 16 advisories – 1 critical, 12 high, 3 moderate – none added by #159. Owner chose triage in 0.21.0: issue #161, task d71e7bf0.
 - PR #159 QA screenshots at 56ba01bb showed the GitHub account name; being replaced, but the old files stay in the branch history (squash-merge keeps them out of develop). Decide if that history matters.
