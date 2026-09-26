@@ -60,20 +60,34 @@ const APPLICATION_LANES = (() => {
   return lanes;
 })();
 if (mode === 'application') {
-  const coverage = entries.find(e => e.name === 'npm run test:cov')?.index;
-  const build = entries.find(e => e.name === 'npx electron-vite build')?.index;
+  // The guards bind to gate identities – the executable command, not only its display label –
+  // and compare whitespace-normalised words, so a relabel or respacing cannot slip past them.
+  const words = (text) => text.trim().split(/\s+/);
+  const normal = (text) => words(text).join(' ');
   // #170 removed the separate unit-test gate on purpose: `test:cov` runs every unit test once and
   // enforces the floors. Naming it again would run the suite twice, and beside coverage it would
-  // collide on test fixtures, so a list that brings it back is refused rather than scheduled.
-  if (entries.some(e => e.name === 'npm run test:ci')) {
+  // collide on test fixtures, so a list that brings it back – under any label, spelling or npm
+  // alias (`run-script`) – is refused rather than scheduled.
+  if (entries.some(e => words(e.name).includes('test:ci') || words(e.command).includes('test:ci'))) {
     throw new Error('npm run test:ci was dropped from the gate by #170 (test:cov runs every unit test); remove it or update the schedule constraints');
   }
-  const known = [coverage, build].filter(index => index !== undefined).length;
-  if (known === 1) {
-    throw new Error('a guarded application command was renamed or removed; update the schedule constraints');
-  }
-  if (coverage !== undefined && build !== undefined &&
-      !APPLICATION_LANES.some(lane => lane.indexOf(coverage) >= 0 && lane.indexOf(build) > lane.indexOf(coverage))) {
+  // Both are mandatory whenever application gates run: coverage deletes and rewrites out/, which
+  // the build also writes, so they must share a lane with coverage first. A list missing either
+  // identity is refused, never scheduled with the ordering guard switched off.
+  const guarded = (identity) => {
+    const matches = entries.filter(e => normal(e.name) === identity || normal(e.command) === identity);
+    if (matches.length !== 1) {
+      throw new Error(`guarded application gate "${identity}" is ${matches.length ? 'named more than once' : 'missing (renamed or removed)'}; update the schedule constraints`);
+    }
+    const [entry] = matches;
+    if (normal(entry.name) !== identity || normal(entry.command) !== identity) {
+      throw new Error(`guarded application gate "${identity}" has a label/command mismatch; update the schedule constraints`);
+    }
+    return entry.index;
+  };
+  const coverage = guarded('npm run test:cov');
+  const build = guarded('npx electron-vite build');
+  if (!APPLICATION_LANES.some(lane => lane.indexOf(coverage) >= 0 && lane.indexOf(build) > lane.indexOf(coverage))) {
     throw new Error('coverage and build must share a lane, with coverage before build');
   }
 }
