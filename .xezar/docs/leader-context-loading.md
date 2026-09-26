@@ -216,11 +216,14 @@ guide's size compounds. Three caps follow, and all are requirements rather than 
   heading, to `archive-decisions.md` in the same folder (`--to archive-<name>.md` picks another).
   Run it from inside the repository: the folder must resolve to a direct child of the repository's
   real `.xezar/campaigns`, so no symlink in the path can send it elsewhere. `--apply` holds an
-  exclusive `.decisions-archive.lock` in the folder, writes both new files as temp files and reads
-  them back, refuses if `decisions.md` or the archive changed since it read them (a decision
-  appended mid-run is kept, not overwritten), and renames the archive into place *before*
-  `decisions.md`, then re-reads both and checks that no line was lost. A lock or `.tmp-<pid>` file
-  left by a crashed run is refused with its path; remove it after a look. It never deletes. Deciding what is resolved is the leader's call; a standing rule stays in `decisions.md`
+  exclusive `.decisions-archive.lock` in the folder (it serialises archive runs only), writes both
+  new files as temp files and reads them back, then swaps the archive in *before* `decisions.md`.
+  Each swap renames the live file aside to `<name>.aside-<pid>`, compares that copy with what it
+  read, and installs the new file with a no-clobber link – so an append made during the run, by
+  path or through an open handle, is never overwritten: the run puts the file back and refuses, or,
+  if a new file already took its place, keeps both and names them for a hand merge. It then re-reads
+  both and checks that no line was lost. A lock, `.tmp-<pid>` or `.aside-<pid>` file left by a
+  crashed or refused run is named in the message; look at it before removing it. It never deletes. Deciding what is resolved is the leader's call; a standing rule stays in `decisions.md`
   for the life of the campaign. Commit both files together.
 
 A silent case costs one process spawn and no tokens. A loud case costs the guide, the whole

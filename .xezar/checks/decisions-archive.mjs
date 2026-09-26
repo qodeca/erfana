@@ -10,11 +10,13 @@
 // `--list` numbers the entries. `--move` without `--apply` only prints what would move. An entry is
 // a line starting `- ` plus the indented lines under it; headings, prose and blank lines never move.
 //
-// It never deletes. `--apply` takes an exclusive lock file in the campaign folder, stages both new
-// files as temp files and reads each one back before anything is replaced, re-reads decisions.md and
-// the archive and refuses if either changed since the run read them, then renames the archive into
-// place first and decisions.md second: a failure in between leaves an entry in both files, never in
-// neither. The result is re-checked line for line before the command reports success. Which entries
+// It never deletes. `--apply` takes an exclusive lock file in the campaign folder (it serialises
+// archive runs only), stages both new files as temp files and reads each one back, then swaps the
+// archive first and decisions.md second. A swap renames the live file aside (atomic) and compares
+// that copy with what the run read, so an append made at any earlier moment is seen and the file is
+// put back; it installs the staged file with a no-clobber link, so a decisions.md recreated by an
+// append after the rename is never overwritten. Every refusal leaves every byte on disk. The result
+// is re-checked line for line before the command reports success. Which entries
 // are resolved is the leader's judgement; this script only moves what it is told to.
 //
 // Trust boundary: campaign files are committed, so their content is untrusted data. Run it from
@@ -23,7 +25,7 @@
 // in the path can point it elsewhere. It refuses symlinked files, bounds the input size, uses no
 // backtracking-prone pattern, and accepts only a fixed archive-name shape.
 import { spawnSync } from 'node:child_process';
-import { closeSync, fsyncSync, lstatSync, openSync, readFileSync, realpathSync, renameSync, unlinkSync, writeSync } from 'node:fs';
+import { closeSync, fsyncSync, linkSync, lstatSync, openSync, readFileSync, realpathSync, renameSync, unlinkSync, writeSync } from 'node:fs';
 import path from 'node:path';
 
 const MAX_BYTES = 8 * 1024 * 1024;
@@ -161,7 +163,44 @@ function campaignDir(dir, cwd) {
   return real;
 }
 
-const defaultIo = { writeChunk: (fd, buffer, offset, length) => writeSync(fd, buffer, offset, length), beforeCommit: () => {} };
+// Swaps the staged file in at `live` without overwriting bytes anyone else wrote. Returns the aside
+// path holding the pre-run file (null if there was none); the caller drops or restores it.
+function swap(live, staged, expected, io) {
+  const aside = `${live}.aside-${process.pid}`;
+  const putBack = (why) => {
+    try {
+      linkSync(aside, live);
+    } catch {
+      fail(`${why}, and a new ${live} now exists: the pre-run file is kept at ${aside}; merge the two by hand – nothing was deleted`);
+    }
+    unlinkSync(aside);
+    fail(`${why}; nothing was replaced, run it again`);
+  };
+  if (expected !== null) {
+    try {
+      renameSync(live, aside);
+    } catch (error) {
+      fail(`${live} could not be set aside (${error.code ?? error.message}); nothing was replaced`);
+    }
+    io.hook(`${path.basename(live)}:aside`);
+    if (readFileSync(aside, 'utf8') !== expected) putBack(`${live} changed while this ran`);
+  }
+  io.hook(`${path.basename(live)}:install`);
+  try {
+    linkSync(staged, live);
+  } catch {
+    if (expected === null) fail(`${live} appeared while this ran; nothing was replaced, run it again`);
+    putBack(`${live} was recreated while this ran`);
+  }
+  unlinkSync(staged);
+  // A writer that opened the file before it was set aside writes into the aside copy.
+  if (expected !== null && readFileSync(aside, 'utf8') !== expected) {
+    fail(`${live} was written through an open handle while this ran: that write is kept at ${aside}; merge it into ${live} by hand – nothing was deleted`);
+  }
+  return expected === null ? null : aside;
+}
+
+const defaultIo = { writeChunk: (fd, buffer, offset, length) => writeSync(fd, buffer, offset, length), closeSync, hook: () => {} };
 
 export function run(argv, { cwd = process.cwd(), io = defaultIo } = {}) {
   const [arg, ...rest] = argv;
@@ -186,12 +225,15 @@ export function run(argv, { cwd = process.cwd(), io = defaultIo } = {}) {
 
   // One writer at a time. A lock left by a crashed run is removed by hand, after a look.
   const lockPath = path.join(dir, '.decisions-archive.lock');
+  let fd;
   try {
-    closeSync(openSync(lockPath, 'wx'));
+    fd = openSync(lockPath, 'wx');
   } catch (error) {
     fail(error.code === 'EEXIST' ? `another archive run holds ${lockPath}; if none is running, remove it and retry` : `cannot create ${lockPath}: ${error.code ?? error.message}`);
   }
+  // Acquired: from here on every exit, a failed close included, removes the lock.
   try {
+    io.closeSync(fd);
     report(dir, decisionsPath, archivePath, list, spec, io);
   } finally {
     unlinkSync(lockPath);
@@ -225,17 +267,23 @@ function report(dir, decisionsPath, archivePath, list, spec, io) {
   const header = existing === null || existing === '' ? '# Archive – resolved decisions\n\nEntries moved verbatim from decisions.md once resolved. Never loaded at session start; read on demand.\n' : '';
   const archiveContent = `${existing ?? ''}${header}${appended}`;
   const staged = [];
+  let archiveAside;
   try {
     staged.push(stage(archivePath, archiveContent, io));
     staged.push(stage(decisionsPath, kept, io));
-    io.beforeCommit();
-    // Nothing is replaced if either file moved on since it was read (an append by the leader, say).
-    if (readRegular(decisionsPath) !== original) fail(`${decisionsPath} changed while this ran; nothing was replaced, run it again`);
-    if ((present(archivePath) ? readRegular(archivePath) : null) !== existing) fail(`${archivePath} changed while this ran; nothing was replaced, run it again`);
-    renameSync(staged.shift(), archivePath);
-    renameSync(staged.shift(), decisionsPath);
+    archiveAside = swap(archivePath, staged[0], existing, io);
+    try {
+      unlinkSync(swap(decisionsPath, staged[1], original, io));
+    } catch (error) {
+      // Take the archive back to its pre-run state: the moved entries are still in decisions.md.
+      if (archiveAside) renameSync(archiveAside, archivePath);
+      else unlinkSync(archivePath);
+      archiveAside = null;
+      throw error;
+    }
+    if (archiveAside) unlinkSync(archiveAside);
   } finally {
-    for (const temp of staged) unlinkSync(temp);
+    for (const temp of staged) if (present(temp)) unlinkSync(temp);
   }
 
   // Nothing may be lost: every original line must now sit in decisions.md or in the archive.

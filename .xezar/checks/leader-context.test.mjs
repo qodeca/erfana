@@ -3,7 +3,7 @@
 // (worktree, task env, not-the-leader) live in documented-output.mjs and are not repeated here.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { appendFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync, writeSync as writeSyncReal } from 'node:fs';
+import { appendFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync, writeSync as writeSyncReal, closeSync as closeSyncReal } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { after, test } from 'node:test';
@@ -137,7 +137,7 @@ test('a timeline within the bound is injected whole, with no pointer', () => {
 // In-process runs with an injected writer or a hook just before the files are replaced.
 function applyWith(campaign, io) {
   const writeChunk = io.writeChunk ?? ((fd, buffer, offset, length) => writeSyncReal(fd, buffer, offset, length));
-  return () => run([campaign, '--move', '1', '--apply'], { cwd: path.resolve(campaign, '../../..'), io: { beforeCommit: () => {}, ...io, writeChunk } });
+  return () => run([campaign, '--move', '1', '--apply'], { cwd: path.resolve(campaign, '../../..'), io: { hook: () => {}, closeSync: closeSyncReal, ...io, writeChunk } });
 }
 
 function unchanged(campaign, original) {
@@ -146,20 +146,89 @@ function unchanged(campaign, original) {
   assert.deepEqual(readdirSync(campaign).filter((name) => name !== 'decisions.md'), [], 'no temp or lock file left');
 }
 
-test('a decision appended between the read and the replace is kept: the run refuses', () => {
+// Every line that existed, plus any late write, is still somewhere in the campaign folder.
+function nothingLost(campaign, text) {
+  const all = readdirSync(campaign).map((name) => readFileSync(path.join(campaign, name), 'utf8')).join('\n');
+  for (const line of text.split('\n')) assert.ok(all.includes(line), `line lost: ${line}`);
+}
+
+const refused = (pattern) => (e) => e instanceof Refusal && pattern.test(e.message);
+
+test('an append after the final comparison and before the install is kept: the run refuses', () => {
   const original = '# Decisions\n\n- "RESOLVED"\n- "OPEN"\n';
   const { campaign } = fixture({ 'decisions.md': original });
   const late = '- "APPENDED-DURING-RUN"\n';
   const decisions = path.join(campaign, 'decisions.md');
-  assert.throws(applyWith(campaign, { beforeCommit: () => appendFileSync(decisions, late) }), (e) => e instanceof Refusal && /changed while this ran/.test(e.message));
-  unchanged(campaign, original + late);
+  const hook = (point) => point === 'decisions.md:install' && appendFileSync(decisions, late);
+  assert.throws(applyWith(campaign, { hook }), refused(/recreated while this ran, and a new .* now exists: the pre-run file is kept at .*decisions\.md\.aside-/));
+  assert.equal(readFileSync(decisions, 'utf8'), late, 'the late append is not overwritten');
+  assert.equal(readFileSync(`${decisions}.aside-${process.pid}`, 'utf8'), original, 'the pre-run file is kept whole');
+  assert.ok(!existsSync(path.join(campaign, 'archive-decisions.md')), 'the archive is taken back');
+  assert.ok(!existsSync(path.join(campaign, '.decisions-archive.lock')));
+  nothingLost(campaign, original + late);
+});
+
+for (const [when, point, target] of [
+  ['before it is set aside', 'archive-decisions.md:install', 'live'],
+  ['through a handle opened before it was set aside', 'decisions.md:aside', 'aside'],
+]) {
+  test(`an append to decisions.md ${when} is kept: the run refuses and puts the file back`, () => {
+    const original = '# Decisions\n\n- "RESOLVED"\n- "OPEN"\n';
+    const { campaign } = fixture({ 'decisions.md': original });
+    const late = '- "APPENDED-DURING-RUN"\n';
+    const decisions = path.join(campaign, 'decisions.md');
+    const file = target === 'live' ? decisions : `${decisions}.aside-${process.pid}`;
+    const hook = (at) => at === point && appendFileSync(file, late);
+    assert.throws(applyWith(campaign, { hook }), refused(/decisions\.md changed while this ran; nothing was replaced/));
+    unchanged(campaign, original + late);
+  });
+}
+
+test('a write through a handle held across the install is kept in the aside file: the run refuses', () => {
+  const original = '# Decisions\n\n- "RESOLVED"\n- "OPEN"\n';
+  const { campaign } = fixture({ 'decisions.md': original });
+  const late = '- "HELD-HANDLE-WRITE"\n';
+  const aside = path.join(campaign, `decisions.md.aside-${process.pid}`);
+  // After the comparison, before the install: only a handle opened earlier could still write here.
+  const hook = (at) => at === 'decisions.md:install' && appendFileSync(aside, late);
+  assert.throws(applyWith(campaign, { hook }), refused(/written through an open handle while this ran: that write is kept at/));
+  assert.equal(readFileSync(aside, 'utf8'), original + late);
+  nothingLost(campaign, original + late);
+});
+
+test('the archive gets the same protection: a late write to it is never overwritten', () => {
+  const original = '# Decisions\n\n- "RESOLVED"\n- "OPEN"\n';
+  const existing = '# Archive – resolved decisions\n\n- "OLD"\n';
+  const late = '- "LATE-ARCHIVE-LINE"\n';
+  for (const [point, pattern] of [
+    ['archive-decisions.md:aside', /archive-decisions\.md changed while this ran; nothing was replaced/],
+    ['archive-decisions.md:install', /archive-decisions\.md was recreated while this ran, and a new .* now exists/],
+  ]) {
+    const { campaign } = fixture({ 'decisions.md': original, 'archive-decisions.md': existing });
+    const archivePath = path.join(campaign, 'archive-decisions.md');
+    const target = point.endsWith(':aside') ? `${archivePath}.aside-${process.pid}` : archivePath;
+    assert.throws(applyWith(campaign, { hook: (at) => at === point && appendFileSync(target, late) }), refused(pattern));
+    assert.equal(readFileSync(path.join(campaign, 'decisions.md'), 'utf8'), original, 'decisions.md untouched');
+    nothingLost(campaign, original + existing + late);
+  }
+});
+
+test('a lock whose close fails is still removed', () => {
+  const original = '# Decisions\n\n- "A"\n';
+  const { campaign } = fixture({ 'decisions.md': original });
+  const failingClose = (fd) => {
+    closeSyncReal(fd);
+    throw new Error('injected close failure');
+  };
+  assert.throws(applyWith(campaign, { closeSync: failingClose }), /injected close failure/);
+  unchanged(campaign, original);
 });
 
 test('two overlapping archive runs cannot both proceed', () => {
   const original = '# Decisions\n\n- "ONE"\n- "TWO"\n';
   const { campaign } = fixture({ 'decisions.md': original });
   let second;
-  applyWith(campaign, { beforeCommit: () => (second = archive(campaign, '--move', '2', '--apply')) })();
+  applyWith(campaign, { hook: (at) => at === 'decisions.md:install' && (second = archive(campaign, '--move', '2', '--apply')) })();
   assert.equal(second.status, 2);
   assert.match(second.stderr, /another archive run holds .*\.decisions-archive\.lock/);
   assert.equal(readFileSync(path.join(campaign, 'decisions.md'), 'utf8'), '# Decisions\n\n- "TWO"\n', 'only the first run moved');
@@ -172,6 +241,7 @@ test('short writes are continued until every byte is written', () => {
   applyWith(campaign, { writeChunk: (fd, buffer, offset, length) => writeSyncReal(fd, buffer, offset, Math.min(length, 7)) })();
   assert.equal(readFileSync(path.join(campaign, 'decisions.md'), 'utf8'), '# Decisions\n\n- "KEEP ME"\n');
   assert.ok(readFileSync(path.join(campaign, 'archive-decisions.md'), 'utf8').endsWith(`- "MOVE ME ${'y'.repeat(200)}"\n`));
+  assert.deepEqual(readdirSync(campaign).sort(), ['archive-decisions.md', 'decisions.md'], 'no aside, temp or lock file left');
 });
 
 for (const [which, target] of [['archive', 1], ['decisions', 2]]) {
