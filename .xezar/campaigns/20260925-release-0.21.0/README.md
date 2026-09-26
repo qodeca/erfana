@@ -5,7 +5,7 @@ Updated: 2026-09-25 11:06 CEST
 ## State
 - Base: `develop` at `9fe8a3f0`. Merges so far: 0. Checkpoints met: none.
 - Scope: open issues labelled `release-0.21.0`, plus new work the owner discusses with the leader (the leader files it as an issue with that label). None labelled yet.
-- Unattended mode: OFF since 2026-09-26T06:36:26Z (was on from 2026-09-25T09:10:38Z). All six owner-only decisions stop the leader again. parked.md empty: 4 calls asked back, all kept.
+- Unattended mode: ON since 2026-09-26T06:49:11Z (restarts 0 of 3). Parked calls go to parked.md.
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
@@ -15,26 +15,31 @@ Updated: 2026-09-25 11:06 CEST
 Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 
 ## Serial merge line
-Empty.
+- #162 (#161): d71e7bf0 done, all 11 checks pass at 5c6c0c5f. Queued: full-cold-review on claude/opus (author pi), held by load (122 at 16:23: a cmplus-project Codex task plus 347fc1ce tests). L1 wakes L3 when load < 18.
 
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
+| 347fc1ce | #164 liteparse 1 -> 2 (post-release, do-not-merge) | dependency-maintenance | pi/deepseek-api/deepseek-flash | – |
+| 43131e43 | #163 lift @electron/rebuild override + electron-builder 26.16.1 (post-release, do-not-merge) | dependency-maintenance | pi/deepseek-api/deepseek-flash | – |
 
-Counts at dispatch (01:28): tasks 1/10, gate runs 0/2, metered 0/4, load 2.9/18.
+Counts at dispatch (16:05): tasks 3/10, gate runs 0/2, metered 3/4 (all pi), load 2.8/18. xezar workspace maxParallel 5 (owner, 16:07).
 
 ## File-ownership table
+- 347fc1ce owns package.json, package-lock.json, src/main/services/import/converters/LiteParseConverter.ts (+ tests), scripts/capture/legibility.mjs.
+- 43131e43 owns package.json, package-lock.json, scripts/fuses.js, docs/build/dependencies.md.
+- Overlap accepted: 347fc1ce and 43131e43 share package.json/package-lock.json; both merge after v0.21.0, one at a time, the second rebased. Neither edits docs/security.md (#162 owns it).
 - Reviews own nothing.
 
-## Accounts (from `read_quota` at 2026-09-26T05:13:10Z)
+## Accounts (from `read_quota` at 2026-09-26T13:52:35Z)
 | Runner | Login | State | Resets (UTC) |
 |---|---|---|---|
-| claude | default | reserved leader login, runs no tasks; ok but weekly 99% | 2026-09-28 23:00 |
-| claude | qodeca | ok (weekly 52%) | 2026-09-28 17:00 |
-| claude | gmail | ok (weekly 4%) | 2026-10-02 18:59 |
-| claude | eqamana | out | 2026-09-26 15:59 |
-| claude | westagilelabs | ok (weekly 6%) | 2026-10-02 06:59 |
-| codex | default | unknown, flapping (read fails "Codex 0.156.1 changed its quota format" at 03:13Z and 05:13Z, ok at 04:13Z; qodeca-2 on the same version reads fine) | – |
+| claude | default | reserved leader login, runs no tasks; ok (weekly 7%; now reports plan max – was team at 99% until 06:13Z, so the login behind `default` changed) | 2026-10-02 06:59 |
+| claude | qodeca | ok (weekly 52%) | 2026-09-28 16:59 |
+| claude | gmail | ok (weekly 6%) | 2026-10-02 18:59 |
+| claude | eqamana | out | 2026-09-26 16:00 |
+| claude | westagilelabs | ok (weekly 7%) | 2026-10-02 06:59 |
+| codex | default | ok (weekly 11%; flapped to unknown at 03:13Z and 05:13Z–06:13Z) | 2026-10-02 10:44 |
 | codex | qodeca-2 | ok (weekly 27%) | 2026-09-29 12:45 |
 | pi | – | no logins | – |
 
@@ -44,8 +49,8 @@ Counts at dispatch (01:28): tasks 1/10, gate runs 0/2, metered 0/4, load 2.9/18.
 - #139 build – PR #159: code review APPROVE, design review FAIL (B-1 account name in QA screenshots); round 1 done at 1f924f73 (B-1 masked, NB-1 stated as a limit, NB-2 documented deviation); design recheck PASS at 9203f493; QA FAIL only because 3 checks could not run (chrome-devtools emulate + evaluate_script denied in the QA session): dark mode, theme switch, reduced motion unverified live. Waiting for the owner.
 
 ## Owner items
-- **#159 blocked on 3 unrun QA checks** (dark theme, banner theme switch, reduced-motion still). Both QA and design sessions were denied the chrome-devtools emulate/evaluate_script tools. Options: (a) owner checks them by hand on github.com in ~2 minutes (branch feature/139-readme-redesign: switch OS dark mode, turn on Reduce motion), or (b) allow those two tools for review sessions and re-run QA. Leader recommends (a).
-- `npm audit` on develop's lockfile (run by the #159 author, 2026-09-25 23:51): 16 advisories – 1 critical, 12 high, 3 moderate – none added by #159. Not triaged. Dependabot PRs #63-#68 are open and out of this campaign's scope. Decide: triage now (a new issue in 0.21.0) or later.
+- **#159: owner checks by hand (answered 2026-09-26 08:40)** – dark theme, banner theme switch, reduced-motion still on github.com, branch feature/139-readme-redesign. Leader merges on the owner's word with green checks. Earlier note: (dark theme, banner theme switch, reduced-motion still). Both QA and design sessions were denied the chrome-devtools emulate/evaluate_script tools. Options: (a) owner checks them by hand on github.com in ~2 minutes (branch feature/139-readme-redesign: switch OS dark mode, turn on Reduce motion), or (b) allow those two tools for review sessions and re-run QA. Leader recommends (a).
+- `npm audit` on develop's lockfile (run by the #159 author, 2026-09-25 23:51): 16 advisories – 1 critical, 12 high, 3 moderate – none added by #159. Owner chose triage in 0.21.0: issue #161, task d71e7bf0.
 - PR #159 QA screenshots at 56ba01bb showed the GitHub account name; being replaced, but the old files stay in the branch history (squash-merge keeps them out of develop). Decide if that history matters.
 - Two Windows flakes seen on #158 (docs-only): useImageSource.test.ts 'keeps the last good image…' and check-shebangs.test.mjs 5000 ms timeout. Not in docs/windows/known-flakes.md yet; file or catalogue them?
 - Review task a873f32c (claude/opus, gmail) was refused `jq … | bash .xezar/checks/gh-write.sh` 4 times (don't-ask mode), so it could not post its #158 verdict; earlier reviews on other logins posted. Look at why, or accept relaying.

@@ -57,3 +57,13 @@ Owner decisions in the owner's exact words, dated, append-only.
   #147 stays the owner's; stays in 0.21.0.
 - 2026-09-26 08:42 CEST - direct question (AskUserQuestion: 16 npm audit advisories) - "New issue in 0.21.0 (Recommended)"
   Leader files one triage issue with the release-0.21.0 label and dispatches it.
+- 2026-09-26 08:49 CEST - direct question (xez-unattended-on contract read back, with pi/deepseek-flash task d71e7bf0 running on metered spend) - "Yes, turn it on"
+  Unattended mode on since 2026-09-26T06:49:11Z. Hard stops: release go, deleting a record, opening a campaign. Parked: account or provider lane switch, scope trim, third repair round. Accepted costs: metered spend while away; stops are instructions, not a hook.
+- 2026-09-26 15:51 CEST - direct question (AskUserQuestion: #161 task d71e7bf0 asked; electron-builder 26.16.1 clears 0 of 16 while the @electron/rebuild 3.7.1 override stands, and breaks the macOS package build without a scripts/fuses.js allowlist change) - "Undo upgrade, triage only (Recommended)"
+  PR carries the triage only; override removal + electron-builder upgrade becomes a follow-up with a node-pty build test.
+- 2026-09-26 15:51 CEST - direct question (AskUserQuestion: docs/security.md policy "zero high/critical production advisories at release"; develop has 4 production highs: electron, extract-zip, @llamaindex/liteparse, sharp; all need majors) - "Except all 4, fix later"
+  0.21.0 ships with a written, dated exception for all 4. liteparse 2 and Electron 44 filed as issues after the release.
+- 2026-09-26 16:04 CEST - direct question (AskUserQuestion: "can you do more in parallel?"; only post-release #161 follow-ups are parallel) - "Start post-release fixes now (Recommended)"
+  File the 4 follow-up issues now without the release label; start liteparse 1->2 and the @electron/rebuild override lift now; their PRs carry do-not-merge until 0.21.0 ships.
+- 2026-09-26 16:05 CEST - chat - "change maxParallel to 5"
+  Set in the xezar workspace (machine) config via project_config set_workspace_config: resources.maxParallel 2 -> 5. Not in the committed project config (kit rule: machine-sized limits stay off it).
