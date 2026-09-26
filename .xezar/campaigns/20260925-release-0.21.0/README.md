@@ -9,8 +9,8 @@ Updated: 2026-09-25 11:06 CEST
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
-- #187 (#176 Dependabot groups, from 9a85cf2c), draft, head 9717d461, gate sealed. Next: code review (not opus) + codex security review; held while load is over 18.
-- #186 (#169 gate lanes, lint:check), draft, head 58640590, round 1 fixed by 04cb9379 (author gate green, not sealed). Next: code + security recheck (queued on load). After merge: leader-guide.md:149 lint -> lint:check.
+- #187 (#176 Dependabot groups, from 9a85cf2c), draft, head 9717d461, gate sealed. Next: cold review dfa7c67f (sonnet) + security review 5cba1e38 (codex/astra, other vendor) (running).
+- #186 (#169 gate lanes, lint:check), draft, head 58640590, round 1 fixed by 04cb9379 (author gate green, not sealed). Next: code recheck 839f072f + security recheck 31c5f2ec (running). After merge: leader-guide.md:149 lint -> lint:check.
 - #185 (#179 spike) merged 2026-09-26 as 5f285011. Result: build the silence alert (+ line-86 doc fix); auto-continue deferred (parked).
 - #184 (#172 spike) merged 2026-09-26 as 4d874fa7; #172 build held for owner.
 - #183 (#133) merged 2026-09-26 as 6b763b38.
@@ -34,21 +34,25 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
 | 974c210b | #171 vitest worker cap | feature-implementation | claude/opus | westagilelabs |
+| 839f072f | #186 code recheck | code-review | claude/sonnet | gmail |
+| 31c5f2ec | #186 security recheck | security-review | claude/opus | eqamana |
+| dfa7c67f | #187 cold review | code-review | claude/sonnet | westagilelabs |
+| 5cba1e38 | #187 security review | security-review | codex/gpt-6-astra | qodeca-2 |
 
 ## File-ownership table
 - 974c210b owns vitest.main.ts, vitest.preload.ts, vitest.renderer.ts (pool/worker lines), docs/ci.md (test parallelism note), CONTRIBUTING.md (if it mentions parallelism). (9a85cf2c done; .github/dependabot.yml released, PR #187.) No overlap between them; #170 (gate list) waits for #186.
 - Reviews own nothing.
 
-## Accounts (from `read_quota` at 2026-09-26T16:13:00Z)
+## Accounts (from `read_quota` at 2026-09-26T17:13:08Z)
 | Runner | Login | State | Resets (UTC) |
 |---|---|---|---|
-| claude | default | reserved leader login, runs no tasks; ok (weekly 10%, plan max; same numbers as westagilelabs – owner item) | 2026-10-02 06:59 |
+| claude | default | reserved leader login, runs no tasks; ok (weekly 11%, plan max; same numbers as westagilelabs – owner item) | 2026-10-02 06:59 |
 | claude | qodeca | ok (weekly 53%) | 2026-09-28 16:59 |
-| claude | gmail | ok (weekly 8%) | 2026-10-02 19:00 |
-| claude | eqamana | ok (weekly 0%, back from out at 16:00Z) | 2026-10-03 16:00 |
-| claude | westagilelabs | ok (weekly 10%) | 2026-10-02 06:59 |
-| codex | default | ok (weekly 13%) | 2026-10-02 10:44 |
-| codex | qodeca-2 | ok (weekly 27%) | 2026-09-29 12:45 |
+| claude | gmail | ok (weekly 9%) | 2026-10-02 19:00 |
+| claude | eqamana | ok (weekly 0%) | 2026-10-03 16:00 |
+| claude | westagilelabs | ok (weekly 11%) | 2026-10-02 06:59 |
+| codex | default | ok (weekly 15%) | 2026-10-02 10:44 |
+| codex | qodeca-2 | ok (weekly 0%) | 2026-10-03 16:58 |
 | pi | – | no logins | – |
 
 ## Held or queued work
