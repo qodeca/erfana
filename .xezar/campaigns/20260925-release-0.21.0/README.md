@@ -27,7 +27,7 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| 43131e43 | #168 S-1 (security.md row) after #162; Windows proof BLOCKED on separate PR (#163) | dependency-maintenance (continued) | pi/deepseek-api/deepseek-flash | – |
+| 43131e43 | #168 S-1 done (164d93b9); told to stop polling; waits for #181 run | dependency-maintenance (continued) | pi/deepseek-api/deepseek-flash | – |
 | 03cbd155 | #133 test:cov --project | bug-fix | pi/deepseek-api/deepseek-flash | – |
 | 5bf6cc9a | #175 brief templates | docs-maintenance | codex/gpt-5.6-terra | default |
 
