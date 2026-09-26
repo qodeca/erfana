@@ -30,8 +30,6 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
 | 43131e43 | #168 S-1 done (164d93b9); told to stop polling; waits for #181 run | dependency-maintenance (continued) | pi/deepseek-api/deepseek-flash | – |
-| 5dc219c2 | #181 full-cold-review | code-review | claude/sonnet | westagilelabs |
-| 9c9fb976 | #183 full-cold-review | code-review | claude/opus | eqamana |
 | 919fea77 | #172 spike verdict posting | spike | claude/opus | westagilelabs |
 | 4aee4aa1 | #179 spike leader liveness | spike | claude/opus | gmail |
 | 04cb9379 | #169 gate lanes + lint without --fix | feature-implementation (kit-refactor) | codex/gpt-6-sol | qodeca-2 |
