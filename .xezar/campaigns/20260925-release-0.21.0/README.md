@@ -9,9 +9,9 @@ Updated: 2026-09-25 11:06 CEST
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
-- #188 (#171 vitest worker cap, from 974c210b), draft, head 17e9fcbc, gate sealed. Next: cold review 4d88df5b (sonnet) running.
-- #187 (#176 Dependabot groups, from 9a85cf2c), draft, head 9717d461, gate sealed. Next: cold review dfa7c67f (sonnet) running; security 5cba1e38 (codex/astra) NO FINDINGS.
-- #186 (#169 gate lanes, lint:check), draft, head 58640590, round 1 fixed by 04cb9379 (author gate green, not sealed). Security recheck 31c5f2ec: S-1, S-2 fixed; new S-3 minor, S-4 nit. Code recheck 839f072f running; then relay together. After merge: leader-guide.md:149 lint -> lint:check.
+- #188 (#171 vitest worker cap, from 974c210b), draft, head 17e9fcbc, gate sealed. Cold review 4d88df5b APPROVE (leader posted). CI Unit tests failed (crash, no summary); rerun watching.
+- #187 (#176 Dependabot groups, from 9a85cf2c), draft, head 9717d461, gate sealed. Code review dfa7c67f REQUEST CHANGES (overrides-only pins, pre-1.0 deps, actions limit); security 5cba1e38 NO FINDINGS. Round 1 with 9a85cf2c.
+- #186 (#169 gate lanes, lint:check), draft, head 58640590, round 1 fixed by 04cb9379 (author gate green, not sealed). Code recheck 839f072f APPROVE; security recheck 31c5f2ec S-1, S-2 fixed, new S-3 minor + S-4 nit → round 2 with 04cb9379. After merge: leader-guide.md:149 lint -> lint:check.
 - #185 (#179 spike) merged 2026-09-26 as 5f285011. Result: build the silence alert (+ line-86 doc fix); auto-continue deferred (parked).
 - #184 (#172 spike) merged 2026-09-26 as 4d874fa7; #172 build held for owner.
 - #183 (#133) merged 2026-09-26 as 6b763b38.
@@ -34,13 +34,14 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| 839f072f | #186 code recheck | code-review | claude/sonnet | gmail |
-| dfa7c67f | #187 cold review | code-review | claude/sonnet | westagilelabs |
-| 4d88df5b | #188 cold review | code-review | claude/sonnet | qodeca |
+| 9a85cf2c | #187 round 1 (continue) | feature-implementation | claude/opus | gmail |
+| 04cb9379 | #186 round 2 (continue) | feature-implementation | codex/gpt-6-sol | qodeca-2 |
+| 7d5d7fc6 | loops.json load ceiling 40 | feature-implementation | claude/opus | westagilelabs |
 | 392e7c9b | #179 silence alert build | feature-implementation | claude/opus | eqamana |
 
 ## File-ownership table
 - 974c210b done (PR #188); vitest configs released.
+- 7d5d7fc6 owns .xezar/loops.json. 9a85cf2c owns .github/dependabot.yml, docs/ci.md (Dependabot note). 04cb9379 owns gate-parallel.mjs + test, repo-gates.sh, gate-record.sh.
 - 392e7c9b owns the new alert script + test under scripts/, a launchd plist template, its install doc, docs/spikes/179-leader-liveness.md (line 86 only). (9a85cf2c done; .github/dependabot.yml released, PR #187.) No overlap between them; #170 (gate list) waits for #186.
 - Reviews own nothing.
 
