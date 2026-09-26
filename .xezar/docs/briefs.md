@@ -23,7 +23,7 @@ Do not touch: <paths or areas owned by other work>.
 Success means: <the named regression is fixed and the test proves it>.
 
 Finish in the foreground.
-Run targeted tests while working and the full gate once at the end.
+Run targeted tests while working. The workflow's gates step runs the full gate once, so do not run it yourself. In a standalone task with no gates step, run the gate once after the final commit.
 Do not poll CI; the leader watches it.
 Do not print, commit, upload, or put secrets in evidence; redact sensitive values in diagnostics.
 Never stop a process by command-line pattern.
@@ -43,7 +43,7 @@ Acceptance criteria: <criterion IDs and observable outcomes>.
 Dependencies and interfaces to preserve: <named modules, schemas, or APIs>.
 
 Finish in the foreground.
-Run targeted tests while working and the full gate once at the end.
+Run targeted tests while working. The workflow's gates step runs the full gate once, so do not run it yourself. In a standalone task with no gates step, run the gate once after the final commit.
 Do not poll CI; the leader watches it.
 Do not print, commit, upload, or put secrets in evidence; redact sensitive values in diagnostics.
 Never stop a process by command-line pattern.
@@ -64,7 +64,7 @@ Do not touch: <project product paths, owner-maintained files, or parallel-task p
 Proof required: <focused fixtures/checks proving the preserved default path>.
 
 Finish in the foreground.
-Run targeted tests while working and the full gate once at the end.
+Run targeted tests while working. The workflow's gates step runs the full gate once, so do not run it yourself. In a standalone task with no gates step, run the gate once after the final commit.
 Do not poll CI; the leader watches it.
 Do not print, commit, upload, or put secrets in evidence; redact sensitive values in diagnostics.
 Never stop a process by command-line pattern.
@@ -83,7 +83,7 @@ Do not touch: <unrelated dependency entries, generated output, or parallel-task 
 Evidence required: <install/build/package or regression evidence appropriate to the dependency>.
 
 Finish in the foreground.
-Run targeted tests while working and the full gate once at the end.
+Run targeted tests while working. The workflow's gates step runs the full gate once, so do not run it yourself. In a standalone task with no gates step, run the gate once after the final commit.
 Do not poll CI; the leader watches it.
 Do not print, commit, upload, or put secrets in evidence; redact sensitive values in diagnostics.
 Never stop a process by command-line pattern.
@@ -102,7 +102,7 @@ Do not touch: <generated copies, owner-maintained pages, or parallel-task paths>
 Reader outcome: <what a reader can now decide or do>.
 
 Finish in the foreground.
-Run targeted tests while working and the full gate once at the end.
+Run targeted tests while working. The workflow's gates step runs the full gate once, so do not run it yourself. In a standalone task with no gates step, run the gate once after the final commit.
 Do not poll CI; the leader watches it.
 Do not print, commit, upload, or put secrets in evidence; redact sensitive values in diagnostics.
 Never stop a process by command-line pattern.
@@ -121,7 +121,7 @@ Do not touch: <author checkout, product files, labels or comments not authorized
 Review boundary: <what is in scope and what cannot be assessed>.
 
 Finish in the foreground.
-Run targeted tests while working and the full gate once at the end.
+Do not run the gate; judge the author's gate evidence. Run a focused check only in your own prepared isolated checkout when a finding needs it.
 Do not poll CI; the leader watches it.
 Do not print, commit, upload, or put secrets in evidence; redact sensitive values in diagnostics.
 Never stop a process by command-line pattern.
@@ -141,7 +141,7 @@ Do not touch: <author checkout, product files, unrelated findings, or workflow s
 Recheck boundary: <named findings and the prior head/base or comment>.
 
 Finish in the foreground.
-Run targeted tests while working and the full gate once at the end.
+Do not run the gate; judge the author's gate evidence. Run a focused check only in your own prepared isolated checkout when a finding needs it.
 Do not poll CI; the leader watches it.
 Do not print, commit, upload, or put secrets in evidence; redact sensitive values in diagnostics.
 Never stop a process by command-line pattern.
@@ -162,7 +162,7 @@ Do not touch: <author checkout, product files, secrets, or deployment/release st
 Security boundary and evidence: <paths, threat model, known limitations, and required evidence>.
 
 Finish in the foreground.
-Run targeted tests while working and the full gate once at the end.
+Do not run the gate; judge the author's gate evidence. Run a focused check only in your own prepared isolated checkout when a finding needs it.
 Do not poll CI; the leader watches it.
 Do not print, commit, upload, or put secrets in evidence; redact sensitive values in diagnostics.
 Never stop a process by command-line pattern.
@@ -183,7 +183,7 @@ Do not touch: <author checkout, product files, generated captures not requested,
 QA boundary: <platform, data/setup, journeys, and known untestable conditions>.
 
 Finish in the foreground.
-Run targeted tests while working and the full gate once at the end.
+Do not run the gate; judge the author's gate evidence. Run a focused check only in your own prepared isolated checkout when a finding needs it.
 Do not poll CI; the leader watches it.
 Do not print, commit, upload, or put secrets in evidence; redact sensitive values in diagnostics.
 Never stop a process by command-line pattern.
