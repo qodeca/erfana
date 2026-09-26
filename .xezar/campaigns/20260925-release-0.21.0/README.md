@@ -18,7 +18,7 @@ Updated: 2026-09-25 11:06 CEST
 - #185 (#179 spike) merged 2026-09-26 as 5f285011. Result: build the silence alert (+ line-86 doc fix); auto-continue deferred (parked).
 - #184 (#172 spike) merged 2026-09-26 as 4d874fa7; #172 build held for owner.
 - #183 (#133) merged 2026-09-26 as 6b763b38.
-- #182 (#175) merged 2026-09-26 as 97d5c17c. #175 stays open for the remaining rows.
+- #182 and #203 (#175 brief templates, all 48 rows + briefs-check) merged 2026-09-26 as 97d5c17c and fae624e7. #175 stays open for the run-log measurement.
 - #181 (#178) merged 2026-09-26 as a9792f3c.
 - #180 (#173) merged 2026-09-26 as db105aab. Owner: enable Require merge queue on develop.
 - #168 (#163 lift @electron/rebuild override + electron-builder 26.16.1), draft, head 164d93b9, do-not-merge until v0.21.0 ships. Security APPROVE (35479ba2); code review round 1 fixed – Windows Native Smoke run 36256339721 green on this branch (negative control failed as expected); recheck b5d01d5e APPROVE. Review-complete.
@@ -42,7 +42,7 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 - e1c555ca done (PR #202 round 4 at d5c8fbd2, cost about 125 USD); files released.
 - 8dadb69a done (PR #201 merged as d4fc1d61); files released.
 - 994fb3e5 done (PR #191 merged); gate files released. (9a85cf2c done; .github/dependabot.yml released, PR #187.) #170 (gate list) is unblocked: #186 merged.
-- 253ba433 done (PR #203 round 2 at 37eed85a); files released.
+- 253ba433 done (PR #203 merged as fae624e7); files released.
 - Reviews own nothing.
 
 ## Accounts (from `read_quota` at 2026-09-26T21:13:04Z)
