@@ -9,6 +9,7 @@ Updated: 2026-09-25 11:06 CEST
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
+- #187 (#176 Dependabot groups, from 9a85cf2c), draft, head 9717d461, gate sealed. Next: code review (not opus) + codex security review; held while load is over 18.
 - #186 (#169 gate lanes, lint:check), draft, head 9aa4f208, gate sealed. Next: security + cold review (queued on load).
 - #185 (#179 spike report), draft. Result: build the silence alert; auto-continue deferred (parked).
 - #184 (#172 spike) merged 2026-09-26 as 4d874fa7; #172 build held for owner.
@@ -33,10 +34,9 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
 | 974c210b | #171 vitest worker cap | feature-implementation | claude/opus | westagilelabs |
-| 9a85cf2c | #176 Dependabot groups | feature-implementation | claude/opus | gmail |
 
 ## File-ownership table
-- 974c210b owns vitest.main.ts, vitest.preload.ts, vitest.renderer.ts (pool/worker lines), docs/ci.md (test parallelism note), CONTRIBUTING.md (if it mentions parallelism). 9a85cf2c owns .github/dependabot.yml (+ its docs note). No overlap between them; #170 (gate list) waits for #186.
+- 974c210b owns vitest.main.ts, vitest.preload.ts, vitest.renderer.ts (pool/worker lines), docs/ci.md (test parallelism note), CONTRIBUTING.md (if it mentions parallelism). (9a85cf2c done; .github/dependabot.yml released, PR #187.) No overlap between them; #170 (gate list) waits for #186.
 - Reviews own nothing.
 
 ## Accounts (from `read_quota` at 2026-09-26T16:13:00Z)
