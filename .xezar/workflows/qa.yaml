@@ -7,10 +7,11 @@
 # Tool grant (#177): `emulate` is granted only to the qa and design-review roles. `evaluate_script`
 # stays ungranted: a read-only step runs with `--setting-sources user`, so the origin guard
 # (scripts/devtools-evaluate-guard.mjs) cannot be registered for it - see .xezar/LOCAL-PATCHES.md.
-# bashAllowlist (#177): the read-only review set, plus the four commands the skill's own text needs
-# (xezar-qa.md: "check the PR's head out ... and run it"): `git fetch origin` and `git checkout --detach` to
-# put this task's worktree on the PR head (the engine refuses `--upload-pack`/`--exec` and
-# `checkout -- <path>`), `npm ci` to install that head, `npm run dev` to serve it at the dev origin.
+# bashAllowlist (#177): the read-only review set plus ONE run entry, the safe app start
+# `node .xezar/checks/review-run-app.mjs <pr> <head-sha>` (xezar-qa.md: "check the PR's head out ... and run it"). It checks the PR head
+# with gh, refuses the primary checkout and non-macOS hosts, and runs `npm ci` and the dev server
+# under sandbox-exec in a private folder with no access to the owner's checkout or credentials.
+# preflight runs strict (no --allow-root): the app start never moves this worktree off its branch.
 name: qa
 description: "Independent QA of a PR or its current head: exercise the change, verify the fix, post a ## QA verdict comment and apply the SDLC QA-gate labels. Read-only."
 steps:
@@ -20,12 +21,12 @@ steps:
     resultScope: routine
   - id: preflight
     name: Report the checkout
-    command: ".xezar/checks/worktree-preflight.sh --allow-root"
+    command: ".xezar/checks/worktree-preflight.sh"
     resultScope: routine
   - id: review
     name: QA
-    prompt: "QA (see your skill for what to post and which labels to apply): {{task}} Report independence as confirmed, not confirmed or unknown, from the author the launch text names; never confirmed without that text."
+    prompt: "QA (see your skill for what to post and which labels to apply): {{task}} Report independence as confirmed, not confirmed or unknown, from the author the launch text names; never confirmed without that text. To run the PR's app, start `node .xezar/checks/review-run-app.mjs <pr-number> <head-sha>` in the background (it refuses anything but that PR's current head, in a task worktree, on macOS) and open http://localhost:5173/ with chrome-devtools; never check the head out into this worktree."
     skill: xezar-qa
     verdictRole: qa
     allowedTools: [Read, Grep, Glob, Bash, mcp__chrome-devtools__navigate_page, mcp__chrome-devtools__new_page, mcp__chrome-devtools__list_pages, mcp__chrome-devtools__select_page, mcp__chrome-devtools__close_page, mcp__chrome-devtools__take_snapshot, mcp__chrome-devtools__take_screenshot, mcp__chrome-devtools__list_console_messages, mcp__chrome-devtools__get_console_message, mcp__chrome-devtools__list_network_requests, mcp__chrome-devtools__get_network_request, mcp__chrome-devtools__click, mcp__chrome-devtools__fill, mcp__chrome-devtools__fill_form, mcp__chrome-devtools__hover, mcp__chrome-devtools__press_key, mcp__chrome-devtools__type_text, mcp__chrome-devtools__wait_for, mcp__chrome-devtools__handle_dialog, mcp__chrome-devtools__resize_page, mcp__chrome-devtools__get_css_styles, mcp__chrome-devtools__emulate]
-    bashAllowlist: ["gh pr view", "gh pr diff", "gh pr checks", "gh pr list", "gh issue view", "gh issue list", "gh label list", "gh repo view", "jq -n", "bash .xezar/checks/git-read.sh", "bash .xezar/checks/gh-write.sh", "bash .xezar/checks/verdict-write.sh", "bash .xezar/checks/phase-record.sh", "bash .xezar/checks/worktree-setup.sh --readonly-init", "git fetch origin", "git checkout --detach", "npm ci", "npm run dev"]
+    bashAllowlist: ["gh pr view", "gh pr diff", "gh pr checks", "gh pr list", "gh issue view", "gh issue list", "gh label list", "gh repo view", "jq -n", "bash .xezar/checks/git-read.sh", "bash .xezar/checks/gh-write.sh", "bash .xezar/checks/verdict-write.sh", "bash .xezar/checks/phase-record.sh", "bash .xezar/checks/worktree-setup.sh --readonly-init", "node .xezar/checks/review-run-app.mjs"]
