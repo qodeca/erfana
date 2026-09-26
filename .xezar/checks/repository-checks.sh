@@ -68,3 +68,8 @@ if [ -f "$SCRIPT_DIR/lib/gate-parallel.test.mjs" ]; then
 else
   skip gate-parallel "no scheduler test installed beside these checks"
 fi
+if [ -f "$SCRIPT_DIR/leader-context.test.mjs" ]; then
+  node --test "$SCRIPT_DIR/leader-context.test.mjs"
+else
+  skip leader-context "no leader-context fixture test installed beside these checks"
+fi

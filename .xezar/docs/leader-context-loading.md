@@ -38,6 +38,9 @@ is what makes the client reload both without a prompt.
 | `.xezar/campaigns/<yyyymmdd>-<code-name>/decisions.md` | Owner decisions in the owner's exact words, append-only. | **yes** |
 | `.xezar/campaigns/<yyyymmdd>-<code-name>/parked.md` | Calls the leader made alone while the owner was away. | **yes** |
 | `.xezar/campaigns/<yyyymmdd>-<code-name>/timeline-<date>.md` | What happened, minute by minute, append-only. | **yes** |
+| `.xezar/campaigns/<yyyymmdd>-<code-name>/archive-*.md` | Stale blocks and resolved decisions, never loaded; the loader only names them. | **yes** |
+| `.xezar/checks/decisions-archive.mjs` | Moves resolved `decisions.md` entries into `archive-decisions.md`, verbatim. Run by hand; never by the hook. | yes |
+| `.xezar/checks/leader-context.test.mjs` | Fixture tests for what the loader injects from a campaign folder. | yes |
 
 The loader's documented JSON shape is checked by its allowlisted fixture. Values can vary with the
 guide and campaign notes, while these keys are its stable output contract:
@@ -134,7 +137,9 @@ A `SessionStart` hook prints nothing on stdout in the silent cases, and one line
 the guide, and then, when a campaign is open, four more labelled blocks inside an
 untrusted-content boundary. The fixed order is: the leader line, the guide, the
 newest campaign `README.md`, its newest `timeline-*.md`, its `parked.md`, then its `decisions.md`.
-Order matters — a rule that a decision overrides is read after the rule, and the authority file is
+When the folder holds any `archive-*.md`, one line after `decisions.md` names those files as not
+loaded, so a moved decision is one read away. Only names matching `archive-[A-Za-z0-9._-]+.md` are
+printed, so a committed file name cannot carry text into the session. Order matters — a rule that a decision overrides is read after the rule, and the authority file is
 read last, nearest to the work.
 
 **The campaign blocks are wrapped, and the wrapper is the security boundary.** Campaign files are
@@ -189,18 +194,35 @@ guide's size compounds. Three caps follow, and all are requirements rather than 
   `parked.md` and its `decisions.md`. A plan or an archive is never loaded; the leader reads those
   on demand.
 - **The cap depends on the file's role, and one file has no cap at all.** The narrative notes —
-  `README.md`, the newest timeline, `parked.md` — are bounded in the payload to their last
+  `README.md` and `parked.md` — are bounded in the payload to their last
   **65 536 bytes** (`NOTE_TAIL_BYTES`), because they grow for the life of a campaign while the
   leader reads the tail anyway. A note over the cap is preceded by a visible line naming the file
   and its size, so a partial note is never mistaken for the whole.
+- **The newest timeline is bounded by entry.** It is the note that grows every few minutes, so only
+  its newest **40 entries** (`TIMELINE_ENTRIES`) are injected, after its `# Timeline` heading and
+  one line: `[timeline bounded: showing the newest 40 of N entries …; the full timeline is on disk
+  at <path> …]`. An entry is a line starting `- ` plus the lines under it, so the cut never lands
+  mid-entry. `NOTE_TAIL_BYTES` still applies on top, so one oversized entry cannot undo the bound.
+  A timeline of 40 entries or fewer is injected whole, with no pointer line.
 - **`decisions.md` is injected whole and is never cut.** It is the authority file: the owner's exact
   words, append-only, and the oldest entry binds the leader exactly as hard as the newest. Cutting
   its head would silently drop standing decisions the leader is still required to follow, and it
   would do so with no visible failure — which is the worst shape a defect can take. The guide is
   likewise **not** capped; it is always loaded in full.
+- **`decisions.md` shrinks only by archiving, never by cutting.** Once an entry is resolved – its
+  work merged, its question closed, nothing left for it to bind – the leader moves it out with
+  `node .xezar/checks/decisions-archive.mjs <campaign-dir> --list`, then `--move <numbers>` to
+  preview and `--move <numbers> --apply` to move. It appends the entries verbatim, under a dated
+  heading, to `archive-decisions.md` in the same folder (`--to archive-<name>.md` picks another)
+  *before* it rewrites `decisions.md`, then re-reads both and checks that no line was lost. It never
+  deletes. Deciding what is resolved is the leader's call; a standing rule stays in `decisions.md`
+  for the life of the campaign. Commit both files together.
 
 A silent case costs one process spawn and no tokens. A loud case costs the guide, the whole
-decisions file, and the bounded narrative notes.
+decisions file, and the bounded narrative notes. Measured on a copy of the `20260925-release-0.21.0`
+campaign on 2026-09-26 (#174): the timeline bound took the injected context from 75 854 to 52 020
+bytes with all 43 decisions still present whole; archiving four resolved entries on the copy took it
+to 51 084.
 
 ## Standing loops the leader runs
 

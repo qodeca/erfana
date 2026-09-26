@@ -32,8 +32,8 @@ Everything else goes through a pull request.
 | `parked.md` | calls the leader made alone while the owner was away | yes |
 | `merges.md` | one line per day: every merge as `#PR -> sha` | no, read on demand |
 | `plan.md` | the owner-approved plan, copied in once, never edited | on demand |
-| `timeline-YYYY-MM-DD.md` | one file per day, append-only | newest day only, tail |
-| `archive-*.md` | stale blocks kept for history | never |
+| `timeline-YYYY-MM-DD.md` | one file per day, append-only | newest day only, newest 40 entries |
+| `archive-*.md` | stale blocks and resolved decisions kept for history | never (only named) |
 
 - **`README.md`** — live state. Rewritten, not appended, at every milestone, as the last act of
   handling that event and before reporting to the owner. Stamp `Updated:` from `date`. Keep: a
@@ -49,7 +49,11 @@ Everything else goes through a pull request.
 - **`decisions.md`** — owner decisions in the owner's exact words, with the date and the channel
   (chat or a direct question), plus the campaign's standing rules. **Append-only**: never edit or
   reorder a past entry. This file is injected **whole** at session start, never truncated, because
-  the oldest entry binds the leader exactly as hard as the newest one.
+  the oldest entry binds the leader exactly as hard as the newest one. To keep it small, move a
+  **resolved** entry out – never cut one – with `node .xezar/checks/decisions-archive.mjs
+  <campaign-dir> --move <numbers> --apply` (`--list` numbers the entries; without `--apply` it only
+  previews). The entry lands verbatim in `archive-decisions.md`; nothing is deleted. Moving is not
+  editing: the entry's words are unchanged, only its file is. Standing rules stay.
 
 - **`parked.md`** — one entry per decision the leader made on the owner's behalf during unattended
   mode. Each entry records what it chose, why, the alternative it rejected, and how to undo it.
@@ -65,9 +69,12 @@ Everything else goes through a pull request.
 
 - **`timeline-YYYY-MM-DD.md`** — one file per day, append-only. Every line starts
   `- YYYY-MM-DD HH:MM - ...` stamped from `date` and names run ids by their first 8 characters.
-  Never read this file whole; read its tail.
+  Never read this file whole; read its tail. Only its newest 40 entries are injected at session
+  start, after a line naming the full file on disk.
 
-- **`archive-*.md`** — stale blocks kept for history. Never loaded at session start.
+- **`archive-*.md`** — stale blocks kept for history, and resolved decisions moved out of
+  `decisions.md` (`archive-decisions.md`). Never loaded at session start; the loader prints one line
+  naming them, so the leader knows they exist.
 
 ## `future-campaign/`
 
@@ -98,8 +105,9 @@ leave the folder in place. Campaigns are never deleted.
 
 ## Loading
 
-The leader's session-start hook injects `README.md`, the newest `timeline-*.md`, `parked.md` and
-the whole of `decisions.md`. `plan.md` and the archives are read on demand. Agent memory holds a
+The leader's session-start hook injects `README.md`, the newest 40 entries of the newest
+`timeline-*.md`, `parked.md` and the whole of `decisions.md`. `plan.md`, older timelines and the
+archives are read on demand. Agent memory holds a
 pointer to the folder, never a copy of its content.
 
 ## Writing rules
