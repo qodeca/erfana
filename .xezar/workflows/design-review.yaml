@@ -5,6 +5,10 @@
 # Tool grant (#177): `emulate` is granted only to the qa and design-review roles. `evaluate_script`
 # stays ungranted: a read-only step runs with `--setting-sources user`, so the origin guard
 # (scripts/devtools-evaluate-guard.mjs) cannot be registered for it - see .xezar/LOCAL-PATCHES.md.
+# bashAllowlist (#177): the read-only review set, plus the four commands the skill's own text needs
+# (xezar-ux-design.md review mode: "Inspect static mockups from disk; review application changes in the running cockpit"): `git fetch origin` and `git checkout --detach` to
+# put this task's worktree on the PR head (the engine refuses `--upload-pack`/`--exec` and
+# `checkout -- <path>`), `npm ci` to install that head, `npm run dev` to serve it at the dev origin.
 name: design-review
 description: "Review a mockup under the folder paths.designs names, or a PR's UI against the design system and the accessibility bar. Verdict PASS / PASS WITH FOLLOW-UPS / FAIL. Read-only."
 steps:
@@ -22,4 +26,4 @@ steps:
     skill: xezar-ux-design
     verdictRole: design-review
     allowedTools: [Read, Grep, Glob, Bash, mcp__chrome-devtools__navigate_page, mcp__chrome-devtools__new_page, mcp__chrome-devtools__list_pages, mcp__chrome-devtools__select_page, mcp__chrome-devtools__close_page, mcp__chrome-devtools__take_snapshot, mcp__chrome-devtools__take_screenshot, mcp__chrome-devtools__list_console_messages, mcp__chrome-devtools__get_console_message, mcp__chrome-devtools__list_network_requests, mcp__chrome-devtools__get_network_request, mcp__chrome-devtools__click, mcp__chrome-devtools__fill, mcp__chrome-devtools__fill_form, mcp__chrome-devtools__hover, mcp__chrome-devtools__press_key, mcp__chrome-devtools__type_text, mcp__chrome-devtools__wait_for, mcp__chrome-devtools__handle_dialog, mcp__chrome-devtools__resize_page, mcp__chrome-devtools__get_css_styles, mcp__chrome-devtools__emulate]
-    bashAllowlist: ["gh pr view", "gh pr diff", "gh pr checks", "gh pr list", "gh issue view", "gh issue list", "gh label list", "gh repo view", "jq -n", "bash .xezar/checks/git-read.sh", "bash .xezar/checks/gh-write.sh", "bash .xezar/checks/verdict-write.sh", "bash .xezar/checks/phase-record.sh", "bash .xezar/checks/worktree-setup.sh --readonly-init"]
+    bashAllowlist: ["gh pr view", "gh pr diff", "gh pr checks", "gh pr list", "gh issue view", "gh issue list", "gh label list", "gh repo view", "jq -n", "bash .xezar/checks/git-read.sh", "bash .xezar/checks/gh-write.sh", "bash .xezar/checks/verdict-write.sh", "bash .xezar/checks/phase-record.sh", "bash .xezar/checks/worktree-setup.sh --readonly-init", "git fetch origin", "git checkout --detach", "npm ci", "npm run dev"]

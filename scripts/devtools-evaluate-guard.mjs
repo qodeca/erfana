@@ -25,11 +25,23 @@
 // denied with the reason. The input is contributor-influenced, so it is size-
 // capped before any regex, the regexes are anchored with no nested
 // quantifiers, and the function is compiled (never run) to prove it is one
-// arrow function with nothing chained after it.
+// arrow function with nothing chained after it. The guard is then checked on
+// the parsed syntax tree, not on text: the throw must be a complete statement
+// whose operand is a bare string literal, so nothing chained onto it
+// (`throw 'x' + document.title`) can run on a page that fails the check.
+// Any failure – including a missing parser or a crash – denies.
 import { readFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
 import { URL, pathToFileURL, fileURLToPath } from 'node:url'
 import vm from 'node:vm'
+
+let ts = null
+try {
+  ts = createRequire(import.meta.url)('typescript')
+} catch {
+  // Without the parser every call is denied in decide().
+}
 
 export const TOOL_NAME = 'mcp__chrome-devtools__evaluate_script'
 export const MAX_INPUT_CHARS = 64 * 1024
@@ -43,7 +55,7 @@ const PREFIX = new RegExp(
   String.raw`^\s*(?:async\s+)?(${PARAMS})\s*=>\s*\{\s*` +
     String.raw`\/\*\s*purpose:([^*\r\n]{0,300})\*\/\s*` +
     String.raw`if\s*\(\s*location\.protocol\s*\+\s*(['"])\/\/\3\s*\+\s*location\.host\s*\+\s*location\.pathname\s*` +
-    String.raw`!==\s*(['"])([^'"\\\r\n]{1,2048})\4\s*\)\s*throw\s+(['"])[^'"\\\r\n]{0,200}\6\s*;?`
+    String.raw`!==\s*(['"])([^'"\\\r\n]{1,2048})\4\s*\)\s*throw\s+(['"])[^'"\\\r\n]{0,200}\6\s*;`
 )
 // A `function location() {}` anywhere in the body is hoisted above the guard
 // and would answer it, and a unicode escape can spell the same name. So
@@ -76,6 +88,40 @@ function compiles(source) {
   } catch {
     return false
   }
+}
+
+const isName = (node, name) => ts.isIdentifier(node) && node.text === name
+const isLocationRead = (node, prop) =>
+  ts.isPropertyAccessExpression(node) && isName(node.expression, 'location') && isName(node.name, prop)
+const isPlus = (node) => ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.PlusToken
+
+// The origin guard as parsed: returns its target URL, or null when the tree is
+// not exactly `(async? (plain, names) => { if (location.protocol + '//' +
+// location.host + location.pathname !== '<url>') throw '<text>'; ... })`.
+function parsedGuardTarget(fn) {
+  const source = ts.createSourceFile('evaluate.js', `(${fn})`, ts.ScriptTarget.Latest, false, ts.ScriptKind.JS)
+  if (source.statements.length !== 1) return null
+  const [statement] = source.statements
+  if (!ts.isExpressionStatement(statement) || !ts.isParenthesizedExpression(statement.expression)) return null
+  const arrow = statement.expression.expression
+  if (!ts.isArrowFunction(arrow) || !ts.isBlock(arrow.body)) return null
+  if ((arrow.modifiers ?? []).some((m) => m.kind !== ts.SyntaxKind.AsyncKeyword)) return null
+  if (!arrow.parameters.every((p) => ts.isIdentifier(p.name) && !p.initializer && !p.dotDotDotToken)) return null
+  const first = arrow.body.statements[0]
+  if (!first || !ts.isIfStatement(first) || first.elseStatement) return null
+  const test = first.expression
+  if (!ts.isBinaryExpression(test) || test.operatorToken.kind !== ts.SyntaxKind.ExclamationEqualsEqualsToken) return null
+  if (!ts.isStringLiteral(test.right)) return null
+  const left = test.left
+  if (!isPlus(left) || !isLocationRead(left.right, 'pathname')) return null
+  const host = left.left
+  if (!isPlus(host) || !isLocationRead(host.right, 'host')) return null
+  const slashes = host.left
+  if (!isPlus(slashes) || !ts.isStringLiteral(slashes.right) || slashes.right.text !== '//') return null
+  if (!isLocationRead(slashes.left, 'protocol')) return null
+  const thrown = first.thenStatement
+  if (!ts.isThrowStatement(thrown) || !thrown.expression || !ts.isStringLiteral(thrown.expression)) return null
+  return test.right.text
 }
 
 export function decide(payload, targets) {
@@ -113,6 +159,13 @@ export function decide(payload, targets) {
   if (!fn.trimEnd().endsWith('}') || !compiles(`(${fn})`) || !compiles(`({ k: ${fn} })`)) {
     return deny('the function must be a single arrow function with a block body and nothing after it.')
   }
+  if (!ts) return deny('the TypeScript parser is unavailable, so the origin guard cannot be verified.')
+  // The text match above is a pre-filter; the parsed tree decides. The throw
+  // must end at a string literal – `throw 'x' + f()` or `throw 'x'\n(f)()`
+  // would run f on the wrong page before throwing.
+  if (parsedGuardTarget(fn) !== target) {
+    return deny("the origin guard must be one complete statement, `if (...) throw '<text>';`, throwing a bare string literal with no else.")
+  }
   return { allowed: true }
 }
 
@@ -147,6 +200,12 @@ function readStdin() {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const out = run(readStdin())
+  let out
+  try {
+    out = run(readStdin())
+  } catch {
+    // A hook that crashes does not block the call, so a crash denies.
+    out = hookOutput(deny('the guard failed while checking the call.'))
+  }
   if (out) process.stdout.write(`${out}\n`)
 }
