@@ -38,8 +38,8 @@ is what makes the client reload both without a prompt.
 | `.xezar/campaigns/<yyyymmdd>-<code-name>/decisions.md` | Owner decisions in the owner's exact words, append-only. | **yes** |
 | `.xezar/campaigns/<yyyymmdd>-<code-name>/parked.md` | Calls the leader made alone while the owner was away. | **yes** |
 | `.xezar/campaigns/<yyyymmdd>-<code-name>/timeline-<date>.md` | What happened, minute by minute, append-only. | **yes** |
-| `.xezar/campaigns/<yyyymmdd>-<code-name>/archive-*.md` | Stale blocks and resolved decisions, never loaded; the loader only names them. | **yes** |
-| `.xezar/checks/decisions-archive.mjs` | Moves resolved `decisions.md` entries into `archive-decisions.md`, verbatim. Run by hand; never by the hook. | yes |
+| `.xezar/campaigns/<yyyymmdd>-<code-name>/archive-*.md` | Stale blocks, and copies of resolved decisions; never loaded, the loader only names them. An entry of `decisions.md` identical to one in `archive-decisions.md` is left out of the injected copy. | **yes** |
+| `.xezar/checks/decisions-archive.mjs` | Appends resolved `decisions.md` entries verbatim to `archive-decisions.md`, which hides them from the injected context; never changes `decisions.md`. Run by hand; also the hook's filter (`--visible`). | yes |
 | `.xezar/checks/leader-context.test.mjs` | Fixture tests for what the loader injects from a campaign folder. | yes |
 
 The loader's documented JSON shape is checked by its allowlisted fixture. Values can vary with the
@@ -138,7 +138,7 @@ the guide, and then, when a campaign is open, four more labelled blocks inside a
 untrusted-content boundary. The fixed order is: the leader line, the guide, the
 newest campaign `README.md`, its newest `timeline-*.md`, its `parked.md`, then its `decisions.md`.
 When the folder holds any `archive-*.md`, one line after `decisions.md` names those files as not
-loaded, so a moved decision is one read away. Only names matching `archive-[A-Za-z0-9._-]+.md` are
+loaded, so an archived decision is one read away. Only names matching `archive-[A-Za-z0-9._-]+.md` are
 printed, so a committed file name cannot carry text into the session. Order matters — a rule that a decision overrides is read after the rule, and the authority file is
 read last, nearest to the work.
 
@@ -209,28 +209,30 @@ guide's size compounds. Three caps follow, and all are requirements rather than 
   its head would silently drop standing decisions the leader is still required to follow, and it
   would do so with no visible failure — which is the worst shape a defect can take. The guide is
   likewise **not** capped; it is always loaded in full.
-- **`decisions.md` shrinks only by archiving, never by cutting.** Once an entry is resolved – its
-  work merged, its question closed, nothing left for it to bind – the leader moves it out with
-  `node .xezar/checks/decisions-archive.mjs <campaign-dir> --list`, then `--move <numbers>` to
-  preview and `--move <numbers> --apply` to move. It appends the entries verbatim, under a dated
-  heading, to `archive-decisions.md` in the same folder (`--to archive-<name>.md` picks another).
-  Run it from inside the repository: the folder must resolve to a direct child of the repository's
-  real `.xezar/campaigns`, so no symlink in the path can send it elsewhere. `--apply` holds an
-  exclusive `.decisions-archive.lock` in the folder (it serialises archive runs only), writes both
-  new files as temp files and reads them back, then swaps the archive in *before* `decisions.md`.
-  Each swap renames the live file aside to `<name>.aside-<pid>`, compares that copy with what it
-  read, and installs the new file with a no-clobber link – so an append made during the run, by
-  path or through an open handle, is never overwritten: the run puts the file back and refuses, or,
-  if a new file already took its place, keeps both and names them for a hand merge. It then re-reads
-  both and checks that no line was lost. A lock, `.tmp-<pid>` or `.aside-<pid>` file left by a
-  crashed or refused run is named in the message; look at it before removing it. It never deletes. Deciding what is resolved is the leader's call; a standing rule stays in `decisions.md`
-  for the life of the campaign. Commit both files together.
+- **Archiving hides an entry from the leader's context; it never removes it from `decisions.md`.**
+  Once an entry is resolved – its work merged, its question closed, nothing left for it to bind –
+  the leader runs `node .xezar/checks/decisions-archive.mjs <campaign-dir> --list`, then
+  `--move <numbers>` to preview and `--move <numbers> --apply` to archive. The script only
+  **appends** those entries, byte for byte under a dated heading, to `archive-decisions.md` in the
+  same folder (`O_APPEND`, every byte written, `fsync`, then read back). It never rewrites, renames
+  or deletes any file, so an append to `decisions.md` during a run cannot be lost. The loader then
+  leaves out of the injected `decisions.md` every entry whose exact block (the same parser: a `- `
+  line plus its indented lines) is also in `archive-decisions.md`, and prints one line saying how
+  many it left out. An entry that differs by a single byte – edited after archiving, or an archive
+  copy that was edited – is injected. If the filter cannot run, the whole file is injected. If
+  `decisions.md` is missing, a symlink or unreadable, the loader prints a one-line WARNING naming it
+  instead of skipping it. Run the script from inside the repository: the folder must resolve to a
+  direct child of the repository's real `.xezar/campaigns`, so no symlink in the path can send it
+  elsewhere. A `.decisions-archive.lock` only stops two runs appending the same entry twice; a
+  second run skips an entry that is already archived. Deciding what is resolved is the leader's
+  call; a standing rule stays visible for the life of the campaign. Commit `archive-decisions.md`.
 
-A silent case costs one process spawn and no tokens. A loud case costs the guide, the whole
-decisions file, and the bounded narrative notes. Measured on a copy of the `20260925-release-0.21.0`
-campaign on 2026-09-26 (#174): the timeline bound took the injected context from 75 854 to 52 020
-bytes with all 43 decisions still present whole; archiving four resolved entries on the copy took it
-to 51 084.
+A silent case costs one process spawn and no tokens. A loud case costs the guide, the visible part
+of the decisions file, and the bounded narrative notes. Measured on a copy of the
+`20260925-release-0.21.0` campaign on 2026-09-26 (#174, record commit e0126e85): the `develop` loader
+injected 84 532 bytes; this loader injects 51 647 with all 45 decisions present whole; archiving four
+resolved entries on the copy took it to 51 160, with the other 41 present and `decisions.md`
+byte-identical.
 
 ## Standing loops the leader runs
 
