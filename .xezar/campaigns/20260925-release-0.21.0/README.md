@@ -9,7 +9,8 @@ Updated: 2026-09-25 11:06 CEST
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
-- #201 (#174 leader context, from 8dadb69a), draft, head 6b3798bf, gate sealed. Next: code review (not opus) + codex security (kit loader); held on load. Shares repository-checks.sh with #191.
+- #202 (#177 browser grant, from e1c555ca), draft, head 82938dae, gate passed. emulate granted; evaluate_script stays denied (wiring options → owner). Reviews 04b8155b (sonnet) + 864506c8 (codex security) running.
+- #201 (#174 leader context, from 8dadb69a), draft, head 6b3798bf, gate sealed. Reviews 9c5505e0 (sonnet) + 1b108196 (codex security) running. Shares repository-checks.sh with #191.
 - #191 (#170 drop test:ci, from 994fb3e5), draft, head abc25817, gate sealed at a99c2605. Cold review 6513c636 APPROVE; codex security fed841b8 FINDINGS (S-1 minor, S-2 nit = #186 S-5, test wiring). Round 1 done at abc25817 (author gate green, 1m44s). Codex recheck 189d6325: S-1 still open, S-3 nit → round 2 (allowlist design) with 994fb3e5; a third round would be parked. After merge: leader-guide.md:150 drop test:ci.
 - #190 (#179 silence alert, from 392e7c9b), draft, head 0fdf50e1, gate sealed. Codex security eab95ae4: S-1 minor (lstat errors leak paths); cold review 0ac0f4e6 APPROVE + 1 runbook minor (leader posted). Round 1 done at 211803b5 (author gate green). Security recheck d6354c72 NO FINDINGS; code recheck 6bd5518f APPROVE. Windows checks fail (4 darwin-only tests) → round 2 with 392e7c9b. Owner installs launchd by hand after merge.
 - #189 (load ceiling 40) merged 2026-09-26 as 25adc9a7.
@@ -40,13 +41,16 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 |---|---|---|---|---|
 | 392e7c9b | #190 round 2 (continue) | feature-implementation | claude/opus | eqamana |
 | 994fb3e5 | #191 round 2 (continue) | feature-implementation | claude/opus | eqamana |
-| e1c555ca | #177 browser grant | feature-implementation | claude/opus | eqamana |
+| 04b8155b | #202 cold review | code-review | claude/sonnet | qodeca |
+| 864506c8 | #202 security review | security-review | codex/gpt-6-astra | default |
+| 9c5505e0 | #201 cold review | code-review | claude/sonnet | westagilelabs |
+| 1b108196 | #201 security review | security-review | codex/gpt-6-astra | qodeca-2 |
 
 ## File-ownership table
 - 974c210b done (PR #188); vitest configs released.
 - 7d5d7fc6 done (PR #189); .xezar/loops.json released.
 - 392e7c9b done. Reviews own nothing.
-- e1c555ca owns .xezar/workflows/qa.yaml, .xezar/workflows/design-review.yaml, a new evaluate_script origin hook + tests, LOCAL-PATCHES.md entry.
+- e1c555ca done (PR #202); workflow files released.
 - 8dadb69a done (PR #201); leader-context files released.
 - 994fb3e5 done (PR #191); gate files released. (9a85cf2c done; .github/dependabot.yml released, PR #187.) #170 (gate list) is unblocked: #186 merged.
 - Reviews own nothing.
@@ -69,6 +73,7 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 - #139 build – PR #159: code review APPROVE, design review FAIL (B-1 account name in QA screenshots); round 1 done at 1f924f73 (B-1 masked, NB-1 stated as a limit, NB-2 documented deviation); design recheck PASS at 9203f493; QA FAIL only because 3 checks could not run (chrome-devtools emulate + evaluate_script denied in the QA session): dark mode, theme switch, reduced motion unverified live. Waiting for the owner.
 
 ## Owner items
+- **#177 evaluate_script wiring (PR #202):** emulate is granted; evaluate_script stays denied because the guard hook cannot be registered per workflow. Options in the PR body: user-scope settings for the xezar profile, a filtering proxy in .mcp.json, or leave denied. Leader recommends leave denied until a QA run proves it is needed.
 - **#172 review posting (spike PR #184):** fix needs either (a) an upstream xezar engine change (pass --settings to reading steps, or a verdict-body field) – recommended, file upstream; or (b) a user-scope PreToolUse hook in ~/.claude/settings.json on this machine (tested: 12k-char verdict posts, 0 denials; but it runs for every Claude session and is outside repo review). Interim rule (short plain-text verdicts) works today. Build held until the owner picks.
 - **#159: owner checks by hand (answered 2026-09-26 08:40)** – dark theme, banner theme switch, reduced-motion still on github.com, branch feature/139-readme-redesign. Leader merges on the owner's word with green checks. Earlier note: (dark theme, banner theme switch, reduced-motion still). Both QA and design sessions were denied the chrome-devtools emulate/evaluate_script tools. Options: (a) owner checks them by hand on github.com in ~2 minutes (branch feature/139-readme-redesign: switch OS dark mode, turn on Reduce motion), or (b) allow those two tools for review sessions and re-run QA. Leader recommends (a).
 - `npm audit` on develop's lockfile (run by the #159 author, 2026-09-25 23:51): 16 advisories – 1 critical, 12 high, 3 moderate – none added by #159. Owner chose triage in 0.21.0: issue #161, task d71e7bf0.
