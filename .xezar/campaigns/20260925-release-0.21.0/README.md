@@ -12,7 +12,7 @@ Updated: 2026-09-25 11:06 CEST
 - #184 (#172 spike report), draft. Needs a light review; build of #172 held for owner.
 - #183 (#133) merged 2026-09-26 as 6b763b38.
 - #182 (#175) merged 2026-09-26 as 97d5c17c. #175 stays open for the remaining rows.
-- #181 (#178 Windows native smoke), draft, head 73880f37, gate sealed. Reviews running. Then run on #168 branch.
+- #181 (#178) merged 2026-09-26 as a9792f3c.
 - #180 (#173) merged 2026-09-26 as db105aab. Owner: enable Require merge queue on develop.
 - #168 (#163 lift @electron/rebuild override + electron-builder 26.16.1), draft, head d4043abc, labels dependencies + do-not-merge. Gate passed; npm audit 16 -> 7; node-pty rebuilt (@electron/rebuild 4.2.0); `electron-builder --dir` green; packed app opened a working terminal. Security review 35479ba2 (opus): APPROVE-level + nit S-1; leader posted it (comment 5847266523). Code review 84cbb123 (sonnet, gmail, posted itself): REQUEST CHANGES – Windows checks job never runs @electron/rebuild, so no Windows evidence for the changed path (leader's brief wrongly named it). Round 1 relayed to 43131e43: fix PR body, list Windows-proof options, BLOCKED for owner; S-1 after #162 lands.
 - #167 (#164 liteparse 2.14.7), draft, head 0fa58e18, do-not-merge until v0.21.0 ships. Round 1 fixed; recheck 0b92cbf1 (sonnet/gmail) APPROVE, posted itself.
