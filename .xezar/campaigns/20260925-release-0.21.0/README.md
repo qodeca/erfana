@@ -10,7 +10,7 @@ Updated: 2026-09-25 11:06 CEST
 
 ## Open pull requests
 - #189 (owner decision: load ceiling 40 in .xezar/loops.json, from 7d5d7fc6), draft, head eb97bd69, gate sealed. Next: code review (not opus).
-- #188 (#171 vitest worker cap, from 974c210b), draft, head 17e9fcbc, gate sealed. Cold review 4d88df5b APPROVE (leader posted). CI Unit tests failed (crash, no summary); rerun watching.
+- #188 (#171 vitest worker cap) merged 2026-09-26 as c27b399b (one CI unit-test crash before, rerun green).
 - #187 (#176 Dependabot groups, from 9a85cf2c), draft, head 9717d461, gate sealed. Code review dfa7c67f REQUEST CHANGES (overrides-only pins, pre-1.0 deps, actions limit); security 5cba1e38 NO FINDINGS. Round 1 done at bdf8dd53 (author gate green). Next: code recheck + codex security recheck.
 - #186 (#169 gate lanes, lint:check), draft, head 58640590, round 1 fixed by 04cb9379 (author gate green, not sealed). Code recheck 839f072f APPROVE; security recheck 31c5f2ec S-1, S-2 fixed, new S-3 minor + S-4 nit → round 2 with 04cb9379. After merge: leader-guide.md:149 lint -> lint:check.
 - #185 (#179 spike) merged 2026-09-26 as 5f285011. Result: build the silence alert (+ line-86 doc fix); auto-continue deferred (parked).
