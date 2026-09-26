@@ -43,7 +43,6 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 | e1c555ca | #202 round 1 (continue) | feature-implementation | claude/opus | eqamana |
 | 994fb3e5 | #191 round 2 (continue) | feature-implementation | claude/opus | eqamana |
 | 9c5505e0 | #201 cold review | code-review | claude/sonnet | westagilelabs |
-| 1b108196 | #201 security review | security-review | codex/gpt-6-astra | qodeca-2 |
 
 ## File-ownership table
 - 974c210b done (PR #188); vitest configs released.
