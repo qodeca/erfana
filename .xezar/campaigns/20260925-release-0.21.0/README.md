@@ -32,7 +32,6 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| 0443825e | #186 security-review | security-review | claude/opus | qodeca |
 | b9b1012d | #186 full-cold-review | code-review | claude/opus | eqamana |
 | b5d01d5e | #168 scoped-recheck (Windows proof, S-1) | code-review | claude/sonnet | gmail |
 | 7c7e6ae8 | #184 spike doc review | code-review | claude/sonnet | qodeca |
