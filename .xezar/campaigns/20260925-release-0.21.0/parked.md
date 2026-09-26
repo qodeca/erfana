@@ -19,3 +19,9 @@ Calls the leader made alone while the owner was away.
 - **Why:** after five rounds the security review still finds a way to hide an open decision (S-8: a committed record can predict a future entry). Nothing in the repo can prove a record was written after its entry existed. Round 5 was announced as the last try.
 - **Rejected:** a sixth attempt at archiving (needs a trusted proof of archival, for example signed records or leader-only writes – a bigger design).
 - **Undo:** reopen archiving as its own issue with a trusted-proof design; the removed code is in PR #201's history (heads 2a3e4be9, 42110df6).
+
+## 2026-09-26T20:57:30Z – #202 scope trim: split the safe app start out of #202 (owner asleep)
+- **Chose:** round 4 removes review-run-app.mjs and its run entry; #202 keeps emulate, the unwired evaluate_script guard, the read-only bash allowlists and strict preflight. The safe app start becomes follow-up work.
+- **Why:** round 3 fixed the file-write hole (S-2), but the security review still finds process-containment gaps (S-3: a detached child can escape cleanup; S-4: remembered PIDs can be reused by an unrelated process, which cleanup then signals). Reliable containment on macOS without root is a larger design; #202 already costs about 74 USD. The guide's own option for a third+ round is "split the helper into its own PR".
+- **Rejected:** a fourth repair round on the wrapper (identity-bound tracking, fail-closed discovery, detached-descendant containment), which the owner may still prefer.
+- **Undo:** the wrapper is in PR #202's history (head eec611b1); open a follow-up issue/PR from it with S-3/S-4 as its acceptance, or tell the leader to restore it into #202.

@@ -34,14 +34,14 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| 1f4ff763 | #202 round 3 security recheck | security-review | codex/gpt-6-astra | default |
+| e1c555ca | #202 round 4 (split app start out, parked call) | feature-implementation | claude/opus | eqamana |
 | c7259038 | #202 round 3 code recheck | code-review | claude/sonnet | gmail |
 
 ## File-ownership table
 - 974c210b done (PR #188); vitest configs released.
 - 7d5d7fc6 done (PR #189); .xezar/loops.json released.
 - 392e7c9b done. Reviews own nothing.
-- e1c555ca done (PR #202 round 3 at eec611b1); files released.
+- e1c555ca owns qa.yaml, design-review.yaml, catalog-check.mjs + tests, review-run-app.mjs (removing), guard files, LOCAL-PATCHES.md (PR #202 round 4).
 - 8dadb69a done (PR #201 round 6 at 457d06b8); files released.
 - 994fb3e5 done (PR #191 merged); gate files released. (9a85cf2c done; .github/dependabot.yml released, PR #187.) #170 (gate list) is unblocked: #186 merged.
 - Reviews own nothing.
