@@ -9,7 +9,8 @@ Updated: 2026-09-25 11:06 CEST
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
-- #190 (#179 silence alert, from 392e7c9b), draft, head 0fdf50e1, gate sealed. Codex security eab95ae4: S-1 minor (lstat errors leak paths); cold review 0ac0f4e6 APPROVE + 1 runbook minor (leader posted). Round 1 done at 211803b5 (author gate green). Next: security + code recheck. Owner installs launchd by hand after merge.
+- #202 (#177 browser grant, from e1c555ca), draft, head 82938dae, gate passed. emulate granted; evaluate_script stays denied (wiring options → owner). Cold review 04b8155b REQUEST CHANGES (2 major, 1 minor, 1 nit); codex security 864506c8 BLOCKING (S-1 = same guard defect as code M-1). Round 1 done at e2bc1a5d (syntax-tree guard; 4 run-code bash entries + catalog-check RUNS_CODE_BASH_PREFIXES – a kit-check loosening). Rechecks ce9b18e4 + 9672867b running.
+- #201 (#174 leader context, from 8dadb69a), draft, head 6b3798bf, gate sealed. Reviews 9c5505e0 (sonnet) + 1b108196 (codex security) running. Shares repository-checks.sh with #191.
 - #189 (load ceiling 40) merged 2026-09-26 as 25adc9a7.
 - #188 (#171 vitest worker cap) merged 2026-09-26 as c27b399b (one CI unit-test crash before, rerun green).
 - #187 (#176 Dependabot groups) merged 2026-09-26 as 80a8c032; #176 closed.
@@ -22,10 +23,7 @@ Updated: 2026-09-25 11:06 CEST
 - #180 (#173) merged 2026-09-26 as db105aab. Owner: enable Require merge queue on develop.
 - #168 (#163 lift @electron/rebuild override + electron-builder 26.16.1), draft, head 164d93b9, do-not-merge until v0.21.0 ships. Security APPROVE (35479ba2); code review round 1 fixed – Windows Native Smoke run 36256339721 green on this branch (negative control failed as expected); recheck b5d01d5e APPROVE. Review-complete.
 - #167 (#164 liteparse 2.14.7), draft, head 0fa58e18, do-not-merge until v0.21.0 ships. Round 1 fixed; recheck 0b92cbf1 (sonnet/gmail) APPROVE, posted itself.
-- #155 ready, head d4fb29e7 – allow rule in scripts/xezar-leader-settings.json (4458b282): exactly 2 exact-match rules + one autoMode reason; all checks green. Next: security-review (widens tool access).
-- #154 ready, head 5fce83d5 – #138 part B (2a1e4316): test fixed, workflow gates sealed, CI all green incl. Windows. Next: full-cold-review + design-review of the 52 images and demo (privacy).
-- #140 ready, head c442a15b – #139 spec. Re-check 12b29be1 APPROVE at c442a15b, all 11 findings fixed, no new defects. Labels design-approved + merge-queue; #139 labelled design-approved. Next in the merge line after #141: bring up to date, wait for green, squash-merge.
-Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
+Dependabot PRs, not in scope: #63-#68 (old config) and #192-#200 (new grouped config, opened 2026-09-26 ~20:10; #196 duplicates #167).
 
 ## Process speed-up plan v3 (owner-approved 2026-09-26)
 Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #173 merge queue, #178 Windows smoke, #175 brief templates. Wave 2 (after spikes): #169, #170, #172, #179. Wave 3: #174, #176, #177, #171 (only if ps shows vitest load). Dropped by owner: records branch, docs-only fast path. Interim rules in force: short plain-text verdicts in review briefs; batched record pushes.
@@ -36,25 +34,29 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| 994fb3e5 | #170 drop test:ci | feature-implementation | claude/opus | eqamana |
+| ce9b18e4 | #202 round 1 code recheck | code-review | claude/sonnet | westagilelabs |
+| 9672867b | #202 round 1 security recheck | security-review | codex/gpt-6-astra | default |
+| a0ebdd91 | #201 round 1 security recheck | security-review | codex/gpt-6-astra | qodeca-2 |
 
 ## File-ownership table
 - 974c210b done (PR #188); vitest configs released.
 - 7d5d7fc6 done (PR #189); .xezar/loops.json released.
 - 392e7c9b done. Reviews own nothing.
-- 994fb3e5 owns .xezar/checks/repo-gates.sh, .xezar/checks/lib/gate-parallel.mjs + test, gate-results.mjs (if needed), .xezar/pipeline/config.json, AGENTS.md, CLAUDE.md (Before pushing line), .xezar/LOCAL-PATCHES.md. (9a85cf2c done; .github/dependabot.yml released, PR #187.) #170 (gate list) is unblocked: #186 merged.
+- e1c555ca done (PR #202 round 1 at e2bc1a5d); files released.
+- 8dadb69a done (PR #201 round 1 at df3c31ea); files released.
+- 994fb3e5 done (PR #191 merged); gate files released. (9a85cf2c done; .github/dependabot.yml released, PR #187.) #170 (gate list) is unblocked: #186 merged.
 - Reviews own nothing.
 
-## Accounts (from `read_quota` at 2026-09-26T17:13:08Z)
+## Accounts (from `read_quota` at 2026-09-26T18:13:01Z)
 | Runner | Login | State | Resets (UTC) |
 |---|---|---|---|
 | claude | default | reserved leader login, runs no tasks; ok (weekly 11%, plan max; same numbers as westagilelabs – owner item) | 2026-10-02 06:59 |
 | claude | qodeca | ok (weekly 53%) | 2026-09-28 16:59 |
-| claude | gmail | ok (weekly 9%) | 2026-10-02 19:00 |
-| claude | eqamana | ok (weekly 0%) | 2026-10-03 16:00 |
+| claude | gmail | ok (weekly 11%) | 2026-10-02 19:00 |
+| claude | eqamana | ok (weekly 1%) | 2026-10-03 16:00 |
 | claude | westagilelabs | ok (weekly 11%) | 2026-10-02 06:59 |
-| codex | default | ok (weekly 15%) | 2026-10-02 10:44 |
-| codex | qodeca-2 | ok (weekly 0%) | 2026-10-03 16:58 |
+| codex | default | ok (weekly 2%, window reset) | 2026-10-03 17:10 |
+| codex | qodeca-2 | ok (weekly 1%) | 2026-10-03 16:58 |
 | pi | – | no logins | – |
 
 ## Held or queued work
@@ -63,7 +65,8 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 - #139 build – PR #159: code review APPROVE, design review FAIL (B-1 account name in QA screenshots); round 1 done at 1f924f73 (B-1 masked, NB-1 stated as a limit, NB-2 documented deviation); design recheck PASS at 9203f493; QA FAIL only because 3 checks could not run (chrome-devtools emulate + evaluate_script denied in the QA session): dark mode, theme switch, reduced motion unverified live. Waiting for the owner.
 
 ## Owner items
-- **#186 S-5 follow-up issue (nit):** gate-parallel.mjs:67 – if all three guarded command names change together, the ordering guards turn off silently. Leader proposes filing it as an issue (title: "gate-parallel: refuse when no guarded command name is found"). Needs your word to create it.
+- **#179 alert (merged #190 as ded31966):** install the launchd agent by hand, per the PR body.
+- **#177 evaluate_script wiring (PR #202):** emulate is granted; evaluate_script stays denied because the guard hook cannot be registered per workflow. Options in the PR body: user-scope settings for the xezar profile, a filtering proxy in .mcp.json, or leave denied. Leader recommends leave denied until a QA run proves it is needed.
 - **#172 review posting (spike PR #184):** fix needs either (a) an upstream xezar engine change (pass --settings to reading steps, or a verdict-body field) – recommended, file upstream; or (b) a user-scope PreToolUse hook in ~/.claude/settings.json on this machine (tested: 12k-char verdict posts, 0 denials; but it runs for every Claude session and is outside repo review). Interim rule (short plain-text verdicts) works today. Build held until the owner picks.
 - **#159: owner checks by hand (answered 2026-09-26 08:40)** – dark theme, banner theme switch, reduced-motion still on github.com, branch feature/139-readme-redesign. Leader merges on the owner's word with green checks. Earlier note: (dark theme, banner theme switch, reduced-motion still). Both QA and design sessions were denied the chrome-devtools emulate/evaluate_script tools. Options: (a) owner checks them by hand on github.com in ~2 minutes (branch feature/139-readme-redesign: switch OS dark mode, turn on Reduce motion), or (b) allow those two tools for review sessions and re-run QA. Leader recommends (a).
 - `npm audit` on develop's lockfile (run by the #159 author, 2026-09-25 23:51): 16 advisories – 1 critical, 12 high, 3 moderate – none added by #159. Owner chose triage in 0.21.0: issue #161, task d71e7bf0.
