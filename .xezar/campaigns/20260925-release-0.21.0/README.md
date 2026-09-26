@@ -9,8 +9,9 @@ Updated: 2026-09-25 11:06 CEST
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
-- #191 (#170 drop test:ci, from 994fb3e5), draft, head a99c2605, gate sealed. Reviews 6513c636 (sonnet) + fed841b8 (codex security) running. After merge: leader-guide.md:150 drop test:ci.
-- #190 (#179 silence alert, from 392e7c9b), draft, head 0fdf50e1, gate sealed. Codex security eab95ae4: S-1 minor (lstat errors leak paths); cold review 0ac0f4e6 APPROVE + 1 runbook minor (leader posted). Round 1 done at 211803b5 (author gate green). Security recheck d6354c72 NO FINDINGS; code recheck 6bd5518f APPROVE. In merge line. Owner installs launchd by hand after merge.
+- #201 (#174 leader context, from 8dadb69a), draft, head 6b3798bf, gate sealed. Next: code review (not opus) + codex security (kit loader); held on load. Shares repository-checks.sh with #191.
+- #191 (#170 drop test:ci, from 994fb3e5), draft, head abc25817, gate sealed at a99c2605. Cold review 6513c636 APPROVE; codex security fed841b8 FINDINGS (S-1 minor, S-2 nit = #186 S-5, test wiring). Round 1 done at abc25817 (author gate green, 1m44s). Codex recheck 189d6325: S-1 still open, S-3 nit → round 2 (allowlist design) with 994fb3e5; a third round would be parked. After merge: leader-guide.md:150 drop test:ci.
+- #190 (#179 silence alert, from 392e7c9b), draft, head 0fdf50e1, gate sealed. Codex security eab95ae4: S-1 minor (lstat errors leak paths); cold review 0ac0f4e6 APPROVE + 1 runbook minor (leader posted). Round 1 done at 211803b5 (author gate green). Security recheck d6354c72 NO FINDINGS; code recheck 6bd5518f APPROVE. Windows checks fail (4 darwin-only tests) → round 2 with 392e7c9b. Owner installs launchd by hand after merge.
 - #189 (load ceiling 40) merged 2026-09-26 as 25adc9a7.
 - #188 (#171 vitest worker cap) merged 2026-09-26 as c27b399b (one CI unit-test crash before, rerun green).
 - #187 (#176 Dependabot groups) merged 2026-09-26 as 80a8c032; #176 closed.
@@ -26,7 +27,7 @@ Updated: 2026-09-25 11:06 CEST
 - #155 ready, head d4fb29e7 – allow rule in scripts/xezar-leader-settings.json (4458b282): exactly 2 exact-match rules + one autoMode reason; all checks green. Next: security-review (widens tool access).
 - #154 ready, head 5fce83d5 – #138 part B (2a1e4316): test fixed, workflow gates sealed, CI all green incl. Windows. Next: full-cold-review + design-review of the 52 images and demo (privacy).
 - #140 ready, head c442a15b – #139 spec. Re-check 12b29be1 APPROVE at c442a15b, all 11 findings fixed, no new defects. Labels design-approved + merge-queue; #139 labelled design-approved. Next in the merge line after #141: bring up to date, wait for green, squash-merge.
-Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
+Dependabot PRs, not in scope: #63-#68 (old config) and #192-#200 (new grouped config, opened 2026-09-26 ~20:10; #196 duplicates #167).
 
 ## Process speed-up plan v3 (owner-approved 2026-09-26)
 Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #173 merge queue, #178 Windows smoke, #175 brief templates. Wave 2 (after spikes): #169, #170, #172, #179. Wave 3: #174, #176, #177, #171 (only if ps shows vitest load). Dropped by owner: records branch, docs-only fast path. Interim rules in force: short plain-text verdicts in review briefs; batched record pushes.
@@ -37,9 +38,8 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| 6513c636 | #191 cold review | code-review | claude/sonnet | qodeca |
-| fed841b8 | #191 security review | security-review | codex/gpt-6-astra | qodeca-2 |
-| 8dadb69a | #174 leader context | feature-implementation | claude/opus | gmail |
+| 392e7c9b | #190 round 2 (continue) | feature-implementation | claude/opus | eqamana |
+| 994fb3e5 | #191 round 2 (continue) | feature-implementation | claude/opus | eqamana |
 | e1c555ca | #177 browser grant | feature-implementation | claude/opus | eqamana |
 
 ## File-ownership table
@@ -47,20 +47,20 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 - 7d5d7fc6 done (PR #189); .xezar/loops.json released.
 - 392e7c9b done. Reviews own nothing.
 - e1c555ca owns .xezar/workflows/qa.yaml, .xezar/workflows/design-review.yaml, a new evaluate_script origin hook + tests, LOCAL-PATCHES.md entry.
-- 8dadb69a owns the leader-context loader + session-start hook, their tests/fixtures, .xezar/docs/leader-context-loading.md, .xezar/docs/campaign-notes.md, LOCAL-PATCHES.md entry.
+- 8dadb69a done (PR #201); leader-context files released.
 - 994fb3e5 done (PR #191); gate files released. (9a85cf2c done; .github/dependabot.yml released, PR #187.) #170 (gate list) is unblocked: #186 merged.
 - Reviews own nothing.
 
-## Accounts (from `read_quota` at 2026-09-26T17:13:08Z)
+## Accounts (from `read_quota` at 2026-09-26T18:13:01Z)
 | Runner | Login | State | Resets (UTC) |
 |---|---|---|---|
 | claude | default | reserved leader login, runs no tasks; ok (weekly 11%, plan max; same numbers as westagilelabs – owner item) | 2026-10-02 06:59 |
 | claude | qodeca | ok (weekly 53%) | 2026-09-28 16:59 |
-| claude | gmail | ok (weekly 9%) | 2026-10-02 19:00 |
-| claude | eqamana | ok (weekly 0%) | 2026-10-03 16:00 |
+| claude | gmail | ok (weekly 11%) | 2026-10-02 19:00 |
+| claude | eqamana | ok (weekly 1%) | 2026-10-03 16:00 |
 | claude | westagilelabs | ok (weekly 11%) | 2026-10-02 06:59 |
-| codex | default | ok (weekly 15%) | 2026-10-02 10:44 |
-| codex | qodeca-2 | ok (weekly 0%) | 2026-10-03 16:58 |
+| codex | default | ok (weekly 2%, window reset) | 2026-10-03 17:10 |
+| codex | qodeca-2 | ok (weekly 1%) | 2026-10-03 16:58 |
 | pi | – | no logins | – |
 
 ## Held or queued work
@@ -69,7 +69,6 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 - #139 build – PR #159: code review APPROVE, design review FAIL (B-1 account name in QA screenshots); round 1 done at 1f924f73 (B-1 masked, NB-1 stated as a limit, NB-2 documented deviation); design recheck PASS at 9203f493; QA FAIL only because 3 checks could not run (chrome-devtools emulate + evaluate_script denied in the QA session): dark mode, theme switch, reduced motion unverified live. Waiting for the owner.
 
 ## Owner items
-- **#186 S-5 follow-up issue (nit):** gate-parallel.mjs:67 – if all three guarded command names change together, the ordering guards turn off silently. Leader proposes filing it as an issue (title: "gate-parallel: refuse when no guarded command name is found"). Needs your word to create it.
 - **#172 review posting (spike PR #184):** fix needs either (a) an upstream xezar engine change (pass --settings to reading steps, or a verdict-body field) – recommended, file upstream; or (b) a user-scope PreToolUse hook in ~/.claude/settings.json on this machine (tested: 12k-char verdict posts, 0 denials; but it runs for every Claude session and is outside repo review). Interim rule (short plain-text verdicts) works today. Build held until the owner picks.
 - **#159: owner checks by hand (answered 2026-09-26 08:40)** – dark theme, banner theme switch, reduced-motion still on github.com, branch feature/139-readme-redesign. Leader merges on the owner's word with green checks. Earlier note: (dark theme, banner theme switch, reduced-motion still). Both QA and design sessions were denied the chrome-devtools emulate/evaluate_script tools. Options: (a) owner checks them by hand on github.com in ~2 minutes (branch feature/139-readme-redesign: switch OS dark mode, turn on Reduce motion), or (b) allow those two tools for review sessions and re-run QA. Leader recommends (a).
 - `npm audit` on develop's lockfile (run by the #159 author, 2026-09-25 23:51): 16 advisories – 1 critical, 12 high, 3 moderate – none added by #159. Owner chose triage in 0.21.0: issue #161, task d71e7bf0.
