@@ -10,7 +10,7 @@ Updated: 2026-09-25 11:06 CEST
 
 ## Open pull requests
 - #188 (#171 vitest worker cap, from 974c210b), draft, head 17e9fcbc, gate sealed. Next: cold review (not opus).
-- #187 (#176 Dependabot groups, from 9a85cf2c), draft, head 9717d461, gate sealed. Next: cold review dfa7c67f (sonnet) + security review 5cba1e38 (codex/astra, other vendor) (running).
+- #187 (#176 Dependabot groups, from 9a85cf2c), draft, head 9717d461, gate sealed. Next: cold review dfa7c67f (sonnet) running; security 5cba1e38 (codex/astra) NO FINDINGS.
 - #186 (#169 gate lanes, lint:check), draft, head 58640590, round 1 fixed by 04cb9379 (author gate green, not sealed). Security recheck 31c5f2ec: S-1, S-2 fixed; new S-3 minor, S-4 nit. Code recheck 839f072f running; then relay together. After merge: leader-guide.md:149 lint -> lint:check.
 - #185 (#179 spike) merged 2026-09-26 as 5f285011. Result: build the silence alert (+ line-86 doc fix); auto-continue deferred (parked).
 - #184 (#172 spike) merged 2026-09-26 as 4d874fa7; #172 build held for owner.
@@ -36,7 +36,6 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 |---|---|---|---|---|
 | 839f072f | #186 code recheck | code-review | claude/sonnet | gmail |
 | dfa7c67f | #187 cold review | code-review | claude/sonnet | westagilelabs |
-| 5cba1e38 | #187 security review | security-review | codex/gpt-6-astra | qodeca-2 |
 
 ## File-ownership table
 - 974c210b done (PR #188); vitest configs released. (9a85cf2c done; .github/dependabot.yml released, PR #187.) No overlap between them; #170 (gate list) waits for #186.
