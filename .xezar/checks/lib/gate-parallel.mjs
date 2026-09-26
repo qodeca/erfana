@@ -1,7 +1,7 @@
 // Fixed application-gate dependency schedule. Workers never mutate attempt.json.
 //
-// THE INDEXES ARE POSITIONS IN `repo-gates.sh`'s canonical list, one-based. Nothing here knows
-// which gates a project has: `repo-gates.sh` passes the application phase's entries, and the
+// THE INDEXES ARE POSITIONS IN `repo-gates.sh`'s canonical list, one-based. The caller passes
+// the application phase's entries; known test/build commands carry ordering constraints, and the
 // lanes come from committed pipeline config, with `GATE_APPLICATION_LANES` overriding it.
 // Lanes split by `;`, a lane's gates by `,`, run in that order. An explicitly empty override
 // means one lane in list order. The
@@ -33,16 +33,23 @@ function configuredLanes() {
   } finally { closeSync(fd); }
 }
 
-const [library, mode, rawEntries] = process.argv.slice(2);
+const describing = process.argv[2] === '--describe';
+const [library, mode, rawEntries] = describing
+  ? [null, 'application', process.argv[3]]
+  : process.argv.slice(2);
 const entries = JSON.parse(rawEntries);
 const byIndex = new Map(entries.map((entry) => [entry.index, entry]));
 if (!['application', 'serial'].includes(mode) || !entries.length || byIndex.size !== entries.length ||
     entries.some(e => !Number.isInteger(e.index) || e.index < 1 || typeof e.name !== 'string' || !e.name || typeof e.command !== 'string' || !e.command)) {
   throw new Error('invalid gate phase');
 }
+const laneSource = process.env.GATE_APPLICATION_LANES === undefined ? 'config' : 'environment';
+const laneRaw = mode === 'application'
+  ? (process.env.GATE_APPLICATION_LANES ?? configuredLanes()).trim()
+  : '';
 const APPLICATION_LANES = (() => {
   if (mode !== 'application') return [];
-  const raw = (process.env.GATE_APPLICATION_LANES ?? configuredLanes()).trim();
+  const raw = laneRaw;
   if (!raw) return [entries.map((e) => e.index)];
   const lanes = raw.split(';').map((l) => l.split(',').map((n) => Number(n.trim())));
   const named = lanes.flat();
@@ -52,6 +59,23 @@ const APPLICATION_LANES = (() => {
   }
   return lanes;
 })();
+if (mode === 'application') {
+  const coverage = entries.find(e => e.name === 'npm run test:cov')?.index;
+  const build = entries.find(e => e.name === 'npx electron-vite build')?.index;
+  const unit = entries.find(e => e.name === 'npm run test:ci')?.index;
+  if (coverage !== undefined && build !== undefined &&
+      !APPLICATION_LANES.some(lane => lane.indexOf(coverage) >= 0 && lane.indexOf(build) > lane.indexOf(coverage))) {
+    throw new Error('coverage and build must share a lane, with coverage before build');
+  }
+  if (coverage !== undefined && unit !== undefined &&
+      !APPLICATION_LANES.some(lane => lane.includes(coverage) && lane.includes(unit))) {
+    throw new Error('coverage and unit tests must share a lane to avoid test fixture collisions');
+  }
+}
+if (describing) {
+  process.stdout.write(`${JSON.stringify({source: laneSource, raw: laneRaw, lanes: APPLICATION_LANES})}\n`);
+  process.exit(0);
+}
 if (process.platform === 'win32') throw new Error('gate process-group supervision requires a POSIX host');
 const directory = join(process.env.GATE_ATTEMPT_DIR, 'workers');
 mkdirSync(directory, { recursive: true });

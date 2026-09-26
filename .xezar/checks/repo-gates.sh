@@ -415,8 +415,31 @@ git rev-parse --verify --quiet "refs/remotes/origin/$BASE_BRANCH" >/dev/null 2>&
 GATE_BASE_SHA="$(git merge-base HEAD "$GATE_BASE_REF" 2>/dev/null || printf '')"
 export GATE_BASE_REF GATE_BASE_SHA
 
+# Resolve the exact application schedule before starting the attempt. The scheduler's own
+# parser validates both the committed default and any environment override; the same resolved
+# lanes are recorded in attempt.json and carried into result.json.
+GATE_LAST=${#GATE_NAMES[@]}
+GATE_APPLICATION=()
+gate_schedule_args=()
+for ((gate_i = 3; gate_i < GATE_LAST; gate_i++)); do
+  GATE_APPLICATION+=("$gate_i")
+  gate_schedule_args+=("$gate_i" "${GATE_NAMES[$((gate_i - 1))]}" "${GATE_COMMANDS[$((gate_i - 1))]}")
+done
+if [ "${#GATE_APPLICATION[@]}" -gt 0 ]; then
+  gate_schedule_entries="$(node -e '
+    const args = process.argv.slice(1), entries = [];
+    for (let i = 0; i < args.length; i += 3) entries.push({index: Number(args[i]), name: args[i+1], command: args[i+2]});
+    process.stdout.write(JSON.stringify(entries));
+  ' "${gate_schedule_args[@]}")" || exit 1
+  GATE_APPLICATION_SCHEDULE_JSON="$(node "$SCRIPT_DIR/lib/gate-parallel.mjs" --describe "$gate_schedule_entries")" || exit 1
+else
+  GATE_APPLICATION_SCHEDULE_JSON='null'
+fi
+export GATE_APPLICATION_SCHEDULE_JSON
+
 printf '=== repo gates ===\n'
 printf 'producer       %s\n' "$GATE_PRODUCER"
+printf 'application    %s\n' "$GATE_APPLICATION_SCHEDULE_JSON"
 if ! gate_attempt_begin "$(gate_names_json)" "$(gate_list_id)"; then
   printf '\nGATES ABORTED: the attempt could not be recorded, so nothing here could become evidence.\n' >&2
   exit 1
@@ -546,9 +569,6 @@ esac
 # The phases are derived from the list, never numbered by hand: gate 1 is the install, gate 2 the
 # security stage, the LAST gate the repository-check tail, and everything between is the
 # application phase. A project with five application gates or nine gets the same three lines.
-GATE_LAST=${#GATE_NAMES[@]}
-GATE_APPLICATION=()
-for ((gate_i = 3; gate_i < GATE_LAST; gate_i++)); do GATE_APPLICATION+=("$gate_i"); done
 if [ "${#GATE_APPLICATION[@]}" -gt 0 ]; then
   gate_phase application "${GATE_APPLICATION[@]}" || exit 1
 fi
