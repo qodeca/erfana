@@ -12,7 +12,7 @@ Updated: 2026-09-25 11:06 CEST
 - #202 (#177 browser grant, from e1c555ca), draft, head 82938dae, gate passed. emulate granted; evaluate_script stays denied (wiring options → owner). Cold review 04b8155b REQUEST CHANGES (2 major, 1 minor, 1 nit); codex security 864506c8 BLOCKING (S-1 = same guard defect as code M-1). Round 1 relayed to e1c555ca.
 - #201 (#174 leader context, from 8dadb69a), draft, head 6b3798bf, gate sealed. Reviews 9c5505e0 (sonnet) + 1b108196 (codex security) running. Shares repository-checks.sh with #191.
 - #191 (#170 drop test:ci, from 994fb3e5), draft, head abc25817, gate sealed at a99c2605. Cold review 6513c636 APPROVE; codex security fed841b8 FINDINGS (S-1 minor, S-2 nit = #186 S-5, test wiring). Round 1 done at abc25817 (author gate green, 1m44s). Codex recheck 189d6325: S-1 still open, S-3 nit → round 2 (allowlist design) with 994fb3e5; a third round would be parked. After merge: leader-guide.md:150 drop test:ci.
-- #190 (#179 silence alert, from 392e7c9b), draft, head 0fdf50e1, gate sealed. Codex security eab95ae4: S-1 minor (lstat errors leak paths); cold review 0ac0f4e6 APPROVE + 1 runbook minor (leader posted). Round 1 done at 211803b5 (author gate green). Security recheck d6354c72 NO FINDINGS; code recheck 6bd5518f APPROVE. Windows checks fail (4 darwin-only tests) → round 2 done at 9c98ae57 (path module via deps seam; suite runs under posix and win32). Code recheck 4b6817f6 (sonnet/gmail) running; CI watch running. Owner installs launchd by hand after merge.
+- #190 (#179 silence alert, from 392e7c9b), draft, head 0fdf50e1, gate sealed. Codex security eab95ae4: S-1 minor (lstat errors leak paths); cold review 0ac0f4e6 APPROVE + 1 runbook minor (leader posted). Round 1 done at 211803b5 (author gate green). Security recheck d6354c72 NO FINDINGS; code recheck 6bd5518f APPROVE. Windows checks fail (4 darwin-only tests) → round 2 done at 9c98ae57 (path module via deps seam; suite runs under posix and win32). Code recheck 4b6817f6 APPROVE (leader posted, reviewer post refused). Updated to b47f33a7; CI running. Owner installs launchd by hand after merge.
 - #189 (load ceiling 40) merged 2026-09-26 as 25adc9a7.
 - #188 (#171 vitest worker cap) merged 2026-09-26 as c27b399b (one CI unit-test crash before, rerun green).
 - #187 (#176 Dependabot groups) merged 2026-09-26 as 80a8c032; #176 closed.
@@ -39,9 +39,7 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| 4b6817f6 | #190 round 2 recheck | code-review | claude/sonnet | gmail |
 | e1c555ca | #202 round 1 (continue) | feature-implementation | claude/opus | eqamana |
-| 994fb3e5 | #191 round 2 (continue) | feature-implementation | claude/opus | eqamana |
 | 9c5505e0 | #201 cold review | code-review | claude/sonnet | westagilelabs |
 
 ## File-ownership table
