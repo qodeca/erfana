@@ -63,3 +63,5 @@ Owner decisions in the owner's exact words, dated, append-only.
   PR carries the triage only; override removal + electron-builder upgrade becomes a follow-up with a node-pty build test.
 - 2026-09-26 15:51 CEST - direct question (AskUserQuestion: docs/security.md policy "zero high/critical production advisories at release"; develop has 4 production highs: electron, extract-zip, @llamaindex/liteparse, sharp; all need majors) - "Except all 4, fix later"
   0.21.0 ships with a written, dated exception for all 4. liteparse 2 and Electron 44 filed as issues after the release.
+- 2026-09-26 16:04 CEST - direct question (AskUserQuestion: "can you do more in parallel?"; only post-release #161 follow-ups are parallel) - "Start post-release fixes now (Recommended)"
+  File the 4 follow-up issues now without the release label; start liteparse 1->2 and the @electron/rebuild override lift now; their PRs carry do-not-merge until 0.21.0 ships.
