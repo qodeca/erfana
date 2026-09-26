@@ -35,7 +35,6 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
 | 8dadb69a | #201 round 4 (continue) | feature-implementation | claude/opus | gmail |
-| fd3f2dc5 | #202 round 2 security recheck | security-review | codex/gpt-6-astra | default |
 | cf9bba13 | #202 round 2 code recheck | code-review | claude/sonnet | gmail |
 
 ## File-ownership table
