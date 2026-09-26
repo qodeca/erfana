@@ -26,15 +26,15 @@ Counts at dispatch (01:28): tasks 1/10, gate runs 0/2, metered 0/4, load 2.9/18.
 ## File-ownership table
 - Reviews own nothing.
 
-## Accounts (from `read_quota` at 2026-09-26T03:13:09Z)
+## Accounts (from `read_quota` at 2026-09-26T04:13:09Z)
 | Runner | Login | State | Resets (UTC) |
 |---|---|---|---|
 | claude | default | reserved leader login, runs no tasks; ok but weekly 99% | 2026-09-28 23:00 |
 | claude | qodeca | ok (weekly 52%) | 2026-09-28 17:00 |
 | claude | gmail | ok (weekly 4%) | 2026-10-02 18:59 |
-| claude | eqamana | out | 2026-09-26 16:00 |
+| claude | eqamana | out | 2026-09-26 15:59 |
 | claude | westagilelabs | ok (weekly 6%) | 2026-10-02 06:59 |
-| codex | default | unknown (read failed: "Codex 0.156.1 changed its quota format"; qodeca-2 on the same version reads fine) | – |
+| codex | default | ok (weekly 9%) | 2026-10-02 10:44 |
 | codex | qodeca-2 | ok (weekly 27%) | 2026-09-29 12:45 |
 | pi | – | no logins | – |
 
