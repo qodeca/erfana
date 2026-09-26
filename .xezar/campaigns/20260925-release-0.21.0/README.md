@@ -20,12 +20,17 @@ Empty.
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| d71e7bf0 | #161 npm audit triage + electron-builder 26.16.1 | dependency-maintenance | pi/deepseek-api/deepseek-flash | – |
+| d71e7bf0 | #161 triage + v0.21.0 exceptions, PR #162 (handoff step) | dependency-maintenance | pi/deepseek-api/deepseek-flash | – |
+| 347fc1ce | #164 liteparse 1 -> 2 (post-release, do-not-merge) | dependency-maintenance | pi/deepseek-api/deepseek-flash | – |
+| 43131e43 | #163 lift @electron/rebuild override + electron-builder 26.16.1 (post-release, do-not-merge) | dependency-maintenance | pi/deepseek-api/deepseek-flash | – |
 
-Counts at dispatch (08:45): tasks 1/10, gate runs 0/2 (1 when its gate step runs), metered 1/4, load 11.9/18 (a node process not started by the leader).
+Counts at dispatch (16:05): tasks 3/10, gate runs 0/2, metered 3/4 (all pi), load 2.8/18. xezar workspace maxParallel 5 (owner, 16:07).
 
 ## File-ownership table
 - d71e7bf0 owns package.json, package-lock.json (revert only), docs/security.md.
+- 347fc1ce owns package.json, package-lock.json, src/main/services/import/converters/LiteParseConverter.ts (+ tests), scripts/capture/legibility.mjs.
+- 43131e43 owns package.json, package-lock.json, scripts/fuses.js, docs/build/dependencies.md.
+- Overlap accepted: 347fc1ce and 43131e43 share package.json/package-lock.json; both merge after v0.21.0, one at a time, the second rebased. Neither edits docs/security.md (#162 owns it).
 - Reviews own nothing.
 
 ## Accounts (from `read_quota` at 2026-09-26T13:52:35Z)
