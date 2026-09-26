@@ -65,3 +65,11 @@ Owner decisions in the owner's exact words, dated, append-only.
   0.21.0 ships with a written, dated exception for all 4. liteparse 2 and Electron 44 filed as issues after the release.
 - 2026-09-26 16:04 CEST - direct question (AskUserQuestion: "can you do more in parallel?"; only post-release #161 follow-ups are parallel) - "Start post-release fixes now (Recommended)"
   File the 4 follow-up issues now without the release label; start liteparse 1->2 and the @electron/rebuild override lift now; their PRs carry do-not-merge until 0.21.0 ships.
+- 2026-09-26 16:05 CEST - chat - "change maxParallel to 5"
+  Set in the xezar workspace (machine) config via project_config set_workspace_config: resources.maxParallel 2 -> 5. Not in the committed project config (kit rule: machine-sized limits stay off it).
+
+## 2026-09-26 – process and kit speed-ups (channel: AskUserQuestion in the leader session, then plan approval)
+- "Which process fixes do you want built?" -> "Faster gate, Reviews post their own verdict, Records off develop, Small tidy-ups"
+- "How should we prove the #168 build-tool upgrade works on Windows?" -> "New manual CI check (Recommended)"
+- "When may the process fixes merge?" -> "Merge when ready (Recommended)"
+- Owner approved plan v2 (after lens review) via plan-mode approval. It adds F (leader liveness) and asks a new owner decision: merge queue vs strict mode off on develop.
