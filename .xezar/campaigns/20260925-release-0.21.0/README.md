@@ -37,11 +37,13 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
 | 0ac0f4e6 | #190 cold review | code-review | claude/sonnet | gmail |
+| 994fb3e5 | #170 drop test:ci | feature-implementation | claude/opus | eqamana |
 
 ## File-ownership table
 - 974c210b done (PR #188); vitest configs released.
 - 7d5d7fc6 done (PR #189); .xezar/loops.json released.
-- 392e7c9b done (PR #190). Reviews own nothing; no file is owned right now. (9a85cf2c done; .github/dependabot.yml released, PR #187.) #170 (gate list) is unblocked: #186 merged.
+- 392e7c9b done (PR #190). Reviews own nothing.
+- 994fb3e5 owns .xezar/checks/repo-gates.sh, .xezar/checks/lib/gate-parallel.mjs + test, gate-results.mjs (if needed), .xezar/pipeline/config.json, AGENTS.md, CLAUDE.md (Before pushing line), .xezar/LOCAL-PATCHES.md. (9a85cf2c done; .github/dependabot.yml released, PR #187.) #170 (gate list) is unblocked: #186 merged.
 - Reviews own nothing.
 
 ## Accounts (from `read_quota` at 2026-09-26T17:13:08Z)
