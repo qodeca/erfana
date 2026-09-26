@@ -9,7 +9,7 @@ Updated: 2026-09-25 11:06 CEST
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
-- #202 (#177 browser grant, from e1c555ca), draft, head 82938dae, gate passed. emulate granted; evaluate_script stays denied (wiring options → owner). Cold review 04b8155b REQUEST CHANGES (2 major, 1 minor, 1 nit); codex security 864506c8 BLOCKING (S-1 = same guard defect as code M-1). Round 1 done at e2bc1a5d (syntax-tree guard; 4 run-code bash entries + catalog-check RUNS_CODE_BASH_PREFIXES – a kit-check loosening). Rechecks ce9b18e4 + 9672867b running.
+- #202 (#177 browser grant, from e1c555ca), draft, head 82938dae, gate passed. emulate granted; evaluate_script stays denied (wiring options → owner). Cold review 04b8155b REQUEST CHANGES (2 major, 1 minor, 1 nit); codex security 864506c8 BLOCKING (S-1 = same guard defect as code M-1). Round 1 done at e2bc1a5d (syntax-tree guard; 4 run-code bash entries + catalog-check RUNS_CODE_BASH_PREFIXES – a kit-check loosening). Code recheck ce9b18e4 APPROVE (leader posted). Security recheck 9672867b BLOCKING: S-1 fixed; S-2 major – npm ci / npm run dev on an untrusted PR head runs contributor code, preflight still allows the primary checkout (pre-existing on develop, which has unrestricted Bash). Owner picked B (safe app start). Round 2 relayed to e1c555ca: one trusted wrapper, SHA-bound, task worktree only, scrubbed env + macOS sandbox.
 - #201 (#174 leader context, from 8dadb69a), draft, head 6b3798bf, gate sealed. Reviews 9c5505e0 (sonnet) + 1b108196 (codex security) running. Shares repository-checks.sh with #191.
 - #189 (load ceiling 40) merged 2026-09-26 as 25adc9a7.
 - #188 (#171 vitest worker cap) merged 2026-09-26 as c27b399b (one CI unit-test crash before, rerun green).
@@ -34,28 +34,28 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| ce9b18e4 | #202 round 1 code recheck | code-review | claude/sonnet | westagilelabs |
-| 9672867b | #202 round 1 security recheck | security-review | codex/gpt-6-astra | default |
-| a0ebdd91 | #201 round 1 security recheck | security-review | codex/gpt-6-astra | qodeca-2 |
+| 8dadb69a | #201 round 4 (continue) | feature-implementation | claude/opus | gmail |
+| fd3f2dc5 | #202 round 2 security recheck | security-review | codex/gpt-6-astra | default |
+| cf9bba13 | #202 round 2 code recheck | code-review | claude/sonnet | gmail |
 
 ## File-ownership table
 - 974c210b done (PR #188); vitest configs released.
 - 7d5d7fc6 done (PR #189); .xezar/loops.json released.
 - 392e7c9b done. Reviews own nothing.
-- e1c555ca done (PR #202 round 1 at e2bc1a5d); files released.
-- 8dadb69a done (PR #201 round 1 at df3c31ea); files released.
+- e1c555ca done (PR #202 round 2 at f78a4a0c); files released.
+- 8dadb69a owns decisions-archive.mjs, leader-context.sh, tests, its repository-checks.sh block, the two docs (PR #201 round 4).
 - 994fb3e5 done (PR #191 merged); gate files released. (9a85cf2c done; .github/dependabot.yml released, PR #187.) #170 (gate list) is unblocked: #186 merged.
 - Reviews own nothing.
 
-## Accounts (from `read_quota` at 2026-09-26T18:13:01Z)
+## Accounts (from `read_quota` at 2026-09-26T20:18:35Z)
 | Runner | Login | State | Resets (UTC) |
 |---|---|---|---|
-| claude | default | reserved leader login, runs no tasks; ok (weekly 11%, plan max; same numbers as westagilelabs – owner item) | 2026-10-02 06:59 |
-| claude | qodeca | ok (weekly 53%) | 2026-09-28 16:59 |
-| claude | gmail | ok (weekly 11%) | 2026-10-02 19:00 |
-| claude | eqamana | ok (weekly 1%) | 2026-10-03 16:00 |
-| claude | westagilelabs | ok (weekly 11%) | 2026-10-02 06:59 |
-| codex | default | ok (weekly 2%, window reset) | 2026-10-03 17:10 |
+| claude | default | reserved leader login, runs no tasks; ok (weekly 13%, plan max; same numbers as westagilelabs – owner item) | 2026-10-02 06:59 |
+| claude | qodeca | ok (weekly 56%) | 2026-09-28 16:59 |
+| claude | gmail | ok (weekly 12%) | 2026-10-02 18:59 |
+| claude | eqamana | ok (weekly 2%) | 2026-10-03 16:00 |
+| claude | westagilelabs | ok (weekly 13%) | 2026-10-02 07:00 |
+| codex | default | ok (weekly 12%) | 2026-10-03 17:10 |
 | codex | qodeca-2 | ok (weekly 1%) | 2026-10-03 16:58 |
 | pi | – | no logins | – |
 
