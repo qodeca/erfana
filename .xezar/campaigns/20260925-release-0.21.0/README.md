@@ -9,6 +9,7 @@ Updated: 2026-09-25 11:06 CEST
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
+- #180 (#173 merge queue triggers), draft, head 094c5e17, gate sealed. Next: security-review + full-cold-review (queued on load).
 - #168 (#163 lift @electron/rebuild override + electron-builder 26.16.1), draft, head d4043abc, labels dependencies + do-not-merge. Gate passed; npm audit 16 -> 7; node-pty rebuilt (@electron/rebuild 4.2.0); `electron-builder --dir` green; packed app opened a working terminal. Security review 35479ba2 (opus): APPROVE-level + nit S-1; leader posted it (comment 5847266523). Code review 84cbb123 (sonnet, gmail, posted itself): REQUEST CHANGES – Windows checks job never runs @electron/rebuild, so no Windows evidence for the changed path (leader's brief wrongly named it). Round 1 relayed to 43131e43: fix PR body, list Windows-proof options, BLOCKED for owner; S-1 after #162 lands.
 - #167 (#164 liteparse 2.14.7), draft, head 0fa58e18, do-not-merge until v0.21.0 ships. Round 1 fixed; recheck 0b92cbf1 (sonnet/gmail) APPROVE, posted itself.
 - #155 ready, head d4fb29e7 – allow rule in scripts/xezar-leader-settings.json (4458b282): exactly 2 exact-match rules + one autoMode reason; all checks green. Next: security-review (widens tool access).
@@ -27,7 +28,6 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 |---|---|---|---|---|
 | 43131e43 | #168 S-1 (security.md row) after #162; Windows proof BLOCKED on separate PR (#163) | dependency-maintenance (continued) | pi/deepseek-api/deepseek-flash | – |
 | 03cbd155 | #133 test:cov --project | bug-fix | pi/deepseek-api/deepseek-flash | – |
-| 29df4b5a | #173 merge queue triggers | feature-implementation (kit-refactor) | claude/opus | gmail |
 | 79cad1a5 | #178 Windows native smoke workflow | feature-implementation (kit-refactor) | claude/opus | qodeca |
 | 5bf6cc9a | #175 brief templates | docs-maintenance | codex/gpt-5.6-terra | default |
 
