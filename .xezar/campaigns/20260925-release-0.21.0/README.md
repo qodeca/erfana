@@ -23,12 +23,15 @@ Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
 | d71e7bf0 | #162 review round 1 (#161) | dependency-maintenance (continued) | pi/deepseek-api/deepseek-flash | – |
+| 76be37d0 | #167 full-cold-review (#164) | code-review | claude/opus | westagilelabs |
+| 35479ba2 | #168 security-review (#163) | security-review | claude/opus | qodeca |
+| 84cbb123 | #168 full-cold-review (#163, also= of security-review) | code-review | claude/sonnet | gmail |
 | 43131e43 | #163 lift @electron/rebuild override + electron-builder 26.16.1 (post-release, do-not-merge) | dependency-maintenance | pi/deepseek-api/deepseek-flash | – |
 
 Counts at dispatch (16:05): tasks 3/10, gate runs 0/2, metered 3/4 (all pi), load 2.8/18. xezar workspace maxParallel 5 (owner, 16:07).
 
 ## File-ownership table
-- 43131e43 owns package.json, package-lock.json, scripts/fuses.js, docs/build/dependencies.md.
+- d71e7bf0 owns docs/security.md (round 1).
 - Overlap accepted: 347fc1ce and 43131e43 share package.json/package-lock.json; both merge after v0.21.0, one at a time, the second rebased. Neither edits docs/security.md (#162 owns it).
 - Reviews own nothing.
 
