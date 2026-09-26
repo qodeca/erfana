@@ -9,14 +9,16 @@ Updated: 2026-09-25 11:06 CEST
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
-- #186 (#169 gate lanes, lint:check), draft, head 9aa4f208, gate sealed. Next: security + cold review (queued on load).
-- #185 (#179 spike report), draft. Result: build the silence alert; auto-continue deferred (parked).
-- #184 (#172 spike report), draft. Needs a light review; build of #172 held for owner.
+- #188 (#171 vitest worker cap, from 974c210b), draft, head 17e9fcbc, gate sealed. Next: cold review 4d88df5b (sonnet) running.
+- #187 (#176 Dependabot groups, from 9a85cf2c), draft, head 9717d461, gate sealed. Next: cold review dfa7c67f (sonnet) running; security 5cba1e38 (codex/astra) NO FINDINGS.
+- #186 (#169 gate lanes, lint:check), draft, head 58640590, round 1 fixed by 04cb9379 (author gate green, not sealed). Security recheck 31c5f2ec: S-1, S-2 fixed; new S-3 minor, S-4 nit. Code recheck 839f072f running; then relay together. After merge: leader-guide.md:149 lint -> lint:check.
+- #185 (#179 spike) merged 2026-09-26 as 5f285011. Result: build the silence alert (+ line-86 doc fix); auto-continue deferred (parked).
+- #184 (#172 spike) merged 2026-09-26 as 4d874fa7; #172 build held for owner.
 - #183 (#133) merged 2026-09-26 as 6b763b38.
 - #182 (#175) merged 2026-09-26 as 97d5c17c. #175 stays open for the remaining rows.
 - #181 (#178) merged 2026-09-26 as a9792f3c.
 - #180 (#173) merged 2026-09-26 as db105aab. Owner: enable Require merge queue on develop.
-- #168 (#163 lift @electron/rebuild override + electron-builder 26.16.1), draft, head d4043abc, labels dependencies + do-not-merge. Gate passed; npm audit 16 -> 7; node-pty rebuilt (@electron/rebuild 4.2.0); `electron-builder --dir` green; packed app opened a working terminal. Security review 35479ba2 (opus): APPROVE-level + nit S-1; leader posted it (comment 5847266523). Code review 84cbb123 (sonnet, gmail, posted itself): REQUEST CHANGES – Windows checks job never runs @electron/rebuild, so no Windows evidence for the changed path (leader's brief wrongly named it). Round 1 relayed to 43131e43: fix PR body, list Windows-proof options, BLOCKED for owner; S-1 after #162 lands.
+- #168 (#163 lift @electron/rebuild override + electron-builder 26.16.1), draft, head 164d93b9, do-not-merge until v0.21.0 ships. Security APPROVE (35479ba2); code review round 1 fixed – Windows Native Smoke run 36256339721 green on this branch (negative control failed as expected); recheck b5d01d5e APPROVE. Review-complete.
 - #167 (#164 liteparse 2.14.7), draft, head 0fa58e18, do-not-merge until v0.21.0 ships. Round 1 fixed; recheck 0b92cbf1 (sonnet/gmail) APPROVE, posted itself.
 - #155 ready, head d4fb29e7 – allow rule in scripts/xezar-leader-settings.json (4458b282): exactly 2 exact-match rules + one autoMode reason; all checks green. Next: security-review (widens tool access).
 - #154 ready, head 5fce83d5 – #138 part B (2a1e4316): test fixed, workflow gates sealed, CI all green incl. Windows. Next: full-cold-review + design-review of the 52 images and demo (privacy).
@@ -32,25 +34,26 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| b5d01d5e | #168 scoped-recheck (Windows proof, S-1) | code-review | claude/sonnet | gmail |
-| 44b16d0c | #185 spike doc review | code-review | claude/sonnet | westagilelabs |
-| 974c210b | #171 vitest worker cap | feature-implementation | claude/opus | westagilelabs |
-| 9a85cf2c | #176 Dependabot groups | feature-implementation | claude/opus | gmail |
+| 839f072f | #186 code recheck | code-review | claude/sonnet | gmail |
+| dfa7c67f | #187 cold review | code-review | claude/sonnet | westagilelabs |
+| 4d88df5b | #188 cold review | code-review | claude/sonnet | qodeca |
+| 392e7c9b | #179 silence alert build | feature-implementation | claude/opus | eqamana |
 
 ## File-ownership table
-- 974c210b owns vitest.main.ts, vitest.preload.ts, vitest.renderer.ts (pool/worker lines), docs/ci.md (test parallelism note), CONTRIBUTING.md (if it mentions parallelism). 9a85cf2c owns .github/dependabot.yml (+ its docs note). No overlap between them; #170 (gate list) waits for #186.
+- 974c210b done (PR #188); vitest configs released.
+- 392e7c9b owns the new alert script + test under scripts/, a launchd plist template, its install doc, docs/spikes/179-leader-liveness.md (line 86 only). (9a85cf2c done; .github/dependabot.yml released, PR #187.) No overlap between them; #170 (gate list) waits for #186.
 - Reviews own nothing.
 
-## Accounts (from `read_quota` at 2026-09-26T16:13:00Z)
+## Accounts (from `read_quota` at 2026-09-26T17:13:08Z)
 | Runner | Login | State | Resets (UTC) |
 |---|---|---|---|
-| claude | default | reserved leader login, runs no tasks; ok (weekly 10%, plan max; same numbers as westagilelabs – owner item) | 2026-10-02 06:59 |
+| claude | default | reserved leader login, runs no tasks; ok (weekly 11%, plan max; same numbers as westagilelabs – owner item) | 2026-10-02 06:59 |
 | claude | qodeca | ok (weekly 53%) | 2026-09-28 16:59 |
-| claude | gmail | ok (weekly 8%) | 2026-10-02 19:00 |
-| claude | eqamana | ok (weekly 0%, back from out at 16:00Z) | 2026-10-03 16:00 |
-| claude | westagilelabs | ok (weekly 10%) | 2026-10-02 06:59 |
-| codex | default | ok (weekly 13%) | 2026-10-02 10:44 |
-| codex | qodeca-2 | ok (weekly 27%) | 2026-09-29 12:45 |
+| claude | gmail | ok (weekly 9%) | 2026-10-02 19:00 |
+| claude | eqamana | ok (weekly 0%) | 2026-10-03 16:00 |
+| claude | westagilelabs | ok (weekly 11%) | 2026-10-02 06:59 |
+| codex | default | ok (weekly 15%) | 2026-10-02 10:44 |
+| codex | qodeca-2 | ok (weekly 0%) | 2026-10-03 16:58 |
 | pi | – | no logins | – |
 
 ## Held or queued work
@@ -76,7 +79,7 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 - Review sessions get `gh-write.sh` / `verdict-write.sh` refused: claude/opus (a873f32c, ab0c9d7f, 612e0cf9, 35479ba2, 76be37d0) and, since 2026-09-26 16:55, claude/sonnet too (0d8a560d). Read the verdict from the task's final message; the leader posts an APPROVE verbatim on the PR, and relays a REQUEST CHANGES to the author. Read the verdict from the PR comment or the task history, close the session, relay.
 - A review task can finish its review but be refused the GitHub post by its own permission check (a873f32c, 4 refusals). Do not work around it: relay the verdict to the author, who quotes it in the response comment, and say so.
 - Never dispatch while the checkout holds unpushed campaign commits: the task's worktree is cut from the local develop and carries them into its PR (#148).
-- Load over 18 for more than one tick: check `pgrep -fl circuit-electron` for launchers with parent PID 1 before anything else. They ignore SIGTERM. Tell the owner at once; after #145 merges use `node scripts/stop-orphan-mcp.mjs`.
+- Load over 40 (owner raised from 18 on 2026-09-26) for more than one tick: check `pgrep -fl circuit-electron` for launchers with parent PID 1 before anything else. They ignore SIGTERM. Tell the owner at once; after #145 merges use `node scripts/stop-orphan-mcp.mjs`.
 - xezar ack can fail with "no longer owns the project" while status says owner (seen 00:45-00:47, load over 130). Reads still work; retry ack later, never re-dispatch on it.
 - A step agent must not end its turn while its own background work runs (XEZ:MONITORING fails the step). Say "finish in the foreground" in every brief.
 
