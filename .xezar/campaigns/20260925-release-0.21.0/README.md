@@ -17,12 +17,12 @@ Updated: 2026-09-25 11:06 CEST
 Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 
 ## Serial merge line
-- #162 (#161): brought up to date (8d7cb84d). Review 612e0cf9 running (full-cold-review, claude/opus, gmail; author pi). Record pushes held until the verdict.
+- #162 (#161): review 612e0cf9 (claude/opus, gmail) REQUEST CHANGES at 8d7cb84d: 2 major (extract-zip row credits Electron 44; guard omits symlink-entry gap), 2 minor (size cap vs decoder flaws; line range), 2 nits. Post refused again (opus pattern); relayed to author d71e7bf0 (round 1), who also runs both audits for check 1. Next: scoped recheck on claude/sonnet.
 
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| 612e0cf9 | #162 review (#161) | code-review | claude/opus | gmail |
+| d71e7bf0 | #162 review round 1 (#161) | dependency-maintenance (continued) | pi/deepseek-api/deepseek-flash | – |
 | 43131e43 | #163 lift @electron/rebuild override + electron-builder 26.16.1 (post-release, do-not-merge) | dependency-maintenance | pi/deepseek-api/deepseek-flash | – |
 
 Counts at dispatch (16:05): tasks 3/10, gate runs 0/2, metered 3/4 (all pi), load 2.8/18. xezar workspace maxParallel 5 (owner, 16:07).
