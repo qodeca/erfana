@@ -25,7 +25,7 @@ Empty.
 Counts at dispatch (08:45): tasks 1/10, gate runs 0/2 (1 when its gate step runs), metered 1/4, load 11.9/18 (a node process not started by the leader).
 
 ## File-ownership table
-- d71e7bf0 owns package.json, package-lock.json.
+- d71e7bf0 owns package.json, package-lock.json (revert only), docs/security.md.
 - Reviews own nothing.
 
 ## Accounts (from `read_quota` at 2026-09-26T05:13:10Z)
