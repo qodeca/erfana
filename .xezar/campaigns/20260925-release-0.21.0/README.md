@@ -16,6 +16,9 @@ Updated: 2026-09-25 11:06 CEST
 - #140 ready, head c442a15b – #139 spec. Re-check 12b29be1 APPROVE at c442a15b, all 11 findings fixed, no new defects. Labels design-approved + merge-queue; #139 labelled design-approved. Next in the merge line after #141: bring up to date, wait for green, squash-merge.
 Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 
+## Process speed-up plan v3 (owner-approved 2026-09-26)
+Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #173 merge queue, #178 Windows smoke, #175 brief templates. Wave 2 (after spikes): #169, #170, #172, #179. Wave 3: #174, #176, #177, #171 (only if ps shows vitest load). Dropped by owner: records branch, docs-only fast path. Interim rules in force: short plain-text verdicts in review briefs; batched record pushes.
+
 ## Serial merge line
 - #162 merged 2026-09-26 as c0cbc66f.
 

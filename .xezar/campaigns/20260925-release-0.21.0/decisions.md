@@ -75,3 +75,4 @@ Owner decisions in the owner's exact words, dated, append-only.
 - Owner approved plan v2 (after lens review) via plan-mode approval. It adds F (leader liveness) and asks a new owner decision: merge queue vs strict mode off on develop.
 - 2026-09-26 (channel: AskUserQuestion, leader session) "Open PRs fall behind develop after every merge … How should we fix that?" -> "Merge queue (Recommended)"
 - 2026-09-26 (same channel) "Proposal F: … tasks waiting for me to say 'continue' … What should it include?" -> "Alert + safe auto-continue (Recommended)"
+- 2026-09-26 (channel: AskUserQuestion, leader session) "Plan v3 drops two items you picked earlier … OK to drop both?" -> "Drop both (Recommended)"
