@@ -266,7 +266,6 @@ Do not poll CI; the leader watches it.
 Do not print, commit, upload, or put secrets in evidence; redact sensitive values in diagnostics.
 Never stop a process by command-line pattern.
 If a real decision comes up, write BLOCKED with the options.
-Keep the verdict under 3,000 characters, plain text, no backticks or dollar signs; if posting is refused, do not retry and do not post test comments; end with the full verdict as your final message.
 ```
 
 ## Mechanical docs (`mechanical-docs`)
