@@ -9,7 +9,7 @@ Updated: 2026-09-25 11:06 CEST
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
-- #183 (#133 test:cov --project), draft, head 76835964. Review 9c9fb976 running.
+- #183 (#133) merged 2026-09-26 as 6b763b38.
 - #182 (#175) merged 2026-09-26 as 97d5c17c. #175 stays open for the remaining rows.
 - #181 (#178 Windows native smoke), draft, head 73880f37, gate sealed. Reviews running. Then run on #168 branch.
 - #180 (#173) merged 2026-09-26 as db105aab. Owner: enable Require merge queue on develop.
