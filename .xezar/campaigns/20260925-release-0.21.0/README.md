@@ -9,25 +9,27 @@ Updated: 2026-09-25 11:06 CEST
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
+- #168 (#163 lift @electron/rebuild override + electron-builder 26.16.1), draft, head d4043abc, labels dependencies + do-not-merge. Gate passed; npm audit 16 -> 7; node-pty rebuilt (@electron/rebuild 4.2.0); `electron-builder --dir` green; packed app opened a working terminal. Security review 35479ba2 (claude/opus, qodeca): APPROVE-level, 1 nit S-1 (docs/security.md override row for @electron/rebuild 3.7.1 must go when #168 lands; true until then, so #168 deletes it after #162 merges). Post refused (opus pattern); relay with the code review verdict (84cbb123) to 43131e43. Merge after v0.21.0, after #167 (both change package.json/lock).
+- #167 (#164 liteparse 2.14.7), draft, head 41d87f42, do-not-merge. Review 76be37d0 (claude/opus, westagilelabs) REQUEST CHANGES: 2 major (OCR failure now fatal in 2.x; OCR language data maybe only 15 languages), 4 minor (no real-engine tests; stale ImageMagick gate; Linux binaries shipped; THIRD-PARTY-LICENSES stale), 2 nits. Post refused (opus). Relayed to author 347fc1ce, round 1; finding 2 may need an owner decision (BLOCKED if languages drop).
 - #155 ready, head d4fb29e7 – allow rule in scripts/xezar-leader-settings.json (4458b282): exactly 2 exact-match rules + one autoMode reason; all checks green. Next: security-review (widens tool access).
 - #154 ready, head 5fce83d5 – #138 part B (2a1e4316): test fixed, workflow gates sealed, CI all green incl. Windows. Next: full-cold-review + design-review of the 52 images and demo (privacy).
 - #140 ready, head c442a15b – #139 spec. Re-check 12b29be1 APPROVE at c442a15b, all 11 findings fixed, no new defects. Labels design-approved + merge-queue; #139 labelled design-approved. Next in the merge line after #141: bring up to date, wait for green, squash-merge.
 Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 
 ## Serial merge line
-- #162 (#161): d71e7bf0 done, all 11 checks pass at 5c6c0c5f. Queued: full-cold-review on claude/opus (author pi), held by load (122 at 16:23: a cmplus-project Codex task plus 347fc1ce tests). L1 wakes L3 when load < 18.
+- #162 (#161): round 1 fixed at e8aa8665 (all 6 findings answered; author ran both audits: 16 total, 4 prod high, 4 GHSA ids quoted). Scoped recheck 0d8a560d on claude/sonnet running. Record pushes held until the verdict.
 
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| 347fc1ce | #164 liteparse 1 -> 2 (post-release, do-not-merge) | dependency-maintenance | pi/deepseek-api/deepseek-flash | – |
+| 0d8a560d | #162 scoped recheck (#161) | code-review | claude/sonnet | westagilelabs |
+| 347fc1ce | #167 review round 1 (#164) | dependency-maintenance (continued) | pi/deepseek-api/deepseek-flash | – |
+| 84cbb123 | #168 full-cold-review (#163, also= of security-review) | code-review | claude/sonnet | gmail |
 | 43131e43 | #163 lift @electron/rebuild override + electron-builder 26.16.1 (post-release, do-not-merge) | dependency-maintenance | pi/deepseek-api/deepseek-flash | – |
 
 Counts at dispatch (16:05): tasks 3/10, gate runs 0/2, metered 3/4 (all pi), load 2.8/18. xezar workspace maxParallel 5 (owner, 16:07).
 
 ## File-ownership table
-- 347fc1ce owns package.json, package-lock.json, src/main/services/import/converters/LiteParseConverter.ts (+ tests), scripts/capture/legibility.mjs.
-- 43131e43 owns package.json, package-lock.json, scripts/fuses.js, docs/build/dependencies.md.
 - Overlap accepted: 347fc1ce and 43131e43 share package.json/package-lock.json; both merge after v0.21.0, one at a time, the second rebased. Neither edits docs/security.md (#162 owns it).
 - Reviews own nothing.
 
