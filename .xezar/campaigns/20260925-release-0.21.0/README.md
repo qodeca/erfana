@@ -30,7 +30,6 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 |---|---|---|---|---|
 | 43131e43 | #168 S-1 done (164d93b9); told to stop polling; waits for #181 run | dependency-maintenance (continued) | pi/deepseek-api/deepseek-flash | – |
 | 03cbd155 | #133 test:cov --project | bug-fix | pi/deepseek-api/deepseek-flash | – |
-| 07be54ed | #180 security-review | security-review | codex/gpt-6-astra | default |
 | 7d1e5077 | #181 security-review | security-review | codex/gpt-6-astra | qodeca-2 |
 | 5dc219c2 | #181 full-cold-review | code-review | claude/sonnet | westagilelabs |
 | d2e3aca9 | #182 full-cold-review | code-review | claude/opus | gmail |
