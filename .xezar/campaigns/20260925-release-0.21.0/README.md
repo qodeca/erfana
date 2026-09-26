@@ -9,10 +9,11 @@ Updated: 2026-09-25 11:06 CEST
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
-- #190 (#179 silence alert, from 392e7c9b), draft, head 0fdf50e1, gate sealed. Codex security eab95ae4: S-1 minor (lstat errors leak paths). Cold review 0ac0f4e6 running; relay together. Owner installs launchd by hand after merge.
-- #189 (owner decision: load ceiling 40 in .xezar/loops.json, from 7d5d7fc6), draft, head eb97bd69, gate sealed. Review ac9e7f48 APPROVE. In merge line after #186.
+- #191 (#170 drop test:ci, from 994fb3e5), draft, head a99c2605, gate sealed. Reviews 6513c636 (sonnet) + fed841b8 (codex security) running. After merge: leader-guide.md:150 drop test:ci.
+- #190 (#179 silence alert, from 392e7c9b), draft, head 0fdf50e1, gate sealed. Codex security eab95ae4: S-1 minor (lstat errors leak paths); cold review 0ac0f4e6 APPROVE + 1 runbook minor (leader posted). Round 1 done at 211803b5 (author gate green). Security recheck d6354c72 NO FINDINGS; code recheck 6bd5518f APPROVE. In merge line. Owner installs launchd by hand after merge.
+- #189 (load ceiling 40) merged 2026-09-26 as 25adc9a7.
 - #188 (#171 vitest worker cap) merged 2026-09-26 as c27b399b (one CI unit-test crash before, rerun green).
-- #187 (#176 Dependabot groups, from 9a85cf2c), draft, head 9717d461, gate sealed. Code review dfa7c67f REQUEST CHANGES (overrides-only pins, pre-1.0 deps, actions limit); security 5cba1e38 NO FINDINGS. Round 1 done at bdf8dd53 (author gate green). Code recheck 375e7414 APPROVE + codex security recheck 6031cb2b NO FINDINGS at bdf8dd53. In merge line after #189.
+- #187 (#176 Dependabot groups) merged 2026-09-26 as 80a8c032; #176 closed.
 - #186 (#169 gate lanes, lint:check) merged 2026-09-26 as 7cfa65bc. S-5 nit → proposed follow-up issue (owner item).
 - #185 (#179 spike) merged 2026-09-26 as 5f285011. Result: build the silence alert (+ line-86 doc fix); auto-continue deferred (parked).
 - #184 (#172 spike) merged 2026-09-26 as 4d874fa7; #172 build held for owner.
@@ -36,12 +37,18 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| 0ac0f4e6 | #190 cold review | code-review | claude/sonnet | gmail |
+| 6513c636 | #191 cold review | code-review | claude/sonnet | qodeca |
+| fed841b8 | #191 security review | security-review | codex/gpt-6-astra | qodeca-2 |
+| 8dadb69a | #174 leader context | feature-implementation | claude/opus | gmail |
+| e1c555ca | #177 browser grant | feature-implementation | claude/opus | eqamana |
 
 ## File-ownership table
 - 974c210b done (PR #188); vitest configs released.
 - 7d5d7fc6 done (PR #189); .xezar/loops.json released.
-- 392e7c9b done (PR #190). Reviews own nothing; no file is owned right now. (9a85cf2c done; .github/dependabot.yml released, PR #187.) #170 (gate list) is unblocked: #186 merged.
+- 392e7c9b done. Reviews own nothing.
+- e1c555ca owns .xezar/workflows/qa.yaml, .xezar/workflows/design-review.yaml, a new evaluate_script origin hook + tests, LOCAL-PATCHES.md entry.
+- 8dadb69a owns the leader-context loader + session-start hook, their tests/fixtures, .xezar/docs/leader-context-loading.md, .xezar/docs/campaign-notes.md, LOCAL-PATCHES.md entry.
+- 994fb3e5 done (PR #191); gate files released. (9a85cf2c done; .github/dependabot.yml released, PR #187.) #170 (gate list) is unblocked: #186 merged.
 - Reviews own nothing.
 
 ## Accounts (from `read_quota` at 2026-09-26T17:13:08Z)
