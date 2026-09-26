@@ -11,7 +11,7 @@ Updated: 2026-09-25 11:06 CEST
 ## Open pull requests
 - #187 (#176 Dependabot groups, from 9a85cf2c), draft, head 9717d461, gate sealed. Next: code review (not opus) + codex security review; held while load is over 18.
 - #186 (#169 gate lanes, lint:check), draft, head 9aa4f208, gate sealed. Next: security + cold review (queued on load).
-- #185 (#179 spike report), draft. Result: build the silence alert; auto-continue deferred (parked).
+- #185 (#179 spike) merged 2026-09-26 as 5f285011. Result: build the silence alert (+ line-86 doc fix); auto-continue deferred (parked).
 - #184 (#172 spike) merged 2026-09-26 as 4d874fa7; #172 build held for owner.
 - #183 (#133) merged 2026-09-26 as 6b763b38.
 - #182 (#175) merged 2026-09-26 as 97d5c17c. #175 stays open for the remaining rows.
