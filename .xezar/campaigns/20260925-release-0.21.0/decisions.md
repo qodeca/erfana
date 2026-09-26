@@ -51,3 +51,9 @@ Owner decisions in the owner's exact words, dated, append-only.
   Parked by the leader 2026-09-25 19:56; owner kept it. #154 already merged (c1b1ad21).
 - 2026-09-26 08:40 CEST - direct question (xez-unattended-off, parked 4 of 4: lane switch for #138 steps 7-8 to codex/gpt-6-sol) - "Keep it (Recommended)"
   Parked by the leader 2026-09-25 20:47; owner kept it. #158 already merged (8949413e).
+- 2026-09-26 08:42 CEST - direct question (AskUserQuestion: #159 QA, 3 checks unrun) - "I check by hand (Recommended)"
+  Owner checks dark mode, banner theme switch and reduced motion on github.com (branch feature/139-readme-redesign); the leader merges on the owner's word once checks are green.
+- 2026-09-26 08:42 CEST - direct question (AskUserQuestion: #147 pin) - "I do it by hand (Recommended)"
+  #147 stays the owner's; stays in 0.21.0.
+- 2026-09-26 08:42 CEST - direct question (AskUserQuestion: 16 npm audit advisories) - "New issue in 0.21.0 (Recommended)"
+  Leader files one triage issue with the release-0.21.0 label and dispatches it.
