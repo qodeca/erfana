@@ -3,11 +3,12 @@
 // (worktree, task env, not-the-leader) live in documented-output.mjs and are not repeated here.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { appendFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync, writeSync as writeSyncReal } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { after, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { Refusal, run } from './decisions-archive.mjs';
 
 const checks = path.dirname(fileURLToPath(import.meta.url));
 const scratch = realpathSync(mkdtempSync(path.join(process.env.TMPDIR || tmpdir(), 'leader-context-test-')));
@@ -45,8 +46,10 @@ function load(root) {
   return JSON.parse(result.stdout).hookSpecificOutput.additionalContext;
 }
 
+// Run from the fixture repository, as the script requires.
 function archive(campaign, ...args) {
-  return spawnSync('node', [path.join(checks, 'decisions-archive.mjs'), campaign, ...args], { encoding: 'utf8' });
+  const root = path.resolve(campaign, '../../..');
+  return spawnSync('node', [path.join(checks, 'decisions-archive.mjs'), campaign, ...args], { cwd: root, encoding: 'utf8' });
 }
 
 function longDecisions() {
@@ -129,4 +132,97 @@ test('a timeline within the bound is injected whole, with no pointer', () => {
   const context = load(root);
   assert.ok(context.includes(timeline(40)));
   assert.ok(!context.includes('timeline bounded'));
+});
+
+// In-process runs with an injected writer or a hook just before the files are replaced.
+function applyWith(campaign, io) {
+  const writeChunk = io.writeChunk ?? ((fd, buffer, offset, length) => writeSyncReal(fd, buffer, offset, length));
+  return () => run([campaign, '--move', '1', '--apply'], { cwd: path.resolve(campaign, '../../..'), io: { beforeCommit: () => {}, ...io, writeChunk } });
+}
+
+function unchanged(campaign, original) {
+  assert.equal(readFileSync(path.join(campaign, 'decisions.md'), 'utf8'), original);
+  assert.ok(!existsSync(path.join(campaign, 'archive-decisions.md')), 'no archive written');
+  assert.deepEqual(readdirSync(campaign).filter((name) => name !== 'decisions.md'), [], 'no temp or lock file left');
+}
+
+test('a decision appended between the read and the replace is kept: the run refuses', () => {
+  const original = '# Decisions\n\n- "RESOLVED"\n- "OPEN"\n';
+  const { campaign } = fixture({ 'decisions.md': original });
+  const late = '- "APPENDED-DURING-RUN"\n';
+  const decisions = path.join(campaign, 'decisions.md');
+  assert.throws(applyWith(campaign, { beforeCommit: () => appendFileSync(decisions, late) }), (e) => e instanceof Refusal && /changed while this ran/.test(e.message));
+  unchanged(campaign, original + late);
+});
+
+test('two overlapping archive runs cannot both proceed', () => {
+  const original = '# Decisions\n\n- "ONE"\n- "TWO"\n';
+  const { campaign } = fixture({ 'decisions.md': original });
+  let second;
+  applyWith(campaign, { beforeCommit: () => (second = archive(campaign, '--move', '2', '--apply')) })();
+  assert.equal(second.status, 2);
+  assert.match(second.stderr, /another archive run holds .*\.decisions-archive\.lock/);
+  assert.equal(readFileSync(path.join(campaign, 'decisions.md'), 'utf8'), '# Decisions\n\n- "TWO"\n', 'only the first run moved');
+  assert.ok(!existsSync(path.join(campaign, '.decisions-archive.lock')), 'the lock is released');
+});
+
+test('short writes are continued until every byte is written', () => {
+  const original = `# Decisions\n\n- "MOVE ME ${'y'.repeat(200)}"\n- "KEEP ME"\n`;
+  const { campaign } = fixture({ 'decisions.md': original });
+  applyWith(campaign, { writeChunk: (fd, buffer, offset, length) => writeSyncReal(fd, buffer, offset, Math.min(length, 7)) })();
+  assert.equal(readFileSync(path.join(campaign, 'decisions.md'), 'utf8'), '# Decisions\n\n- "KEEP ME"\n');
+  assert.ok(readFileSync(path.join(campaign, 'archive-decisions.md'), 'utf8').endsWith(`- "MOVE ME ${'y'.repeat(200)}"\n`));
+});
+
+for (const [which, target] of [['archive', 1], ['decisions', 2]]) {
+  test(`a truncated ${which} write is caught before anything is replaced`, () => {
+    const original = '# Decisions\n\n- "MOVE ME"\n- "KEEP ME"\n';
+    const { campaign } = fixture({ 'decisions.md': original });
+    let staged = 0;
+    // Reports every byte written but writes only half of the file it was told to corrupt.
+    const writeChunk = (fd, buffer, offset, length) => {
+      if (offset === 0) staged += 1;
+      if (staged === target) writeSyncReal(fd, buffer, offset, Math.floor(length / 2));
+      else writeSyncReal(fd, buffer, offset, length);
+      return length;
+    };
+    assert.throws(applyWith(campaign, { writeChunk }), (e) => e instanceof Refusal && /did not read back as written/.test(e.message));
+    unchanged(campaign, original);
+  });
+}
+
+test('a stale temp file is refused with a clear message', () => {
+  const original = '# Decisions\n\n- "A"\n';
+  const { campaign } = fixture({ 'decisions.md': original });
+  const stale = path.join(campaign, `archive-decisions.md.tmp-${process.pid}`);
+  writeFileSync(stale, 'stale\n');
+  assert.throws(applyWith(campaign, {}), (e) => e instanceof Refusal && /left by an interrupted run/.test(e.message));
+  assert.equal(readFileSync(path.join(campaign, 'decisions.md'), 'utf8'), original);
+  assert.equal(readFileSync(stale, 'utf8'), 'stale\n');
+});
+
+test('a symlinked ancestor or campaign cannot send the script outside the repository', () => {
+  const original = '# Decisions\n\n- "OUTSIDE"\n';
+  const { root } = fixture({ 'decisions.md': '# Decisions\n\n- "INSIDE"\n' });
+  const outside = path.join(scratch, `outside-${counter}`);
+  mkdirSync(path.join(outside, '20260101-fixture'), { recursive: true });
+  writeFileSync(path.join(outside, '20260101-fixture/decisions.md'), original);
+
+  // A campaign folder that is a link to an outside folder, passed with a trailing separator.
+  symlinkSync(path.join(outside, '20260101-fixture'), path.join(root, '.xezar/campaigns/20260102-link'));
+  for (const args of [['--list'], ['--move', '1', '--apply']]) {
+    const result = spawnSync('node', [path.join(checks, 'decisions-archive.mjs'), '.xezar/campaigns/20260102-link/', ...args], { cwd: root, encoding: 'utf8' });
+    assert.equal(result.status, 2, result.stdout);
+    assert.match(result.stderr, /not a campaign folder directly inside/);
+    assert.ok(!result.stdout.includes('OUTSIDE'), 'outside text is not printed');
+  }
+
+  // The campaigns folder itself replaced by a link to the outside folder.
+  renameSync(path.join(root, '.xezar/campaigns'), path.join(root, '.xezar/campaigns-real'));
+  symlinkSync(outside, path.join(root, '.xezar/campaigns'));
+  const result = spawnSync('node', [path.join(checks, 'decisions-archive.mjs'), '.xezar/campaigns/20260101-fixture', '--move', '1', '--apply'], { cwd: root, encoding: 'utf8' });
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /campaigns is not a directory \(symlinks are refused\)/);
+  assert.equal(readFileSync(path.join(outside, '20260101-fixture/decisions.md'), 'utf8'), original, 'outside file unchanged');
+  assert.ok(!existsSync(path.join(outside, '20260101-fixture/archive-decisions.md')));
 });
