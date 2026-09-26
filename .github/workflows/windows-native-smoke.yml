@@ -9,8 +9,11 @@ name: Windows Native Smoke
 #
 # Advisory only: dispatch-only, never a required check. No secrets, no
 # environment, no cache (read or write), no artifacts, read-only token.
+# Lifecycle scripts: `npm ci --ignore-scripts`, then exactly three named
+# exceptions – electron's binary download, patch-package, install-app-deps.
 #
-# Run it (the workflow file comes from --ref; the code under test from `ref`):
+# Run it (the workflow file and the checker come from --ref; the code under
+# test from the `ref` input, checked out into ./tested):
 #   gh workflow run windows-native-smoke.yml --ref develop -f ref=<branch-or-sha>
 # Negative control – must FAIL, proving the smoke check detects a skipped rebuild:
 #   gh workflow run windows-native-smoke.yml --ref develop -f ref=<branch-or-sha> -f skip_rebuild=true
@@ -43,21 +46,25 @@ jobs:
       run:
         shell: bash
     steps:
-      # actions/checkout v6.0.3
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
-        with:
-          ref: ${{ inputs.ref }}
-          persist-credentials: false
-
-      # The smoke script comes from the workflow's own commit, not from the
-      # tested ref, so a branch that predates it (e.g. PR #168) can be tested.
+      # Trusted checkout: the workflow's own commit, at the workspace root. It
+      # holds the checker (scripts/native-smoke.cjs) and nothing else, so the
+      # `ref` input never supplies the logic that judges it, and a tested ref
+      # that predates the checker (e.g. PR #168) can still be tested.
       # actions/checkout v6.0.3
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           ref: ${{ github.sha }}
-          path: .native-smoke
           sparse-checkout: scripts/native-smoke.cjs
           sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      # Code under test: the `ref` input, in its own directory. Install and
+      # rebuild run only there.
+      # actions/checkout v6.0.3
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          ref: ${{ inputs.ref }}
+          path: tested
           persist-credentials: false
 
       # actions/setup-node v6.4.0 – no `cache:`, and automatic package-manager
@@ -68,23 +75,36 @@ jobs:
           package-manager-cache: false
 
       - name: Install dependencies (npm ci, no scripts)
+        working-directory: tested
         run: |
           set -euo pipefail
           npm ci --ignore-scripts \
             || (sleep 10 && npm ci --ignore-scripts) \
             || (sleep 20 && npm ci --ignore-scripts)
 
-      - name: Apply patches and fetch the Electron binary
-        # The two install-time steps the smoke needs that --ignore-scripts
-        # skipped: the postinstall's patch-package (node-pty's Windows gyp
-        # fixes must be in place before it compiles) and electron's own
-        # download script, so the smoke can run under the real Electron.
+      # Lifecycle allowlist, exception 1 of 3. The smoke must run under the
+      # real Electron, and the electron npm package ships no binary: its
+      # install script downloads it. That script is the only way to get it,
+      # so it runs on every path, the negative control included. It runs
+      # right after `npm ci`, before patch-package, so only lockfile-verified
+      # bytes execute: the package is checked against the lockfile's
+      # integrity hash, and the downloaded zip against the checksums.json
+      # inside that package (remote checksums are switched off below).
+      - name: Provision the Electron binary (electron's install script)
+        working-directory: tested
         run: |
           set -euo pipefail
-          npx --no-install patch-package --error-on-fail
-          node node_modules/electron/install.js
+          env -u electron_use_remote_checksums -u npm_config_electron_use_remote_checksums \
+            node node_modules/electron/install.js
+
+      # Exception 2 of 3: the postinstall's patch-package (node-pty's Windows
+      # gyp fixes must be in place before it compiles).
+      - name: Apply patches (patch-package)
+        working-directory: tested
+        run: npx --no-install patch-package --error-on-fail
 
       - name: Toolchain versions
+        working-directory: tested
         run: |
           node --version
           npm ls @electron/rebuild node-gyp node-pty electron --all || true
@@ -92,8 +112,10 @@ jobs:
       - name: Record rebuild start time
         run: echo "NATIVE_SMOKE_REBUILT_AFTER=$(date +%s)" >> "$GITHUB_ENV"
 
+      # Exception 3 of 3: the path under test.
       - name: Rebuild native modules (electron-builder install-app-deps)
         if: ${{ !inputs.skip_rebuild }}
+        working-directory: tested
         env:
           DEBUG: electron-rebuild
         run: npx --no-install electron-builder install-app-deps
@@ -102,9 +124,12 @@ jobs:
         if: ${{ inputs.skip_rebuild }}
         run: echo "::warning::skip_rebuild=true – install-app-deps did not run; the smoke step below is expected to fail"
 
+      # The trusted checker, run against the tested tree (it resolves node-pty
+      # from its working directory).
       - name: Smoke – load node-pty and spawn a pty under Electron
+        working-directory: tested
         env:
           ELECTRON_RUN_AS_NODE: '1'
         run: |
           set -euo pipefail
-          "$(node -p "require('electron')")" .native-smoke/scripts/native-smoke.cjs
+          "$(node -p "require('electron')")" "$GITHUB_WORKSPACE/scripts/native-smoke.cjs"

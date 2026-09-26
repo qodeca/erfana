@@ -39,8 +39,9 @@ console.log(
     `${process.platform}-${process.arch}`
 )
 
-// Resolve from the working directory: CI runs this file from a separate
-// checkout of the workflow's commit, against the tested ref's node_modules.
+// Resolve from the working directory: CI runs this trusted copy (the
+// workflow's own commit) from inside the tested ref's checkout, so node-pty
+// comes from the tested tree and the checker does not.
 const ptyRoot = path.dirname(require.resolve('node-pty/package.json', { paths: [process.cwd()] }))
 const releaseDir = path.join(ptyRoot, 'build', 'Release')
 // On Windows node-pty uses ConPTY (conpty.node); elsewhere pty.node.

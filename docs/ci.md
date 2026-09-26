@@ -100,7 +100,7 @@ Runs gitleaks over the **full git history**, then trufflehog for verified secret
 
 A manual, advisory proof ([#178](https://github.com/qodeca/erfana/issues/178)) that native modules rebuild and load under Electron on Windows. It exercises the one path no other Windows job runs – the package `postinstall`'s `electron-builder install-app-deps`, which drives `@electron/rebuild` and node-gyp over node-pty. `Windows checks` runs `npm rebuild node-pty` (node-pty's own node-gyp) instead, and packaging skips the rebuild because `electron-builder.yml` sets `npmRebuild: false`. Run it whenever the rebuild toolchain changes (`electron-builder`, `@electron/rebuild`, `node-gyp`, node-pty, Electron).
 
-**Run it.** The workflow file is read from `--ref`; the code under test comes from the `ref` input, so a branch that predates the workflow can still be tested:
+**Run it.** The workflow file and the checker are read from `--ref`; the code under test comes from the `ref` input, checked out into `tested/`, so a branch that predates the workflow can still be tested:
 
 ```bash
 # Positive run – must be green
@@ -109,7 +109,7 @@ gh workflow run windows-native-smoke.yml --ref develop -f ref=<branch-or-sha>
 gh workflow run windows-native-smoke.yml --ref develop -f ref=<branch-or-sha> -f skip_rebuild=true
 ```
 
-**What it does.** `npm ci --ignore-scripts`; `patch-package --error-on-fail` and Electron's own download script (the two install-time steps the smoke needs); records a start time; `npx --no-install electron-builder install-app-deps` with `DEBUG=electron-rebuild`; then runs [`scripts/native-smoke.cjs`](../scripts/native-smoke.cjs) – taken from the workflow's own commit through a second, sparse checkout, so a tested ref that predates the script still works – with the Electron binary and `ELECTRON_RUN_AS_NODE=1`. The script fails unless all of these hold:
+**What it does.** Two checkouts: the workflow's own commit at the workspace root (sparse – only [`scripts/native-smoke.cjs`](../scripts/native-smoke.cjs), the checker) and the `ref` input in `tested/`. In `tested/` it runs `npm ci --ignore-scripts`, Electron's download script, `patch-package --error-on-fail`, records a start time, then `npx --no-install electron-builder install-app-deps` with `DEBUG=electron-rebuild`. Finally it runs the trusted checker from the root checkout, with the Electron binary and `ELECTRON_RUN_AS_NODE=1`, inside `tested/`, so node-pty comes from the tested tree and the judgement does not. The script fails unless all of these hold:
 
 - it is running under Electron (`process.versions.electron` is set);
 - `node_modules/node-pty/build/Release/conpty.node` exists and is newer than the recorded start time;
@@ -117,9 +117,15 @@ gh workflow run windows-native-smoke.yml --ref develop -f ref=<branch-or-sha> -f
 - node-pty's own loader resolves the binary from `build/Release`, not from a prebuild;
 - a `cmd.exe` pty spawns, prints a marker and exits 0.
 
-**Why the negative control fails.** node-pty ships N-API prebuilds and falls back to them when `build/Release` is absent, so a pty still spawns with no rebuild at all. The provenance checks above are what catch a skipped rebuild; `skip_rebuild=true` proves they do.
+**Why the negative control fails.** node-pty ships N-API prebuilds and falls back to them when `build/Release` is absent, so a pty still spawns with no rebuild at all. The provenance checks above are what catch a skipped rebuild; `skip_rebuild=true` proves they do. Caveat: with no rebuild, `build/Release` never exists (node-pty's own install script is blocked by `--ignore-scripts`), so the negative control always fails at the first check – binary missing. The `.forge-meta` ABI check and the timestamp check are not exercised by either CI run; they were only exercised locally.
 
-**Trust boundary.** Top-level `permissions: {}`; the job holds only `contents: read` for checkout, with `persist-credentials: false`. No secrets, no environment, no cache read or write (`package-manager-cache: false`), no artifacts, SHA-pinned actions. `--ignore-scripts` keeps every other dependency's install script blocked; only patch-package, Electron's download and `install-app-deps` run. The `ref` input can name code nobody has reviewed (anyone with write access can dispatch), and `install-app-deps` compiles that code, so the job deliberately holds nothing worth taking: the checkout token is not persisted and no secret is in scope. It is never a required check.
+**Lifecycle allowlist.** `npm ci --ignore-scripts` blocks every dependency's install script. Exactly three named steps then run install-time code, and nothing else does:
+
+1. **Electron's download script** (`node node_modules/electron/install.js`). It cannot be avoided: the checker must run under the real Electron, and the `electron` npm package ships no binary – this script fetches it. So it runs on every path, the negative control included. It runs straight after `npm ci`, before `patch-package`, so only lockfile-verified bytes execute: npm checks the package against the lockfile's `integrity` hash, and the script checks the downloaded zip against the `checksums.json` inside that package (the step clears `electron_use_remote_checksums`, so the check stays local).
+2. **`patch-package --error-on-fail`** – the postinstall's first half; node-pty's Windows gyp fixes must be in place before it compiles.
+3. **`npx --no-install electron-builder install-app-deps`** – the path under test; skipped when `skip_rebuild=true`.
+
+**Trust boundary.** Top-level `permissions: {}`; the job holds only `contents: read` for checkout, both checkouts with `persist-credentials: false`. No secrets, no environment, no cache read or write (`package-manager-cache: false`), no artifacts, SHA-pinned actions. The `ref` input can name code nobody has reviewed (anyone with write access can dispatch), and that ref controls its own lockfile, patches and dependency tree – so `install-app-deps` compiles, and Electron's script downloads, what that ref says. The two checkouts separate the checker from the code under test, so an ordinary or outdated ref cannot change how it is judged; they are **not** a sandbox. Everything runs as one user on one runner, and build code from a hostile ref could rewrite the checker before it runs. The job therefore deliberately holds nothing worth taking – the checkout token is not persisted and no secret is in scope – and its result is only as trustworthy as the ref: dispatch it on refs you have read. It is never a required check.
 
 ## E2E Tests (`e2e.yml`, disabled)
 
