@@ -54,9 +54,10 @@ Everything else goes through a pull request.
   <campaign-dir> --move <numbers> --apply` (`--list` numbers the entries; without `--apply` it only
   previews). Archiving hides an entry from the leader's context; it never removes it from
   `decisions.md`: the script only appends a record to `archive-decisions.md` naming that one
-  occurrence (SHA-256 of its exact bytes plus its ordinal among identical entries), and the loader
-  leaves out only occurrences a complete record names. Edit an archived entry and it is loaded
-  again; never edit a record – a malformed one makes the loader hide nothing.
+  entry (its byte offsets, the SHA-256 of its bytes and of the file up to it), and the loader leaves
+  out only entries a valid record names. Keep `decisions.md` append-only: editing, inserting or
+  reordering anything at or before an archived entry makes its record stale, and the entry is
+  loaded again. Never edit a record – a malformed one makes the loader hide nothing.
   Standing rules stay visible.
 
 - **`parked.md`** — one entry per decision the leader made on the owner's behalf during unattended
@@ -77,8 +78,8 @@ Everything else goes through a pull request.
   start, after a line naming the full file on disk.
 
 - **`archive-*.md`** — stale blocks kept for history, and records of resolved
-  `decisions.md` entries (`archive-decisions.md`), each naming one exact occurrence that the loader
-  leaves out of its copy of `decisions.md`. Never loaded at session start; the loader prints one line
+  `decisions.md` entries (`archive-decisions.md`), each naming one entry by byte offsets and hashes;
+  the loader leaves it out of its copy of `decisions.md` while the record still matches. Never loaded at session start; the loader prints one line
   naming them, so the leader knows they exist.
 
 ## `future-campaign/`

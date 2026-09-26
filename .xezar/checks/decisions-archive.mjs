@@ -13,22 +13,27 @@
 // APPENDS records to archive-decisions.md in the same folder (O_APPEND, every byte written, fsync,
 // then read back). decisions.md is only read, so an append to it during a run cannot be lost.
 //
-// A record names exactly ONE occurrence in decisions.md: the SHA-256 of the entry's exact bytes
-// plus its ordinal among byte-identical entries (1st, 2nd ...). decisions.md is append-only, so an
-// occurrence keeps its ordinal. A record is self-delimiting and self-checking:
+// A record names exactly ONE entry by the file's history, not by a count: the entry's start and end
+// byte offsets in decisions.md, the SHA-256 of the entry's bytes, and the SHA-256 of the whole file
+// from byte 0 to the entry's end. A record is self-delimiting and self-checking:
 //
-//   <!-- decision-archive begin sha256=<hex> occurrence=<n> bytes=<len> -->
+//   <!-- decision-archive begin from=<n> to=<n> sha256=<hex> prefix-sha256=<hex> -->
 //   <the entry, byte for byte; a newline is added only if the entry had none>
-//   <!-- decision-archive end sha256=<hex> occurrence=<n> -->
+//   <!-- decision-archive end from=<n> to=<n> sha256=<hex> -->
 //
-// The loader hides a decisions.md occurrence only when a complete record names it and the record's
-// body hashes to that name. A record naming nothing hides nothing. Any incomplete or malformed
-// record – a cut append, a hand edit – hides nothing at all: the whole decisions.md is injected with
-// a one-line note. Matching is on original bytes (files are read as latin1, one char per byte), with
-// no newline or whitespace normalisation. The lock file stops two runs from appending the same
-// record twice; safety does not depend on it. Which entries are resolved is the leader's judgement.
+// The loader hides an entry only when a complete record's offsets land exactly on that entry's
+// boundaries in the current file AND both hashes match the current bytes. decisions.md is
+// append-only, so a correct record stays valid as the file grows; any edit, insertion or reorder at
+// or before the entry changes the prefix hash, and the record then hides nothing (the loader says
+// how many records it ignored). A record past the end of the file hides nothing, and still hides
+// nothing once the file grows past it with other bytes. Any incomplete or malformed record – a cut
+// append, a hand edit – hides nothing at all: the whole decisions.md is injected with a one-line
+// note. Matching is on original bytes (files are read as latin1, one char per byte), with no
+// newline or whitespace normalisation. The script writes a record only for an entry present in the
+// file it just re-read. The lock file stops two runs from appending the same record twice; safety
+// does not depend on it. Which entries are resolved is the leader's judgement.
 //
-// `--visible <decisions.md> <archive.md>` prints decisions.md with the archived occurrences left
+// `--visible <decisions.md> <archive.md>` prints decisions.md with the archived entries left
 // out, and one status line on stderr. It is the loader's filter, so both sides share one parser.
 //
 // Trust boundary: campaign files are committed, so their content is untrusted data. Run it from
@@ -84,13 +89,13 @@ export function parseEntries(text) {
       if (line.startsWith('#')) section = line.replace(/\n$/, '');
     }
   });
-  const seen = new Map();
+  const offsets = [0];
+  for (const line of lines) offsets.push(offsets[offsets.length - 1] + line.length);
   for (const entry of entries) {
     entry.block = lines.slice(entry.start, entry.end).join('');
+    entry.from = offsets[entry.start];
+    entry.to = offsets[entry.end];
     entry.sha = sha256(entry.block);
-    entry.occurrence = (seen.get(entry.sha) ?? 0) + 1;
-    seen.set(entry.sha, entry.occurrence);
-    entry.id = `${entry.sha}:${entry.occurrence}`;
   }
   return { lines, entries };
 }
@@ -99,20 +104,24 @@ function sha256(latin1) {
   return createHash('sha256').update(Buffer.from(latin1, 'latin1')).digest('hex');
 }
 
-const BEGIN = /^<!-- decision-archive begin sha256=([0-9a-f]{64}) occurrence=([1-9][0-9]{0,8}) bytes=([0-9]{1,9}) -->\n$/;
+const HEX = '([0-9a-f]{64})';
+const BEGIN = new RegExp(`^<!-- decision-archive begin from=(0|[1-9][0-9]{0,8}) to=([1-9][0-9]{0,8}) sha256=${HEX} prefix-sha256=${HEX} -->\n$`);
 
-export function formatRecord(entry) {
+// The record for an entry of `text` (the decisions.md it was parsed from).
+export function formatRecord(entry, text) {
   const tail = entry.block.endsWith('\n') ? '' : '\n';
-  return `<!-- decision-archive begin sha256=${entry.sha} occurrence=${entry.occurrence} bytes=${entry.block.length} -->\n${entry.block}${tail}<!-- decision-archive end sha256=${entry.sha} occurrence=${entry.occurrence} -->\n`;
+  const name = `from=${entry.from} to=${entry.to} sha256=${entry.sha}`;
+  return `<!-- decision-archive begin ${name} prefix-sha256=${sha256(text.slice(0, entry.to))} -->\n${entry.block}${tail}<!-- decision-archive end ${name} -->\n`;
 }
 
-// The occurrence ids named by complete, hash-checked records, or an error naming the first bad line.
-// Text outside records is free prose and ignored; a line outside a record that starts like a marker
-// is an error, so a record cannot be half-recognised.
+// The complete, hash-checked records, or an error naming the first bad line. Text outside records is
+// free prose and ignored; a line outside a record that starts like a marker is an error, so a record
+// cannot be half-recognised.
 export function parseArchive(text) {
-  const ids = new Set();
+  const records = [];
   let pos = 0;
   let line = 1;
+  const bad = (why) => ({ records: [], error: `line ${line}: ${why}` });
   while (pos < text.length) {
     const nl = text.indexOf('\n', pos);
     const lineEnd = nl === -1 ? text.length : nl + 1;
@@ -123,40 +132,52 @@ export function parseArchive(text) {
       continue;
     }
     const match = BEGIN.exec(head);
-    if (!match) return { ids: new Set(), error: `line ${line}: malformed or incomplete record header` };
-    const [, sha, occurrence, bytes] = match;
-    const body = text.slice(lineEnd, lineEnd + Number(bytes));
-    let at = lineEnd + Number(bytes);
-    if (body.length !== Number(bytes)) return { ids: new Set(), error: `line ${line}: record body is incomplete` };
+    if (!match) return bad('malformed or incomplete record header');
+    const [from, to] = [Number(match[1]), Number(match[2])];
+    const [, , , sha, prefix] = match;
+    if (to <= from) return bad('record offsets are out of order');
+    const body = text.slice(lineEnd, lineEnd + (to - from));
+    let at = lineEnd + (to - from);
+    if (body.length !== to - from) return bad('record body is incomplete');
     if (!body.endsWith('\n')) {
-      if (text[at] !== '\n') return { ids: new Set(), error: `line ${line}: record body is incomplete` };
+      if (text[at] !== '\n') return bad('record body is incomplete');
       at += 1;
     }
-    const end = `<!-- decision-archive end sha256=${sha} occurrence=${occurrence} -->\n`;
-    if (text.slice(at, at + end.length) !== end) return { ids: new Set(), error: `line ${line}: record has no matching end line` };
-    if (sha256(body) !== sha) return { ids: new Set(), error: `line ${line}: record body does not match its sha256` };
-    ids.add(`${sha}:${occurrence}`);
+    const end = `<!-- decision-archive end from=${from} to=${to} sha256=${sha} -->\n`;
+    if (text.slice(at, at + end.length) !== end) return bad('record has no matching end line');
+    if (sha256(body) !== sha) return bad('record body does not match its sha256');
+    records.push({ from, to, sha, prefix });
     at += end.length;
     for (let i = pos; i < at; i += 1) if (text[i] === '\n') line += 1;
     pos = at;
   }
-  return { ids, error: null };
+  return { records, error: null };
 }
 
-// decisions.md without the occurrences a complete record names. Everything else – headings, prose,
-// blank lines, every unnamed occurrence – is kept, in order. A bad archive hides nothing.
-export function visibleDecisions(text, archiveText) {
-  const { ids, error } = parseArchive(archiveText);
-  if (error) return { text, hidden: 0, error };
-  const { lines, entries } = parseEntries(text);
-  const hidden = new Set();
-  let count = 0;
-  for (const entry of entries) {
-    if (!ids.has(entry.id)) continue;
-    count += 1;
-    for (let i = entry.start; i < entry.end; i += 1) hidden.add(i);
+// Which entries of `text` a record validly names, and how many records name nothing.
+export function matchRecords(text, entries, records) {
+  const byRange = new Map(entries.map((entry, i) => [`${entry.from}:${entry.to}`, i]));
+  const archived = new Set();
+  let stale = 0;
+  for (const record of records) {
+    const i = byRange.get(`${record.from}:${record.to}`);
+    const valid = i !== undefined && record.to <= text.length && entries[i].sha === record.sha && sha256(text.slice(0, record.to)) === record.prefix;
+    if (valid) archived.add(i);
+    else stale += 1;
   }
-  return { text: lines.filter((_, i) => !hidden.has(i)).join(''), hidden: count, error: null };
+  return { archived, stale };
+}
+
+// decisions.md without the entries a valid record names. Everything else – headings, prose, blank
+// lines, every entry no valid record names – is kept, in order. A bad archive hides nothing.
+export function visibleDecisions(text, archiveText) {
+  const { records, error } = parseArchive(archiveText);
+  if (error) return { text, hidden: 0, stale: 0, error };
+  const { lines, entries } = parseEntries(text);
+  const { archived, stale } = matchRecords(text, entries, records);
+  const hidden = new Set();
+  for (const i of archived) for (let l = entries[i].start; l < entries[i].end; l += 1) hidden.add(l);
+  return { text: lines.filter((_, l) => !hidden.has(l)).join(''), hidden: archived.size, stale, error: null };
 }
 
 export function parseSelection(spec, count) {
@@ -173,14 +194,14 @@ export function parseSelection(spec, count) {
 }
 
 // The appended block: a dated heading, then each entry verbatim under a heading naming its section.
-export function planArchive(entries, numbers, stamp) {
+export function planArchive(text, entries, numbers, stamp) {
   const blocks = [];
   let lastSection;
   for (const n of numbers) {
     const entry = entries[n - 1];
     if (entry.section && entry.section !== lastSection) blocks.push(`\n### From: ${entry.section.replace(/^#+\s*/, '')}\n\n`);
     lastSection = entry.section;
-    blocks.push(formatRecord(entry));
+    blocks.push(formatRecord(entry, text));
   }
   return `\n## Archived from decisions.md on ${stamp}\n\n${blocks.join('')}`;
 }
@@ -238,9 +259,9 @@ export function run(argv, { cwd = process.cwd(), io = defaultIo } = {}) {
   const [arg, ...rest] = argv;
   if (arg === '--visible' && rest.length === 2) {
     const archive = lstatExists(rest[1]) ? readRegular(rest[1]) : '';
-    const { text, hidden, error } = visibleDecisions(readRegular(rest[0]), archive);
+    const { text, hidden, stale, error } = visibleDecisions(readRegular(rest[0]), archive);
     process.stdout.write(Buffer.from(text, 'latin1'));
-    process.stderr.write(error ? `fallback ${error}\n` : `hidden ${hidden}\n`);
+    process.stderr.write(error ? `fallback ${error}\n` : `hidden ${hidden} stale ${stale}\n`);
     return;
   }
   if (!arg || arg.startsWith('--')) fail('usage: decisions-archive.mjs <campaign-dir> --list | --move <n[,n-m]> [--apply]');
@@ -277,9 +298,11 @@ export function run(argv, { cwd = process.cwd(), io = defaultIo } = {}) {
 }
 
 function archiveEntries(decisionsPath, archivePath, list, spec, io) {
-  const { entries } = parseEntries(readRegular(decisionsPath));
+  const decisions = readRegular(decisionsPath);
+  const { entries } = parseEntries(decisions);
   const archiveText = lstatExists(archivePath) ? readRegular(archivePath) : '';
-  const { ids: archived, error } = parseArchive(archiveText);
+  const { records, error } = parseArchive(archiveText);
+  const { archived } = matchRecords(decisions, entries, records);
   if (error && !list) fail(`${archivePath} ${error}; fix it (git) before archiving more – until then the loader hides nothing`);
   if (error) console.log(`note: ${archivePath} ${error}; the loader hides nothing until it is fixed`);
   const label = (entry) => {
@@ -287,13 +310,13 @@ function archiveEntries(decisionsPath, archivePath, list, spec, io) {
     return first.length > 117 ? `${first.slice(0, 117)}...` : first;
   };
   if (list) {
-    entries.forEach((entry, i) => console.log(`${String(i + 1).padStart(3)}  ${archived.has(entry.id) ? '[archived] ' : ''}${label(entry)}`));
+    entries.forEach((entry, i) => console.log(`${String(i + 1).padStart(3)}  ${archived.has(i) ? '[archived] ' : ''}${label(entry)}`));
     return;
   }
   if (entries.length === 0) fail(`${decisionsPath} has no entries`);
 
   const chosen = parseSelection(spec, entries.length);
-  const numbers = chosen.filter((n) => !archived.has(entries[n - 1].id));
+  const numbers = chosen.filter((n) => !archived.has(n - 1));
   for (const n of chosen) if (!numbers.includes(n)) console.log(`  ${n}  already archived, skipped: ${label(entries[n - 1])}`);
   if (numbers.length === 0) {
     console.log('Nothing to archive.');
@@ -307,15 +330,21 @@ function archiveEntries(decisionsPath, archivePath, list, spec, io) {
   }
 
   const stamp = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
-  const header = archiveText === '' ? '# Archive – resolved decisions\n\nRecords of resolved decisions.md entries, each naming one exact occurrence. The loader leaves those occurrences out of its copy of decisions.md; decisions.md itself is never changed. Do not edit a record: a malformed record makes the loader hide nothing.\n' : '';
+  const header = archiveText === '' ? '# Archive – resolved decisions\n\nRecords of resolved decisions.md entries, each bound to one entry by its byte offsets and the hash of decisions.md up to it. The loader leaves those entries out of its copy of decisions.md; decisions.md itself is never changed. Do not edit a record: a malformed record makes the loader hide nothing.\n' : '';
   // Everything is handled as latin1 (one char per byte); the header is UTF-8 text, so convert it.
-  const block = `${Buffer.from(header, 'utf8').toString('latin1')}${planArchive(entries, numbers, stamp)}`;
+  const block = `${Buffer.from(header, 'utf8').toString('latin1')}${planArchive(decisions, entries, numbers, stamp)}`;
   io.hook('append');
+  // Only an entry present in the file as it is now: decisions.md may have grown, never changed below.
+  const now = readRegular(decisionsPath);
+  if (!numbers.every((n) => entries[n - 1].to <= now.length && now.slice(0, entries[n - 1].to) === decisions.slice(0, entries[n - 1].to))) {
+    fail(`${decisionsPath} changed (not just appended to) while this ran; nothing was written, run it again`);
+  }
   appendAll(archivePath, block, io);
 
   const after = readRegular(archivePath);
   const check = parseArchive(after);
-  if (!after.includes(block) || check.error || !numbers.every((n) => check.ids.has(entries[n - 1].id))) fail(`${archivePath} does not read back with the appended block; decisions.md was not changed, so nothing is hidden or lost – check the archive with git`);
+  const named = check.error ? new Set() : matchRecords(now, parseEntries(now).entries, check.records).archived;
+  if (!after.includes(block) || check.error || !numbers.every((n) => named.has(n - 1))) fail(`${archivePath} does not read back with the appended block; decisions.md was not changed, so nothing is hidden or lost – check the archive with git`);
   console.log('Done. decisions.md is unchanged; the loader now leaves these entries out. Commit archive-decisions.md.');
 }
 

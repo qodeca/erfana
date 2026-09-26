@@ -38,8 +38,8 @@ is what makes the client reload both without a prompt.
 | `.xezar/campaigns/<yyyymmdd>-<code-name>/decisions.md` | Owner decisions in the owner's exact words, append-only. | **yes** |
 | `.xezar/campaigns/<yyyymmdd>-<code-name>/parked.md` | Calls the leader made alone while the owner was away. | **yes** |
 | `.xezar/campaigns/<yyyymmdd>-<code-name>/timeline-<date>.md` | What happened, minute by minute, append-only. | **yes** |
-| `.xezar/campaigns/<yyyymmdd>-<code-name>/archive-*.md` | Stale blocks, and records of resolved decisions; never loaded, the loader only names them. A `decisions.md` occurrence named by a complete record in `archive-decisions.md` is left out of the injected copy. | **yes** |
-| `.xezar/checks/decisions-archive.mjs` | Appends a record naming one exact occurrence of a resolved `decisions.md` entry to `archive-decisions.md`, which hides that occurrence from the injected context; never changes `decisions.md`. Run by hand; also the hook's filter (`--visible`). | yes |
+| `.xezar/campaigns/<yyyymmdd>-<code-name>/archive-*.md` | Stale blocks, and records of resolved decisions; never loaded, the loader only names them. A `decisions.md` entry validly named by a complete record in `archive-decisions.md` is left out of the injected copy. | **yes** |
+| `.xezar/checks/decisions-archive.mjs` | Appends a record naming one resolved `decisions.md` entry by its byte offsets and hashes to `archive-decisions.md`, which hides that entry from the injected context; never changes `decisions.md`. Run by hand; also the hook's filter (`--visible`). | yes |
 | `.xezar/checks/leader-context.test.mjs` | Fixture tests for what the loader injects from a campaign folder. | yes |
 
 The loader's documented JSON shape is checked by its allowlisted fixture. Values can vary with the
@@ -215,14 +215,18 @@ guide's size compounds. Three caps follow, and all are requirements rather than 
   `--move <numbers>` to preview and `--move <numbers> --apply` to archive. The script only
   **appends** one record per chosen entry to `archive-decisions.md` in the same folder (`O_APPEND`,
   every byte written, `fsync`, then read back). It never rewrites, renames or deletes any file, so
-  an append to `decisions.md` during a run cannot be lost. A record names exactly **one
-  occurrence**: the SHA-256 of the entry's exact bytes (a `- ` line plus its indented lines, no
-  newline or whitespace normalisation) and its ordinal among byte-identical entries, between a
-  `<!-- decision-archive begin … bytes=<len> -->` line and a matching `end` line, with the entry
-  verbatim in between. The loader leaves out an occurrence only when a complete record names it and
-  the record's body hashes to that name, and prints one line saying how many it left out. Two
-  identical entries stay two: archiving the first leaves the second visible. A record naming
-  nothing hides nothing. An incomplete or malformed record – a cut append, a hand edit – hides
+  an append to `decisions.md` during a run cannot be lost. A record names one entry by the
+  file's history, not by a count: its start and end byte offsets in `decisions.md`, the SHA-256 of
+  its exact bytes (a `- ` line plus its indented lines, no newline or whitespace normalisation) and
+  the SHA-256 of the whole file from byte 0 to its end – between a `<!-- decision-archive begin … -->`
+  line and a matching `end` line, with the entry verbatim in between. The loader leaves out an entry
+  only when a complete record's offsets land exactly on its boundaries in the current file and both
+  hashes match, and prints one line saying how many it left out. `decisions.md` is append-only, so a
+  correct record stays valid as the file grows; any edit, insertion or reorder at or before the
+  entry changes the prefix hash, and the record then hides nothing – the loader prints how many
+  stale records it ignored. Two identical entries stay two. A record past the end of the file hides
+  nothing, and still nothing once the file grows past it with other bytes; the script writes a
+  record only for an entry present in the file it has just re-read. An incomplete or malformed record – a cut append, a hand edit – hides
   **nothing**: the whole file is injected with a one-line note, and the script refuses to append
   until the archive is fixed. If the filter cannot run, the whole file is injected. If
   `decisions.md` is missing, a symlink or unreadable, the loader prints a one-line WARNING naming it
@@ -234,9 +238,9 @@ guide's size compounds. Three caps follow, and all are requirements rather than 
 
 A silent case costs one process spawn and no tokens. A loud case costs the guide, the visible part
 of the decisions file, and the bounded narrative notes. Measured on a copy of the
-`20260925-release-0.21.0` campaign on 2026-09-26 (#174, record commit 583ca473): the `develop` loader
-injected 86 054 bytes; this loader injects 51 867 with all 46 decisions present whole; archiving four
-resolved entries on the copy took it to 51 441, with the other 42 present and `decisions.md`
+`20260925-release-0.21.0` campaign on 2026-09-26 (#174, record commit 495631d4): the `develop` loader
+injected 88 682 bytes; this loader injects 53 382 with all 48 decisions present whole; archiving four
+resolved entries on the copy took it to 52 977, with the other 44 present and `decisions.md`
 byte-identical.
 
 ## Standing loops the leader runs
