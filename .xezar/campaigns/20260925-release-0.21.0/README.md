@@ -31,7 +31,7 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| 43131e43 | #168 S-1 done (164d93b9); told to stop polling; waits for #181 run | dependency-maintenance (continued) | pi/deepseek-api/deepseek-flash | – |
+
 | 04cb9379 | #169 gate lanes + lint without --fix | feature-implementation (kit-refactor) | codex/gpt-6-sol | qodeca-2 |
 
 Counts at dispatch (16:05): tasks 3/10, gate runs 0/2, metered 3/4 (all pi), load 2.8/18. xezar workspace maxParallel 5 (owner, 16:07).
