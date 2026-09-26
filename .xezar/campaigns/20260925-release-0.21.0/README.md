@@ -9,24 +9,24 @@ Updated: 2026-09-25 11:06 CEST
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
+- #167 (#164 liteparse 2.14.7), draft, head 41d87f42, labels review + do-not-merge. Gate 11/11 on the head; npm audit --omit=dev 4 -> 2 high. Needs review after the release-line reviews; merge after v0.21.0.
 - #155 ready, head d4fb29e7 – allow rule in scripts/xezar-leader-settings.json (4458b282): exactly 2 exact-match rules + one autoMode reason; all checks green. Next: security-review (widens tool access).
 - #154 ready, head 5fce83d5 – #138 part B (2a1e4316): test fixed, workflow gates sealed, CI all green incl. Windows. Next: full-cold-review + design-review of the 52 images and demo (privacy).
 - #140 ready, head c442a15b – #139 spec. Re-check 12b29be1 APPROVE at c442a15b, all 11 findings fixed, no new defects. Labels design-approved + merge-queue; #139 labelled design-approved. Next in the merge line after #141: bring up to date, wait for green, squash-merge.
 Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
 
 ## Serial merge line
-- #162 (#161): d71e7bf0 done, all 11 checks pass at 5c6c0c5f. Queued: full-cold-review on claude/opus (author pi), held by load (122 at 16:23: a cmplus-project Codex task plus 347fc1ce tests). L1 wakes L3 when load < 18.
+- #162 (#161): brought up to date (8d7cb84d). Review 612e0cf9 running (full-cold-review, claude/opus, gmail; author pi). Record pushes held until the verdict.
 
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| 347fc1ce | #164 liteparse 1 -> 2 (post-release, do-not-merge) | dependency-maintenance | pi/deepseek-api/deepseek-flash | – |
+| 612e0cf9 | #162 review (#161) | code-review | claude/opus | gmail |
 | 43131e43 | #163 lift @electron/rebuild override + electron-builder 26.16.1 (post-release, do-not-merge) | dependency-maintenance | pi/deepseek-api/deepseek-flash | – |
 
 Counts at dispatch (16:05): tasks 3/10, gate runs 0/2, metered 3/4 (all pi), load 2.8/18. xezar workspace maxParallel 5 (owner, 16:07).
 
 ## File-ownership table
-- 347fc1ce owns package.json, package-lock.json, src/main/services/import/converters/LiteParseConverter.ts (+ tests), scripts/capture/legibility.mjs.
 - 43131e43 owns package.json, package-lock.json, scripts/fuses.js, docs/build/dependencies.md.
 - Overlap accepted: 347fc1ce and 43131e43 share package.json/package-lock.json; both merge after v0.21.0, one at a time, the second rebased. Neither edits docs/security.md (#162 owns it).
 - Reviews own nothing.
