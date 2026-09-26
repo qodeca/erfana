@@ -28,15 +28,15 @@ Counts at dispatch (08:45): tasks 1/10, gate runs 0/2 (1 when its gate step runs
 - d71e7bf0 owns package.json, package-lock.json (revert only), docs/security.md.
 - Reviews own nothing.
 
-## Accounts (from `read_quota` at 2026-09-26T05:13:10Z)
+## Accounts (from `read_quota` at 2026-09-26T13:52:35Z)
 | Runner | Login | State | Resets (UTC) |
 |---|---|---|---|
-| claude | default | reserved leader login, runs no tasks; ok but weekly 99% | 2026-09-28 23:00 |
-| claude | qodeca | ok (weekly 52%) | 2026-09-28 17:00 |
-| claude | gmail | ok (weekly 4%) | 2026-10-02 18:59 |
-| claude | eqamana | out | 2026-09-26 15:59 |
-| claude | westagilelabs | ok (weekly 6%) | 2026-10-02 06:59 |
-| codex | default | unknown, flapping (read fails "Codex 0.156.1 changed its quota format" at 03:13Z and 05:13Z, ok at 04:13Z; qodeca-2 on the same version reads fine) | – |
+| claude | default | reserved leader login, runs no tasks; ok (weekly 7%; now reports plan max – was team at 99% until 06:13Z, so the login behind `default` changed) | 2026-10-02 06:59 |
+| claude | qodeca | ok (weekly 52%) | 2026-09-28 16:59 |
+| claude | gmail | ok (weekly 6%) | 2026-10-02 18:59 |
+| claude | eqamana | out | 2026-09-26 16:00 |
+| claude | westagilelabs | ok (weekly 7%) | 2026-10-02 06:59 |
+| codex | default | ok (weekly 11%; flapped to unknown at 03:13Z and 05:13Z–06:13Z) | 2026-10-02 10:44 |
 | codex | qodeca-2 | ok (weekly 27%) | 2026-09-29 12:45 |
 | pi | – | no logins | – |
 
