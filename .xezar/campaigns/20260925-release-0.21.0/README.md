@@ -9,7 +9,7 @@ Updated: 2026-09-25 11:06 CEST
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
-- #159 (#139 README) merged 2026-09-27 as 78a76c28; #206 (#147 pin) merged as b850e934. #207 (merge queue fix) merged; owner to re-enable Require merge queue on develop.
+- #159 (#139 README) merged 2026-09-27 as 78a76c28; #206 (#147 pin) merged as b850e934. #207 (merge queue fix) merged; merge queue re-enabled by owner. First queued PR is the live test.
 - #205 (license list regen after #193) merged 2026-09-27 as 3ada84a5. Release blockers: none known; release go is owner-only.
 - #202 (#177 browser grant: emulate for QA/design review, unwired evaluate_script guard; safe app start split out – parked) merged 2026-09-26 as 0b95160e; #177 closed.
 - #201 (#174 leader context: timeline bound, archiving dropped – parked) merged 2026-09-26 as d4fc1d61.

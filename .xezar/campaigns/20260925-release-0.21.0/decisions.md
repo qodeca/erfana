@@ -143,3 +143,6 @@ Owner ran .local/xezar/scratch/owner-jobs.sh: #147 pin committed and pushed by t
 Asked: queue ejects every PR (push + merge_group runs cancel each other on the queue ref). Turn the queue off now and fix it after, or keep it on and fix first (develop blocked 1–2 h)?
 Owner: "Turn queue off now (Recommended)"
 Leader action: owner unticks Require merge queue; leader merges #206 and #159 the old way; leader dispatches the checks.yml/secret-scan.yml fix; owner re-enables the queue after the fix merges.
+
+## 2026-09-27 17:59 – merge queue re-enabled (chat, leader session)
+Owner: "queue on"
