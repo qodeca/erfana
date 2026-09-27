@@ -20,11 +20,19 @@ name: Quality Checks
 # merge_group run and the queue reads the cancelled required checks as
 # failed_checks (#173). Excluding those refs is GitHub's documented way to keep
 # only the merge_group run. This is a branch filter, not a path filter: the
-# required checks still run on every real push.
+# required checks still run on every real branch push.
+#
+# tags: ['**'] keeps tag pushes running. A push trigger that defines
+# branches-ignore and no tag filter skips every tag ref, so without this a
+# pushed release tag would stop getting its own run - and release.yml's
+# green-run gate looks up a checks.yml run for the tagged SHA. tags: ['**']
+# matches every tag, so tags behave exactly as before this filter existed.
 on:
   push:
     branches-ignore:
       - 'gh-readonly-queue/**'
+    tags:
+      - '**'
   merge_group:
 
 permissions:
