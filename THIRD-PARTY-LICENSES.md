@@ -25,7 +25,9 @@ Regenerate it whenever production dependencies change.
 | Cascadia Mono font (`src/renderer/src/assets/fonts/`) | OFL-1.1 | Vendored terminal font. See `Cascadia-LICENSE.txt` and the `.license` sidecars. |
 
 Dual-licensed packages are used under their permissive option where one exists
-(e.g. `jszip` under MIT, `type-fest` under MIT).
+(e.g. `jszip` under MIT). `type-fest` 5.6.0 is (MIT OR CC0-1.0) and the
+generated section below reproduces its CC0 1.0 text; `type-fest` 0.13.1 remains
+MIT.
 
 ---
 
