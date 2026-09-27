@@ -53,7 +53,7 @@ jobs:
     steps:
       # actions/checkout v6.0.3 — MUST run before the local composite action
       # below so the action.yml file can be loaded from the workspace.
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: ./.github/actions/setup-node-with-retry
       - name: Lint
         run: npm run lint
@@ -76,7 +76,7 @@ jobs:
     steps:
       # actions/checkout v6.0.3 — MUST run before the local composite action
       # below so the action.yml file can be loaded from the workspace.
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: ./.github/actions/setup-node-with-retry
       - name: Typecheck
         run: npm run typecheck
@@ -89,7 +89,7 @@ jobs:
     steps:
       # actions/checkout v6.0.3 — MUST run before the local composite action
       # below so the action.yml file can be loaded from the workspace.
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: ./.github/actions/setup-node-with-retry
         with:
           # ConverterRegistry.test.ts + other electron-aware tests import
@@ -173,7 +173,7 @@ jobs:
     steps:
       # actions/checkout v6.0.3 — MUST run before the local composite action
       # below so the action.yml file can be loaded from the workspace.
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: ./.github/actions/setup-node-with-retry
         with:
           # scripts/fuses.test.mjs + the other main-process tests import the
@@ -206,7 +206,7 @@ jobs:
     steps:
       # actions/checkout v6.0.3 — MUST run before the local composite action
       # below so the action.yml file can be loaded from the workspace.
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: ./.github/actions/setup-node-with-retry
         with:
           # electron-vite build imports native modules at config resolution
@@ -223,7 +223,7 @@ jobs:
     steps:
       # actions/checkout v6.0.3 — MUST run before the local composite action
       # below so the action.yml file can be loaded from the workspace.
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: ./.github/actions/setup-node-with-retry
       - name: SPDX headers present on all source files
         run: npm run check:headers
@@ -244,7 +244,7 @@ jobs:
     steps:
       # actions/checkout v6.0.3 — MUST run before the local composite action
       # below so the action.yml file can be loaded from the workspace.
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: ./.github/actions/setup-node-with-retry
         with:
           # test:main imports the electron binary + node-pty native bindings;
@@ -274,7 +274,7 @@ jobs:
     steps:
       # actions/checkout v6.0.3 — MUST run before the local composite action
       # below so the action.yml file can be loaded from the workspace.
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: ./.github/actions/setup-node-with-retry
       - name: Verify npm registry signatures
         # Asserts every package in package-lock.json is signed by npm's
@@ -312,7 +312,7 @@ jobs:
       # the extraResources: block against the push/PR base commit (issue #55).
       # The default depth-1 checkout has no base to diff against, which would
       # force that guard into its fail-safe warn-always path.
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
 
