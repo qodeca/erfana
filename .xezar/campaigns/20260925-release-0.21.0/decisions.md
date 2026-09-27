@@ -106,3 +106,7 @@ Parked by the leader 2026-09-26T20:45:30Z; owner confirmed.
 > Keep split, file issue
 
 Parked by the leader 2026-09-26T20:57:30Z; owner confirmed and gave the word to file a follow-up issue for safe app start (S-3 detached descendants, S-4 PID reuse as acceptance).
+
+## 2026-09-27 07:49 CEST – #172 review posting fix (AskUserQuestion, after the leader explained why posting is refused)
+
+> File a comprehensive issue to Xezar's GH and label it release-0.20.0
