@@ -13,8 +13,18 @@ name: Quality Checks
 # NAMES, so every required job below must also run on the queue's
 # gh-readonly-queue/... ref or the queued PR waits forever. The repository
 # guard on each job holds there: a merge group always runs in qodeca/erfana.
+#
+# push ignores gh-readonly-queue/**: GitHub fires a push event on the queue's
+# temporary branch too, and that push run shares this workflow's ref-keyed
+# concurrency group with the merge_group run, so cancel-in-progress cancels the
+# merge_group run and the queue reads the cancelled required checks as
+# failed_checks (#173). Excluding those refs is GitHub's documented way to keep
+# only the merge_group run. This is a branch filter, not a path filter: the
+# required checks still run on every real push.
 on:
   push:
+    branches-ignore:
+      - 'gh-readonly-queue/**'
   merge_group:
 
 permissions:
