@@ -1,7 +1,9 @@
 {
-  "mode": "on",
-  "since": "2026-09-25T09:10:38Z",
+  "mode": "off",
+  "since": "2026-09-26T06:49:11Z",
+  "endedAt": "2026-09-27T05:06:10Z",
   "enteredBy": "xez-unattended-on",
+  "endedBy": "xez-unattended-off",
   "restarts": 0,
   "maxRestarts": 3
 }

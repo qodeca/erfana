@@ -16,6 +16,7 @@ routing itself is data, not a document: `.xezar/routing.json`, read through `.xe
 | `leader-guide-detail.md` | The reasoning behind each rule in the leader guide. The guide loads at every session start, so it carries rules only; open this when a rule looks wrong. |
 | `campaign-notes.md` | What a campaign folder is, its seven file kinds, and which of them load at session start. |
 | `routing.md` | How the leader picks the lane — a runner plus a model — and the login for each task: classify with `route.mjs --rows`, order with `route.mjs <row id>`, then budget and never the author. |
+| `briefs.md` | Ready-to-fill dispatch briefs for the commonly used routing rows, including ownership boundaries, testing rhythm, CI responsibility, and review verdict limits. |
 
 ## Running the work
 

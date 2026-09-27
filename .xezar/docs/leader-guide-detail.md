@@ -26,6 +26,10 @@ where the two seem to differ, the guide wins and the difference is a finding for
 - **Why least file overlap beats priority.** Two tasks on one file means the second one rebases,
   conflicts, or fails its gate at merge. A high-priority task that collides costs more than it
   saves; priority only chooses between tasks that do not collide.
+- **Why dispatches start from a row-specific brief.** Routing selects a workflow but does not say
+  which paths the task owns, what must stay untouched, or who is responsible for CI observation.
+  Fill the matching template in [briefs.md](briefs.md) before L3 dispatches: it preserves those
+  boundaries, keeps the one-gate rhythm explicit, and gives review rows a safe verdict fallback.
 
 ## Owner-only decisions
 

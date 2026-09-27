@@ -12,7 +12,7 @@
 
 ## Overview & Architecture
 
-The prompt template system enables AI-powered text operations through context menu actions. This guide documents the technical implementation of the **autoExecute feature**, which automatically presses Enter after pasting a prompt into the terminal.
+The prompt template system sends the selected text, with instructions, to the CLI agent running in the terminal, through context menu actions. This guide documents the technical implementation of the **autoExecute feature**, which automatically presses Enter after pasting a prompt into the terminal.
 
 ### Lesson kept from the v0.3.x fixes
 

@@ -38,6 +38,7 @@ is what makes the client reload both without a prompt.
 | `.xezar/campaigns/<yyyymmdd>-<code-name>/decisions.md` | Owner decisions in the owner's exact words, append-only. | **yes** |
 | `.xezar/campaigns/<yyyymmdd>-<code-name>/parked.md` | Calls the leader made alone while the owner was away. | **yes** |
 | `.xezar/campaigns/<yyyymmdd>-<code-name>/timeline-<date>.md` | What happened, minute by minute, append-only. | **yes** |
+| `.xezar/checks/leader-context.test.mjs` | Fixture tests for what the loader injects from a campaign folder. | yes |
 
 The loader's documented JSON shape is checked by its allowlisted fixture. Values can vary with the
 guide and campaign notes, while these keys are its stable output contract:
@@ -189,18 +190,33 @@ guide's size compounds. Three caps follow, and all are requirements rather than 
   `parked.md` and its `decisions.md`. A plan or an archive is never loaded; the leader reads those
   on demand.
 - **The cap depends on the file's role, and one file has no cap at all.** The narrative notes —
-  `README.md`, the newest timeline, `parked.md` — are bounded in the payload to their last
+  `README.md` and `parked.md` — are bounded in the payload to their last
   **65 536 bytes** (`NOTE_TAIL_BYTES`), because they grow for the life of a campaign while the
   leader reads the tail anyway. A note over the cap is preceded by a visible line naming the file
   and its size, so a partial note is never mistaken for the whole.
+- **The newest timeline is bounded by entry.** It is the note that grows every few minutes, so only
+  its newest **40 entries** (`TIMELINE_ENTRIES`) are injected, after its `# Timeline` heading and
+  one line: `[timeline bounded: showing the newest 40 of N entries …; the full timeline is on disk
+  at <path> …]`. An entry is a line starting `- ` plus the lines under it, so the cut never lands
+  mid-entry. `NOTE_TAIL_BYTES` still applies on top, so one oversized entry cannot undo the bound.
+  A timeline of 40 entries or fewer is injected whole, with no pointer line.
 - **`decisions.md` is injected whole and is never cut.** It is the authority file: the owner's exact
   words, append-only, and the oldest entry binds the leader exactly as hard as the newest. Cutting
   its head would silently drop standing decisions the leader is still required to follow, and it
   would do so with no visible failure — which is the worst shape a defect can take. The guide is
   likewise **not** capped; it is always loaded in full.
+- **A missing `decisions.md` is loud.** If the file is missing, a symlink or unreadable, the loader
+  prints a one-line WARNING naming it instead of skipping it, so standing decisions never drop out
+  silently.
+- **Archiving decisions is not supported yet.** `decisions.md` is always injected whole; an
+  `archive-*.md` file is never loaded and never used to filter it. A future issue may add archiving
+  with a trusted proof of archival.
 
 A silent case costs one process spawn and no tokens. A loud case costs the guide, the whole
-decisions file, and the bounded narrative notes.
+decisions file, and the bounded narrative notes. Measured on a copy of the `20260925-release-0.21.0`
+campaign on 2026-09-26 (#174, record commit 753366a6): the `develop` loader injected 90 335 bytes;
+this loader injects 54 093, the timeline bound being the whole difference, with `decisions.md` (48
+entries) present byte for byte.
 
 ## Standing loops the leader runs
 

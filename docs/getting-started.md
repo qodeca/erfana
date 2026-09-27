@@ -55,7 +55,7 @@ src/
 └── renderer/src/       # React UI
     ├── components/     # UI components
     ├── stores/         # Zustand state management
-    └── prompts/        # AI prompt templates
+    └── prompts/        # prompt templates sent to the CLI agent
 ```
 
 ## Common Workflows

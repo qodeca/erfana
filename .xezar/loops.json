@@ -25,7 +25,7 @@
       "mechanism": "cron",
       "schedule": "*/30 * * * *",
       "mayDispatch": true,
-      "prompt": "Decide whether to start more work. Count what is running: full gate runs, total tasks, tasks on the metered agent tool, and machine load. Start another task only while ALL of these hold: at most 2 gate runs, at most 10 tasks, at most 4 metered-tool tasks, machine load at or below 18. If there is ready work and headroom, pick the next item by least file overlap against every running task, using priority only to break a tie, then classify it against `node .xezar/checks/route.mjs --rows` and run `node .xezar/checks/route.mjs <row id>`: dispatch the first listed lane with budget that is not the author's, as .xezar/docs/routing.md says. A `wait` line means the item waits; never pick a lane the script did not list. If you are at a ceiling, queue and name which ceiling. If there is no ready work, do nothing and say so."
+      "prompt": "Decide whether to start more work. Count what is running: full gate runs, total tasks, tasks on the metered agent tool, and machine load. Start another task only while ALL of these hold: at most 2 gate runs, at most 10 tasks, at most 4 metered-tool tasks, machine load at or below 40. If there is ready work and headroom, pick the next item by least file overlap against every running task, using priority only to break a tie, then classify it against `node .xezar/checks/route.mjs --rows` and run `node .xezar/checks/route.mjs <row id>`: dispatch the first listed lane with budget that is not the author's, as .xezar/docs/routing.md says. A `wait` line means the item waits; never pick a lane the script did not list. If you are at a ceiling, queue and name which ceiling. If there is no ready work, do nothing and say so."
     }
   ],
   "ceilings": {
@@ -33,7 +33,7 @@
     "concurrentGateRuns": 2,
     "totalTasks": 10,
     "meteredToolTasks": 4,
-    "machineLoad": 18
+    "machineLoad": 40
   },
   "rules": [
     "L3 is the only loop that may dispatch. L1 and L2 wake it instead of starting work themselves.",

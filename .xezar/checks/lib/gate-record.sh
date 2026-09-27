@@ -181,6 +181,7 @@ gate_attempt_begin() {
     "headSha=$HEAD_SHA" \
     "treeSha=$(head_tree_sha)" \
     "commandListId=$command_list_id" \
+    "applicationSchedule:j=${GATE_APPLICATION_SCHEDULE_JSON:-null}" \
     "leaseWaitMs:n=${GATE_LEASE_WAIT_MS:-}" \
     "required:j=$required_json" \
     "repo:j=$(repo_identity)" \

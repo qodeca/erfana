@@ -2,6 +2,12 @@
 # package ecosystems to update and where the package manifests are located.
 # Please see the documentation for all configuration options:
 # https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+#
+# Grouping (#176): minor and patch updates land as one PR per group, so a
+# weekly run costs one CI run and one review instead of one per package.
+# Major updates match no group, so each still opens its own PR and a
+# breaking upgrade is reviewed on its own. Groups apply to version updates
+# only; security updates keep their own PRs.
 
 version: 2
 updates:
@@ -10,6 +16,53 @@ updates:
     target-branch: "develop"
     schedule:
       interval: "weekly"
+    # Two group PRs plus one PR per major; the default of 5 would let a
+    # handful of majors crowd out the grouped minor/patch PRs.
+    open-pull-requests-limit: 10
+    # Pre-1.0 packages are kept out of both groups: a 0.x -> 0.(x+1) bump is
+    # breaking by convention but Dependabot classes it as minor, so each one
+    # still opens its own PR.
+    groups:
+      npm-production:
+        dependency-type: "production"
+        update-types:
+          - "minor"
+          - "patch"
+        exclude-patterns:
+          - "async-mutex"
+          - "@xterm/addon-fit"
+          - "@xterm/addon-web-links"
+          - "@xterm/addon-webgl"
+          - "lucide-react"
+          - "monaco-editor"
+          - "shx"
+      npm-development:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
+        exclude-patterns:
+          - "async-mutex"
+          - "@xterm/addon-fit"
+          - "@xterm/addon-web-links"
+          - "@xterm/addon-webgl"
+          - "lucide-react"
+          - "monaco-editor"
+          - "shx"
+    ignore:
+      # Packages pinned through package.json `overrides` (docs/security.md
+      # § Dependency overrides). They are transitive-only today, but ignore
+      # them so a version update can never move a pin or ride in a group;
+      # change them by hand with the overrides table.
+      - dependency-name: "lodash"      # exact 4.18.1, CVE pin
+      - dependency-name: "lodash-es"   # exact 4.18.1, CVE pin
+      - dependency-name: "@electron/rebuild"  # 3.7.1, node-pty toolchain
+      - dependency-name: "dompurify"   # ^3.4.1 floor for transitive copies
+      # chokidar is pinned to exact 3.6.0 (package.json dependency and
+      # override): v4 removed `disableGlobbing`, which the file watchers
+      # rely on, and the `Guard - chokidar v3 pinned` step in checks.yml
+      # fails on any drift. See docs/security.md § Dependency overrides.
+      - dependency-name: "chokidar"
 
   # Keep SHA-pinned third-party actions in .github/workflows/* and
   # .github/actions/*/action.yml fresh. Without this block, a SHA-pinned
@@ -20,3 +73,11 @@ updates:
     target-branch: "develop"
     schedule:
       interval: "weekly"
+    # One grouped PR plus one per major: the default limit of 5 is enough.
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"

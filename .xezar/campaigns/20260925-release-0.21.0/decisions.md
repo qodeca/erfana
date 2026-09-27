@@ -43,3 +43,103 @@ Owner decisions in the owner's exact words, dated, append-only.
 - 2026-09-25 13:10 CEST - direct question (AskUserQuestion: the #138 spike, PR #149, stopped because a subscription token needs a browser sign-in by a person) - "Yes, I make it (Recommended)". The owner runs `claude setup-token` as westagilelabs and stores the token in a chmod 600 file outside the repo; the leader then re-runs only the login part of the spike.
 - 2026-09-25 15:28 CEST - direct question (AskUserQuestion: allow-rule task 4458b282 stopped, Claude Code refuses a task edit of .claude/settings.json) - "I add it by hand". The owner pastes the two rules into the task worktree; the task then adds the doc line, runs the checks and opens the PR.
 - 2026-09-25 17:22 CEST - direct question (AskUserQuestion: allow rule refused by the kit check in .claude/settings.json; where should it go?) - "Leader-only file (Recommended)". Rules go in scripts/xezar-leader-settings.json; the owner undoes the manual .claude/settings.json edit in both places.
+- 2026-09-26 08:40 CEST - direct question (xez-unattended-off, parked 1 of 4: third repair round on PR #155, same-PR fix of S-1/S-2) - "Keep it (Recommended)"
+  Parked by the leader 2026-09-25 18:27; owner kept it. #155 already merged (0c8cc10a).
+- 2026-09-26 08:40 CEST - direct question (xez-unattended-off, parked 2 of 4: fourth repair round on PR #155, S-2 fail-closed fix) - "Keep it (Recommended)"
+  Parked by the leader 2026-09-25 18:56; owner kept it.
+- 2026-09-26 08:40 CEST - direct question (xez-unattended-off, parked 3 of 4: third repair round on PR #154, Windows test fix before merge) - "Keep it (Recommended)"
+  Parked by the leader 2026-09-25 19:56; owner kept it. #154 already merged (c1b1ad21).
+- 2026-09-26 08:40 CEST - direct question (xez-unattended-off, parked 4 of 4: lane switch for #138 steps 7-8 to codex/gpt-6-sol) - "Keep it (Recommended)"
+  Parked by the leader 2026-09-25 20:47; owner kept it. #158 already merged (8949413e).
+- 2026-09-26 08:42 CEST - direct question (AskUserQuestion: #159 QA, 3 checks unrun) - "I check by hand (Recommended)"
+  Owner checks dark mode, banner theme switch and reduced motion on github.com (branch feature/139-readme-redesign); the leader merges on the owner's word once checks are green.
+- 2026-09-26 08:42 CEST - direct question (AskUserQuestion: #147 pin) - "I do it by hand (Recommended)"
+  #147 stays the owner's; stays in 0.21.0.
+- 2026-09-26 08:42 CEST - direct question (AskUserQuestion: 16 npm audit advisories) - "New issue in 0.21.0 (Recommended)"
+  Leader files one triage issue with the release-0.21.0 label and dispatches it.
+- 2026-09-26 08:49 CEST - direct question (xez-unattended-on contract read back, with pi/deepseek-flash task d71e7bf0 running on metered spend) - "Yes, turn it on"
+  Unattended mode on since 2026-09-26T06:49:11Z. Hard stops: release go, deleting a record, opening a campaign. Parked: account or provider lane switch, scope trim, third repair round. Accepted costs: metered spend while away; stops are instructions, not a hook.
+- 2026-09-26 15:51 CEST - direct question (AskUserQuestion: #161 task d71e7bf0 asked; electron-builder 26.16.1 clears 0 of 16 while the @electron/rebuild 3.7.1 override stands, and breaks the macOS package build without a scripts/fuses.js allowlist change) - "Undo upgrade, triage only (Recommended)"
+  PR carries the triage only; override removal + electron-builder upgrade becomes a follow-up with a node-pty build test.
+- 2026-09-26 15:51 CEST - direct question (AskUserQuestion: docs/security.md policy "zero high/critical production advisories at release"; develop has 4 production highs: electron, extract-zip, @llamaindex/liteparse, sharp; all need majors) - "Except all 4, fix later"
+  0.21.0 ships with a written, dated exception for all 4. liteparse 2 and Electron 44 filed as issues after the release.
+- 2026-09-26 16:04 CEST - direct question (AskUserQuestion: "can you do more in parallel?"; only post-release #161 follow-ups are parallel) - "Start post-release fixes now (Recommended)"
+  File the 4 follow-up issues now without the release label; start liteparse 1->2 and the @electron/rebuild override lift now; their PRs carry do-not-merge until 0.21.0 ships.
+- 2026-09-26 16:05 CEST - chat - "change maxParallel to 5"
+  Set in the xezar workspace (machine) config via project_config set_workspace_config: resources.maxParallel 2 -> 5. Not in the committed project config (kit rule: machine-sized limits stay off it).
+
+## 2026-09-26 – process and kit speed-ups (channel: AskUserQuestion in the leader session, then plan approval)
+- "Which process fixes do you want built?" -> "Faster gate, Reviews post their own verdict, Records off develop, Small tidy-ups"
+- "How should we prove the #168 build-tool upgrade works on Windows?" -> "New manual CI check (Recommended)"
+- "When may the process fixes merge?" -> "Merge when ready (Recommended)"
+- Owner approved plan v2 (after lens review) via plan-mode approval. It adds F (leader liveness) and asks a new owner decision: merge queue vs strict mode off on develop.
+- 2026-09-26 (channel: AskUserQuestion, leader session) "Open PRs fall behind develop after every merge … How should we fix that?" -> "Merge queue (Recommended)"
+- 2026-09-26 (same channel) "Proposal F: … tasks waiting for me to say 'continue' … What should it include?" -> "Alert + safe auto-continue (Recommended)"
+- 2026-09-26 (channel: AskUserQuestion, leader session) "Plan v3 drops two items you picked earlier … OK to drop both?" -> "Drop both (Recommended)"
+- 2026-09-26T17:22:47Z (channel: typed in the leader session) "bump load ceiling from 24 to 40". Note: the ceiling on record was 18 (leader-guide.md:138, loops.json L3), not 24; applied as 40.
+- 2026-09-26T19:43:08Z (channel: AskUserQuestion in the leader session) #202 S-2 – owner picked "B: safe app start" (build a locked sandbox so testers start the PR's app only in their own folder, with no access to the owner's folder or logins), over the recommended A (no app start).
+- 2026-09-26T19:44:41Z (channel: AskUserQuestion in the leader session) #201 third repair round – owner picked "Fix the script again" over the recommended "Drop the script" (replace it with a written how-to).
+- 2026-09-26T20:17:29Z (channel: AskUserQuestion in the leader session) #201 fourth repair round – owner picked "Fix archiving again" (unique ID per decision, exact-byte match) over the recommended "Drop archiving".
+- 2026-09-26T20:35:52Z (channel: AskUserQuestion in the leader session) #202 third repair round – owner picked "Fix it (round 3)" (starter files outside the app's reach, fresh temp folder per start, stop every child).
+- 2026-09-26T20:36:57Z (channel: typed in the leader session) "I'm goint to sleep. You are fully in charge". Note: unattended.json already reads on (since 06:49:11Z, restarts 0/3); the three hard stops (release go, deleting a record, opening a campaign) still bind – the owner's words do not remove them.
+
+## 2026-09-27 07:25 CEST – #179 scope (asked back after unattended mode, AskUserQuestion)
+
+> OK, alarm only
+
+Parked by the leader 2026-09-26 18:44; owner confirmed.
+
+## 2026-09-27 07:25 CEST – #201 fifth repair round (asked back after unattended mode, AskUserQuestion)
+
+> OK to try once more
+
+Parked by the leader 2026-09-26T20:36:57Z; owner confirmed.
+
+## 2026-09-27 07:25 CEST – #201 scope trim, archiving dropped (asked back after unattended mode, AskUserQuestion)
+
+> Keep it dropped
+
+Parked by the leader 2026-09-26T20:45:30Z; owner confirmed.
+
+## 2026-09-27 07:25 CEST – #202 scope trim, safe app start split out (asked back after unattended mode, AskUserQuestion)
+
+> Keep split, file issue
+
+Parked by the leader 2026-09-26T20:57:30Z; owner confirmed and gave the word to file a follow-up issue for safe app start (S-3 detached descendants, S-4 PID reuse as acceptance).
+
+## 2026-09-27 07:49 CEST – #172 review posting fix (AskUserQuestion, after the leader explained why posting is refused)
+
+> File a comprehensive issue to Xezar's GH and label it release-0.20.0
+
+## 2026-09-27 08:02 CEST – Dependabot PRs (AskUserQuestion)
+
+> Small ones now (Recommended)
+
+Leader offered: review and merge the minor/patch groups (#193, #194, #195, #192) before the release; big jumps and old PRs (#63-#68) wait until after it.
+
+## 2026-09-27 08:02 CEST – #202 evaluate_script wiring (AskUserQuestion)
+
+> Leave it off (Recommended)
+
+## 2026-09-27 09:30 – release 0.21.0 go (AskUserQuestion, leader session)
+Asked: last blocker #205 merged; 6 labelled issues open (#139/PR #159 README awaiting owner hand check; #147, #169, #172, #175, #179 process). Go for release now, or wait for README first?
+Owner: "Finish everything what should be finished so I can move to the other machine to test everything on Windows before the release"
+Leader reading: no release go yet. Finish open work first; owner then tests develop on Windows; release go asked again after that.
+
+## 2026-09-27 09:31 – owner jobs timing (AskUserQuestion, leader session)
+Asked: do the 4 owner jobs (README check #139, pin #147, install #179 alarm, merge queue) after the Windows test, or before leaving?
+Owner: "Before I leave"
+
+## 2026-09-27 16:26 – owner jobs, second ask (AskUserQuestion, leader session)
+Asked: do the 4 owner jobs now, or skip them and go straight to the Windows test?
+Owner: "Do the 4 jobs now"
+
+## 2026-09-27 16:34 – owner jobs results (chat, leader session)
+Owner: "gh change done" (Require merge queue enabled on develop)
+Owner: "README approved" (#139 hand check of PR #159: dark mode, theme switch, reduced motion)
+Owner ran .local/xezar/scratch/owner-jobs.sh: #147 pin committed and pushed by the owner; #179 leader-watch launchd agent installed (plutil OK, last exit code = 0).
+
+## 2026-09-27 16:52 – merge queue broken (AskUserQuestion, leader session)
+Asked: queue ejects every PR (push + merge_group runs cancel each other on the queue ref). Turn the queue off now and fix it after, or keep it on and fix first (develop blocked 1–2 h)?
+Owner: "Turn queue off now (Recommended)"
+Leader action: owner unticks Require merge queue; leader merges #206 and #159 the old way; leader dispatches the checks.yml/secret-scan.yml fix; owner re-enables the queue after the fix merges.
