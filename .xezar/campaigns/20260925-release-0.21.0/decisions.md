@@ -138,3 +138,8 @@ Owner: "Do the 4 jobs now"
 Owner: "gh change done" (Require merge queue enabled on develop)
 Owner: "README approved" (#139 hand check of PR #159: dark mode, theme switch, reduced motion)
 Owner ran .local/xezar/scratch/owner-jobs.sh: #147 pin committed and pushed by the owner; #179 leader-watch launchd agent installed (plutil OK, last exit code = 0).
+
+## 2026-09-27 16:52 – merge queue broken (AskUserQuestion, leader session)
+Asked: queue ejects every PR (push + merge_group runs cancel each other on the queue ref). Turn the queue off now and fix it after, or keep it on and fix first (develop blocked 1–2 h)?
+Owner: "Turn queue off now (Recommended)"
+Leader action: owner unticks Require merge queue; leader merges #206 and #159 the old way; leader dispatches the checks.yml/secret-scan.yml fix; owner re-enables the queue after the fix merges.
