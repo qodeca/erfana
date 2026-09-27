@@ -5,7 +5,7 @@
       "args": [
         "scripts/run-mcp.js",
         "-y",
-        "@snowfort/circuit-electron@latest"
+        "@snowfort/circuit-electron@0.0.18"
       ]
     },
     "xezar": {
