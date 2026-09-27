@@ -4,12 +4,12 @@
  * DOCX conversion child (Electron utilityProcess entry).
  *
  * Runs `@turbodocx/html-to-docx` in a separate, killable process. The library
- * decodes embedded images synchronously (via image-size), so a crafted image can
- * spin the CPU in an infinite loop. In the main process that would freeze the app
- * with no recovery — the in-thread `Promise.race` timeout can never fire while
- * the event loop is held. Isolating the work here means the parent adapter can
- * `kill()` a hung conversion, and a separate process also caps its memory so a
- * decompression bomb cannot OOM the main process.
+ * decodes embedded images synchronously (via probe-image-size), so a crafted
+ * image can spin the CPU in an infinite loop. In the main process that would
+ * freeze the app with no recovery — the in-thread `Promise.race` timeout can
+ * never fire while the event loop is held. Isolating the work here means the
+ * parent adapter can `kill()` a hung conversion, and a separate process also
+ * caps its memory so a decompression bomb cannot OOM the main process.
  *
  * The HTML that arrives here is already stripped of remote images and wrapped in
  * a document shell by `HtmlToDocxConverter` (main side) — this child only runs
