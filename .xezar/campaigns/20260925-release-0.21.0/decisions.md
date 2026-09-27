@@ -110,3 +110,13 @@ Parked by the leader 2026-09-26T20:57:30Z; owner confirmed and gave the word to 
 ## 2026-09-27 07:49 CEST – #172 review posting fix (AskUserQuestion, after the leader explained why posting is refused)
 
 > File a comprehensive issue to Xezar's GH and label it release-0.20.0
+
+## 2026-09-27 08:02 CEST – Dependabot PRs (AskUserQuestion)
+
+> Small ones now (Recommended)
+
+Leader offered: review and merge the minor/patch groups (#193, #194, #195, #192) before the release; big jumps and old PRs (#63-#68) wait until after it.
+
+## 2026-09-27 08:02 CEST – #202 evaluate_script wiring (AskUserQuestion)
+
+> Leave it off (Recommended)
