@@ -34,10 +34,10 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| 49ec990d | #205 license list review | code-review | claude/opus | qodeca |
+| 5cc43f3e | #205 repair round 1 (review 49ec990d REQUEST CHANGES: line-28 type-fest note, comment wrap) | dependency-maintenance | pi/deepseek-flash | – |
 
 ## File-ownership table
-- 5cc43f3e done (PR #205 head 2407436b); files released.
+- 5cc43f3e round 1 owns THIRD-PARTY-LICENSES.md (line 28 note) and src/main/services/docx/docx-convert.process.ts (comment).
 - 974c210b done (PR #188); vitest configs released.
 - 7d5d7fc6 done (PR #189); .xezar/loops.json released.
 - 392e7c9b done. Reviews own nothing.
