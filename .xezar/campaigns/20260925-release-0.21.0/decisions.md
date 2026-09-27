@@ -133,3 +133,8 @@ Owner: "Before I leave"
 ## 2026-09-27 16:26 – owner jobs, second ask (AskUserQuestion, leader session)
 Asked: do the 4 owner jobs now, or skip them and go straight to the Windows test?
 Owner: "Do the 4 jobs now"
+
+## 2026-09-27 16:34 – owner jobs results (chat, leader session)
+Owner: "gh change done" (Require merge queue enabled on develop)
+Owner: "README approved" (#139 hand check of PR #159: dark mode, theme switch, reduced motion)
+Owner ran .local/xezar/scratch/owner-jobs.sh: #147 pin committed and pushed by the owner; #179 leader-watch launchd agent installed (plutil OK, last exit code = 0).
