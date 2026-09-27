@@ -5,7 +5,7 @@ Updated: 2026-09-25 11:06 CEST
 ## State
 - Base: `develop` at `9fe8a3f0`. Merges so far: 0. Checkpoints met: none.
 - Scope: open issues labelled `release-0.21.0`, plus new work the owner discusses with the leader (the leader files it as an issue with that label). None labelled yet.
-- Unattended mode: ON since 2026-09-26T06:49:11Z (restarts 0 of 3). Parked calls go to parked.md.
+- Unattended mode: OFF since 2026-09-27 (owner back). 4 parked calls still to be asked back.
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
@@ -45,12 +45,12 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 - 253ba433 done (PR #203 merged as fae624e7); files released.
 - Reviews own nothing.
 
-## Accounts (from `read_quota` at 2026-09-27T03:13:01Z)
+## Accounts (from `read_quota` at 2026-09-27T05:21:32Z)
 | Runner | Login | State | Resets (UTC) |
 |---|---|---|---|
 | claude | default | reserved leader login, runs no tasks; ok (weekly 15%, plan max; same numbers as westagilelabs – owner item) | 2026-10-02 07:00 |
 | claude | qodeca | ok (weekly 60%) | 2026-09-28 16:59 |
-| claude | gmail | ok (weekly 13%) | 2026-10-02 18:59 |
+| claude | gmail | ok (weekly 14%) | 2026-10-02 18:59 |
 | claude | eqamana | ok (weekly 2%) | 2026-10-03 15:59 |
 | claude | westagilelabs | ok (weekly 15%) | 2026-10-02 06:59 |
 | codex | default | ok (weekly 21%) | 2026-10-03 17:10 |
