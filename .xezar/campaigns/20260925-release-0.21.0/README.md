@@ -34,10 +34,9 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| 5cc43f3e | Regenerate THIRD-PARTY-LICENSES.md after #193 (+ docx comment) | dependency-maintenance | pi/deepseek-flash | – |
 
 ## File-ownership table
-- 5cc43f3e owns THIRD-PARTY-LICENSES.md, src/main/services/docx/docx-convert.process.ts (comment only).
+- 5cc43f3e done (PR #205 head 2407436b); files released.
 - 974c210b done (PR #188); vitest configs released.
 - 7d5d7fc6 done (PR #189); .xezar/loops.json released.
 - 392e7c9b done. Reviews own nothing.
