@@ -9,7 +9,7 @@ Updated: 2026-09-25 11:06 CEST
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
-- #159 (#139 README) merged 2026-09-27 as 78a76c28; #206 (#147 pin) merged as b850e934. #207 (merge queue fix) in repair round 1; queue off until it merges (owner re-enables).
+- #159 (#139 README) merged 2026-09-27 as 78a76c28; #206 (#147 pin) merged as b850e934. #207 (merge queue fix) merged; owner to re-enable Require merge queue on develop.
 - #205 (license list regen after #193) merged 2026-09-27 as 3ada84a5. Release blockers: none known; release go is owner-only.
 - #202 (#177 browser grant: emulate for QA/design review, unwired evaluate_script guard; safe app start split out – parked) merged 2026-09-26 as 0b95160e; #177 closed.
 - #201 (#174 leader context: timeline bound, archiving dropped – parked) merged 2026-09-26 as d4fc1d61.
@@ -36,11 +36,10 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| 7de1f54e | #207 round 1 (S-1: keep tag pushes) | bug-fix | pi/deepseek-flash | – |
 
 ## File-ownership table
 - 89ec8f74 done (PR #159 head 6f95a82e, then update-branch 35786b47); files released.
-- 7de1f54e round 1 owns .github/workflows/checks.yml, .github/workflows/secret-scan.yml, docs/ci.md.
+- 7de1f54e done (PR #207 round 1 at 1f53adf9); files released. Reviews own nothing.
 - 5cc43f3e done (PR #205 merged as 3ada84a5); files released.
 - 974c210b done (PR #188); vitest configs released.
 - 7d5d7fc6 done (PR #189); .xezar/loops.json released.
