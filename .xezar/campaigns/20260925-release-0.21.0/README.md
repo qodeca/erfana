@@ -35,7 +35,7 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
 | 175f5866 | Dependabot #193 (npm-production group) review | code-review | claude/opus | eqamana |
-| aba3b6a2 | Dependabot #194 (npm-development group) review | code-review | claude/opus | gmail |
+| e78af021 | Dependabot #194 local e2e run (Playwright 1.63) | acceptance-verification | claude/opus | westagilelabs |
 
 ## File-ownership table
 - 974c210b done (PR #188); vitest configs released.
