@@ -120,3 +120,8 @@ Leader offered: review and merge the minor/patch groups (#193, #194, #195, #192)
 ## 2026-09-27 08:02 CEST – #202 evaluate_script wiring (AskUserQuestion)
 
 > Leave it off (Recommended)
+
+## 2026-09-27 09:30 – release 0.21.0 go (AskUserQuestion, leader session)
+Asked: last blocker #205 merged; 6 labelled issues open (#139/PR #159 README awaiting owner hand check; #147, #169, #172, #175, #179 process). Go for release now, or wait for README first?
+Owner: "Finish everything what should be finished so I can move to the other machine to test everything on Windows before the release"
+Leader reading: no release go yet. Finish open work first; owner then tests develop on Windows; release go asked again after that.
