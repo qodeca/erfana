@@ -5,7 +5,7 @@ SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 
 # README and GitHub presentation redesign (#139)
 
-> Status: **Draft** – design and implementation plan only. Nothing in this folder changes the README yet.
+> Status: **Implemented** – built by the #139 build PR; see [§ Implementation notes](#implementation-notes).
 > Issue: [#139](https://github.com/qodeca/erfana/issues/139) · depends on [#138](https://github.com/qodeca/erfana/issues/138) (user guide, demo fixture, capture script) · campaign `release-0.21.0`.
 > Approval: by a reviewer agent on a different model, not by the owner (owner decision, campaign `decisions.md`, 2026-09-25).
 
@@ -554,6 +554,7 @@ Not touched: `SECURITY.md` (its anchor is preserved), `.github/workflows/` (no n
 | #138 slips or changes paths | README links break; scripts duplicated | Step 0 precondition; requirements R138-1…11 handed to #141 by the leader (2026-09-25), each ticked in step 0 |
 | Terminal text unreadable at the display width, or blurred by the recorder | The loop's key moment (the hand-off to the agent) cannot be read | Legibility check through the final encode in step 4, before the scenario is built; capture-only zoom or wider display; R138-3's recorder fallback |
 | Claude Code stops at an edit-approval prompt | S4 stalls or the scenario times out | R138-8: edit-accepting mode in the sandbox settings, or the keypress shown in S4 |
+| Demo text unreadable on a phone (NB-1, PR #159 design review) | At 375 px the 1280 px loop scales to about 309 px (24 %), so its terminal and editor text cannot be read | **Accepted limit, not fixed.** The design gives narrow views no other presentation: UX item 8 says nothing is removed and images shrink, and the `<picture>` sources switch only on `prefers-reduced-motion`. The alt text, the caption and the How it works bullets carry the sequence in text. A narrow-view variant (a cropped terminal clip, or a link to #138's MP4) would need a new design decision and a re-recording, which this build does not do |
 | Demo too heavy | Slow first load | 5 MiB hard cap; 12 fps; 1280×800; measured in step 5 |
 | GitHub layout differs from the budget (column width, spacing) | AC-1 fails | Measured on github.com, not assumed; banner and demo heights are the adjustable parts |
 | Banner drifts from tokens later | Off-brand banner | The card is the source; `docs:brand` re-renders it; the card sits in `design/` under the same lint |
@@ -567,3 +568,15 @@ Not touched: `SECURITY.md` (its anchor is preserved), `.github/workflows/` (no n
 Pending. Approval is by a reviewer agent on a different model from the author, not by the owner (owner decision, campaign `release-0.21.0`, 2026-09-25).
 
 - Round 1: REQUEST CHANGES at `68d292ae` ([PR #140](https://github.com/qodeca/erfana/pull/140)), eleven findings; all eleven addressed in the following commit, with the leader's cross-spec decisions shared with #141 (one 1280×800 size, WebP from #138's `encode.mjs`, R138-1…11).
+- Build review: FAIL at `56ba01bb` ([PR #159](https://github.com/qodeca/erfana/pull/159)) – B-1 account name in the QA screenshots (masked), NB-1 demo unreadable at 375 px (accepted limit, see Risks), NB-2 `gp-` class naming (documented deviation in the card).
+
+## Implementation notes
+
+Measured during the build (2026-09-25), logged out, Playwright Chromium on github.com.
+
+- **Demo format**: animated WebP. On github.com it animated in Chromium, WebKit (Safari's engine, not Safari itself) and Firefox, and `prefers-reduced-motion: reduce` swapped in `demo-still.png` in all three (step 1).
+- **Banner width 440, not 800.** At `width="800"` the demo's top edge was at 799 px on the unscrolled README file view at 1440×900, and at 703 px with the banner at 480. At 440 it is at **693 px** (banner 386–496, pitch 531–579, Download 595–623). GitHub's chrome above the article is 386 px; the `<h1>` rule adds 9.6 px padding and a 1 px border. The link row now shares the Download paragraph, which saves one paragraph margin.
+- **Home page**: the unscrolled home page shows the file list first (article top at 2,849 px). Scrolled to the article top, the demo starts at 308 px.
+- **375 px**: no horizontal scroll; images scale to 309 px; the platform line and link row wrap. The demo's text is not readable at that width – an accepted limit, see [Risks](#risks).
+- **Canvas edge**: the banner's solid background is faintly visible against both GitHub canvases as a flat rectangle, as expected from the 1.02:1 and 1.05:1 ratios.
+- QA screenshots of both themes at 1440×900, downscaled: [light](qa/readme-1440x900-light.png), [dark](qa/readme-1440x900-dark.png). GitHub's commit row (avatars and account names) is masked in both; the first versions showed it, and they remain in git history.

@@ -4,6 +4,12 @@ Per-version release notes for Erfana, v0.9.0 onwards. Earlier: v0.8.0–v0.8.3 i
 
 > **Note:** In v0.7.2, BRS (Business Requirements Specifications) were renamed to "specs" and relocated from `specs/business-reqs/` to `specs/spec-t{tier}-{id}-{slug}/`. All references in code and docs now use `Spec #XXX`. Historical entries below have been updated accordingly.
 
+## Unreleased
+
+### Changed
+
+- **A new README and GitHub presentation** ([#139](https://github.com/qodeca/erfana/issues/139)) – the repository page now opens with a banner, a one-line pitch, a Download button, and an 18-second loop of a real Claude Code session in Erfana (a still frame for readers who ask for reduced motion). Features link into the [user guide](./user-guide/README.md); the licence, company, signing and build detail is shorter and links out, with the longer text moved verbatim to [About Erfana and Qodeca](./about.md). The banner and the social preview image are rendered from a design card (`design/product/github-presentation/`) by `npm run docs:brand`, and [TRADEMARKS.md](../TRADEMARKS.md) now names them as Erfana brand assets a renamed fork must replace.
+
 ## 0.20.0
 
 *Released 2026-09-16. Tag `v0.20.0`.*
