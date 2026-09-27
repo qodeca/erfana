@@ -82,3 +82,27 @@ Owner decisions in the owner's exact words, dated, append-only.
 - 2026-09-26T20:17:29Z (channel: AskUserQuestion in the leader session) #201 fourth repair round – owner picked "Fix archiving again" (unique ID per decision, exact-byte match) over the recommended "Drop archiving".
 - 2026-09-26T20:35:52Z (channel: AskUserQuestion in the leader session) #202 third repair round – owner picked "Fix it (round 3)" (starter files outside the app's reach, fresh temp folder per start, stop every child).
 - 2026-09-26T20:36:57Z (channel: typed in the leader session) "I'm goint to sleep. You are fully in charge". Note: unattended.json already reads on (since 06:49:11Z, restarts 0/3); the three hard stops (release go, deleting a record, opening a campaign) still bind – the owner's words do not remove them.
+
+## 2026-09-27 07:25 CEST – #179 scope (asked back after unattended mode, AskUserQuestion)
+
+> OK, alarm only
+
+Parked by the leader 2026-09-26 18:44; owner confirmed.
+
+## 2026-09-27 07:25 CEST – #201 fifth repair round (asked back after unattended mode, AskUserQuestion)
+
+> OK to try once more
+
+Parked by the leader 2026-09-26T20:36:57Z; owner confirmed.
+
+## 2026-09-27 07:25 CEST – #201 scope trim, archiving dropped (asked back after unattended mode, AskUserQuestion)
+
+> Keep it dropped
+
+Parked by the leader 2026-09-26T20:45:30Z; owner confirmed.
+
+## 2026-09-27 07:25 CEST – #202 scope trim, safe app start split out (asked back after unattended mode, AskUserQuestion)
+
+> Keep split, file issue
+
+Parked by the leader 2026-09-26T20:57:30Z; owner confirmed and gave the word to file a follow-up issue for safe app start (S-3 detached descendants, S-4 PID reuse as acceptance).
