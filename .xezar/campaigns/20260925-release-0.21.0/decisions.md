@@ -129,3 +129,7 @@ Leader reading: no release go yet. Finish open work first; owner then tests deve
 ## 2026-09-27 09:31 – owner jobs timing (AskUserQuestion, leader session)
 Asked: do the 4 owner jobs (README check #139, pin #147, install #179 alarm, merge queue) after the Windows test, or before leaving?
 Owner: "Before I leave"
+
+## 2026-09-27 16:26 – owner jobs, second ask (AskUserQuestion, leader session)
+Asked: do the 4 owner jobs now, or skip them and go straight to the Windows test?
+Owner: "Do the 4 jobs now"
