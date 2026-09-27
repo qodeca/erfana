@@ -532,7 +532,6 @@ A dated exception to the policy above: v0.21.0 ships with these four production 
 
 | Package | Pin | Reason |
 |---|---|---|
-| `@electron/rebuild` | `3.7.1` | node-pty toolchain compat |
 | `lodash`, `lodash-es` | **exact** `4.18.1` | GHSA 1115805/6/9/10 (`_.template` code injection + `_.unset`/`_.omit` prototype pollution). Vulnerable range `<=4.17.23`. |
 | `chokidar` | **exact** `3.6.0` | chokidar 4 removed `disableGlobbing`, which `DirectoryWatcherService`, `FileWatcherService` and `GitWatcherService` rely on (FD-exhaustion fix). The `Guard - chokidar v3 pinned` step in `checks.yml` fails the build on any drift. |
 | `dompurify` | `^3.4.1` | Forces every transitive `dompurify` onto 3.4.1 or later. The originating advisory is not recorded in the repo – check `npm audit` history before relaxing. |
