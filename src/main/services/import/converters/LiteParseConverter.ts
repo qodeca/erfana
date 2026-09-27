@@ -113,7 +113,7 @@ export class LiteParseConverter implements IConverter, IConfigurableConverter {
 
     // Enforce the blocking size cap before any parsing. The document-import IPC
     // path calls convert() directly (bypassing ImportService validation), so this
-    // is the guard that bounds memory-bomb inputs to sharp/libvips on this path.
+    // is the guard that bounds memory-bomb inputs to the native parser on this path.
     const validation = await this.validate(filePath)
     if (!validation.valid) {
       // `validateFileForImport` always sets `error` on an invalid result; the `??`
@@ -141,6 +141,12 @@ export class LiteParseConverter implements IConverter, IConfigurableConverter {
       dpi,
       outputFormat: 'text' as const,
       maxPages: MAX_PARSE_PAGES,
+      // 2.x defaults `ocrFailureFatal` to true: when OCR fails on every text-sparse page the
+      // whole parse rejects. 1.x caught OCR errors page by page and kept the text it had
+      // already recovered, so a text PDF with one unscannable page still imported. Keep that
+      // user-visible behaviour: a systemic OCR failure now yields partial text instead of a
+      // hard IMPORT_CONVERSION_FAILED. (Review finding 1, PR #167.)
+      ocrFailureFatal: false,
       ...(tessdataPath ? { tessdataPath } : {})
     })
 

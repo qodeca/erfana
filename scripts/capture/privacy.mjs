@@ -238,7 +238,7 @@ export function sampleTimes(duration) {
 }
 
 /**
- * Resolve tesseract.js (installed through @llamaindex/liteparse). Fails closed
+ * Resolve tesseract.js (a devDependency for the capture pipeline). Fails closed
  * with a message that says what to do.
  */
 export function resolveTesseract(fromDir) {
@@ -247,7 +247,7 @@ export function resolveTesseract(fromDir) {
     return require('tesseract.js')
   } catch {
     throw new Error(
-      'tesseract.js is not installed (it comes with @llamaindex/liteparse). Run `npm ci`; the privacy OCR cannot run without it.'
+      'tesseract.js is not installed (a devDependency for the capture pipeline). Run `npm ci`; the privacy OCR cannot run without it.'
     )
   }
 }

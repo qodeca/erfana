@@ -72,8 +72,9 @@ export default defineConfig({
         }
       },
       // externalizeDeps defaults to true for main process (electron-vite convention).
-      // This is REQUIRED for @llamaindex/liteparse which depends on native modules
-      // (Sharp, @hyzyla/pdfium, tesseract.js-core). Do not set externalizeDeps: false here.
+      // This is REQUIRED for @llamaindex/liteparse, whose platform-specific
+      // native NAPI binary (@llamaindex/liteparse-<platform>) must stay external.
+      // Do not set externalizeDeps: false here.
       minify: true // Vite 6 SSR default changed to false; explicit true halves bundle (429→207 kB)
     }
   },

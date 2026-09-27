@@ -62,6 +62,14 @@ files:
   - '!node_modules/jsdom/**'
   - '!node_modules/canvas/**'
   - '!node_modules/@mapbox/node-pre-gyp/**'
+  # Native artifacts @llamaindex/liteparse carries for OTHER platforms (review #167
+  # finding 5). The binary this app actually loads comes from the optional
+  # @llamaindex/liteparse-<platform> dependency; these two are Linux-only dead weight
+  # in a macOS/Windows bundle (Erfana ships no Linux target) and would otherwise go
+  # through signing and notarization. Anchored with '**/' so it reaches the packed
+  # node_modules tree, like the exclusions above.
+  - '!**/liteparse.linux-x64-gnu.node'
+  - '!**/libpdfium.so'
 asar: false
 npmRebuild: false
 # Explicitly disable auto-updater metadata.

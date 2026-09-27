@@ -28,7 +28,7 @@ export function resolveSharp(fromDir) {
   try {
     return require('sharp')
   } catch {
-    throw new Error('sharp is not installed (it comes with @llamaindex/liteparse). Run `npm ci`; WebP frames cannot be decoded without it.')
+    throw new Error('sharp is not installed (a devDependency for the capture pipeline). Run `npm ci`; WebP frames cannot be decoded without it.')
   }
 }
 
