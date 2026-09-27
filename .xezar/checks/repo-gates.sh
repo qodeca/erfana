@@ -48,8 +48,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 # § Security before the quality verdict requires the security result to be resolved before
 # anyone gives a quality verdict, and putting it in the list's order is what makes the runner
 # execute the rule rather than ask people to remember it. It is a kit check, like
-# `repository-checks.sh`, so `.xezar/pipeline/config.json`'s `validation.commands` — the nine npm
+# `repository-checks.sh`, so `.xezar/pipeline/config.json`'s `validation.commands` — the eight npm
 # commands a person runs by hand — matches this list in order.
+#
+# There is no `npm run test:ci` gate (#170). `test:cov` runs every unit test of the main, preload
+# and renderer projects exactly once, one `--project` pass each (#133), and also enforces every
+# coverage floor, so a separate unit-test run executed the same suite a second time for no extra
+# signal. CI still runs `test:ci` as the required `Unit tests` check; only the local gate dropped it.
+# `lib/gate-parallel.mjs` refuses a list that names it again.
 GATE_NAMES=(
   "npm ci"
   ".xezar/checks/security-scan.sh"
@@ -57,7 +63,6 @@ GATE_NAMES=(
   "npm run lint:css"
   "npm run design -- --check"
   "npm run typecheck"
-  "npm run test:ci"
   "npm run test:cov"
   "npx electron-vite build"
   "npm run check:headers"
@@ -70,7 +75,6 @@ GATE_COMMANDS=(
   "npm run lint:css"
   "npm run design -- --check"
   "npm run typecheck"
-  "npm run test:ci"
   "npm run test:cov"
   "npx electron-vite build"
   "npm run check:headers"

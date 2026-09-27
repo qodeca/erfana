@@ -77,3 +77,46 @@ Owner decisions in the owner's exact words, dated, append-only.
 - 2026-09-26 (same channel) "Proposal F: … tasks waiting for me to say 'continue' … What should it include?" -> "Alert + safe auto-continue (Recommended)"
 - 2026-09-26 (channel: AskUserQuestion, leader session) "Plan v3 drops two items you picked earlier … OK to drop both?" -> "Drop both (Recommended)"
 - 2026-09-26T17:22:47Z (channel: typed in the leader session) "bump load ceiling from 24 to 40". Note: the ceiling on record was 18 (leader-guide.md:138, loops.json L3), not 24; applied as 40.
+- 2026-09-26T19:43:08Z (channel: AskUserQuestion in the leader session) #202 S-2 – owner picked "B: safe app start" (build a locked sandbox so testers start the PR's app only in their own folder, with no access to the owner's folder or logins), over the recommended A (no app start).
+- 2026-09-26T19:44:41Z (channel: AskUserQuestion in the leader session) #201 third repair round – owner picked "Fix the script again" over the recommended "Drop the script" (replace it with a written how-to).
+- 2026-09-26T20:17:29Z (channel: AskUserQuestion in the leader session) #201 fourth repair round – owner picked "Fix archiving again" (unique ID per decision, exact-byte match) over the recommended "Drop archiving".
+- 2026-09-26T20:35:52Z (channel: AskUserQuestion in the leader session) #202 third repair round – owner picked "Fix it (round 3)" (starter files outside the app's reach, fresh temp folder per start, stop every child).
+- 2026-09-26T20:36:57Z (channel: typed in the leader session) "I'm goint to sleep. You are fully in charge". Note: unattended.json already reads on (since 06:49:11Z, restarts 0/3); the three hard stops (release go, deleting a record, opening a campaign) still bind – the owner's words do not remove them.
+
+## 2026-09-27 07:25 CEST – #179 scope (asked back after unattended mode, AskUserQuestion)
+
+> OK, alarm only
+
+Parked by the leader 2026-09-26 18:44; owner confirmed.
+
+## 2026-09-27 07:25 CEST – #201 fifth repair round (asked back after unattended mode, AskUserQuestion)
+
+> OK to try once more
+
+Parked by the leader 2026-09-26T20:36:57Z; owner confirmed.
+
+## 2026-09-27 07:25 CEST – #201 scope trim, archiving dropped (asked back after unattended mode, AskUserQuestion)
+
+> Keep it dropped
+
+Parked by the leader 2026-09-26T20:45:30Z; owner confirmed.
+
+## 2026-09-27 07:25 CEST – #202 scope trim, safe app start split out (asked back after unattended mode, AskUserQuestion)
+
+> Keep split, file issue
+
+Parked by the leader 2026-09-26T20:57:30Z; owner confirmed and gave the word to file a follow-up issue for safe app start (S-3 detached descendants, S-4 PID reuse as acceptance).
+
+## 2026-09-27 07:49 CEST – #172 review posting fix (AskUserQuestion, after the leader explained why posting is refused)
+
+> File a comprehensive issue to Xezar's GH and label it release-0.20.0
+
+## 2026-09-27 08:02 CEST – Dependabot PRs (AskUserQuestion)
+
+> Small ones now (Recommended)
+
+Leader offered: review and merge the minor/patch groups (#193, #194, #195, #192) before the release; big jumps and old PRs (#63-#68) wait until after it.
+
+## 2026-09-27 08:02 CEST – #202 evaluate_script wiring (AskUserQuestion)
+
+> Leave it off (Recommended)

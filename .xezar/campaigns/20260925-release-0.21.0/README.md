@@ -5,11 +5,12 @@ Updated: 2026-09-25 11:06 CEST
 ## State
 - Base: `develop` at `9fe8a3f0`. Merges so far: 0. Checkpoints met: none.
 - Scope: open issues labelled `release-0.21.0`, plus new work the owner discusses with the leader (the leader files it as an issue with that label). None labelled yet.
-- Unattended mode: ON since 2026-09-26T06:49:11Z (restarts 0 of 3). Parked calls go to parked.md.
+- Unattended mode: OFF since 2026-09-27 (owner back). Parked calls: all 4 asked back and kept.
 - The campaign name does not approve a release. The release go stays owner-only.
 
 ## Open pull requests
-- #190 (#179 silence alert, from 392e7c9b), draft, head 0fdf50e1, gate sealed. Codex security eab95ae4: S-1 minor (lstat errors leak paths); cold review 0ac0f4e6 APPROVE + 1 runbook minor (leader posted). Round 1 with 392e7c9b. Owner installs launchd by hand after merge.
+- #202 (#177 browser grant: emulate for QA/design review, unwired evaluate_script guard; safe app start split out – parked) merged 2026-09-26 as 0b95160e; #177 closed.
+- #201 (#174 leader context: timeline bound, archiving dropped – parked) merged 2026-09-26 as d4fc1d61.
 - #189 (load ceiling 40) merged 2026-09-26 as 25adc9a7.
 - #188 (#171 vitest worker cap) merged 2026-09-26 as c27b399b (one CI unit-test crash before, rerun green).
 - #187 (#176 Dependabot groups) merged 2026-09-26 as 80a8c032; #176 closed.
@@ -17,15 +18,12 @@ Updated: 2026-09-25 11:06 CEST
 - #185 (#179 spike) merged 2026-09-26 as 5f285011. Result: build the silence alert (+ line-86 doc fix); auto-continue deferred (parked).
 - #184 (#172 spike) merged 2026-09-26 as 4d874fa7; #172 build held for owner.
 - #183 (#133) merged 2026-09-26 as 6b763b38.
-- #182 (#175) merged 2026-09-26 as 97d5c17c. #175 stays open for the remaining rows.
+- #182 and #203 (#175 brief templates, all 48 rows + briefs-check) merged 2026-09-26 as 97d5c17c and fae624e7. #175 stays open for the run-log measurement.
 - #181 (#178) merged 2026-09-26 as a9792f3c.
 - #180 (#173) merged 2026-09-26 as db105aab. Owner: enable Require merge queue on develop.
 - #168 (#163 lift @electron/rebuild override + electron-builder 26.16.1), draft, head 164d93b9, do-not-merge until v0.21.0 ships. Security APPROVE (35479ba2); code review round 1 fixed – Windows Native Smoke run 36256339721 green on this branch (negative control failed as expected); recheck b5d01d5e APPROVE. Review-complete.
 - #167 (#164 liteparse 2.14.7), draft, head 0fa58e18, do-not-merge until v0.21.0 ships. Round 1 fixed; recheck 0b92cbf1 (sonnet/gmail) APPROVE, posted itself.
-- #155 ready, head d4fb29e7 – allow rule in scripts/xezar-leader-settings.json (4458b282): exactly 2 exact-match rules + one autoMode reason; all checks green. Next: security-review (widens tool access).
-- #154 ready, head 5fce83d5 – #138 part B (2a1e4316): test fixed, workflow gates sealed, CI all green incl. Windows. Next: full-cold-review + design-review of the 52 images and demo (privacy).
-- #140 ready, head c442a15b – #139 spec. Re-check 12b29be1 APPROVE at c442a15b, all 11 findings fixed, no new defects. Labels design-approved + merge-queue; #139 labelled design-approved. Next in the merge line after #141: bring up to date, wait for green, squash-merge.
-Six Dependabot PRs, not yet in scope: #63, #64, #65, #66, #67, #68.
+Dependabot PRs, not in scope: #63-#68 (old config) and #192-#200 (new grouped config, opened 2026-09-26 ~20:10; #196 duplicates #167).
 
 ## Process speed-up plan v3 (owner-approved 2026-09-26)
 Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #173 merge queue, #178 Windows smoke, #175 brief templates. Wave 2 (after spikes): #169, #170, #172, #179. Wave 3: #174, #176, #177, #171 (only if ps shows vitest load). Dropped by owner: records branch, docs-only fast path. Interim rules in force: short plain-text verdicts in review briefs; batched record pushes.
@@ -36,36 +34,42 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| 392e7c9b | #190 round 1 (continue) | feature-implementation | claude/opus | eqamana |
-| 994fb3e5 | #170 drop test:ci | feature-implementation | claude/opus | eqamana |
+| da200bbf | Dependabot #193 local e2e run | acceptance-verification | claude/opus | eqamana |
 
 ## File-ownership table
 - 974c210b done (PR #188); vitest configs released.
 - 7d5d7fc6 done (PR #189); .xezar/loops.json released.
-- 392e7c9b (round 1) owns scripts/leader-watch.mjs + test + fixture, docs/runbooks/leader-watch.md. Reviews own nothing.
-- 994fb3e5 owns .xezar/checks/repo-gates.sh, .xezar/checks/lib/gate-parallel.mjs + test, gate-results.mjs (if needed), .xezar/pipeline/config.json, AGENTS.md, CLAUDE.md (Before pushing line), .xezar/LOCAL-PATCHES.md. (9a85cf2c done; .github/dependabot.yml released, PR #187.) #170 (gate list) is unblocked: #186 merged.
+- 392e7c9b done. Reviews own nothing.
+- e1c555ca done (PR #202 round 4 at d5c8fbd2, cost about 125 USD); files released.
+- 8dadb69a done (PR #201 merged as d4fc1d61); files released.
+- 994fb3e5 done (PR #191 merged); gate files released. (9a85cf2c done; .github/dependabot.yml released, PR #187.) #170 (gate list) is unblocked: #186 merged.
+- 253ba433 done (PR #203 merged as fae624e7); files released.
 - Reviews own nothing.
 
-## Accounts (from `read_quota` at 2026-09-26T17:13:08Z)
+## Accounts (from `read_quota` at 2026-09-27T06:13:02Z)
 | Runner | Login | State | Resets (UTC) |
 |---|---|---|---|
-| claude | default | reserved leader login, runs no tasks; ok (weekly 11%, plan max; same numbers as westagilelabs – owner item) | 2026-10-02 06:59 |
-| claude | qodeca | ok (weekly 53%) | 2026-09-28 16:59 |
-| claude | gmail | ok (weekly 9%) | 2026-10-02 19:00 |
-| claude | eqamana | ok (weekly 0%) | 2026-10-03 16:00 |
-| claude | westagilelabs | ok (weekly 11%) | 2026-10-02 06:59 |
-| codex | default | ok (weekly 15%) | 2026-10-02 10:44 |
-| codex | qodeca-2 | ok (weekly 0%) | 2026-10-03 16:58 |
+| claude | default | reserved leader login, runs no tasks; ok (weekly 16%, plan max; same numbers as westagilelabs – owner item) | 2026-10-02 07:00 |
+| claude | qodeca | ok (weekly 60%) | 2026-09-28 16:59 |
+| claude | gmail | ok (weekly 15%) | 2026-10-02 18:59 |
+| claude | eqamana | ok (weekly 2%) | 2026-10-03 15:59 |
+| claude | westagilelabs | ok (weekly 16%) | 2026-10-02 06:59 |
+| codex | default | ok (weekly 21%) | 2026-10-03 17:10 |
+| codex | qodeca-2 | ok (weekly 2%) | 2026-10-03 16:58 |
 | pi | – | no logins | – |
 
 ## Held or queued work
+- Dependabot #193 (approved) then #194 (approved; merge after e2e e78af021): e2e on #193's DOCX export, transcription metadata, git status and whisper manifest paths runs next, after e78af021 (one Electron suite at a time). After #193 merges: regenerate THIRD-PARTY-LICENSES.md (npx generate-license-file --input package.json; last generated 2026-08-23, ships in the app) + fix docx-convert.process.ts:7 wording – before the v0.21.0 tag.
 - #144 – merged 2026-09-26 as a61b7517 (PR #160).
 - #138 build – split: part A (plan steps 2-4) merged (#150); step 1 spike done (#149); part B (steps 5, 5b, 6) is PR #154: code review REQUEST CHANGES (1 major, run.mjs readLogin can empty the privacy deny-list); design review FAIL (7 privacy/state blockers B-1..B-10, 5 non-blocking); round 2 done at 46600c39; code recheck APPROVE at b543da12 with 1 minor (Windows test, run.test.mjs:220 vs sandbox.mjs:46; advisory Windows checks red); image re-review PASS WITH FOLLOW-UPS (2 guide-copy notes for step 7); merged 2026-09-25 as c1b1ad21; steps 7-8 follow.
 - #139 build – PR #159: code review APPROVE, design review FAIL (B-1 account name in QA screenshots); round 1 done at 1f924f73 (B-1 masked, NB-1 stated as a limit, NB-2 documented deviation); design recheck PASS at 9203f493; QA FAIL only because 3 checks could not run (chrome-devtools emulate + evaluate_script denied in the QA session): dark mode, theme switch, reduced motion unverified live. Waiting for the owner.
 
 ## Owner items
-- **#186 S-5 follow-up issue (nit):** gate-parallel.mjs:67 – if all three guarded command names change together, the ordering guards turn off silently. Leader proposes filing it as an issue (title: "gate-parallel: refuse when no guarded command name is found"). Needs your word to create it.
-- **#172 review posting (spike PR #184):** fix needs either (a) an upstream xezar engine change (pass --settings to reading steps, or a verdict-body field) – recommended, file upstream; or (b) a user-scope PreToolUse hook in ~/.claude/settings.json on this machine (tested: 12k-char verdict posts, 0 denials; but it runs for every Claude session and is outside repo review). Interim rule (short plain-text verdicts) works today. Build held until the owner picks.
+- **#204 filed (safe app start):** not in release 0.21.0 scope unless you label it.
+- **#201 follow-up S-9 (minor, not filed):** the 64 KB timeline tail can cut one oversized timeline entry mid-way (timeline only; decisions.md stays whole). File an issue if wanted – issue creation needs your word.
+- **#179 alert (merged #190 as ded31966):** install the launchd agent by hand, per the PR body.
+- **#177 evaluate_script wiring (PR #202):** emulate is granted; evaluate_script stays denied because the guard hook cannot be registered per workflow. Options in the PR body: user-scope settings for the xezar profile, a filtering proxy in .mcp.json, or leave denied. Leader recommends leave denied until a QA run proves it is needed.
+- **#172 review posting:** owner chose the upstream route; findings posted on qodeca/xezar#901 (release-0.20.0). Leader keeps relaying verdicts by hand until xezar ships a fix. Related xezar issues filed: #923-#927.
 - **#159: owner checks by hand (answered 2026-09-26 08:40)** – dark theme, banner theme switch, reduced-motion still on github.com, branch feature/139-readme-redesign. Leader merges on the owner's word with green checks. Earlier note: (dark theme, banner theme switch, reduced-motion still). Both QA and design sessions were denied the chrome-devtools emulate/evaluate_script tools. Options: (a) owner checks them by hand on github.com in ~2 minutes (branch feature/139-readme-redesign: switch OS dark mode, turn on Reduce motion), or (b) allow those two tools for review sessions and re-run QA. Leader recommends (a).
 - `npm audit` on develop's lockfile (run by the #159 author, 2026-09-25 23:51): 16 advisories – 1 critical, 12 high, 3 moderate – none added by #159. Owner chose triage in 0.21.0: issue #161, task d71e7bf0.
 - PR #159 QA screenshots at 56ba01bb showed the GitHub account name; being replaced, but the old files stay in the branch history (squash-merge keeps them out of develop). Decide if that history matters.

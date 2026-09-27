@@ -83,7 +83,7 @@ most 14 minutes in these two days, and it needs an upstream engine change.
 | 4458b282 | 25 16:35 | security recheck | 19.7 | dispatch 13.3, review 3.4, relay 3.0 |
 | 2a1e4316 | 25 17:16 | code + design recheck | 38.0 | dispatch 10.7, review 23.6, relay 3.7 |
 | bb9b584c | 25 19:11 | review | 24.3 | dispatch 6.2, review 17.8, relay 0.3 |
-| 7b28e450 | 25 21:14 | code + design review | 30.1 | dispatch 12.7, review 10.7, relay 6.6 (11.3 silent) |
+| 7b28e450 | 25 21:14 | code + design review | 30.1 | dispatch 12.7 (11.3 silent), review 10.7, relay 6.6 |
 | 3f8af2d8 | 25 22:48 | review | 16.5 | dispatch 9.0, review 7.2, relay 0.2 |
 | d71e7bf0 | 26 14:06 | review | 40.6 | dispatch 36.2, review 3.5, relay 0.9 |
 | 347fc1ce | 26 14:42 | review | 12.0 | dispatch 5.5, review 5.6, relay 0.8 |

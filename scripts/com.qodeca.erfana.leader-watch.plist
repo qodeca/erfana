@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+SPDX-License-Identifier: GPL-3.0-only
+SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+
+Template for the leader-silence alert (#179). The owner installs it by hand:
+docs/runbooks/leader-watch.md. Replace __NODE__, __REPO__ and __HOME__ with
+absolute paths first; launchd expands neither ~ nor $HOME. No secrets here.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.qodeca.erfana.leader-watch</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>__NODE__</string>
+    <string>__REPO__/scripts/leader-watch.mjs</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key><string>/usr/bin:/bin</string>
+    <key>LEADER_WATCH_REPO</key><string>__REPO__</string>
+    <key>LEADER_WATCH_MINUTES</key><string>30</string>
+    <key>LEADER_WATCH_LOG</key><string>__HOME__/Library/Logs/erfana-leader-watch.log</string>
+  </dict>
+  <key>StartInterval</key><integer>300</integer>
+  <key>RunAtLoad</key><true/>
+  <key>ProcessType</key><string>Background</string>
+  <key>StandardOutPath</key><string>__HOME__/Library/Logs/erfana-leader-watch.log</string>
+  <key>StandardErrorPath</key><string>__HOME__/Library/Logs/erfana-leader-watch.log</string>
+</dict>
+</plist>
