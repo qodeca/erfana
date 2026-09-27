@@ -46,14 +46,14 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 - 253ba433 done (PR #203 merged as fae624e7); files released.
 - Reviews own nothing.
 
-## Accounts (from `read_quota` at 2026-09-27T05:21:32Z)
+## Accounts (from `read_quota` at 2026-09-27T06:13:02Z)
 | Runner | Login | State | Resets (UTC) |
 |---|---|---|---|
-| claude | default | reserved leader login, runs no tasks; ok (weekly 15%, plan max; same numbers as westagilelabs – owner item) | 2026-10-02 07:00 |
+| claude | default | reserved leader login, runs no tasks; ok (weekly 16%, plan max; same numbers as westagilelabs – owner item) | 2026-10-02 07:00 |
 | claude | qodeca | ok (weekly 60%) | 2026-09-28 16:59 |
-| claude | gmail | ok (weekly 14%) | 2026-10-02 18:59 |
+| claude | gmail | ok (weekly 15%) | 2026-10-02 18:59 |
 | claude | eqamana | ok (weekly 2%) | 2026-10-03 15:59 |
-| claude | westagilelabs | ok (weekly 15%) | 2026-10-02 06:59 |
+| claude | westagilelabs | ok (weekly 16%) | 2026-10-02 06:59 |
 | codex | default | ok (weekly 21%) | 2026-10-03 17:10 |
 | codex | qodeca-2 | ok (weekly 2%) | 2026-10-03 16:58 |
 | pi | – | no logins | – |
