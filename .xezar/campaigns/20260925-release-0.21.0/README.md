@@ -35,8 +35,12 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
+| 89ec8f74 | #159 conflict repair (docs/features/README.md) | address-review-findings | codex/gpt-5.6-terra | qodeca-2 |
+| 7de1f54e | merge queue cancel fix (#173 follow-up) | bug-fix | pi/deepseek-flash | – |
 
 ## File-ownership table
+- 89ec8f74 owns docs/features/README.md (PR #159 branch merge).
+- 7de1f54e owns .github/workflows/checks.yml, .github/workflows/secret-scan.yml, docs/ci.md.
 - 5cc43f3e done (PR #205 merged as 3ada84a5); files released.
 - 974c210b done (PR #188); vitest configs released.
 - 7d5d7fc6 done (PR #189); .xezar/loops.json released.
