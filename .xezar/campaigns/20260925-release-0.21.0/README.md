@@ -34,7 +34,6 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
-| 175f5866 | Dependabot #193 (npm-production group) review | code-review | claude/opus | eqamana |
 | e78af021 | Dependabot #194 local e2e run (Playwright 1.63) | acceptance-verification | claude/opus | westagilelabs |
 
 ## File-ownership table
@@ -60,6 +59,7 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 | pi | – | no logins | – |
 
 ## Held or queued work
+- Dependabot #193 (approved) then #194 (approved; merge after e2e e78af021): e2e on #193's DOCX export, transcription metadata, git status and whisper manifest paths runs next, after e78af021 (one Electron suite at a time). After #193 merges: regenerate THIRD-PARTY-LICENSES.md (npx generate-license-file --input package.json; last generated 2026-08-23, ships in the app) + fix docx-convert.process.ts:7 wording – before the v0.21.0 tag.
 - #144 – merged 2026-09-26 as a61b7517 (PR #160).
 - #138 build – split: part A (plan steps 2-4) merged (#150); step 1 spike done (#149); part B (steps 5, 5b, 6) is PR #154: code review REQUEST CHANGES (1 major, run.mjs readLogin can empty the privacy deny-list); design review FAIL (7 privacy/state blockers B-1..B-10, 5 non-blocking); round 2 done at 46600c39; code recheck APPROVE at b543da12 with 1 minor (Windows test, run.test.mjs:220 vs sandbox.mjs:46; advisory Windows checks red); image re-review PASS WITH FOLLOW-UPS (2 guide-copy notes for step 7); merged 2026-09-25 as c1b1ad21; steps 7-8 follow.
 - #139 build – PR #159: code review APPROVE, design review FAIL (B-1 account name in QA screenshots); round 1 done at 1f924f73 (B-1 masked, NB-1 stated as a limit, NB-2 documented deviation); design recheck PASS at 9203f493; QA FAIL only because 3 checks could not run (chrome-devtools emulate + evaluate_script denied in the QA session): dark mode, theme switch, reduced motion unverified live. Waiting for the owner.
