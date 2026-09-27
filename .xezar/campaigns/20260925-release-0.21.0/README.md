@@ -63,7 +63,7 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 - #139 build – PR #159: code review APPROVE, design review FAIL (B-1 account name in QA screenshots); round 1 done at 1f924f73 (B-1 masked, NB-1 stated as a limit, NB-2 documented deviation); design recheck PASS at 9203f493; QA FAIL only because 3 checks could not run (chrome-devtools emulate + evaluate_script denied in the QA session): dark mode, theme switch, reduced motion unverified live. Waiting for the owner.
 
 ## Owner items
-- **#202 follow-up (not filed):** safe app start for QA/design review (round 3 design at eec611b1 plus open S-3 detached descendants and S-4 PID reuse). File an issue if wanted – issue creation needs your word.
+- **#204 filed (safe app start):** not in release 0.21.0 scope unless you label it.
 - **#201 follow-up S-9 (minor, not filed):** the 64 KB timeline tail can cut one oversized timeline entry mid-way (timeline only; decisions.md stays whole). File an issue if wanted – issue creation needs your word.
 - **#179 alert (merged #190 as ded31966):** install the launchd agent by hand, per the PR body.
 - **#177 evaluate_script wiring (PR #202):** emulate is granted; evaluate_script stays denied because the guard hook cannot be registered per workflow. Options in the PR body: user-scope settings for the xezar profile, a filtering proxy in .mcp.json, or leave denied. Leader recommends leave denied until a QA run proves it is needed.
