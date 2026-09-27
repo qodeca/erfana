@@ -34,6 +34,8 @@ Plan: /Users/marcinobel/.claude/plans/silly-swimming-turtle.md. Wave 1: #133, #1
 ## Running tasks per lane
 | Run | Issue | Workflow | Lane | Login |
 |---|---|---|---|---|
+| 175f5866 | Dependabot #193 (npm-production group) review | code-review | claude/opus | eqamana |
+| aba3b6a2 | Dependabot #194 (npm-development group) review | code-review | claude/opus | gmail |
 
 ## File-ownership table
 - 974c210b done (PR #188); vitest configs released.
