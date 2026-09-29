@@ -184,13 +184,14 @@ Stop watching directory for one subscriber. The chokidar watcher is closed only 
 
 ---
 
-#### `pauseWatch(dirPath: string): void`
-Pause watching (used during CRUD operations). Synchronous, and reference-counted so nested pause/resume pairs nest safely. A no-op if no watcher exists for `dirPath`.
+#### `pauseWatch(dirPath: string, senderId?: number): void`
+Pause watching (used during CRUD operations). Synchronous, and reference-counted so nested pause/resume pairs nest safely. A no-op if no watcher exists for `dirPath`. The first pause opens a pause episode (`watcher/PauseEpisode.ts`, #210) that counts the structural changes dropped from outside until the full resume.
 
 **Parameters:**
 - `dirPath` - Absolute path to directory
+- `senderId` - `webContents` id of the pausing window (the `directory-watch:pause` handler passes `event.sender.id`); only that window's tree reads cover the dropped changes
 
-**Safety timeout:** A 10-second auto-resume guard prevents permanent pause states. If `resumeWatch()` is not called within 10 s (e.g., due to a lost IPC message), the PauseController auto-resumes, logs a warning, and triggers a compensating refresh (#103).
+**Safety timeout:** A 10-second auto-resume guard prevents permanent pause states. If `resumeWatch()` is not called within 10 s (e.g., due to a lost IPC message), the PauseController auto-resumes, logs a warning, discards the pause episode and sends one compensating `'directory-watch:changed'` with `catchUp: true` (#103, #210).
 
 **Usage Pattern:**
 ```typescript
@@ -214,9 +215,13 @@ Resume watching after pause. Synchronous. Decrements the pause reference count; 
 
 **Returns:** `false` if no watcher exists for `dirPath` (resume called for an unknown path), `true` otherwise — including when the watch stays paused because outer pauses are still outstanding.
 
+**Catch-up (#210):** at the full resume, sends one `'directory-watch:changed'` with `catchUp: true` if the pause episode holds a structural change from outside that no completed tree read by the pausing window covers. Its log line carries a count (or the cap reason), never a path.
+
 ---
 
 #### Other public methods
+- `beginTreeRead(dirPath: string, senderId?: number): () => void` - Called by `file:readDirectory` before the walk; the returned commit, called only after the read succeeds, marks every change dropped so far as shown. A no-op commit unless `dirPath` resolves to a paused root and `senderId` is the pausing window (#210)
+- `noteInternalChange(...changes: InternalChange[]): void` - Called by the file mutation handlers after success, so a paused watch does not count the operation's own events as missed; never logs the paths (#210)
 - `async unwatchAll(webContents: WebContents): Promise<void>` - Drop every watch held by one window
 - `async cleanupForWebContentsId(webContentsId: number): Promise<void>` - Called on window close to prevent stale watchers
 - `setProjectPath(path: string): void` - Set the project root and bump the session token so stale events are dropped
@@ -239,6 +244,7 @@ Resume watching after pause. Synchronous. Decrements the pause reference count; 
   originalEventCount: number  // raw events from chokidar
   coalescedCount: number      // events removed by the coalescer
   summary: Record<'add' | 'addDir' | 'unlink' | 'unlinkDir' | 'change', number>
+  catchUp?: true              // #210: only on a catch-up refresh (bridge types it `boolean`)
 }
 ```
 
@@ -246,7 +252,7 @@ Emitted when files or folders change anywhere in the watched project tree. Main 
 
 **Event types:** `'add'`, `'addDir'`, `'unlink'`, `'unlinkDir'`, `'change'`. The `'change'` listener was added in #241 — in-place editor saves (Monaco autosave, terminal commands, external editors) now also wake the renderer. `'change'` events whose path is inside `.git/` are suppressed at the source listener (`GitWatcherService` is the canonical publisher for git internals).
 
-**Note:** Not emitted during pause window. The `'directory-watch:changed'` payload is also used by the PauseController auto-resume safety timeout (#103) to issue a compensating refresh after a stuck pause.
+**Note:** Events that arrive during a pause are dropped, not emitted. Two zero-event sends carry `catchUp: true` instead (#210): the catch-up at full resume, sent only when a structural change from outside was dropped after the pausing window's last completed tree read, and the compensating refresh from the PauseController safety timeout (#103). `useDirectoryWatcher` refreshes on `catchUp` even while an internal operation's flag is set, because it reports dropped external changes, not the operation's own.
 
 #### `'directory-watch:project-deleted'`
 **Payload:** `{ dirPath: string }`. Sent when the project root is gone (`ENOENT`) and the restart attempts are used up; the service then stops all watchers. Bridge: `onProjectDeleted`.

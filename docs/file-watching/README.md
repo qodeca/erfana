@@ -273,12 +273,20 @@ Recommended:
 | Edit file content (Monaco autosave or external edit) | Git status badge refreshes after autosave settles (~2.5–3 s total) |
 | Git checkout (bulk changes) | Debounced to single refresh after changes settle |
 | Internal CRUD (create/delete/rename) | Watcher paused, no double refresh |
+| Another program (e.g. an agent in the terminal) adds or removes items while an internal CRUD runs | One catch-up refresh at resume; none when nothing outside changed or the operation's own refresh already showed it (#210) |
 | Expand folders, make external changes | Folders remain expanded after refresh |
 | Very large project keeps changing while the tree is being read | Changes are picked up by one follow-up read after the running one; reads never overlap and the tree never shows an older state (#208) |
 
 **Tree refresh is coalesced (#208):** the tree refresh that a watcher event (or a file operation) triggers is single-flight. In the renderer, `refreshFiles` allows one read per project scope; in main, `FileService.readDirectory` allows one walk per path. Calls made while a read runs share one follow-up read that starts after it, so a burst costs at most two reads, and a result that is older than the tree on screen – or belongs to a project that is no longer open – is dropped. One consequence: a read that never finishes (an unreachable network drive) holds up every later read of that folder, and is logged as `readDirectory still running` after 60 s. See [Technical Details § Tree refresh is single-flight](./technical-details.md#tree-refresh-is-single-flight-208).
 
-**Auto-resume safety timeout (v0.7.2, #103):** The PauseController includes a 10-second safety timeout. If `resume()` is not called within 10 s of `pause()` – for example due to a lost IPC message – the controller auto-resumes, logs a warning, and triggers a compensating refresh to keep the tree in sync. This prevents the watcher from being permanently paused.
+**Auto-resume safety timeout (v0.7.2, #103):** The PauseController includes a 10-second safety timeout. If `resume()` is not called within 10 s of `pause()` – for example due to a lost IPC message – the controller auto-resumes, logs a warning, discards the pause episode (below) and sends one compensating refresh, flagged `catchUp: true` (#210), to keep the tree in sync. This prevents the watcher from being permanently paused.
+
+**Catch-up after a pause ([#210](https://github.com/qodeca/erfana/issues/210)):** a pause drops every event, so a change another program made after the operation's own tree read began, and before resume, used to stay invisible until the next unrelated refresh. The first pause now opens a pause episode (`watcher/PauseEpisode.ts`, pure) that lives until the full resume:
+
+- Only structural drops count (`add`, `addDir`, `unlink`, `unlinkDir`); `change` never does – content edits do not alter the tree, and the operations refresh git status separately.
+- The operation's own changes are filtered by kind: after success each mutation handler in `file-handlers.ts` reports what it changed through `noteInternalChange`. An `added` record filters only `add` / `addDir`, a `removed` one only `unlink` / `unlinkDir`, so a deletion inside a just-made copy still counts. Residual case: if Erfana copies, moves or renames a folder and another program adds a file inside that same folder after the refresh read began, that `add` is filtered as Erfana's own change and can still be missed until the next change or a manual refresh. Past 256 records the episode stops filtering and forces a catch-up.
+- A successful read of the paused root by the window that paused covers every drop seen before that read began (`file:readDirectory` calls `beginTreeRead` first and commits only after the read resolves). A failed read, a subfolder read or another window's read covers nothing.
+- At the full resume, one `directory-watch:changed` with `catchUp: true` goes out if any drop is left uncovered. Nested pauses share one episode, so they catch up once. The renderer lets a `catchUp` event through even when the next operation has already set its internal-operation flag, and `withWatcherPause` now clears that flag before resume on the error path too.
 
 ### IPC Channels
 
@@ -301,6 +309,7 @@ Recommended:
 - **Renderer Hook**: `src/renderer/src/hooks/useDirectoryWatcher.ts` (lifecycle, event handling, AC-010 guard)
 - **Pure Logic**: `src/renderer/src/hooks/useDirectoryWatcher.logic.ts` (state guards, message creation)
 - **Pause Utility**: `src/renderer/src/components/ProjectTree/withWatcherPause.ts` (pause/resume wrapper)
+- **Pause episode (#210)**: `src/main/services/watcher/PauseEpisode.ts` (drop counting, own-change filter, read coverage); hooks in `src/main/ipc/file-handlers.ts`
 - **Tree refresh (single-flight, #208)**: `src/shared/coalescingRunner.ts`, used by `FileService.readDirectory` (`src/main/services/FileService.ts`) and `refreshFiles` in `src/renderer/src/hooks/useProjectManagement.ts`
 - **Integration**: `src/renderer/src/components/ProjectTree/ProjectTree.tsx`
 - **Component**: `src/renderer/src/components/ProjectTree/ProjectTreeNode.tsx` (controlled pattern)
@@ -540,7 +549,7 @@ The service integrates these components:
 
 - `src/main/services/watcher/` - All watcher optimization modules
 - Watcher unit tests in `src/main/services/watcher/*.test.ts`
-- Directory pipeline integration tests in `src/main/services/DirectoryWatcherService.pipeline.test.ts` (17 tests)
+- Directory pipeline integration tests in `src/main/services/DirectoryWatcherService.pipeline.test.ts` (26 tests, 9 of them the #210 catch-up)
 - Git pipeline integration tests in `src/main/services/GitWatcherService.pipeline.test.ts` (22 tests, #99)
   - Covers AC-004 (git add), AC-005 (git commit), AC-006 (git checkout), AC-018 (coalescer dedup)
   - Additional: all 5 event types, correlation ID, WatcherMetrics, disposal guards, circuit breaker
@@ -553,8 +562,8 @@ The service integrates these components:
   - Offset-deque coverage: 60 k-event stress burst runs in <1 s cross-platform after the refactor
 - 016-NFR-001 main-process latency integration tests in `DirectoryWatcherService.pipeline.test.ts`
   - Isolates chokidar + Defender noise via fake timers; asserts <200 ms virtual latency for single add + atomic-save flows
-- Hook tests in `src/renderer/src/hooks/useDirectoryWatcher.test.ts` (13 tests)
-- Pause/resume tests in `src/renderer/src/components/ProjectTree/withWatcherPause.test.ts` (17 tests)
+- Hook tests in `src/renderer/src/hooks/useDirectoryWatcher.test.ts` (14 tests)
+- Pause/resume tests in `src/renderer/src/components/ProjectTree/withWatcherPause.test.ts` (18 tests)
 - Project switching tests in `src/main/services/ProjectService.switching.test.ts` (20 tests, #101)
   - Session token guards, step ordering, in-flight event handling during project switches
 - Renderer switching tests in `src/renderer/src/components/ProjectTree/ProjectTree.switching.test.tsx` (11 tests, #101)

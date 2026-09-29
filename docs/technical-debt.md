@@ -399,9 +399,9 @@ The policy as practised: *a file a change adds behaviour to must come in under 5
 | `src/preload/index.ts` | 1,179 | Pre-existing; the single app bridge grows one block per IPC domain |
 | `src/main/services/preview/PreviewLiveView.ts` | ~~1,169~~ 439 | **Back under the cap (#124).** The live view was split into `previewLiveVisibility.ts`, `previewLiveBounds.ts`, `previewLiveWiring.ts`, `previewLivePipeline.ts`, `previewLiveTeardown.ts` and siblings before #124 added behaviour |
 | `src/renderer/src/components/Editor/MarkdownPreview.tsx` | 1,032 | Pre-existing (entry 8) |
+| `src/main/services/DirectoryWatcherService.ts` | 991 | Pre-existing; 885 at the 2026-09-04 measurement, 991 after #208 and #210 (re-measured for #210). #210 added only the pause-episode plumbing – `beginTreeRead`, `noteInternalChange`, `sendCompensatingRefresh` and the catch-up at resume; the logic itself (drop counting, own-change filter, read coverage) went into the new `watcher/PauseEpisode.ts` (165 lines). Wiring a bug fix into an over-cap file was accepted rather than blocking it on a split |
 | `src/main/services/LocalWhisperService.ts` | 933 | Pre-existing |
 | `src/main/services/ProjectLockService.ts` | 906 | Pre-existing |
-| `src/main/services/DirectoryWatcherService.ts` | 885 | Pre-existing |
 | `src/renderer/src/constants/testids.ts` | 842 | Pre-existing; a flat constant table |
 | `src/main/services/preview/PreviewViewService.ts` | ~~832~~ 493 | **Back under the cap (#124)**, but only just – see entry #47. Navigation, eviction, panel state and the resize-hold registry moved into their own modules |
 | `src/main/services/PdfService.ts` | 821 | Pre-existing |
@@ -413,9 +413,9 @@ The policy as practised: *a file a change adds behaviour to must come in under 5
 | `src/main/index.ts` | 670 | Pre-existing; the composition root |
 | `src/renderer/src/utils/filePathLinks.logic.ts` | 655 | Pre-existing |
 | `src/shared/constants.ts` | 651 | Pre-existing; comment-heavy constant table |
+| `src/main/ipc/file-handlers.ts` | 650 | Pre-existing; **grew by 4 lines** in #70 to 601 (the `projectConfinement` import plus two `assert*` calls) and had reached 627 by 2026-09-04. Adding a security guard to an over-cap file was accepted rather than blocking the fix on a refactor. #210 took it to 650 (re-measured for #210) on the same terms: a `beginTreeRead` / commit pair in `file:readDirectory`, one `noteInternalChange` call per mutation handler and a contract comment – the logic they feed lives in `watcher/PauseEpisode.ts` |
 | `src/renderer/src/components/Editor/DiagramViewer/ChatBubble.tsx` | 641 | Pre-existing (entry 8) |
 | `src/main/services/claudeStatus/ClaudeStatusService.ts` | 639 | Pre-existing |
-| `src/main/ipc/file-handlers.ts` | 627 | Pre-existing; **grew by 4 lines** in #70 to 601 (the `projectConfinement` import plus two `assert*` calls) and has since reached 627. Adding a security guard to an over-cap file was accepted rather than blocking the fix on a refactor |
 | `src/renderer/src/components/Dialog/BaseDialog.tsx` | 624 | Pre-existing |
 | `src/renderer/src/components/Settings/SettingsOverlay.tsx` | 611 | Pre-existing |
 | `src/main/services/ExternalFileService.ts` | 596 | Pre-existing |
@@ -434,7 +434,7 @@ The policy as practised: *a file a change adds behaviour to must come in under 5
 
 **Recommended Solution**: (#124 made the split below for both preview files; the rest stands.) `PreviewLiveView.ts` and `PreviewViewService.ts` were the entries gaining code fastest and the ones to split first – the lifecycle wiring, teardown and still-frame paths in the former and the suspend/resume policy in the latter are separable. `file-handlers.ts` remains a candidate: the project/file/stat/CRUD handler groups are independent. The `imageViewer.logic.ts` file is a candidate for the next pass that genuinely changes it.
 
-**Status**: Accepted for #70; recorded so the next change to any of these files does not re-litigate it.
+**Status**: Accepted for #70, and for #210 on the two rows that name it; recorded so the next change to any of these files does not re-litigate it.
 
 ---
 
