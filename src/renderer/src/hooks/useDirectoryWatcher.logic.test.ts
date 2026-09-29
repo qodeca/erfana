@@ -59,6 +59,12 @@ describe('useDirectoryWatcher.logic', () => {
       expect(shouldHandleDirectoryChange(false)).toBe(true)
       expect(shouldHandleDirectoryChange(true)).toBe(false)
     })
+
+    it('should let a catch-up refresh through during an internal operation (#210)', () => {
+      expect(shouldHandleDirectoryChange(true, true)).toBe(true)
+      expect(shouldHandleDirectoryChange(false, true)).toBe(true)
+      expect(shouldHandleDirectoryChange(true, false)).toBe(false)
+    })
   })
 
   describe('createDirectoryChangeMessage', () => {

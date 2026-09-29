@@ -47,6 +47,10 @@ export async function withWatcherPause<T>(
 
     return result
   } catch (error) {
+    // Reset flag BEFORE resuming, as on the success path, so a catch-up or
+    // external change broadcast right after resume is not skipped
+    isInternalOperationRef.current = false
+
     // Resume watcher even on error
     if (projectPath) {
       try {
@@ -55,7 +59,6 @@ export async function withWatcherPause<T>(
         logger.error('Failed to resume directory watcher', resumeErr instanceof Error ? resumeErr : undefined)
       }
     }
-    isInternalOperationRef.current = false
 
     // Re-throw the original error
     throw error

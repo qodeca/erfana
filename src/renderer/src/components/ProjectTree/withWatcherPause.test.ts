@@ -266,5 +266,24 @@ describe('withWatcherPause', () => {
       // This prevents a race where watcher events fire between resume and ref reset
       expect(refValueWhenResumeWasCalled).toBe(false)
     })
+
+    it('resets isInternalOperationRef to false BEFORE calling resume on the error path (AC-010, #210)', async () => {
+      let refValueWhenResumeWasCalled: boolean | undefined
+
+      mockWindowApi.directoryWatch.resume.mockImplementation(async () => {
+        refValueWhenResumeWasCalled = isInternalOperationRef.current
+        return { success: true }
+      })
+
+      const testError = new Error('Operation failed')
+      const operation = vi.fn().mockRejectedValue(testError)
+
+      await expect(
+        withWatcherPause('/test/project', isInternalOperationRef, setLoading, operation)
+      ).rejects.toBe(testError)
+
+      // A catch-up broadcast sent at resume must not meet a still-set flag
+      expect(refValueWhenResumeWasCalled).toBe(false)
+    })
   })
 })

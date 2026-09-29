@@ -61,13 +61,14 @@ export function registerDirectoryWatcherHandlers(): void {
   })
 
   // Pause directory watching (during internal operations)
-  registerHandle('directory-watch:pause', async (_event, dirPath: string) => {
+  registerHandle('directory-watch:pause', async (event, dirPath: string) => {
     try {
       if (!dirPath || typeof dirPath !== 'string') {
         return { success: false, error: 'Invalid directory path' }
       }
 
-      directoryWatcherService.pauseWatch(dirPath)
+      // The pausing window's own tree read is what covers dropped changes (#210)
+      directoryWatcherService.pauseWatch(dirPath, event.sender.id)
 
       return { success: true }
     } catch (error) {

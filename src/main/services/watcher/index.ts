@@ -28,6 +28,12 @@ export {
   type AtomicSaveCallback
 } from './AtomicSaveDetector'
 export {
+  PauseEpisode,
+  MAX_INTERNAL_CHANGES,
+  type InternalChange,
+  type InternalChangeKind
+} from './PauseEpisode'
+export {
   ThrottledWorker,
   createThrottledWorker,
   type ThrottledWorkerOptions,

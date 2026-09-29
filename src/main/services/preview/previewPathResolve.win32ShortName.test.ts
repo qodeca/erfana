@@ -27,6 +27,16 @@ import { confinePath, isSafeSegment } from './previewPathResolve'
 const onWin32 = process.platform === 'win32'
 
 /**
+ * Whether this host hands out a short tmpdir at all. A profile whose name is
+ * already 8.3-sized (`C:\Users\marci`) gets no `~1` alias, so the real-filesystem
+ * cases have nothing to exercise. Off CI they skip; on CI the guard below still
+ * fails, so a Windows runner that stops providing a short name is noticed.
+ */
+const hostHasShortTmpdir =
+  onWin32 && realpathSync(tmpdir()) !== realpathSync.native(tmpdir())
+const realShortNameCases = hostHasShortTmpdir || !!process.env.CI
+
+/**
  * A project root in both spellings, plus a file just outside it.
  *
  * `long` is the canonical form the production resolver works in
@@ -43,7 +53,7 @@ function makeProject(): { long: string; short: string; cleanup: () => void } {
 }
 
 describe.skipIf(!onWin32)('previewPathResolve – real Windows 8.3 short names', () => {
-  it('has a short tmpdir to test against, and the two realpath forms disagree', () => {
+  it.skipIf(!realShortNameCases)('has a short tmpdir to test against, and the two realpath forms disagree', () => {
     const p = makeProject()
     try {
       // Guards the rest of the file: if a host ever hands out a long tmpdir, the
@@ -55,7 +65,7 @@ describe.skipIf(!onWin32)('previewPathResolve – real Windows 8.3 short names',
     }
   })
 
-  it('accepts an in-root page named by the short spelling of the root (step 8h re-resolves)', async () => {
+  it.skipIf(!realShortNameCases)('accepts an in-root page named by the short spelling of the root (step 8h re-resolves)', async () => {
     const p = makeProject()
     try {
       const verdict = await confinePath(p.long, join(p.short, 'page.html'))
@@ -65,7 +75,7 @@ describe.skipIf(!onWin32)('previewPathResolve – real Windows 8.3 short names',
     }
   })
 
-  it('accepts the same page named by the long spelling', async () => {
+  it.skipIf(!realShortNameCases)('accepts the same page named by the long spelling', async () => {
     const p = makeProject()
     try {
       await expect(confinePath(p.long, join(p.long, 'page.html'))).resolves.toMatchObject({
@@ -77,7 +87,7 @@ describe.skipIf(!onWin32)('previewPathResolve – real Windows 8.3 short names',
     }
   })
 
-  it('refuses a file outside the root reached through the short spelling', async () => {
+  it.skipIf(!realShortNameCases)('refuses a file outside the root reached through the short spelling', async () => {
     const p = makeProject()
     try {
       // `<root>/sub` does not exist; the candidate climbs back out of the root

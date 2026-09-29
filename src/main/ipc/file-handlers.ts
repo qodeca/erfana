@@ -141,10 +141,14 @@ export function registerFileHandlers(): void {
   })
 
   // Read directory structure
-  registerHandle('file:readDirectory', async (_event, dirPath: string) => {
+  registerHandle('file:readDirectory', async (event, dirPath: string) => {
     try {
       const start = performance.now()
+      // #210: a successful read of a paused root shows every change dropped
+      // before it began, so the watcher need not catch up on those at resume.
+      const commitRead = directoryWatcherService.beginTreeRead(dirPath, event.sender.id)
       const result = await fileService.readDirectory(dirPath)
+      commitRead()
       const durationMs = Math.round(performance.now() - start)
       logger.info('file:readDirectory IPC completed', { durationMs, dirPath })
       return result
@@ -256,6 +260,10 @@ export function registerFileHandlers(): void {
     return true
   })
 
+  // #210: each mutation below reports what it changed via noteInternalChange
+  // after success, so a paused directory watcher does not count its own events
+  // as missed external changes.
+
   // Create new file
   registerHandle('file:createFile', async (_event, dirPath: string, fileName: string) => {
     try {
@@ -274,6 +282,7 @@ export function registerFileHandlers(): void {
       }
 
       const createdFilePath = await fileService.createFile(dirPath, sanitizedFileName)
+      directoryWatcherService.noteInternalChange({ path: createdFilePath, kind: 'added', subtree: false })
       return createdFilePath
     } catch (error) {
       // Redact user-typed filename before logging (INVALID_FILENAME embeds it);
@@ -301,6 +310,7 @@ export function registerFileHandlers(): void {
       }
 
       const createdFolderPath = await fileService.createFolder(dirPath, sanitizedFolderName)
+      directoryWatcherService.noteInternalChange({ path: createdFolderPath, kind: 'added', subtree: false })
       return createdFolderPath
     } catch (error) {
       // Redact user-typed name before logging (INVALID_FILENAME embeds it);
@@ -319,6 +329,7 @@ export function registerFileHandlers(): void {
       }
 
       await fileService.deleteFile(filePath)
+      directoryWatcherService.noteInternalChange({ path: filePath, kind: 'removed', subtree: true })
       return true
     } catch (error) {
       logger.error('Error deleting file', error instanceof Error ? error : undefined)
@@ -335,6 +346,7 @@ export function registerFileHandlers(): void {
       }
 
       await fileService.deleteFolder(folderPath)
+      directoryWatcherService.noteInternalChange({ path: folderPath, kind: 'removed', subtree: true })
       return true
     } catch (error) {
       logger.error('Error deleting folder', error instanceof Error ? error : undefined)
@@ -360,6 +372,10 @@ export function registerFileHandlers(): void {
       }
 
       const newPath = await fileService.rename(oldPath, sanitizedName)
+      directoryWatcherService.noteInternalChange(
+        { path: oldPath, kind: 'removed', subtree: true },
+        { path: newPath, kind: 'added', subtree: true }
+      )
       return newPath
     } catch (error) {
       // Redact user-typed name before logging (INVALID_FILENAME embeds it);
@@ -396,6 +412,12 @@ export function registerFileHandlers(): void {
       }
 
       const newPath = await fileService.moveItem(sourcePath, targetParentPath, sanitizedNewName, replaceExisting)
+      directoryWatcherService.noteInternalChange(
+        { path: sourcePath, kind: 'removed', subtree: true },
+        { path: newPath.path, kind: 'added', subtree: true },
+        // The replaced item at the destination was removed first
+        ...(replaceExisting ? [{ path: newPath.path, kind: 'removed' as const, subtree: true }] : [])
+      )
       return newPath
     } catch (error) {
       logger.error('Error moving item', error instanceof Error ? error : undefined)
@@ -427,6 +449,7 @@ export function registerFileHandlers(): void {
       }
 
       const newPath = await fileService.copyItem(sourcePath, targetParentPath, sanitizedNewName)
+      directoryWatcherService.noteInternalChange({ path: newPath.path, kind: 'added', subtree: true })
       return newPath
     } catch (error) {
       logger.error('Error copying item', error instanceof Error ? error : undefined)

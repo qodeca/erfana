@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import chokidar, { FSWatcher } from 'chokidar'
 import { BrowserWindow, WebContents, webContents } from 'electron'
-import { normalize, sep } from 'path'
+import { normalize, resolve, sep } from 'path'
 import { settingsService } from './SettingsService'
 import { PauseController } from '../utils/PauseController'
 import {
@@ -10,13 +10,16 @@ import {
   EventCoalescer,
   AtomicSaveDetector,
   ThrottledWorker,
+  PauseEpisode,
   getPlatformConfig,
   getPlatformDiagnostics,
-  type FileChangeEvent
+  type FileChangeEvent,
+  type InternalChange
 } from './watcher'
 import { DEFAULT_WATCHER_IGNORE_PATTERNS, PAUSE_CONTROLLER } from '../../shared/constants'
 import { logger } from './LoggingService'
 import { isSystemDirectory } from '../utils/pathSecurity'
+import { isLexicallyInside } from '../utils/projectConfinement'
 import { AppError, ErrorCode } from '../../shared/errors'
 import { RateLimitedLogger } from '../utils/RateLimitedLogger'
 import { collectMemorySnapshot } from '../utils/processMemorySnapshot'
@@ -29,6 +32,12 @@ interface WatchedDirectory {
   throttledWorker: ThrottledWorker<FileChangeEvent>
   atomicSaveDetector: AtomicSaveDetector
   version: number
+  /**
+   * What the current pause dropped and what re-read it (#210). Exists only
+   * while paused: set when `pauseWatch` takes the count to 1, cleared at full
+   * resume and on the safety timeout – so its presence is the paused guard.
+   */
+  pauseEpisode?: PauseEpisode
 }
 
 // Git index watching migrated to GitWatcherService (Issue #74)
@@ -407,11 +416,17 @@ export class DirectoryWatcherService {
   /**
    * Pause watching (during internal operations to prevent race conditions)
    * Uses reference counting to support nested pause/resume operations
+   *
+   * @param senderId - webContents id of the pausing window; only its tree reads
+   *   cover the changes dropped during this pause (#210)
    */
-  pauseWatch(dirPath: string): void {
+  pauseWatch(dirPath: string, senderId?: number): void {
     const watched = this.watchedDirectories.get(dirPath)
     if (watched) {
       const count = watched.pauseController.pause()
+      if (count === 1) {
+        watched.pauseEpisode = new PauseEpisode(senderId)
+      }
       this.safeLog(`⏸️  Paused directory watch for: ${dirPath} (count: ${count})`)
     }
   }
@@ -419,6 +434,9 @@ export class DirectoryWatcherService {
   /**
    * Resume watching after internal operations complete
    * Only resumes when all pause operations have completed (pauseCount reaches 0)
+   *
+   * At full resume, sends one catch-up refresh when a structural change from
+   * outside was dropped after the pausing window's last completed tree read (#210).
    */
   resumeWatch(dirPath: string): boolean {
     const watched = this.watchedDirectories.get(dirPath)
@@ -432,10 +450,69 @@ export class DirectoryWatcherService {
     // Only resume when all operations complete
     if (isFullyResumed) {
       this.safeLog(`▶️  Resumed directory watch for: ${dirPath}`)
+      const episode = watched.pauseEpisode
+      watched.pauseEpisode = undefined
+      if (episode?.needsCatchUp()) {
+        // Counts only – no path at info
+        const reason = episode.isForcedByCap()
+          ? 'forced: internal-change cap'
+          : `${episode.uncoveredDrops()} external changes missed while paused`
+        this.safeLog(`🔄 Catch-up refresh after pause (${reason})`)
+        this.sendCompensatingRefresh(dirPath)
+      }
     } else {
       this.safeLog(`⏸️  Directory watch still paused: ${dirPath} (count: ${watched.pauseController.getCount()})`)
     }
     return true
+  }
+
+  /**
+   * A tree read of `dirPath` is starting (#210). When it reads the root of a
+   * paused watch and comes from the window that paused it, the returned commit
+   * marks every change dropped so far as shown – call it only once the read
+   * succeeds. Any other read gets a no-op commit.
+   *
+   * Committing after the pause already ended is harmless: the episode it
+   * writes to has been discarded.
+   */
+  beginTreeRead(dirPath: string, senderId?: number): () => void {
+    const noCommit = (): void => {}
+    if (!dirPath || typeof dirPath !== 'string') {
+      return noCommit
+    }
+
+    const readRoot = resolve(dirPath)
+    // Only the first root matching the read path is covered; a second key
+    // string for the same root costs one extra read, never a missed change.
+    for (const watched of this.watchedDirectories.values()) {
+      const episode = watched.pauseEpisode
+      if (!episode || resolve(watched.dirPath) !== readRoot) {
+        continue
+      }
+      const snapshot = episode.beginTreeRead(senderId)
+      return snapshot === null ? noCommit : () => episode.completeTreeRead(snapshot)
+    }
+    return noCommit
+  }
+
+  /**
+   * Record changes an internal file operation just made (#210), so the paused
+   * watcher does not count their own events as missed external changes. Each
+   * change is recorded in every paused root that contains it; with no paused
+   * root this is a no-op. Never logs the paths.
+   */
+  noteInternalChange(...changes: InternalChange[]): void {
+    for (const watched of this.watchedDirectories.values()) {
+      const episode = watched.pauseEpisode
+      if (!episode) {
+        continue
+      }
+      for (const change of changes) {
+        if (isLexicallyInside(change.path, watched.dirPath)) {
+          episode.noteInternalChange(change)
+        }
+      }
+    }
   }
 
   /**
@@ -449,13 +526,29 @@ export class DirectoryWatcherService {
       `Safety timeout: auto-resumed directory watch for ${dirPath} after ${PAUSE_CONTROLLER.SAFETY_TIMEOUT_MS}ms (resume was never called)`
     )
 
+    // The timeout refresh below covers this pause; nothing carries forward (#210)
+    const watched = this.watchedDirectories.get(dirPath)
+    if (watched) {
+      watched.pauseEpisode = undefined
+    }
+
     // Trigger compensating refresh to recover any events missed during stuck pause
+    this.sendCompensatingRefresh(dirPath)
+  }
+
+  /**
+   * Broadcast a zero-event change that asks the tree to re-read. `catchUp`
+   * lets it through the renderer's internal-operation gate, because it
+   * reports changes the pause dropped rather than the operation's own (#210).
+   */
+  private sendCompensatingRefresh(dirPath: string): void {
     this.notifyWebContents(dirPath, 'directory-watch:changed', {
       dirPath,
       eventCount: 0,
       originalEventCount: 0,
       coalescedCount: 0,
-      summary: {}
+      summary: {},
+      catchUp: true
     })
   }
 
@@ -472,9 +565,11 @@ export class DirectoryWatcherService {
       return
     }
 
-    // Ignore if paused (during our own operations)
+    // Ignore if paused (during our own operations). No path in the log line; the
+    // episode remembers structural drops so resume can catch up on them (#210).
     if (watched.pauseController.isPaused()) {
-      this.safeLog(`⏸️  Ignoring directory change (paused): ${event.type} ${event.path}`)
+      logger.debug('Directory change dropped while paused', { eventType: event.type })
+      watched.pauseEpisode?.recordDrop(event.type, event.path)
       return
     }
 

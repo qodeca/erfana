@@ -33,13 +33,15 @@ const createFile = async () => {
 1. Sets `isInternalOperationRef.current = true` + `setLoading(true)`
 2. Calls `window.api.directoryWatch.pause(projectPath)` (IPC to main process)
 3. Executes the operation
-4. Resets `isInternalOperationRef.current = false` **before** calling resume (prevents race condition – AC-010)
+4. Resets `isInternalOperationRef.current = false` **before** calling resume (prevents race condition – AC-010) – on the error path too since #210, so a catch-up sent at resume is not skipped
 5. Calls `window.api.directoryWatch.resume(projectPath)`
 6. Sets `setLoading(false)` in finally block (even on error)
 
 **Dual-layer suppression**:
 - **Main process**: `PauseController` (ref-counting) drops filesystem events while paused
 - **Renderer**: `isInternalOperationRef` guard in `useDirectoryWatcher` hook suppresses any events that slip through
+
+**Catch-up** ([#210](https://github.com/qodeca/erfana/issues/210)): main counts the structural changes from outside that the pause dropped and the pausing window's refresh read did not cover, and sends one `catchUp: true` refresh at resume, which the renderer guard lets through. See [README § DirectoryWatcherService](./README.md#directorywatcherservice-directory-watching).
 
 ### Event Listening Pattern
 
@@ -210,6 +212,7 @@ git checkout feature-branch
 // "⏸️  Paused directory watch for: /path/to/project"
 // "▶️  Resumed directory watch for: /path/to/project"
 // NO "📁 Directory changed" message (watcher was paused)
+// NO "🔄 Catch-up refresh after pause" line (nothing else changed, #210)
 ```
 
 **Test 9: Rename operation**
@@ -256,6 +259,13 @@ Single-flight tree refresh ([#208](https://github.com/qodeca/erfana/issues/208),
 - `src/renderer/src/hooks/useProjectManagement.refreshSingleFlight.test.ts` – one refresh read per scope, stale-result dropping after a newer read, a switch, a close or from a stale caller, spinner and toast ownership, the never-rejects contract (19 tests, AC2/AC3/AC4/AC6)
 - `src/main/utils/processMemorySnapshot.test.ts` – MB rounding, per-process working sets, one failing source never hides the other (5 tests, AC5)
 - `src/main/services/DirectoryWatcherService.health.test.ts` – the 120 s health line at `info` (`warn` when stressed) with the memory fields, and silence after `stopAll()` (3 tests, AC5). Split from `DirectoryWatcherService.test.ts`, which fakes only the timeout pair on purpose
+
+Catch-up after a pause ([#210](https://github.com/qodeca/erfana/issues/210)):
+- `src/main/services/watcher/PauseEpisode.test.ts` – the pure episode: `change` never counts, a completed owner read covers earlier drops, a failed read or a drop after the read began stays uncovered, another window's read covers nothing, kind-matched own-change filtering (subtree vs exact, `copied-2` is not inside `copied`), the 256-record cap (10 tests; paths built with `path.join`, so they hold on Windows)
+- `DirectoryWatcherService.pipeline.test.ts` › `#210 catch-up after a pause` – the service end to end: exactly one `catchUp: true` send, which reads cover (subfolder, other window, trailing separator), own change filtered, safety timeout, nested pauses (9 tests)
+- `file-handlers.test.ts` › `#210 watcher catch-up hooks` – `beginTreeRead` before the walk and a commit only on success; each mutation channel records its change on success only (18 tests). Renderer: one catch-up case each in `useDirectoryWatcher.test.ts`, `useDirectoryWatcher.logic.test.ts` and `withWatcherPause.test.ts`
+
+**Testing the race**: a real chokidar run cannot order "read began, then outside change, then resume" reliably, so the pipeline test does it by hand – `pauseWatch('/proj', 1)`, `beginTreeRead('/proj', 1)()`, `queueEvent` with a foreign `add`, `resumeWatch` – and asserts one `catchUp: true` send. By hand: on a large project, run `for i in $(seq 1 50); do touch "race-$i.md"; sleep 0.2; done` (PowerShell: `1..50 | % { ni "race-$_.md"; sleep -m 200 }`) in the terminal while renaming or creating items in the tree; every `race-*.md` must appear without a manual refresh, and `main.log` shows `🔄 Catch-up refresh after pause (N external changes missed while paused)`.
 
 ---
 
