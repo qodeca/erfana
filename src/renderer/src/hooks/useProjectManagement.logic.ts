@@ -58,6 +58,33 @@ export function shouldRefreshFiles(projectPath: string | null): boolean {
 }
 
 /**
+ * Identifies one file-tree read (#208): the refresh scope (project
+ * generation) it belongs to and the sequence number taken when it started.
+ */
+export interface TreeReadTicket {
+  generation: number
+  seq: number
+}
+
+/**
+ * A tree read may be shown only if it belongs to the current project scope
+ * and started after the last shown one, so the tree never goes backwards –
+ * not after a newer read, a project switch, or a close.
+ *
+ * @param ticket - The ticket taken when the read started
+ * @param currentGeneration - The refresh scope now in effect
+ * @param lastAppliedSeq - Sequence of the last tree actually shown
+ * @returns true if the result may be applied
+ */
+export function isTreeReadCurrent(
+  ticket: TreeReadTicket,
+  currentGeneration: number,
+  lastAppliedSeq: number
+): boolean {
+  return ticket.generation === currentGeneration && ticket.seq > lastAppliedSeq
+}
+
+/**
  * Determines if component is still valid for state updates
  *
  * @param mounted - Whether the component is mounted
