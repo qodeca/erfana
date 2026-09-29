@@ -1,0 +1,48 @@
+# One figure: an invented picture, or a diagram or chart that has to be correct.
+# The figure's source is committed alongside its rendered output, so a reviewer can read
+# it and the next change is an edit rather than a redraw. The gates still run, because a
+# figure lands in the repository like anything else and this project's checks may lint
+# the folder it lands in.
+#
+# This is deliberately NOT the design workflow. `design` proposes a whole surface with
+# every state and hands off a developer README; this produces one asset for a document or
+# for an existing design, and it never redesigns the thing the figure is about.
+name: visual-asset
+description: "Produce one figure – an invented illustration, or a diagram or chart that must be true to the repository – with its source committed beside it, then gates and a draft PR into the base branch. No application code."
+steps:
+  - id: kit
+    name: Snapshot the local project kit
+    command: 'bash "$(git rev-parse --path-format=absolute --git-common-dir)/../.xezar/checks/bootstrap.sh"'
+    resultScope: routine
+  - id: preflight
+    name: Verify worktree isolation
+    command: ".xezar/checks/worktree-preflight.sh"
+    resultScope: routine
+  - id: setup
+    name: Prepare the worktree
+    command: ".xezar/checks/worktree-setup.sh"
+    resultScope: routine
+  - id: figure
+    name: Produce the figure
+    prompt: "Produce the figure for: {{task}}. Follow xezar-visual-asset. State in your first line whether this is an invented picture or a figure that must be correct, because the two fail in opposite directions. For a correct figure: author it as text where text can carry it – Mermaid, SVG, Graphviz, a plotting script beside its data – commit that source as well as the rendered output, and cite for every number and every box the file, query or command you read it from in this run. If the material you need is not in the repository, stop and name what is missing; never estimate a value to complete a chart. For an invented picture: record what generated it and from what instruction, and follow paths.designSystem in .xezar/pipeline/config.json where this project has one. Put the figure where comparable figures already live. Change no application code. Finish focused checks and commits before the readiness, gates, evidence and PR handoff stages."
+    skill: xezar-visual-asset
+    timeout: 1h
+  - id: readiness
+    name: Confirm the phase record is complete and nothing blocks
+    command: ".xezar/checks/worktree-preflight.sh --readiness"
+    resultScope: stage
+  - id: gates
+    name: Quality gates
+    command: ".xezar/checks/repo-gates.sh --fast --producer gates"
+    resultScope: stage
+    onFail:
+      retry: figure
+      max: 2
+  - id: evidence
+    name: Seal the gate evidence
+    command: ".xezar/checks/worktree-preflight.sh --record-gate-evidence"
+    resultScope: stage
+  - id: handoff
+    name: Draft PR into the base branch
+    prompt: "Hand off the figure for: {{task}}. Verify the sealed head and open the draft PR. Say in the body which kind of figure this is, where its source lives, and either its citations or what generated it – a figure whose numbers cannot be traced is decoration and the body says so rather than implying they were checked. The author already owns the figure and its source; make no content changes here."
+    skill: xezar-handoff-draft-pr

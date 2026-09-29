@@ -18,6 +18,14 @@ import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import { MarkdownToolbar, type MarkdownToolbarProps, type ViewMode, type EditorFile } from './MarkdownToolbar'
 import { TEST_IDS } from '../../../../constants/testids'
 import type { MonacoEditorHandle } from '../../MonacoMarkdownEditor'
+import { isMacOS } from '../../../../utils/platform'
+
+vi.mock('../../../../utils/platform', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../utils/platform')>()),
+  isMacOS: vi.fn(() => true)
+}))
+
+const mockIsMacOS = vi.mocked(isMacOS)
 
 // Mock useSearchStore
 const mockOpenSearch = vi.fn()
@@ -498,19 +506,41 @@ describe('MarkdownToolbar', () => {
   })
 
   describe('button titles (accessibility)', () => {
+    beforeEach(() => {
+      mockIsMacOS.mockReturnValue(true)
+    })
+
     it('has accessible title on bold button', () => {
       render(<MarkdownToolbar {...createDefaultProps({ viewMode: 'editor' })} />)
-      expect(screen.getByTestId(TEST_IDS.TOOLBAR_BTN_BOLD)).toHaveAttribute('title', 'Bold (Cmd/Ctrl+B)')
+      expect(screen.getByTestId(TEST_IDS.TOOLBAR_BTN_BOLD)).toHaveAttribute('title', 'Bold (⌘B)')
     })
 
     it('has accessible title on italic button', () => {
       render(<MarkdownToolbar {...createDefaultProps({ viewMode: 'editor' })} />)
-      expect(screen.getByTestId(TEST_IDS.TOOLBAR_BTN_ITALIC)).toHaveAttribute('title', 'Italic (Cmd/Ctrl+I)')
+      expect(screen.getByTestId(TEST_IDS.TOOLBAR_BTN_ITALIC)).toHaveAttribute('title', 'Italic (⌘I)')
     })
 
     it('has accessible title on search button', () => {
       render(<MarkdownToolbar {...createDefaultProps({ viewMode: 'editor' })} />)
-      expect(screen.getByTestId(TEST_IDS.TOOLBAR_BTN_SEARCH)).toHaveAttribute('title', 'Find (Cmd/Ctrl+F)')
+      expect(screen.getByTestId(TEST_IDS.TOOLBAR_BTN_SEARCH)).toHaveAttribute('title', 'Find (⌘F)')
+    })
+
+    it('shows Ctrl, not ⌘ or "Cmd", in shortcut titles on Windows (#143)', () => {
+      mockIsMacOS.mockReturnValue(false)
+      render(<MarkdownToolbar {...createDefaultProps({ viewMode: 'editor' })} />)
+      expect(screen.getByTestId(TEST_IDS.TOOLBAR_BTN_BOLD)).toHaveAttribute('title', 'Bold (Ctrl+B)')
+      expect(screen.getByTestId(TEST_IDS.TOOLBAR_BTN_ITALIC)).toHaveAttribute('title', 'Italic (Ctrl+I)')
+      expect(screen.getByTestId(TEST_IDS.TOOLBAR_BTN_LINK)).toHaveAttribute('title', 'Insert Link (Ctrl+K)')
+      expect(screen.getByTestId(TEST_IDS.TOOLBAR_BTN_SEARCH)).toHaveAttribute('title', 'Find (Ctrl+F)')
+      for (const button of screen.getAllByRole('button')) {
+        expect(button.getAttribute('title') ?? '').not.toMatch(/[⌘⌥⇧⌃]|Cmd/)
+      }
+    })
+
+    it('shows Ctrl on the preview-mode Find button on Windows (#143)', () => {
+      mockIsMacOS.mockReturnValue(false)
+      render(<MarkdownToolbar {...createDefaultProps({ viewMode: 'preview' })} />)
+      expect(screen.getByTestId(TEST_IDS.TOOLBAR_BTN_SEARCH)).toHaveAttribute('title', 'Find (Ctrl+F)')
     })
 
     it('has accessible titles on view mode buttons', () => {

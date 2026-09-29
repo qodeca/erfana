@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { LucideIcon, Files, Search, Terminal } from 'lucide-react'
 import { TEST_IDS } from '../../constants/testids'
+import { formatShortcut } from '../../utils/shortcutLabel'
 
 export interface ActivityBarPanel {
   id: string
@@ -30,13 +31,17 @@ const getTerminalActiveIndicator = (): string | null => {
   return null
 }
 
+// Tooltips are getters so the shortcut label is resolved for the current
+// platform when it is read, not frozen at module load (#143).
 export const activityBarPanels: ActivityBarPanel[] = [
   // Left sidebar panels
   {
     id: 'project',
     icon: Files,
     label: 'Project',
-    tooltip: 'Project (⌘B)',
+    get tooltip() {
+      return `Project (${formatShortcut('B', { mod: true })})`
+    },
     side: 'left',
     dockviewPanelId: 'project',
     order: 1,
@@ -49,7 +54,9 @@ export const activityBarPanels: ActivityBarPanel[] = [
     id: 'search',
     icon: Search,
     label: 'Search',
-    tooltip: 'Search (⌘⇧F)',
+    get tooltip() {
+      return `Search (${formatShortcut('F', { mod: true, shift: true })})`
+    },
     side: 'left',
     dockviewPanelId: 'search',
     order: 2,
@@ -62,7 +69,9 @@ export const activityBarPanels: ActivityBarPanel[] = [
     id: 'terminal',
     icon: Terminal,
     label: 'Terminal',
-    tooltip: 'Terminal (⌘J)',
+    get tooltip() {
+      return `Terminal (${formatShortcut('J', { mod: true })})`
+    },
     side: 'right',
     dockviewPanelId: 'terminal',
     order: 1,

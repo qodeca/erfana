@@ -36,6 +36,13 @@ export default [
       // then fail `no-undef` on `document`/`window` and break `npm run lint`
       // for reasons unrelated to any change.
       '.e2e-temp/**',
+      // Xezar pipeline: the kit's own scripts (.xezar/), the per-machine skill
+      // installs (.agents/, .claude/skills/xez-*) and local working state (.local/).
+      // None of it is app source.
+      '.xezar/**',
+      '.agents/**',
+      '.claude/**',
+      '.local/**',
       // Static browser test-input fixtures for the HTML-preview feature (#74):
       // these run inside the sealed preview WebContentsView, not the app/Node
       // context, so linting them as project source flags browser globals.
@@ -116,6 +123,23 @@ export default [
     },
     rules: {
       '@typescript-eslint/no-require-imports': 'off'
+    }
+  },
+  // Documentation capture (#138, AC4): condition-based waits only. A fixed
+  // sleep makes a screenshot of whatever state the app happens to be in; the
+  // scenes wait on the PTY stream, the Stop hook's file, the DOM or two
+  // identical screenshots instead (scripts/capture/lib/). No other block sets
+  // `no-restricted-properties` for these files.
+  {
+    files: ['scripts/capture/**/*.{ts,mjs,js}'],
+    rules: {
+      'no-restricted-properties': [
+        'error',
+        {
+          property: 'waitForTimeout',
+          message: 'No fixed waits in the capture (#138 AC4). Wait on a condition: the PTY stream, a locator, a file, or a stable screenshot.'
+        }
+      ]
     }
   },
   // The image-export rasterize harness (#73) is a hidden Chromium page that is

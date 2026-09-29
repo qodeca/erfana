@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+#
+# The capture sandbox's shell start-up file. scripts/capture/sandbox.mjs copies
+# it to <sandbox>/home/.zshrc; the sandbox is never committed.
+
+# Claude Code must not read the operator's own configuration folder.
+unset CLAUDE_CONFIG_DIR
+
+# Agent login (spike, PR #149): Erfana strips CLAUDE_CODE_* from the terminal's
+# environment, so the token is exported here, read from the file the operator
+# named. The value is never echoed.
+if [ -n "$ERFANA_CAPTURE_CLAUDE_TOKEN_FILE" ] && [ -r "$ERFANA_CAPTURE_CLAUDE_TOKEN_FILE" ]; then
+  export CLAUDE_CODE_OAUTH_TOKEN="$(<"$ERFANA_CAPTURE_CLAUDE_TOKEN_FILE")"
+fi
+unset ERFANA_CAPTURE_CLAUDE_TOKEN_FILE
+
+# `claude` is linked into the sandbox's own ~/.local/bin.
+export PATH="$HOME/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+
+# A neutral prompt: the folder name only, no user or host name and no
+# absolute path (Erfana's default prompt shows %n).
+unsetopt PROMPT_SP
+PROMPT='%1~ %# '
+PS1="$PROMPT"
+RPROMPT=''

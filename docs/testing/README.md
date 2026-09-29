@@ -226,6 +226,8 @@ See `specs/archived/spec-t2-019-visual-regression-ci/` for the full specificatio
 
 For unit/integration: `npm ci` (vitest, Testing Library, and jsdom are already devDependencies), then `npm run test`.
 
+Each vitest run uses at most half the cores (at least two) – `vitest.workers.ts`, #171 – so parallel agent runs do not saturate the machine; `VITEST_MAX_WORKERS=8` or `VITEST_MAX_WORKERS=75%` overrides it for one run or one machine.
+
 For MCP visual testing:
 1. Build: `npm run build`
 2. Circuit Electron MCP configured in `.mcp.json`

@@ -1,0 +1,44 @@
+# A UI design run puts the visual layer on a surface whose flow is already designed and landed:
+# components, tokens, layout at each width, every state, both themes. It owns the visual files of
+# the feature folder and nothing else in it – the README status, the index entry and the labels stay
+# with the UX role. It writes no application code.
+name: ui-design
+description: "Design the visual layer of a surface whose flow already landed – components, tokens, layout, every state, both themes – in the feature folder under paths.designs, on the design system, then gates and a draft PR. No application code."
+steps:
+  - id: kit
+    name: Snapshot the local project kit
+    command: 'bash "$(git rev-parse --path-format=absolute --git-common-dir)/../.xezar/checks/bootstrap.sh"'
+    resultScope: routine
+  - id: preflight
+    name: Verify worktree isolation
+    command: ".xezar/checks/worktree-preflight.sh"
+    resultScope: routine
+  - id: setup
+    name: Prepare the worktree
+    command: ".xezar/checks/worktree-setup.sh"
+    resultScope: routine
+  - id: visual
+    name: Design the visual layer
+    prompt: "Design the visual layer for: {{task}}. Follow xezar-ui-design instructions and the design system named by paths.designSystem in .xezar/pipeline/config.json. Work only on a feature folder that already exists on the base branch under paths.designs; if the flow has not landed, say so and stop. Own the visual files only – never the README status, the index entry or a label. Name every component and token by the system's name, show every state in both themes at every width, and record each gap in the system rather than widening it here. Finish focused checks and commits before the existing readiness, gates, evidence and PR handoff stages."
+    skill: xezar-ui-design
+    allowedTools: [Read, Edit, Write, Grep, Glob, Bash, mcp__chrome-devtools__navigate_page, mcp__chrome-devtools__new_page, mcp__chrome-devtools__list_pages, mcp__chrome-devtools__select_page, mcp__chrome-devtools__close_page, mcp__chrome-devtools__take_snapshot, mcp__chrome-devtools__take_screenshot, mcp__chrome-devtools__list_console_messages, mcp__chrome-devtools__get_console_message, mcp__chrome-devtools__list_network_requests, mcp__chrome-devtools__get_network_request, mcp__chrome-devtools__click, mcp__chrome-devtools__fill, mcp__chrome-devtools__fill_form, mcp__chrome-devtools__hover, mcp__chrome-devtools__press_key, mcp__chrome-devtools__type_text, mcp__chrome-devtools__wait_for, mcp__chrome-devtools__handle_dialog, mcp__chrome-devtools__resize_page, mcp__chrome-devtools__get_css_styles]
+    timeout: 2h
+  - id: readiness
+    name: Confirm the phase record is complete and nothing blocks
+    command: ".xezar/checks/worktree-preflight.sh --readiness"
+    resultScope: stage
+  - id: gates
+    name: Quality gates
+    command: ".xezar/checks/repo-gates.sh --fast --producer gates"
+    resultScope: stage
+    onFail:
+      retry: visual
+      max: 2
+  - id: evidence
+    name: Seal the gate evidence
+    command: ".xezar/checks/worktree-preflight.sh --record-gate-evidence"
+    resultScope: stage
+  - id: handoff
+    name: Draft PR into the base branch
+    prompt: "Hand off the visual layer for: {{task}}. Verify the sealed head and open the draft PR with needs-design, linking the feature folder and the captures. The author already owns the visual files; make no content changes here. Independent design review remains pending."
+    skill: xezar-handoff-draft-pr

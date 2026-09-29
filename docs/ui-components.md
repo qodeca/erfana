@@ -100,7 +100,7 @@ Integrated terminal with xterm.js + node-pty.
 | Scroll to bottom | `ArrowDownToLine` | Scroll to bottom |
 | Restart terminal | `RotateCw` | Restart terminal |
 | Scroll lock | `LockKeyhole` / `LockKeyholeOpen` | Lock scroll to bottom / Disable scroll lock |
-| Maximize terminal | `Maximize2` / `Minimize2` | Maximize terminal (⌘⇧M) |
+| Maximize terminal | `Maximize2` / `Minimize2` | Maximize terminal (⇧⌘M on macOS, Ctrl+Shift+M on Windows) |
 
 The three capture buttons appear only on platforms where screenshot capture is supported.
 

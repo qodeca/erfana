@@ -51,6 +51,16 @@ If you need to change dependencies, run `npm install` deliberately, then check `
 keep only the change you meant to make. If the diff shows `encoding` disappearing and a shuffle of `peer` /
 `optional` flags and nothing else, discard it — that is this quirk, not your change.
 
+To build and package the app:
+
+```bash
+npm run build       # production build (typecheck + electron-vite build)
+npm run build:mac   # package for macOS
+npm run build:win   # package for Windows
+```
+
+Packaging details, signing and the Windows toolchain are in [docs/build/](docs/build/README.md).
+
 `main` is the stable release branch. Most work goes through `develop`, the day-to-day integration branch: cut your `feature/...` branch from `develop` and open your PR against `develop`.
 
 The one exception is the **graph engine** (spec 004 and the [#21](https://github.com/qodeca/erfana/issues/21) contract chain). That work lives on the `graph` branch, which acts as "develop for the graph engine" and already carries frozen schema, database and interface contracts that are deliberately absent from `develop`. If your change touches the graph engine, branch from `graph` and target `graph` — starting from `develop` means re-implementing contracts that already exist.
@@ -60,14 +70,15 @@ The one exception is the **graph engine** (spec 004 and the [#21](https://github
 Run the same checks CI runs before opening a PR:
 
 ```bash
-npm run lint            # eslint --fix
+npm run lint            # eslint --fix, then the no-shebang check (lint:shebang)
 npm run lint:css        # stylelint over src/ CSS and the design/ cards
 npm run design -- --check   # fails if a generated file under design/ is stale
 npm run typecheck       # tsc (node + web projects)
 npm run test:ci         # vitest workspace (main / renderer / preload)
 npm run test:cov        # coverage floors - a REQUIRED check that test:ci does not run
 npx electron-vite build # production build
-npm run check:headers   # every source file must carry the SPDX header
+npm run check:headers   # every source file must carry the SPDX header (the MIT Xezar kit in .xezar/ is exempt)
+npm run check:links     # relative links, anchors and user-guide wording (local gate only, not yet a CI step)
 npm audit signatures    # advisory in CI, but it catches a lockfile written by the wrong npm
 pipx run --spec "reuse[charset-normalizer]" reuse lint   # REUSE compliance
 ```
@@ -80,6 +91,12 @@ all three and is the only way to reproduce the `Coverage` job before pushing.
 It cannot pass on a Windows host (at least two `vitest.main.ts` floors miss
 because their symlink cases skip on win32, and the #124 floors have not been run
 there); CI runs it on Linux.
+
+Every vitest run uses at most half the machine's cores (at least two), set in
+`vitest.workers.ts` (#171), so several agents or terminals running tests at once
+do not saturate the machine. Raise or lower it for one run or one machine with
+`VITEST_MAX_WORKERS`, as a count (`VITEST_MAX_WORKERS=8`) or a share of the cores
+(`VITEST_MAX_WORKERS=75%`).
 
 For changes touching Electron-specific paths, also run the end-to-end suite locally (CI does not currently run it):
 
@@ -106,7 +123,7 @@ Never commit a real secret, even to history — rewrite it out and rotate the cr
 - IPC pattern: `shared/ipc` schemas → `main/services` → `main/ipc` handlers → preload bridge → renderer.
 - UI: open the design system first — [`design/index.html`](design/index.html) — and use design tokens (`var(--color-*)`, `var(--space-*)`, `var(--text-*)`); `border-radius: 0` always. `npm run lint:css` enforces the token rules. (`design/` is the design system; `docs/design*/` are per-issue notes.)
 - Prose: **sentence case**, en dashes (not em dashes).
-- New source files must carry the SPDX header (`npm run check:headers` enforces it); new binary assets are covered by the `REUSE.toml` catch-all — add a `.license` sidecar only to *override* it (e.g. a third-party asset). `reuse lint` must pass.
+- New source files must carry the SPDX header (`npm run check:headers` enforces it; the Xezar kit under `.xezar/` is MIT and exempt, see `REUSE.toml`); new binary assets are covered by the `REUSE.toml` catch-all — add a `.license` sidecar only to *override* it (e.g. a third-party asset). `reuse lint` must pass.
 
 ## Pull-request checklist
 
@@ -116,6 +133,22 @@ Never commit a real secret, even to history — rewrite it out and rotate the cr
 - [ ] No secrets introduced — `gitleaks` and `trufflehog` are clean locally.
 - [ ] Docs updated if behavior or project shape changed.
 - [ ] You agree to the project [CLA](CLA.md) (opening this PR records your agreement).
+
+## Automation in this repository
+
+This repository runs an agent pipeline (Xezar, `.xezar/`). **You start none of its workflows**: the
+project leader dispatches them. Nothing is broken when none of them runs on your pull request.
+
+- **What gates your pull request** is only the required GitHub checks: `Lint`, `Typecheck`,
+  `Unit tests`, `Build`, `Coverage`, `License compliance` and `Secret scan`.
+- **Labels**: you may suggest a category (`bug`, `feature`, `refactor`, `security`, `dependencies`,
+  `documentation`) and a `priority-*`. Every other label is applied by the pipeline or a
+  maintainer - never apply those yourself.
+- **Documents** go under `docs/`, by subject; [docs/README.md](docs/README.md) lists the folders.
+- **Pull request titles** follow Conventional Commits: the pipeline squash-merges, so the title
+  becomes the commit on `develop`.
+- **How work moves**, stage by stage, is in [SDLC.md](SDLC.md). You do not need the pipeline to
+  contribute: branch from `develop`, open a pull request, and a maintainer takes it from there.
 
 ## Reporting bugs and security issues
 

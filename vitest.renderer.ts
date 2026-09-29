@@ -3,6 +3,7 @@
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import path from 'node:path'
+import { maxWorkers } from './vitest.workers'
 
 export default defineConfig({
   plugins: [react()],
@@ -13,6 +14,8 @@ export default defineConfig({
   },
   test: {
     name: 'renderer',
+    // Worker cap (issue #171); only read when this file is the root `--config`.
+    maxWorkers,
     environment: 'jsdom',
     include: ['src/renderer/src/**/*.test.{ts,tsx}'],
     exclude: ['node_modules', 'dist', 'out', 'e2e', 'tests/fixtures'],

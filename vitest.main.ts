@@ -2,10 +2,13 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { defineConfig } from 'vitest/config'
 import path from 'node:path'
+import { maxWorkers } from './vitest.workers'
 
 export default defineConfig({
   test: {
     name: 'main',
+    // Worker cap (issue #171); only read when this file is the root `--config`.
+    maxWorkers,
     environment: 'node',
     // `scripts/**`, deliberately broad. #21 briefly narrowed this to
     // `scripts/spikes/**` on the false premise that `scripts/fuses.test.mjs`
@@ -119,6 +122,12 @@ export default defineConfig({
         'src/main/services/browserLaunch/BrowserLaunchService.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
         'src/shared/ipc/browser-schema.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // Offline link and wording check (#138). It reads contributor-controlled
+        // Markdown in the local gate, and its path walk is what keeps a link from
+        // probing or reading files outside the repository, so it carries the
+        // trust-chain floor (spec: 90). measured 99.52/100/94.65/99.52.
+        // See: docs/features/138-user-guide.md § 3.4
+        'scripts/check-links.mjs': { lines: 90, functions: 90, branches: 90, statements: 90 },
       },
       exclude: [
         'node_modules/**',
