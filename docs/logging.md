@@ -282,9 +282,9 @@ The default log level is `info`. This captures normal operations, warnings, and 
 Performance instrumentation added for large-project debugging (#151):
 
 - **Timing**: `GitStatus: completed` with `strategy`, `durationMs`, `fileCount`, `truncated` (info level)
-- **File operations**: `FileService: readDirectory completed` with `durationMs`, `fileCount` (info level)
+- **File operations**: `FileService: readDirectory completed` with `durationMs`, `fileCount` (info level); since #208 one of five `readDirectory` lines for tree walks, all carrying `pathDigest`, and a `readId` (`behindReadId` on the joined line) – see [Tree reads and memory](#tree-reads-and-memory-208)
 - **Project switch**: Per-stage logging with `durationMs` for failure identification
-- **Watcher health**: `DirectoryWatcherService` logs health snapshot every 120s (debug level)
+- **Watcher health**: `DirectoryWatcherService` logs a health snapshot every 120s – `info` level since #208 (`warn` when the watcher is stressed), so it reaches `main.log` at the default level, and it now carries process memory; see [Tree reads and memory](#tree-reads-and-memory-208)
 - **Buffer pressure**: `ThrottledWorker` logs at 80% and 50% buffer capacity (warn/info level)
 - **Rate-limited errors**: `RateLimitedLogger` (`src/main/utils/RateLimitedLogger.ts`) prevents log spam during cascading EMFILE errors (10s default cooldown)
 
@@ -306,6 +306,54 @@ A **third** limiter, `createDropReporter()` in `src/shared/dropReporter.ts`. It 
 - **First drop always logged**: the first drop of each reason is emitted; later drops of that reason are emitted at most once per `PREVIEW_LIMITS.BOUNDS_DROP_LOG_WINDOW_MS` (5 s), and that line carries `suppressed` – how many were swallowed since the previous one
 - **Bounded slots**: at most `BOUNDS_DROP_MAX_REASONS` (16) reasons get their own slot; any further reason shares one overflow slot under the same rule
 - **No path**: a line carries `stablePathDigest` of the panel id (never the id, which spells the file path), sequence numbers and a rect rounded to whole pixels
+
+### Tree reads and memory (#208)
+
+A very large project that kept changing made Erfana exit on Windows with nothing in the log. Overlapping full-tree reads most likely ran the main process out of heap (inferred – see [#208](https://github.com/qodeca/erfana/issues/208)), and the health line that would have shown a memory climb logged at `debug`. Tree reads are now single-flight (see [File watching § Tree refresh is single-flight](./file-watching/technical-details.md#tree-refresh-is-single-flight-208)), and every walk leaves a trace.
+
+**Main process** (`main.log`):
+
+| Line | Level | When | Context |
+|------|-------|------|---------|
+| `FileService: readDirectory started` | info | A walk starts | `readId`, `pathDigest`, `followUp`, `callers` |
+| `FileService: readDirectory completed` | info | A walk succeeded | `durationMs`, `fileCount`, `dirCount`, `hiddenPatternCount`, `maxDepth`, plus `readId`, `pathDigest`, `followUp`, `callers` |
+| `FileService: readDirectory failed` | warn | A walk rejected (only the root `readdir` can fail one; sub-folder errors are recovered) | `readId`, `pathDigest`, `durationMs` |
+| `FileService: readDirectory still running` | warn | Once per walk, `READ_DIRECTORY_SLOW_WARN_MS` (60 s) after it started | `readId`, `pathDigest`, `elapsedMs` |
+| `FileService: readDirectory joined follow-up read` | info | A call arrived while a walk of that path ran and was queued behind it | `pathDigest`, `behindReadId` |
+| `DirectoryWatcher health` | info (warn when stressed) | Every 120 s while a directory watcher is active, i.e. while a project is open | Watcher metrics, plus `mainMemoryMb` and `processMemoryMb`, and `memoryError` when a source could not be read |
+
+**Renderer** (`renderer.log`, prefixed `[RENDERER]`):
+
+| Line | Level | When | Context |
+|------|-------|------|---------|
+| `[useProjectManagement] File tree refreshed` | info | A refresh read finished | `durationMs`, `itemCount`, `followUp`, `callers`, `applied` |
+| `[useProjectManagement] File tree loaded` | info | The project-open load finished for the project still open | `durationMs`, `itemCount`, `applied` |
+| `[useProjectManagement] Stale project load dropped` | info | A project-open load finished after a newer switch or close; no tree, no toast | `durationMs`, `itemCount` |
+
+Field meanings:
+
+- `readId` – a number that goes up by one with every walk. It pairs a walk's `started` line with its `completed`, `failed` or `still running` line.
+- `pathDigest` – `stablePathDigest` of the resolved path: a 16-hex value, the same for every walk of one folder and different for another. None of the five `readDirectory` lines above carries a readable path. Two older lines still do, as before: the handler's own `file:readDirectory IPC completed` (info) logs `dirPath`, and `FileService: readDirectory error recovered` (warn, a sub-folder that could not be read) logs `path`.
+- `followUp` / `callers` – `followUp: true` marks the one queued walk (or refresh read) that serves every call made while the previous one ran; `callers` is how many calls it serves (1 for a walk that started at once).
+- `behindReadId` – the `readId` of the walk that call is waiting behind.
+- `applied` – `false` means the result was older than the tree already shown, or belonged to a project that is no longer open, and was dropped.
+- `mainMemoryMb` – main-process `rss`, `heapUsed`, `heapTotal`, `external` and `heapLimit` (V8's heap ceiling), in MB.
+- `processMemoryMb` – one `{ type, pid, workingSet, peakWorkingSet }` per Electron process (from `app.getAppMetrics()`), in MB. `type` and `pid` tell the main process (`Browser`) from each renderer (`Tab`) and the helper processes.
+
+**Checking that no two reads of a project overlapped** – pair lines by `readId`, group them by `pathDigest`:
+
+```bash
+grep -E 'readDirectory (started|completed|failed|still running|joined follow-up read)' ~/.erfana/logs/main.log
+```
+
+Within one `pathDigest`, every `started` must be closed by the `completed` or `failed` line with the same `readId` before the next `started`. Lines of different `pathDigest` values may interleave – different folders are not serialised against each other. A `still running` line with no closing line for its `readId` is a hung walk (for example an unreachable network drive): every later read of that folder waits behind it until it ends or Erfana restarts.
+
+Reading notes:
+
+- `heapUsed` climbing towards `heapLimit` over successive health lines is the heap-exhaustion trend this line exists to show.
+- The health line adds about 30 `info` lines an hour while a project is open; rotation absorbs it.
+- The handler's `file:readDirectory IPC completed` `durationMs` now includes time spent waiting behind a running walk of the same path, so it can be much larger than the walk's own `durationMs`.
+- Debug-level companions, for a `debug` session: `File tree refresh skipped – project changed`, `File tree refresh skipped – stale caller`, `File tree refresh failed for a project no longer open` and `Stale project load failed; ignored`, all prefixed `[useProjectManagement]`.
 
 ## Related documentation
 

@@ -19,6 +19,7 @@ import { logger } from './LoggingService'
 import { isSystemDirectory } from '../utils/pathSecurity'
 import { AppError, ErrorCode } from '../../shared/errors'
 import { RateLimitedLogger } from '../utils/RateLimitedLogger'
+import { collectMemorySnapshot } from '../utils/processMemorySnapshot'
 
 interface WatchedDirectory {
   dirPath: string
@@ -621,23 +622,33 @@ export class DirectoryWatcherService {
   private startHealthLogger(): void {
     if (this.healthLogInterval !== null) return
 
-    this.healthLogInterval = setInterval(() => {
-      const snapshot = this.metrics.getSnapshot()
-      const resourceCount = process.getActiveResourcesInfo().length
-
-      const isStressed = snapshot.bufferOverflows > 0 || snapshot.peakEventsPerSecond > 100
-      const level = isStressed ? 'warn' : 'debug'
-
-      logger[level]('DirectoryWatcher health', {
-        activeWatchers: snapshot.activeWatchers,
-        eventsReceived: snapshot.eventsReceived,
-        bufferOverflows: snapshot.bufferOverflows,
-        errorCounts: snapshot.errorCounts,
-        peakEventsPerSecond: snapshot.peakEventsPerSecond,
-        resourceCount
-      })
-    }, 120000)
+    this.healthLogInterval = setInterval(() => this.logHealth(), 120000)
     this.healthLogInterval.unref()
+  }
+
+  /**
+   * One health line: watcher metrics plus process memory (#208).
+   *
+   * Logged at `info` so it reaches `main.log` at the default file level – the
+   * memory trend is the only trace a heap exhaustion leaves – and at `warn`
+   * when the watcher shows stress.
+   */
+  private logHealth(): void {
+    const snapshot = this.metrics.getSnapshot()
+    const resourceCount = process.getActiveResourcesInfo().length
+
+    const isStressed = snapshot.bufferOverflows > 0 || snapshot.peakEventsPerSecond > 100
+    const level = isStressed ? 'warn' : 'info'
+
+    logger[level]('DirectoryWatcher health', {
+      activeWatchers: snapshot.activeWatchers,
+      eventsReceived: snapshot.eventsReceived,
+      bufferOverflows: snapshot.bufferOverflows,
+      errorCounts: snapshot.errorCounts,
+      peakEventsPerSecond: snapshot.peakEventsPerSecond,
+      resourceCount,
+      ...collectMemorySnapshot()
+    })
   }
 
   /**

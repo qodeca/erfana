@@ -3,8 +3,8 @@
 > Created: 2026-04-03
 > Status: In progress (4 of 6 done)
 > Scope: Issues #146, #147, #148, #149, #150, #151
-> Related: #60 – renderer crash on very large projects, landed (section below)
-> Provenance: the issue numbers #146–#151 and #136, and the commit SHAs quoted in this plan, are **pre-migration** – they belong to the private tracker and history that were rewritten at the 2026-06 repository migration, so they do not resolve in `qodeca/erfana` or in this repo's `git log`. They are kept as provenance, not as links. #60 is a current-repo issue.
+> Related: #60 – renderer crash on very large projects, landed (section below); #208 – overlapping tree reads on a very large, constantly changing project, fixed (section below)
+> Provenance: the issue numbers #146–#151 and #136, and the commit SHAs quoted in this plan, are **pre-migration** – they belong to the private tracker and history that were rewritten at the 2026-06 repository migration, so they do not resolve in `qodeca/erfana` or in this repo's `git log`. They are kept as provenance, not as links. #60 and #208 are current-repo issues.
 
 ## Context
 
@@ -76,7 +76,31 @@ Design of record: [`docs/design/design-issue-60.md`](./design/design-issue-60.md
 | Lazy / on-demand directory loading | #150 |
 | ≤2 s TTI budget (scan ~2.0 s + IPC clone ~1.2 s dominate) | #149/#150 |
 | Cancelable project open | #150 |
-| Tree-rebuild dedup, once the trigger above fires | #149/#150 |
+| Tree-rebuild dedup, once the trigger above fires – the read side is addressed by #208 (section below); a second *build* at open is not | #149/#150 |
+
+## Related: #208 – overlapping tree reads (fixed)
+
+[#208](https://github.com/qodeca/erfana/issues/208): on Windows, a project of about 200k entries that kept changing made Erfana exit with nothing in the log. Every watcher-driven refresh (every 250 ms under churn) and every file operation started a new full-tree read, in the renderer and again in main, while earlier reads – 25 s to 13 min each on that project – were still running. Each built its own tree in main and cloned it to the renderer, and main most likely ran out of heap (inferred – the 4-hour soak on such a project has not been run yet).
+
+**What shipped** (listed under Unreleased in the [changelog](./CHANGELOG.md#unreleased) until the next release):
+
+- **Single-flight tree reads** – one read per project scope in `useProjectManagement.refreshFiles`, one walk per resolved path in `FileService.readDirectory`, both on the shared `src/shared/coalescingRunner.ts`. At most one read runs plus one queued follow-up per burst, never two at once. This addresses the **tree-refresh dedup**: overlapping reads of the same project can no longer stack, whatever triggers them. A generation + sequence ticket on every result drops stale trees, so the tree never goes back to an older state.
+- **Memory diagnostics** – the 120 s `DirectoryWatcher health` line logs at `info` (was `debug`, so it never reached `main.log` at the default level) and carries main-process heap (`heapUsed` against `heapLimit`) and per-process working sets, so a heap-exhaustion exit leaves a trend behind.
+- **Walk trace** – `FileService: readDirectory started` / `completed` / `failed` / `still running` / `joined follow-up read`, each with `pathDigest` and a `readId` (`behindReadId` on the joined line), so overlap can be checked from `main.log` in the field.
+
+Details: [File watching § Tree refresh is single-flight](./file-watching/technical-details.md#tree-refresh-is-single-flight-208); log lines and the overlap check: [Logging § Tree reads and memory](./logging.md#tree-reads-and-memory-208).
+
+**What stays open.** Overlapping reads can no longer stack; the memory effect is pending the soak test. A very large project that never stops changing still re-reads its whole tree back to back, keeping CPU and disk busy. Deliberately out of scope for #208:
+
+| Open item | What it would fix |
+|---|---|
+| Entry cap on a tree read | One read of ~200k entries still builds and clones the full tree |
+| Lazy / on-demand directory loading (overlaps #150) | Removes full-tree reads altogether |
+| `.gitignore`-aware reading | Skips build output and caches that inflate the tree |
+| Read cancellation (overlaps #150's cancelable project open) | After a switch, a walk of the old project keeps running until it ends; closing and reopening the same project waits for it; and a walk that never finishes (an unreachable network drive) blocks every later read of that folder until Erfana restarts |
+| The `withWatcherPause` window | An external change made during the follow-up read an internal file operation is waiting on can be missed until the next change – one read long, as before #208; closing it needs own-versus-external attribution of watcher events |
+
+The double tree *build* at open (the #60 follow-up trigger above) is a separate question: the project-open load and a refresh that starts after it are both newer than the tree on screen, so both are still applied.
 
 ## Dependency graph
 

@@ -89,6 +89,13 @@ export interface IUseProjectManagementReturn {
   /**
    * Refresh the file tree for the current project
    * Used by file operations to update the tree after making changes
+   *
+   * Coalesced (#208): calls made while a read runs share one follow-up read
+   * that starts after it. The promise resolves – it never rejects – once a
+   * read that started after the call has finished, or without a read of its
+   * own if the project changed or closed before that read could start, or if
+   * the caller belongs to a project that is no longer open. Results from an
+   * older project or an older read are never shown.
    */
   refreshFiles: () => Promise<void>
 
