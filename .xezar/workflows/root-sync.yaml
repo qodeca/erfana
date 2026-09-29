@@ -1,0 +1,23 @@
+# LAUNCH THIS WITH WORKTREE **OFF**. That is a composer setting (a leader passes `worktree: false` to
+# the MCP `task_create`), not a key in this file: Xezar's
+# workflow schema has no worktree field, and inventing one here would be silently stripped and
+# would read as a guarantee nothing enforces. The enforcement is at run time —
+# `root-sync-preflight.sh` refuses a linked worktree, a resume that fell back to the root, and
+# disabled locking — which is a check that actually runs rather than a flag that does not.
+#
+# ONE AGENT STEP, DELIBERATELY. A `command:` step placed before the agent would run the preflight
+# before the agent exists, and the preflight requires an authorization record the agent is the one
+# to establish. That ordering makes the workflow unlaunchable: it refuses, every time, for a
+# prerequisite that cannot be satisfied before it runs. The agent therefore runs the preflight
+# itself, after recording the named authority. Being the last step also keeps XEZ:ASK live.
+name: root-sync
+description: Fast-forward the primary checkout to a fixed, explicitly authorized target. Worktree OFF, single production manager. No source edits, no commits.
+steps:
+  - id: kit
+    name: Snapshot the local project kit
+    command: 'bash "$(git rev-parse --path-format=absolute --git-common-dir)/../.xezar/checks/bootstrap.sh"'
+    resultScope: routine
+  - id: sync
+    name: Verify the root assignment, then fast-forward
+    prompt: "{{task}}"
+    skill: xezar-integration

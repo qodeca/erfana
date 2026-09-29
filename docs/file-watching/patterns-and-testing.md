@@ -250,6 +250,13 @@ Key test files:
 - `ProjectService.switching.test.ts` – project switching orchestration (20 tests, AC-009/014)
 - `useGitStatus.test.ts` – visibility gating and cooldowns (5 of the file's 38 tests, AC-012)
 
+Single-flight tree refresh ([#208](https://github.com/qodeca/erfana/issues/208), see [Technical Details § Tree refresh is single-flight](./technical-details.md#tree-refresh-is-single-flight-208)) – 53 tests in five new files, plus `isTreeReadCurrent` cases added to `useProjectManagement.logic.test.ts`. All drive reads with deferred promises and microtask flushing; fake timers appear only where a timer is the subject, and fake only the timer pair involved:
+- `src/shared/coalescingRunner.test.ts` – the runner's state machine: trailing run, latest task wins, never two at once, re-entrancy, per-run errors, `onIdle` ordering (12 tests; runs in the main vitest project)
+- `src/main/services/FileService.readDirectory.singleFlight.test.ts` – one walk per path, one follow-up walk for N callers, key normalisation without case folding, hidden-pattern snapshot, the five `readDirectory` log lines, and the 60 s slow-walk warning (14 tests, AC2/AC3/AC6). Split from the main `FileService` suite because its mocks hoist to module scope
+- `src/renderer/src/hooks/useProjectManagement.refreshSingleFlight.test.ts` – one refresh read per scope, stale-result dropping after a newer read, a switch, a close or from a stale caller, spinner and toast ownership, the never-rejects contract (19 tests, AC2/AC3/AC4/AC6)
+- `src/main/utils/processMemorySnapshot.test.ts` – MB rounding, per-process working sets, one failing source never hides the other (5 tests, AC5)
+- `src/main/services/DirectoryWatcherService.health.test.ts` – the 120 s health line at `info` (`warn` when stressed) with the memory fields, and silence after `stopAll()` (3 tests, AC5). Split from `DirectoryWatcherService.test.ts`, which fakes only the timeout pair on purpose
+
 ---
 
 ## Watcher Debugging
@@ -287,11 +294,21 @@ await window.api.directoryWatch.pause(<projectPath>)
 await window.api.directoryWatch.resume(<projectPath>)
 ```
 
+### From `main.log` (tree reads and memory, #208)
+
+- **No overlapping reads of one project**: pair the `FileService: readDirectory started` / `completed` / `failed` lines by `readId` and group them by `pathDigest`. Within one `pathDigest`, every `started` is closed by its `completed` or `failed` before the next `started`.
+- **Who is waiting**: `FileService: readDirectory joined follow-up read` names in `behindReadId` the walk a call is queued behind.
+- **Slow or hung walk**: `FileService: readDirectory still running` (once, 60 s into a walk). If no `completed` or `failed` line with that `readId` ever follows, the walk is hung and every later read of that folder waits behind it.
+- **Memory trend**: the `DirectoryWatcher health` line (every 120 s while a project is open, `info`) carries `mainMemoryMb` and `processMemoryMb`. `heapUsed` climbing towards `heapLimit` across successive lines means main is heading for heap exhaustion.
+
+Full field list: [Logging § Tree reads and memory](../logging.md#tree-reads-and-memory-208).
+
 ### Expected Behaviors
 
 - Bulk changes aggregate at three layers: chokidar fires per-event → `EventCoalescer` deduplicates per path within the 75 ms collection window → `ThrottledWorker` waits 200 ms between broadcast rounds → the renderer's `useDirectoryWatcher` debounces by another 250 ms before re-listing the tree. Multi-file write storms (e.g., `prettier --write`, snapshot updates) therefore collapse to roughly one re-list per debounce-window. `git checkout` no longer reaches this channel for `.git/` internals — those flow exclusively through `GitWatcherService` with its own 150 ms coalescing window.
 - Deleting the project folder emits `directory-watch:project-deleted` and clears internal watchers.
 - After project switching, late events from previous sessions are dropped (guarded by session token).
+- Each re-list is single-flight (#208): while a tree read runs, further refreshes queue into one follow-up read, so a burst never costs more than two reads and the renderer log's `[useProjectManagement] File tree refreshed` lines show `followUp: true` with `callers` counting the calls it served. `applied: false` on that line means the result was stale and was not shown.
 
 ---
 

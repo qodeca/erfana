@@ -1,0 +1,17 @@
+name: issue-triage
+description: Triage a GitHub issue, then give a final assessment - implement, simplify, defer or reject - and ask. No code changes.
+steps:
+  - id: kit
+    name: Snapshot the local project kit
+    command: 'bash "$(git rev-parse --path-format=absolute --git-common-dir)/../.xezar/checks/bootstrap.sh"'
+    resultScope: routine
+  - id: preflight
+    name: Report the checkout
+    command: ".xezar/checks/worktree-preflight.sh --allow-root"
+    resultScope: routine
+  - id: triage
+    name: Triage, assess and ask
+    prompt: "{{task}}"
+    skill: xezar-issue-triage
+    allowedTools: [Read, Grep, Glob, Bash]
+    bashAllowlist: ["gh pr view", "gh pr diff", "gh pr checks", "gh pr list", "gh issue view", "gh issue list", "gh label list", "gh repo view", "jq -n", "bash .xezar/checks/git-read.sh", "bash .xezar/checks/gh-write.sh", "bash .xezar/checks/verdict-write.sh", "bash .xezar/checks/phase-record.sh", "bash .xezar/checks/worktree-setup.sh --readonly-init"]

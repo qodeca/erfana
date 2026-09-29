@@ -5,7 +5,24 @@
       "args": [
         "scripts/run-mcp.js",
         "-y",
-        "@snowfort/circuit-electron@latest"
+        "@snowfort/circuit-electron@0.0.18"
+      ]
+    },
+    "xezar": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@qodeca/xezar",
+        "mcp"
+      ]
+    },
+    "chrome-devtools": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "chrome-devtools-mcp@1.10.1",
+        "--isolated",
+        "--headless"
       ]
     }
   }

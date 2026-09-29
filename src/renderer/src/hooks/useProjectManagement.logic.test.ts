@@ -33,10 +33,29 @@ import {
   isValidProjectPath,
   isFileOperationError,
   isSafeToInvokeCallback,
+  isTreeReadCurrent,
   type ProjectChangeData
 } from './useProjectManagement.logic'
 
 describe('useProjectManagement.logic', () => {
+  describe('isTreeReadCurrent (#208)', () => {
+    it('rejects a read from another project scope', () => {
+      expect(isTreeReadCurrent({ generation: 1, seq: 5 }, 2, 0)).toBe(false)
+    })
+
+    it('rejects a read that started before the last shown one', () => {
+      expect(isTreeReadCurrent({ generation: 2, seq: 3 }, 2, 4)).toBe(false)
+    })
+
+    it('rejects the read that is already shown', () => {
+      expect(isTreeReadCurrent({ generation: 2, seq: 4 }, 2, 4)).toBe(false)
+    })
+
+    it('accepts a newer read from the current scope', () => {
+      expect(isTreeReadCurrent({ generation: 2, seq: 5 }, 2, 4)).toBe(true)
+    })
+  })
+
   describe('shouldLoadLastProject', () => {
     it('should return true when mounted is true', () => {
       expect(shouldLoadLastProject(true)).toBe(true)

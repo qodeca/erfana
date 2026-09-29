@@ -15,6 +15,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { ChatBubble } from './ChatBubble'
+import { TEST_IDS } from '../../../constants/testids'
 
 // Helper to type into textarea (fireEvent.change is more reliable than userEvent in tests)
 const typeIntoTextarea = (textarea: HTMLTextAreaElement, value: string) => {
@@ -36,6 +37,14 @@ vi.mock('../../../stores/useTerminalStore', () => ({
 
 // Import after mock to get the mocked version
 import { executePromptTemplate } from '../../../utils/panelUtils'
+import { isMacOS } from '../../../utils/platform'
+
+vi.mock('../../../utils/platform', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../utils/platform')>()),
+  isMacOS: vi.fn(() => true)
+}))
+
+const mockIsMacOS = vi.mocked(isMacOS)
 
 describe('ChatBubble', () => {
   const defaultProps = {
@@ -392,6 +401,27 @@ describe('ChatBubble', () => {
       // Check tooltip becomes visible
       const tooltip = screen.getByRole('tooltip')
       expect(tooltip).toHaveClass('visible')
+    })
+
+    it('shows Ctrl+Enter, not ⌘ or "Cmd", in the send hints on Windows (#143)', () => {
+      mockIsMacOS.mockReturnValue(false)
+      render(<ChatBubble {...defaultProps} />)
+      fireEvent.click(screen.getByRole('button', { name: /open panel/i }))
+
+      const send = screen.getByTestId(TEST_IDS.CHAT_BTN_SEND)
+      expect(send).toHaveAttribute('title', 'Send (Ctrl+Enter)')
+      const tooltip = screen.getByRole('tooltip', { hidden: true })
+      expect(tooltip).toHaveTextContent('Ctrl+Enter to send')
+      expect(`${send.getAttribute('title')} ${tooltip.textContent}`).not.toMatch(/[⌘⌥⇧⌃]|Cmd/)
+    })
+
+    it('shows ⌘Enter in the send hints on macOS', () => {
+      mockIsMacOS.mockReturnValue(true)
+      render(<ChatBubble {...defaultProps} />)
+      fireEvent.click(screen.getByRole('button', { name: /open panel/i }))
+
+      expect(screen.getByTestId(TEST_IDS.CHAT_BTN_SEND)).toHaveAttribute('title', 'Send (⌘Enter)')
+      expect(screen.getByRole('tooltip', { hidden: true })).toHaveTextContent('⌘Enter to send')
     })
   })
 

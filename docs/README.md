@@ -3,6 +3,11 @@
 ## Overview
 Erfana is an agent-native Markdown workspace – an Electron app that runs a terminal coding agent such as Claude Code beside the editor, with live preview, a project tree, and a Claude Code context-window meter.
 
+## User guide
+
+- [Erfana user guide](./user-guide/README.md) – Illustrated walkthroughs and reference for people using Erfana
+- [About Erfana and Qodeca](./about.md) – Why Erfana is open source, how it is licensed, and who builds it
+
 ## Onboarding (For New Developers)
 - [Getting Started](./getting-started.md) – Day 1 setup and orientation
 - [Quick Reference](./quick-reference.md) – Command cheat sheet and common workflows
@@ -116,6 +121,8 @@ Not to be confused with **[`design/`](../design/index.html)** at the repo root, 
 - [Context-meter freeze after compaction](./designs/47-context-meter-freeze.md) - Bounded fallback read + per-file-version result cache (issue #47)
 - [Clipboard service](./designs/issue-203-clipboard-service.md) - Central text-clipboard service design (issue #203)
 - [`http://` and IPv6 in the preview](./designs/108-http-and-ipv6-in-the-preview.md) - What Chromium does with `http://` and IPv6 hosts in the HTML preview (issue #108)
+- [Illustrated user guide](./designs/138-user-guide/README.md) - Guide outline, screenshot list, demo project and capture script (issue #138, proposed); [feature inventory](./user-guide/feature-inventory.md), [research](./designs/138-user-guide/research.md), [spec and plan](./features/138-user-guide.md)
+- [README and GitHub presentation](./designs/139-readme-redesign/README.md) - Banner, demo loop, page structure and fact audit for the README redesign (issue #139)
 
 ### Future Features (Planned)
 - [Graph Engine](./future/graph-engine.md) – SQLite + vec + FTS5 knowledge graph (not yet implemented). The full specification lives in [`future/graph-engine/`](./future/graph-engine/) – 30 files covering the data model, embeddings, hybrid search, MCP server, packaging and performance, plus a milestone-by-milestone [implementation guide](./future/graph-engine/implementation-guide/) and [wireframes](./future/graph-engine/wireframes/). The `architecture-overview`, `data-model`, `packaging` and `implementation-guide/m1-backend` pages there are **superseded for M1** by SD-021 below
@@ -149,3 +156,19 @@ Archived documentation is located in [`./archive/`](./archive/):
 - [Changelog v0.8.x](./archive/changelog-v08.md) – Historical changelog entries for the v0.8 series
 - [Video import fixes (2026-03-07)](./archive/2026-03-07-video-import-fixes.md) – Completed implementation plan for video import (#110)
 - [Phase 2 closure (2026-04)](./archive/phase2-closure-2026-04.md) – Seven-stream closure plan for Windows enablement Phase 2, archived 2026-08-07
+
+## Folders added by the Xezar pipeline
+
+The pipeline's process documents sit at the repository root: [SDLC.md](../SDLC.md) (how work moves), [AGENTS.md](../AGENTS.md) (what every agent runs), [CODE_REVIEW.md](../CODE_REVIEW.md) and [BACKWARD_COMPATIBILITY.md](../BACKWARD_COMPATIBILITY.md). New pipeline designs go in `designs/<feature>/`; the single-file notes already in `designs/` and `design/` stay as they are.
+
+A folder appears when its first document does, so some of these do not exist yet.
+
+| Path | What lands there | Who it is for |
+|---|---|---|
+| `designs/` | one folder per designed feature, and the [index](designs/README.md) | whoever builds or reviews a screen |
+| `adrs/` | decision records and architecture pages (shared with the records above) | anyone about to reverse a choice |
+| `spikes/` | the findings page of a spike, never its prototype code | whoever decides after the spike |
+| `runbooks/` | what to do when an alert fires, how a release is rolled back | whoever is on call |
+| `deprecations/` | what goes, its replacement, the dates | callers of what goes |
+| `performance/` | how a number was measured, and the baselines | whoever changes a hot path |
+| `migrations/` | one page per schema, data or format move, with a `reversibility:` line | whoever runs or reviews the move |

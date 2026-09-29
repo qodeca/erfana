@@ -10,15 +10,26 @@
  * - Helper functions (getPanelsBySide, getPanelById)
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
   type ActivityBarPanel,
   activityBarPanels,
   getPanelsBySide,
   getPanelById
 } from './activityBarConfig'
+import { isMacOS } from '../../utils/platform'
+
+vi.mock('../../utils/platform', () => ({
+  isMacOS: vi.fn(() => true)
+}))
+
+const mockIsMacOS = vi.mocked(isMacOS)
 
 describe('activityBarConfig', () => {
+  beforeEach(() => {
+    mockIsMacOS.mockReturnValue(true)
+  })
+
   describe('ActivityBarPanel interface', () => {
     it('should allow requiresProject field', () => {
       const panel: ActivityBarPanel = {
@@ -214,6 +225,24 @@ describe('activityBarConfig', () => {
         expect(panel.dockviewPanelId).toBeDefined()
         expect(typeof panel.order).toBe('number')
       })
+    })
+  })
+  describe('Tooltips per platform (#143)', () => {
+    it('shows macOS glyphs on macOS', () => {
+      mockIsMacOS.mockReturnValue(true)
+      expect(getPanelById('project')?.tooltip).toBe('Project (⌘B)')
+      expect(getPanelById('search')?.tooltip).toBe('Search (⇧⌘F)')
+      expect(getPanelById('terminal')?.tooltip).toBe('Terminal (⌘J)')
+    })
+
+    it('shows Ctrl and no macOS glyph on Windows and Linux', () => {
+      mockIsMacOS.mockReturnValue(false)
+      expect(getPanelById('project')?.tooltip).toBe('Project (Ctrl+B)')
+      expect(getPanelById('search')?.tooltip).toBe('Search (Ctrl+Shift+F)')
+      expect(getPanelById('terminal')?.tooltip).toBe('Terminal (Ctrl+J)')
+      for (const panel of activityBarPanels) {
+        expect(panel.tooltip).not.toMatch(/[⌘⌥⇧⌃]|Cmd/)
+      }
     })
   })
 })

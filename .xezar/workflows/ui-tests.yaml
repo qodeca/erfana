@@ -1,0 +1,42 @@
+# A UI test run authors browser-driven tests of the running application: one user-visible
+# behaviour per test, found by role and label, standing alone, waiting on conditions. A test that
+# passed only on retry is reported flaky, never PASS. It is not QA and not a design review.
+name: ui-tests
+description: "Build or maintain automated tests that drive the real interface in a browser, through this project's browser descriptor – behaviour-named, isolated, flake-honest, with the automated accessibility scan – then gates and a draft PR."
+steps:
+  - id: kit
+    name: Snapshot the local project kit
+    command: 'bash "$(git rev-parse --path-format=absolute --git-common-dir)/../.xezar/checks/bootstrap.sh"'
+    resultScope: routine
+  - id: preflight
+    name: Verify worktree isolation
+    command: ".xezar/checks/worktree-preflight.sh"
+    resultScope: routine
+  - id: setup
+    name: Prepare the worktree
+    command: ".xezar/checks/worktree-setup.sh"
+    resultScope: routine
+  - id: author
+    name: Author the UI tests
+    prompt: "Author automated UI tests for: {{task}}. Follow xezar-ui-tests instructions: drive the browser only through this project's browser descriptor in .xezar/pipeline/browsers/, with the installed pinned runner; an unavailable browser is reported as unavailable, never as a pass. One user-visible behaviour per test, elements found by role and label, every test standing alone, conditions not sleeps. Report a test that passed only on retry as flaky with its trace, quarantine what you cannot fix with its issue, and run the accessibility scan where the tool has one. Post no QA comment and move no QA label. Finish focused checks and commits before the existing readiness, gates, evidence and PR handoff stages."
+    skill: xezar-ui-tests
+    timeout: 2h
+  - id: readiness
+    name: Confirm the phase record is complete and nothing blocks
+    command: ".xezar/checks/worktree-preflight.sh --readiness"
+    resultScope: stage
+  - id: gates
+    name: Quality gates
+    command: ".xezar/checks/repo-gates.sh --fast --producer gates"
+    resultScope: stage
+    onFail:
+      retry: author
+      max: 2
+  - id: evidence
+    name: Seal the gate evidence
+    command: ".xezar/checks/worktree-preflight.sh --record-gate-evidence"
+    resultScope: stage
+  - id: handoff
+    name: Draft PR into the base branch
+    prompt: "Hand off the UI tests for: {{task}}. Verify the sealed head and open the draft PR; make no content changes here. The body names what each test protects, every flaky or quarantined test, and what could not be automated. Independent QA and design review are separate and remain pending where the change has UI in scope."
+    skill: xezar-handoff-draft-pr

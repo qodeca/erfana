@@ -56,6 +56,7 @@ The goal is **full Windows parity** — every feature that works on macOS must w
 ## Out of scope for the first pass
 
 - ~~GitHub Actions `windows-latest` CI matrix~~ — **now live.** `checks.yml` runs an advisory `windows-checks` job (typecheck + design-sync check + `test:main`) on `windows-latest`; it is not yet a required status check.
+- Native-module rebuild on Windows – a manual, advisory `windows-native-smoke.yml` workflow proves `electron-builder install-app-deps` rebuilds node-pty and that it spawns a pty under Electron: [ci.md § Windows native smoke](../ci.md#windows-native-smoke-windows-native-smokeyml).
 - MSIX / AppX / Microsoft Store distribution.
 - Windows ARM64 native builds.
 - Linux parity gaps (tracked separately).

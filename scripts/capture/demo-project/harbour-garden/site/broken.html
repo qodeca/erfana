@@ -1,0 +1,25 @@
+<!--
+SPDX-License-Identifier: GPL-3.0-only
+SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+-->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Volunteer sign-up (draft)</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Volunteer sign-up</h1>
+      <p>This draft page has a script error on purpose.</p>
+    </header>
+    <main>
+      <p id="slots">Loading the free slots…</p>
+    </main>
+    <script>
+      // Deliberate error: the rota object was never defined.
+      document.getElementById('slots').textContent = rota.freeSlots.join(', ')
+    </script>
+  </body>
+</html>

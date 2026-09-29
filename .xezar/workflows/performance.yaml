@@ -1,0 +1,47 @@
+# A performance run builds benchmarks or load tests and judges a change against the budgets the
+# owner stated in performance.budgets. The guard step refuses before the install when there are
+# none: a project with no budget gets no verdict. Candidate against baseline, same machine, same
+# run; a single sample is never a result.
+name: performance
+description: "Build benchmarks or load tests and judge a change against the budgets in performance.budgets – candidate against baseline on the same machine, percentiles and run counts, the noise floor stated – then gates and a draft PR. Refuses where no budget is set."
+steps:
+  - id: kit
+    name: Snapshot the local project kit
+    command: 'bash "$(git rev-parse --path-format=absolute --git-common-dir)/../.xezar/checks/bootstrap.sh"'
+    resultScope: routine
+  - id: preflight
+    name: Verify worktree isolation
+    command: ".xezar/checks/worktree-preflight.sh"
+    resultScope: routine
+  - id: guard
+    name: Refuse where no performance budget is set
+    command: ".xezar/checks/config-guard.sh performance.budgets"
+    resultScope: routine
+  - id: setup
+    name: Prepare the worktree
+    command: ".xezar/checks/worktree-setup.sh"
+    resultScope: routine
+  - id: measure
+    name: Measure against the budgets
+    prompt: "Measure performance for: {{task}}. Follow xezar-performance instructions: the budgets are performance.budgets in .xezar/pipeline/config.json and you never invent or loosen one. Measure candidate against baseline on the same machine in the same run, warm up first, report the percentile each budget names with the median, spread and run count, and measure the baseline twice to state the noise floor. A difference inside the noise is no measurable change. Never load a shared or production environment without the owner's word naming it. Record the method and baselines under paths.performance. Finish focused checks and commits before the existing readiness, gates, evidence and PR handoff stages."
+    skill: xezar-performance
+    timeout: 2h
+  - id: readiness
+    name: Confirm the phase record is complete and nothing blocks
+    command: ".xezar/checks/worktree-preflight.sh --readiness"
+    resultScope: stage
+  - id: gates
+    name: Quality gates
+    command: ".xezar/checks/repo-gates.sh --fast --producer gates"
+    resultScope: stage
+    onFail:
+      retry: measure
+      max: 2
+  - id: evidence
+    name: Seal the gate evidence
+    command: ".xezar/checks/worktree-preflight.sh --record-gate-evidence"
+    resultScope: stage
+  - id: handoff
+    name: Draft PR into the base branch
+    prompt: "Hand off the performance work for: {{task}}. Verify the sealed head and open the draft PR; make no content changes here. The body carries the table of budgets – verdict, percentile, run count – the noise floor, the machine, and anything that was not measurable."
+    skill: xezar-handoff-draft-pr

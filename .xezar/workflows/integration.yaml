@@ -1,0 +1,52 @@
+# THREE STEPS AFTER THE PREFLIGHT, AND THE SPLIT IS THE POINT (#667).
+#
+# `integrate` decides and merges. `ci-watch` waits. `report` adjudicates. The middle one used to
+# live inside `integrate`'s agent turn, where the wait cost tokens, held an agent session open and
+# had no wall clock of its own — `BACKWARD_COMPATIBILITY.md` §4: an absent `timeout` leaves the
+# last interactive step uncapped, and integrate WAS the last step.
+#
+# WHAT THE OLD SINGLE STEP WAS LOAD-BEARING FOR, which is a different question from what it was
+# for: it kept an agent SESSION alive for the whole CI wait, and a live session is the only thing
+# the leader's `execution_control` `send_message` can reach (`.xezar/docs/ui-operations.md`). That
+# rescue channel is gone during the wait, because a check step has no session. What replaces it is
+# the hard bound: `ci-watch.sh` ends at its own deadline (45 minutes) rather than waiting forever.
+# The window in which the leader cannot reach this run is bounded by construction instead of being
+# open-ended.
+#
+# WHICH OUTCOMES REACH `report`, exactly: only `success`, `cancelled` and `failure`, the three the
+# watcher exits 0 for. `target.missing`/`target.invalid` (2), `unobservable` (3) and `deadline` (4)
+# end the run BEFORE `report` — correct, because there is nothing to adjudicate when the
+# observation never happened, but it also means a deadline does NOT reach the report step here.
+# (`deadline` exits 0 only when the target is a deploy; see `exit_for_outcome` in `ci-watch.sh`,
+# which is the single place that policy lives.)
+#
+# NO `onFail` HERE, DELIBERATELY. `onFail.retry` may only name an EARLIER step, and every step
+# earlier than `ci-watch` is earlier than the merge, so any retry would re-run `integrate`. So
+# there is no repair budget for the observation at all: nothing re-dispatches `ci-watch.sh`, and
+# an inconclusive observation ends the run rather than being retried.
+#
+# A check step still runs inside the run's own slot.
+# What this split saves is tokens, a parked session and an unbounded wait — NOT a workspace slot.
+name: integration
+description: Verify one explicitly authorized pull request and merge it into main, then observe merge CI without spending an agent turn on the wait.
+steps:
+  - id: kit
+    name: Snapshot the local project kit
+    command: 'bash "$(git rev-parse --path-format=absolute --git-common-dir)/../.xezar/checks/bootstrap.sh"'
+    resultScope: routine
+  - id: preflight
+    name: Verify worktree isolation
+    command: ".xezar/checks/worktree-preflight.sh"
+    resultScope: routine
+  - id: integrate
+    name: Verify the target, then merge if it is authorized
+    prompt: "{{task}}"
+    skill: xezar-integration
+  - id: ci-watch
+    name: Observe the base-branch CI run, bounded and token-free
+    command: ".xezar/checks/ci-watch.sh"
+    resultScope: stage
+  - id: report
+    name: Read the CI observation and close out the integration
+    prompt: "Close out the integration of: {{task}}"
+    skill: xezar-integration

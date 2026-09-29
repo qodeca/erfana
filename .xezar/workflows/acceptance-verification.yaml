@@ -1,0 +1,23 @@
+# Checks a finished change against each accepted criterion of its issue, by running it.
+# It changes nothing: no setup, no gates, no commits. The result is one PR comment headed
+# "## Acceptance verification". It RUNS the candidate, which is somebody else's code, so unlike
+# the reading roles its preflight does not allow the project's main checkout and its skill does not
+# carry `interactive: true` (which would seed the Worktree toggle off).
+# It is not QA – it posts no "## QA" comment and moves no label – and it is not the owner's
+# acceptance, which only the owner gives.
+name: acceptance-verification
+description: "Check a finished change against each acceptance criterion of its issue by running it – one verdict and repeatable evidence per criterion, plus what was done that nobody asked for. One comment naming the exact head SHA. Read-only, never by the author's lane."
+steps:
+  - id: kit
+    name: Snapshot the local project kit
+    command: 'bash "$(git rev-parse --path-format=absolute --git-common-dir)/../.xezar/checks/bootstrap.sh"'
+    resultScope: routine
+  - id: preflight
+    name: Verify worktree isolation
+    command: ".xezar/checks/worktree-preflight.sh"
+    resultScope: routine
+  - id: verify
+    name: Acceptance verification
+    prompt: "Acceptance verification: {{task}}. Follow xezar-acceptance instructions. List the issue's accepted criteria first, word for word; if there are none that can be checked, say so and stop – never write your own. Check out the PR's head, detached, in this run's own worktree and run it there. Give each criterion one verdict – MET, NOT MET, PARTLY MET, NOT VERIFIABLE HERE – with evidence somebody else can repeat, then say what the change does that nobody asked for. State author independence as confirmed, not confirmed or unknown from the launch text; when it is not confirmed, post nothing and stop. Post exactly one comment headed '## Acceptance verification' with the full head SHA. Post no QA comment, move no label, fix nothing."
+    skill: xezar-acceptance
+    allowedTools: [Read, Grep, Glob, Bash, mcp__chrome-devtools__navigate_page, mcp__chrome-devtools__new_page, mcp__chrome-devtools__list_pages, mcp__chrome-devtools__select_page, mcp__chrome-devtools__close_page, mcp__chrome-devtools__take_snapshot, mcp__chrome-devtools__take_screenshot, mcp__chrome-devtools__list_console_messages, mcp__chrome-devtools__get_console_message, mcp__chrome-devtools__list_network_requests, mcp__chrome-devtools__get_network_request, mcp__chrome-devtools__click, mcp__chrome-devtools__fill, mcp__chrome-devtools__fill_form, mcp__chrome-devtools__hover, mcp__chrome-devtools__press_key, mcp__chrome-devtools__type_text, mcp__chrome-devtools__wait_for, mcp__chrome-devtools__handle_dialog, mcp__chrome-devtools__resize_page, mcp__chrome-devtools__get_css_styles]

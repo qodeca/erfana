@@ -1,4 +1,11 @@
-# Getting Started
+<!--
+SPDX-License-Identifier: GPL-3.0-only
+SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+-->
+
+# Getting started (developers)
+
+For using Erfana, read the [user guide](./user-guide/README.md).
 
 Quick onboarding guide for new developers working on Erfana.
 
@@ -48,7 +55,7 @@ src/
 └── renderer/src/       # React UI
     ├── components/     # UI components
     ├── stores/         # Zustand state management
-    └── prompts/        # AI prompt templates
+    └── prompts/        # prompt templates sent to the CLI agent
 ```
 
 ## Common Workflows

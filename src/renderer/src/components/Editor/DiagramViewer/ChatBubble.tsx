@@ -44,6 +44,7 @@ import { useTextareaClipboard } from '../../../hooks/useTextareaClipboard'
 import { CharacterCount } from '../../shared'
 import { scheduleScrollIfNeeded } from '../../../utils/promptScrollScheduler.logic'
 import { logger } from '../../../utils/logger'
+import { formatShortcut } from '../../../utils/shortcutLabel'
 import { TEST_IDS } from '../../../constants/testids'
 import './ChatBubble.css'
 
@@ -586,7 +587,7 @@ export function ChatBubble({
                     aria-hidden={!showTooltip}
                   >
                     <div className="chat-tooltip-content">
-                      <kbd>Cmd/Ctrl+Enter</kbd> to send
+                      <kbd>{formatShortcut('Enter', { mod: true })}</kbd> to send
                       <br />
                       <kbd>Esc</kbd> to close
                     </div>
@@ -611,7 +612,7 @@ export function ChatBubble({
                     className="chat-send-btn"
                     onClick={handleSubmit}
                     disabled={!validation.canSubmit}
-                    title="Send (Cmd/Ctrl+Enter)"
+                    title={`Send (${formatShortcut('Enter', { mod: true })})`}
                     aria-label="Send message"
                     data-testid={TEST_IDS.CHAT_BTN_SEND}
                   >

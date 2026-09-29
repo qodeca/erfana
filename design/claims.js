@@ -133,6 +133,41 @@ window.ERFANA_CLAIMS = {
     "value": 1,
     "label": "--color-border-focus on --color-accent-primary, the ring Confirm used to draw inside its own fill",
     "card": "system/components/permission-band/index.html"
+  },
+  "contrast-gp-wordmark-dark": {
+    "value": 17.62,
+    "label": "--color-brand-white on --color-brand-black, the wordmark on the dark banner",
+    "card": "product/github-presentation/index.html"
+  },
+  "contrast-gp-wordmark-light": {
+    "value": 17.62,
+    "label": "--color-brand-black on --color-brand-white, the wordmark on the light banner",
+    "card": "product/github-presentation/index.html"
+  },
+  "contrast-gp-prompt": {
+    "value": 11.51,
+    "label": "--color-text-primary on --color-brand-black, the prompt glyph on the terminal strip",
+    "card": "product/github-presentation/index.html"
+  },
+  "contrast-gp-cursor": {
+    "value": 13.94,
+    "label": "--color-brand-lime on --color-brand-black, the cursor on the terminal strip",
+    "card": "product/github-presentation/index.html"
+  },
+  "contrast-gp-indigo-light": {
+    "value": 7.61,
+    "label": "--color-brand-indigo on --color-brand-white, the light banner accent",
+    "card": "product/github-presentation/index.html"
+  },
+  "contrast-gp-lime-light": {
+    "value": 1.26,
+    "label": "--color-brand-lime on --color-brand-white, why lime never sits on the light banner",
+    "card": "product/github-presentation/index.html"
+  },
+  "contrast-gp-violet-light": {
+    "value": 2.1,
+    "label": "--color-brand-violet on --color-brand-white, why violet is only a muted fill on light",
+    "card": "product/github-presentation/index.html"
   }
 };
 

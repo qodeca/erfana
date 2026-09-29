@@ -15,3 +15,39 @@ path = "**"
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2025-2026 Qodeca sp. z o.o."
 SPDX-License-Identifier = "GPL-3.0-only"
+
+# Xezar pipeline kit (qodeca/xezar-skills), copied in by onboarding. It keeps the
+# collection's own licence, not the project's.
+[[annotations]]
+path = [
+  ".xezar/checks/**",
+  ".xezar/workflows/**",
+  ".xezar/skills/**",
+  ".xezar/docs/**",
+  ".xezar/pipeline/trackers/**",
+  ".xezar/pipeline/toolchains/**",
+  ".xezar/pipeline/browsers/**",
+  ".xezar/pipeline/security/**",
+  ".xezar/pipeline/labels.json",
+  ".xezar/routing.schema.json",
+  ".xezar/loops.json",
+  ".xezar/.gitignore",
+  ".codex/config.toml",
+  "scripts/xezar-leader.sh",
+  "scripts/xezar-leader-settings.json",
+]
+precedence = "override"
+SPDX-FileCopyrightText = ["2026 Qodeca", "2026 Open Mercato"]
+SPDX-License-Identifier = "MIT"
+
+# README and GitHub presentation assets (#139): the banner, the wordmark, the
+# social preview and the demo loop. Copyright is GPL-3.0-only like the rest of the
+# repository, but the Erfana name, icon and wordmark in them are trademarks of
+# Qodeca sp. z o.o. (TRADEMARKS.md § Logos and brand assets): a renamed fork must
+# replace them. The blanket block above already covers these files; this one
+# records the trademark note next to them.
+[[annotations]]
+path = "docs/assets/readme/**"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2025-2026 Qodeca sp. z o.o."
+SPDX-License-Identifier = "GPL-3.0-only"
