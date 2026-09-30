@@ -108,6 +108,66 @@ describe('DirectoryWatcherService health line', () => {
     expect(healthCalls('info')).toHaveLength(0)
   })
 
+  it('#211: carries the path-filter and native-backend counters', () => {
+    const metrics = (svc as unknown as {
+      metrics: {
+        recordEventFiltered: () => void
+        recordNativeOverflow: () => void
+        recordMatcherBudgetExceeded: (count: number) => void
+      }
+    }).metrics
+    metrics.recordEventFiltered()
+    metrics.recordEventFiltered()
+    metrics.recordNativeOverflow()
+    metrics.recordMatcherBudgetExceeded(3)
+
+    vi.advanceTimersByTime(HEALTH_INTERVAL_MS)
+
+    // A native overflow alone is not stress: a split-folder overflow is a cheap re-list
+    expect(healthCalls('info')).toEqual([
+      [
+        HEALTH_MESSAGE,
+        expect.objectContaining({
+          eventsFiltered: 2,
+          nativeOverflows: 1,
+          nativeResyncs: 0,
+          matcherBudgetExceeded: 3
+        })
+      ]
+    ])
+    expect(healthCalls('warn')).toHaveLength(0)
+  })
+
+  it('#211: logs at warn once the native backend asked for a resync', () => {
+    ;(svc as unknown as { metrics: { recordNativeResync: () => void } }).metrics.recordNativeResync()
+
+    vi.advanceTimersByTime(HEALTH_INTERVAL_MS)
+
+    expect(healthCalls('warn')).toEqual([
+      [HEALTH_MESSAGE, expect.objectContaining({ nativeResyncs: 1, bufferOverflows: 0 })]
+    ])
+    expect(healthCalls('info')).toHaveLength(0)
+  })
+
+  it('#211: logs the next line at info when no new resync came since', () => {
+    const metrics = (svc as unknown as { metrics: { recordNativeResync: () => void } }).metrics
+    metrics.recordNativeResync()
+
+    vi.advanceTimersByTime(HEALTH_INTERVAL_MS)
+    vi.advanceTimersByTime(HEALTH_INTERVAL_MS)
+
+    expect(healthCalls('warn')).toHaveLength(1)
+    expect(healthCalls('info')).toEqual([[HEALTH_MESSAGE, expect.objectContaining({ nativeResyncs: 1 })]])
+
+    metrics.recordNativeResync()
+    vi.advanceTimersByTime(HEALTH_INTERVAL_MS)
+
+    expect(healthCalls('warn')).toEqual([
+      [HEALTH_MESSAGE, expect.objectContaining({ nativeResyncs: 1 })],
+      [HEALTH_MESSAGE, expect.objectContaining({ nativeResyncs: 2 })]
+    ])
+  })
+
   it('logs nothing before the first interval and nothing after stopAll()', async () => {
     vi.advanceTimersByTime(HEALTH_INTERVAL_MS - 1)
     expect(healthCalls('info')).toHaveLength(0)

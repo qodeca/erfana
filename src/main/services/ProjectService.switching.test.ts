@@ -11,10 +11,15 @@
  * - AC-009: Project switch clears old and loads new
  * - AC-014: In-flight events silently dropped during switch
  * - Session token bumping across DirectoryWatcherService and GitWatcherService
+ * - #211 W6: one path filter per project open, shared by the file service and
+ *   the directory watcher; rejected exclude entries logged without values
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { ProjectService } from './ProjectService'
+import { ProjectPathFilter } from '../utils/projectPathFilter'
+import { getPlatformConfig } from './watcher/PlatformConfig'
+import type { ResolvedProjectSettings } from '../../shared/ipc/project-settings-schema'
 import type { IFileService } from '../interfaces/IFileService'
 import type { IFileWatcherService } from '../interfaces/IFileWatcherService'
 import type { IDirectoryWatcherService } from '../interfaces/IDirectoryWatcherService'
@@ -58,11 +63,31 @@ vi.mock('fs/promises', () => ({
   realpath: vi.fn()
 }))
 
+// Real platform config by default; a test overrides case sensitivity once
+vi.mock('./watcher/PlatformConfig', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./watcher/PlatformConfig')>()
+  return { ...actual, getPlatformConfig: vi.fn(actual.getPlatformConfig) }
+})
+
 import { stat, realpath } from 'fs/promises'
 import { logger } from './LoggingService'
 
 const mockedStat = vi.mocked(stat)
 const mockedRealpath = vi.mocked(realpath)
+const mockedGetPlatformConfig = vi.mocked(getPlatformConfig)
+
+/** What ProjectSettingsService resolves; empty lists unless overridden. */
+function resolvedSettings(overrides: Partial<ResolvedProjectSettings> = {}): ResolvedProjectSettings {
+  return {
+    treeHiddenPatterns: [],
+    watcherIgnorePatterns: [],
+    excludePatterns: [],
+    excludeRejections: [],
+    ...overrides
+  }
+}
+
+const REJECTIONS_LOG = 'Project switch: files.exclude entries rejected'
 
 describe('ProjectService switching – session token orchestration', () => {
   let projectService: ProjectService
@@ -84,7 +109,8 @@ describe('ProjectService switching – session token orchestration', () => {
         callOrder.push('fileService.setProjectPath')
       }),
       getProjectPath: vi.fn(() => null),
-      setHiddenPatterns: vi.fn()
+      setHiddenPatterns: vi.fn(),
+      setPathFilter: vi.fn()
     } as any
 
     mockFileWatcherService = {
@@ -105,7 +131,7 @@ describe('ProjectService switching – session token orchestration', () => {
         callOrder.push('directoryWatcherService.stopAll')
         return Promise.resolve()
       }),
-      setIgnorePatterns: vi.fn()
+      setPathFilter: vi.fn()
     } as any
 
     mockSettingsService = {
@@ -120,12 +146,7 @@ describe('ProjectService switching – session token orchestration', () => {
     } as any
 
     mockProjectSettingsService = {
-      loadSettings: vi.fn(() =>
-        Promise.resolve({
-          treeHiddenPatterns: [],
-          watcherIgnorePatterns: []
-        })
-      ),
+      loadSettings: vi.fn(() => Promise.resolve(resolvedSettings())),
       clearSettings: vi.fn()
     } as any
 
@@ -572,6 +593,185 @@ describe('ProjectService switching – session token orchestration', () => {
       )
 
       expect(persistIndex).toBeGreaterThan(setPathIndex)
+    })
+  })
+
+  describe('#211 W6: path filter applied on project open', () => {
+    const projectPath = '/Users/test/projects/my-project'
+
+    function useSettings(overrides: Partial<ResolvedProjectSettings>): void {
+      mockProjectSettingsService.loadSettings = vi.fn(() =>
+        Promise.resolve(resolvedSettings(overrides))
+      )
+    }
+
+    function fileServiceFilter(call = 0): ProjectPathFilter {
+      return vi.mocked(mockFileService.setPathFilter).mock.calls[call][0] as ProjectPathFilter
+    }
+
+    function rejectionWarnings(): unknown[] {
+      return vi
+        .mocked(logger.warn)
+        .mock.calls.filter(([message]) => message === REJECTIONS_LOG)
+        .map(([, context]) => context)
+    }
+
+    it('hands the same filter instance to the file service and the directory watcher', async () => {
+      await projectService.switchProject(projectPath)
+
+      expect(mockFileService.setPathFilter).toHaveBeenCalledTimes(1)
+      expect(mockDirectoryWatcherService.setPathFilter).toHaveBeenCalledTimes(1)
+      const filter = fileServiceFilter()
+      expect(filter).toBeInstanceOf(ProjectPathFilter)
+      expect(vi.mocked(mockDirectoryWatcherService.setPathFilter).mock.calls[0][0]).toBe(filter)
+    })
+
+    it('builds the filter from the resolved settings, rooted at the new project', async () => {
+      useSettings({
+        excludePatterns: ['scratch', '**/test-tmp'],
+        treeHiddenPatterns: ['.git'],
+        watcherIgnorePatterns: ['dist']
+      })
+
+      await projectService.switchProject(projectPath)
+
+      const filter = fileServiceFilter()
+      expect(filter.root).toBe(projectPath)
+      expect(filter.isExcluded('scratch/a.md')).toBe(true)
+      expect(filter.isExcluded('src/test-tmp/x')).toBe(true)
+      expect(filter.isHidden('.git/index.lock')).toBe(true)
+      expect(filter.isIgnored('dist/bundle.js')).toBe(true)
+      expect(filter.shouldDrop('notes/today.md')).toBe(false)
+    })
+
+    it('still sets the hidden patterns on the file service', async () => {
+      useSettings({ treeHiddenPatterns: ['.git', '.DS_Store'] })
+
+      await projectService.switchProject(projectPath)
+
+      expect(mockFileService.setHiddenPatterns).toHaveBeenCalledWith(['.git', '.DS_Store'])
+    })
+
+    it.each([
+      [true, false],
+      [false, true]
+    ])('takes case sensitivity from the platform (caseSensitive %s → folded match %s)', async (caseSensitive, excluded) => {
+      mockedGetPlatformConfig.mockReturnValueOnce({ ...getPlatformConfig(), caseSensitive })
+      useSettings({ excludePatterns: ['scratch'] })
+
+      await projectService.switchProject(projectPath)
+
+      expect(fileServiceFilter().isExcluded('SCRATCH/a.md')).toBe(excluded)
+    })
+
+    it('applies the filter after the project path is set and before project:changed', async () => {
+      await projectService.switchProject(projectPath)
+
+      const setPathOrder = vi.mocked(mockDirectoryWatcherService.setProjectPath).mock.invocationCallOrder[0]
+      const fileFilterOrder = vi.mocked(mockFileService.setPathFilter).mock.invocationCallOrder[0]
+      const dirFilterOrder = vi.mocked(mockDirectoryWatcherService.setPathFilter).mock.invocationCallOrder[0]
+      const broadcastOrder = mockSend.mock.invocationCallOrder[0]
+      expect(fileFilterOrder).toBeGreaterThan(setPathOrder)
+      expect(dirFilterOrder).toBeGreaterThan(setPathOrder)
+      expect(broadcastOrder).toBeGreaterThan(Math.max(fileFilterOrder, dirFilterOrder))
+    })
+
+    it('builds a fresh filter on every project open', async () => {
+      await projectService.switchProject('/Users/test/projects/a')
+      mockFileService.getProjectPath = vi.fn(() => '/Users/test/projects/a')
+      await projectService.switchProject('/Users/test/projects/b')
+
+      expect(fileServiceFilter(1)).not.toBe(fileServiceFilter(0))
+      expect(fileServiceFilter(1).root).toBe('/Users/test/projects/b')
+    })
+
+    it('drops no entry of a merged list of two full sources (2 × 256)', async () => {
+      const global = Array.from({ length: 256 }, (_, i) => `global-${i}`)
+      const project = Array.from({ length: 256 }, (_, i) => `project-${i}`)
+      useSettings({ excludePatterns: [...global, ...project] })
+
+      await projectService.switchProject(projectPath)
+
+      const filter = fileServiceFilter()
+      expect(filter.excludeMatcher.size).toBe(512)
+      expect(filter.isExcluded('global-0/a.md')).toBe(true)
+      expect(filter.isExcluded('project-255/a.md')).toBe(true)
+    })
+
+    it('logs one warn per source, by index and reason only', async () => {
+      useSettings({
+        excludeRejections: [
+          { source: 'global', index: 1, reason: 'parent-segment' },
+          { source: 'project', index: 0, reason: 'drive-or-unc' },
+          { source: 'project', index: 3, reason: 'blank' }
+        ]
+      })
+
+      await projectService.switchProject(projectPath)
+
+      expect(rejectionWarnings()).toEqual([
+        { source: 'global', rejectedCount: 1, rejected: [{ index: 1, reason: 'parent-segment' }] },
+        {
+          source: 'project',
+          rejectedCount: 2,
+          rejected: [
+            { index: 0, reason: 'drive-or-unc' },
+            { index: 3, reason: 'blank' }
+          ]
+        }
+      ])
+    })
+
+    it('never logs a value, even if a rejection record carried one', async () => {
+      const leaky = {
+        source: 'project' as const,
+        index: 2,
+        reason: 'drive-or-unc',
+        value: 'C:/Users/secret-name'
+      }
+      useSettings({ excludeRejections: [leaky] })
+
+      await projectService.switchProject(projectPath)
+
+      expect(rejectionWarnings()).toEqual([
+        { source: 'project', rejectedCount: 1, rejected: [{ index: 2, reason: 'drive-or-unc' }] }
+      ])
+      expect(JSON.stringify(vi.mocked(logger.warn).mock.calls)).not.toContain('secret-name')
+    })
+
+    it('lists at most 64 rejections per source but reports the full count', async () => {
+      useSettings({
+        excludeRejections: Array.from({ length: 300 }, (_, index) => ({
+          source: 'project' as const,
+          index,
+          reason: 'too-many-entries'
+        }))
+      })
+
+      await projectService.switchProject(projectPath)
+
+      const [warning] = rejectionWarnings() as Array<{ rejectedCount: number; rejected: unknown[] }>
+      expect(warning.rejectedCount).toBe(300)
+      expect(warning.rejected).toHaveLength(64)
+    })
+
+    it('logs no rejection warning when every entry is accepted', async () => {
+      useSettings({ excludePatterns: ['scratch'] })
+
+      await projectService.switchProject(projectPath)
+
+      expect(rejectionWarnings()).toEqual([])
+    })
+
+    it('reports the merged exclude count in the settings-loaded line', async () => {
+      useSettings({ excludePatterns: ['scratch', 'tmp', '**/*.log'] })
+
+      await projectService.switchProject(projectPath)
+
+      expect(logger.debug).toHaveBeenCalledWith(
+        'Project switch: settings loaded',
+        expect.objectContaining({ excludePatternCount: 3 })
+      )
     })
   })
 })

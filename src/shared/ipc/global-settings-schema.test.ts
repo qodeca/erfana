@@ -109,6 +109,9 @@ describe('GlobalSettingsSchema', () => {
         },
         htmlPreview: {
           enabled: true
+        },
+        files: {
+          exclude: ['tmp']
         }
       }
 
@@ -135,6 +138,9 @@ describe('GlobalSettingsSchema', () => {
         },
         htmlPreview: {
           enabled: true
+        },
+        files: {
+          exclude: ['tmp']
         }
       }
 
@@ -182,6 +188,47 @@ describe('GlobalSettingsSchema', () => {
     })
   })
 
+  describe('files.exclude (Issue #211)', () => {
+    it('defaults a missing files section to an empty exclude list', () => {
+      const result = GlobalSettingsSchema.parse({})
+      expect(result.files).toEqual({ exclude: [] })
+    })
+
+    it('keeps a valid exclude list', () => {
+      const result = GlobalSettingsSchema.parse({ files: { exclude: ['tmp', '**/test-tmp'] } })
+      expect(result.files.exclude).toEqual(['tmp', '**/test-tmp'])
+    })
+
+    it.each([
+      ['a number', 42],
+      ['a string', 'tmp'],
+      ['null', null],
+      ['an array', ['tmp']]
+    ])('never fails when files is %s, and keeps every other value', (_label, files) => {
+      const result = GlobalSettingsSchema.safeParse({
+        logging: { level: 'debug' },
+        gitStatus: { pollingEnabled: false, pollingInterval: 3000 },
+        files
+      })
+
+      expect(result.success).toBe(true)
+      expect(result.data?.files).toEqual({ exclude: [] })
+      expect(result.data?.logging.level).toBe('debug')
+      expect(result.data?.gitStatus).toEqual({ pollingEnabled: false, pollingInterval: 3000 })
+    })
+
+    it('never fails when exclude is not an array', () => {
+      const result = GlobalSettingsSchema.safeParse({ files: { exclude: 'tmp' } })
+      expect(result.success).toBe(true)
+      expect(result.data?.files).toEqual({ exclude: [] })
+    })
+
+    it('keeps a non-string entry as an empty string so indexes stay stable', () => {
+      const result = GlobalSettingsSchema.parse({ files: { exclude: ['a', 7, 'b'] } })
+      expect(result.files.exclude).toEqual(['a', '', 'b'])
+    })
+  })
+
   describe('type inference', () => {
     it('infers correct type for logging.level', () => {
       const settings: GlobalSettings = {
@@ -202,6 +249,9 @@ describe('GlobalSettingsSchema', () => {
         },
         htmlPreview: {
           enabled: true
+        },
+        files: {
+          exclude: []
         }
       }
 
@@ -217,7 +267,8 @@ describe('GlobalSettingsSchema', () => {
         editor: { preserveLineBreaks: false },
         gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
         transcription: { backend: 'openai', openaiApiKeyStored: false, whisperModel: 'base' },
-        htmlPreview: { enabled: true }
+        htmlPreview: { enabled: true },
+        files: { exclude: [] }
       }
       expect(validSettings.logging.level).toBe('info')
     })
@@ -279,5 +330,10 @@ describe('getDefaultGlobalSettings', () => {
   it('returns transcription.whisperModel as base by default', () => {
     const defaults = getDefaultGlobalSettings()
     expect(defaults.transcription.whisperModel).toBe('base')
+  })
+
+  it('returns files.exclude as an empty list by default (Issue #211)', () => {
+    const defaults = getDefaultGlobalSettings()
+    expect(defaults.files).toEqual({ exclude: [] })
   })
 })

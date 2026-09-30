@@ -9,6 +9,7 @@ import { fileWatcherService } from '../services/FileWatcherService'
 import { directoryWatcherService } from '../services/DirectoryWatcherService'
 import { settingsService } from '../services/SettingsService'
 import { projectSettingsService } from '../services/ProjectSettingsService'
+import { globalSettingsService } from '../services/GlobalSettingsService'
 import { projectLockService } from '../services/ProjectLockService'
 import type { ProjectChanged } from '../../shared/ipc/schema'
 import {
@@ -48,6 +49,13 @@ const projectService = new ProjectService(
   settingsService,
   projectSettingsService,
   projectLockService
+)
+
+// Issue #211 (design D7): the global `files.exclude` list is merged ahead of
+// each project's list. Read lazily, so it reflects the settings loaded at app
+// start, whenever a project is opened.
+projectSettingsService.setGlobalExcludeProvider(
+  () => globalSettingsService.getSetting('files').exclude
 )
 
 /**

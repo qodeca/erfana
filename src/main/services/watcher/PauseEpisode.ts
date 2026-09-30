@@ -21,6 +21,9 @@
  *   still counts.
  * - `change` events never count: content edits do not alter the tree, and the
  *   operations refresh git status separately.
+ * - A drop with no known path (the native Windows watcher lost events and asked
+ *   for a resync, #211 D13) counts as one structural drop that no own change
+ *   can explain; a completed owner read that began after it covers it.
  *
  * Pure: no Electron, no filesystem access.
  */
@@ -94,6 +97,19 @@ export class PauseEpisode {
     }
     const kind = STRUCTURAL_EVENT_KIND[type]
     if (!kind || this.isOwnChange(kind, eventPath)) {
+      return
+    }
+    this.droppedTotal++
+  }
+
+  /**
+   * Record a drop whose paths are unknown – a watcher resync during the pause
+   * (#211, D13). It counts as one structural drop, never filtered as an own
+   * change, since nothing says where the lost changes were.
+   */
+  recordUnknownDrop(): void {
+    // Once the cap forced a catch-up, counting further drops changes nothing
+    if (this.forceCatchUp) {
       return
     }
     this.droppedTotal++

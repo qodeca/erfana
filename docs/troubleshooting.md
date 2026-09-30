@@ -158,21 +158,21 @@ const watcher = chokidar.watch(filePath, {
 **Debug Steps:**
 1. Check directory watcher is active
 2. Verify the debounce: the main-process directory watcher runs with `awaitWriteFinish: false` (`DirectoryWatcherService.ts`); the renderer debounces the resulting `directory-watch:changed` events by `DIRECTORY_WATCHER.DEBOUNCE_DELAY` (250 ms, `ProjectTree/constants.ts`)
-3. Check ignored patterns (`node_modules`, `.git`, build output, virtualenvs, …)
+3. Check whether the path is dropped: excluded (`files.exclude`), hidden (`tree.hiddenPatterns`, e.g. `.git`) or ignored (`watcher.ignoreList`: `node_modules`, build output, virtualenvs, …)
 
 **Solution:**
-If the file is in an ignored directory, create it elsewhere or update the ignore patterns. The default list is `DEFAULT_WATCHER_IGNORE_PATTERNS` in `src/shared/constants.ts`; `DirectoryWatcherService.ts` applies it through a function-based `ignored` predicate (`shouldIgnorePath`), not an inline array:
+If the file is in a dropped directory, create it elsewhere or change the list that drops it. One project path filter (`ProjectPathFilter`, `src/main/utils/projectPathFilter.ts`) decides this for the tree walk and both watcher backends: its `shouldDrop(rel)` tests the **project-relative** path against the exclude list, the hidden names and the ignore patterns (default ignore list: `DEFAULT_WATCHER_IGNORE_PATTERNS` in `src/shared/constants.ts`). `DirectoryWatcherService.ts` asks it from chokidar's function-based `ignored` predicate (`shouldDropAbs`), from the Windows native watcher's `shouldDrop` option (`shouldDropWatchRel`) and, as a backstop for every event, in `queueEvent` (`shouldDropAbs`):
 ```typescript
-// src/main/services/DirectoryWatcherService.ts
-const watcher = chokidar.watch(dirPath, {
+// src/main/services/DirectoryWatcherService.ts (createChokidarWatcher)
+chokidar.watch(dirPath, {
   persistent: true,
   ignoreInitial: true,
-  ignored: (path) => this.shouldIgnorePath(path), // backed by DEFAULT_WATCHER_IGNORE_PATTERNS
+  ignored: (path: string) => this.shouldDropAbs(path, dirPath), // project path filter
   awaitWriteFinish: false,
   // ...
 })
 ```
-Per-project overrides go in `.erfana/settings.json` ignore patterns.
+Per-project overrides go in `.erfana/settings.json` (`files.exclude`, `watcher.ignoreList`, `tree.hiddenPatterns`); `ProjectService` builds the filter when the project opens and hands it to the watcher with `setPathFilter`, so a change applies after the project is reopened.
 
 ---
 

@@ -230,7 +230,7 @@ Global settings are stored in:
 
 ### Changing log level
 
-- **Settings file**: Edit `~/.erfana/settings.json` → `{ "logging": { "level": "debug" } }`. Applied immediately (no restart).
+- **Settings file**: Edit `~/.erfana/settings.json` → `{ "logging": { "level": "debug" } }` while Erfana is closed; the file is read only at start. An edit made while Erfana runs is ignored and is overwritten by the next change made in Settings.
 - **Settings UI**: Gear icon → Logging section → dropdown. Applied immediately.
 - **Programmatically**: `globalSettingsService.setSetting('logging', { level: 'debug' })` (`GlobalSettingsService.setSetting` – there is no `updateSetting`)
 
@@ -284,7 +284,7 @@ Performance instrumentation added for large-project debugging (#151):
 - **Timing**: `GitStatus: completed` with `strategy`, `durationMs`, `fileCount`, `truncated` (info level)
 - **File operations**: `FileService: readDirectory completed` with `durationMs`, `fileCount` (info level); since #208 one of five `readDirectory` lines for tree walks, all carrying `pathDigest`, and a `readId` (`behindReadId` on the joined line) – see [Tree reads and memory](#tree-reads-and-memory-208)
 - **Project switch**: Per-stage logging with `durationMs` for failure identification
-- **Watcher health**: `DirectoryWatcherService` logs a health snapshot every 120s – `info` level since #208 (`warn` when the watcher is stressed), so it reaches `main.log` at the default level, and it now carries process memory; see [Tree reads and memory](#tree-reads-and-memory-208)
+- **Watcher health**: `DirectoryWatcherService` logs a health snapshot every 120s – `info` level since #208 (`warn` when the watcher is stressed), so it reaches `main.log` at the default level, and it now carries process memory; see [Tree reads and memory](#tree-reads-and-memory-208). Since #211 it also carries the path-filter and Windows-backend counters – see [Large projects on Windows](#large-projects-on-windows-211)
 - **Buffer pressure**: `ThrottledWorker` logs at 80% and 50% buffer capacity (warn/info level)
 - **Rate-limited errors**: `RateLimitedLogger` (`src/main/utils/RateLimitedLogger.ts`) prevents log spam during cascading EMFILE errors (10s default cooldown)
 
@@ -316,7 +316,7 @@ A very large project that kept changing made Erfana exit on Windows with nothing
 | Line | Level | When | Context |
 |------|-------|------|---------|
 | `FileService: readDirectory started` | info | A walk starts | `readId`, `pathDigest`, `followUp`, `callers` |
-| `FileService: readDirectory completed` | info | A walk succeeded | `durationMs`, `fileCount`, `dirCount`, `hiddenPatternCount`, `maxDepth`, plus `readId`, `pathDigest`, `followUp`, `callers` |
+| `FileService: readDirectory completed` | info | A walk succeeded | `durationMs`, `fileCount`, `dirCount`, `hiddenPatternCount`, `maxDepth`, the #211 exclude counts (`excludePatternCount`, `excludedEntryCount`, `walkHintCount`, `matcherBudgetExceeded` – see [Large projects on Windows](#large-projects-on-windows-211)), plus `readId`, `pathDigest`, `followUp`, `callers` |
 | `FileService: readDirectory failed` | warn | A walk rejected (only the root `readdir` can fail one; sub-folder errors are recovered) | `readId`, `pathDigest`, `durationMs` |
 | `FileService: readDirectory still running` | warn | Once per walk, `READ_DIRECTORY_SLOW_WARN_MS` (60 s) after it started | `readId`, `pathDigest`, `elapsedMs` |
 | `FileService: readDirectory joined follow-up read` | info | A call arrived while a walk of that path ran and was queued behind it | `pathDigest`, `behindReadId` |
@@ -354,6 +354,43 @@ Reading notes:
 - The health line adds about 30 `info` lines an hour while a project is open; rotation absorbs it.
 - The handler's `file:readDirectory IPC completed` `durationMs` now includes time spent waiting behind a running walk of the same path, so it can be much larger than the walk's own `durationMs`.
 - Debug-level companions, for a `debug` session: `File tree refresh skipped – project changed`, `File tree refresh skipped – stale caller`, `File tree refresh failed for a project no longer open` and `Stale project load failed; ignored`, all prefixed `[useProjectManagement]`.
+
+### Large projects on Windows (#211)
+
+The `files.exclude` list, the project path filter and the Windows native directory watcher ([File watching § Watch backends](./file-watching/README.md#watch-backends-211)). Every line below carries counts, durations, codes and fixed reason strings only – never a path, an exclude entry's text or a Node error message (which quotes absolute paths).
+
+**New lines** (`main.log`):
+
+| Line | Level | When | Context |
+|------|-------|------|---------|
+| `Project switch: files.exclude entries rejected` | warn | A project opens and a settings file has entries that break the rules; one line per source | `source` (`global` / `project`), `rejectedCount`, `rejected` – the first 64 `{ index, reason }` |
+| `Exclude patterns disabled: match budget exceeded` | warn | Once per project session, when 100 pattern tests have run out of budget and pattern entries switch off | `budgetExceeded`, `patternEntryCount` |
+| `Directory watcher backend selected` | info | Once, at the first directory watch | `backend` (`chokidar` / `native-recursive`) |
+| `Directory watcher override ignored: unknown value` | warn | `ERFANA_DIRECTORY_WATCHER` is set to anything but `chokidar` | `variable`, `accepted` (the value itself is not logged) |
+| `Native directory watcher ready` | info | Windows: the watcher's plan is complete | `recursiveWatches`, `splitFolders`, `walkHints`, `planCapped`, `elapsedMs` |
+| `Directory watcher resync` | info | Windows: lost events were answered by a catch-up re-read (or counted into a pause) | `reason` (`overflow`, `backlog`, `watch-error`, `reopen`), `paused`, `suppressedCount` – at most one line per 10 s |
+| `Directory watch failed to start, restart scheduled` | info | A watch could not be built and a restart was scheduled | `errorType` |
+| `Native watcher: handle cap reached, folder left unwatched` | warn | The 512-handle cap was hit | `maxHandles` |
+| `Native watcher: a watch failed to open` | warn | `fs.watch` refused a folder (other than as gone) | `code`, `recursive` |
+| `Native watcher: listing a split folder failed, watching it recursively` | warn | A split folder could not be listed during the plan | `code` |
+| `Native watcher: a watch reported an error` | warn | A handle emitted an `error`; it is closed and re-checked | `code`, `recursive` |
+| `Native watcher: folder left unwatched after repeated re-opens` | warn | A path hit the 3-per-60 s re-open cap | `reopenLimit`, `windowMs`, `unwatched` |
+| `Native watcher: resolving the root failed, watching it as given` | warn | `realpathSync.native` failed other than as gone | `code` |
+| `Native watcher: closing a watch failed`, `Native watcher: error with no listener`, `Native watcher: background task failed`, `Native classifier: listener failed` | warn | Defensive paths | `code` |
+
+Every `Native watcher: …` warning is rate-limited per kind to one line per 10 s and carries `suppressedCount`. `Native watcher: listing a folder failed` (`code`) is its debug-level companion.
+
+**New fields on existing lines:**
+
+- `FileService: readDirectory completed` – `excludePatternCount` (entries in the compiled list), `excludedEntryCount` (entries this walk skipped without reading), `walkHintCount` (hints a root walk stored for the Windows plan; 0 for any other walk), `matcherBudgetExceeded` (pattern tests in this walk that ran out of budget).
+- `Project switch: settings loaded` (debug) – `excludePatternCount`.
+- `DirectoryWatcher health` – `eventsFiltered` (events dropped as excluded, hidden, ignored or outside the project), `nativeOverflows` (Windows change-buffer overflows), `nativeResyncs` (catch-up re-reads the native backend asked for), `matcherBudgetExceeded`. The counters are cumulative. A growth in `nativeResyncs` since the previous health line now also counts as stress and logs the line at `warn`; a resync that happened before the previous line no longer does.
+
+Reading notes:
+
+- A burst of changes only inside excluded, hidden or ignored folders leaves no `📁 Directory changed` and no `FileService: readDirectory started` line; `eventsFiltered` grows instead.
+- `planCapped: true` on the ready line, or a `handle cap reached` warning, means some dropped folder still sits inside a recursive watch; heavy churn there can cost a resync. Reopening the project re-plans with fresh walk hints.
+- `RateLimitedLogger` measures its window from process start, so a resync line in roughly the first 10 s after Erfana starts is counted in the next line's `suppressedCount` instead of being written (pre-existing behaviour; the EMFILE line shares it).
 
 ## Related documentation
 

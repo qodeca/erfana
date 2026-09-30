@@ -110,7 +110,7 @@ export const TEXT_INPUT_LIMITS = {
 
 /**
  * Default watcher ignore patterns (performance optimization)
- * These directories cause chokidar performance issues (50K+ files)
+ * These directories cause directory-watcher performance issues (50K+ files)
  *
  * @see DirectoryWatcherService.ts - uses these patterns
  * @see Issue #63 - project-level settings
@@ -128,7 +128,7 @@ export const DEFAULT_WATCHER_IGNORE_PATTERNS = [
   '.virtualenv',
   'virtualenv',
   '.conda',
-  // Git internals (keeps .git/HEAD, .git/config, .git/refs watched)
+  // Git internals. By default the directory watcher drops all of .git (a tree-hidden name, #211); these apply when a project's tree.hiddenPatterns replaces the defaults without .git. Git state reaches the renderer via GitWatcherService.
   '.git/objects',
   '.git/subtree-cache',
   '.git/lfs',

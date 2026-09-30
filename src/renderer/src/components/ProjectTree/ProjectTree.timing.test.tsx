@@ -9,9 +9,10 @@
  * - useProjectManagement: Handles file loading (readDirectory) on project change
  * - useDirectoryWatcher: Starts watcher based on projectPath + initialLoadComplete
  *
- * Current behavior: Watcher start and file loading are NOT causally linked.
- * The watcher starts when projectPath is set, independent of readDirectory completion.
- * This is intentional - the watcher doesn't need files to watch the directory.
+ * Watcher start is causally linked to the first tree read (#211, D12): the
+ * directory watcher starts only once the first readDirectory of the project
+ * has settled, so the watcher's own walk never competes with the first tree
+ * read on a large project.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -32,12 +33,13 @@ describe('ProjectTree project switching timing', () => {
     ;(window as any).api = undefined
   })
 
-  it('starts watcher when projectPath is set (independent of readDirectory)', async () => {
-    // This test documents actual behavior: watcher starts based on projectPath,
-    // not dependent on readDirectory completion.
-
+  it('starts the watcher only after the first readDirectory resolves', async () => {
     const start = vi.fn(async () => ({ success: true }))
-    const readDirectory = vi.fn(async () => [])
+    // Deferred first read: the test decides when it lands.
+    let resolveRead: (tree: unknown[]) => void = () => {}
+    const readDirectory = vi.fn(
+      () => new Promise<unknown[]>((resolve) => { resolveRead = resolve })
+    )
 
     let onProjectChangedCallback: ((data: { newPath: string | null; oldPath: string | null }) => void) | null = null
 
@@ -106,11 +108,20 @@ describe('ProjectTree project switching timing', () => {
       onProjectChangedCallback!({ newPath: '/proj', oldPath: null })
     })
 
-    // Both should be called - they are independent operations
     await waitFor(() => {
       expect(readDirectory).toHaveBeenCalledWith('/proj')
+    })
+    // The read is still pending: the gate is closed.
+    expect(start).not.toHaveBeenCalled()
+
+    await act(async () => {
+      resolveRead([])
+    })
+
+    await waitFor(() => {
       expect(start).toHaveBeenCalledWith('/proj')
     })
+    expect(start).toHaveBeenCalledTimes(1)
   })
 
   it('does not start watcher when no project path is set', async () => {

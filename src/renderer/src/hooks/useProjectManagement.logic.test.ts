@@ -27,7 +27,6 @@ import {
   createRefreshErrorLog,
   createOpenProjectErrorLog,
   createCloseProjectErrorLog,
-  shouldMarkInitialLoadComplete,
   extractProjectName,
   formatProjectPath,
   isValidProjectPath,
@@ -253,25 +252,6 @@ describe('useProjectManagement.logic', () => {
 
     it('createCloseProjectErrorLog should return consistent message', () => {
       expect(createCloseProjectErrorLog()).toBe('Error closing project:')
-    })
-  })
-
-  describe('shouldMarkInitialLoadComplete', () => {
-    it('should return true when lastPath and fileTree are valid', () => {
-      expect(shouldMarkInitialLoadComplete('/test/project', [])).toBe(true)
-      expect(shouldMarkInitialLoadComplete('/test/project', [{ name: 'file' }])).toBe(true)
-    })
-
-    it('should return false when lastPath is null', () => {
-      expect(shouldMarkInitialLoadComplete(null, [])).toBe(false)
-    })
-
-    it('should return false when fileTree is null', () => {
-      expect(shouldMarkInitialLoadComplete('/test/project', null as any)).toBe(false)
-    })
-
-    it('should return false when fileTree is undefined', () => {
-      expect(shouldMarkInitialLoadComplete('/test/project', undefined as any)).toBe(false)
     })
   })
 

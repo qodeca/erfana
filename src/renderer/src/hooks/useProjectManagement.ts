@@ -12,6 +12,8 @@
  * - Handle project closing with confirmations
  * - Token-based race guards for async operations
  * - Single-flight tree refresh with stale-result dropping (#208)
+ * - Watcher gate: the directory watcher starts only after the first tree read
+ *   of the current project has settled (#211, D12)
  * - Error handling and user notifications
  *
  * Extracted from ProjectTree.tsx (lines 102-332, ~230 lines)
@@ -40,7 +42,6 @@ import {
 } from '../components/ProjectTree/switchHelpers'
 import {
   shouldOpenExternalProject,
-  shouldMarkInitialLoadComplete,
   shouldRefreshFiles,
   createProjectOpenedMessage,
   createProjectClosedMessage,
@@ -77,7 +78,11 @@ export function useProjectManagement(
   const [loading, setLoading] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
   const [isSwitchingProject, setIsSwitchingProject] = useState<boolean>(false)
-  const initialLoadCompleteRef = useRef<boolean>(false)
+  // True from the moment a project-changed open starts its first tree read
+  // until that read (or the read that superseded it) settles, success or
+  // failure (#211, D12). Keeps the directory watcher from walking the project
+  // at the same time as the first tree read on a large project.
+  const [firstReadPending, setFirstReadPending] = useState<boolean>(false)
   const switchTokenRef = useRef<number>(0)
 
   // Tree-read guards (#208). Separate from switchTokenRef on purpose: that
@@ -123,11 +128,18 @@ export function useProjectManagement(
       const supersedesPendingLoad = pendingLoadGenerationRef.current === refreshGenerationRef.current
       const runner = beginRefreshScope(path)
       if (path !== null && supersedesPendingLoad) {
+        // The gate stays closed until the replacement read settles.
         reloadSupersededTree(runner)
       } else {
         setLoading(false)
+        // Close, or main's no-op re-open (no project-changed event follows),
+        // so no first read is coming for this scope: open the gate.
+        setFirstReadPending(false)
       }
     }
+    // NOTE: the same-path branch never touches firstReadPending (#211, M1).
+    // The IPC reply of a normal open lands here while the listener's first
+    // read is still pending; clearing the flag would start the watcher early.
     setProjectPath(path)
   }
 
@@ -143,7 +155,10 @@ export function useProjectManagement(
   const reloadSupersededTree = (runner: CoalescingRunner<void>): void => {
     const generation = refreshGenerationRef.current
     const endSpinner = (): void => {
-      if (generation === refreshGenerationRef.current) setLoading(false)
+      if (generation === refreshGenerationRef.current) {
+        setLoading(false)
+        setFirstReadPending(false)
+      }
     }
     runner.run((info) => runRefreshRead(generation, info)).then(endSpinner, endSpinner)
   }
@@ -162,10 +177,9 @@ export function useProjectManagement(
   }
 
   // Load last project on mount - DISABLED
-  // Now shows welcome screen with recent projects instead of auto-loading
+  // Now shows welcome screen with recent projects instead of auto-loading.
+  // Crash recovery relies on this: never reopen the last project here (#60).
   useEffect(() => {
-    // Mark initial load as complete immediately (no auto-load)
-    initialLoadCompleteRef.current = true
     setLoading(false)
   }, [])
 
@@ -192,6 +206,9 @@ export function useProjectManagement(
         // New project opened externally
         // Clear old project files immediately before loading new ones
         setProjectPath(newPath)
+        // Same synchronous block as setProjectPath, before the await: the
+        // render that remounts ProjectTree must already see the gate closed.
+        setFirstReadPending(true)
         setFiles([]) // Clear tree to show empty state during transition
         const ticket = takeReadTicket(generation)
         pendingLoadGenerationRef.current = generation
@@ -207,9 +224,6 @@ export function useProjectManagement(
           }
           const applied = applyTreeIfCurrent(ticket, fileTree)
           logger.info('[useProjectManagement] File tree loaded', { durationMs: treeLoadDuration, itemCount: fileTree.length, applied })
-          if (shouldMarkInitialLoadComplete(newPath, fileTree)) {
-            initialLoadCompleteRef.current = true
-          }
           // Show success toast after files are loaded
           showGlobalToast({
             type: 'success',
@@ -230,8 +244,13 @@ export function useProjectManagement(
           })
         } finally {
           if (pendingLoadGenerationRef.current === generation) pendingLoadGenerationRef.current = null
-          // A newer open owns the spinner once this load is superseded.
-          if (generation === refreshGenerationRef.current) setLoading(false)
+          // A newer open owns the spinner and the watcher gate once this load
+          // is superseded. On failure the gate still opens, so the watcher can
+          // heal the tree once the folder becomes readable.
+          if (generation === refreshGenerationRef.current) {
+            setLoading(false)
+            setFirstReadPending(false)
+          }
         }
       } else {
         // Project closed externally
@@ -240,6 +259,7 @@ export function useProjectManagement(
         setFiles([])
         // Clears a spinner left by an open-load this close superseded.
         setLoading(false)
+        setFirstReadPending(false)
         showGlobalToast({
           type: 'info',
           title: 'Project Closed',
@@ -474,7 +494,7 @@ export function useProjectManagement(
     loading,
     error,
     isSwitchingProject,
-    initialLoadComplete: initialLoadCompleteRef.current,
+    initialLoadComplete: projectPath !== null && !firstReadPending,
     handleOpenProject,
     handleCloseProject,
     handleOpenProjectByPath,
