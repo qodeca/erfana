@@ -67,13 +67,7 @@ Phases 0–2 of Windows enablement shipped in **v0.9.3** (2026-04-22); Phase 4 (
 
 ### `npm run test:cov` exits 1 on Windows
 
-**Issue**: Every test passes; what fails are two **per-file** coverage thresholds declared in `vitest.main.ts` — `scripts/fuses.js` (86% lines / 88% functions) and `src/main/utils/tarArchive.ts` (90% each metric). Both suites skip their symlink cases on win32, because a file symlink needs `SeCreateSymbolicLinkPrivilege`: `scripts/fuses.test.mjs` carries six `skipIf(process.platform === 'win32')` guards, and `src/main/utils/tarArchive.test.ts:77` returns early. The lines those cases would cover never execute, so both file-level floors miss by a few points and vitest exits 1.
-
-Measured on a Windows host on 2026-09-15: those two are the **only** misses. All twelve #124 per-file preview floors pass there, and so do the renderer and preload floors.
-
-**The script itself has two further defects**, tracked as [#133](https://github.com/qodeca/erfana/issues/133): `scripts/test-cov.mjs` runs each config without `--project`, so `vitest.workspace.ts` auto-discovery expands every pass to all three projects and the suite runs about three times per invocation; and its `spawnSync(…, {stdio: 'inherit'})` output does not reach a redirected log on Windows, so a failing run shows only `Command failed (1): …` with no threshold lines at all.
-
-**Workaround**: None on a Windows host for the floors themselves — the run is doing what it is told. Run it on macOS or Linux, or read the CI result: the required `Coverage` job runs on `ubuntu-latest`, where nothing is skipped and it passes. To see *which* floor missed on Windows, run the underlying command directly rather than through the script: `npx vitest --run --config vitest.main.ts --project main --coverage`.
+**Resolved 2026-09-30.** `npm run test:cov` passes on a Windows host. It used to fail for two reasons: the runner spawned `npx.cmd` without a shell, which a current Node rejects with `EINVAL` before any test runs, and the symlink cases behind the `scripts/fuses.js` and `src/main/utils/tarArchive.ts` per-file floors were skipped on win32. The runner now starts vitest through `node`, the tar tests build their fixtures without a real symlink, and the fuses tests gate only their POSIX mode-bit assertions. On a Windows host without symlink privilege (no Developer Mode, not elevated) the symlink cases still skip, and both floors still hold.
 
 **Tracking**: [`docs/windows/known-flakes.md` § `npm run test:cov` cannot pass on a Windows host](./windows/known-flakes.md#npm-run-testcov-cannot-pass-on-a-windows-host).
 

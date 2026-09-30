@@ -4,13 +4,15 @@
 //
 // Responsibilities:
 //   1. Remove any previous `coverage/` output.
-//   2. Stash the existing `out/` directory (if any) into `temp/.out_backup`.
-//      electron-vite writes to `out/`; vitest with coverage can clobber it,
-//      so we preserve it for the developer.
-//   3. Run vitest with coverage for each workspace project (main, preload, renderer),
+//   2. Run vitest with coverage for each workspace project (main, preload, renderer),
 //      scoped with `--project <name>` to match the CI Coverage job.
-//   4. Always restore the `out/` directory from the backup, even on failure.
-//   5. Exit non-zero if any pass failed, naming every project that missed a floor.
+//   3. Exit non-zero if any pass failed, naming every project that missed a floor.
+//
+// It leaves the electron-vite `out/` build alone. The bash original moved it to
+// `temp/.out_backup` and back, but nothing here writes to `out/` (reports go to
+// `coverage/<project>`, and all three configs exclude `out/`), and on Windows
+// the move back fails whenever something watches `out/` (an editor, a running
+// Erfana with the project open), stranding the build in the backup folder.
 //
 // This script replaces a bash one-liner that could not run on Windows
 // (issue #153 — Phase 0 of the Windows enablement roadmap).
@@ -21,16 +23,14 @@
 // `--project` is therefore load-bearing, exactly as it is in checks.yml.
 
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, renameSync, rmSync } from 'node:fs'
+import { existsSync, rmSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 import { projects, coverageArgs } from './lib/test-cov-projects.mjs'
 
 const root = resolve(process.cwd())
 const coverageDir = resolve(root, 'coverage')
-const outDir = resolve(root, 'out')
-const tempDir = resolve(root, 'temp')
-const backupDir = resolve(tempDir, '.out_backup')
+const vitestEntry = resolve(root, 'node_modules', 'vitest', 'vitest.mjs')
 
 // The three workspace projects (and the `--project` scoping that keeps each
 // pass to its own suite) live in ./lib/test-cov-projects.mjs, so the regression
@@ -43,57 +43,40 @@ const backupDir = resolve(tempDir, '.out_backup')
  * pass must not stop the remaining projects, because one project's missed floor
  * must not hide the other two's (issue #133).
  */
-function runPass(npx, project) {
-  const args = coverageArgs(project)
-  const result = spawnSync(npx, args, { stdio: 'inherit', shell: false })
+function runPass(project) {
+  // Run vitest's own entry file with this Node, not `npx`. On Windows `npx` is
+  // `npx.cmd`, and Node refuses to spawn a `.cmd` without a shell (EINVAL since
+  // the CVE-2024-27980 fix), so every pass failed before a single test ran.
+  const [, ...vitestArgs] = coverageArgs(project)
+  const args = [vitestEntry, ...vitestArgs]
+  const result = spawnSync(process.execPath, args, { stdio: 'inherit', shell: false })
   if (result.status === 0) return null
+  // A pass that never started has no vitest output of its own; say why.
+  if (result.error) {
+    console.error(`\n${project.name}: could not start vitest: ${result.error.message}`)
+  }
   const code = typeof result.status === 'number' ? result.status : 1
-  return { project: project.name, code, command: `${npx} ${args.join(' ')}` }
-}
-
-function stashOut() {
-  if (!existsSync(outDir)) return false
-  mkdirSync(tempDir, { recursive: true })
-  // If a previous run crashed and left a stale backup, drop it.
-  if (existsSync(backupDir)) rmSync(backupDir, { recursive: true, force: true })
-  renameSync(outDir, backupDir)
-  return true
-}
-
-function restoreOut(stashed) {
-  if (!stashed) return
-  if (!existsSync(backupDir)) return
-  if (existsSync(outDir)) rmSync(outDir, { recursive: true, force: true })
-  renameSync(backupDir, outDir)
+  return { project: project.name, code, command: `node ${args.join(' ')}` }
 }
 
 async function main() {
   // Step 1: clean previous coverage output.
   if (existsSync(coverageDir)) rmSync(coverageDir, { recursive: true, force: true })
 
-  // Step 2: stash `out/` so vitest coverage runs don't clobber the dev build.
-  const stashed = stashOut()
-
-  const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx'
   const failures = []
 
-  try {
-    // Step 3: run coverage once per workspace project, scoped with `--project`.
-    for (const project of projects) {
-      const failure = runPass(npx, project)
-      if (!failure) continue
-      // Name the project as soon as it fails, then keep going.
-      console.error(
-        `\nFAILED: ${project.name} coverage (exit ${failure.code}): ${failure.command}`
-      )
-      failures.push(failure)
-    }
-  } finally {
-    // Step 4: always restore the dev build directory.
-    restoreOut(stashed)
+  // Step 2: run coverage once per workspace project, scoped with `--project`.
+  for (const project of projects) {
+    const failure = runPass(project)
+    if (!failure) continue
+    // Name the project as soon as it fails, then keep going.
+    console.error(
+      `\nFAILED: ${project.name} coverage (exit ${failure.code}): ${failure.command}`
+    )
+    failures.push(failure)
   }
 
-  // Step 5: fail the run if any project missed a floor, naming each one. The
+  // Step 3: fail the run if any project missed a floor, naming each one. The
   // vitest threshold errors above say which file and which axis; this line says
   // which project, so a redirected or truncated log still points at the floor.
   if (failures.length > 0) {

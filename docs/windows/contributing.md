@@ -81,7 +81,7 @@ npm run test:e2e
 
 These are the local equivalents of the required CI checks — the root [`CLAUDE.md`](../../CLAUDE.md) and [`CONTRIBUTING.md`](../../CONTRIBUTING.md) ask for all of them, and `lint:css` plus the design-sync check are steps inside the required `Lint` job, so skipping them locally just moves the failure to CI. `npm run test:e2e` matters more here than elsewhere: the E2E workflow is disabled in CI, so a local Windows run is the only coverage Electron-specific paths get.
 
-**Do not expect `npm run test:cov` to pass on a Windows host.** Every test passes, but two per-file coverage floors are missed because the symlink cases they cover are skipped on win32 — see [`known-flakes.md` § `npm run test:cov` cannot pass on a Windows host](known-flakes.md#npm-run-testcov-cannot-pass-on-a-windows-host). Run it on macOS or Linux, or read the `Coverage` CI job.
+**`npm run test:cov` passes on a Windows host** (since 2026-09-30) – run it rather than `test:ci`, since it runs the same suite once and also checks the coverage floors. History in [`known-flakes.md` § `npm run test:cov` cannot pass on a Windows host](known-flakes.md#npm-run-testcov-cannot-pass-on-a-windows-host).
 
 If the PR touches platform-branched code (`process.platform === 'win32'`, `path.sep`, shell detection, etc.), also run on macOS:
 
