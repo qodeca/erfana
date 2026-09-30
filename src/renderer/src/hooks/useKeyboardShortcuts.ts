@@ -41,8 +41,12 @@ export interface UseKeyboardShortcutsOptions {
   onSave: () => void
   /** Callback to close the current tab/panel */
   onClose: () => void
-  /** Whether the file has unsaved changes */
-  isModified: boolean
+  /**
+   * Whether the file has unsaved changes. Pass a function to read it at
+   * keypress time: a render-time boolean can trail the edit by a frame, and a
+   * ⌘W landing in that gap closed a dirty tab with no warning.
+   */
+  isModified: boolean | (() => boolean)
   /** Function to show confirmation dialog, returns true if confirmed */
   showConfirm: (options: ConfirmOptions) => Promise<boolean>
   /** Current file name (for dialog message) */
@@ -131,7 +135,12 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions): void
 
         const currentOptions = optionsRef.current
 
-        if (currentOptions.isModified) {
+        const isModified =
+          typeof currentOptions.isModified === 'function'
+            ? currentOptions.isModified()
+            : currentOptions.isModified
+
+        if (isModified) {
           // Show confirmation dialog if unsaved changes
           const confirmed = await currentOptions.showConfirm({
             title: 'Unsaved Changes',

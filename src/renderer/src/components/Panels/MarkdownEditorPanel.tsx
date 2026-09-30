@@ -372,7 +372,13 @@ export function MarkdownEditorPanel(
   useKeyboardShortcuts({
     onSave: () => handleSave(false),
     onClose: () => props.api.close(),
-    isModified: currentFile?.modified ?? false,
+    // Read the store the tab's dirty dot and close button read, at keypress
+    // time. `currentFile.modified` is React state and can lag the edit, so a
+    // quick ⌘W after typing saw a clean file and discarded the change.
+    isModified: () =>
+      panelIdRef.current !== undefined
+        ? useProjectStore.getState().dirtyPanelIds.has(panelIdRef.current)
+        : (currentFile?.modified ?? false),
     showConfirm,
     fileName: currentFile?.path ? getBasename(currentFile.path) : null,
     // Without this, one ⌘W closed every open tab and one ⌘S wrote every open
