@@ -98,6 +98,24 @@ because the second sighting happened after the
 first hardening attempt, so the register should carry it until a few more full
 runs come back clean. Status: 🟡 under observation.
 
+**Seen again 2026-09-30, with a different symptom.** Full run on `develop` @
+`7391814f` (291 tests, two workers): "the fourth preview evicts the first to a
+still frame, and its tab wakes it" (`:54`) waited 20 s for
+`.html-preview-still-frame` on the first preview and found none. Two other full
+runs that day passed it, and it passed 5/5 focused straight after. Not
+investigated further. Still 🟡 under observation.
+
+### `e2e/html-preview-same-tab.history.e2e.ts:228` — Save prompt not shown under full-suite load
+
+First seen 2026-09-30 in a full run on `develop` @ `7391814f`: "should save the
+edits, then move, when the reader picks Save" timed out after 30 s waiting for
+the "Save changes to pricing.html?" dialog after the link click. Two other full
+runs that day passed it, and it passed 5/5 focused straight after. Cause not
+investigated – the link click may land before the page is ready under load. If
+it recurs, check whether the click reached the preview before blaming the
+prompt: a missing unsaved-changes prompt would be a data-loss bug. Status: 🟡
+under observation.
+
 ### `npm run test:cov` cannot pass on a Windows host
 
 **✅ Resolved 2026-09-30 – `npm run test:cov` passes on a Windows host.** The
