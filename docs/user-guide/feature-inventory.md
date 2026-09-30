@@ -69,6 +69,7 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 | TREE-13 | Delete confirmation ("cannot be undone") | all | commands.tsx | [how-to/organise-project-files](./how-to/organise-project-files.md#manage-files) |
 | TREE-14 | Mouse only: no keyboard navigation of the tree yet (#88) | all | docs/keyboard-shortcuts.md | [reference/project-tree](./reference/project-tree.md#navigation-limit) |
 | TREE-15 | Hidden patterns and watcher ignore list (per-project settings) | all | S/ipc/project-settings-schema.ts | [reference/settings](./reference/settings.md#per-project-settings) |
+| TREE-16 | Excluded folders: `files.exclude` in the global and the project settings file (project adds to global); excluded paths are not shown, read or watched; `.erfana` is never excluded; git status unaffected | all | S/ipc/files-exclude-schema.ts, M/utils/excludeMatcher.ts | [reference/settings](./reference/settings.md#excluded-folders) |
 
 ## Editor
 

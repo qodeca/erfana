@@ -86,6 +86,21 @@ vi.mock('../../src/main/ipc/senderValidation', () => ({
   RENDERER_FILE_URL: 'file:///test/renderer/index.html'
 }))
 
+// Global default: the chokidar directory-watch backend on every host (#211, D6).
+//
+// In production the selector picks the native recursive watcher on Windows. The
+// DirectoryWatcherService suites were written against a mocked `chokidar`, so
+// without this default the same suite would exercise chokidar on Linux CI and
+// a real native watcher on a Windows host. A plain function rather than
+// `vi.fn`, so a suite's `vi.resetAllMocks()` cannot turn the answer into
+// `undefined`; the wholesale factory is complete because the module exports
+// nothing else at runtime. The selector's own suite declares `vi.unmock`; a
+// suite for the native wiring constructs the service with
+// `{ backend: 'native-recursive' }` instead.
+vi.mock('../../src/main/services/watcher/directoryWatchBackend', () => ({
+  selectDirectoryWatchBackend: () => 'chokidar'
+}))
+
 // Surface intermittent unhandled rejections / uncaught exceptions firing
 // after teardown (e.g. async `worker_threads` cleanup races, leaked
 // `setTimeout` from production code). See `flakeGuard.ts` for rationale.

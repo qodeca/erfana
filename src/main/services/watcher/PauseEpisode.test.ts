@@ -126,4 +126,60 @@ describe('PauseEpisode (#210)', () => {
     episode.recordDrop('add', at('after-cap.md'))
     expect(episode.uncoveredDrops()).toBe(0)
   })
+
+  describe('unknown drop (#211, D13)', () => {
+    it('counts once, even when own changes cover the whole project', () => {
+      const episode = new PauseEpisode(OWNER)
+      episode.noteInternalChange({ path: ROOT, kind: 'added', subtree: true })
+      episode.noteInternalChange({ path: ROOT, kind: 'removed', subtree: true })
+
+      episode.recordUnknownDrop()
+
+      expect(episode.needsCatchUp()).toBe(true)
+      expect(episode.uncoveredDrops()).toBe(1)
+      expect(episode.isForcedByCap()).toBe(false)
+    })
+
+    it('is covered by a later completed owner read, and a later drop is not', () => {
+      const episode = new PauseEpisode(OWNER)
+      const earlySnapshot = episode.beginTreeRead(OWNER) as number
+      episode.recordUnknownDrop()
+
+      // A read that began before the resync does not cover it
+      episode.completeTreeRead(earlySnapshot)
+      expect(episode.needsCatchUp()).toBe(true)
+
+      const laterSnapshot = episode.beginTreeRead(OWNER) as number
+      episode.completeTreeRead(laterSnapshot)
+      expect(episode.needsCatchUp()).toBe(false)
+      expect(episode.uncoveredDrops()).toBe(0)
+
+      episode.recordUnknownDrop()
+      expect(episode.needsCatchUp()).toBe(true)
+      expect(episode.uncoveredDrops()).toBe(1)
+    })
+
+    it('stays uncovered by a read from another window or one that never completes', () => {
+      const episode = new PauseEpisode(OWNER)
+      episode.recordUnknownDrop()
+
+      expect(episode.beginTreeRead(OTHER)).toBeNull()
+      episode.beginTreeRead(OWNER)
+
+      expect(episode.needsCatchUp()).toBe(true)
+    })
+
+    it('is ignored after the cap forced a catch-up', () => {
+      const episode = new PauseEpisode(OWNER)
+      for (let i = 0; i <= MAX_INTERNAL_CHANGES; i++) {
+        episode.noteInternalChange({ path: at(`f${i}.md`), kind: 'added', subtree: false })
+      }
+      expect(episode.isForcedByCap()).toBe(true)
+
+      episode.recordUnknownDrop()
+
+      expect(episode.uncoveredDrops()).toBe(0)
+      expect(episode.needsCatchUp()).toBe(true)
+    })
+  })
 })

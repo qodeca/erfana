@@ -7,7 +7,7 @@ Erfana automatically detects and responds to external file system changes using 
 **FileWatcherService**: Watches individual open files for content changes, surfaces editor reload/conflict UI
 **DirectoryWatcherService**: Watches entire project directory for both structural changes (create/delete/rename) **and** in-place content changes (`fs.writeFile` in place), broadcasts `directory-watch:changed` for both
 
-Both use [Chokidar](https://github.com/paulmillr/chokidar) for cross-platform file system monitoring with intelligent debouncing and race condition prevention.
+FileWatcherService uses [Chokidar](https://github.com/paulmillr/chokidar) on every platform. DirectoryWatcherService uses chokidar on macOS and Linux, and on Windows a native recursive watcher built on Node's own `fs.watch` ([#211](https://github.com/qodeca/erfana/issues/211)) – see [Watch backends](#watch-backends-211). Both share the debouncing and race-condition guards described below.
 
 > **Chokidar is pinned to exact `3.6.0` (v3 line; do not upgrade to v4).** v3 uses a single macOS FSEvents stream (~0 file descriptors per watched file); v4 dropped FSEvents and watches each file via kqueue (one FD per file), which exhausts the process FD table on large projects and breaks spawning child processes – PDF export's hidden render window crashed with `Failed to initialize sandbox` on a 20k-file folder (commit `68cfab8` – pre-migration; no longer resolvable, that history was rewritten at the 2026-06 migration – shipped in v0.12.0). The rationale is also in the comment above `disableGlobbing` in the `chokidar.watch(...)` options of `DirectoryWatcherService.watchDirectory`.
 
@@ -217,38 +217,47 @@ Monitors entire project folder for structural changes (files/folders created, de
 
 ### Architecture
 
-- **Library**: Chokidar (recursive watching)
-- **Event Pipeline**: VS Code-inspired ThrottledWorker + EventCoalescer
+- **Backend**: chokidar 3.6.0 on macOS and Linux; one `NativeRecursiveWatcher` per project on Windows (#211) – see [Watch backends](#watch-backends-211)
+- **Event Pipeline**: VS Code-inspired ThrottledWorker + EventCoalescer, the same for both backends
   - 75ms collection window for batching events
   - 200ms throttle between processing rounds
-  - AtomicSaveDetector (100ms) for unlink events
+  - AtomicSaveDetector (100ms) for unlink events – chokidar only; the native backend has already confirmed a removal with `lstat`
 - **Events**: `add`, `addDir`, `unlink`, `unlinkDir`, `change`
-- **Scope**: Entire project directory (recursive)
+- **Scope**: Entire project directory (recursive), minus every excluded, hidden or ignored path – see [Watched files](#watched-files)
+- **Start**: only after the project's first tree read settles (#211) – see [The watcher starts after the first tree read](#the-watcher-starts-after-the-first-tree-read-211)
 - **Cleanup**: Automatic on window close and app quit
 
 > The `change` event covers in-place file content modifications from any source – Monaco autosave, terminal commands (`sed`, `echo >>`), external editors, format-on-save scripts. It is what wakes `useGitStatus.debouncedRefresh()` so the Project Tree's git badges update after an edit without a manual refresh. Prior to this, only structural changes broadcast on this channel, so badges only updated after create/delete/rename – not after editing an existing file.
 
 ### Watched Files
 
-Uses a **selective blacklist** approach (same as VS Code) with function-based ignore for reliability.
+Uses a **selective blacklist** approach (same as VS Code). Since #211 one project path filter, `ProjectPathFilter` (`src/main/utils/projectPathFilter.ts`), answers "is this path dropped?" for the tree walk and for both watcher backends, always on the **project-relative** path. A path is dropped when it is:
+
+- **excluded** – matched by the `files.exclude` list (global plus project; merge and syntax: [Settings § Exclude list](../settings.md#exclude-list-filesexclude)). The tree does not show or read it and neither backend watches it;
+- **hidden** – any path segment equals a `tree.hiddenPatterns` name (the tree's own rule; default `node_modules` and `.git`). Neither backend watches it;
+- **ignored** – `/` + the relative path contains `/` + a `watcher.ignoreList` entry (default `DEFAULT_WATCHER_IGNORE_PATTERNS` in `src/shared/constants.ts`). The tree still shows it; neither backend watches it;
+- **outside the project** – dropped, fail closed. The project root itself is never dropped.
+
+Because the test runs on the project-relative path, a project that itself lives under a folder named `build`, `out` or `dist` is watched normally; before #211 the substring test ran on the absolute path and such a project was not watched at all. The ignore rule is still a substring test, so `out` also matches `outline` (a known limit).
 
 **What IS watched:**
 - Dotfolders: `.claude/`, `.github/`, `.vscode/`, `.idea/`
 - Dotfiles: `.env`, `.gitignore`, `.npmrc`, etc.
-- Git state: `.git/HEAD`, `.git/config`, `.git/refs/`
-- Build outputs: `out/`, `dist/`, `build/`
 
 This ensures AI agent file changes (e.g., Claude Code creating `.claude/commands/`) are immediately detected.
 
 **What is NOT watched (performance):**
+- `.git/` as a whole – it is a default hidden name, so since #211 chokidar no longer watches it either; `GitWatcherService` owns git state
 - `node_modules/`, `.pnpm/`, `.yarn/cache/`, `bower_components/` - JS package managers
 - `.venv/`, `venv/`, `.virtualenv/`, `.conda/` - Python virtual environments
-- `.git/objects/`, `.git/subtree-cache/`, `.git/lfs/` - Git internals
 - `dist/`, `build/`, `out/`, `.output/` - Build outputs
 - `.next/`, `.nuxt/`, `.cache/`, `.parcel-cache/`, `.turbo/`, `.vite/` - Framework caches
 - `coverage/`, `__pycache__/`, `.pytest_cache/`, `target/` - Test/build artifacts
+- Anything in the project's `files.exclude` list
 
-This approach provides full dotfolder visibility while maintaining performance on large projects.
+**Filter order.** On chokidar the drop test is the function-based `ignored` option, so a dropped folder is never scanned. On Windows it runs in the native watcher's callback before any `lstat`. Both backends then pass through the same backstop in `DirectoryWatcherService.queueEvent`, right after the session guard and **before** pause accounting and metrics: a dropped path is never counted as a missed change while paused, never counted as received (`eventsFiltered` counts it instead), and never broadcast. A burst of only dropped paths therefore sends nothing to the renderer, so it starts neither a tree re-read nor a git refresh.
+
+`setPathFilter(filter)` replaces the filter; `ProjectService` builds a fresh one on every project open and hands the **same** instance to `FileService` and `DirectoryWatcherService`. Until then the default hidden and ignore lists apply, with no exclude list.
 
 ### Watch Depth (Performance)
 
@@ -258,11 +267,38 @@ The directory watcher supports an optional recursive depth cap to reduce load on
 - No UI control at the moment. Configure via preload settings API, e.g. in DevTools:
   - `await window.api.settings.setDirectoryWatchDepth(2)`
   - `await window.api.settings.setDirectoryWatchDepth(null)` for Unlimited
-- Behavior: Applies to chokidar `depth` option; the watcher will use the new setting on the next start
+- Behavior: on chokidar it is the `depth` option. On Windows the native handles stay recursive and deeper events are dropped by the filter, with chokidar's rule (a path of *n* segments is dropped when *n* − 1 > depth). The watcher uses the new setting on the next start
 
 Recommended:
 - Start with "Unlimited"
 - Use smaller depths when the tree is very large and deep
+
+### Watch backends (#211)
+
+`selectDirectoryWatchBackend(platform, env)` (`src/main/services/watcher/directoryWatchBackend.ts`) picks the backend: `native-recursive` on `win32`, `chokidar` everywhere else. `DirectoryWatcherService` reads it once, in its constructor (the optional `{ backend }` option overrides it, which the native wiring suite uses), and logs `Directory watcher backend selected` at the first watch. Both backends satisfy the same `DirectoryWatchHandle` seam (`on(...)`, `close(): Promise<void>`), so everything after the watcher – `queueEvent`, the throttle, the coalescer, pause, catch-up – is shared.
+
+**Escape hatch.** `ERFANA_DIRECTORY_WATCHER=chokidar` in the environment Erfana starts with forces chokidar on every platform. It exists for support and diagnosis only: there is no setting and no UI. Only that exact value counts; any other non-empty value is ignored and logged as `Directory watcher override ignored: unknown value` (the value itself is not logged).
+
+**Why Windows changed.** chokidar 3 on Windows opens one `fs.watch` handle per folder and scans the whole project while the first tree read runs. On a project of about 222,000 entries that meant tens of thousands of handles, and the scan competed with the tree walk for libuv's four-thread pool. The native backend holds a small, bounded set of handles instead, and none at all for excluded, hidden or ignored folders it knows about.
+
+**The Windows plan** (`src/main/services/watcher/NativeRecursiveWatcher.ts`):
+
+- The root is watched **non-recursively**. Every direct child folder of a *split folder* gets **one recursive** watch, unless it is itself a split folder, where the rule repeats one level down. A dropped child gets no handle at all, so its churn never fills a Windows change buffer.
+- *Split folders* are the root plus every ancestor of a *split path*. Split paths are the **path entries** of the exclude list (`filter.splitPaths()`) and the **walk hints**: the dropped folders at two or more segments deep that the last completed root tree walk met – `packages/a/node_modules`, `src/dist`, `a/b/test-tmp` from `**/test-tmp`. The walk visits every folder anyway, so a hint costs no I/O. Hints are read when the watcher plans (start or restart).
+- **Caps:** 64 path-entry split paths and 64 walk hints, each at most 16 segments deep, and at most **512 handles** per project. Past a cap a folder keeps one recursive watch (its events are still dropped by the filter), and the `Native directory watcher ready` line logs `planCapped: true`. A plan pass opens every direct child before it expands any split one, so the handle cap collapses a deeper folder, never a later sibling. A split folder whose listing fails (other than as gone) also keeps one recursive watch.
+- **Links are never watched.** Junctions, directory symlinks and file symlinks are leaves: never split, never given a handle. An entry that `readdir` does not type as a plain file or folder is confirmed with `lstat`.
+- Every handle is opened under `fs.realpathSync.native(root)`, never the 8.3 short form, which guards against a libuv 1.52.x abort on a short-name watch (Electron 39 ships libuv 1.51.0, which is not affected). Emitted paths are joined onto the caller's root string.
+- Keys are folded to lower case (Windows is case-insensitive), so a case-only rename re-lists a folder instead of opening a second watch.
+
+**Events.** `fs.watch` reports only `rename` or `change` plus a name. A raw event is dropped by the filter first; a surviving one is classified by one `lstat` in `NativeEventClassifier` (at most 2 in flight, a 10,000-path backlog) and emitted as `add`, `addDir`, `unlink`, `unlinkDir` or `change`. A new direct child folder of a split folder is reported (`addDir`) only once its own watch is open. Details, the mapping table and the deleted- and renamed-folder handling: [Technical details § The Windows native watcher](./technical-details.md#the-windows-native-watcher-211).
+
+**Lost events → one debounced re-read.** Windows reports a full change buffer as a `null` filename. On a split folder's own (non-recursive) watch the folder is re-listed and only the differences are emitted. On a recursive watch, or when the classifier backlog trips, the watcher asks for a **resync**, debounced to 1 s of quiet and at most 5 s of waiting, so one burst costs one re-read. `DirectoryWatcherService.handleResync` answers it with one `catchUp: true` refresh – or, while paused, records it as one unknown drop in the pause episode, which the pausing window's next completed read covers (#210). The watch keeps working after an overflow; it is not re-opened.
+
+### The watcher starts after the first tree read (#211)
+
+`useProjectManagement` keeps a `firstReadPending` state, and `initialLoadComplete` – what `useDirectoryWatcher` waits for – is now `projectPath !== null && !firstReadPending`. The `project:changed` listener sets it in the same synchronous block as `setProjectPath`, so the render that remounts the tree never starts a watcher early. It is cleared when that first read settles, **success or failure** (a failed first read can still self-heal through the watcher), when a superseding reload settles, on close, and on main's no-op re-open. Before #211 the flag was `true` from mount, so chokidar's initial scan (or the new backend's plan) competed with the first tree read. Git status still starts at once. Neither the tree read nor git status ever waits for the watcher's `ready`.
+
+One consequence, pre-existing in another form: a change made during the first read in a folder the walk has already passed, or before the watcher's plan has opened that folder's watch, shows up only with the next change or a manual refresh.
 
 ### Use Cases
 
@@ -276,6 +312,8 @@ Recommended:
 | Another program (e.g. an agent in the terminal) adds or removes items while an internal CRUD runs | One catch-up refresh at resume; none when nothing outside changed or the operation's own refresh already showed it (#210) |
 | Expand folders, make external changes | Folders remain expanded after refresh |
 | Very large project keeps changing while the tree is being read | Changes are picked up by one follow-up read after the running one; reads never overlap and the tree never shows an older state (#208) |
+| Something keeps writing inside an excluded, hidden or ignored folder | Nothing reaches the renderer: no tree re-read, no git refresh (#211) |
+| A burst overflows a Windows change buffer | One debounced catch-up re-read about 1 s after the burst ends, at most every 5 s while it lasts (#211) |
 
 **Tree refresh is coalesced (#208):** the tree refresh that a watcher event (or a file operation) triggers is single-flight. In the renderer, `refreshFiles` allows one read per project scope; in main, `FileService.readDirectory` allows one walk per path. Calls made while a read runs share one follow-up read that starts after it, so a burst costs at most two reads, and a result that is older than the tree on screen – or belongs to a project that is no longer open – is dropped. One consequence: a read that never finishes (an unreachable network drive) holds up every later read of that folder, and is logged as `readDirectory still running` after 60 s. See [Technical Details § Tree refresh is single-flight](./technical-details.md#tree-refresh-is-single-flight-208).
 
@@ -309,7 +347,10 @@ Recommended:
 - **Renderer Hook**: `src/renderer/src/hooks/useDirectoryWatcher.ts` (lifecycle, event handling, AC-010 guard)
 - **Pure Logic**: `src/renderer/src/hooks/useDirectoryWatcher.logic.ts` (state guards, message creation)
 - **Pause Utility**: `src/renderer/src/components/ProjectTree/withWatcherPause.ts` (pause/resume wrapper)
-- **Pause episode (#210)**: `src/main/services/watcher/PauseEpisode.ts` (drop counting, own-change filter, read coverage); hooks in `src/main/ipc/file-handlers.ts`
+- **Pause episode (#210)**: `src/main/services/watcher/PauseEpisode.ts` (drop counting, own-change filter, read coverage; `recordUnknownDrop()` for a resync during a pause, #211); hooks in `src/main/ipc/file-handlers.ts`
+- **Path filter and exclude list (#211)**: `src/main/utils/projectPathFilter.ts` (`ProjectPathFilter`, `toRootRelative`, split paths and walk hints), `src/main/utils/excludeMatcher.ts` (the `files.exclude` matcher), `src/shared/ipc/files-exclude-schema.ts` (lenient schema); merged by `ProjectSettingsService`, applied by `ProjectService`
+- **Backends (#211)**: `src/main/services/watcher/directoryWatchBackend.ts` (selector and `DirectoryWatchHandle` seam), `NativeRecursiveWatcher.ts` (Windows plan, lost events, self-events), `NativeEventClassifier.ts` (the `lstat` queue)
+- **Watcher gate (#211)**: `firstReadPending` in `src/renderer/src/hooks/useProjectManagement.ts`
 - **Tree refresh (single-flight, #208)**: `src/shared/coalescingRunner.ts`, used by `FileService.readDirectory` (`src/main/services/FileService.ts`) and `refreshFiles` in `src/renderer/src/hooks/useProjectManagement.ts`
 - **Integration**: `src/renderer/src/components/ProjectTree/ProjectTree.tsx`
 - **Component**: `src/renderer/src/components/ProjectTree/ProjectTreeNode.tsx` (controlled pattern)
@@ -350,7 +391,9 @@ The DirectoryWatcherService automatically recovers from transient filesystem err
 - Sequence: 800ms → 1600ms → 3200ms
 - Max attempts: 3
 
-After 3 failed restart attempts, the service notifies the user and stops retrying. Restart statistics are tracked in `WatcherMetrics` for debugging.
+After 3 failed restart attempts the service stops retrying and sends `directory-watch:restart-failed` – or `directory-watch:project-deleted` when the root is still missing (`ENOENT`). Since #211 both go to the windows captured when the restart was scheduled (`notifyIds`); before, the watch's map entry was already gone, so `restart-failed` was never delivered. The preload bridge still exposes no listener for `restart-failed` (see [API services](../api-services.md#directory-watchrecovered-and-directory-watchrestart-failed)). Restart statistics are tracked in `WatcherMetrics` for debugging.
+
+**A watch that cannot start (#211):** the Windows backend watches the root synchronously in its constructor, so a missing root throws `ENOENT` at once (an `EPERM` on the root is reported as `ENOENT`). `watchDirectory` then schedules a restart before rethrowing, so a root that was briefly unavailable recovers and a deleted one ends in `directory-watch:project-deleted` once the attempts run out. A restart overtaken by `stopAll` (a project switch) sends nothing.
 
 **EMFILE log deduplication**: Uses `RateLimitedLogger` (10s cooldown) to prevent EMFILE error log spam during cascading FD exhaustion. See `src/main/utils/RateLimitedLogger.ts`.
 
@@ -568,12 +611,14 @@ The service integrates these components:
   - Session token guards, step ordering, in-flight event handling during project switches
 - Renderer switching tests in `src/renderer/src/components/ProjectTree/ProjectTree.switching.test.tsx` (11 tests, #101)
   - Tree clearing, new project loading, stale event rejection, git status updates
+- Exclude list, path filter, Windows backend and watcher gate (#211): see [Patterns & Testing § Large projects on Windows](./patterns-and-testing.md#large-projects-on-windows-211)
 
 ---
 
 ## Symlinks
 
 - Watchers do not follow symlinks (security)
+- **The Windows directory watcher never opens a handle on a link** (#211): junctions, directory symlinks and file symlinks are leaves in its plan, and a recursive `fs.watch` does not report inside them (measured in the [W0 spike](../spikes/211-windows-fs-watch.md))
 - **Single-file watches set `followSymlinks: false` explicitly** (`watcher/singleFileWatch.ts`, added in #70). chokidar v3 defaults this to `true`, so a link planted inside the project would otherwise make the watcher — and the automatic re-read behind it — track an out-of-project target
 - Symlinked entries are flagged in the Project Tree with a small chain icon and tooltip
 - Operations on symlink targets remain subject to project boundary checks. Since #70 the read handlers enforce that with `fs.realpath` on both ends rather than by comparing path text — see [API Services § Path confinement](../api-services.md#path-confinement-for-the-file-read-ipc-handlers)

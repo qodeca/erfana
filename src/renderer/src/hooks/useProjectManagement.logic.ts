@@ -235,20 +235,6 @@ export function createCloseProjectErrorLog(): string {
 }
 
 /**
- * Determines the initial load complete value
- *
- * @param lastPath - The last project path
- * @param fileTree - The loaded file tree
- * @returns true if initial load should be marked complete
- */
-export function shouldMarkInitialLoadComplete(
-  lastPath: string | null,
-  fileTree: unknown[]
-): boolean {
-  return lastPath !== null && fileTree !== null && fileTree !== undefined
-}
-
-/**
  * Extracts project name from full path
  *
  * @param path - Full project path

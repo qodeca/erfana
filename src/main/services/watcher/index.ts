@@ -34,6 +34,30 @@ export {
   type InternalChangeKind
 } from './PauseEpisode'
 export {
+  selectDirectoryWatchBackend,
+  type DirectoryWatchBackend,
+  type DirectoryWatchHandle,
+  type DirectoryWatchResyncReason
+} from './directoryWatchBackend'
+export {
+  NativeEventClassifier,
+  type NativeClassifiedEvent,
+  type NativeClassifiedType,
+  type NativeEventClassifierOptions,
+  type NativeLstatResult,
+  type NativeRawEventKind
+} from './NativeEventClassifier'
+export {
+  NativeRecursiveWatcher,
+  type NativeDirEntry,
+  type NativeFsWatch,
+  type NativeRecursiveWatcherOptions,
+  type NativeWatchCaps,
+  type NativeWatchHandle,
+  type NativeWatchListener,
+  type NativeWatchPlanStats
+} from './NativeRecursiveWatcher'
+export {
   ThrottledWorker,
   createThrottledWorker,
   type ThrottledWorkerOptions,

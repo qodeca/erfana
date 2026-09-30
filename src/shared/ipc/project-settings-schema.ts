@@ -7,6 +7,7 @@
  * @see Issue #63 - project-level settings
  */
 import { z } from 'zod'
+import { FilesSettingsSchema, type ExcludeRejection } from './files-exclude-schema'
 
 /**
  * Pattern configuration for watcher ignore or tree hidden settings
@@ -27,7 +28,7 @@ export const PatternConfigSchema = z.object({
 export type PatternConfig = z.infer<typeof PatternConfigSchema>
 
 /**
- * Watcher configuration - controls which directories chokidar ignores
+ * Watcher configuration – paths the project's directory watcher drops (chokidar on macOS/Linux, the native recursive watcher on Windows); each pattern is matched as a substring of '/' + the project-relative path (#211)
  */
 export const WatcherSettingsSchema = z.object({
   ignoreList: PatternConfigSchema.optional()
@@ -59,7 +60,13 @@ export const ProjectSettingsSchema = z.object({
    * failure and that blocks project load (design §3.1, X1). The block is parsed
    * independently by `PreviewAllowlistStore` against `PreviewAllowlistSchema`.
    */
-  htmlPreview: z.unknown().optional()
+  htmlPreview: z.unknown().optional(),
+  /**
+   * `files.exclude` (Issue #211, design D7). Parsed leniently by the shared
+   * schema, so a malformed section resolves to `{ exclude: [] }` instead of
+   * failing this parse and blocking the project from opening.
+   */
+  files: FilesSettingsSchema.optional()
 })
 export type ProjectSettings = z.infer<typeof ProjectSettingsSchema>
 
@@ -69,4 +76,11 @@ export type ProjectSettings = z.infer<typeof ProjectSettingsSchema>
 export interface ResolvedProjectSettings {
   watcherIgnorePatterns: string[]
   treeHiddenPatterns: string[]
+  /**
+   * Validated, normalised `files.exclude` entries: the global list first, then
+   * the project's additions, de-duplicated (Issue #211, design D7).
+   */
+  excludePatterns: string[]
+  /** Entries rejected by validation, by source and index (never by value). */
+  excludeRejections: ExcludeRejection[]
 }

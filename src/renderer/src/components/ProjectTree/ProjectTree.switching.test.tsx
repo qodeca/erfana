@@ -303,8 +303,10 @@ describe('ProjectTree project switching (AC-009)', () => {
         expect(readDirectory).toHaveBeenCalledWith('/projA')
       })
 
-      // Verify watcher was started for project A
-      expect(window.api.directoryWatch.start).toHaveBeenCalledWith('/projA')
+      // The watcher starts once the first read has been applied (#211, D12)
+      await waitFor(() => {
+        expect(window.api.directoryWatch.start).toHaveBeenCalledWith('/projA')
+      })
 
       // Switch to project B
       await act(async () => {
@@ -318,8 +320,10 @@ describe('ProjectTree project switching (AC-009)', () => {
       // Watcher should be stopped for old project A (cleanup in useDirectoryWatcher effect)
       expect(stopWatcher).toHaveBeenCalledWith('/projA')
 
-      // Watcher should be started for new project B
-      expect(window.api.directoryWatch.start).toHaveBeenCalledWith('/projB')
+      // Watcher should be started for new project B, after its first read
+      await waitFor(() => {
+        expect(window.api.directoryWatch.start).toHaveBeenCalledWith('/projB')
+      })
     })
 
     it('useDirectoryWatcher effect cleanup prevents stale callbacks', async () => {
