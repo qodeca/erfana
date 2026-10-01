@@ -513,13 +513,13 @@ The overlay windows have their own, tighter channel path: `screenshot:areaSelect
 
 ## Known vulnerabilities
 
-Run `npm audit` to check. **Policy**: zero high/critical production advisories at release. Pre-release: `npm audit --omit=dev --json` and diff against the **Accepted exceptions for v0.21.0** table below.
+Run `npm audit` to check. **Policy**: zero high/critical production advisories at release. Pre-release: `npm audit --omit=dev --json` and diff against the **Accepted exceptions for v0.20.1** table below.
 
-**Current state** (audited 2026-09-26, pre-0.21.0): `npm audit --omit=dev` reports **4 high** production advisories — `electron`, `extract-zip`, `@llamaindex/liteparse` and `sharp` — accepted for v0.21.0 under the dated exception below. The full tree (`npm audit`) reports 16 (1 critical, 12 high, 3 moderate); the other 12 run only while dependencies install or the app builds, or under the test runner, and never ship. The former `mermaid → langium → chevrotain` moderate advisories no longer count against production because Monaco and Mermaid moved to `devDependencies` in v0.11.0 (#206 — pre-migration PR, no longer resolves on the public repo); `axios` and `fast-uri` high-severity advisories were patched in v0.11.2.
+**Current state** (audited 2026-10-01, pre-0.20.1): `npm audit --omit=dev` reports **4 high** production advisories — `electron`, `extract-zip`, `@llamaindex/liteparse` and `sharp` — accepted for v0.20.1 under the dated exception below, plus **1 moderate**, `fast-uri` (GHSA-hrr3-gc8f-f4qj, host case normalization, CVSS 4.8), which the zero high/critical policy does not block. The full tree (`npm audit`) reports 20 (1 critical, 12 high, 6 moderate, 1 low); the rest run only while dependencies install or the app builds, or under the test runner, and never ship. The former `mermaid → langium → chevrotain` moderate advisories no longer count against production because Monaco and Mermaid moved to `devDependencies` in v0.11.0 (#206 — pre-migration PR, no longer resolves on the public repo); `axios` and `fast-uri` high-severity advisories were patched in v0.11.2.
 
-### Accepted exceptions for v0.21.0 (owner decision 2026-09-26)
+### Accepted exceptions for v0.20.1 (owner decision 2026-09-26)
 
-A dated exception to the policy above: v0.21.0 ships with these four production highs open, and they are fixed after the release.
+A dated exception to the policy above: v0.20.1 ships with these four production highs open, and they are fixed after the release.
 
 | Package | GHSA id(s) | Where Erfana reaches it | Guard that limits it | Follow-up that clears it |
 |---|---|---|---|---|
