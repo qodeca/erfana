@@ -51,6 +51,11 @@ If you need to change dependencies, run `npm install` deliberately, then check `
 keep only the change you meant to make. If the diff shows `encoding` disappearing and a shuffle of `peer` /
 `optional` flags and nothing else, discard it — that is this quirk, not your change.
 
+npm 11.19 ends `npm ci` with `npm warn install-scripts … not yet covered by allowScripts` for `electron`,
+`node-pty`, `esbuild` and a few others. On that version it is only a warning: the scripts still run, and the app
+builds and starts (checked 2026-10-01). If a later npm turns it into a block, the app will not start.
+`node_modules/electron/dist` will be missing, and so will `node_modules/node-pty/build/Release/pty.node`.
+
 To build and package the app:
 
 ```bash

@@ -62,7 +62,7 @@ Closure queued in the 2026-06-03 alignment pass: #164 (Phase 3 shipped v0.12.0),
 
 ## Feature status on Windows today
 
-Honest per-feature assessment of what an end user running an NSIS install of v0.20.0 gets today. Phases 0–4 are shipped; Phase 5 is narrowed to NSIS UX and Phase 6 is partially shipped.
+Honest per-feature assessment of what an end user running an NSIS install of v0.20.1 gets today. Phases 0–4 are shipped; Phase 5 is narrowed to NSIS UX and Phase 6 is partially shipped.
 
 ### ✅ Working
 
@@ -75,7 +75,7 @@ Honest per-feature assessment of what an end user running an NSIS install of v0.
 | Prompt templates, settings overlay, project settings (`.erfana/settings.json`) | Pure web / JSON I/O |
 | PDF export | Electron's headless print API is cross-platform |
 | Image preview (PNG, JPG, SVG, etc.) | Pure renderer |
-| File watching (autorefresh, save races, session tokens) | chokidar handles Windows natively |
+| File watching (autorefresh, save races, session tokens) | Since v0.20.1 project folders are watched by a native `fs.watch` backend on Windows (chokidar elsewhere), started after the first tree load and honouring `files.exclude` ([#211](https://github.com/qodeca/erfana/issues/211)) |
 | Media transcription via **OpenAI API** | HTTP + ffmpeg-static (bundled, cross-platform) |
 | Document import pure-JS path (LiteParse spatial text, OCR via Tesseract.js) | LiteParse + Tesseract.js are pure JS; tessdata is bundled in `resources/tessdata` |
 | Keyboard shortcuts, quit confirmation, multi-instance project lock | Cross-platform Electron |
