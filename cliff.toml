@@ -40,6 +40,7 @@ commit_parsers = [
   { message = "^test",     group = "Tests" },
   { message = "^ci",       group = "CI" },
   { message = "^build",    group = "Build" },
+  { message = "^chore\\((campaign|xezar)\\)", skip = true },
   { message = "^chore",    group = "Chores" },
   { message = "^style",    skip = true },
   { message = ".*",        skip = true },
