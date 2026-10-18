@@ -62,7 +62,9 @@ describe('FileWatcherService.handleAncestorRemovals', () => {
   const deleted = (): string[] =>
     sends.filter(s => s.channel === 'file-watch:deleted').map(s => String(s.payload.filePath))
 
-  it('marks every open file under a renamed folder deleted, and only those', async () => {
+  // Windows refuses to rename a folder while a watch holds a handle inside it (EPERM),
+  // so this real-fs rename needs a POSIX host.
+  it.skipIf(process.platform === 'win32')('marks every open file under a renamed folder deleted, and only those', async () => {
     const open = join(root, 'docs', 'open.md')
     const nested = join(root, 'docs', 'deep', 'nested.md')
     const other = join(root, 'other.md')
