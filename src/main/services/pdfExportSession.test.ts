@@ -10,7 +10,7 @@ vi.mock('./LoggingService', () => ({
   logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() }
 }))
 
-import { buildPdfCsp, isAllowedPdfRequest } from './pdfExportSession'
+import { buildPdfCsp, describeUrlForLog, isAllowedPdfRequest } from './pdfExportSession'
 
 const PAGE = pathToFileURL(join(tmpdir(), 'erfana-pdf-abc', 'export.html')).href
 
@@ -26,10 +26,10 @@ describe('isAllowedPdfRequest', () => {
     expect(isAllowedPdfRequest(pathToFileURL(join(tmpdir(), 'x.png')).href, 'image', PAGE)).toBe(false)
   })
 
-  it('allows data, http and https only as images', () => {
+  it('allows data and https only as images; plain http is refused', () => {
     expect(isAllowedPdfRequest('data:image/png;base64,AAAA', 'image', PAGE)).toBe(true)
     expect(isAllowedPdfRequest('https://example.com/a.png', 'image', PAGE)).toBe(true)
-    expect(isAllowedPdfRequest('http://example.com/a.png', 'image', PAGE)).toBe(true)
+    expect(isAllowedPdfRequest('http://example.com/a.png', 'image', PAGE)).toBe(false)
     expect(isAllowedPdfRequest('https://example.com/a.js', 'script', PAGE)).toBe(false)
     expect(isAllowedPdfRequest('https://example.com/', 'subFrame', PAGE)).toBe(false)
     expect(isAllowedPdfRequest('https://example.com/', 'xhr', PAGE)).toBe(false)
@@ -49,6 +49,20 @@ describe('buildPdfCsp', () => {
     expect(csp).toContain("script-src 'sha256-HASH'")
     expect(csp).toContain("object-src 'none'")
     expect(csp).toContain("base-uri 'none'")
+    expect(csp).toContain('img-src data: https:')
+    expect(csp).not.toContain('http:;')
     expect(csp).not.toMatch(/script-src[^;]*unsafe/)
+  })
+})
+
+describe('describeUrlForLog', () => {
+  it('keeps only scheme and host', () => {
+    expect(describeUrlForLog('https://example.com/a/b.png?token=secret#x')).toBe('https://example.com')
+  })
+
+  it('never logs file names', () => {
+    expect(describeUrlForLog(PAGE)).toBe('file:')
+    expect(describeUrlForLog('data:image/png;base64,AAAA')).toBe('data:')
+    expect(describeUrlForLog('not a url')).toBe('[unparseable-url]')
   })
 })
