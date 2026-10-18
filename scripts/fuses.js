@@ -541,9 +541,18 @@ const ALLOWED_EXTRA_FILES_DESTS = Object.freeze([]);
  * resources dir. Platform-variant superset (icon.icns is macOS-only,
  * elevate.exe is the NSIS elevator on Windows); `*.lproj` localisation folders
  * are matched by pattern, not listed here.
+ *
+ * `LICENSE.electron.txt` and `LICENSES.chromium.html` are Electron's own licence
+ * files. app-builder-lib's `retainElectronLicenseFiles` (electron-builder#9407,
+ * first in 26.16.1) relocates Electron's `LICENSE` to `LICENSE.electron.txt` and
+ * keeps the Chromium licence as `LICENSES.chromium.html` beside `app/` in
+ * `Contents/Resources` on macOS. They are Electron-owned, not repository
+ * content, so the L2a-2 sibling allowlist accepts exactly these two names and
+ * nothing else (#163).
  */
 const ELECTRON_OWNED_RESOURCES_ENTRIES = Object.freeze([
   'app', 'app.asar', 'icon.icns', 'elevate.exe',
+  'LICENSE.electron.txt', 'LICENSES.chromium.html',
 ]);
 
 /**
