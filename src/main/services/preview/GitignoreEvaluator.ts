@@ -149,7 +149,24 @@ export class GitignoreEvaluator implements IGitignoreEvaluator {
       return cached.value
     }
 
-    const value = await this.evaluate(projectRoot, relPath)
+    // A file only counts as ignored when the project folder itself is not: a
+    // project opened from inside a folder that an enclosing repository ignores
+    // would otherwise have every file reported ignored.
+    const value =
+      (await this.evaluate(projectRoot, relPath)) && !(await this.isRootIgnored(projectRoot))
+    this.cache.set(cacheKey, { value, expires: this.now() + this.cacheTtlMs })
+    return value
+  }
+
+  /** Whether an enclosing repository ignores the project folder itself (cached like files). */
+  private async isRootIgnored(projectRoot: string): Promise<boolean> {
+    const cacheKey = `${projectRoot}\u0000`
+    const cached = this.cache.get(cacheKey)
+    if (cached && cached.expires > this.now()) {
+      return cached.value
+    }
+
+    const value = await this.evaluate(projectRoot, '.')
     this.cache.set(cacheKey, { value, expires: this.now() + this.cacheTtlMs })
     return value
   }
