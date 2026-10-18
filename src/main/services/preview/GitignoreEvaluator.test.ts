@@ -102,7 +102,7 @@ describe('GitignoreEvaluator', () => {
         '-c',
         `core.hooksPath=${devNull}`,
         '-c',
-        'include.path=',
+        `include.path=${devNull}`,
         'check-ignore',
         '--quiet',
         '--',
@@ -133,8 +133,13 @@ describe('GitignoreEvaluator', () => {
       const env = exec.mock.calls[0][2].env as NodeJS.ProcessEnv
       const keys = Object.keys(env).sort()
 
-      // Positive assertion: exactly the allowlist keys that are present + NOSYSTEM.
-      const expectedKeys = [...GIT_ENV_ALLOWLIST.filter((k) => process.env[k] !== undefined), 'GIT_CONFIG_NOSYSTEM'].sort()
+      // Positive assertion: exactly the allowlist keys that are present + the fixed GIT_* trio.
+      const expectedKeys = [
+        ...GIT_ENV_ALLOWLIST.filter((k) => process.env[k] !== undefined),
+        'GIT_CONFIG_NOSYSTEM',
+        'GIT_TERMINAL_PROMPT',
+        'GIT_OPTIONAL_LOCKS'
+      ].sort()
       expect(keys).toEqual(expectedKeys)
 
       expect(env['GIT_CONFIG_NOSYSTEM']).toBe('1')

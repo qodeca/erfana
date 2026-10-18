@@ -19,9 +19,11 @@
  *  - **Config overrides** neutralise the known code-execution key
  *    (`core.fsmonitor=`), redirect hooks to the null device
  *    (`core.hooksPath=<NULL_DEVICE>`) and disable ad-hoc includes
- *    (`include.path=`); `GIT_CONFIG_NOSYSTEM=1` drops system config.
+ *    (`include.path=<NULL_DEVICE>`; an empty value is rejected by git);
+ *    `GIT_CONFIG_NOSYSTEM=1` drops system config.
  *  - **Env is an ALLOWLIST**, not a blocklist (design NEW-13): only
- *    {@link GIT_ENV_ALLOWLIST} plus `GIT_CONFIG_NOSYSTEM` survive, so
+ *    {@link GIT_ENV_ALLOWLIST} plus the fixed `GIT_CONFIG_NOSYSTEM`,
+ *    `GIT_TERMINAL_PROMPT` and `GIT_OPTIONAL_LOCKS` (`utils/hardenedGit.ts`) survive, so
  *    `GIT_TRACE*` (an arbitrary-path append primitive), `GIT_WORK_TREE`,
  *    `GIT_INDEX_FILE`, `GIT_PROXY_COMMAND` and `GIT_CEILING_DIRECTORIES` cannot
  *    reach the child.
@@ -36,26 +38,20 @@
  */
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { isAbsolute, join } from 'node:path'
-import { devNull, tmpdir } from 'node:os'
+import { isAbsolute } from 'node:path'
+import { tmpdir } from 'node:os'
+import {
+  GIT_ENV_ALLOWLIST,
+  GIT_INCLUDE_OVERRIDE,
+  GIT_NULL_DEVICE,
+  buildGitEnv,
+  findOnPath
+} from '../../utils/hardenedGit'
+
+// Re-exported so existing importers (and the design NEW-13 env test) keep working.
+export { GIT_ENV_ALLOWLIST }
 
 const execFileAsync = promisify(execFile)
-
-/**
- * The ONLY environment variables passed to the git child, plus
- * `GIT_CONFIG_NOSYSTEM=1` added separately. An allowlist is the only form whose
- * test is writable as "no `GIT_*` variable other than `GIT_CONFIG_NOSYSTEM` is
- * present" (design NEW-13).
- */
-export const GIT_ENV_ALLOWLIST = [
-  'PATH',
-  'HOME',
-  'USERPROFILE',
-  'SystemRoot',
-  'TEMP',
-  'TMP',
-  'LANG'
-] as const
 
 /** Per-invocation timeout (ms). */
 const GIT_TIMEOUT_MS = 2000
@@ -114,40 +110,13 @@ const defaultExec: GitExecFn = (file, args, options) =>
  * a SAFE cwd with an absolute finder binary. Returns the first absolute hit or
  * `null`.
  */
-async function defaultResolveGitPath(tempDir: string): Promise<string | null> {
-  const isWin = process.platform === 'win32'
-  const finder = isWin
-    ? join(process.env['SystemRoot'] ?? 'C:\\Windows', 'System32', 'where.exe')
-    : '/usr/bin/which'
+async function defaultResolveGitPath(): Promise<string | null> {
   try {
-    const { stdout } = await execFileAsync(finder, ['git'], {
-      cwd: tempDir,
-      shell: false,
-      windowsHide: true,
-      timeout: GIT_TIMEOUT_MS
-    })
-    const first = stdout
-      .toString()
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .find((line) => line.length > 0)
+    const [first] = await findOnPath('git', GIT_TIMEOUT_MS)
     return first && isAbsolute(first) ? first : null
   } catch {
     return null
   }
-}
-
-/** Build the child env from the allowlist plus `GIT_CONFIG_NOSYSTEM`. */
-function buildGitEnv(): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = {}
-  for (const key of GIT_ENV_ALLOWLIST) {
-    const value = process.env[key]
-    if (value !== undefined) {
-      env[key] = value
-    }
-  }
-  env['GIT_CONFIG_NOSYSTEM'] = '1'
-  return env
 }
 
 interface CacheEntry {
@@ -209,9 +178,9 @@ export class GitignoreEvaluator implements IGitignoreEvaluator {
       '-c',
       'core.fsmonitor=',
       '-c',
-      `core.hooksPath=${devNull}`,
+      `core.hooksPath=${GIT_NULL_DEVICE}`,
       '-c',
-      'include.path=',
+      GIT_INCLUDE_OVERRIDE,
       'check-ignore',
       '--quiet',
       '--',

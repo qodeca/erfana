@@ -12,7 +12,7 @@
 import { parentPort } from 'worker_threads'
 import * as git from 'isomorphic-git'
 import fs from 'fs'
-import { isAbsolute, join, normalize } from 'path'
+import { isAbsolute, join, normalize, posix, win32 } from 'path'
 import { stat, access } from 'fs/promises'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
@@ -20,6 +20,7 @@ import { createEmptyGitStatusResponse } from '../../../shared/ipc/git-schema'
 import type { GitStatusResponse, GitDisplayStatus, GitFileEntry, GitStatusCounts } from '../../../shared/ipc/git-schema'
 import type { GitStatusStrategy } from '../../interfaces/IGitStatusWorker'
 import { GIT_STATUS } from '../../../shared/constants'
+import { buildHardeningArgs, findOnPath, hardenedSpawnOptions, listFilterNames } from '../../utils/hardenedGit'
 
 const execFileAsync = promisify(execFile)
 
@@ -298,14 +299,26 @@ async function executeIsomorphicGit(projectPath: string): Promise<GitStatusRespo
  * indicates detached HEAD, to resolve a 7-char SHA for parity with the
  * isomorphic-git path.
  */
-async function executeNativeGit(projectPath: string, gitPath: string): Promise<GitStatusResponse> {
+export async function executeNativeGit(projectPath: string, gitPath: string): Promise<GitStatusResponse> {
   // Serialize execFile calls (not Promise.all) to reduce peak FD usage from 6 to 3.
   // On large repos the directory watcher already consumes most available FDs;
   // parallel child process spawns can tip the system into EMFILE.
+  //
+  // The folder may be an untrusted repository, so every spawn runs from a cwd
+  // outside it with an allowlisted env and its config-driven command hooks
+  // neutralised (see `utils/hardenedGit.ts`). If the filter drivers cannot be
+  // enumerated we do not run native git at all.
+  const filterNames = await listFilterNames(gitPath, projectPath)
+  if (filterNames === null) {
+    console.warn('git-status.worker: repository config could not be isolated, falling back to isomorphic-git')
+    return executeIsomorphicGit(projectPath)
+  }
+  const hardeningArgs = buildHardeningArgs(projectPath, filterNames)
+
   const statusResult = await execFileAsync(
     gitPath,
-    ['status', '--porcelain=v1', '--branch', '-z', '--no-renames', '-uall'],
-    { cwd: projectPath, maxBuffer: GIT_STATUS.NATIVE_GIT_MAX_BUFFER, timeout: GIT_STATUS.NATIVE_GIT_TIMEOUT }
+    [...hardeningArgs, 'status', '--porcelain=v1', '--branch', '-z', '--no-renames', '-uall', '--ignore-submodules=all'],
+    { ...hardenedSpawnOptions(), maxBuffer: GIT_STATUS.NATIVE_GIT_MAX_BUFFER, timeout: GIT_STATUS.NATIVE_GIT_TIMEOUT }
   )
 
   const header = parseBranchHeader(statusResult.stdout)
@@ -316,7 +329,7 @@ async function executeNativeGit(projectPath: string, gitPath: string): Promise<G
   // An unborn branch (just-init repo) is NOT detached – we keep the branch name.
   if (header.isDetached) {
     try {
-      const { stdout } = await execFileAsync(gitPath, ['rev-parse', 'HEAD'], { cwd: projectPath, timeout: BRANCH_DETECT_TIMEOUT })
+      const { stdout } = await execFileAsync(gitPath, [...hardeningArgs, 'rev-parse', 'HEAD'], { ...hardenedSpawnOptions(), timeout: BRANCH_DETECT_TIMEOUT })
       branch = stdout.trim().substring(0, 7)
     } catch {
       branch = null
@@ -378,7 +391,7 @@ async function isExecutableGit(candidate: string): Promise<boolean> {
   try {
     if (process.platform === 'win32') {
       await access(candidate, fs.constants.F_OK)
-      await execFileAsync(candidate, ['--version'], { timeout: GIT_LIVENESS_TIMEOUT })
+      await execFileAsync(candidate, ['--version'], { ...hardenedSpawnOptions(), timeout: GIT_LIVENESS_TIMEOUT })
       return true
     }
     await access(candidate, fs.constants.X_OK)
@@ -414,10 +427,11 @@ export async function resolveGitPath(): Promise<string | null> {
     }
   }
 
-  const findCmd = process.platform === 'win32' ? 'where' : 'which'
+  // Absolute `which` / `where.exe` from a safe cwd – a bare finder name could be
+  // answered by a planted binary. Only an absolute hit is accepted.
   try {
-    const { stdout } = await execFileAsync(findCmd, ['git'], { timeout: BRANCH_DETECT_TIMEOUT })
-    nativeGitPath = stdout.trim().split('\n')[0] || null
+    const [first] = await findOnPath('git', BRANCH_DETECT_TIMEOUT)
+    nativeGitPath = first && (process.platform === 'win32' ? win32 : posix).isAbsolute(first) ? first : null
   } catch {
     nativeGitPath = null
   }
