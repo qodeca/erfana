@@ -135,6 +135,7 @@ All log files are stored in:
 ├── combined.log      # All logs from both processes
 ├── main.log          # Main process logs only
 ├── renderer.log      # Renderer process logs only
+├── crash.log         # Last-resort start-up / crash lines (see below)
 ├── combined.1.log    # Rotated (most recent)
 ├── combined.2.log    # Older
 └── ...
@@ -158,11 +159,32 @@ The `~/.erfana/logs` literal above is correct, but the single source of truth is
   - `main.log` -> `main.1.log` (most recent)
   - `main.1.log` -> `main.2.log`
   - ...
-  - `main.100.log` is deleted (oldest)
+  - `main.5.log` is deleted (oldest)
 
-**File limit:** 100 rotated files per type
+**File limit:** 5 rotated files per type. With three logs at 10MB each this keeps the folder to about 180MB (it used to be 100 files per type, up to about 3GB). Leftover `.N.log` files above the cap from older versions are removed by the next cleanup.
 
 **Retention:** Files older than **7 days** are automatically deleted
+
+**Low disk space:** cleanup runs at start-up and always prunes **oldest first**. Below 100MB free it adds a `Low disk space, pruning old logs` warning but still prunes – skipping the cleanup would let the logs keep filling the disk they are short of.
+
+### crash.log (start-up and crash fallback)
+
+`crash.log` is written **synchronously** by `src/main/utils/crashFallbackLog.ts`, for the moments when the normal logger cannot be trusted: it may not be set up yet (a start-up failure) or may not flush before the process dies.
+
+- Lines: `[timestamp] <tag> text`. Tags: `[crash] startup-settings-init`, `[crash] startup-logging-init`, `[crash] unhandled-rejection`, `[crash] uncaught-exception`
+- **Redacted**: no absolute paths or user names (quoted errno paths via `redactedLogError`, any other path-like text cut to its last segment), one line, at most 2,000 characters
+- **Rate-limited per tag**: one line per tag per 5 s; the next line says `(+N skipped)`
+- **Size cap**: at about 1MB it is renamed to `crash.1.log` (replacing the older one) and a fresh file starts. Both are removed by the 7-day retention
+- Never throws: if even this write fails, the app carries on
+
+### Renderer log limits
+
+The renderer is untrusted input, so entries arriving on `logging:log` are bounded in `LogEntrySchema` and in the handler:
+
+- **Size limits shorten, never reject**: message 8,000 characters, error message 8,000, stack 16,000, name 200, timestamp 64; a context keeps at most 50 keys, each value at most 4,000 characters (non-string values via their JSON form), 8,000 characters of JSON in total. Cut text ends in `[truncated]`; a cut context gets `"truncated": true`. A React `componentStack` therefore survives, shortened. Only a malformed shape (wrong type, unknown level) is rejected, and that is reported by a rate-limited `Invalid log entry from renderer` warning (at most one per 10 s)
+- **Per-sender rate cap** (10 s fixed window): normal records are limited to 200 records and 256K characters per sender; `error` and `fatal` have their **own** budget (50 records, 128K characters) so a flood of debug noise cannot starve them. When a window drops anything, one `[RENDERER] log records dropped (rate cap)` warning reports `senderId`, `suppressed` and `suppressedSevere`
+- **Control characters are escaped** (`SenderRateCap` is in `src/main/utils/`; escaping is `escapeControlChars` in `LoggingService.ts`): CR, LF, tab, the other C0/C1 controls, DEL and the Unicode line / paragraph separators become `\n`, `\r`, `\t` or `\uXXXX`, so one log call can only produce one line and a message cannot forge a second one. The same escaping applies to main-process messages, error text and stacks, so interpolated text such as a working directory is covered too (stacks are therefore written on one line with `\n`)
+- **No terminal output in logs**: the terminal service logs a PTY chunk's length only, never its content, and logs file and folder names rather than full paths (`redactPath`)
 
 ### Log format
 
@@ -201,7 +223,8 @@ Reading notes:
 
 - A `[hang] window-unresponsive` **followed by** `[hang] window-responsive` is a recoverable freeze, not a death. `render-process-gone` with no `responsive` line after it is the renderer actually going away.
 - The main-process records land in `main.log` (and `combined.log`) even though they describe renderer failures — they are written by main. The `[GlobalErrorTrail]` records come from the renderer and are prefixed `[RENDERER]`.
-- The handlers are deliberately **log-only**: no auto-reload, no dialog, no relaunch. A crash caused by restored state would re-crash on reload, so automated recovery would be a boot loop.
+- The handlers are deliberately **log-only**: no auto-reload, no dialog, no relaunch. (The one dialog Erfana adds is the start-up one: if the settings or the log files cannot be set up at launch, the app still opens its window and then shows a non-blocking message box once, see [Troubleshooting](./troubleshooting-advanced.md).) A crash caused by restored state would re-crash on reload, so automated recovery would be a boot loop.
+- `[crash] unhandled-rejection` (error) and `[crash] uncaught-exception` (error) come from the main-process listeners in `src/main/utils/processCrashLogging.ts`, and are also written to `crash.log`. The rejection listener logs and then **re-raises** the rejection as an uncaught exception in a microtask, so the app behaves as it did before the listener existed (Electron still shows its error). The benign shutdown timer race (`isBenignShutdownTimerError`) is logged but not re-raised. `uncaughtExceptionMonitor` only observes and changes nothing
 - `[crash] app crash logging already registered` (debug) means a duplicated bootstrap tried to register the app-scope listeners twice; registration is idempotent, so crash records are not doubled.
 
 ### Multi-instance support
@@ -255,7 +278,7 @@ The default log level is `info`. This captures normal operations, warnings, and 
 
 **Symlink error**: Logging service refuses symlinked logs directory for security. Remove symlink: `rm ~/.erfana/logs && mkdir -p ~/.erfana/logs`
 
-**Low disk space**: Log cleanup skipped below 100MB free. Free disk space to resume.
+**Low disk space**: Below 100MB free the cleanup warns and still prunes the oldest logs. Free disk space; the folder is capped at about 180MB.
 
 **IPC errors**: Check console for `Failed to send log to main process`. Verify preload script loads correctly.
 
@@ -265,8 +288,8 @@ The default log level is `info`. This captures normal operations, warnings, and 
 
 - **Single-sourced path**: the directory comes from `LOGS_DIR_RELATIVE` in `src/shared/constants.ts`, consumed by both `LoggingService` and the crash screen's degraded mode — edit the constant, never a hard-coded literal, or the symlink check and the crash screen can drift onto different directories
 - **Symlink protection**: `~/.erfana/logs/` validated as real directory (not symlink) on initialize
-- **Disk space checks**: Cleanup skipped below 100MB free
-- **Input validation**: Renderer log entries validated via Zod schema (`LogEntrySchema` in `logging-schema.ts`). Invalid entries rejected.
+- **Disk space checks**: Below 100MB free a warning is logged and old logs are still pruned oldest-first
+- **Input validation**: Renderer log entries validated via Zod schema (`LogEntrySchema` in `logging-schema.ts`). Malformed entries are rejected; oversized ones are shortened (see [Renderer log limits](#renderer-log-limits)).
 - **Sensitive data**: Never log passwords, API keys, file contents, PII, or session tokens. Log paths and sizes instead.
 
 ## Implementation details
