@@ -378,7 +378,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
           }
           visibilityObserverRef.current = null
           pendingInitRef.current = false
-          void initializeTerminal()
+          void initializeTerminalRef.current()
         }
       })
       try {
