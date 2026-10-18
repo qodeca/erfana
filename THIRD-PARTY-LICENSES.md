@@ -2350,7 +2350,7 @@ THE SOFTWARE.
 
 The following npm package may be included in this product:
 
- - fast-uri@3.1.7
+ - fast-uri@3.1.8
 
 This package contains the following license:
 
