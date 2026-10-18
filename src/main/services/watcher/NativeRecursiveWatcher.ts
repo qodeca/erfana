@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * NativeRecursiveWatcher – one directory watcher per project on Windows,
- * built on Node's own `fs.watch` (#211, design D1, D2, D3, D15).
+ * NativeRecursiveWatcher – one directory watcher per project on Windows and
+ * macOS, built on Node's own `fs.watch` (#211, design D1, D2, D3, D15). On
+ * macOS libuv serves a directory watch from FSEvents, so the plan costs no
+ * file descriptors per file there either.
  *
  * **Plan (D1).** The root is watched non-recursively. Every direct child
  * folder of a *split folder* gets one recursive watch, unless it is itself a
@@ -48,8 +50,10 @@
  * Log lines carry codes and counts, never paths.
  *
  * The drop test and the split paths use paths relative to `root`, with `/`
- * separators; the caller maps them to project-relative paths. Backslashes in
- * reported names are separators: this backend runs on Windows only (D6).
+ * separators; the caller maps them to project-relative paths. On Windows a
+ * backslash in a reported name is a separator and a `\\?\` prefix is
+ * stripped; elsewhere (`platform` option) only `/` separates and a backslash
+ * is an ordinary file-name character.
  */
 import { EventEmitter } from 'events'
 import fs from 'fs'
@@ -79,7 +83,8 @@ export const DEFAULT_MAX_SPLIT_DEPTH = 16
 const WARN_INTERVAL_MS = 10_000
 const NAMESPACE_PREFIX = '\\\\?\\'
 const UNC_NAMESPACE_PREFIX = '\\\\?\\UNC\\'
-const NAME_SEPARATORS = /[\\/]/
+const WINDOWS_NAME_SEPARATORS = /[\\/]/
+const POSIX_NAME_SEPARATORS = /\//
 
 /** The part of an `fs.FSWatcher` the watcher uses. */
 export interface NativeWatchHandle {
@@ -127,6 +132,8 @@ export interface NativeRecursiveWatcherOptions {
   readonly resyncMaxWaitMs?: number
   readonly reopenLimit?: number
   readonly reopenWindowMs?: number
+  /** Which path rules apply to reported names (`process.platform` by default). */
+  readonly platform?: NodeJS.Platform
 }
 
 /** The plan's size, for the `ready` log line. */
@@ -213,8 +220,8 @@ function isAtOrUnder(key: string, ancestor: string): boolean {
 }
 
 /** Only an absolute name can be a self-event; a relative one is never joined as absolute. */
-function isAbsoluteName(name: string): boolean {
-  return path.win32.isAbsolute(name) || name.startsWith('/')
+function isAbsoluteName(name: string, windowsPaths: boolean): boolean {
+  return windowsPaths ? path.win32.isAbsolute(name) || name.startsWith('/') : name.startsWith('/')
 }
 
 /** `\\?\UNC\server\share` → `\\server\share`; `\\?\C:\x` → `C:\x`. */
@@ -241,6 +248,9 @@ export class NativeRecursiveWatcher extends EventEmitter implements DirectoryWat
   private readonly reopenWindowMs: number
   private readonly splitFolderKeys: ReadonlySet<string>
   private readonly classifier: NativeEventClassifier
+  /** Windows path rules: `\` separates, and `\\?\` is a namespace prefix. */
+  private readonly windowsPaths: boolean
+  private readonly nameSeparators: RegExp
 
   private readonly watches = new Map<string, WatchRecord>()
   private readonly listings = new Map<string, SplitListing>()
@@ -281,6 +291,8 @@ export class NativeRecursiveWatcher extends EventEmitter implements DirectoryWat
     this.reopenLimit = options.reopenLimit ?? DEFAULT_REOPEN_LIMIT
     this.reopenWindowMs = options.reopenWindowMs ?? DEFAULT_REOPEN_WINDOW_MS
     this.planCapped = options.splitInputsCapped === true
+    this.windowsPaths = (options.platform ?? process.platform) === 'win32'
+    this.nameSeparators = this.windowsPaths ? WINDOWS_NAME_SEPARATORS : POSIX_NAME_SEPARATORS
     this.splitFolderKeys = this.buildSplitFolders(options.splitPaths, options.caps)
 
     const realpathNative = options.realpathNative ?? ((target: string): string => fs.realpathSync.native(target))
@@ -351,7 +363,7 @@ export class NativeRecursiveWatcher extends EventEmitter implements DirectoryWat
     const keys = new Set<string>([''])
     let used = 0
     for (const splitPath of splitPaths) {
-      const segments = splitPath.split(NAME_SEPARATORS).filter(segment => segment !== '' && segment !== '.')
+      const segments = splitPath.split(this.nameSeparators).filter(segment => segment !== '' && segment !== '.')
       if (segments.length === 0 || segments.includes('..')) continue
       if (used >= maxPaths || segments.length > maxDepth) {
         this.planCapped = true
@@ -694,11 +706,14 @@ export class NativeRecursiveWatcher extends EventEmitter implements DirectoryWat
       // A retired handle still open until its old name is classified floods
       // just the same if its folder is then deleted: close it on the first
       // absolute name, after which this branch is two comparisons
-      if (record.handle !== null && filename !== null && isAbsoluteName(filename)) this.closeHandle(record)
+      if (record.handle !== null && filename !== null && isAbsoluteName(filename, this.windowsPaths)) {
+        this.closeHandle(record)
+      }
       return
     }
-    if (filename !== null && isAbsoluteName(filename)) {
-      if (this.selfKeyOf(stripNamespace(filename)) === record.selfKey) this.onSelfEvent(record)
+    if (filename !== null && isAbsoluteName(filename, this.windowsPaths)) {
+      const name = this.windowsPaths ? stripNamespace(filename) : filename
+      if (this.selfKeyOf(name) === record.selfKey) this.onSelfEvent(record)
       return
     }
     if (filename === null) {
@@ -961,7 +976,7 @@ export class NativeRecursiveWatcher extends EventEmitter implements DirectoryWat
 
   private childRelOf(parentRel: string, filename: string): string | null {
     const segments: string[] = []
-    for (const segment of filename.split(NAME_SEPARATORS)) {
+    for (const segment of filename.split(this.nameSeparators)) {
       if (segment === '' || segment === '.') continue
       if (segment === '..') return null
       segments.push(segment)
@@ -974,7 +989,8 @@ export class NativeRecursiveWatcher extends EventEmitter implements DirectoryWat
   }
 
   private selfKeyOf(absolutePath: string): string {
-    return this.fold(absolutePath.replace(/\\/g, '/').replace(/\/+$/, ''))
+    const slashed = this.windowsPaths ? absolutePath.replace(/\\/g, '/') : absolutePath
+    return this.fold(slashed.replace(/\/+$/, ''))
   }
 
   private toAbs(rel: string): string {

@@ -178,8 +178,8 @@ export class FileWatcherService {
    * Create a chokidar watcher for one path with this service's handlers.
    *
    * Shared by the initial watch and by the atomic re-arm so the production
-   * option object - including the load-bearing `disableGlobbing: true` v3 pin -
-   * and the three handler registrations exist exactly once (issue #70, M3).
+   * option object and the three handler registrations exist exactly once
+   * (issue #70, M3).
    */
   private createWatcher(filePath: string): FSWatcher {
     return createSingleFileWatcher(filePath, {

@@ -22,7 +22,7 @@
  *
  * A watched path is DATA: its confinement is re-verified, never followed.
  */
-import type { FSWatcher, WatchOptions } from 'chokidar'
+import type { FSWatcher, ChokidarOptions } from 'chokidar'
 import { AtomicSaveDetector, createAtomicSaveDetector } from './AtomicSaveDetector'
 import { createSingleFileWatcher } from './singleFileWatch'
 import { AtomicRearmDeps, RearmableWatch, resolveDeletedWatch } from './atomicRearm'
@@ -44,7 +44,7 @@ export interface RearmingSingleFileWatchDeps {
   readonly createWatcher?: (
     filePath: string,
     handlers: { onChange: () => void; onUnlink: () => void; onError: (error: unknown) => void },
-    overrides?: Partial<WatchOptions>
+    overrides?: Partial<ChokidarOptions>
   ) => FSWatcher
   /**
    * Re-check that the path still resolves inside its boundary before re-arming,
@@ -55,7 +55,7 @@ export interface RearmingSingleFileWatchDeps {
   /** The atomic-save detector; defaults to a fresh `createAtomicSaveDetector`. */
   readonly createDetector?: () => AtomicSaveDetector
   /** chokidar options forwarded to the low-level factory. */
-  readonly overrides?: Partial<WatchOptions>
+  readonly overrides?: Partial<ChokidarOptions>
 }
 
 /** The disposable a caller holds; matches `PreviewFileWatcherHandle`. */

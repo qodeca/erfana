@@ -110,14 +110,14 @@ The deferred high advisories in this chain ([issue #39](https://github.com/qodec
 
 ## Deliberate version pins — do not "fix" these
 
-### chokidar 3.6.0 (exact, plus an override)
+### chokidar 5.0.0 (exact, plus an override)
 
 ```json
-"dependencies": { "chokidar": "3.6.0" },
-"overrides":    { "chokidar": "3.6.0" }
+"dependencies": { "chokidar": "5.0.0" },
+"overrides":    { "chokidar": "5.0.0" }
 ```
 
-Pinned exactly **and** forced across the whole tree by an `overrides` entry. **Do not bump to v4.** chokidar v4 opens one file descriptor per watched file, which exhausts the process FD limit on large project folders (>~10k files) and crashes the PDF/DOCX export render window at sandbox init. v3 uses FSEvents on macOS and consumes roughly no FDs per file. Every watch configuration in the app also passes `disableGlobbing: true`.
+Pinned exactly **and** forced across the whole tree by an `overrides` entry. chokidar 3 pulled `braces` (GHSA-vfj7-8cjw-p6xm, high, no patched release) into the production tree; with chokidar 5 it is dev-only. **Do not go back to v3.** chokidar 4+ is ESM-only, has no globbing (glob characters in a file name are taken literally; `disableGlobbing` no longer exists) and has no FSEvents on macOS – it opens one file descriptor per watched file. That is the reason the old 3.6.0 pin existed: on a large project folder (>~10k files) it exhausts the process FD limit and crashes the PDF/DOCX export render window at sandbox init. So on macOS the **project directory watcher** no longer uses chokidar: it runs on `NativeRecursiveWatcher` (Node's recursive `fs.watch`, which libuv serves from FSEvents, ~0 FDs per file), as on Windows – see [File watching § Watch backends](../file-watching/README.md#watch-backends-211). Single-file watches stay on chokidar, where the FD cost is small. The `Guard - chokidar 5 pinned, no braces in production` step in `checks.yml` fails CI on any drift or on `braces` reappearing in production. Dependabot ignores chokidar, so bump it by hand.
 
 ### lodash and lodash-es 4.18.1 (overrides)
 

@@ -13,7 +13,7 @@ Performance considerations, security measures, edge case handling, and integrati
 - Handles rapid successive writes (e.g., auto-save in external editor)
 
 **Directory Watcher**: Fixed-stage pipeline (VS Code values), not an adaptive delay
-- chokidar runs with `awaitWriteFinish: false` (lower latency for editor saves); on Windows the native backend emits once its `lstat` classification is back, and folds lost events into one resync debounced to 1 s quiet / 5 s maximum wait (#211)
+- chokidar runs with `awaitWriteFinish: false` (lower latency for editor saves); on Windows and macOS the native backend emits once its `lstat` classification is back, and folds lost events into one resync debounced to 1 s quiet / 5 s maximum wait (#211)
 - `ThrottledWorker` (`src/main/services/watcher/ThrottledWorker.ts`): 75 ms collection window, then chunks of up to 500 events dispatched with a 200 ms throttle between chunks (`collectionDelay: 75`, `throttleDelay: 200` in `DirectoryWatcherService.watchDirectory`)
 - `AtomicSaveDetector`: a delete is held ~100 ms so an atomic write (unlink + rename) coalesces into a change instead of a delete
 - Renderer: `directory-watch:changed` is debounced a further 250 ms (`DIRECTORY_WATCHER.DEBOUNCE_DELAY`, `ProjectTree/constants.ts`)
@@ -44,8 +44,8 @@ Log lines, and how to check from `main.log` that no two walks of a project overl
 ### Resource Limits
 
 - **File watcher**: 100 file limit (prevents memory issues)
-- **Directory watcher, chokidar (macOS, Linux)**: no handle limit of its own; excluded, hidden and ignored folders are never scanned
-- **Directory watcher, Windows native backend (#211)**: at most 512 `fs.watch` handles per project; 64 exclude path entries and 64 walk hints as split paths, each at most 16 segments deep; at most 2 `lstat` calls in flight and 10,000 queued paths; at most 3 re-opens of one path per 60 s
+- **Directory watcher, chokidar (Linux)**: no handle limit of its own; excluded, hidden and ignored folders are never scanned
+- **Directory watcher, native backend (Windows #211, macOS)**: at most 512 `fs.watch` handles per project; 64 exclude path entries and 64 walk hints as split paths, each at most 16 segments deep; at most 2 `lstat` calls in flight and 10,000 queued paths; at most 3 re-opens of one path per 60 s
 - **Exclude list (#211)**: per settings file 256 entries and 4,096 characters; merged list 512 entries and 8,192 characters; per entry 256 characters, 8 wildcards, 4 `**` segments; 20,000 character comparisons per match, and pattern entries switch off for the rest of the project session after 100 overruns
 - **Cleanup**: Automatic on window close and app quit
 

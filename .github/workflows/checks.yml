@@ -98,23 +98,27 @@ jobs:
           # binary + node-pty are present for vitest.
           run-postinstall: "true"
 
-      # Guard: chokidar pinned to exact 3.6.0.
-      # v4 removed disableGlobbing — DirectoryWatcherService /
-      # FileWatcherService / GitWatcherService all rely on it (FD-exhaustion
-      # fix shipped in merge 1139bf2). A regenerated lockfile, an
-      # `npm install chokidar` bump, or a transitive declaring ^4 would all
-      # have failed today's clean-checkout typecheck silently in the past;
-      # this guard makes it loud. Runs before tests so we know what's being
-      # tested.
-      - name: Guard - chokidar v3 pinned
+      # Guard: chokidar pinned to exact 5.0.0, and no chokidar 3 left.
+      # chokidar 3 pulled `braces` (GHSA-vfj7-8cjw-p6xm, no patched release)
+      # into the production tree. 5.0.0 has no globbing and no fsevents, so
+      # the macOS project tree runs on NativeRecursiveWatcher instead
+      # (directoryWatchBackend.ts). A regenerated lockfile or a transitive
+      # declaring ^3 would quietly bring braces back; this guard makes it
+      # loud. Runs before tests so we know what's being tested.
+      - name: Guard - chokidar 5 pinned, no braces in production
         run: |
           set -euo pipefail
           ACTUAL=$(node -p "require('chokidar/package.json').version")
-          if [ "$ACTUAL" != "3.6.0" ]; then
-            echo "::error::chokidar version drift: expected 3.6.0, got $ACTUAL — see package.json overrides and #1416"
+          if [ "$ACTUAL" != "5.0.0" ]; then
+            echo "::error::chokidar version drift: expected 5.0.0, got $ACTUAL — see package.json overrides"
             exit 1
           fi
-          echo "chokidar pinned at $ACTUAL"
+          BRACES=$(npm ls braces --omit=dev --all --parseable 2>/dev/null || true)
+          if [ -n "$BRACES" ]; then
+            echo "::error::braces is back in the production tree (GHSA-vfj7-8cjw-p6xm): $BRACES"
+            exit 1
+          fi
+          echo "chokidar pinned at $ACTUAL; no braces in production"
 
       - name: Unit tests
         # Deprecation tripwire: captures vitest output and fails if any

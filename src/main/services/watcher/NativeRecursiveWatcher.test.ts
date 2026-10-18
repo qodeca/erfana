@@ -248,6 +248,8 @@ function startWatcher(fsx: FakeFs, overrides: Partial<NativeRecursiveWatcherOpti
   const watcher = new NativeRecursiveWatcher(ROOT, {
     splitPaths: STANDARD_SPLIT_PATHS,
     caseSensitive: false,
+    // The fake root and the reported names are Windows paths, whatever the host.
+    platform: 'win32',
     fsWatch: fsx.fsWatch,
     lstat: fsx.lstat,
     readdir: fsx.readdir,
@@ -1300,6 +1302,48 @@ describe('NativeRecursiveWatcher (#211, W12)', () => {
       await flush()
 
       expect(of('ready')).toHaveLength(0)
+    })
+  })
+
+  describe('POSIX path rules (macOS)', () => {
+    const POSIX_ROOT = '/real/proj'
+
+    // The watcher joins its own folder paths with the host's `path`, so this needs a POSIX host.
+    it.skipIf(process.platform === 'win32')('closes the handle on an absolute self-event', async () => {
+      const fsx = standardTree(new FakeFs(POSIX_ROOT))
+      const { paths } = startWatcher(fsx, { platform: 'darwin' })
+      await flush()
+      fsx.remove('src')
+      const handle = fsx.open('src')
+
+      handle.fire('rename', `${POSIX_ROOT}/src`)
+
+      expect(handle.close).toHaveBeenCalledTimes(1)
+      await flush()
+      expect(paths('unlinkDir')).toEqual(['src'])
+    })
+
+    it('does not read a \\\\?\\ name as an absolute self-event', async () => {
+      const fsx = standardTree(new FakeFs(POSIX_ROOT))
+      startWatcher(fsx, { platform: 'darwin' })
+      await flush()
+      const handle = fsx.open('src')
+
+      handle.fire('rename', `\\\\?\\${POSIX_ROOT}/src`)
+
+      expect(handle.close).not.toHaveBeenCalled()
+    })
+
+    it('keeps a backslash inside one name segment', async () => {
+      const fsx = standardTree(new FakeFs(POSIX_ROOT))
+      const { shouldDrop } = startWatcher(fsx, { platform: 'darwin' })
+      await flush()
+
+      fsx.open('src').fire('change', 'deep\\file.txt')
+      await flush()
+
+      expect(shouldDrop).toHaveBeenCalledWith('src/deep\\file.txt')
+      expect(shouldDrop).not.toHaveBeenCalledWith('src/deep/file.txt')
     })
   })
 })
