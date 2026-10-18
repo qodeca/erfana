@@ -53,4 +53,17 @@ describe('FileService.writeFile atomic save', () => {
       code: 'ENOENT'
     })
   })
+
+  it('never lists an atomic-save temp file in the tree', async () => {
+    await mkdir(join(testDir, 'docs'))
+    await writeFile(join(testDir, 'docs', 'note.md'), 'x')
+    await writeFile(join(testDir, 'docs', '.erfana-tmp-1234'), 'partial')
+    await writeFile(join(testDir, '.erfana-tmp-root'), 'partial')
+
+    const tree = await fileService.readDirectory(testDir)
+
+    const names = JSON.stringify(tree)
+    expect(names).toContain('note.md')
+    expect(names).not.toContain('.erfana-tmp-')
+  })
 })

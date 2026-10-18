@@ -9,8 +9,9 @@
  * @see ProjectLockService.ts - uses atomic writes for lock files
  * @see Spec #010 - Multi-instance support specification
  */
-import { writeFile, rename, unlink, lstat, open } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { writeFile, rename, unlink, lstat, open, access, constants } from 'node:fs/promises'
+import { realpath as realpathCallback } from 'node:fs'
+import { dirname, join, basename } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { logger } from '../services/LoggingService'
 import { redactedLogError } from './redactUserInput'
@@ -32,6 +33,8 @@ export function isAtomicTempName(path: string): boolean {
 const DEFAULT_NEW_FILE_MODE = 0o666
 /** Permission bits kept from the original file (setuid etc. are not copied). */
 const PERMISSION_BITS = 0o777
+/** Owner-write bit of a mode. */
+const OWNER_WRITE_BIT = 0o200
 
 /**
  * Writes JSON content atomically using write-to-temp-then-rename pattern.
@@ -63,6 +66,12 @@ export async function atomicWriteJSON<T>(
       space === undefined
         ? JSON.stringify(content)
         : `${JSON.stringify(content, null, space)}\n`
+    // A symlink (e.g. a dotfile manager's `settings.json`) or a hard-linked
+    // target must keep its link, which a rename over it would break: write in place.
+    if (await isLinkedTarget(filePath)) {
+      await writeFile(filePath, serialized, { encoding: 'utf8', flush: true })
+      return
+    }
     // Write to temp file with owner-only permissions
     await writeFile(tempPath, serialized, {
       encoding: 'utf8',
@@ -88,62 +97,151 @@ export async function atomicWriteJSON<T>(
 const RENAME_RETRYABLE = new Set(['EPERM', 'EBUSY', 'EACCES'])
 const RENAME_BACKOFFS_MS = [10, 30, 100]
 
+/** `fs.realpath.native`: the on-disk spelling of the name, also on case-insensitive disks. */
+const realpathNative = (path: string): Promise<string> =>
+  new Promise((resolve, reject) =>
+    realpathCallback.native(path, (error, resolved) => (error ? reject(error) : resolve(resolved)))
+  )
+
+/** Whether `filePath` is a symlink or has other hard links (both must survive a save). */
+async function isLinkedTarget(filePath: string): Promise<boolean> {
+  try {
+    const info = await lstat(filePath)
+    return info.isSymbolicLink() || info.nlink > 1
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false
+    throw error
+  }
+}
+
+/** Temp file cannot be created here (unwritable folder around a writable file). */
+const TEMP_CREATE_FALLBACK_CODES = new Set(['EACCES', 'EPERM'])
+/** The file system cannot do rename/fsync (network and FUSE mounts). */
+const UNSUPPORTED_FS_CODES = new Set(['EXDEV', 'ENOTSUP', 'EINVAL', 'ENOSYS'])
+
+const errorCode = (error: unknown): string | undefined => (error as NodeJS.ErrnoException).code
+
+async function writeInPlace(filePath: string, data: string): Promise<void> {
+  await writeFile(filePath, data, { encoding: 'utf8', flush: true })
+}
+
+/** In-place write after the atomic route was given up, with a path-free warning. */
+async function fallBackInPlace(filePath: string, data: string, step: string, error: unknown): Promise<void> {
+  logger.warn('atomicWriteText: atomic route unavailable, writing in place', {
+    step,
+    code: errorCode(error),
+    error: redactedLogError(error)?.message
+  })
+  await writeInPlace(filePath, data)
+}
+
+/**
+ * What a save of `filePath` does: write in place (`null`), or replace the
+ * returned on-disk path by rename, keeping the returned mode (`undefined`
+ * mode = a new file).
+ */
+async function planAtomicTarget(
+  filePath: string
+): Promise<{ target: string; mode: number | undefined } | null> {
+  let info
+  try {
+    info = await lstat(filePath)
+  } catch (error) {
+    if (errorCode(error) === 'ENOENT') return { target: filePath, mode: undefined }
+    throw error
+  }
+  if (info.isSymbolicLink() || info.nlink > 1) return null
+  // Not ours (a file of another user in a shared folder): a rename would change its owner
+  if (process.platform !== 'win32' && typeof process.getuid === 'function' && info.uid !== process.getuid()) {
+    return null
+  }
+  // Read-only files keep refusing to save: an in-place write fails with EACCES,
+  // where a rename would silently replace the file (the folder is writable).
+  if ((info.mode & OWNER_WRITE_BIT) === 0) return null
+  try {
+    await access(filePath, constants.W_OK)
+  } catch {
+    return null
+  }
+  // On a case-insensitive disk `Notes.md` can name the file `notes.md`: rename onto
+  // the on-disk spelling, or the file would be renamed by its own save.
+  let target = filePath
+  try {
+    const real = await realpathNative(filePath)
+    if (basename(real).toLowerCase() === basename(filePath).toLowerCase()) {
+      target = join(dirname(filePath), basename(real))
+    }
+  } catch {
+    // keep the path as given
+  }
+  return { target, mode: info.mode & PERMISSION_BITS }
+}
+
 /**
  * Writes text to `filePath` so a crash or power loss mid-save never truncates
  * the existing file: the data goes to a temp file in the same directory
  * (`ATOMIC_TEMP_PREFIX` + uuid), is fsynced, then renamed over the target.
  *
- * The original file's permission bits are kept. The temp file is always
- * removed on failure.
+ * The original file's permission bits are kept (a failing chmod is not fatal).
+ * The temp file is always removed on failure.
  *
  * Writes IN PLACE (non-atomic) instead, deliberately, when:
  *  - the target is a symlink: a rename would replace the link itself with a
  *    regular file instead of updating what it points to;
  *  - the target has more than one hard link (`nlink > 1`): a rename would give
  *    this name a new inode and silently detach it from the other names;
+ *  - the file belongs to another user (POSIX): a rename would change its owner;
+ *  - the file is read-only for its owner or not writable: the save must keep
+ *    failing with EACCES, as before, instead of replacing it;
+ *  - a temp file cannot be created (EACCES/EPERM: unwritable folder around a
+ *    writable file), or the rename/fsync is unsupported (EXDEV, ENOTSUP,
+ *    EINVAL, ENOSYS: network and FUSE mounts): a warning, then the in-place write;
  *  - on Windows the rename keeps failing with EPERM/EBUSY/EACCES after the
- *    retries (the file is open in another app): a logged warning, then the
- *    in-place write, so a save still succeeds.
+ *    retries (the file is open in another app): the same warning and fallback.
  *
+ * Trade-off: only the mode is carried over. Extended attributes, ACLs, macOS
+ * Finder tags and Windows alternate data streams live on the old inode and do
+ * not follow a rename.
+ *
+ * On a case-insensitive disk the rename targets the on-disk spelling of the name.
  * Callers are responsible for the parent directory existing.
  */
 export async function atomicWriteText(filePath: string, data: string): Promise<void> {
-  let existingMode: number | undefined
-  try {
-    const info = await lstat(filePath)
-    if (info.isSymbolicLink() || info.nlink > 1) {
-      await writeFile(filePath, data, { encoding: 'utf8', flush: true })
-      return
-    }
-    existingMode = info.mode & PERMISSION_BITS
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+  const plan = await planAtomicTarget(filePath)
+  if (plan === null) {
+    await writeInPlace(filePath, data)
+    return
   }
 
-  const tempPath = join(dirname(filePath), `${ATOMIC_TEMP_PREFIX}${randomUUID()}`)
+  const { target, mode } = plan
+  const tempPath = join(dirname(target), `${ATOMIC_TEMP_PREFIX}${randomUUID()}`)
+  let step = 'create'
   try {
-    const handle = await open(tempPath, 'wx', existingMode ?? DEFAULT_NEW_FILE_MODE)
+    const handle = await open(tempPath, 'wx', mode ?? DEFAULT_NEW_FILE_MODE)
     try {
+      step = 'write'
       await handle.writeFile(data, 'utf8')
-      // open()'s mode is masked by the umask; restore the original bits exactly
-      if (existingMode !== undefined) await handle.chmod(existingMode)
+      if (mode !== undefined) {
+        // open()'s mode is masked by the umask; restore the original bits exactly
+        await handle.chmod(mode).catch(() => undefined)
+      }
+      step = 'sync'
       await handle.sync()
     } finally {
       await handle.close()
     }
-    await renameWithRetry(tempPath, filePath)
+    step = 'rename'
+    await renameWithRetry(tempPath, target)
   } catch (error) {
     await unlink(tempPath).catch(() => undefined)
-    const code = (error as NodeJS.ErrnoException).code
-    if (process.platform === 'win32' && code && RENAME_RETRYABLE.has(code)) {
-      logger.warn('atomicWriteText: rename kept failing, writing in place', {
-        code,
-        error: redactedLogError(error)?.message
-      })
-      await writeFile(filePath, data, { encoding: 'utf8', flush: true })
-      return
-    }
-    throw error
+    const code = errorCode(error)
+    const giveUp =
+      code !== undefined &&
+      ((step === 'create' && TEMP_CREATE_FALLBACK_CODES.has(code)) ||
+        ((step === 'sync' || step === 'rename') && UNSUPPORTED_FS_CODES.has(code)) ||
+        (step === 'rename' && process.platform === 'win32' && RENAME_RETRYABLE.has(code)))
+    if (!giveUp) throw error
+    await fallBackInPlace(filePath, data, step, error)
   }
 }
 
