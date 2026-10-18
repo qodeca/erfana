@@ -10,7 +10,8 @@ const randomizedDecrypt = (b: Buffer): string => b.toString().split('|').slice(1
 const mockSafeStorage = vi.hoisted(() => ({
   isEncryptionAvailable: vi.fn<[], boolean>(() => true),
   encryptString: vi.fn<[string], Buffer>(),
-  decryptString: vi.fn<[Buffer], string>()
+  decryptString: vi.fn<[Buffer], string>(),
+  getSelectedStorageBackend: vi.fn<[], string>(() => 'gnome_libsecret')
 }))
 
 vi.mock('electron', () => ({
@@ -20,6 +21,9 @@ vi.mock('electron', () => ({
 // In-memory stand-in for the secret file
 const files = vi.hoisted(() => new Map<string, Buffer>())
 
+// Hook that lets a test act "between" our read and our link (the race window)
+const beforeLink = vi.hoisted(() => ({ fn: null as (() => void) | null }))
+
 vi.mock('node:fs', () => ({
   mkdirSync: vi.fn(),
   readFileSync: vi.fn((path: string) => {
@@ -27,11 +31,16 @@ vi.mock('node:fs', () => ({
     if (!data) throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
     return data
   }),
-  writeFileSync: vi.fn((path: string, data: Buffer, opts?: { flag?: string }) => {
-    if (opts?.flag === 'wx' && files.has(path)) {
-      throw Object.assign(new Error('EEXIST'), { code: 'EEXIST' })
-    }
+  writeFileSync: vi.fn((path: string, data: Buffer) => {
     files.set(path, data)
+  }),
+  linkSync: vi.fn((from: string, to: string) => {
+    beforeLink.fn?.()
+    if (files.has(to)) throw Object.assign(new Error('EEXIST'), { code: 'EEXIST' })
+    files.set(to, files.get(from)!)
+  }),
+  unlinkSync: vi.fn((path: string) => {
+    files.delete(path)
   })
 }))
 
@@ -59,6 +68,8 @@ describe('lockHmac', () => {
     mockSafeStorage.encryptString.mockReset()
     mockSafeStorage.decryptString.mockReset()
     files.clear()
+    beforeLink.fn = null
+    mockSafeStorage.getSelectedStorageBackend.mockReturnValue('gnome_libsecret')
     mockSafeStorage.isEncryptionAvailable.mockReturnValue(true)
     mockSafeStorage.encryptString.mockImplementation(randomizedEncrypt)
     mockSafeStorage.decryptString.mockImplementation(randomizedDecrypt)
@@ -116,6 +127,50 @@ describe('lockHmac', () => {
     const second = signLock(baseLock)
     expect(second).toBe(first)
     expect(verifyLock({ ...baseLock, hmac: first! })).toBe('valid')
+  })
+
+  it('race: a secret published by another instance is used, never overwritten', () => {
+    // The other instance publishes its secret after our first read, before our link
+    const otherSecret = 'ab'.repeat(32)
+    const otherFile = Buffer.from(`other|${otherSecret}`)
+    beforeLink.fn = () => {
+      beforeLink.fn = null
+      // Only our temp file exists so far; the secret lives next to it
+      const [tempPath] = [...files.keys()]
+      files.set(tempPath.replace(/[^/\\]*\.tmp$/, 'lock-hmac-secret.enc'), otherFile)
+    }
+    const hmac = signLock(baseLock)!
+
+    const [published] = [...files.entries()]
+    expect(published[1]).toBe(otherFile)
+    // Signed with the other instance's secret, so both instances agree
+    _resetForTesting()
+    expect(signLock(baseLock)).toBe(hmac)
+    expect(files.size).toBe(1)
+  })
+
+  it('never overwrites an existing secret it cannot decrypt (no key for this run)', () => {
+    signLock(baseLock)
+    const [[path, original]] = [...files.entries()]
+    mockSafeStorage.decryptString.mockImplementation(() => {
+      throw new Error('cannot decrypt')
+    })
+    _resetForTesting()
+
+    expect(signLock(baseLock)).toBeUndefined()
+    expect(files.get(path)).toBe(original)
+    expect(files.size).toBe(1)
+  })
+
+  it.skipIf(process.platform !== 'linux')('is disabled on the Linux basic_text backend', () => {
+    mockSafeStorage.getSelectedStorageBackend.mockReturnValue('basic_text')
+    expect(signLock(baseLock)).toBeUndefined()
+    expect(verifyLock({ ...baseLock, hmac: 'a'.repeat(64) })).toBe('no-key')
+  })
+
+  it('rejects a signature of the wrong length without throwing', () => {
+    signLock(baseLock)
+    expect(verifyLock({ ...baseLock, hmac: 'abc' })).toBe('invalid')
   })
 
   it('stores the secret encrypted, never as the readable key', () => {

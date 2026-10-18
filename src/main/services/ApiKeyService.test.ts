@@ -26,6 +26,11 @@ const mockSafeStorage = {
   isAsyncEncryptionAvailable: vi.fn(async () => true),
   getSelectedStorageBackend: vi.fn(() => 'gnome_libsecret'),
   encryptStringAsync: vi.fn(async (str: string) => Buffer.from(`encrypted:${str}`)),
+  decryptString: vi.fn((buf: Buffer) => {
+    const text = buf.toString()
+    if (!text.startsWith('sync:')) throw new Error('Decryption failed')
+    return text.replace('sync:', '')
+  }),
   decryptStringAsync: vi.fn(async (buf: Buffer) => {
     const text = buf.toString()
     if (!text.startsWith('encrypted:')) throw new Error('Decryption failed')
@@ -43,6 +48,10 @@ vi.mock('electron', () => ({
 
 const mockReadFile = vi.fn()
 const mockWriteFile = vi.fn()
+// The service writes through the atomic writer (temp file, fsync, rename)
+vi.mock('../utils/atomicWrite', () => ({
+  atomicWriteBytes: (...args: unknown[]) => mockWriteFile(...args)
+}))
 const mockUnlink = vi.fn()
 const mockAccess = vi.fn()
 const mockMkdir = vi.fn()
@@ -114,8 +123,7 @@ describe('ApiKeyService', () => {
       expect(mockSafeStorage.encryptStringAsync).toHaveBeenCalledWith('sk-test-key-123')
       expect(mockWriteFile).toHaveBeenCalledWith(
         path.join(MOCK_HOME, '.erfana', 'openai-api-key.enc'),
-        expect.any(Buffer),
-        { mode: 0o600 }
+        expect.any(Buffer)
       )
     })
 
@@ -212,8 +220,7 @@ describe('ApiKeyService', () => {
       expect(key).toBe('sk-plaintext-key')
       expect(mockWriteFile).toHaveBeenCalledWith(
         path.join(MOCK_HOME, '.erfana', 'openai-api-key.enc'),
-        Buffer.from('encrypted:sk-plaintext-key'),
-        { mode: 0o600 }
+        Buffer.from('encrypted:sk-plaintext-key')
       )
     })
 
@@ -236,6 +243,19 @@ describe('ApiKeyService', () => {
       const service = createApiKeyService()
 
       expect(await service.getKey('openai')).toBeNull()
+    })
+
+    it('migration: falls back to the sync decrypt and rewrites with the async API', async () => {
+      mockReadFile.mockResolvedValue(Buffer.from('sync:sk-from-sync'))
+
+      const { createApiKeyService } = await import('./ApiKeyService')
+      const service = createApiKeyService()
+
+      expect(await service.getKey('openai')).toBe('sk-from-sync')
+      expect(mockWriteFile).toHaveBeenCalledWith(
+        path.join(MOCK_HOME, '.erfana', 'openai-api-key.enc'),
+        Buffer.from('encrypted:sk-from-sync')
+      )
     })
 
     it('re-encrypts when the OS asks for it', async () => {
@@ -452,13 +472,11 @@ describe('ApiKeyService', () => {
 
       expect(mockWriteFile).toHaveBeenCalledWith(
         path.join(MOCK_HOME, '.erfana', 'openai-api-key.enc'),
-        expect.any(Buffer),
-        { mode: 0o600 }
+        expect.any(Buffer)
       )
       expect(mockWriteFile).toHaveBeenCalledWith(
         path.join(MOCK_HOME, '.erfana', 'anthropic-api-key.enc'),
-        expect.any(Buffer),
-        { mode: 0o600 }
+        expect.any(Buffer)
       )
     })
 
