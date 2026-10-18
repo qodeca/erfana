@@ -277,8 +277,8 @@ File operations with validation and error handling.
 
 ### Public Methods
 
-#### `readFile(filePath: string): Promise<string>` / `writeFile(filePath, content): Promise<void>`
-Read or write file contents (UTF-8). Throws on FS error.
+#### `readFile(filePath: string): Promise<string>` / `writeFile(filePath, content, options?): Promise<void>`
+Read or write file contents (UTF-8). Throws on FS error. `options.createParentDirs` recreates missing parent folders first, inside the open project only; the editor sets it only for the manual "Save to restore it" of a tab whose folder was renamed or deleted (see [File watching § Use Cases](./file-watching/README.md#use-cases)).
 
 **Throws:** Error if write fails.
 

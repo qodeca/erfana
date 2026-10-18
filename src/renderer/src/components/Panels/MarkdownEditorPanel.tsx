@@ -49,7 +49,13 @@ import { DocumentStatsBar } from './DocumentStatsBar'
 
 // Types and pure functions
 import type { ViewMode, EditorFile } from '../Editor/MarkdownEditorPanel/types'
-import { calculateStats, extractFileName, getDefaultViewMode } from './markdownEditorPanel.logic'
+import {
+  calculateStats,
+  extractFileName,
+  formatSaveErrorMessage,
+  getDefaultViewMode,
+  shouldToastSaveError
+} from './markdownEditorPanel.logic'
 import { formatTabTitle } from '../../utils/tabTitle'
 
 // Shared constants
@@ -124,6 +130,8 @@ export function MarkdownEditorPanel(
   const previewRef = useRef<HTMLDivElement>(null)
   const previewHandleRef = useRef<MarkdownPreviewHandle>(null)
   const saveGuardRef = useRef<ReturnType<typeof createFileSaveGuard> | null>(null)
+  /** The last save-failure toast, so a failing autosave does not repeat it every few seconds */
+  const lastSaveErrorRef = useRef<string | null>(null)
 
   // =========================================================================
   // Dialog and Toast
@@ -231,8 +239,16 @@ export function MarkdownEditorPanel(
       const contentToSave =
         editorRef.current?.getEditor()?.getValue() ?? currentFile.content
 
-      // Step 4: Write to disk
-      await window.api.file.writeFile(currentFile.path, contentToSave)
+      // Step 4: Write to disk. A manual save of a tab in the deleted state is
+      // the banner's "Save to restore it", so it may recreate the folder the
+      // file lived in (its folder was renamed or deleted). An autosave never
+      // does: it would silently resurrect a folder someone just renamed.
+      if (isFileDeleted && !isAutoSave) {
+        await window.api.file.writeFile(currentFile.path, contentToSave, { createParentDirs: true })
+      } else {
+        await window.api.file.writeFile(currentFile.path, contentToSave)
+      }
+      lastSaveErrorRef.current = null
 
       // Step 5: Record saved content for self-save echo detection (#124)
       notifySaveComplete(contentToSave)
@@ -269,13 +285,21 @@ export function MarkdownEditorPanel(
     } catch (error) {
       logger.error('Error saving file', error instanceof Error ? error : undefined)
       setIsAutoSaving(false)
+      // Never fail silently: the tab stays dirty and the buffer keeps the edit,
+      // so say why. A manual save always shows it; an autosave repeats only a
+      // reason the user has not seen yet.
+      const message = formatSaveErrorMessage(error, extractFileName(currentFile.path))
+      if (shouldToastSaveError(isAutoSave, message, lastSaveErrorRef.current)) {
+        showToast({ title: 'Save failed', message, type: 'error', duration: 8000 })
+      }
+      lastSaveErrorRef.current = message
       return false
     } finally {
       // Step 8: Resume file watching after save completes
       await saveGuardRef.current?.resumeWatch()
       unmarkSaving()
     }
-  }, [currentFile, dismissConflict, clearDeletedState, markSaving, unmarkSaving, notifySaveComplete])
+  }, [currentFile, isFileDeleted, dismissConflict, clearDeletedState, markSaving, unmarkSaving, notifySaveComplete, showToast])
 
   // =========================================================================
   // Auto-Save Hook

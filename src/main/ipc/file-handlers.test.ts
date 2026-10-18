@@ -184,6 +184,54 @@ describe('file:createFile / createFolder / rename log redaction', () => {
   }
 })
 
+describe('file:writeFile (save after a folder rename)', () => {
+  beforeEach(() => {
+    for (const k of Object.keys(handlers)) delete handlers[k]
+    vi.resetModules()
+  })
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('writes without recreating folders unless the restore option is a literal true', async () => {
+    const { registerFileHandlers } = await import('./file-handlers')
+    const { fileService } = await import('../services/FileService')
+    const write = vi.spyOn(fileService, 'writeFile').mockResolvedValue()
+
+    registerFileHandlers()
+    await handlers['file:writeFile']({}, '/proj/docs/a.md', 'x')
+    await handlers['file:writeFile']({}, '/proj/docs/a.md', 'x', { createParentDirs: 'yes' })
+    await handlers['file:writeFile']({}, '/proj/docs/a.md', 'x', { createParentDirs: true })
+
+    expect(write.mock.calls).toEqual([
+      ['/proj/docs/a.md', 'x', undefined],
+      ['/proj/docs/a.md', 'x', undefined],
+      ['/proj/docs/a.md', 'x', { createParentDirs: true }]
+    ])
+  })
+
+  it('logs the failure without the path but re-throws the original error', async () => {
+    const { registerFileHandlers } = await import('./file-handlers')
+    const { fileService } = await import('../services/FileService')
+    const { logger } = await import('../services/LoggingService')
+    const original = Object.assign(
+      new Error("ENOENT: no such file or directory, open '/Users/alice/proj/docs/secret.md'"),
+      { code: 'ENOENT', errno: -2, syscall: 'open' }
+    )
+    vi.spyOn(fileService, 'writeFile').mockRejectedValue(original)
+    const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => {})
+
+    registerFileHandlers()
+    await expect(
+      handlers['file:writeFile']({}, '/Users/alice/proj/docs/secret.md', 'x')
+    ).rejects.toBe(original)
+
+    const logged = errorSpy.mock.calls[0][1] as Error
+    expect(logged.message).toContain('[redacted-path]')
+    expect(logged.message).not.toContain('secret.md')
+  })
+})
+
 describe('file:exists', () => {
   beforeEach(() => {
     for (const k of Object.keys(handlers)) delete handlers[k]

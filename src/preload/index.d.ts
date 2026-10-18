@@ -61,7 +61,12 @@ declare global {
         getLastProjectPath: () => Promise<string | null>
         readDirectory: (dirPath: string) => Promise<FileNode[]>
         readFile: (filePath: string) => Promise<string>
-        writeFile: (filePath: string, content: string) => Promise<boolean>
+        /** `createParentDirs`: the explicit "Save to restore it" of a tab whose folder is gone */
+        writeFile: (
+          filePath: string,
+          content: string,
+          options?: { createParentDirs?: boolean }
+        ) => Promise<boolean>
         getStats: (filePath: string) => Promise<FileStats>
         exists: (filePath: string) => Promise<boolean>
         getProjectPath: () => Promise<string | null>

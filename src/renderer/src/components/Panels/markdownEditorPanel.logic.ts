@@ -12,6 +12,7 @@
  */
 
 import { getBasename } from '../../utils/fileUtils'
+import { sanitizeIpcError } from '../../utils/errorUtils'
 
 /**
  * Document statistics calculated from content
@@ -584,4 +585,52 @@ export function getDefaultViewMode(
   filePath: string
 ): 'split' | 'split-horizontal' | 'editor' | 'preview' {
   return isMarkdownFile(filePath) ? 'preview' : 'editor'
+}
+
+/**
+ * The toast text for a save that failed. A failed save must never be silent:
+ * the tab stays dirty and the buffer keeps the edit, and this tells the user
+ * why the write did not land.
+ *
+ * @param error - What `window.api.file.writeFile` rejected with
+ * @param fileName - The tab's file name, shown in full (toasts keep user values)
+ * @returns A one-line reason plus the reassurance that nothing was lost
+ *
+ * @example
+ * ```ts
+ * formatSaveErrorMessage(new Error("ENOENT: no such file or directory, open '/p/docs/a.md'"), 'a.md')
+ * // '"a.md" could not be saved: its folder no longer exists on disk. Your changes are still in the editor.'
+ * ```
+ */
+export function formatSaveErrorMessage(error: unknown, fileName: string): string {
+  const reason = sanitizeIpcError(error)
+  const kept = 'Your changes are still in the editor.'
+  if (/\bENOENT\b/.test(reason)) {
+    return `"${fileName}" could not be saved: its folder no longer exists on disk. ${kept}`
+  }
+  if (/\b(EACCES|EPERM)\b/.test(reason)) {
+    return `"${fileName}" could not be saved: permission denied. ${kept}`
+  }
+  if (/\bENOSPC\b/.test(reason)) {
+    return `"${fileName}" could not be saved: the disk is full. ${kept}`
+  }
+  return `"${fileName}" could not be saved: ${reason.replace(/\.$/, '')}. ${kept}`
+}
+
+/**
+ * Whether a failed save shows its toast. A manual save always does - the user
+ * just pressed the key and must see the answer. An autosave retries every few
+ * seconds, so it shows a reason only when it differs from the last one shown;
+ * the dirty tab and the toast already shown carry the rest.
+ *
+ * @param isAutoSave - The failed save was an autosave
+ * @param message - This failure's toast text
+ * @param lastShown - The text of the last save-failure toast, or null after a success
+ */
+export function shouldToastSaveError(
+  isAutoSave: boolean,
+  message: string,
+  lastShown: string | null
+): boolean {
+  return !isAutoSave || message !== lastShown
 }

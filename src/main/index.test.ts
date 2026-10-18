@@ -180,14 +180,16 @@ describe('Main Process - Window Creation', () => {
       fileWatcherService: {
         dispose: vi.fn(),
         setProjectPath: vi.fn(), // issue #59: clear project state on destroy
-        cleanupForWebContentsId: vi.fn(() => Promise.resolve()) // issue #59
+        cleanupForWebContentsId: vi.fn(() => Promise.resolve()), // issue #59
+        handleAncestorRemovals: vi.fn() // save after a folder rename
       }
     }))
     vi.doMock('./services/DirectoryWatcherService', () => ({
       directoryWatcherService: {
         dispose: vi.fn(),
         setProjectPath: vi.fn(), // issue #59: clear project state on destroy
-        cleanupForWebContentsId: vi.fn(() => Promise.resolve()) // issue #59
+        cleanupForWebContentsId: vi.fn(() => Promise.resolve()), // issue #59
+        onPathsRemoved: vi.fn(() => () => {}) // save after a folder rename
       }
     }))
     vi.doMock('./services/TerminalService', () => ({
@@ -396,6 +398,21 @@ describe('Main Process - Window Creation', () => {
     vi.clearAllMocks()
     vi.resetModules()
     delete process.env.ERFANA_E2E_FORCE_CRASH
+  })
+
+  describe('Watcher wiring (save after a folder rename)', () => {
+    it('hands the project watcher’s removals to the single-file watches', async () => {
+      await import('./index')
+      await flushStartup()
+      const { directoryWatcherService } = await import('./services/DirectoryWatcherService')
+      const { fileWatcherService } = await import('./services/FileWatcherService')
+
+      const onPathsRemoved = directoryWatcherService.onPathsRemoved as unknown as ReturnType<typeof vi.fn>
+      expect(onPathsRemoved).toHaveBeenCalledTimes(1)
+      const listener = onPathsRemoved.mock.calls[0][0] as (paths: readonly string[]) => void
+      listener(['/proj/docs'])
+      expect(fileWatcherService.handleAncestorRemovals).toHaveBeenCalledWith(['/proj/docs'])
+    })
   })
 
   describe('Window Title Configuration', () => {

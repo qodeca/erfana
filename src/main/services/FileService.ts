@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { readdir, readFile, writeFile, stat, rm, mkdir, rename as fsRename, cp, copyFile } from 'fs/promises'
 import { join, extname, basename, relative, resolve as resolvePath } from 'path'
-import type { IFileService } from '../interfaces/IFileService'
+import type { IFileService, WriteFileOptions } from '../interfaces/IFileService'
 import { SymlinkDetector } from '../utils/SymlinkDetector'
 import { RollbackHandler } from '../utils/RollbackHandler'
 import { assertValidUserFilename } from '../utils/validateFilename'
@@ -21,6 +21,7 @@ import {
 import { stablePathDigest } from '../../shared/stablePathDigest'
 import { logger } from './LoggingService'
 import { IMAGE_EXTENSIONS, readImage } from './file/imageRead'
+import { restoreParentDirectory } from './file/restoreParentDirectory'
 import type { ImageReadResponse } from '../../shared/ipc/file-image-schema'
 
 export interface FileNode {
@@ -492,7 +493,16 @@ export class FileService implements IFileService {
     return await readFile(filePath, 'utf-8')
   }
 
-  async writeFile(filePath: string, content: string): Promise<void> {
+  /**
+   * Write a text file. `createParentDirs` is the explicit "Save to restore it"
+   * of a tab whose file was deleted together with its folder: the missing
+   * folders are recreated, inside the project only, before the write (see
+   * `file/restoreParentDirectory`). Without it a missing folder is an ENOENT.
+   */
+  async writeFile(filePath: string, content: string, options: WriteFileOptions = {}): Promise<void> {
+    if (options.createParentDirs === true) {
+      await restoreParentDirectory(filePath, this.projectPath)
+    }
     await writeFile(filePath, content, 'utf-8')
   }
 

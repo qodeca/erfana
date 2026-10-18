@@ -87,8 +87,14 @@ const api = {
       ipcRenderer.invoke('file:readDirectory', dirPath),
     readFile: (filePath: string): Promise<string> =>
       ipcRenderer.invoke('file:readFile', filePath),
-    writeFile: (filePath: string, content: string): Promise<boolean> =>
-      ipcRenderer.invoke('file:writeFile', filePath, content),
+    writeFile: (
+      filePath: string,
+      content: string,
+      options?: { createParentDirs?: boolean }
+    ): Promise<boolean> =>
+      options === undefined
+        ? ipcRenderer.invoke('file:writeFile', filePath, content)
+        : ipcRenderer.invoke('file:writeFile', filePath, content, options),
     getStats: (filePath: string): Promise<FileStats> =>
       ipcRenderer.invoke('file:getStats', filePath),
     exists: (filePath: string): Promise<boolean> =>

@@ -28,6 +28,8 @@ import {
   interpolateScrollPosition,
   // Utility Functions
   isSplitMode,
+  formatSaveErrorMessage,
+  shouldToastSaveError,
   extractFileName,
   extractBaseFileName,
   isMarkdownFile,
@@ -807,5 +809,55 @@ describe('Integration: Document stats for various content types', () => {
 
     expect(stats.words).toBe(4)
     expect(stats.characters).toBeGreaterThan(0)
+  })
+})
+
+describe('formatSaveErrorMessage', () => {
+  const ipc = (inner: string): Error =>
+    new Error(`Error invoking remote method 'file:writeFile': Error: ${inner}`)
+
+  it('explains a missing folder (the save-after-folder-rename case) and says nothing was lost', () => {
+    expect(
+      formatSaveErrorMessage(ipc("ENOENT: no such file or directory, open '/p/docs/open.md'"), 'open.md')
+    ).toBe(
+      '"open.md" could not be saved: its folder no longer exists on disk. Your changes are still in the editor.'
+    )
+  })
+
+  it('names a permission problem', () => {
+    expect(formatSaveErrorMessage(ipc("EACCES: permission denied, open '/p/a.md'"), 'a.md')).toBe(
+      '"a.md" could not be saved: permission denied. Your changes are still in the editor.'
+    )
+    expect(formatSaveErrorMessage(ipc("EPERM: operation not permitted, open '/p/a.md'"), 'a.md')).toContain(
+      'permission denied'
+    )
+  })
+
+  it('names a full disk', () => {
+    expect(formatSaveErrorMessage(ipc('ENOSPC: no space left on device, write'), 'a.md')).toContain(
+      'the disk is full'
+    )
+  })
+
+  it('passes any other reason through without the IPC prefix', () => {
+    expect(formatSaveErrorMessage(ipc('Cannot restore a file outside the project directory'), 'a.md')).toBe(
+      '"a.md" could not be saved: Cannot restore a file outside the project directory. Your changes are still in the editor.'
+    )
+    expect(formatSaveErrorMessage('not an error', 'a.md')).toBe(
+      '"a.md" could not be saved: An unknown error occurred. Your changes are still in the editor.'
+    )
+  })
+})
+
+describe('shouldToastSaveError', () => {
+  it('always shows a manual save failure, even one already shown', () => {
+    expect(shouldToastSaveError(false, 'm', 'm')).toBe(true)
+    expect(shouldToastSaveError(false, 'm', null)).toBe(true)
+  })
+
+  it('shows an autosave failure once per distinct reason', () => {
+    expect(shouldToastSaveError(true, 'm', null)).toBe(true)
+    expect(shouldToastSaveError(true, 'm', 'm')).toBe(false)
+    expect(shouldToastSaveError(true, 'other', 'm')).toBe(true)
   })
 })

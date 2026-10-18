@@ -35,6 +35,9 @@ Monitors open files for external content modifications.
 | File modified externally, has unsaved changes | Show orange conflict bar with options |
 | File replaced atomically (write temp + rename) | Surfaces as `file-watch:changed`, not a delete — see [Single-file watch internals](#single-file-watch-internals-70) |
 | File deleted externally | Show red warning banner, keep editor state |
+| Parent folder renamed, moved or deleted externally | Same as a delete: banner, `(deleted)` in the tab. A single-file chokidar watch hears nothing when its parent folder is renamed, so the project watcher's removals are forwarded to `FileWatcherService.handleAncestorRemovals` (both backends), which runs the affected watch through the normal unlink branch, existence re-check included |
+| Save fails (any reason) | Error toast with the reason; the tab stays dirty and the buffer keeps the edit. A failing autosave repeats the toast only when the reason changes |
+| "Save to restore it" when the folder is gone | Only a **manual** save of a tab already in the deleted state passes `createParentDirs`, so main recreates the missing folders (inside the project only, nearest existing ancestor realpath-checked – `file/restoreParentDirectory.ts`) and writes the file back at its original path. An autosave never recreates a folder |
 | Watch dies for any other reason | `file-watch:error` — the consumer shows a degraded state instead of silently going stale (#70) |
 | Rapid changes (git operations) | Debounced to single reload |
 

@@ -51,7 +51,7 @@ function normalizePath(filePath: string): string {
 /**
  * Check if a path is a child of a directory path
  */
-function isChildPath(childPath: string, parentPath: string): boolean {
+export function isChildPath(childPath: string, parentPath: string): boolean {
   const normalizedChild = normalizePath(childPath)
   const normalizedParent = normalizePath(parentPath)
 

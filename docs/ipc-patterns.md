@@ -131,7 +131,7 @@ Note that several domains register through channel **constants**
 | `file:readDirectory` | Read directory tree. Single-flight per resolved path (#208): at most one walk of a path runs; every request made during it shares one follow-up walk that starts after it settles, and a failed walk rejects only its own requests. See [File watching § Tree refresh is single-flight](./file-watching/technical-details.md#tree-refresh-is-single-flight-208) |
 | `file:readFile` | Read file content |
 | `file:readImage` | Read an image as a base64 data URL, or answer `unchanged` when the caller's version still matches (#70) |
-| `file:writeFile` | Write file content |
+| `file:writeFile` | Write file content; optional `{ createParentDirs: true }` (literal `true` only) recreates missing folders inside the project for the editor's "Save to restore it" |
 | `file:getStats` | Get file metadata |
 | `file:exists` | Existence check |
 | `file:createFile` | Create new empty file |

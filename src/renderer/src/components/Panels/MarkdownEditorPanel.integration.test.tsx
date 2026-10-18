@@ -313,7 +313,7 @@ describe('MarkdownEditorPanel Integration', () => {
     ).replace(/\r\n/g, '\n')
     const handleSave = source.slice(
       source.indexOf('const handleSave = useCallback'),
-      source.indexOf('}, [currentFile, dismissConflict')
+      source.indexOf('}, [currentFile, isFileDeleted, dismissConflict')
     )
 
     it('useEditorSaveRegistration hook is imported correctly', async () => {
@@ -353,6 +353,43 @@ describe('MarkdownEditorPanel Integration', () => {
 
       expect(order.every((index) => index >= 0)).toBe(true)
       expect([...order].sort((a, b) => a - b)).toEqual(order)
+    })
+  })
+
+  describe('Save after a folder rename (v0.21.0 validation)', () => {
+    // Pinned on the source for the same reason as the block above: rendering
+    // the panel needs monaco-editor. The message and dedupe rules themselves
+    // are unit-tested in markdownEditorPanel.logic.test.ts.
+    const source = readFileSync(
+      join(process.cwd(), 'src/renderer/src/components/Panels/MarkdownEditorPanel.tsx'),
+      'utf8'
+    ).replace(/\r\n/g, '\n')
+    const handleSave = source.slice(
+      source.indexOf('const handleSave = useCallback'),
+      source.indexOf('}, [currentFile, isFileDeleted, dismissConflict')
+    )
+    const catchBlock = handleSave.slice(handleSave.indexOf('} catch (error) {'), handleSave.indexOf('} finally {'))
+
+    it('the slice under test exists', () => {
+      expect(handleSave.length).toBeGreaterThan(0)
+      expect(catchBlock.length).toBeGreaterThan(0)
+    })
+
+    it('a failed save shows an error toast with the reason and still answers false', () => {
+      expect(catchBlock).toContain('formatSaveErrorMessage(error, extractFileName(currentFile.path))')
+      expect(catchBlock).toContain('shouldToastSaveError(isAutoSave, message, lastSaveErrorRef.current)')
+      expect(catchBlock).toMatch(/showToast\(\{ title: 'Save failed', message, type: 'error'/)
+      expect(catchBlock).toContain('return false')
+      // The tab is marked clean only after a write that succeeded
+      expect(catchBlock).not.toContain('setEditorDirty(panelIdRef.current, false)')
+    })
+
+    it('only a manual save of a deleted tab may recreate the missing folder', () => {
+      expect(handleSave).toContain('if (isFileDeleted && !isAutoSave) {')
+      expect(handleSave).toContain(
+        'await window.api.file.writeFile(currentFile.path, contentToSave, { createParentDirs: true })'
+      )
+      expect(handleSave.match(/createParentDirs/g)).toHaveLength(1)
     })
   })
 })

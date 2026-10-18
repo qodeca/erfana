@@ -184,12 +184,19 @@ export function registerFileHandlers(): void {
   })
 
   // Write file content
-  registerHandle('file:writeFile', async (_event, filePath: string, content: string) => {
+  //
+  // `options.createParentDirs` is the explicit restore of a tab whose file was
+  // deleted together with its folder; only a literal `true` turns it on. The
+  // logged copy of the error drops the path (the renderer gets the original).
+  registerHandle('file:writeFile', async (_event, filePath: string, content: string, options?: unknown) => {
     try {
-      await fileService.writeFile(filePath, content)
+      const createParentDirs =
+        typeof options === 'object' && options !== null &&
+        (options as { createParentDirs?: unknown }).createParentDirs === true
+      await fileService.writeFile(filePath, content, createParentDirs ? { createParentDirs } : undefined)
       return true
     } catch (error) {
-      logger.error('Error writing file', error instanceof Error ? error : undefined)
+      logger.error('Error writing file', redactedLogError(error))
       throw error
     }
   })
