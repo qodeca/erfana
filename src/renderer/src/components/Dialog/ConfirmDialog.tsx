@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+import { useRef } from 'react'
 import { HelpCircle, AlertTriangle } from 'lucide-react'
 import { BaseDialog } from './BaseDialog'
 import { TEST_IDS } from '../../constants/testids'
@@ -19,7 +20,9 @@ interface ConfirmDialogProps {
  * - Dynamic icon (HelpCircle for normal, AlertTriangle for danger)
  * - Confirm/Cancel buttons
  * - Danger mode for destructive actions (red button + warning icon)
- * - Keyboard shortcuts (Enter to confirm, Esc to cancel)
+ * - Initial focus on the choice that loses nothing: Cancel when `danger`,
+ *   Confirm otherwise
+ * - Enter follows the focused button; Esc cancels
  * - Promise-based API via useDialog()
  *
  * @example
@@ -55,11 +58,27 @@ export function ConfirmDialog({ config, zIndex, onConfirm, onCancel }: ConfirmDi
     onCancel()
   }
 
+  const confirmRef = useRef<HTMLButtonElement>(null)
+  const cancelRef = useRef<HTMLButtonElement>(null)
+
+  // Enter must never pick an answer the focused control does not show. A
+  // focused button activates natively on Enter, so the wrapper only steps in
+  // when focus is somewhere else in the dialog (e.g. the container itself).
+  // Auto-repeat is swallowed everywhere, buttons included: a key held down
+  // from whatever opened the prompt must not run into an answer – for a
+  // destructive prompt that answer would be delete, discard or quit.
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+    if (e.key !== 'Enter' || e.shiftKey || e.ctrlKey || e.metaKey) return
+
+    if (e.repeat) {
       e.preventDefault()
-      handleConfirm()
+      return
     }
+
+    if (e.target instanceof HTMLButtonElement) return
+
+    e.preventDefault()
+    handleConfirm()
   }
 
   return (
@@ -71,6 +90,7 @@ export function ConfirmDialog({ config, zIndex, onConfirm, onCancel }: ConfirmDi
       closeOnEscape={true}
       ariaLabelledBy={titleId}
       ariaDescribedBy={messageId}
+      initialFocusRef={danger ? cancelRef : confirmRef}
     >
       <div onKeyDown={handleKeyDown} data-testid={TEST_IDS.DIALOG_CONFIRM}>
         <div className="dialog-header-with-icon">
@@ -89,13 +109,18 @@ export function ConfirmDialog({ config, zIndex, onConfirm, onCancel }: ConfirmDi
         </div>
 
         <div className="dialog-actions">
-          <button className="dialog-btn dialog-btn-secondary" onClick={handleCancel} data-testid={TEST_IDS.DIALOG_BTN_CANCEL}>
+          <button
+            ref={cancelRef}
+            className="dialog-btn dialog-btn-secondary"
+            onClick={handleCancel}
+            data-testid={TEST_IDS.DIALOG_BTN_CANCEL}
+          >
             {cancelLabel}
           </button>
           <button
+            ref={confirmRef}
             className={`dialog-btn ${danger ? 'dialog-btn-danger' : 'dialog-btn-primary'}`}
             onClick={handleConfirm}
-            autoFocus
             data-testid={TEST_IDS.DIALOG_BTN_CONFIRM}
           >
             {confirmLabel}

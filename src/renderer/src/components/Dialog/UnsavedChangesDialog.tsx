@@ -35,8 +35,9 @@ interface UnsavedChangesDialogProps {
  * `initialFocusRef`, and in this button order that is the destructive one – so
  * the ref is set explicitly, on the choice that loses nothing. There is
  * deliberately no Enter handler: Enter activates whichever button has focus,
- * natively. `ConfirmDialog`'s confirm-on-Enter is not copied, because here it
- * would fire an action the user did not have focused. Escape is Cancel, and a
+ * natively. `ConfirmDialog`'s fallback (Enter confirms while focus is off its
+ * buttons) is not copied, because here it would fire an action the user did not
+ * have focused. Escape is Cancel, and a
  * click outside does nothing.
  *
  * @param props - Component props
