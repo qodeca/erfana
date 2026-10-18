@@ -5,7 +5,7 @@ import { logger } from '../services/LoggingService'
 import { describeUrlForLog, parseExternalUrl } from './externalUrl'
 
 /**
- * The ONLY module allowed to import `shell` from electron (enforced by ESLint).
+ * The ONLY module that calls `openExternal` (enforced by ESLint syntax selectors).
  * Every route that hands a URL to the operating system goes through here.
  */
 

@@ -2,7 +2,6 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import type { WebContents } from 'electron'
 import { logger } from '../services/LoggingService'
-import { openExternalSafeDetached } from './openExternalSafe'
 
 /** The subset of a `webContents` the baseline touches. */
 export interface BaselineTarget {
@@ -23,8 +22,9 @@ function withoutHash(url: string): string {
 /**
  * Deny-by-default window-open and navigation policy for every webContents.
  *
- * - A window-open request is always denied; an allowed external URL is routed
- *   through `openExternalSafe` instead.
+ * - A window-open request is always denied. Nothing is opened: a window that
+ *   wants links to reach the OS (the main window) sets its own handler that
+ *   goes through `openExternalSafeDetached`.
  * - A navigation away from the current document is cancelled.
  *
  * Installed at creation, so a window that sets its own (stricter) handler later
@@ -32,10 +32,7 @@ function withoutHash(url: string): string {
  * alongside this one.
  */
 export function applyWebContentsBaseline(wc: BaselineTarget): void {
-  wc.setWindowOpenHandler((details) => {
-    openExternalSafeDetached(details.url)
-    return { action: 'deny' }
-  })
+  wc.setWindowOpenHandler(() => ({ action: 'deny' }))
   wc.on('will-navigate', (event, url) => {
     const current = wc.getURL()
     if (withoutHash(url) !== withoutHash(current)) {

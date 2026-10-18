@@ -273,26 +273,58 @@ export default [
             }
           ]
         }
-      ],
-      // Every URL handed to the OS goes through openExternalSafe(), which checks
-      // it against the one allowlist. This is the only `no-restricted-properties`
-      // entry for src/main (the other two blocks cover other folders).
-      'no-restricted-properties': [
-        'error',
-        {
-          object: 'shell',
-          property: 'openExternal',
-          message:
-            'Open external URLs through openExternalSafe() in src/main/utils/openExternalSafe.ts, the only module allowed to call shell.openExternal. It checks the URL against the one allowlist first.'
-        }
       ]
     }
   },
-  // `openExternalSafe.ts` is the one module that may call `shell.openExternal`.
+  // Every URL handed to the OS goes through `openExternalSafe()`, which checks it
+  // against the one allowlist. Syntax selectors rather than an import ban, so an
+  // alias (`import { shell as s }`, `const sh = shell`), a namespace access
+  // (`electron.shell.openExternal`) or a destructure cannot get round it. Its own
+  // block, with no `ignores` for registry.ts, so nothing in src/main is exempt
+  // except the one module. `deps.openExternal` (an injected dependency, not the
+  // Electron call) is the only receiver left alone. Tests are exempt: they mock
+  // the call by name.
   {
-    files: ['src/main/utils/openExternalSafe.ts'],
+    files: ['src/main/**/*.ts'],
+    ignores: [
+      'src/main/utils/openExternalSafe.ts',
+      'src/main/**/*.test.ts',
+      'src/main/**/__test-helpers__/**'
+    ],
     rules: {
-      'no-restricted-properties': 'off'
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "MemberExpression[property.name='openExternal'][object.name!='deps']",
+          message:
+            'Open external URLs through openExternalSafe() in src/main/utils/openExternalSafe.ts, the only module that calls openExternal. It checks the URL against the one allowlist first.'
+        },
+        {
+          selector: "MemberExpression[computed=true][property.value='openExternal']",
+          message:
+            'Open external URLs through openExternalSafe() in src/main/utils/openExternalSafe.ts, the only module that calls openExternal.'
+        },
+        {
+          selector: "ObjectPattern > Property[key.name='openExternal']",
+          message:
+            'Do not destructure openExternal. Use openExternalSafe() from src/main/utils/openExternalSafe.ts.'
+        },
+        {
+          selector: "ImportSpecifier[imported.name='shell'][local.name!='shell']",
+          message:
+            'Do not alias the electron shell. Use openExternalSafe() from src/main/utils/openExternalSafe.ts for external URLs.'
+        },
+        {
+          selector: "VariableDeclarator[init.name='shell']",
+          message:
+            'Do not alias the electron shell. Use openExternalSafe() from src/main/utils/openExternalSafe.ts for external URLs.'
+        },
+        {
+          selector: "VariableDeclarator > MemberExpression.init[property.name='shell']",
+          message:
+            'Do not alias the electron shell. Use openExternalSafe() from src/main/utils/openExternalSafe.ts for external URLs.'
+        }
+      ]
     }
   },
   // Renderer process: four families of code that keep reintroducing bugs, or
