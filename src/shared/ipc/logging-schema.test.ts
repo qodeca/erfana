@@ -16,6 +16,8 @@ import {
   LOG_ERROR_STACK_MAX_LENGTH,
   LOG_CONTEXT_MAX_KEYS,
   LOG_CONTEXT_MAX_JSON_LENGTH,
+  LOG_CONTEXT_MAX_VALUE_LENGTH,
+  TRUNCATION_MARKER,
   shouldLog,
   validateLogLevel,
   type LogLevel,
@@ -584,7 +586,7 @@ describe('validateLogLevel()', () => {
   })
 })
 
-describe('LogEntrySchema size limits', () => {
+describe('LogEntrySchema size limits (shorten, do not reject)', () => {
   const base = {
     level: 'info',
     message: 'ok',
@@ -592,43 +594,79 @@ describe('LogEntrySchema size limits', () => {
     source: 'renderer'
   }
 
-  it('accepts a message at the limit and rejects one over it', () => {
-    expect(
-      LogEntrySchema.safeParse({ ...base, message: 'a'.repeat(LOG_MESSAGE_MAX_LENGTH) }).success
-    ).toBe(true)
-    expect(
-      LogEntrySchema.safeParse({ ...base, message: 'a'.repeat(LOG_MESSAGE_MAX_LENGTH + 1) }).success
-    ).toBe(false)
+  function parse(input: unknown): LogEntry {
+    const result = LogEntrySchema.safeParse(input)
+    if (!result.success) throw new Error(`rejected: ${JSON.stringify(result.error.issues)}`)
+    return result.data
+  }
+
+  it('keeps a message at the limit untouched and shortens one over it', () => {
+    const atLimit = 'a'.repeat(LOG_MESSAGE_MAX_LENGTH)
+    expect(parse({ ...base, message: atLimit }).message).toBe(atLimit)
+
+    const shortened = parse({ ...base, message: 'a'.repeat(LOG_MESSAGE_MAX_LENGTH + 500) }).message
+    expect(shortened).toBe(`${atLimit}${TRUNCATION_MARKER}`)
   })
 
-  it('rejects an oversized error stack or error message', () => {
-    const error = { name: 'Error', message: 'm' }
-    expect(
-      LogEntrySchema.safeParse({
-        ...base,
-        error: { ...error, stack: 's'.repeat(LOG_ERROR_STACK_MAX_LENGTH + 1) }
-      }).success
-    ).toBe(false)
-    expect(
-      LogEntrySchema.safeParse({
-        ...base,
-        error: { ...error, message: 'm'.repeat(LOG_MESSAGE_MAX_LENGTH + 1) }
-      }).success
-    ).toBe(false)
+  it('shortens an oversized error stack, message and name', () => {
+    const entry = parse({
+      ...base,
+      error: {
+        name: 'n'.repeat(1_000),
+        message: 'm'.repeat(LOG_MESSAGE_MAX_LENGTH + 1),
+        stack: 's'.repeat(LOG_ERROR_STACK_MAX_LENGTH + 1)
+      }
+    })
+    expect(entry.error!.stack!.length).toBe(LOG_ERROR_STACK_MAX_LENGTH + TRUNCATION_MARKER.length)
+    expect(entry.error!.message.endsWith(TRUNCATION_MARKER)).toBe(true)
+    expect(entry.error!.name.endsWith(TRUNCATION_MARKER)).toBe(true)
   })
 
-  it('rejects a context with too many keys', () => {
+  it('keeps a shortened componentStack and flags the context as truncated', () => {
+    const entry = parse({
+      ...base,
+      context: { componentStack: 'at Panel\n'.repeat(2_000), appVersion: '0.21.0' }
+    })
+    const context = entry.context!
+    expect(typeof context.componentStack).toBe('string')
+    expect((context.componentStack as string).startsWith('at Panel')).toBe(true)
+    expect((context.componentStack as string).length).toBe(
+      LOG_CONTEXT_MAX_VALUE_LENGTH + TRUNCATION_MARKER.length
+    )
+    expect(context.appVersion).toBe('0.21.0')
+    expect(context.truncated).toBe(true)
+  })
+
+  it('leaves a small context exactly as sent, with no marker', () => {
+    const context = { component: 'Editor', count: 3, nested: { a: 1 } }
+    expect(parse({ ...base, context }).context).toEqual(context)
+  })
+
+  it('caps the number of context keys', () => {
     const context: Record<string, number> = {}
-    for (let i = 0; i <= LOG_CONTEXT_MAX_KEYS; i++) context[`k${i}`] = i
-    expect(LogEntrySchema.safeParse({ ...base, context }).success).toBe(false)
+    for (let i = 0; i < LOG_CONTEXT_MAX_KEYS + 20; i++) context[`k${i}`] = i
+    const kept = parse({ ...base, context }).context!
+    expect(Object.keys(kept)).toHaveLength(LOG_CONTEXT_MAX_KEYS + 1)
+    expect(kept.truncated).toBe(true)
   })
 
-  it('rejects a context whose JSON form is too large', () => {
-    const context = { blob: 'x'.repeat(LOG_CONTEXT_MAX_JSON_LENGTH) }
-    expect(LogEntrySchema.safeParse({ ...base, context }).success).toBe(false)
+  it('keeps the whole context JSON within its budget', () => {
+    const context: Record<string, string> = {}
+    for (let i = 0; i < 10; i++) context[`blob${i}`] = 'x'.repeat(LOG_CONTEXT_MAX_VALUE_LENGTH)
+    const kept = parse({ ...base, context }).context!
+    expect(JSON.stringify(kept).length).toBeLessThanOrEqual(LOG_CONTEXT_MAX_JSON_LENGTH + 40)
+    expect(kept.truncated).toBe(true)
   })
 
-  it('rejects an oversized timestamp', () => {
-    expect(LogEntrySchema.safeParse({ ...base, timestamp: 't'.repeat(65) }).success).toBe(false)
+  it('shortens a large nested value through its JSON form', () => {
+    const kept = parse({ ...base, context: { big: { list: 'y'.repeat(10_000) } } }).context!
+    expect(typeof kept.big).toBe('string')
+    expect((kept.big as string).endsWith(TRUNCATION_MARKER)).toBe(true)
+  })
+
+  it('still rejects a malformed shape', () => {
+    expect(LogEntrySchema.safeParse({ ...base, message: 42 }).success).toBe(false)
+    expect(LogEntrySchema.safeParse({ ...base, context: 'nope' }).success).toBe(false)
+    expect(LogEntrySchema.safeParse({ ...base, level: 'loud' }).success).toBe(false)
   })
 })

@@ -80,12 +80,32 @@ function mapToElectronLogLevel(level: LogLevel): ElectronLogLevel {
   }
 }
 
+/** C0 and C1 control characters, DEL, and the Unicode line / paragraph separators */
+// eslint-disable-next-line no-control-regex -- matching control characters is the point
+const CONTROL_CHARS =/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g
+
+const NAMED_ESCAPES: Record<string, string> = { '\n': '\\n', '\r': '\\r', '\t': '\\t' }
+
 /**
- * Make untrusted text safe for a single log line: escape CR and LF, and bound
- * the length.
+ * Escape every control character so one log call can only ever produce one
+ * log line: a CR/LF (or a separator some viewers treat as a line break) in a
+ * message would otherwise let its author forge a second line, and the rest can
+ * garble a terminal that tails the file. `\n`, `\r`, `\t` keep their familiar
+ * spelling; the others become `\uXXXX`.
+ */
+export function escapeControlChars(text: string): string {
+  return text.replace(
+    CONTROL_CHARS,
+    (char) => NAMED_ESCAPES[char] ?? `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`
+  )
+}
+
+/**
+ * Make untrusted text safe for a single log line: escape control characters,
+ * and bound the length.
  */
 export function sanitizeLogText(text: string, maxLength: number = MAX_RENDERER_FIELD_LENGTH): string {
-  const escaped = text.replace(/\r/g, '\\r').replace(/\n/g, '\\n')
+  const escaped = escapeControlChars(text)
   return escaped.length > maxLength ? `${escaped.slice(0, maxLength)}[truncated]` : escaped
 }
 
@@ -532,13 +552,13 @@ export class LoggingService {
   }
 
   /**
-   * Format message with optional context
+   * Format message with optional context. Control characters are escaped.
    */
   private formatMessage(message: string, context?: Record<string, unknown>): string {
     if (!context || Object.keys(context).length === 0) {
-      return message
+      return escapeControlChars(message)
     }
-    return `${message} ${JSON.stringify(context)}`
+    return escapeControlChars(`${message} ${JSON.stringify(context)}`)
   }
 
   /**
@@ -562,7 +582,9 @@ export class LoggingService {
       parts.push(JSON.stringify(context))
     }
 
-    return parts.join(' | ')
+    // Main-process callers often interpolate user-derived text (paths, names)
+    // into the message, so the same escaping as for renderer entries applies.
+    return escapeControlChars(parts.join(' | '))
   }
 
   /**

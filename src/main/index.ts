@@ -353,6 +353,38 @@ function createWindow(): BrowserWindow {
   return mainWindow
 }
 
+/**
+ * Tell the user, once, that start-up had to fall back.
+ *
+ * Non-blocking by design: the box is a sheet on the main window (macOS) or a
+ * window-modal dialog, opened only after the window is first shown, and nothing
+ * awaits it – start-up, the renderer and an automated launch (e2e) all carry on
+ * without anyone clicking it. It only appears when an init step failed, which a
+ * healthy launch never does. The "saved to crash.log" sentence is only added
+ * when the fallback line was actually written.
+ */
+function showStartupProblems(win: BrowserWindow, problems: string[], detailsSaved: boolean): void {
+  const detailsLine = detailsSaved
+    ? `Details were saved to crash.log in the ${LOGS_DIR_RELATIVE} folder in your home folder.`
+    : 'Details could not be saved to a file.'
+  win.once('show', () => {
+    if (win.isDestroyed()) return
+    dialog
+      .showMessageBox(win, {
+        type: 'warning',
+        title: 'Erfana started with problems',
+        message: 'Erfana started with problems',
+        detail: `${problems.join('\n\n')}\n\nErfana will keep running. ${detailsLine}`,
+        buttons: ['OK']
+      })
+      .catch((error: unknown) => {
+        logger.warn('Could not show the start-up problems message', {
+          error: error instanceof Error ? error.message : String(error)
+        })
+      })
+  })
+}
+
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
@@ -377,16 +409,19 @@ app.whenReady().then(async () => {
   // A failure here must not leave a windowless process: each step falls back
   // (in-memory default settings, console logging), the failure is written to
   // the crash fallback file, and start-up carries on to the window. The user
-  // is told once, after the window exists.
+  // is told once, by a non-blocking message box once the window is shown.
   const startupProblems: string[] = []
+  let startupDetailsSaved = false
 
   // Initialize global settings service (creates ~/.erfana/settings.json if needed).
   // On failure the service keeps the in-memory defaults it was built with.
   try {
     await globalSettingsService.initialize()
   } catch (error) {
-    writeCrashFallbackLine('[crash] startup-settings-init', error)
-    startupProblems.push('Your saved settings could not be loaded, so default settings are in use.')
+    startupDetailsSaved = writeCrashFallbackLine('[crash] startup-settings-init', error) || startupDetailsSaved
+    startupProblems.push(
+      'Your saved settings could not be loaded, so default settings are in use. Your settings file is not changed until you change a setting, and a copy of it is kept first.'
+    )
   }
 
   // Initialize logging service (after global settings so level is loaded).
@@ -394,7 +429,7 @@ app.whenReady().then(async () => {
   try {
     await loggingService.initialize()
   } catch (error) {
-    writeCrashFallbackLine('[crash] startup-logging-init', error)
+    startupDetailsSaved = writeCrashFallbackLine('[crash] startup-logging-init', error) || startupDetailsSaved
     startupProblems.push('The log files could not be set up, so activity is not being recorded to disk.')
   }
 
@@ -484,13 +519,10 @@ app.whenReady().then(async () => {
   })
 
   // Create main window
-  createWindow()
+  const startupWindow = createWindow()
 
   if (startupProblems.length > 0) {
-    dialog.showErrorBox(
-      'Erfana started with problems',
-      `${startupProblems.join('\n\n')}\n\nErfana will keep running. Details were saved to crash.log in the ${LOGS_DIR_RELATIVE} folder in your home folder.`
-    )
+    showStartupProblems(startupWindow, startupProblems, startupDetailsSaved)
   }
 
   // Fire-and-forget: detect system dependencies for LiteParse document import
