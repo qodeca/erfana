@@ -108,7 +108,7 @@ jobs:
       - name: Guard - chokidar 5 pinned, no braces in production
         run: |
           set -euo pipefail
-          ACTUAL=$(node -p "require('chokidar/package.json').version")
+          ACTUAL=$(node -p "JSON.parse(require('fs').readFileSync('node_modules/chokidar/package.json', 'utf8')).version")
           if [ "$ACTUAL" != "5.0.0" ]; then
             echo "::error::chokidar version drift: expected 5.0.0, got $ACTUAL — see package.json overrides"
             exit 1
