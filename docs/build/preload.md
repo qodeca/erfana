@@ -49,12 +49,12 @@ With process sandboxing enabled (default since Electron 20), the preload script 
 
 If externalization is left enabled (the default), the preload would emit:
 ```javascript
-const preload = require("@electron-toolkit/preload");  // ❌ Fails in sandbox
+const preload = require("some-package");  // ❌ Fails in sandbox
 ```
 
 **Runtime Error**:
 ```
-VM4 sandbox_bundle:2 Error: module not found: @electron-toolkit/preload
+VM4 sandbox_bundle:2 Error: module not found: some-package
 ```
 
 ### Root Cause
