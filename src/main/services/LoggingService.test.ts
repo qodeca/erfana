@@ -319,6 +319,22 @@ describe('LoggingService', () => {
       })
     })
 
+    it('switches off file logging when initialization fails', async () => {
+      mockGlobalSettingsService.getSettings.mockImplementation(() => {
+        throw new Error('Settings error')
+      })
+
+      for (const mockLogger of [mockCombinedLogger, mockMainLogger, mockRendererLogger]) {
+        mockLogger.transports.file.level = 'info'
+      }
+
+      await expect(service.initialize()).rejects.toBeDefined()
+
+      for (const mockLogger of [mockCombinedLogger, mockMainLogger, mockRendererLogger]) {
+        expect(mockLogger.transports.file.level).toBe(false)
+      }
+    })
+
     it('handles settings change to logging key', async () => {
       let settingsChangeCallback: any = null
       mockGlobalSettingsService.onSettingsChanged.mockImplementation((callback) => {
@@ -737,6 +753,24 @@ describe('LoggingService', () => {
       vi.clearAllMocks()
     })
 
+    it('escapes CR and LF so a renderer message cannot forge a log line', () => {
+      const entry: LogEntry = {
+        level: 'info',
+        message: 'first\r\n[2026-01-01 00:00:00.000] [deadbeef] [error] forged',
+        timestamp: new Date().toISOString(),
+        source: 'renderer',
+        error: { name: 'Error', message: 'bad\nline', stack: 'at a\n    at b' }
+      }
+
+      service.logFromRenderer(entry)
+
+      const written = mockCombinedLogger.info.mock.calls[0][0] as string
+      expect(written).not.toMatch(/[\r\n]/)
+      expect(written).toContain('first\\r\\n[2026-01-01')
+      expect(written).toContain('bad\\nline')
+      expect(written).toContain('at a\\n    at b')
+    })
+
     it('logs trace from renderer to combined and renderer logs', () => {
       service.setLevel('trace')
 
@@ -915,8 +949,8 @@ describe('LoggingService', () => {
     it('shifts files correctly when rotating', async () => {
       // Setup: simulate having main.1.log, main.2.log, main.3.log already
       mockExistsSync.mockImplementation((path: string) => {
-        // main.100.log doesn't exist (for deletion check)
-        if (path === path.join(MOCK_TMP, 'erfana-test-logs', 'main.100.log')) return false
+        // main.5.log doesn't exist (for deletion check)
+        if (path === path.join(MOCK_TMP, 'erfana-test-logs', 'main.5.log')) return false
         // main.1.log, main.2.log, main.3.log exist
         if (path === path.join(MOCK_TMP, 'erfana-test-logs', 'main.1.log')) return true
         if (path === path.join(MOCK_TMP, 'erfana-test-logs', 'main.2.log')) return true
@@ -957,9 +991,9 @@ describe('LoggingService', () => {
     })
 
     it('deletes oldest file when at max rotation', async () => {
-      // Setup: simulate having main.100.log (oldest)
+      // Setup: simulate having main.5.log (oldest)
       mockExistsSync.mockImplementation((path: string) => {
-        return path === path.join(MOCK_TMP, 'erfana-test-logs', 'main.100.log') || path === path.join(MOCK_TMP, 'erfana-test-logs', 'main.log')
+        return path === path.join(MOCK_TMP, 'erfana-test-logs', 'main.5.log') || path === path.join(MOCK_TMP, 'erfana-test-logs', 'main.log')
       })
 
       const archiveLogFn = mockMainLogger.transports.file.archiveLogFn
@@ -968,7 +1002,7 @@ describe('LoggingService', () => {
       archiveLogFn(mockLogFile)
 
       // Should delete the oldest file
-      expect(mockUnlinkSync).toHaveBeenCalledWith(path.join(MOCK_TMP, 'erfana-test-logs', 'main.100.log'))
+      expect(mockUnlinkSync).toHaveBeenCalledWith(path.join(MOCK_TMP, 'erfana-test-logs', 'main.5.log'))
     })
 
     it('handles rotation when no previous rotated files exist', async () => {
@@ -995,9 +1029,9 @@ describe('LoggingService', () => {
 
       archiveLogFn(mockLogFile)
 
-      // Should attempt 100 renames (99 shifts + 1 current log rotation) + 1 delete
+      // Should attempt 5 renames (4 shifts + 1 current log rotation) + 1 delete
       // But only main.log -> main.1.log succeeds
-      expect(mockRenameSync).toHaveBeenCalledTimes(100)
+      expect(mockRenameSync).toHaveBeenCalledTimes(5)
       expect(mockUnlinkSync).toHaveBeenCalledTimes(1)
 
       // Verify the successful call
@@ -1036,7 +1070,7 @@ describe('LoggingService', () => {
       })
     })
 
-    it('skips cleanup when disk space is below 100MB', async () => {
+    it('still prunes oldest-first when disk space is below 100MB', async () => {
       // Mock low disk space (50MB available)
       mockStatfs.mockReset()
       mockStatfs.mockResolvedValue({
@@ -1044,31 +1078,42 @@ describe('LoggingService', () => {
         bsize: 4096 // 4KB block size = 52.4MB available
       })
 
-      mockReaddir.mockResolvedValue(['old.log'])
-      mockStat.mockResolvedValue({ mtimeMs: 0 }) // Very old
+      const now = Date.now()
+      const day = 24 * 60 * 60 * 1000
+      const mtimes: Record<string, number> = {
+        'newer.log': now - 9 * day,
+        'oldest.log': now - 30 * day,
+        'fresh.log': now
+      }
+      mockReaddir.mockResolvedValue(['newer.log', 'oldest.log', 'fresh.log'])
+      mockStat.mockImplementation(async (file: string) => ({ mtimeMs: mtimes[path.basename(file)] }))
 
       await service.cleanupOldLogs()
 
-      // Verify statfs was called
-      expect(mockStatfs).toHaveBeenCalled()
+      // Low disk must not skip the prune, and the oldest file goes first
+      expect(mockUnlink.mock.calls.map((call) => path.basename(call[0] as string))).toEqual([
+        'oldest.log',
+        'newer.log'
+      ])
 
-      // Should NOT attempt to delete files
-      expect(mockUnlink).not.toHaveBeenCalled()
-
-      // Should log warning about low disk space
-      // The message and context are formatted together into a single string
       expect(mockCombinedLogger.warn).toHaveBeenCalledWith(
-        expect.stringContaining('Low disk space, skipping log cleanup')
+        expect.stringContaining('Low disk space, pruning old logs')
       )
       expect(mockCombinedLogger.warn).toHaveBeenCalledWith(
         expect.stringContaining('"availableMB"')
       )
-      expect(mockMainLogger.warn).toHaveBeenCalledWith(
-        expect.stringContaining('Low disk space, skipping log cleanup')
-      )
-      expect(mockMainLogger.warn).toHaveBeenCalledWith(
-        expect.stringContaining('"availableMB"')
-      )
+    })
+
+    it('deletes rotated files beyond the rotation cap even when they are recent', async () => {
+      mockReaddir.mockResolvedValue(['main.5.log', 'main.6.log', 'main.100.log'])
+      mockStat.mockResolvedValue({ mtimeMs: Date.now() })
+
+      await service.cleanupOldLogs()
+
+      expect(mockUnlink.mock.calls.map((call) => path.basename(call[0] as string)).sort()).toEqual([
+        'main.100.log',
+        'main.6.log'
+      ])
     })
 
     it('continues cleanup when disk space is above 100MB', async () => {

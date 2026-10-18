@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { app, BrowserWindow, Menu } from 'electron'
+import { app, BrowserWindow, Menu, dialog } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { spawnNewInstance } from './utils/spawnNewInstance'
@@ -31,7 +31,7 @@ import { registerClaudeStatusHandlers } from './ipc/claude-status-handlers'
 import { registerPreviewHandlers } from './ipc/preview-handlers'
 import { registerPreviewScheme } from './services/preview/previewScheme'
 import { DependencyDetector, converterRegistry, getExtensionsForDependencies } from './services/import'
-import { FORCE_CRASH_ARG } from '../shared/constants'
+import { FORCE_CRASH_ARG, LOGS_DIR_RELATIVE } from '../shared/constants'
 import { IMPORT_CHANNELS } from '../shared/ipc/import-channels'
 import type { DependencyReadyEvent } from '../shared/ipc/import-schema'
 import { createApplicationMenu, setPreviewZoomHandler } from './menu'
@@ -49,6 +49,8 @@ import { gitStatusService } from './services/GitStatusService'
 import { installSafeConsole } from './utils/safeConsole'
 import { openExternalSafeDetached } from './utils/openExternalSafe'
 import { registerWebContentsBaseline } from './utils/webContentsBaseline'
+import { registerProcessCrashLogging } from './utils/processCrashLogging'
+import { writeCrashFallbackLine } from './utils/crashFallbackLog'
 import { isBenignShutdownTimerError } from './utils/isBenignShutdownTimerError'
 import {
   registerAppCrashLogging,
@@ -59,6 +61,7 @@ import {
 // Install safe console logging to prevent EPIPE crashes
 // Must be called before any other code that uses console.log
 installSafeConsole()
+registerProcessCrashLogging()
 
 // Register the `erfana-preview://` privileged scheme (#74). MUST run before
 // `app.whenReady()`, so it lives here at module scope beside the other pre-ready
@@ -377,11 +380,29 @@ app.whenReady().then(async () => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  // Initialize global settings service (creates ~/.erfana/settings.json if needed)
-  await globalSettingsService.initialize()
+  // A failure here must not leave a windowless process: each step falls back
+  // (in-memory default settings, console logging), the failure is written to
+  // the crash fallback file, and start-up carries on to the window. The user
+  // is told once, after the window exists.
+  const startupProblems: string[] = []
 
-  // Initialize logging service (after global settings so level is loaded)
-  await loggingService.initialize()
+  // Initialize global settings service (creates ~/.erfana/settings.json if needed).
+  // On failure the service keeps the in-memory defaults it was built with.
+  try {
+    await globalSettingsService.initialize()
+  } catch (error) {
+    writeCrashFallbackLine('[crash] startup-settings-init', error)
+    startupProblems.push('Your saved settings could not be loaded, so default settings are in use.')
+  }
+
+  // Initialize logging service (after global settings so level is loaded).
+  // On failure the service has already switched itself to console logging.
+  try {
+    await loggingService.initialize()
+  } catch (error) {
+    writeCrashFallbackLine('[crash] startup-logging-init', error)
+    startupProblems.push('The log files could not be set up, so activity is not being recorded to disk.')
+  }
 
   // Record renderer / child-process deaths (#60 E). Registered once, app-wide,
   // so it also covers the overlay windows, the PDF/DOCX render window and the
@@ -470,6 +491,13 @@ app.whenReady().then(async () => {
 
   // Create main window
   createWindow()
+
+  if (startupProblems.length > 0) {
+    dialog.showErrorBox(
+      'Erfana started with problems',
+      `${startupProblems.join('\n\n')}\n\nErfana will keep running. Details were saved to crash.log in the ${LOGS_DIR_RELATIVE} folder in your home folder.`
+    )
+  }
 
   // Fire-and-forget: detect system dependencies for LiteParse document import
   // Runs async after window creation so it doesn't block startup
