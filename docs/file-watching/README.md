@@ -7,9 +7,9 @@ Erfana automatically detects and responds to external file system changes using 
 **FileWatcherService**: Watches individual open files for content changes, surfaces editor reload/conflict UI
 **DirectoryWatcherService**: Watches entire project directory for both structural changes (create/delete/rename) **and** in-place content changes (`fs.writeFile` in place), broadcasts `directory-watch:changed` for both
 
-FileWatcherService uses [Chokidar](https://github.com/paulmillr/chokidar) on every platform. DirectoryWatcherService uses chokidar on macOS and Linux, and on Windows a native recursive watcher built on Node's own `fs.watch` ([#211](https://github.com/qodeca/erfana/issues/211)) – see [Watch backends](#watch-backends-211). Both share the debouncing and race-condition guards described below.
+FileWatcherService uses [Chokidar](https://github.com/paulmillr/chokidar) on every platform. DirectoryWatcherService uses chokidar on Linux, and on Windows and macOS a native recursive watcher built on Node's own `fs.watch` ([#211](https://github.com/qodeca/erfana/issues/211)) – see [Watch backends](#watch-backends-211). Both share the debouncing and race-condition guards described below.
 
-> **Chokidar is pinned to exact `3.6.0` (v3 line; do not upgrade to v4).** v3 uses a single macOS FSEvents stream (~0 file descriptors per watched file); v4 dropped FSEvents and watches each file via kqueue (one FD per file), which exhausts the process FD table on large projects and breaks spawning child processes – PDF export's hidden render window crashed with `Failed to initialize sandbox` on a 20k-file folder (commit `68cfab8` – pre-migration; no longer resolvable, that history was rewritten at the 2026-06 migration – shipped in v0.12.0). The rationale is also in the comment above `disableGlobbing` in the `chokidar.watch(...)` options of `DirectoryWatcherService.watchDirectory`.
+> **Chokidar is pinned to exact `5.0.0`.** chokidar 3 pulled `braces` (GHSA-vfj7-8cjw-p6xm, no patched release) into the production tree. chokidar 4+ has no globbing (a name such as `[draft] {v2}.md` is literal) and no macOS FSEvents: it watches each file via kqueue / `fs.watch` (one FD per file), which exhausts the process FD table on large projects and breaks spawning child processes – PDF export's hidden render window crashed with `Failed to initialize sandbox` on a 20k-file folder (the reason for the earlier 3.6.0 pin, commit `68cfab8` – pre-migration; no longer resolvable, that history was rewritten at the 2026-06 migration – shipped in v0.12.0). That is why the project directory watcher on macOS runs on the native backend instead; single-file watches stay on chokidar. The rationale is also in the comment in the `chokidar.watch(...)` options of `DirectoryWatcherService`.
 
 ---
 
@@ -147,7 +147,10 @@ Two design points that are easy to undo by accident:
 
 **Platform split — measured, not assumed.** On **macOS** (fsevents,
 `usePolling: false`) chokidar v3 reports `mv tmp target` over a watched path as
-**`change`**, not `unlink`, and the watch keeps working afterwards. The re-arm
+**`change`**, not `unlink`, and the watch keeps working afterwards. That was
+measured on chokidar 3 with fsevents; on chokidar 5 a macOS single-file watch
+runs on `fs.watch`, so the answer may differ – the test below asserts the
+disjunction either way. The re-arm
 branch is therefore **dormant on macOS**, and the ordinary debounced change path
 is what carries the fix there. The branch matters on platforms that do report
 `unlink`. This is pinned by
@@ -217,7 +220,7 @@ Monitors entire project folder for structural changes (files/folders created, de
 
 ### Architecture
 
-- **Backend**: chokidar 3.6.0 on macOS and Linux; one `NativeRecursiveWatcher` per project on Windows (#211) – see [Watch backends](#watch-backends-211)
+- **Backend**: chokidar 5.0.0 on Linux; one `NativeRecursiveWatcher` per project on Windows (#211) and macOS – see [Watch backends](#watch-backends-211)
 - **Event Pipeline**: VS Code-inspired ThrottledWorker + EventCoalescer, the same for both backends
   - 75ms collection window for batching events
   - 200ms throttle between processing rounds
@@ -255,7 +258,7 @@ This ensures AI agent file changes (e.g., Claude Code creating `.claude/commands
 - `coverage/`, `__pycache__/`, `.pytest_cache/`, `target/` - Test/build artifacts
 - Anything in the project's `files.exclude` list
 
-**Filter order.** On chokidar the drop test is the function-based `ignored` option, so a dropped folder is never scanned. On Windows it runs in the native watcher's callback before any `lstat`. Both backends then pass through the same backstop in `DirectoryWatcherService.queueEvent`, right after the session guard and **before** pause accounting and metrics: a dropped path is never counted as a missed change while paused, never counted as received (`eventsFiltered` counts it instead), and never broadcast. A burst of only dropped paths therefore sends nothing to the renderer, so it starts neither a tree re-read nor a git refresh.
+**Filter order.** On chokidar the drop test is the function-based `ignored` option, so a dropped folder is never scanned. On the native backend (Windows, macOS) it runs in the native watcher's callback before any `lstat`. Both backends then pass through the same backstop in `DirectoryWatcherService.queueEvent`, right after the session guard and **before** pause accounting and metrics: a dropped path is never counted as a missed change while paused, never counted as received (`eventsFiltered` counts it instead), and never broadcast. A burst of only dropped paths therefore sends nothing to the renderer, so it starts neither a tree re-read nor a git refresh.
 
 `setPathFilter(filter)` replaces the filter; `ProjectService` builds a fresh one on every project open and hands the **same** instance to `FileService` and `DirectoryWatcherService`. Until then the default hidden and ignore lists apply, with no exclude list.
 
@@ -267,7 +270,7 @@ The directory watcher supports an optional recursive depth cap to reduce load on
 - No UI control at the moment. Configure via preload settings API, e.g. in DevTools:
   - `await window.api.settings.setDirectoryWatchDepth(2)`
   - `await window.api.settings.setDirectoryWatchDepth(null)` for Unlimited
-- Behavior: on chokidar it is the `depth` option. On Windows the native handles stay recursive and deeper events are dropped by the filter, with chokidar's rule (a path of *n* segments is dropped when *n* − 1 > depth). The watcher uses the new setting on the next start
+- Behavior: on chokidar it is the `depth` option. On the native backend (Windows, macOS) the handles stay recursive and deeper events are dropped by the filter, with chokidar's rule (a path of *n* segments is dropped when *n* − 1 > depth). The watcher uses the new setting on the next start
 
 Recommended:
 - Start with "Unlimited"
@@ -275,11 +278,15 @@ Recommended:
 
 ### Watch backends (#211)
 
-`selectDirectoryWatchBackend(platform, env)` (`src/main/services/watcher/directoryWatchBackend.ts`) picks the backend: `native-recursive` on `win32`, `chokidar` everywhere else. `DirectoryWatcherService` reads it once, in its constructor (the optional `{ backend }` option overrides it, which the native wiring suite uses), and logs `Directory watcher backend selected` at the first watch. Both backends satisfy the same `DirectoryWatchHandle` seam (`on(...)`, `close(): Promise<void>`), so everything after the watcher – `queueEvent`, the throttle, the coalescer, pause, catch-up – is shared.
+`selectDirectoryWatchBackend(platform, env)` (`src/main/services/watcher/directoryWatchBackend.ts`) picks the backend: `native-recursive` on `win32` and `darwin`, `chokidar` on Linux. `DirectoryWatcherService` reads it once, in its constructor (the optional `{ backend }` option overrides it, which the native wiring suite uses), and logs `Directory watcher backend selected` at the first watch. Both backends satisfy the same `DirectoryWatchHandle` seam (`on(...)`, `close(): Promise<void>`), so everything after the watcher – `queueEvent`, the throttle, the coalescer, pause, catch-up – is shared.
 
 **Escape hatch.** `ERFANA_DIRECTORY_WATCHER=chokidar` in the environment Erfana starts with forces chokidar on every platform. It exists for support and diagnosis only: there is no setting and no UI. Only that exact value counts; any other non-empty value is ignored and logged as `Directory watcher override ignored: unknown value` (the value itself is not logged).
 
 **Why Windows changed.** chokidar 3 on Windows opens one `fs.watch` handle per folder and scans the whole project while the first tree read runs. On a project of about 222,000 entries that meant tens of thousands of handles, and the scan competed with the tree walk for libuv's four-thread pool. The native backend holds a small, bounded set of handles instead, and none at all for excluded, hidden or ignored folders it knows about.
+
+**Why macOS changed.** chokidar 4+ dropped FSEvents and opens one file descriptor per watched file, which on a large project exhausts the FD table and breaks child-process spawns such as PDF export's render window. Node's recursive `fs.watch` is served by FSEvents on macOS (~0 FDs per file), so the project watcher uses the native backend there too, with the same plan below. **Not yet verified on a real Mac:** macOS behaviour is covered by unit tests with a fake file system and the Linux CI run only.
+
+**Path rules per platform.** `NativeRecursiveWatcher` takes a `platform` option (default `process.platform`). On `win32` a backslash in a reported name is a separator and a `\\?\` / `\\?\UNC\` prefix is stripped; elsewhere only `/` separates and a backslash is an ordinary file-name character.
 
 **The Windows plan** (`src/main/services/watcher/NativeRecursiveWatcher.ts`):
 
@@ -619,7 +626,7 @@ The service integrates these components:
 
 - Watchers do not follow symlinks (security)
 - **The Windows directory watcher never opens a handle on a link** (#211): junctions, directory symlinks and file symlinks are leaves in its plan, and a recursive `fs.watch` does not report inside them (measured in the [W0 spike](../spikes/211-windows-fs-watch.md))
-- **Single-file watches set `followSymlinks: false` explicitly** (`watcher/singleFileWatch.ts`, added in #70). chokidar v3 defaults this to `true`, so a link planted inside the project would otherwise make the watcher — and the automatic re-read behind it — track an out-of-project target
+- **Single-file watches set `followSymlinks: false` explicitly** (`watcher/singleFileWatch.ts`, added in #70). chokidar (5.0.0 included) defaults this to `true`, so a link planted inside the project would otherwise make the watcher — and the automatic re-read behind it — track an out-of-project target
 - Symlinked entries are flagged in the Project Tree with a small chain icon and tooltip
 - Operations on symlink targets remain subject to project boundary checks. Since #70 the read handlers enforce that with `fs.realpath` on both ends rather than by comparing path text — see [API Services § Path confinement](../api-services.md#path-confinement-for-the-file-read-ipc-handlers)
 

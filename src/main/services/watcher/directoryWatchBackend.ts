@@ -3,10 +3,12 @@
 /**
  * Directory watch backend seam (#211, design D6)
  *
- * Decides how the project's directory watcher is built. On Windows chokidar 3
+ * Decides how the project's directory watcher is built. On Windows chokidar
  * opens one `fs.watch` handle per folder and scans the whole project while the
- * first tree read runs, so Windows gets one native recursive watcher per
- * project instead. macOS and Linux keep chokidar 3.6.0.
+ * first tree read runs; on macOS chokidar 4+ dropped FSEvents and costs one
+ * file descriptor per watched file, which exhausts the process FD table on a
+ * large project. Both therefore get one native recursive watcher per project
+ * (`fs.watch` is FSEvents on macOS, ~0 FDs per file). Linux keeps chokidar.
  *
  * `ERFANA_DIRECTORY_WATCHER=chokidar` forces chokidar on every platform. It is
  * for support and diagnosis only – there is no setting and no UI. Only that
@@ -53,8 +55,8 @@ const OVERRIDE_VALUE: DirectoryWatchBackend = 'chokidar'
  * @param platform - the host platform (`process.platform` by default)
  * @param env - the environment (`process.env` by default); only
  *   `ERFANA_DIRECTORY_WATCHER` is read
- * @returns `native-recursive` on Windows, otherwise `chokidar`; `chokidar`
- *   everywhere when the variable is exactly `chokidar`
+ * @returns `native-recursive` on Windows and macOS, otherwise `chokidar`;
+ *   `chokidar` everywhere when the variable is exactly `chokidar`
  */
 export function selectDirectoryWatchBackend(
   platform: NodeJS.Platform = process.platform,
@@ -72,5 +74,5 @@ export function selectDirectoryWatchBackend(
       accepted: [OVERRIDE_VALUE]
     })
   }
-  return platform === 'win32' ? 'native-recursive' : 'chokidar'
+  return platform === 'win32' || platform === 'darwin' ? 'native-recursive' : 'chokidar'
 }

@@ -535,7 +535,7 @@ A dated exception to the policy above: v0.20.1 ships with these four production 
 | Package | Pin | Reason |
 |---|---|---|
 | `lodash`, `lodash-es` | **exact** `4.18.1` | GHSA 1115805/6/9/10 (`_.template` code injection + `_.unset`/`_.omit` prototype pollution). Vulnerable range `<=4.17.23`. |
-| `chokidar` | **exact** `3.6.0` | chokidar 4 removed `disableGlobbing`, which `DirectoryWatcherService`, `FileWatcherService` and `GitWatcherService` rely on (FD-exhaustion fix). The `Guard - chokidar v3 pinned` step in `checks.yml` fails the build on any drift. |
+| `chokidar` | **exact** `5.0.0` | Keeps chokidar 3 and its `braces` dependency (GHSA-vfj7-8cjw-p6xm, high, no patched release) out of the production tree; with chokidar 5, `braces` is dev-only. The `Guard - chokidar 5 pinned, no braces in production` step in `checks.yml` fails the build unless the installed chokidar is exactly 5.0.0, and fails if `npm ls braces --omit=dev --all --parseable` prints anything. |
 | `dompurify` | `^3.4.1` | Forces every transitive `dompurify` onto 3.4.1 or later. The originating advisory is not recorded in the repo – check `npm audit` history before relaxing. |
 
 **Lodash 4.18.x is a community fork, not OpenJS**: `4.18.0`/`4.18.1` were published by maintainer `magic-akari` in Oct 2025 after the upstream OpenJS branch went dormant. We pin **exact** (no caret) so a future 4.18.2 from any maintainer can't auto-flow into the lockfile; `package-lock.json` integrity hashes additionally pin the tarball. On Mermaid/electron-builder major bumps, retest the override chain — transitive resolution may shift.

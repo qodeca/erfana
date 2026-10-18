@@ -122,7 +122,6 @@ export class RepoPresenceWatcher {
         persistent: true,
         ignoreInitial: true,
         usePolling: false,
-        disableGlobbing: true,
         followSymlinks: false,
         depth: 0,
         ignored: (p: string) => p !== this.gitDir && basename(p) !== '.git'

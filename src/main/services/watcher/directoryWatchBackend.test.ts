@@ -18,8 +18,8 @@ vi.mock('../LoggingService', () => ({
 }))
 
 const ENV_VAR = 'ERFANA_DIRECTORY_WATCHER'
-const OTHER_PLATFORMS = ['darwin', 'linux'] as const
-const ALL_PLATFORMS = ['win32', ...OTHER_PLATFORMS] as const
+const NATIVE_PLATFORMS = ['win32', 'darwin'] as const
+const ALL_PLATFORMS = [...NATIVE_PLATFORMS, 'linux'] as const
 
 describe('selectDirectoryWatchBackend (#211, D6)', () => {
   beforeEach(() => {
@@ -30,12 +30,12 @@ describe('selectDirectoryWatchBackend (#211, D6)', () => {
     vi.unstubAllEnvs()
   })
 
-  it('picks the native recursive watcher on Windows', () => {
-    expect(selectDirectoryWatchBackend('win32', {})).toBe('native-recursive')
+  it.each(NATIVE_PLATFORMS)('picks the native recursive watcher on %s', (platform) => {
+    expect(selectDirectoryWatchBackend(platform, {})).toBe('native-recursive')
   })
 
-  it.each(OTHER_PLATFORMS)('keeps chokidar on %s', (platform) => {
-    expect(selectDirectoryWatchBackend(platform, {})).toBe('chokidar')
+  it('keeps chokidar on linux', () => {
+    expect(selectDirectoryWatchBackend('linux', {})).toBe('chokidar')
   })
 
   it.each(ALL_PLATFORMS)('forces chokidar on %s when the override is exactly "chokidar"', (platform) => {
@@ -47,7 +47,7 @@ describe('selectDirectoryWatchBackend (#211, D6)', () => {
     'ignores the unknown value %j and logs it without the value',
     (value) => {
       expect(selectDirectoryWatchBackend('win32', { [ENV_VAR]: value })).toBe('native-recursive')
-      expect(selectDirectoryWatchBackend('darwin', { [ENV_VAR]: value })).toBe('chokidar')
+      expect(selectDirectoryWatchBackend('linux', { [ENV_VAR]: value })).toBe('chokidar')
 
       expect(logger.warn).toHaveBeenCalledTimes(2)
       expect(logger.warn).toHaveBeenCalledWith('Directory watcher override ignored: unknown value', {
@@ -69,7 +69,8 @@ describe('selectDirectoryWatchBackend (#211, D6)', () => {
 
   it('reads the host platform and process.env by default', () => {
     vi.stubEnv(ENV_VAR, undefined)
-    const hostDefault = process.platform === 'win32' ? 'native-recursive' : 'chokidar'
+    const hostDefault =
+      process.platform === 'win32' || process.platform === 'darwin' ? 'native-recursive' : 'chokidar'
     expect(selectDirectoryWatchBackend()).toBe(hostDefault)
 
     vi.stubEnv(ENV_VAR, 'chokidar')

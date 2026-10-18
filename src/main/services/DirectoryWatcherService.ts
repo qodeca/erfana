@@ -379,7 +379,7 @@ export class DirectoryWatcherService {
   }
 
   /**
-   * chokidar 3 (macOS, Linux, and Windows under the override). The project
+   * chokidar (Linux, and every platform under the override). The project
    * path filter decides what is not watched at all (#211, D4): excluded paths,
    * hidden names (the tree's rule, e.g. .git) and ignore patterns
    * (node_modules, build outputs…); other dotfolders such as .claude and
@@ -391,12 +391,12 @@ export class DirectoryWatcherService {
       ignoreInitial: true, // Don't fire events for existing files
       ignored: (path: string) => this.shouldDropAbs(path, dirPath), // Function-based ignore (more reliable than regex)
       usePolling: false, // Use native fs events (faster)
-      // chokidar is pinned to ^3.x: v3 uses macOS FSEvents (a single stream, ~0
-      // FDs per file). v4 dropped FSEvents and watches each file via kqueue (one
-      // FD per file), which exhausts the process FD table on large projects and
-      // breaks spawning child processes (e.g. PDF export's hidden render window
-      // crashed with "Failed to initialize sandbox" on a 20k-file folder).
-      disableGlobbing: true, // Treat the path literally (matches v4); avoids glob chars in project paths
+      // chokidar 4+ dropped macOS FSEvents and watches each file through kqueue
+      // (one FD per file), which exhausts the process FD table on large
+      // projects and breaks spawning child processes (PDF export's hidden render
+      // window crashed with "Failed to initialize sandbox" on a 20k-file
+      // folder). So macOS never gets here by default: `directoryWatchBackend`
+      // picks the native recursive watcher (FSEvents) there. Paths are literal.
       awaitWriteFinish: false, // Lower latency for editor saves; downstream
                                // consumers tolerate one pre-flush `change` per write.
       depth, // Optional cap for performance

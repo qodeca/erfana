@@ -12,9 +12,9 @@
  * asks to watch a dir for a consumer; the watcher creates exactly one chokidar
  * instance per dir and closes it when the last consumer leaves.
  *
- * chokidar config matches the project convention (v3, FSEvents, ~0 FDs/file):
- * `disableGlobbing:true, ignoreInitial:true, usePolling:false,
- * followSymlinks:false, depth:0`. An `ignored` predicate drops anything under a
+ * chokidar config matches the project convention: `ignoreInitial:true,
+ * usePolling:false, followSymlinks:false, depth:0` (paths are literal in
+ * chokidar 4+; one file handle per watched transcript, a small set). An `ignored` predicate drops anything under a
  * `subagents/` segment and any non-`.jsonl` file so sidechain/excluded writes
  * never trigger a reparse (design §10 performance).
  *
@@ -118,9 +118,6 @@ export class ClaudeTranscriptWatcher {
         persistent: true,
         ignoreInitial: true,
         usePolling: false,
-        // chokidar pinned to v3 (FSEvents, ~0 FDs/file). disableGlobbing treats
-        // the path literally — transcript dirs can contain glob chars.
-        disableGlobbing: true,
         followSymlinks: false,
         depth: 0,
         ignored: (p: string) => shouldIgnoreTranscriptPath(p)

@@ -5,7 +5,7 @@
  *
  * The mocked re-arm tests in `FileWatcherService.atomicSave.test.ts` encode the
  * assumption they are meant to verify: they prove "given an unlink and a file
- * that is back, we re-arm", but they cannot prove that chokidar v3 with
+ * that is back, we re-arm", but they cannot prove that chokidar with
  * `awaitWriteFinish` on a single-file watch actually emits `unlink` for
  * `mv tmp target`. On some platforms it may collapse the rename into `change`.
  *
@@ -164,10 +164,24 @@ describe('single-file chokidar watch, real filesystem', () => {
     TEST_TIMEOUT_MS
   )
 
+  it(
+    'watches a file whose name contains glob characters',
+    async () => {
+      // chokidar 3 read such a name as a glob unless globbing was disabled, so
+      // the file was silently never watched. chokidar 4+ has no globbing; this
+      // proves the name is still taken literally. (`*` and `?` are not legal
+      // in a Windows file name, so the name uses brackets and braces.)
+      const filePath = await createTempFile('[draft] {v2}.md', '# before\n')
+      const events = await startRecordingWatcher(filePath)
+
+      await writeFile(filePath, '# after\n', 'utf-8')
+
+      await waitUntil(() => events.includes('change'), 'a change on a file named with glob characters')
+    },
+    TEST_TIMEOUT_MS
+  )
+
   it('pins the load-bearing watch options', () => {
-    // chokidar v3 treats a path as a glob unless this is set, so a file whose
-    // name contains glob characters would silently never be watched.
-    expect(SINGLE_FILE_WATCH_OPTIONS.disableGlobbing).toBe(true)
     expect(SINGLE_FILE_WATCH_OPTIONS.usePolling).toBe(false)
     expect(SINGLE_FILE_WATCH_OPTIONS.awaitWriteFinish).toEqual({
       stabilityThreshold: 300,
