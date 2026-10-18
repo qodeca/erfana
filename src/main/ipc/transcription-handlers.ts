@@ -43,6 +43,7 @@ import { audioMetadataService } from '../services/AudioMetadataService'
 import { audioExtractionService } from '../services/AudioExtractionService'
 import type { SegmentedExtractionResult } from '../services/AudioExtractionService'
 import { apiKeyService } from '../services/ApiKeyService'
+import { ApiKeyEncryptionUnavailableError } from '../services/apiKeyErrors'
 import { globalSettingsService } from '../services/GlobalSettingsService'
 import { fileService } from '../services/FileService'
 import { logger } from '../services/LoggingService'
@@ -513,6 +514,9 @@ export function registerTranscriptionHandlers(): void {
 
         return { success: true }
       } catch (error) {
+        if (error instanceof ApiKeyEncryptionUnavailableError) {
+          return { success: false, error: error.message }
+        }
         logger.error('Failed to store API key', error instanceof Error ? error : undefined)
         return {
           success: false,

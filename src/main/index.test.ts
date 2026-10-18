@@ -158,7 +158,13 @@ describe('Main Process - Window Creation', () => {
         fromId: vi.fn(() => null)
       },
       // #74: preview scheme registration runs at module load.
-      protocol: { registerSchemesAsPrivileged: vi.fn() }
+      protocol: { registerSchemesAsPrivileged: vi.fn() },
+      session: { defaultSession: {} }
+    }))
+
+    // Mock default-session permission policy (covered by its own suite)
+    vi.doMock('./services/session/defaultSessionPermissions', () => ({
+      installDefaultSessionPermissions: vi.fn()
     }))
 
     // Mock menu module
@@ -589,7 +595,8 @@ describe('Main Process - Window Creation', () => {
           webContents: {
             fromId: vi.fn(() => null)
           },
-          protocol: { registerSchemesAsPrivileged: vi.fn() }
+          protocol: { registerSchemesAsPrivileged: vi.fn() },
+          session: { defaultSession: {} }
         }))
 
         vi.doMock('./menu', () => ({
