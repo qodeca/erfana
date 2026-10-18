@@ -367,7 +367,7 @@ describe('ImageRasterizeWindow.printToPdf', () => {
     expect(HARNESS_PDF_OPTIONS).toEqual({
       preferCSSPageSize: true,
       printBackground: true,
-      margins: { marginType: 'none' },
+      margins: { top: 0, bottom: 0, left: 0, right: 0 },
       scale: 1,
       pageRanges: '1-1'
     })

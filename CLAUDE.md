@@ -4,7 +4,7 @@
 An agent-native Markdown workspace (Electron): integrated terminal for CLI coding agents, Monaco editor + live preview, project tree. Erfana hosts the agent – it is not itself an AI model, so never overclaim built-in AI. The context-window meter is Claude Code-specific (it reads `~/.claude` transcripts); the terminal itself runs any CLI agent.
 - **Repository**: `qodeca/erfana` (GitHub, public)
 - **License and legal**: `GPL-3.0-only` with REUSE-style SPDX headers – see [LICENSE](LICENSE), [`REUSE.toml`](REUSE.toml), [TRADEMARKS.md](TRADEMARKS.md) (forks must rebrand) and [CLA.md](CLA.md). `"private": true` in package.json is a publish guard for the desktop app, not a license statement.
-- **Node Version**: 24+ (development), Electron 39 bundles Node.js 22.22.1
+- **Node Version**: 24+ (development), Electron 44 bundles Node.js 24.22.0
 - **Current version**: v0.20.1 (see [docs/CHANGELOG.md](docs/CHANGELOG.md); bump this line at release)
 
 ## Branching model

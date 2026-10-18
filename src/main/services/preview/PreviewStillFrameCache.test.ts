@@ -10,6 +10,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 import { PREVIEW } from '../../../shared/constants'
+import { TimeoutError } from '../../utils/withTimeout'
 
 import {
   PreviewStillFrameCache,
@@ -326,11 +327,39 @@ describe('PreviewStillFrameCache', () => {
     expect(cache.get(PANEL)).toBeUndefined()
   })
 
-  it('emits NO frame (does not throw) when capture rejects', async () => {
-    const wc = makeWc(vi.fn(async () => Promise.reject(new Error('gpu gone'))))
+  it('emits NO frame (does not throw) when capture rejects twice', async () => {
+    const capturePage = vi.fn(async () => Promise.reject(new Error('gpu gone')))
     const cache = createPreviewStillFrameCache()
 
-    await expect(cache.captureIfStale(wc, PANEL, SIZE)).resolves.toBeUndefined()
+    await expect(cache.captureIfStale(makeWc(capturePage), PANEL, SIZE)).resolves.toBeUndefined()
+    expect(cache.get(PANEL)).toBeUndefined()
+    expect(capturePage).toHaveBeenCalledTimes(2)
+  })
+
+  it('retries a REJECTED first capture like an empty one (Electron 44)', async () => {
+    // Electron 44 rejects the not-yet-painted capture at `'ready'` where
+    // Electron 39 returned an empty image; without the retry no parked tab
+    // ever got a picture.
+    const good = makeImage({ width: 10, height: 10 }, SHORT_DATA_URL)
+    const capturePage = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('UnknownVizError'))
+      .mockResolvedValueOnce(good)
+    const cache = createPreviewStillFrameCache({ now: () => 11 })
+
+    await cache.captureIfStale(makeWc(capturePage), PANEL, SIZE)
+
+    expect(capturePage).toHaveBeenCalledTimes(2)
+    expect(cache.get(PANEL)?.dataUrl).toBe(SHORT_DATA_URL)
+  })
+
+  it('does NOT retry a first capture that timed out', async () => {
+    const capturePage = vi.fn(async () => Promise.reject(new TimeoutError('Preview still-frame capture', 1)))
+    const cache = createPreviewStillFrameCache()
+
+    await cache.captureIfStale(makeWc(capturePage), PANEL, SIZE)
+
+    expect(capturePage).toHaveBeenCalledTimes(1)
     expect(cache.get(PANEL)).toBeUndefined()
   })
 

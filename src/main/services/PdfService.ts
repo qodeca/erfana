@@ -9,6 +9,7 @@ import { ErrorCode } from '../../shared/errors'
 import type { PdfExportResponse } from '../../shared/ipc/pdf-schema'
 import { logger } from './LoggingService'
 import { deriveSafeFilename } from '../utils/validateFilename'
+import { rememberDialogResult, withLastDirectory } from '../utils/lastDialogDirectory'
 
 /**
  * Print stylesheet for PDF export
@@ -363,7 +364,6 @@ const PDF_PRINT_CONFIG = {
   printBackground: true,
   preferCSSPageSize: true,
   margins: {
-    marginType: 'custom' as const,
     top: 0,
     bottom: 0,
     left: 0,
@@ -741,16 +741,17 @@ class PdfService implements IPdfService {
     // Truncate to leave headroom for the .pdf extension + OS path limits.
     const sanitizedFileName = safe.slice(0, PdfService.MAX_FILENAME_LENGTH)
 
-    const result = await dialog.showSaveDialog({
+    const result = await dialog.showSaveDialog(withLastDirectory({
       title: 'Export to PDF',
       defaultPath: `${sanitizedFileName}.pdf`,
       buttonLabel: 'Export',
       filters: [{ name: 'PDF Documents', extensions: ['pdf'] }]
-    })
+    }))
 
     if (result.canceled || !result.filePath) {
       return null
     }
+    rememberDialogResult(result.filePath)
 
     // Ensure .pdf extension
     let filePath = result.filePath

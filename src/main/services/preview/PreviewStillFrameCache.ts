@@ -52,7 +52,7 @@
 import { PREVIEW } from '../../../shared/constants'
 import { stablePathDigest } from '../../../shared/stablePathDigest'
 import { logger } from '../LoggingService'
-import { withTimeout } from '../../utils/withTimeout'
+import { TimeoutError, withTimeout } from '../../utils/withTimeout'
 import type { PreviewBounds, PreviewStillFrame } from '../../../shared/ipc/preview-types'
 
 /**
@@ -195,17 +195,19 @@ export class PreviewStillFrameCache implements IPreviewStillFrameCache {
       return
     }
 
-    let image: PreviewNativeImage
+    let image: PreviewNativeImage | null
     const run: PreviewCaptureRun = { superseded: false, inputDuring: false }
     this.inFlight.set(panelId, run)
     try {
-      image = await this.captureOnce(wc, size)
+      image = await this.firstCapture(wc, size)
       // An EMPTY image is Chromium saying the surface has not produced a frame
       // yet — measured on Windows: the capture at `'ready'` came back empty for
       // a page that had just finished loading, and a parked tab then showed a
       // flat colour block. One retry after a short pause is enough; a second
-      // empty answer means the page is genuinely not painting.
-      if (image.isEmpty()) {
+      // empty answer means the page is genuinely not painting. Electron 44
+      // REJECTS that same not-yet-painted capture instead of returning an
+      // empty image (`firstCapture` maps it to `null`), so both get the retry.
+      if (image === null || image.isEmpty()) {
         await new Promise<void>((resolve) => setTimeout(resolve, PREVIEW.CAPTURE_RETRY_DELAY_MS))
         // `shouldKeep` protects a frame this panel ALREADY has; with an empty
         // slot it has nothing to protect and abandoning the retry costs the tab
@@ -332,6 +334,28 @@ export class PreviewStillFrameCache implements IPreviewStillFrameCache {
     if (run !== undefined) {
       run.superseded = true
       this.inFlight.delete(panelId)
+    }
+  }
+
+  /**
+   * The first {@link captureOnce} of a run. A rejection other than the timeout
+   * comes back as `null` – "no frame yet", retried like an empty image – and
+   * a timeout still ends the run, because a capture that never answered is not
+   * worth a second wait. Measured on Windows with Electron 44: every capture
+   * at `'ready'` rejected, where Electron 39 returned an empty image.
+   */
+  private async firstCapture(
+    wc: PreviewCaptureContents,
+    size: { width: number; height: number }
+  ): Promise<PreviewNativeImage | null> {
+    try {
+      return await this.captureOnce(wc, size)
+    } catch (error) {
+      if (error instanceof TimeoutError) throw error
+      logger.debug('Preview still frame: first capture rejected, retrying once', {
+        ...errorFieldsOf(error)
+      })
+      return null
     }
   }
 

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { dialog, BrowserWindow, shell } from 'electron'
+import { dialog, BrowserWindow, shell, type OpenDialogOptions } from 'electron'
 import { stat, realpath } from 'fs/promises'
 import path from 'path'
 import { ProjectService } from '../services/ProjectService'
@@ -22,6 +22,7 @@ import { redactedLogError } from '../utils/redactUserInput'
 import { assertInsideProject, assertNoConfinementEscape } from '../utils/projectConfinement'
 import { isTrustedSender } from './senderValidation'
 import { registerHandle } from './registry'
+import { rememberDialogResult, withLastDirectory } from '../utils/lastDialogDirectory'
 
 /**
  * Broadcast project change to all renderer processes
@@ -82,16 +83,17 @@ async function openProjectByPath(newProjectPath: string): Promise<string> {
 export function registerFileHandlers(): void {
   // Open project folder via dialog
   registerHandle('file:openProject', async () => {
-    const result = await dialog.showOpenDialog({
+    const result = await dialog.showOpenDialog(withLastDirectory<OpenDialogOptions>({
       properties: ['openDirectory', 'createDirectory'],
       title: 'Select Project Folder',
       buttonLabel: 'Open Project'
-    })
+    }))
 
     if (result.canceled || result.filePaths.length === 0) {
       return null
     }
 
+    rememberDialogResult(result.filePaths)
     const newProjectPath = result.filePaths[0]
     return await openProjectByPath(newProjectPath)
   })
