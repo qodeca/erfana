@@ -19,6 +19,16 @@ vi.mock('fs/promises', () => ({
   constants: { R_OK: 4 }
 }))
 
+// Persistence goes through atomicWriteJSON (temp file + rename, covered in
+// atomicWrite*.test.ts). Here it is routed to the mocked writeFile so these
+// tests keep asserting on what is written and when.
+vi.mock('../utils/atomicWrite', () => ({
+  atomicWriteJSON: async (path: string, content: unknown, space?: number) => {
+    const fs = await import('fs/promises')
+    await fs.writeFile(path, JSON.stringify(content, null, space), 'utf-8')
+  }
+}))
+
 // Mock os.homedir
 vi.mock('os', () => ({
   homedir: vi.fn(() => '/mock-home')

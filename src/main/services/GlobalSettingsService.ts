@@ -14,7 +14,7 @@
  *
  * @see Issue #50 - global settings service
  */
-import { readFile, writeFile, mkdir, copyFile, access, constants } from 'fs/promises'
+import { readFile, mkdir, copyFile, access, constants } from 'fs/promises'
 import { homedir } from 'os'
 import { Mutex } from 'async-mutex'
 import {
@@ -25,6 +25,7 @@ import {
 } from '../../shared/ipc/global-settings-schema'
 import { AppError, ErrorCode } from '../../shared/errors'
 import { logger } from './LoggingService'
+import { atomicWriteJSON } from '../utils/atomicWrite'
 
 /** Global settings directory */
 const SETTINGS_DIR = '.erfana'
@@ -234,8 +235,7 @@ export class GlobalSettingsService {
   private async saveSettings(): Promise<void> {
     return this.writeMutex.runExclusive(async () => {
       try {
-        const content = JSON.stringify(this.settings, null, 2)
-        await writeFile(this.settingsPath, content, 'utf-8')
+        await atomicWriteJSON(this.settingsPath, this.settings, 2)
       } catch (error) {
         throw new AppError(
           `Failed to write settings to ${this.settingsPath}: ${error instanceof Error ? error.message : String(error)}`,
