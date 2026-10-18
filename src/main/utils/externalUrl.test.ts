@@ -15,6 +15,25 @@ describe('parseExternalUrl', () => {
   })
 
   it.each([
+    ['mailto:a@b?attach=/Users/me/.ssh/id_rsa', 'mailto:a@b'],
+    ['mailto:a@b?attachment=/etc/passwd&subject=Hi', 'mailto:a@b?subject=Hi'],
+    ['mailto:a@b?ATTACH=/x&Subject=Hi', 'mailto:a@b?subject=Hi'],
+    ['mailto:a@b?x-custom=1&in-reply-to=zz', 'mailto:a@b'],
+    ['mailto:a@b,c@d?cc=e@f&bcc=g@h', 'mailto:a@b,c@d?cc=e@f&bcc=g@h'],
+    ['mailto:?to=a@b&body=line%20one%0Aline%20two', 'mailto:?to=a@b&body=line%20one%0Aline%20two'],
+    ['mailto:a@b?subject=Hello World', 'mailto:a@b?subject=Hello%20World'],
+    ['mailto:%22x%22@b', 'mailto:%22x%22@b'],
+    ['mailto:a b@c', 'mailto:a%20b@c'],
+    ['mailto:a@b#frag', 'mailto:a@b']
+  ])('rebuilds %s to keep only mail fields', (input, rebuilt) => {
+    expect(parseExternalUrl(input)).toBe(rebuilt)
+  })
+
+  it('rejects a mailto with broken percent-encoding', () => {
+    expect(parseExternalUrl('mailto:%E0%A4%A@b')).toBeNull()
+  })
+
+  it.each([
     ['file:///etc/hosts'],
     ['file://host/share/x'],
     ['file://host/x'],
