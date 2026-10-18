@@ -1,0 +1,32 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`preload surface > window.api has the expected top-level groups 1`] = `
+[
+  "browser",
+  "camera",
+  "claudeStatus",
+  "clipboard",
+  "directoryWatch",
+  "docx",
+  "file",
+  "fileWatch",
+  "git",
+  "gitPolling",
+  "gitWatcher",
+  "globalSettings",
+  "imageExport",
+  "import",
+  "logging",
+  "pdf",
+  "preview",
+  "projectLock",
+  "quit",
+  "screenshot",
+  "settings",
+  "system",
+  "terminal",
+  "transcription",
+  "utils",
+  "whisper",
+]
+`;

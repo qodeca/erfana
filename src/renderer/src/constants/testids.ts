@@ -623,6 +623,7 @@ export const TEST_IDS = {
   SETTINGS_WHISPER_MODEL_STATUS: 'settings-whisper-model-status',
   /** Whisper download error message */
   SETTINGS_WHISPER_DOWNLOAD_ERROR: 'settings-whisper-download-error',
+  SETTINGS_API_KEY_ERROR: 'settings-api-key-error',
   /** Logs folder path display */
   SETTINGS_LOGS_FOLDER_PATH: 'settings-logs-folder-path',
   /** Open logs folder button */

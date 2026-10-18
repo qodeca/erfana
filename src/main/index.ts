@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { app, shell, BrowserWindow, Menu } from 'electron'
+import { app, shell, BrowserWindow, Menu, session } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { spawnNewInstance } from './utils/spawnNewInstance'
@@ -48,6 +48,7 @@ import { projectLockService } from './services/ProjectLockService'
 import { gitStatusService } from './services/GitStatusService'
 import { installSafeConsole } from './utils/safeConsole'
 import { isBenignShutdownTimerError } from './utils/isBenignShutdownTimerError'
+import { installDefaultSessionPermissions } from './services/session/defaultSessionPermissions'
 import {
   registerAppCrashLogging,
   registerWindowErrorSignals,
@@ -356,6 +357,9 @@ function createWindow(): BrowserWindow {
 app.whenReady().then(async () => {
   // Set application name (shows in macOS menu bar)
   app.setName('ERFANA')
+
+  // Deny every page permission except the camera preview (Electron grants all by default)
+  installDefaultSessionPermissions(session.defaultSession)
 
   // Set application menu with Edit roles for native clipboard support
   // Required for Cmd+C/V to work in textarea and input elements

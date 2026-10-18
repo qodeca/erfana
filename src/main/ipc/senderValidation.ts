@@ -105,3 +105,28 @@ export function isTrustedAppSender(event: IpcMainEvent | IpcMainInvokeEvent): bo
     return false
   }
 }
+
+/**
+ * URL-level form of {@link isTrustedAppSender}'s decision, for callers that get a
+ * plain URL instead of an IPC event (session permission handlers).
+ *
+ * Same rule: the dev-server origin when `is.dev && ELECTRON_RENDERER_URL`,
+ * otherwise the bundled renderer entry with fragment and query ignored. An empty
+ * or unparsable URL is untrusted.
+ */
+export function isTrustedAppUrl(rawUrl: string | undefined): boolean {
+  if (!rawUrl) return false
+
+  const devUrl = process.env['ELECTRON_RENDERER_URL']
+  try {
+    const url = new URL(rawUrl)
+    if (is.dev && devUrl) {
+      return url.origin === new URL(devUrl).origin
+    }
+    url.hash = ''
+    url.search = ''
+    return url.href === RENDERER_FILE_URL
+  } catch {
+    return false
+  }
+}

@@ -23,9 +23,14 @@ const MOCK_HOME = path.join(os.tmpdir(), 'erfana-test-home')
 // =============================================================================
 
 const mockSafeStorage = {
-  isEncryptionAvailable: vi.fn(() => true),
-  encryptString: vi.fn((str: string) => Buffer.from(`encrypted:${str}`)),
-  decryptString: vi.fn((buf: Buffer) => buf.toString().replace('encrypted:', ''))
+  isAsyncEncryptionAvailable: vi.fn(async () => true),
+  getSelectedStorageBackend: vi.fn(() => 'gnome_libsecret'),
+  encryptStringAsync: vi.fn(async (str: string) => Buffer.from(`encrypted:${str}`)),
+  decryptStringAsync: vi.fn(async (buf: Buffer) => {
+    const text = buf.toString()
+    if (!text.startsWith('encrypted:')) throw new Error('Decryption failed')
+    return { result: text.replace('encrypted:', ''), shouldReEncrypt: false }
+  })
 }
 
 vi.mock('electron', () => ({
@@ -87,7 +92,8 @@ vi.mock('./LoggingService', () => ({
 describe('ApiKeyService', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockSafeStorage.isEncryptionAvailable.mockReturnValue(true)
+    mockSafeStorage.isAsyncEncryptionAvailable.mockResolvedValue(true)
+    mockSafeStorage.getSelectedStorageBackend.mockReturnValue('gnome_libsecret')
     mockWriteFile.mockResolvedValue(undefined)
     mockMkdir.mockResolvedValue(undefined)
     mockUnlink.mockResolvedValue(undefined)
@@ -105,7 +111,7 @@ describe('ApiKeyService', () => {
 
       await service.storeKey('openai', 'sk-test-key-123')
 
-      expect(mockSafeStorage.encryptString).toHaveBeenCalledWith('sk-test-key-123')
+      expect(mockSafeStorage.encryptStringAsync).toHaveBeenCalledWith('sk-test-key-123')
       expect(mockWriteFile).toHaveBeenCalledWith(
         path.join(MOCK_HOME, '.erfana', 'openai-api-key.enc'),
         expect.any(Buffer),
@@ -122,25 +128,34 @@ describe('ApiKeyService', () => {
       expect(mockMkdir).toHaveBeenCalledWith(path.join(MOCK_HOME, '.erfana'), { recursive: true, mode: 0o700 })
     })
 
-    it('should fall back to plaintext when safeStorage unavailable', async () => {
-      mockSafeStorage.isEncryptionAvailable.mockReturnValue(false)
+    it('should refuse to store (no plaintext write) when encryption is unavailable', async () => {
+      mockSafeStorage.isAsyncEncryptionAvailable.mockResolvedValue(false)
 
       const { createApiKeyService } = await import('./ApiKeyService')
+      const { ApiKeyEncryptionUnavailableError } = await import('./apiKeyErrors')
       const service = createApiKeyService()
 
-      await service.storeKey('openai', 'sk-test-key')
+      await expect(service.storeKey('openai', 'sk-test-key')).rejects.toBeInstanceOf(
+        ApiKeyEncryptionUnavailableError
+      )
 
-      expect(mockSafeStorage.encryptString).not.toHaveBeenCalled()
-      expect(mockWriteFile).toHaveBeenCalledWith(
-        path.join(MOCK_HOME, '.erfana', 'openai-api-key.enc'),
-        'sk-test-key',
-        { encoding: 'utf-8', mode: 0o600 }
-      )
-      expect(mockLogger.warn).toHaveBeenCalledWith(
-        'safeStorage unavailable, storing API key as plaintext',
-        expect.objectContaining({ serviceName: 'openai' })
-      )
+      expect(mockSafeStorage.encryptStringAsync).not.toHaveBeenCalled()
+      expect(mockWriteFile).not.toHaveBeenCalled()
+      expect(service.hasKey('openai')).toBe(false)
     })
+
+    it.skipIf(process.platform !== 'linux')(
+      'should refuse to store when Linux uses the basic_text backend',
+      async () => {
+        mockSafeStorage.getSelectedStorageBackend.mockReturnValue('basic_text')
+
+        const { createApiKeyService } = await import('./ApiKeyService')
+        const service = createApiKeyService()
+
+        await expect(service.storeKey('openai', 'sk-test-key')).rejects.toThrow(/not saved/)
+        expect(mockWriteFile).not.toHaveBeenCalled()
+      }
+    )
 
     it('should mark key as known after storing', async () => {
       const { createApiKeyService } = await import('./ApiKeyService')
@@ -169,7 +184,7 @@ describe('ApiKeyService', () => {
       const key = await service.getKey('openai')
 
       expect(key).toBe('sk-test-key')
-      expect(mockSafeStorage.decryptString).toHaveBeenCalledWith(encrypted)
+      expect(mockSafeStorage.decryptStringAsync).toHaveBeenCalledWith(encrypted)
     })
 
     it('should return null when key file does not exist', async () => {
@@ -186,8 +201,7 @@ describe('ApiKeyService', () => {
       expect(mockReadFile).not.toHaveBeenCalled()
     })
 
-    it('should return plaintext when safeStorage unavailable', async () => {
-      mockSafeStorage.isEncryptionAvailable.mockReturnValue(false)
+    it('migration: reads a legacy plaintext file and rewrites it encrypted', async () => {
       mockReadFile.mockResolvedValue(Buffer.from('sk-plaintext-key'))
 
       const { createApiKeyService } = await import('./ApiKeyService')
@@ -196,7 +210,46 @@ describe('ApiKeyService', () => {
       const key = await service.getKey('openai')
 
       expect(key).toBe('sk-plaintext-key')
-      expect(mockSafeStorage.decryptString).not.toHaveBeenCalled()
+      expect(mockWriteFile).toHaveBeenCalledWith(
+        path.join(MOCK_HOME, '.erfana', 'openai-api-key.enc'),
+        Buffer.from('encrypted:sk-plaintext-key'),
+        { mode: 0o600 }
+      )
+    })
+
+    it('migration: leaves a legacy plaintext file readable when encryption is unavailable', async () => {
+      mockSafeStorage.isAsyncEncryptionAvailable.mockResolvedValue(false)
+      mockReadFile.mockResolvedValue(Buffer.from('sk-plaintext-key'))
+
+      const { createApiKeyService } = await import('./ApiKeyService')
+      const service = createApiKeyService()
+
+      expect(await service.getKey('openai')).toBe('sk-plaintext-key')
+      expect(mockWriteFile).not.toHaveBeenCalled()
+    })
+
+    it('returns null for an encrypted file when encryption is unavailable', async () => {
+      mockSafeStorage.isAsyncEncryptionAvailable.mockResolvedValue(false)
+      mockReadFile.mockResolvedValue(Buffer.from([0x76, 0x31, 0x30, 0x01, 0x02, 0xff]))
+
+      const { createApiKeyService } = await import('./ApiKeyService')
+      const service = createApiKeyService()
+
+      expect(await service.getKey('openai')).toBeNull()
+    })
+
+    it('re-encrypts when the OS asks for it', async () => {
+      mockReadFile.mockResolvedValue(Buffer.from('encrypted:sk-old'))
+      mockSafeStorage.decryptStringAsync.mockResolvedValueOnce({
+        result: 'sk-old',
+        shouldReEncrypt: true
+      })
+
+      const { createApiKeyService } = await import('./ApiKeyService')
+      const service = createApiKeyService()
+
+      expect(await service.getKey('openai')).toBe('sk-old')
+      expect(mockWriteFile).toHaveBeenCalledTimes(1)
     })
 
     it('should return null and log error on read failure', async () => {

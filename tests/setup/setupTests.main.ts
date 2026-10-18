@@ -83,6 +83,7 @@ vi.mock('electron', () => {
 vi.mock('../../src/main/ipc/senderValidation', () => ({
   isTrustedAppSender: () => true,
   isTrustedSender: () => true,
+  isTrustedAppUrl: () => true,
   RENDERER_FILE_URL: 'file:///test/renderer/index.html'
 }))
 

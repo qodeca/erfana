@@ -409,6 +409,23 @@ describe('transcription-handlers', () => {
       )
     })
 
+    it('should pass the plain "not saved" message through when encryption is unavailable', async () => {
+      const { ApiKeyEncryptionUnavailableError } = await import('../services/apiKeyErrors')
+      mockApiKeyStoreKey.mockRejectedValueOnce(new ApiKeyEncryptionUnavailableError())
+      const { registerTranscriptionHandlers } = await import('./transcription-handlers')
+      registerTranscriptionHandlers()
+
+      const handler = getHandler('transcription:setApiKey')
+      const result = (await handler!(mockEvent, 'sk-new-key')) as {
+        success: boolean
+        error?: string
+      }
+
+      expect(result.success).toBe(false)
+      expect(result.error).toMatch(/not saved/)
+      expect(mockSetSetting).not.toHaveBeenCalled()
+    })
+
     it('should reject empty API key', async () => {
       const { registerTranscriptionHandlers } = await import('./transcription-handlers')
       registerTranscriptionHandlers()

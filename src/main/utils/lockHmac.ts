@@ -10,27 +10,80 @@
  * treated as if the file didn't exist (so we proceed to acquire normally).
  *
  * Key derivation:
- *   - Use Electron `safeStorage.encryptString('erfana-lock-hmac-v1')` to derive
- *     a per-user-account key. Different OSes back safeStorage differently
- *     (macOS Keychain, Windows DPAPI, Linux secret-service or basic password),
- *     but in all cases another local user cannot reproduce the encryption
- *     without our process credentials.
- *   - The derived key is cached in-process. We never write it to disk.
+ *   - A random 32-byte secret is generated once and stored encrypted with
+ *     Electron `safeStorage` in `~/.erfana/lock-hmac-secret.enc`. Every launch
+ *     (and every Erfana instance of the same user) decrypts the SAME secret, so
+ *     signatures are stable even where `encryptString` output is randomized
+ *     (Windows DPAPI / AES-GCM).
+ *   - Earlier versions used `encryptString('erfana-lock-hmac-v1')` itself as the
+ *     key. `verifyLock` still accepts that legacy key (verify only, never sign)
+ *     so locks written by an older build keep working until they are rewritten.
+ *   - The decrypted secret is cached in-process.
  *   - If safeStorage is unavailable (e.g. Linux without secret-service), we
  *     skip signing — `signLock` returns `undefined`, `verifyLock` returns
  *     `'no-key'`. The caller treats no-key as "accept for backward compat".
  */
 
-import { createHmac } from 'node:crypto'
+import { createHmac, randomBytes } from 'node:crypto'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 import { safeStorage } from 'electron'
 import type { LockInfo } from '../../shared/ipc/project-lock-schema'
 import { logger } from '../services/LoggingService'
 
-const KEY_LABEL = 'erfana-lock-hmac-v1'
+/** Label whose ciphertext was the HMAC key before the random secret (legacy). */
+const LEGACY_KEY_LABEL = 'erfana-lock-hmac-v1'
+const SECRET_BYTES = 32
+const SECRET_FILE_NAME = 'lock-hmac-secret.enc'
 
 let cachedKey: Buffer | null = null
+let cachedLegacyKey: Buffer | null | undefined
 let keyDerivationAttempted = false
 let noKeyLoggedOnce = false
+
+function secretDir(): string {
+  return join(homedir(), '.erfana')
+}
+
+function secretPath(): string {
+  return join(secretDir(), SECRET_FILE_NAME)
+}
+
+/** Decrypt the stored secret, or null when absent / unreadable. */
+function readStoredSecret(): Buffer | null {
+  try {
+    const hex = safeStorage.decryptString(readFileSync(secretPath()))
+    const secret = Buffer.from(hex, 'hex')
+    return secret.length === SECRET_BYTES ? secret : null
+  } catch {
+    return null
+  }
+}
+
+/** Load the stored secret, creating it on first use. */
+function loadOrCreateSecret(): Buffer {
+  const existing = readStoredSecret()
+  if (existing) return existing
+
+  const secret = randomBytes(SECRET_BYTES)
+  mkdirSync(secretDir(), { recursive: true, mode: 0o700 })
+  const encrypted = safeStorage.encryptString(secret.toString('hex'))
+  try {
+    // 'wx' so two instances starting together cannot overwrite each other's secret.
+    writeFileSync(secretPath(), encrypted, { mode: 0o600, flag: 'wx' })
+    return secret
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'EEXIST') {
+      const winner = readStoredSecret()
+      if (winner) return winner
+      // File exists but cannot be decrypted (e.g. keychain was reset): replace it.
+      writeFileSync(secretPath(), encrypted, { mode: 0o600 })
+      return secret
+    }
+    throw err
+  }
+}
 
 function getKey(): Buffer | null {
   if (cachedKey) return cachedKey
@@ -45,7 +98,7 @@ function getKey(): Buffer | null {
       }
       return null
     }
-    cachedKey = safeStorage.encryptString(KEY_LABEL)
+    cachedKey = loadOrCreateSecret()
     return cachedKey
   } catch (err) {
     logger.warn('lockHmac: failed to derive key', {
@@ -53,6 +106,17 @@ function getKey(): Buffer | null {
     })
     return null
   }
+}
+
+/** Key used by older builds; only ever used to verify existing locks. */
+function getLegacyKey(): Buffer | null {
+  if (cachedLegacyKey !== undefined) return cachedLegacyKey
+  try {
+    cachedLegacyKey = safeStorage.encryptString(LEGACY_KEY_LABEL)
+  } catch {
+    cachedLegacyKey = null
+  }
+  return cachedLegacyKey
 }
 
 /**
@@ -93,8 +157,14 @@ export function verifyLock(lock: LockInfo): 'valid' | 'missing' | 'invalid' | 'n
   if (!lock.hmac) return 'missing'
   const key = getKey()
   if (!key) return 'no-key'
-  const expected = createHmac('sha256', key).update(canonicalize(lock)).digest('hex')
-  return expected === lock.hmac ? 'valid' : 'invalid'
+  const body = canonicalize(lock)
+  if (createHmac('sha256', key).update(body).digest('hex') === lock.hmac) return 'valid'
+  // Lock written by an older build: signed with the legacy key.
+  const legacyKey = getLegacyKey()
+  if (legacyKey && createHmac('sha256', legacyKey).update(body).digest('hex') === lock.hmac) {
+    return 'valid'
+  }
+  return 'invalid'
 }
 
 /**
@@ -102,6 +172,7 @@ export function verifyLock(lock: LockInfo): 'valid' | 'missing' | 'invalid' | 'n
  */
 export function _resetForTesting(): void {
   cachedKey = null
+  cachedLegacyKey = undefined
   keyDerivationAttempted = false
   noKeyLoggedOnce = false
 }
