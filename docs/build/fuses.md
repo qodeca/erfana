@@ -42,7 +42,7 @@ afterSign: ./scripts/resign.js
 
 `afterPack` does seven things, in this order:
 
-1. Resolve the packed Electron binary – and, on a test build, rename it via `renameTestBuildApp` to `Erfana (TEST BUILD).app`.
+1. Resolve the packed Electron binary – and, on a test build, refuse it via `assertTestBuildName` unless the product name ends in `(TEST BUILD)`.
 2. Prune foreign-platform/arch `ffprobe-static` binaries and `node-pty` prebuilds (plus a `.pdb` strip on `win32`).
 3. Restore the `node-pty` `spawn-helper` execute bit (`0755`, Unix only).
 4. `ensurePackedMediaBinaries` – copy this pack's cached `ffmpeg` into the bundle, re-verify it (size floor always, SHA-256 only on pinned arches), and `chmod 0755` the packed `ffmpeg` + every `ffprobe`.
@@ -171,13 +171,14 @@ Playwright drives the packaged app over the Chrome DevTools Protocol, which need
 ```bash
 npm run build:mac:test
 # expands to: npm run build && ERFANA_TEST_BUILD=true electron-builder --mac \
+#             -c.productName="Erfana (TEST BUILD)" \
 #             -c.directories.output=release/test/${npm_package_version}
 ```
 
 Three guardrails keep such a build from being mistaken for a release:
 
 1. **Separate output directory** – artifacts land in `release/test/{version}/`, not `release/{version}/`, so they can never be picked up by the release upload globs.
-2. **Renamed bundle** – `renameTestBuildApp` renames the packed app to `Erfana (TEST BUILD).app` (`.exe` on Windows) before fuses are applied, so the inspector-enabled build is visually distinct in Finder and in the DMG.
+2. **Suffixed product name** – the script sets `-c.productName="Erfana (TEST BUILD)"`, so electron-builder itself names the bundle `Erfana (TEST BUILD).app` and the inspector-enabled build is visually distinct in Finder and in the DMG. `assertTestBuildName` fails a test build without the suffix. The bundle is not renamed in `afterPack`: electron-builder 26.16 checks the entry file under the configured name right after `afterPack`, so a renamed bundle fails the build. The product name also names the app's data folder, so a test build keeps its settings apart from an installed Erfana.
 3. **Loud build log** – `displayTestBuildWarning()` prints a boxed "DO NOT DISTRIBUTE THIS BUILD TO END USERS" banner twice, at the start and the end of the hook, and the closing summary reads `NodeCliInspect: ENABLED (test build)`.
 
 `npm run build:mac` (and `build:win`) leave `ERFANA_TEST_BUILD` unset, so every released artifact has the inspector fuse off. Nothing under `.github/workflows/` sets the variable (verified 2026-08-07).

@@ -28,6 +28,8 @@ const {
   mergeExtraContent,
   assertExtraContentAllowlist,
   resolveExtraFilesDir,
+  assertTestBuildName,
+  TEST_BUILD_SUFFIX,
   verifyExtraContent,
   assertResourcesDestNoRepoLeak,
   assertResourcesSiblingsAllowlist,
@@ -1805,5 +1807,28 @@ describe('verifyExtraContent (F1 wiring)', () => {
     } finally {
       fs.rmSync(outside, { recursive: true, force: true });
     }
+  });
+});
+
+describe('assertTestBuildName', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('accepts a product name carrying the test-build suffix', () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    expect(() => assertTestBuildName('Erfana (TEST BUILD)')).not.toThrow();
+  });
+
+  it('refuses a test build that would look like a production bundle', () => {
+    expect(() => assertTestBuildName('Erfana')).toThrow(/TEST BUILD/);
+  });
+
+  // electron-builder 26.16 checks the entry file under the configured product
+  // name right after afterPack, so the suffix must come from the build script,
+  // not from renaming the bundle.
+  it('is supplied by the build:mac:test script through productName', () => {
+    const pkg = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '..', 'package.json'), 'utf8'));
+    expect(pkg.scripts['build:mac:test']).toContain(`-c.productName="Erfana${TEST_BUILD_SUFFIX}"`);
   });
 });

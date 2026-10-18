@@ -13,8 +13,8 @@
  *   2. Flip Electron security fuses (compile-time feature toggles that
  *      disable unused Electron features to prevent "Living Off The
  *      Land" attacks). 2025 security hardening best practices.
- *   3. Optionally rename the app bundle for test builds (visual
- *      differentiation; test builds enable the Node CLI inspector).
+ *   3. On test builds, refuse a product name without the "(TEST BUILD)"
+ *      suffix (visual differentiation; test builds enable the Node CLI inspector).
  *   4. Assert the packed `app/` tree matches the electron-builder.yml
  *      `files:` allowlist, before signing (issue #43).
  *
@@ -27,7 +27,7 @@
  *
  * Usage:
  *   Production build:  npm run build:mac
- *   Test build:        ERFANA_TEST_BUILD=true npm run build:mac
+ *   Test build:        npm run build:mac:test
  *
  * References:
  * - https://www.electronjs.org/docs/latest/tutorial/fuses
@@ -423,29 +423,28 @@ function pruneForeignNodePtyPrebuilds(resourcesDir, platform, archEnum, { requir
 }
 
 /**
- * Rename app bundle to include test suffix for visual differentiation.
- * This helps prevent accidental distribution of test builds.
- *
- * @param {string} appOutDir - Directory containing the built app
- * @param {string} originalName - Original app filename (e.g., "Erfana.app")
- * @param {string} platform - Target platform (darwin, win32, linux)
- * @returns {string} New app path after renaming
+ * Suffix every test build's product name must carry. `build:mac:test` sets it
+ * through `-c.productName`, so electron-builder names the bundle (and the DMG)
+ * itself. The bundle used to be renamed here in afterPack, but electron-builder
+ * 26.16 sanity-checks the entry file under the configured name right after
+ * afterPack, so a renamed bundle fails the build.
  */
-function renameTestBuildApp(appOutDir, originalName, platform) {
-  const ext = { darwin: '.app', win32: '.exe', linux: '' }[platform];
-  const baseName = originalName.replace(ext, '');
-  const testName = `${baseName} (TEST BUILD)${ext}`;
+const TEST_BUILD_SUFFIX = ' (TEST BUILD)';
 
-  const originalPath = path.join(appOutDir, originalName);
-  const testPath = path.join(appOutDir, testName);
-
-  if (fs.existsSync(originalPath)) {
-    fs.renameSync(originalPath, testPath);
-    console.log(`   Renamed app: ${originalName} → ${testName}`);
-    return testPath;
+/**
+ * Refuse a test build whose product name lacks the suffix, so an
+ * inspector-enabled bundle can never look like a production one.
+ *
+ * @param {string} productFilename - electron-builder's product filename
+ */
+function assertTestBuildName(productFilename) {
+  if (!productFilename.endsWith(TEST_BUILD_SUFFIX)) {
+    throw new Error(
+      `Test build product name "${productFilename}" lacks the "${TEST_BUILD_SUFFIX.trim()}" suffix. ` +
+      `Build with -c.productName="Erfana${TEST_BUILD_SUFFIX}" (see npm run build:mac:test).`
+    );
   }
-
-  return originalPath;
+  console.log(`   Test build product name: ${productFilename}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -1550,12 +1549,8 @@ async function afterPack(context) {
     console.log('   ⚠️  This build should NEVER be distributed to end users!');
     console.log('');
 
-    // Rename the app to include test suffix for visual differentiation
-    electronBinaryPath = renameTestBuildApp(
-      context.appOutDir,
-      `${context.packager.appInfo.productFilename}${ext}`,
-      context.electronPlatformName
-    );
+    // The "(TEST BUILD)" suffix comes from the product name, not a rename
+    assertTestBuildName(productFilename);
   } else {
     console.log('🔒 PRODUCTION BUILD: All security fuses enabled');
   }
@@ -1722,3 +1717,5 @@ module.exports.EXPECTED_RESOURCES_ENTRIES = EXPECTED_RESOURCES_ENTRIES;
 module.exports.REPO_ROOT_SENTINELS = REPO_ROOT_SENTINELS;
 module.exports.SUSPICIOUS_SIBLING_NAMES = SUSPICIOUS_SIBLING_NAMES;
 module.exports.EXTRA_CONTENT_LEAK_NAMES = EXTRA_CONTENT_LEAK_NAMES;
+module.exports.assertTestBuildName = assertTestBuildName;
+module.exports.TEST_BUILD_SUFFIX = TEST_BUILD_SUFFIX;
