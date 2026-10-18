@@ -52,15 +52,19 @@ if (!fs.existsSync(binary)) {
   fail(`${binary} is missing; node-pty was not built from source, so it would load its bundled prebuild`)
 }
 
-// @electron/rebuild writes `<arch>--<ABI>` here after a successful build.
+// @electron/rebuild writes `<arch>--<ABI>` here after a successful build;
+// 4.2.1 and later prefix the platform: `<platform>--<arch>--<ABI>`.
 const metaPath = path.join(releaseDir, '.forge-meta')
 if (!fs.existsSync(metaPath)) {
   fail(`${metaPath} is missing; build/Release was not produced by @electron/rebuild`)
 }
 const meta = fs.readFileSync(metaPath, 'utf8').trim()
-const expectedMeta = `${process.arch}--${process.versions.modules}`
-if (meta !== expectedMeta) {
-  fail(`.forge-meta is "${meta}", expected "${expectedMeta}" (this Electron's arch and ABI)`)
+const expectedMetas = [
+  `${process.platform}--${process.arch}--${process.versions.modules}`,
+  `${process.arch}--${process.versions.modules}`
+]
+if (!expectedMetas.includes(meta)) {
+  fail(`.forge-meta is "${meta}", expected one of ${expectedMetas.map((m) => `"${m}"`).join(', ')} (this Electron's platform, arch and ABI)`)
 }
 
 const mtimeSeconds = Math.floor(fs.statSync(binary).mtimeMs / 1000)
