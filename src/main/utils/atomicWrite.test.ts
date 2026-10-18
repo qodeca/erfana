@@ -66,7 +66,8 @@ describe('atomicWriteJSON', () => {
       JSON.stringify(content),
       {
         encoding: 'utf8',
-        mode: 0o600
+        mode: 0o600,
+        flush: true
       }
     )
 

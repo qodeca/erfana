@@ -20,6 +20,7 @@ import {
 } from '../../shared/coalescingRunner'
 import { stablePathDigest } from '../../shared/stablePathDigest'
 import { logger } from './LoggingService'
+import { atomicWriteText } from '../utils/atomicWrite'
 import { IMAGE_EXTENSIONS, readImage } from './file/imageRead'
 import { restoreParentDirectory } from './file/restoreParentDirectory'
 import type { ImageReadResponse } from '../../shared/ipc/file-image-schema'
@@ -503,7 +504,7 @@ export class FileService implements IFileService {
     if (options.createParentDirs === true) {
       await restoreParentDirectory(filePath, this.projectPath)
     }
-    await writeFile(filePath, content, 'utf-8')
+    await atomicWriteText(filePath, content)
   }
 
   async getFileStats(filePath: string) {
