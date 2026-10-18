@@ -6,6 +6,7 @@ Erfana is an agent-native Markdown workspace – an Electron app that runs a ter
 ## User guide
 
 - [Erfana user guide](./user-guide/README.md) – Illustrated walkthroughs and reference for people using Erfana
+- [About Erfana and Qodeca](./about.md) – Why Erfana is open source, how it is licensed, and who builds it
 
 ## Onboarding (For New Developers)
 - [Getting Started](./getting-started.md) – Day 1 setup and orientation
@@ -73,7 +74,7 @@ Erfana is an agent-native Markdown workspace – an Electron app that runs a ter
   - [Phase 4 binary spec](./windows/phase4-binary-spec.md) - Pinned SHAs for `whisper-build-v1.8.4-erfana1`
   - [Build Setup (Windows)](./build/windows.md) - Node 24, Python 3.12, VS 2022, Developer Mode, long paths
   - [Whisper-binaries CI runbook](./build/whisper-binaries.md) - Ops procedure for self-hosted whisper.cpp rebuilds + cert-revocation + monthly canary + **app-side pin-bump checklist** + **minisign gotchas** + **rejected approaches**
-- [Large Project Performance Plan](./large-project-performance-plan.md) - EMFILE mitigation, worker threads, diagnostics
+- [Large Project Performance Plan](./large-project-performance-plan.md) - EMFILE mitigation, worker threads, diagnostics, single-flight tree reads (#208), the Windows watcher and exclude list (#211)
 - [Testing](./testing/README.md) - Testing strategies and coverage
   - [E2E Testing](./testing/e2e-testing.md) - Playwright/Electron E2E guide
   - [E2E Selectors](./testing/e2e-selectors.md) - 259 testids catalog
@@ -119,9 +120,10 @@ Not to be confused with **[`design/`](../design/index.html)** at the repo root, 
 - [Model capability registry](./designs/41-model-capability-registry.md) - Shared model-id parser + context-window capability table (issue #41)
 - [Context-meter freeze after compaction](./designs/47-context-meter-freeze.md) - Bounded fallback read + per-file-version result cache (issue #47)
 - [Clipboard service](./designs/issue-203-clipboard-service.md) - Central text-clipboard service design (issue #203)
+- [Large projects on Windows](./designs/211-large-project-windows-watcher.md) - Native Windows directory watcher, the `files.exclude` list, and the watcher starting after the first tree read (issue #211); measured in the [W0 spike on `fs.watch`](./spikes/211-windows-fs-watch.md) and the [W17 manual Windows run](./performance/211-large-project-windows-run.md) (no-exclusion arm; the with-exclusion arm is pending)
 - [`http://` and IPv6 in the preview](./designs/108-http-and-ipv6-in-the-preview.md) - What Chromium does with `http://` and IPv6 hosts in the HTML preview (issue #108)
 - [Illustrated user guide](./designs/138-user-guide/README.md) - Guide outline, screenshot list, demo project and capture script (issue #138, proposed); [feature inventory](./user-guide/feature-inventory.md), [research](./designs/138-user-guide/research.md), [spec and plan](./features/138-user-guide.md)
-- [README and GitHub presentation](./designs/139-readme-redesign/README.md) - Banner, demo loop, page structure and fact audit for the README redesign (issue #139, draft)
+- [README and GitHub presentation](./designs/139-readme-redesign/README.md) - Banner, demo loop, page structure and fact audit for the README redesign (issue #139)
 
 ### Future Features (Planned)
 - [Graph Engine](./future/graph-engine.md) – SQLite + vec + FTS5 knowledge graph (not yet implemented). The full specification lives in [`future/graph-engine/`](./future/graph-engine/) – 30 files covering the data model, embeddings, hybrid search, MCP server, packaging and performance, plus a milestone-by-milestone [implementation guide](./future/graph-engine/implementation-guide/) and [wireframes](./future/graph-engine/wireframes/)

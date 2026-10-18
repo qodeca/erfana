@@ -64,8 +64,15 @@ export interface IUseProjectManagementReturn {
   isSwitchingProject: boolean
 
   /**
-   * Whether initial project load has completed
-   * Used to defer directory watcher startup
+   * Whether the first tree read of the current project has been applied –
+   * the directory watcher's start gate (#211, D12).
+   *
+   * `false` with no project open, and while the first read after a
+   * project-changed open (or the read that superseded it) is in flight.
+   * `true` once that read settles, on success **or** failure, so a failed
+   * first read can still self-heal through the watcher. A read superseded by
+   * a newer open or a close never opens it. Main's no-op re-open, which sends
+   * no project-changed event, opens it at once.
    */
   initialLoadComplete: boolean
 
@@ -89,6 +96,13 @@ export interface IUseProjectManagementReturn {
   /**
    * Refresh the file tree for the current project
    * Used by file operations to update the tree after making changes
+   *
+   * Coalesced (#208): calls made while a read runs share one follow-up read
+   * that starts after it. The promise resolves – it never rejects – once a
+   * read that started after the call has finished, or without a read of its
+   * own if the project changed or closed before that read could start, or if
+   * the caller belongs to a project that is no longer open. Results from an
+   * older project or an older read are never shown.
    */
   refreshFiles: () => Promise<void>
 

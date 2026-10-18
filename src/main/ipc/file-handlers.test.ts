@@ -467,3 +467,162 @@ describe('project confinement for read handlers (issue #70)', () => {
     )
   })
 })
+
+describe('#210 watcher catch-up hooks', () => {
+  const event = { sender: { id: 7 } }
+
+  beforeEach(async () => {
+    for (const k of Object.keys(handlers)) delete handlers[k]
+    vi.resetModules()
+
+    const { logger } = await import('../services/LoggingService')
+    // Failure cases log at error by design; keep the suite output readable.
+    vi.spyOn(logger, 'error').mockImplementation(() => {})
+  })
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  describe('file:readDirectory', () => {
+    it('begins the tree read before reading and commits it after success', async () => {
+      const { registerFileHandlers } = await import('./file-handlers')
+      const { fileService } = await import('../services/FileService')
+      const { directoryWatcherService } = await import('../services/DirectoryWatcherService')
+
+      const commitRead = vi.fn()
+      const begin = vi.spyOn(directoryWatcherService, 'beginTreeRead').mockReturnValue(commitRead)
+      const read = vi.spyOn(fileService, 'readDirectory').mockResolvedValue([])
+
+      registerFileHandlers()
+      await expect(handlers['file:readDirectory'](event, '/proj')).resolves.toEqual([])
+
+      expect(begin).toHaveBeenCalledWith('/proj', 7)
+      expect(begin.mock.invocationCallOrder[0]).toBeLessThan(read.mock.invocationCallOrder[0])
+      expect(commitRead).toHaveBeenCalledTimes(1)
+      expect(commitRead.mock.invocationCallOrder[0]).toBeGreaterThan(read.mock.invocationCallOrder[0])
+    })
+
+    it('does not commit a read that fails, and re-throws its error', async () => {
+      const { registerFileHandlers } = await import('./file-handlers')
+      const { fileService } = await import('../services/FileService')
+      const { directoryWatcherService } = await import('../services/DirectoryWatcherService')
+
+      const commitRead = vi.fn()
+      vi.spyOn(directoryWatcherService, 'beginTreeRead').mockReturnValue(commitRead)
+      const failure = new Error('EACCES')
+      vi.spyOn(fileService, 'readDirectory').mockRejectedValue(failure)
+
+      registerFileHandlers()
+      await expect(handlers['file:readDirectory'](event, '/proj')).rejects.toBe(failure)
+
+      expect(commitRead).not.toHaveBeenCalled()
+    })
+  })
+
+  const mutationCases = [
+    {
+      channel: 'file:createFile',
+      method: 'createFile' as const,
+      args: ['/proj', 'a.md'],
+      resolved: '/proj/a.md',
+      recorded: [[{ path: '/proj/a.md', kind: 'added', subtree: false }]]
+    },
+    {
+      channel: 'file:createFolder',
+      method: 'createFolder' as const,
+      args: ['/proj', 'dir'],
+      resolved: '/proj/dir',
+      recorded: [[{ path: '/proj/dir', kind: 'added', subtree: false }]]
+    },
+    {
+      channel: 'file:deleteFile',
+      method: 'deleteFile' as const,
+      args: ['/proj/a.md'],
+      resolved: undefined,
+      recorded: [[{ path: '/proj/a.md', kind: 'removed', subtree: true }]]
+    },
+    {
+      channel: 'file:deleteFolder',
+      method: 'deleteFolder' as const,
+      args: ['/proj/dir'],
+      resolved: undefined,
+      recorded: [[{ path: '/proj/dir', kind: 'removed', subtree: true }]]
+    },
+    {
+      channel: 'file:rename',
+      method: 'rename' as const,
+      args: ['/proj/old', 'new'],
+      resolved: '/proj/new',
+      recorded: [
+        [
+          { path: '/proj/old', kind: 'removed', subtree: true },
+          { path: '/proj/new', kind: 'added', subtree: true }
+        ]
+      ]
+    },
+    {
+      channel: 'file:moveItem',
+      method: 'moveItem' as const,
+      args: ['/proj/a', '/proj/sub'],
+      resolved: { path: '/proj/sub/a' },
+      recorded: [
+        [
+          { path: '/proj/a', kind: 'removed', subtree: true },
+          { path: '/proj/sub/a', kind: 'added', subtree: true }
+        ]
+      ]
+    },
+    {
+      channel: 'file:moveItem',
+      label: ' (replaceExisting)',
+      method: 'moveItem' as const,
+      args: ['/proj/a', '/proj/sub', undefined, true],
+      resolved: { path: '/proj/sub/a' },
+      recorded: [
+        [
+          { path: '/proj/a', kind: 'removed', subtree: true },
+          { path: '/proj/sub/a', kind: 'added', subtree: true },
+          { path: '/proj/sub/a', kind: 'removed', subtree: true }
+        ]
+      ]
+    },
+    {
+      channel: 'file:copyItem',
+      method: 'copyItem' as const,
+      args: ['/proj/a', '/proj/sub'],
+      resolved: { path: '/proj/sub/a' },
+      recorded: [[{ path: '/proj/sub/a', kind: 'added', subtree: true }]]
+    }
+  ]
+
+  for (const { channel, label = '', method, args, resolved, recorded } of mutationCases) {
+    it(`${channel}${label} records its own changes after success`, async () => {
+      const { registerFileHandlers } = await import('./file-handlers')
+      const { fileService } = await import('../services/FileService')
+      const { directoryWatcherService } = await import('../services/DirectoryWatcherService')
+
+      const note = vi.spyOn(directoryWatcherService, 'noteInternalChange')
+      vi.spyOn(fileService, method).mockResolvedValue(resolved as never)
+
+      registerFileHandlers()
+      await handlers[channel](event, ...args)
+
+      expect(note.mock.calls).toEqual(recorded)
+    })
+
+    it(`${channel}${label} records nothing when the operation fails`, async () => {
+      const { registerFileHandlers } = await import('./file-handlers')
+      const { fileService } = await import('../services/FileService')
+      const { directoryWatcherService } = await import('../services/DirectoryWatcherService')
+
+      const note = vi.spyOn(directoryWatcherService, 'noteInternalChange')
+      const failure = new Error('partial failure')
+      vi.spyOn(fileService, method).mockRejectedValue(failure)
+
+      registerFileHandlers()
+      await expect(handlers[channel](event, ...args)).rejects.toBe(failure)
+
+      expect(note).not.toHaveBeenCalled()
+    })
+  }
+})

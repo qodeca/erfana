@@ -547,7 +547,7 @@ All 44 specs in `e2e/`:
 > **HTML preview e2e notes (#124).**
 > - **Toasts are found by `toast-<type>`.** A toast renders its test id as `` `${TEST_IDS.TOAST}-${type}` `` (`ToastNotification.tsx`), never the bare `toast` id; a helper waiting on the bare id never closes anything, and the "Project Opened" toast then covers the preview. Use `dismissAllToasts` / `toastsOf` from `html-preview.browser.ts`.
 > - **Real input is in view pixels.** `webContents.sendInputEvent` takes view pixels while `getBoundingClientRect()` gives CSS pixels, so `clickLink` multiplies the point by `wc.getZoomFactor()`; a click that ignores the zoom misses as soon as a test zooms. A same-tab move and a history entry need that real input – `executeJavaScript` clicks are untrusted.
-> - **The zoom test needs Erfana in front.** On macOS `app.focus({ steal: true })` is blocked while another app is frontmost, so "should keep the zoom level…" can fail for a reason outside the app (inferred from three failures before any move).
+> - **The zoom test needs Erfana in front.** On macOS `app.focus({ steal: true })` is blocked while another app is frontmost, so "should keep the zoom level…" can fail for a reason outside the app (inferred from three failures before any move; seen again in a full macOS run on 2026-10-01 as `the preview could not take focus`, then 5/5 green with `--repeat-each=5 --workers=1`).
 > - **A `.md` can open rendered.** Click `view-mode-btn-editor` before driving Monaco. To reach a file's end in Monaco on macOS press `Cmd+Down` – `Cmd+End` does not get there.
 > - **Type-checking e2e files.** There is no tsconfig over `e2e/` (technical debt #21), and `tsc` on e2e files needs `--ignoreConfig` or it stops at TS5112.
 

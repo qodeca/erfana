@@ -43,6 +43,12 @@ export interface WatcherMetricsSnapshot {
   restartSuccess: number
   restartFailure: number
 
+  // Path filter and native backend (#211)
+  eventsFiltered: number // Dropped as excluded, hidden, ignored or outside the project
+  nativeOverflows: number // Change buffer overflows reported by the native backend
+  nativeResyncs: number // Full re-reads the native backend asked for
+  matcherBudgetExceeded: number // Exclude-pattern tests that ran out of budget
+
   // Polling stats
   pollingRefreshCount: number
   pollingSkippedCount: number
@@ -93,6 +99,12 @@ export class WatcherMetrics {
   private restartScheduled = 0
   private restartSuccess = 0
   private restartFailure = 0
+
+  // Path filter and native backend (#211)
+  private eventsFiltered = 0
+  private nativeOverflows = 0
+  private nativeResyncs = 0
+  private matcherBudgetExceeded = 0
 
   // Polling stats
   private pollingRefreshCount = 0
@@ -209,6 +221,40 @@ export class WatcherMetrics {
   }
 
   /**
+   * Record an event dropped by the project path filter – excluded, hidden,
+   * ignored or outside the project (#211). Such an event is never counted as
+   * received, so it does not move the throughput or buffer figures.
+   */
+  recordEventFiltered(): void {
+    this.eventsFiltered++
+  }
+
+  /**
+   * Record a change-buffer overflow reported by the native backend (#211)
+   */
+  recordNativeOverflow(): void {
+    this.nativeOverflows++
+  }
+
+  /**
+   * Record a full re-read the native backend asked for after losing events (#211)
+   */
+  recordNativeResync(): void {
+    this.nativeResyncs++
+  }
+
+  /**
+   * Record exclude-pattern tests that ran out of their match budget (#211)
+   *
+   * @param count - overruns to add; a non-positive count is ignored
+   */
+  recordMatcherBudgetExceeded(count: number = 1): void {
+    if (count > 0) {
+      this.matcherBudgetExceeded += count
+    }
+  }
+
+  /**
    * Record a polling refresh (git status was refreshed)
    */
   recordPollingRefresh(): void {
@@ -306,6 +352,11 @@ export class WatcherMetrics {
       restartSuccess: this.restartSuccess,
       restartFailure: this.restartFailure,
 
+      eventsFiltered: this.eventsFiltered,
+      nativeOverflows: this.nativeOverflows,
+      nativeResyncs: this.nativeResyncs,
+      matcherBudgetExceeded: this.matcherBudgetExceeded,
+
       pollingRefreshCount: this.pollingRefreshCount,
       pollingSkippedCount: this.pollingSkippedCount,
       pollingEfficiency: this.getPollingStats().efficiency,
@@ -331,6 +382,8 @@ export class WatcherMetrics {
 ├── Latency: avg=${s.avgEventLatencyMs}ms, max=${s.maxEventLatencyMs}ms
 ├── Active watchers: ${s.activeWatchers}
 ├── Restarts: scheduled=${s.restartScheduled}, success=${s.restartSuccess}, failure=${s.restartFailure}
+├── Filtered: events=${s.eventsFiltered}, matcherBudgetExceeded=${s.matcherBudgetExceeded}
+├── Native: overflows=${s.nativeOverflows}, resyncs=${s.nativeResyncs}
 ├── Polling: refresh=${s.pollingRefreshCount}, skipped=${s.pollingSkippedCount}, efficiency=${s.pollingEfficiency}%
 ├── Git watcher events: ${s.gitWatcherEventCount}
 ├── Errors: ${JSON.stringify(s.errorCounts)}
@@ -353,6 +406,10 @@ export class WatcherMetrics {
     this.restartScheduled = 0
     this.restartSuccess = 0
     this.restartFailure = 0
+    this.eventsFiltered = 0
+    this.nativeOverflows = 0
+    this.nativeResyncs = 0
+    this.matcherBudgetExceeded = 0
     this.pollingRefreshCount = 0
     this.pollingSkippedCount = 0
     this.gitWatcherEventCount = 0

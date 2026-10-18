@@ -18,6 +18,10 @@ import { BrowserWindow } from 'electron'
 import { validatePath } from '../utils/pathSecurity'
 import { AppError, ErrorCode } from '../../shared/errors'
 import type { ProjectChanged } from '../../shared/ipc/schema'
+import type { ResolvedProjectSettings } from '../../shared/ipc/project-settings-schema'
+import type { ExcludeRejection, ExcludeSource } from '../../shared/ipc/files-exclude-schema'
+import { ProjectPathFilter } from '../utils/projectPathFilter'
+import { getPlatformConfig } from './watcher/PlatformConfig'
 import type { IFileService } from '../interfaces/IFileService'
 import type { IFileWatcherService } from '../interfaces/IFileWatcherService'
 import type { IDirectoryWatcherService } from '../interfaces/IDirectoryWatcherService'
@@ -63,6 +67,33 @@ async function canonicalizePath(p: string): Promise<string> {
     r = r.toLowerCase()
   }
   return r
+}
+
+/**
+ * Rejections listed per source in the log line. A cloned repository's list is
+ * untrusted and uncapped in length – every entry past the 256th is rejected –
+ * so the line carries the full count and only the first ones.
+ */
+const MAX_LOGGED_EXCLUDE_REJECTIONS = 64
+
+/**
+ * Log the rejected `files.exclude` entries: one `warn` per source that has any,
+ * by index and reason only – an entry's text can name a user's folder (#211).
+ */
+function logExcludeRejections(rejections: readonly ExcludeRejection[]): void {
+  const bySource = new Map<ExcludeSource, Array<{ index: number; reason: string }>>()
+  for (const { source, index, reason } of rejections) {
+    const list = bySource.get(source) ?? []
+    list.push({ index, reason })
+    bySource.set(source, list)
+  }
+  for (const [source, rejected] of bySource) {
+    logger.warn('Project switch: files.exclude entries rejected', {
+      source,
+      rejectedCount: rejected.length,
+      rejected: rejected.slice(0, MAX_LOGGED_EXCLUDE_REJECTIONS)
+    })
+  }
 }
 
 /**
@@ -126,6 +157,26 @@ export class ProjectService {
     this.fileService.setProjectPath(newPath)
     this.fileWatcherService.setProjectPath(newPath)
     this.directoryWatcherService.setProjectPath(newPath)
+  }
+
+  /**
+   * Apply the loaded project settings (#211, design D7). One path filter –
+   * exclude list, hidden names, ignore patterns – is built per project open and
+   * the same instance goes to the tree walk and the directory watcher, so both
+   * drop the same paths and the walk hints the file service records on it reach
+   * the watcher's plan. A fresh filter also restarts the matcher's tripwire.
+   */
+  private applyProjectSettings(projectPath: string, settings: ResolvedProjectSettings): void {
+    logExcludeRejections(settings.excludeRejections)
+    const pathFilter = new ProjectPathFilter(projectPath, {
+      exclude: settings.excludePatterns,
+      hiddenPatterns: settings.treeHiddenPatterns,
+      ignorePatterns: settings.watcherIgnorePatterns,
+      caseSensitive: getPlatformConfig().caseSensitive
+    })
+    this.fileService.setHiddenPatterns(settings.treeHiddenPatterns)
+    this.fileService.setPathFilter(pathFilter)
+    this.directoryWatcherService.setPathFilter(pathFilter)
   }
 
   /**
@@ -288,7 +339,8 @@ export class ProjectService {
       }
       logger.debug('Project switch: settings loaded', {
         hiddenPatternCount: projectSettings.treeHiddenPatterns.length,
-        ignorePatternCount: projectSettings.watcherIgnorePatterns.length
+        ignorePatternCount: projectSettings.watcherIgnorePatterns.length,
+        excludePatternCount: projectSettings.excludePatterns.length
       })
 
       // 7. Update project path across services
@@ -296,8 +348,7 @@ export class ProjectService {
       logger.debug('Project switch: services updated')
 
       // 8. Apply project settings to services
-      this.fileService.setHiddenPatterns(projectSettings.treeHiddenPatterns)
-      this.directoryWatcherService.setIgnorePatterns(projectSettings.watcherIgnorePatterns)
+      this.applyProjectSettings(newProjectPath, projectSettings)
 
       // 9. Persist project change
       await this.persistProjectChange(newProjectPath)

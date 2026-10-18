@@ -8,6 +8,7 @@
  */
 import { z } from 'zod'
 import { TranscriptionSettingsSchema } from './transcription-schema'
+import { FilesSettingsSchema } from './files-exclude-schema'
 
 /**
  * Logging level enum
@@ -79,7 +80,13 @@ export const GlobalSettingsSchema = z.object({
     whisperModel: 'base' as const
   })),
   /** HTML preview configuration (Issue #74) */
-  htmlPreview: HtmlPreviewSettingsSchema.default(() => ({ enabled: true }))
+  htmlPreview: HtmlPreviewSettingsSchema.default(() => ({ enabled: true })),
+  /**
+   * `files.exclude` (Issue #211, design D7). Lenient: a missing or malformed
+   * section resolves to `{ exclude: [] }`, so it never triggers the corruption
+   * reset that would replace every other setting.
+   */
+  files: FilesSettingsSchema
 })
 export type GlobalSettings = z.infer<typeof GlobalSettingsSchema>
 

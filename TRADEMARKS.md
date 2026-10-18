@@ -22,6 +22,8 @@ The names **"Erfana"** and **"Qodeca"**, the Qodeca and Erfana logos, and any as
 
 The repository ships the Erfana application icon (`resources/icon.png`) so the app builds and runs out of the box. It is provided as a functional default; treat the Erfana and Qodeca marks as trademarks per the rules above — do not present them as your own brand, and replace them when distributing a renamed fork.
 
+The README and the repository's GitHub presentation use further Erfana brand assets: the banner with the Erfana wordmark (`docs/assets/readme/banner-dark.png`, `docs/assets/readme/banner-light.png`), the social preview image (`docs/assets/readme/social-preview.png`), and the design card they are rendered from (`design/product/github-presentation/index.html`). The wordmark – the name "Erfana" set beside the icon – is an Erfana mark like the icon itself. A renamed fork must replace these images and must not use the wordmark.
+
 ## Third-party trademarks
 
 Erfana names third-party tools descriptively (nominative use) and is not affiliated with, sponsored by, or endorsed by their owners.

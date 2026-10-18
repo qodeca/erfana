@@ -1,6 +1,6 @@
 # Security Guidelines
 
-**Last Updated**: September 2026 (v0.20.0, Electron 39)
+**Last Updated**: October 2026 (v0.20.1, Electron 39)
 
 ## Security Posture Summary
 
@@ -513,15 +513,27 @@ The overlay windows have their own, tighter channel path: `screenshot:areaSelect
 
 ## Known vulnerabilities
 
-Run `npm audit` to check. **Policy**: zero high/critical production advisories at release. Pre-release: `npm audit --omit=dev --json` and diff against the table below.
+Run `npm audit` to check. **Policy**: zero high/critical production advisories at release. Pre-release: `npm audit --omit=dev --json` and diff against the **Accepted exceptions for v0.20.1** table below.
 
-**Current state** (audited 2026-06-04, re-verified during the v0.12.0 release): production **0 vulnerabilities** (`npm audit --omit=dev`). The former `mermaid → langium → chevrotain` moderate advisories no longer count against production because Monaco and Mermaid moved to `devDependencies` in v0.11.0 (#206 — pre-migration PR, no longer resolves on the public repo); `axios` and `fast-uri` high-severity advisories were patched in v0.11.2. Dev-only advisories remain (notably a `vitest` UI-server critical that needs a breaking 3→4 bump) but do not ship in production builds.
+**Current state** (audited 2026-10-01, pre-0.20.1): `npm audit --omit=dev` reports **4 high** production advisories — `electron`, `extract-zip`, `@llamaindex/liteparse` and `sharp` — accepted for v0.20.1 under the dated exception below, plus **1 moderate**, `fast-uri` (GHSA-hrr3-gc8f-f4qj, host case normalization, CVSS 4.8), which the zero high/critical policy does not block. The full tree (`npm audit`) reports 20 (1 critical, 12 high, 6 moderate, 1 low); the rest run only while dependencies install or the app builds, or under the test runner, and never ship. The former `mermaid → langium → chevrotain` moderate advisories no longer count against production because Monaco and Mermaid moved to `devDependencies` in v0.11.0 (#206 — pre-migration PR, no longer resolves on the public repo); `axios` and `fast-uri` high-severity advisories were patched in v0.11.2.
+
+### Accepted exceptions for v0.20.1 (owner decision 2026-09-26)
+
+A dated exception to the policy above: v0.20.1 ships with these four production highs open, and they are fixed after the release.
+
+| Package | GHSA id(s) | Where Erfana reaches it | Guard that limits it | Follow-up that clears it |
+|---|---|---|---|---|
+| `extract-zip` 2.0.1 | GHSA-jmr9-qjv8-65gv, GHSA-7pqw-9j4j-h8q3 | `src/main/utils/zipArchive.ts:21,45` (`extract()`), called from `src/main/services/WhisperModelManager.ts:373`. **Windows only**: extract-zip runs only for `archiveFormat === 'zip'` (`WhisperModelManager.ts:372`) | The guard that holds is the SHA-256 pin checked at download (`WhisperModelManager.ts:356`) and against the signed manifest (`WhisperModelManager.ts:339-345`), so the residual risk is the pinned archive itself (`whisper-assets.ts:103-106`). The name-only pre-pass (`validateEntries`/`assertSafeEntry`, `zipArchive.ts:48-113`) rejects absolute, drive-letter, UNC, ADS-colon and `..`-traversal entry names but does **not** cover the symlink-entry escape these GHSAs describe | Clears only when `zipArchive.ts` stops using `extract-zip` or adds its own symlink-entry check (tracked in #165); the Electron 39 → 44 upgrade does not clear this row |
+| `@llamaindex/liteparse` 1.4.1 | via `sharp` | `src/main/services/import/converters/LiteParseConverter.ts:131,153` on user-selected PDF/Office/image imports | No guard beyond the byte cap (`LiteParseConverter.ts:114-117`, `validateFileForImport`) applies to the decoder flaws; exposure is limited to documents the user chooses to import. The cap bounds input bytes, not decoded pixels (see [Document import security](#document-import-security)) | `@llamaindex/liteparse` 1.x → 2.x |
+| `sharp` 0.34.5 | GHSA-f88m-g3jw-g9cj (libvips), GHSA-rgj7-g3m4-5g8c (libheif) | transitive of `@llamaindex/liteparse` on the same parse path; build-time only in `scripts/capture/legibility.mjs:29` | No guard beyond the same byte cap applies to the libvips/libheif decoder flaws; reached only through liteparse, on a document the user chose to import. The cap bounds input bytes, not decoded pixels (see [Document import security](#document-import-security)) | `@llamaindex/liteparse` 1.x → 2.x (pulls a fixed `sharp`) |
+| `electron` 39.8.10 | GHSA-jmr9-qjv8-65gv, GHSA-7pqw-9j4j-h8q3 (via `extract-zip`) | Electron is the runtime, but the flagged code is Electron's install-time `extract-zip` dependency, used only to unzip the binary at `npm install`; no Erfana runtime path calls it | Binary downloaded over TLS from the official release and checksum-verified by `@electron/get` | Electron 39 → 44 |
+
+**Cleared after v0.20.1:** the `@llamaindex/liteparse` and `sharp` rows. #164 (PR #167) moved liteparse to 2.14.7, a Rust/NAPI package that no longer depends on `sharp`, so neither appears in `npm audit --omit=dev` any more. `sharp` stays a `devDependency` for the documentation-capture scripts only and is not shipped. The rows stay above as the record of what v0.20.1 shipped with.
 
 ### Dependency overrides (package.json)
 
 | Package | Pin | Reason |
 |---|---|---|
-| `@electron/rebuild` | `3.7.1` | node-pty toolchain compat |
 | `lodash`, `lodash-es` | **exact** `4.18.1` | GHSA 1115805/6/9/10 (`_.template` code injection + `_.unset`/`_.omit` prototype pollution). Vulnerable range `<=4.17.23`. |
 | `chokidar` | **exact** `3.6.0` | chokidar 4 removed `disableGlobbing`, which `DirectoryWatcherService`, `FileWatcherService` and `GitWatcherService` rely on (FD-exhaustion fix). The `Guard - chokidar v3 pinned` step in `checks.yml` fails the build on any drift. |
 | `dompurify` | `^3.4.1` | Forces every transitive `dompurify` onto 3.4.1 or later. The originating advisory is not recorded in the repo – check `npm audit` history before relaxing. |

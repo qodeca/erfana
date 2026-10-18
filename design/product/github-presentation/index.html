@@ -1,0 +1,240 @@
+<!-- @card group="Product" name="GitHub presentation" subtitle="README banner, wordmark and social preview" status="proposed" reviewed="2026-09-25" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Erfana — GitHub presentation</title>
+<link rel="stylesheet" href="../../tokens.css">
+<link rel="stylesheet" href="../../fonts.css">
+<link rel="stylesheet" href="../../ds.css">
+<script src="../../claims.js"></script>
+<style>
+  /* The artwork below is an IMAGE at a fixed canvas, not app UI: scripts/capture/brand.mjs
+     screenshots each #gp-* element at deviceScaleFactor 2. Every colour is a token. */
+
+  /* deviates: design/README.md — the gp- classes are not erf- namespaced. The erf- rule is for
+     component CSS destined for src/; this artwork only ever becomes a PNG, and its #gp-* ids
+     are the contract brand.mjs and brand.test.mjs read. See Exceptions. */
+
+  /* deviates: design/system/foundations/colors.html — Erfana is dark-only, but GitHub has a
+     light theme, so the README banner needs a light variant. It is an asset on github.com,
+     never app chrome; the app rule is unchanged. See Exceptions. */
+  .gp-art--dark {
+    --gp-bg: var(--color-brand-black);
+    --gp-fg: var(--color-brand-white);
+    --gp-frame: var(--color-border-default);
+    --gp-bar: var(--color-gray-700);
+    --gp-accent: var(--color-brand-violet);
+  }
+  .gp-art--light {
+    --gp-bg: var(--color-brand-white);
+    --gp-fg: var(--color-brand-black);
+    --gp-frame: var(--color-gray-200);
+    --gp-bar: var(--color-gray-300);
+    /* Lime and violet fail on a light surface; indigo carries the accent here. */
+    --gp-accent: var(--color-brand-indigo);
+  }
+
+  .gp-art {
+    display: flex; align-items: center; justify-content: space-between;
+    box-sizing: border-box; overflow: hidden;
+    background: var(--gp-bg); color: var(--gp-fg);
+    font-family: var(--font-mono);
+    border-radius: var(--border-radius);
+  }
+  /* deviates: design/system/foundations/type.html — the banner is drawn at image scale, so
+     its icon (88px) and wordmark (60px, 38px in the social card) sit outside the UI type
+     scale. They are values this card decides; see Exceptions. */
+  .gp-banner { width: 800px; height: 200px; padding: 0 var(--space-16); }
+  .gp-social { width: 640px; height: 320px; padding: var(--space-20); gap: var(--space-12); }
+
+  .gp-brand { display: flex; align-items: center; gap: var(--space-10); }
+  .gp-brand img { display: block; width: 88px; height: 88px; }
+  .gp-wordmark { margin: 0; font-size: 60px; font-weight: var(--font-bold); line-height: 1;
+                 letter-spacing: -0.02em; color: var(--gp-fg); }
+
+  .gp-social .gp-lead { display: flex; flex-direction: column; gap: var(--space-8); flex: 1 1 auto; }
+  .gp-social .gp-brand { gap: var(--space-6); }
+  .gp-social .gp-brand img { width: 56px; height: 56px; }
+  .gp-social .gp-wordmark { font-size: 38px; }
+  .gp-pitch { margin: 0; font-size: var(--text-lg); font-weight: 400; line-height: 1.4;
+              color: var(--gp-fg); max-width: 22ch; }
+  .gp-nowrap { white-space: nowrap; }
+
+  /* The abstract window: tree, editor with one selected line, preview with a two-node flow,
+     and a terminal strip that is dark in both variants because the app's terminal is. */
+  .gp-window { display: flex; flex-direction: column; flex: 0 0 auto;
+               width: 400px; height: 152px;
+               border: var(--border-width) solid var(--gp-frame); background: var(--gp-bg); }
+  .gp-social .gp-window { width: 280px; height: 200px; }
+  .gp-panes { display: flex; flex: 1 1 auto; min-height: 0; }
+  .gp-pane { display: flex; flex-direction: column; gap: var(--space-3);
+             padding: var(--space-4); border-right: var(--border-width) solid var(--gp-frame); }
+  .gp-pane:last-child { border-right: 0; }
+  .gp-pane--tree { width: 64px; flex: 0 0 auto; }
+  .gp-pane--editor { flex: 1 1 auto; }
+  .gp-pane--preview { width: 120px; flex: 0 0 auto; }
+  .gp-social .gp-pane--tree { width: 44px; }
+  .gp-social .gp-pane--preview { width: 84px; }
+
+  .gp-bar { height: var(--space-2); background: var(--gp-bar); }
+  .gp-bar--head { height: var(--space-3); width: 70%; background: var(--gp-fg); }
+  .gp-bar--sel { background: var(--color-brand-violet-muted); height: var(--space-4); }
+  .gp-w90 { width: 90%; } .gp-w75 { width: 75%; } .gp-w60 { width: 60%; } .gp-w45 { width: 45%; }
+
+  .gp-flow { display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-4); }
+  .gp-node { width: var(--space-12); height: var(--space-8);
+             border: var(--border-width) solid var(--gp-accent); }
+  .gp-edge { flex: 0 0 var(--space-6); height: var(--border-width); background: var(--gp-accent); }
+
+  .gp-term { display: flex; align-items: center; gap: var(--space-3); flex: 0 0 auto;
+             height: var(--space-16); padding: 0 var(--space-6);
+             border-top: var(--border-width) solid var(--gp-frame);
+             background: var(--color-brand-black); color: var(--color-text-primary);
+             font-size: var(--text-base); }
+  .gp-social .gp-term { height: var(--space-14); }
+  .gp-cursor { width: var(--space-4); height: var(--space-8); background: var(--color-brand-lime); }
+
+  .gp-stage { margin: var(--space-8) 0 var(--space-24); }
+  .gp-stage figcaption { margin-top: var(--space-4); color: var(--color-text-tertiary);
+                         font-size: var(--text-sm); }
+</style>
+</head>
+<body>
+
+<h1>GitHub presentation</h1>
+<p class="ds-lede">
+  The README banner, the wordmark and the repository's social preview. <strong>This page is their
+  source</strong>: <code>npm run docs:brand</code> screenshots the three pieces of artwork below at
+  2&times; into <code>docs/assets/readme/</code>, so a token change is one re-run away from a new
+  banner, and no image editor holds a second copy of the brand.
+</p>
+
+<div class="ds-note">
+  <strong>Four rules this artwork follows.</strong>
+  <br><br>
+  <strong>1 · The icon is used as it ships.</strong> <code>resources/icon.png</code>, unmodified: no
+  recolour, crop, outline or effect (<code>TRADEMARKS.md</code>).
+  <br><br>
+  <strong>2 · Every glyph is Cascadia Mono.</strong> It is bundled and OFL-licensed, so the images
+  render identically on any machine. The system sans would rasterise as a face whose licence is not
+  ours to redistribute in marketing images.
+  <br><br>
+  <strong>3 · No third-party name or mark.</strong> The terminal strip shows a bare prompt glyph and a
+  cursor – no command name – so the banner and the social preview say "a terminal agent" without
+  naming one. The README says which agents in words.
+  <br><br>
+  <strong>4 · Flat and square.</strong> 1px borders, <code>border-radius: 0</code>, no shadow, no
+  gradient, solid backgrounds (the edge disappears against both GitHub canvases, and a viewer that
+  ignores <code>&lt;picture&gt;</code> still shows a legible light banner).
+</div>
+
+<h2>Banner – dark</h2>
+<p>Shown by GitHub's dark themes through <code>&lt;picture&gt;</code> with
+<code>prefers-color-scheme: dark</code>. 800&times;200 layout, exported at 1600&times;400.</p>
+<figure class="gp-stage">
+  <div id="gp-banner-dark" class="gp-art gp-art--dark gp-banner">
+    <div class="gp-brand">
+      <img src="../../../resources/icon.png" alt="">
+      <p class="gp-wordmark">Erfana</p>
+    </div>
+    <div class="gp-window" aria-hidden="true">
+      <div class="gp-panes">
+        <div class="gp-pane gp-pane--tree"><div class="gp-bar gp-w90"></div><div class="gp-bar gp-w60"></div><div class="gp-bar gp-w75"></div><div class="gp-bar gp-w45"></div></div>
+        <div class="gp-pane gp-pane--editor"><div class="gp-bar gp-bar--head"></div><div class="gp-bar gp-w90"></div><div class="gp-bar gp-bar--sel gp-w75"></div><div class="gp-bar gp-w60"></div><div class="gp-bar gp-w75"></div></div>
+        <div class="gp-pane gp-pane--preview"><div class="gp-bar gp-bar--head"></div><div class="gp-flow"><div class="gp-node"></div><div class="gp-edge"></div><div class="gp-node"></div></div></div>
+      </div>
+      <div class="gp-term"><span>&#x276F;</span><span class="gp-cursor"></span></div>
+    </div>
+  </div>
+  <figcaption>Output: <code>docs/assets/readme/banner-dark.png</code></figcaption>
+</figure>
+
+<h2>Banner – light</h2>
+<p>Shown by GitHub's light theme, and the fallback <code>&lt;img&gt;</code> for any viewer that does
+not honour <code>&lt;picture&gt;</code>. Same geometry; indigo replaces violet for the accent.</p>
+<figure class="gp-stage">
+  <div id="gp-banner-light" class="gp-art gp-art--light gp-banner">
+    <div class="gp-brand">
+      <img src="../../../resources/icon.png" alt="">
+      <p class="gp-wordmark">Erfana</p>
+    </div>
+    <div class="gp-window" aria-hidden="true">
+      <div class="gp-panes">
+        <div class="gp-pane gp-pane--tree"><div class="gp-bar gp-w90"></div><div class="gp-bar gp-w60"></div><div class="gp-bar gp-w75"></div><div class="gp-bar gp-w45"></div></div>
+        <div class="gp-pane gp-pane--editor"><div class="gp-bar gp-bar--head"></div><div class="gp-bar gp-w90"></div><div class="gp-bar gp-bar--sel gp-w75"></div><div class="gp-bar gp-w60"></div><div class="gp-bar gp-w75"></div></div>
+        <div class="gp-pane gp-pane--preview"><div class="gp-bar gp-bar--head"></div><div class="gp-flow"><div class="gp-node"></div><div class="gp-edge"></div><div class="gp-node"></div></div></div>
+      </div>
+      <div class="gp-term"><span>&#x276F;</span><span class="gp-cursor"></span></div>
+    </div>
+  </div>
+  <figcaption>Output: <code>docs/assets/readme/banner-light.png</code></figcaption>
+</figure>
+
+<h2>Social preview</h2>
+<p>The card link sites draw for <code>github.com/qodeca/erfana</code>. 640&times;320 layout, exported at
+1280&times;640 (GitHub's recommended size); content stays inside the 1200&times;560 safe area. Dark
+only – it is not theme-aware. Uploaded by hand in Settings after the README merges.</p>
+<figure class="gp-stage">
+  <div id="gp-social" class="gp-art gp-art--dark gp-social">
+    <div class="gp-lead">
+      <div class="gp-brand">
+        <img src="../../../resources/icon.png" alt="">
+        <p class="gp-wordmark">Erfana</p>
+      </div>
+      <p class="gp-pitch">The open-source, <span class="gp-nowrap">agent-native</span> Markdown workspace.</p>
+    </div>
+    <div class="gp-window" aria-hidden="true">
+      <div class="gp-panes">
+        <div class="gp-pane gp-pane--tree"><div class="gp-bar gp-w90"></div><div class="gp-bar gp-w60"></div><div class="gp-bar gp-w75"></div><div class="gp-bar gp-w45"></div></div>
+        <div class="gp-pane gp-pane--editor"><div class="gp-bar gp-bar--head"></div><div class="gp-bar gp-w90"></div><div class="gp-bar gp-bar--sel gp-w75"></div><div class="gp-bar gp-w60"></div><div class="gp-bar gp-w75"></div><div class="gp-bar gp-w45"></div></div>
+        <div class="gp-pane gp-pane--preview"><div class="gp-bar gp-bar--head"></div><div class="gp-flow"><div class="gp-node"></div><div class="gp-edge"></div><div class="gp-node"></div></div></div>
+      </div>
+      <div class="gp-term"><span>&#x276F;</span><span class="gp-cursor"></span></div>
+    </div>
+  </div>
+  <figcaption>Output: <code>docs/assets/readme/social-preview.png</code></figcaption>
+</figure>
+
+<h2>Contrast</h2>
+<table>
+  <thead><tr><th>Element</th><th>Pair</th><th>Ratio</th></tr></thead>
+  <tbody>
+    <tr><td>Wordmark, dark banner</td><td><code>--color-brand-white</code> on <code>--color-brand-black</code></td><td class="ds-ratio ds-pass"><span data-claim="contrast-gp-wordmark-dark"></span>:1</td></tr>
+    <tr><td>Wordmark, light banner</td><td><code>--color-brand-black</code> on <code>--color-brand-white</code></td><td class="ds-ratio ds-pass"><span data-claim="contrast-gp-wordmark-light"></span>:1</td></tr>
+    <tr><td>Prompt glyph (both)</td><td><code>--color-text-primary</code> on <code>--color-brand-black</code></td><td class="ds-ratio ds-pass"><span data-claim="contrast-gp-prompt"></span>:1</td></tr>
+    <tr><td>Cursor (both, on the dark strip)</td><td><code>--color-brand-lime</code> on <code>--color-brand-black</code></td><td class="ds-ratio ds-pass"><span data-claim="contrast-gp-cursor"></span>:1</td></tr>
+    <tr><td>Accent, light banner</td><td><code>--color-brand-indigo</code> on <code>--color-brand-white</code></td><td class="ds-ratio ds-pass"><span data-claim="contrast-gp-indigo-light"></span>:1</td></tr>
+    <tr><td>Why lime never sits on the light surface</td><td><code>--color-brand-lime</code> on <code>--color-brand-white</code></td><td class="ds-ratio ds-fail"><span data-claim="contrast-gp-lime-light"></span>:1</td></tr>
+    <tr><td>Why violet is only a muted fill on light</td><td><code>--color-brand-violet</code> on <code>--color-brand-white</code></td><td class="ds-ratio ds-fail"><span data-claim="contrast-gp-violet-light"></span>:1</td></tr>
+  </tbody>
+</table>
+<p>Frames, pane bars and the selected line are decorative and carry no meaning; the README says in
+text everything the banner shows.</p>
+
+<h2>What it deliberately does not do</h2>
+<table>
+  <thead><tr><th>Not this</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td>A screenshot in the banner</td><td>The demo loop below the banner is the real app. A second, static picture of it would compete and go stale.</td></tr>
+    <tr><td>An SVG banner</td><td>An SVG inside <code>&lt;img&gt;</code> cannot load a web font; outlined text would make the source uneditable.</td></tr>
+    <tr><td>Transparent backgrounds</td><td>A viewer that ignores <code>&lt;picture&gt;</code> would show the dark wordmark on a dark page.</td></tr>
+    <tr><td>A command name in the terminal strip</td><td>It would put a third-party name into Erfana's own brand image.</td></tr>
+  </tbody>
+</table>
+
+<h2>Exceptions</h2>
+<table>
+  <thead><tr><th>Where</th><th>Deviates from</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td><code>.gp-art--light</code> in this card</td><td>Colours – Erfana is dark-only</td><td>GitHub has a light theme, and the banner is a page asset on github.com, not app chrome. The app rule does not change.</td></tr>
+    <tr><td><code>.gp-banner</code>, <code>.gp-social</code> in this card</td><td>Type – the UI type scale</td><td>The icon (88px) and the wordmark (60px, 38px in the social card) are drawn at image scale, which the UI scale does not reach.</td></tr>
+    <tr><td>Every <code>gp-</code> class and <code>#gp-*</code> id in this card</td><td>Naming – the <code>erf-</code> namespace (<code>design/README.md</code>, <code>.stylelintrc.json</code>)</td><td>The namespace guards component CSS that moves into <code>src/</code>, where a bare class can collide with Mermaid's. This artwork never ships as CSS; it is rendered to PNG by <code>scripts/capture/brand.mjs</code>, which, with its test, reads the <code>#gp-*</code> ids.</td></tr>
+  </tbody>
+</table>
+
+</body>
+</html>

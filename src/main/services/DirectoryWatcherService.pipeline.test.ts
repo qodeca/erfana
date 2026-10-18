@@ -46,7 +46,11 @@ vi.mock('fs/promises', () => ({
  * Seed a watched directory with REAL ThrottledWorker and AtomicSaveDetector
  * wired to the service's private processEvents method.
  */
-function seedWatchedDirectory(svc: any, dirPath: string) {
+function seedWatchedDirectory(
+  svc: any,
+  dirPath: string,
+  opts: { pauseController?: PauseController } = {}
+) {
   const fakeWatcher = { close: vi.fn(async () => {}) }
 
   const throttledWorker = new ThrottledWorker<any>(
@@ -60,7 +64,7 @@ function seedWatchedDirectory(svc: any, dirPath: string) {
     dirPath,
     watcher: fakeWatcher,
     webContentsIds: new Set([1]),
-    pauseController: new PauseController(),
+    pauseController: opts.pauseController ?? new PauseController(),
     throttledWorker,
     atomicSaveDetector,
     version: svc.switchVersion
@@ -101,6 +105,7 @@ describe('DirectoryWatcherService pipeline integration', () => {
   afterEach(() => {
     // Dispose all watched directories to prevent test leakage
     for (const [, watched] of svc.watchedDirectories.entries()) {
+      watched.pauseController.dispose()
       watched.throttledWorker.dispose()
       watched.atomicSaveDetector.dispose()
     }
@@ -406,6 +411,145 @@ describe('DirectoryWatcherService pipeline integration', () => {
       svc.queueEvent('/proj', { type: 'add', path: '/proj/file.md' })
 
       vi.advanceTimersByTime(76)
+      expect(sends.length).toBe(1)
+    })
+  })
+
+  // -------------------------------------------------------------------------
+  // #210: an external change dropped during a pause is caught up at resume,
+  // unless the pausing window's own tree read already showed it
+  // -------------------------------------------------------------------------
+  describe('#210 catch-up after a pause', () => {
+    const OWNER = 1
+    const OTHER = 2
+
+    const catchUpSends = () =>
+      sends.filter(
+        (s) => s.channel === 'directory-watch:changed' && (s.payload as any).catchUp === true
+      )
+
+    it('AC1: a change dropped after the owner read sends exactly one catch-up at resume', () => {
+      seedWatchedDirectory(svc, '/proj')
+
+      svc.pauseWatch('/proj', OWNER)
+      const commitRead = svc.beginTreeRead('/proj', OWNER)
+      commitRead()
+      svc.queueEvent('/proj', { type: 'add', path: '/proj/agent-note.md' })
+
+      vi.advanceTimersByTime(200)
+      expect(sends.length).toBe(0)
+
+      expect(svc.resumeWatch('/proj')).toBe(true)
+
+      expect(sends.length).toBe(1)
+      expect(sends[0].channel).toBe('directory-watch:changed')
+      expect(firstPayload()).toMatchObject({ dirPath: '/proj', eventCount: 0, catchUp: true })
+    })
+
+    it('a subtree read by the pausing window does not cover a drop', () => {
+      seedWatchedDirectory(svc, '/proj')
+
+      svc.pauseWatch('/proj', OWNER)
+      svc.queueEvent('/proj', { type: 'add', path: '/proj/a.md' })
+      svc.beginTreeRead('/proj/sub', OWNER)()
+      svc.resumeWatch('/proj')
+
+      expect(catchUpSends()).toHaveLength(1)
+    })
+
+    it("another window's read of the root does not cover a drop", () => {
+      seedWatchedDirectory(svc, '/proj')
+
+      svc.pauseWatch('/proj', OWNER)
+      svc.queueEvent('/proj', { type: 'add', path: '/proj/a.md' })
+      svc.beginTreeRead('/proj', OTHER)()
+      svc.resumeWatch('/proj')
+
+      expect(catchUpSends()).toHaveLength(1)
+    })
+
+    it("the pausing window's read of the root (trailing separator) covers a drop", () => {
+      seedWatchedDirectory(svc, '/proj')
+
+      svc.pauseWatch('/proj', OWNER)
+      svc.queueEvent('/proj', { type: 'add', path: '/proj/b.md' })
+      svc.beginTreeRead('/proj/', OWNER)()
+      svc.resumeWatch('/proj')
+
+      expect(sends.length).toBe(0)
+    })
+
+    it('a pause with nothing dropped sends nothing', () => {
+      seedWatchedDirectory(svc, '/proj')
+
+      svc.pauseWatch('/proj', OWNER)
+      svc.resumeWatch('/proj')
+      vi.advanceTimersByTime(200)
+
+      expect(sends.length).toBe(0)
+    })
+
+    it("the operation's own change, noted against the paused root, is not caught up", () => {
+      seedWatchedDirectory(svc, '/proj')
+
+      svc.pauseWatch('/proj', OWNER)
+      svc.noteInternalChange(
+        { path: '/proj/new.md', kind: 'added', subtree: false },
+        // Outside the root: ignored by this root, and harmless
+        { path: '/other/x.md', kind: 'added', subtree: false }
+      )
+      svc.beginTreeRead('/proj', OWNER)()
+      // Its own watcher event arrives after the refresh read began
+      svc.queueEvent('/proj', { type: 'add', path: '/proj/new.md' })
+      svc.resumeWatch('/proj')
+
+      expect(sends.length).toBe(0)
+    })
+
+    it('the same late event without a noted change earns exactly one catch-up', () => {
+      seedWatchedDirectory(svc, '/proj')
+
+      svc.pauseWatch('/proj', OWNER)
+      svc.beginTreeRead('/proj', OWNER)()
+      svc.queueEvent('/proj', { type: 'add', path: '/proj/new.md' })
+      svc.resumeWatch('/proj')
+
+      expect(catchUpSends()).toHaveLength(1)
+      expect(sends.length).toBe(1)
+    })
+
+    it('safety timeout sends one catch-up and clears the episode', () => {
+      const pauseController = new PauseController({
+        timeoutMs: 10_000,
+        onTimeout: () => svc.handlePauseTimeout('/proj')
+      })
+      seedWatchedDirectory(svc, '/proj', { pauseController })
+
+      svc.pauseWatch('/proj', OWNER)
+      svc.queueEvent('/proj', { type: 'addDir', path: '/proj/new-dir' })
+
+      vi.advanceTimersByTime(10_000)
+      expect(sends.length).toBe(1)
+      expect(firstPayload()).toMatchObject({ dirPath: '/proj', catchUp: true })
+
+      // The late resume from the stuck operation finds no episode left
+      svc.resumeWatch('/proj')
+      expect(sends.length).toBe(1)
+    })
+
+    it('nested pauses catch up once, at the outermost resume', () => {
+      seedWatchedDirectory(svc, '/proj')
+
+      svc.pauseWatch('/proj', OWNER)
+      svc.pauseWatch('/proj', OWNER)
+      svc.queueEvent('/proj', { type: 'unlinkDir', path: '/proj/old-dir' })
+
+      svc.resumeWatch('/proj')
+      vi.advanceTimersByTime(200)
+      expect(sends.length).toBe(0)
+
+      svc.resumeWatch('/proj')
+      expect(catchUpSends()).toHaveLength(1)
       expect(sends.length).toBe(1)
     })
   })

@@ -67,13 +67,7 @@ Phases 0–2 of Windows enablement shipped in **v0.9.3** (2026-04-22); Phase 4 (
 
 ### `npm run test:cov` exits 1 on Windows
 
-**Issue**: Every test passes; what fails are two **per-file** coverage thresholds declared in `vitest.main.ts` — `scripts/fuses.js` (86% lines / 88% functions) and `src/main/utils/tarArchive.ts` (90% each metric). Both suites skip their symlink cases on win32, because a file symlink needs `SeCreateSymbolicLinkPrivilege`: `scripts/fuses.test.mjs` carries six `skipIf(process.platform === 'win32')` guards, and `src/main/utils/tarArchive.test.ts:77` returns early. The lines those cases would cover never execute, so both file-level floors miss by a few points and vitest exits 1.
-
-Measured on a Windows host on 2026-09-15: those two are the **only** misses. All twelve #124 per-file preview floors pass there, and so do the renderer and preload floors.
-
-**The script itself has two further defects**, tracked as [#133](https://github.com/qodeca/erfana/issues/133): `scripts/test-cov.mjs` runs each config without `--project`, so `vitest.workspace.ts` auto-discovery expands every pass to all three projects and the suite runs about three times per invocation; and its `spawnSync(…, {stdio: 'inherit'})` output does not reach a redirected log on Windows, so a failing run shows only `Command failed (1): …` with no threshold lines at all.
-
-**Workaround**: None on a Windows host for the floors themselves — the run is doing what it is told. Run it on macOS or Linux, or read the CI result: the required `Coverage` job runs on `ubuntu-latest`, where nothing is skipped and it passes. To see *which* floor missed on Windows, run the underlying command directly rather than through the script: `npx vitest --run --config vitest.main.ts --project main --coverage`.
+**Resolved 2026-09-30.** `npm run test:cov` passes on a Windows host. It used to fail for two reasons: the runner spawned `npx.cmd` without a shell, which a current Node rejects with `EINVAL` before any test runs, and the symlink cases behind the `scripts/fuses.js` and `src/main/utils/tarArchive.ts` per-file floors were skipped on win32. The runner now starts vitest through `node`, the tar tests build their fixtures without a real symlink, and the fuses tests gate only their POSIX mode-bit assertions. On a Windows host without symlink privilege (no Developer Mode, not elevated) the symlink cases still skip, and both floors still hold.
 
 **Tracking**: [`docs/windows/known-flakes.md` § `npm run test:cov` cannot pass on a Windows host](./windows/known-flakes.md#npm-run-testcov-cannot-pass-on-a-windows-host).
 
@@ -143,10 +137,10 @@ Measured on a Windows host on 2026-09-15: those two are the **only** misses. All
 
 ### Directory watcher latency on Windows
 
-**Issue**: End-to-end file-creation notification latency (terminal `touch` → Project Tree shows the new file) is 1500–2500 ms on Windows versus 200–600 ms on macOS/Linux. The difference is not an Erfana bug — it's the cost of the underlying OS primitives.
+**Issue**: End-to-end file-creation notification latency (terminal `touch` → Project Tree shows the new file) is 1500–2500 ms on Windows versus 200–600 ms on macOS/Linux. The difference is not an Erfana bug — it's the cost of the underlying OS primitives. These figures were measured with the chokidar backend, before [#211](https://github.com/qodeca/erfana/issues/211) moved Windows to a native `fs.watch` watcher; they have not been re-measured since, but the e2e budget below still holds with the native backend.
 
 Pipeline contributors on Windows:
-- **chokidar `ReadDirectoryChangesW`** — 100–500 ms callback latency (vs. <5 ms for POSIX inotify).
+- **`ReadDirectoryChangesW`** (under chokidar before #211, under Node's `fs.watch` since) — 100–500 ms callback latency (vs. <5 ms for POSIX inotify). Since #211 each surviving event also waits for one `lstat` in a queue of at most two at a time.
 - **Windows Defender on-access scanning** — 200–800 ms scan of the new file before the FS notification fires. Enabled by default in Windows 11.
 - **ThrottledWorker collection delay** — 75 ms (VS Code value, deterministic).
 - **`useDirectoryWatcher` consumer debounce** — 250 ms (added in #241 to absorb multi-file write storms; same on macOS and Windows). Pushes the floor for cross-platform measurement above the 500 ms NFR-001 micro-target by design.
@@ -331,12 +325,32 @@ See [E2E troubleshooting § Terminal commands not executing](./testing/e2e-troub
 
 **Fixed – black window on 100k+ files ([#60](https://github.com/qodeca/erfana/issues/60))**: opening a very large project (reported at 174k nodes on an external volume) used to blank the window outright. The project tree's `flattenTree` built its flat array with `flattened.push(...flattenTree(child))`; spread-into-push is `Function.prototype.apply`, whose argument count is bounded by the engine stack (~10^5 on V8), so the first directory whose *flattened subtree* crossed that bound threw `RangeError: Maximum call stack size exceeded`, React 18 unmounted the entire root, and nothing was left to paint. `flattenTree` is now an explicit-stack loop that pushes exactly one node per iteration – output-identical (pre-order DFS, forward sibling order, `depth` per level, `index` reset per parent) and covered by a 200k-node reproduction. Throws that happen *while Erfana is drawing the interface* now surface a recovery screen with Restart / Copy error details / Open logs folder instead of a black window – or, for the project tree specifically, a "Project tree unavailable" panel with the rest of the app still running. Errors outside drawing (background work, event handlers, rejected promises) are written to the log without interrupting the UI – see [UI Components § Error containment](./ui-components.md#error-containment).
 
-**Remaining – performance, not crashes**: a 100k+-file project still opens slowly. Per the #60 diagnosis the cost is dominated by the directory scan (~2.0 s for 169k files) and the main → renderer IPC clone (~1.2 s); the tree is neither memoized nor virtualized, directories load eagerly, and an open cannot be cancelled. Those limits are owned by **#149** (React memoization) and **#150** (lazy loading + virtualization) – see the [large-project performance plan](./large-project-performance-plan.md). The directory watcher also still consumes too many FDs on very large repos. Mitigated by `.erfana/settings.json` ignore patterns.
+**Remaining – performance, not crashes**: a 100k+-file project still opens slowly. Per the #60 diagnosis the cost is dominated by the directory scan (~2.0 s for 169k files) and the main → renderer IPC clone (~1.2 s); the tree is neither memoized nor virtualized, directories load eagerly, and an open cannot be cancelled. Those limits are owned by **#149** (React memoization) and **#150** (lazy loading + virtualization) – see the [large-project performance plan](./large-project-performance-plan.md). On macOS the chokidar directory watcher can still use many FDs on a very large repo. On Windows, since [#211](https://github.com/qodeca/erfana/issues/211), the directory watcher holds at most 512 handles per project instead of one per folder, and it starts only after the first tree read.
 
-**Workaround**: Use `.erfana/settings.json` to ignore large subdirectories:
+**Workaround**: leave large folders you never need in Erfana out with the `files.exclude` list ([#211](https://github.com/qodeca/erfana/issues/211)). An excluded folder is not shown, not read when the tree loads, and not watched – unlike `watcher.ignoreList`, which only stops watching and still reads and shows the folder. In the project's `.erfana/settings.json` (or `~/.erfana/settings.json` for every project):
 ```json
-{ "watcher": { "ignoreList": { "mode": "extend", "patterns": ["large-folder"] } } }
+{ "files": { "exclude": [".local/test-tmp", "large-folder"] } }
 ```
+Then close the project and open it again (after editing the global file, restart Erfana first). Syntax and limits: the "Excluded folders" section of the user guide's settings reference, linked from [Settings § Exclude list](./settings.md#exclude-list-filesexclude). Git status still covers the whole repository, so also add the folder to `.gitignore` if git does not need to see it.
+
+---
+
+### Excluded folders (`files.exclude`): known limits
+
+**Issue**: [#211](https://github.com/qodeca/erfana/issues/211) added the exclude list and a new Windows directory watcher. These limits are known and accepted:
+
+1. **(Windows) A nested folder that becomes excluded, hidden or ignored after the project opened stays inside Windows' watch until the project is reopened.** Typical cases are a new `packages/a/node_modules` from `npm install`, or a new `src/tmp` matching a pattern such as `**/tmp`. A new folder of that kind at the top level of the project is left out at once. Excluded or ignored folders beyond the watcher's limits (64 remembered nested folders, 512 handles) are in the same position. Their changes are still ignored one by one, but a heavy burst there can overflow Windows' change buffer; Erfana then cannot tell where the lost changes were and re-reads the whole tree – about once per burst (a second after it ends, or every 5 s while it lasts). Everything excluded by a path entry, and every such folder that already existed when the project opened, is unaffected.
+2. **The exclude list does not change git status.** It hides folders from the tree and the watcher, not from git; an excluded folder that git still tracks, or sees as untracked, keeps costing git time and still counts in the git status bar.
+3. **(Windows) "One watcher for the whole project" is one watcher per project that holds a small, bounded set of Windows handles** (typically tens, at most 512), not a single handle, so that excluded folders can be left out entirely.
+4. **`.erfana` cannot be excluded**, so the settings that hide things stay findable in the tree.
+5. **An overly costly pattern fails open.** A pattern whose match exceeds the per-path work budget does not hide that path, and after 100 such overruns in one project session every pattern entry is switched off until the project is reopened (path entries keep working; one warning in the log). Real lists do not come near it; it exists because a cloned repository's settings are untrusted.
+6. **(Windows) A folder that keeps failing to be watched is left unwatched until the next restart or project open** – after 3 re-opens in 60 s, or when Windows reports it as gone while it is in fact still there. The tree still shows it correctly after the next re-read; only live updates from inside it pause. A new folder created while the watcher already holds its 512 handles is left unwatched the same way, until the project is closed and opened again.
+7. **Changes made while the first tree is loading can show late.** The directory watcher now starts only after the project's first tree read. A change made during that read in a folder the read has already passed, or before the watcher has opened that folder's watch, shows up with the next change or a manual refresh (Cmd/Ctrl+Alt+R).
+8. **Changes to the list apply the next time the project is opened after being closed.** The global file is read when Erfana starts. Nothing in the tree marks that something was excluded.
+
+**Workaround**: close the project and open it again for items 1, 5, 6 and 8 (restart Erfana first after editing the global file); refresh the tree for item 7; use `.gitignore` for item 2.
+
+**Tracking**: [#211](https://github.com/qodeca/erfana/issues/211); design and the full list in [`docs/designs/211-large-project-windows-watcher.md`](./designs/211-large-project-windows-watcher.md) §9–§10; accepted debt in [technical debt § 65](./technical-debt.md#65-accepted-trade-offs-from-211-2026-09). Content-only changes still re-read the whole tree (a follow-up), and lazy loading stays with #150.
 
 ---
 
