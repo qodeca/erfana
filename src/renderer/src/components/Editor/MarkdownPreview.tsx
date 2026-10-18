@@ -428,6 +428,9 @@ function createMarkdownComponents(
     }
 
     const handleClick = async (e: React.MouseEvent) => {
+      // A middle click (`auxclick`) takes the same path as a click, so it cannot
+      // reach the browser default for the anchor. Other aux buttons are ignored.
+      if (e.type === 'auxclick' && e.button !== 1) return
       if (!href) return
       e.preventDefault()
 
@@ -469,6 +472,7 @@ function createMarkdownComponents(
       <a
         href={href}
         onClick={handleClick}
+        onAuxClick={handleClick}
         className={linkClass}
         title={title}
         data-line-start={range?.start}

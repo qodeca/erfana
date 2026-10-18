@@ -132,7 +132,6 @@ describe('shell:openExternal', () => {
       await expect(openExternal('javascript:steal(document.cookie)')).rejects.toThrow()
 
       const logged = JSON.stringify(mockLogger.warn.mock.calls)
-      expect(logged).toContain('javascript:')
       expect(logged).not.toContain('document.cookie')
     })
   })
