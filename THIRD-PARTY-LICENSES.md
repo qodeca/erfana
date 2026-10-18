@@ -33,8 +33,6 @@ MIT.
 
 ---
 
-## Per-dependency license texts
-
 This file was generated with the generate-license-file npm package!
 https://www.npmjs.com/package/generate-license-file
 
@@ -6217,11 +6215,12 @@ THE SOFTWARE.
 
 -----------
 
-The following npm package may be included in this product:
+The following npm packages may be included in this product:
 
  - yauzl@2.10.0
+ - yauzl@3.4.0
 
-This package contains the following license:
+These packages each contain the following license:
 
 The MIT License (MIT)
 
