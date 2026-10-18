@@ -12,6 +12,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { devNull } from 'node:os'
 import { GitignoreEvaluator, GIT_ENV_ALLOWLIST, type GitExecFn } from './GitignoreEvaluator'
+import { GIT_FIXED_ENV } from '../../utils/hardenedGit'
 
 const GIT_PATH = '/usr/bin/git'
 const TEMP_DIR = '/tmp/erfana-safe-cwd'
@@ -120,12 +121,16 @@ describe('GitignoreEvaluator', () => {
       const [file, args, options] = exec.mock.calls[0]
 
       expect(file).toBe(GIT_PATH)
+      // NOTE: `include.path=\\.\nul` (the Windows null device) still needs a check against
+      // a real Git for Windows install; it is verified in the Windows session.
       expect(args).toEqual([
+        '--literal-pathspecs',
+        '--no-pager',
+        '--no-optional-locks',
         '-C',
         ROOT,
-        '--no-optional-locks',
         '-c',
-        'core.fsmonitor=',
+        'core.fsmonitor=false',
         '-c',
         `core.hooksPath=${devNull}`,
         '-c',
@@ -160,12 +165,10 @@ describe('GitignoreEvaluator', () => {
       const env = exec.mock.calls[0][2].env as NodeJS.ProcessEnv
       const keys = Object.keys(env).sort()
 
-      // Positive assertion: exactly the allowlist keys that are present + the fixed GIT_* trio.
+      // Positive assertion: exactly the allowlist keys that are present + the fixed GIT_* set.
       const expectedKeys = [
         ...GIT_ENV_ALLOWLIST.filter((k) => process.env[k] !== undefined),
-        'GIT_CONFIG_NOSYSTEM',
-        'GIT_TERMINAL_PROMPT',
-        'GIT_OPTIONAL_LOCKS'
+        ...Object.keys(GIT_FIXED_ENV)
       ].sort()
       expect(keys).toEqual(expectedKeys)
 

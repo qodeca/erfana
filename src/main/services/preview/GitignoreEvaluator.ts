@@ -10,14 +10,15 @@
  * turn `check-ignore` into arbitrary command execution or an arbitrary-path file
  * append. This module runs git as narrowly as possible:
  *
- *  - **Absolute git path, resolved once** from a SAFE cwd (never a bare `git`
+ *  - **Absolute git path, resolved once** (fixed install locations, then the
+ *    absolute `which` / `where.exe` from a SAFE cwd – never a bare `git`
  *    against an untrusted current directory, which would let a planted `git`
  *    binary run).
  *  - **cwd is NOT inside the repo** (an OS temp dir), with `-C <root>` selecting
  *    the repository — so a `.git`-relative config include cannot be steered by
  *    the current directory.
  *  - **Config overrides** neutralise the known code-execution key
- *    (`core.fsmonitor=`), redirect hooks to the null device
+ *    (`core.fsmonitor=false`), redirect hooks to the null device
  *    (`core.hooksPath=<NULL_DEVICE>`) and disable ad-hoc includes
  *    (`include.path=<NULL_DEVICE>`; an empty value is rejected by git);
  *    `GIT_CONFIG_NOSYSTEM=1` drops system config.
@@ -38,14 +39,12 @@
  */
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { isAbsolute } from 'node:path'
 import { tmpdir } from 'node:os'
 import {
   GIT_ENV_ALLOWLIST,
-  GIT_INCLUDE_OVERRIDE,
-  GIT_NULL_DEVICE,
   buildGitEnv,
-  findOnPath
+  buildHardeningArgs,
+  resolveGitBinary
 } from '../../utils/hardenedGit'
 
 // Re-exported so existing importers (and the design NEW-13 env test) keep working.
@@ -105,20 +104,6 @@ const defaultExec: GitExecFn = (file, args, options) =>
     stderr: r.stderr.toString()
   }))
 
-/**
- * Default git-path resolver: `which git` (POSIX) / `where git` (win32) run from
- * a SAFE cwd with an absolute finder binary. Returns the first absolute hit or
- * `null`.
- */
-async function defaultResolveGitPath(): Promise<string | null> {
-  try {
-    const [first] = await findOnPath('git', GIT_TIMEOUT_MS)
-    return first && isAbsolute(first) ? first : null
-  } catch {
-    return null
-  }
-}
-
 interface CacheEntry {
   value: boolean
   expires: number
@@ -136,7 +121,9 @@ export class GitignoreEvaluator implements IGitignoreEvaluator {
 
   constructor(deps: GitignoreEvaluatorDeps = {}) {
     this.exec = deps.exec ?? defaultExec
-    this.resolveGitPath = deps.resolveGitPath ?? defaultResolveGitPath
+    // Shared with the git-status worker: install-location allowlist, then the
+    // absolute `which` / `where.exe`.
+    this.resolveGitPath = deps.resolveGitPath ?? resolveGitBinary
     this.tempDir = deps.tempDir ?? (() => tmpdir())
     this.now = deps.now ?? Date.now
     this.cacheTtlMs = deps.cacheTtlMs ?? DEFAULT_CACHE_TTL_MS
@@ -188,16 +175,10 @@ export class GitignoreEvaluator implements IGitignoreEvaluator {
       return false
     }
 
+    // `--literal-pathspecs`: the candidate is a file name, never a pathspec magic.
     const args = [
-      '-C',
-      projectRoot,
-      '--no-optional-locks',
-      '-c',
-      'core.fsmonitor=',
-      '-c',
-      `core.hooksPath=${GIT_NULL_DEVICE}`,
-      '-c',
-      GIT_INCLUDE_OVERRIDE,
+      '--literal-pathspecs',
+      ...buildHardeningArgs(projectRoot),
       'check-ignore',
       '--quiet',
       '--',
