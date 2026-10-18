@@ -706,6 +706,14 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     }
   }
 
+  // initializeTerminal closes over per-render state and is not memoized. Effects
+  // and callbacks that must NOT re-run when it changes (project-change restart,
+  // manual restart) call it through this ref, which always holds the latest one.
+  const initializeTerminalRef = useRef(initializeTerminal)
+  useEffect(() => {
+    initializeTerminalRef.current = initializeTerminal
+  })
+
   // Check terminal availability on mount
   useEffect(() => {
     checkAvailability()
@@ -714,7 +722,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   // Create terminal when available
   useEffect(() => {
     if (isAvailable && terminalRef.current && !xtermRef.current) {
-      initializeTerminal()
+      void initializeTerminalRef.current()
     }
 
     // Cleanup on unmount only
@@ -744,7 +752,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
         visibilityObserverRef.current = null
       }
     }
-  }, [isAvailable, setActiveTerminalId, cleanupTerminalInstance])
+  }, [isAvailable, setActiveTerminalId, cleanupTerminalInstance, cleanupDragHandlers])
 
   // Restart terminal on project change
   useEffect(() => {
@@ -773,11 +781,11 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       // Wait briefly then initialize new terminal in new CWD (if a project is open)
       if (data.newPath) {
         // Try initialize; if hidden, visibility observer will defer until visible
-        void initializeTerminal()
+        void initializeTerminalRef.current()
       }
     })
     return () => unsubscribe()
-  }, [setActiveTerminalId, cleanupTerminalInstance])
+  }, [setActiveTerminalId, cleanupTerminalInstance, cleanupDragHandlers])
 
   // Handle terminal data
   useEffect(() => {
@@ -1079,7 +1087,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
 
     // Create new terminal
     if (terminalRef.current && isAvailable) {
-      await initializeTerminal()
+      await initializeTerminalRef.current()
     }
   }, [setActiveTerminalId, isAvailable, cleanupDragHandlers, cleanupTerminalInstance])
 

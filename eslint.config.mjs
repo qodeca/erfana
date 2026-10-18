@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import pluginJs from '@eslint/js'
 import pluginReact from 'eslint-plugin-react'
+import reactHooks from 'eslint-plugin-react-hooks'
 import * as tseslint from 'typescript-eslint'
 // Use flat-config-friendly Prettier rules directly
 import eslintConfigPrettier from 'eslint-config-prettier'
@@ -53,6 +54,31 @@ export default [
   pluginJs.configs.recommended,
   ...tseslint.configs.recommended,
   pluginReact.configs.flat.recommended,
+  // React hooks (renderer only). `rules-of-hooks` is an error and
+  // `exhaustive-deps` a warning. The plugin's v7 preset also switches on the
+  // React-Compiler-derived rules as errors; this codebase does not use the
+  // compiler, so those are downgraded to warnings rather than blocking lint.
+  {
+    ...reactHooks.configs.flat.recommended,
+    files: ['src/renderer/**/*.{ts,tsx}'],
+    rules: {
+      ...reactHooks.configs.flat.recommended.rules,
+      'react-hooks/rules-of-hooks': 'error',
+      'react-hooks/exhaustive-deps': 'warn',
+      'react-hooks/static-components': 'warn',
+      'react-hooks/use-memo': 'warn',
+      'react-hooks/preserve-manual-memoization': 'warn',
+      'react-hooks/immutability': 'warn',
+      'react-hooks/globals': 'warn',
+      'react-hooks/refs': 'warn',
+      'react-hooks/set-state-in-effect': 'warn',
+      'react-hooks/error-boundaries': 'warn',
+      'react-hooks/purity': 'warn',
+      'react-hooks/set-state-in-render': 'warn',
+      'react-hooks/config': 'warn',
+      'react-hooks/gating': 'warn'
+    }
+  },
   // Disable formatting-related rules that conflict with Prettier
   { rules: eslintConfigPrettier.rules },
   // Configure React version detection for eslint-plugin-react
