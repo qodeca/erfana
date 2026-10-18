@@ -13,19 +13,20 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { mkdtemp, readFile, rm, writeFile } from 'fs/promises'
+import { access, mkdtemp, readFile, rm, stat, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join, resolve } from 'path'
 import yazl from 'yazl'
 
-import { ZipSlipError, assertSafeEntry, unzip } from './zipArchive'
+import { ZipSlipError, assertSafeEntry, assertSafeEntryType, unzip } from './zipArchive'
 
 async function makeZip(
-  entries: Array<{ name: string; content: string }>
+  entries: Array<{ name: string; content?: string; mode?: number; dir?: boolean }>
 ): Promise<Buffer> {
   const zip = new yazl.ZipFile()
-  for (const { name, content } of entries) {
-    zip.addBuffer(Buffer.from(content, 'utf8'), name)
+  for (const { name, content = '', mode, dir } of entries) {
+    if (dir) zip.addEmptyDirectory(name)
+    else zip.addBuffer(Buffer.from(content, 'utf8'), name, mode === undefined ? {} : { mode })
   }
   zip.end()
   return new Promise<Buffer>((resolveP, reject) => {
@@ -114,6 +115,66 @@ describe('zipArchive.unzip (integration, happy path)', () => {
     const src = join(workDir, 'colon.zip')
     await makePatchedZip(src, 'file:x.tx')
     await expect(unzip(src, join(workDir, 'dest'))).rejects.toBeInstanceOf(ZipSlipError)
+  })
+
+  it('rejects a symbolic-link entry and writes nothing (#165)', async () => {
+    // The extract-zip advisories: a symlink entry pointing outside destDir,
+    // followed by a file written through it. The pre-pass must reject the
+    // archive before any entry – even the safe one in front – is written.
+    const src = join(workDir, 'symlink.zip')
+    const dest = join(workDir, 'dest')
+    await writeFile(src, await makeZip([
+      { name: 'safe.txt', content: 'ok' },
+      { name: 'link', content: '../../outside', mode: 0o120777 },
+      { name: 'link/payload.txt', content: 'escaped' }
+    ]))
+    await expect(unzip(src, dest)).rejects.toThrow(/symbolic-link entry/)
+    await expect(access(dest)).rejects.toThrow(/ENOENT/)
+  })
+
+  it('extracts explicit directory entries', async () => {
+    const src = join(workDir, 'dirs.zip')
+    const dest = join(workDir, 'dest')
+    await writeFile(src, await makeZip([
+      { name: 'empty/', dir: true },
+      { name: 'bin/tool', content: 'x' }
+    ]))
+    await unzip(src, dest)
+    expect((await stat(join(dest, 'empty'))).isDirectory()).toBe(true)
+    expect(await readFile(join(dest, 'bin', 'tool'), 'utf8')).toBe('x')
+  })
+
+  it.skipIf(process.platform === 'win32')('keeps the executable bit of a regular file', async () => {
+    const src = join(workDir, 'exec.zip')
+    const dest = join(workDir, 'dest')
+    await writeFile(src, await makeZip([{ name: 'run.sh', content: '#!/bin/sh', mode: 0o100755 }]))
+    await unzip(src, dest)
+    expect((await stat(join(dest, 'run.sh'))).mode & 0o111).not.toBe(0)
+  })
+})
+
+describe('zipArchive.assertSafeEntryType (unit tests for the entry-type rule)', () => {
+  it.each([
+    ['DOS-made entry (no type bits)', 0],
+    ['regular file', 0o100644],
+    ['executable file', 0o100755],
+    ['directory', 0o040755]
+  ])('accepts %s', (_label, mode) => {
+    expect(() => assertSafeEntryType('entry', mode)).not.toThrow()
+  })
+
+  it('rejects a symbolic link', () => {
+    expect(() => assertSafeEntryType('link', 0o120777)).toThrow(ZipSlipError)
+    expect(() => assertSafeEntryType('link', 0o120777)).toThrow(/symbolic-link entry/)
+  })
+
+  it.each([
+    ['character device', 0o020644],
+    ['block device', 0o060644],
+    ['FIFO', 0o010644],
+    ['socket', 0o140644]
+  ])('rejects a %s', (_label, mode) => {
+    expect(() => assertSafeEntryType('odd', mode)).toThrow(/unsupported entry type/)
   })
 })
 
