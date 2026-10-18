@@ -10,6 +10,7 @@ import { SubscriberCounter } from './watcher/SubscriberCounter'
 import { createSingleFileWatcher } from './watcher/singleFileWatch'
 import { sendToSubscribers } from './watcher/watchNotifier'
 import { AtomicRearmDeps, RearmableWatch, resolveDeletedWatch } from './watcher/atomicRearm'
+import { watchedUnderRemovedFolders } from './watcher/ancestorRemoval'
 
 interface WatchedFile {
   filePath: string
@@ -407,6 +408,17 @@ export class FileWatcherService {
     this.atomicSaveDetector.registerDelete(filePath, (path, wasAtomicSave) => {
       void resolveDeletedWatch(path, wasAtomicSave, this.rearmDeps)
     })
+  }
+
+  /**
+   * The project watcher removed these paths: a watched file under a removed
+   * folder vanished unheard (see `watcher/ancestorRemoval`), so it takes the
+   * normal unlink branch, whose existence re-check guards a false banner.
+   */
+  handleAncestorRemovals(removedPaths: readonly string[]): void {
+    if (this.isDisposing) return
+    const affected = watchedUnderRemovedFolders(this.watchedFiles.keys(), removedPaths)
+    for (const filePath of affected) this.handleFileDeleted(filePath)
   }
 
   /**

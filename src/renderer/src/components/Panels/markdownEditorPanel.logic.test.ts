@@ -28,6 +28,8 @@ import {
   interpolateScrollPosition,
   // Utility Functions
   isSplitMode,
+  shouldRecreateParentDirs,
+  shouldToastSaveError,
   extractFileName,
   extractBaseFileName,
   isMarkdownFile,
@@ -807,5 +809,34 @@ describe('Integration: Document stats for various content types', () => {
 
     expect(stats.words).toBe(4)
     expect(stats.characters).toBeGreaterThan(0)
+  })
+})
+
+describe('shouldRecreateParentDirs', () => {
+  it('only the tab’s own Cmd+S of a deleted-state tab may recreate the folder', () => {
+    expect(shouldRecreateParentDirs('user', true)).toBe(true)
+  })
+
+  it('never for an autosave, a save by id (preview move prompt), or a tab that is not deleted', () => {
+    expect(shouldRecreateParentDirs('autosave', true)).toBe(false)
+    expect(shouldRecreateParentDirs('registry', true)).toBe(false)
+    expect(shouldRecreateParentDirs('user', false)).toBe(false)
+  })
+})
+
+describe('shouldToastSaveError', () => {
+  it('always shows a Cmd+S failure, even one already shown', () => {
+    expect(shouldToastSaveError('user', 'm', 'm')).toBe(true)
+    expect(shouldToastSaveError('user', 'm', null)).toBe(true)
+  })
+
+  it('shows an autosave failure once per distinct reason', () => {
+    expect(shouldToastSaveError('autosave', 'm', null)).toBe(true)
+    expect(shouldToastSaveError('autosave', 'm', 'm')).toBe(false)
+    expect(shouldToastSaveError('autosave', 'other', 'm')).toBe(true)
+  })
+
+  it('never shows one for a save by id: the registry caller toasts on false (one failure, one toast)', () => {
+    expect(shouldToastSaveError('registry', 'm', null)).toBe(false)
   })
 })

@@ -27,6 +27,7 @@ import {
   PAUSE_CONTROLLER
 } from '../../shared/constants'
 import { logger } from './LoggingService'
+import { redactedLogError } from '../utils/redactUserInput'
 import { isSystemDirectory } from '../utils/pathSecurity'
 import { isLexicallyInside } from '../utils/projectConfinement'
 import { ProjectPathFilter, toRootRelative } from '../utils/projectPathFilter'
@@ -58,6 +59,9 @@ interface DirectoryChangeEvent {
   type: 'add' | 'addDir' | 'unlink' | 'unlinkDir' | 'change'
   path: string
 }
+
+/** Receives the absolute paths one delivered batch removed. */
+export type PathsRemovedListener = (removedPaths: readonly string[]) => void
 
 /** Construction options for {@link DirectoryWatcherService}. */
 export interface DirectoryWatcherServiceOptions {
@@ -115,6 +119,10 @@ export class DirectoryWatcherService {
   private readonly watchBackend: DirectoryWatchBackend
   private backendLogged = false
 
+  // Told about every confirmed removal in a delivered batch, so the single-file
+  // watches can notice a file whose parent folder was renamed or deleted
+  private readonly removalListeners = new Set<PathsRemovedListener>()
+
   constructor(options: DirectoryWatcherServiceOptions = {}) {
     this.watchBackend = options.backend ?? selectDirectoryWatchBackend()
   }
@@ -127,6 +135,39 @@ export class DirectoryWatcherService {
    */
   setPathFilter(filter: ProjectPathFilter): void {
     this.pathFilter = filter
+  }
+
+  /**
+   * Hear about the paths a delivered batch removed (`unlink` / `unlinkDir`,
+   * absolute, after coalescing). A single-file chokidar watch cannot see its
+   * parent folder being renamed away – nothing touches the file itself – so
+   * `FileWatcherService` listens here to mark such an open file deleted.
+   * Removals dropped while the watch is paused (the app's own operations) are
+   * not reported.
+   *
+   * @returns a function that removes the listener
+   */
+  onPathsRemoved(listener: PathsRemovedListener): () => void {
+    this.removalListeners.add(listener)
+    return () => {
+      this.removalListeners.delete(listener)
+    }
+  }
+
+  /** Hand a batch's removed paths to every listener; one that throws is logged and skipped. */
+  private reportRemovals(events: readonly FileChangeEvent[]): void {
+    if (this.removalListeners.size === 0) return
+    const removed = events
+      .filter((e) => e.type === 'unlink' || e.type === 'unlinkDir')
+      .map((e) => e.path)
+    if (removed.length === 0) return
+    for (const listener of this.removalListeners) {
+      try {
+        listener(removed)
+      } catch (error) {
+        logger.error('Directory removal listener failed', redactedLogError(error))
+      }
+    }
   }
 
   /** A filter with the default hidden names, these ignore patterns and no exclude list. */
@@ -891,6 +932,8 @@ export class DirectoryWatcherService {
     this.safeLog(
       `📁 Directory changed: ${dirPath} (${coalescedEvents.length} events after coalescing ${events.length}, ${efficiency}% reduced: ${JSON.stringify(summary)})`
     )
+
+    this.reportRemovals(coalescedEvents)
 
     // Notify all watching webContents
     this.notifyWebContents(dirPath, 'directory-watch:changed', {

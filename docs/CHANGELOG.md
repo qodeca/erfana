@@ -14,6 +14,10 @@ Per-version release notes for Erfana, v0.9.0 onwards. Earlier: v0.8.0–v0.8.3 i
 - **The project tree on macOS uses a new folder watcher** – macOS now watches the project with one native watcher per project, the one Windows has used since v0.20.1, instead of chokidar. The watcher library moved from chokidar 3.6.0 to 5.0.0, which no longer uses macOS's own file-event service and would open one file handle per file; on a large project that runs a Mac out of file handles, the failure the old version pin existed to prevent. Linux keeps chokidar. `ERFANA_DIRECTORY_WATCHER=chokidar` still forces chokidar on every platform, for diagnosis only – on a large macOS project it brings the file-handle problem back.
 - **Document import uses LiteParse 2** ([#164](https://github.com/qodeca/erfana/issues/164)) – PDF, Office and image imports now go through `@llamaindex/liteparse` 2.14.7, which no longer depends on `sharp`.
 
+### Fixed
+
+- **Saving a file whose folder was renamed outside Erfana no longer fails silently** – when an open file's folder is renamed, moved or deleted outside the app, its tab now shows `(deleted)` and the "This file was deleted on disk. Save to restore it." banner, as a deleted file already did. Saving that tab with ⌘S / Ctrl+S recreates the folder and writes the file back where it was; autosave and other indirect saves never recreate a folder. Any save that fails now shows an error toast with the reason, and the tab stays marked unsaved, so an edit is never lost without notice.
+
 ### Security
 
 - **`npm audit --omit=dev` reports no production advisories** – down from four high and one moderate at v0.20.1:

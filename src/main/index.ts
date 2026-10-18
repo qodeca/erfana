@@ -388,6 +388,13 @@ app.whenReady().then(async () => {
     () => gitWatcherService.isWatching()
   )
 
+  // An open file whose parent folder is renamed, moved or deleted outside the
+  // app is seen only by the project watcher (a single-file watch hears nothing),
+  // so its removals are handed to the single-file watches
+  directoryWatcherService.onPathsRemoved((removedPaths) =>
+    fileWatcherService.handleAncestorRemovals(removedPaths)
+  )
+
   // Register IPC handlers. Every global channel is gated on the app's own
   // top-level renderer by construction: the handlers register through
   // `src/main/ipc/registry.ts`, and an ESLint rule stops `ipcMain` being
