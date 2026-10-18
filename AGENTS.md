@@ -17,26 +17,34 @@ Run the whole gate from the repository root before you hand work back:
 .xezar/checks/repo-gates.sh
 ```
 
-It runs, in order:
+It reports these steps in canonical order:
 
 1. npm ci
 2. .xezar/checks/security-scan.sh
-3. npm run lint
+3. npm run lint:check
 4. npm run lint:css
 5. npm run design -- --check
 6. npm run typecheck
-7. npm run test:ci
-8. npm run test:cov
-9. npx electron-vite build
-10. npm run check:headers
-11. .xezar/checks/repository-checks.sh
+7. npm run test:cov
+8. npx electron-vite build
+9. npm run check:headers
+10. .xezar/checks/repository-checks.sh
+
+`npm run test:cov` runs every unit test in the main, preload and renderer projects once and checks
+every coverage floor, so the gate has no separate `npm run test:ci` step (#170). CI still runs
+`test:ci` as the required `Unit tests` check.
 
 The GitHub checks that gate a pull request are `Lint`, `Typecheck`, `Unit tests`, `Build`,
 `Coverage`, `License compliance` (`.github/workflows/checks.yml`) and `Secret scan`
 (`.github/workflows/secret-scan.yml`). CI also runs `reuse lint` and gitleaks over every ref, which the
 local gate does not. CI does not run e2e: for Electron-specific changes run `npm run test:e2e` locally.
 
-`npm run lint` runs ESLint with `--fix`: commit what it changes. Install with `npm ci`, never
+The application gates run in two lanes by default (`validation.applicationLanes` in
+`.xezar/pipeline/config.json`); `GATE_APPLICATION_LANES` overrides the schedule. The security
+scan finishes before they start, and the repository checks run after all lanes finish.
+
+`npm run lint:check` reports lint errors without edits. `npm run lint` runs ESLint with `--fix`:
+commit what it changes. Install with `npm ci`, never
 `npm install` (it rewrites `package-lock.json` in a way CI rejects).
 
 ## Where things live

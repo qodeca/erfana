@@ -143,7 +143,13 @@ declare global {
         resume: (dirPath: string) => Promise<{ success: boolean; error?: string }>
         getStats: () => Promise<{ success: boolean; stats?: unknown; error?: string }>
         onDirectoryChanged: (
-          callback: (data: { dirPath: string; eventCount: number; summary: Record<string, number> }) => void
+          callback: (data: {
+            dirPath: string
+            eventCount: number
+            summary: Record<string, number>
+            /** Set on a refresh that recovers changes dropped during a pause (#210) */
+            catchUp?: boolean
+          }) => void
         ) => () => void
         onProjectDeleted: (callback: (data: { dirPath: string }) => void) => () => void
         onDirectoryError: (

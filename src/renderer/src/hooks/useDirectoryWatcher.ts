@@ -85,8 +85,9 @@ export function useDirectoryWatcher({
     // re-list. Without this, every broadcast triggered a recursive IPC
     // walk of the project directory.
     const unsubscribeChanged = window.api.directoryWatch.onDirectoryChanged((data) => {
-      // Only refresh if not during our own internal operations
-      if (!shouldHandleDirectoryChange(isInternalOperationRef.current)) {
+      // Only refresh if not during our own internal operations – a catch-up
+      // refresh (changes dropped during a pause, #210) always goes through
+      if (!shouldHandleDirectoryChange(isInternalOperationRef.current, data.catchUp === true)) {
         logger.debug('[RENDERER] Directory change skipped (internal operation)')
         return
       }

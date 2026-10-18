@@ -274,6 +274,42 @@ describe('useKeyboardShortcuts', () => {
       })
     })
 
+    it('reads a function isModified at keypress time, not at render', async () => {
+      // The render-time value can trail the edit; a ⌘W in that gap used to
+      // close a dirty tab without asking.
+      let dirty = false
+      renderHook(() =>
+        useKeyboardShortcuts({
+          ...defaultOptions(),
+          isModified: () => dirty
+        })
+      )
+
+      dirty = true
+      window.dispatchEvent(createKeyboardEvent('w', { metaKey: true }))
+
+      await vi.waitFor(() => {
+        expect(mockShowConfirm).toHaveBeenCalledTimes(1)
+      })
+      expect(mockOnClose).not.toHaveBeenCalled()
+    })
+
+    it('closes without asking when a function isModified returns false', async () => {
+      renderHook(() =>
+        useKeyboardShortcuts({
+          ...defaultOptions(),
+          isModified: () => false
+        })
+      )
+
+      window.dispatchEvent(createKeyboardEvent('w', { metaKey: true }))
+
+      await vi.waitFor(() => {
+        expect(mockOnClose).toHaveBeenCalledTimes(1)
+      })
+      expect(mockShowConfirm).not.toHaveBeenCalled()
+    })
+
     it('does not trigger on Cmd+Shift+W', () => {
       renderHook(() => useKeyboardShortcuts(defaultOptions()))
 

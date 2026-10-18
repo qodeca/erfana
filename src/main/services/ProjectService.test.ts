@@ -77,7 +77,8 @@ describe('ProjectService integration with ProjectLockService', () => {
     mockFileService = {
       setProjectPath: vi.fn(),
       getProjectPath: vi.fn(() => null),
-      setHiddenPatterns: vi.fn()
+      setHiddenPatterns: vi.fn(),
+      setPathFilter: vi.fn()
     } as any
 
     mockFileWatcherService = {
@@ -88,7 +89,7 @@ describe('ProjectService integration with ProjectLockService', () => {
     mockDirectoryWatcherService = {
       setProjectPath: vi.fn(),
       stopAll: vi.fn(() => Promise.resolve()),
-      setIgnorePatterns: vi.fn()
+      setPathFilter: vi.fn()
     } as any
 
     mockSettingsService = {
@@ -100,7 +101,9 @@ describe('ProjectService integration with ProjectLockService', () => {
       loadSettings: vi.fn(() =>
         Promise.resolve({
           treeHiddenPatterns: [],
-          watcherIgnorePatterns: []
+          watcherIgnorePatterns: [],
+          excludePatterns: [],
+          excludeRejections: []
         })
       ),
       clearSettings: vi.fn()
@@ -157,7 +160,12 @@ describe('ProjectService integration with ProjectLockService', () => {
 
       mockProjectSettingsService.loadSettings.mockImplementation(async () => {
         callOrder.push('loadSettings')
-        return { treeHiddenPatterns: [], watcherIgnorePatterns: [] }
+        return {
+          treeHiddenPatterns: [],
+          watcherIgnorePatterns: [],
+          excludePatterns: [],
+          excludeRejections: []
+        }
       })
 
       await projectService.switchProject(projectPath)

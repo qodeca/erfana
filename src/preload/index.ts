@@ -286,11 +286,16 @@ const api = {
 
     // Event listeners
     onDirectoryChanged: (
-      callback: (data: { dirPath: string; eventCount: number; summary: Record<string, number> }) => void
+      callback: (data: {
+        dirPath: string
+        eventCount: number
+        summary: Record<string, number>
+        catchUp?: boolean
+      }) => void
     ) => {
       const listener = (
         _event: unknown,
-        data: { dirPath: string; eventCount: number; summary: Record<string, number> }
+        data: { dirPath: string; eventCount: number; summary: Record<string, number>; catchUp?: boolean }
       ) => callback(data)
       ipcRenderer.on('directory-watch:changed', listener)
       return () => ipcRenderer.removeListener('directory-watch:changed', listener)

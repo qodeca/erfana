@@ -4,8 +4,7 @@
  * useProjectManagement — "no auto-load on mount" invariant (issue #60)
  *
  * The mount effect (`useProjectManagement.ts`, "Load last project on mount -
- * DISABLED") only marks the initial load complete; it never reopens the last
- * project. Crash recovery leans on that: relaunching after a crash caused BY a
+ * DISABLED") only clears the spinner; it never reopens the last project. Crash recovery leans on that: relaunching after a crash caused BY a
  * project must land on the welcome screen, not reopen the offending project and
  * crash again.
  *
@@ -62,17 +61,17 @@ afterEach(() => {
 })
 
 describe('useProjectManagement — no auto-load of the last project', () => {
-  it('marks the initial load complete on mount and never enters a loading state', () => {
+  it('never enters a loading state on mount and keeps the watcher gate closed', () => {
     const { result, rerender } = renderHook(() => useProjectManagement())
 
     // Nothing is awaited, so the hook never shows a spinner on mount.
     expect(result.current.loading).toBe(false)
     expect(result.current.error).toBeNull()
 
-    // `initialLoadComplete` is backed by a ref the mount effect flips; the
-    // flag is therefore observable from the next render onwards.
+    // With no project open there is nothing to watch, so the directory-watcher
+    // gate stays closed (#211, D12).
     rerender()
-    expect(result.current.initialLoadComplete).toBe(true)
+    expect(result.current.initialLoadComplete).toBe(false)
   })
 
   it('opens no project on mount', () => {
@@ -105,6 +104,6 @@ describe('useProjectManagement — no auto-load of the last project', () => {
     expect(fileApi.getLastProjectPath).not.toHaveBeenCalled()
     expect(fileApi.readDirectory).not.toHaveBeenCalled()
     expect(result.current.projectPath).toBeNull()
-    expect(result.current.initialLoadComplete).toBe(true)
+    expect(result.current.initialLoadComplete).toBe(false)
   })
 })

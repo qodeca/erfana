@@ -51,6 +51,21 @@ If you need to change dependencies, run `npm install` deliberately, then check `
 keep only the change you meant to make. If the diff shows `encoding` disappearing and a shuffle of `peer` /
 `optional` flags and nothing else, discard it — that is this quirk, not your change.
 
+npm 11.19 ends `npm ci` with `npm warn install-scripts … not yet covered by allowScripts` for `electron`,
+`node-pty`, `esbuild` and a few others. On that version it is only a warning: the scripts still run, and the app
+builds and starts (checked 2026-10-01). If a later npm turns it into a block, the app will not start.
+`node_modules/electron/dist` will be missing, and so will `node_modules/node-pty/build/Release/pty.node`.
+
+To build and package the app:
+
+```bash
+npm run build       # production build (typecheck + electron-vite build)
+npm run build:mac   # package for macOS
+npm run build:win   # package for Windows
+```
+
+Packaging details, signing and the Windows toolchain are in [docs/build/](docs/build/README.md).
+
 `main` is the stable release branch. Most work goes through `develop`, the day-to-day integration branch: cut your `feature/...` branch from `develop` and open your PR against `develop`.
 
 The one exception is the **graph engine** (spec 004 and the [#21](https://github.com/qodeca/erfana/issues/21) contract chain). That work lives on the `graph` branch, which acts as "develop for the graph engine" and already carries frozen schema, database and interface contracts that are deliberately absent from `develop`. If your change touches the graph engine, branch from `graph` and target `graph` — starting from `develop` means re-implementing contracts that already exist.
@@ -81,6 +96,12 @@ all three and is the only way to reproduce the `Coverage` job before pushing.
 It cannot pass on a Windows host (at least two `vitest.main.ts` floors miss
 because their symlink cases skip on win32, and the #124 floors have not been run
 there); CI runs it on Linux.
+
+Every vitest run uses at most half the machine's cores (at least two), set in
+`vitest.workers.ts` (#171), so several agents or terminals running tests at once
+do not saturate the machine. Raise or lower it for one run or one machine with
+`VITEST_MAX_WORKERS`, as a count (`VITEST_MAX_WORKERS=8`) or a share of the cores
+(`VITEST_MAX_WORKERS=75%`).
 
 For changes touching Electron-specific paths, also run the end-to-end suite locally (CI does not currently run it):
 

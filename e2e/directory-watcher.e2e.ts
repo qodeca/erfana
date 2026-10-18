@@ -16,9 +16,11 @@
  */
 
 import { test, expect, _electron as electron } from '@playwright/test'
+import * as fs from 'fs'
 import * as path from 'path'
 import type { ElectronApplication, Page } from '@playwright/test'
 import {
+  ProjectTreePage,
   TEST_IDS,
   waitForAppReady,
   openProject,
@@ -143,6 +145,143 @@ test.describe('Directory watcher pipeline', () => {
       expect(elapsed).toBeLessThan(LATENCY_BUDGET_MS)
     } finally {
       // Cleanup: close app first, then remove dirs
+      if (electronApp && window) {
+        await closeApp(electronApp, window)
+      } else if (electronApp) {
+        await electronApp.close().catch(() => {})
+      }
+      await cleanupProject()
+      await cleanupUserData()
+    }
+  })
+
+  // Issue #211 (design W15, AC1/AC3/AC4): a folder listed in the project's
+  // `files.exclude` never enters the tree, and heavy churn inside it does not
+  // delay a change in a visible folder beyond the same latency budget.
+  test('should keep excluded folder out of the tree and still show a visible change when the excluded folder churns', async () => {
+    const { projectPath, cleanup: cleanupProject } = await createTestProject({
+      'test.md': '# Test\n'
+    })
+    const { userDataDir, cleanup: cleanupUserData } = await createTempUserDataDir(
+      'dir-watcher-exclude'
+    )
+
+    // Seed the project: an excluded folder with content (so "absent" means
+    // excluded, not merely empty), a visible folder, and the project settings.
+    await fs.promises.mkdir(path.join(projectPath, 'scratch'), { recursive: true })
+    await fs.promises.writeFile(path.join(projectPath, 'scratch', 'seed.md'), '# seed\n', 'utf-8')
+    await fs.promises.mkdir(path.join(projectPath, 'visible'), { recursive: true })
+    await fs.promises.writeFile(path.join(projectPath, 'visible', 'seed.md'), '# seed\n', 'utf-8')
+    await fs.promises.mkdir(path.join(projectPath, '.erfana'), { recursive: true })
+    await fs.promises.writeFile(
+      path.join(projectPath, '.erfana', 'settings.json'),
+      JSON.stringify({ files: { exclude: ['scratch'] } }),
+      'utf-8'
+    )
+
+    const runId = Date.now()
+    const visibleName = `visible-${runId}.md`
+    const afterName = `after-${runId}.md`
+    // The terminal paints to a canvas, so its output cannot be read from the
+    // DOM; the churn script signals completion with a file OUTSIDE the project.
+    const churnDoneFile = path.join(userDataDir, `w15-churn-done-${runId}`)
+
+    // Scripts live OUTSIDE the project (in the temp user-data dir) and are run
+    // with `node "<path>"`, which quotes the same way in pwsh, cmd and POSIX
+    // shells – so the test does not depend on which shell the host resolves.
+    // Forward slashes keep the path literal inside a POSIX double-quoted arg.
+    const toArg = (p: string): string => p.replace(/\\/g, '/')
+    const scratchDir = path.join(projectPath, 'scratch')
+    const churnScript = path.join(userDataDir, 'w15-churn.js')
+    await fs.promises.writeFile(
+      churnScript,
+      [
+        "const fs = require('fs')",
+        "const path = require('path')",
+        `const scratch = ${JSON.stringify(scratchDir)}`,
+        `const visible = ${JSON.stringify(path.join(projectPath, 'visible', visibleName))}`,
+        // Churn before and after the visible write, so the watcher is busy
+        // with excluded events on both sides of the change it must report.
+        'for (let i = 0; i < 200; i++) fs.writeFileSync(path.join(scratch, `c-${i}.txt`), String(i))',
+        "fs.writeFileSync(visible, '# visible\\n')",
+        'for (let i = 200; i < 1000; i++) fs.writeFileSync(path.join(scratch, `c-${i}.txt`), String(i))',
+        'for (let i = 0; i < 1000; i += 2) fs.rmSync(path.join(scratch, `c-${i}.txt`))',
+        `fs.writeFileSync(${JSON.stringify(churnDoneFile)}, 'done')`
+      ].join('\n'),
+      'utf-8'
+    )
+    const afterScript = path.join(userDataDir, 'w15-after.js')
+    await fs.promises.writeFile(
+      afterScript,
+      [
+        "const fs = require('fs')",
+        `fs.writeFileSync(${JSON.stringify(path.join(projectPath, 'visible', afterName))}, '# after\\n')`
+      ].join('\n'),
+      'utf-8'
+    )
+
+    let electronApp: ElectronApplication | undefined
+    let window: Page | undefined
+
+    try {
+      electronApp = await electron.launch({
+        args: [path.join(__dirname, '..'), `--user-data-dir=${userDataDir}`],
+        env: {
+          ...process.env,
+          NODE_ENV: 'development',
+          ERFANA_E2E_FAST_SHELL: '1'
+        }
+      })
+
+      window = await electronApp.firstWindow()
+      await waitForAppReady(window)
+      await openProject(window, projectPath)
+
+      const tree = new ProjectTreePage(window)
+      await expect(tree.fileRow('test.md')).toBeVisible({ timeout: 15000 })
+      // `visible` is listed; `scratch` is not (the exclusion applied on open).
+      await expect(tree.folderRow('visible')).toBeVisible({ timeout: 15000 })
+      await expect(tree.folderRow('scratch')).toHaveCount(0)
+      await tree.expandTo(['visible'])
+      await expect(tree.fileRow('visible/seed.md')).toBeVisible()
+
+      await terminal.open(window)
+
+      // Timing starts after Enter, so node start-up and the 200 churn writes
+      // ahead of the visible file count against the budget (strict side).
+      await terminal.sendCommand(window, `node "${toArg(churnScript)}"`)
+      const startTime = Date.now()
+
+      await tree
+        .fileRow(`visible/${visibleName}`)
+        .waitFor({ state: 'visible', timeout: LATENCY_BUDGET_MS })
+      const elapsed = Date.now() - startTime
+      console.log(
+        `Visible change under excluded churn: ${elapsed}ms (threshold: ${LATENCY_BUDGET_MS}ms, platform: ${process.platform})`
+      )
+      await test.info().attach('latency-trend-excluded-churn', {
+        body: JSON.stringify({ elapsedMs: elapsed, budgetMs: LATENCY_BUDGET_MS, platform: process.platform }),
+        contentType: 'application/json'
+      })
+      expect(elapsed).toBeLessThan(LATENCY_BUDGET_MS)
+
+      // Let the churn finish, then prove the watcher has processed everything
+      // up to a later visible change before asserting `scratch` is still absent
+      // – otherwise the absence check could pass before any late event landed.
+      await expect
+        .poll(() => fs.existsSync(churnDoneFile), {
+          timeout: 30000,
+          message: 'churn script did not finish'
+        })
+        .toBe(true)
+      await terminal.sendCommand(window, `node "${toArg(afterScript)}"`)
+      await expect(tree.fileRow(`visible/${afterName}`)).toBeVisible({
+        timeout: LATENCY_BUDGET_MS
+      })
+
+      await expect(tree.folderRow('scratch')).toHaveCount(0)
+      await expect(tree.fileRow('scratch/c-1.txt')).toHaveCount(0)
+    } finally {
       if (electronApp && window) {
         await closeApp(electronApp, window)
       } else if (electronApp) {

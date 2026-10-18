@@ -2,10 +2,13 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { defineConfig } from 'vitest/config'
 import path from 'node:path'
+import { maxWorkers } from './vitest.workers'
 
 export default defineConfig({
   test: {
     name: 'main',
+    // Worker cap (issue #171); only read when this file is the root `--config`.
+    maxWorkers,
     environment: 'node',
     include: ['src/main/**/*.test.{ts,tsx}', 'src/shared/**/*.test.{ts,tsx}', 'scripts/**/*.test.{js,mjs,ts}'],
     exclude: ['node_modules', 'dist', 'out', 'e2e', 'tests/fixtures'],

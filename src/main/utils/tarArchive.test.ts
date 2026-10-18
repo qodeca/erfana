@@ -2,67 +2,88 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Tests for tarArchive.ts — tar-slip + symlink rejection + happy path.
+ *
+ * Every fixture is a tar stream built header by header, never packed from a
+ * staged directory. A staged symlink needs symlink privilege on Windows, and
+ * `tar.c` normalises `..` and leading `/` away, so a packed fixture either
+ * skipped on Windows or never reached the filter at all. A hand-built header
+ * carries the hostile path or entry type verbatim on every platform.
  */
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { mkdtemp, readFile, rm } from 'fs/promises'
+import { access, mkdtemp, readFile, rm, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import { Readable } from 'stream'
-import { c as createTar } from 'tar'
+import { gzipSync } from 'zlib'
+import { Header } from 'tar'
 
 import { TarSlipError, untarGz } from './tarArchive'
 
-/**
- * Build a .tar.gz archive in a temp dir by creating a file-system layout
- * first, then packing it. For malicious fixtures (symlinks, `..` paths),
- * we emit the raw tar header via node-tar's low-level API.
- */
-async function makeTarGz(
-  workDir: string,
-  layout: Array<{ path: string; content?: string; type?: 'file' | 'symlink'; linkpath?: string }>
-): Promise<string> {
-  const stageDir = join(workDir, 'stage')
-  await rm(stageDir, { recursive: true, force: true })
-  const { mkdir, writeFile: wf, symlink } = await import('fs/promises')
-  await mkdir(stageDir, { recursive: true })
+type Entry = {
+  path: string
+  type?: 'File' | 'Directory' | 'SymbolicLink' | 'Link'
+  content?: string
+  linkpath?: string
+}
 
-  const fileEntries: string[] = []
-  for (const entry of layout) {
-    const full = join(stageDir, entry.path)
-    const { dirname } = await import('path')
-    await mkdir(dirname(full), { recursive: true })
-    if (entry.type === 'symlink') {
-      await symlink(entry.linkpath!, full)
-    } else {
-      await wf(full, entry.content ?? '')
+const BLOCK = 512
+
+/** Encode entries as a gzipped ustar stream, headers taken verbatim. */
+function buildTarGz(entries: Entry[]): Buffer {
+  const blocks: Buffer[] = []
+  for (const entry of entries) {
+    const type = entry.type ?? 'File'
+    const body = Buffer.from(type === 'File' ? (entry.content ?? '') : '')
+    const header = Buffer.alloc(BLOCK)
+    new Header({
+      path: entry.path,
+      type,
+      size: body.length,
+      mode: type === 'Directory' ? 0o755 : 0o644,
+      mtime: new Date(0),
+      linkpath: entry.linkpath
+    }).encode(header, 0)
+    blocks.push(header)
+    if (body.length > 0) {
+      const padded = Buffer.alloc(Math.ceil(body.length / BLOCK) * BLOCK)
+      body.copy(padded)
+      blocks.push(padded)
     }
-    fileEntries.push(entry.path)
   }
+  // End-of-archive marker: two zero blocks.
+  blocks.push(Buffer.alloc(BLOCK * 2))
+  return gzipSync(Buffer.concat(blocks))
+}
 
-  const tarPath = join(workDir, 'src.tar.gz')
-  await createTar(
-    { gzip: true, file: tarPath, cwd: stageDir, portable: true },
-    fileEntries
+async function exists(path: string): Promise<boolean> {
+  return access(path).then(
+    () => true,
+    () => false
   )
-  return tarPath
 }
 
 describe('tarArchive.untarGz', () => {
   let workDir: string
   let destDir: string
+  let src: string
 
   beforeEach(async () => {
     workDir = await mkdtemp(join(tmpdir(), 'erfana-tarArchive-'))
     destDir = join(workDir, 'dest')
+    src = join(workDir, 'src.tar.gz')
   })
 
   afterEach(async () => {
     await rm(workDir, { recursive: true, force: true })
   })
 
+  async function writeArchive(entries: Entry[]): Promise<void> {
+    await writeFile(src, buildTarGz(entries))
+  }
+
   it('extracts a well-formed tarball', async () => {
-    const src = await makeTarGz(workDir, [
+    await writeArchive([
+      { path: 'nested', type: 'Directory' },
       { path: 'hello.txt', content: 'world' },
       { path: 'nested/deep.txt', content: 'deep' }
     ])
@@ -72,77 +93,43 @@ describe('tarArchive.untarGz', () => {
   })
 
   it('rejects archives containing symlinks', async () => {
-    // node-tar node versions on Windows can be fussy about symlinks; skip
-    // on platforms where we can't create one.
-    if (process.platform === 'win32') return
-
-    const src = await makeTarGz(workDir, [
+    await writeArchive([
       { path: 'benign.txt', content: 'ok' },
-      { path: 'evil-link', type: 'symlink', linkpath: '/etc/passwd' }
+      { path: 'evil-link', type: 'SymbolicLink', linkpath: '/etc/passwd' }
     ])
-    await expect(untarGz(src, destDir)).rejects.toThrow(TarSlipError)
-    await expect(untarGz(src, destDir)).rejects.toThrow(/disallowed entry type: SymbolicLink/)
+    const result = untarGz(src, destDir)
+    await expect(result).rejects.toThrow(TarSlipError)
+    await expect(result).rejects.toThrow(/disallowed entry type: SymbolicLink/)
+    expect(await exists(join(destDir, 'evil-link'))).toBe(false)
   })
 
-  it('rejects entries with `..` traversal', async () => {
-    // Low-level: hand-craft a tar header that references `../escape.txt`.
-    // node-tar's `c` API doesn't normally allow this — so we write the tar
-    // stream manually via the Pack class.
-    const { Pack } = await import('tar')
-    const pack = new Pack({ gzip: true, portable: true })
-    const chunks: Buffer[] = []
-    pack.on('data', (c: Buffer) => chunks.push(c))
-    const done = new Promise<void>((resolve) => pack.on('end', resolve))
-
-    // Write a synthetic header + body: node-tar exposes `Header` but the
-    // easiest path is to use its `add` method with a File entry whose
-    // `path` contains `..`. Since `pack.add` normalises, we instead push a
-    // raw Buffer that represents a valid ustar header with path `../escape.txt`.
-    // Simpler: use the `c` function with cwd = parent so `../escape.txt`
-    // resolves INSIDE the fixture staging area.
-    const stage = join(workDir, 'stage2')
-    await (await import('fs/promises')).mkdir(stage, { recursive: true })
-    await (await import('fs/promises')).mkdir(join(stage, 'subdir'), { recursive: true })
-    await (await import('fs/promises')).writeFile(join(stage, 'escape.txt'), 'evil')
-    const src = join(workDir, 'slip.tar.gz')
-    await createTar(
-      { gzip: true, file: src, cwd: join(stage, 'subdir'), portable: true, prefix: undefined },
-      ['../escape.txt']
-    )
-
-    // `createTar` will normally refuse too; if the archive actually got
-    // built with a `..` entry, our filter must reject it. If `createTar`
-    // normalised the path, this test is a no-op — accept either outcome.
-    try {
-      await untarGz(src, destDir)
-      // If we got here, `createTar` stripped the `..` and there's nothing
-      // to test — the fixture itself is safe.
-    } catch (e) {
-      expect(e).toBeInstanceOf(TarSlipError)
-    }
-
-    pack.end()
-    void done
-    void chunks
-    void Readable
+  it('rejects archives containing hardlinks', async () => {
+    await writeArchive([{ path: 'evil-hardlink', type: 'Link', linkpath: 'benign.txt' }])
+    await expect(untarGz(src, destDir)).rejects.toThrow(/disallowed entry type: Link/)
   })
 
-  it('rejects absolute POSIX paths', async () => {
-    // node-tar strips leading `/` by default when extracting; its `c`
-    // function also strips on archival. So a fixture with `/etc/passwd`
-    // becomes `etc/passwd` in the archive. Our filter catches absolute
-    // paths *as stored in the archive*, so if node-tar strips them, this
-    // test is a no-op — but the filter still runs and is the real
-    // defense.
-    // We skip actively-adversarial fixture generation here and rely on
-    // unit-testing the filter logic inline:
-    const target = join(destDir, 'x')
-    const { isAbsolute, relative, resolve } = await import('path')
-    const resolvedDest = resolve(destDir)
-    const badEntry = '/etc/passwd'
-    expect(isAbsolute(badEntry)).toBe(true)
-    const rel = relative(resolvedDest, resolve(resolvedDest, badEntry))
-    expect(rel.startsWith('..') || isAbsolute(rel)).toBe(true)
-    void target
+  it('rejects entries with `..` traversal and writes nothing outside destDir', async () => {
+    await writeArchive([{ path: '../escape.txt', content: 'evil' }])
+    const result = untarGz(src, destDir)
+    await expect(result).rejects.toThrow(TarSlipError)
+    await expect(result).rejects.toThrow(/resolves outside destDir/)
+    expect(await exists(join(workDir, 'escape.txt'))).toBe(false)
+  })
+
+  it.each([
+    ['a POSIX absolute path', '/etc/passwd'],
+    ['a drive-letter absolute path', 'C:/evil.txt'],
+    ['a drive-relative path', 'C:evil.txt']
+  ])('rejects %s', async (_label, entryPath) => {
+    await writeArchive([{ path: entryPath, content: 'evil' }])
+    await expect(untarGz(src, destDir)).rejects.toThrow(/absolute path/)
+  })
+
+  it('throws the first rejection when several entries are hostile', async () => {
+    await writeArchive([
+      { path: '../first.txt', content: 'x' },
+      { path: 'second-link', type: 'SymbolicLink', linkpath: '/etc/passwd' }
+    ])
+    await expect(untarGz(src, destDir)).rejects.toMatchObject({ entryName: '../first.txt' })
   })
 })
