@@ -74,9 +74,18 @@ Both are runtime `dependencies` and both are large: `ffmpeg-static` ~44 MB, `ffp
 
 Full detail in [fuses.md](./fuses.md#afterpack-also-prunes-foreign-arch-native-binaries).
 
-### @llamaindex/liteparse (document import) and its sharp chain
+### @llamaindex/liteparse (document import) and its native binary
 
-`@llamaindex/liteparse` is pinned exactly (`1.4.1`) and drags in native modules: `sharp` (with its ~16 MB `@img/*` platform binaries), `@hyzyla/pdfium`, and `tesseract.js`.
+`@llamaindex/liteparse` is pinned exactly (`2.14.7`). From 2.x it is a Rust/NAPI package: the
+platform-specific native binary ships as an optional dependency (`@llamaindex/liteparse-<platform>`,
+e.g. `@llamaindex/liteparse-darwin-arm64`) alongside `libpdfium`. It no longer drags in `sharp`
+(with its `@img/*` platform binaries), `@hyzyla/pdfium` or `tesseract.js`; OCR is built into the
+native binary. English traineddata is the only language shipped in `resources/tessdata`; any other
+`ocrLanguage` downloads that language's traineddata on first use — from
+`github.com/tesseract-ocr/tessdata_best` (1.x used the Tesseract.js jsdelivr CDN) — into
+`tessdataPath`, the same source-and-cache contract FR-027 describes. `sharp` and `tesseract.js`
+remain **devDependencies** because the documentation-capture pipeline (`scripts/capture/`) uses them
+at build time.
 
 This is why the main-process build **must** keep dependency externalization on:
 
@@ -85,8 +94,9 @@ This is why the main-process build **must** keep dependency externalization on:
 main: {
   build: {
     // externalizeDeps defaults to true for main process (electron-vite convention).
-    // This is REQUIRED for @llamaindex/liteparse which depends on native modules
-    // (Sharp, @hyzyla/pdfium, tesseract.js-core). Do not set externalizeDeps: false here.
+    // This is REQUIRED for @llamaindex/liteparse, whose platform-specific
+    // native NAPI binary (@llamaindex/liteparse-<platform>) must stay external.
+    // Do not set externalizeDeps: false here.
     minify: true
   }
 }
@@ -94,7 +104,7 @@ main: {
 
 Setting `externalizeDeps: false` for `main` would ask Rollup to inline native `.node` addons into the main bundle, which cannot work. The dependencies stay external and ship in `app/node_modules/`.
 
-Known open security work in this chain is tracked in [issue #39](https://github.com/qodeca/erfana/issues/39).
+The deferred high advisories in this chain ([issue #39](https://github.com/qodeca/erfana/issues/39) — `@llamaindex/liteparse` 1.x and its `sharp`) are cleared by the 2.x upgrade; neither `sharp` nor `@llamaindex/liteparse` 1.x is a production dependency any more.
 
 ---
 

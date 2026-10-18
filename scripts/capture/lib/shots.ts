@@ -132,7 +132,7 @@ export async function clearToasts(page: Page): Promise<void> {
  */
 export const MAX_DIFF_PIXELS = 16
 
-// sharp comes with @llamaindex/liteparse (as in legibility.mjs); CommonJS here.
+// sharp is a devDependency for the capture pipeline (as in legibility.mjs); CommonJS here.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const sharp = require('sharp') as (input: Buffer) => { raw: () => { toBuffer: () => Promise<Buffer> } }
 

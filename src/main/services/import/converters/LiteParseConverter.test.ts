@@ -501,6 +501,17 @@ describe('LiteParseConverter', () => {
       const ctorArgs = vi.mocked(LiteParse).mock.calls.at(-1)?.[0]
       expect(ctorArgs?.dpi).toBe(150)
     })
+
+    it('should pass ocrFailureFatal: false so one unscannable page does not fail the whole import', async () => {
+      const converter = new LiteParseConverter(noDeps)
+      await converter.convert('/path/to/doc.pdf')
+
+      const { LiteParse } = await import('@llamaindex/liteparse')
+      const ctorArgs = vi.mocked(LiteParse).mock.calls.at(-1)?.[0]
+      // liteparse 2.x defaults this to true (a systemic OCR failure rejects the parse);
+      // 1.x kept the text recovered from the pages that parsed. Pin the 1.x behaviour.
+      expect(ctorArgs?.ocrFailureFatal).toBe(false)
+    })
   })
 
   // ==========================================================================
@@ -729,7 +740,7 @@ describe('LiteParseConverter', () => {
   })
 
   // ==========================================================================
-  // convert() – validation gate (blocks before parsing; sharp/libvips DoS bound)
+  // convert() – validation gate (blocks before parsing; native-parser DoS bound)
   // ==========================================================================
 
   describe('convert() – validation gate', () => {

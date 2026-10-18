@@ -198,7 +198,7 @@ export async function validateFileForImport(filePath: string): Promise<Validatio
   const sizeInMB = fileStats.size / (1024 * 1024)
 
   // Hard cap (blocking): reject before the file can reach a converter, bounding
-  // memory-bomb inputs to image/PDF parsers (sharp/libvips).
+  // memory-bomb inputs to image/PDF parsers (liteparse's native renderer).
   if (fileStats.size > IMPORT.SIZE_HARD_LIMIT) {
     return {
       valid: false,
