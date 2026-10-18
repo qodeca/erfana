@@ -4,6 +4,31 @@ Per-version release notes for Erfana, v0.9.0 onwards. Earlier: v0.8.0–v0.8.3 i
 
 > **Note:** In v0.7.2, BRS (Business Requirements Specifications) were renamed to "specs" and relocated from `specs/business-reqs/` to `specs/spec-t{tier}-{id}-{slug}/`. All references in code and docs now use `Spec #XXX`. Historical entries below have been updated accordingly.
 
+## 0.21.0
+
+*Released 2026-10-18. Tag `v0.21.0`.*
+
+### Changed
+
+- **Erfana now needs macOS 13 (Ventura) or later** ([#165](https://github.com/qodeca/erfana/issues/165)) – Erfana moved from Electron 39 to Electron 44.9.0 (Chromium 152, Node.js 24.22.0), and Electron 44 no longer runs on macOS 12. Windows support is unchanged. Save and open dialogs now start in the folder you last used, instead of the Downloads folder that Electron 44 picks by default.
+- **The project tree on macOS uses a new folder watcher** – macOS now watches the project with one native watcher per project, the one Windows has used since v0.20.1, instead of chokidar. The watcher library moved from chokidar 3.6.0 to 5.0.0, which no longer uses macOS's own file-event service and would open one file handle per file; on a large project that runs a Mac out of file handles, the failure the old version pin existed to prevent. Linux keeps chokidar. `ERFANA_DIRECTORY_WATCHER=chokidar` still forces chokidar on every platform, for diagnosis only – on a large macOS project it brings the file-handle problem back.
+- **Document import uses LiteParse 2** ([#164](https://github.com/qodeca/erfana/issues/164)) – PDF, Office and image imports now go through `@llamaindex/liteparse` 2.14.7, which no longer depends on `sharp`.
+
+### Security
+
+- **`npm audit --omit=dev` reports no production advisories** – down from four high and one moderate at v0.20.1:
+  - **Zip archives can no longer plant a symbolic link** – the Windows Whisper download is unpacked with `yauzl` 3.4.0 directly, and a pre-pass rejects symbolic-link and other non-regular entries before anything is written (`extract-zip`, GHSA-jmr9-qjv8-65gv and GHSA-7pqw-9j4j-h8q3, is gone).
+  - **Electron 44.9.0** also fixes GHSA-hq2x-r82h-9wj4 and GHSA-gr2m-v5gq-v685 (popups that do not inherit a sandbox – not reachable in Erfana, which denies popups everywhere).
+  - **LiteParse 2** removes the vulnerable `sharp` (libvips and libheif decoders) from the import path.
+  - **chokidar 5** removes `braces` (GHSA-vfj7-8cjw-p6xm, no patched release) from the shipped app, and **`fast-uri` 3.1.8** fixes GHSA-hrr3-gc8f-f4qj.
+- **The `@electron/rebuild` 3.7.1 override is lifted** ([#163](https://github.com/qodeca/erfana/issues/163)) – electron-builder moved to 26.16.1 and its own `@electron/rebuild` 4.x, which clears the nine build-time advisories the old pin held in place, the critical `tar` one among them (`npm audit` went from 16 to 7 findings on that change alone).
+
+### Internal
+
+- **Electron 44 API changes** – the clipboard is Promise-based (`clipboard.writeImage` / `readImage` are gone, so image export writes a `ClipboardItem` with an `image/png` Blob), `printToPDF` margins have no `marginType`, and `websql` left the storage list. Electron has no install script any more: `postinstall` and the CI setup action run its `install-electron` bin. `scripts/native-smoke.cjs` accepts the `<platform>--<arch>--<ABI>` `.forge-meta` that @electron/rebuild 4.2.1 writes. A new `lastDialogDirectory` helper backs the seven save and open dialogs. On Electron 44 the first `capturePage` of a fresh preview rejects where Electron 39 returned an empty image, so `PreviewStillFrameCache` treats that rejection like an empty capture and retries it, and a sleeping tab keeps its still picture.
+- **chokidar 5** – `WatchOptions` is now `ChokidarOptions` and `disableGlobbing` is gone (chokidar 4+ has no globbing; a real-filesystem test watches `[draft] {v2}.md`). `selectDirectoryWatchBackend` picks `native-recursive` on `darwin` as well as `win32`, and `NativeRecursiveWatcher` takes a `platform` option, so backslash separators and the `\\?\` prefix apply on Windows only. The CI guard is now `Guard - chokidar 5 pinned, no braces in production`. The macOS watcher is covered by unit tests; see [File watching § Watch backends](./file-watching/README.md#watch-backends-211).
+- **electron-builder 26.16.1** adds `LICENSE.electron.txt` and `LICENSES.chromium.html` to the Electron-owned resources allowlist in `scripts/fuses.js`, pinned by `scripts/fuses.test.mjs`.
+
 ## 0.20.1
 
 *Released 2026-10-01. Tag `v0.20.1`.*
