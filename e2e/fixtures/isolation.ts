@@ -81,8 +81,11 @@ const APP_ENV_ALLOWLIST: ReadonlySet<string> = new Set([
   'NODE_ENV'
 ])
 
-/** Variable-name prefixes passed through whole (`LC_*`, `ERFANA_E2E_*`, ...). */
-const APP_ENV_PREFIXES: readonly string[] = ['LC_', 'ERFANA_', 'ELECTRON_']
+/** Variable-name prefixes passed through whole (`LC_*`, `ERFANA_*`). */
+const APP_ENV_PREFIXES: readonly string[] = ['LC_', 'ERFANA_']
+// No ELECTRON_* variable is passed on: the built app reads none (only
+// ELECTRON_RENDERER_URL, which electron-vite sets for dev servers), and
+// ELECTRON_RUN_AS_NODE would turn the app into a plain Node process.
 
 export interface AppEnvOptions {
   /**
@@ -132,6 +135,8 @@ export function appLogsDir(homeDir: string): string {
   return path.join(homeDir, LOGS_DIR_RELATIVE)
 }
 
+const SHELL_STARTUP_FILES = ['.zshrc', '.zshenv', '.zprofile', '.bashrc', '.bash_profile']
+
 /**
  * Create a worker's sandbox home under `.e2e-temp`, with the per-user folders
  * {@link buildAppEnv} points at already in place.
@@ -152,6 +157,17 @@ export async function createWorkerHome(prefix: string): Promise<string> {
   ]) {
     await fs.promises.mkdir(dir, { recursive: true })
   }
+  // Empty shell startup files: zsh offers its interactive `zsh-newuser-install`
+  // menu when none exists in $HOME, and that menu swallows typed input.
+  for (const name of SHELL_STARTUP_FILES) {
+    await fs.promises.writeFile(path.join(home, name), '', 'utf-8')
+  }
+  // A minimal identity for any VCS tool run in the terminal, so the real one is never read.
+  await fs.promises.writeFile(
+    path.join(home, '.gitconfig'),
+    '[user]\n\tname = Erfana E2E\n\temail = e2e@erfana.test\n',
+    'utf-8'
+  )
   return home
 }
 
@@ -179,6 +195,8 @@ export async function removeDirWithRetry(dir: string): Promise<void> {
 
 /** Longest teardown waits for the app process to exit after `close()`. */
 const APP_EXIT_TIMEOUT_MS = 10_000
+/** Longest teardown waits for the exit after SIGKILL before moving on. */
+const APP_KILL_TIMEOUT_MS = 5_000
 
 /**
  * Close the app and resolve only once its process has exited, so the folders
@@ -208,6 +226,11 @@ export async function closeAppAndWait(app: ElectronApplication): Promise<void> {
   if (outcome === 'timeout') {
     console.warn('[fixture teardown] app did not exit in time, killing it')
     child.kill('SIGKILL')
-    await exited
+    let killTimer: NodeJS.Timeout | undefined
+    const killTimedOut = new Promise<void>((resolve) => {
+      killTimer = setTimeout(resolve, APP_KILL_TIMEOUT_MS)
+    })
+    await Promise.race([exited, killTimedOut])
+    if (killTimer) clearTimeout(killTimer)
   }
 }
