@@ -12,6 +12,10 @@ import {
   LogLevelSchema,
   LOG_LEVEL_PRIORITY,
   LogEntrySchema,
+  LOG_MESSAGE_MAX_LENGTH,
+  LOG_ERROR_STACK_MAX_LENGTH,
+  LOG_CONTEXT_MAX_KEYS,
+  LOG_CONTEXT_MAX_JSON_LENGTH,
   shouldLog,
   validateLogLevel,
   type LogLevel,
@@ -577,5 +581,54 @@ describe('validateLogLevel()', () => {
         expect(validLevels).toContain(result)
       }
     })
+  })
+})
+
+describe('LogEntrySchema size limits', () => {
+  const base = {
+    level: 'info',
+    message: 'ok',
+    timestamp: '2026-01-01T00:00:00.000Z',
+    source: 'renderer'
+  }
+
+  it('accepts a message at the limit and rejects one over it', () => {
+    expect(
+      LogEntrySchema.safeParse({ ...base, message: 'a'.repeat(LOG_MESSAGE_MAX_LENGTH) }).success
+    ).toBe(true)
+    expect(
+      LogEntrySchema.safeParse({ ...base, message: 'a'.repeat(LOG_MESSAGE_MAX_LENGTH + 1) }).success
+    ).toBe(false)
+  })
+
+  it('rejects an oversized error stack or error message', () => {
+    const error = { name: 'Error', message: 'm' }
+    expect(
+      LogEntrySchema.safeParse({
+        ...base,
+        error: { ...error, stack: 's'.repeat(LOG_ERROR_STACK_MAX_LENGTH + 1) }
+      }).success
+    ).toBe(false)
+    expect(
+      LogEntrySchema.safeParse({
+        ...base,
+        error: { ...error, message: 'm'.repeat(LOG_MESSAGE_MAX_LENGTH + 1) }
+      }).success
+    ).toBe(false)
+  })
+
+  it('rejects a context with too many keys', () => {
+    const context: Record<string, number> = {}
+    for (let i = 0; i <= LOG_CONTEXT_MAX_KEYS; i++) context[`k${i}`] = i
+    expect(LogEntrySchema.safeParse({ ...base, context }).success).toBe(false)
+  })
+
+  it('rejects a context whose JSON form is too large', () => {
+    const context = { blob: 'x'.repeat(LOG_CONTEXT_MAX_JSON_LENGTH) }
+    expect(LogEntrySchema.safeParse({ ...base, context }).success).toBe(false)
+  })
+
+  it('rejects an oversized timestamp', () => {
+    expect(LogEntrySchema.safeParse({ ...base, timestamp: 't'.repeat(65) }).success).toBe(false)
   })
 })

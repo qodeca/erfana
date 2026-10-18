@@ -9,8 +9,8 @@
  * - Singleton pattern for consistent logging state
  * - 6 log levels: trace, debug, info, warn, error, fatal
  * - Three log files: combined.log (all logs), main.log (main process), renderer.log (renderer process)
- * - 10MB file size rotation with daily rotation
- * - 7-day retention policy
+ * - 10MB file size rotation, at most 5 rotated files per log (bounded disk use)
+ * - 7-day retention policy, pruned oldest-first
  * - Dynamic log level from GlobalSettingsService
  * - IPC integration for renderer process logs
  *
@@ -46,8 +46,16 @@ const RENDERER_LOG = 'renderer.log'
 const RETENTION_DAYS = 7
 /** Maximum log file size before rotation (10MB) */
 const MAX_SIZE = 10 * 1024 * 1024
-/** Maximum number of rotated files (100 files: main.1.log through main.100.log) */
-const MAX_ROTATED_FILES = 100
+/**
+ * Maximum number of rotated files per log (main.1.log through main.5.log).
+ * With three logs of MAX_SIZE each this bounds the logs directory to roughly
+ * 180MB; it used to be 100 files per log, about 3GB.
+ */
+const MAX_ROTATED_FILES = 5
+/** Free space below which a warning is logged (cleanup still runs) */
+const LOW_DISK_THRESHOLD_MB = 100
+/** Longest renderer log message / stack written to a log line, in characters */
+const MAX_RENDERER_FIELD_LENGTH = 16_000
 
 /**
  * Map our log levels to electron-log levels
@@ -73,12 +81,21 @@ function mapToElectronLogLevel(level: LogLevel): ElectronLogLevel {
 }
 
 /**
+ * Make untrusted text safe for a single log line: escape CR and LF, and bound
+ * the length.
+ */
+export function sanitizeLogText(text: string, maxLength: number = MAX_RENDERER_FIELD_LENGTH): string {
+  const escaped = text.replace(/\r/g, '\\r').replace(/\n/g, '\\n')
+  return escaped.length > maxLength ? `${escaped.slice(0, maxLength)}[truncated]` : escaped
+}
+
+/**
  * Archive log file using logrotate-style reverse numbering
  * - main.log -> main.1.log (most recent)
  * - main.1.log -> main.2.log
  * - ...
- * - main.99.log -> main.100.log
- * - main.100.log is deleted (oldest)
+ * - ...
+ * - the file at MAX_ROTATED_FILES is deleted (oldest)
  *
  * This function must be synchronous per electron-log requirement
  *
@@ -225,11 +242,24 @@ export class LoggingService {
         logsDir
       })
     } catch (error) {
+      this.fallbackToConsole()
       throw new AppError(
         `Failed to initialize logging service: ${error instanceof Error ? error.message : String(error)}`,
         ErrorCode.LOGGING_INIT_FAILED,
         error instanceof Error ? error : undefined
       )
+    }
+  }
+
+  /**
+   * Last resort when initialize() fails: stop writing to files (their path may
+   * be the very thing that is broken) and log to the console instead, so the
+   * app keeps a trail while it carries on without file logging.
+   */
+  private fallbackToConsole(): void {
+    for (const l of [this.combinedLogger, this.mainLogger, this.rendererLogger]) {
+      l.transports.file.level = false
+      l.transports.console.level = process.env.VITEST ? false : mapToElectronLogLevel(this.currentLevel)
     }
   }
 
@@ -397,22 +427,23 @@ export class LoggingService {
   /**
    * Cleanup old log files (older than RETENTION_DAYS)
    * Includes both active logs (.log) and rotated logs (.N.log)
+   * Always prunes oldest-first, including when disk space is low – low disk is
+   * when pruning matters most, so it only adds a warning.
    * Fire-and-forget - errors are logged but don't throw
    */
   async cleanupOldLogs(): Promise<void> {
     try {
       const logsDir = this.getLogsDir()
 
-      // Check disk space before cleanup (prevent cleanup on low disk space)
+      // Warn on low disk space, but still prune: skipping would let the logs
+      // keep filling the disk they are short of.
       try {
         const stats = await statfs(logsDir)
         const availableMB = (stats.bavail * stats.bsize) / (1024 * 1024)
-        if (availableMB < 100) {
-          // Less than 100MB free
-          this.warn('Low disk space, skipping log cleanup', {
+        if (availableMB < LOW_DISK_THRESHOLD_MB) {
+          this.warn('Low disk space, pruning old logs', {
             availableMB: Math.round(availableMB)
           })
-          return
         }
       } catch {
         // Ignore disk space check errors, proceed with cleanup
@@ -422,26 +453,37 @@ export class LoggingService {
       const now = Date.now()
       const maxAge = RETENTION_DAYS * 24 * 60 * 60 * 1000
 
-      for (const file of files) {
-        // Match both .log files and numbered rotated files (.1.log, .2.log, etc.)
-        const isLogFile = file.endsWith('.log') || /\.\d+\.log$/.test(file)
-        if (!isLogFile) continue
+      // Match both .log files and numbered rotated files (.1.log, .2.log, etc.)
+      const logFiles = files.filter((file) => file.endsWith('.log') || /\.\d+\.log$/.test(file))
 
+      const entries: Array<{ file: string; mtimeMs: number }> = []
+      for (const file of logFiles) {
         try {
-          const filePath = join(logsDir, file)
-          const stats = await stat(filePath)
-          const age = now - stats.mtimeMs
+          const stats = await stat(join(logsDir, file))
+          entries.push({ file, mtimeMs: stats.mtimeMs })
+        } catch (error) {
+          // Log but continue with other files
+          this.warn('Failed to cleanup log file', { file, error: String(error) })
+        }
+      }
+      entries.sort((a, b) => a.mtimeMs - b.mtimeMs)
 
-          if (age > maxAge) {
-            await unlink(filePath)
+      for (const { file, mtimeMs } of entries) {
+        const age = now - mtimeMs
+        const rotatedIndex = /\.(\d+)\.log$/.exec(file)
+        // Rotated files beyond the cap are left over from the old 100-file limit
+        const beyondCap = rotatedIndex !== null && Number(rotatedIndex[1]) > MAX_ROTATED_FILES
+
+        if (age > maxAge || beyondCap) {
+          try {
+            await unlink(join(logsDir, file))
             this.debug('Deleted old log file', {
               file,
               ageInDays: Math.floor(age / (24 * 60 * 60 * 1000))
             })
+          } catch (error) {
+            this.warn('Failed to cleanup log file', { file, error: String(error) })
           }
-        } catch (error) {
-          // Log but continue with other files
-          this.warn('Failed to cleanup log file', { file, error: String(error) })
         }
       }
     } catch (error) {
@@ -525,19 +567,23 @@ export class LoggingService {
 
   /**
    * Format renderer log entry for combined.log
+   *
+   * The renderer is untrusted input: CR/LF are escaped so an entry can never
+   * start a second, forged log line, and each free-text field is bounded.
    */
   private formatRendererMessage(entry: LogEntry): string {
-    const parts: string[] = [`[RENDERER] ${entry.message}`]
+    const parts: string[] = [`[RENDERER] ${sanitizeLogText(entry.message)}`]
 
     if (entry.error) {
-      parts.push(`Error: ${entry.error.message}`)
+      parts.push(`Error: ${sanitizeLogText(entry.error.message)}`)
       if (entry.error.stack) {
-        parts.push(`Stack: ${entry.error.stack}`)
+        parts.push(`Stack: ${sanitizeLogText(entry.error.stack)}`)
       }
     }
 
     if (entry.context && Object.keys(entry.context).length > 0) {
-      parts.push(JSON.stringify(entry.context))
+      // JSON.stringify already escapes CR/LF inside string values
+      parts.push(sanitizeLogText(JSON.stringify(entry.context)))
     }
 
     return parts.join(' | ')

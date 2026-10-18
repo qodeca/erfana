@@ -55,11 +55,26 @@ describe('Main Process - Window Creation', () => {
   let mockRegisterWindowResponsiveness: any
   let mockRegisterWindowErrorSignals: any
   let mockRegisterQuitHandlers: any
+  let mockShowErrorBox: any
+  let mockWriteCrashFallbackLine: any
+  let mockRegisterProcessCrashLogging: any
 
   beforeEach(() => {
     // Reset modules to allow fresh imports
     vi.resetModules()
     delete process.env.ERFANA_E2E_FORCE_CRASH
+
+    mockShowErrorBox = vi.fn()
+    mockWriteCrashFallbackLine = vi.fn()
+    mockRegisterProcessCrashLogging = vi.fn()
+    vi.doMock('./utils/crashFallbackLog', () => ({
+      writeCrashFallbackLine: mockWriteCrashFallbackLine
+    }))
+    // Process-wide listeners would pile up across the repeated re-imports here;
+    // the wiring is asserted below, the behaviour in processCrashLogging.test.ts.
+    vi.doMock('./utils/processCrashLogging', () => ({
+      registerProcessCrashLogging: mockRegisterProcessCrashLogging
+    }))
 
     // Mock BrowserWindow
     createdWindow = {
@@ -128,6 +143,7 @@ describe('Main Process - Window Creation', () => {
       app: mockApp,
       shell: { openExternal: vi.fn() },
       BrowserWindow: mockBrowserWindow,
+      dialog: { showErrorBox: mockShowErrorBox },
       Menu: {
         buildFromTemplate: vi.fn(() => ({})),
         setApplicationMenu: vi.fn()
@@ -412,6 +428,76 @@ describe('Main Process - Window Creation', () => {
       const listener = onPathsRemoved.mock.calls[0][0] as (paths: readonly string[]) => void
       listener(['/proj/docs'])
       expect(fileWatcherService.handleAncestorRemovals).toHaveBeenCalledWith(['/proj/docs'])
+    })
+  })
+
+  describe('Start-up failures keep the app alive', () => {
+    async function failInit(which: 'settings' | 'logging' | 'both'): Promise<void> {
+      const { globalSettingsService } = await import('./services/GlobalSettingsService')
+      const { loggingService } = await import('./services/LoggingService')
+      if (which !== 'logging') {
+        ;(globalSettingsService.initialize as ReturnType<typeof vi.fn>).mockRejectedValue(
+          new Error('settings dir is read-only')
+        )
+      }
+      if (which !== 'settings') {
+        ;(loggingService.initialize as ReturnType<typeof vi.fn>).mockRejectedValue(
+          new Error('logs dir is a symlink')
+        )
+      }
+    }
+
+    it('registers the process-wide crash logging at module load', async () => {
+      await import('./index')
+      expect(mockRegisterProcessCrashLogging).toHaveBeenCalledTimes(1)
+    })
+
+    it.each(['settings', 'logging', 'both'] as const)(
+      'still registers handlers and creates the window when %s init throws',
+      async (which) => {
+        await failInit(which)
+        const { registerFileHandlers } = await import('./ipc/file-handlers')
+        const { registerLoggingHandlers } = await import('./ipc/logging-handlers')
+
+        await import('./index')
+        await flushStartup()
+
+        expect(registerFileHandlers).toHaveBeenCalledTimes(1)
+        expect(registerLoggingHandlers).toHaveBeenCalledTimes(1)
+        expect(mockBrowserWindow).toHaveBeenCalledTimes(1)
+      }
+    )
+
+    it('writes a fallback crash line and tells the user once, after the window exists', async () => {
+      await failInit('both')
+
+      await import('./index')
+      await flushStartup()
+
+      expect(mockWriteCrashFallbackLine).toHaveBeenCalledWith(
+        '[crash] startup-settings-init',
+        expect.any(Error)
+      )
+      expect(mockWriteCrashFallbackLine).toHaveBeenCalledWith(
+        '[crash] startup-logging-init',
+        expect.any(Error)
+      )
+      expect(mockShowErrorBox).toHaveBeenCalledTimes(1)
+      const [title, body] = mockShowErrorBox.mock.calls[0]
+      expect(title).toBe('Erfana started with problems')
+      expect(body).toContain('settings')
+      expect(body).toContain('log files')
+      expect(mockBrowserWindow.mock.invocationCallOrder[0]).toBeLessThan(
+        mockShowErrorBox.mock.invocationCallOrder[0]
+      )
+    })
+
+    it('shows no dialog and writes no fallback line when start-up is healthy', async () => {
+      await import('./index')
+      await flushStartup()
+
+      expect(mockShowErrorBox).not.toHaveBeenCalled()
+      expect(mockWriteCrashFallbackLine).not.toHaveBeenCalled()
     })
   })
 

@@ -10,23 +10,41 @@
  * @see Issue #49 - logging layer implementation
  */
 import { shell } from 'electron'
-import { loggingService } from '../services/LoggingService'
+import { loggingService, logger } from '../services/LoggingService'
+import { SenderRateCap } from '../utils/SenderRateCap'
 import { LogEntrySchema } from '../../shared/ipc/logging-schema'
 import { registerHandle, registerOn } from './registry'
+
+/** Renderer log records accepted per sender per window */
+export const MAX_RENDERER_LOGS_PER_WINDOW = 200
+/** Length of the per-sender rate window */
+export const RENDERER_LOG_WINDOW_MS = 10_000
 
 /**
  * Register all logging IPC handlers
  */
 export function registerLoggingHandlers(): void {
+  // A renderer stuck in a log loop must not flood the log files and push real
+  // history out of the rotation window. Extra records are dropped and counted.
+  const rateCap = new SenderRateCap(
+    MAX_RENDERER_LOGS_PER_WINDOW,
+    RENDERER_LOG_WINDOW_MS,
+    (senderId, suppressed, windowMs) => {
+      logger.warn('[RENDERER] log records dropped (rate cap)', { senderId, suppressed, windowMs })
+    }
+  )
+
   /**
    * Receive log entry from renderer process
    * One-way channel (ipcMain.on) for performance - renderer doesn't need response
    */
-  registerOn('logging:log', (_event, entry: unknown) => {
+  registerOn('logging:log', (event, entry: unknown) => {
+    if (!rateCap.allow(event.sender.id)) return
+
     // Validate log entry
     const result = LogEntrySchema.safeParse(entry)
     if (!result.success) {
-      console.error('Invalid log entry from renderer:', result.error.issues)
+      console.error('Invalid log entry from renderer:', result.error.issues.map((issue) => issue.message))
       return
     }
 

@@ -13,6 +13,7 @@ import { homedir, platform as osPlatform } from 'os'
 import type { IPty } from 'node-pty'
 import type { ShellKind } from '../../shared/shellKind'
 import { logger } from './LoggingService'
+import { redactPath } from '../utils/redactUserInput'
 import {
   buildWindowsBootstrap,
   normalizeWindowsCwd,
@@ -200,7 +201,7 @@ export class TerminalService extends EventEmitter {
 
     logger.info(`🔵 Creating terminal: ${terminalId}`)
     logger.info(`🔵 Shell: ${shell}`)
-    logger.info(`🔵 CWD: ${cwd}`)
+    logger.info(`🔵 CWD: ${redactPath(cwd)}`)
     logger.info(`🔵 Size: ${cols}x${rows}`)
 
     try {
@@ -379,7 +380,9 @@ export class TerminalService extends EventEmitter {
       // regressions.
       ptyProcess.onData((data: string) => {
         const term = this.terminals.get(terminalId)
-        logger.debug(`[PRIMARY onData] term=${!!term}, init=${term?.initializationComplete}, clearing=${term?.isClearing}, marker=${term?.hasReceivedMarker}, dataPreview=${data.substring(0, 50).replace(/\n/g, '\\n')}`)
+        // Length only – PTY output is user content and must never reach the log file.
+        // `logger.debug` drops the call below the configured level.
+        logger.debug(`[PRIMARY onData] term=${!!term}, init=${term?.initializationComplete}, clearing=${term?.isClearing}, marker=${term?.hasReceivedMarker}, length=${data.length}`)
 
         // STRICT BLOCKING: Only forward if:
         // 1. Initialization complete (clear confirmed by renderer)
