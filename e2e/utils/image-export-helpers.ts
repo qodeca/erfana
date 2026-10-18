@@ -177,8 +177,16 @@ export interface ClipboardImageReport {
 export async function readClipboardImage(
   app: ElectronApplication
 ): Promise<ClipboardImageReport> {
-  return app.evaluate(async ({ clipboard }) => {
-    const image = clipboard.readImage()
+  // Electron 44 removed `clipboard.readImage()`: read the `image/png` item
+  // through the Promise-based `clipboard.read()` and decode it with nativeImage.
+  return app.evaluate(async ({ clipboard, nativeImage }) => {
+    const items = await clipboard.read()
+    const pngItem = items.find((item) => item.types.includes('image/png'))
+    const image = pngItem
+      ? nativeImage.createFromBuffer(
+          Buffer.from(await (await pngItem.getType('image/png')).arrayBuffer())
+        )
+      : nativeImage.createEmpty()
     const size = image.getSize()
     return {
       empty: image.isEmpty(),

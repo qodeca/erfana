@@ -1,6 +1,6 @@
 # Security Guidelines
 
-**Last Updated**: October 2026 (v0.20.1, Electron 39)
+**Last Updated**: October 2026 (Electron 44)
 
 ## Security Posture Summary
 
@@ -444,7 +444,7 @@ npm run build:mac
 
 **Why electron-builder 26**:
 - ✅ Latest version with newest features and fixes
-- ✅ Full support for Electron 39.8.x (`^39.8.10` in `package.json`, 39.8.10 in the lockfile)
+- ✅ Full support for Electron 44.x (`^44.9.0` in `package.json`, 44.9.0 in the lockfile)
 - ✅ Applies fuses correctly with `afterPack` hook
 - ⚠️ Requires workaround for dependency scanning bug
 
@@ -528,7 +528,7 @@ A dated exception to the policy above: v0.20.1 ships with these four production 
 | `sharp` 0.34.5 | GHSA-f88m-g3jw-g9cj (libvips), GHSA-rgj7-g3m4-5g8c (libheif) | transitive of `@llamaindex/liteparse` on the same parse path; build-time only in `scripts/capture/legibility.mjs:29` | No guard beyond the same byte cap applies to the libvips/libheif decoder flaws; reached only through liteparse, on a document the user chose to import. The cap bounds input bytes, not decoded pixels (see [Document import security](#document-import-security)) | `@llamaindex/liteparse` 1.x → 2.x (pulls a fixed `sharp`) |
 | `electron` 39.8.10 | GHSA-jmr9-qjv8-65gv, GHSA-7pqw-9j4j-h8q3 (via `extract-zip`) | Electron is the runtime, but the flagged code is Electron's install-time `extract-zip` dependency, used only to unzip the binary at `npm install`; no Erfana runtime path calls it | Binary downloaded over TLS from the official release and checksum-verified by `@electron/get` | Electron 39 → 44 |
 
-**Cleared after v0.20.1:** the `@llamaindex/liteparse` and `sharp` rows. #164 (PR #167) moved liteparse to 2.14.7, a Rust/NAPI package that no longer depends on `sharp`, so neither appears in `npm audit --omit=dev` any more. `sharp` stays a `devDependency` for the documentation-capture scripts only and is not shipped. The rows stay above as the record of what v0.20.1 shipped with. The `extract-zip` row's runtime path is closed too (#165): `src/main/utils/zipArchive.ts` now extracts with `yauzl` 3.4.0 directly and rejects symbolic-link and other non-regular entries in its pre-pass, and `extract-zip` is no longer a direct dependency. `npm audit` still lists it until the Electron upgrade, because Electron 39 itself depends on it at install time.
+**Cleared after v0.20.1:** the `@llamaindex/liteparse` and `sharp` rows. #164 (PR #167) moved liteparse to 2.14.7, a Rust/NAPI package that no longer depends on `sharp`, so neither appears in `npm audit --omit=dev` any more. `sharp` stays a `devDependency` for the documentation-capture scripts only and is not shipped. The rows stay above as the record of what v0.20.1 shipped with. The `extract-zip` row's runtime path is closed too (#165): `src/main/utils/zipArchive.ts` now extracts with `yauzl` 3.4.0 directly and rejects symbolic-link and other non-regular entries in its pre-pass, and `extract-zip` is no longer a direct dependency. `npm audit` still lists it until the Electron upgrade, because Electron 39 itself depends on it at install time. The `electron` row is cleared by the move to Electron 44.9.0 (#165): it also fixes GHSA-hq2x-r82h-9wj4 and GHSA-gr2m-v5gq-v685 (popups that do not inherit a sandbox – not reachable in Erfana, whose main window, preview view and image-export window all deny popups and whose preview CSP grants no `allow-popups`), and Electron 44 no longer depends on `extract-zip`, so that row and the install-time `http-cache-semantics` advisory leave `npm audit --omit=dev` too.
 
 ### Dependency overrides (package.json)
 

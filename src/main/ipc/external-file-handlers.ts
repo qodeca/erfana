@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { dialog } from 'electron'
+import { dialog, type OpenDialogOptions } from 'electron'
 import { externalFileService } from '../services/ExternalFileService'
 import {
   ExternalFileValidateRequestSchema,
@@ -12,6 +12,7 @@ import {
 } from '../../shared/ipc/external-file-schema'
 import { logger } from '../services/LoggingService'
 import { registerHandle } from './registry'
+import { rememberDialogResult, withLastDirectory } from '../utils/lastDialogDirectory'
 
 /**
  * Selected files result from native file picker
@@ -199,15 +200,16 @@ export function registerExternalFileHandlers(): void {
    */
   registerHandle('file:selectExternalFiles', async (): Promise<ExternalFileSelection | null> => {
     try {
-      const result = await dialog.showOpenDialog({
+      const result = await dialog.showOpenDialog(withLastDirectory<OpenDialogOptions>({
         properties: ['openFile', 'multiSelections'],
         title: 'Select files to add',
         buttonLabel: 'Add to project'
-      })
+      }))
 
       if (result.canceled || result.filePaths.length === 0) {
         return null
       }
+      rememberDialogResult(result.filePaths)
 
       logger.debug('External files selected', { count: result.filePaths.length })
 

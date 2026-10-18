@@ -108,7 +108,6 @@ describe('purge', () => {
       'filesystem',
       'indexdb',
       'localstorage',
-      'websql',
       'serviceworkers',
       'cachestorage'
     ])

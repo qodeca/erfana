@@ -209,6 +209,16 @@ describe('clipboard-handlers', () => {
       expect(result).toBe('')
       expect(mockLogger.error).toHaveBeenCalledTimes(1)
     })
+
+    it("returns '' and logs error when the clipboard.readText promise rejects (Electron 44)", async () => {
+      mockClipboardReadText.mockRejectedValue(new Error('clipboard locked'))
+      const handler = await getHandler(CLIPBOARD_CHANNELS.readText)
+
+      const result = await handler(makeEvent(TRUSTED_FRAME))
+
+      expect(result).toBe('')
+      expect(mockLogger.error).toHaveBeenCalledTimes(1)
+    })
   })
 
   describe('writeText', () => {
@@ -279,6 +289,16 @@ describe('clipboard-handlers', () => {
       mockClipboardWriteText.mockImplementation(() => {
         throw new Error('clipboard locked')
       })
+      const handler = await getHandler(CLIPBOARD_CHANNELS.writeText)
+
+      const result = await handler(makeEvent(TRUSTED_FRAME), 'hello')
+
+      expect(result).toBe(false)
+      expect(mockLogger.error).toHaveBeenCalledTimes(1)
+    })
+
+    it('returns false and logs error when the clipboard.writeText promise rejects (Electron 44)', async () => {
+      mockClipboardWriteText.mockRejectedValue(new Error('clipboard locked'))
       const handler = await getHandler(CLIPBOARD_CHANNELS.writeText)
 
       const result = await handler(makeEvent(TRUSTED_FRAME), 'hello')

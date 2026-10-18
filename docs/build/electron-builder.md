@@ -20,7 +20,7 @@ The version is pinned **exactly** — no caret. electron-builder minors have rep
 ### Why version 26?
 
 - Current major, with the newest features and security fixes
-- Supports the Electron the app builds against (`electron: ^39.8.10` in `package.json`; `39.8.10` installed at the time of writing)
+- Supports the Electron the app builds against (`electron: ^44.9.0` in `package.json`; `44.9.0` installed at the time of writing)
 - Correctly applies fuses via the `afterPack` hook
 - Ships the Azure Artifact Signing integration the Windows leg depends on
 
