@@ -16,7 +16,7 @@ Per-version release notes for Erfana, v0.9.0 onwards. Earlier: v0.8.0–v0.8.3 i
 
 ### Fixed
 
-- **Saving a file whose folder was renamed outside Erfana no longer fails silently** – when an open file's folder is renamed, moved or deleted outside the app, its tab now shows `(deleted)` and the "This file was deleted on disk. Save to restore it." banner, as a deleted file already did. Saving that tab with ⌘S / Ctrl+S recreates the folder and writes the file back where it was; autosave never recreates a folder. Any save that fails now shows an error toast with the reason, and the tab stays marked unsaved, so an edit is never lost without notice.
+- **Saving a file whose folder was renamed outside Erfana no longer fails silently** – when an open file's folder is renamed, moved or deleted outside the app, its tab now shows `(deleted)` and the "This file was deleted on disk. Save to restore it." banner, as a deleted file already did. Saving that tab with ⌘S / Ctrl+S recreates the folder and writes the file back where it was; autosave and other indirect saves never recreate a folder. Any save that fails now shows an error toast with the reason, and the tab stays marked unsaved, so an edit is never lost without notice.
 
 ### Security
 

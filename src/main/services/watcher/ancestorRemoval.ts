@@ -11,16 +11,31 @@
  * file's own watcher's job, and treating it again would re-arm healthy watches
  * on every atomic save. Comparison is case-insensitive on macOS and Windows.
  */
-import { isChildPath } from './EventCoalescer'
+import { dirname } from 'path'
+import { normalizePath } from './EventCoalescer'
 
-/** The watched paths that are strict descendants of any removed path. */
+/**
+ * The watched paths that are strict descendants of any removed path.
+ *
+ * The removed paths are normalised once into a set; each watched path then
+ * walks its own ancestors (`dirname` until the root) and looks each one up, so
+ * the cost is watched × depth, not watched × removed string comparisons.
+ */
 export function watchedUnderRemovedFolders(
   watchedPaths: Iterable<string>,
   removedPaths: readonly string[]
 ): string[] {
+  if (removedPaths.length === 0) return []
+  const removed = new Set(removedPaths.map(normalizePath))
   const affected: string[] = []
   for (const watched of watchedPaths) {
-    if (removedPaths.some((removed) => isChildPath(watched, removed))) affected.push(watched)
+    let current = normalizePath(watched)
+    for (let up = dirname(current); up !== current; current = up, up = dirname(current)) {
+      if (removed.has(up)) {
+        affected.push(watched)
+        break
+      }
+    }
   }
   return affected
 }

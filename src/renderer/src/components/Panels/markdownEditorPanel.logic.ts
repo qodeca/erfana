@@ -12,7 +12,6 @@
  */
 
 import { getBasename } from '../../utils/fileUtils'
-import { sanitizeIpcError } from '../../utils/errorUtils'
 
 /**
  * Document statistics calculated from content
@@ -588,49 +587,43 @@ export function getDefaultViewMode(
 }
 
 /**
- * The toast text for a save that failed. A failed save must never be silent:
- * the tab stays dirty and the buffer keeps the edit, and this tells the user
- * why the write did not land.
+ * Who asked for a save. It decides the two things a save may do beyond the
+ * write itself:
  *
- * @param error - What `window.api.file.writeFile` rejected with
- * @param fileName - The tab's file name, shown in full (toasts keep user values)
- * @returns A one-line reason plus the reassurance that nothing was lost
- *
- * @example
- * ```ts
- * formatSaveErrorMessage(new Error("ENOENT: no such file or directory, open '/p/docs/a.md'"), 'a.md')
- * // '"a.md" could not be saved: its folder no longer exists on disk. Your changes are still in the editor.'
- * ```
+ * - `user` - the tab's own Cmd/Ctrl+S. The only trigger that may recreate a
+ *   missing folder (the banner's "Save to restore it"), and it always shows a
+ *   failure toast.
+ * - `autosave` - never recreates a folder; a failure toast repeats only when
+ *   the reason changes, since it retries every few seconds.
+ * - `registry` - a save by id from outside the tab (`editorSaveRegistry`, e.g.
+ *   the unsaved-changes prompt of a preview tab move). Never recreates a folder,
+ *   and shows no toast: the registry contract makes the caller toast on `false`.
  */
-export function formatSaveErrorMessage(error: unknown, fileName: string): string {
-  const reason = sanitizeIpcError(error)
-  const kept = 'Your changes are still in the editor.'
-  if (/\bENOENT\b/.test(reason)) {
-    return `"${fileName}" could not be saved: its folder no longer exists on disk. ${kept}`
-  }
-  if (/\b(EACCES|EPERM)\b/.test(reason)) {
-    return `"${fileName}" could not be saved: permission denied. ${kept}`
-  }
-  if (/\bENOSPC\b/.test(reason)) {
-    return `"${fileName}" could not be saved: the disk is full. ${kept}`
-  }
-  return `"${fileName}" could not be saved: ${reason.replace(/\.$/, '')}. ${kept}`
+export type SaveTrigger = 'user' | 'autosave' | 'registry'
+
+/**
+ * Whether this save may recreate the folder a deleted-state file lived in.
+ *
+ * @param trigger - Who asked for the save
+ * @param isFileDeleted - The tab shows the "deleted on disk" banner
+ */
+export function shouldRecreateParentDirs(trigger: SaveTrigger, isFileDeleted: boolean): boolean {
+  return trigger === 'user' && isFileDeleted
 }
 
 /**
- * Whether a failed save shows its toast. A manual save always does - the user
- * just pressed the key and must see the answer. An autosave retries every few
- * seconds, so it shows a reason only when it differs from the last one shown;
- * the dirty tab and the toast already shown carry the rest.
+ * Whether a failed save shows the panel's own toast (see {@link SaveTrigger}).
  *
- * @param isAutoSave - The failed save was an autosave
+ * @param trigger - Who asked for the save
  * @param message - This failure's toast text
- * @param lastShown - The text of the last save-failure toast, or null after a success
+ * @param lastShown - The last save-failure toast this panel showed for this
+ *   file, or null after a success or a file switch
  */
 export function shouldToastSaveError(
-  isAutoSave: boolean,
+  trigger: SaveTrigger,
   message: string,
   lastShown: string | null
 ): boolean {
-  return !isAutoSave || message !== lastShown
+  if (trigger === 'registry') return false
+  return trigger === 'user' || message !== lastShown
 }

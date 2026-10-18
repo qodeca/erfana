@@ -325,7 +325,7 @@ describe('MarkdownEditorPanel Integration', () => {
       const calls = source.match(/useEditorSaveRegistration\(/g) ?? []
       expect(calls).toHaveLength(1)
       expect(source).toContain(
-        'useEditorSaveRegistration(panelIdRef.current, () => handleSave(false), externalChangeDetected, () => {\n' +
+        "useEditorSaveRegistration(panelIdRef.current, () => handleSave('registry'), externalChangeDetected, () => {\n" +
           '    cancelAutoSave()\n    return () => signalChange()\n  })'
       )
       // Registered below useAutoSave, whose cancelAutoSave and signalChange it uses.
@@ -333,7 +333,7 @@ describe('MarkdownEditorPanel Integration', () => {
     })
 
     it('handleSave answers true after a write and false with no file or a failed write', () => {
-      expect(handleSave).toContain('async (isAutoSave: boolean = false): Promise<boolean> =>')
+      expect(handleSave).toContain("async (trigger: SaveTrigger = 'user'): Promise<boolean> =>")
       expect(handleSave).toContain('if (!currentFile) return false')
       expect(handleSave.match(/return true/g)).toHaveLength(1)
       expect(handleSave).toMatch(/catch \(error\) \{[\s\S]*return false\s*\} finally/)
@@ -376,20 +376,40 @@ describe('MarkdownEditorPanel Integration', () => {
     })
 
     it('a failed save shows an error toast with the reason and still answers false', () => {
-      expect(catchBlock).toContain('formatSaveErrorMessage(error, extractFileName(currentFile.path))')
-      expect(catchBlock).toContain('shouldToastSaveError(isAutoSave, message, lastSaveErrorRef.current)')
+      expect(catchBlock).toContain('formatSaveError(error, extractFileName(currentFile.path))')
+      expect(catchBlock).toContain('shouldToastSaveError(trigger, message, lastSaveErrorRef.current)')
       expect(catchBlock).toMatch(/showToast\(\{ title: 'Save failed', message, type: 'error'/)
       expect(catchBlock).toContain('return false')
       // The tab is marked clean only after a write that succeeded
       expect(catchBlock).not.toContain('setEditorDirty(panelIdRef.current, false)')
     })
 
-    it('only a manual save of a deleted tab may recreate the missing folder', () => {
-      expect(handleSave).toContain('if (isFileDeleted && !isAutoSave) {')
+    it('one failure, one toast: a save by id leaves the toast to the registry caller', () => {
+      // previewTabMove toasts on `false` (editorSaveRegistry contract), so the
+      // panel's own toast is skipped for the registry trigger
+      expect(catchBlock).toMatch(/if \(trigger !== 'registry'\) \{[\s\S]*showToast\(/)
+      expect(catchBlock.indexOf("if (trigger !== 'registry')")).toBeLessThan(catchBlock.indexOf('showToast('))
+    })
+
+    it('wires each caller to its trigger: Cmd+S is user, autosave is autosave, the registry is registry', () => {
+      expect(source).toContain("onSave: () => handleSave('user'),")
+      expect(source).toContain("async () => { await handleSave('autosave') },")
+      expect(source).toContain("() => handleSave('registry'), externalChangeDetected")
+      expect(source.match(/handleSave\(/g)).toHaveLength(3)
+    })
+
+    it('only the tab’s own Cmd+S of a deleted tab may recreate the missing folder', () => {
+      expect(handleSave).toContain('if (shouldRecreateParentDirs(trigger, isFileDeleted)) {')
       expect(handleSave).toContain(
         'await window.api.file.writeFile(currentFile.path, contentToSave, { createParentDirs: true })'
       )
-      expect(handleSave.match(/createParentDirs/g)).toHaveLength(1)
+      expect(handleSave.match(/createParentDirs: true/g)).toHaveLength(1)
+    })
+
+    it('forgets the last failure reason when the panel switches file', () => {
+      expect(source).toMatch(
+        /useEffect\(\(\) => \{\n\s*lastSaveErrorRef\.current = null\n\s*\}, \[currentFile\?\.path\]\)/
+      )
     })
   })
 })

@@ -31,6 +31,19 @@ describe('watchedUnderRemovedFolders', () => {
     ])
   })
 
+  it('finds the match among a large removal batch (set lookup per ancestor)', () => {
+    const batch = Array.from({ length: 5_000 }, (_, i) => p(`gone-${i}`))
+    batch.push(p('docs'))
+    expect(watchedUnderRemovedFolders(watched, batch)).toEqual([
+      p('docs', 'open.md'),
+      p('docs', 'deep', 'nested.md')
+    ])
+  })
+
+  it('returns nothing for an empty batch', () => {
+    expect(watchedUnderRemovedFolders(watched, [])).toEqual([])
+  })
+
   it.runIf(process.platform === 'darwin' || process.platform === 'win32')(
     'ignores case on case-insensitive platforms',
     () => {

@@ -40,7 +40,7 @@ const IS_CASE_INSENSITIVE = platform() === 'darwin' || platform() === 'win32'
  * - Lowercase on case-insensitive platforms
  * - Normalize path separators
  */
-function normalizePath(filePath: string): string {
+export function normalizePath(filePath: string): string {
   let normalized = path.normalize(filePath)
   if (IS_CASE_INSENSITIVE) {
     normalized = normalized.toLowerCase()
@@ -51,7 +51,7 @@ function normalizePath(filePath: string): string {
 /**
  * Check if a path is a child of a directory path
  */
-export function isChildPath(childPath: string, parentPath: string): boolean {
+function isChildPath(childPath: string, parentPath: string): boolean {
   const normalizedChild = normalizePath(childPath)
   const normalizedParent = normalizePath(parentPath)
 

@@ -4,7 +4,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { mkdir, mkdtemp, readFile, realpath, rm, stat, symlink } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import { RESTORE_OUTSIDE_PROJECT_MESSAGE, restoreParentDirectory } from './restoreParentDirectory'
+import {
+  RESTORE_OUTSIDE_PROJECT_MESSAGE,
+  RESTORE_PROJECT_GONE_MESSAGE,
+  restoreParentDirectory
+} from './restoreParentDirectory'
 import { FileService } from '../FileService'
 
 describe('restoreParentDirectory', () => {
@@ -47,6 +51,35 @@ describe('restoreParentDirectory', () => {
       'No project is open'
     )
   })
+
+  it('names the real reason when the project folder itself is gone', async () => {
+    await rm(project, { recursive: true })
+
+    await expect(restoreParentDirectory(join(project, 'docs', 'a.md'), project)).rejects.toThrow(
+      RESTORE_PROJECT_GONE_MESSAGE
+    )
+  })
+
+  it.skipIf(process.platform === 'win32')(
+    'restores through an alias of the project path (canonical check, not lexical)',
+    async () => {
+      // `/var` vs `/private/var` on macOS: same folder, different spelling
+      await symlink(project, join(base, 'alias'))
+
+      await restoreParentDirectory(join(base, 'alias', 'docs', 'a.md'), project)
+
+      expect((await stat(join(project, 'docs'))).isDirectory()).toBe(true)
+    }
+  )
+
+  it.runIf(process.platform === 'darwin')(
+    'restores when the project path differs only in letter case (case-insensitive volume)',
+    async () => {
+      await restoreParentDirectory(join(project, 'docs', 'a.md'), project.toUpperCase())
+
+      expect((await stat(join(project, 'docs'))).isDirectory()).toBe(true)
+    }
+  )
 
   it.skipIf(process.platform === 'win32')(
     'refuses when the nearest existing ancestor is a symlink out of the project',

@@ -28,7 +28,7 @@ import {
   interpolateScrollPosition,
   // Utility Functions
   isSplitMode,
-  formatSaveErrorMessage,
+  shouldRecreateParentDirs,
   shouldToastSaveError,
   extractFileName,
   extractBaseFileName,
@@ -812,52 +812,31 @@ describe('Integration: Document stats for various content types', () => {
   })
 })
 
-describe('formatSaveErrorMessage', () => {
-  const ipc = (inner: string): Error =>
-    new Error(`Error invoking remote method 'file:writeFile': Error: ${inner}`)
-
-  it('explains a missing folder (the save-after-folder-rename case) and says nothing was lost', () => {
-    expect(
-      formatSaveErrorMessage(ipc("ENOENT: no such file or directory, open '/p/docs/open.md'"), 'open.md')
-    ).toBe(
-      '"open.md" could not be saved: its folder no longer exists on disk. Your changes are still in the editor.'
-    )
+describe('shouldRecreateParentDirs', () => {
+  it('only the tab’s own Cmd+S of a deleted-state tab may recreate the folder', () => {
+    expect(shouldRecreateParentDirs('user', true)).toBe(true)
   })
 
-  it('names a permission problem', () => {
-    expect(formatSaveErrorMessage(ipc("EACCES: permission denied, open '/p/a.md'"), 'a.md')).toBe(
-      '"a.md" could not be saved: permission denied. Your changes are still in the editor.'
-    )
-    expect(formatSaveErrorMessage(ipc("EPERM: operation not permitted, open '/p/a.md'"), 'a.md')).toContain(
-      'permission denied'
-    )
-  })
-
-  it('names a full disk', () => {
-    expect(formatSaveErrorMessage(ipc('ENOSPC: no space left on device, write'), 'a.md')).toContain(
-      'the disk is full'
-    )
-  })
-
-  it('passes any other reason through without the IPC prefix', () => {
-    expect(formatSaveErrorMessage(ipc('Cannot restore a file outside the project directory'), 'a.md')).toBe(
-      '"a.md" could not be saved: Cannot restore a file outside the project directory. Your changes are still in the editor.'
-    )
-    expect(formatSaveErrorMessage('not an error', 'a.md')).toBe(
-      '"a.md" could not be saved: An unknown error occurred. Your changes are still in the editor.'
-    )
+  it('never for an autosave, a save by id (preview move prompt), or a tab that is not deleted', () => {
+    expect(shouldRecreateParentDirs('autosave', true)).toBe(false)
+    expect(shouldRecreateParentDirs('registry', true)).toBe(false)
+    expect(shouldRecreateParentDirs('user', false)).toBe(false)
   })
 })
 
 describe('shouldToastSaveError', () => {
-  it('always shows a manual save failure, even one already shown', () => {
-    expect(shouldToastSaveError(false, 'm', 'm')).toBe(true)
-    expect(shouldToastSaveError(false, 'm', null)).toBe(true)
+  it('always shows a Cmd+S failure, even one already shown', () => {
+    expect(shouldToastSaveError('user', 'm', 'm')).toBe(true)
+    expect(shouldToastSaveError('user', 'm', null)).toBe(true)
   })
 
   it('shows an autosave failure once per distinct reason', () => {
-    expect(shouldToastSaveError(true, 'm', null)).toBe(true)
-    expect(shouldToastSaveError(true, 'm', 'm')).toBe(false)
-    expect(shouldToastSaveError(true, 'other', 'm')).toBe(true)
+    expect(shouldToastSaveError('autosave', 'm', null)).toBe(true)
+    expect(shouldToastSaveError('autosave', 'm', 'm')).toBe(false)
+    expect(shouldToastSaveError('autosave', 'other', 'm')).toBe(true)
+  })
+
+  it('never shows one for a save by id: the registry caller toasts on false (one failure, one toast)', () => {
+    expect(shouldToastSaveError('registry', 'm', null)).toBe(false)
   })
 })
