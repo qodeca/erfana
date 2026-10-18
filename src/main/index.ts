@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { app, shell, BrowserWindow, Menu } from 'electron'
+import { app, BrowserWindow, Menu } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { spawnNewInstance } from './utils/spawnNewInstance'
@@ -47,6 +47,8 @@ import { gitPollingService } from './services/GitPollingService'
 import { projectLockService } from './services/ProjectLockService'
 import { gitStatusService } from './services/GitStatusService'
 import { installSafeConsole } from './utils/safeConsole'
+import { openExternalSafeDetached } from './utils/openExternalSafe'
+import { registerWebContentsBaseline } from './utils/webContentsBaseline'
 import { isBenignShutdownTimerError } from './utils/isBenignShutdownTimerError'
 import {
   registerAppCrashLogging,
@@ -253,7 +255,7 @@ function createWindow(): BrowserWindow {
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url)
+    openExternalSafeDetached(details.url)
     return { action: 'deny' }
   })
 
@@ -349,6 +351,10 @@ function createWindow(): BrowserWindow {
 
   return mainWindow
 }
+
+// Deny-by-default window-open and navigation policy for every webContents
+// (windows set stricter handlers of their own where they need them).
+registerWebContentsBaseline(app)
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.

@@ -273,7 +273,26 @@ export default [
             }
           ]
         }
+      ],
+      // Every URL handed to the OS goes through openExternalSafe(), which checks
+      // it against the one allowlist. This is the only `no-restricted-properties`
+      // entry for src/main (the other two blocks cover other folders).
+      'no-restricted-properties': [
+        'error',
+        {
+          object: 'shell',
+          property: 'openExternal',
+          message:
+            'Open external URLs through openExternalSafe() in src/main/utils/openExternalSafe.ts, the only module allowed to call shell.openExternal. It checks the URL against the one allowlist first.'
+        }
       ]
+    }
+  },
+  // `openExternalSafe.ts` is the one module that may call `shell.openExternal`.
+  {
+    files: ['src/main/utils/openExternalSafe.ts'],
+    rules: {
+      'no-restricted-properties': 'off'
     }
   },
   // Renderer process: four families of code that keep reintroducing bugs, or

@@ -52,7 +52,7 @@ import { isPointInElement } from '../../utils/domGeometry'
 import { TerminalStatusContent } from './TerminalPanel/components/TerminalStatusContent'
 import { ClaudeStatusBar } from './TerminalPanel/components/ClaudeStatusBar'
 import { useClaudeStatusStore } from '../../stores/useClaudeStatusStore'
-import { ensureTerminalFontLoaded } from './TerminalPanel/terminalPanel.logic'
+import { ensureTerminalFontLoaded, createTerminalLinkHandler } from './TerminalPanel/terminalPanel.logic'
 import type { TerminalState } from './TerminalPanel/types'
 
 export function TerminalPanel(_props: ISplitviewPanelProps) {
@@ -430,7 +430,13 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
 
       // Add addons (load fit and weblinks BEFORE open)
       const fitAddon = new FitAddon()
-      const webLinksAddon = new WebLinksAddon()
+      // Links go through the checked IPC path, never the addon's default window.open
+      const webLinksAddon = new WebLinksAddon(
+        createTerminalLinkHandler(
+          (url) => window.electron.shell.openExternal(url),
+          (error) => logger.warn('Terminal link not opened', { error: error instanceof Error ? error.message : String(error) })
+        )
+      )
 
       xterm.loadAddon(fitAddon)
       xterm.loadAddon(webLinksAddon)
