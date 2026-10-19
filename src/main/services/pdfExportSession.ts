@@ -21,7 +21,6 @@
 import { session, type BrowserWindow, type Session } from 'electron'
 import { pathToFileURL } from 'url'
 import { logger } from './LoggingService'
-import { redactPath } from '../utils/redactUserInput'
 
 /**
  * In-memory partition (no `persist:` prefix). `session.fromPartition` returns
@@ -29,6 +28,19 @@ import { redactPath } from '../utils/redactUserInput'
  * re-installed on every export; `onBeforeRequest` replaces the previous listener.
  */
 export const PDF_EXPORT_PARTITION = 'pdf-export'
+
+/**
+ * Log-safe description of a URL: scheme and host only. Query strings, paths
+ * and file names never reach the log; file and data URLs log as the bare scheme.
+ */
+export function describeUrlForLog(url: string): string {
+  try {
+    const parsed = new URL(url)
+    return parsed.host ? `${parsed.protocol}//${parsed.host}` : parsed.protocol
+  } catch {
+    return '[unparseable-url]'
+  }
+}
 
 /** Strip query and fragment so the comparison is on the document identity. */
 function withoutQueryAndHash(url: URL): string {
@@ -42,11 +54,11 @@ function withoutQueryAndHash(url: URL): string {
  * May the export window fetch this URL?
  *
  * Decision on images: the Markdown preview can contain `![](https://…)`
- * images and the PDF has always rendered them, so `http:` and `https:` are
- * still allowed – but ONLY as `image` resources. A remote image is a
- * deliberate user-authored reference; remote scripts, styles, frames, fonts
- * and fetches are refused. `data:` images (Mermaid diagrams arrive that way)
- * are allowed. Everything else, other `file:` URLs included, is refused.
+ * images and the PDF has always rendered them, so `https:` images are still
+ * allowed – but ONLY as `image` resources. Plain `http:` is refused,
+ * matching the app's own preview CSP. A remote image is a deliberate
+ * user-authored reference; remote scripts, styles, frames, fonts and fetches
+ * are refused. `data:` images (Mermaid diagrams arrive that way) are allowed. Everything else, other `file:` URLs included, is refused.
  *
  * @param url - The request URL as Chromium reports it.
  * @param resourceType - Electron's `details.resourceType`.
@@ -68,7 +80,7 @@ export function isAllowedPdfRequest(
     return withoutQueryAndHash(parsed) === withoutQueryAndHash(new URL(allowedFileUrl))
   }
   if (resourceType !== 'image') return false
-  return parsed.protocol === 'https:' || parsed.protocol === 'http:' || parsed.protocol === 'data:'
+  return parsed.protocol === 'https:' || parsed.protocol === 'data:'
 }
 
 /**
@@ -88,7 +100,7 @@ export function preparePdfExportSession(tempFilePath: string): Session {
       return
     }
     logger.warn('Blocked request from the PDF export window', {
-      url: redactPath(details.url),
+      url: describeUrlForLog(details.url),
       resourceType: details.resourceType
     })
     callback({ cancel: true })
@@ -115,7 +127,7 @@ export function buildPdfCsp(scriptSha256: string): string {
     "default-src 'none'",
     `script-src 'sha256-${scriptSha256}'`,
     "style-src 'unsafe-inline'",
-    'img-src data: http: https:',
+    'img-src data: https:',
     "object-src 'none'",
     "base-uri 'none'"
   ].join('; ')
@@ -128,7 +140,7 @@ export function buildPdfCsp(scriptSha256: string): string {
 export function hardenPdfWindow(win: BrowserWindow): void {
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
   win.webContents.on('will-navigate', (event, url) => {
-    logger.warn('Blocked PDF export window navigation', { to: redactPath(url) })
+    logger.warn('Blocked PDF export window navigation', { to: describeUrlForLog(url) })
     event.preventDefault()
   })
 }
