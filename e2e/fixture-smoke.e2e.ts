@@ -101,6 +101,30 @@ test.describe('fixture smoke: appWithTestProject + windowWithTestProject', () =>
   })
 })
 
+// The app must be closed BEFORE its project folder is removed. On Windows an
+// open file keeps the folder locked (EBUSY), so removing it first stalled the
+// teardown past the test timeout and left the folder behind (#134).
+test.describe('fixture smoke: teardown order', () => {
+  test.describe.configure({ mode: 'serial' })
+  test.use({
+    openFilePath: 'teardown-order.txt',
+    testProjectFiles: { 'teardown-order.txt': 'Teardown order\n' },
+    resetRendererStorage: true
+  })
+
+  let projectPath: string | undefined
+
+  test('opens a file in the project', async ({ withOpenFile, testProject }) => {
+    projectPath = testProject.path
+    expect(await withOpenFile!.getContent()).toContain('Teardown order')
+  })
+
+  test('the previous project folder was removed', () => {
+    expect(projectPath).toBeDefined()
+    expect(fs.existsSync(projectPath!)).toBe(false)
+  })
+})
+
 test.describe('fixture smoke: withOpenFile', () => {
   test.describe('opens specified file', () => {
     // `.txt` seed instead of `.md` because markdown files default to
