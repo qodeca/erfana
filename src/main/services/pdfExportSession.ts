@@ -19,7 +19,7 @@
  * BEFORE the window that uses the partition is constructed.
  */
 import { session, type BrowserWindow, type Session } from 'electron'
-import { pathToFileURL } from 'url'
+import { fileURLToPath, pathToFileURL } from 'url'
 import { logger } from './LoggingService'
 import { describeUrlForLog } from '../utils/externalUrl'
 
@@ -30,12 +30,22 @@ import { describeUrlForLog } from '../utils/externalUrl'
  */
 export const PDF_EXPORT_PARTITION = 'pdf-export'
 
-/** Strip query and fragment so the comparison is on the document identity. */
-function withoutQueryAndHash(url: URL): string {
-  const clean = new URL(url.href)
-  clean.search = ''
-  clean.hash = ''
-  return clean.href
+/**
+ * The file a `file:` URL names, for comparing document identity. Query and
+ * fragment are ignored. The URL texts cannot be compared directly: Node's
+ * `pathToFileURL` writes `~` as `%7E`, while Chromium reports it as `~`, so a
+ * Windows temp folder under an 8.3 short name (`C:\Users\MARCIN~1\…`) never
+ * matched and every export page was blocked. Windows paths compare
+ * case-insensitively. `null` when the URL cannot be turned into a path (an
+ * encoded separator; on POSIX, a remote host).
+ */
+function filePathOf(url: URL): string | null {
+  try {
+    const path = fileURLToPath(url)
+    return process.platform === 'win32' ? path.toLowerCase() : path
+  } catch {
+    return null
+  }
 }
 
 /**
@@ -65,7 +75,8 @@ export function isAllowedPdfRequest(
   }
 
   if (parsed.protocol === 'file:') {
-    return withoutQueryAndHash(parsed) === withoutQueryAndHash(new URL(allowedFileUrl))
+    const requested = filePathOf(parsed)
+    return requested !== null && requested === filePathOf(new URL(allowedFileUrl))
   }
   if (resourceType !== 'image') return false
   return parsed.protocol === 'https:' || parsed.protocol === 'data:'

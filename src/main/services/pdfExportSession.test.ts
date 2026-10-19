@@ -21,6 +21,22 @@ describe('isAllowedPdfRequest', () => {
     expect(isAllowedPdfRequest(`${PAGE}#top`, 'mainFrame', PAGE)).toBe(true)
   })
 
+  it('allows the temp page however its URL spells the path', () => {
+    // pathToFileURL writes `~` as `%7E`; Chromium reports a Windows 8.3 short
+    // name (`MARCIN~1`) with a plain `~`. Both name the same page.
+    const dir = join(tmpdir(), 'ABCDEF~1', 'erfana-pdf-abc')
+    const page = pathToFileURL(join(dir, 'export.html')).href
+    const asChromium = page.replace(/%7E/gi, '~')
+    expect(asChromium).not.toBe(page)
+    expect(isAllowedPdfRequest(asChromium, 'mainFrame', page)).toBe(true)
+    expect(isAllowedPdfRequest(asChromium.replace('export.html', 'other.html'), 'mainFrame', page)).toBe(false)
+  })
+
+  it('refuses a file URL with an encoded separator or a remote host', () => {
+    expect(isAllowedPdfRequest(PAGE.replace(/\/export\.html$/, '%2Fexport.html'), 'mainFrame', PAGE)).toBe(false)
+    expect(isAllowedPdfRequest('file://server/share/export.html', 'mainFrame', PAGE)).toBe(false)
+  })
+
   it('refuses any other file URL', () => {
     const other = pathToFileURL(join(tmpdir(), 'erfana-pdf-abc', 'other.html')).href
     expect(isAllowedPdfRequest(other, 'image', PAGE)).toBe(false)
