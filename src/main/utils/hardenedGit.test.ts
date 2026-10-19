@@ -68,7 +68,7 @@ describe('buildHardeningArgs', () => {
       '-c',
       `core.hooksPath=${GIT_NULL_DEVICE}`,
       '-c',
-      `include.path=${GIT_NULL_DEVICE}`
+      'include.path=/dev/null'
     ])
   })
 
@@ -156,9 +156,6 @@ describe('buildGitEnv hardening values', () => {
     expect(GIT_ENV_ALLOWLIST).toContain('PATHEXT')
   })
 })
-
-// NOTE: `include.path=\\.\nul` (the Windows null device, via GIT_INCLUDE_OVERRIDE) has not been
-// exercised against a real Git for Windows install; it is checked in the Windows session.
 
 describe('resolveFinderBinary', () => {
   it('is an absolute path, never a bare name', () => {
