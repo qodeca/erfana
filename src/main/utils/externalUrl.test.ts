@@ -8,8 +8,7 @@ describe('parseExternalUrl', () => {
     ['https://example.com', 'https://example.com/'],
     ['http://example.com/a?b=1#c', 'http://example.com/a?b=1#c'],
     ['mailto:someone@example.com', 'mailto:someone@example.com'],
-    ['tel:+48123456789', 'tel:+48123456789'],
-    ['ftp://files.example.com/x', 'ftp://files.example.com/x']
+    ['tel:+48123456789', 'tel:+48123456789']
   ])('accepts %s', (input, normalised) => {
     expect(parseExternalUrl(input)).toBe(normalised)
   })
@@ -44,6 +43,7 @@ describe('parseExternalUrl', () => {
     ['java\nscript:alert(1)'],
     ['data:text/html,hi'],
     ['smb://host/share'],
+    ['ftp://files.example.com/x'],
     ['ms-msdt:/id'],
     ['x-custom-scheme://thing'],
     ['https://user:pass@example.com/'],
