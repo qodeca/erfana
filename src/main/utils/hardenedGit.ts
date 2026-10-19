@@ -70,11 +70,14 @@ export const GIT_NULL_DEVICE = devNull
 /**
  * Command-line include override. An EMPTY `include.path=` is rejected by git
  * ("relative config includes must come from files", exit 128), so the null
- * device is used instead. Includes found in repo config are not disabled by
- * this; the point is that every dangerous key is overridden on the command line,
- * which outranks any file (included or not).
+ * device is used instead. It is the literal `/dev/null` on every platform: Git
+ * for Windows maps that name to its null device, but rejects `\\.\nul` (Node's
+ * `devNull` there) with "unable to access" and exit 128, and `NUL` as a relative
+ * include. Includes found in repo config are not disabled by this; the point is
+ * that every dangerous key is overridden on the command line, which outranks any
+ * file (included or not).
  */
-export const GIT_INCLUDE_OVERRIDE = `include.path=${devNull}`
+export const GIT_INCLUDE_OVERRIDE = 'include.path=/dev/null'
 
 /** Timeout (ms) for the short helper spawns (config listing, finder). */
 export const HARDENED_GIT_HELPER_TIMEOUT_MS = 5_000

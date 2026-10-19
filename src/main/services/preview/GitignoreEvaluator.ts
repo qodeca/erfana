@@ -20,7 +20,7 @@
  *  - **Config overrides** neutralise the known code-execution key
  *    (`core.fsmonitor=false`), redirect hooks to the null device
  *    (`core.hooksPath=<NULL_DEVICE>`) and disable ad-hoc includes
- *    (`include.path=<NULL_DEVICE>`; an empty value is rejected by git);
+ *    (`include.path=/dev/null`; an empty value is rejected by git);
  *    `GIT_CONFIG_NOSYSTEM=1` drops system config.
  *  - **Env is an ALLOWLIST**, not a blocklist (design NEW-13): only
  *    {@link GIT_ENV_ALLOWLIST} plus the fixed `GIT_CONFIG_NOSYSTEM`,

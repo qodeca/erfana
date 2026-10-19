@@ -121,8 +121,6 @@ describe('GitignoreEvaluator', () => {
       const [file, args, options] = exec.mock.calls[0]
 
       expect(file).toBe(GIT_PATH)
-      // NOTE: `include.path=\\.\nul` (the Windows null device) still needs a check against
-      // a real Git for Windows install; it is verified in the Windows session.
       expect(args).toEqual([
         '--literal-pathspecs',
         '--no-pager',
@@ -134,7 +132,7 @@ describe('GitignoreEvaluator', () => {
         '-c',
         `core.hooksPath=${devNull}`,
         '-c',
-        `include.path=${devNull}`,
+        'include.path=/dev/null',
         'check-ignore',
         '--quiet',
         '--',
