@@ -4,12 +4,14 @@ import { describe, it, expect, afterEach } from 'vitest'
 import { tmpdir } from 'node:os'
 import {
   GIT_ENV_ALLOWLIST,
+  GIT_FIXED_ENV,
   GIT_NULL_DEVICE,
   buildGitEnv,
   buildHardeningArgs,
   hardenedSpawnOptions,
   isSafeFilterName,
-  parseFilterNames,
+  parseIsolationListing,
+  parseSystemEolConfig,
   resolveFinderBinary
 } from './hardenedGit'
 
@@ -22,7 +24,7 @@ describe('buildGitEnv', () => {
     process.env = { ...saved }
   })
 
-  it('keeps only allowlisted variables plus the fixed GIT_* trio', () => {
+  it('keeps only allowlisted variables plus the fixed GIT_* set', () => {
     process.env['GIT_TRACE'] = '/tmp/trace.log'
     process.env['GIT_DIR'] = '/elsewhere'
     process.env['GIT_EXTERNAL_DIFF'] = '/tmp/x'
@@ -33,9 +35,7 @@ describe('buildGitEnv', () => {
 
     const expected = [
       ...GIT_ENV_ALLOWLIST.filter((k) => process.env[k] !== undefined),
-      'GIT_CONFIG_NOSYSTEM',
-      'GIT_TERMINAL_PROMPT',
-      'GIT_OPTIONAL_LOCKS'
+      ...Object.keys(GIT_FIXED_ENV)
     ].sort()
     expect(Object.keys(env).sort()).toEqual(expected)
     expect(env['GIT_CONFIG_NOSYSTEM']).toBe('1')
@@ -98,23 +98,67 @@ describe('isSafeFilterName', () => {
   )
 })
 
-describe('parseFilterNames', () => {
-  it('returns an empty list for empty output', () => {
-    expect(parseFilterNames('')).toEqual([])
+describe('parseIsolationListing', () => {
+  it('returns empty results for empty output', () => {
+    expect(parseIsolationListing('')).toEqual({ filterNames: [], eolKeysSet: new Set() })
   })
 
   it('dedupes names across variables and handles dotted subsections', () => {
     const out = ['filter.lfs.clean', 'filter.lfs.smudge', 'filter.a.b.process', ''].join('\0')
-    expect(parseFilterNames(out)).toEqual(['lfs', 'a.b'])
+    expect(parseIsolationListing(out)?.filterNames).toEqual(['lfs', 'a.b'])
+  })
+
+  it('records line-ending keys that are already set', () => {
+    const out = ['core.autocrlf', 'core.eol'].join('\0')
+    expect(parseIsolationListing(out)?.eolKeysSet).toEqual(new Set(['core.autocrlf', 'core.eol']))
   })
 
   it('fails closed on an unsafe name or malformed key', () => {
-    expect(parseFilterNames('filter.a b.clean\0')).toBeNull()
-    expect(parseFilterNames('filter.x=y.clean\0')).toBeNull()
-    expect(parseFilterNames('filter.clean\0')).toBeNull()
-    expect(parseFilterNames('core.fsmonitor\0')).toBeNull()
+    expect(parseIsolationListing('filter.a b.clean\0')).toBeNull()
+    expect(parseIsolationListing('filter.x=y.clean\0')).toBeNull()
+    expect(parseIsolationListing('filter.clean\0')).toBeNull()
+    expect(parseIsolationListing('core.fsmonitor\0')).toBeNull()
+  })
+
+  it('fails closed on a promisor remote or partial clone', () => {
+    expect(parseIsolationListing('remote.origin.promisor\0')).toBeNull()
+    expect(parseIsolationListing('remote.a.b.promisor\0')).toBeNull()
+    expect(parseIsolationListing('extensions.partialclone\0')).toBeNull()
   })
 })
+
+describe('parseSystemEolConfig', () => {
+  it('keeps recognised line-ending keys with recognised values', () => {
+    const out = ['core.autocrlf\ntrue', 'core.eol\nCRLF', 'core.safecrlf\nwarn'].join('\0') + '\0'
+    expect(parseSystemEolConfig(out)).toEqual(['core.autocrlf=true', 'core.eol=crlf', 'core.safecrlf=warn'])
+  })
+
+  it('drops unknown keys, odd values and malformed records', () => {
+    const out = ['core.autocrlf\n!evil', 'core.fsmonitor\ntrue', 'core.eol'].join('\0') + '\0'
+    expect(parseSystemEolConfig(out)).toEqual([])
+  })
+})
+
+describe('buildHardeningArgs extra config', () => {
+  it('passes extra key=value entries as -c', () => {
+    const args = buildHardeningArgs(ROOT, [], ['core.autocrlf=true'])
+    expect(args[args.indexOf('core.autocrlf=true') - 1]).toBe('-c')
+  })
+})
+
+describe('buildGitEnv hardening values', () => {
+  it('blocks lazy fetching and drops NOSYSTEM only on request', () => {
+    expect(GIT_FIXED_ENV.GIT_NO_LAZY_FETCH).toBe('1')
+    expect(GIT_FIXED_ENV.GIT_ALLOW_PROTOCOL).toBe('none')
+    expect(buildGitEnv()['GIT_CONFIG_NOSYSTEM']).toBe('1')
+    expect(buildGitEnv({ includeSystemConfig: true })['GIT_CONFIG_NOSYSTEM']).toBeUndefined()
+    expect(GIT_ENV_ALLOWLIST).toContain('XDG_CONFIG_HOME')
+    expect(GIT_ENV_ALLOWLIST).toContain('PATHEXT')
+  })
+})
+
+// NOTE: `include.path=\\.\nul` (the Windows null device, via GIT_INCLUDE_OVERRIDE) has not been
+// exercised against a real Git for Windows install; it is checked in the Windows session.
 
 describe('resolveFinderBinary', () => {
   it('is an absolute path, never a bare name', () => {

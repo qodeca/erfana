@@ -37,6 +37,7 @@ vi.mock('worker_threads', () => ({ parentPort: { on: vi.fn(), postMessage: vi.fn
 vi.mock('isomorphic-git', () => ({ currentBranch: vi.fn(), resolveRef: vi.fn(), statusMatrix: vi.fn() }))
 
 import { executeNativeGit } from './git-status.worker'
+import { buildHardeningArgs, hardenedSpawnOptions } from '../../utils/hardenedGit'
 
 async function exists(path: string): Promise<boolean> {
   try {
@@ -155,5 +156,78 @@ describe.skipIf(!CAN_RUN)('git-status native path – repository config isolatio
     const byName = new Map(result.files.map((f) => [f.path.slice(repo.length + 1), f.status]))
     expect(byName.get('tracked.txt')).toBe('modified')
     expect(byName.get('untracked.md')).toBe('untracked')
+  })
+})
+
+// (e) A promisor remote makes git fetch objects it cannot find through a child process that
+// reads the repo's own `remote.<n>.uploadpack`. The HEAD tree is deleted so status needs it.
+describe.skipIf(!CAN_RUN)('git-status native path – promisor remote isolation', () => {
+  let sandbox: string
+  let repo: string
+  let marker: string
+
+  const git = (args: string[], env: NodeJS.ProcessEnv = process.env): Promise<{ stdout: string; stderr: string }> =>
+    execFileAsync(GIT_PATH as string, args, { cwd: repo, env })
+
+  beforeAll(async () => {
+    sandbox = await mkdtemp(join(tmpdir(), 'erfana-promisor-it-'))
+    repo = join(sandbox, 'repo')
+    marker = join(sandbox, 'uploadpack-marker')
+    await mkdir(repo, { recursive: true })
+
+    await git(['init', '-q', '-b', 'main'])
+    await git(['config', 'user.email', 'test@erfana.dev'])
+    await git(['config', 'user.name', 'Erfana Test'])
+    await writeFile(join(repo, 'tracked.txt'), 'original\n', 'utf8')
+    await git(['add', 'tracked.txt'])
+    await git(['commit', '-q', '-m', 'initial'])
+
+    const uploadpack = join(sandbox, 'uploadpack.sh')
+    await writeFile(uploadpack, `#!/bin/sh\necho x >> "${marker}"\nexit 1\n`, 'utf8')
+    await chmod(uploadpack, 0o755)
+    await git(['config', 'remote.origin.url', join(sandbox, 'elsewhere')])
+    await git(['config', 'remote.origin.uploadpack', uploadpack])
+    await git(['config', 'remote.origin.promisor', 'true'])
+    await git(['config', 'remote.origin.partialclonefilter', 'blob:none'])
+    await git(['config', 'extensions.partialclone', 'origin'])
+
+    // Drop the loose HEAD tree so the next status has to go and get it.
+    const { stdout } = await git(['rev-parse', 'HEAD^{tree}'])
+    const sha = stdout.trim()
+    const objectPath = join(repo, '.git', 'objects', sha.slice(0, 2), sha.slice(2))
+    await chmod(objectPath, 0o644)
+    await rm(objectPath)
+  })
+
+  afterAll(async () => {
+    if (sandbox) await rm(sandbox, { recursive: true, force: true })
+  })
+
+  it('control: a plain status in this repo does run the remote helper', async () => {
+    await rm(marker, { force: true })
+    await git(['status', '--porcelain']).catch(() => undefined)
+
+    // If the installed git does not lazy-fetch here, the guards below stay as regression guards.
+    console.info(`lazy-fetch recipe reproduced with this git: ${await exists(marker)}`)
+  })
+
+  it('native status never runs the remote helper', async () => {
+    await rm(marker, { force: true })
+
+    await executeNativeGit(repo, GIT_PATH as string)
+
+    expect(await exists(marker)).toBe(false)
+  })
+
+  it('the hardened env alone blocks the fetch even if the config check were bypassed', async () => {
+    await rm(marker, { force: true })
+
+    await execFileAsync(
+      GIT_PATH as string,
+      [...buildHardeningArgs(repo), 'status', '--porcelain=v1'],
+      hardenedSpawnOptions()
+    ).catch(() => undefined)
+
+    expect(await exists(marker)).toBe(false)
   })
 })
