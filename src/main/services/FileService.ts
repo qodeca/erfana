@@ -20,7 +20,7 @@ import {
 } from '../../shared/coalescingRunner'
 import { stablePathDigest } from '../../shared/stablePathDigest'
 import { logger } from './LoggingService'
-import { atomicWriteText } from '../utils/atomicWrite'
+import { atomicWriteText, isAtomicTempName } from '../utils/atomicWrite'
 import { IMAGE_EXTENSIONS, readImage } from './file/imageRead'
 import { restoreParentDirectory } from './file/restoreParentDirectory'
 import type { ImageReadResponse } from '../../shared/ipc/file-image-schema'
@@ -134,13 +134,15 @@ const joinRelative = (parentRel: string, name: string): string =>
   parentRel === '' ? name : `${parentRel}/${name}`
 
 /**
- * Hidden by name (the walk's snapshot) or excluded by the project filter.
+ * Hidden by name (the walk's snapshot), an atomic-save temp file, or excluded by the project filter.
  * Tested before a node is built, so an excluded folder is never read. Only the
  * entry itself is tested against the exclude list: the walk never enters an
  * excluded folder, so no ancestor can be one.
  */
 function isSkippedEntry(name: string, rel: string | null, scope: WalkScope): boolean {
   if (scope.hiddenPatterns.includes(name)) return true
+  // A save in flight (or left by a crash): never part of the tree
+  if (isAtomicTempName(name)) return true
   if (rel === null || scope.filter === null || !scope.filter.isEntryExcluded(rel)) return false
   scope.excludedEntryCount++
   return true

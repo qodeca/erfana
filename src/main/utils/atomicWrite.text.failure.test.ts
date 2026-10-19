@@ -10,11 +10,11 @@ import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-const hooks = vi.hoisted(() => ({ rename: vi.fn() }))
+const hooks = vi.hoisted(() => ({ rename: vi.fn(), open: vi.fn() }))
 
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>()
-  return { ...actual, rename: hooks.rename }
+  return { ...actual, rename: hooks.rename, open: hooks.open }
 })
 
 vi.mock('../services/LoggingService', () => ({
@@ -39,7 +39,22 @@ describe('atomicWriteText failure paths', () => {
     await writeFile(target, 'ORIGINAL')
     vi.clearAllMocks()
     hooks.rename.mockReset()
+    const actual = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises')
+    hooks.open.mockReset()
+    hooks.open.mockImplementation(actual.open)
   })
+
+  /** Make the next temp file's handle fail one operation, as a network mount would. */
+  async function failHandleOp(op: 'sync' | 'chmod', code: string): Promise<void> {
+    const actual = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises')
+    hooks.open.mockImplementation(async (...args: Parameters<typeof actual.open>) => {
+      const handle = await actual.open(...args)
+      ;(handle as unknown as Record<string, unknown>)[op] = async () => {
+        throw errno(code)
+      }
+      return handle
+    })
+  }
 
   afterEach(async () => {
     Object.defineProperty(process, 'platform', platform)
@@ -109,5 +124,74 @@ describe('atomicWriteText failure paths', () => {
 
     await expect(atomicWriteText(target, 'NEW')).rejects.toMatchObject({ code: 'ENOSPC' })
     expect(await readFile(target, 'utf8')).toBe('ORIGINAL')
+  })
+
+  describe('POSIX fallbacks to an in-place write', () => {
+    beforeEach(() => {
+      Object.defineProperty(process, 'platform', { value: 'linux' })
+    })
+
+    function expectWarnedWithoutPath(): void {
+      expect(logger.warn).toHaveBeenCalledTimes(1)
+      expect(JSON.stringify(vi.mocked(logger.warn).mock.calls)).not.toContain('/secret/user')
+    }
+
+    it.each(['EACCES', 'EPERM'])(
+      'falls back when the temp file cannot be created (%s: unwritable folder, writable file)',
+      async (code) => {
+        hooks.open.mockRejectedValue(errno(code))
+
+        await atomicWriteText(target, 'NEW CONTENT')
+
+        expect(await readFile(target, 'utf8')).toBe('NEW CONTENT')
+        expect(await readdir(dir)).toEqual(['doc.md'])
+        expectWarnedWithoutPath()
+      }
+    )
+
+    it.each(['EXDEV', 'ENOTSUP', 'EINVAL', 'ENOSYS'])('falls back when the rename fails with %s', async (code) => {
+      hooks.rename.mockRejectedValue(errno(code))
+
+      await atomicWriteText(target, 'NEW CONTENT')
+
+      expect(await readFile(target, 'utf8')).toBe('NEW CONTENT')
+      expect(await readdir(dir)).toEqual(['doc.md'])
+      expect(hooks.rename).toHaveBeenCalledTimes(1) // not retried
+      expectWarnedWithoutPath()
+    })
+
+    it.each(['EXDEV', 'ENOTSUP', 'EINVAL', 'ENOSYS'])('falls back when the fsync fails with %s', async (code) => {
+      await failHandleOp('sync', code)
+
+      await atomicWriteText(target, 'NEW CONTENT')
+
+      expect(await readFile(target, 'utf8')).toBe('NEW CONTENT')
+      expect(await readdir(dir)).toEqual(['doc.md'])
+      expect(hooks.rename).not.toHaveBeenCalled()
+      expectWarnedWithoutPath()
+    })
+
+    it('a failing chmod is not fatal: the save still goes through the atomic route', async () => {
+      await failHandleOp('chmod', 'EPERM')
+      const actual = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises')
+      hooks.rename.mockImplementation(actual.rename)
+
+      await atomicWriteText(target, 'NEW CONTENT')
+
+      expect(await readFile(target, 'utf8')).toBe('NEW CONTENT')
+      expect(hooks.rename).toHaveBeenCalledTimes(1)
+      expect(logger.warn).not.toHaveBeenCalled()
+    })
+
+    it('does not swallow other errors: a missing folder (ENOENT) and a full disk (ENOSPC) still throw', async () => {
+      hooks.open.mockRejectedValue(errno('ENOENT'))
+      await expect(atomicWriteText(target, 'X')).rejects.toMatchObject({ code: 'ENOENT' })
+
+      await failHandleOp('sync', 'ENOSPC')
+      await expect(atomicWriteText(target, 'X')).rejects.toMatchObject({ code: 'ENOSPC' })
+
+      expect(await readFile(target, 'utf8')).toBe('ORIGINAL')
+      expect(await readdir(dir)).toEqual(['doc.md'])
+    })
   })
 })
