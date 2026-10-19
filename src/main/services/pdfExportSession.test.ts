@@ -10,7 +10,8 @@ vi.mock('./LoggingService', () => ({
   logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() }
 }))
 
-import { buildPdfCsp, describeUrlForLog, isAllowedPdfRequest } from './pdfExportSession'
+import { buildPdfCsp, isAllowedPdfRequest } from './pdfExportSession'
+import { describeUrlForLog } from '../utils/externalUrl'
 
 const PAGE = pathToFileURL(join(tmpdir(), 'erfana-pdf-abc', 'export.html')).href
 
@@ -63,6 +64,6 @@ describe('describeUrlForLog', () => {
   it('never logs file names', () => {
     expect(describeUrlForLog(PAGE)).toBe('file:')
     expect(describeUrlForLog('data:image/png;base64,AAAA')).toBe('data:')
-    expect(describeUrlForLog('not a url')).toBe('[unparseable-url]')
+    expect(describeUrlForLog('not a url')).toBe('[unparseable]')
   })
 })

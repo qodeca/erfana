@@ -21,6 +21,7 @@
 import { session, type BrowserWindow, type Session } from 'electron'
 import { pathToFileURL } from 'url'
 import { logger } from './LoggingService'
+import { describeUrlForLog } from '../utils/externalUrl'
 
 /**
  * In-memory partition (no `persist:` prefix). `session.fromPartition` returns
@@ -28,19 +29,6 @@ import { logger } from './LoggingService'
  * re-installed on every export; `onBeforeRequest` replaces the previous listener.
  */
 export const PDF_EXPORT_PARTITION = 'pdf-export'
-
-/**
- * Log-safe description of a URL: scheme and host only. Query strings, paths
- * and file names never reach the log; file and data URLs log as the bare scheme.
- */
-export function describeUrlForLog(url: string): string {
-  try {
-    const parsed = new URL(url)
-    return parsed.host ? `${parsed.protocol}//${parsed.host}` : parsed.protocol
-  } catch {
-    return '[unparseable-url]'
-  }
-}
 
 /** Strip query and fragment so the comparison is on the document identity. */
 function withoutQueryAndHash(url: URL): string {
