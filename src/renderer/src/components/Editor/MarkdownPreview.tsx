@@ -90,7 +90,7 @@ const sanitizationSchema = {
   ...defaultSchema,
   protocols: {
     ...defaultSchema.protocols,
-    href: [...(defaultSchema.protocols?.href || []), 'tel', 'ftp']
+    href: [...(defaultSchema.protocols?.href || []), 'tel']
   }
 }
 

@@ -41,7 +41,48 @@ export function parseExternalUrl(input: unknown): string | null {
   // A backslash or percent-encoded backslash in the host is a share shape.
   if (/\\|%5c/i.test(parsed.host)) return null
 
+  if (parsed.protocol === 'mailto:') return rebuildMailto(parsed)
+
   return parsed.href
+}
+
+/** The only query fields a mailto link may carry on to the mail client. */
+const MAILTO_FIELDS: ReadonlySet<string> = new Set(['to', 'cc', 'bcc', 'subject', 'body'])
+
+/** Percent-encode one value; `@` stays readable in addresses. */
+function encodeMailtoPart(value: string): string {
+  return encodeURIComponent(value).replace(/%40/g, '@')
+}
+
+/**
+ * Rebuild a `mailto:` URL from its parts so nothing else rides along.
+ *
+ * Mail clients act on extra header fields such as `attach` / `attachment`, so
+ * only `to`, `cc`, `bcc`, `subject` and `body` are kept. Every kept value is
+ * decoded and re-encoded, so the result carries no raw quote, space or control
+ * character.
+ *
+ * @returns The rebuilt URL, or `null` when a part has malformed percent-encoding.
+ */
+function rebuildMailto(parsed: URL): string | null {
+  try {
+    const addresses = decodeURIComponent(parsed.pathname)
+      .split(',')
+      .map((address) => address.trim())
+      .filter((address) => address !== '')
+      .map(encodeMailtoPart)
+
+    const fields: string[] = []
+    for (const [key, value] of new URLSearchParams(parsed.search)) {
+      if (MAILTO_FIELDS.has(key.toLowerCase())) {
+        fields.push(`${key.toLowerCase()}=${encodeMailtoPart(value)}`)
+      }
+    }
+
+    return `mailto:${addresses.join(',')}${fields.length > 0 ? `?${fields.join('&')}` : ''}`
+  } catch {
+    return null
+  }
 }
 
 /**

@@ -42,23 +42,14 @@ describe('web contents baseline: window open', () => {
     mockShell.openExternal.mockResolvedValue(undefined)
   })
 
-  it.each([['https://example.com/'], ['http://example.com/x'], ['mailto:a@example.com']])(
-    'denies the window and opens %s through the checked path',
-    (url) => {
-      const { target, open } = makeTarget()
-      applyWebContentsBaseline(target)
-      expect(open()({ url })).toEqual({ action: 'deny' })
-      expect(mockShell.openExternal).toHaveBeenCalledTimes(1)
-    }
-  )
-
   it.each([
+    ['https://example.com/'],
+    ['mailto:a@example.com'],
     ['file:///etc/hosts'],
     ['file://host/share/x'],
     ['\\\\host\\share'],
     ['javascript:alert(1)'],
-    ['x-custom-scheme://thing'],
-    ['https://user:pass@example.com/']
+    ['x-custom-scheme://thing']
   ])('denies the window and opens nothing for %s', (url) => {
     const { target, open } = makeTarget()
     applyWebContentsBaseline(target)

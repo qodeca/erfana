@@ -5,7 +5,7 @@
 ### Plugin Setup
 ```typescript
 // MarkdownPreview.tsx – sanitizationSchema spreads hast-util-sanitize's defaultSchema
-// and extends it (e.g. tel:/ftp: href protocols)
+// and extends it (e.g. the tel: href protocol)
 const rehypePlugins: PluggableList = [
   rehypeRaw,  // Parse HTML in markdown
   [rehypeSanitize, sanitizationSchema]  // Security sanitization
