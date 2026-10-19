@@ -32,6 +32,7 @@ import * as path from 'path'
 
 import type { ElectronApplication, Page } from '@playwright/test'
 import { test as base, expect } from './fixtures/localServer'
+import { removeDirWithRetry } from './fixtures/isolation'
 import { HtmlPreviewPage, PREVIEW_BUDGET_MS } from './pages/html-preview.page'
 import {
   armFrameTrail,
@@ -103,7 +104,7 @@ const test = base.extend<{ frames: Frames }>({
     await dismissToasts(page)
     await use({ preview: new HtmlPreviewPage(page, app), page, app, projectPath: testProject.path, outsideFile })
     await resetHostZoom(app, page)
-    await fsp.rm(outsideDir, { recursive: true, force: true })
+    await removeDirWithRetry(outsideDir)
   }
 })
 

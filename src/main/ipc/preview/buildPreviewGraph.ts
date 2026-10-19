@@ -16,7 +16,8 @@
  *
  * @see docs/designs/sd-074-html-preview.md §4.4, §5(a)
  */
-import { BrowserWindow, dialog, shell, type Session } from 'electron'
+import { BrowserWindow, dialog, type Session } from 'electron'
+import { openExternalSafe } from '../../utils/openExternalSafe'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import type { ChokidarOptions } from 'chokidar'
@@ -110,7 +111,7 @@ const confirmThenOpenExternal = createExternalLinkConsent({
   // `ConsentWindow` is a structural slice of `BrowserWindow`; `resolveWindow`
   // above only ever hands back a real one.
   showMessageBox: (win, options) => dialog.showMessageBox(win as BrowserWindow, options),
-  openExternal: (url) => shell.openExternal(url)
+  openExternal: (url) => openExternalSafe(url)
 })
 
 /**

@@ -55,15 +55,31 @@ describe('Main Process - Window Creation', () => {
   let mockRegisterWindowResponsiveness: any
   let mockRegisterWindowErrorSignals: any
   let mockRegisterQuitHandlers: any
+  let mockShowMessageBox: any
+  let mockWriteCrashFallbackLine: any
+  let mockRegisterProcessCrashLogging: any
 
   beforeEach(() => {
     // Reset modules to allow fresh imports
     vi.resetModules()
     delete process.env.ERFANA_E2E_FORCE_CRASH
 
+    mockShowMessageBox = vi.fn(() => Promise.resolve({ response: 0 }))
+    mockWriteCrashFallbackLine = vi.fn(() => true)
+    mockRegisterProcessCrashLogging = vi.fn()
+    vi.doMock('./utils/crashFallbackLog', () => ({
+      writeCrashFallbackLine: mockWriteCrashFallbackLine
+    }))
+    // Process-wide listeners would pile up across the repeated re-imports here;
+    // the wiring is asserted below, the behaviour in processCrashLogging.test.ts.
+    vi.doMock('./utils/processCrashLogging', () => ({
+      registerProcessCrashLogging: mockRegisterProcessCrashLogging
+    }))
+
     // Mock BrowserWindow
     createdWindow = {
       on: vi.fn(),
+      once: vi.fn(),
       show: vi.fn(),
       loadURL: vi.fn(),
       loadFile: vi.fn(),
@@ -128,6 +144,7 @@ describe('Main Process - Window Creation', () => {
       app: mockApp,
       shell: { openExternal: vi.fn() },
       BrowserWindow: mockBrowserWindow,
+      dialog: { showMessageBox: mockShowMessageBox },
       Menu: {
         buildFromTemplate: vi.fn(() => ({})),
         setApplicationMenu: vi.fn()
@@ -142,7 +159,13 @@ describe('Main Process - Window Creation', () => {
         fromId: vi.fn(() => null)
       },
       // #74: preview scheme registration runs at module load.
-      protocol: { registerSchemesAsPrivileged: vi.fn() }
+      protocol: { registerSchemesAsPrivileged: vi.fn() },
+      session: { defaultSession: {} }
+    }))
+
+    // Mock default-session permission policy (covered by its own suite)
+    vi.doMock('./services/session/defaultSessionPermissions', () => ({
+      installDefaultSessionPermissions: vi.fn()
     }))
 
     // Mock menu module
@@ -415,6 +438,121 @@ describe('Main Process - Window Creation', () => {
     })
   })
 
+  describe('Start-up failures keep the app alive', () => {
+    async function failInit(which: 'settings' | 'logging' | 'both'): Promise<void> {
+      const { globalSettingsService } = await import('./services/GlobalSettingsService')
+      const { loggingService } = await import('./services/LoggingService')
+      if (which !== 'logging') {
+        ;(globalSettingsService.initialize as ReturnType<typeof vi.fn>).mockRejectedValue(
+          new Error('settings dir is read-only')
+        )
+      }
+      if (which !== 'settings') {
+        ;(loggingService.initialize as ReturnType<typeof vi.fn>).mockRejectedValue(
+          new Error('logs dir is a symlink')
+        )
+      }
+    }
+
+    it('registers the process-wide crash logging at module load', async () => {
+      await import('./index')
+      expect(mockRegisterProcessCrashLogging).toHaveBeenCalledTimes(1)
+    })
+
+    it.each(['settings', 'logging', 'both'] as const)(
+      'still registers handlers and creates the window when %s init throws',
+      async (which) => {
+        await failInit(which)
+        const { registerFileHandlers } = await import('./ipc/file-handlers')
+        const { registerLoggingHandlers } = await import('./ipc/logging-handlers')
+
+        await import('./index')
+        await flushStartup()
+
+        expect(registerFileHandlers).toHaveBeenCalledTimes(1)
+        expect(registerLoggingHandlers).toHaveBeenCalledTimes(1)
+        expect(mockBrowserWindow).toHaveBeenCalledTimes(1)
+      }
+    )
+
+    /** Fires the window's one-time 'show' listener, as Electron does after ready-to-show. */
+    function fireShow(): void {
+      const call = createdWindow.once.mock.calls.find((c: unknown[]) => c[0] === 'show')
+      expect(call).toBeDefined()
+      call![1]()
+    }
+
+    it('writes a fallback crash line for each failed step', async () => {
+      await failInit('both')
+
+      await import('./index')
+      await flushStartup()
+
+      expect(mockWriteCrashFallbackLine).toHaveBeenCalledWith(
+        '[crash] startup-settings-init',
+        expect.any(Error)
+      )
+      expect(mockWriteCrashFallbackLine).toHaveBeenCalledWith(
+        '[crash] startup-logging-init',
+        expect.any(Error)
+      )
+    })
+
+    it('tells the user with a non-blocking message box, only once the window is shown', async () => {
+      await failInit('both')
+
+      await import('./index')
+      await flushStartup()
+
+      // start-up finished and the window exists, but nothing has been shown yet
+      expect(mockBrowserWindow).toHaveBeenCalledTimes(1)
+      expect(mockShowMessageBox).not.toHaveBeenCalled()
+
+      fireShow()
+
+      expect(mockShowMessageBox).toHaveBeenCalledTimes(1)
+      const [parent, options] = mockShowMessageBox.mock.calls[0]
+      expect(parent).toBe(createdWindow)
+      expect(options.title).toBe('Erfana started with problems')
+      expect(options.detail).toContain('settings')
+      expect(options.detail).toContain('log files')
+      expect(options.detail).toContain('crash.log')
+    })
+
+    it('does not claim details were saved when the fallback write failed', async () => {
+      mockWriteCrashFallbackLine.mockReturnValue(false)
+      await failInit('logging')
+
+      await import('./index')
+      await flushStartup()
+      fireShow()
+
+      const { detail } = mockShowMessageBox.mock.calls[0][1]
+      expect(detail).not.toContain('crash.log')
+      expect(detail).toContain('could not be saved')
+    })
+
+    it('survives a message box that fails to open', async () => {
+      mockShowMessageBox.mockRejectedValue(new Error('no display'))
+      await failInit('settings')
+
+      await import('./index')
+      await flushStartup()
+
+      expect(() => fireShow()).not.toThrow()
+      await flushStartup()
+    })
+
+    it('shows no dialog and writes no fallback line when start-up is healthy', async () => {
+      await import('./index')
+      await flushStartup()
+
+      expect(createdWindow.once).not.toHaveBeenCalledWith('show', expect.any(Function))
+      expect(mockShowMessageBox).not.toHaveBeenCalled()
+      expect(mockWriteCrashFallbackLine).not.toHaveBeenCalled()
+    })
+  })
+
   describe('Window Title Configuration', () => {
     it('should set title to "ERFANA v{version}" in production mode', async () => {
       // Set production mode
@@ -503,7 +641,8 @@ describe('Main Process - Window Creation', () => {
           webContents: {
             fromId: vi.fn(() => null)
           },
-          protocol: { registerSchemesAsPrivileged: vi.fn() }
+          protocol: { registerSchemesAsPrivileged: vi.fn() },
+          session: { defaultSession: {} }
         }))
 
         vi.doMock('./menu', () => ({

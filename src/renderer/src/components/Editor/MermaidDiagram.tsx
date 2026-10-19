@@ -71,6 +71,11 @@ export function MermaidDiagram({ code, className = '', filePath, startLine, endL
   })()
 
   // Handle bug report button click
+  const openMermaidDocs = (e: React.MouseEvent): void => {
+    e.preventDefault()
+    window.electron.shell.openExternal('https://mermaid.js.org/')
+  }
+
   const handleBugReport = async () => {
     if (!error || !filePath) return
 
@@ -244,9 +249,9 @@ export function MermaidDiagram({ code, className = '', filePath, startLine, endL
             Check your diagram syntax. See{' '}
             <a
               href="https://mermaid.js.org/"
-              onClick={(e) => {
-                e.preventDefault()
-                window.electron.shell.openExternal('https://mermaid.js.org/')
+              onClick={openMermaidDocs}
+              onAuxClick={(e) => {
+                if (e.button === 1) openMermaidDocs(e)
               }}
             >
               Mermaid documentation

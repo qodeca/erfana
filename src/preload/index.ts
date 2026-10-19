@@ -58,7 +58,6 @@ import type {
   ExternalFileMoveResponse,
   ConflictResolution
 } from '../shared/ipc/external-file-schema'
-import { electronAPI } from '@electron-toolkit/preload'
 
 export interface FileNode {
   name: string
@@ -1158,9 +1157,9 @@ const api = {
 // Use `contextBridge` APIs to expose Electron APIs to
 // renderer only if context isolation is enabled, otherwise
 // just add to the DOM global.
-// Custom electron API with shell.openExternal for external link handling
+// Narrow electron surface: only shell.openExternal is used by the renderer.
+// The generic ipcRenderer / webFrame / process helpers are deliberately not exposed.
 const electron = {
-  ...electronAPI,
   shell: {
     openExternal: (url: string): Promise<void> => ipcRenderer.invoke('shell:openExternal', url)
   }

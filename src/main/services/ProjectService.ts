@@ -29,6 +29,7 @@ import type { ISettingsService } from '../interfaces/ISettingsService'
 import type { IProjectSettingsService } from '../interfaces/IProjectSettingsService'
 import type { IProjectLockService } from '../interfaces/IProjectLockService'
 import { logger } from './LoggingService'
+import { sweepStaleAtomicTemps } from '../utils/atomicTempSweep'
 
 export interface ProjectSwitchResult {
   success: boolean
@@ -359,6 +360,9 @@ export class ProjectService {
         newPath: newProjectPath
       }
       broadcastProjectChanged(payload)
+
+      // Temp files an interrupted save left behind: background, best effort
+      void sweepStaleAtomicTemps(newProjectPath)
 
       // 11. Release old project lock AFTER successful switch
       // This ensures we don't lose lock on old project if switch fails

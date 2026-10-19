@@ -18,7 +18,7 @@ import {
 } from '../../shared/ipc/file-image-schema'
 import { logger } from '../services/LoggingService'
 import { fileExists } from '../utils/fileUtils'
-import { redactedLogError } from '../utils/redactUserInput'
+import { redactPath, redactedLogError } from '../utils/redactUserInput'
 import { assertInsideProject, assertNoConfinementEscape } from '../utils/projectConfinement'
 import { isTrustedSender } from './senderValidation'
 import { registerHandle } from './registry'
@@ -160,10 +160,10 @@ export function registerFileHandlers(): void {
       const result = await fileService.readDirectory(dirPath)
       commitRead()
       const durationMs = Math.round(performance.now() - start)
-      logger.info('file:readDirectory IPC completed', { durationMs, dirPath })
+      logger.info('file:readDirectory IPC completed', { durationMs, dirPath: redactPath(dirPath) })
       return result
     } catch (error) {
-      logger.error('Error reading directory', error instanceof Error ? error : undefined)
+      logger.error('Error reading directory', redactedLogError(error))
       throw error
     }
   })
@@ -178,7 +178,7 @@ export function registerFileHandlers(): void {
       await assertInsideProject(filePath, fileService.getProjectPath())
       return await fileService.readFile(filePath)
     } catch (error) {
-      logger.error('Error reading file', error instanceof Error ? error : undefined)
+      logger.error('Error reading file', redactedLogError(error))
       throw error
     }
   })
@@ -226,9 +226,9 @@ export function registerFileHandlers(): void {
       // site (e.g. ImageViewerPanel and ProjectTree warn; link checks use
       // file:exists instead).
       if (error instanceof Error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
-        logger.debug('file:getStats target not found', { filePath, code: 'ENOENT' })
+        logger.debug('file:getStats target not found', { filePath: redactPath(filePath), code: 'ENOENT' })
       } else {
-        logger.error('Error getting file stats', error instanceof Error ? error : undefined)
+        logger.error('Error getting file stats', redactedLogError(error))
       }
       throw error
     }
@@ -349,7 +349,7 @@ export function registerFileHandlers(): void {
       directoryWatcherService.noteInternalChange({ path: filePath, kind: 'removed', subtree: true })
       return true
     } catch (error) {
-      logger.error('Error deleting file', error instanceof Error ? error : undefined)
+      logger.error('Error deleting file', redactedLogError(error))
       throw error
     }
   })
@@ -366,7 +366,7 @@ export function registerFileHandlers(): void {
       directoryWatcherService.noteInternalChange({ path: folderPath, kind: 'removed', subtree: true })
       return true
     } catch (error) {
-      logger.error('Error deleting folder', error instanceof Error ? error : undefined)
+      logger.error('Error deleting folder', redactedLogError(error))
       throw error
     }
   })
@@ -437,7 +437,7 @@ export function registerFileHandlers(): void {
       )
       return newPath
     } catch (error) {
-      logger.error('Error moving item', error instanceof Error ? error : undefined)
+      logger.error('Error moving item', redactedLogError(error))
       throw error
     }
   })
@@ -469,7 +469,7 @@ export function registerFileHandlers(): void {
       directoryWatcherService.noteInternalChange({ path: newPath.path, kind: 'added', subtree: true })
       return newPath
     } catch (error) {
-      logger.error('Error copying item', error instanceof Error ? error : undefined)
+      logger.error('Error copying item', redactedLogError(error))
       throw error
     }
   })
@@ -488,7 +488,7 @@ export function registerFileHandlers(): void {
       const hasConflict = await fileService.checkNameConflict(targetParentPath, itemName)
       return hasConflict
     } catch (error) {
-      logger.error('Error checking conflict', error instanceof Error ? error : undefined)
+      logger.error('Error checking conflict', redactedLogError(error))
       throw error
     }
   })
@@ -527,7 +527,7 @@ export function registerFileHandlers(): void {
         }
         return result
       } catch (error) {
-        logger.error('Error reading image', error instanceof Error ? error : undefined)
+        logger.error('Error reading image', redactedLogError(error))
         throw error
       }
     }

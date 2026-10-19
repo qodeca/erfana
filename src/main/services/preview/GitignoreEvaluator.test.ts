@@ -12,6 +12,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { devNull } from 'node:os'
 import { GitignoreEvaluator, GIT_ENV_ALLOWLIST, type GitExecFn } from './GitignoreEvaluator'
+import { GIT_FIXED_ENV } from '../../utils/hardenedGit'
 
 const GIT_PATH = '/usr/bin/git'
 const TEMP_DIR = '/tmp/erfana-safe-cwd'
@@ -24,6 +25,14 @@ function makeDeps(exec: GitExecFn) {
     resolveGitPath: vi.fn(async () => GIT_PATH),
     tempDir: () => TEMP_DIR
   }
+}
+
+/** Exec that reports the file ignored (exit 0) and the project folder itself not ignored (exit 1). */
+const fileIgnoredRootTracked: GitExecFn = async (_file, args) => {
+  if (args[args.length - 1] === '.') {
+    throw Object.assign(new Error('not ignored'), { code: 1 })
+  }
+  return { stdout: '', stderr: '' }
 }
 
 const savedEnv = { ...process.env }
@@ -40,9 +49,26 @@ afterEach(() => {
 describe('GitignoreEvaluator', () => {
   describe('exit-code mapping', () => {
     it('treats exit 0 as ignored', async () => {
-      const exec = vi.fn<GitExecFn>(async () => ({ stdout: '', stderr: '' }))
+      const exec = vi.fn<GitExecFn>(fileIgnoredRootTracked)
       const ev = new GitignoreEvaluator(makeDeps(exec))
       expect(await ev.isIgnored(ROOT, 'dist/index.html')).toBe(true)
+    })
+
+    it('does not report a file ignored when the project folder itself is ignored', async () => {
+      // e.g. a project opened from a folder that an enclosing repository ignores.
+      const exec = vi.fn<GitExecFn>(async () => ({ stdout: '', stderr: '' }))
+      const ev = new GitignoreEvaluator(makeDeps(exec))
+      expect(await ev.isIgnored(ROOT, 'dist/index.html')).toBe(false)
+      expect(exec.mock.calls[1][1].at(-1)).toBe('.')
+    })
+
+    it('skips the project-folder check when the file is not ignored', async () => {
+      const exec = vi.fn<GitExecFn>(async () => {
+        throw Object.assign(new Error('not ignored'), { code: 1 })
+      })
+      const ev = new GitignoreEvaluator(makeDeps(exec))
+      await ev.isIgnored(ROOT, 'src/page.html')
+      expect(exec).toHaveBeenCalledTimes(1)
     })
 
     it('treats exit 1 as not ignored', async () => {
@@ -72,7 +98,7 @@ describe('GitignoreEvaluator', () => {
 
   describe('fail-open when git is unavailable', () => {
     it('returns false without calling exec when git cannot be resolved', async () => {
-      const exec = vi.fn<GitExecFn>(async () => ({ stdout: '', stderr: '' }))
+      const exec = vi.fn<GitExecFn>(fileIgnoredRootTracked)
       const ev = new GitignoreEvaluator({
         exec,
         resolveGitPath: async () => null,
@@ -85,24 +111,30 @@ describe('GitignoreEvaluator', () => {
 
   describe('hardened invocation', () => {
     it('uses an absolute git binary, safe cwd, and the hardened argv', async () => {
-      const exec = vi.fn<GitExecFn>(async () => ({ stdout: '', stderr: '' }))
+      const exec = vi.fn<GitExecFn>(fileIgnoredRootTracked)
       const ev = new GitignoreEvaluator(makeDeps(exec))
       await ev.isIgnored(ROOT, 'src/page.html')
 
-      expect(exec).toHaveBeenCalledTimes(1)
+      // The file check, then the project-folder check that only runs for an ignored file.
+      expect(exec).toHaveBeenCalledTimes(2)
+      expect(exec.mock.calls[1][1].at(-1)).toBe('.')
       const [file, args, options] = exec.mock.calls[0]
 
       expect(file).toBe(GIT_PATH)
+      // NOTE: `include.path=\\.\nul` (the Windows null device) still needs a check against
+      // a real Git for Windows install; it is verified in the Windows session.
       expect(args).toEqual([
+        '--literal-pathspecs',
+        '--no-pager',
+        '--no-optional-locks',
         '-C',
         ROOT,
-        '--no-optional-locks',
         '-c',
-        'core.fsmonitor=',
+        'core.fsmonitor=false',
         '-c',
         `core.hooksPath=${devNull}`,
         '-c',
-        'include.path=',
+        `include.path=${devNull}`,
         'check-ignore',
         '--quiet',
         '--',
@@ -126,15 +158,18 @@ describe('GitignoreEvaluator', () => {
       process.env['GIT_CEILING_DIRECTORIES'] = '/'
       process.env['PATH'] = '/usr/bin:/bin'
 
-      const exec = vi.fn<GitExecFn>(async () => ({ stdout: '', stderr: '' }))
+      const exec = vi.fn<GitExecFn>(fileIgnoredRootTracked)
       const ev = new GitignoreEvaluator(makeDeps(exec))
       await ev.isIgnored(ROOT, 'src/page.html')
 
       const env = exec.mock.calls[0][2].env as NodeJS.ProcessEnv
       const keys = Object.keys(env).sort()
 
-      // Positive assertion: exactly the allowlist keys that are present + NOSYSTEM.
-      const expectedKeys = [...GIT_ENV_ALLOWLIST.filter((k) => process.env[k] !== undefined), 'GIT_CONFIG_NOSYSTEM'].sort()
+      // Positive assertion: exactly the allowlist keys that are present + the fixed GIT_* set.
+      const expectedKeys = [
+        ...GIT_ENV_ALLOWLIST.filter((k) => process.env[k] !== undefined),
+        ...Object.keys(GIT_FIXED_ENV)
+      ].sort()
       expect(keys).toEqual(expectedKeys)
 
       expect(env['GIT_CONFIG_NOSYSTEM']).toBe('1')
@@ -149,7 +184,7 @@ describe('GitignoreEvaluator', () => {
 
   describe('git-path resolution', () => {
     it('resolves git exactly once across multiple evaluations', async () => {
-      const exec = vi.fn<GitExecFn>(async () => ({ stdout: '', stderr: '' }))
+      const exec = vi.fn<GitExecFn>(fileIgnoredRootTracked)
       const resolveGitPath = vi.fn(async () => GIT_PATH)
       const ev = new GitignoreEvaluator({ exec, resolveGitPath, tempDir: () => TEMP_DIR })
 
@@ -163,7 +198,7 @@ describe('GitignoreEvaluator', () => {
   describe('TTL cache', () => {
     it('caches a result within the TTL and re-evaluates after it expires', async () => {
       let clock = 1000
-      const exec = vi.fn<GitExecFn>(async () => ({ stdout: '', stderr: '' }))
+      const exec = vi.fn<GitExecFn>(fileIgnoredRootTracked)
       const ev = new GitignoreEvaluator({
         ...makeDeps(exec),
         now: () => clock,
@@ -172,22 +207,22 @@ describe('GitignoreEvaluator', () => {
 
       await ev.isIgnored(ROOT, 'src/page.html')
       await ev.isIgnored(ROOT, 'src/page.html')
-      expect(exec).toHaveBeenCalledTimes(1) // second read served from cache
+      expect(exec).toHaveBeenCalledTimes(2) // file + folder; second read served from cache
 
       clock += 6000 // past the TTL
       await ev.isIgnored(ROOT, 'src/page.html')
-      expect(exec).toHaveBeenCalledTimes(2)
+      expect(exec).toHaveBeenCalledTimes(4)
     })
 
     it('clearCache forces re-evaluation', async () => {
-      const exec = vi.fn<GitExecFn>(async () => ({ stdout: '', stderr: '' }))
+      const exec = vi.fn<GitExecFn>(fileIgnoredRootTracked)
       const ev = new GitignoreEvaluator(makeDeps(exec))
 
       await ev.isIgnored(ROOT, 'src/page.html')
       ev.clearCache()
       await ev.isIgnored(ROOT, 'src/page.html')
 
-      expect(exec).toHaveBeenCalledTimes(2)
+      expect(exec).toHaveBeenCalledTimes(4)
     })
   })
 })

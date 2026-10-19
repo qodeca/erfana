@@ -4690,7 +4690,6 @@ SOFTWARE.
 
 The following npm packages may be included in this product:
 
- - @electron-toolkit/preload@3.0.2
  - @electron-toolkit/utils@3.0.0
 
 These packages each contain the following license:

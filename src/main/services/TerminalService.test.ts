@@ -378,6 +378,32 @@ async function createId(
       expect(clearSpy).toHaveBeenCalledWith({ terminalId: tid })
     })
 
+    it('never writes PTY output or the full cwd into the logs', async () => {
+      vi.doMock('os', async () => {
+        const actual = await vi.importActual<any>('os')
+        return { ...actual, platform: () => 'darwin' }
+      })
+
+      const { terminalService } = await import('./TerminalService')
+      await createId(terminalService, { cwd: '/Users/alice/secret-project' })
+      const { pty } = spawnedPTYs[0]
+
+      const { args } = spawnedPTYs[0]
+      const script = args[args.indexOf('-c') + 1]
+      const marker = script.match(/__ERFANA_PWD_MARKER_\d+__/)![0]
+      pty.emit('data', `/Users/alice/secret-project\n${marker}\n`)
+      pty.emit('data', 'export API_TOKEN=hunter2-super-secret\n')
+
+      const everything = JSON.stringify(
+        Object.values(mockLogger).flatMap((fn) => fn.mock.calls)
+      )
+      expect(everything).not.toContain('hunter2-super-secret')
+      expect(everything).not.toContain('API_TOKEN')
+      expect(everything).not.toContain('/Users/alice')
+      // the chunk length is still recorded for handshake debugging
+      expect(everything).toContain('length=')
+    })
+
     it('markInitializationComplete sets flags correctly', async () => {
       vi.doMock('os', async () => {
         const actual = await vi.importActual<any>('os')

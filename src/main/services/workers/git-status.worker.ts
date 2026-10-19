@@ -20,39 +20,12 @@ import { createEmptyGitStatusResponse } from '../../../shared/ipc/git-schema'
 import type { GitStatusResponse, GitDisplayStatus, GitFileEntry, GitStatusCounts } from '../../../shared/ipc/git-schema'
 import type { GitStatusStrategy } from '../../interfaces/IGitStatusWorker'
 import { GIT_STATUS } from '../../../shared/constants'
+import { buildHardeningArgs, hardenedSpawnOptions, listIsolationConfig, resolveGitBinary } from '../../utils/hardenedGit'
 
 const execFileAsync = promisify(execFile)
 
 const GIT_STATUS_CAP = 10_000
 
-// Git binary allowlist – checked before falling back to `where git` / `which git`.
-// Priority order per platform: most-popular install location first.
-// On Windows, `fs.access(X_OK)` is *existence-only* (no POSIX execute-bit),
-// so a second `git --version` liveness probe is required to reject bad files.
-// See #160 (Windows git allowlist) for context.
-//
-// `USERPROFILE` is validated to start with `C:\Users\` before the Scoop path
-// is added — guards against an attacker setting a poisoned `USERPROFILE`
-// (e.g. via a malicious shortcut) to redirect the Scoop probe to an
-// arbitrary directory under their control.
-function buildWin32GitPaths(): string[] {
-  const fixed = [
-    'C:\\Program Files\\Git\\cmd\\git.exe',
-    'C:\\Program Files\\Git\\bin\\git.exe',
-    'C:\\Program Files (x86)\\Git\\cmd\\git.exe',
-    'C:\\Program Files (x86)\\Git\\bin\\git.exe',
-    'C:\\ProgramData\\chocolatey\\bin\\git.exe',
-  ]
-  const userProfile = process.env.USERPROFILE
-  if (userProfile && /^[A-Za-z]:\\Users\\[^\\]+\\?$/i.test(userProfile.replace(/\\$/, '') + '\\')) {
-    fixed.push(`${userProfile}\\scoop\\apps\\git\\current\\cmd\\git.exe`)
-  }
-  return fixed
-}
-const WIN32_GIT_PATHS = buildWin32GitPaths()
-const POSIX_GIT_PATHS = ['/usr/bin/git', '/usr/local/bin/git', '/opt/homebrew/bin/git']
-const GIT_PATH_ALLOWLIST = process.platform === 'win32' ? WIN32_GIT_PATHS : POSIX_GIT_PATHS
-const GIT_LIVENESS_TIMEOUT = 2_000
 const BRANCH_DETECT_TIMEOUT = 5_000
 
 // -- Message types -----------------------------------------------------------
@@ -298,14 +271,26 @@ async function executeIsomorphicGit(projectPath: string): Promise<GitStatusRespo
  * indicates detached HEAD, to resolve a 7-char SHA for parity with the
  * isomorphic-git path.
  */
-async function executeNativeGit(projectPath: string, gitPath: string): Promise<GitStatusResponse> {
+export async function executeNativeGit(projectPath: string, gitPath: string): Promise<GitStatusResponse> {
   // Serialize execFile calls (not Promise.all) to reduce peak FD usage from 6 to 3.
   // On large repos the directory watcher already consumes most available FDs;
   // parallel child process spawns can tip the system into EMFILE.
+  //
+  // The folder may be an untrusted repository, so every spawn runs from a cwd
+  // outside it with an allowlisted env and its config-driven command hooks
+  // neutralised (see `utils/hardenedGit.ts`). If the config cannot be inspected,
+  // or the repo is a promisor / partial clone, we do not run native git at all.
+  const isolation = await listIsolationConfig(gitPath, projectPath)
+  if (isolation === null) {
+    console.warn('git-status.worker: repository config could not be isolated, falling back to isomorphic-git')
+    return executeIsomorphicGit(projectPath)
+  }
+  const hardeningArgs = buildHardeningArgs(projectPath, isolation.filterNames, isolation.extraConfig)
+
   const statusResult = await execFileAsync(
     gitPath,
-    ['status', '--porcelain=v1', '--branch', '-z', '--no-renames', '-uall'],
-    { cwd: projectPath, maxBuffer: GIT_STATUS.NATIVE_GIT_MAX_BUFFER, timeout: GIT_STATUS.NATIVE_GIT_TIMEOUT }
+    [...hardeningArgs, 'status', '--porcelain=v1', '--branch', '-z', '--no-renames', '-uall', '--ignore-submodules=all'],
+    { ...hardenedSpawnOptions(), maxBuffer: GIT_STATUS.NATIVE_GIT_MAX_BUFFER, timeout: GIT_STATUS.NATIVE_GIT_TIMEOUT }
   )
 
   const header = parseBranchHeader(statusResult.stdout)
@@ -316,7 +301,7 @@ async function executeNativeGit(projectPath: string, gitPath: string): Promise<G
   // An unborn branch (just-init repo) is NOT detached – we keep the branch name.
   if (header.isDetached) {
     try {
-      const { stdout } = await execFileAsync(gitPath, ['rev-parse', 'HEAD'], { cwd: projectPath, timeout: BRANCH_DETECT_TIMEOUT })
+      const { stdout } = await execFileAsync(gitPath, [...hardeningArgs, 'rev-parse', 'HEAD'], { ...hardenedSpawnOptions(), timeout: BRANCH_DETECT_TIMEOUT })
       branch = stdout.trim().substring(0, 7)
     } catch {
       branch = null
@@ -367,28 +352,6 @@ export function parseBranchHeader(output: string): { branch: string | null; isDe
 // -- Git path resolution -----------------------------------------------------
 
 /**
- * Verify that `candidate` is a real git binary.
- *
- * On Windows, `fs.access(X_OK)` degrades to existence-only (no POSIX
- * execute-bit semantics), so a non-binary file at the expected path would
- * pass. We add a `git --version` liveness probe to reject truncated or
- * renamed files. POSIX retains full `X_OK` semantics.
- */
-async function isExecutableGit(candidate: string): Promise<boolean> {
-  try {
-    if (process.platform === 'win32') {
-      await access(candidate, fs.constants.F_OK)
-      await execFileAsync(candidate, ['--version'], { timeout: GIT_LIVENESS_TIMEOUT })
-      return true
-    }
-    await access(candidate, fs.constants.X_OK)
-    return true
-  } catch {
-    return false
-  }
-}
-
-/**
  * Exported for testing in isolation (see `git-resolver.test.ts`). Tests can
  * call `resetGitPathCache()` + `resolveGitPath()` directly without routing
  * through the `worker_threads` message boundary.
@@ -405,22 +368,9 @@ export async function resolveGitPath(): Promise<string | null> {
     return nativeGitPath
   }
 
-  for (const candidate of GIT_PATH_ALLOWLIST) {
-    if (await isExecutableGit(candidate)) {
-      nativeGitPath = candidate
-      gitPathResolved = true
-      gitPathResolvedAt = Date.now()
-      return nativeGitPath
-    }
-  }
-
-  const findCmd = process.platform === 'win32' ? 'where' : 'which'
-  try {
-    const { stdout } = await execFileAsync(findCmd, ['git'], { timeout: BRANCH_DETECT_TIMEOUT })
-    nativeGitPath = stdout.trim().split('\n')[0] || null
-  } catch {
-    nativeGitPath = null
-  }
+  // Allowlisted install locations, then the absolute `which` / `where.exe`
+  // (shared with the ignore evaluator, see `utils/hardenedGit.ts`).
+  nativeGitPath = await resolveGitBinary()
   gitPathResolved = true
   gitPathResolvedAt = Date.now()
   return nativeGitPath

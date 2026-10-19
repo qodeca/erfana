@@ -176,6 +176,12 @@ export const PDF_EXPORT = {
   CONTENT_READY_TIMEOUT: 5000,
   /** Polling interval for readiness check in ms */
   READY_CHECK_INTERVAL: 100,
+  /** Time box for loading the temp page in ms */
+  LOAD_TIMEOUT: 15000,
+  /** Time box for one readiness probe in ms */
+  READY_PROBE_TIMEOUT: 2000,
+  /** Time box for printToPDF in ms */
+  PRINT_TIMEOUT: 60000,
   /** Hidden window dimensions (A4 at 96 DPI) */
   WINDOW_WIDTH: 794,
   WINDOW_HEIGHT: 1123,

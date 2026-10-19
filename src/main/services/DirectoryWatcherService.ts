@@ -34,6 +34,7 @@ import { ProjectPathFilter, toRootRelative } from '../utils/projectPathFilter'
 import { AppError, ErrorCode } from '../../shared/errors'
 import { RateLimitedLogger } from '../utils/RateLimitedLogger'
 import { collectMemorySnapshot } from '../utils/processMemorySnapshot'
+import { isAtomicTempName } from '../utils/atomicWrite'
 
 interface WatchedDirectory {
   dirPath: string
@@ -198,6 +199,10 @@ export class DirectoryWatcherService {
    * overruns this test caused, for the health line.
    */
   private shouldDropRel(relPath: string | null): boolean {
+    // atomicWriteText's temp file (a save in flight): never shown, never a reload.
+    // Checked first, on the last path segment, so it holds for the chokidar and
+    // the native backend alike (both reach the filter through here).
+    if (relPath !== null && isAtomicTempName(relPath)) return true
     const filter = this.pathFilter
     const overrunsBefore = filter.excludeMatcher.budgetExceeded
     const dropped = filter.shouldDrop(relPath)

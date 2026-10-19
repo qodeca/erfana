@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import pluginJs from '@eslint/js'
 import pluginReact from 'eslint-plugin-react'
+import reactHooks from 'eslint-plugin-react-hooks'
 import * as tseslint from 'typescript-eslint'
 // Use flat-config-friendly Prettier rules directly
 import eslintConfigPrettier from 'eslint-config-prettier'
@@ -53,6 +54,31 @@ export default [
   pluginJs.configs.recommended,
   ...tseslint.configs.recommended,
   pluginReact.configs.flat.recommended,
+  // React hooks (renderer only). `rules-of-hooks` is an error and
+  // `exhaustive-deps` a warning. The plugin's v7 preset also switches on the
+  // React-Compiler-derived rules as errors; this codebase does not use the
+  // compiler, so those are downgraded to warnings rather than blocking lint.
+  {
+    ...reactHooks.configs.flat.recommended,
+    files: ['src/renderer/**/*.{ts,tsx}'],
+    rules: {
+      ...reactHooks.configs.flat.recommended.rules,
+      'react-hooks/rules-of-hooks': 'error',
+      'react-hooks/exhaustive-deps': 'warn',
+      'react-hooks/static-components': 'warn',
+      'react-hooks/use-memo': 'warn',
+      'react-hooks/preserve-manual-memoization': 'warn',
+      'react-hooks/immutability': 'warn',
+      'react-hooks/globals': 'warn',
+      'react-hooks/refs': 'warn',
+      'react-hooks/set-state-in-effect': 'warn',
+      'react-hooks/error-boundaries': 'warn',
+      'react-hooks/purity': 'warn',
+      'react-hooks/set-state-in-render': 'warn',
+      'react-hooks/config': 'warn',
+      'react-hooks/gating': 'warn'
+    }
+  },
   // Disable formatting-related rules that conflict with Prettier
   { rules: eslintConfigPrettier.rules },
   // Configure React version detection for eslint-plugin-react
@@ -272,6 +298,57 @@ export default [
                 'Register global IPC through src/main/ipc/registry.ts (registerHandle / registerOn / …) so every channel is gated on the app renderer. Importing ipcMain directly bypasses that gate.'
             }
           ]
+        }
+      ]
+    }
+  },
+  // Every URL handed to the OS goes through `openExternalSafe()`, which checks it
+  // against the one allowlist. Syntax selectors rather than an import ban, so an
+  // alias (`import { shell as s }`, `const sh = shell`), a namespace access
+  // (`electron.shell.openExternal`) or a destructure cannot get round it. Its own
+  // block, with no `ignores` for registry.ts, so nothing in src/main is exempt
+  // except the one module. `deps.openExternal` (an injected dependency, not the
+  // Electron call) is the only receiver left alone. Tests are exempt: they mock
+  // the call by name.
+  {
+    files: ['src/main/**/*.ts'],
+    ignores: [
+      'src/main/utils/openExternalSafe.ts',
+      'src/main/**/*.test.ts',
+      'src/main/**/__test-helpers__/**'
+    ],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "MemberExpression[property.name='openExternal'][object.name!='deps']",
+          message:
+            'Open external URLs through openExternalSafe() in src/main/utils/openExternalSafe.ts, the only module that calls openExternal. It checks the URL against the one allowlist first.'
+        },
+        {
+          selector: "MemberExpression[computed=true][property.value='openExternal']",
+          message:
+            'Open external URLs through openExternalSafe() in src/main/utils/openExternalSafe.ts, the only module that calls openExternal.'
+        },
+        {
+          selector: "ObjectPattern > Property[key.name='openExternal']",
+          message:
+            'Do not destructure openExternal. Use openExternalSafe() from src/main/utils/openExternalSafe.ts.'
+        },
+        {
+          selector: "ImportSpecifier[imported.name='shell'][local.name!='shell']",
+          message:
+            'Do not alias the electron shell. Use openExternalSafe() from src/main/utils/openExternalSafe.ts for external URLs.'
+        },
+        {
+          selector: "VariableDeclarator[init.name='shell']",
+          message:
+            'Do not alias the electron shell. Use openExternalSafe() from src/main/utils/openExternalSafe.ts for external URLs.'
+        },
+        {
+          selector: "VariableDeclarator > MemberExpression.init[property.name='shell']",
+          message:
+            'Do not alias the electron shell. Use openExternalSafe() from src/main/utils/openExternalSafe.ts for external URLs.'
         }
       ]
     }

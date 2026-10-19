@@ -41,7 +41,7 @@ import * as path from 'path'
 import type { BaseWindow, MessageBoxOptions } from 'electron'
 
 import { test, expect } from './fixtures/index'
-import { LogTail } from './fixtures/logTail'
+import { LogTail, appMainLogPath } from './fixtures/logTail'
 import { HtmlPreviewPage, PREVIEW_BUDGET_MS } from './pages/html-preview.page'
 import {
   clickLink,
@@ -236,7 +236,8 @@ test.describe('HTML preview — external links', () => {
   test('an https: link asks before opening, and Cancel is logged as the outcome', async ({
     windowWithTestProject,
     appWithTestProject,
-    testProject
+    testProject,
+    homeDir
   }) => {
     // The question is a NATIVE message box parented to the window
     // (`dialog.showMessageBox` in externalLinkConsent.ts). Playwright cannot
@@ -271,7 +272,7 @@ test.describe('HTML preview — external links', () => {
         original(window, { ...options, signal: controller.signal })) as typeof dialog.showMessageBox
     })
 
-    const log = new LogTail()
+    const log = new LogTail(appMainLogPath(homeDir))
     await log.mark()
 
     // A trusted click: the preload reports a gesture, main routes it as

@@ -10,18 +10,21 @@
  * turn `check-ignore` into arbitrary command execution or an arbitrary-path file
  * append. This module runs git as narrowly as possible:
  *
- *  - **Absolute git path, resolved once** from a SAFE cwd (never a bare `git`
+ *  - **Absolute git path, resolved once** (fixed install locations, then the
+ *    absolute `which` / `where.exe` from a SAFE cwd – never a bare `git`
  *    against an untrusted current directory, which would let a planted `git`
  *    binary run).
  *  - **cwd is NOT inside the repo** (an OS temp dir), with `-C <root>` selecting
  *    the repository — so a `.git`-relative config include cannot be steered by
  *    the current directory.
  *  - **Config overrides** neutralise the known code-execution key
- *    (`core.fsmonitor=`), redirect hooks to the null device
+ *    (`core.fsmonitor=false`), redirect hooks to the null device
  *    (`core.hooksPath=<NULL_DEVICE>`) and disable ad-hoc includes
- *    (`include.path=`); `GIT_CONFIG_NOSYSTEM=1` drops system config.
+ *    (`include.path=<NULL_DEVICE>`; an empty value is rejected by git);
+ *    `GIT_CONFIG_NOSYSTEM=1` drops system config.
  *  - **Env is an ALLOWLIST**, not a blocklist (design NEW-13): only
- *    {@link GIT_ENV_ALLOWLIST} plus `GIT_CONFIG_NOSYSTEM` survive, so
+ *    {@link GIT_ENV_ALLOWLIST} plus the fixed `GIT_CONFIG_NOSYSTEM`,
+ *    `GIT_TERMINAL_PROMPT` and `GIT_OPTIONAL_LOCKS` (`utils/hardenedGit.ts`) survive, so
  *    `GIT_TRACE*` (an arbitrary-path append primitive), `GIT_WORK_TREE`,
  *    `GIT_INDEX_FILE`, `GIT_PROXY_COMMAND` and `GIT_CEILING_DIRECTORIES` cannot
  *    reach the child.
@@ -36,26 +39,18 @@
  */
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { isAbsolute, join } from 'node:path'
-import { devNull, tmpdir } from 'node:os'
+import { tmpdir } from 'node:os'
+import {
+  GIT_ENV_ALLOWLIST,
+  buildGitEnv,
+  buildHardeningArgs,
+  resolveGitBinary
+} from '../../utils/hardenedGit'
+
+// Re-exported so existing importers (and the design NEW-13 env test) keep working.
+export { GIT_ENV_ALLOWLIST }
 
 const execFileAsync = promisify(execFile)
-
-/**
- * The ONLY environment variables passed to the git child, plus
- * `GIT_CONFIG_NOSYSTEM=1` added separately. An allowlist is the only form whose
- * test is writable as "no `GIT_*` variable other than `GIT_CONFIG_NOSYSTEM` is
- * present" (design NEW-13).
- */
-export const GIT_ENV_ALLOWLIST = [
-  'PATH',
-  'HOME',
-  'USERPROFILE',
-  'SystemRoot',
-  'TEMP',
-  'TMP',
-  'LANG'
-] as const
 
 /** Per-invocation timeout (ms). */
 const GIT_TIMEOUT_MS = 2000
@@ -109,47 +104,6 @@ const defaultExec: GitExecFn = (file, args, options) =>
     stderr: r.stderr.toString()
   }))
 
-/**
- * Default git-path resolver: `which git` (POSIX) / `where git` (win32) run from
- * a SAFE cwd with an absolute finder binary. Returns the first absolute hit or
- * `null`.
- */
-async function defaultResolveGitPath(tempDir: string): Promise<string | null> {
-  const isWin = process.platform === 'win32'
-  const finder = isWin
-    ? join(process.env['SystemRoot'] ?? 'C:\\Windows', 'System32', 'where.exe')
-    : '/usr/bin/which'
-  try {
-    const { stdout } = await execFileAsync(finder, ['git'], {
-      cwd: tempDir,
-      shell: false,
-      windowsHide: true,
-      timeout: GIT_TIMEOUT_MS
-    })
-    const first = stdout
-      .toString()
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .find((line) => line.length > 0)
-    return first && isAbsolute(first) ? first : null
-  } catch {
-    return null
-  }
-}
-
-/** Build the child env from the allowlist plus `GIT_CONFIG_NOSYSTEM`. */
-function buildGitEnv(): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = {}
-  for (const key of GIT_ENV_ALLOWLIST) {
-    const value = process.env[key]
-    if (value !== undefined) {
-      env[key] = value
-    }
-  }
-  env['GIT_CONFIG_NOSYSTEM'] = '1'
-  return env
-}
-
 interface CacheEntry {
   value: boolean
   expires: number
@@ -167,7 +121,9 @@ export class GitignoreEvaluator implements IGitignoreEvaluator {
 
   constructor(deps: GitignoreEvaluatorDeps = {}) {
     this.exec = deps.exec ?? defaultExec
-    this.resolveGitPath = deps.resolveGitPath ?? defaultResolveGitPath
+    // Shared with the git-status worker: install-location allowlist, then the
+    // absolute `which` / `where.exe`.
+    this.resolveGitPath = deps.resolveGitPath ?? resolveGitBinary
     this.tempDir = deps.tempDir ?? (() => tmpdir())
     this.now = deps.now ?? Date.now
     this.cacheTtlMs = deps.cacheTtlMs ?? DEFAULT_CACHE_TTL_MS
@@ -180,7 +136,24 @@ export class GitignoreEvaluator implements IGitignoreEvaluator {
       return cached.value
     }
 
-    const value = await this.evaluate(projectRoot, relPath)
+    // A file only counts as ignored when the project folder itself is not: a
+    // project opened from inside a folder that an enclosing repository ignores
+    // would otherwise have every file reported ignored.
+    const value =
+      (await this.evaluate(projectRoot, relPath)) && !(await this.isRootIgnored(projectRoot))
+    this.cache.set(cacheKey, { value, expires: this.now() + this.cacheTtlMs })
+    return value
+  }
+
+  /** Whether an enclosing repository ignores the project folder itself (cached like files). */
+  private async isRootIgnored(projectRoot: string): Promise<boolean> {
+    const cacheKey = `${projectRoot}\u0000`
+    const cached = this.cache.get(cacheKey)
+    if (cached && cached.expires > this.now()) {
+      return cached.value
+    }
+
+    const value = await this.evaluate(projectRoot, '.')
     this.cache.set(cacheKey, { value, expires: this.now() + this.cacheTtlMs })
     return value
   }
@@ -202,16 +175,10 @@ export class GitignoreEvaluator implements IGitignoreEvaluator {
       return false
     }
 
+    // `--literal-pathspecs`: the candidate is a file name, never a pathspec magic.
     const args = [
-      '-C',
-      projectRoot,
-      '--no-optional-locks',
-      '-c',
-      'core.fsmonitor=',
-      '-c',
-      `core.hooksPath=${devNull}`,
-      '-c',
-      'include.path=',
+      '--literal-pathspecs',
+      ...buildHardeningArgs(projectRoot),
       'check-ignore',
       '--quiet',
       '--',

@@ -100,8 +100,8 @@ describe('linkProtocols', () => {
       expect(isExternalProtocol('tel:+1234567890')).toBe(true)
     })
 
-    it('should recognize ftp:// as external', () => {
-      expect(isExternalProtocol('ftp://ftp.example.com')).toBe(true)
+    it('should NOT recognize ftp:// as external', () => {
+      expect(isExternalProtocol('ftp://ftp.example.com')).toBe(false)
     })
 
     it('should NOT recognize dangerous protocols as external', () => {

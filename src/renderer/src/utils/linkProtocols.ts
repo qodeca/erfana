@@ -23,8 +23,7 @@ export const SAFE_EXTERNAL_PROTOCOLS = [
   'http://',
   'https://',
   'mailto:',
-  'tel:',
-  'ftp://'
+  'tel:'
 ] as const;
 
 /**

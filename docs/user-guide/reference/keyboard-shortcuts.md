@@ -100,4 +100,4 @@ In the image viewer, the wheel zooms around the pointer, dragging pans, and doub
 | Close or cancel | <kbd>Esc</kbd> | <kbd>Esc</kbd> |
 | Move through file picker; choose file | <kbd>↑/↓</kbd>; <kbd>Enter</kbd> | Same |
 
-In ordinary dialogs, <kbd>Enter</kbd> activates the focused button, even when it is **Cancel**; <kbd>Tab</kbd> moves focus and <kbd>Space</kbd> activates the focused control. The file picker also copies a selected path with <kbd>Cmd</kbd>+<kbd>C</kbd> (Windows: <kbd>Ctrl</kbd>+<kbd>C</kbd>).
+In ordinary dialogs, <kbd>Enter</kbd> activates the focused button, even when it is **Cancel**. Prompts that delete, discard or quit open with focus on **Cancel**, so pressing <kbd>Enter</kbd> straight away keeps everything as it was; <kbd>Tab</kbd> moves focus and <kbd>Space</kbd> activates the focused control. The file picker also copies a selected path with <kbd>Cmd</kbd>+<kbd>C</kbd> (Windows: <kbd>Ctrl</kbd>+<kbd>C</kbd>).

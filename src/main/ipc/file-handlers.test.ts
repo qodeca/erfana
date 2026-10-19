@@ -565,6 +565,46 @@ describe('#210 watcher catch-up hooks', () => {
 
       expect(commitRead).not.toHaveBeenCalled()
     })
+
+    it('logs the folder name, never the full path, on success', async () => {
+      const { registerFileHandlers } = await import('./file-handlers')
+      const { fileService } = await import('../services/FileService')
+      const { directoryWatcherService } = await import('../services/DirectoryWatcherService')
+      const { logger } = await import('../services/LoggingService')
+      const infoSpy = vi.spyOn(logger, 'info').mockImplementation(() => {})
+
+      vi.spyOn(directoryWatcherService, 'beginTreeRead').mockReturnValue(vi.fn())
+      vi.spyOn(fileService, 'readDirectory').mockResolvedValue([])
+
+      registerFileHandlers()
+      await handlers['file:readDirectory'](event, '/Users/alice/secret-project')
+
+      const logged = JSON.stringify(infoSpy.mock.calls)
+      expect(logged).not.toContain('/Users/alice')
+      expect(logged).toContain('secret-project')
+    })
+
+    it('logs a failed read without the path inside the errno message', async () => {
+      const { registerFileHandlers } = await import('./file-handlers')
+      const { fileService } = await import('../services/FileService')
+      const { directoryWatcherService } = await import('../services/DirectoryWatcherService')
+      const { logger } = await import('../services/LoggingService')
+      const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => {})
+
+      vi.spyOn(directoryWatcherService, 'beginTreeRead').mockReturnValue(vi.fn())
+      const failure = Object.assign(
+        new Error("EACCES: permission denied, scandir '/Users/alice/secret-project'"),
+        { code: 'EACCES', syscall: 'scandir' }
+      )
+      vi.spyOn(fileService, 'readDirectory').mockRejectedValue(failure)
+
+      registerFileHandlers()
+      await expect(handlers['file:readDirectory'](event, '/Users/alice/secret-project')).rejects.toBe(failure)
+
+      const loggedError = errorSpy.mock.calls[0][1] as Error
+      expect(loggedError.message).not.toContain('/Users/alice')
+      expect(JSON.stringify(errorSpy.mock.calls)).not.toContain('/Users/alice')
+    })
   })
 
   const mutationCases = [

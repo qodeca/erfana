@@ -101,6 +101,7 @@ export function SettingsOverlay() {
   const [modelDownloading, setModelDownloading] = useState(false)
   const [downloadProgress, setDownloadProgress] = useState<{ percent: number; downloadedBytes: number; totalBytes: number } | null>(null)
   const [downloadError, setDownloadError] = useState<string | null>(null)
+  const [apiKeyError, setApiKeyError] = useState<string | null>(null)
 
   // Logs folder path for display in settings
   const [logsDir, setLogsDir] = useState<string>('')
@@ -218,10 +219,12 @@ export function SettingsOverlay() {
       try {
         const result = await window.api.transcription.setApiKey(value)
         if (result.success) {
+          setApiKeyError(null)
           setHasApiKey(true)
           // Clear the input after successful save
           e.target.value = ''
         } else {
+          setApiKeyError(result.error ?? 'The key could not be saved.')
           logger.warn('Failed to save API key', { error: result.error })
         }
       } catch (error) {
@@ -515,6 +518,16 @@ export function SettingsOverlay() {
                       />
                     )}
                   </div>
+                </div>
+              )}
+              {settings?.transcription.backend === 'openai' && apiKeyError && (
+                <div className="settings-row">
+                  <p
+                    className="settings-inline-error"
+                    data-testid={TEST_IDS.SETTINGS_API_KEY_ERROR}
+                  >
+                    {apiKeyError}
+                  </p>
                 </div>
               )}
 

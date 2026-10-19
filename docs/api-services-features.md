@@ -572,6 +572,8 @@ PDF generation from HTML content.
 - Print-optimized PDF with A4 page size
 - Vector Mermaid diagrams (not rasterized)
 - Uses Electron's `webContents.printToPDF()`
+- Renders in an isolated window: its own in-memory `pdf-export` partition (`pdfExportSession.ts`), installed before the window exists. A request filter admits only the temp page being loaded plus `https:` and `data:` images; every other request is refused and logged by scheme and host only. The page carries a CSP that allows no script except the built-in readiness script (by hash). Popups, navigation and permission requests are denied.
+- Each step that waits on the renderer (page load, each readiness probe, `printToPDF`) has a time limit (`PDF_EXPORT.LOAD_TIMEOUT`, `READY_PROBE_TIMEOUT`, `PRINT_TIMEOUT`). On expiry the window is destroyed, `PDF_EXPORT_FAILED` is returned and the export lock is released.
 
 ### Public Methods
 

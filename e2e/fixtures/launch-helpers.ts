@@ -10,11 +10,14 @@
 import type { ElectronApplication } from '@playwright/test'
 import * as path from 'path'
 
+import { buildAppEnv, closeAppAndWait } from './isolation'
+
 const PROJECT_ROOT = path.join(__dirname, '..', '..')
 
 export function buildVisualLaunchOptions(
   userDataDir: string,
-  projectPath?: string
+  projectPath?: string,
+  homeDir?: string
 ): {
   args: string[]
   env: Record<string, string>
@@ -26,7 +29,7 @@ export function buildVisualLaunchOptions(
   }
   const opts: ReturnType<typeof buildVisualLaunchOptions> = {
     args,
-    env: { ...process.env, NODE_ENV: 'development' }
+    env: buildAppEnv({ homeDir })
   }
   if (process.env.CI) {
     opts.recordVideo = {
@@ -48,11 +51,7 @@ export async function forceCloseApp(app: ElectronApplication): Promise<void> {
   } catch (e) {
     if (process.env.CI) console.warn('forceCloseApp: window destroy failed –', e)
   }
-  try {
-    await app.close()
-  } catch (e) {
-    if (process.env.CI) console.warn('forceCloseApp: app.close() failed –', e)
-  }
+  await closeAppAndWait(app)
 }
 
 export async function resizeBrowserWindow(

@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { ElectronAPI } from '@electron-toolkit/preload'
 import { FileNode, FileStats } from './index'
 import type { GitStatusResponse } from '../shared/ipc/git-schema'
 import type { GitStateChangeEvent, GitWatcherStatus, GitPollTriggeredEvent } from '../shared/ipc/git-watcher-schema'
@@ -49,7 +48,7 @@ import type { BrowserBridge } from '../shared/ipc/browser-schema'
 
 declare global {
   interface Window {
-    electron: ElectronAPI & {
+    electron: {
       shell: {
         openExternal: (url: string) => Promise<void>
       }

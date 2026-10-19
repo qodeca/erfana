@@ -19,6 +19,16 @@ vi.mock('fs/promises', () => ({
   constants: { R_OK: 4 }
 }))
 
+// Persistence goes through atomicWriteJSON (temp file + rename, covered in
+// atomicWrite*.test.ts). Here it is routed to the mocked writeFile so these
+// tests keep asserting on what is written and when.
+vi.mock('../utils/atomicWrite', () => ({
+  atomicWriteJSON: async (path: string, content: unknown, space?: number) => {
+    const fs = await import('fs/promises')
+    await fs.writeFile(path, JSON.stringify(content, null, space), 'utf-8')
+  }
+}))
+
 // Mock os.homedir
 vi.mock('os', () => ({
   homedir: vi.fn(() => '/mock-home')
@@ -213,6 +223,67 @@ describe('GlobalSettingsService', () => {
         code: ErrorCode.GLOBAL_SETTINGS_DIR_CREATE_FAILED,
         message: expect.stringContaining('Permission denied')
       })
+    })
+  })
+
+  describe('save after a failed load', () => {
+    const SETTINGS = '/mock-home/.erfana/settings.json'
+
+    async function failToLoad(): Promise<void> {
+      vi.mocked(mkdir).mockResolvedValue(undefined)
+      vi.mocked(access).mockResolvedValue(undefined)
+      vi.mocked(readFile).mockRejectedValue(new Error('EIO: i/o error'))
+      await expect(service.initialize()).rejects.toMatchObject({
+        code: ErrorCode.GLOBAL_SETTINGS_READ_FAILED
+      })
+      vi.mocked(copyFile).mockReset()
+      vi.mocked(writeFile).mockReset()
+    }
+
+    it('backs the real file up before the first save overwrites it', async () => {
+      await failToLoad()
+      vi.mocked(copyFile).mockResolvedValue(undefined)
+      vi.mocked(writeFile).mockResolvedValue(undefined)
+
+      await service.setSetting('logging', { level: 'debug' })
+
+      expect(copyFile).toHaveBeenCalledWith(SETTINGS, expect.stringMatching(/settings\.json\.bak-\d{4}-/))
+      expect(vi.mocked(copyFile).mock.invocationCallOrder[0]).toBeLessThan(
+        vi.mocked(writeFile).mock.invocationCallOrder[0]
+      )
+    })
+
+    it('backs up only once', async () => {
+      await failToLoad()
+      vi.mocked(copyFile).mockResolvedValue(undefined)
+      vi.mocked(writeFile).mockResolvedValue(undefined)
+
+      await service.setSetting('logging', { level: 'debug' })
+      await service.setSetting('logging', { level: 'info' })
+
+      expect(copyFile).toHaveBeenCalledTimes(1)
+    })
+
+    it('refuses to save when the backup cannot be made', async () => {
+      await failToLoad()
+      vi.mocked(copyFile).mockRejectedValue(new Error('EACCES'))
+
+      await expect(service.setSetting('logging', { level: 'debug' })).rejects.toMatchObject({
+        code: ErrorCode.GLOBAL_SETTINGS_WRITE_FAILED
+      })
+      expect(writeFile).not.toHaveBeenCalled()
+    })
+
+    it('makes no extra backup after a normal load', async () => {
+      vi.mocked(mkdir).mockResolvedValue(undefined)
+      vi.mocked(access).mockRejectedValue(new Error('ENOENT'))
+      vi.mocked(writeFile).mockResolvedValue(undefined)
+      await service.initialize()
+      vi.mocked(copyFile).mockReset()
+
+      await service.setSetting('logging', { level: 'debug' })
+
+      expect(copyFile).not.toHaveBeenCalled()
     })
   })
 

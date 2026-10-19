@@ -56,6 +56,7 @@ vi.mock('./LoggingService', () => ({
 import { DirectoryWatcherService } from './DirectoryWatcherService'
 import { PauseEpisode } from './watcher'
 import { ProjectPathFilter } from '../utils/projectPathFilter'
+import { ATOMIC_TEMP_PREFIX } from '../utils/atomicWrite'
 
 const ROOT = '/work/build/proj'
 const OWNER = 1
@@ -153,6 +154,15 @@ describe('DirectoryWatcherService path filter (#211)', () => {
       expect(ignored(`${ROOT}/.git/index.lock`)).toBe(true)
     })
 
+    it('drops the temp file of an atomic save (fixed prefix), but not a lookalike document', async () => {
+      const { ignored } = await startWatch(svc, ROOT)
+
+      expect(ignored(`${ROOT}/${ATOMIC_TEMP_PREFIX}1234`)).toBe(true)
+      expect(ignored(`${ROOT}/docs/deep/${ATOMIC_TEMP_PREFIX}1234`)).toBe(true)
+      expect(ignored(`${ROOT}/docs/erfana-tmp-notes.md`)).toBe(false)
+      expect(ignored(`${ROOT}/docs/x${ATOMIC_TEMP_PREFIX}notes.md`)).toBe(false)
+    })
+
     it('drops a path outside the project, including a sibling sharing its prefix (fail closed)', async () => {
       const { ignored } = await startWatch(svc, ROOT)
 
@@ -209,6 +219,20 @@ describe('DirectoryWatcherService path filter (#211)', () => {
       expect(harness.sends).toHaveLength(0)
       expect(svc.getStats().metrics).toEqual(
         expect.objectContaining({ eventsReceived: 0, eventsFiltered: DEFAULT_DROPPED.length + 1 })
+      )
+    })
+
+    it('an atomic-save temp file never reaches the renderer, but the saved document does', async () => {
+      const { emit } = await startWatch(svc, ROOT)
+
+      emit('add', `${ROOT}/docs/${ATOMIC_TEMP_PREFIX}abc`)
+      emit('change', `${ROOT}/docs/${ATOMIC_TEMP_PREFIX}abc`)
+      emit('unlink', `${ROOT}/docs/${ATOMIC_TEMP_PREFIX}abc`)
+      emit('change', `${ROOT}/docs/note.md`)
+      vi.advanceTimersByTime(FLUSH_MS)
+
+      expect(svc.getStats().metrics).toEqual(
+        expect.objectContaining({ eventsReceived: 1, eventsFiltered: 3 })
       )
     })
 

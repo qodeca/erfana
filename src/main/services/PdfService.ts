@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { BrowserWindow, dialog } from 'electron'
+import { createHash } from 'crypto'
 import { writeFile, unlink, mkdtemp } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
@@ -10,6 +11,13 @@ import type { PdfExportResponse } from '../../shared/ipc/pdf-schema'
 import { logger } from './LoggingService'
 import { deriveSafeFilename } from '../utils/validateFilename'
 import { rememberDialogResult, withLastDirectory } from '../utils/lastDialogDirectory'
+import { TimeoutError, withTimeout } from '../utils/withTimeout'
+import {
+  PDF_EXPORT_PARTITION,
+  buildPdfCsp,
+  hardenPdfWindow,
+  preparePdfExportSession
+} from './pdfExportSession'
 
 /**
  * Print stylesheet for PDF export
@@ -357,6 +365,19 @@ const READINESS_SCRIPT = `
 `
 
 /**
+ * Exact text between the `<script>` tags. The CSP hashes this string byte for
+ * byte, so it is built once and embedded verbatim.
+ */
+const INLINE_READINESS_SCRIPT = `
+    ${READINESS_SCRIPT}
+  `
+
+/** CSP for the export page: the readiness script is the only script allowed. */
+const PDF_CSP = buildPdfCsp(
+  createHash('sha256').update(INLINE_READINESS_SCRIPT, 'utf8').digest('base64')
+)
+
+/**
  * PDF print configuration for Electron's printToPDF API
  */
 const PDF_PRINT_CONFIG = {
@@ -382,6 +403,7 @@ function buildPrintableHtml(content: string): string {
 <html>
 <head>
   <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="${PDF_CSP}">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     ${PRINT_STYLESHEET}
@@ -393,9 +415,7 @@ function buildPrintableHtml(content: string): string {
       ${content}
     </div>
   </div>
-  <script>
-    ${READINESS_SCRIPT}
-  </script>
+  <script>${INLINE_READINESS_SCRIPT}</script>
 </body>
 </html>`
 }
@@ -511,7 +531,7 @@ class SecureWindowFactory {
    * @returns Configured BrowserWindow instance
    */
   createPdfRenderWindow(): BrowserWindow {
-    return new BrowserWindow({
+    const win = new BrowserWindow({
       show: false,
       width: PDF_EXPORT.WINDOW_WIDTH,
       height: PDF_EXPORT.WINDOW_HEIGHT,
@@ -519,12 +539,20 @@ class SecureWindowFactory {
         nodeIntegration: false,
         contextIsolation: true,
         sandbox: true,
+        // Own in-memory session, hardened by preparePdfExportSession
+        partition: PDF_EXPORT_PARTITION,
+        webSecurity: true,
+        allowRunningInsecureContent: false,
+        webviewTag: false,
+        nodeIntegrationInSubFrames: false,
         // Disable features not needed for PDF rendering
         webgl: false,
         enableWebSQL: false,
         spellcheck: false
       }
     })
+    hardenPdfWindow(win)
+    return win
   }
 }
 
@@ -567,9 +595,15 @@ class ContentReadinessPoller {
    */
   private async checkReady(win: BrowserWindow): Promise<boolean> {
     try {
-      return await win.webContents.executeJavaScript('window.pdfReady === true')
-    } catch {
-      // Ignore execution errors, keep polling
+      return await withTimeout(
+        win.webContents.executeJavaScript('window.pdfReady === true'),
+        PDF_EXPORT.READY_PROBE_TIMEOUT,
+        'PDF readiness probe'
+      )
+    } catch (error) {
+      // A hung renderer must abort the export, not be polled again
+      if (error instanceof TimeoutError) throw error
+      // Ignore other execution errors, keep polling
       return false
     }
   }
@@ -773,9 +807,8 @@ class PdfService implements IPdfService {
    * @returns PDF buffer or null if generation failed
    */
   private async generatePdfBuffer(html: string): Promise<Buffer | null> {
-    // Create hidden window for rendering
-    const hiddenWindow = this.windowFactory.createPdfRenderWindow()
     const tempFileManager = new TempFileManager()
+    let hiddenWindow: BrowserWindow | null = null
 
     try {
       // Build printable HTML and write to temp file
@@ -783,27 +816,63 @@ class PdfService implements IPdfService {
       const printableHtml = buildPrintableHtml(html)
       const tempFilePath = await tempFileManager.writeTemp(printableHtml)
 
-      // Load HTML from temp file (file:// protocol has no size limit)
-      await hiddenWindow.loadFile(tempFilePath)
+      // Session controls first, window second: the filter must exist before
+      // the first request the window makes.
+      preparePdfExportSession(tempFilePath)
+      const win = this.windowFactory.createPdfRenderWindow()
+      hiddenWindow = win
 
-      // Wait for content to be ready (Mermaid diagrams, images)
-      await this.readinessPoller.waitForReady(hiddenWindow)
+      // Every step that talks to the renderer is time-boxed: a hung renderer
+      // must not keep the export lock held.
+      try {
+        // Load HTML from temp file (file:// protocol has no size limit)
+        await withTimeout(win.loadFile(tempFilePath), PDF_EXPORT.LOAD_TIMEOUT, 'PDF page load')
 
-      // Generate PDF
-      const pdfBuffer = await hiddenWindow.webContents.printToPDF(PDF_PRINT_CONFIG)
+        // Wait for content to be ready (Mermaid diagrams, images)
+        await this.readinessPoller.waitForReady(win)
 
-      // Validate PDF buffer is not empty
-      if (!pdfBuffer || pdfBuffer.length === 0) {
-        return null
+        // Generate PDF
+        const pdfBuffer = await withTimeout(
+          win.webContents.printToPDF(PDF_PRINT_CONFIG),
+          PDF_EXPORT.PRINT_TIMEOUT,
+          'PDF print'
+        )
+
+        // Validate PDF buffer is not empty
+        if (!pdfBuffer || pdfBuffer.length === 0) {
+          return null
+        }
+
+        return pdfBuffer
+      } catch (error) {
+        if (error instanceof TimeoutError) {
+          this.abortWindow(win)
+        }
+        throw error
       }
-
-      return pdfBuffer
     } finally {
       // Always clean up resources
-      if (!hiddenWindow.isDestroyed()) {
+      if (hiddenWindow && !hiddenWindow.isDestroyed()) {
         hiddenWindow.close()
       }
       await tempFileManager.cleanup()
+    }
+  }
+
+  /**
+   * Tear down a window whose renderer stopped answering.
+   * Never throws: the caller is already on a failure path.
+   */
+  private abortWindow(win: BrowserWindow): void {
+    try {
+      if (!win.isDestroyed()) {
+        win.webContents.forcefullyCrashRenderer()
+        win.destroy()
+      }
+    } catch (error) {
+      logger.warn('PDF export: could not tear down unresponsive window', {
+        error: error instanceof Error ? error.message : String(error)
+      })
     }
   }
 
