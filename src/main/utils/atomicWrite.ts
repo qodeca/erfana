@@ -94,6 +94,36 @@ export async function atomicWriteJSON<T>(
   }
 }
 
+/**
+ * Writes raw bytes atomically (temp file, fsync, rename), owner-only (0o600).
+ * Same crash-safety contract as {@link atomicWriteJSON}; the extra fsync makes
+ * sure the bytes are on disk before the rename publishes them. Used for
+ * encrypted secrets, where a torn file would silently lose the secret.
+ *
+ * @throws Error if write or rename fails (temp file is cleaned up)
+ */
+export async function atomicWriteBytes(filePath: string, data: Buffer): Promise<void> {
+  const tempPath = join(dirname(filePath), `.${randomUUID()}.tmp`)
+
+  try {
+    const handle = await open(tempPath, 'w', 0o600)
+    try {
+      await handle.writeFile(data)
+      await handle.sync()
+    } finally {
+      await handle.close()
+    }
+    await renameWithRetry(tempPath, filePath)
+  } catch (error) {
+    try {
+      await unlink(tempPath)
+    } catch {
+      // Ignore cleanup errors - temp file may not exist
+    }
+    throw error
+  }
+}
+
 const RENAME_RETRYABLE = new Set(['EPERM', 'EBUSY', 'EACCES'])
 const RENAME_BACKOFFS_MS = [10, 30, 100]
 

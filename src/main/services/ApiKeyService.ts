@@ -17,14 +17,23 @@
  * @see Issue #75 - Media import with transcription
  */
 import { safeStorage } from 'electron'
-import { readFile, writeFile, unlink, access, mkdir } from 'fs/promises'
+import { readFile, unlink, access, mkdir } from 'fs/promises'
 import { homedir } from 'os'
 import { join } from 'path'
 import { logger } from './LoggingService'
+import { atomicWriteBytes } from '../utils/atomicWrite'
 import { ApiKeyEncryptionUnavailableError } from './apiKeyErrors'
 
 /** Directory for storing encrypted keys */
 const KEYS_DIR = join(homedir(), '.erfana')
+
+/*
+ * Compatibility (checked 2026-10-18, macOS, Electron 44.9.0, throwaway main
+ * script): `decryptStringAsync` reads data written by the older sync
+ * `encryptString` (and the reverse), both with the same `v10` prefix, so
+ * existing key files need no sync-decrypt fallback on macOS. NOT yet verified
+ * on Windows or Linux – repeat the check in the Windows session.
+ */
 
 /** Printable ASCII only: a legacy plaintext key file (encrypted blobs are binary). */
 const LEGACY_PLAINTEXT_PATTERN = /^[\x21-\x7e]+$/
@@ -85,7 +94,7 @@ class ApiKeyService implements IApiKeyService {
     }
 
     const encrypted = await safeStorage.encryptStringAsync(key)
-    await writeFile(filePath, encrypted, { mode: 0o600 })
+    await atomicWriteBytes(filePath, encrypted)
     logger.debug('API key stored with encryption', { serviceName })
 
     this.knownKeys.add(serviceName)
@@ -114,16 +123,21 @@ class ApiKeyService implements IApiKeyService {
         try {
           const { result, shouldReEncrypt } = await safeStorage.decryptStringAsync(data)
           if (shouldReEncrypt) {
-            await writeFile(filePath, await safeStorage.encryptStringAsync(result), {
-              mode: 0o600
-            })
+            await atomicWriteBytes(filePath, await safeStorage.encryptStringAsync(result))
           }
           return result
         } catch (decryptError) {
+          // Written by the older sync API? Windows/Linux interop is unverified, so
+          // try the sync decrypt before treating the file as something else.
+          const syncValue = this.tryDecryptSync(data)
+          if (syncValue !== null) {
+            await atomicWriteBytes(filePath, await safeStorage.encryptStringAsync(syncValue))
+            return syncValue
+          }
           // Not decryptable: may be a plaintext file from an older version.
           const legacy = this.parseLegacyPlaintext(data)
           if (legacy === null) throw decryptError
-          await writeFile(filePath, await safeStorage.encryptStringAsync(legacy), { mode: 0o600 })
+          await atomicWriteBytes(filePath, await safeStorage.encryptStringAsync(legacy))
           logger.info('Migrated legacy API key file to encrypted storage', { serviceName })
           return legacy
         }
@@ -196,6 +210,14 @@ class ApiKeyService implements IApiKeyService {
       } catch {
         // Key file doesn't exist
       }
+    }
+  }
+
+  private tryDecryptSync(data: Buffer): string | null {
+    try {
+      return safeStorage.decryptString(data)
+    } catch {
+      return null
     }
   }
 
