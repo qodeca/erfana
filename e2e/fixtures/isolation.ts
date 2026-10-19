@@ -171,9 +171,14 @@ export async function createWorkerHome(prefix: string): Promise<string> {
   return home
 }
 
-/** Removal retry budget: ~5s in total, enough for Windows to release handles. */
-const REMOVE_MAX_RETRIES = 25
-const REMOVE_RETRY_DELAY_MS = 200
+/**
+ * Removal retry budget: ~5.5s in total, enough for Windows to release handles.
+ * `fs.rm` backs off linearly (the n-th retry waits n × retryDelay), so the total
+ * is retryDelay × maxRetries × (maxRetries + 1) / 2 – 25 × 200 ms was 65 s,
+ * longer than the 60 s test timeout.
+ */
+const REMOVE_MAX_RETRIES = 10
+const REMOVE_RETRY_DELAY_MS = 100
 
 /**
  * Remove a temp directory, retrying while the OS reports it busy (EBUSY /

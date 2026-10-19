@@ -308,8 +308,9 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
 
     await use({ path: projectPath })
 
-    // The app (a dependent fixture) has already been closed and awaited by
-    // now; the retry covers the short window Windows keeps handles open.
+    // appWithTestProject depends on this fixture, so the app has already been
+    // closed and awaited by now; the retry covers the short window Windows
+    // keeps handles open.
     await removeDirWithRetry(projectPath)
   },
 
@@ -352,8 +353,13 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
   // optional: specs that need switches (e.g. the fake camera in
   // camera-mirror.e2e.ts) run on `windowWithTestProject`, which is fed by this
   // fixture. Wiring only `app` would silently drop the switches.
+  // `testProject` is a dependency only for teardown order: Playwright tears a
+  // fixture down before the fixtures it depends on, so the app is closed BEFORE
+  // its project folder is removed. Without it the folder went first and, on
+  // Windows, stayed locked by the still-running app (EBUSY, #134).
   appWithTestProject: async (
-    { userDataDir, homeDir, extraLaunchArgs, resetRendererStorage },
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    { userDataDir, homeDir, extraLaunchArgs, resetRendererStorage, testProject },
     use
   ) => {
     await launchApp(
@@ -563,7 +569,10 @@ export const visualTest = base.extend<VisualTestFixtures, WorkerFixtures>({
     }
   },
 
-  visualAppWithProject: async ({ userDataDir, homeDir }, use) => {
+  // `visualTestProject` is a dependency only for teardown order: the app closes
+  // before its project folder is removed (see appWithTestProject).
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  visualAppWithProject: async ({ userDataDir, homeDir, visualTestProject }, use) => {
     const opts = buildVisualLaunchOptions(userDataDir, undefined, homeDir)
     const app = await electron.launch(opts)
     await resizeBrowserWindow(app, 1280, 800)
