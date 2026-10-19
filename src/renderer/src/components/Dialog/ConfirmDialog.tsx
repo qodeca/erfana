@@ -22,7 +22,8 @@ interface ConfirmDialogProps {
  * - Danger mode for destructive actions (red button + warning icon)
  * - Initial focus on the choice that loses nothing: Cancel when `danger`,
  *   Confirm otherwise
- * - Enter follows the focused button; Esc cancels
+ * - Enter follows the focused button; with focus off the buttons it confirms
+ *   a non-danger prompt and does nothing on a danger one. Esc cancels
  * - Promise-based API via useDialog()
  *
  * @example
@@ -67,6 +68,10 @@ export function ConfirmDialog({ config, zIndex, onConfirm, onCancel }: ConfirmDi
   // Auto-repeat is swallowed everywhere, buttons included: a key held down
   // from whatever opened the prompt must not run into an answer – for a
   // destructive prompt that answer would be delete, discard or quit.
+  //
+  // The off-button fallback confirms only for non-danger prompts. Nothing
+  // focusable sits outside the buttons today, but a link or checkbox added to
+  // a message later must not turn Enter into delete, discard or quit.
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key !== 'Enter' || e.shiftKey || e.ctrlKey || e.metaKey) return
 
@@ -75,7 +80,7 @@ export function ConfirmDialog({ config, zIndex, onConfirm, onCancel }: ConfirmDi
       return
     }
 
-    if (e.target instanceof HTMLButtonElement) return
+    if (e.target instanceof HTMLButtonElement || danger) return
 
     e.preventDefault()
     handleConfirm()

@@ -106,13 +106,13 @@ describe('ConfirmDialog', () => {
       expect(onCancel).not.toHaveBeenCalled()
     })
 
-    it('with focus elsewhere in the dialog confirms', async () => {
+    it(`with focus elsewhere in the dialog ${danger ? 'does nothing' : 'confirms'}`, async () => {
       const { onConfirm, onCancel } = renderDialog(danger)
       await settleFocus()
 
       fireEvent.keyDown(message(), { key: 'Enter' })
 
-      expect(onConfirm).toHaveBeenCalledTimes(1)
+      expect(onConfirm).toHaveBeenCalledTimes(danger ? 0 : 1)
       expect(onCancel).not.toHaveBeenCalled()
     })
 
@@ -134,8 +134,10 @@ describe('ConfirmDialog', () => {
   })
 
   describe('auto-repeated Enter', () => {
+    // Non-danger: the only case where a single Enter off a button confirms,
+    // so it is the case where ignoring the repeat is observable.
     it('is ignored when focus is not on a button', async () => {
-      const { onConfirm, onCancel } = renderDialog(true)
+      const { onConfirm, onCancel } = renderDialog(false)
       await settleFocus()
 
       fireEvent.keyDown(message(), { key: 'Enter', repeat: true })
