@@ -746,6 +746,85 @@ async function createId(
   })
 
   // ===========================================================================
+  // Issue #214: quit must not outrun node-pty's exit callback
+  // ===========================================================================
+
+  describe('Issue #214 - dispose waits for shell exit', () => {
+    async function settledAfterIo(promise: Promise<void>): Promise<boolean> {
+      let settled = false
+      void promise.then(() => {
+        settled = true
+      })
+      await new Promise((resolve) => setImmediate(resolve))
+      return settled
+    }
+
+    beforeEach(() => {
+      vi.doMock('os', async () => {
+        const actual = await vi.importActual<any>('os')
+        return { ...actual, platform: () => 'darwin' }
+      })
+    })
+
+    it('dispose does not resolve until the killed shell reports its exit', async () => {
+      const { terminalService } = await import('./TerminalService')
+      await createId(terminalService, { cwd: '/tmp' })
+      const { pty } = spawnedPTYs[0]
+
+      const disposed = terminalService.dispose()
+
+      expect(pty.kill).toHaveBeenCalled()
+      expect(await settledAfterIo(disposed)).toBe(false)
+
+      pty.emit('exit', { exitCode: 0 })
+      await disposed
+    })
+
+    it('dispose also waits for a shell killed earlier by a window close', async () => {
+      const { terminalService } = await import('./TerminalService')
+      await createId(terminalService, { cwd: '/tmp' }, 7)
+      const { pty } = spawnedPTYs[0]
+
+      terminalService.cleanupForWebContentsId(7)
+      const disposed = terminalService.dispose()
+
+      expect(await settledAfterIo(disposed)).toBe(false)
+
+      pty.emit('exit', { exitCode: 0 })
+      await disposed
+    })
+
+    it('dispose gives up after TERMINAL_EXIT_WAIT_MS when the shell never reports exit', async () => {
+      const { terminalService, TERMINAL_EXIT_WAIT_MS } = await import('./TerminalService')
+      await createId(terminalService, { cwd: '/tmp' })
+
+      vi.useFakeTimers()
+      try {
+        let settled = false
+        const disposed = terminalService.dispose().then(() => {
+          settled = true
+        })
+
+        await vi.advanceTimersByTimeAsync(TERMINAL_EXIT_WAIT_MS - 1)
+        expect(settled).toBe(false)
+
+        await vi.advanceTimersByTimeAsync(1)
+        await disposed
+        expect(settled).toBe(true)
+        expect(mockLogger.warn).toHaveBeenCalledWith(expect.stringContaining('did not report exit'))
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('dispose resolves at once when no shell is running', async () => {
+      const { terminalService } = await import('./TerminalService')
+
+      expect(await settledAfterIo(terminalService.dispose())).toBe(true)
+    })
+  })
+
+  // ===========================================================================
   // Issue #59: WebContents Cleanup Tests
   // ===========================================================================
 
