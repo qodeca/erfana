@@ -747,6 +747,34 @@ describe('LoggingService', () => {
     })
   })
 
+  describe('main-process formatting', () => {
+    beforeEach(async () => {
+      await service.initialize()
+      vi.clearAllMocks()
+    })
+
+    it('escapes control characters interpolated into a main-process message', () => {
+      service.info('CWD: /tmp/evil\n[2026-01-01] [deadbeef] [error] forged\u001b[2J')
+
+      const written = mockMainLogger.info.mock.calls[0][0] as string
+      // eslint-disable-next-line no-control-regex
+      expect(written).not.toMatch(/[\u0000-\u001f\u007f-\u009f]/)
+      expect(written).toContain('/tmp/evil\\n[2026-01-01]')
+    })
+
+    it('escapes control characters in error messages and stacks', () => {
+      const error = new Error('bad\nthing')
+      error.stack = 'Error: bad\n    at fn (file.ts:1:1)'
+
+      service.error('failed', error, { note: 'line\rbreak' })
+
+      const written = mockMainLogger.error.mock.calls[0][0] as string
+       
+      expect(written).not.toMatch(/[\r\n]/)
+      expect(written).toContain('Stack: Error: bad\\n    at fn')
+    })
+  })
+
   describe('logFromRenderer()', () => {
     beforeEach(async () => {
       await service.initialize()
@@ -769,6 +797,22 @@ describe('LoggingService', () => {
       expect(written).toContain('first\\r\\n[2026-01-01')
       expect(written).toContain('bad\\nline')
       expect(written).toContain('at a\\n    at b')
+    })
+
+    it('escapes every control character, not only CR and LF', () => {
+      const entry: LogEntry = {
+        level: 'info',
+        message: 'a\u001b[31mred\u0000\u007f\u0085\u2028\u2029b\tc',
+        timestamp: new Date().toISOString(),
+        source: 'renderer'
+      }
+
+      service.logFromRenderer(entry)
+
+      const written = mockCombinedLogger.info.mock.calls[0][0] as string
+      // eslint-disable-next-line no-control-regex
+      expect(written).not.toMatch(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/)
+      expect(written).toContain('a\\u001b[31mred\\u0000\\u007f\\u0085\\u2028\\u2029b\\tc')
     })
 
     it('logs trace from renderer to combined and renderer logs', () => {

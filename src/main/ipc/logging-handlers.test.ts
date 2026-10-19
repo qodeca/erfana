@@ -37,7 +37,12 @@ vi.mock('../services/LoggingService', () => ({
 import { registerLoggingHandlers } from './logging-handlers'
 import { ipcMain, shell } from 'electron'
 import { loggingService, logger } from '../services/LoggingService'
-import { MAX_RENDERER_LOGS_PER_WINDOW, RENDERER_LOG_WINDOW_MS } from './logging-handlers'
+import {
+  MAX_RENDERER_LOGS_PER_WINDOW,
+  MAX_RENDERER_LOG_CHARS_PER_WINDOW,
+  MAX_RENDERER_SEVERE_LOGS_PER_WINDOW,
+  RENDERER_LOG_WINDOW_MS
+} from './logging-handlers'
 
 // Get references to mocked modules
 const mockIpcMainOn = (ipcMain.on as any)
@@ -54,11 +59,14 @@ let consoleErrorSpy: ReturnType<typeof vi.spyOn>
 describe('registerLoggingHandlers', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // RateLimitedLogger treats a clock below its interval as "just logged"
+    vi.spyOn(performance, 'now').mockReturnValue(1_000_000)
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
   })
 
   afterEach(() => {
     consoleErrorSpy.mockRestore()
+    vi.restoreAllMocks()
   })
 
   describe('registration', () => {
@@ -144,9 +152,9 @@ describe('registerLoggingHandlers', () => {
       logHandler(senderEvent(1), invalidEntry)
 
       expect(mockLoggingService.logFromRenderer).not.toHaveBeenCalled()
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Invalid log entry from renderer:',
-        expect.any(Array)
+      expect(logger.warn).toHaveBeenCalledWith(
+        'Invalid log entry from renderer',
+        expect.objectContaining({ issues: expect.any(Array) })
       )
     })
 
@@ -160,7 +168,7 @@ describe('registerLoggingHandlers', () => {
       logHandler(senderEvent(1), invalidEntry)
 
       expect(mockLoggingService.logFromRenderer).not.toHaveBeenCalled()
-      expect(consoleErrorSpy).toHaveBeenCalled()
+      expect(logger.warn).toHaveBeenCalled()
     })
 
     it('rejects invalid entry (missing timestamp)', () => {
@@ -173,7 +181,7 @@ describe('registerLoggingHandlers', () => {
       logHandler(senderEvent(1), invalidEntry)
 
       expect(mockLoggingService.logFromRenderer).not.toHaveBeenCalled()
-      expect(consoleErrorSpy).toHaveBeenCalled()
+      expect(logger.warn).toHaveBeenCalled()
     })
 
     it('rejects invalid entry (missing source)', () => {
@@ -186,7 +194,7 @@ describe('registerLoggingHandlers', () => {
       logHandler(senderEvent(1), invalidEntry)
 
       expect(mockLoggingService.logFromRenderer).not.toHaveBeenCalled()
-      expect(consoleErrorSpy).toHaveBeenCalled()
+      expect(logger.warn).toHaveBeenCalled()
     })
 
     it('rejects invalid level value', () => {
@@ -200,7 +208,7 @@ describe('registerLoggingHandlers', () => {
       logHandler(senderEvent(1), invalidEntry)
 
       expect(mockLoggingService.logFromRenderer).not.toHaveBeenCalled()
-      expect(consoleErrorSpy).toHaveBeenCalled()
+      expect(logger.warn).toHaveBeenCalled()
     })
 
     it('rejects invalid source value', () => {
@@ -214,7 +222,7 @@ describe('registerLoggingHandlers', () => {
       logHandler(senderEvent(1), invalidEntry)
 
       expect(mockLoggingService.logFromRenderer).not.toHaveBeenCalled()
-      expect(consoleErrorSpy).toHaveBeenCalled()
+      expect(logger.warn).toHaveBeenCalled()
     })
 
     it('accepts all valid log levels', () => {
@@ -306,7 +314,7 @@ describe('registerLoggingHandlers', () => {
       logHandler(senderEvent(1), invalidEntry)
 
       expect(mockLoggingService.logFromRenderer).not.toHaveBeenCalled()
-      expect(consoleErrorSpy).toHaveBeenCalled()
+      expect(logger.warn).toHaveBeenCalled()
     })
 
     it('rejects invalid error structure (missing message)', () => {
@@ -323,7 +331,7 @@ describe('registerLoggingHandlers', () => {
       logHandler(senderEvent(1), invalidEntry)
 
       expect(mockLoggingService.logFromRenderer).not.toHaveBeenCalled()
-      expect(consoleErrorSpy).toHaveBeenCalled()
+      expect(logger.warn).toHaveBeenCalled()
     })
 
     it('rejects non-object context', () => {
@@ -338,28 +346,28 @@ describe('registerLoggingHandlers', () => {
       logHandler(senderEvent(1), invalidEntry)
 
       expect(mockLoggingService.logFromRenderer).not.toHaveBeenCalled()
-      expect(consoleErrorSpy).toHaveBeenCalled()
+      expect(logger.warn).toHaveBeenCalled()
     })
 
     it('handles null entry', () => {
       logHandler(senderEvent(1), null)
 
       expect(mockLoggingService.logFromRenderer).not.toHaveBeenCalled()
-      expect(consoleErrorSpy).toHaveBeenCalled()
+      expect(logger.warn).toHaveBeenCalled()
     })
 
     it('handles undefined entry', () => {
       logHandler(senderEvent(1), undefined)
 
       expect(mockLoggingService.logFromRenderer).not.toHaveBeenCalled()
-      expect(consoleErrorSpy).toHaveBeenCalled()
+      expect(logger.warn).toHaveBeenCalled()
     })
 
     it('handles non-object entry', () => {
       logHandler(senderEvent(1), 'not-an-object')
 
       expect(mockLoggingService.logFromRenderer).not.toHaveBeenCalled()
-      expect(consoleErrorSpy).toHaveBeenCalled()
+      expect(logger.warn).toHaveBeenCalled()
     })
 
     it('is one-way (does not send response)', () => {
@@ -574,7 +582,8 @@ describe('registerLoggingHandlers', () => {
       logHandler(senderEvent(1), validEntry)
 
       expect(mockLoggingService.logFromRenderer).toHaveBeenCalledTimes(2)
-      expect(consoleErrorSpy).toHaveBeenCalledTimes(1)
+      // rate-limited: one warning per interval
+      expect(logger.warn).toHaveBeenCalledTimes(1)
     })
   })
 
@@ -606,8 +615,49 @@ describe('registerLoggingHandlers', () => {
 
       expect(logger.warn).toHaveBeenCalledWith(
         expect.stringContaining('rate cap'),
-        expect.objectContaining({ senderId: 1, suppressed: 25 })
+        expect.objectContaining({ senderId: 1, suppressed: 25, suppressedSevere: 0 })
       )
+    })
+
+    it('keeps error records flowing while a flood of info records is being dropped', () => {
+      for (let i = 0; i < MAX_RENDERER_LOGS_PER_WINDOW + 50; i++) logHandler(senderEvent(1), entry)
+      mockLoggingService.logFromRenderer.mockClear()
+
+      logHandler(senderEvent(1), { ...entry, level: 'error', message: 'real failure' })
+      logHandler(senderEvent(1), { ...entry, level: 'fatal', message: 'crash' })
+
+      expect(mockLoggingService.logFromRenderer).toHaveBeenCalledTimes(2)
+    })
+
+    it('caps the severe budget separately', () => {
+      for (let i = 0; i < MAX_RENDERER_SEVERE_LOGS_PER_WINDOW + 5; i++) {
+        logHandler(senderEvent(1), { ...entry, level: 'error' })
+      }
+      expect(mockLoggingService.logFromRenderer).toHaveBeenCalledTimes(
+        MAX_RENDERER_SEVERE_LOGS_PER_WINDOW
+      )
+
+      vi.advanceTimersByTime(RENDERER_LOG_WINDOW_MS)
+      expect(logger.warn).toHaveBeenCalledWith(
+        expect.stringContaining('rate cap'),
+        expect.objectContaining({ suppressedSevere: 5 })
+      )
+    })
+
+    it('enforces a size budget per sender, not just a record count', () => {
+      const big = { ...entry, message: 'x'.repeat(8_000) }
+      const fits = Math.floor(MAX_RENDERER_LOG_CHARS_PER_WINDOW / 8_000)
+      for (let i = 0; i < fits + 10; i++) logHandler(senderEvent(1), big)
+
+      expect(mockLoggingService.logFromRenderer).toHaveBeenCalledTimes(fits)
+    })
+
+    it('shortens an oversized entry instead of dropping it', () => {
+      logHandler(senderEvent(1), { ...entry, message: 'y'.repeat(50_000) })
+
+      expect(mockLoggingService.logFromRenderer).toHaveBeenCalledTimes(1)
+      const forwarded = mockLoggingService.logFromRenderer.mock.calls[0][0] as LogEntry
+      expect(forwarded.message.length).toBeLessThan(9_000)
     })
 
     it('counts each sender separately and starts a fresh window afterwards', () => {

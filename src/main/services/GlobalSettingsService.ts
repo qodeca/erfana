@@ -42,6 +42,13 @@ export class GlobalSettingsService {
   private readonly settingsPath: string
   private readonly backupPath: string
   private readonly writeMutex = new Mutex()
+  /**
+   * Set when initialize() failed for a reason other than "no settings file".
+   * The settings file on disk may then hold real user settings that were never
+   * loaded, so the next save backs it up first instead of overwriting it with
+   * in-memory defaults.
+   */
+  private loadFailed = false
   private readonly changeListeners: Set<(event: GlobalSettingsChanged) => void> = new Set()
 
   constructor() {
@@ -55,8 +62,13 @@ export class GlobalSettingsService {
    * Initialize service - create directory and load settings
    */
   async initialize(): Promise<void> {
-    await this.ensureSettingsDir()
-    await this.loadSettings()
+    try {
+      await this.ensureSettingsDir()
+      await this.loadSettings()
+    } catch (error) {
+      this.loadFailed = true
+      throw error
+    }
   }
 
   /**
@@ -235,6 +247,7 @@ export class GlobalSettingsService {
   private async saveSettings(): Promise<void> {
     return this.writeMutex.runExclusive(async () => {
       try {
+        if (this.loadFailed) await this.backupBeforeOverwrite()
         await atomicWriteJSON(this.settingsPath, this.settings, 2)
       } catch (error) {
         throw new AppError(
@@ -268,6 +281,22 @@ export class GlobalSettingsService {
 
     // Save defaults
     await this.saveSettings()
+  }
+
+  /**
+   * After a failed load, keep the real file as `settings.json.bak-<timestamp>`
+   * before the first save replaces it with in-memory defaults. If the copy
+   * fails, the save is refused (the throw is reported as a write failure) –
+   * losing the user's settings is worse than not saving. The flag is cleared
+   * only once the backup exists, so a failed attempt is retried on the next save.
+   */
+  private async backupBeforeOverwrite(): Promise<void> {
+    if (await this.fileExists(this.settingsPath)) {
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+      await copyFile(this.settingsPath, `${this.settingsPath}.bak-${stamp}`)
+      logger.warn('Settings failed to load earlier; kept a copy before saving defaults')
+    }
+    this.loadFailed = false
   }
 
   /**

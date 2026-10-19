@@ -55,7 +55,7 @@ describe('Main Process - Window Creation', () => {
   let mockRegisterWindowResponsiveness: any
   let mockRegisterWindowErrorSignals: any
   let mockRegisterQuitHandlers: any
-  let mockShowErrorBox: any
+  let mockShowMessageBox: any
   let mockWriteCrashFallbackLine: any
   let mockRegisterProcessCrashLogging: any
 
@@ -64,8 +64,8 @@ describe('Main Process - Window Creation', () => {
     vi.resetModules()
     delete process.env.ERFANA_E2E_FORCE_CRASH
 
-    mockShowErrorBox = vi.fn()
-    mockWriteCrashFallbackLine = vi.fn()
+    mockShowMessageBox = vi.fn(() => Promise.resolve({ response: 0 }))
+    mockWriteCrashFallbackLine = vi.fn(() => true)
     mockRegisterProcessCrashLogging = vi.fn()
     vi.doMock('./utils/crashFallbackLog', () => ({
       writeCrashFallbackLine: mockWriteCrashFallbackLine
@@ -79,6 +79,7 @@ describe('Main Process - Window Creation', () => {
     // Mock BrowserWindow
     createdWindow = {
       on: vi.fn(),
+      once: vi.fn(),
       show: vi.fn(),
       loadURL: vi.fn(),
       loadFile: vi.fn(),
@@ -143,7 +144,7 @@ describe('Main Process - Window Creation', () => {
       app: mockApp,
       shell: { openExternal: vi.fn() },
       BrowserWindow: mockBrowserWindow,
-      dialog: { showErrorBox: mockShowErrorBox },
+      dialog: { showMessageBox: mockShowMessageBox },
       Menu: {
         buildFromTemplate: vi.fn(() => ({})),
         setApplicationMenu: vi.fn()
@@ -474,7 +475,14 @@ describe('Main Process - Window Creation', () => {
       }
     )
 
-    it('writes a fallback crash line and tells the user once, after the window exists', async () => {
+    /** Fires the window's one-time 'show' listener, as Electron does after ready-to-show. */
+    function fireShow(): void {
+      const call = createdWindow.once.mock.calls.find((c: unknown[]) => c[0] === 'show')
+      expect(call).toBeDefined()
+      call![1]()
+    }
+
+    it('writes a fallback crash line for each failed step', async () => {
       await failInit('both')
 
       await import('./index')
@@ -488,21 +496,59 @@ describe('Main Process - Window Creation', () => {
         '[crash] startup-logging-init',
         expect.any(Error)
       )
-      expect(mockShowErrorBox).toHaveBeenCalledTimes(1)
-      const [title, body] = mockShowErrorBox.mock.calls[0]
-      expect(title).toBe('Erfana started with problems')
-      expect(body).toContain('settings')
-      expect(body).toContain('log files')
-      expect(mockBrowserWindow.mock.invocationCallOrder[0]).toBeLessThan(
-        mockShowErrorBox.mock.invocationCallOrder[0]
-      )
+    })
+
+    it('tells the user with a non-blocking message box, only once the window is shown', async () => {
+      await failInit('both')
+
+      await import('./index')
+      await flushStartup()
+
+      // start-up finished and the window exists, but nothing has been shown yet
+      expect(mockBrowserWindow).toHaveBeenCalledTimes(1)
+      expect(mockShowMessageBox).not.toHaveBeenCalled()
+
+      fireShow()
+
+      expect(mockShowMessageBox).toHaveBeenCalledTimes(1)
+      const [parent, options] = mockShowMessageBox.mock.calls[0]
+      expect(parent).toBe(createdWindow)
+      expect(options.title).toBe('Erfana started with problems')
+      expect(options.detail).toContain('settings')
+      expect(options.detail).toContain('log files')
+      expect(options.detail).toContain('crash.log')
+    })
+
+    it('does not claim details were saved when the fallback write failed', async () => {
+      mockWriteCrashFallbackLine.mockReturnValue(false)
+      await failInit('logging')
+
+      await import('./index')
+      await flushStartup()
+      fireShow()
+
+      const { detail } = mockShowMessageBox.mock.calls[0][1]
+      expect(detail).not.toContain('crash.log')
+      expect(detail).toContain('could not be saved')
+    })
+
+    it('survives a message box that fails to open', async () => {
+      mockShowMessageBox.mockRejectedValue(new Error('no display'))
+      await failInit('settings')
+
+      await import('./index')
+      await flushStartup()
+
+      expect(() => fireShow()).not.toThrow()
+      await flushStartup()
     })
 
     it('shows no dialog and writes no fallback line when start-up is healthy', async () => {
       await import('./index')
       await flushStartup()
 
-      expect(mockShowErrorBox).not.toHaveBeenCalled()
+      expect(createdWindow.once).not.toHaveBeenCalledWith('show', expect.any(Function))
+      expect(mockShowMessageBox).not.toHaveBeenCalled()
       expect(mockWriteCrashFallbackLine).not.toHaveBeenCalled()
     })
   })
