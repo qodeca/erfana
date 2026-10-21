@@ -36,6 +36,9 @@ interface WindowsPtyAgentLike {
 const SHIM_MARK = '__erfanaNoForkConsoleList'
 
 let reported = false
+/** node-pty version the replacement was written and checked against (major.minor). */
+const CHECKED_NODE_PTY_SERIES = '1.1.'
+
 function reportOnce(message: string, detail?: Record<string, unknown>): void {
   if (reported) return
   reported = true
@@ -57,11 +60,37 @@ export function loadWindowsPtyAgent(): unknown {
   return createRequire(__filename)('node-pty/lib/windowsPtyAgent')
 }
 
+/** Installing still goes ahead on another node-pty version, but the upgrade should get a re-check. */
+function noteVersionOnce(version: string | undefined): void {
+  if (versionNoted) return
+  versionNoted = true
+  if (version?.startsWith(CHECKED_NODE_PTY_SERIES)) return
+  logger.warn(
+    `node-pty ${version ?? '(unknown version)'} is not ${CHECKED_NODE_PTY_SERIES}x: the Windows kill shim was installed but must be re-verified`,
+    { checkedSeries: `${CHECKED_NODE_PTY_SERIES}x` }
+  )
+}
+
+/** node-pty's own version, read through the same `createRequire` as the module. */
+export function readNodePtyVersion(): string | undefined {
+  try {
+    const pkg = createRequire(__filename)('node-pty/package.json') as { version?: unknown }
+    return typeof pkg.version === 'string' ? pkg.version : undefined
+  } catch {
+    return undefined
+  }
+}
+
+let versionNoted = false
+
 /**
  * @param load - Returns node-pty's `lib/windowsPtyAgent` module (injected in some tests)
  * @returns true when the replacement is in place
  */
-export function installNoForkConsoleList(load: () => unknown = loadWindowsPtyAgent): boolean {
+export function installNoForkConsoleList(
+  load: () => unknown = loadWindowsPtyAgent,
+  readVersion: () => string | undefined = readNodePtyVersion
+): boolean {
   try {
     const mod = load() as { WindowsPtyAgent?: WindowsPtyAgentLike } | undefined
     const proto = mod?.WindowsPtyAgent?.prototype
@@ -76,6 +105,7 @@ export function installNoForkConsoleList(load: () => unknown = loadWindowsPtyAge
     }
     ;(replacement as unknown as Record<string, unknown>)[SHIM_MARK] = true
     proto._getConsoleProcessList = replacement
+    noteVersionOnce(readVersion())
     return true
   } catch (error) {
     reportOnce('Could not adjust node-pty\'s Windows kill; leaving it as is', {
@@ -88,4 +118,5 @@ export function installNoForkConsoleList(load: () => unknown = loadWindowsPtyAge
 /** Test hook: lets a test see the once-only warning again. */
 export function resetShimWarningForTests(): void {
   reported = false
+  versionNoted = false
 }

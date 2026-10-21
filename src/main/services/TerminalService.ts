@@ -768,8 +768,10 @@ export class TerminalService extends EventEmitter {
     if (terminal.killRequested) return
     terminal.killRequested = true
     try {
-      // node-pty documents kill() as void, but a rejection from work it starts
-      // internally must never surface as an unhandled rejection (error box).
+      // Safety net only. In node-pty 1.1.0 WindowsTerminal.kill() returns undefined,
+      // so this branch never runs there; the #296 error box is prevented by the
+      // shim in nodePtyWindowsShim.ts. If a later node-pty returns a promise from
+      // kill(), its rejection is contained here rather than becoming an unhandled one.
       const result: unknown = terminal.ptyProcess.kill()
       if (result && typeof (result as Promise<unknown>).catch === 'function') {
         void (result as Promise<unknown>).catch((error: unknown) => {

@@ -9,7 +9,7 @@ const logger = vi.hoisted(() => ({
 }))
 vi.mock('./LoggingService', () => ({ logger }))
 
-import { installNoForkConsoleList, resetShimWarningForTests } from './nodePtyWindowsShim'
+import { installNoForkConsoleList, readNodePtyVersion, resetShimWarningForTests } from './nodePtyWindowsShim'
 
 /** Shaped like node-pty 1.1.0: the original builds its list by forking, which throws when the fuse is off */
 function fakeModule() {
@@ -81,6 +81,28 @@ describe('nodePtyWindowsShim', () => {
       })
     ).toBe(false)
     expect(logger.error).toHaveBeenCalledTimes(1)
+  })
+
+  describe('node-pty version', () => {
+    it('reads the installed version, and the lockfile one is the checked 1.1 series', () => {
+      expect(readNodePtyVersion()).toMatch(/^1\.1\./)
+    })
+
+    it.each(['1.1.0', '1.1.7'])('says nothing for %s', (version) => {
+      const { module } = fakeModule()
+      expect(installNoForkConsoleList(() => module, () => version)).toBe(true)
+      expect(logger.warn).not.toHaveBeenCalled()
+    })
+
+    it.each(['1.2.0', '2.0.0', undefined])('installs anyway and warns once, naming the version (%s)', (version) => {
+      const first = fakeModule().module
+      expect(installNoForkConsoleList(() => first, () => version)).toBe(true)
+      const second = fakeModule().module
+      expect(installNoForkConsoleList(() => second, () => version)).toBe(true)
+      expect(logger.warn).toHaveBeenCalledTimes(1)
+      expect(String(logger.warn.mock.calls[0][0])).toContain(version ?? 'unknown')
+      expect(logger.error).not.toHaveBeenCalled()
+    })
   })
 
   it('the real loader finds node-pty and replaces the method on the prototype in use', async () => {
