@@ -67,7 +67,7 @@ import { registerFileHandlers, projectService } from './file-handlers'
 
 const roots: string[] = []
 function makeProject(): string {
-  const dir = realpathSync(mkdtempSync(join(tmpdir(), 'erfana-session-')))
+  const dir = realpathSync.native(mkdtempSync(join(tmpdir(), 'erfana-session-')))
   roots.push(dir)
   return dir
 }

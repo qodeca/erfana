@@ -413,7 +413,7 @@ The policy as practised: *a file a change adds behaviour to must come in under 5
 | `src/main/index.ts` | 670 | Pre-existing; the composition root |
 | `src/renderer/src/utils/filePathLinks.logic.ts` | 655 | Pre-existing |
 | `src/shared/constants.ts` | 651 | Pre-existing; comment-heavy constant table |
-| `src/main/ipc/file-handlers.ts` | 650 | Pre-existing; **grew by 4 lines** in #70 to 601 (the `projectConfinement` import plus two `assert*` calls) and had reached 627 by 2026-09-04. Adding a security guard to an over-cap file was accepted rather than blocking the fix on a refactor. #210 took it to 650 (re-measured for #210) on the same terms: a `beginTreeRead` / commit pair in `file:readDirectory`, one `noteInternalChange` call per mutation handler and a contract comment – the logic they feed lives in `watcher/PauseEpisode.ts` |
+| `src/main/ipc/file-handlers.ts` | 652 | Pre-existing; **grew by 4 lines** in #70 to 601 (the `projectConfinement` import plus two `assert*` calls) and had reached 627 by 2026-09-04. Adding a security guard to an over-cap file was accepted rather than blocking the fix on a refactor. #210 took it to 650 (re-measured for #210) on the same terms: a `beginTreeRead` / commit pair in `file:readDirectory`, one `noteInternalChange` call per mutation handler and a contract comment – the logic they feed lives in `watcher/PauseEpisode.ts` |
 | `src/renderer/src/components/Editor/DiagramViewer/ChatBubble.tsx` | 641 | Pre-existing (entry 8) |
 | `src/main/services/claudeStatus/ClaudeStatusService.ts` | 639 | Pre-existing |
 | `src/renderer/src/components/Dialog/BaseDialog.tsx` | 624 | Pre-existing |

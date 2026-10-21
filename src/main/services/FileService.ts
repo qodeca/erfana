@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { readdir, readFile, writeFile, stat, rm, mkdir, rename as fsRename, cp, copyFile } from 'fs/promises'
 import { join, extname, basename, relative, resolve as resolvePath } from 'path'
-import type { IFileService, WriteFileOptions } from '../interfaces/IFileService'
+import type { IFileService } from '../interfaces/IFileService'
 import { SymlinkDetector } from '../utils/SymlinkDetector'
 import { RollbackHandler } from '../utils/RollbackHandler'
 import { assertValidUserFilename } from '../utils/validateFilename'
@@ -24,8 +24,11 @@ import { redactPath } from '../utils/redactUserInput'
 import { logger } from './LoggingService'
 import { atomicWriteText, isAtomicTempName } from '../utils/atomicWrite'
 import { IMAGE_EXTENSIONS, readImage } from './file/imageRead'
-import { restoreParentDirectory } from './file/restoreParentDirectory'
+import { childPath } from '../utils/childPath'
+import { isSamePath } from '../utils/pathCompare'
+import { getPlatformConfig } from './watcher/PlatformConfig'
 import type { ImageReadResponse } from '../../shared/ipc/file-image-schema'
+import type { ProjectSession } from './session/ProjectSession'
 import type { FileNode } from '../../shared/ipc/file-schema'
 
 export type { FileNode }
@@ -174,6 +177,7 @@ const matcherOverruns = (scope: WalkScope): number =>
 
 export class FileService implements IFileService {
   private projectPath: string | null = null
+  private session: Pick<ProjectSession, 'current'> | null = null
   private symlinkDetector = new SymlinkDetector()
   private rollbackHandler = new RollbackHandler()
 
@@ -224,6 +228,11 @@ export class FileService implements IFileService {
   setProjectPath(path: string): void {
     this.projectPath = path
     this.hasLoggedPatterns = false
+  }
+
+  /** The open-project session, read for the root's canonical form (see `isProjectRoot`) */
+  bindSession(session: Pick<ProjectSession, 'current'>): void {
+    this.session = session
   }
 
   getProjectPath(): string | null {
@@ -455,15 +464,10 @@ export class FileService implements IFileService {
   }
 
   /**
-   * Write a text file. `createParentDirs` is the explicit "Save to restore it"
-   * of a tab whose file was deleted together with its folder: the missing
-   * folders are recreated, inside the project only, before the write (see
-   * `file/restoreParentDirectory`). Without it a missing folder is an ENOENT.
+   * Write a text file. A missing folder is an ENOENT; the explicit "Save to
+   * restore it" recreates the folders first (see `file/restoreParentDirectory`).
    */
-  async writeFile(filePath: string, content: string, options: WriteFileOptions = {}): Promise<void> {
-    if (options.createParentDirs === true) {
-      await restoreParentDirectory(filePath, this.projectPath)
-    }
+  async writeFile(filePath: string, content: string): Promise<void> {
     await atomicWriteText(filePath, content)
   }
 
@@ -517,6 +521,11 @@ export class FileService implements IFileService {
       throw new Error('File name cannot be empty')
     }
 
+    // `.` and `..` are folders, not names; checked before `.md` is appended
+    if (fileName === '.' || fileName === '..') {
+      throw new Error('Invalid name')
+    }
+
     // Ensure .md extension
     if (!fileName.endsWith('.md') && !fileName.endsWith('.markdown')) {
       fileName = `${fileName}.md`
@@ -528,7 +537,7 @@ export class FileService implements IFileService {
     // portability-breaking classes (control chars, bidi, empty, too long).
     assertValidUserFilename(fileName)
 
-    const filePath = join(dirPath, fileName)
+    const filePath = childPath(dirPath, fileName)
 
     // Check if file already exists
     try {
@@ -559,7 +568,7 @@ export class FileService implements IFileService {
     // #161: validate reserved names, forbidden chars, etc. (platform-aware).
     assertValidUserFilename(folderName)
 
-    const folderPath = join(dirPath, folderName)
+    const folderPath = childPath(dirPath, folderName)
 
     // Check if folder already exists
     try {
@@ -579,16 +588,31 @@ export class FileService implements IFileService {
     return folderPath
   }
 
+  /**
+   * Whether `candidate` is the open project's root folder. The one defence the
+   * service keeps of its own: callers pass paths the IPC layer has already
+   * checked against the project, but a handler that skipped that check must
+   * still not be able to remove or move the root.
+   */
+  private isProjectRoot(candidate: string): boolean {
+    if (!this.projectPath) return false
+    const target = resolvePath(candidate)
+    // The session holds the canonical root and the case rule, resolved once at open
+    const snapshot = this.session?.current() ?? null
+    if (snapshot) {
+      return (
+        isSamePath(target, snapshot.realRoot, snapshot.caseSensitive) ||
+        isSamePath(target, resolvePath(snapshot.root), snapshot.caseSensitive)
+      )
+    }
+    return isSamePath(target, resolvePath(this.projectPath), getPlatformConfig().caseSensitive)
+  }
+
   async deleteFile(filePath: string): Promise<void> {
     // Verify it's a file, not a directory
     const stats = await stat(filePath)
     if (stats.isDirectory()) {
       throw new Error('Cannot delete a directory using deleteFile. Use deleteFolder instead.')
-    }
-
-    // Prevent deleting files outside project
-    if (this.projectPath && !filePath.startsWith(this.projectPath)) {
-      throw new Error('Cannot delete files outside the project directory')
     }
 
     await rm(filePath)
@@ -602,13 +626,8 @@ export class FileService implements IFileService {
     }
 
     // Prevent deleting project root
-    if (this.projectPath && folderPath === this.projectPath) {
+    if (this.isProjectRoot(folderPath)) {
       throw new Error('Cannot delete the project root directory')
-    }
-
-    // Prevent deleting folders outside project
-    if (this.projectPath && !folderPath.startsWith(this.projectPath)) {
-      throw new Error('Cannot delete folders outside the project directory')
     }
 
     // Delete folder recursively
@@ -629,7 +648,7 @@ export class FileService implements IFileService {
     // Get the directory and construct new path
     const { dirname } = await import('path')
     const parentDir = dirname(oldPath)
-    const newPath = join(parentDir, newName)
+    const newPath = childPath(parentDir, newName)
 
     // Check if already exists
     try {
@@ -641,16 +660,6 @@ export class FileService implements IFileService {
       if (code !== 'ENOENT') {
         throw error
       }
-    }
-
-    // Prevent renaming files/folders outside project
-    if (this.projectPath && !oldPath.startsWith(this.projectPath)) {
-      throw new Error('Cannot rename items outside the project directory')
-    }
-
-    // Prevent renaming project root
-    if (this.projectPath && oldPath === this.projectPath) {
-      throw new Error('Cannot rename the project root directory')
     }
 
     // Perform the rename
@@ -692,6 +701,7 @@ export class FileService implements IFileService {
     const sourceStats = await stat(sourcePath)
     const isSymlink = await this.symlinkDetector.checkPath(sourcePath)
     const sourceItemName = basename(sourcePath)
+    if (newName) assertValidUserFilename(newName)
     const finalName = newName || sourceItemName
 
     // Validate target parent is a directory
@@ -701,7 +711,7 @@ export class FileService implements IFileService {
     }
 
     // Construct final target path
-    const targetPath = join(targetParentPath, finalName)
+    const targetPath = childPath(targetParentPath, finalName)
 
     // Prevent moving to the same location
     if (sourcePath === targetPath) {
@@ -709,18 +719,8 @@ export class FileService implements IFileService {
     }
 
     // Prevent moving project root
-    if (this.projectPath && sourcePath === this.projectPath) {
+    if (this.isProjectRoot(sourcePath)) {
       throw new Error('Cannot move the project root directory')
-    }
-
-    // Prevent moving items outside project
-    if (this.projectPath && !sourcePath.startsWith(this.projectPath)) {
-      throw new Error('Cannot move items outside the project directory')
-    }
-
-    // Prevent moving items to outside project
-    if (this.projectPath && !targetParentPath.startsWith(this.projectPath)) {
-      throw new Error('Cannot move items to outside the project directory')
     }
 
     // Prevent circular move (folder into its own descendant)
@@ -733,7 +733,7 @@ export class FileService implements IFileService {
     if (conflictExists) {
       if (replaceExisting) {
         // Delete existing item before move
-        const existingItemPath = join(targetParentPath, finalName)
+        const existingItemPath = childPath(targetParentPath, finalName)
         try {
           const existingStats = await stat(existingItemPath)
 
@@ -797,6 +797,7 @@ export class FileService implements IFileService {
     const sourceStats = await stat(sourcePath)
     const isSymlink = await this.symlinkDetector.checkPath(sourcePath)
     const sourceItemName = basename(sourcePath)
+    if (newName) assertValidUserFilename(newName)
     const finalName = newName || sourceItemName
 
     // Validate target parent is a directory
@@ -805,18 +806,8 @@ export class FileService implements IFileService {
       throw new Error('Target must be a directory')
     }
 
-    // Prevent copying items outside project
-    if (this.projectPath && !sourcePath.startsWith(this.projectPath)) {
-      throw new Error('Cannot copy items outside the project directory')
-    }
-
-    // Prevent copying items to outside project
-    if (this.projectPath && !targetParentPath.startsWith(this.projectPath)) {
-      throw new Error('Cannot copy items to outside the project directory')
-    }
-
     // Handle name conflicts by adding (1), (2), etc.
-    let targetPath = join(targetParentPath, finalName)
+    let targetPath = childPath(targetParentPath, finalName)
     let copyNumber = 1
 
     while (await this.checkNameConflict(targetParentPath, basename(targetPath))) {
@@ -825,7 +816,7 @@ export class FileService implements IFileService {
       const nameWithoutExt = ext ? finalName.slice(0, -ext.length) : finalName
 
       // Generate new name with copy number
-      targetPath = join(targetParentPath, `${nameWithoutExt} (${copyNumber})${ext}`)
+      targetPath = childPath(targetParentPath, `${nameWithoutExt} (${copyNumber})${ext}`)
       copyNumber++
 
       // Safety limit to prevent infinite loops

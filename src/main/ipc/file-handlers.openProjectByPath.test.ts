@@ -13,6 +13,10 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import path from 'node:path'
+
+/** A rooted path on the host: `/x` is not absolute on Windows. */
+const abs = (value: string): string => path.resolve(value)
 
 // Capture registered handlers
 const handlers: Record<string, (...args: unknown[]) => unknown> = {}
@@ -45,6 +49,7 @@ vi.mock('electron', () => ({
 vi.mock('../services/ProjectService', () => ({
   ProjectService: class MockProjectService {
     switchProject = mockSwitchProject
+    session = { current: () => null, require: () => { throw new Error('no project') }, onChange: () => () => {} }
   }
 }))
 
@@ -108,7 +113,7 @@ describe('file:openProjectByPath IPC handler', () => {
     // Default: successful switch
     mockSwitchProject.mockResolvedValue({
       success: true,
-      path: '/test/project',
+      path: abs('/test/project'),
       action: 'switched'
     })
   })
@@ -136,12 +141,12 @@ describe('file:openProjectByPath IPC handler', () => {
 
     it('should reject object', async () => {
       const handler = handlers['file:openProjectByPath']
-      await expect(handler({}, { path: '/test' })).rejects.toThrow('Invalid project path')
+      await expect(handler({}, { path: abs('/test') })).rejects.toThrow('Invalid project path')
     })
 
     it('should reject array', async () => {
       const handler = handlers['file:openProjectByPath']
-      await expect(handler({}, ['/test'])).rejects.toThrow('Invalid project path')
+      await expect(handler({}, [abs('/test')])).rejects.toThrow('Invalid project path')
     })
 
     it('should reject whitespace-only string', async () => {
@@ -168,36 +173,36 @@ describe('file:openProjectByPath IPC handler', () => {
   describe('Path processing', () => {
     it('should trim leading whitespace', async () => {
       const handler = handlers['file:openProjectByPath']
-      await handler({}, '  /test/project')
-      expect(mockSwitchProject).toHaveBeenCalledWith('/test/project', expect.objectContaining({ source: 'recent' }))
+      await handler({}, `  ${abs('/test/project')}`)
+      expect(mockSwitchProject).toHaveBeenCalledWith(abs('/test/project'), expect.objectContaining({ source: 'recent' }))
     })
 
     it('should trim trailing whitespace', async () => {
       const handler = handlers['file:openProjectByPath']
-      await handler({}, '/test/project  ')
-      expect(mockSwitchProject).toHaveBeenCalledWith('/test/project', expect.objectContaining({ source: 'recent' }))
+      await handler({}, `${abs('/test/project')}  `)
+      expect(mockSwitchProject).toHaveBeenCalledWith(abs('/test/project'), expect.objectContaining({ source: 'recent' }))
     })
 
     it('should trim both leading and trailing whitespace', async () => {
       const handler = handlers['file:openProjectByPath']
-      await handler({}, '  /test/project  ')
-      expect(mockSwitchProject).toHaveBeenCalledWith('/test/project', expect.objectContaining({ source: 'recent' }))
+      await handler({}, `  ${abs('/test/project')}  `)
+      expect(mockSwitchProject).toHaveBeenCalledWith(abs('/test/project'), expect.objectContaining({ source: 'recent' }))
     })
 
     it('should preserve internal spaces in path', async () => {
       const handler = handlers['file:openProjectByPath']
       mockSwitchProject.mockResolvedValue({
         success: true,
-        path: '/test/my project/folder',
+        path: abs('/test/my project/folder'),
         action: 'switched'
       })
-      await handler({}, '/test/my project/folder')
-      expect(mockSwitchProject).toHaveBeenCalledWith('/test/my project/folder', expect.objectContaining({ source: 'recent' }))
+      await handler({}, abs('/test/my project/folder'))
+      expect(mockSwitchProject).toHaveBeenCalledWith(abs('/test/my project/folder'), expect.objectContaining({ source: 'recent' }))
     })
 
     it('should handle paths with special characters', async () => {
       const handler = handlers['file:openProjectByPath']
-      const specialPath = '/test/project-name_v2.0'
+      const specialPath = abs('/test/project-name_v2.0')
       mockSwitchProject.mockResolvedValue({
         success: true,
         path: specialPath,
@@ -211,30 +216,30 @@ describe('file:openProjectByPath IPC handler', () => {
   describe('ProjectService integration', () => {
     it('should call projectService.switchProject with path', async () => {
       const handler = handlers['file:openProjectByPath']
-      await handler({}, '/test/project')
-      expect(mockSwitchProject).toHaveBeenCalledWith('/test/project', expect.objectContaining({ source: 'recent' }))
+      await handler({}, abs('/test/project'))
+      expect(mockSwitchProject).toHaveBeenCalledWith(abs('/test/project'), expect.objectContaining({ source: 'recent' }))
     })
 
     it('should return path on successful switch', async () => {
       const handler = handlers['file:openProjectByPath']
       mockSwitchProject.mockResolvedValue({
         success: true,
-        path: '/test/project',
+        path: abs('/test/project'),
         action: 'switched'
       })
-      const result = await handler({}, '/test/project')
-      expect(result).toBe('/test/project')
+      const result = await handler({}, abs('/test/project'))
+      expect(result).toBe(abs('/test/project'))
     })
 
     it('should return path on noop (same project)', async () => {
       const handler = handlers['file:openProjectByPath']
       mockSwitchProject.mockResolvedValue({
         success: true,
-        path: '/test/project',
+        path: abs('/test/project'),
         action: 'noop'
       })
-      const result = await handler({}, '/test/project')
-      expect(result).toBe('/test/project')
+      const result = await handler({}, abs('/test/project'))
+      expect(result).toBe(abs('/test/project'))
     })
 
     it('should throw on validation failure', async () => {
@@ -245,7 +250,7 @@ describe('file:openProjectByPath IPC handler', () => {
         action: 'noop',
         error: 'Security validation failed'
       })
-      await expect(handler({}, '/etc')).rejects.toThrow('Security validation failed')
+      await expect(handler({}, abs('/etc'))).rejects.toThrow('Security validation failed')
     })
 
     it('should throw on directory not found', async () => {
@@ -256,7 +261,7 @@ describe('file:openProjectByPath IPC handler', () => {
         action: 'noop',
         error: 'Project directory not found'
       })
-      await expect(handler({}, '/nonexistent')).rejects.toThrow('Project directory not found')
+      await expect(handler({}, abs('/nonexistent'))).rejects.toThrow('Project directory not found')
     })
 
     it('should throw on permission denied', async () => {
@@ -267,7 +272,7 @@ describe('file:openProjectByPath IPC handler', () => {
         action: 'noop',
         error: 'Cannot access project directory'
       })
-      await expect(handler({}, '/private')).rejects.toThrow('Cannot access')
+      await expect(handler({}, abs('/private'))).rejects.toThrow('Cannot access')
     })
 
     it('should throw generic error when error is undefined', async () => {
@@ -278,7 +283,7 @@ describe('file:openProjectByPath IPC handler', () => {
         action: 'noop'
         // No error property
       })
-      await expect(handler({}, '/test')).rejects.toThrow('Unknown error')
+      await expect(handler({}, abs('/test'))).rejects.toThrow('Unknown error')
     })
 
     it('should handle system directory rejection', async () => {
@@ -289,7 +294,7 @@ describe('file:openProjectByPath IPC handler', () => {
         action: 'noop',
         error: 'Cannot open system or sensitive directories'
       })
-      await expect(handler({}, '/System')).rejects.toThrow('system or sensitive')
+      await expect(handler({}, abs('/System'))).rejects.toThrow('system or sensitive')
     })
 
     it('should handle symlink attack rejection', async () => {
@@ -300,7 +305,7 @@ describe('file:openProjectByPath IPC handler', () => {
         action: 'noop',
         error: 'Cannot open symlink to system directory'
       })
-      await expect(handler({}, '/symlink-to-etc')).rejects.toThrow('symlink')
+      await expect(handler({}, abs('/symlink-to-etc'))).rejects.toThrow('symlink')
     })
   })
 
@@ -308,7 +313,7 @@ describe('file:openProjectByPath IPC handler', () => {
     it('should propagate projectService errors', async () => {
       const handler = handlers['file:openProjectByPath']
       mockSwitchProject.mockRejectedValue(new Error('Service error'))
-      await expect(handler({}, '/test')).rejects.toThrow('Service error')
+      await expect(handler({}, abs('/test'))).rejects.toThrow('Service error')
     })
 
     it('should preserve error message from projectService', async () => {
@@ -320,7 +325,7 @@ describe('file:openProjectByPath IPC handler', () => {
         action: 'noop',
         error: errorMessage
       })
-      await expect(handler({}, '/test')).rejects.toThrow(errorMessage)
+      await expect(handler({}, abs('/test'))).rejects.toThrow(errorMessage)
     })
 
     it('should handle async errors correctly', async () => {
@@ -328,7 +333,7 @@ describe('file:openProjectByPath IPC handler', () => {
       mockSwitchProject.mockImplementation(async () => {
         throw new Error('Async error')
       })
-      await expect(handler({}, '/test')).rejects.toThrow('Async error')
+      await expect(handler({}, abs('/test'))).rejects.toThrow('Async error')
     })
 
     it('should not expose internal stack traces to renderer', async () => {
@@ -341,7 +346,7 @@ describe('file:openProjectByPath IPC handler', () => {
       })
 
       try {
-        await handler({}, '/test')
+        await handler({}, abs('/test'))
         expect.fail('Should have thrown')
       } catch (error) {
         expect(error).toBeInstanceOf(Error)
@@ -356,7 +361,7 @@ describe('file:openProjectByPath IPC handler', () => {
           setTimeout(() => reject(new Error('Operation timed out')), 10)
         )
       )
-      await expect(handler({}, '/test')).rejects.toThrow('timed out')
+      await expect(handler({}, abs('/test'))).rejects.toThrow('timed out')
     })
   })
 
@@ -380,7 +385,7 @@ describe('file:openProject IPC handler (dialog)', () => {
     registerFileHandlers()
     mockSwitchProject.mockResolvedValue({
       success: true,
-      path: '/test/project',
+      path: abs('/test/project'),
       action: 'switched'
     })
   })

@@ -460,6 +460,65 @@ export default [
           selector: "VariableDeclarator > MemberExpression.init[property.name='shell']",
           message:
             'Do not alias the electron shell. Use openExternalSafe() from src/main/utils/openExternalSafe.ts for external URLs.'
+        },
+        // Paths are checked with src/main/ipc/confinement, never by a string prefix. The one
+        // permitted prefix test lives there and builds its argument from a variable.
+        {
+          selector:
+            "CallExpression[callee.property.name='startsWith'][arguments.0.type='MemberExpression'][arguments.0.property.name=/^(projectPath|projectRoot)$/]",
+          message: 'Confine paths with src/main/ipc/confinement, never a string prefix.'
+        },
+        {
+          selector:
+            "CallExpression[callee.property.name='startsWith'][arguments.0.name=/^(projectPath|projectRoot|resolvedRoot|realRoot)$/]",
+          message: 'Confine paths with src/main/ipc/confinement, never a string prefix.'
+        },
+        {
+          selector:
+            "CallExpression[callee.property.name='startsWith'][arguments.0.type='BinaryExpression'][arguments.0.left.name=/^(projectPath|projectRoot|resolvedRoot|realRoot)$/]",
+          message: 'Confine paths with src/main/ipc/confinement, never a string prefix.'
+        },
+        {
+          selector:
+            "CallExpression[callee.property.name='startsWith'][arguments.0.type='BinaryExpression'][arguments.0.left.property.name=/^(projectPath|projectRoot)$/]",
+          message: 'Confine paths with src/main/ipc/confinement, never a string prefix.'
+        },
+        {
+          selector:
+            "CallExpression[callee.property.name='startsWith'][arguments.0.type='TemplateLiteral'][arguments.0.expressions.0.name=/^(projectPath|projectRoot|resolvedRoot|realRoot)$/]",
+          message: 'Confine paths with src/main/ipc/confinement, never a string prefix.'
+        },
+        // Only the native resolver: the plain JS `realpathSync` keeps `subst` drives, the
+        // typed letter case and UNC folder case on Windows, so a prefix compare on it fails.
+        // `fs.promises.realpath` and `realpathSync.native` are both native.
+        {
+          selector: "CallExpression[callee.name='realpathSync']",
+          message:
+            'Use fs.promises.realpath or realpathSync.native: the plain realpathSync does not canonicalise Windows paths.'
+        },
+        {
+          selector: "CallExpression[callee.property.name='realpathSync']",
+          message:
+            'Use fs.promises.realpath or realpathSync.native: the plain realpathSync does not canonicalise Windows paths.'
+        }
+      ]
+    }
+  },
+  // The same native-realpath rule for the main-process tests: on Windows the plain
+  // `realpathSync` keeps 8.3 short names (RUNNER~1), so a path built from it does not
+  // match the canonical one the code under test compares against.
+  {
+    files: ['src/main/**/*.test.ts', 'src/main/**/__test-helpers__/**/*.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "CallExpression[callee.name='realpathSync']",
+          message: 'Use fs.promises.realpath or realpathSync.native in tests too.'
+        },
+        {
+          selector: "CallExpression[callee.property.name='realpathSync']",
+          message: 'Use fs.promises.realpath or realpathSync.native in tests too.'
         }
       ]
     }

@@ -32,6 +32,8 @@ const onWin32 = process.platform === 'win32'
  * cases have nothing to exercise. Off CI they skip; on CI the guard below still
  * fails, so a Windows runner that stops providing a short name is noticed.
  */
+// This test needs the plain (short-name keeping) realpathSync on purpose
+/* eslint-disable no-restricted-syntax */
 const hostHasShortTmpdir =
   onWin32 && realpathSync(tmpdir()) !== realpathSync.native(tmpdir())
 const realShortNameCases = hostHasShortTmpdir || !!process.env.CI

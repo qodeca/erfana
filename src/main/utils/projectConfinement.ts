@@ -28,11 +28,13 @@
 import path from 'path'
 import { realpath } from 'fs/promises'
 
-/** Refusal message for a path that leaves the project. */
-export const OUTSIDE_PROJECT_MESSAGE = 'Cannot read files outside the project directory'
+// The refusal messages are shared with the IPC path checker, so a toast reads the same from either
+import {
+  OUTSIDE_PROJECT_MESSAGE,
+  UNVERIFIABLE_PATH_MESSAGE
+} from '../ipc/confinement/ConfinementError'
 
-/** Refusal message for a path whose confinement could not be established. */
-export const UNVERIFIABLE_PATH_MESSAGE = 'Cannot verify this path is inside the project directory'
+export { OUTSIDE_PROJECT_MESSAGE, UNVERIFIABLE_PATH_MESSAGE }
 
 /**
  * What a confinement check concluded.
@@ -53,6 +55,8 @@ export type ConfinementVerdict = 'inside' | 'outside' | 'missing' | 'unverifiabl
 export function isLexicallyInside(filePath: string, projectPath: string): boolean {
   const resolved = path.resolve(filePath)
   const resolvedRoot = path.resolve(projectPath)
+  // Legacy prefix form, kept until the remaining callers move to ipc/confinement
+  // eslint-disable-next-line no-restricted-syntax
   return resolved === resolvedRoot || resolved.startsWith(resolvedRoot + path.sep)
 }
 
@@ -98,6 +102,8 @@ export async function resolveInsideProject(
     return { verdict: code === 'ENOENT' ? 'missing' : 'unverifiable' }
   }
 
+  // Legacy prefix form, kept until the remaining callers move to ipc/confinement
+  // eslint-disable-next-line no-restricted-syntax
   return realTarget === realRoot || realTarget.startsWith(realRoot + path.sep)
     ? { verdict: 'inside', realPath: realTarget }
     : { verdict: 'outside' }

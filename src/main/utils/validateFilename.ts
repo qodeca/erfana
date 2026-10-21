@@ -132,7 +132,10 @@ export type FilenameValidation =
  * @returns `{ valid: true }` if the name is acceptable on the current
  * platform; otherwise `{ valid: false, reason, suggestion? }`.
  */
-export function validateFilename(name: string): FilenameValidation {
+export function validateFilename(
+  name: string,
+  platform: NodeJS.Platform = process.platform
+): FilenameValidation {
   if (!name || !name.trim()) {
     return { valid: false, reason: 'empty' }
   }
@@ -153,7 +156,7 @@ export function validateFilename(name: string): FilenameValidation {
   }
 
   // --- Windows-only checks below ---
-  if (process.platform === 'win32') {
+  if (platform === 'win32') {
     if (WIN_INVALID_CHARS.test(name)) {
       return { valid: false, reason: 'invalid_chars' }
     }

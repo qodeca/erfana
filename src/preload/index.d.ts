@@ -64,7 +64,7 @@ declare global {
         writeFile: (
           filePath: string,
           content: string,
-          options?: { createParentDirs?: boolean }
+          options?: { createParentDirs?: true }
         ) => Promise<boolean>
         getStats: (filePath: string) => Promise<FileStats>
         exists: (filePath: string) => Promise<boolean>

@@ -13,6 +13,10 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import path from 'node:path'
+
+/** A rooted path on the host: `/x` is not absolute on Windows. */
+const abs = (value: string): string => path.resolve(value)
 
 // Capture registered handlers
 const handlers: Record<string, (...args: unknown[]) => unknown> = {}
@@ -44,6 +48,7 @@ vi.mock('electron', () => ({
 vi.mock('../services/ProjectService', () => ({
   ProjectService: class MockProjectService {
     switchProject = vi.fn()
+    session = { current: () => null, require: () => { throw new Error('no project') }, onChange: () => () => {} }
   }
 }))
 
@@ -207,17 +212,24 @@ describe('file:validatePath', () => {
   describe('security: project root containment', () => {
     it('allows paths within project root', async () => {
       mockStat.mockResolvedValue({ isFile: () => true })
-      const result = await validatePath({}, '/project/src/file.ts', '/project')
+      const result = await validatePath({}, abs('/project/src/file.ts'), abs('/project'))
+      expect(result).toHaveProperty('exists', true)
+    })
+
+    it('accepts a path below a project root that ends in a separator (a drive or share root)', async () => {
+      mockStat.mockResolvedValue({ isFile: () => true })
+      const driveRoot = path.parse(abs('/project')).root
+      const result = await validatePath({}, abs('/project/src/file.ts'), driveRoot)
       expect(result).toHaveProperty('exists', true)
     })
 
     it('blocks paths outside project root', async () => {
-      const result = await validatePath({}, '/other/file.ts', '/project')
+      const result = await validatePath({}, abs('/other/file.ts'), abs('/project'))
       expect(result).toEqual({ exists: false, error: 'Path outside project root' })
     })
 
     it('blocks path traversal attempts', async () => {
-      const result = await validatePath({}, '/project/../other/file.ts', '/project')
+      const result = await validatePath({}, abs('/project/../other/file.ts'), abs('/project'))
       expect(result).toEqual({ exists: false, error: 'Path outside project root' })
     })
   })
@@ -225,17 +237,17 @@ describe('file:validatePath', () => {
   describe('file existence', () => {
     it('returns exists: true for existing file', async () => {
       mockStat.mockResolvedValue({ isFile: () => true })
-      const result = await validatePath({}, '/home/user/file.ts')
+      const result = await validatePath({}, abs('/home/user/file.ts'))
       expect(result).toEqual({
         exists: true,
-        absolutePath: '/home/user/file.ts',
+        absolutePath: abs('/home/user/file.ts'),
         isFile: true
       })
     })
 
     it('returns exists: false for directories', async () => {
       mockStat.mockResolvedValue({ isFile: () => false })
-      const result = await validatePath({}, '/home/user/folder')
+      const result = await validatePath({}, abs('/home/user/folder'))
       expect(result).toEqual({ exists: false, error: 'Path is not a file' })
     })
 
@@ -243,7 +255,7 @@ describe('file:validatePath', () => {
       const error = new Error('ENOENT') as NodeJS.ErrnoException
       error.code = 'ENOENT'
       mockStat.mockRejectedValue(error)
-      const result = await validatePath({}, '/home/user/missing.ts')
+      const result = await validatePath({}, abs('/home/user/missing.ts'))
       expect(result).toEqual({ exists: false })
     })
 
@@ -251,7 +263,7 @@ describe('file:validatePath', () => {
       const error = new Error('Permission denied') as NodeJS.ErrnoException
       error.code = 'EACCES'
       mockStat.mockRejectedValue(error)
-      const result = await validatePath({}, '/home/user/protected.ts')
+      const result = await validatePath({}, abs('/home/user/protected.ts'))
       expect(result).toEqual({ exists: false, error: 'Permission denied' })
     })
   })
