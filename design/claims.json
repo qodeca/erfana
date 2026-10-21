@@ -306,5 +306,47 @@
     "label": "--color-brand-violet on --color-brand-white, why violet is only a muted fill on light",
     "foreground": "--color-brand-violet",
     "background": "--color-brand-white"
+  },
+  "contrast-muted-on-panel": {
+    "kind": "contrast",
+    "card": "system/foundations/colors.html",
+    "label": "--color-text-muted on --color-bg-secondary, why muted is not a label colour",
+    "foreground": "--color-text-muted",
+    "background": "--color-bg-secondary"
+  },
+  "contrast-on-accent": {
+    "kind": "contrast",
+    "card": "system/foundations/colors.html",
+    "label": "--color-text-on-accent on --color-btn-primary-bg",
+    "foreground": "--color-text-on-accent",
+    "background": "--color-btn-primary-bg"
+  },
+  "contrast-white-on-accent": {
+    "kind": "contrast",
+    "card": "system/foundations/colors.html",
+    "label": "--color-white on --color-btn-primary-bg, the pairing #231 removed",
+    "foreground": "--color-white",
+    "background": "--color-btn-primary-bg"
+  },
+  "contrast-primary-label": {
+    "kind": "contrast",
+    "card": "system/components/button/index.html",
+    "label": "--color-btn-primary-text on --color-btn-primary-bg",
+    "foreground": "--color-btn-primary-text",
+    "background": "--color-btn-primary-bg"
+  },
+  "contrast-primary-label-hover": {
+    "kind": "contrast",
+    "card": "system/components/button/index.html",
+    "label": "--color-btn-primary-text on --color-btn-primary-hover",
+    "foreground": "--color-btn-primary-text",
+    "background": "--color-btn-primary-hover"
+  },
+  "contrast-primary-white": {
+    "kind": "contrast",
+    "card": "system/components/button/index.html",
+    "label": "--color-white on --color-btn-primary-bg, the historical label",
+    "foreground": "--color-white",
+    "background": "--color-btn-primary-bg"
   }
 }

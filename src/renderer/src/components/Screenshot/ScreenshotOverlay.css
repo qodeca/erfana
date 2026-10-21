@@ -9,9 +9,15 @@
  * **Design token bypass** (#164 F[36]): the overlay is its own renderer
  * root (mounted by `main.tsx` when the hash route matches) and does NOT
  * import `design-tokens.css`. Loading the host app's full stylesheet would
- * defeat the point of the dedicated overlay bundle. The hardcoded values
- * below are deliberate. See FT-5 for the long-term plan to give the overlay
- * its own tokenized stylesheet entry.
+ * defeat the point of the dedicated overlay bundle. The hardcoded colours,
+ * sizes and offsets below are deliberate, and each site carries a
+ * `deviates:` marker pointing at the card it departs from (rows in the
+ * Colours card's Exceptions section). See docs/technical-debt.md for the
+ * long-term plan to give the overlay its own tokenized stylesheet entry.
+ *
+ * Corners are NOT part of the bypass: `border-radius: 0` needs no token, so
+ * the hint and the size readout follow the zero-radius rule like the rest of
+ * the app.
  *
  * **Forced-colors mode** (#164 F[17] / round-2 F#3): Windows High Contrast
  * strips translucent backgrounds and may remap 1px white borders to system
@@ -47,6 +53,9 @@ body,
   cursor: crosshair;
 }
 
+/* deviates: design/system/foundations/colors.html — literal white on a 65%
+   black scrim, no tokens: the overlay window cannot load design-tokens.css,
+   and it paints over arbitrary desktop content rather than an app surface. */
 .screenshot-overlay-hint {
   position: absolute;
   top: 16px;
@@ -57,10 +66,12 @@ body,
   color: #ffffff;
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   font-size: 12px;
-  border-radius: 4px;
+  border-radius: 0;
   pointer-events: none;
 }
 
+/* deviates: design/system/foundations/colors.html — literal white edge and
+   scrim, no tokens: same reason as the hint above. */
 .screenshot-overlay-selection {
   position: absolute;
   border: 1px solid #ffffff;
@@ -74,6 +85,8 @@ body,
   border-width: 2px;
 }
 
+/* deviates: design/system/foundations/colors.html — literal white on a 65%
+   black scrim, no tokens: same reason as the hint above. */
 .screenshot-overlay-size {
   position: absolute;
   bottom: -22px;
@@ -83,7 +96,7 @@ body,
   color: #ffffff;
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   font-size: 11px;
-  border-radius: 2px;
+  border-radius: 0;
   white-space: nowrap;
 }
 
@@ -94,6 +107,9 @@ body,
   cursor: default;
 }
 
+/* deviates: design/system/foundations/focus.html — dashed white ring, not the
+   violet --color-border-focus: no tokens reach this window, and a white edge
+   reads against the desktop under it where violet may not. */
 .screenshot-overlay-keyboard-handle:focus-visible {
   /* Visible focus indicator on the keyboard rectangle even without box-shadow,
    * which can't cross the BrowserWindow transparency. */

@@ -138,7 +138,7 @@
 
 .erf-band__tool:focus-visible {
   outline: var(--border-width-thick) solid var(--color-border-focus);
-  outline-offset: -2px;
+  outline-offset: calc(var(--space-1) * -1);
 }
 
 /* ---------- the disclosure chip ---------- */

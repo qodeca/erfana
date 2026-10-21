@@ -46,11 +46,21 @@
 </p>
 
 <div class="ds-note">
-  <strong>The decision.</strong> The app currently ships three focus rings: a 1px outline on tabs and the
-  activity bar, a 2px outline in dialogs and toasts, and a 3px soft glow on inputs. That is not a style
-  choice, it is drift. <strong>One ring wins: a 2px solid outline in
-  <code>--color-border-focus</code>, offset 2px.</strong> WCAG 2.4.11 asks for at least 2px, so the 1px
-  version fails outright — that settles it without a taste argument.
+  <strong>The decision.</strong> The app used to ship three focus rings: a 1px outline on tabs and the
+  activity bar, a 2px outline in dialogs and toasts, and a 3px soft glow on inputs. That was not a style
+  choice, it was drift. <strong>One ring wins: a 2px solid outline in
+  <code>--color-border-focus</code>, offset 2px.</strong>
+  <br><br>
+  The two numbers come from two different criteria, and this card used to cite the wrong one.
+  <strong>SC 1.4.11</strong> (AA) asks a focus indicator for 3:1 against what is next to it.
+  <strong>SC 2.4.13 Focus Appearance</strong> (AAA) asks for an indicator at least as large as a 2px
+  perimeter, changing contrast by at least 3:1. The 1px ring meets neither half of 2.4.13; the 2px ring
+  meets both, so 2px is the floor here. (SC 2.4.11 is <em>Focus Not Obscured</em> — about the ring
+  being hidden behind a sticky header, not about its width.)
+  <br><br>
+  Every renderer stylesheet is now held to this by <code>focusRing.audit.test.ts</code> (width and
+  offset of every drawn ring) and by <code>npm run lint:css</code> (<code>--shadow-focus</code> is
+  banned in <code>src/</code> as well as here).
 </div>
 
 <h2>The ring</h2>
@@ -114,7 +124,8 @@
   <code>--shadow-focus</code> — the 3px soft glow used on inputs — is retired as a focus indicator. It
   reads as a glow rather than an edge, it is a fourth idiom, and two dialogs hand-rolled its exact
   geometry with a different colour instead of using the token. Inputs take the same outline as
-  everything else.
+  everything else — and since #230 they do: the search bar, the settings controls and every dialog
+  input and select draw this ring, and the glow has no remaining use in <code>src/</code>.
 </p>
 
 <h2>What a card must promise about the keyboard</h2>
@@ -165,6 +176,22 @@
       <td>Returns to the permission band's chip, not to the placeholder that entered the page. The chip's
         accessible name states that exit ("Press Escape in the previewed page to return here", decided
         band card), and a page can also be entered with the mouse, where there is no opener.</td>
+    </tr>
+    <tr>
+      <td>Welcome screen action button</td>
+      <td>The ring is <code>--color-border-focus</code>.</td>
+      <td>White (<code>--color-white</code>), same width and offset. The button is itself violet and sits on
+        a translucent overlay over the welcome image, so a violet ring would be weakest exactly where the
+        image is light; white clears 3:1 against both the dark overlay and the button. See
+        <code>AppDockLayout.css</code>.</td>
+    </tr>
+    <tr>
+      <td>Screenshot area-select overlay</td>
+      <td>A solid violet ring from the tokens.</td>
+      <td>A 2px dashed white ring (<code>Highlight</code> in forced-colours mode), literal values. The overlay
+        is a separate transparent window that cannot load <code>design-tokens.css</code>, and it is drawn
+        over whatever is on the desktop. Same bypass as the Colours card's exception; see
+        <code>ScreenshotOverlay.css</code>.</td>
     </tr>
   </tbody>
 </table>

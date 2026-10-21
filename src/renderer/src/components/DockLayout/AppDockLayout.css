@@ -153,7 +153,7 @@
 
 .panel-content .hint {
   font-size: var(--text-sm);
-  color: var(--color-text-muted);
+  color: var(--color-text-tertiary);
   font-style: italic;
 }
 
@@ -364,7 +364,7 @@
   gap: var(--space-4);
   padding: var(--space-5) var(--space-10);
   background-color: var(--color-btn-primary-bg);
-  color: var(--color-white);
+  color: var(--color-btn-primary-text);
   border: none;
   border-radius: 0;
   font-size: var(--text-md);
@@ -386,12 +386,16 @@
   cursor: not-allowed;
 }
 
+/* deviates: design/system/foundations/focus.html — white ring, not violet: the
+   button is violet and sits on a translucent overlay over the welcome image,
+   so white is the colour that clears 3:1 against both (see the card's
+   Exceptions). */
 .welcome-action-button:focus-visible {
   /* White (not the violet focus token) so the ring contrasts ≥3:1 against the
      button's own violet fill; placed over the dark .welcome-content overlay via
      the offset. WCAG 2.2 SC 1.4.11 / 2.4.13. */
   outline: var(--border-width-thick) solid var(--color-white);
-  outline-offset: var(--border-width-thick);
+  outline-offset: var(--space-1);
 }
 
 /* Remove Dockview's default padding from welcome tab container */

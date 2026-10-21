@@ -66,6 +66,23 @@
   <br><br>
   Read the scope of that carefully: <em>on a panel</em>. The same token on the app background clears
   4.5:1 comfortably, which is why this card judges a pair, never a colour on its own.
+  <br><br>
+  <code>--color-text-muted</code> is not a text colour at all: it reaches only
+  <strong><span data-claim="contrast-muted-on-panel"></span>:1</strong> on a panel and stays under
+  4.5:1 on every surface. Keep it for icons and large text; a label someone has to read takes
+  <code>--color-text-tertiary</code>.
+</div>
+
+<h2>Text on a violet fill</h2>
+<div class="ds-note">
+  The brand violet is a light tint, so anything drawn <em>on</em> it — a primary button's label, an
+  active toggle's icon, a badge count — is dark, not white. <code>--color-text-on-accent</code>
+  (brand black) measures
+  <strong><span data-claim="contrast-on-accent"></span>:1</strong> on the resting fill;
+  <code>--color-white</code> measures only
+  <strong><span data-claim="contrast-white-on-accent"></span>:1</strong>, under both the 4.5:1 text
+  bar and the 3:1 icon bar. <code>--color-btn-primary-text</code> is the button alias of it.
+  <code>accentFill.contrast.test.ts</code> holds every violet fill in the renderer to 4.5:1.
 </div>
 <table data-group="text"><thead><tr>
   <th>Token</th><th>Sample</th><th>Resolved</th><th>on panel</th><th>on app bg</th>
@@ -80,6 +97,37 @@
 <table data-group="status"><thead><tr>
   <th>Token</th><th>Swatch</th><th>Resolved</th><th>on panel</th><th>on app bg</th>
 </tr></thead><tbody></tbody></table>
+
+<h2>Exceptions</h2>
+<p style="max-width: 72ch; color: var(--color-text-tertiary)">
+  Where the shipping component departs from this card, with the reason. An undocumented deviation is a
+  bug; a documented one is a decision. Each row has a <code>deviates:</code> marker at the site.
+</p>
+<table>
+  <thead><tr><th>Where</th><th>The card</th><th>The component, and why</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Screenshot overlay hint (<code>.screenshot-overlay-hint</code>)</td>
+      <td>Every colour is a token.</td>
+      <td>Literal white text on a 65% black scrim. The area-select overlay is its own transparent window
+        and does not load <code>design-tokens.css</code> (#164); it paints over arbitrary desktop content,
+        not an app surface, so the scrim is what guarantees the contrast. Forced-colours mode swaps both
+        for <code>Canvas</code> / <code>CanvasText</code>. See <code>ScreenshotOverlay.css</code>.</td>
+    </tr>
+    <tr>
+      <td>Screenshot overlay selection (<code>.screenshot-overlay-selection</code>)</td>
+      <td>Every colour is a token.</td>
+      <td>Literal white 1px edge and a 25% black scrim outside it, for the same reason: no tokens reach the
+        window, and the edge has to read against the desktop under it.</td>
+    </tr>
+    <tr>
+      <td>Screenshot overlay size readout (<code>.screenshot-overlay-size</code>)</td>
+      <td>Every colour is a token.</td>
+      <td>Same treatment as the hint, at a smaller size. Its corners are 0 like the rest of the app — the
+        bypass covers colour only.</td>
+    </tr>
+  </tbody>
+</table>
 
 <script>
 const TOKENS = {

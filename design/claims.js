@@ -40,7 +40,7 @@ window.ERFANA_CLAIMS = {
     "card": "system/foundations/layering.html"
   },
   "colour-tokens": {
-    "value": 108,
+    "value": 110,
     "label": "colour tokens declared in design-tokens.css",
     "card": "system/foundations/colors.html"
   },
@@ -95,7 +95,7 @@ window.ERFANA_CLAIMS = {
     "card": "system/components/menu/index.html"
   },
   "outline-none-unreplaced": {
-    "value": 8,
+    "value": 4,
     "label": "stylesheets that remove an outline with no :focus-visible rule in the same file",
     "card": "system/foundations/focus.html"
   },
@@ -168,6 +168,36 @@ window.ERFANA_CLAIMS = {
     "value": 2.1,
     "label": "--color-brand-violet on --color-brand-white, why violet is only a muted fill on light",
     "card": "product/github-presentation/index.html"
+  },
+  "contrast-muted-on-panel": {
+    "value": 2.69,
+    "label": "--color-text-muted on --color-bg-secondary, why muted is not a label colour",
+    "card": "system/foundations/colors.html"
+  },
+  "contrast-on-accent": {
+    "value": 8.4,
+    "label": "--color-text-on-accent on --color-btn-primary-bg",
+    "card": "system/foundations/colors.html"
+  },
+  "contrast-white-on-accent": {
+    "value": 2.2,
+    "label": "--color-white on --color-btn-primary-bg, the pairing #231 removed",
+    "card": "system/foundations/colors.html"
+  },
+  "contrast-primary-label": {
+    "value": 8.4,
+    "label": "--color-btn-primary-text on --color-btn-primary-bg",
+    "card": "system/components/button/index.html"
+  },
+  "contrast-primary-label-hover": {
+    "value": 6.85,
+    "label": "--color-btn-primary-text on --color-btn-primary-hover",
+    "card": "system/components/button/index.html"
+  },
+  "contrast-primary-white": {
+    "value": 2.2,
+    "label": "--color-white on --color-btn-primary-bg, the historical label",
+    "card": "system/components/button/index.html"
   }
 };
 

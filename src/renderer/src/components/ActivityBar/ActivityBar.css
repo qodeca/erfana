@@ -45,8 +45,8 @@
 }
 
 .activity-bar-item:focus-visible {
-  outline: 1px solid var(--color-border-focus);
-  outline-offset: -1px;
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: calc(var(--space-1) * -1);
 }
 
 .activity-bar-item.active {
@@ -90,8 +90,8 @@
   height: var(--icon-size-sm);
   padding: 0 var(--space-2);
   background: var(--color-brand-violet);
-  color: var(--color-white);
-  font-size: 9px;
+  color: var(--color-text-on-accent);
+  font-size: var(--text-xs);
   font-weight: var(--font-semibold);
   border-radius: var(--border-radius);
   display: flex;
@@ -131,6 +131,6 @@
 }
 
 .activity-bar-settings-btn:focus-visible {
-  outline: 1px solid var(--color-border-focus);
-  outline-offset: -1px;
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: calc(var(--space-1) * -1);
 }

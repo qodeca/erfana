@@ -9,6 +9,7 @@
 <title>Erfana — buttons</title>
 <link rel="stylesheet" href="../../../tokens.css">
 <link rel="stylesheet" href="../../../ds.css">
+<script src="../../../claims.js"></script>
 <style>
 /* ==========================================================================
    Mirrors src/renderer/src/components/Dialog/Dialog.css. The app owns it; this
@@ -48,7 +49,7 @@
 
 .dialog-btn-primary {
   background-color: var(--dialog-btn-primary-bg);
-  color: var(--color-brand-black);
+  color: var(--color-btn-primary-text);
   box-shadow: var(--shadow-sm);
 }
 .dialog-btn-primary:hover:not(:disabled) {
@@ -95,9 +96,16 @@
 
 <div class="ds-note">
   <strong>The primary button's label is near-black, not white.</strong> The brand violet is a light
-  tint, so white on it measures 2.2:1 and fails WCAG 1.4.3. <code>#161312</code> on the same violet
-  measures 8.4:1. This is guarded by <code>Dialog.contrast.test.ts</code> in the app — if you draw a
-  violet button with a white label in a design, the test will reject the implementation.
+  tint, so white on it measures <span data-claim="contrast-primary-white"></span>:1 and fails WCAG
+  1.4.3. <code>--color-btn-primary-text</code> (brand black) on the same violet measures
+  <span data-claim="contrast-primary-label"></span>:1, and
+  <span data-claim="contrast-primary-label-hover"></span>:1 on hover.
+  <br><br>
+  This holds for <em>every</em> violet fill, not only dialog buttons. The editor's Save button, the
+  view-mode toggles, the welcome screen's action and the diagram chat buttons all shipped a white label
+  until #231, because only <code>Dialog.css</code> was guarded. Now
+  <code>accentFill.contrast.test.ts</code> scans every renderer stylesheet — if you draw a violet
+  button with a white label in a design, the test will reject the implementation.
 </div>
 
 <h2>Variants</h2>
