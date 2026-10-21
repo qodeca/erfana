@@ -13,7 +13,7 @@ import type { RefObject } from 'react'
 import type * as monaco from 'monaco-editor'
 import { MonacoMarkdownEditor, type MonacoEditorHandle } from '../Editor/MonacoMarkdownEditor'
 import type { EditorContextMenuEvent } from '../Editor/MonacoMarkdownEditor'
-import { MarkdownPreview, type MarkdownPreviewHandle } from '../Editor/MarkdownPreview'
+import { MarkdownPreview, type MarkdownPreviewHandle, type PreviewRenderedInfo } from '../Editor/MarkdownPreview'
 import { ResizableDivider } from '../Editor/ResizableDivider'
 import { SearchBar } from '../Search'
 import type { MonacoSearchProvider } from '../../providers/search/MonacoSearchProvider'
@@ -69,6 +69,8 @@ export interface EditorContentLayoutProps {
   onDividerResizeEnd: () => void
   /** Called when user clicks a markdown link to open a file */
   onOpenFile: (path: string, anchor?: string) => Promise<void>
+  /** Called when the preview DOM changed (new content committed, diagram drawn) – drives scroll sync */
+  onPreviewRendered?: (info: PreviewRenderedInfo) => void
   /** Called when text selection changes in editor */
   onSelectionChange: (text: string) => void
 }
@@ -133,6 +135,7 @@ export function EditorContentLayout({
   onDividerResizeHorizontal,
   onDividerResizeEnd,
   onOpenFile,
+  onPreviewRendered,
   onSelectionChange
 }: EditorContentLayoutProps): JSX.Element {
   return (
@@ -153,6 +156,7 @@ export function EditorContentLayout({
               content={currentFile.content}
               filePath={currentFile.path}
               onOpenFile={onOpenFile}
+              onRendered={onPreviewRendered}
             />
             {activePaneId === 'preview' && (
               <SearchBar provider={previewProvider} />
@@ -234,6 +238,7 @@ export function EditorContentLayout({
                 content={currentFile.content}
                 filePath={currentFile.path}
                 onOpenFile={onOpenFile}
+                onRendered={onPreviewRendered}
               />
               {(viewMode === 'preview' || activePaneId === 'preview') && (
                 <SearchBar provider={previewProvider} />
