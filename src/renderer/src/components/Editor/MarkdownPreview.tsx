@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { useState, useRef, forwardRef, useMemo, useImperativeHandle, useCallback, useEffect } from 'react'
+import { useState, useRef, forwardRef, useMemo, useImperativeHandle, useCallback, useEffect, useLayoutEffect } from 'react'
 import ReactMarkdown from 'react-markdown'
 import type { Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -28,6 +28,7 @@ import {
 import { logger } from '../../utils/logger'
 import { textClipboard } from '../../services/textClipboard'
 import { TEST_IDS } from '../../constants/testids'
+import { notePreviewRenderStart, notePreviewRenderCommit } from '../../utils/previewRenderTiming'
 import './MarkdownPreview.css'
 
 // Anchor scroll configuration
@@ -547,6 +548,21 @@ function createMarkdownComponents(
 }
 
 /**
+ * Times one render of the preview body for the typing benchmark.
+ *
+ * Renders before its children and commits after them, so the span it records
+ * covers the whole body subtree. A no-op unless the benchmark switched
+ * recording on (see `utils/previewRenderTiming.ts`).
+ */
+function RenderTimingProbe({ children }: { children: React.ReactNode }): JSX.Element {
+  const startedAt = notePreviewRenderStart()
+  useLayoutEffect(() => {
+    notePreviewRenderCommit(startedAt)
+  })
+  return <>{children}</>
+}
+
+/**
  * Extract source line numbers from DOM selection
  * Walks up from the selection start and end points to find the closest
  * elements with data-line-start/data-line-end attributes
@@ -892,13 +908,15 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
     //   - rehypeSanitize: Sanitize dangerous HTML (scripts, event handlers, etc.)
     const renderedMarkdown = useMemo(
       () => (
-        <ReactMarkdown
-          remarkPlugins={remarkPlugins}
-          rehypePlugins={rehypePlugins}
-          components={markdownComponents}
-        >
-          {body}
-        </ReactMarkdown>
+        <RenderTimingProbe>
+          <ReactMarkdown
+            remarkPlugins={remarkPlugins}
+            rehypePlugins={rehypePlugins}
+            components={markdownComponents}
+          >
+            {body}
+          </ReactMarkdown>
+        </RenderTimingProbe>
       ),
       [body, markdownComponents, remarkPlugins]
     )
