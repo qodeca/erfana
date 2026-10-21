@@ -133,44 +133,6 @@ describe('FileService.moveItem', () => {
       ).rejects.toThrow() // Will throw EINVAL or similar error
     })
 
-    it('should throw error when moving item outside project boundary', async () => {
-      // Setup: Create file inside project
-      const file = join(testDir, 'file.md')
-      await writeFile(file, 'content', 'utf-8')
-
-      // Create target outside project
-      const outsideDir = await mkdtemp(join(tmpdir(), 'erfana-outside-'))
-
-      try {
-        // Execute & Verify
-        await expect(
-          fileService.moveItem(file, outsideDir)
-        ).rejects.toThrow('Cannot move items to outside the project directory')
-      } finally {
-        await rm(outsideDir, { recursive: true, force: true })
-      }
-    })
-
-    it('should throw error when moving item from outside project boundary', async () => {
-      // Setup: Create file outside project
-      const outsideDir = await mkdtemp(join(tmpdir(), 'erfana-outside-'))
-      const outsideFile = join(outsideDir, 'file.md')
-      await writeFile(outsideFile, 'content', 'utf-8')
-
-      // Create target inside project
-      const insideFolder = join(testDir, 'folder')
-      await mkdir(insideFolder)
-
-      try {
-        // Execute & Verify
-        await expect(
-          fileService.moveItem(outsideFile, insideFolder)
-        ).rejects.toThrow('Cannot move items outside the project directory')
-      } finally {
-        await rm(outsideDir, { recursive: true, force: true })
-      }
-    })
-
     it('should throw error when target is not a directory', async () => {
       // Setup: Create source file and target file (not directory)
       const sourceFile = join(testDir, 'source.md')

@@ -39,15 +39,7 @@ describe('FileService.writeFile atomic save', () => {
     expect(await readdir(testDir)).toEqual(['doc.md'])
   })
 
-  it('still recreates missing folders with createParentDirs', async () => {
-    const file = join(testDir, 'gone', 'sub', 'doc.md')
-
-    await fileService.writeFile(file, 'restored', { createParentDirs: true })
-
-    expect(await readFile(file, 'utf-8')).toBe('restored')
-  })
-
-  it('still fails with ENOENT for a missing folder without createParentDirs', async () => {
+  it('still fails with ENOENT for a missing folder', async () => {
     await mkdir(join(testDir, 'x'))
     await expect(fileService.writeFile(join(testDir, 'gone', 'doc.md'), 'x')).rejects.toMatchObject({
       code: 'ENOENT'

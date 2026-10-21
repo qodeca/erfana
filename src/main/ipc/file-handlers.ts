@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { dialog, shell, type OpenDialogOptions } from 'electron'
-import { stat, realpath } from 'fs/promises'
+import { stat } from 'fs/promises'
 import path from 'path'
 import { ProjectService, type OpenContext } from '../services/ProjectService'
 import { fileService } from '../services/FileService'
@@ -12,7 +12,20 @@ import { projectSettingsService } from '../services/ProjectSettingsService'
 import { globalSettingsService } from '../services/GlobalSettingsService'
 import { projectLockService } from '../services/ProjectLockService'
 import type { ProjectSessionInfo } from '../../shared/ipc/schema'
-import type { FileStats } from '../../shared/ipc/file-schema'
+import {
+  CheckConflictArgsSchema,
+  CopyItemArgsSchema,
+  CreateEntryArgsSchema,
+  MoveItemArgsSchema,
+  OpenProjectByPathArgsSchema,
+  PathArgsSchema,
+  ReadDirectoryArgsSchema,
+  ReadImageArgsSchema,
+  RenameArgsSchema,
+  ValidatePathArgsSchema,
+  WriteFileArgsSchema,
+  type FileStats
+} from '../../shared/ipc/file-schema'
 import {
   ImageReadRequestSchema,
   type ImageReadResponse
@@ -20,7 +33,9 @@ import {
 import { logger } from '../services/LoggingService'
 import { fileExists } from '../utils/fileUtils'
 import { redactPath, redactedLogError } from '../utils/redactUserInput'
-import { assertInsideProject, assertNoConfinementEscape } from '../utils/projectConfinement'
+import { isLexicallyInside } from '../utils/projectConfinement'
+import { restoreParentDirectory } from '../services/file/restoreParentDirectory'
+import { registerConfinedHandle } from './confinement/registerConfinedHandle'
 import { isTrustedSender } from './senderValidation'
 import { registerHandle } from './registry'
 import { rememberDialogResult, withLastDirectory } from '../utils/lastDialogDirectory'
@@ -43,6 +58,14 @@ export const projectService = new ProjectService(
 projectSettingsService.setGlobalExcludeProvider(
   () => globalSettingsService.getSetting('files').exclude
 )
+
+/** What `file:validatePath` answers. */
+interface ValidatePathResult {
+  exists: boolean
+  absolutePath?: string
+  isFile?: boolean
+  error?: string
+}
 
 /**
  * Common logic for opening a project by path
@@ -69,6 +92,8 @@ async function openProjectByPath(
 }
 
 export function registerFileHandlers(): void {
+  const session = projectService.session
+
   // Open project folder via dialog
   registerHandle('file:openProject', async (event) => {
     const result = await dialog.showOpenDialog(withLastDirectory<OpenDialogOptions>({
@@ -86,21 +111,18 @@ export function registerFileHandlers(): void {
     return await openProjectByPath(newProjectPath, { senderId: event.sender?.id ?? null, source: 'dialog' })
   })
 
-  // Open project folder by path (for recent projects, etc.)
-  registerHandle('file:openProjectByPath', async (event, projectPath: string) => {
-    // Input validation
-    if (!projectPath || typeof projectPath !== 'string') {
-      throw new Error('Invalid project path: must be a non-empty string')
-    }
-
-    // Trim whitespace
-    const trimmedPath = projectPath.trim()
-    if (!trimmedPath) {
-      throw new Error('Invalid project path: path is empty after trimming')
-    }
-
-    return await openProjectByPath(trimmedPath, { senderId: event.sender?.id ?? null, source: 'recent' })
-  })
+  // Open project folder by path (for recent projects, etc.). The value must be
+  // an absolute path; the project itself is validated by `ProjectService`.
+  registerConfinedHandle(
+    'file:openProjectByPath',
+    {
+      schema: OpenProjectByPathArgsSchema,
+      paths: { projectPath: { arg: 0, mode: 'external', check: 'none' } },
+      handler: async ({ event }, [projectPath]) =>
+        await openProjectByPath(projectPath, { senderId: event.sender?.id ?? null, source: 'recent' })
+    },
+    session
+  )
 
   // The open project as the main process holds it; null when none is open
   registerHandle('file:getSession', async (): Promise<ProjectSessionInfo | null> => {
@@ -108,56 +130,93 @@ export function registerFileHandlers(): void {
     return snapshot ? { root: snapshot.root, generation: snapshot.generation } : null
   })
 
+  // Every handler below states which arguments are paths and what each may be
+  // (see ./confinement). The checks run in the main process, against the open
+  // project, before the handler body: the renderer's word for where a path
+  // leads is never taken. Handlers act on the checked canonical path (`real`)
+  // and answer with paths built from the one the renderer sent (`requested`).
+
   // Read directory structure
-  registerHandle('file:readDirectory', async (event, dirPath: string) => {
-    try {
-      const start = performance.now()
-      // #210: a successful read of a paused root shows every change dropped
-      // before it began, so the watcher need not catch up on those at resume.
-      const commitRead = directoryWatcherService.beginTreeRead(dirPath, event.sender.id)
-      const result = await fileService.readDirectory(dirPath)
-      commitRead()
-      const durationMs = Math.round(performance.now() - start)
-      logger.info('file:readDirectory IPC completed', { durationMs, dirPath: redactPath(dirPath) })
-      return result
-    } catch (error) {
-      logger.error('Error reading directory', redactedLogError(error))
-      throw error
-    }
-  })
+  registerConfinedHandle(
+    'file:readDirectory',
+    {
+      schema: ReadDirectoryArgsSchema,
+      paths: { dirPath: { arg: 0, mode: 'project', mustExist: true } },
+      staleCheck: 'after',
+      handler: async ({ sender }, _args, { dirPath }) => {
+        try {
+          const start = performance.now()
+          // The tree's node paths are built from the walk's base, so the walk takes
+          // the path as sent; it was shown to resolve inside the project.
+          // #210: a successful read of a paused root shows every change dropped
+          // before it began, so the watcher need not catch up on those at resume.
+          const commitRead = directoryWatcherService.beginTreeRead(dirPath.requested, sender.id)
+          const result = await fileService.readDirectory(dirPath.requested)
+          commitRead()
+          const durationMs = Math.round(performance.now() - start)
+          logger.info('file:readDirectory IPC completed', {
+            durationMs,
+            dirPath: redactPath(dirPath.requested)
+          })
+          return result
+        } catch (error) {
+          logger.error('Error reading directory', redactedLogError(error))
+          throw error
+        }
+      }
+    },
+    session
+  )
 
   // Read file content.
   //
   // Confined to the open project, symlinks resolved: the file watcher re-reads
   // a watched path automatically now, so a one-shot user-initiated read became
   // a repeating one an outside party can clock (issue #70, security MEDIUM-2).
-  registerHandle('file:readFile', async (_event, filePath: string) => {
-    try {
-      await assertInsideProject(filePath, fileService.getProjectPath())
-      return await fileService.readFile(filePath)
-    } catch (error) {
-      logger.error('Error reading file', redactedLogError(error))
-      throw error
-    }
-  })
+  registerConfinedHandle(
+    'file:readFile',
+    {
+      schema: PathArgsSchema,
+      paths: { filePath: { arg: 0, mode: 'project', kind: 'file' } },
+      handler: async (_ctx, _args, { filePath }) => {
+        try {
+          return await fileService.readFile(filePath.real)
+        } catch (error) {
+          logger.error('Error reading file', redactedLogError(error))
+          throw error
+        }
+      }
+    },
+    session
+  )
 
   // Write file content
   //
   // `options.createParentDirs` is the explicit restore of a tab whose file was
   // deleted together with its folder; only a literal `true` turns it on. The
   // logged copy of the error drops the path (the renderer gets the original).
-  registerHandle('file:writeFile', async (_event, filePath: string, content: string, options?: unknown) => {
-    try {
-      const createParentDirs =
-        typeof options === 'object' && options !== null &&
-        (options as { createParentDirs?: unknown }).createParentDirs === true
-      await fileService.writeFile(filePath, content, createParentDirs ? { createParentDirs } : undefined)
-      return true
-    } catch (error) {
-      logger.error('Error writing file', redactedLogError(error))
-      throw error
-    }
-  })
+  // The root itself is never a file to write, and a link inside the project
+  // that points outside is refused like a read through it is.
+  registerConfinedHandle(
+    'file:writeFile',
+    {
+      schema: WriteFileArgsSchema,
+      paths: { filePath: { arg: 0, mode: 'project', allowRoot: false } },
+      handler: async (_ctx, [, content, options], { filePath }) => {
+        try {
+          if (options?.createParentDirs) {
+            await restoreParentDirectory(filePath)
+          }
+          await fileService.writeFile(filePath.real, content)
+          return true
+        } catch (error) {
+          logger.error('Error writing file', redactedLogError(error))
+          throw error
+        }
+      }
+    },
+    session
+  )
 
   // Get file stats.
   //
@@ -167,37 +226,55 @@ export function registerFileHandlers(): void {
   // enforced is that a path that *looks* in-project may not resolve out of it
   // through a symlink, so the watcher's automatic re-stat of a watched file
   // cannot be pointed elsewhere (issue #70).
-  registerHandle('file:getStats', async (_event, filePath: string): Promise<FileStats> => {
-    try {
-      await assertNoConfinementEscape(filePath, fileService.getProjectPath())
-      const stats = await fileService.getFileStats(filePath)
-      return {
-        size: stats.size,
-        modified: stats.mtime,
-        created: stats.birthtime
-      } satisfies FileStats
-    } catch (error) {
-      // ENOENT is an expected caller condition (e.g. a markdown link whose
-      // target doesn't exist). Log at debug; surface real failures at error.
-      // NOTE: this shared handler only debug-logs ENOENT — callers that treat a
-      // missing file as a real problem must log their own severity at the call
-      // site (e.g. ImageViewerPanel and ProjectTree warn; link checks use
-      // file:exists instead).
-      if (error instanceof Error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
-        logger.debug('file:getStats target not found', { filePath: redactPath(filePath), code: 'ENOENT' })
-      } else {
-        logger.error('Error getting file stats', redactedLogError(error))
+  registerConfinedHandle(
+    'file:getStats',
+    {
+      schema: PathArgsSchema,
+      paths: { filePath: { arg: 0, mode: 'external', check: 'escape' } },
+      handler: async (_ctx, _args, { filePath }): Promise<FileStats> => {
+        try {
+          const stats = await fileService.getFileStats(filePath.real)
+          return {
+            size: stats.size,
+            modified: stats.mtime,
+            created: stats.birthtime
+          } satisfies FileStats
+        } catch (error) {
+          // ENOENT is an expected caller condition (e.g. a markdown link whose
+          // target doesn't exist). Log at debug; surface real failures at error.
+          // NOTE: this shared handler only debug-logs ENOENT — callers that treat a
+          // missing file as a real problem must log their own severity at the call
+          // site (e.g. ImageViewerPanel and ProjectTree warn; link checks use
+          // file:exists instead).
+          if (error instanceof Error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+            logger.debug('file:getStats target not found', {
+              filePath: redactPath(filePath.requested),
+              code: 'ENOENT'
+            })
+          } else {
+            logger.error('Error getting file stats', redactedLogError(error))
+          }
+          throw error
+        }
       }
-      throw error
-    }
-  })
+    },
+    session
+  )
 
   // Existence check that never throws (fs.access). Used by callers that only
   // need a boolean (e.g. markdown link resolution) — avoids the noise and
-  // fragile error-string parsing of catching file:getStats' ENOENT.
-  registerHandle('file:exists', async (_event, filePath: string): Promise<boolean> => {
-    return fileExists(filePath)
-  })
+  // fragile error-string parsing of catching file:getStats' ENOENT. A value that
+  // is not a usable absolute path is "does not exist".
+  registerConfinedHandle(
+    'file:exists',
+    {
+      schema: PathArgsSchema,
+      paths: { filePath: { arg: 0, mode: 'external', check: 'none' } },
+      onRefusal: () => false,
+      handler: async (_ctx, _args, { filePath }): Promise<boolean> => fileExists(filePath.real)
+    },
+    session
+  )
 
   // Get current project path
   registerHandle('file:getProjectPath', async () => {
@@ -225,255 +302,238 @@ export function registerFileHandlers(): void {
   // as missed external changes.
 
   // Create new file
-  registerHandle('file:createFile', async (_event, dirPath: string, fileName: string) => {
-    try {
-      // Validate inputs
-      if (!dirPath || typeof dirPath !== 'string') {
-        throw new Error('Invalid directory path')
+  registerConfinedHandle(
+    'file:createFile',
+    {
+      schema: CreateEntryArgsSchema,
+      paths: { dirPath: { arg: 0, mode: 'project', mustExist: true, kind: 'directory' } },
+      handler: async (_ctx, [, fileName], { dirPath }) => {
+        try {
+          const created = await fileService.createFile(dirPath.real, fileName)
+          const createdFilePath = path.join(dirPath.requested, path.basename(created))
+          directoryWatcherService.noteInternalChange({ path: createdFilePath, kind: 'added', subtree: false })
+          return createdFilePath
+        } catch (error) {
+          // Redact user-typed filename before logging (INVALID_FILENAME embeds it);
+          // re-throw the ORIGINAL error so the renderer toast keeps the full name.
+          logger.error('Error creating file', redactedLogError(error))
+          throw error
+        }
       }
-      if (!fileName || typeof fileName !== 'string') {
-        throw new Error('Invalid file name')
-      }
-
-      // Sanitize filename to prevent path traversal
-      const sanitizedFileName = fileName.replace(/[/\\]/g, '')
-      if (!sanitizedFileName) {
-        throw new Error('Invalid file name')
-      }
-
-      const createdFilePath = await fileService.createFile(dirPath, sanitizedFileName)
-      directoryWatcherService.noteInternalChange({ path: createdFilePath, kind: 'added', subtree: false })
-      return createdFilePath
-    } catch (error) {
-      // Redact user-typed filename before logging (INVALID_FILENAME embeds it);
-      // re-throw the ORIGINAL error so the renderer toast keeps the full name.
-      logger.error('Error creating file', redactedLogError(error))
-      throw error
-    }
-  })
+    },
+    session
+  )
 
   // Create new folder
-  registerHandle('file:createFolder', async (_event, dirPath: string, folderName: string) => {
-    try {
-      // Validate inputs
-      if (!dirPath || typeof dirPath !== 'string') {
-        throw new Error('Invalid directory path')
+  registerConfinedHandle(
+    'file:createFolder',
+    {
+      schema: CreateEntryArgsSchema,
+      paths: { dirPath: { arg: 0, mode: 'project', mustExist: true, kind: 'directory' } },
+      handler: async (_ctx, [, folderName], { dirPath }) => {
+        try {
+          const created = await fileService.createFolder(dirPath.real, folderName)
+          const createdFolderPath = path.join(dirPath.requested, path.basename(created))
+          directoryWatcherService.noteInternalChange({ path: createdFolderPath, kind: 'added', subtree: false })
+          return createdFolderPath
+        } catch (error) {
+          // Redact user-typed name before logging (INVALID_FILENAME embeds it);
+          // re-throw the ORIGINAL error so the renderer toast keeps the full name.
+          logger.error('Error creating folder', redactedLogError(error))
+          throw error
+        }
       }
-      if (!folderName || typeof folderName !== 'string') {
-        throw new Error('Invalid folder name')
+    },
+    session
+  )
+
+  // Delete file. The entry itself is checked, not what it points at: a link
+  // inside the project is removed as a link and nothing outside is touched.
+  registerConfinedHandle(
+    'file:deleteFile',
+    {
+      schema: PathArgsSchema,
+      paths: { filePath: { arg: 0, mode: 'project-entry' } },
+      handler: async (_ctx, _args, { filePath }) => {
+        try {
+          await fileService.deleteFile(filePath.real)
+          directoryWatcherService.noteInternalChange({ path: filePath.requested, kind: 'removed', subtree: true })
+          return true
+        } catch (error) {
+          logger.error('Error deleting file', redactedLogError(error))
+          throw error
+        }
       }
-
-      // Sanitize folder name to prevent path traversal
-      const sanitizedFolderName = folderName.replace(/[/\\]/g, '')
-      if (!sanitizedFolderName) {
-        throw new Error('Invalid folder name')
-      }
-
-      const createdFolderPath = await fileService.createFolder(dirPath, sanitizedFolderName)
-      directoryWatcherService.noteInternalChange({ path: createdFolderPath, kind: 'added', subtree: false })
-      return createdFolderPath
-    } catch (error) {
-      // Redact user-typed name before logging (INVALID_FILENAME embeds it);
-      // re-throw the ORIGINAL error so the renderer toast keeps the full name.
-      logger.error('Error creating folder', redactedLogError(error))
-      throw error
-    }
-  })
-
-  // Delete file
-  registerHandle('file:deleteFile', async (_event, filePath: string) => {
-    try {
-      // Validate input
-      if (!filePath || typeof filePath !== 'string') {
-        throw new Error('Invalid file path')
-      }
-
-      await fileService.deleteFile(filePath)
-      directoryWatcherService.noteInternalChange({ path: filePath, kind: 'removed', subtree: true })
-      return true
-    } catch (error) {
-      logger.error('Error deleting file', redactedLogError(error))
-      throw error
-    }
-  })
+    },
+    session
+  )
 
   // Delete folder
-  registerHandle('file:deleteFolder', async (_event, folderPath: string) => {
-    try {
-      // Validate input
-      if (!folderPath || typeof folderPath !== 'string') {
-        throw new Error('Invalid folder path')
+  registerConfinedHandle(
+    'file:deleteFolder',
+    {
+      schema: PathArgsSchema,
+      paths: { folderPath: { arg: 0, mode: 'project-entry' } },
+      handler: async (_ctx, _args, { folderPath }) => {
+        try {
+          await fileService.deleteFolder(folderPath.real)
+          directoryWatcherService.noteInternalChange({ path: folderPath.requested, kind: 'removed', subtree: true })
+          return true
+        } catch (error) {
+          logger.error('Error deleting folder', redactedLogError(error))
+          throw error
+        }
       }
-
-      await fileService.deleteFolder(folderPath)
-      directoryWatcherService.noteInternalChange({ path: folderPath, kind: 'removed', subtree: true })
-      return true
-    } catch (error) {
-      logger.error('Error deleting folder', redactedLogError(error))
-      throw error
-    }
-  })
+    },
+    session
+  )
 
   // Rename file or folder
-  registerHandle('file:rename', async (_event, oldPath: string, newName: string) => {
-    try {
-      // Validate inputs
-      if (!oldPath || typeof oldPath !== 'string') {
-        throw new Error('Invalid path')
+  registerConfinedHandle(
+    'file:rename',
+    {
+      schema: RenameArgsSchema,
+      paths: { oldPath: { arg: 0, mode: 'project-entry' } },
+      handler: async (_ctx, [, newName], { oldPath }) => {
+        try {
+          const renamed = await fileService.rename(oldPath.real, newName)
+          const newPath = path.join(path.dirname(oldPath.requested), path.basename(renamed))
+          directoryWatcherService.noteInternalChange(
+            { path: oldPath.requested, kind: 'removed', subtree: true },
+            { path: newPath, kind: 'added', subtree: true }
+          )
+          return newPath
+        } catch (error) {
+          // Redact user-typed name before logging (INVALID_FILENAME embeds it);
+          // re-throw the ORIGINAL error so the renderer toast keeps the full name.
+          logger.error('Error renaming', redactedLogError(error))
+          throw error
+        }
       }
-      if (!newName || typeof newName !== 'string') {
-        throw new Error('Invalid name')
-      }
-
-      // Sanitize new name to prevent path traversal
-      const sanitizedName = newName.replace(/[/\\]/g, '')
-      if (!sanitizedName) {
-        throw new Error('Invalid name')
-      }
-
-      const newPath = await fileService.rename(oldPath, sanitizedName)
-      directoryWatcherService.noteInternalChange(
-        { path: oldPath, kind: 'removed', subtree: true },
-        { path: newPath, kind: 'added', subtree: true }
-      )
-      return newPath
-    } catch (error) {
-      // Redact user-typed name before logging (INVALID_FILENAME embeds it);
-      // re-throw the ORIGINAL error so the renderer toast keeps the full name.
-      logger.error('Error renaming', redactedLogError(error))
-      throw error
-    }
-  })
+    },
+    session
+  )
 
   // Move file or folder
-  registerHandle('file:moveItem', async (_event, sourcePath: string, targetParentPath: string, newName?: string, replaceExisting?: boolean) => {
-    try {
-      // Validate inputs
-      if (!sourcePath || typeof sourcePath !== 'string') {
-        throw new Error('Invalid source path')
-      }
-      if (!targetParentPath || typeof targetParentPath !== 'string') {
-        throw new Error('Invalid target path')
-      }
-      if (newName !== undefined && typeof newName !== 'string') {
-        throw new Error('Invalid new name')
-      }
-      if (replaceExisting !== undefined && typeof replaceExisting !== 'boolean') {
-        throw new Error('Invalid replaceExisting flag')
-      }
-
-      // Sanitize new name if provided
-      let sanitizedNewName: string | undefined = newName
-      if (newName) {
-        sanitizedNewName = newName.replace(/[/\\]/g, '')
-        if (!sanitizedNewName) {
-          throw new Error('Invalid new name')
+  registerConfinedHandle(
+    'file:moveItem',
+    {
+      schema: MoveItemArgsSchema,
+      paths: {
+        sourcePath: { arg: 0, mode: 'project-entry' },
+        targetParentPath: { arg: 1, mode: 'project', mustExist: true, kind: 'directory' }
+      },
+      handler: async (_ctx, [, , newName, replaceExisting], { sourcePath, targetParentPath }) => {
+        try {
+          const moved = await fileService.moveItem(
+            sourcePath.real,
+            targetParentPath.real,
+            newName,
+            replaceExisting
+          )
+          const newPath = path.join(targetParentPath.requested, path.basename(moved.path))
+          directoryWatcherService.noteInternalChange(
+            { path: sourcePath.requested, kind: 'removed', subtree: true },
+            { path: newPath, kind: 'added', subtree: true },
+            // The replaced item at the destination was removed first
+            ...(replaceExisting ? [{ path: newPath, kind: 'removed' as const, subtree: true }] : [])
+          )
+          return { ...moved, path: newPath }
+        } catch (error) {
+          logger.error('Error moving item', redactedLogError(error))
+          throw error
         }
       }
-
-      const newPath = await fileService.moveItem(sourcePath, targetParentPath, sanitizedNewName, replaceExisting)
-      directoryWatcherService.noteInternalChange(
-        { path: sourcePath, kind: 'removed', subtree: true },
-        { path: newPath.path, kind: 'added', subtree: true },
-        // The replaced item at the destination was removed first
-        ...(replaceExisting ? [{ path: newPath.path, kind: 'removed' as const, subtree: true }] : [])
-      )
-      return newPath
-    } catch (error) {
-      logger.error('Error moving item', redactedLogError(error))
-      throw error
-    }
-  })
+    },
+    session
+  )
 
   // Copy file or folder
-  registerHandle('file:copyItem', async (_event, sourcePath: string, targetParentPath: string, newName?: string) => {
-    try {
-      // Validate inputs
-      if (!sourcePath || typeof sourcePath !== 'string') {
-        throw new Error('Invalid source path')
-      }
-      if (!targetParentPath || typeof targetParentPath !== 'string') {
-        throw new Error('Invalid target path')
-      }
-      if (newName !== undefined && typeof newName !== 'string') {
-        throw new Error('Invalid new name')
-      }
-
-      // Sanitize new name if provided
-      let sanitizedNewName: string | undefined = newName
-      if (newName) {
-        sanitizedNewName = newName.replace(/[/\\]/g, '')
-        if (!sanitizedNewName) {
-          throw new Error('Invalid new name')
+  registerConfinedHandle(
+    'file:copyItem',
+    {
+      schema: CopyItemArgsSchema,
+      paths: {
+        sourcePath: { arg: 0, mode: 'project' },
+        targetParentPath: { arg: 1, mode: 'project', mustExist: true, kind: 'directory' }
+      },
+      handler: async (_ctx, [, , newName], { sourcePath, targetParentPath }) => {
+        try {
+          // The copy keeps the name the source was given, not the name of what a link leads to
+          const copied = await fileService.copyItem(
+            sourcePath.real,
+            targetParentPath.real,
+            newName ?? path.basename(sourcePath.requested)
+          )
+          const newPath = path.join(targetParentPath.requested, path.basename(copied.path))
+          directoryWatcherService.noteInternalChange({ path: newPath, kind: 'added', subtree: true })
+          return { ...copied, path: newPath }
+        } catch (error) {
+          logger.error('Error copying item', redactedLogError(error))
+          throw error
         }
       }
+    },
+    session
+  )
 
-      const newPath = await fileService.copyItem(sourcePath, targetParentPath, sanitizedNewName)
-      directoryWatcherService.noteInternalChange({ path: newPath.path, kind: 'added', subtree: true })
-      return newPath
-    } catch (error) {
-      logger.error('Error copying item', redactedLogError(error))
-      throw error
-    }
-  })
-
-  // Check name conflict
-  registerHandle('file:checkConflict', async (_event, targetParentPath: string, itemName: string) => {
-    try {
-      // Validate inputs
-      if (!targetParentPath || typeof targetParentPath !== 'string') {
-        throw new Error('Invalid target path')
+  // Check name conflict. A folder that is not there has no conflict.
+  registerConfinedHandle(
+    'file:checkConflict',
+    {
+      schema: CheckConflictArgsSchema,
+      paths: { targetParentPath: { arg: 0, mode: 'project' } },
+      handler: async (_ctx, [, itemName], { targetParentPath }) => {
+        try {
+          return await fileService.checkNameConflict(targetParentPath.real, itemName)
+        } catch (error) {
+          logger.error('Error checking conflict', redactedLogError(error))
+          throw error
+        }
       }
-      if (!itemName || typeof itemName !== 'string') {
-        throw new Error('Invalid item name')
-      }
-
-      const hasConflict = await fileService.checkNameConflict(targetParentPath, itemName)
-      return hasConflict
-    } catch (error) {
-      logger.error('Error checking conflict', redactedLogError(error))
-      throw error
-    }
-  })
+    },
+    session
+  )
 
   // Read an image, or answer "unchanged" when the caller already holds the
   // current bytes (issue #70). This is the only base64 read channel - the
   // unconditional file:readAsBase64 it replaced is gone.
   //
-  // Confinement is lexical first and then re-checked against fs.realpath of
-  // both ends: path.resolve alone strips "../../../etc/passwd" but does not
-  // resolve symlinks, so an in-project link to an out-of-project file used to
-  // pass - and the image viewer now re-reads on every disk change, which turns
-  // that into a repeating read (issue #70, security MEDIUM-2). The check runs
-  // before the stat, so an out-of-project path is refused without this handler
-  // disclosing anything about it.
+  // The path is resolved against the open project, symlinks included, so an
+  // in-project link to an out-of-project file is refused (the image viewer
+  // re-reads on every disk change, which made that a repeating read, issue
+  // #70). The check runs before the stat, so an out-of-project path is refused
+  // without this handler disclosing anything about it.
   //
   // The skip exists because the image viewer re-reads on every disk change and
   // the base64 encode blocks the main-process event loop; see
   // src/main/services/file/imageRead.ts for why the version is safe to trust.
-  registerHandle(
+  registerConfinedHandle(
     'file:readImage',
-    async (_event, filePath: string, knownVersion?: string): Promise<ImageReadResponse> => {
-      try {
-        const parsed = ImageReadRequestSchema.safeParse({ filePath, knownVersion })
-        if (!parsed.success) {
-          throw new Error(parsed.error.issues.map((issue) => issue.message).join(', '))
-        }
+    {
+      schema: ReadImageArgsSchema,
+      paths: { filePath: { arg: 0, mode: 'project' } },
+      handler: async (_ctx, [, knownVersion], { filePath }): Promise<ImageReadResponse> => {
+        try {
+          const parsed = ImageReadRequestSchema.safeParse({ filePath: filePath.real, knownVersion })
+          if (!parsed.success) {
+            throw new Error(parsed.error.issues.map((issue) => issue.message).join(', '))
+          }
 
-        await assertInsideProject(parsed.data.filePath, fileService.getProjectPath())
-
-        const result = await fileService.readImage(parsed.data.filePath, parsed.data.knownVersion)
-        if (result.status === 'unchanged') {
-          // No path in the log line: the version carries no user content, and
-          // this is the hot path of an agent rewriting an asset in a loop.
-          logger.debug('file:readImage unchanged, skipped re-encode', { version: result.version })
+          const result = await fileService.readImage(parsed.data.filePath, parsed.data.knownVersion)
+          if (result.status === 'unchanged') {
+            // No path in the log line: the version carries no user content, and
+            // this is the hot path of an agent rewriting an asset in a loop.
+            logger.debug('file:readImage unchanged, skipped re-encode', { version: result.version })
+          }
+          return result
+        } catch (error) {
+          logger.error('Error reading image', redactedLogError(error))
+          throw error
         }
-        return result
-      } catch (error) {
-        logger.error('Error reading image', redactedLogError(error))
-        throw error
       }
-    }
+    },
+    session
   )
 
   // Reveal a file or folder in the native OS file manager (Finder / Explorer).
@@ -485,126 +545,108 @@ export function registerFileHandlers(): void {
   // `shell.showItemInFolder` reveals the item in its containing folder, so a
   // folder/root node is highlighted in its parent rather than opened.
   //
-  // The path is confined to the open project: checked lexically first, then
-  // re-checked against fs.realpath-canonicalized paths so an in-project symlink
-  // cannot point the reveal at an out-of-project target. realpath also subsumes
-  // the existence check.
-  registerHandle(
+  // The path is confined to the open project with symlinks resolved, so an
+  // in-project link cannot point the reveal at an out-of-project target; the
+  // check also subsumes the existence check.
+  registerConfinedHandle(
     'file:revealInFileManager',
-    async (event, filePath: string): Promise<string> => {
-      if (!isTrustedSender(event)) {
-        logger.warn('Rejected file:revealInFileManager from untrusted sender', {
-          url: event.senderFrame?.url
-        })
+    {
+      schema: PathArgsSchema,
+      paths: { filePath: { arg: 0, mode: 'project', mustExist: true } },
+      senderGate: {
+        allow: (event) => {
+          const trusted = isTrustedSender(event)
+          if (!trusted) {
+            logger.warn('Rejected file:revealInFileManager from untrusted sender', {
+              url: event.senderFrame?.url
+            })
+          }
+          return trusted
+        },
+        denied: () => ''
+      },
+      onRefusal: (error): string => {
+        switch (error.code) {
+          case 'INVALID_PATH':
+            return 'Invalid path'
+          case 'NO_PROJECT':
+            return 'No project is open'
+          case 'OUTSIDE_PROJECT':
+            return 'Cannot reveal items outside the project'
+          case 'NOT_FOUND':
+            return 'Item no longer exists on disk'
+          default:
+            return 'Cannot reveal this item'
+        }
+      },
+      handler: async (_ctx, _args, { filePath }): Promise<string> => {
+        shell.showItemInFolder(filePath.real)
         return ''
       }
-
-      if (!filePath || typeof filePath !== 'string') {
-        return 'Invalid path'
-      }
-
-      const projectPath = fileService.getProjectPath()
-      if (!projectPath) {
-        return 'No project is open'
-      }
-
-      // Fast lexical boundary check (no fs access; the root itself is allowed so
-      // the project-root node can be revealed). Rejects all clearly-outside
-      // paths uniformly, without disclosing whether they exist.
-      const resolved = path.resolve(filePath)
-      const resolvedRoot = path.resolve(projectPath)
-      if (resolved !== resolvedRoot && !resolved.startsWith(resolvedRoot + path.sep)) {
-        return 'Cannot reveal items outside the project'
-      }
-
-      // Canonicalize (resolve symlinks) and re-check so an in-project symlink
-      // cannot escape the project. A missing path throws ENOENT; other realpath
-      // errors (EACCES / ELOOP / ENOTDIR) get a distinct, accurate message.
-      let realRoot: string
-      let realResolved: string
-      try {
-        realRoot = await realpath(resolvedRoot)
-        realResolved = await realpath(resolved)
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-          return 'Item no longer exists on disk'
-        }
-        return 'Cannot reveal this item'
-      }
-      if (realResolved !== realRoot && !realResolved.startsWith(realRoot + path.sep)) {
-        return 'Cannot reveal items outside the project'
-      }
-
-      shell.showItemInFolder(realResolved)
-      return ''
-    }
+    },
+    session
   )
 
   // Validate file path exists and return info
   // Note: projectRoot is optional to allow validation of absolute paths from terminal output.
-  // When projectRoot is provided, path traversal protection is enforced.
+  // When projectRoot is provided, the path must lie inside it (whole path segments).
   // When omitted, only absolute paths that the user can see in terminal output are validated.
   // This is acceptable because:
   // 1. Terminal output comes from user-initiated commands (not external input)
   // 2. The user can already see and access any file path shown in their terminal
   // 3. This handler only checks existence, it doesn't read or modify files
-  registerHandle('file:validatePath', async (_event, filePath: string, projectRoot?: string) => {
-    try {
-      // Validate input
-      if (!filePath || typeof filePath !== 'string') {
-        return { exists: false, error: 'Invalid file path' }
-      }
+  registerConfinedHandle(
+    'file:validatePath',
+    {
+      schema: ValidatePathArgsSchema,
+      paths: { filePath: { arg: 0, mode: 'external', check: 'none' } },
+      onRefusal: (error): ValidatePathResult => ({ exists: false, error: error.message }),
+      handler: async (_ctx, [trimmedPath, projectRoot], { filePath }): Promise<ValidatePathResult> => {
+        try {
+          const resolvedPath = filePath.requested
 
-      const trimmedPath = filePath.trim()
-      if (!trimmedPath) {
-        return { exists: false, error: 'Empty file path' }
-      }
+          // Security check: block system-critical paths even without projectRoot
+          // Defense-in-depth: prevent validation of sensitive system directories
+          const blockedPrefixes = process.platform === 'win32'
+            ? ['C:\\Windows', 'C:\\Program Files', 'C:\\ProgramData', 'C:\\System']
+            : ['/etc', '/usr', '/bin', '/sbin', '/System', '/Library', '/private/var']
 
-      const path = await import('path')
-      const resolvedPath = path.resolve(trimmedPath)
+          const isBlockedPath = blockedPrefixes.some(prefix =>
+            resolvedPath.toLowerCase().startsWith(prefix.toLowerCase())
+          )
+          if (isBlockedPath) {
+            return { exists: false, error: 'Access to system paths not allowed' }
+          }
 
-      // Security check: block system-critical paths even without projectRoot
-      // Defense-in-depth: prevent validation of sensitive system directories
-      const blockedPrefixes = process.platform === 'win32'
-        ? ['C:\\Windows', 'C:\\Program Files', 'C:\\ProgramData', 'C:\\System']
-        : ['/etc', '/usr', '/bin', '/sbin', '/System', '/Library', '/private/var']
+          // Security check: if projectRoot provided, ensure path is within it
+          if (projectRoot && !isLexicallyInside(resolvedPath, projectRoot)) {
+            return { exists: false, error: 'Path outside project root' }
+          }
 
-      const isBlockedPath = blockedPrefixes.some(prefix =>
-        resolvedPath.toLowerCase().startsWith(prefix.toLowerCase())
-      )
-      if (isBlockedPath) {
-        return { exists: false, error: 'Access to system paths not allowed' }
-      }
+          // Check if file exists and is a file (not directory)
+          const stats = await stat(trimmedPath)
+          if (!stats.isFile()) {
+            return { exists: false, error: 'Path is not a file' }
+          }
 
-      // Security check: if projectRoot provided, ensure path is within it
-      if (projectRoot) {
-        const resolvedRoot = path.resolve(projectRoot)
-        if (!resolvedPath.startsWith(resolvedRoot)) {
-          return { exists: false, error: 'Path outside project root' }
+          return {
+            exists: true,
+            absolutePath: trimmedPath,
+            isFile: true
+          }
+        } catch (error) {
+          // ENOENT means file doesn't exist - this is expected, not an error
+          if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+            return { exists: false }
+          }
+          // Other errors (permissions, etc.)
+          return {
+            exists: false,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          }
         }
       }
-
-      // Check if file exists and is a file (not directory)
-      const stats = await stat(trimmedPath)
-      if (!stats.isFile()) {
-        return { exists: false, error: 'Path is not a file' }
-      }
-
-      return {
-        exists: true,
-        absolutePath: trimmedPath,
-        isFile: true
-      }
-    } catch (error) {
-      // ENOENT means file doesn't exist - this is expected, not an error
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-        return { exists: false }
-      }
-      // Other errors (permissions, etc.)
-      return {
-        exists: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      }
-    }
-  })
+    },
+    session
+  )
 }

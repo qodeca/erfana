@@ -44,6 +44,7 @@ vi.mock('electron', () => ({
 vi.mock('../services/ProjectService', () => ({
   ProjectService: class MockProjectService {
     switchProject = vi.fn()
+    session = { current: () => null, require: () => { throw new Error('no project') }, onChange: () => () => {} }
   }
 }))
 

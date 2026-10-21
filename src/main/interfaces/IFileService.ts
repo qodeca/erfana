@@ -32,7 +32,7 @@ export interface IFileService {
   /**
    * Write file contents
    */
-  writeFile(filePath: string, content: string, options?: WriteFileOptions): Promise<void>
+  writeFile(filePath: string, content: string): Promise<void>
 
   /**
    * Get file statistics
@@ -131,13 +131,4 @@ export interface IFileService {
    * (read them with `filter.getWalkHints()`). Null means no exclusion.
    */
   setPathFilter(filter: ProjectPathFilter | null): void
-}
-
-/** Options for {@link IFileService.writeFile}. */
-export interface WriteFileOptions {
-  /**
-   * Recreate missing parent folders (inside the project only) before writing.
-   * Set only by the explicit "Save to restore it" of a tab in the deleted state.
-   */
-  createParentDirs?: boolean
 }

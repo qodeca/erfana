@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { readdir, readFile, writeFile, stat, rm, mkdir, rename as fsRename, cp, copyFile } from 'fs/promises'
+import { readdir, readFile, writeFile, stat, rm, mkdir, rename as fsRename, cp, copyFile, realpath } from 'fs/promises'
 import { join, extname, basename, relative, resolve as resolvePath } from 'path'
-import type { IFileService, WriteFileOptions } from '../interfaces/IFileService'
+import type { IFileService } from '../interfaces/IFileService'
 import { SymlinkDetector } from '../utils/SymlinkDetector'
 import { RollbackHandler } from '../utils/RollbackHandler'
 import { assertValidUserFilename } from '../utils/validateFilename'
@@ -24,7 +24,8 @@ import { redactPath } from '../utils/redactUserInput'
 import { logger } from './LoggingService'
 import { atomicWriteText, isAtomicTempName } from '../utils/atomicWrite'
 import { IMAGE_EXTENSIONS, readImage } from './file/imageRead'
-import { restoreParentDirectory } from './file/restoreParentDirectory'
+import { isSamePath } from '../ipc/confinement/resolveConfinedPath'
+import { getPlatformConfig } from './watcher/PlatformConfig'
 import type { ImageReadResponse } from '../../shared/ipc/file-image-schema'
 import type { FileNode } from '../../shared/ipc/file-schema'
 
@@ -455,15 +456,10 @@ export class FileService implements IFileService {
   }
 
   /**
-   * Write a text file. `createParentDirs` is the explicit "Save to restore it"
-   * of a tab whose file was deleted together with its folder: the missing
-   * folders are recreated, inside the project only, before the write (see
-   * `file/restoreParentDirectory`). Without it a missing folder is an ENOENT.
+   * Write a text file. A missing folder is an ENOENT; the explicit "Save to
+   * restore it" recreates the folders first (see `file/restoreParentDirectory`).
    */
-  async writeFile(filePath: string, content: string, options: WriteFileOptions = {}): Promise<void> {
-    if (options.createParentDirs === true) {
-      await restoreParentDirectory(filePath, this.projectPath)
-    }
+  async writeFile(filePath: string, content: string): Promise<void> {
     await atomicWriteText(filePath, content)
   }
 
@@ -579,16 +575,28 @@ export class FileService implements IFileService {
     return folderPath
   }
 
+  /**
+   * Whether `candidate` is the open project's root folder. The one defence the
+   * service keeps of its own: callers pass paths the IPC layer has already
+   * checked against the project, but a handler that skipped that check must
+   * still not be able to remove or move the root.
+   */
+  private async isProjectRoot(candidate: string): Promise<boolean> {
+    if (!this.projectPath) return false
+    const caseSensitive = getPlatformConfig().caseSensitive
+    if (isSamePath(resolvePath(candidate), resolvePath(this.projectPath), caseSensitive)) return true
+    try {
+      return isSamePath(resolvePath(candidate), await realpath(this.projectPath), caseSensitive)
+    } catch {
+      return false
+    }
+  }
+
   async deleteFile(filePath: string): Promise<void> {
     // Verify it's a file, not a directory
     const stats = await stat(filePath)
     if (stats.isDirectory()) {
       throw new Error('Cannot delete a directory using deleteFile. Use deleteFolder instead.')
-    }
-
-    // Prevent deleting files outside project
-    if (this.projectPath && !filePath.startsWith(this.projectPath)) {
-      throw new Error('Cannot delete files outside the project directory')
     }
 
     await rm(filePath)
@@ -602,13 +610,8 @@ export class FileService implements IFileService {
     }
 
     // Prevent deleting project root
-    if (this.projectPath && folderPath === this.projectPath) {
+    if (await this.isProjectRoot(folderPath)) {
       throw new Error('Cannot delete the project root directory')
-    }
-
-    // Prevent deleting folders outside project
-    if (this.projectPath && !folderPath.startsWith(this.projectPath)) {
-      throw new Error('Cannot delete folders outside the project directory')
     }
 
     // Delete folder recursively
@@ -641,16 +644,6 @@ export class FileService implements IFileService {
       if (code !== 'ENOENT') {
         throw error
       }
-    }
-
-    // Prevent renaming files/folders outside project
-    if (this.projectPath && !oldPath.startsWith(this.projectPath)) {
-      throw new Error('Cannot rename items outside the project directory')
-    }
-
-    // Prevent renaming project root
-    if (this.projectPath && oldPath === this.projectPath) {
-      throw new Error('Cannot rename the project root directory')
     }
 
     // Perform the rename
@@ -709,18 +702,8 @@ export class FileService implements IFileService {
     }
 
     // Prevent moving project root
-    if (this.projectPath && sourcePath === this.projectPath) {
+    if (await this.isProjectRoot(sourcePath)) {
       throw new Error('Cannot move the project root directory')
-    }
-
-    // Prevent moving items outside project
-    if (this.projectPath && !sourcePath.startsWith(this.projectPath)) {
-      throw new Error('Cannot move items outside the project directory')
-    }
-
-    // Prevent moving items to outside project
-    if (this.projectPath && !targetParentPath.startsWith(this.projectPath)) {
-      throw new Error('Cannot move items to outside the project directory')
     }
 
     // Prevent circular move (folder into its own descendant)
@@ -803,16 +786,6 @@ export class FileService implements IFileService {
     const targetStats = await stat(targetParentPath)
     if (!targetStats.isDirectory()) {
       throw new Error('Target must be a directory')
-    }
-
-    // Prevent copying items outside project
-    if (this.projectPath && !sourcePath.startsWith(this.projectPath)) {
-      throw new Error('Cannot copy items outside the project directory')
-    }
-
-    // Prevent copying items to outside project
-    if (this.projectPath && !targetParentPath.startsWith(this.projectPath)) {
-      throw new Error('Cannot copy items to outside the project directory')
     }
 
     // Handle name conflicts by adding (1), (2), etc.
