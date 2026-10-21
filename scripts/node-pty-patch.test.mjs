@@ -45,6 +45,24 @@ describe('node-pty patch (#305)', () => {
     expect(src).toMatch(/\n {2}pty_baton\* handle = get_pty_baton\(lock, id\);/);
   });
 
+  // Our own additions (not upstream): resize/clear/kill must not touch a pseudoconsole
+  // or shell that is already closed.
+  it('the committed patch file carries the null-hpc / null-hShell guards', () => {
+    const patch = fs.readFileSync(patchFile, 'utf8');
+    expect(patch).toContain('+  HANDLE hShell = nullptr;');
+    expect(patch).toContain('+      if (pfnResizePseudoConsole && handle->hpc != nullptr)');
+    expect(patch).toContain('+      if (pfnClearPseudoConsole && handle->hpc != nullptr)');
+    expect(patch).toContain('+    if (useConptyDll && handle->hShell != nullptr) {');
+  });
+
+  it.skipIf(!fs.existsSync(conpty))('installed conpty.cc skips closed pseudoconsoles and unset shells', () => {
+    const src = fs.readFileSync(conpty, 'utf8');
+    expect(src).toContain('HANDLE hShell = nullptr;');
+    expect(src).toContain('pfnResizePseudoConsole && handle->hpc != nullptr');
+    expect(src).toContain('pfnClearPseudoConsole && handle->hpc != nullptr');
+    expect(src).toContain('useConptyDll && handle->hShell != nullptr');
+  });
+
   // Second crash cause (#305): a shell exiting during Electron teardown fires the exit
   // ThreadSafeFunction when JS cannot run; without the define node-addon-api throws and
   // std::terminate ends the process (0xc0000409).

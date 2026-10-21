@@ -34,15 +34,40 @@ export const CONPTY_REAP_AWAIT_MS = 1_000
 /** A cleanup that has not finished by now is stopped. */
 export const CONPTY_REAP_TIMEOUT_MS = 10_000
 
-/** Margin around the creation-time window, for clock rounding between Node and WMI. */
-const CREATION_WINDOW_SLACK_MS = 5_000
+/**
+ * Rounding allowance after the quit moment, for the clock difference between Node
+ * and WMI. Kept tiny: no legitimate host is created after `terminalService.dispose()`,
+ * and the script can run after we exit, when Windows may already have reused our pid.
+ */
+const CREATION_WINDOW_END_SLACK_MS = 250
+
+/** Upper bound on the WMI query, so a stuck provider cannot keep the script alive. */
+const CIM_OPERATION_TIMEOUT_SEC = 5
 
 /** Image names of a console host; compared case-insensitively inside the script. */
 const HOST_IMAGE_NAMES = ['conhost.exe', 'OpenConsole.exe'] as const
 
+/** The validated Windows directory (`taskkillPath` ignores a relative `SystemRoot`). */
+function systemRoot(env: NodeJS.ProcessEnv): string {
+  return win32.dirname(win32.dirname(taskkillPath(env)))
+}
+
 /** Absolute path of Windows PowerShell, next to `taskkill.exe`; never resolved through PATH. */
 export function powershellPath(env: NodeJS.ProcessEnv = process.env): string {
-  return win32.join(win32.dirname(taskkillPath(env)), 'WindowsPowerShell', 'v1.0', 'powershell.exe')
+  return win32.join(systemRoot(env), 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
+}
+
+/**
+ * The only environment PowerShell gets: the validated Windows directory and the
+ * module path under it, so nothing inherited (PSModulePath, profiles) can load code.
+ */
+export function powershellEnv(env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  const root = systemRoot(env)
+  return {
+    SystemRoot: root,
+    windir: root,
+    PSModulePath: win32.join(root, 'System32', 'WindowsPowerShell', 'v1.0', 'Modules')
+  }
 }
 
 function assertInt(value: number, name: string): void {
@@ -65,10 +90,12 @@ export function buildReapScript(parentPid: number, startMs: number, endMs: numbe
   const names = HOST_IMAGE_NAMES.map((n) => `$_.Name -ieq '${n}'`).join(' -or ')
   return [
     "$ErrorActionPreference = 'SilentlyContinue'",
-    `$s = [DateTimeOffset]::FromUnixTimeMilliseconds(${startMs}).LocalDateTime`,
-    `$e = [DateTimeOffset]::FromUnixTimeMilliseconds(${endMs}).LocalDateTime`,
-    `Get-CimInstance Win32_Process -Filter 'ParentProcessId=${parentPid}' |`,
-    `  Where-Object { (${names}) -and $_.CreationDate -ge $s -and $_.CreationDate -le $e } |`,
+    `$s = [DateTimeOffset]::FromUnixTimeMilliseconds(${startMs}).UtcDateTime`,
+    `$e = [DateTimeOffset]::FromUnixTimeMilliseconds(${endMs}).UtcDateTime`,
+    // Constrained Language Mode can leave a static call returning nothing: stop rather than match everything
+    'if (-not $s -or -not $e) { exit }',
+    `Get-CimInstance Win32_Process -Filter 'ParentProcessId=${parentPid}' -OperationTimeoutSec ${CIM_OPERATION_TIMEOUT_SEC} |`,
+    `  Where-Object { (${names}) -and $_.CreationDate.ToUniversalTime() -ge $s -and $_.CreationDate.ToUniversalTime() -le $e } |`,
     '  ForEach-Object { Stop-Process -Id $_.ProcessId -Force }'
   ].join('\n')
 }
@@ -107,12 +134,12 @@ export function reapConptyHosts(options: ReapOptions = {}): Promise<boolean> {
     }
     try {
       const quitMs = Math.floor(now())
-      const startMs = Math.max(1, Math.floor(quitMs - uptimeSeconds() * 1000) - CREATION_WINDOW_SLACK_MS)
-      const script = buildReapScript(pid, startMs, quitMs + CREATION_WINDOW_SLACK_MS)
+      const startMs = Math.max(1, Math.floor(quitMs - uptimeSeconds() * 1000))
+      const script = buildReapScript(pid, startMs, quitMs + CREATION_WINDOW_END_SLACK_MS)
       const child = spawnFn(
         powershellPath(),
         ['-NoProfile', '-NonInteractive', '-NoLogo', '-Command', script],
-        { stdio: 'ignore', windowsHide: true, detached: true }
+        { stdio: 'ignore', windowsHide: true, detached: true, env: powershellEnv() }
       )
       const killTimer = setTimeout(() => {
         try {

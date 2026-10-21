@@ -6,7 +6,7 @@ import type { spawn } from 'child_process'
 
 vi.mock('./LoggingService', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }))
 
-import { buildReapScript, powershellPath, reapConptyHosts } from './conptyHostReaper'
+import { buildReapScript, powershellEnv, powershellPath, reapConptyHosts } from './conptyHostReaper'
 
 function fakeChild(): EventEmitter & { kill: ReturnType<typeof vi.fn>; unref: ReturnType<typeof vi.fn> } {
   return Object.assign(new EventEmitter(), { kill: vi.fn(), unref: vi.fn() })
@@ -20,7 +20,14 @@ describe('buildReapScript', () => {
     expect(script).toContain("$_.Name -ieq 'OpenConsole.exe'")
     expect(script).toContain('FromUnixTimeMilliseconds(1000)')
     expect(script).toContain('FromUnixTimeMilliseconds(2000)')
-    expect(script).toContain('$_.CreationDate -ge $s -and $_.CreationDate -le $e')
+    expect(script).toContain('$_.CreationDate.ToUniversalTime() -ge $s')
+    expect(script).toContain('$_.CreationDate.ToUniversalTime() -le $e')
+    expect(script).toContain('.UtcDateTime')
+    expect(script).not.toContain('LocalDateTime')
+    expect(script).toContain('-OperationTimeoutSec 5')
+    // Constrained Language Mode guard comes before the query
+    expect(script.indexOf('if (-not $s -or -not $e) { exit }')).toBeGreaterThan(script.indexOf('$e ='))
+    expect(script.indexOf('if (-not $s -or -not $e) { exit }')).toBeLessThan(script.indexOf('Get-CimInstance'))
     expect(script).toContain('Stop-Process -Id $_.ProcessId -Force')
   })
 
@@ -39,6 +46,20 @@ describe('powershellPath', () => {
     expect(powershellPath({ SystemRoot: 'relative' })).toBe(
       'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe'
     )
+  })
+})
+
+describe('powershellEnv', () => {
+  it('carries only SystemRoot, windir and a PSModulePath under the validated root', () => {
+    expect(powershellEnv({ SystemRoot: 'D:\\Win', PATH: 'x', PSModulePath: 'C:\\evil' })).toEqual({
+      SystemRoot: 'D:\\Win',
+      windir: 'D:\\Win',
+      PSModulePath: 'D:\\Win\\System32\\WindowsPowerShell\\v1.0\\Modules'
+    })
+  })
+
+  it('falls back to C:\\Windows when SystemRoot is relative', () => {
+    expect(powershellEnv({ SystemRoot: 'relative' }).SystemRoot).toBe('C:\\Windows')
   })
 })
 
@@ -68,10 +89,13 @@ describe('reapConptyHosts', () => {
     expect(args.slice(0, 3)).toEqual(['-NoProfile', '-NonInteractive', '-NoLogo'])
     expect(args[args.length - 1]).toContain("ParentProcessId=777")
     expect(opts).toMatchObject({ windowsHide: true, detached: true, stdio: 'ignore' })
+    expect(Object.keys(opts.env as object).sort()).toEqual(['PSModulePath', 'SystemRoot', 'windir'])
+    expect(args).not.toContain('-ExecutionPolicy')
+    expect(args).toContain('-Command')
     expect(child.unref).toHaveBeenCalled()
-    // start = now - uptime - slack; end = now + slack
-    expect(args[args.length - 1]).toContain('FromUnixTimeMilliseconds(99935000)')
-    expect(args[args.length - 1]).toContain('FromUnixTimeMilliseconds(100005000)')
+    // start = now - uptime (no margin before our start); end = now + 250 ms rounding only
+    expect(args[args.length - 1]).toContain('FromUnixTimeMilliseconds(99940000)')
+    expect(args[args.length - 1]).toContain('FromUnixTimeMilliseconds(100000250)')
   })
 
   it('stops waiting after awaitMs without killing the cleanup', async () => {
