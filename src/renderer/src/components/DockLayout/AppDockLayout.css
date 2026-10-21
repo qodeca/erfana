@@ -292,9 +292,11 @@
   cursor: pointer;
 }
 
+/* Inset, per the decided Rows & lists card: a row ring sits inside the row, so
+   neighbouring rows and the list's edges never clip or overlap it. */
 .recent-project-open:focus-visible {
   outline: var(--border-width-thick) solid var(--color-border-focus);
-  outline-offset: var(--space-1);
+  outline-offset: calc(var(--space-1) * -1);
 }
 
 .recent-project-item.disabled .recent-project-open {
@@ -372,10 +374,10 @@
   background-color: var(--color-btn-secondary-hover);
 }
 
-/* Reachable by Tab since [24], so it needs the standard ring (Focus card). */
+/* Reachable by Tab since [24], so it needs the ring – inset, like the row's. */
 .recent-project-remove:focus-visible {
   outline: var(--border-width-thick) solid var(--color-border-focus);
-  outline-offset: var(--space-1);
+  outline-offset: calc(var(--space-1) * -1);
 }
 
 /* todo028: CSS classes for disabled/opening states (replaced inline styles) */

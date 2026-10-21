@@ -4,7 +4,7 @@ All dialogs MUST compose on `BaseDialog`. Never build portals, overlays, or focu
 
 ## Focus management
 
-The focusable selector **excludes `:disabled` controls**, so a Start/Capture button that is disabled while work is pending is never picked as the auto-focus target and never acts as a Tab boundary.
+Auto-focus, the Tab trap and the focus rescue all use `getTabbable()` – what Tab can actually land on. It **excludes `:disabled` controls** (a Start/Capture button disabled while work is pending is never the auto-focus target or a Tab boundary), **`tabindex="-1"` on every element type** (the screen and window pickers' roving options – only the selected one is a Tab stop, so the trap wraps to it), hidden inputs, and anything `checkVisibility()` says is not rendered.
 
 | Prop | Behaviour |
 |------|-----------|
@@ -17,7 +17,7 @@ The focusable selector **excludes `:disabled` controls**, so a Start/Capture but
 
 **`aria-modal="true"` and the focus trap go together (#91).** `aria-modal` tells a screen reader that everything behind the dialog is inert, which is only true while Tab cannot reach it. So `trapFocus` defaults to `true`, and `trapFocus={false}` drops `aria-modal` as well – a dialog never claims a modality it does not enforce. No shipping dialog opts out; one that needs to (a picker that must let focus reach another surface) passes `false` and says why at the call site. Never hand-roll a local `handleFocusTrap`.
 
-**Focus returns to the opener on every close** – `isOpen` going false *and* unmount, which is how every DialogManager dialog closes. The opener is captured during render, before a child's `autoFocus` or focus effect moves focus inside, and focus is not returned if the close action already put it somewhere else (focus on `<body>` or inside the dialog counts as "nowhere else").
+**Focus returns to the opener on every close** – `isOpen` going false *and* unmount, which is how every DialogManager dialog closes. The opener is captured during render, before a child's `autoFocus` or focus effect moves focus inside, and focus is not returned if the close action already put it somewhere else (focus on `<body>` or inside the dialog counts as "nowhere else"). When the opener is gone by close time, focus goes to its region instead – the nearest `role="tree"` or `data-focus-return` ancestor captured at open (the region itself if it has a `tabindex`, else its first tabbable control). Two helpers outside this folder complete the chain: `ContextMenu` re-focuses whatever had focus at open before running an item's action (its items are not focusable, so the click leaves focus on `<body>`), and the project tree's `useTreeFocusRecovery` keeps focus in the tree when a rename or delete removes the focused row after the dialog has closed.
 
 **Trap details.** The exact guards on the re-armed focus pass and the `focusout` rescue – the 1.5 s promotion window, why both share one focus authority, why an unmounted control is deliberately not rescued – are documented at length in `BaseDialog.tsx`, not restated here.
 

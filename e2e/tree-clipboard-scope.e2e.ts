@@ -75,6 +75,19 @@ async function selectConfirmMessage(page: Page): Promise<string> {
   }, TEST_IDS.DIALOG_CONFIRM_MESSAGE)
 }
 
+/**
+ * Wait until the dialog has taken focus (BaseDialog focuses ~10 ms after it
+ * opens). The probes select text programmatically, which – unlike a mouse
+ * drag – does not move focus; pressing a key before this point would still
+ * find focus on the clicked tree row, where the tree rightly owns the key.
+ */
+async function focusSettledInDialog(page: Page): Promise<void> {
+  const container = page.locator(`[data-testid="${TEST_IDS.DIALOG_CONTAINER}"]`)
+  await expect
+    .poll(() => container.evaluate((el) => el.contains(document.activeElement)))
+    .toBe(true)
+}
+
 async function readSystemClipboard(app: ElectronApplication): Promise<string> {
   return app.evaluate(({ clipboard }) => clipboard.readText())
 }
@@ -109,6 +122,7 @@ test.describe('Tree clipboard shortcuts stay with the tree ([27])', () => {
 
     await raiseConfirm(page, 'Control probe', MESSAGE)
     await dialog.waitForConfirm('Control probe')
+    await focusSettledInDialog(page)
     await selectConfirmMessage(page)
     await page.keyboard.press('ControlOrMeta+c')
 
@@ -129,6 +143,7 @@ test.describe('Tree clipboard shortcuts stay with the tree ([27])', () => {
 
     await raiseConfirm(page, 'Copy probe', MESSAGE)
     await dialog.waitForConfirm('Copy probe')
+    await focusSettledInDialog(page)
     expect(await selectConfirmMessage(page)).toBe(MESSAGE)
 
     await page.keyboard.press('ControlOrMeta+c')
@@ -151,6 +166,7 @@ test.describe('Tree clipboard shortcuts stay with the tree ([27])', () => {
     await writeSystemClipboard(app, 'clipboard-before')
     await raiseConfirm(page, 'Cut probe', MESSAGE)
     await dialog.waitForConfirm('Cut probe')
+    await focusSettledInDialog(page)
     await selectConfirmMessage(page)
 
     await page.keyboard.press('ControlOrMeta+x')
@@ -180,6 +196,7 @@ test.describe('Tree clipboard shortcuts stay with the tree ([27])', () => {
 
     await raiseConfirm(page, 'Paste probe', MESSAGE)
     await dialog.waitForConfirm('Paste probe')
+    await focusSettledInDialog(page)
     await page.keyboard.press('ControlOrMeta+v')
 
     // Ordering barrier, as above: a Cmd+C whose result is observable lands
@@ -200,6 +217,37 @@ test.describe('Tree clipboard shortcuts stay with the tree ([27])', () => {
     const pasted = join(testProject.path, 'docs', 'README.md')
     await expect.poll(() => exists(pasted), { timeout: 10_000 }).toBe(true)
     await expect(dialog.confirmDialog()).toHaveCount(0)
+  })
+
+  test('a stale selection in the preview does not block copying a clicked folder', async ({
+    windowWithTestProject: page
+  }) => {
+    // Rows are user-select: none, so clicking one leaves text selected
+    // earlier elsewhere in place. The first [27] fix treated ANY selection as
+    // "the user is copying text" and so made Cmd+C on the folder do nothing.
+    const tree = new ProjectTreePage(page)
+    await tree.clickFileByName('README.md')
+    const paragraph = `[data-testid="${TEST_IDS.EDITOR_PREVIEW}"] .markdown-preview-content p`
+    await expect(page.locator(paragraph).first()).toBeVisible({ timeout: 10_000 })
+    const selected = await page.evaluate((sel) => {
+      const node = document.querySelector(sel)
+      if (!node) throw new Error('preview paragraph not found')
+      const range = document.createRange()
+      range.selectNodeContents(node)
+      const selection = window.getSelection()!
+      selection.removeAllRanges()
+      selection.addRange(range)
+      return selection.toString()
+    }, paragraph)
+    expect(selected.length).toBeGreaterThan(0)
+
+    await tree.folderRow('docs').click()
+    // The premise: the click kept the preview selection.
+    expect(await page.evaluate(() => window.getSelection()?.toString() ?? '')).toBe(selected)
+
+    await page.keyboard.press('ControlOrMeta+c')
+
+    await expect(toastWithText(page, '"docs" ready to paste')).toBeVisible({ timeout: 5_000 })
   })
 
   test('Cmd/Ctrl+C with focus on the tree still copies the clicked folder', async ({

@@ -27,6 +27,7 @@ import type { ReactNode } from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, fireEvent, act } from '@testing-library/react'
 import { TEST_IDS } from '../../constants/testids'
+import { getTabbable } from './BaseDialog'
 import { AlertDialog } from './AlertDialog'
 import { ConfirmDialog } from './ConfirmDialog'
 import { ConflictDialog } from './ConflictDialog'
@@ -41,10 +42,6 @@ import { ScreenSelectDialog } from './ScreenSelectDialog'
 import { UnsavedChangesDialog } from './UnsavedChangesDialog'
 import { WindowPickerDialog } from './WindowPickerDialog'
 
-/** Same selector BaseDialog uses for its trap boundaries. */
-const FOCUSABLE_SELECTOR =
-  'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), ' +
-  'textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
 
 /** Past BaseDialog's 10 ms auto-focus delay, with headroom. */
 const FOCUS_TICK_MS = 20
@@ -174,8 +171,10 @@ const CASES: DialogCase[] = [
       <ScreenSelectDialog
         isOpen={open}
         displays={[
-          { id: 1, label: 'Built-in', isPrimary: true, bounds: { x: 0, y: 0, width: 1512, height: 982 } },
-          { id: 2, label: 'External', isPrimary: false, bounds: { x: 1512, y: 0, width: 2560, height: 1440 } }
+          // Primary SECOND: the selected (only tabbable) option is then not
+          // first in DOM order, which is what exposed the roving-tabindex bug.
+          { id: 2, label: 'External', isPrimary: false, bounds: { x: 1512, y: 0, width: 2560, height: 1440 } },
+          { id: 1, label: 'Built-in', isPrimary: true, bounds: { x: 0, y: 0, width: 1512, height: 982 } }
         ]}
         zIndex={Z}
         onSelect={noop}
@@ -244,7 +243,7 @@ function dialogParts(): { container: HTMLElement; first: HTMLElement; last: HTML
   const containers = document.querySelectorAll<HTMLElement>(`[data-testid="${TEST_IDS.DIALOG_CONTAINER}"]`)
   expect(containers).toHaveLength(1)
   const container = containers[0]
-  const focusable = container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)
+  const focusable = getTabbable(container)
   expect(focusable.length).toBeGreaterThan(0)
   return { container, first: focusable[0], last: focusable[focusable.length - 1] }
 }
@@ -326,6 +325,54 @@ describe('every BaseDialog consumer traps focus (#91)', () => {
 
       expect(document.querySelector(`[data-testid="${TEST_IDS.DIALOG_CONTAINER}"]`)).toBeNull()
       expect(document.activeElement).toBe(opener)
+    })
+  })
+
+  describe('roving-tabindex pickers wrap to the SELECTED option (PR #286 review)', () => {
+    /** The picker's options, in DOM order, and the one marked selected. */
+    function options(): { all: HTMLElement[]; selected: HTMLElement } {
+      const all = Array.from(document.querySelectorAll<HTMLElement>('[role="option"]'))
+      const selected = all.find((el) => el.getAttribute('aria-selected') === 'true')
+      expect(selected).toBeDefined()
+      return { all, selected: selected! }
+    }
+
+    function expectWrapsToSelected(): void {
+      const { all, selected } = options()
+      const { first, last } = dialogParts()
+      // Only the selected option is a Tab stop; the others are tabindex -1.
+      expect(first).toBe(selected)
+      expect(all.filter((el) => getTabbable(dialogParts().container).includes(el))).toEqual([selected])
+
+      last.focus()
+      expect(press('Tab')).toBe(false)
+      expect(document.activeElement).toBe(selected)
+
+      selected.focus()
+      expect(press('Tab', { shiftKey: true })).toBe(false)
+      expect(document.activeElement).toBe(last)
+    }
+
+    it('ScreenSelectDialog with the primary display second', () => {
+      const dialog = CASES.find((c) => c.name === 'ScreenSelectDialog')!
+      openFromOpener(dialog)
+      const { all, selected } = options()
+      expect(all.indexOf(selected)).toBe(1)
+
+      expectWrapsToSelected()
+    })
+
+    it('WindowPickerDialog after ArrowRight moved the selection', () => {
+      const dialog = CASES.find((c) => c.name === 'WindowPickerDialog')!
+      openFromOpener(dialog)
+      act(() => {
+        press('ArrowRight')
+      })
+      const { all, selected } = options()
+      expect(all.indexOf(selected)).toBe(1)
+      expect(document.activeElement).toBe(selected)
+
+      expectWrapsToSelected()
     })
   })
 })

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { useEffect, useRef, ReactNode } from 'react'
+import { useEffect, useRef, useState, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { TEST_IDS } from '../../constants/testids'
 import { useOccluder } from '../../hooks/useOccluder'
@@ -31,6 +31,15 @@ interface ContextMenuProps {
 export function ContextMenu({ x, y, items, onClose, containerTestId }: ContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null)
   const openTimeRef = useRef<number>(Date.now())
+  // What had focus when the menu opened (the right-clicked tree row, say),
+  // captured on the first render. Menu items are not focusable, so the click
+  // that picks one drops focus to <body>; handing focus back BEFORE the action
+  // runs means a dialog the action opens records the real opener and can
+  // return focus there when it closes.
+  const [opener] = useState<HTMLElement | null>(() => {
+    const active = document.activeElement
+    return active instanceof HTMLElement && active !== document.body ? active : null
+  })
   const portalRoot = document.getElementById('portal-root')
 
   // Occlude the live preview view for this menu's whole lifetime (item 66). The
@@ -126,6 +135,7 @@ export function ContextMenu({ x, y, items, onClose, containerTestId }: ContextMe
 
   const handleItemClick = (item: ContextMenuItem) => {
     if (!item.separator && !item.disabled) {
+      if (opener?.isConnected) opener.focus()
       item.action()
       onClose()
     }

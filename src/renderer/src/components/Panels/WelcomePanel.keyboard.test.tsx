@@ -270,12 +270,78 @@ describe('WelcomePanel recent projects – keyboard ([24])', () => {
       }
     })
 
-    it('exposes the rows as a labelled list', async () => {
+    it('exposes the rows as a list labelled by the visible heading', async () => {
       await renderLoaded()
 
-      const list = screen.getByRole('list', { name: 'Recent projects' })
+      const list = screen.getByRole('list', { name: 'Recent Projects' })
       expect(list).toBe(screen.getByTestId(TEST_IDS.WELCOME_RECENT_PROJECTS))
+      // Labelled BY the heading, not a second, competing aria-label.
+      expect(list).not.toHaveAttribute('aria-label')
+      const heading = screen.getByRole('heading', { name: 'Recent Projects' })
+      expect(list).toHaveAttribute('aria-labelledby', heading.id)
       expect(screen.getAllByRole('listitem')).toHaveLength(PROJECTS.length)
+    })
+
+    it('keeps the name stable while opening and announces it through a status region', async () => {
+      mockHandleOpenProjectByPath.mockImplementation(() => new Promise(() => {}))
+      const user = await renderLoaded()
+      const status = screen.getByRole('status')
+      expect(status).toHaveTextContent('')
+      await tabIntoList(user)
+
+      await user.keyboard('{Enter}')
+
+      await waitFor(() => expect(status).toHaveTextContent('Opening alpha…'))
+      // The focused button's name does not change under the screen reader.
+      expect(openButton('/path/alpha')).toHaveAccessibleName('alpha')
+      expect(openButton('/path/alpha').closest('li')).toHaveAttribute('aria-busy', 'true')
+      // The visual "Opening..." is still drawn.
+      expect(screen.getByText('Opening...')).toBeInTheDocument()
+    })
+  })
+
+  describe('roving details (PR #286 review)', () => {
+    it('ignores arrow, Home and End keys pressed with Alt, Ctrl or Cmd', async () => {
+      const user = await renderLoaded()
+      await tabIntoList(user)
+
+      await user.keyboard('{Alt>}{ArrowDown}{/Alt}')
+      await user.keyboard('{Control>}{End}{/Control}')
+      await user.keyboard('{Meta>}{ArrowDown}{/Meta}')
+
+      expect(document.activeElement).toBe(openButton('/path/alpha'))
+    })
+
+    it('moves from the row the key came from', async () => {
+      const user = await renderLoaded()
+      // Focus gamma's Remove directly (as a click would), without the list
+      // having recorded gamma as the Tab stop through the arrows.
+      removeButton('/path/gamma').focus()
+
+      await user.keyboard('{ArrowUp}')
+
+      expect(document.activeElement).toBe(openButton('/path/beta'))
+    })
+
+    it('keeps the Tab stop on the same PROJECT when the list reorders', async () => {
+      const user = await renderLoaded()
+      await tabIntoList(user)
+      await user.keyboard('{ArrowDown}')
+      expect(openButton('/path/beta')).toHaveAttribute('tabindex', '0')
+
+      // A project change reloads the list most-recent-first.
+      const onProjectChanged = mockApi.file.onProjectChanged.mock.calls[0][0] as () => void
+      mockGetRecentProjects.mockResolvedValue({
+        success: true,
+        projects: [PROJECTS[2], PROJECTS[0], PROJECTS[1]]
+      })
+      onProjectChanged()
+
+      await waitFor(() =>
+        expect(screen.getAllByRole('listitem')[0]).toHaveTextContent('gamma')
+      )
+      expect(openButton('/path/beta')).toHaveAttribute('tabindex', '0')
+      expect(openButton('/path/gamma')).toHaveAttribute('tabindex', '-1')
     })
   })
 

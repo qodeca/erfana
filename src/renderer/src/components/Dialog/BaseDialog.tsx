@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { useEffect, useRef, ReactNode } from 'react'
+import { useEffect, useRef, useState, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { logger } from '../../utils/logger'
 import { TEST_IDS } from '../../constants/testids'
@@ -37,15 +37,76 @@ const FOCUS_DELAY_MS = 10
 // AT testing can confirm or refute the concern before anyone "fixes" it.
 const FOCUS_PROMOTION_WINDOW_MS = 1500
 
-// Focusable elements, excluding disabled controls. A disabled control cannot
-// take focus, so including it made `focusableElements[0]` a dead target and
-// made the Tab trap's first/last boundaries wrong. Matches the idiom of the
-// two per-dialog traps this file absorbed (DocumentImportDialog,
-// TranscriptionDialog), extended with the two selectors this dialog already
-// carried ([href], textarea) — a superset, so no dialog loses a boundary.
-const FOCUSABLE_SELECTOR =
-  'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), ' +
-  'textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
+// TABBABLE elements: what Tab can actually land on. Two exclusions matter:
+//
+// - Disabled controls cannot take focus, so including one made the first/last
+//   trap boundary a dead target.
+// - `tabindex="-1"` takes an element out of the Tab order, and EVERY arm has
+//   to say so, not only the bare `[tabindex]` one. The screen and window
+//   pickers use roving tabindex (only the selected option is 0); counting the
+//   `-1` options made the trap wrap Tab onto an UNSELECTED option (Enter then
+//   captured the wrong window) and let Shift+Tab from a selected option that
+//   was not first in DOM order walk out of the modal.
+//
+// Hidden inputs and invisible elements are skipped too: the browser's Tab
+// skips them, so a trap boundary on one would never be reached.
+const NOT_REMOVED = ':not([tabindex="-1"])'
+const TABBABLE_SELECTOR = [
+  `button:not(:disabled)${NOT_REMOVED}`,
+  `[href]${NOT_REMOVED}`,
+  `input:not(:disabled):not([type="hidden"])${NOT_REMOVED}`,
+  `select:not(:disabled)${NOT_REMOVED}`,
+  `textarea:not(:disabled)${NOT_REMOVED}`,
+  `[tabindex]${NOT_REMOVED}:not(:disabled)`
+].join(', ')
+
+/**
+ * The elements inside `root` that Tab can land on, in DOM order.
+ *
+ * `checkVisibility()` drops rendered-but-invisible controls (`display: none`
+ * ancestors, `visibility: hidden`). Where it is unavailable (jsdom) every
+ * selector match counts.
+ *
+ * @param root - The dialog container
+ * @returns Tabbable descendants in document order (possibly empty)
+ *
+ * @example
+ * ```ts
+ * const [first] = getTabbable(dialogElement)
+ * first?.focus()
+ * ```
+ */
+export function getTabbable(root: HTMLElement): HTMLElement[] {
+  return Array.from(root.querySelectorAll<HTMLElement>(TABBABLE_SELECTOR)).filter((el) =>
+    typeof el.checkVisibility === 'function' ? el.checkVisibility({ visibilityProperty: true }) : true
+  )
+}
+
+/**
+ * Ancestors of an opener that focus may fall back to when the opener itself
+ * has gone. `role="tree"` covers the project tree without touching it;
+ * `data-focus-return` lets any other widget opt in.
+ */
+const FOCUS_RETURN_REGION = '[role="tree"], [data-focus-return]'
+
+/**
+ * Where focus should go when a dialog closes: the opener while it is still in
+ * the document, otherwise its region – the region itself when it can take
+ * focus, else the first tabbable control inside it.
+ *
+ * @param opener - What had focus when the dialog opened, or null
+ * @param region - The opener's focus-return region, or null
+ * @returns The element to focus, or null to leave focus alone
+ */
+export function resolveFocusReturnTarget(
+  opener: HTMLElement | null,
+  region: HTMLElement | null
+): HTMLElement | null {
+  if (opener?.isConnected) return opener
+  if (region === null || !region.isConnected) return null
+  if (region.hasAttribute('tabindex')) return region
+  return getTabbable(region)[0] ?? null
+}
 
 // ---------------------------------------------------------------------------
 // Open-dialog stack
@@ -235,10 +296,16 @@ export function BaseDialog({
   children
 }: BaseDialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
-  // Whatever had focus when this open cycle began — the control focus returns
-  // to on close. See the capture below for why it is read during render.
-  const opener = useRef<HTMLElement | null>(null)
-  const openerCaptured = useRef(false)
+  // What had focus when this open cycle began – where focus returns on close –
+  // and the widget it lives in (a `role="tree"`, or an ancestor marked
+  // `data-focus-return`). Focus goes to the region when the opener itself is
+  // gone by close time (a tree row re-keyed by a rename, removed by a delete)
+  // instead of being dropped on <body>. `null` while closed. See the capture
+  // below for why it is taken during render.
+  const [openerCapture, setOpenerCapture] = useState<{
+    opener: HTMLElement | null
+    region: HTMLElement | null
+  } | null>(null)
   // The element BaseDialog itself last parked focus on for this open cycle, or
   // null before the first resolution. It is what makes a re-armed pass (see
   // `initialFocusKey`) able to tell "focus is still where we parked it" from
@@ -265,13 +332,21 @@ export function BaseDialog({
   // and a child's own focus effect (Prompt, FileSystem) runs before this
   // parent's effects, so by the time any BaseDialog effect ran, "the focused
   // element" was already a control inside the dialog — and restoring to it on
-  // close restored to a node that no longer exists. The latch makes the
-  // capture idempotent across re-renders and StrictMode's double render; it
-  // is released only when the dialog has really closed (restore effect below).
-  if (isOpen && !openerCaptured.current) {
+  // close restored to a node that no longer exists.
+  //
+  // This is React's "adjust state while rendering" pattern: setting state
+  // during render makes React re-run this component straight away, before any
+  // child is committed, so no child has moved focus yet. It runs once per open
+  // cycle (`openerCapture` is null only while closed) and is idempotent across
+  // StrictMode's double render.
+  if (isOpen && openerCapture === null) {
     const active = document.activeElement
-    opener.current = active instanceof HTMLElement && active !== document.body ? active : null
-    openerCaptured.current = true
+    const opener = active instanceof HTMLElement && active !== document.body ? active : null
+    setOpenerCapture({ opener, region: opener?.closest<HTMLElement>(FOCUS_RETURN_REGION) ?? null })
+  } else if (!isOpen && openerCapture !== null) {
+    // Closed: release the capture so the next open takes a fresh one. The
+    // restore effect's cleanup still holds the old value in its closure.
+    setOpenerCapture(null)
   }
 
   // Stack membership. Registered for EVERY open dialog, trapping or not, so a
@@ -365,7 +440,7 @@ export function BaseDialog({
         return
       }
 
-      const fallback = dialog?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)[0]
+      const fallback = dialog ? getTabbable(dialog)[0] : undefined
       fallback?.focus()
       autoFocusedElement.current = fallback ?? null
     }, FOCUS_DELAY_MS)
@@ -390,7 +465,7 @@ export function BaseDialog({
       // makes the top dialog keyboard-unreachable. See the open-dialog stack.
       if (!isTopmostOverlay(dialogRef)) return
 
-      const focusable = dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)
+      const focusable = getTabbable(dialog)
       // Boundary: nothing to cycle between AND nothing to pull focus back to.
       // Handing the keystroke to the browser is the only non-throwing option --
       // preventDefault() here would swallow Tab with no target to move focus
@@ -536,7 +611,7 @@ export function BaseDialog({
       ) {
         return preferred
       }
-      return dialog.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)
+      return getTabbable(dialog)[0] ?? null
     }
 
     dialog.addEventListener('focusout', handleFocusOut)
@@ -549,8 +624,9 @@ export function BaseDialog({
   // dialog renders `isOpen={true}` and is simply removed from the list, so a
   // restore keyed on `!isOpen` (the previous shape) never ran for them (#91).
   useEffect(() => {
-    if (!isOpen) return undefined
+    if (!isOpen || openerCapture === null) return undefined
     const dialog = dialogRef.current
+    const { opener, region } = openerCapture
 
     return () => {
       // Only a REAL close restores. StrictMode's simulated unmount runs this
@@ -558,10 +634,8 @@ export function BaseDialog({
       // move focus out of an open dialog in development builds.
       if (dialog === null || dialog.isConnected) return
 
-      openerCaptured.current = false
-      const target = opener.current
-      opener.current = null
-      if (target === null || !target.isConnected) return
+      const target = resolveFocusReturnTarget(opener, region)
+      if (target === null) return
 
       // Do not steal focus the close action already placed elsewhere (a
       // caller that focuses the editor after "Create"). Removing the focused
@@ -571,7 +645,7 @@ export function BaseDialog({
 
       target.focus()
     }
-  }, [isOpen])
+  }, [isOpen, openerCapture])
 
   // Handle backdrop click
   const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {

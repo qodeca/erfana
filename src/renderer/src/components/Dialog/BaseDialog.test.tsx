@@ -488,6 +488,61 @@ describe('BaseDialog', () => {
   })
 
   describe('focus return on close', () => {
+    it("falls back to the opener's tree when the opener is gone by close time", () => {
+      // A context-menu Rename/Delete: the row that opened the dialog can be
+      // re-keyed or removed before the dialog closes.
+      function TreeHarness({ open, rowMounted }: { open: boolean; rowMounted: boolean }): JSX.Element {
+        return (
+          <>
+            <div role="tree">
+              <button data-testid="first-row">First row</button>
+              {rowMounted && <button data-testid="opener-row">Opener row</button>}
+            </div>
+            {open && (
+              <BaseDialog isOpen onClose={vi.fn()} zIndex={1000}>
+                <button>Inside</button>
+              </BaseDialog>
+            )}
+          </>
+        )
+      }
+
+      const { rerender } = render(<TreeHarness open={false} rowMounted />)
+      screen.getByTestId('opener-row').focus()
+      rerender(<TreeHarness open rowMounted />)
+      flushFocus()
+      rerender(<TreeHarness open rowMounted={false} />)
+      rerender(<TreeHarness open={false} rowMounted={false} />)
+
+      expect(document.activeElement).toBe(screen.getByTestId('first-row'))
+    })
+
+    it('honours a data-focus-return region that can take focus itself', () => {
+      function RegionHarness({ open, rowMounted }: { open: boolean; rowMounted: boolean }): JSX.Element {
+        return (
+          <>
+            <div data-focus-return tabIndex={-1} data-testid="region">
+              {rowMounted && <button data-testid="opener-row">Row</button>}
+            </div>
+            {open && (
+              <BaseDialog isOpen onClose={vi.fn()} zIndex={1000}>
+                <button>Inside</button>
+              </BaseDialog>
+            )}
+          </>
+        )
+      }
+
+      const { rerender } = render(<RegionHarness open={false} rowMounted />)
+      screen.getByTestId('opener-row').focus()
+      rerender(<RegionHarness open rowMounted />)
+      flushFocus()
+      rerender(<RegionHarness open rowMounted={false} />)
+      rerender(<RegionHarness open={false} rowMounted={false} />)
+
+      expect(document.activeElement).toBe(screen.getByTestId('region'))
+    })
+
     /** An opener outside the dialog, and a dialog that is mounted or not. */
     function UnmountHarness({ mounted }: { mounted: boolean }): JSX.Element {
       return (

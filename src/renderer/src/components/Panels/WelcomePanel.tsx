@@ -81,10 +81,12 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
   const { projectPath, handleOpenProject, isSwitchingProject } = useProjectManagementContext()
   const { isImporting, importFile } = useImport()
 
-  // Keyboard access to the recent-projects list ([24]). `activeIndex` is the
-  // row that holds the list's single Tab stop; it follows focus (Tab, click,
-  // arrows) so returning to the list lands where the user left it.
-  const [activeIndex, setActiveIndex] = useState(0)
+  // Keyboard access to the recent-projects list ([24]). `activePath` is the
+  // project whose row holds the list's single Tab stop; it follows focus (Tab,
+  // click, arrows) so returning to the list lands where the user left it.
+  // Tracked by PATH, not index: the list reorders on every open (most recent
+  // first), and an index would silently hand the Tab stop to another project.
+  const [activePath, setActivePath] = useState<string | null>(null)
   const openButtonRefs = useRef<Array<HTMLButtonElement | null>>([])
   const openProjectButtonRef = useRef<HTMLButtonElement>(null)
   const listRef = useRef<HTMLUListElement>(null)
@@ -93,6 +95,7 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
   // together with the removed button, and a keyboard user is lost.
   const pendingFocusIndex = useRef<number | null>(null)
   const rowIdPrefix = `recent-project-${useId()}`
+  const headingId = `${rowIdPrefix}-heading`
 
   // todo019: Prevent state updates on unmounted components
   // FIXED: Reset isMounted on each mount to handle React 18 StrictMode double-mount
@@ -136,9 +139,22 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
     return () => unsubscribe()
   }, [loadRecentProjects])
 
-  // Clamp instead of resetting: a list that shrank keeps the Tab stop on the
-  // nearest surviving row.
-  const rovingIndex = Math.min(activeIndex, Math.max(recentProjects.length - 1, 0))
+  // The row holding the Tab stop; the first row until the user has moved it,
+  // or when the project it was on has left the list.
+  const openingName =
+    loadingState.type === 'opening'
+      ? (recentProjects.find((p) => p.path === loadingState.path)?.name ?? null)
+      : null
+  const activeRowIndex = recentProjects.findIndex((p) => p.path === activePath)
+  const rovingIndex = activeRowIndex >= 0 ? activeRowIndex : 0
+
+  /** Move the Tab stop – and focus – to the row at `index`. */
+  const focusRow = (index: number): void => {
+    const project = recentProjects[index]
+    if (!project) return
+    setActivePath(project.path)
+    openButtonRefs.current[index]?.focus()
+  }
 
   useEffect(() => {
     const pending = pendingFocusIndex.current
@@ -150,8 +166,9 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
       openProjectButtonRef.current?.focus()
       return
     }
+    // The row that took the removed one's place, or the new last row.
     const target = Math.min(pending, recentProjects.length - 1)
-    setActiveIndex(target)
+    setActivePath(recentProjects[target].path)
     openButtonRefs.current[target]?.focus()
   }, [recentProjects])
 
@@ -171,11 +188,17 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
 
   const handleListKeyDown = (event: React.KeyboardEvent<HTMLUListElement>): void => {
     if (recentProjects.length === 0) return
-    const next = nextRecentIndex(event.key, rovingIndex, recentProjects.length)
+    // Alt/Ctrl/Cmd + arrow or Home/End are other shortcuts (word and line
+    // jumps, app commands); only the bare keys move between rows.
+    if (event.altKey || event.ctrlKey || event.metaKey) return
+    // Move from the row the keystroke actually came from, not from the
+    // remembered Tab stop – the two differ for a moment after a click.
+    const row = event.target instanceof Element ? event.target.closest<HTMLElement>('li[data-path]') : null
+    const fromIndex = row ? recentProjects.findIndex((p) => p.path === row.dataset.path) : -1
+    const next = nextRecentIndex(event.key, fromIndex >= 0 ? fromIndex : rovingIndex, recentProjects.length)
     if (next === null) return
     event.preventDefault()
-    setActiveIndex(next)
-    openButtonRefs.current[next]?.focus()
+    focusRow(next)
   }
 
   const handleProjectClick = async (projectPath: string) => {
@@ -290,17 +313,23 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
 
           {!isLoading && recentProjects.length > 0 && (
             <div className="recent-projects-section">
-              <h3 className="recent-projects-title">
-                <Clock size={16} />
+              <h3 id={headingId} className="recent-projects-title">
+                <Clock size={16} aria-hidden="true" />
                 Recent Projects
               </h3>
+              {/* Announces "Opening <project>…" once, politely. The row's own
+                  accessible name stays the project name, so a screen reader
+                  does not re-read a changed name on the focused button. */}
+              <span role="status" className="sr-only">
+                {openingName !== null ? `Opening ${openingName}…` : ''}
+              </span>
               {/* One Tab stop for the whole list, arrows inside it (decided
                   Rows & lists card). The keydown sits on the list so it works
                   from either control in a row. */}
               <ul
                 ref={listRef}
                 className="recent-projects-list"
-                aria-label="Recent projects"
+                aria-labelledby={headingId}
                 onKeyDown={handleListKeyDown}
                 data-testid={TEST_IDS.WELCOME_RECENT_PROJECTS}
               >
@@ -329,7 +358,9 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
                       // before. The row's text stays selectable (text-selection
                       // policy), which is why it is not inside the button.
                       onClick={openRow}
-                      onFocus={() => setActiveIndex(index)}
+                      onFocus={() => setActivePath(project.path)}
+                      aria-busy={isOpening || undefined}
+                      data-path={project.path}
                       title={getProjectItemTitle(project.path, isOpening, isProjectChanging)}
                       data-testid={getDynamicTestId(TEST_IDS.WELCOME_RECENT_PROJECT, project.path)}
                     >
@@ -356,9 +387,14 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
                       />
                       <Folder size={16} className="recent-project-icon" aria-hidden="true" />
                       <div className="recent-project-info">
-                        <div id={nameId} className="recent-project-name">
-                          {project.name}
-                          {isOpening && <span className="recent-project-opening-text">Opening...</span>}
+                        <div className="recent-project-name">
+                          <span id={nameId}>{project.name}</span>
+                          {/* Visual only: the status region above announces it. */}
+                          {isOpening && (
+                            <span className="recent-project-opening-text" aria-hidden="true">
+                              Opening...
+                            </span>
+                          )}
                         </div>
                         <div id={pathId} className="recent-project-path">{project.path}</div>
                       </div>
@@ -372,8 +408,12 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
                           e.stopPropagation()
                           if (!isDisabled) void handleRemoveProject(project.path)
                         }}
-                        // Only the active row's Remove is a Tab stop, so the
-                        // list costs two Tab presses, not two per row.
+                        /* deviates: design/system/components/row — the card gives a
+                           list ONE Tab stop; the active row's Remove is a second
+                           one, so removing a project needs no extra shortcut to
+                           learn. Every other row's Remove stays out of the Tab
+                           order, so the list costs two Tab presses, not two per
+                           row. Recorded in the card's Exceptions. */
                         tabIndex={isTabStop ? 0 : -1}
                         title="Remove from recent projects"
                         // Unique per row: identical "Remove" names cannot be

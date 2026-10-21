@@ -98,6 +98,59 @@ test.describe('Dialogs keep focus inside (#91)', () => {
   })
 })
 
+/**
+ * Focus must end up back in the project tree – not on <body> – after a dialog
+ * opened from the tree's context menu closes. Menu items are not focusable, so
+ * picking one used to drop focus to <body> before the dialog even opened; and
+ * Rename / Delete remove the very row that opened the dialog.
+ */
+test.describe('Focus returns to the tree after a context-menu dialog (#91 review)', () => {
+  async function expectFocusInTree(page: Page): Promise<void> {
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const active = document.activeElement
+          return active !== null && active.closest('[role="tree"]') !== null
+        })
+      )
+      .toBe(true)
+  }
+
+  test('New File', async ({ windowWithTestProject: page }) => {
+    const tree = new ProjectTreePage(page)
+    const dialog = new DialogPage(page)
+
+    await tree.runContextMenuAction(tree.folderRow('docs'), 'New File')
+    await expect(dialog.nameInput()).toBeFocused()
+    await page.keyboard.press('Escape')
+    await expect(byTestId(page, TEST_IDS.DIALOG_CONTAINER)).toHaveCount(0)
+
+    await expect(tree.folderRow('docs')).toBeFocused()
+  })
+
+  test('Rename', async ({ windowWithTestProject: page }) => {
+    const tree = new ProjectTreePage(page)
+    const dialog = new DialogPage(page)
+
+    await tree.runContextMenuAction(tree.fileRow('a.md'), 'Rename')
+    await dialog.submitName('b.md', 'Rename')
+    await tree.waitForFile('b.md')
+
+    await expectFocusInTree(page)
+  })
+
+  test('Delete', async ({ windowWithTestProject: page }) => {
+    const tree = new ProjectTreePage(page)
+    const dialog = new DialogPage(page)
+
+    await tree.runContextMenuAction(tree.fileRow('a.md'), 'Delete')
+    await dialog.accept()
+    await tree.waitForFileGone('a.md')
+
+    await expectFocusInTree(page)
+  })
+})
+
 test.describe('Recent projects with the keyboard ([24])', () => {
   const extraProjects: string[] = []
 

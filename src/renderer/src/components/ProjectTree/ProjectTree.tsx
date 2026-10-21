@@ -58,7 +58,9 @@ import {
 } from '../../hooks/useExternalFileDrop'
 import type { ConflictResolution } from '../../../../shared/ipc/external-file-schema'
 import { IMPORT } from '../../../../shared/constants'
-import { isTreeClipboardKeystroke } from './treeClipboardScope'
+import { isTreeClipboardKeystroke, treeClipboardAction } from './treeClipboardScope'
+import { isMacOS } from '../../utils/platform'
+import { useTreeFocusRecovery } from './useTreeFocusRecovery'
 
 interface ProjectTreeProps {
   onFileSelect: (filePath: string) => void
@@ -204,6 +206,8 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
   const autoExpandTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const autoScrollIntervalRef = useRef<number | null>(null)
   const treeContainerRef = useRef<HTMLDivElement | null>(null)
+  // A rename or delete removes the focused row; keep focus in the tree.
+  useTreeFocusRecovery(treeContainerRef)
   const lastMousePositionRef = useRef<{ x: number; y: number } | null>(null)
 
   // Drag-drop hooks.
@@ -800,8 +804,9 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
         return // Let native text handling work
       }
 
-      // Check for Ctrl/Cmd + X/C/V
-      if ((e.ctrlKey || e.metaKey) && selectedFolder) {
+      // Cmd+X/C/V on macOS, Ctrl+X/C/V elsewhere
+      const action = treeClipboardAction(e, isMacOS())
+      if (action !== null && selectedFolder) {
         // Only when the keystroke belongs to the tree ([27]): otherwise a
         // folder clicked earlier hijacked Cmd+C on selected text elsewhere.
         if (!isTreeClipboardKeystroke(treeContainerRef.current, document.activeElement, window.getSelection())) {
@@ -812,7 +817,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
         const node = findNode(selectedFolder)
         if (!node) return
 
-        if (e.key === 'x') {
+        if (action === 'cut') {
           // Cut
           e.preventDefault()
           clipboard.cut(node.path, node.name, node.type)
@@ -822,7 +827,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
             message: `"${node.name}" ready to move`,
             type: 'info'
           })
-        } else if (e.key === 'c') {
+        } else if (action === 'copy') {
           // Copy
           e.preventDefault()
           clipboard.copy(node.path, node.name, node.type)
@@ -832,7 +837,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
             message: `"${node.name}" ready to paste`,
             type: 'info'
           })
-        } else if (e.key === 'v' && clipboard.hasClipboard()) {
+        } else if (action === 'paste' && clipboard.hasClipboard()) {
           // Paste
           e.preventDefault()
           handlePaste()

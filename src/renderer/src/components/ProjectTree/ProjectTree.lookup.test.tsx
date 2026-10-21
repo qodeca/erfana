@@ -17,6 +17,7 @@
  * after a tree rebuild, and the `handlePaste` dependency fix that the lookup
  * change depends on.
  */
+import { isMacOS } from '../../utils/platform'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, act, fireEvent } from '@testing-library/react'
 import React from 'react'
@@ -246,8 +247,9 @@ async function dragEnd(sourcePath: string, targetPath: string) {
   })
 }
 
+/** The platform's clipboard modifier (Cmd on macOS, Ctrl elsewhere) plus `key`. */
 function pressKey(key: string) {
-  fireEvent.keyDown(window, { key, metaKey: true })
+  fireEvent.keyDown(window, isMacOS() ? { key, metaKey: true } : { key, ctrlKey: true })
 }
 
 beforeEach(() => {
