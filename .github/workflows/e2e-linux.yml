@@ -10,6 +10,9 @@ on:
     branches:
       - develop
       - main
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
   workflow_dispatch:
 
 permissions:
@@ -17,7 +20,7 @@ permissions:
 
 # Cancel an in-flight run on the same ref when a new push lands.
 concurrency:
-  group: e2e-linux-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -42,6 +45,6 @@ jobs:
         with:
           name: e2e-linux-report
           path: .local/e2e-linux/
-          if-no-files-found: ignore
+          if-no-files-found: warn
           include-hidden-files: true
           retention-days: 7
