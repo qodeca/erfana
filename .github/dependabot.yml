@@ -81,3 +81,11 @@ updates:
         update-types:
           - "minor"
           - "patch"
+
+  # The e2e image (e2e/docker/Dockerfile) pins its base images by digest; this keeps
+  # the digests fresh. Weekly, like the other ecosystems.
+  - package-ecosystem: "docker"
+    directory: "/e2e/docker"
+    target-branch: "develop"
+    schedule:
+      interval: "weekly"
