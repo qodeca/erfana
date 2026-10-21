@@ -133,9 +133,9 @@
   color: var(--color-text-primary);
 }
 
-.toast-close:focus {
-  outline: 2px solid var(--color-border-focus);
-  outline-offset: 2px;
+.toast-close:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
 }
 
 .toast-action {
@@ -158,6 +158,6 @@
 }
 
 .toast-action:focus-visible {
-  outline: 2px solid var(--color-border-focus);
-  outline-offset: 2px;
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
 }

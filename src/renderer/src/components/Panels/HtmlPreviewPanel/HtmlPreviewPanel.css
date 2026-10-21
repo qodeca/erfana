@@ -228,7 +228,7 @@
 
 .html-preview-banner-button:focus-visible {
   outline: var(--border-width-thick) solid var(--color-border-focus);
-  outline-offset: 1px;
+  outline-offset: var(--space-1);
 }
 
 .html-preview-banner-button:disabled {

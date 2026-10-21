@@ -42,10 +42,9 @@
   color: var(--color-text-placeholder);
 }
 
-.search-input:focus {
-  outline: none;
-  border-color: var(--color-border-focus);
-  box-shadow: var(--shadow-focus);
+.search-input:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
 }
 
 /* Toggle buttons container */
@@ -73,10 +72,9 @@
   background: var(--color-bg-hover);
 }
 
-.search-toggle-btn:focus {
-  outline: none;
-  border-color: var(--color-border-focus);
-  box-shadow: var(--shadow-focus);
+.search-toggle-btn:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
 }
 
 .search-toggle-btn.active {
@@ -121,10 +119,9 @@
   background: var(--color-bg-hover);
 }
 
-.search-nav-btn:focus {
-  outline: none;
-  border-color: var(--color-border-focus);
-  box-shadow: var(--shadow-focus);
+.search-nav-btn:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
 }
 
 .search-nav-btn:disabled {
@@ -152,7 +149,7 @@
   background: var(--color-bg-hover);
 }
 
-.search-close-btn:focus {
-  outline: none;
-  box-shadow: var(--shadow-focus);
+.search-close-btn:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
 }
