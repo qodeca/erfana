@@ -138,4 +138,71 @@ describe('FileService.readDirectory folder links', () => {
     await expect(svc.readDirectory(ROOT)).resolves.toBeDefined()
     expect(fs.readdir.mock.calls.length).toBeLessThanOrEqual(MAX_LINK_DEPTH * 4)
   })
+
+  it('reads the link\'s real folder and builds node paths from the link', async () => {
+    listing[ROOT] = [dirent('shared', 'link'), dirent('docs', 'dir')]
+    listing[abs('proj', 'docs')] = [dirent('a.md', 'file')]
+    statDir[abs('proj', 'shared')] = true
+    real[abs('proj', 'shared')] = abs('proj', 'docs')
+
+    const nodes = await svc.readDirectory(ROOT)
+
+    const shared = nodes.find((n) => n.name === 'shared')!
+    expect(shared.children?.[0].path).toBe(abs('proj', 'shared', 'a.md'))
+    const read = fs.readdir.mock.calls.map((c: unknown[]) => path.resolve(c[0] as string))
+    expect(read).not.toContain(abs('proj', 'shared'))
+  })
+
+  it('does not enter a link whose target is hidden or excluded', async () => {
+    listing[ROOT] = [dirent('nm', 'link'), dirent('g', 'link'), dirent('ok', 'link')]
+    statDir[abs('proj', 'nm')] = true
+    real[abs('proj', 'nm')] = abs('proj', 'node_modules')
+    statDir[abs('proj', 'g')] = true
+    real[abs('proj', 'g')] = abs('proj', 'sub', '.git')
+    statDir[abs('proj', 'ok')] = true
+    real[abs('proj', 'ok')] = abs('proj', 'docs')
+    listing[abs('proj', 'node_modules')] = [dirent('x.js', 'file')]
+    listing[abs('proj', 'sub', '.git')] = [dirent('HEAD', 'file')]
+    listing[abs('proj', 'docs')] = [dirent('a.md', 'file')]
+    svc.setHiddenPatterns(['node_modules', '.git'])
+
+    const nodes = await svc.readDirectory(ROOT)
+
+    const byName = Object.fromEntries(nodes.map((n) => [n.name, n]))
+    expect(byName.nm.children).toEqual([])
+    expect(byName.g.children).toEqual([])
+    expect(byName.ok.children?.map((c) => c.name)).toEqual(['a.md'])
+  })
+
+  it('bounds the walk when many folders link to each other', async () => {
+    const N = 10
+    const names = Array.from({ length: N }, (_, i) => `d${i}`)
+    // Every folder holds a link to every other folder
+    for (const n of names) {
+      listing[abs('proj', n)] = names
+        .filter((m) => m !== n)
+        .map((m) => dirent(`to-${m}`, 'link'))
+      for (const m of names) {
+        statDir[abs('proj', n, `to-${m}`)] = true
+        real[abs('proj', n, `to-${m}`)] = abs('proj', m)
+      }
+    }
+    listing[ROOT] = names.map((n) => dirent(n, 'dir'))
+    // A link's own path lists what its target lists
+    const orig = fs.readdir.getMockImplementation()
+    fs.readdir.mockImplementation(async (p: string) => {
+      const key = path.resolve(p)
+      return listing[key] ?? orig?.(p) ?? []
+    })
+
+    const start = Date.now()
+    const nodes = await svc.readDirectory(ROOT)
+
+    const count = (list: any[]): number =>
+      list.reduce((sum, n) => sum + 1 + (n.children ? count(n.children) : 0), 0)
+    // Each target is entered once per walk: at most N entered links, each listing N-1 links
+    expect(count(nodes)).toBeLessThan(N * N * N)
+    expect(fs.readdir.mock.calls.length).toBeLessThanOrEqual(2 * N + 1)
+    expect(Date.now() - start).toBeLessThan(2000)
+  })
 })

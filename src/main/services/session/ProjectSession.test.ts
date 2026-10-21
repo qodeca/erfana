@@ -24,6 +24,14 @@ describe('displayRootSpelling', () => {
     expect(displayRootSpelling('c:\\users\\x~1', 'C:\\Users\\Xavier', 'win32')).toBe('C:\\Users\\Xavier')
   })
 
+  it('keeps the drive letter when realpath turns a mapped drive into a UNC path', () => {
+    expect(displayRootSpelling('Z:\\proj', '\\\\srv\\share\\proj', 'win32')).toBe('Z:\\proj')
+  })
+
+  it('keeps a UNC path as realpath resolved it when both are UNC', () => {
+    expect(displayRootSpelling('\\\\srv\\C$\\x', '\\\\srv\\C$\\X', 'win32')).toBe('\\\\srv\\C$\\X')
+  })
+
   it('keeps the resolved spelling elsewhere', () => {
     expect(displayRootSpelling('/a/link', '/b/target', 'darwin')).toBe('/a/link')
     expect(displayRootSpelling('/a/link', '/b/target', 'linux')).toBe('/a/link')

@@ -28,7 +28,8 @@ vi.mock('electron', () => ({
 }))
 
 vi.mock('../utils/pathSecurity', () => ({
-  validatePath: vi.fn(() => Promise.resolve())
+  validatePath: vi.fn(() => Promise.resolve()),
+  isSystemDirectory: vi.fn(() => false)
 }))
 
 vi.mock('./LoggingService', () => ({

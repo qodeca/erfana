@@ -27,7 +27,8 @@ vi.mock('electron', () => ({
 }))
 
 vi.mock('../utils/pathSecurity', () => ({
-  validatePath: vi.fn(() => Promise.resolve())
+  validatePath: vi.fn(() => Promise.resolve()),
+  isSystemDirectory: vi.fn(() => false)
 }))
 
 vi.mock('./LoggingService', () => ({
@@ -40,6 +41,7 @@ vi.mock('fs/promises', () => ({
 }))
 
 import { stat, realpath } from 'fs/promises'
+import { isSystemDirectory } from '../utils/pathSecurity'
 
 const mockedStat = vi.mocked(stat)
 const mockedRealpath = vi.mocked(realpath)
@@ -175,5 +177,17 @@ describe('ProjectService – canonical project root', () => {
     expect(result.path).toBe(typed)
     expect(service.session.current()?.root).toBe(typed)
     expect(service.session.current()?.realRoot).toBe(onDisk)
+  })
+
+  it('refuses a project whose real folder is a system folder, before the lock', async () => {
+    vi.mocked(isSystemDirectory).mockImplementation((p) => p === onDisk)
+    mockedRealpath.mockImplementation(() => Promise.resolve(onDisk))
+
+    const result = await service.switchProject(typed)
+
+    expect(result.success).toBe(false)
+    expect(result.error).toContain('system or sensitive')
+    expect(lockService.acquireLock).not.toHaveBeenCalled()
+    expect(service.session.current()).toBeNull()
   })
 })

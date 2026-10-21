@@ -28,7 +28,10 @@ vi.mock('electron', () => ({
   BrowserWindow: { getAllWindows: vi.fn(() => []) }
 }))
 
-vi.mock('../utils/pathSecurity', () => ({ validatePath: vi.fn(async () => {}) }))
+vi.mock('../utils/pathSecurity', () => ({
+  validatePath: vi.fn(async () => {}),
+  isSystemDirectory: vi.fn(() => false)
+}))
 
 vi.mock('../services/FileWatcherService', () => ({
   fileWatcherService: { stopAll: vi.fn(async () => {}), setProjectPath: vi.fn() }

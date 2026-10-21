@@ -19,7 +19,7 @@
 import { stat, realpath } from 'fs/promises'
 import { normalize, sep, parse, resolve } from 'path'
 import { BrowserWindow } from 'electron'
-import { validatePath } from '../utils/pathSecurity'
+import { validatePath, isSystemDirectory } from '../utils/pathSecurity'
 import { AppError, ErrorCode } from '../../shared/errors'
 import type { ProjectChanged } from '../../shared/ipc/schema'
 import type { ResolvedProjectSettings } from '../../shared/ipc/project-settings-schema'
@@ -44,6 +44,8 @@ import {
 } from './session/ProjectSession'
 import { sweepStaleAtomicTemps } from '../utils/atomicTempSweep'
 import { withTimeout, TimeoutError } from '../utils/withTimeout'
+
+const SYSTEM_DIR_MESSAGE = 'Cannot open system or sensitive directories as projects'
 
 export interface ProjectSwitchResult {
   success: boolean
@@ -379,6 +381,20 @@ export class ProjectService {
         }
       }
       throw error
+    }
+
+    // 1c. The project is the folder the path leads to, not the one it is named
+    // by: a link chain to a system folder must not open as a project.
+    // TODO(#304): once it merges, replace this check with its single
+    // `assertAcceptableProjectRoot(realRoot)` (volume roots and system folders)
+    // and drop #304's own second realpath, so there is one realpath, one check.
+    if (isSystemDirectory(realRoot)) {
+      return {
+        success: false,
+        path: oldProjectPath || '',
+        action: 'noop',
+        error: `Security validation failed: ${SYSTEM_DIR_MESSAGE}`
+      }
     }
     const newProjectPath = displayRootSpelling(resolvedPath, realRoot, process.platform)
 

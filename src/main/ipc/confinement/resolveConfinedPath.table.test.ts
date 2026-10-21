@@ -503,6 +503,35 @@ describe('resolveConfinedPath – Windows', () => {
     }
     expect(await outcome('C:\\p\\x', ctxFor('\\\\srv\\share\\p'), project, prefixedUnc)).toBe('ACCEPTED')
   })
+
+  it('row 30: realpath succeeds where lstat would be refused (EACCES / EPERM); accepted only inside', async () => {
+    const base = win({
+      'C:\\': 'dir',
+      'C:\\p': 'dir',
+      'C:\\p\\x.md': 'file',
+      'C:\\q': 'dir',
+      'C:\\q\\y.md': 'file'
+    })
+    const refusing = (code: string): ConfinementDeps => ({
+      ...base,
+      fs: {
+        ...base.fs,
+        lstat: async () => {
+          throw Object.assign(new Error(code), { code })
+        }
+      }
+    })
+    const mustExist: PathPolicy = { mode: 'project', mustExist: true }
+    for (const code of ['EACCES', 'EPERM']) {
+      const deps = refusing(code)
+      // A path that must exist is canonicalised first, so the lstat refusal is not reached
+      expect(await outcome('C:\\p\\x.md', ctxFor('C:\\p'), mustExist, deps)).toBe('ACCEPTED')
+      // The same shortcut never accepts a canonical path outside the project
+      expect(await outcome('C:\\q\\y.md', ctxFor('C:\\p'), mustExist, deps)).toBe('OUTSIDE_PROJECT')
+      // A path that is not expected to exist still takes the full climb and refuses
+      expect(await outcome('C:\\p\\x.md', ctxFor('C:\\p'), project, deps)).toBe('UNVERIFIABLE')
+    }
+  })
 })
 
 // ---------------------------------------------------------------------------

@@ -55,19 +55,25 @@ export function normaliseRealRoot(real: string): string {
   return normaliseResolved(real)
 }
 
+const WIN_DRIVE_PATH = /^[A-Za-z]:/
+
 /**
  * The spelling of the project path that is shown and stored. On Windows it is
  * the native `realpath` result (on-disk case, no 8.3 short names; a UNC
- * admin-share path keeps its form), so a project opened as `c:\\users\\X~1`
- * and one opened as `C:\\Users\\Xavier` are the same name. Elsewhere the
- * caller's resolved spelling is kept: a symlinked root stays what the user chose.
+ * admin-share path keeps its form), so two spellings of one folder are one name.
+ * When `realpath` changes the kind of volume (a mapped drive `Z:\proj` comes
+ * back as `\\server\share\proj`) the caller's drive-letter spelling is kept:
+ * a terminal cannot start in a UNC folder. Confinement still uses `realRoot`.
+ * Elsewhere the caller's resolved spelling is kept.
  */
 export function displayRootSpelling(
   resolved: string,
   realRoot: string,
   platform: NodeJS.Platform
 ): string {
-  return platform === 'win32' ? realRoot : resolved
+  if (platform !== 'win32') return resolved
+  if (WIN_DRIVE_PATH.test(resolved) !== WIN_DRIVE_PATH.test(realRoot)) return resolved
+  return realRoot
 }
 
 /** The writable side. Only `ProjectService` holds one. */
