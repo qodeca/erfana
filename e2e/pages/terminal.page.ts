@@ -154,6 +154,7 @@ export class TerminalPage {
         .poll(
           async () => {
             const screen = await this.readScreen()
+            // workaround: blank terminal after start (isClearing drops the prompt) – remove when fixed
             // Linux container only: a shell that is fast enough draws its first prompt
             // while the main process is still discarding output for the clear
             // handshake (TerminalService `isClearing`), so the screen stays blank until
