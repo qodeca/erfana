@@ -44,7 +44,7 @@ import { TEST_IDS } from '../../constants/testids'
 import { notePreviewRenderStart, notePreviewRenderCommit } from '../../utils/previewRenderTiming'
 import { useIdleDebouncedValue } from '../../hooks/useIdleDebouncedValue'
 import { rehypeHeadingIds, rehypeShiftLines } from './previewRehypePlugins'
-import { PREVIEW_RENDERED_EVENT } from './previewEvents'
+import { PreviewWorkContext, PreviewWorkTracker } from './previewWork'
 import './MarkdownPreview.css'
 
 // Anchor scroll configuration
@@ -62,12 +62,40 @@ export const PREVIEW_IDLE_DELAY_MS = 150
 export const PREVIEW_MAX_WAIT_MS = 1000
 /** Documents shorter than this (characters) are never debounced, however long a render took. */
 export const PREVIEW_DEBOUNCE_MIN_CHARS = 2000
+/**
+ * Consecutive slow (or fast) re-renders needed to switch to debounced (or back
+ * to live) updates, so one outlier – a GC pause, a cold cache – does not flip
+ * the mode.
+ */
+export const PREVIEW_MODE_SWITCH_STREAK = 2
+/** Upper bound (ms) on each wait inside `flush()`: the body commit, then the diagrams. */
+export const PREVIEW_FLUSH_TIMEOUT_MS = 5000
+
+/** Why the preview DOM changed, for {@link MarkdownPreviewProps.onRendered}. */
+export interface PreviewRenderedInfo {
+  /** This preview instance's root element (the one to measure) */
+  root: HTMLDivElement
+  /**
+   * `content`: a new version of the document was committed – images in it
+   * may still be loading and diagrams still drawing. `diagram`: a Mermaid
+   * diagram finished drawing (or failed to) and may have changed height.
+   */
+  reason: 'content' | 'diagram'
+}
 
 interface MarkdownPreviewProps {
   content: string
   filePath?: string
   className?: string
   onOpenFile?: (filePath: string, anchor?: string) => Promise<void>
+  /**
+   * Called whenever this preview's DOM changed. The preview renders behind the
+   * editor (deferred, and debounced for large documents), so a content change
+   * is not a DOM change – anything that measures the preview (scroll sync)
+   * must use this. It carries the root element because the preview remounts
+   * when the view mode changes, which a ref captured earlier would miss.
+   */
+  onRendered?: (info: PreviewRenderedInfo) => void
 }
 
 export interface MarkdownPreviewHandle {
@@ -81,6 +109,13 @@ export interface MarkdownPreviewHandle {
    */
   scrollToAnchor: (anchorId: string, options?: { timeout?: number; retryInterval?: number }) => void
   element: HTMLDivElement | null
+  /**
+   * Bring the preview fully up to date with the latest content: release any
+   * held-back render now, wait for it to commit, then for Mermaid diagrams to
+   * finish drawing. Export (PDF / DOCX) awaits this before reading the DOM.
+   * Never rejects; gives up waiting after {@link PREVIEW_FLUSH_TIMEOUT_MS}.
+   */
+  flush: () => Promise<void>
 }
 
 /**
@@ -666,7 +701,7 @@ function getLineNumbersFromSelection(
 }
 
 export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreviewProps>(
-  ({ content, filePath, className = '', onOpenFile }, ref) => {
+  ({ content, filePath, className = '', onOpenFile, onRendered }, ref) => {
     const [selection, setSelection] = useState<{
       text: string
       rect: DOMRect
@@ -680,7 +715,22 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
     const [resolvedLinks, setResolvedLinks] = useState<ReadonlyMap<string, ResolvedLink | null>>(NO_RESOLUTIONS)
     // Set from measured re-render cost; see the scheduling block below.
     const [isLiveRenderSlow, setIsLiveRenderSlow] = useState(false)
+    const slowStreakRef = useRef(0)
+    const fastStreakRef = useRef(0)
     const previewRef = useRef<HTMLDivElement>(null)
+
+    // Outstanding post-commit work (diagrams drawing) and the flush signal for it.
+    const workTracker = useMemo(() => new PreviewWorkTracker(), [])
+    const [flushEpoch, setFlushEpoch] = useState(0)
+    const previewWork = useMemo(() => ({ tracker: workTracker, flushEpoch }), [workTracker, flushEpoch])
+
+    // Latest props for callbacks that must not change identity.
+    const onRenderedRef = useRef(onRendered)
+    const contentRef = useRef(content)
+    useEffect(() => {
+      onRenderedRef.current = onRendered
+      contentRef.current = content
+    }, [onRendered, content])
     const { showToast } = useToast()
 
     // DiagramViewer state from store (persists across MermaidDiagram remounts)
@@ -708,21 +758,31 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
     // =======================================================================
     // The editor and this component get every keystroke; the Markdown body
     // must not re-parse on each one. Two layers:
-    //  1. Debounce – only once a re-render has been measured slower than a
-    //     frame (and the document is not tiny): the body waits for a pause in
-    //     typing, or at most PREVIEW_MAX_WAIT_MS. Small documents stay live.
+    //  1. Debounce – only once re-renders have been measured slower than a
+    //     frame PREVIEW_MODE_SWITCH_STREAK times in a row (and the document is
+    //     not tiny; as many fast ones in a row switch back): the body waits
+    //     for a pause in typing, or at most PREVIEW_MAX_WAIT_MS. Small
+    //     documents stay live.
     //  2. useDeferredValue – whatever is released renders at transition
     //     priority, so a keystroke arriving meanwhile is handled first and the
     //     stale render is thrown away instead of blocking it.
     // The first render is neither: the debounce starts from the mount value
     // and a deferred value's first render uses the value itself.
+    // A release forced by the max wait (or by flush()) skips step 2 and
+    // renders at normal priority: deferred, it could be postponed again by the
+    // next keystroke and the max wait would be no bound at all.
     const isDebounced = isLiveRenderSlow && content.length >= PREVIEW_DEBOUNCE_MIN_CHARS
-    const releasedContent = useIdleDebouncedValue(content, {
+    const {
+      value: releasedContent,
+      urgent: isUrgentRelease,
+      flush: releaseNow
+    } = useIdleDebouncedValue(content, {
       delayMs: PREVIEW_IDLE_DELAY_MS,
       maxWaitMs: PREVIEW_MAX_WAIT_MS,
       enabled: isDebounced
     })
-    const renderedContent = useDeferredValue(releasedContent)
+    const deferredContent = useDeferredValue(releasedContent)
+    const renderedContent = isUrgentRelease ? releasedContent : deferredContent
 
     /**
      * Internal links in the rendered document, as one stable string key.
@@ -926,9 +986,40 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
       }, timeout)
     }, [])
 
-    // Expose scrollToAnchor method and DOM element via ref
+    // -----------------------------------------------------------------------
+    // flush(): used by export so it never captures a preview that is behind
+    // -----------------------------------------------------------------------
+    // The content the DOM currently shows, and flushes waiting for a commit.
+    const committedContentRef = useRef<string | null>(null)
+    const commitWaitersRef = useRef(new Set<{ target: string; resolve: () => void }>())
+
+    const flush = useCallback(async (): Promise<void> => {
+      const target = contentRef.current
+      releaseNow()
+      if (committedContentRef.current !== target) {
+        await new Promise<void>((resolve) => {
+          const waiter = {
+            target,
+            resolve: () => {
+              clearTimeout(timer)
+              commitWaitersRef.current.delete(waiter)
+              resolve()
+            }
+          }
+          const timer = setTimeout(waiter.resolve, PREVIEW_FLUSH_TIMEOUT_MS)
+          commitWaitersRef.current.add(waiter)
+        })
+      }
+      // Diagrams in that commit registered as busy in their layout effects;
+      // release their held-back redraws and wait for the drawing to finish.
+      setFlushEpoch((n) => n + 1)
+      await workTracker.whenIdle(PREVIEW_FLUSH_TIMEOUT_MS)
+    }, [releaseNow, workTracker])
+
+    // Expose scrollToAnchor, flush and the DOM element via ref
     useImperativeHandle(ref, () => ({
       scrollToAnchor,
+      flush,
       element: previewRef.current
     }))
 
@@ -961,8 +1052,48 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
      * and is never debounced anyway.
      */
     const handleBodyCommit = useCallback((durationMs: number, isUpdate: boolean) => {
-      if (isUpdate) setIsLiveRenderSlow(durationMs > PREVIEW_FRAME_BUDGET_MS)
-      previewRef.current?.dispatchEvent(new CustomEvent(PREVIEW_RENDERED_EVENT, { bubbles: true }))
+      if (isUpdate) {
+        // Damped: a mode switch needs PREVIEW_MODE_SWITCH_STREAK renders in a row.
+        if (durationMs > PREVIEW_FRAME_BUDGET_MS) {
+          slowStreakRef.current += 1
+          fastStreakRef.current = 0
+          if (slowStreakRef.current >= PREVIEW_MODE_SWITCH_STREAK) setIsLiveRenderSlow(true)
+        } else {
+          fastStreakRef.current += 1
+          slowStreakRef.current = 0
+          if (fastStreakRef.current >= PREVIEW_MODE_SWITCH_STREAK) setIsLiveRenderSlow(false)
+        }
+      }
+      // Reported from this component's layout effect below: on mount the
+      // root's ref is attached only after the body's effects have run.
+      bodyCommittedRef.current = true
+    }, [])
+    const bodyCommittedRef = useRef(false)
+
+    useLayoutEffect(() => {
+      if (!bodyCommittedRef.current) return
+      bodyCommittedRef.current = false
+      const root = previewRef.current
+      if (root) onRenderedRef.current?.({ root, reason: 'content' })
+    })
+
+    // Runs after the body's commit callback (a parent's layout effect follows
+    // its children's): record what the DOM now shows and release any flush
+    // waiting for it – or for a version this one has superseded.
+    useLayoutEffect(() => {
+      committedContentRef.current = renderedContent
+      for (const waiter of [...commitWaitersRef.current]) {
+        if (waiter.target === renderedContent || waiter.target !== contentRef.current) waiter.resolve()
+      }
+    }, [renderedContent])
+
+    // Diagrams draw after the commit and change height when they do.
+    useEffect(() => {
+      const root = previewRef.current
+      if (!root) return
+      const handler = (): void => onRenderedRef.current?.({ root, reason: 'diagram' })
+      root.addEventListener('mermaid:rendered', handler)
+      return () => root.removeEventListener('mermaid:rendered', handler)
     }, [])
 
     const handleMouseUp = (e: React.MouseEvent) => {
@@ -1077,15 +1208,17 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
             rehype: raw HTML (keeps source positions), sanitize (always after
             raw), heading ids, frontmatter line shift. See buildRehypePlugins.
           */}
-          <ResolvedLinksContext.Provider value={resolvedLinks}>
-            <MarkdownBody
-              source={body}
-              lineOffset={frontmatterLineCount}
-              remarkPlugins={remarkPlugins}
-              components={markdownComponents}
-              onCommit={handleBodyCommit}
-            />
-          </ResolvedLinksContext.Provider>
+          <PreviewWorkContext.Provider value={previewWork}>
+            <ResolvedLinksContext.Provider value={resolvedLinks}>
+              <MarkdownBody
+                source={body}
+                lineOffset={frontmatterLineCount}
+                remarkPlugins={remarkPlugins}
+                components={markdownComponents}
+                onCommit={handleBodyCommit}
+              />
+            </ResolvedLinksContext.Provider>
+          </PreviewWorkContext.Provider>
         </div>
 
         {contextMenu && selection && filePath && (

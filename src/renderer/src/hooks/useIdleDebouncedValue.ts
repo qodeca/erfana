@@ -6,7 +6,7 @@
  * @module hooks/useIdleDebouncedValue
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 /** Options for {@link useIdleDebouncedValue}. */
 export interface UseIdleDebouncedValueOptions {
@@ -26,9 +26,32 @@ export interface UseIdleDebouncedValueOptions {
   enabled?: boolean
 }
 
+/** What {@link useIdleDebouncedValue} returns. */
+export interface IdleDebouncedValue<T> {
+  /** The most recently released value (the live value in pass-through mode). */
+  value: T
+  /**
+   * `true` when `value` was released because it could not wait any longer –
+   * the max wait ran out, or {@link IdleDebouncedValue.flush} was called. A
+   * caller that renders at low priority should render such a value at normal
+   * priority, or the max wait is not a bound. `false` for a release after a
+   * pause and in pass-through mode.
+   */
+  urgent: boolean
+  /** A newer value is waiting to be released. */
+  isPending: boolean
+  /** Release the latest value now (as `urgent`). Stable across renders. */
+  flush: () => void
+}
+
+interface Released<T> {
+  value: T
+  urgent: boolean
+}
+
 /**
- * Return `value`, but release each change only once changes have paused for
- * `delayMs` (or `maxWaitMs` has passed since the first unreleased change).
+ * Release each change of `value` only once changes have paused for `delayMs`
+ * (or `maxWaitMs` has passed since the first unreleased change).
  *
  * The first render returns `value` immediately – the debounce applies to
  * changes only, so a component never mounts showing nothing. Equal values
@@ -42,22 +65,31 @@ export interface UseIdleDebouncedValueOptions {
  * @typeParam T - Type of the value being debounced
  * @param value - The live value
  * @param options - Delay, optional max wait, and an on/off switch
- * @returns The most recently released value
+ * @returns The released value, whether it was released urgently, whether a
+ *   newer one is pending, and a stable `flush`
  *
  * @example Preview that keeps up with typing in a large file
  * ```tsx
- * const shown = useIdleDebouncedValue(content, { delayMs: 150, maxWaitMs: 1000, enabled: isLarge })
- * return <MarkdownBody source={shown} />
+ * const { value: shown, urgent } = useIdleDebouncedValue(content, {
+ *   delayMs: 150,
+ *   maxWaitMs: 1000,
+ *   enabled: isLarge
+ * })
+ * const deferred = useDeferredValue(shown)
+ * return <MarkdownBody source={urgent ? shown : deferred} />
  * ```
  */
-export function useIdleDebouncedValue<T>(value: T, options: UseIdleDebouncedValueOptions): T {
+export function useIdleDebouncedValue<T>(value: T, options: UseIdleDebouncedValueOptions): IdleDebouncedValue<T> {
   const { delayMs, maxWaitMs, enabled = true } = options
-  const [released, setReleased] = useState(value)
+  const [released, setReleased] = useState<Released<T>>({ value, urgent: false })
   // When the oldest unreleased change arrived; null when nothing is pending.
   const pendingSinceRef = useRef<number | null>(null)
+  // The live value as of the last commit, for `flush` (called from events).
+  const latestRef = useRef(value)
 
   useEffect(() => {
-    if (Object.is(value, released)) {
+    latestRef.current = value
+    if (Object.is(value, released.value)) {
       pendingSinceRef.current = null
       return
     }
@@ -65,22 +97,36 @@ export function useIdleDebouncedValue<T>(value: T, options: UseIdleDebouncedValu
       // Pass-through mode already returns `value`; catch the stored copy up so
       // turning the debounce back on starts from what is on screen.
       pendingSinceRef.current = null
-      setReleased(value)
+      setReleased({ value, urgent: false })
       return
     }
 
     const now = Date.now()
     if (pendingSinceRef.current === null) pendingSinceRef.current = now
     const waitedMs = now - pendingSinceRef.current
-    const waitMs = maxWaitMs === undefined ? delayMs : Math.min(delayMs, Math.max(0, maxWaitMs - waitedMs))
+    const budgetMs = maxWaitMs === undefined ? Infinity : Math.max(0, maxWaitMs - waitedMs)
+    // The max wait, not a pause, decides this release – so it is urgent.
+    const urgent = budgetMs <= delayMs
 
     const timer = setTimeout(() => {
       pendingSinceRef.current = null
-      setReleased(value)
-    }, waitMs)
+      setReleased({ value, urgent })
+    }, Math.min(delayMs, budgetMs))
     // A newer change (or unmount) supersedes this release.
     return () => clearTimeout(timer)
-  }, [value, released, enabled, delayMs, maxWaitMs])
+  }, [value, released.value, enabled, delayMs, maxWaitMs])
 
-  return enabled ? released : value
+  const flush = useCallback(() => {
+    pendingSinceRef.current = null
+    const latest = latestRef.current
+    setReleased((prev) => (Object.is(prev.value, latest) ? prev : { value: latest, urgent: true }))
+  }, [])
+
+  if (!enabled) return { value, urgent: false, isPending: false, flush }
+  return {
+    value: released.value,
+    urgent: released.urgent,
+    isPending: !Object.is(value, released.value),
+    flush
+  }
 }

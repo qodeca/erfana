@@ -72,6 +72,19 @@ describe('rehypeHeadingIds', () => {
     expect(first).toEqual(['example', 'example-2'])
   })
 
+  it('never hands out an id a heading already earned by its own text', () => {
+    const ids = (...texts: string[]): unknown[] =>
+      elements(withIds(root(...texts.map((t) => el('h2', [text(t)])))), 'h2').map((h) => h.properties?.id)
+
+    // "Example 2" slugs to example-2, which the second "Example" already holds.
+    expect(ids('Example', 'Example', 'Example 2')).toEqual(['example', 'example-2', 'example-2-2'])
+    // The other way round: the duplicate skips the taken example-2.
+    expect(ids('Example 2', 'Example', 'Example')).toEqual(['example-2', 'example', 'example-3'])
+    // And every id is unique in a longer mix.
+    const mixed = ids('A', 'A 2', 'A', 'A', 'A 3', 'A 2')
+    expect(new Set(mixed).size).toBe(mixed.length)
+  })
+
   it('slugs the full text of headings that contain inline markup', () => {
     const tree = withIds(root(el('h2', [text('Use '), el('code', [text('npm ci')]), text(' '), el('em', [text('always')])])))
     expect(elements(tree, 'h2')[0].properties?.id).toBe('use-npm-ci-always')

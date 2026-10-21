@@ -372,13 +372,13 @@ export function MarkdownEditorPanel(
   const {
     isEditorReady,
     setIsEditorReady,
-    rebuildScrollMap
+    rebuildScrollMap,
+    handlePreviewRendered
   } = useScrollSync({
     editorRef,
     previewRef,
     viewMode,
-    currentFilePath: currentFile?.path ?? null,
-    currentContent: currentFile?.content ?? null
+    currentFilePath: currentFile?.path ?? null
   })
 
   // =========================================================================
@@ -662,6 +662,7 @@ export function MarkdownEditorPanel(
             onDividerResizeHorizontal={handleDividerResizeHorizontal}
             onDividerResizeEnd={baseDividerResizeEnd}
             onOpenFile={handleOpenFile}
+            onPreviewRendered={handlePreviewRendered}
             onSelectionChange={setSelectedText}
           />
         </EditorErrorBoundary>

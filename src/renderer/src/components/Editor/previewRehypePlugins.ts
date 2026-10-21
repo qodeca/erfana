@@ -69,7 +69,8 @@ function walk(node: HastNode, visit: (node: HastNode) => void): void {
 /**
  * Give every `h1`–`h6` a unique, GitHub-compatible `id`, in document order.
  *
- * Duplicates get `-2`, `-3`, … (`example`, `example-2`). The counter belongs to
+ * Duplicates get `-2`, `-3`, … (`example`, `example-2`), skipping any id already
+ * taken, so no two headings share an anchor. The counter belongs to
  * one parse, so re-rendering the same document always yields the same ids –
  * a counter kept in the renderer map counts on across renders that reuse the
  * map – and the map is now kept for the panel's life – which would move every
@@ -80,13 +81,30 @@ function walk(node: HastNode, visit: (node: HastNode) => void): void {
  */
 export function rehypeHeadingIds(): (tree: HastNode) => void {
   return (tree) => {
+    // id -> highest suffix handed out for it as a base (1 = only the bare id).
     const used = new Map<string, number>()
+    const unique = (base: string): string => {
+      const seen = used.get(base)
+      if (seen === undefined) {
+        used.set(base, 1)
+        return base
+      }
+      // Keep counting past ids that are already taken – including ones a
+      // heading earned by its own text ("Example 2" is `example-2`) – so two
+      // headings can never share an anchor.
+      let n = seen
+      let candidate: string
+      do {
+        n += 1
+        candidate = `${base}-${n}`
+      } while (used.has(candidate))
+      used.set(base, n)
+      used.set(candidate, 1)
+      return candidate
+    }
     walk(tree, (node) => {
       if (node.type !== 'element' || !node.tagName || !HEADING_TAGS.has(node.tagName)) return
-      const base = slugifyHeading(textOf(node))
-      const count = used.get(base) ?? 0
-      used.set(base, count + 1)
-      node.properties = { ...node.properties, id: count === 0 ? base : `${base}-${count + 1}` }
+      node.properties = { ...node.properties, id: unique(slugifyHeading(textOf(node))) }
     })
   }
 }

@@ -12,14 +12,13 @@
 #   sh docs/performance/2026-10-21-deferred-preview.ab.sh r2 3
 #   node docs/performance/2026-10-21-deferred-preview.aggregate.mjs .local/bench
 #
-# Needs a clean working tree for the four files below. Writes JSON to .local/bench/.
+# Needs a clean working tree for the files the fix modified. Writes JSON to .local/bench/.
 set -eu
 ROOT=$(git rev-parse --show-toplevel)
 BASE=${ERFANA_BENCH_BASE:-372ae6fc}   # "perf: add a typing benchmark for the Markdown preview"
-FILES="src/renderer/src/components/Editor/MarkdownPreview.tsx
-src/renderer/src/components/Editor/MermaidDiagram.tsx
-src/renderer/src/components/Editor/MarkdownEditorPanel/hooks/useScrollSync.ts
-src/renderer/src/utils/previewRenderTiming.ts"
+# Every source file the fix modified, tests excluded. Files the fix ADDED stay
+# in place for "before"; nothing at the base commit imports them.
+FILES=$(git -C "$ROOT" diff --name-only --diff-filter=M "$BASE" HEAD -- src | grep -v '\.test\.')
 
 run() {
   (cd "$ROOT" && npx electron-vite build > /dev/null)

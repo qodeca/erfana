@@ -18,11 +18,12 @@ vi.mock('mermaid', () => ({
 }))
 
 import { MermaidDiagram, MERMAID_IDLE_DELAY_MS } from './MermaidDiagram'
+import { PreviewWorkContext, PreviewWorkTracker } from './previewWork'
 
 /** Let the async render chain (await mermaid.render → setState) settle. */
 async function flush(): Promise<void> {
   await act(async () => {
-    await Promise.resolve()
+    for (let i = 0; i < 5; i++) await Promise.resolve()
   })
 }
 
@@ -61,5 +62,64 @@ describe('MermaidDiagram redraw scheduling', () => {
     await flush()
     expect(renderMock).toHaveBeenCalledTimes(2)
     expect(renderMock).toHaveBeenLastCalledWith(expect.any(String), 'graph TD; A-->B-->C')
+  })
+
+  it('never lets an older, slower draw overwrite a newer one', async () => {
+    // First draw hangs until released; the second answers at once.
+    let releaseFirst!: (v: { svg: string }) => void
+    renderMock.mockImplementationOnce(() => new Promise((r) => (releaseFirst = r)))
+
+    const { container, rerender } = render(<MermaidDiagram code="old" />)
+    await flush()
+    rerender(<MermaidDiagram code="new" />)
+    await act(async () => {
+      vi.advanceTimersByTime(MERMAID_IDLE_DELAY_MS)
+    })
+    await flush()
+    expect(container.querySelector('.mermaid-diagram svg')?.getAttribute('data-code')).toBe('new')
+
+    await act(async () => {
+      releaseFirst({ svg: '<svg data-code="old"></svg>' })
+    })
+    expect(container.querySelector('.mermaid-diagram svg')?.getAttribute('data-code')).toBe('new')
+  })
+
+  it('reports the line range of the source it drew, not of a newer pending one', async () => {
+    const seen: Array<{ startLine?: number }> = []
+    const { container, rerender } = render(<MermaidDiagram code="A" startLine={10} endLine={12} />)
+    container.addEventListener('mermaid:rendered', (e) => seen.push((e as CustomEvent).detail))
+    await flush()
+
+    // Lines move (text added above) and the code changes: both wait together.
+    rerender(<MermaidDiagram code="B" startLine={20} endLine={22} />)
+    await act(async () => {
+      vi.advanceTimersByTime(MERMAID_IDLE_DELAY_MS)
+    })
+    await flush()
+
+    expect(seen.at(-1)).toMatchObject({ startLine: 20, endLine: 22 })
+    expect(renderMock).toHaveBeenLastCalledWith(expect.any(String), 'B')
+  })
+
+  it('is busy for a preview flush until the latest source is drawn, and redraws at once on flush', async () => {
+    const tracker = new PreviewWorkTracker()
+    const wrap = (code: string, flushEpoch: number) => (
+      <PreviewWorkContext.Provider value={{ tracker, flushEpoch }}>
+        <MermaidDiagram code={code} />
+      </PreviewWorkContext.Provider>
+    )
+    const { rerender } = render(wrap('one', 0))
+    await flush()
+    expect(tracker.pending).toBe(0)
+
+    rerender(wrap('two', 0))
+    expect(tracker.pending).toBe(1)
+
+    // A flush (new epoch) redraws without waiting for the idle delay.
+    rerender(wrap('two', 1))
+    await flush()
+    await flush()
+    expect(renderMock).toHaveBeenLastCalledWith(expect.any(String), 'two')
+    expect(tracker.pending).toBe(0)
   })
 })

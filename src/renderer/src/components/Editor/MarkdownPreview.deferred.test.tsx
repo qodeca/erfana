@@ -11,13 +11,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, cleanup, act } from '@testing-library/react'
 
+import { createRef } from 'react'
 import {
   MarkdownPreview,
   PREVIEW_DEBOUNCE_MIN_CHARS,
   PREVIEW_IDLE_DELAY_MS,
-  PREVIEW_MAX_WAIT_MS
+  PREVIEW_MAX_WAIT_MS,
+  type MarkdownPreviewHandle,
+  type PreviewRenderedInfo
 } from './MarkdownPreview'
-import { PREVIEW_RENDERED_EVENT } from './previewEvents'
 import { ToastProvider } from '../Toast/ToastContext'
 import { useGlobalSettingsStore } from '../../stores/useGlobalSettingsStore'
 
@@ -33,11 +35,22 @@ function bigDoc(marker: string): string {
   return `# Title\n\n${marker}\n\n${filler.repeat(Math.ceil(PREVIEW_DEBOUNCE_MIN_CHARS / filler.length) + 1)}`
 }
 
-const ui = (content: string) => (
+const ui = (
+  content: string,
+  extra: { onRendered?: (info: PreviewRenderedInfo) => void; handle?: React.Ref<MarkdownPreviewHandle> } = {}
+) => (
   <ToastProvider>
-    <MarkdownPreview content={content} filePath={FILE_PATH} />
+    <MarkdownPreview ref={extra.handle} content={content} filePath={FILE_PATH} onRendered={extra.onRendered} />
   </ToastProvider>
 )
+
+/** Mount a large document and make two edits, so two slow re-renders switch it to debounced mode. */
+function renderDebouncedBigDoc(prefix: string) {
+  const r = render(ui(bigDoc(`${prefix}0`)))
+  r.rerender(ui(bigDoc(`${prefix}1`)))
+  r.rerender(ui(bigDoc(`${prefix}2`)))
+  return r
+}
 
 /**
  * Make every body render look slow: each `performance.now()` call returns a
@@ -90,36 +103,37 @@ describe('MarkdownPreview – deferred rendering', () => {
     makeRendersLookSlow()
     const { container, rerender } = render(ui(bigDoc('v0')))
 
-    // First edit: no update render measured yet, so it is still live – and
-    // the measurement it produces is "slow".
+    // The first two edits are still live; each measures "slow", and two in a
+    // row switch the preview to debounced updates.
     rerender(ui(bigDoc('v1')))
     expect(container.textContent).toContain('v1')
+    rerender(ui(bigDoc('v2')))
+    expect(container.textContent).toContain('v2')
 
     // From now on edits wait for a pause.
-    rerender(ui(bigDoc('v2')))
     rerender(ui(bigDoc('v3')))
-    expect(container.textContent).toContain('v1')
-    expect(container.textContent).not.toContain('v3')
+    rerender(ui(bigDoc('v4')))
+    expect(container.textContent).toContain('v2')
+    expect(container.textContent).not.toContain('v4')
 
     act(() => vi.advanceTimersByTime(PREVIEW_IDLE_DELAY_MS))
-    expect(container.textContent).toContain('v3')
-    expect(container.textContent).not.toContain('v2')
+    expect(container.textContent).toContain('v4')
+    expect(container.textContent).not.toContain('v3')
   })
 
   it('still refreshes a slow document during continuous typing, at the max wait', () => {
     vi.useFakeTimers()
     makeRendersLookSlow()
-    const { container, rerender } = render(ui(bigDoc('k0')))
-    rerender(ui(bigDoc('k1'))) // measures "slow"
+    const { container, rerender } = renderDebouncedBigDoc('k')
 
     // An edit every 100 ms never leaves a quiet period.
-    let i = 2
+    let i = 3
     for (let elapsed = 0; elapsed < PREVIEW_MAX_WAIT_MS; elapsed += 100) {
       rerender(ui(bigDoc(`k${i++}`)))
       act(() => vi.advanceTimersByTime(100))
     }
     // Some later version made it out, without any pause in the edits.
-    expect(container.textContent).not.toMatch(/\bk1\b/)
+    expect(container.textContent).not.toMatch(/\bk2\b/)
     expect(container.textContent).toMatch(/\bk\d+\b/)
   })
 
@@ -132,14 +146,74 @@ describe('MarkdownPreview – deferred rendering', () => {
     expect(container.textContent).toContain('small-2')
   })
 
-  it(`raises ${PREVIEW_RENDERED_EVENT} on the preview root after each committed render`, () => {
-    const { container, rerender } = render(ui('# One'))
-    const root = container.querySelector('.markdown-preview') as HTMLElement
-    const seen = vi.fn()
-    root.addEventListener(PREVIEW_RENDERED_EVENT, seen)
+  it('needs two fast re-renders in a row to go back to live updates', () => {
+    vi.useFakeTimers()
+    // 50 ms per performance.now() call while `slow`, 1 ms otherwise.
+    let slow = true
+    let t = 0
+    vi.spyOn(performance, 'now').mockImplementation(() => (t += slow ? 50 : 1))
+    const { container, rerender } = renderDebouncedBigDoc('f')
 
-    rerender(ui('# Two'))
-    expect(seen).toHaveBeenCalledTimes(1)
+    // Debounced now. Renders get fast; the first fast one does not switch back.
+    slow = false
+    rerender(ui(bigDoc('f3')))
+    act(() => vi.advanceTimersByTime(PREVIEW_IDLE_DELAY_MS))
+    rerender(ui(bigDoc('f4')))
+    expect(container.textContent).not.toContain('f4')
+    act(() => vi.advanceTimersByTime(PREVIEW_IDLE_DELAY_MS))
+
+    // Second fast render in a row: live again.
+    rerender(ui(bigDoc('f5')))
+    expect(container.textContent).toContain('f5')
+  })
+
+  it('tells onRendered about every committed render, with its own root', () => {
+    const seen = vi.fn()
+    const { container, rerender } = render(ui('# One', { onRendered: seen }))
+    const root = container.querySelector('.markdown-preview')
+    expect(seen).toHaveBeenLastCalledWith({ root, reason: 'content' })
+
+    rerender(ui('# Two', { onRendered: seen }))
+    expect(seen).toHaveBeenCalledTimes(2)
+  })
+
+  it('forwards a finished diagram to onRendered as a "diagram" render', () => {
+    const seen = vi.fn()
+    const { container } = render(ui('# One', { onRendered: seen }))
+    const root = container.querySelector('.markdown-preview') as HTMLElement
+    seen.mockClear()
+
+    root.querySelector('h1')!.dispatchEvent(new CustomEvent('mermaid:rendered', { bubbles: true }))
+    expect(seen).toHaveBeenCalledWith({ root, reason: 'diagram' })
+  })
+})
+
+describe('MarkdownPreview – flush()', () => {
+  it('releases a held-back edit at once and resolves after it is on screen', async () => {
+    vi.useFakeTimers()
+    makeRendersLookSlow()
+    const handle = createRef<MarkdownPreviewHandle>()
+    const { container, rerender } = render(ui(bigDoc('x0'), { handle }))
+    rerender(ui(bigDoc('x1'), { handle }))
+    rerender(ui(bigDoc('x2'), { handle }))
+    rerender(ui(bigDoc('x3'), { handle }))
+    expect(container.textContent).not.toContain('x3')
+
+    let done = false
+    await act(async () => {
+      void handle.current!.flush().then(() => {
+        done = true
+      })
+    })
+    // No timer advanced: the edit was released by flush, not by the pause.
+    expect(container.textContent).toContain('x3')
+    expect(done).toBe(true)
+  })
+
+  it('resolves at once when the preview is already up to date', async () => {
+    const handle = createRef<MarkdownPreviewHandle>()
+    render(ui('# Up to date', { handle }))
+    await expect(handle.current!.flush()).resolves.toBeUndefined()
   })
 })
 

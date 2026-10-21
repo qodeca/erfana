@@ -5,16 +5,16 @@ SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 
 # Typing in a large Markdown file: the deferred preview (finding [31])
 
-- **Finding:** [31] "The preview is rebuilt on every keystroke" (lens review of v0.21.0, Wave 4 of v0.22.0). Branch `perf/deferred-preview`.
-- **Date:** 2026-10-21. **Host:** Apple M5 Max, 128 GB, macOS 26.6.2, production build (`npx electron-vite build`), Electron 44.9.0. The machine was **not idle** – a VM and other Electron test runs were active, 1-minute load average 12–13 throughout (recorded per run). Before and after were run interleaved (B, A, B, A) so drift hits both.
-- **Data:** 6 runs before, 6 after, each a fresh app launch on a fresh project. Raw per-run data: [`2026-10-21-deferred-preview.raw.json`](2026-10-21-deferred-preview.raw.json).
+- **Finding:** [31] "The preview is rebuilt on every keystroke" (lens review of v0.21.0, Wave 4 of v0.22.0). Branch `perf/deferred-preview`, PR #290.
+- **Date:** 2026-10-21. **Host:** Apple M5 Max, 128 GB, macOS 26.6.2, production build (`npx electron-vite build`), Electron 44.9.0. The machine was **heavily loaded** – a VM and other agents' Electron test runs were active, 1-minute load average 24–41 (recorded per run). Before and after were run interleaved (B, A, B, A) so drift hits both; absolute numbers are inflated, the before/after gap is the signal.
+- **Data:** 6 runs before, 6 after, each a fresh app launch on a fresh project. Raw per-run data: [`2026-10-21-deferred-preview.raw.json`](2026-10-21-deferred-preview.raw.json). These numbers are for the code after the PR #290 review fixes; a first round on the pre-review code (load 12–13) gave the same picture: 23.5 → 0 lost keystrokes, total blocking time 1,350 → 75 ms, 52 → 6 renders.
 
 ## The answer
 
-- **Typing no longer loses characters.** Before, about **half the keystrokes never reached the document** (23–24 of 50 lost in every run) and the cursor jumped to the end of the file. After: 0 lost in every run.
-- **The main thread is free while typing:** 52 → 5 long tasks, total blocking time **1,350 → 75 ms** (−94 %).
-- **The preview re-renders 52 → 6 times** for 50 keystrokes; total preview render time 3.8 s → 0.43 s.
-- **The first render is not delayed** (104 → 106 ms, within noise), and the document is fully settled **sooner** after opening (308 → 175 ms) because the open no longer renders twice.
+- **No keystrokes were lost in the benchmark** (was 22–24 of 50 in every run, with the cursor jumping to the end of the file). This is a symptom of a separate editor-wrapper race that the old slow renders kept triggering; the race itself is still there and is tracked separately – see "Why keystrokes were lost".
+- **The main thread is free while typing:** 52 → 5 long tasks, total blocking time **2,214 → 132 ms** (−94 %).
+- **The preview re-renders 52 → 6 times** for 50 keystrokes; total preview render time 4.7 s → 0.49 s.
+- **The first render is not delayed** (139 → 123 ms, within noise), and the document is fully settled **sooner** after opening (395 → 198 ms) because the open no longer renders twice.
 
 ## Before and after
 
@@ -22,49 +22,50 @@ Medians of 6 runs, range in brackets.
 
 | Measure | Before | After |
 |---|---|---|
-| Keystrokes lost (of 50) | 23.5 (23–24) | **0** (0–0) |
+| Keystrokes lost (of 50) | 24 (22–24) | **0** (0–0) |
 | Typed phrase arrived intact | never | every run |
-| Per-key input-to-next-paint, p50 (ms) | 40 (40–40) | 24 (16–24) |
-| Per-key input-to-next-paint, p95 (ms) | 68 (56–88) | 56 (32–56) |
-| Per-key input-to-next-paint, max (ms) | 104 (88–168) | 80 (64–96) |
-| Keys slower than 50 ms | 9 (8–14) | 3 (2–3) |
-| Long tasks (> 50 ms) | 52 (52–53) | **5** (4–5) |
-| Long-task time (ms) | 3,962 (3,914–4,001) | 325 (261–332) |
-| Total blocking time (ms) | 1,350 (1,314–1,367) | **75** (61–82) |
-| Longest task (ms) | 111 (96–168) | 76 (74–77) |
-| Preview renders committed | 52 (52–53) | **6** (4–6) |
-| Preview render time, total (ms) | 3,828 (3,785–3,867) | 432 (279–462) |
-| Preview render time, median per render (ms) | 72 (70–72) | 70 (67–74) |
-| Typing wall time for 50 keys at 80 ms (ms) | 5,649 (5,592–5,727) | 4,408 (4,336–4,415) |
-| Last key → preview shows it (ms) | 314 (305–356) | 223 (77–300) |
-| First render, duration (ms) | 104 (103–114) | 106 (105–116) |
-| First render, after the click (ms) | 166 (162–183) | 175 (172–186) |
+| Per-key input-to-next-paint, p50 (ms) | 64 (56–88) | 24 (16–24) |
+| Per-key input-to-next-paint, p95 (ms) – indicative | 120 (72–128) | 88 (32–104) |
+| Per-key input-to-next-paint, max (ms) – indicative | 144 (88–168) | 100 (88–120) |
+| Keys slower than 50 ms | 44 (33–50) | 3 (1–4) |
+| Long tasks (> 50 ms) | 52 (52–53) | **5** (5–6) |
+| Long-task time (ms) | 4,839 (4,363–5,513) | 382 (348–499) |
+| Total blocking time (ms) | 2,214 (1,763–2,863) | **132** (98–199) |
+| Longest task (ms) | 165 (108–184) | 90 (80–105) |
+| Preview renders committed | 52 (52–53) | **6** (5–7) |
+| Preview render time, total (ms) | 4,708 (4,213–5,347) | 495 (383–619) |
+| Preview render time, median per render (ms) | 86 (80–100) | 73 (68–87) |
+| Typing wall time for 50 keys at 80 ms (ms) | 7,012 (6,187–7,947) | 4,456 (4,278–4,637) |
+| Last key → preview shows it (ms) | 346 (311–468) | 194 (152–246) |
+| First render, duration (ms) | 139 (114–159) | 123 (107–170) |
+| First render, after the click (ms) | 227 (179–261) | 198 (175–245) |
 | Renders while opening | 2 | 1 |
-| Opening settled, after the click (ms) | 308 (286–313) | 175 (172–186) |
+| Opening settled, after the click (ms) | 395 (340–434) | 198 (175–245) |
 
 How to read it:
 
-- **One render still costs ~70 ms** for this document – the fix makes the preview render far less often and out of the way of typing; it does not make one render cheaper. The 4–6 renders that remain are the ones released by a pause or by the 1 s maximum wait.
+- **One render still costs ~70–90 ms** for this document – the fix makes the preview render far less often and out of the way of typing; it does not make one render cheaper. The 5–7 renders that remain are the first two edits (measured to decide the mode), the releases after a pause, and the release forced by the 1 s maximum wait.
+- **p95 and max per key are indicative only:** 50 keys per run, Event Timing rounds to 8 ms and ignores anything under 16 ms, and on this loaded machine a single scheduler hiccup moves them. The robust measures are long tasks, total blocking time and keys slower than 50 ms.
 - **"Last key → preview"** went down even though the preview now waits for a pause: before, the preview was always busy with a stale render when the last key landed.
 - **Typing wall time** is the time Playwright needed to deliver 50 keys at an 80 ms cadence; 4.0 s is the floor. Before, each key waited for the previous render.
-- **First render after the click** is 9 ms higher at the median with overlapping ranges; the render itself is unchanged. Treated as noise on a loaded machine, not as a regression – worth re-checking on an idle machine.
 
 ## What changed
 
 | Layer | Before | After |
 |---|---|---|
-| When the body re-parses | Every keystroke, synchronously | Live while a re-render fits a frame (≤ 16 ms) or the document is under 2,000 characters; otherwise after a 150 ms pause in typing, at most 1 s behind |
-| Priority | Same as the keystroke | `useDeferredValue` – a keystroke arriving mid-render is handled first |
+| When the body re-parses | Every keystroke, synchronously | Live while re-renders fit a frame (≤ 16 ms) or the document is under 2,000 characters. After **two slow re-renders in a row** it waits for a 150 ms pause in typing, at most 1 s; two fast ones in a row switch it back |
+| Priority | Same as the keystroke | `useDeferredValue` – a keystroke arriving mid-render is handled first. A release forced by the 1 s maximum wait (or by `flush()`) renders at **normal priority**, so the preview is never more than about 1 s plus one render behind |
+| Export (PDF / DOCX) | Read whatever the preview showed | Calls the preview's `flush()` first: releases any held-back render, waits for it to commit and for Mermaid diagrams to finish drawing (each wait capped at 5 s) |
 | Link checks | Re-run on every keystroke (1–3 `file.exists` calls per link), then a second full render | Re-run only when the set of links changes; stale results are discarded; an equal result causes no render |
 | Renderer map | Rebuilt whenever link state changed – React then **remounted the whole preview**, Mermaid diagrams included | Stable for the life of the panel; link state reaches links through context |
-| Heading ids | Counter kept in the renderer map, so a re-render with the same map renumbered them (`#example` → `#example-2`); hidden only because the map was rebuilt after every link check | Assigned in the parse (`rehypeHeadingIds`), the same every time |
+| Heading ids | Counter kept in the renderer map, so a re-render with the same map renumbered them (`#example` → `#example-2`); hidden only because the map was rebuilt after every link check | Assigned in the parse (`rehypeHeadingIds`), the same every time; an id a heading earned by its own text is never handed out twice (`Example`, `Example`, `Example 2` → `example`, `example-2`, `example-2-2`) |
 | Front-matter line offset | Baked into the renderer map | Applied in the parse (`rehypeShiftLines`) |
-| Mermaid | Redrawn on every change to its source | Redrawn 300 ms after its source stops changing; first draw immediate |
-| Scroll sync | Rebuilt its map on content change | Also rebuilds when the preview raises `preview:rendered`, i.e. when the DOM actually changed |
+| Mermaid | Redrawn on every change to its source | Redrawn 300 ms after its source stops changing (code and line range debounced together); first draw immediate; an older, slower draw can never overwrite a newer one |
+| Scroll sync | Rebuilt its map on every editor content change, listening for diagrams on the preview element it first saw | Rebuilds only when the preview reports its DOM changed (`onRendered`), measuring the root it reports – so it keeps working after `split` ↔ `split-horizontal` remounts the preview |
 
 ### Why keystrokes were lost (inferred)
 
-The cursor jumping to the end of the file plus dropped characters matches `@monaco-editor/react`'s controlled-value effect: when the `value` prop differs from the editor's buffer it replaces the **whole** buffer (`executeEdits` over the full range with `forceMoveMarkers`). With ~75 ms renders per keystroke, keystrokes landed between a render and that effect, so the effect "restored" an older buffer. Making the keystroke render cheap closes the window in this benchmark; the race itself is still in the editor wrapper and could reappear under other heavy work. That is a separate defect worth its own issue.
+The cursor jumping to the end of the file plus dropped characters matches `@monaco-editor/react`'s controlled-value effect: when the `value` prop differs from the editor's buffer it replaces the **whole** buffer (`executeEdits` over the full range with `forceMoveMarkers`). With ~75 ms renders per keystroke, keystrokes landed between a render and that effect, so the effect "restored" an older buffer. Making the keystroke render cheap closes the window in this benchmark (80 ms between keys). The race itself is **still in the editor wrapper** and is tracked separately: an unpaced burst of programmatic edits (Playwright `insertText` back to back) still trips it in about half the runs, on this branch before and after the preview change alike, which is why `e2e/preview-deferred.e2e.ts` paces its edits.
 
 ## Method
 
@@ -83,7 +84,7 @@ What is recorded, in the renderer:
 - **Preview renders:** start and commit of each body render, from opt-in timing in the app ([`utils/previewRenderTiming.ts`](../../src/renderer/src/utils/previewRenderTiming.ts)): off unless the benchmark installs `window.__erfanaPreviewRenderTiming`. React's `<Profiler>` does not report in production builds. Under concurrent rendering the span is wall time, so a render React paused for a keystroke reads longer than its CPU cost.
 - **Keystrokes lost:** 50 minus the growth of the document length (the stats bar's character count, which reads the same state the preview renders).
 
-The "before" numbers come from commit `372ae6fc` (the harness alone, on top of `develop` at `caf59f4d`), the "after" numbers from the fix commit; both used the same benchmark file.
+The "before" numbers come from commit `372ae6fc` (the harness alone, on top of `develop` at `caf59f4d`): every source file the fix modified is reverted to that commit, files it added stay unused. The "after" numbers come from the review-fix commit. Both used the same benchmark file.
 
 ## Reproduce
 

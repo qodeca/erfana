@@ -23,7 +23,7 @@ import {
   isSplitMode
 } from '../../../../components/Panels/markdownEditorPanel.logic'
 import { logger } from '../../../../utils/logger'
-import { PREVIEW_RENDERED_EVENT } from '../../previewEvents'
+import type { PreviewRenderedInfo } from '../../MarkdownPreview'
 
 /**
  * Configuration options for the useScrollSync hook.
@@ -37,8 +37,6 @@ export interface UseScrollSyncOptions {
   viewMode: ViewMode
   /** Path of the currently open file (used as dependency for rebuilds) */
   currentFilePath: string | null
-  /** Current content of the file (used as dependency for rebuilds) */
-  currentContent: string | null
 }
 
 /**
@@ -57,6 +55,11 @@ export interface UseScrollSyncReturn {
   handleEditorScroll: () => void
   /** Handles scroll events from the preview */
   handlePreviewScroll: () => void
+  /**
+   * Pass to `MarkdownPreview`'s `onRendered`: rebuilds the map when the
+   * preview DOM changed. Stable while the view mode and readiness hold.
+   */
+  handlePreviewRendered: (info: PreviewRenderedInfo) => void
 }
 
 /** Debounce delay for resize observer callbacks (ms) */
@@ -98,7 +101,6 @@ const MERMAID_READY_FALLBACK_MS = 800
  *     previewRef,
  *     viewMode: 'split',
  *     currentFilePath: '/path/to/file.md',
- *     currentContent: '# Hello World'
  *   })
  *
  *   const handleEditorMount = (editor) => {
@@ -115,7 +117,7 @@ const MERMAID_READY_FALLBACK_MS = 800
  * ```
  */
 export function useScrollSync(options: UseScrollSyncOptions): UseScrollSyncReturn {
-  const { editorRef, previewRef, viewMode, currentFilePath, currentContent } = options
+  const { editorRef, previewRef, viewMode, currentFilePath } = options
 
   // Scroll synchronization state
   const scrollMapRef = useRef<ScrollMapEntry[]>([])
@@ -330,50 +332,30 @@ export function useScrollSync(options: UseScrollSyncOptions): UseScrollSyncRetur
     }
   }, [isAnySplitMode, currentFilePath, isEditorReady, rebuildScrollMap, editorRef, previewRef])
 
-  // Trigger scroll map rebuild when content or file changes
-  useEffect(() => {
-    logger.debug('Rebuild trigger effect fired', {
-      isAnySplitMode,
-      isEditorReady,
-      hasContent: !!currentContent,
-      viewMode
-    })
+  /**
+   * Wait until a preview root is worth measuring: its images have loaded (or
+   * failed) and, if it has diagrams, one has reported drawing – each bounded
+   * by a fallback so a stuck image or diagram cannot hold the map back.
+   */
+  const waitForPreviewReady = useCallback(async (root: HTMLElement): Promise<void> => {
+    const loadingImages = Array.from(root.querySelectorAll('img'))
+      .filter((img) => !(img as HTMLImageElement).complete)
+      .map(
+        (img) =>
+          new Promise<void>((resolve) => {
+            img.addEventListener('load', () => resolve(), { once: true })
+            img.addEventListener('error', () => resolve(), { once: true })
+          })
+      )
 
-    if (!isAnySplitMode || !isEditorReady) {
-      logger.debug('Skipping rebuild trigger: preconditions not met')
-      return
-    }
-
-    /**
-     * Wait for preview content to be ready (images loaded, mermaid rendered).
-     * Returns early if cancelled.
-     */
-    const waitForPreviewReady = async (): Promise<void> => {
-      if (!previewRef.current) return
-      const root = previewRef.current
-
-      // Track pending image loads
-      const imgs = Array.from(root.querySelectorAll('img'))
-      const loadingPromises = imgs
-        .filter((img) => !(img as HTMLImageElement).complete)
-        .map(
-          (img) =>
-            new Promise<void>((resolve) => {
-              img.addEventListener('load', () => resolve(), { once: true })
-              img.addEventListener('error', () => resolve(), { once: true })
-            })
-        )
-
-      // Track a single mermaid event cycle (if any diagrams exist)
-      const hasMermaid = root.querySelector('.mermaid-wrapper') !== null
-      const mermaidPromise = hasMermaid
+    const mermaidReady =
+      root.querySelector('.mermaid-wrapper') !== null
         ? new Promise<void>((resolve) => {
-            const handler = () => {
+            const handler = (): void => {
               root.removeEventListener('mermaid:rendered', handler)
               resolve()
             }
             root.addEventListener('mermaid:rendered', handler, { once: true })
-            // Fallback after timeout in case nothing fires
             setTimeout(() => {
               root.removeEventListener('mermaid:rendered', handler)
               resolve()
@@ -381,76 +363,97 @@ export function useScrollSync(options: UseScrollSyncOptions): UseScrollSyncRetur
           })
         : Promise.resolve()
 
-      // Fallback timeout so we don't wait forever
-      const fallback = new Promise<void>((resolve) => setTimeout(resolve, CONTENT_READY_FALLBACK_MS))
+    const fallback = new Promise<void>((resolve) => setTimeout(resolve, CONTENT_READY_FALLBACK_MS))
+    await Promise.race([Promise.all([Promise.all(loadingImages), mermaidReady]).then(() => undefined), fallback])
+  }, [])
 
-      await Promise.race([
-        Promise.all([Promise.all(loadingPromises), mermaidPromise]).then(() => undefined),
-        fallback
-      ])
-    }
+  // One pending "content" rebuild at a time; a newer preview commit cancels it.
+  const pendingContentRebuildRef = useRef<(() => void) | null>(null)
+  // Debounce for diagram / late-image rebuilds.
+  const lateRebuildTimerRef = useRef<number | null>(null)
 
-    let cancelled = false
-
-    ;(async () => {
-      logger.debug('Waiting for preview content readiness')
-      await waitForPreviewReady()
-      if (cancelled) return
-      logger.debug('Content ready. Rebuilding scroll map')
+  const scheduleLateRebuild = useCallback(() => {
+    if (lateRebuildTimerRef.current) clearTimeout(lateRebuildTimerRef.current)
+    lateRebuildTimerRef.current = window.setTimeout(() => {
+      lateRebuildTimerRef.current = null
       rebuildScrollMap()
-    })()
+    }, RENDER_DEBOUNCE_MS)
+  }, [rebuildScrollMap])
 
+  // Mode and readiness as of the last commit, for the stable callback below.
+  const syncGateRef = useRef({ isAnySplitMode, isEditorReady })
+  useEffect(() => {
+    syncGateRef.current = { isAnySplitMode, isEditorReady }
+  }, [isAnySplitMode, isEditorReady])
+
+  /**
+   * The preview's DOM changed – the ONLY trigger for content rebuilds.
+   *
+   * The preview renders behind the editor (deferred, and debounced for large
+   * documents), so an editor content change says nothing about the DOM. And
+   * the preview remounts on a view-mode switch (`split` ↔ `split-horizontal`),
+   * so `info.root` – not a listener attached to an earlier element – is what
+   * gets measured.
+   */
+  const handlePreviewRendered = useCallback(
+    (info: PreviewRenderedInfo) => {
+      // Point the shared ref at the element that just rendered; the panel
+      // re-syncs it only after its own effects run, which is later.
+      if (previewRef.current !== info.root) {
+        ;(previewRef as React.MutableRefObject<HTMLDivElement | null>).current = info.root
+      }
+      const { isAnySplitMode: split, isEditorReady: ready } = syncGateRef.current
+      if (!split || !ready) return
+
+      if (info.reason === 'diagram') {
+        scheduleLateRebuild()
+        return
+      }
+
+      pendingContentRebuildRef.current?.()
+      let cancelled = false
+      pendingContentRebuildRef.current = () => {
+        cancelled = true
+      }
+
+      // Images that finish after the readiness fallback still move content.
+      for (const img of Array.from(info.root.querySelectorAll('img'))) {
+        if (!(img as HTMLImageElement).complete) {
+          img.addEventListener('load', scheduleLateRebuild, { once: true })
+          img.addEventListener('error', scheduleLateRebuild, { once: true })
+        }
+      }
+
+      void waitForPreviewReady(info.root).then(() => {
+        if (cancelled) return
+        logger.debug('Preview rendered and ready. Rebuilding scroll map')
+        rebuildScrollMap()
+      })
+    },
+    [previewRef, rebuildScrollMap, scheduleLateRebuild, waitForPreviewReady]
+  )
+
+  // A split view (re)entered or the editor (re)mounted: build the map once the
+  // preview is ready. Later content changes arrive via handlePreviewRendered.
+  useEffect(() => {
+    if (!isAnySplitMode || !isEditorReady || !previewRef.current) return
+    let cancelled = false
+    void waitForPreviewReady(previewRef.current).then(() => {
+      if (!cancelled) rebuildScrollMap()
+    })
     return () => {
       cancelled = true
     }
-  }, [currentContent, viewMode, isEditorReady, rebuildScrollMap, isAnySplitMode, previewRef])
+  }, [viewMode, isEditorReady, isAnySplitMode, rebuildScrollMap, waitForPreviewReady, previewRef])
 
-  // Rebuild after anything that moves preview DOM: a Mermaid diagram finishing,
-  // or the preview committing a new version of the document. The preview renders
-  // behind the editor (deferred, and debounced for large files), so the content
-  // change above can fire before the preview DOM has the edit – this event is
-  // what says the DOM is now worth measuring.
-  useEffect(() => {
-    if (!isAnySplitMode || !previewRef.current) return
-    const root = previewRef.current
-    let timer: number | null = null
-    const handler = () => {
-      if (timer) clearTimeout(timer)
-      timer = window.setTimeout(() => rebuildScrollMap(), RENDER_DEBOUNCE_MS)
-    }
-    root.addEventListener('mermaid:rendered', handler)
-    root.addEventListener(PREVIEW_RENDERED_EVENT, handler)
-    return () => {
-      root.removeEventListener('mermaid:rendered', handler)
-      root.removeEventListener(PREVIEW_RENDERED_EVENT, handler)
-      if (timer) clearTimeout(timer)
-    }
-  }, [isAnySplitMode, currentFilePath, rebuildScrollMap, previewRef])
-
-  // Attach image load listeners after content changes to handle lazy-loading
-  useEffect(() => {
-    if (!isAnySplitMode || !previewRef.current) return
-    const root = previewRef.current
-    const imgs = Array.from(root.querySelectorAll('img'))
-    let timer: number | null = null
-    const handler = () => {
-      if (timer) clearTimeout(timer)
-      timer = window.setTimeout(() => rebuildScrollMap(), RENDER_DEBOUNCE_MS)
-    }
-    imgs.forEach((img) => {
-      if (!(img as HTMLImageElement).complete) {
-        img.addEventListener('load', handler, { once: true })
-        img.addEventListener('error', handler, { once: true })
-      }
-    })
-    return () => {
-      if (timer) clearTimeout(timer)
-      imgs.forEach((img) => {
-        img.removeEventListener('load', handler)
-        img.removeEventListener('error', handler)
-      })
-    }
-  }, [isAnySplitMode, currentContent, rebuildScrollMap, previewRef])
+  // Drop pending rebuilds on unmount.
+  useEffect(
+    () => () => {
+      pendingContentRebuildRef.current?.()
+      if (lateRebuildTimerRef.current) clearTimeout(lateRebuildTimerRef.current)
+    },
+    []
+  )
 
   // Attach scroll listeners
   useEffect(() => {
@@ -496,6 +499,7 @@ export function useScrollSync(options: UseScrollSyncOptions): UseScrollSyncRetur
     scrollMapRef,
     rebuildScrollMap,
     handleEditorScroll,
-    handlePreviewScroll
+    handlePreviewScroll,
+    handlePreviewRendered
   }
 }
