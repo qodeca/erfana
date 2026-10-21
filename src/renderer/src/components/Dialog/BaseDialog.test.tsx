@@ -1204,5 +1204,96 @@ describe('BaseDialog', () => {
       expect(notPrevented).toBe(false)
       expect(document.activeElement).toBe(screen.getByTestId('bg-first'))
     })
+
+    describe('Escape (#229)', () => {
+      /** Two stacked dialogs with spy `onClose`s; the top one opens second. */
+      function EscapeHarness({
+        bgClose,
+        topClose,
+        topOpen = true,
+        topClosesOnEscape = true
+      }: {
+        bgClose: () => void
+        topClose: () => void
+        topOpen?: boolean
+        topClosesOnEscape?: boolean
+      }): JSX.Element {
+        return (
+          <>
+            <BaseDialog isOpen onClose={bgClose} zIndex={10000} trapFocus>
+              <button>Background</button>
+            </BaseDialog>
+            <BaseDialog
+              isOpen={topOpen}
+              onClose={topClose}
+              zIndex={10001}
+              closeOnEscape={topClosesOnEscape}
+            >
+              <button>Top</button>
+            </BaseDialog>
+          </>
+        )
+      }
+
+      it('closes only the top dialog of two', () => {
+        // The shipping bug: one Escape on the Cmd+Q quit prompt also ran the
+        // still-open TranscriptionDialog's Escape and cancelled the job.
+        const bgClose = vi.fn()
+        const topClose = vi.fn()
+        render(<EscapeHarness bgClose={bgClose} topClose={topClose} />)
+        flushFocus()
+
+        const notPrevented = fireEvent.keyDown(document, { key: 'Escape' })
+
+        expect(topClose).toHaveBeenCalledOnce()
+        expect(bgClose).not.toHaveBeenCalled()
+        expect(notPrevented).toBe(false)
+      })
+
+      it('closes the dialog beneath on the next Escape, once the top one is gone', () => {
+        const bgClose = vi.fn()
+        const topClose = vi.fn()
+        const { rerender } = render(<EscapeHarness bgClose={bgClose} topClose={topClose} />)
+        flushFocus()
+
+        fireEvent.keyDown(document, { key: 'Escape' })
+        rerender(<EscapeHarness bgClose={bgClose} topClose={topClose} topOpen={false} />)
+        fireEvent.keyDown(document, { key: 'Escape' })
+
+        expect(topClose).toHaveBeenCalledOnce()
+        expect(bgClose).toHaveBeenCalledOnce()
+      })
+
+      it('does not reach the dialog beneath when the top one ignores Escape', () => {
+        const bgClose = vi.fn()
+        const topClose = vi.fn()
+        render(
+          <EscapeHarness bgClose={bgClose} topClose={topClose} topClosesOnEscape={false} />
+        )
+        flushFocus()
+
+        fireEvent.keyDown(document, { key: 'Escape' })
+
+        expect(topClose).not.toHaveBeenCalled()
+        expect(bgClose).not.toHaveBeenCalled()
+      })
+
+      it('uses the latest onClose without reordering the stack', () => {
+        // onClose is usually an inline arrow, so it changes on every render.
+        // The stack must call the current one and keep the dialog on top.
+        const bgClose = vi.fn()
+        const staleClose = vi.fn()
+        const freshClose = vi.fn()
+        const { rerender } = render(<EscapeHarness bgClose={bgClose} topClose={staleClose} />)
+        flushFocus()
+        rerender(<EscapeHarness bgClose={bgClose} topClose={freshClose} />)
+
+        fireEvent.keyDown(document, { key: 'Escape' })
+
+        expect(freshClose).toHaveBeenCalledOnce()
+        expect(staleClose).not.toHaveBeenCalled()
+        expect(bgClose).not.toHaveBeenCalled()
+      })
+    })
   })
 })

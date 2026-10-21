@@ -21,7 +21,7 @@
  * @see Spec #021 - LiteParse document import
  */
 
-import { useEffect, useId } from 'react'
+import { useId } from 'react'
 import { FileText } from 'lucide-react'
 import { useDocumentImportStore } from '../../stores/useDocumentImportStore'
 import { useProjectStore } from '../../stores/useProjectStore'
@@ -93,26 +93,6 @@ export function DocumentImportDialog(): JSX.Element | null {
   const titleId = `doc-import-title${id}`
   const descriptionId = `doc-import-desc${id}`
 
-  // Escape key handler (custom cancel-vs-close logic)
-  useEffect(() => {
-    if (!isOpen) return undefined
-
-    const handleKeyDown = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        e.stopPropagation()
-        if (isImporting) {
-          cancelImport()
-        } else {
-          closeDialog()
-        }
-      }
-    }
-
-    document.addEventListener('keydown', handleKeyDown, true)
-    return () => document.removeEventListener('keydown', handleKeyDown, true)
-  }, [isOpen, isImporting, cancelImport, closeDialog])
-
   if (!isOpen) return null
 
   /** Determine dialog view state */
@@ -175,7 +155,11 @@ export function DocumentImportDialog(): JSX.Element | null {
       onClose={handleClose}
       zIndex={10000}
       closeOnBackdrop={false}
-      closeOnEscape={false}
+      // Escape runs `handleClose` (cancel the running job, otherwise close)
+      // through BaseDialog's default `closeOnEscape`, so it reaches this
+      // dialog only while it is topmost. A private document listener used to
+      // fire under the Cmd+Q quit prompt too and cancel the job when the user
+      // only meant to dismiss the prompt (#229).
       trapFocus
       className="doc-import-dialog"
       ariaLabelledBy={titleId}

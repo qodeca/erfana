@@ -11,6 +11,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ContextMenu, ContextMenuItem } from './ContextMenu'
+import { BaseDialog } from '../Dialog/BaseDialog'
 import { TEST_IDS } from '../../constants/testids'
 
 describe('ContextMenu', () => {
@@ -108,6 +109,39 @@ describe('ContextMenu', () => {
     fireEvent.keyDown(document, { key: 'Escape' })
 
     expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('Escape closes only the menu when it is open over a dialog (#229)', () => {
+    const onClose = vi.fn()
+    const dialogClose = vi.fn()
+    render(
+      <>
+        <BaseDialog isOpen onClose={dialogClose} zIndex={10001}>
+          <button>Dialog button</button>
+        </BaseDialog>
+        <ContextMenu x={100} y={200} items={defaultItems} onClose={onClose} />
+      </>
+    )
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    expect(onClose).toHaveBeenCalledOnce()
+    expect(dialogClose).not.toHaveBeenCalled()
+  })
+
+  it('keeps Escape from reaching the control underneath the menu', () => {
+    // A terminal context menu sits over xterm's textarea: an Escape that leaks
+    // through would interrupt the agent running in the terminal.
+    const underneath = vi.fn()
+    const input = document.createElement('textarea')
+    document.body.appendChild(input)
+    input.addEventListener('keydown', underneath)
+    renderMenu()
+
+    fireEvent.keyDown(input, { key: 'Escape' })
+
+    expect(underneath).not.toHaveBeenCalled()
+    input.remove()
   })
 
   it('clicking outside closes the menu', () => {

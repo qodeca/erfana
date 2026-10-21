@@ -11,12 +11,18 @@ import type { WhisperModel } from '../../../../shared/ipc/transcription-schema'
 import { LOCAL_WHISPER } from '../../../../shared/constants'
 import { logger } from '../../utils/logger'
 import { useOccluder } from '../../hooks/useOccluder'
+import { useOverlayStackEntry } from '../../hooks/useOverlayStackEntry'
 import { TEST_IDS } from '../../constants/testids'
 import { HtmlPreviewSection } from './sections/HtmlPreviewSection'
 import './SettingsOverlay.css'
 
 // Small delay to ensure overlay is fully rendered before focusing
 const FOCUS_DELAY_MS = 10
+
+// Overlay-stack rank. Mirrors `--z-modal` in design-tokens.css (what
+// `.settings-overlay` paints at), so every BaseDialog (10000+) ranks above
+// Settings for Escape, exactly as it paints above it.
+const SETTINGS_OVERLAY_Z_INDEX = 1000
 
 // Log level options for dropdown
 const LOG_LEVEL_OPTIONS: { value: LoggingLevel; label: string }[] = [
@@ -55,7 +61,7 @@ const WHISPER_MODEL_OPTIONS: { value: WhisperModel; label: string }[] =
  * Features:
  * - Portal rendering to #portal-root
  * - Full-screen overlay with backdrop
- * - Keyboard handling (Escape key)
+ * - Escape closes Settings while it is the topmost overlay (#229)
  * - Focus management for accessibility
  * - Logging settings section
  */
@@ -77,6 +83,7 @@ export function SettingsOverlay() {
     updateWhisperModel
   } = useGlobalSettingsStore()
   const closeButtonRef = useRef<HTMLButtonElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
   const previousActiveElement = useRef<HTMLElement | null>(null)
 
   // Platform gate for local whisper support.
@@ -268,25 +275,14 @@ export function SettingsOverlay() {
     return () => clearTimeout(timer)
   }, [isOpen])
 
-  // Keyboard event handler (Escape key)
-  useEffect(() => {
-    if (!isOpen) return undefined
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        e.stopPropagation()
-        closeSettings()
-      }
-    }
-
-    // Add listener with capture to ensure it runs before other handlers
-    document.addEventListener('keydown', handleKeyDown, true)
-
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown, true)
-    }
-  }, [isOpen, closeSettings])
+  // Escape closes Settings only while Settings is the topmost overlay: a
+  // dialog opened over it (the Cmd+Q quit prompt, a confirm from a section)
+  // takes Escape first, and one press must not close both (#229).
+  useOverlayStackEntry(containerRef, {
+    active: isOpen,
+    zIndex: SETTINGS_OVERLAY_Z_INDEX,
+    onEscape: closeSettings
+  })
 
   // Restore focus when overlay closes
   useEffect(() => {
@@ -307,6 +303,7 @@ export function SettingsOverlay() {
   const overlayContent = (
     <div className="settings-overlay" data-testid={TEST_IDS.SETTINGS_OVERLAY}>
       <div
+        ref={containerRef}
         className="settings-container"
         role="dialog"
         aria-modal="true"
