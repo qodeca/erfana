@@ -29,6 +29,7 @@ import { expect } from '@playwright/test'
 import type { ElectronApplication, Locator, Page } from '@playwright/test'
 
 import { previewNavKeyFor, type PreviewNavAction } from '../../src/shared/previewNavKeys'
+import { bringAppToFront } from './html-preview.focus'
 import { PREVIEW_BUDGET_MS, type HtmlPreviewPage, type PreviewTarget } from './html-preview.page'
 
 /** How a link is clicked: which button, and whether the platform accelerator is down. */
@@ -241,8 +242,11 @@ export function navChord(action: PreviewNavAction): string {
  * the path a reader's Cmd/Ctrl+= takes, which zooms a focused preview.
  */
 export async function zoomInPreview(app: ElectronApplication, target: PreviewTarget): Promise<void> {
+  // The menu zooms a preview only while its web contents has focus, and that
+  // needs this app's window to be the OS key window: fail here, naming it.
+  await bringAppToFront(app)
   await app.evaluate(
-    ({ app: electronApp, BrowserWindow, Menu, webContents }, urlIncludes) => {
+    ({ BrowserWindow, Menu, webContents }, urlIncludes) => {
       const wc = webContents.getAllWebContents().find((c) => {
         try {
           const url = c.getURL()
@@ -252,12 +256,14 @@ export async function zoomInPreview(app: ElectronApplication, target: PreviewTar
         }
       })
       if (!wc) throw new Error('no live preview to zoom')
-      // The menu zooms a preview only while its web contents has focus, and
-      // that needs this app's window to be the key window.
-      electronApp.focus({ steal: true })
-      BrowserWindow.getAllWindows()[0]?.focus()
       wc.focus()
-      if (!wc.isFocused()) throw new Error('the preview could not take focus')
+      if (!wc.isFocused()) {
+        const win = BrowserWindow.getAllWindows()[0]
+        throw new Error(
+          `the preview could not take focus (window focused=${win?.isFocused()}, ` +
+            `focused window=${BrowserWindow.getFocusedWindow() !== null})`
+        )
+      }
       type Item = { label: string; submenu?: { items: Item[] } | null; click: () => void }
       const find = (items: Item[]): Item | undefined => {
         for (const item of items) {
