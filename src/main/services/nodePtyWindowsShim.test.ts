@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { existsSync, readFileSync } from 'fs'
+import { join } from 'path'
 
 const logger = vi.hoisted(() => ({
   trace: vi.fn(), debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), fatal: vi.fn()
@@ -38,7 +40,7 @@ describe('nodePtyWindowsShim', () => {
     await expect(before._getConsoleProcessList()).rejects.toThrow(/runAsNode/)
 
     fork.mockClear()
-    await expect(installNoForkConsoleList(async () => module)).resolves.toBe(true)
+    expect(installNoForkConsoleList(() => module)).toBe(true)
     const agent = new module.WindowsPtyAgent()
     await expect(agent._getConsoleProcessList()).resolves.toEqual([4242])
     expect(fork).not.toHaveBeenCalled()
@@ -47,16 +49,16 @@ describe('nodePtyWindowsShim', () => {
   it('is applied to agents created before the install, and twice is the same as once', async () => {
     const { module } = fakeModule()
     const early = new module.WindowsPtyAgent()
-    await installNoForkConsoleList(async () => module)
+    installNoForkConsoleList(() => module)
     const installed = module.WindowsPtyAgent.prototype._getConsoleProcessList
-    await expect(installNoForkConsoleList(async () => module)).resolves.toBe(true)
+    expect(installNoForkConsoleList(() => module)).toBe(true)
     expect(module.WindowsPtyAgent.prototype._getConsoleProcessList).toBe(installed)
     await expect(early._getConsoleProcessList()).resolves.toEqual([4242])
   })
 
   it('resolves to an empty list when the agent has no pid yet', async () => {
     const { module } = fakeModule()
-    await installNoForkConsoleList(async () => module)
+    installNoForkConsoleList(() => module)
     const agent = new module.WindowsPtyAgent()
     agent._innerPid = 0
     await expect(agent._getConsoleProcessList()).resolves.toEqual([])
@@ -67,31 +69,56 @@ describe('nodePtyWindowsShim', () => {
     ['no WindowsPtyAgent', {}],
     ['no prototype method', { WindowsPtyAgent: class {} }]
   ])('does nothing and does not crash with %s, and logs once', async (_name, module) => {
-    await expect(installNoForkConsoleList(async () => module)).resolves.toBe(false)
-    await expect(installNoForkConsoleList(async () => module)).resolves.toBe(false)
-    expect(logger.warn).toHaveBeenCalledTimes(1)
+    expect(installNoForkConsoleList(() => module)).toBe(false)
+    expect(installNoForkConsoleList(() => module)).toBe(false)
+    expect(logger.error).toHaveBeenCalledTimes(1)
   })
 
   it('does not crash when the module cannot be loaded', async () => {
-    await expect(
-      installNoForkConsoleList(async () => {
+    expect(
+      installNoForkConsoleList(() => {
         throw new Error('Cannot find module')
       })
-    ).resolves.toBe(false)
-    expect(logger.warn).toHaveBeenCalledTimes(1)
+    ).toBe(false)
+    expect(logger.error).toHaveBeenCalledTimes(1)
   })
 
-  it('matches the real node-pty 1.1.0 shape (export and field name)', async () => {
-    const real = await import('node-pty/lib/windowsPtyAgent')
-    const proto = (real as unknown as { WindowsPtyAgent: { prototype: Record<string, unknown> } }).WindowsPtyAgent.prototype
-    expect(typeof proto._getConsoleProcessList).toBe('function')
+  it('the real loader finds node-pty and replaces the method on the prototype in use', async () => {
+    const { createRequire } = await import('module')
+    // the same module object node-pty's own code gets from require
+    const viaRequire = createRequire(import.meta.url)('node-pty/lib/windowsPtyAgent') as {
+      WindowsPtyAgent: { prototype: Record<string, unknown> }
+    }
+    const proto = viaRequire.WindowsPtyAgent.prototype
     const original = proto._getConsoleProcessList
+    expect(typeof original).toBe('function')
     try {
-      await installNoForkConsoleList(async () => real)
-      const result = await (proto._getConsoleProcessList as (this: unknown) => Promise<number[]>).call({ _innerPid: 77 })
+      // no injected loader: this is the production path
+      expect(installNoForkConsoleList()).toBe(true)
+      expect(logger.error).not.toHaveBeenCalled()
+      expect(proto._getConsoleProcessList).not.toBe(original)
+      const result = await (proto._getConsoleProcessList as (this: unknown) => Promise<number[]>).call({
+        _innerPid: 77
+      })
       expect(result).toEqual([77])
     } finally {
       proto._getConsoleProcessList = original
     }
   })
+
+  it('never imports node-pty internals with a bare dynamic import (fails under ESM without an extension)', () => {
+    const source = readFileSync(join(__dirname, 'nodePtyWindowsShim.ts'), 'utf8')
+    expect(source).not.toMatch(/import\(\s*['"`]node-pty\//)
+  })
+
+  const builtBundle = join(process.cwd(), 'out', 'main', 'index.js')
+  it.skipIf(!existsSync(builtBundle))(
+    'the built main bundle loads the agent with createRequire, not a bare dynamic import',
+    () => {
+      const bundle = readFileSync(builtBundle, 'utf8')
+      expect(bundle).toContain('node-pty/lib/windowsPtyAgent')
+      expect(bundle).not.toMatch(/import\(\s*["'`]node-pty\/lib\/windowsPtyAgent["'`]\s*\)/)
+      expect(bundle).toMatch(/createRequire\([^)]*\)\(\s*["'`]node-pty\/lib\/windowsPtyAgent["'`]\s*\)/)
+    }
+  )
 })

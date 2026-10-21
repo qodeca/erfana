@@ -39,7 +39,7 @@ const treeKill = vi.hoisted(() => ({
 }))
 vi.mock('./terminalTreeKill', () => treeKill)
 
-const shim = vi.hoisted(() => ({ installNoForkConsoleList: vi.fn(() => Promise.resolve(true)) }))
+const shim = vi.hoisted(() => ({ installNoForkConsoleList: vi.fn(() => true) }))
 vi.mock('./nodePtyWindowsShim', () => shim)
 
 const PTY_GLOBAL = '__ERFANA_TEST_PTY__'

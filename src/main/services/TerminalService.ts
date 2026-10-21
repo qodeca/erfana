@@ -238,7 +238,7 @@ export class TerminalService extends EventEmitter {
     }
 
     // node-pty's Windows kill must not fork a helper (#296); see nodePtyWindowsShim.ts
-    if (osPlatform() === 'win32') await installNoForkConsoleList()
+    if (osPlatform() === 'win32') installNoForkConsoleList()
 
     const terminalId = `terminal-${++this.terminalCounter}`
 
