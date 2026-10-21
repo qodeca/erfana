@@ -310,7 +310,8 @@ describe('ProjectService – main-owned project session', () => {
 
       expect(service.session.require()).toEqual({
         generation: 1,
-        root: PROJECT_A,
+        // On Windows the shown root is the native realpath spelling; elsewhere the typed one
+        root: process.platform === 'win32' ? `${PROJECT_A}-real` : PROJECT_A,
         realRoot: `${PROJECT_A}-real`,
         caseSensitive: expect.any(Boolean),
         ownerWebContentsId: 42
