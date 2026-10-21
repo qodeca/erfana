@@ -142,3 +142,33 @@ export function rehypeShiftLines(options: RehypeShiftLinesOptions): (tree: HastN
     })
   }
 }
+
+/** Options for {@link rehypeCollectLinks}. */
+export interface RehypeCollectLinksOptions {
+  /** Emptied and refilled with every link `href`, exactly as the renderer will see it. */
+  sink: Set<string>
+}
+
+/**
+ * Collect the `href` of every link, as it stands after parsing and sanitising.
+ *
+ * Link checks must key their results by the very string the link renderer
+ * later looks up. Scanning the Markdown source cannot promise that: the parser
+ * percent-encodes spaces, backslashes and non-ASCII (`.\docs\a.md` arrives as
+ * `.%5Cdocs%5Ca.md`) and strips `<...>` wrappers and titles. Reading the tree
+ * does. Runs after sanitisation so only links that survive it are listed.
+ *
+ * @param options - The set to fill
+ * @returns A unified transformer
+ */
+export function rehypeCollectLinks(options: RehypeCollectLinksOptions): (tree: HastNode) => void {
+  const { sink } = options
+  return (tree) => {
+    sink.clear()
+    walk(tree, (node) => {
+      if (node.type !== 'element' || node.tagName !== 'a') return
+      const href = node.properties?.href
+      if (typeof href === 'string' && href !== '') sink.add(href)
+    })
+  }
+}
