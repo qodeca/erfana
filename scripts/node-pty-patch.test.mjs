@@ -20,6 +20,16 @@ describe('node-pty patch (#305)', () => {
     expect(patch).toContain('+static std::mutex g_ptyHandlesMutex;');
     expect(patch).toContain('-static bool remove_pty_baton(int id) {');
     expect(patch).toContain("+if (process.platform === 'win32') {");
+    expect(patch).toContain("+          'defines': [ 'NODE_API_SWALLOW_UNTHROWABLE_EXCEPTIONS' ],");
+  });
+
+  // Second crash cause (#305): a shell exiting during Electron teardown fires the exit
+  // ThreadSafeFunction when JS cannot run; without the define node-addon-api throws and
+  // std::terminate ends the process (0xc0000409).
+  it.skipIf(!fs.existsSync(path.join(ptyDir, 'binding.gyp')))('installed binding.gyp defines NODE_API_SWALLOW_UNTHROWABLE_EXCEPTIONS for conpty', () => {
+    const gyp = fs.readFileSync(path.join(ptyDir, 'binding.gyp'), 'utf8');
+    const conptyTarget = gyp.slice(gyp.indexOf("'target_name': 'conpty',"), gyp.indexOf("'target_name': 'conpty_console_list'"));
+    expect(conptyTarget).toContain('NODE_API_SWALLOW_UNTHROWABLE_EXCEPTIONS');
   });
 
   it.skipIf(!fs.existsSync(conpty))('installed conpty.cc is patched (lock present, unlocked remove helper gone)', () => {

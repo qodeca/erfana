@@ -143,6 +143,13 @@ afterEach(() => {
 
 `patches/node-pty+1.1.0.patch` carries, besides the two Windows build fixes, the change from [microsoft/node-pty#922](https://github.com/microsoft/node-pty/pull/922) (a mutex around the process-wide `ptyHandles` vector in `src/win/conpty.cc`; without it, quitting with many terminals crashes the main process, [#305](https://github.com/qodeca/erfana/issues/305)). It also makes `node-pty/scripts/prebuild.js` refuse the bundled prebuild on `win32`, so `npm rebuild node-pty` compiles the patched source instead of accepting `prebuilds/win32-*`. node-pty falls back to the prebuild whenever `build/Release` is absent **or fails to load**, so two more guards exist: the `afterPack` step in `scripts/fuses.js` (`ensurePatchedConptyBuild`) fails a Windows build when `build/Release/conpty.node` is not packed and deletes the prebuild's `conpty.node` / `conpty_console_list.node`, and the main process logs once at start-up which `conpty.node` was loaded (`node-pty native binding loaded`).
 
+The patch fixes two separate exit crashes, both seen on Windows with the big case (2 restarts + 32 terminals, close the window):
+
+1. **Data race on `ptyHandles`** (the #922 lock above): exit-watcher threads erased from the shared vector at the same time.
+2. **Exit callback fired during Electron teardown**: `node::FreeEnvironment` runs `uv_run`, a shell that exits then fires the `SetupExitCallback` ThreadSafeFunction when JS can no longer run, node-addon-api (7.1.1, nested under `node-pty/node_modules`) throws from the callback and `std::terminate` ends the process (`0xc0000409`). The patch adds `'defines': [ 'NODE_API_SWALLOW_UNTHROWABLE_EXCEPTIONS' ]` to the `conpty` target in `binding.gyp`; the macro makes node-addon-api return quietly only when the environment is shutting down, real `onExit` errors still propagate. Windows measured 4 crashes in 10 quits before and 0 in 16 after.
+
+Not fixed here: [microsoft/node-pty#965](https://github.com/microsoft/node-pty/issues/965) (a shell that exits on its own never gets `ClosePseudoConsole`, leaving one `conhost.exe` per pty until the app exits; open upstream PRs #990/#991).
+
 - **On every node-pty upgrade**, re-check the patch (`npx patch-package --error-on-fail` fails loudly if it no longer applies).
 - **Drop the `conpty.cc` and `prebuild.js` parts** (and `scripts/node-pty-patch.test.mjs`; the `afterPack` guard and the start-up log line can stay as cheap provenance checks) once a stable node-pty >= 1.2 ships #922; it first appeared in 1.2.0-beta.13.
 - To regenerate: edit under `node_modules/node-pty`, then `npx patch-package node-pty --exclude 'package\.json$|^build/'` (without `--exclude` the build output ends up in the patch).
