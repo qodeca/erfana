@@ -64,6 +64,59 @@ ERFANA_TEST_BUILD=true npm run build:mac
 | Production | Disabled (fuse) | Distribution to users |
 | Test | Enabled | Playwright debugging, E2E tests |
 
+### Headless on Linux in Docker
+
+The `electron` project also runs on Linux under xvfb (a virtual X screen), inside Docker, so a run needs no visible window and does not take over the Mac. Docker Desktop must be running.
+
+```bash
+# Whole functional suite (the same projects `test:e2e` runs: add --project=electron to limit it)
+npm run test:e2e:linux -- --project=electron
+
+# Any Playwright arguments pass through
+npm run test:e2e:linux -- --project=electron e2e/editor-save.e2e.ts -g "Autosave"
+```
+
+What `scripts/e2e-linux.sh` does:
+
+1. Builds the image from `e2e/docker/Dockerfile` for the host's native architecture (arm64 on Apple Silicon, amd64 elsewhere): Node 24, the Electron runtime libraries, xvfb plus the openbox window manager, real `bash` and `zsh`, `git`, Python 3.12 and a C++ toolchain for node-pty.
+2. Mounts the repo read-write at `/work`. `node_modules` and `out/` live in **named Docker volumes** (`erfana-e2e-node-modules-<hash>`, `erfana-e2e-out-<hash>`), so the macOS copies on the host are never touched.
+3. Runs `npm ci` (never `npm install`), fails if `package-lock.json` changed, runs `npx electron-vite build`, then `xvfb-run -a … npx playwright test <args>`.
+4. Copies `playwright-report/` and `test-results/` to `.local/e2e-linux/` (git-ignored).
+
+The first run takes a few minutes longer (image build, `npm ci`, native rebuild); later runs reuse the volumes. A full `--project=electron` run takes about 8 minutes on an Apple Silicon Mac.
+
+`--no-sandbox` is not needed: Playwright's `electron.launch` adds it itself unless `chromiumSandbox: true` is passed, and nothing in the app code or the fixtures changes for the container. The one environment change the fixtures needed is `XAUTHORITY` in the env allowlist (`e2e/fixtures/isolation.ts`): `xvfb-run` protects its display with an auth file, and without the variable the app cannot open the display.
+
+The script sets `ERFANA_E2E_LINUX_CONTAINER=1`. Tests read it only through `IS_LINUX_CONTAINER` (`e2e/utils/linux-container.ts`); no app code does.
+
+**Not run in the container**
+
+- The `visual` project: its baselines are `-darwin` PNGs (see `snapshotPathTemplate`), and there are no Linux baselines.
+- The `transcription` project: needs `ERFANA_E2E_TRANSCRIPTION=1` and an API key, as everywhere.
+
+**Skipped or adapted in the container**
+
+| Test | What happens | Why |
+|------|--------------|-----|
+| `html-preview-drag-freeze.e2e.ts` › "should keep the page hidden for the rest of the drag…" | skipped | Under xvfb the page reports drawn again after every move once the freeze engaged (8 of 8 steps). Possible Linux app bug, not confirmed on a real desktop. |
+| `context-menu-explain.e2e.ts` › "Editor: right-click shows menu with disabled Explain…" | skipped | Explain is already enabled at the first right-click under xvfb, so a selection exists. Cause not isolated. |
+| `html-preview-drag-freeze.e2e.ts` › "should show the page on its settled area when a fast drag ends…" | skipped on every non-macOS host | Existing skip, unrelated to the container. |
+
+Two test helpers behave differently in the container, both safe on macOS and Windows:
+
+- `MonacoPage.focus()` and `waitForCursor()` no longer wait for the cursor to be *visible* (it blinks, so a 2 s poll can see only hidden phases); `focus()` waits for Monaco's `focused` class, clicking again until it takes, after waiting for the editor to be laid out.
+- `TerminalPage.waitForPrompt()` presses Enter once when the screen is still blank after 3 s, in the container only. See the app finding below.
+
+**Findings about the app on Linux** (reported, not fixed)
+
+- **Blank terminal after start.** `TerminalService` drops all pty output while `isClearing` is set (the clear handshake). A shell that is quick enough draws its first prompt inside that window, and the terminal then stays blank until the first keystroke. It showed up in 2 to 6 terminal-opening tests per container run. It can happen on any platform with a fast shell; the container only makes it frequent.
+- **Splitter drag freeze.** See the first row of the table above.
+
+**Environment notes**
+
+- `/bin/sh` is linked to bash in the image. `ERFANA_E2E_FAST_SHELL` tests exec `/bin/sh -i`, which is bash on macOS; Ubuntu's dash made the blank-terminal race above more likely.
+- Without a window manager Monaco-heavy specs lose focus and window maximize does nothing, so `e2e/docker/run-under-xvfb.sh` starts openbox before Playwright.
+
 ---
 
 ## Playwright configuration

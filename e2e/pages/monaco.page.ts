@@ -26,9 +26,18 @@ export class MonacoPage {
 
   async focus(): Promise<void> {
     const editor = this.getEditor().locator('.monaco-editor')
-    await editor.click({ force: true })
-    const cursor = this.getEditor().locator('.monaco-editor .cursor')
-    await expect(cursor).toBeVisible({ timeout: 2000 })
+    // `force` skips Playwright's own visibility wait, and a click on a Monaco that
+    // has not laid out yet lands nowhere. Wait for it explicitly: on a slow host
+    // (Linux container) it takes longer than the click needs to arrive.
+    await expect(editor).toBeVisible({ timeout: 10000 })
+    // `focused` is Monaco's own focus class. The cursor element is not a stable
+    // signal: it blinks (visibility toggles every ~500 ms), and on Linux/xvfb a
+    // 2 s `toBeVisible` poll can land only on hidden phases. A click that arrives
+    // while Monaco is still re-laying out is lost, so click again until it takes.
+    await expect(async () => {
+      await editor.click({ force: true })
+      await expect(editor).toHaveClass(/\bfocused\b/, { timeout: 1000 })
+    }).toPass({ timeout: 10000 })
   }
 
   // Both writers use `insertText`, NOT `keyboard.type`. `type()` sends one
@@ -151,7 +160,8 @@ export class MonacoPage {
   }
 
   async waitForCursor(): Promise<void> {
+    // Attached, not visible: the cursor blinks, so its visibility flips by design.
     const cursor = this.getEditor().locator('.monaco-editor .cursor')
-    await expect(cursor).toBeVisible({ timeout: 2000 })
+    await expect(cursor).toBeAttached({ timeout: 2000 })
   }
 }
