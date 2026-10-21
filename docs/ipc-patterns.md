@@ -410,7 +410,8 @@ To keep IPC payloads consistent across processes, shared zod schemas live at `sr
 - `ProjectChangedSchema` — payload for `project:changed` events
   - Shape: `{ oldPath: string | null; newPath: string | null }`
   - Used in main when broadcasting, and in preload typings for `onProjectChanged`
-- Terminal event schemas — `TerminalDataSchema`, `TerminalExitSchema`, `TerminalErrorSchema`
+- Terminal event schemas — `TerminalDataSchema`, `TerminalExitSchema`, `TerminalErrorSchema`; the `TerminalBridge` contract (`terminal-schema.ts`) and channel constants (`terminal-channels.ts`)
+- File bridge — the `FileBridge` contract and `FileNode` / `FileStats` (`src/shared/ipc/file-schema.ts`), channel constants in `src/shared/ipc/file-channels.ts` (`FILE_CHANNELS`, `FILE_EVENTS`). The preload implements both bridges in `src/preload/fileBridge.ts` and `terminalBridge.ts`; the renderer reaches them through `services/fileGateway.ts` and `terminalGateway.ts`
 - Transcription schemas — `TranscriptionImportRequestSchema`, `TranscriptionProgress`, `TranscriptionImportResult`, `TranscriptionSettingsSchema` (see `src/shared/ipc/transcription-schema.ts`)
 - Document import schemas — `DocumentImportRequestSchema`, `DocumentImportOptionsSchema`, `DocumentImportProgress`, `DocumentImportResult`, `DependencyReadyEvent` (see `src/shared/ipc/import-schema.ts`); channel constants in `src/shared/ipc/import-channels.ts`
 - Image read schemas — the contract behind `file:readImage` (#70): `ImageReadRequestSchema` plus the `unchanged`/`ok`-discriminated `ImageReadResponse`, which lets the renderer skip a re-encode when its cached `version` still matches (see `src/shared/ipc/file-image-schema.ts`)

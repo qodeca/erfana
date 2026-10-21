@@ -3,6 +3,7 @@
 import { create, type StoreApi, type UseBoundStore } from 'zustand'
 import type { IFileOperations } from '../interfaces/IFileOperations'
 import { logger } from '../utils/logger'
+import { fileGateway } from '../services/fileGateway'
 
 type ClipboardOperation = 'cut' | 'copy'
 
@@ -142,7 +143,7 @@ let _defaultStore: ReturnType<typeof createClipboardStore> | null = null
 
 function getDefaultStore() {
   if (!_defaultStore) {
-    _defaultStore = createClipboardStore(window.api.file)
+    _defaultStore = createClipboardStore(fileGateway)
   }
   return _defaultStore
 }

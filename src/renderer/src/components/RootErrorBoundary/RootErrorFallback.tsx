@@ -46,6 +46,7 @@ import { TEST_IDS } from '../../constants/testids'
 import { textClipboard } from '../../services/textClipboard'
 import { formatErrorReport, type ErrorDetails } from './errorDetails'
 import './RootErrorBoundary.css'
+import { fileGateway } from '../../services/fileGateway'
 
 /** Copy deck (design §2.3). */
 const HEADING = 'Erfana stopped unexpectedly.'
@@ -158,7 +159,7 @@ async function closeProjectBestEffort(): Promise<void> {
   // a broken bridge is caught here too.
   const closed = (async () => {
     try {
-      await window.api?.file?.closeProject?.()
+      await fileGateway.closeProject()
     } catch {
       /* intentionally ignored — see the restart-safety invariant above */
     }

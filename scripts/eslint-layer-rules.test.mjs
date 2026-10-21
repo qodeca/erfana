@@ -122,3 +122,73 @@ describe('layer import rules', () => {
     expect(messages.some((m) => /must not import app code/.test(m.message))).toBe(true)
   })
 })
+
+describe('renderer gateway rule', () => {
+  const GATEWAY = /services\/fileGateway and services\/terminalGateway/
+  const gatewayMessages = async (rel, code) =>
+    (await lint(rel, code)).filter((m) => GATEWAY.test(m.message))
+
+  const READ_FILE = 'export const f = () => window.api.file.readFile("a")'
+  const READ_TERMINAL = 'export const t = () => window.api.terminal.kill("a")'
+  const READ_OTHER = 'export const g = () => window.api.git.status("a")'
+
+  it('flags a renderer read of window.api.file and window.api.terminal', async () => {
+    expect(await gatewayMessages(RENDERER, READ_FILE)).toHaveLength(1)
+    expect(await gatewayMessages(RENDERER, READ_TERMINAL)).toHaveLength(1)
+    expect(await gatewayMessages(RENDERER, 'export const f = () => window.api?.file?.exists("a")')).toHaveLength(1)
+  })
+
+  it.each([
+    ['destructuring', 'const { file } = window.api\nexport { file }'],
+    ['aliasing', 'const a = window.api\nexport { a }'],
+    ['assignment aliasing', 'let a\na = window.api\nexport { a }'],
+    ['computed on window.api', 'export const f = (k) => window.api[k]'],
+    ['computed literal on window.api', "export const f = () => window.api['file']"],
+    ['computed on window', "export const f = () => window['api']"],
+    ['computed on globalThis', 'export const f = (k) => globalThis[k]'],
+    ['globalThis.api', 'export const f = () => globalThis.api.file'],
+    ['self.api', 'export const f = () => self.api'],
+    ['a cast window', 'export const f = () => (window as unknown as { api: object }).api'],
+    ['optional-chain aliasing', 'const a = window?.api\nexport { a }'],
+    ['optional-chain assignment', 'let a\na = window?.api\nexport { a }'],
+    ['optional-chain destructuring', 'const { file } = window?.api\nexport { file }']
+  ])('flags %s', async (_name, code) => {
+    expect(await gatewayMessages(RENDERER, code)).toHaveLength(1)
+  })
+
+  it('leaves the image-export harness handle alone', async () => {
+    const code = 'export const h = (window as unknown as { imageExportApi: object }).imageExportApi'
+    expect(await gatewayMessages(HARNESS, code)).toHaveLength(0)
+  })
+
+  it('leaves the other bridges to their own migration', async () => {
+    expect(await gatewayMessages(RENDERER, READ_OTHER)).toHaveLength(0)
+    expect(await gatewayMessages(RENDERER, 'export const f = () => deps.window[method]("a")')).toHaveLength(0)
+  })
+
+  it.each([
+    'src/renderer/src/services/fileGateway.ts',
+    'src/renderer/src/services/terminalGateway.ts'
+  ])('exempts %s from the gateway rule only', async (file) => {
+    expect(await gatewayMessages(file, READ_FILE)).toHaveLength(0)
+    const messages = await lint(file, 'export const b = (p) => p.split("/").pop()')
+    expect(messages.some((m) => /POSIX-only basename/.test(m.message))).toBe(true)
+  })
+
+  it.each([
+    'src/renderer/src/utils/probe.test.ts',
+    'src/renderer/src/components/X/__test__/helper.ts',
+    'src/renderer/src/components/X/__tests__/helper.ts',
+    'src/renderer/src/components/X/__test-utils__/helper.ts'
+  ])('lets %s install mocks, and still applies the other selectors', async (file) => {
+    expect(await gatewayMessages(file, READ_FILE)).toHaveLength(0)
+    const messages = await lint(file, 'export const b = (p) => p.split("/").pop()')
+    expect(messages.some((m) => /POSIX-only basename/.test(m.message))).toBe(true)
+  })
+
+  it('keeps the gateway rule on the files that own a banned pattern', async () => {
+    expect(await gatewayMessages('src/renderer/src/utils/fileUtils.ts', READ_FILE)).toHaveLength(1)
+    const messages = await lint('src/renderer/src/utils/fileUtils.ts', 'export const b = (p) => p.split("/").pop()')
+    expect(messages.some((m) => /POSIX-only basename/.test(m.message))).toBe(false)
+  })
+})
