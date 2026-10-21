@@ -81,7 +81,7 @@ index 17f1d98..16d1ec6 100644
  console.log('\x1b[32m> Checking prebuilds...\x1b[0m');
  if (!fs.existsSync(PREBUILD_DIR)) {
 diff --git a/node_modules/node-pty/src/win/conpty.cc b/node_modules/node-pty/src/win/conpty.cc
-index 7b286d3..a63ca9b 100644
+index 7b286d3..c8111dd 100644
 --- a/node_modules/node-pty/src/win/conpty.cc
 +++ b/node_modules/node-pty/src/win/conpty.cc
 @@ -14,6 +14,8 @@
@@ -108,7 +108,7 @@ index 7b286d3..a63ca9b 100644
    auto it = std::find_if(ptyHandles.begin(), ptyHandles.end(), [id](const auto& ptyHandle) {
      return ptyHandle->id == id;
    });
-@@ -62,17 +67,6 @@ static pty_baton* get_pty_baton(int id) {
+@@ -62,22 +67,11 @@ static pty_baton* get_pty_baton(int id) {
    return nullptr;
  }
  
@@ -126,7 +126,22 @@ index 7b286d3..a63ca9b 100644
  struct ExitEvent {
    int exit_code = 0;
  };
-@@ -99,11 +93,15 @@ void SetupExitCallback(Napi::Env env, Napi::Function cb, pty_baton* baton) {
+ 
+-void SetupExitCallback(Napi::Env env, Napi::Function cb, pty_baton* baton) {
++void SetupExitCallback(Napi::Env env, Napi::Function cb, pty_baton* baton, PFNCLOSEPSEUDOCONSOLE pfnClosePseudoConsole) {
+   std::thread *th = new std::thread;
+   // Don't use Napi::AsyncWorker which is limited by UV_THREADPOOL_SIZE.
+   auto tsfn = Napi::ThreadSafeFunction::New(
+@@ -90,7 +84,7 @@ void SetupExitCallback(Napi::Env env, Napi::Function cb, pty_baton* baton) {
+         th->join();
+         delete th;
+       });
+-  *th = std::thread([tsfn = std::move(tsfn), baton] {
++  *th = std::thread([tsfn = std::move(tsfn), baton, pfnClosePseudoConsole] {
+     auto callback = [](Napi::Env env, Napi::Function cb, ExitEvent *exit_event) {
+       cb.Call({Napi::Number::New(env, exit_event->exit_code)});
+       delete exit_event;
+@@ -99,13 +93,31 @@ void SetupExitCallback(Napi::Env env, Napi::Function cb, pty_baton* baton) {
      ExitEvent *exit_event = new ExitEvent;
      // Wait for process to complete.
      WaitForSingleObject(baton->hShell, INFINITE);
@@ -135,10 +150,14 @@ index 7b286d3..a63ca9b 100644
 -    // Clean up handles
 -    CloseHandle(baton->hShell);
 -    assert(remove_pty_baton(baton->id));
++    HPCON hpc = nullptr;
 +    {
 +      std::lock_guard<std::mutex> lock(g_ptyHandlesMutex);
 +      GetExitCodeProcess(baton->hShell, (LPDWORD)(&exit_event->exit_code));
 +      CloseHandle(baton->hShell);
++      // kill() cannot reach the pseudoconsole once the baton is erased, so this
++      // thread closes it. hpc is null if kill() already closed it.
++      hpc = baton->hpc;
 +      const int id = baton->id;
 +      std::erase_if(ptyHandles, [id](const auto& ptyHandle) {
 +        return ptyHandle->id == id;
@@ -146,8 +165,20 @@ index 7b286d3..a63ca9b 100644
 +    }
  
      auto status = tsfn.BlockingCall(exit_event, callback); // In main thread
++
++    // Close after queueing the exit code, so JS gets it before the output pipe
++    // closes, and before Release(), whose finalizer joins this thread on the
++    // main thread. Before Windows 11 24H2 the close waits for the console host
++    // to exit while the conout worker drains output. Skip it when the env is
++    // closing, since the host goes away with this process.
++    if (status == napi_ok && hpc != nullptr && pfnClosePseudoConsole != nullptr) {
++      pfnClosePseudoConsole(hpc);
++    }
++
      switch (status) {
-@@ -299,10 +297,13 @@ static Napi::Value PtyStartProcess(const Napi::CallbackInfo& info) {
+       case napi_closing:
+         break;
+@@ -299,10 +311,13 @@ static Napi::Value PtyStartProcess(const Napi::CallbackInfo& info) {
  
    if (SUCCEEDED(hr)) {
      // We were able to instantiate a conpty
@@ -164,7 +195,7 @@ index 7b286d3..a63ca9b 100644
    } else {
      throw Napi::Error::New(env, "Cannot launch conpty");
    }
-@@ -350,10 +351,13 @@ static Napi::Value PtyConnect(const Napi::CallbackInfo& info) {
+@@ -350,10 +365,13 @@ static Napi::Value PtyConnect(const Napi::CallbackInfo& info) {
    const bool useConptyDll = info[4].As<Napi::Boolean>().Value();
    Napi::Function exitCallback = info[5].As<Napi::Function>();
  
@@ -182,7 +213,32 @@ index 7b286d3..a63ca9b 100644
    }
  
    // Prepare command line
-@@ -472,7 +476,8 @@ static Napi::Value PtyResize(const Napi::CallbackInfo& info) {
+@@ -438,6 +456,15 @@ static Napi::Value PtyConnect(const Napi::CallbackInfo& info) {
+     }
+   }
+ 
++  // Resolved here because the exit watcher thread cannot call LoadConptyDll.
++  PFNCLOSEPSEUDOCONSOLE pfnClosePseudoConsole = nullptr;
++  if (fLoadedDll)
++  {
++    pfnClosePseudoConsole = (PFNCLOSEPSEUDOCONSOLE)GetProcAddress(
++      (HMODULE)hLibrary,
++      useConptyDll ? "ConptyClosePseudoConsole" : "ClosePseudoConsole");
++  }
++
+   // Update handle
+   handle->hShell = piClient.hProcess;
+ 
+@@ -447,7 +474,7 @@ static Napi::Value PtyConnect(const Napi::CallbackInfo& info) {
+   CloseHandle(handle->hIn);
+   CloseHandle(handle->hOut);
+ 
+-  SetupExitCallback(env, exitCallback, handle);
++  SetupExitCallback(env, exitCallback, handle, pfnClosePseudoConsole);
+ 
+   // Return
+   auto marshal = Napi::Object::New(env);
+@@ -472,7 +499,8 @@ static Napi::Value PtyResize(const Napi::CallbackInfo& info) {
    SHORT rows = static_cast<SHORT>(info[2].As<Napi::Number>().Uint32Value());
    const bool useConptyDll = info[3].As<Napi::Boolean>().Value();
  
@@ -192,7 +248,7 @@ index 7b286d3..a63ca9b 100644
  
    if (handle != nullptr) {
      HANDLE hLibrary = LoadConptyDll(info, useConptyDll);
-@@ -513,7 +518,8 @@ static Napi::Value PtyClear(const Napi::CallbackInfo& info) {
+@@ -513,7 +541,8 @@ static Napi::Value PtyClear(const Napi::CallbackInfo& info) {
      return env.Undefined();
    }
  
@@ -202,13 +258,27 @@ index 7b286d3..a63ca9b 100644
  
    if (handle != nullptr) {
      HANDLE hLibrary = LoadConptyDll(info, useConptyDll);
-@@ -544,7 +550,8 @@ static Napi::Value PtyKill(const Napi::CallbackInfo& info) {
+@@ -544,7 +573,8 @@ static Napi::Value PtyKill(const Napi::CallbackInfo& info) {
    int id = info[0].As<Napi::Number>().Int32Value();
    const bool useConptyDll = info[1].As<Napi::Boolean>().Value();
  
 -  const pty_baton* handle = get_pty_baton(id);
 +  std::lock_guard<std::mutex> lock(g_ptyHandlesMutex);
-+  const pty_baton* handle = get_pty_baton(lock, id);
++  pty_baton* handle = get_pty_baton(lock, id);
  
    if (handle != nullptr) {
      HANDLE hLibrary = LoadConptyDll(info, useConptyDll);
+@@ -554,9 +584,12 @@ static Napi::Value PtyKill(const Napi::CallbackInfo& info) {
+       PFNCLOSEPSEUDOCONSOLE const pfnClosePseudoConsole = (PFNCLOSEPSEUDOCONSOLE)GetProcAddress(
+         (HMODULE)hLibrary,
+         useConptyDll ? "ConptyClosePseudoConsole" : "ClosePseudoConsole");
+-      if (pfnClosePseudoConsole)
++      if (pfnClosePseudoConsole && handle->hpc != nullptr)
+       {
+         pfnClosePseudoConsole(handle->hpc);
++        // The handle stays in ptyHandles until the exit watcher erases it, so
++        // null hpc to keep a later call from using the closed pseudoconsole.
++        handle->hpc = nullptr;
+       }
+     }
+     if (useConptyDll) {

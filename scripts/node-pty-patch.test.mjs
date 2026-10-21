@@ -23,6 +23,28 @@ describe('node-pty patch (#305)', () => {
     expect(patch).toContain("+          'defines': [ 'NODE_API_SWALLOW_UNTHROWABLE_EXCEPTIONS' ],");
   });
 
+  // microsoft/node-pty#990 (#305): close the pseudoconsole when the shell exits on its own,
+  // so no conhost.exe is left behind per pty.
+  it('the committed patch file carries the #990 pseudoconsole close', () => {
+    const patch = fs.readFileSync(patchFile, 'utf8');
+    expect(patch).toContain('+void SetupExitCallback(Napi::Env env, Napi::Function cb, pty_baton* baton, PFNCLOSEPSEUDOCONSOLE pfnClosePseudoConsole) {');
+    expect(patch).toContain('+    if (status == napi_ok && hpc != nullptr && pfnClosePseudoConsole != nullptr) {');
+    expect(patch).toContain('+        handle->hpc = nullptr;');
+  });
+
+  it.skipIf(!fs.existsSync(conpty))('installed conpty.cc closes the pseudoconsole once, outside the lock, and not when closing', () => {
+    const src = fs.readFileSync(conpty, 'utf8');
+    expect(src).toContain('pty_baton* baton, PFNCLOSEPSEUDOCONSOLE pfnClosePseudoConsole)');
+    expect(src).toContain('hpc = baton->hpc;');
+    expect(src).toContain('status == napi_ok && hpc != nullptr && pfnClosePseudoConsole != nullptr');
+    expect(src).toContain('handle->hpc = nullptr;');
+    expect(src).toContain('pfnClosePseudoConsole && handle->hpc != nullptr');
+    // The close runs after the erase block ends, so it never holds g_ptyHandlesMutex.
+    expect(src.indexOf('pfnClosePseudoConsole(hpc);')).toBeGreaterThan(src.indexOf('tsfn.BlockingCall(exit_event, callback)'));
+    // PtyKill nulls hpc, so its handle must be non-const
+    expect(src).toMatch(/\n {2}pty_baton\* handle = get_pty_baton\(lock, id\);/);
+  });
+
   // Second crash cause (#305): a shell exiting during Electron teardown fires the exit
   // ThreadSafeFunction when JS cannot run; without the define node-addon-api throws and
   // std::terminate ends the process (0xc0000409).
