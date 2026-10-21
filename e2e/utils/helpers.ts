@@ -256,6 +256,9 @@ export const terminal = {
   async waitForReady(page: Page): Promise<void> {
     return getTerminal(page).waitForReady()
   },
+  async waitForOutputLine(page: Page, line: string, options?: { timeout?: number }): Promise<void> {
+    return getTerminal(page).waitForOutputLine(line, options)
+  },
   async waitForPrompt(page: Page, options?: { timeout?: number }): Promise<void> {
     return getTerminal(page).waitForPrompt(options)
   }
