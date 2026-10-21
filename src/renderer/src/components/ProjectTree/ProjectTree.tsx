@@ -61,6 +61,7 @@ import { IMPORT } from '../../../../shared/constants'
 import { isTreeClipboardKeystroke, treeClipboardAction } from './treeClipboardScope'
 import { isMacOS } from '../../utils/platform'
 import { useTreeFocusRecovery } from './useTreeFocusRecovery'
+import { fileGateway } from '../../services/fileGateway'
 
 interface ProjectTreeProps {
   onFileSelect: (filePath: string) => void
@@ -304,7 +305,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
       })
       // Close project via API (hook will update state via onProjectChanged listener)
       // Send the generation this window last saw: a stale close must not close a newer project
-      window.api.file.closeProject(getLastSeenProjectGeneration()).catch(err => {
+      fileGateway.closeProject(getLastSeenProjectGeneration()).catch(err => {
         logger.error('Error closing deleted project', err instanceof Error ? err : undefined)
       })
       setExpandedFolders(new Set())
@@ -643,7 +644,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     try {
       const result = await withWatcherPause(projectPath, isInternalOperation, setFileOperationLoading, async () => {
         // Execute move
-        const moveResult = await window.api.file.moveItem(sourcePath, targetParent)
+        const moveResult = await fileGateway.moveItem(sourcePath, targetParent)
         logger.info('Move completed', { path: moveResult.path })
 
         // Refresh tree
@@ -760,7 +761,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     const sourceItemType = clipboard.itemType
     if (sourceItemName && clipboard.operation === 'cut') {
       try {
-        const hasConflict = await window.api.file.checkConflict(targetPath, sourceItemName)
+        const hasConflict = await fileGateway.checkConflict(targetPath, sourceItemName)
 
         if (hasConflict) {
           // Show replace confirmation dialog
@@ -924,7 +925,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     for (const file of droppedFiles) {
       try {
         // Validate file still exists and is valid
-        const validation = await window.api.file.validateExternal(file.path, projectPath)
+        const validation = await fileGateway.validateExternal(file.path, projectPath)
 
         if (!validation.valid) {
           logger.warn('External file validation failed', {
@@ -944,7 +945,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
         // Note (M4): Using forward slash works cross-platform in Electron/Node.
         // Actual file operations use backend APIs that handle path joining correctly.
         const targetPath = `${targetFolder}/${file.name}`
-        const hasConflict = await window.api.file.checkConflict(targetFolder, file.name)
+        const hasConflict = await fileGateway.checkConflict(targetFolder, file.name)
 
         let conflictResolution: ConflictResolution | undefined
 
@@ -966,7 +967,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
 
         // Execute the operation
         if (mode === 'move') {
-          const result = await window.api.file.moveFromExternal(
+          const result = await fileGateway.moveFromExternal(
             file.path,
             targetFolder,
             projectPath,
@@ -995,7 +996,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
             failCount++
           }
         } else if (mode === 'copy') {
-          const result = await window.api.file.copyFromExternal(
+          const result = await fileGateway.copyFromExternal(
             file.path,
             targetFolder,
             projectPath,
@@ -1123,7 +1124,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     }
 
     // Open native file picker
-    const result = await window.api.file.selectExternalFiles()
+    const result = await fileGateway.selectExternalFiles()
     if (!result || result.paths.length === 0) {
       return
     }
@@ -1146,7 +1147,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     const droppedFiles: ExternalDropFile[] = await Promise.all(
       result.paths.map(async (filePath) => {
         try {
-          const stats = await window.api.file.getStats(filePath)
+          const stats = await fileGateway.getStats(filePath)
           return {
             path: filePath,
             name: getBasename(filePath) || 'unknown',
@@ -1242,8 +1243,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     clipboard,
     dialogs: { showConfirm, showRename, showNewFile, showNewFolder },
     toast: showGlobalToast,
-    // Cast to IProjectTreeApi['file'] to match interface (runtime behavior is compatible)
-    api: window.api.file as unknown as MenuContext['api'],
+    api: fileGateway,
     withWatcherPause: <T,>(op: () => Promise<T>) =>
       withWatcherPause(projectPath, isInternalOperation, setFileOperationLoading, op),
     refreshProjectTree: refreshFiles,

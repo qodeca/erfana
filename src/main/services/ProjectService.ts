@@ -43,6 +43,7 @@ import {
 } from './session/ProjectSession'
 import { sweepStaleAtomicTemps } from '../utils/atomicTempSweep'
 import { withTimeout, TimeoutError } from '../utils/withTimeout'
+import { FILE_EVENTS } from '../../shared/ipc/file-channels'
 
 export interface ProjectSwitchResult {
   success: boolean
@@ -152,7 +153,7 @@ function broadcastProjectChanged(payload: ProjectChanged): void {
   for (const win of windows) {
     if (win && !win.isDestroyed()) {
       try {
-        win.webContents.send('project:changed', payload)
+        win.webContents.send(FILE_EVENTS.projectChanged, payload)
       } catch {
         // ignore send errors for destroyed windows
       }

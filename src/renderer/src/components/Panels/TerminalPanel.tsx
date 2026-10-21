@@ -57,6 +57,8 @@ import { useOptionalDialog } from '../Dialog/DialogContext'
 import { getRestartRisk, buildRestartConfirm } from './TerminalPanel/restartGuard'
 import { ensureTerminalFontLoaded, createTerminalLinkHandler } from './TerminalPanel/terminalPanel.logic'
 import type { TerminalState } from './TerminalPanel/types'
+import { fileGateway } from '../../services/fileGateway'
+import { terminalGateway } from '../../services/terminalGateway'
 
 export function TerminalPanel(_props: ISplitviewPanelProps) {
   const [isAvailable, setIsAvailable] = useState<boolean | null>(null)
@@ -166,7 +168,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     // entry per closed terminal forever (#216).
     useClaudeStatusStore.getState().clearTerminal(id)
     try {
-      await window.api.terminal.kill(id)
+      await terminalGateway.kill(id)
     } catch (err) {
       logger.error('Failed to kill terminal', err instanceof Error ? err : undefined)
     }
@@ -334,14 +336,14 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   // Fetch project path on mount and update when project changes
   useEffect(() => {
     const fetchProjectPath = async () => {
-      const path = await window.api.file.getProjectPath()
+      const path = await fileGateway.getProjectPath()
       setProjectPath(path)
     }
     fetchProjectPath()
 
     // Subscribe to project changes
-    const unsubscribe = window.api.file.onProjectChanged(async () => {
-      const path = await window.api.file.getProjectPath()
+    const unsubscribe = fileGateway.onProjectChanged(async () => {
+      const path = await fileGateway.getProjectPath()
       setProjectPath(path)
     })
 
@@ -350,7 +352,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
 
   async function checkAvailability() {
     try {
-      const result = await window.api.terminal.isAvailable()
+      const result = await terminalGateway.isAvailable()
       setIsAvailable(result.available)
     } catch (err) {
       logger.error('Failed to check terminal availability', err instanceof Error ? err : undefined)
@@ -663,7 +665,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
           logger.info(`[INIT] Clear sequence complete, confirming once the data listener is attached`)
           // Main flushes the shell output it held back as soon as it gets this
           // confirmation, so the data listener must exist by then.
-          confirmWhenDataListening(id, () => window.api.terminal.markClearComplete(id))
+          confirmWhenDataListening(id, () => terminalGateway.markClearComplete(id))
 
           // Cleanup this one-time handler
           if (clearUnsubscribe) {
@@ -680,7 +682,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
         if (data.terminalId !== createdId) return
         runClear(createdId)
       }
-      clearUnsubscribe = window.api.terminal.onClear(handleClearForInit)
+      clearUnsubscribe = terminalGateway.onClear(handleClearForInit)
 
       // Phase 1.3 bug fix: Register cleanup in case PTY creation fails
       registerCleanup(() => {
@@ -691,14 +693,14 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       })
 
       // Create PTY
-      const result = await window.api.terminal.create({
+      const result = await terminalGateway.create({
         // No cwd: the project root is what a terminal opens in, and main reads it from
         // the session, so a stale path during a project switch cannot fail the start
         cols: xterm.cols,
         rows: xterm.rows
       })
 
-      if (!result.success || !result.terminalId) {
+      if (!result.success) {
         throw new Error(result.error || 'Failed to create terminal')
       }
 
@@ -727,7 +729,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
           store.markUserInput(result.terminalId)
           // Light Claude-status re-check on input (#216, debounced).
           nudgeClaudeStatus(result.terminalId)
-          window.api.terminal.write(result.terminalId, data)
+          terminalGateway.write(result.terminalId, data)
         }
       })
 
@@ -792,7 +794,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
 
   // Restart terminal on project change
   useEffect(() => {
-    const unsubscribe = window.api.file.onProjectChanged(async (data) => {
+    const unsubscribe = fileGateway.onProjectChanged(async (data) => {
       // Kill current terminal session (Phase 1.1 bug fix - use centralized cleanup)
       await cleanupTerminalInstance(terminalIdRef.current)
       shellKindRef.current = null
@@ -846,7 +848,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       }
     })
 
-    const unsubscribeData = window.api.terminal.onData(dataHandler)
+    const unsubscribeData = terminalGateway.onData(dataHandler)
     dataListeningIdRef.current = terminalId
     const waiting = clearConfirmWaitersRef.current.get(terminalId)
     if (waiting) {
@@ -854,7 +856,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       waiting()
     }
 
-    const unsubscribeExit = window.api.terminal.onExit((data) => {
+    const unsubscribeExit = terminalGateway.onExit((data) => {
       if (data.terminalId === terminalId) {
         logger.info(`Terminal exited with code ${data.exitCode}`)
         useTerminalStore.getState().clearActivity(terminalId)
@@ -862,7 +864,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       }
     })
 
-    const unsubscribeError = window.api.terminal.onError((data) => {
+    const unsubscribeError = terminalGateway.onError((data) => {
       if (data.terminalId === terminalId) {
         logger.error('Terminal error', undefined, { error: data.error })
         setError(data.error)
@@ -909,7 +911,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
           const rowsDiff = Math.abs(rows - lastRows)
 
           if ((colsDiff >= 2 || rowsDiff >= 1) && cols > 0 && rows > 0) {
-            window.api.terminal.resize(terminalId, cols, rows)
+            terminalGateway.resize(terminalId, cols, rows)
             lastCols = cols
             lastRows = rows
           }
@@ -961,7 +963,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
           const cols = Math.floor(xtermRef.current.cols)
           const rows = Math.floor(xtermRef.current.rows)
           if (cols > 0 && rows > 0) {
-            window.api.terminal.resize(terminalId, cols, rows)
+            terminalGateway.resize(terminalId, cols, rows)
           }
         }
       }, 50)
@@ -1001,7 +1003,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
         const cols = Math.floor(xtermRef.current.cols)
         const rows = Math.floor(xtermRef.current.rows)
         if (cols > 0 && rows > 0) {
-          window.api.terminal.resize(terminalId, cols, rows)
+          terminalGateway.resize(terminalId, cols, rows)
         }
       }
     }, 50)
@@ -1084,7 +1086,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
 
       // Insert path to terminal with shell-safe escaping
       const quotedPath = escapePathForShell(filePath)
-      window.api.terminal.write(currentTerminalId, quotedPath)
+      terminalGateway.write(currentTerminalId, quotedPath)
 
       // Show success toast with filename only
       const filename = getBasename(filePath) || 'photo.jpg'

@@ -43,4 +43,10 @@ describe('preload surface', () => {
     const api = exposed.get('api') as Record<string, unknown>
     expect(Object.keys(api).sort()).toMatchSnapshot()
   })
+
+  it('window.api.file and window.api.terminal expose the expected members', () => {
+    const api = exposed.get('api') as { file: object; terminal: object }
+    expect(Object.keys(api.file).sort()).toMatchSnapshot('file')
+    expect(Object.keys(api.terminal).sort()).toMatchSnapshot('terminal')
+  })
 })

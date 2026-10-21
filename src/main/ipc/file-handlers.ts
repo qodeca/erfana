@@ -40,6 +40,7 @@ import { registerConfinedHandle } from './confinement/registerConfinedHandle'
 import { isTrustedSender } from './senderValidation'
 import { registerHandle } from './registry'
 import { rememberDialogResult, withLastDirectory } from '../utils/lastDialogDirectory'
+import { FILE_CHANNELS } from '../../shared/ipc/file-channels'
 
 // REFACTORING (todo017): Create ProjectService singleton for orchestration
 // Thin adapter pattern: IPC handler depends on service, not orchestration logic
@@ -119,7 +120,7 @@ export function registerFileHandlers(): void {
   const session = projectService.session
 
   // Open project folder via dialog
-  registerHandle('file:openProject', async (event) => {
+  registerHandle(FILE_CHANNELS.openProject, async (event) => {
     const result = await dialog.showOpenDialog(withLastDirectory<OpenDialogOptions>({
       properties: ['openDirectory', 'createDirectory'],
       title: 'Select Project Folder',
@@ -138,7 +139,7 @@ export function registerFileHandlers(): void {
   // Open project folder by path (for recent projects, etc.). The value must be
   // an absolute path; the project itself is validated by `ProjectService`.
   registerConfinedHandle(
-    'file:openProjectByPath',
+    FILE_CHANNELS.openProjectByPath,
     {
       schema: OpenProjectByPathArgsSchema,
       paths: { projectPath: { arg: 0, mode: 'external', check: 'none' } },
@@ -149,7 +150,7 @@ export function registerFileHandlers(): void {
   )
 
   // The open project as the main process holds it; null when none is open
-  registerHandle('file:getSession', async (): Promise<ProjectSessionInfo | null> => {
+  registerHandle(FILE_CHANNELS.getSession, async (): Promise<ProjectSessionInfo | null> => {
     const snapshot = projectService.session.current()
     return snapshot ? { root: snapshot.root, generation: snapshot.generation } : null
   })
@@ -162,7 +163,7 @@ export function registerFileHandlers(): void {
 
   // Read directory structure
   registerConfinedHandle(
-    'file:readDirectory',
+    FILE_CHANNELS.readDirectory,
     {
       schema: ReadDirectoryArgsSchema,
       paths: { dirPath: { arg: 0, mode: 'project', mustExist: true } },
@@ -198,7 +199,7 @@ export function registerFileHandlers(): void {
   // a watched path automatically now, so a one-shot user-initiated read became
   // a repeating one an outside party can clock (issue #70, security MEDIUM-2).
   registerConfinedHandle(
-    'file:readFile',
+    FILE_CHANNELS.readFile,
     {
       schema: PathArgsSchema,
       paths: { filePath: { arg: 0, mode: 'project', kind: 'file' } },
@@ -222,7 +223,7 @@ export function registerFileHandlers(): void {
   // The root itself is never a file to write, and a link inside the project
   // that points outside is refused like a read through it is.
   registerConfinedHandle(
-    'file:writeFile',
+    FILE_CHANNELS.writeFile,
     {
       schema: WriteFileArgsSchema,
       paths: { filePath: { arg: 0, mode: 'project', allowRoot: false, access: 'change' } },
@@ -251,7 +252,7 @@ export function registerFileHandlers(): void {
   // through a symlink, so the watcher's automatic re-stat of a watched file
   // cannot be pointed elsewhere (issue #70).
   registerConfinedHandle(
-    'file:getStats',
+    FILE_CHANNELS.getStats,
     {
       schema: PathArgsSchema,
       paths: { filePath: { arg: 0, mode: 'external', check: 'escape' } },
@@ -290,7 +291,7 @@ export function registerFileHandlers(): void {
   // fragile error-string parsing of catching file:getStats' ENOENT. A value that
   // is not a usable absolute path is "does not exist".
   registerConfinedHandle(
-    'file:exists',
+    FILE_CHANNELS.exists,
     {
       schema: PathArgsSchema,
       paths: { filePath: { arg: 0, mode: 'external', check: 'escape' } },
@@ -301,14 +302,14 @@ export function registerFileHandlers(): void {
   )
 
   // Get current project path
-  registerHandle('file:getProjectPath', async () => {
+  registerHandle(FILE_CHANNELS.getProjectPath, async () => {
     return fileService.getProjectPath()
   })
 
   // Close current project. A renderer that closes because it saw the folder
   // disappear sends the generation it last saw; if a newer project was opened
   // since, that stale close does nothing.
-  registerHandle('file:closeProject', async (event, expectedGeneration?: unknown) => {
+  registerHandle(FILE_CHANNELS.closeProject, async (event, expectedGeneration?: unknown) => {
     const generation =
       typeof expectedGeneration === 'number' && Number.isInteger(expectedGeneration)
         ? expectedGeneration
@@ -327,7 +328,7 @@ export function registerFileHandlers(): void {
 
   // Create new file
   registerConfinedHandle(
-    'file:createFile',
+    FILE_CHANNELS.createFile,
     {
       schema: CreateEntryArgsSchema,
       paths: { dirPath: { arg: 0, mode: 'project', mustExist: true, kind: 'directory', access: 'change' } },
@@ -350,7 +351,7 @@ export function registerFileHandlers(): void {
 
   // Create new folder
   registerConfinedHandle(
-    'file:createFolder',
+    FILE_CHANNELS.createFolder,
     {
       schema: CreateEntryArgsSchema,
       paths: { dirPath: { arg: 0, mode: 'project', mustExist: true, kind: 'directory', access: 'change' } },
@@ -374,7 +375,7 @@ export function registerFileHandlers(): void {
   // Delete file. The entry itself is checked, not what it points at: a link
   // inside the project is removed as a link and nothing outside is touched.
   registerConfinedHandle(
-    'file:deleteFile',
+    FILE_CHANNELS.deleteFile,
     {
       schema: PathArgsSchema,
       paths: { filePath: { arg: 0, mode: 'project-entry', access: 'change' } },
@@ -394,7 +395,7 @@ export function registerFileHandlers(): void {
 
   // Delete folder
   registerConfinedHandle(
-    'file:deleteFolder',
+    FILE_CHANNELS.deleteFolder,
     {
       schema: PathArgsSchema,
       paths: { folderPath: { arg: 0, mode: 'project-entry', access: 'change' } },
@@ -414,7 +415,7 @@ export function registerFileHandlers(): void {
 
   // Rename file or folder
   registerConfinedHandle(
-    'file:rename',
+    FILE_CHANNELS.rename,
     {
       schema: RenameArgsSchema,
       paths: { oldPath: { arg: 0, mode: 'project-entry', access: 'change' } },
@@ -440,7 +441,7 @@ export function registerFileHandlers(): void {
 
   // Move file or folder
   registerConfinedHandle(
-    'file:moveItem',
+    FILE_CHANNELS.moveItem,
     {
       schema: MoveItemArgsSchema,
       paths: {
@@ -474,7 +475,7 @@ export function registerFileHandlers(): void {
 
   // Copy file or folder
   registerConfinedHandle(
-    'file:copyItem',
+    FILE_CHANNELS.copyItem,
     {
       schema: CopyItemArgsSchema,
       paths: {
@@ -518,7 +519,7 @@ export function registerFileHandlers(): void {
 
   // Check name conflict. A folder that is not there has no conflict.
   registerConfinedHandle(
-    'file:checkConflict',
+    FILE_CHANNELS.checkConflict,
     {
       schema: CheckConflictArgsSchema,
       paths: { targetParentPath: { arg: 0, mode: 'project' } },
@@ -548,7 +549,7 @@ export function registerFileHandlers(): void {
   // the base64 encode blocks the main-process event loop; see
   // src/main/services/file/imageRead.ts for why the version is safe to trust.
   registerConfinedHandle(
-    'file:readImage',
+    FILE_CHANNELS.readImage,
     {
       schema: ReadImageArgsSchema,
       paths: { filePath: { arg: 0, mode: 'project' } },
@@ -588,7 +589,7 @@ export function registerFileHandlers(): void {
   // in-project link cannot point the reveal at an out-of-project target; the
   // check also subsumes the existence check.
   registerConfinedHandle(
-    'file:revealInFileManager',
+    FILE_CHANNELS.revealInFileManager,
     {
       schema: PathArgsSchema,
       paths: { filePath: { arg: 0, mode: 'project', mustExist: true } },
@@ -635,7 +636,7 @@ export function registerFileHandlers(): void {
   // 2. The user can already see and access any file path shown in their terminal
   // 3. This handler only checks existence, it doesn't read or modify files
   registerConfinedHandle(
-    'file:validatePath',
+    FILE_CHANNELS.validatePath,
     {
       schema: ValidatePathArgsSchema,
       paths: { filePath: { arg: 0, mode: 'external', check: 'none' } },

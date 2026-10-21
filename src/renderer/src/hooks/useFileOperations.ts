@@ -16,7 +16,7 @@
  * Complexity reduction: Each handler ~30-50 lines, complexity d5
  */
 
-import type { IProjectTreeApi } from '../interfaces/IProjectTreeApi'
+import { getDefaultProjectTreeApi } from '../services/projectTreeApi'
 import type { IUseFileOperationsOptions, IUseFileOperationsReturn } from '../interfaces/IFileOperationsHook'
 import { useDialog } from '../components/Dialog'
 import { showGlobalToast } from '../components/Toast/toastService'
@@ -52,7 +52,7 @@ export function useFileOperations(
   options: IUseFileOperationsOptions
 ): IUseFileOperationsReturn {
   const {
-    api = window.api as unknown as IProjectTreeApi,
+    api = getDefaultProjectTreeApi(),
     projectPath,
     files,
     selectedFolder,

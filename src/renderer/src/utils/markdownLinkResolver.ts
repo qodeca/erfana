@@ -22,6 +22,7 @@
 
 import { isDangerousProtocol, isExternalProtocol } from './linkProtocols'
 import { logger } from './logger'
+import { fileGateway } from '../services/fileGateway'
 import { stablePathDigest } from './fileUtils'
 import { getRendererPlatform, isWindows } from './platform'
 
@@ -179,7 +180,7 @@ async function checkFileExists(filePath: string): Promise<boolean> {
   // Uses the dedicated file:exists IPC channel (fs.access, never throws), so a
   // missing target is a plain `false` with no error-log noise and no fragile
   // error-message parsing.
-  const exists = await window.api.file.exists(filePath)
+  const exists = await fileGateway.exists(filePath)
   if (!exists) {
     // Digest, not the path: it names a file in the user's project
     logger.debug('[MarkdownLinkResolver] link target missing', {

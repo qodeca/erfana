@@ -22,6 +22,8 @@ import { TERMINAL } from './constants'
 import { logger } from '../../utils/logger'
 import { editorSaveRegistry } from '../../services/editorSaveRegistry'
 import { getLastSeenProjectGeneration } from '../../services/projectGeneration'
+import { fileGateway } from '../../services/fileGateway'
+import { terminalGateway } from '../../services/terminalGateway'
 
 /**
  * Type for confirmation dialog function
@@ -234,7 +236,7 @@ export async function interruptActiveTerminalIfAny(): Promise<void> {
     if (!tid) return
 
     // Send Ctrl+C signal
-    await window.api.terminal.write(tid, TERMINAL.INTERRUPT_SIGNAL)
+    await terminalGateway.write(tid, TERMINAL.INTERRUPT_SIGNAL)
     // Give it a moment to propagate
     await new Promise((r) => setTimeout(r, TERMINAL.SIGNAL_DELAY))
 
@@ -276,7 +278,7 @@ export async function openProjectWithTokenGuard(
 
   try {
     const currentToken = ++switchTokenRef.current
-    const path = await window.api.file.openProject()
+    const path = await fileGateway.openProject()
 
     if (!path) return null
     if (currentToken !== switchTokenRef.current) {
@@ -309,7 +311,7 @@ export async function closeProjectWithTokenGuard(
   setProjectPath: (path: string | null) => void
 ): Promise<boolean> {
   const currentToken = ++switchTokenRef.current
-  const ok = await window.api.file.closeProject()
+  const ok = await fileGateway.closeProject()
 
   if (!ok) return false
   if (currentToken !== switchTokenRef.current) {
