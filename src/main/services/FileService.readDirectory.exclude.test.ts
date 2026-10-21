@@ -246,6 +246,37 @@ describe('FileService.readDirectory – unreadable sub-folder', () => {
       if (passThrough) readdirMock.mockImplementation(passThrough)
     }
   })
+
+  it('logs the warning without the folder path', async () => {
+    await createTree(root, ['gone/a.md', 'open/b.md'])
+    const service = makeService(makeFilter())
+    const passThrough = readdirMock.getMockImplementation()
+    readdirMock.mockImplementation(async (...args: unknown[]) => {
+      if (relativeTo(root, String(args[0])) === 'gone') {
+        throw Object.assign(
+          new Error(`ENOENT: no such file or directory, scandir '${String(args[0])}'`),
+          { code: 'ENOENT' }
+        )
+      }
+      return passThrough?.(...args)
+    })
+
+    try {
+      await service.readDirectory(root)
+
+      const warning = mockLogger.warn.mock.calls.find(
+        ([message]) => message === 'FileService: readDirectory error recovered'
+      )
+      expect(warning).toBeDefined()
+      expect(JSON.stringify(warning)).not.toContain(JSON.stringify(root).slice(1, -1))
+      expect(warning?.[1]).toEqual({
+        path: '[redacted]/gone',
+        error: 'ENOENT: no such file or directory, scandir [redacted-path]'
+      })
+    } finally {
+      if (passThrough) readdirMock.mockImplementation(passThrough)
+    }
+  })
 })
 
 describe('FileService.readDirectory – walk hints (#211, D1)', () => {

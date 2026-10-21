@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { describe, expect, it } from 'vitest'
-import { classifyFsError, formatFileOperationError, formatSaveError } from './errorUtils'
+import { classifyFsError, formatFileOperationError, formatSaveError, loggableError } from './errorUtils'
 
 const ipc = (inner: string): Error =>
   new Error(`Error invoking remote method 'file:writeFile': Error: ${inner}`)
@@ -56,5 +56,30 @@ describe('formatSaveError', () => {
     expect(formatSaveError('not an error', 'a.md')).toBe(
       '"a.md" could not be saved: An unknown error occurred. Your changes are still in the editor.'
     )
+  })
+})
+
+describe('loggableError (no absolute path in the log file)', () => {
+  it('drops the path from a failed save that came over IPC', () => {
+    const error = new Error(
+      "Error invoking remote method 'file:writeFile': Error: EPERM: operation not permitted, open 'C:\\Users\\alice\\proj\\notes.md'"
+    )
+
+    const logged = loggableError(error)
+
+    expect(logged?.message).toBe(
+      "Error invoking remote method 'file:writeFile': Error: EPERM: operation not permitted, open [redacted-path]"
+    )
+    expect(logged?.stack ?? '').not.toContain('alice')
+  })
+
+  it('returns the original error, stack included, when there is no path', () => {
+    const error = new Error('disk full')
+
+    expect(loggableError(error)).toBe(error)
+  })
+
+  it('returns undefined for a value that is not an Error', () => {
+    expect(loggableError('EPERM')).toBeUndefined()
   })
 })

@@ -57,7 +57,7 @@ import {
   shouldToastSaveError,
   type SaveTrigger
 } from './markdownEditorPanel.logic'
-import { formatSaveError } from '../../utils/errorUtils'
+import { formatSaveError, loggableError } from '../../utils/errorUtils'
 import { formatTabTitle } from '../../utils/tabTitle'
 
 // Shared constants
@@ -296,7 +296,7 @@ export function MarkdownEditorPanel(
       }
       return true
     } catch (error) {
-      logger.error('Error saving file', error instanceof Error ? error : undefined)
+      logger.error('Error saving file', loggableError(error))
       setIsAutoSaving(false)
       // Never fail silently: the tab stays dirty and the buffer keeps the edit,
       // so say why. Cmd+S always shows it; an autosave repeats only a reason not

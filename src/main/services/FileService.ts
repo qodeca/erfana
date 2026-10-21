@@ -19,6 +19,8 @@ import {
   type CoalescingRunner
 } from '../../shared/coalescingRunner'
 import { stablePathDigest } from '../../shared/stablePathDigest'
+import { redactQuotedPaths } from '../../shared/redactQuotedPaths'
+import { redactPath } from '../utils/redactUserInput'
 import { logger } from './LoggingService'
 import { atomicWriteText, isAtomicTempName } from '../utils/atomicWrite'
 import { IMAGE_EXTENSIONS, readImage } from './file/imageRead'
@@ -487,7 +489,10 @@ export class FileService implements IFileService {
     try {
       return await this._readDirectoryInternal({ path: fullPath, depth, rel, dropped }, scope)
     } catch (error) {
-      logger.warn('FileService: readDirectory error recovered', { path: fullPath, error: error instanceof Error ? error.message : String(error) })
+      logger.warn('FileService: readDirectory error recovered', {
+        path: redactPath(fullPath),
+        error: redactQuotedPaths(error instanceof Error ? error.message : String(error))
+      })
       return []
     }
   }
