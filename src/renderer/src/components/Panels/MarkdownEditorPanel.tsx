@@ -67,6 +67,7 @@ import { formatTabTitle } from '../../utils/tabTitle'
 import { INDICATOR_DURATION_MS } from '../../constants/fileWatch'
 
 import './MarkdownEditorPanel.css'
+import { fileGateway } from '../../services/fileGateway'
 
 /**
  * Props passed to the MarkdownEditorPanel via Dockview.
@@ -271,9 +272,9 @@ export function MarkdownEditorPanel(
       // the file lived in. An autosave or a save by id never does: it would
       // silently resurrect a folder someone just renamed.
       if (shouldRecreateParentDirs(trigger, isFileDeleted)) {
-        await window.api.file.writeFile(currentFile.path, contentToSave, { createParentDirs: true })
+        await fileGateway.writeFile(currentFile.path, contentToSave, { createParentDirs: true })
       } else {
-        await window.api.file.writeFile(currentFile.path, contentToSave)
+        await fileGateway.writeFile(currentFile.path, contentToSave)
       }
       lastSaveErrorRef.current = null
 
@@ -480,7 +481,7 @@ export function MarkdownEditorPanel(
     logger.info('Loading file', { filePath })
     setIsEditorReady(false) // Reset editor ready state when loading new file
     try {
-      const content = await window.api.file.readFile(filePath)
+      const content = await fileGateway.readFile(filePath)
       logger.info('File loaded successfully', {
         filePath,
         contentLength: content.length,

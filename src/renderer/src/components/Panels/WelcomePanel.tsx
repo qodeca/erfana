@@ -11,6 +11,7 @@ import { formatRelativeTime } from '../../utils/timeFormatting'
 import { useImport } from '../../hooks/useImport'
 import { logger } from '../../utils/logger'
 import { TEST_IDS, getDynamicTestId } from '../../constants/testids'
+import { fileGateway } from '../../services/fileGateway'
 
 interface RecentProject {
   path: string
@@ -133,7 +134,7 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
 
   // Auto-refresh recent projects when any project change occurs (open/close)
   useEffect(() => {
-    const unsubscribe = window.api.file.onProjectChanged(() => {
+    const unsubscribe = fileGateway.onProjectChanged(() => {
       loadRecentProjects()
     })
     return () => unsubscribe()
