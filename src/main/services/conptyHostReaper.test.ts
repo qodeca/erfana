@@ -46,11 +46,15 @@ describe('buildReapScript', () => {
 
   it('waits for our process, and ends it only when still alive and started before the quit moment', () => {
     const script = buildReapScript(4242, 1_000, 2_000)
-    expect(script).toContain(`Wait-Process -Id 4242 -Timeout ${QUIT_GRACE_SEC}`)
-    // the force-end is guarded by the start-time check, and runs before the host query
-    const stop = script.indexOf('Stop-Process -Id 4242 -Force')
+    expect(QUIT_GRACE_SEC).toBe(15)
+    expect(script).toContain(`$p | Wait-Process -Timeout ${QUIT_GRACE_SEC}`)
+    // the force-end uses the checked process object (no pid re-lookup), guarded by the
+    // start-time check, and runs before the host query
+    const stop = script.indexOf('$p | Stop-Process -Force')
     expect(stop).toBeGreaterThan(-1)
-    expect(script.slice(script.lastIndexOf('if (', stop), stop)).toContain('$p.StartTime.ToUniversalTime() -le $q')
+    expect(script).not.toContain('Stop-Process -Id 4242')
+    expect(script).toContain('if (-not $p.HasExited)')
+    expect(script.indexOf('$p.StartTime.ToUniversalTime() -le $q')).toBeLessThan(stop)
     expect(stop).toBeLessThan(script.indexOf('Get-CimInstance'))
   })
 

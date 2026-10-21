@@ -44,6 +44,7 @@ import { settingsService } from './services/SettingsService'
 import { globalSettingsService } from './services/GlobalSettingsService'
 import { loggingService, logger } from './services/LoggingService'
 import { logNodePtyBinding } from './utils/logNodePtyBinding'
+import { createQuitGuard } from './utils/quitGuard'
 import { startConptyHostReaper } from './services/conptyHostReaper'
 import { gitWatcherService } from './services/GitWatcherService'
 import { gitPollingService } from './services/GitPollingService'
@@ -634,12 +635,15 @@ app.whenReady().then(async () => {
 // Note: On macOS, apps typically stay active but we want consistent quit behavior
 // since confirmation already happened via close handler
 app.on('window-all-closed', () => {
-  app.quit()
+  // Destroying the window inside the quit sequence lands here; a second app.quit()
+  // would make Electron emit another before-quit while the shutdown is running (#305)
+  quitGuard.handleWindowAllClosed(() => app.quit())
 })
 
 // Cleanup file watchers, directory watchers, terminals, git watchers, and project locks before app quits.
 // Pattern B (F11): preventDefault + sequenced shutdown guarantees lock release before exit.
-// isShuttingDown guards against the second before-quit Electron emits after preventDefault.
+// quitGuard (utils/quitGuard.ts) prevents the second before-quit Electron emits and keeps
+// window-all-closed from calling app.quit() while the shutdown runs.
 const SHUTDOWN_TIMEOUT_MS = 2_000
 
 /**
@@ -652,7 +656,7 @@ const SHUTDOWN_TIMEOUT_MS = 2_000
  * is a local file unlink on the happy path.
  */
 const LOCK_DISPOSE_TIMEOUT_MS = 1_000
-let isShuttingDown = false
+const quitGuard = createQuitGuard()
 
 /**
  * Runs one disposer and returns when it settles or when `timeoutMs` elapses,
@@ -721,9 +725,11 @@ function handleShutdownException(err: unknown): void {
 }
 
 app.on('before-quit', async (event) => {
-  if (isShuttingDown) return
-  isShuttingDown = true
-  event.preventDefault()
+  // Always prevented: Electron emits a second before-quit when the quit-confirm handler
+  // destroys the window (window-all-closed -> app.quit()). Letting that one through
+  // quits 1 ms after the shutdown started, before any disposer finishes (#305). The
+  // only way out is app.exit(0) at the end of this handler.
+  if (!quitGuard.handleBeforeQuit(event)) return
 
   // Install the guard synchronously, before the first await, so an already-queued
   // chokidar read callback can't crash the process before the handler is registered.

@@ -21,6 +21,9 @@
  * - A pid reused after we exit cannot be hit: hosts must have been created between
  *   our process start and the quit moment (+ 250 ms rounding), and the process
  *   force-ended must have started before the quit moment.
+ * - Under Constrained Language Mode / AppLocker the date guard stops the script before
+ *   anything is ended, so the force-end and the host cleanup are skipped (nothing is
+ *   ever ended on a guess).
  * - Quit only. On a window close the other windows' terminals are alive and their
  *   hosts have the same parent pid, so nothing can be told apart.
  *
@@ -36,10 +39,7 @@ import { taskkillPath } from './terminalTreeKill'
  * How long the helper waits for our process to exit on its own before force-ending
  * it. Normal quits measured on Windows take 3.6–6.2 s with 32 terminals.
  */
-export const QUIT_GRACE_SEC = 10
-
-/** The helper is stopped if it is still running after this long (grace + query + kill). */
-export const CONPTY_REAP_TIMEOUT_MS = (QUIT_GRACE_SEC + 20) * 1_000
+export const QUIT_GRACE_SEC = 15
 
 /**
  * Rounding allowance after the quit moment, for the clock difference between Node
@@ -103,12 +103,13 @@ export function buildReapScript(parentPid: number, startMs: number, quitMs: numb
     `$e = [DateTimeOffset]::FromUnixTimeMilliseconds(${endMs}).UtcDateTime`,
     // Constrained Language Mode can leave a static call returning nothing: stop rather than match everything
     'if (-not $s -or -not $q -or -not $e) { exit }',
-    // 1. Wait for our process; end it only if it is the same one (started before the quit moment)
+    // 1. Wait for our process; end it only if it is the same one (started before the quit
+    //    moment). The checked process object is used for the wait and the end, so a pid
+    //    reused in between cannot be hit.
     `$p = Get-Process -Id ${parentPid}`,
     'if ($p -and $p.StartTime.ToUniversalTime() -le $q) {',
-    `  Wait-Process -Id ${parentPid} -Timeout ${QUIT_GRACE_SEC}`,
-    `  $p = Get-Process -Id ${parentPid}`,
-    `  if ($p -and $p.StartTime.ToUniversalTime() -le $q) { Stop-Process -Id ${parentPid} -Force }`,
+    `  $p | Wait-Process -Timeout ${QUIT_GRACE_SEC}`,
+    '  if (-not $p.HasExited) { $p | Stop-Process -Force }',
     '}',
     // 2. End the console hosts that are direct children of our pid
     `Get-CimInstance Win32_Process -Filter 'ParentProcessId=${parentPid}' -OperationTimeoutSec ${CIM_OPERATION_TIMEOUT_SEC} |`,
@@ -150,17 +151,9 @@ export function startConptyHostReaper(options: ReapOptions = {}): boolean {
       ['-NoProfile', '-NonInteractive', '-NoLogo', '-Command', script],
       { stdio: 'ignore', windowsHide: true, detached: true, env: powershellEnv() }
     )
-    const killTimer = setTimeout(() => {
-      try {
-        child.kill()
-      } catch {
-        // already gone
-      }
-    }, CONPTY_REAP_TIMEOUT_MS)
-    killTimer.unref()
-    child.once('exit', () => clearTimeout(killTimer))
+    // No kill timer: the process is gone before one could fire. The script bounds itself
+    // (grace period, 5 s query timeout).
     child.once('error', (error) => {
-      clearTimeout(killTimer)
       logger.warn('Quit cleanup helper could not be started', { error: error.message })
     })
     child.unref()

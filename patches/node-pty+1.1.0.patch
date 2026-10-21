@@ -81,7 +81,7 @@ index 17f1d98..16d1ec6 100644
  console.log('\x1b[32m> Checking prebuilds...\x1b[0m');
  if (!fs.existsSync(PREBUILD_DIR)) {
 diff --git a/node_modules/node-pty/src/win/conpty.cc b/node_modules/node-pty/src/win/conpty.cc
-index 7b286d3..828ad0e 100644
+index 7b286d3..031b038 100644
 --- a/node_modules/node-pty/src/win/conpty.cc
 +++ b/node_modules/node-pty/src/win/conpty.cc
 @@ -14,6 +14,8 @@
@@ -148,7 +148,7 @@ index 7b286d3..828ad0e 100644
      auto callback = [](Napi::Env env, Napi::Function cb, ExitEvent *exit_event) {
        cb.Call({Napi::Number::New(env, exit_event->exit_code)});
        delete exit_event;
-@@ -99,13 +93,34 @@ void SetupExitCallback(Napi::Env env, Napi::Function cb, pty_baton* baton) {
+@@ -99,13 +93,35 @@ void SetupExitCallback(Napi::Env env, Napi::Function cb, pty_baton* baton) {
      ExitEvent *exit_event = new ExitEvent;
      // Wait for process to complete.
      WaitForSingleObject(baton->hShell, INFINITE);
@@ -180,7 +180,8 @@ index 7b286d3..828ad0e 100644
 +    // the env is closing (napi_closing). The host does NOT go away with the process
 +    // while the main thread joins a conout worker that waits for that host's pipe,
 +    // so skipping the close there hangs the quit. This is plain Win32; it touches no
-+    // N-API state.
++    // N-API state. Before Windows 11 24H2 a blocked close can still hold up the
++    // teardown: the hang is bounded by Erfana's quit helper there, not fixed.
 +    if (hpc != nullptr && pfnClosePseudoConsole != nullptr) {
 +      pfnClosePseudoConsole(hpc);
 +    }
@@ -188,7 +189,7 @@ index 7b286d3..828ad0e 100644
      switch (status) {
        case napi_closing:
          break;
-@@ -299,10 +314,13 @@ static Napi::Value PtyStartProcess(const Napi::CallbackInfo& info) {
+@@ -299,10 +315,13 @@ static Napi::Value PtyStartProcess(const Napi::CallbackInfo& info) {
  
    if (SUCCEEDED(hr)) {
      // We were able to instantiate a conpty
@@ -205,7 +206,7 @@ index 7b286d3..828ad0e 100644
    } else {
      throw Napi::Error::New(env, "Cannot launch conpty");
    }
-@@ -350,10 +368,13 @@ static Napi::Value PtyConnect(const Napi::CallbackInfo& info) {
+@@ -350,10 +369,13 @@ static Napi::Value PtyConnect(const Napi::CallbackInfo& info) {
    const bool useConptyDll = info[4].As<Napi::Boolean>().Value();
    Napi::Function exitCallback = info[5].As<Napi::Function>();
  
@@ -223,7 +224,7 @@ index 7b286d3..828ad0e 100644
    }
  
    // Prepare command line
-@@ -438,6 +459,15 @@ static Napi::Value PtyConnect(const Napi::CallbackInfo& info) {
+@@ -438,6 +460,15 @@ static Napi::Value PtyConnect(const Napi::CallbackInfo& info) {
      }
    }
  
@@ -239,7 +240,7 @@ index 7b286d3..828ad0e 100644
    // Update handle
    handle->hShell = piClient.hProcess;
  
-@@ -447,7 +477,7 @@ static Napi::Value PtyConnect(const Napi::CallbackInfo& info) {
+@@ -447,7 +478,7 @@ static Napi::Value PtyConnect(const Napi::CallbackInfo& info) {
    CloseHandle(handle->hIn);
    CloseHandle(handle->hOut);
  
@@ -248,7 +249,7 @@ index 7b286d3..828ad0e 100644
  
    // Return
    auto marshal = Napi::Object::New(env);
-@@ -472,7 +502,8 @@ static Napi::Value PtyResize(const Napi::CallbackInfo& info) {
+@@ -472,7 +503,8 @@ static Napi::Value PtyResize(const Napi::CallbackInfo& info) {
    SHORT rows = static_cast<SHORT>(info[2].As<Napi::Number>().Uint32Value());
    const bool useConptyDll = info[3].As<Napi::Boolean>().Value();
  
@@ -258,7 +259,7 @@ index 7b286d3..828ad0e 100644
  
    if (handle != nullptr) {
      HANDLE hLibrary = LoadConptyDll(info, useConptyDll);
-@@ -482,7 +513,7 @@ static Napi::Value PtyResize(const Napi::CallbackInfo& info) {
+@@ -482,7 +514,7 @@ static Napi::Value PtyResize(const Napi::CallbackInfo& info) {
        PFNRESIZEPSEUDOCONSOLE const pfnResizePseudoConsole = (PFNRESIZEPSEUDOCONSOLE)GetProcAddress(
          (HMODULE)hLibrary,
          useConptyDll ? "ConptyResizePseudoConsole" : "ResizePseudoConsole");
@@ -267,7 +268,7 @@ index 7b286d3..828ad0e 100644
        {
          COORD size = {cols, rows};
          pfnResizePseudoConsole(handle->hpc, size);
-@@ -513,7 +544,8 @@ static Napi::Value PtyClear(const Napi::CallbackInfo& info) {
+@@ -513,7 +545,8 @@ static Napi::Value PtyClear(const Napi::CallbackInfo& info) {
      return env.Undefined();
    }
  
@@ -277,7 +278,7 @@ index 7b286d3..828ad0e 100644
  
    if (handle != nullptr) {
      HANDLE hLibrary = LoadConptyDll(info, useConptyDll);
-@@ -521,7 +553,7 @@ static Napi::Value PtyClear(const Napi::CallbackInfo& info) {
+@@ -521,7 +554,7 @@ static Napi::Value PtyClear(const Napi::CallbackInfo& info) {
      if (fLoadedDll)
      {
        PFNCLEARPSEUDOCONSOLE const pfnClearPseudoConsole = (PFNCLEARPSEUDOCONSOLE)GetProcAddress((HMODULE)hLibrary, "ConptyClearPseudoConsole");
@@ -286,7 +287,7 @@ index 7b286d3..828ad0e 100644
        {
          pfnClearPseudoConsole(handle->hpc);
        }
-@@ -544,7 +576,8 @@ static Napi::Value PtyKill(const Napi::CallbackInfo& info) {
+@@ -544,7 +577,8 @@ static Napi::Value PtyKill(const Napi::CallbackInfo& info) {
    int id = info[0].As<Napi::Number>().Int32Value();
    const bool useConptyDll = info[1].As<Napi::Boolean>().Value();
  
@@ -296,7 +297,7 @@ index 7b286d3..828ad0e 100644
  
    if (handle != nullptr) {
      HANDLE hLibrary = LoadConptyDll(info, useConptyDll);
-@@ -554,12 +587,15 @@ static Napi::Value PtyKill(const Napi::CallbackInfo& info) {
+@@ -554,12 +588,15 @@ static Napi::Value PtyKill(const Napi::CallbackInfo& info) {
        PFNCLOSEPSEUDOCONSOLE const pfnClosePseudoConsole = (PFNCLOSEPSEUDOCONSOLE)GetProcAddress(
          (HMODULE)hLibrary,
          useConptyDll ? "ConptyClosePseudoConsole" : "ClosePseudoConsole");
