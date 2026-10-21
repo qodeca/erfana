@@ -41,6 +41,34 @@
 export type OverlayEscapeHandler = () => void
 
 /**
+ * A z-index layering token from `design-tokens.css` (e.g. `'--z-modal'`).
+ *
+ * Overlays whose z-index comes from a stylesheet pass the TOKEN, never its
+ * number: the layering card (design/system/foundations/layering.html) forbids
+ * mirroring a token into TypeScript, because changing the CSS would then
+ * silently desynchronise the runtime. The value is read from `:root` when the
+ * stack is queried, so it always matches what is painted.
+ */
+export type ZIndexToken = `--z-${string}`
+
+/**
+ * Resolve a z-index token to the number it currently holds on `:root`.
+ *
+ * @param token - Custom property name, e.g. `'--z-context-menu'`
+ * @returns The token's integer value, or `0` when it is not defined (no
+ *   stylesheet loaded – unit tests under jsdom set the property themselves)
+ */
+export function readZIndexToken(token: ZIndexToken): number {
+  const raw = getComputedStyle(document.documentElement).getPropertyValue(token)
+  const value = Number.parseInt(raw, 10)
+  return Number.isNaN(value) ? 0 : value
+}
+
+function resolveZIndex(zIndex: number | ZIndexToken): number {
+  return typeof zIndex === 'number' ? zIndex : readZIndexToken(zIndex)
+}
+
+/**
  * One open overlay on the stack.
  */
 export interface OverlayStackEntry {
@@ -49,8 +77,12 @@ export interface OverlayStackEntry {
    * same ref again moves it rather than duplicating it.
    */
   ref: React.RefObject<HTMLElement | null>
-  /** The z-index the overlay paints at – the primary ordering key. */
-  zIndex: number
+  /**
+   * The z-index the overlay paints at – the primary ordering key. A number
+   * when the caller already holds one at runtime (BaseDialog's `zIndex`
+   * prop), otherwise the stylesheet token it paints with.
+   */
+  zIndex: number | ZIndexToken
   /**
    * Returns the overlay's CURRENT Escape action, or `null` when Escape must do
    * nothing while this overlay is on top (e.g. `closeOnEscape={false}`).
@@ -110,7 +142,7 @@ function syncListener(): void {
  *
  * @example
  * ```ts
- * registerOverlay({ ref: menuRef, zIndex: 100000, getEscapeHandler: () => close })
+ * registerOverlay({ ref: menuRef, zIndex: '--z-context-menu', getEscapeHandler: () => close })
  * // …on close
  * unregisterOverlay(menuRef)
  * ```
@@ -144,11 +176,16 @@ function removeEntry(ref: React.RefObject<HTMLElement | null>): void {
  */
 export function getTopmostOverlay(): OverlayStackEntry | null {
   let top: OverlayStackEntry | null = null
+  let topRank = Number.NEGATIVE_INFINITY
   for (const entry of stack) {
     const element = entry.ref.current
     if (element === null || !element.isConnected) continue
+    const zIndex = resolveZIndex(entry.zIndex)
     // `>=`, not `>`: within one z-index the LAST registration is frontmost.
-    if (top === null || entry.zIndex >= top.zIndex) top = entry
+    if (top === null || zIndex >= topRank) {
+      top = entry
+      topRank = zIndex
+    }
   }
   return top
 }

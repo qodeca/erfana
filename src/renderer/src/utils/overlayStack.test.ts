@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   getTopmostOverlay,
   isTopmostOverlay,
+  readZIndexToken,
   registerOverlay,
   resetOverlayStackForTests,
   unregisterOverlay
@@ -78,6 +79,21 @@ describe('overlayStack', () => {
       dead.current.remove()
 
       expect(isTopmostOverlay(live)).toBe(true)
+    })
+
+    it('ranks a z-index token by the value it holds on :root', () => {
+      document.documentElement.style.setProperty('--z-context-menu', '100000')
+      const menu = mountedRef()
+      const dialog = mountedRef()
+      registerOverlay({ ref: menu, zIndex: '--z-context-menu', getEscapeHandler: () => null })
+      registerOverlay({ ref: dialog, zIndex: 10001, getEscapeHandler: () => null })
+
+      expect(isTopmostOverlay(menu)).toBe(true)
+      document.documentElement.style.removeProperty('--z-context-menu')
+    })
+
+    it('reads an undefined token as 0', () => {
+      expect(readZIndexToken('--z-not-a-token')).toBe(0)
     })
 
     it('reports any ref as topmost when nothing connected is registered', () => {

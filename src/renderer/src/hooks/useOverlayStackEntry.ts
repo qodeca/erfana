@@ -9,7 +9,12 @@
  */
 
 import { useEffect, useLayoutEffect, useRef } from 'react'
-import { registerOverlay, unregisterOverlay, type OverlayEscapeHandler } from '../utils/overlayStack'
+import {
+  registerOverlay,
+  unregisterOverlay,
+  type OverlayEscapeHandler,
+  type ZIndexToken
+} from '../utils/overlayStack'
 
 /**
  * Options for {@link useOverlayStackEntry}.
@@ -17,8 +22,12 @@ import { registerOverlay, unregisterOverlay, type OverlayEscapeHandler } from '.
 export interface UseOverlayStackEntryOptions {
   /** Whether the overlay is currently open. Closed overlays are not on the stack. */
   active: boolean
-  /** The z-index the overlay paints at – the stack's primary ordering key. */
-  zIndex: number
+  /**
+   * The z-index the overlay paints at – the stack's primary ordering key. Pass
+   * the stylesheet token (e.g. `'--z-context-menu'`) when the overlay's
+   * z-index comes from CSS; never copy the token's number into TypeScript.
+   */
+  zIndex: number | ZIndexToken
   /**
    * What Escape does while this overlay is on top, or `null`/`undefined` to
    * make Escape do nothing (it then does NOT fall through to the overlay
@@ -44,7 +53,7 @@ export interface UseOverlayStackEntryOptions {
  * ```tsx
  * function Menu({ onClose }: { onClose: () => void }) {
  *   const menuRef = useRef<HTMLDivElement>(null)
- *   useOverlayStackEntry(menuRef, { active: true, zIndex: 100000, onEscape: onClose })
+ *   useOverlayStackEntry(menuRef, { active: true, zIndex: '--z-context-menu', onEscape: onClose })
  *   return <div ref={menuRef} role="menu" />
  * }
  * ```

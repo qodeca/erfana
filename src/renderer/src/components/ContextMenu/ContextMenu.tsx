@@ -7,11 +7,6 @@ import { useOccluder } from '../../hooks/useOccluder'
 import { useOverlayStackEntry } from '../../hooks/useOverlayStackEntry'
 import './ContextMenu.css'
 
-// Overlay-stack rank. Mirrors `--z-context-menu` in design-tokens.css (what
-// `.context-menu` paints at): a menu always paints above dialogs, so it is
-// also the overlay that takes Escape first.
-const CONTEXT_MENU_Z_INDEX = 100000
-
 export interface ContextMenuItem {
   label: string
   icon?: ReactNode
@@ -56,7 +51,9 @@ export function ContextMenu({ x, y, items, onClose, containerTestId }: ContextMe
   // where a stray Escape interrupts a running agent).
   useOverlayStackEntry(menuRef, {
     active: true,
-    zIndex: CONTEXT_MENU_Z_INDEX,
+    // The token `.context-menu` paints with: a menu paints above dialogs, so
+    // it is also the overlay that takes Escape first.
+    zIndex: '--z-context-menu',
     onEscape: onClose
   })
 

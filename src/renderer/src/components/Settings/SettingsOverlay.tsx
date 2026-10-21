@@ -19,11 +19,6 @@ import './SettingsOverlay.css'
 // Small delay to ensure overlay is fully rendered before focusing
 const FOCUS_DELAY_MS = 10
 
-// Overlay-stack rank. Mirrors `--z-modal` in design-tokens.css (what
-// `.settings-overlay` paints at), so every BaseDialog (10000+) ranks above
-// Settings for Escape, exactly as it paints above it.
-const SETTINGS_OVERLAY_Z_INDEX = 1000
-
 // Log level options for dropdown
 const LOG_LEVEL_OPTIONS: { value: LoggingLevel; label: string }[] = [
   { value: 'trace', label: 'Trace' },
@@ -280,7 +275,9 @@ export function SettingsOverlay() {
   // takes Escape first, and one press must not close both (#229).
   useOverlayStackEntry(containerRef, {
     active: isOpen,
-    zIndex: SETTINGS_OVERLAY_Z_INDEX,
+    // The token `.settings-overlay` paints with, so every dialog (10000+)
+    // ranks above Settings for Escape exactly as it paints above it.
+    zIndex: '--z-modal',
     onEscape: closeSettings
   })
 

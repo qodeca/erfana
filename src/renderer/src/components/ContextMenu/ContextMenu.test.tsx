@@ -114,6 +114,8 @@ describe('ContextMenu', () => {
   it('Escape closes only the menu when it is open over a dialog (#229)', () => {
     const onClose = vi.fn()
     const dialogClose = vi.fn()
+    // jsdom loads no stylesheet; give the menu's layering token its value.
+    document.documentElement.style.setProperty('--z-context-menu', '100000')
     render(
       <>
         <BaseDialog isOpen onClose={dialogClose} zIndex={10001}>
@@ -127,6 +129,7 @@ describe('ContextMenu', () => {
 
     expect(onClose).toHaveBeenCalledOnce()
     expect(dialogClose).not.toHaveBeenCalled()
+    document.documentElement.style.removeProperty('--z-context-menu')
   })
 
   it('keeps Escape from reaching the control underneath the menu', () => {
