@@ -380,6 +380,8 @@ describe('MarkdownEditorPanel Integration', () => {
       expect(catchBlock).toContain('shouldToastSaveError(trigger, message, lastSaveErrorRef.current)')
       expect(catchBlock).toMatch(/showToast\(\{ title: 'Save failed', message, type: 'error'/)
       expect(catchBlock).toContain('return false')
+      // The log line drops the absolute path the errno message quotes; the toast keeps it
+      expect(catchBlock).toContain("logger.error('Error saving file', loggableError(error))")
       // The tab is marked clean only after a write that succeeded
       expect(catchBlock).not.toContain('setEditorDirty(panelIdRef.current, false)')
     })

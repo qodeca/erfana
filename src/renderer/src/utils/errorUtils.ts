@@ -5,6 +5,7 @@
  */
 
 import { INVALID_FILENAME_MARKER } from '../../../shared/errors'
+import { redactQuotedPaths } from '../../../shared/redactQuotedPaths'
 
 /**
  * Sanitizes IPC error messages by removing Electron's remote method invocation prefix
@@ -119,4 +120,21 @@ export function formatSaveError(error: unknown, fileName: string): string {
   const kind = classifyFsError(reason)
   const why = kind ? what[kind] : reason.replace(/\.$/, '')
   return `"${fileName}" could not be saved: ${why}. ${kept}`
+}
+
+/**
+ * The copy of an error to hand to `logger.error`, without the absolute paths a
+ * Node errno message quotes (`open 'C:\Users\…\notes.md'`). The log file must
+ * not hold the user's folder layout; the toast keeps the full message.
+ *
+ * Returns the ORIGINAL error when there is nothing to remove, so its stack
+ * survives; a rewrite drops the stack, which embeds the message verbatim.
+ *
+ * @param error - The caught error (any value from a `catch` clause)
+ * @returns An `Error` safe to log, or `undefined` for non-`Error` input
+ */
+export function loggableError(error: unknown): Error | undefined {
+  if (!(error instanceof Error)) return undefined
+  const redacted = redactQuotedPaths(error.message)
+  return redacted === error.message ? error : new Error(redacted)
 }
