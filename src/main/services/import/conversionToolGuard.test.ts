@@ -6,7 +6,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync, chmodSync, realpathSync } from 'fs'
-import { join } from 'path'
+import { delimiter, join } from 'path'
 import { tmpdir } from 'os'
 import { findUntrustedConversionTool, resolveLibreOffice } from './conversionToolGuard'
 import type { PathLookupEnv } from '../../utils/pathLookup'
@@ -87,19 +87,33 @@ describe('resolveLibreOffice – POSIX', () => {
   })
 
   it('rejects hits in a project opened through a symlink (root compared by its real path too)', () => {
+    // Real folders and a real link (a junction on Windows, which needs no
+    // privilege), so the root's real path comes from the host. The PATH and the
+    // files are built for the host platform, so this runs on every OS.
+    const host = process.platform
+    const exe = (name: string): string => (host === 'win32' ? `${name}.exe` : name)
+    const sysDir = host === 'win32' ? 'C:\\Windows\\System32' : '/usr/bin'
     // Outside the temp folders, so only the project rule can refuse.
     const base = join(process.cwd(), '.local', 'vitest-symlink-project')
     mkdirSync(base, { recursive: true })
     const real = mkdtempSync(join(base, 'real-'))
     const link = join(base, `link-${process.pid}`)
     mkdirSync(join(real, 'bin'))
-    symlinkSync(real, link)
+    symlinkSync(real, link, 'junction')
     try {
       const realBin = join(realpathSync.native(real), 'bin')
-      const env = posixEnv(`${realBin}:/usr/bin`, ['/usr/bin/which', join(realBin, 'soffice')], process.platform)
-      expect(resolveLibreOffice([link], { env, realpath: id }).state).toBe('unsafe')
+      const files = new Set([join(sysDir, exe('which')), join(sysDir, exe('powershell')), join(realBin, exe('soffice'))])
+      const env: PathLookupEnv = {
+        platform: host,
+        pathValue: [realBin, sysDir].join(delimiter),
+        pathext: '.EXE',
+        cwd: base,
+        rustPrefixDirs: host === 'win32' ? [sysDir] : [],
+        isExecutableFile: (p) => files.has(p)
+      }
+      expect(resolveLibreOffice([link], { env, realpath: id })).toMatchObject({ state: 'unsafe', reason: 'project' })
     } finally {
-      rmSync(link, { force: true })
+      rmSync(link, { recursive: false, force: true })
       rmSync(real, { recursive: true, force: true })
     }
   })
@@ -110,8 +124,11 @@ describe('resolveLibreOffice – POSIX', () => {
     writeFileSync(planted, '#!/bin/sh\nexit 0\n')
     chmodSync(planted, 0o755)
     try {
-      const env: PathLookupEnv = { platform: process.platform, pathValue: `${dir}:/usr/bin`, cwd: '/' }
+      // POSIX only: it relies on the host's real /usr/bin/which and on the
+      // executable bit, neither of which exists on Windows. The Windows lookup
+      // is covered by the injected-file-system cases below.
       if (process.platform === 'win32') return
+      const env: PathLookupEnv = { platform: process.platform, pathValue: `${dir}:/usr/bin`, cwd: '/' }
       expect(resolveLibreOffice([], { env })).toMatchObject({ state: 'unsafe', name: 'soffice' })
     } finally {
       rmSync(dir, { recursive: true, force: true })
