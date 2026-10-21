@@ -250,7 +250,7 @@ describe('file:openProjectByPath IPC handler', () => {
         action: 'noop',
         error: 'Security validation failed'
       })
-      await expect(handler({}, '/etc')).rejects.toThrow('Security validation failed')
+      await expect(handler({}, abs('/etc'))).rejects.toThrow('Security validation failed')
     })
 
     it('should throw on directory not found', async () => {
@@ -261,7 +261,7 @@ describe('file:openProjectByPath IPC handler', () => {
         action: 'noop',
         error: 'Project directory not found'
       })
-      await expect(handler({}, '/nonexistent')).rejects.toThrow('Project directory not found')
+      await expect(handler({}, abs('/nonexistent'))).rejects.toThrow('Project directory not found')
     })
 
     it('should throw on permission denied', async () => {
@@ -272,7 +272,7 @@ describe('file:openProjectByPath IPC handler', () => {
         action: 'noop',
         error: 'Cannot access project directory'
       })
-      await expect(handler({}, '/private')).rejects.toThrow('Cannot access')
+      await expect(handler({}, abs('/private'))).rejects.toThrow('Cannot access')
     })
 
     it('should throw generic error when error is undefined', async () => {
@@ -294,7 +294,7 @@ describe('file:openProjectByPath IPC handler', () => {
         action: 'noop',
         error: 'Cannot open system or sensitive directories'
       })
-      await expect(handler({}, '/System')).rejects.toThrow('system or sensitive')
+      await expect(handler({}, abs('/System'))).rejects.toThrow('system or sensitive')
     })
 
     it('should handle symlink attack rejection', async () => {
@@ -305,7 +305,7 @@ describe('file:openProjectByPath IPC handler', () => {
         action: 'noop',
         error: 'Cannot open symlink to system directory'
       })
-      await expect(handler({}, '/symlink-to-etc')).rejects.toThrow('symlink')
+      await expect(handler({}, abs('/symlink-to-etc'))).rejects.toThrow('symlink')
     })
   })
 
