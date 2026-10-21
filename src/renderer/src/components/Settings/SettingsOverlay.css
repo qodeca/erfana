@@ -193,27 +193,33 @@
   padding: var(--space-4);
 }
 
-/* Settings Checkbox - Custom checkbox styling */
+/* Settings Checkbox - Custom checkbox styling
+ *
+ * The visible box is the decided Form card's 16px checkbox
+ * (design/system/components/form). The element itself is 24 x 24, the WCAG 2.2
+ * SC 2.5.8 minimum target (#96): the outer --space-2 is a transparent border,
+ * which takes the pointer but paints nothing (background-clip: padding-box).
+ * The box's 1px edge is an inset shadow inside that border, in
+ * --color-border-input, the token that reaches SC 1.4.11's 3:1 on every surface.
+ */
 .settings-checkbox {
   /* Reset default appearance */
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
 
-  /* Sizing: a 24 x 24 target (WCAG 2.2 SC 2.5.8, #96) around a 20px visible box.
-     The outer --space-1 is a transparent border, so it takes the pointer but
-     paints nothing (background-clip: padding-box); the visible 1px edge is an
-     inset shadow inside it. */
+  /* Sizing */
   width: var(--btn-height-sm);
   height: var(--btn-height-sm);
   min-width: var(--btn-height-sm);
   min-height: var(--btn-height-sm);
+  margin: 0;
 
   /* Styling */
   background-color: var(--color-bg-tertiary);
   background-clip: padding-box;
-  border: var(--space-1) solid transparent;
-  box-shadow: inset 0 0 0 var(--border-width) var(--color-border-default);
+  border: var(--space-2) solid transparent;
+  box-shadow: inset 0 0 0 var(--border-width) var(--color-border-input);
   border-radius: 0; /* UI Style Guide: no rounded corners */
   cursor: pointer;
   transition: background-color var(--transition-normal), box-shadow var(--transition-normal);
@@ -223,12 +229,16 @@
 }
 
 .settings-checkbox:hover:not(:disabled) {
-  box-shadow: inset 0 0 0 var(--border-width) var(--color-border-subtle);
+  box-shadow: inset 0 0 0 var(--border-width) var(--color-text-tertiary);
 }
 
+/* deviates: design/system/foundations/focus.html — the ring is drawn inward,
+   into the transparent --space-2 border, so it lands --space-1 outside the
+   visible 16px box exactly as the Focus and Form cards draw it; outward it
+   would float --space-2 further off. */
 .settings-checkbox:focus-visible {
   outline: var(--border-width-thick) solid var(--color-border-focus);
-  outline-offset: var(--space-1);
+  outline-offset: calc(var(--space-1) * -1);
 }
 
 .settings-checkbox:checked {
@@ -239,7 +249,7 @@
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23161312' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'%3E%3C/polyline%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: center;
-  background-size: 12px;
+  background-size: var(--space-6);
 }
 
 .settings-checkbox:checked:hover:not(:disabled) {
@@ -250,6 +260,36 @@
 .settings-checkbox:disabled {
   opacity: var(--opacity-disabled);
   cursor: not-allowed;
+}
+
+/* Forced colours (Windows high contrast) drop box-shadow and repaint the fill,
+   which would leave a checked and an unchecked box looking the same. Paint the
+   box with system colours instead: an outlined Canvas box when off, a solid
+   Highlight box when on. */
+@media (forced-colors: active) {
+  .settings-checkbox {
+    forced-color-adjust: none;
+    background-color: Canvas;
+    box-shadow: inset 0 0 0 var(--border-width) CanvasText;
+  }
+
+  .settings-checkbox:hover:not(:disabled) {
+    box-shadow: inset 0 0 0 var(--border-width) Highlight;
+  }
+
+  .settings-checkbox:checked,
+  .settings-checkbox:checked:hover:not(:disabled) {
+    background-color: Highlight;
+    box-shadow: inset 0 0 0 var(--border-width) Highlight;
+  }
+
+  .settings-checkbox:focus-visible {
+    outline-color: Highlight;
+  }
+
+  .settings-checkbox:disabled {
+    box-shadow: inset 0 0 0 var(--border-width) GrayText;
+  }
 }
 
 /* Settings Input - Text/password input styling */

@@ -62,7 +62,7 @@
     width: var(--icon-size-sm); height: var(--icon-size-sm);
     margin: 0;
     background: var(--color-bg-input);
-    border: var(--border-width) solid var(--color-border-subtle);
+    border: var(--border-width) solid var(--color-border-input);
     border-radius: var(--border-radius);
     cursor: pointer;
     display: grid; place-content: center;
@@ -103,7 +103,8 @@
   <strong><span data-claim="contrast-input-border"></span>:1</strong> here — not a brighter fill, which
   would have to clear 3:1 against all three surfaces and would end up reading as a button.
   <code>--color-border-default</code> and <code>--color-border-subtle</code> are unchanged; 1.4.11 does
-  not govern decorative dividers.
+  not govern decorative dividers. An unchecked checkbox is identified by its edge alone too, so it takes
+  <code>--color-border-input</code> for the same reason (#96).
   <br><br>
   Separately, and under a different rule: the placeholder was 2.69:1. Placeholders are text, so the bar
   is 1.4.3's 4.5:1, not 3:1 — it is now

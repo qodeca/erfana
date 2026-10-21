@@ -75,10 +75,10 @@
 }
 
 /* The label wraps its checkbox, so the whole label is the pointer target: at least
-   24px tall (WCAG 2.2 SC 2.5.8, #96) and as wide as its text. The 16px native box
-   inside keeps its size. */
+   24px tall (WCAG 2.2 SC 2.5.8, #96) and as wide as its text – inline-flex, so the
+   empty rest of the row does not toggle it. The 16px native box keeps its size. */
 .doc-import-checkbox-label {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   min-height: var(--btn-height-sm);
   gap: var(--space-4);

@@ -139,6 +139,7 @@
 .editor-tab-close:focus-visible {
   outline: var(--border-width-thick) solid var(--color-border-focus);
   outline-offset: calc(var(--space-1) * -1);
+  opacity: 1;
 }
 
 /* ==================================

@@ -141,7 +141,8 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  height: var(--icon-size-md);
+  /* A 24px-tall target, the WCAG 2.2 SC 2.5.8 minimum (#96) */
+  height: var(--btn-height-sm);
   padding: 0 var(--space-2);
   border: var(--border-width) solid var(--color-warning-border);
   border-radius: var(--border-radius);
@@ -231,6 +232,17 @@
   min-width: 80px !important;
   max-width: 300px !important;
   flex: 1 1 0 !important;
+}
+
+/* With the failure badge showing, the fixed parts of the tab (icon, badge,
+ * close button) are wider than the 80px floor, and the tab's overflow: hidden
+ * would clip the close button to a sliver. The floor becomes the width of
+ * those fixed parts instead (the label shrinks to nothing first), so the close
+ * button keeps its full 24 x 24 target (#96). */
+.html-preview-tab:has(.html-preview-badge),
+.dockview-theme-dark .dv-tab:has(.html-preview-badge),
+.dockview-theme-dark .dv-default-tab:has(.html-preview-badge) {
+  min-width: min-content !important;
 }
 
 .dockview-theme-dark .dv-default-tab:has(.html-preview-tab) .dv-default-tab-action {
