@@ -59,7 +59,9 @@ export class KeyboardHelper {
   }
 
   async save(): Promise<void> {
-    await this.shortcut('S')
+    // Lowercase on purpose: the app's save handler matches `e.key === 's'`, and
+    // Playwright sends `S` as `key: 'S'`, which the handler ignores.
+    await this.shortcut('s')
   }
 
   async find(): Promise<void> {
