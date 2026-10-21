@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { readdir, readFile, writeFile, stat, rm, mkdir, rename as fsRename, cp, copyFile } from 'fs/promises'
+import { readdir, readFile, writeFile, stat, realpath, rm, mkdir, rename as fsRename, cp, copyFile } from 'fs/promises'
 import { join, extname, basename, relative, resolve as resolvePath } from 'path'
 import type { IFileService } from '../interfaces/IFileService'
 import { SymlinkDetector } from '../utils/SymlinkDetector'
@@ -25,7 +25,7 @@ import { logger } from './LoggingService'
 import { atomicWriteText, isAtomicTempName } from '../utils/atomicWrite'
 import { IMAGE_EXTENSIONS, readImage } from './file/imageRead'
 import { childPath } from '../utils/childPath'
-import { isSamePath } from '../utils/pathCompare'
+import { isInsideRoot, isSamePath, normaliseResolved } from '../utils/pathCompare'
 import { getPlatformConfig } from './watcher/PlatformConfig'
 import type { ImageReadResponse } from '../../shared/ipc/file-image-schema'
 import type { ProjectSession } from './session/ProjectSession'
@@ -121,7 +121,18 @@ interface WalkDir {
   readonly rel: string | null
   /** This folder or an ancestor is dropped by the filter: no hints below it. */
   readonly dropped: boolean
+  /**
+   * Real folders of the links this folder was reached through, outermost first.
+   * Empty for a folder reached by plain folders only.
+   */
+  readonly linkChain?: readonly string[]
 }
+
+/**
+ * Folder links (junctions, directory symlinks) a walk follows one inside the
+ * other. A deeper chain is shown as a folder but not entered.
+ */
+export const MAX_LINK_DEPTH = 8
 
 /** A walk's scope and its first folder – null when the base itself is excluded. */
 interface WalkPlan {
@@ -395,7 +406,7 @@ export class FileService implements IFileService {
 
     for (const entry of entries) {
       const rel = dir.rel === null ? null : joinRelative(dir.rel, entry.name)
-      const isDirectory = entry.isDirectory()
+      let isDirectory = entry.isDirectory()
       // Skip hidden (.erfana/settings.json) and excluded (files.exclude) entries
       if (isSkippedEntry(entry.name, rel, scope)) {
         if (isDirectory && rel !== null && !dir.dropped) scope.hints?.add(rel, dir.depth + 1)
@@ -403,6 +414,13 @@ export class FileService implements IFileService {
       }
 
       const fullPath = join(dir.path, entry.name)
+      // A junction or directory symlink reads as a link, not a folder: it is a
+      // folder row only when its target is a folder inside the project
+      let linkTarget: string | null = null
+      if (!isDirectory && this.symlinkDetector.checkDirent(entry)) {
+        linkTarget = await this.resolveFolderLink(fullPath)
+        isDirectory = linkTarget !== null
+      }
       const node: FileNode = {
         name: entry.name,
         path: fullPath,
@@ -419,7 +437,10 @@ export class FileService implements IFileService {
 
       // Recursively read subdirectories for markdown files
       if (node.type === 'directory') {
-        node.children = await this.readChildDirectory(fullPath, rel, dir, scope)
+        node.children =
+          linkTarget === null
+            ? await this.readChildDirectory(fullPath, rel, dir, scope)
+            : await this.readLinkedDirectory(fullPath, linkTarget, rel, dir, scope)
       }
 
       nodes.push(node)
@@ -432,6 +453,64 @@ export class FileService implements IFileService {
       }
       return a.name.localeCompare(b.name)
     })
+  }
+
+  /**
+   * The real folder a link leads to, when it is a folder inside the open
+   * project; null for everything else (a file link, a broken link, a link out
+   * of the project, no project open), which stay file rows as before. The
+   * walk therefore never follows a link out of the project.
+   */
+  private async resolveFolderLink(linkPath: string): Promise<string | null> {
+    const snapshot = this.session?.current() ?? null
+    if (!snapshot) return null
+    try {
+      if (!(await stat(linkPath)).isDirectory()) return null
+      const target = normaliseResolved(await realpath(linkPath))
+      return isInsideRoot(target, snapshot.realRoot, snapshot.caseSensitive) ? target : null
+    } catch {
+      return null
+    }
+  }
+
+  /**
+   * Read a folder reached through a link. It is entered unless that would loop
+   * (the target is, or contains, the folder the link sits in, or was already
+   * entered through another link) or the chain is too deep; then it is a folder
+   * row with no children.
+   */
+  private async readLinkedDirectory(
+    fullPath: string,
+    target: string,
+    rel: string | null,
+    parent: WalkDir,
+    scope: WalkScope
+  ): Promise<FileNode[]> {
+    const snapshot = this.session?.current() ?? null
+    const chain = parent.linkChain ?? []
+    if (!snapshot || chain.length >= MAX_LINK_DEPTH || chain.includes(target)) return []
+    try {
+      const parentReal = normaliseResolved(await realpath(parent.path))
+      // The link's target contains the folder the link is in: entering it loops
+      if (isInsideRoot(parentReal, target, snapshot.caseSensitive)) return []
+    } catch {
+      return []
+    }
+    const depth = parent.depth + 1
+    const dropped = parent.dropped || isDroppedFolder(rel, scope)
+    if (dropped && !parent.dropped && rel !== null) scope.hints?.add(rel, depth)
+    try {
+      return await this._readDirectoryInternal(
+        { path: fullPath, depth, rel, dropped, linkChain: [...chain, target] },
+        scope
+      )
+    } catch (error) {
+      logger.warn('FileService: readDirectory error recovered', {
+        path: redactPath(fullPath),
+        error: redactQuotedPaths(error instanceof Error ? error.message : String(error))
+      })
+      return []
+    }
   }
 
   /**
@@ -449,7 +528,10 @@ export class FileService implements IFileService {
     const dropped = parent.dropped || isDroppedFolder(rel, scope)
     if (dropped && !parent.dropped && rel !== null) scope.hints?.add(rel, depth)
     try {
-      return await this._readDirectoryInternal({ path: fullPath, depth, rel, dropped }, scope)
+      return await this._readDirectoryInternal(
+        { path: fullPath, depth, rel, dropped, linkChain: parent.linkChain },
+        scope
+      )
     } catch (error) {
       logger.warn('FileService: readDirectory error recovered', {
         path: redactPath(fullPath),

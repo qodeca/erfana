@@ -20,7 +20,7 @@ import { ConfinementError, type ConfinementErrorCode } from '../../ipc/confineme
 export interface ProjectSessionSnapshot {
   /** +1 on every commit, open or close */
   readonly generation: number
-  /** `path.resolve` of the path that was opened; shown to the renderer */
+  /** The opened path as shown to the renderer: `path.resolve`, or the native `realpath` spelling on Windows (see `displayRootSpelling`) */
   readonly root: string
   /** `realpath(root)` at open, normalised (see `normaliseRealRoot`) */
   readonly realRoot: string
@@ -53,6 +53,21 @@ export { ConfinementError, type ConfinementErrorCode }
  */
 export function normaliseRealRoot(real: string): string {
   return normaliseResolved(real)
+}
+
+/**
+ * The spelling of the project path that is shown and stored. On Windows it is
+ * the native `realpath` result (on-disk case, no 8.3 short names; a UNC
+ * admin-share path keeps its form), so a project opened as `c:\\users\\X~1`
+ * and one opened as `C:\\Users\\Xavier` are the same name. Elsewhere the
+ * caller's resolved spelling is kept: a symlinked root stays what the user chose.
+ */
+export function displayRootSpelling(
+  resolved: string,
+  realRoot: string,
+  platform: NodeJS.Platform
+): string {
+  return platform === 'win32' ? realRoot : resolved
 }
 
 /** The writable side. Only `ProjectService` holds one. */

@@ -149,13 +149,36 @@ function checkForm(input: unknown, deps: ConfinementDeps): string {
 interface Walk {
   realProbe: string
   tail: string[]
-  /** `lstat` of the nearest existing ancestor */
-  probeStats: ConfinementStats
+  /** `lstat` of the nearest existing ancestor; null on the fast path, which does not need it */
+  probeStats: ConfinementStats | null
 }
 
-/** Step 5 and 6: climb to the nearest existing ancestor and canonicalise it. */
-async function walkToExistingAncestor(start: string, deps: ConfinementDeps): Promise<Walk> {
+/**
+ * Step 5 and 6: climb to the nearest existing ancestor and canonicalise it.
+ *
+ * With `expectExists` the path is canonicalised first: when that succeeds the
+ * path exists, there is nothing to climb, and the `lstat` the climb starts with
+ * is not made (one call instead of two per check, each a round trip on a network
+ * volume). When it fails for any reason the full climb runs and decides the
+ * outcome exactly as before, so no refusal depends on the shortcut.
+ */
+async function walkToExistingAncestor(
+  start: string,
+  deps: ConfinementDeps,
+  expectExists: boolean
+): Promise<Walk> {
   const { path, fs } = deps
+  if (expectExists) {
+    try {
+      return {
+        realProbe: normaliseResolved(await fs.realpath(start), deps),
+        tail: [],
+        probeStats: null
+      }
+    } catch {
+      // Missing, a dangling link or unreadable: the climb below tells which
+    }
+  }
   const tail: string[] = []
   let probe = start
   let probeStats: ConfinementStats
@@ -180,7 +203,7 @@ async function walkToExistingAncestor(start: string, deps: ConfinementDeps): Pro
   }
 
   // Win32 can report a missing child of a file as ENOENT rather than ENOTDIR
-  if (tail.length > 0 && probeStats.isFile()) throw new ConfinementError('NOT_FOUND')
+  if (tail.length > 0 && probeStats?.isFile()) throw new ConfinementError('NOT_FOUND')
 
   let realProbe: string
   try {
@@ -191,7 +214,7 @@ async function walkToExistingAncestor(start: string, deps: ConfinementDeps): Pro
     throw new ConfinementError('UNVERIFIABLE')
   }
 
-  if (tail.length > 0 && probeStats.isSymbolicLink()) {
+  if (tail.length > 0 && probeStats?.isSymbolicLink()) {
     let target: ConfinementStats
     try {
       target = await fs.stat(realProbe)
@@ -216,6 +239,7 @@ async function locateInProject(
   lexical: string,
   session: ConfinementSession,
   entry: boolean,
+  expectExists: boolean,
   deps: ConfinementDeps
 ): Promise<Located> {
   const { path, fs } = deps
@@ -223,7 +247,7 @@ async function locateInProject(
   if (entry && start === lexical) throw new ConfinementError('OUTSIDE_PROJECT')
   const last = entry ? path.basename(lexical) : null
 
-  const { realProbe, tail, probeStats } = await walkToExistingAncestor(start, deps)
+  const { realProbe, tail, probeStats } = await walkToExistingAncestor(start, deps, expectExists)
   const below = [...tail, ...(last === null ? [] : [last])]
   const real = below.length > 0 ? path.join(realProbe, ...below) : realProbe
 
@@ -289,7 +313,7 @@ export async function resolveConfinedPath(
         isInsideRoot(lexical, session.realRoot, session.caseSensitive, deps)
       if (looksInside) {
         try {
-          await locateInProject(lexical, session, false, deps)
+          await locateInProject(lexical, session, false, false, deps)
         } catch (error) {
           // Only a path that resolves out of the project is refused here; a
           // missing or unreadable one keeps failing with its own error later
@@ -314,7 +338,11 @@ export async function resolveConfinedPath(
     throw new ConfinementError('ROOT_FORBIDDEN')
   }
 
-  const located = await locateInProject(lexical, session, entry, deps)
+  // An entry's parent, or a path that must exist or has a kind to match, is
+  // expected to be there; a path about to be created is not
+  const expectExists =
+    entry || (policy.mode === 'project' && (policy.mustExist === true || policy.kind !== undefined))
+  const located = await locateInProject(lexical, session, entry, expectExists, deps)
 
   if (policy.mustExist && !located.existed) throw new ConfinementError('NOT_FOUND')
   if (
@@ -326,9 +354,11 @@ export async function resolveConfinedPath(
   ) {
     throw new ConfinementError('ROOT_FORBIDDEN')
   }
-  if (policy.mode === 'project' && policy.kind && located.existed && located.stats) {
+  if (policy.mode === 'project' && policy.kind && located.existed) {
     let target = located.stats
-    if (target.isSymbolicLink()) {
+    // No `lstat` on the fast path, and a link needs its target's kind: both
+    // ask `stat` about the canonical path
+    if (target === null || target.isSymbolicLink()) {
       try {
         target = await deps.fs.stat(located.realProbe)
       } catch {

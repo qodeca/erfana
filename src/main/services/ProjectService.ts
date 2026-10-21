@@ -38,6 +38,7 @@ import { redactQuotedPaths } from '../../shared/redactQuotedPaths'
 import {
   ProjectSessionStore,
   normaliseRealRoot,
+  displayRootSpelling,
   type ProjectSession,
   type ProjectSessionSnapshot
 } from './session/ProjectSession'
@@ -353,7 +354,33 @@ export class ProjectService {
       throw error
     }
     logger.debug('Project switch: security validation passed')
-    const newProjectPath = resolve(requestedPath)
+    const resolvedPath = resolve(requestedPath)
+
+    // 1b. Resolve the path once, natively. On Windows the spelling realpath
+    // returns (on-disk case, long names) is the one the project is known by
+    // from here on: lock, session, recents and the renderer all get it, so one
+    // project never shows under two spellings. The same value is the session's
+    // `realRoot`, so the commit below needs no second realpath.
+    let realRoot: string
+    try {
+      realRoot = normaliseRealRoot(
+        await step(realpath(resolvedPath), 'Project path resolution').catch((error) => {
+          if (error instanceof TimeoutError) throw error
+          return resolvedPath
+        })
+      )
+    } catch (error) {
+      if (error instanceof TimeoutError) {
+        return {
+          success: false,
+          path: oldProjectPath || '',
+          action: 'noop',
+          error: error.message
+        }
+      }
+      throw error
+    }
+    const newProjectPath = displayRootSpelling(resolvedPath, realRoot, process.platform)
 
     // 2. Check if same project (canonical comparison)
     if (openSnapshot) {
@@ -450,13 +477,6 @@ export class ProjectService {
 
       const caseSensitive = getPlatformConfig().caseSensitive
       pathFilter = this.buildPathFilter(newProjectPath, projectSettings, caseSensitive)
-      const realRoot = normaliseRealRoot(
-        await step(realpath(newProjectPath), 'Project path resolution').catch((error) => {
-          if (error instanceof TimeoutError) throw error
-          return newProjectPath
-        })
-      )
-
       // 7. Commit: swap the session. The services take the new path, and the
       // settings cache the loaded settings, in `onChange`.
       this.settingsForCommit = projectSettings
