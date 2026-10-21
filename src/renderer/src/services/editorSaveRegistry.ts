@@ -67,11 +67,21 @@ export interface EditorSaveEntry {
 /** Options for {@link editorSaveRegistry.flushAll}. */
 export interface FlushAllOptions {
   /**
+   * How long one tab may take before it is counted as failed, so a save that
+   * never answers cannot hold up a project switch. Default {@link FLUSH_TAB_TIMEOUT_MS}.
+   */
+  timeoutMs?: number
+  /**
    * Leave a tab in its "changed on disk" conflict state alone (and report it
    * in `conflicted`), because a save would overwrite the newer file.
    */
   skipConflicts?: boolean
 }
+
+/** Default per-tab deadline of {@link editorSaveRegistry.flushAll} */
+export const FLUSH_TAB_TIMEOUT_MS = 10_000
+
+type FlushOutcome = 'saved' | 'failed' | 'conflicted'
 
 /** What {@link editorSaveRegistry.flushAll} did, as panel ids. */
 export interface FlushAllResult {
@@ -249,30 +259,39 @@ export const editorSaveRegistry = {
    */
   async flushAll(options: FlushAllOptions = {}): Promise<FlushAllResult> {
     const result: FlushAllResult = { saved: [], failed: [], conflicted: [] }
-    const dirtyIds = Array.from(useProjectStore.getState().dirtyPanelIds)
+    const timeoutMs = options.timeoutMs ?? FLUSH_TAB_TIMEOUT_MS
+    const isDirty = (panelId: string): boolean => useProjectStore.getState().dirtyPanelIds.has(panelId)
+
+    const flushTab = async (panelId: string): Promise<FlushOutcome> => {
+      const entry = entries.get(panelId)
+      if (!entry) return 'failed'
+      try {
+        await entry.whenSaveSettled?.()
+      } catch {
+        // Only a wait; the save below reports its own outcome.
+      }
+      // The save that was in flight may have cleaned the tab.
+      if (!isDirty(panelId)) return 'saved'
+      if (options.skipConflicts && editorSaveRegistry.hasConflict(panelId)) return 'conflicted'
+      if (!(await editorSaveRegistry.save(panelId))) return 'failed'
+      // Typing that landed while the write ran leaves the tab dirty again:
+      // write once more, and count it as unsaved if it still is.
+      if (isDirty(panelId) && !(await editorSaveRegistry.save(panelId))) return 'failed'
+      return isDirty(panelId) ? 'failed' : 'saved'
+    }
+
     await Promise.all(
-      dirtyIds.map(async (panelId) => {
-        const entry = entries.get(panelId)
-        if (!entry) {
-          result.failed.push(panelId)
-          return
-        }
+      Array.from(useProjectStore.getState().dirtyPanelIds).map(async (panelId) => {
+        let timer: ReturnType<typeof setTimeout> | undefined
+        const deadline = new Promise<FlushOutcome>((resolve) => {
+          timer = setTimeout(() => resolve('failed'), timeoutMs)
+        })
         try {
-          await entry.whenSaveSettled?.()
-        } catch {
-          // Only a wait; the save below reports its own outcome.
+          const outcome = await Promise.race([flushTab(panelId), deadline])
+          result[outcome].push(panelId)
+        } finally {
+          clearTimeout(timer)
         }
-        // The save that was in flight may have cleaned the tab.
-        if (!useProjectStore.getState().dirtyPanelIds.has(panelId)) {
-          result.saved.push(panelId)
-          return
-        }
-        if (options.skipConflicts && editorSaveRegistry.hasConflict(panelId)) {
-          result.conflicted.push(panelId)
-          return
-        }
-        if (await editorSaveRegistry.save(panelId)) result.saved.push(panelId)
-        else result.failed.push(panelId)
       })
     )
     return result

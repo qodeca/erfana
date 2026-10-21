@@ -38,6 +38,13 @@ export interface UseAutoSaveReturn {
   cancelAutoSave: () => void
   /** Signal a content change to reset the debounce timer. Call on each keystroke. */
   signalChange: () => void
+  /**
+   * Hold auto-save: cancel the pending timers and keep every later arming
+   * (`signalChange`, the modified-state effect) from starting one, until the
+   * returned release is called. The release re-arms the timers when the
+   * content is still modified. Safe to release more than once.
+   */
+  holdAutoSave: () => () => void
 }
 
 /**
@@ -114,10 +121,18 @@ export function useAutoSave(
     enabledRef.current = enabled
   }, [enabled])
 
+  // Set while a hold is active (see holdAutoSave); checked wherever a timer is armed.
+  const heldRef = useRef(false)
+
   const delayRef = useRef(delay)
   useEffect(() => {
     delayRef.current = delay
   }, [delay])
+
+  const maxIntervalRef = useRef(maxInterval)
+  useEffect(() => {
+    maxIntervalRef.current = maxInterval
+  }, [maxInterval])
 
   /**
    * Clear the debounce timer only
@@ -175,7 +190,7 @@ export function useAutoSave(
    * (the useEffect handles the initial modified: false→true transition).
    */
   const signalChange = useCallback(() => {
-    if (!enabledRef.current || !isModifiedRef.current) return
+    if (!enabledRef.current || !isModifiedRef.current || heldRef.current) return
     clearDebounceTimer()
     debounceTimerRef.current = setTimeout(() => {
       triggerSave()
@@ -184,7 +199,7 @@ export function useAutoSave(
 
   // Manage timer lifecycle based on isModified transitions
   useEffect(() => {
-    if (enabled && isModified) {
+    if (enabled && isModified && !heldRef.current) {
       // isModified just became true (or initial mount with modified content)
       // Start debounce timer (backward compat for consumers not calling signalChange)
       clearDebounceTimer()
@@ -207,10 +222,33 @@ export function useAutoSave(
     return cancelAutoSave
   }, [isModified, delay, enabled, maxInterval, cancelAutoSave, clearDebounceTimer, clearMaxIntervalTimer, triggerSave])
 
+  const holdAutoSave = useCallback((): (() => void) => {
+    heldRef.current = true
+    cancelAutoSave()
+    let released = false
+    return () => {
+      if (released) return
+      released = true
+      heldRef.current = false
+      if (!enabledRef.current || !isModifiedRef.current) return
+      clearDebounceTimer()
+      debounceTimerRef.current = setTimeout(() => {
+        triggerSave()
+      }, delayRef.current)
+      if (maxIntervalRef.current > 0) {
+        clearMaxIntervalTimer()
+        maxIntervalTimerRef.current = setTimeout(() => {
+          triggerSave()
+        }, maxIntervalRef.current)
+      }
+    }
+  }, [cancelAutoSave, clearDebounceTimer, clearMaxIntervalTimer, triggerSave])
+
   return {
     isAutoSaving,
     setIsAutoSaving,
     cancelAutoSave,
-    signalChange
+    signalChange,
+    holdAutoSave
   }
 }

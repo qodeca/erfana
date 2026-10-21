@@ -293,6 +293,7 @@ export function useProjectManagement(
         return
       }
 
+      let projectChanged = false
       try {
         // Gracefully interrupt terminal if it was busy
         if (transition.terminalBusy) {
@@ -301,9 +302,12 @@ export function useProjectManagement(
 
         // Open project with race guard (files will be loaded by IPC event)
         // Success toast will be shown by IPC listener after files load
-        await openProjectWithTokenGuard(switchTokenRef, setProjectPathAndScope)
+        const previousPath = projectPathRef.current
+        const openedPath = await openProjectWithTokenGuard(switchTokenRef, setProjectPathAndScope)
+        // null: picker cancelled or superseded; same path: main's no-op
+        projectChanged = openedPath !== null && openedPath !== previousPath
       } finally {
-        transition.settle()
+        transition.settle(projectChanged)
       }
     } catch (err) {
       setError(formatErrorForState(err))
@@ -339,6 +343,7 @@ export function useProjectManagement(
         return
       }
 
+      let projectChanged = false
       try {
         // Gracefully interrupt terminal if it was busy
         if (transition.terminalBusy) {
@@ -347,9 +352,9 @@ export function useProjectManagement(
 
         // Close project with race guard (files and UI state cleared by IPC event)
         // Success toast will be shown by IPC listener after state is cleared
-        await closeProjectWithTokenGuard(switchTokenRef, setProjectPathAndScope)
+        projectChanged = await closeProjectWithTokenGuard(switchTokenRef, setProjectPathAndScope)
       } finally {
-        transition.settle()
+        transition.settle(projectChanged)
       }
     } catch (err) {
       setError(formatErrorForState(err))
@@ -387,6 +392,7 @@ export function useProjectManagement(
         return false
       }
 
+      let projectChanged = false
       try {
         // Gracefully interrupt terminal if it was busy
         if (transition.terminalBusy) {
@@ -395,10 +401,13 @@ export function useProjectManagement(
 
         // Open project directly by path (files will be loaded by IPC event)
         // Success toast will be shown by IPC listener after files load
-        await api.file.openProjectByPath(projectPath)
+        const previousPath = projectPathRef.current
+        const openedPath = await api.file.openProjectByPath(projectPath)
+        // Main answers the path for a no-op too, so an unchanged path is the no-op
+        projectChanged = openedPath !== previousPath
         return true
       } finally {
-        transition.settle()
+        transition.settle(projectChanged)
       }
     } catch (err) {
       setError(formatErrorForState(err))

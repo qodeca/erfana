@@ -124,7 +124,7 @@ describe('useProjectManagement.handleOpenProjectByPath', () => {
         await result.current.handleOpenProjectByPath('/test/project')
       })
 
-      // confirmProjectSwitch is called but with hasDirty=false and terminalBusy=false
+      // the prompt step still runs, with hasDirty=false and terminalBusy=false
       expect(mockConfirmProjectSwitch).toHaveBeenCalledWith(
         false, // hasDirty
         false, // terminalBusy

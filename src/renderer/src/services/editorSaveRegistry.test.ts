@@ -268,9 +268,16 @@ describe('editorSaveRegistry.flushAll', () => {
     for (const id of ids) useProjectStore.getState().setEditorDirty(id, true)
   }
 
+  /** A save that succeeds and cleans the tab, as the real panel does. */
+  const cleaningSave = (id: string) =>
+    vi.fn(async () => {
+      useProjectStore.getState().setEditorDirty(id, false)
+      return true
+    })
+
   it('saves each dirty tab and leaves clean tabs alone', async () => {
-    const saveA = vi.fn(async () => true)
-    const saveB = vi.fn(async () => true)
+    const saveA = cleaningSave('editor-a')
+    const saveB = cleaningSave('editor-b')
     editorSaveRegistry.register('editor-a', { save: saveA, hasConflict: () => false, holdAutosave: noHold })
     editorSaveRegistry.register('editor-b', { save: saveB, hasConflict: () => false, holdAutosave: noHold })
     markDirty('editor-a')
@@ -308,7 +315,7 @@ describe('editorSaveRegistry.flushAll', () => {
   })
 
   it('skips a conflicted tab with skipConflicts and saves it without', async () => {
-    const save = vi.fn(async () => true)
+    const save = cleaningSave('editor-a')
     editorSaveRegistry.register('editor-a', { save, hasConflict: () => true, holdAutosave: noHold })
     markDirty('editor-a')
 
@@ -348,7 +355,7 @@ describe('editorSaveRegistry.flushAll', () => {
   })
 
   it('saves after the in-flight save when the tab is still dirty', async () => {
-    const save = vi.fn(async () => true)
+    const save = cleaningSave('editor-a')
     editorSaveRegistry.register('editor-a', {
       save,
       hasConflict: () => false,
@@ -361,6 +368,76 @@ describe('editorSaveRegistry.flushAll', () => {
 
     expect(save).toHaveBeenCalledTimes(1)
     expect(result.saved).toEqual(['editor-a'])
+  })
+
+  it('writes once more when typing during the write left the tab dirty again', async () => {
+    let calls = 0
+    const save = vi.fn(async () => {
+      calls += 1
+      // the first write is overtaken by typing; the second one catches up
+      useProjectStore.getState().setEditorDirty('editor-a', calls === 1)
+      return true
+    })
+    editorSaveRegistry.register('editor-a', { save, hasConflict: () => false, holdAutosave: noHold })
+    markDirty('editor-a')
+
+    const result = await editorSaveRegistry.flushAll()
+
+    expect(save).toHaveBeenCalledTimes(2)
+    expect(result.saved).toEqual(['editor-a'])
+  })
+
+  it('counts a tab that is still dirty after the second write as failed, never saved', async () => {
+    const save = vi.fn(async () => true)
+    editorSaveRegistry.register('editor-a', { save, hasConflict: () => false, holdAutosave: noHold })
+    markDirty('editor-a')
+
+    const result = await editorSaveRegistry.flushAll()
+
+    expect(save).toHaveBeenCalledTimes(2)
+    expect(result).toEqual({ saved: [], failed: ['editor-a'], conflicted: [] })
+  })
+
+  it('counts a save that never answers as failed once its deadline passes', async () => {
+    vi.useFakeTimers()
+    try {
+      editorSaveRegistry.register('editor-a', {
+        save: () => new Promise<boolean>(() => {}),
+        hasConflict: () => false,
+        holdAutosave: noHold
+      })
+      markDirty('editor-a')
+
+      const flushing = editorSaveRegistry.flushAll({ timeoutMs: 10_000 })
+      await vi.advanceTimersByTimeAsync(10_000)
+
+      expect(await flushing).toEqual({ saved: [], failed: ['editor-a'], conflicted: [] })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('does not let one stuck tab delay another', async () => {
+    vi.useFakeTimers()
+    try {
+      editorSaveRegistry.register('editor-a', {
+        save: () => new Promise<boolean>(() => {}),
+        hasConflict: () => false,
+        holdAutosave: noHold
+      })
+      const saveB = cleaningSave('editor-b')
+      editorSaveRegistry.register('editor-b', { save: saveB, hasConflict: () => false, holdAutosave: noHold })
+      markDirty('editor-a', 'editor-b')
+
+      const flushing = editorSaveRegistry.flushAll({ timeoutMs: 10_000 })
+      await vi.advanceTimersByTimeAsync(10_000)
+      const result = await flushing
+
+      expect(result.saved).toEqual(['editor-b'])
+      expect(result.failed).toEqual(['editor-a'])
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('resolves with nothing to do when no tab is dirty', async () => {

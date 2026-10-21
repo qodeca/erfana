@@ -71,7 +71,74 @@ describe('prepareProjectTransition', () => {
     expect(tab.save).toHaveBeenCalledTimes(1)
     expect(confirm).not.toHaveBeenCalled()
     expect(transition.proceed).toBe(true)
+  })
+
+  it('keeps the UI locked from the flush to settle when no prompt shows (no flicker)', async () => {
+    registerTab('editor-a')
+    const seen: boolean[] = []
+    const unsubscribe = useProjectStore.subscribe((state) => seen.push(state.isProjectChanging))
+
+    const transition = await prepareProjectTransition('switch', confirm)
+    expect(useProjectStore.getState().isProjectChanging).toBe(true)
+    expect(useProjectStore.getState().projectChangingMessage).toBe('Saving open tabs…')
+
+    transition.settle(false)
+    unsubscribe()
+
     expect(useProjectStore.getState().isProjectChanging).toBe(false)
+    // never unlocked and locked again in between
+    expect(seen.join()).not.toContain('false,true')
+  })
+
+  it('locks again after a confirmed prompt and unlocks on settle', async () => {
+    registerTab('editor-a', { conflict: true })
+
+    const transition = await prepareProjectTransition('switch', confirm)
+    expect(useProjectStore.getState().isProjectChanging).toBe(true)
+
+    noteProjectGeneration(generation + 1)
+    transition.settle(true)
+    expect(useProjectStore.getState().isProjectChanging).toBe(false)
+  })
+
+  it('an answer of "did not change" releases the hold even when an event was seen', async () => {
+    const tab = registerTab('editor-a')
+    const transition = await prepareProjectTransition('switch', confirm)
+
+    noteProjectGeneration(generation + 1)
+    transition.settle(false)
+
+    expect(tab.release).toHaveBeenCalledTimes(1)
+  })
+
+  it('an answer of "changed" with no project:changed event releases the hold', async () => {
+    const tab = registerTab('editor-a')
+    const transition = await prepareProjectTransition('switch', confirm)
+
+    transition.settle(true)
+
+    expect(tab.release).toHaveBeenCalledTimes(1)
+  })
+
+  it('an answer of "changed" with an event keeps the hold', async () => {
+    const tab = registerTab('editor-a')
+    const transition = await prepareProjectTransition('switch', confirm)
+
+    noteProjectGeneration(generation + 1)
+    transition.settle(true)
+
+    expect(tab.release).not.toHaveBeenCalled()
+  })
+
+  it('counts a tab that is dirty again after its save in the prompt', async () => {
+    const tab = registerTab('editor-a')
+    tab.save.mockImplementation(async () => true) // "saved", yet the store still says dirty
+
+    await prepareProjectTransition('switch', confirm)
+
+    expect(confirm).toHaveBeenCalledWith(
+      expect.objectContaining({ message: '1 tab could not be saved. Discard and switch project?' })
+    )
   })
 
   it('holds autosave while it works and keeps the hold once the project changed', async () => {

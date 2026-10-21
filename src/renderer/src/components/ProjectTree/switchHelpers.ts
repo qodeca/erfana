@@ -128,25 +128,38 @@ export interface ProjectTransition {
   /** Whether the terminal showed recent activity when the check ran */
   terminalBusy: boolean
   /**
-   * End the transition once the open or close has finished, however it went.
-   * If the project did change (a new `project:changed` generation arrived) the
-   * autosave hold is kept: the tabs unmount and drop it, so nothing can write
-   * into the project that was left. If it did not (picker cancelled, main
-   * answered no-op, an error), the hold is released and autosave re-arms.
+   * End the transition once the open or close has finished, however it went:
+   * lifts the UI lock and decides what happens to the autosave hold.
+   *
+   * @param projectChanged - What the open or close answered: `true` when it
+   *   switched or closed the project, `false` for a no-op, a cancelled picker
+   *   or a failure; omit it when that is not known. A project that did change
+   *   keeps the hold (the tabs unmount and drop it, so nothing can write into
+   *   the project that was left); anything else releases it and autosave
+   *   re-arms. A `true` answer is also checked against the `project:changed`
+   *   generation, because a hold kept on tabs that never unmount would leave
+   *   autosave off for good; with no answer the generation decides alone.
+   *
    * Safe to call more than once.
    */
-  settle: () => void
+  settle: (projectChanged?: boolean) => void
 }
+
+/** What the blocker says while open tabs are being saved */
+const SAVING_TABS_MESSAGE = 'Saving open tabs…'
 
 /**
  * Get the editors ready for a project switch or close.
  *
- * 1. Lock the UI and hold every tab's autosave, so no timer can fire from here.
+ * 1. Lock the UI and hold every tab's autosave (and make the editors
+ *    read-only), so nothing can be typed or saved from here.
  * 2. Save every dirty tab; a tab in conflict is left alone.
- * 3. Re-read what is still unsaved (conflicts, failed writes, typing during
- *    the save) and, only then, prompt: "N tabs could not be saved".
+ * 3. Re-read what is still unsaved (conflicts, failed or timed-out writes,
+ *    tabs dirty again) and, only then, prompt: "N tabs could not be saved".
  *
- * The lock is lifted before the prompt, because it paints above dialogs.
+ * With nothing to ask, the lock stays on until `settle()`, so there is no
+ * unlock and relock between the flush and the open. A prompt lifts it, because
+ * the blocker paints above dialogs, and a confirmed prompt locks again.
  * Cancelling ends the transition here and re-arms autosave.
  *
  * @param action - 'switch' or 'close'
@@ -160,13 +173,18 @@ export async function prepareProjectTransition(
   const { useProjectStore } = await import('../../stores/useProjectStore')
   const startGeneration = getLastSeenProjectGeneration()
 
-  useProjectStore.getState().setProjectChanging(true)
+  useProjectStore.getState().setProjectChanging(true, SAVING_TABS_MESSAGE)
   const releaseHold = editorSaveRegistry.holdAll()
   let settled = false
-  const settle = (): void => {
+  const settle = (projectChanged?: boolean): void => {
     if (settled) return
     settled = true
-    if (getLastSeenProjectGeneration() === startGeneration) releaseHold()
+    useProjectStore.getState().setProjectChanging(false)
+    const eventSeen = getLastSeenProjectGeneration() !== startGeneration
+    const generationUnknown = startGeneration === undefined && getLastSeenProjectGeneration() === undefined
+    const keep =
+      projectChanged === false ? false : projectChanged === true ? eventSeen || generationUnknown : eventSeen
+    if (!keep) releaseHold()
   }
 
   try {
@@ -180,17 +198,20 @@ export async function prepareProjectTransition(
 
     const terminalBusy = await checkTerminalBusy(TERMINAL.RECENT_ACTIVITY_WINDOW)
     const unsavedCount = useProjectStore.getState().dirtyPanelIds.size
-    useProjectStore.getState().setProjectChanging(false)
+    if (!needsSwitchConfirmation(unsavedCount > 0, terminalBusy)) {
+      return { proceed: true, terminalBusy, settle }
+    }
 
+    useProjectStore.getState().setProjectChanging(false)
     const confirmed = await confirmProjectSwitch(unsavedCount > 0, terminalBusy, action, confirm, unsavedCount)
     if (!confirmed) {
-      settle()
+      settle(false)
       return { proceed: false, terminalBusy, settle }
     }
+    useProjectStore.getState().setProjectChanging(true, action === 'switch' ? 'Switching project…' : 'Closing project…')
     return { proceed: true, terminalBusy, settle }
   } catch (error) {
-    useProjectStore.getState().setProjectChanging(false)
-    settle()
+    settle(false)
     throw error
   }
 }
