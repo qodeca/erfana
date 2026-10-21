@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { dialog, BrowserWindow, shell, type OpenDialogOptions } from 'electron'
+import { dialog, shell, type OpenDialogOptions } from 'electron'
 import { stat, realpath } from 'fs/promises'
 import path from 'path'
-import { ProjectService } from '../services/ProjectService'
+import { ProjectService, type OpenContext } from '../services/ProjectService'
 import { fileService } from '../services/FileService'
 import { fileWatcherService } from '../services/FileWatcherService'
 import { directoryWatcherService } from '../services/DirectoryWatcherService'
@@ -11,7 +11,7 @@ import { settingsService } from '../services/SettingsService'
 import { projectSettingsService } from '../services/ProjectSettingsService'
 import { globalSettingsService } from '../services/GlobalSettingsService'
 import { projectLockService } from '../services/ProjectLockService'
-import type { ProjectChanged } from '../../shared/ipc/schema'
+import type { ProjectSessionInfo } from '../../shared/ipc/schema'
 import {
   ImageReadRequestSchema,
   type ImageReadResponse
@@ -24,26 +24,10 @@ import { isTrustedSender } from './senderValidation'
 import { registerHandle } from './registry'
 import { rememberDialogResult, withLastDirectory } from '../utils/lastDialogDirectory'
 
-/**
- * Broadcast project change to all renderer processes
- * Used by handlers that need to notify renderers of project changes
- */
-export function broadcastProjectChanged(payload: ProjectChanged): void {
-  const windows = BrowserWindow.getAllWindows()
-  for (const win of windows) {
-    if (win && !win.isDestroyed()) {
-      try {
-        win.webContents.send('project:changed', payload)
-      } catch {
-        // ignore send errors for destroyed windows
-      }
-    }
-  }
-}
-
 // REFACTORING (todo017): Create ProjectService singleton for orchestration
 // Thin adapter pattern: IPC handler depends on service, not orchestration logic
-const projectService = new ProjectService(
+// Exported: the composition root reads the session from it (preview teardown, window close)
+export const projectService = new ProjectService(
   fileService,
   fileWatcherService,
   directoryWatcherService,
@@ -65,8 +49,11 @@ projectSettingsService.setGlobalExcludeProvider(
  *
  * REFACTORING (todo017): Simplified to thin adapter delegating to ProjectService
  */
-async function openProjectByPath(newProjectPath: string): Promise<string> {
-  const result = await projectService.switchProject(newProjectPath)
+async function openProjectByPath(
+  newProjectPath: string,
+  ctx: OpenContext
+): Promise<string> {
+  const result = await projectService.switchProject(newProjectPath, ctx)
 
   if (!result.success) {
     // focused_existing is a success case - existing window was focused
@@ -82,7 +69,7 @@ async function openProjectByPath(newProjectPath: string): Promise<string> {
 
 export function registerFileHandlers(): void {
   // Open project folder via dialog
-  registerHandle('file:openProject', async () => {
+  registerHandle('file:openProject', async (event) => {
     const result = await dialog.showOpenDialog(withLastDirectory<OpenDialogOptions>({
       properties: ['openDirectory', 'createDirectory'],
       title: 'Select Project Folder',
@@ -95,11 +82,11 @@ export function registerFileHandlers(): void {
 
     rememberDialogResult(result.filePaths)
     const newProjectPath = result.filePaths[0]
-    return await openProjectByPath(newProjectPath)
+    return await openProjectByPath(newProjectPath, { senderId: event.sender?.id ?? null, source: 'dialog' })
   })
 
   // Open project folder by path (for recent projects, etc.)
-  registerHandle('file:openProjectByPath', async (_event, projectPath: string) => {
+  registerHandle('file:openProjectByPath', async (event, projectPath: string) => {
     // Input validation
     if (!projectPath || typeof projectPath !== 'string') {
       throw new Error('Invalid project path: must be a non-empty string')
@@ -111,43 +98,13 @@ export function registerFileHandlers(): void {
       throw new Error('Invalid project path: path is empty after trimming')
     }
 
-    return await openProjectByPath(trimmedPath)
+    return await openProjectByPath(trimmedPath, { senderId: event.sender?.id ?? null, source: 'recent' })
   })
 
-  // Get last opened project path if it still exists
-  registerHandle('file:getLastProjectPath', async () => {
-    const lastPath = await settingsService.getLastProjectPath()
-    if (!lastPath) {
-      return null
-    }
-
-    // Verify the folder still exists
-    try {
-      const stats = await stat(lastPath)
-      if (stats.isDirectory()) {
-        fileService.setProjectPath(lastPath)
-        // Keep watchers in sync with restored project path
-        try {
-          fileWatcherService.setProjectPath(lastPath)
-        } catch (e) {
-          logger.warn('Failed to set FileWatcherService projectPath on restore', e instanceof Error ? { error: e.message } : undefined)
-        }
-        try {
-          directoryWatcherService.setProjectPath(lastPath)
-        } catch (e) {
-          logger.warn('Failed to set DirectoryWatcherService projectPath on restore', e instanceof Error ? { error: e.message } : undefined)
-        }
-        // NOTE: Do NOT call addRecentProject here!
-        // It's only called in openProjectByPath() to avoid duplicate writes
-        // and ensure single source of truth for recent projects updates
-        return lastPath
-      }
-    } catch {
-      // Folder doesn't exist anymore, clear from settings
-      await settingsService.clearLastProjectPath()
-    }
-
-    return null
+  // The open project as the main process holds it; null when none is open
+  registerHandle('file:getSession', async (): Promise<ProjectSessionInfo | null> => {
+    const snapshot = projectService.session.current()
+    return snapshot ? { root: snapshot.root, generation: snapshot.generation } : null
   })
 
   // Read directory structure
@@ -247,33 +204,8 @@ export function registerFileHandlers(): void {
   })
 
   // Close current project
-  registerHandle('file:closeProject', async () => {
-    const oldProjectPath = fileService.getProjectPath()
-
-    if (!oldProjectPath) return true
-
-    // Release project lock
-    await projectLockService.releaseLock(oldProjectPath)
-
-    // Stop all watchers
-    await fileWatcherService.stopAll()
-    await directoryWatcherService.stopAll()
-
-    // Clear project path in services
-    fileService.setProjectPath('')
-    fileWatcherService.setProjectPath('')
-    directoryWatcherService.setProjectPath('')
-
-    // Clear last project path from settings
-    await settingsService.clearLastProjectPath()
-
-    // Notify renderers of closed project
-    const payload: ProjectChanged = {
-      oldPath: oldProjectPath,
-      newPath: null
-    }
-    broadcastProjectChanged(payload)
-
+  registerHandle('file:closeProject', async (event) => {
+    await projectService.close({ senderId: event.sender?.id ?? null, reason: 'user' })
     return true
   })
 

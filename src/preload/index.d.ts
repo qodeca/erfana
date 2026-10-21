@@ -57,7 +57,7 @@ declare global {
       file: {
         openProject: () => Promise<string | null>
         openProjectByPath: (projectPath: string) => Promise<string>
-        getLastProjectPath: () => Promise<string | null>
+        getSession: () => Promise<{ root: string; generation: number } | null>
         readDirectory: (dirPath: string) => Promise<FileNode[]>
         readFile: (filePath: string) => Promise<string>
         /** `createParentDirs`: the explicit "Save to restore it" of a tab whose folder is gone */
@@ -124,7 +124,11 @@ declare global {
          */
         selectExternalFiles: () => Promise<{ paths: string[] } | null>
         onProjectChanged: (
-          callback: (data: { oldPath: string | null; newPath: string | null }) => void
+          callback: (data: {
+            oldPath: string | null
+            newPath: string | null
+            generation: number
+          }) => void
         ) => () => void
         closeProject: () => Promise<boolean>
       }

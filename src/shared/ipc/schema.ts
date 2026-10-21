@@ -6,8 +6,17 @@ import { z } from 'zod'
 export const ProjectChangedSchema = z.object({
   oldPath: z.string().nullable(),
   newPath: z.string().nullable(),
+  // The main-owned session's generation after this change; +1 per open or close
+  generation: z.number().int().nonnegative(),
 })
 export type ProjectChanged = z.infer<typeof ProjectChangedSchema>
+
+// `file:getSession` reply: what the renderer may know of the open project
+export const ProjectSessionInfoSchema = z.object({
+  root: z.string(),
+  generation: z.number().int().nonnegative(),
+})
+export type ProjectSessionInfo = z.infer<typeof ProjectSessionInfoSchema>
 
 // Terminal event payloads (lightweight placeholders for future use)
 export const TerminalDataSchema = z.object({

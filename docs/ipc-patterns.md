@@ -126,7 +126,7 @@ Note that several domains register through channel **constants**
 | `file:openProject` | Open folder dialog, save to settings |
 | `file:openProjectByPath` | Open a project by an explicit path (recent projects, CLI) |
 | `file:closeProject` | Close the current project |
-| `file:getLastProjectPath` | Get last opened project path |
+| `file:getSession` | The open project as the main process holds it: `{ root, generation }`, or `null` when none is open |
 | `file:getProjectPath` | Get current project path |
 | `file:readDirectory` | Read directory tree. Single-flight per resolved path (#208): at most one walk of a path runs; every request made during it shares one follow-up walk that starts after it settles, and a failed walk rejects only its own requests. See [File watching § Tree refresh is single-flight](./file-watching/technical-details.md#tree-refresh-is-single-flight-208) |
 | `file:readFile` | Read file content |
@@ -144,7 +144,7 @@ Note that several domains register through channel **constants**
 | `file:checkConflict` | Case-insensitive name-conflict probe before a move/copy |
 | `file:validatePath` | Validate a path against the project boundary |
 | `file:revealInFileManager` | Reveal the item in Finder / Explorer |
-| `project:changed` | Event: project switched (main → renderer). Broadcast to every window by `ProjectService` and `file-handlers`; payload `{ oldPath, newPath }` |
+| `project:changed` | Event: project switched (main → renderer). Broadcast to every window by `ProjectService`, its only sender; payload `{ oldPath, newPath, generation }`, where `generation` is the project session's counter (+1 per open or close) |
 
 ### External files (`external-file-handlers.ts`)
 

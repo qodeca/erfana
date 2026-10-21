@@ -38,7 +38,6 @@ const fileApi = {
   openProject: vi.fn(async () => null),
   openProjectByPath: vi.fn(async () => '/should-not-open'),
   closeProject: vi.fn(async () => true),
-  getLastProjectPath: vi.fn(async () => '/previous-project'),
   readDirectory: vi.fn(async () => []),
   onProjectChanged: vi.fn(() => unsubscribe)
 }
@@ -77,7 +76,6 @@ describe('useProjectManagement — no auto-load of the last project', () => {
   it('opens no project on mount', () => {
     const { result } = renderHook(() => useProjectManagement())
 
-    expect(fileApi.getLastProjectPath).not.toHaveBeenCalled()
     expect(fileApi.readDirectory).not.toHaveBeenCalled()
     expect(fileApi.openProject).not.toHaveBeenCalled()
     expect(fileApi.openProjectByPath).not.toHaveBeenCalled()
@@ -101,7 +99,6 @@ describe('useProjectManagement — no auto-load of the last project', () => {
     const { result, rerender } = renderHook(() => useProjectManagement())
     rerender()
 
-    expect(fileApi.getLastProjectPath).not.toHaveBeenCalled()
     expect(fileApi.readDirectory).not.toHaveBeenCalled()
     expect(result.current.projectPath).toBeNull()
     expect(result.current.initialLoadComplete).toBe(false)

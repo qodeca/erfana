@@ -66,6 +66,16 @@ describe('preload api exposure', () => {
     expect((ipcRenderer.invoke as any)).toHaveBeenCalledWith('file:openProject')
   })
 
+  it('file.getSession invokes file:getSession', async () => {
+    const { ipcRenderer } = await import('electron')
+    await window.api.file.getSession()
+    expect((ipcRenderer.invoke as any)).toHaveBeenCalledWith('file:getSession')
+  })
+
+  it('file.getLastProjectPath is gone', () => {
+    expect((window.api.file as Record<string, unknown>).getLastProjectPath).toBeUndefined()
+  })
+
   it('onProjectChanged delivers payload with string | null', async () => {
     const { ipcRenderer } = await import('electron')
     const received: Array<{ oldPath: string | null; newPath: string | null }> = []

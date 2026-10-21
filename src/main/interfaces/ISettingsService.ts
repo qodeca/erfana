@@ -14,4 +14,9 @@ export interface ISettingsService {
    * Add a project to recent projects list
    */
   addRecentProject(path: string, name: string): Promise<void>
+
+  /**
+   * Forget the last opened project path
+   */
+  clearLastProjectPath(): Promise<void>
 }

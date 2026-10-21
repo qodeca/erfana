@@ -4,7 +4,7 @@ import { app, BrowserWindow, Menu, dialog, session } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { spawnNewInstance } from './utils/spawnNewInstance'
-import { registerFileHandlers } from './ipc/file-handlers'
+import { registerFileHandlers, projectService } from './ipc/file-handlers'
 import { registerFileWatcherHandlers } from './ipc/file-watcher-handlers'
 import { registerDirectoryWatcherHandlers } from './ipc/directory-watcher-handlers'
 import { registerSettingsHandlers } from './ipc/settings-handlers'
@@ -302,12 +302,15 @@ function createWindow(): BrowserWindow {
   mainWindow.webContents.on('destroyed', () => {
     logger.info('WebContents destroyed, cleaning up services', { webContentsId })
 
-    // CRITICAL FIX (issue #59): Clear project state in services
-    // Without this, ProjectService.isSameProject() returns true and does 'noop'
-    // when user clicks same project in new window, causing empty file tree
-    fileService.setProjectPath('')
-    fileWatcherService.setProjectPath('')
-    directoryWatcherService.setProjectPath('')
+    // CRITICAL FIX (issue #59): Close the project, which clears the session and
+    // the services that follow it. Without this, the same-project check returns
+    // true and does 'noop' when the user clicks the same project in a new
+    // window, causing an empty file tree. The lock is released too.
+    projectService
+      .close({ senderId: webContentsId, reason: 'window-destroyed' })
+      .catch((err) => {
+        logger.error('Error closing project', err instanceof Error ? err : undefined)
+      })
 
     // Cleanup watcher services asynchronously
     // Pattern: Fire-and-forget with error logging - cleanup must not block the destroyed event
@@ -501,7 +504,10 @@ app.whenReady().then(async () => {
     // Main-side teardown on project switch. Until now this seam had no
     // producer, so only the renderer's own `preview:close` tore views down
     // (sd-074b §4.9).
-    subscribeProjectChanged: (listener) => fileService.onProjectPathChanged(listener),
+    subscribeProjectChanged: (listener) =>
+      projectService.session.onChange((prev, next) =>
+        listener(prev?.root ?? null, next?.root ?? null)
+      ),
     globalSettings: globalSettingsService
   })
 

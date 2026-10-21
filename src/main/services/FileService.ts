@@ -198,9 +198,6 @@ export class FileService implements IFileService {
   // key → readId of the walk now running, for the "joined" log line
   private readonly activeReadIds = new Map<string, number>()
   private readSequence = 0
-  private readonly projectChangeListeners = new Set<
-    (oldPath: string | null, newPath: string | null) => void
-  >()
 
   /**
    * Set custom hidden patterns (called by ProjectService after loading settings)
@@ -231,46 +228,8 @@ export class FileService implements IFileService {
   }
 
   setProjectPath(path: string): void {
-    const previousPath = this.projectPath
     this.projectPath = path
     this.hasLoggedPatterns = false
-
-    if (previousPath === path) {
-      return
-    }
-    // Notify on a REAL change only. Subscribers tear down per-project state
-    // (the HTML preview destroys every live view), so re-setting the same path
-    // must not churn them.
-    for (const listener of [...this.projectChangeListeners]) {
-      try {
-        listener(previousPath, path)
-      } catch (error) {
-        logger.error(
-          'FileService: project-change listener threw',
-          error instanceof Error ? error : undefined
-        )
-      }
-    }
-  }
-
-  /**
-   * Subscribe to project-root changes.
-   *
-   * Added for the HTML preview's main-side teardown (sd-074b §4.9): the preview
-   * handlers accepted a `subscribeProjectChanged` seam from the start, but no
-   * producer existed, so the belt-and-braces teardown on project switch never
-   * fired and relied entirely on the renderer sending `preview:close`.
-   *
-   * @param listener - Called with the previous and new project path.
-   * @returns An unsubscribe function.
-   */
-  onProjectPathChanged(
-    listener: (oldPath: string | null, newPath: string | null) => void
-  ): () => void {
-    this.projectChangeListeners.add(listener)
-    return () => {
-      this.projectChangeListeners.delete(listener)
-    }
   }
 
   getProjectPath(): string | null {

@@ -186,6 +186,29 @@ describe('ProjectService switching – session token orchestration', () => {
     vi.clearAllMocks()
   })
 
+  /**
+   * Open `path` first, then forget the calls that took, so a test starts from
+   * "this project is already open" with clean call history.
+   */
+  async function seedOpenProject(path: string): Promise<void> {
+    const result = await projectService.switchProject(path)
+    expect(result.action).toBe('switched')
+    for (const service of [
+      mockFileService,
+      mockFileWatcherService,
+      mockDirectoryWatcherService,
+      mockSettingsService,
+      mockProjectSettingsService,
+      mockProjectLockService
+    ]) {
+      for (const member of Object.values(service)) {
+        if (vi.isMockFunction(member)) member.mockClear()
+      }
+    }
+    mockSend.mockClear()
+    callOrder.length = 0
+  }
+
   describe('016-FR-007: Project switching step ordering', () => {
     it('calls stopAll watchers before updateServices during switch', async () => {
       const projectPath = '/Users/test/projects/my-project'
@@ -234,7 +257,8 @@ describe('ProjectService switching – session token orchestration', () => {
       // Verify broadcast happened
       expect(mockSend).toHaveBeenCalledWith('project:changed', {
         oldPath: null,
-        newPath: projectPath
+        newPath: projectPath,
+        generation: 1
       })
 
       // Verify broadcast happened after service updates
@@ -387,12 +411,10 @@ describe('ProjectService switching – session token orchestration', () => {
       const bumpsAfterFirst = versionBumps
 
       // Switch to path2
-      mockFileService.getProjectPath = vi.fn(() => path1)
       await projectService.switchProject(path2)
       const bumpsAfterSecond = versionBumps
 
       // Switch to path3
-      mockFileService.getProjectPath = vi.fn(() => path2)
       await projectService.switchProject(path3)
       const bumpsAfterThird = versionBumps
 
@@ -406,7 +428,7 @@ describe('ProjectService switching – session token orchestration', () => {
       const oldPath = '/Users/test/projects/old-project'
       const newPath = '/Users/test/projects/new-project'
 
-      mockFileService.getProjectPath = vi.fn(() => oldPath)
+      await seedOpenProject(oldPath)
 
       await projectService.switchProject(newPath)
 
@@ -451,39 +473,30 @@ describe('ProjectService switching – session token orchestration', () => {
       )
     })
 
-    it('failed switch calls setProjectPath with empty string during rollback', async () => {
-      const projectPath = '/Users/test/projects/nonexistent'
-
-      // Make directory check fail
+    it('a failed switch leaves the open project and the service paths alone', async () => {
+      const openPath = '/Users/test/projects/open-project'
+      await seedOpenProject(openPath)
       mockedStat.mockRejectedValue(new Error('ENOENT: no such file or directory'))
 
-      await projectService.switchProject(projectPath)
+      const result = await projectService.switchProject('/Users/test/projects/nonexistent')
 
-      // setProjectPath SHOULD be called with empty string during rollback (no old project)
-      expect(mockFileService.setProjectPath).toHaveBeenCalledWith('')
-      expect(mockFileWatcherService.setProjectPath).toHaveBeenCalledWith('')
-      expect(mockDirectoryWatcherService.setProjectPath).toHaveBeenCalledWith('')
+      expect(result).toMatchObject({ success: false, path: openPath, action: 'noop' })
+      expect(projectService.session.current()?.root).toBe(openPath)
+      expect(mockFileService.setProjectPath).not.toHaveBeenCalled()
+      expect(mockFileWatcherService.setProjectPath).not.toHaveBeenCalled()
+      expect(mockDirectoryWatcherService.setProjectPath).not.toHaveBeenCalled()
     })
 
-    it('settings validation failure triggers rollback with empty string setProjectPath', async () => {
-      const projectPath = '/Users/test/projects/invalid-settings'
-
-      // Make settings load fail
+    it('a settings validation failure leaves the session empty and drops the loaded settings', async () => {
       mockProjectSettingsService.loadSettings = vi.fn(() =>
         Promise.reject(new Error('Invalid settings'))
       )
 
-      const result = await projectService.switchProject(projectPath)
+      const result = await projectService.switchProject('/Users/test/projects/invalid-settings')
 
-      // Should fail
       expect(result.success).toBe(false)
-
-      // setProjectPath SHOULD be called with empty string during rollback
-      expect(mockFileService.setProjectPath).toHaveBeenCalledWith('')
-      expect(mockFileWatcherService.setProjectPath).toHaveBeenCalledWith('')
-      expect(mockDirectoryWatcherService.setProjectPath).toHaveBeenCalledWith('')
-
-      // clearSettings should be called during rollback
+      expect(projectService.session.current()).toBeNull()
+      expect(mockFileService.setProjectPath).not.toHaveBeenCalled()
       expect(mockProjectSettingsService.clearSettings).toHaveBeenCalled()
     })
   })
@@ -492,7 +505,7 @@ describe('ProjectService switching – session token orchestration', () => {
     it('no stopAll or setProjectPath calls when switching to same project', async () => {
       const projectPath = '/Users/test/projects/same-project'
 
-      mockFileService.getProjectPath = vi.fn(() => projectPath)
+      await seedOpenProject(projectPath)
       mockedRealpath.mockResolvedValue(projectPath)
 
       const result = await projectService.switchProject(projectPath)
@@ -514,7 +527,7 @@ describe('ProjectService switching – session token orchestration', () => {
       const oldPath = '/Users/test/projects/old-project'
       const newPath = '/Users/test/projects/new-project'
 
-      mockFileService.getProjectPath = vi.fn(() => oldPath)
+      await seedOpenProject(oldPath)
 
       // Record 'broadcast' in callOrder when project:changed is sent,
       // so we can assert ordering relative to service update entries.
@@ -529,7 +542,8 @@ describe('ProjectService switching – session token orchestration', () => {
       // Verify broadcast was called
       expect(mockSend).toHaveBeenCalledWith('project:changed', {
         oldPath,
-        newPath
+        newPath,
+        generation: 2
       })
 
       // The broadcast entry must appear after every service update entry
@@ -551,26 +565,26 @@ describe('ProjectService switching – session token orchestration', () => {
       const oldPath = '/Users/test/projects/old-project'
       const newPath = '/Users/test/projects/new-project'
 
-      mockFileService.getProjectPath = vi.fn(() => oldPath)
+      await seedOpenProject(oldPath)
 
       await projectService.switchProject(newPath)
 
       expect(mockSend).toHaveBeenCalledWith('project:changed', {
         oldPath,
-        newPath
+        newPath,
+        generation: 2
       })
     })
 
     it('broadcast includes null oldPath for first project', async () => {
       const newPath = '/Users/test/projects/first-project'
 
-      mockFileService.getProjectPath = vi.fn(() => null)
-
       await projectService.switchProject(newPath)
 
       expect(mockSend).toHaveBeenCalledWith('project:changed', {
         oldPath: null,
-        newPath
+        newPath,
+        generation: 1
       })
     })
   })
@@ -678,7 +692,6 @@ describe('ProjectService switching – session token orchestration', () => {
 
     it('builds a fresh filter on every project open', async () => {
       await projectService.switchProject('/Users/test/projects/a')
-      mockFileService.getProjectPath = vi.fn(() => '/Users/test/projects/a')
       await projectService.switchProject('/Users/test/projects/b')
 
       expect(fileServiceFilter(1)).not.toBe(fileServiceFilter(0))

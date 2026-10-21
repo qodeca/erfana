@@ -229,25 +229,9 @@ SettingsService provides persistent storage using electron-store.
 **Pattern**: All methods are async due to dynamic ES Module import.
 
 ```typescript
-// In an IPC handler module (simplified from src/main/ipc/file-handlers.ts)
 import { settingsService } from '../services/SettingsService'
-import { registerHandle } from './registry'
 
-registerHandle('file:getLastProjectPath', async () => {
-  // Retrieve from settings (async)
-  const lastPath = await settingsService.getLastProjectPath()
-  if (!lastPath) return null
-
-  try {
-    // Verify the folder still exists
-    const stats = await stat(lastPath)
-    if (stats.isDirectory()) return lastPath
-  } catch {
-    // Folder is gone – clean up the stale setting
-    await settingsService.clearLastProjectPath()
-  }
-  return null
-})
+const recent = await settingsService.getRecentProjects()
 ```
 
 Writing the last project path is not done in a handler: `ProjectService` calls `settingsService.setLastProjectPath(newPath)` when a project opens (`src/main/services/ProjectService.ts`).

@@ -148,7 +148,6 @@ beforeEach(() => {
       openProject: vi.fn(async () => null),
       openProjectByPath: vi.fn(async () => null),
       closeProject: vi.fn(async () => true),
-      getLastProjectPath: vi.fn(async () => null),
       readDirectory,
       onProjectChanged: vi.fn((listener: ProjectChangedListener) => {
         projectChangedListener = listener

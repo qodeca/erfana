@@ -67,7 +67,6 @@ function treeB(): FileNode[] {
 // --------------------------------------------------------------------------
 
 const fileApi = {
-  getLastProjectPath: vi.fn(async () => null),
   readDirectory: vi.fn(async (_path: string) => [] as FileNode[]),
   onProjectChanged: vi.fn(),
   closeProject: vi.fn(async () => undefined),

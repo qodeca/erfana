@@ -573,7 +573,7 @@ Resolved by the #73 image-export work. The canonical extension list, the MIME ma
 
 **Narrowed (2026-08-29).** Main reaps a window's previews when the window itself goes away: `index.ts` subscribes `closed` per window and calls `PreviewViewService.closeWindow`, which drains that window's registry entries, invalidates their in-flight opens and releases the project refcount. That removed the quit-time `removeChildView` warning at source and closed the latent second-window leak.
 
-**Resolved (v0.19.0).** `FileService.onProjectPathChanged(listener)` is the producer the seam was missing, and `src/main/index.ts` now passes `subscribeProjectChanged: (listener) => fileService.onProjectPathChanged(listener)` to `registerPreviewHandlers` (sd-074b §4.9). Main-side teardown on a project switch no longer depends on the renderer surviving the switch. The number is kept so existing references to "item #36" stay valid.
+**Resolved (v0.19.0).** `FileService.onProjectPathChanged(listener)` is the producer the seam was missing, and `src/main/index.ts` now passes a `subscribeProjectChanged` that listens to `projectService.session.onChange` (it was `FileService.onProjectPathChanged` until the project session took over) to `registerPreviewHandlers` (sd-074b §4.9). Main-side teardown on a project switch no longer depends on the renderer surviving the switch. The number is kept so existing references to "item #36" stay valid.
 
 ---
 

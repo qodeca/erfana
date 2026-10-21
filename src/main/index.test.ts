@@ -193,10 +193,7 @@ describe('Main Process - Window Creation', () => {
     // Mock service modules
     vi.doMock('./services/FileService', () => ({
       fileService: {
-        setProjectPath: vi.fn(), // issue #59: clear project state on destroy
-        getProjectPath: vi.fn(() => null),
-        // sd-074b §4.9: the preview handlers subscribe to project changes.
-        onProjectPathChanged: vi.fn(() => () => {})
+        getProjectPath: vi.fn(() => null)
       }
     }))
     vi.doMock('./services/FileWatcherService', () => ({
@@ -229,7 +226,12 @@ describe('Main Process - Window Creation', () => {
 
     // Mock IPC handler registration
     vi.doMock('./ipc/file-handlers', () => ({
-      registerFileHandlers: vi.fn()
+      registerFileHandlers: vi.fn(),
+      // The session owner: the preview teardown subscribes, a destroyed window closes it
+      projectService: {
+        session: { onChange: vi.fn(() => () => {}) },
+        close: vi.fn(() => Promise.resolve())
+      }
     }))
     vi.doMock('./ipc/file-watcher-handlers', () => ({
       registerFileWatcherHandlers: vi.fn()
@@ -790,6 +792,24 @@ describe('Main Process - Window Creation', () => {
         reason: 'close'
       })
       expect(createdWindow.destroy).not.toHaveBeenCalled()
+    })
+
+    it('should close the project session when the window contents are destroyed', async () => {
+      // Issue #59: without it the same-project check answers 'noop' for a new
+      // window. The session close also releases the project lock.
+      await loadAndGetCloseHandler()
+      const destroyed = createdWindow.webContents.on.mock.calls.find(
+        ([event]: [string]) => event === 'destroyed'
+      )?.[1]
+      expect(destroyed).toBeInstanceOf(Function)
+      const { projectService } = await import('./ipc/file-handlers')
+
+      destroyed()
+
+      expect(projectService.close).toHaveBeenCalledWith({
+        senderId: createdWindow.webContents.id,
+        reason: 'window-destroyed'
+      })
     })
 
     it('should close on the FIRST click when the renderer has already crashed', async () => {
