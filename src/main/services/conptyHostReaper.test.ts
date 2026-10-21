@@ -54,6 +54,9 @@ describe('buildReapScript', () => {
     expect(stop).toBeGreaterThan(-1)
     expect(script).not.toContain('Stop-Process -Id 4242')
     expect(script).toContain('if (-not $p.HasExited)')
+    // the process handle is held, so the wait and the end hit this exact process
+    expect(script).toContain('$null = $p.Handle')
+    expect(script.indexOf('$null = $p.Handle')).toBeLessThan(script.indexOf('Wait-Process'))
     expect(script.indexOf('$p.StartTime.ToUniversalTime() -le $q')).toBeLessThan(stop)
     expect(stop).toBeLessThan(script.indexOf('Get-CimInstance'))
   })

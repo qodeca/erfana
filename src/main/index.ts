@@ -45,6 +45,7 @@ import { globalSettingsService } from './services/GlobalSettingsService'
 import { loggingService, logger } from './services/LoggingService'
 import { logNodePtyBinding } from './utils/logNodePtyBinding'
 import { createQuitGuard } from './utils/quitGuard'
+import { armLastResortExit, runQuitSequence } from './utils/quitSequence'
 import { startConptyHostReaper } from './services/conptyHostReaper'
 import { gitWatcherService } from './services/GitWatcherService'
 import { gitPollingService } from './services/GitPollingService'
@@ -627,6 +628,8 @@ app.whenReady().then(async () => {
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the
     // dock icon is clicked and there are no other windows open.
+    // Not during the shutdown: a window would reopen the project and retake its lock (#305)
+    if (quitGuard.isShuttingDown()) return
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 })
@@ -724,60 +727,74 @@ function handleShutdownException(err: unknown): void {
   )
 }
 
-app.on('before-quit', async (event) => {
+app.on('before-quit', (event): Promise<void> | undefined => {
   // Always prevented: Electron emits a second before-quit when the quit-confirm handler
   // destroys the window (window-all-closed -> app.quit()). Letting that one through
   // quits 1 ms after the shutdown started, before any disposer finishes (#305). The
-  // only way out is app.exit(0) at the end of this handler.
+  // only way out is app.exit(0), which runQuitSequence always reaches.
   if (!quitGuard.handleBeforeQuit(event)) return
 
   // Install the guard synchronously, before the first await, so an already-queued
   // chokidar read callback can't crash the process before the handler is registered.
   process.on('uncaughtException', handleShutdownException)
 
-  logger.info('App quitting, cleaning up services')
+  // Last resort: a step that never settles must not leave the app un-quittable (the
+  // guard blocks every later quit). Not unref'd.
+  armLastResortExit(() => app.exit(0))
 
-  // Priority: lock release runs first and alone, so the next launch can open
-  // the project without waiting for heartbeat staleness — but bounded, so a
-  // disposer that never settles cannot strand the process short of app.exit(0).
-  await disposeWithin(
-    'projectLockService.dispose()',
-    () => projectLockService.dispose(),
-    LOCK_DISPOSE_TIMEOUT_MS
+  return runQuitSequence(
+    [
+      () => {
+        // Windows (#305): a detached helper that force-ends us if teardown hangs and then
+        // ends any console host still parented to us. Started FIRST so a main thread that
+        // blocks in a disposer is still force-ended, and outside the dispose race so it
+        // always runs. The quit moment it records is the start of the shutdown.
+        const quitHelperStarted = startConptyHostReaper()
+        logger.info('App quitting, cleaning up services', { quitHelperStarted })
+      },
+      // Priority: lock release runs first and alone, so the next launch can open
+      // the project without waiting for heartbeat staleness — but bounded, so a
+      // disposer that never settles cannot strand the process short of app.exit(0).
+      () =>
+        disposeWithin(
+          'projectLockService.dispose()',
+          () => projectLockService.dispose(),
+          LOCK_DISPOSE_TIMEOUT_MS
+        ),
+      // Best-effort: the remaining disposers run together, bounded by the same
+      // helper the lock release uses — so the timer is cleared on both branches and
+      // a timeout leaves a log line instead of passing silently.
+      // `Promise.allSettled` swallows individual failures so one bad disposer
+      // can't cancel the others.
+      () =>
+        disposeWithin(
+          'best-effort disposers',
+          async () => {
+            await Promise.allSettled([
+              fileWatcherService.dispose(),
+              directoryWatcherService.dispose(),
+              terminalService.dispose(),
+              claudeStatusHandlers ? claudeStatusHandlers.dispose() : Promise.resolve(),
+              previewHandlers ? previewHandlers.dispose() : Promise.resolve(),
+              gitWatcherService.dispose(),
+              gitStatusService.dispose()
+            ])
+          },
+          SHUTDOWN_TIMEOUT_MS
+        ),
+      // Sync disposer — always runs after the race
+      () => {
+        gitPollingService.dispose()
+        // electron-log writes synchronously, so this line is on disk before the process exits
+        logger.info('App quit: disposers done, exiting')
+      }
+    ],
+    () => app.exit(0),
+    (error) =>
+      logger.error('App quit: a shutdown step threw', error instanceof Error ? error : undefined, {
+        error: error instanceof Error ? error.message : String(error)
+      })
   )
-
-  // Best-effort: the remaining disposers run together, bounded by the same
-  // helper the lock release uses — so the timer is cleared on both branches and
-  // a timeout leaves a log line instead of passing silently.
-  // `Promise.allSettled` swallows individual failures so one bad disposer
-  // can't cancel the others.
-  await disposeWithin(
-    'best-effort disposers',
-    async () => {
-      await Promise.allSettled([
-        fileWatcherService.dispose(),
-        directoryWatcherService.dispose(),
-        terminalService.dispose(),
-        claudeStatusHandlers ? claudeStatusHandlers.dispose() : Promise.resolve(),
-        previewHandlers ? previewHandlers.dispose() : Promise.resolve(),
-        gitWatcherService.dispose(),
-        gitStatusService.dispose()
-      ])
-    },
-    SHUTDOWN_TIMEOUT_MS
-  )
-
-  // Sync disposer — always runs after the race
-  gitPollingService.dispose()
-
-  // Windows (#305): a detached helper that force-ends us if teardown hangs and then
-  // ends any console host still parented to us. Started here, outside the dispose
-  // race, so it always runs. electron-log writes synchronously, so these lines are on
-  // disk before the process exits.
-  const quitHelperStarted = startConptyHostReaper()
-  logger.info('App quit: disposers done, exiting', { quitHelperStarted })
-
-  app.exit(0)
 })
 
 // In this file you can include the rest of your app's specific main process

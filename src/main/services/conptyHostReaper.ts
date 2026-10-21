@@ -108,6 +108,8 @@ export function buildReapScript(parentPid: number, startMs: number, quitMs: numb
     //    reused in between cannot be hit.
     `$p = Get-Process -Id ${parentPid}`,
     'if ($p -and $p.StartTime.ToUniversalTime() -le $q) {',
+    // Touching Handle makes the Process object hold an OS handle to this exact process
+    '  $null = $p.Handle',
     `  $p | Wait-Process -Timeout ${QUIT_GRACE_SEC}`,
     '  if (-not $p.HasExited) { $p | Stop-Process -Force }',
     '}',
