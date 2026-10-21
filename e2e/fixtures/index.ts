@@ -456,7 +456,7 @@ export function getTestProjectPath(): string {
 // ---------------------------------------------------------------------------
 //
 // `visualTest` is a separate fixture set tuned for screenshot-based tests:
-// deterministic 1280×800 window at 1× DPR, CI-only video recording, and a
+// a pinned window content size at 1× DPR, CI-only video recording, and a
 // dedicated worker-scoped userDataDir prefix so visual workers don't share
 // state with functional workers. Imported by e2e/visual-regression.e2e.ts.
 //
@@ -485,8 +485,19 @@ function createUserDataDirFixture(prefix: string) {
   ]
 }
 
+/**
+ * Content size of the visual window. The committed baselines were captured at
+ * the content area of the app's default 1400×900 window, because the old
+ * resize to 1280×800 ran before the window existed and did nothing (#267).
+ * Pinning that size keeps every baseline valid and makes the capture
+ * independent of the host's window chrome. A new size means new baselines on
+ * every platform.
+ */
+export const VISUAL_CONTENT_SIZE =
+  process.platform === 'darwin' ? { width: 1400, height: 868 } : { width: 1384, height: 861 }
+
 type VisualTestFixtures = {
-  /** Electron app with deterministic 1280×800 window, 1× DPR, and CI video recording. */
+  /** Electron app with a pinned content size (`VISUAL_CONTENT_SIZE`), 1× DPR, and CI video recording. */
   visualApp: ElectronApplication
   /** Window from visual app, ready for screenshot capture. */
   visualWindow: Page
@@ -535,7 +546,7 @@ export const visualTest = base.extend<VisualTestFixtures, WorkerFixtures>({
   visualApp: async ({ userDataDir, homeDir }, use) => {
     const opts = buildVisualLaunchOptions(userDataDir, undefined, homeDir)
     const app = await electron.launch(opts)
-    await resizeBrowserWindow(app, 1280, 800)
+    await resizeBrowserWindow(app, VISUAL_CONTENT_SIZE.width, VISUAL_CONTENT_SIZE.height)
     await use(app)
     await forceCloseApp(app)
   },
@@ -575,7 +586,7 @@ export const visualTest = base.extend<VisualTestFixtures, WorkerFixtures>({
   visualAppWithProject: async ({ userDataDir, homeDir, visualTestProject }, use) => {
     const opts = buildVisualLaunchOptions(userDataDir, undefined, homeDir)
     const app = await electron.launch(opts)
-    await resizeBrowserWindow(app, 1280, 800)
+    await resizeBrowserWindow(app, VISUAL_CONTENT_SIZE.width, VISUAL_CONTENT_SIZE.height)
     await use(app)
     await forceCloseApp(app)
   },

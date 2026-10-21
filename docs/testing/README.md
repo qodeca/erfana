@@ -165,7 +165,7 @@ Screenshot-based comparison for 6 core UI states:
 
 **Key details**:
 - Baselines in `e2e/screenshots/` with platform suffix (e.g., `welcome-empty-darwin.png`). Both the `darwin` and the `win32` set are committed for all six states; the `win32` set was regenerated on 2026-09-04 after page-level captures were clipped
-- Deterministic rendering: 1280x800 window, 1x DPR (`--force-device-scale-factor=1`), and page-level captures (a)–(c) pass `clip: PAGE_CLIP` — the same 1280x800 rectangle — so the baseline stops depending on whatever content size the host window manager actually granted. Element-level captures (d)–(f) need no clip
+- Deterministic rendering: the fixture pins the window's content size (`VISUAL_CONTENT_SIZE` in `e2e/fixtures/index.ts`: 1384x861 on Windows, 1400x868 on macOS – the content area of the app's default window, which the baselines were captured at) and checks the size was granted; 1x DPR (`--force-device-scale-factor=1`); page-level captures (a)–(c) pass `clip: PAGE_CLIP`, a 1280x800 rectangle. Before #267 the resize ran before the window existed and usually did nothing, so a slow run that let it land failed all five cases. Element-level captures (d)–(f) need no clip
 - Monaco cursor blink disabled; minimap and scrollbar masked
 - A missing baseline does **not** skip: `assertBaselineExists()` throws, and `playwright.config.ts` sets `updateSnapshots: 'none'`, so nothing is auto-written on a first run. Generate a new platform's set with `npm run test:e2e:update-screenshots` and commit it
 - `maxDiffPixelRatio: 0.01`, `retries: 0` (diffs must be investigated, not retried)
