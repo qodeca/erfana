@@ -22,6 +22,7 @@ import {
 import { isWindowsLongPath } from './watcher/PlatformConfig'
 import { isForegroundBusy, shellProcessNames } from './terminalForeground'
 import { killProcessTrees } from './terminalTreeKill'
+import { installNoForkConsoleList } from './nodePtyWindowsShim'
 
 /**
  * Outcome of {@link TerminalService.createTerminal}. A failure carries its
@@ -57,7 +58,8 @@ try {
 // Kick off loading in background
 void import('node-pty')
   .then((mod) => {
-    pty = mod
+    // Keep a module that is already set (an injected test double, or one loaded by createTerminal)
+    pty = pty ?? mod
   })
   .catch((error) => {
     logger.error('⚠️ node-pty not available', error instanceof Error ? error : undefined)
@@ -234,6 +236,9 @@ export class TerminalService extends EventEmitter {
         return { error: 'Terminal support is not available (node-pty failed to load)' }
       }
     }
+
+    // node-pty's Windows kill must not fork a helper (#296); see nodePtyWindowsShim.ts
+    if (osPlatform() === 'win32') await installNoForkConsoleList()
 
     const terminalId = `terminal-${++this.terminalCounter}`
 
@@ -763,7 +768,16 @@ export class TerminalService extends EventEmitter {
     if (terminal.killRequested) return
     terminal.killRequested = true
     try {
-      terminal.ptyProcess.kill()
+      // node-pty documents kill() as void, but a rejection from work it starts
+      // internally must never surface as an unhandled rejection (error box).
+      const result: unknown = terminal.ptyProcess.kill()
+      if (result && typeof (result as Promise<unknown>).catch === 'function') {
+        void (result as Promise<unknown>).catch((error: unknown) => {
+          logger.warn(`Terminal ${terminal.id} kill rejected`, {
+            error: error instanceof Error ? error.message : String(error)
+          })
+        })
+      }
     } catch (error) {
       terminal.killRequested = false
       throw error

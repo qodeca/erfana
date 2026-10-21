@@ -39,6 +39,9 @@ const treeKill = vi.hoisted(() => ({
 }))
 vi.mock('./terminalTreeKill', () => treeKill)
 
+const shim = vi.hoisted(() => ({ installNoForkConsoleList: vi.fn(() => Promise.resolve(true)) }))
+vi.mock('./nodePtyWindowsShim', () => shim)
+
 const PTY_GLOBAL = '__ERFANA_TEST_PTY__'
 
 vi.mock('./LoggingService', () => ({
@@ -88,6 +91,7 @@ describe('TerminalService kill paths (#296)', () => {
     spawned.length = 0
     mockNodePty.spawn.mockClear()
     treeKill.killProcessTrees.mockClear()
+    shim.installNoForkConsoleList.mockClear()
     treeKill.killProcessTrees.mockImplementation(() => Promise.resolve(true))
     process.env.SHELL = '/bin/zsh'
     delete process.env.ERFANA_E2E_FAST_SHELL
@@ -95,6 +99,35 @@ describe('TerminalService kill paths (#296)', () => {
 
   afterEach(() => {
     vi.useRealTimers()
+  })
+
+  describe('node-pty fork shim', () => {
+    it('is installed before a terminal is created on Windows', async () => {
+      const { terminalService } = await load('win32')
+      await create(terminalService, 'win32')
+      expect(shim.installNoForkConsoleList).toHaveBeenCalledTimes(1)
+    })
+
+    it('is not installed off Windows', async () => {
+      const { terminalService } = await load('darwin')
+      await create(terminalService, 'darwin')
+      expect(shim.installNoForkConsoleList).not.toHaveBeenCalled()
+    })
+
+    it('a kill that returns a rejecting promise is contained', async () => {
+      const { terminalService } = await load('win32')
+      const id = await create(terminalService, 'win32')
+      const unhandled = vi.fn()
+      process.on('unhandledRejection', unhandled)
+      try {
+        spawned[0].kill.mockImplementation(() => Promise.reject(new Error('fork is not supported')))
+        expect(terminalService.killTerminal(id)).toBe(true)
+        await new Promise((resolve) => setImmediate(resolve))
+        expect(unhandled).not.toHaveBeenCalled()
+      } finally {
+        process.off('unhandledRejection', unhandled)
+      }
+    })
   })
 
   describe('one terminal (tab close, restart)', () => {
