@@ -8,9 +8,10 @@
  * one module gives the renderer a single seam to change or fake.
  */
 import type { TerminalBridge } from '../../../shared/ipc/terminal-schema'
+import { gatewayBridges } from './gatewayAccess'
 
 /** The bridge is read per call, so a test that swaps `window.api` is honoured. */
-const bridge = (): TerminalBridge => window.api.terminal
+const bridge = (): TerminalBridge => gatewayBridges().terminal
 
 export const terminalGateway: TerminalBridge = {
   isAvailable: (...args) => bridge().isAvailable(...args),

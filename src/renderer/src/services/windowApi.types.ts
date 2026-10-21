@@ -18,7 +18,7 @@ type Equal<A, B> =
 type Assert<T extends true> = T
 
 export type WindowApiChecks = [
-  Assert<Equal<Window['api'], Api>>,
+  Assert<Equal<Window['api'], Omit<Api, 'file' | 'terminal'>>>,
   Assert<Equal<typeof fileGateway, FileBridge>>,
   Assert<Equal<typeof terminalGateway, TerminalBridge>>
 ]

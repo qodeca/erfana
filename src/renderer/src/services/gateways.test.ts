@@ -125,15 +125,16 @@ describe('getDefaultProjectTreeApi', () => {
     expect(api.directoryWatch).toBe(directoryWatch)
   })
 
-  it('keeps its identity while window.api stays the same, so effect dependencies hold', () => {
-    window.api = { directoryWatch: {} } as unknown as typeof window.api
+  it('keeps its identity, so effect dependencies hold', () => {
     expect(getDefaultProjectTreeApi()).toBe(getDefaultProjectTreeApi())
   })
 
-  it('is rebuilt when window.api is replaced', () => {
-    window.api = { directoryWatch: {} } as unknown as typeof window.api
-    const before = getDefaultProjectTreeApi()
-    window.api = { directoryWatch: {} } as unknown as typeof window.api
-    expect(getDefaultProjectTreeApi()).not.toBe(before)
+  it('reads the directory watcher from the current window.api', () => {
+    const first = { start: vi.fn() }
+    const second = { start: vi.fn() }
+    window.api = { directoryWatch: first } as unknown as typeof window.api
+    const api = getDefaultProjectTreeApi()
+    window.api = { directoryWatch: second } as unknown as typeof window.api
+    expect(api.directoryWatch).toBe(second)
   })
 })

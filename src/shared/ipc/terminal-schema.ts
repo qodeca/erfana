@@ -135,8 +135,8 @@ export interface TerminalAvailabilityResponse {
 /**
  * Shared contract for the preload `terminal` bridge.
  *
- * Implemented by `window.api.terminal` (preload, which is typed `satisfies
- * TerminalBridge`) and consumed by the renderer terminal gateway. The event
+ * Implemented by `window.api.terminal` (preload, `terminalBridge.ts`, typed as
+ * this contract) and consumed by the renderer terminal gateway. The event
  * subscriptions return their unsubscribe function.
  */
 export interface TerminalBridge {

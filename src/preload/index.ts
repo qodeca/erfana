@@ -63,7 +63,7 @@ const api = {
    * (unpackaged app + `ERFANA_E2E_TEST_HOOKS=1`). The preload is the only source:
    * the renderer reads this value, never a global that page script could set.
    */
-  testHooks: { enabled: process.argv.includes(TEST_HOOKS_ARG) },
+  testHooks: { enabled: process.argv.includes(TEST_HOOKS_ARG) } as { readonly enabled: boolean },
 
   // File operations (see fileBridge.ts)
   file: fileBridge,
@@ -84,20 +84,26 @@ const api = {
       ipcRenderer.invoke('file-watch:stats'),
 
     // Event listeners
-    onFileChanged: (callback: (data: { filePath: string }) => void) => {
+    onFileChanged: (callback: (data: { filePath: string }) => void): (() => void) => {
       const listener = (_event: unknown, data: { filePath: string }) => callback(data)
       ipcRenderer.on('file-watch:changed', listener)
-      return () => ipcRenderer.removeListener('file-watch:changed', listener)
+      return () => {
+        ipcRenderer.removeListener('file-watch:changed', listener)
+      }
     },
-    onFileDeleted: (callback: (data: { filePath: string }) => void) => {
+    onFileDeleted: (callback: (data: { filePath: string }) => void): (() => void) => {
       const listener = (_event: unknown, data: { filePath: string }) => callback(data)
       ipcRenderer.on('file-watch:deleted', listener)
-      return () => ipcRenderer.removeListener('file-watch:deleted', listener)
+      return () => {
+        ipcRenderer.removeListener('file-watch:deleted', listener)
+      }
     },
-    onFileError: (callback: (data: { filePath: string; error: string }) => void) => {
+    onFileError: (callback: (data: { filePath: string; error: string }) => void): (() => void) => {
       const listener = (_event: unknown, data: { filePath: string; error: string }) => callback(data)
       ipcRenderer.on('file-watch:error', listener)
-      return () => ipcRenderer.removeListener('file-watch:error', listener)
+      return () => {
+        ipcRenderer.removeListener('file-watch:error', listener)
+      }
     }
   },
 
@@ -124,23 +130,29 @@ const api = {
         summary: Record<string, number>
         catchUp?: boolean
       }) => void
-    ) => {
+    ): (() => void) => {
       const listener = (
         _event: unknown,
         data: { dirPath: string; eventCount: number; summary: Record<string, number>; catchUp?: boolean }
       ) => callback(data)
       ipcRenderer.on('directory-watch:changed', listener)
-      return () => ipcRenderer.removeListener('directory-watch:changed', listener)
+      return () => {
+        ipcRenderer.removeListener('directory-watch:changed', listener)
+      }
     },
-    onProjectDeleted: (callback: (data: { dirPath: string }) => void) => {
+    onProjectDeleted: (callback: (data: { dirPath: string }) => void): (() => void) => {
       const listener = (_event: unknown, data: { dirPath: string }) => callback(data)
       ipcRenderer.on('directory-watch:project-deleted', listener)
-      return () => ipcRenderer.removeListener('directory-watch:project-deleted', listener)
+      return () => {
+        ipcRenderer.removeListener('directory-watch:project-deleted', listener)
+      }
     },
-    onDirectoryError: (callback: (data: { dirPath: string; error: string }) => void) => {
+    onDirectoryError: (callback: (data: { dirPath: string; error: string }) => void): (() => void) => {
       const listener = (_event: unknown, data: { dirPath: string; error: string }) => callback(data)
       ipcRenderer.on('directory-watch:error', listener)
-      return () => ipcRenderer.removeListener('directory-watch:error', listener)
+      return () => {
+        ipcRenderer.removeListener('directory-watch:error', listener)
+      }
     }
   },
 

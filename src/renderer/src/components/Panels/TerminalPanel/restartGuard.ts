@@ -90,7 +90,7 @@ export async function getRestartRisk(
  */
 async function hasRunningProgram(terminalId: string): Promise<boolean> {
   try {
-    const result = await terminalGateway.getActivity?.(terminalId)
+    const result = await terminalGateway.getActivity(terminalId)
     return result?.success === true && result.busy === true
   } catch {
     return false

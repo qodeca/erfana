@@ -67,6 +67,67 @@ describe('Api type', () => {
   })
 })
 
+describe('channel names', () => {
+  it('are the wire strings, which must not change', () => {
+    expect({
+      FILE_CHANNELS,
+      FILE_EVENTS,
+      TERMINAL_CHANNELS,
+      TERMINAL_EVENTS
+    }).toMatchInlineSnapshot(`
+      {
+        "FILE_CHANNELS": {
+          "checkConflict": "file:checkConflict",
+          "closeProject": "file:closeProject",
+          "copyFromExternal": "file:copyFromExternal",
+          "copyItem": "file:copyItem",
+          "createFile": "file:createFile",
+          "createFolder": "file:createFolder",
+          "deleteFile": "file:deleteFile",
+          "deleteFolder": "file:deleteFolder",
+          "exists": "file:exists",
+          "getProjectPath": "file:getProjectPath",
+          "getSession": "file:getSession",
+          "getStats": "file:getStats",
+          "moveFromExternal": "file:moveFromExternal",
+          "moveItem": "file:moveItem",
+          "openProject": "file:openProject",
+          "openProjectByPath": "file:openProjectByPath",
+          "readDirectory": "file:readDirectory",
+          "readFile": "file:readFile",
+          "readImage": "file:readImage",
+          "rename": "file:rename",
+          "revealInFileManager": "file:revealInFileManager",
+          "selectExternalFiles": "file:selectExternalFiles",
+          "validateExternal": "file:validateExternal",
+          "validatePath": "file:validatePath",
+          "writeFile": "file:writeFile",
+        },
+        "FILE_EVENTS": {
+          "projectChanged": "project:changed",
+        },
+        "TERMINAL_CHANNELS": {
+          "clearComplete": "terminal:clearComplete",
+          "create": "terminal:create",
+          "getActivity": "terminal:getActivity",
+          "getInfo": "terminal:getInfo",
+          "isAvailable": "terminal:isAvailable",
+          "kill": "terminal:kill",
+          "list": "terminal:list",
+          "resize": "terminal:resize",
+          "write": "terminal:write",
+        },
+        "TERMINAL_EVENTS": {
+          "clear": "terminal:clear",
+          "data": "terminal:data",
+          "error": "terminal:error",
+          "exit": "terminal:exit",
+        },
+      }
+    `)
+  })
+})
+
 describe('file bridge', () => {
   /** Every request method, called with the arguments the contract allows, and the wire it must produce. */
   const calls: Array<{

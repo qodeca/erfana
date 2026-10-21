@@ -10,8 +10,12 @@ declare global {
         openExternal: (url: string) => Promise<void>
       }
     }
-    /** Derived from the preload object itself, so it cannot drift from it. */
-    api: Api
+    /**
+     * Derived from the preload object itself, so it cannot drift from it. The
+     * `file` and `terminal` bridges are left out on purpose: the renderer reaches
+     * them through `services/fileGateway` and `terminalGateway`.
+     */
+    api: Omit<Api, 'file' | 'terminal'>
     /**
      * Area-select overlay API exposed only by the per-display overlay
      * BrowserWindows via `src/preload/screenshotOverlay.ts`. `undefined`

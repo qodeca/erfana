@@ -39,14 +39,69 @@ const MAIN_LAYER_PATTERNS = [
   layerPattern('renderer', 'src/main'),
   layerPattern('preload', 'src/main')
 ]
-const RENDERER_GATEWAY_SELECTOR = {
-  selector:
-    "MemberExpression[object.object.name='window'][object.property.name='api'][property.name=/^(file|terminal)$/]",
-  message:
-    'Reach the file and terminal bridges through services/fileGateway and services/terminalGateway, not window.api.'
-}
+const GATEWAY_MESSAGE =
+  'Reach the file and terminal bridges through services/fileGateway and services/terminalGateway, not window.api.'
+// The type system already hides `file` / `terminal` from `window.api` (see
+// preload/index.d.ts); these selectors are the backstop for the ways round it.
+const RENDERER_GATEWAY_SELECTORS = [
+  {
+    selector:
+      "MemberExpression[object.object.name='window'][object.property.name='api'][property.name=/^(file|terminal)$/]",
+    message: GATEWAY_MESSAGE
+  },
+  {
+    // window.api['file'], window.api[key]
+    selector: "MemberExpression[computed=true][object.object.name='window'][object.property.name='api']",
+    message: GATEWAY_MESSAGE
+  },
+  {
+    // window['api'], globalThis[k], self[k]
+    selector: "MemberExpression[computed=true][object.name=/^(window|globalThis|self)$/]",
+    message: GATEWAY_MESSAGE
+  },
+  {
+    // globalThis.api, self.api
+    selector: "MemberExpression[object.name=/^(globalThis|self)$/][property.name='api']",
+    message: GATEWAY_MESSAGE
+  },
+  {
+    // const a = window.api ; a = window.api
+    selector:
+      "VariableDeclarator[id.type!='ObjectPattern'][init.type='MemberExpression'][init.object.name='window'][init.property.name='api'], AssignmentExpression[right.type='MemberExpression'][right.object.name='window'][right.property.name='api']",
+    message: GATEWAY_MESSAGE
+  },
+  {
+    // const { file } = window.api
+    selector:
+      "VariableDeclarator[id.type='ObjectPattern'][init.object.name='window'][init.property.name='api']",
+    message: GATEWAY_MESSAGE
+  }
+]
 
-// Selectors every renderer file obeys; the gateway selector is added on top for non-test code.
+// Where the renderer may stand in for the bridges: tests install mocks on `window.api`
+const RENDERER_TEST_FILES = [
+  'src/renderer/**/*.test.{ts,tsx}',
+  'src/renderer/**/__test__/**',
+  'src/renderer/**/__tests__/**',
+  'src/renderer/**/__test-utils__/**',
+  'src/renderer/**/test-utils/**'
+]
+
+// Files that own a pattern the shared selectors ban (see the block comment below)
+const RENDERER_PATTERN_OWNERS = [
+  'src/renderer/src/utils/fileUtils.ts',
+  'src/renderer/src/utils/openFileInPanel.ts',
+  'src/renderer/src/services/preview/OverlayGuardService.ts'
+]
+
+// The only files that read the bridges off `window.api`
+const RENDERER_GATEWAY_FILES = [
+  'src/renderer/src/services/fileGateway.ts',
+  'src/renderer/src/services/terminalGateway.ts',
+  'src/renderer/src/services/gatewayAccess.ts'
+]
+
+// Selectors every renderer file obeys; the gateway selectors are added on top for non-test code.
 const RENDERER_RESTRICTED_SYNTAX = [
   {
     selector:
@@ -612,34 +667,43 @@ export default [
   //    silently disable these selectors for whichever files it matched. No
   //    renderer code creates those elements today.
   //
-  // NOTE: all four families live in ONE `no-restricted-syntax` entry on
-  // purpose. Flat config replaces a rule wholesale rather than merging, so a
-  // second block setting `no-restricted-syntax` for these files would silently
-  // disable whichever set it did not repeat.
+  // NOTE: flat config replaces a rule wholesale rather than merging, so every
+  // block below sets the COMPLETE `no-restricted-syntax` list for the files it
+  // matches: the shared families above, plus the gateway selectors where they
+  // apply. A block that listed only one set would silently disable the other.
+  //
+  // 5. Reading the file and terminal bridges off `window.api`. The renderer's
+  //    `window.api` type already omits them; the gateway selectors catch the
+  //    ways round the type. Tests may install mocks; the gateways read them.
+  //
+  //  - ordinary renderer code: shared families + gateway selectors
   {
     files: ['src/renderer/**/*.{ts,tsx}'],
-    ignores: [
-      'src/renderer/src/utils/fileUtils.ts',
-      'src/renderer/src/utils/openFileInPanel.ts',
-      'src/renderer/src/services/preview/OverlayGuardService.ts',
-      // The gateways are the one place `window.api.file` / `.terminal` is read
-      'src/renderer/src/services/fileGateway.ts',
-      'src/renderer/src/services/terminalGateway.ts'
-    ],
+    ignores: [...RENDERER_PATTERN_OWNERS, ...RENDERER_TEST_FILES, ...RENDERER_GATEWAY_FILES],
     rules: {
-      'no-restricted-syntax': ['error', RENDERER_GATEWAY_SELECTOR, ...RENDERER_RESTRICTED_SYNTAX]
+      'no-restricted-syntax': ['error', ...RENDERER_GATEWAY_SELECTORS, ...RENDERER_RESTRICTED_SYNTAX]
     }
   },
-  // Tests install mocks on `window.api`, so they may read it; every other selector still applies.
+  //  - tests and their helpers: shared families only
   {
-    files: ['src/renderer/**/*.test.{ts,tsx}'],
-    ignores: [
-      'src/renderer/src/utils/fileUtils.ts',
-      'src/renderer/src/utils/openFileInPanel.ts',
-      'src/renderer/src/services/preview/OverlayGuardService.ts'
-    ],
+    files: RENDERER_TEST_FILES,
+    ignores: RENDERER_PATTERN_OWNERS,
     rules: {
       'no-restricted-syntax': ['error', ...RENDERER_RESTRICTED_SYNTAX]
+    }
+  },
+  //  - the gateways: shared families only
+  {
+    files: RENDERER_GATEWAY_FILES,
+    rules: {
+      'no-restricted-syntax': ['error', ...RENDERER_RESTRICTED_SYNTAX]
+    }
+  },
+  //  - the files that own a banned pattern: gateway selectors only
+  {
+    files: RENDERER_PATTERN_OWNERS,
+    rules: {
+      'no-restricted-syntax': ['error', ...RENDERER_GATEWAY_SELECTORS]
     }
   }
 ]
