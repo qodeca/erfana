@@ -1,6 +1,9 @@
 # Terminal Flickering Prevention (v0.3.2)
 
-Hardware-accelerated rendering stability fixes for Electron 39 and production builds.
+Hardware-accelerated rendering stability fixes for production builds.
+
+> Written against Electron 39 (Chromium 142). The app now runs Electron 44 (Chromium 152); the switches below
+> have not been re-tested on it, and the code comment that says so still names Electron 39.
 
 ## Problem
 
