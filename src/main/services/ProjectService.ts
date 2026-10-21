@@ -19,7 +19,7 @@
 import { stat, realpath } from 'fs/promises'
 import { normalize, sep, parse, resolve } from 'path'
 import { BrowserWindow } from 'electron'
-import { validatePath } from '../utils/pathSecurity'
+import { assertAcceptableProjectRoot, validatePath } from '../utils/pathSecurity'
 import { AppError, ErrorCode } from '../../shared/errors'
 import type { ProjectChanged } from '../../shared/ipc/schema'
 import type { ResolvedProjectSettings } from '../../shared/ipc/project-settings-schema'
@@ -50,6 +50,8 @@ export interface ProjectSwitchResult {
   path: string
   action: 'noop' | 'switched'
   error?: string
+  /** The `ErrorCode` behind `error`, when the refusal was an `AppError` */
+  errorCode?: ErrorCode
 }
 
 /** Who asked for a transition; recorded on the session for later owner checks */
@@ -348,7 +350,8 @@ export class ProjectService {
           success: false,
           path: oldProjectPath || '',
           action: 'noop',
-          error: errorMsg
+          error: errorMsg,
+          errorCode: error.code
         }
       }
       throw error
@@ -418,6 +421,17 @@ export class ProjectService {
         )
       }
 
+      // The canonical folder must be acceptable too: a link can lead a typed path to a volume
+      // root. Checked before the watchers stop, so a refusal leaves the open project as it was.
+      assertAcceptableProjectRoot(
+        normaliseRealRoot(
+          await step(realpath(newProjectPath), 'Project path resolution').catch((error) => {
+            if (error instanceof TimeoutError) throw error
+            return newProjectPath
+          })
+        )
+      )
+
       // 5. Stop all existing watchers before switching
       const watcherStopStart = performance.now()
       await this.stopAllWatchers()
@@ -486,7 +500,8 @@ export class ProjectService {
         success: false,
         path: oldProjectPath || '',
         action: 'noop',
-        error: message
+        error: message,
+        errorCode: error instanceof AppError ? error.code : undefined
       }
     }
 
