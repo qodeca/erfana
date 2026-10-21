@@ -162,12 +162,13 @@ test.describe('Recent projects', () => {
     windowWithTestProject
   }) => {
     // Rows carry `welcome-recent-project-<path hash>`, so match the prefix
-    // rather than reproducing the renderer's hash of a temp path. The remove
-    // button's id (`welcome-recent-project-btn-remove-<hash>`) shares that
-    // prefix, so it has to be excluded explicitly.
+    // rather than reproducing the renderer's hash of a temp path. The row's
+    // open and remove buttons (`welcome-recent-project-btn-open-<hash>`,
+    // `…-btn-remove-<hash>`) share that prefix, so both are excluded.
     const entries = windowWithTestProject.locator(
       `[data-testid^="${TEST_IDS.WELCOME_RECENT_PROJECT}-"]` +
-        `:not([data-testid^="${TEST_IDS.WELCOME_RECENT_PROJECT_BTN_REMOVE}-"])`
+        `:not([data-testid^="${TEST_IDS.WELCOME_RECENT_PROJECT_BTN_REMOVE}-"])` +
+        `:not([data-testid^="${TEST_IDS.WELCOME_RECENT_PROJECT_BTN_OPEN}-"])`
     )
     // `userDataDir` is WORKER-scoped while the app fixtures are TEST-scoped, so
     // every project an earlier test in this worker opened is still on the list.

@@ -196,7 +196,7 @@ describe('WelcomePanel', () => {
       render(<WelcomePanel {...mockDockviewProps} />)
 
       await waitFor(() => {
-        const removeButtons = screen.getAllByRole('button', { name: 'Remove from recent projects' })
+        const removeButtons = screen.getAllByRole('button', { name: /^Remove .+ from recent projects$/ })
         expect(removeButtons).toHaveLength(2)
       })
     })
@@ -354,10 +354,10 @@ describe('WelcomePanel', () => {
       render(<WelcomePanel {...mockDockviewProps} />)
 
       await waitFor(() => {
-        expect(screen.getAllByRole('button', { name: 'Remove from recent projects' })).toHaveLength(2)
+        expect(screen.getAllByRole('button', { name: /^Remove .+ from recent projects$/ })).toHaveLength(2)
       })
 
-      const removeButtons = screen.getAllByRole('button', { name: 'Remove from recent projects' })
+      const removeButtons = screen.getAllByRole('button', { name: /^Remove .+ from recent projects$/ })
       await user.click(removeButtons[0])
 
       expect(mockRemoveRecentProject).toHaveBeenCalledWith('/path/project-a')
@@ -371,7 +371,7 @@ describe('WelcomePanel', () => {
         expect(mockGetRecentProjects).toHaveBeenCalledTimes(1)
       })
 
-      const removeButtons = screen.getAllByRole('button', { name: 'Remove from recent projects' })
+      const removeButtons = screen.getAllByRole('button', { name: /^Remove .+ from recent projects$/ })
       await user.click(removeButtons[0])
 
       await waitFor(() => {
@@ -385,10 +385,10 @@ describe('WelcomePanel', () => {
       render(<WelcomePanel {...mockDockviewProps} />)
 
       await waitFor(() => {
-        expect(screen.getAllByRole('button', { name: 'Remove from recent projects' })).toHaveLength(2)
+        expect(screen.getAllByRole('button', { name: /^Remove .+ from recent projects$/ })).toHaveLength(2)
       })
 
-      const removeButtons = screen.getAllByRole('button', { name: 'Remove from recent projects' })
+      const removeButtons = screen.getAllByRole('button', { name: /^Remove .+ from recent projects$/ })
       await user.click(removeButtons[0])
 
       await waitFor(() => {
@@ -406,10 +406,10 @@ describe('WelcomePanel', () => {
       render(<WelcomePanel {...mockDockviewProps} />)
 
       await waitFor(() => {
-        expect(screen.getAllByRole('button', { name: 'Remove from recent projects' })).toHaveLength(2)
+        expect(screen.getAllByRole('button', { name: /^Remove .+ from recent projects$/ })).toHaveLength(2)
       })
 
-      const removeButtons = screen.getAllByRole('button', { name: 'Remove from recent projects' })
+      const removeButtons = screen.getAllByRole('button', { name: /^Remove .+ from recent projects$/ })
       await user.click(removeButtons[0])
 
       // Should not open project when clicking remove
@@ -423,10 +423,10 @@ describe('WelcomePanel', () => {
       render(<WelcomePanel {...mockDockviewProps} />)
 
       await waitFor(() => {
-        expect(screen.getAllByRole('button', { name: 'Remove from recent projects' })).toHaveLength(2)
+        expect(screen.getAllByRole('button', { name: /^Remove .+ from recent projects$/ })).toHaveLength(2)
       })
 
-      const removeButtons = screen.getAllByRole('button', { name: 'Remove from recent projects' })
+      const removeButtons = screen.getAllByRole('button', { name: /^Remove .+ from recent projects$/ })
       await user.click(removeButtons[0])
 
       await waitFor(() => {
@@ -444,8 +444,8 @@ describe('WelcomePanel', () => {
       render(<WelcomePanel {...mockDockviewProps} />)
 
       await waitFor(() => {
-        const removeButtons = screen.getAllByRole('button', { name: 'Remove from recent projects' })
-        expect(removeButtons[0]).toBeDisabled()
+        const removeButtons = screen.getAllByRole('button', { name: /^Remove .+ from recent projects$/ })
+        expect(removeButtons[0]).toHaveAttribute('aria-disabled', 'true')
       })
     })
   })
@@ -509,10 +509,10 @@ describe('WelcomePanel', () => {
       render(<WelcomePanel {...mockDockviewProps} />)
 
       await waitFor(() => {
-        expect(screen.getAllByRole('button', { name: 'Remove from recent projects' })).toHaveLength(2)
+        expect(screen.getAllByRole('button', { name: /^Remove .+ from recent projects$/ })).toHaveLength(2)
       })
 
-      const removeButtons = screen.getAllByRole('button', { name: 'Remove from recent projects' })
+      const removeButtons = screen.getAllByRole('button', { name: /^Remove .+ from recent projects$/ })
       fireEvent.click(removeButtons[0])
 
       // Button is disabled, but the handler also checks and shows warning
@@ -648,10 +648,10 @@ describe('WelcomePanel', () => {
       render(<WelcomePanel {...mockDockviewProps} />)
 
       await waitFor(() => {
-        expect(screen.getAllByRole('button', { name: 'Remove from recent projects' })).toHaveLength(2)
+        expect(screen.getAllByRole('button', { name: /^Remove .+ from recent projects$/ })).toHaveLength(2)
       })
 
-      const removeButtons = screen.getAllByRole('button', { name: 'Remove from recent projects' })
+      const removeButtons = screen.getAllByRole('button', { name: /^Remove .+ from recent projects$/ })
       await user.click(removeButtons[0])
 
       await waitFor(() => {

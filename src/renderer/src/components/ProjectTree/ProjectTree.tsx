@@ -58,6 +58,7 @@ import {
 } from '../../hooks/useExternalFileDrop'
 import type { ConflictResolution } from '../../../../shared/ipc/external-file-schema'
 import { IMPORT } from '../../../../shared/constants'
+import { isTreeClipboardKeystroke } from './treeClipboardScope'
 
 interface ProjectTreeProps {
   onFileSelect: (filePath: string) => void
@@ -801,6 +802,11 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
 
       // Check for Ctrl/Cmd + X/C/V
       if ((e.ctrlKey || e.metaKey) && selectedFolder) {
+        // Only when the keystroke belongs to the tree ([27]): otherwise a
+        // folder clicked earlier hijacked Cmd+C on selected text elsewhere.
+        if (!isTreeClipboardKeystroke(treeContainerRef.current, document.activeElement, window.getSelection())) {
+          return
+        }
         // Root-EXCLUSIVE on purpose: the synthetic project root must not
         // resolve here, which is what keeps it non-cuttable / non-copyable.
         const node = findNode(selectedFolder)

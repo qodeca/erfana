@@ -68,10 +68,11 @@ const FOCUSABLE_SELECTOR =
 // non-BaseDialog overlays (SettingsOverlay, ContextMenu), so a context menu or
 // the Settings overlay ranks against dialogs on one scale.
 //
-// The stack holds EVERY open BaseDialog, not only the trapping ones, because
-// the dialog that lands on top is frequently a plain ConfirmDialog that never
-// opted into `trapFocus`. Registering only trapping dialogs would leave exactly
-// the case above unfixed.
+// The stack holds EVERY open BaseDialog, not only the trapping ones. Since #91
+// every shipping dialog traps, but `trapFocus={false}` remains possible, and a
+// non-trapping dialog on top must still suppress the trap beneath it — the
+// quit ConfirmDialog was exactly that case before #91 made trapping the
+// default.
 //
 // ORDERING CONTRACT: the frontmost dialog is the one with the HIGHEST
 // `zIndex`, and registration order breaks a tie. Painted order is what the user
@@ -175,9 +176,12 @@ export interface BaseDialogProps {
    */
   focusRescueRef?: React.RefObject<HTMLElement | null>
   /**
-   * Cycle Tab / Shift+Tab within the dialog. Opt-in: BaseDialog historically
-   * only auto-focused, and turning cycling on globally would change keyboard
-   * behaviour for every shipping dialog at once.
+   * Cycle Tab / Shift+Tab within the dialog. On by default (#91): the
+   * container's `aria-modal="true"` tells a screen reader that everything
+   * behind the dialog is inert, and that claim is only true while Tab cannot
+   * reach the page behind it. The two therefore travel together — passing
+   * `false` turns the trap off AND drops `aria-modal`, so the dialog never
+   * claims a modality it does not enforce. No shipping dialog opts out today.
    *
    * The trap also RECOVERS focus that has already escaped: when
    * `document.activeElement` is outside the dialog (`<body>` after a backdrop
@@ -196,7 +200,7 @@ export interface BaseDialogProps {
    * Both behaviours are suppressed while another dialog is stacked on top of
    * this one — see the open-dialog stack above.
    *
-   * @default false
+   * @default true
    */
   trapFocus?: boolean
   children: ReactNode
@@ -209,7 +213,9 @@ export interface BaseDialogProps {
  * - Portal rendering to #portal-root (consistent across all dialogs)
  * - Backdrop/overlay with configurable click-to-close
  * - Escape closes the topmost dialog only (shared overlay stack, #229)
- * - Focus trap for accessibility
+ * - Focus trap, on by default and coupled to `aria-modal` (#91)
+ * - Focus returns to the opener on close, whether `isOpen` goes false or the
+ *   dialog unmounts (DialogManager dialogs are removed, never set closed)
  * - Z-index management via props
  * - Fade-in animation
  */
@@ -225,11 +231,14 @@ export function BaseDialog({
   initialFocusRef,
   initialFocusKey,
   focusRescueRef,
-  trapFocus = false,
+  trapFocus = true,
   children
 }: BaseDialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
-  const previousActiveElement = useRef<HTMLElement | null>(null)
+  // Whatever had focus when this open cycle began — the control focus returns
+  // to on close. See the capture below for why it is read during render.
+  const opener = useRef<HTMLElement | null>(null)
+  const openerCaptured = useRef(false)
   // The element BaseDialog itself last parked focus on for this open cycle, or
   // null before the first resolution. It is what makes a re-armed pass (see
   // `initialFocusKey`) able to tell "focus is still where we parked it" from
@@ -251,12 +260,19 @@ export function BaseDialog({
   // focusout, and without this the rescue could recurse.
   const isRescuingFocus = useRef(false)
 
-  // Store the currently focused element when dialog opens
-  useEffect(() => {
-    if (isOpen) {
-      previousActiveElement.current = document.activeElement as HTMLElement
-    }
-  }, [isOpen])
+  // Capture the opener DURING RENDER, once per open cycle. An effect is too
+  // late: a child's `autoFocus` (Alert, Conflict, DropMode) runs in the commit
+  // and a child's own focus effect (Prompt, FileSystem) runs before this
+  // parent's effects, so by the time any BaseDialog effect ran, "the focused
+  // element" was already a control inside the dialog — and restoring to it on
+  // close restored to a node that no longer exists. The latch makes the
+  // capture idempotent across re-renders and StrictMode's double render; it
+  // is released only when the dialog has really closed (restore effect below).
+  if (isOpen && !openerCaptured.current) {
+    const active = document.activeElement
+    opener.current = active instanceof HTMLElement && active !== document.body ? active : null
+    openerCaptured.current = true
+  }
 
   // Stack membership. Registered for EVERY open dialog, trapping or not, so a
   // non-trapping dialog opened on top still suppresses the trap beneath it and
@@ -335,8 +351,8 @@ export function BaseDialog({
         // `document.body` is where Chromium leaves focus after blurring a
         // control that just became disabled. In a `trapFocus` dialog the
         // focusout rescue normally gets there first and re-parks focus on a
-        // live control (updating `placed`), so this arm mostly covers the
-        // non-trapping dialogs; it is kept because it costs nothing and the
+        // live control (updating `placed`), so this arm mostly covers a
+        // `trapFocus={false}` dialog; it is kept because it costs nothing and the
         // rescue has boundary cases (no focusable control at all) where focus
         // really does stay on `<body>`.
         const active = document.activeElement
@@ -357,7 +373,7 @@ export function BaseDialog({
     return () => clearTimeout(timer)
   }, [isOpen, initialFocusRef, initialFocusKey])
 
-  // Tab-cycling trap. Opt-in via `trapFocus`. The list is recomputed on every
+  // Tab-cycling trap (`trapFocus`, on by default). The list is recomputed on every
   // keystroke so controls that enable/disable mid-session move the boundaries
   // with them. Bubble phase, matching the two local traps this replaced
   // (DocumentImportDialog, TranscriptionDialog).
@@ -416,7 +432,7 @@ export function BaseDialog({
     return () => document.removeEventListener('keydown', handleFocusTrap)
   }, [isOpen, trapFocus])
 
-  // Keystroke-free focus recovery. Part of the `trapFocus` opt-in.
+  // Keystroke-free focus recovery. Part of `trapFocus`.
   //
   // Chromium blurs a focused control the instant it becomes `disabled` and
   // moves focus NOWHERE: `relatedTarget` is null and `document.activeElement`
@@ -527,11 +543,33 @@ export function BaseDialog({
     return () => dialog.removeEventListener('focusout', handleFocusOut)
   }, [isOpen, trapFocus, focusRescueRef])
 
-  // Restore focus when dialog closes
+  // Return focus to the opener when the dialog closes. Done in the CLEANUP of
+  // an `isOpen` effect so it covers both close paths: `isOpen` going false
+  // (app-root dialogs) and the component unmounting — every DialogManager
+  // dialog renders `isOpen={true}` and is simply removed from the list, so a
+  // restore keyed on `!isOpen` (the previous shape) never ran for them (#91).
   useEffect(() => {
-    if (!isOpen && previousActiveElement.current) {
-      previousActiveElement.current.focus()
-      previousActiveElement.current = null
+    if (!isOpen) return undefined
+    const dialog = dialogRef.current
+
+    return () => {
+      // Only a REAL close restores. StrictMode's simulated unmount runs this
+      // cleanup with the dialog still in the document; restoring then would
+      // move focus out of an open dialog in development builds.
+      if (dialog === null || dialog.isConnected) return
+
+      openerCaptured.current = false
+      const target = opener.current
+      opener.current = null
+      if (target === null || !target.isConnected) return
+
+      // Do not steal focus the close action already placed elsewhere (a
+      // caller that focuses the editor after "Create"). Removing the focused
+      // control leaves focus on <body>; anything else was a deliberate move.
+      const active = document.activeElement
+      if (active !== null && active !== document.body && !dialog.contains(active)) return
+
+      target.focus()
     }
   }, [isOpen])
 
@@ -561,7 +599,8 @@ export function BaseDialog({
         ref={dialogRef}
         className={`dialog-container ${className}`}
         role="dialog"
-        aria-modal="true"
+        // Modality is claimed only while it is enforced (#91, `trapFocus`).
+        aria-modal={trapFocus ? 'true' : undefined}
         aria-labelledby={ariaLabelledBy}
         aria-describedby={ariaDescribedBy}
         data-testid={TEST_IDS.DIALOG_CONTAINER}
