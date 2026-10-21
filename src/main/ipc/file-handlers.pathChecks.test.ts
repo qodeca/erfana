@@ -265,6 +265,20 @@ describe('file:* path checks', () => {
       await expect(invoke('file:openProjectByPath', 'relative/project')).rejects.toThrow('Invalid file path')
     })
 
+    it.skipIf(process.platform === 'win32')(
+      'file:validatePath checks the system folders on the canonical path',
+      async () => {
+        const blocked = { exists: false, error: 'Access to system paths not allowed' }
+        await expect(invoke('file:validatePath', '/etc/hosts')).resolves.toEqual(blocked)
+        if (process.platform === 'darwin') {
+          await expect(invoke('file:validatePath', '/private/etc/hosts')).resolves.toEqual(blocked)
+        }
+        // A link in the project that leads into a system folder is judged by where it leads
+        symlinkSync('/etc', path.join(root, 'sysetc'))
+        await expect(invoke('file:validatePath', path.join(root, 'sysetc', 'hosts'))).resolves.toEqual(blocked)
+      }
+    )
+
     it('file:validatePath still reports on a path outside, and refuses a malformed one', async () => {
       await expect(invoke('file:validatePath', 'relative.md')).resolves.toEqual({
         exists: false,
@@ -335,6 +349,24 @@ describe('file:* path checks', () => {
         await expect(invoke(channel, ...args), channel).rejects.toThrow('No project is open')
       }
       expect(readFileSync(path.join(root, 'a.md'), 'utf8')).toBe('inside')
+    })
+
+    it.each(['.', '..'])('rejects the dot-segment name %j on every channel that takes a name', async (name) => {
+      const before = readdirSync(base).sort()
+      await expect(invoke('file:createFile', root, name)).rejects.toThrow('Invalid')
+      await expect(invoke('file:createFolder', root, name)).rejects.toThrow('Invalid')
+      await expect(invoke('file:rename', path.join(root, 'a.md'), name)).rejects.toThrow('Invalid')
+      await expect(
+        invoke('file:moveItem', path.join(root, 'a.md'), path.join(root, 'sub'), name)
+      ).rejects.toThrow('Invalid')
+      await expect(invoke('file:copyItem', path.join(root, 'sub'), root, name)).rejects.toThrow('Invalid')
+      expect(readdirSync(base).sort()).toEqual(before)
+    })
+
+    it.each(['...', '.. '])('a name such as %j never lands outside the folder it is placed in', async (name) => {
+      const before = readdirSync(base).sort()
+      await invoke('file:copyItem', path.join(root, 'sub'), root, name).catch(() => undefined)
+      expect(readdirSync(base).sort()).toEqual(before)
     })
 
     it('names with a separator are rejected, not stripped', async () => {

@@ -7,7 +7,7 @@
  * (see src/main/ipc/confinement).
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { mkdir, mkdtemp, realpath, rm, stat, symlink } from 'fs/promises'
+import { mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, symlink, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { FileService } from './FileService'
@@ -65,5 +65,47 @@ describe('FileService project root', () => {
     await mkdir(join(root, 'moving'))
     const moved = await svc.moveItem(join(root, 'moving'), join(root, 'sub'))
     expect(moved.path).toBe(join(root, 'sub', 'moving'))
+  })
+})
+
+describe('FileService entry names', () => {
+  let base: string
+  let root: string
+  let svc: FileService
+
+  beforeEach(async () => {
+    base = await realpath(await mkdtemp(join(tmpdir(), 'erfana-names-')))
+    root = join(base, 'proj')
+    await mkdir(join(root, 'sub'), { recursive: true })
+    await writeFile(join(root, 'a.md'), 'a')
+    await writeFile(join(base, 'sibling.md'), 's')
+    svc = new FileService()
+    svc.setProjectPath(root)
+  })
+
+  afterEach(async () => {
+    await rm(base, { recursive: true, force: true })
+  })
+
+  const snapshot = async () => (await readdir(base)).sort()
+
+  it.each(['.', '..'])('rejects the dot-segment name %j for every operation and changes nothing', async (name) => {
+    const before = await snapshot()
+    await expect(svc.copyItem(join(root, 'a.md'), root, name)).rejects.toThrow()
+    await expect(svc.copyItem(join(root, 'sub'), join(root, 'sub'), name)).rejects.toThrow()
+    await expect(svc.moveItem(join(root, 'a.md'), join(root, 'sub'), name)).rejects.toThrow()
+    await expect(svc.moveItem(join(root, 'sub'), root, name)).rejects.toThrow()
+    await expect(svc.createFile(root, name)).rejects.toThrow()
+    await expect(svc.createFolder(root, name)).rejects.toThrow()
+    await expect(svc.rename(join(root, 'a.md'), name)).rejects.toThrow()
+    expect(await snapshot()).toEqual(before)
+    expect((await readdir(root)).sort()).toEqual(['a.md', 'sub'])
+  })
+
+  it('does not copy or move a folder into the parent of the project', async () => {
+    await expect(svc.copyItem(join(root, 'sub'), root, '..')).rejects.toThrow()
+    await expect(svc.moveItem(join(root, 'sub'), root, '..')).rejects.toThrow()
+    expect(await readFile(join(base, 'sibling.md'), 'utf-8')).toBe('s')
+    expect(await snapshot()).toEqual(['proj', 'sibling.md'])
   })
 })

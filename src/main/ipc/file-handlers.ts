@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { dialog, shell, type OpenDialogOptions } from 'electron'
-import { stat } from 'fs/promises'
+import { stat, realpath } from 'fs/promises'
 import path from 'path'
 import { ProjectService, type OpenContext } from '../services/ProjectService'
 import { fileService } from '../services/FileService'
@@ -58,6 +58,27 @@ export const projectService = new ProjectService(
 projectSettingsService.setGlobalExcludeProvider(
   () => globalSettingsService.getSetting('files').exclude
 )
+
+/**
+ * The canonical form of `target` for a comparison: the real path of the nearest
+ * folder that exists, plus the missing tail. Falls back to `target` itself when
+ * nothing can be resolved. `/etc` and `/private/etc` therefore agree.
+ */
+async function canonicalForCheck(target: string): Promise<string> {
+  const tail: string[] = []
+  let probe = target
+  for (;;) {
+    try {
+      const real = await realpath(probe)
+      return tail.length > 0 ? path.join(real, ...tail) : real
+    } catch (error) {
+      const up = path.dirname(probe)
+      if ((error as NodeJS.ErrnoException)?.code !== 'ENOENT' || up === probe) return target
+      tail.unshift(path.basename(probe))
+      probe = up
+    }
+  }
+}
 
 /** What `file:validatePath` answers. */
 interface ValidatePathResult {
@@ -603,16 +624,20 @@ export function registerFileHandlers(): void {
       onRefusal: (error): ValidatePathResult => ({ exists: false, error: error.message }),
       handler: async (_ctx, [trimmedPath, projectRoot], { filePath }): Promise<ValidatePathResult> => {
         try {
+          // One string for the system-folder check and the stat: the canonical path
           const resolvedPath = filePath.requested
+          const canonicalPath = await canonicalForCheck(resolvedPath)
 
           // Security check: block system-critical paths even without projectRoot
           // Defense-in-depth: prevent validation of sensitive system directories
           const blockedPrefixes = process.platform === 'win32'
             ? ['C:\\Windows', 'C:\\Program Files', 'C:\\ProgramData', 'C:\\System']
-            : ['/etc', '/usr', '/bin', '/sbin', '/System', '/Library', '/private/var']
+            : ['/etc', '/private/etc', '/usr', '/bin', '/sbin', '/System', '/Library', '/private/var']
 
-          const isBlockedPath = blockedPrefixes.some(prefix =>
-            resolvedPath.toLowerCase().startsWith(prefix.toLowerCase())
+          const isBlockedPath = [resolvedPath, canonicalPath].some(candidate =>
+            blockedPrefixes.some(prefix =>
+              candidate.toLowerCase().startsWith(prefix.toLowerCase())
+            )
           )
           if (isBlockedPath) {
             return { exists: false, error: 'Access to system paths not allowed' }
@@ -624,7 +649,7 @@ export function registerFileHandlers(): void {
           }
 
           // Check if file exists and is a file (not directory)
-          const stats = await stat(trimmedPath)
+          const stats = await stat(canonicalPath)
           if (!stats.isFile()) {
             return { exists: false, error: 'Path is not a file' }
           }

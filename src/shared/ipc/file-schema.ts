@@ -53,6 +53,9 @@ const entryNameArg = (message: string) =>
     .min(1, message)
     .max(ENTRY_NAME_MAX_CHARS, message)
     .refine((name) => !name.includes('/') && !name.includes('\\') && !name.includes('\0'), message)
+    // `.` and `..` name a folder, not an entry inside one; names Win32 would trim to them
+    // (`.. `, `...`) are refused in the main process, where the platform is known
+    .refine((name) => name !== '.' && name !== '..', message)
 
 export const PathArgsSchema = z.tuple([pathArg('Invalid file path')])
 export const ReadDirectoryArgsSchema = z.tuple([pathArg('Invalid directory path')])

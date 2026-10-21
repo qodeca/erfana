@@ -24,6 +24,7 @@ import { redactPath } from '../utils/redactUserInput'
 import { logger } from './LoggingService'
 import { atomicWriteText, isAtomicTempName } from '../utils/atomicWrite'
 import { IMAGE_EXTENSIONS, readImage } from './file/imageRead'
+import { childPath } from '../utils/childPath'
 import { isSamePath } from '../ipc/confinement/resolveConfinedPath'
 import { getPlatformConfig } from './watcher/PlatformConfig'
 import type { ImageReadResponse } from '../../shared/ipc/file-image-schema'
@@ -513,6 +514,11 @@ export class FileService implements IFileService {
       throw new Error('File name cannot be empty')
     }
 
+    // `.` and `..` are folders, not names; checked before `.md` is appended
+    if (fileName === '.' || fileName === '..') {
+      throw new Error('Invalid name')
+    }
+
     // Ensure .md extension
     if (!fileName.endsWith('.md') && !fileName.endsWith('.markdown')) {
       fileName = `${fileName}.md`
@@ -524,7 +530,7 @@ export class FileService implements IFileService {
     // portability-breaking classes (control chars, bidi, empty, too long).
     assertValidUserFilename(fileName)
 
-    const filePath = join(dirPath, fileName)
+    const filePath = childPath(dirPath, fileName)
 
     // Check if file already exists
     try {
@@ -555,7 +561,7 @@ export class FileService implements IFileService {
     // #161: validate reserved names, forbidden chars, etc. (platform-aware).
     assertValidUserFilename(folderName)
 
-    const folderPath = join(dirPath, folderName)
+    const folderPath = childPath(dirPath, folderName)
 
     // Check if folder already exists
     try {
@@ -632,7 +638,7 @@ export class FileService implements IFileService {
     // Get the directory and construct new path
     const { dirname } = await import('path')
     const parentDir = dirname(oldPath)
-    const newPath = join(parentDir, newName)
+    const newPath = childPath(parentDir, newName)
 
     // Check if already exists
     try {
@@ -685,6 +691,7 @@ export class FileService implements IFileService {
     const sourceStats = await stat(sourcePath)
     const isSymlink = await this.symlinkDetector.checkPath(sourcePath)
     const sourceItemName = basename(sourcePath)
+    if (newName) assertValidUserFilename(newName)
     const finalName = newName || sourceItemName
 
     // Validate target parent is a directory
@@ -694,7 +701,7 @@ export class FileService implements IFileService {
     }
 
     // Construct final target path
-    const targetPath = join(targetParentPath, finalName)
+    const targetPath = childPath(targetParentPath, finalName)
 
     // Prevent moving to the same location
     if (sourcePath === targetPath) {
@@ -716,7 +723,7 @@ export class FileService implements IFileService {
     if (conflictExists) {
       if (replaceExisting) {
         // Delete existing item before move
-        const existingItemPath = join(targetParentPath, finalName)
+        const existingItemPath = childPath(targetParentPath, finalName)
         try {
           const existingStats = await stat(existingItemPath)
 
@@ -780,6 +787,7 @@ export class FileService implements IFileService {
     const sourceStats = await stat(sourcePath)
     const isSymlink = await this.symlinkDetector.checkPath(sourcePath)
     const sourceItemName = basename(sourcePath)
+    if (newName) assertValidUserFilename(newName)
     const finalName = newName || sourceItemName
 
     // Validate target parent is a directory
@@ -789,7 +797,7 @@ export class FileService implements IFileService {
     }
 
     // Handle name conflicts by adding (1), (2), etc.
-    let targetPath = join(targetParentPath, finalName)
+    let targetPath = childPath(targetParentPath, finalName)
     let copyNumber = 1
 
     while (await this.checkNameConflict(targetParentPath, basename(targetPath))) {
@@ -798,7 +806,7 @@ export class FileService implements IFileService {
       const nameWithoutExt = ext ? finalName.slice(0, -ext.length) : finalName
 
       // Generate new name with copy number
-      targetPath = join(targetParentPath, `${nameWithoutExt} (${copyNumber})${ext}`)
+      targetPath = childPath(targetParentPath, `${nameWithoutExt} (${copyNumber})${ext}`)
       copyNumber++
 
       // Safety limit to prevent infinite loops
