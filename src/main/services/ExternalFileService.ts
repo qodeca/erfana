@@ -400,7 +400,7 @@ export class ExternalFileService implements IExternalFileService {
       if (validation.valid && !validation.isSymlink) {
         askable.push(item.sourcePath)
         shown.set(item.sourcePath, {
-          sourceIdentity: await this.identityOf(item.sourcePath),
+          sourceIdentity: await this.sourceVersionOf(item.sourcePath),
           sourceEntry: await this.entryIdentityOf(item.sourcePath),
           sourceFolder: await this.folderOf(item.sourcePath)
         })
@@ -477,7 +477,7 @@ export class ExternalFileService implements IExternalFileService {
     try {
       // What the user was shown: this entry, in this folder. A batch move recorded
       // it before the box (`decided`); a single move records it now, just before asking.
-      const sourceIdentity = decided ? decided.sourceIdentity : await this.identityOf(sourcePath)
+      const sourceIdentity = decided ? decided.sourceIdentity : await this.sourceVersionOf(sourcePath)
       const sourceEntry = decided ? decided.sourceEntry : await this.entryIdentityOf(sourcePath)
       const sourceFolder = decided ? decided.sourceFolder : await this.folderOf(sourcePath)
       if (await this.plannedIsSameFile(sourcePath, target, conflictResolution)) {
@@ -515,7 +515,7 @@ export class ExternalFileService implements IExternalFileService {
       const again = await this.validateExternalFile(sourcePath)
       const unchanged =
         again.valid &&
-        (await this.identityOf(sourcePath)) === sourceIdentity &&
+        (await this.sourceVersionOf(sourcePath)) === sourceIdentity &&
         (recheckTarget ? await recheckTarget() : true)
       if (!unchanged) {
         logger.warn('Move cancelled: source or target changed while waiting', {
@@ -718,11 +718,36 @@ export class ExternalFileService implements IExternalFileService {
     }
   }
 
-  /** Device and inode of the entry itself (a link is not followed), or null. */
+  /**
+   * What identifies the source a user was shown: device and inode, plus size,
+   * modification, change and creation times. A freed inode number is reused (a
+   * file removed and written again can come back under the same one), so the
+   * inode alone cannot tell a swapped file from the original.
+   */
+  private async sourceVersionOf(filePath: string): Promise<string | null> {
+    try {
+      const stats = await stat(filePath, { bigint: true })
+      return this.versionKey(stats)
+    } catch {
+      return null
+    }
+  }
+
+  private versionKey(stats: {
+    dev: bigint
+    ino: bigint
+    size: bigint
+    mtimeNs: bigint
+    ctimeNs: bigint
+    birthtimeNs: bigint
+  }): string {
+    return [stats.dev, stats.ino, stats.size, stats.mtimeNs, stats.ctimeNs, stats.birthtimeNs].join(':')
+  }
+
+  /** The same, for the entry itself (a link is not followed), or null. */
   private async entryIdentityOf(filePath: string): Promise<string | null> {
     try {
-      const stats = await lstat(filePath, { bigint: true })
-      return stats ? `${stats.dev}:${stats.ino}` : null
+      return this.versionKey(await lstat(filePath, { bigint: true }))
     } catch {
       return null
     }

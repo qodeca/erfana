@@ -885,10 +885,12 @@ describe('External File Handlers', () => {
     it('refuses a file that was swapped for another while the box was open, and keeps it', async () => {
       const swapped = path.join(outside, 'swap.md')
       writeFileSync(swapped, 'shown to the user')
+      const replacement = path.join(outside, 'swap-replacement.md')
+      writeFileSync(replacement, 'something else')
       const showBox = vi.fn(async () => {
-        // Same name, different file: what the user said Move to is gone
-        rmSync(swapped)
-        writeFileSync(swapped, 'something else')
+        // Same name, different file: the replacement is made first and renamed over
+        // the original, so both inodes are alive at once (no number is reused)
+        renameSync(replacement, swapped)
         return { response: 0 }
       })
       registerExternalFileHandlers(
@@ -903,6 +905,32 @@ describe('External File Handlers', () => {
         errorCode: ErrorCode.EXTERNAL_FILE_MOVE_CHANGED
       })
       expect(readFileSync(swapped, 'utf8')).toBe('something else')
+      expect(listDir(docs())).toEqual([])
+    })
+
+    it('refuses a file removed and written again with the same size while the box was open', async () => {
+      // The freed inode number is reused on some systems; the times differ either way
+      const swapped = path.join(outside, 'rewrite.md')
+      writeFileSync(swapped, 'shown to the user')
+      const showBox = vi.fn(async () => {
+        // The box is open for seconds in practice; a few ticks keep coarse clocks apart
+        await new Promise((resolve) => setTimeout(resolve, 30))
+        rmSync(swapped)
+        writeFileSync(swapped, 'other contents!!!')
+        return { response: 0 }
+      })
+      registerExternalFileHandlers(
+        projectService.session,
+        new ExternalMoveConfirmerImpl({ showBox, resolveOwner: () => ({}), coalesceMs: 0 })
+      )
+
+      const response = await invoke('file:moveBatchFromExternal', request([swapped]))
+
+      expect(response.results[0]).toMatchObject({
+        success: false,
+        errorCode: ErrorCode.EXTERNAL_FILE_MOVE_CHANGED
+      })
+      expect(readFileSync(swapped, 'utf8')).toBe('other contents!!!')
       expect(listDir(docs())).toEqual([])
     })
 
