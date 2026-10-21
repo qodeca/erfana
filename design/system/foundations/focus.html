@@ -54,7 +54,7 @@
   The two numbers come from two different criteria, and this card used to cite the wrong one.
   <strong>SC 1.4.11</strong> (AA) asks a focus indicator for 3:1 against what is next to it.
   <strong>SC 2.4.13 Focus Appearance</strong> (AAA) asks for an indicator at least as large as a 2px
-  perimeter, changing contrast by at least 3:1. The 1px ring meets neither half of 2.4.13; the 2px ring
+  perimeter, changing contrast by at least 3:1. The 1px ring fails the area half of 2.4.13; the 2px ring
   meets both, so 2px is the floor here. (SC 2.4.11 is <em>Focus Not Obscured</em> — about the ring
   being hidden behind a sticky header, not about its width.)
   <br><br>
@@ -176,14 +176,6 @@
       <td>Returns to the permission band's chip, not to the placeholder that entered the page. The chip's
         accessible name states that exit ("Press Escape in the previewed page to return here", decided
         band card), and a page can also be entered with the mouse, where there is no opener.</td>
-    </tr>
-    <tr>
-      <td>Welcome screen action button</td>
-      <td>The ring is <code>--color-border-focus</code>.</td>
-      <td>White (<code>--color-white</code>), same width and offset. The button is itself violet and sits on
-        a translucent overlay over the welcome image, so a violet ring would be weakest exactly where the
-        image is light; white clears 3:1 against both the dark overlay and the button. See
-        <code>AppDockLayout.css</code>.</td>
     </tr>
     <tr>
       <td>Screenshot area-select overlay</td>

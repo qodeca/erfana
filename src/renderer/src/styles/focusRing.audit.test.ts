@@ -31,7 +31,11 @@ interface Ring {
   outline: string
   offset: string | null
   deviates: boolean
+  outlineColor: string | null
+  colourIsFocusToken: boolean
 }
+
+const FOCUS_COLOUR = 'var(--color-border-focus)'
 
 /**
  * Whether the rule with this selector is directly preceded by a `deviates:`
@@ -56,12 +60,19 @@ const RINGS: Ring[] = SHEETS.flatMap((sheet) =>
     if (!/:focus(?:-visible|-within)?\b/.test(rule.selector)) return []
     const outline = declared(rule.body, 'outline')
     if (outline === null || /^(none|0)$/.test(outline)) return []
+    // `outline-color` declared after the shorthand wins; otherwise the
+    // shorthand's colour (its last component) is what paints.
+    const outlineColor = declared(rule.body, 'outline-color')
+    const colourIsFocusToken =
+      outlineColor !== null ? outlineColor === FOCUS_COLOUR : outline.endsWith(FOCUS_COLOUR)
     return [
       {
         key: `${sheet.file} :: ${rule.selector}`,
         outline,
         offset: declared(rule.body, 'outline-offset'),
-        deviates: hasDeviationMarker(sheet.css, rule.selector)
+        deviates: hasDeviationMarker(sheet.css, rule.selector),
+        outlineColor,
+        colourIsFocusToken
       }
     ]
   })
@@ -93,6 +104,17 @@ describe('focus rings follow the Focus card (every stylesheet)', () => {
       ).toBe(true)
     }
   )
+
+  it('paints every ring in --color-border-focus unless a deviates: marker says otherwise', () => {
+    // Colour drifted the same way width did: a white ring on the diagram chat
+    // buttons and the welcome action, --color-accent-primary on preview links.
+    // Same violet today in the second case, but it MEANS "accent", and
+    // repointing the accent would silently move the ring.
+    const offColour = RINGS.filter(
+      (ring) => !ring.deviates && !ring.colourIsFocusToken
+    ).map((ring) => `${ring.key} -> ${ring.outline}${ring.outlineColor ? ` / ${ring.outlineColor}` : ''}`)
+    expect(offColour).toEqual([])
+  })
 
   it('uses :focus-visible, never bare :focus, for a drawn ring', () => {
     const bare = RINGS.filter((ring) => /:focus(?![-\w])/.test(ring.key)).map((ring) => ring.key)

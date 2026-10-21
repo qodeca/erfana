@@ -112,7 +112,7 @@
 }
 
 .markdown-preview a:focus-visible {
-  outline: var(--border-width-thick) solid var(--color-link);
+  outline: var(--border-width-thick) solid var(--color-border-focus);
   outline-offset: var(--space-1);
   border-radius: var(--border-radius);
 }
@@ -129,7 +129,7 @@
 }
 
 .markdown-preview a.internal-link:focus-visible {
-  outline-color: var(--color-accent-primary);
+  outline-color: var(--color-border-focus);
 }
 
 /* Broken links - file not found */
@@ -146,7 +146,7 @@
 }
 
 .markdown-preview a.broken-link:focus-visible {
-  outline: var(--border-width-thick) solid var(--color-accent-primary);
+  outline: var(--border-width-thick) solid var(--color-border-focus);
   outline-offset: var(--space-1);
   border-radius: var(--border-radius);
 }
@@ -172,7 +172,7 @@
 }
 
 .markdown-preview a.anchor-link:focus-visible {
-  outline: var(--border-width-thick) solid var(--color-link);
+  outline: var(--border-width-thick) solid var(--color-border-focus);
   outline-offset: var(--space-1);
   border-radius: var(--border-radius);
 }
@@ -525,7 +525,7 @@
   font-family: var(--font-mono);
   font-size: var(--text-md);
   font-weight: var(--font-medium);
-  color: var(--color-text-secondary);
+  color: var(--color-text-tertiary);
   white-space: nowrap;
   width: 1%;
   vertical-align: top;
@@ -609,7 +609,7 @@
 .frontmatter-nested-key {
   font-family: var(--font-mono);
   font-size: var(--text-md);
-  color: var(--color-text-secondary);
+  color: var(--color-text-tertiary);
   flex-shrink: 0;
 }
 
@@ -641,7 +641,7 @@
   background-color: transparent;
   border: none;
   border-top: var(--border-width) solid var(--color-border-default);
-  color: var(--color-text-secondary);
+  color: var(--color-text-tertiary);
   font-family: var(--font-mono);
   font-size: var(--text-base);
   cursor: pointer;
@@ -654,7 +654,7 @@
 }
 
 .frontmatter-expand-btn:focus-visible {
-  outline: var(--border-width-thick) solid var(--color-accent-primary);
+  outline: var(--border-width-thick) solid var(--color-border-focus);
   outline-offset: calc(var(--space-1) * -1);
 }
 

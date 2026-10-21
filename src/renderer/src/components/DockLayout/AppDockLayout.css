@@ -386,15 +386,12 @@
   cursor: not-allowed;
 }
 
-/* deviates: design/system/foundations/focus.html — white ring, not violet: the
-   button is violet and sits on a translucent overlay over the welcome image,
-   so white is the colour that clears 3:1 against both (see the card's
-   Exceptions). */
+/* The standard ring (design/system/foundations/focus.html). Offset outward, it
+   sits on the dark .welcome-content overlay, not on the button's own violet:
+   violet on that 78% overlay measures about 4.5:1 even with white behind it, clear
+   of the 3:1 SC 1.4.11 asks. */
 .welcome-action-button:focus-visible {
-  /* White (not the violet focus token) so the ring contrasts ≥3:1 against the
-     button's own violet fill; placed over the dark .welcome-content overlay via
-     the offset. WCAG 2.2 SC 1.4.11 / 2.4.13. */
-  outline: var(--border-width-thick) solid var(--color-white);
+  outline: var(--border-width-thick) solid var(--color-border-focus);
   outline-offset: var(--space-1);
 }
 

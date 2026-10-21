@@ -74,6 +74,16 @@
   background: var(--color-brand-lime);
 }
 
+/* While the active item has keyboard focus, the inset ring runs along the same
+   edge as the 2px lime bar, and the two would sit on top of each other (a
+   lime-and-violet stripe that reads as neither). The ring wins for as long as
+   focus is there; the bar comes back when focus leaves. The ring stays inset
+   because an outward one would spill into the neighbouring items and out of
+   the 48px bar. */
+.activity-bar-item.active:focus-visible::before {
+  display: none;
+}
+
 /* Icon Container */
 .activity-bar-item-icon {
   display: flex;

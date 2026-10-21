@@ -5,7 +5,7 @@
   their text and icons in near-black instead of white, which was very hard to read on the light
   violet. (#231)
 - **Small grey labels are easier to read.** Labels such as "Selected text" in the prompt dialog,
-  the front-matter header and values in the preview, empty-editor hints and the "Clean" git count
+  the front-matter header, keys and placeholder values in the preview, empty-editor hints and the "Clean" git count
   use a lighter grey that meets the contrast minimum for text. (#231)
 - **One clear focus outline everywhere.** The search bar, settings controls and dialog fields and
   dropdowns now show the same solid 2px outline as the rest of the app when you move to them with

@@ -106,7 +106,7 @@
   /* Text and icons drawn ON a violet fill (primary buttons, active toggles,
    * badges). The brand violet is a light tint, so white on it is 2.20:1 and
    * fails SC 1.4.3; brand black is 8.40:1 at rest, 6.85:1 on hover and 5.55:1
-   * pressed. Guarded by primaryFill.contrast.test.ts. */
+   * pressed. Guarded by accentFill.contrast.test.ts. */
   --color-text-on-accent: var(--color-brand-black);
 
   /* ============================================
