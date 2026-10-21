@@ -9,38 +9,55 @@ import eslintConfigPrettier from 'eslint-config-prettier'
 
 // Layer rules (project-session design, section 6). The layers are `src/main`,
 // `src/preload`, `src/renderer` and `src/shared`; `shared` sits under all of
-// them. Patterns match relative specifiers (`../../main/x`) and the `@main/*`
-// style aliases. Flat config replaces `no-restricted-imports` wholesale per
-// matching block, so every block that sets it must spread these.
+// them. A layer is matched only by climbing out to it (`../../main/x`,
+// `../src/main`) or by its `@main/` style alias, via the `regex` option, so a
+// sibling `./main`, a folder that merely contains the word, or a package such as
+// `@electron-toolkit/preload` is never hit. Flat config replaces
+// `no-restricted-imports` wholesale per matching block, so every block that
+// sets it for these files must spread the right set.
 //
 //   * shared   imports nothing from main, renderer, preload or electron;
 //   * renderer imports nothing from main, and only TYPES from preload/index;
-//   * main     imports nothing from renderer or preload.
+//   * main     imports nothing from renderer or preload;
+//   * preload  imports nothing from renderer. preload -> main is left open on
+//     purpose: previewPage.contract.test.ts imports main values.
 const LAYER_MESSAGE = 'Layer rule: '
-const layerGroup = (layer, who, allowTypeImports = false) => ({
-  group: [`**/${layer}/**`, `**/${layer}`, `@${layer}/*`],
-  ...(allowTypeImports ? { allowTypeImports: true } : {}),
+const layerRegex = (layer, suffix = '(/|$)') => `^((\\.\\./)+(src/)?|@)${layer}${suffix}`
+const layerPattern = (layer, who) => ({
+  regex: layerRegex(layer),
   message: `${LAYER_MESSAGE}${who} must not import from src/${layer}.`
 })
+const ELECTRON_IPCMAIN_MESSAGE =
+  'Register global IPC through src/main/ipc/registry.ts (registerHandle / registerOn / …) so every channel is gated on the app renderer. Importing ipcMain directly bypasses that gate.'
 const SHARED_LAYER_PATTERNS = [
-  layerGroup('main', 'src/shared'),
-  layerGroup('renderer', 'src/shared'),
-  layerGroup('preload', 'src/shared')
+  layerPattern('main', 'src/shared'),
+  layerPattern('renderer', 'src/shared'),
+  layerPattern('preload', 'src/shared'),
+  { group: ['electron/*'], message: `${LAYER_MESSAGE}src/shared must not import electron.` }
 ]
 const MAIN_LAYER_PATTERNS = [
-  layerGroup('renderer', 'src/main'),
-  layerGroup('preload', 'src/main')
+  layerPattern('renderer', 'src/main'),
+  layerPattern('preload', 'src/main')
 ]
+const PRELOAD_LAYER_PATTERNS = [layerPattern('renderer', 'src/preload')]
 // The renderer reaches the preload only through `window.api`; a type-only
-// import of the preload's declarations is the one allowed link. (Known limit:
-// typescript-eslint exempts a type-only import when ANY pattern with
-// `allowTypeImports` matches it, so the image-export harness's `../*` group
-// also lets a type-only import of main through there. Value imports are caught.)
+// import of `preload/index` is the one allowed link. Two patterns do it: the
+// first bans every preload file except `index`, the second matches ONLY
+// `preload` and `preload/index`, carries `allowTypeImports`, and so bans value
+// imports of those two while letting type imports through. (typescript-eslint exempts a
+// type-only import when ANY `allowTypeImports` pattern matches it, so
+// `preload/x` stays banned for types too because the second pattern misses it.
+// Known limit: the image-export harness's `../*` group also has
+// `allowTypeImports`, so a type-only import of main slips through there. Value
+// imports are caught.)
+const RENDERER_PRELOAD_MESSAGE = `${LAYER_MESSAGE}src/renderer may only \`import type\` from src/preload/index.`
 const RENDERER_LAYER_PATTERNS = [
-  layerGroup('main', 'src/renderer'),
+  layerPattern('main', 'src/renderer'),
+  { regex: layerRegex('preload', '/(?!index$)'), message: RENDERER_PRELOAD_MESSAGE },
   {
-    ...layerGroup('preload', 'src/renderer', true),
-    message: `${LAYER_MESSAGE}src/renderer may only \`import type\` from src/preload/index.`
+    regex: layerRegex('preload', '(/index)?$'),
+    allowTypeImports: true,
+    message: RENDERER_PRELOAD_MESSAGE
   }
 ]
 
@@ -341,11 +358,12 @@ export default [
   // the same enforcement pattern used for `api.preview.setVisibility` and
   // `openFileInPanel` in the renderer block below. See sd-074b §7.
   //
-  // NOTE: `no-restricted-imports` is set for `e2e/**` and for
-  // `src/renderer/src/imageExport/**` elsewhere in this file. Neither overlaps
-  // `src/main/**`, so this block is safe — but flat config REPLACES a rule
-  // rather than merging it, so never add a second block setting
-  // `no-restricted-imports` for main-process files.
+  // NOTE: `no-restricted-imports` is set for `e2e/**`, `src/shared/**`,
+  // `src/renderer/**` (and its `imageExport/**` folder) and `src/preload/**`
+  // elsewhere in this file. None overlaps `src/main/**`, so this block is safe.
+  // Flat config REPLACES a rule rather than merging it, so the only second block
+  // that sets it for main-process files is the one right below, which covers
+  // exactly the files this one ignores and sets nothing but the layer patterns.
   {
     files: ['src/main/**/*.ts'],
     // Tests read the emitter to assert what a `register*Handlers()` call put on
@@ -362,13 +380,37 @@ export default [
               name: 'electron',
               importNames: ['ipcMain'],
               allowTypeImports: true,
-              message:
-                'Register global IPC through src/main/ipc/registry.ts (registerHandle / registerOn / …) so every channel is gated on the app renderer. Importing ipcMain directly bypasses that gate.'
+              message: ELECTRON_IPCMAIN_MESSAGE
+            },
+            {
+              name: 'electron/main',
+              importNames: ['ipcMain'],
+              allowTypeImports: true,
+              message: ELECTRON_IPCMAIN_MESSAGE
             }
           ],
           patterns: MAIN_LAYER_PATTERNS
         }
       ]
+    }
+  },
+  // The files the block above ignores still obey the layer rules: only the
+  // `ipcMain` path is dropped for them. Safe as a second setter because the two
+  // blocks' file sets are disjoint (this one is exactly the other's `ignores`).
+  {
+    files: ['src/main/ipc/registry.ts', 'src/main/**/*.test.ts'],
+    rules: {
+      'no-restricted-imports': 'off',
+      '@typescript-eslint/no-restricted-imports': ['error', { patterns: MAIN_LAYER_PATTERNS }]
+    }
+  },
+  // Preload: nothing from the renderer. preload -> main is open on purpose (see
+  // the layer notes at the top of this file).
+  {
+    files: ['src/preload/**/*.ts'],
+    rules: {
+      'no-restricted-imports': 'off',
+      '@typescript-eslint/no-restricted-imports': ['error', { patterns: PRELOAD_LAYER_PATTERNS }]
     }
   },
   // Every URL handed to the OS goes through `openExternalSafe()`, which checks it
