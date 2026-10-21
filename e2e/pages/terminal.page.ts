@@ -7,9 +7,10 @@
  *
  * NOTE: xterm.js v6 with WebGL renderer does not expose terminal text content
  * to the DOM (.xterm-rows only exists with the DOM renderer, and
- * .xterm-accessibility-tree requires screenReaderMode: true). Therefore
- * prompt detection uses xterm textarea presence (condition-based) plus a
- * KNOWN_WAIT for PTY shell initialization.
+ * .xterm-accessibility-tree requires screenReaderMode: true). The page object
+ * therefore reads xterm's own buffer – the text the terminal draws – through
+ * the React fiber of the terminal element (`readScreen`), without any
+ * test-only code in the app.
  *
  * @see e2e/utils/helpers.ts - Backward-compatible adapter
  */
@@ -21,14 +22,53 @@ import { byTestId } from '../utils/locators'
 /** Selector for the xterm.js terminal container */
 const TERMINAL_SELECTOR = `[data-testid="${TEST_IDS.TERMINAL_INSTANCE}"]`
 
+/** What `readScreen` returns: the terminal's text and cursor, or why it could not be read. */
+export interface TerminalScreen {
+  /** Logical lines (wrapped rows joined), trailing blanks trimmed, empty lines dropped. */
+  lines: string[]
+  cursorX: number
+  cursorY: number
+  /** Set only inside the page when the screen cannot be read; `readScreen` throws on it. */
+  error?: string
+}
+
 /**
- * KNOWN_WAIT: PTY shell initialization delay.
- * xterm.js WebGL renderer does not expose text to the DOM, so we cannot
- * poll for prompt characters. After confirming xterm is initialized
- * (textarea present), this delay allows the PTY shell to start and
- * render the prompt via the GPU renderer.
+ * Read the xterm buffer of the terminal element `selector`.
+ *
+ * Runs in the page. Walks up the React fibers from the element and through each
+ * component's hooks to the first ref that holds an xterm `Terminal` (it has
+ * `buffer.active.getLine`). Wrapped rows are joined into one logical line.
  */
-const PTY_INIT_DELAY_MS = 1500
+function readScreenInPage(selector: string): TerminalScreen {
+  const empty = (error: string): TerminalScreen => ({ lines: [], cursorX: 0, cursorY: 0, error })
+  const el = document.querySelector(selector)
+  if (!el) return empty('no terminal element')
+  const fiberKey = Object.keys(el).find((k) => k.startsWith('__reactFiber$'))
+  if (!fiberKey) return empty('no React fiber on the terminal element')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let fiber: any = (el as any)[fiberKey]
+  for (let depth = 0; fiber && depth < 30; depth++, fiber = fiber.return) {
+    let hook = fiber.memoizedState
+    for (let n = 0; hook && n < 200; n++, hook = hook.next) {
+      const buffer = hook.memoizedState?.current?.buffer?.active
+      if (!buffer?.getLine) continue
+      const lines: string[] = []
+      for (let i = 0; i < buffer.length; i++) {
+        const line = buffer.getLine(i)
+        if (!line) continue
+        const text = line.translateToString(true)
+        if (line.isWrapped && lines.length > 0) lines[lines.length - 1] += text
+        else lines.push(text)
+      }
+      return {
+        lines: lines.map((l) => l.trimEnd()).filter((l) => l.length > 0),
+        cursorX: buffer.cursorX,
+        cursorY: buffer.cursorY
+      }
+    }
+  }
+  return empty('no xterm Terminal found in the React fibers')
+}
 
 export class TerminalPage {
   constructor(private readonly page: Page) {}
@@ -37,14 +77,28 @@ export class TerminalPage {
     return byTestId(this.page, TEST_IDS.TERMINAL_INSTANCE)
   }
 
+  /** The terminal's text and cursor, read from xterm's buffer. */
+  async readScreen(): Promise<TerminalScreen> {
+    const screen = await this.page.evaluate(readScreenInPage, TERMINAL_SELECTOR)
+    // Fail loudly: an unreadable screen must never look like an empty one.
+    if (screen.error) {
+      throw new Error(
+        `Terminal screen unreadable: ${screen.error}. ` +
+          'xterm instance not found – React internals changed? See readScreenInPage in e2e/pages/terminal.page.ts.'
+      )
+    }
+    return screen
+  }
+
   /**
    * Waits for the terminal to be ready for input.
    *
-   * Two-stage approach:
-   * 1. Condition-based: polls for xterm textarea (proves xterm.open() completed)
-   * 2. KNOWN_WAIT: brief delay for PTY shell startup (unavoidable with WebGL renderer)
+   * 1. xterm is initialised (its textarea exists).
+   * 2. The shell has drawn a prompt: the cursor sits after some text on its
+   *    row, and two reads in a row see the same screen, so a prompt that is
+   *    still being drawn (or a banner before it) does not count.
    *
-   * @param options.timeout - Maximum wait time for xterm init (default: 10000ms)
+   * @param options.timeout - Maximum wait time (default: 10000ms)
    */
   async waitForPrompt(options?: { timeout?: number }): Promise<void> {
     const timeout = options?.timeout ?? 10_000
@@ -61,10 +115,23 @@ export class TerminalPage {
       { timeout }
     )
 
-    // Stage 2: KNOWN_WAIT for PTY shell initialization
-    // WebGL renderer doesn't expose text to DOM, so prompt detection via
-    // DOM polling is not possible without app-level changes (e.g. screenReaderMode)
-    await this.page.waitForTimeout(PTY_INIT_DELAY_MS)
+    // Stage 2: the shell has drawn a settled prompt
+    let previous = ''
+    await expect
+      .poll(
+        async () => {
+          const screen = await this.readScreen()
+          const snapshot = JSON.stringify(screen)
+          const settled = screen.cursorX > 0 && screen.lines.length > 0 && snapshot === previous
+          previous = snapshot
+          return settled ? 'prompt' : 'starting'
+        },
+        { message: 'the shell should draw its prompt', intervals: [100], timeout }
+      )
+      .toBe('prompt')
+
+    // Sanity: the screen the prompt check passed on really holds text
+    expect((await this.readScreen()).lines.length, 'terminal screen after the prompt').toBeGreaterThan(0)
   }
 
   /**
@@ -145,14 +212,30 @@ export class TerminalPage {
     }
   }
 
-  /**
-   * NOTE: Uses toContainText() which may not work with xterm.js WebGL renderer
-   * (text is rendered to canvas, not DOM). Works when xterm falls back to DOM renderer.
-   * For WebGL-only scenarios, use a KNOWN_WAIT pattern instead.
-   */
+  /** Waits until the terminal shows `text` anywhere (the typed command line counts). */
   async waitForOutput(text: string, options: { timeout?: number } = {}): Promise<void> {
     const { timeout = 10000 } = options
-    await expect(this.getTerminal()).toContainText(text, { timeout })
+    await expect
+      .poll(async () => (await this.readScreen()).lines.join('\n'), {
+        message: `the terminal should show ${JSON.stringify(text)}`,
+        timeout
+      })
+      .toContain(text)
+  }
+
+  /**
+   * Waits until a whole terminal line reads `line` (surrounding spaces ignored).
+   * Use this to check a command's OUTPUT: the line that echoes the typed command
+   * also contains the text, so `waitForOutput` would pass without any output.
+   */
+  async waitForOutputLine(line: string, options: { timeout?: number } = {}): Promise<void> {
+    const { timeout = 10000 } = options
+    await expect
+      .poll(async () => (await this.readScreen()).lines.map((l) => l.trim()), {
+        message: `the terminal should print the line ${JSON.stringify(line)}`,
+        timeout
+      })
+      .toContain(line)
   }
 
   async interrupt(): Promise<void> {
