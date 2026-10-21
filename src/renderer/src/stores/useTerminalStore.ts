@@ -115,6 +115,12 @@ export function createTerminalStore(
         return false
       }
 
+      // Programmatic input counts as user input: a prompt the app sent on the
+      // user's behalf (prompt sends, drag-and-drop, ProjectTree actions) starts
+      // work just as typing does, and the restart and quit guards must see it.
+      get().markUserInput(terminalId)
+      get().markActivity(terminalId)
+
       // If autoExecute is enabled, send Enter key after a short delay
       // IMPORTANT: The 200ms delay is REQUIRED - atomic writes don't work reliably
       // This accounts for: PTY buffering + shell line discipline processing + rendering

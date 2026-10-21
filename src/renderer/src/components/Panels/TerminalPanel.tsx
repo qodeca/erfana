@@ -260,6 +260,8 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   // depending on the object would re-register the portal terminal controls
   // each time any dialog opens or closes.
   const showConfirm = useOptionalDialog()?.showConfirm
+  // Latch for handleRestartRequest – see there.
+  const restartInProgressRef = useRef(false)
   const portalTarget = portalContext?.portalTarget ?? 'main'
   const mainContainerRef = useRef<HTMLDivElement>(null)
   const terminalPanelRef = useRef<HTMLDivElement>(null)
@@ -1109,12 +1111,21 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
    * mounts one) there is no way to ask, and the restart proceeds as before.
    */
   const handleRestartRequest = useCallback(async () => {
-    const risk = getRestartRisk(terminalIdRef.current)
-    if (risk !== null && showConfirm) {
-      const confirmed = await showConfirm(buildRestartConfirm(risk))
-      if (!confirmed) return
+    // One restart at a time. A second request while the first is still asking
+    // or tearing down (a double click, the ChatBubble button) would otherwise
+    // stack a second prompt or kill the freshly created session.
+    if (restartInProgressRef.current) return
+    restartInProgressRef.current = true
+    try {
+      const risk = getRestartRisk(terminalIdRef.current)
+      if (risk !== null && showConfirm) {
+        const confirmed = await showConfirm(buildRestartConfirm(risk))
+        if (!confirmed) return
+      }
+      await handleRestartTerminal()
+    } finally {
+      restartInProgressRef.current = false
     }
-    await handleRestartTerminal()
   }, [showConfirm, handleRestartTerminal])
 
   const handleScrollToBottom = useCallback(() => {

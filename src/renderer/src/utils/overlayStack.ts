@@ -7,9 +7,11 @@
  * the shared `ContextMenu`) registers here while it is open. Two questions are
  * answered from the stack:
  *
- * 1. **Who is on top?** ({@link isTopmostOverlay}) – read by BaseDialog's Tab
- *    trap and focusout rescue, which must stand down while anything is stacked
- *    on top of their dialog.
+ * 1. **Which modal is on top?** ({@link isTopmostOverlay}) – read by
+ *    BaseDialog's Tab trap and focusout rescue, which must stand down while
+ *    another MODAL surface is stacked on top of their dialog. Non-modal
+ *    entries (context menus) are ignored here: a menu opened over a trapping
+ *    dialog must not switch that dialog's trap off.
  * 2. **Who gets Escape?** – ONE shared capture-phase `keydown` listener on
  *    `document` hands Escape to the topmost overlay only (#229).
  *
@@ -37,6 +39,8 @@
  * never ran its cleanup must not wedge every later overlay.
  */
 
+import { logger } from './logger'
+
 /** What an overlay does when it owns an Escape keystroke. */
 export type OverlayEscapeHandler = () => void
 
@@ -59,9 +63,32 @@ export type ZIndexToken = `--z-${string}`
  *   stylesheet loaded – unit tests under jsdom set the property themselves)
  */
 export function readZIndexToken(token: ZIndexToken): number {
-  const raw = getComputedStyle(document.documentElement).getPropertyValue(token)
-  const value = Number.parseInt(raw, 10)
-  return Number.isNaN(value) ? 0 : value
+  const raw = getComputedStyle(document.documentElement).getPropertyValue(token).trim()
+  if (raw === '') return 0
+  // Plain integers only: `parseInt` would read `calc(…)` or a `var(…)` chain
+  // as NaN and `10000px` as 10000, and either way the stack would silently
+  // rank against a number the stylesheet does not paint.
+  if (!/^-?\d+$/.test(raw)) {
+    warnUnparsableToken(token, raw)
+    return 0
+  }
+  return Number.parseInt(raw, 10)
+}
+
+const warnedTokens = new Set<string>()
+
+/**
+ * Dev-only, once per token: a DEFINED token that is not a plain integer means
+ * the stack ranks that overlay at 0 – below every dialog – which is a layering
+ * bug in the stylesheet, not something to fail on at runtime.
+ */
+function warnUnparsableToken(token: ZIndexToken, raw: string): void {
+  if (!import.meta.env.DEV || warnedTokens.has(token)) return
+  warnedTokens.add(token)
+  logger.warn('overlayStack: z-index token is not a plain integer; ranking it at 0', {
+    token,
+    value: raw
+  })
 }
 
 function resolveZIndex(zIndex: number | ZIndexToken): number {
@@ -93,6 +120,15 @@ export interface OverlayStackEntry {
    * z-index tie group and silently reorder equal-z-index overlays.
    */
   getEscapeHandler: () => OverlayEscapeHandler | null
+  /**
+   * Whether the overlay is modal, i.e. owns Tab focus while it is on top.
+   * Non-modal entries (the context menu) still take Escape first when they
+   * are topmost, but are invisible to {@link isTopmostOverlay}, so a menu
+   * opened over a trapping dialog leaves that dialog's Tab trap working.
+   *
+   * @default true
+   */
+  modal?: boolean
 }
 
 const stack: OverlayStackEntry[] = []
@@ -109,6 +145,10 @@ function handleDocumentKeyDown(event: KeyboardEvent): void {
   // An IME composition uses Escape to cancel the candidate window; that
   // keystroke belongs to the input, not to the overlay around it.
   if (event.isComposing) return
+  // A held Escape auto-repeats: without this guard one long press would walk
+  // down the stack and close every overlay in turn – the very cascade this
+  // module exists to prevent, just spread over a few hundred milliseconds.
+  if (event.repeat) return
 
   const top = getTopmostOverlay()
   if (top === null) return
@@ -172,12 +212,16 @@ function removeEntry(ref: React.RefObject<HTMLElement | null>): void {
  * The frontmost connected overlay – highest `zIndex`, latest registration on
  * a tie – or `null` when no registered overlay is on screen.
  *
+ * @param options - `modalOnly` skips non-modal entries (context menus)
  * @returns The topmost entry, or `null`
  */
-export function getTopmostOverlay(): OverlayStackEntry | null {
+export function getTopmostOverlay(
+  options: { modalOnly?: boolean } = {}
+): OverlayStackEntry | null {
   let top: OverlayStackEntry | null = null
   let topRank = Number.NEGATIVE_INFINITY
   for (const entry of stack) {
+    if (options.modalOnly && entry.modal === false) continue
     const element = entry.ref.current
     if (element === null || !element.isConnected) continue
     const zIndex = resolveZIndex(entry.zIndex)
@@ -191,15 +235,17 @@ export function getTopmostOverlay(): OverlayStackEntry | null {
 }
 
 /**
- * Whether `ref` is the frontmost open overlay. An overlay registered while
- * nothing else is connected is topmost by definition, so this is also `true`
- * when the stack holds no connected entry at all.
+ * Whether `ref` is the frontmost open MODAL overlay – the question focus
+ * management asks. Non-modal entries are ignored (see
+ * {@link OverlayStackEntry.modal}). An overlay registered while nothing else
+ * is connected is topmost by definition, so this is also `true` when the
+ * stack holds no connected modal entry at all.
  *
  * @param ref - The container ref the overlay registered with
- * @returns `true` when nothing connected is stacked above `ref`
+ * @returns `true` when no connected modal overlay is stacked above `ref`
  */
 export function isTopmostOverlay(ref: React.RefObject<HTMLElement | null>): boolean {
-  const top = getTopmostOverlay()
+  const top = getTopmostOverlay({ modalOnly: true })
   return top === null || top.ref === ref
 }
 

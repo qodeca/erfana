@@ -8,7 +8,7 @@
  * when something is stacked above it. See `utils/overlayStack.ts`.
  */
 
-import { useEffect, useLayoutEffect, useRef } from 'react'
+import { useLayoutEffect, useRef } from 'react'
 import {
   registerOverlay,
   unregisterOverlay,
@@ -34,6 +34,13 @@ export interface UseOverlayStackEntryOptions {
    * beneath). May change on every render; the latest value is used.
    */
   onEscape?: OverlayEscapeHandler | null
+  /**
+   * Whether the overlay owns Tab focus while on top. Pass `false` for a menu
+   * or popover, so a trapping dialog beneath keeps its Tab trap.
+   *
+   * @default true
+   */
+  modal?: boolean
 }
 
 /**
@@ -60,7 +67,7 @@ export interface UseOverlayStackEntryOptions {
  */
 export function useOverlayStackEntry(
   ref: React.RefObject<HTMLElement | null>,
-  { active, zIndex, onEscape }: UseOverlayStackEntryOptions
+  { active, zIndex, onEscape, modal = true }: UseOverlayStackEntryOptions
 ): void {
   const onEscapeRef = useRef<OverlayEscapeHandler | null>(onEscape ?? null)
 
@@ -70,10 +77,15 @@ export function useOverlayStackEntry(
     onEscapeRef.current = onEscape ?? null
   })
 
-  useEffect(() => {
+  // Layout effect, not passive: the overlay is on the stack before the
+  // browser paints it, so there is no frame in which the user can see a new
+  // dialog and press Escape while the stack still hands the key to the one
+  // beneath. Cleanup runs in the same phase, so a closing overlay leaves the
+  // stack before the frame that no longer shows it.
+  useLayoutEffect(() => {
     if (!active) return undefined
 
-    registerOverlay({ ref, zIndex, getEscapeHandler: () => onEscapeRef.current })
+    registerOverlay({ ref, zIndex, modal, getEscapeHandler: () => onEscapeRef.current })
     return () => unregisterOverlay(ref)
-  }, [active, zIndex, ref])
+  }, [active, zIndex, modal, ref])
 }

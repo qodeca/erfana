@@ -21,9 +21,15 @@
  *    and it produced output or input within {@link TERMINAL.RECENT_ACTIVITY_WINDOW}.
  *    Catches any CLI agent or long-running command, not only Claude Code.
  *
- * KNOWN GAP: a non-Claude agent that has been silent for longer than the
- * window restarts without a prompt. Closing it needs the PTY's foreground
- * process from main (node-pty exposes `IPty.process`), i.e. a new IPC channel.
+ * "Input" covers keystrokes AND programmatic input: `sendToTerminal` (prompt
+ * sends, drag-and-drop paths, ProjectTree actions) marks the terminal too, so
+ * a task handed to an agent by the app counts the same as one typed by hand.
+ *
+ * KNOWN GAP: an agent other than Claude Code that has produced no output and
+ * received no input for longer than the window (20 s) restarts without a
+ * prompt – e.g. one thinking silently or idling at its own prompt. Closing it
+ * needs the PTY's foreground process from main (node-pty exposes
+ * `IPty.process`), i.e. a new IPC channel.
  */
 
 import { useTerminalStore } from '../../../stores/useTerminalStore'
@@ -98,7 +104,7 @@ export function buildRestartConfirm(
     message:
       risk === 'claude'
         ? 'Claude Code is running in this terminal. Restarting ends it and stops anything it is doing.'
-        : 'This terminal is still busy. Restarting ends whatever is running in it.',
+        : 'This terminal was in use moments ago. Restarting ends anything still running in it.',
     confirmLabel: 'Restart',
     cancelLabel: 'Cancel',
     danger: true

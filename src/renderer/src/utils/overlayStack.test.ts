@@ -4,7 +4,10 @@
  * Shared open-overlay stack (#229): Escape reaches only the topmost overlay.
  */
 
+import { readFileSync, readdirSync } from 'node:fs'
+import { join, resolve } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { logger } from './logger'
 import {
   getTopmostOverlay,
   isTopmostOverlay,
@@ -185,5 +188,95 @@ describe('overlayStack', () => {
       expect(handler).not.toHaveBeenCalled()
       expect(event.defaultPrevented).toBe(false)
     })
+
+    it('ignores an auto-repeated Escape so a held key cannot walk down the stack', () => {
+      const bottom = vi.fn()
+      const top = vi.fn()
+      registerOverlay({ ref: mountedRef(), zIndex: 10000, getEscapeHandler: () => bottom })
+      registerOverlay({ ref: mountedRef(), zIndex: 10001, getEscapeHandler: () => top })
+
+      pressEscape({ repeat: true })
+
+      expect(top).not.toHaveBeenCalled()
+      expect(bottom).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('non-modal entries', () => {
+    it('take Escape first when topmost', () => {
+      const dialog = vi.fn()
+      const menu = vi.fn()
+      registerOverlay({ ref: mountedRef(), zIndex: 10001, getEscapeHandler: () => dialog })
+      registerOverlay({
+        ref: mountedRef(),
+        zIndex: 100000,
+        modal: false,
+        getEscapeHandler: () => menu
+      })
+
+      pressEscape()
+
+      expect(menu).toHaveBeenCalledOnce()
+      expect(dialog).not.toHaveBeenCalled()
+    })
+
+    it('do not take the topmost-modal slot from the dialog beneath', () => {
+      const dialog = mountedRef()
+      const menu = mountedRef()
+      registerOverlay({ ref: dialog, zIndex: 10001, getEscapeHandler: () => null })
+      registerOverlay({ ref: menu, zIndex: 100000, modal: false, getEscapeHandler: () => null })
+
+      expect(isTopmostOverlay(dialog)).toBe(true)
+      expect(getTopmostOverlay()?.ref).toBe(menu)
+    })
+  })
+
+  describe('token parsing', () => {
+    afterEach(() => {
+      document.documentElement.style.removeProperty('--z-test-bad')
+      vi.restoreAllMocks()
+    })
+
+    it('ranks a defined but non-integer token at 0 and warns once in dev', () => {
+      const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined)
+      document.documentElement.style.setProperty('--z-test-bad', 'calc(1000 + 1)')
+
+      expect(readZIndexToken('--z-test-bad')).toBe(0)
+      expect(readZIndexToken('--z-test-bad')).toBe(0)
+
+      expect(warn).toHaveBeenCalledOnce()
+    })
+  })
+})
+
+describe('stack tokens in design-tokens.css', () => {
+  // Every `zIndex: '--z-…'` an overlay passes to the stack must be a plain
+  // integer in the stylesheet, or readZIndexToken ranks that overlay at 0 –
+  // below every dialog – and Escape goes to the wrong surface.
+  const rendererSrc = resolve(__dirname, '..')
+  const tokensCss = readFileSync(resolve(rendererSrc, 'styles/design-tokens.css'), 'utf8')
+
+  function sourceFiles(dir: string): string[] {
+    return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      const full = join(dir, entry.name)
+      if (entry.isDirectory()) return sourceFiles(full)
+      return /\.tsx?$/.test(entry.name) && !/\.test\./.test(entry.name) ? [full] : []
+    })
+  }
+
+  const usedTokens = new Set(
+    sourceFiles(rendererSrc).flatMap((file) =>
+      [...readFileSync(file, 'utf8').matchAll(/zIndex:\s*'(--z-[\w-]+)'/g)].map((m) => m[1])
+    )
+  )
+
+  it('finds the tokens the overlays use', () => {
+    expect([...usedTokens]).toEqual(expect.arrayContaining(['--z-modal', '--z-context-menu']))
+  })
+
+  it.each([...usedTokens])('%s is declared as a plain integer', (token) => {
+    const declaration = new RegExp(`${token}\\s*:\\s*([^;]+);`).exec(tokensCss)
+    expect(declaration, `${token} is not declared`).not.toBeNull()
+    expect(declaration![1].trim()).toMatch(/^-?\d+$/)
   })
 })

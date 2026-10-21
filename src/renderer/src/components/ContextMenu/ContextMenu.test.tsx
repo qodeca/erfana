@@ -132,6 +132,28 @@ describe('ContextMenu', () => {
     document.documentElement.style.removeProperty('--z-context-menu')
   })
 
+  it('leaves the Tab trap of a dialog beneath it working', () => {
+    // A menu is not modal: opened inside a trapping dialog it must not make
+    // that dialog think something modal is stacked above it.
+    document.documentElement.style.setProperty('--z-context-menu', '100000')
+    render(
+      <>
+        <BaseDialog isOpen onClose={vi.fn()} zIndex={10001} trapFocus>
+          <button data-testid="first">First</button>
+          <button data-testid="last">Last</button>
+        </BaseDialog>
+        <ContextMenu x={100} y={200} items={defaultItems} onClose={vi.fn()} />
+      </>
+    )
+
+    screen.getByTestId('last').focus()
+    const notPrevented = fireEvent.keyDown(document, { key: 'Tab' })
+
+    expect(notPrevented).toBe(false)
+    expect(document.activeElement).toBe(screen.getByTestId('first'))
+    document.documentElement.style.removeProperty('--z-context-menu')
+  })
+
   it('keeps Escape from reaching the control underneath the menu', () => {
     // A terminal context menu sits over xterm's textarea: an Escape that leaks
     // through would interrupt the agent running in the terminal.

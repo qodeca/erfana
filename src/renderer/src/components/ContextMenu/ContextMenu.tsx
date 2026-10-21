@@ -54,7 +54,10 @@ export function ContextMenu({ x, y, items, onClose, containerTestId }: ContextMe
     // The token `.context-menu` paints with: a menu paints above dialogs, so
     // it is also the overlay that takes Escape first.
     zIndex: '--z-context-menu',
-    onEscape: onClose
+    onEscape: onClose,
+    // A menu is transient chrome, not a modal: a trapping dialog beneath it
+    // (a menu opened inside one) must keep its Tab trap and focus rescue.
+    modal: false
   })
 
   useEffect(() => {

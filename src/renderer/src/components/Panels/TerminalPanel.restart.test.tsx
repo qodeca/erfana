@@ -207,6 +207,21 @@ describe('TerminalPanel restart confirmation', () => {
     expect(window.api.terminal.create).toHaveBeenCalledTimes(1)
   })
 
+  it('opens one prompt for a double click on Restart', async () => {
+    const user = userEvent.setup()
+    await renderPanel()
+    makeTerminalBusy()
+
+    const restart = screen.getByTestId(TEST_IDS.TERMINAL_BTN_RESTART)
+    await user.click(restart)
+    await screen.findByTestId(TEST_IDS.DIALOG_CONFIRM)
+    // jsdom does no hit-testing, so this click reaches the button even though
+    // the dialog backdrop covers it in the app – the latch is what stops it.
+    await user.click(restart)
+
+    expect(screen.getAllByTestId(TEST_IDS.DIALOG_CONFIRM)).toHaveLength(1)
+  })
+
   it('restarts once the user confirms', async () => {
     const user = userEvent.setup()
     await renderPanel()
