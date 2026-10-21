@@ -67,17 +67,22 @@ export interface DocumentImportResult {
 }
 
 /**
- * Dependency detection complete event
+ * What LibreOffice detection found (#250). `unsafe`: a LibreOffice exists, but
+ * the one a conversion would run is in the open project, a temp folder, a
+ * network share or a relative PATH entry, so Office conversions are refused.
+ */
+export const ToolStateSchema = z.enum(['found', 'missing', 'unsafe'])
+export type ToolState = z.infer<typeof ToolStateSchema>
+
+/**
+ * Dependency detection result event
  *
- * Fired once after DependencyDetector runs at startup.
- * Tells the renderer which system tools are available
- * and the updated list of supported document extensions.
+ * Broadcast to every window after each detection (startup and "Check again").
+ * Tells the renderer whether LibreOffice can be used and the updated list of
+ * supported document extensions. Images and PDF need no external tool.
  */
 export interface DependencyReadyEvent {
-  /** Whether LibreOffice (soffice) is available */
-  libreOffice: boolean
-  /** Whether ImageMagick (magick/convert) is available */
-  imageMagick: boolean
+  libreOffice: ToolState
   /** Full list of supported document extensions after detection */
   extensions: string[]
 }
@@ -97,10 +102,8 @@ export type ImportToolStatusRequest = z.infer<typeof ImportToolStatusRequestSche
 /** What detection found, plus the document extensions that follow from it. */
 export const ImportToolStatusSchema = z
   .object({
-    /** Whether LibreOffice (soffice) is available */
-    libreOffice: z.boolean(),
-    /** Whether ImageMagick (magick/convert) is available */
-    imageMagick: z.boolean(),
+    /** What LibreOffice detection found */
+    libreOffice: ToolStateSchema,
     /** Supported document extensions after detection (same list as `DependencyReadyEvent`) */
     extensions: z.array(z.string()),
     /**

@@ -55,6 +55,40 @@ describe('findOnPathEntries', () => {
   })
 })
 
+describe('findOnPathEntries – Rust style (#250)', () => {
+  const base = { platform: 'win32' as const, pathext: '.COM;.EXE;.BAT;.CMD', cwd: 'C:\\cwd' }
+
+  it('tries <name>.exe only, and searches the prefix folders before PATH', () => {
+    const files = new Set(['C:\\Repo\\which.bat', 'C:\\App\\which.exe'])
+    const env = { ...base, pathValue: 'C:\\Repo', rustPrefixDirs: ['C:\\App'], isExecutableFile: (p: string) => files.has(p) }
+    expect(findOnPathEntries('which', env, 'rust').map((h) => h.path)).toEqual(['C:\\App\\which.exe'])
+    expect(findOnPathEntries('which', env, 'pathext')[0].path).toBe('C:\\Repo\\which.bat')
+  })
+
+  it('is the plain walk on POSIX', () => {
+    const env = { platform: 'linux' as const, pathValue: '/usr/bin', cwd: '/', isExecutableFile: (p: string) => p === '/usr/bin/which' }
+    expect(findOnPathEntries('which', env, 'rust')).toEqual([{ path: '/usr/bin/which', fromRelativeEntry: false }])
+  })
+})
+
+describe('findOnPathEntries – UNC entries (#250)', () => {
+  it('skips a UNC entry before any file-system call', () => {
+    const touched: string[] = []
+    const env = {
+      platform: 'win32' as const,
+      pathValue: '\\\\host\\share;//host/share;C:\\Tools',
+      pathext: '.EXE',
+      cwd: 'C:\\cwd',
+      isExecutableFile: (p: string) => {
+        touched.push(p)
+        return false
+      }
+    }
+    findOnPathEntries('soffice', env)
+    expect(touched).toEqual(['C:\\Tools\\soffice.exe'])
+  })
+})
+
 describe('isTrustedHit', () => {
   const hit = (path: string, fromRelativeEntry = false) => ({ path, fromRelativeEntry })
 
@@ -82,6 +116,15 @@ describe('isTrustedHit', () => {
     expect(isTrustedHit(hit('\\\\host\\share\\magick.exe'), [], 'win32', (p) => p)).toBe(false)
   })
 
+  it('fails closed when the real path cannot be resolved or throws', () => {
+    expect(isTrustedHit(hit('/usr/bin/soffice'), [], 'linux', () => null)).toBe(false)
+    expect(
+      isTrustedHit(hit('/usr/bin/soffice'), [], 'linux', () => {
+        throw new Error('ELOOP')
+      })
+    ).toBe(false)
+  })
+
   it('is case-insensitive on Windows and macOS, case-sensitive on Linux', () => {
     expect(isTrustedHit(hit('C:\\Work\\Repo\\soffice.exe'), ['c:\\work\\repo'], 'win32', (p) => p)).toBe(false)
     expect(isTrustedHit(hit('/Users/me/Repo/soffice'), ['/users/me/repo'], 'darwin', (p) => p)).toBe(false)
@@ -94,5 +137,15 @@ describe('untrustedFolders', () => {
     const folders = untrustedFolders([null, undefined, '/work/repo'])
     expect(folders).toContain(tmpdir())
     expect(folders).toContain('/work/repo')
+  })
+
+  it('includes the shared temp folders', () => {
+    expect(untrustedFolders([], 'linux')).toEqual(expect.arrayContaining(['/tmp', '/private/tmp', '/var/tmp']))
+    expect(untrustedFolders([], 'darwin')).toEqual(expect.arrayContaining(['/tmp', '/private/tmp', '/var/tmp']))
+    expect(untrustedFolders([], 'win32').some((f) => /\\Temp$/i.test(f))).toBe(true)
+  })
+
+  it('a hit in /var/tmp is untrusted', () => {
+    expect(isTrustedHit({ path: '/var/tmp/soffice', fromRelativeEntry: false }, untrustedFolders([], 'linux'), 'linux', (p) => p)).toBe(false)
   })
 })

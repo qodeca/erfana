@@ -4,6 +4,7 @@ import { app, BrowserWindow, Menu, dialog, session } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { spawnNewInstance } from './utils/spawnNewInstance'
+import { moveToSafeWorkingDirectory } from './utils/safeWorkingDirectory'
 import { registerFileHandlers, projectService } from './ipc/file-handlers'
 import { registerFileWatcherHandlers } from './ipc/file-watcher-handlers'
 import { registerDirectoryWatcherHandlers } from './ipc/directory-watcher-handlers'
@@ -67,6 +68,16 @@ registerProcessCrashLogging()
 // `app.whenReady()`, so it lives here at module scope beside the other pre-ready
 // setup (`registerSchemesAsPrivileged` is a no-op once the app is ready).
 registerPreviewScheme()
+
+// Packaged: leave the launching folder (possibly a cloned repo) as cwd, so no
+// bare-name spawn can resolve into it (#250). Dev keeps the repo as cwd.
+moveToSafeWorkingDirectory({
+  isPackaged: app.isPackaged,
+  platform: process.platform,
+  execPath: process.execPath,
+  userDataPath: () => app.getPath('userData'),
+  chdir: (dir) => process.chdir(dir)
+})
 
 // Strip --new-window flag to prevent infinite spawn loops
 // Must happen before any window creation

@@ -253,8 +253,7 @@ describe('Main Process - Window Creation', () => {
     vi.doMock('./services/import', () => ({
       importToolStatusService: {
         getStatus: vi.fn().mockResolvedValue({
-          libreOffice: false,
-          imageMagick: false,
+          libreOffice: 'missing',
           extensions: ['pdf'],
           throttled: false
         })

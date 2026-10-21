@@ -12,8 +12,8 @@ import { broadcastToAllWindows } from '../../utils/ipcBroadcast'
 import { setUntrustedRootsProvider } from './conversionToolGuard'
 export { missingToolsDialogMessage } from './missingToolsMessage'
 
-/** Every extension an optional tool can unlock – the set "Check again" may add or take away. */
-const TOOL_EXTENSIONS = getExtensionsForDependencies({ libreOffice: true, imageMagick: true })
+/** Every extension LibreOffice can unlock – the set "Check again" may add or take away. */
+const TOOL_EXTENSIONS = getExtensionsForDependencies({ libreOffice: 'found' })
 
 export interface ImportToolStatusServiceOptions {
   detector?: DependencyDetector
@@ -118,7 +118,6 @@ export class ImportToolStatusService {
   private toStatus(deps: DependencyStatus, throttled: boolean): ImportToolStatus {
     return {
       libreOffice: deps.libreOffice,
-      imageMagick: deps.imageMagick,
       extensions: this.registry.getExtensionsByConversionType().requiresConversion,
       throttled
     }
@@ -140,7 +139,6 @@ export const importToolStatusService = new ImportToolStatusService({
   onApplied: (status) => {
     const payload: DependencyReadyEvent = {
       libreOffice: status.libreOffice,
-      imageMagick: status.imageMagick,
       extensions: status.extensions
     }
     broadcastToAllWindows(IMPORT_CHANNELS.DEPENDENCIES_READY, payload)

@@ -25,10 +25,10 @@ vi.mock('./senderValidation', () => ({
   isTrustedAppSender: () => true
 }))
 
-const STATUS = { libreOffice: true, imageMagick: false, extensions: ['pdf', 'docx'], throttled: false }
+const STATUS = { libreOffice: 'found' as const, extensions: ['pdf', 'docx'], throttled: false }
 const mockGetStatus = vi.fn(async () => STATUS)
 const mockRecheck = vi.fn(async () => ({ ...STATUS, throttled: true }))
-const mockPeek = vi.fn(() => null as null | { libreOffice: boolean; imageMagick: boolean })
+const mockPeek = vi.fn(() => null as null | { libreOffice: 'found' | 'missing' | 'unsafe' })
 vi.mock('../services/import', async () => {
   const { missingToolsDialogMessage } = await import('../services/import/missingToolsMessage')
   return {
@@ -113,8 +113,8 @@ describe('import:toolStatus', () => {
     })
   })
 
-  it('import:selectFile tells the macOS picker why Office and image files are not listed', async () => {
-    mockPeek.mockReturnValue({ libreOffice: false, imageMagick: true })
+  it('import:selectFile tells the macOS picker why Office files are not listed', async () => {
+    mockPeek.mockReturnValue({ libreOffice: 'missing' })
     const { registerImportHandlers } = await import('./import-handlers')
     registerImportHandlers()
     const select = mockIpcMainHandle.mock.calls.find((c) => c[0] === 'import:selectFile')?.[1]
@@ -127,7 +127,7 @@ describe('import:toolStatus', () => {
   })
 
   it('import:selectFile adds no message when nothing is missing', async () => {
-    mockPeek.mockReturnValue({ libreOffice: true, imageMagick: true })
+    mockPeek.mockReturnValue({ libreOffice: 'found' })
     const { registerImportHandlers } = await import('./import-handlers')
     registerImportHandlers()
     const select = mockIpcMainHandle.mock.calls.find((c) => c[0] === 'import:selectFile')?.[1]

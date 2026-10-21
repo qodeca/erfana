@@ -338,7 +338,7 @@ const api = {
       ipcRenderer.invoke(IMPORT_CHANNELS.GET_DOCUMENT_EXTENSIONS),
 
     /**
-     * Optional import tools' status (LibreOffice, ImageMagick) (#250).
+     * Optional import tool status – LibreOffice found / missing / unsafe (#250).
      * `{ recheck: true }` re-runs detection ("Check again"); main rate-limits
      * it. Never rejects: failures arrive as `success: false`.
      */

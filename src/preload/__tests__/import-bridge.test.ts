@@ -95,7 +95,7 @@ describe('api.import – document import bridge', () => {
   })
 
   it('toolStatus invokes import:toolStatus with the request object (#250)', async () => {
-    mockInvoke.mockResolvedValueOnce({ success: true, libreOffice: false, imageMagick: false, extensions: ['pdf'], throttled: false })
+    mockInvoke.mockResolvedValueOnce({ success: true, libreOffice: 'missing', extensions: ['pdf'], throttled: false })
 
     await getImportApi().toolStatus({ recheck: true })
 
@@ -171,7 +171,7 @@ describe('api.import – document import bridge', () => {
     getImportApi().onDependenciesReady(callback)
 
     const listener = mockOn.mock.calls[0][1] as (_event: unknown, data: unknown) => void
-    const event = { libreOffice: true, imageMagick: false, extensions: ['pdf'] }
+    const event = { libreOffice: 'found', extensions: ['pdf'] }
     listener(null, event)
 
     expect(callback).toHaveBeenCalledWith(event)

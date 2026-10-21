@@ -335,6 +335,18 @@ export class AppError extends Error {
  * User-friendly error messages for display
  * todo023: Error message translator
  */
+/**
+ * The refusal for a conversion whose tool is untrusted (#250), naming the tool
+ * or the helper (`which`, `powershell`) at fault. Never carries the path.
+ */
+export function untrustedToolMessage(tool: string): string {
+  const what = tool === 'which' || tool === 'powershell' ? `the \`${tool}\` program LiteParse uses to find LibreOffice` : `\`${tool}\``
+  return (
+    `Erfana did not run LibreOffice: ${what} is in the open project, a temporary folder or a network share, ` +
+    'or comes from a relative PATH entry. Remove that folder from PATH, then try again.'
+  )
+}
+
 export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   // Path validation errors
   [ErrorCode.PATH_INVALID]: 'The selected path is invalid',
@@ -394,7 +406,7 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.IMPORT_TIMEOUT]: 'Document conversion timed out',
   [ErrorCode.IMPORT_BUSY]: 'A document import is already in progress',
   [ErrorCode.IMPORT_UNTRUSTED_TOOL]:
-    'The conversion tool found first on PATH is inside the project or a temporary folder, so Erfana did not run it. Remove that folder from PATH and try again.',
+    'Erfana did not run LibreOffice: the copy it would use is in the open project, a temporary folder or a network share, or comes from a relative PATH entry. Remove that folder from PATH, then try again.',
 
   // Prompt execution errors
   [ErrorCode.PROMPT_NOT_FOUND]: 'Prompt template not found',

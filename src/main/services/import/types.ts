@@ -186,14 +186,18 @@ export function isConfigurableConverter(
 }
 
 /**
+ * What LibreOffice detection found (#250): `unsafe` means a LibreOffice exists
+ * but the one a conversion would run is in the open project, a temp folder, a
+ * network share or a relative PATH entry, so conversions are refused.
+ */
+export type ToolState = 'found' | 'missing' | 'unsafe'
+
+/**
  * Runtime dependency detection result
  *
- * Indicates which optional system tools are available for document conversion.
- * LibreOffice enables Office format support; ImageMagick enables image OCR.
+ * LibreOffice enables Office format support. Images need no external tool:
+ * LiteParse 2.14.7 decodes PNG, JPEG, GIF, BMP, TIFF and WebP itself (#250).
  */
 export interface DependencyStatus {
-  /** Whether LibreOffice (soffice) is available */
-  libreOffice: boolean
-  /** Whether ImageMagick (magick/convert) is available */
-  imageMagick: boolean
+  libreOffice: ToolState
 }

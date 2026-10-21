@@ -5,7 +5,7 @@
  * it would resolve by name is untrusted (#250).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { ErrorCode, ERROR_MESSAGES } from '../../../../shared/errors'
+import { ErrorCode, untrustedToolMessage } from '../../../../shared/errors'
 
 const mockParse = vi.fn()
 vi.mock('@llamaindex/liteparse', () => ({
@@ -15,6 +15,11 @@ vi.mock('electron', () => ({ app: { isPackaged: false, getAppPath: () => '/mock/
 vi.mock('../../../utils/fileUtils', async (importOriginal) => ({
   ...((await importOriginal()) as object),
   validateFileForImport: vi.fn().mockResolvedValue({ valid: true, sizeInMB: 1, fileName: 'a.docx' })
+}))
+
+const mockWarn = vi.fn()
+vi.mock('../../LoggingService', () => ({
+  logger: { warn: (...args: unknown[]) => mockWarn(...args), info: vi.fn(), error: vi.fn(), debug: vi.fn() }
 }))
 
 const mockFind = vi.fn()
@@ -31,24 +36,27 @@ describe('LiteParseConverter – conversion tool guard (#250)', () => {
     mockParse.mockResolvedValue({ pages: [{ pageNum: 1, text: 'hi' }], text: 'hi' })
   })
 
-  it('refuses with IMPORT_UNTRUSTED_TOOL and never calls LiteParse', async () => {
+  it('refuses with IMPORT_UNTRUSTED_TOOL naming the tool, logs a redacted path, and never calls LiteParse', async () => {
     mockFind.mockReturnValue({ name: 'soffice', path: '/work/repo/soffice' })
 
-    const result = await new LiteParseConverter({ libreOffice: true, imageMagick: false }).convert('/docs/a.docx')
+    const result = await new LiteParseConverter({ libreOffice: 'found' }).convert('/docs/a.docx')
 
     expect(result).toEqual({
       success: false,
-      error: ERROR_MESSAGES[ErrorCode.IMPORT_UNTRUSTED_TOOL],
+      error: untrustedToolMessage('soffice'),
       errorCode: ErrorCode.IMPORT_UNTRUSTED_TOOL
     })
+    expect(result.error).toContain('`soffice`')
     expect(mockFind).toHaveBeenCalledWith('docx', ['/work/repo'])
+    expect(mockWarn).toHaveBeenCalledTimes(1)
+    expect(JSON.stringify(mockWarn.mock.calls[0])).not.toContain('/work/repo')
     expect(mockParse).not.toHaveBeenCalled()
   })
 
   it('converts when every tool is trusted', async () => {
     mockFind.mockReturnValue(null)
 
-    const result = await new LiteParseConverter({ libreOffice: true, imageMagick: false }).convert('/docs/a.docx')
+    const result = await new LiteParseConverter({ libreOffice: 'found' }).convert('/docs/a.docx')
 
     expect(result.success).toBe(true)
     expect(mockParse).toHaveBeenCalled()

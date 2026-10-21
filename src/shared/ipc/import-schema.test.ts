@@ -316,23 +316,20 @@ describe('DocumentImportResult interface', () => {
 describe('DependencyReadyEvent interface', () => {
   it('allows event with all dependencies available', () => {
     const event: DependencyReadyEvent = {
-      libreOffice: true,
-      imageMagick: true,
+      libreOffice: 'found',
       extensions: ['pdf', 'docx', 'jpg']
     }
-    expect(event.libreOffice).toBe(true)
+    expect(event.libreOffice).toBe('found')
     expect(event.extensions).toContain('pdf')
   })
 
   it('allows event with no optional dependencies', () => {
     const event: DependencyReadyEvent = {
-      libreOffice: false,
-      imageMagick: false,
-      extensions: ['pdf']
+      libreOffice: 'missing',
+      extensions: ['pdf', 'png']
     }
-    expect(event.libreOffice).toBe(false)
-    expect(event.imageMagick).toBe(false)
-    expect(event.extensions).toEqual(['pdf'])
+    expect(event.libreOffice).toBe('missing')
+    expect(event.extensions).toEqual(['pdf', 'png'])
   })
 })
 
@@ -353,15 +350,18 @@ describe('ImportToolStatusRequestSchema (#250)', () => {
 
 describe('ImportToolStatusSchema (#250)', () => {
   it('accepts a full status', () => {
-    const status = { libreOffice: true, imageMagick: false, extensions: ['pdf', 'docx'], throttled: false }
+    const status = { libreOffice: 'unsafe' as const, extensions: ['pdf'], throttled: false }
     expect(ImportToolStatusSchema.parse(status)).toEqual(status)
+  })
+
+  it.each([true, 'available', undefined])('rejects a libreOffice state of %o', (state) => {
+    expect(ImportToolStatusSchema.safeParse({ libreOffice: state, extensions: [], throttled: false }).success).toBe(false)
   })
 
   it('rejects an unknown key (strict)', () => {
     expect(
       ImportToolStatusSchema.safeParse({
-        libreOffice: true,
-        imageMagick: true,
+        libreOffice: 'found',
         extensions: [],
         throttled: false,
         path: '/usr/bin/soffice'

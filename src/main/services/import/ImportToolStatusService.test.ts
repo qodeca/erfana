@@ -37,8 +37,9 @@ function fakeDetector(answers: DependencyStatus[]) {
   return { detector: detector as unknown as DependencyDetector, raw: detector, probes: () => probes }
 }
 
-const NONE = { libreOffice: false, imageMagick: false }
-const BOTH = { libreOffice: true, imageMagick: true }
+const NONE: DependencyStatus = { libreOffice: 'missing' }
+const BOTH: DependencyStatus = { libreOffice: 'found' }
+const UNSAFE: DependencyStatus = { libreOffice: 'unsafe' }
 
 describe('ImportToolStatusService', () => {
   let registry: ConverterRegistry
@@ -66,7 +67,7 @@ describe('ImportToolStatusService', () => {
     const first = await service.getStatus()
     const second = await service.getStatus()
 
-    expect(first).toMatchObject({ libreOffice: false, imageMagick: false, throttled: false })
+    expect(first).toMatchObject({ libreOffice: 'missing', throttled: false })
     expect(first.extensions).toContain('pdf')
     expect(first.extensions).not.toContain('docx')
     expect(second.throttled).toBe(false)
@@ -83,10 +84,18 @@ describe('ImportToolStatusService', () => {
 
     expect(raw.clearCache).toHaveBeenCalledTimes(1)
     expect(probes()).toBe(2)
-    expect(status).toMatchObject({ libreOffice: true, imageMagick: true, throttled: false })
+    expect(status).toMatchObject({ libreOffice: 'found', throttled: false })
     expect(status.extensions).toEqual(expect.arrayContaining(['pdf', 'docx', 'png']))
     expect(registry.getConverter('docx')?.category).toBe('document')
     expect(registry.getConverter('png')?.category).toBe('document')
+  })
+
+  it('an unsafe LibreOffice unlocks nothing', async () => {
+    const { service } = build([UNSAFE])
+    const status = await service.getStatus()
+    expect(status.libreOffice).toBe('unsafe')
+    expect(status.extensions).not.toContain('docx')
+    expect(registry.getConverter('docx')).toBeUndefined()
   })
 
   it('a tool that disappears takes its extensions away again, and .rtf goes back to text', async () => {
@@ -99,7 +108,8 @@ describe('ImportToolStatusService', () => {
 
     expect(status.extensions).toContain('pdf')
     expect(status.extensions).not.toContain('docx')
-    expect(status.extensions).not.toContain('png')
+    // Images are native to LiteParse: they stay whatever LibreOffice does.
+    expect(status.extensions).toContain('png')
     expect(registry.getConverter('docx')).toBeUndefined()
     expect(registry.getConverter('rtf')?.category).toBe('text')
     expect(registry.getConverter('pdf')?.category).toBe('document')
@@ -112,7 +122,7 @@ describe('ImportToolStatusService', () => {
     clock += 2999
     const status = await service.recheck()
 
-    expect(status).toMatchObject({ libreOffice: false, throttled: true })
+    expect(status).toMatchObject({ libreOffice: 'missing', throttled: true })
     expect(raw.clearCache).not.toHaveBeenCalled()
     expect(probes()).toBe(1)
   })
@@ -148,8 +158,8 @@ describe('ImportToolStatusService', () => {
     const recheck = service.recheck()
     release(BOTH)
 
-    await expect(startup).resolves.toMatchObject({ libreOffice: true, throttled: false })
-    await expect(recheck).resolves.toMatchObject({ libreOffice: true, throttled: true })
+    await expect(startup).resolves.toMatchObject({ libreOffice: 'found', throttled: false })
+    await expect(recheck).resolves.toMatchObject({ libreOffice: 'found', throttled: true })
     expect(detector.detect).toHaveBeenCalledTimes(1)
     expect(detector.clearCache).not.toHaveBeenCalled()
   })
@@ -159,7 +169,7 @@ describe('ImportToolStatusService', () => {
 
     const status = await service.recheck()
 
-    expect(status).toMatchObject({ libreOffice: true, throttled: false })
+    expect(status).toMatchObject({ libreOffice: 'found', throttled: false })
     expect(probes()).toBe(1)
   })
 
@@ -203,7 +213,7 @@ describe('ImportToolStatusService', () => {
     await service.recheck() // throttled – nothing new applied
 
     expect(onApplied).toHaveBeenCalledTimes(2)
-    expect(onApplied).toHaveBeenLastCalledWith(expect.objectContaining({ libreOffice: true, imageMagick: true }))
+    expect(onApplied).toHaveBeenLastCalledWith(expect.objectContaining({ libreOffice: 'found' }))
   })
 
   it('peek returns the last result without probing', async () => {
@@ -218,10 +228,9 @@ describe('ImportToolStatusService', () => {
 describe('missingToolsDialogMessage', () => {
   it.each([
     [null, null],
-    [{ libreOffice: true, imageMagick: true }, null],
-    [{ libreOffice: false, imageMagick: true }, 'Office documents need LibreOffice, so they are not listed. Settings → Import tools shows how to install them.'],
-    [{ libreOffice: true, imageMagick: false }, 'Images need ImageMagick, so they are not listed. Settings → Import tools shows how to install them.'],
-    [{ libreOffice: false, imageMagick: false }, 'Office documents need LibreOffice and images need ImageMagick, so they are not listed. Settings → Import tools shows how to install them.']
+    [BOTH, null],
+    [NONE, 'Office documents need LibreOffice, so they are not listed. Settings → Import tools shows how to install it.'],
+    [UNSAFE, 'Office documents are not listed: the LibreOffice Erfana would run is in an unsafe location. Settings → Import tools has details.']
   ])('%o → %s', (deps, expected) => {
     expect(missingToolsDialogMessage(deps)).toBe(expected)
   })
