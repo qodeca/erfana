@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import type { FileNode } from '../../preload/index'
+import type { FileNode } from '../../shared/ipc/file-schema'
 import type { ImageReadResponse } from '../../shared/ipc/file-image-schema'
 import type { ProjectPathFilter } from '../utils/projectPathFilter'
 

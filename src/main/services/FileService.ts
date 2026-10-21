@@ -26,15 +26,9 @@ import { atomicWriteText, isAtomicTempName } from '../utils/atomicWrite'
 import { IMAGE_EXTENSIONS, readImage } from './file/imageRead'
 import { restoreParentDirectory } from './file/restoreParentDirectory'
 import type { ImageReadResponse } from '../../shared/ipc/file-image-schema'
+import type { FileNode } from '../../shared/ipc/file-schema'
 
-export interface FileNode {
-  name: string
-  path: string
-  type: 'file' | 'directory'
-  children?: FileNode[]
-  extension?: string
-  isSymlink?: boolean
-}
+export type { FileNode }
 
 // Maximum number of auto-numbered copies before rejecting operation (e.g., file.md, file (1).md, ... file (999).md)
 export const MAX_COPY_ATTEMPTS = 1000

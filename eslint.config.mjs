@@ -7,6 +7,43 @@ import * as tseslint from 'typescript-eslint'
 // Use flat-config-friendly Prettier rules directly
 import eslintConfigPrettier from 'eslint-config-prettier'
 
+// Layer rules (project-session design, section 6). The layers are `src/main`,
+// `src/preload`, `src/renderer` and `src/shared`; `shared` sits under all of
+// them. Patterns match relative specifiers (`../../main/x`) and the `@main/*`
+// style aliases. Flat config replaces `no-restricted-imports` wholesale per
+// matching block, so every block that sets it must spread these.
+//
+//   * shared   imports nothing from main, renderer, preload or electron;
+//   * renderer imports nothing from main, and only TYPES from preload/index;
+//   * main     imports nothing from renderer or preload.
+const LAYER_MESSAGE = 'Layer rule: '
+const layerGroup = (layer, who, allowTypeImports = false) => ({
+  group: [`**/${layer}/**`, `**/${layer}`, `@${layer}/*`],
+  ...(allowTypeImports ? { allowTypeImports: true } : {}),
+  message: `${LAYER_MESSAGE}${who} must not import from src/${layer}.`
+})
+const SHARED_LAYER_PATTERNS = [
+  layerGroup('main', 'src/shared'),
+  layerGroup('renderer', 'src/shared'),
+  layerGroup('preload', 'src/shared')
+]
+const MAIN_LAYER_PATTERNS = [
+  layerGroup('renderer', 'src/main'),
+  layerGroup('preload', 'src/main')
+]
+// The renderer reaches the preload only through `window.api`; a type-only
+// import of the preload's declarations is the one allowed link. (Known limit:
+// typescript-eslint exempts a type-only import when ANY pattern with
+// `allowTypeImports` matches it, so the image-export harness's `../*` group
+// also lets a type-only import of main through there. Value imports are caught.)
+const RENDERER_LAYER_PATTERNS = [
+  layerGroup('main', 'src/renderer'),
+  {
+    ...layerGroup('preload', 'src/renderer', true),
+    message: `${LAYER_MESSAGE}src/renderer may only \`import type\` from src/preload/index.`
+  }
+]
+
 export default [
   // Ignore build outputs and vendored folders. `playwright-report/`,
   // `test-results/`, and `coverage/` are test-run artifacts containing
@@ -168,6 +205,36 @@ export default [
       ]
     }
   },
+  // Shared code is imported by every process, so it may not import any of them
+  // (nor electron). Its own block: no other block matches `src/shared/**`.
+  {
+    files: ['src/shared/**/*.ts'],
+    rules: {
+      'no-restricted-imports': 'off',
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'electron',
+              message: `${LAYER_MESSAGE}src/shared must not import electron.`
+            }
+          ],
+          patterns: SHARED_LAYER_PATTERNS
+        }
+      ]
+    }
+  },
+  // Renderer layer rule. MUST stay before the imageExport block below: both set
+  // `@typescript-eslint/no-restricted-imports` for the harness folder, the later
+  // block wins, and it re-states these patterns.
+  {
+    files: ['src/renderer/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': 'off',
+      '@typescript-eslint/no-restricted-imports': ['error', { patterns: RENDERER_LAYER_PATTERNS }]
+    }
+  },
   // The image-export rasterize harness (#73) is a hidden Chromium page that is
   // handed image bytes straight from the user's project — SVG included, which
   // is a document format with a script model. It is safe ONLY because an SVG
@@ -241,6 +308,7 @@ export default [
         'error',
         {
           patterns: [
+            ...RENDERER_LAYER_PATTERNS,
             {
               // `../**` is belt and braces. Verified by probe: the `ignore`
               // matcher treats `../*` as a directory prefix, so it already
@@ -297,7 +365,8 @@ export default [
               message:
                 'Register global IPC through src/main/ipc/registry.ts (registerHandle / registerOn / …) so every channel is gated on the app renderer. Importing ipcMain directly bypasses that gate.'
             }
-          ]
+          ],
+          patterns: MAIN_LAYER_PATTERNS
         }
       ]
     }
