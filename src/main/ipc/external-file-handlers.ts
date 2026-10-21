@@ -25,6 +25,7 @@ import { resolveConfinedPath, type PathPolicy } from './confinement/resolveConfi
 import { isInsideRoot } from '../utils/pathCompare'
 import type { ConfinementError } from './confinement/ConfinementError'
 import { rememberDialogResult, withLastDirectory } from '../utils/lastDialogDirectory'
+import { FILE_CHANNELS } from '../../shared/ipc/file-channels'
 
 /**
  * Selected files result from native file picker
@@ -131,7 +132,7 @@ export function registerExternalFileHandlers(
    * - If symlink, target is not a system directory
    */
   registerConfinedHandle(
-    'file:validateExternal',
+    FILE_CHANNELS.validateExternal,
     {
       schema: ExternalFileValidateArgsSchema,
       paths: { source: { arg: 0, mode: 'external', check: 'escape' } },
@@ -171,7 +172,7 @@ export function registerExternalFileHandlers(
    * Supports conflict resolution strategies: 'replace' or 'keepBoth'.
    */
   registerConfinedHandle(
-    'file:copyFromExternal',
+    FILE_CHANNELS.copyFromExternal,
     {
       schema: ExternalFileTransferArgsSchema,
       paths: {
@@ -213,7 +214,7 @@ export function registerExternalFileHandlers(
    * Supports conflict resolution strategies: 'replace' or 'keepBoth'.
    */
   registerConfinedHandle(
-    'file:moveFromExternal',
+    FILE_CHANNELS.moveFromExternal,
     {
       schema: ExternalFileTransferArgsSchema,
       paths: {
@@ -285,7 +286,7 @@ export function registerExternalFileHandlers(
    * Returns array of selected file paths, and records them as one pick, so a later
    * move of one of them is confirmed once for the whole pick.
    */
-  registerHandle('file:selectExternalFiles', async (event): Promise<ExternalFileSelection | null> => {
+  registerHandle(FILE_CHANNELS.selectExternalFiles, async (event): Promise<ExternalFileSelection | null> => {
     try {
       const result = await dialog.showOpenDialog(withLastDirectory<OpenDialogOptions>({
         properties: ['openFile', 'multiSelections'],

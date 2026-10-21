@@ -16,6 +16,7 @@
 import path from 'path-browserify'
 import { isDangerousProtocol, isExternalProtocol } from './linkProtocols'
 import { logger } from './logger'
+import { fileGateway } from '../services/fileGateway'
 
 export interface ResolvedLink {
   /** Absolute file path */
@@ -68,7 +69,7 @@ async function checkFileExists(filePath: string): Promise<boolean> {
   // Uses the dedicated file:exists IPC channel (fs.access, never throws), so a
   // missing target is a plain `false` with no error-log noise and no fragile
   // error-message parsing.
-  const exists = await window.api.file.exists(filePath)
+  const exists = await fileGateway.exists(filePath)
   if (!exists) {
     logger.debug('[MarkdownLinkResolver] link target missing', { filePath })
   }

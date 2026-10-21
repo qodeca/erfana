@@ -15,7 +15,8 @@
  * - Type safety for API calls
  */
 
-import type { FileNode } from '../../../shared/ipc/file-schema'
+import type { FileBridge, FileNode } from '../../../shared/ipc/file-schema'
+import type { TerminalBridge } from '../../../shared/ipc/terminal-schema'
 
 /** File node type – defined in shared/ipc/file-schema */
 export type { FileNode }
@@ -24,37 +25,23 @@ export interface IProjectTreeApi {
   /**
    * File operations
    */
-  file: {
-    openProject(): Promise<string | null>
-    openProjectByPath(projectPath: string): Promise<string>
-    closeProject(expectedGeneration?: number): Promise<boolean>
-    readDirectory(path: string): Promise<FileNode[]>
-    onProjectChanged(
-      callback: (data: {
-        oldPath: string | null
-        newPath: string | null
-        generation?: number
-      }) => void
-    ): () => void
-    createFile(targetPath: string, fileName: string): Promise<string>
-    createFolder(targetPath: string, folderName: string): Promise<string>
-    deleteFile(filePath: string): Promise<void>
-    deleteFolder(folderPath: string): Promise<void>
-    rename(path: string, newName: string): Promise<void>
-    moveItem(
-      sourcePath: string,
-      targetParent: string,
-      newName?: string,
-      replaceExisting?: boolean
-    ): Promise<{ path: string; isSymlink?: boolean }>
-    copyItem(
-      sourcePath: string,
-      targetParent: string,
-      newName?: string
-    ): Promise<{ path: string; isSymlink?: boolean }>
-    checkConflict(targetPath: string, itemName: string): Promise<boolean>
-    revealInFileManager(filePath: string): Promise<string>
-  }
+  file: Pick<
+    FileBridge,
+    | 'openProject'
+    | 'openProjectByPath'
+    | 'closeProject'
+    | 'readDirectory'
+    | 'onProjectChanged'
+    | 'createFile'
+    | 'createFolder'
+    | 'deleteFile'
+    | 'deleteFolder'
+    | 'rename'
+    | 'moveItem'
+    | 'copyItem'
+    | 'checkConflict'
+    | 'revealInFileManager'
+  >
 
   /**
    * Directory watching operations
@@ -74,7 +61,5 @@ export interface IProjectTreeApi {
   /**
    * Terminal operations (limited scope for ProjectTree)
    */
-  terminal: {
-    write(terminalId: string, data: string): Promise<void>
-  }
+  terminal: Pick<TerminalBridge, 'write'>
 }

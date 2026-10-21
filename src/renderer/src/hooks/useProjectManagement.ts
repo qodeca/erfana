@@ -22,6 +22,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { IProjectTreeApi, FileNode } from '../interfaces/IProjectTreeApi'
+import { getDefaultProjectTreeApi } from '../services/projectTreeApi'
 import type { IUseProjectManagementOptions, IUseProjectManagementReturn } from '../interfaces/IProjectManagement'
 import { useDialog } from '../components/Dialog'
 import { showGlobalToast } from '../components/Toast/toastService'
@@ -66,8 +67,8 @@ import {
 export function useProjectManagement(
   options?: IUseProjectManagementOptions
 ): IUseProjectManagementReturn {
-  // Use provided API or default to window.api
-  const api: IProjectTreeApi = (options?.api ?? (window.api as unknown as IProjectTreeApi))
+  // Use provided API or the default gateways
+  const api: IProjectTreeApi = (options?.api ?? getDefaultProjectTreeApi())
   const { showConfirm } = useDialog()
 
   // Project state

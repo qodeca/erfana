@@ -122,3 +122,34 @@ describe('layer import rules', () => {
     expect(messages.some((m) => /must not import app code/.test(m.message))).toBe(true)
   })
 })
+
+describe('renderer gateway rule', () => {
+  const GATEWAY = /services\/fileGateway and services\/terminalGateway/
+  const gatewayMessages = async (rel, code) =>
+    (await lint(rel, code)).filter((m) => GATEWAY.test(m.message))
+
+  const READ_FILE = 'export const f = () => window.api.file.readFile("a")'
+  const READ_TERMINAL = 'export const t = () => window.api.terminal.kill("a")'
+  const READ_OTHER = 'export const g = () => window.api.git.status("a")'
+
+  it('flags a renderer read of window.api.file and window.api.terminal', async () => {
+    expect(await gatewayMessages(RENDERER, READ_FILE)).toHaveLength(1)
+    expect(await gatewayMessages(RENDERER, READ_TERMINAL)).toHaveLength(1)
+  })
+
+  it('leaves the other bridges to their own migration', async () => {
+    expect(await gatewayMessages(RENDERER, READ_OTHER)).toHaveLength(0)
+  })
+
+  it('exempts the two gateways', async () => {
+    expect(await gatewayMessages('src/renderer/src/services/fileGateway.ts', READ_FILE)).toHaveLength(0)
+    expect(await gatewayMessages('src/renderer/src/services/terminalGateway.ts', READ_TERMINAL)).toHaveLength(0)
+  })
+
+  it('lets a test install mocks, and still applies the other selectors there', async () => {
+    const test = 'src/renderer/src/utils/probe.test.ts'
+    expect(await gatewayMessages(test, READ_FILE)).toHaveLength(0)
+    const messages = await lint(test, 'export const b = (p) => p.split("/").pop()')
+    expect(messages.some((m) => /POSIX-only basename/.test(m.message))).toBe(true)
+  })
+})

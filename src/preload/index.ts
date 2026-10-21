@@ -2,7 +2,6 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { contextBridge, ipcRenderer, IpcRendererEvent, webUtils } from 'electron'
 import { FORCE_CRASH_ARG, TEST_HOOKS_ARG } from '../shared/constants'
-import type { ProjectChanged, ProjectSessionInfo } from '../shared/ipc/schema'
 import type { GitStatusResponse } from '../shared/ipc/git-schema'
 import type { PdfExportRequest, PdfExportResponse } from '../shared/ipc/pdf-schema'
 import type { DocxExportRequest, DocxExportResponse } from '../shared/ipc/docx-schema'
@@ -10,7 +9,6 @@ import type { GlobalSettings, GlobalSettingsChanged } from '../shared/ipc/global
 import type { LogEntry } from '../shared/ipc/logging-schema'
 import type { GitStateChangeEvent, GitWatcherStatus, GitPollTriggeredEvent } from '../shared/ipc/git-watcher-schema'
 import type { LockResult, LockStatus } from '../shared/ipc/project-lock-schema'
-import type { ImageReadResponse } from '../shared/ipc/file-image-schema'
 import type {
   ScreenshotCaptureRequest,
   ScreenshotCaptureResponse,
@@ -52,13 +50,9 @@ import type {
   DocumentImportProgress,
   DependencyReadyEvent
 } from '../shared/ipc/import-schema'
+import { fileBridge } from './fileBridge'
+import { terminalBridge } from './terminalBridge'
 import type { FileNode, FileStats } from '../shared/ipc/file-schema'
-import type {
-  ExternalFileValidateResponse,
-  ExternalFileCopyResponse,
-  ExternalFileMoveResponse,
-  ConflictResolution
-} from '../shared/ipc/external-file-schema'
 
 export type { FileNode, FileStats }
 
@@ -71,172 +65,8 @@ const api = {
    */
   testHooks: { enabled: process.argv.includes(TEST_HOOKS_ARG) },
 
-  // File operations
-  file: {
-    openProject: (): Promise<string | null> => ipcRenderer.invoke('file:openProject'),
-    openProjectByPath: (projectPath: string): Promise<string> => ipcRenderer.invoke('file:openProjectByPath', projectPath),
-    getSession: (): Promise<ProjectSessionInfo | null> =>
-      ipcRenderer.invoke('file:getSession'),
-    readDirectory: (dirPath: string): Promise<FileNode[]> =>
-      ipcRenderer.invoke('file:readDirectory', dirPath),
-    readFile: (filePath: string): Promise<string> =>
-      ipcRenderer.invoke('file:readFile', filePath),
-    writeFile: (
-      filePath: string,
-      content: string,
-      options?: { createParentDirs?: true }
-    ): Promise<boolean> =>
-      options === undefined
-        ? ipcRenderer.invoke('file:writeFile', filePath, content)
-        : ipcRenderer.invoke('file:writeFile', filePath, content, options),
-    getStats: (filePath: string): Promise<FileStats> =>
-      ipcRenderer.invoke('file:getStats', filePath),
-    exists: (filePath: string): Promise<boolean> =>
-      ipcRenderer.invoke('file:exists', filePath),
-    getProjectPath: (): Promise<string | null> => ipcRenderer.invoke('file:getProjectPath'),
-    createFile: (dirPath: string, fileName: string): Promise<string> =>
-      ipcRenderer.invoke('file:createFile', dirPath, fileName),
-    createFolder: (dirPath: string, folderName: string): Promise<string> =>
-      ipcRenderer.invoke('file:createFolder', dirPath, folderName),
-    deleteFile: (filePath: string): Promise<boolean> =>
-      ipcRenderer.invoke('file:deleteFile', filePath),
-    deleteFolder: (folderPath: string): Promise<boolean> =>
-      ipcRenderer.invoke('file:deleteFolder', folderPath),
-    rename: (oldPath: string, newName: string): Promise<string> =>
-      ipcRenderer.invoke('file:rename', oldPath, newName),
-    revealInFileManager: (filePath: string): Promise<string> =>
-      ipcRenderer.invoke('file:revealInFileManager', filePath),
-    moveItem: (sourcePath: string, targetParentPath: string, newName?: string, replaceExisting?: boolean): Promise<string> =>
-      ipcRenderer.invoke('file:moveItem', sourcePath, targetParentPath, newName, replaceExisting),
-    copyItem: (sourcePath: string, targetParentPath: string, newName?: string): Promise<string> =>
-      ipcRenderer.invoke('file:copyItem', sourcePath, targetParentPath, newName),
-    checkConflict: (targetParentPath: string, itemName: string): Promise<boolean> =>
-      ipcRenderer.invoke('file:checkConflict', targetParentPath, itemName),
-    validatePath: (filePath: string, projectRoot?: string): Promise<{
-      exists: boolean
-      absolutePath?: string
-      isFile?: boolean
-      insideProject?: boolean
-      error?: string
-    }> => ipcRenderer.invoke('file:validatePath', filePath, projectRoot),
-
-    /**
-     * Read an image, or learn that it has not changed
-     *
-     * The only image read channel: ImageViewerPanel loads images through it in
-     * the sandboxed renderer, and gets back a data URL like
-     * data:image/png;base64,iVBORw0KGgo...
-     *
-     * Pass the `version` from the previous response as `knownVersion`: an
-     * unchanged file then answers `{ status: 'unchanged', version }` without
-     * re-encoding up to ~67 MB of base64 on the main-process event loop or
-     * sending it across IPC. `unchanged` is a SUCCESS - keep the bytes you
-     * have; it must not be surfaced as a failed refresh.
-     *
-     * Omit `knownVersion` whenever you hold no bytes (first load, remount,
-     * after an error) to force a full read. The version is opaque: store the
-     * one you were given, never parse or construct one.
-     *
-     * @param filePath - Absolute path to the image file
-     * @param knownVersion - Version the caller already holds bytes for
-     * @returns The bytes plus their version, or `unchanged` plus that version
-     * @throws Error if file doesn't exist, is outside project, or unsupported format
-     *
-     * @see Issue #70 - preview tabs show stale content when the file changes
-     */
-    readImage: (filePath: string, knownVersion?: string): Promise<ImageReadResponse> =>
-      ipcRenderer.invoke('file:readImage', filePath, knownVersion),
-
-    // External file drop operations (Spec #012)
-    /**
-     * Validate an external file for drop into project
-     *
-     * Performs security checks: exists, is file, not device/pipe/socket,
-     * symlink validation.
-     *
-     * @param sourcePath - Absolute path to external file
-     * @param projectRoot - Ignored; the main process uses the open project
-     * @returns Validation result with file type info
-     */
-    validateExternal: (
-      sourcePath: string,
-      projectRoot: string
-    ): Promise<ExternalFileValidateResponse> =>
-      ipcRenderer.invoke('file:validateExternal', sourcePath, projectRoot),
-
-    /**
-     * Copy an external file into the project
-     *
-     * Validates file, then copies to target folder.
-     *
-     * @param sourcePath - Absolute path to external file
-     * @param targetFolder - Absolute path to target folder within project
-     * @param projectRoot - Ignored; the main process uses the open project
-     * @param conflictResolution - How to handle name conflicts: 'replace' or 'keepBoth'
-     * @returns Copy result with new file path
-     */
-    copyFromExternal: (
-      sourcePath: string,
-      targetFolder: string,
-      projectRoot: string,
-      conflictResolution?: ConflictResolution
-    ): Promise<ExternalFileCopyResponse> =>
-      ipcRenderer.invoke(
-        'file:copyFromExternal',
-        sourcePath,
-        targetFolder,
-        projectRoot,
-        conflictResolution
-      ),
-
-    /**
-     * Move an external file into the project
-     *
-     * Validates file, copies to target folder, then deletes source.
-     *
-     * @param sourcePath - Absolute path to external file
-     * @param targetFolder - Absolute path to target folder within project
-     * @param projectRoot - Ignored; the main process uses the open project
-     * @param conflictResolution - How to handle name conflicts: 'replace' or 'keepBoth'
-     * @returns Move result with new file path
-     */
-    moveFromExternal: (
-      sourcePath: string,
-      targetFolder: string,
-      projectRoot: string,
-      conflictResolution?: ConflictResolution
-    ): Promise<ExternalFileMoveResponse> =>
-      ipcRenderer.invoke(
-        'file:moveFromExternal',
-        sourcePath,
-        targetFolder,
-        projectRoot,
-        conflictResolution
-      ),
-
-    /**
-     * Open native file picker for selecting external files
-     *
-     * Used when a folder is selected and user presses Cmd+Shift+I.
-     *
-     * @returns Selected file paths or null if cancelled
-     */
-    selectExternalFiles: (): Promise<{ paths: string[] } | null> =>
-      ipcRenderer.invoke('file:selectExternalFiles'),
-
-    // Project change event listener
-    onProjectChanged: (callback: (data: ProjectChanged) => void) => {
-      const listener = (
-        _event: unknown,
-        data: ProjectChanged
-      ) =>
-        callback(data)
-      ipcRenderer.on('project:changed', listener)
-      return () => ipcRenderer.removeListener('project:changed', listener)
-    },
-    closeProject: (expectedGeneration?: number): Promise<boolean> =>
-      ipcRenderer.invoke('file:closeProject', expectedGeneration)
-  },
+  // File operations (see fileBridge.ts)
+  file: fileBridge,
 
   // File watching operations
   fileWatch: {
@@ -421,98 +251,8 @@ const api = {
 
   // Copilot/Claude Code removed
 
-  // Terminal operations
-  terminal: {
-    // Check availability
-    isAvailable: (terminalId?: string): Promise<{ success: boolean; available: boolean; initialized?: boolean }> =>
-      ipcRenderer.invoke('terminal:isAvailable', terminalId),
-
-    /**
-     * Create a terminal. The response includes `shellKind` so the renderer
-     * can quote pasted paths correctly without a follow-up IPC round-trip
-     * (#164 round-2 F#1).
-     */
-    create: (config: {
-      cwd?: string
-      cols: number
-      rows: number
-    }): Promise<{
-      success: boolean
-      terminalId?: string
-      shellKind?: 'posix' | 'cmd' | 'powershell'
-      error?: string
-    }> => ipcRenderer.invoke('terminal:create', config),
-
-    // Write to terminal
-    write: (terminalId: string, data: string): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke('terminal:write', { terminalId, data }),
-
-    // Resize terminal
-    resize: (terminalId: string, cols: number, rows: number): void => {
-      ipcRenderer.send('terminal:resize', { terminalId, cols, rows })
-    },
-
-    // Kill terminal
-    kill: (terminalId: string): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke('terminal:kill', terminalId),
-
-    // Get terminal info
-    getInfo: (terminalId: string): Promise<{
-      success: boolean
-      info?: { id: string; cwd: string; title: string }
-      error?: string
-    }> => ipcRenderer.invoke('terminal:getInfo', terminalId),
-
-    // List terminals
-    list: (): Promise<{
-      success: boolean
-      terminals?: Array<{ id: string; title: string }>
-      error?: string
-    }> => ipcRenderer.invoke('terminal:list'),
-
-    // Whether a program other than the shell is running in the terminal
-    getActivity: (terminalId: string): Promise<{
-      success: boolean
-      busy?: boolean
-      known?: boolean
-      error?: string
-    }> => ipcRenderer.invoke('terminal:getActivity', terminalId),
-
-    // Event listeners
-    onData: (callback: (data: { terminalId: string; data: string }) => void) => {
-      const listener = (_event: unknown, data: { terminalId: string; data: string }) => callback(data)
-      ipcRenderer.on('terminal:data', listener)
-      return () => ipcRenderer.removeListener('terminal:data', listener)
-    },
-
-    onExit: (callback: (data: { terminalId: string; exitCode: number; signal?: number }) => void) => {
-      const listener = (
-        _event: unknown,
-        data: { terminalId: string; exitCode: number; signal?: number }
-      ) => callback(data)
-      ipcRenderer.on('terminal:exit', listener)
-      return () => ipcRenderer.removeListener('terminal:exit', listener)
-    },
-
-    onError: (callback: (data: { terminalId: string; error: string }) => void) => {
-      const listener = (_event: unknown, data: { terminalId: string; error: string }) =>
-        callback(data)
-      ipcRenderer.on('terminal:error', listener)
-      return () => ipcRenderer.removeListener('terminal:error', listener)
-    },
-
-    // Clear control channel (bypass normal data filter)
-    onClear: (callback: (data: { terminalId: string }) => void) => {
-      const listener = (_event: unknown, data: { terminalId: string }) => callback(data)
-      ipcRenderer.on('terminal:clear', listener)
-      return () => ipcRenderer.removeListener('terminal:clear', listener)
-    },
-
-    // Confirm clear was processed
-    markClearComplete: (terminalId: string): void => {
-      ipcRenderer.send('terminal:clearComplete', { terminalId })
-    }
-  },
+  // Terminal operations (see terminalBridge.ts)
+  terminal: terminalBridge,
 
   // Unified import operations (supports PDF, text, and future formats)
   import: {
@@ -1156,6 +896,9 @@ const api = {
     getArch: (): NodeJS.Architecture => process.arch
   }
 }
+
+/** The shape of `window.api`; the renderer's global type is this, never a hand-written copy. */
+export type Api = typeof api
 
 // Use `contextBridge` APIs to expose Electron APIs to
 // renderer only if context isolation is enabled, otherwise

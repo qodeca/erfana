@@ -32,6 +32,7 @@ import { useTerminalStore } from '../../../stores/useTerminalStore'
 import { useClaudeStatusStore } from '../../../stores/useClaudeStatusStore'
 import { TERMINAL } from '../../ProjectTree/constants'
 import type { ConfirmDialogConfig } from '../../Dialog/types'
+import { terminalGateway } from '../../../services/terminalGateway'
 
 /**
  * Why a restart needs confirmation, or `null` when it is safe to restart.
@@ -89,7 +90,7 @@ export async function getRestartRisk(
  */
 async function hasRunningProgram(terminalId: string): Promise<boolean> {
   try {
-    const result = await window.api?.terminal?.getActivity?.(terminalId)
+    const result = await terminalGateway.getActivity?.(terminalId)
     return result?.success === true && result.busy === true
   } catch {
     return false

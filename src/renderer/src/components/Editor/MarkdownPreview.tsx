@@ -46,6 +46,7 @@ import { useIdleDebouncedValue } from '../../hooks/useIdleDebouncedValue'
 import { rehypeHeadingIds, rehypeShiftLines } from './previewRehypePlugins'
 import { PreviewWorkContext, PreviewWorkTracker } from './previewWork'
 import './MarkdownPreview.css'
+import { fileGateway } from '../../services/fileGateway'
 
 // Anchor scroll configuration
 const ANCHOR_SCROLL_TIMEOUT_MS = 2000 // Wait up to 2s for anchor element to appear in DOM
@@ -834,7 +835,7 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
       let cancelled = false
 
       const resolveAllLinks = async () => {
-        const projectRoot = await window.api.file.getProjectPath()
+        const projectRoot = await fileGateway.getProjectPath()
         if (cancelled || !projectRoot) return
 
         const resolutions = await Promise.all(
@@ -873,7 +874,7 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
         if (!currentFilePath || !currentOnOpenFile) return
 
         try {
-          const projectRoot = await window.api.file.getProjectPath()
+          const projectRoot = await fileGateway.getProjectPath()
           if (!projectRoot) {
             showToast({
               title: 'Error',

@@ -8,6 +8,14 @@
  * renderer share one definition without the renderer reaching into main.
  */
 import { z } from 'zod'
+import type { ProjectChanged, ProjectSessionInfo } from './schema'
+import type { ImageReadResponse } from './file-image-schema'
+import type {
+  ConflictResolution,
+  ExternalFileCopyResponse,
+  ExternalFileMoveResponse,
+  ExternalFileValidateResponse
+} from './external-file-schema'
 
 export const FileNodeSchema = z.object({
   name: z.string(),
@@ -99,3 +107,90 @@ export const ValidatePathArgsSchema = z.tuple([
     .pipe(z.string().min(1, 'Empty file path')),
   z.string().optional()
 ])
+
+/** What `file:moveItem` and `file:copyItem` answer: where the item landed. */
+export interface FileTransferResult {
+  path: string
+  isSymlink?: boolean
+}
+
+/** What `file:validatePath` answers. */
+export interface ValidatePathResult {
+  exists: boolean
+  absolutePath?: string
+  isFile?: boolean
+  insideProject?: boolean
+  error?: string
+}
+
+/**
+ * Shared contract for the preload `file` bridge.
+ *
+ * Implemented by `window.api.file` (preload, `fileBridge.ts`) and consumed by
+ * the renderer file gateway. One definition keeps the preload, its typing and
+ * the renderer's view of it from drifting.
+ */
+export interface FileBridge {
+  /** Native folder picker, then open. `null` when the user cancels. */
+  openProject(): Promise<string | null>
+  openProjectByPath(projectPath: string): Promise<string>
+  getSession(): Promise<ProjectSessionInfo | null>
+  readDirectory(dirPath: string): Promise<FileNode[]>
+  readFile(filePath: string): Promise<string>
+  /** `createParentDirs`: the explicit "Save to restore it" of a tab whose folder is gone */
+  writeFile(
+    filePath: string,
+    content: string,
+    options?: { createParentDirs?: true }
+  ): Promise<boolean>
+  getStats(filePath: string): Promise<FileStats>
+  exists(filePath: string): Promise<boolean>
+  getProjectPath(): Promise<string | null>
+  createFile(dirPath: string, fileName: string): Promise<string>
+  createFolder(dirPath: string, folderName: string): Promise<string>
+  deleteFile(filePath: string): Promise<boolean>
+  deleteFolder(folderPath: string): Promise<boolean>
+  rename(oldPath: string, newName: string): Promise<string>
+  revealInFileManager(filePath: string): Promise<string>
+  moveItem(
+    sourcePath: string,
+    targetParentPath: string,
+    newName?: string,
+    replaceExisting?: boolean
+  ): Promise<FileTransferResult>
+  copyItem(
+    sourcePath: string,
+    targetParentPath: string,
+    newName?: string
+  ): Promise<FileTransferResult>
+  checkConflict(targetParentPath: string, itemName: string): Promise<boolean>
+  /** `projectRoot` is ignored: the main process uses the open project. */
+  validatePath(filePath: string, projectRoot?: string): Promise<ValidatePathResult>
+  /**
+   * Read an image, or learn it has not changed since `knownVersion`
+   * @see Issue #70 - preview tabs show stale content when the file changes
+   */
+  readImage(filePath: string, knownVersion?: string): Promise<ImageReadResponse>
+  /** Validate an external file for drop into the project. `projectRoot` is ignored. */
+  validateExternal(sourcePath: string, projectRoot: string): Promise<ExternalFileValidateResponse>
+  /** Copy an external file into the project. `projectRoot` is ignored. */
+  copyFromExternal(
+    sourcePath: string,
+    targetFolder: string,
+    projectRoot: string,
+    conflictResolution?: ConflictResolution
+  ): Promise<ExternalFileCopyResponse>
+  /** Move an external file into the project. `projectRoot` is ignored. */
+  moveFromExternal(
+    sourcePath: string,
+    targetFolder: string,
+    projectRoot: string,
+    conflictResolution?: ConflictResolution
+  ): Promise<ExternalFileMoveResponse>
+  /** Native file picker for external files; `null` when cancelled. */
+  selectExternalFiles(): Promise<{ paths: string[] } | null>
+  /** Subscribe to project open/close; returns the unsubscribe function. */
+  onProjectChanged(callback: (data: ProjectChanged) => void): () => void
+  /** `expectedGeneration`: close only if the project session is still at it */
+  closeProject(expectedGeneration?: number): Promise<boolean>
+}

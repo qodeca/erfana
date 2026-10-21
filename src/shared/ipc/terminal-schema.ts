@@ -117,3 +117,45 @@ export const TerminalErrorSchema = z.object({
   error: z.string()
 })
 export type TerminalError = z.infer<typeof TerminalErrorSchema>
+
+/** `{ success, error? }`, what `terminal:write` and `terminal:kill` answer. */
+export interface TerminalAckResponse {
+  success: boolean
+  error?: string
+}
+
+/** `terminal:isAvailable`: whether node-pty loaded, and a terminal's init state. */
+export interface TerminalAvailabilityResponse {
+  success: boolean
+  available: boolean
+  initialized?: boolean
+  error?: string
+}
+
+/**
+ * Shared contract for the preload `terminal` bridge.
+ *
+ * Implemented by `window.api.terminal` (preload, which is typed `satisfies
+ * TerminalBridge`) and consumed by the renderer terminal gateway. The event
+ * subscriptions return their unsubscribe function.
+ */
+export interface TerminalBridge {
+  isAvailable(terminalId?: string): Promise<TerminalAvailabilityResponse>
+  /** The response carries `shellKind`, so pasted paths can be quoted for the right shell. */
+  create(config: TerminalCreateRequest): Promise<TerminalCreateResponse>
+  write(terminalId: string, data: string): Promise<TerminalAckResponse>
+  /** Fire-and-forget. */
+  resize(terminalId: string, cols: number, rows: number): void
+  kill(terminalId: string): Promise<TerminalAckResponse>
+  getInfo(terminalId: string): Promise<TerminalInfoResponse>
+  list(): Promise<TerminalListResponse>
+  /** Whether a program other than the shell is running in the terminal. */
+  getActivity(terminalId: string): Promise<TerminalActivityResponse>
+  onData(callback: (data: TerminalData) => void): () => void
+  onExit(callback: (data: TerminalExit) => void): () => void
+  onError(callback: (data: TerminalError) => void): () => void
+  /** The clear handshake runs outside the normal data filter. */
+  onClear(callback: (data: TerminalIdRequest) => void): () => void
+  /** Confirm that a clear was processed. */
+  markClearComplete(terminalId: string): void
+}
