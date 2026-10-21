@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import nodePath, { isAbsolute, normalize, resolve, dirname, sep, type PlatformPath } from 'path'
+import nodePath, { isAbsolute, normalize, resolve, dirname, sep, win32, type PlatformPath } from 'path'
 import { lstat, readlink, access, constants } from 'fs/promises'
 import { homedir } from 'os'
 import { AppError, ErrorCode } from '../../shared/errors'
+import { normaliseResolved } from './pathCompare'
 
 /**
  * Path Security Utilities
@@ -84,8 +85,29 @@ export function isSystemDirectory(path: string): boolean {
  * so it would turn the project boundary into no boundary at all.
  */
 export function isFilesystemRoot(path: string, flavour: PlatformPath = nodePath): boolean {
-  const normalized = flavour.normalize(path)
+  // `\\?\C:\` and `\\?\UNC\srv\share\` name the same roots as `C:\` and `\\srv\share\`
+  const platform = flavour === win32 ? 'win32' : process.platform
+  const normalized = flavour.normalize(normaliseResolved(path, { path: flavour, platform }))
   return normalized === flavour.parse(normalized).root
+}
+
+const ROOT_REFUSED_MESSAGE = 'Cannot open the top of a drive, volume or network share as a project'
+
+/**
+ * The project folder as the filesystem names it (`realpath`) must also be
+ * acceptable: a link or junction can lead a harmless typed path to a volume
+ * root or a system folder. Call it with the canonical path, before the open
+ * commits.
+ *
+ * @throws AppError (`PATH_SYSTEM_DIR`) for a volume root or a system folder
+ */
+export function assertAcceptableProjectRoot(realRoot: string): void {
+  if (isFilesystemRoot(realRoot)) {
+    throw new AppError(ROOT_REFUSED_MESSAGE, ErrorCode.PATH_SYSTEM_DIR)
+  }
+  if (isSystemDirectory(realRoot)) {
+    throw new AppError('Cannot open system or sensitive directories as projects', ErrorCode.PATH_SYSTEM_DIR)
+  }
 }
 
 /**
@@ -139,10 +161,7 @@ export async function validateProjectPath(projectPath: string): Promise<void> {
 
   // The root of a volume is every path on it
   if (isFilesystemRoot(normalized)) {
-    throw new AppError(
-      'Cannot open the root of a drive or volume as a project',
-      ErrorCode.PATH_SYSTEM_DIR
-    )
+    throw new AppError(ROOT_REFUSED_MESSAGE, ErrorCode.PATH_SYSTEM_DIR)
   }
 
   // Check path is accessible
@@ -193,7 +212,7 @@ export async function validateSymlink(projectPath: string): Promise<boolean> {
       : resolve(dirname(projectPath), target) // Relative symlink target
 
     // Check if symlink target is a system directory
-    if (isSystemDirectory(resolvedTarget)) {
+    if (isSystemDirectory(resolvedTarget) || isFilesystemRoot(resolvedTarget)) {
       throw new AppError(
         'Cannot open symlink to system or sensitive directory',
         ErrorCode.SYMLINK_ATTACK

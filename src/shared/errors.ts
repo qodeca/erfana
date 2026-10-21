@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+import { ERROR_CODE_MARKER_PATTERN } from './errorCodeMarker'
 /**
  * Standardized Error Codes and Types
  *
@@ -552,9 +553,23 @@ export function getUserFriendlyMessage(error: unknown): string {
     return ERROR_MESSAGES[error.code] || ERROR_MESSAGES[ErrorCode.UNKNOWN_ERROR]
   }
 
+  // An error that crossed IPC is a plain Error; main marks the code on the end of its message
+  const carried = errorCodeInMessage(error)
+  if (carried) {
+    return ERROR_MESSAGES[carried]
+  }
+
   // Security: Don't expose raw error messages - return generic message
   // Internal details are logged separately, not sent to renderer
   return ERROR_MESSAGES[ErrorCode.UNKNOWN_ERROR]
+}
+
+/** The code main marked on the end of an error's message (see errorCodeMarker.ts), if any. */
+export function errorCodeInMessage(error: unknown): ErrorCode | null {
+  if (!(error instanceof Error)) return null
+  const match = ERROR_CODE_MARKER_PATTERN.exec(error.message)
+  if (!match) return null
+  return (Object.values(ErrorCode) as string[]).includes(match[1]) ? (match[1] as ErrorCode) : null
 }
 
 /**

@@ -17,7 +17,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { homedir } from 'os'
-import { parse, posix, win32 } from 'path'
+import { join, parse, posix, win32 } from 'path'
 import { ErrorCode } from '../../shared/errors'
 
 // Mock fs/promises
@@ -31,6 +31,7 @@ vi.mock('fs/promises', () => ({
 // Import after mocking
 import { lstat, readlink, access } from 'fs/promises'
 import {
+  assertAcceptableProjectRoot,
   isFilesystemRoot,
   isSystemDirectory,
   validateProjectPath,
@@ -603,9 +604,32 @@ describe('isFilesystemRoot', () => {
     ['a drive root', win32, 'C:\\', true],
     ['a drive root without its separator', win32, 'C:', false],
     ['a folder on a drive', win32, 'C:\\a', false],
+    ['a drive root spelled with a forward slash', win32, 'C:/', true],
+    ['an extended-length drive root', win32, '\\\\?\\C:\\', true],
+    ['an extended-length folder on a drive', win32, '\\\\?\\C:\\a', false],
+    ['a share root without its separator', win32, '\\\\srv\\share', true],
+    ['an extended-length share root', win32, '\\\\?\\UNC\\srv\\share\\', true],
     ['a share root', win32, '\\\\srv\\share\\', true],
     ['a folder on a share', win32, '\\\\srv\\share\\a', false]
   ])('%s', (_name, flavour, value, expected) => {
     expect(isFilesystemRoot(value, flavour)).toBe(expected)
+  })
+})
+
+describe('assertAcceptableProjectRoot', () => {
+  it('refuses the root of the volume the tests run on', () => {
+    expect(() => assertAcceptableProjectRoot(parse(process.cwd()).root)).toThrowError(
+      expect.objectContaining({ code: ErrorCode.PATH_SYSTEM_DIR })
+    )
+  })
+
+  it('refuses a system folder', () => {
+    expect(() => assertAcceptableProjectRoot(join(homedir(), '.ssh'))).toThrowError(
+      expect.objectContaining({ code: ErrorCode.PATH_SYSTEM_DIR })
+    )
+  })
+
+  it('accepts an ordinary folder', () => {
+    expect(() => assertAcceptableProjectRoot(process.cwd())).not.toThrow()
   })
 })

@@ -1,3 +1,3 @@
 ### Fixed
 
-- **A whole drive or volume can no longer be opened as a project.** Choosing a drive root (such as `/` or `C:\`) or a network share root is now refused with a clear message, because every file on the volume would count as part of the project.
+- **Opening the top of a drive (such as `/` or `C:\`) or of a network share as a project is now refused,** because every file on it would count as part of the project. A link or shortcut that leads to such a place is refused as well, and the Welcome screen's recent list now shows the refusal instead of a generic error.

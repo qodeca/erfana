@@ -40,6 +40,11 @@ export { OUTSIDE_PROJECT_MESSAGE, UNVERIFIABLE_PATH_MESSAGE }
 /**
  * These helpers carry no session, so they have no case rule: they compare
  * exactly, as they always did. The case-aware check is `ipc/confinement`.
+ *
+ * On macOS `isInsideRoot` also folds Unicode normalisation (NFC), as APFS and HFS+ do. On a
+ * volume that does not (SMB shares, exFAT), two names that differ only in normalisation are
+ * different folders there but read as one here; the check then errs towards "inside" for a
+ * name the user would have to have created on purpose.
  */
 const LEGACY_CASE_SENSITIVE = true
 
