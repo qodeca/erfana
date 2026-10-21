@@ -47,6 +47,7 @@ const APP_ENV_ALLOWLIST: ReadonlySet<string> = new Set([
   'TMPDIR',
   // Display / session (Linux CI runs under xvfb)
   'DISPLAY',
+  'XAUTHORITY',
   'WAYLAND_DISPLAY',
   'XDG_RUNTIME_DIR',
   'XDG_SESSION_TYPE',
