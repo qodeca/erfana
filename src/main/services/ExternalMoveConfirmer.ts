@@ -54,6 +54,8 @@ export interface MoveConfirmerDeps {
   /** False when the window cannot show a box now (minimised, hidden) */
   canShow?: (owner: unknown) => boolean
   coalesceMs?: number
+  /** Runs `ask` once the batch window closes; tests replace it to control when that is */
+  schedule?: (ask: () => void) => void
   homeDir?: string
   path?: PlatformPath
   now?: () => number
@@ -212,7 +214,9 @@ export class ExternalMoveConfirmerImpl implements MoveConfirmer {
   }
 
   private schedule(senderId: number): void {
-    setTimeout(() => void this.ask(senderId), this.coalesceMs)
+    const ask = (): void => void this.ask(senderId)
+    if (this.deps.schedule) this.deps.schedule(ask)
+    else setTimeout(ask, this.coalesceMs)
   }
 
   /** True once, and only for the file that was approved (same device and inode). */

@@ -43,6 +43,9 @@ function redactedMessage(error: unknown): string {
   return redactedLogError(error)?.message ?? String(error)
 }
 
+/** Errors a rename gives when another program holds the destination open */
+const RENAME_BUSY_CODES: ReadonlySet<string> = new Set(['EPERM', 'EBUSY', 'EACCES'])
+
 /** Maximum number of auto-numbered copies (e.g., file.md, file (1).md, ... file (999).md) */
 const MAX_COPY_ATTEMPTS = 1000
 
@@ -701,12 +704,23 @@ export class ExternalFileService implements IExternalFileService {
       return
     }
     const temporary = childPath(dirname(targetPath), `${ATOMIC_TEMP_PREFIX}${randomUUID()}`)
+    let renaming = false
     try {
       await copyFile(sourcePath, temporary, constants.COPYFILE_EXCL)
       await this.assertFolderUnchanged(targetPath, folder)
+      renaming = true
       await rename(temporary, targetPath)
     } catch (error) {
       await rm(temporary, { force: true }).catch(() => undefined)
+      const code = (error as NodeJS.ErrnoException).code
+      if (renaming && code !== undefined && RENAME_BUSY_CODES.has(code)) {
+        // The error text names the temporary file; the log keeps its redacted form
+        logger.warn('Replace blocked', { error: redactedMessage(error), code })
+        throw new AppError(
+          `Could not replace ${basename(targetPath)} – it may be open in another program.`,
+          ErrorCode.EXTERNAL_FILE_COPY_FAILED
+        )
+      }
       throw error
     }
   }

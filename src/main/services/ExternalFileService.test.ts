@@ -648,6 +648,30 @@ describe('ExternalFileService', () => {
       expect(fs.rm).toHaveBeenCalledWith(temporary, { force: true })
     })
 
+    it.each(['EPERM', 'EBUSY', 'EACCES'])(
+      'says plainly that the file may be open when the rename gives %s',
+      async (code) => {
+        const folder = path.resolve('/project/docs')
+        ;(fs.lstat as Mock)
+          .mockResolvedValueOnce(makeStats({ isDir: false }))
+          .mockResolvedValueOnce(makeStats({ isDir: false }))
+        ;(mockFileService.checkNameConflict as Mock).mockResolvedValue(true)
+        ;(fs.copyFile as Mock).mockResolvedValue(undefined)
+        ;(fs.rm as Mock).mockResolvedValue(undefined)
+        ;(fs.rename as Mock).mockImplementation(async (from: string) => {
+          throw Object.assign(new Error(`${code}: operation not permitted, rename '${from}'`), { code })
+        })
+
+        const result = await service.copyFromExternal('/external/file.md', target(folder), 'replace')
+
+        expect(result.success).toBe(false)
+        expect(result.error).toBe('Could not replace file.md – it may be open in another program.')
+        expect(result.error).not.toContain('erfana-tmp')
+        const [, temporary] = (fs.copyFile as Mock).mock.calls[0]
+        expect(fs.rm).toHaveBeenCalledWith(temporary, { force: true })
+      }
+    )
+
     it('creates a new name exclusively even when replace finds nothing there', async () => {
       ;(fs.lstat as Mock)
         .mockResolvedValueOnce(makeStats({ isDir: false }))

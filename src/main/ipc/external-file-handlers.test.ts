@@ -548,17 +548,35 @@ describe('External File Handlers', () => {
       const ownerWindow = { id: 'owner-window' }
       const showBox = vi.fn(async () => ({ response: 0 }))
       const resolveOwner = vi.fn(() => ownerWindow)
-      registerExternalFileHandlers(
-        projectService.session,
-        new ExternalMoveConfirmerImpl({ showBox, resolveOwner, coalesceMs: 0 })
-      )
+      // The batch window closes only when the test says so, after both moves
+      // have reached the confirmer, however slow the file checks before it are
+      let closeWindow: () => void = () => {}
+      const impl = new ExternalMoveConfirmerImpl({
+        showBox,
+        resolveOwner,
+        schedule: (ask) => {
+          closeWindow = ask
+        }
+      })
+      let arrived = 0
+      registerExternalFileHandlers(projectService.session, {
+        confirm: (...args) => {
+          const answer = impl.confirm(...args)
+          arrived++
+          return answer
+        }
+      })
       const second = path.join(outside, 'second.md')
       writeFileSync(second, 'second')
 
-      const [one, two] = await Promise.all([
+      const moves = Promise.all([
         invoke('file:moveFromExternal', source, path.join(root, 'docs'), root),
         invoke('file:moveFromExternal', second, path.join(root, 'docs'), root)
       ])
+      await vi.waitFor(() => expect(arrived).toBe(2))
+      await new Promise((resolve) => setImmediate(resolve))
+      closeWindow()
+      const [one, two] = await moves
 
       expect(one.success).toBe(true)
       expect(two.success).toBe(true)
