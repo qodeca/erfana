@@ -38,7 +38,8 @@ vi.mock('./LoggingService', () => ({
 
 vi.mock('fs/promises', () => ({
   stat: vi.fn(),
-  realpath: vi.fn()
+  realpath: vi.fn(),
+  lstat: vi.fn(() => Promise.reject(new Error('ENOENT')))
 }))
 
 import { stat, realpath } from 'fs/promises'

@@ -37,10 +37,12 @@ vi.mock('./LoggingService', () => ({
 
 vi.mock('fs/promises', () => ({
   stat: vi.fn(),
-  realpath: vi.fn()
+  realpath: vi.fn(),
+  lstat: vi.fn(() => Promise.reject(new Error('ENOENT')))
 }))
 
-import { stat, realpath } from 'fs/promises'
+import { stat, realpath, lstat } from 'fs/promises'
+import { logger } from './LoggingService'
 import { assertAcceptableProjectRoot } from '../utils/pathSecurity'
 import { AppError, ErrorCode } from '../../shared/errors'
 
@@ -193,5 +195,38 @@ describe('ProjectService – canonical project root', () => {
     expect(assertAcceptableProjectRoot).toHaveBeenCalledWith(onDisk)
     expect(lockService.acquireLock).not.toHaveBeenCalled()
     expect(service.session.current()).toBeNull()
+  })
+
+  it('logs the refusal of a canonical root', async () => {
+    vi.mocked(assertAcceptableProjectRoot).mockImplementationOnce(() => {
+      throw new AppError('no', ErrorCode.PATH_SYSTEM_DIR)
+    })
+    mockedRealpath.mockImplementation(() => Promise.resolve(onDisk))
+
+    await service.switchProject(typed)
+
+    expect(logger.warn).toHaveBeenCalledWith(
+      'Project switch: canonical root refused',
+      expect.objectContaining({ code: ErrorCode.PATH_SYSTEM_DIR })
+    )
+  })
+
+  it('refuses a link whose target cannot be resolved, before the lock', async () => {
+    mockedRealpath.mockRejectedValue(new Error('EACCES'))
+    vi.mocked(lstat).mockResolvedValue({ isSymbolicLink: () => true } as any)
+
+    const result = await service.switchProject(typed)
+
+    expect(result).toMatchObject({ success: false, errorCode: ErrorCode.SYMLINK_ATTACK })
+    expect(lockService.acquireLock).not.toHaveBeenCalled()
+  })
+
+  it('still opens a plain folder that realpath cannot resolve', async () => {
+    mockedRealpath.mockRejectedValue(new Error('EACCES'))
+    vi.mocked(lstat).mockResolvedValue({ isSymbolicLink: () => false } as any)
+
+    const result = await service.switchProject(typed)
+
+    expect(result).toMatchObject({ success: true, path: typed })
   })
 })

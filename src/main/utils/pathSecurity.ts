@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import nodePath, { isAbsolute, normalize, resolve, dirname, win32, type PlatformPath } from 'path'
 import { lstat, readlink, access, constants } from 'fs/promises'
-import { homedir } from 'os'
+import { homedir, hostname } from 'os'
 import { AppError, ErrorCode } from '../../shared/errors'
 import { normaliseResolved } from './pathCompare'
 
@@ -47,6 +47,8 @@ export interface SystemPathContext {
   flavour: PlatformPath
   env: Readonly<Record<string, string | undefined>>
   home: string
+  /** This machine's name, so `\\<name>\C$\...` is known to be local; defaults to `os.hostname()` */
+  hostname?: string
 }
 
 const hostContext = (): SystemPathContext => ({
@@ -103,6 +105,27 @@ function getSensitiveUserDirectories(ctx: SystemPathContext): string[] {
   ]
 }
 
+const LOCAL_HOST_NAMES = ['localhost', '127.0.0.1', '::1', '[::1]']
+const ADMIN_SHARE = /^[\\/]{2}([^\\/]+)[\\/]+([A-Za-z])\$(?:[\\/]+(.*))?$/
+
+/**
+ * `\\localhost\C$\Windows` is `C:\Windows` reached by another name. On Windows a
+ * path through this machine's own administrative share (by `localhost`, a
+ * loopback address, or the machine's name) is mapped to its drive path, so the
+ * system-folder list sees it. The share itself is not refused: a project below
+ * it opens. Other hosts, and other platforms, are left as they are.
+ */
+function localAdminShareToDrive(value: string, ctx: SystemPathContext): string {
+  if (ctx.platform !== 'win32') return value
+  const plain = normaliseResolved(value, { path: ctx.flavour, platform: ctx.platform })
+  const match = ADMIN_SHARE.exec(plain)
+  if (!match) return value
+  const host = match[1].toLowerCase()
+  const self = (ctx.hostname ?? hostname()).toLowerCase()
+  if (!LOCAL_HOST_NAMES.includes(host) && host !== self) return value
+  return `${match[2]}:\\${match[3] ?? ''}`
+}
+
 /** The form paths are compared in: normalised, no trailing separator past the root, folded on Windows. */
 function comparable(value: string, ctx: SystemPathContext): string {
   const normalized = ctx.flavour.normalize(value)
@@ -123,7 +146,7 @@ export function isSystemDirectory(
   path: string,
   ctx: SystemPathContext = hostContext()
 ): boolean {
-  const normalized = comparable(path, ctx)
+  const normalized = comparable(localAdminShareToDrive(path, ctx), ctx)
   const directories = [...systemDirectories(ctx), ...getSensitiveUserDirectories(ctx)]
   return directories.some((directory) => {
     const dir = comparable(directory, ctx)

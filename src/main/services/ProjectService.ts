@@ -16,7 +16,7 @@
  * Open/Closed: Extensible for new services without modifying existing code
  */
 
-import { stat, realpath } from 'fs/promises'
+import { stat, realpath, lstat } from 'fs/promises'
 import { normalize, sep, parse, resolve } from 'path'
 import { BrowserWindow } from 'electron'
 import { assertAcceptableProjectRoot, validatePath } from '../utils/pathSecurity'
@@ -368,8 +368,18 @@ export class ProjectService {
     let realRoot: string
     try {
       realRoot = normaliseRealRoot(
-        await step(realpath(resolvedPath), 'Project path resolution').catch((error) => {
+        await step(realpath(resolvedPath), 'Project path resolution').catch(async (error) => {
           if (error instanceof TimeoutError) throw error
+          // A plain folder that cannot be resolved falls back to its typed path;
+          // a link or junction whose target cannot be resolved is never opened
+          // unchecked, since where it leads is not known
+          const link = await lstat(resolvedPath).catch(() => null)
+          if (link?.isSymbolicLink()) {
+            throw new AppError(
+              'Cannot open a directory link whose target could not be resolved',
+              ErrorCode.SYMLINK_ATTACK
+            )
+          }
           return resolvedPath
         })
       )
@@ -382,6 +392,15 @@ export class ProjectService {
           error: error.message
         }
       }
+      if (error instanceof AppError) {
+        return {
+          success: false,
+          path: oldProjectPath || '',
+          action: 'noop',
+          error: `Security validation failed: ${error.message}`,
+          errorCode: error.code
+        }
+      }
       throw error
     }
 
@@ -392,6 +411,10 @@ export class ProjectService {
       assertAcceptableProjectRoot(realRoot)
     } catch (error) {
       if (error instanceof AppError) {
+        logger.warn('Project switch: canonical root refused', {
+          code: error.code,
+          path: redactPath(realRoot)
+        })
         return {
           success: false,
           path: oldProjectPath || '',
