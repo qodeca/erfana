@@ -44,7 +44,7 @@ import { settingsService } from './services/SettingsService'
 import { globalSettingsService } from './services/GlobalSettingsService'
 import { loggingService, logger } from './services/LoggingService'
 import { logNodePtyBinding } from './utils/logNodePtyBinding'
-import { reapConptyHosts } from './services/conptyHostReaper'
+import { startConptyHostReaper } from './services/conptyHostReaper'
 import { gitWatcherService } from './services/GitWatcherService'
 import { gitPollingService } from './services/GitPollingService'
 import { projectLockService } from './services/ProjectLockService'
@@ -751,8 +751,7 @@ app.on('before-quit', async (event) => {
       await Promise.allSettled([
         fileWatcherService.dispose(),
         directoryWatcherService.dispose(),
-        // After every shell is killed, end any console host still parented to us (#305)
-        terminalService.dispose().then(() => reapConptyHosts()),
+        terminalService.dispose(),
         claudeStatusHandlers ? claudeStatusHandlers.dispose() : Promise.resolve(),
         previewHandlers ? previewHandlers.dispose() : Promise.resolve(),
         gitWatcherService.dispose(),
@@ -764,6 +763,13 @@ app.on('before-quit', async (event) => {
 
   // Sync disposer — always runs after the race
   gitPollingService.dispose()
+
+  // Windows (#305): a detached helper that force-ends us if teardown hangs and then
+  // ends any console host still parented to us. Started here, outside the dispose
+  // race, so it always runs. electron-log writes synchronously, so these lines are on
+  // disk before the process exits.
+  const quitHelperStarted = startConptyHostReaper()
+  logger.info('App quit: disposers done, exiting', { quitHelperStarted })
 
   app.exit(0)
 })

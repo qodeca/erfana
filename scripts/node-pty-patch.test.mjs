@@ -28,15 +28,18 @@ describe('node-pty patch (#305)', () => {
   it('the committed patch file carries the #990 pseudoconsole close', () => {
     const patch = fs.readFileSync(patchFile, 'utf8');
     expect(patch).toContain('+void SetupExitCallback(Napi::Env env, Napi::Function cb, pty_baton* baton, PFNCLOSEPSEUDOCONSOLE pfnClosePseudoConsole) {');
-    expect(patch).toContain('+    if (status == napi_ok && hpc != nullptr && pfnClosePseudoConsole != nullptr) {');
+    expect(patch).toContain('+    if (hpc != nullptr && pfnClosePseudoConsole != nullptr) {');
+    expect(patch).not.toContain('status == napi_ok && hpc != nullptr');
     expect(patch).toContain('+        handle->hpc = nullptr;');
   });
 
-  it.skipIf(!fs.existsSync(conpty))('installed conpty.cc closes the pseudoconsole once, outside the lock, and not when closing', () => {
+  it.skipIf(!fs.existsSync(conpty))('installed conpty.cc closes the pseudoconsole once, outside the lock, also when closing', () => {
     const src = fs.readFileSync(conpty, 'utf8');
     expect(src).toContain('pty_baton* baton, PFNCLOSEPSEUDOCONSOLE pfnClosePseudoConsole)');
     expect(src).toContain('hpc = baton->hpc;');
-    expect(src).toContain('status == napi_ok && hpc != nullptr && pfnClosePseudoConsole != nullptr');
+    expect(src).toContain('if (hpc != nullptr && pfnClosePseudoConsole != nullptr) {');
+    // Our adaptation of #990: the close is NOT skipped on napi_closing (deadlocks the quit)
+    expect(src).not.toContain('status == napi_ok && hpc != nullptr');
     expect(src).toContain('handle->hpc = nullptr;');
     expect(src).toContain('pfnClosePseudoConsole && handle->hpc != nullptr');
     // The close runs after the erase block ends, so it never holds g_ptyHandlesMutex.

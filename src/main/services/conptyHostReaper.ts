@@ -1,38 +1,45 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Last-resort cleanup of console hosts left behind by terminals on Windows (#305).
+ * Quit-time backstop for Windows terminals (#305): ends console hosts left
+ * behind by node-pty, and guarantees the main process does not hang on exit.
  *
  * Each ConPTY terminal has a `conhost.exe` (or `OpenConsole.exe`) child of the
- * main process. node-pty is meant to close it, but a leftover keeps the
- * process tree alive after the app is gone. At app quit, after every shell has
- * been killed, this ends any such host that is still a direct child of THIS
- * process. It does not depend on node-pty.
+ * main process. node-pty is meant to close it, but a leftover keeps the process
+ * tree alive after the app is gone. The cleanup does not depend on node-pty.
+ *
+ * It is started RIGHT BEFORE `app.exit(0)`, outside the 2 s dispose race, as one
+ * hidden, detached, absolute-path PowerShell that:
+ * 1. waits for our process to exit; if it is still alive after the grace period
+ *    (a worker thread stuck while the environment is torn down), force-ends it;
+ * 2. then ends every console host that is still a direct child of our pid. A
+ *    child keeps its parent pid after the parent is gone, so orphans match.
  *
  * Safety:
- * - Only direct children of our own pid, matched by image name AND parent pid,
- *   never by name alone.
- * - The parent link is checked in the same query that selects the process, and
- *   only hosts created between this process's start and the quit moment match,
- *   so a pid reused after we exit cannot make us touch someone else's hosts.
- * - Quit only. On a window close the other windows' terminals are alive and
- *   their hosts are children of the same pid too, so nothing can be told apart.
+ * - Hosts are matched by image name AND parent pid, never by name alone, in the
+ *   same query that selects them.
+ * - A pid reused after we exit cannot be hit: hosts must have been created between
+ *   our process start and the quit moment (+ 250 ms rounding), and the process
+ *   force-ended must have started before the quit moment.
+ * - Quit only. On a window close the other windows' terminals are alive and their
+ *   hosts have the same parent pid, so nothing can be told apart.
  *
- * It runs one hidden, absolute-path PowerShell (a CIM query plus Stop-Process;
- * `wmic` is removed on current Windows). The caller waits for it only briefly;
- * the process is detached, so it still finishes if the app exits first. All
- * values placed in the script are integers.
+ * `wmic` is removed on current Windows, hence PowerShell. All values placed in the
+ * script are integers.
  */
 import { spawn as nodeSpawn } from 'child_process'
 import { win32 } from 'path'
 import { logger } from './LoggingService'
 import { taskkillPath } from './terminalTreeKill'
 
-/** How long quit waits for the cleanup before going on (it keeps running on its own). */
-export const CONPTY_REAP_AWAIT_MS = 1_000
+/**
+ * How long the helper waits for our process to exit on its own before force-ending
+ * it. Normal quits measured on Windows take 3.6–6.2 s with 32 terminals.
+ */
+export const QUIT_GRACE_SEC = 10
 
-/** A cleanup that has not finished by now is stopped. */
-export const CONPTY_REAP_TIMEOUT_MS = 10_000
+/** The helper is stopped if it is still running after this long (grace + query + kill). */
+export const CONPTY_REAP_TIMEOUT_MS = (QUIT_GRACE_SEC + 20) * 1_000
 
 /**
  * Rounding allowance after the quit moment, for the clock difference between Node
@@ -77,23 +84,33 @@ function assertInt(value: number, name: string): void {
 }
 
 /**
- * Builds the cleanup script. Exported for tests.
+ * Builds the helper script. Exported for tests.
  *
- * @param parentPid - our main process pid; only its direct children match
- * @param startMs - earliest creation time (epoch ms) a host may have
- * @param endMs - latest creation time (epoch ms) a host may have
+ * @param parentPid - our main process pid
+ * @param startMs - earliest creation time (epoch ms) a host may have: our process start
+ * @param quitMs - the quit moment (epoch ms)
  */
-export function buildReapScript(parentPid: number, startMs: number, endMs: number): string {
+export function buildReapScript(parentPid: number, startMs: number, quitMs: number): string {
   assertInt(parentPid, 'parentPid')
   assertInt(startMs, 'startMs')
-  assertInt(endMs, 'endMs')
+  assertInt(quitMs, 'quitMs')
+  const endMs = quitMs + CREATION_WINDOW_END_SLACK_MS
   const names = HOST_IMAGE_NAMES.map((n) => `$_.Name -ieq '${n}'`).join(' -or ')
   return [
     "$ErrorActionPreference = 'SilentlyContinue'",
     `$s = [DateTimeOffset]::FromUnixTimeMilliseconds(${startMs}).UtcDateTime`,
+    `$q = [DateTimeOffset]::FromUnixTimeMilliseconds(${quitMs}).UtcDateTime`,
     `$e = [DateTimeOffset]::FromUnixTimeMilliseconds(${endMs}).UtcDateTime`,
     // Constrained Language Mode can leave a static call returning nothing: stop rather than match everything
-    'if (-not $s -or -not $e) { exit }',
+    'if (-not $s -or -not $q -or -not $e) { exit }',
+    // 1. Wait for our process; end it only if it is the same one (started before the quit moment)
+    `$p = Get-Process -Id ${parentPid}`,
+    'if ($p -and $p.StartTime.ToUniversalTime() -le $q) {',
+    `  Wait-Process -Id ${parentPid} -Timeout ${QUIT_GRACE_SEC}`,
+    `  $p = Get-Process -Id ${parentPid}`,
+    `  if ($p -and $p.StartTime.ToUniversalTime() -le $q) { Stop-Process -Id ${parentPid} -Force }`,
+    '}',
+    // 2. End the console hosts that are direct children of our pid
     `Get-CimInstance Win32_Process -Filter 'ParentProcessId=${parentPid}' -OperationTimeoutSec ${CIM_OPERATION_TIMEOUT_SEC} |`,
     `  Where-Object { (${names}) -and $_.CreationDate.ToUniversalTime() -ge $s -and $_.CreationDate.ToUniversalTime() -le $e } |`,
     '  ForEach-Object { Stop-Process -Id $_.ProcessId -Force }'
@@ -106,65 +123,52 @@ export interface ReapOptions {
   now?: () => number
   uptimeSeconds?: () => number
   spawnFn?: typeof nodeSpawn
-  awaitMs?: number
 }
 
 /**
- * Starts the cleanup and waits at most `awaitMs` for it. Never throws or
- * rejects, and does nothing off Windows.
+ * Starts the helper and returns at once; it is detached, so it keeps running after
+ * the app exits. Never throws, and does nothing off Windows.
  *
- * @returns true when the cleanup was started
+ * @returns true when the helper was started
  */
-export function reapConptyHosts(options: ReapOptions = {}): Promise<boolean> {
+export function startConptyHostReaper(options: ReapOptions = {}): boolean {
   const {
     platform = process.platform,
     pid = process.pid,
     now = Date.now,
     uptimeSeconds = process.uptime,
-    spawnFn = nodeSpawn,
-    awaitMs = CONPTY_REAP_AWAIT_MS
+    spawnFn = nodeSpawn
   } = options
-  if (platform !== 'win32') return Promise.resolve(false)
+  if (platform !== 'win32') return false
 
-  return new Promise<boolean>((resolve) => {
-    let waitTimer: ReturnType<typeof setTimeout> | undefined
-    const done = (started: boolean): void => {
-      if (waitTimer) clearTimeout(waitTimer)
-      resolve(started)
-    }
-    try {
-      const quitMs = Math.floor(now())
-      const startMs = Math.max(1, Math.floor(quitMs - uptimeSeconds() * 1000))
-      const script = buildReapScript(pid, startMs, quitMs + CREATION_WINDOW_END_SLACK_MS)
-      const child = spawnFn(
-        powershellPath(),
-        ['-NoProfile', '-NonInteractive', '-NoLogo', '-Command', script],
-        { stdio: 'ignore', windowsHide: true, detached: true, env: powershellEnv() }
-      )
-      const killTimer = setTimeout(() => {
-        try {
-          child.kill()
-        } catch {
-          // already gone
-        }
-      }, CONPTY_REAP_TIMEOUT_MS)
-      killTimer.unref()
-      child.once('exit', () => {
-        clearTimeout(killTimer)
-        done(true)
-      })
-      child.once('error', (error) => {
-        clearTimeout(killTimer)
-        logger.warn('Console host cleanup could not be started', { error: error.message })
-        done(false)
-      })
-      child.unref()
-      waitTimer = setTimeout(() => done(true), awaitMs)
-    } catch (error) {
-      logger.warn('Console host cleanup could not be started', {
-        error: error instanceof Error ? error.message : String(error)
-      })
-      done(false)
-    }
-  })
+  try {
+    const quitMs = Math.floor(now())
+    const startMs = Math.max(1, Math.floor(quitMs - uptimeSeconds() * 1000))
+    const script = buildReapScript(pid, startMs, quitMs)
+    const child = spawnFn(
+      powershellPath(),
+      ['-NoProfile', '-NonInteractive', '-NoLogo', '-Command', script],
+      { stdio: 'ignore', windowsHide: true, detached: true, env: powershellEnv() }
+    )
+    const killTimer = setTimeout(() => {
+      try {
+        child.kill()
+      } catch {
+        // already gone
+      }
+    }, CONPTY_REAP_TIMEOUT_MS)
+    killTimer.unref()
+    child.once('exit', () => clearTimeout(killTimer))
+    child.once('error', (error) => {
+      clearTimeout(killTimer)
+      logger.warn('Quit cleanup helper could not be started', { error: error.message })
+    })
+    child.unref()
+    return true
+  } catch (error) {
+    logger.warn('Quit cleanup helper could not be started', {
+      error: error instanceof Error ? error.message : String(error)
+    })
+    return false
+  }
 }
