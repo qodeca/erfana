@@ -192,16 +192,20 @@ export function useTerminalFileLinks(
       try {
         const result = await window.api.file.validatePath(path, projectRoot || undefined)
 
+        // With a project open, only files inside it are links (the main process
+        // answers for every readable path and says where it lies)
+        const exists = result.exists && !(projectRoot && result.insideProject === false)
+
         // Cache the result
         pathCache.set(path, {
-          exists: result.exists,
-          absolutePath: result.absolutePath || null,
+          exists,
+          absolutePath: exists ? result.absolutePath || null : null,
           timestamp: Date.now()
         })
 
         return {
-          exists: result.exists,
-          absolutePath: result.absolutePath
+          exists,
+          absolutePath: exists ? result.absolutePath : undefined
         }
       } catch (e) {
         const errorMsg = e instanceof Error ? e.message : String(e)

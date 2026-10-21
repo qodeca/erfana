@@ -35,7 +35,6 @@ import { fileExists } from '../utils/fileUtils'
 import { redactPath, redactedLogError } from '../utils/redactUserInput'
 import { isInsideRoot } from '../utils/pathCompare'
 import { isSystemPath } from '../utils/systemPathBlock'
-import { getPlatformConfig } from '../services/watcher/PlatformConfig'
 import { restoreParentDirectory } from '../services/file/restoreParentDirectory'
 import { registerConfinedHandle } from './confinement/registerConfinedHandle'
 import { isTrustedSender } from './senderValidation'
@@ -87,6 +86,8 @@ interface ValidatePathResult {
   exists: boolean
   absolutePath?: string
   isFile?: boolean
+  /** Whether the file lies inside the open project (symbolic links resolved) */
+  insideProject?: boolean
   error?: string
 }
 
@@ -626,9 +627,9 @@ export function registerFileHandlers(): void {
   )
 
   // Validate file path exists and return info
-  // Note: projectRoot is optional to allow validation of absolute paths from terminal output.
-  // When projectRoot is provided, the path must lie inside it (whole path segments).
-  // When omitted, only absolute paths that the user can see in terminal output are validated.
+  // Note: validates absolute paths from terminal output, inside the project or not.
+  // The projectRoot argument older callers still send is ignored; the answer says
+  // whether the file lies inside the project the main process has open (`insideProject`).
   // This is acceptable because:
   // 1. Terminal output comes from user-initiated commands (not external input)
   // 2. The user can already see and access any file path shown in their terminal
@@ -639,7 +640,7 @@ export function registerFileHandlers(): void {
       schema: ValidatePathArgsSchema,
       paths: { filePath: { arg: 0, mode: 'external', check: 'none' } },
       onRefusal: (error): ValidatePathResult => ({ exists: false, error: error.message }),
-      handler: async (_ctx, [trimmedPath, projectRoot], { filePath }): Promise<ValidatePathResult> => {
+      handler: async ({ session: snapshot }, [trimmedPath], { filePath }): Promise<ValidatePathResult> => {
         try {
           // One string for the system-folder check and the stat: the canonical path
           const resolvedPath = filePath.requested
@@ -652,11 +653,6 @@ export function registerFileHandlers(): void {
             return { exists: false, error: 'Access to system paths not allowed' }
           }
 
-          // Security check: if projectRoot provided, ensure path is within it
-          if (projectRoot && !isInsideRoot(resolvedPath, path.resolve(projectRoot), getPlatformConfig().caseSensitive)) {
-            return { exists: false, error: 'Path outside project root' }
-          }
-
           // Check if file exists and is a file (not directory)
           const stats = await stat(canonicalPath)
           if (!stats.isFile()) {
@@ -666,7 +662,10 @@ export function registerFileHandlers(): void {
           return {
             exists: true,
             absolutePath: trimmedPath,
-            isFile: true
+            isFile: true,
+            insideProject:
+              snapshot !== null &&
+              isInsideRoot(canonicalPath, snapshot.realRoot, snapshot.caseSensitive)
           }
         } catch (error) {
           // ENOENT means file doesn't exist - this is expected, not an error

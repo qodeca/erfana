@@ -17,7 +17,8 @@ import { describe, it, expect, beforeEach, vi, type Mock } from 'vitest'
 import path from 'path'
 import type * as FsProm from 'fs/promises'
 import type * as PathUtils from '../utils/pathSecurity'
-import { ExternalFileService } from './ExternalFileService'
+import { ExternalFileService, type ExternalTarget } from './ExternalFileService'
+import { ExternalSourceGrants } from './ExternalSourceGrants'
 import type { IFileService } from '../interfaces/IFileService'
 import { ErrorCode } from '../../shared/errors'
 
@@ -30,9 +31,10 @@ vi.mock('fs/promises', () => {
     rm: vi.fn(),
     access: vi.fn(),
     constants: {
-      R_OK: 4
+      R_OK: 4,
+      COPYFILE_EXCL: 1
     }
-  } satisfies Partial<typeof FsProm> & { constants: { R_OK: number } }
+  } satisfies Partial<typeof FsProm> & { constants: { R_OK: number; COPYFILE_EXCL: number } }
 })
 
 // Mock pathSecurity utilities
@@ -44,6 +46,12 @@ vi.mock('../utils/pathSecurity', async (importOriginal) => {
     isSystemDirectory: vi.fn()
   }
 })
+
+const COPYFILE_EXCL = 1
+const SENDER = 7
+
+/** A target folder the way the IPC layer hands it over */
+const target = (folder: string): ExternalTarget => ({ real: folder, requested: folder })
 
 /**
  * Helper to create mock Stats objects
@@ -97,6 +105,7 @@ describe('ExternalFileService', () => {
   let pathSecurity: any
   let mockFileService: IFileService
   let service: ExternalFileService
+  let grants: ExternalSourceGrants
 
   beforeEach(async () => {
     fs = (await import('fs/promises')) as any
@@ -107,7 +116,9 @@ describe('ExternalFileService', () => {
 
     // Create service with mock dependencies
     mockFileService = createMockFileService()
-    service = new ExternalFileService(mockFileService)
+    grants = new ExternalSourceGrants()
+    service = new ExternalFileService(mockFileService, grants)
+    grants.issue(SENDER, ['/external/file.md', '/external/../path/bad\\file.md'])
 
     // Default mock implementations
     ;(fs.access as Mock).mockResolvedValue(undefined)
@@ -118,11 +129,10 @@ describe('ExternalFileService', () => {
   describe('validateExternalFile', () => {
     it('returns valid for regular file within project', async () => {
       const sourcePath = '/external/path/file.md'
-      const projectRoot = '/project'
 
       ;(fs.lstat as Mock).mockResolvedValueOnce(makeStats({ isDir: false }))
 
-      const result = await service.validateExternalFile(sourcePath, projectRoot)
+      const result = await service.validateExternalFile(sourcePath)
 
       expect(result).toMatchObject({
         valid: true,
@@ -135,11 +145,10 @@ describe('ExternalFileService', () => {
 
     it('returns invalid for directory', async () => {
       const sourcePath = '/external/path/folder'
-      const projectRoot = '/project'
 
       ;(fs.lstat as Mock).mockResolvedValueOnce(makeStats({ isDir: true }))
 
-      const result = await service.validateExternalFile(sourcePath, projectRoot)
+      const result = await service.validateExternalFile(sourcePath)
 
       expect(result).toMatchObject({
         valid: false,
@@ -154,7 +163,6 @@ describe('ExternalFileService', () => {
 
     it('returns invalid for symlink pointing to system directory', async () => {
       const sourcePath = '/external/path/symlink'
-      const projectRoot = '/project'
 
       // Symlink itself
       ;(fs.lstat as Mock)
@@ -168,7 +176,7 @@ describe('ExternalFileService', () => {
 
       ;(pathSecurity.isSystemDirectory as Mock).mockReturnValue(true)
 
-      const result = await service.validateExternalFile(sourcePath, projectRoot)
+      const result = await service.validateExternalFile(sourcePath)
 
       expect(result.valid).toBe(false)
       expect(result.isSymlink).toBe(true)
@@ -179,11 +187,10 @@ describe('ExternalFileService', () => {
     it('returns invalid for file outside project (path traversal attempt)', async () => {
       // This test validates the concept - actual boundary validation happens in copyFromExternal/moveFromExternal
       const sourcePath = '/external/../../etc/passwd'
-      const projectRoot = '/project'
 
       ;(fs.lstat as Mock).mockResolvedValueOnce(makeStats({ isDir: false }))
 
-      const result = await service.validateExternalFile(sourcePath, projectRoot)
+      const result = await service.validateExternalFile(sourcePath)
 
       // File itself is valid, but boundary check happens in copy/move operations
       expect(result.valid).toBe(true)
@@ -191,11 +198,10 @@ describe('ExternalFileService', () => {
 
     it('returns invalid for non-existent file', async () => {
       const sourcePath = '/external/path/nonexistent.md'
-      const projectRoot = '/project'
 
       ;(fs.lstat as Mock).mockRejectedValueOnce(new Error('ENOENT: no such file or directory'))
 
-      const result = await service.validateExternalFile(sourcePath, projectRoot)
+      const result = await service.validateExternalFile(sourcePath)
 
       expect(result).toMatchObject({
         valid: false,
@@ -210,11 +216,10 @@ describe('ExternalFileService', () => {
 
     it('returns invalid for special files (socket)', async () => {
       const sourcePath = '/external/path/socket'
-      const projectRoot = '/project'
 
       ;(fs.lstat as Mock).mockResolvedValueOnce(makeStats({ isSocket: true }))
 
-      const result = await service.validateExternalFile(sourcePath, projectRoot)
+      const result = await service.validateExternalFile(sourcePath)
 
       expect(result).toMatchObject({
         valid: false,
@@ -229,11 +234,10 @@ describe('ExternalFileService', () => {
 
     it('returns invalid for special files (FIFO pipe)', async () => {
       const sourcePath = '/external/path/pipe'
-      const projectRoot = '/project'
 
       ;(fs.lstat as Mock).mockResolvedValueOnce(makeStats({ isFIFO: true }))
 
-      const result = await service.validateExternalFile(sourcePath, projectRoot)
+      const result = await service.validateExternalFile(sourcePath)
 
       expect(result).toMatchObject({
         valid: false,
@@ -244,11 +248,10 @@ describe('ExternalFileService', () => {
 
     it('returns invalid for special files (block device)', async () => {
       const sourcePath = '/dev/sda1'
-      const projectRoot = '/project'
 
       ;(fs.lstat as Mock).mockResolvedValueOnce(makeStats({ isBlockDevice: true }))
 
-      const result = await service.validateExternalFile(sourcePath, projectRoot)
+      const result = await service.validateExternalFile(sourcePath)
 
       expect(result).toMatchObject({
         valid: false,
@@ -259,11 +262,10 @@ describe('ExternalFileService', () => {
 
     it('returns invalid for special files (character device)', async () => {
       const sourcePath = '/dev/tty'
-      const projectRoot = '/project'
 
       ;(fs.lstat as Mock).mockResolvedValueOnce(makeStats({ isCharDevice: true }))
 
-      const result = await service.validateExternalFile(sourcePath, projectRoot)
+      const result = await service.validateExternalFile(sourcePath)
 
       expect(result).toMatchObject({
         valid: false,
@@ -274,9 +276,8 @@ describe('ExternalFileService', () => {
 
     it('returns invalid for non-absolute source path', async () => {
       const sourcePath = 'relative/path/file.md'
-      const projectRoot = '/project'
 
-      const result = await service.validateExternalFile(sourcePath, projectRoot)
+      const result = await service.validateExternalFile(sourcePath)
 
       expect(result).toMatchObject({
         valid: false,
@@ -285,22 +286,8 @@ describe('ExternalFileService', () => {
       })
     })
 
-    it('returns invalid for non-absolute project root', async () => {
-      const sourcePath = '/external/file.md'
-      const projectRoot = 'relative/project'
-
-      const result = await service.validateExternalFile(sourcePath, projectRoot)
-
-      expect(result).toMatchObject({
-        valid: false,
-        error: 'Project root must be absolute',
-        errorCode: ErrorCode.PATH_NOT_ABSOLUTE
-      })
-    })
-
     it('validates symlink target is a regular file', async () => {
       const sourcePath = '/external/path/symlink'
-      const projectRoot = '/project'
 
       // Symlink itself
       ;(fs.lstat as Mock)
@@ -312,7 +299,7 @@ describe('ExternalFileService', () => {
       ;(pathSecurity.isSystemDirectory as Mock).mockReturnValue(false)
       ;(pathSecurity.validateSymlink as Mock).mockResolvedValue(true)
 
-      const result = await service.validateExternalFile(sourcePath, projectRoot)
+      const result = await service.validateExternalFile(sourcePath)
 
       expect(result.valid).toBe(true)
       expect(result.isSymlink).toBe(true)
@@ -321,12 +308,11 @@ describe('ExternalFileService', () => {
 
     it('handles broken symlinks gracefully', async () => {
       const sourcePath = '/external/path/broken-symlink'
-      const projectRoot = '/project'
 
       ;(fs.lstat as Mock).mockResolvedValueOnce(makeStats({ isSymlink: true }))
       ;(fs.realpath as Mock).mockRejectedValueOnce(new Error('ENOENT'))
 
-      const result = await service.validateExternalFile(sourcePath, projectRoot)
+      const result = await service.validateExternalFile(sourcePath)
 
       expect(result.valid).toBe(false)
       expect(result.isSymlink).toBe(true)
@@ -412,11 +398,10 @@ describe('ExternalFileService', () => {
     it('validates file before copying', async () => {
       const sourcePath = '/external/file.md'
       const targetFolder = '/project/docs'
-      const projectRoot = '/project'
 
       ;(fs.lstat as Mock).mockResolvedValueOnce(makeStats({ isDir: true }))
 
-      const result = await service.copyFromExternal(sourcePath, targetFolder, projectRoot)
+      const result = await service.copyFromExternal(sourcePath, target(targetFolder))
 
       expect(result.success).toBe(false)
       expect(result.errorCode).toBe(ErrorCode.EXTERNAL_FILE_IS_DIRECTORY)
@@ -426,34 +411,27 @@ describe('ExternalFileService', () => {
     it('delegates to FileService.copyItem', async () => {
       const sourcePath = '/external/file.md'
       const targetFolder = '/project/docs'
-      const projectRoot = '/project'
 
       ;(fs.lstat as Mock).mockResolvedValueOnce(makeStats({ isDir: false }))
       ;(mockFileService.checkNameConflict as Mock).mockResolvedValue(false)
       ;(fs.copyFile as Mock).mockResolvedValueOnce(undefined)
 
-      const result = await service.copyFromExternal(sourcePath, targetFolder, projectRoot)
+      const result = await service.copyFromExternal(sourcePath, target(targetFolder))
 
       expect(result.success).toBe(true)
       expect(result.path).toBe(path.join('/project', 'docs', 'file.md'))
-      expect(fs.copyFile).toHaveBeenCalledWith(sourcePath, path.join('/project', 'docs', 'file.md'))
+      expect(fs.copyFile).toHaveBeenCalledWith(sourcePath, path.join('/project', 'docs', 'file.md'), COPYFILE_EXCL)
     })
 
     it('handles conflict resolution with replace', async () => {
       const sourcePath = '/external/file.md'
       const targetFolder = '/project/docs'
-      const projectRoot = '/project'
 
       ;(fs.lstat as Mock).mockResolvedValueOnce(makeStats({ isDir: false }))
       ;(mockFileService.checkNameConflict as Mock).mockResolvedValue(true) // Conflict exists
       ;(fs.copyFile as Mock).mockResolvedValueOnce(undefined)
 
-      const result = await service.copyFromExternal(
-        sourcePath,
-        targetFolder,
-        projectRoot,
-        'replace'
-      )
+      const result = await service.copyFromExternal(sourcePath, target(targetFolder), 'replace')
 
       expect(result.success).toBe(true)
       expect(result.path).toBe(path.join('/project', 'docs', 'file.md'))
@@ -462,7 +440,6 @@ describe('ExternalFileService', () => {
     it('handles conflict resolution with keepBoth', async () => {
       const sourcePath = '/external/file.md'
       const targetFolder = '/project/docs'
-      const projectRoot = '/project'
 
       ;(fs.lstat as Mock).mockResolvedValueOnce(makeStats({ isDir: false }))
       ;(mockFileService.checkNameConflict as Mock)
@@ -471,41 +448,21 @@ describe('ExternalFileService', () => {
         .mockResolvedValueOnce(false) // checkNameConflict for 'file (1).md' (second while loop iteration, no conflict)
       ;(fs.copyFile as Mock).mockResolvedValueOnce(undefined)
 
-      const result = await service.copyFromExternal(
-        sourcePath,
-        targetFolder,
-        projectRoot,
-        'keepBoth'
-      )
+      const result = await service.copyFromExternal(sourcePath, target(targetFolder), 'keepBoth')
 
       expect(result.success).toBe(true)
       expect(result.path).toBe(path.join('/project', 'docs', 'file (1).md'))
     })
 
-    it('rejects target folder outside project boundary', async () => {
-      const sourcePath = '/external/file.md'
-      const targetFolder = '/other/location'
-      const projectRoot = '/project'
-
-      ;(fs.lstat as Mock).mockResolvedValueOnce(makeStats({ isDir: false }))
-
-      const result = await service.copyFromExternal(sourcePath, targetFolder, projectRoot)
-
-      expect(result.success).toBe(false)
-      expect(result.errorCode).toBe(ErrorCode.PATH_OUTSIDE_PROJECT)
-      expect(fs.copyFile).not.toHaveBeenCalled()
-    })
-
     it('handles source file deletion during operation (race condition)', async () => {
       const sourcePath = '/external/file.md'
       const targetFolder = '/project/docs'
-      const projectRoot = '/project'
 
       ;(fs.lstat as Mock).mockResolvedValueOnce(makeStats({ isDir: false }))
       ;(mockFileService.checkNameConflict as Mock).mockResolvedValue(false)
       ;(fs.access as Mock).mockRejectedValueOnce(new Error('ENOENT'))
 
-      const result = await service.copyFromExternal(sourcePath, targetFolder, projectRoot)
+      const result = await service.copyFromExternal(sourcePath, target(targetFolder))
 
       expect(result.success).toBe(false)
       expect(result.errorCode).toBe(ErrorCode.EXTERNAL_FILE_SOURCE_DELETED)
@@ -515,13 +472,12 @@ describe('ExternalFileService', () => {
     it('sanitizes filename during copy', async () => {
       const sourcePath = '/external/../path/bad\\file.md'
       const targetFolder = '/project/docs'
-      const projectRoot = '/project'
 
       ;(fs.lstat as Mock).mockResolvedValueOnce(makeStats({ isDir: false }))
       ;(mockFileService.checkNameConflict as Mock).mockResolvedValue(false)
       ;(fs.copyFile as Mock).mockResolvedValueOnce(undefined)
 
-      const result = await service.copyFromExternal(sourcePath, targetFolder, projectRoot)
+      const result = await service.copyFromExternal(sourcePath, target(targetFolder))
 
       expect(result.success).toBe(true)
       // Filename should be sanitized – on Windows, basename of path with backslash
@@ -533,13 +489,12 @@ describe('ExternalFileService', () => {
     it('handles copy errors gracefully', async () => {
       const sourcePath = '/external/file.md'
       const targetFolder = '/project/docs'
-      const projectRoot = '/project'
 
       ;(fs.lstat as Mock).mockResolvedValueOnce(makeStats({ isDir: false }))
       ;(mockFileService.checkNameConflict as Mock).mockResolvedValue(false)
       ;(fs.copyFile as Mock).mockRejectedValueOnce(new Error('Disk full'))
 
-      const result = await service.copyFromExternal(sourcePath, targetFolder, projectRoot)
+      const result = await service.copyFromExternal(sourcePath, target(targetFolder))
 
       expect(result.success).toBe(false)
       expect(result.errorCode).toBe(ErrorCode.EXTERNAL_FILE_COPY_FAILED)
@@ -550,11 +505,10 @@ describe('ExternalFileService', () => {
     it('validates file before moving', async () => {
       const sourcePath = '/external/file.md'
       const targetFolder = '/project/docs'
-      const projectRoot = '/project'
 
       ;(fs.lstat as Mock).mockResolvedValueOnce(makeStats({ isDir: true }))
 
-      const result = await service.moveFromExternal(sourcePath, targetFolder, projectRoot)
+      const result = await service.moveFromExternal(sourcePath, target(targetFolder), SENDER)
 
       expect(result.success).toBe(false)
       expect(result.errorCode).toBe(ErrorCode.EXTERNAL_FILE_IS_DIRECTORY)
@@ -565,32 +519,30 @@ describe('ExternalFileService', () => {
     it('copies then deletes source', async () => {
       const sourcePath = '/external/file.md'
       const targetFolder = '/project/docs'
-      const projectRoot = '/project'
 
       ;(fs.lstat as Mock).mockResolvedValueOnce(makeStats({ isDir: false }))
       ;(mockFileService.checkNameConflict as Mock).mockResolvedValue(false)
       ;(fs.copyFile as Mock).mockResolvedValueOnce(undefined)
       ;(fs.rm as Mock).mockResolvedValueOnce(undefined)
 
-      const result = await service.moveFromExternal(sourcePath, targetFolder, projectRoot)
+      const result = await service.moveFromExternal(sourcePath, target(targetFolder), SENDER)
 
       expect(result.success).toBe(true)
       expect(result.path).toBe(path.join('/project', 'docs', 'file.md'))
-      expect(fs.copyFile).toHaveBeenCalledWith(sourcePath, path.join('/project', 'docs', 'file.md'))
+      expect(fs.copyFile).toHaveBeenCalledWith(sourcePath, path.join('/project', 'docs', 'file.md'), COPYFILE_EXCL)
       expect(fs.rm).toHaveBeenCalledWith(sourcePath)
     })
 
     it('handles errors during source deletion gracefully', async () => {
       const sourcePath = '/external/file.md'
       const targetFolder = '/project/docs'
-      const projectRoot = '/project'
 
       ;(fs.lstat as Mock).mockResolvedValueOnce(makeStats({ isDir: false }))
       ;(mockFileService.checkNameConflict as Mock).mockResolvedValue(false)
       ;(fs.copyFile as Mock).mockResolvedValueOnce(undefined)
       ;(fs.rm as Mock).mockRejectedValueOnce(Object.assign(new Error('Permission denied'), { code: 'EPERM' }))
 
-      const result = await service.moveFromExternal(sourcePath, targetFolder, projectRoot)
+      const result = await service.moveFromExternal(sourcePath, target(targetFolder), SENDER)
 
       // Move still succeeds even if source deletion fails (file was copied)
       expect(result.success).toBe(true)
@@ -600,46 +552,142 @@ describe('ExternalFileService', () => {
     it('handles source already deleted during move (ENOENT)', async () => {
       const sourcePath = '/external/file.md'
       const targetFolder = '/project/docs'
-      const projectRoot = '/project'
 
       ;(fs.lstat as Mock).mockResolvedValueOnce(makeStats({ isDir: false }))
       ;(mockFileService.checkNameConflict as Mock).mockResolvedValue(false)
       ;(fs.copyFile as Mock).mockResolvedValueOnce(undefined)
       ;(fs.rm as Mock).mockRejectedValueOnce(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }))
 
-      const result = await service.moveFromExternal(sourcePath, targetFolder, projectRoot)
+      const result = await service.moveFromExternal(sourcePath, target(targetFolder), SENDER)
 
       // Still successful - file was already gone
       expect(result.success).toBe(true)
     })
 
-    it('rejects target folder outside project boundary', async () => {
-      const sourcePath = '/external/file.md'
-      const targetFolder = '/other/location'
-      const projectRoot = '/project'
-
-      ;(fs.lstat as Mock).mockResolvedValueOnce(makeStats({ isDir: false }))
-
-      const result = await service.moveFromExternal(sourcePath, targetFolder, projectRoot)
-
-      expect(result.success).toBe(false)
-      expect(result.errorCode).toBe(ErrorCode.PATH_OUTSIDE_PROJECT)
-    })
-
     it('handles move errors gracefully', async () => {
       const sourcePath = '/external/file.md'
       const targetFolder = '/project/docs'
-      const projectRoot = '/project'
 
       ;(fs.lstat as Mock).mockResolvedValueOnce(makeStats({ isDir: false }))
       ;(mockFileService.checkNameConflict as Mock).mockResolvedValue(false)
       ;(fs.copyFile as Mock).mockRejectedValueOnce(new Error('Disk full'))
 
-      const result = await service.moveFromExternal(sourcePath, targetFolder, projectRoot)
+      const result = await service.moveFromExternal(sourcePath, target(targetFolder), SENDER)
 
       expect(result.success).toBe(false)
       expect(result.errorCode).toBe(ErrorCode.EXTERNAL_FILE_MOVE_FAILED)
       expect(fs.rm).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('target folder', () => {
+    it('writes below the checked folder and answers with the folder the caller named', async () => {
+      const real = path.resolve('/canonical/docs')
+      const requested = path.resolve('/project/docs-link')
+
+      ;(fs.lstat as Mock).mockResolvedValueOnce(makeStats({ isDir: false }))
+      ;(mockFileService.checkNameConflict as Mock).mockResolvedValue(false)
+      ;(fs.copyFile as Mock).mockResolvedValueOnce(undefined)
+
+      const result = await service.copyFromExternal('/external/file.md', { real, requested })
+
+      expect(fs.copyFile).toHaveBeenCalledWith(
+        '/external/file.md',
+        path.join(real, 'file.md'),
+        COPYFILE_EXCL
+      )
+      expect(mockFileService.checkNameConflict).toHaveBeenCalledWith(real, 'file.md')
+      expect(result.path).toBe(path.join(requested, 'file.md'))
+    })
+
+    it('refuses to replace a name that is a link', async () => {
+      ;(fs.lstat as Mock)
+        .mockResolvedValueOnce(makeStats({ isDir: false }))
+        .mockResolvedValueOnce(makeStats({ isSymlink: true }))
+      ;(mockFileService.checkNameConflict as Mock).mockResolvedValue(true)
+
+      const result = await service.copyFromExternal(
+        '/external/file.md',
+        target(path.resolve('/project/docs')),
+        'replace'
+      )
+
+      expect(result.success).toBe(false)
+      expect(fs.copyFile).not.toHaveBeenCalled()
+    })
+
+    it('replaces a name that is an ordinary file', async () => {
+      ;(fs.lstat as Mock)
+        .mockResolvedValueOnce(makeStats({ isDir: false }))
+        .mockResolvedValueOnce(makeStats({ isDir: false }))
+      ;(mockFileService.checkNameConflict as Mock).mockResolvedValue(true)
+      ;(fs.copyFile as Mock).mockResolvedValueOnce(undefined)
+
+      const folder = path.resolve('/project/docs')
+      const result = await service.copyFromExternal('/external/file.md', target(folder), 'replace')
+
+      expect(result.success).toBe(true)
+      expect(fs.copyFile).toHaveBeenCalledWith('/external/file.md', path.join(folder, 'file.md'))
+    })
+  })
+
+  describe('move grants', () => {
+    const source = '/external/file.md'
+    const folder = path.resolve('/project/docs')
+
+    beforeEach(() => {
+      ;(fs.lstat as Mock).mockResolvedValue(makeStats({ isDir: false }))
+      ;(mockFileService.checkNameConflict as Mock).mockResolvedValue(false)
+      ;(fs.copyFile as Mock).mockResolvedValue(undefined)
+      ;(fs.rm as Mock).mockResolvedValue(undefined)
+    })
+
+    it('refuses a file that was not picked, and copies and deletes nothing', async () => {
+      grants.clear()
+
+      const result = await service.moveFromExternal(source, target(folder), SENDER)
+
+      expect(result).toMatchObject({
+        success: false,
+        errorCode: ErrorCode.EXTERNAL_FILE_MOVE_NOT_GRANTED
+      })
+      expect(fs.copyFile).not.toHaveBeenCalled()
+      expect(fs.rm).not.toHaveBeenCalled()
+    })
+
+    it('refuses a file another window picked', async () => {
+      const result = await service.moveFromExternal(source, target(folder), SENDER + 1)
+
+      expect(result.errorCode).toBe(ErrorCode.EXTERNAL_FILE_MOVE_NOT_GRANTED)
+      expect(fs.rm).not.toHaveBeenCalled()
+    })
+
+    it('allows one move per pick', async () => {
+      const first = await service.moveFromExternal(source, target(folder), SENDER)
+      const second = await service.moveFromExternal(source, target(folder), SENDER)
+
+      expect(first.success).toBe(true)
+      expect(second.errorCode).toBe(ErrorCode.EXTERNAL_FILE_MOVE_NOT_GRANTED)
+      expect(fs.rm).toHaveBeenCalledTimes(1)
+    })
+
+    it('does not need a grant to copy', async () => {
+      grants.clear()
+
+      const result = await service.copyFromExternal(source, target(folder))
+
+      expect(result.success).toBe(true)
+      expect(fs.rm).not.toHaveBeenCalled()
+    })
+
+    it('does not use up a grant when the file fails validation', async () => {
+      ;(fs.lstat as Mock).mockResolvedValueOnce(makeStats({ isDir: true }))
+
+      const refused = await service.moveFromExternal(source, target(folder), SENDER)
+      const retried = await service.moveFromExternal(source, target(folder), SENDER)
+
+      expect(refused.errorCode).toBe(ErrorCode.EXTERNAL_FILE_IS_DIRECTORY)
+      expect(retried.success).toBe(true)
     })
   })
 })

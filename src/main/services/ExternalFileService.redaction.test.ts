@@ -9,6 +9,7 @@
  */
 import { describe, it, expect, beforeEach, vi, type Mock } from 'vitest'
 import { ExternalFileService } from './ExternalFileService'
+import { ExternalSourceGrants } from './ExternalSourceGrants'
 import type { IFileService } from '../interfaces/IFileService'
 
 const mockLogger = vi.hoisted(() => ({
@@ -27,7 +28,7 @@ vi.mock('fs/promises', () => ({
   copyFile: vi.fn(),
   rm: vi.fn(),
   access: vi.fn(),
-  constants: { R_OK: 4 }
+  constants: { R_OK: 4, COPYFILE_EXCL: 1 }
 }))
 
 vi.mock('../utils/pathSecurity', () => ({
@@ -84,7 +85,7 @@ describe('ExternalFileService log redaction', () => {
       })
     )
 
-    const result = await service.validateExternalFile(SOURCE, PROJECT)
+    const result = await service.validateExternalFile(SOURCE)
 
     expect(result.valid).toBe(false)
     const logged = everythingLogged()
@@ -109,14 +110,14 @@ describe('ExternalFileService log redaction', () => {
       })
     )
 
-    const result = await service.copyFromExternal(SOURCE, PROJECT, PROJECT)
+    const result = await service.copyFromExternal(SOURCE, { real: PROJECT, requested: PROJECT })
 
     expect(result.success).toBe(false)
     expect(mockLogger.error).toHaveBeenCalled()
     expect(everythingLogged()).not.toContain('/Users/alice')
   })
 
-  it('logs no full paths when the target folder is outside the project', async () => {
+  it('logs no full paths when a move is refused for lack of a pick', async () => {
     ;(fs.lstat as Mock).mockResolvedValue({
       isDirectory: () => false,
       isFile: () => true,
@@ -126,9 +127,11 @@ describe('ExternalFileService log redaction', () => {
       isFIFO: () => false,
       isSocket: () => false
     })
+    const unpicked = new ExternalFileService(makeFileService(), new ExternalSourceGrants())
 
-    await service.copyFromExternal(SOURCE, '/Users/alice/elsewhere', PROJECT)
+    const result = await unpicked.moveFromExternal(SOURCE, { real: PROJECT, requested: PROJECT }, 1)
 
+    expect(result.success).toBe(false)
     expect(mockLogger.warn).toHaveBeenCalled()
     expect(everythingLogged()).not.toContain('/Users/alice')
   })

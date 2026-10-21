@@ -8,11 +8,11 @@
  * Test groups:
  * - Input validation
  * - Security: system path blocking
- * - Security: project root containment
+ * - Project containment (`insideProject`, the renderer's projectRoot ignored)
  * - File existence checks
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import path from 'node:path'
 
 /** A rooted path on the host: `/x` is not absolute on Windows. */
@@ -22,8 +22,9 @@ const abs = (value: string): string => path.resolve(value)
 const handlers: Record<string, (...args: unknown[]) => unknown> = {}
 
 // Use vi.hoisted for mocks
-const { mockStat } = vi.hoisted(() => ({
-  mockStat: vi.fn()
+const { mockStat, sessionState } = vi.hoisted(() => ({
+  mockStat: vi.fn(),
+  sessionState: { snapshot: null as null | Record<string, unknown> }
 }))
 
 // Mock electron
@@ -48,7 +49,7 @@ vi.mock('electron', () => ({
 vi.mock('../services/ProjectService', () => ({
   ProjectService: class MockProjectService {
     switchProject = vi.fn()
-    session = { current: () => null, require: () => { throw new Error('no project') }, onChange: () => () => {} }
+    session = { current: () => sessionState.snapshot, require: () => { throw new Error('no project') }, onChange: () => () => {} }
   }
 }))
 
@@ -209,28 +210,73 @@ describe('file:validatePath', () => {
     }
   })
 
-  describe('security: project root containment', () => {
-    it('allows paths within project root', async () => {
+  describe('project containment', () => {
+    const projectRoot = abs('/project')
+
+    beforeEach(() => {
+      sessionState.snapshot = {
+        generation: 1,
+        root: projectRoot,
+        realRoot: projectRoot,
+        caseSensitive: process.platform === 'linux',
+        ownerWebContentsId: null
+      }
       mockStat.mockResolvedValue({ isFile: () => true })
-      const result = await validatePath({}, abs('/project/src/file.ts'), abs('/project'))
-      expect(result).toHaveProperty('exists', true)
     })
 
-    it('accepts a path below a project root that ends in a separator (a drive or share root)', async () => {
-      mockStat.mockResolvedValue({ isFile: () => true })
+    afterEach(() => {
+      sessionState.snapshot = null
+    })
+
+    it('reports a file inside the open project', async () => {
+      const result = await validatePath({}, abs('/project/src/file.ts'))
+      expect(result).toEqual({
+        exists: true,
+        absolutePath: abs('/project/src/file.ts'),
+        isFile: true,
+        insideProject: true
+      })
+    })
+
+    it('reports a file outside the open project, and still validates it', async () => {
+      const result = await validatePath({}, abs('/other/file.ts'))
+      expect(result).toHaveProperty('exists', true)
+      expect(result).toHaveProperty('insideProject', false)
+    })
+
+    it('does not take a sibling folder with the same name prefix for the project', async () => {
+      const result = await validatePath({}, abs('/project-evil/file.ts'))
+      expect(result).toHaveProperty('insideProject', false)
+    })
+
+    it('resolves .. before it decides', async () => {
+      const result = await validatePath({}, abs('/project/../other/file.ts'))
+      expect(result).toHaveProperty('insideProject', false)
+    })
+
+    it('ignores the project root the renderer sends', async () => {
+      const inside = await validatePath({}, abs('/project/src/file.ts'), abs('/elsewhere'))
+      expect(inside).toHaveProperty('insideProject', true)
+
+      const outside = await validatePath({}, abs('/other/file.ts'), abs('/other'))
+      expect(outside).toHaveProperty('insideProject', false)
+
       const driveRoot = path.parse(abs('/project')).root
-      const result = await validatePath({}, abs('/project/src/file.ts'), driveRoot)
+      const underDriveRoot = await validatePath({}, abs('/other/file.ts'), driveRoot)
+      expect(underDriveRoot).toHaveProperty('insideProject', false)
+    })
+
+    it('reports false when no project is open', async () => {
+      sessionState.snapshot = null
+      const result = await validatePath({}, abs('/project/src/file.ts'))
       expect(result).toHaveProperty('exists', true)
+      expect(result).toHaveProperty('insideProject', false)
     })
 
-    it('blocks paths outside project root', async () => {
-      const result = await validatePath({}, abs('/other/file.ts'), abs('/project'))
-      expect(result).toEqual({ exists: false, error: 'Path outside project root' })
-    })
-
-    it('blocks path traversal attempts', async () => {
-      const result = await validatePath({}, abs('/project/../other/file.ts'), abs('/project'))
-      expect(result).toEqual({ exists: false, error: 'Path outside project root' })
+    it('still blocks system paths whatever the project', async () => {
+      if (process.platform === 'win32') return
+      const result = await validatePath({}, '/etc/passwd', abs('/etc'))
+      expect(result).toEqual({ exists: false, error: 'Access to system paths not allowed' })
     })
   })
 
@@ -241,7 +287,8 @@ describe('file:validatePath', () => {
       expect(result).toEqual({
         exists: true,
         absolutePath: abs('/home/user/file.ts'),
-        isFile: true
+        isFile: true,
+        insideProject: false
       })
     })
 

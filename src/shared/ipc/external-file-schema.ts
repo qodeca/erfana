@@ -32,11 +32,30 @@ export type ConflictResolution = z.infer<typeof ConflictResolution>
 export const ExternalFileValidateRequestSchema = z.object({
   /** Absolute path to the external source file */
   sourcePath: absolutePathString,
-  /** Absolute path to the project root */
-  projectRoot: absolutePathString
+  /** Accepted for older callers and ignored: the main process uses the open project */
+  projectRoot: z.string().optional()
 })
 
 export type ExternalFileValidateRequest = z.infer<typeof ExternalFileValidateRequestSchema>
+
+/**
+ * Positional arguments of `file:validateExternal`: source, ignored project root
+ */
+export const ExternalFileValidateArgsSchema = z.tuple([
+  absolutePathString,
+  z.string().optional()
+])
+
+/**
+ * Positional arguments of `file:copyFromExternal` and `file:moveFromExternal`:
+ * source, target folder, ignored project root, conflict strategy
+ */
+export const ExternalFileTransferArgsSchema = z.tuple([
+  absolutePathString,
+  absolutePathString,
+  z.string().optional(),
+  ConflictResolution.optional()
+])
 
 /**
  * External File Validate Response
@@ -72,8 +91,8 @@ export const ExternalFileCopyRequestSchema = z.object({
   sourcePath: absolutePathString,
   /** Absolute path to the target folder within project */
   targetFolder: absolutePathString,
-  /** Absolute path to the project root (for boundary validation) */
-  projectRoot: absolutePathString,
+  /** Accepted for older callers and ignored: the main process uses the open project */
+  projectRoot: z.string().optional(),
   /** How to handle name conflicts */
   conflictResolution: ConflictResolution.optional()
 })
@@ -108,8 +127,8 @@ export const ExternalFileMoveRequestSchema = z.object({
   sourcePath: absolutePathString,
   /** Absolute path to the target folder within project */
   targetFolder: absolutePathString,
-  /** Absolute path to the project root (for boundary validation) */
-  projectRoot: absolutePathString,
+  /** Accepted for older callers and ignored: the main process uses the open project */
+  projectRoot: z.string().optional(),
   /** How to handle name conflicts */
   conflictResolution: ConflictResolution.optional()
 })

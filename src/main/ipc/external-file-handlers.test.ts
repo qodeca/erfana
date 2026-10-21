@@ -3,461 +3,431 @@
 /**
  * External File Handlers Tests
  *
- * Tests for IPC handlers that expose external file drop functionality to renderer.
- * Covers Spec #012: External File Drop to Project Tree
+ * Covers Spec #012 (external file drop to project tree), end to end through
+ * the real handlers and the real `ExternalFileService` on a temp tree:
  *
- * Test coverage:
- * - file:validateExternal - validation handler
- * - file:copyFromExternal - copy handler
- * - file:moveFromExternal - move handler
- * - file:selectExternalFiles - file picker handler
+ * - the target folder resolves against the project the main process has open;
+ *   the `projectRoot` argument the renderer still sends is accepted and ignored
+ * - a move deletes its source only when the user picked that file in the dialog
+ * - validation and the file picker keep their behaviour
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { ipcMain, dialog } from 'electron'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync
+} from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import { ErrorCode } from '../../shared/errors'
 
-// Mock electron
+const { handlers, showOpenDialog } = vi.hoisted(() => ({
+  handlers: {} as Record<string, (...args: any[]) => any>,
+  showOpenDialog: vi.fn()
+}))
+
+vi.mock('./senderValidation', () => ({
+  isTrustedSender: () => true,
+  isTrustedAppSender: () => true
+}))
+
 vi.mock('electron', () => ({
+  BrowserWindow: { getAllWindows: vi.fn(() => []) },
   ipcMain: {
-    handle: vi.fn()
+    handle: (channel: string, fn: (...args: any[]) => any) => {
+      handlers[channel] = fn
+    }
   },
-  dialog: {
-    showOpenDialog: vi.fn()
+  dialog: { showOpenDialog, showSaveDialog: vi.fn() },
+  shell: { showItemInFolder: vi.fn() }
+}))
+
+vi.mock('electron-store', () => {
+  class MockStore {
+    constructor(_opts?: any) {}
+    get(_key: string, _def?: any): any {
+      return null
+    }
+    set(_key: string, _val: any): void {}
+    delete(_key: string): void {}
+  }
+  return { default: MockStore }
+})
+
+vi.mock('../services/ProjectLockService', () => ({
+  projectLockService: {
+    acquireLock: vi.fn(async () => ({ status: 'acquired' })),
+    releaseLock: vi.fn(async () => {}),
+    checkLock: vi.fn(async () => ({ status: 'unlocked' })),
+    requestFocus: vi.fn(async () => true),
+    cleanupStaleLocks: vi.fn(async () => 0),
+    dispose: vi.fn(async () => {})
   }
 }))
 
-// Mock ExternalFileService
-const mockValidateExternalFile = vi.fn()
-const mockCopyFromExternal = vi.fn()
-const mockMoveFromExternal = vi.fn()
+import { registerExternalFileHandlers } from './external-file-handlers'
+import { getConfinedChannels } from './confinement/registerConfinedHandle'
+import { externalSourceGrants } from '../services/ExternalSourceGrants'
+import { logger } from '../services/LoggingService'
+import { openTestProject } from './__test-helpers__/openTestProject'
 
-vi.mock('../services/ExternalFileService', () => ({
-  externalFileService: {
-    validateExternalFile: mockValidateExternalFile,
-    copyFromExternal: mockCopyFromExternal,
-    moveFromExternal: mockMoveFromExternal
-  }
-}))
-
-// Mock LoggingService
-vi.mock('../services/LoggingService', () => ({
-  logger: {
-    debug: vi.fn(),
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn()
-  }
-}))
-
-type IpcHandler = (event: Electron.IpcMainInvokeEvent, ...args: unknown[]) => Promise<unknown>
+const OWNER_ID = 1
+const event = { sender: { id: OWNER_ID } }
+const otherEvent = { sender: { id: OWNER_ID + 1 } }
+const invoke = (channel: string, ...args: unknown[]) => handlers[channel](event, ...args)
 
 describe('External File Handlers', () => {
-  let handlers: Map<string, IpcHandler>
+  let base: string
+  let root: string
+  let outside: string
+  let source: string
+  let projectService: { session: Parameters<typeof registerExternalFileHandlers>[0] }
+
+  const listDir = (dir: string): string[] => readdirSync(dir).sort()
+
+  /** Pick `source` in the dialog, the way the renderer's shortcut does. */
+  const pick = async (...paths: string[]): Promise<void> => {
+    showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: paths })
+    await invoke('file:selectExternalFiles')
+  }
 
   beforeEach(async () => {
-    // Reset mocks
-    vi.resetAllMocks()
-
-    // Capture IPC handlers
-    handlers = new Map()
-    vi.mocked(ipcMain.handle).mockImplementation((channel: string, handler: IpcHandler) => {
-      handlers.set(channel, handler)
-    })
-
-    // Import and call registration function
-    const module = await import('./external-file-handlers')
-    module.registerExternalFileHandlers()
+    for (const key of Object.keys(handlers)) delete handlers[key]
+    showOpenDialog.mockReset()
+    externalSourceGrants.clear()
+    base = realpathSync.native(mkdtempSync(path.join(tmpdir(), 'erfana-external-')))
+    root = path.join(base, 'proj')
+    outside = path.join(base, 'outside')
+    mkdirSync(path.join(root, 'docs'), { recursive: true })
+    mkdirSync(path.join(base, 'proj-sibling'), { recursive: true })
+    mkdirSync(path.join(outside, 'folder'), { recursive: true })
+    writeFileSync(path.join(root, 'a.md'), 'inside')
+    source = path.join(outside, 'incoming.md')
+    writeFileSync(source, 'incoming')
+    // Refusals are logged by design; keep the suite output readable
+    vi.spyOn(logger, 'error').mockImplementation(() => {})
+    vi.spyOn(logger, 'warn').mockImplementation(() => {})
+    await openTestProject(root, { ownerWebContentsId: OWNER_ID })
+    projectService = (await import('./file-handlers')).projectService
+    registerExternalFileHandlers(projectService.session)
   })
 
   afterEach(() => {
-    vi.resetModules()
+    rmSync(base, { recursive: true, force: true })
+    vi.restoreAllMocks()
+  })
+
+  describe('registration', () => {
+    it('registers all required handlers', () => {
+      for (const channel of [
+        'file:validateExternal',
+        'file:copyFromExternal',
+        'file:moveFromExternal',
+        'file:selectExternalFiles'
+      ]) {
+        expect(handlers[channel], channel).toBeDefined()
+      }
+    })
+
+    it('lists every path argument of the confined channels', () => {
+      const confined = getConfinedChannels()
+      expect([...(confined.get('file:validateExternal') ?? [])]).toEqual(['source'])
+      expect([...(confined.get('file:copyFromExternal') ?? [])].sort()).toEqual(['source', 'target'])
+      expect([...(confined.get('file:moveFromExternal') ?? [])].sort()).toEqual(['source', 'target'])
+    })
   })
 
   describe('file:validateExternal', () => {
-    it('returns validation result from service', async () => {
-      const handler = handlers.get('file:validateExternal')
-      expect(handler).toBeDefined()
-
-      const mockResponse = {
-        valid: true,
-        isSymlink: false,
-        isDirectory: false,
-        exists: true,
-        isRegularFile: true
+    it('accepts a regular file whatever project root is sent', async () => {
+      for (const lying of [root, outside, 'not-even-absolute', undefined]) {
+        const result = await invoke('file:validateExternal', source, lying)
+        expect(result).toMatchObject({ valid: true, isRegularFile: true })
       }
-      mockValidateExternalFile.mockResolvedValueOnce(mockResponse)
-
-      const result = await handler!(
-        {} as any,
-        '/external/file.md',
-        '/project'
-      )
-
-      expect(result).toEqual(mockResponse)
-      expect(mockValidateExternalFile).toHaveBeenCalledWith('/external/file.md', '/project')
     })
 
-    it('handles service errors', async () => {
-      const handler = handlers.get('file:validateExternal')
-
-      mockValidateExternalFile.mockRejectedValueOnce(new Error('Validation failed'))
-
-      const result = await handler!(
-        {} as any,
-        '/external/file.md',
-        '/project'
-      )
-
-      expect(result.valid).toBe(false)
-      expect(result.error).toBe('Validation failed')
-      expect(result.errorCode).toBe('UNKNOWN_ERROR')
+    it('rejects a folder', async () => {
+      const result = await invoke('file:validateExternal', path.join(outside, 'folder'), root)
+      expect(result).toMatchObject({
+        valid: false,
+        isDirectory: true,
+        errorCode: ErrorCode.EXTERNAL_FILE_IS_DIRECTORY
+      })
     })
 
-    it('validates input schema - rejects non-absolute paths', async () => {
-      const handler = handlers.get('file:validateExternal')
+    it('reports a missing file', async () => {
+      const result = await invoke('file:validateExternal', path.join(outside, 'gone.md'), root)
+      expect(result).toMatchObject({
+        valid: false,
+        exists: false,
+        errorCode: ErrorCode.EXTERNAL_FILE_NOT_FOUND
+      })
+    })
 
-      const result = await handler!(
-        {} as any,
-        'relative/path/file.md',
-        '/project'
-      )
-
+    it('rejects a relative path', async () => {
+      const result = await invoke('file:validateExternal', 'relative/path/file.md', root)
       expect(result.valid).toBe(false)
       expect(result.error).toContain('Path must be absolute')
       expect(result.errorCode).toBe('VALIDATION_ERROR')
-      expect(mockValidateExternalFile).not.toHaveBeenCalled()
     })
 
-    it('validates input schema - rejects empty paths', async () => {
-      const handler = handlers.get('file:validateExternal')
-
-      const result = await handler!(
-        {} as any,
-        '',
-        '/project'
-      )
-
+    it('rejects an empty path', async () => {
+      const result = await invoke('file:validateExternal', '', root)
       expect(result.valid).toBe(false)
       expect(result.errorCode).toBe('VALIDATION_ERROR')
-      expect(mockValidateExternalFile).not.toHaveBeenCalled()
     })
+
+    it.skipIf(process.platform === 'win32')(
+      'refuses a path inside the project that resolves outside it',
+      async () => {
+        symlinkSync(path.join(outside, 'incoming.md'), path.join(root, 'link.md'))
+        const result = await invoke('file:validateExternal', path.join(root, 'link.md'), root)
+        expect(result).toMatchObject({ valid: false, errorCode: ErrorCode.PATH_OUTSIDE_PROJECT })
+      }
+    )
   })
 
   describe('file:copyFromExternal', () => {
-    it('delegates to service', async () => {
-      const handler = handlers.get('file:copyFromExternal')
-      expect(handler).toBeDefined()
+    it('copies into a folder of the open project', async () => {
+      const target = path.join(root, 'docs')
+      const result = await invoke('file:copyFromExternal', source, target, root)
 
-      const mockResponse = {
-        success: true,
-        path: '/project/docs/file.md',
-        isSymlink: false
+      expect(result).toMatchObject({ success: true, path: path.join(target, 'incoming.md') })
+      expect(readFileSync(path.join(target, 'incoming.md'), 'utf8')).toBe('incoming')
+      expect(existsSync(source)).toBe(true)
+    })
+
+    it('ignores a project root that names another folder', async () => {
+      // The renderer claims the outside folder is the project: the copy still
+      // goes by the project the main process has open
+      const refused = await invoke('file:copyFromExternal', source, path.join(outside, 'folder'), outside)
+      expect(refused).toMatchObject({ success: false, errorCode: ErrorCode.PATH_OUTSIDE_PROJECT })
+      expect(listDir(path.join(outside, 'folder'))).toEqual([])
+
+      const landed = await invoke('file:copyFromExternal', source, path.join(root, 'docs'), outside)
+      expect(landed.success).toBe(true)
+      expect(listDir(path.join(root, 'docs'))).toEqual(['incoming.md'])
+    })
+
+    it('refuses a folder beside the project whose name starts like the project', async () => {
+      const result = await invoke('file:copyFromExternal', source, path.join(base, 'proj-sibling'), base)
+      expect(result).toMatchObject({ success: false, errorCode: ErrorCode.PATH_OUTSIDE_PROJECT })
+      expect(listDir(path.join(base, 'proj-sibling'))).toEqual([])
+    })
+
+    it('refuses a folder reached through ..', async () => {
+      const target = path.join(root, 'docs', '..', '..', 'outside', 'folder')
+      const result = await invoke('file:copyFromExternal', source, target, root)
+      expect(result).toMatchObject({ success: false, errorCode: ErrorCode.PATH_OUTSIDE_PROJECT })
+      expect(listDir(path.join(outside, 'folder'))).toEqual([])
+    })
+
+    it.skipIf(process.platform === 'win32')('refuses a link inside the project that leads out', async () => {
+      symlinkSync(path.join(outside, 'folder'), path.join(root, 'linked'))
+      const result = await invoke('file:copyFromExternal', source, path.join(root, 'linked'), root)
+      expect(result).toMatchObject({ success: false, errorCode: ErrorCode.PATH_OUTSIDE_PROJECT })
+      expect(listDir(path.join(outside, 'folder'))).toEqual([])
+    })
+
+    it.skipIf(process.platform === 'win32')(
+      'will not replace a name inside the project that is a link out',
+      async () => {
+        const victim = path.join(outside, 'victim.md')
+        writeFileSync(victim, 'untouched')
+        symlinkSync(victim, path.join(root, 'docs', 'incoming.md'))
+
+        const result = await invoke('file:copyFromExternal', source, path.join(root, 'docs'), root, 'replace')
+
+        expect(result.success).toBe(false)
+        expect(readFileSync(victim, 'utf8')).toBe('untouched')
       }
-      mockCopyFromExternal.mockResolvedValueOnce(mockResponse)
+    )
 
-      const result = await handler!(
-        {} as any,
-        '/external/file.md',
-        '/project/docs',
-        '/project',
-        'keepBoth'
-      )
-
-      expect(result).toEqual(mockResponse)
-      expect(mockCopyFromExternal).toHaveBeenCalledWith(
-        '/external/file.md',
-        '/project/docs',
-        '/project',
-        'keepBoth'
-      )
+    it('refuses a folder that does not exist', async () => {
+      const result = await invoke('file:copyFromExternal', source, path.join(root, 'nope'), root)
+      expect(result).toMatchObject({ success: false, errorCode: ErrorCode.EXTERNAL_FILE_NOT_FOUND })
+      expect(existsSync(path.join(root, 'nope'))).toBe(false)
     })
 
-    it('returns success response', async () => {
-      const handler = handlers.get('file:copyFromExternal')
+    it('refuses a target that is a file', async () => {
+      const result = await invoke('file:copyFromExternal', source, path.join(root, 'a.md'), root)
+      expect(result.success).toBe(false)
+      expect(readFileSync(path.join(root, 'a.md'), 'utf8')).toBe('inside')
+    })
 
-      mockCopyFromExternal.mockResolvedValueOnce({
-        success: true,
-        path: '/project/file.md',
-        isSymlink: false
-      })
+    it('refuses every target when no project is open', async () => {
+      await openTestProject(null)
+      const result = await invoke('file:copyFromExternal', source, path.join(root, 'docs'), root)
+      expect(result).toMatchObject({ success: false, errorCode: 'NO_PROJECT' })
+      expect(listDir(path.join(root, 'docs'))).toEqual([])
+    })
 
-      const result = await handler!(
-        {} as any,
-        '/external/file.md',
-        '/project',
-        '/project'
+    it('refuses a window that does not own the project', async () => {
+      const result = await handlers['file:copyFromExternal'](
+        otherEvent,
+        source,
+        path.join(root, 'docs'),
+        root
       )
+      expect(result).toMatchObject({ success: false, errorCode: 'NOT_SESSION_OWNER' })
+      expect(listDir(path.join(root, 'docs'))).toEqual([])
+    })
 
+    it('keeps both files on a name clash', async () => {
+      writeFileSync(path.join(root, 'docs', 'incoming.md'), 'old')
+      const result = await invoke('file:copyFromExternal', source, path.join(root, 'docs'), root, 'keepBoth')
+      expect(result).toMatchObject({ success: true, path: path.join(root, 'docs', 'incoming (1).md') })
+      expect(readFileSync(path.join(root, 'docs', 'incoming.md'), 'utf8')).toBe('old')
+    })
+
+    it('replaces on request', async () => {
+      writeFileSync(path.join(root, 'docs', 'incoming.md'), 'old')
+      const result = await invoke('file:copyFromExternal', source, path.join(root, 'docs'), root, 'replace')
       expect(result.success).toBe(true)
-      expect(result.path).toBe('/project/file.md')
+      expect(readFileSync(path.join(root, 'docs', 'incoming.md'), 'utf8')).toBe('incoming')
     })
 
-    it('returns error for invalid files', async () => {
-      const handler = handlers.get('file:copyFromExternal')
+    it('rejects relative paths and a bad strategy', async () => {
+      const relative = await invoke('file:copyFromExternal', source, 'relative/target', root)
+      expect(relative).toMatchObject({ success: false, errorCode: 'VALIDATION_ERROR' })
 
-      mockCopyFromExternal.mockResolvedValueOnce({
-        success: false,
-        error: 'File is a directory',
-        errorCode: ErrorCode.EXTERNAL_FILE_IS_DIRECTORY
-      })
-
-      const result = await handler!(
-        {} as any,
-        '/external/folder',
-        '/project',
-        '/project'
-      )
-
-      expect(result.success).toBe(false)
-      expect(result.error).toBe('File is a directory')
-      expect(result.errorCode).toBe(ErrorCode.EXTERNAL_FILE_IS_DIRECTORY)
+      const strategy = await invoke('file:copyFromExternal', source, path.join(root, 'docs'), root, 'overwrite')
+      expect(strategy).toMatchObject({ success: false, errorCode: 'VALIDATION_ERROR' })
     })
 
-    it('handles service errors', async () => {
-      const handler = handlers.get('file:copyFromExternal')
-
-      mockCopyFromExternal.mockRejectedValueOnce(new Error('Copy failed'))
-
-      const result = await handler!(
-        {} as any,
-        '/external/file.md',
-        '/project',
-        '/project'
-      )
-
-      expect(result.success).toBe(false)
-      expect(result.error).toBe('Copy failed')
-      expect(result.errorCode).toBe('UNKNOWN_ERROR')
-    })
-
-    it('validates input schema - rejects non-absolute paths', async () => {
-      const handler = handlers.get('file:copyFromExternal')
-
-      const result = await handler!(
-        {} as any,
-        'relative/path.md',
-        '/project',
-        '/project'
-      )
-
-      expect(result.success).toBe(false)
-      expect(result.errorCode).toBe('VALIDATION_ERROR')
-      expect(mockCopyFromExternal).not.toHaveBeenCalled()
-    })
-
-    it('validates input schema - accepts valid conflict resolution', async () => {
-      const handler = handlers.get('file:copyFromExternal')
-
-      mockCopyFromExternal.mockResolvedValueOnce({
-        success: true,
-        path: '/project/file.md'
-      })
-
-      await handler!(
-        {} as any,
-        '/external/file.md',
-        '/project',
-        '/project',
-        'replace'
-      )
-
-      expect(mockCopyFromExternal).toHaveBeenCalledWith(
-        '/external/file.md',
-        '/project',
-        '/project',
-        'replace'
-      )
-    })
-
-    it('validates input schema - rejects invalid conflict resolution', async () => {
-      const handler = handlers.get('file:copyFromExternal')
-
-      const result = await handler!(
-        {} as any,
-        '/external/file.md',
-        '/project',
-        '/project',
-        'invalid' as any
-      )
-
-      expect(result.success).toBe(false)
-      expect(result.errorCode).toBe('VALIDATION_ERROR')
-      expect(mockCopyFromExternal).not.toHaveBeenCalled()
+    it('does not need a pick to copy', async () => {
+      const result = await invoke('file:copyFromExternal', source, path.join(root, 'docs'), root)
+      expect(result.success).toBe(true)
     })
   })
 
   describe('file:moveFromExternal', () => {
-    it('delegates to service', async () => {
-      const handler = handlers.get('file:moveFromExternal')
-      expect(handler).toBeDefined()
+    it('refuses a file that was not picked and leaves both sides alone', async () => {
+      const result = await invoke('file:moveFromExternal', source, path.join(root, 'docs'), root)
 
-      const mockResponse = {
-        success: true,
-        path: '/project/docs/file.md',
-        isSymlink: false
-      }
-      mockMoveFromExternal.mockResolvedValueOnce(mockResponse)
-
-      const result = await handler!(
-        {} as any,
-        '/external/file.md',
-        '/project/docs',
-        '/project',
-        'keepBoth'
-      )
-
-      expect(result).toEqual(mockResponse)
-      expect(mockMoveFromExternal).toHaveBeenCalledWith(
-        '/external/file.md',
-        '/project/docs',
-        '/project',
-        'keepBoth'
-      )
-    })
-
-    it('returns success response', async () => {
-      const handler = handlers.get('file:moveFromExternal')
-
-      mockMoveFromExternal.mockResolvedValueOnce({
-        success: true,
-        path: '/project/file.md',
-        isSymlink: false
-      })
-
-      const result = await handler!(
-        {} as any,
-        '/external/file.md',
-        '/project',
-        '/project'
-      )
-
-      expect(result.success).toBe(true)
-      expect(result.path).toBe('/project/file.md')
-    })
-
-    it('returns error for invalid files', async () => {
-      const handler = handlers.get('file:moveFromExternal')
-
-      mockMoveFromExternal.mockResolvedValueOnce({
+      expect(result).toMatchObject({
         success: false,
-        error: 'File not found',
-        errorCode: ErrorCode.EXTERNAL_FILE_NOT_FOUND
+        errorCode: ErrorCode.EXTERNAL_FILE_MOVE_NOT_GRANTED
       })
-
-      const result = await handler!(
-        {} as any,
-        '/external/nonexistent.md',
-        '/project',
-        '/project'
-      )
-
-      expect(result.success).toBe(false)
-      expect(result.error).toBe('File not found')
-      expect(result.errorCode).toBe(ErrorCode.EXTERNAL_FILE_NOT_FOUND)
+      expect(existsSync(source)).toBe(true)
+      expect(listDir(path.join(root, 'docs'))).toEqual([])
     })
 
-    it('handles service errors', async () => {
-      const handler = handlers.get('file:moveFromExternal')
+    it('moves a file the user picked in the dialog', async () => {
+      await pick(source)
 
-      mockMoveFromExternal.mockRejectedValueOnce(new Error('Move failed'))
+      const result = await invoke('file:moveFromExternal', source, path.join(root, 'docs'), root)
 
-      const result = await handler!(
-        {} as any,
-        '/external/file.md',
-        '/project',
-        '/project'
-      )
-
-      expect(result.success).toBe(false)
-      expect(result.error).toBe('Move failed')
-      expect(result.errorCode).toBe('UNKNOWN_ERROR')
+      expect(result).toMatchObject({ success: true, path: path.join(root, 'docs', 'incoming.md') })
+      expect(existsSync(source)).toBe(false)
+      expect(readFileSync(path.join(root, 'docs', 'incoming.md'), 'utf8')).toBe('incoming')
     })
 
-    it('validates input schema - rejects non-absolute paths', async () => {
-      const handler = handlers.get('file:moveFromExternal')
+    it('uses a pick once', async () => {
+      await pick(source)
+      await invoke('file:moveFromExternal', source, path.join(root, 'docs'), root)
+      writeFileSync(source, 'again')
 
-      const result = await handler!(
-        {} as any,
-        '/external/file.md',
-        'relative/target',
-        '/project'
-      )
+      const second = await invoke('file:moveFromExternal', source, path.join(root, 'docs'), root)
 
-      expect(result.success).toBe(false)
-      expect(result.errorCode).toBe('VALIDATION_ERROR')
-      expect(mockMoveFromExternal).not.toHaveBeenCalled()
+      expect(second.errorCode).toBe(ErrorCode.EXTERNAL_FILE_MOVE_NOT_GRANTED)
+      expect(readFileSync(source, 'utf8')).toBe('again')
+    })
+
+    it('does not move another file than the one picked', async () => {
+      const other = path.join(outside, 'other.md')
+      writeFileSync(other, 'other')
+      await pick(source)
+
+      const result = await invoke('file:moveFromExternal', other, path.join(root, 'docs'), root)
+
+      expect(result.errorCode).toBe(ErrorCode.EXTERNAL_FILE_MOVE_NOT_GRANTED)
+      expect(existsSync(other)).toBe(true)
+    })
+
+    it('does not move a picked file into a folder outside the project', async () => {
+      await pick(source)
+
+      const result = await invoke('file:moveFromExternal', source, path.join(outside, 'folder'), outside)
+
+      expect(result).toMatchObject({ success: false, errorCode: ErrorCode.PATH_OUTSIDE_PROJECT })
+      expect(existsSync(source)).toBe(true)
+      expect(listDir(path.join(outside, 'folder'))).toEqual([])
+    })
+
+    it('does not honour a pick made by another window', async () => {
+      showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: [source] })
+      await handlers['file:selectExternalFiles'](otherEvent)
+
+      const result = await invoke('file:moveFromExternal', source, path.join(root, 'docs'), root)
+
+      expect(result.errorCode).toBe(ErrorCode.EXTERNAL_FILE_MOVE_NOT_GRANTED)
+      expect(existsSync(source)).toBe(true)
+    })
+
+    it('does not honour a lapsed pick', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] })
+      try {
+        await pick(source)
+        vi.setSystemTime(Date.now() + 60 * 60 * 1000)
+
+        const result = await invoke('file:moveFromExternal', source, path.join(root, 'docs'), root)
+
+        expect(result.errorCode).toBe(ErrorCode.EXTERNAL_FILE_MOVE_NOT_GRANTED)
+        expect(existsSync(source)).toBe(true)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('rejects relative paths', async () => {
+      const result = await invoke('file:moveFromExternal', source, 'relative/target', root)
+      expect(result).toMatchObject({ success: false, errorCode: 'VALIDATION_ERROR' })
     })
   })
 
   describe('file:selectExternalFiles', () => {
-    it('opens dialog and returns file paths', async () => {
-      const handler = handlers.get('file:selectExternalFiles')
-      expect(handler).toBeDefined()
+    it('opens the dialog and returns file paths', async () => {
+      showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: [source] })
 
-      ;(dialog.showOpenDialog as any).mockResolvedValueOnce({
-        canceled: false,
-        filePaths: ['/external/file1.md', '/external/file2.md']
-      })
+      const result = await invoke('file:selectExternalFiles')
 
-      const result = await handler!({} as any)
-
-      expect(result).toEqual({
-        paths: ['/external/file1.md', '/external/file2.md']
-      })
-      expect(dialog.showOpenDialog).toHaveBeenCalledWith({
-        properties: ['openFile', 'multiSelections'],
-        title: 'Select files to add',
-        buttonLabel: 'Add to project'
-      })
+      expect(result).toEqual({ paths: [source] })
+      expect(showOpenDialog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          properties: ['openFile', 'multiSelections'],
+          title: 'Select files to add',
+          buttonLabel: 'Add to project'
+        })
+      )
     })
 
     it('returns null when cancelled', async () => {
-      const handler = handlers.get('file:selectExternalFiles')
-
-      ;(dialog.showOpenDialog as any).mockResolvedValueOnce({
-        canceled: true,
-        filePaths: []
-      })
-
-      const result = await handler!({} as any)
-
-      expect(result).toBeNull()
+      showOpenDialog.mockResolvedValueOnce({ canceled: true, filePaths: [] })
+      expect(await invoke('file:selectExternalFiles')).toBeNull()
     })
 
     it('returns null when no files selected', async () => {
-      const handler = handlers.get('file:selectExternalFiles')
+      showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: [] })
+      expect(await invoke('file:selectExternalFiles')).toBeNull()
+    })
 
-      ;(dialog.showOpenDialog as any).mockResolvedValueOnce({
-        canceled: false,
-        filePaths: []
-      })
+    it('records nothing when cancelled', async () => {
+      showOpenDialog.mockResolvedValueOnce({ canceled: true, filePaths: [source] })
+      await invoke('file:selectExternalFiles')
 
-      const result = await handler!({} as any)
-
-      expect(result).toBeNull()
+      expect(externalSourceGrants.consume(OWNER_ID, source)).toBe(false)
     })
 
     it('handles dialog errors', async () => {
-      const handler = handlers.get('file:selectExternalFiles')
-
-      ;(dialog.showOpenDialog as any).mockRejectedValueOnce(new Error('Dialog error'))
-
-      await expect(handler!({} as any)).rejects.toThrow('Failed to open file picker')
-    })
-  })
-
-  describe('handler registration', () => {
-    it('registers all required handlers', () => {
-      expect(handlers.has('file:validateExternal')).toBe(true)
-      expect(handlers.has('file:copyFromExternal')).toBe(true)
-      expect(handlers.has('file:moveFromExternal')).toBe(true)
-      expect(handlers.has('file:selectExternalFiles')).toBe(true)
-    })
-
-    it('registers handlers once', () => {
-      const handleCallCount = (ipcMain.handle as any).mock.calls.length
-      expect(handleCallCount).toBeGreaterThanOrEqual(4)
+      showOpenDialog.mockRejectedValueOnce(new Error('Dialog error'))
+      await expect(invoke('file:selectExternalFiles')).rejects.toThrow('Failed to open file picker')
     })
   })
 })

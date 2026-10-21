@@ -9,19 +9,22 @@
  * - M2: Uses fs.realpath() to resolve symlink targets before validation
  * - M3: Blocks symlinks pointing to system directories via isSystemDirectory()
  * - M4: Composes with FileService instead of duplicating operations
- * - M5: Uses path.relative() for project boundary check to prevent prefix attacks
+ * - M5: The target folder is resolved against the open project by the IPC layer (confinement);
+ *       this service acts on the checked path it is handed
  * - M6: Error handling for source file deletion during operations
  * - S1: Null byte and Unicode normalization in filename sanitization
  * - S4: Filters special files (devices, pipes, sockets), not just directories
  */
 
-import { basename, extname, join, relative, normalize, isAbsolute } from 'path'
+import { basename, extname, isAbsolute } from 'path'
 import { lstat, realpath, copyFile, rm, access, constants } from 'fs/promises'
 import type { Stats } from 'fs'
 import { validateSymlink, isSystemDirectory } from '../utils/pathSecurity'
-import { AppError, ErrorCode } from '../../shared/errors'
+import { AppError, ErrorCode, ERROR_MESSAGES } from '../../shared/errors'
 import { logger } from './LoggingService'
 import { redactPath, redactedLogError } from '../utils/redactUserInput'
+import { childPath } from '../utils/childPath'
+import { externalSourceGrants as defaultGrants, type ExternalSourceGrants } from './ExternalSourceGrants'
 import type { IFileService } from '../interfaces/IFileService'
 import { fileService as defaultFileService } from './FileService'
 import type {
@@ -40,6 +43,17 @@ function redactedMessage(error: unknown): string {
 const MAX_COPY_ATTEMPTS = 1000
 
 /**
+ * A target folder the IPC layer has already checked against the open project.
+ * The service acts on `real` and hands paths built from `requested` back.
+ */
+export interface ExternalTarget {
+  /** Canonical folder the file is written into */
+  real: string
+  /** The folder as the caller wrote it; returned paths are built from it */
+  requested: string
+}
+
+/**
  * Interface for ExternalFileService operations
  */
 export interface IExternalFileService {
@@ -47,10 +61,7 @@ export interface IExternalFileService {
    * Validate an external file for import into project
    * Performs security checks before copy/move
    */
-  validateExternalFile(
-    sourcePath: string,
-    projectRoot: string
-  ): Promise<ExternalFileValidateResponse>
+  validateExternalFile(sourcePath: string): Promise<ExternalFileValidateResponse>
 
   /**
    * Copy an external file into the project
@@ -58,19 +69,18 @@ export interface IExternalFileService {
    */
   copyFromExternal(
     sourcePath: string,
-    targetFolder: string,
-    projectRoot: string,
+    target: ExternalTarget,
     conflictResolution?: ConflictResolution
   ): Promise<ExternalFileCopyResponse>
 
   /**
    * Move an external file into the project
-   * Validates first, copies, then deletes source
+   * Needs a grant from the picker for `sourcePath`; validates, copies, then deletes source
    */
   moveFromExternal(
     sourcePath: string,
-    targetFolder: string,
-    projectRoot: string,
+    target: ExternalTarget,
+    senderId: number | null,
     conflictResolution?: ConflictResolution
   ): Promise<ExternalFileMoveResponse>
 }
@@ -80,10 +90,12 @@ export interface IExternalFileService {
  */
 export class ExternalFileService implements IExternalFileService {
   private fileService: IFileService
+  private grants: ExternalSourceGrants
 
-  constructor(fileService?: IFileService) {
+  constructor(fileService?: IFileService, grants?: ExternalSourceGrants) {
     // M4: Compose with FileService for file operations
     this.fileService = fileService || defaultFileService
+    this.grants = grants || defaultGrants
   }
 
   /**
@@ -94,15 +106,11 @@ export class ExternalFileService implements IExternalFileService {
    * 2. Source is not a directory
    * 3. Source is a regular file (not device, pipe, socket)
    * 4. If symlink, target is not a system directory
-   * 5. Target folder is within project boundary
    */
-  async validateExternalFile(
-    sourcePath: string,
-    projectRoot: string
-  ): Promise<ExternalFileValidateResponse> {
-    logger.debug('Validating external file', { sourcePath: redactPath(sourcePath), projectRoot: redactPath(projectRoot) })
+  async validateExternalFile(sourcePath: string): Promise<ExternalFileValidateResponse> {
+    logger.debug('Validating external file', { sourcePath: redactPath(sourcePath) })
 
-    // Validate inputs are absolute paths
+    // Validate input is an absolute path
     if (!isAbsolute(sourcePath)) {
       return {
         valid: false,
@@ -111,18 +119,6 @@ export class ExternalFileService implements IExternalFileService {
         exists: false,
         isRegularFile: false,
         error: 'Source path must be absolute',
-        errorCode: ErrorCode.PATH_NOT_ABSOLUTE
-      }
-    }
-
-    if (!isAbsolute(projectRoot)) {
-      return {
-        valid: false,
-        isSymlink: false,
-        isDirectory: false,
-        exists: false,
-        isRegularFile: false,
-        error: 'Project root must be absolute',
         errorCode: ErrorCode.PATH_NOT_ABSOLUTE
       }
     }
@@ -253,14 +249,13 @@ export class ExternalFileService implements IExternalFileService {
    */
   async copyFromExternal(
     sourcePath: string,
-    targetFolder: string,
-    projectRoot: string,
+    target: ExternalTarget,
     conflictResolution?: ConflictResolution
   ): Promise<ExternalFileCopyResponse> {
-    logger.info('Copying external file', { sourcePath: redactPath(sourcePath), targetFolder: redactPath(targetFolder), conflictResolution })
+    logger.info('Copying external file', { sourcePath: redactPath(sourcePath), targetFolder: redactPath(target.requested), conflictResolution })
 
     // Validate the external file first
-    const validation = await this.validateExternalFile(sourcePath, projectRoot)
+    const validation = await this.validateExternalFile(sourcePath)
     if (!validation.valid) {
       return {
         success: false,
@@ -270,27 +265,19 @@ export class ExternalFileService implements IExternalFileService {
       }
     }
 
-    // M5: Validate target folder is within project boundary
-    if (!this.isWithinProject(targetFolder, projectRoot)) {
-      logger.warn('Target folder outside project boundary', { targetFolder: redactPath(targetFolder), projectRoot: redactPath(projectRoot) })
-      return {
-        success: false,
-        error: 'Target folder is outside project',
-        errorCode: ErrorCode.PATH_OUTSIDE_PROJECT
-      }
-    }
-
     try {
       // S1: Sanitize the filename
       const originalName = basename(sourcePath)
       const sanitizedName = this.sanitizeFileName(originalName)
 
       // Handle conflicts based on resolution strategy
-      const targetPath = await this.resolveTargetPath(
-        targetFolder,
+      const targetName = await this.resolveTargetName(
+        target.real,
         sanitizedName,
         conflictResolution
       )
+      const targetPath = childPath(target.real, targetName)
+      const resultPath = childPath(target.requested, targetName)
 
       // M6: Verify source still exists before copy (race condition check)
       try {
@@ -305,24 +292,24 @@ export class ExternalFileService implements IExternalFileService {
       }
 
       // Perform the copy
-      await copyFile(sourcePath, targetPath)
+      await this.copyInto(sourcePath, targetPath, conflictResolution)
 
       logger.info('External file copied successfully', {
         sourcePath: redactPath(sourcePath),
-        targetPath: redactPath(targetPath),
+        targetPath: redactPath(resultPath),
         isSymlink: validation.isSymlink
       })
 
       return {
         success: true,
-        path: targetPath,
+        path: resultPath,
         isSymlink: validation.isSymlink
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       logger.error('Failed to copy external file', redactedLogError(error), {
         sourcePath: redactPath(sourcePath),
-        targetFolder: redactPath(targetFolder)
+        targetFolder: redactPath(target.requested)
       })
       return {
         success: false,
@@ -338,14 +325,14 @@ export class ExternalFileService implements IExternalFileService {
    */
   async moveFromExternal(
     sourcePath: string,
-    targetFolder: string,
-    projectRoot: string,
+    target: ExternalTarget,
+    senderId: number | null,
     conflictResolution?: ConflictResolution
   ): Promise<ExternalFileMoveResponse> {
-    logger.info('Moving external file', { sourcePath: redactPath(sourcePath), targetFolder: redactPath(targetFolder), conflictResolution })
+    logger.info('Moving external file', { sourcePath: redactPath(sourcePath), targetFolder: redactPath(target.requested), conflictResolution })
 
     // Validate the external file first
-    const validation = await this.validateExternalFile(sourcePath, projectRoot)
+    const validation = await this.validateExternalFile(sourcePath)
     if (!validation.valid) {
       return {
         success: false,
@@ -355,13 +342,14 @@ export class ExternalFileService implements IExternalFileService {
       }
     }
 
-    // M5: Validate target folder is within project boundary
-    if (!this.isWithinProject(targetFolder, projectRoot)) {
-      logger.warn('Target folder outside project boundary', { targetFolder: redactPath(targetFolder), projectRoot: redactPath(projectRoot) })
+    // The original is deleted below, so the move needs the record the picker made
+    if (!this.grants.consume(senderId, sourcePath)) {
+      logger.warn('Move refused: source was not picked with the dialog', { sourcePath: redactPath(sourcePath) })
       return {
         success: false,
-        error: 'Target folder is outside project',
-        errorCode: ErrorCode.PATH_OUTSIDE_PROJECT
+        isSymlink: validation.isSymlink,
+        error: ERROR_MESSAGES[ErrorCode.EXTERNAL_FILE_MOVE_NOT_GRANTED],
+        errorCode: ErrorCode.EXTERNAL_FILE_MOVE_NOT_GRANTED
       }
     }
 
@@ -371,11 +359,13 @@ export class ExternalFileService implements IExternalFileService {
       const sanitizedName = this.sanitizeFileName(originalName)
 
       // Handle conflicts based on resolution strategy
-      const targetPath = await this.resolveTargetPath(
-        targetFolder,
+      const targetName = await this.resolveTargetName(
+        target.real,
         sanitizedName,
         conflictResolution
       )
+      const targetPath = childPath(target.real, targetName)
+      const resultPath = childPath(target.requested, targetName)
 
       // M6: Verify source still exists before copy (race condition check)
       try {
@@ -390,7 +380,7 @@ export class ExternalFileService implements IExternalFileService {
       }
 
       // Copy the file first
-      await copyFile(sourcePath, targetPath)
+      await this.copyInto(sourcePath, targetPath, conflictResolution)
 
       // M6: Try to delete source, but don't fail if it's already gone
       try {
@@ -413,20 +403,20 @@ export class ExternalFileService implements IExternalFileService {
 
       logger.info('External file moved successfully', {
         sourcePath: redactPath(sourcePath),
-        targetPath: redactPath(targetPath),
+        targetPath: redactPath(resultPath),
         isSymlink: validation.isSymlink
       })
 
       return {
         success: true,
-        path: targetPath,
+        path: resultPath,
         isSymlink: validation.isSymlink
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       logger.error('Failed to move external file', redactedLogError(error), {
         sourcePath: redactPath(sourcePath),
-        targetFolder: redactPath(targetFolder)
+        targetFolder: redactPath(target.requested)
       })
       return {
         success: false,
@@ -524,56 +514,57 @@ export class ExternalFileService implements IExternalFileService {
   }
 
   /**
-   * Check if a path is within the project boundary
-   *
-   * M5: Uses path.relative() to prevent prefix attacks
-   * e.g., /project-evil could match /project prefix check
+   * Write the copy. A new name is created exclusively; replacing a name that is
+   * a link is refused, since the write would follow the link out of the folder.
    */
-  private isWithinProject(targetPath: string, projectRoot: string): boolean {
-    const normalizedTarget = normalize(targetPath)
-    const normalizedRoot = normalize(projectRoot)
-
-    // Use relative path to check containment
-    const relativePath = relative(normalizedRoot, normalizedTarget)
-
-    // If relative path starts with '..' or is absolute, target is outside project
-    if (relativePath.startsWith('..') || isAbsolute(relativePath)) {
-      return false
+  private async copyInto(
+    sourcePath: string,
+    targetPath: string,
+    conflictResolution?: ConflictResolution
+  ): Promise<void> {
+    if (conflictResolution === 'replace') {
+      let existing: Stats | null = null
+      try {
+        existing = await lstat(targetPath)
+      } catch {
+        existing = null
+      }
+      if (existing?.isSymbolicLink()) {
+        throw new AppError(
+          'Cannot replace a link; remove it first',
+          ErrorCode.PATH_OUTSIDE_PROJECT
+        )
+      }
+      await copyFile(sourcePath, targetPath)
+      return
     }
-
-    return true
+    await copyFile(sourcePath, targetPath, constants.COPYFILE_EXCL)
   }
 
   /**
-   * Resolve target path based on conflict resolution strategy
+   * Resolve the name the copy gets, based on conflict resolution strategy
    */
-  private async resolveTargetPath(
+  private async resolveTargetName(
     targetFolder: string,
     fileName: string,
     conflictResolution?: ConflictResolution
   ): Promise<string> {
-    const targetPath = join(targetFolder, fileName)
-
     // Check if conflict exists
     const hasConflict = await this.fileService.checkNameConflict(targetFolder, fileName)
 
-    if (!hasConflict) {
-      return targetPath
-    }
-
-    if (conflictResolution === 'replace') {
-      // Caller will handle replacement
-      return targetPath
+    if (!hasConflict || conflictResolution === 'replace') {
+      // For 'replace' the caller overwrites the existing file
+      return fileName
     }
 
     // Default to keepBoth: generate unique name with (1), (2), etc.
     const ext = extname(fileName)
     const nameWithoutExt = ext ? fileName.slice(0, -ext.length) : fileName
     let copyNumber = 1
-    let newPath = targetPath
+    let newName = fileName
 
-    while (await this.fileService.checkNameConflict(targetFolder, basename(newPath))) {
-      newPath = join(targetFolder, `${nameWithoutExt} (${copyNumber})${ext}`)
+    while (await this.fileService.checkNameConflict(targetFolder, newName)) {
+      newName = `${nameWithoutExt} (${copyNumber})${ext}`
       copyNumber++
 
       // Safety limit
@@ -585,7 +576,7 @@ export class ExternalFileService implements IExternalFileService {
       }
     }
 
-    return newPath
+    return newName
   }
 }
 
@@ -593,8 +584,11 @@ export class ExternalFileService implements IExternalFileService {
  * Factory function to create ExternalFileService instance
  * Enables dependency injection and testing
  */
-export function createExternalFileService(fileService?: IFileService): IExternalFileService {
-  return new ExternalFileService(fileService)
+export function createExternalFileService(
+  fileService?: IFileService,
+  grants?: ExternalSourceGrants
+): IExternalFileService {
+  return new ExternalFileService(fileService, grants)
 }
 
 // Singleton instance for backward compatibility
