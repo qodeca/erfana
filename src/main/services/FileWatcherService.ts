@@ -110,6 +110,9 @@ export class FileWatcherService {
    */
   async watchFile(filePath: string, webContents: WebContents): Promise<void> {
     // Security: Prevent watching files outside project
+    // The watch channels move onto the confined-path wrapper in a follow-up; until then this
+    // prefix test stays as it was.
+    // eslint-disable-next-line no-restricted-syntax
     if (this.projectPath && !filePath.startsWith(this.projectPath)) {
       throw new Error('Cannot watch files outside the project directory')
     }

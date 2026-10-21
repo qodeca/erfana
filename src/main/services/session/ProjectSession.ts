@@ -15,6 +15,7 @@
 import { parse, sep } from 'path'
 import { logger } from '../LoggingService'
 import { redactedLogError } from '../../utils/redactUserInput'
+import { ConfinementError, type ConfinementErrorCode } from '../../ipc/confinement/ConfinementError'
 
 export interface ProjectSessionSnapshot {
   /** +1 on every commit, open or close */
@@ -42,17 +43,8 @@ export interface ProjectSession {
   onChange(listener: ProjectSessionListener): () => void
 }
 
-export type ConfinementErrorCode = 'NO_PROJECT'
-
-export class ConfinementError extends Error {
-  constructor(
-    readonly code: ConfinementErrorCode,
-    message: string
-  ) {
-    super(message)
-    this.name = 'ConfinementError'
-  }
-}
+// The error lives with the path checker; re-exported so existing imports keep working
+export { ConfinementError, type ConfinementErrorCode }
 
 const WIN_UNC_EXTENDED_PREFIX = '\\\\?\\UNC\\'
 const WIN_EXTENDED_PREFIX = '\\\\?\\'
