@@ -20,12 +20,22 @@ vi.mock('child_process', () => ({
 // Mock fs/promises before importing DependencyDetector
 vi.mock('fs/promises', () => ({
   access: vi.fn(),
+  realpath: vi.fn(async (p: string) => p),
   constants: { X_OK: 1, F_OK: 0 }
 }))
+
+// The absolute `which` / `where.exe` lookup: every bare name resolves to /usr/bin/<name>
+const mockFindOnPath = vi.hoisted(() => vi.fn(async (name: string) => [`/usr/bin/${name}`]))
+vi.mock('../../utils/hardenedGit', () => ({ findOnPath: mockFindOnPath }))
 
 import { execFile } from 'child_process'
 import { access } from 'fs/promises'
 import { DependencyDetector } from './DependencyDetector'
+
+/** The absolute path the fake PATH lookup resolves `name` to. */
+const BIN = (name: string): string => `/usr/bin/${name}`
+/** The bare name an absolute probe path stands for. */
+const bare = (command: string): string => command.replace(/^\/usr\/bin\//, '')
 
 const mockedExecFile = vi.mocked(execFile)
 const mockedAccess = vi.mocked(access)
@@ -35,7 +45,7 @@ function setupExecFileMock(config: Record<string, boolean>): void {
   mockedExecFile.mockImplementation(
     (command: string, _args: unknown, _options: unknown, callback: unknown) => {
       const cb = callback as (error: Error | null) => void
-      const shouldSucceed = config[command] ?? false
+      const shouldSucceed = config[bare(command)] ?? false
       if (shouldSucceed) {
         cb(null)
       } else {
@@ -147,7 +157,7 @@ describe('DependencyDetector', () => {
       mockedExecFile.mockImplementation(
         (command: string, _args: unknown, _options: unknown, callback: unknown) => {
           const cb = callback as (error: Error | null) => void
-          if (command === 'magick') {
+          if (command === BIN('magick')) {
             cb(null)
           } else {
             const err = new Error('ENOENT')
@@ -237,7 +247,7 @@ describe('DependencyDetector', () => {
       mockedExecFile.mockImplementation(
         (command: string, _args: unknown, _options: unknown, callback: unknown) => {
           const cb = callback as (error: Error | null) => void
-          if (command === 'soffice') {
+          if (command === BIN('soffice')) {
             const err = new Error('Command failed with exit code 1')
             cb(err)
           } else {
@@ -455,7 +465,7 @@ describe('DependencyDetector', () => {
       mockedExecFile.mockImplementation(
         (command: string, _args: unknown, _options: unknown, callback: unknown) => {
           const cb = callback as (error: Error | null) => void
-          if (command === PF_GIT || command === 'magick') {
+          if (command === PF_GIT || command === BIN('magick')) {
             cb(null)
           } else {
             const err = new Error('ENOENT')
@@ -485,7 +495,7 @@ describe('DependencyDetector', () => {
       mockedExecFile.mockImplementation(
         (command: string, _args: unknown, _options: unknown, callback: unknown) => {
           const cb = callback as (error: Error | null) => void
-          if (command === 'magick') {
+          if (command === BIN('magick')) {
             cb(null)
           } else {
             // soffice on PATH and BOTH PF candidates fail liveness.
@@ -507,7 +517,7 @@ describe('DependencyDetector', () => {
       mockedExecFile.mockImplementation(
         (command: string, _args: unknown, _options: unknown, callback: unknown) => {
           const cb = callback as (error: Error | null) => void
-          if (command === PFx86_GIT || command === 'magick') {
+          if (command === PFx86_GIT || command === BIN('magick')) {
             cb(null)
           } else {
             cb(new Error('ENOENT'))
@@ -555,6 +565,100 @@ describe('DependencyDetector', () => {
       // execFile should have been called for `soffice` but not for any `C:\` path.
       const calledCommands = mockedExecFile.mock.calls.map((c) => c[0] as string)
       expect(calledCommands.some((cmd) => cmd.startsWith('C:\\'))).toBe(false)
+    })
+  })
+
+  // --------------------------------------------------------------------------
+  // Safe PATH lookup (#250): never run a bare name, a relative hit, or a
+  // binary inside the open project
+  // --------------------------------------------------------------------------
+
+  describe('safe PATH lookup (#250)', () => {
+    beforeEach(() => {
+      Object.defineProperty(process, 'platform', { value: 'linux', configurable: true })
+    })
+
+    it('runs only the absolute path the finder returned, from a cwd outside the project', async () => {
+      setupExecFileMock({ soffice: true, magick: true })
+
+      await detector.detect()
+
+      const commands = mockedExecFile.mock.calls.map((c) => c[0] as string)
+      expect(commands).toEqual(expect.arrayContaining([BIN('soffice'), BIN('magick')]))
+      expect(commands.every((c) => c.startsWith('/'))).toBe(true)
+      for (const call of mockedExecFile.mock.calls) {
+        const options = call[2] as { cwd?: string }
+        expect(options.cwd).toBeTruthy()
+      }
+    })
+
+    it('ignores a relative finder hit (PATH entry ".")', async () => {
+      mockFindOnPath.mockImplementation(async (name: string) => [`./${name}`])
+      setupExecFileMock({ soffice: true, magick: true, convert: true })
+
+      const result = await detector.detect()
+
+      expect(result).toEqual({ libreOffice: false, imageMagick: false })
+      expect(mockedExecFile).not.toHaveBeenCalled()
+      mockFindOnPath.mockImplementation(async (name: string) => [BIN(name)])
+    })
+
+    it('never runs a binary that PATH resolves inside the open project', async () => {
+      mockFindOnPath.mockImplementation(async (name: string) => [`/work/repo/bin/${name}`])
+      mockedExecFile.mockImplementation(
+        (_command: string, _args: unknown, _options: unknown, callback: unknown) => {
+          ;(callback as (error: Error | null) => void)(null)
+          return { on: vi.fn() } as unknown as ChildProcess
+        }
+      )
+      const guarded = new DependencyDetector({ untrustedRoots: () => ['/work/repo', null] })
+
+      const result = await guarded.detect()
+
+      expect(result).toEqual({ libreOffice: false, imageMagick: false })
+      expect(mockedExecFile).not.toHaveBeenCalled()
+      mockFindOnPath.mockImplementation(async (name: string) => [BIN(name)])
+    })
+
+    it('rejects a PATH symlink whose real path lies inside the project', async () => {
+      const { realpath } = await import('fs/promises')
+      vi.mocked(realpath).mockImplementation((async (p: string) =>
+        p === BIN('magick') ? '/work/repo/evil/magick' : p) as unknown as typeof realpath)
+      setupExecFileMock({ magick: true, convert: true })
+      const guarded = new DependencyDetector({ untrustedRoots: () => ['/work/repo'] })
+
+      const result = await guarded.detect()
+
+      expect(result.imageMagick).toBe(true) // via convert, not the planted magick
+      const commands = mockedExecFile.mock.calls.map((c) => c[0] as string)
+      expect(commands).not.toContain(BIN('magick'))
+      vi.mocked(realpath).mockImplementation((async (p: string) => p) as unknown as typeof realpath)
+    })
+
+    it('does not treat a sibling folder that shares the project name as inside it', async () => {
+      mockFindOnPath.mockImplementation(async (name: string) => [`/work/repo-tools/${name}`])
+      mockedExecFile.mockImplementation(
+        (_command: string, _args: unknown, _options: unknown, callback: unknown) => {
+          ;(callback as (error: Error | null) => void)(null)
+          return { on: vi.fn() } as unknown as ChildProcess
+        }
+      )
+      const guarded = new DependencyDetector({ untrustedRoots: () => ['/work/repo'] })
+
+      const result = await guarded.detect()
+
+      expect(result).toEqual({ libreOffice: true, imageMagick: true })
+      mockFindOnPath.mockImplementation(async (name: string) => [BIN(name)])
+    })
+
+    it('returns false when the finder fails (name not on PATH)', async () => {
+      mockFindOnPath.mockRejectedValue(new Error('which: exit 1'))
+
+      const result = await detector.detect()
+
+      expect(result).toEqual({ libreOffice: false, imageMagick: false })
+      expect(mockedExecFile).not.toHaveBeenCalled()
+      mockFindOnPath.mockImplementation(async (name: string) => [BIN(name)])
     })
   })
 })

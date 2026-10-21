@@ -70,7 +70,7 @@ Project-specific terminology used in Erfana documentation and code.
 | **BrowserLaunchService** | `src/main/services/browserLaunch/` – opens a project `.html` / `.htm` file in the default browser after seven ordered checks; never rejects, answers with an `OPEN_IN_BROWSER_*` code (#124) |
 | **editorSaveRegistry** | `src/renderer/src/services/editorSaveRegistry.ts` – saves an editor tab by panel id, so a preview tab move can save another tab's edits; editors register through `useEditorSaveRegistration`. An unregistered id answers `false` (#124) |
 | **stablePathDigest** | `src/shared/stablePathDigest.ts` – 16-hex FNV-1a digest of a path, shared by main and renderer, for over-long panel ids and log lines. Not cryptographic (#124) |
-| **DependencyDetector** | Async detection of optional system tools (LibreOffice, ImageMagick) with 5s timeout and session caching |
+| **DependencyDetector** | Async detection of optional system tools (LibreOffice, ImageMagick) with 5s timeout and session caching; Settings → Import tools shows the result and its "Check again" clears the cache without a restart (#250) |
 
 ## State Management
 

@@ -419,7 +419,16 @@ export const DOCUMENT_IMPORT = {
     'xls', 'xlsx', 'xlsm', 'ods'
   ] as const,
   /** Image extensions that require ImageMagick for conversion */
-  IMAGEMAGICK_EXTENSIONS: ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'tiff', 'tif', 'webp'] as const
+  IMAGEMAGICK_EXTENSIONS: ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'tiff', 'tif', 'webp'] as const,
+  /**
+   * Shortest gap between two "Check again" probes of the import tools (#250).
+   * A recheck inside the window returns the current result without spawning
+   * anything, so a held key or a scripted loop cannot fork probes repeatedly.
+   */
+  TOOL_RECHECK_MIN_INTERVAL_MS: 3000,
+  /** Official download pages, opened through the `shell:openExternal` allowlist (#250) */
+  LIBREOFFICE_DOWNLOAD_URL: 'https://www.libreoffice.org/download/',
+  IMAGEMAGICK_DOWNLOAD_URL: 'https://imagemagick.org/script/download.php'
 } as const
 
 /**

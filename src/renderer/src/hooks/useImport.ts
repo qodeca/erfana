@@ -208,9 +208,7 @@ export function useImport(): UseImportReturn {
       const needsLibreOffice = (DOCUMENT_IMPORT.LIBREOFFICE_EXTENSIONS as readonly string[]).includes(ext)
       await showAlert({
         title: needsLibreOffice ? 'LibreOffice required' : 'ImageMagick required',
-        message: needsLibreOffice
-          ? `Importing .${ext} files requires LibreOffice.\n\nInstall LibreOffice from https://www.libreoffice.org/download and restart the application.`
-          : `Importing .${ext} files requires ImageMagick.\n\nInstall via Homebrew: brew install imagemagick\nor download from https://imagemagick.org/script/download.php`
+        message: missingToolMessage(needsLibreOffice ? 'LibreOffice' : 'ImageMagick', ext)
       })
       filesToProcess = filesToProcess.filter(f => !missingDepFiles.includes(f))
       if (filesToProcess.length === 0) {
@@ -380,7 +378,7 @@ export function useImport(): UseImportReturn {
     if ((DOCUMENT_IMPORT.LIBREOFFICE_EXTENSIONS as readonly string[]).includes(ext) && !depState.hasLibreOffice) {
       await showAlert({
         title: 'LibreOffice required',
-        message: `Importing .${ext} files requires LibreOffice.\n\nInstall LibreOffice from https://www.libreoffice.org/download and restart the application.`
+        message: missingToolMessage('LibreOffice', ext)
       })
       return null
     }
@@ -388,7 +386,7 @@ export function useImport(): UseImportReturn {
     if ((DOCUMENT_IMPORT.IMAGEMAGICK_EXTENSIONS as readonly string[]).includes(ext) && !depState.hasImageMagick) {
       await showAlert({
         title: 'ImageMagick required',
-        message: `Importing .${ext} files requires ImageMagick.\n\nInstall via Homebrew: brew install imagemagick\nor download from https://imagemagick.org/script/download.php`
+        message: missingToolMessage('ImageMagick', ext)
       })
       return null
     }
@@ -412,6 +410,18 @@ export function useImport(): UseImportReturn {
     importFile,
     processFiles
   }
+}
+
+/**
+ * The refusal shown when a file needs a tool that was not found (#250). It
+ * points at Settings → Import tools, which has the install hint for this
+ * platform and a "Check again" that needs no restart.
+ */
+export function missingToolMessage(tool: 'LibreOffice' | 'ImageMagick', ext: string): string {
+  return (
+    `Importing .${ext} files needs ${tool}, which was not found on this computer.\n\n` +
+    `Settings → Import tools shows how to install it. After installing, choose Check again there – no restart needed.`
+  )
 }
 
 /**

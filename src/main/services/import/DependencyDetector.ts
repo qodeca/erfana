@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { execFile } from 'child_process'
-import { access, constants } from 'fs/promises'
+import { access, constants, realpath } from 'fs/promises'
+import { tmpdir } from 'os'
+import { posix, win32 } from 'path'
+import { findOnPath } from '../../utils/hardenedGit'
+import { isInsideRoot, normaliseResolved } from '../../utils/pathCompare'
 import type { DependencyStatus } from './types'
 
 /** Timeout for each dependency check command (ms) */
@@ -21,6 +25,24 @@ const WIN32_LIBREOFFICE_PATHS = [
   'C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe',
 ]
 
+/** Looks a bare command name up on PATH and returns the hits it printed. */
+export type PathFinder = (name: string, timeout: number) => Promise<string[]>
+
+/** Construction options – both exist so tests and callers can narrow the lookup. */
+export interface DependencyDetectorOptions {
+  /**
+   * PATH lookup. Defaults to the absolute `which` / `where.exe` from
+   * `hardenedGit`, run from a safe cwd, so a binary planted in the current
+   * directory can never answer it.
+   */
+  findOnPath?: PathFinder
+  /**
+   * Folders whose binaries must never be run – the open project, which the
+   * user (or a cloned repository) controls. Evaluated on every detection.
+   */
+  untrustedRoots?: () => ReadonlyArray<string | null | undefined>
+}
+
 /**
  * Dependency detector service
  *
@@ -33,12 +55,23 @@ const WIN32_LIBREOFFICE_PATHS = [
  * - Timeout: 5s per command to prevent hangs
  * - Caching: single detection per session, concurrent calls share one promise
  * - Graceful: missing tools or errors result in false, never thrown errors
+ * - Safe lookup: a bare name is resolved to an ABSOLUTE path first, through the
+ *   absolute `which` / `where.exe`; relative hits and hits inside an untrusted
+ *   root (the open project) are dropped, and the probe runs from `os.tmpdir()`.
+ *   Spawning a bare name would let Windows search the current directory first.
  *
  * @see Issue #132 – LiteParse document import
  */
 export class DependencyDetector {
   private cachedResult: DependencyStatus | null = null
   private pendingDetection: Promise<DependencyStatus> | null = null
+  private readonly findOnPath: PathFinder
+  private readonly untrustedRoots: () => ReadonlyArray<string | null | undefined>
+
+  constructor(options: DependencyDetectorOptions = {}) {
+    this.findOnPath = options.findOnPath ?? findOnPath
+    this.untrustedRoots = options.untrustedRoots ?? (() => [])
+  }
 
   /**
    * Detect available system dependencies.
@@ -87,7 +120,7 @@ export class DependencyDetector {
    */
   private async detectLibreOffice(): Promise<boolean> {
     // Try PATH-based detection first
-    if (await this.tryCommand('soffice', ['--version'])) {
+    if (await this.tryOnPath('soffice')) {
       return true
     }
 
@@ -140,12 +173,54 @@ export class DependencyDetector {
    */
   private async detectImageMagick(): Promise<boolean> {
     // ImageMagick v7+
-    if (await this.tryCommand('magick', ['--version'])) {
+    if (await this.tryOnPath('magick')) {
       return true
     }
 
     // ImageMagick v6 fallback
-    return this.tryCommand('convert', ['--version'])
+    return this.tryOnPath('convert')
+  }
+
+  /**
+   * Resolve `name` on PATH to an absolute, trusted path and probe it with
+   * `--version`. Each hit is tried in order; the first that runs wins.
+   */
+  private async tryOnPath(name: string): Promise<boolean> {
+    let hits: string[]
+    try {
+      hits = await this.findOnPath(name, DETECTION_TIMEOUT_MS)
+    } catch {
+      return false
+    }
+    for (const hit of hits) {
+      if (!(await this.isTrustedCandidate(hit))) continue
+      if (await this.tryCommand(hit, ['--version'])) return true
+    }
+    return false
+  }
+
+  /**
+   * A candidate is trusted when it is absolute and neither it nor its real
+   * path (a PATH symlink may point anywhere) lies inside an untrusted root.
+   * Case-insensitive on Windows and macOS, whose default file systems are.
+   */
+  private async isTrustedCandidate(candidate: string): Promise<boolean> {
+    const flavour = { path: process.platform === 'win32' ? win32 : posix, platform: process.platform }
+    if (!flavour.path.isAbsolute(candidate)) return false
+    const roots = this.untrustedRoots().filter((root): root is string => !!root)
+    if (roots.length === 0) return true
+
+    const caseSensitive = process.platform === 'linux'
+    const forms = [normaliseResolved(flavour.path.resolve(candidate), flavour)]
+    try {
+      forms.push(normaliseResolved(await realpath(candidate), flavour))
+    } catch {
+      // Unresolvable: the probe below fails on its own; the raw form is still checked.
+    }
+    return !roots.some((root) => {
+      const rootForm = normaliseResolved(flavour.path.resolve(root), flavour)
+      return forms.some((form) => isInsideRoot(form, rootForm, caseSensitive, flavour))
+    })
   }
 
   /**
@@ -159,7 +234,8 @@ export class DependencyDetector {
         const child = execFile(
           command,
           args,
-          { timeout: DETECTION_TIMEOUT_MS },
+          // cwd outside any project: a tool's own lookups never start in it
+          { timeout: DETECTION_TIMEOUT_MS, cwd: tmpdir(), windowsHide: true },
           (error) => {
             resolve(!error)
           }
@@ -175,8 +251,8 @@ export class DependencyDetector {
   }
 
   /**
-   * Clear cached detection result.
-   * Primarily used for testing.
+   * Clear cached detection result, so the next `detect()` probes again.
+   * Used by "Check again" (#250, via `ImportToolStatusService`) and by tests.
    */
   clearCache(): void {
     this.cachedResult = null

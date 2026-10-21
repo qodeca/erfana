@@ -39,6 +39,7 @@ export { ConverterRegistry, createConverterRegistry, converterRegistry } from '.
 
 // Dependency detection
 export { DependencyDetector } from './DependencyDetector'
+export { ImportToolStatusService, importToolStatusService } from './ImportToolStatusService'
 
 // Language mapping
 export { isoToTessLang } from './isoToTessLang'

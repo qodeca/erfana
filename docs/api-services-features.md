@@ -503,6 +503,7 @@ Runtime detection of optional system tools for document import.
 
 ### Key features
 - Checks LibreOffice (`soffice --version`) and ImageMagick (`magick --version`, v6 `convert` fallback)
+- Safe lookup (#250): a bare name is resolved to an absolute path with the absolute `which` / `where.exe` (`findOnPath` in `utils/hardenedGit.ts`); relative hits and hits whose path or real path lie inside the open project are dropped, and every probe runs from `os.tmpdir()`, so a binary planted in a project or the current directory is never run
 - 5-second timeout per command via `execFile` (no shell – safe from injection)
 - Session-level caching (single detection, concurrent calls share one promise)
 - macOS bundle path fallback for LibreOffice (`/Applications/LibreOffice.app/...`)
@@ -511,14 +512,15 @@ Runtime detection of optional system tools for document import.
 
 ### Public methods
 - `detect(): Promise<DependencyStatus>` – Run detection (cached after first call)
-- `clearCache(): void` – Reset cache (testing only)
+- `clearCache(): void` – Reset cache, so the next `detect()` probes again ("Check again" via `ImportToolStatusService`, and tests)
 
 ### DependencyStatus
 `{ libreOffice: boolean, imageMagick: boolean }`
 
 ### Integration
-- Fire-and-forget at app startup (`src/main/index.ts`) → pushes result via `import:dependenciesReady`
-- `ConverterRegistry.updateConverterExtensions()` consumes result to register format extensions
+- Owned by `ImportToolStatusService` (`src/main/services/import/ImportToolStatusService.ts`, #250), which keeps the converter registry in step with the result: a tool found adds its extensions (`updateConverterExtensions`), a tool gone removes them (`removeConverterExtensions`, which hands `.rtf` back to the text converter)
+- Fire-and-forget at app startup (`src/main/index.ts`, `importToolStatusService.getStatus()`) → pushes result via `import:dependenciesReady`
+- `import:toolStatus` serves the cached result to Settings → Import tools; `{ recheck: true }` ("Check again") clears the cache and probes again. Rate-limited: a recheck while a probe runs joins it, and one within `DOCUMENT_IMPORT.TOOL_RECHECK_MIN_INTERVAL_MS` (3 s) of the last probe returns `throttled: true` and spawns nothing
 
 ---
 
@@ -534,7 +536,8 @@ Central Strategy-pattern registry mapping file extensions to `IConverter` implem
 - `isSupported(extension: string): boolean`
 - `getSupportedExtensions(): string[]` / `getExtensionsByConversionType()` / `getCategories(): FileTypeCategory[]`
 - `mightBeTextFile(extension: string): boolean`
-- `updateConverterExtensions(category: FileTypeCategory, extensions: string[]): void` – Two-phase registration hook consumed by `DependencyDetector`
+- `updateConverterExtensions(category: FileTypeCategory, extensions: string[]): void` – Two-phase registration hook consumed by `DependencyDetector`; remembers the converter an extension was taken from
+- `removeConverterExtensions(category: FileTypeCategory, extensions: readonly string[]): void` – The reverse, for a tool that is no longer found (#250); never removes a converter's native extensions
 
 Exports both the class and a shared `converterRegistry` singleton.
 

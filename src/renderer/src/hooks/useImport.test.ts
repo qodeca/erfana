@@ -1334,7 +1334,9 @@ describe('useImport', () => {
 
       expect(mockShowAlert).toHaveBeenCalledWith(
         expect.objectContaining({
-          title: 'LibreOffice required'
+          title: 'LibreOffice required',
+          // #250: points at Settings → Import tools, and no longer asks for a restart
+          message: expect.stringContaining('Settings → Import tools')
         })
       )
       expect(mockDocImportOpenDialog).not.toHaveBeenCalled()

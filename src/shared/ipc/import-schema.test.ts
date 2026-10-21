@@ -12,6 +12,8 @@ import { describe, it, expect } from 'vitest'
 import {
   DocumentImportOptionsSchema,
   DocumentImportRequestSchema,
+  ImportToolStatusRequestSchema,
+  ImportToolStatusSchema,
   type DocumentImportOptions,
   type DocumentImportRequest,
   type DocumentImportProgress,
@@ -331,5 +333,39 @@ describe('DependencyReadyEvent interface', () => {
     expect(event.libreOffice).toBe(false)
     expect(event.imageMagick).toBe(false)
     expect(event.extensions).toEqual(['pdf'])
+  })
+})
+
+describe('ImportToolStatusRequestSchema (#250)', () => {
+  it.each([{ recheck: true }, { recheck: false }])('accepts %o', (payload) => {
+    expect(ImportToolStatusRequestSchema.safeParse(payload).success).toBe(true)
+  })
+
+  it.each([
+    ['undefined', undefined],
+    ['an empty object', {}],
+    ['a non-boolean flag', { recheck: 1 }],
+    ['an extra key (strict)', { recheck: true, binary: 'soffice' }]
+  ])('rejects %s', (_name, payload) => {
+    expect(ImportToolStatusRequestSchema.safeParse(payload).success).toBe(false)
+  })
+})
+
+describe('ImportToolStatusSchema (#250)', () => {
+  it('accepts a full status', () => {
+    const status = { libreOffice: true, imageMagick: false, extensions: ['pdf', 'docx'], throttled: false }
+    expect(ImportToolStatusSchema.parse(status)).toEqual(status)
+  })
+
+  it('rejects an unknown key (strict)', () => {
+    expect(
+      ImportToolStatusSchema.safeParse({
+        libreOffice: true,
+        imageMagick: true,
+        extensions: [],
+        throttled: false,
+        path: '/usr/bin/soffice'
+      }).success
+    ).toBe(false)
   })
 })

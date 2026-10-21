@@ -50,6 +50,7 @@ type ImportBridge = {
   documentImport: (request: unknown) => Promise<unknown>
   cancelDocument: () => Promise<unknown>
   getDocumentExtensions: () => Promise<unknown>
+  toolStatus: (request: unknown) => Promise<unknown>
   onDocumentProgress: (cb: (data: unknown) => void) => () => void
   onDependenciesReady: (cb: (data: unknown) => void) => () => void
 }
@@ -91,6 +92,14 @@ describe('api.import – document import bridge', () => {
     await getImportApi().getDocumentExtensions()
 
     expect(mockInvoke).toHaveBeenCalledWith('import:getDocumentExtensions')
+  })
+
+  it('toolStatus invokes import:toolStatus with the request object (#250)', async () => {
+    mockInvoke.mockResolvedValueOnce({ success: true, libreOffice: false, imageMagick: false, extensions: ['pdf'], throttled: false })
+
+    await getImportApi().toolStatus({ recheck: true })
+
+    expect(mockInvoke).toHaveBeenCalledWith('import:toolStatus', { recheck: true })
   })
 
   it('onDocumentProgress subscribes and returns cleanup function', () => {

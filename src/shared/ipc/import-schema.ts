@@ -81,3 +81,41 @@ export interface DependencyReadyEvent {
   /** Full list of supported document extensions after detection */
   extensions: string[]
 }
+
+/**
+ * Request for the optional import tools' status (#250).
+ *
+ * `recheck: false` returns the per-session cached result (detecting once if it
+ * has not run yet). `recheck: true` clears that cache and probes again – the
+ * "Check again" action, so installing a tool needs no restart. Main rate-limits
+ * rechecks (see `DOCUMENT_IMPORT.TOOL_RECHECK_MIN_INTERVAL_MS`). Strict: nothing else
+ * can ride along.
+ */
+export const ImportToolStatusRequestSchema = z.object({ recheck: z.boolean() }).strict()
+export type ImportToolStatusRequest = z.infer<typeof ImportToolStatusRequestSchema>
+
+/** What detection found, plus the document extensions that follow from it. */
+export const ImportToolStatusSchema = z
+  .object({
+    /** Whether LibreOffice (soffice) is available */
+    libreOffice: z.boolean(),
+    /** Whether ImageMagick (magick/convert) is available */
+    imageMagick: z.boolean(),
+    /** Supported document extensions after detection (same list as `DependencyReadyEvent`) */
+    extensions: z.array(z.string()),
+    /**
+     * True when a recheck was asked for too soon after the previous one and the
+     * existing result was returned without probing again.
+     */
+    throttled: z.boolean()
+  })
+  .strict()
+export type ImportToolStatus = z.infer<typeof ImportToolStatusSchema>
+
+/**
+ * Response of `import:toolStatus`. Never rejects: a refused sender or a
+ * malformed request arrives as `success: false`.
+ */
+export type ImportToolStatusResponse =
+  | ({ success: true } & ImportToolStatus)
+  | { success: false; error: string }

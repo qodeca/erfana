@@ -14,6 +14,7 @@ import { useOccluder } from '../../hooks/useOccluder'
 import { useOverlayStackEntry } from '../../hooks/useOverlayStackEntry'
 import { TEST_IDS } from '../../constants/testids'
 import { HtmlPreviewSection } from './sections/HtmlPreviewSection'
+import { ImportToolsSection } from './sections/ImportToolsSection'
 import './SettingsOverlay.css'
 
 // Small delay to ensure overlay is fully rendered before focusing
@@ -606,6 +607,8 @@ export function SettingsOverlay() {
                 </>
               )}
             </section>
+
+            <ImportToolsSection />
 
             <HtmlPreviewSection />
           </div>

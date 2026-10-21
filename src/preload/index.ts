@@ -48,7 +48,9 @@ import type {
   DocumentImportRequest,
   DocumentImportResult,
   DocumentImportProgress,
-  DependencyReadyEvent
+  DependencyReadyEvent,
+  ImportToolStatusRequest,
+  ImportToolStatusResponse
 } from '../shared/ipc/import-schema'
 import { fileBridge } from './fileBridge'
 import { terminalBridge } from './terminalBridge'
@@ -334,6 +336,14 @@ const api = {
      */
     getDocumentExtensions: (): Promise<string[]> =>
       ipcRenderer.invoke(IMPORT_CHANNELS.GET_DOCUMENT_EXTENSIONS),
+
+    /**
+     * Optional import tools' status (LibreOffice, ImageMagick) (#250).
+     * `{ recheck: true }` re-runs detection ("Check again"); main rate-limits
+     * it. Never rejects: failures arrive as `success: false`.
+     */
+    toolStatus: (request: ImportToolStatusRequest): Promise<ImportToolStatusResponse> =>
+      ipcRenderer.invoke(IMPORT_CHANNELS.TOOL_STATUS, request),
 
     /**
      * Subscribe to document import progress events

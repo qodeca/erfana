@@ -1,0 +1,74 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/* Import tools section (#250) – builds on the shared settings-* classes. */
+
+.import-tools-intro {
+  margin-bottom: var(--space-4);
+}
+
+.import-tools-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.import-tools-row + .import-tools-row {
+  border-top: var(--border-width) solid var(--color-border-default);
+}
+
+.import-tools-extensions {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  /* A long extension list wraps between entries, never mid-entry. */
+  word-spacing: var(--space-1);
+}
+
+/* Words plus an icon, so the state never rests on colour alone (design/feedback). */
+.import-tools-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--color-text-secondary);
+}
+
+.import-tools-status--ready {
+  color: var(--color-success);
+}
+
+.import-tools-status--missing {
+  color: var(--color-warning);
+}
+
+.import-tools-hint {
+  margin: 0 0 var(--space-6);
+}
+
+.import-tools-hint--action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+.import-tools-command {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+  background: var(--color-bg-tertiary);
+  padding: 0 var(--space-2);
+  /* Selectable for copying into a terminal via `.settings-content` in utilities.css. */
+}
+
+/* At least a 24px target (WCAG 2.5.8), whatever the label length. */
+.import-tools-btn {
+  min-height: var(--btn-height-sm);
+  flex-shrink: 0;
+}
+
+/* Reserve one line so the announcement does not push the row down (design/feedback). */
+.import-tools-live {
+  min-height: calc(var(--text-sm) * var(--leading-normal));
+}

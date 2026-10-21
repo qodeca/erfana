@@ -67,6 +67,12 @@ interface DocumentImportState {
   hasLibreOffice: boolean
   /** Whether ImageMagick is available for image conversion */
   hasImageMagick: boolean
+  /** Whether a detection result has arrived yet (until then, the two flags above are only defaults) */
+  toolStatusKnown: boolean
+  /** Whether a status read or "Check again" is in flight (#250) */
+  isCheckingTools: boolean
+  /** Outcome of the last read or "Check again", for the Settings live region (#250) */
+  toolCheckOutcome: 'idle' | 'checked' | 'throttled' | 'failed'
 
   // Actions
   /** Open the import dialog for a specific document file */
@@ -89,6 +95,12 @@ interface DocumentImportState {
   fetchExtensions: () => Promise<void>
   /** Subscribe to dependency-ready events; returns cleanup function */
   initDependencyListener: () => () => void
+  /**
+   * Read the optional import tools' status from main (#250). `recheck: true`
+   * is "Check again": main clears its per-session cache and probes again
+   * (rate-limited). A call while one is in flight is ignored.
+   */
+  loadToolStatus: (recheck: boolean) => Promise<void>
 
   // Internal – progress event handler (exposed for testing)
   /** Handle incoming progress events from the main process */
@@ -138,6 +150,9 @@ export const useDocumentImportStore = create<DocumentImportState>((set, get) => 
 
   hasLibreOffice: false,
   hasImageMagick: false,
+  toolStatusKnown: false,
+  isCheckingTools: false,
+  toolCheckOutcome: 'idle',
 
   openDialog: (filePath: string, fileName: string, fileSize: number, fileType: string) => {
     // Reject if an import is currently running
@@ -300,10 +315,37 @@ export const useDocumentImportStore = create<DocumentImportState>((set, get) => 
       set({
         documentExtensions: event.extensions,
         hasLibreOffice: event.libreOffice,
-        hasImageMagick: event.imageMagick
+        hasImageMagick: event.imageMagick,
+        toolStatusKnown: true
       })
     })
     return cleanup
+  },
+
+  loadToolStatus: async (recheck: boolean) => {
+    if (get().isCheckingTools) return
+    if (!window.api?.import?.toolStatus) return
+    set({ isCheckingTools: true })
+    try {
+      const response = await window.api.import.toolStatus({ recheck })
+      if (response.success) {
+        set({
+          documentExtensions: response.extensions,
+          hasLibreOffice: response.libreOffice,
+          hasImageMagick: response.imageMagick,
+          toolStatusKnown: true,
+          isCheckingTools: false,
+          // Only "Check again" reports an outcome; the silent read on open does not.
+          toolCheckOutcome: recheck
+            ? response.throttled ? 'throttled' : 'checked'
+            : get().toolCheckOutcome
+        })
+      } else {
+        set({ isCheckingTools: false, toolCheckOutcome: 'failed' })
+      }
+    } catch {
+      set({ isCheckingTools: false, toolCheckOutcome: 'failed' })
+    }
   },
 
   _handleProgress: (progress: DocumentImportProgress) => {
