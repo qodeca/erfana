@@ -8,17 +8,22 @@
  * - Absolute from project root: /docs/file.md
  * - Filename only: file.md
  * - Anchors: file.md#section
+ * - Percent-encoded names: my%20file.md
+ *
+ * Path math is done here on a parsed root + segments form, never with a
+ * POSIX-only library: the main process hands the renderer NATIVE paths, so on
+ * Windows they are `C:\proj\a.md` or `\\server\share\proj\a.md`.
  *
  * Security: Ensures resolved paths stay within project boundaries
  * Security: Blocks dangerous protocols (javascript:, data:, vbscript:, file:)
  */
 
-import path from 'path-browserify'
 import { isDangerousProtocol, isExternalProtocol } from './linkProtocols'
 import { logger } from './logger'
+import { getRendererPlatform, isWindows } from './platform'
 
 export interface ResolvedLink {
-  /** Absolute file path */
+  /** Absolute file path (native separators for the platform) */
   filePath: string
   /** Optional anchor/fragment (e.g., "section-name") */
   anchor?: string
@@ -26,35 +31,114 @@ export interface ResolvedLink {
   exists: boolean
 }
 
+/** An absolute path split into a root prefix and its normalised segments. */
+interface ParsedPath {
+  /** '' (POSIX), 'C:' (drive) or '//server/share' (UNC) */
+  root: string
+  /** Segments with '.', '..' and empty parts already resolved */
+  segments: string[]
+}
+
+const DRIVE_ROOT = /^([A-Za-z]):(?:\/|$)/
+const UNC_ROOT = /^\/\/([^/]+)\/([^/]+)(?:\/|$)/
+
+/**
+ * Collapse '.', '..' and empty segments. A '..' at the root is dropped, the
+ * same way `path.resolve` clamps at the filesystem root.
+ */
+function collapseSegments(parts: string[]): string[] {
+  const out: string[] = []
+  for (const part of parts) {
+    if (part === '' || part === '.') continue
+    if (part === '..') {
+      out.pop()
+      continue
+    }
+    out.push(part)
+  }
+  return out
+}
+
+/**
+ * Split an absolute path into root and segments, whatever separators it uses.
+ * Returns null for a relative path. The drive letter is upper-cased and UNC
+ * roots are kept as '//server/share'.
+ */
+function parseAbsolute(input: string): ParsedPath | null {
+  const p = input.replace(/\\/g, '/')
+  const unc = UNC_ROOT.exec(p)
+  if (unc) {
+    return {
+      root: `//${unc[1]}/${unc[2]}`,
+      segments: collapseSegments(p.slice(unc[0].length).split('/'))
+    }
+  }
+  const drive = DRIVE_ROOT.exec(p)
+  if (drive) {
+    return {
+      root: `${drive[1].toUpperCase()}:`,
+      segments: collapseSegments(p.slice(drive[0].length).split('/'))
+    }
+  }
+  if (p.startsWith('/')) {
+    return { root: '', segments: collapseSegments(p.split('/')) }
+  }
+  return null
+}
+
+/** Render a parsed path in the native form of the given platform. */
+function formatPath(parsed: ParsedPath, platform: NodeJS.Platform): string {
+  const joined = parsed.root + '/' + parsed.segments.join('/')
+  return isWindows(platform) ? joined.replace(/\//g, '\\') : joined
+}
+
+/** Compare two names (segments or roots), folding case only on Windows. */
+function sameName(a: string, b: string, platform: NodeJS.Platform): boolean {
+  return isWindows(platform) ? a.toLowerCase() === b.toLowerCase() : a === b
+}
+
+/** Whether `file` equals or is nested under `root`. */
+function isUnder(file: ParsedPath, root: ParsedPath, platform: NodeJS.Platform): boolean {
+  if (!sameName(file.root, root.root, platform)) return false
+  if (file.segments.length < root.segments.length) return false
+  return root.segments.every((seg, i) => sameName(seg, file.segments[i], platform))
+}
+
+/** Append '/'-separated relative parts to a parsed base. */
+function joinParsed(base: ParsedPath, relative: string): ParsedPath {
+  return {
+    root: base.root,
+    segments: collapseSegments([...base.segments, ...relative.split('/')])
+  }
+}
+
 /**
  * Check if a path is within the project directory
  *
+ * Handles POSIX, drive-letter and UNC paths with either separator; on Windows
+ * the comparison ignores case. Pure string math for link resolution – real
+ * confinement stays main-side.
+ *
  * @param filePath - Absolute path to check
  * @param projectRoot - Absolute path to project root
+ * @param platform - Whose case rule applies; defaults to the renderer's own
  * @returns true if filePath is within or equal to projectRoot
  *
  * @example
  * isPathWithinProject('/project/docs/file.md', '/project') // => true
  * isPathWithinProject('/etc/passwd', '/project') // => false
+ * isPathWithinProject('c:\\Proj\\a.md', 'C:\\proj', 'win32') // => true
  */
-export function isPathWithinProject(filePath: string, projectRoot: string): boolean {
-  const normalizedFile = path.normalize(filePath)
-  const normalizedRoot = path.normalize(projectRoot)
-
+export function isPathWithinProject(
+  filePath: string,
+  projectRoot: string,
+  platform: NodeJS.Platform = getRendererPlatform()
+): boolean {
+  const file = parseAbsolute(filePath)
+  const root = parseAbsolute(projectRoot)
   // Both should be absolute paths
-  if (!path.isAbsolute(normalizedFile) || !path.isAbsolute(normalizedRoot)) {
-    return false
-  }
-
-  // Exact match - file is the project root itself
-  if (normalizedFile === normalizedRoot) {
-    return true
-  }
-
-  // Use path.relative to check containment
-  // If relative path starts with '..' or is absolute, it's outside
-  const relative = path.relative(normalizedRoot, normalizedFile)
-  return !relative.startsWith('..') && !path.isAbsolute(relative)
+  if (!file || !root) return false
+  return isUnder(file, root, platform)
 }
 
 /**
@@ -78,24 +162,25 @@ async function checkFileExists(filePath: string): Promise<boolean> {
 /**
  * Search for a filename in the current directory and project root (in parallel)
  *
- * @param filename - Just the filename (e.g., "file.md")
- * @param currentDir - Absolute path to current directory
- * @param projectRoot - Absolute path to project root
+ * @param filename - Relative '/'-separated name (e.g., "file.md")
+ * @param currentDir - Parsed current directory
+ * @param projectRoot - Parsed project root
+ * @param platform - Platform used to render the native candidate paths
  * @returns Promise resolving to found path, or current dir candidate if not found
  */
 async function searchForFile(
   filename: string,
-  currentDir: string,
-  projectRoot: string
-): Promise<string> {
-  // Check both in parallel for better performance
-  const candidateInCurrentDir = path.join(currentDir, filename)
-  const candidateInProjectRoot = path.join(projectRoot, filename)
+  currentDir: ParsedPath,
+  projectRoot: ParsedPath,
+  platform: NodeJS.Platform
+): Promise<ParsedPath> {
+  const candidateInCurrentDir = joinParsed(currentDir, filename)
+  const candidateInProjectRoot = joinParsed(projectRoot, filename)
 
   // Parallel checks to avoid race conditions
   const [existsInCurrentDir, existsInProjectRoot] = await Promise.all([
-    checkFileExists(candidateInCurrentDir),
-    checkFileExists(candidateInProjectRoot)
+    checkFileExists(formatPath(candidateInCurrentDir, platform)),
+    checkFileExists(formatPath(candidateInProjectRoot, platform))
   ])
 
   // Prefer current directory
@@ -111,12 +196,22 @@ async function searchForFile(
   return candidateInCurrentDir
 }
 
+/** Percent-decode a link path; a malformed escape leaves the text as written. */
+function decodeLinkPath(pathPart: string): string {
+  try {
+    return decodeURIComponent(pathPart)
+  } catch {
+    return pathPart
+  }
+}
+
 /**
  * Resolve a markdown link to an absolute file path
  *
  * @param linkHref - The href attribute from the markdown link
  * @param currentFilePath - Absolute path of the current markdown file
  * @param projectRoot - Absolute path of the project root directory
+ * @param platform - Platform whose path rules apply; defaults to the renderer's own
  * @returns ResolvedLink object or null if the link is external or invalid
  *
  * @example
@@ -131,11 +226,16 @@ async function searchForFile(
  * // With anchor
  * await resolveMarkdownLink('./api.md#section', '/project/README.md', '/project')
  * // => { filePath: '/project/api.md', anchor: 'section', exists: true }
+ *
+ * // Windows: result keeps native separators
+ * await resolveMarkdownLink('./api.md', 'C:\\proj\\README.md', 'C:\\proj', 'win32')
+ * // => { filePath: 'C:\\proj\\api.md', exists: true }
  */
 export async function resolveMarkdownLink(
   linkHref: string,
   currentFilePath: string,
-  projectRoot: string
+  projectRoot: string,
+  platform: NodeJS.Platform = getRendererPlatform()
 ): Promise<ResolvedLink | null> {
   // Security: Block dangerous protocols
   if (isDangerousProtocol(linkHref)) {
@@ -167,41 +267,48 @@ export async function resolveMarkdownLink(
 
   // Normalize path separators (convert Windows backslashes to forward slashes)
   // Also collapse multiple consecutive slashes (e.g., docs//api.md -> docs/api.md)
-  const normalizedPathPart = pathPart.replace(/\\/g, '/').replace(/\/+/g, '/')
+  const normalizedPathPart = decodeLinkPath(pathPart).replace(/\\/g, '/').replace(/\/+/g, '/')
 
-  let resolvedPath: string
-  const currentDir = path.dirname(currentFilePath)
+  const parsedFile = parseAbsolute(currentFilePath)
+  const parsedRoot = parseAbsolute(projectRoot)
+  if (!parsedFile || !parsedRoot) {
+    logger.warn('[MarkdownLinkResolver] Current file or project root is not an absolute path')
+    return null
+  }
+  const currentDir: ParsedPath = { root: parsedFile.root, segments: parsedFile.segments.slice(0, -1) }
+
+  let resolved: ParsedPath
 
   // Case 1: Absolute from project root (/docs/file.md)
   if (normalizedPathPart.startsWith('/')) {
-    resolvedPath = path.join(projectRoot, normalizedPathPart.slice(1))
+    resolved = joinParsed(parsedRoot, normalizedPathPart)
   }
   // Case 2: Relative (./ or ../)
   else if (normalizedPathPart.startsWith('./') || normalizedPathPart.startsWith('../')) {
-    resolvedPath = path.resolve(currentDir, normalizedPathPart)
+    resolved = joinParsed(currentDir, normalizedPathPart)
   }
   // Case 3: Filename only (file.md)
   else {
-    resolvedPath = await searchForFile(normalizedPathPart, currentDir, projectRoot)
+    resolved = await searchForFile(normalizedPathPart, currentDir, parsedRoot, platform)
   }
 
-  // Normalize for consistent comparison
-  resolvedPath = path.normalize(resolvedPath)
-  const normalizedProjectRoot = path.normalize(projectRoot)
-
   // Security: Ensure path is within project
-  if (!isPathWithinProject(resolvedPath, normalizedProjectRoot)) {
-    // Log relative path only to avoid exposing full filesystem structure
-    const relativePath = path.relative(normalizedProjectRoot, resolvedPath)
-    logger.warn('[MarkdownLinkResolver] Link points outside project: ' + relativePath)
+  if (!isUnder(resolved, parsedRoot, platform)) {
+    // Log only the tail below the shared prefix to avoid exposing full filesystem structure
+    logger.warn(
+      '[MarkdownLinkResolver] Link points outside project: ' +
+        resolved.segments.slice(parsedRoot.segments.length).join('/')
+    )
     return null
   }
 
+  const filePath = formatPath(resolved, platform)
+
   // Check if file exists
-  const exists = await checkFileExists(resolvedPath)
+  const exists = await checkFileExists(filePath)
 
   return {
-    filePath: resolvedPath,
+    filePath,
     anchor,
     exists
   }

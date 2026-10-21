@@ -19,6 +19,8 @@ beforeEach(() => {
   // Setup window.api mock
   global.window = {
     api: {
+      // Pin the default platform so the POSIX cases do not depend on the host OS
+      utils: { getPlatform: () => 'darwin' },
       file: {
         exists: mockExists
       }
@@ -417,6 +419,98 @@ describe('markdownLinkResolver', () => {
       )
 
       expect(tooltip).toBe('📄 ./api.md#section → /Users/test/project/docs/api.md')
+    })
+  })
+
+  describe('Windows paths (platform injected, runs on every OS)', () => {
+    const win = 'win32' as const
+    const root = 'C:\\erf\\proj'
+    const file = 'C:\\erf\\proj\\large.md'
+
+    it('resolves ./missing-1.md and reports it missing (preview-deferred e2e case)', async () => {
+      mockExists.mockResolvedValue(false)
+      const result = await resolveMarkdownLink('./missing-1.md', file, root, win)
+      expect(result).toEqual({ filePath: 'C:\\erf\\proj\\missing-1.md', anchor: undefined, exists: false })
+      expect(mockExists).toHaveBeenCalledWith('C:\\erf\\proj\\missing-1.md')
+    })
+
+    it('resolves an existing sibling and passes the native path to IPC', async () => {
+      mockExists.mockResolvedValue(true)
+      const result = await resolveMarkdownLink('./other.md', file, root, win)
+      expect(result?.exists).toBe(true)
+      expect(result?.filePath).toBe('C:\\erf\\proj\\other.md')
+    })
+
+    it('goes up with ../ inside the project and rejects escaping it', async () => {
+      mockExists.mockResolvedValue(true)
+      const nested = 'C:\\erf\\proj\\docs\\a.md'
+      expect((await resolveMarkdownLink('../x.md', nested, root, win))?.filePath).toBe('C:\\erf\\proj\\x.md')
+      expect(await resolveMarkdownLink('../../x.md', nested, root, win)).toBeNull()
+    })
+
+    it('resolves /docs/x.md from the project root', async () => {
+      mockExists.mockResolvedValue(true)
+      const result = await resolveMarkdownLink('/docs/x.md', file, root, win)
+      expect(result?.filePath).toBe('C:\\erf\\proj\\docs\\x.md')
+    })
+
+    it('finds a filename-only link in the current dir, then the project root', async () => {
+      mockExists.mockImplementation(async (p: string) => p === 'C:\\erf\\proj\\top.md')
+      const nested = 'C:\\erf\\proj\\docs\\a.md'
+      const result = await resolveMarkdownLink('top.md', nested, root, win)
+      expect(result?.filePath).toBe('C:\\erf\\proj\\top.md')
+    })
+
+    it('accepts mixed separators and a lower-case drive letter', async () => {
+      mockExists.mockResolvedValue(true)
+      const result = await resolveMarkdownLink('./sub/y.md', 'c:/erf/proj\\docs/a.md', 'C:\\ERF\\proj', win)
+      expect(result?.filePath).toBe('C:\\erf\\proj\\docs\\sub\\y.md')
+    })
+
+    it('keeps UNC roots', async () => {
+      mockExists.mockResolvedValue(true)
+      const unc = '\\\\server\\share\\proj'
+      const result = await resolveMarkdownLink('./b.md', unc + '\\a.md', unc, win)
+      expect(result?.filePath).toBe('\\\\server\\share\\proj\\b.md')
+      expect(await resolveMarkdownLink('../../b.md', unc + '\\a.md', unc, win)).toBeNull()
+    })
+
+    it('decodes %20 and keeps the anchor', async () => {
+      mockExists.mockResolvedValue(true)
+      const result = await resolveMarkdownLink('./my%20file.md#top', file, root, win)
+      expect(result?.filePath).toBe('C:\\erf\\proj\\my file.md')
+      expect(result?.anchor).toBe('top')
+    })
+
+    it('leaves a malformed escape as written', async () => {
+      mockExists.mockResolvedValue(false)
+      const result = await resolveMarkdownLink('./100%.md', file, root, win)
+      expect(result?.filePath).toBe('C:\\erf\\proj\\100%.md')
+    })
+
+    it('rejects a sibling drive or sibling folder with a shared prefix', async () => {
+      expect(await resolveMarkdownLink('../proj2/x.md', file, root, win)).toBeNull()
+      expect(isPathWithinProject('D:\\erf\\proj\\a.md', root, win)).toBe(false)
+    })
+  })
+
+  describe('isPathWithinProject on Windows paths', () => {
+    it('ignores case and separator style on win32', () => {
+      expect(isPathWithinProject('c:/ERF/Proj/a.md', 'C:\\erf\\proj', 'win32')).toBe(true)
+      expect(isPathWithinProject('C:\\erf\\proj', 'C:\\erf\\proj\\', 'win32')).toBe(true)
+    })
+
+    it('is case-sensitive on POSIX platforms', () => {
+      expect(isPathWithinProject('/Proj/a.md', '/proj', 'linux')).toBe(false)
+    })
+
+    it('handles a drive-letter root', () => {
+      expect(isPathWithinProject('C:\\a.md', 'C:\\', 'win32')).toBe(true)
+      expect(isPathWithinProject('D:\\a.md', 'C:\\', 'win32')).toBe(false)
+    })
+
+    it('rejects relative paths', () => {
+      expect(isPathWithinProject('docs\\a.md', 'C:\\erf', 'win32')).toBe(false)
     })
   })
 })
