@@ -119,6 +119,11 @@ export function registerConfinedHandle<
 ): void {
   const optionalBindings = (definition.optionalPaths ?? {}) as Record<string, PathBinding>
   const optionalNames = new Set(Object.keys(optionalBindings))
+  for (const name of Object.keys(definition.paths)) {
+    if (optionalNames.has(name)) {
+      throw new Error(`registerConfinedHandle(${channel}): "${name}" is listed as both required and optional`)
+    }
+  }
   const allBindings = { ...definition.paths, ...optionalBindings } as Record<string, PathBinding>
   confinedChannels.set(channel, Object.keys(allBindings))
 

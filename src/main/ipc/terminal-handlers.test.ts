@@ -193,6 +193,16 @@ describe('terminal-handlers', () => {
       expect(await invoke('terminal:kill', OWNER, 'terminal-1')).toEqual({ success: true })
     })
 
+    it('answers isAvailable for a foreign id like an unknown id', async () => {
+      mockTerminalService.isAvailable.mockImplementation(((id?: string) =>
+        id ? { available: true, initialized: mockTerminalService.owners.has(id) } : { available: true }) as never)
+      const unknown = await invoke('terminal:isAvailable', OTHER, 'terminal-9')
+      const foreign = await invoke('terminal:isAvailable', OTHER, 'terminal-1')
+      expect(foreign).toEqual(unknown)
+      expect(foreign).toMatchObject({ success: true, initialized: false })
+      expect(await invoke('terminal:isAvailable', OWNER, 'terminal-1')).toMatchObject({ initialized: true })
+    })
+
     it('answers a foreign window like an unknown id', async () => {
       const unknown = await invoke('terminal:getInfo', OTHER, 'terminal-9')
       const foreign = await invoke('terminal:getInfo', OTHER, 'terminal-1')
@@ -284,6 +294,26 @@ describe('terminal-handlers', () => {
         { cwd: root, cols: 80, rows: 24 },
         OWNER
       )
+    })
+
+    it('refuses past 32 terminals in one window and still serves another window', async () => {
+      const many = Array.from({ length: 32 }, (_, i) => ({ id: `terminal-${i + 1}`, title: 'T' }))
+      mockTerminalService.owners = new Map(many.map((t) => [t.id, OWNER]))
+      mockTerminalService.listTerminals.mockReturnValue(many)
+
+      const refused = await invoke('terminal:create', OWNER, { cols: 80, rows: 24 })
+      expect(refused).toMatchObject({ success: false })
+      expect((refused as { error: string }).error).toMatch(/limit is 32/)
+      expect(mockTerminalService.createTerminal).not.toHaveBeenCalled()
+
+      expect(await invoke('terminal:create', OTHER, { cols: 80, rows: 24 })).toMatchObject({ success: true })
+    })
+
+    it('allows the 32nd terminal', async () => {
+      const many = Array.from({ length: 31 }, (_, i) => ({ id: `terminal-${i + 1}`, title: 'T' }))
+      mockTerminalService.owners = new Map(many.map((t) => [t.id, OWNER]))
+      mockTerminalService.listTerminals.mockReturnValue(many)
+      expect(await invoke('terminal:create', OWNER, { cols: 80, rows: 24 })).toMatchObject({ success: true })
     })
 
     it('answers { success: false, error } and passes the service reason through', async () => {

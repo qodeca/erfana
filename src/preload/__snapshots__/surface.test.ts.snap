@@ -25,6 +25,7 @@ exports[`preload surface > window.api has the expected top-level groups 1`] = `
   "settings",
   "system",
   "terminal",
+  "testHooks",
   "transcription",
   "utils",
   "whisper",

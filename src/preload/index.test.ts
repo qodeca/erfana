@@ -438,54 +438,43 @@ describe('__ERFANA_FORCE_CRASH__ exposure', () => {
 
 
 /**
- * The e2e test-hook flag follows the crash flag's rule: exposed only when main
- * appended `--erfana-test-hooks` (unpackaged + `ERFANA_E2E_TEST_HOOKS=1`).
+ * The e2e test-hook switch lives on the bridge (`api.testHooks.enabled`), set
+ * from the launch arguments only: no global that page script could set, and
+ * true only when main appended `--erfana-test-hooks` (unpackaged +
+ * `ERFANA_E2E_TEST_HOOKS=1`).
  */
-describe('__ERFANA_TEST_HOOKS__ exposure', () => {
+describe('api.testHooks exposure', () => {
   const ORIGINAL_ARGV = process.argv
-  const FLAG = '__ERFANA_TEST_HOOKS__'
 
-  async function loadPreloadWith(argv: string[], contextIsolated: boolean): Promise<void> {
-    const { contextBridge } = await import('electron')
-    vi.mocked(contextBridge.exposeInMainWorld).mockClear()
+  async function loadPreloadWith(argv: string[]): Promise<void> {
     process.argv = argv
-    ;(process as any).contextIsolated = contextIsolated
+    ;(process as any).contextIsolated = false
     vi.resetModules()
-    delete (window as any)[FLAG]
+    delete (window as any).api
     await import('./index')
   }
 
   afterEach(() => {
     process.argv = ORIGINAL_ARGV
-    delete (window as any)[FLAG]
   })
 
-  it('is absent when argv does not carry the flag', async () => {
-    await loadPreloadWith(['electron', 'main.js'], false)
+  it('is false when argv does not carry the flag', async () => {
+    await loadPreloadWith(['electron', 'main.js'])
 
-    expect(FLAG in (window as any)).toBe(false)
+    expect((window as any).api.testHooks.enabled).toBe(false)
   })
 
-  it('is exposed as true when argv carries --erfana-test-hooks', async () => {
-    await loadPreloadWith(['electron', 'main.js', '--erfana-test-hooks'], false)
+  it('is true when argv carries --erfana-test-hooks', async () => {
+    await loadPreloadWith(['electron', 'main.js', '--erfana-test-hooks'])
 
-    expect((window as any)[FLAG]).toBe(true)
+    expect((window as any).api.testHooks.enabled).toBe(true)
   })
 
-  it('goes through contextBridge when context isolation is on', async () => {
+  it('exposes no separate global for it', async () => {
     const { contextBridge } = await import('electron')
+    vi.mocked(contextBridge.exposeInMainWorld).mockClear()
+    await loadPreloadWith(['electron', 'main.js', '--erfana-test-hooks'])
 
-    await loadPreloadWith(['electron', 'main.js', '--erfana-test-hooks'], true)
-
-    expect(contextBridge.exposeInMainWorld).toHaveBeenCalledWith(FLAG, true)
-  })
-
-  it('exposes nothing through contextBridge in a normal isolated run', async () => {
-    const { contextBridge } = await import('electron')
-
-    await loadPreloadWith(['electron', 'main.js'], true)
-
-    const keys = vi.mocked(contextBridge.exposeInMainWorld).mock.calls.map(([key]) => key)
-    expect(keys).not.toContain(FLAG)
+    expect('__ERFANA_TEST_HOOKS__' in (window as any)).toBe(false)
   })
 })

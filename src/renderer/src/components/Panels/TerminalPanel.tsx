@@ -638,9 +638,6 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
         fitAddon.fit()
       }, 50)
 
-      // Get project path for initial CWD
-      const projectPath = await window.api.file.getProjectPath()
-
       // Set up clear event handler BEFORE creating PTY to avoid race condition
       // The PTY immediately starts marker detection, so we must subscribe first
       let clearUnsubscribe: (() => void) | null = null
@@ -670,7 +667,8 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
 
       // Create PTY
       const result = await window.api.terminal.create({
-        cwd: projectPath || undefined,
+        // No cwd: the project root is what a terminal opens in, and main reads it from
+        // the session, so a stale path during a project switch cannot fail the start
         cols: xterm.cols,
         rows: xterm.rows
       })

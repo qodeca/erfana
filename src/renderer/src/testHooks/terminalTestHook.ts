@@ -3,10 +3,11 @@
 /**
  * E2E test hook: `window.__erfanaTest.terminalText(terminalId)`.
  *
- * Present only when the main process launched this window with the test-hook
+ * The switch comes from the preload (`window.api.testHooks.enabled`), never from a
+ * global the page could set. Present only when the main process launched this window with the test-hook
  * flag, which it does only for an unpackaged app with `ERFANA_E2E_TEST_HOOKS=1`
  * (`buildAdditionalArguments` in src/main/index.ts). In every other run the
- * preload does not expose `__ERFANA_TEST_HOOKS__`, nothing is installed, and
+ * preload reports `api.testHooks.enabled` as false, nothing is installed, and
  * terminals are not recorded.
  */
 import type { Terminal } from '@xterm/xterm'
@@ -15,7 +16,7 @@ const terminals = new Map<string, Terminal>()
 
 /** Whether the launcher switched the test hooks on for this window. */
 function hooksEnabled(): boolean {
-  return window.__ERFANA_TEST_HOOKS__ === true
+  return window.api?.testHooks?.enabled === true
 }
 
 function terminalText(terminalId: string): string | null {

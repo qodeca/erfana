@@ -254,9 +254,7 @@ describe('TerminalPanel flickering prevention', () => {
     // Verify component initialized successfully
     // ResizeObserver integration tested via manual/E2E testing
     expect(window.api.terminal.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        cwd: '/test/project'
-      })
+      expect.not.objectContaining({ cwd: expect.anything() })
     )
   })
 
@@ -364,9 +362,7 @@ describe('TerminalPanel flickering prevention', () => {
     // Verify component initialized successfully with resize handling
     // Row threshold logic (1 row >= threshold) tested via manual/E2E testing
     expect(window.api.terminal.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        cwd: '/test/project'
-      })
+      expect.not.objectContaining({ cwd: expect.anything() })
     )
   })
 })

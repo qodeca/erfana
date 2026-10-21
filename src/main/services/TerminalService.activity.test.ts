@@ -158,4 +158,28 @@ describe('TerminalService owner and activity', () => {
       ])
     })
   })
+
+  describe('marker buffer', () => {
+    it('still finds the marker and the directory after a flood of earlier output', async () => {
+      const service = await loadService()
+      const id = await createTerminal(service, 7)
+      const clears: unknown[] = []
+      service.on('clearTerminal', (payload: unknown) => clears.push(payload))
+      const calls = mockNodePty.spawn.mock.calls
+      const marker = /__ERFANA_PWD_MARKER_\d+__/.exec(String(calls[calls.length - 1][1]))![0]
+
+      // 1 MiB of banner text in 8 KiB chunks, no marker among it
+      for (let i = 0; i < 128; i++) spawned[0].emit('data', 'x'.repeat(8191) + '\n')
+      spawned[0].emit('data', `/some/where\n${marker.slice(0, 10)}`)
+      spawned[0].emit('data', `${marker.slice(10)}\n`)
+
+      expect(clears).toHaveLength(1)
+      expect(service.getTerminalInfo(id)?.cwd).toBe('/some/where')
+    })
+
+    it('caps what it keeps at 64 KiB', async () => {
+      const { MARKER_BUFFER_MAX_CHARS } = await import('./TerminalService')
+      expect(MARKER_BUFFER_MAX_CHARS).toBe(65536)
+    })
+  })
 })

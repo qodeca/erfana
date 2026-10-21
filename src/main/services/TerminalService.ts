@@ -94,6 +94,9 @@ interface TerminalInstance {
  */
 export const TERMINAL_EXIT_WAIT_MS = 1_500
 
+/** Most output kept while waiting for the bootstrap marker (64 KiB). */
+export const MARKER_BUFFER_MAX_CHARS = 64 * 1024
+
 /**
  * Terminal configuration
  */
@@ -362,6 +365,11 @@ export class TerminalService extends EventEmitter {
       const markerDetector = (data: string) => {
         if (markerDetected) return
         markerBuffer += data
+        // Output before the marker is bounded: keep the tail (the marker and the
+        // line before it are at the end)
+        if (markerBuffer.length > MARKER_BUFFER_MAX_CHARS) {
+          markerBuffer = markerBuffer.slice(-MARKER_BUFFER_MAX_CHARS)
+        }
         if (markerBuffer.includes(marker)) {
           markerDetected = true
 

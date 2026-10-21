@@ -25,6 +25,7 @@ import { redactPath, redactedLogError } from '../utils/redactUserInput'
 import { registerHandle, registerOn } from './registry'
 import { registerConfinedHandle } from './confinement/registerConfinedHandle'
 import {
+  TERMINAL_MAX_PER_WINDOW,
   TerminalCreateRequestSchema,
   TerminalIdRequestSchema,
   TerminalIdSchema,
@@ -89,10 +90,14 @@ export function registerTerminalHandlers(session: ProjectSession): void {
    * Check if terminal support is available (node-pty loaded)
    * Optionally check initialization state for a specific terminal
    */
-  registerHandle(TERMINAL_CHANNELS.isAvailable, (_event, terminalId?: unknown) => {
+  registerHandle(TERMINAL_CHANNELS.isAvailable, (event, terminalId?: unknown) => {
     const parsed = TerminalIdSchema.optional().safeParse(terminalId)
     if (!parsed.success) {
       return { success: false, available: false, error: 'Invalid terminal id' }
+    }
+    // A foreign id answers like an unknown one
+    if (parsed.data !== undefined && !ownsTerminal(event.sender?.id, parsed.data)) {
+      return { success: true, available: terminalService.isAvailable().available, initialized: false }
     }
     const result = terminalService.isAvailable(parsed.data)
     logger.info(`🔍 Terminal available: ${result.available}, initialized: ${result.initialized ?? 'N/A'}`)
@@ -126,6 +131,19 @@ export function registerTerminalHandlers(session: ProjectSession): void {
         { cwd }
       ): Promise<TerminalCreateResponse> => {
         try {
+          const owned = terminalService
+            .listTerminals()
+            .filter((terminal) => ownsTerminal(sender.id, terminal.id)).length
+          if (owned >= TERMINAL_MAX_PER_WINDOW) {
+            return {
+              success: false,
+              error: `Too many terminals are open (the limit is ${TERMINAL_MAX_PER_WINDOW}). Close one and try again.`
+            }
+          }
+
+          // `cwd` was checked before this point, and the folder can change before the
+          // shell starts. That gap is accepted: the shell can `cd` anywhere afterwards,
+          // so the check keeps a request honest rather than confining the shell.
           const ownsProject =
             snapshot !== null &&
             (snapshot.ownerWebContentsId === null || snapshot.ownerWebContentsId === sender.id)

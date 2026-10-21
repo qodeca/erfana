@@ -12,7 +12,7 @@ test.describe('terminal test hook', () => {
     const terminalPage = new TerminalPage(window)
     await terminalPage.open()
 
-    expect(await window.evaluate(() => window.__ERFANA_TEST_HOOKS__)).toBe(true)
+    expect(await window.evaluate(() => window.api.testHooks.enabled)).toBe(true)
 
     const viaHook = await window.evaluate(async () => {
       const listed = await window.api.terminal.list()

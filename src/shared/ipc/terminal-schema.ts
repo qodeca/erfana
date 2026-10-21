@@ -16,6 +16,9 @@ export const TERMINAL_WRITE_MAX_CHARS = 1_048_576
 /** Largest column or row count accepted. */
 export const TERMINAL_MAX_DIM = 2000
 
+/** Most live terminals one window may hold. */
+export const TERMINAL_MAX_PER_WINDOW = 32
+
 /** Longest `cwd` accepted; matches the path limit used by the file checks. */
 const TERMINAL_CWD_MAX_CHARS = 32_767
 

@@ -22,8 +22,9 @@ function fakeXterm(rows: Array<{ text: string; wrapped?: boolean }>, cursor = { 
 
 describe('terminal test hook', () => {
   afterEach(() => {
-    delete window.__ERFANA_TEST_HOOKS__
+    delete (window as unknown as Record<string, unknown>).__ERFANA_TEST_HOOKS__
     delete window.__erfanaTest
+    delete (window as unknown as Record<string, unknown>).api
   })
 
   it('installs nothing when the launcher did not switch the hooks on', () => {
@@ -34,7 +35,16 @@ describe('terminal test hook', () => {
   })
 
   it('does not install on a truthy value other than true', () => {
-    ;(window as unknown as Record<string, unknown>).__ERFANA_TEST_HOOKS__ = 'yes'
+    ;(window as unknown as Record<string, unknown>).api = { testHooks: { enabled: 'yes' } }
+
+    registerTestTerminal('terminal-1', fakeXterm([{ text: 'x' }]))
+
+    expect(window.__erfanaTest).toBeUndefined()
+  })
+
+  it('ignores a global that page script sets', () => {
+    ;(window as unknown as Record<string, unknown>).__ERFANA_TEST_HOOKS__ = true
+    ;(window as unknown as Record<string, unknown>).api = { testHooks: { enabled: false } }
 
     registerTestTerminal('terminal-1', fakeXterm([{ text: 'x' }]))
 
@@ -43,7 +53,7 @@ describe('terminal test hook', () => {
 
   describe('when the hooks are on', () => {
     const enable = (): void => {
-      window.__ERFANA_TEST_HOOKS__ = true
+      ;(window as unknown as Record<string, unknown>).api = { testHooks: { enabled: true } }
     }
 
     it('returns the buffer text with wrapped rows joined and blank rows dropped', () => {

@@ -209,6 +209,8 @@ declare global {
         addRecentProject: (path: string, name: string) => Promise<{ success: boolean; error?: string }>
         removeRecentProject: (path: string) => Promise<{ success: boolean; error?: string }>
       }
+      /** E2E test-hook switch, set by the preload from the launch arguments only */
+      testHooks: { readonly enabled: boolean }
       terminal: {
         isAvailable: (terminalId?: string) => Promise<{ success: boolean; available: boolean; initialized?: boolean }>
         /**
@@ -489,12 +491,7 @@ declare global {
      * @see docs/design/design-issue-60.md §2.8
      */
     __ERFANA_FORCE_CRASH__?: true
-    /**
-     * E2E test-hook flag, exposed only when the main process appended
-     * `--erfana-test-hooks` (unpackaged + `ERFANA_E2E_TEST_HOOKS=1`).
-     */
-    __ERFANA_TEST_HOOKS__?: true
-    /** Installed by the renderer only when {@link Window.__ERFANA_TEST_HOOKS__} is set. */
+    /** Installed by the renderer only when `api.testHooks.enabled` is true. */
     __erfanaTest?: {
       /** The text of a terminal's xterm buffer, or null for an unknown id */
       terminalText: (terminalId: string) => string | null

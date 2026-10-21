@@ -64,6 +64,13 @@ export type { FileNode, FileStats }
 
 // Custom APIs for renderer
 const api = {
+  /**
+   * E2E test-hook switch. True only when main appended {@link TEST_HOOKS_ARG}
+   * (unpackaged app + `ERFANA_E2E_TEST_HOOKS=1`). The preload is the only source:
+   * the renderer reads this value, never a global that page script could set.
+   */
+  testHooks: { enabled: process.argv.includes(TEST_HOOKS_ARG) },
+
   // File operations
   file: {
     openProject: (): Promise<string | null> => ipcRenderer.invoke('file:openProject'),
@@ -1176,22 +1183,12 @@ const electron = {
  */
 const forceCrash = process.argv.includes(FORCE_CRASH_ARG)
 
-/**
- * E2E test-hook flag. Same mechanism as {@link forceCrash}: main appends
- * {@link TEST_HOOKS_ARG} only when the app is UNPACKAGED and
- * `ERFANA_E2E_TEST_HOOKS=1` is set. Exposed ONLY when true.
- */
-const testHooks = process.argv.includes(TEST_HOOKS_ARG)
-
 if (process.contextIsolated) {
   try {
     contextBridge.exposeInMainWorld('electron', electron)
     contextBridge.exposeInMainWorld('api', api)
     if (forceCrash) {
       contextBridge.exposeInMainWorld('__ERFANA_FORCE_CRASH__', true)
-    }
-    if (testHooks) {
-      contextBridge.exposeInMainWorld('__ERFANA_TEST_HOOKS__', true)
     }
   } catch (error) {
     console.error(error)
@@ -1201,8 +1198,5 @@ if (process.contextIsolated) {
   ;(window as unknown as { api: typeof api }).api = api
   if (forceCrash) {
     ;(window as unknown as { __ERFANA_FORCE_CRASH__: boolean }).__ERFANA_FORCE_CRASH__ = true
-  }
-  if (testHooks) {
-    ;(window as unknown as { __ERFANA_TEST_HOOKS__: boolean }).__ERFANA_TEST_HOOKS__ = true
   }
 }
