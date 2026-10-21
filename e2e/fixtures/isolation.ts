@@ -20,6 +20,7 @@
  */
 
 import type { ElectronApplication } from '@playwright/test'
+import { execFile, type ChildProcess } from 'child_process'
 import * as fs from 'fs'
 import * as path from 'path'
 
@@ -198,15 +199,56 @@ export async function removeDirWithRetry(dir: string): Promise<void> {
   }
 }
 
-/** Longest teardown waits for the app process to exit after `close()`. */
-const APP_EXIT_TIMEOUT_MS = 10_000
-/** Longest teardown waits for the exit after SIGKILL before moving on. */
+/**
+ * Longest teardown waits for `close()` AND the process exit together. One
+ * deadline covers both, so a `close()` that never settles is cut too (#63).
+ */
+export const APP_EXIT_TIMEOUT_MS = 15_000
+/** Longest teardown waits for the exit after the kill before moving on. */
 const APP_KILL_TIMEOUT_MS = 5_000
+
+/** Resolve with `value`, or with `'timeout'` after `ms`. */
+async function withDeadline<T>(promise: Promise<T>, ms: number): Promise<T | 'timeout'> {
+  let timer: NodeJS.Timeout | undefined
+  const timedOut = new Promise<'timeout'>((resolve) => {
+    timer = setTimeout(() => resolve('timeout'), ms)
+  })
+  try {
+    return await Promise.race([promise, timedOut])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
+/**
+ * Kill the app Playwright started, and only that one: found by its own PID,
+ * never by name or command-line pattern. On Windows `taskkill /T` also ends its
+ * GPU, utility and renderer children, which otherwise outlive the main process
+ * and keep the test folders locked. Elsewhere SIGKILL goes to the PID alone –
+ * never to the process group, which Playwright's child shares with the runner.
+ *
+ * @returns What was killed, for the teardown log
+ */
+async function killAppProcess(child: ChildProcess): Promise<string> {
+  const pid = child.pid
+  if (pid === undefined) return 'nothing (the app has no PID)'
+  if (process.platform === 'win32') {
+    return new Promise((resolve) => {
+      execFile('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true }, (error, stdout, stderr) => {
+        const output = `${stdout}${stderr}`.trim().replace(/\s+/g, ' ')
+        resolve(error ? `taskkill /PID ${pid} /T /F failed: ${output || error.message}` : `process tree of PID ${pid} (${output})`)
+      })
+    })
+  }
+  child.kill('SIGKILL')
+  return `PID ${pid} (SIGKILL)`
+}
 
 /**
  * Close the app and resolve only once its process has exited, so the folders
- * it had open can be removed. If a graceful close fails or hangs, the process
- * Playwright started (and only that one) is killed.
+ * it had open can be removed. If `close()` fails, hangs or never settles, or the
+ * process outlives the deadline, the app Playwright started (and only that one)
+ * is killed.
  */
 export async function closeAppAndWait(app: ElectronApplication): Promise<void> {
   const child = app.process()
@@ -215,27 +257,20 @@ export async function closeAppAndWait(app: ElectronApplication): Promise<void> {
       ? Promise.resolve()
       : new Promise<void>((resolve) => child.once('exit', () => resolve()))
 
-  try {
-    await app.close()
-  } catch (error) {
+  const closed = app.close().catch((error: unknown) => {
     console.warn('[fixture teardown] app.close() failed:', error)
-  }
-
-  let timer: NodeJS.Timeout | undefined
-  const timedOut = new Promise<'timeout'>((resolve) => {
-    timer = setTimeout(() => resolve('timeout'), APP_EXIT_TIMEOUT_MS)
   })
-  const outcome = await Promise.race([exited.then(() => 'exited' as const), timedOut])
-  if (timer) clearTimeout(timer)
+  const outcome = await withDeadline(
+    closed.then(() => exited).then(() => 'exited' as const),
+    APP_EXIT_TIMEOUT_MS
+  )
+  if (outcome === 'exited') return
 
-  if (outcome === 'timeout') {
-    console.warn('[fixture teardown] app did not exit in time, killing it')
-    child.kill('SIGKILL')
-    let killTimer: NodeJS.Timeout | undefined
-    const killTimedOut = new Promise<void>((resolve) => {
-      killTimer = setTimeout(resolve, APP_KILL_TIMEOUT_MS)
-    })
-    await Promise.race([exited, killTimedOut])
-    if (killTimer) clearTimeout(killTimer)
+  const killed = await killAppProcess(child)
+  console.warn(
+    `[fixture teardown] app did not close and exit within ${APP_EXIT_TIMEOUT_MS} ms; killed ${killed}`
+  )
+  if ((await withDeadline(exited, APP_KILL_TIMEOUT_MS)) === 'timeout') {
+    console.warn(`[fixture teardown] PID ${child.pid} still running ${APP_KILL_TIMEOUT_MS} ms after the kill`)
   }
 }
