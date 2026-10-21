@@ -39,6 +39,7 @@ import {
   cleanTelLink
 } from '../../utils/linkProtocols'
 import { logger } from '../../utils/logger'
+import { stablePathDigest } from '../../utils/fileUtils'
 import { textClipboard } from '../../services/textClipboard'
 import { TEST_IDS } from '../../constants/testids'
 import { notePreviewRenderStart, notePreviewRenderCommit } from '../../utils/previewRenderTiming'
@@ -447,7 +448,13 @@ function createMarkdownComponents(
 
       // Handle anchor-only links (same-document navigation)
       if (isAnchorOnly) {
-        const anchorId = href.slice(1)
+        // Heading ids are the decoded text: `[x](#été)` arrives as `#%C3%A9t%C3%A9`
+        let anchorId = href.slice(1)
+        try {
+          anchorId = decodeURIComponent(anchorId)
+        } catch {
+          // malformed escape: use the text as written
+        }
         // Scroll to anchor within current preview
         const targetElement = document.getElementById(anchorId)
         if (targetElement) {
@@ -788,25 +795,39 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
     const deferredContent = useDeferredValue(releasedContent)
     const renderedContent = isUrgentRelease ? releasedContent : deferredContent
 
+    // The hrefs come from the parsed tree (see `rehypeCollectLinks`), so they are
+    // the exact strings the link renderer looks results up by. The body fills
+    // the sink while it parses; its commit callback publishes them.
+    const [linkSink] = useState(() => new Set<string>())
     /**
-     * Internal links in the rendered document, as one stable string key.
+     * Internal links in the rendered document, as one stable string key, with the
+     * file they were read for.
      *
      * Only links that need resolution (not external, not anchors, not
      * dangerous). Sorted and joined so that typing which leaves the set of
-     * links unchanged yields the same key and does not re-run the checks.
+     * links unchanged yields the same key and does not re-run the checks. The
+     * file is published with the key so a check never runs for one file's links
+     * against another file.
      */
-    // The hrefs come from the parsed tree (see `rehypeCollectLinks`), so they are
-    // the exact strings the link renderer looks results up by. The body fills
-    // the sink while it parses; its commit callback publishes the key.
-    const linkSink = useMemo(() => new Set<string>(), [])
-    const [internalLinksKey, setInternalLinksKey] = useState('')
+    const [publishedLinks, setPublishedLinks] = useState<{ key: string; filePath?: string }>({
+      key: ''
+    })
     const publishInternalLinks = useCallback(() => {
       const key = Array.from(linkSink)
         .filter((href) => isInternalLink(href))
         .sort()
         .join(LINK_KEY_SEPARATOR)
-      setInternalLinksKey((prev) => (prev === key ? prev : key))
+      const publishedFor = filePathRef.current
+      setPublishedLinks((prev) =>
+        prev.key === key && prev.filePath === publishedFor ? prev : { key, filePath: publishedFor }
+      )
     }, [linkSink])
+    // A file change without a content change does not re-parse the body, so
+    // republish the current links for the new file. Runs after the ref-updating
+    // effect above, so `filePathRef` already holds the new path.
+    useEffect(() => {
+      publishInternalLinks()
+    }, [filePath, publishInternalLinks])
 
     /**
      * Resolve the document's internal links (tooltips, broken-link styling)
@@ -818,7 +839,11 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
      * so the links do not re-render for nothing.
      */
     useEffect(() => {
+      const internalLinksKey = publishedLinks.key
       const hrefs = internalLinksKey ? internalLinksKey.split(LINK_KEY_SEPARATOR) : []
+
+      // The links were read for another file: wait for them to be republished.
+      if (publishedLinks.filePath !== filePath) return
 
       // No project context, or nothing to resolve.
       if (!filePath || hrefs.length === 0) {
@@ -838,7 +863,10 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
               const resolved = await resolveMarkdownLink(href, filePath, projectRoot)
               return [href, resolved] as [string, ResolvedLink | null]
             } catch (error) {
-              logger.error('Failed to resolve link', error instanceof Error ? error : undefined, { href })
+              // Digest, not the href: a link names a file in the user's project
+              logger.error('Failed to resolve link', error instanceof Error ? error : undefined, {
+                hrefDigest: stablePathDigest(href)
+              })
               return [href, null] as [string, ResolvedLink | null]
             }
           })
@@ -853,7 +881,7 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
       return () => {
         cancelled = true
       }
-    }, [internalLinksKey, filePath])
+    }, [publishedLinks, filePath])
 
     /**
      * Handle internal markdown link clicks

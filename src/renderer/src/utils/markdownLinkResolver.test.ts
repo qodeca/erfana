@@ -541,6 +541,13 @@ describe('markdownLinkResolver', () => {
       expect(mockExists).not.toHaveBeenCalled()
     })
 
+    it('refuses a link that leaves the project and comes back in', async () => {
+      mockExists.mockResolvedValue(true)
+      expect(await resolveMarkdownLink('../../proj/x.md', file, root, win)).toBeNull()
+      expect(await resolveMarkdownLink('../../../proj/x.md', file, root, win)).toBeNull()
+      expect(mockExists).not.toHaveBeenCalled()
+    })
+
     it('rejects an encoded climb on POSIX too', async () => {
       mockExists.mockResolvedValue(true)
       const posixFile = '/proj/a.md'

@@ -22,6 +22,7 @@
 
 import { isDangerousProtocol, isExternalProtocol } from './linkProtocols'
 import { logger } from './logger'
+import { stablePathDigest } from './fileUtils'
 import { getRendererPlatform, isWindows } from './platform'
 
 export interface ResolvedLink {
@@ -180,7 +181,10 @@ async function checkFileExists(filePath: string): Promise<boolean> {
   // error-message parsing.
   const exists = await window.api.file.exists(filePath)
   if (!exists) {
-    logger.debug('[MarkdownLinkResolver] link target missing', { filePath })
+    // Digest, not the path: it names a file in the user's project
+    logger.debug('[MarkdownLinkResolver] link target missing', {
+      pathDigest: stablePathDigest(filePath)
+    })
   }
   return exists
 }
