@@ -51,3 +51,153 @@ index 1ac5758..d2a5e79 100644
              },
              'msvs_settings': {
                  # Specify this setting here to override a setting from somewhere
+diff --git a/node_modules/node-pty/scripts/prebuild.js b/node_modules/node-pty/scripts/prebuild.js
+index 17f1d98..16d1ec6 100644
+--- a/node_modules/node-pty/scripts/prebuild.js
++++ b/node_modules/node-pty/scripts/prebuild.js
+@@ -24,6 +24,13 @@ if (process.env.npm_config_build_from_source === 'true') {
+   process.exit(1);
+ }
+ 
++// Erfana (#305): on Windows always build conpty.node from the patched source so
++// the shipped build carries the ptyHandles lock; never accept the prebuild.
++if (process.platform === 'win32') {
++  console.log('\x1b[33m> Rebuilding from source on Windows (patched conpty.cc)\x1b[0m');
++  process.exit(1);
++}
++
+ // Check whether the correct prebuilt files exist
+ console.log('\x1b[32m> Checking prebuilds...\x1b[0m');
+ if (!fs.existsSync(PREBUILD_DIR)) {
+diff --git a/node_modules/node-pty/src/win/conpty.cc b/node_modules/node-pty/src/win/conpty.cc
+index 7b286d3..a63ca9b 100644
+--- a/node_modules/node-pty/src/win/conpty.cc
++++ b/node_modules/node-pty/src/win/conpty.cc
+@@ -14,6 +14,8 @@
+ #include <node_api.h>
+ #include <assert.h>
+ #include <Shlwapi.h> // PathCombine, PathIsRelative
++#include <atomic>
++#include <mutex>
+ #include <sstream>
+ #include <iostream>
+ #include <string>
+@@ -50,9 +52,12 @@ struct pty_baton {
+ };
+ 
+ static std::vector<std::unique_ptr<pty_baton>> ptyHandles;
+-static volatile LONG ptyCounter;
++static std::mutex g_ptyHandlesMutex;
++static std::atomic<int> ptyCounter{0};
+ 
+-static pty_baton* get_pty_baton(int id) {
++// The leading scoped-lock parameter encodes the precondition that the caller
++// holds g_ptyHandlesMutex.
++static pty_baton* get_pty_baton(const std::lock_guard<std::mutex>&, int id) {
+   auto it = std::find_if(ptyHandles.begin(), ptyHandles.end(), [id](const auto& ptyHandle) {
+     return ptyHandle->id == id;
+   });
+@@ -62,17 +67,6 @@ static pty_baton* get_pty_baton(int id) {
+   return nullptr;
+ }
+ 
+-static bool remove_pty_baton(int id) {
+-  auto it = std::remove_if(ptyHandles.begin(), ptyHandles.end(), [id](const auto& ptyHandle) {
+-    return ptyHandle->id == id;
+-  });
+-  if (it != ptyHandles.end()) {
+-    ptyHandles.erase(it);
+-    return true;
+-  }
+-  return false;
+-}
+-
+ struct ExitEvent {
+   int exit_code = 0;
+ };
+@@ -99,11 +93,15 @@ void SetupExitCallback(Napi::Env env, Napi::Function cb, pty_baton* baton) {
+     ExitEvent *exit_event = new ExitEvent;
+     // Wait for process to complete.
+     WaitForSingleObject(baton->hShell, INFINITE);
+-    // Get process exit code.
+-    GetExitCodeProcess(baton->hShell, (LPDWORD)(&exit_event->exit_code));
+-    // Clean up handles
+-    CloseHandle(baton->hShell);
+-    assert(remove_pty_baton(baton->id));
++    {
++      std::lock_guard<std::mutex> lock(g_ptyHandlesMutex);
++      GetExitCodeProcess(baton->hShell, (LPDWORD)(&exit_event->exit_code));
++      CloseHandle(baton->hShell);
++      const int id = baton->id;
++      std::erase_if(ptyHandles, [id](const auto& ptyHandle) {
++        return ptyHandle->id == id;
++      });
++    }
+ 
+     auto status = tsfn.BlockingCall(exit_event, callback); // In main thread
+     switch (status) {
+@@ -299,10 +297,13 @@ static Napi::Value PtyStartProcess(const Napi::CallbackInfo& info) {
+ 
+   if (SUCCEEDED(hr)) {
+     // We were able to instantiate a conpty
+-    const int ptyId = InterlockedIncrement(&ptyCounter);
++    const int ptyId = ++ptyCounter;
+     marshal.Set("pty", Napi::Number::New(env, ptyId));
+-    ptyHandles.emplace_back(
+-        std::make_unique<pty_baton>(ptyId, hIn, hOut, hpc));
++    {
++      std::lock_guard<std::mutex> lock(g_ptyHandlesMutex);
++      ptyHandles.emplace_back(
++          std::make_unique<pty_baton>(ptyId, hIn, hOut, hpc));
++    }
+   } else {
+     throw Napi::Error::New(env, "Cannot launch conpty");
+   }
+@@ -350,10 +351,13 @@ static Napi::Value PtyConnect(const Napi::CallbackInfo& info) {
+   const bool useConptyDll = info[4].As<Napi::Boolean>().Value();
+   Napi::Function exitCallback = info[5].As<Napi::Function>();
+ 
+-  // Fetch pty handle from ID and start process
+-  pty_baton* handle = get_pty_baton(id);
+-  if (!handle) {
+-    throw Napi::Error::New(env, "Invalid pty handle");
++  pty_baton* handle;
++  {
++    std::lock_guard<std::mutex> lock(g_ptyHandlesMutex);
++    handle = get_pty_baton(lock, id);
++    if (!handle) {
++      throw Napi::Error::New(env, "Invalid pty handle");
++    }
+   }
+ 
+   // Prepare command line
+@@ -472,7 +476,8 @@ static Napi::Value PtyResize(const Napi::CallbackInfo& info) {
+   SHORT rows = static_cast<SHORT>(info[2].As<Napi::Number>().Uint32Value());
+   const bool useConptyDll = info[3].As<Napi::Boolean>().Value();
+ 
+-  const pty_baton* handle = get_pty_baton(id);
++  std::lock_guard<std::mutex> lock(g_ptyHandlesMutex);
++  const pty_baton* handle = get_pty_baton(lock, id);
+ 
+   if (handle != nullptr) {
+     HANDLE hLibrary = LoadConptyDll(info, useConptyDll);
+@@ -513,7 +518,8 @@ static Napi::Value PtyClear(const Napi::CallbackInfo& info) {
+     return env.Undefined();
+   }
+ 
+-  const pty_baton* handle = get_pty_baton(id);
++  std::lock_guard<std::mutex> lock(g_ptyHandlesMutex);
++  const pty_baton* handle = get_pty_baton(lock, id);
+ 
+   if (handle != nullptr) {
+     HANDLE hLibrary = LoadConptyDll(info, useConptyDll);
+@@ -544,7 +550,8 @@ static Napi::Value PtyKill(const Napi::CallbackInfo& info) {
+   int id = info[0].As<Napi::Number>().Int32Value();
+   const bool useConptyDll = info[1].As<Napi::Boolean>().Value();
+ 
+-  const pty_baton* handle = get_pty_baton(id);
++  std::lock_guard<std::mutex> lock(g_ptyHandlesMutex);
++  const pty_baton* handle = get_pty_baton(lock, id);
+ 
+   if (handle != nullptr) {
+     HANDLE hLibrary = LoadConptyDll(info, useConptyDll);
