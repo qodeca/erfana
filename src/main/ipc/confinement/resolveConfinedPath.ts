@@ -108,6 +108,8 @@ const WIN_DEVICE_PREFIX = /^[\\/]{2}[?.](?:[\\/]|$)|^[\\/]\?\?(?:[\\/]|$)/
 const WIN_DRIVE_ROOT = /^[A-Za-z]:[\\/]/
 const WIN_UNC_ROOT = /^[\\/]{2}[^\\/]+[\\/]+[^\\/]+/
 const PATH_SEPARATORS = /[\\/]+/
+/** Reserved device basenames; the superscript digits reserve COM and LPT too. */
+const WIN_DEVICE_NAME = /^(?:CON|PRN|AUX|NUL|(?:COM|LPT)[1-9¹²³])$/i
 
 const invalid = (): ConfinementError => new ConfinementError('INVALID_PATH')
 
@@ -142,6 +144,9 @@ function checkForm(input: unknown, deps: ConfinementDeps): string {
     // `:` opens an alternate data stream; a trailing dot or space is trimmed by Win32,
     // so the lexical path and the one that gets opened would differ
     if (segment.includes(':') || segment.endsWith('.') || segment.endsWith(' ')) throw invalid()
+    // `CON`, `NUL.txt`, `com1`, `COM¹` open a device, not a file, in any folder and
+    // for every mode - a read or a delete reaches the device just as a create does
+    if (WIN_DEVICE_NAME.test(segment.split('.')[0].trim())) throw invalid()
   }
   return input
 }

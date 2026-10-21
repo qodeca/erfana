@@ -426,6 +426,21 @@ describe('resolveConfinedPath – Windows', () => {
     expect(await outcome('C:\\p\\gone\\ok.md', ctx, project, cDrive)).toBe('ACCEPTED')
   })
 
+  it('row 23b: a reserved device name is invalid in every mode, existing or not', async () => {
+    const ctx = ctxFor('C:\\p')
+    const names = ['CON', 'prn', 'Aux.md', 'NUL.txt', 'COM1', 'lpt9.md', 'COM\u00B9', 'lpt\u00B2.txt', 'COM\u00B3']
+    for (const name of names) {
+      for (const policy of [project, entry, { mode: 'external' } as PathPolicy]) {
+        expect(await outcome(`C:\\p\\${name}`, ctx, policy, cDrive), name).toBe('INVALID_PATH')
+        expect(await outcome(`C:\\p\\sub\\${name}\\x.md`, ctx, policy, cDrive), name).toBe('INVALID_PATH')
+      }
+    }
+    // Look-alikes that are ordinary names stay valid
+    for (const name of ['console.md', 'COM0', 'COM10', 'auxiliary']) {
+      expect(await outcome(`C:\\p\\${name}`, ctx, project, cDrive), name).not.toBe('INVALID_PATH')
+    }
+  })
+
   it('row 26: a project opened by its short 8.3 name accepts the long-name spelling', async () => {
     const shortName = win({
       'C:\\': 'dir',

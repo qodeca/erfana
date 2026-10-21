@@ -43,7 +43,7 @@ import { textClipboard } from '../../services/textClipboard'
 import { TEST_IDS } from '../../constants/testids'
 import { notePreviewRenderStart, notePreviewRenderCommit } from '../../utils/previewRenderTiming'
 import { useIdleDebouncedValue } from '../../hooks/useIdleDebouncedValue'
-import { rehypeHeadingIds, rehypeShiftLines } from './previewRehypePlugins'
+import { rehypeCollectLinks, rehypeHeadingIds, rehypeShiftLines } from './previewRehypePlugins'
 import { PreviewWorkContext, PreviewWorkTracker } from './previewWork'
 import './MarkdownPreview.css'
 
@@ -229,14 +229,15 @@ const remarkPluginsWithBreaks = [remarkGfm, remarkBreaks]
  *
  * Reference: https://github.com/rehypejs/rehype-raw and https://github.com/rehypejs/rehype-sanitize
  */
-function buildRehypePlugins(lineOffset: number): PluggableList {
+function buildRehypePlugins(lineOffset: number, linkSink: Set<string>): PluggableList {
   return [
     rehypeRaw,
     [rehypeSanitize, sanitizationSchema],
     // After sanitize: ids must not get the `user-content-` clobber prefix, and
     // line numbers must be final before the renderers read them.
     rehypeHeadingIds,
-    [rehypeShiftLines, { offset: lineOffset }]
+    [rehypeShiftLines, { offset: lineOffset }],
+    [rehypeCollectLinks, { sink: linkSink }]
   ]
 }
 
@@ -599,6 +600,8 @@ interface MarkdownBodyProps {
   remarkPlugins: PluggableList
   /** Element renderers; stable for the life of the panel */
   components: Components
+  /** Refilled with every link href on each parse; stable for the life of the panel */
+  linkSink: Set<string>
   /** Forwarded to the timing probe */
   onCommit: (durationMs: number, isUpdate: boolean) => void
 }
@@ -616,9 +619,10 @@ const MarkdownBody = memo(function MarkdownBody({
   lineOffset,
   remarkPlugins,
   components,
+  linkSink,
   onCommit
 }: MarkdownBodyProps): JSX.Element {
-  const rehypePlugins = useMemo(() => buildRehypePlugins(lineOffset), [lineOffset])
+  const rehypePlugins = useMemo(() => buildRehypePlugins(lineOffset, linkSink), [lineOffset, linkSink])
   return (
     <RenderTimingProbe onCommit={onCommit}>
       <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={components}>
@@ -791,27 +795,18 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
      * dangerous). Sorted and joined so that typing which leaves the set of
      * links unchanged yields the same key and does not re-run the checks.
      */
-    const internalLinksKey = useMemo(() => {
-      const linkRegex = /\[([^\]]*)\]\(([^)]+)\)/g
-      const links = new Set<string>()
-      let match: RegExpExecArray | null
-
-      while ((match = linkRegex.exec(renderedContent)) !== null) {
-        const href = match[2]
-
-        // Skip dangerous protocols
-        if (isDangerousProtocol(href)) {
-          continue
-        }
-
-        // Skip external protocols and anchor-only links
-        if (!isExternalProtocol(href) && !href.startsWith('#')) {
-          links.add(href)
-        }
-      }
-
-      return Array.from(links).sort().join(LINK_KEY_SEPARATOR)
-    }, [renderedContent])
+    // The hrefs come from the parsed tree (see `rehypeCollectLinks`), so they are
+    // the exact strings the link renderer looks results up by. The body fills
+    // the sink while it parses; its commit callback publishes the key.
+    const linkSink = useMemo(() => new Set<string>(), [])
+    const [internalLinksKey, setInternalLinksKey] = useState('')
+    const publishInternalLinks = useCallback(() => {
+      const key = Array.from(linkSink)
+        .filter((href) => isInternalLink(href))
+        .sort()
+        .join(LINK_KEY_SEPARATOR)
+      setInternalLinksKey((prev) => (prev === key ? prev : key))
+    }, [linkSink])
 
     /**
      * Resolve the document's internal links (tooltips, broken-link styling)
@@ -1067,7 +1062,8 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
       // Reported from this component's layout effect below: on mount the
       // root's ref is attached only after the body's effects have run.
       bodyCommittedRef.current = true
-    }, [])
+      publishInternalLinks()
+    }, [publishInternalLinks])
     const bodyCommittedRef = useRef(false)
 
     useLayoutEffect(() => {
@@ -1215,6 +1211,7 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
                 lineOffset={frontmatterLineCount}
                 remarkPlugins={remarkPlugins}
                 components={markdownComponents}
+                linkSink={linkSink}
                 onCommit={handleBodyCommit}
               />
             </ResolvedLinksContext.Provider>

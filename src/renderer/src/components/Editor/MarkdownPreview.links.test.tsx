@@ -229,6 +229,31 @@ describe('MarkdownPreview Link Features', () => {
     })
   })
 
+  describe('Checked links are keyed by the rendered href', () => {
+    beforeEach(() => {
+      global.window.api = {
+        utils: { getPlatform: () => 'darwin' },
+        file: {
+          getProjectPath: vi.fn().mockResolvedValue('/test/project'),
+          exists: vi.fn().mockResolvedValue(false)
+        }
+      } as any
+    })
+
+    it.each([
+      ['[a](.\\docs\\a.md)'],
+      ['[a](<my file.md>)'],
+      ['[a](zażółć.md)']
+    ])('gives %s the broken-link class and tooltip', async (markdown) => {
+      const { container } = await renderWithToastAsync(
+        <MarkdownPreview content={markdown} filePath="/test/project/file.md" />
+      )
+      const link = container.querySelector('a')
+      expect(link?.className).toContain('broken-link')
+      expect(link?.getAttribute('title')).toContain('File not found')
+    })
+  })
+
   // Note: "Focus Accessibility" test removed - it only verified that an <a> tag exists,
   // which provides no value. Actual focus-visible styles are CSS and tested visually.
 
