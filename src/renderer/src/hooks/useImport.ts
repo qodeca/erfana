@@ -32,7 +32,8 @@ import { logger } from '../utils/logger'
 import { useTranscriptionStore } from '../stores/useTranscriptionStore'
 import { useDocumentImportStore } from '../stores/useDocumentImportStore'
 import { useSettingsStore } from '../stores/useSettingsStore'
-import type { ToolState } from '../../../shared/ipc/import-schema'
+import type { ToolState, UnsafeTool } from '../../../shared/ipc/import-schema'
+import { untrustedToolMessage } from '../../../shared/errors'
 
 /** Size threshold for confirmation dialog (in MB) */
 const LARGE_FILE_THRESHOLD_MB = IMPORT.SIZE_WARNING_THRESHOLD / BYTES_PER_MB
@@ -206,7 +207,7 @@ export function useImport(): UseImportReturn {
 
     if (missingDepFiles.length > 0) {
       const ext = missingDepFiles[0].name.split('.').pop()?.toLowerCase() || ''
-      await offerImportTools(showConfirm, ext, depState.libreOfficeState)
+      await offerImportTools(showConfirm, ext, depState.libreOfficeState, depState.libreOfficeUnsafe)
       filesToProcess = filesToProcess.filter(f => !missingDepFiles.includes(f))
       if (filesToProcess.length === 0) {
         return { successCount: 0, failCount: 0, skippedCount: missingDepFiles.length + mediaFiles.length + documentFiles.length, outputPaths: [], failures: [] }
@@ -373,7 +374,7 @@ export function useImport(): UseImportReturn {
     const depState = useDocumentImportStore.getState()
 
     if ((DOCUMENT_IMPORT.LIBREOFFICE_EXTENSIONS as readonly string[]).includes(ext) && !depState.hasLibreOffice) {
-      await offerImportTools(showConfirm, ext, depState.libreOfficeState)
+      await offerImportTools(showConfirm, ext, depState.libreOfficeState, depState.libreOfficeUnsafe)
       return null
     }
 
@@ -404,7 +405,14 @@ export function useImport(): UseImportReturn {
  * points at Settings → Import tools, which has the install hint for this
  * platform and a "Check again" that needs no restart.
  */
-export function missingToolMessage(ext: string, state: ToolState | null): string {
+export function missingToolMessage(ext: string, state: ToolState | null, unsafe: UnsafeTool = null): string {
+  if (state === 'unsafe' && unsafe) {
+    // Same wording as the conversion refusal in main and the Settings hint.
+    return (
+      `Importing .${ext} files needs LibreOffice. ${untrustedToolMessage(unsafe.tool, unsafe.reason)}\n\n` +
+      `Import tools in Settings has details.`
+    )
+  }
   if (state === 'unsafe') {
     return (
       `Importing .${ext} files needs LibreOffice. A copy was found, but Erfana will not run it: it is in the open ` +
@@ -425,11 +433,12 @@ export function missingToolMessage(ext: string, state: ToolState | null): string
 async function offerImportTools(
   showConfirm: ReturnType<typeof useDialog>['showConfirm'],
   ext: string,
-  state: ToolState | null
+  state: ToolState | null,
+  unsafe: UnsafeTool
 ): Promise<void> {
   const open = await showConfirm({
     title: state === 'unsafe' ? 'LibreOffice in an unsafe location' : 'LibreOffice required',
-    message: missingToolMessage(ext, state),
+    message: missingToolMessage(ext, state, unsafe),
     confirmLabel: 'Open import tools',
     cancelLabel: 'Close',
     danger: false

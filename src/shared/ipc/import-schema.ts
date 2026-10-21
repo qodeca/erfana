@@ -11,6 +11,7 @@
  * @see Spec #021 - LiteParse document import
  */
 import { z } from 'zod'
+import { UNSAFE_TOOL_NAMES, UNSAFE_TOOL_REASONS } from '../unsafeTool'
 
 /**
  * Import options for document conversion
@@ -74,6 +75,13 @@ export interface DocumentImportResult {
 export const ToolStateSchema = z.enum(['found', 'missing', 'unsafe'])
 export type ToolState = z.infer<typeof ToolStateSchema>
 
+/** For an `unsafe` LibreOffice: which program and why – never a path. Null otherwise. */
+export const UnsafeToolSchema = z
+  .object({ tool: z.enum(UNSAFE_TOOL_NAMES), reason: z.enum(UNSAFE_TOOL_REASONS) })
+  .strict()
+  .nullable()
+export type UnsafeTool = z.infer<typeof UnsafeToolSchema>
+
 /**
  * Dependency detection result event
  *
@@ -83,6 +91,8 @@ export type ToolState = z.infer<typeof ToolStateSchema>
  */
 export interface DependencyReadyEvent {
   libreOffice: ToolState
+  /** Set only when `libreOffice` is `unsafe` */
+  unsafe: UnsafeTool
   /** Full list of supported document extensions after detection */
   extensions: string[]
 }
@@ -104,6 +114,8 @@ export const ImportToolStatusSchema = z
   .object({
     /** What LibreOffice detection found */
     libreOffice: ToolStateSchema,
+    /** Set only when `libreOffice` is `unsafe`: which program and why */
+    unsafe: UnsafeToolSchema,
     /** Supported document extensions after detection (same list as `DependencyReadyEvent`) */
     extensions: z.array(z.string()),
     /**

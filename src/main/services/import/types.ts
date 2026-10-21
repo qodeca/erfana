@@ -7,6 +7,7 @@
  * All converters implement the IConverter interface.
  */
 
+import type { UnsafeToolInfo } from '../../../shared/unsafeTool'
 import { ErrorCode } from '../../../shared/errors'
 import type { TranscriptionResult } from '../../../shared/ipc/transcription-schema'
 
@@ -200,4 +201,6 @@ export type ToolState = 'found' | 'missing' | 'unsafe'
  */
 export interface DependencyStatus {
   libreOffice: ToolState
+  /** Which program was refused and why, when `libreOffice` is `unsafe` (#250) */
+  unsafe?: UnsafeToolInfo | null
 }

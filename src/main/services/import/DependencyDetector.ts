@@ -5,6 +5,7 @@ import { tmpdir } from 'os'
 import { posix, win32 } from 'path'
 import { resolveLibreOffice, type LibreOfficeResolution } from './conversionToolGuard'
 import type { DependencyStatus, ToolState } from './types'
+import { UNSAFE_TOOL_NAMES, type UnsafeToolName } from '../../../shared/unsafeTool'
 
 /** Timeout for each dependency check command (ms) */
 const DETECTION_TIMEOUT_MS = 5000
@@ -80,18 +81,22 @@ export class DependencyDetector {
   }
 
   private async runDetection(): Promise<DependencyStatus> {
-    return { libreOffice: await this.detectLibreOffice() }
-  }
-
-  private async detectLibreOffice(): Promise<ToolState> {
     let resolution: LibreOfficeResolution
     try {
       resolution = this.resolve(this.untrustedRoots())
     } catch {
-      return 'missing'
+      return { libreOffice: 'missing', unsafe: null }
     }
-    if (resolution.state !== 'found') return resolution.state
-    return (await this.tryCommand(resolution.path, ['--version'])) ? 'found' : 'missing'
+    if (resolution.state === 'missing') return { libreOffice: 'missing', unsafe: null }
+    if (resolution.state === 'unsafe') {
+      // The name always comes from LiteParse's fixed list; anything else is reported as soffice.
+      const tool = (UNSAFE_TOOL_NAMES as readonly string[]).includes(resolution.name)
+        ? (resolution.name as UnsafeToolName)
+        : 'soffice'
+      return { libreOffice: 'unsafe', unsafe: { tool, reason: resolution.reason } }
+    }
+    const state: ToolState = (await this.tryCommand(resolution.path, ['--version'])) ? 'found' : 'missing'
+    return { libreOffice: state, unsafe: null }
   }
 
   /**

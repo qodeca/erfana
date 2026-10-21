@@ -13,7 +13,8 @@ import { useDocumentImportStore } from '../../../stores/useDocumentImportStore'
 import { useSettingsStore } from '../../../stores/useSettingsStore'
 import { TEST_IDS } from '../../../constants/testids'
 import { DOCUMENT_IMPORT } from '../../../../../shared/constants'
-import type { ImportToolStatusResponse, ToolState } from '../../../../../shared/ipc/import-schema'
+import type { ImportToolStatusResponse, ToolState, UnsafeTool } from '../../../../../shared/ipc/import-schema'
+import { untrustedToolMessage } from '../../../../../shared/errors'
 
 const mockLogger = vi.hoisted(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }))
 vi.mock('../../../utils/logger', () => ({ logger: mockLogger }))
@@ -24,8 +25,8 @@ const mockToolStatus = vi.fn<(request: { recheck: boolean }) => Promise<ImportTo
 const mockOpenExternal = vi.fn(async (_url: string) => undefined)
 const mockGetPlatform = vi.fn(() => 'darwin')
 
-function ok(libreOffice: ToolState, throttled = false): ImportToolStatusResponse {
-  return { success: true, libreOffice, extensions: ['pdf'], throttled }
+function ok(libreOffice: ToolState, throttled = false, unsafe: UnsafeTool = null): ImportToolStatusResponse {
+  return { success: true, libreOffice, unsafe, extensions: ['pdf'], throttled }
 }
 
 beforeEach(() => {
@@ -43,6 +44,7 @@ beforeEach(() => {
   useDocumentImportStore.setState({
     hasLibreOffice: false,
     libreOfficeState: null,
+    libreOfficeUnsafe: null,
     toolStatusKnown: false,
     isCheckingTools: false,
     toolCheckOutcome: 'idle',
@@ -99,6 +101,28 @@ describe('ImportToolsSection', () => {
     expect(within(row('office')).queryByText(/Homebrew/) !== null).toBe(lo === 'missing')
     expect(within(row('office')).queryByText(/Erfana will not run it/) !== null).toBe(lo === 'unsafe')
     expect(within(row('images')).queryByText(/Homebrew/)).toBeNull()
+  })
+
+  it.each([
+    ['soffice', 'project', 'soffice is in the open project. Remove that folder from PATH'],
+    ['soffice', 'ambiguous', 'soffice has copies in more than one PATH folder'],
+    ['libreoffice', 'unresolvable', 'libreoffice could not be checked, because its real location cannot be resolved'],
+    ['which', 'network', 'the which program LiteParse uses to find LibreOffice would be looked up on a network share']
+  ] as const)('the unsafe hint names %s, the %s reason and its fix – the same words main uses', async (tool, reason, words) => {
+    mockToolStatus.mockResolvedValue(ok('unsafe', false, { tool, reason }))
+    render(<ImportToolsSection />)
+    await waitFor(() => expect(row('office').dataset.state).toBe('unsafe'))
+
+    const hint = within(row('office')).getByText(new RegExp(words.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+    expect(hint).toHaveTextContent(untrustedToolMessage(tool, reason))
+    expect(hint).toHaveAttribute('data-reason', reason)
+    // Never a path.
+    expect(hint.textContent).not.toMatch(/[\\/]/)
+  })
+
+  it('falls back to the general unsafe hint when no reason arrived', async () => {
+    await renderWith('unsafe')
+    expect(within(row('office')).getByText(/temporary folder or a network share/)).toBeInTheDocument()
   })
 
   it('lists every extension in the image and office rows', async () => {

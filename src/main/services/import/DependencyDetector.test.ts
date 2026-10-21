@@ -52,7 +52,7 @@ describe('DependencyDetector', () => {
     probeSucceedsFor(SOFFICE)
     const { detector } = detectorWith({ state: 'found', path: SOFFICE })
 
-    expect(await detector.detect()).toEqual({ libreOffice: 'found' })
+    expect(await detector.detect()).toEqual({ libreOffice: 'found', unsafe: null })
     expect(mockedExecFile).toHaveBeenCalledWith(SOFFICE, ['--version'], expect.any(Object), expect.any(Function))
   })
 
@@ -60,21 +60,28 @@ describe('DependencyDetector', () => {
     probeSucceedsFor()
     const { detector } = detectorWith({ state: 'found', path: SOFFICE })
 
-    expect(await detector.detect()).toEqual({ libreOffice: 'missing' })
+    expect(await detector.detect()).toEqual({ libreOffice: 'missing', unsafe: null })
   })
 
   it('reports missing without running anything when nothing resolves', async () => {
     const { detector } = detectorWith({ state: 'missing' })
 
-    expect(await detector.detect()).toEqual({ libreOffice: 'missing' })
+    expect(await detector.detect()).toEqual({ libreOffice: 'missing', unsafe: null })
     expect(mockedExecFile).not.toHaveBeenCalled()
   })
 
   it('reports unsafe – and never runs the binary – when a conversion would refuse it', async () => {
     probeSucceedsFor('/work/repo/soffice')
-    const { detector } = detectorWith({ state: 'unsafe', name: 'soffice', path: '/work/repo/soffice' })
+    const { detector } = detectorWith({ state: 'unsafe', name: 'soffice', path: '/work/repo/soffice', reason: 'temp' })
 
-    expect(await detector.detect()).toEqual({ libreOffice: 'unsafe' })
+    expect(await detector.detect()).toEqual({ libreOffice: 'unsafe', unsafe: { tool: 'soffice', reason: 'temp' } })
+    expect(mockedExecFile).not.toHaveBeenCalled()
+  })
+
+  it.each(['unresolvable', 'ambiguous', 'network'] as const)('reports the %s reason and the helper at fault', async (reason) => {
+    const { detector } = detectorWith({ state: 'unsafe', name: 'which', path: 'C:\\Repo\\which.exe', reason })
+
+    expect(await detector.detect()).toEqual({ libreOffice: 'unsafe', unsafe: { tool: 'which', reason } })
     expect(mockedExecFile).not.toHaveBeenCalled()
   })
 
@@ -105,7 +112,7 @@ describe('DependencyDetector', () => {
     probeSucceedsFor('soffice')
     const { detector } = detectorWith({ state: 'found', path: 'soffice' })
 
-    expect(await detector.detect()).toEqual({ libreOffice: 'missing' })
+    expect(await detector.detect()).toEqual({ libreOffice: 'missing', unsafe: null })
     expect(mockedExecFile).not.toHaveBeenCalled()
   })
 
@@ -116,7 +123,7 @@ describe('DependencyDetector', () => {
       }
     })
 
-    expect(await detector.detect()).toEqual({ libreOffice: 'missing' })
+    expect(await detector.detect()).toEqual({ libreOffice: 'missing', unsafe: null })
   })
 
   it('resolves to missing when execFile throws or the child emits error', async () => {
@@ -124,7 +131,7 @@ describe('DependencyDetector', () => {
       throw new Error('spawn EACCES')
     })
     const first = detectorWith({ state: 'found', path: SOFFICE }).detector
-    expect(await first.detect()).toEqual({ libreOffice: 'missing' })
+    expect(await first.detect()).toEqual({ libreOffice: 'missing', unsafe: null })
 
     mockedExecFile.mockImplementationOnce(((_c: unknown, _a: unknown, _o: unknown, _cb: unknown) => ({
       on: (event: string, handler: (e: Error) => void) => {
@@ -132,7 +139,7 @@ describe('DependencyDetector', () => {
       }
     })) as unknown as typeof execFile)
     const second = detectorWith({ state: 'found', path: SOFFICE }).detector
-    expect(await second.detect()).toEqual({ libreOffice: 'missing' })
+    expect(await second.detect()).toEqual({ libreOffice: 'missing', unsafe: null })
   })
 
   describe('caching', () => {

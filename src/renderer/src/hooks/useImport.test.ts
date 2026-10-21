@@ -19,6 +19,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useImport, type ImportFileInfo, type ProcessFilesResult } from './useImport'
 import { IMPORT } from '../../../shared/constants'
+import { untrustedToolMessage } from '../../../shared/errors'
 
 // Mock the dialog context
 const mockShowConfirm = vi.fn()
@@ -1357,6 +1358,7 @@ describe('useImport', () => {
         documentExtensions: [],
         hasLibreOffice: false,
         libreOfficeState: 'unsafe',
+        libreOfficeUnsafe: { tool: 'soffice', reason: 'ambiguous' },
         openDialog: mockDocImportOpenDialog,
         fetchExtensions: mockFetchExtensions,
         initDependencyListener: mockInitDependencyListener
@@ -1378,12 +1380,22 @@ describe('useImport', () => {
       expect(mockShowConfirm).toHaveBeenCalledWith(
         expect.objectContaining({
           title: 'LibreOffice in an unsafe location',
-          message: expect.stringContaining('will not run it')
+          message: expect.stringContaining(untrustedToolMessage('soffice', 'ambiguous'))
         })
       )
       const { useSettingsStore } = await import('../stores/useSettingsStore')
       expect(useSettingsStore.getState().isOpen).toBe(false)
       expect(mockDocImportOpenDialog).not.toHaveBeenCalled()
+    })
+
+    it('missingToolMessage names the specific reason when it is known, and falls back otherwise', async () => {
+      const { missingToolMessage } = await import('./useImport')
+      for (const reason of ['project', 'temp', 'network', 'relative', 'unresolvable', 'ambiguous'] as const) {
+        const message = missingToolMessage('docx', 'unsafe', { tool: 'soffice', reason })
+        expect(message).toContain(untrustedToolMessage('soffice', reason))
+        expect(message).toContain('Import tools in Settings')
+      }
+      expect(missingToolMessage('docx', 'unsafe', null)).toContain('will not run it')
     })
 
     it('should import images without any external tool (LiteParse reads them natively)', async () => {

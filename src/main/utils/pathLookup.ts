@@ -28,7 +28,7 @@ import { statSync, accessSync, constants, realpathSync } from 'fs'
 import { tmpdir } from 'os'
 import { posix, win32 } from 'path'
 import { isInsideRoot, normaliseResolved } from './pathCompare'
-import type { UnsafeToolReason } from '../../shared/errors'
+import type { UnsafeToolReason } from '../../shared/unsafeTool'
 
 /** Most hits considered per name, so a PATH stuffed with copies cannot fan out probes. */
 export const MAX_PATH_HITS = 4

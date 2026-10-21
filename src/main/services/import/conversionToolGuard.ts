@@ -27,7 +27,7 @@
  */
 import { win32 } from 'path'
 import { DOCUMENT_IMPORT } from '../../../shared/constants'
-import type { UnsafeToolReason } from '../../../shared/errors'
+import type { UnsafeToolReason } from '../../../shared/unsafeTool'
 import {
   classifiedUntrustedFolders,
   defaultIsExecutableFile,

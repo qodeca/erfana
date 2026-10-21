@@ -5,7 +5,8 @@ import { useDocumentImportStore } from '../../../stores/useDocumentImportStore'
 import { useSettingsStore } from '../../../stores/useSettingsStore'
 import { textClipboard } from '../../../services/textClipboard'
 import { DOCUMENT_IMPORT } from '../../../../../shared/constants'
-import type { ToolState } from '../../../../../shared/ipc/import-schema'
+import type { ToolState, UnsafeTool } from '../../../../../shared/ipc/import-schema'
+import { untrustedToolMessage } from '../../../../../shared/errors'
 import { isMacOS, isWindows } from '../../../utils/platform'
 import { logger } from '../../../utils/logger'
 import { renderIcon } from '../../../utils/iconRegistry'
@@ -90,14 +91,20 @@ function InstallHint({ platform, onCopied }: { platform: Platform; onCopied: (me
   )
 }
 
-/** Why an "unsafe" LibreOffice is not used, and the way out. */
-function UnsafeHint(): JSX.Element {
+/**
+ * Why an "unsafe" LibreOffice is not used, and the way out. The wording comes
+ * from `untrustedToolMessage`, the same source as the conversion refusal in
+ * main, so the two never disagree. No path is ever shown.
+ */
+function UnsafeHint({ unsafe }: { unsafe: UnsafeTool }): JSX.Element {
   return (
     <div className="import-tools-hint">
-      <p className="import-tools-hint__text">
-        Erfana will not run it: the copy it would use is in the open project, a temporary folder or a
-        network share, or comes from a relative PATH entry. Remove that folder from PATH, then choose
-        Check again.
+      <p className="import-tools-hint__text" data-reason={unsafe?.reason}>
+        {unsafe
+          ? untrustedToolMessage(unsafe.tool, unsafe.reason)
+          : 'Erfana will not run it: the copy it would use is in the open project, a temporary folder or a ' +
+            'network share, or comes from a relative PATH entry. Remove that folder from PATH, then choose ' +
+            'Check again.'}
       </p>
     </div>
   )
@@ -172,6 +179,7 @@ const SUMMARY: Record<ToolState, string> = {
  */
 export function ImportToolsSection(): JSX.Element {
   const libreOfficeState = useDocumentImportStore((s) => s.libreOfficeState)
+  const libreOfficeUnsafe = useDocumentImportStore((s) => s.libreOfficeUnsafe)
   const known = useDocumentImportStore((s) => s.toolStatusKnown)
   const isChecking = useDocumentImportStore((s) => s.isCheckingTools)
   const outcome = useDocumentImportStore((s) => s.toolCheckOutcome)
@@ -249,7 +257,7 @@ export function ImportToolsSection(): JSX.Element {
           text={STATE_TEXT[officeState]}
         >
           {officeState === 'missing' && <InstallHint platform={platform} onCopied={setCopyNotice} />}
-          {officeState === 'unsafe' && <UnsafeHint />}
+          {officeState === 'unsafe' && <UnsafeHint unsafe={libreOfficeUnsafe} />}
         </FormatRow>
       </ul>
       <div className="settings-row">

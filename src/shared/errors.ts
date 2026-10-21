@@ -7,6 +7,8 @@
  * Provides type-safe error codes and structured error class
  */
 
+import type { UnsafeToolReason } from './unsafeTool'
+
 /**
  * Sentinel phrase embedded in `AppError` messages thrown by
  * `assertValidUserFilename`. Renderer formatters discriminate the
@@ -335,16 +337,13 @@ export class AppError extends Error {
  * User-friendly error messages for display
  * todo023: Error message translator
  */
-/**
- * Why a tool Erfana would run is refused (#250):
- * - `project` / `temp` – it is inside the open project or a temporary folder;
- * - `network` – it is, or would be looked up, on a network share in PATH;
- * - `relative` – it comes from a relative or empty PATH entry;
- * - `unresolvable` – its real location cannot be resolved (fail closed);
- * - `ambiguous` – two copies in different folders, and the lookup styles
- *   disagree on which one runs.
- */
-export type UnsafeToolReason = 'project' | 'temp' | 'network' | 'relative' | 'unresolvable' | 'ambiguous'
+export {
+  UNSAFE_TOOL_REASONS,
+  UNSAFE_TOOL_NAMES,
+  type UnsafeToolReason,
+  type UnsafeToolName,
+  type UnsafeToolInfo
+} from './unsafeTool'
 
 const UNSAFE_REASON_TEXT: Record<UnsafeToolReason, { what: string; fix: string }> = {
   project: { what: 'is in the open project', fix: 'Remove that folder from PATH, then try again.' },
@@ -365,13 +364,16 @@ const UNSAFE_REASON_TEXT: Record<UnsafeToolReason, { what: string; fix: string }
 }
 
 /**
- * The refusal for a conversion whose tool is untrusted (#250), naming the tool
- * or the helper (`which`, `powershell`) at fault and why. Never carries the path.
+ * Why Erfana will not run LibreOffice (#250), naming the tool or the helper
+ * (`which`, `powershell`) at fault, the reason and its fix. Never carries the
+ * path. The single wording source: the conversion refusal in main, the
+ * Settings → Import tools hint and the import refusal dialog all use it, so
+ * they cannot disagree.
  */
 export function untrustedToolMessage(tool: string, reason: UnsafeToolReason): string {
-  const who = tool === 'which' || tool === 'powershell' ? `the \`${tool}\` program LiteParse uses to find LibreOffice` : `\`${tool}\``
+  const who = tool === 'which' || tool === 'powershell' ? `the ${tool} program LiteParse uses to find LibreOffice` : tool
   const { what, fix } = UNSAFE_REASON_TEXT[reason]
-  return `Erfana did not run LibreOffice: ${who} ${what}. ${fix}`
+  return `Erfana will not run LibreOffice: ${who} ${what}. ${fix}`
 }
 
 export const ERROR_MESSAGES: Record<ErrorCode, string> = {

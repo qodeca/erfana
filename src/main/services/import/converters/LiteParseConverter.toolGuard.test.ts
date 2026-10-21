@@ -46,7 +46,7 @@ describe('LiteParseConverter – conversion tool guard (#250)', () => {
       error: untrustedToolMessage('soffice', 'project'),
       errorCode: ErrorCode.IMPORT_UNTRUSTED_TOOL
     })
-    expect(result.error).toContain('`soffice` is in the open project')
+    expect(result.error).toContain('Erfana will not run LibreOffice: soffice is in the open project. Remove that folder from PATH')
     expect(mockFind).toHaveBeenCalledWith('docx', ['/work/repo'])
     expect(mockWarn).toHaveBeenCalledTimes(1)
     expect(JSON.stringify(mockWarn.mock.calls[0])).not.toContain('/work/repo')

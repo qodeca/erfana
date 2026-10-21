@@ -34,6 +34,7 @@ async function stubLibreOfficeMissing(app: ElectronApplication): Promise<void> {
     ipcMain.handle('import:toolStatus', () => ({
       success: true,
       libreOffice: 'missing',
+      unsafe: null,
       extensions: ['pdf'],
       throttled: false
     }))

@@ -18,7 +18,8 @@ import { create } from 'zustand'
 import type {
   DocumentImportProgress,
   DocumentImportResult,
-  ToolState
+  ToolState,
+  UnsafeTool
 } from '../../../shared/ipc/import-schema'
 
 /**
@@ -68,6 +69,8 @@ interface DocumentImportState {
   hasLibreOffice: boolean
   /** What LibreOffice detection found (#250); null until a result arrives */
   libreOfficeState: ToolState | null
+  /** For an `unsafe` LibreOffice: which program and why (never a path); null otherwise */
+  libreOfficeUnsafe: UnsafeTool
   /** Whether a detection result has arrived yet (until then, the two fields above are only defaults) */
   toolStatusKnown: boolean
   /** Whether a status read or "Check again" is in flight (#250) */
@@ -151,6 +154,7 @@ export const useDocumentImportStore = create<DocumentImportState>((set, get) => 
 
   hasLibreOffice: false,
   libreOfficeState: null,
+  libreOfficeUnsafe: null,
   toolStatusKnown: false,
   isCheckingTools: false,
   toolCheckOutcome: 'idle',
@@ -317,6 +321,7 @@ export const useDocumentImportStore = create<DocumentImportState>((set, get) => 
         documentExtensions: event.extensions,
         hasLibreOffice: event.libreOffice === 'found',
         libreOfficeState: event.libreOffice,
+        libreOfficeUnsafe: event.libreOffice === 'unsafe' ? (event.unsafe ?? null) : null,
         toolStatusKnown: true
       })
     })
@@ -334,6 +339,7 @@ export const useDocumentImportStore = create<DocumentImportState>((set, get) => 
           documentExtensions: response.extensions,
           hasLibreOffice: response.libreOffice === 'found',
           libreOfficeState: response.libreOffice,
+          libreOfficeUnsafe: response.libreOffice === 'unsafe' ? (response.unsafe ?? null) : null,
           toolStatusKnown: true,
           isCheckingTools: false,
           // Only "Check again" reports an outcome; the silent read on open

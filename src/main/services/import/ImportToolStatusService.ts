@@ -118,6 +118,7 @@ export class ImportToolStatusService {
   private toStatus(deps: DependencyStatus, throttled: boolean): ImportToolStatus {
     return {
       libreOffice: deps.libreOffice,
+      unsafe: deps.libreOffice === 'unsafe' ? (deps.unsafe ?? null) : null,
       extensions: this.registry.getExtensionsByConversionType().requiresConversion,
       throttled
     }
@@ -139,6 +140,7 @@ export const importToolStatusService = new ImportToolStatusService({
   onApplied: (status) => {
     const payload: DependencyReadyEvent = {
       libreOffice: status.libreOffice,
+      unsafe: status.unsafe,
       extensions: status.extensions
     }
     broadcastToAllWindows(IMPORT_CHANNELS.DEPENDENCIES_READY, payload)

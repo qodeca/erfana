@@ -65,6 +65,7 @@ function resetStore(): void {
     documentExtensions: [],
     hasLibreOffice: false,
     libreOfficeState: null,
+    libreOfficeUnsafe: null,
     toolStatusKnown: false,
     isCheckingTools: false,
     toolCheckOutcome: 'idle'
@@ -730,13 +731,30 @@ describe('useDocumentImportStore', () => {
         return vi.fn()
       })
       useDocumentImportStore.getState().initDependencyListener()
-      captured!({ libreOffice: 'unsafe', extensions: ['pdf', 'png'] })
+      captured!({ libreOffice: 'unsafe', unsafe: { tool: 'which', reason: 'unresolvable' }, extensions: ['pdf', 'png'] })
 
       expect(useDocumentImportStore.getState()).toMatchObject({
         toolStatusKnown: true,
         libreOfficeState: 'unsafe',
+        libreOfficeUnsafe: { tool: 'which', reason: 'unresolvable' },
         hasLibreOffice: false
       })
+    })
+
+    it('keeps the unsafe details from a status read, and drops them once LibreOffice is found', async () => {
+      mockToolStatus.mockResolvedValueOnce({
+        success: true,
+        libreOffice: 'unsafe',
+        unsafe: { tool: 'soffice', reason: 'ambiguous' },
+        extensions: ['pdf'],
+        throttled: false
+      })
+      await useDocumentImportStore.getState().loadToolStatus(false)
+      expect(useDocumentImportStore.getState().libreOfficeUnsafe).toEqual({ tool: 'soffice', reason: 'ambiguous' })
+
+      mockToolStatus.mockResolvedValueOnce(status('found'))
+      await useDocumentImportStore.getState().loadToolStatus(true)
+      expect(useDocumentImportStore.getState().libreOfficeUnsafe).toBeNull()
     })
   })
 })

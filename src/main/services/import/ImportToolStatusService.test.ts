@@ -98,6 +98,16 @@ describe('ImportToolStatusService', () => {
     expect(registry.getConverter('docx')).toBeUndefined()
   })
 
+  it('passes the unsafe tool and reason through, and nothing for a found LibreOffice', async () => {
+    const ambiguous: DependencyStatus = { libreOffice: 'unsafe', unsafe: { tool: 'soffice', reason: 'ambiguous' } }
+    const { service } = build([ambiguous])
+    expect((await service.getStatus()).unsafe).toEqual({ tool: 'soffice', reason: 'ambiguous' })
+
+    const stale: DependencyStatus = { libreOffice: 'found', unsafe: { tool: 'which', reason: 'project' } }
+    const second = build([stale]).service
+    expect((await second.getStatus()).unsafe).toBeNull()
+  })
+
   it('a tool that disappears takes its extensions away again, and .rtf goes back to text', async () => {
     const { service } = build([BOTH, NONE])
     await service.getStatus()
