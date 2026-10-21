@@ -7,7 +7,7 @@
  * `trapFocus` — plus the focusable-selector change that makes both of them
  * correct in the presence of disabled controls.
  */
-import { useRef } from 'react'
+import { StrictMode, useRef } from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
 import { BaseDialog } from './BaseDialog'
@@ -445,6 +445,212 @@ describe('BaseDialog', () => {
     })
   })
 
+  describe('modality and the trap travel together (#91)', () => {
+    it('traps Tab by default', () => {
+      render(
+        <BaseDialog isOpen onClose={vi.fn()} zIndex={1000}>
+          <button data-testid="first">First</button>
+          <button data-testid="last">Last</button>
+        </BaseDialog>
+      )
+      flushFocus()
+
+      screen.getByTestId('last').focus()
+      const notPrevented = fireEvent.keyDown(document, { key: 'Tab' })
+
+      expect(notPrevented).toBe(false)
+      expect(document.activeElement).toBe(screen.getByTestId('first'))
+    })
+
+    it('declares aria-modal by default', () => {
+      render(
+        <BaseDialog isOpen onClose={vi.fn()} zIndex={1000}>
+          <button>Only</button>
+        </BaseDialog>
+      )
+
+      expect(screen.getByTestId(TEST_IDS.DIALOG_CONTAINER)).toHaveAttribute('aria-modal', 'true')
+    })
+
+    it('drops aria-modal when trapFocus is false', () => {
+      // A dialog that lets Tab reach the page behind it must not tell a
+      // screen reader that the page is inert.
+      render(
+        <BaseDialog isOpen onClose={vi.fn()} zIndex={1000} trapFocus={false}>
+          <button>Only</button>
+        </BaseDialog>
+      )
+
+      const container = screen.getByTestId(TEST_IDS.DIALOG_CONTAINER)
+      expect(container).toHaveAttribute('role', 'dialog')
+      expect(container).not.toHaveAttribute('aria-modal')
+    })
+  })
+
+  describe('focus return on close', () => {
+    it("falls back to the opener's tree when the opener is gone by close time", () => {
+      // A context-menu Rename/Delete: the row that opened the dialog can be
+      // re-keyed or removed before the dialog closes.
+      function TreeHarness({ open, rowMounted }: { open: boolean; rowMounted: boolean }): JSX.Element {
+        return (
+          <>
+            <div role="tree">
+              <button data-testid="first-row">First row</button>
+              {rowMounted && <button data-testid="opener-row">Opener row</button>}
+            </div>
+            {open && (
+              <BaseDialog isOpen onClose={vi.fn()} zIndex={1000}>
+                <button>Inside</button>
+              </BaseDialog>
+            )}
+          </>
+        )
+      }
+
+      const { rerender } = render(<TreeHarness open={false} rowMounted />)
+      screen.getByTestId('opener-row').focus()
+      rerender(<TreeHarness open rowMounted />)
+      flushFocus()
+      rerender(<TreeHarness open rowMounted={false} />)
+      rerender(<TreeHarness open={false} rowMounted={false} />)
+
+      expect(document.activeElement).toBe(screen.getByTestId('first-row'))
+    })
+
+    it('honours a data-focus-return region that can take focus itself', () => {
+      function RegionHarness({ open, rowMounted }: { open: boolean; rowMounted: boolean }): JSX.Element {
+        return (
+          <>
+            <div data-focus-return tabIndex={-1} data-testid="region">
+              {rowMounted && <button data-testid="opener-row">Row</button>}
+            </div>
+            {open && (
+              <BaseDialog isOpen onClose={vi.fn()} zIndex={1000}>
+                <button>Inside</button>
+              </BaseDialog>
+            )}
+          </>
+        )
+      }
+
+      const { rerender } = render(<RegionHarness open={false} rowMounted />)
+      screen.getByTestId('opener-row').focus()
+      rerender(<RegionHarness open rowMounted />)
+      flushFocus()
+      rerender(<RegionHarness open rowMounted={false} />)
+      rerender(<RegionHarness open={false} rowMounted={false} />)
+
+      expect(document.activeElement).toBe(screen.getByTestId('region'))
+    })
+
+    /** An opener outside the dialog, and a dialog that is mounted or not. */
+    function UnmountHarness({ mounted }: { mounted: boolean }): JSX.Element {
+      return (
+        <>
+          <button data-testid="opener">Opener</button>
+          {mounted && (
+            <BaseDialog isOpen onClose={vi.fn()} zIndex={1000}>
+              <button data-testid="inside">Inside</button>
+            </BaseDialog>
+          )}
+        </>
+      )
+    }
+
+    it('returns focus to the opener when the dialog unmounts', () => {
+      // The DialogManager path: those dialogs render `isOpen` true and are
+      // removed from the list, so a restore keyed on `isOpen` going false
+      // never ran for them.
+      const { rerender } = render(<UnmountHarness mounted={false} />)
+      const opener = screen.getByTestId('opener')
+      opener.focus()
+      rerender(<UnmountHarness mounted />)
+      flushFocus()
+      expect(document.activeElement).toBe(screen.getByTestId('inside'))
+
+      rerender(<UnmountHarness mounted={false} />)
+
+      expect(document.activeElement).toBe(opener)
+    })
+
+    it('captures the opener before a child autoFocus moves focus inside', () => {
+      // AlertDialog / ConflictDialog / DropModeDialog put `autoFocus` on a
+      // button, which React applies during commit — before any BaseDialog
+      // effect. An effect-time capture recorded that button as "the opener".
+      function AutoFocusHarness({ mounted }: { mounted: boolean }): JSX.Element {
+        return (
+          <>
+            <button data-testid="opener">Opener</button>
+            {mounted && (
+              <BaseDialog isOpen onClose={vi.fn()} zIndex={1000}>
+                <button data-testid="auto" autoFocus>
+                  Auto
+                </button>
+              </BaseDialog>
+            )}
+          </>
+        )
+      }
+
+      const { rerender } = render(<AutoFocusHarness mounted={false} />)
+      const opener = screen.getByTestId('opener')
+      opener.focus()
+      rerender(<AutoFocusHarness mounted />)
+      expect(document.activeElement).toBe(screen.getByTestId('auto'))
+
+      rerender(<AutoFocusHarness mounted={false} />)
+
+      expect(document.activeElement).toBe(opener)
+    })
+
+    it('does not steal focus the close action already moved elsewhere', () => {
+      const elsewhere = document.createElement('button')
+      document.body.appendChild(elsewhere)
+
+      try {
+        const { rerender } = render(<UnmountHarness mounted={false} />)
+        screen.getByTestId('opener').focus()
+        rerender(<UnmountHarness mounted />)
+        flushFocus()
+
+        // e.g. a "Create" handler that focuses the new file's editor first.
+        elsewhere.focus()
+        rerender(<UnmountHarness mounted={false} />)
+
+        expect(document.activeElement).toBe(elsewhere)
+      } finally {
+        elsewhere.remove()
+      }
+    })
+
+    it('does not move focus out of an open dialog under StrictMode', () => {
+      // StrictMode runs effect cleanups once on mount with the dialog still in
+      // the document. Restoring there would pull focus out of an open dialog
+      // in every development build.
+      const { rerender } = render(
+        <StrictMode>
+          <UnmountHarness mounted={false} />
+        </StrictMode>
+      )
+      screen.getByTestId('opener').focus()
+      rerender(
+        <StrictMode>
+          <UnmountHarness mounted />
+        </StrictMode>
+      )
+      flushFocus()
+
+      expect(document.activeElement).toBe(screen.getByTestId('inside'))
+
+      rerender(
+        <StrictMode>
+          <UnmountHarness mounted={false} />
+        </StrictMode>
+      )
+      expect(document.activeElement).toBe(screen.getByTestId('opener'))
+    })
+  })
+
   describe('trapFocus', () => {
     it('cycles Tab from the last control back to the first', () => {
       render(
@@ -496,9 +702,11 @@ describe('BaseDialog', () => {
       expect(document.activeElement).toBe(screen.getByTestId('first'))
     })
 
-    it('leaves Tab alone when trapFocus is not set', () => {
+    it('leaves Tab alone when trapFocus is false', () => {
+      // Pinned the default until #91 made trapping the default; it now guards
+      // the explicit opt-out instead.
       render(
-        <BaseDialog isOpen onClose={vi.fn()} zIndex={1000}>
+        <BaseDialog isOpen onClose={vi.fn()} zIndex={1000} trapFocus={false}>
           <button data-testid="first">First</button>
           <button data-testid="last">Last</button>
         </BaseDialog>
@@ -622,15 +830,15 @@ describe('BaseDialog', () => {
       }
     })
 
-    it('leaves escaped focus alone when trapFocus is not set (Tab)', () => {
-      // The recovery branch is part of the opt-in, not a global behaviour
-      // change for the dialogs that never asked for a trap.
+    it('leaves escaped focus alone when trapFocus is false (Tab)', () => {
+      // The recovery branch is part of the trap: a dialog that opts out of
+      // trapping (and therefore of `aria-modal`) gets neither.
       const outside = document.createElement('button')
       document.body.appendChild(outside)
 
       try {
         render(
-          <BaseDialog isOpen onClose={vi.fn()} zIndex={1000}>
+          <BaseDialog isOpen onClose={vi.fn()} zIndex={1000} trapFocus={false}>
             <button data-testid="first">First</button>
             <button data-testid="last">Last</button>
           </BaseDialog>

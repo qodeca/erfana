@@ -190,10 +190,10 @@ describe('TEST_IDS', () => {
       expect(fileConflictIds).toHaveLength(4)
     })
 
-    it('should have 5 Welcome Panel IDs', async () => {
+    it('should have 6 Welcome Panel IDs', async () => {
       const { TEST_IDS } = await getTestIds()
       const welcomeIds = Object.keys(TEST_IDS).filter((k) => k.startsWith('WELCOME_'))
-      expect(welcomeIds).toHaveLength(5)
+      expect(welcomeIds).toHaveLength(6)
     })
 
     it('should have 2 Context Menu base IDs', async () => {

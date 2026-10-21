@@ -117,8 +117,8 @@ export class ProjectTreePage {
   // ---------------------------------------------------------------------------
 
   /**
-   * A recent-project row, addressed by the folder name it displays. The remove
-   * button shares the row's testid prefix but has no name element, so the
+   * A recent-project row, addressed by the folder name it displays. The open and
+   * remove buttons share the row's testid prefix but hold no name element, so the
    * `.recent-project-name` filter leaves only the row.
    */
   recentProject(name: string): Locator {
