@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * ImportToolsSection (#250): status for each tool combination, per-platform
- * install hint, "Check again", and the always-mounted live region.
+ * ImportToolsSection (#250): PDF and images built in, LibreOffice found /
+ * missing / unsafe, per-platform install hint, "Check again", and the
+ * always-mounted live region.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, within, act } from '@testing-library/react'
@@ -12,7 +13,7 @@ import { useDocumentImportStore } from '../../../stores/useDocumentImportStore'
 import { useSettingsStore } from '../../../stores/useSettingsStore'
 import { TEST_IDS } from '../../../constants/testids'
 import { DOCUMENT_IMPORT } from '../../../../../shared/constants'
-import type { ImportToolStatusResponse } from '../../../../../shared/ipc/import-schema'
+import type { ImportToolStatusResponse, ToolState } from '../../../../../shared/ipc/import-schema'
 
 const mockLogger = vi.hoisted(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }))
 vi.mock('../../../utils/logger', () => ({ logger: mockLogger }))
@@ -23,8 +24,8 @@ const mockToolStatus = vi.fn<(request: { recheck: boolean }) => Promise<ImportTo
 const mockOpenExternal = vi.fn(async (_url: string) => undefined)
 const mockGetPlatform = vi.fn(() => 'darwin')
 
-function ok(libreOffice: boolean, imageMagick: boolean, throttled = false): ImportToolStatusResponse {
-  return { success: true, libreOffice, imageMagick, extensions: ['pdf'], throttled }
+function ok(libreOffice: ToolState, throttled = false): ImportToolStatusResponse {
+  return { success: true, libreOffice, extensions: ['pdf'], throttled }
 }
 
 beforeEach(() => {
@@ -41,7 +42,7 @@ beforeEach(() => {
   })
   useDocumentImportStore.setState({
     hasLibreOffice: false,
-    hasImageMagick: false,
+    libreOfficeState: null,
     toolStatusKnown: false,
     isCheckingTools: false,
     toolCheckOutcome: 'idle',
@@ -56,15 +57,15 @@ function row(format: string): HTMLElement {
   return found
 }
 
-async function renderWith(libreOffice: boolean, imageMagick: boolean): Promise<void> {
-  mockToolStatus.mockResolvedValue(ok(libreOffice, imageMagick))
+async function renderWith(libreOffice: ToolState): Promise<void> {
+  mockToolStatus.mockResolvedValue(ok(libreOffice))
   render(<ImportToolsSection />)
   await waitFor(() => expect(row('office').dataset.state).not.toBe('checking'))
 }
 
 describe('ImportToolsSection', () => {
   it('reads the cached status on mount, without re-probing', async () => {
-    await renderWith(true, true)
+    await renderWith('found')
 
     expect(mockToolStatus).toHaveBeenCalledTimes(1)
     expect(mockToolStatus).toHaveBeenCalledWith({ recheck: false })
@@ -82,67 +83,56 @@ describe('ImportToolsSection', () => {
   })
 
   it.each([
-    [true, true, 'ready', 'ready'],
-    [true, false, 'ready', 'missing'],
-    [false, true, 'missing', 'ready'],
-    [false, false, 'missing', 'missing']
-  ])(
-    'LibreOffice %s / ImageMagick %s → office %s, images %s – in words, not colour alone',
-    async (lo, im, officeState, imagesState) => {
-      await renderWith(lo, im)
+    ['found', 'ready', 'Ready – LibreOffice found'],
+    ['missing', 'missing', 'LibreOffice not found'],
+    ['unsafe', 'unsafe', 'LibreOffice found in an unsafe location']
+  ] as const)('LibreOffice %s → office row %s, in words, not colour alone', async (lo, officeState, text) => {
+    await renderWith(lo)
 
-      expect(row('pdf').dataset.state).toBe('ready')
-      expect(row('office').dataset.state).toBe(officeState)
-      expect(row('images').dataset.state).toBe(imagesState)
+    expect(row('pdf').dataset.state).toBe('ready')
+    expect(row('images').dataset.state).toBe('ready')
+    expect(within(row('images')).getByText('Ready – built in')).toBeInTheDocument()
+    expect(row('office').dataset.state).toBe(officeState)
+    expect(within(row('office')).getByText(text)).toBeInTheDocument()
 
-      expect(
-        within(row('office')).getByText(lo ? 'Ready – LibreOffice found' : 'LibreOffice not found')
-      ).toBeInTheDocument()
-      expect(
-        within(row('images')).getByText(im ? 'Ready – ImageMagick found' : 'ImageMagick not found')
-      ).toBeInTheDocument()
+    // The install hint appears only under a missing LibreOffice; the unsafe hint only under unsafe.
+    expect(within(row('office')).queryByText(/Homebrew/) !== null).toBe(lo === 'missing')
+    expect(within(row('office')).queryByText(/Erfana will not run it/) !== null).toBe(lo === 'unsafe')
+    expect(within(row('images')).queryByText(/Homebrew/)).toBeNull()
+  })
 
-      // A hint appears only under a missing tool.
-      expect(within(row('office')).queryByText(/Homebrew/) !== null).toBe(!lo)
-      expect(within(row('images')).queryByText(/Homebrew/) !== null).toBe(!im)
-    }
-  )
-
-  it('lists every extension each tool unlocks', async () => {
-    await renderWith(false, false)
+  it('lists every extension in the image and office rows', async () => {
+    await renderWith('missing')
 
     for (const ext of DOCUMENT_IMPORT.LIBREOFFICE_EXTENSIONS) {
       expect(within(row('office')).getByText(new RegExp(`\\.${ext}\\b`))).toBeInTheDocument()
     }
-    for (const ext of DOCUMENT_IMPORT.IMAGEMAGICK_EXTENSIONS) {
+    for (const ext of DOCUMENT_IMPORT.IMAGE_EXTENSIONS) {
       expect(within(row('images')).getByText(new RegExp(`\\.${ext}\\b`))).toBeInTheDocument()
     }
   })
 
-  it('macOS: shows the Homebrew command for each missing tool', async () => {
-    await renderWith(false, false)
+  it('macOS: shows the Homebrew command for a missing LibreOffice', async () => {
+    await renderWith('missing')
 
     expect(within(row('office')).getByText('brew install --cask libreoffice')).toBeInTheDocument()
-    expect(within(row('images')).getByText('brew install imagemagick')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Download/ })).not.toBeInTheDocument()
   })
 
   it('Windows: offers a download button that goes through shell:openExternal', async () => {
     mockGetPlatform.mockReturnValue('win32')
-    await renderWith(false, false)
+    await renderWith('missing')
 
     expect(screen.queryByText(/brew install/)).not.toBeInTheDocument()
     await userEvent.click(within(row('office')).getByRole('button', { name: 'Download LibreOffice' }))
-    await userEvent.click(within(row('images')).getByRole('button', { name: 'Download ImageMagick' }))
 
     expect(mockOpenExternal).toHaveBeenCalledWith(DOCUMENT_IMPORT.LIBREOFFICE_DOWNLOAD_URL)
-    expect(mockOpenExternal).toHaveBeenCalledWith(DOCUMENT_IMPORT.IMAGEMAGICK_DOWNLOAD_URL)
   })
 
   it('Windows: a refused URL is logged, not thrown', async () => {
     mockGetPlatform.mockReturnValue('win32')
     mockOpenExternal.mockRejectedValueOnce(new Error('refused'))
-    await renderWith(false, true)
+    await renderWith('missing')
 
     await userEvent.click(screen.getByRole('button', { name: 'Download LibreOffice' }))
 
@@ -151,7 +141,7 @@ describe('ImportToolsSection', () => {
 
   it('Linux: a generic package-manager hint, no command and no link', async () => {
     mockGetPlatform.mockReturnValue('linux')
-    await renderWith(false, false)
+    await renderWith('missing')
 
     expect(within(row('office')).getByText(/package manager/)).toBeInTheDocument()
     expect(screen.queryByText(/brew install/)).not.toBeInTheDocument()
@@ -159,21 +149,20 @@ describe('ImportToolsSection', () => {
   })
 
   it('Check again re-runs detection and updates the rows without a restart', async () => {
-    await renderWith(false, false)
-    mockToolStatus.mockResolvedValueOnce(ok(true, true))
+    await renderWith('missing')
+    mockToolStatus.mockResolvedValueOnce(ok('found'))
 
     await userEvent.click(screen.getByRole('button', { name: 'Check again' }))
 
     await waitFor(() => expect(row('office').dataset.state).toBe('ready'))
-    expect(row('images').dataset.state).toBe('ready')
     expect(mockToolStatus).toHaveBeenLastCalledWith({ recheck: true })
     expect(screen.getByTestId(TEST_IDS.SETTINGS_IMPORT_TOOLS_LIVE)).toHaveTextContent(
-      'Check complete – LibreOffice found, ImageMagick found.'
+      'Check complete – LibreOffice found.'
     )
   })
 
   it('Check again is aria-disabled while a check runs: focus stays, a second click starts nothing', async () => {
-    await renderWith(false, false)
+    await renderWith('missing')
     let release: (r: ImportToolStatusResponse) => void = () => {}
     mockToolStatus.mockReturnValueOnce(new Promise((resolve) => { release = resolve }))
 
@@ -189,16 +178,16 @@ describe('ImportToolsSection', () => {
     await userEvent.click(button)
     expect(mockToolStatus).toHaveBeenCalledTimes(2) // mount read + one recheck
 
-    await act(async () => release(ok(false, true)))
+    await act(async () => release(ok('unsafe')))
     expect(button).toHaveAttribute('aria-disabled', 'false')
     expect(button).toHaveFocus()
     expect(screen.getByTestId(TEST_IDS.SETTINGS_IMPORT_TOOLS_LIVE)).toHaveTextContent(
-      'Check complete – LibreOffice not found, ImageMagick found.'
+      'Check complete – LibreOffice found in an unsafe location.'
     )
   })
 
   it('macOS: the Homebrew command has its own Copy button that copies through textClipboard', async () => {
-    await renderWith(false, true)
+    await renderWith('missing')
 
     await userEvent.click(within(row('office')).getByRole('button', { name: 'Copy command: brew install --cask libreoffice' }))
 
@@ -219,7 +208,7 @@ describe('ImportToolsSection', () => {
 
   it('a reopened section does not repeat a stale outcome', async () => {
     useDocumentImportStore.setState({ toolCheckOutcome: 'checked', toolStatusKnown: true })
-    await renderWith(true, true)
+    await renderWith('found')
 
     expect(screen.getByTestId(TEST_IDS.SETTINGS_IMPORT_TOOLS_LIVE)).toHaveTextContent('')
   })
@@ -228,7 +217,7 @@ describe('ImportToolsSection', () => {
     const scroll = vi.fn()
     Element.prototype.scrollIntoView = scroll
     useSettingsStore.setState({ isOpen: true, focusSection: 'import-tools' })
-    await renderWith(false, false)
+    await renderWith('missing')
 
     expect(screen.getByRole('heading', { name: 'Import tools' })).toHaveFocus()
     expect(scroll).toHaveBeenCalledWith({ block: 'start' })
@@ -237,15 +226,14 @@ describe('ImportToolsSection', () => {
 
   it('Linux: names the package to install', async () => {
     mockGetPlatform.mockReturnValue('linux')
-    await renderWith(false, false)
+    await renderWith('missing')
 
     expect(within(row('office')).getByText('libreoffice')).toBeInTheDocument()
-    expect(within(row('images')).getByText('imagemagick')).toBeInTheDocument()
   })
 
   it('announces a throttled recheck in the live region', async () => {
-    await renderWith(false, false)
-    mockToolStatus.mockResolvedValueOnce(ok(false, false, true))
+    await renderWith('missing')
+    mockToolStatus.mockResolvedValueOnce(ok('missing', true))
 
     await userEvent.click(screen.getByRole('button', { name: 'Check again' }))
 
@@ -257,14 +245,14 @@ describe('ImportToolsSection', () => {
   })
 
   it('announces a failed check', async () => {
-    await renderWith(false, false)
+    await renderWith('missing')
     mockToolStatus.mockResolvedValueOnce({ success: false, error: 'Request refused' })
 
     await userEvent.click(screen.getByRole('button', { name: 'Check again' }))
 
     await waitFor(() =>
       expect(screen.getByTestId(TEST_IDS.SETTINGS_IMPORT_TOOLS_LIVE)).toHaveTextContent(
-        'Could not check the tools. Try again.'
+        'Could not check for LibreOffice. Try again.'
       )
     )
   })
@@ -278,7 +266,7 @@ describe('ImportToolsSection', () => {
   })
 
   it('Check again is a real, keyboard-reachable button', async () => {
-    await renderWith(true, true)
+    await renderWith('found')
 
     await userEvent.tab()
     expect(screen.getByRole('button', { name: 'Check again' })).toHaveFocus()

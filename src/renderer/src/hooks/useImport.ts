@@ -32,6 +32,7 @@ import { logger } from '../utils/logger'
 import { useTranscriptionStore } from '../stores/useTranscriptionStore'
 import { useDocumentImportStore } from '../stores/useDocumentImportStore'
 import { useSettingsStore } from '../stores/useSettingsStore'
+import type { ToolState } from '../../../shared/ipc/import-schema'
 
 /** Size threshold for confirmation dialog (in MB) */
 const LARGE_FILE_THRESHOLD_MB = IMPORT.SIZE_WARNING_THRESHOLD / BYTES_PER_MB
@@ -197,17 +198,15 @@ export function useImport(): UseImportReturn {
 
     // Check for files that need missing dependencies (e.g., dropped before detection completes)
     const depState = useDocumentImportStore.getState()
+    // Images need no external tool (#250): LiteParse reads them natively.
     const missingDepFiles = filesToProcess.filter(f => {
       const ext = f.name.split('.').pop()?.toLowerCase() || ''
-      if ((DOCUMENT_IMPORT.LIBREOFFICE_EXTENSIONS as readonly string[]).includes(ext) && !depState.hasLibreOffice) return true
-      if ((DOCUMENT_IMPORT.IMAGEMAGICK_EXTENSIONS as readonly string[]).includes(ext) && !depState.hasImageMagick) return true
-      return false
+      return (DOCUMENT_IMPORT.LIBREOFFICE_EXTENSIONS as readonly string[]).includes(ext) && !depState.hasLibreOffice
     })
 
     if (missingDepFiles.length > 0) {
       const ext = missingDepFiles[0].name.split('.').pop()?.toLowerCase() || ''
-      const needsLibreOffice = (DOCUMENT_IMPORT.LIBREOFFICE_EXTENSIONS as readonly string[]).includes(ext)
-      await offerImportTools(showConfirm, needsLibreOffice ? 'LibreOffice' : 'ImageMagick', ext)
+      await offerImportTools(showConfirm, ext, depState.libreOfficeState)
       filesToProcess = filesToProcess.filter(f => !missingDepFiles.includes(f))
       if (filesToProcess.length === 0) {
         return { successCount: 0, failCount: 0, skippedCount: missingDepFiles.length + mediaFiles.length + documentFiles.length, outputPaths: [], failures: [] }
@@ -374,12 +373,7 @@ export function useImport(): UseImportReturn {
     const depState = useDocumentImportStore.getState()
 
     if ((DOCUMENT_IMPORT.LIBREOFFICE_EXTENSIONS as readonly string[]).includes(ext) && !depState.hasLibreOffice) {
-      await offerImportTools(showConfirm, 'LibreOffice', ext)
-      return null
-    }
-
-    if ((DOCUMENT_IMPORT.IMAGEMAGICK_EXTENSIONS as readonly string[]).includes(ext) && !depState.hasImageMagick) {
-      await offerImportTools(showConfirm, 'ImageMagick', ext)
+      await offerImportTools(showConfirm, ext, depState.libreOfficeState)
       return null
     }
 
@@ -405,13 +399,21 @@ export function useImport(): UseImportReturn {
 }
 
 /**
- * The refusal shown when a file needs a tool that was not found (#250). It
+ * The refusal shown when an Office file cannot be imported (#250): LibreOffice
+ * was not found, or the copy Erfana would run is in an unsafe location. It
  * points at Settings → Import tools, which has the install hint for this
  * platform and a "Check again" that needs no restart.
  */
-export function missingToolMessage(tool: 'LibreOffice' | 'ImageMagick', ext: string): string {
+export function missingToolMessage(ext: string, state: ToolState | null): string {
+  if (state === 'unsafe') {
+    return (
+      `Importing .${ext} files needs LibreOffice. A copy was found, but Erfana will not run it: it is in the open ` +
+      `project, a temporary folder or a network share, or comes from a relative PATH entry.\n\n` +
+      `Import tools in Settings has details.`
+    )
+  }
   return (
-    `Importing .${ext} files needs ${tool}, which was not found on this computer.\n\n` +
+    `Importing .${ext} files needs LibreOffice, which was not found on this computer.\n\n` +
     `Import tools in Settings shows how to install it. After installing, choose Check again there.`
   )
 }
@@ -422,12 +424,12 @@ export function missingToolMessage(tool: 'LibreOffice' | 'ImageMagick', ext: str
  */
 async function offerImportTools(
   showConfirm: ReturnType<typeof useDialog>['showConfirm'],
-  tool: 'LibreOffice' | 'ImageMagick',
-  ext: string
+  ext: string,
+  state: ToolState | null
 ): Promise<void> {
   const open = await showConfirm({
-    title: `${tool} required`,
-    message: missingToolMessage(tool, ext),
+    title: state === 'unsafe' ? 'LibreOffice in an unsafe location' : 'LibreOffice required',
+    message: missingToolMessage(ext, state),
     confirmLabel: 'Open import tools',
     cancelLabel: 'Close',
     danger: false

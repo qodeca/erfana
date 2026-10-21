@@ -5,10 +5,11 @@
  * any file is picked, and Check again re-runs detection in main without a
  * restart, rate-limited.
  *
- * Host-independent on purpose: whether LibreOffice and ImageMagick are
- * installed differs per machine, so the spec asserts that every row settles
- * on a state, that a missing tool shows a hint and a ready one does not, and
- * that the recheck round-trip and its rate limit behave – not which tools exist.
+ * Host-independent on purpose: whether LibreOffice is installed differs per
+ * machine, so the spec asserts that the Office row settles on a state, that a
+ * missing LibreOffice shows an install hint and a ready one does not, and that
+ * the recheck round-trip and its rate limit behave – not which tools exist.
+ * PDF and images are built in (LiteParse reads them natively) and always ready.
  */
 
 import * as fs from 'fs'
@@ -32,8 +33,7 @@ async function stubLibreOfficeMissing(app: ElectronApplication): Promise<void> {
     ipcMain.removeHandler('import:toolStatus')
     ipcMain.handle('import:toolStatus', () => ({
       success: true,
-      libreOffice: false,
-      imageMagick: true,
+      libreOffice: 'missing',
       extensions: ['pdf'],
       throttled: false
     }))
@@ -41,19 +41,21 @@ async function stubLibreOfficeMissing(app: ElectronApplication): Promise<void> {
 }
 
 test.describe('Settings – Import tools', () => {
-  test('shows each format’s status and a hint only for a missing tool', async ({ window }) => {
+  test('shows each format’s status and an install hint only for a missing LibreOffice', async ({ window }) => {
     await openSettings(window)
     const tools = new ImportToolsPage(window)
     await expect(tools.section()).toBeVisible()
 
     expect(await tools.waitForSettled('pdf')).toBe('ready')
-    for (const format of ['office', 'images'] as const) {
-      const state = await tools.waitForSettled(format)
-      const row = tools.row(format)
-      // The state is spelled out in words, not colour alone.
-      await expect(row).toContainText(state === 'ready' ? 'Ready' : 'not found')
-      await expect(row.getByText(/then choose Check again/)).toHaveCount(state === 'missing' ? 1 : 0)
-    }
+    expect(await tools.waitForSettled('images')).toBe('ready')
+    await expect(tools.row('images')).toContainText('Ready – built in')
+
+    const state = await tools.waitForSettled('office')
+    const row = tools.row('office')
+    // The state is spelled out in words, not colour alone.
+    const words = { ready: 'Ready – LibreOffice found', missing: 'LibreOffice not found', unsafe: 'unsafe location' }
+    await expect(row).toContainText(words[state as keyof typeof words])
+    await expect(row.getByText(/then choose Check again/)).toHaveCount(state === 'missing' ? 1 : 0)
   })
 
   test('Check again re-runs detection, then a quick second press is rate-limited', async ({ window }) => {
@@ -65,7 +67,7 @@ test.describe('Settings – Import tools', () => {
     // throttled; retry the press until a real probe has run.
     await expect(async () => {
       await tools.checkAgain()
-      await expect(tools.liveRegion()).toHaveText(/^Check complete – LibreOffice (found|not found), ImageMagick (found|not found)\.$/, { timeout: 1_000 })
+      await expect(tools.liveRegion()).toHaveText(/^Check complete – LibreOffice (found|not found|found in an unsafe location)\.$/, { timeout: 1_000 })
     }).toPass({ timeout: 20_000, intervals: [1_000] })
     // Same machine, same tools: a fresh probe agrees with the startup result.
     expect(await tools.waitForSettled('office')).toBe(before)

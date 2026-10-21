@@ -1,41 +1,21 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { useEffect, useCallback, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useCallback, useRef, useState } from 'react'
 import { useDocumentImportStore } from '../../../stores/useDocumentImportStore'
 import { useSettingsStore } from '../../../stores/useSettingsStore'
 import { textClipboard } from '../../../services/textClipboard'
 import { DOCUMENT_IMPORT } from '../../../../../shared/constants'
+import type { ToolState } from '../../../../../shared/ipc/import-schema'
 import { isMacOS, isWindows } from '../../../utils/platform'
 import { logger } from '../../../utils/logger'
 import { renderIcon } from '../../../utils/iconRegistry'
 import { TEST_IDS } from '../../../constants/testids'
 import './ImportToolsSection.css'
 
-type ToolId = 'libreOffice' | 'imageMagick'
 type Platform = 'mac' | 'windows' | 'other'
-type RowState = 'checking' | 'unchecked' | 'ready' | 'missing'
+type RowState = 'checking' | 'unchecked' | 'ready' | 'missing' | 'unsafe'
 
-interface ToolInfo {
-  name: string
-  brewCommand: string
-  linuxPackage: string
-  downloadUrl: string
-}
-
-const TOOLS: Record<ToolId, ToolInfo> = {
-  libreOffice: {
-    name: 'LibreOffice',
-    brewCommand: 'brew install --cask libreoffice',
-    linuxPackage: 'libreoffice',
-    downloadUrl: DOCUMENT_IMPORT.LIBREOFFICE_DOWNLOAD_URL
-  },
-  imageMagick: {
-    name: 'ImageMagick',
-    brewCommand: 'brew install imagemagick',
-    linuxPackage: 'imagemagick',
-    downloadUrl: DOCUMENT_IMPORT.IMAGEMAGICK_DOWNLOAD_URL
-  }
-}
+const BREW_COMMAND = 'brew install --cask libreoffice'
 
 /** The extensions a list shows, written the way the file picker does. */
 function formatExtensions(extensions: readonly string[]): string {
@@ -48,42 +28,34 @@ function currentPlatform(): Platform {
   return 'other'
 }
 
-/** Open a download page through the `shell:openExternal` allowlist, never directly. */
-async function openDownloadPage(url: string): Promise<void> {
+/** Open the download page through the `shell:openExternal` allowlist, never directly. */
+async function openDownloadPage(): Promise<void> {
   try {
-    await window.electron.shell.openExternal(url)
+    await window.electron.shell.openExternal(DOCUMENT_IMPORT.LIBREOFFICE_DOWNLOAD_URL)
   } catch (error) {
     logger.error('Failed to open download page', error instanceof Error ? error : undefined)
   }
 }
 
-/** The per-platform "how to get it" lines under a missing tool. */
-function InstallHint({
-  tool,
-  platform,
-  onCopied
-}: {
-  tool: ToolInfo
-  platform: Platform
-  onCopied: (message: string) => void
-}): JSX.Element {
+/** The per-platform "how to get it" lines under a missing LibreOffice. */
+function InstallHint({ platform, onCopied }: { platform: Platform; onCopied: (message: string) => void }): JSX.Element {
   const handleCopy = useCallback(async () => {
     // textClipboard is the single transport-error chokepoint (retry + toast).
-    const ok = await textClipboard.writeText(tool.brewCommand)
+    const ok = await textClipboard.writeText(BREW_COMMAND)
     if (ok) onCopied('Copied.')
-  }, [tool.brewCommand, onCopied])
+  }, [onCopied])
 
   if (platform === 'mac') {
     return (
       <div className="import-tools-hint">
         <p className="import-tools-hint__text">Install it with Homebrew, then choose Check again:</p>
         <div className="import-tools-hint__command">
-          <code className="import-tools-command">{tool.brewCommand}</code>
+          <code className="import-tools-command">{BREW_COMMAND}</code>
           <button
             type="button"
             className="settings-btn-secondary import-tools-btn import-tools-btn--icon"
             onClick={() => void handleCopy()}
-            aria-label={`Copy command: ${tool.brewCommand}`}
+            aria-label={`Copy command: ${BREW_COMMAND}`}
             title="Copy command"
           >
             {renderIcon('copy', { 'aria-hidden': true })}
@@ -96,14 +68,14 @@ function InstallHint({
     return (
       <div className="import-tools-hint import-tools-hint--action">
         <p className="import-tools-hint__text">
-          Download and install {tool.name}, then choose Check again.
+          Download and install LibreOffice in its default folder, then choose Check again.
         </p>
         <button
           type="button"
           className="settings-btn-secondary import-tools-btn"
-          onClick={() => void openDownloadPage(tool.downloadUrl)}
+          onClick={() => void openDownloadPage()}
         >
-          Download {tool.name}
+          Download LibreOffice
         </button>
       </div>
     )
@@ -111,11 +83,39 @@ function InstallHint({
   return (
     <div className="import-tools-hint">
       <p className="import-tools-hint__text">
-        Install the <code className="import-tools-command">{tool.linuxPackage}</code> package with
-        your system&apos;s package manager, then choose Check again.
+        Install the <code className="import-tools-command">libreoffice</code> package with your
+        system&apos;s package manager, then choose Check again.
       </p>
     </div>
   )
+}
+
+/** Why an "unsafe" LibreOffice is not used, and the way out. */
+function UnsafeHint(): JSX.Element {
+  return (
+    <div className="import-tools-hint">
+      <p className="import-tools-hint__text">
+        Erfana will not run it: the copy it would use is in the open project, a temporary folder or a
+        network share, or comes from a relative PATH entry. Remove that folder from PATH, then choose
+        Check again.
+      </p>
+    </div>
+  )
+}
+
+const STATE_TEXT: Record<RowState, string> = {
+  checking: 'Checking…',
+  unchecked: 'Not checked',
+  ready: 'Ready – LibreOffice found',
+  missing: 'LibreOffice not found',
+  unsafe: 'LibreOffice found in an unsafe location'
+}
+
+const STATE_ICON: Partial<Record<RowState, string>> = {
+  ready: 'check-circle',
+  missing: 'alert-triangle',
+  unsafe: 'alert-triangle',
+  unchecked: 'help-circle'
 }
 
 interface FormatRowProps {
@@ -123,19 +123,12 @@ interface FormatRowProps {
   title: string
   extensions: string
   state: RowState
-  readyText: string
-  missingText: string
-  hint?: ReactNode
+  text: string
+  children?: React.ReactNode
 }
 
-const STATE_TEXT: Record<'checking' | 'unchecked', string> = {
-  checking: 'Checking…',
-  unchecked: 'Not checked'
-}
-
-function FormatRow({ format, title, extensions, state, readyText, missingText, hint }: FormatRowProps): JSX.Element {
-  const text =
-    state === 'ready' ? readyText : state === 'missing' ? missingText : STATE_TEXT[state]
+function FormatRow({ format, title, extensions, state, text, children }: FormatRowProps): JSX.Element {
+  const icon = STATE_ICON[state]
   return (
     <li
       className="import-tools-row"
@@ -150,40 +143,35 @@ function FormatRow({ format, title, extensions, state, readyText, missingText, h
         </div>
         {/* Status is always words plus an icon – never colour alone. */}
         <span className={`import-tools-status import-tools-status--${state}`}>
-          {state === 'ready' && renderIcon('check-circle', { 'aria-hidden': true })}
-          {state === 'missing' && renderIcon('alert-triangle', { 'aria-hidden': true })}
-          {state === 'unchecked' && renderIcon('help-circle', { 'aria-hidden': true })}
+          {icon && renderIcon(icon, { 'aria-hidden': true })}
           <span>{text}</span>
         </span>
       </div>
-      {state === 'missing' && hint}
+      {children}
     </li>
   )
 }
 
-/** What "Check again" found, in words – the live region reads this. */
-function foundSummary(libreOffice: boolean, imageMagick: boolean): string {
-  const part = (name: string, found: boolean): string => `${name} ${found ? 'found' : 'not found'}`
-  return `${part('LibreOffice', libreOffice)}, ${part('ImageMagick', imageMagick)}.`
+const SUMMARY: Record<ToolState, string> = {
+  found: 'LibreOffice found.',
+  missing: 'LibreOffice not found.',
+  unsafe: 'LibreOffice found in an unsafe location.'
 }
 
 /**
  * ImportToolsSection – which import formats work on this computer (#250).
  *
- * Shows, before the user picks a file, whether the optional tools that Office
- * documents (LibreOffice) and images (ImageMagick) need were found, how to
- * install a missing one on this platform, and a "Check again" button that
- * re-runs detection in main without a restart. Reads the main process's
- * session-cached `DependencyDetector` result through `import:toolStatus`.
+ * PDF, images and text need nothing extra: LiteParse reads PDF and images
+ * itself. Office documents need LibreOffice. The section shows, before the
+ * user picks a file, whether it was found – or found somewhere Erfana will not
+ * run it from – how to install it on this platform, and a "Check again" button
+ * that re-runs detection in main without a restart (`import:toolStatus`).
  *
  * Opening Settings with `{ section: 'import-tools' }` (the import refusal's
  * "Open import tools") scrolls here and moves focus to the heading.
- *
- * Renders inside {@link SettingsOverlay} as one more `settings-section`.
  */
 export function ImportToolsSection(): JSX.Element {
-  const hasLibreOffice = useDocumentImportStore((s) => s.hasLibreOffice)
-  const hasImageMagick = useDocumentImportStore((s) => s.hasImageMagick)
+  const libreOfficeState = useDocumentImportStore((s) => s.libreOfficeState)
   const known = useDocumentImportStore((s) => s.toolStatusKnown)
   const isChecking = useDocumentImportStore((s) => s.isCheckingTools)
   const outcome = useDocumentImportStore((s) => s.toolCheckOutcome)
@@ -214,18 +202,24 @@ export function ImportToolsSection(): JSX.Element {
   }, [isChecking, loadToolStatus])
 
   const platform = currentPlatform()
-  const rowState = (ready: boolean): RowState =>
-    known ? (ready ? 'ready' : 'missing') : outcome === 'failed' ? 'unchecked' : 'checking'
+  const officeState: RowState =
+    known && libreOfficeState
+      ? libreOfficeState === 'found'
+        ? 'ready'
+        : libreOfficeState
+      : outcome === 'failed'
+        ? 'unchecked'
+        : 'checking'
 
   const liveText = isChecking
     ? ''
     : copyNotice ||
-      (outcome === 'checked'
-        ? `Check complete – ${foundSummary(hasLibreOffice, hasImageMagick)}`
+      (outcome === 'checked' && libreOfficeState
+        ? `Check complete – ${SUMMARY[libreOfficeState]}`
         : outcome === 'throttled'
           ? 'Checked a moment ago – try again in a few seconds.'
           : outcome === 'failed'
-            ? 'Could not check the tools. Try again.'
+            ? 'Could not check for LibreOffice. Try again.'
             : '')
 
   return (
@@ -234,44 +228,35 @@ export function ImportToolsSection(): JSX.Element {
         Import tools
       </h2>
       <p className="import-tools-intro">
-        PDF and text files import out of the box. Audio and video use the Transcription settings
-        above. Office documents and images need a free tool installed on this computer – Erfana does
-        not include it.
+        PDF, image and text files import out of the box. Audio and video use the Transcription
+        settings above. Office documents need LibreOffice, a free office suite – Erfana does not
+        include it.
       </p>
       <ul className="import-tools-list" aria-label="Import formats">
+        <FormatRow format="pdf" title="PDF documents" extensions=".pdf" state="ready" text="Ready – built in" />
         <FormatRow
-          format="pdf"
-          title="PDF documents"
-          extensions=".pdf"
+          format="images"
+          title="Images (reads the text in them)"
+          extensions={formatExtensions(DOCUMENT_IMPORT.IMAGE_EXTENSIONS)}
           state="ready"
-          readyText="Ready – built in"
-          missingText=""
+          text="Ready – built in"
         />
         <FormatRow
           format="office"
           title="Office documents"
           extensions={formatExtensions(DOCUMENT_IMPORT.LIBREOFFICE_EXTENSIONS)}
-          state={rowState(hasLibreOffice)}
-          readyText="Ready – LibreOffice found"
-          missingText="LibreOffice not found"
-          hint={<InstallHint tool={TOOLS.libreOffice} platform={platform} onCopied={setCopyNotice} />}
-        />
-        <FormatRow
-          format="images"
-          title="Images (reads the text in them)"
-          extensions={formatExtensions(DOCUMENT_IMPORT.IMAGEMAGICK_EXTENSIONS)}
-          state={rowState(hasImageMagick)}
-          readyText="Ready – ImageMagick found"
-          missingText="ImageMagick not found"
-          hint={<InstallHint tool={TOOLS.imageMagick} platform={platform} onCopied={setCopyNotice} />}
-        />
+          state={officeState}
+          text={STATE_TEXT[officeState]}
+        >
+          {officeState === 'missing' && <InstallHint platform={platform} onCopied={setCopyNotice} />}
+          {officeState === 'unsafe' && <UnsafeHint />}
+        </FormatRow>
       </ul>
       <div className="settings-row">
         <div className="settings-field">
-          <span className="settings-label">Installed a tool?</span>
+          <span className="settings-label">Installed LibreOffice?</span>
           <p className="import-tools-note">
-            Look for the tools again – no restart needed. If one still shows as not found, restart
-            Erfana.
+            Look for it again – no restart needed. If it still shows as not found, restart Erfana.
           </p>
           {/* Always mounted, so a screen reader is already watching when the text arrives. */}
           <p

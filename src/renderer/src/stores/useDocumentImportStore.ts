@@ -17,7 +17,8 @@
 import { create } from 'zustand'
 import type {
   DocumentImportProgress,
-  DocumentImportResult
+  DocumentImportResult,
+  ToolState
 } from '../../../shared/ipc/import-schema'
 
 /**
@@ -65,9 +66,9 @@ interface DocumentImportState {
   // Dependency status (set by DependencyReadyEvent)
   /** Whether LibreOffice (soffice) is available for Office document conversion */
   hasLibreOffice: boolean
-  /** Whether ImageMagick is available for image conversion */
-  hasImageMagick: boolean
-  /** Whether a detection result has arrived yet (until then, the two flags above are only defaults) */
+  /** What LibreOffice detection found (#250); null until a result arrives */
+  libreOfficeState: ToolState | null
+  /** Whether a detection result has arrived yet (until then, the two fields above are only defaults) */
   toolStatusKnown: boolean
   /** Whether a status read or "Check again" is in flight (#250) */
   isCheckingTools: boolean
@@ -149,7 +150,7 @@ export const useDocumentImportStore = create<DocumentImportState>((set, get) => 
   documentExtensions: [],
 
   hasLibreOffice: false,
-  hasImageMagick: false,
+  libreOfficeState: null,
   toolStatusKnown: false,
   isCheckingTools: false,
   toolCheckOutcome: 'idle',
@@ -314,8 +315,8 @@ export const useDocumentImportStore = create<DocumentImportState>((set, get) => 
     const cleanup = window.api.import.onDependenciesReady((event) => {
       set({
         documentExtensions: event.extensions,
-        hasLibreOffice: event.libreOffice,
-        hasImageMagick: event.imageMagick,
+        hasLibreOffice: event.libreOffice === 'found',
+        libreOfficeState: event.libreOffice,
         toolStatusKnown: true
       })
     })
@@ -331,8 +332,8 @@ export const useDocumentImportStore = create<DocumentImportState>((set, get) => 
       if (response.success) {
         set({
           documentExtensions: response.extensions,
-          hasLibreOffice: response.libreOffice,
-          hasImageMagick: response.imageMagick,
+          hasLibreOffice: response.libreOffice === 'found',
+          libreOfficeState: response.libreOffice,
           toolStatusKnown: true,
           isCheckingTools: false,
           // Only "Check again" reports an outcome; the silent read on open

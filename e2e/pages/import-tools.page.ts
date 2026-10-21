@@ -4,7 +4,7 @@
  * Settings → Import tools Page Object Model (#250).
  *
  * Each format row carries `data-format` (`pdf` / `office` / `images`) and
- * `data-state` (`checking` / `ready` / `missing`), so a spec can wait for the
+ * `data-state` (`checking` / `unchecked` / `ready` / `missing` / `unsafe`), so a spec can wait for the
  * first detection result without reading styling.
  *
  * @see src/renderer/src/components/Settings/sections/ImportToolsSection.tsx
@@ -15,7 +15,7 @@ import { TEST_IDS } from '../../src/renderer/src/constants/testids'
 import { byTestId } from '../utils/locators'
 
 export type ImportFormat = 'pdf' | 'office' | 'images'
-export type ImportFormatState = 'checking' | 'unchecked' | 'ready' | 'missing'
+export type ImportFormatState = 'checking' | 'unchecked' | 'ready' | 'missing' | 'unsafe'
 
 export class ImportToolsPage {
   constructor(private readonly page: Page) {}
@@ -41,7 +41,7 @@ export class ImportToolsPage {
   /** The row's settled state, once the first detection result has arrived. */
   async waitForSettled(format: ImportFormat): Promise<ImportFormatState> {
     const row = this.row(format)
-    await expect(row).toHaveAttribute('data-state', /^(ready|missing)$/, { timeout: 15_000 })
+    await expect(row).toHaveAttribute('data-state', /^(ready|missing|unsafe)$/, { timeout: 15_000 })
     return (await row.getAttribute('data-state')) as ImportFormatState
   }
 

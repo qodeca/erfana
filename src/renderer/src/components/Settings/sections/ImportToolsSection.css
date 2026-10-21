@@ -57,7 +57,8 @@
   color: var(--color-success);
 }
 
-.import-tools-status--missing {
+.import-tools-status--missing,
+.import-tools-status--unsafe {
   color: var(--color-warning);
 }
 
