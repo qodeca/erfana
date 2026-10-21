@@ -16,8 +16,9 @@
  * - S4: Filters special files (devices, pipes, sockets), not just directories
  */
 
-import { basename, extname, isAbsolute } from 'path'
-import { lstat, realpath, copyFile, rm, access, constants } from 'fs/promises'
+import { basename, dirname, extname, isAbsolute } from 'path'
+import { randomUUID } from 'crypto'
+import { lstat, stat, realpath, copyFile, rename, rm, access, constants } from 'fs/promises'
 import type { Stats } from 'fs'
 import { validateSymlink, isSystemDirectory } from '../utils/pathSecurity'
 import { AppError, ErrorCode, ERROR_MESSAGES } from '../../shared/errors'
@@ -82,13 +83,16 @@ export interface IExternalFileService {
 
   /**
    * Move an external file into the project
-   * Needs a grant from the picker for `sourcePath`; validates, copies, then deletes source
+   * Validates, asks the user to confirm, checks again that nothing changed
+   * (`recheckTarget` answers false when the target no longer resolves the same),
+   * copies, then deletes source
    */
   moveFromExternal(
     sourcePath: string,
     target: ExternalTarget,
     senderId: number | null,
-    conflictResolution?: ConflictResolution
+    conflictResolution?: ConflictResolution,
+    recheckTarget?: () => Promise<boolean>
   ): Promise<ExternalFileMoveResponse>
 }
 
@@ -292,6 +296,8 @@ export class ExternalFileService implements IExternalFileService {
       const targetPath = childPath(target.real, targetName)
       const resultPath = childPath(target.requested, targetName)
 
+      if (await this.isSameFile(sourcePath, targetPath)) return this.sameFileRefusal()
+
       // M6: Verify source still exists before copy (race condition check)
       try {
         await access(sourcePath, constants.R_OK)
@@ -340,7 +346,8 @@ export class ExternalFileService implements IExternalFileService {
     sourcePath: string,
     target: ExternalTarget,
     senderId: number | null,
-    conflictResolution?: ConflictResolution
+    conflictResolution?: ConflictResolution,
+    recheckTarget?: () => Promise<boolean>
   ): Promise<ExternalFileMoveResponse> {
     logger.info('Moving external file', { sourcePath: redactPath(sourcePath), targetFolder: redactPath(target.requested), conflictResolution })
 
@@ -355,11 +362,17 @@ export class ExternalFileService implements IExternalFileService {
       }
     }
 
-    // The original is deleted below: it needs the record the picker made, or the
-    // user's answer to a native box
-    if (!this.grants.consume(senderId, sourcePath)) {
+    try {
+      const sourceIdentity = await this.identityOf(sourcePath)
+      if (await this.plannedIsSameFile(sourcePath, target, conflictResolution)) {
+        return this.sameFileRefusal()
+      }
+
+      // The original is deleted below: every move waits for the user's answer to a
+      // native box. A file picked in the dialog is named together with its pick.
+      const batch = await this.grants.batchOf(senderId, sourcePath)
       const answer = this.moveConfirmer
-        ? await this.moveConfirmer.confirm(senderId, sourcePath)
+        ? await this.moveConfirmer.confirm(senderId, sourcePath, batch ?? undefined)
         : 'unavailable'
       if (answer !== 'move') {
         logger.info('Move not confirmed', { sourcePath: redactPath(sourcePath), answer })
@@ -374,9 +387,26 @@ export class ExternalFileService implements IExternalFileService {
           errorCode: code
         }
       }
-    }
+      this.grants.forget(senderId, sourcePath)
 
-    try {
+      // The box was open for as long as the user took: nothing may have changed meanwhile
+      const again = await this.validateExternalFile(sourcePath)
+      const unchanged =
+        again.valid &&
+        (await this.identityOf(sourcePath)) === sourceIdentity &&
+        (recheckTarget ? await recheckTarget() : true)
+      if (!unchanged) {
+        logger.warn('Move cancelled: source or target changed while waiting', {
+          sourcePath: redactPath(sourcePath)
+        })
+        return {
+          success: false,
+          isSymlink: validation.isSymlink,
+          error: ERROR_MESSAGES[ErrorCode.EXTERNAL_FILE_MOVE_CHANGED],
+          errorCode: ErrorCode.EXTERNAL_FILE_MOVE_CHANGED
+        }
+      }
+
       // S1: Sanitize the filename
       const originalName = basename(sourcePath)
       const sanitizedName = this.sanitizeFileName(originalName)
@@ -389,6 +419,9 @@ export class ExternalFileService implements IExternalFileService {
       )
       const targetPath = childPath(target.real, targetName)
       const resultPath = childPath(target.requested, targetName)
+
+      // Never delete the source when the copy would land on the source itself
+      if (await this.isSameFile(sourcePath, targetPath)) return this.sameFileRefusal()
 
       // M6: Verify source still exists before copy (race condition check)
       try {
@@ -536,32 +569,75 @@ export class ExternalFileService implements IExternalFileService {
     }
   }
 
+  /** Device and inode of a path (links followed), or null when it cannot be read. */
+  private async identityOf(filePath: string): Promise<string | null> {
+    try {
+      const stats = await stat(filePath, { bigint: true })
+      return stats ? `${stats.dev}:${stats.ino}` : null
+    } catch {
+      return null
+    }
+  }
+
+  /** Whether both paths are the same file on disk (a hard link counts). */
+  private async isSameFile(first: string, second: string): Promise<boolean> {
+    const [a, b] = await Promise.all([this.identityOf(first), this.identityOf(second)])
+    return a !== null && a === b
+  }
+
+  /** Whether the copy would land on the source, for the name the copy would get now. */
+  private async plannedIsSameFile(
+    sourcePath: string,
+    target: ExternalTarget,
+    conflictResolution?: ConflictResolution
+  ): Promise<boolean> {
+    const name = await this.resolveTargetName(
+      target.real,
+      this.sanitizeFileName(basename(sourcePath)),
+      conflictResolution
+    )
+    return this.isSameFile(sourcePath, childPath(target.real, name))
+  }
+
+  private sameFileRefusal(): { success: false; error: string; errorCode: string } {
+    return {
+      success: false,
+      error: ERROR_MESSAGES[ErrorCode.EXTERNAL_FILE_SAME_FILE],
+      errorCode: ErrorCode.EXTERNAL_FILE_SAME_FILE
+    }
+  }
+
   /**
-   * Write the copy. A new name is created exclusively; replacing a name that is
-   * a link is refused, since the write would follow the link out of the folder.
+   * Write the copy. A new name is created exclusively. Replacing an existing name
+   * writes to a temporary name in the same folder first (also exclusively) and
+   * renames it over the old entry, so a link or a hard link at that name is
+   * replaced, never written through.
    */
   private async copyInto(
     sourcePath: string,
     targetPath: string,
     conflictResolution?: ConflictResolution
   ): Promise<void> {
+    let existing: Stats | null = null
     if (conflictResolution === 'replace') {
-      let existing: Stats | null = null
       try {
-        existing = await lstat(targetPath)
+        existing = (await lstat(targetPath)) ?? null
       } catch {
         existing = null
       }
-      if (existing?.isSymbolicLink()) {
-        throw new AppError(
-          'Cannot replace a link; remove it first',
-          ErrorCode.PATH_OUTSIDE_PROJECT
-        )
-      }
-      await copyFile(sourcePath, targetPath)
+    }
+    if (!existing) {
+      await copyFile(sourcePath, targetPath, constants.COPYFILE_EXCL)
       return
     }
-    await copyFile(sourcePath, targetPath, constants.COPYFILE_EXCL)
+    const temporary = childPath(dirname(targetPath), `.${randomUUID()}.erfana-tmp`)
+    try {
+      await copyFile(sourcePath, temporary, constants.COPYFILE_EXCL)
+      await rename(temporary, targetPath)
+    } catch (error) {
+      await rm(temporary, { force: true }).catch(() => undefined)
+      throw error
+    }
   }
 
   /**

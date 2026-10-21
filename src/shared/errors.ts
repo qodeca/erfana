@@ -176,6 +176,9 @@ export enum ErrorCode {
   EXTERNAL_FILE_SOURCE_DELETED = 'EXTERNAL_FILE_SOURCE_DELETED',
   EXTERNAL_FILE_MOVE_NOT_GRANTED = 'EXTERNAL_FILE_MOVE_NOT_GRANTED',
   EXTERNAL_FILE_MOVE_CANCELLED = 'EXTERNAL_FILE_MOVE_CANCELLED',
+  EXTERNAL_FILE_MOVE_CHANGED = 'EXTERNAL_FILE_MOVE_CHANGED',
+  EXTERNAL_FILE_SAME_FILE = 'EXTERNAL_FILE_SAME_FILE',
+  EXTERNAL_FILE_IN_PROJECT = 'EXTERNAL_FILE_IN_PROJECT',
 
   // Transcription errors (Issue #75)
   TRANSCRIPTION_NO_API_KEY = 'TRANSCRIPTION_NO_API_KEY',
@@ -463,6 +466,9 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.EXTERNAL_FILE_MOVE_NOT_GRANTED]:
     'Moving needs a file chosen with the Add files dialog; copy the file instead',
   [ErrorCode.EXTERNAL_FILE_MOVE_CANCELLED]: 'Move cancelled',
+  [ErrorCode.EXTERNAL_FILE_MOVE_CHANGED]: 'The files changed while waiting; nothing was moved',
+  [ErrorCode.EXTERNAL_FILE_SAME_FILE]: 'The file is already there',
+  [ErrorCode.EXTERNAL_FILE_IN_PROJECT]: 'This file is already in the project; move it from the project tree',
 
   // Transcription errors (Issue #75)
   [ErrorCode.TRANSCRIPTION_NO_API_KEY]: 'No API key configured. Add your OpenAI API key in Settings.',

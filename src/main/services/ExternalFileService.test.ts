@@ -26,8 +26,10 @@ import { ErrorCode } from '../../shared/errors'
 vi.mock('fs/promises', () => {
   return {
     lstat: vi.fn(),
+    stat: vi.fn(),
     realpath: vi.fn(),
     copyFile: vi.fn(),
+    rename: vi.fn(),
     rm: vi.fn(),
     access: vi.fn(),
     constants: {
@@ -106,6 +108,7 @@ describe('ExternalFileService', () => {
   let mockFileService: IFileService
   let service: ExternalFileService
   let grants: ExternalSourceGrants
+  let confirm: Mock
 
   beforeEach(async () => {
     fs = (await import('fs/promises')) as any
@@ -116,9 +119,14 @@ describe('ExternalFileService', () => {
 
     // Create service with mock dependencies
     mockFileService = createMockFileService()
-    grants = new ExternalSourceGrants()
+    grants = new ExternalSourceGrants({
+      now: () => Date.now(),
+      path,
+      lstat: async (p: string) => ({ dev: 1n, ino: BigInt(p.length) })
+    })
     service = new ExternalFileService(mockFileService, grants)
-    grants.issue(SENDER, ['/external/file.md', '/external/../path/bad\\file.md'])
+    confirm = vi.fn().mockResolvedValue('move')
+    service.setMoveConfirmer({ confirm })
 
     // Default mock implementations
     ;(fs.access as Mock).mockResolvedValue(undefined)
@@ -520,7 +528,7 @@ describe('ExternalFileService', () => {
       const sourcePath = '/external/file.md'
       const targetFolder = '/project/docs'
 
-      ;(fs.lstat as Mock).mockResolvedValueOnce(makeStats({ isDir: false }))
+      ;(fs.lstat as Mock).mockResolvedValue(makeStats({ isDir: false }))
       ;(mockFileService.checkNameConflict as Mock).mockResolvedValue(false)
       ;(fs.copyFile as Mock).mockResolvedValueOnce(undefined)
       ;(fs.rm as Mock).mockResolvedValueOnce(undefined)
@@ -537,7 +545,7 @@ describe('ExternalFileService', () => {
       const sourcePath = '/external/file.md'
       const targetFolder = '/project/docs'
 
-      ;(fs.lstat as Mock).mockResolvedValueOnce(makeStats({ isDir: false }))
+      ;(fs.lstat as Mock).mockResolvedValue(makeStats({ isDir: false }))
       ;(mockFileService.checkNameConflict as Mock).mockResolvedValue(false)
       ;(fs.copyFile as Mock).mockResolvedValueOnce(undefined)
       ;(fs.rm as Mock).mockRejectedValueOnce(Object.assign(new Error('Permission denied'), { code: 'EPERM' }))
@@ -553,7 +561,7 @@ describe('ExternalFileService', () => {
       const sourcePath = '/external/file.md'
       const targetFolder = '/project/docs'
 
-      ;(fs.lstat as Mock).mockResolvedValueOnce(makeStats({ isDir: false }))
+      ;(fs.lstat as Mock).mockResolvedValue(makeStats({ isDir: false }))
       ;(mockFileService.checkNameConflict as Mock).mockResolvedValue(false)
       ;(fs.copyFile as Mock).mockResolvedValueOnce(undefined)
       ;(fs.rm as Mock).mockRejectedValueOnce(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }))
@@ -568,7 +576,7 @@ describe('ExternalFileService', () => {
       const sourcePath = '/external/file.md'
       const targetFolder = '/project/docs'
 
-      ;(fs.lstat as Mock).mockResolvedValueOnce(makeStats({ isDir: false }))
+      ;(fs.lstat as Mock).mockResolvedValue(makeStats({ isDir: false }))
       ;(mockFileService.checkNameConflict as Mock).mockResolvedValue(false)
       ;(fs.copyFile as Mock).mockRejectedValueOnce(new Error('Disk full'))
 
@@ -600,11 +608,32 @@ describe('ExternalFileService', () => {
       expect(result.path).toBe(path.join(requested, 'file.md'))
     })
 
-    it('refuses to replace a name that is a link', async () => {
+    it('replaces an existing name through a temporary copy renamed over it', async () => {
       ;(fs.lstat as Mock)
         .mockResolvedValueOnce(makeStats({ isDir: false }))
         .mockResolvedValueOnce(makeStats({ isSymlink: true }))
       ;(mockFileService.checkNameConflict as Mock).mockResolvedValue(true)
+      ;(fs.copyFile as Mock).mockResolvedValue(undefined)
+      ;(fs.rename as Mock).mockResolvedValue(undefined)
+
+      const folder = path.resolve('/project/docs')
+      const result = await service.copyFromExternal('/external/file.md', target(folder), 'replace')
+
+      expect(result.success).toBe(true)
+      const [, temporary, flag] = (fs.copyFile as Mock).mock.calls[0]
+      expect(path.dirname(temporary)).toBe(folder)
+      expect(flag).toBe(COPYFILE_EXCL)
+      expect(fs.rename).toHaveBeenCalledWith(temporary, path.join(folder, 'file.md'))
+    })
+
+    it('removes the temporary copy when the rename fails', async () => {
+      ;(fs.lstat as Mock)
+        .mockResolvedValueOnce(makeStats({ isDir: false }))
+        .mockResolvedValueOnce(makeStats({ isDir: false }))
+      ;(mockFileService.checkNameConflict as Mock).mockResolvedValue(true)
+      ;(fs.copyFile as Mock).mockResolvedValue(undefined)
+      ;(fs.rename as Mock).mockRejectedValue(new Error('busy'))
+      ;(fs.rm as Mock).mockResolvedValue(undefined)
 
       const result = await service.copyFromExternal(
         '/external/file.md',
@@ -613,25 +642,45 @@ describe('ExternalFileService', () => {
       )
 
       expect(result.success).toBe(false)
-      expect(fs.copyFile).not.toHaveBeenCalled()
+      const [, temporary] = (fs.copyFile as Mock).mock.calls[0]
+      expect(fs.rm).toHaveBeenCalledWith(temporary, { force: true })
     })
 
-    it('replaces a name that is an ordinary file', async () => {
+    it('creates a new name exclusively even when replace finds nothing there', async () => {
       ;(fs.lstat as Mock)
         .mockResolvedValueOnce(makeStats({ isDir: false }))
-        .mockResolvedValueOnce(makeStats({ isDir: false }))
-      ;(mockFileService.checkNameConflict as Mock).mockResolvedValue(true)
-      ;(fs.copyFile as Mock).mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }))
+      ;(mockFileService.checkNameConflict as Mock).mockResolvedValue(false)
+      ;(fs.copyFile as Mock).mockResolvedValue(undefined)
 
       const folder = path.resolve('/project/docs')
-      const result = await service.copyFromExternal('/external/file.md', target(folder), 'replace')
+      await service.copyFromExternal('/external/file.md', target(folder), 'replace')
 
-      expect(result.success).toBe(true)
-      expect(fs.copyFile).toHaveBeenCalledWith('/external/file.md', path.join(folder, 'file.md'))
+      expect(fs.copyFile).toHaveBeenCalledWith(
+        '/external/file.md',
+        path.join(folder, 'file.md'),
+        COPYFILE_EXCL
+      )
+      expect(fs.rename).not.toHaveBeenCalled()
+    })
+
+    it('refuses a copy onto the same file', async () => {
+      ;(fs.lstat as Mock).mockResolvedValue(makeStats({ isDir: false }))
+      ;(fs.stat as Mock).mockResolvedValue({ dev: 5n, ino: 9n })
+      ;(mockFileService.checkNameConflict as Mock).mockResolvedValue(true)
+
+      const result = await service.copyFromExternal(
+        '/external/file.md',
+        target(path.resolve('/project/docs')),
+        'replace'
+      )
+
+      expect(result.errorCode).toBe(ErrorCode.EXTERNAL_FILE_SAME_FILE)
+      expect(fs.copyFile).not.toHaveBeenCalled()
     })
   })
 
-  describe('move grants', () => {
+  describe('move confirmation', () => {
     const source = '/external/file.md'
     const folder = path.resolve('/project/docs')
 
@@ -642,34 +691,16 @@ describe('ExternalFileService', () => {
       ;(fs.rm as Mock).mockResolvedValue(undefined)
     })
 
-    it('refuses a file that was not picked, and copies and deletes nothing', async () => {
-      grants.clear()
-
-      const result = await service.moveFromExternal(source, target(folder), SENDER)
-
-      expect(result).toMatchObject({
-        success: false,
-        errorCode: ErrorCode.EXTERNAL_FILE_MOVE_NOT_GRANTED
-      })
-      expect(fs.copyFile).not.toHaveBeenCalled()
-      expect(fs.rm).not.toHaveBeenCalled()
-    })
-
-    it('moves a file the user confirms in the box, once per answer', async () => {
-      const confirm = vi.fn().mockResolvedValue('move')
-      service.setMoveConfirmer({ confirm })
-      grants.clear()
-
+    it('moves a file after the user answers Move', async () => {
       const result = await service.moveFromExternal(source, target(folder), SENDER)
 
       expect(result.success).toBe(true)
-      expect(confirm).toHaveBeenCalledWith(SENDER, source)
+      expect(confirm).toHaveBeenCalledWith(SENDER, source, undefined)
       expect(fs.rm).toHaveBeenCalledWith(source)
     })
 
     it('touches nothing when the user cancels, and answers quietly', async () => {
-      service.setMoveConfirmer({ confirm: vi.fn().mockResolvedValue('cancel') })
-      grants.clear()
+      confirm.mockResolvedValue('cancel')
 
       const result = await service.moveFromExternal(source, target(folder), SENDER)
 
@@ -682,8 +713,7 @@ describe('ExternalFileService', () => {
     })
 
     it('refuses when no box can be shown', async () => {
-      service.setMoveConfirmer({ confirm: vi.fn().mockResolvedValue('unavailable') })
-      grants.clear()
+      confirm.mockResolvedValue('unavailable')
 
       const result = await service.moveFromExternal(source, target(folder), SENDER)
 
@@ -691,60 +721,84 @@ describe('ExternalFileService', () => {
       expect(fs.rm).not.toHaveBeenCalled()
     })
 
-    it('does not ask for a file picked in the dialog', async () => {
-      const confirm = vi.fn().mockResolvedValue('cancel')
-      service.setMoveConfirmer({ confirm })
+    it('refuses when there is nobody to ask', async () => {
+      service.setMoveConfirmer(null)
 
       const result = await service.moveFromExternal(source, target(folder), SENDER)
 
-      expect(result.success).toBe(true)
-      expect(confirm).not.toHaveBeenCalled()
+      expect(result.errorCode).toBe(ErrorCode.EXTERNAL_FILE_MOVE_NOT_GRANTED)
+      expect(fs.rm).not.toHaveBeenCalled()
     })
 
     it('does not ask about a file that fails validation', async () => {
-      const confirm = vi.fn().mockResolvedValue('move')
-      service.setMoveConfirmer({ confirm })
-      grants.clear()
-      ;(fs.lstat as Mock).mockResolvedValueOnce(makeStats({ isDir: true }))
+      ;(fs.lstat as Mock).mockResolvedValue(makeStats({ isDir: true }))
 
       await service.moveFromExternal(source, target(folder), SENDER)
 
       expect(confirm).not.toHaveBeenCalled()
     })
 
-    it('refuses a file another window picked', async () => {
-      const result = await service.moveFromExternal(source, target(folder), SENDER + 1)
+    it('names the whole dialog pick in the one question', async () => {
+      await grants.issue(SENDER, [source, '/external/two.md'])
 
-      expect(result.errorCode).toBe(ErrorCode.EXTERNAL_FILE_MOVE_NOT_GRANTED)
+      await service.moveFromExternal(source, target(folder), SENDER)
+
+      const batch = confirm.mock.calls[0][2] as string[]
+      expect(batch).toEqual([path.resolve(source), path.resolve('/external/two.md')])
+    })
+
+    it('cancels without change when the target no longer resolves the same', async () => {
+      const result = await service.moveFromExternal(
+        source,
+        target(folder),
+        SENDER,
+        undefined,
+        async () => false
+      )
+
+      expect(result.errorCode).toBe(ErrorCode.EXTERNAL_FILE_MOVE_CHANGED)
+      expect(fs.copyFile).not.toHaveBeenCalled()
       expect(fs.rm).not.toHaveBeenCalled()
     })
 
-    it('allows one move per pick', async () => {
-      const first = await service.moveFromExternal(source, target(folder), SENDER)
-      const second = await service.moveFromExternal(source, target(folder), SENDER)
+    it('cancels without change when the source became another file while waiting', async () => {
+      ;(fs.stat as Mock)
+        .mockResolvedValueOnce({ dev: 1n, ino: 10n }) // identity before the box
+        .mockResolvedValueOnce({ dev: 1n, ino: 11n }) // same-file check: source
+        .mockRejectedValueOnce(new Error('ENOENT')) // same-file check: target
+      confirm.mockImplementation(async () => {
+        ;(fs.stat as Mock).mockResolvedValue({ dev: 1n, ino: 99n })
+        return 'move'
+      })
 
-      expect(first.success).toBe(true)
-      expect(second.errorCode).toBe(ErrorCode.EXTERNAL_FILE_MOVE_NOT_GRANTED)
-      expect(fs.rm).toHaveBeenCalledTimes(1)
-    })
+      const result = await service.moveFromExternal(source, target(folder), SENDER)
 
-    it('does not need a grant to copy', async () => {
-      grants.clear()
-
-      const result = await service.copyFromExternal(source, target(folder))
-
-      expect(result.success).toBe(true)
+      expect(result.errorCode).toBe(ErrorCode.EXTERNAL_FILE_MOVE_CHANGED)
       expect(fs.rm).not.toHaveBeenCalled()
     })
 
-    it('does not use up a grant when the file fails validation', async () => {
-      ;(fs.lstat as Mock).mockResolvedValueOnce(makeStats({ isDir: true }))
+    it('cancels without change when the source stopped being a regular file while waiting', async () => {
+      confirm.mockImplementation(async () => {
+        ;(fs.lstat as Mock).mockResolvedValue(makeStats({ isDir: true }))
+        return 'move'
+      })
 
-      const refused = await service.moveFromExternal(source, target(folder), SENDER)
-      const retried = await service.moveFromExternal(source, target(folder), SENDER)
+      const result = await service.moveFromExternal(source, target(folder), SENDER)
 
-      expect(refused.errorCode).toBe(ErrorCode.EXTERNAL_FILE_IS_DIRECTORY)
-      expect(retried.success).toBe(true)
+      expect(result.errorCode).toBe(ErrorCode.EXTERNAL_FILE_MOVE_CHANGED)
+      expect(fs.rm).not.toHaveBeenCalled()
+    })
+
+    it('never deletes the source when the copy would land on it', async () => {
+      ;(fs.stat as Mock).mockResolvedValue({ dev: 3n, ino: 4n })
+      ;(mockFileService.checkNameConflict as Mock).mockResolvedValue(true)
+
+      const result = await service.moveFromExternal(source, target(folder), SENDER, 'replace')
+
+      expect(result.errorCode).toBe(ErrorCode.EXTERNAL_FILE_SAME_FILE)
+      expect(confirm).not.toHaveBeenCalled()
+      expect(fs.copyFile).not.toHaveBeenCalled()
+      expect(fs.rm).not.toHaveBeenCalled()
     })
   })
 })

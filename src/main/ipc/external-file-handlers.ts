@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+import { realpath } from 'fs/promises'
 import { BrowserWindow, dialog, webContents, type OpenDialogOptions } from 'electron'
 import { externalFileService } from '../services/ExternalFileService'
 import { externalSourceGrants } from '../services/ExternalSourceGrants'
@@ -7,7 +8,7 @@ import {
   ExternalMoveConfirmerImpl,
   type MoveConfirmer
 } from '../services/ExternalMoveConfirmer'
-import type { ProjectSession } from '../services/session/ProjectSession'
+import type { ProjectSession, ProjectSessionSnapshot } from '../services/session/ProjectSession'
 import {
   ExternalFileValidateArgsSchema,
   ExternalFileTransferArgsSchema,
@@ -15,11 +16,13 @@ import {
   type ExternalFileCopyResponse,
   type ExternalFileMoveResponse
 } from '../../shared/ipc/external-file-schema'
-import { ErrorCode } from '../../shared/errors'
+import { ErrorCode, ERROR_MESSAGES } from '../../shared/errors'
 import { logger } from '../services/LoggingService'
 import { redactedLogError } from '../utils/redactUserInput'
 import { registerHandle } from './registry'
 import { registerConfinedHandle } from './confinement/registerConfinedHandle'
+import { resolveConfinedPath } from './confinement/resolveConfinedPath'
+import { isInsideRoot } from '../utils/pathCompare'
 import type { ConfinementError } from './confinement/ConfinementError'
 import { rememberDialogResult, withLastDirectory } from '../utils/lastDialogDirectory'
 
@@ -38,8 +41,30 @@ function createNativeMoveConfirmer(): MoveConfirmer {
     resolveOwner: (senderId) => {
       const contents = webContents.fromId(senderId)
       return contents ? BrowserWindow.fromWebContents(contents) : null
+    },
+    // A minimised or hidden window cannot be asked
+    canShow: (owner) => {
+      const window = owner as BrowserWindow
+      return window.isVisible() && !window.isMinimized()
     }
   })
+}
+
+/** Whether a file lies in the open project, by the spelling given or where it really is. */
+async function isInProject(
+  sourcePath: string,
+  snapshot: ProjectSessionSnapshot | null
+): Promise<boolean> {
+  if (!snapshot) return false
+  const inside = (candidate: string): boolean =>
+    isInsideRoot(candidate, snapshot.root, snapshot.caseSensitive) ||
+    isInsideRoot(candidate, snapshot.realRoot, snapshot.caseSensitive)
+  if (inside(sourcePath)) return true
+  try {
+    return inside(await realpath(sourcePath))
+  } catch {
+    return false
+  }
 }
 
 /** The error code a refused path carries in a result-shaped answer. */
@@ -164,7 +189,8 @@ export function registerExternalFileHandlers(
    *
    * Validates the file, copies to target folder, then deletes source. The
    * source must be a file the user chose in the native picker (see
-   * ExternalSourceGrants), or the user confirms the move in a native box.
+   * ExternalSourceGrants) or came from a drop; either way the original is deleted
+   * only after the user answers "Move" in a native box.
    * Supports conflict resolution strategies: 'replace' or 'keepBoth'.
    */
   registerConfinedHandle(
@@ -180,13 +206,43 @@ export function registerExternalFileHandlers(
         error: error.message,
         errorCode: refusalCode(error)
       }),
-      handler: async ({ event }, [, , , conflictResolution], { source, target }): Promise<ExternalFileMoveResponse> => {
+      handler: async (
+        { event, session: started },
+        [, , , conflictResolution],
+        { source, target }
+      ): Promise<ExternalFileMoveResponse> => {
         try {
+          // A file already in the project is moved from the project tree
+          if (await isInProject(source.requested, started)) {
+            return {
+              success: false,
+              error: ERROR_MESSAGES[ErrorCode.EXTERNAL_FILE_IN_PROJECT],
+              errorCode: ErrorCode.EXTERNAL_FILE_IN_PROJECT
+            }
+          }
+          const senderId = event.sender?.id ?? null
+          // After the user answers: the same project must be open and the target
+          // must still resolve to the same folder
+          const recheckTarget = async (): Promise<boolean> => {
+            const now = session.current()
+            if (!now || now.generation !== started?.generation) return false
+            try {
+              const again = await resolveConfinedPath(
+                target.requested,
+                { session: now, senderId },
+                { mode: 'project', mustExist: true, kind: 'directory' }
+              )
+              return again.real === target.real
+            } catch {
+              return false
+            }
+          }
           return await externalFileService.moveFromExternal(
             source.requested,
             { real: target.real, requested: target.requested },
-            event.sender?.id ?? null,
-            conflictResolution
+            senderId,
+            conflictResolution,
+            recheckTarget
           )
         } catch (error) {
           logger.error('Error moving external file', redactedLogError(error))
@@ -205,8 +261,8 @@ export function registerExternalFileHandlers(
    * Open native file picker for external files
    *
    * Used when folder is selected and user presses Cmd+Shift+I.
-   * Returns array of selected file paths, and records them as files the user
-   * chose, so a later move of one of them may delete the original.
+   * Returns array of selected file paths, and records them as one pick, so a later
+   * move of one of them is confirmed once for the whole pick.
    */
   registerHandle('file:selectExternalFiles', async (event): Promise<ExternalFileSelection | null> => {
     try {
@@ -220,7 +276,7 @@ export function registerExternalFileHandlers(
         return null
       }
       rememberDialogResult(result.filePaths)
-      externalSourceGrants.issue(event.sender?.id ?? null, result.filePaths)
+      await externalSourceGrants.issue(event.sender?.id ?? null, result.filePaths)
 
       logger.debug('External files selected', { count: result.filePaths.length })
 
