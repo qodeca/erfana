@@ -175,7 +175,7 @@ test.describe('Context Menu – Explain prompt', () => {
     // Under xvfb Monaco already holds a selection when the right-click lands, so Explain
     // is enabled where the test expects it disabled. Cause not isolated (font-dependent
     // click position or a selection the app makes on open): see docs/testing/e2e-testing.md.
-    test.skip(IS_LINUX_CONTAINER, 'Explain is enabled before any selection under xvfb')
+    test.skip(IS_LINUX_CONTAINER, '#299: Explain is enabled before any selection under xvfb')
 
     const { projectPath, cleanup: cleanupProject } = await createTestProject(testSeed)
     const { userDataDir, cleanup: cleanupUserData } = await createTempUserDataDir(

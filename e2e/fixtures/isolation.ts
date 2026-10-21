@@ -115,6 +115,8 @@ export function buildAppEnv(options: AppEnvOptions = {}): Record<string, string>
     }
   }
   env.NODE_ENV = 'development'
+  // Switches on the app's e2e test hooks (window.__erfanaTest); main ignores it in a packaged build
+  env.ERFANA_E2E_TEST_HOOKS = '1'
 
   if (options.homeDir) {
     const home = options.homeDir

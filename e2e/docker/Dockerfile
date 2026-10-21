@@ -4,9 +4,11 @@
 # Headless Linux image for the Playwright Electron suite (run under xvfb).
 # Built for the host's native architecture (arm64 on Apple Silicon, amd64 elsewhere).
 # Driven by scripts/e2e-linux.sh – see docs/testing/e2e-testing.md.
-FROM node:24-bookworm AS node
+# node:24-bookworm
+FROM node:24-bookworm@sha256:925de64a85319052d6971ae81ef2417da956e8a3a2c4a0fac732327970f017f5 AS node
 
-FROM ubuntu:24.04
+# ubuntu:24.04
+FROM ubuntu:24.04@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac
 
 ENV DEBIAN_FRONTEND=noninteractive \
     LANG=C.UTF-8 \
@@ -17,7 +19,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # openbox is a minimal window manager: without one no window gets keyboard focus
 # (Monaco hides its cursor) and window resize/maximize requests are ignored.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      ca-certificates curl xvfb xauth x11-utils openbox dbus dbus-x11 \
+      ca-certificates xvfb xauth x11-utils openbox dbus dbus-x11 \
       libnss3 libatk1.0-0t64 libatk-bridge2.0-0t64 libcups2t64 libdrm2 libgbm1 \
       libgtk-3-0t64 libasound2t64 libxss1 libxtst6 libxkbcommon0 libx11-xcb1 \
       libxcomposite1 libxdamage1 libxrandr2 libxfixes3 libpango-1.0-0 libcairo2 \
@@ -40,8 +42,9 @@ RUN ln -sf ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
 # dash draws its prompt before the clear and the clear then wipes it. Match macOS.
 RUN ln -sf bash /bin/sh
 
-# zsh without a ~/.zshrc prints a first-run wizard instead of a prompt.
-RUN touch /root/.zshrc
+# The suite runs as the host user (no passwd entry) with HOME=/tmp/home. zsh without a
+# ~/.zshrc prints a first-run wizard instead of a prompt, so give it an empty one.
+RUN mkdir -p /tmp/home/.npm && touch /tmp/home/.zshrc && chmod -R a+rwX /tmp/home
 
 WORKDIR /work
 CMD ["bash"]
