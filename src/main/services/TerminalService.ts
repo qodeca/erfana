@@ -76,6 +76,8 @@ interface TerminalInstance {
   isClearing: boolean // Track clearing phase to prevent forwarding clear sequence
   clearFallbackTimeout?: NodeJS.Timeout // Safety timeout for clear confirmation
   hasReceivedMarker: boolean // Track if marker was detected (prevents late data forwarding)
+  /** Output that arrived after the marker line while the clear handshake was open; flushed in order once it ends. */
+  pendingOutput: string
   webContentsId: number // Track owning webContents for cleanup on window close
   shellKind: ShellKind // Quoting flavour resolved at create time (#164)
   shellNames: ReadonlySet<string> // Names the idle shell shows as; see terminalForeground.ts
@@ -96,6 +98,25 @@ export const TERMINAL_EXIT_WAIT_MS = 1_500
 
 /** Most output kept while waiting for the bootstrap marker (64 KiB). */
 export const MARKER_BUFFER_MAX_CHARS = 64 * 1024
+
+/** Most post-marker output held while the clear handshake is open (64 KiB, newest kept). */
+export const PENDING_OUTPUT_MAX_CHARS = 64 * 1024
+
+/**
+ * Drops the rest of the marker's own line from output that follows the marker.
+ *
+ * The shell prints the marker followed by a line break. That break belongs to
+ * the hidden handshake, anything after it is real output (a prompt can follow
+ * within the same chunk). `pending` is true when the line break has not fully
+ * arrived yet (the chunk ended on the marker, or on a lone `\r`), so the next
+ * chunk must be given to this function again.
+ */
+export function stripMarkerLineEnd(text: string): { rest: string; pending: boolean } {
+  const eol = /^[ \t]*\r?\n/.exec(text)
+  if (eol) return { rest: text.slice(eol[0].length), pending: false }
+  if (/^[ \t]*\r?$/.test(text)) return { rest: '', pending: true }
+  return { rest: text, pending: false }
+}
 
 /**
  * Terminal configuration
@@ -344,6 +365,7 @@ export class TerminalService extends EventEmitter {
         initializationComplete: false, // Will be set to true after cwd verification
         isClearing: false, // Will be set to true during terminal clear phase
         hasReceivedMarker: false, // Will be set to true when marker is detected
+        pendingOutput: '',
         // Track owning webContents for cleanup on window close (issue #59)
         // Sentinel value -1 means "no owner" - terminals with -1 won't be cleaned up
         // during window destruction (used in tests and manual terminal creation)
@@ -362,6 +384,11 @@ export class TerminalService extends EventEmitter {
       // Marker detection: buffer data until we see the marker from bootstrap script
       let markerBuffer = ''
       let markerDetected = false
+      // True while the line break that ends the marker line has not been seen yet
+      let markerLineEndPending = false
+      // Set by the detector for the chunk that held the marker, so the forwarder
+      // does not process that chunk a second time
+      let markerChunkHandled = false
       const markerDetector = (data: string) => {
         if (markerDetected) return
         markerBuffer += data
@@ -370,8 +397,10 @@ export class TerminalService extends EventEmitter {
         if (markerBuffer.length > MARKER_BUFFER_MAX_CHARS) {
           markerBuffer = markerBuffer.slice(-MARKER_BUFFER_MAX_CHARS)
         }
-        if (markerBuffer.includes(marker)) {
+        const markerAt = markerBuffer.indexOf(marker)
+        if (markerAt !== -1) {
           markerDetected = true
+          markerChunkHandled = true
 
           // Parse PWD from output (line before marker)
           const lines = markerBuffer.split(/\r?\n/).filter(Boolean)
@@ -392,6 +421,13 @@ export class TerminalService extends EventEmitter {
             term.hasReceivedMarker = true
             term.isClearing = true
 
+            // Output that followed the marker in the same chunk (a fast shell can
+            // draw its prompt right behind it) is real: hold it until the clear
+            // has been applied instead of discarding it.
+            const afterMarker = stripMarkerLineEnd(markerBuffer.slice(markerAt + marker.length))
+            markerLineEndPending = afterMarker.pending
+            this.queuePendingOutput(term, afterMarker.rest)
+
             this.emit('clearTerminal', { terminalId, webContentsId: webContentsId ?? -1 })
 
             // Safety fallback: if renderer doesn't respond in 3 seconds, enable anyway
@@ -402,6 +438,7 @@ export class TerminalService extends EventEmitter {
                 t.isClearing = false
                 t.initializationComplete = true
                 t.clearFallbackTimeout = undefined
+                this.flushPendingOutput(t)
               }
             }, 3000)
           }
@@ -420,15 +457,32 @@ export class TerminalService extends EventEmitter {
         // `logger.debug` drops the call below the configured level.
         logger.debug(`[PRIMARY onData] term=${!!term}, init=${term?.initializationComplete}, clearing=${term?.isClearing}, marker=${term?.hasReceivedMarker}, length=${data.length}`)
 
-        // STRICT BLOCKING: Only forward if:
-        // 1. Initialization complete (clear confirmed by renderer)
-        // 2. NOT currently clearing
-        // 3. Marker has been received (ensures no pre-marker data leaks through)
-        if (term && term.initializationComplete && !term.isClearing && term.hasReceivedMarker) {
-          logger.debug(`[PRIMARY onData] FORWARDING data`)
-          this.emit('data', { terminalId, data, webContentsId: webContentsId ?? -1 })
-        } else {
+        // Output before the marker is bootstrap noise and is dropped. The chunk
+        // that held the marker was already split by the detector.
+        if (!term || !term.hasReceivedMarker) {
           logger.debug(`[PRIMARY onData] BLOCKING data`)
+          return
+        }
+        if (markerChunkHandled) {
+          markerChunkHandled = false
+          return
+        }
+
+        let output = data
+        if (markerLineEndPending) {
+          const stripped = stripMarkerLineEnd(output)
+          markerLineEndPending = stripped.pending
+          output = stripped.rest
+        }
+        if (!output) return
+
+        if (term.initializationComplete && !term.isClearing) {
+          logger.debug(`[PRIMARY onData] FORWARDING data`)
+          this.emit('data', { terminalId, data: output, webContentsId: webContentsId ?? -1 })
+        } else {
+          // Clear handshake still open: keep it, in order, for the flush.
+          logger.debug(`[PRIMARY onData] QUEUEING data`)
+          this.queuePendingOutput(term, output)
         }
       })
 
@@ -451,6 +505,22 @@ export class TerminalService extends EventEmitter {
   }
 
 
+  /** Holds post-marker output while the clear handshake is open (bounded, newest kept). */
+  private queuePendingOutput(terminal: TerminalInstance, output: string): void {
+    if (!output) return
+    const merged = terminal.pendingOutput + output
+    terminal.pendingOutput =
+      merged.length > PENDING_OUTPUT_MAX_CHARS ? merged.slice(-PENDING_OUTPUT_MAX_CHARS) : merged
+  }
+
+  /** Forwards held output, in order, once the handshake has ended. */
+  private flushPendingOutput(terminal: TerminalInstance): void {
+    const data = terminal.pendingOutput
+    if (!data) return
+    terminal.pendingOutput = ''
+    this.emit('data', { terminalId: terminal.id, data, webContentsId: terminal.webContentsId })
+  }
+
   /**
    * Called by renderer after clear sequence is processed
    * Enables normal terminal output
@@ -468,6 +538,7 @@ export class TerminalService extends EventEmitter {
 
       terminal.isClearing = false
       terminal.initializationComplete = true
+      this.flushPendingOutput(terminal)
 
       // Note: We intentionally do NOT send a newline here
       // Sending '\r' would cause the shell to flush its output buffer,
