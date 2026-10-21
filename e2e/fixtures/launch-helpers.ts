@@ -54,19 +54,32 @@ export async function forceCloseApp(app: ElectronApplication): Promise<void> {
   await closeAppAndWait(app)
 }
 
+/**
+ * Give the first window a content area of exactly `width` × `height`.
+ *
+ * Waits for the window first: right after `electron.launch()` the app has not
+ * created it yet, so a resize sent then did nothing – except on a slow run,
+ * where it landed and every visual case failed (#267). Throws when the window
+ * manager does not grant the size, so a wrong size fails here, not as a
+ * pixel diff.
+ */
 export async function resizeBrowserWindow(
   app: ElectronApplication,
   width: number,
   height: number
 ): Promise<void> {
-  await app.evaluate(
+  await app.firstWindow()
+  const granted = await app.evaluate(
     ({ BrowserWindow }, size) => {
       const win = BrowserWindow.getAllWindows()[0]
-      if (win) {
-        win.setSize(size.width, size.height)
-        win.setContentSize(size.width, size.height)
-      }
+      win.setContentSize(size.width, size.height)
+      return win.getContentSize()
     },
     { width, height }
   )
+  if (granted[0] !== width || granted[1] !== height) {
+    throw new Error(
+      `resizeBrowserWindow: asked for ${width}×${height}, got ${granted[0]}×${granted[1]}`
+    )
+  }
 }

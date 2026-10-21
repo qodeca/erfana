@@ -80,8 +80,8 @@ Three Playwright projects are configured:
 
 Visual project settings: `snapshotDir: './e2e/screenshots'`, `snapshotPathTemplate: '{snapshotDir}/{arg}-{platform}{ext}'`, `maxDiffPixelRatio: 0.01`, `animations: 'disabled'`.
 
-Page-level captures (welcome, editor, terminal) pass `clip: PAGE_CLIP` — the `1280x800` rectangle the visual fixture asks the window for — so the baseline
-records the app's own layout rather than whatever content size the host window manager granted. Element-level captures (settings overlay, confirm dialog,
+The visual fixture pins the window's content size (`VISUAL_CONTENT_SIZE` in `e2e/fixtures/index.ts`) after the window exists, and throws if the window
+manager does not grant it (#267). Page-level captures (welcome, editor, terminal) pass `clip: PAGE_CLIP`, a fixed `1280x800` rectangle. Element-level captures (settings overlay, confirm dialog,
 image-viewer toolbar) need no clip: the element bounds are the capture.
 
 Baselines are per platform and committed. Both the **darwin** and the **win32** set exist for all six states; the three page-level captures were
