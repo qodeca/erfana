@@ -113,6 +113,33 @@ export class ProjectTreePage {
   }
 
   // ---------------------------------------------------------------------------
+  // Recent projects (on the Welcome tab)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * A recent-project row, addressed by the folder name it displays. The remove
+   * button shares the row's testid prefix but has no name element, so the
+   * `.recent-project-name` filter leaves only the row.
+   */
+  recentProject(name: string): Locator {
+    return this.page
+      .locator(`[data-testid^="${TEST_IDS.WELCOME_RECENT_PROJECT}-"]`)
+      .filter({ has: this.page.locator('.recent-project-name', { hasText: name }) })
+  }
+
+  /**
+   * Open the Welcome tab and click a recent project, returning once the click
+   * has landed. The switch itself (flush, prompt, open) runs on after this
+   * returns; wait on its outcome (the tree, the prompt, a toast).
+   */
+  async switchToRecent(name: string): Promise<void> {
+    await this.page.locator('.welcome-tab').click()
+    const row = this.recentProject(name)
+    await expect(row).toBeVisible({ timeout: 10_000 })
+    await row.click()
+  }
+
+  // ---------------------------------------------------------------------------
   // Context menu
   //
   // The tree renders the shared `ContextMenu` primitive with no custom
