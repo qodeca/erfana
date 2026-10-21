@@ -8,9 +8,7 @@
  * terminal looks busy. Quit already asks on the same evidence
  * (`utils/quitHelpers.ts`); restart did not.
  *
- * The renderer cannot see the terminal's foreground process: that would need
- * a main-side IPC that does not exist today. The guard therefore uses the two
- * signals the renderer already has, either of which is enough:
+ * The guard combines three signals, any one of which is enough:
  *
  * 1. **Claude Code is running** – the Claude status store holds a snapshot for
  *    this terminal. Main only publishes one while the `claude` CLI is a live
@@ -20,16 +18,14 @@
  *    (`checkTerminalBusy`) applied to THIS terminal: the user has typed in it
  *    and it produced output or input within {@link TERMINAL.RECENT_ACTIVITY_WINDOW}.
  *    Catches any CLI agent or long-running command, not only Claude Code.
+ * 3. **A program is running** – main reports a foreground process other than
+ *    the shell (`terminal:getActivity`). Catches a silent agent or command that
+ *    has produced no output and received no input for a while. Where the
+ *    platform cannot tell (Windows), only signals 1 and 2 apply.
  *
  * "Input" covers keystrokes AND programmatic input: `sendToTerminal` (prompt
  * sends, drag-and-drop paths, ProjectTree actions) marks the terminal too, so
  * a task handed to an agent by the app counts the same as one typed by hand.
- *
- * KNOWN GAP: an agent other than Claude Code that has produced no output and
- * received no input for longer than the window (20 s) restarts without a
- * prompt – e.g. one thinking silently or idling at its own prompt. Closing it
- * needs the PTY's foreground process from main (node-pty exposes
- * `IPty.process`), i.e. a new IPC channel.
  */
 
 import { useTerminalStore } from '../../../stores/useTerminalStore'
@@ -42,14 +38,16 @@ import type { ConfirmDialogConfig } from '../../Dialog/types'
  *
  * - `'claude'` – Claude Code is running in the terminal
  * - `'activity'` – the terminal was used and is still producing output
+ * - `'process'` – a program other than the shell is running in it
  */
-export type RestartRisk = 'claude' | 'activity' | null
+export type RestartRisk = 'claude' | 'activity' | 'process' | null
 
 /**
  * Decide whether restarting `terminalId` could end work in progress.
  *
  * Reads both stores through `getState()` at call time, so the answer reflects
- * the moment the user clicked, not the last render.
+ * the moment the user clicked, not the last render. The cheap local signals run
+ * first; main is asked only when they find nothing.
  *
  * @param terminalId - The PTY session about to be restarted, or `null` when
  *   the panel has none (nothing to lose, so no prompt)
@@ -59,15 +57,15 @@ export type RestartRisk = 'claude' | 'activity' | null
  *
  * @example
  * ```ts
- * const risk = getRestartRisk(terminalIdRef.current)
+ * const risk = await getRestartRisk(terminalIdRef.current)
  * if (risk !== null && !(await showConfirm(buildRestartConfirm(risk)))) return
  * await restart()
  * ```
  */
-export function getRestartRisk(
+export async function getRestartRisk(
   terminalId: string | null,
   windowMs: number = TERMINAL.RECENT_ACTIVITY_WINDOW
-): RestartRisk {
+): Promise<RestartRisk> {
   if (!terminalId) return null
 
   // A `null` value is main's "bar hidden" signal (no live claude process);
@@ -81,7 +79,27 @@ export function getRestartRisk(
     return 'activity'
   }
 
-  return null
+  return (await hasRunningProgram(terminalId)) ? 'process' : null
+}
+
+/**
+ * Ask main whether a program other than the shell runs in the terminal. Any
+ * failure (no bridge, a refused call) reads as "no", so the guard never blocks
+ * a restart on a broken lookup.
+ */
+async function hasRunningProgram(terminalId: string): Promise<boolean> {
+  try {
+    const result = await window.api?.terminal?.getActivity?.(terminalId)
+    return result?.success === true && result.busy === true
+  } catch {
+    return false
+  }
+}
+
+const RESTART_MESSAGES: Record<Exclude<RestartRisk, null>, string> = {
+  claude: 'Claude Code is running in this terminal. Restarting ends it and stops anything it is doing.',
+  activity: 'This terminal was in use moments ago. Restarting ends anything still running in it.',
+  process: 'A program is running in this terminal. Restarting ends it and stops anything it is doing.'
 }
 
 /**
@@ -101,10 +119,7 @@ export function buildRestartConfirm(
 ): Omit<ConfirmDialogConfig, 'id'> {
   return {
     title: 'Restart terminal?',
-    message:
-      risk === 'claude'
-        ? 'Claude Code is running in this terminal. Restarting ends it and stops anything it is doing.'
-        : 'This terminal was in use moments ago. Restarting ends anything still running in it.',
+    message: RESTART_MESSAGES[risk],
     confirmLabel: 'Restart',
     cancelLabel: 'Cancel',
     danger: true

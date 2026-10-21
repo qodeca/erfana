@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { contextBridge, ipcRenderer, IpcRendererEvent, webUtils } from 'electron'
-import { FORCE_CRASH_ARG } from '../shared/constants'
+import { FORCE_CRASH_ARG, TEST_HOOKS_ARG } from '../shared/constants'
 import type { ProjectChanged, ProjectSessionInfo } from '../shared/ipc/schema'
 import type { GitStatusResponse } from '../shared/ipc/git-schema'
 import type { PdfExportRequest, PdfExportResponse } from '../shared/ipc/pdf-schema'
@@ -64,6 +64,13 @@ export type { FileNode, FileStats }
 
 // Custom APIs for renderer
 const api = {
+  /**
+   * E2E test-hook switch. True only when main appended {@link TEST_HOOKS_ARG}
+   * (unpackaged app + `ERFANA_E2E_TEST_HOOKS=1`). The preload is the only source:
+   * the renderer reads this value, never a global that page script could set.
+   */
+  testHooks: { enabled: process.argv.includes(TEST_HOOKS_ARG) },
+
   // File operations
   file: {
     openProject: (): Promise<string | null> => ipcRenderer.invoke('file:openProject'),
@@ -425,12 +432,10 @@ const api = {
      * can quote pasted paths correctly without a follow-up IPC round-trip
      * (#164 round-2 F#1).
      */
-    create: (config?: {
-      shell?: string
+    create: (config: {
       cwd?: string
-      env?: Record<string, string>
-      cols?: number
-      rows?: number
+      cols: number
+      rows: number
     }): Promise<{
       success: boolean
       terminalId?: string
@@ -464,6 +469,14 @@ const api = {
       terminals?: Array<{ id: string; title: string }>
       error?: string
     }> => ipcRenderer.invoke('terminal:list'),
+
+    // Whether a program other than the shell is running in the terminal
+    getActivity: (terminalId: string): Promise<{
+      success: boolean
+      busy?: boolean
+      known?: boolean
+      error?: string
+    }> => ipcRenderer.invoke('terminal:getActivity', terminalId),
 
     // Event listeners
     onData: (callback: (data: { terminalId: string; data: string }) => void) => {

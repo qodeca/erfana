@@ -9,8 +9,8 @@
  * to the DOM (.xterm-rows only exists with the DOM renderer, and
  * .xterm-accessibility-tree requires screenReaderMode: true). The page object
  * therefore reads xterm's own buffer – the text the terminal draws – through
- * the React fiber of the terminal element (`readScreen`), without any
- * test-only code in the app.
+ * the app's e2e test hook (`window.__erfanaTest`), falling back to the React
+ * fiber of the terminal element when the hook is missing (`readScreen`).
  *
  * @see e2e/utils/helpers.ts - Backward-compatible adapter
  */
@@ -86,6 +86,24 @@ function readScreenInPage(selector: string): TerminalScreen {
   return empty('no xterm Terminal found in the React fibers')
 }
 
+/**
+ * Read the screen through `window.__erfanaTest`. Runs in the page; returns null
+ * when the hook, or a terminal registered with it, is missing.
+ */
+async function readScreenViaHook(): Promise<TerminalScreen | null> {
+  const hook = window.__erfanaTest
+  if (!hook) return null
+  const listed = await window.api.terminal.list()
+  const ids = listed.terminals?.map((t) => t.id) ?? []
+  for (const id of ids.reverse()) {
+    const text = hook.terminalText(id)
+    const cursor = hook.terminalCursor(id)
+    if (text === null || cursor === null) continue
+    return { lines: text === '' ? [] : text.split('\n'), cursorX: cursor.x, cursorY: cursor.y }
+  }
+  return null
+}
+
 export class TerminalPage {
   constructor(private readonly page: Page) {}
 
@@ -93,8 +111,16 @@ export class TerminalPage {
     return byTestId(this.page, TEST_IDS.TERMINAL_INSTANCE)
   }
 
-  /** The terminal's text and cursor, read from xterm's buffer. */
+  /**
+   * The terminal's text and cursor, read from xterm's buffer.
+   *
+   * Uses the app's e2e test hook (`window.__erfanaTest`, installed only for an
+   * unpackaged app launched by the e2e fixtures). The React-fiber walk is the
+   * fallback for a window where the hook is missing.
+   */
   async readScreen(): Promise<TerminalScreen> {
+    const viaHook = await this.page.evaluate(readScreenViaHook)
+    if (viaHook) return viaHook
     const screen = await this.page.evaluate(readScreenInPage, TERMINAL_SELECTOR)
     // Fail loudly: an unreadable screen must never look like an empty one.
     if (screen.error) {
