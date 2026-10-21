@@ -60,6 +60,17 @@ export interface ExternalTarget {
   requested: string
 }
 
+/**
+ * What a batch move hands one file's move: the answer the user gave, and what
+ * the file looked like when the box was put up. Main-internal; it never crosses IPC.
+ */
+export interface DecidedMove {
+  answer: MoveAnswer
+  sourceIdentity: string | null
+  sourceEntry: string | null
+  sourceFolder: string | null
+}
+
 /** One file of a batch move, with the way its name conflict was settled. */
 export interface ExternalMoveItem {
   sourcePath: string
@@ -104,7 +115,7 @@ export interface IExternalFileService {
     senderId: number | null,
     conflictResolution?: ConflictResolution,
     recheckTarget?: () => Promise<boolean>,
-    decided?: MoveAnswer
+    decided?: DecidedMove
   ): Promise<ExternalFileMoveResponse>
 
   /**
@@ -380,10 +391,20 @@ export class ExternalFileService implements IExternalFileService {
   ): Promise<ExternalFileMoveResponse[]> {
     logger.info('Moving external files', { count: items.length })
 
+    // What the user is shown is recorded BEFORE the box: the checks after the answer
+    // compare the file with this, not with itself
     const askable: string[] = []
+    const shown = new Map<string, Omit<DecidedMove, 'answer'>>()
     for (const item of items) {
       const validation = await this.validateExternalFile(item.sourcePath)
-      if (validation.valid && !validation.isSymlink) askable.push(item.sourcePath)
+      if (validation.valid && !validation.isSymlink) {
+        askable.push(item.sourcePath)
+        shown.set(item.sourcePath, {
+          sourceIdentity: await this.identityOf(item.sourcePath),
+          sourceEntry: await this.entryIdentityOf(item.sourcePath),
+          sourceFolder: await this.folderOf(item.sourcePath)
+        })
+      }
     }
 
     const answers = new Map<string, MoveAnswer>()
@@ -405,8 +426,13 @@ export class ExternalFileService implements IExternalFileService {
           senderId,
           item.conflictResolution,
           recheckTarget,
-          // A file that was not put to the user fails its own checks before the answer is read
-          answers.get(item.sourcePath) ?? (confirmer ? undefined : 'unavailable')
+          // A file that was not put to the user is never moved on a later answer
+          {
+            answer: answers.get(item.sourcePath) ?? 'unavailable',
+            sourceIdentity: shown.get(item.sourcePath)?.sourceIdentity ?? null,
+            sourceEntry: shown.get(item.sourcePath)?.sourceEntry ?? null,
+            sourceFolder: shown.get(item.sourcePath)?.sourceFolder ?? null
+          }
         )
       )
     }
@@ -423,7 +449,7 @@ export class ExternalFileService implements IExternalFileService {
     senderId: number | null,
     conflictResolution?: ConflictResolution,
     recheckTarget?: () => Promise<boolean>,
-    decided?: MoveAnswer
+    decided?: DecidedMove
   ): Promise<ExternalFileMoveResponse> {
     logger.info('Moving external file', { sourcePath: redactPath(sourcePath), targetFolder: redactPath(target.requested), conflictResolution })
 
@@ -449,10 +475,11 @@ export class ExternalFileService implements IExternalFileService {
     }
 
     try {
-      const sourceIdentity = await this.identityOf(sourcePath)
-      // What the user was shown: this entry, in this folder
-      const sourceEntry = await this.entryIdentityOf(sourcePath)
-      const sourceFolder = await this.folderOf(sourcePath)
+      // What the user was shown: this entry, in this folder. A batch move recorded
+      // it before the box (`decided`); a single move records it now, just before asking.
+      const sourceIdentity = decided ? decided.sourceIdentity : await this.identityOf(sourcePath)
+      const sourceEntry = decided ? decided.sourceEntry : await this.entryIdentityOf(sourcePath)
+      const sourceFolder = decided ? decided.sourceFolder : await this.folderOf(sourcePath)
       if (await this.plannedIsSameFile(sourcePath, target, conflictResolution)) {
         return this.sameFileRefusal()
       }
@@ -461,7 +488,7 @@ export class ExternalFileService implements IExternalFileService {
       // native box. A file picked in the dialog is named together with its pick.
       // A batch move has asked for all its files at once (`decided`)
       const answer: MoveAnswer =
-        decided ??
+        decided?.answer ??
         (this.moveConfirmer
           ? await this.moveConfirmer.confirm(
               senderId,

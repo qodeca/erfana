@@ -62,7 +62,7 @@ import { isTreeClipboardKeystroke, treeClipboardAction } from './treeClipboardSc
 import { isMacOS } from '../../utils/platform'
 import { useTreeFocusRecovery } from './useTreeFocusRecovery'
 import { fileGateway } from '../../services/fileGateway'
-import { moveExternalBatch, type PendingExternalMove } from './externalMoveBatch'
+import { moveExternalBatch, refuseOversizedMove, type PendingExternalMove } from './externalMoveBatch'
 
 interface ProjectTreeProps {
   onFileSelect: (filePath: string) => void
@@ -918,6 +918,9 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
       refreshGitStatus()
       return
     }
+
+    // A move is one request and one box: more files than a request carries is refused up front
+    if (mode === 'move' && refuseOversizedMove(droppedFiles.length)) return
 
     // Step 3: Validate each file and settle its name conflict. Copies run as they go;
     // moves are collected and sent together (below), so the user is asked once

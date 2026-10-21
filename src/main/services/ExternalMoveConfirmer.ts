@@ -257,13 +257,28 @@ export class ExternalMoveConfirmerImpl implements MoveConfirmer {
       }
       const named = [...namedSet]
       const answers = new Map<string, MoveAnswer>()
+      const approvedHere: string[] = []
+      let cancelled = false
       for (let i = 0; i < named.length; i += MAX_FILES_PER_BOX) {
         const chunk = named.slice(i, i + MAX_FILES_PER_BOX)
         const answer = await this.askChunk(senderId, chunk)
         for (const p of chunk) answers.set(p, answer)
         if (answer === 'move' && epoch === this.epoch) {
-          await this.approve(senderId, chunk.filter((p) => !waitingPaths.has(p)))
+          const extra = chunk.filter((p) => !waitingPaths.has(p))
+          await this.approve(senderId, extra)
+          approvedHere.push(...extra)
         }
+        // Cancel is for the whole drop: no further box is shown
+        if (answer === 'cancel') {
+          cancelled = true
+          break
+        }
+      }
+      if (cancelled) {
+        // ... and nothing the earlier boxes said Move to is moved either
+        answers.clear()
+        const entries = this.approved.get(senderId)
+        for (const p of approvedHere) entries?.delete(p)
       }
       for (const entry of entries) entry.resolve(answers.get(entry.sourcePath) ?? 'cancel')
     } finally {

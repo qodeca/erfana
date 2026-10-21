@@ -329,6 +329,9 @@ export function registerExternalFileHandlers(
           const senderId = event.sender?.id ?? null
           const results: (ExternalFileMoveResponse | null)[] = items.map(() => null)
           const toMove: { index: number; sourcePath: string; conflictResolution?: ConflictResolution }[] = []
+          // The same file under two spellings (case, links, `..`) is one file: it is
+          // asked about and moved once
+          const seen = new Set<string>()
 
           for (const [index, item] of items.entries()) {
             try {
@@ -346,6 +349,16 @@ export function registerExternalFileHandlers(
                 }
                 continue
               }
+              const key = started?.caseSensitive === false ? source.real.toLowerCase() : source.real
+              if (seen.has(key)) {
+                results[index] = {
+                  success: false,
+                  error: 'This file is listed more than once',
+                  errorCode: 'VALIDATION_ERROR'
+                }
+                continue
+              }
+              seen.add(key)
               toMove.push({
                 index,
                 sourcePath: source.requested,

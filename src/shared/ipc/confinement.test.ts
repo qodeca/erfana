@@ -36,6 +36,17 @@ describe('confinementCodeFromMessage', () => {
     expect(confinementCodeFromMessage(message)).toBeNull()
   })
 
+  it('does not read a refusal out of an error that only quotes one', () => {
+    const quoting = [
+      `Error invoking remote method 'file:writeFile': Error: ENOENT: no such file or directory, open '/p/${CONFINEMENT_MESSAGES.PROJECT_CHANGED}.md'`,
+      `${CONFINEMENT_MESSAGES.PROJECT_CHANGED}.md`,
+      `EEXIST: file already exists, '${CONFINEMENT_MESSAGES.NO_PROJECT}'`,
+      `Error invoking remote method 'file:rename': Error: "${OUTSIDE_PROJECT_CHANGE_MESSAGE}" is not a valid filename`,
+      `${PROJECT_FOLDER_GONE_MESSAGE} and more`
+    ]
+    for (const message of quoting) expect(confinementCodeFromMessage(message), message).toBeNull()
+  })
+
   it('has a distinct message per code, so one message names one code', () => {
     expect(new Set(Object.values(CONFINEMENT_MESSAGES)).size).toBe(codes.length)
   })

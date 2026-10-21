@@ -730,7 +730,7 @@ describe('External File Handlers', () => {
       expect(response.results.every((result: { success: boolean }) => result.success)).toBe(true)
     })
 
-    it('answers each box on its own: cancel on the second leaves the first moved', async () => {
+    it('moves nothing for the whole drop when any box is cancelled', async () => {
       const showBox = vi.fn()
       showBox.mockResolvedValueOnce({ response: 0 }).mockResolvedValueOnce({ response: 1 })
       registerExternalFileHandlers(
@@ -741,13 +741,18 @@ describe('External File Handlers', () => {
 
       const response = await invoke('file:moveBatchFromExternal', request(files))
 
-      const moved = response.results.filter((result: { success: boolean }) => result.success)
-      const cancelled = response.results.filter(
-        (result: { errorCode?: string }) => result.errorCode === ErrorCode.EXTERNAL_FILE_MOVE_CANCELLED
-      )
-      expect(moved).toHaveLength(MAX_FILES_PER_BOX)
-      expect(cancelled).toHaveLength(1)
-      expect(existsSync(files[MAX_FILES_PER_BOX])).toBe(true)
+      for (const result of response.results) {
+        expect(result).toMatchObject({ success: false, errorCode: ErrorCode.EXTERNAL_FILE_MOVE_CANCELLED })
+      }
+      for (const file of files) expect(existsSync(file)).toBe(true)
+      expect(listDir(docs())).toEqual([])
+    })
+
+    it('shows no second box after the first is cancelled', async () => {
+      const showBox = useBox(1)
+      const files = makeFiles(MAX_FILES_PER_BOX + 2)
+      await invoke('file:moveBatchFromExternal', request(files))
+      expect(showBox).toHaveBeenCalledTimes(1)
     })
 
     it('answers every file as unavailable when the box rate cap is used up', async () => {
@@ -877,6 +882,64 @@ describe('External File Handlers', () => {
       expect(listDir(docs())).toEqual([])
     })
 
+    it('refuses a file that was swapped for another while the box was open, and keeps it', async () => {
+      const swapped = path.join(outside, 'swap.md')
+      writeFileSync(swapped, 'shown to the user')
+      const showBox = vi.fn(async () => {
+        // Same name, different file: what the user said Move to is gone
+        rmSync(swapped)
+        writeFileSync(swapped, 'something else')
+        return { response: 0 }
+      })
+      registerExternalFileHandlers(
+        projectService.session,
+        new ExternalMoveConfirmerImpl({ showBox, resolveOwner: () => ({}), coalesceMs: 0 })
+      )
+
+      const response = await invoke('file:moveBatchFromExternal', request([swapped]))
+
+      expect(response.results[0]).toMatchObject({
+        success: false,
+        errorCode: ErrorCode.EXTERNAL_FILE_MOVE_CHANGED
+      })
+      expect(readFileSync(swapped, 'utf8')).toBe('something else')
+      expect(listDir(docs())).toEqual([])
+    })
+
+    it.skipIf(process.platform === 'win32')('does not delete the original when its folder was swapped while the box was open', async () => {
+      const dir = path.join(outside, 'shown')
+      mkdirSync(dir)
+      const file = path.join(dir, 'moved.md')
+      writeFileSync(file, 'content')
+      const showBox = vi.fn(async () => {
+        // The same file answers at the same path, but the folder is now a link to another one
+        renameSync(dir, `${dir}-away`)
+        symlinkSync(`${dir}-away`, dir)
+        return { response: 0 }
+      })
+      registerExternalFileHandlers(
+        projectService.session,
+        new ExternalMoveConfirmerImpl({ showBox, resolveOwner: () => ({}), coalesceMs: 0 })
+      )
+
+      const response = await invoke('file:moveBatchFromExternal', request([file]))
+
+      expect(response.results[0].success).toBe(false)
+      expect(response.results[0].errorCode).toMatch(/EXTERNAL_FILE_(SOURCE|MOVE)_CHANGED/)
+      expect(existsSync(file)).toBe(true)
+    })
+
+    it('never opens a second box for a file that was not put to the user', async () => {
+      const showBox = useBox(0)
+      const late = path.join(outside, 'late.md')
+      // Not there when the batch is checked, so not asked about
+      const response = await invoke('file:moveBatchFromExternal', request([source, late]))
+      writeFileSync(late, 'appears later')
+
+      expect(response.results[1].success).toBe(false)
+      expect(showBox).toHaveBeenCalledTimes(1)
+    })
+
     describe('limits and shape of the request', () => {
       it('refuses an empty request', async () => {
         const response = await invoke('file:moveBatchFromExternal', request([]))
@@ -896,6 +959,19 @@ describe('External File Handlers', () => {
       it('refuses the same file listed twice', async () => {
         const response = await invoke('file:moveBatchFromExternal', request([source, source]))
         expect(response).toMatchObject({ results: [], errorCode: 'VALIDATION_ERROR' })
+      })
+
+      it('moves a file once when it is listed under two spellings', async () => {
+        const showBox = useBox(0)
+        // path.join would fold the `..` away, and the schema would see the same string twice
+        const respelled = `${path.join(outside, 'folder')}${path.sep}..${path.sep}incoming.md`
+
+        const response = await invoke('file:moveBatchFromExternal', request([source, respelled]))
+
+        expect(response.results[0].success).toBe(true)
+        expect(response.results[1]).toMatchObject({ success: false, errorCode: 'VALIDATION_ERROR' })
+        expect(showBox.mock.calls[0][1]).toMatchObject({ message: 'Move "incoming.md" into the project?' })
+        expect(listDir(docs())).toEqual(['incoming.md'])
       })
 
       it('refuses a relative source or target', async () => {

@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { z } from 'zod'
 import { isAbsolute } from 'path'
+import { EXTERNAL_MOVE_BATCH_MAX } from './external-file-limits'
 
 /**
  * External File Drop IPC Schema
@@ -129,8 +130,7 @@ export const ExternalFileMoveResponseSchema = z.object({
 export type ExternalFileMoveResponse = z.infer<typeof ExternalFileMoveResponseSchema>
 
 
-/** Most files one batch request may carry; matches the confirmer's per-window queue. */
-export const EXTERNAL_MOVE_BATCH_MAX = 100
+export { EXTERNAL_MOVE_BATCH_MAX }
 
 /**
  * External File Move Batch Request

@@ -56,17 +56,23 @@ const VARIANT_MESSAGES: ReadonlyArray<readonly [string, ConfinementErrorCode]> =
   [PROJECT_FOLDER_GONE_MESSAGE, 'NOT_FOUND']
 ]
 
+/** What Electron puts in front of the message of a rejected `invoke`, with the error's name. */
+const IPC_PREFIX = /^Error invoking remote method '[^']*': (?:\w*Error: )?/
+
 /**
  * The code a rejected `invoke` carried, read from its message; `null` when the
  * message is not one of the fixed refusal messages (a schema message, a
- * filesystem error).
+ * filesystem error). The whole message must BE a refusal message once Electron's
+ * prefix is removed, so a filesystem error that merely quotes one (a file named
+ * like a refusal) is not mistaken for it.
  */
 export function confinementCodeFromMessage(message: string): ConfinementErrorCode | null {
-  for (const [text, code] of VARIANT_MESSAGES) {
-    if (message.includes(text)) return code
+  const text = message.replace(IPC_PREFIX, '')
+  for (const [known, code] of VARIANT_MESSAGES) {
+    if (text === known) return code
   }
   for (const code of Object.keys(CONFINEMENT_MESSAGES) as ConfinementErrorCode[]) {
-    if (message.includes(CONFINEMENT_MESSAGES[code])) return code
+    if (text === CONFINEMENT_MESSAGES[code]) return code
   }
   return null
 }

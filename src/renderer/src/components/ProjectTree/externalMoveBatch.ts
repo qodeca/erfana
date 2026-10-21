@@ -8,6 +8,7 @@
  * error, a moved link gets its warning, anything else is a failure toast.
  */
 import type { ConflictResolution } from '../../../../shared/ipc/external-file-schema'
+import { EXTERNAL_MOVE_BATCH_MAX } from '../../../../shared/ipc/external-file-limits'
 import type { FileBridge } from '../../../../shared/ipc/file-schema'
 import { logger } from '../../utils/logger'
 import { showGlobalToast } from '../Toast/toastService'
@@ -20,6 +21,21 @@ export interface PendingExternalMove {
 
 /** The error code main answers when the user pressed Cancel in the confirmation box. */
 const MOVE_CANCELLED = 'EXTERNAL_FILE_MOVE_CANCELLED'
+
+/**
+ * Whether a drop is too large to move in one request. If so, says so with the
+ * same "Too many files" toast the picker shows, before any file is checked, so
+ * one drop is still one box.
+ */
+export function refuseOversizedMove(fileCount: number): boolean {
+  if (fileCount <= EXTERNAL_MOVE_BATCH_MAX) return false
+  showGlobalToast({
+    title: 'Too many files',
+    message: `Cannot move more than ${EXTERNAL_MOVE_BATCH_MAX} files at once. Please drop fewer files.`,
+    type: 'error'
+  })
+  return true
+}
 
 export interface ExternalMoveOutcome {
   successCount: number
