@@ -18,13 +18,9 @@
 import { Page, Locator, expect } from '@playwright/test'
 import { TEST_IDS } from '../../src/renderer/src/constants/testids'
 import { byTestId } from '../utils/locators'
-import { IS_LINUX_CONTAINER } from '../utils/linux-container'
 
 /** How long `waitForPrompt` waits for a settled prompt by default. */
 export const PROMPT_TIMEOUT_MS = 30_000
-
-/** Linux container only: how long a blank terminal is given before `waitForPrompt` presses Enter. */
-const BLANK_SCREEN_NUDGE_MS = 3_000
 
 /** A line that ends like a shell prompt: zsh `%`, bash/sh `$`, PowerShell `>`, root `#`. */
 const PROMPT_END = /[%$>#]\s*$/
@@ -173,32 +169,11 @@ export class TerminalPage {
 
     // Stage 2: the shell has drawn a settled prompt
     let previous = ''
-    const startedAt = Date.now()
-    let nudged = false
     try {
       await expect
         .poll(
           async () => {
             const screen = await this.readScreen()
-            // workaround: blank terminal after start (isClearing drops the prompt) – remove when fixed
-            // Linux container only: a shell that is fast enough draws its first prompt
-            // while the main process is still discarding output for the clear
-            // handshake (TerminalService `isClearing`), so the screen stays blank until
-            // the next keystroke. Press Enter once to make the shell draw it again.
-            if (
-              IS_LINUX_CONTAINER &&
-              !nudged &&
-              screen.lines.length === 0 &&
-              Date.now() - startedAt > BLANK_SCREEN_NUDGE_MS
-            ) {
-              nudged = true
-              console.warn('[e2e] blank terminal after the clear handshake; pressing Enter')
-              const focused = await this.focus().then(
-                () => true,
-                () => false
-              )
-              if (focused) await this.page.keyboard.press('Enter')
-            }
             const snapshot = JSON.stringify(screen)
             const settled = isPromptDrawn(screen) && snapshot === previous
             previous = snapshot
