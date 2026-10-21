@@ -28,11 +28,13 @@
 import path from 'path'
 import { realpath } from 'fs/promises'
 
-/** Refusal message for a path that leaves the project. */
-export const OUTSIDE_PROJECT_MESSAGE = 'Cannot read files outside the project directory'
+// The refusal messages are shared with the IPC path checker, so a toast reads the same from either
+import {
+  OUTSIDE_PROJECT_MESSAGE,
+  UNVERIFIABLE_PATH_MESSAGE
+} from '../ipc/confinement/ConfinementError'
 
-/** Refusal message for a path whose confinement could not be established. */
-export const UNVERIFIABLE_PATH_MESSAGE = 'Cannot verify this path is inside the project directory'
+export { OUTSIDE_PROJECT_MESSAGE, UNVERIFIABLE_PATH_MESSAGE }
 
 /**
  * What a confinement check concluded.
