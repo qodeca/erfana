@@ -120,8 +120,18 @@ the "Save changes to pricing.html?" dialog after the link click. Two other full
 runs that day passed it, and it passed 5/5 focused straight after. Cause not
 investigated – the link click may land before the page is ready under load. If
 it recurs, check whether the click reached the preview before blaming the
-prompt: a missing unsaved-changes prompt would be a data-loss bug. Status: 🟡
-under observation.
+prompt: a missing unsaved-changes prompt would be a data-loss bug.
+
+**✅ Resolved 2026-10-21 – test timing, not data loss.** Seen again on Windows
+11 (`develop` 455984bb: 3 of 6 with `--repeat-each=3`, also the "reader cancels"
+case). The setup made the edit first and then opened the overview; when that
+took longer than the 2 s autosave debounce, autosave saved the edit before the
+click, so the app correctly asked nothing. Probe: setup 7311 ms → no dirty dot,
+edit on disk → fail; setup 2917 ms → dirty → pass. The helper
+(`overviewWithDirtyPricing`) now makes the edit last, checks that it is still
+unsaved with the overview in front, and edits again with a new marker if
+autosave got there first. 10/10 passed; with a forced 3 s pause on the first
+try, both tests passed on the second marker.
 
 ### `npm run test:cov` cannot pass on a Windows host
 

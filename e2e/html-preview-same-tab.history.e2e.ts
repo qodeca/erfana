@@ -174,18 +174,44 @@ async function openAsSource(h: Nav, relPath: string): Promise<MonacoPage> {
   return monaco
 }
 
-/** An editor for pricing.html with an unsaved edit, then the overview in same-tab mode. */
-async function dirtyPricingThenOverview(h: Nav): Promise<void> {
+/**
+ * An editor for pricing.html and the overview in same-tab mode, then an unsaved
+ * edit in pricing.html as the last step, with the overview back in front.
+ *
+ * Autosave writes 2 s after the last keystroke. An edit made before the overview
+ * was opened was often saved by then under load (7 s setups on Windows), so the
+ * link click found nothing unsaved and – correctly – asked nothing. The edit
+ * therefore comes last, and is made again, with a new marker, if autosave still
+ * got to it before the overview was back in front.
+ *
+ * @returns The marker of the edit that is unsaved now
+ */
+async function overviewWithDirtyPricing(h: Nav): Promise<string> {
   const monaco = await openAsSource(h, PRICING)
-  await monaco.focus()
-  // To the end of the file (Cmd+Down in Monaco on macOS), so the text lands after </html>.
-  await h.page.keyboard.press(process.platform === 'darwin' ? 'Meta+ArrowDown' : 'Control+End')
-  // `insertText`, not `keyboard.type`: Monaco drops individual keystrokes during
-  // re-layout, so on Windows this marker arrived as 'E2ENSAVED'. See monaco.page.ts.
-  await h.page.keyboard.insertText('E2EUNSAVED')
-  await expect(h.tabs.dirtyDot('pricing.html')).toBeVisible()
   await openPage(h, INDEX)
   await turnSameTabOn(h.preview, 'index.html')
+
+  const file = path.join(h.projectPath, PRICING)
+  let attempt = 0
+  let marker = ''
+  await expect(async () => {
+    marker = `E2EUNSAVED${++attempt}`
+    await h.tabs.activate('pricing.html')
+    await monaco.focus()
+    // To the end of the file (Cmd+Down in Monaco on macOS), so the text lands after </html>.
+    await h.page.keyboard.press(process.platform === 'darwin' ? 'Meta+ArrowDown' : 'Control+End')
+    // `insertText`, not `keyboard.type`: Monaco drops individual keystrokes during
+    // re-layout, so on Windows this marker arrived as 'E2ENSAVED'. See monaco.page.ts.
+    await h.page.keyboard.insertText(marker)
+    await expect(h.tabs.dirtyDot('pricing.html')).toBeVisible()
+    // A preview tab, not an editor tab: `TabBarPage` does not see it
+    await previewTabs(h.page).filter({ hasText: 'index.html' }).click()
+    await expect(linkModeToggle(h.preview, 'index.html')).toBeVisible()
+    // Still unsaved with the overview in front: the caller's click comes next
+    expect(await h.tabs.dirtyDot('pricing.html').isVisible(), 'autosave saved the edit first').toBe(true)
+    expect(await fsp.readFile(file, 'utf-8')).not.toContain(marker)
+  }).toPass({ timeout: PREVIEW_BUDGET_MS })
+  return marker
 }
 
 function unsavedPrompt(h: Nav): ReturnType<Page['getByRole']> {
@@ -210,7 +236,7 @@ test.describe('HTML preview same tab – one file, one tab (P3-AC3)', () => {
   })
 
   test('should ask about unsaved edits and stay on the page when the reader cancels', async ({ nav: h }) => {
-    await dirtyPricingThenOverview(h)
+    await overviewWithDirtyPricing(h)
 
     await click(h, INDEX, 'to-pricing')
 
@@ -226,16 +252,16 @@ test.describe('HTML preview same tab – one file, one tab (P3-AC3)', () => {
   })
 
   test('should save the edits, then move, when the reader picks Save', async ({ nav: h }) => {
-    await dirtyPricingThenOverview(h)
+    const marker = await overviewWithDirtyPricing(h)
 
     await click(h, INDEX, 'to-pricing')
     await unsavedPrompt(h).getByRole('button', { name: 'Save', exact: true }).click()
 
     await waitForPage(h.preview, PRICING, TITLE[PRICING])
-    expect(await fsp.readFile(path.join(h.projectPath, PRICING), 'utf-8')).toContain('E2EUNSAVED')
+    expect(await fsp.readFile(path.join(h.projectPath, PRICING), 'utf-8')).toContain(marker)
     await expect
       .poll(() => h.preview.eval('document.body.textContent', target(PRICING)), { timeout: PREVIEW_BUDGET_MS })
-      .toContain('E2EUNSAVED')
+      .toContain(marker)
     await h.tabs.waitForTabGone('pricing.html')
     await expect(backButton(h.preview, 'pricing.html')).toBeFocused()
   })
