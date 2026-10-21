@@ -37,7 +37,7 @@ describe('registerConfinedHandle', () => {
   const call = (channel: string, ...args: unknown[]) => listeners.get(channel)!(event(), ...args)
 
   beforeAll(() => {
-    base = realpathSync(mkdtempSync(path.join(tmpdir(), 'erfana-register-')))
+    base = realpathSync.native(mkdtempSync(path.join(tmpdir(), 'erfana-register-')))
     root = path.join(base, 'proj')
     outside = path.join(base, 'outside')
     mkdirSync(root)

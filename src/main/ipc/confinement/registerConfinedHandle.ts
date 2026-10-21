@@ -22,11 +22,14 @@ import type {
   ProjectSessionSnapshot
 } from '../../services/session/ProjectSession'
 import { registerHandle } from '../registry'
-import { ConfinementError } from './ConfinementError'
+import { ConfinementError, OUTSIDE_PROJECT_CHANGE_MESSAGE } from './ConfinementError'
 import { resolveConfinedPath, type PathPolicy, type ResolvedPath } from './resolveConfinedPath'
 
-/** A policy plus the position of the argument it governs. */
-export type PathBinding = PathPolicy & { arg: number }
+/**
+ * A policy plus the position of the argument it governs. `access: 'change'`
+ * marks an argument the action writes to, so a refusal reads accordingly.
+ */
+export type PathBinding = PathPolicy & { arg: number; access?: 'read' | 'change' }
 
 export interface ConfinedHandlerContext {
   /** The project open when the call began; null when none is */
@@ -79,8 +82,19 @@ async function resolveAll<TPaths extends string>(
 ): Promise<Record<TPaths, ResolvedPath>> {
   const resolved = {} as Record<TPaths, ResolvedPath>
   for (const name of Object.keys(paths) as TPaths[]) {
-    const { arg, ...policy } = paths[name]
-    resolved[name] = await resolveConfinedPath(args[arg], { session: snapshot, senderId }, policy as PathPolicy)
+    const { arg, access, ...policy } = paths[name]
+    try {
+      resolved[name] = await resolveConfinedPath(
+        args[arg],
+        { session: snapshot, senderId },
+        policy as PathPolicy
+      )
+    } catch (error) {
+      if (access === 'change' && error instanceof ConfinementError && error.code === 'OUTSIDE_PROJECT') {
+        throw new ConfinementError('OUTSIDE_PROJECT', OUTSIDE_PROJECT_CHANGE_MESSAGE)
+      }
+      throw error
+    }
   }
   return resolved
 }

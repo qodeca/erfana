@@ -26,13 +26,21 @@
  * Every refusal happens before the caller's own first `stat`, and an outside
  * path gives the same answer whether or not it exists.
  */
-import nodePath, { type PlatformPath } from 'path'
+import nodePath from 'path'
 import { lstat, realpath, stat } from 'fs/promises'
 import type { ProjectSessionSnapshot } from '../../services/session/ProjectSession'
 import { validateFilename } from '../../utils/validateFilename'
+import {
+  isInsideRoot,
+  isSamePath,
+  normaliseResolved,
+  type PathFlavour
+} from '../../utils/pathCompare'
 import { ConfinementError, PROJECT_FOLDER_GONE_MESSAGE } from './ConfinementError'
 
 /** Longest path accepted, matching the Windows extended-length limit. */
+export { isInsideRoot, isSamePath, normaliseResolved }
+
 export const MAX_PATH_CHARS = 32_767
 
 export type PathPolicy =
@@ -58,10 +66,8 @@ export interface ConfinementFs {
   realpath(target: string): Promise<string>
 }
 
-export interface ConfinementDeps {
+export interface ConfinementDeps extends PathFlavour {
   fs: ConfinementFs
-  path: PlatformPath
-  platform: NodeJS.Platform
 }
 
 /** The part of the session snapshot the check reads. */
@@ -101,8 +107,6 @@ export const defaultConfinementDeps: ConfinementDeps = {
 const WIN_DEVICE_PREFIX = /^[\\/]{2}[?.](?:[\\/]|$)|^[\\/]\?\?(?:[\\/]|$)/
 const WIN_DRIVE_ROOT = /^[A-Za-z]:[\\/]/
 const WIN_UNC_ROOT = /^[\\/]{2}[^\\/]+[\\/]+[^\\/]+/
-const WIN_EXTENDED_UNC_PREFIX = '\\\\?\\UNC\\'
-const WIN_EXTENDED_PREFIX = '\\\\?\\'
 const PATH_SEPARATORS = /[\\/]+/
 
 const invalid = (): ConfinementError => new ConfinementError('INVALID_PATH')
@@ -140,58 +144,6 @@ function checkForm(input: unknown, deps: ConfinementDeps): string {
     if (segment.includes(':') || segment.endsWith('.') || segment.endsWith(' ')) throw invalid()
   }
   return input
-}
-
-/**
- * Strip a Windows extended-length prefix from `realpath` output and the
- * trailing separators past the root. Defensive: libuv does not emit the prefix.
- */
-export function normaliseResolved(real: string, deps: ConfinementDeps = defaultConfinementDeps): string {
-  let n = real
-  if (n.startsWith(WIN_EXTENDED_UNC_PREFIX)) {
-    n = `\\\\${n.slice(WIN_EXTENDED_UNC_PREFIX.length)}`
-  } else if (n.startsWith(WIN_EXTENDED_PREFIX)) {
-    n = n.slice(WIN_EXTENDED_PREFIX.length)
-  }
-  const root = deps.path.parse(n).root
-  while (n.length > root.length && (n.endsWith(deps.path.sep) || n.endsWith('/'))) {
-    n = n.slice(0, -1)
-  }
-  return n
-}
-
-/** The comparison form of a path under the session's case rule. */
-function comparisonKey(value: string, caseSensitive: boolean, deps: ConfinementDeps): string {
-  const composed = deps.platform === 'darwin' ? value.normalize('NFC') : value
-  return caseSensitive ? composed : composed.toLowerCase()
-}
-
-/**
- * `candidate` is `root` or lies below it. A segment boundary is required, so a
- * sibling that merely starts with the root's name is not inside; a root that
- * already ends in a separator (`C:\`, `\\srv\share\`) gets none added.
- */
-export function isInsideRoot(
-  candidate: string,
-  root: string,
-  caseSensitive: boolean,
-  deps: ConfinementDeps = defaultConfinementDeps
-): boolean {
-  const key = comparisonKey(candidate, caseSensitive, deps)
-  const rootKey = comparisonKey(root, caseSensitive, deps)
-  if (key === rootKey) return true
-  const prefix = rootKey.endsWith(deps.path.sep) ? rootKey : rootKey + deps.path.sep
-  return key.startsWith(prefix)
-}
-
-/** Two paths name the same place under the session's case rule. */
-export function isSamePath(
-  a: string,
-  b: string,
-  caseSensitive: boolean,
-  deps: ConfinementDeps = defaultConfinementDeps
-): boolean {
-  return comparisonKey(a, caseSensitive, deps) === comparisonKey(b, caseSensitive, deps)
 }
 
 interface Walk {

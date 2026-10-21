@@ -16,7 +16,15 @@
 import type { PlatformPath } from 'path'
 import type { ConfinementFs, ConfinementStats } from '../confinement/resolveConfinedPath'
 
-export type FakeEntry = 'dir' | 'file' | { link: string }
+/**
+ * - `link`: a symbolic link or junction; `lstat` reports it as a link
+ * - `alias`: a name that `realpath` and every walk follow but `lstat` reports as
+ *   an ordinary folder (a `subst` drive, a mapped drive, an 8.3 short name)
+ */
+export type FakeEntry = 'dir' | 'file' | { link: string } | { alias: string }
+
+const targetOf = (entry: { link: string } | { alias: string }): string =>
+  'link' in entry ? entry.link : entry.alias
 
 const MAX_LINK_DEPTH = 20
 
@@ -26,9 +34,9 @@ function errno(code: string): NodeJS.ErrnoException {
 
 function statsOf(entry: FakeEntry): ConfinementStats {
   return {
-    isDirectory: () => entry === 'dir',
+    isDirectory: () => entry === 'dir' || (typeof entry === 'object' && 'alias' in entry),
     isFile: () => entry === 'file',
-    isSymbolicLink: () => typeof entry === 'object'
+    isSymbolicLink: () => typeof entry === 'object' && 'link' in entry
   }
 }
 
@@ -63,7 +71,7 @@ export function createFakeConfinementFs(
     let cur: string
     let curEntry: FakeEntry
     if (typeof rootHit.entry === 'object') {
-      const target = resolveFull(rootHit.entry.link, depth + 1)
+      const target = resolveFull(targetOf(rootHit.entry), depth + 1)
       cur = target.real
       curEntry = target.entry
     } else {
@@ -77,7 +85,7 @@ export function createFakeConfinementFs(
       const hit = table.get(keyOf(flavour.join(cur, segment)))
       if (!hit) throw errno('ENOENT')
       if (typeof hit.entry === 'object') {
-        const target = resolveFull(hit.entry.link, depth + 1)
+        const target = resolveFull(targetOf(hit.entry), depth + 1)
         cur = target.real
         curEntry = target.entry
       } else {

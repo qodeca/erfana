@@ -178,6 +178,7 @@ export class ProjectService {
     private projectSettingsService: IProjectSettingsService,
     private projectLockService: IProjectLockService
   ) {
+    this.fileService.bindSession?.(this.sessionStore)
     // The services and the settings cache follow the session, so they cannot drift from it
     this.sessionStore.onChange((_prev, next) => {
       this.updateServices(next?.root ?? '')

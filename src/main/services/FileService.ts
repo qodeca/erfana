@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { readdir, readFile, writeFile, stat, rm, mkdir, rename as fsRename, cp, copyFile, realpath } from 'fs/promises'
+import { readdir, readFile, writeFile, stat, rm, mkdir, rename as fsRename, cp, copyFile } from 'fs/promises'
 import { join, extname, basename, relative, resolve as resolvePath } from 'path'
 import type { IFileService } from '../interfaces/IFileService'
 import { SymlinkDetector } from '../utils/SymlinkDetector'
@@ -25,9 +25,10 @@ import { logger } from './LoggingService'
 import { atomicWriteText, isAtomicTempName } from '../utils/atomicWrite'
 import { IMAGE_EXTENSIONS, readImage } from './file/imageRead'
 import { childPath } from '../utils/childPath'
-import { isSamePath } from '../ipc/confinement/resolveConfinedPath'
+import { isSamePath } from '../utils/pathCompare'
 import { getPlatformConfig } from './watcher/PlatformConfig'
 import type { ImageReadResponse } from '../../shared/ipc/file-image-schema'
+import type { ProjectSession } from './session/ProjectSession'
 import type { FileNode } from '../../shared/ipc/file-schema'
 
 export type { FileNode }
@@ -176,6 +177,7 @@ const matcherOverruns = (scope: WalkScope): number =>
 
 export class FileService implements IFileService {
   private projectPath: string | null = null
+  private session: Pick<ProjectSession, 'current'> | null = null
   private symlinkDetector = new SymlinkDetector()
   private rollbackHandler = new RollbackHandler()
 
@@ -226,6 +228,11 @@ export class FileService implements IFileService {
   setProjectPath(path: string): void {
     this.projectPath = path
     this.hasLoggedPatterns = false
+  }
+
+  /** The open-project session, read for the root's canonical form (see `isProjectRoot`) */
+  bindSession(session: Pick<ProjectSession, 'current'>): void {
+    this.session = session
   }
 
   getProjectPath(): string | null {
@@ -587,15 +594,18 @@ export class FileService implements IFileService {
    * checked against the project, but a handler that skipped that check must
    * still not be able to remove or move the root.
    */
-  private async isProjectRoot(candidate: string): Promise<boolean> {
+  private isProjectRoot(candidate: string): boolean {
     if (!this.projectPath) return false
-    const caseSensitive = getPlatformConfig().caseSensitive
-    if (isSamePath(resolvePath(candidate), resolvePath(this.projectPath), caseSensitive)) return true
-    try {
-      return isSamePath(resolvePath(candidate), await realpath(this.projectPath), caseSensitive)
-    } catch {
-      return false
+    const target = resolvePath(candidate)
+    // The session holds the canonical root and the case rule, resolved once at open
+    const snapshot = this.session?.current() ?? null
+    if (snapshot) {
+      return (
+        isSamePath(target, snapshot.realRoot, snapshot.caseSensitive) ||
+        isSamePath(target, resolvePath(snapshot.root), snapshot.caseSensitive)
+      )
     }
+    return isSamePath(target, resolvePath(this.projectPath), getPlatformConfig().caseSensitive)
   }
 
   async deleteFile(filePath: string): Promise<void> {
@@ -616,7 +626,7 @@ export class FileService implements IFileService {
     }
 
     // Prevent deleting project root
-    if (await this.isProjectRoot(folderPath)) {
+    if (this.isProjectRoot(folderPath)) {
       throw new Error('Cannot delete the project root directory')
     }
 
@@ -709,7 +719,7 @@ export class FileService implements IFileService {
     }
 
     // Prevent moving project root
-    if (await this.isProjectRoot(sourcePath)) {
+    if (this.isProjectRoot(sourcePath)) {
       throw new Error('Cannot move the project root directory')
     }
 

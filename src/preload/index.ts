@@ -77,7 +77,7 @@ const api = {
     writeFile: (
       filePath: string,
       content: string,
-      options?: { createParentDirs?: boolean }
+      options?: { createParentDirs?: true }
     ): Promise<boolean> =>
       options === undefined
         ? ipcRenderer.invoke('file:writeFile', filePath, content)

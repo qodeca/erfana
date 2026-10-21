@@ -21,6 +21,13 @@ export type ConfinementErrorCode =
 /** Refusal message for a path that leaves the project. */
 export const OUTSIDE_PROJECT_MESSAGE = 'Cannot read files outside the project directory'
 
+/**
+ * Refusal message for a path an action would change. A link inside the project
+ * that leads out is a possible reason, so it is named.
+ */
+export const OUTSIDE_PROJECT_CHANGE_MESSAGE =
+  'Cannot change files outside the project directory, or through a link that leads outside it'
+
 /** Refusal message for a path whose position could not be established. */
 export const UNVERIFIABLE_PATH_MESSAGE = 'Cannot verify this path is inside the project directory'
 
@@ -34,7 +41,7 @@ export const CONFINEMENT_MESSAGES: Readonly<Record<ConfinementErrorCode, string>
   OUTSIDE_PROJECT: OUTSIDE_PROJECT_MESSAGE,
   UNVERIFIABLE: UNVERIFIABLE_PATH_MESSAGE,
   ROOT_FORBIDDEN: 'Cannot change the project root directory',
-  NOT_FOUND: 'Path does not exist',
+  NOT_FOUND: 'Item not found',
   WRONG_KIND: 'Path is not the kind of item this action needs',
   PROJECT_CHANGED: 'The project changed while the request was running',
   NOT_SESSION_OWNER: 'This window does not own the open project'

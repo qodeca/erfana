@@ -116,7 +116,7 @@ const EXPECTED_PATH_ARGS: Readonly<Record<string, readonly string[]>> = {
   'file:deleteFolder': ['folderPath'],
   'file:rename': ['oldPath'],
   'file:moveItem': ['sourcePath', 'targetParentPath'],
-  'file:copyItem': ['sourcePath', 'targetParentPath'],
+  'file:copyItem': ['sourcePath', 'sourceEntry', 'targetParentPath'],
   'file:checkConflict': ['targetParentPath'],
   'file:revealInFileManager': ['filePath'],
   'file:validatePath': ['filePath']
@@ -134,7 +134,7 @@ describe('file:* path checks', () => {
     statSpy.mockReset()
     statSpy.mockImplementation((...args: any[]) => realStat.current(...args))
     showItemInFolder.mockClear()
-    base = realpathSync(mkdtempSync(path.join(tmpdir(), 'erfana-path-checks-')))
+    base = realpathSync.native(mkdtempSync(path.join(tmpdir(), 'erfana-path-checks-')))
     root = path.join(base, 'proj')
     outside = path.join(base, 'outside')
     mkdirSync(path.join(root, 'sub'), { recursive: true })
@@ -246,6 +246,29 @@ describe('file:* path checks', () => {
       expect(readFileSync(path.join(outside, 'secret.txt'), 'utf8')).toBe('secret')
       expect(readdirSync(path.join(outside, 'folder'))).toEqual(['keep.txt'])
       expect(readFileSync(path.join(root, 'a.md'), 'utf8')).toBe('inside')
+    })
+
+    it('read channels keep the read wording; channels that change things name a link as a reason', async () => {
+      const outsideFile = path.join(outside, 'secret.txt')
+      await expect(invoke('file:readFile', outsideFile)).rejects.toThrow(
+        'Cannot read files outside the project directory'
+      )
+      for (const [channel, args] of [
+        ['file:writeFile', [outsideFile, 'x']],
+        ['file:createFile', [outside, 'n']],
+        ['file:deleteFile', [outsideFile]],
+        ['file:rename', [outsideFile, 'n']],
+        ['file:moveItem', [path.join(root, 'a.md'), outside]],
+        ['file:copyItem', [path.join(root, 'a.md'), outside]]
+      ] as Array<[string, unknown[]]>) {
+        await expect(invoke(channel, ...args), channel).rejects.toThrow(
+          'Cannot change files outside the project directory, or through a link that leads outside it'
+        )
+      }
+    })
+
+    it('a missing target reads as "not found"', async () => {
+      await expect(invoke('file:createFile', path.join(root, 'nope'), 'n')).rejects.toThrow('Item not found')
     })
 
     it('file:revealInFileManager answers with a message and never opens the file manager', async () => {
@@ -414,9 +437,8 @@ describe('file:* path checks', () => {
       expect(readFileSync(nested, 'utf8')).toBe('x')
     })
 
-    it('creates, renames, copies and moves, and answers with paths built from the request', async () => {
+    it.skipIf(process.platform === 'win32')('creates, renames, copies and moves, and answers with paths built from the request', async () => {
       const aliasRoot = path.join(base, 'alias')
-      if (process.platform === 'win32') return
       symlinkSync(root, aliasRoot)
       await openTestProject(aliasRoot)
       // The tree the renderer holds is keyed by the alias spelling
@@ -435,11 +457,21 @@ describe('file:* path checks', () => {
       expect(existsSync(path.join(root, 'folder2', 'renamed.md'))).toBe(true)
     })
 
-    it('copying a link inside the project keeps the name the link was given', async () => {
-      if (process.platform === 'win32') return
+    it.skipIf(process.platform === 'win32')('copying a link inside the project keeps the name the link was given', async () => {
       symlinkSync(path.join(root, 'a.md'), path.join(root, 'alias.md'))
       const copied = await invoke('file:copyItem', path.join(root, 'alias.md'), path.join(root, 'sub'))
       expect(copied.path).toBe(path.join(root, 'sub', 'alias.md'))
+    })
+
+    it.skipIf(process.platform === 'win32')('a copied folder link stays a link and is reported as one', async () => {
+      mkdirSync(path.join(root, 'real-folder'))
+      writeFileSync(path.join(root, 'real-folder', 'inner.md'), 'inner')
+      symlinkSync(path.join(root, 'real-folder'), path.join(root, 'folder-link'))
+      const copied = await invoke('file:copyItem', path.join(root, 'folder-link'), path.join(root, 'sub'))
+      expect(copied.path).toBe(path.join(root, 'sub', 'folder-link'))
+      expect(copied.isSymlink).toBe(true)
+      expect(lstatSync(path.join(root, 'sub', 'folder-link')).isSymbolicLink()).toBe(true)
+      expect(existsSync(path.join(root, 'sub', 'folder-link', 'inner.md'))).toBe(true)
     })
 
     it.skipIf(process.platform === 'win32')(
@@ -467,7 +499,7 @@ describe('file:* path checks', () => {
 
     it('reveals an inside item at its canonical path and the root itself', async () => {
       await expect(invoke('file:revealInFileManager', path.join(root, 'a.md'))).resolves.toBe('')
-      expect(showItemInFolder).toHaveBeenCalledWith(path.join(realpathSync(root), 'a.md'))
+      expect(showItemInFolder).toHaveBeenCalledWith(path.join(realpathSync.native(root), 'a.md'))
       await expect(invoke('file:revealInFileManager', root)).resolves.toBe('')
     })
 

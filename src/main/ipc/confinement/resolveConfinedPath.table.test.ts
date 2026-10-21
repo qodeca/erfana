@@ -13,6 +13,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { execFileSync } from 'node:child_process'
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   realpathSync,
@@ -20,7 +21,7 @@ import {
   symlinkSync,
   writeFileSync
 } from 'node:fs'
-import { lstat, realpath } from 'node:fs/promises'
+import { realpath } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import {
@@ -89,7 +90,7 @@ describe.skipIf(process.platform === 'win32')('resolveConfinedPath – POSIX tre
     symlinkSync(outside, path.join(root, 'dirlink'))
     symlinkSync(path.join(root, 'sub'), path.join(base, 'alias'))
     ctx = {
-      session: sessionOf(root, realpathSync(root), { caseSensitive: process.platform === 'linux' }),
+      session: sessionOf(root, realpathSync.native(root), { caseSensitive: process.platform === 'linux' }),
       senderId: 1
     }
   })
@@ -155,7 +156,7 @@ describe.skipIf(process.platform === 'win32')('resolveConfinedPath – POSIX tre
 
   it('row 10: a root reached through an alias keeps the spelling the caller used', async () => {
     const aliasCtx: ContextWithRoot = {
-      session: sessionOf(path.join(base, 'alias'), realpathSync(path.join(root, 'sub')), {
+      session: sessionOf(path.join(base, 'alias'), realpathSync.native(path.join(root, 'sub')), {
         caseSensitive: process.platform === 'linux'
       }),
       senderId: 1
@@ -163,12 +164,12 @@ describe.skipIf(process.platform === 'win32')('resolveConfinedPath – POSIX tre
     // Asked through the alias: requested keeps it, real is canonical
     const viaAlias = await resolveConfinedPath(path.join(base, 'alias', 'x'), aliasCtx, project)
     expect(viaAlias.requested).toBe(path.join(base, 'alias', 'x'))
-    expect(viaAlias.real).toBe(path.join(realpathSync(path.join(root, 'sub')), 'x'))
+    expect(viaAlias.real).toBe(path.join(realpathSync.native(path.join(root, 'sub')), 'x'))
     // Asked through the canonical spelling: also inside
-    expect(await outcome(path.join(realpathSync(root), 'sub', 'x'), aliasCtx, project)).toBe('ACCEPTED')
+    expect(await outcome(path.join(realpathSync.native(root), 'sub', 'x'), aliasCtx, project)).toBe('ACCEPTED')
     // A folder opened by its raw temp path (/var vs /private/var on macOS) still contains it
-    const rawCtx: ContextWithRoot = { session: sessionOf(root, realpathSync(root)), senderId: 1 }
-    expect(await outcome(path.join(realpathSync(root), 'x.md'), rawCtx, project)).toBe('ACCEPTED')
+    const rawCtx: ContextWithRoot = { session: sessionOf(root, realpathSync.native(root)), senderId: 1 }
+    expect(await outcome(path.join(realpathSync.native(root), 'x.md'), rawCtx, project)).toBe('ACCEPTED')
   })
 
   it('row 13: values that are not absolute paths are invalid, in every mode', async () => {
@@ -225,7 +226,7 @@ describe.skipIf(process.platform === 'win32')('resolveConfinedPath – POSIX tre
   })
 
   it('the project folder being gone is named as such, not as "outside"', async () => {
-    const gone = path.join(realpathSync(base), 'vanished')
+    const gone = path.join(realpathSync.native(base), 'vanished')
     const goneCtx: ContextWithRoot = { session: sessionOf(gone, gone), senderId: 1 }
     try {
       await resolveConfinedPath(path.join(gone, 'docs', 'a.md'), goneCtx, project)
@@ -399,7 +400,7 @@ describe('resolveConfinedPath – Windows', () => {
       'D:\\real': 'dir',
       'D:\\real\\p': 'dir',
       'D:\\real\\p\\x': 'file',
-      'Z:\\': { link: 'D:\\real' }
+      'Z:\\': { alias: 'D:\\real' }
     })
     const ctx = ctxFor('Z:\\p', 'D:\\real\\p')
     const resolved = await resolveConfinedPath('Z:\\p\\x', ctx, project, subst)
@@ -432,7 +433,7 @@ describe('resolveConfinedPath – Windows', () => {
       'C:\\Users\\Name': 'dir',
       'C:\\Users\\Name\\p': 'dir',
       'C:\\Users\\Name\\p\\x': 'file',
-      'C:\\Users\\NAME~1': { link: 'C:\\Users\\Name' }
+      'C:\\Users\\NAME~1': { alias: 'C:\\Users\\Name' }
     })
     const ctx = ctxFor('C:\\Users\\NAME~1\\p', 'C:\\Users\\Name\\p')
     expect(await outcome('C:\\Users\\Name\\p\\x', ctx, project, shortName)).toBe('ACCEPTED')
@@ -446,7 +447,7 @@ describe('resolveConfinedPath – Windows', () => {
       '\\\\host\\share\\': 'dir',
       '\\\\host\\share\\p': 'dir',
       '\\\\host\\share\\p\\x': 'file',
-      'Z:\\': { link: '\\\\host\\share\\' }
+      'Z:\\': { alias: '\\\\host\\share\\' }
     })
     const ctx = ctxFor('Z:\\p', '\\\\host\\share\\p')
     const resolved = await resolveConfinedPath('Z:\\p\\x', ctx, project, mapped)
@@ -511,6 +512,7 @@ describe.runIf(process.platform === 'win32')('resolveConfinedPath – Windows re
   let base: string
   let root: string
   let outside: string
+  let substLetter = ''
 
   beforeAll(() => {
     base = realpathSync.native(mkdtempSync(path.join(tmpdir(), 'erfana-table-win-')))
@@ -523,6 +525,14 @@ describe.runIf(process.platform === 'win32')('resolveConfinedPath – Windows re
   })
 
   afterAll(() => {
+    // Always drop the mapping, even when the test failed half-way
+    if (substLetter) {
+      try {
+        execFileSync('subst', [substLetter, '/d'], { stdio: 'ignore' })
+      } catch {
+        // already removed
+      }
+    }
     rmSync(base, { recursive: true, force: true })
   })
 
@@ -540,55 +550,54 @@ describe.runIf(process.platform === 'win32')('resolveConfinedPath – Windows re
     expect(await outcome(`\\\\?\\${path.join(root, 'Sub', 'x.md')}`, ctx(), project)).toBe('INVALID_PATH')
   })
 
-  it('UNC: the administrative share of the same folder is inside the project', async (testContext) => {
+  it('UNC: a project opened on the administrative share keeps that form, and a drive root does not contain it', async (testContext) => {
     const unc = `\\\\localhost\\${root[0]}$${root.slice(2)}`
+    let uncReal = ''
     try {
-      await lstat(unc)
+      uncReal = await realpath(unc)
     } catch {
       testContext.skip()
     }
-    const uncCtx: ConfinementContext = { session: sessionOf(root, root), senderId: 1 }
+    // Node keeps the UNC form (host and share as typed); it does not map back to the drive
+    const uncCtx: ConfinementContext = { session: sessionOf(unc, uncReal), senderId: 1 }
     expect(await outcome(path.join(unc, 'Sub', 'x.md'), uncCtx, project)).toBe('ACCEPTED')
     expect(await outcome(path.join(unc.replace('localhost', 'LOCALHOST'), 'Sub'), uncCtx, project)).toBe('ACCEPTED')
+    // A project on the drive form does not contain the same folder spelled as UNC
+    expect(await outcome(path.join(unc, 'Sub', 'x.md'), ctx(), project)).toBe('OUTSIDE_PROJECT')
   })
 
-  it('subst: a substituted drive resolves to its target and requested keeps the drive', async (testContext) => {
-    const letter = 'Y:'
-    try {
-      execFileSync('subst', [letter, base], { stdio: 'ignore' })
-    } catch {
-      testContext.skip()
+  it('subst: a substituted drive resolves to its target and requested keeps the drive', async () => {
+    // First drive letter that is not in use; there is no skip, a host with none free fails
+    const free = 'ZYXWVUTSRQPONMLKJIHGFED'.split('').find((l) => !existsSync(`${l}:\\`))
+    expect(free, 'no free drive letter for subst').toBeDefined()
+    const letter = `${free}:`
+    execFileSync('subst', [letter, base], { stdio: 'ignore' })
+    substLetter = letter
+    const substRoot = `${letter}\\Proj`
+    const substCtx: ConfinementContext = {
+      session: sessionOf(substRoot, await realpath(substRoot)),
+      senderId: 1
     }
-    try {
-      const substRoot = `${letter}\\Proj`
-      const substCtx: ConfinementContext = {
-        session: sessionOf(substRoot, await realpath(substRoot)),
-        senderId: 1
-      }
-      const resolved = await resolveConfinedPath(`${substRoot}\\Sub\\x.md`, substCtx, project)
-      expect(resolved.requested).toBe(`${substRoot}\\Sub\\x.md`)
-      expect(resolved.real).toBe(path.join(root, 'Sub', 'x.md'))
-    } finally {
-      execFileSync('subst', [letter, '/d'], { stdio: 'ignore' })
-    }
+    const resolved = await resolveConfinedPath(`${substRoot}\\Sub\\x.md`, substCtx, project)
+    expect(resolved.requested).toBe(`${substRoot}\\Sub\\x.md`)
+    expect(resolved.real).toBe(path.join(root, 'Sub', 'x.md'))
   })
 
   it('8.3: a project opened by its short name accepts the long spelling', async (testContext) => {
-    let short = ''
+    // The runner's temp folder is usually reached through a short name (RUNNER~1)
+    if (!tmpdir().includes('~')) testContext.skip()
+    const shortRoot = mkdtempSync(path.join(tmpdir(), 'erfana-83-folder-'))
     try {
-      short = execFileSync('cmd.exe', ['/d', '/c', `for %I in ("${root}") do @echo %~sI`], {
-        encoding: 'utf8'
-      }).trim()
-    } catch {
-      testContext.skip()
+      mkdirSync(path.join(shortRoot, 'Sub'))
+      writeFileSync(path.join(shortRoot, 'Sub', 'x.md'), 'x')
+      const longRoot = await realpath(shortRoot)
+      expect(longRoot.includes('~')).toBe(false)
+      const shortCtx: ConfinementContext = { session: sessionOf(shortRoot, longRoot), senderId: 1 }
+      expect(await outcome(path.join(longRoot, 'Sub', 'x.md'), shortCtx, project)).toBe('ACCEPTED')
+      expect(await outcome(path.join(shortRoot, 'Sub', 'x.md'), shortCtx, project)).toBe('ACCEPTED')
+    } finally {
+      rmSync(shortRoot, { recursive: true, force: true })
     }
-    if (!short || short.toLowerCase() === root.toLowerCase()) testContext.skip()
-    const shortCtx: ConfinementContext = {
-      session: sessionOf(short, await realpath(short)),
-      senderId: 1
-    }
-    expect(await outcome(path.join(root, 'Sub', 'x.md'), shortCtx, project)).toBe('ACCEPTED')
-    expect(await outcome(path.join(short, 'Sub', 'x.md'), shortCtx, project)).toBe('ACCEPTED')
   })
 
   it('junction: a junction to a folder outside is refused for content and kept literal for an entry', async (testContext) => {

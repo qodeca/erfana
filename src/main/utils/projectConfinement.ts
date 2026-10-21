@@ -55,6 +55,8 @@ export type ConfinementVerdict = 'inside' | 'outside' | 'missing' | 'unverifiabl
 export function isLexicallyInside(filePath: string, projectPath: string): boolean {
   const resolved = path.resolve(filePath)
   const resolvedRoot = path.resolve(projectPath)
+  // Legacy prefix form, kept until the remaining callers move to ipc/confinement
+  // eslint-disable-next-line no-restricted-syntax
   return resolved === resolvedRoot || resolved.startsWith(resolvedRoot + path.sep)
 }
 
@@ -100,6 +102,8 @@ export async function resolveInsideProject(
     return { verdict: code === 'ENOENT' ? 'missing' : 'unverifiable' }
   }
 
+  // Legacy prefix form, kept until the remaining callers move to ipc/confinement
+  // eslint-disable-next-line no-restricted-syntax
   return realTarget === realRoot || realTarget.startsWith(realRoot + path.sep)
     ? { verdict: 'inside', realPath: realTarget }
     : { verdict: 'outside' }

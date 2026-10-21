@@ -33,7 +33,11 @@ describe('eslint main-process path guards', () => {
       'export const a = (p: string, projectPath: string) => p.startsWith(projectPath)\n',
       'export const a = (p: string, projectRoot: string) => p.startsWith(projectRoot)\n',
       'export const a = (p: string, resolvedRoot: string) => p.startsWith(resolvedRoot)\n',
-      'export const a = (p: string, realRoot: string) => p.startsWith(realRoot)\n'
+      'export const a = (p: string, realRoot: string) => p.startsWith(realRoot)\n',
+      "export const a = (p: string, realRoot: string) => p.startsWith(realRoot + '/')\n",
+      'export const a = (p: string, projectRoot: string, sep: string) => p.startsWith(projectRoot + sep)\n',
+      'export const a = (p: string, o: { projectPath: string }) => p.startsWith(o.projectPath + \'/\')\n',
+      'export const a = (p: string, resolvedRoot: string) => p.startsWith(`${resolvedRoot}/`)\n'
     ])('flags %s', async (code) => {
       expect(await count(code, file)).toBeGreaterThanOrEqual(1)
     })
@@ -46,6 +50,12 @@ describe('eslint main-process path guards', () => {
       const code = 'export const a = (p: string, r: string, sep: string) => p.startsWith(r + sep)\n'
       expect(await count(code, 'src/main/ipc/confinement/resolveConfinedPath.ts')).toBe(0)
     })
+  })
+
+  it('applies the native realpath rule to main-process tests too', async () => {
+    const code = "import { realpathSync } from 'fs'\nexport const a = realpathSync('/x')\n"
+    expect(await count(code, 'src/main/ipc/Foo.test.ts')).toBe(1)
+    expect(await count("import { realpathSync } from 'fs'\nexport const a = realpathSync.native('/x')\n", 'src/main/ipc/Foo.test.ts')).toBe(0)
   })
 
   describe('native realpath only', () => {

@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import nodePath from 'node:path'
 import { openTestProject } from './__test-helpers__/openTestProject'
+
+/** `rel` below `root`, with the host's separators. */
+const J = (root: string, rel: string): string => nodePath.join(root, ...rel.split('/'))
 
 // Mocks for electron BrowserWindow
 const sends: Array<{ idx: number; channel: string; payload: unknown }> = []
@@ -101,7 +105,7 @@ describe('file:getStats logging', () => {
     )
 
     registerFileHandlers()
-    await expect(handlers['file:getStats']({}, '/x/missing.md')).rejects.toThrow('ENOENT')
+    await expect(handlers['file:getStats']({}, nodePath.resolve('/x/missing.md'))).rejects.toThrow('ENOENT')
 
     expect(debugSpy).toHaveBeenCalled()
     expect(errorSpy).not.toHaveBeenCalled()
@@ -630,51 +634,51 @@ describe('#210 watcher catch-up hooks', () => {
       channel: 'file:createFile',
       method: 'createFile' as const,
       args: (r: string) => [r, 'a.md'],
-      resolved: (r: string) => `${r}/a.md`,
-      recorded: (r: string) => [[{ path: `${r}/a.md`, kind: 'added', subtree: false }]]
+      resolved: (r: string) => J(r, 'a.md'),
+      recorded: (r: string) => [[{ path: J(r, 'a.md'), kind: 'added', subtree: false }]]
     },
     {
       channel: 'file:createFolder',
       method: 'createFolder' as const,
       args: (r: string) => [r, 'dir2'],
-      resolved: (r: string) => `${r}/dir2`,
-      recorded: (r: string) => [[{ path: `${r}/dir2`, kind: 'added', subtree: false }]]
+      resolved: (r: string) => J(r, 'dir2'),
+      recorded: (r: string) => [[{ path: J(r, 'dir2'), kind: 'added', subtree: false }]]
     },
     {
       channel: 'file:deleteFile',
       method: 'deleteFile' as const,
-      args: (r: string) => [`${r}/a.md`],
+      args: (r: string) => [J(r, 'a.md')],
       resolved: () => undefined,
-      recorded: (r: string) => [[{ path: `${r}/a.md`, kind: 'removed', subtree: true }]]
+      recorded: (r: string) => [[{ path: J(r, 'a.md'), kind: 'removed', subtree: true }]]
     },
     {
       channel: 'file:deleteFolder',
       method: 'deleteFolder' as const,
-      args: (r: string) => [`${r}/dir`],
+      args: (r: string) => [J(r, 'dir')],
       resolved: () => undefined,
-      recorded: (r: string) => [[{ path: `${r}/dir`, kind: 'removed', subtree: true }]]
+      recorded: (r: string) => [[{ path: J(r, 'dir'), kind: 'removed', subtree: true }]]
     },
     {
       channel: 'file:rename',
       method: 'rename' as const,
-      args: (r: string) => [`${r}/old`, 'new'],
-      resolved: (r: string) => `${r}/new`,
+      args: (r: string) => [J(r, 'old'), 'new'],
+      resolved: (r: string) => J(r, 'new'),
       recorded: (r: string) => [
         [
-          { path: `${r}/old`, kind: 'removed', subtree: true },
-          { path: `${r}/new`, kind: 'added', subtree: true }
+          { path: J(r, 'old'), kind: 'removed', subtree: true },
+          { path: J(r, 'new'), kind: 'added', subtree: true }
         ]
       ]
     },
     {
       channel: 'file:moveItem',
       method: 'moveItem' as const,
-      args: (r: string) => [`${r}/a`, `${r}/sub`],
-      resolved: (r: string) => ({ path: `${r}/sub/a` }),
+      args: (r: string) => [J(r, 'a'), J(r, 'sub')],
+      resolved: (r: string) => ({ path: J(r, 'sub/a') }),
       recorded: (r: string) => [
         [
-          { path: `${r}/a`, kind: 'removed', subtree: true },
-          { path: `${r}/sub/a`, kind: 'added', subtree: true }
+          { path: J(r, 'a'), kind: 'removed', subtree: true },
+          { path: J(r, 'sub/a'), kind: 'added', subtree: true }
         ]
       ]
     },
@@ -682,22 +686,22 @@ describe('#210 watcher catch-up hooks', () => {
       channel: 'file:moveItem',
       label: ' (replaceExisting)',
       method: 'moveItem' as const,
-      args: (r: string) => [`${r}/a`, `${r}/sub`, undefined, true],
-      resolved: (r: string) => ({ path: `${r}/sub/a` }),
+      args: (r: string) => [J(r, 'a'), J(r, 'sub'), undefined, true],
+      resolved: (r: string) => ({ path: J(r, 'sub/a') }),
       recorded: (r: string) => [
         [
-          { path: `${r}/a`, kind: 'removed', subtree: true },
-          { path: `${r}/sub/a`, kind: 'added', subtree: true },
-          { path: `${r}/sub/a`, kind: 'removed', subtree: true }
+          { path: J(r, 'a'), kind: 'removed', subtree: true },
+          { path: J(r, 'sub/a'), kind: 'added', subtree: true },
+          { path: J(r, 'sub/a'), kind: 'removed', subtree: true }
         ]
       ]
     },
     {
       channel: 'file:copyItem',
       method: 'copyItem' as const,
-      args: (r: string) => [`${r}/a`, `${r}/sub`],
-      resolved: (r: string) => ({ path: `${r}/sub/a` }),
-      recorded: (r: string) => [[{ path: `${r}/sub/a`, kind: 'added', subtree: true }]]
+      args: (r: string) => [J(r, 'a'), J(r, 'sub')],
+      resolved: (r: string) => ({ path: J(r, 'sub/a') }),
+      recorded: (r: string) => [[{ path: J(r, 'sub/a'), kind: 'added', subtree: true }]]
     }
   ]
 

@@ -12,8 +12,8 @@
  * touches it, so there is nothing to roll back.
  */
 
-import { parse, sep } from 'path'
 import { logger } from '../LoggingService'
+import { normaliseResolved } from '../../utils/pathCompare'
 import { redactedLogError } from '../../utils/redactUserInput'
 import { ConfinementError, type ConfinementErrorCode } from '../../ipc/confinement/ConfinementError'
 
@@ -46,26 +46,13 @@ export interface ProjectSession {
 // The error lives with the path checker; re-exported so existing imports keep working
 export { ConfinementError, type ConfinementErrorCode }
 
-const WIN_UNC_EXTENDED_PREFIX = '\\\\?\\UNC\\'
-const WIN_EXTENDED_PREFIX = '\\\\?\\'
-
 /**
  * Normalise `realpath` output for storage: strip a Windows extended-length
- * prefix (`\\?\C:\x` -> `C:\x`, `\\?\UNC\srv\sh` -> `\\srv\sh`) and trailing
- * separators past the filesystem root. Defensive: libuv should not emit them.
+ * prefix and trailing separators past the filesystem root. Defensive: libuv
+ * does not emit the prefix. Shared with the path checker.
  */
 export function normaliseRealRoot(real: string): string {
-  let n = real
-  if (n.startsWith(WIN_UNC_EXTENDED_PREFIX)) {
-    n = `\\\\${n.slice(WIN_UNC_EXTENDED_PREFIX.length)}`
-  } else if (n.startsWith(WIN_EXTENDED_PREFIX)) {
-    n = n.slice(WIN_EXTENDED_PREFIX.length)
-  }
-  const root = parse(n).root
-  while (n.length > root.length && (n.endsWith(sep) || n.endsWith('/'))) {
-    n = n.slice(0, -1)
-  }
-  return n
+  return normaliseResolved(real)
 }
 
 /** The writable side. Only `ProjectService` holds one. */

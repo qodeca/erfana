@@ -33,7 +33,8 @@ import {
 import { logger } from '../services/LoggingService'
 import { fileExists } from '../utils/fileUtils'
 import { redactPath, redactedLogError } from '../utils/redactUserInput'
-import { isLexicallyInside } from '../utils/projectConfinement'
+import { isInsideRoot } from '../utils/pathCompare'
+import { getPlatformConfig } from '../services/watcher/PlatformConfig'
 import { restoreParentDirectory } from '../services/file/restoreParentDirectory'
 import { registerConfinedHandle } from './confinement/registerConfinedHandle'
 import { isTrustedSender } from './senderValidation'
@@ -222,7 +223,7 @@ export function registerFileHandlers(): void {
     'file:writeFile',
     {
       schema: WriteFileArgsSchema,
-      paths: { filePath: { arg: 0, mode: 'project', allowRoot: false } },
+      paths: { filePath: { arg: 0, mode: 'project', allowRoot: false, access: 'change' } },
       handler: async (_ctx, [, content, options], { filePath }) => {
         try {
           if (options?.createParentDirs) {
@@ -327,7 +328,7 @@ export function registerFileHandlers(): void {
     'file:createFile',
     {
       schema: CreateEntryArgsSchema,
-      paths: { dirPath: { arg: 0, mode: 'project', mustExist: true, kind: 'directory' } },
+      paths: { dirPath: { arg: 0, mode: 'project', mustExist: true, kind: 'directory', access: 'change' } },
       handler: async (_ctx, [, fileName], { dirPath }) => {
         try {
           const created = await fileService.createFile(dirPath.real, fileName)
@@ -350,7 +351,7 @@ export function registerFileHandlers(): void {
     'file:createFolder',
     {
       schema: CreateEntryArgsSchema,
-      paths: { dirPath: { arg: 0, mode: 'project', mustExist: true, kind: 'directory' } },
+      paths: { dirPath: { arg: 0, mode: 'project', mustExist: true, kind: 'directory', access: 'change' } },
       handler: async (_ctx, [, folderName], { dirPath }) => {
         try {
           const created = await fileService.createFolder(dirPath.real, folderName)
@@ -374,7 +375,7 @@ export function registerFileHandlers(): void {
     'file:deleteFile',
     {
       schema: PathArgsSchema,
-      paths: { filePath: { arg: 0, mode: 'project-entry' } },
+      paths: { filePath: { arg: 0, mode: 'project-entry', access: 'change' } },
       handler: async (_ctx, _args, { filePath }) => {
         try {
           await fileService.deleteFile(filePath.real)
@@ -394,7 +395,7 @@ export function registerFileHandlers(): void {
     'file:deleteFolder',
     {
       schema: PathArgsSchema,
-      paths: { folderPath: { arg: 0, mode: 'project-entry' } },
+      paths: { folderPath: { arg: 0, mode: 'project-entry', access: 'change' } },
       handler: async (_ctx, _args, { folderPath }) => {
         try {
           await fileService.deleteFolder(folderPath.real)
@@ -414,7 +415,7 @@ export function registerFileHandlers(): void {
     'file:rename',
     {
       schema: RenameArgsSchema,
-      paths: { oldPath: { arg: 0, mode: 'project-entry' } },
+      paths: { oldPath: { arg: 0, mode: 'project-entry', access: 'change' } },
       handler: async (_ctx, [, newName], { oldPath }) => {
         try {
           const renamed = await fileService.rename(oldPath.real, newName)
@@ -441,8 +442,8 @@ export function registerFileHandlers(): void {
     {
       schema: MoveItemArgsSchema,
       paths: {
-        sourcePath: { arg: 0, mode: 'project-entry' },
-        targetParentPath: { arg: 1, mode: 'project', mustExist: true, kind: 'directory' }
+        sourcePath: { arg: 0, mode: 'project-entry', access: 'change' },
+        targetParentPath: { arg: 1, mode: 'project', mustExist: true, kind: 'directory', access: 'change' }
       },
       handler: async (_ctx, [, , newName, replaceExisting], { sourcePath, targetParentPath }) => {
         try {
@@ -475,16 +476,18 @@ export function registerFileHandlers(): void {
     {
       schema: CopyItemArgsSchema,
       paths: {
+        // What the copy reads must lie inside the project (links followed) ...
         sourcePath: { arg: 0, mode: 'project' },
-        targetParentPath: { arg: 1, mode: 'project', mustExist: true, kind: 'directory' }
+        // ... but a link is copied as a link, so the copy starts from the entry itself
+        sourceEntry: { arg: 0, mode: 'project-entry' },
+        targetParentPath: { arg: 1, mode: 'project', mustExist: true, kind: 'directory', access: 'change' }
       },
-      handler: async (_ctx, [, , newName], { sourcePath, targetParentPath }) => {
+      handler: async (_ctx, [, , newName], { sourceEntry, targetParentPath }) => {
         try {
-          // The copy keeps the name the source was given, not the name of what a link leads to
           const copied = await fileService.copyItem(
-            sourcePath.real,
+            sourceEntry.real,
             targetParentPath.real,
-            newName ?? path.basename(sourcePath.requested)
+            newName ?? path.basename(sourceEntry.requested)
           )
           const newPath = path.join(targetParentPath.requested, path.basename(copied.path))
           directoryWatcherService.noteInternalChange({ path: newPath, kind: 'added', subtree: true })
@@ -644,7 +647,7 @@ export function registerFileHandlers(): void {
           }
 
           // Security check: if projectRoot provided, ensure path is within it
-          if (projectRoot && !isLexicallyInside(resolvedPath, projectRoot)) {
+          if (projectRoot && !isInsideRoot(resolvedPath, path.resolve(projectRoot), getPlatformConfig().caseSensitive)) {
             return { exists: false, error: 'Path outside project root' }
           }
 

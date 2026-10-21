@@ -15,7 +15,7 @@ import { tmpdir } from 'os'
 import { join } from 'path'
 import { test, expect } from './fixtures/index'
 
-const REFUSAL = 'Cannot read files outside the project directory'
+const REFUSAL = 'outside the project directory'
 
 test.use({
   testProjectFiles: {

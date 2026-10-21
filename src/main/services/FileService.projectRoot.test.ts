@@ -48,6 +48,15 @@ describe('FileService project root', () => {
       await symlink(root, alias)
       // The service was pointed at the alias; the path it is handed is the canonical one
       svc.setProjectPath(alias)
+      svc.bindSession({
+        current: () => ({
+          generation: 1,
+          root: alias,
+          realRoot: root,
+          caseSensitive: process.platform === 'linux',
+          ownerWebContentsId: null
+        })
+      })
 
       await expect(svc.deleteFolder(root)).rejects.toThrow('Cannot delete the project root directory')
       await expect(svc.moveItem(root, join(root, 'sub'))).rejects.toThrow(

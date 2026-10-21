@@ -3,6 +3,7 @@
 import type { FileNode } from '../../shared/ipc/file-schema'
 import type { ImageReadResponse } from '../../shared/ipc/file-image-schema'
 import type { ProjectPathFilter } from '../utils/projectPathFilter'
+import type { ProjectSession } from '../services/session/ProjectSession'
 
 /**
  * Interface for file system operations
@@ -131,4 +132,10 @@ export interface IFileService {
    * (read them with `filter.getWalkHints()`). Null means no exclusion.
    */
   setPathFilter(filter: ProjectPathFilter | null): void
+
+  /**
+   * Give the service the open-project session (called once by `ProjectService`),
+   * so it can refuse to delete or move the project root by its canonical path.
+   */
+  bindSession?(session: Pick<ProjectSession, 'current'>): void
 }
