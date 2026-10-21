@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { useRef, useImperativeHandle, forwardRef } from 'react'
+import { useRef, useImperativeHandle, forwardRef, useLayoutEffect } from 'react'
 import Editor, { OnMount, loader } from '@monaco-editor/react'
 import * as monaco from 'monaco-editor'
 import { useSearchStore } from '../../stores/useSearchStore'
@@ -9,6 +9,7 @@ import { TEST_IDS } from '../../constants/testids'
 import { registerClipboardActions } from '../../utils/monacoClipboardCommands'
 import { getMonacoLanguage } from '../../utils/monacoLanguage'
 import { disableWorkerLanguageServices } from '../../utils/monacoLanguageServices'
+import { createEditorValueSync, type EditorValueSync } from '../../utils/monacoValueSync'
 import './MonacoMarkdownEditor.css'
 
 // Configure Monaco to use local files instead of CDN
@@ -38,8 +39,22 @@ export interface EditorContextMenuEvent {
 }
 
 interface MonacoMarkdownEditorProps {
+  /**
+   * The document text as React holds it.
+   *
+   * The editor is uncontrolled: it mounts with this text and afterwards owns
+   * its buffer. A new `value` is written into the buffer only when it is an
+   * outside change (reload from disk, conflict "Reload") – never when it is
+   * the editor's own `onChange` echo, even an echo that is behind the buffer.
+   * See `utils/monacoValueSync.ts`.
+   */
   value: string
+  /** Called with the full buffer text after every user edit (not after an outside change) */
   onChange: (value: string) => void
+  /**
+   * Path of the open file. Picks the language, and a different path mounts a
+   * fresh editor model, so undo can never step back into another file.
+   */
   filePath?: string
   onSelectionChange?: (selection: string) => void
   onEditorMount?: (editor: monaco.editor.IStandaloneCodeEditor) => void
@@ -88,6 +103,46 @@ export const MonacoMarkdownEditor = forwardRef<MonacoEditorHandle, MonacoMarkdow
   ({ value, onChange, filePath, onSelectionChange, onEditorMount, onContextMenu }, ref) => {
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
     const monacoRef = useRef<typeof monaco | null>(null)
+    // Sync state of the mounted editor (null until mount); see monacoValueSync
+    const valueSyncRef = useRef<EditorValueSync | null>(null)
+    // The file the mounted editor was created for. A path change remounts the
+    // inner <Editor>; until the new one mounts, the old one must not be synced.
+    const mountedPathRef = useRef<string | undefined>(undefined)
+    // Latest props for listeners registered once at mount. @monaco-editor/react
+    // also keeps only the first `onMount`, so anything it closes over is stale.
+    const latestRef = useRef({ value, onChange, filePath })
+
+    useLayoutEffect(() => {
+      latestRef.current = { value, onChange, filePath }
+    })
+
+    // A new path remounts the inner <Editor> (see its `key`), whose cleanup
+    // disposes the old editor only later, in the passive phase. Drop it now:
+    // a disposed editor reads as an empty document, and a save in that gap
+    // would write '' instead of falling back to the React copy of the text.
+    useLayoutEffect(() => {
+      if (editorRef.current && mountedPathRef.current !== filePath) {
+        editorRef.current = null
+        valueSyncRef.current = null
+      }
+    }, [filePath])
+
+    // Outside changes. A layout effect, not a passive one: it runs inside the
+    // commit, so no keystroke can arrive between React rendering `value` and
+    // this check. The echo test in reconcile() covers the other direction – a
+    // keystroke that reached Monaco before React rendered the previous one.
+    useLayoutEffect(() => {
+      const editor = editorRef.current
+      const sync = valueSyncRef.current
+      // The path is only a guard (read from latestRef, refreshed by the effect
+      // above in this same commit): a path change remounts the editor, and the
+      // new one starts from `defaultValue`.
+      if (!editor || !sync || mountedPathRef.current !== latestRef.current.filePath) return
+      const result = sync.reconcile(editor, value)
+      if (result === 'applied') {
+        logger.debug('MonacoMarkdownEditor applied an outside change', { valueLength: value.length })
+      }
+    }, [value])
 
     // Debug logging
     logger.debug('MonacoMarkdownEditor render', {
@@ -97,9 +152,28 @@ export const MonacoMarkdownEditor = forwardRef<MonacoEditorHandle, MonacoMarkdow
     })
 
     const handleEditorDidMount: OnMount = (editor, monaco) => {
-      logger.debug('Monaco mounted, setting value', { valuePreview: value?.substring(0, 50) })
+      logger.debug('Monaco mounted', { valueLength: latestRef.current.value.length })
       editorRef.current = editor
       monacoRef.current = monaco
+
+      // The model was created from `defaultValue` when Monaco finished
+      // loading, which can be a few renders before this callback: start from
+      // the latest text, with no undo entry and no `onChange`.
+      const sync = createEditorValueSync()
+      valueSyncRef.current = sync
+      mountedPathRef.current = latestRef.current.filePath
+      sync.resetTo(editor, latestRef.current.value)
+
+      // Our own listener rather than the wrapper's `onChange` prop: it has to
+      // stay silent while an outside change is being written, or a reload from
+      // disk would mark the file modified and re-arm autosave. Disposed along
+      // with the editor.
+      editor.onDidChangeModelContent(() => {
+        if (sync.isApplying()) return
+        const text = editor.getValue()
+        sync.recordEmit(text)
+        latestRef.current.onChange(text)
+      })
 
       // Configure markdown-specific options
       editor.updateOptions({
@@ -421,14 +495,21 @@ export const MonacoMarkdownEditor = forwardRef<MonacoEditorHandle, MonacoMarkdow
     return (
       <div className="monaco-markdown-editor" data-testid={TEST_IDS.EDITOR_MONACO}>
         <Editor
+          // One editor (and model) per file: a different file never inherits
+          // this one's undo history or pending emits.
+          key={filePath ?? ''}
           height="100%"
           // Markdown stays markdown; a `.html`/`.css`/`.ts`/… file gets its own
           // Monarch tokenizer (item 75). Unknown/absent extensions fall back to
           // 'markdown', so existing `.md` behaviour is unchanged.
           language={getMonacoLanguage(filePath ?? '')}
           theme="vs-dark"
-          value={value}
-          onChange={(value) => onChange(value || '')}
+          // Uncontrolled on purpose – never `value=`. The wrapper's controlled
+          // sync replaces the whole buffer from a passive effect, and a
+          // keystroke landing before that effect was lost (typed characters
+          // dropped under load). Outside changes go through the layout effect
+          // above instead.
+          defaultValue={value}
           onMount={handleEditorDidMount}
           options={{
             automaticLayout: true
