@@ -13,7 +13,9 @@
  * against `process.cwd()` (checked when this was added); `spawnNewInstance`
  * passes absolute paths when packaged.
  */
-import { dirname } from 'path'
+import { mkdirSync } from 'fs'
+import { win32 } from 'path'
+import { redactPath } from './redactUserInput'
 
 export interface SafeCwdEnv {
   isPackaged: boolean
@@ -21,6 +23,10 @@ export interface SafeCwdEnv {
   execPath: string
   userDataPath: () => string
   chdir: (dir: string) => void
+  /** Create the folder if needed (on a first launch userData may not exist yet). */
+  mkdir?: (dir: string) => void
+  /** Told when the move fails; the path it gets is already redacted. */
+  warn?: (message: string, context: Record<string, unknown>) => void
 }
 
 /** The folder chosen, or null when nothing was changed. */
@@ -28,11 +34,22 @@ export function moveToSafeWorkingDirectory(env: SafeCwdEnv): string | null {
   if (!env.isPackaged) return null
   // Windows: the install folder, already first in the DLL / exe search order.
   // Elsewhere: the app's own data folder.
+  let target = ''
   try {
-    const target = env.platform === 'win32' ? dirname(env.execPath) : env.userDataPath()
+    target = env.platform === 'win32' ? win32.dirname(env.execPath) : env.userDataPath()
+    const mkdir = env.mkdir ?? ((dir: string) => mkdirSync(dir, { recursive: true }))
+    if (env.platform !== 'win32') mkdir(target)
     env.chdir(target)
     return target
-  } catch {
+  } catch (error) {
+    try {
+      env.warn?.('Could not move the working directory to a safe folder', {
+        path: target ? redactPath(target) : '(unknown)',
+        code: (error as NodeJS.ErrnoException)?.code ?? 'unknown'
+      })
+    } catch {
+      // Logging must never stop startup.
+    }
     return null
   }
 }

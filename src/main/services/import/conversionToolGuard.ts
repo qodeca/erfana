@@ -25,13 +25,15 @@
  * between the check and the spawn (someone who can write into a trusted PATH
  * folder already controls the user's account).
  */
+import { win32 } from 'path'
 import { DOCUMENT_IMPORT } from '../../../shared/constants'
+import type { UnsafeToolReason } from '../../../shared/errors'
 import {
+  classifiedUntrustedFolders,
   defaultIsExecutableFile,
-  findOnPathEntries,
-  isTrustedHit,
+  lookupOnPath,
   processLookupEnv,
-  untrustedFolders,
+  untrustedReason,
   type PathHit,
   type PathLookupEnv
 } from '../../utils/pathLookup'
@@ -54,7 +56,14 @@ export type LibreOfficeResolution =
   | { state: 'found'; path: string }
   | { state: 'missing' }
   /** `name` is the tool or helper at fault; `path` is for a redacted log line only. */
-  | { state: 'unsafe'; name: string; path: string }
+  | UnsafeResolution
+
+export interface UnsafeResolution {
+  state: 'unsafe'
+  name: string
+  path: string
+  reason: UnsafeToolReason
+}
 
 /** Where the open project comes from; set once by the import tool status service. */
 let rootsProvider: () => ReadonlyArray<string | null | undefined> = () => []
@@ -78,34 +87,56 @@ export function resolveLibreOffice(
   options: ResolveOptions = {}
 ): LibreOfficeResolution {
   const env = options.env ?? processLookupEnv()
-  const folders = untrustedFolders(roots, env.platform)
-  const trusted = (hit: PathHit): boolean => isTrustedHit(hit, folders, env.platform, options.realpath)
+  const folders = classifiedUntrustedFolders(roots, env.platform)
+  const judge = (name: string, hit: PathHit): UnsafeResolution | null => {
+    const reason = untrustedReason(hit, folders, env.platform, options.realpath)
+    return reason ? { state: 'unsafe', name, path: hit.path, reason } : null
+  }
+  const network = (name: string, entry: string): UnsafeResolution => ({
+    state: 'unsafe',
+    name,
+    path: entry,
+    reason: 'network'
+  })
 
-  // The helpers, as Rust starts them. An untrusted one makes every conversion unsafe.
+  // The helpers, as Rust starts them. An untrusted one makes every conversion
+  // unsafe – so does a network share a spawn would search before a local copy.
   let whichAvailable = false
   for (const helper of BARE_NAME_HELPERS) {
-    const [first] = findOnPathEntries(helper, env, 'rust')
+    const { hits: [first], uncEntry } = lookupOnPath(helper, env, 'rust')
+    if (uncEntry !== null) return network(helper, uncEntry)
     if (!first) continue
-    if (!trusted(first)) return { state: 'unsafe', name: helper, path: first.path }
+    const unsafe = judge(helper, first)
+    if (unsafe) return unsafe
     if (helper === 'which') whichAvailable = true
   }
 
   // `which <name>` – only when LiteParse has a `which` to ask.
   if (whichAvailable) {
     for (const name of LIBREOFFICE_NAMES) {
-      const [printed] = findOnPathEntries(name, env, 'pathext')
+      const printed = lookupOnPath(name, env, 'pathext')
+      if (printed.uncEntry !== null) return network(name, printed.uncEntry)
+      let hit = printed.hits[0]
       if (env.platform === 'win32') {
-        // Fail closed when a `which`-style lookup and an .exe-only lookup
-        // disagree (`soffice.bat` or `soffice.com` ahead of `soffice.exe`):
-        // then the guard cannot be sure which file runs.
-        const [exe] = findOnPathEntries(name, { ...env, rustPrefixDirs: [] }, 'rust')
-        if ((printed?.path ?? null) !== (exe?.path ?? null)) {
-          const path = printed?.path ?? exe?.path ?? name
-          return { state: 'unsafe', name, path }
+        // A `which`-style lookup (PATHEXT order) and an .exe-only one can
+        // disagree: LibreOffice's own program folder ships soffice.com next to
+        // soffice.exe. Same trusted folder → the .exe. Anything else – either
+        // copy untrusted, a copy on one side only, or two folders – the guard
+        // cannot be sure which file runs, so it fails closed.
+        const [exe] = lookupOnPath(name, { ...env, rustPrefixDirs: [] }, 'rust').hits
+        if ((hit?.path ?? null) !== (exe?.path ?? null)) {
+          for (const candidate of [hit, exe]) {
+            const unsafe = candidate ? judge(name, candidate) : null
+            if (unsafe) return unsafe
+          }
+          if (!hit || !exe || !sameWindowsFolder(hit.path, exe.path)) {
+            return { state: 'unsafe', name, path: (hit ?? exe).path, reason: 'ambiguous' }
+          }
+          hit = exe
         }
       }
-      if (!printed) continue
-      return trusted(printed) ? { state: 'found', path: printed.path } : { state: 'unsafe', name, path: printed.path }
+      if (!hit) continue
+      return judge(name, hit) ?? { state: 'found', path: hit.path }
     }
   }
 
@@ -119,6 +150,7 @@ export function resolveLibreOffice(
 export interface UntrustedTool {
   name: string
   path: string
+  reason: UnsafeToolReason
 }
 
 /**
@@ -133,5 +165,11 @@ export function findUntrustedConversionTool(
 ): UntrustedTool | null {
   if (!(DOCUMENT_IMPORT.LIBREOFFICE_EXTENSIONS as readonly string[]).includes(ext.toLowerCase())) return null
   const resolution = resolveLibreOffice(roots, options)
-  return resolution.state === 'unsafe' ? { name: resolution.name, path: resolution.path } : null
+  return resolution.state === 'unsafe'
+    ? { name: resolution.name, path: resolution.path, reason: resolution.reason }
+    : null
+}
+
+function sameWindowsFolder(a: string, b: string): boolean {
+  return win32.dirname(a).toLowerCase() === win32.dirname(b).toLowerCase()
 }

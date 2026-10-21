@@ -125,9 +125,9 @@ export class ImportToolStatusService {
 }
 
 /**
- * Session singleton. The open project is an untrusted root: a `soffice` or
- * `magick` that PATH resolves into it is never run – not by detection, and
- * not by a conversion (`conversionToolGuard`). Every applied result is
+ * Session singleton. The open project is an untrusted root: a LibreOffice
+ * (or a `which` / `powershell` helper) that PATH resolves into it is never run
+ * – not by detection, and not by a conversion (`conversionToolGuard`). Every applied result is
  * broadcast as `import:dependenciesReady`, so all windows stay in step after a
  * "Check again".
  */

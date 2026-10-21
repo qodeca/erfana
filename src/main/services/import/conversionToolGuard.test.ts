@@ -43,20 +43,21 @@ describe('resolveLibreOffice – POSIX', () => {
     expect(resolveLibreOffice(ROOTS, { env, realpath: id })).toEqual({
       state: 'unsafe',
       name: 'libreoffice',
-      path: '/work/repo/bin/libreoffice'
+      path: '/work/repo/bin/libreoffice',
+      reason: 'project'
     })
   })
 
   it('is unsafe for a hit from a "." or empty PATH entry', () => {
     for (const pathValue of ['.:/usr/bin', ':/usr/bin']) {
       const env = posixEnv(pathValue, ['/usr/bin/which', '/cwd/soffice'])
-      expect(resolveLibreOffice([], { env, realpath: id }).state).toBe('unsafe')
+      expect(resolveLibreOffice([], { env, realpath: id })).toMatchObject({ state: 'unsafe', reason: 'relative' })
     }
   })
 
   it('is unsafe for a hit in a shared temp folder', () => {
     const env = posixEnv('/var/tmp/bin:/usr/bin', ['/usr/bin/which', '/var/tmp/bin/soffice'])
-    expect(resolveLibreOffice([], { env, realpath: id }).state).toBe('unsafe')
+    expect(resolveLibreOffice([], { env, realpath: id })).toMatchObject({ state: 'unsafe', reason: 'temp' })
   })
 
   it.each(['which', 'powershell'])('is unsafe when the bare-name helper `%s` resolves into the project', (helper) => {
@@ -77,7 +78,7 @@ describe('resolveLibreOffice – POSIX', () => {
   it('fails closed when the real path of a hit cannot be resolved', () => {
     const env = posixEnv('/usr/bin', ['/usr/bin/which', '/usr/bin/soffice'])
     const realpath = (p: string): string | null => (p === '/usr/bin/soffice' ? null : p)
-    expect(resolveLibreOffice([], { env, realpath }).state).toBe('unsafe')
+    expect(resolveLibreOffice([], { env, realpath })).toMatchObject({ state: 'unsafe', reason: 'unresolvable' })
   })
 
   it('compares the project case-insensitively on macOS', () => {
@@ -142,13 +143,28 @@ describe('resolveLibreOffice – Windows', () => {
     expect(resolveLibreOffice(['C:\\Repo'], { env: ps, realpath: id }).state).toBe('found')
   })
 
-  it('fails closed when a which-style lookup and an .exe-only lookup disagree', () => {
-    // soffice.com ahead of soffice.exe in the same folder: `which` prints the .com.
-    const env = winEnv('C:\\Tools;C:\\LO', ['C:\\Tools\\which.exe', 'C:\\LO\\soffice.com', 'C:\\LO\\soffice.exe'])
-    expect(resolveLibreOffice([], { env, realpath: id })).toMatchObject({ state: 'unsafe', name: 'soffice' })
+  it('a normal install – soffice.com next to soffice.exe in one trusted folder – is found, as the .exe', () => {
+    // LibreOffice's program folder ships both; `which` prints the .com (PATHEXT
+    // order), Rust would start the .exe. Same folder, trusted: no disagreement.
+    const LO = 'C:\\Program Files\\LibreOffice\\program'
+    const env = winEnv(`C:\\Tools;${LO}`, ['C:\\Tools\\which.exe', `${LO}\\soffice.com`, `${LO}\\soffice.exe`])
+    expect(resolveLibreOffice([], { env, realpath: id })).toEqual({ state: 'found', path: `${LO}\\soffice.exe` })
+  })
+
+  it('is unsafe when the two lookups land in different folders', () => {
     // soffice.cmd in an earlier folder than soffice.exe.
-    const env2 = winEnv('C:\\Tools;C:\\Early;C:\\LO', ['C:\\Tools\\which.exe', 'C:\\Early\\soffice.cmd', 'C:\\LO\\soffice.exe'])
-    expect(resolveLibreOffice([], { env: env2, realpath: id })).toMatchObject({ state: 'unsafe', name: 'soffice' })
+    const env = winEnv('C:\\Tools;C:\\Early;C:\\LO', ['C:\\Tools\\which.exe', 'C:\\Early\\soffice.cmd', 'C:\\LO\\soffice.exe'])
+    expect(resolveLibreOffice([], { env, realpath: id })).toMatchObject({ state: 'unsafe', name: 'soffice', reason: 'ambiguous' })
+  })
+
+  it('is unsafe when only one lookup finds a copy', () => {
+    const env = winEnv('C:\\Tools;C:\\LO', ['C:\\Tools\\which.exe', 'C:\\LO\\soffice.com'])
+    expect(resolveLibreOffice([], { env, realpath: id })).toMatchObject({ state: 'unsafe', name: 'soffice', reason: 'ambiguous' })
+  })
+
+  it('is unsafe, with that copy’s reason, when the shared folder is untrusted', () => {
+    const env = winEnv('C:\\Tools;C:\\Repo\\bin', ['C:\\Tools\\which.exe', 'C:\\Repo\\bin\\soffice.com', 'C:\\Repo\\bin\\soffice.exe'])
+    expect(resolveLibreOffice(['C:\\Repo'], { env, realpath: id })).toMatchObject({ state: 'unsafe', name: 'soffice', reason: 'project' })
   })
 
   it('agrees when both lookups land on the same .exe', () => {
@@ -158,10 +174,10 @@ describe('resolveLibreOffice – Windows', () => {
 
   it('compares the project case-insensitively with backslash paths', () => {
     const env = winEnv('C:\\Tools;C:\\Work\\Repo\\bin', ['C:\\Tools\\which.exe', 'C:\\Work\\Repo\\bin\\soffice.exe'])
-    expect(resolveLibreOffice(['c:\\work\\repo'], { env, realpath: id }).state).toBe('unsafe')
+    expect(resolveLibreOffice(['c:\\work\\repo'], { env, realpath: id })).toMatchObject({ state: 'unsafe', reason: 'project' })
   })
 
-  it('skips UNC PATH entries without touching them', () => {
+  it('a UNC entry ahead of a helper is unsafe (network share), without touching the share', () => {
     const touched: string[] = []
     const env: PathLookupEnv = {
       ...winEnv('\\\\evil\\share;C:\\Tools', []),
@@ -170,8 +186,47 @@ describe('resolveLibreOffice – Windows', () => {
         return p.toLowerCase() === 'c:\\tools\\which.exe'
       }
     }
-    resolveLibreOffice([], { env, realpath: id })
+    expect(resolveLibreOffice([], { env, realpath: id })).toMatchObject({ state: 'unsafe', name: 'which', reason: 'network' })
     expect(touched.some((p) => p.startsWith('\\\\'))).toBe(false)
+  })
+
+  it('a UNC entry before the first local LibreOffice is unsafe (network share), without any stat of it', () => {
+    // PATH=\\srv\share;C:\LO – which/Rust would search the share first.
+    const touched: string[] = []
+    const files = new Set([
+      'c:\\windows\\system32\\which.exe',
+      'c:\\windows\\system32\\powershell.exe',
+      'c:\\lo\\soffice.exe'
+    ])
+    const env: PathLookupEnv = {
+      ...winEnv('\\\\srv\\share;C:\\LO', []),
+      isExecutableFile: (p) => {
+        touched.push(p)
+        return files.has(p.toLowerCase())
+      }
+    }
+    expect(resolveLibreOffice([], { env, realpath: id })).toMatchObject({
+      state: 'unsafe',
+      name: 'libreoffice-fresh',
+      reason: 'network',
+      path: '\\\\srv\\share'
+    })
+    expect(touched.some((p) => p.startsWith('\\\\'))).toBe(false)
+  })
+
+  it('a UNC entry with no local hit at all is unsafe: the share is where the lookup would end up', () => {
+    const env = winEnv('C:\\Tools;\\\\srv\\share', ['C:\\Windows\\System32\\which.exe', 'C:\\Windows\\System32\\powershell.exe', PF])
+    expect(resolveLibreOffice([], { env, realpath: id })).toMatchObject({ state: 'unsafe', name: 'libreoffice-fresh', reason: 'network' })
+  })
+
+  it('a UNC entry where a helper is not found locally is unsafe: Rust would search the share for it', () => {
+    const env = winEnv('C:\\Tools;\\\\srv\\share', ['C:\\Windows\\System32\\which.exe', PF])
+    expect(resolveLibreOffice([], { env, realpath: id })).toMatchObject({ state: 'unsafe', name: 'powershell', reason: 'network' })
+  })
+
+  it('a UNC entry after the local hit is searched by nobody, so the local copy is found', () => {
+    const env = winEnv('C:\\LO;\\\\srv\\share', ['C:\\Windows\\System32\\which.exe', 'C:\\Windows\\System32\\powershell.exe', 'C:\\LO\\libreoffice-fresh.exe'])
+    expect(resolveLibreOffice([], { env, realpath: id })).toEqual({ state: 'found', path: 'C:\\LO\\libreoffice-fresh.exe' })
   })
 })
 
@@ -184,7 +239,11 @@ describe('findUntrustedConversionTool', () => {
 
   it('names the untrusted tool for an Office format', () => {
     const env = posixEnv('/usr/bin:/work/repo', ['/usr/bin/which', '/work/repo/soffice'])
-    expect(findUntrustedConversionTool('DOCX', ROOTS, { env, realpath: id })).toEqual({ name: 'soffice', path: '/work/repo/soffice' })
+    expect(findUntrustedConversionTool('DOCX', ROOTS, { env, realpath: id })).toEqual({
+      name: 'soffice',
+      path: '/work/repo/soffice',
+      reason: 'project'
+    })
   })
 
   it('passes a trusted or absent LibreOffice', () => {

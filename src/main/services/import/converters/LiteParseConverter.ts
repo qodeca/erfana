@@ -135,16 +135,17 @@ export class LiteParseConverter implements IConverter, IConfigurableConverter {
     }
 
     // LiteParse finds LibreOffice itself, by name on PATH (#250). Refuse when
-    // the binary it would run is inside the project or a temp folder.
+    // the binary it would run is unsafe (project, temp, network share, ...).
     const untrusted = findUntrustedConversionTool(ext, currentUntrustedRoots())
     if (untrusted) {
       logger.warn('Refused conversion: untrusted tool on PATH', {
         tool: untrusted.name,
+        reason: untrusted.reason,
         path: redactPath(untrusted.path)
       })
       return {
         success: false,
-        error: untrustedToolMessage(untrusted.name),
+        error: untrustedToolMessage(untrusted.name, untrusted.reason),
         errorCode: ErrorCode.IMPORT_UNTRUSTED_TOOL
       }
     }

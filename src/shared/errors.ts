@@ -336,15 +336,42 @@ export class AppError extends Error {
  * todo023: Error message translator
  */
 /**
- * The refusal for a conversion whose tool is untrusted (#250), naming the tool
- * or the helper (`which`, `powershell`) at fault. Never carries the path.
+ * Why a tool Erfana would run is refused (#250):
+ * - `project` / `temp` – it is inside the open project or a temporary folder;
+ * - `network` – it is, or would be looked up, on a network share in PATH;
+ * - `relative` – it comes from a relative or empty PATH entry;
+ * - `unresolvable` – its real location cannot be resolved (fail closed);
+ * - `ambiguous` – two copies in different folders, and the lookup styles
+ *   disagree on which one runs.
  */
-export function untrustedToolMessage(tool: string): string {
-  const what = tool === 'which' || tool === 'powershell' ? `the \`${tool}\` program LiteParse uses to find LibreOffice` : `\`${tool}\``
-  return (
-    `Erfana did not run LibreOffice: ${what} is in the open project, a temporary folder or a network share, ` +
-    'or comes from a relative PATH entry. Remove that folder from PATH, then try again.'
-  )
+export type UnsafeToolReason = 'project' | 'temp' | 'network' | 'relative' | 'unresolvable' | 'ambiguous'
+
+const UNSAFE_REASON_TEXT: Record<UnsafeToolReason, { what: string; fix: string }> = {
+  project: { what: 'is in the open project', fix: 'Remove that folder from PATH, then try again.' },
+  temp: { what: 'is in a temporary folder', fix: 'Remove that folder from PATH, then try again.' },
+  network: {
+    what: 'would be looked up on a network share listed in PATH',
+    fix: 'Remove the network share from PATH, or move it after the local folder, then try again.'
+  },
+  relative: { what: 'comes from a relative PATH entry', fix: 'Remove that entry from PATH, then try again.' },
+  unresolvable: {
+    what: 'could not be checked, because its real location cannot be resolved',
+    fix: 'Reinstall it in its default folder, then try again.'
+  },
+  ambiguous: {
+    what: 'has copies in more than one PATH folder, and Erfana cannot tell which one would run',
+    fix: 'Remove the extra copy from PATH, then try again.'
+  }
+}
+
+/**
+ * The refusal for a conversion whose tool is untrusted (#250), naming the tool
+ * or the helper (`which`, `powershell`) at fault and why. Never carries the path.
+ */
+export function untrustedToolMessage(tool: string, reason: UnsafeToolReason): string {
+  const who = tool === 'which' || tool === 'powershell' ? `the \`${tool}\` program LiteParse uses to find LibreOffice` : `\`${tool}\``
+  const { what, fix } = UNSAFE_REASON_TEXT[reason]
+  return `Erfana did not run LibreOffice: ${who} ${what}. ${fix}`
 }
 
 export const ERROR_MESSAGES: Record<ErrorCode, string> = {

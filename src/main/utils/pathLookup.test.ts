@@ -8,6 +8,9 @@ import { tmpdir } from 'os'
 import { join } from 'path'
 import {
   findOnPathEntries,
+  lookupOnPath,
+  untrustedReason,
+  classifiedUntrustedFolders,
   isTrustedHit,
   isUncPath,
   untrustedFolders,
@@ -28,20 +31,20 @@ describe('findOnPathEntries', () => {
   })
 
   it.each([
-    ['empty entry', ':/usr/bin', '/cwd/magick'],
-    ['"." entry', '.:/usr/bin', '/cwd/magick'],
-    ['relative entry', 'bin:/usr/bin', '/cwd/bin/magick']
+    ['empty entry', ':/usr/bin', '/cwd/soffice'],
+    ['"." entry', '.:/usr/bin', '/cwd/soffice'],
+    ['relative entry', 'bin:/usr/bin', '/cwd/bin/soffice']
   ])('marks a hit from an %s as relative', (_name, pathValue, planted) => {
-    const [first] = findOnPathEntries('magick', env('linux', pathValue, [planted, '/usr/bin/magick']))
+    const [first] = findOnPathEntries('soffice', env('linux', pathValue, [planted, '/usr/bin/soffice']))
     expect(first).toEqual({ path: planted, fromRelativeEntry: true })
   })
 
   it('tries PATHEXT on Windows, including quoted entries', () => {
     const hits = findOnPathEntries(
-      'magick',
-      env('win32', '"C:\\Tools";C:\\IM', ['C:\\Tools\\magick.exe', 'C:\\IM\\magick.EXE'], { pathext: '.COM;.EXE' })
+      'soffice',
+      env('win32', '"C:\\Tools";C:\\IM', ['C:\\Tools\\soffice.exe', 'C:\\IM\\soffice.EXE'], { pathext: '.COM;.EXE' })
     )
-    expect(hits[0]).toEqual({ path: 'C:\\Tools\\magick.exe', fromRelativeEntry: false })
+    expect(hits[0]).toEqual({ path: 'C:\\Tools\\soffice.exe', fromRelativeEntry: false })
   })
 
   it('caps the hits', () => {
@@ -87,6 +90,14 @@ describe('findOnPathEntries – UNC entries (#250)', () => {
     findOnPathEntries('soffice', env)
     expect(touched).toEqual(['C:\\Tools\\soffice.exe'])
   })
+
+  it('reports the first UNC entry met before the first local hit, or anywhere when there is none', () => {
+    const base = { platform: 'win32' as const, pathext: '.EXE', cwd: 'C:\\cwd' }
+    const has = (p: string): boolean => p === 'C:\\LO\\soffice.exe'
+    expect(lookupOnPath('soffice', { ...base, pathValue: '\\\\srv\\share;C:\\LO', isExecutableFile: has }).uncEntry).toBe('\\\\srv\\share')
+    expect(lookupOnPath('soffice', { ...base, pathValue: 'C:\\Tools;\\\\srv\\share', isExecutableFile: () => false }).uncEntry).toBe('\\\\srv\\share')
+    expect(lookupOnPath('soffice', { ...base, pathValue: 'C:\\LO;\\\\srv\\share', isExecutableFile: has }).uncEntry).toBeNull()
+  })
 })
 
 describe('isTrustedHit', () => {
@@ -111,9 +122,9 @@ describe('isTrustedHit', () => {
   })
 
   it('rejects UNC hits in both spellings', () => {
-    expect(isUncPath('\\\\host\\share\\magick.exe')).toBe(true)
-    expect(isUncPath('//host/share/magick')).toBe(true)
-    expect(isTrustedHit(hit('\\\\host\\share\\magick.exe'), [], 'win32', (p) => p)).toBe(false)
+    expect(isUncPath('\\\\host\\share\\soffice.exe')).toBe(true)
+    expect(isUncPath('//host/share/soffice')).toBe(true)
+    expect(isTrustedHit(hit('\\\\host\\share\\soffice.exe'), [], 'win32', (p) => p)).toBe(false)
   })
 
   it('fails closed when the real path cannot be resolved or throws', () => {
@@ -129,6 +140,20 @@ describe('isTrustedHit', () => {
     expect(isTrustedHit(hit('C:\\Work\\Repo\\soffice.exe'), ['c:\\work\\repo'], 'win32', (p) => p)).toBe(false)
     expect(isTrustedHit(hit('/Users/me/Repo/soffice'), ['/users/me/repo'], 'darwin', (p) => p)).toBe(false)
     expect(isTrustedHit(hit('/home/me/Repo/soffice'), ['/home/me/repo'], 'linux', (p) => p)).toBe(true)
+  })
+})
+
+describe('untrustedReason', () => {
+  const hit = (path: string, fromRelativeEntry = false) => ({ path, fromRelativeEntry })
+
+  it('names why a hit is refused', () => {
+    const folders = classifiedUntrustedFolders(['/work/repo'], 'linux')
+    expect(untrustedReason(hit('/usr/bin/soffice'), folders, 'linux', (p) => p)).toBeNull()
+    expect(untrustedReason(hit('/work/repo/soffice'), folders, 'linux', (p) => p)).toBe('project')
+    expect(untrustedReason(hit('/var/tmp/soffice'), folders, 'linux', (p) => p)).toBe('temp')
+    expect(untrustedReason(hit('/cwd/soffice', true), folders, 'linux', (p) => p)).toBe('relative')
+    expect(untrustedReason(hit('/usr/bin/soffice'), folders, 'linux', () => null)).toBe('unresolvable')
+    expect(untrustedReason(hit('C:\\x\\soffice.exe'), [], 'win32', () => '\\\\host\\share\\soffice.exe')).toBe('network')
   })
 })
 

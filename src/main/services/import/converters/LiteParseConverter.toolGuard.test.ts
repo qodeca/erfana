@@ -37,16 +37,16 @@ describe('LiteParseConverter – conversion tool guard (#250)', () => {
   })
 
   it('refuses with IMPORT_UNTRUSTED_TOOL naming the tool, logs a redacted path, and never calls LiteParse', async () => {
-    mockFind.mockReturnValue({ name: 'soffice', path: '/work/repo/soffice' })
+    mockFind.mockReturnValue({ name: 'soffice', path: '/work/repo/soffice', reason: 'project' })
 
     const result = await new LiteParseConverter({ libreOffice: 'found' }).convert('/docs/a.docx')
 
     expect(result).toEqual({
       success: false,
-      error: untrustedToolMessage('soffice'),
+      error: untrustedToolMessage('soffice', 'project'),
       errorCode: ErrorCode.IMPORT_UNTRUSTED_TOOL
     })
-    expect(result.error).toContain('`soffice`')
+    expect(result.error).toContain('`soffice` is in the open project')
     expect(mockFind).toHaveBeenCalledWith('docx', ['/work/repo'])
     expect(mockWarn).toHaveBeenCalledTimes(1)
     expect(JSON.stringify(mockWarn.mock.calls[0])).not.toContain('/work/repo')

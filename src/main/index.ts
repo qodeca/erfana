@@ -76,7 +76,8 @@ moveToSafeWorkingDirectory({
   platform: process.platform,
   execPath: process.execPath,
   userDataPath: () => app.getPath('userData'),
-  chdir: (dir) => process.chdir(dir)
+  chdir: (dir) => process.chdir(dir),
+  warn: (message, context) => logger.warn(message, context)
 })
 
 // Strip --new-window flag to prevent infinite spawn loops
