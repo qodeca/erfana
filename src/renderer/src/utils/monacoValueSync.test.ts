@@ -13,6 +13,8 @@ import {
   computeMinimalEdit,
   createEditorValueSync,
   MAX_PENDING_EMITS,
+  MIN_PENDING_CHARS,
+  PENDING_CHARS_PER_DOCUMENT,
   type ValueSyncEditor,
   type ValueSyncModel
 } from './monacoValueSync'
@@ -222,6 +224,55 @@ describe('createEditorValueSync', () => {
     fake.type(`v${MAX_PENDING_EMITS}`)
     // The oldest fell off: it now reads as an outside change
     expect(sync.reconcile(fake.editor, 'v0')).toBe('applied')
+  })
+
+  it('confirm forgets emits that cancelled out, so a later disk text equal to one is applied', () => {
+    // Type "x" then Backspace before React renders: `value` never changes,
+    // reconcile never runs, and "basex" would stay remembered
+    const fake = fakeEditor('base')
+    const sync = createEditorValueSync()
+    fake.type('basex')
+    sync.recordEmit('basex')
+    fake.type('base')
+    sync.recordEmit('base')
+
+    // The next commit shows exactly the buffer
+    sync.confirm(fake.editor, 'base')
+
+    // Another tool writes "basex" to disk: it must reach the buffer, not be
+    // taken for an echo (the next save would write "base" over it)
+    expect(sync.reconcile(fake.editor, 'basex')).toBe('applied')
+    expect(fake.text()).toBe('basex')
+  })
+
+  it('confirm keeps the emits while the buffer is ahead of the rendered value', () => {
+    const fake = fakeEditor('')
+    const sync = createEditorValueSync()
+    fake.type('a')
+    sync.recordEmit('a')
+    fake.type('ab')
+    sync.recordEmit('ab')
+    sync.confirm(fake.editor, 'a')
+    expect(sync.reconcile(fake.editor, 'ab')).toBe('echo')
+    expect(fake.model.pushEditOperations).not.toHaveBeenCalled()
+  })
+
+  it('caps the remembered emits by characters, dropping the oldest first', () => {
+    const fake = fakeEditor('')
+    const sync = createEditorValueSync()
+    const docLength = MIN_PENDING_CHARS // budget = PENDING_CHARS_PER_DOCUMENT x this
+    const copies = PENDING_CHARS_PER_DOCUMENT + 2
+    const emits = Array.from({ length: copies }, (_, i) => String(i % 10).repeat(docLength))
+    for (const e of emits) sync.recordEmit(e)
+    fake.type(emits[copies - 1])
+
+    // The two oldest no longer fit the budget: they read as outside changes
+    expect(sync.reconcile(fake.editor, emits[0])).toBe('applied')
+    fake.type(emits[copies - 1])
+    const fresh = createEditorValueSync()
+    for (const e of emits) fresh.recordEmit(e)
+    expect(fresh.reconcile(fake.editor, emits[2])).toBe('echo')
+    expect(fresh.reconcile(fake.editor, emits[copies - 1])).toBe('echo')
   })
 
   it('resetTo replaces the buffer without an undo entry and forgets emits', () => {

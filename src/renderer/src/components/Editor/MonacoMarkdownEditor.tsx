@@ -110,10 +110,10 @@ export const MonacoMarkdownEditor = forwardRef<MonacoEditorHandle, MonacoMarkdow
     const mountedPathRef = useRef<string | undefined>(undefined)
     // Latest props for listeners registered once at mount. @monaco-editor/react
     // also keeps only the first `onMount`, so anything it closes over is stale.
-    const latestRef = useRef({ value, onChange, filePath })
+    const latestRef = useRef({ value, onChange, filePath, onSelectionChange, onEditorMount, onContextMenu })
 
     useLayoutEffect(() => {
-      latestRef.current = { value, onChange, filePath }
+      latestRef.current = { value, onChange, filePath, onSelectionChange, onEditorMount, onContextMenu }
     })
 
     // A new path remounts the inner <Editor> (see its `key`), whose cleanup
@@ -144,6 +144,17 @@ export const MonacoMarkdownEditor = forwardRef<MonacoEditorHandle, MonacoMarkdow
       }
     }, [value])
 
+    // Every commit, after the effect above: once React shows exactly what the
+    // buffer holds, forget the remembered emits (see EditorValueSync.confirm –
+    // edits that cancel out never change `value`, so the effect above alone
+    // would keep them).
+    useLayoutEffect(() => {
+      const editor = editorRef.current
+      const sync = valueSyncRef.current
+      if (!editor || !sync || mountedPathRef.current !== latestRef.current.filePath) return
+      sync.confirm(editor, latestRef.current.value)
+    })
+
     // Debug logging
     logger.debug('MonacoMarkdownEditor render', {
       valueLength: value?.length,
@@ -169,7 +180,10 @@ export const MonacoMarkdownEditor = forwardRef<MonacoEditorHandle, MonacoMarkdow
       // disk would mark the file modified and re-arm autosave. Disposed along
       // with the editor.
       editor.onDidChangeModelContent(() => {
-        if (sync.isApplying()) return
+        // `editorRef.current !== editor`: after a path change this editor is
+        // already detached (see the [filePath] effect) but not yet disposed;
+        // anything it reports must not land in the next file's state.
+        if (sync.isApplying() || editorRef.current !== editor) return
         const text = editor.getValue()
         sync.recordEmit(text)
         latestRef.current.onChange(text)
@@ -195,8 +209,9 @@ export const MonacoMarkdownEditor = forwardRef<MonacoEditorHandle, MonacoMarkdow
       // Handle selection changes
       editor.onDidChangeCursorSelection((e) => {
         const selection = editor.getModel()?.getValueInRange(e.selection)
-        if (selection && onSelectionChange) {
-          onSelectionChange(selection)
+        const notify = latestRef.current.onSelectionChange
+        if (selection && notify) {
+          notify(selection)
         }
       })
 
@@ -256,8 +271,9 @@ export const MonacoMarkdownEditor = forwardRef<MonacoEditorHandle, MonacoMarkdow
         const cursorLine = position?.lineNumber ?? 1
 
         // Notify parent component
-        if (onContextMenu) {
-          onContextMenu({
+        const notify = latestRef.current.onContextMenu
+        if (notify) {
+          notify({
             x: e.event.posx,
             y: e.event.posy,
             selectedText,
@@ -268,9 +284,7 @@ export const MonacoMarkdownEditor = forwardRef<MonacoEditorHandle, MonacoMarkdow
       })
 
       // Notify parent component that editor is mounted and ready
-      if (onEditorMount) {
-        onEditorMount(editor)
-      }
+      latestRef.current.onEditorMount?.(editor)
     }
 
     const wrapSelection = (wrapper: string) => {

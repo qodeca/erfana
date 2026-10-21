@@ -122,11 +122,15 @@ test.describe('Outside changes to an open buffer', () => {
       .poll(async () => monaco.visibleText(), { timeout: WATCH_BUDGET_MS })
       .toContain('rewritten by another tool')
     expect(await monaco.visibleText()).not.toContain('LOCAL')
+    // The buffer equals the disk again, so the unsaved dot must go (it used to
+    // stay on after a Reload)
+    await expect(tabs.dirtyDot('notes.md')).toHaveCount(0)
 
     // The discarded edit is still in the undo history, as in any editor's revert
     await monaco.focus()
     await keyboard.undo()
     await expect.poll(async () => monaco.visibleText(), { timeout: WATCH_BUDGET_MS }).toContain('LOCAL')
+    await expect(tabs.dirtyDot('notes.md')).toBeVisible({ timeout: WATCH_BUDGET_MS })
     // …and undoing the reload is a user edit like any other: it reaches disk
     await expect
       .poll(async () => readFile(target, 'utf-8'), { timeout: WATCH_BUDGET_MS })

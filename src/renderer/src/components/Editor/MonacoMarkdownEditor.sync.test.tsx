@@ -33,6 +33,7 @@ function createFakeEditor(initial: string) {
   let disposed = false
   let selection: FakeRange = { startLineNumber: 1, startColumn: 1, endLineNumber: 1, endColumn: 1 }
   const contentListeners: Array<() => void> = []
+  const selectionListeners: Array<(e: { selection: FakeRange }) => void> = []
   // Text before each undoable change, newest last
   const undoStack: string[] = []
 
@@ -117,7 +118,15 @@ function createFakeEditor(initial: string) {
       contentListeners.push(listener)
       return { dispose: () => contentListeners.splice(contentListeners.indexOf(listener), 1) }
     },
-    onDidChangeCursorSelection: () => ({ dispose: () => {} }),
+    onDidChangeCursorSelection: (listener: (e: { selection: FakeRange }) => void) => {
+      selectionListeners.push(listener)
+      return { dispose: () => {} }
+    },
+    /** Simulate the user selecting a range */
+    userSelects: (r: FakeRange) => {
+      selection = r
+      selectionListeners.forEach((l) => l({ selection: r }))
+    },
     onContextMenu: () => ({ dispose: () => {} }),
     addCommand: () => null,
     updateOptions: (opts: { readOnly?: boolean }) => {
@@ -399,6 +408,57 @@ describe('MonacoMarkdownEditor – uncontrolled buffer', () => {
     expect(second.getValue()).toBe('second file')
     expect(ref.current!.getEditor()).toBe(second)
     expect(first.isDisposed()).toBe(true)
+  })
+
+  it('applies a disk change equal to an emit that was cancelled out before React rendered', () => {
+    const { onChange, rerender } = setup('base')
+    mountPending()
+    const editor = lastEditor()
+
+    // "x" then Backspace, both before React renders: `value` stays "base"
+    editor.userTypes('basex')
+    editor.userTypes('base')
+    expect(onChange).toHaveBeenCalledTimes(2)
+    rerender('base')
+
+    // Another tool writes "basex": it must reach the buffer
+    rerender('basex')
+    expect(editor.getValue()).toBe('basex')
+    expect(editor.model.pushEditOperations).toHaveBeenCalledTimes(1)
+  })
+
+  it('drops what the old editor reports after a path change, before it is disposed', () => {
+    const { onChange, rerender } = setup('first file', '/proj/a.md')
+    mountPending()
+    const first = lastEditor()
+
+    rerender('second file', '/proj/b.md')
+    // The old editor is detached but its disposal is still pending
+    act(() => first.userTypes('first file, late key'))
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('reports selections to the latest onSelectionChange, not the one from the first render', () => {
+    const first = vi.fn()
+    const latest = vi.fn()
+    const utils = render(<MonacoMarkdownEditor value="hello" onChange={vi.fn()} onSelectionChange={first} />)
+    mountPending()
+    utils.rerender(<MonacoMarkdownEditor value="hello" onChange={vi.fn()} onSelectionChange={latest} />)
+
+    lastEditor().userSelects({ startLineNumber: 1, startColumn: 1, endLineNumber: 1, endColumn: 3 })
+    expect(latest).toHaveBeenCalledWith('he')
+    expect(first).not.toHaveBeenCalled()
+  })
+
+  it('reports edits to the latest onChange', () => {
+    const first = vi.fn()
+    const latest = vi.fn()
+    const utils = render(<MonacoMarkdownEditor value="a" onChange={first} />)
+    mountPending()
+    utils.rerender(<MonacoMarkdownEditor value="a" onChange={latest} />)
+    act(() => lastEditor().userTypes('ab'))
+    expect(latest).toHaveBeenCalledWith('ab')
+    expect(first).not.toHaveBeenCalled()
   })
 
   it('ignores value changes before the editor has mounted', () => {

@@ -39,6 +39,19 @@ import type * as monaco from 'monaco-editor'
 export const MAX_PENDING_EMITS = 64
 
 /**
+ * The remembered emits may hold at most this many times the length of the
+ * newest one, in characters (oldest dropped first), so a large document does
+ * not keep 64 full copies alive.
+ */
+export const PENDING_CHARS_PER_DOCUMENT = 8
+
+/**
+ * Floor for the character budget, so a small document keeps its full
+ * {@link MAX_PENDING_EMITS} entries.
+ */
+export const MIN_PENDING_CHARS = 64 * 1024
+
+/**
  * One contiguous replacement that turns `current` into `next`.
  * Offsets are UTF-16 indexes into `current`.
  */
@@ -166,6 +179,24 @@ export interface EditorValueSync {
    */
   reconcile(editor: ValueSyncEditor, value: string): ReconcileResult
   /**
+   * Forget every remembered emit if the buffer holds `value`. Call it after
+   * every commit (a layout effect with no dependency list), not only when
+   * `value` changed.
+   *
+   * Why: edits that cancel out before React renders (type `x`, then
+   * Backspace) leave `value` unchanged, so {@link reconcile} never runs and
+   * the `…x` emit stays remembered. A later reload whose text happened to
+   * equal it would be taken for an echo and skipped, and the next save would
+   * write the old buffer over the newer file.
+   *
+   * Clearing is safe because the buffer always equals the newest emit: when
+   * React has rendered that text, nothing older can still be on its way.
+   * (A type-delete-type run that commits only its middle could make React
+   * render one older emit after this; it is then applied as an outside
+   * change, and the newest emit, applied in turn, restores the buffer.)
+   */
+  confirm(editor: ValueSyncEditor, value: string): void
+  /**
    * Replace the buffer with `value` (no undo entry) and forget every emit.
    * For a freshly mounted editor whose model was created from an older value.
    */
@@ -188,12 +219,21 @@ export interface EditorValueSync {
  * })
  * // in useLayoutEffect(() => …, [value]):
  * sync.reconcile(editor, value)
+ * // in useLayoutEffect(() => …) – every commit:
+ * sync.confirm(editor, value)
  * ```
  */
 export function createEditorValueSync(): EditorValueSync {
-  // Emitted values React has not rendered yet, oldest first.
+  // Emitted values React has not rendered yet, oldest first, and their
+  // total length in characters.
   const pending: string[] = []
+  let pendingChars = 0
   let applying = false
+
+  const clear = (): void => {
+    pending.length = 0
+    pendingChars = 0
+  }
 
   const write = (fn: () => void): void => {
     applying = true
@@ -207,7 +247,18 @@ export function createEditorValueSync(): EditorValueSync {
   return {
     recordEmit(value) {
       pending.push(value)
-      if (pending.length > MAX_PENDING_EMITS) pending.shift()
+      pendingChars += value.length
+      const budget = Math.max(MIN_PENDING_CHARS, PENDING_CHARS_PER_DOCUMENT * value.length)
+      // Never drop the newest: it is the one React will render next
+      while (pending.length > 1 && (pending.length > MAX_PENDING_EMITS || pendingChars > budget)) {
+        pendingChars -= pending.shift()!.length
+      }
+    },
+
+    confirm(editor, value) {
+      if (pending.length === 0) return
+      const model = editor.getModel()
+      if (model && model.getValue() === value) clear()
     },
 
     isApplying: () => applying,
@@ -218,7 +269,7 @@ export function createEditorValueSync(): EditorValueSync {
       // when React rendered one of those it would look like an outside change.
       const echoAt = pending.indexOf(value)
       if (echoAt !== -1) {
-        pending.splice(0, echoAt + 1)
+        for (const dropped of pending.splice(0, echoAt + 1)) pendingChars -= dropped.length
         return 'echo'
       }
 
@@ -227,7 +278,7 @@ export function createEditorValueSync(): EditorValueSync {
 
       const current = model.getValue()
       const edit = computeMinimalEdit(current, value)
-      pending.length = 0
+      clear()
       if (!edit) return 'in-sync'
 
       const start = model.getPositionAt(edit.start)
@@ -258,7 +309,7 @@ export function createEditorValueSync(): EditorValueSync {
     },
 
     resetTo(editor, value) {
-      pending.length = 0
+      clear()
       const model = editor.getModel()
       if (!model || model.getValue() === value) return
       write(() => model.setValue(value))
