@@ -141,26 +141,6 @@ export function TranscriptionDialog(): JSX.Element | null {
     }
   }, [isDialogOpen, filePath, lastLanguage])
 
-  // Escape key handler (custom cancel-vs-close logic)
-  useEffect(() => {
-    if (!isDialogOpen) return undefined
-
-    const handleKeyDown = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        e.stopPropagation()
-        if (isTranscribing) {
-          cancelTranscription()
-        } else {
-          closeDialog()
-        }
-      }
-    }
-
-    document.addEventListener('keydown', handleKeyDown, true)
-    return () => document.removeEventListener('keydown', handleKeyDown, true)
-  }, [isDialogOpen, isTranscribing, cancelTranscription, closeDialog])
-
   if (!isDialogOpen) return null
 
   /** Check if the current file is a video file */
@@ -245,7 +225,11 @@ export function TranscriptionDialog(): JSX.Element | null {
       onClose={handleClose}
       zIndex={10000}
       closeOnBackdrop={false}
-      closeOnEscape={false}
+      // Escape runs `handleClose` (cancel the running job, otherwise close)
+      // through BaseDialog's default `closeOnEscape`, so it reaches this
+      // dialog only while it is topmost. A private document listener used to
+      // fire under the Cmd+Q quit prompt too and cancel the job when the user
+      // only meant to dismiss the prompt (#229).
       trapFocus
       className="transcription-dialog"
       ariaLabelledBy={titleId}

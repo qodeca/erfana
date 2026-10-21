@@ -536,4 +536,75 @@ describe('useAutoSave', () => {
       expect(onSave).toHaveBeenCalledTimes(1)
     })
   })
+
+  describe('holdAutoSave', () => {
+    it('never fires while held, whatever re-arms it', () => {
+      const onSave = vi.fn()
+      const { result, rerender } = renderHook(
+        ({ modified }) => useAutoSave(modified, onSave, { delay: 2000, maxInterval: 30000 }),
+        { initialProps: { modified: true } }
+      )
+
+      act(() => void result.current.holdAutoSave())
+      // typing keeps calling signalChange, and the modified flag flips
+      act(() => result.current.signalChange())
+      rerender({ modified: false })
+      rerender({ modified: true })
+      act(() => result.current.signalChange())
+      act(() => void vi.advanceTimersByTime(60000))
+
+      expect(onSave).not.toHaveBeenCalled()
+    })
+
+    it('re-arms on release when the content is still modified', () => {
+      const onSave = vi.fn()
+      const { result } = renderHook(() => useAutoSave(true, onSave, { delay: 2000 }))
+
+      let release = (): void => {}
+      act(() => {
+        release = result.current.holdAutoSave()
+      })
+      act(() => void vi.advanceTimersByTime(5000))
+      expect(onSave).not.toHaveBeenCalled()
+
+      act(() => release())
+      act(() => void vi.advanceTimersByTime(2000))
+      expect(onSave).toHaveBeenCalledTimes(1)
+    })
+
+    it('arms nothing on release when the content is clean, and release is idempotent', () => {
+      const onSave = vi.fn()
+      const { result } = renderHook(() => useAutoSave(false, onSave, { delay: 2000 }))
+
+      let release = (): void => {}
+      act(() => {
+        release = result.current.holdAutoSave()
+      })
+      act(() => {
+        release()
+        release()
+      })
+      act(() => void vi.advanceTimersByTime(60000))
+
+      expect(onSave).not.toHaveBeenCalled()
+    })
+
+    it('restores the max-interval failsafe on release', () => {
+      const onSave = vi.fn()
+      const { result } = renderHook(() => useAutoSave(true, onSave, { delay: 2000, maxInterval: 30000 }))
+
+      let release = (): void => {}
+      act(() => {
+        release = result.current.holdAutoSave()
+      })
+      act(() => release())
+      // the debounce keeps being reset by typing; only the failsafe can fire
+      for (let i = 0; i < 20; i++) {
+        act(() => result.current.signalChange())
+        act(() => void vi.advanceTimersByTime(1500))
+      }
+
+      expect(onSave).toHaveBeenCalledTimes(1)
+    })
+  })
 })

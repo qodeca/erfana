@@ -67,12 +67,13 @@ export function UIBlockerBase({
  */
 export function UIBlocker() {
   const isProjectChanging = useProjectStore((state) => state.isProjectChanging)
+  const message = useProjectStore((state) => state.projectChangingMessage) ?? 'Waiting for folder selection...'
 
   return (
     <UIBlockerBase
       visible={isProjectChanging}
-      message="Waiting for folder selection..."
-      tooltip="Waiting for folder selection..."
+      message={message}
+      tooltip={message}
     />
   )
 }

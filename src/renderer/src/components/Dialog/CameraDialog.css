@@ -61,11 +61,9 @@
   background-color: var(--color-bg-tertiary);
 }
 
-.camera-device-select:focus {
-  outline: none;
-  border-color: var(--color-border-focus);
-  background-color: var(--color-bg-tertiary);
-  box-shadow: var(--shadow-focus);
+.camera-device-select:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
 }
 
 .camera-device-select option {

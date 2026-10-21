@@ -16,11 +16,17 @@ const mockCheckHasDirtyEditors = vi.fn()
 const mockCheckTerminalBusy = vi.fn()
 const mockConfirmProjectSwitch = vi.fn()
 const mockInterruptActiveTerminalIfAny = vi.fn()
+const mockSettle = vi.fn()
 
+// prepareProjectTransition is stood in for by its parts: the dirty and busy
+// checks feed the confirmation, and the transition is ended through mockSettle.
+// The real flow (hold, flush, prompt) is covered in switchHelpers.test.ts.
 vi.mock('../components/ProjectTree/switchHelpers', () => ({
-  checkHasDirtyEditors: () => mockCheckHasDirtyEditors(),
-  checkTerminalBusy: () => mockCheckTerminalBusy(),
-  confirmProjectSwitch: (...args: unknown[]) => mockConfirmProjectSwitch(...args),
+  prepareProjectTransition: async (action: string, confirm: unknown) => {
+    const [hasDirty, terminalBusy] = await Promise.all([mockCheckHasDirtyEditors(), mockCheckTerminalBusy()])
+    const proceed = await mockConfirmProjectSwitch(hasDirty, terminalBusy, action, confirm)
+    return { proceed, terminalBusy, settle: mockSettle }
+  },
   interruptActiveTerminalIfAny: () => mockInterruptActiveTerminalIfAny(),
   openProjectWithTokenGuard: vi.fn(),
   closeProjectWithTokenGuard: vi.fn()
@@ -118,7 +124,7 @@ describe('useProjectManagement.handleOpenProjectByPath', () => {
         await result.current.handleOpenProjectByPath('/test/project')
       })
 
-      // confirmProjectSwitch is called but with hasDirty=false and terminalBusy=false
+      // the prompt step still runs, with hasDirty=false and terminalBusy=false
       expect(mockConfirmProjectSwitch).toHaveBeenCalledWith(
         false, // hasDirty
         false, // terminalBusy
@@ -270,6 +276,40 @@ describe('useProjectManagement.handleOpenProjectByPath', () => {
 
       expect(mockInterruptActiveTerminalIfAny).toHaveBeenCalledTimes(1)
       expect(mockOpenProjectByPath).toHaveBeenCalled()
+    })
+  })
+
+  describe('Ending the transition', () => {
+    it('settles the transition once the project has been opened', async () => {
+      const { result } = renderHook(() => useProjectManagement())
+
+      await act(async () => {
+        await result.current.handleOpenProjectByPath('/test/project')
+      })
+
+      expect(mockSettle).toHaveBeenCalledTimes(1)
+    })
+
+    it('settles the transition when the open fails, so autosave can re-arm', async () => {
+      mockOpenProjectByPath.mockRejectedValue(new Error('Failed to open'))
+      const { result } = renderHook(() => useProjectManagement())
+
+      await act(async () => {
+        await expect(result.current.handleOpenProjectByPath('/test/project')).rejects.toThrow()
+      })
+
+      expect(mockSettle).toHaveBeenCalledTimes(1)
+    })
+
+    it('does not open anything when the user cancels', async () => {
+      mockConfirmProjectSwitch.mockResolvedValue(false)
+      const { result } = renderHook(() => useProjectManagement())
+
+      await act(async () => {
+        await result.current.handleOpenProjectByPath('/test/project')
+      })
+
+      expect(mockOpenProjectByPath).not.toHaveBeenCalled()
     })
   })
 

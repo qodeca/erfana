@@ -183,4 +183,32 @@ describe('ConfirmDialog', () => {
     expect(onCancel).toHaveBeenCalledTimes(1)
     expect(onConfirm).not.toHaveBeenCalled()
   })
+
+  it('Escape cancels only the topmost of two stacked prompts (#229)', async () => {
+    const user = userEvent.setup()
+    const lowerCancel = vi.fn()
+    const upperCancel = vi.fn()
+    render(
+      <>
+        <ConfirmDialog
+          config={{ id: 'lower', title: 'Discard changes', message: 'Discard?', danger: true }}
+          zIndex={10001}
+          onConfirm={vi.fn()}
+          onCancel={lowerCancel}
+        />
+        <ConfirmDialog
+          config={{ id: 'upper', title: 'Quit', message: 'Quit Erfana?', danger: true }}
+          zIndex={10002}
+          onConfirm={vi.fn()}
+          onCancel={upperCancel}
+        />
+      </>
+    )
+    await settleFocus()
+
+    await user.keyboard('{Escape}')
+
+    expect(upperCancel).toHaveBeenCalledTimes(1)
+    expect(lowerCancel).not.toHaveBeenCalled()
+  })
 })

@@ -47,8 +47,8 @@
 }
 
 .diagram-viewer-close-floating:focus-visible {
-  outline: var(--border-width) solid var(--color-border-focus);
-  outline-offset: var(--border-width);
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
 }
 
 
@@ -119,8 +119,8 @@
 }
 
 .mermaid-expand-btn:focus-visible {
-  outline: var(--border-width) solid var(--color-border-focus);
-  outline-offset: var(--border-width);
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
   opacity: 1;
 }
 

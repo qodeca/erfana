@@ -20,7 +20,7 @@
   background: var(--color-accent-primary);
   border: none;
   border-radius: var(--border-radius);
-  color: var(--color-white);
+  color: var(--color-text-on-accent);
   cursor: pointer;
   box-shadow: var(--shadow-md);
   transition: transform var(--transition-normal),
@@ -39,7 +39,7 @@
 }
 
 .chat-bubble-btn:focus-visible {
-  outline: var(--border-width-thick) solid var(--color-white);
+  outline: var(--border-width-thick) solid var(--color-border-focus);
   outline-offset: var(--space-1);
 }
 
@@ -142,8 +142,8 @@
 }
 
 .chat-header-btn:focus-visible {
-  outline: var(--border-width) solid var(--color-border-focus);
-  outline-offset: var(--border-width);
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
 }
 
 /* Active state for toggle buttons (scroll lock) - issue #60 */
@@ -326,8 +326,8 @@
 }
 
 .chat-info-icon:focus-visible {
-  outline: var(--border-width) solid var(--color-border-focus);
-  outline-offset: var(--border-width);
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
 }
 
 .chat-tooltip {
@@ -382,7 +382,7 @@
   background: var(--color-accent-primary);
   border: none;
   border-radius: var(--border-radius);
-  color: var(--color-white);
+  color: var(--color-text-on-accent);
   cursor: pointer;
   transition: background-color var(--transition-normal),
               opacity var(--transition-normal);
@@ -402,7 +402,7 @@
 }
 
 .chat-send-btn:focus-visible {
-  outline: var(--border-width-thick) solid var(--color-white);
+  outline: var(--border-width-thick) solid var(--color-border-focus);
   outline-offset: var(--space-1);
 }
 

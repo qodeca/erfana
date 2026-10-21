@@ -118,7 +118,7 @@
 .markdown-toolbar .view-mode-btn.active {
   background-color: var(--color-btn-primary-bg);
   border-color: var(--color-btn-primary-bg);
-  color: var(--color-white);
+  color: var(--color-btn-primary-text);
 }
 
 /* Separator between button groups */

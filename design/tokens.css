@@ -103,6 +103,11 @@
   --color-text-emphasis: var(--color-white);     /* Headings, emphasis */
   --color-text-disabled: var(--color-gray-600);  /* Disabled text */
   --color-text-placeholder: var(--color-gray-450); /* Placeholder text - 4.53:1 on an input; gray-600 was 2.69:1 */
+  /* Text and icons drawn ON a violet fill (primary buttons, active toggles,
+   * badges). The brand violet is a light tint, so white on it is 2.20:1 and
+   * fails SC 1.4.3; brand black is 8.40:1 at rest, 6.85:1 on hover and 5.55:1
+   * pressed. Guarded by accentFill.contrast.test.ts. */
+  --color-text-on-accent: var(--color-brand-black);
 
   /* ============================================
    * COLORS: Semantic Borders
@@ -150,6 +155,7 @@
   --color-btn-primary-bg: var(--color-brand-violet);
   --color-btn-primary-hover: var(--color-brand-violet-hover);
   --color-btn-primary-active: var(--color-brand-violet-active);
+  --color-btn-primary-text: var(--color-text-on-accent);
   --color-btn-secondary-bg: var(--color-gray-800);
   --color-btn-secondary-hover: #505050;
   --color-btn-danger-bg: #c72e0f;
@@ -305,6 +311,11 @@
   --text-lg: 16px;    /* Subheadings */
   --text-xl: 18px;    /* Headings */
   --text-2xl: 20px;   /* Large headings */
+  /* Rendered DOCUMENT content (the Markdown preview body), not app chrome. It
+   * sits outside the UI scale on purpose: a document is read for minutes at a
+   * time, so it is set larger than any UI label. Headings inside the preview
+   * scale from it in em. */
+  --text-prose: 15px;
 
   /* ============================================
    * TYPOGRAPHY: Font Weights

@@ -151,8 +151,8 @@
 }
 
 .controlButton:focus-visible {
-  outline: 1px solid var(--color-border-focus);
-  outline-offset: 1px;
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
 }
 
 /* ============================================
@@ -187,8 +187,8 @@
 }
 
 .zoomLevel:focus-visible {
-  outline: 1px solid var(--color-border-focus);
-  outline-offset: 1px;
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
 }
 
 /* ============================================
@@ -552,8 +552,8 @@
 }
 
 .bannerButton:focus-visible {
-  outline: 1px solid var(--color-border-focus);
-  outline-offset: 1px;
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
 }
 
 /* ============================================

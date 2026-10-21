@@ -8,6 +8,6 @@ Dialog behaviour rules (focus trap, portal, the `trapFocus` prop) live in [`../D
 
 ## Key design decisions
 
-- **BaseDialog with `closeOnEscape={false}` and `closeOnBackdrop={false}`**: Custom Escape handler – cancels transcription when active, closes dialog otherwise
-- **`onClose={handleClose}`**: Safety guard – uses cancel-aware handler, not raw `closeDialog`
+- **BaseDialog with `closeOnBackdrop={false}` and the default `closeOnEscape`**: Escape runs `onClose`, so it reaches this dialog only while it is the topmost overlay (#229). Never add a private `document` Escape listener here – that is how one Escape on the Cmd+Q quit prompt used to cancel a running transcription
+- **`onClose={handleClose}`**: Safety guard – uses the cancel-aware handler (cancel while transcribing, close otherwise), not raw `closeDialog`
 - **Local whisper trust chain**: anchored client-side; the layers and the granular `WHISPER_*` error codes are documented in `docs/api-services-features.md` § [WhisperModelManager](../../../../../docs/api-services-features.md#whispermodelmanager) and § [LocalWhisperService](../../../../../docs/api-services-features.md#localwhisperservice)

@@ -52,6 +52,8 @@ import { isPointInElement } from '../../utils/domGeometry'
 import { TerminalStatusContent } from './TerminalPanel/components/TerminalStatusContent'
 import { ClaudeStatusBar } from './TerminalPanel/components/ClaudeStatusBar'
 import { useClaudeStatusStore } from '../../stores/useClaudeStatusStore'
+import { useOptionalDialog } from '../Dialog/DialogContext'
+import { getRestartRisk, buildRestartConfirm } from './TerminalPanel/restartGuard'
 import { ensureTerminalFontLoaded, createTerminalLinkHandler } from './TerminalPanel/terminalPanel.logic'
 import type { TerminalState } from './TerminalPanel/types'
 
@@ -253,6 +255,13 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
 
   // Portal context for rendering in DiagramViewer (optional - may not have provider yet)
   const portalContext = useTerminalPortalOptional()
+  // `showConfirm` only, not the whole context: the provider's value object is
+  // rebuilt on every dialog change, while `showConfirm` is a stable callback –
+  // depending on the object would re-register the portal terminal controls
+  // each time any dialog opens or closes.
+  const showConfirm = useOptionalDialog()?.showConfirm
+  // Latch for handleRestartRequest – see there.
+  const restartInProgressRef = useRef(false)
   const portalTarget = portalContext?.portalTarget ?? 'main'
   const mainContainerRef = useRef<HTMLDivElement>(null)
   const terminalPanelRef = useRef<HTMLDivElement>(null)
@@ -1091,6 +1100,34 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     }
   }, [setActiveTerminalId, isAvailable, cleanupDragHandlers, cleanupTerminalInstance])
 
+  /**
+   * User-facing restart: asks first when the terminal looks busy, because a
+   * restart kills whatever runs in it – including a coding agent mid-task
+   * (lens review [25]). Every user entry point (toolbar button, ChatBubble via
+   * the portal controls) goes through here, never straight to
+   * `handleRestartTerminal`.
+   *
+   * Without a DialogProvider (isolated component renders only – the app always
+   * mounts one) there is no way to ask, and the restart proceeds as before.
+   */
+  const handleRestartRequest = useCallback(async () => {
+    // One restart at a time. A second request while the first is still asking
+    // or tearing down (a double click, the ChatBubble button) would otherwise
+    // stack a second prompt or kill the freshly created session.
+    if (restartInProgressRef.current) return
+    restartInProgressRef.current = true
+    try {
+      const risk = getRestartRisk(terminalIdRef.current)
+      if (risk !== null && showConfirm) {
+        const confirmed = await showConfirm(buildRestartConfirm(risk))
+        if (!confirmed) return
+      }
+      await handleRestartTerminal()
+    } finally {
+      restartInProgressRef.current = false
+    }
+  }, [showConfirm, handleRestartTerminal])
+
   const handleScrollToBottom = useCallback(() => {
     if (xtermRef.current) {
       xtermRef.current.scrollToBottom()
@@ -1136,7 +1173,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
 
     registerTerminalControls({
       scrollToBottom: handleScrollToBottom,
-      restart: handleRestartTerminal,
+      restart: handleRestartRequest,
       copy,
       paste,
       hasSelection: () => hasSelectionRef.current,  // Use ref to avoid re-registration on selection change
@@ -1147,7 +1184,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     return () => {
       unregisterTerminalControls()
     }
-  }, [registerTerminalControls, unregisterTerminalControls, terminalId, handleScrollToBottom, handleRestartTerminal, handleToggleScrollLock, copy, paste])
+  }, [registerTerminalControls, unregisterTerminalControls, terminalId, handleScrollToBottom, handleRestartRequest, handleToggleScrollLock, copy, paste])
 
   // Register lastUserScrollTsRef with portal context (issue #52)
   // Allows components to check if user scrolled during prompt execution delay
@@ -1304,7 +1341,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
                 </button>
                 <button
                   className="icon-btn"
-                  onClick={handleRestartTerminal}
+                  onClick={() => void handleRestartRequest()}
                   title="Restart terminal"
                   aria-label="Restart terminal"
                   data-testid={TEST_IDS.TERMINAL_BTN_RESTART}

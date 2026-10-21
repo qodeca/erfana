@@ -280,7 +280,7 @@ ASAR integrity validation computes a SHA-256 hash of `app.asar` at build time an
 2. **Runtime**: Electron validates hash before loading app code
 3. **Tampering detected**: App forcefully terminates if hash mismatch
 
-**Status in Electron 39**: Stable (no longer experimental)
+**Status**: stable, no longer experimental (recorded under Electron 39; the app now runs Electron 44)
 
 ### Future Improvement:
 

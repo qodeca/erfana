@@ -5,6 +5,8 @@ import { createPortal } from 'react-dom'
 import { logger } from '../../utils/logger'
 import { TEST_IDS } from '../../constants/testids'
 import { useOccluder } from '../../hooks/useOccluder'
+import { useOverlayStackEntry } from '../../hooks/useOverlayStackEntry'
+import { isTopmostOverlay } from '../../utils/overlayStack'
 import './Dialog.css'
 
 // Small delay to ensure dialog is fully rendered before focusing
@@ -59,7 +61,12 @@ const FOCUSABLE_SELECTOR =
 // control, and Tab can therefore never advance. The concrete shipping case is
 // Cmd+Q during a transcription — the quit ConfirmDialog mounts on top of the
 // still-open TranscriptionDialog and neither Quit nor Cancel can be reached by
-// keyboard.
+// keyboard. The same stack decides who receives Escape (#229): before it did,
+// one Escape on that quit prompt also cancelled the transcription beneath it.
+//
+// The stack itself lives in `utils/overlayStack.ts`, shared with the
+// non-BaseDialog overlays (SettingsOverlay, ContextMenu), so a context menu or
+// the Settings overlay ranks against dialogs on one scale.
 //
 // The stack holds EVERY open BaseDialog, not only the trapping ones, because
 // the dialog that lands on top is frequently a plain ConfirmDialog that never
@@ -82,61 +89,24 @@ const FOCUSABLE_SELECTOR =
 // topmost, and reinstates the very app-wide keyboard trap this stack exists to
 // prevent. Comparing z-index removes the assumption instead of documenting it.
 //
-// Entries pair the per-instance container ref with the `zIndex` that instance
-// is rendering at. The ref is stable for the lifetime of a component instance
-// (so registration is idempotent under StrictMode's setup/cleanup/setup
-// double-invocation) and self-healing, since `isTopmost` skips entries whose
-// element is gone — a registration leaked by a component that never ran its
-// cleanup cannot wedge every later dialog.
-interface OpenDialogEntry {
-  ref: React.RefObject<HTMLDivElement>
-  zIndex: number
-}
-
-const openDialogStack: OpenDialogEntry[] = []
-
-/** Move `ref` to the top of the stack at `zIndex`, without ever duplicating it. */
-function registerOpenDialog(ref: React.RefObject<HTMLDivElement>, zIndex: number): void {
-  unregisterOpenDialog(ref)
-  openDialogStack.push({ ref, zIndex })
-}
-
-/** Remove `ref` from the stack. No-op when it is not registered. */
-function unregisterOpenDialog(ref: React.RefObject<HTMLDivElement>): void {
-  const index = openDialogStack.findIndex((entry) => entry.ref === ref)
-  if (index !== -1) {
-    openDialogStack.splice(index, 1)
-  }
-}
-
-/**
- * Whether `ref` is the frontmost open dialog — highest `zIndex` wins, and the
- * most recently registered of an equal-`zIndex` group wins the tie.
- *
- * Detached entries are skipped rather than trusted: React removes a portal
- * subtree in the mutation phase but runs the passive cleanup that unregisters
- * it later, so there is a real window in which a dead dialog still sits on the
- * stack. A dialog registered while nothing else is connected is topmost by
- * definition.
- */
-function isTopmostDialog(ref: React.RefObject<HTMLDivElement>): boolean {
-  let top: OpenDialogEntry | null = null
-  for (const entry of openDialogStack) {
-    const element = entry.ref.current
-    if (element === null || !element.isConnected) continue
-    // `>=`, not `>`: within one z-index the LAST registration is frontmost,
-    // which is the behaviour equal-z-index stacks had before z-index was
-    // compared at all.
-    if (top === null || entry.zIndex >= top.zIndex) top = entry
-  }
-  return top === null || top.ref === ref
-}
+// The per-instance container ref is the entry's identity. It is stable for the
+// lifetime of a component instance (so registration is idempotent under
+// StrictMode's setup/cleanup/setup double-invocation) and self-healing, since
+// the stack skips entries whose element is gone.
 
 export interface BaseDialogProps {
   isOpen: boolean
   onClose: () => void
   zIndex: number
   closeOnBackdrop?: boolean
+  /**
+   * Whether Escape acts on this dialog. Escape only ever reaches the TOPMOST
+   * open dialog or overlay (#229); while this dialog is on top and
+   * `closeOnEscape` is `false`, Escape does nothing at all – it does not fall
+   * through to the dialog beneath.
+   *
+   * @default true
+   */
   closeOnEscape?: boolean
   className?: string
   ariaLabelledBy?: string
@@ -238,7 +208,7 @@ export interface BaseDialogProps {
  * Features:
  * - Portal rendering to #portal-root (consistent across all dialogs)
  * - Backdrop/overlay with configurable click-to-close
- * - Keyboard handling (Escape key)
+ * - Escape closes the topmost dialog only (shared overlay stack, #229)
  * - Focus trap for accessibility
  * - Z-index management via props
  * - Fade-in animation
@@ -289,17 +259,18 @@ export function BaseDialog({
   }, [isOpen])
 
   // Stack membership. Registered for EVERY open dialog, trapping or not, so a
-  // non-trapping dialog opened on top still suppresses the trap beneath it.
+  // non-trapping dialog opened on top still suppresses the trap beneath it and
+  // takes Escape away from it.
   //
-  // `zIndex` is a dependency because it is half of the ordering key: a dialog
-  // re-rendered at a new z-index must be re-ranked, or the stack would answer
-  // "who is on top" from a stale paint order.
-  useEffect(() => {
-    if (!isOpen) return undefined
-
-    registerOpenDialog(dialogRef, zIndex)
-    return () => unregisterOpenDialog(dialogRef)
-  }, [isOpen, zIndex])
+  // `zIndex` is a registration dependency because it is half of the ordering
+  // key: a dialog re-rendered at a new z-index must be re-ranked, or the stack
+  // would answer "who is on top" from a stale paint order. The Escape action
+  // is NOT – it is read at keystroke time (see useOverlayStackEntry).
+  useOverlayStackEntry(dialogRef, {
+    active: isOpen,
+    zIndex,
+    onEscape: closeOnEscape ? onClose : null
+  })
 
   // Preview occluder (item 63, design §1.8 NEW-10). Every dialog composing on
   // BaseDialog occludes the live preview view while open. Deliberately a
@@ -386,26 +357,6 @@ export function BaseDialog({
     return () => clearTimeout(timer)
   }, [isOpen, initialFocusRef, initialFocusKey])
 
-  // Keyboard event handler
-  useEffect(() => {
-    if (!isOpen || !closeOnEscape) return
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        e.stopPropagation()
-        onClose()
-      }
-    }
-
-    // Add listener with capture to ensure it runs before other handlers
-    document.addEventListener('keydown', handleKeyDown, true)
-
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown, true)
-    }
-  }, [isOpen, closeOnEscape, onClose])
-
   // Tab-cycling trap. Opt-in via `trapFocus`. The list is recomputed on every
   // keystroke so controls that enable/disable mid-session move the boundaries
   // with them. Bubble phase, matching the two local traps this replaced
@@ -421,7 +372,7 @@ export function BaseDialog({
       // this check the escaped-focus branch below reads "focus is in the top
       // dialog" as "focus escaped to the page" and drags it down here, which
       // makes the top dialog keyboard-unreachable. See the open-dialog stack.
-      if (!isTopmostDialog(dialogRef)) return
+      if (!isTopmostOverlay(dialogRef)) return
 
       const focusable = dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)
       // Boundary: nothing to cycle between AND nothing to pull focus back to.
@@ -518,7 +469,7 @@ export function BaseDialog({
 
       // Another dialog is stacked on top: it owns focus now, and a control of
       // ours going disabled underneath it must not yank focus out of it.
-      if (!isTopmostDialog(dialogRef)) return
+      if (!isTopmostOverlay(dialogRef)) return
 
       // A legitimate move to another control inside the dialog (Tab, a click).
       const next = event.relatedTarget as Node | null

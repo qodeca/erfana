@@ -168,8 +168,21 @@ export class TerminalPage {
     await byTestId(this.page, TEST_IDS.TERMINAL_BTN_SCROLL).click()
   }
 
-  async restart(): Promise<void> {
+  /**
+   * Click "Restart terminal" and wait for the new session.
+   *
+   * Restart asks first while the terminal looks busy (typed in and still
+   * producing output, or Claude Code running). A test that typed into the
+   * terminal must pass `confirm: true` to accept that prompt; an idle terminal
+   * restarts without one.
+   */
+  async restart(options: { confirm?: boolean } = {}): Promise<void> {
     await byTestId(this.page, TEST_IDS.TERMINAL_BTN_RESTART).click()
+    if (options.confirm) {
+      await expect(byTestId(this.page, TEST_IDS.DIALOG_CONFIRM)).toBeVisible({ timeout: 10_000 })
+      await byTestId(this.page, TEST_IDS.DIALOG_BTN_CONFIRM).click()
+      await expect(byTestId(this.page, TEST_IDS.DIALOG_CONFIRM)).toHaveCount(0, { timeout: 10_000 })
+    }
     // Wait for terminal to reinitialize
     await this.waitForPrompt()
   }

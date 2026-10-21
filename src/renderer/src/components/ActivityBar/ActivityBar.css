@@ -45,8 +45,8 @@
 }
 
 .activity-bar-item:focus-visible {
-  outline: 1px solid var(--color-border-focus);
-  outline-offset: -1px;
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: calc(var(--space-1) * -1);
 }
 
 .activity-bar-item.active {
@@ -74,6 +74,16 @@
   background: var(--color-brand-lime);
 }
 
+/* While the active item has keyboard focus, the inset ring runs along the same
+   edge as the 2px lime bar, and the two would sit on top of each other (a
+   lime-and-violet stripe that reads as neither). The ring wins for as long as
+   focus is there; the bar comes back when focus leaves. The ring stays inset
+   because an outward one would spill into the neighbouring items and out of
+   the 48px bar. */
+.activity-bar-item.active:focus-visible::before {
+  display: none;
+}
+
 /* Icon Container */
 .activity-bar-item-icon {
   display: flex;
@@ -90,8 +100,8 @@
   height: var(--icon-size-sm);
   padding: 0 var(--space-2);
   background: var(--color-brand-violet);
-  color: var(--color-white);
-  font-size: 9px;
+  color: var(--color-text-on-accent);
+  font-size: var(--text-xs);
   font-weight: var(--font-semibold);
   border-radius: var(--border-radius);
   display: flex;
@@ -131,6 +141,6 @@
 }
 
 .activity-bar-settings-btn:focus-visible {
-  outline: 1px solid var(--color-border-focus);
-  outline-offset: -1px;
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: calc(var(--space-1) * -1);
 }

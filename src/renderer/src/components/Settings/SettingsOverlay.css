@@ -76,8 +76,8 @@
 }
 
 .settings-close-btn:focus-visible {
-  outline: 2px solid var(--color-border-focus);
-  outline-offset: 2px;
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
 }
 
 .settings-close-btn:active {
@@ -176,11 +176,9 @@
   background-color: var(--color-bg-tertiary);
 }
 
-.settings-select:focus {
-  outline: none;
-  border-color: var(--color-border-focus);
-  background-color: var(--color-bg-tertiary);
-  box-shadow: var(--shadow-focus);
+.settings-select:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
 }
 
 .settings-select:disabled {
@@ -223,10 +221,9 @@
   border-color: var(--color-border-subtle);
 }
 
-.settings-checkbox:focus {
-  outline: none;
-  border-color: var(--color-border-focus);
-  box-shadow: var(--shadow-focus);
+.settings-checkbox:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
 }
 
 .settings-checkbox:checked {
@@ -267,10 +264,9 @@
   border-color: var(--color-border-subtle);
 }
 
-.settings-input:focus {
-  outline: none;
-  border-color: var(--color-border-focus);
-  box-shadow: var(--shadow-focus);
+.settings-input:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
 }
 
 .settings-input:disabled {
@@ -305,8 +301,8 @@
 }
 
 .settings-btn-secondary:focus-visible {
-  outline: 2px solid var(--color-border-focus);
-  outline-offset: 2px;
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
 }
 
 /* Settings API Key Controls - Flex container */
