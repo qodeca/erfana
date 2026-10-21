@@ -9,6 +9,7 @@ import { DOCUMENT_IMPORT } from '../../../../shared/constants'
 import { validateFileForImport } from '../../../utils/fileUtils'
 import { isoToTessLang } from '../isoToTessLang'
 import { LITEPARSE_EXCLUDED_EXTENSIONS } from '../extensions'
+import { findUntrustedConversionTool, currentUntrustedRoots } from '../conversionToolGuard'
 import type {
   IConverter,
   IConfigurableConverter,
@@ -124,6 +125,16 @@ export class LiteParseConverter implements IConverter, IConfigurableConverter {
         success: false,
         error: ERROR_MESSAGES[code],
         errorCode: code
+      }
+    }
+
+    // LiteParse finds LibreOffice itself, by name on PATH (#250). Refuse when
+    // the binary it would run is inside the project or a temp folder.
+    if (findUntrustedConversionTool(ext, currentUntrustedRoots())) {
+      return {
+        success: false,
+        error: ERROR_MESSAGES[ErrorCode.IMPORT_UNTRUSTED_TOOL],
+        errorCode: ErrorCode.IMPORT_UNTRUSTED_TOOL
       }
     }
 

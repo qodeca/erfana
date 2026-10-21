@@ -20,22 +20,37 @@ vi.mock('child_process', () => ({
 // Mock fs/promises before importing DependencyDetector
 vi.mock('fs/promises', () => ({
   access: vi.fn(),
-  realpath: vi.fn(async (p: string) => p),
   constants: { X_OK: 1, F_OK: 0 }
 }))
 
-// The absolute `which` / `where.exe` lookup: every bare name resolves to /usr/bin/<name>
-const mockFindOnPath = vi.hoisted(() => vi.fn(async (name: string) => [`/usr/bin/${name}`]))
-vi.mock('../../utils/hardenedGit', () => ({ findOnPath: mockFindOnPath }))
+// The in-process PATH walk: every bare name resolves to /usr/bin/<name>; no
+// fixed ImageMagick folders exist. The trust check itself stays real.
+const mockFindOnPath = vi.hoisted(() =>
+  vi.fn((name: string) => [{ path: `/usr/bin/${name}`, fromRelativeEntry: false }])
+)
+const mockWinImDirs = vi.hoisted(() => vi.fn((): string[] => []))
+vi.mock('../../utils/pathLookup', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../utils/pathLookup')>()
+  return {
+    ...actual,
+    findOnPathEntries: (name: string) => mockFindOnPath(name),
+    windowsImageMagickDirs: () => mockWinImDirs(),
+    POSIX_TOOL_DIRS: [] as string[]
+  }
+})
 
 import { execFile } from 'child_process'
 import { access } from 'fs/promises'
+import { tmpdir } from 'os'
+import { join } from 'path'
+import { mkdtempSync, mkdirSync, symlinkSync, rmSync, realpathSync } from 'fs'
 import { DependencyDetector } from './DependencyDetector'
 
 /** The absolute path the fake PATH lookup resolves `name` to. */
 const BIN = (name: string): string => `/usr/bin/${name}`
 /** The bare name an absolute probe path stands for. */
 const bare = (command: string): string => command.replace(/^\/usr\/bin\//, '')
+const DEFAULT_FIND = (name: string) => [{ path: BIN(name), fromRelativeEntry: false }]
 
 const mockedExecFile = vi.mocked(execFile)
 const mockedAccess = vi.mocked(access)
@@ -65,6 +80,8 @@ describe('DependencyDetector', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    mockFindOnPath.mockImplementation(DEFAULT_FIND)
+    mockWinImDirs.mockReturnValue([])
     detector = new DependencyDetector()
     originalPlatform = Object.getOwnPropertyDescriptor(process, 'platform')
   })
@@ -569,96 +586,179 @@ describe('DependencyDetector', () => {
   })
 
   // --------------------------------------------------------------------------
-  // Safe PATH lookup (#250): never run a bare name, a relative hit, or a
-  // binary inside the open project
+  // Safe PATH lookup (#250): never run a relative-entry hit, a UNC hit, or a
+  // binary inside the open project or the temp folder
   // --------------------------------------------------------------------------
 
   describe('safe PATH lookup (#250)', () => {
+    const succeedAll = (): void => {
+      mockedExecFile.mockImplementation(
+        (_command: string, _args: unknown, _options: unknown, callback: unknown) => {
+          ;(callback as (error: Error | null) => void)(null)
+          return { on: vi.fn() } as unknown as ChildProcess
+        }
+      )
+    }
+
     beforeEach(() => {
       Object.defineProperty(process, 'platform', { value: 'linux', configurable: true })
     })
 
-    it('runs only the absolute path the finder returned, from a cwd outside the project', async () => {
+    it('runs only absolute hits, from the temp folder, with a minimal env', async () => {
+      process.env['MAGICK_CONFIGURE_PATH'] = '/evil'
       setupExecFileMock({ soffice: true, magick: true })
 
       await detector.detect()
 
       const commands = mockedExecFile.mock.calls.map((c) => c[0] as string)
       expect(commands).toEqual(expect.arrayContaining([BIN('soffice'), BIN('magick')]))
-      expect(commands.every((c) => c.startsWith('/'))).toBe(true)
       for (const call of mockedExecFile.mock.calls) {
-        const options = call[2] as { cwd?: string }
-        expect(options.cwd).toBeTruthy()
+        const options = call[2] as { cwd?: string; env?: NodeJS.ProcessEnv }
+        expect(options.cwd).toBe(tmpdir())
+        expect(options.env).not.toHaveProperty('MAGICK_CONFIGURE_PATH')
       }
+      delete process.env['MAGICK_CONFIGURE_PATH']
     })
 
-    it('ignores a relative finder hit (PATH entry ".")', async () => {
-      mockFindOnPath.mockImplementation(async (name: string) => [`./${name}`])
-      setupExecFileMock({ soffice: true, magick: true, convert: true })
+    it('never runs a hit from a relative or empty PATH entry', async () => {
+      mockFindOnPath.mockImplementation((name: string) => [{ path: `/cwd/${name}`, fromRelativeEntry: true }])
+      succeedAll()
 
-      const result = await detector.detect()
-
-      expect(result).toEqual({ libreOffice: false, imageMagick: false })
+      expect(await detector.detect()).toEqual({ libreOffice: false, imageMagick: false })
       expect(mockedExecFile).not.toHaveBeenCalled()
-      mockFindOnPath.mockImplementation(async (name: string) => [BIN(name)])
+    })
+
+    it('never runs a hit inside the temp folder (what "." resolves to for a lookup run there)', async () => {
+      mockFindOnPath.mockImplementation((name: string) => [{ path: join(tmpdir(), name), fromRelativeEntry: false }])
+      succeedAll()
+
+      expect(await detector.detect()).toEqual({ libreOffice: false, imageMagick: false })
+      expect(mockedExecFile).not.toHaveBeenCalled()
     })
 
     it('never runs a binary that PATH resolves inside the open project', async () => {
-      mockFindOnPath.mockImplementation(async (name: string) => [`/work/repo/bin/${name}`])
-      mockedExecFile.mockImplementation(
-        (_command: string, _args: unknown, _options: unknown, callback: unknown) => {
-          ;(callback as (error: Error | null) => void)(null)
-          return { on: vi.fn() } as unknown as ChildProcess
-        }
-      )
+      mockFindOnPath.mockImplementation((name: string) => [{ path: `/work/repo/bin/${name}`, fromRelativeEntry: false }])
+      succeedAll()
       const guarded = new DependencyDetector({ untrustedRoots: () => ['/work/repo', null] })
 
-      const result = await guarded.detect()
-
-      expect(result).toEqual({ libreOffice: false, imageMagick: false })
+      expect(await guarded.detect()).toEqual({ libreOffice: false, imageMagick: false })
       expect(mockedExecFile).not.toHaveBeenCalled()
-      mockFindOnPath.mockImplementation(async (name: string) => [BIN(name)])
     })
 
-    it('rejects a PATH symlink whose real path lies inside the project', async () => {
-      const { realpath } = await import('fs/promises')
-      vi.mocked(realpath).mockImplementation((async (p: string) =>
-        p === BIN('magick') ? '/work/repo/evil/magick' : p) as unknown as typeof realpath)
+    it('rejects a PATH symlink whose real path lies inside the project, and moves on to the next name', async () => {
       setupExecFileMock({ magick: true, convert: true })
-      const guarded = new DependencyDetector({ untrustedRoots: () => ['/work/repo'] })
+      const guarded = new DependencyDetector({
+        untrustedRoots: () => ['/work/repo'],
+        realpath: (p) => (p === BIN('magick') ? '/work/repo/evil/magick' : p)
+      })
 
       const result = await guarded.detect()
 
       expect(result.imageMagick).toBe(true) // via convert, not the planted magick
-      const commands = mockedExecFile.mock.calls.map((c) => c[0] as string)
-      expect(commands).not.toContain(BIN('magick'))
-      vi.mocked(realpath).mockImplementation((async (p: string) => p) as unknown as typeof realpath)
+      expect(mockedExecFile.mock.calls.map((c) => c[0])).not.toContain(BIN('magick'))
+    })
+
+    it('rejects hits in a symlinked project folder (root compared by its real path too)', async () => {
+      // Outside the temp folder, so only the project rule can refuse.
+      const base = join(process.cwd(), '.local', 'vitest-symlink-project')
+      mkdirSync(base, { recursive: true })
+      const real = mkdtempSync(join(base, 'real-'))
+      const link = join(base, `link-${process.pid}`)
+      mkdirSync(join(real, 'bin'))
+      symlinkSync(real, link)
+      try {
+        // PATH names the REAL folder; the project was opened through the link.
+        mockFindOnPath.mockImplementation((name: string) => [{ path: join(realpathSync.native(real), 'bin', name), fromRelativeEntry: false }])
+        succeedAll()
+        const guarded = new DependencyDetector({ untrustedRoots: () => [link] })
+        expect(await guarded.detect()).toEqual({ libreOffice: false, imageMagick: false })
+      } finally {
+        rmSync(link, { force: true })
+        rmSync(real, { recursive: true, force: true })
+      }
     })
 
     it('does not treat a sibling folder that shares the project name as inside it', async () => {
-      mockFindOnPath.mockImplementation(async (name: string) => [`/work/repo-tools/${name}`])
-      mockedExecFile.mockImplementation(
-        (_command: string, _args: unknown, _options: unknown, callback: unknown) => {
-          ;(callback as (error: Error | null) => void)(null)
-          return { on: vi.fn() } as unknown as ChildProcess
-        }
-      )
+      mockFindOnPath.mockImplementation((name: string) => [{ path: `/work/repo-tools/${name}`, fromRelativeEntry: false }])
+      succeedAll()
       const guarded = new DependencyDetector({ untrustedRoots: () => ['/work/repo'] })
 
-      const result = await guarded.detect()
-
-      expect(result).toEqual({ libreOffice: true, imageMagick: true })
-      mockFindOnPath.mockImplementation(async (name: string) => [BIN(name)])
+      expect(await guarded.detect()).toEqual({ libreOffice: true, imageMagick: true })
     })
 
-    it('returns false when the finder fails (name not on PATH)', async () => {
-      mockFindOnPath.mockRejectedValue(new Error('which: exit 1'))
+    it('probes at most four hits per name', async () => {
+      mockFindOnPath.mockImplementation((name: string) =>
+        [1, 2, 3, 4].map((n) => ({ path: `/opt/p${n}/${name}`, fromRelativeEntry: false }))
+      )
+      setupExecFileMock({})
 
-      const result = await detector.detect()
+      await detector.detect()
 
-      expect(result).toEqual({ libreOffice: false, imageMagick: false })
+      const sofficeProbes = mockedExecFile.mock.calls.filter((c) => (c[0] as string).endsWith('/soffice'))
+      expect(sofficeProbes.length).toBeLessThanOrEqual(4)
+    })
+
+    it('returns false when nothing is on PATH', async () => {
+      mockFindOnPath.mockReturnValue([])
+
+      expect(await detector.detect()).toEqual({ libreOffice: false, imageMagick: false })
       expect(mockedExecFile).not.toHaveBeenCalled()
-      mockFindOnPath.mockImplementation(async (name: string) => [BIN(name)])
+    })
+  })
+
+  describe('Windows lookup (#250)', () => {
+    beforeEach(() => {
+      Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })
+    })
+
+    it('rejects a UNC hit without probing it (no NTLM round-trip)', async () => {
+      mockFindOnPath.mockImplementation((name: string) => [{ path: `\\\\evil\\share\\${name}.exe`, fromRelativeEntry: false }])
+      setupExecFileMock({})
+
+      await detector.detect()
+
+      expect(mockedExecFile.mock.calls.map((c) => c[0] as string).some((c) => c.startsWith('\\\\'))).toBe(false)
+    })
+
+    it('compares the project folder case-insensitively with backslash paths', async () => {
+      mockFindOnPath.mockImplementation((name: string) => [{ path: `C:\\Work\\Repo\\bin\\${name}.exe`, fromRelativeEntry: false }])
+      setupExecFileMock({})
+      const guarded = new DependencyDetector({ untrustedRoots: () => ['c:\\work\\repo'] })
+
+      await guarded.detect()
+
+      const commands = mockedExecFile.mock.calls.map((c) => (c[0] as string).toLowerCase())
+      expect(commands.some((c) => c.startsWith('c:\\work\\repo'))).toBe(false)
+    })
+
+    it('never probes `convert` on Windows (System32 convert.exe is the disk converter)', async () => {
+      setupExecFileMock({})
+
+      await detector.detect()
+
+      expect(mockFindOnPath).not.toHaveBeenCalledWith('convert')
+    })
+
+    it('finds ImageMagick in its Program Files folder when PATH does not have it', async () => {
+      mockFindOnPath.mockReturnValue([])
+      mockWinImDirs.mockReturnValue(['C:\\Program Files\\ImageMagick-7.1.1-Q16-HDRI'])
+      setupExecFileMock({ 'C:\\Program Files\\ImageMagick-7.1.1-Q16-HDRI\\magick.exe': true })
+
+      expect((await detector.detect()).imageMagick).toBe(true)
+    })
+  })
+
+  describe('darwin lookup (#250)', () => {
+    it('compares the project folder case-insensitively on macOS', async () => {
+      Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true })
+      mockFindOnPath.mockImplementation((name: string) => [{ path: `/Users/me/Repo/bin/${name}`, fromRelativeEntry: false }])
+      setupExecFileMock({})
+      mockedAccess.mockRejectedValue(new Error('ENOENT'))
+      const guarded = new DependencyDetector({ untrustedRoots: () => ['/users/me/repo'] })
+
+      await guarded.detect()
+
+      expect(mockedExecFile).not.toHaveBeenCalled()
     })
   })
 })

@@ -6,7 +6,11 @@ import { getExtensionsForDependencies } from './converters/LiteParseConverter'
 import type { DependencyStatus } from './types'
 import { fileService } from '../FileService'
 import { DOCUMENT_IMPORT } from '../../../shared/constants'
-import type { ImportToolStatus } from '../../../shared/ipc/import-schema'
+import type { DependencyReadyEvent, ImportToolStatus } from '../../../shared/ipc/import-schema'
+import { IMPORT_CHANNELS } from '../../../shared/ipc/import-channels'
+import { broadcastToAllWindows } from '../../utils/ipcBroadcast'
+import { setUntrustedRootsProvider } from './conversionToolGuard'
+export { missingToolsDialogMessage } from './missingToolsMessage'
 
 /** Every extension an optional tool can unlock – the set "Check again" may add or take away. */
 const TOOL_EXTENSIONS = getExtensionsForDependencies({ libreOffice: true, imageMagick: true })
@@ -17,6 +21,8 @@ export interface ImportToolStatusServiceOptions {
   /** Clock, injectable for the rate-limit tests. */
   now?: () => number
   minRecheckIntervalMs?: number
+  /** Called after every probe's result is applied – the singleton broadcasts it to every window. */
+  onApplied?: (status: ImportToolStatus) => void
 }
 
 /**
@@ -31,14 +37,16 @@ export interface ImportToolStatusServiceOptions {
  * - {@link recheck} – "Check again": clears the cache and probes again, so a
  *   tool installed after launch is picked up without a restart. Rate-limited:
  *   a recheck while a probe is running joins it, and one within
- *   `minRecheckIntervalMs` of the last probe returns the current result with
- *   `throttled: true` and spawns nothing.
+ *   `minRecheckIntervalMs` of the END of the last probe returns the current
+ *   result with `throttled: true` and spawns nothing. Measured from the end, a
+ *   slow probe (up to 5 s per tool) cannot be followed back-to-back.
  */
 export class ImportToolStatusService {
   private readonly detector: DependencyDetector
   private readonly registry: ConverterRegistry
   private readonly now: () => number
   private readonly minRecheckIntervalMs: number
+  private readonly onApplied?: (status: ImportToolStatus) => void
 
   private current: DependencyStatus | null = null
   private inFlight: Promise<DependencyStatus> | null = null
@@ -50,12 +58,18 @@ export class ImportToolStatusService {
     this.now = options.now ?? Date.now
     this.minRecheckIntervalMs =
       options.minRecheckIntervalMs ?? DOCUMENT_IMPORT.TOOL_RECHECK_MIN_INTERVAL_MS
+    this.onApplied = options.onApplied
   }
 
   /** The current status, detecting once if detection has not run yet. */
   async getStatus(): Promise<ImportToolStatus> {
     const deps = this.current ?? (await this.probe())
     return this.toStatus(deps, false)
+  }
+
+  /** The last applied result, or null before the first probe finished. Never probes. */
+  peek(): DependencyStatus | null {
+    return this.current
   }
 
   /** Clear the session cache and probe again, unless rate-limited. */
@@ -72,15 +86,16 @@ export class ImportToolStatusService {
 
   private probe(): Promise<DependencyStatus> {
     if (this.inFlight) return this.inFlight
-    this.lastProbeAt = this.now()
     const run = this.detector
       .detect()
       .then((deps) => {
         this.apply(deps)
         this.current = deps
+        this.onApplied?.(this.toStatus(deps, false))
         return deps
       })
       .finally(() => {
+        this.lastProbeAt = this.now()
         this.inFlight = null
       })
     this.inFlight = run
@@ -112,8 +127,22 @@ export class ImportToolStatusService {
 
 /**
  * Session singleton. The open project is an untrusted root: a `soffice` or
- * `magick` that PATH resolves into it is never run.
+ * `magick` that PATH resolves into it is never run – not by detection, and
+ * not by a conversion (`conversionToolGuard`). Every applied result is
+ * broadcast as `import:dependenciesReady`, so all windows stay in step after a
+ * "Check again".
  */
+const projectRoots = (): ReadonlyArray<string | null> => [fileService.getProjectPath()]
+setUntrustedRootsProvider(projectRoots)
+
 export const importToolStatusService = new ImportToolStatusService({
-  detector: new DependencyDetector({ untrustedRoots: () => [fileService.getProjectPath()] })
+  detector: new DependencyDetector({ untrustedRoots: projectRoots }),
+  onApplied: (status) => {
+    const payload: DependencyReadyEvent = {
+      libreOffice: status.libreOffice,
+      imageMagick: status.imageMagick,
+      extensions: status.extensions
+    }
+    broadcastToAllWindows(IMPORT_CHANNELS.DEPENDENCIES_READY, payload)
+  }
 })

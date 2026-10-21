@@ -85,6 +85,8 @@ export enum ErrorCode {
   IMPORT_PAGE_LIMIT_EXCEEDED = 'IMPORT_PAGE_LIMIT_EXCEEDED',
   IMPORT_TIMEOUT = 'IMPORT_TIMEOUT',
   IMPORT_BUSY = 'IMPORT_BUSY',
+  // The tool a conversion would run resolves into the project or a temp folder (#250)
+  IMPORT_UNTRUSTED_TOOL = 'IMPORT_UNTRUSTED_TOOL',
 
   // Prompt execution errors
   PROMPT_NOT_FOUND = 'PROMPT_NOT_FOUND',
@@ -391,6 +393,8 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.IMPORT_PAGE_LIMIT_EXCEEDED]: 'Document exceeds the maximum page limit',
   [ErrorCode.IMPORT_TIMEOUT]: 'Document conversion timed out',
   [ErrorCode.IMPORT_BUSY]: 'A document import is already in progress',
+  [ErrorCode.IMPORT_UNTRUSTED_TOOL]:
+    'The conversion tool found first on PATH is inside the project or a temporary folder, so Erfana did not run it. Remove that folder from PATH and try again.',
 
   // Prompt execution errors
   [ErrorCode.PROMPT_NOT_FOUND]: 'Prompt template not found',

@@ -503,7 +503,9 @@ Runtime detection of optional system tools for document import.
 
 ### Key features
 - Checks LibreOffice (`soffice --version`) and ImageMagick (`magick --version`, v6 `convert` fallback)
-- Safe lookup (#250): a bare name is resolved to an absolute path with the absolute `which` / `where.exe` (`findOnPath` in `utils/hardenedGit.ts`); relative hits and hits whose path or real path lie inside the open project are dropped, and every probe runs from `os.tmpdir()`, so a binary planted in a project or the current directory is never run
+- Safe lookup (#250): a bare name is resolved by walking PATH in-process (`findOnPathEntries` in `src/main/utils/pathLookup.ts`) – no lookup tool is spawned. A hit from a relative or empty PATH entry, a UNC hit, and a hit whose path or real path is inside the open project or the temp folder is never run; at most four hits per name are probed; probes run from `os.tmpdir()` with a minimal env. `convert` is never probed on Windows (System32 `convert.exe` is the disk converter)
+- Fixed ImageMagick fallbacks (#250): `/opt/homebrew/bin`, `/usr/local/bin`, `/opt/local/bin` and `C:\Program Files\ImageMagick-*`, because a macOS Dock launch and a running Windows app do not see installer PATH changes
+- Pre-conversion guard (#250, `conversionToolGuard.ts`): LiteParse finds LibreOffice itself (`which libreoffice-fresh` / `libreoffice` / `soffice`, then fixed paths – read from the 2.14.7 native module; it takes no binary-path option). Before each Office/image conversion `LiteParseConverter` walks PATH the same way and refuses with `IMPORT_UNTRUSTED_TOOL` when the binary that would win, or the bare-name `which` / `powershell` it spawns, is untrusted. Not covered: a later LiteParse that changes its lookup order
 - 5-second timeout per command via `execFile` (no shell – safe from injection)
 - Session-level caching (single detection, concurrent calls share one promise)
 - macOS bundle path fallback for LibreOffice (`/Applications/LibreOffice.app/...`)
@@ -520,7 +522,8 @@ Runtime detection of optional system tools for document import.
 ### Integration
 - Owned by `ImportToolStatusService` (`src/main/services/import/ImportToolStatusService.ts`, #250), which keeps the converter registry in step with the result: a tool found adds its extensions (`updateConverterExtensions`), a tool gone removes them (`removeConverterExtensions`, which hands `.rtf` back to the text converter)
 - Fire-and-forget at app startup (`src/main/index.ts`, `importToolStatusService.getStatus()`) → pushes result via `import:dependenciesReady`
-- `import:toolStatus` serves the cached result to Settings → Import tools; `{ recheck: true }` ("Check again") clears the cache and probes again. Rate-limited: a recheck while a probe runs joins it, and one within `DOCUMENT_IMPORT.TOOL_RECHECK_MIN_INTERVAL_MS` (3 s) of the last probe returns `throttled: true` and spawns nothing
+- `import:toolStatus` serves the cached result to Settings → Import tools; `{ recheck: true }` ("Check again") clears the cache and probes again. Rate-limited: a recheck while a probe runs joins it, and one within `DOCUMENT_IMPORT.TOOL_RECHECK_MIN_INTERVAL_MS` (3 s) of the END of the last probe returns `throttled: true` and spawns nothing
+- Every applied result is broadcast to all windows as `import:dependenciesReady`; `import:selectFile` passes a macOS-only `message` naming the formats left out of "All importable files" and the tool each needs
 
 ---
 

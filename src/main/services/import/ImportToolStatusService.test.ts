@@ -15,7 +15,7 @@ vi.mock('../AudioMetadataService', () => ({ audioMetadataService: {} }))
 vi.mock('../AudioExtractionService', () => ({ audioExtractionService: {} }))
 vi.mock('electron', () => ({ app: { getPath: () => '/tmp' } }))
 
-import { ImportToolStatusService } from './ImportToolStatusService'
+import { ImportToolStatusService, missingToolsDialogMessage } from './ImportToolStatusService'
 import { createConverterRegistry, type ConverterRegistry } from './ConverterRegistry'
 import type { DependencyDetector } from './DependencyDetector'
 
@@ -161,5 +161,68 @@ describe('ImportToolStatusService', () => {
 
     expect(status).toMatchObject({ libreOffice: true, throttled: false })
     expect(probes()).toBe(1)
+  })
+
+  it('measures the rate-limit window from the END of the last probe', async () => {
+    let release: (deps: DependencyStatus) => void = () => {}
+    let cached: DependencyStatus | null = null
+    const detector = {
+      detect: vi.fn(() => cached ? Promise.resolve(cached) : new Promise<DependencyStatus>((resolve) => {
+        release = (d) => { cached = d; resolve(d) }
+      })),
+      clearCache: vi.fn(() => { cached = null })
+    }
+    const service = new ImportToolStatusService({
+      detector: detector as unknown as DependencyDetector,
+      registry,
+      now: () => clock,
+      minRecheckIntervalMs: 3000
+    })
+
+    const first = service.getStatus()
+    clock += 5000 // a slow probe: 5 s
+    release(NONE)
+    await first
+
+    clock += 1000 // 6 s after the start, 1 s after the end
+    expect((await service.recheck()).throttled).toBe(true)
+    clock += 2000
+    const second = service.recheck()
+    release(BOTH)
+    expect((await second).throttled).toBe(false)
+  })
+
+  it('reports every applied result (the singleton broadcasts it to all windows)', async () => {
+    const onApplied = vi.fn()
+    const fake = fakeDetector([NONE, BOTH])
+    const service = new ImportToolStatusService({ detector: fake.detector, registry, now: () => clock, onApplied })
+
+    await service.getStatus()
+    clock += 3000
+    await service.recheck()
+    await service.recheck() // throttled – nothing new applied
+
+    expect(onApplied).toHaveBeenCalledTimes(2)
+    expect(onApplied).toHaveBeenLastCalledWith(expect.objectContaining({ libreOffice: true, imageMagick: true }))
+  })
+
+  it('peek returns the last result without probing', async () => {
+    const { service, probes } = build([BOTH])
+    expect(service.peek()).toBeNull()
+    await service.getStatus()
+    expect(service.peek()).toEqual(BOTH)
+    expect(probes()).toBe(1)
+  })
+})
+
+describe('missingToolsDialogMessage', () => {
+  it.each([
+    [null, null],
+    [{ libreOffice: true, imageMagick: true }, null],
+    [{ libreOffice: false, imageMagick: true }, 'Office documents need LibreOffice, so they are not listed. Settings → Import tools shows how to install them.'],
+    [{ libreOffice: true, imageMagick: false }, 'Images need ImageMagick, so they are not listed. Settings → Import tools shows how to install them.'],
+    [{ libreOffice: false, imageMagick: false }, 'Office documents need LibreOffice and images need ImageMagick, so they are not listed. Settings → Import tools shows how to install them.']
+  ])('%o → %s', (deps, expected) => {
+    expect(missingToolsDialogMessage(deps)).toBe(expected)
   })
 })

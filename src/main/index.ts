@@ -32,8 +32,6 @@ import { registerPreviewHandlers } from './ipc/preview-handlers'
 import { registerPreviewScheme } from './services/preview/previewScheme'
 import { importToolStatusService } from './services/import'
 import { FORCE_CRASH_ARG, LOGS_DIR_RELATIVE, TEST_HOOKS_ARG } from '../shared/constants'
-import { IMPORT_CHANNELS } from '../shared/ipc/import-channels'
-import type { DependencyReadyEvent } from '../shared/ipc/import-schema'
 import { createApplicationMenu, setPreviewZoomHandler } from './menu'
 import { fileService } from './services/FileService'
 import { redactedLogError } from './utils/redactUserInput'
@@ -549,19 +547,10 @@ app.whenReady().then(async () => {
 
   // Fire-and-forget: detect system dependencies for LiteParse document import
   // Runs async after window creation so it doesn't block startup. The service
-  // maps the found tools' extensions into the converter registry and caches
-  // the result for `import:toolStatus` (#250).
-  importToolStatusService.getStatus().then((status) => {
-    // Notify renderer that dependencies have been detected
-    if (mainWindowRef && !mainWindowRef.isDestroyed()) {
-      const payload: DependencyReadyEvent = {
-        libreOffice: status.libreOffice,
-        imageMagick: status.imageMagick,
-        extensions: status.extensions
-      }
-      mainWindowRef.webContents.send(IMPORT_CHANNELS.DEPENDENCIES_READY, payload)
-    }
-  }).catch((error) => {
+  // maps the found tools' extensions into the converter registry, caches the
+  // result for `import:toolStatus`, and broadcasts `import:dependenciesReady`
+  // to every window (#250).
+  importToolStatusService.getStatus().catch((error) => {
     logger.error('Failed to detect document import dependencies', error instanceof Error ? error : undefined)
   })
 

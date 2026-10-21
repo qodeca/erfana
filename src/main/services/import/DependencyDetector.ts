@@ -1,11 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { execFile } from 'child_process'
-import { access, constants, realpath } from 'fs/promises'
+import { access, constants } from 'fs/promises'
 import { tmpdir } from 'os'
 import { posix, win32 } from 'path'
-import { findOnPath } from '../../utils/hardenedGit'
-import { isInsideRoot, normaliseResolved } from '../../utils/pathCompare'
+import {
+  findOnPathEntries,
+  isTrustedHit,
+  untrustedFolders,
+  windowsImageMagickDirs,
+  POSIX_TOOL_DIRS,
+  type PathHit
+} from '../../utils/pathLookup'
 import type { DependencyStatus } from './types'
 
 /** Timeout for each dependency check command (ms) */
@@ -25,22 +31,36 @@ const WIN32_LIBREOFFICE_PATHS = [
   'C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe',
 ]
 
-/** Looks a bare command name up on PATH and returns the hits it printed. */
-export type PathFinder = (name: string, timeout: number) => Promise<string[]>
+/**
+ * The only variables a probe child gets. `--version` needs nothing else, and a
+ * minimal env keeps `MAGICK_*` / `SAL_*` / `LD_*` style overrides out of it.
+ */
+const PROBE_ENV_ALLOWLIST = ['PATH', 'Path', 'HOME', 'USERPROFILE', 'SystemRoot', 'TEMP', 'TMP', 'LANG', 'PATHEXT']
 
-/** Construction options – both exist so tests and callers can narrow the lookup. */
+/** Walks PATH for a bare command name; see `utils/pathLookup`. */
+export type PathFinder = (name: string) => PathHit[]
+
+/** Construction options – all exist so tests and callers can narrow the lookup. */
 export interface DependencyDetectorOptions {
-  /**
-   * PATH lookup. Defaults to the absolute `which` / `where.exe` from
-   * `hardenedGit`, run from a safe cwd, so a binary planted in the current
-   * directory can never answer it.
-   */
+  /** PATH walk. Defaults to {@link findOnPathEntries} over this process's PATH. */
   findOnPath?: PathFinder
   /**
    * Folders whose binaries must never be run – the open project, which the
-   * user (or a cloned repository) controls. Evaluated on every detection.
+   * user (or a cloned repository) controls. Evaluated on every detection; the
+   * temp folder is always added.
    */
   untrustedRoots?: () => ReadonlyArray<string | null | undefined>
+  /** Fixed ImageMagick candidates; defaults per platform (Homebrew, MacPorts, Program Files). */
+  imageMagickFallbacks?: () => string[]
+  /** Real-path resolver for the trust check; injectable for tests. */
+  realpath?: (p: string) => string
+}
+
+function defaultImageMagickFallbacks(): string[] {
+  if (process.platform === 'win32') {
+    return windowsImageMagickDirs().map((dir) => win32.join(dir, 'magick.exe'))
+  }
+  return POSIX_TOOL_DIRS.flatMap((dir) => [posix.join(dir, 'magick'), posix.join(dir, 'convert')])
 }
 
 /**
@@ -48,17 +68,22 @@ export interface DependencyDetectorOptions {
  *
  * Checks for optional system tools (LibreOffice, ImageMagick) required
  * for Office document and image OCR import. Results are cached for the
- * session lifetime – detection runs at most once.
+ * session lifetime – `clearCache()` ("Check again") forces a new probe.
  *
  * Design:
  * - Non-blocking: all checks are async, never blocks app startup
  * - Timeout: 5s per command to prevent hangs
  * - Caching: single detection per session, concurrent calls share one promise
  * - Graceful: missing tools or errors result in false, never thrown errors
- * - Safe lookup: a bare name is resolved to an ABSOLUTE path first, through the
- *   absolute `which` / `where.exe`; relative hits and hits inside an untrusted
- *   root (the open project) are dropped, and the probe runs from `os.tmpdir()`.
- *   Spawning a bare name would let Windows search the current directory first.
+ * - Safe lookup (#250): a bare name is resolved by walking PATH in-process
+ *   ({@link findOnPathEntries}), never by spawning the bare name or a lookup
+ *   tool. A hit from a relative or empty PATH entry, a UNC hit, and a hit whose
+ *   path or real path is inside the open project or the temp folder is never
+ *   run. At most four hits per name are probed. Probes run from `os.tmpdir()`
+ *   with a minimal env.
+ * - Fixed fallbacks: ImageMagick is also looked for in Homebrew / MacPorts
+ *   folders and `C:\Program Files\ImageMagick-*`, because a macOS Dock launch
+ *   and a running Windows app do not see a PATH change made by an installer.
  *
  * @see Issue #132 – LiteParse document import
  */
@@ -67,10 +92,14 @@ export class DependencyDetector {
   private pendingDetection: Promise<DependencyStatus> | null = null
   private readonly findOnPath: PathFinder
   private readonly untrustedRoots: () => ReadonlyArray<string | null | undefined>
+  private readonly imageMagickFallbacks: () => string[]
+  private readonly realpath?: (p: string) => string
 
   constructor(options: DependencyDetectorOptions = {}) {
-    this.findOnPath = options.findOnPath ?? findOnPath
+    this.findOnPath = options.findOnPath ?? ((name) => findOnPathEntries(name))
     this.untrustedRoots = options.untrustedRoots ?? (() => [])
+    this.imageMagickFallbacks = options.imageMagickFallbacks ?? defaultImageMagickFallbacks
+    this.realpath = options.realpath
   }
 
   /**
@@ -114,12 +143,11 @@ export class DependencyDetector {
    * Check if LibreOffice is available.
    *
    * Strategy:
-   * 1. Try `soffice --version` (works if soffice is on PATH)
+   * 1. `soffice --version` on a trusted PATH hit
    * 2. On macOS, fall back to the known .app bundle path
    * 3. On Windows (#162), fall back to standard Program Files locations
    */
   private async detectLibreOffice(): Promise<boolean> {
-    // Try PATH-based detection first
     if (await this.tryOnPath('soffice')) {
       return true
     }
@@ -141,17 +169,10 @@ export class DependencyDetector {
 
     // Windows fallback (#162): probe standard install locations.
     //
-    // Each candidate must pass BOTH `F_OK` (file exists) AND a `--version`
-    // liveness probe (binary actually runs and produces output). This
-    // mirrors the git-resolver pattern at `git-status.worker.ts:isExecutableGit`.
-    //
-    // Why not F_OK only (security review HIGH): an attacker with write
-    // access to `C:\Program Files\LibreOffice\program\soffice.exe` (e.g. a
-    // malicious installer that drops a stub) could otherwise plant a path
-    // that satisfies detection. By the time we try to `execFile(soffice,
-    // [user-supplied args])` it would be too late — attacker code would
-    // have already run. The liveness probe forces the candidate to behave
-    // like a real LibreOffice binary first.
+    // Each candidate must pass a `--version` liveness probe (binary actually
+    // runs). This mirrors the git-resolver pattern at
+    // `git-status.worker.ts:isExecutableGit`: a stub planted at the path that
+    // does not behave like soffice is rejected.
     if (process.platform === 'win32') {
       for (const candidate of WIN32_LIBREOFFICE_PATHS) {
         if (await this.tryCommand(candidate, ['--version'])) {
@@ -168,74 +189,64 @@ export class DependencyDetector {
    * Check if ImageMagick is available.
    *
    * Strategy:
-   * 1. Try `magick --version` (ImageMagick v7+)
-   * 2. Fall back to `convert --version` (ImageMagick v6)
+   * 1. `magick --version` (v7+) on a trusted PATH hit
+   * 2. `convert --version` (v6) – POSIX only: on Windows `convert` is the
+   *    System32 FAT-to-NTFS converter, which must never be probed
+   * 3. Fixed install folders (see {@link defaultImageMagickFallbacks})
    */
   private async detectImageMagick(): Promise<boolean> {
-    // ImageMagick v7+
     if (await this.tryOnPath('magick')) {
       return true
     }
-
-    // ImageMagick v6 fallback
-    return this.tryOnPath('convert')
-  }
-
-  /**
-   * Resolve `name` on PATH to an absolute, trusted path and probe it with
-   * `--version`. Each hit is tried in order; the first that runs wins.
-   */
-  private async tryOnPath(name: string): Promise<boolean> {
-    let hits: string[]
-    try {
-      hits = await this.findOnPath(name, DETECTION_TIMEOUT_MS)
-    } catch {
-      return false
+    if (process.platform !== 'win32' && (await this.tryOnPath('convert'))) {
+      return true
     }
-    for (const hit of hits) {
-      if (!(await this.isTrustedCandidate(hit))) continue
-      if (await this.tryCommand(hit, ['--version'])) return true
+    for (const candidate of this.imageMagickFallbacks()) {
+      if (!this.isTrusted({ path: candidate, fromRelativeEntry: false })) continue
+      if (await this.tryCommand(candidate, ['--version'])) return true
     }
     return false
   }
 
   /**
-   * A candidate is trusted when it is absolute and neither it nor its real
-   * path (a PATH symlink may point anywhere) lies inside an untrusted root.
-   * Case-insensitive on Windows and macOS, whose default file systems are.
+   * Walk PATH for `name` and probe each trusted hit with `--version`; the
+   * first that runs wins.
    */
-  private async isTrustedCandidate(candidate: string): Promise<boolean> {
-    const flavour = { path: process.platform === 'win32' ? win32 : posix, platform: process.platform }
-    if (!flavour.path.isAbsolute(candidate)) return false
-    const roots = this.untrustedRoots().filter((root): root is string => !!root)
-    if (roots.length === 0) return true
-
-    const caseSensitive = process.platform === 'linux'
-    const forms = [normaliseResolved(flavour.path.resolve(candidate), flavour)]
+  private async tryOnPath(name: string): Promise<boolean> {
+    let hits: PathHit[]
     try {
-      forms.push(normaliseResolved(await realpath(candidate), flavour))
+      hits = this.findOnPath(name)
     } catch {
-      // Unresolvable: the probe below fails on its own; the raw form is still checked.
+      return false
     }
-    return !roots.some((root) => {
-      const rootForm = normaliseResolved(flavour.path.resolve(root), flavour)
-      return forms.some((form) => isInsideRoot(form, rootForm, caseSensitive, flavour))
-    })
+    for (const hit of hits) {
+      if (!this.isTrusted(hit)) continue
+      if (await this.tryCommand(hit.path, ['--version'])) return true
+    }
+    return false
+  }
+
+  private isTrusted(hit: PathHit): boolean {
+    return isTrustedHit(hit, untrustedFolders(this.untrustedRoots()), process.platform, this.realpath)
   }
 
   /**
-   * Try running a command with timeout.
+   * Try running a command with timeout. Only ever called with an absolute
+   * path. A `.bat` / `.cmd` fails safely: Node refuses to `execFile` a batch
+   * file without a shell (EINVAL, CVE-2024-27980), which reads as "not found".
    *
    * @returns true if the command exits with code 0
    */
   private tryCommand(command: string, args: string[]): Promise<boolean> {
+    const pathApi = process.platform === 'win32' ? win32 : posix
+    if (!pathApi.isAbsolute(command)) return Promise.resolve(false)
     return new Promise((resolve) => {
       try {
         const child = execFile(
           command,
           args,
-          // cwd outside any project: a tool's own lookups never start in it
-          { timeout: DETECTION_TIMEOUT_MS, cwd: tmpdir(), windowsHide: true },
+          // cwd outside any project; minimal env
+          { timeout: DETECTION_TIMEOUT_MS, cwd: tmpdir(), windowsHide: true, env: probeEnv() },
           (error) => {
             resolve(!error)
           }
@@ -258,4 +269,13 @@ export class DependencyDetector {
     this.cachedResult = null
     this.pendingDetection = null
   }
+}
+
+function probeEnv(): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {}
+  for (const key of PROBE_ENV_ALLOWLIST) {
+    const value = process.env[key]
+    if (value !== undefined) env[key] = value
+  }
+  return env
 }
