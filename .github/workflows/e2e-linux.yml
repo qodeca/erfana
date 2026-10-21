@@ -1,0 +1,47 @@
+name: E2E (Linux, xvfb)
+
+# Advisory, never required: runs the Playwright Electron suite headless on Linux
+# under xvfb, in the same Docker image as `npm run test:e2e:linux`
+# (scripts/e2e-linux.sh, e2e/docker/Dockerfile). Its name must not match a
+# required check (Lint, Typecheck, Unit tests, Build, Coverage,
+# License compliance, Secret scan).
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Cancel an in-flight run on the same ref when a new push lands.
+concurrency:
+  group: e2e-linux-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e-linux:
+    name: E2E (Linux, xvfb)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      # actions/checkout v6.0.3
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - name: Run the Electron suite in Docker under xvfb
+        # CI=1 turns on the Playwright retries (2) from playwright.config.ts.
+        env:
+          CI: '1'
+        run: bash scripts/e2e-linux.sh --project=electron
+      - name: Upload report and test results
+        if: always()
+        # actions/upload-artifact v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: e2e-linux-report
+          path: .local/e2e-linux/
+          if-no-files-found: ignore
+          include-hidden-files: true
+          retention-days: 7
