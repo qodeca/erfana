@@ -17,6 +17,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { homedir } from 'os'
+import { parse, posix, win32 } from 'path'
 import { ErrorCode } from '../../shared/errors'
 
 // Mock fs/promises
@@ -30,6 +31,7 @@ vi.mock('fs/promises', () => ({
 // Import after mocking
 import { lstat, readlink, access } from 'fs/promises'
 import {
+  isFilesystemRoot,
   isSystemDirectory,
   validateProjectPath,
   validateSymlink,
@@ -240,6 +242,19 @@ describe('pathSecurity', () => {
         await expect(validateProjectPath('/Users')).rejects.toMatchObject({
           code: ErrorCode.PATH_NOT_ACCESSIBLE
         })
+      })
+    })
+
+    describe('Volume roots', () => {
+      it('should reject the root of the volume the tests run on', async () => {
+        await expect(validateProjectPath(parse(process.cwd()).root)).rejects.toMatchObject({
+          code: ErrorCode.PATH_SYSTEM_DIR
+        })
+      })
+
+      it('should not reach the access check for a root', async () => {
+        await validateProjectPath(parse(process.cwd()).root).catch(() => undefined)
+        expect(mockedAccess).not.toHaveBeenCalled()
       })
     })
 
@@ -578,5 +593,19 @@ describe('pathSecurity', () => {
         expect(error).toBeInstanceOf(PathSecurityError)
       }
     })
+  })
+})
+
+describe('isFilesystemRoot', () => {
+  it.each([
+    ['a POSIX root', posix, posix.sep, true],
+    ['a folder under a POSIX root', posix, posix.join(posix.sep, 'a'), false],
+    ['a drive root', win32, 'C:\\', true],
+    ['a drive root without its separator', win32, 'C:', false],
+    ['a folder on a drive', win32, 'C:\\a', false],
+    ['a share root', win32, '\\\\srv\\share\\', true],
+    ['a folder on a share', win32, '\\\\srv\\share\\a', false]
+  ])('%s', (_name, flavour, value, expected) => {
+    expect(isFilesystemRoot(value, flavour)).toBe(expected)
   })
 })

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { isAbsolute, normalize, resolve, dirname, sep } from 'path'
+import nodePath, { isAbsolute, normalize, resolve, dirname, sep, type PlatformPath } from 'path'
 import { lstat, readlink, access, constants } from 'fs/promises'
 import { homedir } from 'os'
 import { AppError, ErrorCode } from '../../shared/errors'
@@ -79,6 +79,16 @@ export function isSystemDirectory(path: string): boolean {
 }
 
 /**
+ * Whether a path is the top of a volume or share: `/`, `C:\`, `\\srv\share\`.
+ * Such a folder is not a project, and every path on the volume lies inside it,
+ * so it would turn the project boundary into no boundary at all.
+ */
+export function isFilesystemRoot(path: string, flavour: PlatformPath = nodePath): boolean {
+  const normalized = flavour.normalize(path)
+  return normalized === flavour.parse(normalized).root
+}
+
+/**
  * Validate that a path is safe to use as a project directory
  *
  * Checks:
@@ -86,6 +96,7 @@ export function isSystemDirectory(path: string): boolean {
  * - Path is absolute (not relative)
  * - Path doesn't contain path traversal patterns
  * - Path is not a system or sensitive directory
+ * - Path is not the root of a volume or share
  * - Path is accessible (exists and readable)
  *
  * SECURITY NOTE: TOCTOU Limitation
@@ -122,6 +133,14 @@ export async function validateProjectPath(projectPath: string): Promise<void> {
   if (isSystemDirectory(normalized)) {
     throw new AppError(
       'Cannot open system or sensitive directories as projects',
+      ErrorCode.PATH_SYSTEM_DIR
+    )
+  }
+
+  // The root of a volume is every path on it
+  if (isFilesystemRoot(normalized)) {
+    throw new AppError(
+      'Cannot open the root of a drive or volume as a project',
       ErrorCode.PATH_SYSTEM_DIR
     )
   }
