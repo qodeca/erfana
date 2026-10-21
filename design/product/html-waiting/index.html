@@ -322,7 +322,7 @@
   </tr>
   <tr>
     <td>Residual</td>
-    <td class="ds-mono">Still loading — part of the page has not arrived</td>
+    <td class="ds-mono">Still loading – part of the page has not arrived</td>
     <td>The page painted; something is still outstanding. Both halves observed. The host is
         <strong>not</strong> named here: this line may not wrap, and a host that cannot wrap can only
         fit by being cut, which the Rows card forbids. Surface A names it, where it can wrap.</td>
@@ -370,7 +370,7 @@
   and the quieter aside (<code>--color-text-secondary</code>) is
   <strong><span data-claim="contrast-wait-aside"></span>:1</strong>, both clear of the 4.5:1 small text
   needs. The aside used to be <code>--color-text-muted</code>, at
-  <strong><span data-claim="contrast-wait-aside-muted"></span>:1</strong> — this card rendered a
+  <strong><span data-claim="contrast-wait-aside-muted"></span>:1</strong> – this card rendered a
   contrast failure in every case that showed it. If this surface
   were ever allowed to render over the page's own paper — which the page chooses — the contrast
   would be uncontrollable. That timing is a precondition of the design, not a detail of it.
@@ -552,7 +552,7 @@ function band({ counts = '0 blocked · 0 allowed', slot = '', paused = false, op
       <button class="erf-band__tool" type="button" aria-label="Export to PDF" title="Export to PDF">
           <!-- lucide "file-down", 16px — the same button the markdown toolbar has.
                No backticks in here: this markup is inside a template literal, and a
-               backtick ends it — which once left every case on this card unrendered. -->
+               backtick ends it – which once left every case on this card unrendered. -->
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path>
@@ -602,7 +602,7 @@ const CASES = [
   {
     title: 'Explained — a remote host',
     text: 'From <strong>10 s</strong>. Names who is being waited on. The host is deliberately a ' +
-          'long one, so you can see it wrap at its dots rather than be cut — take no one’s word for it.',
+          'long one, so you can see it wrap at its dots rather than be cut – take no one’s word for it.',
     html: panel({
       bandOpts: { counts: '0 blocked · 6 allowed' },
       bodyClass: 'panel__body--backdrop',
@@ -677,7 +677,7 @@ const WIDTH_CASES = [
     title: 'Residual — the page painted, something is still hanging',
     text: 'The bar’s height must never change, so the line clips rather than wraps. If it ' +
           'wrapped, the page below it would be pushed down — a bounds push, for a slow load.',
-    slot: '<span class="erf-band__wait">Still loading — part of the page has not arrived</span>',
+    slot: '<span class="erf-band__wait">Still loading – part of the page has not arrived</span>',
     body: PAGE
   },
   {
@@ -735,12 +735,19 @@ WIDTH_CASES.forEach((c) => {
 /* Measured, not asserted: how much room the line really gets at each width.
    This replaced chip and button widths typed into a comment, which nothing kept
    true when the band changed. */
-for (const label of hostB.querySelectorAll('.width')) {
-  const line = label.querySelector('.erf-band__wait');
-  const out = label.querySelector('[data-wait-room]');
-  const room = line ? Math.round(line.getBoundingClientRect().width) : 0;
-  out.textContent = room === 0 ? '(measured: the line is not drawn)' : `(measured: the line gets ${room} px)`;
+function measureWaitRoom() {
+  for (const label of hostB.querySelectorAll('.width')) {
+    const line = label.querySelector('.erf-band__wait');
+    const out = label.querySelector('[data-wait-room]');
+    const room = line ? Math.round(line.getBoundingClientRect().width) : 0;
+    out.textContent = room === 0 ? '(measured: the line is not drawn)' : `(measured: the line gets ${room} px)`;
+  }
 }
+measureWaitRoom();
+// Widths depend on the font, so measure again once it has loaded, and again
+// when the window narrows a demo below its nominal width (max-width: 100%).
+document.fonts.ready.then(measureWaitRoom);
+window.addEventListener('resize', measureWaitRoom);
 
 /* ---------- the runnable timeline ---------- */
 

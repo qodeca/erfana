@@ -152,7 +152,7 @@ describe('a card does not render the contrast failure it warns about', () => {
    * THE BUG THIS EXISTS FOR (#114). The html-waiting card drew its aside in
    * --color-text-muted at --text-xs on the pre-paint backdrop: 3.63:1, under the
    * 4.5:1 small text needs (WCAG 1.4.3). Every gate was green, because the ratio
-   * was never a claim — and a card is the reference the app copies. So every text
+   * was never a claim – and a card is the reference the app copies. So every text
    * rule of Surface A is read from the card's own <style> and measured against
    * the backdrop it sits on.
    */
@@ -185,6 +185,20 @@ describe('a card does not render the contrast failure it warns about', () => {
         resolveVar('var(--color-brand-black)', TOKENS)
       )
       expect(ratio, `${selector} is ${ratio}:1`).toBeGreaterThanOrEqual(4.5)
+    }
+  )
+
+  it.each(['.erf-wait__title', '.erf-wait__text', '.erf-wait__aside'])(
+    '%s sets its colour exactly once, so no later rule can override the measured one',
+    selector => {
+      // Innermost brace pairs, so rules nested in @media or @container are seen
+      // as themselves. Any rule whose selector mentions the class counts, not
+      // only an exact match: a `.panel .erf-wait__aside` would win just as well.
+      const name = new RegExp(`${selector.replace('.', '\\.')}(?![\\w-])`)
+      const setters = [...STYLE.matchAll(/([^{}]+)\{([^{}]*)\}/g)].filter(
+        ([, sel, body]) => name.test(sel) && /(?:^|;)\s*color:/.test(body)
+      )
+      expect(setters.map(([, sel]) => sel.trim())).toHaveLength(1)
     }
   )
 })

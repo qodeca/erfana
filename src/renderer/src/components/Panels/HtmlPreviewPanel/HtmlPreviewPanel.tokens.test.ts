@@ -88,12 +88,14 @@ describe('HtmlPreviewPanel.css token references', () => {
    * indirection did nothing. A property is defined if the token sheet or the
    * stylesheet itself declares it.
    */
+  // The last column is each sheet's floor: the distinct tokens it reads today
+  // (20, 44, 7 and 3), minus a little, so a shrinking scan is noticed per sheet.
   it.each([
-    ['HtmlPreviewPanel.css', PANEL_CSS],
-    ['PreviewChromeBand.css', BAND_CSS],
-    ['PreviewNavControls.css', NAV_CSS],
-    ['hostName.css', HOST_CSS]
-  ] as const)('%s references only tokens that exist', (_name, css) => {
+    ['HtmlPreviewPanel.css', PANEL_CSS, 15],
+    ['PreviewChromeBand.css', BAND_CSS, 35],
+    ['PreviewNavControls.css', NAV_CSS, 5],
+    ['hostName.css', HOST_CSS, 3]
+  ] as const)('%s references only tokens that exist', (_name, css, floor) => {
     const defined = definedTokens(TOKENS_CSS)
     // A sheet may define a few of its own properties inline (e.g. the band
     // height the panel publishes for the find bar); those count as defined too.
@@ -106,7 +108,7 @@ describe('HtmlPreviewPanel.css token references', () => {
     // when the scan found nothing at all — a changed `var(...)` shape, a moved
     // file, an over-eager comment stripper. Without this the check could pass
     // forever while reading nothing.
-    expect(referenced.length).toBeGreaterThan(2)
+    expect(referenced.length).toBeGreaterThanOrEqual(floor)
     expect(defined.size).toBeGreaterThan(20)
 
     const missing = referenced.filter((token) => !defined.has(token)).sort()

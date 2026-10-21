@@ -205,7 +205,7 @@
     <button class="erf-band__allow ctl-btn" id="narrow">Narrow side pane: 300px, list open</button>
     <p style="font-size:var(--text-sm); color:var(--color-text-secondary); margin-top:calc(var(--space-6) * -1)">
       The state the bar-only width demos below cannot reach. The row keeps its fixed middle track,
-      its gaps and the scroll gutter, so the host column is what gives — and the long host has to
+      its gaps and the scroll gutter, so the host column is what gives – and the long host has to
       wrap at its dots, never lose its end. Scroll the list to reach it.
     </p>
 
@@ -522,16 +522,8 @@
         reachable by keyboard.</td>
     </tr>
     <tr>
-      <td>A toolbar tool's focus ring</td>
-      <td>Outward 2px; inset only inside a scrolling list (<a href="../../foundations/focus.html">Focus</a>).</td>
-      <td>Inset. The bar is a horizontal scroll container (<code>overflow-x: auto</code>, <code>nav.css</code>),
-        so an outward ring is clipped at the scroll edge, and across the tools' 2px gap it would land on the
-        neighbouring tool. That is the card's scroll-container case, but the card words it for lists, so it is
-        recorded. The chip keeps the outward ring: it fits inside the bar's padding.</td>
-    </tr>
-    <tr>
       <td>Host-list clamp and the row's middle track</td>
-      <td>Spacing from the scale (<a href="../../foundations/spacing.html">Spacing</a>).</td>
+      <td>Spacing from the scale (<a href="../../foundations/spacing.html">Spacing</a>, tokens only).</td>
       <td>Two literals: the list clamps at <code>240px</code>, and the middle track is <code>72px</code>, sized to the
         short failure text it carries. The scale stops at 48px and neither is a step of it. The clamp used to read
         <code>var(--erf-band-max-list, 240px)</code>, a property defined nowhere; it is now plainly the literal it
@@ -539,7 +531,7 @@
     </tr>
     <tr>
       <td>Section headings and the confirm text</td>
-      <td>Type from the scale (<a href="../../foundations/type.html">Typography</a>).</td>
+      <td>Type from the scale (<a href="../../foundations/type.html">Typography</a>, tokens only).</td>
       <td>The uppercase section headings take <code>letter-spacing: 0.5px</code> and the confirm text a
         <code>72ch</code> measure. The type scale has no tracking or measure token; 0.5px is what the app's other
         uppercase labels already use.</td>
