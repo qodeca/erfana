@@ -103,8 +103,14 @@ test.describe('Directory watcher pipeline', () => {
       // Generate unique filename to avoid conflicts across retries
       const fileName = `e2e-watcher-${Date.now()}.md`
 
-      // Send command and start timing AFTER Enter is pressed (when the file is created on disk)
-      await terminal.sendCommand(window, `touch "${path.join(projectPath, fileName)}"`)
+      // Send command and start timing AFTER Enter is pressed (when the file is created on disk).
+      // `node -e` rather than `touch`, which PowerShell and cmd.exe do not have: the app
+      // picks the shell from $SHELL, so a suite started from PowerShell gets PowerShell.
+      const filePath = path.join(projectPath, fileName).replace(/\\/g, '/')
+      await terminal.sendCommand(
+        window,
+        `node -e "require('fs').closeSync(require('fs').openSync(process.argv[1], 'w'))" "${filePath}"`
+      )
       const startTime = Date.now()
 
       // Wait for file to appear in Project Tree

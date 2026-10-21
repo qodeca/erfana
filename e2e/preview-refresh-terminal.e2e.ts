@@ -39,6 +39,7 @@ import {
   createTempUserDataDir
 } from './utils/helpers'
 import { ImageViewerPage } from './pages/image-viewer.page'
+import { existsSync } from 'fs'
 
 // =============================================================================
 // Constants and helpers
@@ -52,6 +53,16 @@ const SEED_SVG =
 
 /** How long to keep retrying the link click before failing. */
 const LINK_CLICK_BUDGET_MS = process.platform === 'win32' ? 30_000 : 20_000
+
+/**
+ * This spec drives a POSIX shell (`printf`, `clear`, `PS1`). The app takes the
+ * shell from $SHELL first, so on Windows pin it to Git Bash: a suite started
+ * from PowerShell has no $SHELL and would otherwise get PowerShell.
+ */
+const WINDOWS_POSIX_SHELL =
+  process.env.SHELL && existsSync(process.env.SHELL)
+    ? process.env.SHELL
+    : 'C:\\Program Files\\Git\\bin\\bash.exe'
 
 /** How many lines the probe command prints, and therefore how many rows carry a link. */
 const PRINTED_LINES = 3
@@ -141,6 +152,10 @@ async function clickCell(page: Page, grid: TerminalGrid, row: number, col: numbe
 
 test.describe('Terminal file links route images to the image viewer', () => {
   test('should open the image viewer, not the editor, for an image path', async () => {
+    test.skip(
+      process.platform === 'win32' && !existsSync(WINDOWS_POSIX_SHELL),
+      `needs a POSIX shell; Git Bash not found at ${WINDOWS_POSIX_SHELL}`
+    )
     const { projectPath, cleanup: cleanupProject } = await createTestProject({
       [IMAGE_NAME]: SEED_SVG,
       'notes.md': '# Notes\n'
@@ -159,7 +174,8 @@ test.describe('Terminal file links route images to the image viewer', () => {
           NODE_ENV: 'development',
           // Skip the user's login shell rc files – see docs/known-issues.md
           // § "E2E terminal-driven tests sensitive to user's shell init speed".
-          ERFANA_E2E_FAST_SHELL: '1'
+          ERFANA_E2E_FAST_SHELL: '1',
+          ...(process.platform === 'win32' ? { SHELL: WINDOWS_POSIX_SHELL } : {})
         }
       })
 
