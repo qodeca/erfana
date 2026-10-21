@@ -22,6 +22,7 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  renameSync,
   realpathSync,
   rmSync,
   symlinkSync,
@@ -388,7 +389,9 @@ describe('External File Handlers', () => {
 
     it('does not treat a file that changed after the pick as picked', async () => {
       await pick(source)
-      rmSync(source)
+      // Keep the picked file alive under another name so the new one cannot reuse its inode
+      const kept = path.join(outside, 'kept.md')
+      renameSync(source, kept)
       writeFileSync(source, 'a different file')
 
       await invoke('file:moveFromExternal', source, path.join(root, 'docs'), root)
@@ -488,7 +491,7 @@ describe('External File Handlers', () => {
 
     it('cancels with no change when the source changed while the box was open', async () => {
       confirm.mockImplementation(async () => {
-        rmSync(source)
+        renameSync(source, path.join(outside, 'kept-original.md'))
         writeFileSync(source, 'swapped in')
         return 'move'
       })

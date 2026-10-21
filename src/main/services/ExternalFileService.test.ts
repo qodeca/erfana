@@ -407,7 +407,7 @@ describe('ExternalFileService', () => {
   describe('copyFromExternal', () => {
     it('validates file before copying', async () => {
       const sourcePath = '/external/file.md'
-      const targetFolder = '/project/docs'
+      const targetFolder = path.resolve('/project/docs')
 
       ;(fs.lstat as Mock).mockResolvedValueOnce(makeStats({ isDir: true }))
 
@@ -420,7 +420,7 @@ describe('ExternalFileService', () => {
 
     it('delegates to FileService.copyItem', async () => {
       const sourcePath = '/external/file.md'
-      const targetFolder = '/project/docs'
+      const targetFolder = path.resolve('/project/docs')
 
       ;(fs.lstat as Mock).mockResolvedValueOnce(makeStats({ isDir: false }))
       ;(mockFileService.checkNameConflict as Mock).mockResolvedValue(false)
@@ -429,13 +429,13 @@ describe('ExternalFileService', () => {
       const result = await service.copyFromExternal(sourcePath, target(targetFolder))
 
       expect(result.success).toBe(true)
-      expect(result.path).toBe(path.join('/project', 'docs', 'file.md'))
-      expect(fs.copyFile).toHaveBeenCalledWith(sourcePath, path.join('/project', 'docs', 'file.md'), COPYFILE_EXCL)
+      expect(result.path).toBe(path.join(path.resolve('/project/docs'), 'file.md'))
+      expect(fs.copyFile).toHaveBeenCalledWith(sourcePath, path.join(path.resolve('/project/docs'), 'file.md'), COPYFILE_EXCL)
     })
 
     it('handles conflict resolution with replace', async () => {
       const sourcePath = '/external/file.md'
-      const targetFolder = '/project/docs'
+      const targetFolder = path.resolve('/project/docs')
 
       ;(fs.lstat as Mock).mockResolvedValueOnce(makeStats({ isDir: false }))
       ;(mockFileService.checkNameConflict as Mock).mockResolvedValue(true) // Conflict exists
@@ -444,12 +444,12 @@ describe('ExternalFileService', () => {
       const result = await service.copyFromExternal(sourcePath, target(targetFolder), 'replace')
 
       expect(result.success).toBe(true)
-      expect(result.path).toBe(path.join('/project', 'docs', 'file.md'))
+      expect(result.path).toBe(path.join(path.resolve('/project/docs'), 'file.md'))
     })
 
     it('handles conflict resolution with keepBoth', async () => {
       const sourcePath = '/external/file.md'
-      const targetFolder = '/project/docs'
+      const targetFolder = path.resolve('/project/docs')
 
       ;(fs.lstat as Mock).mockResolvedValueOnce(makeStats({ isDir: false }))
       ;(mockFileService.checkNameConflict as Mock)
@@ -461,12 +461,12 @@ describe('ExternalFileService', () => {
       const result = await service.copyFromExternal(sourcePath, target(targetFolder), 'keepBoth')
 
       expect(result.success).toBe(true)
-      expect(result.path).toBe(path.join('/project', 'docs', 'file (1).md'))
+      expect(result.path).toBe(path.join(path.resolve('/project/docs'), 'file (1).md'))
     })
 
     it('handles source file deletion during operation (race condition)', async () => {
       const sourcePath = '/external/file.md'
-      const targetFolder = '/project/docs'
+      const targetFolder = path.resolve('/project/docs')
 
       ;(fs.lstat as Mock).mockResolvedValueOnce(makeStats({ isDir: false }))
       ;(mockFileService.checkNameConflict as Mock).mockResolvedValue(false)
@@ -481,7 +481,7 @@ describe('ExternalFileService', () => {
 
     it('sanitizes filename during copy', async () => {
       const sourcePath = '/external/../path/bad\\file.md'
-      const targetFolder = '/project/docs'
+      const targetFolder = path.resolve('/project/docs')
 
       ;(fs.lstat as Mock).mockResolvedValueOnce(makeStats({ isDir: false }))
       ;(mockFileService.checkNameConflict as Mock).mockResolvedValue(false)
@@ -498,7 +498,7 @@ describe('ExternalFileService', () => {
 
     it('handles copy errors gracefully', async () => {
       const sourcePath = '/external/file.md'
-      const targetFolder = '/project/docs'
+      const targetFolder = path.resolve('/project/docs')
 
       ;(fs.lstat as Mock).mockResolvedValueOnce(makeStats({ isDir: false }))
       ;(mockFileService.checkNameConflict as Mock).mockResolvedValue(false)
@@ -514,7 +514,7 @@ describe('ExternalFileService', () => {
   describe('moveFromExternal', () => {
     it('validates file before moving', async () => {
       const sourcePath = '/external/file.md'
-      const targetFolder = '/project/docs'
+      const targetFolder = path.resolve('/project/docs')
 
       ;(fs.lstat as Mock).mockResolvedValueOnce(makeStats({ isDir: true }))
 
@@ -528,7 +528,7 @@ describe('ExternalFileService', () => {
 
     it('copies then deletes source', async () => {
       const sourcePath = '/external/file.md'
-      const targetFolder = '/project/docs'
+      const targetFolder = path.resolve('/project/docs')
 
       ;(fs.lstat as Mock).mockResolvedValue(makeStats({ isDir: false }))
       ;(mockFileService.checkNameConflict as Mock).mockResolvedValue(false)
@@ -538,14 +538,14 @@ describe('ExternalFileService', () => {
       const result = await service.moveFromExternal(sourcePath, target(targetFolder), SENDER)
 
       expect(result.success).toBe(true)
-      expect(result.path).toBe(path.join('/project', 'docs', 'file.md'))
-      expect(fs.copyFile).toHaveBeenCalledWith(sourcePath, path.join('/project', 'docs', 'file.md'), COPYFILE_EXCL)
+      expect(result.path).toBe(path.join(path.resolve('/project/docs'), 'file.md'))
+      expect(fs.copyFile).toHaveBeenCalledWith(sourcePath, path.join(path.resolve('/project/docs'), 'file.md'), COPYFILE_EXCL)
       expect(fs.rm).toHaveBeenCalledWith(sourcePath)
     })
 
     it('handles errors during source deletion gracefully', async () => {
       const sourcePath = '/external/file.md'
-      const targetFolder = '/project/docs'
+      const targetFolder = path.resolve('/project/docs')
 
       ;(fs.lstat as Mock).mockResolvedValue(makeStats({ isDir: false }))
       ;(mockFileService.checkNameConflict as Mock).mockResolvedValue(false)
@@ -556,12 +556,12 @@ describe('ExternalFileService', () => {
 
       // Move still succeeds even if source deletion fails (file was copied)
       expect(result.success).toBe(true)
-      expect(result.path).toBe(path.join('/project', 'docs', 'file.md'))
+      expect(result.path).toBe(path.join(path.resolve('/project/docs'), 'file.md'))
     })
 
     it('handles source already deleted during move (ENOENT)', async () => {
       const sourcePath = '/external/file.md'
-      const targetFolder = '/project/docs'
+      const targetFolder = path.resolve('/project/docs')
 
       ;(fs.lstat as Mock).mockResolvedValue(makeStats({ isDir: false }))
       ;(mockFileService.checkNameConflict as Mock).mockResolvedValue(false)
@@ -576,7 +576,7 @@ describe('ExternalFileService', () => {
 
     it('handles move errors gracefully', async () => {
       const sourcePath = '/external/file.md'
-      const targetFolder = '/project/docs'
+      const targetFolder = path.resolve('/project/docs')
 
       ;(fs.lstat as Mock).mockResolvedValue(makeStats({ isDir: false }))
       ;(mockFileService.checkNameConflict as Mock).mockResolvedValue(false)
