@@ -22,8 +22,9 @@
   .state-demo { background: var(--color-bg-tertiary); padding: var(--space-2) 0; }
   .state-name { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-tertiary);
                 padding: var(--space-2) var(--space-8) 0; }
-  /* The host demo is deliberately squeezable: the elide only misbehaves when it
-     actually has to cut, which is why this defect survived unseen. */
+  /* The host demo is deliberately squeezable: wrapping only shows when a host
+     actually stops fitting, and the old elide survived unseen because no demo
+     ever made it cut. */
   /* overflow-x: auto IS the "the parent gives" half of the contract. Squeeze the
      slider past the widest domain and this scrolls rather than cutting it. */
   .host-frame { background: var(--color-bg-tertiary);
@@ -234,6 +235,14 @@
         Removing a project then needs no extra shortcut to learn, and every other row's Remove stays out
         of the Tab order, so the cost does not grow with the list. Arrows, Home and End move between rows
         as the card says. See <code>WelcomePanel.tsx</code> (PR #286).</td>
+    </tr>
+    <tr>
+      <td>Cut row (<code>row.css</code>)</td>
+      <td>Tokens only (<code>design/README.md</code>).</td>
+      <td>The fade is a literal <code>opacity: 0.6</code> and the dashed underline sits at a literal
+        <code>3px</code> offset. No opacity token sits between <code>--opacity-disabled</code> and opaque,
+        and 3px is off the 2px spacing scale. The fade is the one <code>ProjectTree.css</code> ships, and
+        tokenising them is a visual decision for the adoption of this file, not a side effect.</td>
     </tr>
   </tbody>
 </table>
