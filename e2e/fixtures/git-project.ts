@@ -25,6 +25,7 @@ import * as path from 'path'
 import { sep } from 'path'
 import { TEST_IDS } from '../../src/renderer/src/constants/testids'
 import { byTestId } from '../utils/locators'
+import { E2E_TEMP_DIR, buildAppEnv, closeAppAndWait, removeDirWithRetry } from './isolation'
 import {
   initRepoWithCommit,
   writeFileTree,
@@ -131,9 +132,8 @@ type GitProjectFixtures = {
 export const test = base.extend<GitProjectFixtures>({
   // eslint-disable-next-line no-empty-pattern
   gitTestProject: async ({}, use) => {
-    const e2eTempDir = path.join(PROJECT_ROOT, '.e2e-temp')
-    await fs.promises.mkdir(e2eTempDir, { recursive: true })
-    const repo = await fs.promises.mkdtemp(path.join(e2eTempDir, 'git-'))
+    await fs.promises.mkdir(E2E_TEMP_DIR, { recursive: true })
+    const repo = await fs.promises.mkdtemp(path.join(E2E_TEMP_DIR, 'git-'))
 
     initRepoWithCommit(repo, SEED_FILES)
     applyMutations(repo)
@@ -141,19 +141,15 @@ export const test = base.extend<GitProjectFixtures>({
     await use({ path: repo })
 
     // Teardown: caller closes the app first (windowWithGitProject depends on
-    // this fixture, so its teardown runs before ours). Force + retry survives
+    // this fixture, so its teardown runs before ours). The retry survives
     // Windows EBUSY from lingering `.git` / MERGING handles.
-    try {
-      await fs.promises.rm(repo, { recursive: true, force: true, maxRetries: 3 })
-    } catch (error) {
-      console.warn('[git-project teardown] repo cleanup failed:', error)
-    }
+    await removeDirWithRetry(repo)
   },
 
-  windowWithGitProject: async ({ userDataDir, gitTestProject }, use) => {
+  windowWithGitProject: async ({ userDataDir, homeDir, gitTestProject }, use) => {
     const app: ElectronApplication = await electron.launch({
       args: [PROJECT_ROOT, `--user-data-dir=${userDataDir}`],
-      env: { ...process.env, NODE_ENV: 'development' }
+      env: buildAppEnv({ homeDir })
     })
 
     const window = await app.firstWindow()
@@ -194,11 +190,7 @@ export const test = base.extend<GitProjectFixtures>({
 
     // KNOWN_WAIT: electron-log flush before close (teardown path, not assertion)
     await new Promise((resolve) => setTimeout(resolve, 100))
-    try {
-      await app.close()
-    } catch (error) {
-      console.warn('[git-project teardown] app.close() failed:', error)
-    }
+    await closeAppAndWait(app)
   }
 })
 

@@ -36,11 +36,6 @@ vi.mock('electron', () => {
   }
 })
 
-vi.mock('@electron-toolkit/preload', () => {
-  // Minimal stub; not used directly in tests when contextIsolated=false
-  return { electronAPI: {} }
-})
-
 declare global {
   interface Window {
     api: typeof import('./index').default extends never ? any : any

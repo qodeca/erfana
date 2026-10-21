@@ -13,6 +13,7 @@ import { homedir, platform as osPlatform } from 'os'
 import type { IPty } from 'node-pty'
 import type { ShellKind } from '../../shared/shellKind'
 import { logger } from './LoggingService'
+import { redactPath } from '../utils/redactUserInput'
 import {
   buildWindowsBootstrap,
   normalizeWindowsCwd,
@@ -76,7 +77,20 @@ interface TerminalInstance {
   hasReceivedMarker: boolean // Track if marker was detected (prevents late data forwarding)
   webContentsId: number // Track owning webContents for cleanup on window close
   shellKind: ShellKind // Quoting flavour resolved at create time (#164)
+  exited: Promise<void> // Settles when node-pty reports the shell exit (#214)
 }
+
+/**
+ * How long `dispose()` waits for killed shells to report their exit (#214).
+ *
+ * On Windows, node-pty reports a ConPTY shell's exit from a native thread that
+ * calls back into JavaScript. If the app exits first, that callback lands while
+ * Node is tearing down and V8 aborts the process ("Invoke in
+ * DisallowJavascriptExecutionScope"). Waiting for the exit lets the callback run
+ * while JavaScript is still allowed. Measured on Windows 11: 115–400 ms after
+ * kill. Kept below the 2 s shutdown bound in `src/main/index.ts`.
+ */
+export const TERMINAL_EXIT_WAIT_MS = 1_500
 
 /**
  * Terminal configuration
@@ -92,6 +106,8 @@ interface TerminalConfig {
 export class TerminalService extends EventEmitter {
   private terminals: Map<string, TerminalInstance> = new Map()
   private terminalCounter = 0
+  /** Exits of killed shells not yet reported by node-pty; `dispose()` waits for them (#214). */
+  private pendingExits = new Set<Promise<void>>()
 
   /**
    * @param fsExists - injected for `resolveWindowsShell()` testability;
@@ -200,7 +216,7 @@ export class TerminalService extends EventEmitter {
 
     logger.info(`🔵 Creating terminal: ${terminalId}`)
     logger.info(`🔵 Shell: ${shell}`)
-    logger.info(`🔵 CWD: ${cwd}`)
+    logger.info(`🔵 CWD: ${redactPath(cwd)}`)
     logger.info(`🔵 Size: ${cols}x${rows}`)
 
     try {
@@ -306,6 +322,11 @@ export class TerminalService extends EventEmitter {
         env: spawnEnv
       })
 
+      let markExited: () => void = () => {}
+      const exited = new Promise<void>((resolve) => {
+        markExited = resolve
+      })
+
       // Store terminal instance
       const terminal: TerminalInstance = {
         id: terminalId,
@@ -322,7 +343,8 @@ export class TerminalService extends EventEmitter {
         // Sentinel value -1 means "no owner" - terminals with -1 won't be cleaned up
         // during window destruction (used in tests and manual terminal creation)
         webContentsId: webContentsId ?? -1,
-        shellKind
+        shellKind,
+        exited
       }
 
       this.terminals.set(terminalId, terminal)
@@ -379,7 +401,9 @@ export class TerminalService extends EventEmitter {
       // regressions.
       ptyProcess.onData((data: string) => {
         const term = this.terminals.get(terminalId)
-        logger.debug(`[PRIMARY onData] term=${!!term}, init=${term?.initializationComplete}, clearing=${term?.isClearing}, marker=${term?.hasReceivedMarker}, dataPreview=${data.substring(0, 50).replace(/\n/g, '\\n')}`)
+        // Length only – PTY output is user content and must never reach the log file.
+        // `logger.debug` drops the call below the configured level.
+        logger.debug(`[PRIMARY onData] term=${!!term}, init=${term?.initializationComplete}, clearing=${term?.isClearing}, marker=${term?.hasReceivedMarker}, length=${data.length}`)
 
         // STRICT BLOCKING: Only forward if:
         // 1. Initialization complete (clear confirmed by renderer)
@@ -396,6 +420,7 @@ export class TerminalService extends EventEmitter {
       // Handle PTY exit
       ptyProcess.onExit((event: { exitCode: number; signal?: number }) => {
         logger.info(`🏁 Terminal ${terminalId} exited`, event)
+        markExited()
         this.emit('exit', { terminalId, exitCode: event.exitCode, signal: event.signal })
         this.terminals.delete(terminalId)
       })
@@ -532,6 +557,7 @@ export class TerminalService extends EventEmitter {
     try {
       terminal.ptyProcess.kill()
       this.terminals.delete(terminalId)
+      this.trackExit(terminal)
       logger.info(`🛑 Terminal ${terminalId} killed`)
       return true
     } catch (error) {
@@ -540,6 +566,7 @@ export class TerminalService extends EventEmitter {
       if (code === 'EPIPE' || code === 'ESRCH') {
         logger.info(`ℹ️ Terminal ${terminalId} process already terminated`)
         this.terminals.delete(terminalId)
+        this.trackExit(terminal)
         return true
       }
 
@@ -591,12 +618,16 @@ export class TerminalService extends EventEmitter {
   }
 
   /**
-   * Cleanup all terminals
+   * Cleanup all terminals, then wait (bounded by `TERMINAL_EXIT_WAIT_MS`) until
+   * node-pty has reported every killed shell's exit – including shells killed
+   * earlier by `killTerminal` or a window close – so its native exit callback
+   * cannot run after the app starts to exit (#214).
    */
   async dispose(): Promise<void> {
     logger.info('🛑 Disposing TerminalService...')
 
     for (const [terminalId, terminal] of this.terminals.entries()) {
+      this.trackExit(terminal)
       try {
         terminal.ptyProcess.kill()
         logger.info(`✅ Terminal ${terminalId} cleaned up`)
@@ -612,7 +643,29 @@ export class TerminalService extends EventEmitter {
     }
 
     this.terminals.clear()
+    await this.waitForPendingExits()
     logger.info('✅ TerminalService disposed')
+  }
+
+  /** Remember a killed shell until node-pty reports its exit (#214). */
+  private trackExit(terminal: TerminalInstance): void {
+    const exited = terminal.exited
+    this.pendingExits.add(exited)
+    void exited.then(() => this.pendingExits.delete(exited))
+  }
+
+  private async waitForPendingExits(): Promise<void> {
+    if (this.pendingExits.size === 0) return
+    let timer: NodeJS.Timeout | undefined
+    const timedOut = new Promise<boolean>((resolve) => {
+      timer = setTimeout(() => resolve(true), TERMINAL_EXIT_WAIT_MS)
+    })
+    const allExited = Promise.all(this.pendingExits).then(() => false)
+    const didTimeOut = await Promise.race([allExited, timedOut])
+    clearTimeout(timer)
+    if (didTimeOut) {
+      logger.warn(`⚠️ ${this.pendingExits.size} terminal(s) did not report exit within ${TERMINAL_EXIT_WAIT_MS}ms`)
+    }
   }
 
   /**

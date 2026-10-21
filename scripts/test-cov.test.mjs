@@ -8,7 +8,7 @@
 // either the runner's passes or the per-area npm scripts.
 
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
@@ -35,6 +35,17 @@ describe('test-cov project scoping (issue #133)', () => {
       expect(args[flagIndex + 1]).toBe(project.name)
       expect(args).toContain('--coverage')
     }
+  })
+
+  it('starts vitest through node, never npx, and leaves out/ in place', () => {
+    // Node refuses to spawn `npx.cmd` without a shell on Windows (EINVAL), so
+    // an npx-based runner fails every pass there before a test runs. And a
+    // moved `out/` cannot be moved back while anything watches it.
+    const runner = readFileSync(join(here, 'test-cov.mjs'), 'utf8')
+    expect(runner).toContain('process.execPath')
+    expect(runner).not.toMatch(/['"]npx(\.cmd)?['"]/)
+    expect(runner).not.toMatch(/renameSync/)
+    expect(existsSync(join(here, '..', 'node_modules', 'vitest', 'vitest.mjs'))).toBe(true)
   })
 
   it('scopes the per-area npm scripts with the same --project flag', () => {

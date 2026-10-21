@@ -65,7 +65,6 @@ export const PURGED_STORAGES = Object.freeze([
   'filesystem',
   'indexdb',
   'localstorage',
-  'websql',
   'serviceworkers',
   'cachestorage'
 ] as const)

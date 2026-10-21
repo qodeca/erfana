@@ -53,7 +53,7 @@ export function registerClipboardHandlers(): void {
       // Cap the returned text at the same bound as the write path so a hostile
       // or accidental multi-MB clipboard payload can't be funnelled into the
       // renderer unbounded.
-      return clipboard.readText().slice(0, CLIPBOARD_MAX_TEXT_LENGTH)
+      return (await clipboard.readText()).slice(0, CLIPBOARD_MAX_TEXT_LENGTH)
     } catch (error) {
       logger.error(
         'Failed to read text from clipboard',
@@ -88,7 +88,7 @@ export function registerClipboardHandlers(): void {
       }
 
       try {
-        clipboard.writeText(parsed.data)
+        await clipboard.writeText(parsed.data)
         return true
       } catch (error) {
         logger.error(

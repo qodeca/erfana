@@ -9,7 +9,7 @@
  *
  * What this file can and cannot prove: it verifies "given an unlink and a file
  * that is back on disk, the watch is re-armed and the change is debounced". It
- * CANNOT verify that chokidar v3 actually emits `unlink` for `mv tmp target` -
+ * CANNOT verify that chokidar actually emits `unlink` for `mv tmp target` -
  * that premise is pinned by the real-chokidar test in
  * `watcher/singleFileWatch.rename.integration.test.ts` (finding M-7).
  */

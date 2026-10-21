@@ -39,22 +39,6 @@ vi.mock('electron', () => ({
   }
 }))
 
-vi.mock('@electron-toolkit/preload', () => ({
-  electronAPI: {
-    ipcRenderer: {
-      invoke: mockInvoke,
-      on: mockOn,
-      removeListener: mockRemoveListener,
-      send: vi.fn(),
-      sendSync: vi.fn()
-    },
-    webFrame: { insertCSS: vi.fn(), setZoomFactor: vi.fn(), setZoomLevel: vi.fn() },
-    webUtils: { getPathForFile: vi.fn() },
-    process: { platform: 'darwin', versions: {}, env: {} }
-  },
-  exposeElectronAPI: vi.fn()
-}))
-
 // Import the preload entry point AFTER all mocks are registered.
 import '../index'
 

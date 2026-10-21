@@ -22,17 +22,15 @@
 /**
  * Protocols allowed to leave the app for an OS handler.
  *
- * `tel:` and `ftp:` are inherited from the Markdown preview's existing list so
- * this change alters HOW links are checked, not WHICH links work. Both route to
- * an OS-registered handler with no browser in between and are worth revisiting
- * as a product decision, separately.
+ * `tel:` is kept from the Markdown preview's earlier list; it routes to an
+ * OS-registered handler with no browser in between. `ftp:` was dropped by an
+ * owner decision: a plain-text file-transfer link has no place in the list.
  */
 export const EXTERNAL_PROTOCOLS: ReadonlySet<string> = new Set([
   'http:',
   'https:',
   'mailto:',
-  'tel:',
-  'ftp:'
+  'tel:'
 ])
 
 /**

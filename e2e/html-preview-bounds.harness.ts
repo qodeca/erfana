@@ -16,19 +16,18 @@
  * @see docs/design/design-issue-124-part1.md
  */
 
-import * as os from 'os'
 import * as path from 'path'
 
 import type { ElectronApplication, JSHandle, Page } from '@playwright/test'
 import type { BrowserWindow } from 'electron'
 import { test as base, expect } from './fixtures/index'
+import { appLogsDir } from './fixtures/isolation'
 import { LogTail } from './fixtures/logTail'
 import { dismissAllToasts } from './pages/html-preview.browser'
 import { HtmlPreviewPage, PREVIEW_BUDGET_MS, type ViewBounds } from './pages/html-preview.page'
 import { TerminalPage } from './pages/terminal.page'
 import { byTestId } from './utils/locators'
 import { TEST_IDS } from '../src/renderer/src/constants/testids'
-import { LOGS_DIR_RELATIVE } from '../src/shared/constants'
 import { BOUNDS_DROP_MESSAGE } from '../src/shared/dropReporter'
 
 export { expect }
@@ -107,23 +106,25 @@ function beyondSlack(offset: Offset | null): Offset | null {
 }
 
 /** The main log shared by both processes; drop lines from either end up here. */
-function combinedLogPath(): string {
-  return path.join(os.homedir(), LOGS_DIR_RELATIVE, 'combined.log')
+function combinedLogPath(homeDir: string): string {
+  return path.join(appLogsDir(homeDir), 'combined.log')
 }
 
 /**
  * The lines carrying `message` that this test's preview wrote since `mark()`.
- * Scoped by the temp project folder, which the panel id carries in sanitized
- * form, so another worker's lines never count.
+ * Reads the worker's own log (sandbox `homeDir`) and is further scoped by the
+ * temp project folder, which the panel id carries in sanitized form.
  */
 export class LogTrail {
-  private readonly tail = new LogTail(combinedLogPath())
+  private readonly tail: LogTail
   private readonly scope: string
 
   constructor(
+    homeDir: string,
     projectPath: string,
     private readonly message: string
   ) {
+    this.tail = new LogTail(combinedLogPath(homeDir))
     this.scope = path.basename(projectPath).replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()
   }
 
@@ -156,10 +157,11 @@ export class BoundsHarness {
   constructor(
     readonly page: Page,
     readonly app: ElectronApplication,
-    projectPath: string
+    projectPath: string,
+    readonly homeDir: string
   ) {
     this.preview = new HtmlPreviewPage(page, app)
-    this.drops = new LogTrail(projectPath, BOUNDS_DROP_MESSAGE)
+    this.drops = new LogTrail(homeDir, projectPath, BOUNDS_DROP_MESSAGE)
     this.terminal = new TerminalPage(page)
   }
 
@@ -313,8 +315,17 @@ export class BoundsHarness {
  * attached, zoom reset, and every other window destroyed after it.
  */
 export const test = base.extend<{ bounds: BoundsHarness }>({
-  bounds: async ({ windowWithTestProject, appWithTestProject, testProject }, use, testInfo) => {
-    const harness = new BoundsHarness(windowWithTestProject, appWithTestProject, testProject.path)
+  bounds: async (
+    { windowWithTestProject, appWithTestProject, testProject, homeDir },
+    use,
+    testInfo
+  ) => {
+    const harness = new BoundsHarness(
+      windowWithTestProject,
+      appWithTestProject,
+      testProject.path,
+      homeDir
+    )
     const hostId = await (await harness.hostWindow()).evaluate((w) => w.id)
     // The zoom a previous test left in this worker's profile must not leak in.
     await harness.setHostZoomLevel(0)

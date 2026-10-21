@@ -9,7 +9,7 @@
  * overrides (`stabilityThreshold: 50`) reach the factory.
  */
 import { describe, it, expect, vi } from 'vitest'
-import type { FSWatcher, WatchOptions } from 'chokidar'
+import type { FSWatcher, ChokidarOptions } from 'chokidar'
 import { createPreviewWatchPool, type WatchFactory } from './PreviewWatchPool'
 import { createPreviewWatchBudget } from './previewWatchBudget'
 import { PREVIEW } from '../../../shared/constants'
@@ -17,7 +17,7 @@ import { PREVIEW } from '../../../shared/constants'
 interface FakeWatcher {
   path: string
   handlers: { onChange: () => void; onUnlink: () => void; onError: (e: unknown) => void }
-  overrides?: Partial<WatchOptions>
+  overrides?: Partial<ChokidarOptions>
   close: ReturnType<typeof vi.fn>
   closed: boolean
 }

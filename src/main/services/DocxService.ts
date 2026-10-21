@@ -8,6 +8,7 @@ import type { DocxExportResponse } from '../../shared/ipc/docx-schema'
 import { htmlToDocxConverter } from './HtmlToDocxConverter'
 import { logger } from './LoggingService'
 import { deriveSafeFilename } from '../utils/validateFilename'
+import { rememberDialogResult, withLastDirectory } from '../utils/lastDialogDirectory'
 
 // ============================================================================
 // Value Objects
@@ -187,18 +188,19 @@ class DocxService implements IDocxService {
     const sanitized = this.sanitizeFilename(suggestedName)
     const defaultName = sanitized || DOCX_EXPORT.DEFAULT_FILENAME
 
-    const result = await dialog.showSaveDialog({
+    const result = await dialog.showSaveDialog(withLastDirectory({
       title: 'Export to Word Document',
       defaultPath: `${defaultName}.docx`,
       filters: [
         { name: 'Word Document', extensions: ['docx'] }
       ],
       properties: ['showOverwriteConfirmation']
-    })
+    }))
 
     if (result.canceled || !result.filePath) {
       return undefined
     }
+    rememberDialogResult(result.filePath)
 
     // Ensure .docx extension
     let filePath = result.filePath

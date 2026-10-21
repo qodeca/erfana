@@ -53,7 +53,12 @@ vi.mock('child_process', () => {
   type Cb = (err: Error | null, out?: { stdout: string; stderr: string }) => void
   const forward = (cmd: string, args: string[], opts: unknown, cb?: Cb): void => {
     const callback = (typeof opts === 'function' ? opts : cb) as Cb
-    hoisted.mockRun(cmd, args).then(
+    // Hardened spawns put isolation args before the subcommand; present the
+    // subcommand first so handlers keep matching on args[0]. The filter-driver
+    // listing (`config`) reports no drivers.
+    const sub = args[0] === '--no-pager' ? args.slice(args.findIndex((a) => ['config', 'status', 'rev-parse'].includes(a))) : args
+    const run = sub[0] === 'config' ? Promise.resolve('') : hoisted.mockRun(cmd, sub)
+    run.then(
       (stdout: string) => callback(null, { stdout, stderr: '' }),
       (err: Error) => callback(err),
     )

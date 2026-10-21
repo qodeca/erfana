@@ -585,3 +585,45 @@ export function getDefaultViewMode(
 ): 'split' | 'split-horizontal' | 'editor' | 'preview' {
   return isMarkdownFile(filePath) ? 'preview' : 'editor'
 }
+
+/**
+ * Who asked for a save. It decides the two things a save may do beyond the
+ * write itself:
+ *
+ * - `user` - the tab's own Cmd/Ctrl+S. The only trigger that may recreate a
+ *   missing folder (the banner's "Save to restore it"), and it always shows a
+ *   failure toast.
+ * - `autosave` - never recreates a folder; a failure toast repeats only when
+ *   the reason changes, since it retries every few seconds.
+ * - `registry` - a save by id from outside the tab (`editorSaveRegistry`, e.g.
+ *   the unsaved-changes prompt of a preview tab move). Never recreates a folder,
+ *   and shows no toast: the registry contract makes the caller toast on `false`.
+ */
+export type SaveTrigger = 'user' | 'autosave' | 'registry'
+
+/**
+ * Whether this save may recreate the folder a deleted-state file lived in.
+ *
+ * @param trigger - Who asked for the save
+ * @param isFileDeleted - The tab shows the "deleted on disk" banner
+ */
+export function shouldRecreateParentDirs(trigger: SaveTrigger, isFileDeleted: boolean): boolean {
+  return trigger === 'user' && isFileDeleted
+}
+
+/**
+ * Whether a failed save shows the panel's own toast (see {@link SaveTrigger}).
+ *
+ * @param trigger - Who asked for the save
+ * @param message - This failure's toast text
+ * @param lastShown - The last save-failure toast this panel showed for this
+ *   file, or null after a success or a file switch
+ */
+export function shouldToastSaveError(
+  trigger: SaveTrigger,
+  message: string,
+  lastShown: string | null
+): boolean {
+  if (trigger === 'registry') return false
+  return trigger === 'user' || message !== lastShown
+}

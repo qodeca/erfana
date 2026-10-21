@@ -126,6 +126,15 @@ This is the canonical cookbook for `release.yml` failures. Each row below is a r
 - **Platform:** All
 - **First seen:** run 31264941055 (v0.17.0 attempt 1) — see `docs/release-incidents/v0.17.0-attempt-1.md`
 
+### Row 13: Apple developer agreement missing or expired
+
+- **Regex:** `HTTP status code: 403\. A required agreement is missing or has expired`
+- **Human-readable symptom:** `Build macOS` fails at notarization with `⨯ Failed to notarize via notarytool. Failed with unexpected result: Error: HTTP status code: 403. A required agreement is missing or has expired.` The app was already packaged and code-signed; `Build Windows` can still pass.
+- **Root cause:** Not a code or secrets problem. Apple has published a new Apple Developer Program License Agreement (or a paid-apps agreement lapsed) and the team's Account Holder has not accepted it, so Apple's notary service refuses every submission from that team. Credentials stay valid; every release attempt fails the same way until the agreement is accepted.
+- **Fix:** The Apple Developer team's **Account Holder** signs in at developer.apple.com/account (and App Store Connect → Business, if it lists a pending agreement) and accepts the new agreement. Nothing in the repo changes. Re-run the macOS leg (`gh run rerun <run-id> --failed`) or, for a dry-run, dispatch `release.yml` again. Prevention: run a `release.yml` dry-run (`gh workflow run release.yml --ref main -f dry-run=true`) before tagging, so the 403 shows up before a tag is spent.
+- **Platform:** macOS
+- **First seen:** run 39144882739 (v0.21.0 pre-release dry-run, 2026-10-18)
+
 ## Operator-side failures (not `release.yml`)
 
 These happen on the operator's machine or against the REST API, so no CI log carries them and the analyzer never matches them. They are kept here because they stop a release just as hard.

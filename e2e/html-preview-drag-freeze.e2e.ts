@@ -97,7 +97,7 @@ async function freezeReasons(trail: LogTrail): Promise<string[]> {
 /** Open the page and start this test's drag-freeze trail after it settles. */
 async function openWithTrail(bounds: BoundsHarness, projectPath: string): Promise<LogTrail> {
   await bounds.open()
-  const trail = new LogTrail(projectPath, DRAG_FREEZE_LOG_MESSAGE)
+  const trail = new LogTrail(bounds.homeDir, projectPath, DRAG_FREEZE_LOG_MESSAGE)
   await trail.mark()
   return trail
 }

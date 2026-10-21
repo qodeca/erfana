@@ -157,6 +157,76 @@ describe('WatcherMetrics', () => {
     })
   })
 
+  describe('path filter and native backend counters (#211)', () => {
+    it('starts every counter at zero', () => {
+      expect(metrics.getSnapshot()).toEqual(
+        expect.objectContaining({
+          eventsFiltered: 0,
+          nativeOverflows: 0,
+          nativeResyncs: 0,
+          matcherBudgetExceeded: 0
+        })
+      )
+    })
+
+    it('counts filtered events without counting them as received or buffered', () => {
+      metrics.recordEventFiltered()
+      metrics.recordEventFiltered()
+
+      const snapshot = metrics.getSnapshot()
+      expect(snapshot.eventsFiltered).toBe(2)
+      expect(snapshot.eventsReceived).toBe(0)
+      expect(snapshot.currentBufferSize).toBe(0)
+    })
+
+    it('counts native overflows and resyncs separately', () => {
+      metrics.recordNativeOverflow()
+      metrics.recordNativeOverflow()
+      metrics.recordNativeResync()
+
+      const snapshot = metrics.getSnapshot()
+      expect(snapshot.nativeOverflows).toBe(2)
+      expect(snapshot.nativeResyncs).toBe(1)
+    })
+
+    it('adds matcher budget overruns, one by default, ignoring a non-positive count', () => {
+      metrics.recordMatcherBudgetExceeded()
+      metrics.recordMatcherBudgetExceeded(4)
+      metrics.recordMatcherBudgetExceeded(0)
+      metrics.recordMatcherBudgetExceeded(-2)
+
+      expect(metrics.getSnapshot().matcherBudgetExceeded).toBe(5)
+    })
+
+    it('clears them on reset', () => {
+      metrics.recordEventFiltered()
+      metrics.recordNativeOverflow()
+      metrics.recordNativeResync()
+      metrics.recordMatcherBudgetExceeded(2)
+
+      metrics.reset()
+
+      expect(metrics.getSnapshot()).toEqual(
+        expect.objectContaining({
+          eventsFiltered: 0,
+          nativeOverflows: 0,
+          nativeResyncs: 0,
+          matcherBudgetExceeded: 0
+        })
+      )
+    })
+
+    it('shows them in the formatted stats', () => {
+      metrics.recordEventFiltered()
+      metrics.recordNativeResync()
+
+      const formatted = metrics.getFormattedStats()
+
+      expect(formatted).toContain('Filtered: events=1, matcherBudgetExceeded=0')
+      expect(formatted).toContain('Native: overflows=0, resyncs=1')
+    })
+  })
+
   describe('uptime tracking', () => {
     it('should track uptime', () => {
       const snapshot = metrics.getSnapshot()

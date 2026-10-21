@@ -312,7 +312,7 @@ export function useImport(): UseImportReturn {
     } finally {
       setIsImporting(false)
     }
-  }, [showConfirm, terminalPortal])
+  }, [showConfirm, showAlert, terminalPortal])
 
   /**
    * Import via file dialog.

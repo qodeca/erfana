@@ -21,6 +21,7 @@ import type { Stats } from 'fs'
 import { validateSymlink, isSystemDirectory } from '../utils/pathSecurity'
 import { AppError, ErrorCode } from '../../shared/errors'
 import { logger } from './LoggingService'
+import { redactPath, redactedLogError } from '../utils/redactUserInput'
 import type { IFileService } from '../interfaces/IFileService'
 import { fileService as defaultFileService } from './FileService'
 import type {
@@ -29,6 +30,11 @@ import type {
   ExternalFileMoveResponse,
   ConflictResolution
 } from '../../shared/ipc/external-file-schema'
+
+/** Error message safe to log: quoted absolute paths in errno messages are replaced. */
+function redactedMessage(error: unknown): string {
+  return redactedLogError(error)?.message ?? String(error)
+}
 
 /** Maximum number of auto-numbered copies (e.g., file.md, file (1).md, ... file (999).md) */
 const MAX_COPY_ATTEMPTS = 1000
@@ -94,7 +100,7 @@ export class ExternalFileService implements IExternalFileService {
     sourcePath: string,
     projectRoot: string
   ): Promise<ExternalFileValidateResponse> {
-    logger.debug('Validating external file', { sourcePath, projectRoot })
+    logger.debug('Validating external file', { sourcePath: redactPath(sourcePath), projectRoot: redactPath(projectRoot) })
 
     // Validate inputs are absolute paths
     if (!isAbsolute(sourcePath)) {
@@ -126,8 +132,7 @@ export class ExternalFileService implements IExternalFileService {
     try {
       sourceStats = await lstat(sourcePath) // Don't follow symlinks initially
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      logger.warn('External file not found', { sourcePath, error: message })
+      logger.warn('External file not found', { sourcePath: redactPath(sourcePath), error: redactedMessage(error) })
       return {
         valid: false,
         isSymlink: false,
@@ -144,7 +149,7 @@ export class ExternalFileService implements IExternalFileService {
 
     // Reject directories
     if (isDirectory) {
-      logger.debug('External file is directory, rejecting', { sourcePath })
+      logger.debug('External file is directory, rejecting', { sourcePath: redactPath(sourcePath) })
       return {
         valid: false,
         isSymlink,
@@ -159,7 +164,7 @@ export class ExternalFileService implements IExternalFileService {
     // S4: Check for special files (devices, pipes, sockets)
     const isRegular = await this.isRegularFile(sourcePath, sourceStats)
     if (!isRegular) {
-      logger.debug('External file is special file, rejecting', { sourcePath })
+      logger.debug('External file is special file, rejecting', { sourcePath: redactPath(sourcePath) })
       return {
         valid: false,
         isSymlink,
@@ -180,8 +185,8 @@ export class ExternalFileService implements IExternalFileService {
         // M3: Block symlinks to system directories
         if (isSystemDirectory(resolvedTarget)) {
           logger.warn('External file symlink points to system directory', {
-            sourcePath,
-            target: resolvedTarget
+            sourcePath: redactPath(sourcePath),
+            target: redactPath(resolvedTarget)
           })
           return {
             valid: false,
@@ -199,8 +204,8 @@ export class ExternalFileService implements IExternalFileService {
       } catch (error) {
         if (error instanceof AppError) {
           logger.warn('External file symlink validation failed', {
-            sourcePath,
-            error: error.message,
+            sourcePath: redactPath(sourcePath),
+            error: redactedMessage(error),
             code: error.code
           })
           return {
@@ -215,7 +220,7 @@ export class ExternalFileService implements IExternalFileService {
         }
         // Broken symlink or other error
         const message = error instanceof Error ? error.message : String(error)
-        logger.warn('External file symlink error', { sourcePath, error: message })
+        logger.warn('External file symlink error', { sourcePath: redactPath(sourcePath), error: redactedMessage(error) })
         return {
           valid: false,
           isSymlink: true,
@@ -229,7 +234,7 @@ export class ExternalFileService implements IExternalFileService {
     }
 
     logger.debug('External file validated successfully', {
-      sourcePath,
+      sourcePath: redactPath(sourcePath),
       isSymlink,
       isRegularFile: true
     })
@@ -252,7 +257,7 @@ export class ExternalFileService implements IExternalFileService {
     projectRoot: string,
     conflictResolution?: ConflictResolution
   ): Promise<ExternalFileCopyResponse> {
-    logger.info('Copying external file', { sourcePath, targetFolder, conflictResolution })
+    logger.info('Copying external file', { sourcePath: redactPath(sourcePath), targetFolder: redactPath(targetFolder), conflictResolution })
 
     // Validate the external file first
     const validation = await this.validateExternalFile(sourcePath, projectRoot)
@@ -267,7 +272,7 @@ export class ExternalFileService implements IExternalFileService {
 
     // M5: Validate target folder is within project boundary
     if (!this.isWithinProject(targetFolder, projectRoot)) {
-      logger.warn('Target folder outside project boundary', { targetFolder, projectRoot })
+      logger.warn('Target folder outside project boundary', { targetFolder: redactPath(targetFolder), projectRoot: redactPath(projectRoot) })
       return {
         success: false,
         error: 'Target folder is outside project',
@@ -291,7 +296,7 @@ export class ExternalFileService implements IExternalFileService {
       try {
         await access(sourcePath, constants.R_OK)
       } catch {
-        logger.error('Source file deleted during copy operation', undefined, { sourcePath })
+        logger.error('Source file deleted during copy operation', undefined, { sourcePath: redactPath(sourcePath) })
         return {
           success: false,
           error: 'Source file was deleted',
@@ -303,8 +308,8 @@ export class ExternalFileService implements IExternalFileService {
       await copyFile(sourcePath, targetPath)
 
       logger.info('External file copied successfully', {
-        sourcePath,
-        targetPath,
+        sourcePath: redactPath(sourcePath),
+        targetPath: redactPath(targetPath),
         isSymlink: validation.isSymlink
       })
 
@@ -315,9 +320,9 @@ export class ExternalFileService implements IExternalFileService {
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      logger.error('Failed to copy external file', error instanceof Error ? error : undefined, {
-        sourcePath,
-        targetFolder
+      logger.error('Failed to copy external file', redactedLogError(error), {
+        sourcePath: redactPath(sourcePath),
+        targetFolder: redactPath(targetFolder)
       })
       return {
         success: false,
@@ -337,7 +342,7 @@ export class ExternalFileService implements IExternalFileService {
     projectRoot: string,
     conflictResolution?: ConflictResolution
   ): Promise<ExternalFileMoveResponse> {
-    logger.info('Moving external file', { sourcePath, targetFolder, conflictResolution })
+    logger.info('Moving external file', { sourcePath: redactPath(sourcePath), targetFolder: redactPath(targetFolder), conflictResolution })
 
     // Validate the external file first
     const validation = await this.validateExternalFile(sourcePath, projectRoot)
@@ -352,7 +357,7 @@ export class ExternalFileService implements IExternalFileService {
 
     // M5: Validate target folder is within project boundary
     if (!this.isWithinProject(targetFolder, projectRoot)) {
-      logger.warn('Target folder outside project boundary', { targetFolder, projectRoot })
+      logger.warn('Target folder outside project boundary', { targetFolder: redactPath(targetFolder), projectRoot: redactPath(projectRoot) })
       return {
         success: false,
         error: 'Target folder is outside project',
@@ -376,7 +381,7 @@ export class ExternalFileService implements IExternalFileService {
       try {
         await access(sourcePath, constants.R_OK)
       } catch {
-        logger.error('Source file deleted during move operation', undefined, { sourcePath })
+        logger.error('Source file deleted during move operation', undefined, { sourcePath: redactPath(sourcePath) })
         return {
           success: false,
           error: 'Source file was deleted',
@@ -390,25 +395,25 @@ export class ExternalFileService implements IExternalFileService {
       // M6: Try to delete source, but don't fail if it's already gone
       try {
         await rm(sourcePath)
-        logger.debug('Source file deleted after move', { sourcePath })
+        logger.debug('Source file deleted after move', { sourcePath: redactPath(sourcePath) })
       } catch (deleteError) {
         // Source might have been deleted by another process
         const code = (deleteError as NodeJS.ErrnoException).code
         if (code === 'ENOENT') {
-          logger.warn('Source file already deleted during move', { sourcePath })
+          logger.warn('Source file already deleted during move', { sourcePath: redactPath(sourcePath) })
           // File was already deleted - operation still successful
         } else {
           // Other error - log but don't fail (file was copied successfully)
           logger.warn('Failed to delete source file after move', {
-            sourcePath,
-            error: deleteError instanceof Error ? deleteError.message : String(deleteError)
+            sourcePath: redactPath(sourcePath),
+            error: redactedMessage(deleteError)
           })
         }
       }
 
       logger.info('External file moved successfully', {
-        sourcePath,
-        targetPath,
+        sourcePath: redactPath(sourcePath),
+        targetPath: redactPath(targetPath),
         isSymlink: validation.isSymlink
       })
 
@@ -419,9 +424,9 @@ export class ExternalFileService implements IExternalFileService {
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      logger.error('Failed to move external file', error instanceof Error ? error : undefined, {
-        sourcePath,
-        targetFolder
+      logger.error('Failed to move external file', redactedLogError(error), {
+        sourcePath: redactPath(sourcePath),
+        targetFolder: redactPath(targetFolder)
       })
       return {
         success: false,

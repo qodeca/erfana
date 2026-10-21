@@ -71,7 +71,7 @@ npm rebuild node-pty
 ### Error Message
 
 ```
-Cannot find module '@electron-toolkit/preload'
+Cannot find module 'some-package'
 ```
 
 ### Cause

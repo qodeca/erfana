@@ -49,7 +49,15 @@ import { DocumentStatsBar } from './DocumentStatsBar'
 
 // Types and pure functions
 import type { ViewMode, EditorFile } from '../Editor/MarkdownEditorPanel/types'
-import { calculateStats, extractFileName, getDefaultViewMode } from './markdownEditorPanel.logic'
+import {
+  calculateStats,
+  extractFileName,
+  getDefaultViewMode,
+  shouldRecreateParentDirs,
+  shouldToastSaveError,
+  type SaveTrigger
+} from './markdownEditorPanel.logic'
+import { formatSaveError, loggableError } from '../../utils/errorUtils'
 import { formatTabTitle } from '../../utils/tabTitle'
 
 // Shared constants
@@ -124,6 +132,11 @@ export function MarkdownEditorPanel(
   const previewRef = useRef<HTMLDivElement>(null)
   const previewHandleRef = useRef<MarkdownPreviewHandle>(null)
   const saveGuardRef = useRef<ReturnType<typeof createFileSaveGuard> | null>(null)
+  /**
+   * The last save-failure toast for the CURRENT file, so a failing autosave
+   * does not repeat it every few seconds. Reset when the file changes (below).
+   */
+  const lastSaveErrorRef = useRef<string | null>(null)
 
   // =========================================================================
   // Dialog and Toast
@@ -183,6 +196,12 @@ export function MarkdownEditorPanel(
     onContentUpdate: handleContentUpdateFromWatcher
   })
 
+  // A save-failure reason shown for one file must not mute the same reason for
+  // the next file this panel shows
+  useEffect(() => {
+    lastSaveErrorRef.current = null
+  }, [currentFile?.path])
+
   // Create file save guard for pausing/resuming file watching during save
   useEffect(() => {
     if (currentFile?.path) {
@@ -209,11 +228,13 @@ export function MarkdownEditorPanel(
    * 7. Post-save dirty check – if editor diverged during async write, re-mark dirty
    * 8. finally: resumeWatch + unmarkSaving
    *
-   * @param isAutoSave - Whether this is an auto-save (shows indicator) or manual save
+   * @param trigger - Who asked: the tab's own Cmd+S (`user`), `autosave`, or a
+   *   save by id (`registry`); it decides folder restore and the failure toast
    * @returns `true` when the write succeeded (issue #124: a save by id reads it)
    */
-  const handleSave = useCallback(async (isAutoSave: boolean = false): Promise<boolean> => {
+  const handleSave = useCallback(async (trigger: SaveTrigger = 'user'): Promise<boolean> => {
     if (!currentFile) return false
+    const isAutoSave = trigger === 'autosave'
 
     // Step 1: Mark saving via hook to prevent race conditions with file watcher
     markSaving()
@@ -231,8 +252,16 @@ export function MarkdownEditorPanel(
       const contentToSave =
         editorRef.current?.getEditor()?.getValue() ?? currentFile.content
 
-      // Step 4: Write to disk
-      await window.api.file.writeFile(currentFile.path, contentToSave)
+      // Step 4: Write to disk. Only the tab's own Cmd+S in the deleted state is
+      // the banner's "Save to restore it", so only it may recreate the folder
+      // the file lived in. An autosave or a save by id never does: it would
+      // silently resurrect a folder someone just renamed.
+      if (shouldRecreateParentDirs(trigger, isFileDeleted)) {
+        await window.api.file.writeFile(currentFile.path, contentToSave, { createParentDirs: true })
+      } else {
+        await window.api.file.writeFile(currentFile.path, contentToSave)
+      }
+      lastSaveErrorRef.current = null
 
       // Step 5: Record saved content for self-save echo detection (#124)
       notifySaveComplete(contentToSave)
@@ -267,25 +296,36 @@ export function MarkdownEditorPanel(
       }
       return true
     } catch (error) {
-      logger.error('Error saving file', error instanceof Error ? error : undefined)
+      logger.error('Error saving file', loggableError(error))
       setIsAutoSaving(false)
+      // Never fail silently: the tab stays dirty and the buffer keeps the edit,
+      // so say why. Cmd+S always shows it; an autosave repeats only a reason not
+      // yet shown; a save by id shows none, because its caller toasts on
+      // `false` (editorSaveRegistry contract) and one failure is one toast.
+      if (trigger !== 'registry') {
+        const message = formatSaveError(error, extractFileName(currentFile.path))
+        if (shouldToastSaveError(trigger, message, lastSaveErrorRef.current)) {
+          showToast({ title: 'Save failed', message, type: 'error', duration: 8000 })
+        }
+        lastSaveErrorRef.current = message
+      }
       return false
     } finally {
       // Step 8: Resume file watching after save completes
       await saveGuardRef.current?.resumeWatch()
       unmarkSaving()
     }
-  }, [currentFile, dismissConflict, clearDeletedState, markSaving, unmarkSaving, notifySaveComplete])
+  }, [currentFile, isFileDeleted, dismissConflict, clearDeletedState, markSaving, unmarkSaving, notifySaveComplete, showToast])
 
   // =========================================================================
   // Auto-Save Hook
   // =========================================================================
   const { isAutoSaving, setIsAutoSaving, cancelAutoSave, signalChange } = useAutoSave(
     currentFile?.modified ?? false,
-    async () => { await handleSave(true) },
+    async () => { await handleSave('autosave') },
     { delay: 2000, enabled: true, maxInterval: 30000 }
   )
-  useEditorSaveRegistration(panelIdRef.current, () => handleSave(false), externalChangeDetected, () => {
+  useEditorSaveRegistration(panelIdRef.current, () => handleSave('registry'), externalChangeDetected, () => {
     cancelAutoSave()
     return () => signalChange()
   })
@@ -370,9 +410,15 @@ export function MarkdownEditorPanel(
   }, [props.api])
 
   useKeyboardShortcuts({
-    onSave: () => handleSave(false),
+    onSave: () => handleSave('user'),
     onClose: () => props.api.close(),
-    isModified: currentFile?.modified ?? false,
+    // Read the store the tab's dirty dot and close button read, at keypress
+    // time. `currentFile.modified` is React state and can lag the edit, so a
+    // quick ⌘W after typing saw a clean file and discarded the change.
+    isModified: () =>
+      panelIdRef.current !== undefined
+        ? useProjectStore.getState().dirtyPanelIds.has(panelIdRef.current)
+        : (currentFile?.modified ?? false),
     showConfirm,
     fileName: currentFile?.path ? getBasename(currentFile.path) : null,
     // Without this, one ⌘W closed every open tab and one ⌘S wrote every open

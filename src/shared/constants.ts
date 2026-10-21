@@ -119,7 +119,7 @@ export const TEXT_INPUT_LIMITS = {
 
 /**
  * Default watcher ignore patterns (performance optimization)
- * These directories cause chokidar performance issues (50K+ files)
+ * These directories cause directory-watcher performance issues (50K+ files)
  *
  * Deliberately broader than DEFAULT_GRAPH_EXCLUDE_PATTERNS (graph-constants.ts):
  * these entries protect the FD budget, not indexing relevance. Editing either
@@ -141,7 +141,7 @@ export const DEFAULT_WATCHER_IGNORE_PATTERNS = [
   '.virtualenv',
   'virtualenv',
   '.conda',
-  // Git internals (keeps .git/HEAD, .git/config, .git/refs watched)
+  // Git internals. By default the directory watcher drops all of .git (a tree-hidden name, #211); these apply when a project's tree.hiddenPatterns replaces the defaults without .git. Git state reaches the renderer via GitWatcherService.
   '.git/objects',
   '.git/subtree-cache',
   '.git/lfs',
@@ -189,6 +189,12 @@ export const PDF_EXPORT = {
   CONTENT_READY_TIMEOUT: 5000,
   /** Polling interval for readiness check in ms */
   READY_CHECK_INTERVAL: 100,
+  /** Time box for loading the temp page in ms */
+  LOAD_TIMEOUT: 15000,
+  /** Time box for one readiness probe in ms */
+  READY_PROBE_TIMEOUT: 2000,
+  /** Time box for printToPDF in ms */
+  PRINT_TIMEOUT: 60000,
   /** Hidden window dimensions (A4 at 96 DPI) */
   WINDOW_WIDTH: 794,
   WINDOW_HEIGHT: 1123,

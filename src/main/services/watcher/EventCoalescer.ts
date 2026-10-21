@@ -40,7 +40,7 @@ const IS_CASE_INSENSITIVE = platform() === 'darwin' || platform() === 'win32'
  * - Lowercase on case-insensitive platforms
  * - Normalize path separators
  */
-function normalizePath(filePath: string): string {
+export function normalizePath(filePath: string): string {
   let normalized = path.normalize(filePath)
   if (IS_CASE_INSENSITIVE) {
     normalized = normalized.toLowerCase()

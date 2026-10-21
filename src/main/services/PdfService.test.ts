@@ -4,7 +4,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import path from 'path'
 import os from 'os'
 import { ErrorCode } from '../../shared/errors'
+import { createHash } from 'crypto'
+import { pathToFileURL } from 'url'
 import { PDF_EXPORT } from '../../shared/constants'
+
+// Literal, not imported: importing the module would run its electron import
+// before the mocks below are initialised
+const PDF_EXPORT_PARTITION = 'pdf-export'
 
 // Platform-safe test paths
 const MOCK_TMP = os.tmpdir()
@@ -18,15 +24,33 @@ const mockLoadFile = vi.fn()
 const mockClose = vi.fn()
 const mockIsDestroyed = vi.fn(() => false)
 const mockExecuteJavaScript = vi.fn()
+const mockDestroy = vi.fn()
+const mockForcefullyCrashRenderer = vi.fn()
+const mockSetWindowOpenHandler = vi.fn()
+const mockWebContentsOn = vi.fn()
 
 const mockBrowserWindow = vi.fn(() => ({
   loadFile: mockLoadFile,
   close: mockClose,
+  destroy: mockDestroy,
   isDestroyed: mockIsDestroyed,
   webContents: {
     printToPDF: mockPrintToPdf,
-    executeJavaScript: mockExecuteJavaScript
+    executeJavaScript: mockExecuteJavaScript,
+    forcefullyCrashRenderer: mockForcefullyCrashRenderer,
+    setWindowOpenHandler: mockSetWindowOpenHandler,
+    on: mockWebContentsOn
   }
+}))
+
+// The partition's session: records the controls installed on it
+const mockOnBeforeRequest = vi.fn()
+const mockSetPermissionRequestHandler = vi.fn()
+const mockSetPermissionCheckHandler = vi.fn()
+const mockFromPartition = vi.fn(() => ({
+  webRequest: { onBeforeRequest: mockOnBeforeRequest },
+  setPermissionRequestHandler: mockSetPermissionRequestHandler,
+  setPermissionCheckHandler: mockSetPermissionCheckHandler
 }))
 
 const mockShowSaveDialog = vi.fn()
@@ -35,7 +59,8 @@ vi.mock('electron', () => ({
   BrowserWindow: mockBrowserWindow,
   dialog: {
     showSaveDialog: mockShowSaveDialog
-  }
+  },
+  session: { fromPartition: mockFromPartition }
 }))
 
 // Mock fs/promises
@@ -89,7 +114,8 @@ describe('PdfService', () => {
       BrowserWindow: mockBrowserWindow,
       dialog: {
         showSaveDialog: mockShowSaveDialog
-      }
+      },
+      session: { fromPartition: mockFromPartition }
     }))
 
     vi.doMock('fs/promises', () => ({
@@ -459,6 +485,162 @@ describe('PdfService', () => {
         expect(mockUnlink).toHaveBeenCalledWith(MOCK_EXPORT_HTML)
         expect(mockRmdir).toHaveBeenCalledWith(MOCK_TMPDIR)
       })
+    })
+  })
+
+  describe('export window isolation', () => {
+    it('should render in its own in-memory partition', async () => {
+      setupSuccessfulExport()
+
+      await pdfService.exportToPdf('<p>Test</p>', 'test')
+
+      expect(mockFromPartition).toHaveBeenCalledWith(PDF_EXPORT_PARTITION)
+      expect(PDF_EXPORT_PARTITION.startsWith('persist:')).toBe(false)
+      expect(mockBrowserWindow).toHaveBeenCalledWith(
+        expect.objectContaining({
+          webPreferences: expect.objectContaining({
+            partition: PDF_EXPORT_PARTITION,
+            webSecurity: true,
+            webviewTag: false
+          })
+        })
+      )
+    })
+
+    it('should install the request filter and permission denials before the window exists', async () => {
+      setupSuccessfulExport()
+
+      await pdfService.exportToPdf('<p>Test</p>', 'test')
+
+      expect(mockOnBeforeRequest).toHaveBeenCalledTimes(1)
+      expect(mockSetPermissionRequestHandler).toHaveBeenCalledTimes(1)
+      expect(mockSetPermissionCheckHandler).toHaveBeenCalledTimes(1)
+      expect(mockOnBeforeRequest.mock.invocationCallOrder[0]).toBeLessThan(
+        mockBrowserWindow.mock.invocationCallOrder[0]
+      )
+    })
+
+    it('should let only the temp page and images through the request filter', async () => {
+      setupSuccessfulExport()
+      await pdfService.exportToPdf('<p>Test</p>', 'test')
+      const filter = mockOnBeforeRequest.mock.calls[0][1] as (
+        details: { url: string; resourceType: string },
+        callback: (r: { cancel: boolean }) => void
+      ) => void
+      const isCancelled = (url: string, resourceType: string): boolean => {
+        let cancel = false
+        filter({ url, resourceType }, (r) => {
+          cancel = r.cancel
+        })
+        return cancel
+      }
+
+      expect(isCancelled(pathToFileURL(MOCK_EXPORT_HTML).href, 'mainFrame')).toBe(false)
+      expect(isCancelled(pathToFileURL(path.join(MOCK_TMPDIR, 'other.html')).href, 'subFrame')).toBe(true)
+      expect(isCancelled('https://example.com/a.js', 'script')).toBe(true)
+      expect(isCancelled('https://example.com/', 'xhr')).toBe(true)
+      expect(isCancelled('https://example.com/a.png', 'image')).toBe(false)
+    })
+
+    it('should deny permissions', async () => {
+      setupSuccessfulExport()
+      await pdfService.exportToPdf('<p>Test</p>', 'test')
+
+      const callback = vi.fn()
+      mockSetPermissionRequestHandler.mock.calls[0][0]({}, 'media', callback)
+      expect(callback).toHaveBeenCalledWith(false)
+      expect(mockSetPermissionCheckHandler.mock.calls[0][0]()).toBe(false)
+    })
+
+    it('should deny popups and block navigation on the window', async () => {
+      setupSuccessfulExport()
+      await pdfService.exportToPdf('<p>Test</p>', 'test')
+
+      expect(mockSetWindowOpenHandler.mock.calls[0][0]()).toEqual({ action: 'deny' })
+      const navCall = mockWebContentsOn.mock.calls.find(([name]) => name === 'will-navigate')
+      expect(navCall).toBeDefined()
+      const event = { preventDefault: vi.fn() }
+      navCall![1](event, 'https://example.com/')
+      expect(event.preventDefault).toHaveBeenCalled()
+    })
+
+    it('should write a CSP that allows only the hashed readiness script', async () => {
+      setupSuccessfulExport()
+
+      await pdfService.exportToPdf('<p>Test</p>', 'test')
+
+      const html = mockWriteFile.mock.calls[0][1] as string
+      const meta = html.match(/<meta http-equiv="Content-Security-Policy" content="([^"]+)">/)
+      expect(meta).not.toBeNull()
+      const csp = meta![1]
+      expect(csp).toContain("default-src 'none'")
+      expect(csp).toContain("object-src 'none'")
+      expect(csp).toContain("base-uri 'none'")
+
+      const script = html.match(/<script>([\s\S]*?)<\/script>/)
+      expect(script).not.toBeNull()
+      const hash = createHash('sha256').update(script![1], 'utf8').digest('base64')
+      expect(csp).toContain(`script-src 'sha256-${hash}'`)
+      // the policy must be parsed before any exported content
+      expect(html.indexOf('Content-Security-Policy')).toBeLessThan(html.indexOf('<p>Test</p>'))
+    })
+  })
+
+  describe('step timeouts', () => {
+    beforeEach(() => {
+      vi.useFakeTimers()
+      mockIsDestroyed.mockReturnValue(false)
+    })
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    async function expectTimedOutAndRecovered(
+      exportPromise: Promise<any>,
+      advanceMs: number
+    ): Promise<void> {
+      await vi.advanceTimersByTimeAsync(advanceMs)
+      const result = await exportPromise
+      expect(result.success).toBe(false)
+      expect(result.errorCode).toBe(ErrorCode.PDF_EXPORT_FAILED)
+      expect(mockForcefullyCrashRenderer).toHaveBeenCalled()
+      expect(mockDestroy).toHaveBeenCalled()
+
+      // The lock is released: the next export is not rejected as in progress
+      setupSuccessfulExport()
+      const next = await pdfService.exportToPdf('<p>Test</p>', 'test')
+      expect(next.success).toBe(true)
+    }
+
+    it('should time out a hung loadFile, destroy the window and release the lock', async () => {
+      setupSuccessfulExport()
+      mockLoadFile.mockReturnValue(new Promise(() => {}))
+
+      await expectTimedOutAndRecovered(
+        pdfService.exportToPdf('<p>Test</p>', 'test'),
+        PDF_EXPORT.LOAD_TIMEOUT
+      )
+    })
+
+    it('should time out a hung readiness probe', async () => {
+      setupSuccessfulExport()
+      mockExecuteJavaScript.mockReturnValue(new Promise(() => {}))
+
+      await expectTimedOutAndRecovered(
+        pdfService.exportToPdf('<p>Test</p>', 'test'),
+        PDF_EXPORT.READY_PROBE_TIMEOUT
+      )
+    })
+
+    it('should time out a hung printToPDF', async () => {
+      setupSuccessfulExport()
+      mockPrintToPdf.mockReturnValue(new Promise(() => {}))
+
+      await expectTimedOutAndRecovered(
+        pdfService.exportToPdf('<p>Test</p>', 'test'),
+        PDF_EXPORT.PRINT_TIMEOUT
+      )
     })
   })
 })

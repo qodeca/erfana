@@ -188,3 +188,25 @@ export function shouldApplyResize(
     newRows > 0
   )
 }
+
+/**
+ * Build the click handler for the terminal's web-links addon.
+ *
+ * The addon's default handler calls `window.open`, which skips the checked
+ * external-open path. This one hands the URL to the supplied opener (the
+ * `shell:openExternal` IPC call), which validates it in the main process.
+ * A refusal or failure is reported through `onError` and never thrown into the
+ * addon's mouse handler.
+ *
+ * @param open - Opens a URL through the checked IPC path
+ * @param onError - Called with the error when the open is refused or fails
+ */
+export function createTerminalLinkHandler(
+  open: (url: string) => Promise<void>,
+  onError: (error: unknown, url: string) => void
+): (event: MouseEvent, uri: string) => void {
+  return (event, uri) => {
+    event.preventDefault()
+    open(uri).catch((error: unknown) => onError(error, uri))
+  }
+}

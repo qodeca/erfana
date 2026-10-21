@@ -52,28 +52,15 @@ import type {
   DocumentImportProgress,
   DependencyReadyEvent
 } from '../shared/ipc/import-schema'
+import type { FileNode, FileStats } from '../shared/ipc/file-schema'
 import type {
   ExternalFileValidateResponse,
   ExternalFileCopyResponse,
   ExternalFileMoveResponse,
   ConflictResolution
 } from '../shared/ipc/external-file-schema'
-import { electronAPI } from '@electron-toolkit/preload'
 
-export interface FileNode {
-  name: string
-  path: string
-  type: 'file' | 'directory'
-  children?: FileNode[]
-  extension?: string
-  isSymlink?: boolean
-}
-
-export interface FileStats {
-  size: number
-  modified: Date
-  created: Date
-}
+export type { FileNode, FileStats }
 
 // Custom APIs for renderer
 const api = {
@@ -87,8 +74,14 @@ const api = {
       ipcRenderer.invoke('file:readDirectory', dirPath),
     readFile: (filePath: string): Promise<string> =>
       ipcRenderer.invoke('file:readFile', filePath),
-    writeFile: (filePath: string, content: string): Promise<boolean> =>
-      ipcRenderer.invoke('file:writeFile', filePath, content),
+    writeFile: (
+      filePath: string,
+      content: string,
+      options?: { createParentDirs?: boolean }
+    ): Promise<boolean> =>
+      options === undefined
+        ? ipcRenderer.invoke('file:writeFile', filePath, content)
+        : ipcRenderer.invoke('file:writeFile', filePath, content, options),
     getStats: (filePath: string): Promise<FileStats> =>
       ipcRenderer.invoke('file:getStats', filePath),
     exists: (filePath: string): Promise<boolean> =>
@@ -286,11 +279,16 @@ const api = {
 
     // Event listeners
     onDirectoryChanged: (
-      callback: (data: { dirPath: string; eventCount: number; summary: Record<string, number> }) => void
+      callback: (data: {
+        dirPath: string
+        eventCount: number
+        summary: Record<string, number>
+        catchUp?: boolean
+      }) => void
     ) => {
       const listener = (
         _event: unknown,
-        data: { dirPath: string; eventCount: number; summary: Record<string, number> }
+        data: { dirPath: string; eventCount: number; summary: Record<string, number>; catchUp?: boolean }
       ) => callback(data)
       ipcRenderer.on('directory-watch:changed', listener)
       return () => ipcRenderer.removeListener('directory-watch:changed', listener)
@@ -1147,9 +1145,9 @@ const api = {
 // Use `contextBridge` APIs to expose Electron APIs to
 // renderer only if context isolation is enabled, otherwise
 // just add to the DOM global.
-// Custom electron API with shell.openExternal for external link handling
+// Narrow electron surface: only shell.openExternal is used by the renderer.
+// The generic ipcRenderer / webFrame / process helpers are deliberately not exposed.
 const electron = {
-  ...electronAPI,
   shell: {
     openExternal: (url: string): Promise<void> => ipcRenderer.invoke('shell:openExternal', url)
   }

@@ -3,6 +3,12 @@
 import type { ResolvedProjectSettings } from '../../shared/ipc/project-settings-schema'
 
 /**
+ * Supplies the global `files.exclude` list from `~/.erfana/settings.json`
+ * (Issue #211, design D7). Read once per `loadSettings` call.
+ */
+export type GlobalExcludeProvider = () => readonly string[]
+
+/**
  * Interface for project-level settings service
  * Loads and validates .erfana/settings.json
  *
@@ -24,4 +30,11 @@ export interface IProjectSettingsService {
    * Clear cached settings (called on project close or rollback)
    */
   clearSettings(): void
+
+  /**
+   * Set the source of the global `files.exclude` list, merged ahead of the
+   * project's list on every `loadSettings` (Issue #211, design D7). Set once
+   * at wiring time; until then the global list is empty.
+   */
+  setGlobalExcludeProvider(provider: GlobalExcludeProvider): void
 }

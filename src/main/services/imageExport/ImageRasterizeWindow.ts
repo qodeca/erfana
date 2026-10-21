@@ -73,7 +73,9 @@ const HARNESS_WINDOW_HEIGHT = 600
 export const HARNESS_PDF_OPTIONS = {
   preferCSSPageSize: true,
   printBackground: true,
-  margins: { marginType: 'none' as const },
+  // Explicit zeros, matching the harness's `@page { margin: 0 }`. Electron
+  // never read the old `marginType` key; its 0.4in defaults applied instead.
+  margins: { top: 0, bottom: 0, left: 0, right: 0 },
   scale: 1,
   pageRanges: '1-1'
 }

@@ -42,7 +42,7 @@ Only a page that runs as a preview can open in place. A link to anything else â€
 | a `.md`, an image, any other project file | opens in its usual panel |
 | a file under `node_modules/`, `dist/`, `out/`, `coverage/`, `.git/`, or gitignored | opens as **source** |
 | a path outside the project, or a missing file | refused, and listed in the failure badge |
-| `https:`, `http:`, `mailto:`, `tel:`, `ftp:` | Erfana shows you the destination and asks before handing it to the operating system (your browser, mail or phone app) |
+| `https:`, `http:`, `mailto:`, `tel:` | Erfana shows you the destination and asks before handing it to the operating system (your browser, mail or phone app) |
 | anything else, and `<a download>` | blocked, and listed in the failure badge |
 
 That question is a native message box **owned by the window whose preview asked**, so it is modal to that window and raised with it, and only one such question is open per window at a time â€” a second external link clicked while the first is still waiting is refused rather than queued, and listed in the failure badge as a blocked link.

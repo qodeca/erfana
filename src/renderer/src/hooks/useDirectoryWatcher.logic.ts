@@ -26,11 +26,19 @@ export function shouldStartWatcher(
 /**
  * Determines if a directory change event should be handled
  *
+ * A catch-up refresh always passes: it reports external changes the watcher
+ * dropped during a pause, not the internal operation's own events, and may
+ * land while the next operation has already set the flag (#210).
+ *
  * @param isInternalOperation - Whether change is from internal operation
+ * @param isCatchUp - Whether the event is a catch-up refresh from the main process
  * @returns true if change should trigger refresh, false otherwise
  */
-export function shouldHandleDirectoryChange(isInternalOperation: boolean): boolean {
-  return !isInternalOperation
+export function shouldHandleDirectoryChange(
+  isInternalOperation: boolean,
+  isCatchUp = false
+): boolean {
+  return isCatchUp || !isInternalOperation
 }
 
 /**

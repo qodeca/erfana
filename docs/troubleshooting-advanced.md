@@ -159,6 +159,18 @@ Open DevTools in app (F12 or View → Toggle Developer Tools).
 
 ---
 
+### "Erfana started with problems" Message at Launch
+
+**Symptom:** A message box titled "Erfana started with problems" appears over the window right after launch
+
+**Cause:** The saved settings or the log files could not be set up at start-up (for example an unreadable `~/.erfana/settings.json`, or a symlinked or read-only `~/.erfana/logs`). Erfana still opens and runs with default settings and console-only logging; it does not block on the message.
+
+**Diagnosis:** Read `~/.erfana/logs/crash.log` – the lines tagged `[crash] startup-settings-init` and `[crash] startup-logging-init` name the cause (paths and user names are redacted). If the message says the details could not be saved, the logs folder itself is not writable.
+
+**Settings safety:** If the settings file could not be *read*, Erfana does not overwrite it with defaults on start. The first time a setting is saved, the existing file is first copied to `~/.erfana/settings.json.bak-<timestamp>`; if that copy fails, the save is refused. Restore from that copy once the cause is fixed.
+
+---
+
 **File Watcher Logs:**
 ```bash
 # Enable debug logging in FileWatcherService.ts

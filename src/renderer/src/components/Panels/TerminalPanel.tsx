@@ -52,7 +52,7 @@ import { isPointInElement } from '../../utils/domGeometry'
 import { TerminalStatusContent } from './TerminalPanel/components/TerminalStatusContent'
 import { ClaudeStatusBar } from './TerminalPanel/components/ClaudeStatusBar'
 import { useClaudeStatusStore } from '../../stores/useClaudeStatusStore'
-import { ensureTerminalFontLoaded } from './TerminalPanel/terminalPanel.logic'
+import { ensureTerminalFontLoaded, createTerminalLinkHandler } from './TerminalPanel/terminalPanel.logic'
 import type { TerminalState } from './TerminalPanel/types'
 
 export function TerminalPanel(_props: ISplitviewPanelProps) {
@@ -378,7 +378,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
           }
           visibilityObserverRef.current = null
           pendingInitRef.current = false
-          void initializeTerminal()
+          void initializeTerminalRef.current()
         }
       })
       try {
@@ -430,7 +430,13 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
 
       // Add addons (load fit and weblinks BEFORE open)
       const fitAddon = new FitAddon()
-      const webLinksAddon = new WebLinksAddon()
+      // Links go through the checked IPC path, never the addon's default window.open
+      const webLinksAddon = new WebLinksAddon(
+        createTerminalLinkHandler(
+          (url) => window.electron.shell.openExternal(url),
+          (error) => logger.warn('Terminal link not opened', { error: error instanceof Error ? error.message : String(error) })
+        )
+      )
 
       xterm.loadAddon(fitAddon)
       xterm.loadAddon(webLinksAddon)
@@ -700,6 +706,14 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     }
   }
 
+  // initializeTerminal closes over per-render state and is not memoized. Effects
+  // and callbacks that must NOT re-run when it changes (project-change restart,
+  // manual restart) call it through this ref, which always holds the latest one.
+  const initializeTerminalRef = useRef(initializeTerminal)
+  useEffect(() => {
+    initializeTerminalRef.current = initializeTerminal
+  })
+
   // Check terminal availability on mount
   useEffect(() => {
     checkAvailability()
@@ -708,7 +722,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   // Create terminal when available
   useEffect(() => {
     if (isAvailable && terminalRef.current && !xtermRef.current) {
-      initializeTerminal()
+      void initializeTerminalRef.current()
     }
 
     // Cleanup on unmount only
@@ -738,7 +752,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
         visibilityObserverRef.current = null
       }
     }
-  }, [isAvailable, setActiveTerminalId, cleanupTerminalInstance])
+  }, [isAvailable, setActiveTerminalId, cleanupTerminalInstance, cleanupDragHandlers])
 
   // Restart terminal on project change
   useEffect(() => {
@@ -767,11 +781,11 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       // Wait briefly then initialize new terminal in new CWD (if a project is open)
       if (data.newPath) {
         // Try initialize; if hidden, visibility observer will defer until visible
-        void initializeTerminal()
+        void initializeTerminalRef.current()
       }
     })
     return () => unsubscribe()
-  }, [setActiveTerminalId, cleanupTerminalInstance])
+  }, [setActiveTerminalId, cleanupTerminalInstance, cleanupDragHandlers])
 
   // Handle terminal data
   useEffect(() => {
@@ -1073,7 +1087,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
 
     // Create new terminal
     if (terminalRef.current && isAvailable) {
-      await initializeTerminal()
+      await initializeTerminalRef.current()
     }
   }, [setActiveTerminalId, isAvailable, cleanupDragHandlers, cleanupTerminalInstance])
 

@@ -10,11 +10,14 @@
 import type { ElectronApplication } from '@playwright/test'
 import * as path from 'path'
 
+import { buildAppEnv, closeAppAndWait } from './isolation'
+
 const PROJECT_ROOT = path.join(__dirname, '..', '..')
 
 export function buildVisualLaunchOptions(
   userDataDir: string,
-  projectPath?: string
+  projectPath?: string,
+  homeDir?: string
 ): {
   args: string[]
   env: Record<string, string>
@@ -26,7 +29,7 @@ export function buildVisualLaunchOptions(
   }
   const opts: ReturnType<typeof buildVisualLaunchOptions> = {
     args,
-    env: { ...process.env, NODE_ENV: 'development' }
+    env: buildAppEnv({ homeDir })
   }
   if (process.env.CI) {
     opts.recordVideo = {
@@ -48,26 +51,35 @@ export async function forceCloseApp(app: ElectronApplication): Promise<void> {
   } catch (e) {
     if (process.env.CI) console.warn('forceCloseApp: window destroy failed –', e)
   }
-  try {
-    await app.close()
-  } catch (e) {
-    if (process.env.CI) console.warn('forceCloseApp: app.close() failed –', e)
-  }
+  await closeAppAndWait(app)
 }
 
+/**
+ * Give the first window a content area of exactly `width` × `height`.
+ *
+ * Waits for the window first: right after `electron.launch()` the app has not
+ * created it yet, so a resize sent then did nothing – except on a slow run,
+ * where it landed and every visual case failed (#267). Throws when the window
+ * manager does not grant the size, so a wrong size fails here, not as a
+ * pixel diff.
+ */
 export async function resizeBrowserWindow(
   app: ElectronApplication,
   width: number,
   height: number
 ): Promise<void> {
-  await app.evaluate(
+  await app.firstWindow()
+  const granted = await app.evaluate(
     ({ BrowserWindow }, size) => {
       const win = BrowserWindow.getAllWindows()[0]
-      if (win) {
-        win.setSize(size.width, size.height)
-        win.setContentSize(size.width, size.height)
-      }
+      win.setContentSize(size.width, size.height)
+      return win.getContentSize()
     },
     { width, height }
   )
+  if (granted[0] !== width || granted[1] !== height) {
+    throw new Error(
+      `resizeBrowserWindow: asked for ${width}×${height}, got ${granted[0]}×${granted[1]}`
+    )
+  }
 }

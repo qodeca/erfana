@@ -74,9 +74,18 @@ Both are runtime `dependencies` and both are large: `ffmpeg-static` ~44 MB, `ffp
 
 Full detail in [fuses.md](./fuses.md#afterpack-also-prunes-foreign-arch-native-binaries).
 
-### @llamaindex/liteparse (document import) and its sharp chain
+### @llamaindex/liteparse (document import) and its native binary
 
-`@llamaindex/liteparse` is pinned exactly (`1.4.1`) and drags in native modules: `sharp` (with its ~16 MB `@img/*` platform binaries), `@hyzyla/pdfium`, and `tesseract.js`.
+`@llamaindex/liteparse` is pinned exactly (`2.14.7`). From 2.x it is a Rust/NAPI package: the
+platform-specific native binary ships as an optional dependency (`@llamaindex/liteparse-<platform>`,
+e.g. `@llamaindex/liteparse-darwin-arm64`) alongside `libpdfium`. It no longer drags in `sharp`
+(with its `@img/*` platform binaries), `@hyzyla/pdfium` or `tesseract.js`; OCR is built into the
+native binary. English traineddata is the only language shipped in `resources/tessdata`; any other
+`ocrLanguage` downloads that language's traineddata on first use — from
+`github.com/tesseract-ocr/tessdata_best` (1.x used the Tesseract.js jsdelivr CDN) — into
+`tessdataPath`, the same source-and-cache contract FR-027 describes. `sharp` and `tesseract.js`
+remain **devDependencies** because the documentation-capture pipeline (`scripts/capture/`) uses them
+at build time.
 
 This is why the main-process build **must** keep dependency externalization on:
 
@@ -85,8 +94,9 @@ This is why the main-process build **must** keep dependency externalization on:
 main: {
   build: {
     // externalizeDeps defaults to true for main process (electron-vite convention).
-    // This is REQUIRED for @llamaindex/liteparse which depends on native modules
-    // (Sharp, @hyzyla/pdfium, tesseract.js-core). Do not set externalizeDeps: false here.
+    // This is REQUIRED for @llamaindex/liteparse, whose platform-specific
+    // native NAPI binary (@llamaindex/liteparse-<platform>) must stay external.
+    // Do not set externalizeDeps: false here.
     minify: true
   }
 }
@@ -94,20 +104,20 @@ main: {
 
 Setting `externalizeDeps: false` for `main` would ask Rollup to inline native `.node` addons into the main bundle, which cannot work. The dependencies stay external and ship in `app/node_modules/`.
 
-Known open security work in this chain is tracked in [issue #39](https://github.com/qodeca/erfana/issues/39).
+The deferred high advisories in this chain ([issue #39](https://github.com/qodeca/erfana/issues/39) — `@llamaindex/liteparse` 1.x and its `sharp`) are cleared by the 2.x upgrade; neither `sharp` nor `@llamaindex/liteparse` 1.x is a production dependency any more.
 
 ---
 
 ## Deliberate version pins — do not "fix" these
 
-### chokidar 3.6.0 (exact, plus an override)
+### chokidar 5.0.0 (exact, plus an override)
 
 ```json
-"dependencies": { "chokidar": "3.6.0" },
-"overrides":    { "chokidar": "3.6.0" }
+"dependencies": { "chokidar": "5.0.0" },
+"overrides":    { "chokidar": "5.0.0" }
 ```
 
-Pinned exactly **and** forced across the whole tree by an `overrides` entry. **Do not bump to v4.** chokidar v4 opens one file descriptor per watched file, which exhausts the process FD limit on large project folders (>~10k files) and crashes the PDF/DOCX export render window at sandbox init. v3 uses FSEvents on macOS and consumes roughly no FDs per file. Every watch configuration in the app also passes `disableGlobbing: true`.
+Pinned exactly **and** forced across the whole tree by an `overrides` entry. chokidar 3 pulled `braces` (GHSA-vfj7-8cjw-p6xm, high, no patched release) into the production tree; with chokidar 5 it is dev-only. **Do not go back to v3.** chokidar 4+ is ESM-only, has no globbing (glob characters in a file name are taken literally; `disableGlobbing` no longer exists) and has no FSEvents on macOS – it opens one file descriptor per watched file. That is the reason the old 3.6.0 pin existed: on a large project folder (>~10k files) it exhausts the process FD limit and crashes the PDF/DOCX export render window at sandbox init. So on macOS the **project directory watcher** no longer uses chokidar: it runs on `NativeRecursiveWatcher` (Node's recursive `fs.watch`, which libuv serves from FSEvents, ~0 FDs per file), as on Windows – see [File watching § Watch backends](../file-watching/README.md#watch-backends-211). Single-file watches stay on chokidar, where the FD cost is small. The `Guard - chokidar 5 pinned, no braces in production` step in `checks.yml` fails CI on any drift or on `braces` reappearing in production. Dependabot ignores chokidar, so bump it by hand.
 
 ### lodash and lodash-es 4.18.1 (overrides)
 
@@ -119,9 +129,9 @@ These are **CVE pins**, forced onto transitive consumers. 4.18.1 is a real publi
 
 ### Other overrides
 
-`@electron/rebuild` is pinned to `3.7.1` and `dompurify` floored at `^3.4.1`, both forced through the tree.
+`dompurify` is floored at `^3.4.1`, forced through the tree. The `@electron/rebuild` pin that used to sit beside it was lifted in [#163](https://github.com/qodeca/erfana/issues/163).
 
-- **`@electron/rebuild`** — the pin was added in v0.8.0 to fix a CI build failure ([changelog](../archive/changelog-v08.md)); [security.md](../security.md#dependency-overrides-packagejson) records the reason as node-pty toolchain compatibility.
+- **`@electron/rebuild`** — the `3.7.1` override was added in v0.8.0 ([changelog](../archive/changelog-v08.md), commit `291caa02`) to fix a CI build failure. The lockfile refresh had pulled in `@electron/rebuild` 4.x, whose `node-gyp` 12 requires Node `^20.17.0 || >=22.9.0` (`@electron/rebuild` 4.0.4 itself requires `>=22.12.0`), while the e2e job still ran Node 18; the same commit moved that job to Node 24. Every CI job and local development now runs Node 24 (`.nvmrc`, the `setup-node-with-retry` action default), so the engine constraint no longer applies. The override was removed and `app-builder-lib` 26.16.1's `@electron/rebuild ^4.0.4` resolves normally (currently 4.2.0, which uses `node-gyp` 12 and `tar` 7.x). **Do not re-add the pin without downgrading Node below 22.12.**
 - **`dompurify`** — nothing in the repo records why. What is verifiable from `package-lock.json`: `dompurify` is not a direct dependency; `monaco-editor` requests exactly `3.2.7` and `mermaid` requests `^3.3.1`, and the override lifts both to the installed `3.4.10`. **The rationale is unverified** — treat the floor as load-bearing until someone confirms it, and record the reason here when they do.
 
 ---

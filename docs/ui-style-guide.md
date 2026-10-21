@@ -117,7 +117,7 @@ the token discipline that `npm run lint:css` now enforces.
 }
 ```
 
-The `-webkit-user-select` prefix is not needed; Erfana ships on Chromium 142 via Electron 39.8.x and unprefixed `user-select` has been honored in Chromium since v54.
+The `-webkit-user-select` prefix is not needed; Erfana ships on Chromium 152 via Electron 44.x and unprefixed `user-select` has been honored in Chromium since v54.
 
 **Cascade assumption.** These overrides rely on app stylesheets loading after `dockview-core/dist/styles/dockview.css` in the Vite bundle. Don't change CSS import order without re-running `src/renderer/src/styles/userSelect.audit.test.ts`, which asserts every audited selector still declares `user-select: text` in its source file.
 

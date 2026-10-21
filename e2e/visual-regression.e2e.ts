@@ -135,12 +135,11 @@ async function stabilizeEditor(page: import('@playwright/test').Page): Promise<v
 }
 
 /**
- * Page-level captures are clipped to the size the fixture REQUESTS
- * (`win.setContentSize(1280, 800)` in `e2e/fixtures/index.ts`), because every
- * Windows host overshoots that request by its own window-chrome and scaling
- * amount – the committed baselines once disagreed with each other for exactly
- * that reason (`docs/windows/known-flakes.md`). Clipping makes the captured
- * size independent of the host; element-level captures need no clip.
+ * Page-level captures are clipped to a fixed 1280×800 rectangle in the top
+ * left of the window. The fixture pins the window's content size
+ * (`VISUAL_CONTENT_SIZE` in `e2e/fixtures/index.ts`); the clip keeps the
+ * page-level baselines at the size they were committed with (#267,
+ * `docs/windows/known-flakes.md`). Element-level captures need no clip.
  */
 const PAGE_CLIP = { x: 0, y: 0, width: 1280, height: 800 } as const
 

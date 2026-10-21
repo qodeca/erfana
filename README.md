@@ -11,7 +11,7 @@ Editor, live preview, project tree and a terminal running Claude Code – or any
 
 <p align="center">
   <a href="https://github.com/qodeca/erfana/releases/latest"><img alt="Download Erfana for macOS or Windows" src="https://img.shields.io/badge/Download-macOS%20%C2%B7%20Windows-E3E829?style=for-the-badge&labelColor=161312"></a><br>
-  <sub>macOS (Apple silicon) · Windows · no Linux build · free and open source (GPL-3.0-only)</sub><br>
+  <sub>macOS 13 or later (Apple silicon) · Windows · no Linux build · free and open source (GPL-3.0-only)</sub><br>
   <a href="docs/user-guide/README.md">User guide</a> · <a href="docs/CHANGELOG.md">Changelog</a> · <a href="https://github.com/qodeca/erfana/discussions">Discussions</a> · <a href="CONTRIBUTING.md">Contributing</a>
 </p>
 

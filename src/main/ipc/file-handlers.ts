@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { dialog, BrowserWindow, shell } from 'electron'
+import { dialog, BrowserWindow, shell, type OpenDialogOptions } from 'electron'
 import { stat, realpath } from 'fs/promises'
 import path from 'path'
 import { ProjectService } from '../services/ProjectService'
@@ -9,18 +9,21 @@ import { fileWatcherService } from '../services/FileWatcherService'
 import { directoryWatcherService } from '../services/DirectoryWatcherService'
 import { settingsService } from '../services/SettingsService'
 import { projectSettingsService } from '../services/ProjectSettingsService'
+import { globalSettingsService } from '../services/GlobalSettingsService'
 import { projectLockService } from '../services/ProjectLockService'
 import type { ProjectChanged } from '../../shared/ipc/schema'
+import type { FileStats } from '../../shared/ipc/file-schema'
 import {
   ImageReadRequestSchema,
   type ImageReadResponse
 } from '../../shared/ipc/file-image-schema'
 import { logger } from '../services/LoggingService'
 import { fileExists } from '../utils/fileUtils'
-import { redactedLogError } from '../utils/redactUserInput'
+import { redactPath, redactedLogError } from '../utils/redactUserInput'
 import { assertInsideProject, assertNoConfinementEscape } from '../utils/projectConfinement'
 import { isTrustedSender } from './senderValidation'
 import { registerHandle } from './registry'
+import { rememberDialogResult, withLastDirectory } from '../utils/lastDialogDirectory'
 
 /**
  * Broadcast project change to all renderer processes
@@ -50,6 +53,13 @@ const projectService = new ProjectService(
   projectLockService
 )
 
+// Issue #211 (design D7): the global `files.exclude` list is merged ahead of
+// each project's list. Read lazily, so it reflects the settings loaded at app
+// start, whenever a project is opened.
+projectSettingsService.setGlobalExcludeProvider(
+  () => globalSettingsService.getSetting('files').exclude
+)
+
 /**
  * Common logic for opening a project by path
  * Used by both file:openProject (dialog) and file:openProjectByPath (direct)
@@ -74,16 +84,17 @@ async function openProjectByPath(newProjectPath: string): Promise<string> {
 export function registerFileHandlers(): void {
   // Open project folder via dialog
   registerHandle('file:openProject', async () => {
-    const result = await dialog.showOpenDialog({
+    const result = await dialog.showOpenDialog(withLastDirectory<OpenDialogOptions>({
       properties: ['openDirectory', 'createDirectory'],
       title: 'Select Project Folder',
       buttonLabel: 'Open Project'
-    })
+    }))
 
     if (result.canceled || result.filePaths.length === 0) {
       return null
     }
 
+    rememberDialogResult(result.filePaths)
     const newProjectPath = result.filePaths[0]
     return await openProjectByPath(newProjectPath)
   })
@@ -141,15 +152,19 @@ export function registerFileHandlers(): void {
   })
 
   // Read directory structure
-  registerHandle('file:readDirectory', async (_event, dirPath: string) => {
+  registerHandle('file:readDirectory', async (event, dirPath: string) => {
     try {
       const start = performance.now()
+      // #210: a successful read of a paused root shows every change dropped
+      // before it began, so the watcher need not catch up on those at resume.
+      const commitRead = directoryWatcherService.beginTreeRead(dirPath, event.sender.id)
       const result = await fileService.readDirectory(dirPath)
+      commitRead()
       const durationMs = Math.round(performance.now() - start)
-      logger.info('file:readDirectory IPC completed', { durationMs, dirPath })
+      logger.info('file:readDirectory IPC completed', { durationMs, dirPath: redactPath(dirPath) })
       return result
     } catch (error) {
-      logger.error('Error reading directory', error instanceof Error ? error : undefined)
+      logger.error('Error reading directory', redactedLogError(error))
       throw error
     }
   })
@@ -164,18 +179,25 @@ export function registerFileHandlers(): void {
       await assertInsideProject(filePath, fileService.getProjectPath())
       return await fileService.readFile(filePath)
     } catch (error) {
-      logger.error('Error reading file', error instanceof Error ? error : undefined)
+      logger.error('Error reading file', redactedLogError(error))
       throw error
     }
   })
 
   // Write file content
-  registerHandle('file:writeFile', async (_event, filePath: string, content: string) => {
+  //
+  // `options.createParentDirs` is the explicit restore of a tab whose file was
+  // deleted together with its folder; only a literal `true` turns it on. The
+  // logged copy of the error drops the path (the renderer gets the original).
+  registerHandle('file:writeFile', async (_event, filePath: string, content: string, options?: unknown) => {
     try {
-      await fileService.writeFile(filePath, content)
+      const createParentDirs =
+        typeof options === 'object' && options !== null &&
+        (options as { createParentDirs?: unknown }).createParentDirs === true
+      await fileService.writeFile(filePath, content, createParentDirs ? { createParentDirs } : undefined)
       return true
     } catch (error) {
-      logger.error('Error writing file', error instanceof Error ? error : undefined)
+      logger.error('Error writing file', redactedLogError(error))
       throw error
     }
   })
@@ -188,7 +210,7 @@ export function registerFileHandlers(): void {
   // enforced is that a path that *looks* in-project may not resolve out of it
   // through a symlink, so the watcher's automatic re-stat of a watched file
   // cannot be pointed elsewhere (issue #70).
-  registerHandle('file:getStats', async (_event, filePath: string) => {
+  registerHandle('file:getStats', async (_event, filePath: string): Promise<FileStats> => {
     try {
       await assertNoConfinementEscape(filePath, fileService.getProjectPath())
       const stats = await fileService.getFileStats(filePath)
@@ -196,7 +218,7 @@ export function registerFileHandlers(): void {
         size: stats.size,
         modified: stats.mtime,
         created: stats.birthtime
-      }
+      } satisfies FileStats
     } catch (error) {
       // ENOENT is an expected caller condition (e.g. a markdown link whose
       // target doesn't exist). Log at debug; surface real failures at error.
@@ -205,9 +227,9 @@ export function registerFileHandlers(): void {
       // site (e.g. ImageViewerPanel and ProjectTree warn; link checks use
       // file:exists instead).
       if (error instanceof Error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
-        logger.debug('file:getStats target not found', { filePath, code: 'ENOENT' })
+        logger.debug('file:getStats target not found', { filePath: redactPath(filePath), code: 'ENOENT' })
       } else {
-        logger.error('Error getting file stats', error instanceof Error ? error : undefined)
+        logger.error('Error getting file stats', redactedLogError(error))
       }
       throw error
     }
@@ -256,6 +278,10 @@ export function registerFileHandlers(): void {
     return true
   })
 
+  // #210: each mutation below reports what it changed via noteInternalChange
+  // after success, so a paused directory watcher does not count its own events
+  // as missed external changes.
+
   // Create new file
   registerHandle('file:createFile', async (_event, dirPath: string, fileName: string) => {
     try {
@@ -274,6 +300,7 @@ export function registerFileHandlers(): void {
       }
 
       const createdFilePath = await fileService.createFile(dirPath, sanitizedFileName)
+      directoryWatcherService.noteInternalChange({ path: createdFilePath, kind: 'added', subtree: false })
       return createdFilePath
     } catch (error) {
       // Redact user-typed filename before logging (INVALID_FILENAME embeds it);
@@ -301,6 +328,7 @@ export function registerFileHandlers(): void {
       }
 
       const createdFolderPath = await fileService.createFolder(dirPath, sanitizedFolderName)
+      directoryWatcherService.noteInternalChange({ path: createdFolderPath, kind: 'added', subtree: false })
       return createdFolderPath
     } catch (error) {
       // Redact user-typed name before logging (INVALID_FILENAME embeds it);
@@ -319,9 +347,10 @@ export function registerFileHandlers(): void {
       }
 
       await fileService.deleteFile(filePath)
+      directoryWatcherService.noteInternalChange({ path: filePath, kind: 'removed', subtree: true })
       return true
     } catch (error) {
-      logger.error('Error deleting file', error instanceof Error ? error : undefined)
+      logger.error('Error deleting file', redactedLogError(error))
       throw error
     }
   })
@@ -335,9 +364,10 @@ export function registerFileHandlers(): void {
       }
 
       await fileService.deleteFolder(folderPath)
+      directoryWatcherService.noteInternalChange({ path: folderPath, kind: 'removed', subtree: true })
       return true
     } catch (error) {
-      logger.error('Error deleting folder', error instanceof Error ? error : undefined)
+      logger.error('Error deleting folder', redactedLogError(error))
       throw error
     }
   })
@@ -360,6 +390,10 @@ export function registerFileHandlers(): void {
       }
 
       const newPath = await fileService.rename(oldPath, sanitizedName)
+      directoryWatcherService.noteInternalChange(
+        { path: oldPath, kind: 'removed', subtree: true },
+        { path: newPath, kind: 'added', subtree: true }
+      )
       return newPath
     } catch (error) {
       // Redact user-typed name before logging (INVALID_FILENAME embeds it);
@@ -396,9 +430,15 @@ export function registerFileHandlers(): void {
       }
 
       const newPath = await fileService.moveItem(sourcePath, targetParentPath, sanitizedNewName, replaceExisting)
+      directoryWatcherService.noteInternalChange(
+        { path: sourcePath, kind: 'removed', subtree: true },
+        { path: newPath.path, kind: 'added', subtree: true },
+        // The replaced item at the destination was removed first
+        ...(replaceExisting ? [{ path: newPath.path, kind: 'removed' as const, subtree: true }] : [])
+      )
       return newPath
     } catch (error) {
-      logger.error('Error moving item', error instanceof Error ? error : undefined)
+      logger.error('Error moving item', redactedLogError(error))
       throw error
     }
   })
@@ -427,9 +467,10 @@ export function registerFileHandlers(): void {
       }
 
       const newPath = await fileService.copyItem(sourcePath, targetParentPath, sanitizedNewName)
+      directoryWatcherService.noteInternalChange({ path: newPath.path, kind: 'added', subtree: true })
       return newPath
     } catch (error) {
-      logger.error('Error copying item', error instanceof Error ? error : undefined)
+      logger.error('Error copying item', redactedLogError(error))
       throw error
     }
   })
@@ -448,7 +489,7 @@ export function registerFileHandlers(): void {
       const hasConflict = await fileService.checkNameConflict(targetParentPath, itemName)
       return hasConflict
     } catch (error) {
-      logger.error('Error checking conflict', error instanceof Error ? error : undefined)
+      logger.error('Error checking conflict', redactedLogError(error))
       throw error
     }
   })
@@ -487,7 +528,7 @@ export function registerFileHandlers(): void {
         }
         return result
       } catch (error) {
-        logger.error('Error reading image', error instanceof Error ? error : undefined)
+        logger.error('Error reading image', redactedLogError(error))
         throw error
       }
     }

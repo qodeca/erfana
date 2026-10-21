@@ -42,7 +42,7 @@ afterSign: ./scripts/resign.js
 
 `afterPack` does seven things, in this order:
 
-1. Resolve the packed Electron binary – and, on a test build, rename it via `renameTestBuildApp` to `Erfana (TEST BUILD).app`.
+1. Resolve the packed Electron binary – and, on a test build, refuse it via `assertTestBuildName` unless the product name ends in `(TEST BUILD)`.
 2. Prune foreign-platform/arch `ffprobe-static` binaries and `node-pty` prebuilds (plus a `.pdb` strip on `win32`).
 3. Restore the `node-pty` `spawn-helper` execute bit (`0755`, Unix only).
 4. `ensurePackedMediaBinaries` – copy this pack's cached `ffmpeg` into the bundle, re-verify it (size floor always, SHA-256 only on pinned arches), and `chmod 0755` the packed `ffmpeg` + every `ffprobe`.
@@ -147,7 +147,7 @@ The `files:` guards above cover only `<resources>/app/`. `extraResources` copies
 
 **L2a-1 — resources leak-name tripwire (`assertResourcesDestNoRepoLeak`), FATAL on both platforms.** A tripwire, *not* an exhaustive allowlist: it fatally rejects a sibling beside `app/` whose top-level name is a known repo-structure sentinel or a known secret/exfil leak-name (`EXTRA_CONTENT_LEAK_NAMES` = `REPO_ROOT_SENTINELS` ∪ suspicious names like `secrets`, `.env`, `id_rsa`) and is not an allowlisted `extraResources` dest. Such names are never part of Electron's runtime layout beside `app/`, so this is a platform-agnostic leak signal and stays fatal on both platforms.
 
-**L2a-2 — resources full-sibling enumeration (`assertResourcesSiblingsAllowlist`), FATAL on macOS / ADVISORY (`console.warn`) on Windows.** Every sibling beside `app/` must be an expected Electron-owned name (`EXPECTED_RESOURCES_ENTRIES`, derived as the config slots ∪ `app`/`app.asar`/`icon.icns`/`elevate.exe`), a config slot, or a `*.lproj` folder. The Electron-owned name set was enumerated on a **macOS-only** baseline and CI never runs an electron-builder pack on Windows (`windows-checks` runs only typecheck + `test:main`), so keeping this fatal on Windows would rest a release-blocking gate on an unverified baseline and risk a first-Windows-release false-fail. It is therefore advisory on win32 until a real Windows packed-tree baseline is captured; the softening touches **only** the Electron-owned enumeration — the config leak vector (L2a-1) stays both-platforms-fatal. Tracked as a promotion follow-up in [technical-debt.md](../technical-debt.md).
+**L2a-2 — resources full-sibling enumeration (`assertResourcesSiblingsAllowlist`), FATAL on macOS / ADVISORY (`console.warn`) on Windows.** Every sibling beside `app/` must be an expected Electron-owned name (`EXPECTED_RESOURCES_ENTRIES`, derived as the config slots ∪ `app`/`app.asar`/`icon.icns`/`elevate.exe`/`LICENSE.electron.txt`/`LICENSES.chromium.html`), a config slot, or a `*.lproj` folder. The Electron-owned name set was enumerated on a **macOS-only** baseline and CI never runs an electron-builder pack on Windows (`windows-checks` runs only typecheck + `test:main`), so keeping this fatal on Windows would rest a release-blocking gate on an unverified baseline and risk a first-Windows-release false-fail. It is therefore advisory on win32 until a real Windows packed-tree baseline is captured; the softening touches **only** the Electron-owned enumeration — the config leak vector (L2a-1) stays both-platforms-fatal. Tracked as a promotion follow-up in [technical-debt.md](../technical-debt.md).
 
 **L2b — extraFiles coarse repo-leak tripwire (`assertExtraFilesDestNoRepoLeak`), FATAL on both platforms.** The `extraFiles` dest on Windows *is* the app output root — full of Electron's standard runtime layout — so a "every entry must be allowlisted" walk there would very likely false-fail the first Windows release. Instead L2b is a coarse backstop: it recurses two levels scanning for `REPO_ROOT_SENTINELS` (closing a `to: 'bundled'` nested-copy evasion) and flags any file with a source-code extension (`REPO_SOURCE_EXTENSIONS`), since `ALLOWED_EXTRA_FILES_DESTS` is empty so L1 already forbids *any* config content there. It is explicitly **not** a sound standalone control — it cannot enumerate Electron's runtime layout — and the guarantee rests on L1; L2b exists to catch a gross regression if L1 is ever bypassed.
 
@@ -172,13 +172,14 @@ Playwright drives the packaged app over the Chrome DevTools Protocol, which need
 ```bash
 npm run build:mac:test
 # expands to: npm run build && ERFANA_TEST_BUILD=true electron-builder --mac \
+#             -c.productName="Erfana (TEST BUILD)" \
 #             -c.directories.output=release/test/${npm_package_version}
 ```
 
 Three guardrails keep such a build from being mistaken for a release:
 
 1. **Separate output directory** – artifacts land in `release/test/{version}/`, not `release/{version}/`, so they can never be picked up by the release upload globs.
-2. **Renamed bundle** – `renameTestBuildApp` renames the packed app to `Erfana (TEST BUILD).app` (`.exe` on Windows) before fuses are applied, so the inspector-enabled build is visually distinct in Finder and in the DMG.
+2. **Suffixed product name** – the script sets `-c.productName="Erfana (TEST BUILD)"`, so electron-builder itself names the bundle `Erfana (TEST BUILD).app` and the inspector-enabled build is visually distinct in Finder and in the DMG. `assertTestBuildName` fails a test build without the suffix. The bundle is not renamed in `afterPack`: electron-builder 26.16 checks the entry file under the configured name right after `afterPack`, so a renamed bundle fails the build. The product name also names the app's data folder, so a test build keeps its settings apart from an installed Erfana.
 3. **Loud build log** – `displayTestBuildWarning()` prints a boxed "DO NOT DISTRIBUTE THIS BUILD TO END USERS" banner twice, at the start and the end of the hook, and the closing summary reads `NodeCliInspect: ENABLED (test build)`.
 
 `npm run build:mac` (and `build:win`) leave `ERFANA_TEST_BUILD` unset, so every released artifact has the inspector fuse off. Nothing under `.github/workflows/` sets the variable (verified 2026-08-07).
