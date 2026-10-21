@@ -19,6 +19,9 @@ import { Page, Locator, expect } from '@playwright/test'
 import { TEST_IDS } from '../../src/renderer/src/constants/testids'
 import { byTestId } from '../utils/locators'
 
+/** How long `waitForPrompt` waits for a settled prompt by default. */
+export const PROMPT_TIMEOUT_MS = 30_000
+
 /** Selector for the xterm.js terminal container */
 const TERMINAL_SELECTOR = `[data-testid="${TEST_IDS.TERMINAL_INSTANCE}"]`
 
@@ -98,10 +101,15 @@ export class TerminalPage {
    *    row, and two reads in a row see the same screen, so a prompt that is
    *    still being drawn (or a banner before it) does not count.
    *
-   * @param options.timeout - Maximum wait time (default: 10000ms)
+   * The default budget is generous on purpose: a first zsh prompt under
+   * full-suite load on macOS took longer than the old 10 s, and the check only
+   * waits as long as the shell needs. A timeout reports the last screen read,
+   * so a slow shell can be told apart from a prompt this check does not see.
+   *
+   * @param options.timeout - Maximum wait time (default: PROMPT_TIMEOUT_MS)
    */
   async waitForPrompt(options?: { timeout?: number }): Promise<void> {
-    const timeout = options?.timeout ?? 10_000
+    const timeout = options?.timeout ?? PROMPT_TIMEOUT_MS
 
     // Stage 1: Condition-based wait for xterm initialization
     await this.page.waitForFunction(
@@ -117,18 +125,24 @@ export class TerminalPage {
 
     // Stage 2: the shell has drawn a settled prompt
     let previous = ''
-    await expect
-      .poll(
-        async () => {
-          const screen = await this.readScreen()
-          const snapshot = JSON.stringify(screen)
-          const settled = screen.cursorX > 0 && screen.lines.length > 0 && snapshot === previous
-          previous = snapshot
-          return settled ? 'prompt' : 'starting'
-        },
-        { message: 'the shell should draw its prompt', intervals: [100], timeout }
-      )
-      .toBe('prompt')
+    try {
+      await expect
+        .poll(
+          async () => {
+            const screen = await this.readScreen()
+            const snapshot = JSON.stringify(screen)
+            const settled = screen.cursorX > 0 && screen.lines.length > 0 && snapshot === previous
+            previous = snapshot
+            return settled ? 'prompt' : 'starting'
+          },
+          { message: 'the shell should draw its prompt', intervals: [100], timeout }
+        )
+        .toBe('prompt')
+    } catch (error) {
+      throw new Error(`${(error as Error).message}\nLast terminal screen read: ${previous || '(none)'}`, {
+        cause: error
+      })
+    }
 
     // Sanity: the screen the prompt check passed on really holds text
     expect((await this.readScreen()).lines.length, 'terminal screen after the prompt').toBeGreaterThan(0)
