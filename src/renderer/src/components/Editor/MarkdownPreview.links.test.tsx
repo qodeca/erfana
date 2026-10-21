@@ -229,6 +229,71 @@ describe('MarkdownPreview Link Features', () => {
     })
   })
 
+  describe('Checked links are keyed by the rendered href', () => {
+    beforeEach(() => {
+      global.window.api = {
+        utils: { getPlatform: () => 'darwin' },
+        file: {
+          getProjectPath: vi.fn().mockResolvedValue('/test/project'),
+          exists: vi.fn().mockResolvedValue(false)
+        }
+      } as any
+    })
+
+    it.each([
+      ['[a](.\\docs\\a.md)'],
+      ['[a](<my file.md>)'],
+      ['[a](zażółć.md)']
+    ])('gives %s the broken-link class and tooltip', async (markdown) => {
+      const { container } = await renderWithToastAsync(
+        <MarkdownPreview content={markdown} filePath="/test/project/file.md" />
+      )
+      const link = container.querySelector('a')
+      expect(link?.className).toContain('broken-link')
+      expect(link?.getAttribute('title')).toContain('File not found')
+    })
+
+    it('collects raw-HTML and reference-style links, and ignores images', async () => {
+      const markdown = [
+        '<a href="./raw.md">raw</a>',
+        '',
+        '[ref][1]',
+        '',
+        '![pic](./pic.png)',
+        '',
+        '[1]: ./ref.md'
+      ].join('\n')
+      const { container } = await renderWithToastAsync(
+        <MarkdownPreview content={markdown} filePath="/test/project/file.md" />
+      )
+      const checked = (window.api.file.exists as ReturnType<typeof vi.fn>).mock.calls.map(
+        ([p]) => p
+      )
+      expect(checked).toContain('/test/project/raw.md')
+      expect(checked).toContain('/test/project/ref.md')
+      expect(checked).not.toContain('/test/project/pic.png')
+      expect(container.querySelector('a[href="./raw.md"]')?.className).toContain('broken-link')
+    })
+
+    it('checks nothing for a file the links were not read for', async () => {
+      const { rerender } = await renderWithToastAsync(
+        <MarkdownPreview content="[a](./x.md)" filePath="/test/project/one.md" />
+      )
+      ;(window.api.file.exists as ReturnType<typeof vi.fn>).mockClear()
+      await act(async () => {
+        rerender(
+          <ToastProvider>
+            <MarkdownPreview content="[a](./x.md)" filePath="/test/project/docs/two.md" />
+          </ToastProvider>
+        )
+      })
+      const checked = (window.api.file.exists as ReturnType<typeof vi.fn>).mock.calls.map(
+        ([p]) => p
+      )
+      expect(checked).toEqual(['/test/project/docs/x.md'])
+    })
+  })
+
   // Note: "Focus Accessibility" test removed - it only verified that an <a> tag exists,
   // which provides no value. Actual focus-visible styles are CSS and tested visually.
 

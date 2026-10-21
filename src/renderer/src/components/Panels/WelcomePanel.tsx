@@ -5,12 +5,13 @@ import { Folder, Clock, X, FileUp, FolderOpen, Replace } from 'lucide-react'
 import { useState, useEffect, useCallback, useRef, useId } from 'react'
 import { useProjectStore } from '../../stores/useProjectStore'
 import { useOpenProjectByPath, useProjectManagementContext } from '../../context/ProjectManagementContext'
-import { isProjectNotFoundError, getUserFriendlyMessage } from '../../../../shared/errors'
+import { isProjectNotFoundError, getUserFriendlyMessage, getDisplayMessage } from '../../../../shared/errors'
 import { showErrorToast, showSuccessToast, showWarningToast } from '../../utils/toastHelpers'
 import { formatRelativeTime } from '../../utils/timeFormatting'
 import { useImport } from '../../hooks/useImport'
 import { logger } from '../../utils/logger'
 import { TEST_IDS, getDynamicTestId } from '../../constants/testids'
+import { fileGateway } from '../../services/fileGateway'
 
 interface RecentProject {
   path: string
@@ -133,7 +134,7 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
 
   // Auto-refresh recent projects when any project change occurs (open/close)
   useEffect(() => {
-    const unsubscribe = window.api.file.onProjectChanged(() => {
+    const unsubscribe = fileGateway.onProjectChanged(() => {
       loadRecentProjects()
     })
     return () => unsubscribe()
@@ -223,7 +224,7 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
       logger.error('Failed to open project:', error instanceof Error ? error : undefined)
 
       const isNotFound = isProjectNotFoundError(error)
-      const userMessage = getUserFriendlyMessage(error)
+      const userMessage = getDisplayMessage(error)
       const errorMessage = isNotFound
         ? 'Project no longer exists at this location. It has been removed from recent projects.'
         : userMessage

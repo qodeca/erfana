@@ -21,6 +21,8 @@ import {
 } from './WindowsTerminalBootstrap'
 import { isWindowsLongPath } from './watcher/PlatformConfig'
 import { isForegroundBusy, shellProcessNames } from './terminalForeground'
+import { killProcessTrees } from './terminalTreeKill'
+import { installNoForkConsoleList } from './nodePtyWindowsShim'
 
 /**
  * Outcome of {@link TerminalService.createTerminal}. A failure carries its
@@ -56,7 +58,8 @@ try {
 // Kick off loading in background
 void import('node-pty')
   .then((mod) => {
-    pty = mod
+    // Keep a module that is already set (an injected test double, or one loaded by createTerminal)
+    pty = pty ?? mod
   })
   .catch((error) => {
     logger.error('⚠️ node-pty not available', error instanceof Error ? error : undefined)
@@ -76,10 +79,14 @@ interface TerminalInstance {
   isClearing: boolean // Track clearing phase to prevent forwarding clear sequence
   clearFallbackTimeout?: NodeJS.Timeout // Safety timeout for clear confirmation
   hasReceivedMarker: boolean // Track if marker was detected (prevents late data forwarding)
+  /** Output that arrived after the marker line while the clear handshake was open; flushed in order once it ends. */
+  pendingOutput: string
   webContentsId: number // Track owning webContents for cleanup on window close
   shellKind: ShellKind // Quoting flavour resolved at create time (#164)
   shellNames: ReadonlySet<string> // Names the idle shell shows as; see terminalForeground.ts
   exited: Promise<void> // Settles when node-pty reports the shell exit (#214)
+  hasExited?: boolean // Set when node-pty reports the exit; the shell's pid may be reused after that (#296)
+  killRequested?: boolean // A pty kill is under way or done; cleared again if it throws (#296)
 }
 
 /**
@@ -94,8 +101,68 @@ interface TerminalInstance {
  */
 export const TERMINAL_EXIT_WAIT_MS = 1_500
 
+/**
+ * Longest `dispose()` may take (#296). `src/main/index.ts` gives all disposers
+ * together 2 s before it exits the app, so this stays under that. The tree kill
+ * wait, the node-pty kills and the exit wait all draw from it.
+ */
+export const TERMINAL_DISPOSE_BOUND_MS = 1_800
+
+/** The exit wait never gets less than this, even when the kills used up the bound. */
+export const TERMINAL_MIN_EXIT_WAIT_MS = 300
+
+/**
+ * How long a Windows batch (window close, quit) may spend in node-pty's own
+ * kill (#296). Each call starts a helper process, so dozens in a row are slow.
+ * The shells are already gone by then (their process trees were killed first),
+ * so what is left over is deferred to later turns of the event loop instead of
+ * blocking this one.
+ */
+export const TERMINAL_KILL_BUDGET_MS = 500
+
 /** Most output kept while waiting for the bootstrap marker (64 KiB). */
 export const MARKER_BUFFER_MAX_CHARS = 64 * 1024
+
+/** Most post-marker output held while the clear handshake is open (64 KiB, newest kept). */
+export const PENDING_OUTPUT_MAX_CHARS = 64 * 1024
+
+const ESC = String.fromCharCode(0x1b)
+const MARKER_LINE_END = new RegExp(`^(?:[ \\t]|${ESC}\\[[0-9;]*K)*\\r?\\n`)
+const MARKER_LINE_END_PARTIAL = new RegExp(`^(?:[ \\t]|${ESC}\\[[0-9;]*K)*\\r?$`)
+
+/**
+ * Drops the rest of the marker's own line from output that follows the marker.
+ *
+ * The shell prints the marker followed by a line break. That break belongs to
+ * the hidden handshake, anything after it is real output (a prompt can follow
+ * within the same chunk). `pending` is true when the line break has not fully
+ * arrived yet (the chunk ended on the marker, or on a lone `\r`), so the next
+ * chunk must be given to this function again.
+ */
+export function stripMarkerLineEnd(text: string): { rest: string; pending: boolean } {
+  // ConPTY pads a line with spaces or erase-to-end-of-line sequences before the break
+  const eol = MARKER_LINE_END.exec(text)
+  if (eol) return { rest: text.slice(eol[0].length), pending: false }
+  if (MARKER_LINE_END_PARTIAL.test(text)) return { rest: '', pending: true }
+  return { rest: text, pending: false }
+}
+
+/**
+ * Cuts held output down to {@link PENDING_OUTPUT_MAX_CHARS}, keeping the newest.
+ * The cut starts at the next line break so no line is half there, else after a
+ * split surrogate pair, and resets the text style so a cut escape sequence
+ * cannot leave the terminal coloured.
+ */
+export function cutHeldOutput(text: string): string {
+  let tail = text.slice(-PENDING_OUTPUT_MAX_CHARS)
+  const lineBreak = tail.indexOf('\n')
+  if (lineBreak !== -1) {
+    tail = tail.slice(lineBreak + 1)
+  } else if (/^[\uDC00-\uDFFF]/.test(tail)) {
+    tail = tail.slice(1)
+  }
+  return '\x1b[0m' + tail
+}
 
 /**
  * Terminal configuration
@@ -113,6 +180,8 @@ export class TerminalService extends EventEmitter {
   private terminalCounter = 0
   /** Exits of killed shells not yet reported by node-pty; `dispose()` waits for them (#214). */
   private pendingExits = new Set<Promise<void>>()
+  /** Window-close kill batches still running on Windows; `dispose()` waits for them (#296). */
+  private pendingKills = new Set<Promise<void>>()
 
   /**
    * @param fsExists - injected for `resolveWindowsShell()` testability;
@@ -210,6 +279,9 @@ export class TerminalService extends EventEmitter {
         return { error: 'Terminal support is not available (node-pty failed to load)' }
       }
     }
+
+    // node-pty's Windows kill must not fork a helper (#296); see nodePtyWindowsShim.ts
+    if (osPlatform() === 'win32') installNoForkConsoleList()
 
     const terminalId = `terminal-${++this.terminalCounter}`
 
@@ -344,6 +416,7 @@ export class TerminalService extends EventEmitter {
         initializationComplete: false, // Will be set to true after cwd verification
         isClearing: false, // Will be set to true during terminal clear phase
         hasReceivedMarker: false, // Will be set to true when marker is detected
+        pendingOutput: '',
         // Track owning webContents for cleanup on window close (issue #59)
         // Sentinel value -1 means "no owner" - terminals with -1 won't be cleaned up
         // during window destruction (used in tests and manual terminal creation)
@@ -362,6 +435,11 @@ export class TerminalService extends EventEmitter {
       // Marker detection: buffer data until we see the marker from bootstrap script
       let markerBuffer = ''
       let markerDetected = false
+      // True while the line break that ends the marker line has not been seen yet
+      let markerLineEndPending = false
+      // Set by the detector for the chunk that held the marker, so the forwarder
+      // does not process that chunk a second time
+      let markerChunkHandled = false
       const markerDetector = (data: string) => {
         if (markerDetected) return
         markerBuffer += data
@@ -370,8 +448,10 @@ export class TerminalService extends EventEmitter {
         if (markerBuffer.length > MARKER_BUFFER_MAX_CHARS) {
           markerBuffer = markerBuffer.slice(-MARKER_BUFFER_MAX_CHARS)
         }
-        if (markerBuffer.includes(marker)) {
+        const markerAt = markerBuffer.indexOf(marker)
+        if (markerAt !== -1) {
           markerDetected = true
+          markerChunkHandled = true
 
           // Parse PWD from output (line before marker)
           const lines = markerBuffer.split(/\r?\n/).filter(Boolean)
@@ -392,7 +472,15 @@ export class TerminalService extends EventEmitter {
             term.hasReceivedMarker = true
             term.isClearing = true
 
+            // Output that followed the marker in the same chunk (a fast shell can
+            // draw its prompt right behind it) is real: hold it until the clear
+            // has been applied instead of discarding it.
+            const afterMarker = stripMarkerLineEnd(markerBuffer.slice(markerAt + marker.length))
+            markerLineEndPending = afterMarker.pending
+            this.queuePendingOutput(term, afterMarker.rest, marker)
+
             this.emit('clearTerminal', { terminalId, webContentsId: webContentsId ?? -1 })
+            markerBuffer = ''
 
             // Safety fallback: if renderer doesn't respond in 3 seconds, enable anyway
             term.clearFallbackTimeout = setTimeout(() => {
@@ -402,6 +490,7 @@ export class TerminalService extends EventEmitter {
                 t.isClearing = false
                 t.initializationComplete = true
                 t.clearFallbackTimeout = undefined
+                this.flushPendingOutput(t)
               }
             }, 3000)
           }
@@ -420,15 +509,32 @@ export class TerminalService extends EventEmitter {
         // `logger.debug` drops the call below the configured level.
         logger.debug(`[PRIMARY onData] term=${!!term}, init=${term?.initializationComplete}, clearing=${term?.isClearing}, marker=${term?.hasReceivedMarker}, length=${data.length}`)
 
-        // STRICT BLOCKING: Only forward if:
-        // 1. Initialization complete (clear confirmed by renderer)
-        // 2. NOT currently clearing
-        // 3. Marker has been received (ensures no pre-marker data leaks through)
-        if (term && term.initializationComplete && !term.isClearing && term.hasReceivedMarker) {
-          logger.debug(`[PRIMARY onData] FORWARDING data`)
-          this.emit('data', { terminalId, data, webContentsId: webContentsId ?? -1 })
-        } else {
+        // Output before the marker is bootstrap noise and is dropped. The chunk
+        // that held the marker was already split by the detector.
+        if (!term || !term.hasReceivedMarker) {
           logger.debug(`[PRIMARY onData] BLOCKING data`)
+          return
+        }
+        if (markerChunkHandled) {
+          markerChunkHandled = false
+          return
+        }
+
+        let output = data
+        if (markerLineEndPending) {
+          const stripped = stripMarkerLineEnd(output)
+          markerLineEndPending = stripped.pending
+          output = stripped.rest
+        }
+        if (!output) return
+
+        if (term.initializationComplete && !term.isClearing) {
+          logger.debug(`[PRIMARY onData] FORWARDING data`)
+          this.emit('data', { terminalId, data: output, webContentsId: webContentsId ?? -1 })
+        } else {
+          // Clear handshake still open: keep it, in order, for the flush.
+          logger.debug(`[PRIMARY onData] QUEUEING data`)
+          this.queuePendingOutput(term, output, marker)
         }
       })
 
@@ -436,6 +542,15 @@ export class TerminalService extends EventEmitter {
       ptyProcess.onExit((event: { exitCode: number; signal?: number }) => {
         logger.info(`🏁 Terminal ${terminalId} exited`, event)
         markExited()
+        terminal.hasExited = true
+        // A shell that fails during the handshake still said why: show it before the exit
+        if (terminal.clearFallbackTimeout) {
+          clearTimeout(terminal.clearFallbackTimeout)
+          terminal.clearFallbackTimeout = undefined
+        }
+        terminal.isClearing = false
+        terminal.initializationComplete = true
+        this.flushPendingOutput(terminal)
         this.emit('exit', { terminalId, exitCode: event.exitCode, signal: event.signal, webContentsId: webContentsId ?? -1 })
         this.terminals.delete(terminalId)
       })
@@ -450,6 +565,26 @@ export class TerminalService extends EventEmitter {
     }
   }
 
+
+  /** Holds post-marker output while the clear handshake is open (bounded, newest kept). */
+  private queuePendingOutput(terminal: TerminalInstance, output: string, marker: string): void {
+    if (!output) return
+    let merged = terminal.pendingOutput + output
+    // A marker that shows up again (a console redraw) means the screen was redrawn
+    // from there: only what follows it is new.
+    const markerAt = merged.lastIndexOf(marker)
+    if (markerAt !== -1) merged = stripMarkerLineEnd(merged.slice(markerAt + marker.length)).rest
+    if (merged.length > PENDING_OUTPUT_MAX_CHARS) merged = cutHeldOutput(merged)
+    terminal.pendingOutput = merged
+  }
+
+  /** Forwards held output, in order, once the handshake has ended. */
+  private flushPendingOutput(terminal: TerminalInstance): void {
+    const data = terminal.pendingOutput
+    if (!data) return
+    terminal.pendingOutput = ''
+    this.emit('data', { terminalId: terminal.id, data, webContentsId: terminal.webContentsId })
+  }
 
   /**
    * Called by renderer after clear sequence is processed
@@ -468,6 +603,7 @@ export class TerminalService extends EventEmitter {
 
       terminal.isClearing = false
       terminal.initializationComplete = true
+      this.flushPendingOutput(terminal)
 
       // Note: We intentionally do NOT send a newline here
       // Sending '\r' would cause the shell to flush its output buffer,
@@ -570,7 +706,7 @@ export class TerminalService extends EventEmitter {
     }
 
     try {
-      terminal.ptyProcess.kill()
+      this.ptyKill(terminal)
       this.terminals.delete(terminalId)
       this.trackExit(terminal)
       logger.info(`🛑 Terminal ${terminalId} killed`)
@@ -671,26 +807,114 @@ export class TerminalService extends EventEmitter {
    */
   async dispose(): Promise<void> {
     logger.info('🛑 Disposing TerminalService...')
+    const deadline = Date.now() + TERMINAL_DISPOSE_BOUND_MS
 
-    for (const [terminalId, terminal] of this.terminals.entries()) {
+    const shells = this.detachTerminals([...this.terminals.keys()])
+    // Shells already being ended by a window close are awaited too, within the bound
+    const killing = Promise.all([this.endShells(shells), ...this.pendingKills])
+    await this.settleWithin(killing, deadline - TERMINAL_MIN_EXIT_WAIT_MS - Date.now())
+
+    await this.waitForPendingExits(
+      Math.max(TERMINAL_MIN_EXIT_WAIT_MS, Math.min(TERMINAL_EXIT_WAIT_MS, deadline - Date.now()))
+    )
+    logger.info('✅ TerminalService disposed')
+  }
+
+  /**
+   * Takes terminals out of the map (their owner is gone or the app is quitting):
+   * clears their timers and remembers their exit for `dispose()`.
+   */
+  private detachTerminals(terminalIds: string[]): TerminalInstance[] {
+    const detached: TerminalInstance[] = []
+    for (const terminalId of terminalIds) {
+      const terminal = this.terminals.get(terminalId)
+      if (!terminal) continue
+      if (terminal.clearFallbackTimeout) {
+        clearTimeout(terminal.clearFallbackTimeout)
+        terminal.clearFallbackTimeout = undefined
+      }
+      this.terminals.delete(terminalId)
       this.trackExit(terminal)
-      try {
-        terminal.ptyProcess.kill()
-        logger.info(`✅ Terminal ${terminalId} cleaned up`)
-      } catch (error) {
-        // Suppress EPIPE and ESRCH errors during cleanup
-        const code = (error as { code?: unknown }).code
-        if (code === 'EPIPE' || code === 'ESRCH') {
-          logger.info(`ℹ️ Terminal ${terminalId} already terminated`)
-        } else {
-          logger.error(`❌ Failed to cleanup terminal ${terminalId}`, error instanceof Error ? error : undefined)
-        }
+      detached.push(terminal)
+    }
+    return detached
+  }
+
+  /**
+   * Ends a batch of shells for app quit or window close – the only places that
+   * kill process trees (#296). One tab closed or restarted goes through
+   * `killTerminal` instead and ends only the shell, so programs the user started
+   * keep running.
+   *
+   * On Windows the trees of all still-running shells are killed first, in one
+   * `taskkill` that is awaited for a short time while the shells are alive (a
+   * pid freed by the shell's exit could be looked up wrongly). Then node-pty's
+   * own kill releases the pty handles, for as long as the budget lasts; the
+   * rest run on later turns of the event loop. Off Windows this is just the
+   * pty kill.
+   */
+  private async endShells(shells: TerminalInstance[]): Promise<void> {
+    const win32 = osPlatform() === 'win32'
+    if (win32) {
+      await killProcessTrees(shells.filter((t) => !t.hasExited).map((t) => t.pid))
+    }
+    const startedAt = Date.now()
+    for (const terminal of shells) {
+      if (terminal.hasExited) continue
+      if (win32 && Date.now() - startedAt >= TERMINAL_KILL_BUDGET_MS) {
+        setImmediate(() => this.ptyKillQuietly(terminal))
+      } else {
+        this.ptyKillQuietly(terminal)
       }
     }
+  }
 
-    this.terminals.clear()
-    await this.waitForPendingExits()
-    logger.info('✅ TerminalService disposed')
+  /** node-pty's kill, once per terminal. A kill that throws can be tried again. */
+  private ptyKill(terminal: TerminalInstance): void {
+    if (terminal.killRequested) return
+    terminal.killRequested = true
+    try {
+      // Safety net only. In node-pty 1.1.0 WindowsTerminal.kill() returns undefined,
+      // so this branch never runs there; the #296 error box is prevented by the
+      // shim in nodePtyWindowsShim.ts. If a later node-pty returns a promise from
+      // kill(), its rejection is contained here rather than becoming an unhandled one.
+      const result: unknown = terminal.ptyProcess.kill()
+      if (result && typeof (result as Promise<unknown>).catch === 'function') {
+        void (result as Promise<unknown>).catch((error: unknown) => {
+          logger.warn(`Terminal ${terminal.id} kill rejected`, {
+            error: error instanceof Error ? error.message : String(error)
+          })
+        })
+      }
+    } catch (error) {
+      terminal.killRequested = false
+      throw error
+    }
+  }
+
+  private ptyKillQuietly(terminal: TerminalInstance): void {
+    try {
+      this.ptyKill(terminal)
+      logger.info(`✅ Terminal ${terminal.id} cleaned up`)
+    } catch (error) {
+      // Suppress EPIPE and ESRCH errors during cleanup
+      const code = (error as { code?: unknown }).code
+      if (code === 'EPIPE' || code === 'ESRCH') {
+        logger.info(`ℹ️ Terminal ${terminal.id} already terminated`)
+      } else {
+        logger.error(`❌ Failed to cleanup terminal ${terminal.id}`, error instanceof Error ? error : undefined)
+      }
+    }
+  }
+
+  /** Waits for `work` for at most `ms`; never rejects. */
+  private async settleWithin(work: Promise<unknown>, ms: number): Promise<void> {
+    let timer: NodeJS.Timeout | undefined
+    const timedOut = new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, Math.max(0, ms))
+    })
+    await Promise.race([work.then(() => undefined, () => undefined), timedOut])
+    clearTimeout(timer)
   }
 
   /** Remember a killed shell until node-pty reports its exit (#214). */
@@ -700,17 +924,17 @@ export class TerminalService extends EventEmitter {
     void exited.then(() => this.pendingExits.delete(exited))
   }
 
-  private async waitForPendingExits(): Promise<void> {
+  private async waitForPendingExits(waitMs: number = TERMINAL_EXIT_WAIT_MS): Promise<void> {
     if (this.pendingExits.size === 0) return
     let timer: NodeJS.Timeout | undefined
     const timedOut = new Promise<boolean>((resolve) => {
-      timer = setTimeout(() => resolve(true), TERMINAL_EXIT_WAIT_MS)
+      timer = setTimeout(() => resolve(true), waitMs)
     })
     const allExited = Promise.all(this.pendingExits).then(() => false)
     const didTimeOut = await Promise.race([allExited, timedOut])
     clearTimeout(timer)
     if (didTimeOut) {
-      logger.warn(`⚠️ ${this.pendingExits.size} terminal(s) did not report exit within ${TERMINAL_EXIT_WAIT_MS}ms`)
+      logger.warn(`⚠️ ${this.pendingExits.size} terminal(s) did not report exit within ${waitMs}ms`)
     }
   }
 
@@ -734,12 +958,23 @@ export class TerminalService extends EventEmitter {
       }
     }
 
-    for (const terminalId of terminalsToKill) {
-      // Check if terminal still exists - it may have exited naturally between collection and kill
-      if (!this.terminals.has(terminalId)) {
-        continue
+    if (osPlatform() === 'win32') {
+      // The window is gone: end the shells and what they started (#296)
+      const batch = this.endShells(this.detachTerminals(terminalsToKill))
+      this.pendingKills.add(batch)
+      void batch
+        .catch((error) => {
+          logger.error('Failed to end terminals of a closed window', error instanceof Error ? error : undefined)
+        })
+        .finally(() => this.pendingKills.delete(batch))
+    } else {
+      for (const terminalId of terminalsToKill) {
+        // Check if terminal still exists - it may have exited naturally between collection and kill
+        if (!this.terminals.has(terminalId)) {
+          continue
+        }
+        this.killTerminal(terminalId)
       }
-      this.killTerminal(terminalId)
     }
 
     logger.info(`✅ Cleaned up ${terminalsToKill.length} terminals for webContents ${webContentsId}`)

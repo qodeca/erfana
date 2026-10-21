@@ -3,6 +3,7 @@
 import { create, type StoreApi, type UseBoundStore } from 'zustand'
 import type { ITerminalOperations } from '../interfaces/ITerminalOperations'
 import { logger } from '../utils/logger'
+import { terminalGateway } from '../services/terminalGateway'
 
 interface TerminalStore {
   // Active terminal ID (null if no terminal is active)
@@ -164,7 +165,7 @@ let _defaultStore: ReturnType<typeof createTerminalStore> | null = null
 
 function getDefaultStore() {
   if (!_defaultStore) {
-    _defaultStore = createTerminalStore(window.api.terminal)
+    _defaultStore = createTerminalStore(terminalGateway)
   }
   return _defaultStore
 }

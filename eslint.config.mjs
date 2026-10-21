@@ -39,6 +39,128 @@ const MAIN_LAYER_PATTERNS = [
   layerPattern('renderer', 'src/main'),
   layerPattern('preload', 'src/main')
 ]
+const GATEWAY_MESSAGE =
+  'Reach the file and terminal bridges through services/fileGateway and services/terminalGateway, not window.api.'
+// The type system already hides `file` / `terminal` from `window.api` (see
+// preload/index.d.ts); these selectors are the backstop for the ways round it.
+const RENDERER_GATEWAY_SELECTORS = [
+  {
+    selector:
+      "MemberExpression[object.object.name='window'][object.property.name='api'][property.name=/^(file|terminal)$/]",
+    message: GATEWAY_MESSAGE
+  },
+  {
+    // window.api['file'], window.api[key]
+    selector: "MemberExpression[computed=true][object.object.name='window'][object.property.name='api']",
+    message: GATEWAY_MESSAGE
+  },
+  {
+    // window['api'], globalThis[k], self[k]
+    selector: "MemberExpression[computed=true][object.name=/^(window|globalThis|self)$/]",
+    message: GATEWAY_MESSAGE
+  },
+  {
+    // globalThis.api, self.api
+    selector: "MemberExpression[object.name=/^(globalThis|self)$/][property.name='api']",
+    message: GATEWAY_MESSAGE
+  },
+  {
+    // (window as X).api
+    selector: "MemberExpression[property.name='api'][object.type=/^TS(As|NonNull|Satisfies)Expression$/]",
+    message: GATEWAY_MESSAGE
+  },
+  {
+    // const a = window.api ; a = window.api
+    selector:
+      "VariableDeclarator[id.type!='ObjectPattern'][init.type='MemberExpression'][init.object.name='window'][init.property.name='api'], VariableDeclarator[id.type!='ObjectPattern'][init.type='ChainExpression'][init.expression.object.name='window'][init.expression.property.name='api'], AssignmentExpression[right.type='MemberExpression'][right.object.name='window'][right.property.name='api'], AssignmentExpression[right.type='ChainExpression'][right.expression.object.name='window'][right.expression.property.name='api']",
+    message: GATEWAY_MESSAGE
+  },
+  {
+    // const { file } = window.api
+    selector:
+      "VariableDeclarator[id.type='ObjectPattern'][init.object.name='window'][init.property.name='api'], VariableDeclarator[id.type='ObjectPattern'][init.type='ChainExpression'][init.expression.object.name='window'][init.expression.property.name='api']",
+    message: GATEWAY_MESSAGE
+  }
+]
+
+// Where the renderer may stand in for the bridges: tests install mocks on `window.api`
+const RENDERER_TEST_FILES = [
+  'src/renderer/**/*.test.{ts,tsx}',
+  'src/renderer/**/__test__/**',
+  'src/renderer/**/__tests__/**',
+  'src/renderer/**/__test-utils__/**',
+  'src/renderer/**/test-utils/**'
+]
+
+// Files that own a pattern the shared selectors ban (see the block comment below)
+const RENDERER_PATTERN_OWNERS = [
+  'src/renderer/src/utils/fileUtils.ts',
+  'src/renderer/src/utils/openFileInPanel.ts',
+  'src/renderer/src/services/preview/OverlayGuardService.ts'
+]
+
+// The only files that read the bridges off `window.api`
+const RENDERER_GATEWAY_FILES = [
+  'src/renderer/src/services/fileGateway.ts',
+  'src/renderer/src/services/terminalGateway.ts'
+]
+
+// Selectors every renderer file obeys; the gateway selectors are added on top for non-test code.
+const RENDERER_RESTRICTED_SYNTAX = [
+  {
+    selector:
+      "CallExpression[callee.property.name='pop'][callee.object.type='CallExpression'][callee.object.callee.property.name='split'][callee.object.arguments.length=1][callee.object.arguments.0.type='Literal'][callee.object.arguments.0.value='/']",
+    message:
+      "POSIX-only basename: .split('/').pop() breaks on Windows native paths. Use getBasename() from utils/fileUtils."
+  },
+  {
+    selector:
+      "ConditionalExpression[test.type='CallExpression'][test.callee.property.name='endsWith'][test.arguments.length=1][test.arguments.0.type='Literal'][test.arguments.0.value='/']",
+    message:
+      "POSIX-only path join: x.endsWith('/') ? x : x+'/' breaks on Windows. Use isPathInside()/isStrictDescendant()/getDisplayRelativePath() from utils/fileUtils."
+  },
+  // The `sanitizeFilePath` callee is part of the selector on purpose:
+  // `editor-${...}` is also a legitimate React `key` (see
+  // EditorContentLayout), and only the sanitized-path form is a panel id.
+  {
+    selector:
+      "TemplateLiteral[quasis.0.value.raw='editor-'][expressions.0.callee.name='sanitizeFilePath']",
+    message:
+      'Panel ids are built in one place. Use getFilePanelId() from utils/openFileInPanel.'
+  },
+  {
+    selector:
+      "TemplateLiteral[quasis.0.value.raw='image-'][expressions.0.callee.name='sanitizeFilePath']",
+    message:
+      'Panel ids are built in one place. Use getFilePanelId() from utils/openFileInPanel.'
+  },
+  // Mirrors the editor-/image- guards for the #74 running-preview prefix.
+  // getFilePanelId is kind-free (never `preview-`), so the preview id is
+  // built only inside openFileInPanel via `openFileInPanel({ kind:
+  // 'preview' })`.
+  {
+    selector:
+      "TemplateLiteral[quasis.0.value.raw='preview-'][expressions.0.callee.name='sanitizeFilePath']",
+    message:
+      'Preview panel ids are built in one place. Use openFileInPanel({ kind: "preview" }) from utils/openFileInPanel.'
+  },
+  // The running preview's visibility has a single owner (§1.8). Forbid the
+  // `api.preview.setVisibility` bridge call and the raw
+  // `preview:setVisibility` channel everywhere except OverlayGuardService.
+  {
+    selector:
+      "CallExpression[callee.property.name='setVisibility'][callee.object.property.name='preview'], Literal[value='preview:setVisibility']",
+    message:
+      'Preview visibility is owned by services/preview/OverlayGuardService. Do not call api.preview.setVisibility or reference the preview:setVisibility channel elsewhere (issue #74, design §1.8).'
+  },
+  {
+    selector:
+      "CallExpression[callee.property.name='createElement'][arguments.0.value=/^(object|embed|iframe|frame)$/i]",
+    message:
+      'object / embed / iframe load an SVG AS A DOCUMENT, which executes script. Use <img> (see the image-export harness boundary, #73).'
+  }
+]
+
 const PRELOAD_LAYER_PATTERNS = [layerPattern('renderer', 'src/preload')]
 // The renderer reaches the preload only through `window.api`; a type-only
 // import of `preload/index` is the one allowed link. Two patterns do it: the
@@ -549,73 +671,43 @@ export default [
   //    silently disable these selectors for whichever files it matched. No
   //    renderer code creates those elements today.
   //
-  // NOTE: all four families live in ONE `no-restricted-syntax` entry on
-  // purpose. Flat config replaces a rule wholesale rather than merging, so a
-  // second block setting `no-restricted-syntax` for these files would silently
-  // disable whichever set it did not repeat.
+  // NOTE: flat config replaces a rule wholesale rather than merging, so every
+  // block below sets the COMPLETE `no-restricted-syntax` list for the files it
+  // matches: the shared families above, plus the gateway selectors where they
+  // apply. A block that listed only one set would silently disable the other.
+  //
+  // 5. Reading the file and terminal bridges off `window.api`. The renderer's
+  //    `window.api` type already omits them; the gateway selectors catch the
+  //    ways round the type. Tests may install mocks; the gateways read them.
+  //
+  //  - ordinary renderer code: shared families + gateway selectors
   {
     files: ['src/renderer/**/*.{ts,tsx}'],
-    ignores: [
-      'src/renderer/src/utils/fileUtils.ts',
-      'src/renderer/src/utils/openFileInPanel.ts',
-      'src/renderer/src/services/preview/OverlayGuardService.ts'
-    ],
+    ignores: [...RENDERER_PATTERN_OWNERS, ...RENDERER_TEST_FILES, ...RENDERER_GATEWAY_FILES],
     rules: {
-      'no-restricted-syntax': [
-        'error',
-        {
-          selector:
-            "CallExpression[callee.property.name='pop'][callee.object.type='CallExpression'][callee.object.callee.property.name='split'][callee.object.arguments.length=1][callee.object.arguments.0.type='Literal'][callee.object.arguments.0.value='/']",
-          message:
-            "POSIX-only basename: .split('/').pop() breaks on Windows native paths. Use getBasename() from utils/fileUtils."
-        },
-        {
-          selector:
-            "ConditionalExpression[test.type='CallExpression'][test.callee.property.name='endsWith'][test.arguments.length=1][test.arguments.0.type='Literal'][test.arguments.0.value='/']",
-          message:
-            "POSIX-only path join: x.endsWith('/') ? x : x+'/' breaks on Windows. Use isPathInside()/isStrictDescendant()/getDisplayRelativePath() from utils/fileUtils."
-        },
-        // The `sanitizeFilePath` callee is part of the selector on purpose:
-        // `editor-${...}` is also a legitimate React `key` (see
-        // EditorContentLayout), and only the sanitized-path form is a panel id.
-        {
-          selector:
-            "TemplateLiteral[quasis.0.value.raw='editor-'][expressions.0.callee.name='sanitizeFilePath']",
-          message:
-            'Panel ids are built in one place. Use getFilePanelId() from utils/openFileInPanel.'
-        },
-        {
-          selector:
-            "TemplateLiteral[quasis.0.value.raw='image-'][expressions.0.callee.name='sanitizeFilePath']",
-          message:
-            'Panel ids are built in one place. Use getFilePanelId() from utils/openFileInPanel.'
-        },
-        // Mirrors the editor-/image- guards for the #74 running-preview prefix.
-        // getFilePanelId is kind-free (never `preview-`), so the preview id is
-        // built only inside openFileInPanel via `openFileInPanel({ kind:
-        // 'preview' })`.
-        {
-          selector:
-            "TemplateLiteral[quasis.0.value.raw='preview-'][expressions.0.callee.name='sanitizeFilePath']",
-          message:
-            'Preview panel ids are built in one place. Use openFileInPanel({ kind: "preview" }) from utils/openFileInPanel.'
-        },
-        // The running preview's visibility has a single owner (§1.8). Forbid the
-        // `api.preview.setVisibility` bridge call and the raw
-        // `preview:setVisibility` channel everywhere except OverlayGuardService.
-        {
-          selector:
-            "CallExpression[callee.property.name='setVisibility'][callee.object.property.name='preview'], Literal[value='preview:setVisibility']",
-          message:
-            'Preview visibility is owned by services/preview/OverlayGuardService. Do not call api.preview.setVisibility or reference the preview:setVisibility channel elsewhere (issue #74, design §1.8).'
-        },
-        {
-          selector:
-            "CallExpression[callee.property.name='createElement'][arguments.0.value=/^(object|embed|iframe|frame)$/i]",
-          message:
-            'object / embed / iframe load an SVG AS A DOCUMENT, which executes script. Use <img> (see the image-export harness boundary, #73).'
-        }
-      ]
+      'no-restricted-syntax': ['error', ...RENDERER_GATEWAY_SELECTORS, ...RENDERER_RESTRICTED_SYNTAX]
+    }
+  },
+  //  - tests and their helpers: shared families only
+  {
+    files: RENDERER_TEST_FILES,
+    ignores: RENDERER_PATTERN_OWNERS,
+    rules: {
+      'no-restricted-syntax': ['error', ...RENDERER_RESTRICTED_SYNTAX]
+    }
+  },
+  //  - the gateways: shared families only
+  {
+    files: RENDERER_GATEWAY_FILES,
+    rules: {
+      'no-restricted-syntax': ['error', ...RENDERER_RESTRICTED_SYNTAX]
+    }
+  },
+  //  - the files that own a banned pattern: gateway selectors only
+  {
+    files: RENDERER_PATTERN_OWNERS,
+    rules: {
+      'no-restricted-syntax': ['error', ...RENDERER_GATEWAY_SELECTORS]
     }
   }
 ]

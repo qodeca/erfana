@@ -29,7 +29,7 @@ vi.mock('electron', () => ({
 
 vi.mock('../utils/pathSecurity', () => ({
   validatePath: vi.fn(() => Promise.resolve()),
-  isSystemDirectory: vi.fn(() => false)
+  assertAcceptableProjectRoot: vi.fn()
 }))
 
 vi.mock('./LoggingService', () => ({
@@ -43,7 +43,8 @@ vi.mock('fs/promises', () => ({
 
 import { stat, realpath } from 'fs/promises'
 import { BrowserWindow } from 'electron'
-import { validatePath } from '../utils/pathSecurity'
+import { assertAcceptableProjectRoot, validatePath } from '../utils/pathSecurity'
+import { AppError, ErrorCode } from '../../shared/errors'
 
 const mockedStat = vi.mocked(stat)
 const mockedRealpath = vi.mocked(realpath)
@@ -217,6 +218,26 @@ describe('ProjectService – main-owned project session', () => {
       expect(service.session.current()).toBe(before)
       expect(listener).not.toHaveBeenCalled()
       expect(fileService.setProjectPath).not.toHaveBeenCalled()
+    })
+
+    it('refuses a folder whose canonical path is unacceptable, before the watchers stop', async () => {
+      await service.switchProject(PROJECT_A)
+      const before = service.session.current()
+      vi.mocked(assertAcceptableProjectRoot).mockImplementationOnce(() => {
+        throw new AppError('Cannot open the top of a drive', ErrorCode.PATH_SYSTEM_DIR)
+      })
+      vi.mocked(directoryWatcherService.stopAll).mockClear()
+
+      const result = await service.switchProject(PROJECT_B)
+
+      expect(result).toMatchObject({
+        success: false,
+        path: PROJECT_A,
+        action: 'noop',
+        errorCode: ErrorCode.PATH_SYSTEM_DIR
+      })
+      expect(service.session.current()).toBe(before)
+      expect(directoryWatcherService.stopAll).not.toHaveBeenCalled()
     })
 
     it('does not spend a generation number', async () => {

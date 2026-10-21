@@ -19,7 +19,7 @@
 import { stat, realpath } from 'fs/promises'
 import { normalize, sep, parse, resolve } from 'path'
 import { BrowserWindow } from 'electron'
-import { validatePath, isSystemDirectory } from '../utils/pathSecurity'
+import { assertAcceptableProjectRoot, validatePath } from '../utils/pathSecurity'
 import { AppError, ErrorCode } from '../../shared/errors'
 import type { ProjectChanged } from '../../shared/ipc/schema'
 import type { ResolvedProjectSettings } from '../../shared/ipc/project-settings-schema'
@@ -44,14 +44,15 @@ import {
 } from './session/ProjectSession'
 import { sweepStaleAtomicTemps } from '../utils/atomicTempSweep'
 import { withTimeout, TimeoutError } from '../utils/withTimeout'
-
-const SYSTEM_DIR_MESSAGE = 'Cannot open system or sensitive directories as projects'
+import { FILE_EVENTS } from '../../shared/ipc/file-channels'
 
 export interface ProjectSwitchResult {
   success: boolean
   path: string
   action: 'noop' | 'switched'
   error?: string
+  /** The `ErrorCode` behind `error`, when the refusal was an `AppError` */
+  errorCode?: ErrorCode
 }
 
 /** Who asked for a transition; recorded on the session for later owner checks */
@@ -155,7 +156,7 @@ function broadcastProjectChanged(payload: ProjectChanged): void {
   for (const win of windows) {
     if (win && !win.isDestroyed()) {
       try {
-        win.webContents.send('project:changed', payload)
+        win.webContents.send(FILE_EVENTS.projectChanged, payload)
       } catch {
         // ignore send errors for destroyed windows
       }
@@ -350,7 +351,8 @@ export class ProjectService {
           success: false,
           path: oldProjectPath || '',
           action: 'noop',
-          error: errorMsg
+          error: errorMsg,
+          errorCode: error.code
         }
       }
       throw error
@@ -384,17 +386,21 @@ export class ProjectService {
     }
 
     // 1c. The project is the folder the path leads to, not the one it is named
-    // by: a link chain to a system folder must not open as a project.
-    // TODO(#304): once it merges, replace this check with its single
-    // `assertAcceptableProjectRoot(realRoot)` (volume roots and system folders)
-    // and drop #304's own second realpath, so there is one realpath, one check.
-    if (isSystemDirectory(realRoot)) {
-      return {
-        success: false,
-        path: oldProjectPath || '',
-        action: 'noop',
-        error: `Security validation failed: ${SYSTEM_DIR_MESSAGE}`
+    // by: a link chain to a volume root or system folder must not open as a
+    // project. Checked before the lock, on the one realpath above.
+    try {
+      assertAcceptableProjectRoot(realRoot)
+    } catch (error) {
+      if (error instanceof AppError) {
+        return {
+          success: false,
+          path: oldProjectPath || '',
+          action: 'noop',
+          error: `Security validation failed: ${error.message}`,
+          errorCode: error.code
+        }
       }
+      throw error
     }
     const newProjectPath = displayRootSpelling(resolvedPath, realRoot, process.platform)
 
@@ -521,7 +527,8 @@ export class ProjectService {
         success: false,
         path: oldProjectPath || '',
         action: 'noop',
-        error: message
+        error: message,
+        errorCode: error instanceof AppError ? error.code : undefined
       }
     }
 

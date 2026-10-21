@@ -30,7 +30,7 @@ vi.mock('electron', () => ({
 
 vi.mock('../utils/pathSecurity', () => ({
   validatePath: vi.fn(async () => {}),
-  isSystemDirectory: vi.fn(() => false)
+  assertAcceptableProjectRoot: vi.fn()
 }))
 
 vi.mock('../services/FileWatcherService', () => ({

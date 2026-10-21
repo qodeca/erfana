@@ -165,9 +165,10 @@ export class PauseEpisode {
   }
 
   /**
-   * Same lexical rule as `isLexicallyInside` (projectConfinement): the exact
-   * path, or – for a subtree change – anything under it at a separator
-   * boundary, so `copied-2` is not inside `copied`.
+   * The exact path, or – for a subtree change – anything under it at a separator
+   * boundary, so `copied-2` is not inside `copied`. Unlike `isLexicallyInside`
+   * this compares spelling exactly, which is right: both sides are paths this
+   * app produced itself.
    */
   private isOwnChange(kind: InternalChangeKind, eventPath: string): boolean {
     const resolvedEvent = path.resolve(eventPath)

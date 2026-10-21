@@ -411,7 +411,7 @@ describe('MarkdownEditorPanel Integration', () => {
     it('only the tab’s own Cmd+S of a deleted tab may recreate the missing folder', () => {
       expect(handleSave).toContain('if (shouldRecreateParentDirs(trigger, isFileDeleted)) {')
       expect(handleSave).toContain(
-        'await window.api.file.writeFile(currentFile.path, contentToSave, { createParentDirs: true })'
+        'await fileGateway.writeFile(currentFile.path, contentToSave, { createParentDirs: true })'
       )
       expect(handleSave.match(/createParentDirs: true/g)).toHaveLength(1)
     })

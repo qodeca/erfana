@@ -39,6 +39,8 @@ import {
 import type { PathScore } from '../utils/pathScoring'
 import { findCliWrapGroup, joinedPosToBuffer, type JoinSegment } from '../utils/cliWrapJoin.logic'
 import { logger } from '../utils/logger'
+import { fileGateway } from '../services/fileGateway'
+import { terminalGateway } from '../services/terminalGateway'
 
 // Create a module-level cache shared across hook instances
 // This ensures cache hits across terminal restarts and multiple terminals
@@ -176,7 +178,7 @@ export function useTerminalFileLinks(
     if (!terminalId) return null
 
     try {
-      const result = await window.api.terminal.getInfo(terminalId)
+      const result = await terminalGateway.getInfo(terminalId)
       if (result.success && result.info) {
         cwdRef.current = result.info.cwd
         return result.info.cwd
@@ -202,7 +204,7 @@ export function useTerminalFileLinks(
       }
 
       try {
-        const result = await window.api.file.validatePath(path, projectRoot || undefined)
+        const result = await fileGateway.validatePath(path, projectRoot || undefined)
 
         // With a project open, only files inside it are links (the main process
         // answers for every readable path and says where it lies)
