@@ -193,8 +193,11 @@ export class TerminalPage {
             ) {
               nudged = true
               console.warn('[e2e] blank terminal after the clear handshake; pressing Enter')
-              await this.focus().catch(() => undefined)
-              await this.page.keyboard.press('Enter')
+              const focused = await this.focus().then(
+                () => true,
+                () => false
+              )
+              if (focused) await this.page.keyboard.press('Enter')
             }
             const snapshot = JSON.stringify(screen)
             const settled = isPromptDrawn(screen) && snapshot === previous
