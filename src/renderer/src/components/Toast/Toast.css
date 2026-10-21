@@ -63,10 +63,12 @@
 }
 
 /* A 400px slide is a vestibular trigger: honour prefers-reduced-motion by
-   swapping the slide for an opacity-only fade (keeps the same duration). */
+   swapping the slide for an opacity-only fade (keeps the same duration).
+   `!important` keeps the fade against the app-wide reduce rule in index.css,
+   which would otherwise end it at once. */
 @media (prefers-reduced-motion: reduce) {
   .toast {
-    animation-name: toast-fade-in;
+    animation: toast-fade-in var(--transition-slower) !important;
   }
 }
 
