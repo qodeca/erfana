@@ -61,6 +61,9 @@ import { stat, realpath } from 'fs/promises'
 const mockedStat = vi.mocked(stat)
 const mockedRealpath = vi.mocked(realpath)
 
+/** An absolute project path on any platform; `ProjectService` resolves what it opens. */
+const projectDir = (name: string): string => path.resolve('/Users/test/projects', name)
+
 describe('ProjectService integration with ProjectLockService', () => {
   let projectService: ProjectService
   let mockFileService: IFileService
@@ -106,7 +109,8 @@ describe('ProjectService integration with ProjectLockService', () => {
           excludeRejections: []
         })
       ),
-      clearSettings: vi.fn()
+      clearSettings: vi.fn(),
+      setCurrentSettings: vi.fn()
     } as any
 
     // Setup mock for projectLockService (injected, not global)
@@ -146,9 +150,30 @@ describe('ProjectService integration with ProjectLockService', () => {
     vi.clearAllMocks()
   })
 
+  /**
+   * Open `path` first, then forget the calls that took, so a test starts from
+   * "this project is already open" with clean call history.
+   */
+  async function seedOpenProject(path: string): Promise<void> {
+    const result = await projectService.switchProject(path)
+    expect(result.action).toBe('switched')
+    for (const service of [
+      mockFileService,
+      mockFileWatcherService,
+      mockDirectoryWatcherService,
+      mockSettingsService,
+      mockProjectSettingsService,
+      mockProjectLockService
+    ]) {
+      for (const member of Object.values(service)) {
+        if (vi.isMockFunction(member)) member.mockClear()
+      }
+    }
+  }
+
   describe('Lock acquisition during project switch', () => {
     it('should acquire lock before loading project settings', async () => {
-      const projectPath = '/Users/test/projects/my-project'
+      const projectPath = projectDir('my-project')
 
       // Track call order
       const callOrder: string[] = []
@@ -176,11 +201,11 @@ describe('ProjectService integration with ProjectLockService', () => {
     })
 
     it('should release old lock after successful switch', async () => {
-      const oldProjectPath = '/Users/test/projects/old-project'
-      const newProjectPath = '/Users/test/projects/new-project'
+      const oldProjectPath = projectDir('old-project')
+      const newProjectPath = projectDir('new-project')
 
       // Setup: already have a project open
-      mockFileService.getProjectPath.mockReturnValue(oldProjectPath)
+      await seedOpenProject(oldProjectPath)
 
       // Mock different paths for canonicalization
       mockedRealpath.mockImplementation((path) => {
@@ -197,11 +222,11 @@ describe('ProjectService integration with ProjectLockService', () => {
     })
 
     it('should NOT release old lock if switch fails before completion', async () => {
-      const oldProjectPath = '/Users/test/projects/old-project'
-      const newProjectPath = '/Users/test/projects/new-project'
+      const oldProjectPath = projectDir('old-project')
+      const newProjectPath = projectDir('new-project')
 
       // Setup: already have a project open
-      mockFileService.getProjectPath.mockReturnValue(oldProjectPath)
+      await seedOpenProject(oldProjectPath)
 
       // Mock successful lock acquisition
       mockProjectLockService.acquireLock.mockResolvedValue({
@@ -224,7 +249,7 @@ describe('ProjectService integration with ProjectLockService', () => {
     })
 
     it('should release new lock on rollback when switch fails', async () => {
-      const projectPath = '/Users/test/projects/new-project'
+      const projectPath = projectDir('new-project')
 
       // Mock successful lock acquisition
       mockProjectLockService.acquireLock.mockResolvedValue({
@@ -247,7 +272,7 @@ describe('ProjectService integration with ProjectLockService', () => {
 
   describe('Already locked project handling', () => {
     it('should request focus and return early when project already locked', async () => {
-      const projectPath = '/Users/test/projects/locked-project'
+      const projectPath = projectDir('locked-project')
 
       // Mock lock already held by another instance
       mockProjectLockService.acquireLock.mockResolvedValue({
@@ -275,7 +300,7 @@ describe('ProjectService integration with ProjectLockService', () => {
     })
 
     it('should return early even if focus request fails', async () => {
-      const projectPath = '/Users/test/projects/locked-project'
+      const projectPath = projectDir('locked-project')
 
       mockProjectLockService.acquireLock.mockResolvedValue({
         status: 'already_locked',
@@ -299,7 +324,7 @@ describe('ProjectService integration with ProjectLockService', () => {
 
   describe('Graceful degradation on lock errors', () => {
     it('should continue with project switch when lock acquisition errors', async () => {
-      const projectPath = '/Users/test/projects/test-project'
+      const projectPath = projectDir('test-project')
 
       // Mock lock acquisition error
       mockProjectLockService.acquireLock.mockResolvedValue({
@@ -321,10 +346,10 @@ describe('ProjectService integration with ProjectLockService', () => {
     })
 
     it('should handle lock release errors gracefully during switch', async () => {
-      const oldProjectPath = '/Users/test/projects/old-project'
-      const newProjectPath = '/Users/test/projects/new-project'
+      const oldProjectPath = projectDir('old-project')
+      const newProjectPath = projectDir('new-project')
 
-      mockFileService.getProjectPath.mockReturnValue(oldProjectPath)
+      await seedOpenProject(oldProjectPath)
 
       // Make lock release fail
       mockProjectLockService.releaseLock.mockRejectedValue(
@@ -341,7 +366,7 @@ describe('ProjectService integration with ProjectLockService', () => {
     })
 
     it('should handle lock release errors gracefully during rollback', async () => {
-      const projectPath = '/Users/test/projects/new-project'
+      const projectPath = projectDir('new-project')
 
       mockProjectLockService.acquireLock.mockResolvedValue({
         status: 'acquired',
@@ -370,9 +395,9 @@ describe('ProjectService integration with ProjectLockService', () => {
 
   describe('Lock lifecycle with same project detection', () => {
     it('should not acquire lock when switching to same project', async () => {
-      const projectPath = '/Users/test/projects/same-project'
+      const projectPath = projectDir('same-project')
 
-      mockFileService.getProjectPath.mockReturnValue(projectPath)
+      await seedOpenProject(projectPath)
 
       // Mock realpath to return same path
       mockedRealpath.mockResolvedValue(projectPath)
@@ -398,7 +423,7 @@ describe('ProjectService integration with ProjectLockService', () => {
       const canonicalized = process.platform === 'win32'
         ? realPathValue.toLowerCase()
         : realPathValue
-      mockFileService.getProjectPath.mockReturnValue(canonicalized)
+      await seedOpenProject(canonicalized)
 
       // Mock realpath to resolve symlink – receives normalized path
       mockedRealpath.mockImplementation((p) => {
@@ -422,7 +447,7 @@ describe('ProjectService integration with ProjectLockService', () => {
 
   describe('Lock coordination with service updates', () => {
     it('should acquire lock before stopping watchers', async () => {
-      const projectPath = '/Users/test/projects/test-project'
+      const projectPath = projectDir('test-project')
 
       const callOrder: string[] = []
 
@@ -443,7 +468,7 @@ describe('ProjectService integration with ProjectLockService', () => {
     })
 
     it('should acquire lock before updating services', async () => {
-      const projectPath = '/Users/test/projects/test-project'
+      const projectPath = projectDir('test-project')
 
       const callOrder: string[] = []
 
@@ -464,10 +489,10 @@ describe('ProjectService integration with ProjectLockService', () => {
     })
 
     it('should release old lock after all service updates complete', async () => {
-      const oldProjectPath = '/Users/test/projects/old-project'
-      const newProjectPath = '/Users/test/projects/new-project'
+      const oldProjectPath = projectDir('old-project')
+      const newProjectPath = projectDir('new-project')
 
-      mockFileService.getProjectPath.mockReturnValue(oldProjectPath)
+      await seedOpenProject(oldProjectPath)
 
       const callOrder: string[] = []
 
@@ -497,7 +522,7 @@ describe('ProjectService integration with ProjectLockService', () => {
 
   describe('Error handling with lock cleanup', () => {
     it('should rollback services if lock acquired but directory check fails', async () => {
-      const projectPath = '/Users/test/projects/nonexistent'
+      const projectPath = projectDir('nonexistent')
 
       mockProjectLockService.acquireLock.mockResolvedValue({
         status: 'acquired',
@@ -514,12 +539,13 @@ describe('ProjectService integration with ProjectLockService', () => {
       // Should rollback by releasing the acquired lock
       expect(mockProjectLockService.releaseLock).toHaveBeenCalledWith(projectPath)
 
-      // Should clear project settings
-      expect(mockProjectSettingsService.clearSettings).toHaveBeenCalled()
+      // The settings cache follows the session, which was never changed
+      expect(mockProjectSettingsService.setCurrentSettings).not.toHaveBeenCalled()
+      expect(mockProjectSettingsService.clearSettings).not.toHaveBeenCalled()
     })
 
     it('should rollback services if lock acquired but settings validation fails', async () => {
-      const projectPath = '/Users/test/projects/invalid-settings'
+      const projectPath = projectDir('invalid-settings')
 
       mockProjectLockService.acquireLock.mockResolvedValue({
         status: 'acquired',
@@ -538,12 +564,13 @@ describe('ProjectService integration with ProjectLockService', () => {
       // Should release the acquired lock
       expect(mockProjectLockService.releaseLock).toHaveBeenCalledWith(projectPath)
 
-      // Should clear project settings
-      expect(mockProjectSettingsService.clearSettings).toHaveBeenCalled()
+      // The settings cache follows the session, which was never changed
+      expect(mockProjectSettingsService.setCurrentSettings).not.toHaveBeenCalled()
+      expect(mockProjectSettingsService.clearSettings).not.toHaveBeenCalled()
     })
 
     it('should continue rollback even if lock release fails', async () => {
-      const projectPath = '/Users/test/projects/test-project'
+      const projectPath = projectDir('test-project')
 
       mockProjectLockService.acquireLock.mockResolvedValue({
         status: 'acquired',
@@ -563,8 +590,8 @@ describe('ProjectService integration with ProjectLockService', () => {
 
       expect(result.success).toBe(false)
 
-      // Should have attempted all rollback steps
-      expect(mockProjectSettingsService.clearSettings).toHaveBeenCalled()
+      // Nothing was committed, so nothing was cached
+      expect(mockProjectSettingsService.setCurrentSettings).not.toHaveBeenCalled()
     })
   })
 })

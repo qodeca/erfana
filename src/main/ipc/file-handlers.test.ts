@@ -67,27 +67,6 @@ vi.mock('../services/ProjectLockService', () => ({
   }
 }))
 
-describe('broadcastProjectChanged', () => {
-  beforeEach(() => {
-    sends.length = 0
-  })
-  afterEach(() => {
-    vi.resetModules()
-  })
-
-  it('sends project:changed to all non-destroyed windows', async () => {
-    const { broadcastProjectChanged } = await import('./file-handlers')
-
-    const payload = { oldPath: '/old', newPath: '/new' }
-    broadcastProjectChanged(payload)
-
-    // Should send to window 0 and 1, skip 2 (destroyed)
-    expect(sends).toHaveLength(2)
-    expect(sends[0]).toMatchObject({ idx: 0, channel: 'project:changed', payload })
-    expect(sends[1]).toMatchObject({ idx: 1, channel: 'project:changed', payload })
-  })
-})
-
 describe('file:getStats logging', () => {
   beforeEach(() => {
     // Clear the module-scope handler map so registrations can't leak across tests.

@@ -169,19 +169,19 @@ describe('file:openProjectByPath IPC handler', () => {
     it('should trim leading whitespace', async () => {
       const handler = handlers['file:openProjectByPath']
       await handler({}, '  /test/project')
-      expect(mockSwitchProject).toHaveBeenCalledWith('/test/project')
+      expect(mockSwitchProject).toHaveBeenCalledWith('/test/project', expect.objectContaining({ source: 'recent' }))
     })
 
     it('should trim trailing whitespace', async () => {
       const handler = handlers['file:openProjectByPath']
       await handler({}, '/test/project  ')
-      expect(mockSwitchProject).toHaveBeenCalledWith('/test/project')
+      expect(mockSwitchProject).toHaveBeenCalledWith('/test/project', expect.objectContaining({ source: 'recent' }))
     })
 
     it('should trim both leading and trailing whitespace', async () => {
       const handler = handlers['file:openProjectByPath']
       await handler({}, '  /test/project  ')
-      expect(mockSwitchProject).toHaveBeenCalledWith('/test/project')
+      expect(mockSwitchProject).toHaveBeenCalledWith('/test/project', expect.objectContaining({ source: 'recent' }))
     })
 
     it('should preserve internal spaces in path', async () => {
@@ -192,7 +192,7 @@ describe('file:openProjectByPath IPC handler', () => {
         action: 'switched'
       })
       await handler({}, '/test/my project/folder')
-      expect(mockSwitchProject).toHaveBeenCalledWith('/test/my project/folder')
+      expect(mockSwitchProject).toHaveBeenCalledWith('/test/my project/folder', expect.objectContaining({ source: 'recent' }))
     })
 
     it('should handle paths with special characters', async () => {
@@ -204,7 +204,7 @@ describe('file:openProjectByPath IPC handler', () => {
         action: 'switched'
       })
       await handler({}, specialPath)
-      expect(mockSwitchProject).toHaveBeenCalledWith(specialPath)
+      expect(mockSwitchProject).toHaveBeenCalledWith(specialPath, expect.objectContaining({ source: 'recent' }))
     })
   })
 
@@ -212,7 +212,7 @@ describe('file:openProjectByPath IPC handler', () => {
     it('should call projectService.switchProject with path', async () => {
       const handler = handlers['file:openProjectByPath']
       await handler({}, '/test/project')
-      expect(mockSwitchProject).toHaveBeenCalledWith('/test/project')
+      expect(mockSwitchProject).toHaveBeenCalledWith('/test/project', expect.objectContaining({ source: 'recent' }))
     })
 
     it('should return path on successful switch', async () => {
@@ -400,8 +400,8 @@ describe('file:openProject IPC handler (dialog)', () => {
       filePaths: ['/selected/path']
     })
 
-    await handler({})
-    expect(mockSwitchProject).toHaveBeenCalledWith('/selected/path')
+    await handler({ sender: { id: 7 } })
+    expect(mockSwitchProject).toHaveBeenCalledWith('/selected/path', { senderId: 7, source: 'dialog' })
   })
 
   it('should return path on successful selection', async () => {

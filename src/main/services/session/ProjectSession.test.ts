@@ -1,0 +1,20 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+import { describe, it, expect, vi } from 'vitest'
+import { normaliseRealRoot } from './ProjectSession'
+
+vi.mock('../LoggingService', () => ({
+  logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+}))
+
+describe('normaliseRealRoot', () => {
+  it.each([
+    ['\\\\?\\C:\\Users\\me\\proj', 'C:\\Users\\me\\proj'],
+    ['\\\\?\\UNC\\server\\share\\proj', '\\\\server\\share\\proj'],
+    ['/Users/me/proj', '/Users/me/proj'],
+    ['/Users/me/proj/', '/Users/me/proj'],
+    ['/', '/']
+  ])('%s -> %s', (input, expected) => {
+    expect(normaliseRealRoot(input)).toBe(expected)
+  })
+})

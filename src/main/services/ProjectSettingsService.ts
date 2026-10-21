@@ -46,7 +46,8 @@ export class ProjectSettingsService implements IProjectSettingsService {
   }
 
   /**
-   * Load and validate project settings from .erfana/settings.json
+   * Load and validate project settings from .erfana/settings.json.
+   * Does not change the cache: see `setCurrentSettings`.
    * @throws AppError if settings file exists but is invalid JSON or fails schema validation
    */
   async loadSettings(projectPath: string): Promise<ResolvedProjectSettings> {
@@ -56,8 +57,7 @@ export class ProjectSettingsService implements IProjectSettingsService {
     const exists = await this.fileExists(settingsPath)
     if (!exists) {
       // No settings file - use defaults
-      this.currentSettings = this.getDefaultSettings()
-      return this.currentSettings
+      return this.getDefaultSettings()
     }
 
     // Read and parse settings
@@ -65,8 +65,16 @@ export class ProjectSettingsService implements IProjectSettingsService {
     const validatedSettings = this.validateSettings(rawSettings, settingsPath)
 
     // Resolve patterns (apply mode-based merging)
-    this.currentSettings = this.resolveSettings(validatedSettings)
-    return this.currentSettings
+    return this.resolveSettings(validatedSettings)
+  }
+
+  /**
+   * Cache the settings of the project that is now open (`null` for none).
+   * Called by the project session's change listener, so the cache follows the
+   * session and a failed open never touches it.
+   */
+  setCurrentSettings(settings: ResolvedProjectSettings | null): void {
+    this.currentSettings = settings
   }
 
   getCurrentSettings(): ResolvedProjectSettings | null {

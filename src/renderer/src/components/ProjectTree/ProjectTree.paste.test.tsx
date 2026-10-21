@@ -46,7 +46,6 @@ describe('ProjectTree paste operations (integration tests)', () => {
     // Setup window.api mock
     ;(window as any).api = {
       file: {
-        getLastProjectPath: vi.fn(async () => '/project'),
         readDirectory: vi.fn(async () => [
           {
             name: 'source.md',

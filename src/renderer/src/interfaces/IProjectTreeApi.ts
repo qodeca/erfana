@@ -27,11 +27,14 @@ export interface IProjectTreeApi {
   file: {
     openProject(): Promise<string | null>
     openProjectByPath(projectPath: string): Promise<string>
-    closeProject(): Promise<boolean>
-    getLastProjectPath(): Promise<string | null>
+    closeProject(expectedGeneration?: number): Promise<boolean>
     readDirectory(path: string): Promise<FileNode[]>
     onProjectChanged(
-      callback: (data: { oldPath: string | null; newPath: string | null }) => void
+      callback: (data: {
+        oldPath: string | null
+        newPath: string | null
+        generation?: number
+      }) => void
     ): () => void
     createFile(targetPath: string, fileName: string): Promise<string>
     createFolder(targetPath: string, folderName: string): Promise<string>

@@ -49,7 +49,6 @@ const mockApi = {
     openProject: vi.fn(),
     openProjectByPath: mockOpenProjectByPath,
     closeProject: vi.fn(),
-    getLastProjectPath: vi.fn(),
     readDirectory: vi.fn().mockResolvedValue([]),
     onProjectChanged: vi.fn(() => vi.fn())
   },

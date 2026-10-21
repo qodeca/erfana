@@ -16,18 +16,24 @@ export type GlobalExcludeProvider = () => readonly string[]
  */
 export interface IProjectSettingsService {
   /**
-   * Load and validate project settings from .erfana/settings.json
+   * Load and validate project settings from .erfana/settings.json.
+   * Does not change the cache: see `setCurrentSettings`.
    * @throws AppError if settings file exists but is invalid
    */
   loadSettings(projectPath: string): Promise<ResolvedProjectSettings>
 
   /**
-   * Get currently loaded settings (cached from last loadSettings call)
+   * Cache the settings of the project that is now open (`null` for none)
+   */
+  setCurrentSettings(settings: ResolvedProjectSettings | null): void
+
+  /**
+   * Get the cached settings of the open project
    */
   getCurrentSettings(): ResolvedProjectSettings | null
 
   /**
-   * Clear cached settings (called on project close or rollback)
+   * Clear cached settings (called when the project session closes)
    */
   clearSettings(): void
 

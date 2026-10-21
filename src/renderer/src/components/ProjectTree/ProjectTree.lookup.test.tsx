@@ -123,7 +123,6 @@ function rebuiltTree(): FileNode[] {
 // The clipboard store is a module singleton that captures `window.api.file` on
 // first use, so the `file` object identity must stay stable across tests.
 const fileApi = {
-  getLastProjectPath: vi.fn(async () => null),
   readDirectory: vi.fn(async (_path: string) => baseTree()),
   onProjectChanged: vi.fn(),
   moveItem: vi.fn(async () => ({ path: '/moved' })),

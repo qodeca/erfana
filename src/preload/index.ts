@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { contextBridge, ipcRenderer, IpcRendererEvent, webUtils } from 'electron'
 import { FORCE_CRASH_ARG } from '../shared/constants'
-import type { ProjectChanged } from '../shared/ipc/schema'
+import type { ProjectChanged, ProjectSessionInfo } from '../shared/ipc/schema'
 import type { GitStatusResponse } from '../shared/ipc/git-schema'
 import type { PdfExportRequest, PdfExportResponse } from '../shared/ipc/pdf-schema'
 import type { DocxExportRequest, DocxExportResponse } from '../shared/ipc/docx-schema'
@@ -68,8 +68,8 @@ const api = {
   file: {
     openProject: (): Promise<string | null> => ipcRenderer.invoke('file:openProject'),
     openProjectByPath: (projectPath: string): Promise<string> => ipcRenderer.invoke('file:openProjectByPath', projectPath),
-    getLastProjectPath: (): Promise<string | null> =>
-      ipcRenderer.invoke('file:getLastProjectPath'),
+    getSession: (): Promise<ProjectSessionInfo | null> =>
+      ipcRenderer.invoke('file:getSession'),
     readDirectory: (dirPath: string): Promise<FileNode[]> =>
       ipcRenderer.invoke('file:readDirectory', dirPath),
     readFile: (filePath: string): Promise<string> =>
@@ -226,7 +226,8 @@ const api = {
       ipcRenderer.on('project:changed', listener)
       return () => ipcRenderer.removeListener('project:changed', listener)
     },
-    closeProject: (): Promise<boolean> => ipcRenderer.invoke('file:closeProject')
+    closeProject: (expectedGeneration?: number): Promise<boolean> =>
+      ipcRenderer.invoke('file:closeProject', expectedGeneration)
   },
 
   // File watching operations

@@ -45,7 +45,6 @@ describe('ProjectTree project switching timing', () => {
 
     ;(window as any).api = {
       file: {
-        getLastProjectPath: vi.fn(async () => null),
         readDirectory,
         onProjectChanged: (cb: any) => {
           onProjectChangedCallback = cb
@@ -132,7 +131,6 @@ describe('ProjectTree project switching timing', () => {
 
     ;(window as any).api = {
       file: {
-        getLastProjectPath: vi.fn(async () => null),
         readDirectory,
         onProjectChanged: (cb: any) => {
           onProjectChangedCallback = cb
@@ -217,7 +215,6 @@ describe('AC-007: Manual refresh via keyboard shortcut', () => {
 
     ;(window as any).api = {
       file: {
-        getLastProjectPath: vi.fn(async () => null),
         readDirectory,
         onProjectChanged: (cb: any) => {
           onProjectChangedCallback = cb
