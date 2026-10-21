@@ -326,9 +326,13 @@ describe('MarkdownEditorPanel Integration', () => {
       expect(calls).toHaveLength(1)
       expect(source).toContain(
         "useEditorSaveRegistration(panelIdRef.current, () => handleSave('registry'), externalChangeDetected, () => {\n" +
-          '    cancelAutoSave()\n    return () => signalChange()\n  })'
+          '    // A hold stops autosave for real (no re-arming by typing or the modified\n' +
+          '    // effect) and makes the editor read-only, so nothing new can be typed\n' +
+          '    // between a flush and the end of the hold.\n' +
+          '    const releaseAutoSave = holdAutoSave()\n'
       )
-      // Registered below useAutoSave, whose cancelAutoSave and signalChange it uses.
+      expect(source).toContain('}, () => saveInFlightRef.current ?? Promise.resolve())')
+      // Registered below useAutoSave, whose holdAutoSave it uses.
       expect(source.indexOf('useEditorSaveRegistration(panelIdRef')).toBeGreaterThan(source.indexOf('= useAutoSave('))
     })
 
@@ -395,7 +399,11 @@ describe('MarkdownEditorPanel Integration', () => {
 
     it('wires each caller to its trigger: Cmd+S is user, autosave is autosave, the registry is registry', () => {
       expect(source).toContain("onSave: () => handleSave('user'),")
-      expect(source).toContain("async () => { await handleSave('autosave') },")
+      expect(source).toContain("await handleSave('autosave')")
+      // an autosave never overwrites a file that changed on disk
+      expect(source.indexOf('if (externalChangeDetected) return')).toBeLessThan(
+        source.indexOf("await handleSave('autosave')")
+      )
       expect(source).toContain("() => handleSave('registry'), externalChangeDetected")
       expect(source.match(/handleSave\(/g)).toHaveLength(3)
     })

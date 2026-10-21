@@ -33,7 +33,8 @@ import {
   extractFileName,
   extractBaseFileName,
   isMarkdownFile,
-  getDefaultViewMode
+  getDefaultViewMode,
+  trackSaveInFlight
 } from './markdownEditorPanel.logic'
 
 // ============================================================================
@@ -838,5 +839,32 @@ describe('shouldToastSaveError', () => {
 
   it('never shows one for a save by id: the registry caller toasts on false (one failure, one toast)', () => {
     expect(shouldToastSaveError('registry', 'm', null)).toBe(false)
+  })
+})
+
+describe('trackSaveInFlight', () => {
+  it('publishes a promise that settles when the save finishes, then clears the ref', async () => {
+    const ref: { current: Promise<void> | null } = { current: null }
+    const finish = trackSaveInFlight(ref)
+    const inFlight = ref.current
+    expect(inFlight).not.toBeNull()
+
+    finish()
+    await inFlight
+
+    expect(ref.current).toBeNull()
+  })
+
+  it('leaves a newer save in the ref when an older one finishes', async () => {
+    const ref: { current: Promise<void> | null } = { current: null }
+    const finishOlder = trackSaveInFlight(ref)
+    const finishNewer = trackSaveInFlight(ref)
+    const newer = ref.current
+
+    finishOlder()
+    expect(ref.current).toBe(newer)
+
+    finishNewer()
+    expect(ref.current).toBeNull()
   })
 })

@@ -50,6 +50,18 @@ export class MonacoPage {
     await this.page.keyboard.insertText(content)
   }
 
+  /**
+   * Insert text at the cursor and return at once.
+   *
+   * Unlike {@link appendContent} it does not click, wait for the cursor or move
+   * to the end of the document: the editor must already have focus (a prior
+   * `focus()` or `appendContent()`). For specs that act within a fraction of a
+   * second of the edit, where the wait itself would let the 2 s autosave win.
+   */
+  async typeWithoutWaiting(content: string): Promise<void> {
+    await this.page.keyboard.insertText(content)
+  }
+
   async getContent(): Promise<string> {
     await this.focus()
     await this.keyboard.selectAll()

@@ -55,6 +55,7 @@ import {
   getDefaultViewMode,
   shouldRecreateParentDirs,
   shouldToastSaveError,
+  trackSaveInFlight,
   type SaveTrigger
 } from './markdownEditorPanel.logic'
 import { formatSaveError, loggableError } from '../../utils/errorUtils'
@@ -215,6 +216,9 @@ export function MarkdownEditorPanel(
   // Save Handler (defined early so hooks can reference it)
   // =========================================================================
 
+  // The running save, so a project switch can wait for it (see trackSaveInFlight)
+  const saveInFlightRef = useRef<Promise<void> | null>(null)
+
   /**
    * Saves the current file to disk.
    *
@@ -235,6 +239,8 @@ export function MarkdownEditorPanel(
   const handleSave = useCallback(async (trigger: SaveTrigger = 'user'): Promise<boolean> => {
     if (!currentFile) return false
     const isAutoSave = trigger === 'autosave'
+
+    const finishInFlight = trackSaveInFlight(saveInFlightRef)
 
     // Step 1: Mark saving via hook to prevent race conditions with file watcher
     markSaving()
@@ -314,21 +320,43 @@ export function MarkdownEditorPanel(
       // Step 8: Resume file watching after save completes
       await saveGuardRef.current?.resumeWatch()
       unmarkSaving()
+      finishInFlight()
     }
   }, [currentFile, isFileDeleted, dismissConflict, clearDeletedState, markSaving, unmarkSaving, notifySaveComplete, showToast])
 
   // =========================================================================
   // Auto-Save Hook
   // =========================================================================
-  const { isAutoSaving, setIsAutoSaving, cancelAutoSave, signalChange } = useAutoSave(
+  const { isAutoSaving, setIsAutoSaving, holdAutoSave, signalChange } = useAutoSave(
     currentFile?.modified ?? false,
-    async () => { await handleSave('autosave') },
+    async () => {
+      // A file that changed on disk while the tab holds unsaved edits waits for
+      // the user's choice in the conflict bar; an autosave would overwrite the
+      // newer file and dismiss the bar.
+      if (externalChangeDetected) return
+      await handleSave('autosave')
+    },
     { delay: 2000, enabled: true, maxInterval: 30000 }
   )
+
+  // When the conflict bar goes away with edits still unsaved ("Keep My
+  // Version", Dismiss), autosave resumes without waiting for another keystroke.
+  useEffect(() => {
+    if (!externalChangeDetected) signalChange()
+  }, [externalChangeDetected, signalChange])
+
   useEditorSaveRegistration(panelIdRef.current, () => handleSave('registry'), externalChangeDetected, () => {
-    cancelAutoSave()
-    return () => signalChange()
-  })
+    // A hold stops autosave for real (no re-arming by typing or the modified
+    // effect) and makes the editor read-only, so nothing new can be typed
+    // between a flush and the end of the hold.
+    const releaseAutoSave = holdAutoSave()
+    const editor = editorRef.current?.getEditor()
+    editor?.updateOptions?.({ readOnly: true })
+    return () => {
+      editorRef.current?.getEditor()?.updateOptions?.({ readOnly: false })
+      releaseAutoSave()
+    }
+  }, () => saveInFlightRef.current ?? Promise.resolve())
 
   // =========================================================================
   // Scroll Sync Hook

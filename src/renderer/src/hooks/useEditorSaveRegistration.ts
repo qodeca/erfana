@@ -27,6 +27,8 @@ import { editorSaveRegistry } from '../services/editorSaveRegistry'
  * @param hasConflict - The tab is in its "changed on disk" conflict state
  * @param holdAutosave - Cancels the tab's pending autosave and returns a
  *   release that re-arms it (see `EditorSaveEntry.holdAutosave`)
+ * @param whenSaveSettled - Resolves once a save in flight has finished (see
+ *   `EditorSaveEntry.whenSaveSettled`); optional
  *
  * @example
  * ```tsx
@@ -40,17 +42,19 @@ export function useEditorSaveRegistration(
   panelId: string | undefined,
   save: () => Promise<boolean>,
   hasConflict: boolean,
-  holdAutosave: () => () => void
+  holdAutosave: () => () => void,
+  whenSaveSettled?: () => Promise<void>
 ): void {
-  const latest = useRef({ save, hasConflict, holdAutosave })
-  latest.current = { save, hasConflict, holdAutosave }
+  const latest = useRef({ save, hasConflict, holdAutosave, whenSaveSettled })
+  latest.current = { save, hasConflict, holdAutosave, whenSaveSettled }
 
   useEffect(() => {
     if (!panelId) return undefined
     return editorSaveRegistry.register(panelId, {
       save: () => latest.current.save(),
       hasConflict: () => latest.current.hasConflict,
-      holdAutosave: () => latest.current.holdAutosave()
+      holdAutosave: () => latest.current.holdAutosave(),
+      whenSaveSettled: () => latest.current.whenSaveSettled?.() ?? Promise.resolve()
     })
   }, [panelId])
 }
