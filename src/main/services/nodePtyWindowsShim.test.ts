@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { existsSync, readFileSync } from 'fs'
+import { existsSync, readFileSync, statSync } from 'fs'
 import { join } from 'path'
 
 const logger = vi.hoisted(() => ({
@@ -134,8 +134,13 @@ describe('nodePtyWindowsShim', () => {
   })
 
   const builtBundle = join(process.cwd(), 'out', 'main', 'index.js')
-  it.skipIf(!existsSync(builtBundle))(
-    'the built main bundle loads the agent with createRequire, not a bare dynamic import',
+  // A stale bundle (built before the shim source last changed) says nothing about the
+  // current code: skip until `npx electron-vite build` has been run again.
+  const bundleIsFresh =
+    existsSync(builtBundle) &&
+    statSync(builtBundle).mtimeMs >= statSync(join(__dirname, 'nodePtyWindowsShim.ts')).mtimeMs
+  it.skipIf(!bundleIsFresh)(
+    'the built main bundle loads the agent with createRequire, not a bare dynamic import (skipped when out/main is missing or older than nodePtyWindowsShim.ts: run npx electron-vite build)',
     () => {
       const bundle = readFileSync(builtBundle, 'utf8')
       expect(bundle).toContain('node-pty/lib/windowsPtyAgent')
