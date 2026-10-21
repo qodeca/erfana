@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { dialog, type OpenDialogOptions } from 'electron'
+import { BrowserWindow, dialog, webContents, type OpenDialogOptions } from 'electron'
 import { externalFileService } from '../services/ExternalFileService'
 import { externalSourceGrants } from '../services/ExternalSourceGrants'
+import {
+  ExternalMoveConfirmerImpl,
+  type MoveConfirmer
+} from '../services/ExternalMoveConfirmer'
 import type { ProjectSession } from '../services/session/ProjectSession'
 import {
   ExternalFileValidateArgsSchema,
@@ -25,6 +29,17 @@ import { rememberDialogResult, withLastDirectory } from '../utils/lastDialogDire
 export interface ExternalFileSelection {
   /** Array of absolute paths to selected files */
   paths: string[]
+}
+
+/** The confirmation box the app shows: a native message box modal to the project's window. */
+function createNativeMoveConfirmer(): MoveConfirmer {
+  return new ExternalMoveConfirmerImpl({
+    showBox: (owner, options) => dialog.showMessageBox(owner as BrowserWindow, options),
+    resolveOwner: (senderId) => {
+      const contents = webContents.fromId(senderId)
+      return contents ? BrowserWindow.fromWebContents(contents) : null
+    }
+  })
 }
 
 /** The error code a refused path carries in a result-shaped answer. */
@@ -56,7 +71,12 @@ function refusalCode(error: ConfinementError): string {
  * the open project. The trailing project-root argument the renderer still
  * sends is accepted and not used.
  */
-export function registerExternalFileHandlers(session: ProjectSession): void {
+export function registerExternalFileHandlers(
+  session: ProjectSession,
+  moveConfirmer: MoveConfirmer = createNativeMoveConfirmer()
+): void {
+  externalFileService.setMoveConfirmer(moveConfirmer)
+
   /**
    * Validate external file for drop
    *
@@ -144,7 +164,7 @@ export function registerExternalFileHandlers(session: ProjectSession): void {
    *
    * Validates the file, copies to target folder, then deletes source. The
    * source must be a file the user chose in the native picker (see
-   * ExternalSourceGrants).
+   * ExternalSourceGrants), or the user confirms the move in a native box.
    * Supports conflict resolution strategies: 'replace' or 'keepBoth'.
    */
   registerConfinedHandle(

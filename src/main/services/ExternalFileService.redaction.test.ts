@@ -132,7 +132,7 @@ describe('ExternalFileService log redaction', () => {
     const result = await unpicked.moveFromExternal(SOURCE, { real: PROJECT, requested: PROJECT }, 1)
 
     expect(result.success).toBe(false)
-    expect(mockLogger.warn).toHaveBeenCalled()
+    expect(mockLogger.info).toHaveBeenCalled()
     expect(everythingLogged()).not.toContain('/Users/alice')
   })
 })

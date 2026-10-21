@@ -119,6 +119,18 @@ const SMART_LINK_DECORATIONS: ILinkDecorations = {
   pointerCursor: true
 }
 
+/**
+ * Whether a validated path can be a terminal link. With a project open, only a
+ * file inside it is: the main process answers for every readable file and says
+ * where it lies. An answer without `insideProject` counts as inside.
+ */
+export function isLinkableFile(
+  result: { exists: boolean; insideProject?: boolean },
+  projectRoot: string | null | undefined
+): boolean {
+  return result.exists && !(projectRoot && result.insideProject === false)
+}
+
 export function useTerminalFileLinks(
   options: UseTerminalFileLinksOptions
 ): UseTerminalFileLinksReturn {
@@ -194,7 +206,7 @@ export function useTerminalFileLinks(
 
         // With a project open, only files inside it are links (the main process
         // answers for every readable path and says where it lies)
-        const exists = result.exists && !(projectRoot && result.insideProject === false)
+        const exists = isLinkableFile(result, projectRoot)
 
         // Cache the result
         pathCache.set(path, {

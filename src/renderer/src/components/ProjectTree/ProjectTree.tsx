@@ -982,6 +982,9 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
                 type: 'warning'
               })
             }
+          } else if (result.errorCode === 'EXTERNAL_FILE_MOVE_CANCELLED') {
+            // The user answered Cancel in the confirmation box: not an error
+            logger.info('User cancelled moving file', { fileName: file.name })
           } else {
             logger.warn('Move failed', { path: file.path, error: result.error })
             showGlobalToast({

@@ -655,6 +655,63 @@ describe('ExternalFileService', () => {
       expect(fs.rm).not.toHaveBeenCalled()
     })
 
+    it('moves a file the user confirms in the box, once per answer', async () => {
+      const confirm = vi.fn().mockResolvedValue('move')
+      service.setMoveConfirmer({ confirm })
+      grants.clear()
+
+      const result = await service.moveFromExternal(source, target(folder), SENDER)
+
+      expect(result.success).toBe(true)
+      expect(confirm).toHaveBeenCalledWith(SENDER, source)
+      expect(fs.rm).toHaveBeenCalledWith(source)
+    })
+
+    it('touches nothing when the user cancels, and answers quietly', async () => {
+      service.setMoveConfirmer({ confirm: vi.fn().mockResolvedValue('cancel') })
+      grants.clear()
+
+      const result = await service.moveFromExternal(source, target(folder), SENDER)
+
+      expect(result).toMatchObject({
+        success: false,
+        errorCode: ErrorCode.EXTERNAL_FILE_MOVE_CANCELLED
+      })
+      expect(fs.copyFile).not.toHaveBeenCalled()
+      expect(fs.rm).not.toHaveBeenCalled()
+    })
+
+    it('refuses when no box can be shown', async () => {
+      service.setMoveConfirmer({ confirm: vi.fn().mockResolvedValue('unavailable') })
+      grants.clear()
+
+      const result = await service.moveFromExternal(source, target(folder), SENDER)
+
+      expect(result.errorCode).toBe(ErrorCode.EXTERNAL_FILE_MOVE_NOT_GRANTED)
+      expect(fs.rm).not.toHaveBeenCalled()
+    })
+
+    it('does not ask for a file picked in the dialog', async () => {
+      const confirm = vi.fn().mockResolvedValue('cancel')
+      service.setMoveConfirmer({ confirm })
+
+      const result = await service.moveFromExternal(source, target(folder), SENDER)
+
+      expect(result.success).toBe(true)
+      expect(confirm).not.toHaveBeenCalled()
+    })
+
+    it('does not ask about a file that fails validation', async () => {
+      const confirm = vi.fn().mockResolvedValue('move')
+      service.setMoveConfirmer({ confirm })
+      grants.clear()
+      ;(fs.lstat as Mock).mockResolvedValueOnce(makeStats({ isDir: true }))
+
+      await service.moveFromExternal(source, target(folder), SENDER)
+
+      expect(confirm).not.toHaveBeenCalled()
+    })
+
     it('refuses a file another window picked', async () => {
       const result = await service.moveFromExternal(source, target(folder), SENDER + 1)
 

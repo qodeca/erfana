@@ -9,6 +9,7 @@
  * - the target folder resolves against the project the main process has open;
  *   the `projectRoot` argument the renderer still sends is accepted and ignored
  * - a move deletes its source only when the user picked that file in the dialog
+ *   or confirms the move in a native box
  * - validation and the file picker keep their behaviour
  */
 
@@ -73,6 +74,7 @@ vi.mock('../services/ProjectLockService', () => ({
 }))
 
 import { registerExternalFileHandlers } from './external-file-handlers'
+import { ExternalMoveConfirmerImpl } from '../services/ExternalMoveConfirmer'
 import { getConfinedChannels } from './confinement/registerConfinedHandle'
 import { externalSourceGrants } from '../services/ExternalSourceGrants'
 import { logger } from '../services/LoggingService'
@@ -89,6 +91,8 @@ describe('External File Handlers', () => {
   let outside: string
   let source: string
   let projectService: { session: Parameters<typeof registerExternalFileHandlers>[0] }
+  // Answers Cancel unless a test says otherwise
+  const confirm = vi.fn()
 
   const listDir = (dir: string): string[] => readdirSync(dir).sort()
 
@@ -116,7 +120,9 @@ describe('External File Handlers', () => {
     vi.spyOn(logger, 'warn').mockImplementation(() => {})
     await openTestProject(root, { ownerWebContentsId: OWNER_ID })
     projectService = (await import('./file-handlers')).projectService
-    registerExternalFileHandlers(projectService.session)
+    confirm.mockReset()
+    confirm.mockResolvedValue('cancel')
+    registerExternalFileHandlers(projectService.session, { confirm })
   })
 
   afterEach(() => {
@@ -313,10 +319,63 @@ describe('External File Handlers', () => {
 
       expect(result).toMatchObject({
         success: false,
-        errorCode: ErrorCode.EXTERNAL_FILE_MOVE_NOT_GRANTED
+        errorCode: ErrorCode.EXTERNAL_FILE_MOVE_CANCELLED
       })
       expect(existsSync(source)).toBe(true)
       expect(listDir(path.join(root, 'docs'))).toEqual([])
+    })
+
+    it('moves a dropped file after the user confirms, and asks about it', async () => {
+      confirm.mockResolvedValueOnce('move')
+
+      const result = await invoke('file:moveFromExternal', source, path.join(root, 'docs'), root)
+
+      expect(result).toMatchObject({ success: true, path: path.join(root, 'docs', 'incoming.md') })
+      expect(confirm).toHaveBeenCalledWith(OWNER_ID, source)
+      expect(existsSync(source)).toBe(false)
+    })
+
+    it('leaves a dropped file alone when the user cancels', async () => {
+      const result = await invoke('file:moveFromExternal', source, path.join(root, 'docs'), root)
+
+      expect(result).toMatchObject({
+        success: false,
+        errorCode: ErrorCode.EXTERNAL_FILE_MOVE_CANCELLED
+      })
+      expect(existsSync(source)).toBe(true)
+      expect(listDir(path.join(root, 'docs'))).toEqual([])
+    })
+
+    it('shows no box for a file picked in the dialog', async () => {
+      await pick(source)
+
+      await invoke('file:moveFromExternal', source, path.join(root, 'docs'), root)
+
+      expect(confirm).not.toHaveBeenCalled()
+    })
+
+    it('asks once for a batch, in a box modal to the window that owns the project', async () => {
+      const ownerWindow = { id: 'owner-window' }
+      const showBox = vi.fn(async () => ({ response: 0 }))
+      const resolveOwner = vi.fn(() => ownerWindow)
+      registerExternalFileHandlers(
+        projectService.session,
+        new ExternalMoveConfirmerImpl({ showBox, resolveOwner, coalesceMs: 0 })
+      )
+      const second = path.join(outside, 'second.md')
+      writeFileSync(second, 'second')
+
+      const [one, two] = await Promise.all([
+        invoke('file:moveFromExternal', source, path.join(root, 'docs'), root),
+        invoke('file:moveFromExternal', second, path.join(root, 'docs'), root)
+      ])
+
+      expect(one.success).toBe(true)
+      expect(two.success).toBe(true)
+      expect(showBox).toHaveBeenCalledTimes(1)
+      expect(showBox.mock.calls[0]).toEqual([ownerWindow, expect.objectContaining({ type: 'question' })])
+      expect(resolveOwner).toHaveBeenCalledWith(OWNER_ID)
+      expect(listDir(path.join(root, 'docs'))).toEqual(['incoming.md', 'second.md'])
     })
 
     it('moves a file the user picked in the dialog', async () => {
@@ -336,7 +395,7 @@ describe('External File Handlers', () => {
 
       const second = await invoke('file:moveFromExternal', source, path.join(root, 'docs'), root)
 
-      expect(second.errorCode).toBe(ErrorCode.EXTERNAL_FILE_MOVE_NOT_GRANTED)
+      expect(second.errorCode).toBe(ErrorCode.EXTERNAL_FILE_MOVE_CANCELLED)
       expect(readFileSync(source, 'utf8')).toBe('again')
     })
 
@@ -347,7 +406,7 @@ describe('External File Handlers', () => {
 
       const result = await invoke('file:moveFromExternal', other, path.join(root, 'docs'), root)
 
-      expect(result.errorCode).toBe(ErrorCode.EXTERNAL_FILE_MOVE_NOT_GRANTED)
+      expect(result.errorCode).toBe(ErrorCode.EXTERNAL_FILE_MOVE_CANCELLED)
       expect(existsSync(other)).toBe(true)
     })
 
@@ -367,7 +426,7 @@ describe('External File Handlers', () => {
 
       const result = await invoke('file:moveFromExternal', source, path.join(root, 'docs'), root)
 
-      expect(result.errorCode).toBe(ErrorCode.EXTERNAL_FILE_MOVE_NOT_GRANTED)
+      expect(result.errorCode).toBe(ErrorCode.EXTERNAL_FILE_MOVE_CANCELLED)
       expect(existsSync(source)).toBe(true)
     })
 
@@ -379,7 +438,7 @@ describe('External File Handlers', () => {
 
         const result = await invoke('file:moveFromExternal', source, path.join(root, 'docs'), root)
 
-        expect(result.errorCode).toBe(ErrorCode.EXTERNAL_FILE_MOVE_NOT_GRANTED)
+        expect(result.errorCode).toBe(ErrorCode.EXTERNAL_FILE_MOVE_CANCELLED)
         expect(existsSync(source)).toBe(true)
       } finally {
         vi.useRealTimers()

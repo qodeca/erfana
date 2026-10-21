@@ -175,6 +175,7 @@ export enum ErrorCode {
   EXTERNAL_FILE_MOVE_FAILED = 'EXTERNAL_FILE_MOVE_FAILED',
   EXTERNAL_FILE_SOURCE_DELETED = 'EXTERNAL_FILE_SOURCE_DELETED',
   EXTERNAL_FILE_MOVE_NOT_GRANTED = 'EXTERNAL_FILE_MOVE_NOT_GRANTED',
+  EXTERNAL_FILE_MOVE_CANCELLED = 'EXTERNAL_FILE_MOVE_CANCELLED',
 
   // Transcription errors (Issue #75)
   TRANSCRIPTION_NO_API_KEY = 'TRANSCRIPTION_NO_API_KEY',
@@ -461,6 +462,7 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.EXTERNAL_FILE_SOURCE_DELETED]: 'Source file was deleted during operation',
   [ErrorCode.EXTERNAL_FILE_MOVE_NOT_GRANTED]:
     'Moving needs a file chosen with the Add files dialog; copy the file instead',
+  [ErrorCode.EXTERNAL_FILE_MOVE_CANCELLED]: 'Move cancelled',
 
   // Transcription errors (Issue #75)
   [ErrorCode.TRANSCRIPTION_NO_API_KEY]: 'No API key configured. Add your OpenAI API key in Settings.',

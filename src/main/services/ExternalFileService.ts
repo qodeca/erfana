@@ -24,6 +24,7 @@ import { AppError, ErrorCode, ERROR_MESSAGES } from '../../shared/errors'
 import { logger } from './LoggingService'
 import { redactPath, redactedLogError } from '../utils/redactUserInput'
 import { childPath } from '../utils/childPath'
+import type { MoveConfirmer } from './ExternalMoveConfirmer'
 import { externalSourceGrants as defaultGrants, type ExternalSourceGrants } from './ExternalSourceGrants'
 import type { IFileService } from '../interfaces/IFileService'
 import { fileService as defaultFileService } from './FileService'
@@ -58,6 +59,12 @@ export interface ExternalTarget {
  */
 export interface IExternalFileService {
   /**
+   * Who is asked before a file that was not picked in the dialog is moved.
+   * Without one, such a move is refused.
+   */
+  setMoveConfirmer(confirmer: MoveConfirmer | null): void
+
+  /**
    * Validate an external file for import into project
    * Performs security checks before copy/move
    */
@@ -91,11 +98,17 @@ export interface IExternalFileService {
 export class ExternalFileService implements IExternalFileService {
   private fileService: IFileService
   private grants: ExternalSourceGrants
+  private moveConfirmer: MoveConfirmer | null
 
-  constructor(fileService?: IFileService, grants?: ExternalSourceGrants) {
+  constructor(fileService?: IFileService, grants?: ExternalSourceGrants, moveConfirmer?: MoveConfirmer) {
+    this.moveConfirmer = moveConfirmer ?? null
     // M4: Compose with FileService for file operations
     this.fileService = fileService || defaultFileService
     this.grants = grants || defaultGrants
+  }
+
+  setMoveConfirmer(confirmer: MoveConfirmer | null): void {
+    this.moveConfirmer = confirmer
   }
 
   /**
@@ -342,14 +355,24 @@ export class ExternalFileService implements IExternalFileService {
       }
     }
 
-    // The original is deleted below, so the move needs the record the picker made
+    // The original is deleted below: it needs the record the picker made, or the
+    // user's answer to a native box
     if (!this.grants.consume(senderId, sourcePath)) {
-      logger.warn('Move refused: source was not picked with the dialog', { sourcePath: redactPath(sourcePath) })
-      return {
-        success: false,
-        isSymlink: validation.isSymlink,
-        error: ERROR_MESSAGES[ErrorCode.EXTERNAL_FILE_MOVE_NOT_GRANTED],
-        errorCode: ErrorCode.EXTERNAL_FILE_MOVE_NOT_GRANTED
+      const answer = this.moveConfirmer
+        ? await this.moveConfirmer.confirm(senderId, sourcePath)
+        : 'unavailable'
+      if (answer !== 'move') {
+        logger.info('Move not confirmed', { sourcePath: redactPath(sourcePath), answer })
+        const code =
+          answer === 'cancel'
+            ? ErrorCode.EXTERNAL_FILE_MOVE_CANCELLED
+            : ErrorCode.EXTERNAL_FILE_MOVE_NOT_GRANTED
+        return {
+          success: false,
+          isSymlink: validation.isSymlink,
+          error: ERROR_MESSAGES[code],
+          errorCode: code
+        }
       }
     }
 
