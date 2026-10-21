@@ -40,6 +40,17 @@ export const LOGS_DIR_RELATIVE = '.erfana/logs'
  */
 export const FORCE_CRASH_ARG = '--erfana-force-crash'
 
+/**
+ * Renderer launch argument that switches the e2e test hooks on
+ * (`window.__erfanaTest`). Appended by the main process only when the app is
+ * unpackaged AND `ERFANA_E2E_TEST_HOOKS=1`; the preload reads it back off
+ * `process.argv` and exposes `window.__ERFANA_TEST_HOOKS__`.
+ *
+ * @see src/main/index.ts - buildAdditionalArguments()
+ * @see src/preload/index.ts - testHooks
+ */
+export const TEST_HOOKS_ARG = '--erfana-test-hooks'
+
 /** Toast notification durations in milliseconds */
 export const TOAST_DURATION = {
   ERROR: 5000,

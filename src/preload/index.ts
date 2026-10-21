@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { contextBridge, ipcRenderer, IpcRendererEvent, webUtils } from 'electron'
-import { FORCE_CRASH_ARG } from '../shared/constants'
+import { FORCE_CRASH_ARG, TEST_HOOKS_ARG } from '../shared/constants'
 import type { ProjectChanged, ProjectSessionInfo } from '../shared/ipc/schema'
 import type { GitStatusResponse } from '../shared/ipc/git-schema'
 import type { PdfExportRequest, PdfExportResponse } from '../shared/ipc/pdf-schema'
@@ -424,12 +424,10 @@ const api = {
      * can quote pasted paths correctly without a follow-up IPC round-trip
      * (#164 round-2 F#1).
      */
-    create: (config?: {
-      shell?: string
+    create: (config: {
       cwd?: string
-      env?: Record<string, string>
-      cols?: number
-      rows?: number
+      cols: number
+      rows: number
     }): Promise<{
       success: boolean
       terminalId?: string
@@ -463,6 +461,14 @@ const api = {
       terminals?: Array<{ id: string; title: string }>
       error?: string
     }> => ipcRenderer.invoke('terminal:list'),
+
+    // Whether a program other than the shell is running in the terminal
+    getActivity: (terminalId: string): Promise<{
+      success: boolean
+      busy?: boolean
+      known?: boolean
+      error?: string
+    }> => ipcRenderer.invoke('terminal:getActivity', terminalId),
 
     // Event listeners
     onData: (callback: (data: { terminalId: string; data: string }) => void) => {
@@ -1170,12 +1176,22 @@ const electron = {
  */
 const forceCrash = process.argv.includes(FORCE_CRASH_ARG)
 
+/**
+ * E2E test-hook flag. Same mechanism as {@link forceCrash}: main appends
+ * {@link TEST_HOOKS_ARG} only when the app is UNPACKAGED and
+ * `ERFANA_E2E_TEST_HOOKS=1` is set. Exposed ONLY when true.
+ */
+const testHooks = process.argv.includes(TEST_HOOKS_ARG)
+
 if (process.contextIsolated) {
   try {
     contextBridge.exposeInMainWorld('electron', electron)
     contextBridge.exposeInMainWorld('api', api)
     if (forceCrash) {
       contextBridge.exposeInMainWorld('__ERFANA_FORCE_CRASH__', true)
+    }
+    if (testHooks) {
+      contextBridge.exposeInMainWorld('__ERFANA_TEST_HOOKS__', true)
     }
   } catch (error) {
     console.error(error)
@@ -1185,5 +1201,8 @@ if (process.contextIsolated) {
   ;(window as unknown as { api: typeof api }).api = api
   if (forceCrash) {
     ;(window as unknown as { __ERFANA_FORCE_CRASH__: boolean }).__ERFANA_FORCE_CRASH__ = true
+  }
+  if (testHooks) {
+    ;(window as unknown as { __ERFANA_TEST_HOOKS__: boolean }).__ERFANA_TEST_HOOKS__ = true
   }
 }

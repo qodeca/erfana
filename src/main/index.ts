@@ -31,7 +31,7 @@ import { registerClaudeStatusHandlers } from './ipc/claude-status-handlers'
 import { registerPreviewHandlers } from './ipc/preview-handlers'
 import { registerPreviewScheme } from './services/preview/previewScheme'
 import { DependencyDetector, converterRegistry, getExtensionsForDependencies } from './services/import'
-import { FORCE_CRASH_ARG, LOGS_DIR_RELATIVE } from '../shared/constants'
+import { FORCE_CRASH_ARG, LOGS_DIR_RELATIVE, TEST_HOOKS_ARG } from '../shared/constants'
 import { IMPORT_CHANNELS } from '../shared/ipc/import-channels'
 import type { DependencyReadyEvent } from '../shared/ipc/import-schema'
 import { createApplicationMenu, setPreviewZoomHandler } from './menu'
@@ -165,10 +165,15 @@ app.commandLine.appendSwitch('ignore-gpu-blocklist')
  * `ERFANA_E2E_FORCE_CRASH` outright.
  */
 function buildAdditionalArguments(): string[] {
+  const args: string[] = []
   if (!app.isPackaged && process.env.ERFANA_E2E_FORCE_CRASH === '1') {
-    return [FORCE_CRASH_ARG]
+    args.push(FORCE_CRASH_ARG)
   }
-  return []
+  // The e2e test hooks follow the same rule: a packaged build ignores the variable
+  if (!app.isPackaged && process.env.ERFANA_E2E_TEST_HOOKS === '1') {
+    args.push(TEST_HOOKS_ARG)
+  }
+  return args
 }
 
 function createWindow(): BrowserWindow {
@@ -474,7 +479,7 @@ app.whenReady().then(async () => {
   registerFileWatcherHandlers()
   registerDirectoryWatcherHandlers()
   registerSettingsHandlers()
-  registerTerminalHandlers()
+  registerTerminalHandlers(projectService.session)
   registerImportHandlers()
   registerDocumentImportHandlers()
   registerGitHandlers()

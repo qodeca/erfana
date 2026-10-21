@@ -42,6 +42,7 @@ import { getBasename } from '../../utils/fileUtils'
 import { openFileInPanel } from '../../utils/openFileInPanel'
 import { resolvePanelKind } from '../../utils/resolvePanelKind'
 import { formatShortcut } from '../../utils/shortcutLabel'
+import { registerTestTerminal } from '../../testHooks/terminalTestHook'
 import { formatPathsForTerminal, escapePathForShell, type ShellKind } from '../../utils/shellPathEscape'
 import { logger } from '../../utils/logger'
 import { TEST_IDS } from '../../constants/testids'
@@ -679,6 +680,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       }
 
       setTerminalId(result.terminalId)
+      registerCleanup(registerTestTerminal(result.terminalId, xterm))
       // Record the resolved shellKind so the screenshot path-paste quotes
       // correctly without an extra IPC (#164 round-2 F#1). Main always
       // returns a value when terminalId is present, but guard defensively.
@@ -1117,7 +1119,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     if (restartInProgressRef.current) return
     restartInProgressRef.current = true
     try {
-      const risk = getRestartRisk(terminalIdRef.current)
+      const risk = await getRestartRisk(terminalIdRef.current)
       if (risk !== null && showConfirm) {
         const confirmed = await showConfirm(buildRestartConfirm(risk))
         if (!confirmed) return

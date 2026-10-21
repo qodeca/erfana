@@ -20,6 +20,7 @@ import {
   validateWindowsCwd
 } from './WindowsTerminalBootstrap'
 import { isWindowsLongPath } from './watcher/PlatformConfig'
+import { isForegroundBusy, shellProcessNames } from './terminalForeground'
 
 /**
  * Outcome of {@link TerminalService.createTerminal}. A failure carries its
@@ -77,6 +78,7 @@ interface TerminalInstance {
   hasReceivedMarker: boolean // Track if marker was detected (prevents late data forwarding)
   webContentsId: number // Track owning webContents for cleanup on window close
   shellKind: ShellKind // Quoting flavour resolved at create time (#164)
+  shellNames: ReadonlySet<string> // Names the idle shell shows as; see terminalForeground.ts
   exited: Promise<void> // Settles when node-pty reports the shell exit (#214)
 }
 
@@ -238,7 +240,7 @@ export class TerminalService extends EventEmitter {
         // create terminal". The length is logged, never the path.
         if (isWindowsLongPath(cwd)) {
           logger.error(`❌ Cannot create terminal ${terminalId}: cwd exceeds MAX_PATH (${cwd.length} chars)`)
-          this.emit('error', { terminalId, error: TERMINAL_CWD_TOO_LONG_MESSAGE })
+          this.emit('error', { terminalId, error: TERMINAL_CWD_TOO_LONG_MESSAGE, webContentsId: webContentsId ?? -1 })
           return { error: TERMINAL_CWD_TOO_LONG_MESSAGE }
         }
         // Validate + normalize the cwd, then dispatch to a registered
@@ -247,7 +249,7 @@ export class TerminalService extends EventEmitter {
         const validation = validateWindowsCwd(cwd)
         if (!validation.ok) {
           logger.error(`❌ Cannot create terminal ${terminalId}: ${validation.reason}`)
-          this.emit('error', { terminalId, error: validation.reason })
+          this.emit('error', { terminalId, error: validation.reason, webContentsId: webContentsId ?? -1 })
           return { error: validation.reason }
         }
         const winCwd = normalizeWindowsCwd(cwd)
@@ -269,7 +271,7 @@ export class TerminalService extends EventEmitter {
         if (/[\r\n]/.test(cwd)) {
           const reason = 'cwd contains unsupported newline character'
           logger.error(`❌ Cannot create terminal ${terminalId}: ${reason}`)
-          this.emit('error', { terminalId, error: reason })
+          this.emit('error', { terminalId, error: reason, webContentsId: webContentsId ?? -1 })
           return { error: reason }
         }
         const posixEscapedCwd = cwd.replace(/'/g, "'\\''")
@@ -344,6 +346,11 @@ export class TerminalService extends EventEmitter {
         // during window destruction (used in tests and manual terminal creation)
         webContentsId: webContentsId ?? -1,
         shellKind,
+        shellNames: shellProcessNames(
+          shell,
+          process.env.SHELL,
+          process.env.ERFANA_E2E_FAST_SHELL === '1'
+        ),
         exited
       }
 
@@ -377,7 +384,7 @@ export class TerminalService extends EventEmitter {
             term.hasReceivedMarker = true
             term.isClearing = true
 
-            this.emit('clearTerminal', { terminalId })
+            this.emit('clearTerminal', { terminalId, webContentsId: webContentsId ?? -1 })
 
             // Safety fallback: if renderer doesn't respond in 3 seconds, enable anyway
             term.clearFallbackTimeout = setTimeout(() => {
@@ -411,7 +418,7 @@ export class TerminalService extends EventEmitter {
         // 3. Marker has been received (ensures no pre-marker data leaks through)
         if (term && term.initializationComplete && !term.isClearing && term.hasReceivedMarker) {
           logger.debug(`[PRIMARY onData] FORWARDING data`)
-          this.emit('data', { terminalId, data })
+          this.emit('data', { terminalId, data, webContentsId: webContentsId ?? -1 })
         } else {
           logger.debug(`[PRIMARY onData] BLOCKING data`)
         }
@@ -421,7 +428,7 @@ export class TerminalService extends EventEmitter {
       ptyProcess.onExit((event: { exitCode: number; signal?: number }) => {
         logger.info(`🏁 Terminal ${terminalId} exited`, event)
         markExited()
-        this.emit('exit', { terminalId, exitCode: event.exitCode, signal: event.signal })
+        this.emit('exit', { terminalId, exitCode: event.exitCode, signal: event.signal, webContentsId: webContentsId ?? -1 })
         this.terminals.delete(terminalId)
       })
 
@@ -430,7 +437,7 @@ export class TerminalService extends EventEmitter {
     } catch (error) {
       logger.error(`❌ Failed to create terminal`, error instanceof Error ? error : undefined)
       const message = error instanceof Error ? error.message : String(error)
-      this.emit('error', { terminalId, error: message })
+      this.emit('error', { terminalId, error: message, webContentsId: webContentsId ?? -1 })
       return { error: message }
     }
   }
@@ -485,13 +492,13 @@ export class TerminalService extends EventEmitter {
         logger.info(`ℹ️ Terminal ${terminalId} PTY closed (terminal likely exited)`)
         // Clean up the closed terminal
         this.terminals.delete(terminalId)
-        this.emit('exit', { terminalId, exitCode: 0 })
+        this.emit('exit', { terminalId, exitCode: 0, webContentsId: terminal.webContentsId })
         return false
       }
 
       logger.error(`❌ Failed to write to terminal ${terminalId}`, error instanceof Error ? error : undefined)
       const message = error instanceof Error ? error.message : String(error)
-      this.emit('error', { terminalId, error: message })
+      this.emit('error', { terminalId, error: message, webContentsId: terminal.webContentsId })
       return false
     }
   }
@@ -527,7 +534,7 @@ export class TerminalService extends EventEmitter {
       }
 
       logger.error(`❌ Failed to resize terminal ${terminalId}`, error instanceof Error ? error : undefined)
-      this.emit('error', { terminalId, error: message })
+      this.emit('error', { terminalId, error: message, webContentsId: terminal.webContentsId })
       return false
     }
   }
@@ -572,7 +579,7 @@ export class TerminalService extends EventEmitter {
 
       logger.error(`❌ Failed to kill terminal ${terminalId}`, error instanceof Error ? error : undefined)
       const message = error instanceof Error ? error.message : String(error)
-      this.emit('error', { terminalId, error: message })
+      this.emit('error', { terminalId, error: message, webContentsId: terminal.webContentsId })
       return false
     }
   }
@@ -591,6 +598,37 @@ export class TerminalService extends EventEmitter {
       id: terminal.id,
       cwd: terminal.cwd,
       title: terminal.title
+    }
+  }
+
+  /**
+   * The `webContents` that created a terminal, or `undefined` for an unknown
+   * id. `-1` means the terminal has no owner (created without a sender).
+   */
+  getOwner(terminalId: string): number | undefined {
+    return this.terminals.get(terminalId)?.webContentsId
+  }
+
+  /**
+   * Whether a program other than the shell is in the terminal's foreground.
+   *
+   * node-pty names the foreground process on macOS and Linux. On Windows
+   * `IPty.process` is the shell's own name for the life of the terminal, so the
+   * answer is not available there (`known: false`).
+   *
+   * @returns `null` for an unknown id
+   */
+  getActivity(terminalId: string): { busy: boolean; known: boolean } | null {
+    const terminal = this.terminals.get(terminalId)
+    if (!terminal) return null
+    if (osPlatform() === 'win32') return { busy: false, known: false }
+    try {
+      const foreground = terminal.ptyProcess.process
+      if (typeof foreground !== 'string') return { busy: false, known: false }
+      return { busy: isForegroundBusy(foreground, terminal.shellNames), known: true }
+    } catch {
+      // The process may have exited between the lookup and the read
+      return { busy: false, known: false }
     }
   }
 

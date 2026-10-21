@@ -18,23 +18,12 @@ export const ProjectSessionInfoSchema = z.object({
 })
 export type ProjectSessionInfo = z.infer<typeof ProjectSessionInfoSchema>
 
-// Terminal event payloads (lightweight placeholders for future use)
-export const TerminalDataSchema = z.object({
-  terminalId: z.string(),
-  data: z.string(),
-})
-export type TerminalData = z.infer<typeof TerminalDataSchema>
-
-export const TerminalExitSchema = z.object({
-  terminalId: z.string(),
-  exitCode: z.number(),
-  signal: z.number().optional(),
-})
-export type TerminalExit = z.infer<typeof TerminalExitSchema>
-
-export const TerminalErrorSchema = z.object({
-  terminalId: z.string(),
-  error: z.string(),
-})
-export type TerminalError = z.infer<typeof TerminalErrorSchema>
-
+// Terminal event payloads live in ./terminal-schema; re-exported for existing importers
+export {
+  TerminalDataSchema,
+  TerminalExitSchema,
+  TerminalErrorSchema,
+  type TerminalData,
+  type TerminalExit,
+  type TerminalError
+} from './terminal-schema'

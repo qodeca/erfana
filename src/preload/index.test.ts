@@ -436,3 +436,56 @@ describe('__ERFANA_FORCE_CRASH__ exposure', () => {
   })
 })
 
+
+/**
+ * The e2e test-hook flag follows the crash flag's rule: exposed only when main
+ * appended `--erfana-test-hooks` (unpackaged + `ERFANA_E2E_TEST_HOOKS=1`).
+ */
+describe('__ERFANA_TEST_HOOKS__ exposure', () => {
+  const ORIGINAL_ARGV = process.argv
+  const FLAG = '__ERFANA_TEST_HOOKS__'
+
+  async function loadPreloadWith(argv: string[], contextIsolated: boolean): Promise<void> {
+    const { contextBridge } = await import('electron')
+    vi.mocked(contextBridge.exposeInMainWorld).mockClear()
+    process.argv = argv
+    ;(process as any).contextIsolated = contextIsolated
+    vi.resetModules()
+    delete (window as any)[FLAG]
+    await import('./index')
+  }
+
+  afterEach(() => {
+    process.argv = ORIGINAL_ARGV
+    delete (window as any)[FLAG]
+  })
+
+  it('is absent when argv does not carry the flag', async () => {
+    await loadPreloadWith(['electron', 'main.js'], false)
+
+    expect(FLAG in (window as any)).toBe(false)
+  })
+
+  it('is exposed as true when argv carries --erfana-test-hooks', async () => {
+    await loadPreloadWith(['electron', 'main.js', '--erfana-test-hooks'], false)
+
+    expect((window as any)[FLAG]).toBe(true)
+  })
+
+  it('goes through contextBridge when context isolation is on', async () => {
+    const { contextBridge } = await import('electron')
+
+    await loadPreloadWith(['electron', 'main.js', '--erfana-test-hooks'], true)
+
+    expect(contextBridge.exposeInMainWorld).toHaveBeenCalledWith(FLAG, true)
+  })
+
+  it('exposes nothing through contextBridge in a normal isolated run', async () => {
+    const { contextBridge } = await import('electron')
+
+    await loadPreloadWith(['electron', 'main.js'], true)
+
+    const keys = vi.mocked(contextBridge.exposeInMainWorld).mock.calls.map(([key]) => key)
+    expect(keys).not.toContain(FLAG)
+  })
+})

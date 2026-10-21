@@ -63,6 +63,7 @@ describe('Main Process - Window Creation', () => {
     // Reset modules to allow fresh imports
     vi.resetModules()
     delete process.env.ERFANA_E2E_FORCE_CRASH
+    delete process.env.ERFANA_E2E_TEST_HOOKS
 
     mockShowMessageBox = vi.fn(() => Promise.resolve({ response: 0 }))
     mockWriteCrashFallbackLine = vi.fn(() => true)
@@ -423,6 +424,7 @@ describe('Main Process - Window Creation', () => {
     vi.clearAllMocks()
     vi.resetModules()
     delete process.env.ERFANA_E2E_FORCE_CRASH
+    delete process.env.ERFANA_E2E_TEST_HOOKS
   })
 
   describe('Watcher wiring (save after a folder rename)', () => {
@@ -1074,6 +1076,45 @@ describe('Main Process - Window Creation', () => {
 
       expect(windowConfig.webPreferences.additionalArguments ?? []).not.toContain(
         '--erfana-force-crash'
+      )
+    })
+  })
+
+  describe('E2E Test Hooks Flag', () => {
+    it('passes the flag to the renderer when ERFANA_E2E_TEST_HOOKS=1', async () => {
+      mockIs.dev = false
+      process.env.ERFANA_E2E_TEST_HOOKS = '1'
+
+      await import('./index')
+
+      const windowConfig = mockBrowserWindow.mock.calls[0][0]
+
+      expect(windowConfig.webPreferences.additionalArguments).toContain('--erfana-test-hooks')
+    })
+
+    it('does not pass the flag when the env var is unset', async () => {
+      mockIs.dev = false
+
+      await import('./index')
+
+      const windowConfig = mockBrowserWindow.mock.calls[0][0]
+
+      expect(windowConfig.webPreferences.additionalArguments ?? []).not.toContain(
+        '--erfana-test-hooks'
+      )
+    })
+
+    it('ignores the env var in a packaged build', async () => {
+      mockIs.dev = false
+      mockApp.isPackaged = true
+      process.env.ERFANA_E2E_TEST_HOOKS = '1'
+
+      await import('./index')
+
+      const windowConfig = mockBrowserWindow.mock.calls[0][0]
+
+      expect(windowConfig.webPreferences.additionalArguments ?? []).not.toContain(
+        '--erfana-test-hooks'
       )
     })
   })
