@@ -21,6 +21,7 @@ import {
 } from './WindowsTerminalBootstrap'
 import { isWindowsLongPath } from './watcher/PlatformConfig'
 import { isForegroundBusy, shellProcessNames } from './terminalForeground'
+import { killProcessTree } from './terminalTreeKill'
 
 /**
  * Outcome of {@link TerminalService.createTerminal}. A failure carries its
@@ -80,6 +81,8 @@ interface TerminalInstance {
   shellKind: ShellKind // Quoting flavour resolved at create time (#164)
   shellNames: ReadonlySet<string> // Names the idle shell shows as; see terminalForeground.ts
   exited: Promise<void> // Settles when node-pty reports the shell exit (#214)
+  killRequested?: boolean // Set by the first kill; a second kill of the same pty is a no-op (#296)
+  treeKilled?: boolean // Windows process-tree kill already started for this shell (#296)
 }
 
 /**
@@ -93,6 +96,15 @@ interface TerminalInstance {
  * kill. Kept below the 2 s shutdown bound in `src/main/index.ts`.
  */
 export const TERMINAL_EXIT_WAIT_MS = 1_500
+
+/**
+ * How long a batch of terminal kills (window close, quit) may spend in
+ * node-pty's own kill on Windows (#296). Each of those calls starts a helper
+ * process, so dozens at once can take longer than a quit should. Once the
+ * budget is spent the remaining shells are ended by their process-tree kill
+ * alone, which is started for every shell up front.
+ */
+export const TERMINAL_KILL_BUDGET_MS = 1_000
 
 /** Most output kept while waiting for the bootstrap marker (64 KiB). */
 export const MARKER_BUFFER_MAX_CHARS = 64 * 1024
@@ -551,6 +563,14 @@ export class TerminalService extends EventEmitter {
    * Kill terminal
    */
   killTerminal(terminalId: string): boolean {
+    return this.killTerminalWithin(terminalId, true)
+  }
+
+  /**
+   * Kills one terminal. With `ptyKill` false only the process-tree kill runs
+   * (Windows) and node-pty's own kill is skipped – see {@link TERMINAL_KILL_BUDGET_MS}.
+   */
+  private killTerminalWithin(terminalId: string, ptyKill: boolean): boolean {
     const terminal = this.terminals.get(terminalId)
 
     if (!terminal) {
@@ -570,7 +590,7 @@ export class TerminalService extends EventEmitter {
     }
 
     try {
-      terminal.ptyProcess.kill()
+      this.killShell(terminal, ptyKill)
       this.terminals.delete(terminalId)
       this.trackExit(terminal)
       logger.info(`🛑 Terminal ${terminalId} killed`)
@@ -672,10 +692,12 @@ export class TerminalService extends EventEmitter {
   async dispose(): Promise<void> {
     logger.info('🛑 Disposing TerminalService...')
 
+    const killStartedAt = Date.now()
+    this.treeKillAll(this.terminals.values())
     for (const [terminalId, terminal] of this.terminals.entries()) {
       this.trackExit(terminal)
       try {
-        terminal.ptyProcess.kill()
+        this.killShell(terminal, this.withinKillBudget(killStartedAt))
         logger.info(`✅ Terminal ${terminalId} cleaned up`)
       } catch (error) {
         // Suppress EPIPE and ESRCH errors during cleanup
@@ -691,6 +713,38 @@ export class TerminalService extends EventEmitter {
     this.terminals.clear()
     await this.waitForPendingExits()
     logger.info('✅ TerminalService disposed')
+  }
+
+  /**
+   * Ends one shell. On Windows the shell's whole process tree is killed first
+   * (see `terminalTreeKill.ts`), then node-pty's own kill releases the pty
+   * handles unless `ptyKill` is false. A second call for the same terminal does
+   * nothing, so a shell is never killed twice (#296).
+   */
+  private killShell(terminal: TerminalInstance, ptyKill: boolean): void {
+    if (terminal.killRequested) return
+    terminal.killRequested = true
+    this.treeKill(terminal)
+    if (ptyKill) terminal.ptyProcess.kill()
+  }
+
+  /** Starts the Windows process-tree kill for several shells at once, before any slow pty kill. */
+  private treeKillAll(terminals: Iterable<TerminalInstance>): void {
+    if (osPlatform() !== 'win32') return
+    for (const terminal of terminals) {
+      if (!terminal.killRequested) this.treeKill(terminal)
+    }
+  }
+
+  private treeKill(terminal: TerminalInstance): void {
+    if (terminal.treeKilled || osPlatform() !== 'win32') return
+    terminal.treeKilled = true
+    killProcessTree(terminal.pid)
+  }
+
+  /** True while a batch of kills may still call node-pty's own kill. Always true off Windows. */
+  private withinKillBudget(startedAt: number): boolean {
+    return osPlatform() !== 'win32' || Date.now() - startedAt < TERMINAL_KILL_BUDGET_MS
   }
 
   /** Remember a killed shell until node-pty reports its exit (#214). */
@@ -734,12 +788,19 @@ export class TerminalService extends EventEmitter {
       }
     }
 
+    const killStartedAt = Date.now()
+    this.treeKillAll(
+      terminalsToKill.flatMap((id) => {
+        const terminal = this.terminals.get(id)
+        return terminal ? [terminal] : []
+      })
+    )
     for (const terminalId of terminalsToKill) {
       // Check if terminal still exists - it may have exited naturally between collection and kill
       if (!this.terminals.has(terminalId)) {
         continue
       }
-      this.killTerminal(terminalId)
+      this.killTerminalWithin(terminalId, this.withinKillBudget(killStartedAt))
     }
 
     logger.info(`✅ Cleaned up ${terminalsToKill.length} terminals for webContents ${webContentsId}`)
