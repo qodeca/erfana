@@ -238,7 +238,8 @@ const api = {
       ipcRenderer.on('project:changed', listener)
       return () => ipcRenderer.removeListener('project:changed', listener)
     },
-    closeProject: (): Promise<boolean> => ipcRenderer.invoke('file:closeProject')
+    closeProject: (expectedGeneration?: number): Promise<boolean> =>
+      ipcRenderer.invoke('file:closeProject', expectedGeneration)
   },
 
   // File watching operations

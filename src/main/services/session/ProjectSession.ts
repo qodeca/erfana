@@ -3,10 +3,10 @@
 /**
  * ProjectSession
  *
- * The main process's single record of which project is open. `ProjectService`
- * is the only writer (through `ProjectSessionStore`); everything else reads it
- * through the read-only `ProjectSession` view, so no handler needs the renderer
- * to name the project root.
+ * The main process's record of which project is open: its root, a generation
+ * number and the window that opened it. `ProjectService` is the only writer
+ * (through `ProjectSessionStore`); everything else reads it through the
+ * read-only `ProjectSession` view.
  *
  * A snapshot is immutable and swapped whole at commit. A failed open never
  * touches it, so there is nothing to roll back.
@@ -14,6 +14,7 @@
 
 import { parse, sep } from 'path'
 import { logger } from '../LoggingService'
+import { redactedLogError } from '../../utils/redactUserInput'
 
 export interface ProjectSessionSnapshot {
   /** +1 on every commit, open or close */
@@ -116,10 +117,7 @@ export class ProjectSessionStore implements ProjectSession {
       try {
         listener(prev, this.snapshot)
       } catch (error) {
-        logger.error(
-          'ProjectSession: change listener threw',
-          error instanceof Error ? error : undefined
-        )
+        logger.error('ProjectSession: change listener threw', redactedLogError(error))
       }
     }
     return this.generation

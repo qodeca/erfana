@@ -36,6 +36,7 @@ import { IMPORT_CHANNELS } from '../shared/ipc/import-channels'
 import type { DependencyReadyEvent } from '../shared/ipc/import-schema'
 import { createApplicationMenu, setPreviewZoomHandler } from './menu'
 import { fileService } from './services/FileService'
+import { redactedLogError } from './utils/redactUserInput'
 import { fileWatcherService } from './services/FileWatcherService'
 import { directoryWatcherService } from './services/DirectoryWatcherService'
 import { terminalService } from './services/TerminalService'
@@ -309,7 +310,7 @@ function createWindow(): BrowserWindow {
     projectService
       .close({ senderId: webContentsId, reason: 'window-destroyed' })
       .catch((err) => {
-        logger.error('Error closing project', err instanceof Error ? err : undefined)
+        logger.error('Error closing project', redactedLogError(err))
       })
 
     // Cleanup watcher services asynchronously

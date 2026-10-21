@@ -37,6 +37,7 @@ import { formatFileOperationError } from '../../utils/errorUtils'
 import { DRAG_DROP, AUTO_SCROLL, AUTO_EXPAND } from './constants'
 import { withWatcherPause } from './withWatcherPause'
 import { logger } from '../../utils/logger'
+import { getLastSeenProjectGeneration } from '../../services/projectGeneration'
 import { useTerminalStore } from '../../stores/useTerminalStore'
 import { formatPathsForTerminal } from '../../utils/shellPathEscape'
 import { formatShortcut } from '../../utils/shortcutLabel'
@@ -297,7 +298,8 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
         message: 'Project folder no longer exists'
       })
       // Close project via API (hook will update state via onProjectChanged listener)
-      window.api.file.closeProject().catch(err => {
+      // Send the generation this window last saw: a stale close must not close a newer project
+      window.api.file.closeProject(getLastSeenProjectGeneration()).catch(err => {
         logger.error('Error closing deleted project', err instanceof Error ? err : undefined)
       })
       setExpandedFolders(new Set())

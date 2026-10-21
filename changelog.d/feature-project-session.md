@@ -2,8 +2,8 @@
 
 - **The app now keeps track of the open project in one place.** Opening, switching and closing a
   project run one at a time, so a quick double-click on two recent projects ends with the second one
-  open instead of a half-switched state. A project that fails to open leaves the current one
-  untouched, and closing the window now also releases the project's lock.
+  open instead of a half-switched state. A project that cannot be opened is no longer recorded as
+  the open one.
 
 ### Removed
 

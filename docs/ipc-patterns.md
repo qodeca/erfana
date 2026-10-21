@@ -125,7 +125,7 @@ Note that several domains register through channel **constants**
 |---------|---------|
 | `file:openProject` | Open folder dialog, save to settings |
 | `file:openProjectByPath` | Open a project by an explicit path (recent projects, CLI) |
-| `file:closeProject` | Close the current project |
+| `file:closeProject` | Close the current project. Optional argument: the project session generation the renderer last saw; a close for an older generation does nothing |
 | `file:getSession` | The open project as the main process holds it: `{ root, generation }`, or `null` when none is open |
 | `file:getProjectPath` | Get current project path |
 | `file:readDirectory` | Read directory tree. Single-flight per resolved path (#208): at most one walk of a path runs; every request made during it shares one follow-up walk that starts after it settles, and a failed walk rejects only its own requests. See [File watching § Tree refresh is single-flight](./file-watching/technical-details.md#tree-refresh-is-single-flight-208) |

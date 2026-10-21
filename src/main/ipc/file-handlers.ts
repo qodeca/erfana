@@ -203,9 +203,19 @@ export function registerFileHandlers(): void {
     return fileService.getProjectPath()
   })
 
-  // Close current project
-  registerHandle('file:closeProject', async (event) => {
-    await projectService.close({ senderId: event.sender?.id ?? null, reason: 'user' })
+  // Close current project. A renderer that closes because it saw the folder
+  // disappear sends the generation it last saw; if a newer project was opened
+  // since, that stale close does nothing.
+  registerHandle('file:closeProject', async (event, expectedGeneration?: unknown) => {
+    const generation =
+      typeof expectedGeneration === 'number' && Number.isInteger(expectedGeneration)
+        ? expectedGeneration
+        : undefined
+    await projectService.close({
+      senderId: event.sender?.id ?? null,
+      reason: generation === undefined ? 'user' : 'project-deleted',
+      expectedGeneration: generation
+    })
     return true
   })
 

@@ -15,6 +15,8 @@ import { getBasename } from '../utils/fileUtils'
 export interface ProjectChangeData {
   oldPath: string | null
   newPath: string | null
+  /** Project session generation after this change */
+  generation?: number
 }
 
 /**

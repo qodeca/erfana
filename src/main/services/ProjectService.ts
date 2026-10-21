@@ -42,6 +42,7 @@ import {
   type ProjectSessionSnapshot
 } from './session/ProjectSession'
 import { sweepStaleAtomicTemps } from '../utils/atomicTempSweep'
+import { withTimeout, TimeoutError } from '../utils/withTimeout'
 
 export interface ProjectSwitchResult {
   success: boolean
@@ -65,6 +66,17 @@ export interface CloseContext {
 }
 
 const DEFAULT_OPEN_CONTEXT: OpenContext = { senderId: null, source: 'recent' }
+
+/**
+ * Longest one I/O step of a transition may take. A hung disk or network share
+ * then fails that transition instead of holding every later one behind it.
+ */
+const TRANSITION_STEP_TIMEOUT_MS = 15_000
+
+/** Await one I/O step of a transition, time-boxed */
+function step<T>(operation: Promise<T>, what: string): Promise<T> {
+  return withTimeout(operation, TRANSITION_STEP_TIMEOUT_MS, what)
+}
 
 /** Same case rule as `canonicalizePath`, for a path that is already resolved */
 function foldCase(p: string): string {
@@ -152,6 +164,8 @@ export class ProjectService {
   private readonly sessionStore = new ProjectSessionStore()
   // Tail of the transition queue; always resolves, so one failure never blocks the next
   private transitionTail: Promise<unknown> = Promise.resolve()
+  // The settings loaded for the open in flight; the commit hands them to the settings cache
+  private settingsForCommit: ResolvedProjectSettings | null = null
 
   /** Read-only view of the open project; this service is its only writer */
   readonly session: ProjectSession = this.sessionStore
@@ -164,8 +178,16 @@ export class ProjectService {
     private projectSettingsService: IProjectSettingsService,
     private projectLockService: IProjectLockService
   ) {
-    // The services follow the session, so they cannot drift from it
-    this.sessionStore.onChange((_prev, next) => this.updateServices(next?.root ?? ''))
+    // The services and the settings cache follow the session, so they cannot drift from it
+    this.sessionStore.onChange((_prev, next) => {
+      this.updateServices(next?.root ?? '')
+      if (next && this.settingsForCommit) {
+        this.projectSettingsService.setCurrentSettings(this.settingsForCommit)
+      } else {
+        this.projectSettingsService.clearSettings()
+      }
+      this.settingsForCommit = null
+    })
   }
 
   /**
@@ -196,8 +218,8 @@ export class ProjectService {
    */
   private async stopAllWatchers(): Promise<void> {
     try {
-      await this.fileWatcherService.stopAll()
-      await this.directoryWatcherService.stopAll()
+      await step(this.fileWatcherService.stopAll(), 'Stopping the file watchers')
+      await step(this.directoryWatcherService.stopAll(), 'Stopping the directory watchers')
     } catch (e) {
       // Non-fatal: proceed with switch, guards prevent stale events
       logger.warn('Stopping watchers failed (continuing)', {
@@ -260,21 +282,13 @@ export class ProjectService {
   }
 
   /**
-   * Drop the settings a failed open may have loaded, and give back the lock it
-   * took. The session needs no rollback: it was never changed.
+   * Give back the lock a failed open took. The session and the settings cache
+   * need no rollback: neither was changed.
    * Best-effort: continues on error
    */
   private abandonOpen(newProjectPath: string, lockLogMessage: string): void {
-    try {
-      this.projectSettingsService.clearSettings()
-    } catch (e) {
-      logger.warn('Clearing project settings failed after openProject error', {
-        error: e instanceof Error ? redactQuotedPaths(e.message) : String(e)
-      })
-    }
-
     // Release the lock we just acquired (fire-and-forget)
-    this.projectLockService.releaseLock(newProjectPath).catch((e) => {
+    step(this.projectLockService.releaseLock(newProjectPath), 'Project lock release').catch((e) => {
       logger.warn(lockLogMessage, {
         projectPath: redactPath(newProjectPath),
         error: e instanceof Error ? redactQuotedPaths(e.message) : String(e)
@@ -324,7 +338,7 @@ export class ProjectService {
 
     // 1. SECURITY: Validate path before any operations
     try {
-      await validatePath(requestedPath)
+      await step(validatePath(requestedPath), 'Project path validation')
     } catch (error) {
       if (error instanceof AppError) {
         const errorMsg = `Security validation failed: ${error.message}`
@@ -342,7 +356,7 @@ export class ProjectService {
 
     // 2. Check if same project (canonical comparison)
     if (openSnapshot) {
-      const isSame = await this.isSameProject(openSnapshot, newProjectPath)
+      const isSame = await step(this.isSameProject(openSnapshot, newProjectPath), 'Same-project check')
       if (isSame) {
         return {
           success: true,
@@ -353,10 +367,10 @@ export class ProjectService {
     }
 
     // 3. Try to acquire project lock (multi-instance support)
-    const lockResult = await this.projectLockService.acquireLock(newProjectPath)
+    const lockResult = await step(this.projectLockService.acquireLock(newProjectPath), 'Project lock')
     if (lockResult.status === 'already_locked') {
       // Focus existing window and exit silently
-      await this.projectLockService.requestFocus(newProjectPath)
+      await step(this.projectLockService.requestFocus(newProjectPath), 'Focus request')
       logger.info('Project already locked, focused existing instance', {
         projectPath: redactPath(newProjectPath),
         holderPid: lockResult.holderPid,
@@ -377,9 +391,16 @@ export class ProjectService {
       })
     }
 
+    // Everything that can fail runs in this try and ends at the commit. Once
+    // the session has changed there is nothing to abandon: the steps after it
+    // are guarded one by one and never undo the open.
+    let projectSettings: ResolvedProjectSettings
+    let pathFilter: ProjectPathFilter
+    let generation: number
     try {
       // 4. Validate directory exists and is accessible
-      const stats = await stat(newProjectPath).catch((error) => {
+      const stats = await step(stat(newProjectPath), 'Project folder check').catch((error) => {
+        if (error instanceof TimeoutError) throw error
         const originalError = error instanceof Error ? error : undefined
         throw new AppError(
           'Project directory not found or not accessible',
@@ -401,9 +422,11 @@ export class ProjectService {
       logger.debug('Project switch: watchers stopped', { durationMs: Math.round(performance.now() - watcherStopStart) })
 
       // 6. Load and validate project settings
-      let projectSettings
       try {
-        projectSettings = await this.projectSettingsService.loadSettings(newProjectPath)
+        projectSettings = await step(
+          this.projectSettingsService.loadSettings(newProjectPath),
+          'Project settings load'
+        )
       } catch (error) {
         // Settings validation failed - block project open
         this.abandonOpen(newProjectPath, 'Failed to release lock after settings validation failure')
@@ -425,70 +448,34 @@ export class ProjectService {
       })
 
       const caseSensitive = getPlatformConfig().caseSensitive
-      const pathFilter = this.buildPathFilter(newProjectPath, projectSettings, caseSensitive)
-      const realRoot = normaliseRealRoot(await realpath(newProjectPath).catch(() => newProjectPath))
+      pathFilter = this.buildPathFilter(newProjectPath, projectSettings, caseSensitive)
+      const realRoot = normaliseRealRoot(
+        await step(realpath(newProjectPath), 'Project path resolution').catch((error) => {
+          if (error instanceof TimeoutError) throw error
+          return newProjectPath
+        })
+      )
 
-      // 7. Commit: swap the session. The services take the new path in `onChange`.
-      const generation = this.sessionStore.commit({
+      // 7. Commit: swap the session. The services take the new path, and the
+      // settings cache the loaded settings, in `onChange`.
+      this.settingsForCommit = projectSettings
+      generation = this.sessionStore.commit({
         root: newProjectPath,
         realRoot,
         caseSensitive,
         ownerWebContentsId: ctx.senderId
       })
       logger.debug('Project switch: session committed', { generation })
-
-      // 8. Apply project settings to services
-      this.applyProjectSettings(projectSettings, pathFilter)
-
-      // 9. Persist project change. The project is open from here on, so a
-      // failure to remember it is logged and does not undo the open.
-      try {
-        await this.persistProjectChange(newProjectPath)
-      } catch (e) {
-        logger.warn('Project switch: could not persist the opened project', {
-          error: e instanceof Error ? redactQuotedPaths(e.message) : String(e)
-        })
-      }
-
-      // 10. Broadcast change to renderers
-      broadcastProjectChanged({
-        oldPath: oldProjectPath,
-        newPath: newProjectPath,
-        generation
-      })
-
-      // Temp files an interrupted save left behind: background, best effort
-      void sweepStaleAtomicTemps(newProjectPath)
-
-      // 11. Release old project lock AFTER successful switch
-      // This ensures we don't lose lock on old project if switch fails
-      if (oldProjectPath) {
-        this.projectLockService.releaseLock(oldProjectPath).catch((e) => {
-          logger.warn('Failed to release old project lock', {
-            projectPath: redactPath(oldProjectPath),
-            error: e instanceof Error ? redactQuotedPaths(e.message) : String(e)
-          })
-        })
-      }
-
-      const durationMs = Math.round(performance.now() - switchStart)
-      logger.info('Project switch: completed', { durationMs, generation, note: 'git watcher/polling will be started by renderer' })
-
-      return {
-        success: true,
-        path: newProjectPath,
-        action: 'switched'
-      }
     } catch (error) {
-      // 12. The session was not changed. Release the new lock and drop loaded settings.
+      // The session was not changed. Release the new lock.
       // Note: Old project lock is NOT released here - we keep it if switch fails
+      this.settingsForCommit = null
       this.abandonOpen(newProjectPath, 'Failed to release lock during rollback')
 
-      const stage = this.sessionStore.current() === openSnapshot ? 'pre-switch' : 'post-switch'
       const durationMs = Math.round(performance.now() - switchStart)
       const message = error instanceof Error ? error.message : String(error)
       logger.error('Project switch: failed', redactedLogError(error), {
-        stage,
+        stage: 'pre-commit',
         durationMs,
         path: redactPath(newProjectPath)
       })
@@ -500,13 +487,79 @@ export class ProjectService {
         error: message
       }
     }
+
+    // 8. Apply project settings to services
+    this.afterCommit('apply project settings', () =>
+      this.applyProjectSettings(projectSettings, pathFilter)
+    )
+
+    // 9. Persist project change. The project is open from here on, so a
+    // failure to remember it is logged and does not undo the open.
+    try {
+      await step(this.persistProjectChange(newProjectPath), 'Saving the opened project')
+    } catch (e) {
+      logger.warn('Project switch: could not persist the opened project', {
+        error: e instanceof Error ? redactQuotedPaths(e.message) : String(e)
+      })
+    }
+
+    // 10. Broadcast change to renderers
+    this.afterCommit('broadcast project change', () =>
+      broadcastProjectChanged({
+        oldPath: oldProjectPath,
+        newPath: newProjectPath,
+        generation
+      })
+    )
+
+    // Temp files an interrupted save left behind: background, best effort
+    this.afterCommit('sweep temp files', () => {
+      void sweepStaleAtomicTemps(newProjectPath)
+    })
+
+    // 11. Release old project lock AFTER successful switch
+    // This ensures we don't lose lock on old project if switch fails
+    if (oldProjectPath) {
+      this.afterCommit('release old lock', () => {
+        step(this.projectLockService.releaseLock(oldProjectPath), 'Old project lock release').catch((e) => {
+          logger.warn('Failed to release old project lock', {
+            projectPath: redactPath(oldProjectPath),
+            error: e instanceof Error ? redactQuotedPaths(e.message) : String(e)
+          })
+        })
+      })
+    }
+
+    const durationMs = Math.round(performance.now() - switchStart)
+    logger.info('Project switch: completed', { durationMs, generation, note: 'git watcher/polling will be started by renderer' })
+
+    return {
+      success: true,
+      path: newProjectPath,
+      action: 'switched'
+    }
+  }
+
+  /**
+   * Run one step that follows the commit. The project is already open, so a
+   * failure is logged and the rest of the transition still runs.
+   */
+  private afterCommit(what: string, run: () => void): void {
+    try {
+      run()
+    } catch (e) {
+      logger.warn(`Project switch: could not ${what}`, {
+        error: e instanceof Error ? redactQuotedPaths(e.message) : String(e)
+      })
+    }
   }
 
   /**
    * Close the open project: release its lock, stop the watchers, commit `null`,
    * forget the last path, tell the renderers. Runs after any open or switch
    * already queued. With `expectedGeneration`, a project opened in the meantime
-   * is left alone.
+   * is left alone; a `window-destroyed` close from a window that does not own
+   * the open project is ignored.
    */
   close(ctx: CloseContext): Promise<void> {
     return this.serialise(() => this.performClose(ctx))
@@ -523,10 +576,20 @@ export class ProjectService {
       })
       return
     }
+    if (
+      ctx.reason === 'window-destroyed' &&
+      open.ownerWebContentsId !== null &&
+      open.ownerWebContentsId !== ctx.senderId
+    ) {
+      logger.debug('Project close: skipped, the project belongs to another window', {
+        generation: open.generation
+      })
+      return
+    }
     logger.info('Project close: starting', { reason: ctx.reason, generation: open.generation })
 
     try {
-      await this.projectLockService.releaseLock(open.root)
+      await step(this.projectLockService.releaseLock(open.root), 'Project lock release')
     } catch (e) {
       logger.warn('Failed to release project lock on close', {
         projectPath: redactPath(open.root),
@@ -540,7 +603,7 @@ export class ProjectService {
     // A closing window is not the user forgetting the project: keep the last path
     if (ctx.reason !== 'window-destroyed') {
       try {
-        await this.settingsService.clearLastProjectPath()
+        await step(this.settingsService.clearLastProjectPath(), 'Clearing the last project path')
       } catch (e) {
         logger.warn('Project close: could not clear the last project path', {
           error: e instanceof Error ? redactQuotedPaths(e.message) : String(e)
@@ -548,6 +611,8 @@ export class ProjectService {
       }
     }
 
-    broadcastProjectChanged({ oldPath: open.root, newPath: null, generation })
+    this.afterCommit('broadcast project change', () =>
+      broadcastProjectChanged({ oldPath: open.root, newPath: null, generation })
+    )
   }
 }

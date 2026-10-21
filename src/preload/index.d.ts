@@ -130,7 +130,8 @@ declare global {
             generation: number
           }) => void
         ) => () => void
-        closeProject: () => Promise<boolean>
+        /** `expectedGeneration`: close only if the project session is still at it */
+        closeProject: (expectedGeneration?: number) => Promise<boolean>
       }
       fileWatch: {
         start: (filePath: string) => Promise<{ success: boolean; error?: string }>

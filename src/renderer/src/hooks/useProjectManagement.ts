@@ -27,6 +27,7 @@ import { useDialog } from '../components/Dialog'
 import { showGlobalToast } from '../components/Toast/toastService'
 import { TERMINAL } from '../components/ProjectTree/constants'
 import { logger } from '../utils/logger'
+import { noteProjectGeneration } from '../services/projectGeneration'
 import {
   createCoalescingRunner,
   type CoalescedRunInfo,
@@ -187,6 +188,7 @@ export function useProjectManagement(
   useEffect(() => {
     const unsubscribe = api.file.onProjectChanged(async (data) => {
       logger.info(createProjectChangedLogMessage(data))
+      noteProjectGeneration(data.generation)
 
       // Notify consumer to reset UI state
       try {

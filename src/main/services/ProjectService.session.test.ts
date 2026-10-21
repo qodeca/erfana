@@ -7,7 +7,8 @@
  * leaves the snapshot as it was, and every commit carries a generation number.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import path from 'path'
 import { ProjectService } from './ProjectService'
 import { ConfinementError } from './session/ProjectSession'
 import type { IFileService } from '../interfaces/IFileService'
@@ -40,12 +41,14 @@ vi.mock('fs/promises', () => ({
 }))
 
 import { stat, realpath } from 'fs/promises'
+import { BrowserWindow } from 'electron'
+import { validatePath } from '../utils/pathSecurity'
 
 const mockedStat = vi.mocked(stat)
 const mockedRealpath = vi.mocked(realpath)
 
-const PROJECT_A = '/Users/test/projects/a'
-const PROJECT_B = '/Users/test/projects/b'
+const PROJECT_A = path.resolve('/Users/test/projects/a')
+const PROJECT_B = path.resolve('/Users/test/projects/b')
 
 /** A promise the test settles by hand, to hold a transition at a chosen step. */
 function deferred<T = void>(): { promise: Promise<T>; resolve: (value: T) => void } {
@@ -97,7 +100,8 @@ describe('ProjectService – main-owned project session', () => {
           excludeRejections: []
         })
       ),
-      clearSettings: vi.fn()
+      clearSettings: vi.fn(),
+      setCurrentSettings: vi.fn()
     } as any
     lockService = {
       acquireLock: vi.fn().mockResolvedValue({ status: 'acquired', lockPath: '/locks/x.lock' }),
@@ -277,14 +281,14 @@ describe('ProjectService – main-owned project session', () => {
 
   describe('snapshot and onChange', () => {
     it('records the owner and the resolved root', async () => {
-      mockedRealpath.mockImplementation((p) => Promise.resolve(`/private${p.toString()}`))
+      mockedRealpath.mockImplementation((p) => Promise.resolve(`${p.toString()}-real`))
 
       await service.switchProject(PROJECT_A, { senderId: 42, source: 'dialog' })
 
       expect(service.session.require()).toEqual({
         generation: 1,
         root: PROJECT_A,
-        realRoot: `/private${PROJECT_A}`,
+        realRoot: `${PROJECT_A}-real`,
         caseSensitive: expect.any(Boolean),
         ownerWebContentsId: 42
       })
@@ -375,6 +379,175 @@ describe('ProjectService – main-owned project session', () => {
       const result = await service.switchProject(PROJECT_A)
 
       expect(result.action).toBe('switched')
+    })
+  })
+  describe('a transition that throws', () => {
+    it('does not poison the queue for the next one', async () => {
+      vi.mocked(validatePath).mockRejectedValueOnce(new Error('disk exploded'))
+
+      const rejected = service.switchProject(PROJECT_A)
+      const next = service.switchProject(PROJECT_B)
+
+      await expect(rejected).rejects.toThrow('disk exploded')
+      expect((await next).action).toBe('switched')
+      expect(service.session.current()?.root).toBe(PROJECT_B)
+    })
+  })
+
+  describe('steps after the commit', () => {
+    it('keep the project open and the lock when one of them fails', async () => {
+      vi.mocked(fileService.setPathFilter).mockImplementation(() => {
+        throw new Error('filter refused')
+      })
+
+      const result = await service.switchProject(PROJECT_A)
+
+      expect(result).toMatchObject({ success: true, action: 'switched' })
+      expect(service.session.current()?.root).toBe(PROJECT_A)
+      // Never handed back as if the open had failed
+      expect(lockService.releaseLock).not.toHaveBeenCalled()
+      expect(mockSend).toHaveBeenCalledWith('project:changed', expect.objectContaining({ generation: 1 }))
+    })
+  })
+
+  describe('settings cache', () => {
+    const loaded = {
+      treeHiddenPatterns: ['.git'],
+      watcherIgnorePatterns: [],
+      excludePatterns: [],
+      excludeRejections: []
+    }
+
+    it('is set at the commit and cleared when the project closes', async () => {
+      vi.mocked(projectSettingsService.loadSettings).mockResolvedValue(loaded)
+
+      await service.switchProject(PROJECT_A)
+      expect(projectSettingsService.setCurrentSettings).toHaveBeenCalledWith(loaded)
+
+      await service.close({ senderId: null, reason: 'user' })
+      expect(projectSettingsService.clearSettings).toHaveBeenCalledTimes(1)
+    })
+
+    it('is left alone by a failed open', async () => {
+      await service.switchProject(PROJECT_A)
+      vi.mocked(projectSettingsService.setCurrentSettings).mockClear()
+      mockedStat.mockRejectedValueOnce(new Error('ENOENT'))
+
+      await service.switchProject(PROJECT_B)
+
+      expect(projectSettingsService.setCurrentSettings).not.toHaveBeenCalled()
+      expect(projectSettingsService.clearSettings).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('a step that never settles', () => {
+    const STEP_TIMEOUT_MS = 15_000
+
+    beforeEach(() => {
+      vi.useFakeTimers()
+    })
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it.each([
+      ['stat', () => mockedStat.mockReturnValueOnce(new Promise(() => {}))],
+      ['loadSettings', () => vi.mocked(projectSettingsService.loadSettings).mockReturnValueOnce(new Promise(() => {}))],
+      ['realpath', () => mockedRealpath.mockReturnValueOnce(new Promise(() => {}))]
+    ])('fails an open when %s hangs, and the next open still runs', async (_name, hang) => {
+      hang()
+
+      const hung = service.switchProject(PROJECT_A)
+      const next = service.switchProject(PROJECT_B)
+      await vi.advanceTimersByTimeAsync(STEP_TIMEOUT_MS)
+
+      expect(await hung).toMatchObject({ success: false, action: 'noop' })
+      expect((await next).action).toBe('switched')
+      expect(service.session.current()?.root).toBe(PROJECT_B)
+    })
+
+    it('does not free the queue slot before the hung task has settled', async () => {
+      mockedStat.mockReturnValueOnce(new Promise(() => {}))
+      const order: string[] = []
+
+      const hung = service.switchProject(PROJECT_A).then(() => order.push('hung settled'))
+      const next = service.switchProject(PROJECT_B).then(() => order.push('next settled'))
+      await vi.advanceTimersByTimeAsync(STEP_TIMEOUT_MS - 1)
+      expect(order).toEqual([])
+      expect(lockService.acquireLock).toHaveBeenCalledTimes(1)
+
+      await vi.advanceTimersByTimeAsync(1)
+      await Promise.all([hung, next])
+      expect(order).toEqual(['hung settled', 'next settled'])
+    })
+
+    it('still closes the project when releasing its lock hangs', async () => {
+      await service.switchProject(PROJECT_A)
+      vi.mocked(lockService.releaseLock).mockReturnValueOnce(new Promise(() => {}))
+
+      const closing = service.close({ senderId: null, reason: 'user' })
+      await vi.advanceTimersByTimeAsync(STEP_TIMEOUT_MS)
+      await closing
+
+      expect(service.session.current()).toBeNull()
+    })
+  })
+
+  describe('close from a destroyed window', () => {
+    it('is ignored when another window owns the project', async () => {
+      await service.switchProject(PROJECT_A, { senderId: 5, source: 'dialog' })
+      vi.mocked(lockService.releaseLock).mockClear()
+
+      await service.close({ senderId: 9, reason: 'window-destroyed' })
+
+      expect(service.session.current()?.root).toBe(PROJECT_A)
+      expect(lockService.releaseLock).not.toHaveBeenCalled()
+    })
+
+    it('closes when the owning window is the one destroyed', async () => {
+      await service.switchProject(PROJECT_A, { senderId: 5, source: 'dialog' })
+
+      await service.close({ senderId: 5, reason: 'window-destroyed' })
+
+      expect(service.session.current()).toBeNull()
+    })
+
+    it('closes a project that has no owner, whichever window is destroyed', async () => {
+      await service.switchProject(PROJECT_A)
+
+      await service.close({ senderId: 9, reason: 'window-destroyed' })
+
+      expect(service.session.current()).toBeNull()
+    })
+
+    it('does not let a destroyed window block a user close from elsewhere', async () => {
+      await service.switchProject(PROJECT_A, { senderId: 5, source: 'dialog' })
+
+      await service.close({ senderId: 9, reason: 'user' })
+
+      expect(service.session.current()).toBeNull()
+    })
+  })
+
+  describe('project:changed sender', () => {
+    it('skips destroyed windows and keeps going when a send throws', async () => {
+      const sent: string[] = []
+      vi.mocked(BrowserWindow.getAllWindows).mockReturnValueOnce([
+        { isDestroyed: () => true, webContents: { send: () => sent.push('destroyed') } },
+        {
+          isDestroyed: () => false,
+          webContents: {
+            send: () => {
+              throw new Error('gone')
+            }
+          }
+        },
+        { isDestroyed: () => false, webContents: { send: () => sent.push('live') } }
+      ] as any)
+
+      await service.switchProject(PROJECT_A)
+
+      expect(sent).toEqual(['live'])
     })
   })
 })

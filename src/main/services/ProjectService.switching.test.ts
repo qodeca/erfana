@@ -16,6 +16,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import path from 'path'
 import { ProjectService } from './ProjectService'
 import { ProjectPathFilter } from '../utils/projectPathFilter'
 import { getPlatformConfig } from './watcher/PlatformConfig'
@@ -89,6 +90,9 @@ function resolvedSettings(overrides: Partial<ResolvedProjectSettings> = {}): Res
 
 const REJECTIONS_LOG = 'Project switch: files.exclude entries rejected'
 
+/** An absolute project path on any platform; `ProjectService` resolves what it opens. */
+const projectDir = (name: string): string => path.resolve('/Users/test/projects', name)
+
 describe('ProjectService switching – session token orchestration', () => {
   let projectService: ProjectService
   let mockFileService: IFileService
@@ -147,7 +151,8 @@ describe('ProjectService switching – session token orchestration', () => {
 
     mockProjectSettingsService = {
       loadSettings: vi.fn(() => Promise.resolve(resolvedSettings())),
-      clearSettings: vi.fn()
+      clearSettings: vi.fn(),
+      setCurrentSettings: vi.fn()
     } as any
 
     mockProjectLockService = {
@@ -211,7 +216,7 @@ describe('ProjectService switching – session token orchestration', () => {
 
   describe('016-FR-007: Project switching step ordering', () => {
     it('calls stopAll watchers before updateServices during switch', async () => {
-      const projectPath = '/Users/test/projects/my-project'
+      const projectPath = projectDir('my-project')
 
       await projectService.switchProject(projectPath)
 
@@ -234,7 +239,7 @@ describe('ProjectService switching – session token orchestration', () => {
     })
 
     it('directoryWatcherService.stopAll is called during switch', async () => {
-      const projectPath = '/Users/test/projects/my-project'
+      const projectPath = projectDir('my-project')
 
       await projectService.switchProject(projectPath)
 
@@ -242,7 +247,7 @@ describe('ProjectService switching – session token orchestration', () => {
     })
 
     it('directoryWatcherService.setProjectPath is called with new path during switch', async () => {
-      const projectPath = '/Users/test/projects/my-project'
+      const projectPath = projectDir('my-project')
 
       await projectService.switchProject(projectPath)
 
@@ -250,7 +255,7 @@ describe('ProjectService switching – session token orchestration', () => {
     })
 
     it('broadcasts project:changed after all service updates complete', async () => {
-      const projectPath = '/Users/test/projects/my-project'
+      const projectPath = projectDir('my-project')
 
       await projectService.switchProject(projectPath)
 
@@ -281,7 +286,7 @@ describe('ProjectService switching – session token orchestration', () => {
 
   describe('AC-009: Project switch clears old and loads new', () => {
     it('stopAllWatchers clears both file and directory watchers', async () => {
-      const projectPath = '/Users/test/projects/my-project'
+      const projectPath = projectDir('my-project')
 
       await projectService.switchProject(projectPath)
 
@@ -291,7 +296,7 @@ describe('ProjectService switching – session token orchestration', () => {
     })
 
     it('updateServices sets new project path on all services', async () => {
-      const projectPath = '/Users/test/projects/my-project'
+      const projectPath = projectDir('my-project')
 
       await projectService.switchProject(projectPath)
 
@@ -314,7 +319,7 @@ describe('ProjectService switching – session token orchestration', () => {
   // the session token, causing stale-version events to be rejected.
   describe('AC-014: In-flight events silently dropped during switch', () => {
     it('switchVersion is bumped during stopAll call (DirectoryWatcherService)', async () => {
-      const projectPath = '/Users/test/projects/my-project'
+      const projectPath = projectDir('my-project')
 
       // Track version changes in directoryWatcherService mock
       let versionBeforeStopAll: number | undefined
@@ -336,7 +341,7 @@ describe('ProjectService switching – session token orchestration', () => {
     })
 
     it('switchVersion is bumped during setProjectPath call (DirectoryWatcherService)', async () => {
-      const projectPath = '/Users/test/projects/my-project'
+      const projectPath = projectDir('my-project')
 
       // Track version changes
       let versionBeforeSetPath: number | undefined
@@ -357,7 +362,7 @@ describe('ProjectService switching – session token orchestration', () => {
     })
 
     it('full switch sequence bumps switchVersion at least twice', async () => {
-      const projectPath = '/Users/test/projects/my-project'
+      const projectPath = projectDir('my-project')
 
       // Track all version bumps
       let versionBumps = 0
@@ -380,7 +385,7 @@ describe('ProjectService switching – session token orchestration', () => {
     })
 
     it('no error logged during switch orchestration', async () => {
-      const projectPath = '/Users/test/projects/my-project'
+      const projectPath = projectDir('my-project')
 
       await projectService.switchProject(projectPath)
 
@@ -391,9 +396,9 @@ describe('ProjectService switching – session token orchestration', () => {
 
   describe('Session token guards across multiple switches', () => {
     it('multiple consecutive switches increment version multiple times', async () => {
-      const path1 = '/Users/test/projects/project1'
-      const path2 = '/Users/test/projects/project2'
-      const path3 = '/Users/test/projects/project3'
+      const path1 = projectDir('project1')
+      const path2 = projectDir('project2')
+      const path3 = projectDir('project3')
 
       let versionBumps = 0
 
@@ -425,8 +430,8 @@ describe('ProjectService switching – session token orchestration', () => {
     })
 
     it('stopAll is called before setProjectPath in multi-service switch', async () => {
-      const oldPath = '/Users/test/projects/old-project'
-      const newPath = '/Users/test/projects/new-project'
+      const oldPath = projectDir('old-project')
+      const newPath = projectDir('new-project')
 
       await seedOpenProject(oldPath)
 
@@ -451,7 +456,7 @@ describe('ProjectService switching – session token orchestration', () => {
 
   describe('Error handling preserves session token ordering', () => {
     it('stopAll errors are logged but switch continues', async () => {
-      const projectPath = '/Users/test/projects/my-project'
+      const projectPath = projectDir('my-project')
 
       // Make stopAll fail
       mockDirectoryWatcherService.stopAll = vi.fn(() => {
@@ -474,11 +479,11 @@ describe('ProjectService switching – session token orchestration', () => {
     })
 
     it('a failed switch leaves the open project and the service paths alone', async () => {
-      const openPath = '/Users/test/projects/open-project'
+      const openPath = projectDir('open-project')
       await seedOpenProject(openPath)
       mockedStat.mockRejectedValue(new Error('ENOENT: no such file or directory'))
 
-      const result = await projectService.switchProject('/Users/test/projects/nonexistent')
+      const result = await projectService.switchProject(projectDir('nonexistent'))
 
       expect(result).toMatchObject({ success: false, path: openPath, action: 'noop' })
       expect(projectService.session.current()?.root).toBe(openPath)
@@ -487,23 +492,24 @@ describe('ProjectService switching – session token orchestration', () => {
       expect(mockDirectoryWatcherService.setProjectPath).not.toHaveBeenCalled()
     })
 
-    it('a settings validation failure leaves the session empty and drops the loaded settings', async () => {
+    it('a settings validation failure leaves the session empty and the settings cache alone', async () => {
       mockProjectSettingsService.loadSettings = vi.fn(() =>
         Promise.reject(new Error('Invalid settings'))
       )
 
-      const result = await projectService.switchProject('/Users/test/projects/invalid-settings')
+      const result = await projectService.switchProject(projectDir('invalid-settings'))
 
       expect(result.success).toBe(false)
       expect(projectService.session.current()).toBeNull()
       expect(mockFileService.setProjectPath).not.toHaveBeenCalled()
-      expect(mockProjectSettingsService.clearSettings).toHaveBeenCalled()
+      expect(mockProjectSettingsService.setCurrentSettings).not.toHaveBeenCalled()
+      expect(mockProjectSettingsService.clearSettings).not.toHaveBeenCalled()
     })
   })
 
   describe('Same project detection bypasses switch', () => {
     it('no stopAll or setProjectPath calls when switching to same project', async () => {
-      const projectPath = '/Users/test/projects/same-project'
+      const projectPath = projectDir('same-project')
 
       await seedOpenProject(projectPath)
       mockedRealpath.mockResolvedValue(projectPath)
@@ -524,8 +530,8 @@ describe('ProjectService switching – session token orchestration', () => {
 
   describe('Broadcast timing', () => {
     it('project:changed broadcast happens after all service updates', async () => {
-      const oldPath = '/Users/test/projects/old-project'
-      const newPath = '/Users/test/projects/new-project'
+      const oldPath = projectDir('old-project')
+      const newPath = projectDir('new-project')
 
       await seedOpenProject(oldPath)
 
@@ -562,8 +568,8 @@ describe('ProjectService switching – session token orchestration', () => {
     })
 
     it('broadcast includes correct oldPath and newPath', async () => {
-      const oldPath = '/Users/test/projects/old-project'
-      const newPath = '/Users/test/projects/new-project'
+      const oldPath = projectDir('old-project')
+      const newPath = projectDir('new-project')
 
       await seedOpenProject(oldPath)
 
@@ -577,7 +583,7 @@ describe('ProjectService switching – session token orchestration', () => {
     })
 
     it('broadcast includes null oldPath for first project', async () => {
-      const newPath = '/Users/test/projects/first-project'
+      const newPath = projectDir('first-project')
 
       await projectService.switchProject(newPath)
 
@@ -591,7 +597,7 @@ describe('ProjectService switching – session token orchestration', () => {
 
   describe('Settings persistence timing', () => {
     it('settings are persisted after service updates but before broadcast', async () => {
-      const projectPath = '/Users/test/projects/my-project'
+      const projectPath = projectDir('my-project')
 
       await projectService.switchProject(projectPath)
 
@@ -611,7 +617,7 @@ describe('ProjectService switching – session token orchestration', () => {
   })
 
   describe('#211 W6: path filter applied on project open', () => {
-    const projectPath = '/Users/test/projects/my-project'
+    const projectPath = projectDir('my-project')
 
     function useSettings(overrides: Partial<ResolvedProjectSettings>): void {
       mockProjectSettingsService.loadSettings = vi.fn(() =>
@@ -691,11 +697,11 @@ describe('ProjectService switching – session token orchestration', () => {
     })
 
     it('builds a fresh filter on every project open', async () => {
-      await projectService.switchProject('/Users/test/projects/a')
-      await projectService.switchProject('/Users/test/projects/b')
+      await projectService.switchProject(projectDir('a'))
+      await projectService.switchProject(projectDir('b'))
 
       expect(fileServiceFilter(1)).not.toBe(fileServiceFilter(0))
-      expect(fileServiceFilter(1).root).toBe('/Users/test/projects/b')
+      expect(fileServiceFilter(1).root).toBe(projectDir('b'))
     })
 
     it('drops no entry of a merged list of two full sources (2 × 256)', async () => {
