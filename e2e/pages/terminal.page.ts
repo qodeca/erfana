@@ -19,6 +19,22 @@ import { Page, Locator, expect } from '@playwright/test'
 import { TEST_IDS } from '../../src/renderer/src/constants/testids'
 import { byTestId } from '../utils/locators'
 
+/** How long `waitForPrompt` waits for a settled prompt by default. */
+export const PROMPT_TIMEOUT_MS = 30_000
+
+/** A line that ends like a shell prompt: zsh `%`, bash/sh `$`, PowerShell `>`, root `#`. */
+const PROMPT_END = /[%$>#]\s*$/
+
+/**
+ * Whether a screen shows a drawn prompt: the cursor sits after text on its row,
+ * or the last line ends with a prompt sign. Stability (two equal reads) is
+ * checked by the caller.
+ */
+export function isPromptDrawn(screen: Pick<TerminalScreen, 'lines' | 'cursorX'>): boolean {
+  if (screen.lines.length === 0) return false
+  return screen.cursorX > 0 || PROMPT_END.test(screen.lines[screen.lines.length - 1])
+}
+
 /** Selector for the xterm.js terminal container */
 const TERMINAL_SELECTOR = `[data-testid="${TEST_IDS.TERMINAL_INSTANCE}"]`
 
@@ -94,14 +110,24 @@ export class TerminalPage {
    * Waits for the terminal to be ready for input.
    *
    * 1. xterm is initialised (its textarea exists).
-   * 2. The shell has drawn a prompt: the cursor sits after some text on its
-   *    row, and two reads in a row see the same screen, so a prompt that is
-   *    still being drawn (or a banner before it) does not count.
+   * 2. The shell has drawn a prompt, and two reads in a row see the same
+   *    screen, so a prompt that is still being drawn (or a banner before it)
+   *    does not count. A prompt shows as either of:
+   *    - the cursor sits after some text on its row; or
+   *    - the last line ends with a prompt sign (`%`, `$`, `>`, `#`). zsh can
+   *      leave the cursor at column 0 of the row below its prompt after a
+   *      resize redraw (seen on macOS: `["%", "user@host dir %"]`, cursorX 0),
+   *      and that shell is ready all the same.
    *
-   * @param options.timeout - Maximum wait time (default: 10000ms)
+   * The default budget is generous on purpose: a first zsh prompt under
+   * full-suite load on macOS took longer than the old 10 s, and the check only
+   * waits as long as the shell needs. A timeout reports the last screen read,
+   * so a slow shell can be told apart from a prompt this check does not see.
+   *
+   * @param options.timeout - Maximum wait time (default: PROMPT_TIMEOUT_MS)
    */
   async waitForPrompt(options?: { timeout?: number }): Promise<void> {
-    const timeout = options?.timeout ?? 10_000
+    const timeout = options?.timeout ?? PROMPT_TIMEOUT_MS
 
     // Stage 1: Condition-based wait for xterm initialization
     await this.page.waitForFunction(
@@ -117,18 +143,24 @@ export class TerminalPage {
 
     // Stage 2: the shell has drawn a settled prompt
     let previous = ''
-    await expect
-      .poll(
-        async () => {
-          const screen = await this.readScreen()
-          const snapshot = JSON.stringify(screen)
-          const settled = screen.cursorX > 0 && screen.lines.length > 0 && snapshot === previous
-          previous = snapshot
-          return settled ? 'prompt' : 'starting'
-        },
-        { message: 'the shell should draw its prompt', intervals: [100], timeout }
-      )
-      .toBe('prompt')
+    try {
+      await expect
+        .poll(
+          async () => {
+            const screen = await this.readScreen()
+            const snapshot = JSON.stringify(screen)
+            const settled = isPromptDrawn(screen) && snapshot === previous
+            previous = snapshot
+            return settled ? 'prompt' : 'starting'
+          },
+          { message: 'the shell should draw its prompt', intervals: [100], timeout }
+        )
+        .toBe('prompt')
+    } catch (error) {
+      throw new Error(`${(error as Error).message}\nLast terminal screen read: ${previous || '(none)'}`, {
+        cause: error
+      })
+    }
 
     // Sanity: the screen the prompt check passed on really holds text
     expect((await this.readScreen()).lines.length, 'terminal screen after the prompt').toBeGreaterThan(0)

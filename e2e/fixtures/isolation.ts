@@ -139,6 +139,14 @@ export function appLogsDir(homeDir: string): string {
 const SHELL_STARTUP_FILES = ['.zshrc', '.zshenv', '.zprofile', '.bashrc', '.bash_profile']
 
 /**
+ * What a seeded startup file holds. Only `.zshrc` carries anything: zsh's
+ * PROMPT_SP prints a `%` end-of-line marker and pads to the terminal width
+ * before each prompt, and a resize during startup left that marker on its own
+ * line with the cursor at column 0 below the prompt (macOS, #288).
+ */
+const SHELL_STARTUP_CONTENT: Record<string, string> = { '.zshrc': 'unsetopt PROMPT_SP\n' }
+
+/**
  * Create a worker's sandbox home under `.e2e-temp`, with the per-user folders
  * {@link buildAppEnv} points at already in place.
  *
@@ -158,10 +166,10 @@ export async function createWorkerHome(prefix: string): Promise<string> {
   ]) {
     await fs.promises.mkdir(dir, { recursive: true })
   }
-  // Empty shell startup files: zsh offers its interactive `zsh-newuser-install`
+  // Seeded shell startup files: zsh offers its interactive `zsh-newuser-install`
   // menu when none exists in $HOME, and that menu swallows typed input.
   for (const name of SHELL_STARTUP_FILES) {
-    await fs.promises.writeFile(path.join(home, name), '', 'utf-8')
+    await fs.promises.writeFile(path.join(home, name), SHELL_STARTUP_CONTENT[name] ?? '', 'utf-8')
   }
   // A minimal identity for any VCS tool run in the terminal, so the real one is never read.
   await fs.promises.writeFile(
