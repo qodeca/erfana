@@ -1,6 +1,19 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { useState, useRef, forwardRef, useMemo, useImperativeHandle, useCallback, useEffect, useLayoutEffect } from 'react'
+import {
+  useState,
+  useRef,
+  forwardRef,
+  memo,
+  useMemo,
+  useImperativeHandle,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useDeferredValue,
+  createContext,
+  useContext
+} from 'react'
 import ReactMarkdown from 'react-markdown'
 import type { Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -29,11 +42,26 @@ import { logger } from '../../utils/logger'
 import { textClipboard } from '../../services/textClipboard'
 import { TEST_IDS } from '../../constants/testids'
 import { notePreviewRenderStart, notePreviewRenderCommit } from '../../utils/previewRenderTiming'
+import { useIdleDebouncedValue } from '../../hooks/useIdleDebouncedValue'
+import { rehypeHeadingIds, rehypeShiftLines } from './previewRehypePlugins'
+import { PREVIEW_RENDERED_EVENT } from './previewEvents'
 import './MarkdownPreview.css'
 
 // Anchor scroll configuration
 const ANCHOR_SCROLL_TIMEOUT_MS = 2000 // Wait up to 2s for anchor element to appear in DOM
 const ANCHOR_SCROLL_RETRY_INTERVAL_MS = 100 // Check every 100ms if anchor exists
+
+// Live-render scheduling (finding [31]: the preview was rebuilt on every keystroke).
+// A body render that fits in one frame keeps the preview live per keystroke; one
+// that does not is held until typing pauses, so each keystroke stays cheap.
+/** A body re-render slower than this (ms) switches the preview to debounced updates. */
+export const PREVIEW_FRAME_BUDGET_MS = 16
+/** Quiet period (ms) after the last edit before a slow document re-renders. */
+export const PREVIEW_IDLE_DELAY_MS = 150
+/** Longest (ms) a slow document's preview lags continuous typing. */
+export const PREVIEW_MAX_WAIT_MS = 1000
+/** Documents shorter than this (characters) are never debounced, however long a render took. */
+export const PREVIEW_DEBOUNCE_MIN_CHARS = 2000
 
 interface MarkdownPreviewProps {
   content: string
@@ -102,17 +130,16 @@ const sanitizationSchema = {
  * @param node - The AST node with position information
  * @returns Line range object or undefined
  */
-function extractLineRange(node?: unknown, lineOffset = 0): { start: number; end: number } | undefined {
+function extractLineRange(node?: unknown): { start: number; end: number } | undefined {
   const n = node as { position?: { start?: { line?: number }; end?: { line?: number } } }
   if (!n?.position?.start?.line) return undefined
 
   const startLine = n.position.start.line as number
   const endLine = (n.position.end?.line as number | undefined) ?? startLine
 
-  // react-markdown positions are relative to the frontmatter-stripped body string.
-  // lineOffset (= frontmatterLineCount) shifts them back to real file lines so that
-  // selection -> source mapping and scroll sync line up with the original document.
-  return { start: startLine + lineOffset, end: endLine + lineOffset }
+  // Positions are already real file lines: `rehypeShiftLines` adds the
+  // frontmatter's height during the parse.
+  return { start: startLine, end: endLine }
 }
 
 /**
@@ -121,11 +148,10 @@ function extractLineRange(node?: unknown, lineOffset = 0): { start: number; end:
  * Adds both data-line-start and data-line-end for multi-line elements
  */
 function withLineRange<T extends keyof JSX.IntrinsicElements>(
-  tag: T,
-  lineOffset = 0
+  tag: T
 ): React.ComponentType<{ node?: unknown } & Record<string, unknown>> {
   const Comp: React.FC<{ node?: unknown } & Record<string, unknown>> = ({ node, ...props }) => {
-    const range = extractLineRange(node, lineOffset)
+    const range = extractLineRange(node)
     const Component = tag as unknown as React.ElementType
     return (
       <Component
@@ -153,22 +179,58 @@ const remarkPluginsBase = [remarkGfm]
 const remarkPluginsWithBreaks = [remarkGfm, remarkBreaks]
 
 /**
- * Stable rehype plugins array for HTML rendering and sanitization
- * Defined at module level to maintain referential equality across renders
+ * Rehype plugins for HTML rendering, sanitization and per-document bookkeeping.
+ * Built once per frontmatter height (memoised in {@link MarkdownBody}), so the
+ * array is referentially stable while the user types in the body.
  *
  * PLUGIN ORDER IS CRITICAL:
  * 1. rehypeRaw: Parses raw HTML in markdown (with position preservation for line tracking)
- * 2. rehypeSanitize: Filters dangerous content AFTER HTML is parsed (always last)
+ * 2. rehypeSanitize: Filters dangerous content AFTER HTML is parsed – nothing that
+ *    follows it may add markup from the document, only ids and positions
+ * 3. rehypeHeadingIds / rehypeShiftLines: see `previewRehypePlugins.ts`
  *
  * WARNING: Never use rehypeRaw without rehypeSanitize, as it defeats XSS protections.
  * The sanitizer removes: scripts, event handlers, javascript: URLs, iframes, style tags, etc.
  *
  * Reference: https://github.com/rehypejs/rehype-raw and https://github.com/rehypejs/rehype-sanitize
  */
-const rehypePlugins: PluggableList = [
-  rehypeRaw,
-  [rehypeSanitize, sanitizationSchema]
-]
+function buildRehypePlugins(lineOffset: number): PluggableList {
+  return [
+    rehypeRaw,
+    [rehypeSanitize, sanitizationSchema],
+    // After sanitize: ids must not get the `user-content-` clobber prefix, and
+    // line numbers must be final before the renderers read them.
+    rehypeHeadingIds,
+    [rehypeShiftLines, { offset: lineOffset }]
+  ]
+}
+
+/**
+ * Resolution state of the document's internal links, read by the link
+ * renderer. Delivered through context rather than baked into the renderers so
+ * that a link check finishing re-renders only the links, not the document.
+ */
+const NO_RESOLUTIONS: ReadonlyMap<string, ResolvedLink | null> = new Map()
+const ResolvedLinksContext = createContext<ReadonlyMap<string, ResolvedLink | null>>(NO_RESOLUTIONS)
+
+/** Joins hrefs into one memo key; a NUL cannot appear in a Markdown link target. */
+const LINK_KEY_SEPARATOR = '\u0000'
+
+/** Same keys, and per key the same target and existence – nothing to re-render. */
+function sameResolutions(
+  a: ReadonlyMap<string, ResolvedLink | null>,
+  b: ReadonlyMap<string, ResolvedLink | null>
+): boolean {
+  if (a.size !== b.size) return false
+  for (const [href, ra] of a) {
+    if (!b.has(href)) return false
+    const rb = b.get(href)
+    if (ra === rb) continue
+    if (!ra || !rb) return false
+    if (ra.filePath !== rb.filePath || ra.exists !== rb.exists || ra.anchor !== rb.anchor) return false
+  }
+  return true
+}
 
 /**
  * Markdown components configuration factory
@@ -176,13 +238,12 @@ const rehypePlugins: PluggableList = [
  * Called with filePath to enable bug report functionality
  * @param filePath - Current file path for Mermaid error reporting
  * @param handleInternalLink - Callback for handling internal markdown link clicks
- * @param resolvedLinks - Map of resolved link information for tooltips and styling
+ * @param onLinkError - Tells the user an external link could not be opened
+ * @returns Element renderers for react-markdown; link state comes from `ResolvedLinksContext`
  */
 function createMarkdownComponents(
   filePath?: string,
   handleInternalLink?: (href: string) => Promise<void>,
-  resolvedLinks?: Map<string, ResolvedLink | null>,
-  lineOffset = 0,
   /**
    * Tell the user a link went nowhere.
    *
@@ -192,50 +253,13 @@ function createMarkdownComponents(
    */
   onLinkError?: (message: string) => void
 ): Components {
-  // Bind the frontmatter line offset once so every renderer (HOC-based and custom)
-  // emits real file line numbers. Using these instead of the bare module-level
-  // helpers guarantees no producer is missed.
-  function withRange<T extends keyof JSX.IntrinsicElements>(
-    tag: T
-  ): React.ComponentType<{ node?: unknown } & Record<string, unknown>> {
-    return withLineRange(tag, lineOffset)
-  }
-  const extractRange = (node?: unknown): { start: number; end: number } | undefined =>
-    extractLineRange(node, lineOffset)
-
-  // Track used heading IDs to prevent duplicates
-  // Map: base ID -> count (e.g., "example" -> 2 means next "example" becomes "example-3")
-  const usedHeadingIds = new Map<string, number>()
-
-  /**
-   * Generate unique heading ID using GitHub-compatible slug algorithm
-   * - Converts to lowercase
-   * - Removes special characters (except hyphens and underscores)
-   * - Replaces spaces with hyphens
-   * - Handles duplicates with numeric suffix (-2, -3, etc.)
-   *
-   * @param text - Heading text content
-   * @returns Unique ID (appends -2, -3, etc. for duplicates)
-   *
-   * @example
-   * generateUniqueHeadingId('Hello World!') // => 'hello-world'
-   * generateUniqueHeadingId('Hello, World?') // => 'hello-world'
-   * generateUniqueHeadingId('Café') // => 'café'
-   */
-  function generateUniqueHeadingId(text: string): string {
-    const baseId = text
-      .toLowerCase()
-      .trim()
-      .replace(/[^\p{L}\p{N}\s-]/gu, '') // Remove special chars, keep letters/numbers (including unicode), spaces, hyphens
-      .replace(/\s+/g, '-')              // Replace spaces with hyphens
-      .replace(/-+/g, '-')               // Collapse multiple hyphens
-      .replace(/^-|-$/g, '')             // Remove leading/trailing hyphens
-
-    const count = usedHeadingIds.get(baseId) || 0
-    usedHeadingIds.set(baseId, count + 1)
-
-    return count === 0 ? baseId : `${baseId}-${count + 1}`
-  }
+  // NOTE: the returned map must stay the same object for as long as possible –
+  // a new map is a new component type for every element, so React rebuilds the
+  // whole preview DOM (and redraws every Mermaid diagram). Anything that changes
+  // while the user types (link state, frontmatter height, heading ids) therefore
+  // reaches the renderers through context or the parse, never through here.
+  const withRange = withLineRange
+  const extractRange = extractLineRange
 
   return {
   // Inject line range on all block elements for scroll synchronization
@@ -319,69 +343,19 @@ function createMarkdownComponents(
     }
     return <input type={type} {...props} />
   },
-  // Add IDs to headings for potential TOC and line range tracking for scroll sync
-  h1({ node, children }: { node?: unknown; children?: React.ReactNode }) {
-    const range = extractRange(node)
-    const text = String(children)
-    const id = generateUniqueHeadingId(text)
-    return (
-      <h1 data-line-start={range?.start} data-line-end={range?.end} data-line={range?.start} id={id}>
-        {children}
-      </h1>
-    )
-  },
-  h2({ node, children }: { node?: unknown; children?: React.ReactNode }) {
-    const range = extractRange(node)
-    const text = String(children)
-    const id = generateUniqueHeadingId(text)
-    return (
-      <h2 data-line-start={range?.start} data-line-end={range?.end} data-line={range?.start} id={id}>
-        {children}
-      </h2>
-    )
-  },
-  h3({ node, children }: { node?: unknown; children?: React.ReactNode }) {
-    const range = extractRange(node)
-    const text = String(children)
-    const id = generateUniqueHeadingId(text)
-    return (
-      <h3 data-line-start={range?.start} data-line-end={range?.end} data-line={range?.start} id={id}>
-        {children}
-      </h3>
-    )
-  },
-  h4({ node, children }: { node?: unknown; children?: React.ReactNode }) {
-    const range = extractRange(node)
-    const text = String(children)
-    const id = generateUniqueHeadingId(text)
-    return (
-      <h4 data-line-start={range?.start} data-line-end={range?.end} data-line={range?.start} id={id}>
-        {children}
-      </h4>
-    )
-  },
-  h5({ node, children }: { node?: unknown; children?: React.ReactNode }) {
-    const range = extractRange(node)
-    const text = String(children)
-    const id = generateUniqueHeadingId(text)
-    return (
-      <h5 data-line-start={range?.start} data-line-end={range?.end} data-line={range?.start} id={id}>
-        {children}
-      </h5>
-    )
-  },
-  h6({ node, children }: { node?: unknown; children?: React.ReactNode }) {
-    const range = extractRange(node)
-    const text = String(children)
-    const id = generateUniqueHeadingId(text)
-    return (
-      <h6 data-line-start={range?.start} data-line-end={range?.end} data-line={range?.start} id={id}>
-        {children}
-      </h6>
-    )
-  },
+  // Headings: ids come from `rehypeHeadingIds` in the parse and arrive as the
+  // `id` prop, so a re-render can never renumber them.
+  h1: withRange('h1'),
+  h2: withRange('h2'),
+  h3: withRange('h3'),
+  h4: withRange('h4'),
+  h5: withRange('h5'),
+  h6: withRange('h6'),
   // Links - handle both external (browser) and internal (file navigation)
-  a({ node, href, children, ...props }: { node?: unknown; href?: string; children?: React.ReactNode } & Record<string, unknown>) {
+  // A named function component (not a method) so it may read context: link
+  // checks finishing re-render only the links that read this.
+  a: function MarkdownLink({ node, href, children, ...props }: { node?: unknown; href?: string; children?: React.ReactNode } & Record<string, unknown>) {
+    const resolvedLinks = useContext(ResolvedLinksContext)
     const range = extractRange(node)
 
     // Security: Block dangerous protocols
@@ -399,7 +373,7 @@ function createMarkdownComponents(
     const isAnchorOnly = href?.startsWith('#') ?? false
 
     // Get resolved link info for tooltip and styling (for internal links only)
-    const resolved = href && isInternalLink(href) ? resolvedLinks?.get(href) : undefined
+    const resolved = href && isInternalLink(href) ? resolvedLinks.get(href) : undefined
     const isBroken = resolved !== undefined && resolved !== null && !resolved.exists
 
     // Determine CSS class based on link type
@@ -548,19 +522,76 @@ function createMarkdownComponents(
 }
 
 /**
- * Times one render of the preview body for the typing benchmark.
+ * Times each render of the preview body.
  *
- * Renders before its children and commits after them, so the span it records
- * covers the whole body subtree. A no-op unless the benchmark switched
- * recording on (see `utils/previewRenderTiming.ts`).
+ * Renders before its children and commits after them, so the span covers the
+ * whole body subtree: parse, reconciliation and DOM writes. The timing drives
+ * the live/debounced decision in {@link MarkdownPreview} and, when the typing
+ * benchmark switched recording on, is also written to its sink
+ * (`utils/previewRenderTiming.ts`).
+ *
+ * Under concurrent rendering the span is wall time, so a render React paused
+ * to handle a keystroke reads longer than its CPU cost – an over-estimate that
+ * only ever errs towards debouncing.
  */
-function RenderTimingProbe({ children }: { children: React.ReactNode }): JSX.Element {
-  const startedAt = notePreviewRenderStart()
+function RenderTimingProbe({
+  children,
+  onCommit
+}: {
+  children: React.ReactNode
+  /** Called after each commit with the render's duration and whether it was an update (not the mount) */
+  onCommit: (durationMs: number, isUpdate: boolean) => void
+}): JSX.Element {
+  const startedAt = performance.now()
+  notePreviewRenderStart()
+  const hasCommittedRef = useRef(false)
   useLayoutEffect(() => {
-    notePreviewRenderCommit(startedAt)
+    const committedAt = performance.now()
+    notePreviewRenderCommit(startedAt, committedAt)
+    onCommit(committedAt - startedAt, hasCommittedRef.current)
+    hasCommittedRef.current = true
   })
   return <>{children}</>
 }
+
+/** Props for {@link MarkdownBody}. */
+interface MarkdownBodyProps {
+  /** Markdown body, frontmatter already stripped */
+  source: string
+  /** Frontmatter height in lines, added to every source position */
+  lineOffset: number
+  /** remark plugins (GFM, optionally breaks); a stable module-level array */
+  remarkPlugins: PluggableList
+  /** Element renderers; stable for the life of the panel */
+  components: Components
+  /** Forwarded to the timing probe */
+  onCommit: (durationMs: number, isUpdate: boolean) => void
+}
+
+/**
+ * The expensive part of the preview: Markdown to React elements.
+ *
+ * Memoised on its props, so the preview's own re-renders – one per keystroke
+ * while the deferred source has not caught up yet, selection changes, link
+ * checks finishing – skip it entirely; it re-renders only for a new source,
+ * frontmatter height or plugin set.
+ */
+const MarkdownBody = memo(function MarkdownBody({
+  source,
+  lineOffset,
+  remarkPlugins,
+  components,
+  onCommit
+}: MarkdownBodyProps): JSX.Element {
+  const rehypePlugins = useMemo(() => buildRehypePlugins(lineOffset), [lineOffset])
+  return (
+    <RenderTimingProbe onCommit={onCommit}>
+      <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={components}>
+        {source}
+      </ReactMarkdown>
+    </RenderTimingProbe>
+  )
+})
 
 /**
  * Extract source line numbers from DOM selection
@@ -646,7 +677,9 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
       x: number
       y: number
     } | null>(null)
-    const [resolvedLinks, setResolvedLinks] = useState<Map<string, ResolvedLink | null>>(new Map())
+    const [resolvedLinks, setResolvedLinks] = useState<ReadonlyMap<string, ResolvedLink | null>>(NO_RESOLUTIONS)
+    // Set from measured re-render cost; see the scheduling block below.
+    const [isLiveRenderSlow, setIsLiveRenderSlow] = useState(false)
     const previewRef = useRef<HTMLDivElement>(null)
     const { showToast } = useToast()
 
@@ -670,16 +703,40 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
       onOpenFileRef.current = onOpenFile
     }, [filePath, onOpenFile])
 
+    // =======================================================================
+    // Render scheduling (finding [31])
+    // =======================================================================
+    // The editor and this component get every keystroke; the Markdown body
+    // must not re-parse on each one. Two layers:
+    //  1. Debounce – only once a re-render has been measured slower than a
+    //     frame (and the document is not tiny): the body waits for a pause in
+    //     typing, or at most PREVIEW_MAX_WAIT_MS. Small documents stay live.
+    //  2. useDeferredValue – whatever is released renders at transition
+    //     priority, so a keystroke arriving meanwhile is handled first and the
+    //     stale render is thrown away instead of blocking it.
+    // The first render is neither: the debounce starts from the mount value
+    // and a deferred value's first render uses the value itself.
+    const isDebounced = isLiveRenderSlow && content.length >= PREVIEW_DEBOUNCE_MIN_CHARS
+    const releasedContent = useIdleDebouncedValue(content, {
+      delayMs: PREVIEW_IDLE_DELAY_MS,
+      maxWaitMs: PREVIEW_MAX_WAIT_MS,
+      enabled: isDebounced
+    })
+    const renderedContent = useDeferredValue(releasedContent)
+
     /**
-     * Extract internal markdown links from content (memoized)
-     * Only extracts links that need resolution (not external, not anchors, not dangerous)
+     * Internal links in the rendered document, as one stable string key.
+     *
+     * Only links that need resolution (not external, not anchors, not
+     * dangerous). Sorted and joined so that typing which leaves the set of
+     * links unchanged yields the same key and does not re-run the checks.
      */
-    const internalLinks = useMemo(() => {
+    const internalLinksKey = useMemo(() => {
       const linkRegex = /\[([^\]]*)\]\(([^)]+)\)/g
       const links = new Set<string>()
       let match: RegExpExecArray | null
 
-      while ((match = linkRegex.exec(content)) !== null) {
+      while ((match = linkRegex.exec(renderedContent)) !== null) {
         const href = match[2]
 
         // Skip dangerous protocols
@@ -693,33 +750,35 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
         }
       }
 
-      return links
-    }, [content])
+      return Array.from(links).sort().join(LINK_KEY_SEPARATOR)
+    }, [renderedContent])
 
     /**
-     * Resolve all internal markdown links when content or filePath changes
-     * This enables tooltips and broken link detection before user clicks
+     * Resolve the document's internal links (tooltips, broken-link styling)
+     * when the set of links or the file changes.
+     *
+     * A newer run supersedes an older one: the cleanup marks the older run
+     * cancelled, so a slow `file.exists` round trip can never overwrite fresher
+     * results. An outcome equal to the current one keeps the current object,
+     * so the links do not re-render for nothing.
      */
     useEffect(() => {
-      // Skip if no filePath (no project context for resolution)
-      if (!filePath) {
-        setResolvedLinks(new Map())
+      const hrefs = internalLinksKey ? internalLinksKey.split(LINK_KEY_SEPARATOR) : []
+
+      // No project context, or nothing to resolve.
+      if (!filePath || hrefs.length === 0) {
+        setResolvedLinks((prev) => (prev.size === 0 ? prev : NO_RESOLUTIONS))
         return
       }
 
-      // Skip if no internal links to resolve
-      if (internalLinks.size === 0) {
-        setResolvedLinks(new Map())
-        return
-      }
+      let cancelled = false
 
-      // Resolve all links in parallel
       const resolveAllLinks = async () => {
         const projectRoot = await window.api.file.getProjectPath()
-        if (!projectRoot) return
+        if (cancelled || !projectRoot) return
 
         const resolutions = await Promise.all(
-          Array.from(internalLinks).map(async (href) => {
+          hrefs.map(async (href) => {
             try {
               const resolved = await resolveMarkdownLink(href, filePath, projectRoot)
               return [href, resolved] as [string, ResolvedLink | null]
@@ -729,12 +788,17 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
             }
           })
         )
+        if (cancelled) return
 
-        setResolvedLinks(new Map(resolutions))
+        const next = new Map(resolutions)
+        setResolvedLinks((prev) => (sameResolutions(prev, next) ? prev : next))
       }
 
-      resolveAllLinks()
-    }, [internalLinks, filePath])
+      void resolveAllLinks()
+      return () => {
+        cancelled = true
+      }
+    }, [internalLinksKey, filePath])
 
     /**
      * Handle internal markdown link clicks
@@ -872,13 +936,12 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
     // Separates YAML frontmatter from markdown body for separate rendering.
     // Computed before markdownComponents so the body line offset is available.
     const { frontmatter, body, frontmatterLineCount, parseError, rawFrontmatter } = useMemo(
-      () => extractFrontmatter(content),
-      [content]
+      () => extractFrontmatter(renderedContent),
+      [renderedContent]
     )
 
-    // Memoize markdown components to prevent unnecessary re-renders.
-    // frontmatterLineCount shifts body element line attributes back to real file
-    // lines (body is rendered frontmatter-stripped, so positions are body-relative).
+    // Renderers are memoised on values that are stable for the panel's life –
+    // see the NOTE in createMarkdownComponents for why that matters.
     const notifyLinkError = useCallback(
       (message: string) => {
         showToast({ title: 'Link', message, type: 'warning', duration: 3000 })
@@ -887,39 +950,20 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
     )
 
     const markdownComponents = useMemo(
-      () =>
-        createMarkdownComponents(
-          filePath,
-          handleInternalLink,
-          resolvedLinks,
-          frontmatterLineCount,
-          notifyLinkError
-        ),
-      [filePath, handleInternalLink, resolvedLinks, frontmatterLineCount, notifyLinkError]
+      () => createMarkdownComponents(filePath, handleInternalLink, notifyLinkError),
+      [filePath, handleInternalLink, notifyLinkError]
     )
 
-    // Memoize ReactMarkdown rendering to prevent re-renders when selection state changes
-    // Only re-render when content or components actually change
-    //
-    // PLUGINS:
-    // - remarkPlugins: Markdown syntax extensions (GFM for tables, checkboxes, etc.)
-    // - rehypePlugins: HTML processing:
-    //   - rehypeRaw: Parse embedded HTML in markdown (preserves source line info for scroll sync)
-    //   - rehypeSanitize: Sanitize dangerous HTML (scripts, event handlers, etc.)
-    const renderedMarkdown = useMemo(
-      () => (
-        <RenderTimingProbe>
-          <ReactMarkdown
-            remarkPlugins={remarkPlugins}
-            rehypePlugins={rehypePlugins}
-            components={markdownComponents}
-          >
-            {body}
-          </ReactMarkdown>
-        </RenderTimingProbe>
-      ),
-      [body, markdownComponents, remarkPlugins]
-    )
+    /**
+     * After each committed body render: decide live vs debounced from what the
+     * re-render cost, and tell DOM measurers (scroll sync) the DOM changed.
+     * The mount render is ignored for the decision – it includes one-off costs
+     * and is never debounced anyway.
+     */
+    const handleBodyCommit = useCallback((durationMs: number, isUpdate: boolean) => {
+      if (isUpdate) setIsLiveRenderSlow(durationMs > PREVIEW_FRAME_BUDGET_MS)
+      previewRef.current?.dispatchEvent(new CustomEvent(PREVIEW_RENDERED_EVENT, { bubbles: true }))
+    }, [])
 
     const handleMouseUp = (e: React.MouseEvent) => {
       // Only capture selection on left-click (button 0)
@@ -1028,7 +1072,20 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
               lineEnd={frontmatterLineCount}
             />
           )}
-          {renderedMarkdown}
+          {/*
+            PLUGINS – remark: GFM (tables, task lists…), optionally breaks;
+            rehype: raw HTML (keeps source positions), sanitize (always after
+            raw), heading ids, frontmatter line shift. See buildRehypePlugins.
+          */}
+          <ResolvedLinksContext.Provider value={resolvedLinks}>
+            <MarkdownBody
+              source={body}
+              lineOffset={frontmatterLineCount}
+              remarkPlugins={remarkPlugins}
+              components={markdownComponents}
+              onCommit={handleBodyCommit}
+            />
+          </ResolvedLinksContext.Provider>
         </div>
 
         {contextMenu && selection && filePath && (

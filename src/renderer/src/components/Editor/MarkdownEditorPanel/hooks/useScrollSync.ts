@@ -23,6 +23,7 @@ import {
   isSplitMode
 } from '../../../../components/Panels/markdownEditorPanel.logic'
 import { logger } from '../../../../utils/logger'
+import { PREVIEW_RENDERED_EVENT } from '../../previewEvents'
 
 /**
  * Configuration options for the useScrollSync hook.
@@ -404,7 +405,11 @@ export function useScrollSync(options: UseScrollSyncOptions): UseScrollSyncRetur
     }
   }, [currentContent, viewMode, isEditorReady, rebuildScrollMap, isAnySplitMode, previewRef])
 
-  // Listen for subsequent Mermaid render events to keep mapping accurate
+  // Rebuild after anything that moves preview DOM: a Mermaid diagram finishing,
+  // or the preview committing a new version of the document. The preview renders
+  // behind the editor (deferred, and debounced for large files), so the content
+  // change above can fire before the preview DOM has the edit – this event is
+  // what says the DOM is now worth measuring.
   useEffect(() => {
     if (!isAnySplitMode || !previewRef.current) return
     const root = previewRef.current
@@ -414,8 +419,10 @@ export function useScrollSync(options: UseScrollSyncOptions): UseScrollSyncRetur
       timer = window.setTimeout(() => rebuildScrollMap(), RENDER_DEBOUNCE_MS)
     }
     root.addEventListener('mermaid:rendered', handler)
+    root.addEventListener(PREVIEW_RENDERED_EVENT, handler)
     return () => {
       root.removeEventListener('mermaid:rendered', handler)
+      root.removeEventListener(PREVIEW_RENDERED_EVENT, handler)
       if (timer) clearTimeout(timer)
     }
   }, [isAnySplitMode, currentFilePath, rebuildScrollMap, previewRef])

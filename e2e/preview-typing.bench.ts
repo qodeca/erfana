@@ -32,6 +32,7 @@
  */
 
 import * as fs from 'fs'
+import * as os from 'os'
 import * as path from 'path'
 
 import { test, expect } from './fixtures/index'
@@ -113,10 +114,12 @@ for (let run = 1; run <= RUNS; run++) {
     await tabs.waitForTab(DOC_NAME)
     await panel.waitForReady()
     await expect(panel.previewPane()).toContainText('Typing anchor paragraph.', { timeout: 30_000 })
-    // The commit that put the document on screen: the newest one by the time
-    // its text is visible. Earlier ones (if any) rendered an empty buffer.
+    // Renders while opening, before any typing. The first one put the
+    // document on screen; any later ones re-rendered it (e.g. after the link
+    // checks came back).
     const openSamples = await page.evaluate(() => window.__erfanaPreviewRenderTiming?.samples ?? [])
-    const firstRender = openSamples[openSamples.length - 1] ?? null
+    const firstRender = openSamples[0] ?? null
+    const lastOpenRender = openSamples[openSamples.length - 1] ?? null
 
     await panel.setViewMode('split')
     await monaco.waitForReady()
@@ -149,13 +152,16 @@ for (let run = 1; run <= RUNS; run++) {
     // line is exact; arrow keys move by wrapped visual line and drift.
     await monaco.getEditor().locator('.view-line', { hasText: 'Typing anchor paragraph.' }).click()
     await page.keyboard.press('End')
-    await page.keyboard.press('Space')
 
     // The document's length as React state holds it (the stats bar reads the
     // same `currentFile.content` the preview renders).
     const readChars = async (): Promise<number> =>
       Number(((await byTestId(page, TEST_IDS.STATS_CHARACTERS).locator('.stat-value').textContent()) ?? '').replace(/\D/g, ''))
-    const charsBefore = await readChars()
+    // A separating space, typed (and waited for) before the measurement starts.
+    const charsAtAnchor = await readChars()
+    await page.keyboard.press('Space')
+    await expect.poll(readChars, { timeout: 10_000 }).toBe(charsAtAnchor + 1)
+    const charsBefore = charsAtAnchor + 1
 
     // Start recording only now: the setup above is not part of the measurement.
     await page.evaluate(() => {
@@ -297,7 +303,11 @@ for (let run = 1; run <= RUNS; run++) {
       firstRender: firstRender
         ? { durationMs: round(firstRender.duration), afterClickMs: round(firstRender.committedAt - openedAt) }
         : null,
-      openSamples: openSamples.length
+      openRenders: openSamples.length,
+      openSettledAfterClickMs: lastOpenRender ? round(lastOpenRender.committedAt - openedAt) : null,
+      // The machine's 1-minute load average when the run ended – context for
+      // comparing runs taken at different times.
+      loadAvg1m: round(os.loadavg()[0])
     }
 
     await fs.promises.mkdir(OUT_DIR, { recursive: true })

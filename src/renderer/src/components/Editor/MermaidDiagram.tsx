@@ -11,6 +11,15 @@ import { useDiagramViewerStore, buildDiagramId, hashDiagramContent } from '../..
 import { useTerminalPortalOptional } from '../../context/TerminalPortalContext'
 import { scheduleScrollIfNeeded } from '../../utils/promptScrollScheduler.logic'
 import { logger } from '../../utils/logger'
+import { useIdleDebouncedValue } from '../../hooks/useIdleDebouncedValue'
+
+/**
+ * Quiet period (ms) after the diagram source last changed before it is redrawn.
+ * `mermaid.render` costs tens of milliseconds per diagram, and a diagram being
+ * typed is invalid most of the time, so redrawing per keystroke both stalls
+ * typing and flashes the error panel. The first draw is never delayed.
+ */
+export const MERMAID_IDLE_DELAY_MS = 300
 
 interface MermaidDiagramProps {
   code: string
@@ -20,7 +29,10 @@ interface MermaidDiagramProps {
   endLine?: number
 }
 
-export function MermaidDiagram({ code, className = '', filePath, startLine, endLine }: MermaidDiagramProps) {
+export function MermaidDiagram({ code: source, className = '', filePath, startLine, endLine }: MermaidDiagramProps) {
+  // Everything below – the drawing, the viewer identity, bug reports – works on
+  // the debounced source, so the SVG and the code it is reported with always match.
+  const code = useIdleDebouncedValue(source, { delayMs: MERMAID_IDLE_DELAY_MS })
   const containerRef = useRef<HTMLDivElement>(null)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)

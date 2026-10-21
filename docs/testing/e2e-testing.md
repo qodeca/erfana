@@ -70,13 +70,14 @@ ERFANA_TEST_BUILD=true npm run build:mac
 
 Create `playwright.config.ts` in the project root:
 
-Three Playwright projects are configured:
+Four Playwright projects are configured:
 
 | Project | Test match | Retries | Purpose |
 |---------|-----------|---------|---------|
 | `electron` | `**/*.e2e.ts` (ignores `visual-regression*` and `audio-transcription*`) | 2 on CI, 0 locally | Functional E2E tests |
 | `transcription` | `**/audio-transcription*.e2e.ts` | 2 on CI, 0 locally | Env-gated: runs only with `ERFANA_E2E_TRANSCRIPTION=1` (real, paid OpenAI calls) |
 | `visual` | `**/visual-regression.e2e.ts` | 0 | Screenshot comparison (diffs must be investigated) |
+| `bench` | `**/*.bench.ts` | 0 | Env-gated: runs only with `ERFANA_E2E_BENCH=1`. Records performance numbers rather than asserting behaviour – see [docs/performance/](../performance/) (e.g. the [preview typing benchmark](../performance/2026-10-21-deferred-preview.md)) |
 
 Visual project settings: `snapshotDir: './e2e/screenshots'`, `snapshotPathTemplate: '{snapshotDir}/{arg}-{platform}{ext}'`, `maxDiffPixelRatio: 0.01`, `animations: 'disabled'`.
 

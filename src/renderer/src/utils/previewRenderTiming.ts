@@ -53,35 +53,26 @@ function getSink(): PreviewRenderTimingSink | undefined {
 }
 
 /**
- * Note that a preview body render pass has started.
- *
- * @returns The start stamp to hand to {@link notePreviewRenderCommit}, or
- *   `null` when recording is off
+ * Count a preview body render pass that has started (committed or not).
  *
  * @example
  * ```tsx
- * const startedAt = notePreviewRenderStart()
- * useLayoutEffect(() => notePreviewRenderCommit(startedAt))
+ * const startedAt = performance.now()
+ * notePreviewRenderStart()
+ * useLayoutEffect(() => notePreviewRenderCommit(startedAt, performance.now()))
  * ```
  */
-export function notePreviewRenderStart(): number | null {
+export function notePreviewRenderStart(): void {
   const sink = getSink()
-  if (!sink) return null
-  sink.starts += 1
-  return performance.now()
+  if (sink) sink.starts += 1
 }
 
 /**
- * Record a committed preview body render.
+ * Record a committed preview body render, when recording is on.
  *
- * A `null` start (recording was off when the pass began) records nothing, so
- * switching recording on mid-render never produces a half-measured sample.
- *
- * @param startedAt - The stamp returned by {@link notePreviewRenderStart}
+ * @param startedAt - `performance.now()` taken when the render pass began
+ * @param committedAt - `performance.now()` taken in the commit's layout effect
  */
-export function notePreviewRenderCommit(startedAt: number | null): void {
-  const sink = getSink()
-  if (!sink || startedAt === null) return
-  const committedAt = performance.now()
-  sink.samples.push({ startedAt, committedAt, duration: committedAt - startedAt })
+export function notePreviewRenderCommit(startedAt: number, committedAt: number): void {
+  getSink()?.samples.push({ startedAt, committedAt, duration: committedAt - startedAt })
 }

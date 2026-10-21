@@ -10,6 +10,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useScrollSync, UseScrollSyncOptions } from './useScrollSync'
+import { PREVIEW_RENDERED_EVENT } from '../../previewEvents'
 import type { MonacoEditorHandle } from '../../MonacoMarkdownEditor'
 import * as monaco from 'monaco-editor'
 
@@ -769,6 +770,20 @@ describe('useScrollSync', () => {
         'mermaid:rendered',
         expect.any(Function)
       )
+    })
+
+    it('should listen for the preview committing a new version of the document', () => {
+      // The preview renders behind the editor (deferred / debounced), so the
+      // map must be rebuilt when the preview DOM changes, not when content does.
+      const addEventListenerSpy = vi.spyOn(previewRef.current!, 'addEventListener')
+
+      const { result } = renderHook(() => useScrollSync(defaultOptions))
+
+      act(() => {
+        result.current.setIsEditorReady(true)
+      })
+
+      expect(addEventListenerSpy).toHaveBeenCalledWith(PREVIEW_RENDERED_EVENT, expect.any(Function))
     })
   })
 
