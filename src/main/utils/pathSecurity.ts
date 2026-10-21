@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import nodePath, { isAbsolute, normalize, resolve, dirname, sep, win32, type PlatformPath } from 'path'
+import nodePath, { isAbsolute, normalize, resolve, dirname, win32, type PlatformPath } from 'path'
 import { lstat, readlink, access, constants } from 'fs/promises'
 import { homedir } from 'os'
 import { AppError, ErrorCode } from '../../shared/errors'
@@ -39,44 +39,96 @@ const SYSTEM_DIRECTORIES = [
 ]
 
 /**
- * List of sensitive user directories that should be protected
+ * Where "the system" and "the user's home" are, for one platform. Injectable, so
+ * the Windows rules run on every host.
  */
-function getSensitiveUserDirectories(): string[] {
-  const home = homedir()
-  return [
-    `${home}/.ssh`,
-    `${home}/.gnupg`,
-    `${home}/.aws`,
-    `${home}/.config/gcloud`,
-    `${home}/Library/Keychains`,
-    `${home}/Library/Application Support/Google/Chrome`,
-    `${home}/Library/Application Support/Firefox`
-  ]
+export interface SystemPathContext {
+  platform: NodeJS.Platform
+  flavour: PlatformPath
+  env: Readonly<Record<string, string | undefined>>
+  home: string
+}
+
+const hostContext = (): SystemPathContext => ({
+  platform: process.platform,
+  flavour: nodePath,
+  env: process.env,
+  home: homedir()
+})
+
+/** Environment variables naming the Windows system folders. */
+const WINDOWS_SYSTEM_ENV = [
+  'SystemRoot',
+  'windir',
+  'ProgramFiles',
+  'ProgramFiles(x86)',
+  'ProgramW6432',
+  'ProgramData'
+] as const
+
+/** Used when the environment does not name them. */
+const WINDOWS_SYSTEM_FALLBACK = ['C:\\Windows', 'C:\\Program Files', 'C:\\ProgramData']
+
+/**
+ * The system folders (and, by the rule in {@link isSystemDirectory}, everything
+ * below them). On Windows they come from the environment; a value is used only
+ * when it is an absolute path that is not a volume root, so a bad variable
+ * cannot block a whole drive.
+ */
+function systemDirectories(ctx: SystemPathContext): string[] {
+  if (ctx.platform !== 'win32') return SYSTEM_DIRECTORIES
+  const fromEnv = WINDOWS_SYSTEM_ENV.map((name) => ctx.env[name]).filter(
+    (value): value is string =>
+      typeof value === 'string' &&
+      ctx.flavour.isAbsolute(value) &&
+      !isFilesystemRoot(value, ctx.flavour)
+  )
+  return [...fromEnv, ...WINDOWS_SYSTEM_FALLBACK]
 }
 
 /**
- * Check if a path points to a system or sensitive directory
+ * List of sensitive user directories that should be protected. Built with the
+ * platform's own separator, so they compare equal to a normalised path.
+ */
+function getSensitiveUserDirectories(ctx: SystemPathContext): string[] {
+  const join = ctx.flavour.join
+  return [
+    join(ctx.home, '.ssh'),
+    join(ctx.home, '.gnupg'),
+    join(ctx.home, '.aws'),
+    join(ctx.home, '.config', 'gcloud'),
+    join(ctx.home, 'Library', 'Keychains'),
+    join(ctx.home, 'Library', 'Application Support', 'Google', 'Chrome'),
+    join(ctx.home, 'Library', 'Application Support', 'Firefox')
+  ]
+}
+
+/** The form paths are compared in: normalised, no trailing separator past the root, folded on Windows. */
+function comparable(value: string, ctx: SystemPathContext): string {
+  const normalized = ctx.flavour.normalize(value)
+  const root = ctx.flavour.parse(normalized).root
+  let n = normalized
+  while (n.length > root.length && n.endsWith(ctx.flavour.sep)) n = n.slice(0, -1)
+  return ctx.platform === 'win32' ? n.toLowerCase() : n
+}
+
+/**
+ * Check if a path points to a system or sensitive directory: one of them, or
+ * anything below one, at a separator boundary (`/usr` and `/usr/local`, not
+ * `/usrx`). On Windows the comparison ignores case.
  *
  * SECURITY FIX: Use platform-specific path separator instead of hardcoded '/'
  */
-export function isSystemDirectory(path: string): boolean {
-  const normalized = normalize(path)
-
-  // Check system directories
-  for (const sysDir of SYSTEM_DIRECTORIES) {
-    if (normalized === sysDir || normalized.startsWith(sysDir + sep)) {
-      return true
-    }
-  }
-
-  // Check sensitive user directories
-  for (const sensitiveDir of getSensitiveUserDirectories()) {
-    if (normalized === sensitiveDir || normalized.startsWith(sensitiveDir + sep)) {
-      return true
-    }
-  }
-
-  return false
+export function isSystemDirectory(
+  path: string,
+  ctx: SystemPathContext = hostContext()
+): boolean {
+  const normalized = comparable(path, ctx)
+  const directories = [...systemDirectories(ctx), ...getSensitiveUserDirectories(ctx)]
+  return directories.some((directory) => {
+    const dir = comparable(directory, ctx)
+    return normalized === dir || normalized.startsWith(dir + ctx.flavour.sep)
+  })
 }
 
 /**

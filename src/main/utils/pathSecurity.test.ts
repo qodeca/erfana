@@ -34,6 +34,7 @@ import {
   assertAcceptableProjectRoot,
   isFilesystemRoot,
   isSystemDirectory,
+  type SystemPathContext,
   validateProjectPath,
   validateSymlink,
   validatePath,
@@ -631,5 +632,62 @@ describe('assertAcceptableProjectRoot', () => {
 
   it('accepts an ordinary folder', () => {
     expect(() => assertAcceptableProjectRoot(process.cwd())).not.toThrow()
+  })
+})
+
+describe('isSystemDirectory – Windows rules on any host', () => {
+  const win: SystemPathContext = {
+    platform: 'win32',
+    flavour: win32,
+    home: 'C:\\Users\\me',
+    env: {
+      SystemRoot: 'D:\\WinNT',
+      ProgramFiles: 'D:\\Programs',
+      'ProgramFiles(x86)': 'D:\\Programs (x86)',
+      ProgramW6432: 'D:\\Programs',
+      ProgramData: 'D:\\Data'
+    }
+  }
+
+  it.each([
+    ['the system root from the environment', 'D:\\WinNT'],
+    ['a folder below it', 'D:\\WinNT\\System32'],
+    ['the same folder spelled in another case', 'd:\\winnt\\system32'],
+    ['program files', 'D:\\Programs'],
+    ['a folder in program files (x86)', 'D:\\Programs (x86)\\Vendor'],
+    ['program data', 'D:\\Data\\Vendor'],
+    ['the usual Windows folder, when the environment names another', 'C:\\Windows'],
+    ['the usual Program Files folder', 'c:\\program files\\x'],
+    ['a trailing separator', 'D:\\WinNT\\'],
+    ['a forward-slash spelling', 'D:/WinNT/System32'],
+    ['the ssh folder of the user', 'C:\\Users\\me\\.ssh'],
+    ['a folder in it, in another case', 'c:\\users\\ME\\.SSH\\keys']
+  ])('refuses %s', (_name, value) => {
+    expect(isSystemDirectory(value, win)).toBe(true)
+  })
+
+  it.each([
+    ['a folder of the user', 'C:\\Users\\me\\source'],
+    ['the home folder', 'C:\\Users\\me'],
+    ['a sibling that merely starts with a system name', 'D:\\WinNTX'],
+    ['another drive', 'E:\\work'],
+    ['a drive root', 'D:\\']
+  ])('allows %s', (_name, value) => {
+    expect(isSystemDirectory(value, win)).toBe(false)
+  })
+
+  it('ignores an environment value that is relative or a drive root', () => {
+    const odd: SystemPathContext = {
+      ...win,
+      env: { SystemRoot: 'Windows', ProgramFiles: 'E:\\', ProgramData: '' }
+    }
+    expect(isSystemDirectory('E:\\work', odd)).toBe(false)
+    expect(isSystemDirectory('E:\\', odd)).toBe(false)
+    expect(isSystemDirectory('C:\\Windows\\x', odd)).toBe(true)
+  })
+
+  it('refuses a system folder in a POSIX list only on the platforms that have them', () => {
+    expect(isSystemDirectory(posix.join(posix.sep, 'usr', 'local'), { ...win, platform: 'linux', flavour: posix })).toBe(true)
+    expect(isSystemDirectory(win32.join('C:\\', 'usr'), win)).toBe(false)
   })
 })

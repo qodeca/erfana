@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { ERROR_CODE_MARKER_PATTERN } from './errorCodeMarker'
+import { ERROR_CODE_MARKER_PATTERN, cleanErrorMessage } from './errorCodeMarker'
 /**
  * Standardized Error Codes and Types
  *
@@ -562,6 +562,22 @@ export function getUserFriendlyMessage(error: unknown): string {
   // Security: Don't expose raw error messages - return generic message
   // Internal details are logged separately, not sent to renderer
   return ERROR_MESSAGES[ErrorCode.UNKNOWN_ERROR]
+}
+
+/**
+ * What to show a person for a failed operation, in a toast or inline: the
+ * friendly text of the error's code when it has one (an `AppError`, or an error
+ * that crossed IPC with its code marked), otherwise its message without the
+ * Electron prefix and code marker.
+ */
+export function getDisplayMessage(error: unknown): string {
+  const code = error instanceof AppError ? error.code : errorCodeInMessage(error)
+  if (code && ERROR_MESSAGES[code]) {
+    return ERROR_MESSAGES[code]
+  }
+  if (error instanceof Error) return cleanErrorMessage(error.message)
+  if (typeof error === 'string') return cleanErrorMessage(error)
+  return String(error)
 }
 
 /** The code main marked on the end of an error's message (see errorCodeMarker.ts), if any. */

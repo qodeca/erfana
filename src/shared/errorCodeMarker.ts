@@ -14,3 +14,13 @@ export const ERROR_CODE_MARKER_PATTERN = /\[([A-Z_]+)\]$/
 export function withErrorCodeMarker(message: string, code: ErrorCode): string {
   return `${message} [${code}]`
 }
+
+const ELECTRON_IPC_PREFIX = /^Error invoking remote method '[^']*': (?:Error: )?/
+
+/**
+ * An error message as a person should read it: without the prefix Electron adds
+ * to an error thrown in the main process, and without the code marker.
+ */
+export function cleanErrorMessage(message: string): string {
+  return message.replace(ELECTRON_IPC_PREFIX, '').replace(/ ?\[[A-Z_]+\]$/, '')
+}
