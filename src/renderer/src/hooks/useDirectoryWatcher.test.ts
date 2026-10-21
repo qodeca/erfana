@@ -177,6 +177,38 @@ describe('useDirectoryWatcher hook', () => {
       expect(onRefresh).toHaveBeenCalledTimes(1)
     })
 
+    it('resume then immediate pause – catch-up still refreshes (#210)', () => {
+      // The main process sends a catch-up at resume, but the next operation may
+      // already have set the internal-operation flag when it arrives. It reports
+      // external changes the pause dropped, so it must not be skipped.
+      const onRefresh = vi.fn()
+      const isInternalOperationRef = { current: true }
+
+      renderHook(() =>
+        useDirectoryWatcher({
+          projectPath: '/proj',
+          initialLoadComplete: true,
+          isInternalOperationRef,
+          onRefresh,
+          onProjectDeleted: vi.fn(),
+          onError: vi.fn()
+        })
+      )
+
+      const callback = mockOnDirectoryChanged.mock.calls[0][0]
+
+      act(() => {
+        callback({ eventCount: 0, summary: {}, catchUp: true })
+      })
+      expect(onRefresh).not.toHaveBeenCalled()
+
+      act(() => {
+        vi.advanceTimersByTime(DIRECTORY_WATCHER.DEBOUNCE_DELAY + 1)
+      })
+
+      expect(onRefresh).toHaveBeenCalledTimes(1)
+    })
+
     it('debounces rapid directory change events into a single refresh (lens-review Finding 2)', () => {
       // Validates that consumer-side throttling collapses a multi-file write
       // storm (e.g., prettier --write src/, snapshot updates) into one

@@ -31,7 +31,11 @@ vi.mock('node:fs/promises', () => ({
   writeFile: vi.fn(),
   rename: vi.fn(),
   unlink: vi.fn(),
-  mkdir: vi.fn()
+  mkdir: vi.fn(),
+  // the target does not exist yet: the plain temp + rename route
+  lstat: vi.fn(async () => {
+    throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+  })
 }))
 
 // Mock crypto
@@ -66,7 +70,8 @@ describe('atomicWriteJSON', () => {
       JSON.stringify(content),
       {
         encoding: 'utf8',
-        mode: 0o600
+        mode: 0o600,
+        flush: true
       }
     )
 

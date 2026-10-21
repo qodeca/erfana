@@ -54,7 +54,11 @@ export class MonacoPage {
     await this.focus()
     await this.keyboard.selectAll()
     await this.keyboard.copy()
-    return this.page.evaluate(() => navigator.clipboard.readText())
+    // Through the app's clipboard bridge, never `navigator.clipboard`: the default
+    // session refuses the page's clipboard-read permission.
+    return this.page.evaluate(
+      () => (window as unknown as { api: { clipboard: { readText(): Promise<string> } } }).api.clipboard.readText()
+    )
   }
 
   async selectAll(): Promise<void> {

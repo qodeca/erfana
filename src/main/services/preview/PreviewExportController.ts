@@ -26,6 +26,7 @@ import { BrowserWindow, dialog } from 'electron'
 import { ErrorCode } from '../../../shared/errors'
 import type { PdfExportResult } from '../../../shared/ipc/preview-types'
 import { deriveSafeFilename } from '../../utils/validateFilename'
+import { rememberDialogResult, withLastDirectory } from '../../utils/lastDialogDirectory'
 
 /** Fallback basename when the source name reduces to empty. */
 const DEFAULT_EXPORT_NAME = 'preview'
@@ -102,11 +103,13 @@ export class PreviewExportController implements IPreviewExportController {
   constructor(deps: PreviewExportControllerDeps = {}) {
     this.showSaveDialog =
       deps.showSaveDialog ??
-      ((options, windowId) => {
+      (async (options, windowId) => {
         const win = windowId === undefined ? null : BrowserWindow.fromId(windowId)
-        return win !== null && !win.isDestroyed()
-          ? dialog.showSaveDialog(win, options)
-          : dialog.showSaveDialog(options)
+        const result = win !== null && !win.isDestroyed()
+          ? await dialog.showSaveDialog(win, withLastDirectory(options))
+          : await dialog.showSaveDialog(withLastDirectory(options))
+        if (!result.canceled) rememberDialogResult(result.filePath)
+        return result
       })
     this.writeFile = deps.writeFile ?? ((path, data) => writeFile(path, data))
   }

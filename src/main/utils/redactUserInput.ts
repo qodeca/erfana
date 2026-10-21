@@ -13,6 +13,7 @@
  */
 
 import { AppError, ErrorCode } from '../../shared/errors'
+import { redactQuotedPaths } from '../../shared/redactQuotedPaths'
 
 /**
  * Error codes whose `Error.message` embeds verbatim user-typed input that must
@@ -72,21 +73,6 @@ export function redactUserInput(message: string, code?: ErrorCode): string {
 }
 
 /**
- * A quoted path operand inside a Node errno message.
- *
- * Node writes the path it failed on into `Error.message`, always as a quoted
- * operand: `ENOENT: no such file or directory, open '/Users/alice/notes.md'`,
- * and `rename` contributes two of them. The match requires the quoted content
- * to START with a separator or a `C:`-style drive prefix, so ordinary quoted
- * prose in a message survives while every absolute path (POSIX, Windows, UNC)
- * is caught. `[^'"]*` is a single quantifier over a negated class — linear, no
- * backtracking blow-up on a long value.
- */
-const QUOTED_PATH = /(['"])(?:[A-Za-z]:)?[\\/][^'"]*\1/g
-
-const PATH_PLACEHOLDER = '[redacted-path]'
-
-/**
  * `true` when the error looks like it came from a syscall.
  *
  * Deliberately loose: any of the three fields Node sets is enough. The cost of
@@ -137,7 +123,7 @@ export function redactedLogError(error: unknown): Error | undefined {
   if (withoutUserInput !== error.message) return new Error(withoutUserInput)
 
   if (!carriesSyscallFields(error)) return error
-  const withoutPaths = error.message.replace(QUOTED_PATH, PATH_PLACEHOLDER)
+  const withoutPaths = redactQuotedPaths(error.message)
   return withoutPaths === error.message ? error : new Error(withoutPaths)
 }
 

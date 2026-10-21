@@ -169,14 +169,14 @@ Start watching directory recursively. Watches are refcounted per `webContents`; 
 - `webContents` - Electron `WebContents` of the subscribing window
 
 **Side Effects:**
-- Creates chokidar watcher feeding a 75 ms collection window + 200 ms throttle (VS Code pattern). The renderer's `useDirectoryWatcher` debounces its `onRefresh` callback by another 250 ms.
-- Ignores: `node_modules`, `.git/objects`, `.git/subtree-cache`, `.git/lfs`, `dist`, `build`, `out`, `.next`, `.vite`, `.cache`, `coverage`, `.venv`, `__pycache__`, etc. — see `DEFAULT_WATCHER_IGNORE_PATTERNS` in `src/shared/constants.ts` for the full list.
+- Creates the backend watcher – chokidar on macOS and Linux, a `NativeRecursiveWatcher` on Windows (#211, see [File watching § Watch backends](./file-watching/README.md#watch-backends-211)) – feeding a 75 ms collection window + 200 ms throttle (VS Code pattern). The renderer's `useDirectoryWatcher` debounces its `onRefresh` callback by another 250 ms. Resolves without waiting for the backend's `ready`. If the watcher cannot be built (the Windows backend throws at once for a missing root), a restart is scheduled and the error is rethrown.
+- Drops every path the project path filter drops (see `setPathFilter` below): excluded (`files.exclude`), hidden (`tree.hiddenPatterns`, default `node_modules` and `.git`) and ignored (`watcher.ignoreList`, default `DEFAULT_WATCHER_IGNORE_PATTERNS` in `src/shared/constants.ts`: `node_modules`, `dist`, `build`, `out`, `.next`, `.vite`, `.cache`, `coverage`, `.venv`, `__pycache__`, etc.), tested on the project-relative path.
 - The `'change'` listener (added in #241) suppresses paths under `.git/` so `GitWatcherService` stays the sole publisher for git-state changes.
 
 ---
 
 #### `async unwatchDirectory(dirPath: string, webContents: WebContents): Promise<void>`
-Stop watching directory for one subscriber. The chokidar watcher is closed only when the last subscriber unwatches.
+Stop watching directory for one subscriber. The backend watcher is closed only when the last subscriber unwatches.
 
 **Parameters:**
 - `dirPath` - Absolute path to directory
@@ -184,13 +184,14 @@ Stop watching directory for one subscriber. The chokidar watcher is closed only 
 
 ---
 
-#### `pauseWatch(dirPath: string): void`
-Pause watching (used during CRUD operations). Synchronous, and reference-counted so nested pause/resume pairs nest safely. A no-op if no watcher exists for `dirPath`.
+#### `pauseWatch(dirPath: string, senderId?: number): void`
+Pause watching (used during CRUD operations). Synchronous, and reference-counted so nested pause/resume pairs nest safely. A no-op if no watcher exists for `dirPath`. The first pause opens a pause episode (`watcher/PauseEpisode.ts`, #210) that counts the structural changes dropped from outside until the full resume.
 
 **Parameters:**
 - `dirPath` - Absolute path to directory
+- `senderId` - `webContents` id of the pausing window (the `directory-watch:pause` handler passes `event.sender.id`); only that window's tree reads cover the dropped changes
 
-**Safety timeout:** A 10-second auto-resume guard prevents permanent pause states. If `resumeWatch()` is not called within 10 s (e.g., due to a lost IPC message), the PauseController auto-resumes, logs a warning, and triggers a compensating refresh (#103).
+**Safety timeout:** A 10-second auto-resume guard prevents permanent pause states. If `resumeWatch()` is not called within 10 s (e.g., due to a lost IPC message), the PauseController auto-resumes, logs a warning, discards the pause episode and sends one compensating `'directory-watch:changed'` with `catchUp: true` (#103, #210).
 
 **Usage Pattern:**
 ```typescript
@@ -214,13 +215,17 @@ Resume watching after pause. Synchronous. Decrements the pause reference count; 
 
 **Returns:** `false` if no watcher exists for `dirPath` (resume called for an unknown path), `true` otherwise — including when the watch stays paused because outer pauses are still outstanding.
 
+**Catch-up (#210):** at the full resume, sends one `'directory-watch:changed'` with `catchUp: true` if the pause episode holds a structural change from outside that no completed tree read by the pausing window covers. Its log line carries a count (or the cap reason), never a path.
+
 ---
 
 #### Other public methods
+- `beginTreeRead(dirPath: string, senderId?: number): () => void` - Called by `file:readDirectory` before the walk; the returned commit, called only after the read succeeds, marks every change dropped so far as shown. A no-op commit unless `dirPath` resolves to a paused root and `senderId` is the pausing window (#210)
+- `noteInternalChange(...changes: InternalChange[]): void` - Called by the file mutation handlers after success, so a paused watch does not count the operation's own events as missed; never logs the paths (#210)
 - `async unwatchAll(webContents: WebContents): Promise<void>` - Drop every watch held by one window
 - `async cleanupForWebContentsId(webContentsId: number): Promise<void>` - Called on window close to prevent stale watchers
 - `setProjectPath(path: string): void` - Set the project root and bump the session token so stale events are dropped
-- `setIgnorePatterns(patterns: string[]): void` / `getIgnorePatterns(): string[]`
+- `setPathFilter(filter: ProjectPathFilter): void` - Set the project's path filter (`src/main/utils/projectPathFilter.ts`: the `files.exclude` list, hidden names and ignore patterns). Called by `ProjectService` after loading settings, with the same instance it hands to `FileService`; applies to watches started after the call and to every event queued after it. Until then the default hidden and ignore lists apply, with no exclude list (#211)
 - `getStats()` / `getFormattedMetrics(): string` - Watcher diagnostics
 - `async stopAll(): Promise<void>` / `async dispose(): Promise<void>` - Shutdown paths
 
@@ -236,9 +241,10 @@ Resume watching after pause. Synchronous. Decrements the pause reference count; 
 {
   dirPath: string
   eventCount: number          // events surviving coalescing
-  originalEventCount: number  // raw events from chokidar
+  originalEventCount: number  // raw events from the backend watcher, after the path filter
   coalescedCount: number      // events removed by the coalescer
   summary: Record<'add' | 'addDir' | 'unlink' | 'unlinkDir' | 'change', number>
+  catchUp?: true              // #210: only on a catch-up refresh (bridge types it `boolean`)
 }
 ```
 
@@ -246,7 +252,7 @@ Emitted when files or folders change anywhere in the watched project tree. Main 
 
 **Event types:** `'add'`, `'addDir'`, `'unlink'`, `'unlinkDir'`, `'change'`. The `'change'` listener was added in #241 — in-place editor saves (Monaco autosave, terminal commands, external editors) now also wake the renderer. `'change'` events whose path is inside `.git/` are suppressed at the source listener (`GitWatcherService` is the canonical publisher for git internals).
 
-**Note:** Not emitted during pause window. The `'directory-watch:changed'` payload is also used by the PauseController auto-resume safety timeout (#103) to issue a compensating refresh after a stuck pause.
+**Note:** Events that arrive during a pause are dropped, not emitted. Two zero-event sends carry `catchUp: true` instead (#210): the catch-up at full resume, sent only when a structural change from outside was dropped after the pausing window's last completed tree read, and the compensating refresh from the PauseController safety timeout (#103). `useDirectoryWatcher` refreshes on `catchUp` even while an internal operation's flag is set, because it reports dropped external changes, not the operation's own.
 
 #### `'directory-watch:project-deleted'`
 **Payload:** `{ dirPath: string }`. Sent when the project root is gone (`ENOENT`) and the restart attempts are used up; the service then stops all watchers. Bridge: `onProjectDeleted`.
@@ -255,7 +261,7 @@ Emitted when files or folders change anywhere in the watched project tree. Main 
 **Payload:** `{ dirPath: string; error: string; errorType }`. Sent for any other watcher error that is not retried – a non-transient type, or a transient one (`EACCES`, `ESTALE`) whose restart attempts are used up. `EMFILE` never reaches it: that path always tears down and schedules a restart. Bridge: `onDirectoryError` (typed without `errorType`).
 
 #### `'directory-watch:recovered'` and `'directory-watch:restart-failed'`
-**Payloads:** `{ dirPath }` after a successful automatic restart; `{ dirPath, attempts, message }` once `MAX_RESTART_ATTEMPTS` is reached. Both are sent from main, but the preload bridge exposes no listener for either.
+**Payloads:** `{ dirPath }` after a successful automatic restart; `{ dirPath, attempts, message }` once `MAX_RESTART_ATTEMPTS` is reached. Both are sent from main, but the preload bridge exposes no listener for either. Since #211 the exhausted-restart notice goes to the windows captured when the restart was scheduled (`notifyIds`) – before, the watch's map entry was already gone and `restart-failed` was never sent – and a root still missing (`ENOENT`) gets `'directory-watch:project-deleted'` instead.
 
 ---
 
@@ -271,8 +277,8 @@ File operations with validation and error handling.
 
 ### Public Methods
 
-#### `readFile(filePath: string): Promise<string>` / `writeFile(filePath, content): Promise<void>`
-Read or write file contents (UTF-8). Throws on FS error.
+#### `readFile(filePath: string): Promise<string>` / `writeFile(filePath, content, options?): Promise<void>`
+Read or write file contents (UTF-8). Throws on FS error. `options.createParentDirs` recreates missing parent folders first, inside the open project only; the editor sets it only for the manual "Save to restore it" of a tab whose folder was renamed or deleted (see [File watching § Use Cases](./file-watching/README.md#use-cases)).
 
 **Throws:** Error if write fails.
 

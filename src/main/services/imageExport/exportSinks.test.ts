@@ -35,8 +35,13 @@ vi.mock('fs/promises', () => ({
 
 vi.mock('electron', () => ({
   nativeImage: { createFromBuffer: (...args: unknown[]) => mockCreateFromBuffer(...args) },
+  // Stand-in for Electron's ClipboardItem: keeps the MIME map so a test can
+  // assert what was written.
+  ClipboardItem: class {
+    constructor(public readonly items: Record<string, unknown>) {}
+  },
   clipboard: {
-    writeImage: (...args: unknown[]) => mockWriteImage(...args),
+    write: (...args: unknown[]) => mockWriteImage(...args),
     writeText: (...args: unknown[]) => mockWriteText(...args)
   }
 }))
@@ -174,34 +179,38 @@ describe('writePdfFile', () => {
 })
 
 describe('copyPngToClipboard', () => {
-  it('writes an IMAGE, never text, and never a path', () => {
+  it('writes an IMAGE, never text, and never a path', async () => {
     mockCreateFromBuffer.mockReturnValue({ isEmpty: () => false })
-    expect(copyPngToClipboard(Uint8Array.from([1, 2, 3]))).toEqual({ ok: true })
+    expect(await copyPngToClipboard(Uint8Array.from([1, 2, 3]))).toEqual({ ok: true })
     expect(mockWriteImage).toHaveBeenCalledTimes(1)
     expect(mockWriteText).not.toHaveBeenCalled()
+    const [items] = mockWriteImage.mock.calls[0] as [Array<{ items: Record<string, unknown> }>]
+    expect(items).toHaveLength(1)
+    expect(Object.keys(items[0].items)).toEqual(['image/png'])
+    const blob = items[0].items['image/png'] as Blob
+    expect(blob.type).toBe('image/png')
+    expect(Array.from(new Uint8Array(await blob.arrayBuffer()))).toEqual([1, 2, 3])
   })
 
-  it('hands nativeImage the PNG bytes it was given', () => {
+  it('hands nativeImage the PNG bytes it was given', async () => {
     mockCreateFromBuffer.mockReturnValue({ isEmpty: () => false })
-    copyPngToClipboard(Uint8Array.from([9, 8, 7]))
+    await copyPngToClipboard(Uint8Array.from([9, 8, 7]))
     expect(Array.from(mockCreateFromBuffer.mock.calls[0][0] as Uint8Array)).toEqual([9, 8, 7])
   })
 
-  it('fails when the decoded image is empty, and does not touch the clipboard', () => {
+  it('fails when the decoded image is empty, and does not touch the clipboard', async () => {
     mockCreateFromBuffer.mockReturnValue({ isEmpty: () => true })
-    expect(copyPngToClipboard(Uint8Array.from([1]))).toEqual({
+    expect(await copyPngToClipboard(Uint8Array.from([1]))).toEqual({
       ok: false,
       code: ErrorCode.IMAGE_EXPORT_CLIPBOARD_FAILED
     })
     expect(mockWriteImage).not.toHaveBeenCalled()
   })
 
-  it('fails when the clipboard write throws', () => {
+  it('fails when the clipboard write rejects', async () => {
     mockCreateFromBuffer.mockReturnValue({ isEmpty: () => false })
-    mockWriteImage.mockImplementation(() => {
-      throw new Error('clipboard is busy')
-    })
-    expect(copyPngToClipboard(Uint8Array.from([1]))).toEqual({
+    mockWriteImage.mockRejectedValue(new Error('clipboard is busy'))
+    expect(await copyPngToClipboard(Uint8Array.from([1]))).toEqual({
       ok: false,
       code: ErrorCode.IMAGE_EXPORT_CLIPBOARD_FAILED
     })

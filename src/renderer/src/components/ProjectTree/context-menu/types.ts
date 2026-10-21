@@ -17,7 +17,7 @@
  */
 
 import type { ReactNode } from 'react'
-import type { FileNode as PreloadFileNode } from '../../../../../preload/index'
+import type { FileNode as PreloadFileNode } from '../../../../../shared/ipc/file-schema'
 import type { IProjectTreeApi } from '../../../interfaces/IProjectTreeApi'
 
 /**

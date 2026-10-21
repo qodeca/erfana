@@ -29,10 +29,13 @@ import { buildMatchExpression, type FtsMatchExpression } from './graphMatch'
 // Type-only cross-layer import: the branded param sites live main-side, and a
 // verified `@ts-expect-error` can only sit in a typechecked file (this one).
 // Erased at runtime — the test bundle never carries a main-process dependency.
+// Deliberate exception to the shared -> main layer rule (merge of develop's rule into graph).
+/* eslint-disable @typescript-eslint/no-restricted-imports */
 import type {
   GraphKeyedQueryParams,
   GraphSearchQueryParams
 } from '../main/interfaces/IGraphReadConnection'
+/* eslint-enable @typescript-eslint/no-restricted-imports */
 
 let db: Database.Database
 

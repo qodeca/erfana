@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { dialog } from 'electron'
+import { dialog, type OpenDialogOptions } from 'electron'
 import { stat, writeFile, mkdir, cp, rm } from 'fs/promises'
 import { basename, extname, isAbsolute, normalize, join } from 'path'
 import { importService, converterRegistry } from '../services/import'
@@ -18,6 +18,7 @@ import { ErrorCode, AppError, getUserFriendlyMessage } from '../../shared/errors
 import { isConfigurableConverter } from '../services/import/types'
 import { changeExtension, sanitizeFileName, findAvailableFileName } from '../utils/fileUtils'
 import { registerHandle } from './registry'
+import { rememberDialogResult, withLastDirectory } from '../utils/lastDialogDirectory'
 
 /**
  * File selection result from the native dialog
@@ -50,7 +51,7 @@ export function registerImportHandlers(): void {
     const extensions = converterRegistry.getSupportedExtensions()
     const { requiresConversion, passthrough } = converterRegistry.getExtensionsByConversionType()
 
-    const result = await dialog.showOpenDialog({
+    const result = await dialog.showOpenDialog(withLastDirectory<OpenDialogOptions>({
       properties: ['openFile'],
       title: 'Select File to Import',
       buttonLabel: 'Import',
@@ -68,11 +69,12 @@ export function registerImportHandlers(): void {
         // Allow any file for advanced users
         { name: 'All Files', extensions: ['*'] }
       ]
-    })
+    }))
 
     if (result.canceled || result.filePaths.length === 0) {
       return null
     }
+    rememberDialogResult(result.filePaths)
 
     const filePath = result.filePaths[0]
     const fileName = basename(filePath)

@@ -29,6 +29,8 @@ const {
   mergeExtraContent,
   assertExtraContentAllowlist,
   resolveExtraFilesDir,
+  assertTestBuildName,
+  TEST_BUILD_SUFFIX,
   verifyExtraContent,
   assertResourcesDestNoRepoLeak,
   assertResourcesSiblingsAllowlist,
@@ -36,6 +38,7 @@ const {
   ALLOWED_EXTRA_RESOURCES_DESTS,
   ALLOWED_EXTRA_RESOURCES_FROM,
   ALLOWED_EXTRA_FILES_DESTS,
+  ELECTRON_OWNED_RESOURCES_ENTRIES,
   EXPECTED_RESOURCES_ENTRIES,
   REPO_ROOT_SENTINELS,
   SUSPICIOUS_SIBLING_NAMES,
@@ -63,11 +66,33 @@ function modeOf(p) {
   return fs.lstatSync(p).mode & 0o777;
 }
 
-// Pure POSIX-mode contract tests: Windows `fs.chmodSync` is effectively a no-op
-// for POSIX permission bits, so these assert 0o644/0o755 transitions that only
-// hold on macOS/Linux. Skipped on Windows (ubuntu CI still covers them).
-// See docs/windows/known-flakes.md row "scripts/fuses.test.mjs".
-describe.skipIf(process.platform === 'win32')('chmodNodePtySpawnHelper', () => {
+// Windows `fs.chmodSync` is effectively a no-op for POSIX permission bits, so
+// the 0o644/0o755 assertions only hold on macOS/Linux. Only those assertions
+// are POSIX-gated: the rest of each test (counts, warnings, errors, copies)
+// runs everywhere, which keeps the per-file coverage floor reachable on a
+// Windows host. See docs/windows/known-flakes.md row "scripts/fuses.test.mjs".
+const POSIX_MODES = process.platform !== 'win32';
+
+function expectMode(p, mode) {
+  if (POSIX_MODES) expect(modeOf(p)).toBe(mode);
+}
+
+// Creating a symlink on Windows needs Developer Mode or elevation. Probe once
+// and skip only the symlink cases when the host cannot make one.
+const CAN_SYMLINK = (() => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fuses-symlink-probe-'));
+  try {
+    fs.writeFileSync(path.join(dir, 'target'), '');
+    fs.symlinkSync(path.join(dir, 'target'), path.join(dir, 'link'));
+    return true;
+  } catch {
+    return false;
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+})();
+
+describe('chmodNodePtySpawnHelper', () => {
   let tmpRoot;
 
   beforeEach(() => {
@@ -81,11 +106,11 @@ describe.skipIf(process.platform === 'win32')('chmodNodePtySpawnHelper', () => {
 
   it('chmods a 0644 spawn-helper to 0755 and reports chmodCount:1', () => {
     const helperPath = makeHelperFixture(tmpRoot, 'darwin-arm64');
-    expect(modeOf(helperPath)).toBe(0o644);
+    expectMode(helperPath, 0o644);
 
     const result = chmodNodePtySpawnHelper(tmpRoot);
 
-    expect(modeOf(helperPath)).toBe(SPAWN_HELPER_MODE);
+    expectMode(helperPath, SPAWN_HELPER_MODE);
     expect(result).toEqual({ chmodCount: 1, skipped: 0 });
   });
 
@@ -94,7 +119,7 @@ describe.skipIf(process.platform === 'win32')('chmodNodePtySpawnHelper', () => {
 
     const result = chmodNodePtySpawnHelper(tmpRoot);
 
-    expect(modeOf(helperPath)).toBe(0o755);
+    expectMode(helperPath, 0o755);
     expect(result).toEqual({ chmodCount: 1, skipped: 0 });
   });
 
@@ -104,8 +129,8 @@ describe.skipIf(process.platform === 'win32')('chmodNodePtySpawnHelper', () => {
 
     const result = chmodNodePtySpawnHelper(tmpRoot);
 
-    expect(modeOf(arm)).toBe(SPAWN_HELPER_MODE);
-    expect(modeOf(x64)).toBe(SPAWN_HELPER_MODE);
+    expectMode(arm, SPAWN_HELPER_MODE);
+    expectMode(x64, SPAWN_HELPER_MODE);
     expect(result.chmodCount).toBe(2);
   });
 
@@ -139,7 +164,7 @@ describe.skipIf(process.platform === 'win32')('chmodNodePtySpawnHelper', () => {
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('No spawn-helper binaries'));
   });
 
-  it('refuses to chmod a symlinked spawn-helper and leaves the target untouched', () => {
+  it.runIf(CAN_SYMLINK)('refuses to chmod a symlinked spawn-helper and leaves the target untouched', () => {
     const externalFile = path.join(tmpRoot, 'external-target');
     fs.writeFileSync(externalFile, 'do not modify me');
     fs.chmodSync(externalFile, 0o644);
@@ -152,7 +177,7 @@ describe.skipIf(process.platform === 'win32')('chmodNodePtySpawnHelper', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const result = chmodNodePtySpawnHelper(tmpRoot);
 
-    expect(modeOf(externalFile)).toBe(0o644);
+    expectMode(externalFile, 0o644);
     expect(result).toEqual({ chmodCount: 0, skipped: 1 });
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('non-regular file'));
   });
@@ -191,9 +216,9 @@ describe.skipIf(process.platform === 'win32')('chmodNodePtySpawnHelper', () => {
   });
 });
 
-// POSIX-mode contract (chmod 0755 on copied media binaries) — same Windows
-// no-op caveat as chmodNodePtySpawnHelper above. See docs/windows/known-flakes.md.
-describe.skipIf(process.platform === 'win32')('ensurePackedMediaBinaries', () => {
+// chmod 0755 on copied media binaries — same POSIX-only mode assertions as
+// chmodNodePtySpawnHelper above. See docs/windows/known-flakes.md.
+describe('ensurePackedMediaBinaries', () => {
   // Use an unpinned key (linux-x64) so verifyBinary does size-only (no SHA pin).
   const PLATFORM = 'linux';
   const ARCH_ENUM = Arch.x64;
@@ -217,9 +242,26 @@ describe.skipIf(process.platform === 'win32')('ensurePackedMediaBinaries', () =>
     fs.rmSync(path.join(process.env.ERFANA_MEDIA_CACHE, KEY), { recursive: true, force: true });
   });
 
-  it('copies the cached arch ffmpeg into the bundle, chmod 0755, and chmods ffprobe (skipping symlinks)', () => {
+  it('copies the cached arch ffmpeg into the bundle, chmod 0755, and chmods ffprobe', () => {
     seedCache();
-    // ffprobe fixture + a symlink that must be skipped
+    const probeDir = path.join(tmpRoot, 'app', 'node_modules', 'ffprobe-static', 'bin', 'linux', 'x64');
+    fs.mkdirSync(probeDir, { recursive: true });
+    const probe = path.join(probeDir, 'ffprobe');
+    fs.writeFileSync(probe, 'probe');
+    fs.chmodSync(probe, 0o644);
+
+    expect(() =>
+      ensurePackedMediaBinaries(tmpRoot, PLATFORM, ARCH_ENUM, { requireMatch: true })
+    ).not.toThrow();
+
+    const dest = path.join(tmpRoot, 'app', 'node_modules', 'ffmpeg-static', 'ffmpeg');
+    expect(fs.existsSync(dest)).toBe(true);
+    expectMode(dest, SPAWN_HELPER_MODE);
+    expectMode(probe, SPAWN_HELPER_MODE);
+  });
+
+  it.runIf(CAN_SYMLINK)('skips an ffprobe symlink instead of chmod-following it', () => {
+    seedCache();
     const probeDir = path.join(tmpRoot, 'app', 'node_modules', 'ffprobe-static', 'bin', 'linux', 'x64');
     fs.mkdirSync(probeDir, { recursive: true });
     const probe = path.join(probeDir, 'ffprobe');
@@ -232,10 +274,7 @@ describe.skipIf(process.platform === 'win32')('ensurePackedMediaBinaries', () =>
       ensurePackedMediaBinaries(tmpRoot, PLATFORM, ARCH_ENUM, { requireMatch: true })
     ).not.toThrow();
 
-    const dest = path.join(tmpRoot, 'app', 'node_modules', 'ffmpeg-static', 'ffmpeg');
-    expect(fs.existsSync(dest)).toBe(true);
-    expect(fs.lstatSync(dest).mode & 0o777).toBe(SPAWN_HELPER_MODE);
-    expect(fs.lstatSync(probe).mode & 0o777).toBe(SPAWN_HELPER_MODE);
+    expectMode(probe, SPAWN_HELPER_MODE);
     // The symlink itself must not have been chmod-followed (still a symlink)
     expect(fs.lstatSync(link).isSymbolicLink()).toBe(true);
   });
@@ -1067,7 +1106,7 @@ describe('assertPackagedAppContents', () => {
       }
     });
 
-    it.skipIf(process.platform === 'win32')('throws on a dangling symlink on darwin, where Gatekeeper rejects the bundle', () => {
+    it.runIf(CAN_SYMLINK)('throws on a dangling symlink on darwin, where Gatekeeper rejects the bundle', () => {
       const app = makePackedApp(tmpRoot);
       fs.symlinkSync(path.join(app, 'node_modules', 'gone'), path.join(app, 'node_modules', 'dangling'));
 
@@ -1075,7 +1114,7 @@ describe('assertPackagedAppContents', () => {
         .toThrow(/unresolvable symlink/i);
     });
 
-    it.skipIf(process.platform === 'win32')('only warns about a dangling symlink off darwin', () => {
+    it.runIf(CAN_SYMLINK)('only warns about a dangling symlink off darwin', () => {
       const app = makePackedApp(tmpRoot);
       fs.symlinkSync(path.join(app, 'node_modules', 'gone'), path.join(app, 'node_modules', 'dangling'));
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -1137,7 +1176,7 @@ describe('assertPackagedAppContents', () => {
       }
     });
 
-    it.skipIf(process.platform === 'win32')('accepts an intra-bundle relative symlink (npm .bin style)', () => {
+    it.runIf(CAN_SYMLINK)('accepts an intra-bundle relative symlink (npm .bin style)', () => {
       const app = makePackedApp(tmpRoot);
       const bin = path.join(app, 'node_modules', '.bin');
       fs.mkdirSync(bin, { recursive: true });
@@ -1464,6 +1503,20 @@ describe('assertResourcesSiblingsAllowlist (L2a-2)', () => {
     fs.mkdirSync(path.join(tmpRoot, 'tessdata'));
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     expect(() => assertResourcesSiblingsAllowlist(tmpRoot, { platform: 'win32' })).not.toThrow();
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("accepts Electron's relocated licence files and pins the Electron-owned allowlist (#163)", () => {
+    // app-builder-lib 26.16.1 (electron-builder#9407) moves Electron's own
+    // licence files into Contents/Resources beside app/. They are Electron-owned,
+    // so the sibling allowlist accepts exactly these two names and nothing more —
+    // this is a security control, so the whole set is pinned rather than probed.
+    expect([...ELECTRON_OWNED_RESOURCES_ENTRIES].sort()).toEqual([
+      'LICENSE.electron.txt', 'LICENSES.chromium.html', 'app', 'app.asar', 'elevate.exe', 'icon.icns',
+    ]);
+    makeResourcesDir(tmpRoot, ['LICENSE.electron.txt', 'LICENSES.chromium.html']);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(() => assertResourcesSiblingsAllowlist(tmpRoot, { platform: 'darwin' })).not.toThrow();
     expect(warn).not.toHaveBeenCalled();
   });
 
@@ -1842,5 +1895,28 @@ describe('verifyExtraContent (F1 wiring)', () => {
     } finally {
       fs.rmSync(outside, { recursive: true, force: true });
     }
+  });
+});
+
+describe('assertTestBuildName', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('accepts a product name carrying the test-build suffix', () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    expect(() => assertTestBuildName('Erfana (TEST BUILD)')).not.toThrow();
+  });
+
+  it('refuses a test build that would look like a production bundle', () => {
+    expect(() => assertTestBuildName('Erfana')).toThrow(/TEST BUILD/);
+  });
+
+  // electron-builder 26.16 checks the entry file under the configured product
+  // name right after afterPack, so the suffix must come from the build script,
+  // not from renaming the bundle.
+  it('is supplied by the build:mac:test script through productName', () => {
+    const pkg = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '..', 'package.json'), 'utf8'));
+    expect(pkg.scripts['build:mac:test']).toContain(`-c.productName="Erfana${TEST_BUILD_SUFFIX}"`);
   });
 });

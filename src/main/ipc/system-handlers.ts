@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { app, shell } from 'electron'
+import { app } from 'electron'
+import { openSystemSettingsPane } from '../utils/openExternalSafe'
 import { SYSTEM_CHANNELS } from '../../shared/ipc/system-channels'
 import { isTrustedSender } from './senderValidation'
 import { logger } from '../services/LoggingService'
@@ -31,7 +32,7 @@ export function registerSystemHandlers(): void {
     }
     // Screen Recording is a macOS-only TCC concept; no-op elsewhere.
     if (process.platform !== 'darwin') return
-    await shell.openExternal(SCREEN_RECORDING_PANE)
+    await openSystemSettingsPane(SCREEN_RECORDING_PANE)
   })
 
   registerHandle(SYSTEM_CHANNELS.RELAUNCH_APP, (event) => {

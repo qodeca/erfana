@@ -64,8 +64,15 @@ export interface IUseProjectManagementReturn {
   isSwitchingProject: boolean
 
   /**
-   * Whether initial project load has completed
-   * Used to defer directory watcher startup
+   * Whether the first tree read of the current project has been applied –
+   * the directory watcher's start gate (#211, D12).
+   *
+   * `false` with no project open, and while the first read after a
+   * project-changed open (or the read that superseded it) is in flight.
+   * `true` once that read settles, on success **or** failure, so a failed
+   * first read can still self-heal through the watcher. A read superseded by
+   * a newer open or a close never opens it. Main's no-op re-open, which sends
+   * no project-changed event, opens it at once.
    */
   initialLoadComplete: boolean
 

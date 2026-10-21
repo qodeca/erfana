@@ -58,12 +58,19 @@ export interface BadgeGroup {
   entries: string[]
 }
 
+/**
+ * The longest one frame's title read may take before it counts as empty. Not a
+ * wait: a healthy read answers in milliseconds, and this only bounds a read
+ * whose frame navigated away under it, which never settles on its own.
+ */
+const FRAME_READ_CAP_MS = 2_000
+
 /** Every frame of the matching preview, parents before children; `[]` when none is live. */
 export async function frameTree(
   app: ElectronApplication,
   target: PreviewTarget = {}
 ): Promise<FrameRead[]> {
-  return app.evaluate(async ({ webContents }, urlIncludes) => {
+  return app.evaluate(async ({ webContents }, { urlIncludes, readCapMs }) => {
     const wc = webContents.getAllWebContents().find((c) => {
       try {
         const url = c.getURL()
@@ -84,7 +91,19 @@ export async function frameTree(
         }
         let title = ''
         try {
-          title = String(await frame.executeJavaScript('document.title'))
+          // Capped: a frame read while its document is being replaced (a link
+          // just followed) can leave `executeJavaScript` pending forever, and
+          // one hung read would stall the caller's poll past its timeout.
+          // A capped read counts as empty and the caller polls again.
+          let cap: ReturnType<typeof setTimeout> | undefined
+          title = String(
+            await Promise.race([
+              frame.executeJavaScript('document.title'),
+              new Promise<string>((resolve) => {
+                cap = setTimeout(() => resolve(''), readCapMs)
+              })
+            ]).finally(() => clearTimeout(cap))
+          )
         } catch {
           // Mid-load or gone: read as empty, the caller polls.
         }
@@ -94,7 +113,7 @@ export async function frameTree(
       return []
     }
     return out
-  }, target.urlIncludes)
+  }, { urlIncludes: target.urlIncludes, readCapMs: FRAME_READ_CAP_MS })
 }
 
 /**

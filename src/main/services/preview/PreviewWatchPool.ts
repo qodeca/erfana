@@ -9,8 +9,8 @@
  * the security-load-bearing chokidar options, this pool reuses the single
  * watcher factory (`createSingleFileWatcher`, item 29) with preview overrides
  * that lower `awaitWriteFinish` to `PREVIEW.WATCH_STABILITY_MS` /
- * `PREVIEW.WATCH_POLL_INTERVAL_MS`. `followSymlinks: false` and
- * `disableGlobbing: true` stay in the base options and are NOT duplicated here.
+ * `PREVIEW.WATCH_POLL_INTERVAL_MS`. `followSymlinks: false` stays in the base
+ * options and is NOT duplicated here.
  *
  * The pool is refcounted: acquiring an already-watched path bumps a count and
  * reuses the one watcher; releasing decrements and closes the watcher only when
@@ -26,7 +26,7 @@
  * chokidar events fan out to the caller's `onChange`. A watched file is DATA:
  * its path only triggers a signal, it is never executed here.
  */
-import type { FSWatcher, WatchOptions } from 'chokidar'
+import type { FSWatcher, ChokidarOptions } from 'chokidar'
 import { createSingleFileWatcher } from '../watcher/singleFileWatch'
 import type { AtomicSaveDetector } from '../watcher/AtomicSaveDetector'
 import {
@@ -40,7 +40,7 @@ import {
 } from './previewWatchBudget'
 
 /** The preview-tuned `awaitWriteFinish` overrides layered onto the base options. */
-const PREVIEW_WATCH_OVERRIDES: Partial<WatchOptions> = {
+const PREVIEW_WATCH_OVERRIDES: Partial<ChokidarOptions> = {
   awaitWriteFinish: {
     stabilityThreshold: PREVIEW.WATCH_STABILITY_MS,
     pollInterval: PREVIEW.WATCH_POLL_INTERVAL_MS
@@ -51,7 +51,7 @@ const PREVIEW_WATCH_OVERRIDES: Partial<WatchOptions> = {
 export type WatchFactory = (
   filePath: string,
   handlers: { onChange: () => void; onUnlink: () => void; onError: (error: unknown) => void },
-  overrides?: Partial<WatchOptions>
+  overrides?: Partial<ChokidarOptions>
 ) => FSWatcher
 
 export interface PreviewWatchPoolDeps {

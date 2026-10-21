@@ -2,9 +2,64 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import pluginJs from '@eslint/js'
 import pluginReact from 'eslint-plugin-react'
+import reactHooks from 'eslint-plugin-react-hooks'
 import * as tseslint from 'typescript-eslint'
 // Use flat-config-friendly Prettier rules directly
 import eslintConfigPrettier from 'eslint-config-prettier'
+
+// Layer rules (project-session design, section 6). The layers are `src/main`,
+// `src/preload`, `src/renderer` and `src/shared`; `shared` sits under all of
+// them. A layer is matched only by climbing out to it (`../../main/x`,
+// `../src/main`) or by its `@main/` style alias, via the `regex` option, so a
+// sibling `./main`, a folder that merely contains the word, or a package such as
+// `@electron-toolkit/preload` is never hit. Flat config replaces
+// `no-restricted-imports` wholesale per matching block, so every block that
+// sets it for these files must spread the right set.
+//
+//   * shared   imports nothing from main, renderer, preload or electron;
+//   * renderer imports nothing from main, and only TYPES from preload/index;
+//   * main     imports nothing from renderer or preload;
+//   * preload  imports nothing from renderer. preload -> main is left open on
+//     purpose: previewPage.contract.test.ts imports main values.
+const LAYER_MESSAGE = 'Layer rule: '
+const layerRegex = (layer, suffix = '(/|$)') => `^((\\.\\./)+(src/)?|@)${layer}${suffix}`
+const layerPattern = (layer, who) => ({
+  regex: layerRegex(layer),
+  message: `${LAYER_MESSAGE}${who} must not import from src/${layer}.`
+})
+const ELECTRON_IPCMAIN_MESSAGE =
+  'Register global IPC through src/main/ipc/registry.ts (registerHandle / registerOn / …) so every channel is gated on the app renderer. Importing ipcMain directly bypasses that gate.'
+const SHARED_LAYER_PATTERNS = [
+  layerPattern('main', 'src/shared'),
+  layerPattern('renderer', 'src/shared'),
+  layerPattern('preload', 'src/shared'),
+  { group: ['electron/*'], message: `${LAYER_MESSAGE}src/shared must not import electron.` }
+]
+const MAIN_LAYER_PATTERNS = [
+  layerPattern('renderer', 'src/main'),
+  layerPattern('preload', 'src/main')
+]
+const PRELOAD_LAYER_PATTERNS = [layerPattern('renderer', 'src/preload')]
+// The renderer reaches the preload only through `window.api`; a type-only
+// import of `preload/index` is the one allowed link. Two patterns do it: the
+// first bans every preload file except `index`, the second matches ONLY
+// `preload` and `preload/index`, carries `allowTypeImports`, and so bans value
+// imports of those two while letting type imports through. (typescript-eslint exempts a
+// type-only import when ANY `allowTypeImports` pattern matches it, so
+// `preload/x` stays banned for types too because the second pattern misses it.
+// Known limit: the image-export harness's `../*` group also has
+// `allowTypeImports`, so a type-only import of main slips through there. Value
+// imports are caught.)
+const RENDERER_PRELOAD_MESSAGE = `${LAYER_MESSAGE}src/renderer may only \`import type\` from src/preload/index.`
+const RENDERER_LAYER_PATTERNS = [
+  layerPattern('main', 'src/renderer'),
+  { regex: layerRegex('preload', '/(?!index$)'), message: RENDERER_PRELOAD_MESSAGE },
+  {
+    regex: layerRegex('preload', '(/index)?$'),
+    allowTypeImports: true,
+    message: RENDERER_PRELOAD_MESSAGE
+  }
+]
 
 export default [
   // Ignore build outputs and vendored folders. `playwright-report/`,
@@ -53,6 +108,31 @@ export default [
   pluginJs.configs.recommended,
   ...tseslint.configs.recommended,
   pluginReact.configs.flat.recommended,
+  // React hooks (renderer only). `rules-of-hooks` is an error and
+  // `exhaustive-deps` a warning. The plugin's v7 preset also switches on the
+  // React-Compiler-derived rules as errors; this codebase does not use the
+  // compiler, so those are downgraded to warnings rather than blocking lint.
+  {
+    ...reactHooks.configs.flat.recommended,
+    files: ['src/renderer/**/*.{ts,tsx}'],
+    rules: {
+      ...reactHooks.configs.flat.recommended.rules,
+      'react-hooks/rules-of-hooks': 'error',
+      'react-hooks/exhaustive-deps': 'warn',
+      'react-hooks/static-components': 'warn',
+      'react-hooks/use-memo': 'warn',
+      'react-hooks/preserve-manual-memoization': 'warn',
+      'react-hooks/immutability': 'warn',
+      'react-hooks/globals': 'warn',
+      'react-hooks/refs': 'warn',
+      'react-hooks/set-state-in-effect': 'warn',
+      'react-hooks/error-boundaries': 'warn',
+      'react-hooks/purity': 'warn',
+      'react-hooks/set-state-in-render': 'warn',
+      'react-hooks/config': 'warn',
+      'react-hooks/gating': 'warn'
+    }
+  },
   // Disable formatting-related rules that conflict with Prettier
   { rules: eslintConfigPrettier.rules },
   // Configure React version detection for eslint-plugin-react
@@ -142,6 +222,36 @@ export default [
       ]
     }
   },
+  // Shared code is imported by every process, so it may not import any of them
+  // (nor electron). Its own block: no other block matches `src/shared/**`.
+  {
+    files: ['src/shared/**/*.ts'],
+    rules: {
+      'no-restricted-imports': 'off',
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'electron',
+              message: `${LAYER_MESSAGE}src/shared must not import electron.`
+            }
+          ],
+          patterns: SHARED_LAYER_PATTERNS
+        }
+      ]
+    }
+  },
+  // Renderer layer rule. MUST stay before the imageExport block below: both set
+  // `@typescript-eslint/no-restricted-imports` for the harness folder, the later
+  // block wins, and it re-states these patterns.
+  {
+    files: ['src/renderer/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': 'off',
+      '@typescript-eslint/no-restricted-imports': ['error', { patterns: RENDERER_LAYER_PATTERNS }]
+    }
+  },
   // The image-export rasterize harness (#73) is a hidden Chromium page that is
   // handed image bytes straight from the user's project — SVG included, which
   // is a document format with a script model. It is safe ONLY because an SVG
@@ -215,6 +325,7 @@ export default [
         'error',
         {
           patterns: [
+            ...RENDERER_LAYER_PATTERNS,
             {
               // `../**` is belt and braces. Verified by probe: the `ignore`
               // matcher treats `../*` as a directory prefix, so it already
@@ -247,11 +358,12 @@ export default [
   // the same enforcement pattern used for `api.preview.setVisibility` and
   // `openFileInPanel` in the renderer block below. See sd-074b §7.
   //
-  // NOTE: `no-restricted-imports` is set for `e2e/**` and for
-  // `src/renderer/src/imageExport/**` elsewhere in this file. Neither overlaps
-  // `src/main/**`, so this block is safe — but flat config REPLACES a rule
-  // rather than merging it, so never add a second block setting
-  // `no-restricted-imports` for main-process files.
+  // NOTE: `no-restricted-imports` is set for `e2e/**`, `src/shared/**`,
+  // `src/renderer/**` (and its `imageExport/**` folder) and `src/preload/**`
+  // elsewhere in this file. None overlaps `src/main/**`, so this block is safe.
+  // Flat config REPLACES a rule rather than merging it, so the only second block
+  // that sets it for main-process files is the one right below, which covers
+  // exactly the files this one ignores and sets nothing but the layer patterns.
   {
     files: ['src/main/**/*.ts'],
     // Tests read the emitter to assert what a `register*Handlers()` call put on
@@ -268,10 +380,86 @@ export default [
               name: 'electron',
               importNames: ['ipcMain'],
               allowTypeImports: true,
-              message:
-                'Register global IPC through src/main/ipc/registry.ts (registerHandle / registerOn / …) so every channel is gated on the app renderer. Importing ipcMain directly bypasses that gate.'
+              message: ELECTRON_IPCMAIN_MESSAGE
+            },
+            {
+              name: 'electron/main',
+              importNames: ['ipcMain'],
+              allowTypeImports: true,
+              message: ELECTRON_IPCMAIN_MESSAGE
             }
-          ]
+          ],
+          patterns: MAIN_LAYER_PATTERNS
+        }
+      ]
+    }
+  },
+  // The files the block above ignores still obey the layer rules: only the
+  // `ipcMain` path is dropped for them. Safe as a second setter because the two
+  // blocks' file sets are disjoint (this one is exactly the other's `ignores`).
+  {
+    files: ['src/main/ipc/registry.ts', 'src/main/**/*.test.ts'],
+    rules: {
+      'no-restricted-imports': 'off',
+      '@typescript-eslint/no-restricted-imports': ['error', { patterns: MAIN_LAYER_PATTERNS }]
+    }
+  },
+  // Preload: nothing from the renderer. preload -> main is open on purpose (see
+  // the layer notes at the top of this file).
+  {
+    files: ['src/preload/**/*.ts'],
+    rules: {
+      'no-restricted-imports': 'off',
+      '@typescript-eslint/no-restricted-imports': ['error', { patterns: PRELOAD_LAYER_PATTERNS }]
+    }
+  },
+  // Every URL handed to the OS goes through `openExternalSafe()`, which checks it
+  // against the one allowlist. Syntax selectors rather than an import ban, so an
+  // alias (`import { shell as s }`, `const sh = shell`), a namespace access
+  // (`electron.shell.openExternal`) or a destructure cannot get round it. Its own
+  // block, with no `ignores` for registry.ts, so nothing in src/main is exempt
+  // except the one module. `deps.openExternal` (an injected dependency, not the
+  // Electron call) is the only receiver left alone. Tests are exempt: they mock
+  // the call by name.
+  {
+    files: ['src/main/**/*.ts'],
+    ignores: [
+      'src/main/utils/openExternalSafe.ts',
+      'src/main/**/*.test.ts',
+      'src/main/**/__test-helpers__/**'
+    ],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "MemberExpression[property.name='openExternal'][object.name!='deps']",
+          message:
+            'Open external URLs through openExternalSafe() in src/main/utils/openExternalSafe.ts, the only module that calls openExternal. It checks the URL against the one allowlist first.'
+        },
+        {
+          selector: "MemberExpression[computed=true][property.value='openExternal']",
+          message:
+            'Open external URLs through openExternalSafe() in src/main/utils/openExternalSafe.ts, the only module that calls openExternal.'
+        },
+        {
+          selector: "ObjectPattern > Property[key.name='openExternal']",
+          message:
+            'Do not destructure openExternal. Use openExternalSafe() from src/main/utils/openExternalSafe.ts.'
+        },
+        {
+          selector: "ImportSpecifier[imported.name='shell'][local.name!='shell']",
+          message:
+            'Do not alias the electron shell. Use openExternalSafe() from src/main/utils/openExternalSafe.ts for external URLs.'
+        },
+        {
+          selector: "VariableDeclarator[init.name='shell']",
+          message:
+            'Do not alias the electron shell. Use openExternalSafe() from src/main/utils/openExternalSafe.ts for external URLs.'
+        },
+        {
+          selector: "VariableDeclarator > MemberExpression.init[property.name='shell']",
+          message:
+            'Do not alias the electron shell. Use openExternalSafe() from src/main/utils/openExternalSafe.ts for external URLs.'
         }
       ]
     }

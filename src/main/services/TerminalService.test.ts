@@ -378,6 +378,32 @@ async function createId(
       expect(clearSpy).toHaveBeenCalledWith({ terminalId: tid })
     })
 
+    it('never writes PTY output or the full cwd into the logs', async () => {
+      vi.doMock('os', async () => {
+        const actual = await vi.importActual<any>('os')
+        return { ...actual, platform: () => 'darwin' }
+      })
+
+      const { terminalService } = await import('./TerminalService')
+      await createId(terminalService, { cwd: '/Users/alice/secret-project' })
+      const { pty } = spawnedPTYs[0]
+
+      const { args } = spawnedPTYs[0]
+      const script = args[args.indexOf('-c') + 1]
+      const marker = script.match(/__ERFANA_PWD_MARKER_\d+__/)![0]
+      pty.emit('data', `/Users/alice/secret-project\n${marker}\n`)
+      pty.emit('data', 'export API_TOKEN=hunter2-super-secret\n')
+
+      const everything = JSON.stringify(
+        Object.values(mockLogger).flatMap((fn) => fn.mock.calls)
+      )
+      expect(everything).not.toContain('hunter2-super-secret')
+      expect(everything).not.toContain('API_TOKEN')
+      expect(everything).not.toContain('/Users/alice')
+      // the chunk length is still recorded for handshake debugging
+      expect(everything).toContain('length=')
+    })
+
     it('markInitializationComplete sets flags correctly', async () => {
       vi.doMock('os', async () => {
         const actual = await vi.importActual<any>('os')
@@ -716,6 +742,85 @@ async function createId(
 
       expect(exitSpy).toHaveBeenCalledWith({ terminalId: tid, exitCode: 0, signal: undefined })
       expect(terminalService.getTerminalInfo(tid!)).toBeNull()
+    })
+  })
+
+  // ===========================================================================
+  // Issue #214: quit must not outrun node-pty's exit callback
+  // ===========================================================================
+
+  describe('Issue #214 - dispose waits for shell exit', () => {
+    async function settledAfterIo(promise: Promise<void>): Promise<boolean> {
+      let settled = false
+      void promise.then(() => {
+        settled = true
+      })
+      await new Promise((resolve) => setImmediate(resolve))
+      return settled
+    }
+
+    beforeEach(() => {
+      vi.doMock('os', async () => {
+        const actual = await vi.importActual<any>('os')
+        return { ...actual, platform: () => 'darwin' }
+      })
+    })
+
+    it('dispose does not resolve until the killed shell reports its exit', async () => {
+      const { terminalService } = await import('./TerminalService')
+      await createId(terminalService, { cwd: '/tmp' })
+      const { pty } = spawnedPTYs[0]
+
+      const disposed = terminalService.dispose()
+
+      expect(pty.kill).toHaveBeenCalled()
+      expect(await settledAfterIo(disposed)).toBe(false)
+
+      pty.emit('exit', { exitCode: 0 })
+      await disposed
+    })
+
+    it('dispose also waits for a shell killed earlier by a window close', async () => {
+      const { terminalService } = await import('./TerminalService')
+      await createId(terminalService, { cwd: '/tmp' }, 7)
+      const { pty } = spawnedPTYs[0]
+
+      terminalService.cleanupForWebContentsId(7)
+      const disposed = terminalService.dispose()
+
+      expect(await settledAfterIo(disposed)).toBe(false)
+
+      pty.emit('exit', { exitCode: 0 })
+      await disposed
+    })
+
+    it('dispose gives up after TERMINAL_EXIT_WAIT_MS when the shell never reports exit', async () => {
+      const { terminalService, TERMINAL_EXIT_WAIT_MS } = await import('./TerminalService')
+      await createId(terminalService, { cwd: '/tmp' })
+
+      vi.useFakeTimers()
+      try {
+        let settled = false
+        const disposed = terminalService.dispose().then(() => {
+          settled = true
+        })
+
+        await vi.advanceTimersByTimeAsync(TERMINAL_EXIT_WAIT_MS - 1)
+        expect(settled).toBe(false)
+
+        await vi.advanceTimersByTimeAsync(1)
+        await disposed
+        expect(settled).toBe(true)
+        expect(mockLogger.warn).toHaveBeenCalledWith(expect.stringContaining('did not report exit'))
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('dispose resolves at once when no shell is running', async () => {
+      const { terminalService } = await import('./TerminalService')
+
+      expect(await settledAfterIo(terminalService.dispose())).toBe(true)
     })
   })
 

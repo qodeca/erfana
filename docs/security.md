@@ -1,6 +1,6 @@
 # Security Guidelines
 
-**Last Updated**: September 2026 (v0.20.0, Electron 39)
+**Last Updated**: October 2026 (Electron 44)
 
 ## Security Posture Summary
 
@@ -444,7 +444,7 @@ npm run build:mac
 
 **Why electron-builder 26**:
 - ✅ Latest version with newest features and fixes
-- ✅ Full support for Electron 39.8.x (`^39.8.10` in `package.json`, 39.8.10 in the lockfile)
+- ✅ Full support for Electron 44.x (`^44.9.0` in `package.json`, 44.9.0 in the lockfile)
 - ✅ Applies fuses correctly with `afterPack` hook
 - ⚠️ Requires workaround for dependency scanning bug
 
@@ -513,13 +513,15 @@ The overlay windows have their own, tighter channel path: `screenshot:areaSelect
 
 ## Known vulnerabilities
 
-Run `npm audit` to check. **Policy**: zero high/critical production advisories at release. Pre-release: `npm audit --omit=dev --json` and diff against the **Accepted exceptions for v0.21.0** table below.
+Run `npm audit` to check. **Policy**: zero high/critical production advisories at release. Pre-release: `npm audit --omit=dev --json` and diff against the **Accepted exceptions for v0.20.1** table below.
 
-**Current state** (audited 2026-09-26, pre-0.21.0): `npm audit --omit=dev` reports **4 high** production advisories — `electron`, `extract-zip`, `@llamaindex/liteparse` and `sharp` — accepted for v0.21.0 under the dated exception below. The full tree (`npm audit`) reports 16 (1 critical, 12 high, 3 moderate); the other 12 run only while dependencies install or the app builds, or under the test runner, and never ship. The former `mermaid → langium → chevrotain` moderate advisories no longer count against production because Monaco and Mermaid moved to `devDependencies` in v0.11.0 (#206 — pre-migration PR, no longer resolves on the public repo); `axios` and `fast-uri` high-severity advisories were patched in v0.11.2.
+**Current state** (audited 2026-10-18, after v0.20.1): `npm audit --omit=dev` reports **0** production advisories. The four v0.20.1 highs are cleared (see below), `chokidar` 5.0.0 took `braces` (GHSA-vfj7-8cjw-p6xm) out of the production tree, and `fast-uri` moved to 3.1.8 (GHSA-hrr3-gc8f-f4qj, a lock-only update inside `ajv`'s range). The full tree (`npm audit`) reports 28 (2 critical, 11 high, 12 moderate, 3 low); all of them run only while dependencies install or the app builds, or under the test runner, and never ship.
 
-### Accepted exceptions for v0.21.0 (owner decision 2026-09-26)
+**At v0.20.1** (audited 2026-10-01): **4 high** production advisories — `electron`, `extract-zip`, `@llamaindex/liteparse` and `sharp` — accepted under the dated exception below, plus **1 moderate**, `fast-uri` (GHSA-hrr3-gc8f-f4qj, host case normalization, CVSS 4.8). The former `mermaid → langium → chevrotain` moderate advisories no longer count against production because Monaco and Mermaid moved to `devDependencies` in v0.11.0 (#206 — pre-migration PR, no longer resolves on the public repo); `axios` and `fast-uri` high-severity advisories were patched in v0.11.2.
 
-A dated exception to the policy above: v0.21.0 ships with these four production highs open, and they are fixed after the release.
+### Accepted exceptions for v0.20.1 (owner decision 2026-09-26)
+
+A dated exception to the policy above: v0.20.1 ships with these four production highs open, and they are fixed after the release.
 
 | Package | GHSA id(s) | Where Erfana reaches it | Guard that limits it | Follow-up that clears it |
 |---|---|---|---|---|
@@ -528,13 +530,14 @@ A dated exception to the policy above: v0.21.0 ships with these four production 
 | `sharp` 0.34.5 | GHSA-f88m-g3jw-g9cj (libvips), GHSA-rgj7-g3m4-5g8c (libheif) | transitive of `@llamaindex/liteparse` on the same parse path; build-time only in `scripts/capture/legibility.mjs:29` | No guard beyond the same byte cap applies to the libvips/libheif decoder flaws; reached only through liteparse, on a document the user chose to import. The cap bounds input bytes, not decoded pixels (see [Document import security](#document-import-security)) | `@llamaindex/liteparse` 1.x → 2.x (pulls a fixed `sharp`) |
 | `electron` 39.8.10 | GHSA-jmr9-qjv8-65gv, GHSA-7pqw-9j4j-h8q3 (via `extract-zip`) | Electron is the runtime, but the flagged code is Electron's install-time `extract-zip` dependency, used only to unzip the binary at `npm install`; no Erfana runtime path calls it | Binary downloaded over TLS from the official release and checksum-verified by `@electron/get` | Electron 39 → 44 |
 
+**Cleared after v0.20.1:** the `@llamaindex/liteparse` and `sharp` rows. #164 (PR #167) moved liteparse to 2.14.7, a Rust/NAPI package that no longer depends on `sharp`, so neither appears in `npm audit --omit=dev` any more. `sharp` stays a `devDependency` for the documentation-capture scripts only and is not shipped. The rows stay above as the record of what v0.20.1 shipped with. The `extract-zip` row's runtime path is closed too (#165): `src/main/utils/zipArchive.ts` now extracts with `yauzl` 3.4.0 directly and rejects symbolic-link and other non-regular entries in its pre-pass, and `extract-zip` is no longer a direct dependency. `npm audit` still lists it until the Electron upgrade, because Electron 39 itself depends on it at install time. The `electron` row is cleared by the move to Electron 44.9.0 (#165): it also fixes GHSA-hq2x-r82h-9wj4 and GHSA-gr2m-v5gq-v685 (popups that do not inherit a sandbox – not reachable in Erfana, whose main window, preview view and image-export window all deny popups and whose preview CSP grants no `allow-popups`), and Electron 44 no longer depends on `extract-zip`, so that row and the install-time `http-cache-semantics` advisory leave `npm audit --omit=dev` too.
+
 ### Dependency overrides (package.json)
 
 | Package | Pin | Reason |
 |---|---|---|
-| `@electron/rebuild` | `3.7.1` | node-pty toolchain compat |
 | `lodash`, `lodash-es` | **exact** `4.18.1` | GHSA 1115805/6/9/10 (`_.template` code injection + `_.unset`/`_.omit` prototype pollution). Vulnerable range `<=4.17.23`. |
-| `chokidar` | **exact** `3.6.0` | chokidar 4 removed `disableGlobbing`, which `DirectoryWatcherService`, `FileWatcherService` and `GitWatcherService` rely on (FD-exhaustion fix). The `Guard - chokidar v3 pinned` step in `checks.yml` fails the build on any drift. |
+| `chokidar` | **exact** `5.0.0` | Keeps chokidar 3 and its `braces` dependency (GHSA-vfj7-8cjw-p6xm, high, no patched release) out of the production tree; with chokidar 5, `braces` is dev-only. The `Guard - chokidar 5 pinned, no braces in production` step in `checks.yml` fails the build unless the installed chokidar is exactly 5.0.0, and fails if `npm ls braces --omit=dev --all --parseable` prints anything. |
 | `dompurify` | `^3.4.1` | Forces every transitive `dompurify` onto 3.4.1 or later. The originating advisory is not recorded in the repo – check `npm audit` history before relaxing. |
 
 **Lodash 4.18.x is a community fork, not OpenJS**: `4.18.0`/`4.18.1` were published by maintainer `magic-akari` in Oct 2025 after the upstream OpenJS branch went dormant. We pin **exact** (no caret) so a future 4.18.2 from any maintainer can't auto-flow into the lockfile; `package-lock.json` integrity hashes additionally pin the tarball. On Mermaid/electron-builder major bumps, retest the override chain — transitive resolution may shift.

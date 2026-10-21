@@ -5,7 +5,7 @@ capabilities:
   - pre-release-checklist
   - environment-validation
   - ci-config-integrity
-description: MUST BE USED in Phase 0 of the releasing-erfana skill to enforce the pre-flight checklist before any release tag is pushed. Erfana-local override. Validates: branch gate, clean working tree, required tools, green checks.yml for HEAD, GitHub Secrets completeness, workflow YAML lint, electron-builder config integrity, Windows status-snapshot freshness (docs/windows/implementation-plan.md re-anchored on the version about to ship). Heavyweight quality gates (lint, typecheck, tests, audit) are already enforced as required status checks on main, so this agent does NOT re-run them.
+description: "MUST BE USED in Phase 0 of the releasing-erfana skill to enforce the pre-flight checklist before any release tag is pushed. Erfana-local override. Validates: branch gate, clean working tree, required tools, green checks.yml for HEAD, GitHub Secrets completeness, workflow YAML lint, electron-builder config integrity, Windows status-snapshot freshness (docs/windows/implementation-plan.md re-anchored on the version about to ship). Heavyweight quality gates (lint, typecheck, tests, audit) are already enforced as required status checks on main, so this agent does NOT re-run them."
 tools: Bash, Read, Glob, Grep
 model: sonnet
 ---

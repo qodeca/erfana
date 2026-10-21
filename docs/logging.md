@@ -135,6 +135,7 @@ All log files are stored in:
 ├── combined.log      # All logs from both processes
 ├── main.log          # Main process logs only
 ├── renderer.log      # Renderer process logs only
+├── crash.log         # Last-resort start-up / crash lines (see below)
 ├── combined.1.log    # Rotated (most recent)
 ├── combined.2.log    # Older
 └── ...
@@ -158,11 +159,32 @@ The `~/.erfana/logs` literal above is correct, but the single source of truth is
   - `main.log` -> `main.1.log` (most recent)
   - `main.1.log` -> `main.2.log`
   - ...
-  - `main.100.log` is deleted (oldest)
+  - `main.5.log` is deleted (oldest)
 
-**File limit:** 100 rotated files per type
+**File limit:** 5 rotated files per type. With three logs at 10MB each this keeps the folder to about 180MB (it used to be 100 files per type, up to about 3GB). Leftover `.N.log` files above the cap from older versions are removed by the next cleanup.
 
 **Retention:** Files older than **7 days** are automatically deleted
+
+**Low disk space:** cleanup runs at start-up and always prunes **oldest first**. Below 100MB free it adds a `Low disk space, pruning old logs` warning but still prunes – skipping the cleanup would let the logs keep filling the disk they are short of.
+
+### crash.log (start-up and crash fallback)
+
+`crash.log` is written **synchronously** by `src/main/utils/crashFallbackLog.ts`, for the moments when the normal logger cannot be trusted: it may not be set up yet (a start-up failure) or may not flush before the process dies.
+
+- Lines: `[timestamp] <tag> text`. Tags: `[crash] startup-settings-init`, `[crash] startup-logging-init`, `[crash] unhandled-rejection`, `[crash] uncaught-exception`
+- **Redacted**: no absolute paths or user names (quoted errno paths via `redactedLogError`, any other path-like text cut to its last segment), one line, at most 2,000 characters
+- **Rate-limited per tag**: one line per tag per 5 s; the next line says `(+N skipped)`
+- **Size cap**: at about 1MB it is renamed to `crash.1.log` (replacing the older one) and a fresh file starts. Both are removed by the 7-day retention
+- Never throws: if even this write fails, the app carries on
+
+### Renderer log limits
+
+The renderer is untrusted input, so entries arriving on `logging:log` are bounded in `LogEntrySchema` and in the handler:
+
+- **Size limits shorten, never reject**: message 8,000 characters, error message 8,000, stack 16,000, name 200, timestamp 64; a context keeps at most 50 keys, each value at most 4,000 characters (non-string values via their JSON form), 8,000 characters of JSON in total. Cut text ends in `[truncated]`; a cut context gets `"truncated": true`. A React `componentStack` therefore survives, shortened. Only a malformed shape (wrong type, unknown level) is rejected, and that is reported by a rate-limited `Invalid log entry from renderer` warning (at most one per 10 s)
+- **Per-sender rate cap** (10 s fixed window): normal records are limited to 200 records and 256K characters per sender; `error` and `fatal` have their **own** budget (50 records, 128K characters) so a flood of debug noise cannot starve them. When a window drops anything, one `[RENDERER] log records dropped (rate cap)` warning reports `senderId`, `suppressed` and `suppressedSevere`
+- **Control characters are escaped** (`SenderRateCap` is in `src/main/utils/`; escaping is `escapeControlChars` in `LoggingService.ts`): CR, LF, tab, the other C0/C1 controls, DEL and the Unicode line / paragraph separators become `\n`, `\r`, `\t` or `\uXXXX`, so one log call can only produce one line and a message cannot forge a second one. The same escaping applies to main-process messages, error text and stacks, so interpolated text such as a working directory is covered too (stacks are therefore written on one line with `\n`)
+- **No terminal output in logs**: the terminal service logs a PTY chunk's length only, never its content, and logs file and folder names rather than full paths (`redactPath`)
 
 ### Log format
 
@@ -201,7 +223,8 @@ Reading notes:
 
 - A `[hang] window-unresponsive` **followed by** `[hang] window-responsive` is a recoverable freeze, not a death. `render-process-gone` with no `responsive` line after it is the renderer actually going away.
 - The main-process records land in `main.log` (and `combined.log`) even though they describe renderer failures — they are written by main. The `[GlobalErrorTrail]` records come from the renderer and are prefixed `[RENDERER]`.
-- The handlers are deliberately **log-only**: no auto-reload, no dialog, no relaunch. A crash caused by restored state would re-crash on reload, so automated recovery would be a boot loop.
+- The handlers are deliberately **log-only**: no auto-reload, no dialog, no relaunch. (The one dialog Erfana adds is the start-up one: if the settings or the log files cannot be set up at launch, the app still opens its window and then shows a non-blocking message box once, see [Troubleshooting](./troubleshooting-advanced.md).) A crash caused by restored state would re-crash on reload, so automated recovery would be a boot loop.
+- `[crash] unhandled-rejection` (error) and `[crash] uncaught-exception` (error) come from the main-process listeners in `src/main/utils/processCrashLogging.ts`, and are also written to `crash.log`. The rejection listener logs and then **re-raises** the rejection as an uncaught exception in a microtask, so the app behaves as it did before the listener existed (Electron still shows its error). The benign shutdown timer race (`isBenignShutdownTimerError`) is logged but not re-raised. `uncaughtExceptionMonitor` only observes and changes nothing
 - `[crash] app crash logging already registered` (debug) means a duplicated bootstrap tried to register the app-scope listeners twice; registration is idempotent, so crash records are not doubled.
 
 ### Multi-instance support
@@ -230,7 +253,7 @@ Global settings are stored in:
 
 ### Changing log level
 
-- **Settings file**: Edit `~/.erfana/settings.json` → `{ "logging": { "level": "debug" } }`. Applied immediately (no restart).
+- **Settings file**: Edit `~/.erfana/settings.json` → `{ "logging": { "level": "debug" } }` while Erfana is closed; the file is read only at start. An edit made while Erfana runs is ignored and is overwritten by the next change made in Settings.
 - **Settings UI**: Gear icon → Logging section → dropdown. Applied immediately.
 - **Programmatically**: `globalSettingsService.setSetting('logging', { level: 'debug' })` (`GlobalSettingsService.setSetting` – there is no `updateSetting`)
 
@@ -255,7 +278,7 @@ The default log level is `info`. This captures normal operations, warnings, and 
 
 **Symlink error**: Logging service refuses symlinked logs directory for security. Remove symlink: `rm ~/.erfana/logs && mkdir -p ~/.erfana/logs`
 
-**Low disk space**: Log cleanup skipped below 100MB free. Free disk space to resume.
+**Low disk space**: Below 100MB free the cleanup warns and still prunes the oldest logs. Free disk space; the folder is capped at about 180MB.
 
 **IPC errors**: Check console for `Failed to send log to main process`. Verify preload script loads correctly.
 
@@ -265,8 +288,8 @@ The default log level is `info`. This captures normal operations, warnings, and 
 
 - **Single-sourced path**: the directory comes from `LOGS_DIR_RELATIVE` in `src/shared/constants.ts`, consumed by both `LoggingService` and the crash screen's degraded mode — edit the constant, never a hard-coded literal, or the symlink check and the crash screen can drift onto different directories
 - **Symlink protection**: `~/.erfana/logs/` validated as real directory (not symlink) on initialize
-- **Disk space checks**: Cleanup skipped below 100MB free
-- **Input validation**: Renderer log entries validated via Zod schema (`LogEntrySchema` in `logging-schema.ts`). Invalid entries rejected.
+- **Disk space checks**: Below 100MB free a warning is logged and old logs are still pruned oldest-first
+- **Input validation**: Renderer log entries validated via Zod schema (`LogEntrySchema` in `logging-schema.ts`). Malformed entries are rejected; oversized ones are shortened (see [Renderer log limits](#renderer-log-limits)).
 - **Sensitive data**: Never log passwords, API keys, file contents, PII, or session tokens. Log paths and sizes instead.
 
 ## Implementation details
@@ -284,7 +307,7 @@ Performance instrumentation added for large-project debugging (#151):
 - **Timing**: `GitStatus: completed` with `strategy`, `durationMs`, `fileCount`, `truncated` (info level)
 - **File operations**: `FileService: readDirectory completed` with `durationMs`, `fileCount` (info level); since #208 one of five `readDirectory` lines for tree walks, all carrying `pathDigest`, and a `readId` (`behindReadId` on the joined line) – see [Tree reads and memory](#tree-reads-and-memory-208)
 - **Project switch**: Per-stage logging with `durationMs` for failure identification
-- **Watcher health**: `DirectoryWatcherService` logs a health snapshot every 120s – `info` level since #208 (`warn` when the watcher is stressed), so it reaches `main.log` at the default level, and it now carries process memory; see [Tree reads and memory](#tree-reads-and-memory-208)
+- **Watcher health**: `DirectoryWatcherService` logs a health snapshot every 120s – `info` level since #208 (`warn` when the watcher is stressed), so it reaches `main.log` at the default level, and it now carries process memory; see [Tree reads and memory](#tree-reads-and-memory-208). Since #211 it also carries the path-filter and Windows-backend counters – see [Large projects on Windows](#large-projects-on-windows-211)
 - **Buffer pressure**: `ThrottledWorker` logs at 80% and 50% buffer capacity (warn/info level)
 - **Rate-limited errors**: `RateLimitedLogger` (`src/main/utils/RateLimitedLogger.ts`) prevents log spam during cascading EMFILE errors (10s default cooldown)
 
@@ -316,7 +339,7 @@ A very large project that kept changing made Erfana exit on Windows with nothing
 | Line | Level | When | Context |
 |------|-------|------|---------|
 | `FileService: readDirectory started` | info | A walk starts | `readId`, `pathDigest`, `followUp`, `callers` |
-| `FileService: readDirectory completed` | info | A walk succeeded | `durationMs`, `fileCount`, `dirCount`, `hiddenPatternCount`, `maxDepth`, plus `readId`, `pathDigest`, `followUp`, `callers` |
+| `FileService: readDirectory completed` | info | A walk succeeded | `durationMs`, `fileCount`, `dirCount`, `hiddenPatternCount`, `maxDepth`, the #211 exclude counts (`excludePatternCount`, `excludedEntryCount`, `walkHintCount`, `matcherBudgetExceeded` – see [Large projects on Windows](#large-projects-on-windows-211)), plus `readId`, `pathDigest`, `followUp`, `callers` |
 | `FileService: readDirectory failed` | warn | A walk rejected (only the root `readdir` can fail one; sub-folder errors are recovered) | `readId`, `pathDigest`, `durationMs` |
 | `FileService: readDirectory still running` | warn | Once per walk, `READ_DIRECTORY_SLOW_WARN_MS` (60 s) after it started | `readId`, `pathDigest`, `elapsedMs` |
 | `FileService: readDirectory joined follow-up read` | info | A call arrived while a walk of that path ran and was queued behind it | `pathDigest`, `behindReadId` |
@@ -354,6 +377,43 @@ Reading notes:
 - The health line adds about 30 `info` lines an hour while a project is open; rotation absorbs it.
 - The handler's `file:readDirectory IPC completed` `durationMs` now includes time spent waiting behind a running walk of the same path, so it can be much larger than the walk's own `durationMs`.
 - Debug-level companions, for a `debug` session: `File tree refresh skipped – project changed`, `File tree refresh skipped – stale caller`, `File tree refresh failed for a project no longer open` and `Stale project load failed; ignored`, all prefixed `[useProjectManagement]`.
+
+### Large projects on Windows (#211)
+
+The `files.exclude` list, the project path filter and the Windows native directory watcher ([File watching § Watch backends](./file-watching/README.md#watch-backends-211)). Every line below carries counts, durations, codes and fixed reason strings only – never a path, an exclude entry's text or a Node error message (which quotes absolute paths).
+
+**New lines** (`main.log`):
+
+| Line | Level | When | Context |
+|------|-------|------|---------|
+| `Project switch: files.exclude entries rejected` | warn | A project opens and a settings file has entries that break the rules; one line per source | `source` (`global` / `project`), `rejectedCount`, `rejected` – the first 64 `{ index, reason }` |
+| `Exclude patterns disabled: match budget exceeded` | warn | Once per project session, when 100 pattern tests have run out of budget and pattern entries switch off | `budgetExceeded`, `patternEntryCount` |
+| `Directory watcher backend selected` | info | Once, at the first directory watch | `backend` (`chokidar` / `native-recursive`) |
+| `Directory watcher override ignored: unknown value` | warn | `ERFANA_DIRECTORY_WATCHER` is set to anything but `chokidar` | `variable`, `accepted` (the value itself is not logged) |
+| `Native directory watcher ready` | info | Windows: the watcher's plan is complete | `recursiveWatches`, `splitFolders`, `walkHints`, `planCapped`, `elapsedMs` |
+| `Directory watcher resync` | info | Windows: lost events were answered by a catch-up re-read (or counted into a pause) | `reason` (`overflow`, `backlog`, `watch-error`, `reopen`), `paused`, `suppressedCount` – at most one line per 10 s |
+| `Directory watch failed to start, restart scheduled` | info | A watch could not be built and a restart was scheduled | `errorType` |
+| `Native watcher: handle cap reached, folder left unwatched` | warn | The 512-handle cap was hit | `maxHandles` |
+| `Native watcher: a watch failed to open` | warn | `fs.watch` refused a folder (other than as gone) | `code`, `recursive` |
+| `Native watcher: listing a split folder failed, watching it recursively` | warn | A split folder could not be listed during the plan | `code` |
+| `Native watcher: a watch reported an error` | warn | A handle emitted an `error`; it is closed and re-checked | `code`, `recursive` |
+| `Native watcher: folder left unwatched after repeated re-opens` | warn | A path hit the 3-per-60 s re-open cap | `reopenLimit`, `windowMs`, `unwatched` |
+| `Native watcher: resolving the root failed, watching it as given` | warn | `realpathSync.native` failed other than as gone | `code` |
+| `Native watcher: closing a watch failed`, `Native watcher: error with no listener`, `Native watcher: background task failed`, `Native classifier: listener failed` | warn | Defensive paths | `code` |
+
+Every `Native watcher: …` warning is rate-limited per kind to one line per 10 s and carries `suppressedCount`. `Native watcher: listing a folder failed` (`code`) is its debug-level companion.
+
+**New fields on existing lines:**
+
+- `FileService: readDirectory completed` – `excludePatternCount` (entries in the compiled list), `excludedEntryCount` (entries this walk skipped without reading), `walkHintCount` (hints a root walk stored for the Windows plan; 0 for any other walk), `matcherBudgetExceeded` (pattern tests in this walk that ran out of budget).
+- `Project switch: settings loaded` (debug) – `excludePatternCount`.
+- `DirectoryWatcher health` – `eventsFiltered` (events dropped as excluded, hidden, ignored or outside the project), `nativeOverflows` (Windows change-buffer overflows), `nativeResyncs` (catch-up re-reads the native backend asked for), `matcherBudgetExceeded`. The counters are cumulative. A growth in `nativeResyncs` since the previous health line now also counts as stress and logs the line at `warn`; a resync that happened before the previous line no longer does.
+
+Reading notes:
+
+- A burst of changes only inside excluded, hidden or ignored folders leaves no `📁 Directory changed` and no `FileService: readDirectory started` line; `eventsFiltered` grows instead.
+- `planCapped: true` on the ready line, or a `handle cap reached` warning, means some dropped folder still sits inside a recursive watch; heavy churn there can cost a resync. Reopening the project re-plans with fresh walk hints.
+- `RateLimitedLogger` measures its window from process start, so a resync line in roughly the first 10 s after Erfana starts is counted in the next line's `suppressedCount` instead of being written (pre-existing behaviour; the EMFILE line shares it).
 
 ## Related documentation
 

@@ -16,10 +16,11 @@
  *
  * @see docs/designs/sd-074-html-preview.md §4.4, §5(a)
  */
-import { BrowserWindow, dialog, shell, type Session } from 'electron'
+import { BrowserWindow, dialog, type Session } from 'electron'
+import { openExternalSafe } from '../../utils/openExternalSafe'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import type { WatchOptions } from 'chokidar'
+import type { ChokidarOptions } from 'chokidar'
 import { PREVIEW } from '../../../shared/constants'
 import type { GlobalSettings } from '../../../shared/ipc/global-settings-schema'
 import { createPreviewRootRegistry } from '../../services/preview/PreviewRootRegistry'
@@ -82,7 +83,7 @@ export interface PreviewGraph {
 }
 
 /** Preview-tuned entry-file watch timings (mirrors the pool's overrides, §1.4). */
-const PREVIEW_ENTRY_WATCH_OVERRIDES: Partial<WatchOptions> = {
+const PREVIEW_ENTRY_WATCH_OVERRIDES: Partial<ChokidarOptions> = {
   awaitWriteFinish: {
     stabilityThreshold: PREVIEW.WATCH_STABILITY_MS,
     pollInterval: PREVIEW.WATCH_POLL_INTERVAL_MS
@@ -110,7 +111,7 @@ const confirmThenOpenExternal = createExternalLinkConsent({
   // `ConsentWindow` is a structural slice of `BrowserWindow`; `resolveWindow`
   // above only ever hands back a real one.
   showMessageBox: (win, options) => dialog.showMessageBox(win as BrowserWindow, options),
-  openExternal: (url) => shell.openExternal(url)
+  openExternal: (url) => openExternalSafe(url)
 })
 
 /**

@@ -6,6 +6,15 @@ import dotenv from 'dotenv'
 // Load .env file so E2E tests can access API keys (e.g., OPENAI_API_KEY)
 dotenv.config()
 
+// The OpenAI key is for the env-gated `transcription` project only (real, paid
+// calls). Drop it from the runner's environment otherwise, so no other spec -
+// including the ones that still launch the app with `...process.env` - can pass
+// it on. The fixtures also build the app's environment from an allowlist
+// (e2e/fixtures/isolation.ts), which never includes it.
+if (process.env.ERFANA_E2E_TRANSCRIPTION !== '1') {
+  delete process.env.OPENAI_API_KEY
+}
+
 export default defineConfig({
   testDir: './e2e',
   timeout: 60000,

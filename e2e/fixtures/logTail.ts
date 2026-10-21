@@ -5,10 +5,11 @@
  *
  * The app logs to `~/.erfana/logs/main.log` (`LoggingService.getLogsDir` —
  * `homedir()` + `LOGS_DIR_RELATIVE`; the e2e `--user-data-dir` does not move
- * it), so the file is shared with every other Erfana process on the machine,
- * including a second Playwright worker. Two things keep a read honest: only
- * bytes appended after `mark()` are looked at, and the caller's pattern must
- * carry something unique to its own run (a random token in the URL it clicked).
+ * it). The fixtures launch the app with a per-worker sandbox home (the
+ * `homeDir` fixture), so the file is the worker's own, not the developer's
+ * real log. Two things keep a read honest: only bytes appended after `mark()`
+ * are looked at, and the caller's pattern should carry something unique to its
+ * own run (a random token in the URL it clicked).
  *
  * Rotation (`main.log` → `main.1.log`) shrinks the file; a size below the mark
  * resets the mark to zero so the read continues from the fresh file.
@@ -17,21 +18,20 @@
  */
 
 import * as fsp from 'fs/promises'
-import * as os from 'os'
 import * as path from 'path'
 
 import { expect } from '@playwright/test'
-import { LOGS_DIR_RELATIVE } from '../../src/shared/constants'
+import { appLogsDir } from './isolation'
 
-/** Where the running app writes its main-process log. */
-export function appMainLogPath(): string {
-  return path.join(os.homedir(), LOGS_DIR_RELATIVE, 'main.log')
+/** Where the app launched with `homeDir` writes its main-process log. */
+export function appMainLogPath(homeDir: string): string {
+  return path.join(appLogsDir(homeDir), 'main.log')
 }
 
 export class LogTail {
   private offset = 0
 
-  constructor(private readonly file: string = appMainLogPath()) {}
+  constructor(private readonly file: string) {}
 
   /** Remember the current end of the file; `appended()` reads from here. */
   async mark(): Promise<void> {

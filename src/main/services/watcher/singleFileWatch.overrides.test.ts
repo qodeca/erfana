@@ -9,17 +9,17 @@
  *   - with no overrides the base options are applied byte-for-byte (both
  *     existing call sites are behaviourally unchanged),
  *   - overrides shallow-merge over the base, and
- *   - the security-load-bearing `followSymlinks` / `disableGlobbing` invariants
- *     survive an overrides call.
+ *   - the security-load-bearing `followSymlinks` invariant
+ *     survives an overrides call.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import type { WatchOptions } from 'chokidar'
+import type { ChokidarOptions } from 'chokidar'
 
-const watchCalls: Array<{ path: string; options: WatchOptions }> = []
+const watchCalls: Array<{ path: string; options: ChokidarOptions }> = []
 
 vi.mock('chokidar', () => {
   const fakeWatcher = { on: vi.fn(), close: vi.fn(async () => {}) }
-  const watch = vi.fn((path: string, options: WatchOptions) => {
+  const watch = vi.fn((path: string, options: ChokidarOptions) => {
     watchCalls.push({ path, options })
     return fakeWatcher
   })
@@ -45,8 +45,7 @@ describe('createSingleFileWatcher options merge', () => {
       persistent: SINGLE_FILE_WATCH_OPTIONS.persistent,
       ignoreInitial: SINGLE_FILE_WATCH_OPTIONS.ignoreInitial,
       usePolling: SINGLE_FILE_WATCH_OPTIONS.usePolling,
-      followSymlinks: false,
-      disableGlobbing: true
+      followSymlinks: false
     })
     expect(options.awaitWriteFinish).toEqual({ stabilityThreshold: 300, pollInterval: 100 })
   })
@@ -72,7 +71,6 @@ describe('createSingleFileWatcher options merge', () => {
     expect(options.awaitWriteFinish).toEqual({ stabilityThreshold: 50, pollInterval: 25 })
     // The security invariants are NOT in the overrides, so they survive.
     expect(options.followSymlinks).toBe(false)
-    expect(options.disableGlobbing).toBe(true)
   })
 
   it('does not mutate the shared constant when overrides are passed', async () => {

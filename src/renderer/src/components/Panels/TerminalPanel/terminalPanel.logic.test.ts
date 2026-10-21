@@ -6,7 +6,7 @@
  * @module TerminalPanel/logic.test
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import {
   computeTerminalState,
   shouldApplyResize,
@@ -16,7 +16,8 @@ import {
   TERMINAL_THEME,
   TERMINAL_OPTIONS,
   TERMINAL_FONT_FAMILY,
-  ensureTerminalFontLoaded
+  ensureTerminalFontLoaded,
+  createTerminalLinkHandler
 } from './terminalPanel.logic'
 
 describe('computeTerminalState', () => {
@@ -106,5 +107,35 @@ describe('ensureTerminalFontLoaded', () => {
     const second = ensureTerminalFontLoaded()
     expect(second).toBe(first)
     await expect(first).resolves.toBeUndefined()
+  })
+})
+
+describe('createTerminalLinkHandler', () => {
+  it('opens the clicked link through the supplied opener and not window.open', async () => {
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(null)
+    const open = vi.fn().mockResolvedValue(undefined)
+    const onError = vi.fn()
+    const event = { preventDefault: vi.fn() } as unknown as MouseEvent
+
+    createTerminalLinkHandler(open, onError)(event, 'https://example.com/')
+    await Promise.resolve()
+
+    expect(open).toHaveBeenCalledWith('https://example.com/')
+    expect(event.preventDefault).toHaveBeenCalled()
+    expect(openSpy).not.toHaveBeenCalled()
+    expect(onError).not.toHaveBeenCalled()
+    openSpy.mockRestore()
+  })
+
+  it('reports a refused open instead of throwing', async () => {
+    const failure = new Error('refused')
+    const open = vi.fn().mockRejectedValue(failure)
+    const onError = vi.fn()
+    const event = { preventDefault: vi.fn() } as unknown as MouseEvent
+
+    createTerminalLinkHandler(open, onError)(event, 'file:///etc/hosts')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(onError).toHaveBeenCalledWith(failure, 'file:///etc/hosts')
   })
 })

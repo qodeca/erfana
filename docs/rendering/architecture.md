@@ -68,7 +68,7 @@ Content Security Policy enforces:
 ## Allowed Elements
 
 The allowlist is GitHub's `defaultSchema` from `hast-util-sanitize`, applied verbatim.
-Erfana's only customisation adds `tel` and `ftp` to `protocols.href`
+Erfana's only customisation adds `tel` to `protocols.href`
 (`MarkdownPreview.tsx`) – it does **not** extend `protocols.src`, so `data:` image sources
 are stripped even though the CSP would permit them.
 

@@ -4,7 +4,7 @@ Rules for `src/main/services/` that are not readable from a module's own header.
 
 **Watchers** (`watcher/`)
 
-- `singleFileWatch` is the one place a single-file chokidar watcher is built. Its `disableGlobbing: true` is a load-bearing chokidar v3 pin – keep it.
+- `singleFileWatch` is the one place a single-file chokidar watcher is built. chokidar 5 has no globbing, so a glob-looking name (`[draft] {v2}.md`) is literal – `singleFileWatch.rename.integration.test.ts` pins that.
 - `atomicRearm` owns the unlink branch (atomic save re-arm vs genuine delete) and re-checks realpath confinement there.
 - Reuse `rearmingSingleFileWatch` (singleFileWatch + atomicRearm) for any single-file watcher that must keep firing across atomic editor saves.
 

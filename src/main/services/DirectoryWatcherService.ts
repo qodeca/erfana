@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import chokidar, { FSWatcher } from 'chokidar'
+import chokidar from 'chokidar'
 import { BrowserWindow, WebContents, webContents } from 'electron'
-import { normalize, sep } from 'path'
+import { normalize, resolve, sep } from 'path'
 import { settingsService } from './SettingsService'
 import { PauseController } from '../utils/PauseController'
 import {
@@ -10,25 +10,48 @@ import {
   EventCoalescer,
   AtomicSaveDetector,
   ThrottledWorker,
+  PauseEpisode,
+  NativeRecursiveWatcher,
+  selectDirectoryWatchBackend,
   getPlatformConfig,
   getPlatformDiagnostics,
-  type FileChangeEvent
+  type DirectoryWatchBackend,
+  type DirectoryWatchHandle,
+  type DirectoryWatchResyncReason,
+  type FileChangeEvent,
+  type InternalChange
 } from './watcher'
-import { DEFAULT_WATCHER_IGNORE_PATTERNS, PAUSE_CONTROLLER } from '../../shared/constants'
+import {
+  DEFAULT_TREE_HIDDEN_PATTERNS,
+  DEFAULT_WATCHER_IGNORE_PATTERNS,
+  PAUSE_CONTROLLER
+} from '../../shared/constants'
 import { logger } from './LoggingService'
+import { redactedLogError } from '../utils/redactUserInput'
 import { isSystemDirectory } from '../utils/pathSecurity'
+import { isLexicallyInside } from '../utils/projectConfinement'
+import { ProjectPathFilter, toRootRelative } from '../utils/projectPathFilter'
 import { AppError, ErrorCode } from '../../shared/errors'
 import { RateLimitedLogger } from '../utils/RateLimitedLogger'
 import { collectMemorySnapshot } from '../utils/processMemorySnapshot'
+import { isAtomicTempName } from '../utils/atomicWrite'
 
 interface WatchedDirectory {
   dirPath: string
-  watcher: FSWatcher
+  watcher: DirectoryWatchHandle
+  /** Which backend built `watcher`; a native `unlink` is already confirmed by `lstat` (#211, D2). */
+  backend: DirectoryWatchBackend
   webContentsIds: Set<number>
   pauseController: PauseController
   throttledWorker: ThrottledWorker<FileChangeEvent>
   atomicSaveDetector: AtomicSaveDetector
   version: number
+  /**
+   * What the current pause dropped and what re-read it (#210). Exists only
+   * while paused: set when `pauseWatch` takes the count to 1, cleared at full
+   * resume and on the safety timeout – so its presence is the paused guard.
+   */
+  pauseEpisode?: PauseEpisode
 }
 
 // Git index watching migrated to GitWatcherService (Issue #74)
@@ -37,6 +60,27 @@ interface DirectoryChangeEvent {
   type: 'add' | 'addDir' | 'unlink' | 'unlinkDir' | 'change'
   path: string
 }
+
+/** Receives the absolute paths one delivered batch removed. */
+export type PathsRemovedListener = (removedPaths: readonly string[]) => void
+
+/** Construction options for {@link DirectoryWatcherService}. */
+export interface DirectoryWatcherServiceOptions {
+  /**
+   * Which backend watches a directory (#211, design D6). Defaults to
+   * `selectDirectoryWatchBackend()`: the native recursive watcher on Windows,
+   * chokidar elsewhere. Read once, here.
+   */
+  readonly backend?: DirectoryWatchBackend
+}
+
+/** Most resync log lines per window; the rest are counted (#211, D3). */
+const RESYNC_LOG_INTERVAL_MS = 10_000
+
+function isPresent<T>(value: T | null): value is T {
+  return value !== null
+}
+
 export class DirectoryWatcherService {
   private watchedDirectories: Map<string, WatchedDirectory> = new Map()
   private projectPath: string | null = null
@@ -56,41 +100,114 @@ export class DirectoryWatcherService {
   private readonly MAX_RESTART_ATTEMPTS = 3
   private readonly RESTART_BASE_DELAY = 800
 
-  // Dynamic ignore patterns (configurable per-project via .erfana/settings.json)
-  private ignorePatterns: string[] = [...DEFAULT_WATCHER_IGNORE_PATTERNS]
+  // Which paths are not watched and whose events are dropped (#211, design D4):
+  // excluded, hidden or ignored. Replaced per project by ProjectService; until
+  // then the default hidden and ignore lists, with no exclude list.
+  private pathFilter: ProjectPathFilter = this.createPatternFilter([...DEFAULT_WATCHER_IGNORE_PATTERNS])
 
   // Rate-limited EMFILE logger (max once per 10s to prevent fd feedback loop)
   private readonly emfileLogger = new RateLimitedLogger('emfile', 10000)
 
+  // A burst of lost native events can ask for a resync every few seconds
+  private readonly resyncLogger = new RateLimitedLogger('native-resync', RESYNC_LOG_INTERVAL_MS)
+
   // Health logger interval (120s)
   private healthLogInterval: NodeJS.Timeout | null = null
+  // Resync count at the previous health line: only new resyncs mean stress
+  private lastNativeResyncs = 0
 
-  /**
-   * Set custom ignore patterns (called by ProjectService after loading settings)
-   */
-  setIgnorePatterns(patterns: string[]): void {
-    this.ignorePatterns = patterns
+  // The watch backend (#211, D6), logged once at the first watch
+  private readonly watchBackend: DirectoryWatchBackend
+  private backendLogged = false
+
+  // Told about every confirmed removal in a delivered batch, so the single-file
+  // watches can notice a file whose parent folder was renamed or deleted
+  private readonly removalListeners = new Set<PathsRemovedListener>()
+
+  constructor(options: DirectoryWatcherServiceOptions = {}) {
+    this.watchBackend = options.backend ?? selectDirectoryWatchBackend()
   }
 
   /**
-   * Get current ignore patterns
+   * Set the project's path filter (called by ProjectService after loading
+   * settings). It applies to watches started after the call and to every
+   * event queued after it; its own `root` is not read – paths are measured
+   * against this service's project root (design D4).
    */
-  getIgnorePatterns(): string[] {
-    return [...this.ignorePatterns]
+  setPathFilter(filter: ProjectPathFilter): void {
+    this.pathFilter = filter
   }
 
   /**
-   * Fast ignore function - called for every path by chokidar.
-   * Uses string includes for performance (faster than regex).
+   * Hear about the paths a delivered batch removed (`unlink` / `unlinkDir`,
+   * absolute, after coalescing). A single-file chokidar watch cannot see its
+   * parent folder being renamed away – nothing touches the file itself – so
+   * `FileWatcherService` listens here to mark such an open file deleted.
+   * Removals dropped while the watch is paused (the app's own operations) are
+   * not reported.
+   *
+   * @returns a function that removes the listener
    */
-  private shouldIgnorePath = (filePath: string): boolean => {
-    for (const pattern of this.ignorePatterns) {
-      // Check both Unix and Windows path separators
-      if (filePath.includes(`/${pattern}`) || filePath.includes(`\\${pattern}`)) {
-        return true
+  onPathsRemoved(listener: PathsRemovedListener): () => void {
+    this.removalListeners.add(listener)
+    return () => {
+      this.removalListeners.delete(listener)
+    }
+  }
+
+  /** Hand a batch's removed paths to every listener; one that throws is logged and skipped. */
+  private reportRemovals(events: readonly FileChangeEvent[]): void {
+    if (this.removalListeners.size === 0) return
+    const removed = events
+      .filter((e) => e.type === 'unlink' || e.type === 'unlinkDir')
+      .map((e) => e.path)
+    if (removed.length === 0) return
+    for (const listener of this.removalListeners) {
+      try {
+        listener(removed)
+      } catch (error) {
+        logger.error('Directory removal listener failed', redactedLogError(error))
       }
     }
-    return false
+  }
+
+  /** A filter with the default hidden names, these ignore patterns and no exclude list. */
+  private createPatternFilter(ignorePatterns: readonly string[]): ProjectPathFilter {
+    // The filter's root is never read here (see setPathFilter), so none is given
+    return new ProjectPathFilter('', {
+      hiddenPatterns: DEFAULT_TREE_HIDDEN_PATTERNS,
+      ignorePatterns,
+      caseSensitive: this.platformConfig.caseSensitive
+    })
+  }
+
+  /**
+   * Whether an event or watch at this absolute path is dropped (#211, D4):
+   * excluded, hidden, ignored, or outside the project (fail closed). Paths are
+   * made relative to the project root – the tree walk's base, so a watch on a
+   * subfolder applies the same list and the project's own parent folders
+   * never match – or to the watch root when no project is set. Called by
+   * chokidar for every path it meets, so it stays synchronous and cheap.
+   */
+  private shouldDropAbs(absPath: string, watchRoot: string): boolean {
+    return this.shouldDropRel(toRootRelative(this.projectPath || watchRoot, absPath))
+  }
+
+  /**
+   * Whether an event at this project-relative path is dropped (`null`:
+   * outside the project, always dropped). Counts the exclude matcher's budget
+   * overruns this test caused, for the health line.
+   */
+  private shouldDropRel(relPath: string | null): boolean {
+    // atomicWriteText's temp file (a save in flight): never shown, never a reload.
+    // Checked first, on the last path segment, so it holds for the chokidar and
+    // the native backend alike (both reach the filter through here).
+    if (relPath !== null && isAtomicTempName(relPath)) return true
+    const filter = this.pathFilter
+    const overrunsBefore = filter.excludeMatcher.budgetExceeded
+    const dropped = filter.shouldDrop(relPath)
+    this.metrics.recordMatcherBudgetExceeded(filter.excludeMatcher.budgetExceeded - overrunsBefore)
+    return dropped
   }
 
   setProjectPath(path: string): void {
@@ -102,9 +219,14 @@ export class DirectoryWatcherService {
    * Stop all directory watchers (for project switching)
    */
   async stopAll(): Promise<void> {
+    // Bump the session FIRST (as cleanupForWebContentsId does): a late event, or
+    // a first start still in flight that fails during the closes below, then
+    // sees it is stale and cannot schedule a restart that outlives this call
+    this.switchVersion++
     this.safeLog('👁️  Stopping all directory watchers...')
     this.stopHealthLogger()
     this.emfileLogger.reset()
+    this.resyncLogger.reset()
 
     // Clear pending restarts
     for (const timeout of this.pendingRestarts.values()) {
@@ -125,9 +247,6 @@ export class DirectoryWatcherService {
     }
     this.watchedDirectories.clear()
     this.metrics.setActiveWatchers(0)
-
-    // Increment session to ignore late events from the previous watchers
-    this.switchVersion++
   }
 
   /**
@@ -151,6 +270,11 @@ export class DirectoryWatcherService {
    *
    * Security: Uses normalized path comparison and checks for system directories
    * (Issue #74 review fix - aligned with validateProjectPath pattern)
+   *
+   * When the watcher cannot be built (the native backend throws at once for a
+   * root it cannot watch), a restart is scheduled and the error is rethrown
+   * (#211): a root that was briefly unavailable recovers, and a deleted one
+   * ends in `directory-watch:project-deleted` once the attempts run out.
    */
   async watchDirectory(dirPath: string, webContents: WebContents): Promise<void> {
     // Security: Normalize paths to prevent traversal attacks (Issue #74 review fix)
@@ -185,6 +309,9 @@ export class DirectoryWatcherService {
     }
 
     this.safeLog(`👁️  Starting directory watch for: ${dirPath}`)
+    this.logBackendOnce()
+    // Taken before the await below, which a stopAll can overtake
+    const session = this.switchVersion
 
     // Read depth setting (undefined => watch all levels)
     let depth: number | undefined
@@ -193,26 +320,14 @@ export class DirectoryWatcherService {
     } catch {
       depth = undefined
     }
+    // A stopAll (project switch) overtook this start: its watcher would be
+    // registered under the new session, for the old project
+    if (session !== this.switchVersion) return
 
-    // Create new watcher with performance optimizations
-    // Uses selective ignore (VS Code approach) - watches dotfolders like .claude, .github
-    // but ignores performance-killing directories like node_modules, .git/objects
-    const watcher = chokidar.watch(dirPath, {
-      persistent: true,
-      ignoreInitial: true, // Don't fire events for existing files
-      ignored: (path) => this.shouldIgnorePath(path), // Function-based ignore (more reliable than regex)
-      usePolling: false, // Use native fs events (faster)
-      // chokidar is pinned to ^3.x: v3 uses macOS FSEvents (a single stream, ~0
-      // FDs per file). v4 dropped FSEvents and watches each file via kqueue (one
-      // FD per file), which exhausts the process FD table on large projects and
-      // breaks spawning child processes (e.g. PDF export's hidden render window
-      // crashed with "Failed to initialize sandbox" on a 20k-file folder).
-      disableGlobbing: true, // Treat the path literally (matches v4); avoids glob chars in project paths
-      awaitWriteFinish: false, // Lower latency for editor saves; downstream
-                               // consumers tolerate one pre-flush `change` per write.
-      depth, // Optional cap for performance
-      followSymlinks: false // Security: don't follow symlinks
-    })
+    // Built before anything else: the native backend throws at once when the
+    // root cannot be watched (ENOENT, D15), and then nothing is left behind.
+    // Resolves without waiting for the backend's `ready` (AC5).
+    const watcher = this.createWatcherOrScheduleRestart(dirPath, depth, webContentsId, session)
 
     // Create throttled worker with VS Code values
     const throttledWorker = new ThrottledWorker<FileChangeEvent>(
@@ -234,6 +349,7 @@ export class DirectoryWatcherService {
     const watched: WatchedDirectory = {
       dirPath,
       watcher,
+      backend: this.watchBackend,
       webContentsIds: new Set([webContentsId]),
       pauseController: new PauseController({
         timeoutMs: PAUSE_CONTROLLER.SAFETY_TIMEOUT_MS,
@@ -244,6 +360,192 @@ export class DirectoryWatcherService {
       version: this.switchVersion
     }
 
+    this.attachWatcherListeners(dirPath, watcher)
+
+    this.watchedDirectories.set(dirPath, watched)
+    this.metrics.setActiveWatchers(this.watchedDirectories.size)
+
+    // Start health logger on first watch
+    this.startHealthLogger()
+  }
+
+  /** Log the backend once, at the first watch (#211, D6). */
+  private logBackendOnce(): void {
+    if (this.backendLogged) return
+    this.backendLogged = true
+    logger.info('Directory watcher backend selected', { backend: this.watchBackend })
+  }
+
+  /**
+   * Build the watcher, scheduling a restart when a first start cannot (#211).
+   * The error is rethrown either way, so the caller still hears the start failed.
+   *
+   * @param session - `switchVersion` when the start began
+   */
+  private createWatcherOrScheduleRestart(
+    dirPath: string,
+    depth: number | undefined,
+    webContentsId: number,
+    session: number
+  ): DirectoryWatchHandle {
+    try {
+      return this.createBackendWatcher(dirPath, depth)
+    } catch (error) {
+      if (this.canRestartFailedStart(dirPath, session)) {
+        // Error type only – the path stays out of the log line
+        logger.info('Directory watch failed to start, restart scheduled', { errorType: this.errorTypeOf(error) })
+        this.scheduleRestart(dirPath, new Set([webContentsId]))
+      }
+      throw error
+    }
+  }
+
+  /**
+   * Whether a failed start may schedule a restart. Not while a restart of that
+   * folder is pending or running – its own failure is `restartWatcher`'s to
+   * handle, under its stale-attempt guard. Not once the start's session is
+   * stale or the service is disposing: `stopAll` (a project switch) and
+   * `dispose` clear every restart, and one scheduled after them would outlive
+   * them – that covers a restart's start overtaken by `stopAll` as well.
+   */
+  private canRestartFailedStart(dirPath: string, session: number): boolean {
+    return (
+      !this.isDisposing &&
+      session === this.switchVersion &&
+      !this.restartAttempts.has(dirPath) &&
+      !this.pendingRestarts.has(dirPath)
+    )
+  }
+
+  /** Build the watcher for `dirPath` with the backend chosen at construction (D6). */
+  private createBackendWatcher(dirPath: string, depth: number | undefined): DirectoryWatchHandle {
+    return this.watchBackend === 'native-recursive'
+      ? this.createNativeWatcher(dirPath, depth)
+      : this.createChokidarWatcher(dirPath, depth)
+  }
+
+  /**
+   * chokidar (Linux, and every platform under the override). The project
+   * path filter decides what is not watched at all (#211, D4): excluded paths,
+   * hidden names (the tree's rule, e.g. .git) and ignore patterns
+   * (node_modules, build outputs…); other dotfolders such as .claude and
+   * .github stay watched.
+   */
+  private createChokidarWatcher(dirPath: string, depth: number | undefined): DirectoryWatchHandle {
+    return chokidar.watch(dirPath, {
+      persistent: true,
+      ignoreInitial: true, // Don't fire events for existing files
+      ignored: (path: string) => this.shouldDropAbs(path, dirPath), // Function-based ignore (more reliable than regex)
+      usePolling: false, // Use native fs events (faster)
+      // chokidar 4+ dropped macOS FSEvents and watches each file through kqueue
+      // (one FD per file), which exhausts the process FD table on large
+      // projects and breaks spawning child processes (PDF export's hidden render
+      // window crashed with "Failed to initialize sandbox" on a 20k-file
+      // folder). So macOS never gets here by default: `directoryWatchBackend`
+      // picks the native recursive watcher (FSEvents) there. Paths are literal.
+      awaitWriteFinish: false, // Lower latency for editor saves; downstream
+                               // consumers tolerate one pre-flush `change` per write.
+      depth, // Optional cap for performance
+      followSymlinks: false // Security: don't follow symlinks
+    })
+  }
+
+  /**
+   * The Windows backend (#211, D1, D5): one {@link NativeRecursiveWatcher} per
+   * watch root. The path filter works on project-relative paths – the tree
+   * walk's base (D4) – while the watcher measures from its own root, so the
+   * split paths and walk hints are mapped into the watch and the drop test
+   * maps back. `directoryWatchDepth` is honoured by dropping deeper paths;
+   * the handles stay recursive.
+   */
+  private createNativeWatcher(dirPath: string, depth: number | undefined): NativeRecursiveWatcher {
+    const filter = this.pathFilter
+    // `null`: the watch root is outside the project, so every path is dropped
+    const watchPrefix = toRootRelative(this.projectPath || dirPath, dirPath)
+    const intoWatch = (projectRel: string): string | null =>
+      watchPrefix === null ? null : this.toWatchRelative(watchPrefix, projectRel)
+    const pathEntries = filter.splitPaths().map(intoWatch).filter(isPresent)
+    const walkHints = filter.getWalkHints().map(intoWatch).filter(isPresent)
+
+    const watcher = new NativeRecursiveWatcher(dirPath, {
+      shouldDrop: (rel: string) => this.shouldDropWatchRel(watchPrefix, rel, depth),
+      splitPaths: [...pathEntries, ...walkHints],
+      splitInputsCapped: filter.splitInputsCapped,
+      caseSensitive: this.platformConfig.caseSensitive
+    })
+    this.attachNativeListeners(dirPath, watcher, walkHints.length)
+    return watcher
+  }
+
+  /**
+   * A project-relative path as seen from a watch whose root is `watchPrefix`
+   * (project-relative; `''` is the project root), or `null` when the path is
+   * not strictly inside that watch.
+   */
+  private toWatchRelative(watchPrefix: string, projectRel: string): string | null {
+    if (watchPrefix === '') return projectRel
+    const head = `${watchPrefix}/`
+    if (projectRel.length <= head.length) return null
+    const lead = projectRel.slice(0, head.length)
+    const inside = this.platformConfig.caseSensitive
+      ? lead === head
+      : lead.toLowerCase() === head.toLowerCase()
+    return inside ? projectRel.slice(head.length) : null
+  }
+
+  /**
+   * The native watcher's drop test (D4, D5) on a path relative to the watch
+   * root: deeper than `directoryWatchDepth` (chokidar's rule – a path of n
+   * segments when n − 1 > depth), or dropped by the project path filter once
+   * mapped to its project-relative form. A `null` prefix fails closed.
+   */
+  private shouldDropWatchRel(watchPrefix: string | null, rel: string, depth: number | undefined): boolean {
+    if (watchPrefix === null) return true
+    if (depth !== undefined && rel.split('/').length - 1 > depth) return true
+    return this.shouldDropRel(watchPrefix === '' ? rel : `${watchPrefix}/${rel}`)
+  }
+
+  /** The native backend's own events: lost-event resyncs, overflow counts, the plan's size (D3). */
+  private attachNativeListeners(dirPath: string, watcher: NativeRecursiveWatcher, walkHints: number): void {
+    watcher.on('resync', (reason: DirectoryWatchResyncReason) => this.handleResync(dirPath, reason))
+    watcher.on('overflow', () => {
+      if (!this.isDisposing) this.metrics.recordNativeOverflow()
+    })
+    watcher.on('ready', () => {
+      // Counts and durations only, never paths (AC8)
+      const plan = watcher.getPlanStats()
+      logger.info('Native directory watcher ready', {
+        recursiveWatches: plan.recursiveWatches,
+        splitFolders: plan.splitFolders,
+        walkHints,
+        planCapped: plan.planCapped,
+        elapsedMs: plan.elapsedMs
+      })
+    })
+  }
+
+  /**
+   * The native watcher lost events and cannot say where (#211, D3, D13).
+   * Answered with one catch-up refresh; while paused, counted as one unknown
+   * drop instead, so resume catches up unless a later completed read by the
+   * pausing window covers it.
+   */
+  private handleResync(dirPath: string, reason: DirectoryWatchResyncReason): void {
+    if (this.isDisposing) return
+    const watched = this.watchedDirectories.get(dirPath)
+    if (!watched || watched.version !== this.switchVersion) return
+    this.metrics.recordNativeResync()
+    const paused = watched.pauseController.isPaused()
+    this.resyncLogger.log('info', 'Directory watcher resync', { reason, paused })
+    if (paused) {
+      watched.pauseEpisode?.recordUnknownDrop()
+      return
+    }
+    this.sendCompensatingRefresh(dirPath)
+  }
+
+  /** Route a watcher's events into the pipeline – the same for both backends. */
+  private attachWatcherListeners(dirPath: string, watcher: DirectoryWatchHandle): void {
     // Handle file/folder additions
     watcher.on('add', (path: string) => {
       this.queueEvent(dirPath, { type: 'add', path })
@@ -304,12 +606,6 @@ export class DirectoryWatcherService {
       this.safeLog(`✅ Directory watcher ready for: ${dirPath}`)
       this.metrics.setActiveWatchers(this.watchedDirectories.size)
     })
-
-    this.watchedDirectories.set(dirPath, watched)
-    this.metrics.setActiveWatchers(this.watchedDirectories.size)
-
-    // Start health logger on first watch
-    this.startHealthLogger()
   }
 
   /**
@@ -407,11 +703,17 @@ export class DirectoryWatcherService {
   /**
    * Pause watching (during internal operations to prevent race conditions)
    * Uses reference counting to support nested pause/resume operations
+   *
+   * @param senderId - webContents id of the pausing window; only its tree reads
+   *   cover the changes dropped during this pause (#210)
    */
-  pauseWatch(dirPath: string): void {
+  pauseWatch(dirPath: string, senderId?: number): void {
     const watched = this.watchedDirectories.get(dirPath)
     if (watched) {
       const count = watched.pauseController.pause()
+      if (count === 1) {
+        watched.pauseEpisode = new PauseEpisode(senderId)
+      }
       this.safeLog(`⏸️  Paused directory watch for: ${dirPath} (count: ${count})`)
     }
   }
@@ -419,6 +721,9 @@ export class DirectoryWatcherService {
   /**
    * Resume watching after internal operations complete
    * Only resumes when all pause operations have completed (pauseCount reaches 0)
+   *
+   * At full resume, sends one catch-up refresh when a structural change from
+   * outside was dropped after the pausing window's last completed tree read (#210).
    */
   resumeWatch(dirPath: string): boolean {
     const watched = this.watchedDirectories.get(dirPath)
@@ -432,10 +737,69 @@ export class DirectoryWatcherService {
     // Only resume when all operations complete
     if (isFullyResumed) {
       this.safeLog(`▶️  Resumed directory watch for: ${dirPath}`)
+      const episode = watched.pauseEpisode
+      watched.pauseEpisode = undefined
+      if (episode?.needsCatchUp()) {
+        // Counts only – no path at info
+        const reason = episode.isForcedByCap()
+          ? 'forced: internal-change cap'
+          : `${episode.uncoveredDrops()} external changes missed while paused`
+        this.safeLog(`🔄 Catch-up refresh after pause (${reason})`)
+        this.sendCompensatingRefresh(dirPath)
+      }
     } else {
       this.safeLog(`⏸️  Directory watch still paused: ${dirPath} (count: ${watched.pauseController.getCount()})`)
     }
     return true
+  }
+
+  /**
+   * A tree read of `dirPath` is starting (#210). When it reads the root of a
+   * paused watch and comes from the window that paused it, the returned commit
+   * marks every change dropped so far as shown – call it only once the read
+   * succeeds. Any other read gets a no-op commit.
+   *
+   * Committing after the pause already ended is harmless: the episode it
+   * writes to has been discarded.
+   */
+  beginTreeRead(dirPath: string, senderId?: number): () => void {
+    const noCommit = (): void => {}
+    if (!dirPath || typeof dirPath !== 'string') {
+      return noCommit
+    }
+
+    const readRoot = resolve(dirPath)
+    // Only the first root matching the read path is covered; a second key
+    // string for the same root costs one extra read, never a missed change.
+    for (const watched of this.watchedDirectories.values()) {
+      const episode = watched.pauseEpisode
+      if (!episode || resolve(watched.dirPath) !== readRoot) {
+        continue
+      }
+      const snapshot = episode.beginTreeRead(senderId)
+      return snapshot === null ? noCommit : () => episode.completeTreeRead(snapshot)
+    }
+    return noCommit
+  }
+
+  /**
+   * Record changes an internal file operation just made (#210), so the paused
+   * watcher does not count their own events as missed external changes. Each
+   * change is recorded in every paused root that contains it; with no paused
+   * root this is a no-op. Never logs the paths.
+   */
+  noteInternalChange(...changes: InternalChange[]): void {
+    for (const watched of this.watchedDirectories.values()) {
+      const episode = watched.pauseEpisode
+      if (!episode) {
+        continue
+      }
+      for (const change of changes) {
+        if (isLexicallyInside(change.path, watched.dirPath)) {
+          episode.noteInternalChange(change)
+        }
+      }
+    }
   }
 
   /**
@@ -449,13 +813,29 @@ export class DirectoryWatcherService {
       `Safety timeout: auto-resumed directory watch for ${dirPath} after ${PAUSE_CONTROLLER.SAFETY_TIMEOUT_MS}ms (resume was never called)`
     )
 
+    // The timeout refresh below covers this pause; nothing carries forward (#210)
+    const watched = this.watchedDirectories.get(dirPath)
+    if (watched) {
+      watched.pauseEpisode = undefined
+    }
+
     // Trigger compensating refresh to recover any events missed during stuck pause
+    this.sendCompensatingRefresh(dirPath)
+  }
+
+  /**
+   * Broadcast a zero-event change that asks the tree to re-read. `catchUp`
+   * lets it through the renderer's internal-operation gate, because it
+   * reports changes the pause dropped rather than the operation's own (#210).
+   */
+  private sendCompensatingRefresh(dirPath: string): void {
     this.notifyWebContents(dirPath, 'directory-watch:changed', {
       dirPath,
       eventCount: 0,
       originalEventCount: 0,
       coalescedCount: 0,
-      summary: {}
+      summary: {},
+      catchUp: true
     })
   }
 
@@ -472,17 +852,31 @@ export class DirectoryWatcherService {
       return
     }
 
-    // Ignore if paused (during our own operations)
+    // Path filter backstop (#211, D4/D13): an excluded, hidden, ignored or
+    // outside path is dropped before pause accounting and before it counts as
+    // received, so it is never a missed change and never reaches the renderer –
+    // a burst of only such paths broadcasts nothing
+    if (this.shouldDropAbs(event.path, dirPath)) {
+      this.metrics.recordEventFiltered()
+      return
+    }
+
+    // Ignore if paused (during our own operations). No path in the log line; the
+    // episode remembers structural drops so resume can catch up on them (#210).
     if (watched.pauseController.isPaused()) {
-      this.safeLog(`⏸️  Ignoring directory change (paused): ${event.type} ${event.path}`)
+      logger.debug('Directory change dropped while paused', { eventType: event.type })
+      watched.pauseEpisode?.recordDrop(event.type, event.path)
       return
     }
 
     // Track metrics
     this.metrics.recordEventReceived()
 
-    // Handle delete events with atomic save detection (VS Code 100ms pattern)
-    if (event.type === 'unlink') {
+    // Handle delete events with atomic save detection (VS Code 100ms pattern).
+    // Not for the native backend (#211, D2): its `lstat` already confirmed the
+    // removal, a rename-style save is coalesced (`unlink` + `add` → `change`),
+    // and a large delete must not start one unthrottled `stat` per file.
+    if (event.type === 'unlink' && watched.backend !== 'native-recursive') {
       watched.atomicSaveDetector.registerDelete(event.path, (path, wasAtomicSave) => {
         if (wasAtomicSave) {
           // File reappeared → atomic save, emit as change
@@ -544,6 +938,8 @@ export class DirectoryWatcherService {
       `📁 Directory changed: ${dirPath} (${coalescedEvents.length} events after coalescing ${events.length}, ${efficiency}% reduced: ${JSON.stringify(summary)})`
     )
 
+    this.reportRemovals(coalescedEvents)
+
     // Notify all watching webContents
     this.notifyWebContents(dirPath, 'directory-watch:changed', {
       dirPath,
@@ -570,9 +966,23 @@ export class DirectoryWatcherService {
       return
     }
 
+    this.notifyIds(watched.webContentsIds, channel, data)
+  }
+
+  /**
+   * Send to these webContents ids directly, without the map entry – a restart
+   * outcome is sent after the entry is gone (#211, D16). The caller makes sure
+   * the notice is not stale.
+   */
+  private notifyIds(
+    webContentsIds: ReadonlySet<number>,
+    channel: string,
+    data: Record<string, unknown>
+  ): void {
+    if (this.isDisposing) return // Don't notify during disposal
     const windows = BrowserWindow.getAllWindows()
 
-    for (const webContentsId of watched.webContentsIds) {
+    for (const webContentsId of webContentsIds) {
       const window = windows.find((w) => w.webContents.id === webContentsId)
       if (window && !window.isDestroyed()) {
         try {
@@ -637,12 +1047,22 @@ export class DirectoryWatcherService {
     const snapshot = this.metrics.getSnapshot()
     const resourceCount = process.getActiveResourcesInfo().length
 
-    const isStressed = snapshot.bufferOverflows > 0 || snapshot.peakEventsPerSecond > 100
+    // The counters are cumulative: a resync is stress only on the first line after it
+    const newResyncs = snapshot.nativeResyncs > this.lastNativeResyncs
+    this.lastNativeResyncs = snapshot.nativeResyncs
+    const isStressed =
+      snapshot.bufferOverflows > 0 ||
+      snapshot.peakEventsPerSecond > 100 ||
+      newResyncs
     const level = isStressed ? 'warn' : 'info'
 
     logger[level]('DirectoryWatcher health', {
       activeWatchers: snapshot.activeWatchers,
       eventsReceived: snapshot.eventsReceived,
+      eventsFiltered: snapshot.eventsFiltered,
+      nativeOverflows: snapshot.nativeOverflows,
+      nativeResyncs: snapshot.nativeResyncs,
+      matcherBudgetExceeded: snapshot.matcherBudgetExceeded,
       bufferOverflows: snapshot.bufferOverflows,
       errorCounts: snapshot.errorCounts,
       peakEventsPerSecond: snapshot.peakEventsPerSecond,
@@ -668,6 +1088,7 @@ export class DirectoryWatcherService {
     this.isDisposing = true // Set flag FIRST to stop all event processing
     this.stopHealthLogger()
     this.emfileLogger.reset()
+    this.resyncLogger.reset()
     this.safeLog('👁️  Disposing all directory watchers...')
     this.safeLog(this.metrics.getFormattedStats()) // Log final metrics
 
@@ -863,25 +1284,53 @@ export class DirectoryWatcherService {
 
       // Emit recovery event
       this.notifyWebContents(dirPath, 'directory-watch:recovered', { dirPath })
+      // Nothing else listens for the notice: catch up on changes made while
+      // no watcher was running
+      this.sendCompensatingRefresh(dirPath)
 
     } catch (error) {
       logger.error(`Watcher restart failed for ${dirPath}`, error instanceof Error ? error : undefined)
       this.metrics.recordRestartFailure()
 
+      // stopAll (a project switch) or dispose cleared the attempts meanwhile:
+      // this restart is stale, and a notice sent by id (D16) would reach the
+      // windows of whatever project is open now
+      if (this.restartAttempts.get(dirPath) !== attempts) return
+
       if (attempts < this.MAX_RESTART_ATTEMPTS) {
         // Schedule another attempt
         this.scheduleRestart(dirPath, webContentsIds)
       } else {
-        // Max attempts reached - notify user
-        logger.warn(`Max restart attempts (${this.MAX_RESTART_ATTEMPTS}) reached for ${dirPath}`)
-        this.restartAttempts.delete(dirPath)
-        this.notifyWebContents(dirPath, 'directory-watch:restart-failed', {
-          dirPath,
-          attempts: this.MAX_RESTART_ATTEMPTS,
-          message: 'File watcher could not recover. Please reload the project.'
-        })
+        this.reportRestartExhausted(dirPath, webContentsIds, error)
       }
     }
+  }
+
+  /**
+   * Max attempts reached – tell the windows that were watching (#211, D15,
+   * D16). The map entry is already gone, so the notice goes to the captured
+   * ids. A root that is still missing (`ENOENT`, as the native backend throws
+   * at once) means the project was deleted; anything else is a failed restart.
+   */
+  private reportRestartExhausted(dirPath: string, webContentsIds: ReadonlySet<number>, error: unknown): void {
+    logger.warn(`Max restart attempts (${this.MAX_RESTART_ATTEMPTS}) reached for ${dirPath}`)
+    this.restartAttempts.delete(dirPath)
+    if (this.errorTypeOf(error) === 'ENOENT') {
+      this.notifyIds(webContentsIds, 'directory-watch:project-deleted', { dirPath })
+      return
+    }
+    this.notifyIds(webContentsIds, 'directory-watch:restart-failed', {
+      dirPath,
+      attempts: this.MAX_RESTART_ATTEMPTS,
+      message: 'File watcher could not recover. Please reload the project.'
+    })
+  }
+
+  /** The error type of a thrown error: from its `code` when it has one, else from its message. */
+  private errorTypeOf(error: unknown): string {
+    const code = (error as { code?: unknown } | null)?.code
+    if (typeof code === 'string') return this.classifyError(code)
+    return this.classifyError(error instanceof Error ? error.message : String(error))
   }
 
   /**

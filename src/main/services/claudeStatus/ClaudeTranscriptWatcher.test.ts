@@ -89,7 +89,6 @@ describe('ClaudeTranscriptWatcher', () => {
         persistent: true,
         ignoreInitial: true,
         usePolling: false,
-        disableGlobbing: true,
         followSymlinks: false,
         depth: 0,
         ignored: expect.any(Function)

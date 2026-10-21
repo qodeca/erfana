@@ -32,6 +32,7 @@ import {
   createTempUserDataDir
 } from './utils/helpers'
 import { IMPORT } from '../src/shared/constants'
+import { buildAppEnv } from './fixtures/isolation'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -95,10 +96,10 @@ test.describe('Audio transcription', () => {
 
     const electronApp = await electron.launch({
       args: [path.join(__dirname, '..'), `--user-data-dir=${userDataDir}`],
-      env: {
-        ...process.env,
-        NODE_ENV: 'development'
-      }
+      // The one spec that is meant to see the key (it is set via IPC below, but
+      // the transcription project owns it); everything else comes from the
+      // allowlist.
+      env: buildAppEnv({ extra: { OPENAI_API_KEY: OPENAI_API_KEY as string } })
     })
 
     let window: Awaited<ReturnType<typeof electronApp.firstWindow>> | undefined

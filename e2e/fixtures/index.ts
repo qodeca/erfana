@@ -8,7 +8,7 @@
  *
  * Fixture dependency graph:
  * ```
- * Worker: userDataDir
+ * Worker: userDataDir, homeDir
  * Test:   app → window → POM fixtures (keyboardHelper, terminalPage, monacoPage, ...)
  *         appWithProject → windowWithProject
  *         testProject → appWithTestProject → windowWithTestProject
@@ -43,6 +43,13 @@ import { MonacoPage } from '../pages/monaco.page'
 import { MermaidPage } from '../pages/mermaid.page'
 import { ProjectTreePage } from '../pages/project-tree.page'
 import { buildVisualLaunchOptions, forceCloseApp, resizeBrowserWindow } from './launch-helpers'
+import {
+  E2E_TEMP_DIR,
+  buildAppEnv,
+  closeAppAndWait,
+  createWorkerHome,
+  removeDirWithRetry
+} from './isolation'
 
 const PROJECT_ROOT = path.join(__dirname, '..', '..')
 const DEFAULT_TEST_PROJECT = process.env.ERFANA_TEST_PROJECT || PROJECT_ROOT
@@ -97,12 +104,14 @@ async function resetRendererStorageDirs(userDataDir: string): Promise<void> {
  *
  * @param args - Launch arguments, before `--user-data-dir`
  * @param userDataDir - Worker-scoped user-data directory
+ * @param homeDir - Worker-scoped sandbox home (`~/.erfana`, `~/.claude`, ...)
  * @param use - Playwright's fixture consumer
  * @param resetRendererStorage - Wipe persisted web storage before launching
  */
 async function launchApp(
   args: string[],
   userDataDir: string,
+  homeDir: string,
   use: (app: ElectronApplication) => Promise<void>,
   resetRendererStorage = false
 ): Promise<void> {
@@ -112,18 +121,14 @@ async function launchApp(
 
   const app = await electron.launch({
     args: [...args, `--user-data-dir=${userDataDir}`],
-    env: { ...process.env, NODE_ENV: 'development' }
+    env: buildAppEnv({ homeDir })
   })
 
   await use(app)
 
   // KNOWN_WAIT: electron-log flush before close (teardown path, not assertion)
   await new Promise((resolve) => setTimeout(resolve, 100))
-  try {
-    await app.close()
-  } catch (error) {
-    console.warn('[fixture teardown] app.close() failed:', error)
-  }
+  await closeAppAndWait(app)
 }
 
 /**
@@ -146,6 +151,13 @@ async function getReadyWindow(
 
 type WorkerFixtures = {
   userDataDir: string
+  /**
+   * Sandbox home directory. Passed to the app as HOME / USERPROFILE (plus the
+   * per-user config and cache folders), so `~/.erfana` and `~/.claude` resolve
+   * inside it and never touch the developer's real home. Logs land in
+   * `appLogsDir(homeDir)`.
+   */
+  homeDir: string
 }
 
 type TestFixtures = {
@@ -206,16 +218,28 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
   userDataDir: [
     // eslint-disable-next-line no-empty-pattern
     async ({}, use, workerInfo) => {
-      const e2eTempDir = path.join(__dirname, '..', '..', '.e2e-temp')
-      await fs.promises.mkdir(e2eTempDir, { recursive: true })
+      await fs.promises.mkdir(E2E_TEMP_DIR, { recursive: true })
 
       const userDataDir = await fs.promises.mkdtemp(
-        path.join(e2eTempDir, `worker-${workerInfo.workerIndex}-`)
+        path.join(E2E_TEMP_DIR, `worker-${workerInfo.workerIndex}-`)
       )
 
       await use(userDataDir)
 
-      await fs.promises.rm(userDataDir, { recursive: true, force: true })
+      await removeDirWithRetry(userDataDir)
+    },
+    { scope: 'worker' }
+  ],
+
+  // Worker-scoped: isolated home directory
+  homeDir: [
+    // eslint-disable-next-line no-empty-pattern
+    async ({}, use, workerInfo) => {
+      const homeDir = await createWorkerHome(`home-${workerInfo.workerIndex}-`)
+
+      await use(homeDir)
+
+      await removeDirWithRetry(homeDir)
     },
     { scope: 'worker' }
   ],
@@ -227,8 +251,14 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
   resetRendererStorage: [false, { option: true }],
 
   // Test-scoped: app launch
-  app: async ({ userDataDir, extraLaunchArgs, resetRendererStorage }, use) => {
-    await launchApp([PROJECT_ROOT, ...extraLaunchArgs], userDataDir, use, resetRendererStorage)
+  app: async ({ userDataDir, homeDir, extraLaunchArgs, resetRendererStorage }, use) => {
+    await launchApp(
+      [PROJECT_ROOT, ...extraLaunchArgs],
+      userDataDir,
+      homeDir,
+      use,
+      resetRendererStorage
+    )
   },
 
   // Test-scoped: main window
@@ -237,10 +267,11 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
   },
 
   // Test-scoped: app with project loaded
-  appWithProject: async ({ userDataDir, extraLaunchArgs, resetRendererStorage }, use) => {
+  appWithProject: async ({ userDataDir, homeDir, extraLaunchArgs, resetRendererStorage }, use) => {
     await launchApp(
       [PROJECT_ROOT, DEFAULT_TEST_PROJECT, ...extraLaunchArgs],
       userDataDir,
+      homeDir,
       use,
       resetRendererStorage
     )
@@ -258,10 +289,9 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
 
   // Test-scoped: isolated project directory with seed files
   testProject: async ({ testProjectFiles }, use) => {
-    const e2eTempDir = path.join(__dirname, '..', '..', '.e2e-temp')
-    await fs.promises.mkdir(e2eTempDir, { recursive: true })
+    await fs.promises.mkdir(E2E_TEMP_DIR, { recursive: true })
 
-    const projectPath = await fs.promises.mkdtemp(path.join(e2eTempDir, 'test-'))
+    const projectPath = await fs.promises.mkdtemp(path.join(E2E_TEMP_DIR, 'test-'))
     const hasCustomFiles = Object.keys(testProjectFiles).length > 0
     const files = hasCustomFiles ? testProjectFiles : DEFAULT_SEED_FILES
 
@@ -278,11 +308,10 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
 
     await use({ path: projectPath })
 
-    try {
-      await fs.promises.rm(projectPath, { recursive: true, force: true })
-    } catch (error) {
-      console.warn('[fixture teardown] testProject cleanup failed:', error)
-    }
+    // appWithTestProject depends on this fixture, so the app has already been
+    // closed and awaited by now; the retry covers the short window Windows
+    // keeps handles open.
+    await removeDirWithRetry(projectPath)
   },
 
   // Option: project settings to write (override with test.use())
@@ -324,8 +353,22 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
   // optional: specs that need switches (e.g. the fake camera in
   // camera-mirror.e2e.ts) run on `windowWithTestProject`, which is fed by this
   // fixture. Wiring only `app` would silently drop the switches.
-  appWithTestProject: async ({ userDataDir, extraLaunchArgs, resetRendererStorage }, use) => {
-    await launchApp([PROJECT_ROOT, ...extraLaunchArgs], userDataDir, use, resetRendererStorage)
+  // `testProject` is a dependency only for teardown order: Playwright tears a
+  // fixture down before the fixtures it depends on, so the app is closed BEFORE
+  // its project folder is removed. Without it the folder went first and, on
+  // Windows, stayed locked by the still-running app (EBUSY, #134).
+  appWithTestProject: async (
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    { userDataDir, homeDir, extraLaunchArgs, resetRendererStorage, testProject },
+    use
+  ) => {
+    await launchApp(
+      [PROJECT_ROOT, ...extraLaunchArgs],
+      userDataDir,
+      homeDir,
+      use,
+      resetRendererStorage
+    )
   },
 
   // Test-scoped: window from appWithTestProject with the project opened.
@@ -413,7 +456,7 @@ export function getTestProjectPath(): string {
 // ---------------------------------------------------------------------------
 //
 // `visualTest` is a separate fixture set tuned for screenshot-based tests:
-// deterministic 1280×800 window at 1× DPR, CI-only video recording, and a
+// a pinned window content size at 1× DPR, CI-only video recording, and a
 // dedicated worker-scoped userDataDir prefix so visual workers don't share
 // state with functional workers. Imported by e2e/visual-regression.e2e.ts.
 //
@@ -431,20 +474,30 @@ function createUserDataDirFixture(prefix: string) {
   return [
     // eslint-disable-next-line no-empty-pattern
     async ({}, use: (value: string) => Promise<void>, workerInfo: { workerIndex: number }) => {
-      const e2eTempDir = path.join(__dirname, '..', '..', '.e2e-temp')
-      await fs.promises.mkdir(e2eTempDir, { recursive: true })
+      await fs.promises.mkdir(E2E_TEMP_DIR, { recursive: true })
       const userDataDir = await fs.promises.mkdtemp(
-        path.join(e2eTempDir, `${prefix}${workerInfo.workerIndex}-`)
+        path.join(E2E_TEMP_DIR, `${prefix}${workerInfo.workerIndex}-`)
       )
       await use(userDataDir)
-      await fs.promises.rm(userDataDir, { recursive: true, force: true })
+      await removeDirWithRetry(userDataDir)
     },
     { scope: 'worker' as const }
   ]
 }
 
+/**
+ * Content size of the visual window. The committed baselines were captured at
+ * the content area of the app's default 1400×900 window, because the old
+ * resize to 1280×800 ran before the window existed and did nothing (#267).
+ * Pinning that size keeps every baseline valid and makes the capture
+ * independent of the host's window chrome. A new size means new baselines on
+ * every platform.
+ */
+export const VISUAL_CONTENT_SIZE =
+  process.platform === 'darwin' ? { width: 1400, height: 868 } : { width: 1384, height: 861 }
+
 type VisualTestFixtures = {
-  /** Electron app with deterministic 1280×800 window, 1× DPR, and CI video recording. */
+  /** Electron app with a pinned content size (`VISUAL_CONTENT_SIZE`), 1× DPR, and CI video recording. */
   visualApp: ElectronApplication
   /** Window from visual app, ready for screenshot capture. */
   visualWindow: Page
@@ -480,10 +533,20 @@ export const visualTest = base.extend<VisualTestFixtures, WorkerFixtures>({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   userDataDir: createUserDataDirFixture('worker-visual-') as any,
 
-  visualApp: async ({ userDataDir }, use) => {
-    const opts = buildVisualLaunchOptions(userDataDir)
+  homeDir: [
+    // eslint-disable-next-line no-empty-pattern
+    async ({}, use, workerInfo) => {
+      const homeDir = await createWorkerHome(`home-visual-${workerInfo.workerIndex}-`)
+      await use(homeDir)
+      await removeDirWithRetry(homeDir)
+    },
+    { scope: 'worker' }
+  ],
+
+  visualApp: async ({ userDataDir, homeDir }, use) => {
+    const opts = buildVisualLaunchOptions(userDataDir, undefined, homeDir)
     const app = await electron.launch(opts)
-    await resizeBrowserWindow(app, 1280, 800)
+    await resizeBrowserWindow(app, VISUAL_CONTENT_SIZE.width, VISUAL_CONTENT_SIZE.height)
     await use(app)
     await forceCloseApp(app)
   },
@@ -497,15 +560,14 @@ export const visualTest = base.extend<VisualTestFixtures, WorkerFixtures>({
 
   // eslint-disable-next-line no-empty-pattern
   visualTestProject: async ({}, use) => {
-    const e2eTempDir = path.join(__dirname, '..', '..', '.e2e-temp')
-    await fs.promises.mkdir(e2eTempDir, { recursive: true })
-    const stat = await fs.promises.lstat(e2eTempDir)
+    await fs.promises.mkdir(E2E_TEMP_DIR, { recursive: true })
+    const stat = await fs.promises.lstat(E2E_TEMP_DIR)
     if (stat.isSymbolicLink()) {
       throw new Error(
         `.e2e-temp is a symlink – refusing to create fixture project. Remove or replace with a real directory to continue.`
       )
     }
-    const tmpParent = await fs.promises.mkdtemp(path.join(e2eTempDir, 'visual-'))
+    const tmpParent = await fs.promises.mkdtemp(path.join(E2E_TEMP_DIR, 'visual-'))
     try {
       const projectPath = path.join(tmpParent, 'visual-project')
       await fs.promises.mkdir(projectPath)
@@ -514,18 +576,17 @@ export const visualTest = base.extend<VisualTestFixtures, WorkerFixtures>({
       }
       await use(projectPath)
     } finally {
-      await fs.promises
-        .rm(tmpParent, { recursive: true, force: true, maxRetries: 3 })
-        .catch(() => {
-          // ignore – leftover dirs under .e2e-temp are gitignored
-        })
+      await removeDirWithRetry(tmpParent)
     }
   },
 
-  visualAppWithProject: async ({ userDataDir }, use) => {
-    const opts = buildVisualLaunchOptions(userDataDir)
+  // `visualTestProject` is a dependency only for teardown order: the app closes
+  // before its project folder is removed (see appWithTestProject).
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  visualAppWithProject: async ({ userDataDir, homeDir, visualTestProject }, use) => {
+    const opts = buildVisualLaunchOptions(userDataDir, undefined, homeDir)
     const app = await electron.launch(opts)
-    await resizeBrowserWindow(app, 1280, 800)
+    await resizeBrowserWindow(app, VISUAL_CONTENT_SIZE.width, VISUAL_CONTENT_SIZE.height)
     await use(app)
     await forceCloseApp(app)
   },

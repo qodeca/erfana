@@ -17,8 +17,7 @@ describe('classifyLinkProtocol', () => {
     ['https://example.com', 'external'],
     ['http://example.com/a?b=c', 'external'],
     ['mailto:someone@example.com', 'external'],
-    ['tel:+48123456789', 'external'],
-    ['ftp://files.example.com/x', 'external']
+    ['tel:+48123456789', 'external']
   ])('classifies %s as %s', (href, kind) => {
     expect(classifyLinkProtocol(href)).toBe(kind)
   })
@@ -52,7 +51,7 @@ describe('classifyLinkProtocol', () => {
     expect(classifyLinkProtocol(href)).toBe('relative')
   })
 
-  it.each([['ms-msdt:/id'], ['search-ms:query=x'], ['smb://host/share'], ['intent://x']])(
+  it.each([['ms-msdt:/id'], ['search-ms:query=x'], ['smb://host/share'], ['intent://x'], ['ftp://files.example.com/x']])(
     'refuses %s by default rather than allowing it',
     (href) => {
       expect(classifyLinkProtocol(href)).toBe('unknown')

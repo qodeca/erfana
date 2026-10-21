@@ -20,7 +20,7 @@
  *
  * @see Issue #73 - PNG / PDF / clipboard export controls in the image viewer
  */
-import { clipboard, nativeImage } from 'electron'
+import { ClipboardItem, clipboard, nativeImage } from 'electron'
 import { writeFile } from 'fs/promises'
 import { ErrorCode } from '../../../shared/errors'
 import { IMAGE_EXPORT, type ImageExportErrorCode } from '../../../shared/ipc/image-export-schema'
@@ -116,20 +116,26 @@ export async function writePdfFile(
 /**
  * Put the exported pixels on the OS clipboard as a real image.
  *
- * A PNG buffer is exactly the input `nativeImage` is reliable for, and
- * `writeImage` (never `writeText`, never a file reference) is what makes the
- * paste land as pixels in Preview and Paint alike. The white flattening
- * happened upstream, which is what makes the Windows CF_DIB path — which has
- * no alpha channel — come out correct instead of black.
+ * The bytes are decoded by `nativeImage` first, so an undecodable buffer
+ * fails here instead of reaching the clipboard. They are then written as one
+ * `image/png` item (never `text/plain`, never a file reference), which is
+ * what makes the paste land as pixels in Preview and Paint alike – Electron
+ * 44's Promise-based `clipboard.write` replaced the removed `writeImage`.
+ * The white flattening happened upstream, which is what makes the Windows
+ * CF_DIB path — which has no alpha channel — come out correct instead of
+ * black.
  */
-export function copyPngToClipboard(pngBytes: Uint8Array): SinkOutcome {
+export async function copyPngToClipboard(pngBytes: Uint8Array): Promise<SinkOutcome> {
   try {
-    const image = nativeImage.createFromBuffer(Buffer.from(pngBytes))
+    const png = Buffer.from(pngBytes)
+    const image = nativeImage.createFromBuffer(png)
     if (image.isEmpty()) {
       logger.error('Image export: the decoded clipboard image was empty')
       return { ok: false, code: ErrorCode.IMAGE_EXPORT_CLIPBOARD_FAILED }
     }
-    clipboard.writeImage(image)
+    await clipboard.write([
+      new ClipboardItem({ 'image/png': new Blob([png], { type: 'image/png' }) })
+    ])
     return { ok: true }
   } catch (error) {
     logger.error('Image export: the clipboard rejected the image', redactedLogError(error))

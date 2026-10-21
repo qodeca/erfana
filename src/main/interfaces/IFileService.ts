@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import type { FileNode } from '../../preload/index'
+import type { FileNode } from '../../shared/ipc/file-schema'
 import type { ImageReadResponse } from '../../shared/ipc/file-image-schema'
+import type { ProjectPathFilter } from '../utils/projectPathFilter'
 
 /**
  * Interface for file system operations
@@ -39,7 +40,7 @@ export interface IFileService {
   /**
    * Write file contents
    */
-  writeFile(filePath: string, content: string): Promise<void>
+  writeFile(filePath: string, content: string, options?: WriteFileOptions): Promise<void>
 
   /**
    * Get file statistics
@@ -130,4 +131,21 @@ export interface IFileService {
    * Get current hidden patterns
    */
   getHiddenPatterns(): string[]
+
+  /**
+   * Set the project's path filter (#211, called by ProjectService on project
+   * open): tree walks skip excluded entries without reading them, and every
+   * completed walk of the project root replaces the filter's walk hints
+   * (read them with `filter.getWalkHints()`). Null means no exclusion.
+   */
+  setPathFilter(filter: ProjectPathFilter | null): void
+}
+
+/** Options for {@link IFileService.writeFile}. */
+export interface WriteFileOptions {
+  /**
+   * Recreate missing parent folders (inside the project only) before writing.
+   * Set only by the explicit "Save to restore it" of a tab in the deleted state.
+   */
+  createParentDirs?: boolean
 }

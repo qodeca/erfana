@@ -80,8 +80,8 @@ Three Playwright projects are configured:
 
 Visual project settings: `snapshotDir: './e2e/screenshots'`, `snapshotPathTemplate: '{snapshotDir}/{arg}-{platform}{ext}'`, `maxDiffPixelRatio: 0.01`, `animations: 'disabled'`.
 
-Page-level captures (welcome, editor, terminal) pass `clip: PAGE_CLIP` — the `1280x800` rectangle the visual fixture asks the window for — so the baseline
-records the app's own layout rather than whatever content size the host window manager granted. Element-level captures (settings overlay, confirm dialog,
+The visual fixture pins the window's content size (`VISUAL_CONTENT_SIZE` in `e2e/fixtures/index.ts`) after the window exists, and throws if the window
+manager does not grant it (#267). Page-level captures (welcome, editor, terminal) pass `clip: PAGE_CLIP`, a fixed `1280x800` rectangle. Element-level captures (settings overlay, confirm dialog,
 image-viewer toolbar) need no clip: the element bounds are the capture.
 
 Baselines are per platform and committed. Both the **darwin** and the **win32** set exist for all six states; the three page-level captures were
@@ -118,7 +118,7 @@ Located in `e2e/pages/`:
 | `SearchBarPage` | Find bar – `waitForOpen()` / `waitForClosed()`, `search()`, `matchCount()` / `waitForTotal()` / `waitForOrdinal()`, the case and whole-word toggles, next/prev/close |
 | `ImageViewerPage` | Image viewer tab (#70, extended for #73) – `openFromTree()`, `waitForReady()`, `marker()` / `waitForMarker()`, `zoomIn()`, `transformStyle()`, `expectStatusState()`, `expectBanner()` / `expectNoBanner()`, `clickReload()`, `enterFullScreen()` / `exitFullScreen()`. Export (#73): three panel-scoped locators `exportPngButton()` / `exportPdfButton()` / `copyButton()`, their overlay-scoped twins `fullScreenExportPngButton()` / `fullScreenExportPdfButton()` / `fullScreenCopyButton()`, the `exportStatus()` polite live region (the assertive `image-viewer-export-alert` region has no POM locator — query it directly), plus `clickExport()`, `expectExportBusy()` and `expectExportAnnouncement()` |
 | `ImageViewerNarrowPage` | Extends the above for the narrow-width toolbar contract (#73) – `toolbar()`, `controls()`, `constrainPanelWidth()`, `toolbarScrollMetrics()`, `panelScrollLeft()`, `focusedTestId()`, `expectWithinPanel()`. A separate file only because the base POM is near the 500-line cap |
-| `HtmlPreviewPage` | HTML preview (#111) – takes `(page, app)` because the previewed page runs in a sealed `WebContentsView` and is read main-side: `open()` (path-exact, waits for the `erfana-preview://` web contents), `snapshot()` / `eval()` / `livePreviews()` / `waitForTitled()` (address one of several with `HtmlPreviewPage.target(relPath)`), `clickInPreview()` (untrusted, `will-navigate` path) vs `clickTrusted()` (real input event – the only way to a gesture-gated path such as an external link), `viewBounds()` (`{ x, y, width, height, visible }`, window content DIP – `x` and `y` because a view can keep the right size at the wrong place). The native-view reads are plain functions taking the `ElectronApplication` in `e2e/pages/html-preview.native.ts` (#124 split); the class methods are one-line delegates. DOM chrome: `placeholder()` / `panel()` / `stillFrame()` / `tab()` scoped by basename (the placeholder name is `HTML preview of <basename>`, followed by ` – press Enter …` while the page can be entered from the keyboard; both match), the failure badge, and the permission band (`chip()`, `openBand()`, `hostRow()`, `allowButton(origin)`, `confirmDialog()` / `confirmButton()` / `cancelButton()`, `allowedSection()`). Not a composed fixture – construct it in the test. Companions: `e2e/fixtures/localServer.ts` (ephemeral loopback server + `localServer` fixture) and `e2e/fixtures/logTail.ts` (condition-based read of what `~/.erfana/logs/main.log` gains after a mark) |
+| `HtmlPreviewPage` | HTML preview (#111) – takes `(page, app)` because the previewed page runs in a sealed `WebContentsView` and is read main-side: `open()` (path-exact, waits for the `erfana-preview://` web contents), `snapshot()` / `eval()` / `livePreviews()` / `waitForTitled()` (address one of several with `HtmlPreviewPage.target(relPath)`), `clickInPreview()` (untrusted, `will-navigate` path) vs `clickTrusted()` (real input event – the only way to a gesture-gated path such as an external link), `viewBounds()` (`{ x, y, width, height, visible }`, window content DIP – `x` and `y` because a view can keep the right size at the wrong place). The native-view reads are plain functions taking the `ElectronApplication` in `e2e/pages/html-preview.native.ts` (#124 split); the class methods are one-line delegates. DOM chrome: `placeholder()` / `panel()` / `stillFrame()` / `tab()` scoped by basename (the placeholder name is `HTML preview of <basename>`, followed by ` – press Enter …` while the page can be entered from the keyboard; both match), the failure badge, and the permission band (`chip()`, `openBand()`, `hostRow()`, `allowButton(origin)`, `confirmDialog()` / `confirmButton()` / `cancelButton()`, `allowedSection()`). Not a composed fixture – construct it in the test. Companions: `e2e/fixtures/localServer.ts` (ephemeral loopback server + `localServer` fixture) and `e2e/fixtures/logTail.ts` (condition-based read of what the worker's `~/.erfana/logs/main.log` gains after a mark; `new LogTail(appMainLogPath(homeDir))`) |
 | `html-preview.native.ts` | The native-view reads behind `HtmlPreviewPage` (#124 split) – plain functions taking the `ElectronApplication`, read main-side: `previewSnapshot()`, `livePreviews()`, `evalInPreview()`, `clickInPreview()`, `clickTrusted()` and `viewBounds()`. The class methods of the same names are one-line delegates |
 | `html-preview.frames.ts` | HTML preview frames (#124, part 2) – plain functions (like `html-preview.native.ts`, because `HtmlPreviewPage` keeps its app handle private): `frameTree()` (every frame with depth, URL and `document.title`, read main-side), `evalInFrame()`, `armFrameTrail()` / `readFrameTrail()` / `writerOf()` (which layer wrote a refused-frame entry, from Electron's own frame signals), `waitForBadgeCount()`, `readBadgeGroups()`, `resetHostZoom()`; `dismissToasts` re-exports the shared `dismissAllToasts`. The reads and clicks in frames are the test's own – the product runs no script in a page's frames |
 | `html-preview.browser.ts` | "Open in default browser" (#124, part 4) – the launch seam: `armBrowserSeam(app, mode)` (`answer` / `hold` / `throw`), `setBrowserSeamMode()`, `releaseBrowserSeam()`, `browserSeamCalls()` / `waitForBrowserSeamCalls()`, `stubBrowserLookup()` (a fixed default-browser path, or `'reject'` to force the fallback), `expectedBrowserLaunch()`; plus `openInBrowserButton()`, `toastsOf(page, type)`, `dismissAllToasts()`, `rendererPlatform()` / `revealCommandFor()` |
@@ -147,6 +147,7 @@ Available fixtures:
 | Fixture | Scope | Description |
 |---------|-------|-------------|
 | `userDataDir` | Worker | Isolated Electron user data directory |
+| `homeDir` | Worker | Sandbox home (`HOME` / `USERPROFILE`); `~/.erfana` and its logs live inside it |
 | `extraLaunchArgs` | Test (option) | Extra Chromium/Electron switches appended to the launch args of `app`, `appWithProject` and `appWithTestProject`; default `[]` |
 | `resetRendererStorage` | Test (option) | Deletes the renderer's persisted `localStorage` / `sessionStorage` before launch; default `false`. Opt in only from a spec whose subject *is* persisted renderer state |
 | `app` | Test | Electron application instance |
@@ -213,7 +214,7 @@ The `e2e/utils/helpers.ts` adapter provides backward compatibility – existing 
 ### Fixture dependency graph
 
 ```
-Worker: userDataDir
+Worker: userDataDir, homeDir
 Test:   app → window → POM fixtures (keyboardHelper, terminalPage, monacoPage, ...)
         appWithProject → windowWithProject
         testProject → appWithTestProject → windowWithTestProject
@@ -266,39 +267,17 @@ await waitForTestIdHidden(page, 'dialog-overlay')
 
 ---
 
-### Test-data isolation: what `--user-data-dir` does NOT cover
+### Test-data isolation: user data, home and environment
 
-Every fixture launches Electron with its own `--user-data-dir`, which isolates
-electron-store data (recent projects, project filter mode) and the renderer's
-`localStorage` (sidebar widths, active panel, divider positions).
+Every fixture launch is isolated three ways (`e2e/fixtures/isolation.ts`):
 
-It does **not** isolate `~/.erfana/`. `GlobalSettingsService` derives its path
-from `os.homedir()`, so `~/.erfana/settings.json` — log level, editor line
-breaks, git-status polling, transcription backend, HTML-preview enabled — is a
-single machine-wide file shared by the app, every worker, and the developer's
-own install. A test that CHANGES a global setting will rewrite that file and
-race the other worker.
+- **`--user-data-dir`** isolates electron-store data (recent projects, project filter mode) and the renderer's `localStorage`.
+- **A per-worker sandbox home (`homeDir` fixture).** `GlobalSettingsService`, `ApiKeyService` and `LoggingService` derive `~/.erfana/` from `os.homedir()`, and the Claude Code status reader uses `~/.claude`, so the app is launched with `HOME` / `USERPROFILE` (plus `APPDATA`, `LOCALAPPDATA` and the `XDG_*` folders) pointing inside `.e2e-temp/home-<worker>-*`. The developer's real home is never read or written, and two workers never share it. `LogTail` / `LogTrail` read the log under `appLogsDir(homeDir)` – pass the fixture's `homeDir`, never `os.homedir()`.
+- **A minimal environment.** `buildAppEnv({ homeDir })` builds the app's environment from an allowlist (PATH, locale, display and Windows basics, plus `ERFANA_*` / `LC_*`; no `ELECTRON_*`), not from `...process.env`, so runner secrets do not reach the app or the shells its terminal spawns. `OPENAI_API_KEY` is dropped from the runner in `playwright.config.ts` unless `ERFANA_E2E_TRANSCRIPTION=1`, and only the transcription spec passes it on (`buildAppEnv({ extra })`).
 
-If your spec changes a global setting, give each launch its own home:
+The home is per **worker**, so tests in one worker still share it; a spec that CHANGES a global setting and needs a clean slate per launch gives that launch its own home, as `settings-persistence.e2e.ts` does (`HOME` / `USERPROFILE` on top of `buildAppEnv()`).
 
-```typescript
-const app = await electron.launch({
-  args: [APP_ROOT, `--user-data-dir=${userDataDir}`],
-  env: {
-    ...process.env,
-    NODE_ENV: 'development',
-    // os.homedir() reads HOME on POSIX and USERPROFILE on Windows
-    HOME: fakeHome,
-    USERPROFILE: fakeHome
-  }
-})
-```
-
-`settings-persistence.e2e.ts` does exactly this. The shared fixtures deliberately
-do **not**, because `e2e/fixtures/logTail.ts` reads `~/.erfana/logs/main.log`
-from the real home — a global HOME redirect would break every spec that tails
-the log. Reading a global setting is fine through the normal fixtures; writing
-one is not.
+Teardown (#134): the `app` fixtures wait for the Electron process to exit (`closeAppAndWait`) before the dependent temp folders go, and folders are removed with `removeDirWithRetry` (`fs.rm` with `maxRetries` / `retryDelay`), which covers Windows keeping handles open for a moment. Specs that still call `electron.launch` themselves with `...process.env` have not moved to the allowlist yet.
 
 ### Reading editor content: `getContent()` vs `visibleText()`
 
@@ -547,7 +526,7 @@ All 44 specs in `e2e/`:
 > **HTML preview e2e notes (#124).**
 > - **Toasts are found by `toast-<type>`.** A toast renders its test id as `` `${TEST_IDS.TOAST}-${type}` `` (`ToastNotification.tsx`), never the bare `toast` id; a helper waiting on the bare id never closes anything, and the "Project Opened" toast then covers the preview. Use `dismissAllToasts` / `toastsOf` from `html-preview.browser.ts`.
 > - **Real input is in view pixels.** `webContents.sendInputEvent` takes view pixels while `getBoundingClientRect()` gives CSS pixels, so `clickLink` multiplies the point by `wc.getZoomFactor()`; a click that ignores the zoom misses as soon as a test zooms. A same-tab move and a history entry need that real input – `executeJavaScript` clicks are untrusted.
-> - **The zoom test needs Erfana in front.** On macOS `app.focus({ steal: true })` is blocked while another app is frontmost, so "should keep the zoom level…" can fail for a reason outside the app (inferred from three failures before any move).
+> - **The zoom test needs Erfana in front.** On macOS `app.focus({ steal: true })` is blocked while another app is frontmost, so "should keep the zoom level…" can fail for a reason outside the app (inferred from three failures before any move; seen again in a full macOS run on 2026-10-01 as `the preview could not take focus`, then 5/5 green with `--repeat-each=5 --workers=1`).
 > - **A `.md` can open rendered.** Click `view-mode-btn-editor` before driving Monaco. To reach a file's end in Monaco on macOS press `Cmd+Down` – `Cmd+End` does not get there.
 > - **Type-checking e2e files.** There is no tsconfig over `e2e/` (technical debt #21), and `tsc` on e2e files needs `--ignoreConfig` or it stops at TS5112.
 

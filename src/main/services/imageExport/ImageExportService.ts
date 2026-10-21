@@ -65,6 +65,7 @@ import { readDeclaredDimensions } from './declaredDimensions'
 import { forceExtension, isSameExistingFile, suggestExportFilename } from './exportPaths'
 import { ImageRasterizeWindow } from './ImageRasterizeWindow'
 import { copyPngToClipboard, writePdfFile, writePngFile } from './exportSinks'
+import { rememberDialogResult, withLastDirectory } from '../../utils/lastDialogDirectory'
 
 /** What `run` needs from its caller. `parentWindow` makes the dialog modal. */
 export interface ImageExportRunOptions {
@@ -186,12 +187,12 @@ export class ImageExportService {
   ): Promise<DestinationOutcome> {
     const extension = TARGET_EXTENSION[target]
     const copy = SAVE_DIALOG_COPY[target]
-    const dialogOptions = {
+    const dialogOptions = withLastDirectory({
       title: copy.title,
       defaultPath: suggestExportFilename(options.filePath, extension),
       buttonLabel: 'Export',
       filters: [{ name: copy.filterName, extensions: [extension.slice(1)] }]
-    }
+    })
 
     // `showSaveDialog` is the only awaited call in `run` that sits outside a
     // guarded block, and it CAN reject — a parent window destroyed while the
@@ -208,6 +209,7 @@ export class ImageExportService {
     }
 
     if (result.canceled || !result.filePath) return { status: 'cancelled' }
+    rememberDialogResult(result.filePath)
 
     const chosen = forceExtension(result.filePath, extension)
     if (await isSameExistingFile(chosen, options.filePath)) {
@@ -371,7 +373,7 @@ export class ImageExportService {
     } else if (target === 'png') {
       outcome = await writePngFile(destination!, rendered.pngBytes)
     } else {
-      outcome = copyPngToClipboard(rendered.pngBytes)
+      outcome = await copyPngToClipboard(rendered.pngBytes)
     }
 
     if (!outcome.ok) return this.fail(outcome.code, filePath)

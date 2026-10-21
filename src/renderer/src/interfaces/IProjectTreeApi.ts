@@ -15,18 +15,10 @@
  * - Type safety for API calls
  */
 
-/**
- * File node type - simplified for documentation purposes
- * See preload/index.ts for the full type definition
- */
-export type FileNode = {
-  name: string
-  path: string
-  type: 'file' | 'directory'
-  children?: FileNode[]
-  extension?: string
-  isSymlink?: boolean
-}
+import type { FileNode } from '../../../shared/ipc/file-schema'
+
+/** File node type – defined in shared/ipc/file-schema */
+export type { FileNode }
 
 export interface IProjectTreeApi {
   /**
@@ -69,7 +61,9 @@ export interface IProjectTreeApi {
     stop(projectPath: string): Promise<{ success: boolean }>
     pause(projectPath: string): Promise<{ success: boolean }>
     resume(projectPath: string): Promise<{ success: boolean }>
-    onDirectoryChanged(callback: (data: { eventCount: number }) => void): () => void
+    onDirectoryChanged(
+      callback: (data: { eventCount: number; catchUp?: boolean }) => void
+    ): () => void
     onProjectDeleted(callback: () => void): () => void
     onDirectoryError(callback: (data: { error: string }) => void): () => void
   }

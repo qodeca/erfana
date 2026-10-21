@@ -59,8 +59,7 @@ describe('shell:openExternal', () => {
       'https://example.com/docs',
       'http://example.com/',
       'mailto:someone@example.com',
-      'tel:+48123456789',
-      'ftp://files.example.com/x'
+      'tel:+48123456789'
     ])('opens %s', async (url) => {
       await openExternal(url)
       expect(mockShell.openExternal).toHaveBeenCalledTimes(1)
@@ -79,6 +78,7 @@ describe('shell:openExternal', () => {
       ['file:///etc/passwd', 'file'],
       ['vbscript:msgbox(1)', 'vbscript'],
       ['smb://host/share', 'smb'],
+      ['ftp://files.example.com/x', 'ftp'],
       ['ms-msdt:/id', 'ms-msdt'],
       ['search-ms:query=x', 'search-ms'],
       ['intent://scan/#Intent;end', 'intent']
@@ -132,7 +132,6 @@ describe('shell:openExternal', () => {
       await expect(openExternal('javascript:steal(document.cookie)')).rejects.toThrow()
 
       const logged = JSON.stringify(mockLogger.warn.mock.calls)
-      expect(logged).toContain('javascript:')
       expect(logged).not.toContain('document.cookie')
     })
   })

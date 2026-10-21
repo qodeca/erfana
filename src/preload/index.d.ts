@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { ElectronAPI } from '@electron-toolkit/preload'
 import { FileNode, FileStats } from './index'
 import type { GitStatusResponse } from '../shared/ipc/git-schema'
 import type { GitStateChangeEvent, GitWatcherStatus, GitPollTriggeredEvent } from '../shared/ipc/git-watcher-schema'
@@ -49,7 +48,7 @@ import type { BrowserBridge } from '../shared/ipc/browser-schema'
 
 declare global {
   interface Window {
-    electron: ElectronAPI & {
+    electron: {
       shell: {
         openExternal: (url: string) => Promise<void>
       }
@@ -61,7 +60,12 @@ declare global {
         getLastProjectPath: () => Promise<string | null>
         readDirectory: (dirPath: string) => Promise<FileNode[]>
         readFile: (filePath: string) => Promise<string>
-        writeFile: (filePath: string, content: string) => Promise<boolean>
+        /** `createParentDirs`: the explicit "Save to restore it" of a tab whose folder is gone */
+        writeFile: (
+          filePath: string,
+          content: string,
+          options?: { createParentDirs?: boolean }
+        ) => Promise<boolean>
         getStats: (filePath: string) => Promise<FileStats>
         exists: (filePath: string) => Promise<boolean>
         getProjectPath: () => Promise<string | null>
@@ -143,7 +147,13 @@ declare global {
         resume: (dirPath: string) => Promise<{ success: boolean; error?: string }>
         getStats: () => Promise<{ success: boolean; stats?: unknown; error?: string }>
         onDirectoryChanged: (
-          callback: (data: { dirPath: string; eventCount: number; summary: Record<string, number> }) => void
+          callback: (data: {
+            dirPath: string
+            eventCount: number
+            summary: Record<string, number>
+            /** Set on a refresh that recovers changes dropped during a pause (#210) */
+            catchUp?: boolean
+          }) => void
         ) => () => void
         onProjectDeleted: (callback: (data: { dirPath: string }) => void) => () => void
         onDirectoryError: (

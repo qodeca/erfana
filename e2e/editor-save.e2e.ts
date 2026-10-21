@@ -41,6 +41,12 @@ import { TEST_IDS } from '../src/renderer/src/constants/testids'
  */
 const AUTOSAVE_BUDGET_MS = 15_000
 
+/**
+ * Shorter than the 2 s autosave debounce, so a manual-save assertion cannot be
+ * satisfied by autosave when the shortcut silently did nothing.
+ */
+const MANUAL_SAVE_BUDGET_MS = 1_500
+
 const NOTES = '# Notes\n\nOriginal notes body.\n'
 const OTHER = '# Other\n\nUntouched by these tests.\n'
 
@@ -124,21 +130,24 @@ test.describe('Autosave', () => {
 test.describe('Manual save', () => {
   test('should write the active file on the save shortcut', async ({
     windowWithTestProject,
-    testProject,
-    keyboardHelper
+    testProject
   }) => {
     const { monaco } = await openForEditing(windowWithTestProject, 'notes.md')
 
     await monaco.appendContent('\nmanually saved\n')
-    await windowWithTestProject.keyboard.press(`${await keyboardHelper.getModifier()}+s`)
+    await new KeyboardHelper(windowWithTestProject).save()
 
-    await expectFileToContain(join(testProject.path, 'notes.md'), 'manually saved')
+    // Inside the autosave debounce, so only the shortcut can have written it.
+    await expect
+      .poll(async () => readFile(join(testProject.path, 'notes.md'), 'utf-8'), {
+        timeout: MANUAL_SAVE_BUDGET_MS
+      })
+      .toContain('manually saved')
   })
 
   test('should not write a background file when the active file is saved', async ({
     windowWithTestProject,
-    testProject,
-    keyboardHelper
+    testProject
   }) => {
     // Edit `other.md`, then move to `notes.md` and save that instead.
     const other = await openForEditing(windowWithTestProject, 'other.md')
@@ -147,7 +156,7 @@ test.describe('Manual save', () => {
     const notes = await openForEditing(windowWithTestProject, 'notes.md')
     await notes.monaco.appendContent('\nforeground edit\n')
 
-    await windowWithTestProject.keyboard.press(`${await keyboardHelper.getModifier()}+s`)
+    await new KeyboardHelper(windowWithTestProject).save()
     await expectFileToContain(join(testProject.path, 'notes.md'), 'foreground edit')
 
     // Regression guard, paired with the ⌘W case in `tab-lifecycle.e2e.ts`:
