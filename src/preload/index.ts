@@ -52,6 +52,7 @@ import type {
   DocumentImportProgress,
   DependencyReadyEvent
 } from '../shared/ipc/import-schema'
+import type { FileNode, FileStats } from '../shared/ipc/file-schema'
 import type {
   ExternalFileValidateResponse,
   ExternalFileCopyResponse,
@@ -59,20 +60,7 @@ import type {
   ConflictResolution
 } from '../shared/ipc/external-file-schema'
 
-export interface FileNode {
-  name: string
-  path: string
-  type: 'file' | 'directory'
-  children?: FileNode[]
-  extension?: string
-  isSymlink?: boolean
-}
-
-export interface FileStats {
-  size: number
-  modified: Date
-  created: Date
-}
+export type { FileNode, FileStats }
 
 // Custom APIs for renderer
 const api = {

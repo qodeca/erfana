@@ -12,6 +12,7 @@ import { projectSettingsService } from '../services/ProjectSettingsService'
 import { globalSettingsService } from '../services/GlobalSettingsService'
 import { projectLockService } from '../services/ProjectLockService'
 import type { ProjectSessionInfo } from '../../shared/ipc/schema'
+import type { FileStats } from '../../shared/ipc/file-schema'
 import {
   ImageReadRequestSchema,
   type ImageReadResponse
@@ -166,7 +167,7 @@ export function registerFileHandlers(): void {
   // enforced is that a path that *looks* in-project may not resolve out of it
   // through a symlink, so the watcher's automatic re-stat of a watched file
   // cannot be pointed elsewhere (issue #70).
-  registerHandle('file:getStats', async (_event, filePath: string) => {
+  registerHandle('file:getStats', async (_event, filePath: string): Promise<FileStats> => {
     try {
       await assertNoConfinementEscape(filePath, fileService.getProjectPath())
       const stats = await fileService.getFileStats(filePath)
@@ -174,7 +175,7 @@ export function registerFileHandlers(): void {
         size: stats.size,
         modified: stats.mtime,
         created: stats.birthtime
-      }
+      } satisfies FileStats
     } catch (error) {
       // ENOENT is an expected caller condition (e.g. a markdown link whose
       // target doesn't exist). Log at debug; surface real failures at error.
