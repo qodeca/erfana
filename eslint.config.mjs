@@ -65,15 +65,20 @@ const RENDERER_GATEWAY_SELECTORS = [
     message: GATEWAY_MESSAGE
   },
   {
+    // (window as X).api
+    selector: "MemberExpression[property.name='api'][object.type=/^TS(As|NonNull|Satisfies)Expression$/]",
+    message: GATEWAY_MESSAGE
+  },
+  {
     // const a = window.api ; a = window.api
     selector:
-      "VariableDeclarator[id.type!='ObjectPattern'][init.type='MemberExpression'][init.object.name='window'][init.property.name='api'], AssignmentExpression[right.type='MemberExpression'][right.object.name='window'][right.property.name='api']",
+      "VariableDeclarator[id.type!='ObjectPattern'][init.type='MemberExpression'][init.object.name='window'][init.property.name='api'], VariableDeclarator[id.type!='ObjectPattern'][init.type='ChainExpression'][init.expression.object.name='window'][init.expression.property.name='api'], AssignmentExpression[right.type='MemberExpression'][right.object.name='window'][right.property.name='api'], AssignmentExpression[right.type='ChainExpression'][right.expression.object.name='window'][right.expression.property.name='api']",
     message: GATEWAY_MESSAGE
   },
   {
     // const { file } = window.api
     selector:
-      "VariableDeclarator[id.type='ObjectPattern'][init.object.name='window'][init.property.name='api']",
+      "VariableDeclarator[id.type='ObjectPattern'][init.object.name='window'][init.property.name='api'], VariableDeclarator[id.type='ObjectPattern'][init.type='ChainExpression'][init.expression.object.name='window'][init.expression.property.name='api']",
     message: GATEWAY_MESSAGE
   }
 ]
@@ -97,8 +102,7 @@ const RENDERER_PATTERN_OWNERS = [
 // The only files that read the bridges off `window.api`
 const RENDERER_GATEWAY_FILES = [
   'src/renderer/src/services/fileGateway.ts',
-  'src/renderer/src/services/terminalGateway.ts',
-  'src/renderer/src/services/gatewayAccess.ts'
+  'src/renderer/src/services/terminalGateway.ts'
 ]
 
 // Selectors every renderer file obeys; the gateway selectors are added on top for non-test code.

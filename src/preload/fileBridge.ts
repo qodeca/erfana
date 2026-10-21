@@ -93,7 +93,9 @@ export const fileBridge: FileBridge = {
   onProjectChanged: (callback) => {
     const listener = (_event: unknown, data: ProjectChanged) => callback(data)
     ipcRenderer.on(FILE_EVENTS.projectChanged, listener)
-    return () => ipcRenderer.removeListener(FILE_EVENTS.projectChanged, listener)
+    return () => {
+      ipcRenderer.removeListener(FILE_EVENTS.projectChanged, listener)
+    }
   },
   closeProject: (expectedGeneration) =>
     ipcRenderer.invoke(FILE_CHANNELS.closeProject, expectedGeneration)

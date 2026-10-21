@@ -8,10 +8,10 @@
  * module gives the renderer a single seam to change or fake.
  */
 import type { FileBridge } from '../../../shared/ipc/file-schema'
-import { gatewayBridges } from './gatewayAccess'
 
 /** The bridge is read per call, so a test that swaps `window.api` is honoured. */
-const bridge = (): FileBridge => gatewayBridges().file
+// `Window['api']` leaves this bridge out of its type; this module is the only place it is put back
+const bridge = (): FileBridge => (window as unknown as { api: { file: FileBridge } }).api.file
 
 export const fileGateway: FileBridge = {
   openProject: (...args) => bridge().openProject(...args),

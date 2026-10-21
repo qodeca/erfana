@@ -17,7 +17,9 @@ import type { TerminalBridge } from '../shared/ipc/terminal-schema'
 function subscribe<T>(event: string, callback: (data: T) => void): () => void {
   const listener = (_event: unknown, data: T) => callback(data)
   ipcRenderer.on(event, listener)
-  return () => ipcRenderer.removeListener(event, listener)
+  return () => {
+    ipcRenderer.removeListener(event, listener)
+  }
 }
 
 export const terminalBridge: TerminalBridge = {

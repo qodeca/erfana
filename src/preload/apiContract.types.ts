@@ -26,7 +26,7 @@ type IsAny<T> = 0 extends 1 & T ? true : false
  * `true` where `any` appears in `T`: as a value, a property, a parameter, a
  * return or a promised value. Depth is bounded so DOM and Node types end the walk.
  */
-type AnyIn<T, Depth extends unknown[] = []> = Depth['length'] extends 8
+type AnyIn<T, Depth extends unknown[] = []> = Depth['length'] extends 14
   ? never
   : IsAny<T> extends true
     ? true

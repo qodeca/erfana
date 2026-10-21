@@ -192,7 +192,9 @@ const api = {
     onStateChanged: (callback: (event: GitStateChangeEvent) => void): (() => void) => {
       const handler = (_event: IpcRendererEvent, data: GitStateChangeEvent): void => callback(data)
       ipcRenderer.on('git:state-changed', handler)
-      return () => ipcRenderer.removeListener('git:state-changed', handler)
+      return () => {
+        ipcRenderer.removeListener('git:state-changed', handler)
+      }
     }
   },
 
@@ -237,7 +239,9 @@ const api = {
     onPollTriggered: (callback: (event: GitPollTriggeredEvent) => void): (() => void) => {
       const handler = (_event: IpcRendererEvent, data: GitPollTriggeredEvent): void => callback(data)
       ipcRenderer.on('git:poll-triggered', handler)
-      return () => ipcRenderer.removeListener('git:poll-triggered', handler)
+      return () => {
+        ipcRenderer.removeListener('git:poll-triggered', handler)
+      }
     }
   },
 
@@ -338,7 +342,9 @@ const api = {
     onDocumentProgress: (callback: (progress: DocumentImportProgress) => void): (() => void) => {
       const listener = (_event: unknown, data: DocumentImportProgress): void => callback(data)
       ipcRenderer.on(IMPORT_CHANNELS.DOCUMENT_PROGRESS, listener)
-      return () => ipcRenderer.removeListener(IMPORT_CHANNELS.DOCUMENT_PROGRESS, listener)
+      return () => {
+        ipcRenderer.removeListener(IMPORT_CHANNELS.DOCUMENT_PROGRESS, listener)
+      }
     },
 
     /**
@@ -348,7 +354,9 @@ const api = {
     onDependenciesReady: (callback: (event: DependencyReadyEvent) => void): (() => void) => {
       const listener = (_event: unknown, data: DependencyReadyEvent): void => callback(data)
       ipcRenderer.on(IMPORT_CHANNELS.DEPENDENCIES_READY, listener)
-      return () => ipcRenderer.removeListener(IMPORT_CHANNELS.DEPENDENCIES_READY, listener)
+      return () => {
+        ipcRenderer.removeListener(IMPORT_CHANNELS.DEPENDENCIES_READY, listener)
+      }
     }
   },
 
@@ -571,7 +579,9 @@ const api = {
     onProgress: (callback: (progress: TranscriptionProgress) => void): (() => void) => {
       const listener = (_event: unknown, data: TranscriptionProgress): void => callback(data)
       ipcRenderer.on('transcription:progress', listener)
-      return () => ipcRenderer.removeListener('transcription:progress', listener)
+      return () => {
+        ipcRenderer.removeListener('transcription:progress', listener)
+      }
     }
   },
 
@@ -630,7 +640,9 @@ const api = {
     onDownloadProgress: (callback: (progress: { percent: number; downloadedBytes: number; totalBytes: number }) => void): (() => void) => {
       const listener = (_event: unknown, data: { percent: number; downloadedBytes: number; totalBytes: number }): void => callback(data)
       ipcRenderer.on(TRANSCRIPTION_CHANNELS.WHISPER_DOWNLOAD_PROGRESS, listener)
-      return () => ipcRenderer.removeListener(TRANSCRIPTION_CHANNELS.WHISPER_DOWNLOAD_PROGRESS, listener)
+      return () => {
+        ipcRenderer.removeListener(TRANSCRIPTION_CHANNELS.WHISPER_DOWNLOAD_PROGRESS, listener)
+      }
     }
   },
 
@@ -664,7 +676,9 @@ const api = {
     onSettingsChanged: (callback: (data: GlobalSettingsChanged) => void): (() => void) => {
       const listener = (_event: unknown, data: GlobalSettingsChanged): void => callback(data)
       ipcRenderer.on('globalSettings:changed', listener)
-      return () => ipcRenderer.removeListener('globalSettings:changed', listener)
+      return () => {
+        ipcRenderer.removeListener('globalSettings:changed', listener)
+      }
     }
   },
 
@@ -754,7 +768,9 @@ const api = {
       const listener = (_event: unknown, payload: ClaudeStatusChangePayload): void =>
         callback(payload)
       ipcRenderer.on(ClaudeStatusEvents.CHANGED, listener)
-      return () => ipcRenderer.removeListener(ClaudeStatusEvents.CHANGED, listener)
+      return () => {
+        ipcRenderer.removeListener(ClaudeStatusEvents.CHANGED, listener)
+      }
     }
   },
 
@@ -773,7 +789,9 @@ const api = {
     onQuitRequested: (callback: (data: { reason?: string }) => void): (() => void) => {
       const listener = (_event: unknown, data: { reason?: string }): void => callback(data)
       ipcRenderer.on('quit:requested', listener)
-      return () => ipcRenderer.removeListener('quit:requested', listener)
+      return () => {
+        ipcRenderer.removeListener('quit:requested', listener)
+      }
     },
 
     /**
@@ -863,7 +881,9 @@ const api = {
         data: { projectPath: string; requesterPid: number }
       ): void => callback(data)
       ipcRenderer.on('project-lock:focused', handler)
-      return () => ipcRenderer.removeListener('project-lock:focused', handler)
+      return () => {
+        ipcRenderer.removeListener('project-lock:focused', handler)
+      }
     }
   },
 

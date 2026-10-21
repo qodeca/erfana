@@ -63,7 +63,7 @@ Never import `ipcMain` in a handler module: ESLint (`no-restricted-imports` in `
        ipcRenderer.invoke(MY_CHANNELS.DO_SOMETHING, { filePath })
    }
    ```
-   `window.api` is typed `Api = typeof api` (exported from `src/preload/index.ts`), so there is no second declaration to keep in step; give the bridge a `MyBridge` contract in the schema file and type the preload object with it (`fileBridge.ts`, `terminalBridge.ts` are the model). A renderer gateway (`services/fileGateway.ts`, `terminalGateway.ts`) is the one place the renderer reads `window.api.file` / `.terminal`; ESLint enforces it for those two bridges.
+   `Api = typeof api` is exported from `src/preload/index.ts`, and `Window['api']` is that type, so there is no second declaration to keep in step. Give the bridge a `MyBridge` contract in the schema file and type the preload object with it (`fileBridge.ts`, `terminalBridge.ts` are the model). The `file` and `terminal` bridges are left out of `Window['api']` on purpose: the renderer reaches them only through `services/fileGateway.ts` and `terminalGateway.ts`, and ESLint rejects any other way round.
 
 6. Call from the renderer:
    ```typescript

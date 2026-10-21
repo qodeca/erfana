@@ -147,9 +147,18 @@ describe('renderer gateway rule', () => {
     ['computed on window', "export const f = () => window['api']"],
     ['computed on globalThis', 'export const f = (k) => globalThis[k]'],
     ['globalThis.api', 'export const f = () => globalThis.api.file'],
-    ['self.api', 'export const f = () => self.api']
+    ['self.api', 'export const f = () => self.api'],
+    ['a cast window', 'export const f = () => (window as unknown as { api: object }).api'],
+    ['optional-chain aliasing', 'const a = window?.api\nexport { a }'],
+    ['optional-chain assignment', 'let a\na = window?.api\nexport { a }'],
+    ['optional-chain destructuring', 'const { file } = window?.api\nexport { file }']
   ])('flags %s', async (_name, code) => {
     expect(await gatewayMessages(RENDERER, code)).toHaveLength(1)
+  })
+
+  it('leaves the image-export harness handle alone', async () => {
+    const code = 'export const h = (window as unknown as { imageExportApi: object }).imageExportApi'
+    expect(await gatewayMessages(HARNESS, code)).toHaveLength(0)
   })
 
   it('leaves the other bridges to their own migration', async () => {
@@ -159,8 +168,7 @@ describe('renderer gateway rule', () => {
 
   it.each([
     'src/renderer/src/services/fileGateway.ts',
-    'src/renderer/src/services/terminalGateway.ts',
-    'src/renderer/src/services/gatewayAccess.ts'
+    'src/renderer/src/services/terminalGateway.ts'
   ])('exempts %s from the gateway rule only', async (file) => {
     expect(await gatewayMessages(file, READ_FILE)).toHaveLength(0)
     const messages = await lint(file, 'export const b = (p) => p.split("/").pop()')
