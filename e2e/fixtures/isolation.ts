@@ -221,6 +221,21 @@ async function withDeadline<T>(promise: Promise<T>, ms: number): Promise<T | 'ti
 }
 
 /**
+ * The teardown log line for a `taskkill /PID <pid> /T /F` run.
+ *
+ * taskkill exits non-zero when ANY process of the tree could not be ended – most
+ * often a helper that had already exited by itself ("There is no running
+ * instance of the task"). That is not a failed kill: what matters is whether
+ * the app's own process was ended, which its output says by PID.
+ */
+export function describeTaskkill(pid: number, exitedNonZero: boolean, output: string): string {
+  const mainEnded = new RegExp(`The process with PID ${pid} (\\([^)]*\\) )?has been terminated`).test(output)
+  if (exitedNonZero && !mainEnded) return `taskkill /PID ${pid} /T /F failed: ${output}`
+  const partial = exitedNonZero ? '; some child processes had already exited' : ''
+  return `process tree of PID ${pid}${partial} (${output})`
+}
+
+/**
  * Kill the app Playwright started, and only that one: found by its own PID,
  * never by name or command-line pattern. On Windows `taskkill /T` also ends its
  * GPU, utility and renderer children, which otherwise outlive the main process
@@ -236,7 +251,7 @@ async function killAppProcess(child: ChildProcess): Promise<string> {
     return new Promise((resolve) => {
       execFile('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true }, (error, stdout, stderr) => {
         const output = `${stdout}${stderr}`.trim().replace(/\s+/g, ' ')
-        resolve(error ? `taskkill /PID ${pid} /T /F failed: ${output || error.message}` : `process tree of PID ${pid} (${output})`)
+        resolve(describeTaskkill(pid, error !== null, output || (error?.message ?? '')))
       })
     })
   }

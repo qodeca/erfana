@@ -15,7 +15,7 @@
 
 import { test, expect, type ElectronApplication } from '@playwright/test'
 import { spawn } from 'child_process'
-import { APP_EXIT_TIMEOUT_MS, closeAppAndWait } from './fixtures/isolation'
+import { APP_EXIT_TIMEOUT_MS, closeAppAndWait, describeTaskkill } from './fixtures/isolation'
 
 /** `true` while a process with this PID exists. */
 function isRunning(pid: number): boolean {
@@ -34,6 +34,35 @@ const PARENT_SCRIPT = [
   'console.log(helper.pid)',
   'setInterval(() => {}, 1000)'
 ].join('\n')
+
+test.describe('fixture teardown: the taskkill log line', () => {
+  // Real taskkill output from a teardown on Windows 11 (2026-10-21)
+  const PARTIAL =
+    'SUCCESS: The process with PID 8512 (child process of PID 7412) has been terminated. ' +
+    'SUCCESS: The process with PID 7412 (child process of PID 16948) has been terminated. ' +
+    'ERROR: The process with PID 16152 (child process of PID 8512) could not be terminated. ' +
+    'Reason: There is no running instance of the task.'
+
+  test('a helper that had already exited does not make the kill a failure', () => {
+    const line = describeTaskkill(7412, true, PARTIAL)
+    expect(line).toMatch(/^process tree of PID 7412; some child processes had already exited \(/)
+    expect(line).not.toContain('failed')
+  })
+
+  test('a kill that did not end the main process is a failure', () => {
+    expect(describeTaskkill(9999, true, PARTIAL)).toMatch(/^taskkill \/PID 9999 \/T \/F failed: /)
+    expect(describeTaskkill(9999, true, 'ERROR: The process "9999" not found.')).toMatch(/failed/)
+  })
+
+  test('a clean kill names the tree', () => {
+    const ok = 'SUCCESS: The process with PID 7412 (child process of PID 16948) has been terminated.'
+    expect(describeTaskkill(7412, false, ok)).toBe(`process tree of PID 7412 (${ok})`)
+  })
+
+  test('a PID that is a prefix of another is not mistaken for it', () => {
+    expect(describeTaskkill(741, true, PARTIAL)).toMatch(/failed/)
+  })
+})
 
 test.describe('fixture teardown: an app that hangs on quit', () => {
   test('is killed after the deadline, child processes included on Windows', async () => {
