@@ -310,4 +310,27 @@ describe('useTerminalStore.sendToTerminal with autoExecute', () => {
 
     await promise
   })
+
+  it('counts a programmatic send as recent user input for the restart and quit guards', async () => {
+    // A prompt the app sends on the user's behalf starts agent work exactly as
+    // typing does; the restart guard must ask before killing it.
+    useTerminalStore.setState({ activeTerminalId: 'term1' })
+
+    const promise = useTerminalStore.getState().sendToTerminal('explain this', true)
+    await vi.advanceTimersByTimeAsync(200)
+    await promise
+
+    const state = useTerminalStore.getState()
+    expect(state.userInputById.has('term1')).toBe(true)
+    expect(state.isRecentlyActiveId('term1', 20_000)).toBe(true)
+  })
+
+  it('does not mark input when the write fails', async () => {
+    useTerminalStore.setState({ activeTerminalId: 'term1' })
+    mockWrite.mockResolvedValue({ success: false, error: 'closed' })
+
+    await useTerminalStore.getState().sendToTerminal('explain this', false)
+
+    expect(useTerminalStore.getState().userInputById.has('term1')).toBe(false)
+  })
 })

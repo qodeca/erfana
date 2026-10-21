@@ -4,6 +4,7 @@ import { useEffect, useRef, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { TEST_IDS } from '../../constants/testids'
 import { useOccluder } from '../../hooks/useOccluder'
+import { useOverlayStackEntry } from '../../hooks/useOverlayStackEntry'
 import './ContextMenu.css'
 
 export interface ContextMenuItem {
@@ -43,6 +44,22 @@ export function ContextMenu({ x, y, items, onClose, containerTestId }: ContextMe
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
 
+  // Escape goes through the shared overlay stack (#229) rather than a private
+  // document listener: a private listener fired alongside every other
+  // overlay's on the same keystroke, and – because it never stopped the event
+  // – also let Escape through to the focused control underneath (the terminal,
+  // where a stray Escape interrupts a running agent).
+  useOverlayStackEntry(menuRef, {
+    active: true,
+    // The token `.context-menu` paints with: a menu paints above dialogs, so
+    // it is also the overlay that takes Escape first.
+    zIndex: '--z-context-menu',
+    onEscape: onClose,
+    // A menu is transient chrome, not a modal: a trapping dialog beneath it
+    // (a menu opened inside one) must keep its Tab trap and focus rescue.
+    modal: false
+  })
+
   useEffect(() => {
     // Record when menu was opened to ignore the opening click
     // Only set once on mount, not on every effect re-run
@@ -57,21 +74,13 @@ export function ContextMenu({ x, y, items, onClose, containerTestId }: ContextMe
       }
     }
 
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onCloseRef.current()
-      }
-    }
-
     // Use capture phase to catch events before any stopPropagation in children
     // Add immediately (no delay) - timestamp check handles the opening click
     document.addEventListener('mousedown', handleClickOutside, { capture: true })
-    document.addEventListener('keydown', handleEscape, { capture: true })
 
     return () => {
       // Must match capture option when removing
       document.removeEventListener('mousedown', handleClickOutside, { capture: true })
-      document.removeEventListener('keydown', handleEscape, { capture: true })
     }
   }, []) // Empty deps - only run on mount/unmount
 
