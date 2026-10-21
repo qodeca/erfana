@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { dialog, shell, type OpenDialogOptions } from 'electron'
-import { stat, realpath } from 'fs/promises'
+import { lstat, stat, realpath } from 'fs/promises'
 import path from 'path'
 import { ProjectService, type OpenContext } from '../services/ProjectService'
 import { fileService } from '../services/FileService'
@@ -34,6 +34,7 @@ import { logger } from '../services/LoggingService'
 import { fileExists } from '../utils/fileUtils'
 import { redactPath, redactedLogError } from '../utils/redactUserInput'
 import { isInsideRoot } from '../utils/pathCompare'
+import { isSystemPath } from '../utils/systemPathBlock'
 import { getPlatformConfig } from '../services/watcher/PlatformConfig'
 import { restoreParentDirectory } from '../services/file/restoreParentDirectory'
 import { registerConfinedHandle } from './confinement/registerConfinedHandle'
@@ -291,7 +292,7 @@ export function registerFileHandlers(): void {
     'file:exists',
     {
       schema: PathArgsSchema,
-      paths: { filePath: { arg: 0, mode: 'external', check: 'none' } },
+      paths: { filePath: { arg: 0, mode: 'external', check: 'escape' } },
       onRefusal: () => false,
       handler: async (_ctx, _args, { filePath }): Promise<boolean> => fileExists(filePath.real)
     },
@@ -482,10 +483,23 @@ export function registerFileHandlers(): void {
         sourceEntry: { arg: 0, mode: 'project-entry' },
         targetParentPath: { arg: 1, mode: 'project', mustExist: true, kind: 'directory', access: 'change' }
       },
-      handler: async (_ctx, [, , newName], { sourceEntry, targetParentPath }) => {
+      handler: async (_ctx, [, , newName], { sourcePath, sourceEntry, targetParentPath }) => {
         try {
+          // A folder link is copied as a link; a file link is copied as the content the
+          // check resolved, so the target is not read again through the link
+          const linkToFolder = await (async (): Promise<boolean> => {
+            try {
+              return (
+                (await lstat(sourceEntry.real)).isSymbolicLink() &&
+                (await stat(sourcePath.real)).isDirectory()
+              )
+            } catch {
+              // Missing or unreadable: the copy itself reports it
+              return false
+            }
+          })()
           const copied = await fileService.copyItem(
-            sourceEntry.real,
+            linkToFolder ? sourceEntry.real : sourcePath.real,
             targetParentPath.real,
             newName ?? path.basename(sourceEntry.requested)
           )
@@ -633,15 +647,7 @@ export function registerFileHandlers(): void {
 
           // Security check: block system-critical paths even without projectRoot
           // Defense-in-depth: prevent validation of sensitive system directories
-          const blockedPrefixes = process.platform === 'win32'
-            ? ['C:\\Windows', 'C:\\Program Files', 'C:\\ProgramData', 'C:\\System']
-            : ['/etc', '/private/etc', '/usr', '/bin', '/sbin', '/System', '/Library', '/private/var']
-
-          const isBlockedPath = [resolvedPath, canonicalPath].some(candidate =>
-            blockedPrefixes.some(prefix =>
-              candidate.toLowerCase().startsWith(prefix.toLowerCase())
-            )
-          )
+          const isBlockedPath = isSystemPath([resolvedPath, canonicalPath], process.platform, process.env)
           if (isBlockedPath) {
             return { exists: false, error: 'Access to system paths not allowed' }
           }

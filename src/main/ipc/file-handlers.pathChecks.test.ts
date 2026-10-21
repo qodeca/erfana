@@ -282,6 +282,11 @@ describe('file:* path checks', () => {
       await expect(invoke('file:exists', 'relative/path.md')).resolves.toBe(false)
       await expect(invoke('file:exists', '')).resolves.toBe(false)
       await expect(invoke('file:exists', path.join(outside, 'secret.txt'))).resolves.toBe(true)
+      if (process.platform !== 'win32') {
+        // A link inside the project that leads out does not answer as an existing file
+        await expect(invoke('file:exists', path.join(root, 'link.md'))).resolves.toBe(false)
+        await expect(invoke('file:exists', path.join(root, 'a.md'))).resolves.toBe(true)
+      }
     })
 
     it('file:openProjectByPath refuses a value that is not an absolute path', async () => {
@@ -461,6 +466,9 @@ describe('file:* path checks', () => {
       symlinkSync(path.join(root, 'a.md'), path.join(root, 'alias.md'))
       const copied = await invoke('file:copyItem', path.join(root, 'alias.md'), path.join(root, 'sub'))
       expect(copied.path).toBe(path.join(root, 'sub', 'alias.md'))
+      // A file link is copied as the content it resolved to
+      expect(lstatSync(path.join(root, 'sub', 'alias.md')).isSymbolicLink()).toBe(false)
+      expect(readFileSync(path.join(root, 'sub', 'alias.md'), 'utf8')).toBe('inside')
     })
 
     it.skipIf(process.platform === 'win32')('a copied folder link stays a link and is reported as one', async () => {

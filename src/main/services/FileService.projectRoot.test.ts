@@ -111,7 +111,7 @@ describe('FileService entry names', () => {
     expect((await readdir(root)).sort()).toEqual(['a.md', 'sub'])
   })
 
-  it('does not copy or move a folder into the parent of the project', async () => {
+  it('accepts only single-level names for copy and move targets', async () => {
     await expect(svc.copyItem(join(root, 'sub'), root, '..')).rejects.toThrow()
     await expect(svc.moveItem(join(root, 'sub'), root, '..')).rejects.toThrow()
     expect(await readFile(join(base, 'sibling.md'), 'utf-8')).toBe('s')
