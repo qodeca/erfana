@@ -144,15 +144,39 @@ describe('TerminalService start-up prompt', () => {
     }
   })
 
-  it('bounds the held output and keeps the newest', async () => {
+  it('bounds the held output, keeps the newest, starts at a line and resets the style', async () => {
     const { mod, terminalService, terminalId, pty, marker, received } = await setup()
     pty.emit('data', `${tmpdir()}\n${marker}\n`)
-    pty.emit('data', 'a'.repeat(mod.PENDING_OUTPUT_MAX_CHARS))
+    pty.emit('data', `half-line${'a'.repeat(mod.PENDING_OUTPUT_MAX_CHARS)}\nwhole line\n`)
     pty.emit('data', 'tail')
     terminalService.markInitializationComplete(terminalId)
     const all = received.join('')
-    expect(all.length).toBe(mod.PENDING_OUTPUT_MAX_CHARS)
-    expect(all.endsWith('tail')).toBe(true)
+    expect(all.startsWith('\u001b[0m')).toBe(true)
+    expect(all.slice(4)).toBe('whole line\ntail')
+  })
+
+  it('skips a half surrogate pair when a cut finds no line break', async () => {
+    const { mod } = await setup()
+    const cut = mod.cutHeldOutput(`\uD83D\uDE00${'a'.repeat(mod.PENDING_OUTPUT_MAX_CHARS - 1)}`)
+    expect(cut).toBe(`\u001b[0m${'a'.repeat(mod.PENDING_OUTPUT_MAX_CHARS - 1)}`)
+  })
+
+  it('shows the output of a shell that exits during the handshake, before the exit', async () => {
+    const { terminalService, pty, marker } = await setup()
+    const order: string[] = []
+    terminalService.on('data', (e: { data: string }) => order.push(`data:${e.data}`))
+    terminalService.on('exit', () => order.push('exit'))
+    pty.emit('data', `${tmpdir()}\n${marker}\nexec: not found\n`)
+    pty.emit('exit', { exitCode: 127 })
+    expect(order).toEqual(['data:exec: not found\n', 'exit'])
+  })
+
+  it('keeps only what follows a marker that appears again in held output', async () => {
+    const { terminalService, terminalId, pty, marker, received } = await setup()
+    pty.emit('data', `${tmpdir()}\n${marker}\nold prompt`)
+    pty.emit('data', `\u001b[2J${marker}\r\nnew prompt`)
+    terminalService.markInitializationComplete(terminalId)
+    expect(received.join('')).toBe('new prompt')
   })
 
   describe('stripMarkerLineEnd', () => {
@@ -160,6 +184,9 @@ describe('TerminalService start-up prompt', () => {
       ['\n$ ', '$ ', false],
       ['\r\n$ ', '$ ', false],
       ['  \r\n', '', false],
+      ['\u001b[K\r\n$ ', '$ ', false],
+      [' \u001b[0K\u001b[K\r\n', '', false],
+      ['\u001b[K', '', true],
       ['', '', true],
       ['\r', '', true],
       ['$ ', '$ ', false]

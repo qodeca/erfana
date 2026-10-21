@@ -102,6 +102,10 @@ export const MARKER_BUFFER_MAX_CHARS = 64 * 1024
 /** Most post-marker output held while the clear handshake is open (64 KiB, newest kept). */
 export const PENDING_OUTPUT_MAX_CHARS = 64 * 1024
 
+const ESC = String.fromCharCode(0x1b)
+const MARKER_LINE_END = new RegExp(`^(?:[ \\t]|${ESC}\\[[0-9;]*K)*\\r?\\n`)
+const MARKER_LINE_END_PARTIAL = new RegExp(`^(?:[ \\t]|${ESC}\\[[0-9;]*K)*\\r?$`)
+
 /**
  * Drops the rest of the marker's own line from output that follows the marker.
  *
@@ -112,10 +116,28 @@ export const PENDING_OUTPUT_MAX_CHARS = 64 * 1024
  * chunk must be given to this function again.
  */
 export function stripMarkerLineEnd(text: string): { rest: string; pending: boolean } {
-  const eol = /^[ \t]*\r?\n/.exec(text)
+  // ConPTY pads a line with spaces or erase-to-end-of-line sequences before the break
+  const eol = MARKER_LINE_END.exec(text)
   if (eol) return { rest: text.slice(eol[0].length), pending: false }
-  if (/^[ \t]*\r?$/.test(text)) return { rest: '', pending: true }
+  if (MARKER_LINE_END_PARTIAL.test(text)) return { rest: '', pending: true }
   return { rest: text, pending: false }
+}
+
+/**
+ * Cuts held output down to {@link PENDING_OUTPUT_MAX_CHARS}, keeping the newest.
+ * The cut starts at the next line break so no line is half there, else after a
+ * split surrogate pair, and resets the text style so a cut escape sequence
+ * cannot leave the terminal coloured.
+ */
+export function cutHeldOutput(text: string): string {
+  let tail = text.slice(-PENDING_OUTPUT_MAX_CHARS)
+  const lineBreak = tail.indexOf('\n')
+  if (lineBreak !== -1) {
+    tail = tail.slice(lineBreak + 1)
+  } else if (/^[\uDC00-\uDFFF]/.test(tail)) {
+    tail = tail.slice(1)
+  }
+  return '\x1b[0m' + tail
 }
 
 /**
@@ -426,9 +448,10 @@ export class TerminalService extends EventEmitter {
             // has been applied instead of discarding it.
             const afterMarker = stripMarkerLineEnd(markerBuffer.slice(markerAt + marker.length))
             markerLineEndPending = afterMarker.pending
-            this.queuePendingOutput(term, afterMarker.rest)
+            this.queuePendingOutput(term, afterMarker.rest, marker)
 
             this.emit('clearTerminal', { terminalId, webContentsId: webContentsId ?? -1 })
+            markerBuffer = ''
 
             // Safety fallback: if renderer doesn't respond in 3 seconds, enable anyway
             term.clearFallbackTimeout = setTimeout(() => {
@@ -482,7 +505,7 @@ export class TerminalService extends EventEmitter {
         } else {
           // Clear handshake still open: keep it, in order, for the flush.
           logger.debug(`[PRIMARY onData] QUEUEING data`)
-          this.queuePendingOutput(term, output)
+          this.queuePendingOutput(term, output, marker)
         }
       })
 
@@ -490,6 +513,17 @@ export class TerminalService extends EventEmitter {
       ptyProcess.onExit((event: { exitCode: number; signal?: number }) => {
         logger.info(`🏁 Terminal ${terminalId} exited`, event)
         markExited()
+        // A shell that fails during the handshake still said why: show it before the exit
+        const exiting = this.terminals.get(terminalId)
+        if (exiting) {
+          if (exiting.clearFallbackTimeout) {
+            clearTimeout(exiting.clearFallbackTimeout)
+            exiting.clearFallbackTimeout = undefined
+          }
+          exiting.isClearing = false
+          exiting.initializationComplete = true
+          this.flushPendingOutput(exiting)
+        }
         this.emit('exit', { terminalId, exitCode: event.exitCode, signal: event.signal, webContentsId: webContentsId ?? -1 })
         this.terminals.delete(terminalId)
       })
@@ -506,11 +540,15 @@ export class TerminalService extends EventEmitter {
 
 
   /** Holds post-marker output while the clear handshake is open (bounded, newest kept). */
-  private queuePendingOutput(terminal: TerminalInstance, output: string): void {
+  private queuePendingOutput(terminal: TerminalInstance, output: string, marker: string): void {
     if (!output) return
-    const merged = terminal.pendingOutput + output
-    terminal.pendingOutput =
-      merged.length > PENDING_OUTPUT_MAX_CHARS ? merged.slice(-PENDING_OUTPUT_MAX_CHARS) : merged
+    let merged = terminal.pendingOutput + output
+    // A marker that shows up again (a console redraw) means the screen was redrawn
+    // from there: only what follows it is new.
+    const markerAt = merged.lastIndexOf(marker)
+    if (markerAt !== -1) merged = stripMarkerLineEnd(merged.slice(markerAt + marker.length)).rest
+    if (merged.length > PENDING_OUTPUT_MAX_CHARS) merged = cutHeldOutput(merged)
+    terminal.pendingOutput = merged
   }
 
   /** Forwards held output, in order, once the handshake has ended. */

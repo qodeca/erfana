@@ -61,6 +61,16 @@ import type { TerminalState } from './TerminalPanel/types'
 export function TerminalPanel(_props: ISplitviewPanelProps) {
   const [isAvailable, setIsAvailable] = useState<boolean | null>(null)
   const [terminalId, setTerminalId] = useState<string | null>(null)
+  // Id whose terminal:data listener is attached, and clear confirmations waiting for it
+  const dataListeningIdRef = useRef<string | null>(null)
+  const clearConfirmWaitersRef = useRef(new Map<string, () => void>())
+  const confirmWhenDataListening = useCallback((id: string, confirm: () => void) => {
+    if (dataListeningIdRef.current === id) {
+      confirm()
+    } else {
+      clearConfirmWaitersRef.current.set(id, confirm)
+    }
+  }, [])
   const [error, setError] = useState<string | null>(null)
   const [recheckCooldown, setRecheckCooldown] = useState(false)
 
@@ -641,12 +651,19 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       // Set up clear event handler BEFORE creating PTY to avoid race condition
       // The PTY immediately starts marker detection, so we must subscribe first
       let clearUnsubscribe: (() => void) | null = null
-      const handleClearForInit = (data: { terminalId: string }) => {
-        logger.info(`[INIT] Received clear event for terminal ${data.terminalId}`)
+      // The terminal id is only known once create resolves, but the clear event can
+      // arrive first. Clear events seen before that are held, and every clear event
+      // is checked against the id so another terminal's start-up cannot clear this one.
+      let createdId: string | null = null
+      const earlyClearIds = new Set<string>()
+      const runClear = (id: string) => {
+        logger.info(`[INIT] Received clear event for terminal ${id}`)
         // Write clear sequence with callback for deterministic confirmation
         xterm.write('\x1b[2J\x1b[3J\x1b[H', () => {
-          logger.info(`[INIT] Clear sequence complete, calling markClearComplete`)
-          window.api.terminal.markClearComplete(data.terminalId)
+          logger.info(`[INIT] Clear sequence complete, confirming once the data listener is attached`)
+          // Main flushes the shell output it held back as soon as it gets this
+          // confirmation, so the data listener must exist by then.
+          confirmWhenDataListening(id, () => window.api.terminal.markClearComplete(id))
 
           // Cleanup this one-time handler
           if (clearUnsubscribe) {
@@ -654,6 +671,14 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
             clearUnsubscribe = null
           }
         })
+      }
+      const handleClearForInit = (data: { terminalId: string }) => {
+        if (createdId === null) {
+          earlyClearIds.add(data.terminalId)
+          return
+        }
+        if (data.terminalId !== createdId) return
+        runClear(createdId)
       }
       clearUnsubscribe = window.api.terminal.onClear(handleClearForInit)
 
@@ -677,7 +702,9 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
         throw new Error(result.error || 'Failed to create terminal')
       }
 
+      createdId = result.terminalId
       setTerminalId(result.terminalId)
+      if (earlyClearIds.has(result.terminalId)) runClear(result.terminalId)
       registerCleanup(registerTestTerminal(result.terminalId, xterm))
       // Record the resolved shellKind so the screenshot path-paste quotes
       // correctly without an extra IPC (#164 round-2 F#1). Main always
@@ -820,6 +847,12 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     })
 
     const unsubscribeData = window.api.terminal.onData(dataHandler)
+    dataListeningIdRef.current = terminalId
+    const waiting = clearConfirmWaitersRef.current.get(terminalId)
+    if (waiting) {
+      clearConfirmWaitersRef.current.delete(terminalId)
+      waiting()
+    }
 
     const unsubscribeExit = window.api.terminal.onExit((data) => {
       if (data.terminalId === terminalId) {
@@ -840,6 +873,8 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     // No need for duplicate handler here - clear only happens once during init
 
     return () => {
+      if (dataListeningIdRef.current === terminalId) dataListeningIdRef.current = null
+      clearConfirmWaitersRef.current.delete(terminalId)
       unsubscribeData()
       unsubscribeExit()
       unsubscribeError()
