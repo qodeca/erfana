@@ -307,7 +307,7 @@ async function createId(
       pty.emit('data', 'C:\\Projects\\test\r\n')
       pty.emit('data', `${marker}\r\n`)
 
-      expect(clearSpy).toHaveBeenCalledWith({ terminalId: tid })
+      expect(clearSpy).toHaveBeenCalledWith(expect.objectContaining({ terminalId: tid }))
       expect(terminalService.getTerminalInfo(tid!)?.cwd).toBe('C:\\Projects\\test')
     })
   })
@@ -347,7 +347,7 @@ async function createId(
       pty.emit('data', `${marker}\n`)
 
       // clearTerminal event should be emitted
-      expect(clearSpy).toHaveBeenCalledWith({ terminalId: tid })
+      expect(clearSpy).toHaveBeenCalledWith(expect.objectContaining({ terminalId: tid }))
 
       // CWD should be updated
       const info = terminalService.getTerminalInfo(tid!)
@@ -375,7 +375,7 @@ async function createId(
       // Emit pwd and marker in single chunk
       pty.emit('data', `/home/user\n${marker}\n`)
 
-      expect(clearSpy).toHaveBeenCalledWith({ terminalId: tid })
+      expect(clearSpy).toHaveBeenCalledWith(expect.objectContaining({ terminalId: tid }))
     })
 
     it('never writes PTY output or the full cwd into the logs', async () => {
@@ -429,7 +429,7 @@ async function createId(
       terminalService.on('data', dataSpy)
 
       pty.emit('data', 'user output\n')
-      expect(dataSpy).toHaveBeenCalledWith({ terminalId: tid, data: 'user output\n' })
+      expect(dataSpy).toHaveBeenCalledWith(expect.objectContaining({ terminalId: tid, data: 'user output\n' }))
     })
 
     it('fallback timeout enables terminal after 3 seconds if no confirmation', async () => {
@@ -464,7 +464,7 @@ async function createId(
 
       // Now output should be forwarded (fallback enabled)
       pty.emit('data', 'fallback output\n')
-      expect(dataSpy).toHaveBeenCalledWith({ terminalId: tid, data: 'fallback output\n' })
+      expect(dataSpy).toHaveBeenCalledWith(expect.objectContaining({ terminalId: tid, data: 'fallback output\n' }))
 
       vi.useRealTimers()
     })
@@ -568,7 +568,7 @@ async function createId(
 
       // All three flags true: hasReceivedMarker=true, initializationComplete=true, isClearing=false
       pty.emit('data', 'forwarded output\n')
-      expect(dataSpy).toHaveBeenCalledWith({ terminalId: tid, data: 'forwarded output\n' })
+      expect(dataSpy).toHaveBeenCalledWith(expect.objectContaining({ terminalId: tid, data: 'forwarded output\n' }))
     })
   })
 
@@ -740,7 +740,7 @@ async function createId(
       // Simulate PTY exit
       pty.emit('exit', { exitCode: 0 })
 
-      expect(exitSpy).toHaveBeenCalledWith({ terminalId: tid, exitCode: 0, signal: undefined })
+      expect(exitSpy).toHaveBeenCalledWith(expect.objectContaining({ terminalId: tid, exitCode: 0, signal: undefined }))
       expect(terminalService.getTerminalInfo(tid!)).toBeNull()
     })
   })
@@ -1189,7 +1189,7 @@ async function createId(
       pty.emit('data', 'C:\\Projects\\test\r\n')
       pty.emit('data', `${marker}\r\n`)
 
-      expect(clearSpy).toHaveBeenCalledWith({ terminalId: tid })
+      expect(clearSpy).toHaveBeenCalledWith(expect.objectContaining({ terminalId: tid }))
       // Critical assertion: cwd is the actual path, not a banner line
       // and not the echoed bootstrap command line.
       expect(terminalService.getTerminalInfo(tid!)?.cwd).toBe('C:\\Projects\\test')

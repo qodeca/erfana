@@ -307,4 +307,54 @@ describe('registerConfinedHandle', () => {
       expect(handler).not.toHaveBeenCalled()
     })
   })
+
+  describe('optional path arguments', () => {
+    const register = (handler: ReturnType<typeof vi.fn>) =>
+      registerConfinedHandle(
+        'test:optional',
+        {
+          schema: z.tuple([z.string().optional()]),
+          paths: {},
+          optionalPaths: { dir: { arg: 0, mode: 'project', mustExist: true, kind: 'directory' } },
+          handler
+        },
+        session
+      )
+
+    it('refuses a name listed as both required and optional', () => {
+      expect(() =>
+        registerConfinedHandle(
+          'test:overlap',
+          {
+            schema: z.tuple([z.string().optional()]),
+            paths: { dir: { arg: 0, mode: 'project' } },
+            optionalPaths: { dir: { arg: 0, mode: 'project' } },
+            handler: async () => true
+          },
+          session
+        )
+      ).toThrow(/both required and optional/)
+      expect(getConfinedChannels().has('test:overlap')).toBe(false)
+    })
+
+    it('lists an optional path with the others', () => {
+      register(vi.fn(async () => true))
+      expect(getConfinedChannels().get('test:optional')).toEqual(['dir'])
+    })
+
+    it('skips the check when the argument is absent', async () => {
+      const handler = vi.fn(async (_ctx, _args, resolved) => resolved.dir)
+      register(handler)
+      await expect(call('test:optional', undefined)).resolves.toBeUndefined()
+      expect(handler).toHaveBeenCalledTimes(1)
+    })
+
+    it('checks the argument when it is present', async () => {
+      const handler = vi.fn(async (_ctx, _args, resolved) => resolved.dir.real)
+      register(handler)
+      await expect(call('test:optional', root)).resolves.toBe(root)
+      await expect(call('test:optional', outside)).rejects.toThrow('outside the project')
+      expect(handler).toHaveBeenCalledTimes(1)
+    })
+  })
 })

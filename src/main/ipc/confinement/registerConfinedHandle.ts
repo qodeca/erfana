@@ -41,12 +41,18 @@ export interface ConfinedHandlerContext {
 export interface ConfinedHandleDefinition<
   TArgs extends readonly unknown[],
   TPaths extends string,
-  TResult
+  TResult,
+  TOptional extends string = never
 > {
   /** `z.tuple([...])`: the wire stays positional */
   schema: z.ZodType<TArgs>
   /** Every path argument, by name */
   paths: Record<TPaths, PathBinding>
+  /**
+   * Path arguments that may be left out. One that is present is checked like
+   * any other; one that is `undefined` is skipped and arrives as `undefined`.
+   */
+  optionalPaths?: Record<TOptional, PathBinding>
   /** `'after'`: refuse with `PROJECT_CHANGED` if the project changed while the handler ran */
   staleCheck?: 'none' | 'after'
   /**
@@ -59,7 +65,7 @@ export interface ConfinedHandleDefinition<
   handler: (
     ctx: ConfinedHandlerContext,
     args: TArgs,
-    resolved: Record<TPaths, ResolvedPath>
+    resolved: Record<TPaths, ResolvedPath> & Partial<Record<TOptional, ResolvedPath>>
   ) => Promise<TResult>
 }
 
@@ -76,6 +82,7 @@ export function getConfinedChannels(): ReadonlyMap<string, readonly string[]> {
 /** The paths of one call, checked in the order they were listed. */
 async function resolveAll<TPaths extends string>(
   paths: Record<TPaths, PathBinding>,
+  optionalNames: ReadonlySet<string>,
   args: readonly unknown[],
   snapshot: ProjectSessionSnapshot | null,
   senderId: number | null
@@ -83,6 +90,7 @@ async function resolveAll<TPaths extends string>(
   const resolved = {} as Record<TPaths, ResolvedPath>
   for (const name of Object.keys(paths) as TPaths[]) {
     const { arg, access, ...policy } = paths[name]
+    if (optionalNames.has(name) && args[arg] === undefined) continue
     try {
       resolved[name] = await resolveConfinedPath(
         args[arg],
@@ -102,13 +110,22 @@ async function resolveAll<TPaths extends string>(
 export function registerConfinedHandle<
   TArgs extends readonly unknown[],
   TPaths extends string,
-  TResult
+  TResult,
+  TOptional extends string = never
 >(
   channel: string,
-  definition: ConfinedHandleDefinition<TArgs, TPaths, TResult>,
+  definition: ConfinedHandleDefinition<TArgs, TPaths, TResult, TOptional>,
   session: ProjectSession
 ): void {
-  confinedChannels.set(channel, Object.keys(definition.paths))
+  const optionalBindings = (definition.optionalPaths ?? {}) as Record<string, PathBinding>
+  const optionalNames = new Set(Object.keys(optionalBindings))
+  for (const name of Object.keys(definition.paths)) {
+    if (optionalNames.has(name)) {
+      throw new Error(`registerConfinedHandle(${channel}): "${name}" is listed as both required and optional`)
+    }
+  }
+  const allBindings = { ...definition.paths, ...optionalBindings } as Record<string, PathBinding>
+  confinedChannels.set(channel, Object.keys(allBindings))
 
   registerHandle(channel, async (event, ...rawArgs: unknown[]) => {
     if (definition.senderGate && !definition.senderGate.allow(event)) {
@@ -126,7 +143,8 @@ export function registerConfinedHandle<
 
       const snapshot = session.current()
       const resolved = await resolveAll(
-        definition.paths,
+        allBindings,
+        optionalNames,
         parsed.data,
         snapshot,
         event.sender?.id ?? null
@@ -134,7 +152,7 @@ export function registerConfinedHandle<
       const result = await definition.handler(
         { session: snapshot, sender: event.sender, event },
         parsed.data,
-        resolved
+        resolved as Record<TPaths, ResolvedPath> & Partial<Record<TOptional, ResolvedPath>>
       )
 
       if (

@@ -208,12 +208,13 @@ Note the `file:` prefix – these are **not** `external-file:*`.
 | Channel | Purpose |
 |---------|---------|
 | `terminal:isAvailable` | Whether node-pty loaded and a PTY can be spawned |
-| `terminal:create` | Spawn a PTY; returns `{ success: true, terminalId, shellKind }` or `{ success: false, error }`, the reason passed through verbatim from `TerminalService.createTerminal` |
+| `terminal:create` | Spawn a PTY from strict `{ cwd?, cols, rows }` (`cwd` must be an existing folder inside the open project; none means the project folder, or home with no project open); returns `{ success: true, terminalId, shellKind }` or `{ success: false, error }`, the reason passed through verbatim from `TerminalService.createTerminal` |
 | `terminal:write` | Write to the PTY; returns `{ success, error? }` from a synchronous PTY write – the promise is only the invoke round-trip (see the invoke round-trip section above) |
 | `terminal:resize` | `ipcMain.on` – resize the PTY (fire-and-forget) |
-| `terminal:kill` | Kill a PTY |
+| `terminal:kill` | Kill a PTY (owner-checked, like `write`, `resize`, `getInfo`, `getActivity` and `clearComplete`: another window gets the answer for an unknown id) |
 | `terminal:getInfo` | Metadata for one terminal |
-| `terminal:list` | List live terminals |
+| `terminal:list` | List the calling window's live terminals |
+| `terminal:getActivity` | Whether a program other than the shell is running in the terminal: `{ success, busy, known }` (`known: false` on Windows). Owner-checked |
 | `terminal:clearComplete` | `ipcMain.on` – renderer acknowledges that a clear finished |
 | `terminal:data` | Event: PTY output (main → renderer) |
 | `terminal:exit` | Event: PTY exited, with exit code and signal |

@@ -210,6 +210,8 @@ declare global {
         addRecentProject: (path: string, name: string) => Promise<{ success: boolean; error?: string }>
         removeRecentProject: (path: string) => Promise<{ success: boolean; error?: string }>
       }
+      /** E2E test-hook switch, set by the preload from the launch arguments only */
+      testHooks: { readonly enabled: boolean }
       terminal: {
         isAvailable: (terminalId?: string) => Promise<{ success: boolean; available: boolean; initialized?: boolean }>
         /**
@@ -217,12 +219,10 @@ declare global {
          * path-quoting works without a follow-up IPC round-trip
          * (#164 round-2 F#1).
          */
-        create: (config?: {
-          shell?: string
+        create: (config: {
           cwd?: string
-          env?: Record<string, string>
-          cols?: number
-          rows?: number
+          cols: number
+          rows: number
         }) => Promise<{
           success: boolean
           terminalId?: string
@@ -235,6 +235,13 @@ declare global {
         getInfo: (terminalId: string) => Promise<{
           success: boolean
           info?: { id: string; cwd: string; title: string }
+          error?: string
+        }>
+        /** Whether a program other than the shell is running in the terminal */
+        getActivity: (terminalId: string) => Promise<{
+          success: boolean
+          busy?: boolean
+          known?: boolean
           error?: string
         }>
         list: () => Promise<{
@@ -485,5 +492,12 @@ declare global {
      * @see docs/design/design-issue-60.md §2.8
      */
     __ERFANA_FORCE_CRASH__?: true
+    /** Installed by the renderer only when `api.testHooks.enabled` is true. */
+    __erfanaTest?: {
+      /** The text of a terminal's xterm buffer, or null for an unknown id */
+      terminalText: (terminalId: string) => string | null
+      /** The cursor position in a terminal's buffer, or null for an unknown id */
+      terminalCursor: (terminalId: string) => { x: number; y: number } | null
+    }
   }
 }
