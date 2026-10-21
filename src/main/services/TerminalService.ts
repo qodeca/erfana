@@ -21,7 +21,7 @@ import {
 } from './WindowsTerminalBootstrap'
 import { isWindowsLongPath } from './watcher/PlatformConfig'
 import { isForegroundBusy, shellProcessNames } from './terminalForeground'
-import { killProcessTree } from './terminalTreeKill'
+import { killProcessTrees } from './terminalTreeKill'
 
 /**
  * Outcome of {@link TerminalService.createTerminal}. A failure carries its
@@ -81,8 +81,8 @@ interface TerminalInstance {
   shellKind: ShellKind // Quoting flavour resolved at create time (#164)
   shellNames: ReadonlySet<string> // Names the idle shell shows as; see terminalForeground.ts
   exited: Promise<void> // Settles when node-pty reports the shell exit (#214)
-  killRequested?: boolean // Set by the first kill; a second kill of the same pty is a no-op (#296)
-  treeKilled?: boolean // Windows process-tree kill already started for this shell (#296)
+  hasExited?: boolean // Set when node-pty reports the exit; the shell's pid may be reused after that (#296)
+  killRequested?: boolean // A pty kill is under way or done; cleared again if it throws (#296)
 }
 
 /**
@@ -98,13 +98,23 @@ interface TerminalInstance {
 export const TERMINAL_EXIT_WAIT_MS = 1_500
 
 /**
- * How long a batch of terminal kills (window close, quit) may spend in
- * node-pty's own kill on Windows (#296). Each of those calls starts a helper
- * process, so dozens at once can take longer than a quit should. Once the
- * budget is spent the remaining shells are ended by their process-tree kill
- * alone, which is started for every shell up front.
+ * Longest `dispose()` may take (#296). `src/main/index.ts` gives all disposers
+ * together 2 s before it exits the app, so this stays under that. The tree kill
+ * wait, the node-pty kills and the exit wait all draw from it.
  */
-export const TERMINAL_KILL_BUDGET_MS = 1_000
+export const TERMINAL_DISPOSE_BOUND_MS = 1_800
+
+/** The exit wait never gets less than this, even when the kills used up the bound. */
+export const TERMINAL_MIN_EXIT_WAIT_MS = 300
+
+/**
+ * How long a Windows batch (window close, quit) may spend in node-pty's own
+ * kill (#296). Each call starts a helper process, so dozens in a row are slow.
+ * The shells are already gone by then (their process trees were killed first),
+ * so what is left over is deferred to later turns of the event loop instead of
+ * blocking this one.
+ */
+export const TERMINAL_KILL_BUDGET_MS = 500
 
 /** Most output kept while waiting for the bootstrap marker (64 KiB). */
 export const MARKER_BUFFER_MAX_CHARS = 64 * 1024
@@ -125,6 +135,8 @@ export class TerminalService extends EventEmitter {
   private terminalCounter = 0
   /** Exits of killed shells not yet reported by node-pty; `dispose()` waits for them (#214). */
   private pendingExits = new Set<Promise<void>>()
+  /** Window-close kill batches still running on Windows; `dispose()` waits for them (#296). */
+  private pendingKills = new Set<Promise<void>>()
 
   /**
    * @param fsExists - injected for `resolveWindowsShell()` testability;
@@ -448,6 +460,7 @@ export class TerminalService extends EventEmitter {
       ptyProcess.onExit((event: { exitCode: number; signal?: number }) => {
         logger.info(`🏁 Terminal ${terminalId} exited`, event)
         markExited()
+        terminal.hasExited = true
         this.emit('exit', { terminalId, exitCode: event.exitCode, signal: event.signal, webContentsId: webContentsId ?? -1 })
         this.terminals.delete(terminalId)
       })
@@ -563,14 +576,6 @@ export class TerminalService extends EventEmitter {
    * Kill terminal
    */
   killTerminal(terminalId: string): boolean {
-    return this.killTerminalWithin(terminalId, true)
-  }
-
-  /**
-   * Kills one terminal. With `ptyKill` false only the process-tree kill runs
-   * (Windows) and node-pty's own kill is skipped – see {@link TERMINAL_KILL_BUDGET_MS}.
-   */
-  private killTerminalWithin(terminalId: string, ptyKill: boolean): boolean {
     const terminal = this.terminals.get(terminalId)
 
     if (!terminal) {
@@ -590,7 +595,7 @@ export class TerminalService extends EventEmitter {
     }
 
     try {
-      this.killShell(terminal, ptyKill)
+      this.ptyKill(terminal)
       this.terminals.delete(terminalId)
       this.trackExit(terminal)
       logger.info(`🛑 Terminal ${terminalId} killed`)
@@ -691,60 +696,103 @@ export class TerminalService extends EventEmitter {
    */
   async dispose(): Promise<void> {
     logger.info('🛑 Disposing TerminalService...')
+    const deadline = Date.now() + TERMINAL_DISPOSE_BOUND_MS
 
-    const killStartedAt = Date.now()
-    this.treeKillAll(this.terminals.values())
-    for (const [terminalId, terminal] of this.terminals.entries()) {
-      this.trackExit(terminal)
-      try {
-        this.killShell(terminal, this.withinKillBudget(killStartedAt))
-        logger.info(`✅ Terminal ${terminalId} cleaned up`)
-      } catch (error) {
-        // Suppress EPIPE and ESRCH errors during cleanup
-        const code = (error as { code?: unknown }).code
-        if (code === 'EPIPE' || code === 'ESRCH') {
-          logger.info(`ℹ️ Terminal ${terminalId} already terminated`)
-        } else {
-          logger.error(`❌ Failed to cleanup terminal ${terminalId}`, error instanceof Error ? error : undefined)
-        }
-      }
-    }
+    const shells = this.detachTerminals([...this.terminals.keys()])
+    // Shells already being ended by a window close are awaited too, within the bound
+    const killing = Promise.all([this.endShells(shells), ...this.pendingKills])
+    await this.settleWithin(killing, deadline - TERMINAL_MIN_EXIT_WAIT_MS - Date.now())
 
-    this.terminals.clear()
-    await this.waitForPendingExits()
+    await this.waitForPendingExits(
+      Math.max(TERMINAL_MIN_EXIT_WAIT_MS, Math.min(TERMINAL_EXIT_WAIT_MS, deadline - Date.now()))
+    )
     logger.info('✅ TerminalService disposed')
   }
 
   /**
-   * Ends one shell. On Windows the shell's whole process tree is killed first
-   * (see `terminalTreeKill.ts`), then node-pty's own kill releases the pty
-   * handles unless `ptyKill` is false. A second call for the same terminal does
-   * nothing, so a shell is never killed twice (#296).
+   * Takes terminals out of the map (their owner is gone or the app is quitting):
+   * clears their timers and remembers their exit for `dispose()`.
    */
-  private killShell(terminal: TerminalInstance, ptyKill: boolean): void {
-    if (terminal.killRequested) return
-    terminal.killRequested = true
-    this.treeKill(terminal)
-    if (ptyKill) terminal.ptyProcess.kill()
+  private detachTerminals(terminalIds: string[]): TerminalInstance[] {
+    const detached: TerminalInstance[] = []
+    for (const terminalId of terminalIds) {
+      const terminal = this.terminals.get(terminalId)
+      if (!terminal) continue
+      if (terminal.clearFallbackTimeout) {
+        clearTimeout(terminal.clearFallbackTimeout)
+        terminal.clearFallbackTimeout = undefined
+      }
+      this.terminals.delete(terminalId)
+      this.trackExit(terminal)
+      detached.push(terminal)
+    }
+    return detached
   }
 
-  /** Starts the Windows process-tree kill for several shells at once, before any slow pty kill. */
-  private treeKillAll(terminals: Iterable<TerminalInstance>): void {
-    if (osPlatform() !== 'win32') return
-    for (const terminal of terminals) {
-      if (!terminal.killRequested) this.treeKill(terminal)
+  /**
+   * Ends a batch of shells for app quit or window close – the only places that
+   * kill process trees (#296). One tab closed or restarted goes through
+   * `killTerminal` instead and ends only the shell, so programs the user started
+   * keep running.
+   *
+   * On Windows the trees of all still-running shells are killed first, in one
+   * `taskkill` that is awaited for a short time while the shells are alive (a
+   * pid freed by the shell's exit could be looked up wrongly). Then node-pty's
+   * own kill releases the pty handles, for as long as the budget lasts; the
+   * rest run on later turns of the event loop. Off Windows this is just the
+   * pty kill.
+   */
+  private async endShells(shells: TerminalInstance[]): Promise<void> {
+    const win32 = osPlatform() === 'win32'
+    if (win32) {
+      await killProcessTrees(shells.filter((t) => !t.hasExited).map((t) => t.pid))
+    }
+    const startedAt = Date.now()
+    for (const terminal of shells) {
+      if (terminal.hasExited) continue
+      if (win32 && Date.now() - startedAt >= TERMINAL_KILL_BUDGET_MS) {
+        setImmediate(() => this.ptyKillQuietly(terminal))
+      } else {
+        this.ptyKillQuietly(terminal)
+      }
     }
   }
 
-  private treeKill(terminal: TerminalInstance): void {
-    if (terminal.treeKilled || osPlatform() !== 'win32') return
-    terminal.treeKilled = true
-    killProcessTree(terminal.pid)
+  /** node-pty's kill, once per terminal. A kill that throws can be tried again. */
+  private ptyKill(terminal: TerminalInstance): void {
+    if (terminal.killRequested) return
+    terminal.killRequested = true
+    try {
+      terminal.ptyProcess.kill()
+    } catch (error) {
+      terminal.killRequested = false
+      throw error
+    }
   }
 
-  /** True while a batch of kills may still call node-pty's own kill. Always true off Windows. */
-  private withinKillBudget(startedAt: number): boolean {
-    return osPlatform() !== 'win32' || Date.now() - startedAt < TERMINAL_KILL_BUDGET_MS
+  private ptyKillQuietly(terminal: TerminalInstance): void {
+    try {
+      this.ptyKill(terminal)
+      logger.info(`✅ Terminal ${terminal.id} cleaned up`)
+    } catch (error) {
+      // Suppress EPIPE and ESRCH errors during cleanup
+      const code = (error as { code?: unknown }).code
+      if (code === 'EPIPE' || code === 'ESRCH') {
+        logger.info(`ℹ️ Terminal ${terminal.id} already terminated`)
+      } else {
+        logger.error(`❌ Failed to cleanup terminal ${terminal.id}`, error instanceof Error ? error : undefined)
+      }
+    }
+  }
+
+  /** Waits for `work` for at most `ms`; never rejects. */
+  private async settleWithin(work: Promise<unknown>, ms: number): Promise<void> {
+    let timer: NodeJS.Timeout | undefined
+    const timedOut = new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, Math.max(0, ms))
+    })
+    await Promise.race([work.then(() => undefined, () => undefined), timedOut])
+    clearTimeout(timer)
   }
 
   /** Remember a killed shell until node-pty reports its exit (#214). */
@@ -754,17 +802,17 @@ export class TerminalService extends EventEmitter {
     void exited.then(() => this.pendingExits.delete(exited))
   }
 
-  private async waitForPendingExits(): Promise<void> {
+  private async waitForPendingExits(waitMs: number = TERMINAL_EXIT_WAIT_MS): Promise<void> {
     if (this.pendingExits.size === 0) return
     let timer: NodeJS.Timeout | undefined
     const timedOut = new Promise<boolean>((resolve) => {
-      timer = setTimeout(() => resolve(true), TERMINAL_EXIT_WAIT_MS)
+      timer = setTimeout(() => resolve(true), waitMs)
     })
     const allExited = Promise.all(this.pendingExits).then(() => false)
     const didTimeOut = await Promise.race([allExited, timedOut])
     clearTimeout(timer)
     if (didTimeOut) {
-      logger.warn(`⚠️ ${this.pendingExits.size} terminal(s) did not report exit within ${TERMINAL_EXIT_WAIT_MS}ms`)
+      logger.warn(`⚠️ ${this.pendingExits.size} terminal(s) did not report exit within ${waitMs}ms`)
     }
   }
 
@@ -788,19 +836,23 @@ export class TerminalService extends EventEmitter {
       }
     }
 
-    const killStartedAt = Date.now()
-    this.treeKillAll(
-      terminalsToKill.flatMap((id) => {
-        const terminal = this.terminals.get(id)
-        return terminal ? [terminal] : []
-      })
-    )
-    for (const terminalId of terminalsToKill) {
-      // Check if terminal still exists - it may have exited naturally between collection and kill
-      if (!this.terminals.has(terminalId)) {
-        continue
+    if (osPlatform() === 'win32') {
+      // The window is gone: end the shells and what they started (#296)
+      const batch = this.endShells(this.detachTerminals(terminalsToKill))
+      this.pendingKills.add(batch)
+      void batch
+        .catch((error) => {
+          logger.error('Failed to end terminals of a closed window', error instanceof Error ? error : undefined)
+        })
+        .finally(() => this.pendingKills.delete(batch))
+    } else {
+      for (const terminalId of terminalsToKill) {
+        // Check if terminal still exists - it may have exited naturally between collection and kill
+        if (!this.terminals.has(terminalId)) {
+          continue
+        }
+        this.killTerminal(terminalId)
       }
-      this.killTerminalWithin(terminalId, this.withinKillBudget(killStartedAt))
     }
 
     logger.info(`✅ Cleaned up ${terminalsToKill.length} terminals for webContents ${webContentsId}`)
