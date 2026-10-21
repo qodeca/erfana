@@ -31,6 +31,7 @@ import { scheduleScrollIfNeeded } from '../utils/promptScrollScheduler.logic'
 import { logger } from '../utils/logger'
 import { useTranscriptionStore } from '../stores/useTranscriptionStore'
 import { useDocumentImportStore } from '../stores/useDocumentImportStore'
+import { useSettingsStore } from '../stores/useSettingsStore'
 
 /** Size threshold for confirmation dialog (in MB) */
 const LARGE_FILE_THRESHOLD_MB = IMPORT.SIZE_WARNING_THRESHOLD / BYTES_PER_MB
@@ -103,7 +104,7 @@ interface UseImportReturn {
  */
 export function useImport(): UseImportReturn {
   const [isImporting, setIsImporting] = useState(false)
-  const { showConfirm, showAlert } = useDialog()
+  const { showConfirm } = useDialog()
 
   // Terminal portal context for scroll scheduling (issue #52)
   const terminalPortal = useTerminalPortalOptional()
@@ -206,10 +207,7 @@ export function useImport(): UseImportReturn {
     if (missingDepFiles.length > 0) {
       const ext = missingDepFiles[0].name.split('.').pop()?.toLowerCase() || ''
       const needsLibreOffice = (DOCUMENT_IMPORT.LIBREOFFICE_EXTENSIONS as readonly string[]).includes(ext)
-      await showAlert({
-        title: needsLibreOffice ? 'LibreOffice required' : 'ImageMagick required',
-        message: missingToolMessage(needsLibreOffice ? 'LibreOffice' : 'ImageMagick', ext)
-      })
+      await offerImportTools(showConfirm, needsLibreOffice ? 'LibreOffice' : 'ImageMagick', ext)
       filesToProcess = filesToProcess.filter(f => !missingDepFiles.includes(f))
       if (filesToProcess.length === 0) {
         return { successCount: 0, failCount: 0, skippedCount: missingDepFiles.length + mediaFiles.length + documentFiles.length, outputPaths: [], failures: [] }
@@ -310,7 +308,7 @@ export function useImport(): UseImportReturn {
     } finally {
       setIsImporting(false)
     }
-  }, [showConfirm, showAlert, terminalPortal])
+  }, [showConfirm, terminalPortal])
 
   /**
    * Import via file dialog.
@@ -376,18 +374,12 @@ export function useImport(): UseImportReturn {
     const depState = useDocumentImportStore.getState()
 
     if ((DOCUMENT_IMPORT.LIBREOFFICE_EXTENSIONS as readonly string[]).includes(ext) && !depState.hasLibreOffice) {
-      await showAlert({
-        title: 'LibreOffice required',
-        message: missingToolMessage('LibreOffice', ext)
-      })
+      await offerImportTools(showConfirm, 'LibreOffice', ext)
       return null
     }
 
     if ((DOCUMENT_IMPORT.IMAGEMAGICK_EXTENSIONS as readonly string[]).includes(ext) && !depState.hasImageMagick) {
-      await showAlert({
-        title: 'ImageMagick required',
-        message: missingToolMessage('ImageMagick', ext)
-      })
+      await offerImportTools(showConfirm, 'ImageMagick', ext)
       return null
     }
 
@@ -403,7 +395,7 @@ export function useImport(): UseImportReturn {
     const result = await processFiles([fileInfo])
 
     return result.outputPaths[0] ?? null
-  }, [processFiles, showAlert])
+  }, [processFiles, showConfirm])
 
   return {
     isImporting,
@@ -420,8 +412,29 @@ export function useImport(): UseImportReturn {
 export function missingToolMessage(tool: 'LibreOffice' | 'ImageMagick', ext: string): string {
   return (
     `Importing .${ext} files needs ${tool}, which was not found on this computer.\n\n` +
-    `Settings → Import tools shows how to install it. After installing, choose Check again there – no restart needed.`
+    `Import tools in Settings shows how to install it. After installing, choose Check again there.`
   )
+}
+
+/**
+ * Refuse the import and offer to open Settings → Import tools (#250).
+ * Confirm opens the section with focus on its heading; Close just closes.
+ */
+async function offerImportTools(
+  showConfirm: ReturnType<typeof useDialog>['showConfirm'],
+  tool: 'LibreOffice' | 'ImageMagick',
+  ext: string
+): Promise<void> {
+  const open = await showConfirm({
+    title: `${tool} required`,
+    message: missingToolMessage(tool, ext),
+    confirmLabel: 'Open import tools',
+    cancelLabel: 'Close',
+    danger: false
+  })
+  if (open) {
+    useSettingsStore.getState().openSettings({ section: 'import-tools' })
+  }
 }
 
 /**

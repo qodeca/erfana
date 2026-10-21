@@ -3,7 +3,12 @@
 import { dialog, type OpenDialogOptions } from 'electron'
 import { stat, writeFile, mkdir, cp, rm } from 'fs/promises'
 import { basename, extname, isAbsolute, normalize, join } from 'path'
-import { importService, converterRegistry, importToolStatusService } from '../services/import'
+import {
+  importService,
+  converterRegistry,
+  importToolStatusService,
+  missingToolsDialogMessage
+} from '../services/import'
 import { fileService } from '../services/FileService'
 import type { ValidationResult, ImportResult } from '../services/import'
 import { logger } from '../services/LoggingService'
@@ -54,10 +59,14 @@ export function registerImportHandlers(): void {
     const extensions = converterRegistry.getSupportedExtensions()
     const { requiresConversion, passthrough } = converterRegistry.getExtensionsByConversionType()
 
+    // Formats whose tool is missing are not in "All Importable Files"; say why (#250).
+    const missingNote = missingToolsDialogMessage(importToolStatusService?.peek() ?? null)
+
     const result = await dialog.showOpenDialog(withLastDirectory<OpenDialogOptions>({
       properties: ['openFile'],
       title: 'Select File to Import',
       buttonLabel: 'Import',
+      ...(missingNote ? { message: missingNote } : {}),
       filters: [
         // All supported files as default
         { name: 'All Importable Files', extensions: [...extensions] },

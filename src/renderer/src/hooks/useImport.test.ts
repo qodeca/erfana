@@ -1332,13 +1332,19 @@ describe('useImport', () => {
         await result.current.importFile()
       })
 
-      expect(mockShowAlert).toHaveBeenCalledWith(
+      // #250: the refusal offers to open Settings → Import tools
+      expect(mockShowConfirm).toHaveBeenCalledWith(
         expect.objectContaining({
           title: 'LibreOffice required',
-          // #250: points at Settings → Import tools, and no longer asks for a restart
-          message: expect.stringContaining('Settings → Import tools')
+          message: expect.stringContaining('Import tools in Settings'),
+          confirmLabel: 'Open import tools',
+          cancelLabel: 'Close',
+          danger: false
         })
       )
+      const { useSettingsStore } = await import('../stores/useSettingsStore')
+      expect(useSettingsStore.getState()).toMatchObject({ isOpen: true, focusSection: 'import-tools' })
+      useSettingsStore.getState().closeSettings()
       expect(mockDocImportOpenDialog).not.toHaveBeenCalled()
       expect(mockProcessImport).not.toHaveBeenCalled()
     })
@@ -1363,16 +1369,19 @@ describe('useImport', () => {
         extension: 'tiff'
       })
 
+      mockShowConfirm.mockResolvedValueOnce(false) // Close
       const { result } = renderHook(() => useImport())
       await act(async () => {
         await result.current.importFile()
       })
 
-      expect(mockShowAlert).toHaveBeenCalledWith(
+      expect(mockShowConfirm).toHaveBeenCalledWith(
         expect.objectContaining({
           title: 'ImageMagick required'
         })
       )
+      const { useSettingsStore } = await import('../stores/useSettingsStore')
+      expect(useSettingsStore.getState().isOpen).toBe(false)
     })
 
     it('should filter document files from batch with warning toast', async () => {

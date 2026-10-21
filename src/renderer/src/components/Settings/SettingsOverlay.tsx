@@ -62,7 +62,7 @@ const WHISPER_MODEL_OPTIONS: { value: WhisperModel; label: string }[] =
  * - Logging settings section
  */
 export function SettingsOverlay() {
-  const { isOpen, closeSettings } = useSettingsStore()
+  const { isOpen, closeSettings, focusSection } = useSettingsStore()
 
   // Register a 'settings' occluder while the overlay is open so the native
   // preview WebContentsView hides behind a still frame (design §1.8). Called
@@ -260,16 +260,17 @@ export function SettingsOverlay() {
     }
   }, [isOpen])
 
-  // Focus close button when overlay opens
+  // Focus close button when overlay opens – unless a section was asked for,
+  // in which case that section moves focus to its own heading (#250).
   useEffect(() => {
-    if (!isOpen) return undefined
+    if (!isOpen || focusSection) return undefined
 
     const timer = setTimeout(() => {
       closeButtonRef.current?.focus()
     }, FOCUS_DELAY_MS)
 
     return () => clearTimeout(timer)
-  }, [isOpen])
+  }, [isOpen, focusSection])
 
   // Escape closes Settings only while Settings is the topmost overlay: a
   // dialog opened over it (the Cmd+Q quit prompt, a confirm from a section)

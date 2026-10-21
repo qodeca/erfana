@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { useEffect, useCallback, type ReactNode } from 'react'
+import { useEffect, useCallback, useRef, useState, type ReactNode } from 'react'
 import { useDocumentImportStore } from '../../../stores/useDocumentImportStore'
+import { useSettingsStore } from '../../../stores/useSettingsStore'
+import { textClipboard } from '../../../services/textClipboard'
 import { DOCUMENT_IMPORT } from '../../../../../shared/constants'
 import { isMacOS, isWindows } from '../../../utils/platform'
 import { logger } from '../../../utils/logger'
@@ -11,10 +13,12 @@ import './ImportToolsSection.css'
 
 type ToolId = 'libreOffice' | 'imageMagick'
 type Platform = 'mac' | 'windows' | 'other'
+type RowState = 'checking' | 'unchecked' | 'ready' | 'missing'
 
 interface ToolInfo {
   name: string
   brewCommand: string
+  linuxPackage: string
   downloadUrl: string
 }
 
@@ -22,11 +26,13 @@ const TOOLS: Record<ToolId, ToolInfo> = {
   libreOffice: {
     name: 'LibreOffice',
     brewCommand: 'brew install --cask libreoffice',
+    linuxPackage: 'libreoffice',
     downloadUrl: DOCUMENT_IMPORT.LIBREOFFICE_DOWNLOAD_URL
   },
   imageMagick: {
     name: 'ImageMagick',
     brewCommand: 'brew install imagemagick',
+    linuxPackage: 'imagemagick',
     downloadUrl: DOCUMENT_IMPORT.IMAGEMAGICK_DOWNLOAD_URL
   }
 }
@@ -51,20 +57,45 @@ async function openDownloadPage(url: string): Promise<void> {
   }
 }
 
-/** The per-platform "how to get it" line under a missing tool. */
-function InstallHint({ tool, platform }: { tool: ToolInfo; platform: Platform }): JSX.Element {
+/** The per-platform "how to get it" lines under a missing tool. */
+function InstallHint({
+  tool,
+  platform,
+  onCopied
+}: {
+  tool: ToolInfo
+  platform: Platform
+  onCopied: (message: string) => void
+}): JSX.Element {
+  const handleCopy = useCallback(async () => {
+    // textClipboard is the single transport-error chokepoint (retry + toast).
+    const ok = await textClipboard.writeText(tool.brewCommand)
+    if (ok) onCopied('Copied.')
+  }, [tool.brewCommand, onCopied])
+
   if (platform === 'mac') {
     return (
-      <p className="settings-description import-tools-hint">
-        Install it with Homebrew: <code className="import-tools-command">{tool.brewCommand}</code>,
-        then choose Check again.
-      </p>
+      <div className="import-tools-hint">
+        <p className="import-tools-hint__text">Install it with Homebrew, then choose Check again:</p>
+        <div className="import-tools-hint__command">
+          <code className="import-tools-command">{tool.brewCommand}</code>
+          <button
+            type="button"
+            className="settings-btn-secondary import-tools-btn import-tools-btn--icon"
+            onClick={() => void handleCopy()}
+            aria-label={`Copy command: ${tool.brewCommand}`}
+            title="Copy command"
+          >
+            {renderIcon('copy', { 'aria-hidden': true })}
+          </button>
+        </div>
+      </div>
     )
   }
   if (platform === 'windows') {
     return (
       <div className="import-tools-hint import-tools-hint--action">
-        <p className="settings-description">
+        <p className="import-tools-hint__text">
           Download and install {tool.name}, then choose Check again.
         </p>
         <button
@@ -78,9 +109,12 @@ function InstallHint({ tool, platform }: { tool: ToolInfo; platform: Platform })
     )
   }
   return (
-    <p className="settings-description import-tools-hint">
-      Install {tool.name} with your system&apos;s package manager, then choose Check again.
-    </p>
+    <div className="import-tools-hint">
+      <p className="import-tools-hint__text">
+        Install the <code className="import-tools-command">{tool.linuxPackage}</code> package with
+        your system&apos;s package manager, then choose Check again.
+      </p>
+    </div>
   )
 }
 
@@ -88,15 +122,20 @@ interface FormatRowProps {
   format: string
   title: string
   extensions: string
-  /** null while the first detection result is still on its way */
-  ready: boolean | null
+  state: RowState
   readyText: string
   missingText: string
   hint?: ReactNode
 }
 
-function FormatRow({ format, title, extensions, ready, readyText, missingText, hint }: FormatRowProps): JSX.Element {
-  const state = ready === null ? 'checking' : ready ? 'ready' : 'missing'
+const STATE_TEXT: Record<'checking' | 'unchecked', string> = {
+  checking: 'Checking…',
+  unchecked: 'Not checked'
+}
+
+function FormatRow({ format, title, extensions, state, readyText, missingText, hint }: FormatRowProps): JSX.Element {
+  const text =
+    state === 'ready' ? readyText : state === 'missing' ? missingText : STATE_TEXT[state]
   return (
     <li
       className="import-tools-row"
@@ -107,13 +146,14 @@ function FormatRow({ format, title, extensions, ready, readyText, missingText, h
       <div className="settings-row import-tools-row__main">
         <div className="settings-field">
           <span className="settings-label">{title}</span>
-          <p className="settings-description import-tools-extensions">{extensions}</p>
+          <p className="import-tools-extensions">{extensions}</p>
         </div>
         {/* Status is always words plus an icon – never colour alone. */}
         <span className={`import-tools-status import-tools-status--${state}`}>
           {state === 'ready' && renderIcon('check-circle', { 'aria-hidden': true })}
           {state === 'missing' && renderIcon('alert-triangle', { 'aria-hidden': true })}
-          <span>{state === 'checking' ? 'Checking…' : state === 'ready' ? readyText : missingText}</span>
+          {state === 'unchecked' && renderIcon('help-circle', { 'aria-hidden': true })}
+          <span>{text}</span>
         </span>
       </div>
       {state === 'missing' && hint}
@@ -121,12 +161,11 @@ function FormatRow({ format, title, extensions, ready, readyText, missingText, h
   )
 }
 
-const OUTCOME_TEXT = {
-  idle: '',
-  checked: 'Check complete.',
-  throttled: 'Checked a moment ago – try again in a few seconds.',
-  failed: 'Could not check the tools. Try again.'
-} as const
+/** What "Check again" found, in words – the live region reads this. */
+function foundSummary(libreOffice: boolean, imageMagick: boolean): string {
+  const part = (name: string, found: boolean): string => `${name} ${found ? 'found' : 'not found'}`
+  return `${part('LibreOffice', libreOffice)}, ${part('ImageMagick', imageMagick)}.`
+}
 
 /**
  * ImportToolsSection – which import formats work on this computer (#250).
@@ -137,6 +176,9 @@ const OUTCOME_TEXT = {
  * re-runs detection in main without a restart. Reads the main process's
  * session-cached `DependencyDetector` result through `import:toolStatus`.
  *
+ * Opening Settings with `{ section: 'import-tools' }` (the import refusal's
+ * "Open import tools") scrolls here and moves focus to the heading.
+ *
  * Renders inside {@link SettingsOverlay} as one more `settings-section`.
  */
 export function ImportToolsSection(): JSX.Element {
@@ -146,6 +188,9 @@ export function ImportToolsSection(): JSX.Element {
   const isChecking = useDocumentImportStore((s) => s.isCheckingTools)
   const outcome = useDocumentImportStore((s) => s.toolCheckOutcome)
   const loadToolStatus = useDocumentImportStore((s) => s.loadToolStatus)
+  const focusSection = useSettingsStore((s) => s.focusSection)
+  const headingRef = useRef<HTMLHeadingElement>(null)
+  const [copyNotice, setCopyNotice] = useState('')
 
   // Read the cached result when the section mounts (Settings opens). This
   // never re-probes: it returns what startup detection already found.
@@ -153,25 +198,52 @@ export function ImportToolsSection(): JSX.Element {
     void loadToolStatus(false)
   }, [loadToolStatus])
 
+  // Opened from the import refusal: jump here (no smooth scroll) and focus the heading.
+  useEffect(() => {
+    if (focusSection !== 'import-tools') return
+    headingRef.current?.scrollIntoView({ block: 'start' })
+    headingRef.current?.focus({ preventScroll: true })
+  }, [focusSection])
+
   const handleRecheck = useCallback(() => {
+    // aria-disabled keeps the button focusable while checking; the store
+    // ignores a call while one is in flight.
+    if (isChecking) return
+    setCopyNotice('')
     void loadToolStatus(true)
-  }, [loadToolStatus])
+  }, [isChecking, loadToolStatus])
 
   const platform = currentPlatform()
+  const rowState = (ready: boolean): RowState =>
+    known ? (ready ? 'ready' : 'missing') : outcome === 'failed' ? 'unchecked' : 'checking'
+
+  const liveText = isChecking
+    ? ''
+    : copyNotice ||
+      (outcome === 'checked'
+        ? `Check complete – ${foundSummary(hasLibreOffice, hasImageMagick)}`
+        : outcome === 'throttled'
+          ? 'Checked a moment ago – try again in a few seconds.'
+          : outcome === 'failed'
+            ? 'Could not check the tools. Try again.'
+            : '')
 
   return (
     <section className="settings-section" data-testid={TEST_IDS.SETTINGS_SECTION_IMPORT_TOOLS}>
-      <h2 className="settings-section-title">Import tools</h2>
-      <p className="settings-description import-tools-intro">
-        PDF, text, audio and video files import out of the box. Office documents and images need a
-        free tool installed on this computer – Erfana does not include it.
+      <h2 ref={headingRef} tabIndex={-1} className="settings-section-title import-tools-title">
+        Import tools
+      </h2>
+      <p className="import-tools-intro">
+        PDF and text files import out of the box. Audio and video use the Transcription settings
+        above. Office documents and images need a free tool installed on this computer – Erfana does
+        not include it.
       </p>
       <ul className="import-tools-list" aria-label="Import formats">
         <FormatRow
           format="pdf"
           title="PDF documents"
           extensions=".pdf"
-          ready={true}
+          state="ready"
           readyText="Ready – built in"
           missingText=""
         />
@@ -179,40 +251,42 @@ export function ImportToolsSection(): JSX.Element {
           format="office"
           title="Office documents"
           extensions={formatExtensions(DOCUMENT_IMPORT.LIBREOFFICE_EXTENSIONS)}
-          ready={known ? hasLibreOffice : null}
+          state={rowState(hasLibreOffice)}
           readyText="Ready – LibreOffice found"
           missingText="LibreOffice not found"
-          hint={<InstallHint tool={TOOLS.libreOffice} platform={platform} />}
+          hint={<InstallHint tool={TOOLS.libreOffice} platform={platform} onCopied={setCopyNotice} />}
         />
         <FormatRow
           format="images"
-          title="Images (text by OCR)"
+          title="Images (reads the text in them)"
           extensions={formatExtensions(DOCUMENT_IMPORT.IMAGEMAGICK_EXTENSIONS)}
-          ready={known ? hasImageMagick : null}
+          state={rowState(hasImageMagick)}
           readyText="Ready – ImageMagick found"
           missingText="ImageMagick not found"
-          hint={<InstallHint tool={TOOLS.imageMagick} platform={platform} />}
+          hint={<InstallHint tool={TOOLS.imageMagick} platform={platform} onCopied={setCopyNotice} />}
         />
       </ul>
       <div className="settings-row">
         <div className="settings-field">
           <span className="settings-label">Installed a tool?</span>
-          <p className="settings-description">Look for the tools again – no restart needed.</p>
+          <p className="import-tools-note">
+            Look for the tools again – no restart needed. If one still shows as not found, restart
+            Erfana.
+          </p>
           {/* Always mounted, so a screen reader is already watching when the text arrives. */}
           <p
-            className="settings-description import-tools-live"
+            className="import-tools-live"
             aria-live="polite"
             data-testid={TEST_IDS.SETTINGS_IMPORT_TOOLS_LIVE}
           >
-            {isChecking ? '' : OUTCOME_TEXT[outcome]}
+            {liveText}
           </p>
         </div>
         <button
           type="button"
           className="settings-btn-secondary import-tools-btn"
           onClick={handleRecheck}
-          disabled={isChecking}
-          aria-busy={isChecking}
+          aria-disabled={isChecking}
           data-testid={TEST_IDS.SETTINGS_BTN_IMPORT_TOOLS_RECHECK}
         >
           {isChecking ? 'Checking…' : 'Check again'}

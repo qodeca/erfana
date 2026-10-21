@@ -9,12 +9,15 @@ import { render, screen, waitFor, within, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ImportToolsSection } from './ImportToolsSection'
 import { useDocumentImportStore } from '../../../stores/useDocumentImportStore'
+import { useSettingsStore } from '../../../stores/useSettingsStore'
 import { TEST_IDS } from '../../../constants/testids'
 import { DOCUMENT_IMPORT } from '../../../../../shared/constants'
 import type { ImportToolStatusResponse } from '../../../../../shared/ipc/import-schema'
 
 const mockLogger = vi.hoisted(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }))
 vi.mock('../../../utils/logger', () => ({ logger: mockLogger }))
+const mockWriteText = vi.hoisted(() => vi.fn(async (_text: string) => true))
+vi.mock('../../../services/textClipboard', () => ({ textClipboard: { writeText: mockWriteText } }))
 
 const mockToolStatus = vi.fn<(request: { recheck: boolean }) => Promise<ImportToolStatusResponse>>()
 const mockOpenExternal = vi.fn(async (_url: string) => undefined)
@@ -164,24 +167,80 @@ describe('ImportToolsSection', () => {
     await waitFor(() => expect(row('office').dataset.state).toBe('ready'))
     expect(row('images').dataset.state).toBe('ready')
     expect(mockToolStatus).toHaveBeenLastCalledWith({ recheck: true })
-    expect(screen.getByTestId(TEST_IDS.SETTINGS_IMPORT_TOOLS_LIVE)).toHaveTextContent('Check complete.')
+    expect(screen.getByTestId(TEST_IDS.SETTINGS_IMPORT_TOOLS_LIVE)).toHaveTextContent(
+      'Check complete – LibreOffice found, ImageMagick found.'
+    )
   })
 
-  it('Check again is disabled while a check runs, so a second click cannot start another', async () => {
+  it('Check again is aria-disabled while a check runs: focus stays, a second click starts nothing', async () => {
     await renderWith(false, false)
     let release: (r: ImportToolStatusResponse) => void = () => {}
     mockToolStatus.mockReturnValueOnce(new Promise((resolve) => { release = resolve }))
 
     const button = screen.getByTestId(TEST_IDS.SETTINGS_BTN_IMPORT_TOOLS_RECHECK)
-    await userEvent.click(button)
+    button.focus()
+    await userEvent.keyboard('{Enter}')
 
-    expect(button).toBeDisabled()
+    expect(button).toHaveAttribute('aria-disabled', 'true')
+    expect(button).not.toBeDisabled()
+    expect(button).not.toHaveAttribute('aria-busy')
+    expect(button).toHaveFocus()
     expect(button).toHaveTextContent('Checking…')
     await userEvent.click(button)
     expect(mockToolStatus).toHaveBeenCalledTimes(2) // mount read + one recheck
 
-    await act(async () => release(ok(false, false)))
-    expect(button).toBeEnabled()
+    await act(async () => release(ok(false, true)))
+    expect(button).toHaveAttribute('aria-disabled', 'false')
+    expect(button).toHaveFocus()
+    expect(screen.getByTestId(TEST_IDS.SETTINGS_IMPORT_TOOLS_LIVE)).toHaveTextContent(
+      'Check complete – LibreOffice not found, ImageMagick found.'
+    )
+  })
+
+  it('macOS: the Homebrew command has its own Copy button that copies through textClipboard', async () => {
+    await renderWith(false, true)
+
+    await userEvent.click(within(row('office')).getByRole('button', { name: 'Copy command: brew install --cask libreoffice' }))
+
+    expect(mockWriteText).toHaveBeenCalledWith('brew install --cask libreoffice')
+    await waitFor(() =>
+      expect(screen.getByTestId(TEST_IDS.SETTINGS_IMPORT_TOOLS_LIVE)).toHaveTextContent('Copied.')
+    )
+  })
+
+  it('shows "Not checked" (not an endless "Checking…") when the first read fails', async () => {
+    mockToolStatus.mockResolvedValue({ success: false, error: 'Request refused' })
+    render(<ImportToolsSection />)
+
+    await waitFor(() => expect(row('office').dataset.state).toBe('unchecked'))
+    expect(within(row('office')).getByText('Not checked')).toBeInTheDocument()
+    expect(row('pdf').dataset.state).toBe('ready')
+  })
+
+  it('a reopened section does not repeat a stale outcome', async () => {
+    useDocumentImportStore.setState({ toolCheckOutcome: 'checked', toolStatusKnown: true })
+    await renderWith(true, true)
+
+    expect(screen.getByTestId(TEST_IDS.SETTINGS_IMPORT_TOOLS_LIVE)).toHaveTextContent('')
+  })
+
+  it('opened with the import-tools section, it moves focus to the heading', async () => {
+    const scroll = vi.fn()
+    Element.prototype.scrollIntoView = scroll
+    useSettingsStore.setState({ isOpen: true, focusSection: 'import-tools' })
+    await renderWith(false, false)
+
+    expect(screen.getByRole('heading', { name: 'Import tools' })).toHaveFocus()
+    expect(scroll).toHaveBeenCalledWith({ block: 'start' })
+    useSettingsStore.setState({ isOpen: false, focusSection: null })
+  })
+
+  it('Linux: names the package to install', async () => {
+    mockGetPlatform.mockReturnValue('linux')
+    await renderWith(false, false)
+
+    expect(within(row('office')).getByText('libreoffice')).toBeInTheDocument()
+    expect(within(row('images')).getByText('imagemagick')).toBeInTheDocument()
   })
 
   it('announces a throttled recheck in the live region', async () => {

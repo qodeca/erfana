@@ -335,10 +335,9 @@ export const useDocumentImportStore = create<DocumentImportState>((set, get) => 
           hasImageMagick: response.imageMagick,
           toolStatusKnown: true,
           isCheckingTools: false,
-          // Only "Check again" reports an outcome; the silent read on open does not.
-          toolCheckOutcome: recheck
-            ? response.throttled ? 'throttled' : 'checked'
-            : get().toolCheckOutcome
+          // Only "Check again" reports an outcome; the silent read on open
+          // resets it, so a reopened Settings never shows a stale message.
+          toolCheckOutcome: recheck ? (response.throttled ? 'throttled' : 'checked') : 'idle'
         })
       } else {
         set({ isCheckingTools: false, toolCheckOutcome: 'failed' })

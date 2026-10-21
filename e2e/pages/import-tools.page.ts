@@ -15,7 +15,7 @@ import { TEST_IDS } from '../../src/renderer/src/constants/testids'
 import { byTestId } from '../utils/locators'
 
 export type ImportFormat = 'pdf' | 'office' | 'images'
-export type ImportFormatState = 'checking' | 'ready' | 'missing'
+export type ImportFormatState = 'checking' | 'unchecked' | 'ready' | 'missing'
 
 export class ImportToolsPage {
   constructor(private readonly page: Page) {}
@@ -48,6 +48,6 @@ export class ImportToolsPage {
   /** Press Check again and wait until the check finished (button enabled again). */
   async checkAgain(): Promise<void> {
     await this.recheckButton().click()
-    await expect(this.recheckButton()).toBeEnabled({ timeout: 15_000 })
+    await expect(this.recheckButton()).toHaveAttribute('aria-disabled', 'false', { timeout: 15_000 })
   }
 }
