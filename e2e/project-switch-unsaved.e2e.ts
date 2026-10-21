@@ -37,8 +37,11 @@ import { TEST_IDS } from '../src/renderer/src/constants/testids'
 /** The 2 s autosave debounce plus the IPC write, with headroom. */
 const AUTOSAVE_BUDGET_MS = 15_000
 
-/** Longer than the autosave debounce, so a late write would have landed inside it. */
-const LATE_WRITE_WINDOW_MS = 3_500
+/** Longer than the 2 s autosave debounce, so a late write would have landed inside it. */
+const PROMPT_OPEN_WINDOW_MS = 2_500
+
+/** How long to keep watching after the prompt is accepted and the switch has run. */
+const AFTER_SWITCH_WINDOW_MS = 1_500
 
 /** Gap between samples while watching a file for a write that must not come. */
 const SAMPLE_INTERVAL_MS = 100
@@ -105,17 +108,28 @@ async function makeConflict(page: Page, panel: EditorPanelPage, aPath: string): 
   await expect(panel.conflictNotification()).toBeVisible({ timeout: AUTOSAVE_BUDGET_MS })
 }
 
-/** Fail if the file is written at all during the window. */
-async function expectNoWriteFor(path: string, windowMs: number): Promise<void> {
-  const before = (await stat(path)).mtimeMs
-  const deadline = Date.now() + windowMs
-  while (Date.now() < deadline) {
-    expect((await stat(path)).mtimeMs).toBe(before)
-    // KNOWN_WAIT: observing that nothing happens takes elapsed time; the loop is
-    // bounded by the deadline above and fails on the first change it sees.
+/** The file's mtime and content, which any write would change. */
+async function fingerprint(path: string): Promise<string> {
+  return `${(await stat(path)).mtimeMs}:${await readFile(path, 'utf-8')}`
+}
+
+/**
+ * Fail on the first write to the file for at least `minMs`, and for as long as
+ * `until` is pending. Observing that nothing happens takes elapsed time, so the
+ * loop is bounded by that window and fails at the first change it sees.
+ */
+async function expectNoWrite(path: string, baseline: string, minMs: number, until?: Promise<unknown>): Promise<void> {
+  let pending = until !== undefined
+  const done = (): void => {
+    pending = false
+  }
+  void until?.then(done, done)
+  const deadline = Date.now() + minMs
+  while (pending || Date.now() < deadline) {
+    expect(await fingerprint(path)).toBe(baseline)
+    // KNOWN_WAIT: sampling interval of the bounded observation loop above.
     await new Promise((resolve) => setTimeout(resolve, SAMPLE_INTERVAL_MS))
   }
-  expect(await readFile(path, 'utf-8')).toBe(EXTERNAL_BODY)
 }
 
 test.describe('Project switch with unsaved tabs', () => {
@@ -154,6 +168,9 @@ test.describe('Project switch with unsaved tabs', () => {
 
     await monaco.typeWithoutWaiting(EDIT)
     await makeConflict(page, panel, aPath)
+    // A lost race with the 2 s autosave would show here, not as a confusing failure later
+    expect(await readFile(aPath, 'utf-8')).toBe(EXTERNAL_BODY)
+    const baseline = await fingerprint(aPath)
 
     await tree.switchToRecent(basename(bPath))
     await dialog.waitForConfirm('Unsaved Changes')
@@ -167,13 +184,20 @@ test.describe('Project switch with unsaved tabs', () => {
     await expect(tree.fileRow('b.md')).toHaveCount(0)
     await new TabBarPage(page).activate('a.md')
     expect(await monaco.visibleText()).toContain('unsaved edit')
-    // Autosave is armed again: the edit reaches disk without further input
+    // The hold is over: the editor takes input again
+    await monaco.appendContent('\nmore typing\n')
+    // The conflict is still the user's call: autosave does not overwrite the newer file
+    await expect(panel.conflictNotification()).toBeVisible()
+    await expectNoWrite(aPath, baseline, PROMPT_OPEN_WINDOW_MS)
+    // "Keep My Version" resolves it, and autosave (armed again) writes both edits
+    await panel.conflictKeepButton().click()
     await expect
       .poll(async () => readFile(aPath, 'utf-8'), { timeout: AUTOSAVE_BUDGET_MS })
-      .toContain('unsaved edit')
+      .toContain('more typing')
+    expect(await readFile(aPath, 'utf-8')).toContain('unsaved edit')
   })
 
-  test('discard does not write late: Switch Anyway leaves the old file untouched', async ({
+  test('discard does not write late: the old file is untouched while the prompt is open and after Switch Anyway', async ({
     windowWithTestProject: page,
     testProject
   }) => {
@@ -186,13 +210,21 @@ test.describe('Project switch with unsaved tabs', () => {
 
     await monaco.typeWithoutWaiting(EDIT)
     await makeConflict(page, panel, aPath)
+    expect(await readFile(aPath, 'utf-8')).toBe(EXTERNAL_BODY)
+    const baseline = await fingerprint(aPath)
 
     await tree.switchToRecent(basename(bPath))
     await dialog.waitForConfirm('Unsaved Changes')
-    await dialog.accept()
-    await tree.waitForFile('b.md')
+    // Past the autosave debounce with the prompt still open: nothing may write
+    await expectNoWrite(aPath, baseline, PROMPT_OPEN_WINDOW_MS)
 
-    await expectNoWriteFor(aPath, LATE_WRITE_WINDOW_MS)
+    // Accept, and keep watching until B's tree shows and a little beyond
+    const switched = (async () => {
+      await dialog.accept()
+      await tree.waitForFile('b.md')
+    })()
+    await expectNoWrite(aPath, baseline, AFTER_SWITCH_WINDOW_MS, switched)
+    await switched
     await expect(toastOfType(page, 'error')).toHaveCount(0)
   })
 
@@ -227,8 +259,19 @@ test.describe('Project switch with unsaved tabs', () => {
     // Toasts of the setup opens must be gone before counting the ones under test
     await expect(toastWithText(page, 'Project Opened')).toHaveCount(0, { timeout: 30_000 })
 
-    await tree.switchToRecent(basename(bPath))
-    await tree.switchToRecent(basename(cPath))
+    // Both opens start in one renderer turn, before either has answered. While
+    // the UI is locked a second click cannot even happen, so this is the
+    // overlap the open path itself has to survive.
+    const answers = await page.evaluate(
+      async ([b, c]) => {
+        const api = (window as unknown as { api: { file: { openProjectByPath(p: string): Promise<string> } } }).api
+        const first = api.file.openProjectByPath(b)
+        const second = api.file.openProjectByPath(c)
+        return Promise.all([first, second])
+      },
+      [bPath, cPath]
+    )
+    expect(answers).toHaveLength(2)
 
     await tree.waitForFile('c.md')
     await expect(toastWithText(page, basename(cPath))).toHaveCount(1)
