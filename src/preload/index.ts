@@ -109,6 +109,7 @@ const api = {
       exists: boolean
       absolutePath?: string
       isFile?: boolean
+      insideProject?: boolean
       error?: string
     }> => ipcRenderer.invoke('file:validatePath', filePath, projectRoot),
 
@@ -147,7 +148,7 @@ const api = {
      * symlink validation.
      *
      * @param sourcePath - Absolute path to external file
-     * @param projectRoot - Absolute path to project root
+     * @param projectRoot - Ignored; the main process uses the open project
      * @returns Validation result with file type info
      */
     validateExternal: (
@@ -163,7 +164,7 @@ const api = {
      *
      * @param sourcePath - Absolute path to external file
      * @param targetFolder - Absolute path to target folder within project
-     * @param projectRoot - Absolute path to project root
+     * @param projectRoot - Ignored; the main process uses the open project
      * @param conflictResolution - How to handle name conflicts: 'replace' or 'keepBoth'
      * @returns Copy result with new file path
      */
@@ -188,7 +189,7 @@ const api = {
      *
      * @param sourcePath - Absolute path to external file
      * @param targetFolder - Absolute path to target folder within project
-     * @param projectRoot - Absolute path to project root
+     * @param projectRoot - Ignored; the main process uses the open project
      * @param conflictResolution - How to handle name conflicts: 'replace' or 'keepBoth'
      * @returns Move result with new file path
      */

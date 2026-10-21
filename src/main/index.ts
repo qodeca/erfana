@@ -488,7 +488,7 @@ app.whenReady().then(async () => {
   registerGlobalSettingsHandlers()
   registerLoggingHandlers()
   registerProjectLockHandlers()
-  registerExternalFileHandlers()
+  registerExternalFileHandlers(projectService.session)
   registerTranscriptionHandlers()
   registerClipboardHandlers()
   registerImageExportHandlers()

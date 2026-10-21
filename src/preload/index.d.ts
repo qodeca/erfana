@@ -82,6 +82,7 @@ declare global {
           exists: boolean
           absolutePath?: string
           isFile?: boolean
+          insideProject?: boolean
           error?: string
         }>
         /**

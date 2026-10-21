@@ -80,7 +80,7 @@ const WIN_INVALID_CHARS = /[<>:"/\\|?*]/
 
 /** Control chars (C0: 0x00-0x1F) — portable security concern on any OS. */
 // eslint-disable-next-line no-control-regex
-const CONTROL_CHARS = /[\x00-\x1f]/
+export const CONTROL_CHARS = /[\x00-\x1f]/
 
 /**
  * Unicode bidi-override + direction-mark chars that enable RTL spoofing
@@ -104,7 +104,7 @@ const CONTROL_CHARS = /[\x00-\x1f]/
  * Without the `u` flag, JS treats supplementary-plane chars as surrogate
  * halves and these BMP ranges may not match in some runtimes.
  */
-const BIDI_OVERRIDES = /[‪-‮⁦-⁩‎‏]/u
+export const BIDI_OVERRIDES = /[‪-‮⁦-⁩‎‏]/u
 
 const DEFAULT_FALLBACK = 'untitled'
 
