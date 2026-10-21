@@ -178,6 +178,8 @@ export enum ErrorCode {
   EXTERNAL_FILE_MOVE_CANCELLED = 'EXTERNAL_FILE_MOVE_CANCELLED',
   EXTERNAL_FILE_MOVE_CHANGED = 'EXTERNAL_FILE_MOVE_CHANGED',
   EXTERNAL_FILE_SAME_FILE = 'EXTERNAL_FILE_SAME_FILE',
+  EXTERNAL_FILE_MOVE_SYMLINK = 'EXTERNAL_FILE_MOVE_SYMLINK',
+  EXTERNAL_FILE_SOURCE_CHANGED = 'EXTERNAL_FILE_SOURCE_CHANGED',
   EXTERNAL_FILE_IN_PROJECT = 'EXTERNAL_FILE_IN_PROJECT',
 
   // Transcription errors (Issue #75)
@@ -468,6 +470,9 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.EXTERNAL_FILE_MOVE_CANCELLED]: 'Move cancelled',
   [ErrorCode.EXTERNAL_FILE_MOVE_CHANGED]: 'The files changed while waiting; nothing was moved',
   [ErrorCode.EXTERNAL_FILE_SAME_FILE]: 'The file is already there',
+  [ErrorCode.EXTERNAL_FILE_MOVE_SYMLINK]: 'A link can be copied but not moved; copy it instead',
+  [ErrorCode.EXTERNAL_FILE_SOURCE_CHANGED]:
+    'The original changed during the move, so it was left in place; the copy was kept',
   [ErrorCode.EXTERNAL_FILE_IN_PROJECT]: 'This file is already in the project; move it from the project tree',
 
   // Transcription errors (Issue #75)

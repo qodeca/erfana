@@ -517,6 +517,30 @@ describe('External File Handlers', () => {
       }
     )
 
+    it('cancels with no change when the target folder became a file while the box was open', async () => {
+      confirm.mockImplementation(async () => {
+        rmSync(path.join(root, 'docs'), { recursive: true })
+        writeFileSync(path.join(root, 'docs'), 'now a file')
+        return 'move'
+      })
+
+      const result = await invoke('file:moveFromExternal', source, path.join(root, 'docs'), root)
+
+      expect(result.errorCode).toBe(ErrorCode.EXTERNAL_FILE_MOVE_CHANGED)
+      expect(existsSync(source)).toBe(true)
+      expect(readFileSync(path.join(root, 'docs'), 'utf8')).toBe('now a file')
+    })
+
+    it('leaves no temporary file behind after a replace', async () => {
+      confirm.mockResolvedValue('move')
+      writeFileSync(path.join(root, 'docs', 'incoming.md'), 'old')
+
+      const result = await invoke('file:moveFromExternal', source, path.join(root, 'docs'), root, 'replace')
+
+      expect(result.success).toBe(true)
+      expect(listDir(path.join(root, 'docs'))).toEqual(['incoming.md'])
+    })
+
     it('asks once for a batch, in a box modal to the window that owns the project', async () => {
       const ownerWindow = { id: 'owner-window' }
       const showBox = vi.fn(async () => ({ response: 0 }))

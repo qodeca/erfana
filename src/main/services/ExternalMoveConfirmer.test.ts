@@ -4,6 +4,7 @@ import { describe, it, expect, vi } from 'vitest'
 import nodePath from 'node:path'
 import {
   APPROVAL_TTL_MS,
+  MAX_WAITING_PER_WINDOW,
   ExternalMoveConfirmerImpl,
   MAX_FILES_PER_BOX,
   describeMove,
@@ -25,6 +26,7 @@ interface Setup {
 
 function make({ response = 0, owner = OWNER, canShow, allow = true }: Setup = {}) {
   const clock = { now: 1_000 }
+  const identities = new Map<string, string>()
   const showBox = vi.fn(async (_owner: unknown, _options: MoveBoxOptions) => {
     if (response instanceof Error) throw response
     return { response }
@@ -39,9 +41,10 @@ function make({ response = 0, owner = OWNER, canShow, allow = true }: Setup = {}
     homeDir: HOME,
     path: posix,
     now: () => clock.now,
-    rateCap
+    rateCap,
+    identityOf: async (p: string) => identities.get(p) ?? `1:${p}`
   })
-  return { confirmer, showBox, resolveOwner, rateCap, clock }
+  return { confirmer, showBox, resolveOwner, rateCap, clock, identities }
 }
 
 const file = (name: string, dir = `${HOME}/Downloads`): string => `${dir}/${name}`
@@ -195,7 +198,84 @@ describe('ExternalMoveConfirmer', () => {
   })
 })
 
+describe('approvals', () => {
+  it('hold only for the file that was approved', async () => {
+    const { confirmer, showBox, identities } = make()
+    const pick = [file('a.md'), file('b.md')]
+
+    await confirmer.confirm(SENDER, pick[0], pick)
+    identities.set(pick[1], '1:swapped') // another file now sits at that path
+
+    expect(await confirmer.confirm(SENDER, pick[1], pick)).toBe('move')
+    expect(showBox).toHaveBeenCalledTimes(2) // asked again
+  })
+
+  it('end on clear, for one window or for all', async () => {
+    const one = make()
+    const pick = [file('a.md'), file('b.md')]
+    await one.confirmer.confirm(SENDER, pick[0], pick)
+    one.confirmer.clear(SENDER)
+    await one.confirmer.confirm(SENDER, pick[1], pick)
+    expect(one.showBox).toHaveBeenCalledTimes(2)
+
+    const all = make()
+    await all.confirmer.confirm(SENDER, pick[0], pick)
+    all.confirmer.clear()
+    await all.confirmer.confirm(SENDER, pick[1], pick)
+    expect(all.showBox).toHaveBeenCalledTimes(2)
+  })
+
+  it('are not made by an answer given before a clear', async () => {
+    const { confirmer, showBox } = make()
+    const pick = [file('a.md'), file('b.md')]
+    showBox.mockImplementationOnce(async () => {
+      confirmer.clear(SENDER)
+      return { response: 0 }
+    })
+
+    await confirmer.confirm(SENDER, pick[0], pick)
+    await confirmer.confirm(SENDER, pick[1], pick)
+
+    expect(showBox).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('waiting limit', () => {
+  it('answers unavailable for files past the cap and still asks about the rest', async () => {
+    const { confirmer, showBox } = make({ allow: true })
+    const total = MAX_WAITING_PER_WINDOW + 20
+    const answers = await Promise.all(
+      Array.from({ length: total }, (_, i) => confirmer.confirm(SENDER, file(`f${i}.md`)))
+    )
+
+    expect(answers.filter((a) => a === 'unavailable')).toHaveLength(20)
+    expect(answers.slice(0, MAX_WAITING_PER_WINDOW).every((a) => a === 'move')).toBe(true)
+    expect(showBox).toHaveBeenCalled()
+  })
+
+  it('names a file once however many times a pick repeats it', async () => {
+    const { confirmer, showBox } = make()
+    const pick = [file('a.md'), file('b.md')]
+
+    await Promise.all([
+      confirmer.confirm(SENDER, pick[0], [...pick, ...pick]),
+      confirmer.confirm(SENDER, pick[1], pick)
+    ])
+
+    expect(showBox.mock.calls[0][1].message).toBe('Move 2 files into the project?')
+  })
+})
+
 describe('describeMove', () => {
+  it('keeps the last part of a long folder and drops the middle', () => {
+    const deep = `/mnt/${'x'.repeat(120)}/Projects/Client/Inbox`
+    const { detail } = describeMove([`${deep}/a.md`], HOME, posix)
+
+    expect(detail).toContain('…')
+    expect(detail).toContain('Projects/Client/Inbox')
+    expect(detail.split('\n')[0].length).toBeLessThan(100)
+  })
+
   it('shows a folder outside the home folder as it is, and the home folder itself as ~', () => {
     expect(describeMove(['/mnt/usb/a.md'], HOME, posix).detail).toContain('From /mnt/usb')
     expect(describeMove([`${HOME}/a.md`], HOME, posix).detail).toContain('From ~\n')
@@ -204,6 +284,9 @@ describe('describeMove', () => {
 
 describe('safeShown', () => {
   it('replaces control, bidi and line-separator characters', () => {
+    const invisible = safeShown('a\u061Cb\u200Bc\u200Cd\u200De\uFEFFf')
+    expect(invisible).toBe('a\uFFFDb\uFFFDc\uFFFDd\uFFFDe\uFFFDf')
+
     const hostile = `a\u0000b\u001bc\u202Ed\u2066e\u200Ff\u2028g\u2029h\u0085i\u007fj`
     const shown = safeShown(hostile)
 

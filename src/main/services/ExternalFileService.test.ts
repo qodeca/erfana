@@ -19,6 +19,7 @@ import type * as FsProm from 'fs/promises'
 import type * as PathUtils from '../utils/pathSecurity'
 import { ExternalFileService, type ExternalTarget } from './ExternalFileService'
 import { ExternalSourceGrants } from './ExternalSourceGrants'
+import { ATOMIC_TEMP_PREFIX, isAtomicTempName } from '../utils/atomicWrite'
 import type { IFileService } from '../interfaces/IFileService'
 import { ErrorCode } from '../../shared/errors'
 
@@ -130,6 +131,7 @@ describe('ExternalFileService', () => {
 
     // Default mock implementations
     ;(fs.access as Mock).mockResolvedValue(undefined)
+    ;(fs.realpath as Mock).mockImplementation(async (p: string) => p)
     ;(pathSecurity.isSystemDirectory as Mock).mockReturnValue(false)
     ;(pathSecurity.validateSymlink as Mock).mockResolvedValue(false)
   })
@@ -799,6 +801,109 @@ describe('ExternalFileService', () => {
       expect(confirm).not.toHaveBeenCalled()
       expect(fs.copyFile).not.toHaveBeenCalled()
       expect(fs.rm).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('safety around the copy and the delete', () => {
+    const source = '/external/file.md'
+    const folder = path.resolve('/project/docs')
+
+    beforeEach(() => {
+      ;(fs.lstat as Mock).mockResolvedValue({ ...makeStats({ isDir: false }), dev: 1n, ino: 10n })
+      ;(mockFileService.checkNameConflict as Mock).mockResolvedValue(false)
+      ;(fs.copyFile as Mock).mockResolvedValue(undefined)
+      ;(fs.rm as Mock).mockResolvedValue(undefined)
+    })
+
+    it('removes the source when it is still the entry that was shown', async () => {
+      const result = await service.moveFromExternal(source, target(folder), SENDER)
+
+      expect(result.success).toBe(true)
+      expect(fs.rm).toHaveBeenCalledWith(source)
+    })
+
+    it('keeps the copy and leaves the source when another file took its place during the copy', async () => {
+      ;(fs.copyFile as Mock).mockImplementation(async () => {
+        ;(fs.lstat as Mock).mockResolvedValue({ ...makeStats({ isDir: false }), dev: 1n, ino: 77n })
+      })
+
+      const result = await service.moveFromExternal(source, target(folder), SENDER)
+
+      expect(result).toMatchObject({
+        success: false,
+        errorCode: ErrorCode.EXTERNAL_FILE_SOURCE_CHANGED
+      })
+      expect(fs.rm).not.toHaveBeenCalled()
+      expect(fs.copyFile).toHaveBeenCalled()
+    })
+
+    it('leaves the source when its folder now leads somewhere else', async () => {
+      ;(fs.copyFile as Mock).mockImplementation(async () => {
+        ;(fs.realpath as Mock).mockImplementation(async (p: string) =>
+          p === path.dirname(source) ? path.resolve('/elsewhere') : p
+        )
+      })
+
+      const result = await service.moveFromExternal(source, target(folder), SENDER)
+
+      expect(result.errorCode).toBe(ErrorCode.EXTERNAL_FILE_SOURCE_CHANGED)
+      expect(fs.rm).not.toHaveBeenCalled()
+    })
+
+    it('refuses to move a link without asking', async () => {
+      ;(fs.lstat as Mock)
+        .mockResolvedValueOnce({ ...makeStats({ isSymlink: true }), dev: 1n, ino: 10n })
+        .mockResolvedValue({ ...makeStats({ isDir: false }), dev: 1n, ino: 11n })
+      ;(fs.realpath as Mock).mockResolvedValue(path.resolve('/external/real.md'))
+      ;(pathSecurity.validateSymlink as Mock).mockResolvedValue(true)
+
+      const moved = await service.moveFromExternal(source, target(folder), SENDER)
+
+      expect(moved).toMatchObject({
+        success: false,
+        errorCode: ErrorCode.EXTERNAL_FILE_MOVE_SYMLINK
+      })
+      expect(confirm).not.toHaveBeenCalled()
+      expect(fs.rm).not.toHaveBeenCalled()
+    })
+
+    it('names the temporary copy with the application temp prefix', async () => {
+      ;(fs.lstat as Mock).mockResolvedValue({ ...makeStats({ isDir: false }), dev: 1n, ino: 10n })
+      ;(mockFileService.checkNameConflict as Mock).mockResolvedValue(true)
+      ;(fs.rename as Mock).mockResolvedValue(undefined)
+
+      await service.copyFromExternal(source, target(folder), 'replace')
+
+      const [, temporary] = (fs.copyFile as Mock).mock.calls[0]
+      expect(path.basename(temporary).startsWith(ATOMIC_TEMP_PREFIX)).toBe(true)
+      expect(isAtomicTempName(temporary)).toBe(true)
+    })
+
+    it('copies nothing when the destination folder leads somewhere else by then', async () => {
+      ;(fs.realpath as Mock).mockImplementation(async (p: string) =>
+        p === folder ? path.resolve('/elsewhere') : p
+      )
+
+      const result = await service.copyFromExternal(source, target(folder))
+
+      expect(result.success).toBe(false)
+      expect(fs.copyFile).not.toHaveBeenCalled()
+    })
+
+    it('does not rename, and removes the temporary copy, when the folder changed during the copy', async () => {
+      ;(mockFileService.checkNameConflict as Mock).mockResolvedValue(true)
+      ;(fs.copyFile as Mock).mockImplementation(async () => {
+        ;(fs.realpath as Mock).mockImplementation(async (p: string) =>
+          p === folder ? path.resolve('/elsewhere') : p
+        )
+      })
+
+      const result = await service.copyFromExternal(source, target(folder), 'replace')
+
+      expect(result.success).toBe(false)
+      expect(fs.rename).not.toHaveBeenCalled()
+      const [, temporary] = (fs.copyFile as Mock).mock.calls[0]
+      expect(fs.rm).toHaveBeenCalledWith(temporary, { force: true })
     })
   })
 })

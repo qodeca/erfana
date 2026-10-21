@@ -20,8 +20,8 @@ import { ErrorCode, ERROR_MESSAGES } from '../../shared/errors'
 import { logger } from '../services/LoggingService'
 import { redactedLogError } from '../utils/redactUserInput'
 import { registerHandle } from './registry'
-import { registerConfinedHandle } from './confinement/registerConfinedHandle'
-import { resolveConfinedPath } from './confinement/resolveConfinedPath'
+import { registerConfinedHandle, type PathBinding } from './confinement/registerConfinedHandle'
+import { resolveConfinedPath, type PathPolicy } from './confinement/resolveConfinedPath'
 import { isInsideRoot } from '../utils/pathCompare'
 import type { ConfinementError } from './confinement/ConfinementError'
 import { rememberDialogResult, withLastDirectory } from '../utils/lastDialogDirectory'
@@ -36,11 +36,18 @@ export interface ExternalFileSelection {
 
 /** The confirmation box the app shows: a native message box modal to the project's window. */
 function createNativeMoveConfirmer(): MoveConfirmer {
-  return new ExternalMoveConfirmerImpl({
+  const watched = new WeakSet<object>()
+  const confirmer: ExternalMoveConfirmerImpl = new ExternalMoveConfirmerImpl({
     showBox: (owner, options) => dialog.showMessageBox(owner as BrowserWindow, options),
     resolveOwner: (senderId) => {
       const contents = webContents.fromId(senderId)
-      return contents ? BrowserWindow.fromWebContents(contents) : null
+      const window = contents ? BrowserWindow.fromWebContents(contents) : null
+      // Approvals end with the window
+      if (window && !watched.has(window)) {
+        watched.add(window)
+        window.once('closed', () => confirmer.clear(senderId))
+      }
+      return window
     },
     // A minimised or hidden window cannot be asked
     canShow: (owner) => {
@@ -48,6 +55,7 @@ function createNativeMoveConfirmer(): MoveConfirmer {
       return window.isVisible() && !window.isMinimized()
     }
   })
+  return confirmer
 }
 
 /** Whether a file lies in the open project, by the spelling given or where it really is. */
@@ -65,6 +73,15 @@ async function isInProject(
   } catch {
     return false
   }
+}
+
+/** The target folder of a copy or move: the first check and the one after the box are the same. */
+const TARGET_BINDING: PathBinding = {
+  arg: 1,
+  mode: 'project',
+  mustExist: true,
+  kind: 'directory',
+  access: 'change'
 }
 
 /** The error code a refused path carries in a result-shaped answer. */
@@ -101,6 +118,8 @@ export function registerExternalFileHandlers(
   moveConfirmer: MoveConfirmer = createNativeMoveConfirmer()
 ): void {
   externalFileService.setMoveConfirmer(moveConfirmer)
+  // An answer given for one project says nothing about the next
+  session.onChange(() => moveConfirmer.clear?.())
 
   /**
    * Validate external file for drop
@@ -157,7 +176,7 @@ export function registerExternalFileHandlers(
       schema: ExternalFileTransferArgsSchema,
       paths: {
         source: { arg: 0, mode: 'external', check: 'escape' },
-        target: { arg: 1, mode: 'project', mustExist: true, kind: 'directory', access: 'change' }
+        target: TARGET_BINDING
       },
       onRefusal: (error): ExternalFileCopyResponse => ({
         success: false,
@@ -199,7 +218,7 @@ export function registerExternalFileHandlers(
       schema: ExternalFileTransferArgsSchema,
       paths: {
         source: { arg: 0, mode: 'external', check: 'escape' },
-        target: { arg: 1, mode: 'project', mustExist: true, kind: 'directory', access: 'change' }
+        target: TARGET_BINDING
       },
       onRefusal: (error): ExternalFileMoveResponse => ({
         success: false,
@@ -227,10 +246,12 @@ export function registerExternalFileHandlers(
             const now = session.current()
             if (!now || now.generation !== started?.generation) return false
             try {
+              // eslint-disable-next-line @typescript-eslint/no-unused-vars
+              const { arg, access, ...policy } = TARGET_BINDING
               const again = await resolveConfinedPath(
                 target.requested,
                 { session: now, senderId },
-                { mode: 'project', mustExist: true, kind: 'directory' }
+                policy as PathPolicy
               )
               return again.real === target.real
             } catch {

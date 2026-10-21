@@ -25,6 +25,8 @@ import { AppError, ErrorCode, ERROR_MESSAGES } from '../../shared/errors'
 import { logger } from './LoggingService'
 import { redactPath, redactedLogError } from '../utils/redactUserInput'
 import { childPath } from '../utils/childPath'
+import { ATOMIC_TEMP_PREFIX } from '../utils/atomicWrite'
+import { normaliseResolved } from '../utils/pathCompare'
 import type { MoveConfirmer } from './ExternalMoveConfirmer'
 import { externalSourceGrants as defaultGrants, type ExternalSourceGrants } from './ExternalSourceGrants'
 import type { IFileService } from '../interfaces/IFileService'
@@ -311,7 +313,7 @@ export class ExternalFileService implements IExternalFileService {
       }
 
       // Perform the copy
-      await this.copyInto(sourcePath, targetPath, conflictResolution)
+      await this.copyInto(sourcePath, targetPath, conflictResolution, target.real)
 
       logger.info('External file copied successfully', {
         sourcePath: redactPath(sourcePath),
@@ -362,8 +364,21 @@ export class ExternalFileService implements IExternalFileService {
       }
     }
 
+    // A link can be copied; moving one would remove the link and leave its target
+    if (validation.isSymlink) {
+      return {
+        success: false,
+        isSymlink: true,
+        error: ERROR_MESSAGES[ErrorCode.EXTERNAL_FILE_MOVE_SYMLINK],
+        errorCode: ErrorCode.EXTERNAL_FILE_MOVE_SYMLINK
+      }
+    }
+
     try {
       const sourceIdentity = await this.identityOf(sourcePath)
+      // What the user was shown: this entry, in this folder
+      const sourceEntry = await this.entryIdentityOf(sourcePath)
+      const sourceFolder = await this.folderOf(sourcePath)
       if (await this.plannedIsSameFile(sourcePath, target, conflictResolution)) {
         return this.sameFileRefusal()
       }
@@ -436,7 +451,24 @@ export class ExternalFileService implements IExternalFileService {
       }
 
       // Copy the file first
-      await this.copyInto(sourcePath, targetPath, conflictResolution)
+      await this.copyInto(sourcePath, targetPath, conflictResolution, target.real)
+
+      // The copy can take long. Delete only the entry the user was shown, in the
+      // folder they were shown; otherwise keep the copy and leave the source alone.
+      if (
+        (await this.entryIdentityOf(sourcePath)) !== sourceEntry ||
+        (await this.folderOf(sourcePath)) !== sourceFolder
+      ) {
+        logger.warn('Original changed during the move; it was not removed', {
+          sourcePath: redactPath(sourcePath)
+        })
+        return {
+          success: false,
+          isSymlink: false,
+          error: ERROR_MESSAGES[ErrorCode.EXTERNAL_FILE_SOURCE_CHANGED],
+          errorCode: ErrorCode.EXTERNAL_FILE_SOURCE_CHANGED
+        }
+      }
 
       // M6: Try to delete source, but don't fail if it's already gone
       try {
@@ -579,6 +611,42 @@ export class ExternalFileService implements IExternalFileService {
     }
   }
 
+  /** Device and inode of the entry itself (a link is not followed), or null. */
+  private async entryIdentityOf(filePath: string): Promise<string | null> {
+    try {
+      const stats = await lstat(filePath, { bigint: true })
+      return stats ? `${stats.dev}:${stats.ino}` : null
+    } catch {
+      return null
+    }
+  }
+
+  /** The real folder a path sits in, or null when it cannot be resolved. */
+  private async folderOf(filePath: string): Promise<string | null> {
+    try {
+      const real = await realpath(dirname(filePath))
+      return real ? normaliseResolved(real) : null
+    } catch {
+      return null
+    }
+  }
+
+  /** Throws unless the folder the copy is about to enter is still the one that was checked. */
+  private async assertFolderUnchanged(targetPath: string, folder: string): Promise<void> {
+    const actual = await this.folderOf(targetPath)
+    const same =
+      actual !== null &&
+      (process.platform === 'linux'
+        ? actual === normaliseResolved(folder)
+        : actual.toLowerCase() === normaliseResolved(folder).toLowerCase())
+    if (!same) {
+      throw new AppError(
+        'The destination folder changed; nothing was copied',
+        ErrorCode.PATH_OUTSIDE_PROJECT
+      )
+    }
+  }
+
   /** Whether both paths are the same file on disk (a hard link counts). */
   private async isSameFile(first: string, second: string): Promise<boolean> {
     const [a, b] = await Promise.all([this.identityOf(first), this.identityOf(second)])
@@ -616,8 +684,10 @@ export class ExternalFileService implements IExternalFileService {
   private async copyInto(
     sourcePath: string,
     targetPath: string,
-    conflictResolution?: ConflictResolution
+    conflictResolution: ConflictResolution | undefined,
+    folder: string
   ): Promise<void> {
+    await this.assertFolderUnchanged(targetPath, folder)
     let existing: Stats | null = null
     if (conflictResolution === 'replace') {
       try {
@@ -630,9 +700,10 @@ export class ExternalFileService implements IExternalFileService {
       await copyFile(sourcePath, targetPath, constants.COPYFILE_EXCL)
       return
     }
-    const temporary = childPath(dirname(targetPath), `.${randomUUID()}.erfana-tmp`)
+    const temporary = childPath(dirname(targetPath), `${ATOMIC_TEMP_PREFIX}${randomUUID()}`)
     try {
       await copyFile(sourcePath, temporary, constants.COPYFILE_EXCL)
+      await this.assertFolderUnchanged(targetPath, folder)
       await rename(temporary, targetPath)
     } catch (error) {
       await rm(temporary, { force: true }).catch(() => undefined)
