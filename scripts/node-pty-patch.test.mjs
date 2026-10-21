@@ -27,6 +27,8 @@ describe('node-pty patch (#305)', () => {
     expect(src).toContain('static std::mutex g_ptyHandlesMutex;');
     expect(src).toContain('std::lock_guard<std::mutex> lock(g_ptyHandlesMutex);');
     expect(src).not.toContain('remove_pty_baton');
+    expect(src).not.toContain('InterlockedIncrement(&ptyCounter)');
+    expect(src).toContain('std::erase_if(ptyHandles');
   });
 
   it.skipIf(!fs.existsSync(prebuild))('installed prebuild.js never accepts the prebuild on win32', () => {

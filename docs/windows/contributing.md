@@ -141,12 +141,12 @@ afterEach(() => {
 
 ## node-pty patch (#305)
 
-`patches/node-pty+1.1.0.patch` carries, besides the two Windows build fixes, the change from [microsoft/node-pty#922](https://github.com/microsoft/node-pty/pull/922) (a mutex around the process-wide `ptyHandles` vector in `src/win/conpty.cc`; without it, quitting with many terminals crashes the main process, [#305](https://github.com/qodeca/erfana/issues/305)). It also makes `node-pty/scripts/prebuild.js` refuse the bundled prebuild on `win32`, so `npm rebuild node-pty` compiles the patched source instead of accepting `prebuilds/win32-*` (which load only if `build/Release` is absent).
+`patches/node-pty+1.1.0.patch` carries, besides the two Windows build fixes, the change from [microsoft/node-pty#922](https://github.com/microsoft/node-pty/pull/922) (a mutex around the process-wide `ptyHandles` vector in `src/win/conpty.cc`; without it, quitting with many terminals crashes the main process, [#305](https://github.com/qodeca/erfana/issues/305)). It also makes `node-pty/scripts/prebuild.js` refuse the bundled prebuild on `win32`, so `npm rebuild node-pty` compiles the patched source instead of accepting `prebuilds/win32-*`. node-pty falls back to the prebuild whenever `build/Release` is absent **or fails to load**, so two more guards exist: the `afterPack` step in `scripts/fuses.js` (`ensurePatchedConptyBuild`) fails a Windows build when `build/Release/conpty.node` is not packed and deletes the prebuild's `conpty.node` / `conpty_console_list.node`, and the main process logs once at start-up which `conpty.node` was loaded (`node-pty native binding loaded`).
 
 - **On every node-pty upgrade**, re-check the patch (`npx patch-package --error-on-fail` fails loudly if it no longer applies).
-- **Drop the `conpty.cc` and `prebuild.js` parts** (and `scripts/node-pty-patch.test.mjs`) once a stable node-pty >= 1.2 ships #922; it first appeared in 1.2.0-beta.13.
+- **Drop the `conpty.cc` and `prebuild.js` parts** (and `scripts/node-pty-patch.test.mjs`; the `afterPack` guard and the start-up log line can stay as cheap provenance checks) once a stable node-pty >= 1.2 ships #922; it first appeared in 1.2.0-beta.13.
 - To regenerate: edit under `node_modules/node-pty`, then `npx patch-package node-pty --exclude 'package\.json$|^build/'` (without `--exclude` the build output ends up in the patch).
-- To prove the loaded binary on Windows: `build\Release\conpty.node` must exist and be the one loaded (node-pty tries `build/Release`, then `build/Debug`, then `prebuilds/<platform>-<arch>`).
+- To prove the loaded binary on Windows: `build\Release\conpty.node` must exist and be the one loaded, as the start-up log line shows (node-pty tries `build/Release`, then `build/Debug`, then `prebuilds/<platform>-<arch>`, and moves on when a load throws, not only when the file is missing).
 
 ---
 

@@ -43,6 +43,7 @@ import { terminalService } from './services/TerminalService'
 import { settingsService } from './services/SettingsService'
 import { globalSettingsService } from './services/GlobalSettingsService'
 import { loggingService, logger } from './services/LoggingService'
+import { logNodePtyBinding } from './utils/logNodePtyBinding'
 import { gitWatcherService } from './services/GitWatcherService'
 import { gitPollingService } from './services/GitPollingService'
 import { projectLockService } from './services/ProjectLockService'
@@ -407,6 +408,9 @@ function showStartupProblems(win: BrowserWindow, problems: string[], detailsSave
 app.whenReady().then(async () => {
   // Set application name (shows in macOS menu bar)
   app.setName('ERFANA')
+
+  // Windows: record which conpty.node node-pty loaded (patched build vs prebuild, #305)
+  logNodePtyBinding()
 
   // Deny every page permission except the camera preview (Electron grants all by default)
   installDefaultSessionPermissions(session.defaultSession)
