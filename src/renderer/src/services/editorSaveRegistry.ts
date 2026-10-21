@@ -21,9 +21,16 @@
  * `true` for a tab that could not be reached would let the coordinator close
  * it and drop the edits.
  *
+ * A project switch or close uses the same registry to save every dirty tab
+ * first: {@link editorSaveRegistry.holdAll} stops the autosave timers and
+ * {@link editorSaveRegistry.flushAll} writes the dirty buffers, so only what
+ * cannot be saved reaches the "discard?" prompt and no timer fires into the
+ * project being left.
+ *
  * @module editorSaveRegistry
  * @see docs/design/design-issue-124-part3.md §3.6 "Saving an editor tab by its id"
  */
+import { useProjectStore } from '../stores/useProjectStore'
 
 /** What one mounted editor tab offers the registry. */
 export interface EditorSaveEntry {
@@ -48,6 +55,32 @@ export interface EditorSaveEntry {
    *   unsaved once the prompt ends without closing the tab
    */
   holdAutosave(): () => void
+  /**
+   * Resolve once a save already in flight has finished, or at once when none
+   * is. Optional: a tab without it is assumed to have nothing in flight.
+   *
+   * @returns A promise that never rejects
+   */
+  whenSaveSettled?(): Promise<void>
+}
+
+/** Options for {@link editorSaveRegistry.flushAll}. */
+export interface FlushAllOptions {
+  /**
+   * Leave a tab in its "changed on disk" conflict state alone (and report it
+   * in `conflicted`), because a save would overwrite the newer file.
+   */
+  skipConflicts?: boolean
+}
+
+/** What {@link editorSaveRegistry.flushAll} did, as panel ids. */
+export interface FlushAllResult {
+  /** Dirty tabs whose write succeeded */
+  saved: string[]
+  /** Dirty tabs whose write failed, or that nothing registered could reach */
+  failed: string[]
+  /** Dirty tabs left unsaved because of a conflict (only with `skipConflicts`) */
+  conflicted: string[]
 }
 
 const entries = new Map<string, EditorSaveEntry>()
@@ -189,6 +222,60 @@ export const editorSaveRegistry = {
         // or the panel's modified-state effect arms it again.
       }
     }
+  },
+
+  /**
+   * Pause the autosave of every registered tab until the returned release is
+   * called. One {@link editorSaveRegistry.holdAutosave} per tab, so the
+   * counting, idempotence and "a closed tab is never re-armed" rules carry over.
+   *
+   * @returns A release for every hold taken here; safe to call more than once
+   */
+  holdAll(): () => void {
+    const releases = Array.from(entries.keys()).map((panelId) => editorSaveRegistry.holdAutosave(panelId))
+    return () => {
+      for (const release of releases) release()
+    }
+  },
+
+  /**
+   * Save every dirty tab. A save already in flight is awaited first, then the
+   * tab is saved through its own `save` (so every autosave guard still
+   * applies) if it is still dirty. Never rejects: whatever cannot be saved is
+   * reported, not thrown.
+   *
+   * @param options - See {@link FlushAllOptions}
+   * @returns The panel ids that were saved, failed, or were left in conflict
+   */
+  async flushAll(options: FlushAllOptions = {}): Promise<FlushAllResult> {
+    const result: FlushAllResult = { saved: [], failed: [], conflicted: [] }
+    const dirtyIds = Array.from(useProjectStore.getState().dirtyPanelIds)
+    await Promise.all(
+      dirtyIds.map(async (panelId) => {
+        const entry = entries.get(panelId)
+        if (!entry) {
+          result.failed.push(panelId)
+          return
+        }
+        try {
+          await entry.whenSaveSettled?.()
+        } catch {
+          // Only a wait; the save below reports its own outcome.
+        }
+        // The save that was in flight may have cleaned the tab.
+        if (!useProjectStore.getState().dirtyPanelIds.has(panelId)) {
+          result.saved.push(panelId)
+          return
+        }
+        if (options.skipConflicts && editorSaveRegistry.hasConflict(panelId)) {
+          result.conflicted.push(panelId)
+          return
+        }
+        if (await editorSaveRegistry.save(panelId)) result.saved.push(panelId)
+        else result.failed.push(panelId)
+      })
+    )
+    return result
   },
 
   /**

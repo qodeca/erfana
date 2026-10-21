@@ -221,6 +221,28 @@ describe('switchHelpers', () => {
       })
     })
 
+    it('names a single tab that could not be saved', async () => {
+      await confirmProjectSwitch(true, false, 'switch', mockConfirm, 1)
+
+      expect(mockConfirm).toHaveBeenCalledWith({
+        title: 'Unsaved Changes',
+        message: '1 tab could not be saved. Discard and switch project?',
+        confirmLabel: 'Switch Anyway',
+        danger: true
+      })
+    })
+
+    it('names the count when several tabs could not be saved, for a close', async () => {
+      await confirmProjectSwitch(true, false, 'close', mockConfirm, 3)
+
+      expect(mockConfirm).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: '3 tabs could not be saved. Discard and close project?',
+          confirmLabel: 'Close Anyway'
+        })
+      )
+    })
+
     it('should show "Active Terminal Session" dialog when terminalBusy=true', async () => {
       await confirmProjectSwitch(false, true, 'switch', mockConfirm)
 

@@ -627,3 +627,26 @@ export function shouldToastSaveError(
   if (trigger === 'registry') return false
   return trigger === 'user' || message !== lastShown
 }
+
+/**
+ * Start tracking a save that is in flight.
+ *
+ * The panel keeps the promise of its running save in a ref, so a project
+ * switch can wait for it (`editorSaveRegistry.flushAll`) instead of starting a
+ * second write beside it.
+ *
+ * @param ref - The panel's in-flight ref
+ * @returns A function to call when the save has finished; it clears the ref
+ *   only if no newer save has replaced the promise
+ */
+export function trackSaveInFlight(ref: { current: Promise<void> | null }): () => void {
+  let finish: () => void = () => {}
+  const inFlight = new Promise<void>((resolve) => {
+    finish = resolve
+  })
+  ref.current = inFlight
+  return () => {
+    finish()
+    if (ref.current === inFlight) ref.current = null
+  }
+}

@@ -20,6 +20,8 @@
 import type { MutableRefObject } from 'react'
 import { TERMINAL } from './constants'
 import { logger } from '../../utils/logger'
+import { editorSaveRegistry } from '../../services/editorSaveRegistry'
+import { getLastSeenProjectGeneration } from '../../services/projectGeneration'
 
 /**
  * Type for confirmation dialog function
@@ -82,13 +84,17 @@ export function needsSwitchConfirmation(hasDirty: boolean, terminalBusy: boolean
  * @param terminalBusy - Whether terminal has recent activity
  * @param action - Action being performed ('switch' or 'close')
  * @param confirm - Confirmation dialog function
+ * @param unsavedCount - How many tabs could not be saved, when known. Names the
+ *   count in the message ("1 tab could not be saved"); omitted, the message
+ *   keeps the generic "You have unsaved changes" wording.
  * @returns true if user confirmed, false if cancelled
  */
 export async function confirmProjectSwitch(
   hasDirty: boolean,
   terminalBusy: boolean,
   action: 'switch' | 'close',
-  confirm: ConfirmFn
+  confirm: ConfirmFn,
+  unsavedCount?: number
 ): Promise<boolean> {
   if (!needsSwitchConfirmation(hasDirty, terminalBusy)) {
     return true
@@ -96,8 +102,12 @@ export async function confirmProjectSwitch(
 
   const title = hasDirty ? 'Unsaved Changes' : 'Active Terminal Session'
   const actionVerb = action === 'switch' ? 'switch project' : 'close project'
+  const unsavedLead =
+    unsavedCount === undefined || unsavedCount < 1
+      ? 'You have unsaved changes.'
+      : `${unsavedCount} ${unsavedCount === 1 ? 'tab' : 'tabs'} could not be saved.`
   const message = hasDirty
-    ? `You have unsaved changes. Discard and ${actionVerb}?`
+    ? `${unsavedLead} Discard and ${actionVerb}?`
     : `Terminal shows recent activity. Stop it and ${actionVerb}?`
   const confirmLabel = action === 'switch' ? 'Switch Anyway' : 'Close Anyway'
 
@@ -107,6 +117,82 @@ export async function confirmProjectSwitch(
     confirmLabel,
     danger: true
   })
+}
+
+/**
+ * The outcome of {@link prepareProjectTransition}.
+ */
+export interface ProjectTransition {
+  /** false when the user cancelled; the transition has already ended */
+  proceed: boolean
+  /** Whether the terminal showed recent activity when the check ran */
+  terminalBusy: boolean
+  /**
+   * End the transition once the open or close has finished, however it went.
+   * If the project did change (a new `project:changed` generation arrived) the
+   * autosave hold is kept: the tabs unmount and drop it, so nothing can write
+   * into the project that was left. If it did not (picker cancelled, main
+   * answered no-op, an error), the hold is released and autosave re-arms.
+   * Safe to call more than once.
+   */
+  settle: () => void
+}
+
+/**
+ * Get the editors ready for a project switch or close.
+ *
+ * 1. Lock the UI and hold every tab's autosave, so no timer can fire from here.
+ * 2. Save every dirty tab; a tab in conflict is left alone.
+ * 3. Re-read what is still unsaved (conflicts, failed writes, typing during
+ *    the save) and, only then, prompt: "N tabs could not be saved".
+ *
+ * The lock is lifted before the prompt, because it paints above dialogs.
+ * Cancelling ends the transition here and re-arms autosave.
+ *
+ * @param action - 'switch' or 'close'
+ * @param confirm - Confirmation dialog function
+ * @returns Whether to go on, and how to end the transition afterwards
+ */
+export async function prepareProjectTransition(
+  action: 'switch' | 'close',
+  confirm: ConfirmFn
+): Promise<ProjectTransition> {
+  const { useProjectStore } = await import('../../stores/useProjectStore')
+  const startGeneration = getLastSeenProjectGeneration()
+
+  useProjectStore.getState().setProjectChanging(true)
+  const releaseHold = editorSaveRegistry.holdAll()
+  let settled = false
+  const settle = (): void => {
+    if (settled) return
+    settled = true
+    if (getLastSeenProjectGeneration() === startGeneration) releaseHold()
+  }
+
+  try {
+    const flushed = await editorSaveRegistry.flushAll({ skipConflicts: true })
+    logger.info('[switchHelpers] Flushed unsaved tabs before project transition', {
+      action,
+      saved: flushed.saved.length,
+      failed: flushed.failed.length,
+      conflicted: flushed.conflicted.length
+    })
+
+    const terminalBusy = await checkTerminalBusy(TERMINAL.RECENT_ACTIVITY_WINDOW)
+    const unsavedCount = useProjectStore.getState().dirtyPanelIds.size
+    useProjectStore.getState().setProjectChanging(false)
+
+    const confirmed = await confirmProjectSwitch(unsavedCount > 0, terminalBusy, action, confirm, unsavedCount)
+    if (!confirmed) {
+      settle()
+      return { proceed: false, terminalBusy, settle }
+    }
+    return { proceed: true, terminalBusy, settle }
+  } catch (error) {
+    useProjectStore.getState().setProjectChanging(false)
+    settle()
+    throw error
+  }
 }
 
 /**

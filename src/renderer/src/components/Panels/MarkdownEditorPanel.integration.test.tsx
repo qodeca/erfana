@@ -326,7 +326,7 @@ describe('MarkdownEditorPanel Integration', () => {
       expect(calls).toHaveLength(1)
       expect(source).toContain(
         "useEditorSaveRegistration(panelIdRef.current, () => handleSave('registry'), externalChangeDetected, () => {\n" +
-          '    cancelAutoSave()\n    return () => signalChange()\n  })'
+          '    cancelAutoSave()\n    return () => signalChange()\n  }, () => saveInFlightRef.current ?? Promise.resolve())'
       )
       // Registered below useAutoSave, whose cancelAutoSave and signalChange it uses.
       expect(source.indexOf('useEditorSaveRegistration(panelIdRef')).toBeGreaterThan(source.indexOf('= useAutoSave('))

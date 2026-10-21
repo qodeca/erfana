@@ -55,6 +55,7 @@ import {
   getDefaultViewMode,
   shouldRecreateParentDirs,
   shouldToastSaveError,
+  trackSaveInFlight,
   type SaveTrigger
 } from './markdownEditorPanel.logic'
 import { formatSaveError, loggableError } from '../../utils/errorUtils'
@@ -215,6 +216,9 @@ export function MarkdownEditorPanel(
   // Save Handler (defined early so hooks can reference it)
   // =========================================================================
 
+  // The running save, so a project switch can wait for it (see trackSaveInFlight)
+  const saveInFlightRef = useRef<Promise<void> | null>(null)
+
   /**
    * Saves the current file to disk.
    *
@@ -235,6 +239,8 @@ export function MarkdownEditorPanel(
   const handleSave = useCallback(async (trigger: SaveTrigger = 'user'): Promise<boolean> => {
     if (!currentFile) return false
     const isAutoSave = trigger === 'autosave'
+
+    const finishInFlight = trackSaveInFlight(saveInFlightRef)
 
     // Step 1: Mark saving via hook to prevent race conditions with file watcher
     markSaving()
@@ -314,6 +320,7 @@ export function MarkdownEditorPanel(
       // Step 8: Resume file watching after save completes
       await saveGuardRef.current?.resumeWatch()
       unmarkSaving()
+      finishInFlight()
     }
   }, [currentFile, isFileDeleted, dismissConflict, clearDeletedState, markSaving, unmarkSaving, notifySaveComplete, showToast])
 
@@ -328,7 +335,7 @@ export function MarkdownEditorPanel(
   useEditorSaveRegistration(panelIdRef.current, () => handleSave('registry'), externalChangeDetected, () => {
     cancelAutoSave()
     return () => signalChange()
-  })
+  }, () => saveInFlightRef.current ?? Promise.resolve())
 
   // =========================================================================
   // Scroll Sync Hook
