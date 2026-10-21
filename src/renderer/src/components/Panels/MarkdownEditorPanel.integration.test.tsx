@@ -350,7 +350,7 @@ describe('MarkdownEditorPanel Integration', () => {
         'getValue()',
         'writeFile(',
         'notifySaveComplete(contentToSave)',
-        'setEditorDirty(panelIdRef.current, false)',
+        'settleSavedFile(prev, contentToSave, bufferNow)',
         'resumeWatch()',
         'unmarkSaving()'
       ].map((step) => handleSave.indexOf(step))
@@ -414,6 +414,35 @@ describe('MarkdownEditorPanel Integration', () => {
         'await fileGateway.writeFile(currentFile.path, contentToSave, { createParentDirs: true })'
       )
       expect(handleSave.match(/createParentDirs: true/g)).toHaveLength(1)
+    })
+
+    it('settles a finished save in one update, from the buffer as it is after the write', () => {
+      // Two updates (written text, then the newer buffer) let React render the
+      // older text as current for a moment; the rules are in settleSavedFile
+      expect(handleSave.match(/setCurrentFile\(/g)).toHaveLength(1)
+      expect(handleSave).toContain('const bufferNow = editorRef.current?.getEditor()?.getValue()')
+      expect(handleSave).toContain(
+        'bufferNow !== undefined && bufferNow !== contentToSave'
+      )
+    })
+
+    it('clears the tab’s dirty dot when the buffer takes the disk’s text (Reload from Disk)', () => {
+      const watcherUpdate = source.slice(
+        source.indexOf('const handleContentUpdateFromWatcher = useCallback'),
+        source.indexOf('const {\n    externalChangeDetected')
+      )
+      expect(watcherUpdate).toContain('modified: false')
+      expect(watcherUpdate).toContain('setEditorDirty(panelIdRef.current, false)')
+    })
+
+    it('keeps a remounted editor read-only while an autosave hold is active', () => {
+      expect(source).toContain('const releaseReadOnly = readOnlyHold.hold()')
+      const onMount = source.slice(
+        source.indexOf('const handleEditorMount = useCallback'),
+        source.indexOf('}, [viewMode, setIsEditorReady, readOnlyHold])')
+      )
+      expect(onMount).toContain('readOnlyHold.applyToMountedEditor(editor)')
+      // The hook's behaviour is covered in useEditorReadOnlyHold.test.ts
     })
 
     it('forgets the last failure reason when the panel switches file', () => {

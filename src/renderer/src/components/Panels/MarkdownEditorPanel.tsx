@@ -41,6 +41,7 @@ import { useEditorContextMenu } from '../../hooks/useEditorContextMenu'
 import { useDividerPosition } from '../../hooks/useDividerPosition'
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts'
 import { useEditorSaveRegistration } from '../../hooks/useEditorSaveRegistration'
+import { useEditorReadOnlyHold } from '../../hooks/useEditorReadOnlyHold'
 
 // Extracted components
 import { MarkdownToolbar, EditorErrorBoundary } from '../Editor/MarkdownEditorPanel/components'
@@ -53,6 +54,7 @@ import {
   calculateStats,
   extractFileName,
   getDefaultViewMode,
+  settleSavedFile,
   shouldRecreateParentDirs,
   shouldToastSaveError,
   trackSaveInFlight,
@@ -180,6 +182,12 @@ export function MarkdownEditorPanel(
   // closing over currentFile, which would cause watcher re-subscription on every keystroke.
   const handleContentUpdateFromWatcher = useCallback((content: string) => {
     setCurrentFile((prev) => prev ? { ...prev, content, modified: false } : prev)
+    // The buffer now matches the disk ("Reload from Disk" or a clean file
+    // taking an external change), so the tab's dirty dot goes too. It reads
+    // the store, not `modified`, and used to stay on after a Reload.
+    if (panelIdRef.current) {
+      useProjectStore.getState().setEditorDirty(panelIdRef.current, false)
+    }
   }, [])
   const {
     externalChangeDetected,
@@ -273,24 +281,18 @@ export function MarkdownEditorPanel(
       // Step 5: Record saved content for self-save echo detection (#124)
       notifySaveComplete(contentToSave)
 
-      // Step 6: Mark file as clean (functional updater to avoid stale closure overwrite)
-      setCurrentFile((prev) =>
-        prev ? { ...prev, content: contentToSave, modified: false } : prev
-      )
+      // Steps 6+7: settle the file state in one update. If the user typed
+      // during the async write, the buffer is ahead of what was written: keep
+      // the buffer's text and stay modified. One update, so React never
+      // renders the written (older) text as current (functional updater to
+      // avoid a stale-closure overwrite).
+      const bufferNow = editorRef.current?.getEditor()?.getValue()
+      setCurrentFile((prev) => settleSavedFile(prev, contentToSave, bufferNow))
       if (panelIdRef.current) {
-        useProjectStore.getState().setEditorDirty(panelIdRef.current, false)
-      }
-
-      // Step 7: Post-save dirty detection – if user typed during the async write,
-      // the Monaco model has diverged from what we saved. Re-mark as modified.
-      const currentEditorContent = editorRef.current?.getEditor()?.getValue()
-      if (currentEditorContent !== undefined && currentEditorContent !== contentToSave) {
-        setCurrentFile((prev) =>
-          prev ? { ...prev, content: currentEditorContent, modified: true } : prev
+        useProjectStore.getState().setEditorDirty(
+          panelIdRef.current,
+          bufferNow !== undefined && bufferNow !== contentToSave
         )
-        if (panelIdRef.current) {
-          useProjectStore.getState().setEditorDirty(panelIdRef.current, true)
-        }
       }
 
       // Clear any external change detection since we just saved
@@ -346,15 +348,18 @@ export function MarkdownEditorPanel(
     if (!externalChangeDetected) signalChange()
   }, [externalChangeDetected, signalChange])
 
+  // Read-only during an autosave hold, including an editor that remounts
+  // (view-mode switch) while the hold is active – see handleEditorMount
+  const readOnlyHold = useEditorReadOnlyHold(() => editorRef.current?.getEditor())
+
   useEditorSaveRegistration(panelIdRef.current, () => handleSave('registry'), externalChangeDetected, () => {
     // A hold stops autosave for real (no re-arming by typing or the modified
     // effect) and makes the editor read-only, so nothing new can be typed
     // between a flush and the end of the hold.
     const releaseAutoSave = holdAutoSave()
-    const editor = editorRef.current?.getEditor()
-    editor?.updateOptions?.({ readOnly: true })
+    const releaseReadOnly = readOnlyHold.hold()
     return () => {
-      editorRef.current?.getEditor()?.updateOptions?.({ readOnly: false })
+      releaseReadOnly()
       releaseAutoSave()
     }
   }, () => saveInFlightRef.current ?? Promise.resolve())
@@ -547,14 +552,16 @@ export function MarkdownEditorPanel(
 
   /**
    * Handles editor mount event from Monaco.
-   * Signals that the editor is ready for scroll synchronization.
+   * Signals that the editor is ready for scroll synchronization, and keeps a
+   * remounted editor read-only while an autosave hold is active.
    *
-   * @param _editor - Monaco editor instance (unused, accessed via ref)
+   * @param editor - The Monaco editor that just mounted
    */
-  const handleEditorMount = useCallback((_editor: monaco.editor.IStandaloneCodeEditor) => {
+  const handleEditorMount = useCallback((editor: monaco.editor.IStandaloneCodeEditor) => {
     logger.info('Editor mounted and ready', { viewMode })
+    readOnlyHold.applyToMountedEditor(editor)
     setIsEditorReady(true)
-  }, [viewMode, setIsEditorReady])
+  }, [viewMode, setIsEditorReady, readOnlyHold])
 
   // =========================================================================
   // Effects

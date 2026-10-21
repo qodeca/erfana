@@ -21,8 +21,6 @@ import { KeyboardHelper } from './pages/keyboard.helper'
 import { MonacoPage } from './pages/monaco.page'
 import { ProjectTreePage } from './pages/project-tree.page'
 import { TabBarPage } from './pages/tab-bar.page'
-import { TEST_IDS } from '../src/renderer/src/constants/testids'
-import { byTestId } from './utils/locators'
 
 const LARGE = 'large.md'
 const SMALL = 'small.md'
@@ -55,25 +53,18 @@ async function openAtEndOf(
 }
 
 /**
- * Insert `chunks` one edit at a time, each confirmed in the document state
- * (the stats bar reads the same state the preview renders) before the next.
+ * Insert `chunks` back to back, one input event each, without waiting between
+ * them – the way a fast typist's keys arrive while the preview is busy.
  *
- * Why paced: an unpaced burst of `insertText` calls trips a known, separate
- * race in the editor wrapper (`@monaco-editor/react` re-applies an older
- * `value` over the buffer, dropping edits and moving the cursor to the end) –
- * reproduced on this branch before and after the preview change, 4 of 8 runs.
- * This spec is about the preview, so it feeds edits the way a fast typist
- * does: each lands before the next. The preview still sees a stream of
- * separate changes, far faster than its debounce.
+ * This used to be paced (each chunk confirmed before the next) because a
+ * burst tripped the controlled editor's race: `@monaco-editor/react`
+ * re-applied an older `value` over the buffer, dropping edits. The editor is
+ * uncontrolled now, so the burst must survive as typed – the assertions after
+ * each call check every word arrived, in order.
  */
-async function typePaced(page: Page, monaco: MonacoPage, chunks: string[]): Promise<void> {
-  const chars = byTestId(page, TEST_IDS.STATS_CHARACTERS).locator('.stat-value')
-  const read = async (): Promise<number> => Number(((await chars.textContent()) ?? '').replace(/\D/g, ''))
-  let expected = await read()
+async function typeBurst(monaco: MonacoPage, chunks: string[]): Promise<void> {
   for (const chunk of chunks) {
     await monaco.typeWithoutWaiting(chunk)
-    expected += chunk.length
-    await expect.poll(read, { timeout: 5_000 }).toBe(expected)
   }
 }
 
@@ -88,7 +79,7 @@ test.describe('Deferred Markdown preview', () => {
     // Twenty separate edits in quick succession – each its own input event,
     // so the preview sees a stream of changes, not one paste.
     const words = Array.from({ length: 20 }, (_, i) => ` w${i}`)
-    await typePaced(page, monaco, words)
+    await typeBurst(monaco, words)
 
     // Once typing stops the preview shows every edit, in order.
     await expect(preview).toContainText(`Typing anchor paragraph.${words.join('')}`, { timeout: 15_000 })
@@ -115,7 +106,7 @@ test.describe('Deferred Markdown preview', () => {
     await monaco.waitForReady()
     await monaco.getEditor().locator('.view-line', { hasText: 'Typing anchor paragraph.' }).click()
     await page.keyboard.press('End')
-    await typePaced(page, monaco, [' after', ' the', ' switch'])
+    await typeBurst(monaco, [' after', ' the', ' switch'])
 
     const preview = panel.previewPane()
     await expect(preview).toContainText('Typing anchor paragraph. after the switch', { timeout: 15_000 })

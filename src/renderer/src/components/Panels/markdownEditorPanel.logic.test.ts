@@ -34,7 +34,8 @@ import {
   extractBaseFileName,
   isMarkdownFile,
   getDefaultViewMode,
-  trackSaveInFlight
+  trackSaveInFlight,
+  settleSavedFile
 } from './markdownEditorPanel.logic'
 
 // ============================================================================
@@ -866,5 +867,31 @@ describe('trackSaveInFlight', () => {
 
     finishNewer()
     expect(ref.current).toBeNull()
+  })
+})
+
+describe('settleSavedFile', () => {
+  const file = { path: '/p/a.md', content: 'old', modified: true }
+
+  it('marks the file clean when the buffer still equals what was written', () => {
+    expect(settleSavedFile(file, 'saved', 'saved')).toEqual({ path: '/p/a.md', content: 'saved', modified: false })
+  })
+
+  it('keeps the newer buffer and stays modified when the user typed during the write', () => {
+    // One update, never the written (older) text: the editor must not be
+    // handed a value that is behind its buffer
+    expect(settleSavedFile(file, 'saved', 'saved plus typing')).toEqual({
+      path: '/p/a.md',
+      content: 'saved plus typing',
+      modified: true
+    })
+  })
+
+  it('takes the written text when no editor is mounted', () => {
+    expect(settleSavedFile(file, 'saved', undefined)).toEqual({ path: '/p/a.md', content: 'saved', modified: false })
+  })
+
+  it('leaves a closed file closed', () => {
+    expect(settleSavedFile(null, 'saved', 'saved')).toBeNull()
   })
 })
