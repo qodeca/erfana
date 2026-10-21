@@ -103,16 +103,28 @@
     "match": "^\\s*--color-[\\w-]+\\s*:",
     "unit": "matches"
   },
-  "reduced-motion-gaps": {
-    "kind": "countWithout",
+  "animating-stylesheets": {
+    "kind": "count",
     "card": "system/foundations/motion.html",
-    "label": "stylesheets that animate without a reduced-motion escape",
+    "label": "renderer stylesheets that declare a keyframe animation",
     "dir": "src/renderer",
     "ext": [
       ".css"
     ],
     "match": "@keyframes",
-    "without": "prefers-reduced-motion"
+    "unit": "files"
+  },
+  "reduced-motion-entry-rules": {
+    "kind": "count",
+    "card": "system/foundations/motion.html",
+    "label": "app-wide reduced-motion blocks in the renderer entry stylesheet",
+    "dir": "src/renderer/src",
+    "ext": [
+      ".css"
+    ],
+    "includePath": "^src/renderer/src/index\\.css$",
+    "match": "@media[^{]*prefers-reduced-motion:\\s*reduce",
+    "unit": "matches"
   },
   "contrast-secondary-on-panel": {
     "kind": "contrast",

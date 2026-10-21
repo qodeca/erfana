@@ -44,9 +44,14 @@ window.ERFANA_CLAIMS = {
     "label": "colour tokens declared in design-tokens.css",
     "card": "system/foundations/colors.html"
   },
-  "reduced-motion-gaps": {
-    "value": 12,
-    "label": "stylesheets that animate without a reduced-motion escape",
+  "animating-stylesheets": {
+    "value": 15,
+    "label": "renderer stylesheets that declare a keyframe animation",
+    "card": "system/foundations/motion.html"
+  },
+  "reduced-motion-entry-rules": {
+    "value": 1,
+    "label": "app-wide reduced-motion blocks in the renderer entry stylesheet",
     "card": "system/foundations/motion.html"
   },
   "contrast-secondary-on-panel": {

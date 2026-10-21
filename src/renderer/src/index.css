@@ -20,3 +20,21 @@ html, body, #root {
   padding: 0;
   overflow: hidden;
 }
+
+/* Reduced motion, once for the whole app (#96, design/system/foundations/motion.html).
+   Every keyframe animation runs once and ends at once: a spinner rests as a still
+   ring, the camera flash (which ends at opacity 0) never shows, and a slide-in
+   appears in place. Per-file opt-in is how twelve stylesheets were missed, so the
+   rule lives here and covers stylesheets not written yet. Ending the animation,
+   rather than `animation: none`, keeps its final frame and its animationend event.
+   A component that has a motion-safe replacement (an opacity fade) sets it in its
+   own reduce block with `!important`; a class beats this universal selector. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-delay: 0s !important;
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
