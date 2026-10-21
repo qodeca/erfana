@@ -62,6 +62,7 @@ import { isTreeClipboardKeystroke, treeClipboardAction } from './treeClipboardSc
 import { isMacOS } from '../../utils/platform'
 import { useTreeFocusRecovery } from './useTreeFocusRecovery'
 import { fileGateway } from '../../services/fileGateway'
+import { moveExternalBatch, type PendingExternalMove } from './externalMoveBatch'
 
 interface ProjectTreeProps {
   onFileSelect: (filePath: string) => void
@@ -305,7 +306,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
       })
       // Close project via API (hook will update state via onProjectChanged listener)
       // Send the generation this window last saw: a stale close must not close a newer project
-      fileGateway.closeProject(getLastSeenProjectGeneration()).catch(err => {
+      fileGateway.closeProject({ expectedGeneration: getLastSeenProjectGeneration() }).catch(err => {
         logger.error('Error closing deleted project', err instanceof Error ? err : undefined)
       })
       setExpandedFolders(new Set())
@@ -644,7 +645,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     try {
       const result = await withWatcherPause(projectPath, isInternalOperation, setFileOperationLoading, async () => {
         // Execute move
-        const moveResult = await fileGateway.moveItem(sourcePath, targetParent)
+        const moveResult = await fileGateway.moveItem({ sourcePath, targetParentPath: targetParent })
         logger.info('Move completed', { path: moveResult.path })
 
         // Refresh tree
@@ -761,7 +762,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     const sourceItemType = clipboard.itemType
     if (sourceItemName && clipboard.operation === 'cut') {
       try {
-        const hasConflict = await fileGateway.checkConflict(targetPath, sourceItemName)
+        const hasConflict = await fileGateway.checkConflict({ targetParentPath: targetPath, itemName: sourceItemName })
 
         if (hasConflict) {
           // Show replace confirmation dialog
@@ -918,14 +919,16 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
       return
     }
 
-    // Step 3: Process move/copy for each file
+    // Step 3: Validate each file and settle its name conflict. Copies run as they go;
+    // moves are collected and sent together (below), so the user is asked once
     let successCount = 0
     let failCount = 0
+    const pendingMoves: PendingExternalMove[] = []
 
     for (const file of droppedFiles) {
       try {
         // Validate file still exists and is valid
-        const validation = await fileGateway.validateExternal(file.path, projectPath)
+        const validation = await fileGateway.validateExternal({ sourcePath: file.path })
 
         if (!validation.valid) {
           logger.warn('External file validation failed', {
@@ -945,7 +948,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
         // Note (M4): Using forward slash works cross-platform in Electron/Node.
         // Actual file operations use backend APIs that handle path joining correctly.
         const targetPath = `${targetFolder}/${file.name}`
-        const hasConflict = await fileGateway.checkConflict(targetFolder, file.name)
+        const hasConflict = await fileGateway.checkConflict({ targetParentPath: targetFolder, itemName: file.name })
 
         let conflictResolution: ConflictResolution | undefined
 
@@ -967,41 +970,13 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
 
         // Execute the operation
         if (mode === 'move') {
-          const result = await fileGateway.moveFromExternal(
-            file.path,
-            targetFolder,
-            projectPath,
-            conflictResolution
-          )
-
-          if (result.success) {
-            successCount++
-            if (result.isSymlink) {
-              showGlobalToast({
-                title: 'Symlink moved',
-                message: 'Warning: You moved a symbolic link. The target file remains at its original location.',
-                type: 'warning'
-              })
-            }
-          } else if (result.errorCode === 'EXTERNAL_FILE_MOVE_CANCELLED') {
-            // The user answered Cancel in the confirmation box: not an error
-            logger.info('User cancelled moving file', { fileName: file.name })
-          } else {
-            logger.warn('Move failed', { path: file.path, error: result.error })
-            showGlobalToast({
-              title: 'Move failed',
-              message: result.error || `Failed to move "${file.name}"`,
-              type: 'error'
-            })
-            failCount++
-          }
+          pendingMoves.push({ file, conflictResolution })
         } else if (mode === 'copy') {
-          const result = await fileGateway.copyFromExternal(
-            file.path,
+          const result = await fileGateway.copyFromExternal({
+            sourcePath: file.path,
             targetFolder,
-            projectPath,
             conflictResolution
-          )
+          })
 
           if (result.success) {
             successCount++
@@ -1035,7 +1010,14 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
       }
     }
 
-    // Step 3: Refresh tree and show summary
+    // Step 3b: One request for all the moves: main shows ONE confirmation box
+    if (pendingMoves.length > 0) {
+      const outcome = await moveExternalBatch(fileGateway, pendingMoves, targetFolder)
+      successCount += outcome.successCount
+      failCount += outcome.failCount
+    }
+
+    // Step 3c: Refresh tree and show summary
     await refreshProjectTree()
     refreshGitStatus()
 
@@ -1147,7 +1129,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     const droppedFiles: ExternalDropFile[] = await Promise.all(
       result.paths.map(async (filePath) => {
         try {
-          const stats = await fileGateway.getStats(filePath)
+          const stats = await fileGateway.getStats({ filePath })
           return {
             path: filePath,
             name: getBasename(filePath) || 'unknown',

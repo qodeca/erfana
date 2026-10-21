@@ -13,17 +13,18 @@ import { globalSettingsService } from '../services/GlobalSettingsService'
 import { projectLockService } from '../services/ProjectLockService'
 import type { ProjectSessionInfo } from '../../shared/ipc/schema'
 import {
-  CheckConflictArgsSchema,
-  CopyItemArgsSchema,
-  CreateEntryArgsSchema,
-  MoveItemArgsSchema,
-  OpenProjectByPathArgsSchema,
-  PathArgsSchema,
-  ReadDirectoryArgsSchema,
-  ReadImageArgsSchema,
-  RenameArgsSchema,
-  ValidatePathArgsSchema,
-  WriteFileArgsSchema,
+  CheckConflictRequestSchema,
+  CloseProjectRequestSchema,
+  CopyItemRequestSchema,
+  CreateEntryRequestSchema,
+  MoveItemRequestSchema,
+  OpenProjectByPathRequestSchema,
+  PathRequestSchema,
+  ReadDirectoryRequestSchema,
+  RenameRequestSchema,
+  ValidatePathRequestSchema,
+  WriteFileRequestSchema,
+  payloadArgs,
   type FileStats
 } from '../../shared/ipc/file-schema'
 import {
@@ -141,9 +142,9 @@ export function registerFileHandlers(): void {
   registerConfinedHandle(
     FILE_CHANNELS.openProjectByPath,
     {
-      schema: OpenProjectByPathArgsSchema,
-      paths: { projectPath: { arg: 0, mode: 'external', check: 'none' } },
-      handler: async ({ event }, [projectPath]) =>
+      schema: payloadArgs(OpenProjectByPathRequestSchema),
+      paths: { projectPath: { arg: 0, key: 'projectPath', mode: 'external', check: 'none' } },
+      handler: async ({ event }, [{ projectPath }]) =>
         await openProjectByPath(projectPath, { senderId: event.sender?.id ?? null, source: 'recent' })
     },
     session
@@ -165,8 +166,8 @@ export function registerFileHandlers(): void {
   registerConfinedHandle(
     FILE_CHANNELS.readDirectory,
     {
-      schema: ReadDirectoryArgsSchema,
-      paths: { dirPath: { arg: 0, mode: 'project', mustExist: true } },
+      schema: payloadArgs(ReadDirectoryRequestSchema),
+      paths: { dirPath: { arg: 0, key: 'dirPath', mode: 'project', mustExist: true } },
       staleCheck: 'after',
       handler: async ({ sender }, _args, { dirPath }) => {
         try {
@@ -201,8 +202,8 @@ export function registerFileHandlers(): void {
   registerConfinedHandle(
     FILE_CHANNELS.readFile,
     {
-      schema: PathArgsSchema,
-      paths: { filePath: { arg: 0, mode: 'project', kind: 'file' } },
+      schema: payloadArgs(PathRequestSchema),
+      paths: { filePath: { arg: 0, key: 'filePath', mode: 'project', kind: 'file' } },
       handler: async (_ctx, _args, { filePath }) => {
         try {
           return await fileService.readFile(filePath.real)
@@ -225,11 +226,13 @@ export function registerFileHandlers(): void {
   registerConfinedHandle(
     FILE_CHANNELS.writeFile,
     {
-      schema: WriteFileArgsSchema,
-      paths: { filePath: { arg: 0, mode: 'project', allowRoot: false, access: 'change' } },
-      handler: async (_ctx, [, content, options], { filePath }) => {
+      schema: payloadArgs(WriteFileRequestSchema),
+      paths: { filePath: { arg: 0, key: 'filePath', mode: 'project', allowRoot: false, access: 'change' } },
+      // The tab was opened under one project; a write after a switch must not land in the next one
+      expectedGeneration: ([request]) => request.generation,
+      handler: async (_ctx, [{ content, createParentDirs }], { filePath }) => {
         try {
-          if (options?.createParentDirs) {
+          if (createParentDirs) {
             await restoreParentDirectory(filePath)
           }
           await fileService.writeFile(filePath.real, content)
@@ -254,8 +257,8 @@ export function registerFileHandlers(): void {
   registerConfinedHandle(
     FILE_CHANNELS.getStats,
     {
-      schema: PathArgsSchema,
-      paths: { filePath: { arg: 0, mode: 'external', check: 'escape' } },
+      schema: payloadArgs(PathRequestSchema),
+      paths: { filePath: { arg: 0, key: 'filePath', mode: 'external', check: 'escape' } },
       handler: async (_ctx, _args, { filePath }): Promise<FileStats> => {
         try {
           const stats = await fileService.getFileStats(filePath.real)
@@ -293,8 +296,8 @@ export function registerFileHandlers(): void {
   registerConfinedHandle(
     FILE_CHANNELS.exists,
     {
-      schema: PathArgsSchema,
-      paths: { filePath: { arg: 0, mode: 'external', check: 'escape' } },
+      schema: payloadArgs(PathRequestSchema),
+      paths: { filePath: { arg: 0, key: 'filePath', mode: 'external', check: 'escape' } },
       onRefusal: () => false,
       handler: async (_ctx, _args, { filePath }): Promise<boolean> => fileExists(filePath.real)
     },
@@ -309,11 +312,12 @@ export function registerFileHandlers(): void {
   // Close current project. A renderer that closes because it saw the folder
   // disappear sends the generation it last saw; if a newer project was opened
   // since, that stale close does nothing.
-  registerHandle(FILE_CHANNELS.closeProject, async (event, expectedGeneration?: unknown) => {
-    const generation =
-      typeof expectedGeneration === 'number' && Number.isInteger(expectedGeneration)
-        ? expectedGeneration
-        : undefined
+  registerHandle(FILE_CHANNELS.closeProject, async (event, request?: unknown) => {
+    const parsed = CloseProjectRequestSchema.optional().safeParse(request)
+    if (!parsed.success) {
+      throw new Error('Invalid close request')
+    }
+    const generation = parsed.data?.expectedGeneration
     await projectService.close({
       senderId: event.sender?.id ?? null,
       reason: generation === undefined ? 'user' : 'project-deleted',
@@ -330,9 +334,9 @@ export function registerFileHandlers(): void {
   registerConfinedHandle(
     FILE_CHANNELS.createFile,
     {
-      schema: CreateEntryArgsSchema,
-      paths: { dirPath: { arg: 0, mode: 'project', mustExist: true, kind: 'directory', access: 'change' } },
-      handler: async (_ctx, [, fileName], { dirPath }) => {
+      schema: payloadArgs(CreateEntryRequestSchema),
+      paths: { dirPath: { arg: 0, key: 'dirPath', mode: 'project', mustExist: true, kind: 'directory', access: 'change' } },
+      handler: async (_ctx, [{ name: fileName }], { dirPath }) => {
         try {
           const created = await fileService.createFile(dirPath.real, fileName)
           const createdFilePath = path.join(dirPath.requested, path.basename(created))
@@ -353,9 +357,9 @@ export function registerFileHandlers(): void {
   registerConfinedHandle(
     FILE_CHANNELS.createFolder,
     {
-      schema: CreateEntryArgsSchema,
-      paths: { dirPath: { arg: 0, mode: 'project', mustExist: true, kind: 'directory', access: 'change' } },
-      handler: async (_ctx, [, folderName], { dirPath }) => {
+      schema: payloadArgs(CreateEntryRequestSchema),
+      paths: { dirPath: { arg: 0, key: 'dirPath', mode: 'project', mustExist: true, kind: 'directory', access: 'change' } },
+      handler: async (_ctx, [{ name: folderName }], { dirPath }) => {
         try {
           const created = await fileService.createFolder(dirPath.real, folderName)
           const createdFolderPath = path.join(dirPath.requested, path.basename(created))
@@ -377,8 +381,8 @@ export function registerFileHandlers(): void {
   registerConfinedHandle(
     FILE_CHANNELS.deleteFile,
     {
-      schema: PathArgsSchema,
-      paths: { filePath: { arg: 0, mode: 'project-entry', access: 'change' } },
+      schema: payloadArgs(PathRequestSchema),
+      paths: { filePath: { arg: 0, key: 'filePath', mode: 'project-entry', access: 'change' } },
       handler: async (_ctx, _args, { filePath }) => {
         try {
           await fileService.deleteFile(filePath.real)
@@ -397,8 +401,8 @@ export function registerFileHandlers(): void {
   registerConfinedHandle(
     FILE_CHANNELS.deleteFolder,
     {
-      schema: PathArgsSchema,
-      paths: { folderPath: { arg: 0, mode: 'project-entry', access: 'change' } },
+      schema: payloadArgs(PathRequestSchema),
+      paths: { folderPath: { arg: 0, key: 'filePath', mode: 'project-entry', access: 'change' } },
       handler: async (_ctx, _args, { folderPath }) => {
         try {
           await fileService.deleteFolder(folderPath.real)
@@ -417,9 +421,9 @@ export function registerFileHandlers(): void {
   registerConfinedHandle(
     FILE_CHANNELS.rename,
     {
-      schema: RenameArgsSchema,
-      paths: { oldPath: { arg: 0, mode: 'project-entry', access: 'change' } },
-      handler: async (_ctx, [, newName], { oldPath }) => {
+      schema: payloadArgs(RenameRequestSchema),
+      paths: { oldPath: { arg: 0, key: 'oldPath', mode: 'project-entry', access: 'change' } },
+      handler: async (_ctx, [{ newName }], { oldPath }) => {
         try {
           const renamed = await fileService.rename(oldPath.real, newName)
           const newPath = path.join(path.dirname(oldPath.requested), path.basename(renamed))
@@ -443,12 +447,19 @@ export function registerFileHandlers(): void {
   registerConfinedHandle(
     FILE_CHANNELS.moveItem,
     {
-      schema: MoveItemArgsSchema,
+      schema: payloadArgs(MoveItemRequestSchema),
       paths: {
-        sourcePath: { arg: 0, mode: 'project-entry', access: 'change' },
-        targetParentPath: { arg: 1, mode: 'project', mustExist: true, kind: 'directory', access: 'change' }
+        sourcePath: { arg: 0, key: 'sourcePath', mode: 'project-entry', access: 'change' },
+        targetParentPath: {
+          arg: 0,
+          key: 'targetParentPath',
+          mode: 'project',
+          mustExist: true,
+          kind: 'directory',
+          access: 'change'
+        }
       },
-      handler: async (_ctx, [, , newName, replaceExisting], { sourcePath, targetParentPath }) => {
+      handler: async (_ctx, [{ newName, replaceExisting }], { sourcePath, targetParentPath }) => {
         try {
           const moved = await fileService.moveItem(
             sourcePath.real,
@@ -477,15 +488,22 @@ export function registerFileHandlers(): void {
   registerConfinedHandle(
     FILE_CHANNELS.copyItem,
     {
-      schema: CopyItemArgsSchema,
+      schema: payloadArgs(CopyItemRequestSchema),
       paths: {
         // What the copy reads must lie inside the project (links followed) ...
-        sourcePath: { arg: 0, mode: 'project' },
+        sourcePath: { arg: 0, key: 'sourcePath', mode: 'project' },
         // ... but a link is copied as a link, so the copy starts from the entry itself
-        sourceEntry: { arg: 0, mode: 'project-entry' },
-        targetParentPath: { arg: 1, mode: 'project', mustExist: true, kind: 'directory', access: 'change' }
+        sourceEntry: { arg: 0, key: 'sourcePath', mode: 'project-entry' },
+        targetParentPath: {
+          arg: 0,
+          key: 'targetParentPath',
+          mode: 'project',
+          mustExist: true,
+          kind: 'directory',
+          access: 'change'
+        }
       },
-      handler: async (_ctx, [, , newName], { sourcePath, sourceEntry, targetParentPath }) => {
+      handler: async (_ctx, [{ newName }], { sourcePath, sourceEntry, targetParentPath }) => {
         try {
           // A folder link is copied as a link; a file link is copied as the content the
           // check resolved, so the target is not read again through the link
@@ -521,9 +539,9 @@ export function registerFileHandlers(): void {
   registerConfinedHandle(
     FILE_CHANNELS.checkConflict,
     {
-      schema: CheckConflictArgsSchema,
-      paths: { targetParentPath: { arg: 0, mode: 'project' } },
-      handler: async (_ctx, [, itemName], { targetParentPath }) => {
+      schema: payloadArgs(CheckConflictRequestSchema),
+      paths: { targetParentPath: { arg: 0, key: 'targetParentPath', mode: 'project' } },
+      handler: async (_ctx, [{ itemName }], { targetParentPath }) => {
         try {
           return await fileService.checkNameConflict(targetParentPath.real, itemName)
         } catch (error) {
@@ -551,9 +569,9 @@ export function registerFileHandlers(): void {
   registerConfinedHandle(
     FILE_CHANNELS.readImage,
     {
-      schema: ReadImageArgsSchema,
-      paths: { filePath: { arg: 0, mode: 'project' } },
-      handler: async (_ctx, [, knownVersion], { filePath }): Promise<ImageReadResponse> => {
+      schema: payloadArgs(ImageReadRequestSchema),
+      paths: { filePath: { arg: 0, key: 'filePath', mode: 'project' } },
+      handler: async (_ctx, [{ knownVersion }], { filePath }): Promise<ImageReadResponse> => {
         try {
           const parsed = ImageReadRequestSchema.safeParse({ filePath: filePath.real, knownVersion })
           if (!parsed.success) {
@@ -591,8 +609,8 @@ export function registerFileHandlers(): void {
   registerConfinedHandle(
     FILE_CHANNELS.revealInFileManager,
     {
-      schema: PathArgsSchema,
-      paths: { filePath: { arg: 0, mode: 'project', mustExist: true } },
+      schema: payloadArgs(PathRequestSchema),
+      paths: { filePath: { arg: 0, key: 'filePath', mode: 'project', mustExist: true } },
       senderGate: {
         allow: (event) => {
           const trusted = isTrustedSender(event)
@@ -629,8 +647,8 @@ export function registerFileHandlers(): void {
 
   // Validate file path exists and return info
   // Note: validates absolute paths from terminal output, inside the project or not.
-  // The projectRoot argument older callers still send is ignored; the answer says
-  // whether the file lies inside the project the main process has open (`insideProject`).
+  // The request carries no project root; the answer says whether the file lies
+  // inside the project the main process has open (`insideProject`).
   // This is acceptable because:
   // 1. Terminal output comes from user-initiated commands (not external input)
   // 2. The user can already see and access any file path shown in their terminal
@@ -638,10 +656,10 @@ export function registerFileHandlers(): void {
   registerConfinedHandle(
     FILE_CHANNELS.validatePath,
     {
-      schema: ValidatePathArgsSchema,
-      paths: { filePath: { arg: 0, mode: 'external', check: 'none' } },
+      schema: payloadArgs(ValidatePathRequestSchema),
+      paths: { filePath: { arg: 0, key: 'filePath', mode: 'external', check: 'none' } },
       onRefusal: (error): ValidatePathResult => ({ exists: false, error: error.message }),
-      handler: async ({ session: snapshot }, [trimmedPath], { filePath }): Promise<ValidatePathResult> => {
+      handler: async ({ session: snapshot }, [{ filePath: trimmedPath }], { filePath }): Promise<ValidatePathResult> => {
         try {
           // One string for the system-folder check and the stat: the canonical path
           const resolvedPath = filePath.requested

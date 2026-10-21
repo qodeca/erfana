@@ -37,6 +37,20 @@ test.describe('File channels check paths against the open project', () => {
     await rm(outside, { recursive: true, force: true })
   })
 
+  /** The request fields of each bridge method, in the order the cases below list their values. */
+  const FIELDS: Record<string, string[]> = {
+    writeFile: ['filePath', 'content'],
+    readDirectory: ['dirPath'],
+    readFile: ['filePath'],
+    createFile: ['dirPath', 'name'],
+    createFolder: ['dirPath', 'name'],
+    deleteFile: ['filePath'],
+    deleteFolder: ['filePath'],
+    rename: ['oldPath', 'newName'],
+    checkConflict: ['targetParentPath', 'itemName'],
+    copyItem: ['sourcePath', 'targetParentPath']
+  }
+
   /** Calls one bridge method in the renderer and returns the rejection message, or null. */
   const refusal = async (
     page: import('@playwright/test').Page,
@@ -44,17 +58,17 @@ test.describe('File channels check paths against the open project', () => {
     args: unknown[]
   ): Promise<string | null> =>
     page.evaluate(
-      async ([name, params]) => {
+      async ([name, request]) => {
         try {
-          const file = (window as unknown as { api: { file: Record<string, (...a: unknown[]) => Promise<unknown>> } })
+          const file = (window as unknown as { api: { file: Record<string, (r: unknown) => Promise<unknown>> } })
             .api.file
-          await file[name as string](...(params as unknown[]))
+          await file[name as string](request)
           return null
         } catch (error) {
           return error instanceof Error ? error.message : String(error)
         }
       },
-      [method, args] as const
+      [method, Object.fromEntries(FIELDS[method].map((field, index) => [field, args[index]]))] as const
     )
 
   const untouched = async (): Promise<void> => {

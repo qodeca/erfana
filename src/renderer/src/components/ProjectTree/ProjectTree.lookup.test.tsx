@@ -289,7 +289,10 @@ describe('ProjectTree root-inclusive lookups', () => {
 
     await dragEnd(`${PROJECT_PATH}/top.md`, PROJECT_PATH)
 
-    expect(fileApi.moveItem).toHaveBeenCalledWith(`${PROJECT_PATH}/top.md`, PROJECT_PATH)
+    expect(fileApi.moveItem).toHaveBeenCalledWith({
+      sourcePath: `${PROJECT_PATH}/top.md`,
+      targetParentPath: PROJECT_PATH
+    })
   })
 
   it('resolves a nested folder as a drop target', async () => {
@@ -297,10 +300,10 @@ describe('ProjectTree root-inclusive lookups', () => {
 
     await dragEnd(`${PROJECT_PATH}/top.md`, `${PROJECT_PATH}/folder1`)
 
-    expect(fileApi.moveItem).toHaveBeenCalledWith(
-      `${PROJECT_PATH}/top.md`,
-      `${PROJECT_PATH}/folder1`
-    )
+    expect(fileApi.moveItem).toHaveBeenCalledWith({
+      sourcePath: `${PROJECT_PATH}/top.md`,
+      targetParentPath: `${PROJECT_PATH}/folder1`
+    })
   })
 
   it('resolves a nested file to its parent directory', async () => {
@@ -310,10 +313,10 @@ describe('ProjectTree root-inclusive lookups', () => {
     // tree, not just the rendered rows.
     await dragEnd(`${PROJECT_PATH}/top.md`, `${PROJECT_PATH}/folder1/child.md`)
 
-    expect(fileApi.moveItem).toHaveBeenCalledWith(
-      `${PROJECT_PATH}/top.md`,
-      `${PROJECT_PATH}/folder1`
-    )
+    expect(fileApi.moveItem).toHaveBeenCalledWith({
+      sourcePath: `${PROJECT_PATH}/top.md`,
+      targetParentPath: `${PROJECT_PATH}/folder1`
+    })
   })
 
   it('resolves a top-level file to the project root (drop parity)', async () => {
@@ -323,7 +326,10 @@ describe('ProjectTree root-inclusive lookups', () => {
     // fallback must reproduce what the prepended-root copy used to supply.
     await dragEnd(`${PROJECT_PATH}/folder1`, `${PROJECT_PATH}/top.md`)
 
-    expect(fileApi.moveItem).toHaveBeenCalledWith(`${PROJECT_PATH}/folder1`, PROJECT_PATH)
+    expect(fileApi.moveItem).toHaveBeenCalledWith({
+      sourcePath: `${PROJECT_PATH}/folder1`,
+      targetParentPath: PROJECT_PATH
+    })
   })
 
   it('reports a miss for an unknown path instead of moving anything', async () => {
@@ -481,12 +487,11 @@ describe('ProjectTree paste keyboard shortcut', () => {
     })
 
     await waitFor(() => {
-      expect(fileApi.moveItem).toHaveBeenCalledWith(
-        `${PROJECT_PATH}/other.md`,
-        `${PROJECT_PATH}/folder1`,
-        undefined,
-        false
-      )
+      expect(fileApi.moveItem).toHaveBeenCalledWith({
+        sourcePath: `${PROJECT_PATH}/other.md`,
+        targetParentPath: `${PROJECT_PATH}/folder1`,
+        replaceExisting: false
+      })
     })
     expect(dialog.showConfirm).not.toHaveBeenCalled()
   })

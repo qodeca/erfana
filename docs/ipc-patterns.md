@@ -6,7 +6,7 @@
 ```typescript
 const api = {
   file: {
-    readFile: (path: string) => ipcRenderer.invoke('file:readFile', path)
+    readFile: (request: PathRequest) => ipcRenderer.invoke('file:readFile', request)
   }
 }
 contextBridge.exposeInMainWorld('api', api)
@@ -16,18 +16,19 @@ contextBridge.exposeInMainWorld('api', api)
 ```typescript
 import { registerHandle } from './registry'
 
-registerHandle('file:readFile', async (_event, filePath: string) => {
+registerHandle('file:readFile', async (_event, request: unknown) => {
   // ALWAYS validate input
-  if (!isValidPath(filePath)) throw new Error('Invalid path')
+  const { filePath } = PathRequestSchema.parse(request)
   return await fileService.readFile(filePath)
 })
 ```
 
+A channel that takes arguments takes **one request object**, validated by a strict Zod schema (`z.strictObject`, in `src/shared/ipc/*-schema.ts`): a key the schema does not list is refused, not ignored, and positional arguments are refused. The `file:*` channels register through `registerConfinedHandle`, whose `schema` is `payloadArgs(SomeRequestSchema)` and whose `paths` name the request key that holds each path (`{ arg: 0, key: 'filePath', mode: 'project' }`).
 Never call `ipcMain.handle(...)` or `ipcMain.on(...)` yourself. `src/main/ipc/registry.ts` (`registerHandle` / `registerHandleOnce` / `registerOn` / `registerOnce`, paired with `unregisterHandle` / `unregisterOn`) is the **only** place a global handler is registered, and every listener it registers is gated on the app's own top-level renderer (`isTrustedAppSender`, `src/main/ipc/senderValidation.ts`) before the payload is seen – an untrusted `invoke` rejects, an untrusted `send` is dropped and logged by origin. Importing `ipcMain` anywhere else under `src/main/**` is an ESLint error (`no-restricted-imports` in `eslint.config.mjs`), so the gate cannot be skipped by forgetting it. Frame-scoped listeners (`webContents.ipc`, `webContents.mainFrame.ipc`) are deliberately outside the registry; they carry their own per-call token or frame check. Why an explicit entry point rather than a wrapped `ipcMain`: see the header of `registry.ts` and [Security § Sender-frame gating](./security.md#sender-frame-gating).
 
 **3. Call from renderer**:
 ```typescript
-const content = await window.api.file.readFile('/path/to/file.md')
+const content = await fileGateway.readFile({ filePath: '/path/to/file.md' })
 ```
 
 ## Invoke round-trip for terminal writes (v0.3.3)
@@ -125,13 +126,13 @@ Note that several domains register through channel **constants**
 |---------|---------|
 | `file:openProject` | Open folder dialog, save to settings |
 | `file:openProjectByPath` | Open a project by an explicit path (recent projects, CLI) |
-| `file:closeProject` | Close the current project. Optional argument: the project session generation the renderer last saw; a close for an older generation does nothing |
+| `file:closeProject` | Close the current project. Optional request `{ expectedGeneration? }`: the project session generation the renderer last saw; a close for an older generation does nothing |
 | `file:getSession` | The open project as the main process holds it: `{ root, generation }`, or `null` when none is open |
 | `file:getProjectPath` | Get current project path |
 | `file:readDirectory` | Read directory tree. Single-flight per resolved path (#208): at most one walk of a path runs; every request made during it shares one follow-up walk that starts after it settles, and a failed walk rejects only its own requests. See [File watching § Tree refresh is single-flight](./file-watching/technical-details.md#tree-refresh-is-single-flight-208) |
 | `file:readFile` | Read file content |
 | `file:readImage` | Read an image as a base64 data URL, or answer `unchanged` when the caller's version still matches (#70) |
-| `file:writeFile` | Write file content; optional `{ createParentDirs: true }` (literal `true` only) recreates missing folders inside the project for the editor's "Save to restore it" |
+| `file:writeFile` | Write file content. Request `{ filePath, content, createParentDirs?, generation? }`: `createParentDirs` (literal `true` only) recreates missing folders inside the project for the editor's "Save to restore it"; `generation` is the project session generation the file was opened under, and a write is refused with `PROJECT_CHANGED` (before anything is touched) when the open project is a different one |
 | `file:getStats` | Get file metadata |
 | `file:exists` | Existence check |
 | `file:createFile` | Create new empty file |
@@ -142,7 +143,7 @@ Note that several domains register through channel **constants**
 | `file:moveItem` | Move file/folder – `fs.rename` with copy+delete fallback on EXDEV (drag-drop, cut/paste) |
 | `file:copyItem` | Copy file/folder with automatic `(1)`, `(2)` name numbering |
 | `file:checkConflict` | Case-insensitive name-conflict probe before a move/copy |
-| `file:validatePath` | Validate a path against the project boundary |
+| `file:validatePath` | Validate a path against the project boundary. Request `{ filePath }`; the answer's `insideProject` is computed from the open project, never from anything the renderer sends |
 | `file:revealInFileManager` | Reveal the item in Finder / Explorer |
 | `project:changed` | Event: project switched (main → renderer). Broadcast to every window by `ProjectService`, its only sender; payload `{ oldPath, newPath, generation }`, where `generation` is the project session's counter (+1 per open or close) |
 
@@ -153,9 +154,10 @@ Note the `file:` prefix – these are **not** `external-file:*`.
 | Channel | Purpose |
 |---------|---------|
 | `file:selectExternalFiles` | Open a dialog for files outside the project |
-| `file:validateExternal` | Validate an external file before copy/move |
-| `file:copyFromExternal` | Copy an external file into the project |
-| `file:moveFromExternal` | Move an external file into the project |
+| `file:validateExternal` | Validate an external file before copy/move. Request `{ sourcePath }` |
+| `file:copyFromExternal` | Copy an external file into the project. Request `{ sourcePath, targetFolder, conflictResolution? }`; the target is checked against the open project, and there is no project-root field |
+| `file:moveFromExternal` | Move an external file into the project (one confirmation box). Same request shape as copy |
+| `file:moveBatchFromExternal` | Move several external files with ONE confirmation box. Request `{ items: [{ sourcePath, conflictResolution? }], targetFolder }`, 1 to 100 distinct files; answers `{ results }`, one per item in order, or `{ results: [], error, errorCode }` when the whole request is refused. Cancel moves none of them; the confirmer's limits (ten files to a box, a queue of 100 per window, a rate cap on boxes) stay in force |
 
 ### File watching (`file-watcher-handlers.ts`)
 
@@ -416,7 +418,7 @@ To keep IPC payloads consistent across processes, shared zod schemas live at `sr
 - Document import schemas — `DocumentImportRequestSchema`, `DocumentImportOptionsSchema`, `DocumentImportProgress`, `DocumentImportResult`, `DependencyReadyEvent` (see `src/shared/ipc/import-schema.ts`); channel constants in `src/shared/ipc/import-channels.ts`
 - Image read schemas — the contract behind `file:readImage` (#70): `ImageReadRequestSchema` plus the `unchanged`/`ok`-discriminated `ImageReadResponse`, which lets the renderer skip a re-encode when its cached `version` still matches (see `src/shared/ipc/file-image-schema.ts`)
 - Image export schemas — `ImageExportRequestSchema` (`.strict()`, with the supported-extension allow-list expressed in the schema itself, so "unsupported format" needs no error code of its own) and the `success`-discriminated `ImageExportResponse`, whose failure branch **requires** both `errorCode` and `error`; plus the main-only harness render/result union (see `src/shared/ipc/image-export-schema.ts`); channel constants in `src/shared/ipc/image-export-channels.ts` (#73). The supported extensions and their MIME map are shared across the process boundary by `src/shared/ipc/image-formats.ts`, which both `main/services/file/imageRead.ts` and `renderer/src/utils/imageUtils.ts` import rather than re-declaring
-- File schemas — `FileNodeSchema` (project-tree node, recursive) and `FileStatsSchema` (`file:getStats` result), with the inferred `FileNode` / `FileStats` types that preload, `FileService`, `IProjectTreeApi` and the context-menu types re-export (see `src/shared/ipc/file-schema.ts`)
+- File schemas — `FileNodeSchema` (project-tree node, recursive) and `FileStatsSchema` (`file:getStats` result), with the inferred `FileNode` / `FileStats` types that preload, `FileService`, `IProjectTreeApi` and the context-menu types re-export (see `src/shared/ipc/file-schema.ts`); and the strict request objects of the `file:*` channels (`ReadDirectoryRequestSchema`, `PathRequestSchema`, `WriteFileRequestSchema`, …, with `payloadArgs()` wrapping one in the tuple `registerConfinedHandle` takes). The external-file requests and the batch move shape are in `src/shared/ipc/external-file-schema.ts`. The refusal codes a path check throws, and the reader that recovers a code from a rejected `invoke`, are in `src/shared/ipc/confinement.ts`; the renderer gateway turns them into a `FileGatewayError` with a `code`
 - Clipboard schemas — `ClipboardWriteTextSchema`, `CLIPBOARD_MAX_TEXT_LENGTH`, and the `ClipboardBridge` contract shared by the preload bridge and renderer service (see `src/shared/ipc/clipboard-schema.ts`); channel constants in `src/shared/ipc/clipboard-channels.ts`
 - Claude Code status schemas — the per-`terminalId` `ClaudeStatusSnapshot` contract consumed by `useClaudeStatusStore` and the register/nudge payloads (see `src/shared/ipc/claude-status-schema.ts`); channel constants in `src/shared/ipc/claude-status-channels.ts` (#216)
 - HTML preview schemas — the open/close/find/export and host-approval payloads plus the push-event shapes (see `src/shared/ipc/preview-schema.ts`), the versioned per-project allowlist contract (`src/shared/ipc/preview-settings-schema.ts`), and the `htmlPreview.enabled` global switch (`src/shared/ipc/global-settings-schema.ts`); channel constants in `src/shared/ipc/preview-channels.ts` (#74). Since #124 the same-tab navigation and resize-hold shapes live in `src/shared/ipc/preview-navigation-schema.ts` and the bridge contract in `src/shared/ipc/preview-bridge-types.ts`, because `preview-schema.ts` is at its size cap

@@ -27,7 +27,7 @@ import { redactPath, redactedLogError } from '../utils/redactUserInput'
 import { childPath } from '../utils/childPath'
 import { ATOMIC_TEMP_PREFIX } from '../utils/atomicWrite'
 import { normaliseResolved } from '../utils/pathCompare'
-import type { MoveConfirmer } from './ExternalMoveConfirmer'
+import type { MoveAnswer, MoveConfirmer } from './ExternalMoveConfirmer'
 import { externalSourceGrants as defaultGrants, type ExternalSourceGrants } from './ExternalSourceGrants'
 import type { IFileService } from '../interfaces/IFileService'
 import { fileService as defaultFileService } from './FileService'
@@ -58,6 +58,12 @@ export interface ExternalTarget {
   real: string
   /** The folder as the caller wrote it; returned paths are built from it */
   requested: string
+}
+
+/** One file of a batch move, with the way its name conflict was settled. */
+export interface ExternalMoveItem {
+  sourcePath: string
+  conflictResolution?: ConflictResolution
 }
 
 /**
@@ -97,8 +103,22 @@ export interface IExternalFileService {
     target: ExternalTarget,
     senderId: number | null,
     conflictResolution?: ConflictResolution,
-    recheckTarget?: () => Promise<boolean>
+    recheckTarget?: () => Promise<boolean>,
+    decided?: MoveAnswer
   ): Promise<ExternalFileMoveResponse>
+
+  /**
+   * Move several external files into the project after ONE confirmation: the
+   * files that can be moved at all are put to the user together, so a drop of
+   * many files shows one box, not one per file. Answers one result per item, in
+   * order; a cancelled or unavailable answer moves nothing.
+   */
+  moveBatchFromExternal(
+    items: readonly ExternalMoveItem[],
+    target: ExternalTarget,
+    senderId: number | null,
+    recheckTarget?: () => Promise<boolean>
+  ): Promise<ExternalFileMoveResponse[]>
 }
 
 /**
@@ -344,6 +364,56 @@ export class ExternalFileService implements IExternalFileService {
   }
 
   /**
+   * Move several external files into the project after one confirmation.
+   *
+   * The files that pass validation (and are not links, which are never moved)
+   * ask together, inside the confirmer's batching window, so they share a box.
+   * Each file then goes through the same steps as a single move, with its answer
+   * already in hand; the moves run one after another so name conflicts in the
+   * target folder are settled in order.
+   */
+  async moveBatchFromExternal(
+    items: readonly ExternalMoveItem[],
+    target: ExternalTarget,
+    senderId: number | null,
+    recheckTarget?: () => Promise<boolean>
+  ): Promise<ExternalFileMoveResponse[]> {
+    logger.info('Moving external files', { count: items.length })
+
+    const askable: string[] = []
+    for (const item of items) {
+      const validation = await this.validateExternalFile(item.sourcePath)
+      if (validation.valid && !validation.isSymlink) askable.push(item.sourcePath)
+    }
+
+    const answers = new Map<string, MoveAnswer>()
+    const confirmer = this.moveConfirmer
+    if (confirmer) {
+      await Promise.all(
+        askable.map(async (sourcePath) => {
+          answers.set(sourcePath, await confirmer.confirm(senderId, sourcePath, askable))
+        })
+      )
+    }
+
+    const results: ExternalFileMoveResponse[] = []
+    for (const item of items) {
+      results.push(
+        await this.moveFromExternal(
+          item.sourcePath,
+          target,
+          senderId,
+          item.conflictResolution,
+          recheckTarget,
+          // A file that was not put to the user fails its own checks before the answer is read
+          answers.get(item.sourcePath) ?? (confirmer ? undefined : 'unavailable')
+        )
+      )
+    }
+    return results
+  }
+
+  /**
    * Move an external file into the project
    * Copies file, then deletes source
    */
@@ -352,7 +422,8 @@ export class ExternalFileService implements IExternalFileService {
     target: ExternalTarget,
     senderId: number | null,
     conflictResolution?: ConflictResolution,
-    recheckTarget?: () => Promise<boolean>
+    recheckTarget?: () => Promise<boolean>,
+    decided?: MoveAnswer
   ): Promise<ExternalFileMoveResponse> {
     logger.info('Moving external file', { sourcePath: redactPath(sourcePath), targetFolder: redactPath(target.requested), conflictResolution })
 
@@ -388,10 +459,16 @@ export class ExternalFileService implements IExternalFileService {
 
       // The original is deleted below: every move waits for the user's answer to a
       // native box. A file picked in the dialog is named together with its pick.
-      const batch = await this.grants.batchOf(senderId, sourcePath)
-      const answer = this.moveConfirmer
-        ? await this.moveConfirmer.confirm(senderId, sourcePath, batch ?? undefined)
-        : 'unavailable'
+      // A batch move has asked for all its files at once (`decided`)
+      const answer: MoveAnswer =
+        decided ??
+        (this.moveConfirmer
+          ? await this.moveConfirmer.confirm(
+              senderId,
+              sourcePath,
+              (await this.grants.batchOf(senderId, sourcePath)) ?? undefined
+            )
+          : 'unavailable')
       if (answer !== 'move') {
         logger.info('Move not confirmed', { sourcePath: redactPath(sourcePath), answer })
         const code =
