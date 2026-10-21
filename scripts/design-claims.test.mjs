@@ -101,6 +101,37 @@ describe('design claims ledger', () => {
     })
   })
 
+  describe('the reduced-motion contract (#96, system/foundations/motion.html)', () => {
+    // The drift check above only proves the card matches the code: deleting the
+    // app-wide block and re-running `npm run design` would turn the count to 0
+    // and pass it. Twelve stylesheets once animated with no escape because the
+    // rule lived per file, so this floor is what keeps it from going back.
+    it('keeps one app-wide reduce block while any stylesheet animates', () => {
+      const fresh = evaluate(ROOT, {
+        animating: LEDGER['animating-stylesheets'],
+        entry: LEDGER['reduced-motion-entry-rules']
+      })
+      expect(fresh.animating).toBeGreaterThan(0)
+      expect(
+        fresh.entry,
+        'src/renderer/src/index.css lost its @media (prefers-reduced-motion: reduce) block'
+      ).toBeGreaterThanOrEqual(1)
+    })
+
+    it('ends every animation on every element inside that block', () => {
+      const css = readFileSync(path.join(ROOT, 'src/renderer/src/index.css'), 'utf8').replace(
+        /\/\*[\s\S]*?\*\//g,
+        ''
+      )
+      const block = /@media[^{]*prefers-reduced-motion:\s*reduce[^{]*\{([\s\S]*?\}\s*)\}/.exec(css)
+      expect(block, 'no reduce block in index.css').not.toBeNull()
+      const body = block[1]
+      expect(body).toMatch(/(^|[\s,])\*\s*,/)
+      expect(body).toMatch(/animation-iteration-count:\s*1\s*!important/)
+      expect(body).toMatch(/animation-duration:\s*[^;]*!important/)
+    })
+  })
+
   describe('the ledger and the cards agree', () => {
     it('has no card asking for a claim that does not exist', () => {
       const missing = [...CLAIM_IDS_IN_CARDS].filter(id => !(id in LEDGER))
