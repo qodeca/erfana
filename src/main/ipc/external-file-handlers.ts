@@ -304,11 +304,17 @@ export function registerExternalFileHandlers(
    *
    * The same checks as a single move, per file; the difference is that the files
    * that can be moved ask together, so the user sees one box ("Move N files into
-   * the project?") instead of one per file. Cancel moves none of them. The box
-   * limits stay the confirmer's: ten files to a box, a queue of 100 per window,
-   * a rate cap on boxes. The source paths are inside an array, so they are
-   * resolved here rather than in the `paths` list; a source that is refused
-   * answers its own failure and the others go on.
+   * the project?") instead of one per file. The box limits stay the confirmer's:
+   * a queue of 100 per window, a rate cap on boxes, and at most ten files named
+   * in a box. A drop of more than ten files is therefore a short SEQUENCE of
+   * boxes, but it is still one decision: Cancel in any of them closes the
+   * sequence (no further box) and moves none of the drop's files, including the
+   * ones an earlier box said Move to; only Move in every box moves them. Name
+   * conflicts are not asked here: the renderer settles them before the request
+   * (its per-file Skip leaves that one file out) and sends the answer per item.
+   * The source paths are inside an array, so they are resolved here rather than
+   * in the `paths` list; a source that is refused answers its own failure and
+   * the others go on.
    */
   registerConfinedHandle(
     FILE_CHANNELS.moveBatchFromExternal,
