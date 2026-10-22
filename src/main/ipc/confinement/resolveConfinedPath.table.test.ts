@@ -243,6 +243,14 @@ describe.skipIf(process.platform === 'win32')('resolveConfinedPath – POSIX tre
     expect(existing).toBe('OUTSIDE_PROJECT')
     expect(missing).toBe(existing)
   })
+
+  it('a path below an outside file gets the outside answer, not "not found"', async () => {
+    expect(await outcome(path.join(outside, 'hosts', 'child'), ctx, project)).toBe('OUTSIDE_PROJECT')
+    expect(await outcome(path.join(outside, 'hosts', 'a', 'b'), ctx, project)).toBe('OUTSIDE_PROJECT')
+    expect(await outcome(path.join(root, 'link', 'child'), ctx, project)).toBe('OUTSIDE_PROJECT')
+    // Inside the project the same shape is still "not found"
+    expect(await outcome(path.join(root, 'file.md', 'child'), ctx, project)).toBe('NOT_FOUND')
+  })
 })
 
 type ContextWithRoot = ConfinementContext

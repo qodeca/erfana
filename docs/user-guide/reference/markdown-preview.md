@@ -26,7 +26,7 @@ Preview renders GitHub-style Markdown, frontmatter, links and Mermaid diagrams b
 
 ## Images
 
-**What they do:** An image inside the project, referenced by a path relative to the document (`![logo](./assets/logo.svg)`), is shown in the preview and updates within about a second when the image file changes on disk – no need to reopen the tab. PNG, JPEG, GIF, WebP and SVG images up to 50 MB are shown, up to 64 per document. Web images (`https://…`) behave as before. An image outside the project, an absolute path or a `file:` address is not loaded: the preview shows its alt text in a box instead, and hovering the box says why. **How to reach them:** Open a Markdown file with images in Preview.
+**What they do:** An image inside the project, referenced by a path relative to the document (`![logo](./assets/logo.svg)`), is shown in the preview and updates within about a second when the image file changes on disk – no need to reopen the tab. PNG, JPEG, GIF, WebP and SVG images up to 16 MB are shown, up to 64 per document. Web images (`https://…`) behave as before. An image outside the project, an absolute path or a `file:` address is not loaded: the preview shows its alt text in a box instead, and hovering the box says why. **How to reach them:** Open a Markdown file with images in Preview.
 
 ## Mermaid diagrams
 

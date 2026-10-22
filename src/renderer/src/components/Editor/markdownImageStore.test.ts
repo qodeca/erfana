@@ -16,6 +16,7 @@ import {
   MARKDOWN_IMAGE_MAX_WAIT_MS,
   MARKDOWN_IMAGE_RELEASE_GRACE_MS,
   MARKDOWN_IMAGE_SETTLE_MS,
+  ImageByteBudget,
   MarkdownImageStore
 } from './markdownImageStore'
 
@@ -43,13 +44,15 @@ let disk: FakeDisk
 let directoryListeners: Set<() => void>
 let ownListeners: Set<() => void>
 let decode: ReturnType<typeof vi.fn>
+let budget: ImageByteBudget
 
-function makeStore(documentPath = '/p/docs/doc.md'): MarkdownImageStore {
+function makeStore(documentPath = '/p/docs/doc.md', platform: NodeJS.Platform = 'darwin'): MarkdownImageStore {
   const store = new MarkdownImageStore({
     read: disk.read,
     getProjectPath: async () => '/p',
     decode,
-    platform: () => 'darwin',
+    budget,
+    platform: () => platform,
     onDirectoryChanged: (callback) => {
       directoryListeners.add(callback)
       return () => directoryListeners.delete(callback)
@@ -78,6 +81,7 @@ beforeEach(() => {
   directoryListeners = new Set()
   ownListeners = new Set()
   decode = vi.fn(async () => {})
+  budget = new ImageByteBudget(1_000_000)
 })
 
 afterEach(() => {
@@ -312,5 +316,118 @@ describe('MarkdownImageStore – refresh', () => {
     off()
     expect(directoryListeners.size).toBe(0)
     expect(ownListeners.size).toBe(0)
+  })
+})
+
+describe('MarkdownImageStore – files, not spellings', () => {
+  it('shares one read and one cap slot between spellings of the same file', async () => {
+    disk.write('/p/docs/a.png', 'A1')
+    const store = makeStore()
+    for (const spelling of ['./a.png', 'a.png', './x/../a.png', './A.PNG']) store.subscribe(spelling, () => {})
+    await flush()
+    expect(disk.read).toHaveBeenCalledTimes(1)
+    expect(store.size).toBe(1)
+    expect(store.getView('./A.PNG')).toEqual({ status: 'ready', url: 'data:image/png;base64,A1' })
+  })
+
+  it('keeps names that differ in case apart on a case-sensitive platform', async () => {
+    disk.write('/p/docs/a.png', 'lower')
+    disk.write('/p/docs/A.png', 'upper')
+    const store = makeStore('/p/docs/doc.md', 'linux')
+    store.subscribe('./a.png', () => {})
+    store.subscribe('./A.png', () => {})
+    await flush()
+    expect(store.size).toBe(2)
+    expect(store.getView('./A.png')).toEqual({ status: 'ready', url: 'data:image/png;base64,upper' })
+  })
+
+  it('counts the cap in files, so extra spellings of loaded files are not refused', async () => {
+    const store = makeStore()
+    for (let i = 0; i < MAX_MARKDOWN_IMAGES_PER_DOCUMENT; i++) store.subscribe(`./${i}.png`, () => {})
+    store.subscribe('./x/../1.png', () => {})
+    await flush()
+    expect(store.size).toBe(MAX_MARKDOWN_IMAGES_PER_DOCUMENT)
+    expect(store.getView('./x/../1.png')).not.toEqual({ status: 'unavailable', reason: 'limit' })
+  })
+})
+
+describe('MarkdownImageStore – byte budget', () => {
+  it('shows an image that does not fit the shared budget as unavailable, and frees bytes on release', async () => {
+    budget = new ImageByteBudget(60)
+    disk.write('/p/docs/a.png', 'A'.repeat(20))
+    disk.write('/p/docs/b.png', 'B'.repeat(20))
+    const store = makeStore()
+    const offA = store.subscribe('./a.png', () => {})
+    store.subscribe('./b.png', () => {})
+    await flush()
+    // Each data URL is 22 + 20 characters: one fits, two do not
+    const views = [store.getView('./a.png'), store.getView('./b.png')].map((v) => v.status)
+    expect(views.sort()).toEqual(['ready', 'unavailable'])
+    expect(budget.held).toBe(42)
+
+    offA()
+    await flush(MARKDOWN_IMAGE_RELEASE_GRACE_MS)
+    directoryChanged()
+    await flush(MARKDOWN_IMAGE_SETTLE_MS)
+    expect(store.getView('./b.png').status).toBe('ready')
+  })
+
+  it('is shared: a second preview draws from the same budget', async () => {
+    budget = new ImageByteBudget(50)
+    disk.write('/p/docs/a.png', 'A'.repeat(20))
+    const first = makeStore()
+    const second = makeStore()
+    first.subscribe('./a.png', () => {})
+    second.subscribe('./a.png', () => {})
+    await flush()
+    expect(first.getView('./a.png').status).toBe('ready')
+    expect(second.getView('./a.png')).toEqual({ status: 'unavailable', reason: 'budget' })
+  })
+})
+
+describe('MarkdownImageStore – one read per change', () => {
+  it('reads undecodable bytes once, however many refreshes follow', async () => {
+    disk.write('/p/docs/a.png', 'BAD')
+    decode.mockRejectedValue(new Error('bad'))
+    const store = makeStore()
+    store.subscribe('./a.png', () => {})
+    await flush()
+    for (let i = 0; i < 3; i++) {
+      directoryChanged()
+      await flush(MARKDOWN_IMAGE_SETTLE_MS)
+    }
+    const answers = await Promise.all(disk.read.mock.results.map((r) => r.value))
+    expect(answers.filter((a) => a.status === 'ok')).toHaveLength(1)
+    expect(answers.filter((a) => a.status === 'unchanged')).toHaveLength(3)
+    expect(decode).toHaveBeenCalledTimes(1)
+    expect(store.getView('./a.png')).toEqual({ status: 'unavailable', reason: 'undecodable' })
+  })
+
+  it('keeps at most one read per file waiting, and none for a file released meanwhile', async () => {
+    const gates: Array<() => void> = []
+    disk.read.mockImplementation(
+      () =>
+        new Promise<MarkdownImageReadResponse>((resolve) => {
+          gates.push(() => resolve({ status: 'refused', reason: 'not-found' }))
+        })
+    )
+    const store = makeStore()
+    // Fill every slot, so the next reads wait
+    for (let i = 0; i < MARKDOWN_IMAGE_MAX_CONCURRENT_READS; i++) store.subscribe(`./busy${i}.png`, () => {})
+    const offWaiting = store.subscribe('./waiting.png', () => {})
+    await flush()
+    expect(disk.read).toHaveBeenCalledTimes(MARKDOWN_IMAGE_MAX_CONCURRENT_READS)
+
+    // Three refreshes while it waits add no further waiting read for it
+    store.refresh()
+    store.refresh()
+    store.refresh()
+    // And it is released before a slot frees
+    offWaiting()
+    await flush(MARKDOWN_IMAGE_RELEASE_GRACE_MS)
+    for (const open of gates.splice(0)) open()
+    await flush()
+    const asked = disk.read.mock.calls.map(([r]) => (r as MarkdownImageReadRequest).filePath)
+    expect(asked.filter((p) => p.endsWith('waiting.png'))).toHaveLength(0)
   })
 })

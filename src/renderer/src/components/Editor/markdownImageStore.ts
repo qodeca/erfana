@@ -6,7 +6,15 @@
  * A project-relative image cannot be loaded by the page itself (its base is the
  * app bundle), so each one is read over `markdown-image:read` – confined to the
  * project main-side – and shown as a `data:` URL. This store holds those URLs
- * for one preview panel, keyed by the document-relative path as written.
+ * for one preview panel.
+ *
+ * Two levels of key:
+ * - a **spelling** is a `src` as written (`./a.png`, `a.png`, `./x/../a.png`);
+ *   image elements subscribe by spelling;
+ * - a **file** is the project path a spelling resolves to, case-folded where
+ *   the file system usually is case-insensitive (macOS, Windows). Every
+ *   spelling of one file shares one read, one `data:` URL and one slot of
+ *   {@link MAX_MARKDOWN_IMAGES_PER_DOCUMENT}.
  *
  * Refresh, without a watch of its own:
  * - It listens to the signals the link checks already use
@@ -15,18 +23,18 @@
  *   and this window's own file operations (`fileStructureSignal.ts`). No file
  *   watch is added per image, so the per-file watcher budget is untouched.
  * - A burst of events is settled ({@link MARKDOWN_IMAGE_SETTLE_MS}, at most
- *   {@link MARKDOWN_IMAGE_MAX_WAIT_MS}), then every image on screen is asked
- *   again WITH the version it shows. The main process answers `unchanged`
- *   after a `stat`, so only images whose bytes changed are read, encoded and
- *   sent again. The batch carries no paths, which is why the check is per
- *   image rather than per event.
+ *   {@link MARKDOWN_IMAGE_MAX_WAIT_MS}), then every file is asked again WITH
+ *   the version of the last bytes received for it – also when those bytes did
+ *   not decode. The main process answers `unchanged` after an `fstat`, so only
+ *   files whose bytes changed are read, encoded and sent again.
  * - A hidden preview does nothing; it catches up once when shown
  *   ({@link MarkdownImageStore.setVisible}).
  *
- * Bounds: at most {@link MAX_MARKDOWN_IMAGES_PER_DOCUMENT} distinct images per
- * preview (the rest show their alt text), at most
- * {@link MARKDOWN_IMAGE_MAX_CONCURRENT_READS} reads in flight, and the main
- * process's 50 MB cap per image.
+ * Bounds: {@link MAX_MARKDOWN_IMAGES_PER_DOCUMENT} files per preview; at most
+ * {@link MARKDOWN_IMAGE_MAX_CONCURRENT_READS} reads in flight and at most one
+ * waiting per file; and a byte budget for the `data:` URLs shared by every
+ * preview in the window, hidden ones included ({@link ImageByteBudget},
+ * {@link MARKDOWN_IMAGE_BYTE_BUDGET}).
  *
  * New bytes are decoded off the DOM before they replace what is shown, so a
  * half-written file keeps the last good image instead of a broken one.
@@ -35,6 +43,7 @@
  */
 
 import {
+  MARKDOWN_IMAGE_BYTE_BUDGET,
   MAX_MARKDOWN_IMAGES_PER_DOCUMENT,
   isMarkdownImagePath,
   type MarkdownImageReadRequest,
@@ -61,6 +70,8 @@ export type MarkdownImageUnavailableReason =
   | MarkdownImageRefusal
   /** Past {@link MAX_MARKDOWN_IMAGES_PER_DOCUMENT} */
   | 'limit'
+  /** The window's previews already hold {@link MARKDOWN_IMAGE_BYTE_BUDGET} of images */
+  | 'budget'
   /** The bytes arrived but could not be decoded as an image */
   | 'undecodable'
 
@@ -70,8 +81,39 @@ export type MarkdownImageView =
   | { status: 'ready'; url: string }
   | { status: 'unavailable'; reason: MarkdownImageUnavailableReason }
 
-/** Shown for a key nobody has asked about yet. */
+/** Shown for a spelling nobody has asked about yet, or not resolved yet. */
 export const LOADING_VIEW: MarkdownImageView = Object.freeze({ status: 'loading' })
+
+/**
+ * `data:` URL characters held by every preview of a window. Counting the URL
+ * length rather than the file size is deliberate: the URL is what is held.
+ */
+export class ImageByteBudget {
+  private used = 0
+
+  constructor(private readonly limit: number) {}
+
+  /** Characters held now (for tests and measurements). */
+  get held(): number {
+    return this.used
+  }
+
+  /** Take `amount` if it fits; false (and nothing taken) when it does not. */
+  reserve(amount: number): boolean {
+    if (amount <= 0) return true
+    if (this.used + amount > this.limit) return false
+    this.used += amount
+    return true
+  }
+
+  /** Give back what {@link reserve} took. */
+  release(amount: number): void {
+    this.used = Math.max(0, this.used - amount)
+  }
+}
+
+/** One budget per window: every preview panel, hidden ones included, draws from it. */
+export const sharedImageByteBudget = new ImageByteBudget(MARKDOWN_IMAGE_BYTE_BUDGET)
 
 /** Collaborators, injectable for tests. */
 export interface MarkdownImageStoreDeps {
@@ -82,6 +124,7 @@ export interface MarkdownImageStoreDeps {
   onDirectoryChanged: (callback: () => void) => () => void
   onFileStructureChanged: (callback: () => void) => () => void
   platform: () => NodeJS.Platform
+  budget: ImageByteBudget
 }
 
 /** Decode off the DOM where the engine can; jsdom cannot, and is trusted. */
@@ -101,28 +144,52 @@ const defaultDeps: MarkdownImageStoreDeps = {
   onDirectoryChanged: (callback) =>
     window.api?.directoryWatch?.onDirectoryChanged?.(() => callback()) ?? (() => {}),
   onFileStructureChanged,
-  platform: getRendererPlatform
+  platform: getRendererPlatform,
+  budget: sharedImageByteBudget
 }
 
-interface Entry {
-  /** The document-relative path, as classified */
+/**
+ * The key one file is held under. macOS and Windows volumes are usually
+ * case-insensitive, so spellings that differ only in case share an entry; on
+ * macOS a composed and a decomposed name do too.
+ */
+function fileKeyOf(filePath: string, platform: NodeJS.Platform): string {
+  if (platform === 'darwin') return filePath.normalize('NFC').toLowerCase()
+  if (platform === 'win32') return filePath.toLowerCase()
+  return filePath
+}
+
+interface FileEntry {
   readonly key: string
+  readonly filePath: string
   view: MarkdownImageView
-  /** Version of the bytes in a `ready` view, echoed back on the next read */
+  /** Version of the last bytes received – decoded or not – echoed back on the next read */
   version?: string
-  /** Elements showing this image */
+  /** Budget characters this entry holds (its `data:` URL length) */
+  bytes: number
+  readonly spellings: Set<Spelling>
+  /** Bumped per read; an answer for an older read is dropped */
+  token: number
+  /** A read for this file is waiting for a slot */
+  queued: boolean
+}
+
+interface Spelling {
+  readonly key: string
+  /** Shown while not bound to a file (resolving, or refused before any read) */
+  view: MarkdownImageView
+  file: FileEntry | null
   refs: number
   readonly listeners: Set<() => void>
-  /** Bumped per load; an answer for an older load is dropped */
-  token: number
   releaseTimer: ReturnType<typeof setTimeout> | null
 }
 
 export class MarkdownImageStore {
   private readonly deps: MarkdownImageStoreDeps
-  private readonly entries = new Map<string, Entry>()
+  private readonly spellings = new Map<string, Spelling>()
+  private readonly files = new Map<string, FileEntry>()
   private documentPath: string | undefined
-  /** Bumped when the document changes; every load started before is stale */
+  /** Bumped when the document changes; work started before is stale */
   private generation = 0
   private projectRoot: Promise<string | null> | null = null
   private visible = true
@@ -139,26 +206,32 @@ export class MarkdownImageStore {
     this.deps = { ...defaultDeps, ...deps }
   }
 
-  /** The view for `key` (a document-relative path as classified). */
-  readonly getView = (key: string): MarkdownImageView => this.entries.get(key)?.view ?? LOADING_VIEW
+  /** The view for a spelling (a document-relative path as classified). */
+  readonly getView = (key: string): MarkdownImageView => {
+    const spelling = this.spellings.get(key)
+    if (!spelling) return LOADING_VIEW
+    return spelling.file ? spelling.file.view : spelling.view
+  }
 
-  /** Number of images held (for tests and measurements). */
+  /** Distinct files held (for tests and measurements). */
   get size(): number {
-    return this.entries.size
+    return this.files.size
   }
 
   /**
-   * Point the store at a document. A different path forgets every image and
-   * reads the ones on screen again, relative to the new document.
+   * Point the store at a document. A different path forgets every file and
+   * resolves the spellings on screen again, relative to the new document.
    */
   setDocument(documentPath: string | undefined): void {
     if (documentPath === this.documentPath) return
     this.documentPath = documentPath
     this.generation += 1
     this.projectRoot = null
-    for (const entry of this.entries.values()) {
-      entry.version = undefined
-      if (entry.refs > 0) this.load(entry)
+    for (const file of [...this.files.values()]) this.dropFile(file)
+    for (const spelling of this.spellings.values()) {
+      spelling.file = null
+      spelling.view = LOADING_VIEW
+      if (spelling.refs > 0) this.bind(spelling)
     }
   }
 
@@ -173,21 +246,17 @@ export class MarkdownImageStore {
   }
 
   /**
-   * Show `key` in one more element; the first one starts its read. Shaped for
-   * `useSyncExternalStore` with a per-key subscribe.
+   * Show a spelling in one more element; the first one resolves it and, for a
+   * new file, starts the read. Shaped for `useSyncExternalStore`.
    */
   subscribe(key: string, listener: () => void): () => void {
-    let entry = this.entries.get(key)
-    if (!entry) {
-      entry = { key, view: LOADING_VIEW, refs: 0, listeners: new Set(), token: 0, releaseTimer: null }
-      this.entries.set(key, entry)
-      if (this.liveCount() >= MAX_MARKDOWN_IMAGES_PER_DOCUMENT) {
-        entry.view = { status: 'unavailable', reason: 'limit' }
-      } else {
-        this.load(entry)
-      }
+    let spelling = this.spellings.get(key)
+    if (!spelling) {
+      spelling = { key, view: LOADING_VIEW, file: null, refs: 0, listeners: new Set(), releaseTimer: null }
+      this.spellings.set(key, spelling)
+      this.bind(spelling)
     }
-    const held = entry
+    const held = spelling
     if (held.releaseTimer) {
       clearTimeout(held.releaseTimer)
       held.releaseTimer = null
@@ -204,7 +273,7 @@ export class MarkdownImageStore {
       held.refs -= 1
       held.listeners.delete(listener)
       this.subscribers -= 1
-      if (held.refs === 0) this.scheduleRelease(key, held)
+      if (held.refs === 0) this.scheduleRelease(held)
       if (this.subscribers === 0 && this.detach) {
         this.detach()
         this.detach = null
@@ -212,12 +281,14 @@ export class MarkdownImageStore {
     }
   }
 
-  /** Re-check every image on screen now (debounce and visibility bypassed). */
+  /** Re-check every file now (debounce and visibility bypassed). */
   refresh(): void {
     this.clearSettle()
     this.pending = false
-    for (const entry of this.entries.values()) {
-      if (entry.refs > 0 && !this.isOverLimit(entry)) this.load(entry)
+    for (const file of this.files.values()) this.load(file)
+    // A spelling refused for the cap gets another chance once files went away
+    for (const spelling of this.spellings.values()) {
+      if (spelling.refs > 0 && !spelling.file && isReason(spelling.view, 'limit')) this.bind(spelling)
     }
   }
 
@@ -246,42 +317,72 @@ export class MarkdownImageStore {
     }
   }
 
-  private isOverLimit(entry: Entry): boolean {
-    return entry.view.status === 'unavailable' && entry.view.reason === 'limit'
+  /** Resolve a spelling to its file, sharing the entry with other spellings of it. */
+  private bind(spelling: Spelling): void {
+    const generation = this.generation
+    void this.getProjectRoot().then((root) => {
+      if (generation !== this.generation || this.spellings.get(spelling.key) !== spelling) return
+      if (spelling.file) return
+      const documentPath = this.documentPath
+      const platform = this.deps.platform()
+      const filePath =
+        documentPath && root ? resolveDocumentRelativePath(spelling.key, documentPath, root, platform) : null
+      if (!filePath) return this.setSpellingView(spelling, unavailable('outside-project'))
+      if (!isMarkdownImagePath(filePath)) return this.setSpellingView(spelling, unavailable('unsupported-type'))
+
+      const key = fileKeyOf(filePath, platform)
+      let file = this.files.get(key)
+      const isNew = !file
+      if (!file) {
+        if (this.files.size >= MAX_MARKDOWN_IMAGES_PER_DOCUMENT) {
+          return this.setSpellingView(spelling, unavailable('limit'))
+        }
+        file = { key, filePath, view: LOADING_VIEW, bytes: 0, spellings: new Set(), token: 0, queued: false }
+        this.files.set(key, file)
+      }
+      file.spellings.add(spelling)
+      spelling.file = file
+      this.notify(spelling)
+      if (isNew) this.load(file)
+    })
   }
 
-  /** Images that count against the per-document cap: shown, and not over it. */
-  private liveCount(): number {
-    let count = 0
-    for (const entry of this.entries.values()) {
-      if (entry.refs > 0 && !this.isOverLimit(entry)) count += 1
-    }
-    return count
-  }
-
-  private scheduleRelease(key: string, entry: Entry): void {
-    if (this.isOverLimit(entry)) {
-      this.entries.delete(key)
-      return
-    }
-    entry.releaseTimer = setTimeout(() => {
-      entry.releaseTimer = null
-      if (entry.refs === 0 && this.entries.get(key) === entry) this.entries.delete(key)
+  private scheduleRelease(spelling: Spelling): void {
+    spelling.releaseTimer = setTimeout(() => {
+      spelling.releaseTimer = null
+      if (spelling.refs > 0 || this.spellings.get(spelling.key) !== spelling) return
+      this.spellings.delete(spelling.key)
+      const { file } = spelling
+      spelling.file = null
+      if (file) {
+        file.spellings.delete(spelling)
+        if (file.spellings.size === 0) this.dropFile(file)
+      }
     }, MARKDOWN_IMAGE_RELEASE_GRACE_MS)
   }
 
-  private setView(entry: Entry, view: MarkdownImageView, version?: string): void {
-    entry.version = view.status === 'ready' ? version : undefined
-    const current = entry.view
-    // The same refusal again is no change: nothing re-renders for it
-    if (
-      current === view ||
-      (current.status === 'unavailable' && view.status === 'unavailable' && current.reason === view.reason)
-    ) {
-      return
-    }
-    entry.view = view
-    for (const listener of [...entry.listeners]) listener()
+  /** Forget a file and give its bytes back; a read in flight for it is dropped. */
+  private dropFile(file: FileEntry): void {
+    if (this.files.get(file.key) === file) this.files.delete(file.key)
+    file.token += 1
+    this.deps.budget.release(file.bytes)
+    file.bytes = 0
+  }
+
+  private notify(spelling: Spelling): void {
+    for (const listener of [...spelling.listeners]) listener()
+  }
+
+  private setSpellingView(spelling: Spelling, view: MarkdownImageView): void {
+    if (sameView(spelling.view, view)) return
+    spelling.view = view
+    this.notify(spelling)
+  }
+
+  private setFileView(file: FileEntry, view: MarkdownImageView): void {
+    if (sameView(file.view, view)) return
+    file.view = view
+    for (const spelling of file.spellings) this.notify(spelling)
   }
 
   private getProjectRoot(): Promise<string | null> {
@@ -290,83 +391,80 @@ export class MarkdownImageStore {
   }
 
   /** Run `task` when a read slot is free. */
-  private enqueue<T>(task: () => Promise<T>): Promise<T> {
-    return new Promise<T>((resolve, reject) => {
-      const run = (): void => {
-        this.inFlight += 1
-        task()
-          .then(resolve, reject)
-          .finally(() => {
-            this.inFlight -= 1
-            this.queue.shift()?.()
-          })
-      }
-      if (this.inFlight < MARKDOWN_IMAGE_MAX_CONCURRENT_READS) run()
-      else this.queue.push(run)
-    })
+  private enqueue(task: () => Promise<void>): void {
+    const run = (): void => {
+      this.inFlight += 1
+      void task().finally(() => {
+        this.inFlight -= 1
+        this.queue.shift()?.()
+      })
+    }
+    if (this.inFlight < MARKDOWN_IMAGE_MAX_CONCURRENT_READS) run()
+    else this.queue.push(run)
   }
 
-  /** Read (or re-check) one image and publish what it should show. */
-  private load(entry: Entry): void {
-    const { key } = entry
+  /** Read (or re-check) one file; at most one read per file waits for a slot. */
+  private load(file: FileEntry): void {
     if (!this.visible) {
       // Read once shown: a hidden preview costs no main-process encode
       this.pending = true
       return
     }
-    const token = ++entry.token
-    const generation = this.generation
-    const documentPath = this.documentPath
-    const isStale = (): boolean =>
-      entry.token !== token || this.generation !== generation || this.entries.get(key) !== entry
-
-    void (async () => {
-      const root = await this.getProjectRoot()
-      if (isStale()) return
-      const filePath =
-        documentPath && root
-          ? resolveDocumentRelativePath(key, documentPath, root, this.deps.platform())
-          : null
-      if (!filePath) {
-        this.setView(entry, { status: 'unavailable', reason: 'outside-project' })
-        return
-      }
-      if (!isMarkdownImagePath(filePath)) {
-        this.setView(entry, { status: 'unavailable', reason: 'unsupported-type' })
-        return
-      }
-
-      const shown = entry.view.status === 'ready'
-      let response: MarkdownImageReadResponse
+    if (file.queued) return
+    file.queued = true
+    this.enqueue(async () => {
+      file.queued = false
+      // The file may have been released, or the document changed, while waiting
+      if (this.files.get(file.key) !== file) return
+      const token = ++file.token
+      const isStale = (): boolean => file.token !== token || this.files.get(file.key) !== file
       try {
-        response = await this.enqueue(() =>
-          this.deps.read({ filePath, knownVersion: shown ? entry.version : undefined })
-        )
+        await this.read(file, isStale)
       } catch (error) {
-        if (isStale()) return
         logger.warn('Markdown image read failed', { error: String(error) })
         // A transport failure keeps the last good image rather than blanking it
-        if (!shown) this.setView(entry, { status: 'unavailable', reason: 'unreadable' })
-        return
+        if (!isStale() && file.view.status !== 'ready') this.setFileView(file, unavailable('unreadable'))
       }
-      if (isStale()) return
+    })
+  }
 
-      if (response.status === 'unchanged') return
-      if (response.status === 'refused') {
-        this.setView(entry, { status: 'unavailable', reason: response.reason })
-        return
-      }
-      try {
-        await this.deps.decode(response.dataUrl)
-      } catch {
-        if (isStale()) return
-        // Half-written or corrupt: keep what is shown; the next change re-checks
-        if (!shown) this.setView(entry, { status: 'unavailable', reason: 'undecodable' })
-        return
-      }
+  private async read(file: FileEntry, isStale: () => boolean): Promise<void> {
+    const response = await this.deps.read({ filePath: file.filePath, knownVersion: file.version })
+    if (isStale() || response.status === 'unchanged') return
+
+    if (response.status === 'refused') {
+      file.version = undefined
+      this.deps.budget.release(file.bytes)
+      file.bytes = 0
+      this.setFileView(file, unavailable(response.reason))
+      return
+    }
+
+    // Remembered whatever the decode says: the same bytes are not asked for again
+    file.version = response.version
+    try {
+      await this.deps.decode(response.dataUrl)
+    } catch {
       if (isStale()) return
-      this.setView(entry, { status: 'ready', url: response.dataUrl }, response.version)
-    })()
+      // Half-written or corrupt: keep what is shown; the next change re-checks
+      if (file.view.status !== 'ready') this.setFileView(file, unavailable('undecodable'))
+      return
+    }
+    if (isStale()) return
+
+    const size = response.dataUrl.length
+    if (!this.deps.budget.reserve(size - file.bytes)) {
+      // Over the window's budget: show the alt text, and forget the version so
+      // a later re-check reads again once room is free
+      this.deps.budget.release(file.bytes)
+      file.bytes = 0
+      file.version = undefined
+      this.setFileView(file, unavailable('budget'))
+      return
+    }
+    if (size < file.bytes) this.deps.budget.release(file.bytes - size)
+    file.bytes = size
+    this.setFileView(file, { status: 'ready', url: response.dataUrl })
   }
 
   private clearSettle(): void {
@@ -374,4 +472,17 @@ export class MarkdownImageStore {
     this.settleTimer = null
     this.burstStartedAt = null
   }
+}
+
+function unavailable(reason: MarkdownImageUnavailableReason): MarkdownImageView {
+  return { status: 'unavailable', reason }
+}
+
+function isReason(view: MarkdownImageView, reason: MarkdownImageUnavailableReason): boolean {
+  return view.status === 'unavailable' && view.reason === reason
+}
+
+/** The same refusal again is no change: nothing re-renders for it. */
+function sameView(a: MarkdownImageView, b: MarkdownImageView): boolean {
+  return a === b || (a.status === 'unavailable' && b.status === 'unavailable' && a.reason === b.reason)
 }

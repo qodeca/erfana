@@ -75,7 +75,7 @@ export class ImageTooLargeError extends Error {
  * the platform records, and the inode so a swapped-in file with identical size
  * and preserved mtime is still a different version. Callers treat it as opaque.
  */
-function formatVersion(stats: BigIntStats): string {
+export function formatVersion(stats: BigIntStats): string {
   return `${stats.size}:${stats.mtimeNs}:${stats.ino}`
 }
 

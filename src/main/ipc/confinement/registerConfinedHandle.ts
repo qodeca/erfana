@@ -23,7 +23,14 @@ import type {
 } from '../../services/session/ProjectSession'
 import { registerHandle } from '../registry'
 import { ConfinementError, OUTSIDE_PROJECT_CHANGE_MESSAGE } from './ConfinementError'
-import { resolveConfinedPath, type PathPolicy, type ResolvedPath } from './resolveConfinedPath'
+import {
+  defaultConfinementDeps,
+  isInsideRoot,
+  resolveConfinedPath,
+  type ConfinementDeps,
+  type PathPolicy,
+  type ResolvedPath
+} from './resolveConfinedPath'
 
 /**
  * A policy plus the position of the argument it governs. `key` names the
@@ -78,6 +85,14 @@ export interface ConfinedHandleDefinition<
    * is re-asked on every project change, #71).
    */
   refusalLogLevel?: 'warn' | 'debug'
+  /**
+   * Refuse a `project`-mode path that is not lexically inside the project root
+   * (as opened, or canonical) before anything is asked of the file system, so
+   * every such path gets one answer without a single `lstat` (#71).
+   */
+  lexicalPrecheck?: boolean
+  /** File system and path flavour for the checks; the real ones by default (tests inject fakes) */
+  confinementDeps?: ConfinementDeps
   handler: (
     ctx: ConfinedHandlerContext,
     args: TArgs,
@@ -96,12 +111,31 @@ export function getConfinedChannels(): ReadonlyMap<string, readonly string[]> {
 }
 
 /** The paths of one call, checked in the order they were listed. */
+/**
+ * The lexical half of the project check: `value` names a place under the
+ * root as opened or as canonicalised. Anything that is not an absolute
+ * string is left to {@link resolveConfinedPath}, which refuses it as invalid.
+ */
+function refuseLexicallyOutside(
+  value: unknown,
+  snapshot: ProjectSessionSnapshot | null,
+  deps: ConfinementDeps
+): void {
+  if (!snapshot || typeof value !== 'string' || value.includes('\0') || !deps.path.isAbsolute(value)) return
+  const lexical = deps.path.resolve(value)
+  const inside =
+    isInsideRoot(lexical, snapshot.root, snapshot.caseSensitive, deps) ||
+    isInsideRoot(lexical, snapshot.realRoot, snapshot.caseSensitive, deps)
+  if (!inside) throw new ConfinementError('OUTSIDE_PROJECT')
+}
+
 async function resolveAll<TPaths extends string>(
   paths: Record<TPaths, PathBinding>,
   optionalNames: ReadonlySet<string>,
   args: readonly unknown[],
   snapshot: ProjectSessionSnapshot | null,
-  senderId: number | null
+  senderId: number | null,
+  options: { lexicalPrecheck: boolean; deps: ConfinementDeps }
 ): Promise<Record<TPaths, ResolvedPath>> {
   const resolved = {} as Record<TPaths, ResolvedPath>
   for (const name of Object.keys(paths) as TPaths[]) {
@@ -109,10 +143,14 @@ async function resolveAll<TPaths extends string>(
     const value = key === undefined ? args[arg] : (args[arg] as Record<string, unknown> | undefined)?.[key]
     if (optionalNames.has(name) && value === undefined) continue
     try {
+      if (options.lexicalPrecheck && policy.mode === 'project') {
+        refuseLexicallyOutside(value, snapshot, options.deps)
+      }
       resolved[name] = await resolveConfinedPath(
         value,
         { session: snapshot, senderId },
-        policy as PathPolicy
+        policy as PathPolicy,
+        options.deps
       )
     } catch (error) {
       if (access === 'change' && error instanceof ConfinementError && error.code === 'OUTSIDE_PROJECT') {
@@ -168,7 +206,11 @@ export function registerConfinedHandle<
         optionalNames,
         parsed.data,
         snapshot,
-        event.sender?.id ?? null
+        event.sender?.id ?? null,
+        {
+          lexicalPrecheck: definition.lexicalPrecheck === true,
+          deps: definition.confinementDeps ?? defaultConfinementDeps
+        }
       )
       const result = await definition.handler(
         { session: snapshot, sender: event.sender, event },

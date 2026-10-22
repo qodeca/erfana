@@ -125,18 +125,27 @@ e2e test `e2e/preview-images.e2e.ts` now pins the fixed behaviour).
 | Relative to the document (`./a.png`, `a.png`, `../img/a.svg`) | Read by the main process over `markdown-image:read`, confined to the open project (links and junctions resolved; one that leads out is refused), and shown as a `data:` URL in an `<img>`. |
 | Absolute or rooted path, drive or UNC path, protocol-relative `//host/…`, `file:`, `data:`, any other scheme, or a relative path that climbs out of the project | Never loaded: the alt text is shown in a placeholder, with the reason as tooltip. |
 
-- **`<picture>`:** a `<source srcset>` is kept only when every candidate is `http(s)`; otherwise
-  it is dropped and the picture falls back to its `<img>`, which follows the table above.
-- **Types and caps:** PNG, JPEG, GIF, WebP, SVG only; 50 MB per image (the image viewer's
-  cap); 64 distinct images per document; 4 reads in flight per preview.
+- **`<picture>`:** a `<source>` is never rendered, so the picture falls back to its `<img>`,
+  which follows the table above.
+- **Types and caps:** PNG, JPEG, GIF, WebP, SVG only, and regular files only. 16 MB per image –
+  lower than the image viewer's 50 MB, because the document picks what is read. The main
+  process opens the file once, checks that handle with `fstat`, and reads at most the cap plus
+  one byte from it.
+- **Files, not spellings:** `./a.png`, `a.png` and `./x/../a.png` share one read, one `data:` URL
+  and one slot. Paths are case-folded on macOS and Windows. A preview holds at most 64 files and
+  keeps at most 4 reads in flight, with at most one waiting per file.
+- **Memory budget:** all Markdown previews in a window, hidden ones included, share 128 MB of
+  `data:` URLs. An image that does not fit shows its alt text, and is retried on the next
+  change once other images have been released.
 - **SVG** is always an `<img src="data:image/svg+xml;base64,…">`, never inlined into the DOM, so
   its scripts do not run and it fetches nothing.
 - **CSP:** unchanged. The page already allows `img-src data:`; no custom protocol was added.
 - **Refresh:** no new watch. `markdownImageStore.ts` listens to the same signals as the link
   checks – every `directory-watch:changed` batch (content edits included) and this window's own
   file operations – settles a burst (300 ms, at most 2 s), then asks again for every image on
-  screen *with the version it shows*. The main process answers `unchanged` after a `stat`, so
-  only changed images are re-read and re-sent. New bytes are decoded off the DOM first; a
+  screen *with the version of the last bytes it received* (also when they did not decode). The
+  main process answers `unchanged` after an `fstat`, so only changed images are re-read and
+  re-sent. New bytes are decoded off the DOM first; a
   half-written file keeps the last good image. The `<img>` element is updated in place.
 - **Hidden previews** (the `isVisible` prop) read nothing; they catch up once when shown.
 - **Scroll sync and export:** an arriving image reports `onRendered({ reason: 'image' })`, which

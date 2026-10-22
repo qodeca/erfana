@@ -12,7 +12,8 @@
  *
  * Narrower than `file:readImage` on purpose, because a document – not the
  * user – chooses what is read:
- * - only the five web image types ({@link MARKDOWN_IMAGE_EXTENSIONS});
+ * - only the five web image types ({@link MARKDOWN_IMAGE_EXTENSIONS}), only
+ *   regular files, and a lower size cap ({@link MARKDOWN_IMAGE_MAX_BYTES});
  * - a refusal is an answer (`status: 'refused'`), not a rejected invoke, so a
  *   document full of missing images costs no error logging in either process.
  *
@@ -41,6 +42,20 @@ export const MARKDOWN_IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.web
  * thousands of `data:` URLs in memory or queue thousands of reads.
  */
 export const MAX_MARKDOWN_IMAGES_PER_DOCUMENT = 64
+
+/**
+ * Largest image file the preview reads: 16 MB. Lower than the image viewer's
+ * 50 MB, because a document – not the user – chooses what is read, and a
+ * preview holds several images at once (each ~4/3 its size as a `data:` URL).
+ */
+export const MARKDOWN_IMAGE_MAX_BYTES = 16 * 1024 * 1024
+
+/**
+ * Total `data:` URL characters one window's Markdown previews hold: 128 MB.
+ * Shared by every preview panel, hidden ones included; an image that would
+ * go over it shows its alt text until others are released.
+ */
+export const MARKDOWN_IMAGE_BYTE_BUDGET = 128 * 1024 * 1024
 
 /** Longest path accepted, matching the confinement check's limit. */
 const MAX_PATH_CHARS = 32_767
@@ -71,11 +86,11 @@ export type MarkdownImageReadRequest = z.infer<typeof MarkdownImageReadRequestSc
 export const MARKDOWN_IMAGE_REFUSALS = [
   /** Outside the open project, through a link or otherwise, or no project open */
   'outside-project',
-  /** Not there, or not a file */
+  /** Not there, or not a regular file */
   'not-found',
   /** Not one of {@link MARKDOWN_IMAGE_EXTENSIONS} */
   'unsupported-type',
-  /** Over the image viewer's size cap */
+  /** Over {@link MARKDOWN_IMAGE_MAX_BYTES} */
   'too-large',
   /** Malformed request, untrusted sender, or the read failed */
   'unreadable'

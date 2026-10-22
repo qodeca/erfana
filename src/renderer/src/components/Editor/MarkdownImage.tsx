@@ -31,7 +31,10 @@ import {
   useRef,
   useSyncExternalStore
 } from 'react'
-import { MAX_MARKDOWN_IMAGES_PER_DOCUMENT } from '../../../../shared/ipc/markdown-image-schema'
+import {
+  MARKDOWN_IMAGE_MAX_BYTES,
+  MAX_MARKDOWN_IMAGES_PER_DOCUMENT
+} from '../../../../shared/ipc/markdown-image-schema'
 import { classifyImageSource } from './markdownImageSource'
 import type { MarkdownImageStore, MarkdownImageUnavailableReason, MarkdownImageView } from './markdownImageStore'
 import { PreviewWorkContext } from './previewWork'
@@ -52,10 +55,11 @@ export const MARKDOWN_IMAGE_MESSAGES: Readonly<Record<MarkdownImagePlaceholderRe
   'outside-project': 'Image not shown: it is outside the project',
   'not-found': 'Image not found',
   'unsupported-type': 'Image not shown: only PNG, JPEG, GIF, WebP and SVG images are shown',
-  'too-large': 'Image not shown: it is larger than 50 MB',
+  'too-large': `Image not shown: it is larger than ${MARKDOWN_IMAGE_MAX_BYTES / (1024 * 1024)} MB`,
   unreadable: 'Image could not be read',
   undecodable: 'Image could not be displayed',
-  limit: `Image not shown: a preview shows at most ${MAX_MARKDOWN_IMAGES_PER_DOCUMENT} images`
+  limit: `Image not shown: a preview shows at most ${MAX_MARKDOWN_IMAGES_PER_DOCUMENT} images`,
+  budget: 'Image not shown: open previews already hold as many images as they can'
 }
 
 /** Props the preview's `img` renderer passes on. */

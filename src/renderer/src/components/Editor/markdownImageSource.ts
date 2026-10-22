@@ -70,21 +70,3 @@ export function classifyImageSource(src: string | undefined): MarkdownImageSourc
   return { kind: 'relative', path: decoded.replace(/\\/g, '/') }
 }
 
-/**
- * Whether every candidate in a `<source srcset>` is a remote address.
- *
- * A `srcset` is resolved by the page exactly like an `<img src>`, and the
- * sanitizer does not check its scheme, so a `<picture>` source is kept only
- * when all its candidates are `http:` / `https:`. Otherwise the preview drops
- * the `<source>` and the `<picture>` falls back to its `<img>`, which goes
- * through {@link classifyImageSource}.
- *
- * @param srcSet - The `srcset` attribute (may be undefined)
- */
-export function isRemoteSrcSet(srcSet: string | undefined): boolean {
-  const candidates = (srcSet ?? '')
-    .split(',')
-    .map((candidate) => candidate.trim().split(/\s+/)[0] ?? '')
-    .filter((url) => url !== '')
-  return candidates.length > 0 && candidates.every((url) => REMOTE.test(url))
-}

@@ -5,7 +5,7 @@
  * or never loads (#71).
  */
 import { describe, it, expect } from 'vitest'
-import { classifyImageSource, isRemoteSrcSet } from './markdownImageSource'
+import { classifyImageSource } from './markdownImageSource'
 
 describe('classifyImageSource', () => {
   it.each([
@@ -45,20 +45,5 @@ describe('classifyImageSource', () => {
     ['only a query', '?x=1']
   ])('never loads %s', (_label, src) => {
     expect(classifyImageSource(src)).toEqual({ kind: 'blocked' })
-  })
-})
-
-describe('isRemoteSrcSet', () => {
-  it.each([
-    ['https://x.test/a.png 1x, https://x.test/b.png 2x', true],
-    ['http://x.test/a.png', true],
-    ['./a.png 1x', false],
-    ['https://x.test/a.png 1x, ./b.png 2x', false],
-    ['file:///etc/a.png', false],
-    ['//server/share/a.png', false],
-    ['', false],
-    [undefined, false]
-  ])('isRemoteSrcSet(%s) is %s', (srcSet, expected) => {
-    expect(isRemoteSrcSet(srcSet)).toBe(expected)
   })
 })

@@ -123,17 +123,17 @@ describe('MarkdownPreview – project images (#71)', () => {
     expect(container.querySelector('img[alt="raw"]')?.getAttribute('src')).toBe('data:image/png;base64,PNG1')
   })
 
-  it('drops a <picture> source that is not remote, so the picture falls back to its checked <img>', async () => {
+  it.each([
+    ['a local srcset', 'file:///etc/a.png 1x'],
+    ['a remote srcset', 'https://example.test/a.png 1x'],
+    ['a srcset behind U+00A0', '\u00a0file:///etc/a.png 1x'],
+    ['a srcset behind U+FEFF', '\ufefffile:///etc/a.png 1x'],
+    ['a srcset behind U+3000', '\u3000file:///etc/a.png 1x']
+  ])('never renders a <picture> source (%s); the picture falls back to its checked <img>', async (_label, srcset) => {
     const { container } = await mount(
-      [
-        '<picture><source srcset="file:///etc/a.png 1x"><img src="./assets/pixel.png" alt="local"></picture>',
-        '',
-        '<picture><source srcset="https://example.test/a.png 1x"><img src="https://example.test/b.png" alt="web"></picture>',
-        ''
-      ].join('\n')
+      `<picture><source srcset="${srcset}"><img src="./assets/pixel.png" alt="local"></picture>\n`
     )
-    const sources = Array.from(container.querySelectorAll('source')).map((s) => s.getAttribute('srcset'))
-    expect(sources).toEqual(['https://example.test/a.png 1x'])
+    expect(container.querySelectorAll('source')).toHaveLength(0)
     expect(container.querySelector('img[alt="local"]')?.getAttribute('src')).toBe('data:image/png;base64,PNG1')
   })
 

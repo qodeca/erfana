@@ -12,15 +12,19 @@
  * 2. **`isTrustedSender`** – the app's own top-level frame only, checked before
  *    the payload is looked at;
  * 3. **Zod** – `{ filePath, knownVersion? }`, strict;
- * 4. **confinement** – `resolveConfinedPath` in `project` mode: the nearest
+ * 4. **confinement** – a path not lexically inside the project root is
+ *    refused before the file system is asked anything; then
+ *    `resolveConfinedPath` in `project` mode: the nearest
  *    existing ancestor is canonicalised, links and junctions included, and must
  *    lie inside the open project; the file must exist and be a file;
  * 5. **type** – the requested AND the canonical path must both end in one of
  *    the five web image extensions, so an in-project link named `x.png` cannot
  *    hand back some other in-project file.
  *
- * Then `readImage` (shared with the image viewer) applies the same 50 MB cap and
- * the same stat-before-read version token. Every refusal is an answer, never a
+ * Then `readDocumentImage` opens the file once, refuses anything but a regular
+ * file from `fstat` on that handle, and reads at most
+ * `MARKDOWN_IMAGE_MAX_BYTES + 1` bytes, with the same version token as the
+ * image viewer. Every refusal is an answer, never a
  * rejected invoke, and none carries a path or says whether something outside
  * the project exists.
  *
@@ -33,6 +37,7 @@
 import type { IpcMainInvokeEvent } from 'electron'
 import { MARKDOWN_IMAGE_CHANNELS } from '../../shared/ipc/markdown-image-channels'
 import {
+  MARKDOWN_IMAGE_MAX_BYTES,
   MarkdownImageReadRequestSchema,
   isMarkdownImagePath,
   type MarkdownImageReadResponse,
@@ -40,11 +45,13 @@ import {
 } from '../../shared/ipc/markdown-image-schema'
 import { payloadArgs } from '../../shared/ipc/file-schema'
 import { logger } from '../services/LoggingService'
-import { readImage, ImageTooLargeError } from '../services/file/imageRead'
+import { ImageTooLargeError } from '../services/file/imageRead'
+import { NotARegularFileError, readDocumentImage } from '../services/file/readDocumentImage'
 import type { ProjectSession } from '../services/session/ProjectSession'
 import { redactPath, redactedLogError } from '../utils/redactUserInput'
 import { registerConfinedHandle } from './confinement/registerConfinedHandle'
 import type { ConfinementError } from './confinement/ConfinementError'
+import type { ConfinementDeps } from './confinement/resolveConfinedPath'
 import { isTrustedSender } from './senderValidation'
 
 /** The single refusal shape this channel returns. */
@@ -88,8 +95,12 @@ function allowSender(event: IpcMainInvokeEvent): boolean {
  * Register the Markdown image IPC handler.
  *
  * @param session - The project session the confinement check reads
+ * @param confinementDeps - File system and path flavour for the path check (tests inject fakes)
  */
-export function registerMarkdownImageHandlers(session: ProjectSession): void {
+export function registerMarkdownImageHandlers(
+  session: ProjectSession,
+  confinementDeps?: ConfinementDeps
+): void {
   registerConfinedHandle(
     MARKDOWN_IMAGE_CHANNELS.read,
     {
@@ -101,15 +112,18 @@ export function registerMarkdownImageHandlers(session: ProjectSession): void {
       // A missing image is routine for a document being written; refusals stay
       // out of the warning log.
       refusalLogLevel: 'debug',
+      lexicalPrecheck: true,
+      confinementDeps,
       onRefusal: (error) => refusalForConfinement(error),
       handler: async (_ctx, [{ knownVersion }], { filePath }): Promise<MarkdownImageReadResponse> => {
         if (!isMarkdownImagePath(filePath.requested) || !isMarkdownImagePath(filePath.real)) {
           return refuse('unsupported-type')
         }
         try {
-          return await readImage(filePath.real, knownVersion)
+          return await readDocumentImage(filePath.real, knownVersion, MARKDOWN_IMAGE_MAX_BYTES)
         } catch (error) {
           if (error instanceof ImageTooLargeError) return refuse('too-large')
+          if (error instanceof NotARegularFileError) return refuse('not-found')
           // A raw Node error can carry an absolute path: logged redacted, never returned
           logger.debug('markdown-image:read failed', { error: redactedLogError(error)?.message })
           return refuse('unreadable')

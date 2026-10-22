@@ -50,7 +50,6 @@ import { PreviewWorkContext, PreviewWorkTracker } from './previewWork'
 import { LinkTargetCache } from './linkTargetCache'
 import { MarkdownImage, MarkdownImageStoreContext, MARKDOWN_IMAGE_SETTLED_EVENT } from './MarkdownImage'
 import { MarkdownImageStore } from './markdownImageStore'
-import { isRemoteSrcSet } from './markdownImageSource'
 import './MarkdownPreview.css'
 import { fileGateway } from '../../services/fileGateway'
 
@@ -534,11 +533,12 @@ function createMarkdownComponents(
       />
     )
   },
-  // `<picture><source srcset>`: a srcset resolves like an img src and its
-  // scheme is not sanitized, so only an all-remote one is kept (#71). Dropped,
-  // the picture falls back to its <img>, which goes through MarkdownImage.
-  source({ node: _node, srcSet, ...props }: { node?: unknown; srcSet?: string } & Record<string, unknown>) {
-    return isRemoteSrcSet(srcSet) ? <source srcSet={srcSet} {...props} /> : null
+  // `<picture><source srcset>` is never rendered (#71): a srcset is resolved
+  // by the page like an img src, and the sanitizer does not check its scheme.
+  // Without it the picture falls back to its <img>, which goes through
+  // MarkdownImage.
+  source(_props: { node?: unknown } & Record<string, unknown>): JSX.Element | null {
+    return null
   },
   // Horizontal rule with line tracking
   hr: withRange('hr'),

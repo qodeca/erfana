@@ -7,10 +7,13 @@
  * folder; only Electron and the sender check are faked.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { execFileSync } from 'node:child_process'
 import { mkdtempSync, mkdirSync, rmSync, symlinkSync, truncateSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import path, { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { openTestProject } from './__test-helpers__/openTestProject'
+import { createFakeConfinementFs } from './__test-helpers__/fakeConfinementFs'
+import type { ConfinementDeps } from './confinement/resolveConfinedPath'
 
 const handlers: Record<string, (...args: any[]) => any> = {}
 const trusted = vi.hoisted(() => ({ value: true }))
@@ -185,11 +188,85 @@ describe('markdown-image:read', () => {
     })
   })
 
-  it('refuses an image over the image viewer size cap without reading it', async () => {
+  it('refuses an image over the 16 MB document-image cap, below the viewer cap too', async () => {
     const big = join(tmp, 'big.png')
     writeFileSync(big, '')
-    truncateSync(big, 50 * 1024 * 1024 + 1)
+    truncateSync(big, 16 * 1024 * 1024 + 1)
     await expect(call({ filePath: big })).resolves.toEqual({ status: 'refused', reason: 'too-large' })
+    const exact = join(tmp, 'exact.png')
+    writeFileSync(exact, '')
+    truncateSync(exact, 16 * 1024 * 1024)
+    await expect(call({ filePath: exact })).resolves.toMatchObject({ status: 'ok' })
+  })
+
+  it.skipIf(process.platform === 'win32')(
+    'refuses a junction-type link that leads outside the project',
+    async () => {
+      // 'junction' is honoured on Windows (no admin rights needed) and is a
+      // plain folder link elsewhere
+      symlinkSync(outside, join(tmp, 'junction'), 'junction')
+      await expect(call({ filePath: join(tmp, 'junction', 'secret.png') })).resolves.toEqual({
+        status: 'refused',
+        reason: 'outside-project'
+      })
+    }
+  )
+
+  const hasMkfifo = ((): boolean => {
+    if (process.platform === 'win32') return false
+    try {
+      execFileSync('which', ['mkfifo'], { stdio: 'ignore' })
+      return true
+    } catch {
+      return false
+    }
+  })()
+
+  it.runIf(hasMkfifo)(
+    'refuses a FIFO with an image name at once, without waiting for a writer',
+    { timeout: 2_000 },
+    async () => {
+      const fifo = join(tmp, 'assets', 'pipe.png')
+      execFileSync('mkfifo', [fifo])
+      const started = Date.now()
+      await expect(call({ filePath: fifo })).resolves.toEqual({ status: 'refused', reason: 'not-found' })
+      expect(Date.now() - started).toBeLessThan(1_000)
+      // The handle was closed: the FIFO can be removed and the folder cleaned up
+      rmSync(fifo)
+    }
+  )
+
+  it('refuses a path outside the project before asking the file system anything', async () => {
+    const fsCalls: string[] = []
+    const spyDeps: ConfinementDeps = {
+      path,
+      platform: process.platform,
+      fs: {
+        lstat: async (target) => {
+          fsCalls.push(target)
+          const { lstat } = await import('node:fs/promises')
+          return lstat(target)
+        },
+        stat: async (target) => {
+          fsCalls.push(target)
+          const { stat } = await import('node:fs/promises')
+          return stat(target)
+        },
+        realpath: async (target) => {
+          fsCalls.push(target)
+          const { realpath } = await import('node:fs/promises')
+          return realpath(target)
+        }
+      }
+    }
+    const { projectService } = await import('./file-handlers')
+    const { registerMarkdownImageHandlers } = await import('./markdown-image-handlers')
+    registerMarkdownImageHandlers(projectService.session, spyDeps)
+
+    for (const filePath of [join(outside, 'secret.png'), join(outside, 'secret.png', 'below'), join(tmp, '..', 'x.png')]) {
+      await expect(call({ filePath })).resolves.toEqual({ status: 'refused', reason: 'outside-project' })
+    }
+    expect(fsCalls).toEqual([])
   })
 
   it('refuses an untrusted sender before looking at the request', async () => {
@@ -221,5 +298,74 @@ describe('markdown-image:read', () => {
       status: 'refused',
       reason: 'outside-project'
     })
+  })
+})
+
+describe('markdown-image:read – Windows paths (fake file system)', () => {
+  const win = path.win32
+  const winDeps: ConfinementDeps = {
+    path: win,
+    platform: 'win32',
+    fs: createFakeConfinementFs(
+      win,
+      {
+        'C:\\': 'dir',
+        'C:\\p': 'dir',
+        'C:\\p\\img.png': 'file',
+        'C:\\outside': 'dir',
+        'C:\\outside\\secret.png': 'file',
+        'C:\\p\\junction': { link: 'C:\\outside' },
+        'C:\\p\\LINKED~1': { alias: 'C:\\outside' }
+      },
+      true
+    )
+  }
+  const call = (request: unknown): Promise<unknown> =>
+    handlers[CHANNEL]({ sender: { id: 1 }, senderFrame: { url: 'file:///app/index.html' } }, request)
+
+  beforeEach(async () => {
+    for (const key of Object.keys(handlers)) delete handlers[key]
+    trusted.value = true
+    vi.resetModules()
+    const { projectService } = await import('./file-handlers')
+    vi.spyOn(projectService.session, 'current').mockReturnValue({
+      generation: 1,
+      root: 'C:\\p',
+      realRoot: 'C:\\p',
+      caseSensitive: false,
+      ownerWebContentsId: null
+    })
+    const { registerMarkdownImageHandlers } = await import('./markdown-image-handlers')
+    registerMarkdownImageHandlers(projectService.session, winDeps)
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.resetModules()
+  })
+
+  it.each([
+    ['an alternate data stream', 'C:\\p\\img.png:x'],
+    ['a trailing dot', 'C:\\p\\img.png.'],
+    ['a trailing space', 'C:\\p\\img.png '],
+    ['a device name', 'C:\\p\\CON.png'],
+    ['a device name with digits', 'C:\\p\\com1.png']
+  ])('refuses %s inside the project as unreadable', async (_label, filePath) => {
+    await expect(call({ filePath })).resolves.toEqual({ status: 'refused', reason: 'unreadable' })
+  })
+
+  it.each([
+    ['a UNC share', '\\\\srv\\share\\img.png'],
+    ['a device namespace path', '\\\\?\\C:\\p\\img.png'],
+    ['a dot device path', '\\\\.\\pipe\\img.png'],
+    ['another folder on the drive', 'C:\\outside\\secret.png'],
+    ['a junction leading out', 'C:\\p\\junction\\secret.png'],
+    ['an 8.3 short name leading out', 'C:\\p\\LINKED~1\\secret.png']
+  ])('refuses %s as outside the project', async (_label, filePath) => {
+    await expect(call({ filePath })).resolves.toEqual({ status: 'refused', reason: 'outside-project' })
+  })
+
+  it('refuses a drive-relative path as unreadable', async () => {
+    await expect(call({ filePath: 'C:img.png' })).resolves.toEqual({ status: 'refused', reason: 'unreadable' })
   })
 })
