@@ -15,7 +15,16 @@ import { join } from 'path'
 
 vi.mock('./LoggingService', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }))
 
-import { buildReapScript, MAX_SWEEPS, QUIT_TRACE_ENV, type LiveShell } from './conptyHostReaper'
+import {
+  buildLauncherScript,
+  buildReapScript,
+  encodeCommand,
+  MAX_SWEEPS,
+  QUIT_SHELLS_ENV,
+  QUIT_TRACE_ENV,
+  shellsEnvValue,
+  type LiveShell
+} from './conptyHostReaper'
 
 const POWERSHELL = process.platform === 'win32' ? 'powershell.exe' : 'pwsh'
 const hasPowerShell = spawnSync(POWERSHELL, ['-NoProfile', '-NonInteractive', '-Command', 'exit 0']).status === 0
@@ -146,10 +155,15 @@ function run(
   shells: LiveShell[] = [],
   graceSec?: number
 ): { stopped: string[]; trace: string[] } {
-  const script = buildReapScript(APP, START, QUIT, shells, graceSec)
+  const script = buildReapScript(APP, START, QUIT, graceSec)
   const result = spawnSync(POWERSHELL, ['-NoProfile', '-NonInteractive', '-NoLogo', '-Command', `${PRELUDE}\n${script}`], {
     encoding: 'utf8',
-    env: { ...process.env, REAP_SCENARIO: JSON.stringify(scenario), [QUIT_TRACE_ENV]: tracePath },
+    env: {
+      ...process.env,
+      REAP_SCENARIO: JSON.stringify(scenario),
+      [QUIT_TRACE_ENV]: tracePath,
+      [QUIT_SHELLS_ENV]: shellsEnvValue(shells)
+    },
     timeout: 60_000
   })
   expect(result.error).toBeUndefined()
@@ -377,5 +391,51 @@ describe.skipIf(!hasPowerShell)('quit helper script against a mocked process lis
     expect(stopped).toEqual([])
     expect(trace.filter((l) => l.includes('process list unavailable'))).toHaveLength(MAX_SWEEPS)
     expect(trace.at(-2)).toBe('helper done result=gave-up members-left=unknown')
+  })
+})
+
+describe.skipIf(!hasPowerShell)('quit launcher script with a mocked Start-Process', { timeout: 60_000 }, () => {
+  /** Runs the launcher; `fail` makes Start-Process throw */
+  function launch(fail: boolean): { status: number | null; started: string[]; trace: string[] } {
+    const encoded = encodeCommand(buildReapScript(APP, START, QUIT))
+    const mock = [
+      // Write-Host: the launcher keeps the function's output in $h
+      'function Start-Process { [CmdletBinding()] param($FilePath, $WindowStyle, [switch]$PassThru, $ArgumentList)',
+      `  if (${fail ? '$true' : '$false'}) { throw 'blocked' }`,
+      "  Write-Host ('FILE ' + (Split-Path -Leaf $FilePath))",
+      "  Write-Host ('STYLE ' + $WindowStyle)",
+      "  Write-Host ('ARGS ' + (@($ArgumentList)[0..3] -join ' '))",
+      "  Write-Host ('ENC ' + @($ArgumentList)[4])",
+      '  [pscustomobject]@{ Id = 4321 }',
+      '}'
+    ].join('\n')
+    const result = spawnSync(
+      POWERSHELL,
+      ['-NoProfile', '-NonInteractive', '-NoLogo', '-Command', `${mock}\n${buildLauncherScript(encoded)}`],
+      { encoding: 'utf8', env: { ...process.env, [QUIT_TRACE_ENV]: tracePath }, timeout: 60_000 }
+    )
+    const trace = existsSync(tracePath)
+      ? readFileSync(tracePath, 'utf8')
+          .split(/\r?\n/)
+          .filter(Boolean)
+          .map((l) => l.slice(l.indexOf(' ') + 1))
+      : []
+    const started = result.stdout.split(/\r?\n/).filter((l) => /^(FILE|STYLE|ARGS|ENC) /.test(l))
+    expect(started.find((l) => l.startsWith('ENC '))?.slice(4) ?? encoded).toBe(encoded)
+    return { status: result.status, started: started.filter((l) => !l.startsWith('ENC ')), trace }
+  }
+
+  it('starts the helper hidden, with its encoded script, and traces its pid', () => {
+    const { status, started, trace } = launch(false)
+    expect(started).toEqual(['FILE powershell.exe', 'STYLE Hidden', 'ARGS -NoProfile -NonInteractive -NoLogo -EncodedCommand'])
+    expect(trace).toEqual(['launcher started helper pid=4321'])
+    expect(status).toBe(0)
+  })
+
+  it('traces a launcher failure and exits 1', () => {
+    const { status, started, trace } = launch(true)
+    expect(started).toEqual([])
+    expect(trace).toEqual(['launcher failed error=blocked'])
+    expect(status).toBe(1)
   })
 })

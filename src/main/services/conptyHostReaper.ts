@@ -9,8 +9,10 @@
  * end both, but a leftover keeps running after the app is gone. This cleanup does
  * not depend on either.
  *
- * It is started FIRST in the quit sequence, as one hidden, absolute-path PowerShell
- * (deliberately NOT detached, see {@link startConptyHostReaper}) that:
+ * It is started FIRST in the quit sequence. A short launcher PowerShell (a child of the
+ * app) starts the real helper with `Start-Process -WindowStyle Hidden` and exits, so the
+ * helper is a grandchild that outlives the app (see {@link startConptyHostReaper}). The
+ * helper is one hidden PowerShell that:
  * 1. while our process is still alive (at most the grace period), lists the processes
  *    every second and learns our terminal tree – console hosts that are our children,
  *    the shells we pass in, and everything below them – each by pid AND creation time,
@@ -56,9 +58,12 @@
  * - Quit only. On a window close the other windows' terminals are alive and their
  *   hosts have the same parent pid, so nothing can be told apart.
  *
- * `wmic` is removed on current Windows, hence PowerShell. All values placed in the
- * script are integers; the trace path travels in an environment variable. The script
- * has no double quotes or backslashes, so its command-line quoting is trivial.
+ * `wmic` is removed on current Windows, hence PowerShell. Only integers and constants
+ * are placed in the scripts. The trace path and the shell table travel in environment
+ * variables (the table is integers only and is checked again inside the script). The
+ * helper reaches the launcher as `-EncodedCommand` (base64, so its own quoting does not
+ * matter); the launcher script has no double quotes or backslashes, so its command-line
+ * quoting is trivial.
  */
 import { spawn as nodeSpawn } from 'child_process'
 import { appendFileSync, writeFileSync } from 'fs'
@@ -84,6 +89,12 @@ export const QUIT_TRACE_FILE = 'quit-cleanup.log'
 /** Environment variable that carries the trace path into the script. */
 export const QUIT_TRACE_ENV = 'ERFANA_QUIT_TRACE'
 
+/** Environment variable that carries the shell table (`pid:ticks,...`) into the helper. */
+export const QUIT_SHELLS_ENV = 'ERFANA_QUIT_SHELLS'
+
+/** Windows' limit on a whole command line (CreateProcess `lpCommandLine`). */
+export const WINDOWS_COMMAND_LINE_MAX = 32_767
+
 /**
  * Rounding allowance after the quit moment, for the clock difference between Node
  * and WMI. Kept tiny: no terminal is created once the shutdown has started
@@ -95,8 +106,8 @@ const CREATION_WINDOW_END_SLACK_MS = 250
 /** Upper bound on each WMI query, so a stuck provider cannot keep the script alive. */
 const CIM_OPERATION_TIMEOUT_SEC = 5
 
-/** Most shells passed in; far above any real terminal count, keeps the command line short. */
-const MAX_SHELLS = 512
+/** Most shells passed in; far above any real terminal count, keeps the environment short. */
+export const MAX_SHELLS = 512
 
 /**
  * How far a shell's creation time may be from the moment node-pty returned its pid.
@@ -134,9 +145,15 @@ export function powershellPath(env: NodeJS.ProcessEnv = process.env): string {
 /**
  * The only environment PowerShell gets: the validated Windows directory and the
  * module path under it, so nothing inherited (PSModulePath, profiles) can load code.
- * The trace path is added when it is an absolute drive or UNC path.
+ * The trace path is added when it is an absolute drive or UNC path, and the shell
+ * table when given (built by {@link shellsEnvValue}). The launcher passes this
+ * environment on to the helper.
  */
-export function powershellEnv(env: NodeJS.ProcessEnv = process.env, tracePath?: string): NodeJS.ProcessEnv {
+export function powershellEnv(
+  env: NodeJS.ProcessEnv = process.env,
+  tracePath?: string,
+  shells?: string
+): NodeJS.ProcessEnv {
   const root = systemRoot(env)
   const out: NodeJS.ProcessEnv = {
     SystemRoot: root,
@@ -144,8 +161,12 @@ export function powershellEnv(env: NodeJS.ProcessEnv = process.env, tracePath?: 
     PSModulePath: win32.join(root, 'System32', 'WindowsPowerShell', 'v1.0', 'Modules')
   }
   if (tracePath && isDriveOrUncPath(tracePath)) out[QUIT_TRACE_ENV] = tracePath
+  if (shells && SHELLS_VALUE.test(shells)) out[QUIT_SHELLS_ENV] = shells
   return out
 }
+
+/** `pid:ticks` pairs, comma-separated; ticks are always 18 digits for current dates. */
+const SHELLS_VALUE = /^[0-9]{1,9}:[0-9]{18}(?:,[0-9]{1,9}:[0-9]{18})*$/
 
 function assertInt(value: number, name: string): void {
   if (!Number.isSafeInteger(value) || value <= 0) {
@@ -154,34 +175,39 @@ function assertInt(value: number, name: string): void {
 }
 
 /**
- * Builds the helper script. Exported for tests.
+ * The shell table for {@link QUIT_SHELLS_ENV}: `pid:ticks` pairs (spawn time as .NET
+ * ticks), duplicates dropped, at most {@link MAX_SHELLS}. Exported for tests.
+ */
+export function shellsEnvValue(shells: ReadonlyArray<LiveShell>): string {
+  const byPid = new Map<number, number>()
+  for (const shell of shells) {
+    assertInt(shell.pid, 'shell pid')
+    assertInt(shell.spawnedAtMs, 'shell spawn time')
+    if (shell.pid > 999_999_999) throw new Error('shell pid out of range')
+    if (byPid.size < MAX_SHELLS) byPid.set(shell.pid, shell.spawnedAtMs)
+  }
+  return [...byPid].map(([pid, ms]) => `${pid}:${BigInt(ms) * 10_000n + UNIX_EPOCH_TICKS}`).join(',')
+}
+
+/**
+ * Builds the helper script. Exported for tests. The shells come from
+ * {@link QUIT_SHELLS_ENV}, not from the script, so its size does not grow with them.
  *
  * @param parentPid - our main process pid
  * @param startMs - earliest creation time (epoch ms) a member may have: our process start
  * @param quitMs - the quit moment (epoch ms)
- * @param shells - the terminal shells still running at the quit moment
  * @param graceSec - how long to wait for our process before force-ending it
  */
 export function buildReapScript(
   parentPid: number,
   startMs: number,
   quitMs: number,
-  shells: ReadonlyArray<LiveShell> = [],
   graceSec: number = QUIT_GRACE_SEC
 ): string {
   assertInt(parentPid, 'parentPid')
   assertInt(startMs, 'startMs')
   assertInt(quitMs, 'quitMs')
   assertInt(graceSec, 'graceSec')
-  const byPid = new Map<number, number>()
-  for (const shell of shells) {
-    assertInt(shell.pid, 'shell pid')
-    assertInt(shell.spawnedAtMs, 'shell spawn time')
-    if (byPid.size < MAX_SHELLS) byPid.set(shell.pid, shell.spawnedAtMs)
-  }
-  const shellTable = [...byPid]
-    .map(([pid, ms]) => `${pid} = ${BigInt(ms) * 10_000n + UNIX_EPOCH_TICKS}`)
-    .join('; ')
   const endMs = quitMs + CREATION_WINDOW_END_SLACK_MS
   const hosts = HOST_IMAGE_NAMES.map((n) => `'${n}'`).join(', ')
   const shellTol = SHELL_SPAWN_TOLERANCE_MS * 10_000
@@ -193,8 +219,9 @@ export function buildReapScript(
     "function ErrId($r) { [string]$r.FullyQualifiedErrorId }",
     `$app = ${parentPid}`,
     `$hosts = @(${hosts})`,
-    // pid -> spawn time (ticks) of each shell we passed
-    `$shells = @{${shellTable ? ` ${shellTable} ` : ''}}`,
+    // pid -> spawn time (ticks) of each shell we passed; only well-formed integer pairs
+    '$shells = @{}',
+    `try { foreach ($pair in (([string]$env:${QUIT_SHELLS_ENV}) -split ',')) { if ($pair -match '^[0-9]{1,9}:[0-9]{18}$') { $kv = $pair -split ':'; $shells[[int]$kv[0]] = [long]$kv[1] } } } catch { }`,
     // pid -> creation ticks (T), image name (N), parent pid (P) and the time of the last
     // listing that saw it alive (L) of every member seen
     '$known = @{}',
@@ -344,6 +371,41 @@ export function buildReapScript(
   ].join('\n')
 }
 
+/** Base64 alphabet only: what may be placed in the launcher script. */
+const BASE64 = /^[A-Za-z0-9+/]+={0,2}$/
+
+/** `-EncodedCommand` form of a script: base64 of its UTF-16LE text. */
+export function encodeCommand(script: string): string {
+  return Buffer.from(script, 'utf16le').toString('base64')
+}
+
+/**
+ * Builds the launcher script (Windows round 6): it starts the helper as a separate,
+ * hidden PowerShell with its own console and exits. It holds only constants and the
+ * base64 text, and writes one trace line, so a missing helper can be told apart from
+ * a launcher that failed. Exported for tests.
+ *
+ * @param encodedHelper - {@link encodeCommand} of the helper script
+ */
+export function buildLauncherScript(encodedHelper: string): string {
+  if (!BASE64.test(encodedHelper)) throw new Error('encodedHelper must be base64')
+  return [
+    "$ErrorActionPreference = 'Stop'",
+    `$tr = $env:${QUIT_TRACE_ENV}`,
+    "function Trace([string]$m) { if ($tr) { try { Add-Content -LiteralPath $tr -Value ((Get-Date -Format 'o') + ' ' + $m) } catch { } } }",
+    'try {',
+    // $PSHOME is this launcher's own folder: the same validated powershell.exe
+    `  $h = Start-Process -FilePath (Join-Path $PSHOME 'powershell.exe') -WindowStyle Hidden -PassThru -ArgumentList '-NoProfile', '-NonInteractive', '-NoLogo', '-EncodedCommand', '${encodedHelper}'`,
+    "  Trace ('launcher started helper pid=' + $h.Id)",
+    "} catch { Trace ('launcher failed error=' + [string]$_.FullyQualifiedErrorId); exit 1 }"
+  ].join('\n')
+}
+
+/** The launcher's arguments, after the PowerShell path. Exported for tests. */
+export function launcherArgs(launcherScript: string): string[] {
+  return ['-NoProfile', '-NonInteractive', '-NoLogo', '-Command', launcherScript]
+}
+
 export interface ReapOptions {
   platform?: NodeJS.Platform
   pid?: number
@@ -359,28 +421,30 @@ export interface ReapOptions {
 }
 
 /**
- * Starts the helper and returns at once; it is `unref`'d and keeps running after the
- * app exits. Never throws, and does nothing off Windows.
+ * Starts the launcher and returns at once. Never throws, and does nothing off Windows.
  *
- * NOT `detached` (#305, Windows round 5): on Windows `detached: true` starts the child
- * with DETACHED_PROCESS, so `powershell.exe` gets no console and exits with code 0
- * after about 0.6 s without running `-Command` (nodejs/node#51018). Measured on
- * Windows: 20 of 20 quits had no `helper started` line; the same spawn without
- * `detached` ran the whole script, and kept running after its parent had exited.
- * `windowsHide` gives it a hidden console instead.
+ * Why a launcher (#305, Windows rounds 5 and 6):
+ * - NOT `detached`: on Windows `detached: true` starts the child with DETACHED_PROCESS,
+ *   so `powershell.exe` gets no console and exits with code 0 without running
+ *   `-Command` (nodejs/node#51018). Round 5: 20 of 20 quits had no `helper started`.
+ * - But not the helper itself either: libuv (`uv__init_global_job_handle` in
+ *   src/win/process.c) puts every non-detached child into one job object with
+ *   KILL_ON_JOB_CLOSE, which closes when the app exits and kills the child. Round 6:
+ *   the helper's trace stopped after `helper started`.
+ * - That job also has SILENT_BREAKAWAY_OK, so a process the child starts is NOT in it.
+ *   The launcher (a non-detached, hidden child) starts the helper with `Start-Process
+ *   -WindowStyle Hidden`, which gives it its own hidden console, and exits. Measured on
+ *   Windows: the helper then ran the whole script after the app had exited.
  *
- * Job objects: a child that is not detached stays in every job object the app is in.
- * If something launched Erfana inside a job that ends its processes when it closes
- * (JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE, used by some launchers and terminals), the helper
- * ends with the app, before its sweeps. Node exposes no CREATE_BREAKAWAY_FROM_JOB, and a
- * native module is out of scope, so this is not worked around; it is visible in the
- * trace: `helper started` and `learned` lines with no `app exited` / `sweep` lines
- * after it.
+ * Still in any job the APP was started in: if a launcher or terminal runs Erfana inside
+ * a job that kills its processes on close and does not allow breakaway, the helper ends
+ * with the app. Node exposes no CREATE_BREAKAWAY_FROM_JOB and a native module is out of
+ * scope; the trace shows it as `helper started` / `learned` with no `app exited` after.
  *
  * Before the start it replaces the trace file with one line from the app, so a file
- * that holds only that line means the helper never ran.
+ * that holds only that line means the launcher never ran.
  *
- * @returns true when the helper was started
+ * @returns true when the launcher was started
  */
 export function startConptyHostReaper(options: ReapOptions = {}): boolean {
   const {
@@ -412,26 +476,34 @@ export function startConptyHostReaper(options: ReapOptions = {}): boolean {
     const quitMs = Math.floor(now())
     const startMs = Math.max(1, Math.floor(quitMs - uptimeSeconds() * 1000))
     const shells = liveShells.filter(
-      (sh) => Number.isSafeInteger(sh.pid) && sh.pid > 0 && Number.isSafeInteger(sh.spawnedAtMs) && sh.spawnedAtMs > 0
+      (sh) =>
+        Number.isSafeInteger(sh.pid) &&
+        sh.pid > 0 &&
+        sh.pid <= 999_999_999 &&
+        Number.isSafeInteger(sh.spawnedAtMs) &&
+        sh.spawnedAtMs > 0
     )
-    const script = buildReapScript(pid, startMs, quitMs, shells)
-    note(`app starting quit helper app-pid=${pid} shells=${shells.length}`, true)
+    const shellsValue = shellsEnvValue(shells)
+    const launcher = buildLauncherScript(encodeCommand(buildReapScript(pid, startMs, quitMs)))
+    const shellCount = shellsValue ? shellsValue.split(',').length : 0
+    note(`app starting quit helper app-pid=${pid} shells=${shellCount}`, true)
     const child = spawnFn(
       powershellPath(),
-      ['-NoProfile', '-NonInteractive', '-NoLogo', '-Command', script],
+      launcherArgs(launcher),
       // No `detached` (see above): a detached powershell.exe never runs its script
-      { stdio: 'ignore', windowsHide: true, env: powershellEnv(process.env, trace) }
+      { stdio: 'ignore', windowsHide: true, env: powershellEnv(process.env, trace, shellsValue) }
     )
-    // No kill timer: the process is gone before one could fire. The script bounds itself
-    // (grace period, query timeout, sweep count).
+    // No kill timer: the launcher exits right after starting the helper, and the helper
+    // bounds itself (grace period, query timeout, sweep count).
     child.once('error', (error) => {
       logger.warn('Quit cleanup helper could not be started', { error: error.message })
       note(`app: quit helper could not be started (${(error as NodeJS.ErrnoException).code ?? 'error'})`)
     })
-    // The helper waits for us, so an exit seen here (we are still alive) is a failure
+    // The launcher exits at once; a non-zero code means it could not start the helper
     child.once('exit', (code) => {
-      logger.warn('Quit cleanup helper exited before the app', { code })
-      note(`app: quit helper exited before the app code=${code ?? 'none'}`)
+      if (code === 0) return
+      logger.warn('Quit cleanup launcher failed', { code })
+      note(`app: quit launcher failed code=${code ?? 'none'}`)
     })
     child.unref()
     return true
