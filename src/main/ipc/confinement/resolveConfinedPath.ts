@@ -37,6 +37,7 @@ import {
   type PathFlavour
 } from '../../utils/pathCompare'
 import { ConfinementError, PROJECT_FOLDER_GONE_MESSAGE } from './ConfinementError'
+import { isPermissionDeniedFile } from './permissionDeniedFile'
 
 /** Longest path accepted, matching the Windows extended-length limit. */
 export { isInsideRoot, isSamePath, normaliseResolved }
@@ -347,7 +348,23 @@ export async function resolveConfinedPath(
   // expected to be there; a path about to be created is not
   const expectExists =
     entry || (policy.mode === 'project' && (policy.mustExist === true || policy.kind !== undefined))
-  const located = await locateInProject(lexical, session, entry, expectExists, deps)
+  let located: Located
+  try {
+    located = await locateInProject(lexical, session, entry, expectExists, deps)
+  } catch (error) {
+    // Still refused; only the reason changes. A regular in-project file that
+    // the file system will not resolve (Windows "Deny Read") says
+    // "permission denied" rather than "cannot verify" (see permissionDeniedFile)
+    if (
+      error instanceof ConfinementError &&
+      error.code === 'UNVERIFIABLE' &&
+      !entry &&
+      (await isPermissionDeniedFile(lexical, session, deps))
+    ) {
+      throw new ConfinementError('PERMISSION_DENIED')
+    }
+    throw error
+  }
 
   if (policy.mustExist && !located.existed) throw new ConfinementError('NOT_FOUND')
   if (

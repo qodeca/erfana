@@ -40,7 +40,12 @@ export type FsErrorKind = 'not-found' | 'permission' | 'no-space'
  */
 export function classifyFsError(message: string): FsErrorKind | null {
   if (/\bENOENT\b/.test(message) || message.includes('not found')) return 'not-found'
-  if (/\b(EACCES|EPERM)\b/.test(message) || message.includes('permission denied')) {
+  if (
+    /\b(EACCES|EPERM)\b/.test(message) ||
+    message.includes('permission denied') ||
+    // The main process's confinement check refusing an unreadable project file
+    confinementCodeFromMessage(message) === 'PERMISSION_DENIED'
+  ) {
     return 'permission'
   }
   if (/\bENOSPC\b/.test(message)) return 'no-space'

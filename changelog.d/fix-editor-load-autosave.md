@@ -2,7 +2,9 @@
 
 - **An editor tab that cannot read its file now says so.** Before, a failed read left the tab
   reading "No file open" with no message. Now the tab names the file and the reason, shows a
-  "Try again" button and raises an error toast. When two reads race, only the latest one is
+  "Try again" button and raises an error toast. A file the user may not read (Windows "Deny
+  Read") now says "permission denied" instead of "Cannot verify this path is inside the project
+  directory"; it is still refused, and a link keeps the old answer. When two reads race, only the latest one is
   shown, so switching files fast can no longer leave the wrong file's text on screen, and the
   log no longer records the first 100 characters of every opened document.
 - **Autosave keeps its 30-second safety save during long typing sessions, and stops retrying a
