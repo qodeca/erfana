@@ -11,16 +11,16 @@ Erfana follows **2025 Electron security best practices** with comprehensive hard
 | Context Isolation | ✅ Enabled | v0.1.0 |
 | Node Integration | ✅ Disabled | v0.1.0 |
 | Process Sandboxing | ✅ Enabled (default) | v0.6.0 |
-| Electron Fuses | ✅ 6 of 6 configured (5 harden the build) | v0.6.0 (all six since v0.22.0) |
+| Electron Fuses | ✅ all 9 pinned (`strictlyRequireAllFuses`); 5 hardening fuses on | v0.6.0 (all pinned since v0.22.0) |
 | ASAR Packaging | ✅ Enabled (native addons and executables unpacked) | v0.22.0 |
-| ASAR Integrity | ✅ Enforced at start-up (`EnableEmbeddedAsarIntegrityValidation` + `OnlyLoadAppFromAsar`) | v0.22.0 |
+| ASAR Integrity | ✅ Checked at start-up (`EnableEmbeddedAsarIntegrityValidation` + `OnlyLoadAppFromAsar`); see the limits below | v0.22.0 |
 | Cookie Encryption | ❌ Disabled (no persistent cookies to protect – re-evaluated v0.22.0) | v0.6.0 |
 | Content Security Policy | ✅ Strict | v0.1.0 |
 
 **Notes**:
-- The app's JavaScript ships inside `app.asar`, and the app refuses to start if a single byte of the archive changes – see [ASAR Configuration](#asar-configuration). Native addons and executables (`node-pty`, `ffmpeg`, `ffprobe`, LiteParse) stay real files in `app.asar.unpacked/`, which the check does **not** cover
+- The app's JavaScript ships inside `app.asar`, and the app refuses to start if a single byte of the archive changes while the embedded hash stays the same – see [ASAR Configuration](#asar-configuration) and its limits: on Windows the per-machine install (a separate change in the same release) is what stops a same-user process from rewriting the hash too. Native addons and executables (`node-pty`, `ffmpeg`, `ffprobe`, LiteParse) stay real files in `app.asar.unpacked/`, which the check does **not** cover
 - Cookie encryption stays off: Erfana keeps no persistent cookies worth protecting (spike: [docs/spikes/2026-10-22-asar-integrity.md](spikes/2026-10-22-asar-integrity.md))
-- `scripts/fuses.js` sets all 6 fuses. Five of them harden the build — RunAsNode, NodeOptions, NodeCliInspect (the last one only in production builds; see below), EnableEmbeddedAsarIntegrityValidation and OnlyLoadAppFromAsar — while the sixth, EnableCookieEncryption, is deliberately set to `false`
+- `scripts/fuses.js` pins all 9 fuses of Electron 44 (`strictlyRequireAllFuses`, read back after the flip). Five harden the build — RunAsNode, NodeOptions, NodeCliInspect (the last one only in production builds; see below), EnableEmbeddedAsarIntegrityValidation and OnlyLoadAppFromAsar. EnableCookieEncryption is deliberately `false`; LoadBrowserProcessSpecificV8Snapshot, GrantFileProtocolExtraPrivileges and WasmTrapHandlers stay at Electron's defaults
 - Test builds (`ERFANA_TEST_BUILD=true`) enable NodeCliInspect for Playwright E2E testing - see [Test Builds](#test-builds-erfana_test_build)
 - `ERFANA_E2E_FORCE_CRASH=1` injects a renderer crash for the error-boundary E2E scenario. Double-gated on `!app.isPackaged`, so a packaged build ignores it - see [Crash Injection](#crash-injection-erfana_e2e_force_crash)
 
@@ -69,7 +69,7 @@ The `sandbox: false` pattern is **3+ year old outdated information**. Modern Ele
 
 ## Electron Fuses (2025 Critical Security)
 
-**Status**: ✅ all 6 fuses configured; 5 of the 6 are hardening fuses (since v0.22.0)
+**Status**: ✅ all 9 fuses pinned and read back after the flip; 5 are hardening fuses (since v0.22.0)
 
 Fuses are **compile-time feature toggles** that disable unused Electron features to prevent "Living Off The Land" (LOTL) attacks.
 
@@ -87,6 +87,9 @@ Attackers exploit legitimate Electron features (like `ELECTRON_RUN_AS_NODE`) to 
 | `EnableNodeCliInspectArguments` | `isTestBuild` – `false` on every production build | Disables `--inspect` CLI args (prevents remote debugging). `true` only under `ERFANA_TEST_BUILD=true` — see [Test Builds](#test-builds-erfana_test_build) |
 | `EnableEmbeddedAsarIntegrityValidation` | `true` | Refuses to start when `app.asar` no longer matches the header hash embedded at build time (see ASAR Configuration below) |
 | `OnlyLoadAppFromAsar` | `true` | Loads the app only from `app.asar`, never from an `app/` folder beside it, which Electron would otherwise load first |
+| `LoadBrowserProcessSpecificV8Snapshot` | `false` | Electron's default; no browser-process snapshot is used |
+| `GrantFileProtocolExtraPrivileges` | `true` | Electron's default, kept because the app window loads from `file://`. Follow-up: move the app to a custom protocol, then turn it off |
+| `WasmTrapHandlers` | `true` | Electron's default |
 
 ### Implementation:
 
@@ -108,9 +111,14 @@ await flipFuses(electronBinaryPath, {
   [FuseV1Options.EnableNodeCliInspectArguments]: isTestBuild,  // false in production
   [FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: true,
   [FuseV1Options.OnlyLoadAppFromAsar]: true,
+  [FuseV1Options.LoadBrowserProcessSpecificV8Snapshot]: false,
+  [FuseV1Options.GrantFileProtocolExtraPrivileges]: true,  // until a custom protocol
+  [FuseV1Options.WasmTrapHandlers]: true,
+  strictlyRequireAllFuses: true,
 });
-// afterPack refuses to flip the two asar fuses onto a bundle without app.asar,
-// which could not start.
+// applyAndVerifyFuses() refuses a bundle without app.asar (it could not start),
+// reads the fuse wire back, and compares the embedded integrity hash with the
+// archive on disk.
 ```
 
 ### Verification:
@@ -234,23 +242,42 @@ Worst case if the gate were bypassed: the renderer throws and the user sees the 
 
 The app's JavaScript – `out/` and every pure-JS dependency – ships inside `Resources/app.asar`. Electron checks the archive against a SHA-256 header hash that electron-builder embeds at build time (`ElectronAsarIntegrity` in `Info.plist` on macOS, an `INTEGRITY`/`ELECTRONASAR` resource in `Erfana.exe` on Windows) and refuses to start on a mismatch. Each file read from the archive is checked against its own block hashes too.
 
-This closes the gap that existed while `asar: false` shipped the app as plain files in `resources/app/`: the NSIS installer installs per user, so any process running as that user could patch `out/main/index.js` inside a signed app and have it run with the app's identity and permissions.
+While `asar: false` shipped the app as plain files in `resources/app/`, any process running as the user could change `out/main/index.js` inside a signed app without any check noticing. With the archive and the integrity fuse, such a change stops the app from starting. How far that goes depends on who can write the file that holds the hash – see [Limits](#limits).
 
 ### What stays outside the archive
 
-`asarUnpack` in `electron-builder.yml` keeps the files the operating system itself must open as real files in `Resources/app.asar.unpacked/`:
+`asarUnpack` in `electron-builder.yml` keeps only the binaries the operating system itself must open in `Resources/app.asar.unpacked/` – never a `.js` or `.json` file, because an unpacked `package.json` decides which JavaScript a `require` runs:
 
 | Unpacked | Why |
 |---|---|
-| `node-pty/build/**`, `node-pty/prebuilds/**` | Native addon (`dlopen`) and `spawn-helper` (`posix_spawn`); on Windows also `conpty.dll`, `OpenConsole.exe`, `winpty-agent.exe` |
-| `ffmpeg-static/ffmpeg(.exe)`, `ffprobe-static/bin/**` | Spawned as child processes; `src/main/utils/mediaBinaries.ts` maps their `app.asar` paths to `app.asar.unpacked` |
-| `@llamaindex/liteparse-*/**` | Native addon plus `libpdfium` it loads from its own folder |
+| `node-pty/build/Release/*.node`, `node-pty/prebuilds/*/*.{node,dll,exe}`, `spawn-helper` | Native addon (`dlopen`) and `spawn-helper` (`posix_spawn`); on Windows also `winpty.dll` and `winpty-agent.exe` |
+| `ffmpeg-static/ffmpeg(.exe)`, `ffprobe-static/bin/*/*/ffprobe(.exe)` | Spawned as child processes; in a packaged build `src/main/utils/mediaBinaries.ts` builds their paths from `process.resourcesPath` |
+| `@llamaindex/liteparse-*/*.{node,dylib,dll,so}` | Native addon plus `libpdfium` it loads from its own folder |
 
-The list is file-level and `smartUnpack` is off, because smart unpacking moves the **whole package** of any module with a binary in it – node-pty's JavaScript, all of jszip – out of the archive. **Unpacked files are not covered by the integrity check**: a same-user process can still replace a native addon or `ffmpeg`. The gap is narrower (no JavaScript, no main-process entry point) but not zero; closing it needs OS code-signature enforcement on those binaries.
+`smartUnpack` is off, because smart unpacking moves the **whole package** of any module with a binary in it – node-pty's JavaScript, all of jszip – out of the archive. node-pty's Windows `*.pdb` files and its unused `conpty/` folder are not packed at all.
 
 ### Packaging guards
 
-`scripts/fuses.js` verifies the asar build before signing, with the same fail-closed bar as the `app/` tree had (issue #43): `assertPackagedAsarContents` reads the archive header and checks the top-level allowlist both ways, every archive link, the main entry, and the `app.asar.unpacked/` tree. A stray `app/` folder beside `app.asar` is refused. The afterPack prunes, chmods and `ffmpeg` staging operate on `app.asar.unpacked/`, which leaves the archive – and so its hash – untouched.
+`scripts/fuses.js` verifies the asar build before signing, with the same fail-closed bar as the `app/` tree had (issue #43):
+
+- `assertEffectiveAsarConfig` compares the build's effective `asar`/`asarUnpack` (CLI overrides and `mac:`/`win:` keys included) with the pinned constants and refuses `electronFuses` and `disableAsarIntegrity`.
+- `assertUnpackPatternsBinaryOnly` refuses an unpack pattern that could match anything but a binary.
+- `assertPackagedAsarContents` reads the archive header and checks the top-level allowlist both ways, every archive link, the main entry, and the `app.asar.unpacked/` tree (binaries only, no `out/`, no escaping symlinks). A stray `app/` folder beside `app.asar` is refused.
+- `applyAndVerifyFuses` reads the fuse wire back after the flip and compares the embedded integrity hash with the SHA-256 of the archive header on disk.
+
+The afterPack prunes, chmods and `ffmpeg` staging operate on `app.asar.unpacked/`, which leaves the archive – and so its hash – untouched.
+
+### Module search paths
+
+Electron limits a packaged app's `require` lookups to `process.resourcesPath`, which still includes `Resources/node_modules/` and `Resources/app.asar.unpacked/node_modules/` – outside the archive. `src/main/bootstrap/confineModulePaths.cjs`, inlined first into every main-process bundle (main process, git-status worker, DOCX utility process), narrows those lookups to `app.asar/` and clears the global paths, so a `require()` the archive cannot satisfy fails instead of loading a planted file. A build check fails if it does not run before a bundle's first dependency `require`.
+
+### Limits
+
+- **What the check protects against.** It detects an archive that no longer matches the hash embedded in the binary. It cannot detect an attacker who rewrites the archive **and** the hash, so it is only as strong as the protection of the file that holds the hash.
+- **macOS:** the hash is in `Info.plist`, sealed by the app's code signature; rewriting both breaks the signature.
+- **Windows:** the hash and the fuses are inside `Erfana.exe`. With a per-user install that file, its DLLs and `resources\` are writable by the same user, so the integrity check alone raises the bar and makes tampering visible – the archive stops matching what was signed, and the Authenticode signature breaks – but does not stop a same-user process. The per-machine install in `Program Files`, a separate change in the same release (the "per-machine Windows install" PR), is what stops a same-user process from changing `Erfana.exe` and the files beside it.
+- **Unpacked binaries** (`pty.node`, the LiteParse addon, `ffmpeg`, `ffprobe`) are not covered by the check. On macOS the code signature covers them; on Windows the per-machine install is again what protects them.
+- **`Resources/node_modules` fallback:** closed for the bundled entries by the module-path confinement above; code that builds its own resolver rooted outside the archive is not covered (none does today).
 
 ### History
 

@@ -34,7 +34,7 @@
  * - https://www.druva.com/blog/living-off-the-land-lotl-attack-due-to-electron-fuses-misconfiguration
  */
 
-const { flipFuses, FuseVersion, FuseV1Options } = require('@electron/fuses');
+const { FuseVersion, FuseV1Options } = require('@electron/fuses');
 const { Arch } = require('electron-builder');
 const path = require('path');
 const fs = require('fs');
@@ -645,6 +645,10 @@ function buildFuseConfig(electronPlatformName, { isTestBuild: testBuild = false 
   return {
     version: FuseVersion.V1,
 
+    // Every fuse in the wire must be set below: a fuse a future Electron adds
+    // fails the flip until someone decides its value here.
+    strictlyRequireAllFuses: true,
+
     // Reset ad-hoc signature on macOS (required for arm64)
     // Must be done before code signing
     resetAdHocDarwinSignature: electronPlatformName === 'darwin',
@@ -676,6 +680,17 @@ function buildFuseConfig(electronPlatformName, { isTestBuild: testBuild = false 
     // Load the app only from app.asar - never from an app/ folder beside it,
     // which Electron would otherwise load first, bypassing the integrity check.
     [FuseV1Options.OnlyLoadAppFromAsar]: true,
+
+    // Electron 44 defaults, pinned so a change is a reviewed diff.
+    // A browser-process-specific V8 snapshot is not used.
+    [FuseV1Options.LoadBrowserProcessSpecificV8Snapshot]: false,
+    // file:// keeps its extra privileges because the app window and its
+    // preview frames load from file://. Follow-up: serve the app from a custom
+    // protocol, then turn this off.
+    [FuseV1Options.GrantFileProtocolExtraPrivileges]: true,
+    // WebAssembly trap handlers stay on (Electron's default; faster, and the
+    // safer of the two for out-of-bounds checks).
+    [FuseV1Options.WasmTrapHandlers]: true,
   };
 }
 
@@ -1449,6 +1464,7 @@ function assertPackagedAsarContents(
         `${formatOffenders(extra)}. Refusing to ship a bundle carrying repository files.`
       );
     }
+    assertUnpackedTreeBinaryOnly(unpackedDir, resourcesDir);
     unpacked = assertNoSymlinkEscape(unpackedDir, fs.realpathSync(unpackedDir), {
       platform,
       allowedAbsoluteLinkRoots,
@@ -1495,6 +1511,294 @@ function assertPackagedAsarContents(
     archive: true,
     unpacked: { files: unpacked.files, dirs: unpacked.dirs, symlinks: unpacked.symlinks },
   };
+}
+
+// ---------------------------------------------------------------------------
+// ASAR configuration and integrity (v0.22.0 asar spike, security review of #324)
+// ---------------------------------------------------------------------------
+
+/**
+ * The asar settings this hook is written for. electron-builder.yml must carry
+ * exactly these (a binding test in scripts/fuses.test.mjs), and the build's
+ * EFFECTIVE config must still carry them at pack time
+ * (assertEffectiveAsarConfig), which also catches `-c.asarUnpack=…` style CLI
+ * overrides and platform-scoped `mac:`/`win:` keys.
+ */
+const ASAR_OPTIONS = Object.freeze({ smartUnpack: false });
+
+/**
+ * Every pattern names binaries only: a native addon, a library it loads from
+ * its own folder, or an executable the OS starts. Nothing a JavaScript loader
+ * reads – a package.json (its "main" decides which JS runs), a .js file – may
+ * leave the integrity-checked archive. Enforced per pattern by
+ * assertUnpackPatternsBinaryOnly and per file by assertPackagedAsarContents.
+ */
+const ASAR_UNPACK = Object.freeze([
+  'node_modules/node-pty/build/Release/*.node',
+  'node_modules/node-pty/build/Release/spawn-helper',
+  'node_modules/node-pty/prebuilds/*/*.{node,dll,exe}',
+  'node_modules/node-pty/prebuilds/*/spawn-helper',
+  'node_modules/ffmpeg-static/ffmpeg',
+  'node_modules/ffmpeg-static/ffmpeg.exe',
+  'node_modules/ffprobe-static/bin/*/*/ffprobe',
+  'node_modules/ffprobe-static/bin/*/*/ffprobe.exe',
+  'node_modules/@llamaindex/liteparse-*/*.{node,dylib,dll,so}',
+]);
+
+/** File extensions a binary-only unpack pattern may end in. */
+const UNPACK_BINARY_EXTENSIONS = Object.freeze(['node', 'dylib', 'dll', 'so', 'exe']);
+
+/** Extension-less executables an unpack pattern may name. */
+const UNPACK_NAMED_EXECUTABLES = Object.freeze(['spawn-helper', 'ffmpeg', 'ffprobe']);
+
+/** What may never sit in app.asar.unpacked/: anything a JS loader would read. */
+const UNPACKED_FORBIDDEN_EXTENSIONS = Object.freeze(['.js', '.cjs', '.mjs', '.json']);
+
+function toStringList(value) {
+  if (value === undefined || value === null) return [];
+  return Array.isArray(value) ? value.map(String) : [String(value)];
+}
+
+/**
+ * Refuse an unpack pattern that could match anything but a binary: its last
+ * segment must be `*.<ext>` / `*.{ext,…}` with only binary extensions, or the
+ * exact name of a known executable. `**`, `*` or `*.json` as the last segment
+ * all fail.
+ *
+ * @param {readonly string[]} patterns
+ * @returns {readonly string[]} the patterns, unchanged
+ * @throws {Error} naming every offending pattern
+ */
+function assertUnpackPatternsBinaryOnly(patterns) {
+  const bad = [];
+  for (const pattern of patterns) {
+    if (pattern.startsWith('!')) continue; // an exclusion cannot widen the set
+    const last = pattern.split('/').pop();
+    let ok = false;
+    if (UNPACK_NAMED_EXECUTABLES.includes(last)) {
+      ok = true;
+    } else {
+      const named = UNPACK_NAMED_EXECUTABLES.map((n) => `${n}.exe`);
+      const m = /^[^*{}?[\]]*\*?\.(\{([a-z0-9,]+)\}|([a-z0-9]+))$/.exec(last);
+      if (named.includes(last)) ok = true;
+      else if (m) {
+        const exts = m[2] ? m[2].split(',') : [m[3]];
+        ok = exts.length > 0 && exts.every((e) => UNPACK_BINARY_EXTENSIONS.includes(e));
+      }
+    }
+    if (!ok) bad.push(pattern);
+  }
+  if (bad.length > 0) {
+    throw new Error(
+      `asarUnpack pattern(s) can match non-binary files: ${formatOffenders(bad)}. Only native addons ` +
+      `(${UNPACK_BINARY_EXTENSIONS.join(', ')}) and the named executables ` +
+      `(${UNPACK_NAMED_EXECUTABLES.join(', ')}) may leave app.asar. Refusing to move code outside the ` +
+      `integrity check.`
+    );
+  }
+  return patterns;
+}
+
+/**
+ * Compare the build's EFFECTIVE asar settings with the pinned ones. Runs at
+ * pack time on `context.packager.config` (YAML merged with any `-c.*` CLI
+ * override) and `context.packager.platformSpecificBuildOptions` (the `mac:` /
+ * `win:` block), so a one-off override cannot quietly change what is checked.
+ *
+ * Also refuses electron-builder's own `electronFuses` block (it would flip the
+ * fuses a second time, after this hook) and `disableAsarIntegrity` (it would
+ * drop the embedded hash the integrity fuse checks against).
+ *
+ * @param {object} config context.packager.config
+ * @param {object} [platformOptions] context.packager.platformSpecificBuildOptions
+ */
+function assertEffectiveAsarConfig(config, platformOptions = {}) {
+  const problems = [];
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  if (!same(config?.asar, ASAR_OPTIONS)) {
+    problems.push(`asar is ${JSON.stringify(config?.asar)}, expected ${JSON.stringify(ASAR_OPTIONS)}`);
+  }
+  const unpack = toStringList(config?.asarUnpack);
+  if (!same(unpack, [...ASAR_UNPACK])) {
+    problems.push(`asarUnpack is ${JSON.stringify(unpack)}, expected the ASAR_UNPACK list in scripts/fuses.js`);
+  }
+  for (const key of ['asar', 'asarUnpack']) {
+    if (platformOptions && platformOptions[key] !== undefined) {
+      problems.push(`a platform block sets ${key} (${JSON.stringify(platformOptions[key])}); keep it top-level only`);
+    }
+  }
+  if (config?.electronFuses != null) {
+    problems.push('electronFuses is set; the fuses are owned by this hook (buildFuseConfig)');
+  }
+  if (config?.disableAsarIntegrity) {
+    problems.push('disableAsarIntegrity is set; the integrity fuse would have no hash to check');
+  }
+  if (problems.length > 0) {
+    throw new Error(
+      `Effective asar configuration does not match the pinned one: ${problems.join('; ')}. ` +
+      `Change electron-builder.yml and ASAR_OPTIONS / ASAR_UNPACK in scripts/fuses.js together. ` +
+      `Refusing to ship a bundle whose integrity setup was not reviewed.`
+    );
+  }
+  assertUnpackPatternsBinaryOnly(unpack);
+}
+
+/**
+ * Load a module app-builder-lib depends on, through app-builder-lib, so the
+ * hook needs no dependency of its own (and no package-lock change).
+ */
+function requireViaBuilder(name) {
+  const builderRoot = path.dirname(require.resolve('app-builder-lib/package.json'));
+  return require(require.resolve(name, { paths: [builderRoot] }));
+}
+
+/** SHA-256 of the archive's header string – what Electron's integrity check compares. */
+function asarHeaderHash(archive, asar = loadAsarModule()) {
+  const { headerString } = asar.getRawHeader(archive);
+  return require('crypto').createHash('sha256').update(headerString).digest('hex');
+}
+
+/**
+ * Read back the integrity hash electron-builder embedded for `app.asar`.
+ *
+ * macOS: `ElectronAsarIntegrity` in Contents/Info.plist. Windows: the
+ * `INTEGRITY`/`ELECTRONASAR` resource in the .exe (a JSON list of
+ * `{file, alg, value}`). Returns null when none is found.
+ *
+ * @param {string} platform context.electronPlatformName
+ * @param {string} electronBinaryPath the .app bundle or the .exe
+ * @param {object} [deps] injectable `plist` / `resedit` (tests)
+ * @returns {{algorithm: string, hash: string} | null}
+ */
+function readEmbeddedAsarIntegrity(platform, electronBinaryPath, deps = {}) {
+  if (platform === 'darwin') {
+    const plist = deps.plist || requireViaBuilder('plist');
+    const info = plist.parse(fs.readFileSync(path.join(electronBinaryPath, 'Contents', 'Info.plist'), 'utf8'));
+    const entry = info?.ElectronAsarIntegrity?.['Resources/app.asar'];
+    return entry ? { algorithm: entry.algorithm, hash: entry.hash } : null;
+  }
+  if (platform === 'win32') {
+    const resedit = deps.resedit || requireViaBuilder('resedit');
+    const exe = resedit.NtExecutable.from(fs.readFileSync(electronBinaryPath));
+    const res = resedit.NtExecutableResource.from(exe);
+    const entry = res.entries.find((e) => e.type === 'INTEGRITY' && e.id === 'ELECTRONASAR');
+    if (!entry) return null;
+    const list = JSON.parse(require('buffer').Buffer.from(entry.bin).toString('utf8'));
+    const item = Array.isArray(list)
+      ? list.find((i) => String(i.file).toLowerCase().replace(/\//g, '\\') === 'resources\\app.asar')
+      : null;
+    return item ? { algorithm: item.alg, hash: item.value } : null;
+  }
+  return null;
+}
+
+/**
+ * Flip the fuses, then prove the result: read the fuse wire back, and check
+ * that the integrity hash embedded in the binary matches the archive on disk.
+ *
+ * Refuses to flip when the bundle has no `app.asar` – with the two asar fuses
+ * on, such an app cannot start.
+ *
+ * @param {object} args
+ * @param {string} args.platform context.electronPlatformName
+ * @param {string} args.electronBinaryPath the .app bundle or the .exe
+ * @param {string|null} args.packedResourcesDir directory containing app.asar
+ * @param {boolean} args.isTestBuild ERFANA_TEST_BUILD=true build
+ * @param {object} [deps] injectable flipFuses / getCurrentFuseWire / asar / plist / resedit (tests)
+ * @returns {Promise<{fuses: object, integrity: {algorithm: string, hash: string} | null}>}
+ */
+async function applyAndVerifyFuses(
+  { platform, electronBinaryPath, packedResourcesDir, isTestBuild: testBuild },
+  deps = {}
+) {
+  const fusesLib = require('@electron/fuses');
+  const flip = deps.flipFuses || fusesLib.flipFuses;
+  const readWire = deps.getCurrentFuseWire || fusesLib.getCurrentFuseWire;
+  const archive = packedResourcesDir ? path.join(packedResourcesDir, 'app.asar') : null;
+
+  if (!archive || !fs.existsSync(archive)) {
+    throw new Error(
+      `No app.asar in ${packedResourcesDir}, but the fuses enable OnlyLoadAppFromAsar and ` +
+      `EnableEmbeddedAsarIntegrityValidation. Keep 'asar' enabled in electron-builder.yml. ` +
+      `Refusing to ship a bundle that cannot start.`
+    );
+  }
+
+  const config = buildFuseConfig(platform, { isTestBuild: testBuild });
+  await flip(electronBinaryPath, config);
+
+  // Read the wire back: a fuse the flip did not land is a bundle that is not
+  // what this hook claims, whatever the log says.
+  const wire = await readWire(electronBinaryPath);
+  const mismatched = [];
+  for (const [name, index] of Object.entries(FuseV1Options)) {
+    if (typeof index !== 'number') continue;
+    const want = config[index] ? fusesLib.FuseState.ENABLE : fusesLib.FuseState.DISABLE;
+    if (wire[index] !== want) mismatched.push(`${name}=${wire[index]} (want ${want})`);
+  }
+  if (mismatched.length > 0) {
+    throw new Error(`Fuse wire read back does not match the config: ${mismatched.join(', ')}. Refusing to ship.`);
+  }
+
+  // The integrity hash the fuse will check must be the hash of the archive
+  // that ships. electron-builder computes it before afterPack; this catches a
+  // step that rewrote app.asar afterwards, or a hash that never got embedded.
+  let integrity = null;
+  if (platform === 'darwin' || platform === 'win32') {
+    integrity = readEmbeddedAsarIntegrity(platform, electronBinaryPath, deps);
+    const actual = asarHeaderHash(archive, deps.asar || loadAsarModule());
+    if (!integrity) {
+      throw new Error(
+        `No embedded asar integrity hash found in ${electronBinaryPath}. With ` +
+        `EnableEmbeddedAsarIntegrityValidation on, the app would have nothing to check against. Refusing to ship.`
+      );
+    }
+    if (String(integrity.algorithm).toUpperCase() !== 'SHA256' || integrity.hash !== actual) {
+      throw new Error(
+        `Embedded asar integrity (${integrity.algorithm} ${integrity.hash}) does not match app.asar on disk ` +
+        `(SHA256 ${actual}). Something changed app.asar after electron-builder packed it. Refusing to ship.`
+      );
+    }
+  }
+  return { fuses: config, integrity };
+}
+
+/**
+ * Refuse anything a JavaScript loader would read, and any build output, in
+ * app.asar.unpacked/. Those files are outside the integrity check, so a
+ * package.json there could point a `require` at unchecked code.
+ *
+ * @param {string} unpackedDir Resources/app.asar.unpacked
+ * @param {string} resourcesDir base for the paths shown in messages
+ * @returns {number} files checked
+ */
+function assertUnpackedTreeBinaryOnly(unpackedDir, resourcesDir) {
+  const offenders = [];
+  let files = 0;
+  if (fs.existsSync(path.join(unpackedDir, 'out'))) offenders.push('app.asar.unpacked/out');
+  const stack = [unpackedDir];
+  while (stack.length > 0) {
+    const dir = stack.pop();
+    for (const entry of readDirOrThrow(dir, resourcesDir)) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        stack.push(full);
+        continue;
+      }
+      files++;
+      if (UNPACKED_FORBIDDEN_EXTENSIONS.includes(path.extname(entry.name).toLowerCase())) {
+        offenders.push(path.relative(resourcesDir, full));
+      }
+    }
+  }
+  if (offenders.length > 0) {
+    throw new Error(
+      `app.asar.unpacked contains ${offenders.length} file(s) a JavaScript loader reads, outside the integrity ` +
+      `check: ${formatOffenders(offenders)}. Unpack binaries only (ASAR_UNPACK in scripts/fuses.js). ` +
+      `Refusing to ship unchecked code.`
+    );
+  }
+  return files;
 }
 
 // ---------------------------------------------------------------------------
@@ -1827,6 +2131,11 @@ async function afterPack(context) {
     console.log('🔒 PRODUCTION BUILD: All security fuses enabled');
   }
 
+  // The asar settings and the fuse/integrity switches are pinned (security
+  // review of #324): compare the EFFECTIVE config, CLI overrides included,
+  // before anything is changed.
+  assertEffectiveAsarConfig(context.packager.config, context.packager.platformSpecificBuildOptions);
+
   // Resolve the packed resources dir ONCE and reuse it across every step below
   // (prune / spawn-helper / media / packaged-contents / extra-content), so the
   // four near-duplicate resolutions cannot drift (F11). The win32-null policy for
@@ -1880,25 +2189,23 @@ async function afterPack(context) {
 
   console.log(`   Applying fuses to: ${electronBinaryPath}`);
 
-  // The two asar fuses make an app without app.asar unable to start, so refuse
-  // to flip them onto a bundle that has none (e.g. `asar: false` came back).
-  if (packedResourcesDir && !fs.existsSync(path.join(packedResourcesDir, 'app.asar'))) {
-    throw new Error(
-      `No app.asar in ${packedResourcesDir}, but the fuses enable OnlyLoadAppFromAsar and ` +
-      `EnableEmbeddedAsarIntegrityValidation. Keep 'asar' enabled in electron-builder.yml. ` +
-      `Refusing to ship a bundle that cannot start.`
-    );
-  }
-
-  await flipFuses(electronBinaryPath, buildFuseConfig(context.electronPlatformName, { isTestBuild }));
+  // Flip, read the wire back, and check the embedded integrity hash against
+  // the archive on disk (refuses a bundle without app.asar).
+  const { integrity } = await applyAndVerifyFuses({
+    platform: context.electronPlatformName,
+    electronBinaryPath,
+    packedResourcesDir,
+    isTestBuild,
+  });
 
   console.log('✅ Electron fuses applied successfully');
   console.log('   - RunAsNode: disabled');
   console.log('   - CookieEncryption: disabled');
   console.log('   - NodeOptions: disabled');
   console.log(`   - NodeCliInspect: ${isTestBuild ? 'ENABLED (test build)' : 'disabled'}`);
-  console.log('   - AsarIntegrity: enabled');
+  console.log(`   - AsarIntegrity: enabled (embedded ${integrity ? `${integrity.algorithm} ${integrity.hash}` : 'n/a on this platform'})`);
   console.log('   - OnlyLoadAppFromAsar: enabled');
+  console.log('   - Fuse wire read back and matches (all 9 fuses pinned)');
 
   // Display warning again at the end for test builds
   if (isTestBuild) {
@@ -1951,6 +2258,14 @@ module.exports.assertPackagedAppContents = assertPackagedAppContents;
 module.exports.assertPackagedAsarContents = assertPackagedAsarContents;
 module.exports.packedPayloadDir = packedPayloadDir;
 module.exports.buildFuseConfig = buildFuseConfig;
+module.exports.applyAndVerifyFuses = applyAndVerifyFuses;
+module.exports.readEmbeddedAsarIntegrity = readEmbeddedAsarIntegrity;
+module.exports.asarHeaderHash = asarHeaderHash;
+module.exports.assertEffectiveAsarConfig = assertEffectiveAsarConfig;
+module.exports.assertUnpackPatternsBinaryOnly = assertUnpackPatternsBinaryOnly;
+module.exports.assertUnpackedTreeBinaryOnly = assertUnpackedTreeBinaryOnly;
+module.exports.ASAR_OPTIONS = ASAR_OPTIONS;
+module.exports.ASAR_UNPACK = ASAR_UNPACK;
 module.exports.assertNoSymlinkEscape = assertNoSymlinkEscape;
 module.exports.assertConfigMatchesAllowlist = assertConfigMatchesAllowlist;
 module.exports.deriveAllowedAppEntries = deriveAllowedAppEntries;

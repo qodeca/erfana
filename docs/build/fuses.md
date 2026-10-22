@@ -27,10 +27,15 @@ await flipFuses(electronBinaryPath, {
   [FuseV1Options.EnableNodeCliInspectArguments]: isTestBuild,
   [FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: true,
   [FuseV1Options.OnlyLoadAppFromAsar]: true,
+  [FuseV1Options.LoadBrowserProcessSpecificV8Snapshot]: false,
+  [FuseV1Options.GrantFileProtocolExtraPrivileges]: true,
+  [FuseV1Options.WasmTrapHandlers]: true,
+  // A fuse a future Electron adds fails the flip until it gets a value here.
+  strictlyRequireAllFuses: true,
 });
 ```
 
-The flip is refused when the packed bundle has no `app.asar`: with the two asar fuses on, such an app cannot start.
+`applyAndVerifyFuses()` wraps the flip: it refuses a bundle with no `app.asar` (with the two asar fuses on, such an app cannot start), reads the fuse wire back with `getCurrentFuseWire` and compares all nine fuses, and compares the integrity hash embedded in the binary (`Info.plist` `ElectronAsarIntegrity` on macOS, the `INTEGRITY`/`ELECTRONASAR` resource in the `.exe` on Windows) with the SHA-256 of the `app.asar` header on disk. Before any of that, `assertEffectiveAsarConfig` refuses electron-builder's own `electronFuses` block (it would flip the fuses a second time) and `disableAsarIntegrity`.
 
 `isTestBuild` is the only conditional fuse. Every other value is a hard-coded constant, so a production DMG always ships the same fuse set – see [test builds and the Node CLI inspector](#test-builds-and-the-node-cli-inspector).
 
@@ -45,11 +50,11 @@ afterSign: ./scripts/resign.js
 
 `afterPack` does seven things, in this order:
 
-1. Resolve the packed Electron binary – and, on a test build, refuse it via `assertTestBuildName` unless the product name ends in `(TEST BUILD)`.
-2. Prune foreign-platform/arch `ffprobe-static` binaries and `node-pty` prebuilds (plus a `.pdb` strip on `win32`).
+1. Resolve the packed Electron binary – and, on a test build, refuse it via `assertTestBuildName` unless the product name ends in `(TEST BUILD)` – then `assertEffectiveAsarConfig`: the build's effective `asar`/`asarUnpack` (CLI overrides and `mac:`/`win:` keys included) must equal the pinned `ASAR_OPTIONS`/`ASAR_UNPACK`, with no `electronFuses` and no `disableAsarIntegrity`.
+2. Prune foreign-platform/arch `ffprobe-static` binaries and `node-pty` prebuilds (plus a `.pdb` strip on `win32`; on an asar build `files:` already keeps the `.pdb` files and node-pty's unused `conpty/` folder out).
 3. Restore the `node-pty` `spawn-helper` execute bit (`0755`, Unix only).
 4. `ensurePackedMediaBinaries` – copy this pack's cached `ffmpeg` into the bundle, re-verify it (size floor always, SHA-256 only on pinned arches), and `chmod 0755` the packed `ffmpeg` + every `ffprobe`.
-5. Flip the Electron fuses and reset the ad-hoc Darwin signature on the main binary (refused without `app.asar`).
+5. `applyAndVerifyFuses` – flip the Electron fuses and reset the ad-hoc Darwin signature on the main binary (refused without `app.asar`), read the wire back, and check the embedded integrity hash against the archive.
 6. `assertConfigMatchesAllowlist` + `assertPackagedAppContents` – verify the packed app against the `files:` allowlist: the `app.asar` header and `app.asar.unpacked/` (`assertPackagedAsarContents`), or an `app/` tree on an `asar: false` build. Deliberately after the mutating steps above, so it covers every change they made.
 7. Verify the `extraFiles`/`extraResources` destinations beside and above `app/` (issue #55): a merged-config shape check (`assertExtraContentAllowlist`) plus the packed-tree tripwires/enumeration (`assertResourcesDestNoRepoLeak`, `assertResourcesSiblingsAllowlist`, `assertExtraFilesDestNoRepoLeak`).
 
@@ -198,6 +203,9 @@ Three guardrails keep such a build from being mistaken for a release:
 | `EnableNodeCliInspectArguments` | `isTestBuild` – `false` on every production build | **Critical**: Prevents remote debugging access via `--inspect`. Set to `true` only when `ERFANA_TEST_BUILD=true`, for Playwright E2E over CDP – see [test builds and the Node CLI inspector](#test-builds-and-the-node-cli-inspector) |
 | `EnableEmbeddedAsarIntegrityValidation` | `true` | **Tamper check**: refuses to start when `app.asar` differs from the hash embedded at build time (since v0.22.0) |
 | `OnlyLoadAppFromAsar` | `true` | **No side-loading**: never loads an `app/` folder in place of the verified archive (since v0.22.0) |
+| `LoadBrowserProcessSpecificV8Snapshot` | `false` | Electron's default, pinned; no browser-process snapshot is used |
+| `GrantFileProtocolExtraPrivileges` | `true` | Electron's default, pinned: the app window loads from `file://`. **Follow-up**: move the app to a custom protocol, then turn this off |
+| `WasmTrapHandlers` | `true` | Electron's default, pinned |
 
 ---
 
@@ -243,7 +251,7 @@ The original v0.6.0 reason – a keychain prompt with no context – is weaker t
 
 **Purpose**: Validates `app.asar` against the SHA-256 header hash electron-builder embeds at pack time – `ElectronAsarIntegrity` in `Info.plist` on macOS, an `INTEGRITY`/`ELECTRONASAR` resource in the `.exe` on Windows – and each file's block hashes when it is read.
 
-**Status**: On since v0.22.0. Verified on a macOS test build: one changed byte in a file inside the archive exits with `ASAR Integrity Violation: got a hash mismatch`; one changed byte in the header aborts with `Integrity check failed for asar archive entry '<header>'`.
+**Status**: On since v0.22.0. **Limits**: it detects an archive that no longer matches the embedded hash; it cannot detect a rewrite of both. On macOS the hash is sealed by the code signature. On Windows the hash is inside `Erfana.exe`, which a per-user install leaves writable by the same user – there the check raises the bar and makes tampering visible, and the per-machine install (the "per-machine Windows install" PR, same release) is what stops a same-user process – see [asar.md § Limits](./asar.md#limits). Verified on a macOS test build: one changed byte in a file inside the archive exits with `ASAR Integrity Violation: got a hash mismatch`; one changed byte in the header aborts with `Integrity check failed for asar archive entry '<header>'`.
 
 **Does not cover**: the native addons and executables in `app.asar.unpacked/` – see [asar.md](./asar.md#what-goes-where).
 
