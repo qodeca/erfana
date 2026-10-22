@@ -66,13 +66,16 @@ Returns terminal metadata, or `null` if not found.
 #### `listTerminals(): Array<{ id: string; title: string }>`
 Returns metadata for all live terminals.
 
+#### `ackOutput(terminalId: string, chars: number): void`
+Flow control (`terminal:ackOutput`): the owning window has parsed `chars` more UTF-16 code units of output. On macOS and Linux the PTY is paused above 512 KiB unacknowledged and resumed below 128 KiB; a pause with no ack progress for 5 s is lifted. Windows terminals are batched, never paused. See [performance/terminal-output-batching.md](performance/terminal-output-batching.md).
+
 ---
 
 ### Events
 
 | Event | Payload | When |
 |---|---|---|
-| `'data'` | `{ terminalId: string; data: string }` | PTY output (after marker handshake + clear confirm) |
+| `'data'` | `{ terminalId: string; data: string }` | PTY output (after marker handshake + clear confirm), batched per terminal by `TerminalOutputFlow` (8 ms or 64 KiB) and always sent before that terminal's `'exit'` |
 | `'exit'` | `{ terminalId: string; exitCode: number; signal?: string }` | PTY process exit |
 | `'clearTerminal'` | `{ terminalId: string }` | Bootstrap marker detected; renderer should clear and call `markClearComplete()` |
 | `'error'` | `{ terminalId: string; error: string }` | cwd deny-list rejection (Windows), shell resolution failure, or spawn failure |

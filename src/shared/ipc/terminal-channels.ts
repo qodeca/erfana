@@ -21,7 +21,9 @@ export const TERMINAL_CHANNELS = {
   /** Whether a program other than the shell is running in the terminal */
   getActivity: 'terminal:getActivity',
   /** `send`: the renderer confirms the clear handshake */
-  clearComplete: 'terminal:clearComplete'
+  clearComplete: 'terminal:clearComplete',
+  /** `send`: the renderer reports how much output xterm has parsed (flow control) */
+  ackOutput: 'terminal:ackOutput'
 } as const
 
 /** Events sent from main to the window that owns the terminal. */

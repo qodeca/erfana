@@ -66,6 +66,7 @@ exports[`preload surface > window.api.file and window.api.terminal expose the ex
 
 exports[`preload surface > window.api.file and window.api.terminal expose the expected members > terminal 1`] = `
 [
+  "ackOutput",
   "create",
   "getActivity",
   "getInfo",

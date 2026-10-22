@@ -8,6 +8,7 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { EventEmitter } from 'events'
 import { tmpdir } from 'node:os'
+import { TERMINAL_OUTPUT_FLUSH_MS } from './terminalOutputFlow'
 
 interface MockPTY extends EventEmitter {
   pid: number
@@ -85,8 +86,15 @@ describe('TerminalService start-up prompt', () => {
     expect(received).toEqual([])
     terminalService.markInitializationComplete(terminalId)
     expect(received).toEqual(['user ~ $ '])
-    pty.emit('data', 'ls\r\n')
-    expect(received).toEqual(['user ~ $ ', 'ls\r\n'])
+    vi.useFakeTimers()
+    try {
+      pty.emit('data', 'ls\r\n')
+      // Live output goes out in the next batch
+      vi.advanceTimersByTime(TERMINAL_OUTPUT_FLUSH_MS)
+      expect(received).toEqual(['user ~ $ ', 'ls\r\n'])
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('keeps a prompt that is split across chunks, in order', async () => {

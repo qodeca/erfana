@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { describe, it, expect, vi } from 'vitest'
-import { createTerminalStore } from './useTerminalStore'
+import { ACTIVITY_THROTTLE_MS, createTerminalStore } from './useTerminalStore'
 import type { ITerminalOperations } from '../interfaces/ITerminalOperations'
 
 // Mock terminal operations (not used in these tests, but required for store creation)
@@ -36,6 +36,36 @@ describe('useTerminalStore activity tracking', () => {
     expect(store.hasUserInteracted()).toBe(false)
     store.markUserInput('t2')
     expect(useTerminalStore.getState().hasUserInteracted()).toBe(true)
+  })
+})
+
+describe('useTerminalStore markActivity throttle (finding [30])', () => {
+  it('does not replace the map or notify subscribers for every output batch', () => {
+    vi.useFakeTimers()
+    try {
+      const store = createTerminalStore(mockTerminalOps)
+      const listener = vi.fn()
+      const unsubscribe = store.subscribe(listener)
+
+      store.getState().markActivity('t1')
+      const first = store.getState().activityById
+      for (let i = 0; i < 1000; i++) store.getState().markActivity('t1')
+      expect(listener).toHaveBeenCalledTimes(1)
+      expect(store.getState().activityById).toBe(first)
+
+      // A later batch still moves the timestamp forward
+      vi.advanceTimersByTime(ACTIVITY_THROTTLE_MS)
+      store.getState().markActivity('t1')
+      expect(listener).toHaveBeenCalledTimes(2)
+      expect(store.getState().activityById.get('t1')).toBe(Date.now())
+
+      // The throttle is per terminal
+      store.getState().markActivity('t2')
+      expect(store.getState().activityById.has('t2')).toBe(true)
+      unsubscribe()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 
