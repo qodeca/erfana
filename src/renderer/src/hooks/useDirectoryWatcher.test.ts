@@ -14,6 +14,7 @@ import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from 'vites
 import { renderHook, act, cleanup } from '@testing-library/react'
 import { useDirectoryWatcher } from './useDirectoryWatcher'
 import { DIRECTORY_WATCHER } from '../components/ProjectTree/constants'
+import { recordTreeReadMs } from '../utils/treeReadTiming'
 
 // Hoist logger mock so vi.mock can reference it
 const { mockLogger } = vi.hoisted(() => ({
@@ -383,10 +384,11 @@ describe('useDirectoryWatcher hook', () => {
         expect(onRefresh).toHaveBeenCalledTimes(2)
       })
 
-      it('stretches the max wait to twice the last read on a slow project', async () => {
-        // Each tree read takes 3 s: the next forced refresh waits 6 s, not 1 s
-        const READ_MS = 3000
-        const onRefresh = vi.fn(() => new Promise<void>((resolve) => setTimeout(resolve, READ_MS)))
+      it.each([
+        ['twice a slow read', 3000, 6000],
+        ['the 10 s ceiling for a very slow read', 30000, 10000]
+      ])('stretches the max wait to %s', (_label, readMs, maxWaitMs) => {
+        const onRefresh = vi.fn()
         renderHook(() =>
           useDirectoryWatcher({
             projectPath: '/proj',
@@ -398,30 +400,25 @@ describe('useDirectoryWatcher hook', () => {
           })
         )
         const callback = mockOnDirectoryChanged.mock.calls[0][0]
+        // The read alone, as useProjectManagement records it
+        recordTreeReadMs(readMs)
 
-        // First read: debounced as usual, then it runs for 3 s
-        await act(async () => {
-          callback({ eventCount: 1, summary: { add: 1 }, structural: true })
-          await vi.advanceTimersByTimeAsync(DIRECTORY_WATCHER.DEBOUNCE_DELAY + 1 + READ_MS)
-        })
-        expect(onRefresh).toHaveBeenCalledTimes(1)
-
-        // A steady stream for 5 s: still inside the 6 s max wait
-        await act(async () => {
-          for (let elapsed = 0; elapsed < 5000; elapsed += 100) {
+        // A steady stream, one event every 100 ms
+        act(() => {
+          for (let elapsed = 0; elapsed < maxWaitMs - 200; elapsed += 100) {
             callback({ eventCount: 1, summary: { add: 1 }, structural: true })
-            await vi.advanceTimersByTimeAsync(100)
+            vi.advanceTimersByTime(100)
+          }
+        })
+        expect(onRefresh).not.toHaveBeenCalled()
+
+        act(() => {
+          for (let elapsed = 0; elapsed < 400; elapsed += 100) {
+            callback({ eventCount: 1, summary: { add: 1 }, structural: true })
+            vi.advanceTimersByTime(100)
           }
         })
         expect(onRefresh).toHaveBeenCalledTimes(1)
-
-        await act(async () => {
-          for (let elapsed = 0; elapsed < 1100; elapsed += 100) {
-            callback({ eventCount: 1, summary: { add: 1 }, structural: true })
-            await vi.advanceTimersByTimeAsync(100)
-          }
-        })
-        expect(onRefresh).toHaveBeenCalledTimes(2)
       })
     })
 

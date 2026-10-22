@@ -75,17 +75,19 @@ export function getRefreshDelay(
 }
 
 /**
- * The max wait for the next tree refresh: at least `floorMs`, and at least
- * twice as long as the last refresh took. On a project whose tree read takes
- * seconds a 1 s cap would start the next full read as soon as the last one
- * ended, keeping disk and CPU busy without pause (the #208 concern); this keeps
- * the tree at most about two reads behind and the reader idle half the time.
+ * The max wait for the next tree refresh: at least `floorMs`, twice the
+ * (smoothed) time one tree read takes, and never more than `ceilingMs`. On a
+ * project whose read takes seconds a 1 s cap would start the next full read
+ * as soon as the last one ended, keeping disk and CPU busy without pause (the
+ * #208 concern); twice the read keeps the reader idle about half the time,
+ * and the ceiling keeps the tree from falling far behind on a very slow one.
  *
  * @param floorMs - The configured max wait
- * @param lastRefreshMs - How long the last refresh took (0 before the first)
+ * @param readMs - How long a tree read takes, the read alone (0 before the first)
+ * @param ceilingMs - The longest max wait
  */
-export function getMaxWait(floorMs: number, lastRefreshMs: number): number {
-  return Math.max(floorMs, 2 * lastRefreshMs)
+export function getMaxWait(floorMs: number, readMs: number, ceilingMs: number): number {
+  return Math.min(ceilingMs, Math.max(floorMs, 2 * readMs))
 }
 
 /**

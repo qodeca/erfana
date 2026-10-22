@@ -27,6 +27,7 @@ import type { IUseProjectManagementOptions, IUseProjectManagementReturn } from '
 import { useDialog } from '../components/Dialog'
 import { showGlobalToast } from '../components/Toast/toastService'
 import { logger } from '../utils/logger'
+import { recordTreeReadMs } from '../utils/treeReadTiming'
 import { noteProjectGeneration } from '../services/projectGeneration'
 import {
   createCoalescingRunner,
@@ -439,6 +440,7 @@ export function useProjectManagement(
       const refreshStart = performance.now()
       const fileTree = await api.file.readDirectory({ dirPath: path })
       const refreshDuration = Math.round(performance.now() - refreshStart)
+      recordTreeReadMs(refreshDuration)
       const applied = applyTreeIfCurrent(ticket, fileTree)
       logger.info('[useProjectManagement] File tree refreshed', {
         durationMs: refreshDuration,

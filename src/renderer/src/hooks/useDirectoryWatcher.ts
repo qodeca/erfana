@@ -37,13 +37,13 @@ import {
 } from './useDirectoryWatcher.logic'
 import { DIRECTORY_WATCHER } from '../components/ProjectTree/constants'
 import { logger } from '../utils/logger'
+import { getTreeReadMs, resetTreeReadTiming } from '../utils/treeReadTiming'
 
 interface UseDirectoryWatcherOptions {
   projectPath: string | null
   initialLoadComplete: boolean
   isInternalOperationRef: React.MutableRefObject<boolean>
-  /** Re-reads the tree; a returned promise lets the max wait follow how long a read takes */
-  onRefresh: () => void | Promise<void>
+  onRefresh: () => void
   onProjectDeleted: () => void
   onError: (error: string) => void
 }
@@ -71,16 +71,18 @@ export function useDirectoryWatcher({
   // bursts of 'directory-watch:changed' broadcasts (multi-file edits, save
   // storms, formatters). Mirrors the useGitStatus.debouncedRefresh pattern,
   // plus a max wait so a steady stream still refreshes: about once a second,
-  // or every two read-lengths on a project whose tree read takes longer.
+  // or every two read-lengths (at most 10 s) on a project whose read is slow.
   const refreshTimerRef = useRef<NodeJS.Timeout | null>(null)
   const burstStartedAtRef = useRef(0)
-  const lastRefreshMsRef = useRef(0)
 
   useEffect(() => {
     // Guard: Should we start the watcher?
     if (!shouldStartWatcher(projectPath, initialLoadComplete)) {
       return
     }
+
+    // A new project: its reads have not been timed yet
+    resetTreeReadTiming()
 
     // Start watching the project directory
     window.api.directoryWatch.start(projectPath as string).catch((err) => {
@@ -116,14 +118,11 @@ export function useDirectoryWatcher({
         burstStartedAtRef.current,
         now,
         DIRECTORY_WATCHER.DEBOUNCE_DELAY,
-        getMaxWait(DIRECTORY_WATCHER.MAX_WAIT, lastRefreshMsRef.current)
+        getMaxWait(DIRECTORY_WATCHER.MAX_WAIT, getTreeReadMs(), DIRECTORY_WATCHER.MAX_WAIT_CEILING)
       )
       refreshTimerRef.current = setTimeout(() => {
         refreshTimerRef.current = null
-        const started = Date.now()
-        void Promise.resolve(onRefreshRef.current()).finally(() => {
-          lastRefreshMsRef.current = Date.now() - started
-        })
+        onRefreshRef.current()
       }, delay)
     })
 

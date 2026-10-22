@@ -180,10 +180,11 @@ describe('useDirectoryWatcher.logic', () => {
       expect(getRefreshDelay(0, 1200, 250, 1000)).toBe(0)
     })
 
-    it('stretches the max wait to twice the last refresh', () => {
-      expect(getMaxWait(1000, 0)).toBe(1000)
-      expect(getMaxWait(1000, 300)).toBe(1000)
-      expect(getMaxWait(1000, 3000)).toBe(6000)
+    it('stretches the max wait to twice the read, up to the ceiling', () => {
+      expect(getMaxWait(1000, 0, 10000)).toBe(1000)
+      expect(getMaxWait(1000, 300, 10000)).toBe(1000)
+      expect(getMaxWait(1000, 3000, 10000)).toBe(6000)
+      expect(getMaxWait(1000, 30000, 10000)).toBe(10000)
     })
   })
 })
