@@ -837,12 +837,21 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     // - Smart recovery targeting user's reading position
     // Flow control (finding [30]): xterm reports each batch once parsed, and the
     // acker passes the totals to main, which pauses the PTY while we lag behind.
+    // A hidden window acks on receipt (see outputAck.ts), so a build or agent
+    // left running in the background is never held back by throttled parsing.
     const acker = createOutputAcker(terminalId, terminalGateway.ackOutput)
+    // Per terminal, not a window-wide action: every mounted panel must release
+    // its own terminal's output, so no active-panel gate here
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') acker.releaseInFlight()
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
     const dataHandler = wrapOnDataHandler((data: { terminalId: string; data: string }) => {
-      if (data.terminalId === terminalId && xtermRef.current) {
+      if (data.terminalId !== terminalId) return
+      const parsed = acker.received(data.data.length, document.visibilityState === 'hidden')
+      if (xtermRef.current) {
         // Write data to terminal
-        const chars = data.data.length
-        xtermRef.current.write(data.data, () => acker.parsed(chars))
+        xtermRef.current.write(data.data, parsed)
 
         // Record recent activity (ignore warmup period noise)
         if (Date.now() >= warmupUntilRef.current) {
@@ -850,6 +859,9 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
           // Light Claude-status re-check on output (#216, debounced).
           nudgeClaudeStatus(terminalId)
         }
+      } else {
+        // No xterm to parse it: count it as handled, so main's count stays true
+        parsed?.()
       }
     })
 
@@ -883,7 +895,9 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       if (dataListeningIdRef.current === terminalId) dataListeningIdRef.current = null
       clearConfirmWaitersRef.current.delete(terminalId)
       unsubscribeData()
-      acker.flush()
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      // Writes still being parsed may never call back once the panel is gone
+      acker.releaseInFlight()
       unsubscribeExit()
       unsubscribeError()
     }

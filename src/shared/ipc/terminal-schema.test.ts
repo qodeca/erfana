@@ -30,20 +30,20 @@ describe('TerminalIdSchema', () => {
 })
 
 describe('TerminalOutputAckRequestSchema', () => {
-  it.each([1, 32 * 1024, TERMINAL_OUTPUT_ACK_MAX_CHARS])('accepts %d', (bytes) => {
-    expect(TerminalOutputAckRequestSchema.safeParse({ terminalId: 'terminal-1', bytes }).success).toBe(true)
+  it.each([1, 32 * 1024, TERMINAL_OUTPUT_ACK_MAX_CHARS])('accepts %d', (chars) => {
+    expect(TerminalOutputAckRequestSchema.safeParse({ terminalId: 'terminal-1', chars }).success).toBe(true)
   })
 
   it.each([0, -1, 0.5, TERMINAL_OUTPUT_ACK_MAX_CHARS + 1, Number.NaN, Number.POSITIVE_INFINITY, '10', null])(
-    'refuses bytes %j',
-    (bytes) => {
-      expect(TerminalOutputAckRequestSchema.safeParse({ terminalId: 'terminal-1', bytes }).success).toBe(false)
+    'refuses chars %j',
+    (chars) => {
+      expect(TerminalOutputAckRequestSchema.safeParse({ terminalId: 'terminal-1', chars }).success).toBe(false)
     }
   )
 
   it('is strict and needs a valid id', () => {
-    expect(TerminalOutputAckRequestSchema.safeParse({ terminalId: 'terminal-1', bytes: 1, extra: 1 }).success).toBe(false)
-    expect(TerminalOutputAckRequestSchema.safeParse({ terminalId: 'nope', bytes: 1 }).success).toBe(false)
+    expect(TerminalOutputAckRequestSchema.safeParse({ terminalId: 'terminal-1', chars: 1, extra: 1 }).success).toBe(false)
+    expect(TerminalOutputAckRequestSchema.safeParse({ terminalId: 'nope', chars: 1 }).success).toBe(false)
   })
 })
 

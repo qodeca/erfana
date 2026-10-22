@@ -40,7 +40,7 @@ export const terminalBridge: TerminalBridge = {
   markClearComplete: (terminalId) => {
     ipcRenderer.send(TERMINAL_CHANNELS.clearComplete, { terminalId })
   },
-  ackOutput: (terminalId, bytes) => {
-    ipcRenderer.send(TERMINAL_CHANNELS.ackOutput, { terminalId, bytes })
+  ackOutput: (terminalId, chars) => {
+    ipcRenderer.send(TERMINAL_CHANNELS.ackOutput, { terminalId, chars })
   }
 }

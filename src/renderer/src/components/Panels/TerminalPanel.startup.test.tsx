@@ -212,4 +212,64 @@ describe('TerminalPanel start-up clear handshake', () => {
     for (const done of parsed.splice(0)) done()
     expect(window.api.terminal.ackOutput).toHaveBeenCalledExactlyOnceWith(TERMINAL_ID, 32 * 1024)
   })
+
+  describe('hidden window (flow control)', () => {
+    let visibility: DocumentVisibilityState = 'visible'
+    beforeEach(() => {
+      visibility = 'visible'
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => visibility })
+    })
+    afterEach(() => {
+      delete (document as unknown as { visibilityState?: unknown }).visibilityState
+    })
+
+    async function panelWithHeldParses() {
+      let dataHandler: ((d: { terminalId: string; data: string }) => void) | null = null
+      window.api.terminal.onData.mockImplementation((cb: typeof dataHandler) => {
+        dataHandler = cb
+        return vi.fn()
+      })
+      const parsed: Array<() => void> = []
+      mockXtermInstance.write.mockImplementation((_d: string, cb?: () => void) => {
+        if (cb) parsed.push(cb)
+      })
+      await renderPanel()
+      await waitFor(() => expect(dataHandler).not.toBeNull())
+      parsed.length = 0
+      return { send: (data: string) => dataHandler!({ terminalId: TERMINAL_ID, data }), parsed }
+    }
+
+    it('acks on receipt while hidden, before xterm has parsed anything', async () => {
+      const { send, parsed } = await panelWithHeldParses()
+      visibility = 'hidden'
+      send('x'.repeat(32 * 1024))
+      expect(window.api.terminal.ackOutput).toHaveBeenCalledExactlyOnceWith(TERMINAL_ID, 32 * 1024)
+      // Written without a parse callback, so it can never be counted twice
+      expect(parsed).toHaveLength(0)
+      expect(mockXtermInstance.write).toHaveBeenLastCalledWith('x'.repeat(32 * 1024), undefined)
+    })
+
+    it('releases output still being parsed when the window hides, and counts it once', async () => {
+      const { send, parsed } = await panelWithHeldParses()
+      send('x'.repeat(16 * 1024))
+      send('x'.repeat(8 * 1024))
+      expect(window.api.terminal.ackOutput).not.toHaveBeenCalled()
+
+      visibility = 'hidden'
+      document.dispatchEvent(new Event('visibilitychange'))
+      expect(window.api.terminal.ackOutput).toHaveBeenCalledExactlyOnceWith(TERMINAL_ID, 24 * 1024)
+
+      // The parses finish later: nothing more is reported for them
+      for (const done of parsed.splice(0)) done()
+      expect(window.api.terminal.ackOutput).toHaveBeenCalledTimes(1)
+
+      // Visible again: acks follow the parse callbacks once more
+      visibility = 'visible'
+      document.dispatchEvent(new Event('visibilitychange'))
+      send('x'.repeat(32 * 1024))
+      expect(window.api.terminal.ackOutput).toHaveBeenCalledTimes(1)
+      for (const done of parsed.splice(0)) done()
+      expect(window.api.terminal.ackOutput).toHaveBeenLastCalledWith(TERMINAL_ID, 32 * 1024)
+    })
+  })
 })

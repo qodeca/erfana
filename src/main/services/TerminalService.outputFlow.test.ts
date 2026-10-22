@@ -192,6 +192,37 @@ describe('TerminalService output batching and flow control', () => {
     await disposed
   })
 
+  it('sends the queued output before the exit event when a write finds the PTY closed (EPIPE)', async () => {
+    const { terminalService, terminalId, pty, events } = await started()
+    pty.emit('data', 'last line\r\n')
+    pty.write.mockImplementation(() => {
+      throw Object.assign(new Error('write EPIPE'), { code: 'EPIPE' })
+    })
+    expect(terminalService.write(terminalId, 'x')).toBe(false)
+    expect(events.map((e) => e.type)).toEqual(['data', 'exit'])
+    expect(events[0].data).toBe('last line\r\n')
+    vi.advanceTimersByTime(TERMINAL_OUTPUT_FLUSH_MS * 10)
+    expect(events).toHaveLength(2)
+  })
+
+  it('disposes the flow when a resize finds the PTY already exited', async () => {
+    const { terminalService, terminalId, pty, data } = await started()
+    flood(pty, TERMINAL_OUTPUT_HIGH_WATERMARK + TERMINAL_OUTPUT_BATCH_MAX_CHARS)
+    pty.emit('data', 'queued')
+    expect(pty.pause).toHaveBeenCalled()
+    pty.resize.mockImplementation(() => {
+      throw new Error('Cannot resize a pty that has already exited')
+    })
+    expect(terminalService.resize(terminalId, 100, 30)).toBe(false)
+    // Queued output went out, the pause was lifted, and nothing is left running
+    expect(data().at(-1)).toBe('queued')
+    expect(pty.resume).toHaveBeenCalledTimes(1)
+    expect(vi.getTimerCount()).toBe(0)
+    pty.emit('data', 'late')
+    vi.advanceTimersByTime(TERMINAL_OUTPUT_FLUSH_MS)
+    expect(data().at(-1)).toBe('queued')
+  })
+
   it('never pauses a Windows terminal, only batches its output', async () => {
     const { pty, data } = await started('win32')
     const sent = flood(pty, TERMINAL_OUTPUT_HIGH_WATERMARK * 3)

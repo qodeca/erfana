@@ -765,11 +765,10 @@ export class TerminalService extends EventEmitter {
       // Continue with kill anyway - don't let timeout error prevent cleanup
     }
 
-    // Send what is queued and lift a pause first: a paused shell would not see
-    // its hang-up, and node-pty would not report its exit
-    terminal.output.release()
-
     try {
+      // Send what is queued and lift a pause first: a paused shell would not see
+      // its hang-up, and node-pty would not report its exit
+      terminal.output.release()
       this.ptyKill(terminal)
       terminal.output.dispose()
       this.terminals.delete(terminalId)

@@ -218,7 +218,7 @@ Note the `file:` prefix – these are **not** `external-file:*`.
 | `terminal:list` | List the calling window's live terminals |
 | `terminal:getActivity` | Whether a program other than the shell is running in the terminal: `{ success, busy, known }` (`known: false` on Windows). Owner-checked |
 | `terminal:clearComplete` | `ipcMain.on` – renderer acknowledges that a clear finished |
-| `terminal:ackOutput` | `ipcMain.on` – flow control: strict `{ terminalId, bytes }` (integer 1–16 Mi), how much output xterm has parsed; sent once per 32 KiB. Owner-checked – an ack from another window is ignored. Main pauses the PTY above 512 KiB unacknowledged and resumes below 128 KiB (POSIX only; Windows is batched, never paused). See `src/main/services/terminalOutputFlow.ts` and [performance/terminal-output-batching.md](performance/terminal-output-batching.md) |
+| `terminal:ackOutput` | `ipcMain.on` – flow control: strict `{ terminalId, chars }` (an integer count of UTF-16 code units, 1–16 Mi), how much output xterm has parsed; sent once per 32 KiB, and on receipt while the window is hidden. Owner-checked – an ack from another window is ignored. Main pauses the PTY above 512 KiB unacknowledged and resumes below 128 KiB, or after 5 s with no ack progress (POSIX only; Windows is batched, never paused). See `src/main/services/terminalOutputFlow.ts` and [performance/terminal-output-batching.md](performance/terminal-output-batching.md) |
 | `terminal:data` | Event: PTY output (main → the owning window), batched per terminal – every 8 ms or at 64 KiB, in order, and always before that terminal's `terminal:exit` |
 | `terminal:exit` | Event: PTY exited, with exit code and signal |
 | `terminal:error` | Event: PTY error |

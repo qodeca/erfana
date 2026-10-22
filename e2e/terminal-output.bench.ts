@@ -24,6 +24,11 @@
  * - **renderer main thread**: long tasks (> 50 ms) and total blocking time;
  * - **renderer heap**: the largest `performance.memory.usedJSHeapSize` seen.
  *
+ * The window stays in front. A minimised or covered window cannot be measured
+ * through Playwright (it turns background throttling off and keeps the page
+ * "visible"); `fixtures/terminalHiddenFloodDriver.cjs` runs that case from the
+ * app's own main process (`ERFANA_BENCH_HIDE=minimize|cover` in the A/B script).
+ *
  * Raw results go to `$ERFANA_BENCH_OUT` (default `.local/bench/`) as one JSON
  * file per run; the summary is printed to stdout.
  *

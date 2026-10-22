@@ -368,7 +368,7 @@ export function registerTerminalHandlers(session: ProjectSession): void {
     const parsed = TerminalOutputAckRequestSchema.safeParse(payload)
     if (!parsed.success) return
     if (!ownsTerminal(event.sender?.id, parsed.data.terminalId)) return
-    terminalService.ackOutput(parsed.data.terminalId, parsed.data.bytes)
+    terminalService.ackOutput(parsed.data.terminalId, parsed.data.chars)
   })
 
   logger.info('✅ Terminal IPC handlers registered')

@@ -484,13 +484,13 @@ describe('terminal-handlers', () => {
     const ack = (id: number, payload: unknown) => onListeners.get('terminal:ackOutput')!(event(id), payload)
 
     it('passes an ack from the owner to the service', () => {
-      ack(OWNER, { terminalId: 'terminal-1', bytes: 32_768 })
+      ack(OWNER, { terminalId: 'terminal-1', chars: 32_768 })
       expect(mockTerminalService.ackOutput).toHaveBeenCalledWith('terminal-1', 32_768)
     })
 
     it('ignores an ack from a window that does not own the terminal, and for an unknown id', () => {
-      ack(OTHER, { terminalId: 'terminal-1', bytes: 32_768 })
-      ack(OWNER, { terminalId: 'terminal-2', bytes: 32_768 })
+      ack(OTHER, { terminalId: 'terminal-1', chars: 32_768 })
+      ack(OWNER, { terminalId: 'terminal-2', chars: 32_768 })
       expect(mockTerminalService.ackOutput).not.toHaveBeenCalled()
     })
 
@@ -500,16 +500,16 @@ describe('terminal-handlers', () => {
         null,
         'terminal-1',
         { terminalId: 'terminal-1' },
-        { terminalId: 'terminal-1', bytes: 0 },
-        { terminalId: 'terminal-1', bytes: -5 },
-        { terminalId: 'terminal-1', bytes: 1.5 },
-        { terminalId: 'terminal-1', bytes: Number.NaN },
-        { terminalId: 'terminal-1', bytes: Number.POSITIVE_INFINITY },
-        { terminalId: 'terminal-1', bytes: '100' },
-        { terminalId: 'terminal-1', bytes: 16 * 1024 * 1024 + 1 },
-        { terminalId: 'bogus', bytes: 10 },
+        { terminalId: 'terminal-1', chars: 0 },
+        { terminalId: 'terminal-1', chars: -5 },
+        { terminalId: 'terminal-1', chars: 1.5 },
+        { terminalId: 'terminal-1', chars: Number.NaN },
+        { terminalId: 'terminal-1', chars: Number.POSITIVE_INFINITY },
+        { terminalId: 'terminal-1', chars: '100' },
+        { terminalId: 'terminal-1', chars: 16 * 1024 * 1024 + 1 },
+        { terminalId: 'bogus', chars: 10 },
         // Strict: an extra field is refused rather than ignored
-        { terminalId: 'terminal-1', bytes: 10, webContentsId: OWNER }
+        { terminalId: 'terminal-1', chars: 10, webContentsId: OWNER }
       ]) {
         ack(OWNER, payload)
       }
@@ -517,7 +517,7 @@ describe('terminal-handlers', () => {
     })
 
     it('accepts the largest ack', () => {
-      ack(OWNER, { terminalId: 'terminal-1', bytes: 16 * 1024 * 1024 })
+      ack(OWNER, { terminalId: 'terminal-1', chars: 16 * 1024 * 1024 })
       expect(mockTerminalService.ackOutput).toHaveBeenCalledWith('terminal-1', 16 * 1024 * 1024)
     })
   })

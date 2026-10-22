@@ -136,14 +136,26 @@ describe('TerminalOutputFlow', () => {
       expect(sent).toHaveLength(1)
     })
 
-    it('lifts a pause that gets no ack within the stall window', () => {
-      const { flow, resume } = setup()
+    it('lifts a pause with no ack progress within the stall window, keeping the count', () => {
+      const { flow, pause, resume } = setup()
       sendNow(flow, TERMINAL_OUTPUT_HIGH_WATERMARK + 1)
       vi.advanceTimersByTime(TERMINAL_OUTPUT_STALL_MS - 1)
       expect(resume).not.toHaveBeenCalled()
       vi.advanceTimersByTime(1)
       expect(resume).toHaveBeenCalledTimes(1)
-      expect(flow.unacknowledged).toBe(0)
+      expect(flow.unacknowledged).toBe(TERMINAL_OUTPUT_HIGH_WATERMARK + 1)
+
+      // No pause again until the renderer shows it is alive: never a stuck program
+      sendNow(flow, TERMINAL_OUTPUT_HIGH_WATERMARK)
+      expect(pause).toHaveBeenCalledTimes(1)
+      expect(vi.getTimerCount()).toBe(0)
+
+      // The next ack restores flow control, against the true count
+      flow.ack(1)
+      sendNow(flow, 1)
+      expect(pause).toHaveBeenCalledTimes(2)
+      flow.ack(flow.unacknowledged - TERMINAL_OUTPUT_LOW_WATERMARK + 1)
+      expect(resume).toHaveBeenCalledTimes(2)
     })
 
     it('restarts the stall window on every ack that still leaves it paused', () => {
@@ -155,6 +167,15 @@ describe('TerminalOutputFlow', () => {
       expect(resume).not.toHaveBeenCalled()
       vi.advanceTimersByTime(100)
       expect(resume).toHaveBeenCalledTimes(1)
+    })
+
+    it('does not pause a shell that is already gone', () => {
+      const { flow, pause, sent } = setup({ alive: () => false })
+      sendNow(flow, TERMINAL_OUTPUT_HIGH_WATERMARK * 2)
+      sendNow(flow, TERMINAL_OUTPUT_HIGH_WATERMARK * 2)
+      expect(pause).not.toHaveBeenCalled()
+      expect(sent).toHaveLength(2)
+      expect(vi.getTimerCount()).toBe(0)
     })
 
     it('lifts the pause as soon as the shell is gone, and does not pause again', () => {
@@ -175,14 +196,37 @@ describe('TerminalOutputFlow', () => {
   })
 
   describe('dispose and release', () => {
-    it('dispose sends what is queued and resumes a paused PTY', () => {
+    it('dispose sends what is queued and resumes a paused PTY, leaving no timer', () => {
       const { flow, sent, resume } = setup()
       sendNow(flow, TERMINAL_OUTPUT_HIGH_WATERMARK + 1)
       flow.push('last words')
+      expect(vi.getTimerCount()).toBeGreaterThan(0)
       flow.dispose()
       expect(sent[sent.length - 1]).toBe('last words')
       expect(resume).toHaveBeenCalledTimes(1)
       expect(flow.isPaused).toBe(false)
+      expect(vi.getTimerCount()).toBe(0)
+    })
+
+    it('release resumes a paused PTY even when sending the queued output throws', () => {
+      const pause = vi.fn()
+      const resume = vi.fn()
+      let fail = false
+      const flow = new TerminalOutputFlow({
+        emit: () => {
+          if (fail) throw new Error('window gone')
+        },
+        pause,
+        resume,
+        isAlive: () => true
+      })
+      sendNow(flow, TERMINAL_OUTPUT_HIGH_WATERMARK + 1)
+      flow.push('queued')
+      fail = true
+      expect(() => flow.release()).toThrow('window gone')
+      expect(resume).toHaveBeenCalledTimes(1)
+      expect(flow.isPaused).toBe(false)
+      expect(vi.getTimerCount()).toBe(0)
     })
 
     it('ignores pushes and acks after dispose and leaves no timer behind', () => {

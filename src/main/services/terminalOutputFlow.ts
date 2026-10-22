@@ -11,13 +11,14 @@
  *
  * Flow control follows the xterm.js guide
  * (https://xtermjs.org/docs/guides/flowcontrol/): the renderer reports how much
- * output xterm has parsed (`terminal:ackOutput`), and above
+ * output xterm has parsed (`terminal:ackOutput`; a hidden window reports on
+ * receipt instead, see `TerminalPanel/outputAck.ts`), and above
  * {@link TERMINAL_OUTPUT_HIGH_WATERMARK} unparsed characters the PTY is paused,
  * so the program blocks on its own writes instead of the app buffering without
  * bound. It resumes below {@link TERMINAL_OUTPUT_LOW_WATERMARK}.
  *
  * Amounts are counted in UTF-16 code units (`string.length`) on both sides,
- * which is cheap and consistent; the wire field is still called `bytes`.
+ * which is cheap and consistent; the wire field is `chars`.
  *
  * Nothing is ever dropped or reordered here: every chunk goes out in the order
  * it arrived, `flush()` runs before the exit event is sent, and `dispose()`
@@ -42,19 +43,25 @@ export const TERMINAL_OUTPUT_HIGH_WATERMARK = 512 * 1024
 export const TERMINAL_OUTPUT_LOW_WATERMARK = 128 * 1024
 
 /**
- * A pause with no ack for this long is lifted (5 s). A renderer that stops
- * acknowledging (a panel that unmounted without killing its terminal, a
- * reload) must not freeze the program in the terminal for good; the count is
- * reset and flow control starts over.
+ * A pause with no ack progress for this long is lifted (5 s). A renderer that
+ * stops acknowledging (a reload, a panel that went away without killing its
+ * terminal) must not freeze the program in the terminal for good. The count of
+ * unacknowledged output is kept, so the watermarks stay true once acks come
+ * back; until the next ack the PTY is not paused again, so a renderer that
+ * never acks again costs back-pressure, never a stuck program.
  */
 export const TERMINAL_OUTPUT_STALL_MS = 5_000
 
 /**
  * How often a paused PTY checks that its shell is still alive (50 ms). On
  * POSIX node-pty waits for the output socket to close before it reports an
- * exit, and destroys the socket 200 ms after the shell died. A socket that is
- * still paused then would lose what it holds, so the pause is lifted as soon
- * as the shell is gone and the rest drains well inside that window.
+ * exit, and destroys the socket 200 ms after the shell was reaped. A socket
+ * that is still paused then would lose what it holds, so the pause is lifted
+ * as soon as the shell is gone and the rest drains well inside that window.
+ * This matters on Linux, where a dead shell is reaped at once. On macOS a
+ * dying shell cannot finish exiting while its terminal output is unread, so
+ * node-pty reports the exit only after the pause is lifted (by an ack or the
+ * stall rule) and nothing is at risk (measured in TerminalService.realPty.test.ts).
  */
 export const TERMINAL_OUTPUT_EXIT_POLL_MS = 50
 
@@ -80,8 +87,10 @@ export class TerminalOutputFlow {
   private stallTimer: NodeJS.Timeout | undefined
   private exitPoll: NodeJS.Timeout | undefined
   private disposed = false
-  /** Set once the shell was found dead while paused: the rest must drain, so it never pauses again. */
+  /** Set once the shell was found dead: the rest must drain, so it never pauses again. */
   private shellGone = false
+  /** Set when a pause timed out with no ack; cleared by the next ack. No pause while set. */
+  private stalled = false
 
   constructor(private readonly options: TerminalOutputFlowOptions) {}
 
@@ -118,13 +127,21 @@ export class TerminalOutputFlow {
     this.options.emit(data)
     if (this.disposed || this.shellGone || !this.options.pause) return
     this.unacked += data.length
-    if (!this.paused && this.unacked > TERMINAL_OUTPUT_HIGH_WATERMARK) this.setPaused(true)
+    if (this.paused || this.stalled || this.unacked <= TERMINAL_OUTPUT_HIGH_WATERMARK) return
+    // A shell that already died must drain, not pause: node-pty destroys its
+    // socket shortly after the exit
+    if (this.options.isAlive && !this.options.isAlive()) {
+      this.shellGone = true
+      return
+    }
+    this.setPaused(true)
   }
 
   /** The renderer has parsed `chars` more characters. */
   ack(chars: number): void {
     if (this.disposed || !this.options.pause) return
     this.unacked = Math.max(0, this.unacked - chars)
+    this.stalled = false
     if (!this.paused) return
     if (this.unacked < TERMINAL_OUTPUT_LOW_WATERMARK) {
       this.setPaused(false)
@@ -149,8 +166,11 @@ export class TerminalOutputFlow {
    * right before a kill, which can fail and leave the terminal running.
    */
   release(): void {
-    this.flush()
-    if (this.paused) this.setPaused(false)
+    try {
+      this.flush()
+    } finally {
+      if (this.paused) this.setPaused(false)
+    }
   }
 
   private setPaused(paused: boolean): void {
@@ -178,7 +198,7 @@ export class TerminalOutputFlow {
     if (this.stallTimer) clearTimeout(this.stallTimer)
     this.stallTimer = setTimeout(() => {
       this.stallTimer = undefined
-      this.unacked = 0
+      this.stalled = true
       this.setPaused(false)
     }, TERMINAL_OUTPUT_STALL_MS)
   }

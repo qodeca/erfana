@@ -77,14 +77,14 @@ export const TERMINAL_OUTPUT_ACK_STEP_CHARS = 32 * 1024
 export const TERMINAL_OUTPUT_ACK_MAX_CHARS = 16 * 1024 * 1024
 
 /**
- * `terminal:ackOutput`: the renderer has parsed `bytes` more characters of the
- * terminal's output (counted as `string.length`, like the main process counts
+ * `terminal:ackOutput`: the renderer has parsed `chars` more characters of the
+ * terminal's output (UTF-16 code units, as `string.length` counts them, like the main process counts
  * what it sent). Strict, and ignored unless it comes from the owning window.
  */
 export const TerminalOutputAckRequestSchema = z
   .object({
     terminalId: TerminalIdSchema,
-    bytes: z.number().int().min(1).max(TERMINAL_OUTPUT_ACK_MAX_CHARS)
+    chars: z.number().int().min(1).max(TERMINAL_OUTPUT_ACK_MAX_CHARS)
   })
   .strict()
 export type TerminalOutputAckRequest = z.infer<typeof TerminalOutputAckRequestSchema>
@@ -181,6 +181,6 @@ export interface TerminalBridge {
   onClear(callback: (data: TerminalIdRequest) => void): () => void
   /** Confirm that a clear was processed. */
   markClearComplete(terminalId: string): void
-  /** Fire-and-forget: report that xterm has parsed `bytes` more characters of output. */
-  ackOutput(terminalId: string, bytes: number): void
+  /** Fire-and-forget: report that xterm has parsed `chars` more characters of output. */
+  ackOutput(terminalId: string, chars: number): void
 }

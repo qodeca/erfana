@@ -303,7 +303,7 @@ describe('terminal bridge', () => {
     terminalBridge.markClearComplete('t')
     expect(ipc.send).toHaveBeenLastCalledWith(TERMINAL_CHANNELS.clearComplete, { terminalId: 't' })
     terminalBridge.ackOutput('t', 4096)
-    expect(ipc.send).toHaveBeenLastCalledWith(TERMINAL_CHANNELS.ackOutput, { terminalId: 't', bytes: 4096 })
+    expect(ipc.send).toHaveBeenLastCalledWith(TERMINAL_CHANNELS.ackOutput, { terminalId: 't', chars: 4096 })
     expect(ipc.invoke).not.toHaveBeenCalled()
   })
 
