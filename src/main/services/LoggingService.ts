@@ -27,7 +27,7 @@ import { randomUUID } from 'node:crypto'
 import { homedir, tmpdir } from 'os'
 import { readdir, stat, unlink, statfs } from 'fs/promises'
 import { join, dirname, basename, extname } from 'path'
-import { unlinkSync, renameSync, lstatSync } from 'fs'
+import { renameSync, lstatSync } from 'fs'
 import { globalSettingsService } from './GlobalSettingsService'
 import { AppError, ErrorCode } from '../../shared/errors'
 import { LOGS_DIR_RELATIVE } from '../../shared/constants'
@@ -114,13 +114,13 @@ export function sanitizeLogText(text: string, maxLength: number = MAX_RENDERER_F
  * - main.log -> main.1.log (most recent)
  * - main.1.log -> main.2.log
  * - ...
- * - ...
- * - the file at MAX_ROTATED_FILES is deleted (oldest)
+ * - main.4.log -> main.5.log, replacing the oldest
  *
- * This function must be synchronous per electron-log requirement
- *
- * Fixed: Shifts files BEFORE deleting oldest to prevent data loss if crash mid-rotation
- * Fixed: Uses try-catch on operations instead of TOCTOU-vulnerable existsSync checks
+ * This function must be synchronous per electron-log requirement, and runs on
+ * the main thread, so it makes one call per file and no more: each shift is a
+ * rename onto the next slot, which replaces the file there in one step, so the
+ * oldest log goes without a separate delete and a crash mid-rotation never
+ * leaves a gap. A missing file is ENOENT on its rename, not an existence check.
  */
 function archiveLog(oldLogFile: Logger.LogFile): void {
   const logPath = oldLogFile.path
@@ -129,8 +129,7 @@ function archiveLog(oldLogFile: Logger.LogFile): void {
   const base = basename(logPath, ext)
 
   try {
-    // 1. Shift files down FIRST (reverse order for safety)
-    // Work from highest to lowest to avoid clobbering files
+    // 1. Shift rotated files down, highest first, so none is overwritten unread
     for (let i = MAX_ROTATED_FILES - 1; i >= 1; i--) {
       const currentPath = join(dir, `${base}.${i}${ext}`)
       const nextPath = join(dir, `${base}.${i + 1}${ext}`)
@@ -150,17 +149,6 @@ function archiveLog(oldLogFile: Logger.LogFile): void {
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
         console.error(`[LoggingService] Failed to rotate ${logPath}:`, err)
-      }
-    }
-
-    // 3. Delete oldest file AFTER rotation succeeds
-    const oldestPath = join(dir, `${base}.${MAX_ROTATED_FILES}${ext}`)
-    try {
-      unlinkSync(oldestPath)
-    } catch (err) {
-      // Ignore ENOENT (file already gone is fine)
-      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
-        console.error(`[LoggingService] Failed to delete oldest log ${oldestPath}:`, err)
       }
     }
   } catch (error) {

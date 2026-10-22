@@ -154,21 +154,20 @@ describe('AtomicSaveDetector', () => {
     })
   })
 
-  describe('fallback to sync check', () => {
-    it('should fallback to existsSync when stat throws', async () => {
+  describe('no sync fallback', () => {
+    it('treats a failed stat as a delete without a sync existsSync on the main thread', async () => {
       const callback = vi.fn()
 
-      // async stat fails
+      // async stat fails; the old code then asked existsSync, which answered true
       vi.mocked(fsPromises.stat).mockRejectedValue(new Error('Failed'))
-      // sync check succeeds (file exists)
       vi.mocked(fs.existsSync).mockReturnValue(true)
 
       detector.registerDelete('/test/file.txt', callback)
 
       await vi.advanceTimersByTimeAsync(110)
 
-      expect(callback).toHaveBeenCalledWith('/test/file.txt', true)
-      expect(fs.existsSync).toHaveBeenCalledWith('/test/file.txt')
+      expect(callback).toHaveBeenCalledWith('/test/file.txt', false)
+      expect(fs.existsSync).not.toHaveBeenCalled()
     })
   })
 })
