@@ -20,6 +20,7 @@ import {
   type ConfinementErrorCode
 } from '../../../shared/ipc/confinement'
 import type { FileBridge } from '../../../shared/ipc/file-schema'
+import { notifyFileStructureChanged } from './fileStructureSignal'
 
 /** A file request the main process refused, with the reason as a code. */
 export class FileGatewayError extends Error {
@@ -67,6 +68,22 @@ function forward<K extends RequestMethod>(name: K): FileBridge[K] {
   }) as FileBridge[K]
 }
 
+/**
+ * Forward a method that can add, remove or move entries, and raise
+ * {@link notifyFileStructureChanged} once it settles. Also after a failure: a
+ * batch move or a copy may have done part of its work before it failed.
+ */
+function forwardStructural<K extends RequestMethod>(name: K): FileBridge[K] {
+  const call = forward(name) as unknown as (...a: unknown[]) => Promise<unknown>
+  return (async (...args: unknown[]) => {
+    try {
+      return await call(...args)
+    } finally {
+      notifyFileStructureChanged()
+    }
+  }) as FileBridge[K]
+}
+
 export const fileGateway: FileBridge = {
   openProject: forward('openProject'),
   openProjectByPath: forward('openProjectByPath'),
@@ -77,21 +94,21 @@ export const fileGateway: FileBridge = {
   getStats: forward('getStats'),
   exists: forward('exists'),
   getProjectPath: forward('getProjectPath'),
-  createFile: forward('createFile'),
-  createFolder: forward('createFolder'),
-  deleteFile: forward('deleteFile'),
-  deleteFolder: forward('deleteFolder'),
-  rename: forward('rename'),
+  createFile: forwardStructural('createFile'),
+  createFolder: forwardStructural('createFolder'),
+  deleteFile: forwardStructural('deleteFile'),
+  deleteFolder: forwardStructural('deleteFolder'),
+  rename: forwardStructural('rename'),
   revealInFileManager: forward('revealInFileManager'),
-  moveItem: forward('moveItem'),
-  copyItem: forward('copyItem'),
+  moveItem: forwardStructural('moveItem'),
+  copyItem: forwardStructural('copyItem'),
   checkConflict: forward('checkConflict'),
   validatePath: forward('validatePath'),
   readImage: forward('readImage'),
   validateExternal: forward('validateExternal'),
-  copyFromExternal: forward('copyFromExternal'),
-  moveFromExternal: forward('moveFromExternal'),
-  moveBatchFromExternal: forward('moveBatchFromExternal'),
+  copyFromExternal: forwardStructural('copyFromExternal'),
+  moveFromExternal: forwardStructural('moveFromExternal'),
+  moveBatchFromExternal: forwardStructural('moveBatchFromExternal'),
   selectExternalFiles: forward('selectExternalFiles'),
   onProjectChanged: (...args) => bridge().onProjectChanged(...args),
   closeProject: forward('closeProject')

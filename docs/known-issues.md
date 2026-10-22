@@ -350,7 +350,7 @@ Then close the project and open it again (after editing the global file, restart
 
 **Workaround**: close the project and open it again for items 1, 5, 6 and 8 (restart Erfana first after editing the global file); refresh the tree for item 7; use `.gitignore` for item 2.
 
-**Tracking**: [#211](https://github.com/qodeca/erfana/issues/211); design and the full list in [`docs/designs/211-large-project-windows-watcher.md`](./designs/211-large-project-windows-watcher.md) §9–§10; accepted debt in [technical debt § 65](./technical-debt.md#65-accepted-trade-offs-from-211-2026-09). Content-only changes still re-read the whole tree (a follow-up), and lazy loading stays with #150.
+**Tracking**: [#211](https://github.com/qodeca/erfana/issues/211); design and the full list in [`docs/designs/211-large-project-windows-watcher.md`](./designs/211-large-project-windows-watcher.md) §9–§10; accepted debt in [technical debt § 65](./technical-debt.md#65-accepted-trade-offs-from-211-2026-09). Content-only changes no longer re-read the tree (only git status refreshes for them – see [watcher structural refresh](./performance/watcher-structural-refresh.md)); lazy loading stays with #150.
 
 ---
 

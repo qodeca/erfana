@@ -14,6 +14,7 @@ import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from 'vites
 import { renderHook, act, cleanup } from '@testing-library/react'
 import { useDirectoryWatcher } from './useDirectoryWatcher'
 import { DIRECTORY_WATCHER } from '../components/ProjectTree/constants'
+import { recordTreeReadMs } from '../utils/treeReadTiming'
 
 // Hoist logger mock so vi.mock can reference it
 const { mockLogger } = vi.hoisted(() => ({
@@ -167,10 +168,9 @@ describe('useDirectoryWatcher hook', () => {
       // Reset internal operation flag
       isInternalOperationRef.current = false
 
-      // Now onRefresh should be called after debounce expires.
-      // Uses the real 'change' event key DirectoryWatcherService emits.
+      // Now onRefresh should be called after debounce expires
       act(() => {
-        callback({ eventCount: 2, summary: { change: 1 } })
+        callback({ eventCount: 2, summary: { add: 1, change: 1 }, structural: true })
         vi.advanceTimersByTime(DIRECTORY_WATCHER.DEBOUNCE_DELAY + 1)
       })
 
@@ -232,11 +232,11 @@ describe('useDirectoryWatcher hook', () => {
 
       // Three rapid events within the debounce window
       act(() => {
-        callback({ eventCount: 1, summary: { change: 1 } })
+        callback({ eventCount: 1, summary: { add: 1 }, structural: true })
         vi.advanceTimersByTime(50)
-        callback({ eventCount: 1, summary: { change: 1 } })
+        callback({ eventCount: 1, summary: { unlink: 1 }, structural: true })
         vi.advanceTimersByTime(50)
-        callback({ eventCount: 1, summary: { change: 1 } })
+        callback({ eventCount: 1, summary: { addDir: 1 }, structural: true })
       })
 
       // Not yet — last event reset the timer
@@ -254,9 +254,9 @@ describe('useDirectoryWatcher hook', () => {
 
     it('refreshes on an event with empty summary (hook is summary-shape-agnostic, lens-review Finding 10)', () => {
       // The hook does not inspect the summary contents – isInternalOperationRef
-      // and presence of the broadcast are what gate refresh. This pins the
-      // contract so a future change that starts depending on summary shape
-      // surfaces a test failure rather than silent drift.
+      // and the `structural` flag (absent counts as structural) are what gate
+      // refresh. This pins the contract so a future change that starts
+      // depending on summary shape surfaces a test failure rather than silent drift.
       const onRefresh = vi.fn()
 
       renderHook(() =>
@@ -278,6 +278,148 @@ describe('useDirectoryWatcher hook', () => {
       })
 
       expect(onRefresh).toHaveBeenCalledTimes(1)
+    })
+
+    describe('structural flag (content-only batches skip the tree)', () => {
+      function mountWatcher(): { onRefresh: ReturnType<typeof vi.fn>; callback: (data: unknown) => void } {
+        const onRefresh = vi.fn()
+        renderHook(() =>
+          useDirectoryWatcher({
+            projectPath: '/proj',
+            initialLoadComplete: true,
+            isInternalOperationRef: { current: false },
+            onRefresh,
+            onProjectDeleted: vi.fn(),
+            onError: vi.fn()
+          })
+        )
+        return { onRefresh, callback: mockOnDirectoryChanged.mock.calls[0][0] }
+      }
+
+      it('does not re-read the tree for a content-only batch', () => {
+        const { onRefresh, callback } = mountWatcher()
+
+        act(() => {
+          callback({ eventCount: 3, summary: { change: 3 }, structural: false })
+          vi.advanceTimersByTime(DIRECTORY_WATCHER.MAX_WAIT * 2)
+        })
+
+        expect(onRefresh).not.toHaveBeenCalled()
+      })
+
+      it.each([
+        ['add', { add: 1 }],
+        ['unlink', { unlink: 1 }],
+        ['addDir', { addDir: 1 }],
+        ['unlinkDir', { unlinkDir: 1 }]
+      ])('re-reads the tree for a structural %s batch', (_type, summary) => {
+        const { onRefresh, callback } = mountWatcher()
+
+        act(() => {
+          callback({ eventCount: 1, summary, structural: true })
+          vi.advanceTimersByTime(DIRECTORY_WATCHER.DEBOUNCE_DELAY + 1)
+        })
+
+        expect(onRefresh).toHaveBeenCalledTimes(1)
+      })
+
+      it('a catch-up refresh re-reads the tree even if marked non-structural', () => {
+        const { onRefresh, callback } = mountWatcher()
+
+        act(() => {
+          callback({ eventCount: 0, summary: {}, structural: false, catchUp: true })
+          vi.advanceTimersByTime(DIRECTORY_WATCHER.DEBOUNCE_DELAY + 1)
+        })
+
+        expect(onRefresh).toHaveBeenCalledTimes(1)
+      })
+
+      it('a content-only batch does not restart a pending structural refresh', () => {
+        const { onRefresh, callback } = mountWatcher()
+
+        act(() => {
+          callback({ eventCount: 1, summary: { add: 1 }, structural: true })
+          vi.advanceTimersByTime(DIRECTORY_WATCHER.DEBOUNCE_DELAY - 10)
+          callback({ eventCount: 1, summary: { change: 1 }, structural: false })
+          vi.advanceTimersByTime(11)
+        })
+
+        expect(onRefresh).toHaveBeenCalledTimes(1)
+      })
+    })
+
+    describe('max wait', () => {
+      it('refreshes within MAX_WAIT under a steady stream of structural events', () => {
+        const onRefresh = vi.fn()
+        renderHook(() =>
+          useDirectoryWatcher({
+            projectPath: '/proj',
+            initialLoadComplete: true,
+            isInternalOperationRef: { current: false },
+            onRefresh,
+            onProjectDeleted: vi.fn(),
+            onError: vi.fn()
+          })
+        )
+        const callback = mockOnDirectoryChanged.mock.calls[0][0]
+
+        // One event every 100 ms keeps restarting the 250 ms debounce
+        act(() => {
+          for (let elapsed = 0; elapsed < DIRECTORY_WATCHER.MAX_WAIT; elapsed += 100) {
+            callback({ eventCount: 1, summary: { add: 1 }, structural: true })
+            vi.advanceTimersByTime(100)
+          }
+        })
+
+        expect(onRefresh).toHaveBeenCalledTimes(1)
+
+        // The stream goes on: the next burst is capped the same way
+        act(() => {
+          for (let elapsed = 0; elapsed < DIRECTORY_WATCHER.MAX_WAIT; elapsed += 100) {
+            callback({ eventCount: 1, summary: { add: 1 }, structural: true })
+            vi.advanceTimersByTime(100)
+          }
+        })
+
+        expect(onRefresh).toHaveBeenCalledTimes(2)
+      })
+
+      it.each([
+        ['twice a slow read', 3000, 6000],
+        ['the 10 s ceiling for a very slow read', 30000, 10000]
+      ])('stretches the max wait to %s', (_label, readMs, maxWaitMs) => {
+        const onRefresh = vi.fn()
+        renderHook(() =>
+          useDirectoryWatcher({
+            projectPath: '/proj',
+            initialLoadComplete: true,
+            isInternalOperationRef: { current: false },
+            onRefresh,
+            onProjectDeleted: vi.fn(),
+            onError: vi.fn()
+          })
+        )
+        const callback = mockOnDirectoryChanged.mock.calls[0][0]
+        // The read alone, as useProjectManagement records it
+        recordTreeReadMs(readMs)
+
+        // A steady stream, one event every 100 ms
+        act(() => {
+          for (let elapsed = 0; elapsed < maxWaitMs - 200; elapsed += 100) {
+            callback({ eventCount: 1, summary: { add: 1 }, structural: true })
+            vi.advanceTimersByTime(100)
+          }
+        })
+        expect(onRefresh).not.toHaveBeenCalled()
+
+        act(() => {
+          for (let elapsed = 0; elapsed < 400; elapsed += 100) {
+            callback({ eventCount: 1, summary: { add: 1 }, structural: true })
+            vi.advanceTimersByTime(100)
+          }
+        })
+        expect(onRefresh).toHaveBeenCalledTimes(1)
+      })
     })
 
     it('calls onProjectDeleted when project deletion event received', () => {

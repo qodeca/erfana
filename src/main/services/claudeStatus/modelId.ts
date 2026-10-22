@@ -27,7 +27,13 @@
  * {@link windowForModelId}, so its tests cannot degenerate into a restatement of
  * the data structure.
  *
+ * Cloud-platform ids (#49) are normalised to the bare `claude-…` form in ONE
+ * place, {@link stripModelVariants}, before any of this runs, so a Bedrock,
+ * Vertex or Foundry id gets the same label, window and sticky key as its bare
+ * equivalent. See {@link normaliseProviderId} for the accepted forms.
+ *
  * @see Issue #41 - Context meter reads the 200k window for Opus 5 sessions
+ * @see Issue #49 - Model ids from Bedrock, Vertex and Foundry are not recognised
  * @see docs/designs/41-model-capability-registry.md §5, §6, §7, §8, §11
  */
 import { MAX_MODEL_ID_LENGTH } from '../../../shared/ipc/claude-status-schema'
@@ -90,6 +96,55 @@ const DATE_SEGMENT_RE = /^\d{8}$/
  */
 const MODEL_ID_RE = /^claude-([a-z]+)-(\d+)(?:-(\d+))?((?:-[a-z0-9]+)*)$/
 
+/**
+ * Max characters of an untrusted id accepted BEFORE provider normalisation
+ * (#49). A Bedrock inference-profile ARN wrapping a Claude id runs to ~100
+ * characters, so the 64-char {@link MAX_MODEL_ID_LENGTH} cannot be the input
+ * bound any more; it still bounds the NORMALISED id. Every operation on the
+ * raw text is linear, so this is a cost ceiling, not a ReDoS mitigation.
+ */
+export const MAX_PROVIDER_MODEL_ID_LENGTH = 256
+
+/**
+ * A Bedrock ARN whose resource names a model: `arn:<partition>:bedrock:<region>:
+ * <account>:inference-profile/` or `…:foundation-model/` (the account is empty
+ * for a foundation model). Only these two resource types: an
+ * `application-inference-profile/` id is a name the user chose, not a model, so
+ * it stays unreadable, and an ARN of any other service never maps. Linear: no
+ * class contains the `:` or `/` delimiters that follow it.
+ */
+const BEDROCK_MODEL_ARN_RE =
+  /^arn:aws[a-z-]*:bedrock:[a-z0-9-]*:\d*:(?:inference-profile|foundation-model)\//
+
+/** The vendor segment Bedrock puts in front of every Claude id. */
+const BEDROCK_VENDOR_PREFIX = 'anthropic.'
+
+/**
+ * The documented Bedrock inference-profile geographies. A list, not a shape:
+ * a shape match let `openai.anthropic.claude-…` through. A geography AWS adds
+ * later is a one-line change here.
+ * @see https://code.claude.com/docs/en/amazon-bedrock — "Valid values are `us`, `eu`, `apac`, `jp`, `au`, and `global`"; GovCloud uses `us-gov.`
+ * @see https://platform.claude.com/docs/en/build-with-claude/claude-on-amazon-bedrock-legacy — `global`, `us`, `eu`, `jp`, `apac` columns
+ */
+const BEDROCK_GEOGRAPHIES: ReadonlySet<string> = new Set([
+  'us',
+  'eu',
+  'apac',
+  'jp',
+  'au',
+  'global',
+  'us-gov'
+])
+
+/** Bedrock's trailing model version (`-v1:0`, `-v1`). Anchored at the end. */
+const BEDROCK_VERSION_SUFFIX_RE = /-v\d+(?::\d+)?$/
+
+/**
+ * Vertex's pinned-snapshot form, `claude-haiku-4-5@20251001`. Linear: the
+ * literal `@` cannot be consumed by the `[a-z0-9-]` class before it.
+ */
+const VERTEX_DATE_RE = /^(claude-[a-z0-9-]+)@(\d{8})$/
+
 /** Frozen empty variant list, shared to avoid per-call allocation. */
 const NO_VARIANTS: readonly string[] = Object.freeze([])
 
@@ -112,23 +167,72 @@ export interface ParsedModelId {
 }
 
 /**
- * Split trailing `[…]` variant groups off an untrusted model id.
+ * Map a cloud-platform model id onto the bare `claude-…` form (#49). Input is
+ * the trimmed, lower-cased base with variant groups already split off.
+ *
+ * Forms accepted, from each platform's documentation:
+ *  - Bedrock ARN, `arn:aws:bedrock:<region>:<account>:inference-profile/<id>`
+ *    or `…:foundation-model/<id>`: the resource id after the `/` is kept. An
+ *    application-inference-profile ARN names no model and stays unparseable.
+ *  - Bedrock id, `anthropic.claude-…`, optionally behind a documented
+ *    geography (`us.anthropic.claude-…`) and with a version suffix (`…-20251001-v1:0`,
+ *    `…-v1`). The suffix is dropped only when a Bedrock prefix was, so a bare
+ *    id is never reinterpreted.
+ *  - Vertex, `claude-…@<yyyymmdd>`: the `@` becomes the `-` before the date.
+ *  - Foundry deployments default to the bare Claude API id: nothing to do.
+ *
+ * Anything else is returned unchanged and judged by the grammar as before.
+ * ONE pass, never a loop: a stacked prefix (`us.anthropic.us.anthropic.…`)
+ * stays unparseable, and every caller must normalise exactly once. String
+ * primitives and anchored regexes without nested quantifiers only, so the cost
+ * stays linear in the (already bounded) input.
+ */
+function normaliseProviderId(base: string): string {
+  let id = base
+  const arn = BEDROCK_MODEL_ARN_RE.exec(id)
+  if (arn !== null) id = id.slice(arn[0].length)
+
+  const vendor = id.indexOf(BEDROCK_VENDOR_PREFIX)
+  const isBedrock =
+    vendor === 0 ||
+    (vendor > 1 && id[vendor - 1] === '.' && BEDROCK_GEOGRAPHIES.has(id.slice(0, vendor - 1)))
+  if (isBedrock) {
+    id = id.slice(vendor + BEDROCK_VENDOR_PREFIX.length).replace(BEDROCK_VERSION_SUFFIX_RE, '')
+  }
+
+  const vertex = VERTEX_DATE_RE.exec(id)
+  return vertex === null ? id : `${vertex[1]}-${vertex[2]}`
+}
+
+/**
+ * Split trailing `[…]` variant groups off an untrusted model id, and normalise
+ * a cloud-platform id to its bare form ({@link normaliseProviderId}).
  *
  * SECURITY (design §11, F10): the length cap is the FIRST statement, before any
  * scanning. `arg` reaches here from a `<command-args>` block bounded only by the
  * 256 KB tail window, on the main-process event loop ~1x/1.25s per terminal.
+ * The input cap is {@link MAX_PROVIDER_MODEL_ID_LENGTH}; the NORMALISED base is
+ * then held to {@link MAX_MODEL_ID_LENGTH}, so every base returned still fits
+ * the IPC bound.
  *
  * @param raw Untrusted model id, possibly with `[…]` groups appended.
- * @returns The trimmed, lower-cased base plus its variant tokens, or `null` when
- *   the input is over-long, malformed, or carries more than
+ * @returns The normalised base plus its variant tokens, or `null` when the
+ *   input or its normalised base is over-long, malformed, or carries more than
  *   {@link MAX_VARIANT_TOKENS} groups. Never throws.
  */
 export function stripModelVariants(
   raw: string
 ): { base: string; variants: readonly string[] } | null {
-  if (typeof raw !== 'string' || raw.length > MAX_MODEL_ID_LENGTH) return null
+  if (typeof raw !== 'string' || raw.length > MAX_PROVIDER_MODEL_ID_LENGTH) return null
 
-  const value = raw.trim().toLowerCase()
+  const split = splitVariants(raw.trim().toLowerCase())
+  if (split === null) return null
+  const base = normaliseProviderId(split.base)
+  return base.length > MAX_MODEL_ID_LENGTH ? null : { base, variants: split.variants }
+}
+
+/** The `[…]` split behind {@link stripModelVariants}; `value` is trimmed and lower-cased. */
+function splitVariants(value: string): { base: string; variants: readonly string[] } | null {
   const firstBracket = value.indexOf('[')
   if (firstBracket === -1) return { base: value, variants: NO_VARIANTS }
 
@@ -497,4 +601,19 @@ export function windowForModelId(raw: string): 200000 | 1000000 | null {
   if (parsed.variants.includes(EXTENDED_VARIANT)) return EXTENDED
 
   return exactWindowFor(parsed) ?? heuristicWindowFor(parsed)
+}
+
+/**
+ * True iff this module UNDERSTANDS the id: the grammar decomposes it, or the
+ * undecomposable map names it (#49). Separates "could not read the id" from a
+ * genuine "no opinion" — {@link windowForModelId} returns `null` for both, and
+ * only the first makes a 200k meter a guess about an unknown model. A bare
+ * alias (`opus`) is NOT understood here: it names a family, not a window.
+ * Never throws.
+ */
+export function isRecognisedModelId(raw: string): boolean {
+  const stripped = stripModelVariants(raw)
+  if (stripped === null || stripped.base === '') return false
+  if (UNDECOMPOSABLE_WINDOWS.has(stripped.base)) return true
+  return parseStrippedId(stripped.base, stripped.variants) !== null
 }

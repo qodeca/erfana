@@ -21,7 +21,7 @@ Rules for `src/main/services/` that are not readable from a module's own header.
 **Claude status** (`claudeStatus/`)
 
 - `modelId` is the single model-id parser and the single window-policy entry point.
-- `ClaudeTranscriptWatcher` is a refcounted chokidar watcher on `~/.claude/projects`; `fallbackGuard` caps the post-compaction transcript re-read with a per-file-version bounded-read cache (#47).
+- `ClaudeTranscriptWatcher` is a refcounted watcher on `~/.claude/projects/<ENC>` folders – one non-recursive `fs.watch` per folder filtered to `.jsonl`, never one handle per transcript (chokidar held one kqueue descriptor per file on macOS); `fallbackGuard` caps the post-compaction transcript re-read with a per-file-version bounded-read cache (#47).
 
 **HTML preview** (`preview/`)
 

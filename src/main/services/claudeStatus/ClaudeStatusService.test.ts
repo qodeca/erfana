@@ -338,6 +338,20 @@ describe('ClaudeStatusService', () => {
     expect(extra).toBe(2)
   })
 
+  it('asks the watcher on every refresh, so a missing or dead folder watch is re-armed', async () => {
+    const h = makeHarness()
+    h.service.registerPanel('t1', 4242, '/p', 7)
+    await flush()
+    const calls = h.watcher.watchDir.mock.calls.length
+    expect(calls).toBeGreaterThan(0)
+
+    await h.service.refresh('t1')
+    await flush()
+
+    expect(h.watcher.watchDir.mock.calls.length).toBeGreaterThan(calls)
+    expect(h.watcher.unwatchDir).not.toHaveBeenCalled()
+  })
+
   it('unregisterPanel is idempotent and unwatches the dir', async () => {
     const h = makeHarness()
     h.service.registerPanel('t1', 4242, '/p', 7)

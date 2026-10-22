@@ -14,19 +14,25 @@ vi.mock('../LoggingService', () => ({
 
 import {
   ClaudeTranscriptWatcher,
+  REARM_DELAY_MS,
+  isTranscriptEventName,
   shouldIgnoreTranscriptPath
 } from './ClaudeTranscriptWatcher'
 
-/** Build a fake chokidar FSWatcher that records handlers for manual triggering. */
-function makeMockWatcher() {
+type FolderListener = (eventType: string, filename: string | null) => void
+
+/** Build a fake folder watch that records its listener for manual triggering. */
+function makeMockWatcher(listener: FolderListener) {
   const handlers: Record<string, ((arg?: unknown) => void) | undefined> = {}
   const w = {
     on: vi.fn((event: string, cb: (arg?: unknown) => void) => {
       handlers[event] = cb
       return w
     }),
-    close: vi.fn().mockResolvedValue(undefined),
-    _emit: (event: string, arg?: unknown) => handlers[event]?.(arg)
+    close: vi.fn(),
+    /** A folder event, named relative to the watched folder as fs.watch does. */
+    _emit: (eventType: string, filename: string | null) => listener(eventType, filename),
+    _error: (error: unknown) => handlers.error?.(error)
   }
   return w
 }
@@ -50,8 +56,21 @@ describe('shouldIgnoreTranscriptPath', () => {
     expect(shouldIgnoreTranscriptPath('/root/ENC/session.jsonl')).toBe(false)
   })
 
-  it('allows extension-less entries (dirs) so chokidar can watch the dir', () => {
+  it('allows extension-less entries (dirs) through the path predicate', () => {
     expect(shouldIgnoreTranscriptPath('/root/ENC')).toBe(false)
+  })
+})
+
+describe('isTranscriptEventName', () => {
+  it('accepts a .jsonl name and a missing name', () => {
+    expect(isTranscriptEventName('session.jsonl')).toBe(true)
+    expect(isTranscriptEventName(null)).toBe(true)
+  })
+
+  it('rejects other names, folders and subagent paths', () => {
+    expect(isTranscriptEventName('notes.md')).toBe(false)
+    expect(isTranscriptEventName('subagents')).toBe(false)
+    expect(isTranscriptEventName('subagents/x.jsonl')).toBe(false)
   })
 })
 
@@ -63,8 +82,8 @@ describe('ClaudeTranscriptWatcher', () => {
     vi.useFakeTimers()
     vi.clearAllMocks()
     createdWatchers = []
-    watchFn = vi.fn(() => {
-      const w = makeMockWatcher()
+    watchFn = vi.fn((_dir: string, listener: FolderListener) => {
+      const w = makeMockWatcher(listener)
       createdWatchers.push(w)
       return w
     })
@@ -78,22 +97,25 @@ describe('ClaudeTranscriptWatcher', () => {
     return new ClaudeTranscriptWatcher({ watch: watchFn as never })
   }
 
-  it('creates exactly one chokidar watcher for the first consumer of a dir', () => {
+  it('creates exactly one folder watch for the first consumer of a dir', () => {
     const w = makeWatcher()
     w.watchDir('/dir/A', 'term-1')
 
     expect(watchFn).toHaveBeenCalledTimes(1)
-    expect(watchFn).toHaveBeenCalledWith(
-      '/dir/A',
-      expect.objectContaining({
-        persistent: true,
-        ignoreInitial: true,
-        usePolling: false,
-        followSymlinks: false,
-        depth: 0,
-        ignored: expect.any(Function)
-      })
-    )
+    expect(watchFn).toHaveBeenCalledWith('/dir/A', expect.any(Function))
+  })
+
+  it('opens no further watch as transcripts appear and change (one handle per folder)', () => {
+    const w = makeWatcher()
+    w.watchDir('/dir/A', 'term-1')
+    const watcher = createdWatchers[0]
+
+    for (let i = 0; i < 50; i++) {
+      watcher._emit('rename', `s${i}.jsonl`)
+      watcher._emit('change', `s${i}.jsonl`)
+    }
+
+    expect(watchFn).toHaveBeenCalledTimes(1)
   })
 
   it('does NOT create a second watcher for a second consumer of the same dir', () => {
@@ -104,14 +126,18 @@ describe('ClaudeTranscriptWatcher', () => {
     expect(watchFn).toHaveBeenCalledTimes(1)
   })
 
-  it('passes shouldIgnoreTranscriptPath as the chokidar ignored predicate', () => {
+  it('ignores events for non-transcript names', () => {
     const w = makeWatcher()
+    const onChange = vi.fn()
+    w.onChange(onChange)
     w.watchDir('/dir/A', 'term-1')
 
-    const options = watchFn.mock.calls[0][1] as { ignored: (p: string) => boolean }
-    expect(options.ignored('/dir/A/subagents/x.jsonl')).toBe(true)
-    expect(options.ignored('/dir/A/x.txt')).toBe(true)
-    expect(options.ignored('/dir/A/x.jsonl')).toBe(false)
+    const watcher = createdWatchers[0]
+    watcher._emit('change', 'x.txt')
+    watcher._emit('rename', 'subagents')
+    vi.advanceTimersByTime(250)
+
+    expect(onChange).not.toHaveBeenCalled()
   })
 
   it('closes the watcher only when the LAST consumer leaves', () => {
@@ -143,9 +169,9 @@ describe('ClaudeTranscriptWatcher', () => {
     w.watchDir('/dir/A', 'term-1')
 
     const watcher = createdWatchers[0]
-    watcher._emit('change', '/dir/A/s.jsonl')
-    watcher._emit('change', '/dir/A/s.jsonl')
-    watcher._emit('add', '/dir/A/s2.jsonl')
+    watcher._emit('change', 's.jsonl')
+    watcher._emit('change', 's.jsonl')
+    watcher._emit('rename', 's2.jsonl')
 
     // Nothing yet — still inside the coalesce window.
     expect(onChange).not.toHaveBeenCalled()
@@ -162,7 +188,7 @@ describe('ClaudeTranscriptWatcher', () => {
     w.watchDir('/dir/A', 'term-1')
 
     const watcher = createdWatchers[0]
-    watcher._emit('change', '/dir/A/s.jsonl')
+    watcher._emit('change', 's.jsonl')
     w.unwatchDir('/dir/A', 'term-1')
 
     vi.advanceTimersByTime(250)
@@ -189,5 +215,156 @@ describe('ClaudeTranscriptWatcher', () => {
     })
     const w = new ClaudeTranscriptWatcher({ watch: throwing as never })
     expect(() => w.watchDir('/dir/A', 'term-1')).not.toThrow()
+  })
+
+  describe('a dead or missing watch (Node closes the handle before `error`)', () => {
+    const enoent = (): never => {
+      throw Object.assign(new Error('ENOENT: no such file or directory'), { code: 'ENOENT' })
+    }
+
+    it('drops the dead handle on error, keeps the consumers, and re-arms after the back-off', () => {
+      const w = makeWatcher()
+      const onChange = vi.fn()
+      w.onChange(onChange)
+      w.watchDir('/dir/A', 'term-1')
+
+      expect(() => createdWatchers[0]._error(new Error('EPERM'))).not.toThrow()
+      expect(watchFn).toHaveBeenCalledTimes(1)
+
+      vi.advanceTimersByTime(REARM_DELAY_MS)
+      expect(watchFn).toHaveBeenCalledTimes(2)
+      // The new watch reports one change: transcripts may have moved meanwhile
+      vi.advanceTimersByTime(250)
+      expect(onChange).toHaveBeenCalledWith('/dir/A')
+
+      // Events reach the consumer through the new handle
+      onChange.mockClear()
+      createdWatchers[1]._emit('change', 's.jsonl')
+      vi.advanceTimersByTime(250)
+      expect(onChange).toHaveBeenCalledTimes(1)
+    })
+
+    it('re-arms on the next watchDir without waiting for the back-off', () => {
+      const w = makeWatcher()
+      w.watchDir('/dir/A', 'term-1')
+      createdWatchers[0]._error(new Error('EPERM'))
+
+      w.watchDir('/dir/A', 'term-1')
+      expect(watchFn).toHaveBeenCalledTimes(2)
+
+      // A live watch: watchDir again is a no-op
+      w.watchDir('/dir/A', 'term-1')
+      expect(watchFn).toHaveBeenCalledTimes(2)
+    })
+
+    it('watches a folder that appears after the first watchDir', () => {
+      const w = makeWatcher()
+      const onChange = vi.fn()
+      w.onChange(onChange)
+      watchFn.mockImplementationOnce(enoent)
+
+      w.watchDir('/dir/New', 'term-1')
+      expect(createdWatchers).toHaveLength(0)
+
+      // Folder created; the service's next refresh calls watchDir again
+      w.watchDir('/dir/New', 'term-1')
+      expect(createdWatchers).toHaveLength(1)
+      vi.advanceTimersByTime(250)
+      expect(onChange).toHaveBeenCalledWith('/dir/New')
+    })
+
+    it('backs off between attempts while the folder stays missing, and stops when unwatched', () => {
+      const w = makeWatcher()
+      watchFn.mockImplementation(enoent)
+
+      w.watchDir('/dir/Gone', 'term-1')
+      vi.advanceTimersByTime(REARM_DELAY_MS)
+      expect(watchFn).toHaveBeenCalledTimes(2)
+      // Doubled: nothing at one more base delay, a third try at two
+      vi.advanceTimersByTime(REARM_DELAY_MS)
+      expect(watchFn).toHaveBeenCalledTimes(2)
+      vi.advanceTimersByTime(REARM_DELAY_MS)
+      expect(watchFn).toHaveBeenCalledTimes(3)
+
+      w.unwatchDir('/dir/Gone', 'term-1')
+      vi.advanceTimersByTime(REARM_DELAY_MS * 20)
+      expect(watchFn).toHaveBeenCalledTimes(3)
+    })
+
+    it('re-arms a silent watch whose folder was replaced (inode changed), checked from watchDir', async () => {
+      let ino = 1
+      const stat = vi.fn(async () => ({ ino }))
+      const w = new ClaudeTranscriptWatcher({ watch: watchFn as never, stat })
+      const onChange = vi.fn()
+      w.onChange(onChange)
+      w.watchDir('/dir/A', 'term-1')
+      await vi.advanceTimersByTimeAsync(0)
+
+      // Within the check interval: no stat, no re-arm
+      w.watchDir('/dir/A', 'term-1')
+      expect(stat).toHaveBeenCalledTimes(1)
+
+      // Deleted and re-created: a new inode, and no `error` from the old handle
+      ino = 2
+      await vi.advanceTimersByTimeAsync(REARM_DELAY_MS)
+      w.watchDir('/dir/A', 'term-1')
+      await vi.advanceTimersByTimeAsync(0)
+
+      expect(watchFn).toHaveBeenCalledTimes(2)
+      expect(createdWatchers[0].close).toHaveBeenCalledTimes(1)
+      await vi.advanceTimersByTimeAsync(250)
+      expect(onChange).toHaveBeenCalledWith('/dir/A')
+    })
+
+    it('re-arms when the folder is gone, and keeps a healthy watch as it is', async () => {
+      let gone = false
+      const stat = vi.fn(async () => {
+        if (gone) throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+        return { ino: 7 }
+      })
+      const w = new ClaudeTranscriptWatcher({ watch: watchFn as never, stat })
+      w.watchDir('/dir/A', 'term-1')
+      await vi.advanceTimersByTimeAsync(REARM_DELAY_MS)
+
+      w.watchDir('/dir/A', 'term-1')
+      await vi.advanceTimersByTimeAsync(0)
+      expect(watchFn).toHaveBeenCalledTimes(1)
+
+      gone = true
+      await vi.advanceTimersByTimeAsync(REARM_DELAY_MS)
+      w.watchDir('/dir/A', 'term-1')
+      await vi.advanceTimersByTimeAsync(0)
+      expect(createdWatchers[0].close).toHaveBeenCalledTimes(1)
+      expect(watchFn).toHaveBeenCalledTimes(2)
+    })
+
+    it('does not keep the process alive with a pending re-arm', () => {
+      const w = makeWatcher()
+      const unref = vi.fn()
+      const realSetTimeout = globalThis.setTimeout
+      const spy = vi.spyOn(globalThis, 'setTimeout').mockImplementation(((fn: () => void, ms?: number) => {
+        const timer = realSetTimeout(fn, ms) as unknown as { unref?: () => void }
+        timer.unref = unref
+        return timer
+      }) as never)
+      try {
+        w.watchDir('/dir/A', 'term-1')
+        createdWatchers[0]._error(new Error('EPERM'))
+        expect(unref).toHaveBeenCalled()
+      } finally {
+        spy.mockRestore()
+      }
+    })
+
+    it('closes nothing twice: unwatch after a dead watch closes only the live one', () => {
+      const w = makeWatcher()
+      w.watchDir('/dir/A', 'term-1')
+      createdWatchers[0]._error(new Error('EPERM'))
+      vi.advanceTimersByTime(REARM_DELAY_MS)
+
+      w.unwatchDir('/dir/A', 'term-1')
+      expect(createdWatchers[0].close).toHaveBeenCalledTimes(1) // when it died
+      expect(createdWatchers[1].close).toHaveBeenCalledTimes(1)
+    })
   })
 })

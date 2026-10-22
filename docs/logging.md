@@ -159,7 +159,7 @@ The `~/.erfana/logs` literal above is correct, but the single source of truth is
   - `main.log` -> `main.1.log` (most recent)
   - `main.1.log` -> `main.2.log`
   - ...
-  - `main.5.log` is deleted (oldest)
+  - `main.4.log` -> `main.5.log`, replacing the oldest (a rename onto it, no separate delete – rotation is synchronous on the main thread, so it costs one call per file)
 
 **File limit:** 5 rotated files per type. With three logs at 10MB each this keeps the folder to about 180MB (it used to be 100 files per type, up to about 3GB). Leftover `.N.log` files above the cap from older versions are removed by the next cleanup.
 
