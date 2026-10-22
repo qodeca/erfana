@@ -127,31 +127,68 @@ test.describe('Project tree keyboard (#87)', () => {
     await expect(tree.contextMenu()).toHaveCount(0)
   })
 
-  test('Shift+F10 and the Menu key open one menu, at the row (no second, native one)', async ({
+  test('Shift+F10 and the Menu key open one menu, under the row, not at the pointer', async ({
     windowWithTestProject: page
   }) => {
+    // The contract on every platform. How the key arrives differs: Windows
+    // Chromium also sends a native `contextmenu` at the row's centre for the
+    // Menu key, macOS and Linux do not – so this checks the outcome, not the
+    // events.
     const tree = new ProjectTreePage(page)
     await tabIntoTree(page)
     await page.keyboard.press('End')
-    // Count native `contextmenu` events: on platforms where Chromium turns the
-    // key into one, the row's own handler would re-open the menu elsewhere.
-    await page.evaluate(() => {
-      const w = window as unknown as { __treeContextMenus: number }
-      w.__treeContextMenus = 0
-      document.addEventListener('contextmenu', () => { w.__treeContextMenus++ }, { capture: true })
-    })
+    // Park the pointer far from the row, so "at the pointer" would show.
+    const viewport = page.viewportSize() ?? { width: 1200, height: 800 }
+    await page.mouse.move(viewport.width - 20, viewport.height - 20)
 
     for (const key of ['Shift+F10', 'ContextMenu']) {
-      const row = await page.evaluate(() => (document.activeElement as HTMLElement).getBoundingClientRect().bottom)
+      const row = await page.evaluate(() => {
+        const r = (document.activeElement as HTMLElement).getBoundingClientRect()
+        return { left: r.left, bottom: r.bottom }
+      })
       await page.keyboard.press(key)
+      if (key === 'ContextMenu') {
+        // What Windows Chromium adds after the key: a native contextmenu at
+        // the focused row's centre. Replayed here so macOS and Linux runs
+        // cover that path too.
+        await page.evaluate(() => {
+          const el = document.activeElement as HTMLElement
+          const r = el.getBoundingClientRect()
+          el.dispatchEvent(new MouseEvent('contextmenu', {
+            bubbles: true, cancelable: true, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2
+          }))
+        })
+      }
       await expect(tree.contextMenu()).toHaveCount(1)
-      const menuTop = await tree.contextMenu().evaluate((el) => el.getBoundingClientRect().top)
-      expect(Math.abs(menuTop - row)).toBeLessThan(40)
-      expect(await page.evaluate(() => (window as unknown as { __treeContextMenus: number }).__treeContextMenus)).toBe(0)
+      const menu = () => tree.contextMenu().evaluate((el) => {
+        const r = el.getBoundingClientRect()
+        return { left: r.left, top: r.top }
+      })
+      // Under the row's left edge (ContextMenu offsets its anchor by 8 px).
+      await expect.poll(async () => Math.abs((await menu()).top - row.bottom)).toBeLessThan(40)
+      await expect.poll(async () => Math.abs((await menu()).left - row.left)).toBeLessThan(24)
+      await expect(tree.contextMenu()).toHaveCount(1)
       await page.keyboard.press('Escape')
       await expect(tree.contextMenu()).toHaveCount(0)
       await tree.fileRow('README.md').focus()
     }
+  })
+
+  test('a right-click opens the menu at the pointer', async ({ windowWithTestProject: page }) => {
+    const tree = new ProjectTreePage(page)
+    const box = (await tree.fileRow('notes.md').boundingBox())!
+    const at = { x: box.x + box.width - 10, y: box.y + box.height / 2 }
+
+    await page.mouse.click(at.x, at.y, { button: 'right' })
+
+    await expect(tree.contextMenu()).toHaveCount(1)
+    const menu = await tree.contextMenu().evaluate((el) => {
+      const r = el.getBoundingClientRect()
+      return { left: r.left, top: r.top }
+    })
+    // At the pointer (ContextMenu offsets it by 8 px), not under the row's left edge.
+    expect(Math.abs(menu.top - at.y)).toBeLessThan(24)
+    expect(Math.abs(menu.left - at.x)).toBeLessThan(24)
   })
 
   test('dragging a file onto a folder still moves it', async ({ windowWithTestProject: page, testProject }) => {

@@ -8,6 +8,7 @@ import type { FilterMode } from '../../types/filters'
 import { ProjectTreeNode, TREE_ROW_HEIGHT } from './ProjectTreeNode'
 import { buildVisibleRows } from './visibleRows'
 import { resolveInternalDropFolder, isSameFolderMove } from './dropTarget'
+import { isKeyboardContextMenu, rowMenuAnchor, KEYBOARD_MENU_ECHO_MS, type PointerPress } from './contextMenuOrigin'
 import { resolveTreeKey, findTypeAheadMatch, isTypeAheadKey } from './treeKeyboard'
 import { isStrictDescendant } from '../../utils/fileUtils'
 import { ContextMenu, ContextMenuItem } from '../ContextMenu/ContextMenu'
@@ -431,13 +432,29 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     })
   }, [])
 
-  // Context menu handlers (stable identity, setter-only)
+  // Context menu handlers (stable identity: refs and the setter only).
+  // The last pointer press on the tree, and the last menu the keyboard opened
+  // – together they tell a right-click from a key-made native event
+  // (contextMenuOrigin.ts).
+  const lastPointerPressRef = useRef<PointerPress | null>(null)
+  const keyboardMenuRef = useRef<{ path: string; at: number } | null>(null)
+  const handleTreePointerDownCapture = useCallback((e: React.PointerEvent) => {
+    lastPointerPressRef.current = { x: e.clientX, y: e.clientY, at: performance.now() }
+  }, [])
   const handleContextMenu = useCallback((e: React.MouseEvent, node: FileNode) => {
-    setContextMenu({
-      x: e.clientX,
-      y: e.clientY,
-      node
-    })
+    const now = performance.now()
+    const pointerType = (e.nativeEvent as Partial<PointerEvent>).pointerType
+    if (!isKeyboardContextMenu({ clientX: e.clientX, clientY: e.clientY, pointerType }, lastPointerPressRef.current, now)) {
+      setContextMenu({ x: e.clientX, y: e.clientY, node })
+      return
+    }
+    // Keyboard-made (Windows turns the Menu key into a native event at the
+    // row's centre). If keydown already opened this row's menu, this is its
+    // echo: keep the one menu where it is.
+    const opened = keyboardMenuRef.current
+    keyboardMenuRef.current = null
+    if (opened !== null && opened.path === node.path && now - opened.at <= KEYBOARD_MENU_ECHO_MS) return
+    setContextMenu({ ...rowMenuAnchor(e.currentTarget), node })
   }, [])
 
   // ---------------------------------------------------------------------------
@@ -1459,9 +1476,11 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
         break
       case 'menu': {
         // Shift+F10 / the Menu key: open the menu under the row, not at a
-        // pointer position the keyboard user never set.
-        const rect = row.getBoundingClientRect()
-        setContextMenu({ x: rect.left, y: rect.bottom, node })
+        // pointer position the keyboard user never set. Handled here on every
+        // platform; a native `contextmenu` that Windows sends after it is
+        // recognised as its echo in handleContextMenu, so there is one menu.
+        keyboardMenuRef.current = { path: node.path, at: performance.now() }
+        setContextMenu({ ...rowMenuAnchor(row), node })
         break
       }
     }
@@ -1614,6 +1633,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
         onKeyDown={handleTreeKeyDown}
         onFocus={handleTreeFocus}
         onBlur={handleTreeBlur}
+        onPointerDownCapture={handleTreePointerDownCapture}
       >
         <DndContext
           sensors={sensors}

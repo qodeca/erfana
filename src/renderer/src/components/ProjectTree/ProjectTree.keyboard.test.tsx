@@ -295,6 +295,55 @@ describe('ProjectTree – Enter, type-ahead and the context menu key', () => {
     expect(await screen.findByTestId(TEST_IDS.CONTEXT_MENU)).toBeInTheDocument()
   })
 
+  describe('one menu, under the row, however the key arrives', () => {
+    // jsdom has no layout: give the row a box so "under the row" is checkable.
+    const ROW_RECT = { left: 16, right: 316, top: 100, bottom: 128, width: 300, height: 28, x: 16, y: 100 }
+    function placeRow(el: HTMLElement) {
+      el.getBoundingClientRect = () => ({ ...ROW_RECT, toJSON: () => ROW_RECT }) as DOMRect
+    }
+    /** The menu's anchor, from the x/y it was given (ContextMenu adds 8 px). */
+    async function menuAnchor() {
+      const menu = await screen.findByTestId(TEST_IDS.CONTEXT_MENU)
+      return { left: parseFloat(menu.style.left) - 8, top: parseFloat(menu.style.top) - 8 }
+    }
+    // The point Windows Chromium gives a Menu-key `contextmenu`: the row's centre.
+    const CENTRE = { clientX: 166, clientY: 114 }
+
+    it('Menu key, then the native contextmenu Windows sends: still one menu, under the row', async () => {
+      await renderTree(smallTree())
+      const row = item(`${ROOT}/alpha.md`)
+      placeRow(row)
+      act(() => row.focus())
+
+      press('ContextMenu')
+      fireEvent.contextMenu(row, CENTRE)
+
+      expect(screen.getAllByTestId(TEST_IDS.CONTEXT_MENU)).toHaveLength(1)
+      expect(await menuAnchor()).toEqual({ left: ROW_RECT.left, top: ROW_RECT.bottom })
+    })
+
+    it('a key-made native contextmenu with no keydown before it opens under the row', async () => {
+      await renderTree(smallTree())
+      const row = item(`${ROOT}/alpha.md`)
+      placeRow(row)
+
+      fireEvent.contextMenu(row, CENTRE)
+
+      expect(await menuAnchor()).toEqual({ left: ROW_RECT.left, top: ROW_RECT.bottom })
+    })
+
+    it('a right-click still opens at the pointer', async () => {
+      await renderTree(smallTree())
+      const row = item(`${ROOT}/alpha.md`)
+      placeRow(row)
+
+      fireEvent.pointerDown(row, { clientX: 250, clientY: 110, button: 2 })
+      fireEvent.contextMenu(row, { clientX: 250, clientY: 110, button: 2 })
+
+      expect(await menuAnchor()).toEqual({ left: 250, top: 110 })
+    })
+  })
+
   it('leaves keys with Cmd / Ctrl to the app shortcuts', async () => {
     await renderTree(smallTree())
     act(() => item(ROOT).focus())
