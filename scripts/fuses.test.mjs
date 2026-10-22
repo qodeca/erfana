@@ -21,6 +21,9 @@ const {
   pruneForeignFfprobeBinaries,
   pruneForeignNodePtyPrebuilds,
   assertPackagedAppContents,
+  assertPackagedAsarContents,
+  packedPayloadDir,
+  buildFuseConfig,
   assertConfigMatchesAllowlist,
   deriveAllowedAppEntries,
   resolvePackedResourcesDir,
@@ -44,6 +47,14 @@ const {
   EXTRA_CONTENT_LEAK_NAMES,
 } = require('./fuses.js');
 const { Arch } = require('electron-builder');
+const { FuseV1Options, FuseVersion } = require('@electron/fuses');
+
+// The same @electron/asar electron-builder packs with (fuses.js resolves it
+// through app-builder-lib the same way).
+function loadAsarForTest() {
+  const builderRoot = path.dirname(require.resolve('app-builder-lib/package.json'));
+  return require(require.resolve('@electron/asar', { paths: [builderRoot] }));
+}
 
 /**
  * Build a fixture mirroring the bundle layout the helper expects:
@@ -640,6 +651,23 @@ describe('assertConfigMatchesAllowlist', () => {
     // required test job. Deleting afterPack silently disables all three Electron
     // fuses and the packaged-contents assertion in an otherwise-green build.
     expect(config.afterPack).toBe('./scripts/fuses.js');
+    // asar on with file-level unpacking (v0.22.0 asar spike). `asar: false`
+    // would leave the two asar fuses with nothing to check (afterPack refuses
+    // that), and smartUnpack would move whole packages - JS included - out of
+    // the integrity-checked archive.
+    expect(config.asar).toEqual({ smartUnpack: false });
+    expect(config.asarUnpack).toEqual([
+      'node_modules/node-pty/build/**',
+      'node_modules/node-pty/prebuilds/**',
+      'node_modules/ffmpeg-static/ffmpeg',
+      'node_modules/ffmpeg-static/ffmpeg.exe',
+      'node_modules/ffprobe-static/bin/**',
+      'node_modules/@llamaindex/liteparse-*/**',
+    ]);
+    expect(config.mac?.asar).toBeUndefined();
+    expect(config.win?.asar).toBeUndefined();
+    expect(config.mac?.asarUnpack).toBeUndefined();
+    expect(config.win?.asarUnpack).toBeUndefined();
     expect(config.afterSign).toBe('./scripts/resign.js');
 
     // --- Extra-content binding (issue #55, F1/F4/F5) ---
@@ -916,17 +944,122 @@ describe('assertPackagedAppContents', () => {
     expect(() => assertPackagedAppContents(tmpRoot)).toThrow(/app directory not found/i);
   });
 
-  it('refuses an asar-packed bundle unless the skip is explicitly opted into', () => {
-    fs.writeFileSync(path.join(tmpRoot, 'app.asar'), 'asar');
-    expect(() => assertPackagedAppContents(tmpRoot)).toThrow(/no explicit allowAsar/i);
+  it('verifies an asar-packed bundle through the archive instead of skipping it', async () => {
+    // A REAL archive written by the same @electron/asar electron-builder uses,
+    // so this exercises the header reader end to end, not a stub.
+    const src = path.join(tmpRoot, 'src');
+    fs.mkdirSync(src);
+    makePackedApp(src);
+    const asar = loadAsarForTest();
+    await asar.createPackage(path.join(src, 'app'), path.join(tmpRoot, 'app.asar'));
+    fs.rmSync(src, { recursive: true, force: true });
+    fs.mkdirSync(path.join(tmpRoot, 'app.asar.unpacked', 'node_modules', 'node-pty'), { recursive: true });
+    fs.writeFileSync(path.join(tmpRoot, 'app.asar.unpacked', 'node_modules', 'node-pty', 'pty.node'), 'bin');
+
+    expect(assertPackagedAppContents(tmpRoot)).toEqual({
+      files: 4, dirs: 6, symlinks: 0, archive: true, unpacked: { files: 1, dirs: 2, symlinks: 0 },
+    });
   });
 
-  it('skips with a warning only when allowAsar is set', () => {
-    fs.writeFileSync(path.join(tmpRoot, 'app.asar'), 'asar');
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  describe('asar bundles (assertPackagedAsarContents)', () => {
+    // Header shapes match @electron/asar: dirs carry `files`, links carry `link`
+    // (archive-relative), everything else is a file entry.
+    const cleanHeader = () => ({
+      files: {
+        out: { files: { main: { files: { 'index.js': { size: 4, offset: '0' } } } } },
+        node_modules: { files: { 'node-pty': { files: { 'pty.node': { size: 3, unpacked: true } } } } },
+        'package.json': { size: 40, offset: '4' },
+      },
+    });
+    const fakeAsar = (header, manifest = { name: 'erfana', main: './out/main/index.js' }) => ({
+      getRawHeader: () => ({ header, headerSize: 0 }),
+      extractFile: () => Buffer.from(typeof manifest === 'string' ? manifest : JSON.stringify(manifest)),
+    });
+    const archiveIn = (root) => fs.writeFileSync(path.join(root, 'app.asar'), 'asar');
 
-    expect(assertPackagedAppContents(tmpRoot, { allowAsar: true }).skipped).toBe('asar');
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('app.asar'));
+    it('counts the archive tree and accepts a clean header', () => {
+      archiveIn(tmpRoot);
+      expect(assertPackagedAsarContents(tmpRoot, { asarModule: fakeAsar(cleanHeader()) })).toEqual({
+        files: 3, dirs: 4, symlinks: 0, archive: true, unpacked: { files: 0, dirs: 0, symlinks: 0 },
+      });
+    });
+
+    it('applies the bidirectional top-level allowlist to the archive (issue #43)', () => {
+      archiveIn(tmpRoot);
+      const extra = cleanHeader();
+      extra.files.specs = { files: {} };
+      expect(() => assertPackagedAsarContents(tmpRoot, { asarModule: fakeAsar(extra) }))
+        .toThrow(/disallowed top-level path.*"specs"/i);
+      const short = cleanHeader();
+      delete short.files.out;
+      expect(() => assertPackagedAsarContents(tmpRoot, { asarModule: fakeAsar(short) }))
+        .toThrow(/missing 1 expected top-level path.*"out"/i);
+    });
+
+    it('refuses a stray app/ folder beside app.asar (it would load first without the fuse)', () => {
+      archiveIn(tmpRoot);
+      makePackedApp(tmpRoot);
+      expect(() => assertPackagedAppContents(tmpRoot)).toThrow(/both app\.asar and an app\/ directory/i);
+    });
+
+    it('rejects archive links that escape the archive or point nowhere', () => {
+      archiveIn(tmpRoot);
+      const escaping = cleanHeader();
+      escaping.files.node_modules.files.evil = { link: '../../etc' };
+      expect(() => assertPackagedAsarContents(tmpRoot, { asarModule: fakeAsar(escaping) }))
+        .toThrow(/resolving outside the archive/i);
+      const absolute = cleanHeader();
+      absolute.files.node_modules.files.evil = { link: '/etc/passwd' };
+      expect(() => assertPackagedAsarContents(tmpRoot, { asarModule: fakeAsar(absolute) }))
+        .toThrow(/resolving outside the archive/i);
+      const dangling = cleanHeader();
+      dangling.files.node_modules.files.gone = { link: 'node_modules/missing' };
+      expect(() => assertPackagedAsarContents(tmpRoot, { asarModule: fakeAsar(dangling) }))
+        .toThrow(/do not exist/i);
+      const fine = cleanHeader();
+      fine.files.node_modules.files['.bin'] = { link: 'node_modules/node-pty' };
+      expect(assertPackagedAsarContents(tmpRoot, { asarModule: fakeAsar(fine) }).symlinks).toBe(1);
+    });
+
+    it('holds app.asar.unpacked to the same allowlist and symlink policy', () => {
+      archiveIn(tmpRoot);
+      const unpacked = path.join(tmpRoot, 'app.asar.unpacked');
+      fs.mkdirSync(path.join(unpacked, 'node_modules'), { recursive: true });
+      fs.mkdirSync(path.join(unpacked, 'scripts'));
+      expect(() => assertPackagedAsarContents(tmpRoot, { asarModule: fakeAsar(cleanHeader()) }))
+        .toThrow(/app\.asar\.unpacked contains 1 disallowed.*"scripts"/i);
+      fs.rmSync(path.join(unpacked, 'scripts'), { recursive: true });
+      const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'outside-unpacked-'));
+      try {
+        fs.symlinkSync(outside, path.join(unpacked, 'node_modules', 'leak'), process.platform === 'win32' ? 'junction' : undefined);
+        expect(() => assertPackagedAsarContents(tmpRoot, { asarModule: fakeAsar(cleanHeader()) }))
+          .toThrow(/resolving outside app\.asar\.unpacked\//i);
+      } finally {
+        fs.rmSync(outside, { recursive: true, force: true });
+      }
+    });
+
+    it('verifies the main entry declared by the archived manifest', () => {
+      archiveIn(tmpRoot);
+      expect(() => assertPackagedAsarContents(tmpRoot, { asarModule: fakeAsar(cleanHeader(), { main: './out/main/nope.js' }) }))
+        .toThrow(/no main entry file at \.\/out\/main\/nope\.js/i);
+      expect(() => assertPackagedAsarContents(tmpRoot, { asarModule: fakeAsar(cleanHeader(), { main: '../out/main/index.js' }) }))
+        .toThrow(/no main entry file/i);
+      expect(() => assertPackagedAsarContents(tmpRoot, { asarModule: fakeAsar(cleanHeader(), { main: './out/main' }) }))
+        .toThrow(/no main entry file/i);
+      expect(() => assertPackagedAsarContents(tmpRoot, { asarModule: fakeAsar(cleanHeader(), '{ not json') }))
+        .toThrow(/not readable as JSON/i);
+      const noManifest = cleanHeader();
+      delete noManifest.files['package.json'];
+      expect(() => assertPackagedAsarContents(tmpRoot, { allowed: ['out', 'node_modules'], asarModule: fakeAsar(noManifest) }))
+        .toThrow(/has no package\.json/i);
+    });
+
+    it('fails closed on an unreadable header', () => {
+      archiveIn(tmpRoot);
+      const broken = { getRawHeader: () => { throw new Error('bad pickle'); }, extractFile: () => Buffer.from('') };
+      expect(() => assertPackagedAsarContents(tmpRoot, { asarModule: broken })).toThrow(/header is not readable \(bad pickle\)/i);
+    });
   });
 
   it("falls back to Node's own default (index.js) when the manifest declares no main", () => {
@@ -1424,7 +1557,8 @@ describe('assertResourcesSiblingsAllowlist (L2a-2)', () => {
     // so the sibling allowlist accepts exactly these two names and nothing more —
     // this is a security control, so the whole set is pinned rather than probed.
     expect([...ELECTRON_OWNED_RESOURCES_ENTRIES].sort()).toEqual([
-      'LICENSE.electron.txt', 'LICENSES.chromium.html', 'app', 'app.asar', 'elevate.exe', 'icon.icns',
+      'LICENSE.electron.txt', 'LICENSES.chromium.html', 'app', 'app.asar', 'app.asar.unpacked',
+      'elevate.exe', 'icon.icns',
     ]);
     makeResourcesDir(tmpRoot, ['LICENSE.electron.txt', 'LICENSES.chromium.html']);
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -1830,5 +1964,74 @@ describe('assertTestBuildName', () => {
   it('is supplied by the build:mac:test script through productName', () => {
     const pkg = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '..', 'package.json'), 'utf8'));
     expect(pkg.scripts['build:mac:test']).toContain(`-c.productName="Erfana${TEST_BUILD_SUFFIX}"`);
+  });
+});
+
+// ---- Fuse configuration (v0.22.0 asar spike) -------------------------------
+
+describe('buildFuseConfig', () => {
+  it('pins every production fuse value', () => {
+    expect(buildFuseConfig('win32')).toEqual({
+      version: FuseVersion.V1,
+      resetAdHocDarwinSignature: false,
+      [FuseV1Options.RunAsNode]: false,
+      [FuseV1Options.EnableCookieEncryption]: false,
+      [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,
+      [FuseV1Options.EnableNodeCliInspectArguments]: false,
+      [FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: true,
+      [FuseV1Options.OnlyLoadAppFromAsar]: true,
+    });
+  });
+
+  it('only resets the ad-hoc signature on darwin, and only a test build opens the inspector', () => {
+    expect(buildFuseConfig('darwin').resetAdHocDarwinSignature).toBe(true);
+    const test = buildFuseConfig('darwin', { isTestBuild: true });
+    expect(test[FuseV1Options.EnableNodeCliInspectArguments]).toBe(true);
+    // A test build keeps the asar fuses: it is the build the tamper check runs on.
+    expect(test[FuseV1Options.EnableEmbeddedAsarIntegrityValidation]).toBe(true);
+    expect(test[FuseV1Options.OnlyLoadAppFromAsar]).toBe(true);
+  });
+
+  it('is what afterPack flips, behind the no-app.asar refusal', () => {
+    const src = fs.readFileSync(path.join(import.meta.dirname, 'fuses.js'), 'utf8');
+    const body = src.slice(src.indexOf('async function afterPack('), src.indexOf('module.exports = afterPack;'));
+    expect(body).toContain('await flipFuses(electronBinaryPath, buildFuseConfig(context.electronPlatformName, { isTestBuild }));');
+    expect(body.indexOf("'app.asar'")).toBeGreaterThan(-1);
+    expect(body.indexOf("'app.asar'")).toBeLessThan(body.indexOf('await flipFuses('));
+  });
+});
+
+describe('packedPayloadDir', () => {
+  let tmpRoot;
+  beforeEach(() => {
+    tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'payload-dir-'));
+  });
+  afterEach(() => {
+    fs.rmSync(tmpRoot, { recursive: true, force: true });
+  });
+
+  it('is app/ without an archive and app.asar.unpacked/ with one', () => {
+    expect(packedPayloadDir(tmpRoot)).toBe(path.join(tmpRoot, 'app'));
+    fs.writeFileSync(path.join(tmpRoot, 'app.asar'), 'asar');
+    expect(packedPayloadDir(tmpRoot)).toBe(path.join(tmpRoot, 'app.asar.unpacked'));
+  });
+
+  it('routes the afterPack prunes and chmods into app.asar.unpacked/', () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    fs.writeFileSync(path.join(tmpRoot, 'app.asar'), 'asar');
+    const prebuilds = path.join(tmpRoot, 'app.asar.unpacked', 'node_modules', 'node-pty', 'prebuilds');
+    fs.mkdirSync(path.join(prebuilds, 'darwin-arm64'), { recursive: true });
+    fs.mkdirSync(path.join(prebuilds, 'win32-x64'), { recursive: true });
+    fs.writeFileSync(path.join(prebuilds, 'darwin-arm64', 'pty.node'), 'bin');
+    fs.writeFileSync(path.join(prebuilds, 'darwin-arm64', 'spawn-helper'), 'bin', { mode: 0o644 });
+    fs.writeFileSync(path.join(prebuilds, 'win32-x64', 'pty.node'), 'bin');
+
+    pruneForeignNodePtyPrebuilds(tmpRoot, 'darwin', Arch.arm64, { requireMatch: true });
+    expect(fs.readdirSync(prebuilds)).toEqual(['darwin-arm64']);
+    if (process.platform !== 'win32') {
+      expect(chmodNodePtySpawnHelper(tmpRoot, { requireMatch: true }).chmodCount).toBe(1);
+      expect(fs.statSync(path.join(prebuilds, 'darwin-arm64', 'spawn-helper')).mode & 0o777).toBe(SPAWN_HELPER_MODE);
+    }
+    vi.restoreAllMocks();
   });
 });

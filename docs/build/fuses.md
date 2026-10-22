@@ -1,6 +1,6 @@
 # Electron fuses
 
-**Last updated**: September 2026 (v0.20.0)
+**Last updated**: October 2026 (v0.22.0 – asar fuses on)
 
 This document explains the Electron fuses configuration and security decisions. `scripts/fuses.js` is the single `afterPack` hook, so it also carries five non-fuse responsibilities: it restores the executable bit on bundled `node-pty` `spawn-helper` binaries (see [afterPack also chmods node-pty spawn-helper](#afterpack-also-chmods-node-pty-spawn-helper)), prunes foreign-arch native binaries, stages and re-verifies the per-arch `ffmpeg` binary, renames the bundle for test builds, and verifies the packed contents — the `app/` tree against the `files:` allowlist plus the `extraFiles`/`extraResources` destinations beside and above it (see [afterPack also verifies the packed app/ contents](#afterpack-also-verifies-the-packed-app-contents)).
 
@@ -16,6 +16,8 @@ const { flipFuses, FuseVersion, FuseV1Options } = require('@electron/fuses');
 // ERFANA_TEST_BUILD=true build turns it on, for Playwright over CDP.
 const isTestBuild = process.env.ERFANA_TEST_BUILD === 'true';
 
+// buildFuseConfig(platform, { isTestBuild }) returns this object; the
+// buildFuseConfig describe block in scripts/fuses.test.mjs pins every value.
 await flipFuses(electronBinaryPath, {
   version: FuseVersion.V1,
   resetAdHocDarwinSignature: context.electronPlatformName === 'darwin',
@@ -23,11 +25,12 @@ await flipFuses(electronBinaryPath, {
   [FuseV1Options.EnableCookieEncryption]: false,
   [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,
   [FuseV1Options.EnableNodeCliInspectArguments]: isTestBuild,
-  // NOTE: ASAR integrity validation disabled because asar: false
-  // - EnableEmbeddedAsarIntegrityValidation
-  // - OnlyLoadAppFromAsar
+  [FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: true,
+  [FuseV1Options.OnlyLoadAppFromAsar]: true,
 });
 ```
+
+The flip is refused when the packed bundle has no `app.asar`: with the two asar fuses on, such an app cannot start.
 
 `isTestBuild` is the only conditional fuse. Every other value is a hard-coded constant, so a production DMG always ships the same fuse set – see [test builds and the Node CLI inspector](#test-builds-and-the-node-cli-inspector).
 
@@ -46,11 +49,11 @@ afterSign: ./scripts/resign.js
 2. Prune foreign-platform/arch `ffprobe-static` binaries and `node-pty` prebuilds (plus a `.pdb` strip on `win32`).
 3. Restore the `node-pty` `spawn-helper` execute bit (`0755`, Unix only).
 4. `ensurePackedMediaBinaries` – copy this pack's cached `ffmpeg` into the bundle, re-verify it (size floor always, SHA-256 only on pinned arches), and `chmod 0755` the packed `ffmpeg` + every `ffprobe`.
-5. Flip the Electron fuses and reset the ad-hoc Darwin signature on the main binary.
-6. `assertConfigMatchesAllowlist` + `assertPackagedAppContents` – verify the packed `app/` tree against the `files:` allowlist. Deliberately after the mutating steps above, so it covers every change they made.
+5. Flip the Electron fuses and reset the ad-hoc Darwin signature on the main binary (refused without `app.asar`).
+6. `assertConfigMatchesAllowlist` + `assertPackagedAppContents` – verify the packed app against the `files:` allowlist: the `app.asar` header and `app.asar.unpacked/` (`assertPackagedAsarContents`), or an `app/` tree on an `asar: false` build. Deliberately after the mutating steps above, so it covers every change they made.
 7. Verify the `extraFiles`/`extraResources` destinations beside and above `app/` (issue #55): a merged-config shape check (`assertExtraContentAllowlist`) plus the packed-tree tripwires/enumeration (`assertResourcesDestNoRepoLeak`, `assertResourcesSiblingsAllowlist`, `assertExtraFilesDestNoRepoLeak`).
 
-Everything happens before signing so the signed tree is the final tree. The `afterSign` step is critical because `flipFuses` modifies the main binary's code directory hash, creating a mismatch with helper processes. Without deep re-signing, macOS Sequoia+ rejects `@rpath` library loads. See [electron-builder.md](./electron-builder.md) for details.
+Steps 2–4 write to the real-file tree: `app.asar.unpacked/` on an asar build (`packedPayloadDir()`), `app/` otherwise. None of them modifies `app.asar`, whose integrity hash electron-builder has already embedded by the time `afterPack` runs. Everything happens before signing so the signed tree is the final tree. The `afterSign` step is critical because `flipFuses` modifies the main binary's code directory hash, creating a mismatch with helper processes. Without deep re-signing, macOS Sequoia+ rejects `@rpath` library loads. See [electron-builder.md](./electron-builder.md) for details.
 
 ---
 
@@ -132,7 +135,7 @@ Two functions run, both refusing to ship rather than warning:
 Hardening — four decisions worth keeping:
 
 1. **A symlinked `app/` root is refused outright.** Following it would silently re-root every containment check onto the link target.
-2. **An asar-packed bundle is refused unless `allowAsar` is passed explicitly.** ASAR changes how files are *stored*, not which files are *packaged*, so the issue #43 defect survives it; skipping silently would retire this guard the moment `asar: true` landed.
+2. **An asar-packed bundle is walked, not skipped.** ASAR changes how files are *stored*, not which files are *packaged*, so the issue #43 defect survives it. `assertPackagedAsarContents` runs the same three passes over the archive header (read with the `@electron/asar` that app-builder-lib ships, so no new dependency) and over `app.asar.unpacked/`, and refuses an `app/` folder beside `app.asar`.
 3. **Platform-conditional rules key off the platform being packaged**, not the build host, so a `--win` pack on macOS is not judged by Gatekeeper's rules.
 4. **Entry names are JSON-quoted before printing.** Names originate from third-party `node_modules`, and a POSIX filename may contain newlines — unquoted, a hostile dependency could forge `::error::` workflow commands in a public release log.
 
@@ -146,7 +149,7 @@ The `files:` guards above cover only `<resources>/app/`. `extraResources` copies
 
 **L2a-1 — resources leak-name tripwire (`assertResourcesDestNoRepoLeak`), FATAL on both platforms.** A tripwire, *not* an exhaustive allowlist: it fatally rejects a sibling beside `app/` whose top-level name is a known repo-structure sentinel or a known secret/exfil leak-name (`EXTRA_CONTENT_LEAK_NAMES` = `REPO_ROOT_SENTINELS` ∪ suspicious names like `secrets`, `.env`, `id_rsa`) and is not an allowlisted `extraResources` dest. Such names are never part of Electron's runtime layout beside `app/`, so this is a platform-agnostic leak signal and stays fatal on both platforms.
 
-**L2a-2 — resources full-sibling enumeration (`assertResourcesSiblingsAllowlist`), FATAL on macOS / ADVISORY (`console.warn`) on Windows.** Every sibling beside `app/` must be an expected Electron-owned name (`EXPECTED_RESOURCES_ENTRIES`, derived as the config slots ∪ `app`/`app.asar`/`icon.icns`/`elevate.exe`/`LICENSE.electron.txt`/`LICENSES.chromium.html`), a config slot, or a `*.lproj` folder. The Electron-owned name set was enumerated on a **macOS-only** baseline and CI never runs an electron-builder pack on Windows (`windows-checks` runs only typecheck + `test:main`), so keeping this fatal on Windows would rest a release-blocking gate on an unverified baseline and risk a first-Windows-release false-fail. It is therefore advisory on win32 until a real Windows packed-tree baseline is captured; the softening touches **only** the Electron-owned enumeration — the config leak vector (L2a-1) stays both-platforms-fatal. Tracked as a promotion follow-up in [technical-debt.md](../technical-debt.md).
+**L2a-2 — resources full-sibling enumeration (`assertResourcesSiblingsAllowlist`), FATAL on macOS / ADVISORY (`console.warn`) on Windows.** Every sibling beside `app/` must be an expected Electron-owned name (`EXPECTED_RESOURCES_ENTRIES`, derived as the config slots ∪ `app`/`app.asar`/`app.asar.unpacked`/`icon.icns`/`elevate.exe`/`LICENSE.electron.txt`/`LICENSES.chromium.html`), a config slot, or a `*.lproj` folder. The Electron-owned name set was enumerated on a **macOS-only** baseline and CI never runs an electron-builder pack on Windows (`windows-checks` runs only typecheck + `test:main`), so keeping this fatal on Windows would rest a release-blocking gate on an unverified baseline and risk a first-Windows-release false-fail. It is therefore advisory on win32 until a real Windows packed-tree baseline is captured; the softening touches **only** the Electron-owned enumeration — the config leak vector (L2a-1) stays both-platforms-fatal. Tracked as a promotion follow-up in [technical-debt.md](../technical-debt.md).
 
 **L2b — extraFiles coarse repo-leak tripwire (`assertExtraFilesDestNoRepoLeak`), FATAL on both platforms.** The `extraFiles` dest on Windows *is* the app output root — full of Electron's standard runtime layout — so a "every entry must be allowlisted" walk there would very likely false-fail the first Windows release. Instead L2b is a coarse backstop: it recurses two levels scanning for `REPO_ROOT_SENTINELS` (closing a `to: 'bundled'` nested-copy evasion) and flags any file with a source-code extension (`REPO_SOURCE_EXTENSIONS`), since `ALLOWED_EXTRA_FILES_DESTS` is empty so L1 already forbids *any* config content there. It is explicitly **not** a sound standalone control — it cannot enumerate Electron's runtime layout — and the guarantee rests on L1; L2b exists to catch a gross regression if L1 is ever bypassed.
 
@@ -190,11 +193,11 @@ Three guardrails keep such a build from being mistaken for a release:
 | Fuse | Value | Reason |
 |------|-------|--------|
 | `RunAsNode` | `false` | **Critical**: Prevents `ELECTRON_RUN_AS_NODE` exploitation (CVE-2024-46992) |
-| `EnableCookieEncryption` | `false` | **UX**: Avoids confusing macOS keychain prompts without context |
+| `EnableCookieEncryption` | `false` | **Nothing to protect**: no persistent cookies (re-evaluated v0.22.0, see [Cookie encryption decision](#cookie-encryption-decision)) |
 | `EnableNodeOptionsEnvironmentVariable` | `false` | **Critical**: Prevents command injection via `NODE_OPTIONS` |
 | `EnableNodeCliInspectArguments` | `isTestBuild` – `false` on every production build | **Critical**: Prevents remote debugging access via `--inspect`. Set to `true` only when `ERFANA_TEST_BUILD=true`, for Playwright E2E over CDP – see [test builds and the Node CLI inspector](#test-builds-and-the-node-cli-inspector) |
-| `EnableEmbeddedAsarIntegrityValidation` | N/A | **Unavailable**: Requires ASAR enabled (we have it disabled) |
-| `OnlyLoadAppFromAsar` | N/A | **Unavailable**: Requires ASAR enabled (we have it disabled) |
+| `EnableEmbeddedAsarIntegrityValidation` | `true` | **Tamper check**: refuses to start when `app.asar` differs from the hash embedded at build time (since v0.22.0) |
+| `OnlyLoadAppFromAsar` | `true` | **No side-loading**: never loads an `app/` folder in place of the verified archive (since v0.22.0) |
 
 ---
 
@@ -222,31 +225,15 @@ Three guardrails keep such a build from being mistaken for a release:
 
 ## Cookie encryption decision
 
-### Why disabled?
+### Why it stays off (re-evaluated for v0.22.0)
 
-When `EnableCookieEncryption: true`, macOS shows this prompt at first launch:
+The fuse encrypts Chromium's on-disk cookie store with the OS key (Keychain on macOS, DPAPI on Windows). Erfana has nothing in that store worth encrypting:
 
-```
-"Erfana" wants to access your keychain.
-[Allow] [Deny] [Always Allow]
-```
+- The main window loads `file://` and sets no cookies.
+- HTML previews run in in-memory partitions (no `persist:` prefix – `previewSessionPolicy.ts`), so their cookies never reach disk.
+- Secrets that do need the OS key already use `safeStorage` directly: the transcription API key (`ApiKeyService`) and the project-lock HMAC secret (`lockHmac.ts`). Settings are a JSON file, not cookies, and the fuse does not touch them.
 
-### Problems
-
-1. No way to explain to user **why** keychain access is needed before prompt appears
-2. Appears suspicious and scary to non-technical users
-3. Users may deny access, breaking settings storage
-4. Industry standard apps (Chrome, VS Code) already show this, but they have brand trust
-
-### Decision
-
-Disable cookie encryption to avoid user confusion, accept plaintext settings storage.
-
-### Security trade-off
-
-- Settings stored in plaintext on disk (`~/Library/Application Support/Erfana/`)
-- Acceptable risk for a local development tool
-- User's file system security is their responsibility
+The original v0.6.0 reason – a keychain prompt with no context – is weaker than it was, because `safeStorage` already reads the same "Erfana Safe Storage" key when a project lock is taken. Turning the fuse on would still add that read to every start, before any window opens, and Electron cannot read encrypted cookies again if the fuse is ever turned back off. With no benefit today, it stays off. Revisit it if Erfana ever keeps a signed-in web session.
 
 ---
 
@@ -254,37 +241,32 @@ Disable cookie encryption to avoid user confusion, accept plaintext settings sto
 
 ### EnableEmbeddedAsarIntegrityValidation
 
-**Purpose**: Validates ASAR archive integrity using embedded SHA-256 hash.
+**Purpose**: Validates `app.asar` against the SHA-256 header hash electron-builder embeds at pack time – `ElectronAsarIntegrity` in `Info.plist` on macOS, an `INTEGRITY`/`ELECTRONASAR` resource in the `.exe` on Windows – and each file's block hashes when it is read.
 
-**Status**: Unavailable (requires `asar: true`)
+**Status**: On since v0.22.0. Verified on a macOS test build: one changed byte in a file inside the archive exits with `ASAR Integrity Violation: got a hash mismatch`; one changed byte in the header aborts with `Integrity check failed for asar archive entry '<header>'`.
 
-**Impact**: No protection against post-installation code tampering.
+**Does not cover**: the native addons and executables in `app.asar.unpacked/` – see [asar.md](./asar.md#what-goes-where).
 
 ### OnlyLoadAppFromAsar
 
-**Purpose**: Forces app to only load code from ASAR archive.
+**Purpose**: Electron's loader tries `app/` before `app.asar`; this fuse makes `app.asar` the only search path, so an `app/` folder dropped beside the archive cannot replace the verified code.
 
-**Status**: Unavailable (requires `asar: true`)
+**Status**: On since v0.22.0. Verified: an `app/` folder with its own `package.json` placed beside `app.asar` is ignored.
 
-**Impact**: App can load code from file system (but sandboxing still restricts renderer).
-
-**See**: [ASAR packaging](./asar.md) for why ASAR is disabled.
+**See**: [ASAR packaging](./asar.md).
 
 ---
 
 ## Security summary
 
-**Lost** (ASAR disabled):
-- Code integrity validation
-- Tamper detection
-
-**Lost** (UX choice):
+**Kept off** (no benefit today):
 - Cookie encryption
 
-**Kept** (critical fuses):
+**On** (critical fuses):
 - RunAsNode protection
 - NodeOptions protection
 - Inspect arguments protection (production builds; test builds deliberately opt out)
+- ASAR integrity validation and asar-only loading
 
 **Kept** (other security):
 - Process sandboxing
