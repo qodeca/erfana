@@ -90,7 +90,7 @@ Design of record: [`docs/design/design-issue-60.md`](./design/design-issue-60.md
 
 Details: [File watching § Tree refresh is single-flight](./file-watching/technical-details.md#tree-refresh-is-single-flight-208); log lines and the overlap check: [Logging § Tree reads and memory](./logging.md#tree-reads-and-memory-208).
 
-**What stays open.** Overlapping reads can no longer stack; the memory effect is pending the soak test. A very large project that never stops changing still re-reads its whole tree back to back, keeping CPU and disk busy. Deliberately out of scope for #208:
+**What stays open.** Overlapping reads can no longer stack; the memory effect is pending the soak test. A very large project that never stops changing still re-reads its whole tree back to back when the changes add or remove entries, keeping CPU and disk busy; content edits alone no longer do (finding [29], [measurement](./performance/watcher-structural-refresh.md)). Deliberately out of scope for #208:
 
 | Open item | What it would fix |
 |---|---|
@@ -123,12 +123,12 @@ Details: [File watching § Watch backends](./file-watching/README.md#watch-backe
 | Lazy or incremental tree loading, virtualization | #150 |
 | Cancelable reads (also the #208 open item) | #150 |
 | A parallel tree walk – only as the lever if the W17 measurement misses the first-tree target, weighed against file-open latency | #150 |
-| Content-only watcher batches skipping the full tree re-read (a `structural` flag on `directory-watch:changed`) | follow-up issue |
+| ~~Content-only watcher batches skipping the full tree re-read (a `structural` flag on `directory-watch:changed`)~~ ✅ done – finding [29], [measurement](./performance/watcher-structural-refresh.md) | `perf/watcher-structural-refresh` |
 | Re-planning the Windows watch when a dropped folder appears after the project opened | follow-up (known limit) |
 | An `@parcel/watcher` backend – only if W17 shows overflow re-reads under ordinary work | follow-up, contingent |
 | Git status honouring the exclude list | follow-up |
 
-Every broadcast batch – structural or content-only – still re-reads the whole tree, as before; #211 only stops the batches that contain nothing visible.
+#211 only stopped the batches that contain nothing visible. Since finding [29] a content-only batch (`structural: false`) no longer re-reads the tree either – git status still refreshes for it – and the tree's refresh debounce waits at most 1 s under a steady stream. A structural batch still re-reads the whole tree; incremental updates stay with #150. Measured on a 25,000-file project: 50 content-only saves went from 50 tree reads and 189 MB of IPC payload to none ([watcher structural refresh](./performance/watcher-structural-refresh.md)).
 
 ## Dependency graph
 
