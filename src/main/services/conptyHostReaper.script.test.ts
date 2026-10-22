@@ -53,6 +53,14 @@ interface Scenario {
   appStart?: 'ok' | 'null' | 'throw' | 'bad'
   /** HasExited of our process reads $null (not readable) */
   appHasExitedNull?: boolean
+  /** Our process object has no Handle (it could not be pinned) */
+  appNoHandle?: boolean
+  /** Pids whose process object has no Handle at kill time */
+  noHandle?: number[]
+  /** Listings that throw (a terminating error) */
+  throwCalls?: number[]
+  /** How long each listing takes after its snapshot (simulated ms); default 0 */
+  listMs?: number
 }
 
 /** Mocks, defined as functions so they win over the cmdlets of the same name */
@@ -77,13 +85,18 @@ const PRELUDE = [
   '  if (@($sc.failCalls) -contains $n) { return }',
   // a real list always holds System
   "  Row 4 0 'System' 1",
+  "  if (@($sc.throwCalls) -contains $n) { throw 'listing-broke' }",
   "  if (@($sc.partialCalls) -contains $n) { Write-Error -Message 'quota' -ErrorId 'HRESULT 0x80041006'; return }",
-  '  foreach ($p in $sc.procs) { if (Visible $p) { Row $p.pid $p.ppid $p.name $p.createdMs } }',
+  // the rows are the snapshot; returning them takes listMs more
+  '  $rows = @(foreach ($p in $sc.procs) { if (Visible $p) { Row $p.pid $p.ppid $p.name $p.createdMs } })',
+  '  if ($sc.listMs) { $global:clock += [long]$sc.listMs }',
+  '  $rows',
   '}',
   'function Get-Process { [CmdletBinding()] param($Id)',
   `  if ($Id -eq ${APP}) {`,
   '    if ($sc.appMissing) { return }',
   '    $o = [pscustomobject]@{ Id = $Id; Handle = 1 }',
+  '    if ($sc.appNoHandle) { $o.Handle = $null }',
   "    if ($sc.appStart -eq 'null') { $o | Add-Member -NotePropertyName StartTime -NotePropertyValue $null }",
   "    elseif ($sc.appStart -eq 'bad') { $o | Add-Member -NotePropertyName StartTime -NotePropertyValue 'not-a-date' }",
   "    elseif ($sc.appStart -eq 'throw') { $o | Add-Member -MemberType ScriptProperty -Name StartTime -Value { throw [System.ComponentModel.Win32Exception]::new(5) } }",
@@ -95,7 +108,8 @@ const PRELUDE = [
   '  foreach ($p in $sc.procs) {',
   '    if ([int]$p.pid -eq [int]$Id -and (Visible $p)) {',
   '      $ms = $p.createdMs; if ($p.pinnedCreatedMs) { $ms = $p.pinnedCreatedMs }',
-  '      return [pscustomobject]@{ Id = [int]$Id; Handle = 1; StartTime = [DateTimeOffset]::FromUnixTimeMilliseconds([long]$ms).LocalDateTime }',
+  '      $hd = 1; if (@($sc.noHandle) -contains [int]$Id) { $hd = $null }',
+  '      return [pscustomobject]@{ Id = [int]$Id; Handle = $hd; StartTime = [DateTimeOffset]::FromUnixTimeMilliseconds([long]$ms).LocalDateTime }',
   '    }',
   '  }',
   '}',
@@ -231,6 +245,47 @@ describe.skipIf(!hasPowerShell)('quit helper script against a mocked process lis
       [shell(6001, START + 2_000), shell(6101, START + 2_500)]
     )
     expect(stopped.sort()).toEqual(['6001', '6002', '6003'])
+  })
+
+  it('does not take a child of a reused pid for ours when the listing is slow', () => {
+    // listing 1 snapshots at quit + ~300 ms and takes 300 ms. The shell and its node
+    // child are in it, then end; pid 6002 is reused at quit + 350 ms by an unrelated
+    // program R, which starts U at quit + 400 ms. U's parent pid is 6002, but it was
+    // created after the snapshot that last saw node 6002 alive.
+    const { stopped } = run(
+      {
+        appExitsAtWait: 2,
+        listMs: 300,
+        procs: [
+          { pid: 6001, ppid: APP, name: 'pwsh.exe', createdMs: START + 2_000, until: 1 },
+          { pid: 6002, ppid: 6001, name: 'node.exe', createdMs: START + 3_000, until: 1 },
+          { pid: 6002, ppid: 999, name: 'R.exe', createdMs: QUIT + 350, from: 2 },
+          { pid: 8002, ppid: 6002, name: 'U.exe', createdMs: QUIT + 400, from: 2 }
+        ]
+      },
+      [shell(6001, START + 2_000)]
+    )
+    expect(stopped).toEqual([])
+  })
+
+  it('never ends a process it could not pin, and never ends an app it could not pin', () => {
+    const { stopped, trace } = run(
+      { appExitsAtWait: 1_000, appNoHandle: true, noHandle: [5001], procs: [host(5001), host(5002)] },
+      [],
+      3
+    )
+    // the app is hung but not pinned: never ended; host 5001 has no handle: skipped
+    expect(stopped).toEqual(['5002'])
+    expect(trace).toContain('app start time unreadable')
+    expect(trace).toContain('waited out the grace period')
+    expect(trace).toContain('sweep 1 alive=5001:conhost.exe<4000,5002:conhost.exe<4000 stopped=5002 skipped=5001')
+  })
+
+  it('still force-ends a verified hung app when a listing throws during the wait', () => {
+    const { stopped, trace } = run({ appExitsAtWait: 1_000, throwCalls: [1], procs: [host(5001)] }, [], 3)
+    expect(stopped).toEqual(['app waits=3', '5001'])
+    expect(trace).toContain('app force-ended after the grace period')
+    expect(trace).not.toContain('waited out the grace period')
   })
 
   it('never ends a program opened from the app, an unlisted child, or anything outside the creation window', () => {

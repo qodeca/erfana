@@ -48,7 +48,9 @@ describe('buildReapScript', () => {
     // ended only through a handle opened at kill time, after its start time matched
     expect(script).toContain('$h | Stop-Process -Force')
     expect(script).not.toContain('Stop-Process -Id')
-    expect(script.indexOf('$null = $h.Handle')).toBeLessThan(script.indexOf('$st = $h.StartTime'))
+    // a process without a handle is not pinned and never ended
+    expect(script).toContain('if ($null -ne $h.Handle) {')
+    expect(script.indexOf('if ($null -ne $h.Handle) {')).toBeLessThan(script.indexOf('$st = $h.StartTime'))
   })
 
   it('has no double quotes or backslashes, so the command line needs no escaping', () => {
@@ -77,7 +79,11 @@ describe('buildReapScript', () => {
     expect(stop).toBeGreaterThan(-1)
     expect(script).toContain('if ($p.HasExited)')
     // the handle is held before the start time is read, so both refer to this process
-    expect(script.indexOf('$null = $p.Handle')).toBeLessThan(script.indexOf('$st = $p.StartTime'))
+    expect(script).toContain('if ($null -ne $p.Handle) { $st = $p.StartTime }')
+    // a listing error during the wait does not end the wait
+    expect(script).toContain('try { $null = Tree @(Snap) } catch { }')
+    // the "seen alive" time is taken before the query
+    expect(script.indexOf('$script:snapAt =')).toBeLessThan(script.indexOf('Get-CimInstance'))
     expect(script.indexOf('$st.ToUniversalTime() -gt $q')).toBeLessThan(stop)
     expect(stop).toBeLessThan(script.indexOf(`for ($i = 1; $i -le ${MAX_SWEEPS}; $i++)`))
   })

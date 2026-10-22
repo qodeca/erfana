@@ -17,8 +17,9 @@
  *    so a process whose parent ends first is still recognised later;
  * 2. force-ends our process if it is still alive after the grace period (a worker
  *    thread stuck while the environment is torn down). If our process cannot be
- *    checked (its start time is unreadable), it is never ended: the helper waits out
- *    the grace period instead, so nothing is ended while the app may still run;
+ *    checked (no handle, or its start time is unreadable), it is never ended: the
+ *    helper waits out the grace period instead (or until it sees the app gone). The
+ *    sweeps then run even if the app is still alive, because that could not be told;
  * 3. then sweeps: lists the processes again, ends every member of the tree that is
  *    still alive, and repeats every 500 ms until two sweeps in a row find nothing
  *    (at most {@link MAX_SWEEPS}). One listing is not enough: a failed, partial or
@@ -27,7 +28,8 @@
  *    the next step still runs.
  *
  * It writes what it saw to {@link QUIT_TRACE_FILE} in the log folder, so a run can be
- * checked afterwards: pids, parent pids, PowerShell error ids, and image names only of
+ * checked afterwards: pids, parent pids, PowerShell error ids (`FullyQualifiedErrorId`;
+ * for a plain `throw` that is its message), and image names only of
  * console hosts and of the shells we passed (any other process is written as
  * `other`); never a command line, path or window title. The last lines say
  * `result=clean members-left=0` when nothing of ours was left running.
@@ -41,8 +43,10 @@
  *   pid of a shell that has ended.
  * - Our direct children must have been created between our process start and the quit
  *   moment (+ 250 ms rounding). A process below a member may be newer only while that
- *   member is alive: once the member is gone, a child counts only if it was created no
- *   later than the last listing that saw the member alive (its pid may be reused after).
+ *   member is alive: it counts when the member is in the same list, or when it was
+ *   created no later than the last snapshot (taken before the query starts) that saw the
+ *   member alive. Once the member is gone its pid may be reused, so a newer child is not
+ *   ours.
  * - A process is ended through a handle opened on it at kill time, and only after its
  *   start time read through that handle matches the creation time recorded for the
  *   member (1 ms tolerance). A pid reused between the listing and the kill is skipped.
@@ -204,8 +208,11 @@ export function buildReapScript(
     "if (-not $s -or -not $q -or -not $e) { Trace 'helper stopped: dates unavailable'; exit }",
     // An empty result, or any error (a partial or timed-out list), means "unavailable"
     "$script:snapErr = ''",
+    // snapAt is taken BEFORE the query: a process created while the query runs is newer
+    // than it, so "seen alive at snapAt" never covers a process created after the snapshot
     'function Snap {',
     "  $script:snapErr = ''",
+    '  $script:snapAt = (Get-Date).ToUniversalTime().Ticks',
     '  $err = $null',
     `  $r = @(Get-CimInstance -Query 'SELECT ProcessId,ParentProcessId,Name,CreationDate FROM Win32_Process' -OperationTimeoutSec ${CIM_OPERATION_TIMEOUT_SEC} -ErrorVariable err -ErrorAction SilentlyContinue)`,
     "  if ($err -and @($err).Count -gt 0) { $script:snapErr = ErrId @($err)[0]; return }",
@@ -216,10 +223,11 @@ export function buildReapScript(
     // Adds new members of the tree to $known (until nothing more is added), then returns
     // the processes of $list that are members
     'function Tree($list) {',
-    '  $now = (Get-Date).ToUniversalTime().Ticks',
+    // $here: members present in this list with their recorded creation time
+    '  $now = $script:snapAt; $here = @{}',
     '  foreach ($x in $list) {',
     '    $id = [int]$x.ProcessId',
-    '    if ($x.CreationDate -and $known.ContainsKey($id) -and $known[$id].T -eq $x.CreationDate.ToUniversalTime().Ticks) { $known[$id].L = $now }',
+    '    if ($x.CreationDate -and $known.ContainsKey($id) -and $known[$id].T -eq $x.CreationDate.ToUniversalTime().Ticks) { $known[$id].L = $now; $here[$id] = $true }',
     '  }',
     '  $grew = $true',
     '  while ($grew) {',
@@ -236,10 +244,10 @@ export function buildReapScript(
     '        if ($hosts -contains [string]$x.Name) { $mine = $true }',
     `        elseif ($shells.ContainsKey($id)) { $d = $c - $shells[$id]; $mine = $d -le ${shellTol} -and $d -ge -${shellTol} }`,
     '      }',
-    // below a member: no older than it, and created while it was last seen alive (or
-    // inside the quit window)
-    '      $below = $known.ContainsKey($pp) -and $known[$pp].T -le $c -and ($c -le $e.Ticks -or $c -le $known[$pp].L)',
-    '      if ($mine -or $below) { $known[$id] = @{ T = $c; N = [string]$x.Name; P = $pp; L = $now }; $grew = $true }',
+    // below a member: no older than it, and either that member is in this same list, or
+    // the child was created no later than the last snapshot that saw the member alive
+    '      $below = $known.ContainsKey($pp) -and $known[$pp].T -le $c -and ($here.ContainsKey($pp) -or $c -le $known[$pp].L)',
+    '      if ($mine -or $below) { $known[$id] = @{ T = $c; N = [string]$x.Name; P = $pp; L = $now }; $here[$id] = $true; $grew = $true }',
     '    }',
     '  }',
     '  foreach ($x in $list) {',
@@ -258,15 +266,16 @@ export function buildReapScript(
     '  $p = Get-Process -Id $app -ErrorAction SilentlyContinue',
     "  if (-not $p) { Trace 'app already exited'; $waited = $true }",
     '  else {',
-    // Touching Handle first makes the Process object hold an OS handle to this exact
-    // process, so StartTime, the wait and the end all refer to it
-    '    $null = $p.Handle',
-    '    $st = $p.StartTime',
+    // Reading Handle first makes the Process object hold an OS handle to this exact
+    // process, so StartTime, the wait and the end all refer to it. No handle = not pinned
+    '    $st = $null',
+    '    if ($null -ne $p.Handle) { $st = $p.StartTime }',
     "    if (-not $st) { Trace 'app start time unreadable' }",
     "    elseif ($st.ToUniversalTime() -gt $q) { Trace 'app pid reused, not waited for'; $waited = $true }",
     '    else {',
     '      while (-not $p.HasExited -and (Get-Date) -lt $until) {',
-    '        $null = Tree @(Snap)',
+    // a listing error must not stop the wait: a verified hung app is still force-ended
+    '        try { $null = Tree @(Snap) } catch { }',
     '        $p | Wait-Process -Timeout 1',
     '      }',
     "      if ($p.HasExited) { Trace 'app exited' } else { $p | Stop-Process -Force; Trace 'app force-ended after the grace period' }",
@@ -274,7 +283,8 @@ export function buildReapScript(
     '    }',
     '  }',
     "} catch { Trace ('wait failed error=' + (ErrId $_)) }",
-    // The app could not be checked: never end it, and end nothing while it may still run
+    // The app could not be checked: never end it, and give it the whole grace period
+    // before the sweeps (which then run even if it is still alive)
     'if (-not $waited) {',
     '  while ((Get-Date) -lt $until) {',
     '    $gone = $false',
@@ -309,10 +319,11 @@ export function buildReapScript(
     // Pin the process, verify it is the member through that handle, end it through it
     '            $h = Get-Process -Id $id -ErrorAction SilentlyContinue',
     '            if ($h) {',
-    '              $null = $h.Handle',
-    '              $st = $h.StartTime',
     '              $d = $null',
-    '              if ($st) { $d = $st.ToUniversalTime().Ticks - $known[$id].T }',
+    '              if ($null -ne $h.Handle) {',
+    '                $st = $h.StartTime',
+    '                if ($st) { $d = $st.ToUniversalTime().Ticks - $known[$id].T }',
+    '              }',
     `              if ($null -ne $d -and $d -le ${idTol} -and $d -ge -${idTol}) { $h | Stop-Process -Force; $done += $id } else { $skip += $id }`,
     '            }',
     "          } catch { $skip += $id; Trace ('sweep ' + $i + ' stop failed pid=' + $id + ' error=' + (ErrId $_)) }",
@@ -324,8 +335,10 @@ export function buildReapScript(
     `  Start-Sleep -Milliseconds ${SWEEP_PAUSE_MS}`,
     '}',
     "Trace ('helper done result=' + $result + ' members-left=' + $left)",
-    // Error ids only (no messages): they name the failing command, never user data. The
-    // expected ones (a pid already gone, a wait that timed out) are left out.
+    // Error ids only (FullyQualifiedErrorId), not the full error records. The cmdlets used
+    // here report fixed ids; a plain `throw` uses its message as the id, so an id can
+    // carry a message. The expected ones (a pid already gone, a wait that timed out) are
+    // left out.
     "$ids = @($Error | ForEach-Object { [string]$_.FullyQualifiedErrorId } | Where-Object { $_ -notlike 'ProcessNotTerminated*' -and $_ -notlike 'NoProcessFoundForGivenId*' } | Select-Object -Unique)",
     "Trace ('helper exit errors=' + $(if ($ids.Count -eq 0) { 'none' } else { $ids -join ';' }))"
   ].join('\n')
