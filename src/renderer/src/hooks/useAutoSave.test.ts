@@ -465,6 +465,59 @@ describe('useAutoSave', () => {
       expect(onSave).not.toHaveBeenCalled()
     })
 
+    it('re-arms the failsafe after a save when isModified never turns false (batched update)', () => {
+      // The save settles `modified` false and the next keystroke sets it true
+      // in the same React batch, so the hook only ever sees `true`: the
+      // modified-state effect never re-runs, and only triggerSave can re-arm.
+      const onSave = vi.fn()
+      const { result } = renderHook(() =>
+        useAutoSave(true, onSave, { delay: 2000, maxInterval: 5000 })
+      )
+
+      // Continuous typing for two full intervals
+      for (let i = 0; i < 10; i++) {
+        act(() => {
+          vi.advanceTimersByTime(1000)
+          result.current.signalChange()
+        })
+      }
+
+      expect(onSave).toHaveBeenCalledTimes(2)
+    })
+
+    it('does not re-arm the failsafe for a save that leaves the content clean', () => {
+      const onSave = vi.fn()
+      const { result, rerender } = renderHook(
+        ({ isModified }) => useAutoSave(isModified, onSave, { delay: 2000, maxInterval: 5000 }),
+        { initialProps: { isModified: true } }
+      )
+
+      act(() => void vi.advanceTimersByTime(2000))
+      expect(onSave).toHaveBeenCalledTimes(1)
+      // The save landed: nothing is unsaved any more
+      rerender({ isModified: false })
+      act(() => result.current.signalChange())
+      act(() => void vi.advanceTimersByTime(20000))
+
+      expect(onSave).toHaveBeenCalledTimes(1)
+    })
+
+    it('does not re-arm the failsafe while held', () => {
+      const onSave = vi.fn()
+      const { result } = renderHook(() =>
+        useAutoSave(true, onSave, { delay: 2000, maxInterval: 5000 })
+      )
+
+      // Hold from inside the save, as a project switch can while one runs
+      onSave.mockImplementationOnce(() => {
+        result.current.holdAutoSave()
+      })
+      act(() => void vi.advanceTimersByTime(2000))
+      act(() => void vi.advanceTimersByTime(20000))
+
+      expect(onSave).toHaveBeenCalledTimes(1)
+    })
+
     it('should not double-save when both timers would fire at the same time', () => {
       const onSave = vi.fn()
       renderHook(() =>

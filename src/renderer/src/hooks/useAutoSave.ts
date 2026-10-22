@@ -53,7 +53,8 @@ export interface UseAutoSaveReturn {
  * Uses two complementary timers:
  * - **Debounce timer**: Resets on each `signalChange()` call. Fires `delay` ms
  *   after the last content change. Provides responsive "save after idle" behavior.
- * - **Max interval timer**: Started when `isModified` becomes true. Fires after
+ * - **Max interval timer**: Started when `isModified` becomes true, and re-armed
+ *   by every save that starts while it is still true. Fires after
  *   `maxInterval` ms regardless of debounce resets. Prevents data loss during
  *   continuous typing sessions.
  *
@@ -172,10 +173,25 @@ export function useAutoSave(
   /**
    * Core save trigger – clears both timers and invokes save.
    * Used by both the debounce and max interval timers.
+   *
+   * The max interval timer is re-armed here, not only by the modified-state
+   * effect: when the save settles `modified` false and a keystroke sets it
+   * true again in the same batch, `isModified` never changes, the effect
+   * never re-runs, and continuous typing would get no further max-interval
+   * save. A save that does leave the content clean turns `isModified` false,
+   * and the effect then cancels this timer.
    */
   const triggerSave = useCallback(() => {
     clearDebounceTimer()
     clearMaxIntervalTimer()
+    if (
+      enabledRef.current &&
+      isModifiedRef.current &&
+      !heldRef.current &&
+      maxIntervalRef.current > 0
+    ) {
+      maxIntervalTimerRef.current = setTimeout(() => triggerSave(), maxIntervalRef.current)
+    }
     onSaveRef.current()
   }, [clearDebounceTimer, clearMaxIntervalTimer])
 
