@@ -66,6 +66,8 @@ interface Scenario {
   appNoHandle?: boolean
   /** Pids whose process object has no Handle at kill time */
   noHandle?: number[]
+  /** Our process is no longer listed after this many lookups (it is mid-exit) */
+  appGoneAtCheck?: number
   /** Listings that throw (a terminating error) */
   throwCalls?: number[]
   /** How long each listing takes after its snapshot (simulated ms); default 0 */
@@ -75,7 +77,7 @@ interface Scenario {
 /** Mocks, defined as functions so they win over the cmdlets of the same name */
 const PRELUDE = [
   '$sc = $env:REAP_SCENARIO | ConvertFrom-Json',
-  '$global:calls = 0; $global:waits = 0; $global:stopped = @{}; $global:appExited = $false',
+  '$global:calls = 0; $global:waits = 0; $global:stopped = @{}; $global:appExited = $false; $global:appChecks = 0',
   // simulated clock (epoch ms); the helper starts just after the quit moment
   `$global:clock = ${QUIT + 300}`,
   'function Get-Date { [CmdletBinding()] param($Format)',
@@ -104,6 +106,7 @@ const PRELUDE = [
   'function Get-Process { [CmdletBinding()] param($Id)',
   `  if ($Id -eq ${APP}) {`,
   '    if ($sc.appMissing) { return }',
+  '    $global:appChecks++; if ($sc.appGoneAtCheck -and $global:appChecks -gt $sc.appGoneAtCheck) { return }',
   '    $o = [pscustomobject]@{ Id = $Id; Handle = 1 }',
   '    if ($sc.appNoHandle) { $o.Handle = $null }',
   "    if ($sc.appStart -eq 'null') { $o | Add-Member -NotePropertyName StartTime -NotePropertyValue $null }",
@@ -238,7 +241,7 @@ describe.skipIf(!hasPowerShell)('quit helper script against a mocked process lis
     )
     expect(stopped.sort()).toEqual(['5001', '6002', '6003'])
     // the name of a process that is neither a host nor our shell is not written
-    expect(trace).toContain('learned 4: 5001:conhost.exe<4000,6001:pwsh.exe<4000,6002:other<6001,6003:conhost.exe<6002')
+    expect(trace).toContain('learned 4 (handed 0, seen 4): 5001:conhost.exe<4000,6001:pwsh.exe<4000,6002:other<6001,6003:conhost.exe<6002')
   })
 
   it('ends a child started after the quit moment below a member that is still alive', () => {
@@ -299,6 +302,37 @@ describe.skipIf(!hasPowerShell)('quit helper script against a mocked process lis
     const { stopped, trace } = run({ appExitsAtWait: 1_000, throwCalls: [1], procs: [host(5001)] }, [], 3)
     expect(stopped).toEqual(['app waits=3', '5001'])
     expect(trace).toContain('app force-ended after the grace period')
+    expect(trace).not.toContain('waited out the grace period')
+  })
+
+  it('judges the tree from the handed-over shells when the app was gone before the helper started (Windows round 7)', () => {
+    const { stopped, trace } = run(
+      {
+        appMissing: true,
+        procs: [
+          // a console host of ours that survived
+          host(5001),
+          // shell 6001 (handed over) has ended; its child and that child's host survive
+          { pid: 6002, ppid: 6001, name: 'ping.exe', createdMs: START + 3_000 },
+          { pid: 6003, ppid: 6002, name: 'conhost.exe', createdMs: START + 3_001 },
+          // our pid and the shell's pid were reused after the quit; their children are newer
+          host(7001, { createdMs: QUIT + 260 }),
+          { pid: 7002, ppid: 6001, name: 'other.exe', createdMs: QUIT + 260 }
+        ]
+      },
+      [shell(6001, START + 2_000)]
+    )
+    expect(stopped.sort()).toEqual(['5001', '6002', '6003'])
+    expect(trace).toContain('learned 1 (handed 1, seen 0): 6001:shell<4000')
+    expect(trace.at(-2)).toBe('helper done result=clean members-left=0')
+  })
+
+  it('waits for an app that is still listed while exiting, instead of giving up on it', () => {
+    // the start time cannot be read while the app exits; two lookups later it is gone
+    const { stopped, trace } = run({ appStart: 'null', appGoneAtCheck: 2, procs: [host(5001)] })
+    expect(stopped).toEqual(['5001'])
+    expect(trace).toContain('app exited while being checked')
+    expect(trace).not.toContain('app start time unreadable')
     expect(trace).not.toContain('waited out the grace period')
   })
 
@@ -377,7 +411,7 @@ describe.skipIf(!hasPowerShell)('quit helper script against a mocked process lis
     expect(trace).toEqual([
       expect.stringMatching(/^helper started pid=\d+ app-pid=4000 shells=0 language=FullLanguage$/),
       'app exited',
-      'learned 0: none',
+      'learned 0 (handed 0, seen 0): none',
       'sweep 1 alive=none',
       'sweep 2 alive=none',
       'helper done result=clean members-left=0',

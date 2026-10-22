@@ -16,7 +16,9 @@
  * 1. while our process is still alive (at most the grace period), lists the processes
  *    every second and learns our terminal tree – console hosts that are our children,
  *    the shells we pass in, and everything below them – each by pid AND creation time,
- *    so a process whose parent ends first is still recognised later;
+ *    so a process whose parent ends first is still recognised later. An app that is
+ *    still listed while its start time cannot be read is still exiting: the helper looks
+ *    again for up to 1 s before it calls the start time unreadable;
  * 2. force-ends our process if it is still alive after the grace period (a worker
  *    thread stuck while the environment is torn down). If our process cannot be
  *    checked (no handle, or its start time is unreadable), it is never ended: the
@@ -43,6 +45,12 @@
  *   was created no later than it. A program opened from the app (`shell.openPath`) is
  *   our child too, but none of these, so it is never touched – even when it got the
  *   pid of a shell that has ended.
+ * - The shells we pass are members from the start, even if no list ever shows them
+ *   (the helper often starts after the app and its shells are gone): a process whose
+ *   parent pid is such a shell counts if it was created after the shell's spawn time
+ *   (minus the 5 s tolerance) and no later than the quit moment + 250 ms. Known gap:
+ *   a shell that ended just before the quit, whose pid was reused at once by a process
+ *   that started a child before quit + 250 ms, would make that child look like ours.
  * - Our direct children must have been created between our process start and the quit
  *   moment (+ 250 ms rounding). A process below a member may be newer only while that
  *   member is alive: it counts when the member is in the same list, or when it was
@@ -233,6 +241,12 @@ export function buildReapScript(
     "} catch { Trace ('helper stopped: dates failed error=' + (ErrId $_)); exit }",
     // Constrained Language Mode can leave a static call returning nothing: stop rather than match everything
     "if (-not $s -or -not $q -or -not $e) { Trace 'helper stopped: dates unavailable'; exit }",
+    // Handed-over members (Windows round 7: the helper often starts after the app is gone,
+    // so nothing can be learned live): each shell we passed counts as a member from just
+    // before its spawn (the 5 s tolerance) until the quit moment + 250 ms, so a process it
+    // started is ours even if the shell itself has ended. H marks it as handed over; a
+    // shell seen in a list replaces its entry with what was seen.
+    `try { foreach ($k in @($shells.Keys)) { $known[[int]$k] = @{ T = $shells[$k] - ${shellTol}; N = 'shell'; P = $app; L = $e.Ticks; H = $true } } } catch { }`,
     // An empty result, or any error (a partial or timed-out list), means "unavailable"
     "$script:snapErr = ''",
     // snapAt is taken BEFORE the query: a process created while the query runs is newer
@@ -294,10 +308,22 @@ export function buildReapScript(
     "  if (-not $p) { Trace 'app already exited'; $waited = $true }",
     '  else {',
     // Reading Handle first makes the Process object hold an OS handle to this exact
-    // process, so StartTime, the wait and the end all refer to it. No handle = not pinned
-    '    $st = $null',
-    '    if ($null -ne $p.Handle) { $st = $p.StartTime }',
-    "    if (-not $st) { Trace 'app start time unreadable' }",
+    // process, so StartTime, the wait and the end all refer to it. No handle = not pinned.
+    // An app that is still exiting can be listed while its start time cannot be read:
+    // look again every 100 ms for up to 1 s before calling it unreadable
+    "    $st = $null; $state = 'unreadable'",
+    '    for ($try = 0; $try -le 10; $try++) {',
+    '      if ($null -ne $p.Handle) { $st = $p.StartTime }',
+    "      if ($st) { $state = 'ok'; break }",
+    "      if ($p.HasExited -eq $true) { $state = 'gone'; break }",
+    '      if ($try -eq 10 -or (Get-Date) -ge $until) { break }',
+    '      Start-Sleep -Milliseconds 100',
+    '      $again = Get-Process -Id $app -ErrorAction SilentlyContinue',
+    "      if (-not $again) { $state = 'gone'; break }",
+    '      $p = $again',
+    '    }',
+    "    if ($state -eq 'gone') { Trace 'app exited while being checked'; $waited = $true }",
+    "    elseif ($state -ne 'ok') { Trace 'app start time unreadable' }",
     "    elseif ($st.ToUniversalTime() -gt $q) { Trace 'app pid reused, not waited for'; $waited = $true }",
     '    else {',
     '      while (-not $p.HasExited -and (Get-Date) -lt $until) {',
@@ -313,16 +339,18 @@ export function buildReapScript(
     // The app could not be checked: never end it, and give it the whole grace period
     // before the sweeps (which then run even if it is still alive)
     'if (-not $waited) {',
+    '  $gone = $false',
     '  while ((Get-Date) -lt $until) {',
-    '    $gone = $false',
     '    try { $gone = $p -and ($p.HasExited -eq $true) } catch { }',
+    '    if (-not $gone) { $gone = -not (Get-Process -Id $app -ErrorAction SilentlyContinue) }',
     '    if ($gone) { break }',
     '    try { $null = Tree @(Snap) } catch { }',
     '    Start-Sleep -Milliseconds 1000',
     '  }',
-    "  Trace 'waited out the grace period'",
+    "  if ($gone) { Trace 'app exited (not verified)' } else { Trace 'waited out the grace period' }",
     '}',
-    "try { Trace ('learned ' + $known.Count + ': ' + (Fmt @($known.Keys | Sort-Object | ForEach-Object { @{ ProcessId = $_; Name = $known[$_].N; ParentProcessId = $known[$_].P } }))) } catch { }",
+    // learned N (handed M, seen K): handed = shells passed in and not seen in any list
+    "try { $hd = @($known.Values | Where-Object { $_.H }).Count; Trace ('learned ' + $known.Count + ' (handed ' + $hd + ', seen ' + ($known.Count - $hd) + '): ' + (Fmt @($known.Keys | Sort-Object | ForEach-Object { @{ ProcessId = $_; Name = $known[$_].N; ParentProcessId = $known[$_].P } }))) } catch { }",
     // 2. Sweep until two sweeps in a row find no member alive. members-left = members
     //    alive in the last list that could be read ("unknown" when it could not be).
     "$quiet = 0; $result = 'gave-up'; $left = 'unknown'",

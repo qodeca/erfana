@@ -44,6 +44,14 @@ export type TerminalCreateResult =
 export const TERMINAL_CWD_TOO_LONG_MESSAGE =
   "This folder's path is longer than Windows allows for a terminal (260 characters). Move the project to a shorter path."
 
+/**
+ * Diagnostics only (#305): set to `1` to skip the Windows tree kill on quit and window
+ * close, so a process a terminal started is left for the quit helper
+ * (`conptyHostReaper.ts`) to find. Lets a Windows tester force a leftover on purpose;
+ * the normal path never sets it. Logged as a warning when used.
+ */
+export const SKIP_TREE_KILL_ENV = 'ERFANA_DIAG_SKIP_TREE_KILL'
+
 /** Returned by `createTerminal` once the app has started to quit (#305). */
 export const TERMINAL_SHUTTING_DOWN_MESSAGE = 'The app is closing, so no new terminal can be opened.'
 
@@ -898,7 +906,9 @@ export class TerminalService extends EventEmitter {
    */
   private async endShells(shells: TerminalInstance[]): Promise<void> {
     const win32 = osPlatform() === 'win32'
-    if (win32) {
+    if (win32 && process.env[SKIP_TREE_KILL_ENV] === '1') {
+      logger.warn(`Tree kill skipped: ${SKIP_TREE_KILL_ENV}=1 (diagnostics only)`)
+    } else if (win32) {
       await killProcessTrees(shells.filter((t) => !t.hasExited).map((t) => t.pid))
     }
     const startedAt = Date.now()
