@@ -89,10 +89,17 @@ describe('readDocumentImage', () => {
     expect(result).toMatchObject({ status: 'ok', dataUrl: `data:image/png;base64,${Buffer.from('abcdef').toString('base64')}` })
   })
 
-  it('opens non-blocking and without following a last-segment link on POSIX, read-only on Windows', () => {
-    const posix = documentImageOpenFlags('darwin')
-    expect(posix & constants.O_NONBLOCK).toBe(constants.O_NONBLOCK)
-    expect(posix & constants.O_NOFOLLOW).toBe(constants.O_NOFOLLOW)
+  // The POSIX flags are host constants: a Windows host's Node does not define them
+  it.skipIf(process.platform === 'win32')(
+    'opens non-blocking and without following a last-segment link on POSIX',
+    () => {
+      const posix = documentImageOpenFlags('darwin')
+      expect(posix & constants.O_NONBLOCK).toBe(constants.O_NONBLOCK)
+      expect(posix & constants.O_NOFOLLOW).toBe(constants.O_NOFOLLOW)
+    }
+  )
+
+  it('opens read-only on Windows', () => {
     expect(documentImageOpenFlags('win32')).toBe(constants.O_RDONLY)
   })
 })
