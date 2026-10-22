@@ -85,7 +85,7 @@ describe('reconcileLazyState', () => {
 describe('useLazyFolderChildren', () => {
   it('does not read a lazy folder until it is expanded', () => {
     const tree = baseTree()
-    const { result } = renderHook(() => useLazyFolderChildren(tree, new Set(['/p', '/p/docs'])))
+    const { result } = renderHook(() => useLazyFolderChildren(tree, new Set(['/p', '/p/docs'])).tree)
 
     expect(result.current).toBe(tree)
     expect(readDirectory).not.toHaveBeenCalled()
@@ -95,7 +95,7 @@ describe('useLazyFolderChildren', () => {
     readDirectory.mockResolvedValue([file('/p/dist/b.js')])
     const tree = baseTree()
     const expanded = new Set(['/p', '/p/dist'])
-    const { result, rerender } = renderHook(() => useLazyFolderChildren(tree, expanded))
+    const { result, rerender } = renderHook(() => useLazyFolderChildren(tree, expanded).tree)
 
     expect(status('/p/dist')).toBe('loading')
     await waitFor(() => expect(childrenOf(result.current, '/p/dist')).toEqual(['/p/dist/b.js']))
@@ -108,7 +108,7 @@ describe('useLazyFolderChildren', () => {
   it('shares what it read with the merged files any other consumer sees', async () => {
     readDirectory.mockResolvedValue([file('/p/dist/b.js')])
     const tree = baseTree()
-    renderHook(() => useLazyFolderChildren(tree, new Set(['/p/dist'])))
+    renderHook(() => useLazyFolderChildren(tree, new Set(['/p/dist'])).tree)
     const { result } = renderHook(() => useMergedProjectFiles(tree))
 
     await waitFor(() => expect(childrenOf(result.current.files, '/p/dist')).toEqual(['/p/dist/b.js']))
@@ -118,7 +118,7 @@ describe('useLazyFolderChildren', () => {
   it('reads a loaded folder again after a new base tree, keeping the old children until then', async () => {
     readDirectory.mockResolvedValueOnce([file('/p/dist/old.js')])
     const expanded = new Set(['/p', '/p/dist'])
-    const { result, rerender } = renderHook(({ files }) => useLazyFolderChildren(files, expanded), {
+    const { result, rerender } = renderHook(({ files }) => useLazyFolderChildren(files, expanded).tree, {
       initialProps: { files: baseTree() }
     })
     await waitFor(() => expect(childrenOf(result.current, '/p/dist')).toEqual(['/p/dist/old.js']))
@@ -136,7 +136,7 @@ describe('useLazyFolderChildren', () => {
   it('keeps a read folder that turns lazy showing its children, then re-reads it (review item 3)', async () => {
     readDirectory.mockResolvedValue([file('/p/big/a.md'), file('/p/big/b.md')])
     const expanded = new Set(['/p/big'])
-    const { result, rerender } = renderHook(({ files }) => useLazyFolderChildren(files, expanded), {
+    const { result, rerender } = renderHook(({ files }) => useLazyFolderChildren(files, expanded).tree, {
       initialProps: { files: [folder('/p/big', [file('/p/big/a.md')])] }
     })
 
@@ -151,7 +151,7 @@ describe('useLazyFolderChildren', () => {
     readDirectory.mockRejectedValue(new Error('EACCES: /p/dist'))
     const tree = baseTree()
     const expanded = new Set(['/p', '/p/dist'])
-    const { result, rerender } = renderHook(() => useLazyFolderChildren(tree, expanded))
+    const { result, rerender } = renderHook(() => useLazyFolderChildren(tree, expanded).tree)
 
     await waitFor(() => expect(status('/p/dist')).toBe('failed'))
     rerender()
@@ -166,7 +166,7 @@ describe('useLazyFolderChildren', () => {
     readDirectory.mockRejectedValue(new Error('PROJECT_CHANGED'))
     isProjectChanged.mockReturnValue(true)
     const tree = baseTree()
-    const { result } = renderHook(() => useLazyFolderChildren(tree, new Set(['/p/dist'])))
+    const { result } = renderHook(() => useLazyFolderChildren(tree, new Set(['/p/dist'])).tree)
 
     await waitFor(() => expect(readDirectory).toHaveBeenCalledTimes(1))
     await waitFor(() => expect(status('/p/dist')).toBeUndefined())

@@ -80,6 +80,8 @@ interface ProjectTreeNodeProps {
   /** Offset from the top of the list in px (virtualised placement) */
   top: number
   isExpanded: boolean
+  /** An expanded lazy folder being read (#320): `aria-busy` until its children arrive */
+  isBusy?: boolean
   /**
    * Whether this row is THE selected row – the folder that paste, New file
    * and Import act on (`selectedFolder`). It drives both the lime selected
@@ -139,6 +141,7 @@ function ProjectTreeNodeRow({
   parentPath,
   top,
   isExpanded,
+  isBusy = false,
   isSelected,
   isTabStop,
   onFileClick,
@@ -267,6 +270,7 @@ function ProjectTreeNodeRow({
         aria-posinset={posInSet}
         aria-setsize={setSize}
         aria-expanded={node.type === 'directory' ? isExpanded : undefined}
+        aria-busy={isBusy ? true : undefined}
         aria-selected={isSelected}
         tabIndex={isTabStop ? 0 : -1}
         onClick={handleClick}

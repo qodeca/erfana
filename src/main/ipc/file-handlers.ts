@@ -210,8 +210,17 @@ export function registerFileHandlers(): void {
 
   // Find files by name below a project folder (finding [32], PR #320 review):
   // the terminal's fallback for a bare file name the incomplete tree does not
-  // hold. Confined like a tree read; the search itself is bounded in results,
-  // folders and time, and never follows a link (`file/findByName`).
+  // hold. The controls, for review:
+  // - payload: strict `{ dirPath, name }`; `name` is one entry name (no `/`,
+  //   `\`, NUL, `.` or `..`), so it is compared, never joined into a path;
+  // - `dirPath`: confined to the open project and must exist (`mode:
+  //   'project'`, the same binding as `file:readDirectory`); a project
+  //   switch during the search answers PROJECT_CHANGED (`staleCheck`);
+  // - the walk: never follows a link or junction, so it stays below `dirPath`;
+  //   hidden names and the exclude list are skipped as in the tree;
+  // - cost: at most 20 results, 20,000 folders, 1.5 s and 16 reads in flight
+  //   (`file/findByName`), then it answers with what it found, `truncated`;
+  // - logs: counts and duration only, never the name or the paths.
   registerConfinedHandle(
     FILE_CHANNELS.findByName,
     {

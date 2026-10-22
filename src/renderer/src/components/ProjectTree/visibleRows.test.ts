@@ -3,7 +3,7 @@
 import { describe, it, expect } from 'vitest'
 import type { FileNode } from '../../../../preload/index'
 import { getBasename } from '../../utils/fileUtils'
-import { buildVisibleRows } from './visibleRows'
+import { buildVisibleRows, dropTargetPath, isNodeRow, placeholderKey } from './visibleRows'
 
 const file = (path: string): FileNode => ({ name: getBasename(path), path, type: 'file', extension: '.md' })
 const dir = (path: string, children: FileNode[]): FileNode => ({
@@ -68,5 +68,50 @@ describe('buildVisibleRows', () => {
     const { rows } = buildVisibleRows(deepRoot, expanded)
     expect(rows).toHaveLength(20_002)
     expect(rows[rows.length - 1].level).toBe(20_001)
+  })
+})
+
+describe('buildVisibleRows – lazy-folder placeholder lines (#320)', () => {
+  const lazy = (path: string, children: FileNode[] = []): FileNode => ({ ...dir(path, children), lazy: 'capped' })
+  const tree = dir('/p', [lazy('/p/big'), file('/p/z.md')])
+  const open = new Set(['/p', '/p/big'])
+
+  it('puts a loading line under an expanded lazy folder that has nothing to show yet', () => {
+    const { rows, indexByPath } = buildVisibleRows(tree, open, new Map([['/p/big', 'loading' as const]]))
+
+    expect(rows[2]).toEqual({ kind: 'placeholder', folderPath: '/p/big', level: 2, parentPath: '/p/big', status: 'loading' })
+    // Not a node: no index of its own, and its folder's siblings still count two
+    expect([...indexByPath.keys()]).toEqual(['/p', '/p/big', '/p/z.md'])
+    expect(rows.filter(isNodeRow).map((r) => [r.node.path, r.posInSet, r.setSize])).toEqual([
+      ['/p', 1, 1],
+      ['/p/big', 1, 2],
+      ['/p/z.md', 2, 2]
+    ])
+  })
+
+  it('shows no line for a collapsed folder, a folder with no status, or a reload that has children', () => {
+    const status = new Map([['/p/big', 'loading' as const]])
+    expect(buildVisibleRows(tree, new Set(['/p']), status).rows.some((r) => !isNodeRow(r))).toBe(false)
+    expect(buildVisibleRows(tree, open).rows.some((r) => !isNodeRow(r))).toBe(false)
+    const withChildren = dir('/p', [lazy('/p/big', [file('/p/big/a.md')])])
+    expect(buildVisibleRows(withChildren, open, status).rows.some((r) => !isNodeRow(r))).toBe(false)
+  })
+
+  it('puts a failed line first, above whatever the folder still shows', () => {
+    const withChildren = dir('/p', [lazy('/p/big', [file('/p/big/a.md')])])
+    const { rows } = buildVisibleRows(withChildren, open, new Map([['/p/big', 'failed' as const]]))
+    expect(rows.map((r) => (isNodeRow(r) ? r.node.path : `line:${r.status}`))).toEqual([
+      '/p',
+      '/p/big',
+      'line:failed',
+      '/p/big/a.md'
+    ])
+  })
+
+  it('keys a line apart from every path, and resolves a drop on it to its folder', () => {
+    expect(placeholderKey('/p/big')).not.toBe('/p/big')
+    expect(placeholderKey('/p/big').startsWith('/')).toBe(false)
+    expect(dropTargetPath(placeholderKey('/p/big'))).toBe('/p/big')
+    expect(dropTargetPath('/p/z.md')).toBe('/p/z.md')
   })
 })

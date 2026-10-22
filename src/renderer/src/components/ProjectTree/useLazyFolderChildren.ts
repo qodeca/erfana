@@ -26,7 +26,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import type { FileNode } from '../../../../shared/ipc/file-schema'
 import { fileGateway, isProjectChanged } from '../../services/fileGateway'
 import { logger } from '../../utils/logger'
-import { useLazyFolderStore, type LoadedChildren } from '../../stores/useLazyFolderStore'
+import { useLazyFolderStore, type LazyFolderStatus, type LoadedChildren } from '../../stores/useLazyFolderStore'
 import { collectLazyPaths, mergeLazyChildren } from '../../utils/lazyTree'
 
 /** Every folder of a tree that shows children, by path. */
@@ -75,11 +75,25 @@ export function reconcileLazyState(
 /**
  * @param files - The base tree from the project context
  * @param expandedFolders - The panel's expanded folder paths
- * @returns The tree to render, with the loaded lazy folders filled in
+ * @returns `tree`: the tree to render, with the loaded lazy folders filled in;
+ *   `status`: which lazy folders are being read or failed to read (for
+ *   `buildVisibleRows`' placeholder lines); `loaded`: the folders read so far
  */
-export function useLazyFolderChildren(files: FileNode[], expandedFolders: ReadonlySet<string>): FileNode[] {
+export function useLazyFolderChildren(
+  files: FileNode[],
+  expandedFolders: ReadonlySet<string>
+): {
+  tree: FileNode[]
+  status: ReadonlyMap<string, LazyFolderStatus>
+  loaded: ReadonlyMap<string, LoadedChildren>
+} {
   const loaded = useLazyFolderStore((state) => state.loaded)
+  const status = useLazyFolderStore((state) => state.status)
   const inFlight = useRef(new Set<string>())
+  // Folders whose read a project switch refused, for the base tree it was
+  // made against: not asked again until the tree changes (or every re-render
+  // would ask again)
+  const refused = useRef<{ base: FileNode[]; paths: Set<string> }>({ base: files, paths: new Set() })
   const previousTree = useRef<FileNode[]>([])
 
   const tree = useMemo(() => mergeLazyChildren(files, loaded), [files, loaded])
@@ -104,6 +118,7 @@ export function useLazyFolderChildren(files: FileNode[], expandedFolders: Readon
       if (!lazyPaths.has(path) || inFlight.current.has(path)) continue
       const entry = loaded.get(path)
       if (entry?.baseTree === files) continue
+      if (refused.current.base === files && refused.current.paths.has(path)) continue
       inFlight.current.add(path)
       store.setStatus(path, 'loading')
       fileGateway
@@ -118,6 +133,8 @@ export function useLazyFolderChildren(files: FileNode[], expandedFolders: Readon
           inFlight.current.delete(path)
           // A project switch refuses the read; the remounted tree starts afresh
           if (isProjectChanged(error)) {
+            if (refused.current.base !== files) refused.current = { base: files, paths: new Set() }
+            refused.current.paths.add(path)
             store.setStatus(path, null)
             return
           }
@@ -132,5 +149,5 @@ export function useLazyFolderChildren(files: FileNode[], expandedFolders: Readon
     }
   }, [expandedFolders, lazyPaths, loaded, files])
 
-  return tree
+  return { tree, status, loaded }
 }

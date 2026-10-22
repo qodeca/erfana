@@ -114,3 +114,27 @@ describe('isTypeAheadKey', () => {
     expect(isTypeAheadKey(key('c', { metaKey: true }))).toBe(false)
   })
 })
+
+describe('the keyboard and lazy-folder placeholder lines (#320)', () => {
+  // 0 /p, 1 big (open, loading), 2 line, 3 zeta.md
+  const lazyRoot = dir('/p', [{ ...dir('/p/big', []), lazy: 'capped' as const }, file('/p/zeta.md')])
+  const { rows: withLine } = buildVisibleRows(lazyRoot, new Set(['/p', '/p/big']), new Map([['/p/big', 'loading' as const]]))
+
+  it('steps over the line with the arrows and never lands on it with End', () => {
+    expect(withLine[2]).toMatchObject({ kind: 'placeholder' })
+    expect(resolveTreeKey(withLine, 1, key('ArrowDown'))).toEqual({ type: 'focus', index: 3 })
+    expect(resolveTreeKey(withLine, 3, key('ArrowUp'))).toEqual({ type: 'focus', index: 1 })
+    expect(resolveTreeKey(withLine, 1, key('End'))).toEqual({ type: 'focus', index: 3 })
+  })
+
+  it('does not treat the line as the open folder\'s first child, nor as anyone\'s parent', () => {
+    expect(resolveTreeKey(withLine, 1, key('ArrowRight'))).toBeNull()
+    expect(resolveTreeKey(withLine, 3, key('ArrowLeft'))).toEqual({ type: 'focus', index: 0 })
+    expect(resolveTreeKey(withLine, 2, key('ArrowDown'))).toBeNull()
+  })
+
+  it('never matches the line in type-ahead', () => {
+    expect(findTypeAheadMatch(withLine, 1, 'l')).toBeNull()
+    expect(findTypeAheadMatch(withLine, 1, 'z')).toBe(3)
+  })
+})

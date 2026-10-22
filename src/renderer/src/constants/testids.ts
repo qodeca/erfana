@@ -83,6 +83,8 @@ export const TEST_IDS = {
   PROJECT_TREE_NODE_FILE: 'project-tree-node-file',
   /** Folder node - use with getDynamicTestId for specific folder targeting */
   PROJECT_TREE_NODE_FOLDER: 'project-tree-node-folder',
+  /** The loading / could-not-read line under an expanded lazy folder (#320) */
+  PROJECT_TREE_PLACEHOLDER: 'project-tree-placeholder',
   /** Drag overlay ghost element during drag operations */
   PROJECT_TREE_DRAG_OVERLAY: 'project-tree-drag-overlay',
   /** Error state container */
