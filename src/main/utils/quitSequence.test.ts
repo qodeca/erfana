@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { armLastResortExit, runQuitSequence, SHUTDOWN_LAST_RESORT_MS } from './quitSequence'
+import { armLastResortExit, LAUNCHER_WAIT_MS, runQuitSequence, SHUTDOWN_LAST_RESORT_MS, waitBounded } from './quitSequence'
 
 afterEach(() => {
   vi.useRealTimers()
@@ -64,5 +64,35 @@ describe('armLastResortExit', () => {
     const fakeSetTimeout = vi.fn(() => ({ unref })) as unknown as typeof setTimeout
     armLastResortExit(vi.fn(), 10, fakeSetTimeout)
     expect(unref).not.toHaveBeenCalled()
+  })
+})
+
+describe('waitBounded (quit-helper launcher, #305)', () => {
+  it('returns as soon as the launcher has exited, with the time it took', async () => {
+    vi.useFakeTimers({ now: 0 })
+    let release: () => void = () => {}
+    const launcher = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const waited = waitBounded(launcher)
+    await vi.advanceTimersByTimeAsync(400)
+    release()
+    await expect(waited).resolves.toEqual({ settled: true, waitedMs: 400 })
+  })
+
+  it('gives up after 3 s so a stuck launcher cannot hold up the quit', async () => {
+    vi.useFakeTimers({ now: 0 })
+    expect(LAUNCHER_WAIT_MS).toBe(3_000)
+    const waited = waitBounded(new Promise<void>(() => {}))
+    await vi.advanceTimersByTimeAsync(LAUNCHER_WAIT_MS)
+    await expect(waited).resolves.toEqual({ settled: false, waitedMs: LAUNCHER_WAIT_MS })
+  })
+
+  it('treats a rejected wait as settled and never rejects', async () => {
+    await expect(waitBounded(Promise.reject(new Error('boom')), 10)).resolves.toMatchObject({ settled: true })
+  })
+
+  it('fits inside the last-resort exit with the lock (1 s) and disposer (2 s) bounds', () => {
+    expect(1_000 + 2_000 + LAUNCHER_WAIT_MS).toBeLessThan(SHUTDOWN_LAST_RESORT_MS)
   })
 })

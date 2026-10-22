@@ -115,6 +115,53 @@ export function installNoForkConsoleList(
   }
 }
 
+/** Marks the wrapped exit method so a second install does nothing. */
+const EXIT_MARK = '__erfanaExitTimeRecorder'
+
+/** Property set on a WindowsPtyAgent when its native exit callback fires. */
+const EXIT_AT = '__erfanaExitAtMs'
+
+/**
+ * Records WHEN node-pty's native exit callback fires for each Windows agent (#305).
+ *
+ * node-pty reports the exit to JavaScript only after the output is drained (up to about
+ * a second later), so `onExit` is late. The quit helper must not treat a pid as the
+ * shell's after the shell has ended (Windows may hand the pid to another process), so it
+ * needs the earliest moment the shell was known to be gone. `_$onProcessExit` is the
+ * method the native exit thread calls; the wrapper only notes `Date.now()` on the agent
+ * and then calls the original. Nothing happens if the method is not what 1.1.0 has.
+ *
+ * @returns true when the wrapper is in place
+ */
+export function installExitTimeRecorder(load: () => unknown = loadWindowsPtyAgent): boolean {
+  try {
+    const mod = load() as { WindowsPtyAgent?: { prototype?: Record<string, unknown> } } | undefined
+    const proto = mod?.WindowsPtyAgent?.prototype
+    const original = proto?._$onProcessExit
+    if (!proto || typeof original !== 'function') return false
+    if ((original as unknown as Record<string, unknown>)[EXIT_MARK]) return true
+    const wrapped = function (this: Record<string, unknown>, ...args: unknown[]): unknown {
+      this[EXIT_AT] = Date.now()
+      return (original as (...a: unknown[]) => unknown).apply(this, args)
+    }
+    ;(wrapped as unknown as Record<string, unknown>)[EXIT_MARK] = true
+    proto._$onProcessExit = wrapped
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * When the native exit callback fired for a node-pty Windows terminal (`IPty`), or
+ * `undefined` if it has not (or the terminal is not a Windows one).
+ */
+export function nativeExitAtMs(ptyProcess: unknown): number | undefined {
+  const agent = (ptyProcess as { _agent?: Record<string, unknown> } | undefined)?._agent
+  const at = agent?.[EXIT_AT]
+  return typeof at === 'number' && Number.isFinite(at) ? at : undefined
+}
+
 /** Test hook: lets a test see the once-only warning again. */
 export function resetShimWarningForTests(): void {
   reported = false

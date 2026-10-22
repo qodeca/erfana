@@ -304,6 +304,8 @@ describe('Main Process - Window Creation', () => {
       loggingService: {
         initialize: vi.fn(() => Promise.resolve()),
         cleanupOldLogs: vi.fn(() => Promise.resolve()),
+        // the quit step reads it for the quit-helper trace path (#305)
+        getLogsDir: vi.fn(() => '/tmp/erfana-test-logs'),
         info: vi.fn(),
         debug: vi.fn(),
         warn: vi.fn(),
@@ -1026,6 +1028,36 @@ describe('Main Process - Window Creation', () => {
         expect(mockApp.exit).toHaveBeenCalledWith(0)
       } finally {
         cleanup()
+      }
+    })
+
+    it('waits at most 3 s for the quit-helper launcher, last, and logs the wait (#305)', async () => {
+      vi.doMock('./services/conptyHostReaper', () => ({
+        QUIT_TRACE_FILE: 'quit-cleanup.log',
+        startConptyHostReaper: vi.fn(() => ({ started: true, launcherDone: new Promise<void>(() => {}) }))
+      }))
+      const { logger } = (await import('./services/LoggingService')) as any
+      const { run, cleanup } = await loadAndGetBeforeQuit()
+
+      try {
+        vi.useFakeTimers()
+        const shutdown = run({ preventDefault: vi.fn() })
+        await vi.advanceTimersByTimeAsync(2_999)
+        expect(mockApp.exit).not.toHaveBeenCalled()
+        await vi.advanceTimersByTimeAsync(1)
+        await shutdown
+
+        expect(mockApp.exit).toHaveBeenCalledWith(0)
+        const waitLog = logger.info.mock.calls.find(([m]: [string]) => m === 'App quit: quit helper launcher wait')
+        expect(waitLog?.[1]).toEqual({ settled: false, waitedMs: 3_000 })
+        // the wait comes after the disposers
+        const order = logger.info.mock.calls.map(([m]: [string]) => m)
+        expect(order.indexOf('App quit: disposers done, exiting')).toBeLessThan(
+          order.indexOf('App quit: quit helper launcher wait')
+        )
+      } finally {
+        cleanup()
+        vi.doUnmock('./services/conptyHostReaper')
       }
     })
 

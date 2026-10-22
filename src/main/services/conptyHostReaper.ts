@@ -67,11 +67,11 @@
  *   hosts have the same parent pid, so nothing can be told apart.
  *
  * `wmic` is removed on current Windows, hence PowerShell. Only integers and constants
- * are placed in the scripts. The trace path and the shell table travel in environment
- * variables (the table is integers only and is checked again inside the script). The
- * helper reaches the launcher as `-EncodedCommand` (base64, so its own quoting does not
- * matter); the launcher script has no double quotes or backslashes, so its command-line
- * quoting is trivial.
+ * are placed in the scripts. The trace path, the shell table (integers only, checked
+ * again inside the script) and the helper text travel in environment variables. The
+ * helper runs as `-Command &([scriptblock]::Create($env:ERFANA_QUIT_HELPER))`, not as a
+ * long `-EncodedCommand` (round 7b: EDR tools flag that). Neither script has double
+ * quotes or backslashes, so the command-line quoting is trivial.
  */
 import { spawn as nodeSpawn } from 'child_process'
 import { appendFileSync, writeFileSync } from 'fs'
@@ -127,14 +127,29 @@ export const SHELL_SPAWN_TOLERANCE_MS = 5_000
 /** Kill-time start-time check tolerance: 1 ms in .NET ticks (WMI keeps microseconds). */
 const IDENTITY_TOLERANCE_TICKS = 10_000
 
-/** .NET ticks of the Unix epoch, to place spawn times in the script as ticks. */
-const UNIX_EPOCH_TICKS = 621_355_968_000_000_000n
+/**
+ * Margin around a shell's known life for the clock difference between Node and WMI
+ * (both read the system clock): its children may be created from `spawnedAtMs - 50`
+ * to `end + 50` ms.
+ */
+export const SHELL_LIFE_MARGIN_MS = 50
 
-/** A terminal shell still running at the quit moment. */
+/** Environment variable that carries the helper script from the launcher to the helper. */
+export const QUIT_HELPER_ENV = 'ERFANA_QUIT_HELPER'
+
+/** Windows' limit on one environment variable, and the size kept for the whole block. */
+export const WINDOWS_ENV_VAR_MAX = 32_767
+
+/** A terminal shell whose exit had not been reported at the quit moment. */
 export interface LiveShell {
   pid: number
-  /** `Date.now()` right after node-pty returned the pid */
+  /** `Date.now()` taken right BEFORE node-pty spawned the shell */
   spawnedAtMs: number
+  /**
+   * Earliest moment the shell was asked to end or its native exit fired, if any: after
+   * it, the pid may belong to another process
+   */
+  endBeforeMs?: number
 }
 
 /** Image names of a console host; `-contains` compares case-insensitively inside the script. */
@@ -160,7 +175,8 @@ export function powershellPath(env: NodeJS.ProcessEnv = process.env): string {
 export function powershellEnv(
   env: NodeJS.ProcessEnv = process.env,
   tracePath?: string,
-  shells?: string
+  shells?: string,
+  helper?: string
 ): NodeJS.ProcessEnv {
   const root = systemRoot(env)
   const out: NodeJS.ProcessEnv = {
@@ -170,11 +186,15 @@ export function powershellEnv(
   }
   if (tracePath && isDriveOrUncPath(tracePath)) out[QUIT_TRACE_ENV] = tracePath
   if (shells && SHELLS_VALUE.test(shells)) out[QUIT_SHELLS_ENV] = shells
+  if (helper && ASCII.test(helper)) out[QUIT_HELPER_ENV] = helper
   return out
 }
 
-/** `pid:ticks` pairs, comma-separated; ticks are always 18 digits for current dates. */
-const SHELLS_VALUE = /^[0-9]{1,9}:[0-9]{18}(?:,[0-9]{1,9}:[0-9]{18})*$/
+/** `pid:startBeforeQuitMs:lifeMs` triples, comma-separated. */
+const SHELLS_VALUE = /^[0-9]{1,9}:[0-9]{1,11}:[0-9]{1,11}(?:,[0-9]{1,9}:[0-9]{1,11}:[0-9]{1,11})*$/
+
+/** Printable ASCII and line breaks only: what the helper text may contain. */
+const ASCII = /^[\x20-\x7e\n]+$/
 
 function assertInt(value: number, name: string): void {
   if (!Number.isSafeInteger(value) || value <= 0) {
@@ -183,18 +203,28 @@ function assertInt(value: number, name: string): void {
 }
 
 /**
- * The shell table for {@link QUIT_SHELLS_ENV}: `pid:ticks` pairs (spawn time as .NET
- * ticks), duplicates dropped, at most {@link MAX_SHELLS}. Exported for tests.
+ * The shell table for {@link QUIT_SHELLS_ENV}, relative to the quit moment so it stays
+ * short: `pid:a:b` where the shell's life (and so the creation time of anything it
+ * started) runs from `quit - a` to `quit - a + b` ms. It starts {@link SHELL_LIFE_MARGIN_MS}
+ * before the spawn and ends that much after the earliest of the quit moment, the moment
+ * the shell was asked to end and its native exit (after any of them the pid may belong
+ * to another process). Duplicates dropped, at most {@link MAX_SHELLS}. Exported for tests.
  */
-export function shellsEnvValue(shells: ReadonlyArray<LiveShell>): string {
-  const byPid = new Map<number, number>()
+export function shellsEnvValue(shells: ReadonlyArray<LiveShell>, quitMs: number): string {
+  assertInt(quitMs, 'quitMs')
+  const byPid = new Map<number, string>()
   for (const shell of shells) {
     assertInt(shell.pid, 'shell pid')
     assertInt(shell.spawnedAtMs, 'shell spawn time')
+    if (shell.endBeforeMs !== undefined) assertInt(shell.endBeforeMs, 'shell end time')
     if (shell.pid > 999_999_999) throw new Error('shell pid out of range')
-    if (byPid.size < MAX_SHELLS) byPid.set(shell.pid, shell.spawnedAtMs)
+    // spawned after the quit moment: cannot happen (beginShutdown), so never trusted
+    if (shell.spawnedAtMs > quitMs) continue
+    const from = shell.spawnedAtMs - SHELL_LIFE_MARGIN_MS
+    const until = Math.min(quitMs, shell.endBeforeMs ?? quitMs) + SHELL_LIFE_MARGIN_MS
+    if (byPid.size < MAX_SHELLS) byPid.set(shell.pid, `${quitMs - from}:${Math.max(0, until - from)}`)
   }
-  return [...byPid].map(([pid, ms]) => `${pid}:${BigInt(ms) * 10_000n + UNIX_EPOCH_TICKS}`).join(',')
+  return [...byPid].map(([pid, life]) => `${pid}:${life}`).join(',')
 }
 
 /**
@@ -228,12 +258,13 @@ export function buildReapScript(
     `$app = ${parentPid}`,
     `$hosts = @(${hosts})`,
     // pid -> spawn time (ticks) of each shell we passed; only well-formed integer pairs
-    '$shells = @{}',
-    `try { foreach ($pair in (([string]$env:${QUIT_SHELLS_ENV}) -split ',')) { if ($pair -match '^[0-9]{1,9}:[0-9]{18}$') { $kv = $pair -split ':'; $shells[[int]$kv[0]] = [long]$kv[1] } } } catch { }`,
+    // pid -> earliest creation ticks ($shells) and end of life ticks ($shellEnd) of each
+    // shell we passed; filled after the dates below, from well-formed integer triples only
+    '$shells = @{}; $shellEnd = @{}',
     // pid -> creation ticks (T), image name (N), parent pid (P) and the time of the last
     // listing that saw it alive (L) of every member seen
     '$known = @{}',
-    "Trace ('helper started pid=' + $PID + ' app-pid=' + $app + ' shells=' + $shells.Count + ' language=' + $ExecutionContext.SessionState.LanguageMode)",
+    `Trace ('helper started pid=' + $PID + ' app-pid=' + $app + ' shells=' + @(([string]$env:${QUIT_SHELLS_ENV}) -split ',' | Where-Object { $_ }).Count + ' language=' + $ExecutionContext.SessionState.LanguageMode)`,
     'try {',
     `  $s = [DateTimeOffset]::FromUnixTimeMilliseconds(${startMs}).UtcDateTime`,
     `  $q = [DateTimeOffset]::FromUnixTimeMilliseconds(${quitMs}).UtcDateTime`,
@@ -241,12 +272,14 @@ export function buildReapScript(
     "} catch { Trace ('helper stopped: dates failed error=' + (ErrId $_)); exit }",
     // Constrained Language Mode can leave a static call returning nothing: stop rather than match everything
     "if (-not $s -or -not $q -or -not $e) { Trace 'helper stopped: dates unavailable'; exit }",
+    `try { foreach ($pair in (([string]$env:${QUIT_SHELLS_ENV}) -split ',')) { if ($pair -match '^[0-9]{1,9}:[0-9]{1,11}:[0-9]{1,11}$') { $kv = $pair -split ':'; $t0 = $q.Ticks - [long]$kv[1] * 10000; $shells[[int]$kv[0]] = $t0; $shellEnd[[int]$kv[0]] = $t0 + [long]$kv[2] * 10000 } } } catch { }`,
     // Handed-over members (Windows round 7: the helper often starts after the app is gone,
-    // so nothing can be learned live): each shell we passed counts as a member from just
-    // before its spawn (the 5 s tolerance) until the quit moment + 250 ms, so a process it
-    // started is ours even if the shell itself has ended. H marks it as handed over; a
-    // shell seen in a list replaces its entry with what was seen.
-    `try { foreach ($k in @($shells.Keys)) { $known[[int]$k] = @{ T = $shells[$k] - ${shellTol}; N = 'shell'; P = $app; L = $e.Ticks; H = $true } } } catch { }`,
+    // so nothing can be learned live): each shell we passed is a member for its known life
+    // (from just before its spawn to just after the earliest of the quit, the kill request
+    // and its native exit), so a process it started is ours even if the shell has ended.
+    // H marks it as handed over; a shell seen in a list replaces its entry with what was
+    // seen. A DIFFERENT process seen holding the pid caps that life at its own creation.
+    "try { foreach ($k in @($shells.Keys)) { $known[[int]$k] = @{ T = $shells[$k]; N = 'shell'; P = $app; L = $shellEnd[$k]; H = $true } } } catch { }",
     // An empty result, or any error (a partial or timed-out list), means "unavailable"
     "$script:snapErr = ''",
     // snapAt is taken BEFORE the query: a process created while the query runs is newer
@@ -269,6 +302,9 @@ export function buildReapScript(
     '  foreach ($x in $list) {',
     '    $id = [int]$x.ProcessId',
     '    if ($x.CreationDate -and $known.ContainsKey($id) -and $known[$id].T -eq $x.CreationDate.ToUniversalTime().Ticks) { $known[$id].L = $now; $here[$id] = $true }',
+    // a handed-over shell's pid held by another process: the shell was gone before that
+    // process was created, so nothing created after it is the shell's
+    `    elseif ($x.CreationDate -and $known.ContainsKey($id) -and $known[$id].H) { $c0 = $x.CreationDate.ToUniversalTime().Ticks; $d0 = $c0 - $shells[$id]; $isShell = [int]$x.ParentProcessId -eq $app -and $d0 -ge 0 -and $d0 -le ${shellTol}; if (-not $isShell -and $c0 -lt $known[$id].L) { $known[$id].L = $c0 } }`,
     '  }',
     '  $grew = $true',
     '  while ($grew) {',
@@ -283,7 +319,7 @@ export function buildReapScript(
     '      $mine = $false',
     '      if ($pp -eq $app -and $c -le $e.Ticks) {',
     '        if ($hosts -contains [string]$x.Name) { $mine = $true }',
-    `        elseif ($shells.ContainsKey($id)) { $d = $c - $shells[$id]; $mine = $d -le ${shellTol} -and $d -ge -${shellTol} }`,
+    `        elseif ($shells.ContainsKey($id)) { $d = $c - $shells[$id]; $mine = $d -ge 0 -and $d -le ${shellTol} }`,
     '      }',
     // below a member: no older than it, and either that member is in this same list, or
     // the child was created no later than the last snapshot that saw the member alive
@@ -296,6 +332,8 @@ export function buildReapScript(
     '    if ($x.CreationDate -and $known.ContainsKey($id) -and $known[$id].T -eq $x.CreationDate.ToUniversalTime().Ticks) { $x }',
     '  }',
     '}',
+    // True when a list shows our pid held by a process created after the quit moment
+    "function AppReused($list) { foreach ($x in $list) { if ([int]$x.ProcessId -eq $app -and $x.CreationDate -and $x.CreationDate.ToUniversalTime() -gt $q) { return $true } }; $false }",
     // Image names only for console hosts and our shells; anything else is "other"
     "function Label($id, $name) { if (($hosts -contains [string]$name) -or $shells.ContainsKey([int]$id)) { [string]$name } else { 'other' } }",
     "function Fmt($items) { $t = @($items | ForEach-Object { [string]$_.ProcessId + ':' + (Label $_.ProcessId $_.Name) + '<' + $_.ParentProcessId }); if ($t.Count -eq 0) { 'none' } else { $t -join ',' } }",
@@ -322,7 +360,10 @@ export function buildReapScript(
     "      if (-not $again) { $state = 'gone'; break }",
     '      $p = $again',
     '    }',
+    // unreadable, but WMI lists the pid's holder as created after the quit: reused
+    "    if ($state -eq 'unreadable' -and (AppReused @(Snap))) { $state = 'reused' }",
     "    if ($state -eq 'gone') { Trace 'app exited while being checked'; $waited = $true }",
+    "    elseif ($state -eq 'reused') { Trace 'app pid reused (listed as newer than the quit), not waited for'; $waited = $true }",
     "    elseif ($state -ne 'ok') { Trace 'app start time unreadable' }",
     "    elseif ($st.ToUniversalTime() -gt $q) { Trace 'app pid reused, not waited for'; $waited = $true }",
     '    else {',
@@ -339,15 +380,16 @@ export function buildReapScript(
     // The app could not be checked: never end it, and give it the whole grace period
     // before the sweeps (which then run even if it is still alive)
     'if (-not $waited) {',
-    '  $gone = $false',
+    '  $gone = $false; $reusedSeen = $false',
     '  while ((Get-Date) -lt $until) {',
     '    try { $gone = $p -and ($p.HasExited -eq $true) } catch { }',
     '    if (-not $gone) { $gone = -not (Get-Process -Id $app -ErrorAction SilentlyContinue) }',
     '    if ($gone) { break }',
-    '    try { $null = Tree @(Snap) } catch { }',
+    "    try { $l = @(Snap); $reusedSeen = AppReused $l; $null = Tree $l } catch { }",
+    '    if ($reusedSeen) { break }',
     '    Start-Sleep -Milliseconds 1000',
     '  }',
-    "  if ($gone) { Trace 'app exited (not verified)' } else { Trace 'waited out the grace period' }",
+    "  if ($reusedSeen) { Trace 'app pid reused (listed as newer than the quit)' } elseif ($gone) { Trace 'app exited (not verified)' } else { Trace 'waited out the grace period' }",
     '}',
     // learned N (handed M, seen K): handed = shells passed in and not seen in any list
     "try { $hd = @($known.Values | Where-Object { $_.H }).Count; Trace ('learned ' + $known.Count + ' (handed ' + $hd + ', seen ' + ($known.Count - $hd) + '): ' + (Fmt @($known.Keys | Sort-Object | ForEach-Object { @{ ProcessId = $_; Name = $known[$_].N; ParentProcessId = $known[$_].P } }))) } catch { }",
@@ -399,31 +441,29 @@ export function buildReapScript(
   ].join('\n')
 }
 
-/** Base64 alphabet only: what may be placed in the launcher script. */
-const BASE64 = /^[A-Za-z0-9+/]+={0,2}$/
-
-/** `-EncodedCommand` form of a script: base64 of its UTF-16LE text. */
-export function encodeCommand(script: string): string {
-  return Buffer.from(script, 'utf16le').toString('base64')
-}
+/**
+ * The helper's `-Command`: runs the text of {@link QUIT_HELPER_ENV} as a script block.
+ * It has no spaces, so it passes through Windows PowerShell 5.1's `-ArgumentList`
+ * (which joins without quoting) unchanged. Round 7b: no `-EncodedCommand` – a hidden
+ * PowerShell with a long base64 command looks like malware to EDR tools (T1027).
+ */
+export const HELPER_COMMAND = `&([scriptblock]::Create($env:${QUIT_HELPER_ENV}))`
 
 /**
  * Builds the launcher script (Windows round 6): it starts the helper as a separate,
- * hidden PowerShell with its own console and exits. It holds only constants and the
- * base64 text, and writes one trace line, so a missing helper can be told apart from
- * a launcher that failed. Exported for tests.
- *
- * @param encodedHelper - {@link encodeCommand} of the helper script
+ * hidden PowerShell with its own console and exits. It holds only constants, and
+ * writes one trace line, so a missing helper can be told apart from a launcher that
+ * failed. The helper text reaches the helper through {@link QUIT_HELPER_ENV}, which
+ * `Start-Process` passes on with the rest of the environment. Exported for tests.
  */
-export function buildLauncherScript(encodedHelper: string): string {
-  if (!BASE64.test(encodedHelper)) throw new Error('encodedHelper must be base64')
+export function buildLauncherScript(): string {
   return [
     "$ErrorActionPreference = 'Stop'",
     `$tr = $env:${QUIT_TRACE_ENV}`,
     "function Trace([string]$m) { if ($tr) { try { Add-Content -LiteralPath $tr -Value ((Get-Date -Format 'o') + ' ' + $m) } catch { } } }",
     'try {',
     // $PSHOME is this launcher's own folder: the same validated powershell.exe
-    `  $h = Start-Process -FilePath (Join-Path $PSHOME 'powershell.exe') -WindowStyle Hidden -PassThru -ArgumentList '-NoProfile', '-NonInteractive', '-NoLogo', '-EncodedCommand', '${encodedHelper}'`,
+    `  $h = Start-Process -FilePath (Join-Path $PSHOME 'powershell.exe') -WindowStyle Hidden -PassThru -ArgumentList '-NoProfile', '-NonInteractive', '-NoLogo', '-Command', '${HELPER_COMMAND}'`,
     "  Trace ('launcher started helper pid=' + $h.Id)",
     "} catch { Trace ('launcher failed error=' + [string]$_.FullyQualifiedErrorId); exit 1 }"
   ].join('\n')
@@ -432,6 +472,12 @@ export function buildLauncherScript(encodedHelper: string): string {
 /** The launcher's arguments, after the PowerShell path. Exported for tests. */
 export function launcherArgs(launcherScript: string): string[] {
   return ['-NoProfile', '-NonInteractive', '-NoLogo', '-Command', launcherScript]
+}
+
+/** What {@link startConptyHostReaper} returns. */
+export interface QuitHelperStart {
+  started: boolean
+  launcherDone: Promise<void>
 }
 
 export interface ReapOptions {
@@ -472,9 +518,12 @@ export interface ReapOptions {
  * Before the start it replaces the trace file with one line from the app, so a file
  * that holds only that line means the launcher never ran.
  *
- * @returns true when the launcher was started
+ * @returns `started` (the launcher was spawned) and `launcherDone`, which settles when
+ *   the launcher exits or fails (at once when nothing was started). The quit waits for
+ *   it, bounded, before `app.exit(0)`: until `Start-Process` has returned, the launcher
+ *   is inside libuv's kill-on-close job and the helper would not be started.
  */
-export function startConptyHostReaper(options: ReapOptions = {}): boolean {
+export function startConptyHostReaper(options: ReapOptions = {}): QuitHelperStart {
   const {
     platform = process.platform,
     pid = process.pid,
@@ -486,7 +535,8 @@ export function startConptyHostReaper(options: ReapOptions = {}): boolean {
     writeFileFn = writeFileSync,
     appendFileFn = appendFileSync
   } = options
-  if (platform !== 'win32') return false
+  const none: QuitHelperStart = { started: false, launcherDone: Promise.resolve() }
+  if (platform !== 'win32') return none
 
   const trace = tracePath && isDriveOrUncPath(tracePath) ? tracePath : undefined
   const note = (line: string, first = false): void => {
@@ -511,35 +561,41 @@ export function startConptyHostReaper(options: ReapOptions = {}): boolean {
         Number.isSafeInteger(sh.spawnedAtMs) &&
         sh.spawnedAtMs > 0
     )
-    const shellsValue = shellsEnvValue(shells)
-    const launcher = buildLauncherScript(encodeCommand(buildReapScript(pid, startMs, quitMs)))
+    const shellsValue = shellsEnvValue(shells, quitMs)
+    const helper = buildReapScript(pid, startMs, quitMs)
     const shellCount = shellsValue ? shellsValue.split(',').length : 0
     note(`app starting quit helper app-pid=${pid} shells=${shellCount}`, true)
     const child = spawnFn(
       powershellPath(),
-      launcherArgs(launcher),
+      launcherArgs(buildLauncherScript()),
       // No `detached` (see above): a detached powershell.exe never runs its script
-      { stdio: 'ignore', windowsHide: true, env: powershellEnv(process.env, trace, shellsValue) }
+      { stdio: 'ignore', windowsHide: true, env: powershellEnv(process.env, trace, shellsValue, helper) }
     )
+    let settle: () => void = () => {}
+    const launcherDone = new Promise<void>((resolve) => {
+      settle = resolve
+    })
     // No kill timer: the launcher exits right after starting the helper, and the helper
     // bounds itself (grace period, query timeout, sweep count).
     child.once('error', (error) => {
       logger.warn('Quit cleanup helper could not be started', { error: error.message })
       note(`app: quit helper could not be started (${(error as NodeJS.ErrnoException).code ?? 'error'})`)
+      settle()
     })
     // The launcher exits at once; a non-zero code means it could not start the helper
     child.once('exit', (code) => {
+      settle()
       if (code === 0) return
       logger.warn('Quit cleanup launcher failed', { code })
       note(`app: quit launcher failed code=${code ?? 'none'}`)
     })
     child.unref()
-    return true
+    return { started: true, launcherDone }
   } catch (error) {
     logger.warn('Quit cleanup helper could not be started', {
       error: error instanceof Error ? error.message : String(error)
     })
     note('app: quit helper could not be started')
-    return false
+    return none
   }
 }

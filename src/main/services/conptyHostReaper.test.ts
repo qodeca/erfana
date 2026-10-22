@@ -9,26 +9,22 @@ vi.mock('./LoggingService', () => ({ logger: { info: vi.fn(), warn: vi.fn(), err
 import {
   buildLauncherScript,
   buildReapScript,
-  encodeCommand,
+  HELPER_COMMAND,
   launcherArgs,
   MAX_SHELLS,
   MAX_SWEEPS,
   powershellEnv,
   powershellPath,
   QUIT_GRACE_SEC,
+  QUIT_HELPER_ENV,
   QUIT_SHELLS_ENV,
   QUIT_TRACE_ENV,
   SHELL_SPAWN_TOLERANCE_MS,
   shellsEnvValue,
   startConptyHostReaper,
-  WINDOWS_COMMAND_LINE_MAX
+  WINDOWS_COMMAND_LINE_MAX,
+  WINDOWS_ENV_VAR_MAX
 } from './conptyHostReaper'
-
-/** The helper script carried in a launcher script's -EncodedCommand */
-function helperOf(launcher: string): string {
-  const b64 = /'-EncodedCommand', '([A-Za-z0-9+/=]+)'/.exec(launcher)?.[1] ?? ''
-  return Buffer.from(b64, 'base64').toString('utf16le')
-}
 
 /** Length of a command line as libuv builds it: each argument with spaces is quoted */
 function commandLineLength(file: string, args: string[]): number {
@@ -47,7 +43,9 @@ describe('buildReapScript', () => {
     expect(script).toContain("$hosts = @('conhost.exe', 'OpenConsole.exe')")
     // the shells come from the environment, checked again as integer pairs in the script
     expect(script).toContain(`$env:${QUIT_SHELLS_ENV}`)
-    expect(script).toContain("if ($pair -match '^[0-9]{1,9}:[0-9]{18}$')")
+    expect(script).toContain("if ($pair -match '^[0-9]{1,9}:[0-9]{1,11}:[0-9]{1,11}$')")
+    // a different process seen holding a handed-over shell pid caps the shell's life
+    expect(script).toContain('if (-not $isShell -and $c0 -lt $known[$id].L) { $known[$id].L = $c0 }')
     expect(script).toContain('FromUnixTimeMilliseconds(1000)')
     expect(script).toContain('FromUnixTimeMilliseconds(2000)')
     // the end of the creation window is the quit moment + 250 ms, nothing more
@@ -58,7 +56,7 @@ describe('buildReapScript', () => {
     expect(script).toContain('-OperationTimeoutSec 5')
     // a shell counts only near its spawn time
     expect(SHELL_SPAWN_TOLERANCE_MS).toBe(5_000)
-    expect(script).toContain('$mine = $d -le 50000000 -and $d -ge -50000000')
+    expect(script).toContain('$mine = $d -ge 0 -and $d -le 50000000')
     // a descendant must be no older than the member it hangs below
     expect(script).toContain('$known[$pp].T -le $c')
     // ended only through a handle opened at kill time, after its start time matched
@@ -71,7 +69,9 @@ describe('buildReapScript', () => {
 
   it('has no double quotes or backslashes, so the command line needs no escaping', () => {
     expect(buildReapScript(4242, 1_000, 2_000)).not.toMatch(/["\\]/)
-    expect(buildLauncherScript(encodeCommand(buildReapScript(4242, 1_000, 2_000)))).not.toMatch(/["\\]/)
+    expect(buildLauncherScript()).not.toMatch(/["\\]/)
+    // the helper travels in an environment variable: printable ASCII only
+    expect(buildReapScript(4242, 1_000, 2_000)).toMatch(/^[\x20-\x7e\n]+$/)
   })
 
   it('stops before listing or ending anything when a date could not be built (Constrained Language Mode)', () => {
@@ -118,51 +118,67 @@ describe('buildReapScript', () => {
     expect(() => buildReapScript(1.5, 1, 2)).toThrow()
     expect(() => buildReapScript(0, 1, 2)).toThrow()
     expect(() => buildReapScript(1, 1, 2, 0)).toThrow()
-    expect(() => shellsEnvValue([{ pid: 0, spawnedAtMs: 1 }])).toThrow()
-    expect(() => shellsEnvValue([{ pid: 1, spawnedAtMs: 1.5 }])).toThrow()
-    expect(() => shellsEnvValue([{ pid: 1_000_000_000, spawnedAtMs: 1 }])).toThrow()
+    expect(() => shellsEnvValue([{ pid: 0, spawnedAtMs: 1 }], 2)).toThrow()
+    expect(() => shellsEnvValue([{ pid: 1, spawnedAtMs: 1.5 }], 2)).toThrow()
+    expect(() => shellsEnvValue([{ pid: 1, spawnedAtMs: 1, endBeforeMs: 1.5 }], 2)).toThrow()
+    expect(() => shellsEnvValue([{ pid: 1_000_000_000, spawnedAtMs: 1 }], 2)).toThrow()
     // @ts-expect-error a string must never reach the script
     expect(() => buildReapScript("1' ; calc ; '", 1, 2)).toThrow()
     // @ts-expect-error nor the shell table
-    expect(() => shellsEnvValue([{ pid: "1' ; calc ; '", spawnedAtMs: 1 }])).toThrow()
-    // only base64 goes into the launcher
-    expect(() => buildLauncherScript("abc'; calc; '")).toThrow()
+    expect(() => shellsEnvValue([{ pid: "1' ; calc ; '", spawnedAtMs: 1 }], 2)).toThrow()
   })
 })
 
 describe('shellsEnvValue', () => {
-  it('writes pid:ticks pairs, drops duplicates and stops at the maximum', () => {
-    // spawn times as .NET ticks (ms * 10000 + the Unix epoch)
+  it('writes each shell as pid:startBeforeQuit:life in ms, around its known life', () => {
+    // spawned at 1500 (life from 1450), quit at 10000: life until 10050
+    expect(shellsEnvValue([{ pid: 9001, spawnedAtMs: 1_500 }], 10_000)).toBe('9001:8550:8600')
+    // asked to end (or native exit) at 4000: life until 4050, not the quit
+    expect(shellsEnvValue([{ pid: 9001, spawnedAtMs: 1_500, endBeforeMs: 4_000 }], 10_000)).toBe('9001:8550:2600')
+    // an end after the quit is capped at the quit
+    expect(shellsEnvValue([{ pid: 9001, spawnedAtMs: 1_500, endBeforeMs: 12_000 }], 10_000)).toBe('9001:8550:8600')
+    // a shell "spawned" after the quit is never trusted
+    expect(shellsEnvValue([{ pid: 9001, spawnedAtMs: 10_001 }], 10_000)).toBe('')
+  })
+
+  it('drops duplicates and stops at the maximum', () => {
     expect(
-      shellsEnvValue([
-        { pid: 9001, spawnedAtMs: 1_500 },
-        { pid: 9002, spawnedAtMs: 1_600 },
-        { pid: 9001, spawnedAtMs: 1_500 }
-      ])
-    ).toBe('9001:621355968015000000,9002:621355968016000000')
+      shellsEnvValue(
+        [
+          { pid: 9001, spawnedAtMs: 1_500 },
+          { pid: 9002, spawnedAtMs: 1_600 },
+          { pid: 9001, spawnedAtMs: 1_500 }
+        ],
+        10_000
+      )
+    ).toBe('9001:8550:8600,9002:8450:8500')
     const many = Array.from({ length: MAX_SHELLS + 10 }, (_, i) => ({ pid: 10_000 + i, spawnedAtMs: 1_700_000_000_000 }))
-    expect(shellsEnvValue(many).split(',')).toHaveLength(MAX_SHELLS)
-    expect(shellsEnvValue([])).toBe('')
+    expect(shellsEnvValue(many, 1_800_000_000_000).split(',')).toHaveLength(MAX_SHELLS)
+    expect(shellsEnvValue([], 1)).toBe('')
   })
 })
 
 describe('buildLauncherScript', () => {
-  it('starts the helper hidden with Start-Process from its own folder, and traces it', () => {
-    const helper = buildReapScript(4242, 1_000, 2_000)
-    const launcher = buildLauncherScript(encodeCommand(helper))
+  it('starts the helper hidden with Start-Process from its own folder, with no encoded command', () => {
+    const launcher = buildLauncherScript()
     expect(launcher).toContain("Start-Process -FilePath (Join-Path $PSHOME 'powershell.exe') -WindowStyle Hidden -PassThru")
-    expect(launcher).toContain("-ArgumentList '-NoProfile', '-NonInteractive', '-NoLogo', '-EncodedCommand', '")
+    expect(launcher).toContain(`-ArgumentList '-NoProfile', '-NonInteractive', '-NoLogo', '-Command', '${HELPER_COMMAND}'`)
+    // the helper text comes from the environment; no base64 anywhere (EDR, round 7b)
+    expect(HELPER_COMMAND).toBe(`&([scriptblock]::Create($env:${QUIT_HELPER_ENV}))`)
+    expect(HELPER_COMMAND).not.toMatch(/\s/)
+    expect(launcher).not.toContain('EncodedCommand')
     expect(launcher).toContain("Trace ('launcher started helper pid=' + $h.Id)")
     expect(launcher).toContain("Trace ('launcher failed error=' + [string]$_.FullyQualifiedErrorId); exit 1")
     expect(launcher).toContain(`$tr = $env:${QUIT_TRACE_ENV}`)
     expect(launcher).toContain('Add-Content -LiteralPath $tr')
-    // the encoded text is exactly the helper
-    expect(helperOf(launcher)).toBe(helper)
   })
 
-  it('keeps both command lines under the Windows limit at the maximum shell count', () => {
-    // the shells travel in the environment, so the size does not depend on them
-    const shells = Array.from({ length: MAX_SHELLS }, (_, i) => ({ pid: 100_000 + i * 4, spawnedAtMs: 1_700_000_000_000 }))
+  it('keeps the command lines and the environment under the Windows limits at the maximum shell count', () => {
+    const shells = Array.from({ length: MAX_SHELLS }, (_, i) => ({
+      pid: 100_000_000 + i * 4,
+      spawnedAtMs: 1_800_000_000_000 - 86_000_000,
+      endBeforeMs: 1_800_000_000_000 - 1
+    }))
     const child = fakeChild()
     const spawnFn = vi.fn(() => child)
     startConptyHostReaper({
@@ -171,17 +187,18 @@ describe('buildLauncherScript', () => {
       now: () => 1_800_000_000_000,
       uptimeSeconds: () => 86_400,
       shells,
+      tracePath: 'C:\\Users\\someone-with-a-long-name\\.erfana\\logs\\quit-cleanup.log',
       spawnFn: spawnFn as unknown as typeof spawn
     })
     const [file, args, opts] = spawnFn.mock.calls[0] as unknown as [string, string[], { env: Record<string, string> }]
-    const launcherLength = commandLineLength(file, args)
-    const helper = helperOf(args[args.length - 1])
-    const helperLength = commandLineLength(file, ['-NoProfile', '-NonInteractive', '-NoLogo', '-EncodedCommand', encodeCommand(helper)])
-    expect(launcherLength).toBeLessThan(WINDOWS_COMMAND_LINE_MAX * 0.7)
-    expect(helperLength).toBeLessThan(WINDOWS_COMMAND_LINE_MAX * 0.7)
+    const helperLength = commandLineLength(file, ['-NoProfile', '-NonInteractive', '-NoLogo', '-Command', HELPER_COMMAND])
+    expect(commandLineLength(file, args)).toBeLessThan(WINDOWS_COMMAND_LINE_MAX * 0.1)
+    expect(helperLength).toBeLessThan(WINDOWS_COMMAND_LINE_MAX * 0.1)
     expect(opts.env[QUIT_SHELLS_ENV].split(',')).toHaveLength(MAX_SHELLS)
-    // one environment variable is limited to 32,767 characters too
-    expect(opts.env[QUIT_SHELLS_ENV].length).toBeLessThan(WINDOWS_COMMAND_LINE_MAX)
+    // each variable, and the whole block (NAME=value plus a terminator each)
+    for (const value of Object.values(opts.env)) expect(value.length).toBeLessThan(WINDOWS_ENV_VAR_MAX)
+    const block = Object.entries(opts.env).reduce((n, [k, v]) => n + k.length + 1 + v.length + 1, 1)
+    expect(block).toBeLessThan(WINDOWS_ENV_VAR_MAX)
   })
 })
 
@@ -219,7 +236,7 @@ describe('powershellEnv', () => {
 describe('startConptyHostReaper', () => {
   it('does nothing off Windows', () => {
     const spawnFn = vi.fn()
-    expect(startConptyHostReaper({ platform: 'darwin', spawnFn: spawnFn as unknown as typeof spawn })).toBe(false)
+    expect(startConptyHostReaper({ platform: 'darwin', spawnFn: spawnFn as unknown as typeof spawn }).started).toBe(false)
     expect(spawnFn).not.toHaveBeenCalled()
   })
 
@@ -233,7 +250,7 @@ describe('startConptyHostReaper', () => {
       uptimeSeconds: () => 60,
       spawnFn: spawnFn as unknown as typeof spawn
     })
-    expect(started).toBe(true)
+    expect(started.started).toBe(true)
     expect(spawnFn).toHaveBeenCalledTimes(1)
     const [file, args, opts] = spawnFn.mock.calls[0] as unknown as [string, string[], Record<string, unknown>]
     expect(file).toMatch(/powershell\.exe$/i)
@@ -244,7 +261,7 @@ describe('startConptyHostReaper', () => {
     // job object libuv puts the launcher in (it is killed when the app exits)
     const launcher = args[args.length - 1]
     expect(launcher).toContain('Start-Process')
-    const script = helperOf(launcher)
+    const script = (opts.env as Record<string, string>)[QUIT_HELPER_ENV]
     expect(script).toContain('$app = 777')
     // start = now - uptime (no margin before our start); end = now + 250 ms rounding only
     expect(script).toContain('FromUnixTimeMilliseconds(99940000)')
@@ -254,7 +271,7 @@ describe('startConptyHostReaper', () => {
     // a detached powershell.exe has no console and exits without running -Command
     // (nodejs/node#51018; 20 of 20 Windows quits on d30c622e)
     expect(opts.detached).not.toBe(true)
-    expect(Object.keys(opts.env as object).sort()).toEqual(['PSModulePath', 'SystemRoot', 'windir'])
+    expect(Object.keys(opts.env as object).sort()).toEqual([QUIT_HELPER_ENV, 'PSModulePath', 'SystemRoot', 'windir'])
     expect(child.unref).toHaveBeenCalled()
   })
 
@@ -290,7 +307,8 @@ describe('startConptyHostReaper', () => {
     // pids and counts only
     expect(text).toMatch(/^\S+ app starting quit helper app-pid=777 shells=2\n$/)
     const [, args, opts] = spawnFn.mock.calls[0] as unknown as [string, string[], { env: Record<string, string> }]
-    expect(opts.env[QUIT_SHELLS_ENV]).toMatch(/^9001:\d{18},9002:\d{18}$/)
+    // quit at 100,000,000; both spawned at 99,000,000: life from 50 ms before to 50 ms after the quit
+    expect(opts.env[QUIT_SHELLS_ENV]).toBe('9001:1000050:1000100,9002:1000050:1000100')
     expect(opts.env[QUIT_TRACE_ENV]).toBe(tracePath)
     expect(args[args.length - 1]).not.toContain('9001')
   })
@@ -344,20 +362,39 @@ describe('startConptyHostReaper', () => {
         throw new Error('EACCES')
       }) as never
     })
-    expect(started).toBe(true)
+    expect(started.started).toBe(true)
     expect(spawnFn).toHaveBeenCalledTimes(1)
   })
 
   it('does not throw when PowerShell cannot be started', () => {
     const child = fakeChild()
-    expect(
-      startConptyHostReaper({ platform: 'win32', spawnFn: vi.fn(() => child) as unknown as typeof spawn })
-    ).toBe(true)
+    const start = startConptyHostReaper({ platform: 'win32', spawnFn: vi.fn(() => child) as unknown as typeof spawn })
+    expect(start.started).toBe(true)
     expect(() => child.emit('error', new Error('ENOENT'))).not.toThrow()
 
     const throwing = vi.fn(() => {
       throw new Error('boom')
     })
-    expect(startConptyHostReaper({ platform: 'win32', spawnFn: throwing as unknown as typeof spawn })).toBe(false)
+    expect(startConptyHostReaper({ platform: 'win32', spawnFn: throwing as unknown as typeof spawn }).started).toBe(false)
+  })
+
+  it('settles launcherDone when the launcher exits or fails, and at once when nothing started', async () => {
+    const exits = fakeChild()
+    const a = startConptyHostReaper({ platform: 'win32', spawnFn: vi.fn(() => exits) as unknown as typeof spawn })
+    let done = false
+    void a.launcherDone.then(() => {
+      done = true
+    })
+    await Promise.resolve()
+    expect(done).toBe(false)
+    exits.emit('exit', 0)
+    await a.launcherDone
+
+    const fails = fakeChild()
+    const b = startConptyHostReaper({ platform: 'win32', spawnFn: vi.fn(() => fails) as unknown as typeof spawn })
+    fails.emit('error', new Error('ENOENT'))
+    await b.launcherDone
+
+    await startConptyHostReaper({ platform: 'darwin' }).launcherDone
   })
 })

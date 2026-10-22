@@ -23,7 +23,7 @@ import { isWindowsLongPath } from './watcher/PlatformConfig'
 import { isForegroundBusy, shellProcessNames } from './terminalForeground'
 import { killProcessTrees } from './terminalTreeKill'
 import type { LiveShell } from './conptyHostReaper'
-import { installNoForkConsoleList } from './nodePtyWindowsShim'
+import { installExitTimeRecorder, installNoForkConsoleList, nativeExitAtMs } from './nodePtyWindowsShim'
 
 /**
  * Outcome of {@link TerminalService.createTerminal}. A failure carries its
@@ -101,6 +101,7 @@ interface TerminalInstance {
   exited: Promise<void> // Settles when node-pty reports the shell exit (#214)
   hasExited?: boolean // Set when node-pty reports the exit; the shell's pid may be reused after that (#296)
   killRequested?: boolean // A pty kill is under way or done; cleared again if it throws (#296)
+  killRequestedAtMs?: number // First moment this service asked for the shell to end (tree or pty kill, #305)
 }
 
 /**
@@ -201,7 +202,7 @@ export class TerminalService extends EventEmitter {
    * node-pty returned the pid; handed to the quit helper (#305). Keyed by terminal, not
    * by pid, so a later shell that got a reused pid cannot be removed by an old exit.
    */
-  private liveShells = new Map<string, LiveShell>()
+  private liveShells = new Map<string, { pid: number; spawnedAtMs: number; terminal: TerminalInstance }>()
   /** Set when `dispose()` starts: no terminal may be created after it (#305). */
   private shuttingDown = false
   /** Whether {@link SKIP_TREE_KILL_ENV} is honoured; off unless the app says so (#305). */
@@ -312,7 +313,11 @@ export class TerminalService extends EventEmitter {
     }
 
     // node-pty's Windows kill must not fork a helper (#296); see nodePtyWindowsShim.ts
-    if (osPlatform() === 'win32') installNoForkConsoleList()
+    if (osPlatform() === 'win32') {
+      installNoForkConsoleList()
+      // When each shell's native exit fires: bounds what the quit helper may take as ours (#305)
+      installExitTimeRecorder()
+    }
 
     const terminalId = `terminal-${++this.terminalCounter}`
 
@@ -422,6 +427,8 @@ export class TerminalService extends EventEmitter {
       }
 
       // Spawn PTY process with bootstrap script
+      // Taken BEFORE the spawn: the shell cannot be older than this (quit helper, #305)
+      const spawnStartedAtMs = Date.now()
       const ptyProcess = pty.spawn(shell, shellArgs, {
         name: 'xterm-256color',
         cols,
@@ -464,7 +471,7 @@ export class TerminalService extends EventEmitter {
       this.terminals.set(terminalId, terminal)
       const shellPid = terminal.pid
       if (typeof shellPid === 'number' && Number.isSafeInteger(shellPid) && shellPid > 0) {
-        this.liveShells.set(terminalId, { pid: shellPid, spawnedAtMs: Date.now() })
+        this.liveShells.set(terminalId, { pid: shellPid, spawnedAtMs: spawnStartedAtMs, terminal })
       }
 
       // Marker detection: buffer data until we see the marker from bootstrap script
@@ -831,7 +838,14 @@ export class TerminalService extends EventEmitter {
    * read once at quit for the quit helper (`conptyHostReaper.ts`), never sent anywhere.
    */
   getLiveShells(): LiveShell[] {
-    return [...this.liveShells.values()]
+    return [...this.liveShells.values()].map(({ pid, spawnedAtMs, terminal }) => {
+      // The shell is not known to hold its pid after we asked it to end, or after its
+      // native exit fired (node-pty reports that to JavaScript only later)
+      const ends = [terminal.killRequestedAtMs, nativeExitAtMs(terminal.ptyProcess)].filter(
+        (t): t is number => typeof t === 'number'
+      )
+      return ends.length > 0 ? { pid, spawnedAtMs, endBeforeMs: Math.min(...ends) } : { pid, spawnedAtMs }
+    })
   }
 
   /**
@@ -921,6 +935,8 @@ export class TerminalService extends EventEmitter {
     if (win32 && this.diagnosticsAllowed && process.env[SKIP_TREE_KILL_ENV] === '1') {
       logger.warn(`Tree kill skipped: ${SKIP_TREE_KILL_ENV}=1 (diagnostics only)`)
     } else if (win32) {
+      const now = Date.now()
+      for (const t of shells) t.killRequestedAtMs ??= now
       await killProcessTrees(shells.filter((t) => !t.hasExited).map((t) => t.pid))
     }
     const startedAt = Date.now()
@@ -938,6 +954,7 @@ export class TerminalService extends EventEmitter {
   private ptyKill(terminal: TerminalInstance): void {
     if (terminal.killRequested) return
     terminal.killRequested = true
+    terminal.killRequestedAtMs ??= Date.now()
     try {
       // Safety net only. In node-pty 1.1.0 WindowsTerminal.kill() returns undefined,
       // so this branch never runs there; the #296 error box is prevented by the

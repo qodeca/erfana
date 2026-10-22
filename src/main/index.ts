@@ -45,7 +45,7 @@ import { globalSettingsService } from './services/GlobalSettingsService'
 import { loggingService, logger } from './services/LoggingService'
 import { logNodePtyBinding } from './utils/logNodePtyBinding'
 import { createQuitGuard } from './utils/quitGuard'
-import { armLastResortExit, runQuitSequence } from './utils/quitSequence'
+import { armLastResortExit, LAUNCHER_WAIT_MS, runQuitSequence, waitBounded } from './utils/quitSequence'
 import { QUIT_TRACE_FILE, startConptyHostReaper } from './services/conptyHostReaper'
 import { gitWatcherService } from './services/GitWatcherService'
 import { gitPollingService } from './services/GitPollingService'
@@ -745,6 +745,7 @@ app.on('before-quit', (event): Promise<void> | undefined => {
   // Last resort: a step that never settles must not leave the app un-quittable (the
   // guard blocks every later quit). Not unref'd.
   armLastResortExit(() => app.exit(0))
+  let launcherDone: Promise<void> = Promise.resolve()
 
   return runQuitSequence(
     [
@@ -757,11 +758,15 @@ app.on('before-quit', (event): Promise<void> | undefined => {
         // records is the start of the shutdown; no terminal is created after it. What it
         // saw and ended is written to QUIT_TRACE_FILE in the log folder.
         terminalService.beginShutdown()
-        const quitHelperStarted = startConptyHostReaper({
+        const quitHelper = startConptyHostReaper({
           shells: terminalService.getLiveShells(),
           tracePath: join(loggingService.getLogsDir(), QUIT_TRACE_FILE)
         })
-        logger.info('App quitting, cleaning up services', { quitHelperStarted, quitTrace: QUIT_TRACE_FILE })
+        launcherDone = quitHelper.launcherDone
+        logger.info('App quitting, cleaning up services', {
+          quitHelperStarted: quitHelper.started,
+          quitTrace: QUIT_TRACE_FILE
+        })
       },
       // Priority: lock release runs first and alone, so the next launch can open
       // the project without waiting for heartbeat staleness — but bounded, so a
@@ -798,6 +803,13 @@ app.on('before-quit', (event): Promise<void> | undefined => {
         gitPollingService.dispose()
         // electron-log writes synchronously, so this line is on disk before the process exits
         logger.info('App quit: disposers done, exiting')
+      },
+      // Last: the quit helper's launcher is inside libuv's kill-on-close job until it has
+      // started the helper, so wait for it (bounded; it is usually long done by now). Only
+      // the launcher is waited for, never the helper (#305)
+      async () => {
+        const { settled, waitedMs } = await waitBounded(launcherDone, LAUNCHER_WAIT_MS)
+        logger.info('App quit: quit helper launcher wait', { settled, waitedMs })
       }
     ],
     () => app.exit(0),

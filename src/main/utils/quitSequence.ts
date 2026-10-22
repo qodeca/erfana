@@ -13,7 +13,7 @@ export type QuitStep = () => void | Promise<void>
 
 /**
  * Last-resort bound on the whole shutdown. Longer than every per-step bound in
- * `src/main/index.ts` (lock 1 s + disposers 2 s), so it only fires when something
+ * `src/main/index.ts` (lock 1 s + disposers 2 s + quit-helper launcher 3 s), so it only fires when something
  * never settles or the event loop is starved.
  */
 export const SHUTDOWN_LAST_RESORT_MS = 8_000
@@ -56,4 +56,30 @@ export async function runQuitSequence(
   } finally {
     exit()
   }
+}
+
+/** Longest the quit waits for the quit helper's launcher before `app.exit(0)` (#305). */
+export const LAUNCHER_WAIT_MS = 3_000
+
+/**
+ * Waits for `work` for at most `ms`; never rejects (#305: the quit-helper launcher must
+ * leave libuv's kill-on-close job before the app exits, but a stuck one must not hold
+ * up the quit).
+ *
+ * @returns whether `work` settled in time, and how long the wait took
+ */
+export async function waitBounded(
+  work: Promise<unknown>,
+  ms: number = LAUNCHER_WAIT_MS,
+  now: () => number = Date.now,
+  setTimeoutFn: typeof setTimeout = setTimeout
+): Promise<{ settled: boolean; waitedMs: number }> {
+  const startedAt = now()
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timedOut = new Promise<boolean>((resolve) => {
+    timer = setTimeoutFn(() => resolve(false), ms)
+  })
+  const settled = await Promise.race([work.then(() => true, () => true), timedOut])
+  clearTimeout(timer)
+  return { settled, waitedMs: now() - startedAt }
 }

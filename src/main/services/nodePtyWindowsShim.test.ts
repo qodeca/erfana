@@ -9,7 +9,13 @@ const logger = vi.hoisted(() => ({
 }))
 vi.mock('./LoggingService', () => ({ logger }))
 
-import { installNoForkConsoleList, readNodePtyVersion, resetShimWarningForTests } from './nodePtyWindowsShim'
+import {
+  installExitTimeRecorder,
+  installNoForkConsoleList,
+  nativeExitAtMs,
+  readNodePtyVersion,
+  resetShimWarningForTests
+} from './nodePtyWindowsShim'
 
 /** Shaped like node-pty 1.1.0: the original builds its list by forking, which throws when the fuse is off */
 function fakeModule() {
@@ -148,4 +154,37 @@ describe('nodePtyWindowsShim', () => {
       expect(bundle).toMatch(/createRequire\([^)]*\)\(\s*["'`]node-pty\/lib\/windowsPtyAgent["'`]\s*\)/)
     }
   )
+})
+
+describe('installExitTimeRecorder (#305)', () => {
+  it('notes when the native exit fires, still calls the original, and wraps only once', () => {
+    const original = vi.fn()
+    class WindowsPtyAgent {
+      _$onProcessExit(code: number): void {
+        original(code)
+      }
+    }
+    const load = () => ({ WindowsPtyAgent })
+    expect(installExitTimeRecorder(load)).toBe(true)
+    const wrapped = WindowsPtyAgent.prototype._$onProcessExit
+    expect(installExitTimeRecorder(load)).toBe(true)
+    expect(WindowsPtyAgent.prototype._$onProcessExit).toBe(wrapped)
+
+    const agent = new WindowsPtyAgent()
+    const terminal = { _agent: agent }
+    expect(nativeExitAtMs(terminal)).toBeUndefined()
+    const before = Date.now()
+    agent._$onProcessExit(3)
+    expect(original).toHaveBeenCalledWith(3)
+    expect(nativeExitAtMs(terminal)).toBeGreaterThanOrEqual(before)
+  })
+
+  it('does nothing when node-pty has no such method, and reads nothing from a non-Windows pty', () => {
+    expect(installExitTimeRecorder(() => ({ WindowsPtyAgent: class {} }))).toBe(false)
+    expect(installExitTimeRecorder(() => {
+      throw new Error('missing')
+    })).toBe(false)
+    expect(nativeExitAtMs({})).toBeUndefined()
+    expect(nativeExitAtMs(undefined)).toBeUndefined()
+  })
 })

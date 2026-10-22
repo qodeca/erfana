@@ -39,7 +39,11 @@ const treeKill = vi.hoisted(() => ({
 }))
 vi.mock('./terminalTreeKill', () => treeKill)
 
-const shim = vi.hoisted(() => ({ installNoForkConsoleList: vi.fn(() => true) }))
+const shim = vi.hoisted(() => ({
+  installNoForkConsoleList: vi.fn(() => true),
+  installExitTimeRecorder: vi.fn(() => true),
+  nativeExitAtMs: vi.fn((_pty: unknown): number | undefined => undefined)
+}))
 vi.mock('./nodePtyWindowsShim', () => shim)
 
 const PTY_GLOBAL = '__ERFANA_TEST_PTY__'
@@ -92,6 +96,9 @@ describe('TerminalService kill paths (#296)', () => {
     mockNodePty.spawn.mockClear()
     treeKill.killProcessTrees.mockClear()
     shim.installNoForkConsoleList.mockClear()
+    shim.installExitTimeRecorder.mockClear()
+    shim.nativeExitAtMs.mockReset()
+    shim.nativeExitAtMs.mockImplementation(() => undefined)
     treeKill.killProcessTrees.mockImplementation(() => Promise.resolve(true))
     process.env.SHELL = '/bin/zsh'
     delete process.env.ERFANA_E2E_FAST_SHELL
@@ -394,6 +401,38 @@ describe('TerminalService kill paths (#296)', () => {
       expect(spawned[0].pid).toBe(first.pid)
       first.emit('exit', { exitCode: 0 })
       expect(terminalService.getLiveShells().map((s) => s.pid)).toEqual([9000])
+    })
+
+    it('takes the spawn time before node-pty spawns the shell', async () => {
+      const { terminalService } = await load('win32')
+      let spawnCalledAt = 0
+      mockNodePty.spawn.mockImplementationOnce((...args: unknown[]) => {
+        spawnCalledAt = Date.now()
+        return (mockNodePty.spawn.getMockImplementation() as (...a: unknown[]) => MockPTY)(...args)
+      })
+      await create(terminalService, 'win32')
+      const [live] = terminalService.getLiveShells()
+      expect(live.spawnedAtMs).toBeLessThanOrEqual(spawnCalledAt)
+      expect(shim.installExitTimeRecorder).toHaveBeenCalled()
+    })
+
+    it('reports the earliest end: the kill request or the native exit, whichever came first', async () => {
+      vi.useFakeTimers({ now: 1_000_000 })
+      const { terminalService } = await load('win32')
+      await create(terminalService, 'win32', 7)
+      await create(terminalService, 'win32')
+      expect(terminalService.getLiveShells().every((s) => s.endBeforeMs === undefined)).toBe(true)
+
+      // the second shell's native exit fired at 1,000,500 (onExit not yet delivered)
+      shim.nativeExitAtMs.mockImplementation((pty: unknown) => (pty === spawned[1] ? 1_000_500 : undefined))
+      vi.setSystemTime(1_002_000)
+      // the window closes: the first shell is asked to end now
+      terminalService.cleanupForWebContentsId(7)
+      const ends = terminalService.getLiveShells().map((s) => [s.pid, s.endBeforeMs])
+      expect(ends).toEqual([
+        [9000, 1_002_000],
+        [9001, 1_000_500]
+      ])
     })
 
     it('creates no terminal once the shutdown has begun', async () => {

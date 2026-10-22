@@ -18,7 +18,8 @@ vi.mock('./LoggingService', () => ({ logger: { info: vi.fn(), warn: vi.fn(), err
 import {
   buildLauncherScript,
   buildReapScript,
-  encodeCommand,
+  HELPER_COMMAND,
+  QUIT_HELPER_ENV,
   MAX_SWEEPS,
   QUIT_SHELLS_ENV,
   QUIT_TRACE_ENV,
@@ -60,6 +61,8 @@ interface Scenario {
   appExitsAtWait?: number
   /** How our process's StartTime reads; 'bad' is a value whose use throws */
   appStart?: 'ok' | 'null' | 'throw' | 'bad'
+  /** Our process's readable start time (epoch ms); default 5 s before START */
+  appStartMs?: number
   /** HasExited of our process reads $null (not readable) */
   appHasExitedNull?: boolean
   /** Our process object has no Handle (it could not be pinned) */
@@ -112,7 +115,7 @@ const PRELUDE = [
   "    if ($sc.appStart -eq 'null') { $o | Add-Member -NotePropertyName StartTime -NotePropertyValue $null }",
   "    elseif ($sc.appStart -eq 'bad') { $o | Add-Member -NotePropertyName StartTime -NotePropertyValue 'not-a-date' }",
   "    elseif ($sc.appStart -eq 'throw') { $o | Add-Member -MemberType ScriptProperty -Name StartTime -Value { throw [System.ComponentModel.Win32Exception]::new(5) } }",
-  `    else { $o | Add-Member -NotePropertyName StartTime -NotePropertyValue ([DateTimeOffset]::FromUnixTimeMilliseconds(${START - 5_000}).LocalDateTime) }`,
+  `    else { $ms = ${START - 5_000}; if ($sc.appStartMs) { $ms = [long]$sc.appStartMs }; $o | Add-Member -NotePropertyName StartTime -NotePropertyValue ([DateTimeOffset]::FromUnixTimeMilliseconds($ms).LocalDateTime) }`,
   '    if ($sc.appHasExitedNull) { $o | Add-Member -MemberType ScriptProperty -Name HasExited -Value { $null } }',
   '    else { $o | Add-Member -MemberType ScriptProperty -Name HasExited -Value { $global:appExited } }',
   '    return $o',
@@ -159,13 +162,15 @@ function run(
   graceSec?: number
 ): { stopped: string[]; trace: string[] } {
   const script = buildReapScript(APP, START, QUIT, graceSec)
-  const result = spawnSync(POWERSHELL, ['-NoProfile', '-NonInteractive', '-NoLogo', '-Command', `${PRELUDE}\n${script}`], {
+  // run the helper the way the launcher starts it: its text from the environment
+  const result = spawnSync(POWERSHELL, ['-NoProfile', '-NonInteractive', '-NoLogo', '-Command', `${PRELUDE}\n${HELPER_COMMAND}`], {
     encoding: 'utf8',
     env: {
       ...process.env,
       REAP_SCENARIO: JSON.stringify(scenario),
       [QUIT_TRACE_ENV]: tracePath,
-      [QUIT_SHELLS_ENV]: shellsEnvValue(shells)
+      [QUIT_SHELLS_ENV]: shellsEnvValue(shells, QUIT),
+      [QUIT_HELPER_ENV]: script
     },
     timeout: 60_000
   })
@@ -192,8 +197,9 @@ const host = (pid: number, extra: Partial<Proc> = {}): Proc => ({
   ...extra
 })
 
-/** A shell we passed, spawned at `createdMs` */
-const shell = (pid: number, createdMs: number): LiveShell => ({ pid, spawnedAtMs: createdMs })
+/** A shell we passed, spawned at `createdMs` (and asked to end at `endBeforeMs`) */
+const shell = (pid: number, createdMs: number, endBeforeMs?: number): LiveShell =>
+  endBeforeMs === undefined ? { pid, spawnedAtMs: createdMs } : { pid, spawnedAtMs: createdMs, endBeforeMs }
 
 describe.skipIf(!hasPowerShell)('quit helper script against a mocked process list', { timeout: 60_000 }, () => {
   it('ends a console host that the first sweep could not see (query failed)', () => {
@@ -336,6 +342,81 @@ describe.skipIf(!hasPowerShell)('quit helper script against a mocked process lis
     expect(trace).not.toContain('waited out the grace period')
   })
 
+  it('A: never ends the children of an unrelated process now holding a stale shell pid', () => {
+    const { stopped } = run(
+      {
+        appMissing: true,
+        procs: [
+          // shell 6001 ended long ago without an exit event; a browser holds the pid now
+          { pid: 6001, ppid: 999, name: 'chrome.exe', createdMs: START + 30_000 },
+          { pid: 6100, ppid: 6001, name: 'chrome.exe', createdMs: START + 40_000 },
+          { pid: 6101, ppid: 6001, name: 'chrome.exe', createdMs: START + 41_000 }
+        ]
+      },
+      [shell(6001, START + 2_000)]
+    )
+    expect(stopped).toEqual([])
+  })
+
+  it('B: never ends a child of the pid’s previous holder, created before the shell was spawned', () => {
+    const { stopped } = run(
+      { appMissing: true, procs: [{ pid: 6050, ppid: 6001, name: 'app.exe', createdMs: START + 7_000 }] },
+      [shell(6001, START + 10_000)]
+    )
+    expect(stopped).toEqual([])
+  })
+
+  it('C: never ends a child of a process that took the shell pid just after the quit', () => {
+    const { stopped } = run(
+      {
+        appMissing: true,
+        procs: [
+          { pid: 6001, ppid: 999, name: 'r.exe', createdMs: QUIT + 100 },
+          { pid: 6060, ppid: 6001, name: 'u.exe', createdMs: QUIT + 200 }
+        ]
+      },
+      [shell(6001, START + 2_000)]
+    )
+    expect(stopped).toEqual([])
+  })
+
+  it('bounds a dead shell’s children by the moment it was asked to end', () => {
+    // shell 6001 was asked to end at START + 50 s; its pid can be anyone's after that
+    const { stopped } = run(
+      {
+        appMissing: true,
+        procs: [
+          { pid: 6002, ppid: 6001, name: 'node.exe', createdMs: START + 45_000 },
+          { pid: 6003, ppid: 6001, name: 'other.exe', createdMs: START + 50_100 }
+        ]
+      },
+      [shell(6001, START + 2_000, START + 50_000)]
+    )
+    expect(stopped).toEqual(['6002'])
+  })
+
+  it('sweeps at once, without ending it, when the app pid is held by a process started after the quit', () => {
+    const { stopped, trace } = run({ appStartMs: QUIT + 100, appExitsAtWait: 1_000, procs: [host(5001)] })
+    expect(stopped).toEqual(['5001'])
+    expect(trace).toContain('app pid reused, not waited for')
+    expect(trace).not.toContain('waited out the grace period')
+  })
+
+  it('sweeps at once when the app pid is unreadable but listed as created after the quit', () => {
+    const { stopped, trace } = run(
+      {
+        appStart: 'null',
+        appHasExitedNull: true,
+        procs: [{ pid: APP, ppid: 1, name: 'x.exe', createdMs: QUIT + 100 }, host(5001)]
+      },
+      [],
+      3
+    )
+    expect(stopped).toEqual(['5001'])
+    expect(trace).toContain('app pid reused (listed as newer than the quit), not waited for')
+    expect(trace).not.toContain('waited out the grace period')
+  })
+
   it('never ends a program opened from the app, an unlisted child, or anything outside the creation window', () => {
     const { stopped, trace } = run(
       {
@@ -431,7 +512,6 @@ describe.skipIf(!hasPowerShell)('quit helper script against a mocked process lis
 describe.skipIf(!hasPowerShell)('quit launcher script with a mocked Start-Process', { timeout: 60_000 }, () => {
   /** Runs the launcher; `fail` makes Start-Process throw */
   function launch(fail: boolean): { status: number | null; started: string[]; trace: string[] } {
-    const encoded = encodeCommand(buildReapScript(APP, START, QUIT))
     const mock = [
       // Write-Host: the launcher keeps the function's output in $h
       'function Start-Process { [CmdletBinding()] param($FilePath, $WindowStyle, [switch]$PassThru, $ArgumentList)',
@@ -439,13 +519,13 @@ describe.skipIf(!hasPowerShell)('quit launcher script with a mocked Start-Proces
       "  Write-Host ('FILE ' + (Split-Path -Leaf $FilePath))",
       "  Write-Host ('STYLE ' + $WindowStyle)",
       "  Write-Host ('ARGS ' + (@($ArgumentList)[0..3] -join ' '))",
-      "  Write-Host ('ENC ' + @($ArgumentList)[4])",
+      "  Write-Host ('CMD ' + @($ArgumentList)[4])",
       '  [pscustomobject]@{ Id = 4321 }',
       '}'
     ].join('\n')
     const result = spawnSync(
       POWERSHELL,
-      ['-NoProfile', '-NonInteractive', '-NoLogo', '-Command', `${mock}\n${buildLauncherScript(encoded)}`],
+      ['-NoProfile', '-NonInteractive', '-NoLogo', '-Command', `${mock}\n${buildLauncherScript()}`],
       { encoding: 'utf8', env: { ...process.env, [QUIT_TRACE_ENV]: tracePath }, timeout: 60_000 }
     )
     const trace = existsSync(tracePath)
@@ -454,14 +534,18 @@ describe.skipIf(!hasPowerShell)('quit launcher script with a mocked Start-Proces
           .filter(Boolean)
           .map((l) => l.slice(l.indexOf(' ') + 1))
       : []
-    const started = result.stdout.split(/\r?\n/).filter((l) => /^(FILE|STYLE|ARGS|ENC) /.test(l))
-    expect(started.find((l) => l.startsWith('ENC '))?.slice(4) ?? encoded).toBe(encoded)
-    return { status: result.status, started: started.filter((l) => !l.startsWith('ENC ')), trace }
+    const started = result.stdout.split(/\r?\n/).filter((l) => /^(FILE|STYLE|ARGS|CMD) /.test(l))
+    return { status: result.status, started, trace }
   }
 
-  it('starts the helper hidden, with its encoded script, and traces its pid', () => {
+  it('starts the helper hidden, running its text from the environment, and traces its pid', () => {
     const { status, started, trace } = launch(false)
-    expect(started).toEqual(['FILE powershell.exe', 'STYLE Hidden', 'ARGS -NoProfile -NonInteractive -NoLogo -EncodedCommand'])
+    expect(started).toEqual([
+      'FILE powershell.exe',
+      'STYLE Hidden',
+      'ARGS -NoProfile -NonInteractive -NoLogo -Command',
+      `CMD ${HELPER_COMMAND}`
+    ])
     expect(trace).toEqual(['launcher started helper pid=4321'])
     expect(status).toBe(0)
   })
