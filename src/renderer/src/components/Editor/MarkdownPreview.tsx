@@ -100,6 +100,11 @@ interface MarkdownPreviewProps {
    * when the view mode changes, which a ref captured earlier would miss.
    */
   onRendered?: (info: PreviewRenderedInfo) => void
+  /**
+   * Whether the panel is on screen (default true). A hidden preview holds its
+   * link re-checks until it is shown again.
+   */
+  isVisible?: boolean
 }
 
 export interface MarkdownPreviewHandle {
@@ -715,7 +720,7 @@ function getLineNumbersFromSelection(
 }
 
 export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreviewProps>(
-  ({ content, filePath, className = '', onOpenFile, onRendered }, ref) => {
+  ({ content, filePath, className = '', onOpenFile, onRendered, isVisible = true }, ref) => {
     const [selection, setSelection] = useState<{
       text: string
       rect: DOMRect
@@ -832,15 +837,19 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
       publishInternalLinks()
     }, [filePath, publishInternalLinks])
 
-    // Remembered `file.exists` answers. Its generation moves when a file or
-    // folder may have appeared or gone, which re-runs the link check below.
+    // Remembered `file.exists` answers. Its version moves (debounced, and only
+    // while visible) when a file or folder may have appeared or gone, or a
+    // "missing" answer expired, which re-runs the link check below.
     const [linkTargets] = useState(() => new LinkTargetCache())
-    const linkTargetsGeneration = useSyncExternalStore(linkTargets.subscribe, () => linkTargets.generation)
+    const linkTargetsVersion = useSyncExternalStore(linkTargets.subscribe, linkTargets.getVersion)
+    useEffect(() => {
+      linkTargets.setVisible(isVisible)
+    }, [linkTargets, isVisible])
 
     /**
      * Resolve the document's internal links (tooltips, broken-link styling)
      * when the set of links or the file changes, or when the file structure
-     * may have changed (`linkTargetsGeneration`). Paths already checked are
+     * may have changed (`linkTargetsVersion`). Paths already checked are
      * answered from `linkTargets`, so only new link targets cross IPC.
      *
      * A newer run supersedes an older one: the cleanup marks the older run
@@ -898,7 +907,7 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
       return () => {
         cancelled = true
       }
-    }, [publishedLinks, filePath, linkTargets, linkTargetsGeneration])
+    }, [publishedLinks, filePath, linkTargets, linkTargetsVersion])
 
     /**
      * Handle internal markdown link clicks

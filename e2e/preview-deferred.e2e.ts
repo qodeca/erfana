@@ -143,10 +143,16 @@ test.describe('Deferred Markdown preview', () => {
     const link = panel.previewPane().locator('a[href="./later.md"]')
     await expect(link).toHaveClass('broken-link', { timeout: 10_000 })
 
+    // The directory watcher starts after the first tree read (#211). A probe
+    // file showing up in the tree proves it is delivering events.
+    await fs.promises.writeFile(path.join(testProject.path, 'watcher-probe.md'), '# Probe\n')
+    await new ProjectTreePage(page).waitForFile('watcher-probe.md')
+
     // Created by another program: the directory watcher reports an `add`,
     // which makes the preview forget its remembered link checks.
     await fs.promises.writeFile(path.join(testProject.path, 'later.md'), '# Later\n')
 
+    // Well inside the 30 s age limit, so this proves the event path, not expiry.
     await expect(link).toHaveClass('internal-link', { timeout: 10_000 })
   })
 })

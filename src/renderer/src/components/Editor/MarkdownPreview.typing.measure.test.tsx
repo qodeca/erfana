@@ -3,7 +3,8 @@
 /**
  * Measurement, not a check: how many commits, body renders and `file.exists`
  * IPC calls 20 keystrokes cost in a ~2,000-line document with 300 internal
- * links. Off unless `ERFANA_MEASURE=1`; prints one JSON line per scenario.
+ * links, and how many `file.exists` calls agent-style file churn costs with
+ * several previews open. Off unless `ERFANA_MEASURE=1`; prints one JSON line per scenario.
  * Results and method: docs/performance/deferred-markdown-preview.md.
  *
  * ```sh
@@ -66,11 +67,21 @@ function buildDocument(): string {
 }
 
 let exists: ReturnType<typeof vi.fn>
+let directoryListeners: Array<(change: { summary: Record<string, number> }) => void>
 
 beforeEach(() => {
   exists = vi.fn().mockResolvedValue(true)
+  directoryListeners = []
   ;(window as unknown as { api: unknown }).api = {
-    file: { getProjectPath: vi.fn().mockResolvedValue('/proj'), exists }
+    file: { getProjectPath: vi.fn().mockResolvedValue('/proj'), exists },
+    directoryWatch: {
+      onDirectoryChanged: (listener: (change: { summary: Record<string, number> }) => void) => {
+        directoryListeners.push(listener)
+        return () => {
+          directoryListeners = directoryListeners.filter((l) => l !== listener)
+        }
+      }
+    }
   }
   Object.defineProperty(window, 'electron', {
     value: { shell: { openExternal: vi.fn() } },
@@ -150,4 +161,61 @@ describe.skipIf(!process.env.ERFANA_MEASURE)('MarkdownPreview – typing cost (m
     const r = await measure('link-target', (doc, i) => doc.replace('TARGET', `TARGET${'x'.repeat(i)}`))
     expect(r.keystrokes).toBe(KEYSTROKES)
   }, 120_000)
+
+  it('agent churn: 50 file adds over 10 s, 5 previews open, 2 of them visible', async () => {
+    const doc = buildDocument()
+    const PANELS = 5
+    const VISIBLE = 2
+    const ui = (shown: boolean) => (
+      <ToastProvider>
+        {Array.from({ length: PANELS }, (_, i) => (
+          <MarkdownPreview
+            key={i}
+            content={doc}
+            filePath={`/proj/README-${i}.md`}
+            isVisible={shown || i < VISIBLE}
+          />
+        ))}
+      </ToastProvider>
+    )
+    // Extra props are ignored by a preview that has no `isVisible` (the baselines).
+    let rerender!: ReturnType<typeof render>['rerender']
+    await act(async () => {
+      ;({ rerender } = render(ui(false)))
+    })
+    await act(async () => vi.advanceTimersByTimeAsync(2000))
+    const mount = exists.mock.calls.length
+    exists.mockClear()
+
+    // One structural broadcast every 200 ms, as an agent writing files would cause.
+    const startedAt = performance.now()
+    for (let i = 0; i < 50; i++) {
+      await act(async () => {
+        for (const listener of [...directoryListeners]) listener({ summary: { add: 1 } })
+        await vi.advanceTimersByTimeAsync(200)
+      })
+    }
+    await act(async () => vi.advanceTimersByTimeAsync(3000))
+    const duringChurn = exists.mock.calls.length
+    const elapsedMs = performance.now() - startedAt
+
+    // Afterwards the user brings every hidden tab forward once.
+    exists.mockClear()
+    await act(async () => rerender(ui(true)))
+    await act(async () => vi.advanceTimersByTimeAsync(3000))
+    const onShow = exists.mock.calls.length
+
+    const result = {
+      scenario: 'agent-churn',
+      panels: PANELS,
+      visible: VISIBLE,
+      events: 50,
+      mount,
+      existsDuringChurn: duringChurn,
+      existsWhenHiddenShown: onShow,
+      elapsedMs: Math.round(elapsedMs)
+    }
+    console.log(`[measure] ${JSON.stringify(result)}`)
+    expect(result.events).toBe(50)
+  }, 300_000)
 })

@@ -3,8 +3,9 @@
 /**
  * The preview's link checks remember `file.exists` answers (finding [31]):
  * only new link targets cross IPC, a file or folder appearing or going makes
- * them re-check, answers from before such a change are dropped, and a re-check
- * with the same outcome re-renders no link.
+ * them re-check (once per burst, and only while the panel is shown), answers
+ * from before such a change are dropped, a "missing" answer expires, and a
+ * re-check with the same outcome re-renders no link.
  *
  * @module MarkdownPreview.linkcache.test
  */
@@ -16,7 +17,7 @@ import { MarkdownPreview } from './MarkdownPreview'
 import { ToastProvider } from '../Toast/ToastContext'
 import { useGlobalSettingsStore } from '../../stores/useGlobalSettingsStore'
 import { fileGateway } from '../../services/fileGateway'
-import type { DirectoryChange } from './linkTargetCache'
+import { LINK_TARGET_SETTLE_MS, LINK_TARGET_TTL_MS, type DirectoryChange } from './linkTargetCache'
 
 // Counts link renders: the link renderer computes a tooltip for every resolved internal link.
 const tooltipCalls = vi.hoisted(() => ({ count: 0 }))
@@ -37,26 +38,38 @@ vi.mock('./MermaidDiagram', () => ({
 
 const FILE_PATH = '/proj/notes.md'
 
-const ui = (content: string) => (
+const ui = (content: string, isVisible = true) => (
   <ToastProvider>
-    <MarkdownPreview content={content} filePath={FILE_PATH} />
+    <MarkdownPreview content={content} filePath={FILE_PATH} isVisible={isVisible} />
   </ToastProvider>
 )
 
 let exists: ReturnType<typeof vi.fn>
 let directoryListeners: Array<(change: DirectoryChange) => void>
 
-/** Deliver a `directory-watch:changed` broadcast to the preview. */
-async function broadcast(change: DirectoryChange): Promise<void> {
+/** Let timers run for `ms` (fake clock) and every promise callback they lead to. */
+async function advance(ms: number): Promise<void> {
   await act(async () => {
-    for (const listener of [...directoryListeners]) listener(change)
+    await vi.advanceTimersByTimeAsync(ms)
   })
+}
+
+/** Deliver a `directory-watch:changed` broadcast, without waiting for the re-check. */
+function emit(change: DirectoryChange): void {
+  for (const listener of [...directoryListeners]) listener(change)
+}
+
+/** Deliver a broadcast and wait until the debounced re-check has finished. */
+async function broadcast(change: DirectoryChange): Promise<void> {
+  emit(change)
+  await advance(LINK_TARGET_SETTLE_MS)
 }
 
 /** Paths `file.exists` was asked about, in order. */
 const askedPaths = (): string[] => exists.mock.calls.map(([request]) => (request as { filePath: string }).filePath)
 
 beforeEach(() => {
+  vi.useFakeTimers()
   tooltipCalls.count = 0
   directoryListeners = []
   exists = vi.fn().mockResolvedValue(true)
@@ -91,14 +104,16 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup()
+  vi.useRealTimers()
   vi.restoreAllMocks()
 })
 
-async function mount(content: string) {
+async function mount(content: string, isVisible = true) {
   let result!: ReturnType<typeof render>
   await act(async () => {
-    result = render(ui(content))
+    result = render(ui(content, isVisible))
   })
+  await advance(0)
   return result
 }
 
@@ -109,6 +124,7 @@ describe('MarkdownPreview – remembered link checks', () => {
     exists.mockClear()
 
     await act(async () => rerender(ui('[a](./a.md) [b](./b.md) [c](./c.md) [d](./d.md)')))
+    await advance(0)
     expect(askedPaths()).toEqual(['/proj/d.md'])
   })
 
@@ -118,6 +134,7 @@ describe('MarkdownPreview – remembered link checks', () => {
     for (let i = 0; i < 20; i++) {
       await act(async () => rerender(ui(`[a](./a.md)\n\ntext ${'x'.repeat(i)}`)))
     }
+    await advance(0)
     expect(exists).not.toHaveBeenCalled()
   })
 
@@ -132,7 +149,7 @@ describe('MarkdownPreview – remembered link checks', () => {
     expect(link()?.className).toBe('internal-link')
   })
 
-  it('re-checks after a catch-up refresh, but not after content-only changes', async () => {
+  it('re-checks after a catch-up refresh or a payload without a summary, not after content-only changes', async () => {
     await mount('[a](./a.md)')
     exists.mockClear()
 
@@ -141,6 +158,9 @@ describe('MarkdownPreview – remembered link checks', () => {
 
     await broadcast({ summary: {}, catchUp: true })
     expect(askedPaths()).toEqual(['/proj/a.md'])
+
+    await broadcast({ eventCount: 1 })
+    expect(exists).toHaveBeenCalledTimes(2)
   })
 
   it("re-checks after this window's own file operation (the watcher is paused for those)", async () => {
@@ -152,6 +172,51 @@ describe('MarkdownPreview – remembered link checks', () => {
     await act(async () => {
       await fileGateway.createFile({ dirPath: '/proj', name: 'created.md' })
     })
+    await advance(LINK_TARGET_SETTLE_MS)
+    expect(container.querySelector('a')?.className).toBe('internal-link')
+  })
+
+  it('re-checks once for a burst of changes, after the burst settles', async () => {
+    await mount('[a](./a.md) [b](./b.md)')
+    exists.mockClear()
+
+    for (let i = 0; i < 10; i++) {
+      emit({ summary: { add: 1 } })
+      await advance(50)
+    }
+    expect(exists).not.toHaveBeenCalled()
+
+    await advance(LINK_TARGET_SETTLE_MS)
+    expect(exists).toHaveBeenCalledTimes(2)
+  })
+
+  it('a hidden preview holds its re-check until it is shown, then does one', async () => {
+    exists.mockResolvedValue(false)
+    const { container, rerender } = await mount('[later](./later.md)', false)
+    expect(container.querySelector('a')?.className).toBe('broken-link')
+    exists.mockClear()
+    exists.mockResolvedValue(true)
+
+    for (let i = 0; i < 5; i++) await broadcast({ summary: { add: 1 } })
+    expect(exists).not.toHaveBeenCalled()
+
+    await act(async () => rerender(ui('[later](./later.md)', true)))
+    await advance(0)
+    expect(exists).toHaveBeenCalledTimes(1)
+    expect(container.querySelector('a')?.className).toBe('internal-link')
+  })
+
+  it('re-checks a link shown as missing once its answer expires, with no event', async () => {
+    exists.mockResolvedValue(false)
+    const { container } = await mount('[later](./later.md)')
+    expect(container.querySelector('a')?.className).toBe('broken-link')
+
+    // Created where no event reaches this window.
+    exists.mockResolvedValue(true)
+    await advance(LINK_TARGET_TTL_MS - 1000)
+    expect(container.querySelector('a')?.className).toBe('broken-link')
+
+    await advance(1000 + LINK_TARGET_SETTLE_MS)
     expect(container.querySelector('a')?.className).toBe('internal-link')
   })
 
@@ -167,12 +232,10 @@ describe('MarkdownPreview – remembered link checks', () => {
     expect(container.querySelector('a')?.className).toBe('internal-link')
 
     // The structure changes, and the answer from before the change ("missing")
-    // lands before React has re-rendered for the change: it must be dropped.
-    await act(async () => {
-      for (const listener of [...directoryListeners]) listener({ summary: { unlink: 1 } })
-      releaseFirst(false)
-      for (let i = 0; i < 10; i++) await Promise.resolve()
-    })
+    // lands while the re-check is still waiting for the burst to settle.
+    emit({ summary: { unlink: 1 } })
+    releaseFirst(false)
+    await advance(LINK_TARGET_SETTLE_MS / 2)
     expect(container.querySelector('a')?.className).toBe('internal-link')
   })
 
@@ -184,5 +247,12 @@ describe('MarkdownPreview – remembered link checks', () => {
     await broadcast({ summary: { addDir: 1 } })
     expect(exists).toHaveBeenCalledTimes(4) // both links asked again …
     expect(tooltipCalls.count).toBe(settled) // … and nothing re-rendered
+  })
+
+  it('leaves no watcher listener behind when it unmounts', async () => {
+    const { unmount } = await mount('[a](./a.md)')
+    expect(directoryListeners).toHaveLength(1)
+    unmount()
+    expect(directoryListeners).toHaveLength(0)
   })
 })
