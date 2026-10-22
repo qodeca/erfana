@@ -319,7 +319,7 @@ describe('file:openProjectByPath IPC handler', () => {
         error: 'Security validation failed: refused',
         errorCode: 'PATH_SYSTEM_DIR'
       })
-      await expect(handler({}, abs('/test'))).rejects.toThrow(
+      await expect(handler({}, { projectPath: abs('/test') })).rejects.toThrow(
         'Security validation failed: refused [PATH_SYSTEM_DIR]'
       )
     })
