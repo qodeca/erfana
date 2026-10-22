@@ -128,7 +128,7 @@ Details: [File watching § Watch backends](./file-watching/README.md#watch-backe
 | An `@parcel/watcher` backend – only if W17 shows overflow re-reads under ordinary work | follow-up, contingent |
 | Git status honouring the exclude list | follow-up |
 
-#211 only stopped the batches that contain nothing visible. Since finding [29] a content-only batch (`structural: false`) no longer re-reads the tree either – git status still refreshes for it – and the tree's refresh debounce waits at most 1 s under a steady stream. A structural batch still re-reads the whole tree; incremental updates stay with #150. Measured on a 25,000-file project: 50 content-only saves went from 50 tree reads and 189 MB of IPC payload to none ([watcher structural refresh](./performance/watcher-structural-refresh.md)).
+#211 only stopped the batches that contain nothing visible. Since finding [29] a content-only batch (`structural: false`) no longer re-reads the tree either – git status still refreshes for it – and the tree's refresh debounce waits at most max(1 s, 2 × the last read) under a steady stream. A structural batch still re-reads the whole tree; incremental updates stay with #150. Measured on a 25,000-file project on a Mac: 50 content-only saves – in place, or through a temp file renamed over the target – went from 50 tree reads and 189 MB of IPC payload to none ([watcher structural refresh](./performance/watcher-structural-refresh.md)).
 
 ## Dependency graph
 
