@@ -67,7 +67,7 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 | TREE-11 | File right-click menu; HTML files add Open as source, Open in default browser | all | same | [reference/menus](./reference/menus.md#project-tree-context-menus) |
 | TREE-12 | Reveal in Finder / Reveal in Explorer | all (label per OS) | commands.tsx | [reference/project-tree](./reference/project-tree.md#file-actions) |
 | TREE-13 | Delete confirmation ("cannot be undone") | all | commands.tsx | [how-to/organise-project-files](./how-to/organise-project-files.md#manage-files) |
-| TREE-14 | Mouse only: no keyboard navigation of the tree yet (#88) | all | docs/keyboard-shortcuts.md | [reference/project-tree](./reference/project-tree.md#navigation-limit) |
+| TREE-14 | Keyboard navigation: one Tab stop, arrows, Home/End, Enter, type-ahead, Shift+F10 (#88) | all | ProjectTree/treeKeyboard.ts | [reference/project-tree](./reference/project-tree.md#keyboard-navigation) |
 | TREE-15 | Hidden patterns and watcher ignore list (per-project settings) | all | S/ipc/project-settings-schema.ts | [reference/settings](./reference/settings.md#per-project-settings) |
 | TREE-16 | Excluded folders: `files.exclude` in the global and the project settings file (project adds to global); excluded paths are not shown, read or watched; `.erfana` is never excluded; git status unaffected | all | S/ipc/files-exclude-schema.ts, M/utils/excludeMatcher.ts | [reference/settings](./reference/settings.md#excluded-folders) |
 
