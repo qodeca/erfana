@@ -315,7 +315,7 @@ export function useProjectManagement(
       logger.error(createOpenProjectErrorLog(), err instanceof Error ? err : undefined)
       showGlobalToast({
         type: 'error',
-        title: 'Open Project Failed',
+        title: 'Failed to Open Project',
         message: createOpenErrorMessage(err)
       })
     } finally {
