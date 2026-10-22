@@ -224,24 +224,25 @@ export class ProjectTreePage {
     )
   }
 
-  /** The wrapping treeitem (`.project-tree-node`) for a project-relative folder. */
+  /**
+   * The treeitem for a project-relative folder. Since #87 the role and
+   * `aria-expanded` sit on the row itself (`.project-tree-item`), the same
+   * element that is clicked and focused.
+   */
   private folderTreeItem(relPath: string): Locator {
     const suffix = this.cssEscapeAttr(this.nativeSuffix(relPath))
     return this.page.locator(
-      `.project-tree-node[role="treeitem"][data-type="directory"][data-path$="${suffix}"]`
+      `.project-tree-item[role="treeitem"][data-type="directory"][data-path$="${suffix}"]`
     )
   }
 
   /**
-   * The ROOT project folder item. It is the single top-level ProjectTreeNode
-   * (`rootFolderNode`) and is a direct child of `.project-tree-content`, so it
-   * cannot be addressed by a relative-path suffix (empty rel). Matched
-   * structurally instead.
+   * The ROOT project folder item. The tree is a flat list, and the root is its
+   * only row at `aria-level="1"`; it cannot be addressed by a relative-path
+   * suffix (empty rel).
    */
   rootFolderRow(): Locator {
-    return this.page.locator(
-      '.project-tree-content > .project-tree-node[data-type="directory"] > .project-tree-item'
-    )
+    return this.page.locator('.project-tree-item[role="treeitem"][aria-level="1"]')
   }
 
   // The git badge/dot is a `role="img"` span carrying `data-git-status`. Scope
@@ -287,7 +288,7 @@ export class ProjectTreePage {
    * Expand every ancestor folder (project-relative paths, root→leaf order) so
    * descendant nodes are mounted. Child nodes — and their git dots — only exist
    * in the DOM once their parent folder is expanded. aria-expanded lives on the
-   * wrapping treeitem; the click toggle is the inner `.file-icon` span.
+   * row (the treeitem), which is also what a click toggles.
    */
   async expandTo(ancestorRelPaths: string[]): Promise<void> {
     for (const relPath of ancestorRelPaths) {

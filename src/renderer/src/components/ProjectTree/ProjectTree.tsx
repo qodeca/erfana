@@ -1,10 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react'
 import { FilePlus, FolderPlus, FolderOpen, Replace, FileText, Files, FileUp, RotateCw, X as CloseIcon } from 'lucide-react'
+import { useVirtualizer, defaultRangeExtractor, type Range } from '@tanstack/react-virtual'
 import type { FileNode } from '../../../../preload/index'
 import type { FilterMode } from '../../types/filters'
-import { ProjectTreeNode } from './ProjectTreeNode'
+import { ProjectTreeNode, TREE_ROW_HEIGHT } from './ProjectTreeNode'
+import { buildVisibleRows } from './visibleRows'
+import { resolveTreeKey, findTypeAheadMatch, isTypeAheadKey } from './treeKeyboard'
+import { isStrictDescendant } from '../../utils/fileUtils'
 import { ContextMenu, ContextMenuItem } from '../ContextMenu/ContextMenu'
 import { useDialog } from '../Dialog'
 import type { DropModeDialogResult, ConflictDialogResult } from '../Dialog/types'
@@ -121,6 +125,20 @@ const treeCollisionDetection: CollisionDetection = (args) => {
  */
 function seedExpansion(path: string | null): Set<string> {
   return path ? new Set([path]) : new Set()
+}
+
+/** Rows rendered above and below the viewport, so a fast scroll does not show blanks. */
+const TREE_OVERSCAN = 10
+
+/** Type-ahead forgets what was typed after this long without a key (APG tree view). */
+const TYPE_AHEAD_RESET_MS = 500
+
+/** dnd-kit's screen-reader markup goes to the body, outside role="tree". */
+const TREE_DND_ACCESSIBILITY = { container: typeof document !== 'undefined' ? document.body : undefined }
+
+/** The focusable tree row a keyboard or focus event came from, if any. */
+function rowFromEventTarget(target: EventTarget | null): HTMLElement | null {
+  return target instanceof HTMLElement && target.matches('.project-tree-item[data-path]') ? target : null
 }
 
 export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilterModeChange }: ProjectTreeProps) {
@@ -383,7 +401,8 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     }
   }, [projectPath, filteredFiles])
 
-  const handleToggleFolder = (folderPath: string) => {
+  // Stable identity (setter-only), so the memoised rows are not re-rendered by it.
+  const handleToggleFolder = useCallback((folderPath: string) => {
     setExpandedFolders((prev) => {
       const newSet = new Set(prev)
       if (newSet.has(folderPath)) {
@@ -393,17 +412,114 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
       }
       return newSet
     })
-  }
+  }, [])
 
+  /** Open or close one folder, leaving the set untouched when it is already in that state. */
+  const setFolderExpanded = useCallback((folderPath: string, expand: boolean) => {
+    setExpandedFolders((prev) => {
+      if (prev.has(folderPath) === expand) return prev
+      const newSet = new Set(prev)
+      if (expand) newSet.add(folderPath)
+      else newSet.delete(folderPath)
+      return newSet
+    })
+  }, [])
 
-  // Context menu handlers
-  const handleContextMenu = (e: React.MouseEvent, node: FileNode) => {
+  // Context menu handlers (stable identity, setter-only)
+  const handleContextMenu = useCallback((e: React.MouseEvent, node: FileNode) => {
     setContextMenu({
       x: e.clientX,
       y: e.clientY,
       node
     })
-  }
+  }, [])
+
+  // ---------------------------------------------------------------------------
+  // Visible rows, virtualisation and keyboard (#87, review finding [33])
+  // ---------------------------------------------------------------------------
+
+  // The expanded part of the tree as a flat list: what the virtualiser renders
+  // and what the arrow keys walk. Rebuilt only when the tree or the expansion
+  // changes – never on a selection, focus or drag-hover change.
+  const { rows: visibleRows, indexByPath } = useMemo(
+    () => buildVisibleRows(rootFolderNode, expandedFolders),
+    [rootFolderNode, expandedFolders]
+  )
+
+  // The row that holds the tree's one Tab stop (roving tabindex). Follows DOM
+  // focus (`handleTreeFocus`); falls back to the selection, then to the first
+  // row, when that row is no longer visible (collapsed away, deleted).
+  const [focusedPath, setFocusedPath] = useState<string | null>(null)
+  const tabStopIndex = useMemo(() => {
+    if (focusedPath !== null && indexByPath.has(focusedPath)) return indexByPath.get(focusedPath)!
+    if (selectedFolder !== null && indexByPath.has(selectedFolder)) return indexByPath.get(selectedFolder)!
+    return visibleRows.length > 0 ? 0 : -1
+  }, [focusedPath, selectedFolder, indexByPath, visibleRows.length])
+  const dragIndex = activeId !== null ? indexByPath.get(activeId) ?? -1 : -1
+
+  // Always render the Tab-stop row and the row being dragged, even when they
+  // are scrolled out of view. If the focused row unmounted on a wheel scroll,
+  // focus would fall to <body> (and focus recovery would yank the scroll
+  // back); if the dragged row unmounted, dnd-kit would lose its active node.
+  const rangeExtractor = useCallback((range: Range) => {
+    const indexes = defaultRangeExtractor(range)
+    for (const pinned of [tabStopIndex, dragIndex]) {
+      if (pinned >= 0 && pinned < range.count && !indexes.includes(pinned)) indexes.push(pinned)
+    }
+    return indexes.sort((a, b) => a - b)
+  }, [tabStopIndex, dragIndex])
+
+  // The scroll container is padded; the list starts that far into it.
+  const [listOffset, setListOffset] = useState(0)
+  useLayoutEffect(() => {
+    const container = treeContainerRef.current
+    if (!container) return
+    const padding = parseFloat(getComputedStyle(container).paddingTop)
+    setListOffset(Number.isFinite(padding) ? padding : 0)
+  }, [rootFolderNode])
+
+  // The rule warns that React Compiler skips this component; the app does not
+  // build with the compiler, and the virtualizer is only read during render.
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const virtualizer = useVirtualizer({
+    count: visibleRows.length,
+    getScrollElement: () => treeContainerRef.current,
+    estimateSize: () => TREE_ROW_HEIGHT,
+    getItemKey: (index) => visibleRows[index].node.path,
+    overscan: TREE_OVERSCAN,
+    scrollMargin: listOffset,
+    rangeExtractor
+  })
+
+  // A keyboard move sets the row to focus here; the layout effect below moves
+  // DOM focus once that row is rendered (it may have just scrolled into range).
+  const pendingFocusRef = useRef<string | null>(null)
+  useLayoutEffect(() => {
+    const path = pendingFocusRef.current
+    const container = treeContainerRef.current
+    if (path === null || !container) return
+    for (const row of container.querySelectorAll<HTMLElement>('.project-tree-item[data-path]')) {
+      if (row.dataset.path === path) {
+        pendingFocusRef.current = null
+        row.focus({ preventScroll: true })
+        return
+      }
+    }
+  })
+
+  const moveFocusTo = useCallback((index: number) => {
+    const row = visibleRows[index]
+    if (!row) return
+    pendingFocusRef.current = row.node.path
+    virtualizer.scrollToIndex(index, { align: 'auto' })
+    setFocusedPath(row.node.path)
+  }, [visibleRows, virtualizer])
+
+  // Type-ahead buffer: characters typed in quick succession form one query.
+  const typeAheadRef = useRef<{ query: string; timer: ReturnType<typeof setTimeout> | null }>({ query: '', timer: null })
+  useEffect(() => () => {
+    if (typeAheadRef.current.timer) clearTimeout(typeAheadRef.current.timer)
+  }, [])
 
   const handleCloseContextMenu = () => {
     setContextMenu(null)
@@ -1276,6 +1392,88 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     }))
   }
 
+  // `handleFileClick` reads the current tree and selection, so it changes on
+  // every render. The rows get a stable wrapper instead; it always calls the
+  // latest version, and the memoised rows are not re-rendered by it.
+  const handleFileClickRef = useRef(handleFileClick)
+  handleFileClickRef.current = handleFileClick
+  const handleRowClick = useCallback((filePath: string) => handleFileClickRef.current(filePath), [])
+
+  /** Roving tabindex: the row that takes DOM focus becomes the Tab stop. */
+  const handleTreeFocus = (e: React.FocusEvent<HTMLDivElement>) => {
+    const row = rowFromEventTarget(e.target)
+    const path = row?.dataset.path
+    if (path !== undefined && path !== focusedPath) setFocusedPath(path)
+  }
+
+  /**
+   * The tree's keyboard contract (WAI-ARIA APG tree view, decided by
+   * design/system/components/row/index.html); the key → action mapping lives
+   * in `treeKeyboard.ts`. Keys only count when a row has focus, so nothing
+   * here reaches a keystroke meant for a dialog or input elsewhere.
+   */
+  const handleTreeKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const row = rowFromEventTarget(e.target)
+    const index = row?.dataset.path !== undefined ? indexByPath.get(row.dataset.path) : undefined
+    if (row === null || index === undefined) return
+
+    const action = resolveTreeKey(visibleRows, index, e)
+    if (action === null) {
+      if (!isTypeAheadKey(e)) return
+      const buffer = typeAheadRef.current
+      if (buffer.timer) clearTimeout(buffer.timer)
+      buffer.query += e.key
+      buffer.timer = setTimeout(() => { buffer.query = ''; buffer.timer = null }, TYPE_AHEAD_RESET_MS)
+      const match = findTypeAheadMatch(visibleRows, index, buffer.query)
+      if (match !== null) {
+        e.preventDefault()
+        moveFocusTo(match)
+      }
+      return
+    }
+
+    e.preventDefault()
+    const { node } = visibleRows[index]
+    switch (action.type) {
+      case 'focus':
+        moveFocusTo(action.index)
+        break
+      case 'expand':
+        setFolderExpanded(action.path, true)
+        break
+      case 'collapse':
+        setFolderExpanded(action.path, false)
+        break
+      case 'activate':
+        // Exactly what a click does: a folder toggles and becomes the paste
+        // target, a file opens.
+        if (node.type === 'directory') handleToggleFolder(node.path)
+        handleFileClick(node.path)
+        break
+      case 'menu': {
+        // Shift+F10 / the Menu key: open the menu under the row, not at a
+        // pointer position the keyboard user never set.
+        const rect = row.getBoundingClientRect()
+        setContextMenu({ x: rect.left, y: rect.bottom, node })
+        break
+      }
+    }
+  }
+
+  const virtualItems = virtualizer.getVirtualItems()
+  // Drop feedback for the folder a drag will land in. Hovering a file inside a
+  // folder lands in that folder, so the file's parent is highlighted – the
+  // nested tree got this for free, because a folder's element contained its
+  // children's; a flat list has to say it.
+  const internalDropFolder = useMemo(() => {
+    if (activeId === null || overId === null || overId === activeId) return null
+    const index = indexByPath.get(overId)
+    if (index === undefined) return null
+    const row = visibleRows[index]
+    return row.node.type === 'directory' ? row.node.path : row.parentPath
+  }, [activeId, overId, indexByPath, visibleRows])
+  const isCut = clipboard.operation === 'cut'
+
   return (
     <div
       className="project-tree"
@@ -1407,32 +1605,64 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
       </div>
     )}
 
-      <div className="project-tree-content" role="tree" aria-label="Project files" ref={treeContainerRef}>
+      <div
+        className="project-tree-content"
+        role="tree"
+        aria-label="Project files"
+        ref={treeContainerRef}
+        onKeyDown={handleTreeKeyDown}
+        onFocus={handleTreeFocus}
+      >
         <DndContext
           sensors={sensors}
           collisionDetection={treeCollisionDetection}
           onDragStart={handleDragStart}
           onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
+          // dnd-kit renders its live region and instructions next to the
+          // rows; inside role="tree" they would be children a tree may not
+          // own (only treeitem and group). Render them at the body instead.
+          accessibility={TREE_DND_ACCESSIBILITY}
         >
           {rootFolderNode ? (
-            <ProjectTreeNode
-              key={rootFolderNode.path}
-              node={rootFolderNode}
-              level={0}
-              onFileClick={handleFileClick}
-              onContextMenu={handleContextMenu}
-              selectedFolder={selectedFolder}
-              expandedFolders={expandedFolders}
-              onToggleFolder={handleToggleFolder}
-              isDragging={activeId === rootFolderNode.path}
-              isDropTarget={overId === rootFolderNode.path}
-              clipboardCut={clipboard.itemPath === rootFolderNode.path && clipboard.operation === 'cut'}
-              getFileStatus={getFileStatus}
-              getFolderStatus={getFolderStatus}
-              isExternalDragActive={isExternalDragActive}
-              externalDropTarget={externalDropTarget}
-            />
+            // Only the rows in (and just around) the viewport are mounted; the
+            // sizer gives the scroll container the height of the whole list.
+            <div className="project-tree-rows" style={{ height: virtualizer.getTotalSize() }}>
+              {virtualItems.map((item) => {
+                const row = visibleRows[item.index]
+                const { node } = row
+                const dropZone =
+                  internalDropFolder !== null && isStrictDescendant(internalDropFolder, node.path)
+                    ? 'internal'
+                    : externalDropTarget !== null && isStrictDescendant(externalDropTarget, node.path)
+                      ? 'external'
+                      : null
+                return (
+                  <ProjectTreeNode
+                    key={item.key}
+                    node={node}
+                    level={row.level}
+                    posInSet={row.posInSet}
+                    setSize={row.setSize}
+                    parentPath={row.parentPath}
+                    top={item.start - listOffset}
+                    isExpanded={row.isExpanded}
+                    isSelected={node.path === selectedFolder}
+                    isTabStop={item.index === tabStopIndex}
+                    onFileClick={handleRowClick}
+                    onContextMenu={handleContextMenu}
+                    onToggleFolder={handleToggleFolder}
+                    isDragging={activeId === node.path}
+                    isDropTarget={internalDropFolder === node.path}
+                    clipboardCut={isCut && clipboard.itemPath === node.path}
+                    inDropZone={dropZone}
+                    gitStatus={node.type === 'file' ? getFileStatus(node.path) : getFolderStatus(node.path)}
+                    isExternalDragActive={isExternalDragActive}
+                    isExternalDropTarget={externalDropTarget === node.path}
+                  />
+                )
+              })}
+            </div>
           ) : (
             <div className="project-tree-empty" data-testid={TEST_IDS.PROJECT_TREE_EMPTY}>
               {projectPath ? (filterMode === 'markdown' ? 'No markdown files found' : 'No files found') : 'Open a project to get started'}
