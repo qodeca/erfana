@@ -60,6 +60,11 @@ export interface NativeClassifiedEvent {
   readonly source: NativeRawEventKind
   /** For `locked` only: `EPERM` or `EBUSY`. */
   readonly code?: string
+  /**
+   * For `add` / `change` classified from an `lstat`: whether the entry is a
+   * symlink. Absent when the stat failed, so the kind is unknown.
+   */
+  readonly symbolicLink?: boolean
 }
 
 /** The part of `fs.Stats` the classifier reads. */
@@ -358,12 +363,12 @@ export class NativeEventClassifier {
     }
     if (stats) {
       if (entry.kind === 'change') {
-        if (!isDirectory) this.emit('change', entry)
+        if (!isDirectory) this.emit('change', entry, undefined, stats.isSymbolicLink())
       } else if (isDirectory) {
         this.rememberFolder(entry.key)
         this.emit('addDir', entry)
       } else {
-        this.emit('add', entry)
+        this.emit('add', entry, undefined, stats.isSymbolicLink())
       }
       return
     }
@@ -417,11 +422,11 @@ export class NativeEventClassifier {
     this.rememberedFolders.add(key)
   }
 
-  private emit(type: NativeClassifiedType, entry: InFlightEntry, code?: string): void {
-    const event: NativeClassifiedEvent =
+  private emit(type: NativeClassifiedType, entry: InFlightEntry, code?: string, symbolicLink?: boolean): void {
+    const base: NativeClassifiedEvent =
       code === undefined
         ? { type, path: entry.path, source: entry.kind }
         : { type, path: entry.path, source: entry.kind, code }
-    this.onEvent(event)
+    this.onEvent(symbolicLink === undefined ? base : { ...base, symbolicLink })
   }
 }

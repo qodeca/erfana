@@ -9,6 +9,7 @@
  * ```sh
  * npx electron-vite build
  * ERFANA_E2E_BENCH=1 ERFANA_BENCH_LABEL=after npx playwright test --project=bench watcher-structural
+ * ERFANA_E2E_BENCH=1 ERFANA_BENCH_SAVE_MODE=rename … # temp file + rename, like atomicWrite
  * ```
  *
  * The project is generated once outside the repository (250 folders × 100
@@ -49,6 +50,12 @@ const SETTLE_MS = 3000
 const WATCHER_WARMUP_MS = 8000
 const RUNS = Number(process.env.ERFANA_BENCH_RUNS ?? 3)
 const LABEL = process.env.ERFANA_BENCH_LABEL ?? 'unlabelled'
+/**
+ * How a save reaches the disk: `inplace` appends to the file; `rename` writes a
+ * temp file beside it and renames it over the target, as Erfana's own
+ * `atomicWrite` does (same `.erfana-tmp-` prefix) and as many editors do.
+ */
+const SAVE_MODE = process.env.ERFANA_BENCH_SAVE_MODE === 'rename' ? 'rename' : 'inplace'
 const OUT_DIR = process.env.ERFANA_BENCH_OUT ?? path.join(__dirname, '..', '.local', 'bench')
 // Erfana refuses a project under a system folder, and on macOS `os.tmpdir()`
 // resolves to one (`/private/var/folders`), so the default there is ~/.cache
@@ -149,13 +156,20 @@ test.describe('Watcher structural refresh benchmark', () => {
         const start = Date.now()
         for (let i = 0; i < SAVES; i++) {
           const folder = `folder-${String(i % FOLDERS).padStart(3, '0')}`
-          fs.appendFileSync(path.join(PROJECT, folder, 'note-000.md'), `edit ${run}.${i}\n`)
+          const target = path.join(PROJECT, folder, 'note-000.md')
+          if (SAVE_MODE === 'rename') {
+            const temp = path.join(PROJECT, folder, `.erfana-tmp-bench-${run}-${i}`)
+            fs.writeFileSync(temp, `${fs.readFileSync(target, 'utf8')}edit ${run}.${i}\n`)
+            fs.renameSync(temp, target)
+          } else {
+            fs.appendFileSync(target, `edit ${run}.${i}\n`)
+          }
           await new Promise((resolve) => setTimeout(resolve, SAVE_GAP_MS))
         }
         await new Promise((resolve) => setTimeout(resolve, SETTLE_MS))
         const counters = await readCounters(app)
         results.push({ ...counters, wallMs: Date.now() - start, run })
-        console.log(`[bench ${LABEL}] run ${run}: ${JSON.stringify(counters)}`)
+        console.log(`[bench ${LABEL} ${SAVE_MODE}] run ${run}: ${JSON.stringify(counters)}`)
         expect(counters.changedSends).toBeGreaterThan(0)
       } finally {
         if (app && window) await closeApp(app, window)
@@ -164,8 +178,9 @@ test.describe('Watcher structural refresh benchmark', () => {
       }
     }
 
-    const file = path.join(OUT_DIR, `watcher-structural-${LABEL}-${Date.now()}.json`)
-    fs.writeFileSync(file, JSON.stringify({ label: LABEL, project: { folders: FOLDERS, filesPerFolder: FILES_PER_FOLDER }, saves: SAVES, results }, null, 2))
+    const file = path.join(OUT_DIR, `watcher-structural-${LABEL}-${SAVE_MODE}-${Date.now()}.json`)
+    const project = { folders: FOLDERS, filesPerFolder: FILES_PER_FOLDER }
+    fs.writeFileSync(file, JSON.stringify({ label: LABEL, saveMode: SAVE_MODE, project, saves: SAVES, results }, null, 2))
     console.log(`[bench ${LABEL}] wrote ${file}`)
   })
 })

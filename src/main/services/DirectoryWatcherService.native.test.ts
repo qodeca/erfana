@@ -362,8 +362,135 @@ describe('DirectoryWatcherService native backend (#211, W13)', () => {
 
       const batches = sent('directory-watch:changed')
       expect(svc.getStats().metrics.bufferOverflows).toBeGreaterThan(0)
+      expect(batches.length).toBeGreaterThan(1)
       expect(batches[0]).toEqual(expect.objectContaining({ structural: true }))
       expect(batches.slice(1).every(b => b.structural === false)).toBe(true)
+    })
+
+    it('sends one compensating refresh when the batch after an overflow coalesces away entirely', async () => {
+      await svc.watchDirectory(ROOT, webContents)
+      const native = latestNative()
+      const limit = getPlatformConfig().recommendedBufferLimit
+
+      // add + unlink pairs on distinct paths; two past the buffer drops the first
+      // pair, so every chunk (an even 500 events) coalesces to nothing
+      for (let i = 0; i < limit / 2 + 1; i++) {
+        native.emit('add', inRoot(`t${i}.md`), { symbolicLink: false })
+        native.emit('unlink', inRoot(`t${i}.md`))
+      }
+      vi.advanceTimersByTime(FLUSH_MS)
+
+      expect(svc.getStats().metrics.bufferOverflows).toBeGreaterThan(0)
+      expect(sent('directory-watch:changed')).toEqual([
+        expect.objectContaining({ eventCount: 0, structural: true, catchUp: true })
+      ])
+    })
+
+    it('keeps `rm -rf out && mkdir out && write out/new.md` in one window structural', async () => {
+      await svc.watchDirectory(ROOT, webContents)
+      const native = latestNative()
+
+      native.emit('unlinkDir', inRoot('out'))
+      native.emit('addDir', inRoot('out'))
+      native.emit('add', inRoot('out', 'new.md'), { symbolicLink: false })
+      vi.advanceTimersByTime(FLUSH_MS)
+
+      expect(sent('directory-watch:changed')).toEqual([expect.objectContaining({ structural: true })])
+    })
+
+    it.each([
+      ['a file replaced by a folder', 'unlink', 'addDir'],
+      ['a folder replaced by a file', 'unlinkDir', 'add']
+    ] as const)('keeps %s on one path structural', async (_label, gone, created) => {
+      await svc.watchDirectory(ROOT, webContents)
+      const native = latestNative()
+
+      native.emit(gone, inRoot('swap'))
+      native.emit(created, inRoot('swap'), created === 'add' ? { symbolicLink: false } : undefined)
+      vi.advanceTimersByTime(FLUSH_MS)
+
+      expect(sent('directory-watch:changed')).toEqual([expect.objectContaining({ structural: true })])
+    })
+  })
+
+  describe('rename-style saves against the tree on screen (finding [29], PR #316)', () => {
+    const tree = [
+      { name: 'a.md', path: inRoot('a.md'), type: 'file' as const },
+      { name: 'link.md', path: inRoot('link.md'), type: 'file' as const, isSymlink: true },
+      {
+        name: 'sub',
+        path: inRoot('sub'),
+        type: 'directory' as const,
+        children: [{ name: 'b.md', path: inRoot('sub', 'b.md'), type: 'file' as const }]
+      }
+    ]
+
+    it('treats an add of a file the tree already shows as a content change', async () => {
+      await svc.watchDirectory(ROOT, webContents)
+      svc.noteTreeRead(ROOT, tree)
+
+      latestNative().emit('add', inRoot('a.md'), { symbolicLink: false })
+      latestNative().emit('add', inRoot('sub', 'b.md'), { symbolicLink: false })
+      vi.advanceTimersByTime(FLUSH_MS)
+
+      expect(sent('directory-watch:changed')).toEqual([
+        expect.objectContaining({ summary: { change: 2 }, structural: false })
+      ])
+    })
+
+    it('keeps a new file structural', async () => {
+      await svc.watchDirectory(ROOT, webContents)
+      svc.noteTreeRead(ROOT, tree)
+
+      latestNative().emit('add', inRoot('new.md'), { symbolicLink: false })
+      vi.advanceTimersByTime(FLUSH_MS)
+
+      expect(sent('directory-watch:changed')).toEqual([
+        expect.objectContaining({ summary: { add: 1 }, structural: true })
+      ])
+    })
+
+    it.each([
+      ['a file became a symlink (add)', 'add', 'a.md', true],
+      ['a symlink became a file (add)', 'add', 'link.md', false],
+      ['a file became a symlink (change)', 'change', 'a.md', true]
+    ] as const)('keeps %s structural', async (_label, type, name, symbolicLink) => {
+      await svc.watchDirectory(ROOT, webContents)
+      svc.noteTreeRead(ROOT, tree)
+
+      latestNative().emit(type, inRoot(name), { symbolicLink })
+      vi.advanceTimersByTime(FLUSH_MS)
+
+      expect(sent('directory-watch:changed')).toEqual([expect.objectContaining({ structural: true })])
+    })
+
+    it('keeps an add structural when the kind is unknown, or no root read was seen', async () => {
+      await svc.watchDirectory(ROOT, webContents)
+      // A subfolder read does not seed the record
+      svc.noteTreeRead(inRoot('sub'), tree)
+      latestNative().emit('add', inRoot('a.md'), { symbolicLink: false })
+      vi.advanceTimersByTime(FLUSH_MS)
+
+      svc.noteTreeRead(ROOT, tree)
+      latestNative().emit('add', inRoot('a.md'))
+      vi.advanceTimersByTime(FLUSH_MS)
+
+      expect(sent('directory-watch:changed').map(b => b.structural)).toEqual([true, true])
+    })
+
+    it('forgets a removed file, so its re-creation is structural', async () => {
+      await svc.watchDirectory(ROOT, webContents)
+      svc.noteTreeRead(ROOT, tree)
+
+      latestNative().emit('unlink', inRoot('a.md'))
+      vi.advanceTimersByTime(FLUSH_MS)
+      latestNative().emit('unlinkDir', inRoot('sub'))
+      vi.advanceTimersByTime(FLUSH_MS)
+      latestNative().emit('add', inRoot('a.md'), { symbolicLink: false })
+      latestNative().emit('add', inRoot('sub', 'b.md'), { symbolicLink: false })
+      vi.advanceTimersByTime(FLUSH_MS)
+
+      expect(sent('directory-watch:changed').map(b => b.structural)).toEqual([true, true, true])
     })
 
     it('passes a native unlink straight through, without the atomic-save stat', async () => {

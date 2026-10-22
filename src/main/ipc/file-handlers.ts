@@ -182,6 +182,8 @@ export function registerFileHandlers(): void {
           const commitRead = directoryWatcherService.beginTreeRead(dirPath.requested, sender.id)
           const result = await fileService.readDirectory(dirPath.requested)
           commitRead()
+          // Finding [29]: the tree on screen is what a rename-style save is judged against
+          directoryWatcherService.noteTreeRead(dirPath.requested, result)
           const durationMs = Math.round(performance.now() - start)
           logger.info('file:readDirectory IPC completed', {
             durationMs,

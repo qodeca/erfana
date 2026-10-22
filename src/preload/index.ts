@@ -3,6 +3,7 @@
 import { contextBridge, ipcRenderer, IpcRendererEvent, webUtils } from 'electron'
 import { FORCE_CRASH_ARG, TEST_HOOKS_ARG } from '../shared/constants'
 import type { GitStatusResponse } from '../shared/ipc/git-schema'
+import type { DirectoryChangedPayload } from '../shared/ipc/directory-watch-schema'
 import type { PdfExportRequest, PdfExportResponse } from '../shared/ipc/pdf-schema'
 import type { DocxExportRequest, DocxExportResponse } from '../shared/ipc/docx-schema'
 import type { GlobalSettings, GlobalSettingsChanged } from '../shared/ipc/global-settings-schema'
@@ -123,26 +124,8 @@ const api = {
       ipcRenderer.invoke('directory-watch:get-stats'),
 
     // Event listeners
-    onDirectoryChanged: (
-      callback: (data: {
-        dirPath: string
-        eventCount: number
-        summary: Record<string, number>
-        /** False only for a batch of content edits – the tree is unchanged */
-        structural: boolean
-        catchUp?: boolean
-      }) => void
-    ): (() => void) => {
-      const listener = (
-        _event: unknown,
-        data: {
-          dirPath: string
-          eventCount: number
-          summary: Record<string, number>
-          structural: boolean
-          catchUp?: boolean
-        }
-      ) => callback(data)
+    onDirectoryChanged: (callback: (data: DirectoryChangedPayload) => void): (() => void) => {
+      const listener = (_event: unknown, data: DirectoryChangedPayload) => callback(data)
       ipcRenderer.on('directory-watch:changed', listener)
       return () => {
         ipcRenderer.removeListener('directory-watch:changed', listener)

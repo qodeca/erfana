@@ -483,7 +483,7 @@ describe('NativeEventClassifier (#211, D2)', () => {
         expect(classifier.pendingCount).toBe(1)
         await flush()
 
-        expect(events).toEqual([{ type: 'add', path: 'C:/proj/second', source: 'rename' }])
+        expect(events).toEqual([{ type: 'add', path: 'C:/proj/second', source: 'rename', symbolicLink: false }])
         expect(classifier.inFlightCount + classifier.pendingCount).toBe(0)
         expect(logger.warn).toHaveBeenCalledWith('Native classifier: listener failed', { code: 'EBOOM' })
 

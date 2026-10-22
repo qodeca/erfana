@@ -236,7 +236,7 @@ Resume watching after pause. Synchronous. Decrements the pause reference count; 
 `DirectoryWatcherService` is a plain class, not an event emitter: it pushes these channels to the owning window with `webContents.send`. The renderer subscribes through the preload bridge (`window.api.directoryWatch.onDirectoryChanged`, `onProjectDeleted`, `onDirectoryError`).
 
 #### `'directory-watch:changed'`
-**Payload:**
+**Payload** – `DirectoryChangedPayload` in `src/shared/ipc/directory-watch-schema.ts`, the one type the sender, the preload bridge and `IProjectTreeApi` share:
 ```ts
 {
   dirPath: string
@@ -244,8 +244,8 @@ Resume watching after pause. Synchronous. Decrements the pause reference count; 
   originalEventCount: number  // raw events from the backend watcher, after the path filter
   coalescedCount: number      // events removed by the coalescer
   summary: Record<'add' | 'addDir' | 'unlink' | 'unlinkDir' | 'change', number>
-  structural: boolean         // false only for a batch of `change` events – the tree is unchanged
-  catchUp?: true              // #210: only on a catch-up refresh (bridge types it `boolean`)
+  structural: boolean         // false only for content edits to entries already shown – the tree is unchanged
+  catchUp?: true              // #210: only on a catch-up refresh (typed `boolean`)
 }
 ```
 

@@ -19,7 +19,9 @@ import {
   type DirectoryWatchHandle,
   type DirectoryWatchResyncReason,
   type FileChangeEvent,
-  type InternalChange
+  type InternalChange,
+  KnownEntries,
+  type KnownEntryKind
 } from './watcher'
 import {
   DEFAULT_TREE_HIDDEN_PATTERNS,
@@ -35,6 +37,8 @@ import { AppError, ErrorCode } from '../../shared/errors'
 import { RateLimitedLogger } from '../utils/RateLimitedLogger'
 import { collectMemorySnapshot } from '../utils/processMemorySnapshot'
 import { isAtomicTempName } from '../utils/atomicWrite'
+import type { FileNode } from '../../shared/ipc/file-schema'
+import type { DirectoryChangedPayload } from '../../shared/ipc/directory-watch-schema'
 
 interface WatchedDirectory {
   dirPath: string
@@ -64,6 +68,8 @@ interface WatchedDirectory {
 interface DirectoryChangeEvent {
   type: 'add' | 'addDir' | 'unlink' | 'unlinkDir' | 'change'
   path: string
+  /** For `add` / `change`, what `lstat` says the entry is, when the backend says */
+  kind?: KnownEntryKind
 }
 
 /**
@@ -73,6 +79,35 @@ interface DirectoryChangeEvent {
  */
 export function isStructuralBatch(events: readonly { type: string }[]): boolean {
   return events.some((event) => event.type !== 'change')
+}
+
+/**
+ * Whether a batch is structural, judged on its RAW events as well as the
+ * coalesced ones: the coalescer turns `unlinkDir` + `addDir` on one path into
+ * `change` and drops later events under a deleted folder, so
+ * `rm -rf out && mkdir out && write out/new.md` in one window would otherwise
+ * coalesce to one `change`.
+ */
+export function isStructuralRawBatch(
+  raw: readonly { type: string }[],
+  coalesced: readonly { type: string }[]
+): boolean {
+  return isStructuralBatch(coalesced) || raw.some((e) => e.type === 'addDir' || e.type === 'unlinkDir')
+}
+
+/**
+ * The entry kind a backend passed with an `add` / `change`: the native watcher
+ * passes `{ symbolicLink }`, chokidar (with `followSymlinks: false`) its
+ * `lstat` result. `undefined` when it passed nothing usable.
+ */
+function entryKindOf(info: unknown): KnownEntryKind | undefined {
+  if (info === null || typeof info !== 'object') return undefined
+  const value = info as { symbolicLink?: unknown; isSymbolicLink?: unknown }
+  if (typeof value.symbolicLink === 'boolean') return value.symbolicLink ? 'symlink' : 'file'
+  if (typeof value.isSymbolicLink === 'function') {
+    return (value.isSymbolicLink as () => boolean)() ? 'symlink' : 'file'
+  }
+  return undefined
 }
 
 /** Receives the absolute paths one delivered batch removed. */
@@ -98,6 +133,11 @@ function isPresent<T>(value: T | null): value is T {
 export class DirectoryWatcherService {
   private watchedDirectories: Map<string, WatchedDirectory> = new Map()
   private projectPath: string | null = null
+  /**
+   * The non-folder entries the last root tree read showed (finding [29]): lets
+   * a rename-style save of an existing file count as a content change.
+   */
+  private knownEntries: KnownEntries | null = null
   private isDisposing: boolean = false // Flag to prevent operations during cleanup
   // Session token to guard against late/stale events during project switches
   private switchVersion = 0
@@ -226,6 +266,7 @@ export class DirectoryWatcherService {
 
   setProjectPath(path: string): void {
     this.projectPath = path
+    this.knownEntries = null
     // Bump session on project changes to drop stale events
     this.switchVersion++
   }
@@ -564,8 +605,8 @@ export class DirectoryWatcherService {
   /** Route a watcher's events into the pipeline – the same for both backends. */
   private attachWatcherListeners(dirPath: string, watcher: DirectoryWatchHandle): void {
     // Handle file/folder additions
-    watcher.on('add', (path: string) => {
-      this.queueEvent(dirPath, { type: 'add', path })
+    watcher.on('add', (path: string, info?: unknown) => {
+      this.queueEvent(dirPath, { type: 'add', path, kind: entryKindOf(info) })
     })
 
     watcher.on('addDir', (path: string) => {
@@ -600,9 +641,9 @@ export class DirectoryWatcherService {
     // changes (and reaches the same `useGitStatus.debouncedRefresh`).
     // Suppressing here avoids duplicate refresh requests during
     // `git checkout` / `git commit` and similar internal git operations.
-    watcher.on('change', (path: string) => {
+    watcher.on('change', (path: string, info?: unknown) => {
       if (path.includes('/.git/') || path.includes('\\.git\\')) return
-      this.queueEvent(dirPath, { type: 'change', path })
+      this.queueEvent(dirPath, { type: 'change', path, kind: entryKindOf(info) })
     })
 
     // Handle errors
@@ -856,13 +897,14 @@ export class DirectoryWatcherService {
       summary: {},
       structural: true,
       catchUp: true
-    })
+    } satisfies DirectoryChangedPayload)
   }
 
   /**
    * Queue an event for throttled processing with VS Code patterns
    */
-  private queueEvent(dirPath: string, event: DirectoryChangeEvent): void {
+  private queueEvent(dirPath: string, incoming: DirectoryChangeEvent): void {
+    let event = incoming
     if (this.isDisposing) return // Ignore events during disposal
     const watched = this.watchedDirectories.get(dirPath)
     if (!watched) return
@@ -892,6 +934,8 @@ export class DirectoryWatcherService {
     // Track metrics
     this.metrics.recordEventReceived()
 
+    event = this.reclassifyAgainstTree(event)
+
     // Handle delete events with atomic save detection (VS Code 100ms pattern).
     // Not for the native backend (#211, D2): its `lstat` already confirmed the
     // removal, a rename-style save is coalesced (`unlink` + `add` → `change`),
@@ -911,6 +955,54 @@ export class DirectoryWatcherService {
 
     // For non-delete events, queue directly
     watched.throttledWorker.work({ type: event.type, path: event.path })
+  }
+
+  /**
+   * A successful tree read finished (finding [29]). A read of the project root
+   * replaces the record of known entries, which then follows the watcher's
+   * events until the next one; a read of a subfolder is ignored.
+   */
+  noteTreeRead(dirPath: string, tree: readonly FileNode[]): void {
+    const root = this.projectPath
+    if (!root || typeof dirPath !== 'string' || resolve(dirPath) !== resolve(root)) return
+    this.knownEntries = KnownEntries.fromTree(tree, (abs) => toRootRelative(root, abs), this.foldKey)
+  }
+
+  private readonly foldKey = (rel: string): string =>
+    this.platformConfig.caseSensitive ? rel : rel.toLowerCase()
+
+  /**
+   * Against the tree on screen: an `add` of an entry it already shows, of the
+   * same kind, is a content change (a temp file renamed over it); a `change`
+   * that turned a file into a symlink or back is structural. Then the record
+   * follows the event.
+   */
+  private reclassifyAgainstTree(event: DirectoryChangeEvent): DirectoryChangeEvent {
+    const known = this.knownEntries
+    const root = this.projectPath
+    if (!known || !root) return event
+    const rel = toRootRelative(root, event.path)
+    if (rel === null) return event
+    const before = known.kindOf(rel)
+    let result = event
+    if (event.type === 'add' && event.kind !== undefined && before === event.kind) {
+      result = { ...event, type: 'change' }
+    } else if (event.type === 'change' && event.kind !== undefined && before !== undefined && before !== event.kind) {
+      result = { ...event, type: 'add' }
+    }
+    switch (result.type) {
+      case 'add':
+      case 'change':
+        known.noteAdded(rel, result.kind ?? (result.type === 'change' ? before : undefined))
+        break
+      case 'unlink':
+        known.noteRemoved(rel)
+        break
+      case 'unlinkDir':
+        known.noteFolderRemoved(rel)
+        break
+    }
+    return result
   }
 
   /**
@@ -972,8 +1064,8 @@ export class DirectoryWatcherService {
       originalEventCount: events.length,
       coalescedCount,
       summary,
-      structural: dropped || isStructuralBatch(coalescedEvents)
-    })
+      structural: dropped || isStructuralRawBatch(events, coalescedEvents)
+    } satisfies DirectoryChangedPayload)
   }
 
   /**
