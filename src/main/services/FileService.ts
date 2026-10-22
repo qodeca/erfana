@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { readdir, readFile, writeFile, stat, realpath, rm, mkdir, rename as fsRename, cp, copyFile } from 'fs/promises'
+import type { Dirent } from 'fs'
 import { join, extname, basename, relative, sep, resolve as resolvePath } from 'path'
 import type { IFileService } from '../interfaces/IFileService'
 import { SymlinkDetector } from '../utils/SymlinkDetector'
@@ -25,6 +26,7 @@ import { logger } from './LoggingService'
 import { atomicWriteText, isAtomicTempName } from '../utils/atomicWrite'
 import { IMAGE_EXTENSIONS, readImage } from './file/imageRead'
 import { childPath } from '../utils/childPath'
+import { createConcurrencyLimit, type ConcurrencyLimit } from '../utils/concurrencyLimit'
 import { isInsideRoot, isSamePath, normaliseResolved } from '../utils/pathCompare'
 import { getPlatformConfig } from './watcher/PlatformConfig'
 import type { ImageReadResponse } from '../../shared/ipc/file-image-schema'
@@ -113,6 +115,16 @@ interface WalkScope {
   excludedEntryCount: number
   /** Real folders already entered through a link in this walk (case-folded key) */
   readonly enteredLinkTargets: Set<string>
+  /** Bounds the walk's `readdir` calls in flight ({@link WALK_READ_CONCURRENCY}) */
+  readonly reads: ConcurrencyLimit
+  /** Rows built so far, checked against {@link MAX_WALK_ENTRIES} */
+  entryCount: number
+  /** Folders actually listed (`readdir` calls), for the `completed` line */
+  folderReadCount: number
+  /** Folder rows left lazy – ignored, or not reached before the cap */
+  lazyFolderCount: number
+  /** The cap left at least one folder lazy */
+  entryCapReached: boolean
 }
 
 /** One folder of a walk. */
@@ -148,6 +160,35 @@ export const MAX_LINK_DEPTH = 8
  */
 export const MAX_ENTERED_LINKS = 200
 
+/**
+ * Folder reads one walk keeps in flight (review finding 32). The walk used to
+ * read one folder at a time; a few dozen in flight keep the disk and libuv's
+ * thread pool busy without opening thousands of handles at once.
+ */
+export const WALK_READ_CONCURRENCY = 24
+
+/**
+ * Rows one walk lists before it stops reading further folders. A folder whose
+ * turn comes after that is left lazy – shown, its children read when it is
+ * expanded – so a huge project still opens with a bounded first tree. Reads
+ * already in flight still finish, so a walk may list up to
+ * {@link WALK_READ_CONCURRENCY} folders' worth of rows past the cap.
+ */
+export const MAX_WALK_ENTRIES = 50_000
+
+/**
+ * One collator for every sort. `a.localeCompare(b)` with no locale and no
+ * options is specified as `new Intl.Collator().compare(a, b)`, so the order is
+ * unchanged – without setting up a collator on each of the walk's comparisons.
+ */
+const nameCollator = new Intl.Collator()
+
+/** The tree's order: folders first, then by name. */
+export function compareTreeNodes(a: FileNode, b: FileNode): number {
+  if (a.type !== b.type) return a.type === 'directory' ? -1 : 1
+  return nameCollator.compare(a.name, b.name)
+}
+
 /** A walk's scope and its first folder – null when the base itself is excluded. */
 interface WalkPlan {
   readonly scope: WalkScope
@@ -181,6 +222,20 @@ function isDroppedFolder(rel: string | null, scope: WalkScope): boolean {
   if (scope.hints === null || scope.filter === null || rel === null) return false
   return scope.filter.isHidden(rel) || scope.filter.isIgnored(rel)
 }
+
+/**
+ * An ignored folder (`watcher.ignoreList`, on whole segments): shown, but not
+ * read by the walk – its row reads it when expanded. Applies whenever the
+ * project filter does, so an expanded ignored folder's own sub-folders stay
+ * lazy as well, one level per expand.
+ */
+function isLazyFolder(rel: string | null, scope: WalkScope): boolean {
+  return rel !== null && scope.filter !== null && scope.filter.isIgnoredFolder(rel)
+}
+
+/** The segments of a link's real target below the project's real root. */
+const targetSegments = (target: string, realRoot: string): string[] =>
+  relative(realRoot, target).split(sep).filter(Boolean)
 
 /**
  * Store a completed root walk's hints on its filter, replacing the previous
@@ -324,7 +379,8 @@ export class FileService implements IFileService {
     const slowWarning = armSlowWalkWarning(readId, pathDigest, start)
 
     try {
-      const result = base === null ? [] : await this._readDirectoryInternal(base, scope)
+      // The base folder is never left lazy, so `null` only stands for "not read"
+      const result = base === null ? [] : ((await this._readDirectoryInternal(base, scope)) ?? [])
       const walkHintCount = recordWalkHints(scope)
       const durationMs = Math.round(performance.now() - start)
       const counts = this.countNodes(result)
@@ -339,6 +395,9 @@ export class FileService implements IFileService {
         excludedEntryCount: scope.excludedEntryCount,
         walkHintCount,
         matcherBudgetExceeded: matcherOverruns(scope) - budgetBefore,
+        folderReadCount: scope.folderReadCount,
+        lazyFolderCount: scope.lazyFolderCount,
+        entryCapReached: scope.entryCapReached,
         ...runContext
       })
 
@@ -381,7 +440,12 @@ export class FileService implements IFileService {
       filter: baseRel === null ? null : filter,
       hints: baseRel === '' ? new WalkHintCollector() : null,
       excludedEntryCount: 0,
-      enteredLinkTargets: new Set<string>()
+      enteredLinkTargets: new Set<string>(),
+      reads: createConcurrencyLimit(WALK_READ_CONCURRENCY),
+      entryCount: 0,
+      folderReadCount: 0,
+      lazyFolderCount: 0,
+      entryCapReached: false
     }
     if (baseRel !== null && baseRel !== '' && scope.filter?.isExcluded(baseRel)) {
       scope.excludedEntryCount = 1
@@ -415,59 +479,77 @@ export class FileService implements IFileService {
     return { files, dirs, maxDepth }
   }
 
-  private async _readDirectoryInternal(dir: WalkDir, scope: WalkScope): Promise<FileNode[]> {
-    const entries = await readdir(dir.readPath ?? dir.path, { withFileTypes: true })
-    const nodes: FileNode[] = []
-
-    for (const entry of entries) {
-      const rel = dir.rel === null ? null : joinRelative(dir.rel, entry.name)
-      let isDirectory = entry.isDirectory()
-      // Skip hidden (.erfana/settings.json) and excluded (files.exclude) entries
-      if (isSkippedEntry(entry.name, rel, scope)) {
-        if (isDirectory && rel !== null && !dir.dropped) scope.hints?.add(rel, dir.depth + 1)
-        continue
-      }
-
-      const fullPath = join(dir.path, entry.name)
-      // A junction or directory symlink reads as a link, not a folder: it is a
-      // folder row only when its target is a folder inside the project
-      let linkTarget: string | null = null
-      if (!isDirectory && this.symlinkDetector.checkDirent(entry)) {
-        linkTarget = await this.resolveFolderLink(fullPath)
-        isDirectory = linkTarget !== null
-      }
-      const node: FileNode = {
-        name: entry.name,
-        path: fullPath,
-        type: isDirectory ? 'directory' : 'file'
-      }
-      // Flag symlinks for UI indication/security awareness
-      if (this.symlinkDetector.checkDirent(entry)) {
-        node.isSymlink = true
-      }
-
-      if (node.type === 'file') {
-        node.extension = extname(entry.name)
-      }
-
-      // Recursively read subdirectories for markdown files
-      if (node.type === 'directory') {
-        node.children =
-          linkTarget === null
-            ? await this.readChildDirectory(fullPath, rel, dir, scope)
-            : await this.readLinkedDirectory(fullPath, linkTarget, rel, dir, scope)
-      }
-
-      nodes.push(node)
+  /**
+   * List one folder and build its rows. Its sub-folders are read in parallel,
+   * each taking a slot of the walk's limiter for its own `readdir` only, so a
+   * folder never holds a slot while it waits on its children. The base folder
+   * is always read; any other folder whose turn comes once the walk has listed
+   * {@link MAX_WALK_ENTRIES} entries is not, and returns null (left lazy).
+   */
+  private async _readDirectoryInternal(dir: WalkDir, scope: WalkScope): Promise<FileNode[] | null> {
+    const entries = await scope.reads.run(async () => {
+      if (dir.depth > 0 && scope.entryCount >= MAX_WALK_ENTRIES) return null
+      scope.folderReadCount++
+      return readdir(dir.readPath ?? dir.path, { withFileTypes: true })
+    })
+    if (entries === null) {
+      scope.entryCapReached = true
+      return null
     }
 
+    const nodes = await Promise.all(entries.map((entry) => this.buildNode(entry, dir, scope)))
     // Sort: directories first, then files alphabetically
-    return nodes.sort((a, b) => {
-      if (a.type !== b.type) {
-        return a.type === 'directory' ? -1 : 1
+    return nodes.filter((node): node is FileNode => node !== null).sort(compareTreeNodes)
+  }
+
+  /** One entry's row, its children read when it is a folder; null when the entry is skipped. */
+  private async buildNode(entry: Dirent, dir: WalkDir, scope: WalkScope): Promise<FileNode | null> {
+    const rel = dir.rel === null ? null : joinRelative(dir.rel, entry.name)
+    let isDirectory = entry.isDirectory()
+    // Skip hidden (.erfana/settings.json) and excluded (files.exclude) entries
+    if (isSkippedEntry(entry.name, rel, scope)) {
+      if (isDirectory && rel !== null && !dir.dropped) scope.hints?.add(rel, dir.depth + 1)
+      return null
+    }
+    // Counted before any await, so the cap sees every row listed so far
+    scope.entryCount++
+
+    const fullPath = join(dir.path, entry.name)
+    // A junction or directory symlink reads as a link, not a folder: it is a
+    // folder row only when its target is a folder inside the project
+    let linkTarget: string | null = null
+    if (!isDirectory && this.symlinkDetector.checkDirent(entry)) {
+      linkTarget = await this.resolveFolderLink(fullPath)
+      isDirectory = linkTarget !== null
+    }
+    const node: FileNode = {
+      name: entry.name,
+      path: fullPath,
+      type: isDirectory ? 'directory' : 'file'
+    }
+    // Flag symlinks for UI indication/security awareness
+    if (this.symlinkDetector.checkDirent(entry)) {
+      node.isSymlink = true
+    }
+
+    if (node.type === 'file') {
+      node.extension = extname(entry.name)
+    }
+
+    // Recursively read subdirectories; an ignored or capped one is left lazy
+    if (node.type === 'directory') {
+      const children =
+        linkTarget === null
+          ? await this.readChildDirectory(fullPath, rel, dir, scope)
+          : await this.readLinkedDirectory(fullPath, linkTarget, rel, dir, scope)
+      node.children = children ?? []
+      if (children === null) {
+        node.lazy = true
+        scope.lazyFolderCount++
       }
-      return a.name.localeCompare(b.name)
-    })
+    }
+
+    return node
   }
 
   /**
@@ -493,9 +575,8 @@ export class FileService implements IFileService {
    * hidden name or an excluded entry, so a link cannot show what the tree hides.
    */
   private isHiddenOrExcludedTarget(target: string, realRoot: string, scope: WalkScope): boolean {
-    const segments = relative(realRoot, target).split(sep).filter(Boolean)
     let rel = ''
-    for (const segment of segments) {
+    for (const segment of targetSegments(target, realRoot)) {
       rel = joinRelative(rel, segment)
       if (scope.hiddenPatterns.includes(segment) || isAtomicTempName(segment)) return true
       if (scope.filter?.isEntryExcluded(rel)) return true
@@ -507,7 +588,8 @@ export class FileService implements IFileService {
    * Read a folder reached through a link. It is entered unless that would loop
    * (the target is, or contains, the folder the link sits in, or was already
    * entered through another link) or the chain is too deep; then it is a folder
-   * row with no children.
+   * row with no children. A link that is, or leads to, an ignored folder is
+   * left lazy (null) instead of entered.
    */
   private async readLinkedDirectory(
     fullPath: string,
@@ -515,17 +597,12 @@ export class FileService implements IFileService {
     rel: string | null,
     parent: WalkDir,
     scope: WalkScope
-  ): Promise<FileNode[]> {
+  ): Promise<FileNode[] | null> {
     const snapshot = this.session?.current() ?? null
     const chain = parent.linkChain ?? []
     if (!snapshot || chain.length >= MAX_LINK_DEPTH || chain.includes(target)) return []
     // A link must not reach what the tree hides or excludes by another name
     if (this.isHiddenOrExcludedTarget(target, snapshot.realRoot, scope)) return []
-    // Each real folder once per walk, and a bounded number of links in all
-    const key = snapshot.caseSensitive ? target : target.toLowerCase()
-    if (scope.enteredLinkTargets.has(key) || scope.enteredLinkTargets.size >= MAX_ENTERED_LINKS) {
-      return []
-    }
     try {
       const parentReal = normaliseResolved(await realpath(parent.readPath ?? parent.path))
       // The link's target contains the folder the link is in: entering it loops
@@ -533,10 +610,19 @@ export class FileService implements IFileService {
     } catch {
       return []
     }
-    scope.enteredLinkTargets.add(key)
+    // Each real folder once per walk, and a bounded number of links in all.
+    // Tested and taken with no await in between: sibling folders are read in
+    // parallel, and two links to one folder must not both pass the test.
+    const key = snapshot.caseSensitive ? target : target.toLowerCase()
+    if (scope.enteredLinkTargets.has(key) || scope.enteredLinkTargets.size >= MAX_ENTERED_LINKS) {
+      return []
+    }
     const depth = parent.depth + 1
     const dropped = parent.dropped || isDroppedFolder(rel, scope)
     if (dropped && !parent.dropped && rel !== null) scope.hints?.add(rel, depth)
+    const targetRel = targetSegments(target, snapshot.realRoot).join('/')
+    if (isLazyFolder(rel, scope) || isLazyFolder(targetRel, scope)) return null
+    scope.enteredLinkTargets.add(key)
     try {
       return await this._readDirectoryInternal(
         { path: fullPath, readPath: target, depth, rel, dropped, linkChain: [...chain, target] },
@@ -553,18 +639,20 @@ export class FileService implements IFileService {
 
   /**
    * Read one sub-folder of a walk; an unreadable one becomes an empty folder.
-   * A folder the watcher drops (hidden by the filter or ignored) is still shown
-   * and read, but it becomes a walk hint – unless an ancestor already is one.
+   * A folder the watcher drops (hidden by the filter or ignored) is still shown,
+   * and becomes a walk hint – unless an ancestor already is one. An ignored one
+   * is not read (null: lazy); the row reads it when the user expands it.
    */
   private async readChildDirectory(
     fullPath: string,
     rel: string | null,
     parent: WalkDir,
     scope: WalkScope
-  ): Promise<FileNode[]> {
+  ): Promise<FileNode[] | null> {
     const depth = parent.depth + 1
     const dropped = parent.dropped || isDroppedFolder(rel, scope)
     if (dropped && !parent.dropped && rel !== null) scope.hints?.add(rel, depth)
+    if (isLazyFolder(rel, scope)) return null
     try {
       return await this._readDirectoryInternal(
         {

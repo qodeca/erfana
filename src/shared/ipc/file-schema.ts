@@ -31,7 +31,14 @@ export const FileNodeSchema = z.object({
     return z.array(FileNodeSchema).optional()
   },
   extension: z.string().optional(),
-  isSymlink: z.boolean().optional()
+  isSymlink: z.boolean().optional(),
+  /**
+   * A folder the walk did not read: an ignored one (`watcher.ignoreList`), or
+   * one past the walk's entry cap. Its `children` is empty, not its contents –
+   * the tree asks for them (`file:readDirectory` on this path) when the folder
+   * is expanded. Absent on every folder that was read.
+   */
+  lazy: z.literal(true).optional()
 })
 
 export type FileNode = z.infer<typeof FileNodeSchema>

@@ -339,7 +339,7 @@ A very large project that kept changing made Erfana exit on Windows with nothing
 | Line | Level | When | Context |
 |------|-------|------|---------|
 | `FileService: readDirectory started` | info | A walk starts | `readId`, `pathDigest`, `followUp`, `callers` |
-| `FileService: readDirectory completed` | info | A walk succeeded | `durationMs`, `fileCount`, `dirCount`, `hiddenPatternCount`, `maxDepth`, the #211 exclude counts (`excludePatternCount`, `excludedEntryCount`, `walkHintCount`, `matcherBudgetExceeded` – see [Large projects on Windows](#large-projects-on-windows-211)), plus `readId`, `pathDigest`, `followUp`, `callers` |
+| `FileService: readDirectory completed` | info | A walk succeeded | `durationMs`, `fileCount`, `dirCount`, `hiddenPatternCount`, `maxDepth`, the #211 exclude counts (`excludePatternCount`, `excludedEntryCount`, `walkHintCount`, `matcherBudgetExceeded` – see [Large projects on Windows](#large-projects-on-windows-211)), the lazy-walk counts (`folderReadCount` – folders actually listed, `lazyFolderCount` – folder rows left unread, `entryCapReached` – the walk hit `MAX_WALK_ENTRIES`; see [the lazy tree walk note](./performance/2026-10-22-lazy-tree-walk.md)), plus `readId`, `pathDigest`, `followUp`, `callers` |
 | `FileService: readDirectory failed` | warn | A walk rejected (only the root `readdir` can fail one; sub-folder errors are recovered) | `readId`, `pathDigest`, `durationMs` |
 | `FileService: readDirectory still running` | warn | Once per walk, `READ_DIRECTORY_SLOW_WARN_MS` (60 s) after it started | `readId`, `pathDigest`, `elapsedMs` |
 | `FileService: readDirectory joined follow-up read` | info | A call arrived while a walk of that path ran and was queued behind it | `pathDigest`, `behindReadId` |

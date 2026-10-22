@@ -148,6 +148,27 @@ describe('ProjectPathFilter – drop rules', () => {
     expect(filter.isIgnored('src/about.md')).toBe(false)
   })
 
+  it('matches an ignored folder on whole segments only, for the lazy tree walk', () => {
+    const filter = makeFilter('/proj')
+
+    expect(filter.isIgnoredFolder('dist')).toBe(true)
+    expect(filter.isIgnoredFolder('packages/a/dist')).toBe(true)
+    expect(filter.isIgnoredFolder('packages/a/dist/chunks')).toBe(true)
+    expect(filter.isIgnoredFolder('.yarn/cache')).toBe(true)
+    // The substring rule would take these; a folder named `outline` stays read.
+    expect(filter.isIgnoredFolder('outline')).toBe(false)
+    expect(filter.isIgnoredFolder('distribution')).toBe(false)
+    expect(filter.isIgnoredFolder('.yarn')).toBe(false)
+    expect(filter.isIgnoredFolder('')).toBe(false)
+  })
+
+  it('matches a pattern written with a trailing slash as a folder', () => {
+    const filter = makeFilter('/proj', { ignorePatterns: ['vendor/'], hiddenPatterns: [] })
+
+    expect(filter.isIgnoredFolder('vendor')).toBe(true)
+    expect(filter.isIgnoredFolder('vendors')).toBe(false)
+  })
+
   it('skips an empty ignore pattern instead of ignoring everything', () => {
     const filter = makeFilter('/proj', { ignorePatterns: [''], hiddenPatterns: [] })
 

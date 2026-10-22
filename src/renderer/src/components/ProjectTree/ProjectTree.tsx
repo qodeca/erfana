@@ -36,6 +36,7 @@ import { useClipboardStore } from '../../stores/useClipboardStore'
 import { formatFileOperationError } from '../../utils/errorUtils'
 import { DRAG_DROP, AUTO_SCROLL, AUTO_EXPAND } from './constants'
 import { withWatcherPause } from './withWatcherPause'
+import { useLazyFolderChildren } from './useLazyFolderChildren'
 import { logger } from '../../utils/logger'
 import { getLastSeenProjectGeneration } from '../../services/projectGeneration'
 import { useTerminalStore } from '../../stores/useTerminalStore'
@@ -131,7 +132,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
   // Project lifecycle management via context (singleton - avoids duplicate IPC listeners)
   const {
     projectPath,
-    files,
+    files: baseFiles,
     loading,
     error,
     isSwitchingProject,
@@ -152,6 +153,10 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(() =>
     seedExpansion(projectPath)
   )
+
+  // The tree as rendered and operated on: the base tree with the children of
+  // the lazy folders (ignored, or past the walk's cap) read on expand
+  const files = useLazyFolderChildren(baseFiles, expandedFolders)
 
   // Register for project change notifications to reset UI state.
   // Still required for IN-PLACE changes (a project change that does not remount
@@ -347,6 +352,8 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
               }
             }
           }
+          // A lazy folder's contents are unknown until it is expanded: keep it
+          if (node.lazy) return { ...node, children: [] }
           return null
         }
       })
