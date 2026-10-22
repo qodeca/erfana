@@ -126,7 +126,7 @@ export interface UseScrollAnomalyRecoveryReturn {
  *   }
  * })
  *
- * const unsubscribe = window.api.terminal.onData(wrappedHandler)
+ * const unsubscribe = terminalGateway.onData(wrappedHandler)
  * ```
  */
 export function useScrollAnomalyRecovery(

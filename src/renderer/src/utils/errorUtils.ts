@@ -100,7 +100,7 @@ export function formatFileOperationError(
  * the user why the write did not land. A missing file on save means its folder
  * is gone (the file itself is simply recreated by a write).
  *
- * @param error - What `window.api.file.writeFile` rejected with
+ * @param error - What `fileGateway.writeFile` rejected with
  * @param fileName - The tab's file name, shown in full (toasts keep user values)
  * @returns A one-line reason plus the reassurance that nothing was lost
  *
