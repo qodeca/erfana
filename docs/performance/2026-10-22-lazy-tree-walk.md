@@ -41,13 +41,15 @@ How to read it:
 
 | Part | Before | After |
 |---|---|---|
-| Ignored folders | Listed in full, every level | A folder matching `watcher.ignoreList` **on whole segments** is a row with `lazy: true` and no children; expanding it reads one level (its own sub-folders stay lazy). `outline` is not lazy for `out` – the watcher keeps its substring rule |
-| Reads | One `readdir` at a time, depth first | Sub-folders in parallel, at most `WALK_READ_CONCURRENCY` (24) `readdir` calls in flight per walk; a folder holds a slot only for its own read |
-| Huge trees | Walked to the end | After `MAX_WALK_ENTRIES` (50,000) rows, a folder whose turn comes is left lazy; reads in flight still finish. The base folder is always read |
+| Ignored folders | Listed in full, every level | A folder matching `watcher.ignoreList` **on whole segments** is a row with `lazy: 'ignored'` and no children; expanding it reads one level (its own sub-folders stay lazy). `outline` is not lazy for `out` – the watcher keeps its substring rule |
+| Reads | One `readdir` at a time, depth first | Sub-folders in parallel, at most `WALK_READ_CONCURRENCY` (24) file-system calls in flight per walk – the `readdir`s and the `stat`/`realpath` of folder links share the slots; a folder holds a slot only for its own read. libuv's pool runs 4 at a time, so the rest queue there; 4, 8 and 24 are to be compared on Windows (PR list) before the value moves |
+| Huge trees | Walked to the end | After `MAX_WALK_ENTRIES` (50,000) rows, a folder whose turn comes is left lazy (`lazy: 'capped'`); reads in flight still finish. The base folder is always read. Expanding a capped folder reads one level of it (`file:readDirectory` with `shallow: true`), its sub-folders capped in turn |
 | Sort | `localeCompare` per comparison | One shared `Intl.Collator` – specified to give the same order |
-| Links | Once per walk, checked before an `await` | Same rule; the check and the reservation now run with no `await` between them, so two links read in parallel cannot both enter one folder |
-| Renderer | Rendered `files` as sent | `useLazyFolderChildren` reads a lazy folder on expand (`file:readDirectory` of that folder) and merges the result; the Markdown filter keeps lazy folders |
-| Log | `readDirectory completed` | Adds `folderReadCount`, `lazyFolderCount`, `entryCapReached` |
+| Links | Once per walk, checked before an `await` | Same rule; the check and the reservation now run with no `await` between them, so two links read in parallel cannot both enter one folder. The link that loses, and any past `MAX_ENTERED_LINKS`, is a `capped` lazy row (expandable); a real loop stays an empty row |
+| Renderer | Rendered `files` as sent | `useLazyFolderChildren` reads a lazy folder on expand and keeps the result in `useLazyFolderStore`; the tree and the terminal's file links both see the merged tree (`useMergedProjectFiles`). A folder that turns lazy keeps the children it showed until it is read again |
+| Terminal file links | Index of the whole tree | Index of the merged tree. While a `capped` folder is unread the tree is incomplete: a single name match opens the chooser instead of the file, and a name the index lacks is searched for in main (`file:findByName`: confined, at most 20 results, 20,000 folders, 1.5 s) |
+| Watcher record (#316) | Seeded by root reads only | An expand read adds its folder's entries, so a rename-style save in an expanded capped folder stays a content change; a later root read keeps what is known below folders it leaves lazy again |
+| Log | `readDirectory completed` | Adds `folderReadCount`, `lazyFolderCount`, `entryCapReached`, and `shallow: true` on an expand read |
 
 Walk hints for the Windows watcher are unchanged: a lazy folder is still recorded as one, and nothing below a dropped folder ever was. A capped walk records only the hints it met.
 

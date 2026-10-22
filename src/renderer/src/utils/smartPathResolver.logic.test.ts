@@ -392,4 +392,56 @@ describe('smartPathResolver', () => {
       expect(result.resolvedPath).toBe('/project/README.md')
     })
   })
+
+  describe('on a truncated tree (finding 32, PR #320 review item 2)', () => {
+    const tree: FileNode[] = [
+      { name: 'Button.tsx', path: '/project/src/Button.tsx', type: 'file', extension: '.tsx' },
+      { name: 'big', path: '/project/big', type: 'directory', children: [], lazy: 'capped' }
+    ]
+
+    it('offers a single index match for choosing instead of opening it', async () => {
+      const result = await resolvePathSmart({
+        path: 'Button.tsx', cwd: null, projectRoot: '/project', index: createFilenameIndex(), files: tree,
+        treeTruncated: true
+      })
+
+      expect(result.status).toBe('multiple-matches')
+      expect(result.candidates?.map((c) => c.path)).toEqual(['/project/src/Button.tsx'])
+    })
+
+    it('keeps a single match certain when the tree is complete', async () => {
+      const result = await resolvePathSmart({
+        path: 'Button.tsx', cwd: null, projectRoot: '/project', index: createFilenameIndex(), files: tree
+      })
+      expect(result.status).toBe('single-match')
+    })
+
+    it('searches on disk for a name the index lacks, and offers every result', async () => {
+      const searchByName = vi.fn(async () => ['/project/big/Card.tsx'])
+
+      const result = await resolvePathSmart({
+        path: 'Card.tsx:12', cwd: null, projectRoot: '/project', index: createFilenameIndex(), files: tree,
+        treeTruncated: true, searchByName
+      })
+
+      expect(searchByName).toHaveBeenCalledWith('Card.tsx')
+      expect(result.status).toBe('multiple-matches')
+      expect(result.candidates?.map((c) => c.path)).toEqual(['/project/big/Card.tsx'])
+    })
+
+    it('does not search when the tree is complete, or when the search finds nothing', async () => {
+      const searchByName = vi.fn(async () => [] as string[])
+      const complete = await resolvePathSmart({
+        path: 'Card.tsx', cwd: null, projectRoot: '/project', index: createFilenameIndex(), files: tree, searchByName
+      })
+      expect(complete.status).toBe('no-match')
+      expect(searchByName).not.toHaveBeenCalled()
+
+      const empty = await resolvePathSmart({
+        path: 'Card.tsx', cwd: null, projectRoot: '/project', index: createFilenameIndex(), files: tree,
+        treeTruncated: true, searchByName
+      })
+      expect(empty.status).toBe('no-match')
+    })
+  })
 })

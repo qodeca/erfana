@@ -465,6 +465,26 @@ describe('DirectoryWatcherService native backend (#211, W13)', () => {
       ])
     })
 
+    it('treats a save in an expanded capped folder as a content change (finding [32])', async () => {
+      const cappedTree = [
+        { name: 'a.md', path: inRoot('a.md'), type: 'file' as const },
+        { name: 'big', path: inRoot('big'), type: 'directory' as const, children: [], lazy: 'capped' as const }
+      ]
+      await svc.watchDirectory(ROOT, webContents)
+      svc.beginKnownEntriesRead(ROOT).commit(cappedTree)
+      // The tree expands the capped folder: one shallow read of it
+      svc.beginKnownEntriesRead(inRoot('big')).commit([
+        { name: 'c.md', path: inRoot('big', 'c.md'), type: 'file' as const }
+      ])
+
+      latestNative().emit('add', inRoot('big', 'c.md'), { symbolicLink: false })
+      vi.advanceTimersByTime(FLUSH_MS)
+
+      expect(sent('directory-watch:changed')).toEqual([
+        expect.objectContaining({ summary: { change: 1 }, structural: false })
+      ])
+    })
+
     it('keeps a new file structural', async () => {
       await svc.watchDirectory(ROOT, webContents)
       svc.beginKnownEntriesRead(ROOT).commit(tree)

@@ -86,6 +86,7 @@ describe('channel names', () => {
           "deleteFile": "file:deleteFile",
           "deleteFolder": "file:deleteFolder",
           "exists": "file:exists",
+          "findByName": "file:findByName",
           "getProjectPath": "file:getProjectPath",
           "getSession": "file:getSession",
           "getStats": "file:getStats",
@@ -144,6 +145,7 @@ describe('file bridge', () => {
     { method: 'openProjectByPath', channel: FILE_CHANNELS.openProjectByPath, args: [{ projectPath: 'p' }] },
     { method: 'getSession', channel: FILE_CHANNELS.getSession, args: [] },
     { method: 'readDirectory', channel: FILE_CHANNELS.readDirectory, args: [{ dirPath: 'd' }] },
+    { method: 'findByName', channel: FILE_CHANNELS.findByName, args: [{ dirPath: 'd', name: 'a.md' }] },
     { method: 'readFile', channel: FILE_CHANNELS.readFile, args: [{ filePath: 'f' }] },
     { method: 'writeFile', channel: FILE_CHANNELS.writeFile, args: [{ filePath: 'f', content: 'c' }] },
     {

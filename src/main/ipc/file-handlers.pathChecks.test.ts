@@ -100,6 +100,7 @@ const event = { sender: { id: 1 } }
 const REQUEST_FIELDS: Readonly<Record<string, readonly string[]>> = {
   'file:openProjectByPath': ['projectPath'],
   'file:readDirectory': ['dirPath'],
+  'file:findByName': ['dirPath', 'name'],
   'file:readFile': ['filePath'],
   'file:readImage': ['filePath', 'knownVersion'],
   'file:writeFile': ['filePath', 'content', '...options'],
@@ -145,6 +146,7 @@ const UNCONFINED_ALLOW_LIST: Readonly<Record<string, string>> = {
 const EXPECTED_PATH_ARGS: Readonly<Record<string, readonly string[]>> = {
   'file:openProjectByPath': ['projectPath'],
   'file:readDirectory': ['dirPath'],
+  'file:findByName': ['dirPath'],
   'file:readFile': ['filePath'],
   'file:readImage': ['filePath'],
   'file:writeFile': ['filePath'],
@@ -265,6 +267,7 @@ describe('file:* path checks', () => {
 
     it.each([
       ['file:readDirectory', () => [outside]],
+      ['file:findByName', () => [outside, 'secret.txt']],
       ['file:readFile', () => [path.join(outside, 'secret.txt')]],
       ['file:readImage', () => [path.join(outside, 'pic.png')]],
       ['file:writeFile', () => [path.join(outside, 'secret.txt'), 'overwritten']],
@@ -470,6 +473,10 @@ describe('file:* path checks', () => {
       expect(tree[0].path.startsWith(root)).toBe(true)
       await expect(invoke('file:getStats', path.join(root, 'a.md'))).resolves.toMatchObject({ size: 6 })
       await expect(invoke('file:checkConflict', root, 'A.MD')).resolves.toBe(true)
+      await expect(invoke('file:findByName', root, 'A.MD')).resolves.toEqual({
+        paths: [path.join(root, 'a.md')],
+        truncated: false
+      })
       await expect(invoke('file:checkConflict', path.join(root, 'missing-dir'), 'x')).resolves.toBe(false)
     })
 

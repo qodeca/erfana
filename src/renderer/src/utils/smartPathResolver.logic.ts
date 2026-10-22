@@ -68,6 +68,17 @@ export interface SmartResolveOptions {
    * If not provided, exact resolution is skipped and smart resolution is always used.
    */
   validateExactPath?: (path: string) => Promise<boolean>
+
+  /**
+   * The tree is incomplete: a walk bound left some folder unread (review
+   * finding 32). A single index match is then not certain – another file of
+   * that name may sit in an unread folder – so it is offered for choosing, and
+   * a name the index lacks is looked up with `searchByName`.
+   */
+  treeTruncated?: boolean
+
+  /** Files of this name on disk, for a truncated tree (a bounded search in main) */
+  searchByName?: (filename: string) => Promise<string[]>
 }
 
 /**
@@ -247,7 +258,28 @@ export async function resolvePathSmart(
   }
 
   // Fall back to smart resolution
-  return resolvePathSmartSync(path, index, files)
+  const result = resolvePathSmartSync(path, index, files)
+  if (options.treeTruncated !== true) return result
+  return resolveOnTruncatedTree(result, path, options.searchByName)
+}
+
+/**
+ * On an incomplete tree no lookup is certain: a single match becomes a choice
+ * of one, and a name the index lacks is searched for on disk – every result
+ * offered for choosing.
+ */
+export async function resolveOnTruncatedTree(
+  result: SmartResolutionResult,
+  query: string,
+  searchByName?: (filename: string) => Promise<string[]>
+): Promise<SmartResolutionResult> {
+  if (result.status === 'single-match' && result.resolvedPath) {
+    return { status: 'multiple-matches', candidates: rankCandidates([result.resolvedPath], query), wasSmartResolved: true }
+  }
+  if (result.status !== 'no-match' || !searchByName) return result
+  const found = await searchByName(extractFilenameFromPath(query))
+  if (found.length === 0) return result
+  return { status: 'multiple-matches', candidates: rankCandidates(found, query), wasSmartResolved: true }
 }
 
 /**

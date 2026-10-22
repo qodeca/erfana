@@ -17,6 +17,7 @@ import {
   CloseProjectRequestSchema,
   CopyItemRequestSchema,
   CreateEntryRequestSchema,
+  FindByNameRequestSchema,
   MoveItemRequestSchema,
   OpenProjectByPathRequestSchema,
   PathRequestSchema,
@@ -25,7 +26,8 @@ import {
   ValidatePathRequestSchema,
   WriteFileRequestSchema,
   payloadArgs,
-  type FileStats
+  type FileStats,
+  type FindByNameResponse
 } from '../../shared/ipc/file-schema'
 import {
   ImageReadRequestSchema,
@@ -172,7 +174,7 @@ export function registerFileHandlers(): void {
       schema: payloadArgs(ReadDirectoryRequestSchema),
       paths: { dirPath: { arg: 0, key: 'dirPath', mode: 'project', mustExist: true } },
       staleCheck: 'after',
-      handler: async ({ sender }, _args, { dirPath }) => {
+      handler: async ({ sender }, [request], { dirPath }) => {
         try {
           const start = performance.now()
           // The tree's node paths are built from the walk's base, so the walk takes
@@ -184,7 +186,7 @@ export function registerFileHandlers(): void {
           const knownRead = directoryWatcherService.beginKnownEntriesRead(dirPath.requested)
           let result: Awaited<ReturnType<typeof fileService.readDirectory>>
           try {
-            result = await fileService.readDirectory(dirPath.requested)
+            result = await fileService.readDirectory(dirPath.requested, { shallow: request.shallow === true })
           } catch (error) {
             knownRead.cancel()
             throw error
@@ -201,6 +203,31 @@ export function registerFileHandlers(): void {
           logger.error('Error reading directory', redactedLogError(error))
           throw error
         }
+      }
+    },
+    session
+  )
+
+  // Find files by name below a project folder (finding [32], PR #320 review):
+  // the terminal's fallback for a bare file name the incomplete tree does not
+  // hold. Confined like a tree read; the search itself is bounded in results,
+  // folders and time, and never follows a link (`file/findByName`).
+  registerConfinedHandle(
+    FILE_CHANNELS.findByName,
+    {
+      schema: payloadArgs(FindByNameRequestSchema),
+      paths: { dirPath: { arg: 0, key: 'dirPath', mode: 'project', mustExist: true } },
+      staleCheck: 'after',
+      handler: async (_ctx, [{ name }], { dirPath }): Promise<FindByNameResponse> => {
+        const start = performance.now()
+        const result = await fileService.findByName(dirPath.requested, name)
+        // Counts only: the name and the paths are the user's
+        logger.info('file:findByName completed', {
+          durationMs: Math.round(performance.now() - start),
+          resultCount: result.paths.length,
+          truncated: result.truncated
+        })
+        return { paths: result.paths, truncated: result.truncated }
       }
     },
     session

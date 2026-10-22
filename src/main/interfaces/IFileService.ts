@@ -23,7 +23,12 @@ export interface IFileService {
   /**
    * Read directory contents recursively
    */
-  readDirectory(dirPath: string): Promise<FileNode[]>
+  readDirectory(dirPath: string, options?: { shallow?: boolean }): Promise<FileNode[]>
+
+  /**
+   * Files of one name below a folder, bounded (terminal links on an incomplete tree)
+   */
+  findByName(dirPath: string, name: string): Promise<{ paths: string[]; truncated: boolean }>
 
   /**
    * Read file contents

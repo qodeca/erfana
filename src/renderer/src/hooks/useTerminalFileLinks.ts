@@ -46,6 +46,36 @@ import { terminalGateway } from '../services/terminalGateway'
 // This ensures cache hits across terminal restarts and multiple terminals
 const pathCache = createPathCache(100, 30000)
 
+/** Name searches on a truncated tree, by project + lower-case name; same lifetime as `pathCache` */
+const NAME_SEARCH_TTL_MS = 30_000
+const NAME_SEARCH_CACHE_MAX = 100
+const nameSearchCache = new Map<string, { paths: string[]; at: number }>()
+
+/**
+ * Files named `filename` in the project, from main's bounded search, cached
+ * for {@link NAME_SEARCH_TTL_MS} so hovering a line does not repeat it.
+ * Answers [] on any failure: an unresolved name just stays plain text.
+ */
+export async function searchProjectByName(projectRoot: string, filename: string): Promise<string[]> {
+  const key = `${projectRoot}\0${filename.toLowerCase()}`
+  const cached = nameSearchCache.get(key)
+  if (cached && Date.now() - cached.at < NAME_SEARCH_TTL_MS) return cached.paths
+  let paths: string[] = []
+  try {
+    paths = (await fileGateway.findByName({ dirPath: projectRoot, name: filename })).paths
+  } catch (e) {
+    logger.warn('[FileLinks] Name search failed', { error: e instanceof Error ? e.name : typeof e })
+  }
+  if (nameSearchCache.size >= NAME_SEARCH_CACHE_MAX) nameSearchCache.clear()
+  nameSearchCache.set(key, { paths, at: Date.now() })
+  return paths
+}
+
+/** Forget cached name searches (tests). */
+export function clearNameSearchCache(): void {
+  nameSearchCache.clear()
+}
+
 export interface UseTerminalFileLinksOptions {
   /** Reference to xterm Terminal instance */
   terminalRef: React.RefObject<Terminal | null>
@@ -58,6 +88,13 @@ export interface UseTerminalFileLinksOptions {
    * When provided, enables smart file lookup when exact path validation fails.
    */
   files?: FileNode[]
+  /**
+   * `files` is incomplete: a walk bound left some folder unread (review
+   * finding 32, `useMergedProjectFiles`). A single match is then offered in
+   * the picker rather than opened, and a name `files` lacks is searched for
+   * in main (bounded, confined to the project).
+   */
+  treeTruncated?: boolean
   /**
    * Callback when a file link is clicked.
    * Should open the file in the Monaco editor at the specified position.
@@ -136,7 +173,7 @@ export function isLinkableFile(
 export function useTerminalFileLinks(
   options: UseTerminalFileLinksOptions
 ): UseTerminalFileLinksReturn {
-  const { terminalRef, terminalId, projectRoot, files = [], onFileOpen, onShowPicker, onError } =
+  const { terminalRef, terminalId, projectRoot, files = [], treeTruncated = false, onFileOpen, onShowPicker, onError } =
     options
 
   // Track terminal readiness with state to trigger re-renders when terminal is created
@@ -360,7 +397,9 @@ export function useTerminalFileLinks(
                 validateExactPath: async (p) => {
                   const v = await validatePath(p)
                   return v.exists
-                }
+                },
+                treeTruncated,
+                searchByName: projectRoot ? (name) => searchProjectByName(projectRoot, name) : undefined
               })
 
               if (smartResult.status === 'exact') {
@@ -473,7 +512,7 @@ export function useTerminalFileLinks(
         }
       }
     }
-  }, [terminal, terminalReady, fetchCwd, validatePath, projectRoot, files, getIndex, onFileOpen, onShowPicker, onError])
+  }, [terminal, terminalReady, fetchCwd, validatePath, projectRoot, files, treeTruncated, getIndex, onFileOpen, onShowPicker, onError])
 
   // Register the link provider with xterm
   useEffect(() => {

@@ -4,7 +4,7 @@
  * ProjectTree and lazy folders (review finding 32).
  *
  * The main process leaves an ignored folder (and every folder past the walk's
- * entry cap) unread and marks the row `lazy: true`. Expanding that row must
+ * entry cap) unread and marks the row `lazy`. Expanding that row must
  * read it – one `readDirectory` of that folder – and show what came back; the
  * Markdown filter must keep the row, because its contents are not yet known.
  *
@@ -29,7 +29,7 @@ const PROJECT = '/proj'
 
 /** dist/ is lazy (ignored), docs/ was read */
 const baseTree = (): FileNode[] => [
-  { name: 'dist', path: `${PROJECT}/dist`, type: 'directory', children: [], lazy: true },
+  { name: 'dist', path: `${PROJECT}/dist`, type: 'directory', children: [], lazy: 'ignored' },
   {
     name: 'docs',
     path: `${PROJECT}/docs`,

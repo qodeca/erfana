@@ -35,10 +35,12 @@ describe('FileNodeSchema', () => {
     expect(FileNodeSchema.parse(tree)).toEqual(tree)
   })
 
-  it('carries a lazy folder flag as a literal true only', () => {
-    const lazy = { name: 'dist', path: '/p/dist', type: 'directory', children: [], lazy: true }
+  it('carries why a folder was left lazy: ignored or capped, nothing else', () => {
+    const lazy = { name: 'dist', path: '/p/dist', type: 'directory', children: [], lazy: 'ignored' }
     expect(FileNodeSchema.parse(lazy)).toEqual(lazy)
-    expect(FileNodeSchema.safeParse({ ...lazy, lazy: false }).success).toBe(false)
+    expect(FileNodeSchema.parse({ ...lazy, lazy: 'capped' })).toEqual({ ...lazy, lazy: 'capped' })
+    expect(FileNodeSchema.safeParse({ ...lazy, lazy: true }).success).toBe(false)
+    expect(FileNodeSchema.safeParse({ ...lazy, lazy: 'other' }).success).toBe(false)
   })
 
   it('rejects an unknown type', () => {

@@ -5,7 +5,7 @@
  * sort order (review finding 32).
  *
  * An ignored folder (`watcher.ignoreList`, on whole segments) is shown but not
- * read: its row carries `lazy: true` and an empty `children`, and a walk of
+ * read: its row carries `lazy: 'ignored'` and an empty `children`, and a walk of
  * that folder on its own lists one level of it. Sub-folders are read with at
  * most {@link WALK_READ_CONCURRENCY} `readdir` calls in flight, a walk past
  * {@link MAX_WALK_ENTRIES} rows leaves the rest of its folders lazy, and the
@@ -140,7 +140,7 @@ describe('FileService.readDirectory – lazy ignored folders (finding 32)', () =
     const tree = await makeService().readDirectory(ROOT)
 
     const nodes = byName(tree)
-    expect(nodes.dist).toEqual({ name: 'dist', path: at('dist'), type: 'directory', children: [], lazy: true })
+    expect(nodes.dist).toEqual({ name: 'dist', path: at('dist'), type: 'directory', children: [], lazy: 'ignored' })
     expect(nodes.docs.lazy).toBeUndefined()
     expect(nodes.docs.children?.map((c) => c.name)).toEqual(['b.md'])
     expect(foldersRead()).toEqual(['', 'docs'])
@@ -157,10 +157,10 @@ describe('FileService.readDirectory – lazy ignored folders (finding 32)', () =
     const tree = await makeService(['dist', 'out', '.yarn/cache']).readDirectory(ROOT)
 
     const app = byName(byName(byName(tree).packages.children!).app.children!)
-    expect(app.dist.lazy).toBe(true)
+    expect(app.dist.lazy).toBe('ignored')
     expect(app.src.lazy).toBeUndefined()
     const yarn = byName(byName(tree)['.yarn'].children!)
-    expect(yarn.cache.lazy).toBe(true)
+    expect(yarn.cache.lazy).toBe('ignored')
     expect(yarn.releases.lazy).toBeUndefined()
     // `out` is ignored, but `outline` only contains it – still read in full
     expect(byName(tree).outline.children?.map((c) => c.name)).toEqual(['plan.md'])
@@ -174,7 +174,7 @@ describe('FileService.readDirectory – lazy ignored folders (finding 32)', () =
     const tree = await makeService().readDirectory(at('dist'))
 
     expect(tree.map((n) => [n.name, n.lazy])).toEqual([
-      ['chunks', true],
+      ['chunks', 'ignored'],
       ['bundle.js', undefined]
     ])
     expect(foldersRead()).toEqual(['dist'])
@@ -201,7 +201,7 @@ describe('FileService.readDirectory – lazy ignored folders (finding 32)', () =
     const tree = await makeService().readDirectory(ROOT)
 
     const built = byName(tree).built
-    expect(built).toMatchObject({ type: 'directory', isSymlink: true, children: [], lazy: true })
+    expect(built).toMatchObject({ type: 'directory', isSymlink: true, children: [], lazy: 'ignored' })
     expect(foldersRead()).toEqual([''])
   })
 })
@@ -234,9 +234,100 @@ describe('FileService.readDirectory – parallel reads (finding 32)', () => {
 
     const tree = await makeService().readDirectory(ROOT)
 
-    const linkChildren = ['a', 'b'].map((parent) => byName(tree)[parent].children![0].children!.length)
+    const links = ['a', 'b'].map((parent) => byName(tree)[parent].children![0])
     // Both links resolve in parallel; exactly one of them enters the folder
-    expect(linkChildren.sort()).toEqual([0, 1])
+    expect(links.map((link) => link.children!.length).sort()).toEqual([0, 1])
+    // The other is not a loop: it stays expandable, as a capped lazy row (review item 3)
+    expect(links.map((link) => link.lazy ?? null).sort()).toEqual(['capped', null])
+  })
+
+  it('keeps a link back to its own ancestor an empty row, not a lazy one', async () => {
+    listing[ROOT] = [dirent('docs', 'dir')]
+    listing[at('docs')] = [dirent('up', 'link')]
+    statDir[at('docs', 'up')] = true
+    real[at('docs', 'up')] = ROOT
+
+    const tree = await makeService().readDirectory(ROOT)
+
+    const up = tree[0].children![0]
+    expect(up).toMatchObject({ type: 'directory', children: [] })
+    expect(up.lazy).toBeUndefined()
+  })
+
+  it('resolves folder links within the same limit as the folder reads', async () => {
+    // Every stat, realpath and readdir counts against one in-flight total
+    const counted = <T extends unknown[], R>(fn: (...args: T) => Promise<R>) => async (...args: T): Promise<R> => {
+      inFlight++
+      maxInFlight = Math.max(maxInFlight, inFlight)
+      try {
+        await tick()
+        return await fn(...args)
+      } finally {
+        inFlight--
+      }
+    }
+    const names = Array.from({ length: WALK_READ_CONCURRENCY * 3 }, (_, i) => `l${i}`)
+    listing[ROOT] = [...names.map((name) => dirent(name, 'link')), dirent('docs', 'dir')]
+    for (const name of names) {
+      statDir[at(name)] = true
+      real[at(name)] = at('docs')
+    }
+    const statImpl = statMock.getMockImplementation()!
+    const realImpl = realpathMock.getMockImplementation()!
+    readdirMock.mockImplementation(counted(async (dir: string) => listing[path.resolve(dir)] ?? []))
+    statMock.mockImplementation(counted(statImpl))
+    realpathMock.mockImplementation(counted(realImpl))
+
+    await makeService().readDirectory(ROOT)
+
+    expect(maxInFlight).toBeGreaterThan(1)
+    expect(maxInFlight).toBeLessThanOrEqual(WALK_READ_CONCURRENCY)
+  })
+})
+
+describe('FileService.readDirectory – shallow expand reads (review item 5)', () => {
+  it('lists one level only, leaving every sub-folder lazy with its reason', async () => {
+    listing[at('docs')] = [dirent('a', 'dir'), dirent('dist', 'dir'), dirent('x.md', 'file')]
+    listing[at('docs', 'a')] = [dirent('deep.md', 'file')]
+
+    const tree = await makeService().readDirectory(at('docs'), { shallow: true })
+
+    expect(tree.map((n) => [n.name, n.lazy])).toEqual([
+      ['a', 'capped'],
+      ['dist', 'ignored'],
+      ['x.md', undefined]
+    ])
+    expect(foldersRead()).toEqual(['docs'])
+    expect(completedLine()).toMatchObject({ shallow: true, entryCapReached: false, lazyFolderCount: 2 })
+  })
+
+  it('never replaces the walk hints from a shallow read of the root', async () => {
+    listing[ROOT] = [dirent('packages', 'dir')]
+    listing[at('packages')] = [dirent('a', 'dir')]
+    listing[at('packages', 'a')] = [dirent('dist', 'dir')]
+    const service = makeService()
+    await service.readDirectory(ROOT)
+    const filter = (service as unknown as { pathFilter: ProjectPathFilter }).pathFilter
+    expect(filter.getWalkHints()).toEqual(['packages/a/dist'])
+
+    await service.readDirectory(ROOT, { shallow: true })
+
+    expect(filter.getWalkHints()).toEqual(['packages/a/dist'])
+  })
+
+  it('runs a shallow and a full read of one path separately', async () => {
+    listing[at('docs')] = [dirent('a', 'dir')]
+    listing[at('docs', 'a')] = [dirent('deep.md', 'file')]
+    const service = makeService()
+
+    const [shallow, full] = await Promise.all([
+      service.readDirectory(at('docs'), { shallow: true }),
+      service.readDirectory(at('docs'))
+    ])
+
+    expect(shallow[0]).toMatchObject({ lazy: 'capped', children: [] })
+    expect(full[0].lazy).toBeUndefined()
+    expect(full[0].children?.map((c) => c.name)).toEqual(['deep.md'])
   })
 })
 
@@ -258,7 +349,7 @@ describe('FileService.readDirectory – entry cap (finding 32)', () => {
 
     const tree = await makeService().readDirectory(ROOT)
 
-    const lazy = tree.filter((node) => node.lazy)
+    const lazy = tree.filter((node) => node.lazy === 'capped')
     expect(lazy.length).toBeGreaterThan(0)
     expect(lazy.every((node) => node.children?.length === 0)).toBe(true)
     // Reads in flight when the cap is reached still finish
