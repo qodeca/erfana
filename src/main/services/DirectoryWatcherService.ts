@@ -3,6 +3,7 @@
 import chokidar from 'chokidar'
 import { BrowserWindow, WebContents, webContents } from 'electron'
 import { normalize, resolve, sep } from 'path'
+import { lstat } from 'fs/promises'
 import { settingsService } from './SettingsService'
 import { PauseController } from '../utils/PauseController'
 import {
@@ -950,16 +951,26 @@ export class DirectoryWatcherService {
     // and a large delete must not start one unthrottled `stat` per file.
     if (event.type === 'unlink' && watched.backend !== 'native-recursive') {
       const removedKind = judged.removedKind
-      watched.atomicSaveDetector.registerDelete(event.path, (path, wasAtomicSave, kind) => {
+      watched.atomicSaveDetector.registerDelete(event.path, (path, wasAtomicSave) => {
         if (wasAtomicSave) {
           // File reappeared → atomic save, emit as change – structural unless
-          // it is back as the kind the tree shows (a file↔symlink swap is not a save)
-          const rel = this.projectPath ? toRootRelative(this.projectPath, path) : null
-          if (rel === null || this.knownEntries.reappeared(rel, removedKind, kind)) {
-            const current = this.watchedDirectories.get(dirPath)
-            if (current) current.forceStructural = true
-          }
-          watched.throttledWorker.work({ type: 'change', path })
+          // it is back as the kind the tree shows (a file↔symlink swap is not a
+          // save). One `lstat`, on this rare path only (chokidar reports most
+          // atomic saves as a `change` itself); a failed one is structural.
+          void Promise.resolve()
+            .then(() => lstat(path))
+            .then(
+              (stats): KnownEntryKind => (stats.isSymbolicLink() ? 'symlink' : 'file'),
+              () => undefined
+            )
+            .then((kind) => {
+              if (this.isDisposing || this.watchedDirectories.get(dirPath) !== watched) return
+              const rel = this.projectPath ? toRootRelative(this.projectPath, path) : null
+              if (rel === null || this.knownEntries.reappeared(rel, removedKind, kind)) {
+                watched.forceStructural = true
+              }
+              watched.throttledWorker.work({ type: 'change', path })
+            })
         } else {
           // Actual delete
           watched.throttledWorker.work({ type: 'unlink', path })

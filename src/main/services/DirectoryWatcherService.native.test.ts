@@ -34,8 +34,22 @@ const harness = vi.hoisted(() => ({
   construct: vi.fn(),
   chokidarWatch: vi.fn(),
   depth: vi.fn(async (): Promise<number | undefined> => undefined),
-  logger: { trace: vi.fn(), debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+  logger: { trace: vi.fn(), debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+  /** What `lstat` reports for a reappeared entry on the chokidar path; null: the real one */
+  lstatKind: null as null | 'file' | 'symlink'
 }))
+
+vi.mock('fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('fs/promises')>()
+  return {
+    ...actual,
+    lstat: vi.fn(async (target: string) =>
+      harness.lstatKind === null
+        ? actual.lstat(target)
+        : { isSymbolicLink: () => harness.lstatKind === 'symlink', isDirectory: () => false }
+    )
+  }
+})
 
 vi.mock('./watcher/NativeRecursiveWatcher', async () => {
   const { EventEmitter } = await import('events')
@@ -594,8 +608,9 @@ describe('DirectoryWatcherService native backend (#211, W13)', () => {
         return watcher
       })
       // The file reappears at once, as `kind`
+      harness.lstatKind = kind
       vi.spyOn(AtomicSaveDetector.prototype, 'registerDelete').mockImplementation((path, callback) => {
-        setTimeout(() => callback(path, true, kind), 100)
+        setTimeout(() => callback(path, true), 100)
       })
       const chokidarSvc = new DirectoryWatcherService({ backend: 'chokidar' })
       try {
@@ -604,12 +619,13 @@ describe('DirectoryWatcherService native backend (#211, W13)', () => {
         chokidarSvc.beginKnownEntriesRead(ROOT).commit(tree)
 
         handlers.get('unlink')?.(inRoot('a.md'))
-        vi.advanceTimersByTime(FLUSH_MS)
+        await vi.advanceTimersByTimeAsync(FLUSH_MS)
 
         expect(sent('directory-watch:changed')).toEqual([
           expect.objectContaining({ summary: { change: 1 }, structural })
         ])
       } finally {
+        harness.lstatKind = null
         await chokidarSvc.dispose()
       }
     })
