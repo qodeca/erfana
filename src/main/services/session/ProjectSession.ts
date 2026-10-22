@@ -20,7 +20,7 @@ import { ConfinementError, type ConfinementErrorCode } from '../../ipc/confineme
 export interface ProjectSessionSnapshot {
   /** +1 on every commit, open or close */
   readonly generation: number
-  /** `path.resolve` of the path that was opened; shown to the renderer */
+  /** The opened path as shown to the renderer: `path.resolve`, or the native `realpath` spelling on Windows (see `displayRootSpelling`) */
   readonly root: string
   /** `realpath(root)` at open, normalised (see `normaliseRealRoot`) */
   readonly realRoot: string
@@ -53,6 +53,27 @@ export { ConfinementError, type ConfinementErrorCode }
  */
 export function normaliseRealRoot(real: string): string {
   return normaliseResolved(real)
+}
+
+const WIN_DRIVE_PATH = /^[A-Za-z]:/
+
+/**
+ * The spelling of the project path that is shown and stored. On Windows it is
+ * the native `realpath` result (on-disk case, no 8.3 short names; a UNC
+ * admin-share path keeps its form), so two spellings of one folder are one name.
+ * When `realpath` changes the kind of volume (a mapped drive `Z:\proj` comes
+ * back as `\\server\share\proj`) the caller's drive-letter spelling is kept:
+ * a terminal cannot start in a UNC folder. Confinement still uses `realRoot`.
+ * Elsewhere the caller's resolved spelling is kept.
+ */
+export function displayRootSpelling(
+  resolved: string,
+  realRoot: string,
+  platform: NodeJS.Platform
+): string {
+  if (platform !== 'win32') return resolved
+  if (WIN_DRIVE_PATH.test(resolved) !== WIN_DRIVE_PATH.test(realRoot)) return resolved
+  return realRoot
 }
 
 /** The writable side. Only `ProjectService` holds one. */

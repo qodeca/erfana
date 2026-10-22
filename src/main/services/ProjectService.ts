@@ -16,7 +16,7 @@
  * Open/Closed: Extensible for new services without modifying existing code
  */
 
-import { stat, realpath } from 'fs/promises'
+import { stat, realpath, lstat } from 'fs/promises'
 import { normalize, sep, parse, resolve } from 'path'
 import { BrowserWindow } from 'electron'
 import { assertAcceptableProjectRoot, validatePath } from '../utils/pathSecurity'
@@ -38,6 +38,7 @@ import { redactQuotedPaths } from '../../shared/redactQuotedPaths'
 import {
   ProjectSessionStore,
   normaliseRealRoot,
+  displayRootSpelling,
   type ProjectSession,
   type ProjectSessionSnapshot
 } from './session/ProjectSession'
@@ -357,7 +358,74 @@ export class ProjectService {
       throw error
     }
     logger.debug('Project switch: security validation passed')
-    const newProjectPath = resolve(requestedPath)
+    const resolvedPath = resolve(requestedPath)
+
+    // 1b. Resolve the path once, natively. On Windows the spelling realpath
+    // returns (on-disk case, long names) is the one the project is known by
+    // from here on: lock, session, recents and the renderer all get it, so one
+    // project never shows under two spellings. The same value is the session's
+    // `realRoot`, so the commit below needs no second realpath.
+    let realRoot: string
+    try {
+      realRoot = normaliseRealRoot(
+        await step(realpath(resolvedPath), 'Project path resolution').catch(async (error) => {
+          if (error instanceof TimeoutError) throw error
+          // A plain folder that cannot be resolved falls back to its typed path;
+          // a link or junction whose target cannot be resolved is never opened
+          // unchecked, since where it leads is not known
+          const link = await lstat(resolvedPath).catch(() => null)
+          if (link?.isSymbolicLink()) {
+            throw new AppError(
+              'Cannot open a directory link whose target could not be resolved',
+              ErrorCode.SYMLINK_ATTACK
+            )
+          }
+          return resolvedPath
+        })
+      )
+    } catch (error) {
+      if (error instanceof TimeoutError) {
+        return {
+          success: false,
+          path: oldProjectPath || '',
+          action: 'noop',
+          error: error.message
+        }
+      }
+      if (error instanceof AppError) {
+        return {
+          success: false,
+          path: oldProjectPath || '',
+          action: 'noop',
+          error: `Security validation failed: ${error.message}`,
+          errorCode: error.code
+        }
+      }
+      throw error
+    }
+
+    // 1c. The project is the folder the path leads to, not the one it is named
+    // by: a link chain to a volume root or system folder must not open as a
+    // project. Checked before the lock, on the one realpath above.
+    try {
+      assertAcceptableProjectRoot(realRoot)
+    } catch (error) {
+      if (error instanceof AppError) {
+        logger.warn('Project switch: canonical root refused', {
+          code: error.code,
+          path: redactPath(realRoot)
+        })
+        return {
+          success: false,
+          path: oldProjectPath || '',
+          action: 'noop',
+          error: `Security validation failed: ${error.message}`,
+          errorCode: error.code
+        }
+      }
+      throw error
+    }
+    const newProjectPath = displayRootSpelling(resolvedPath, realRoot, process.platform)
 
     // 2. Check if same project (canonical comparison)
     if (openSnapshot) {
@@ -421,17 +489,6 @@ export class ProjectService {
         )
       }
 
-      // The canonical folder must be acceptable too: a link can lead a typed path to a volume
-      // root. Checked before the watchers stop, so a refusal leaves the open project as it was.
-      assertAcceptableProjectRoot(
-        normaliseRealRoot(
-          await step(realpath(newProjectPath), 'Project path resolution').catch((error) => {
-            if (error instanceof TimeoutError) throw error
-            return newProjectPath
-          })
-        )
-      )
-
       // 5. Stop all existing watchers before switching
       const watcherStopStart = performance.now()
       await this.stopAllWatchers()
@@ -465,13 +522,6 @@ export class ProjectService {
 
       const caseSensitive = getPlatformConfig().caseSensitive
       pathFilter = this.buildPathFilter(newProjectPath, projectSettings, caseSensitive)
-      const realRoot = normaliseRealRoot(
-        await step(realpath(newProjectPath), 'Project path resolution').catch((error) => {
-          if (error instanceof TimeoutError) throw error
-          return newProjectPath
-        })
-      )
-
       // 7. Commit: swap the session. The services take the new path, and the
       // settings cache the loaded settings, in `onChange`.
       this.settingsForCommit = projectSettings
