@@ -658,11 +658,11 @@ export class ClaudeStatusService {
     if (!entry) return
 
     const dir = transcriptDirFor(cwd)
-    if (entry.watchedDir === dir) return
-
-    if (entry.watchedDir) {
+    if (entry.watchedDir !== undefined && entry.watchedDir !== dir) {
       this.deps.watcher.unwatchDir(entry.watchedDir, terminalId)
     }
+    // Every refresh: a no-op for a live watch, and a re-arm for a folder that
+    // was missing (Claude creates it on the first message) or whose watch died
     this.deps.watcher.watchDir(dir, terminalId)
     entry.watchedDir = dir
   }
