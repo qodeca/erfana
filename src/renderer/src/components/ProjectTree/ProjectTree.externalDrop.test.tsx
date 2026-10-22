@@ -12,7 +12,7 @@ import { ProjectTree } from './ProjectTree'
 import { DialogProvider } from '../Dialog'
 import { ProjectManagementProvider } from '../../context/ProjectManagementContext'
 import { subscribeGlobalToasts, type GlobalToastPayload } from '../Toast/toastService'
-import { EXTERNAL_MOVE_BATCH_MAX } from '../../../../shared/ipc/external-file-limits'
+import { EXTERNAL_DROP_MAX } from './externalDropLimit'
 import type { ExternalDropFile } from '../../hooks/useExternalFileDrop'
 import type { FileNode } from '../../../../preload/index'
 
@@ -180,22 +180,32 @@ afterEach(() => {
 describe('ProjectTree external drop – file limit', () => {
   it('refuses a drop over the limit without asking Move / Copy first', async () => {
     await renderWithProject()
-    drop.files = droppedFiles(EXTERNAL_MOVE_BATCH_MAX + 1)
+    drop.files = droppedFiles(EXTERNAL_DROP_MAX + 1)
 
     await dropOnTree()
 
     await waitFor(() => {
-      expect(toasts).toContainEqual(expect.objectContaining({ title: 'Too many files', type: 'error' }))
+      expect(toasts).toContainEqual(
+        expect.objectContaining({
+          title: 'Too many files',
+          message: `Cannot add more than ${EXTERNAL_DROP_MAX} files at once. Please drop fewer files.`,
+          type: 'error'
+        })
+      )
     })
     expect(dialog.showDropMode).not.toHaveBeenCalled()
+    expect((window as any).api.import.isSupported).not.toHaveBeenCalled()
     expect(fileApi.validateExternal).not.toHaveBeenCalled()
     expect(fileApi.copyFromExternal).not.toHaveBeenCalled()
     expect(fileApi.moveBatchFromExternal).not.toHaveBeenCalled()
   })
 
   it('asks how to add a drop at the limit', async () => {
+    // Cancel the question, so no move or copy runs after the test (set before
+    // the render: the mocked useDialog reads it then)
+    dialog.showDropMode = vi.fn(async () => null)
     await renderWithProject()
-    drop.files = droppedFiles(EXTERNAL_MOVE_BATCH_MAX)
+    drop.files = droppedFiles(EXTERNAL_DROP_MAX)
 
     await dropOnTree()
 
@@ -203,5 +213,6 @@ describe('ProjectTree external drop – file limit', () => {
       expect(dialog.showDropMode).toHaveBeenCalledTimes(1)
     })
     expect(toasts).not.toContainEqual(expect.objectContaining({ title: 'Too many files' }))
+    expect(fileApi.validateExternal).not.toHaveBeenCalled()
   })
 })

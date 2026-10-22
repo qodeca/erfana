@@ -62,7 +62,8 @@ import { isTreeClipboardKeystroke, treeClipboardAction } from './treeClipboardSc
 import { isMacOS } from '../../utils/platform'
 import { useTreeFocusRecovery } from './useTreeFocusRecovery'
 import { fileGateway } from '../../services/fileGateway'
-import { moveExternalBatch, refuseOversizedDrop, type PendingExternalMove } from './externalMoveBatch'
+import { moveExternalBatch, type PendingExternalMove } from './externalMoveBatch'
+import { refuseOversizedDrop } from './externalDropLimit'
 
 interface ProjectTreeProps {
   onFileSelect: (filePath: string) => void
