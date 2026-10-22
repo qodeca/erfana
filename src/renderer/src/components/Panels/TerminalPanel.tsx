@@ -42,6 +42,7 @@ import { getBasename } from '../../utils/fileUtils'
 import { openFileInPanel } from '../../utils/openFileInPanel'
 import { resolvePanelKind } from '../../utils/resolvePanelKind'
 import { formatShortcut } from '../../utils/shortcutLabel'
+import { registerTestTerminal } from '../../testHooks/terminalTestHook'
 import { formatPathsForTerminal, escapePathForShell, type ShellKind } from '../../utils/shellPathEscape'
 import { logger } from '../../utils/logger'
 import { TEST_IDS } from '../../constants/testids'
@@ -52,12 +53,27 @@ import { isPointInElement } from '../../utils/domGeometry'
 import { TerminalStatusContent } from './TerminalPanel/components/TerminalStatusContent'
 import { ClaudeStatusBar } from './TerminalPanel/components/ClaudeStatusBar'
 import { useClaudeStatusStore } from '../../stores/useClaudeStatusStore'
+import { useOptionalDialog } from '../Dialog/DialogContext'
+import { getRestartRisk, buildRestartConfirm } from './TerminalPanel/restartGuard'
+import { createOutputAcker } from './TerminalPanel/outputAck'
 import { ensureTerminalFontLoaded, createTerminalLinkHandler } from './TerminalPanel/terminalPanel.logic'
 import type { TerminalState } from './TerminalPanel/types'
+import { fileGateway } from '../../services/fileGateway'
+import { terminalGateway } from '../../services/terminalGateway'
 
 export function TerminalPanel(_props: ISplitviewPanelProps) {
   const [isAvailable, setIsAvailable] = useState<boolean | null>(null)
   const [terminalId, setTerminalId] = useState<string | null>(null)
+  // Id whose terminal:data listener is attached, and clear confirmations waiting for it
+  const dataListeningIdRef = useRef<string | null>(null)
+  const clearConfirmWaitersRef = useRef(new Map<string, () => void>())
+  const confirmWhenDataListening = useCallback((id: string, confirm: () => void) => {
+    if (dataListeningIdRef.current === id) {
+      confirm()
+    } else {
+      clearConfirmWaitersRef.current.set(id, confirm)
+    }
+  }, [])
   const [error, setError] = useState<string | null>(null)
   const [recheckCooldown, setRecheckCooldown] = useState(false)
 
@@ -153,7 +169,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     // entry per closed terminal forever (#216).
     useClaudeStatusStore.getState().clearTerminal(id)
     try {
-      await window.api.terminal.kill(id)
+      await terminalGateway.kill(id)
     } catch (err) {
       logger.error('Failed to kill terminal', err instanceof Error ? err : undefined)
     }
@@ -253,6 +269,13 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
 
   // Portal context for rendering in DiagramViewer (optional - may not have provider yet)
   const portalContext = useTerminalPortalOptional()
+  // `showConfirm` only, not the whole context: the provider's value object is
+  // rebuilt on every dialog change, while `showConfirm` is a stable callback –
+  // depending on the object would re-register the portal terminal controls
+  // each time any dialog opens or closes.
+  const showConfirm = useOptionalDialog()?.showConfirm
+  // Latch for handleRestartRequest – see there.
+  const restartInProgressRef = useRef(false)
   const portalTarget = portalContext?.portalTarget ?? 'main'
   const mainContainerRef = useRef<HTMLDivElement>(null)
   const terminalPanelRef = useRef<HTMLDivElement>(null)
@@ -314,14 +337,14 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   // Fetch project path on mount and update when project changes
   useEffect(() => {
     const fetchProjectPath = async () => {
-      const path = await window.api.file.getProjectPath()
+      const path = await fileGateway.getProjectPath()
       setProjectPath(path)
     }
     fetchProjectPath()
 
     // Subscribe to project changes
-    const unsubscribe = window.api.file.onProjectChanged(async () => {
-      const path = await window.api.file.getProjectPath()
+    const unsubscribe = fileGateway.onProjectChanged(async () => {
+      const path = await fileGateway.getProjectPath()
       setProjectPath(path)
     })
 
@@ -330,7 +353,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
 
   async function checkAvailability() {
     try {
-      const result = await window.api.terminal.isAvailable()
+      const result = await terminalGateway.isAvailable()
       setIsAvailable(result.available)
     } catch (err) {
       logger.error('Failed to check terminal availability', err instanceof Error ? err : undefined)
@@ -628,18 +651,22 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
         fitAddon.fit()
       }, 50)
 
-      // Get project path for initial CWD
-      const projectPath = await window.api.file.getProjectPath()
-
       // Set up clear event handler BEFORE creating PTY to avoid race condition
       // The PTY immediately starts marker detection, so we must subscribe first
       let clearUnsubscribe: (() => void) | null = null
-      const handleClearForInit = (data: { terminalId: string }) => {
-        logger.info(`[INIT] Received clear event for terminal ${data.terminalId}`)
+      // The terminal id is only known once create resolves, but the clear event can
+      // arrive first. Clear events seen before that are held, and every clear event
+      // is checked against the id so another terminal's start-up cannot clear this one.
+      let createdId: string | null = null
+      const earlyClearIds = new Set<string>()
+      const runClear = (id: string) => {
+        logger.info(`[INIT] Received clear event for terminal ${id}`)
         // Write clear sequence with callback for deterministic confirmation
         xterm.write('\x1b[2J\x1b[3J\x1b[H', () => {
-          logger.info(`[INIT] Clear sequence complete, calling markClearComplete`)
-          window.api.terminal.markClearComplete(data.terminalId)
+          logger.info(`[INIT] Clear sequence complete, confirming once the data listener is attached`)
+          // Main flushes the shell output it held back as soon as it gets this
+          // confirmation, so the data listener must exist by then.
+          confirmWhenDataListening(id, () => terminalGateway.markClearComplete(id))
 
           // Cleanup this one-time handler
           if (clearUnsubscribe) {
@@ -648,7 +675,15 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
           }
         })
       }
-      clearUnsubscribe = window.api.terminal.onClear(handleClearForInit)
+      const handleClearForInit = (data: { terminalId: string }) => {
+        if (createdId === null) {
+          earlyClearIds.add(data.terminalId)
+          return
+        }
+        if (data.terminalId !== createdId) return
+        runClear(createdId)
+      }
+      clearUnsubscribe = terminalGateway.onClear(handleClearForInit)
 
       // Phase 1.3 bug fix: Register cleanup in case PTY creation fails
       registerCleanup(() => {
@@ -659,17 +694,21 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       })
 
       // Create PTY
-      const result = await window.api.terminal.create({
-        cwd: projectPath || undefined,
+      const result = await terminalGateway.create({
+        // No cwd: the project root is what a terminal opens in, and main reads it from
+        // the session, so a stale path during a project switch cannot fail the start
         cols: xterm.cols,
         rows: xterm.rows
       })
 
-      if (!result.success || !result.terminalId) {
+      if (!result.success) {
         throw new Error(result.error || 'Failed to create terminal')
       }
 
+      createdId = result.terminalId
       setTerminalId(result.terminalId)
+      if (earlyClearIds.has(result.terminalId)) runClear(result.terminalId)
+      registerCleanup(registerTestTerminal(result.terminalId, xterm))
       // Record the resolved shellKind so the screenshot path-paste quotes
       // correctly without an extra IPC (#164 round-2 F#1). Main always
       // returns a value when terminalId is present, but guard defensively.
@@ -691,7 +730,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
           store.markUserInput(result.terminalId)
           // Light Claude-status re-check on input (#216, debounced).
           nudgeClaudeStatus(result.terminalId)
-          window.api.terminal.write(result.terminalId, data)
+          terminalGateway.write(result.terminalId, data)
         }
       })
 
@@ -756,7 +795,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
 
   // Restart terminal on project change
   useEffect(() => {
-    const unsubscribe = window.api.file.onProjectChanged(async (data) => {
+    const unsubscribe = fileGateway.onProjectChanged(async (data) => {
       // Kill current terminal session (Phase 1.1 bug fix - use centralized cleanup)
       await cleanupTerminalInstance(terminalIdRef.current)
       shellKindRef.current = null
@@ -796,10 +835,23 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     // - Escape sequence detection (ED 2, ED 3) BEFORE write
     // - Buffer truncation detection AFTER write
     // - Smart recovery targeting user's reading position
+    // Flow control (finding [30]): xterm reports each batch once parsed, and the
+    // acker passes the totals to main, which pauses the PTY while we lag behind.
+    // A hidden window acks on receipt (see outputAck.ts), so a build or agent
+    // left running in the background is never held back by throttled parsing.
+    const acker = createOutputAcker(terminalId, terminalGateway.ackOutput)
+    // Per terminal, not a window-wide action: every mounted panel must release
+    // its own terminal's output, so no active-panel gate here
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') acker.releaseInFlight()
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
     const dataHandler = wrapOnDataHandler((data: { terminalId: string; data: string }) => {
-      if (data.terminalId === terminalId && xtermRef.current) {
+      if (data.terminalId !== terminalId) return
+      const parsed = acker.received(data.data.length, document.visibilityState === 'hidden')
+      if (xtermRef.current) {
         // Write data to terminal
-        xtermRef.current.write(data.data)
+        xtermRef.current.write(data.data, parsed)
 
         // Record recent activity (ignore warmup period noise)
         if (Date.now() >= warmupUntilRef.current) {
@@ -807,12 +859,21 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
           // Light Claude-status re-check on output (#216, debounced).
           nudgeClaudeStatus(terminalId)
         }
+      } else {
+        // No xterm to parse it: count it as handled, so main's count stays true
+        parsed?.()
       }
     })
 
-    const unsubscribeData = window.api.terminal.onData(dataHandler)
+    const unsubscribeData = terminalGateway.onData(dataHandler)
+    dataListeningIdRef.current = terminalId
+    const waiting = clearConfirmWaitersRef.current.get(terminalId)
+    if (waiting) {
+      clearConfirmWaitersRef.current.delete(terminalId)
+      waiting()
+    }
 
-    const unsubscribeExit = window.api.terminal.onExit((data) => {
+    const unsubscribeExit = terminalGateway.onExit((data) => {
       if (data.terminalId === terminalId) {
         logger.info(`Terminal exited with code ${data.exitCode}`)
         useTerminalStore.getState().clearActivity(terminalId)
@@ -820,7 +881,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       }
     })
 
-    const unsubscribeError = window.api.terminal.onError((data) => {
+    const unsubscribeError = terminalGateway.onError((data) => {
       if (data.terminalId === terminalId) {
         logger.error('Terminal error', undefined, { error: data.error })
         setError(data.error)
@@ -831,7 +892,12 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     // No need for duplicate handler here - clear only happens once during init
 
     return () => {
+      if (dataListeningIdRef.current === terminalId) dataListeningIdRef.current = null
+      clearConfirmWaitersRef.current.delete(terminalId)
       unsubscribeData()
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      // Writes still being parsed may never call back once the panel is gone
+      acker.releaseInFlight()
       unsubscribeExit()
       unsubscribeError()
     }
@@ -865,7 +931,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
           const rowsDiff = Math.abs(rows - lastRows)
 
           if ((colsDiff >= 2 || rowsDiff >= 1) && cols > 0 && rows > 0) {
-            window.api.terminal.resize(terminalId, cols, rows)
+            terminalGateway.resize(terminalId, cols, rows)
             lastCols = cols
             lastRows = rows
           }
@@ -917,7 +983,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
           const cols = Math.floor(xtermRef.current.cols)
           const rows = Math.floor(xtermRef.current.rows)
           if (cols > 0 && rows > 0) {
-            window.api.terminal.resize(terminalId, cols, rows)
+            terminalGateway.resize(terminalId, cols, rows)
           }
         }
       }, 50)
@@ -957,7 +1023,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
         const cols = Math.floor(xtermRef.current.cols)
         const rows = Math.floor(xtermRef.current.rows)
         if (cols > 0 && rows > 0) {
-          window.api.terminal.resize(terminalId, cols, rows)
+          terminalGateway.resize(terminalId, cols, rows)
         }
       }
     }, 50)
@@ -1040,7 +1106,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
 
       // Insert path to terminal with shell-safe escaping
       const quotedPath = escapePathForShell(filePath)
-      window.api.terminal.write(currentTerminalId, quotedPath)
+      terminalGateway.write(currentTerminalId, quotedPath)
 
       // Show success toast with filename only
       const filename = getBasename(filePath) || 'photo.jpg'
@@ -1091,6 +1157,34 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     }
   }, [setActiveTerminalId, isAvailable, cleanupDragHandlers, cleanupTerminalInstance])
 
+  /**
+   * User-facing restart: asks first when the terminal looks busy, because a
+   * restart kills whatever runs in it – including a coding agent mid-task
+   * (lens review [25]). Every user entry point (toolbar button, ChatBubble via
+   * the portal controls) goes through here, never straight to
+   * `handleRestartTerminal`.
+   *
+   * Without a DialogProvider (isolated component renders only – the app always
+   * mounts one) there is no way to ask, and the restart proceeds as before.
+   */
+  const handleRestartRequest = useCallback(async () => {
+    // One restart at a time. A second request while the first is still asking
+    // or tearing down (a double click, the ChatBubble button) would otherwise
+    // stack a second prompt or kill the freshly created session.
+    if (restartInProgressRef.current) return
+    restartInProgressRef.current = true
+    try {
+      const risk = await getRestartRisk(terminalIdRef.current)
+      if (risk !== null && showConfirm) {
+        const confirmed = await showConfirm(buildRestartConfirm(risk))
+        if (!confirmed) return
+      }
+      await handleRestartTerminal()
+    } finally {
+      restartInProgressRef.current = false
+    }
+  }, [showConfirm, handleRestartTerminal])
+
   const handleScrollToBottom = useCallback(() => {
     if (xtermRef.current) {
       xtermRef.current.scrollToBottom()
@@ -1136,7 +1230,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
 
     registerTerminalControls({
       scrollToBottom: handleScrollToBottom,
-      restart: handleRestartTerminal,
+      restart: handleRestartRequest,
       copy,
       paste,
       hasSelection: () => hasSelectionRef.current,  // Use ref to avoid re-registration on selection change
@@ -1147,7 +1241,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     return () => {
       unregisterTerminalControls()
     }
-  }, [registerTerminalControls, unregisterTerminalControls, terminalId, handleScrollToBottom, handleRestartTerminal, handleToggleScrollLock, copy, paste])
+  }, [registerTerminalControls, unregisterTerminalControls, terminalId, handleScrollToBottom, handleRestartRequest, handleToggleScrollLock, copy, paste])
 
   // Register lastUserScrollTsRef with portal context (issue #52)
   // Allows components to check if user scrolled during prompt execution delay
@@ -1304,7 +1398,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
                 </button>
                 <button
                   className="icon-btn"
-                  onClick={handleRestartTerminal}
+                  onClick={() => void handleRestartRequest()}
                   title="Restart terminal"
                   aria-label="Restart terminal"
                   data-testid={TEST_IDS.TERMINAL_BTN_RESTART}

@@ -160,7 +160,7 @@ export const test = base.extend<GitProjectFixtures>({
     // pattern as windowWithTestProject in index.ts).
     await window.evaluate(async (projectPath: string) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (window as any).api.file.openProjectByPath(projectPath)
+      await (window as any).api.file.openProjectByPath({ projectPath })
     }, gitTestProject.path)
 
     await byTestId(window, TEST_IDS.PROJECT_TREE).waitFor({ state: 'visible', timeout: 15000 })

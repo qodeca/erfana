@@ -39,6 +39,16 @@
   column header. Anything a reader has to actually read starts at <code>--text-base</code>.
 </div>
 
+<h2>Document size</h2>
+<div id="prose"></div>
+<div class="ds-note">
+  <strong><code>--text-prose</code> is not an eighth step of the scale above.</strong> It is the body
+  size of rendered <em>document</em> content — the Markdown preview — which a reader stays in for
+  minutes, not a label they glance at. It used to be typed by hand as a literal in
+  <code>MarkdownPreview.css</code>; naming it keeps the one size outside the UI scale visible instead of
+  hidden. Headings inside the preview scale from it in <code>em</code>. Chrome never uses it.
+</div>
+
 <h2>Weights</h2>
 <div id="weights"></div>
 
@@ -103,6 +113,7 @@ function row(host, token, note, style) {
 }
 
 for (const [token, note] of SIZES) row(document.getElementById('sizes'), token, note, { fontSize: `var(${token})` });
+row(document.getElementById('prose'), '--text-prose', 'Rendered document body', { fontSize: 'var(--text-prose)', fontFamily: 'var(--font-serif)' });
 for (const [token, note] of WEIGHTS) row(document.getElementById('weights'), token, note, { fontWeight: `var(${token})`, fontSize: 'var(--text-md)' });
 for (const [token, note] of LEADING) row(document.getElementById('leading'), token, note, { lineHeight: `var(${token})`, fontSize: 'var(--text-base)' });
 </script>

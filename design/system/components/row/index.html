@@ -219,6 +219,25 @@
   </tbody>
 </table>
 
+<h2>Exceptions</h2>
+<p style="max-width: 72ch; color: var(--color-text-tertiary)">
+  Where the shipping component departs from this card, with the reason. An undocumented deviation is a
+  bug; a documented one is a decision.
+</p>
+<table>
+  <thead><tr><th>Where</th><th>The card</th><th>The component, and why</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Welcome tab, recent projects</td>
+      <td>Tab enters the list once — not once per row.</td>
+      <td>The list is one Tab stop for opening, plus the active row's Remove button as a second stop.
+        Removing a project then needs no extra shortcut to learn, and every other row's Remove stays out
+        of the Tab order, so the cost does not grow with the list. Arrows, Home and End move between rows
+        as the card says. See <code>WelcomePanel.tsx</code> (PR #286).</td>
+    </tr>
+  </tbody>
+</table>
+
 <script>
 const FILES = [
   { name: 'README.md', git: null, kind: 'file' },

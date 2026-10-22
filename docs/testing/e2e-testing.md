@@ -64,19 +64,74 @@ ERFANA_TEST_BUILD=true npm run build:mac
 | Production | Disabled (fuse) | Distribution to users |
 | Test | Enabled | Playwright debugging, E2E tests |
 
+### Headless on Linux in Docker
+
+The `electron` project also runs on Linux under xvfb (a virtual X screen), inside Docker, so a run needs no visible window and does not take over the Mac. Docker Desktop must be running.
+
+```bash
+# Whole functional suite (--project=electron is added when you pass no --project)
+npm run test:e2e:linux
+
+# Any Playwright arguments pass through
+npm run test:e2e:linux -- e2e/editor-save.e2e.ts -g "Autosave"
+```
+
+What `scripts/e2e-linux.sh` does:
+
+1. Builds the image from `e2e/docker/Dockerfile` for the host's native architecture (arm64 on Apple Silicon, amd64 elsewhere): Node 24, the Electron runtime libraries, xvfb plus the openbox window manager, real `bash` and `zsh`, `git`, Python 3.12 and a C++ toolchain for node-pty.
+2. Mounts the repo read-write at `/work`, running as your own user id (HOME is `/tmp/home`). `node_modules`, `out/` and the npm download cache live in **named Docker volumes** (`erfana-e2e-node-modules-<hash>`, `erfana-e2e-out-<hash>`, `erfana-e2e-npm-cache-<hash>`), so the macOS copies on the host are never touched. The image tag carries the same hash.
+3. Runs `npm ci` (never `npm install`), runs `npx electron-vite build`, then `xvfb-run -a … npx playwright test <args>` (`e2e/docker/run-suite.sh`). The script compares the hash of `package-lock.json` before and after and fails if it changed; the suite's own exit code wins when both fail.
+4. Writes the HTML report and the test results straight to `.local/e2e-linux/` (git-ignored, emptied at the start of every run); the repo-root `playwright-report/` and `test-results/` are not used.
+
+The first run takes a few minutes longer (image build, `npm ci`, native rebuild); later runs reuse the volumes. A full run takes about 8 minutes on an Apple Silicon Mac.
+
+`--no-sandbox` is not needed: Playwright's `electron.launch` adds it itself unless `chromiumSandbox: true` is passed, and nothing in the app code or the fixtures changes for the container. The one environment change the fixtures needed is `XAUTHORITY` in the env allowlist (`e2e/fixtures/isolation.ts`): `xvfb-run` protects its display with an auth file, and without the variable the app cannot open the display.
+
+The script sets `ERFANA_E2E_LINUX_CONTAINER=1`. Tests read it only through `IS_LINUX_CONTAINER` (`e2e/utils/linux-container.ts`); no app code does.
+
+**Not run in the container**
+
+- The `visual` project: its baselines are `-darwin` PNGs (see `snapshotPathTemplate`), and there are no Linux baselines.
+- The `transcription` project: needs `ERFANA_E2E_TRANSCRIPTION=1` and an API key, as everywhere.
+
+**Skipped or adapted in the container**
+
+| Test | What happens | Why |
+|------|--------------|-----|
+| `html-preview-drag-freeze.e2e.ts` › "should keep the page hidden for the rest of the drag…" | skipped (#299) | Under xvfb the page reports drawn again after every move once the freeze engaged (8 of 8 steps). Possible Linux app bug, not confirmed on a real desktop. |
+| `html-preview-drag-freeze.e2e.ts` › "should leave the terminal / project tree sash at the pointer…" (2 tests) | skipped (#299) | Same finding: the page is not reliably hidden during a sash drag under xvfb (failed in the last run, passed in earlier ones). |
+| `context-menu-explain.e2e.ts` › "Editor: right-click shows menu with disabled Explain…" | skipped (#299) | Explain is already enabled at the first right-click under xvfb, so a selection exists. Cause not isolated. |
+| `html-preview-drag-freeze.e2e.ts` › "should show the page on its settled area when a fast drag ends…" | skipped on every non-macOS host | Existing skip, unrelated to the container. |
+
+Two test helpers behave differently in the container, both safe on macOS and Windows:
+
+- `MonacoPage.focus()` and `waitForCursor()` no longer wait for the cursor to be *visible* (it blinks, so a 2 s poll can see only hidden phases); `focus()` waits for Monaco's `focused` class, clicking again until it takes, after waiting for the editor to be laid out.
+- `TerminalPage.waitForPrompt()` presses Enter once when the screen is still blank after 3 s, in the container only. See the app finding below.
+
+**Findings about the app on Linux** (reported, not fixed; tracked in #299)
+
+- **Blank terminal after start.** `TerminalService` drops all pty output while `isClearing` is set (the clear handshake). A shell that is quick enough draws its first prompt inside that window, and the terminal then stays blank until the first keystroke. It showed up in 2 to 6 terminal-opening tests per container run. It can happen on any platform with a fast shell; the container only makes it frequent.
+- **Splitter drag freeze.** See the first row of the table above.
+
+**Environment notes**
+
+- `/bin/sh` is linked to bash in the image. `ERFANA_E2E_FAST_SHELL` tests exec `/bin/sh -i`, which is bash on macOS; Ubuntu's dash made the blank-terminal race above more likely.
+- Without a window manager Monaco-heavy specs lose focus and window maximize does nothing, so `e2e/docker/run-under-xvfb.sh` starts openbox before Playwright.
+
 ---
 
 ## Playwright configuration
 
 Create `playwright.config.ts` in the project root:
 
-Three Playwright projects are configured:
+Four Playwright projects are configured:
 
 | Project | Test match | Retries | Purpose |
 |---------|-----------|---------|---------|
 | `electron` | `**/*.e2e.ts` (ignores `visual-regression*` and `audio-transcription*`) | 2 on CI, 0 locally | Functional E2E tests |
 | `transcription` | `**/audio-transcription*.e2e.ts` | 2 on CI, 0 locally | Env-gated: runs only with `ERFANA_E2E_TRANSCRIPTION=1` (real, paid OpenAI calls) |
 | `visual` | `**/visual-regression.e2e.ts` | 0 | Screenshot comparison (diffs must be investigated) |
+| `bench` | `**/*.bench.ts` | 0 | Env-gated: runs only with `ERFANA_E2E_BENCH=1`. Records performance numbers rather than asserting behaviour – see [docs/performance/](../performance/) (e.g. the [preview typing benchmark](../performance/2026-10-21-deferred-preview.md)) |
 
 Visual project settings: `snapshotDir: './e2e/screenshots'`, `snapshotPathTemplate: '{snapshotDir}/{arg}-{platform}{ext}'`, `maxDiffPixelRatio: 0.01`, `animations: 'disabled'`.
 
@@ -109,9 +164,9 @@ Located in `e2e/pages/`:
 |-------|---------|
 | `KeyboardHelper` | Platform-aware keyboard shortcuts (Cmd/Ctrl abstraction) |
 | `TerminalPage` | Terminal interactions – `waitForPrompt()`, `sendCommand()`, `waitForOutput()` |
-| `MonacoPage` | Editor interactions – `waitForReady()`, `focus()`, `setContent()`, `getContent()`, `visibleText()` |
+| `MonacoPage` | Editor interactions – `waitForReady()`, `focus()`, `setContent()`, `typeWithoutWaiting()` (insert at the cursor with no waits, for edits followed at once by another action), `getContent()`, `visibleText()` |
 | `MermaidPage` | Mermaid diagram interactions |
-| `ProjectTreePage` | Project tree navigation, git decorations, toolbar buttons, and the row context menu – `fileRow()` / `folderRow()`, `waitForFile()` / `waitForFileGone()`, `newFileButton()` / `newFolderButton()` / `refreshButton()` / `closeProjectButton()`, `emptyState()`, `openContextMenu()` / `contextMenuItem()` / `runContextMenuAction()` |
+| `ProjectTreePage` | Project tree navigation, git decorations, toolbar buttons, and the row context menu – `fileRow()` / `folderRow()`, `waitForFile()` / `waitForFileGone()`, `newFileButton()` / `newFolderButton()` / `refreshButton()` / `closeProjectButton()`, `emptyState()`, `openContextMenu()` / `contextMenuItem()` / `runContextMenuAction()`, and the Welcome-tab recents – `recentProject(name)` / `switchToRecent(name)` |
 | `DialogPage` | The modal surfaces – `ConfirmDialog` (`waitForConfirm()`, `accept()`, `decline()`) and the shared name-entry dialog behind New File / New Folder / Rename (`waitForNameEntry()`, `nameInput()`, `submitName()`, `validationError()`). The confirm dialog has testids; `FileSystemDialog` has none, so its controls are addressed by role and visible label |
 | `TabBarPage` | Editor tab bar – `tab(fileName)`, `activeTab()`, `dirtyDot()`, `closeButton()`, `welcomeTab()`, `waitForTab()` / `waitForTabGone()`, `expectActive()`, `activate()`, `runContextMenuAction()` (Close / Close Others / Close All). Tabs are addressed by the filename they display, not by their path-hashed testid |
 | `EditorPanelPage` | Markdown editor panel – the four view modes (`setViewMode()`, `isViewModeActive()`), the formatting buttons (`format()`), the status indicators (`modifiedIndicator()`, `autosaveIndicator()`, `reloadIndicator()`), the stats bar, and the file-conflict notification |

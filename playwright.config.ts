@@ -83,6 +83,18 @@ export default defineConfig({
       grepInvert: process.env.ERFANA_E2E_TRANSCRIPTION === '1' ? undefined : /./,
     },
     {
+      // Env-gated performance benchmarks (`*.bench.ts`). They record numbers
+      // rather than assert behaviour, take minutes, and are only meaningful on
+      // an otherwise idle machine, so they never run with the suite.
+      // Enable with: ERFANA_E2E_BENCH=1 npx playwright test --project=bench
+      // Records: docs/performance/.
+      name: 'bench',
+      testMatch: '**/*.bench.ts',
+      fullyParallel: false,
+      retries: 0,
+      grepInvert: process.env.ERFANA_E2E_BENCH === '1' ? undefined : /./,
+    },
+    {
       name: 'visual',
       testMatch: '**/visual-regression.e2e.ts',
       retries: 0, // Visual diffs must be investigated, not retried (spec 019-FR-003)

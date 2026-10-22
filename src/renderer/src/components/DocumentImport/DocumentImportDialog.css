@@ -122,11 +122,10 @@
   border-color: var(--color-border-subtle);
 }
 
-.doc-import-language-select:focus,
-.doc-import-dpi-select:focus {
-  outline: none;
-  border-color: var(--color-border-focus);
-  box-shadow: var(--shadow-focus);
+.doc-import-language-select:focus-visible,
+.doc-import-dpi-select:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
 }
 
 .doc-import-language-select:disabled,

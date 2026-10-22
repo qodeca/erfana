@@ -3,6 +3,10 @@
 import { create, type StoreApi, type UseBoundStore } from 'zustand'
 import type { ITerminalOperations } from '../interfaces/ITerminalOperations'
 import { logger } from '../utils/logger'
+import { terminalGateway } from '../services/terminalGateway'
+
+/** Shortest gap between two recorded activity timestamps for one terminal. */
+export const ACTIVITY_THROTTLE_MS = 250
 
 interface TerminalStore {
   // Active terminal ID (null if no terminal is active)
@@ -47,9 +51,15 @@ export function createTerminalStore(
     return get().activeTerminalId
   },
 
+  // Called for every batch of output, so a flood would clone the Map and notify
+  // every subscriber hundreds of times a second. The readers compare against
+  // windows of seconds, so a timestamp up to ACTIVITY_THROTTLE_MS old is as good.
   markActivity: (id: string) => {
+    const now = Date.now()
+    const previous = get().activityById.get(id)
+    if (previous !== undefined && now >= previous && now - previous < ACTIVITY_THROTTLE_MS) return
     const map = new Map(get().activityById)
-    map.set(id, Date.now())
+    map.set(id, now)
     set({ activityById: map })
   },
 
@@ -115,6 +125,12 @@ export function createTerminalStore(
         return false
       }
 
+      // Programmatic input counts as user input: a prompt the app sent on the
+      // user's behalf (prompt sends, drag-and-drop, ProjectTree actions) starts
+      // work just as typing does, and the restart and quit guards must see it.
+      get().markUserInput(terminalId)
+      get().markActivity(terminalId)
+
       // If autoExecute is enabled, send Enter key after a short delay
       // IMPORTANT: The 200ms delay is REQUIRED - atomic writes don't work reliably
       // This accounts for: PTY buffering + shell line discipline processing + rendering
@@ -158,7 +174,7 @@ let _defaultStore: ReturnType<typeof createTerminalStore> | null = null
 
 function getDefaultStore() {
   if (!_defaultStore) {
-    _defaultStore = createTerminalStore(window.api.terminal)
+    _defaultStore = createTerminalStore(terminalGateway)
   }
   return _defaultStore
 }

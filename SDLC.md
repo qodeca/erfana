@@ -633,7 +633,7 @@ The file kinds and their rules are in `.xezar/docs/campaign-notes.md`.
 | Fact | Value |
 |---|---|
 | Product | Erfana: an agent-native Markdown workspace – an Electron app that runs a terminal coding agent beside the editor |
-| Stack | Electron 39, TypeScript strict, React and Zustand, Monaco, dockview, node-pty, Vitest, Playwright-Electron, electron-builder; GPL-3.0-only with REUSE/SPDX headers and a CLA |
+| Stack | Electron 44, TypeScript strict, React and Zustand, Monaco, dockview, node-pty, Vitest, Playwright-Electron, electron-builder; GPL-3.0-only with REUSE/SPDX headers and a CLA |
 | Tracker | GitHub issues and pull requests, `qodeca/erfana` (public). Before filing, editing or closing an issue: `docs/claude-code/github-issues-protocol.md` |
 | Pipeline | Xezar. The leader is the session started with `./scripts/xezar-leader.sh`; its rules are in `.xezar/docs/leader-guide.md`. Local kit changes: `.xezar/LOCAL-PATCHES.md` |
 | Machine sources | `.xezar/pipeline/config.json`, `.xezar/pipeline/labels.json`, `.xezar/routing.json`, `.xezar/loops.json` |

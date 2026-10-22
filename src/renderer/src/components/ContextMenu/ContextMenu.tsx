@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { useEffect, useRef, ReactNode } from 'react'
+import { useEffect, useRef, useState, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { TEST_IDS } from '../../constants/testids'
 import { useOccluder } from '../../hooks/useOccluder'
+import { useOverlayStackEntry } from '../../hooks/useOverlayStackEntry'
 import './ContextMenu.css'
 
 export interface ContextMenuItem {
@@ -30,6 +31,15 @@ interface ContextMenuProps {
 export function ContextMenu({ x, y, items, onClose, containerTestId }: ContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null)
   const openTimeRef = useRef<number>(Date.now())
+  // What had focus when the menu opened (the right-clicked tree row, say),
+  // captured on the first render. Menu items are not focusable, so the click
+  // that picks one drops focus to <body>; handing focus back BEFORE the action
+  // runs means a dialog the action opens records the real opener and can
+  // return focus there when it closes.
+  const [opener] = useState<HTMLElement | null>(() => {
+    const active = document.activeElement
+    return active instanceof HTMLElement && active !== document.body ? active : null
+  })
   const portalRoot = document.getElementById('portal-root')
 
   // Occlude the live preview view for this menu's whole lifetime (item 66). The
@@ -42,6 +52,22 @@ export function ContextMenu({ x, y, items, onClose, containerTestId }: ContextMe
   // This prevents openTimeRef from being reset when context value updates
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
+
+  // Escape goes through the shared overlay stack (#229) rather than a private
+  // document listener: a private listener fired alongside every other
+  // overlay's on the same keystroke, and – because it never stopped the event
+  // – also let Escape through to the focused control underneath (the terminal,
+  // where a stray Escape interrupts a running agent).
+  useOverlayStackEntry(menuRef, {
+    active: true,
+    // The token `.context-menu` paints with: a menu paints above dialogs, so
+    // it is also the overlay that takes Escape first.
+    zIndex: '--z-context-menu',
+    onEscape: onClose,
+    // A menu is transient chrome, not a modal: a trapping dialog beneath it
+    // (a menu opened inside one) must keep its Tab trap and focus rescue.
+    modal: false
+  })
 
   useEffect(() => {
     // Record when menu was opened to ignore the opening click
@@ -57,21 +83,13 @@ export function ContextMenu({ x, y, items, onClose, containerTestId }: ContextMe
       }
     }
 
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onCloseRef.current()
-      }
-    }
-
     // Use capture phase to catch events before any stopPropagation in children
     // Add immediately (no delay) - timestamp check handles the opening click
     document.addEventListener('mousedown', handleClickOutside, { capture: true })
-    document.addEventListener('keydown', handleEscape, { capture: true })
 
     return () => {
       // Must match capture option when removing
       document.removeEventListener('mousedown', handleClickOutside, { capture: true })
-      document.removeEventListener('keydown', handleEscape, { capture: true })
     }
   }, []) // Empty deps - only run on mount/unmount
 
@@ -117,6 +135,7 @@ export function ContextMenu({ x, y, items, onClose, containerTestId }: ContextMe
 
   const handleItemClick = (item: ContextMenuItem) => {
     if (!item.separator && !item.disabled) {
+      if (opener?.isConnected) opener.focus()
       item.action()
       onClose()
     }

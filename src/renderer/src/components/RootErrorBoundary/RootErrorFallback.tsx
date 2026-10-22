@@ -8,12 +8,14 @@
  * disclosure — never as HTML, never in the heading.
  *
  * RESTART SAFETY INVARIANT. Relaunching after a crash is only safe because
- * Erfana does NOT auto-restore the last project on start-up — see the
- * "Load last project on mount - DISABLED" effect in
- * `src/renderer/src/hooks/useProjectManagement.ts:75`. Were that ever re-enabled,
+ * Erfana does NOT auto-restore the last project on start-up — nothing in the
+ * renderer asks for it (the `file:getLastProjectPath` channel is gone), and the
+ * mount effect in `src/renderer/src/hooks/useProjectManagement.ts` opens
+ * nothing. Were restore ever re-added,
  * restarting after a crash *caused by* a project would reopen that project and
  * crash again, in a loop. Rather than depend on the coupling, Restart calls
- * `window.api.file.closeProject()` best-effort (clearing `lastProjectPath`) before
+ * `fileGateway.closeProject()` best-effort (which forgets the saved last
+ * project path) before
  * `relaunchApp()`. That call is BOUNDED, not merely wrapped: after a crash the
  * main process may never answer, and a rejection, a hang, and a success all have
  * to end at the relaunch — so it races a
@@ -44,6 +46,7 @@ import { TEST_IDS } from '../../constants/testids'
 import { textClipboard } from '../../services/textClipboard'
 import { formatErrorReport, type ErrorDetails } from './errorDetails'
 import './RootErrorBoundary.css'
+import { fileGateway } from '../../services/fileGateway'
 
 /** Copy deck (design §2.3). */
 const HEADING = 'Erfana stopped unexpectedly.'
@@ -140,7 +143,7 @@ function isCallable(method: unknown): boolean {
 }
 
 /**
- * Clear `lastProjectPath` before a relaunch, without ever blocking it.
+ * Forget the saved last project path before a relaunch, without ever blocking it.
  *
  * Three outcomes, one behaviour. A resolution is the happy path; a rejection is
  * ignored (the restart-safety invariant in the module docblock explains why the
@@ -156,7 +159,7 @@ async function closeProjectBestEffort(): Promise<void> {
   // a broken bridge is caught here too.
   const closed = (async () => {
     try {
-      await window.api?.file?.closeProject?.()
+      await fileGateway.closeProject()
     } catch {
       /* intentionally ignored — see the restart-safety invariant above */
     }

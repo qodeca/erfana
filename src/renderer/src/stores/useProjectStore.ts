@@ -10,12 +10,14 @@ interface ProjectState {
   editorPanelIds: Set<string>
   dirtyPanelIds: Set<string>
   isProjectChanging: boolean
+  /** What the blocker says while the project is changing; null for its default text */
+  projectChangingMessage: string | null
   setDockviewApi: (api: DockviewApi | null) => void
   registerEditorPanel: (id: string) => void
   setEditorDirty: (id: string, dirty: boolean) => void
   hasDirtyEditors: () => boolean
   clearAllEditorTabs: () => void
-  setProjectChanging: (changing: boolean) => void
+  setProjectChanging: (changing: boolean, message?: string) => void
 }
 
 export const useProjectStore = create<ProjectState>((set, get) => ({
@@ -23,8 +25,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   editorPanelIds: new Set<string>(),
   dirtyPanelIds: new Set<string>(),
   isProjectChanging: false,
+  projectChangingMessage: null,
   setDockviewApi: (api) => set({ dockviewApi: api }),
-  setProjectChanging: (changing: boolean) => set({ isProjectChanging: changing }),
+  setProjectChanging: (changing: boolean, message?: string) =>
+    set({ isProjectChanging: changing, projectChangingMessage: changing ? (message ?? null) : null }),
   registerEditorPanel: (id: string) => {
     const next = new Set(get().editorPanelIds)
     next.add(id)

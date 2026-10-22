@@ -37,6 +37,7 @@ import {
   ProjectTreePage,
   byTestId
 } from './utils/helpers'
+import { expectToStayVisible } from './utils/wait-helpers'
 
 const execFileAsync = promisify(execFile)
 
@@ -167,8 +168,7 @@ test.describe('Git status badge auto-refresh on editor save', () => {
       // Catches a regression where status flips back to "clean" after a
       // brief flash (cooldown race, stale store update overwriting fresh
       // state) — a fleeting render would otherwise satisfy toBeVisible.
-      await window.waitForTimeout(500)
-      await expect(modifiedBadge).toBeVisible()
+      await expectToStayVisible(modifiedBadge, 500)
 
       // Assert the badge content — a regression that changes the status
       // letter to 'A' (added), 'U' (untracked), or '!' (conflicted) would

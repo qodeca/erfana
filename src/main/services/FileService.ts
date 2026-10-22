@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { readdir, readFile, writeFile, stat, rm, mkdir, rename as fsRename, cp, copyFile } from 'fs/promises'
-import { join, extname, basename, relative, resolve as resolvePath } from 'path'
-import type { IFileService, WriteFileOptions } from '../interfaces/IFileService'
+import { readdir, readFile, writeFile, stat, realpath, rm, mkdir, rename as fsRename, cp, copyFile } from 'fs/promises'
+import { join, extname, basename, relative, sep, resolve as resolvePath } from 'path'
+import type { IFileService } from '../interfaces/IFileService'
 import { SymlinkDetector } from '../utils/SymlinkDetector'
 import { RollbackHandler } from '../utils/RollbackHandler'
 import { assertValidUserFilename } from '../utils/validateFilename'
@@ -24,8 +24,11 @@ import { redactPath } from '../utils/redactUserInput'
 import { logger } from './LoggingService'
 import { atomicWriteText, isAtomicTempName } from '../utils/atomicWrite'
 import { IMAGE_EXTENSIONS, readImage } from './file/imageRead'
-import { restoreParentDirectory } from './file/restoreParentDirectory'
+import { childPath } from '../utils/childPath'
+import { isInsideRoot, isSamePath, normaliseResolved } from '../utils/pathCompare'
+import { getPlatformConfig } from './watcher/PlatformConfig'
 import type { ImageReadResponse } from '../../shared/ipc/file-image-schema'
+import type { ProjectSession } from './session/ProjectSession'
 import type { FileNode } from '../../shared/ipc/file-schema'
 
 export type { FileNode }
@@ -108,17 +111,42 @@ interface WalkScope {
   /** Collects walk hints; set only when the walk's base is the project root. */
   readonly hints: WalkHintCollector | null
   excludedEntryCount: number
+  /** Real folders already entered through a link in this walk (case-folded key) */
+  readonly enteredLinkTargets: Set<string>
 }
 
 /** One folder of a walk. */
 interface WalkDir {
   readonly path: string
+  /**
+   * Where the folder is read when that differs from `path`: the real folder of
+   * a link, or a folder below one. Node paths are always built from `path`.
+   */
+  readonly readPath?: string
   readonly depth: number
   /** Project-relative, `/`-separated; null when no filter applies. */
   readonly rel: string | null
   /** This folder or an ancestor is dropped by the filter: no hints below it. */
   readonly dropped: boolean
+  /**
+   * Real folders of the links this folder was reached through, outermost first.
+   * Empty for a folder reached by plain folders only.
+   */
+  readonly linkChain?: readonly string[]
 }
+
+/**
+ * Folder links (junctions, directory symlinks) a walk follows one inside the
+ * other. A deeper chain is shown as a folder but not entered.
+ */
+export const MAX_LINK_DEPTH = 8
+
+/**
+ * Folder links one walk enters in all. Each real folder is entered once, and
+ * past this many the remaining links show as folders but are not entered, so
+ * a tree of folders linked to each other costs a bounded walk.
+ */
+export const MAX_ENTERED_LINKS = 200
 
 /** A walk's scope and its first folder – null when the base itself is excluded. */
 interface WalkPlan {
@@ -174,6 +202,7 @@ const matcherOverruns = (scope: WalkScope): number =>
 
 export class FileService implements IFileService {
   private projectPath: string | null = null
+  private session: Pick<ProjectSession, 'current'> | null = null
   private symlinkDetector = new SymlinkDetector()
   private rollbackHandler = new RollbackHandler()
 
@@ -192,9 +221,6 @@ export class FileService implements IFileService {
   // key → readId of the walk now running, for the "joined" log line
   private readonly activeReadIds = new Map<string, number>()
   private readSequence = 0
-  private readonly projectChangeListeners = new Set<
-    (oldPath: string | null, newPath: string | null) => void
-  >()
 
   /**
    * Set custom hidden patterns (called by ProjectService after loading settings)
@@ -225,46 +251,13 @@ export class FileService implements IFileService {
   }
 
   setProjectPath(path: string): void {
-    const previousPath = this.projectPath
     this.projectPath = path
     this.hasLoggedPatterns = false
-
-    if (previousPath === path) {
-      return
-    }
-    // Notify on a REAL change only. Subscribers tear down per-project state
-    // (the HTML preview destroys every live view), so re-setting the same path
-    // must not churn them.
-    for (const listener of [...this.projectChangeListeners]) {
-      try {
-        listener(previousPath, path)
-      } catch (error) {
-        logger.error(
-          'FileService: project-change listener threw',
-          error instanceof Error ? error : undefined
-        )
-      }
-    }
   }
 
-  /**
-   * Subscribe to project-root changes.
-   *
-   * Added for the HTML preview's main-side teardown (sd-074b §4.9): the preview
-   * handlers accepted a `subscribeProjectChanged` seam from the start, but no
-   * producer existed, so the belt-and-braces teardown on project switch never
-   * fired and relied entirely on the renderer sending `preview:close`.
-   *
-   * @param listener - Called with the previous and new project path.
-   * @returns An unsubscribe function.
-   */
-  onProjectPathChanged(
-    listener: (oldPath: string | null, newPath: string | null) => void
-  ): () => void {
-    this.projectChangeListeners.add(listener)
-    return () => {
-      this.projectChangeListeners.delete(listener)
-    }
+  /** The open-project session, read for the root's canonical form (see `isProjectRoot`) */
+  bindSession(session: Pick<ProjectSession, 'current'>): void {
+    this.session = session
   }
 
   getProjectPath(): string | null {
@@ -387,7 +380,8 @@ export class FileService implements IFileService {
       hiddenPatterns,
       filter: baseRel === null ? null : filter,
       hints: baseRel === '' ? new WalkHintCollector() : null,
-      excludedEntryCount: 0
+      excludedEntryCount: 0,
+      enteredLinkTargets: new Set<string>()
     }
     if (baseRel !== null && baseRel !== '' && scope.filter?.isExcluded(baseRel)) {
       scope.excludedEntryCount = 1
@@ -422,12 +416,12 @@ export class FileService implements IFileService {
   }
 
   private async _readDirectoryInternal(dir: WalkDir, scope: WalkScope): Promise<FileNode[]> {
-    const entries = await readdir(dir.path, { withFileTypes: true })
+    const entries = await readdir(dir.readPath ?? dir.path, { withFileTypes: true })
     const nodes: FileNode[] = []
 
     for (const entry of entries) {
       const rel = dir.rel === null ? null : joinRelative(dir.rel, entry.name)
-      const isDirectory = entry.isDirectory()
+      let isDirectory = entry.isDirectory()
       // Skip hidden (.erfana/settings.json) and excluded (files.exclude) entries
       if (isSkippedEntry(entry.name, rel, scope)) {
         if (isDirectory && rel !== null && !dir.dropped) scope.hints?.add(rel, dir.depth + 1)
@@ -435,6 +429,13 @@ export class FileService implements IFileService {
       }
 
       const fullPath = join(dir.path, entry.name)
+      // A junction or directory symlink reads as a link, not a folder: it is a
+      // folder row only when its target is a folder inside the project
+      let linkTarget: string | null = null
+      if (!isDirectory && this.symlinkDetector.checkDirent(entry)) {
+        linkTarget = await this.resolveFolderLink(fullPath)
+        isDirectory = linkTarget !== null
+      }
       const node: FileNode = {
         name: entry.name,
         path: fullPath,
@@ -451,7 +452,10 @@ export class FileService implements IFileService {
 
       // Recursively read subdirectories for markdown files
       if (node.type === 'directory') {
-        node.children = await this.readChildDirectory(fullPath, rel, dir, scope)
+        node.children =
+          linkTarget === null
+            ? await this.readChildDirectory(fullPath, rel, dir, scope)
+            : await this.readLinkedDirectory(fullPath, linkTarget, rel, dir, scope)
       }
 
       nodes.push(node)
@@ -464,6 +468,87 @@ export class FileService implements IFileService {
       }
       return a.name.localeCompare(b.name)
     })
+  }
+
+  /**
+   * The real folder a link leads to, when it is a folder inside the open
+   * project; null for everything else (a file link, a broken link, a link out
+   * of the project, no project open), which stay file rows as before. The
+   * walk therefore never follows a link out of the project.
+   */
+  private async resolveFolderLink(linkPath: string): Promise<string | null> {
+    const snapshot = this.session?.current() ?? null
+    if (!snapshot) return null
+    try {
+      if (!(await stat(linkPath)).isDirectory()) return null
+      const target = normaliseResolved(await realpath(linkPath))
+      return isInsideRoot(target, snapshot.realRoot, snapshot.caseSensitive) ? target : null
+    } catch {
+      return null
+    }
+  }
+
+  /**
+   * Whether the project-relative path of a link's real target passes through a
+   * hidden name or an excluded entry, so a link cannot show what the tree hides.
+   */
+  private isHiddenOrExcludedTarget(target: string, realRoot: string, scope: WalkScope): boolean {
+    const segments = relative(realRoot, target).split(sep).filter(Boolean)
+    let rel = ''
+    for (const segment of segments) {
+      rel = joinRelative(rel, segment)
+      if (scope.hiddenPatterns.includes(segment) || isAtomicTempName(segment)) return true
+      if (scope.filter?.isEntryExcluded(rel)) return true
+    }
+    return false
+  }
+
+  /**
+   * Read a folder reached through a link. It is entered unless that would loop
+   * (the target is, or contains, the folder the link sits in, or was already
+   * entered through another link) or the chain is too deep; then it is a folder
+   * row with no children.
+   */
+  private async readLinkedDirectory(
+    fullPath: string,
+    target: string,
+    rel: string | null,
+    parent: WalkDir,
+    scope: WalkScope
+  ): Promise<FileNode[]> {
+    const snapshot = this.session?.current() ?? null
+    const chain = parent.linkChain ?? []
+    if (!snapshot || chain.length >= MAX_LINK_DEPTH || chain.includes(target)) return []
+    // A link must not reach what the tree hides or excludes by another name
+    if (this.isHiddenOrExcludedTarget(target, snapshot.realRoot, scope)) return []
+    // Each real folder once per walk, and a bounded number of links in all
+    const key = snapshot.caseSensitive ? target : target.toLowerCase()
+    if (scope.enteredLinkTargets.has(key) || scope.enteredLinkTargets.size >= MAX_ENTERED_LINKS) {
+      return []
+    }
+    try {
+      const parentReal = normaliseResolved(await realpath(parent.readPath ?? parent.path))
+      // The link's target contains the folder the link is in: entering it loops
+      if (isInsideRoot(parentReal, target, snapshot.caseSensitive)) return []
+    } catch {
+      return []
+    }
+    scope.enteredLinkTargets.add(key)
+    const depth = parent.depth + 1
+    const dropped = parent.dropped || isDroppedFolder(rel, scope)
+    if (dropped && !parent.dropped && rel !== null) scope.hints?.add(rel, depth)
+    try {
+      return await this._readDirectoryInternal(
+        { path: fullPath, readPath: target, depth, rel, dropped, linkChain: [...chain, target] },
+        scope
+      )
+    } catch (error) {
+      logger.warn('FileService: readDirectory error recovered', {
+        path: redactPath(fullPath),
+        error: redactQuotedPaths(error instanceof Error ? error.message : String(error))
+      })
+      return []
+    }
   }
 
   /**
@@ -481,7 +566,17 @@ export class FileService implements IFileService {
     const dropped = parent.dropped || isDroppedFolder(rel, scope)
     if (dropped && !parent.dropped && rel !== null) scope.hints?.add(rel, depth)
     try {
-      return await this._readDirectoryInternal({ path: fullPath, depth, rel, dropped }, scope)
+      return await this._readDirectoryInternal(
+        {
+          path: fullPath,
+          readPath: parent.readPath === undefined ? undefined : join(parent.readPath, basename(fullPath)),
+          depth,
+          rel,
+          dropped,
+          linkChain: parent.linkChain
+        },
+        scope
+      )
     } catch (error) {
       logger.warn('FileService: readDirectory error recovered', {
         path: redactPath(fullPath),
@@ -496,15 +591,10 @@ export class FileService implements IFileService {
   }
 
   /**
-   * Write a text file. `createParentDirs` is the explicit "Save to restore it"
-   * of a tab whose file was deleted together with its folder: the missing
-   * folders are recreated, inside the project only, before the write (see
-   * `file/restoreParentDirectory`). Without it a missing folder is an ENOENT.
+   * Write a text file. A missing folder is an ENOENT; the explicit "Save to
+   * restore it" recreates the folders first (see `file/restoreParentDirectory`).
    */
-  async writeFile(filePath: string, content: string, options: WriteFileOptions = {}): Promise<void> {
-    if (options.createParentDirs === true) {
-      await restoreParentDirectory(filePath, this.projectPath)
-    }
+  async writeFile(filePath: string, content: string): Promise<void> {
     await atomicWriteText(filePath, content)
   }
 
@@ -558,6 +648,11 @@ export class FileService implements IFileService {
       throw new Error('File name cannot be empty')
     }
 
+    // `.` and `..` are folders, not names; checked before `.md` is appended
+    if (fileName === '.' || fileName === '..') {
+      throw new Error('Invalid name')
+    }
+
     // Ensure .md extension
     if (!fileName.endsWith('.md') && !fileName.endsWith('.markdown')) {
       fileName = `${fileName}.md`
@@ -569,7 +664,7 @@ export class FileService implements IFileService {
     // portability-breaking classes (control chars, bidi, empty, too long).
     assertValidUserFilename(fileName)
 
-    const filePath = join(dirPath, fileName)
+    const filePath = childPath(dirPath, fileName)
 
     // Check if file already exists
     try {
@@ -600,7 +695,7 @@ export class FileService implements IFileService {
     // #161: validate reserved names, forbidden chars, etc. (platform-aware).
     assertValidUserFilename(folderName)
 
-    const folderPath = join(dirPath, folderName)
+    const folderPath = childPath(dirPath, folderName)
 
     // Check if folder already exists
     try {
@@ -620,16 +715,31 @@ export class FileService implements IFileService {
     return folderPath
   }
 
+  /**
+   * Whether `candidate` is the open project's root folder. The one defence the
+   * service keeps of its own: callers pass paths the IPC layer has already
+   * checked against the project, but a handler that skipped that check must
+   * still not be able to remove or move the root.
+   */
+  private isProjectRoot(candidate: string): boolean {
+    if (!this.projectPath) return false
+    const target = resolvePath(candidate)
+    // The session holds the canonical root and the case rule, resolved once at open
+    const snapshot = this.session?.current() ?? null
+    if (snapshot) {
+      return (
+        isSamePath(target, snapshot.realRoot, snapshot.caseSensitive) ||
+        isSamePath(target, resolvePath(snapshot.root), snapshot.caseSensitive)
+      )
+    }
+    return isSamePath(target, resolvePath(this.projectPath), getPlatformConfig().caseSensitive)
+  }
+
   async deleteFile(filePath: string): Promise<void> {
     // Verify it's a file, not a directory
     const stats = await stat(filePath)
     if (stats.isDirectory()) {
       throw new Error('Cannot delete a directory using deleteFile. Use deleteFolder instead.')
-    }
-
-    // Prevent deleting files outside project
-    if (this.projectPath && !filePath.startsWith(this.projectPath)) {
-      throw new Error('Cannot delete files outside the project directory')
     }
 
     await rm(filePath)
@@ -643,13 +753,8 @@ export class FileService implements IFileService {
     }
 
     // Prevent deleting project root
-    if (this.projectPath && folderPath === this.projectPath) {
+    if (this.isProjectRoot(folderPath)) {
       throw new Error('Cannot delete the project root directory')
-    }
-
-    // Prevent deleting folders outside project
-    if (this.projectPath && !folderPath.startsWith(this.projectPath)) {
-      throw new Error('Cannot delete folders outside the project directory')
     }
 
     // Delete folder recursively
@@ -670,7 +775,7 @@ export class FileService implements IFileService {
     // Get the directory and construct new path
     const { dirname } = await import('path')
     const parentDir = dirname(oldPath)
-    const newPath = join(parentDir, newName)
+    const newPath = childPath(parentDir, newName)
 
     // Check if already exists
     try {
@@ -682,16 +787,6 @@ export class FileService implements IFileService {
       if (code !== 'ENOENT') {
         throw error
       }
-    }
-
-    // Prevent renaming files/folders outside project
-    if (this.projectPath && !oldPath.startsWith(this.projectPath)) {
-      throw new Error('Cannot rename items outside the project directory')
-    }
-
-    // Prevent renaming project root
-    if (this.projectPath && oldPath === this.projectPath) {
-      throw new Error('Cannot rename the project root directory')
     }
 
     // Perform the rename
@@ -733,6 +828,7 @@ export class FileService implements IFileService {
     const sourceStats = await stat(sourcePath)
     const isSymlink = await this.symlinkDetector.checkPath(sourcePath)
     const sourceItemName = basename(sourcePath)
+    if (newName) assertValidUserFilename(newName)
     const finalName = newName || sourceItemName
 
     // Validate target parent is a directory
@@ -742,7 +838,7 @@ export class FileService implements IFileService {
     }
 
     // Construct final target path
-    const targetPath = join(targetParentPath, finalName)
+    const targetPath = childPath(targetParentPath, finalName)
 
     // Prevent moving to the same location
     if (sourcePath === targetPath) {
@@ -750,18 +846,8 @@ export class FileService implements IFileService {
     }
 
     // Prevent moving project root
-    if (this.projectPath && sourcePath === this.projectPath) {
+    if (this.isProjectRoot(sourcePath)) {
       throw new Error('Cannot move the project root directory')
-    }
-
-    // Prevent moving items outside project
-    if (this.projectPath && !sourcePath.startsWith(this.projectPath)) {
-      throw new Error('Cannot move items outside the project directory')
-    }
-
-    // Prevent moving items to outside project
-    if (this.projectPath && !targetParentPath.startsWith(this.projectPath)) {
-      throw new Error('Cannot move items to outside the project directory')
     }
 
     // Prevent circular move (folder into its own descendant)
@@ -774,7 +860,7 @@ export class FileService implements IFileService {
     if (conflictExists) {
       if (replaceExisting) {
         // Delete existing item before move
-        const existingItemPath = join(targetParentPath, finalName)
+        const existingItemPath = childPath(targetParentPath, finalName)
         try {
           const existingStats = await stat(existingItemPath)
 
@@ -838,6 +924,7 @@ export class FileService implements IFileService {
     const sourceStats = await stat(sourcePath)
     const isSymlink = await this.symlinkDetector.checkPath(sourcePath)
     const sourceItemName = basename(sourcePath)
+    if (newName) assertValidUserFilename(newName)
     const finalName = newName || sourceItemName
 
     // Validate target parent is a directory
@@ -846,18 +933,8 @@ export class FileService implements IFileService {
       throw new Error('Target must be a directory')
     }
 
-    // Prevent copying items outside project
-    if (this.projectPath && !sourcePath.startsWith(this.projectPath)) {
-      throw new Error('Cannot copy items outside the project directory')
-    }
-
-    // Prevent copying items to outside project
-    if (this.projectPath && !targetParentPath.startsWith(this.projectPath)) {
-      throw new Error('Cannot copy items to outside the project directory')
-    }
-
     // Handle name conflicts by adding (1), (2), etc.
-    let targetPath = join(targetParentPath, finalName)
+    let targetPath = childPath(targetParentPath, finalName)
     let copyNumber = 1
 
     while (await this.checkNameConflict(targetParentPath, basename(targetPath))) {
@@ -866,7 +943,7 @@ export class FileService implements IFileService {
       const nameWithoutExt = ext ? finalName.slice(0, -ext.length) : finalName
 
       // Generate new name with copy number
-      targetPath = join(targetParentPath, `${nameWithoutExt} (${copyNumber})${ext}`)
+      targetPath = childPath(targetParentPath, `${nameWithoutExt} (${copyNumber})${ext}`)
       copyNumber++
 
       // Safety limit to prevent infinite loops

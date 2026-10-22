@@ -22,20 +22,19 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { IProjectTreeApi, FileNode } from '../interfaces/IProjectTreeApi'
+import { getDefaultProjectTreeApi } from '../services/projectTreeApi'
 import type { IUseProjectManagementOptions, IUseProjectManagementReturn } from '../interfaces/IProjectManagement'
 import { useDialog } from '../components/Dialog'
 import { showGlobalToast } from '../components/Toast/toastService'
-import { TERMINAL } from '../components/ProjectTree/constants'
 import { logger } from '../utils/logger'
+import { noteProjectGeneration } from '../services/projectGeneration'
 import {
   createCoalescingRunner,
   type CoalescedRunInfo,
   type CoalescingRunner
 } from '../../../shared/coalescingRunner'
 import {
-  checkHasDirtyEditors,
-  checkTerminalBusy,
-  confirmProjectSwitch,
+  prepareProjectTransition,
   interruptActiveTerminalIfAny,
   openProjectWithTokenGuard,
   closeProjectWithTokenGuard
@@ -68,8 +67,8 @@ import {
 export function useProjectManagement(
   options?: IUseProjectManagementOptions
 ): IUseProjectManagementReturn {
-  // Use provided API or default to window.api
-  const api: IProjectTreeApi = (options?.api ?? (window.api as unknown as IProjectTreeApi))
+  // Use provided API or the default gateways
+  const api: IProjectTreeApi = (options?.api ?? getDefaultProjectTreeApi())
   const { showConfirm } = useDialog()
 
   // Project state
@@ -187,6 +186,7 @@ export function useProjectManagement(
   useEffect(() => {
     const unsubscribe = api.file.onProjectChanged(async (data) => {
       logger.info(createProjectChangedLogMessage(data))
+      noteProjectGeneration(data.generation)
 
       // Notify consumer to reset UI state
       try {
@@ -215,7 +215,7 @@ export function useProjectManagement(
         try {
           setLoading(true)
           const treeLoadStart = performance.now()
-          const fileTree = await api.file.readDirectory(newPath)
+          const fileTree = await api.file.readDirectory({ dirPath: newPath })
           const treeLoadDuration = Math.round(performance.now() - treeLoadStart)
           if (generation !== refreshGenerationRef.current) {
             // A newer switch or close superseded this load: no tree, no toast.
@@ -277,8 +277,8 @@ export function useProjectManagement(
    * Open a new project
    *
    * Flow:
-   * 1. Check for unsaved editors and terminal activity
-   * 2. Request confirmation if needed
+   * 1. Save dirty editors (autosave held), check terminal activity
+   * 2. Request confirmation if a tab could not be saved or the terminal is busy
    * 3. Interrupt terminal if busy
    * 4. Open project with race guard
    * 5. Show success toast
@@ -288,32 +288,34 @@ export function useProjectManagement(
       setIsSwitchingProject(true)
       setError(null)
 
-      // Check for unsaved changes and terminal activity in parallel
-      const [hasDirty, terminalBusy] = await Promise.all([
-        checkHasDirtyEditors(),
-        checkTerminalBusy(TERMINAL.RECENT_ACTIVITY_WINDOW)
-      ])
-
-      // Ask for confirmation if needed
-      const confirmed = await confirmProjectSwitch(hasDirty, terminalBusy, 'switch', showConfirm)
-      if (!confirmed) {
+      // Save dirty tabs first, then ask only about what could not be saved
+      const transition = await prepareProjectTransition('switch', showConfirm)
+      if (!transition.proceed) {
         return
       }
 
-      // Gracefully interrupt terminal if it was busy
-      if (terminalBusy) {
-        await interruptActiveTerminalIfAny()
-      }
+      let projectChanged = false
+      try {
+        // Gracefully interrupt terminal if it was busy
+        if (transition.terminalBusy) {
+          await interruptActiveTerminalIfAny()
+        }
 
-      // Open project with race guard (files will be loaded by IPC event)
-      // Success toast will be shown by IPC listener after files load
-      await openProjectWithTokenGuard(switchTokenRef, setProjectPathAndScope)
+        // Open project with race guard (files will be loaded by IPC event)
+        // Success toast will be shown by IPC listener after files load
+        const previousPath = projectPathRef.current
+        const openedPath = await openProjectWithTokenGuard(switchTokenRef, setProjectPathAndScope)
+        // null: picker cancelled or superseded; same path: main's no-op
+        projectChanged = openedPath !== null && openedPath !== previousPath
+      } finally {
+        transition.settle(projectChanged)
+      }
     } catch (err) {
       setError(formatErrorForState(err))
       logger.error(createOpenProjectErrorLog(), err instanceof Error ? err : undefined)
       showGlobalToast({
         type: 'error',
-        title: 'Open Project Failed',
+        title: 'Failed to Open Project',
         message: createOpenErrorMessage(err)
       })
     } finally {
@@ -325,8 +327,8 @@ export function useProjectManagement(
    * Close the current project
    *
    * Flow:
-   * 1. Check for unsaved editors and terminal activity
-   * 2. Request confirmation if needed
+   * 1. Save dirty editors (autosave held), check terminal activity
+   * 2. Request confirmation if a tab could not be saved or the terminal is busy
    * 3. Interrupt terminal if busy
    * 4. Close project with race guard
    * 5. Show info toast
@@ -336,35 +338,31 @@ export function useProjectManagement(
       setIsSwitchingProject(true)
       setError(null)
 
-      // Check for unsaved changes and terminal activity in parallel
-      const [hasDirty, terminalBusy] = await Promise.all([
-        checkHasDirtyEditors(),
-        checkTerminalBusy(TERMINAL.RECENT_ACTIVITY_WINDOW)
-      ])
-
-      // Ask for confirmation if needed
-      const confirmed = await confirmProjectSwitch(hasDirty, terminalBusy, 'close', showConfirm)
-      if (!confirmed) {
+      // Save dirty tabs first, then ask only about what could not be saved
+      const transition = await prepareProjectTransition('close', showConfirm)
+      if (!transition.proceed) {
         return
       }
 
-      // Gracefully interrupt terminal if it was busy
-      if (terminalBusy) {
-        await interruptActiveTerminalIfAny()
-      }
+      let projectChanged = false
+      try {
+        // Gracefully interrupt terminal if it was busy
+        if (transition.terminalBusy) {
+          await interruptActiveTerminalIfAny()
+        }
 
-      // Close project with race guard (files and UI state cleared by IPC event)
-      const closed = await closeProjectWithTokenGuard(switchTokenRef, setProjectPathAndScope)
-      if (closed) {
+        // Close project with race guard (files and UI state cleared by IPC event)
         // Success toast will be shown by IPC listener after state is cleared
-        // No toast needed here to avoid duplicate
+        projectChanged = await closeProjectWithTokenGuard(switchTokenRef, setProjectPathAndScope)
+      } finally {
+        transition.settle(projectChanged)
       }
     } catch (err) {
       setError(formatErrorForState(err))
       logger.error(createCloseProjectErrorLog(), err instanceof Error ? err : undefined)
       showGlobalToast({
         type: 'error',
-        title: 'Close Project Failed',
+        title: 'Failed to Close Project',
         message: createCloseErrorMessage(err)
       })
     } finally {
@@ -376,8 +374,8 @@ export function useProjectManagement(
    * Open a project by direct path (for recent projects)
    *
    * Flow:
-   * 1. Check for unsaved editors and terminal activity
-   * 2. Request confirmation if needed
+   * 1. Save dirty editors (autosave held), check terminal activity
+   * 2. Request confirmation if a tab could not be saved or the terminal is busy
    * 3. Interrupt terminal if busy
    * 4. Open project directly by path (no file picker dialog)
    *
@@ -389,27 +387,29 @@ export function useProjectManagement(
       setIsSwitchingProject(true)
       setError(null)
 
-      // Check for unsaved changes and terminal activity in parallel
-      const [hasDirty, terminalBusy] = await Promise.all([
-        checkHasDirtyEditors(),
-        checkTerminalBusy(TERMINAL.RECENT_ACTIVITY_WINDOW)
-      ])
-
-      // Ask for confirmation if needed
-      const confirmed = await confirmProjectSwitch(hasDirty, terminalBusy, 'switch', showConfirm)
-      if (!confirmed) {
+      // Save dirty tabs first, then ask only about what could not be saved
+      const transition = await prepareProjectTransition('switch', showConfirm)
+      if (!transition.proceed) {
         return false
       }
 
-      // Gracefully interrupt terminal if it was busy
-      if (terminalBusy) {
-        await interruptActiveTerminalIfAny()
-      }
+      let projectChanged = false
+      try {
+        // Gracefully interrupt terminal if it was busy
+        if (transition.terminalBusy) {
+          await interruptActiveTerminalIfAny()
+        }
 
-      // Open project directly by path (files will be loaded by IPC event)
-      // Success toast will be shown by IPC listener after files load
-      await api.file.openProjectByPath(projectPath)
-      return true
+        // Open project directly by path (files will be loaded by IPC event)
+        // Success toast will be shown by IPC listener after files load
+        const previousPath = projectPathRef.current
+        const openedPath = await api.file.openProjectByPath({ projectPath })
+        // Main answers the path for a no-op too, so an unchanged path is the no-op
+        projectChanged = openedPath !== previousPath
+        return true
+      } finally {
+        transition.settle(projectChanged)
+      }
     } catch (err) {
       setError(formatErrorForState(err))
       logger.error(createOpenProjectErrorLog(), err instanceof Error ? err : undefined)
@@ -437,7 +437,7 @@ export function useProjectManagement(
     try {
       const ticket = takeReadTicket(generation)
       const refreshStart = performance.now()
-      const fileTree = await api.file.readDirectory(path)
+      const fileTree = await api.file.readDirectory({ dirPath: path })
       const refreshDuration = Math.round(performance.now() - refreshStart)
       const applied = applyTreeIfCurrent(ticket, fileTree)
       logger.info('[useProjectManagement] File tree refreshed', {

@@ -118,7 +118,7 @@
 
 .html-preview-tab-close:focus-visible {
   outline: var(--border-width-thick) solid var(--color-border-focus);
-  outline-offset: -1px;
+  outline-offset: calc(var(--space-1) * -1);
   opacity: 1;
 }
 
@@ -160,7 +160,7 @@
 
 .html-preview-badge:focus-visible {
   outline: var(--border-width-thick) solid var(--color-border-focus);
-  outline-offset: 1px;
+  outline-offset: var(--space-1);
 }
 
 .html-preview-badge-count {
@@ -245,5 +245,5 @@
 
 .html-preview-tab:focus-visible {
   outline: var(--border-width-thick) solid var(--color-border-focus);
-  outline-offset: -1px;
+  outline-offset: calc(var(--space-1) * -1);
 }

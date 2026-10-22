@@ -12,6 +12,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { TranscriptionDialog } from './TranscriptionDialog'
+import { BaseDialog } from '../Dialog/BaseDialog'
 import { useTranscriptionStore } from '../../stores/useTranscriptionStore'
 import { useProjectStore } from '../../stores/useProjectStore'
 import { TEST_IDS } from '../../constants/testids'
@@ -666,6 +667,34 @@ describe('TranscriptionDialog', () => {
   })
 
   describe('Keyboard interaction', () => {
+    it('leaves a running transcription alone when Escape closes a dialog stacked on top (#229)', () => {
+      // The shipping case: Cmd+Q mid-transcription stacks the quit
+      // ConfirmDialog (DialogManager, zIndex 10001+) over this one (10000).
+      const cancelSpy = vi.fn().mockResolvedValue(undefined)
+      const quitPromptClose = vi.fn()
+      useTranscriptionStore.setState({
+        isDialogOpen: true,
+        filePath: '/path/to/audio.mp3',
+        fileName: 'audio.mp3',
+        isTranscribing: true,
+        progress: { percent: 50, phase: 'Transcribing' },
+        cancelTranscription: cancelSpy
+      })
+
+      render(
+        <>
+          <TranscriptionDialog />
+          <BaseDialog isOpen onClose={quitPromptClose} zIndex={10001}>
+            <button>Cancel</button>
+          </BaseDialog>
+        </>
+      )
+      fireEvent.keyDown(document, { key: 'Escape' })
+
+      expect(quitPromptClose).toHaveBeenCalledOnce()
+      expect(cancelSpy).not.toHaveBeenCalled()
+    })
+
     it('closes dialog on Escape when not transcribing', () => {
       const closeDialogSpy = vi.fn()
       useTranscriptionStore.setState({

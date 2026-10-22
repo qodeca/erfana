@@ -46,7 +46,6 @@ describe('ProjectTree paste operations (integration tests)', () => {
     // Setup window.api mock
     ;(window as any).api = {
       file: {
-        getLastProjectPath: vi.fn(async () => '/project'),
         readDirectory: vi.fn(async () => [
           {
             name: 'source.md',
@@ -109,12 +108,10 @@ describe('ProjectTree paste operations (integration tests)', () => {
       const result = await clipboard.getState().paste('/project/target')
 
       // Verify: moveItem was called without replaceExisting
-      expect(mockFileOps.moveItem).toHaveBeenCalledWith(
-        '/project/source.md',
-        '/project/target',
-        undefined,
-        undefined
-      )
+      expect(mockFileOps.moveItem).toHaveBeenCalledWith({
+        sourcePath: '/project/source.md',
+        targetParentPath: '/project/target'
+      })
 
       // Verify: Success
       expect(result.success).toBe(true)
@@ -130,7 +127,10 @@ describe('ProjectTree paste operations (integration tests)', () => {
       const result = await clipboard.getState().paste('/project/target')
 
       // Verify: copyItem was called (no replaceExisting parameter)
-      expect(mockFileOps.copyItem).toHaveBeenCalledWith('/project/source.md', '/project/target')
+      expect(mockFileOps.copyItem).toHaveBeenCalledWith({
+        sourcePath: '/project/source.md',
+        targetParentPath: '/project/target'
+      })
 
       // Verify: Success
       expect(result.success).toBe(true)
@@ -150,12 +150,11 @@ describe('ProjectTree paste operations (integration tests)', () => {
       const result = await clipboard.getState().paste('/project/target', true)
 
       // Verify: moveItem called with replaceExisting=true
-      expect(mockFileOps.moveItem).toHaveBeenCalledWith(
-        '/project/source.md',
-        '/project/target',
-        undefined,
-        true
-      )
+      expect(mockFileOps.moveItem).toHaveBeenCalledWith({
+        sourcePath: '/project/source.md',
+        targetParentPath: '/project/target',
+        replaceExisting: true
+      })
 
       // Verify: Success
       expect(result.success).toBe(true)
@@ -170,12 +169,11 @@ describe('ProjectTree paste operations (integration tests)', () => {
       const result = await clipboard.getState().paste('/project/target', true)
 
       // Verify: moveItem called with replaceExisting=true
-      expect(mockFileOps.moveItem).toHaveBeenCalledWith(
-        '/project/source',
-        '/project/target',
-        undefined,
-        true
-      )
+      expect(mockFileOps.moveItem).toHaveBeenCalledWith({
+        sourcePath: '/project/source',
+        targetParentPath: '/project/target',
+        replaceExisting: true
+      })
 
       expect(result.success).toBe(true)
     })
@@ -213,12 +211,11 @@ describe('ProjectTree paste operations (integration tests)', () => {
       const result = await clipboard.getState().paste('/project/target', false)
 
       // Verify: moveItem called with replaceExisting=false
-      expect(mockFileOps.moveItem).toHaveBeenCalledWith(
-        '/project/source.md',
-        '/project/target',
-        undefined,
-        false
-      )
+      expect(mockFileOps.moveItem).toHaveBeenCalledWith({
+        sourcePath: '/project/source.md',
+        targetParentPath: '/project/target',
+        replaceExisting: false
+      })
 
       expect(result.success).toBe(true)
     })

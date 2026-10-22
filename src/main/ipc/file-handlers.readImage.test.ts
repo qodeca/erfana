@@ -7,6 +7,8 @@
  * hoist to module scope, and that file is at its size budget.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { realpath } from 'node:fs/promises'
+import { openTestProject } from './__test-helpers__/openTestProject'
 
 // Captures ipcMain.handle registrations so tests can invoke handlers directly
 const handlers: Record<string, (...args: any[]) => any> = {}
@@ -68,11 +70,10 @@ describe('file:readImage', () => {
     inProjectImage = join(tmp, 'shot.png')
     writeFileSync(inProjectImage, 'bytes')
 
-    const { fileService } = await import('../services/FileService')
     const { logger } = await import('../services/LoggingService')
-    vi.spyOn(fileService, 'getProjectPath').mockReturnValue(tmp)
     // Refusals are logged at error by design; keep the suite output readable.
     vi.spyOn(logger, 'error').mockImplementation(() => {})
+    await openTestProject(tmp)
 
     const { registerFileHandlers } = await import('./file-handlers')
     registerFileHandlers()
@@ -92,19 +93,20 @@ describe('file:readImage', () => {
       .spyOn(fileService, 'readImage')
       .mockResolvedValue({ status: 'ok', dataUrl: 'data:image/png;base64,AAAA', version: '1:2:3' })
 
-    await expect(handlers['file:readImage']({}, inProjectImage, '0:0:0')).resolves.toEqual({
+    await expect(handlers['file:readImage']({}, { filePath: inProjectImage, knownVersion: '0:0:0' })).resolves.toEqual({
       status: 'ok',
       dataUrl: 'data:image/png;base64,AAAA',
       version: '1:2:3'
     })
-    expect(read).toHaveBeenCalledWith(inProjectImage, '0:0:0')
+    // The file is read at the canonical path the check resolved
+    expect(read).toHaveBeenCalledWith(await realpath(inProjectImage), '0:0:0')
   })
 
   it('passes an unchanged verdict through untouched', async () => {
     const { fileService } = await import('../services/FileService')
     vi.spyOn(fileService, 'readImage').mockResolvedValue({ status: 'unchanged', version: '1:2:3' })
 
-    await expect(handlers['file:readImage']({}, inProjectImage, '1:2:3')).resolves.toEqual({
+    await expect(handlers['file:readImage']({}, { filePath: inProjectImage, knownVersion: '1:2:3' })).resolves.toEqual({
       status: 'unchanged',
       version: '1:2:3'
     })
@@ -116,9 +118,9 @@ describe('file:readImage', () => {
       .spyOn(fileService, 'readImage')
       .mockResolvedValue({ status: 'ok', dataUrl: 'data:,', version: '1:2:3' })
 
-    await handlers['file:readImage']({}, inProjectImage)
+    await handlers['file:readImage']({}, { filePath: inProjectImage })
 
-    expect(read).toHaveBeenCalledWith(inProjectImage, undefined)
+    expect(read).toHaveBeenCalledWith(await realpath(inProjectImage), undefined)
   })
 
   it('rejects a path outside the project without reading it', async () => {
@@ -130,7 +132,7 @@ describe('file:readImage', () => {
     const { fileService } = await import('../services/FileService')
     const read = vi.spyOn(fileService, 'readImage')
 
-    await expect(handlers['file:readImage']({}, target)).rejects.toThrow(
+    await expect(handlers['file:readImage']({}, { filePath: target })).rejects.toThrow(
       'Cannot read files outside the project directory'
     )
     expect(read).not.toHaveBeenCalled()
@@ -149,7 +151,7 @@ describe('file:readImage', () => {
       const { fileService } = await import('../services/FileService')
       const read = vi.spyOn(fileService, 'readImage')
 
-      await expect(handlers['file:readImage']({}, link)).rejects.toThrow(
+      await expect(handlers['file:readImage']({}, { filePath: link })).rejects.toThrow(
         'Cannot read files outside the project directory'
       )
       expect(read).not.toHaveBeenCalled()
@@ -157,20 +159,19 @@ describe('file:readImage', () => {
   )
 
   it('rejects when no project is open', async () => {
-    const { fileService } = await import('../services/FileService')
-    vi.spyOn(fileService, 'getProjectPath').mockReturnValue(null)
+    await openTestProject(null)
 
-    await expect(handlers['file:readImage']({}, inProjectImage)).rejects.toThrow(
+    await expect(handlers['file:readImage']({}, { filePath: inProjectImage })).rejects.toThrow(
       'No project is open'
     )
   })
 
-  it('rejects an oversized version token before confining the path', async () => {
+  it('rejects an oversized version token without reading', async () => {
     const { fileService } = await import('../services/FileService')
     const read = vi.spyOn(fileService, 'readImage')
 
     await expect(
-      handlers['file:readImage']({}, inProjectImage, 'x'.repeat(129))
+      handlers['file:readImage']({}, { filePath: inProjectImage, knownVersion: 'x'.repeat(129) })
     ).rejects.toThrow('Too big: expected string to have <=128 characters')
     expect(read).not.toHaveBeenCalled()
   })
@@ -179,7 +180,7 @@ describe('file:readImage', () => {
     const { fileService } = await import('../services/FileService')
     const read = vi.spyOn(fileService, 'readImage')
 
-    await expect(handlers['file:readImage']({}, '')).rejects.toThrow('Path is required')
+    await expect(handlers['file:readImage']({}, { filePath: '' })).rejects.toThrow('Path is required')
     expect(read).not.toHaveBeenCalled()
   })
 })

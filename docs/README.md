@@ -21,12 +21,12 @@ Erfana is an agent-native Markdown workspace – an Electron app that runs a ter
 - [API Services – Features](./api-services-features.md) - Feature service implementations (Git, Transcription, Camera, etc.)
 - [IPC Patterns](./ipc-patterns.md) - Inter-process communication patterns
 - [Security](./security.md) - Security considerations and implementations
-- [Error Codes](./error-codes.md) - Project-wide `ErrorCode` enum index (166 codes grouped by category; operator actions for the most-visible ones). Includes the 26-code graph/MCP block, which is contract-only until #23-#32 raise it
-- [Architecture Decision Records](./adrs/README.md) - Durable rationale for load-bearing design choices (ADR 0001 self-host whisper, 0002 minisign, 0003 dual-pubkey, 0004 TOCTOU close)
+- [Error Codes](./error-codes.md) - Project-wide `ErrorCode` enum index (grouped by category; operator actions for the most-visible ones). Includes the graph/MCP block, which is contract-only until #23-#32 raise it
+- [Architecture Decision Records](./adrs/README.md) - Durable rationale for load-bearing design choices; the index lists every record
 - [Technical Debt](./technical-debt.md) - Technical debt tracking and priorities
 
 ### Feature Documentation
-- [Core features](./features/README.md) - Catalogue of all 15 shipped features (editor, project tree, terminal, prompt templates, export, import, transcription, Claude Code status bar). Referenced from the root `CLAUDE.md` rather than inlined there
+- [Core features](./features/README.md) - Catalogue of the shipped features (editor, project tree, terminal, prompt templates, export, import, transcription, Claude Code status bar). Referenced from the root `CLAUDE.md` rather than inlined there
 - [Editor](./editor/README.md) - Monaco editor, markdown preview, scroll sync, Mermaid diagrams (full-screen viewer), PDF/DOCX export
   - [Export](./editor/export.md) - PDF and DOCX export pipeline
   - [Mermaid Viewer](./editor/mermaid-viewer.md) - Full-screen diagram viewer with zoom and pan
@@ -63,7 +63,7 @@ Erfana is an agent-native Markdown workspace – an Electron app that runs a ter
 - [Build](./build/README.md) - electron-builder, ASAR, fuses, troubleshooting
 - [Release signing keys](./release-pubkey.txt) - Published minisign public keys (primary + standby rotation) for verifying release artifacts
 - [Release handoffs](./handoffs/) - Point-in-time release-verification handoffs - a checklist handed to the next session, and the report handed back; each file is dated and anchored on a commit, and is not maintained after that release ships
-- [Windows Enablement](./windows/README.md) - Phases 0–2 shipped in v0.9.3; Phase 4 (local Whisper trust chain + Windows x64 binary) shipped in v0.9.4 on 2026-04-23 per #165; Windows-host test-flake remediation pool (#172) + ThrottledWorker offset-deque refactor (#173) also in v0.9.4; Phase 3 (screenshots, #164) shipped in v0.12.0; Phases 5–6 tracked under #166–#167. Those issue and release numbers predate the public-repo migration and do not resolve on `qodeca/erfana`. The convention is split by location: **outside** `docs/windows/` such numbers are kept as plain text (as on this line) — as of 2026-08-07 that holds for `CHANGELOG.md` too, where 55 dead issue / PR / commit / release links were converted to bare references. **Inside** `docs/windows/` the dead references stay as links behind the provenance banner at the top of each file; note that folder is a deliberate *mix*, since text written after the migration cites bare numbers while the pre-migration history keeps its links. Links written *after* the migration do resolve — the repository root, the `v0.16.3` and `v0.17.0` releases, and the post-migration issue/PR references added in the v0.17.0 entries of `CHANGELOG.md` and `known-issues.md`. **[`implementation-plan.md`](./windows/implementation-plan.md) is the canonical phase status – prefer it over this line**
+- [Windows Enablement](./windows/README.md) - Phase roadmap, Windows-only behaviour and the test-flake register. **[`implementation-plan.md`](./windows/implementation-plan.md) § Status snapshot is the canonical status.** Issue, PR and release numbers from before the public-repo migration do not resolve on `qodeca/erfana`; the provenance banner at the top of each `docs/windows/` file explains how they are kept
   - [Implementation Plan](./windows/implementation-plan.md) - Canonical phased roadmap + status snapshot + Phase 4 test inventory
   - [Gap Analysis](./windows/gap-analysis.md) - Feature-parity baseline (P0/P1/P2 with file:line refs)
   - [Contributing](./windows/contributing.md) - Branch strategy, commit scope, test expectations, reviewer checklist, **amendment-not-drop discipline**, **test-file split policy**, **`src/main/utils/` tier rules**
@@ -77,8 +77,8 @@ Erfana is an agent-native Markdown workspace – an Electron app that runs a ter
 - [Large Project Performance Plan](./large-project-performance-plan.md) - EMFILE mitigation, worker threads, diagnostics, single-flight tree reads (#208), the Windows watcher and exclude list (#211)
 - [Testing](./testing/README.md) - Testing strategies and coverage
   - [E2E Testing](./testing/e2e-testing.md) - Playwright/Electron E2E guide
-  - [E2E Selectors](./testing/e2e-selectors.md) - 259 testids catalog
-  - [Test Scenarios](./testing/test-scenarios.md) - 10 manual/MCP visual test scenarios
+  - [E2E Selectors](./testing/e2e-selectors.md) - `data-testid` catalog (`testids.ts` is the source of truth)
+  - [Test Scenarios](./testing/test-scenarios.md) - Manual/MCP visual test scenarios
   - [E2E Helpers](./testing/e2e-helpers.md) - Test utility functions
   - [E2E Third-Party](./testing/e2e-third-party.md) - Monaco, xterm.js, Mermaid patterns
   - [E2E Debugging](./testing/e2e-debugging.md) - Debugging and CI/CD
@@ -126,7 +126,7 @@ Not to be confused with **[`design/`](../design/index.html)** at the repo root, 
 - [README and GitHub presentation](./designs/139-readme-redesign/README.md) - Banner, demo loop, page structure and fact audit for the README redesign (issue #139)
 
 ### Future Features (Planned)
-- [Graph Engine](./future/graph-engine.md) – SQLite + vec + FTS5 knowledge graph (not yet implemented). The full specification lives in [`future/graph-engine/`](./future/graph-engine/) – 30 files covering the data model, embeddings, hybrid search, MCP server, packaging and performance, plus a milestone-by-milestone [implementation guide](./future/graph-engine/implementation-guide/) and [wireframes](./future/graph-engine/wireframes/). The `architecture-overview`, `data-model`, `packaging` and `implementation-guide/m1-backend` pages there are **superseded for M1** by SD-021 below
+- [Graph Engine](./future/graph-engine.md) – SQLite + vec + FTS5 knowledge graph (not yet implemented). The full specification lives in [`future/graph-engine/`](./future/graph-engine/), covering the data model, embeddings, hybrid search, MCP server, packaging and performance, plus a milestone-by-milestone [implementation guide](./future/graph-engine/implementation-guide/) and [wireframes](./future/graph-engine/wireframes/). The `architecture-overview`, `data-model`, `packaging` and `implementation-guide/m1-backend` pages there are **superseded for M1** by SD-021 below
 - [Graph engine R1 design set (SD-021/#21)](../specs/designs/sd-021-graph-architecture.md) – **frozen contracts, nothing wired up.** #21 shipped the M1 architecture (8 parts), spec errata E1–E10, a spike harness and contract code that typechecks but creates no database, spawns no worker, registers no IPC handler and renders no UI. #22–#32 implement against it. Index in [§0](../specs/designs/sd-021-graph-architecture.md#0-document-set); the scope invariant ("no PR under #21 changes observable runtime behaviour") is [§2.1](../specs/designs/sd-021-graph-architecture.md#21-the-invariant)
 - [WAL concurrency spike findings](./graph/wal-concurrency-spike.md) – the C1–C9 contract measurements behind SD-021 §3.2, re-expressed as assertions in `scripts/spikes/graph-wal-concurrency.test.mjs` so the numbers are falsifiable in CI (#21)
 - [Native dependencies spike findings](./graph/native-dependencies.md) – better-sqlite3 13 + MCP SDK de-risking results (SD-019/#19); input to the graph DB layer (#23) and MCP server (#30)

@@ -11,7 +11,7 @@
  *
  * @example
  * await withWatcherPause(projectPath, isInternalOperation, setLoading, async () => {
- *   await window.api.file.createFile(targetPath, fileName)
+ *   await fileGateway.createFile({ dirPath: targetPath, name: fileName })
  *   await refreshProjectTree()
  * })
  */

@@ -66,8 +66,8 @@
 }
 
 .icon-btn:focus-visible {
-  outline: var(--border-width) solid var(--color-border-focus);
-  outline-offset: 1px;
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
 }
 
 .icon-btn .spin {
@@ -665,7 +665,7 @@
 }
 
 .git-count-clean {
-  color: var(--color-text-muted);
+  color: var(--color-text-tertiary);
   font-style: italic;
 }
 

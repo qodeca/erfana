@@ -47,11 +47,15 @@ describe('ProjectSettingsService', () => {
         expect(result.treeHiddenPatterns).toEqual([...DEFAULT_TREE_HIDDEN_PATTERNS])
       })
 
-      it('caches settings for getCurrentSettings()', async () => {
+      it('does not touch the cache: a load that is never committed leaves it alone', async () => {
         await service.loadSettings('/project')
-        const cached = service.getCurrentSettings()
-        expect(cached).not.toBeNull()
-        expect(cached?.watcherIgnorePatterns).toEqual([...DEFAULT_WATCHER_IGNORE_PATTERNS])
+        expect(service.getCurrentSettings()).toBeNull()
+      })
+
+      it('caches what setCurrentSettings is given', async () => {
+        const loaded = await service.loadSettings('/project')
+        service.setCurrentSettings(loaded)
+        expect(service.getCurrentSettings()?.watcherIgnorePatterns).toEqual([...DEFAULT_WATCHER_IGNORE_PATTERNS])
       })
     })
 
@@ -239,9 +243,9 @@ describe('ProjectSettingsService', () => {
       expect(service.getCurrentSettings()).toBeNull()
     })
 
-    it('returns cached settings after loadSettings', async () => {
+    it('returns cached settings after setCurrentSettings', async () => {
       vi.mocked(access).mockRejectedValue(new Error('ENOENT'))
-      await service.loadSettings('/project')
+      service.setCurrentSettings(await service.loadSettings('/project'))
       expect(service.getCurrentSettings()).not.toBeNull()
     })
   })
@@ -249,7 +253,7 @@ describe('ProjectSettingsService', () => {
   describe('clearSettings', () => {
     it('clears cached settings', async () => {
       vi.mocked(access).mockRejectedValue(new Error('ENOENT'))
-      await service.loadSettings('/project')
+      service.setCurrentSettings(await service.loadSettings('/project'))
       expect(service.getCurrentSettings()).not.toBeNull()
 
       service.clearSettings()
@@ -372,7 +376,7 @@ describe('ProjectSettingsService', () => {
 
     it('caches the resolved graph list for getCurrentSettings()', async () => {
       vi.mocked(access).mockRejectedValue(new Error('ENOENT'))
-      await service.loadSettings('/project')
+      service.setCurrentSettings(await service.loadSettings('/project'))
       expect(service.getCurrentSettings()?.graphExcludePatterns).toEqual([
         ...DEFAULT_GRAPH_EXCLUDE_PATTERNS
       ])
@@ -523,7 +527,7 @@ describe('ProjectSettingsService', () => {
       service.setGlobalExcludeProvider(() => ['.local'])
       projectFile({ exclude: ['scratch'] })
 
-      await service.loadSettings('/project')
+      service.setCurrentSettings(await service.loadSettings('/project'))
 
       expect(service.getCurrentSettings()?.excludePatterns).toEqual(['.local', 'scratch'])
     })

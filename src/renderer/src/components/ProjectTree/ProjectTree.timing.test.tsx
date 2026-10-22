@@ -45,7 +45,6 @@ describe('ProjectTree project switching timing', () => {
 
     ;(window as any).api = {
       file: {
-        getLastProjectPath: vi.fn(async () => null),
         readDirectory,
         onProjectChanged: (cb: any) => {
           onProjectChangedCallback = cb
@@ -109,7 +108,7 @@ describe('ProjectTree project switching timing', () => {
     })
 
     await waitFor(() => {
-      expect(readDirectory).toHaveBeenCalledWith('/proj')
+      expect(readDirectory).toHaveBeenCalledWith({ dirPath: '/proj' })
     })
     // The read is still pending: the gate is closed.
     expect(start).not.toHaveBeenCalled()
@@ -132,7 +131,6 @@ describe('ProjectTree project switching timing', () => {
 
     ;(window as any).api = {
       file: {
-        getLastProjectPath: vi.fn(async () => null),
         readDirectory,
         onProjectChanged: (cb: any) => {
           onProjectChangedCallback = cb
@@ -217,7 +215,6 @@ describe('AC-007: Manual refresh via keyboard shortcut', () => {
 
     ;(window as any).api = {
       file: {
-        getLastProjectPath: vi.fn(async () => null),
         readDirectory,
         onProjectChanged: (cb: any) => {
           onProjectChangedCallback = cb
@@ -269,7 +266,7 @@ describe('AC-007: Manual refresh via keyboard shortcut', () => {
 
     // Wait for initial load to complete
     await waitFor(() => {
-      expect(readDirectory).toHaveBeenCalledWith('/proj')
+      expect(readDirectory).toHaveBeenCalledWith({ dirPath: '/proj' })
     })
 
     // Clear call counts after initial load
@@ -288,7 +285,7 @@ describe('AC-007: Manual refresh via keyboard shortcut', () => {
 
     // Manual refresh should trigger both readDirectory and getStatus
     await waitFor(() => {
-      expect(readDirectory).toHaveBeenCalledWith('/proj')
+      expect(readDirectory).toHaveBeenCalledWith({ dirPath: '/proj' })
       expect(getStatus).toHaveBeenCalledWith('/proj')
     })
   })

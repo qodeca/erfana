@@ -13,6 +13,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { DocumentImportDialog } from './DocumentImportDialog'
+import { BaseDialog } from '../Dialog/BaseDialog'
 import { useDocumentImportStore } from '../../stores/useDocumentImportStore'
 import { useProjectStore } from '../../stores/useProjectStore'
 import { TEST_IDS } from '../../constants/testids'
@@ -666,6 +667,30 @@ describe('DocumentImportDialog', () => {
   // ===========================================================================
 
   describe('Keyboard interaction', () => {
+    it('leaves a running import alone when Escape closes a dialog stacked on top (#229)', () => {
+      const cancelImportSpy = vi.fn()
+      const quitPromptClose = vi.fn()
+      useDocumentImportStore.setState({
+        ...openFileState,
+        isImporting: true,
+        progress: { percent: 50, phase: 'Extracting' },
+        cancelImport: cancelImportSpy
+      })
+
+      render(
+        <>
+          <DocumentImportDialog />
+          <BaseDialog isOpen onClose={quitPromptClose} zIndex={10001}>
+            <button>Cancel</button>
+          </BaseDialog>
+        </>
+      )
+      fireEvent.keyDown(document, { key: 'Escape' })
+
+      expect(quitPromptClose).toHaveBeenCalledOnce()
+      expect(cancelImportSpy).not.toHaveBeenCalled()
+    })
+
     it('Escape key closes dialog when not importing', () => {
       const closeDialogSpy = vi.fn()
       useDocumentImportStore.setState({

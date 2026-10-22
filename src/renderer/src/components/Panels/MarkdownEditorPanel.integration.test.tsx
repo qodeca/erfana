@@ -326,9 +326,13 @@ describe('MarkdownEditorPanel Integration', () => {
       expect(calls).toHaveLength(1)
       expect(source).toContain(
         "useEditorSaveRegistration(panelIdRef.current, () => handleSave('registry'), externalChangeDetected, () => {\n" +
-          '    cancelAutoSave()\n    return () => signalChange()\n  })'
+          '    // A hold stops autosave for real (no re-arming by typing or the modified\n' +
+          '    // effect) and makes the editor read-only, so nothing new can be typed\n' +
+          '    // between a flush and the end of the hold.\n' +
+          '    const releaseAutoSave = holdAutoSave()\n'
       )
-      // Registered below useAutoSave, whose cancelAutoSave and signalChange it uses.
+      expect(source).toContain('}, () => saveInFlightRef.current ?? Promise.resolve())')
+      // Registered below useAutoSave, whose holdAutoSave it uses.
       expect(source.indexOf('useEditorSaveRegistration(panelIdRef')).toBeGreaterThan(source.indexOf('= useAutoSave('))
     })
 
@@ -346,7 +350,7 @@ describe('MarkdownEditorPanel Integration', () => {
         'getValue()',
         'writeFile(',
         'notifySaveComplete(contentToSave)',
-        'setEditorDirty(panelIdRef.current, false)',
+        'settleSavedFile(prev, contentToSave, bufferNow)',
         'resumeWatch()',
         'unmarkSaving()'
       ].map((step) => handleSave.indexOf(step))
@@ -395,17 +399,55 @@ describe('MarkdownEditorPanel Integration', () => {
 
     it('wires each caller to its trigger: Cmd+S is user, autosave is autosave, the registry is registry', () => {
       expect(source).toContain("onSave: () => handleSave('user'),")
-      expect(source).toContain("async () => { await handleSave('autosave') },")
+      expect(source).toContain("await handleSave('autosave')")
+      // an autosave never overwrites a file that changed on disk
+      expect(source.indexOf('if (externalChangeDetected) return')).toBeLessThan(
+        source.indexOf("await handleSave('autosave')")
+      )
       expect(source).toContain("() => handleSave('registry'), externalChangeDetected")
       expect(source.match(/handleSave\(/g)).toHaveLength(3)
     })
 
     it('only the tab’s own Cmd+S of a deleted tab may recreate the missing folder', () => {
       expect(handleSave).toContain('if (shouldRecreateParentDirs(trigger, isFileDeleted)) {')
-      expect(handleSave).toContain(
-        'await window.api.file.writeFile(currentFile.path, contentToSave, { createParentDirs: true })'
-      )
+      expect(handleSave).toContain('createParentDirs: true,')
       expect(handleSave.match(/createParentDirs: true/g)).toHaveLength(1)
+    })
+
+    it('names the project the file was opened under on every write', () => {
+      expect(handleSave).toContain('const generation = openedGenerationRef.current')
+      const writes = handleSave.match(/await fileGateway\.writeFile\(\{[^}]*\}\)/g) ?? []
+      expect(writes).toHaveLength(2)
+      for (const write of writes) expect(write).toContain('generation')
+    })
+
+    it('settles a finished save in one update, from the buffer as it is after the write', () => {
+      // Two updates (written text, then the newer buffer) let React render the
+      // older text as current for a moment; the rules are in settleSavedFile
+      expect(handleSave.match(/setCurrentFile\(/g)).toHaveLength(1)
+      expect(handleSave).toContain('const bufferNow = editorRef.current?.getEditor()?.getValue()')
+      expect(handleSave).toContain(
+        'bufferNow !== undefined && bufferNow !== contentToSave'
+      )
+    })
+
+    it('clears the tab’s dirty dot when the buffer takes the disk’s text (Reload from Disk)', () => {
+      const watcherUpdate = source.slice(
+        source.indexOf('const handleContentUpdateFromWatcher = useCallback'),
+        source.indexOf('const {\n    externalChangeDetected')
+      )
+      expect(watcherUpdate).toContain('modified: false')
+      expect(watcherUpdate).toContain('setEditorDirty(panelIdRef.current, false)')
+    })
+
+    it('keeps a remounted editor read-only while an autosave hold is active', () => {
+      expect(source).toContain('const releaseReadOnly = readOnlyHold.hold()')
+      const onMount = source.slice(
+        source.indexOf('const handleEditorMount = useCallback'),
+        source.indexOf('}, [viewMode, setIsEditorReady, readOnlyHold])')
+      )
+      expect(onMount).toContain('readOnlyHold.applyToMountedEditor(editor)')
+      // The hook's behaviour is covered in useEditorReadOnlyHold.test.ts
     })
 
     it('forgets the last failure reason when the panel switches file', () => {

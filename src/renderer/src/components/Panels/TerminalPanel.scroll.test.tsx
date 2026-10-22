@@ -117,7 +117,8 @@ describe('TerminalPanel scroll position preservation', () => {
           mockOnClearCallback = callback
           return vi.fn() // unsubscribe function
         }),
-        markClearComplete: vi.fn()
+        markClearComplete: vi.fn(),
+        ackOutput: vi.fn()
         // #164 round-2 F#1: `terminal:getShellKind` was deleted; `shellKind`
         // ships with the `terminal:create` response (see `create` above).
       },

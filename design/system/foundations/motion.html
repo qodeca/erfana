@@ -72,13 +72,18 @@
   <br><br>
   The spinner above obeys it. If your system is set to reduce motion, it is a static ring right now and
   the app is still perfectly usable — which is the point.
-  <strong><span data-claim="reduced-motion-gaps"></span> stylesheets in Erfana animate with no
-  reduced-motion escape</strong>, including a full-screen camera flash and several infinite spinners.
+  <strong>The rule lives once, in the entry stylesheet.</strong> <code>index.css</code> holds
+  <span data-claim="reduced-motion-entry-rules"></span> app-wide reduce block, and it covers all
+  <span data-claim="animating-stylesheets"></span> renderer stylesheets that animate, including a
+  full-screen camera flash and several infinite spinners. Under reduce, every keyframe animation runs
+  once and ends at once: a spinner rests as a still ring, the flash (which ends at opacity 0) never
+  shows, and a slide-in appears in place.
   <br><br>
-  <strong>Per-file opt-in is why that number is what it is.</strong> Four files do it correctly, and one
-  of those disables the very same <code>spin</code> keyframe another file leaves running. The rule
-  belongs once, in the entry stylesheet, not once per component — a list this long is not carelessness,
-  it is the predictable result of asking every author to remember.
+  <strong>Why not per file.</strong> Per-file opt-in left twelve stylesheets animating, and one file
+  disabled the very same <code>spin</code> keyframe another left running — not carelessness, the
+  predictable result of asking every author to remember. A component that has a motion-safe
+  replacement, such as the toast's opacity fade, sets it in its own reduce block with
+  <code>!important</code>; a class beats the universal selector.
 </div>
 
 <table>
@@ -86,7 +91,7 @@
   <tbody>
     <tr><td>Infinite spin / pulse / shimmer</td><td>Stop it. Keep the shape so the meaning survives.</td></tr>
     <tr><td>Full-screen flash or wipe</td><td>Remove entirely. Never negotiable.</td></tr>
-    <tr><td>Slide-in of a new element</td><td>Cross-fade instead — no travel.</td></tr>
+    <tr><td>Slide-in of a new element</td><td>No travel: it appears in place, or cross-fades where the component opts in.</td></tr>
     <tr><td>Colour or opacity change on hover</td><td>Keep. It does not move, so it is safe.</td></tr>
   </tbody>
 </table>

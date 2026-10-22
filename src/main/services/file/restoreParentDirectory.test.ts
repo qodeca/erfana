@@ -4,17 +4,31 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { mkdir, mkdtemp, readFile, realpath, rm, stat, symlink } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import {
-  RESTORE_OUTSIDE_PROJECT_MESSAGE,
-  RESTORE_PROJECT_GONE_MESSAGE,
-  restoreParentDirectory
-} from './restoreParentDirectory'
+import { restoreParentDirectory } from './restoreParentDirectory'
 import { FileService } from '../FileService'
+import { resolveConfinedPath } from '../../ipc/confinement/resolveConfinedPath'
+import { PROJECT_FOLDER_GONE_MESSAGE, OUTSIDE_PROJECT_MESSAGE } from '../../ipc/confinement/ConfinementError'
 
 describe('restoreParentDirectory', () => {
   let base: string
   let project: string
   let outside: string
+
+  /** The path as the write handler resolves it for the project at `root`. */
+  const resolveWrite = async (filePath: string, root: string = project) =>
+    resolveConfinedPath(
+      filePath,
+      {
+        session: {
+          root,
+          realRoot: await realpath(root).catch(() => root),
+          caseSensitive: process.platform === 'linux',
+          ownerWebContentsId: null
+        },
+        senderId: null
+      },
+      { mode: 'project', allowRoot: false }
+    )
 
   beforeEach(async () => {
     base = await realpath(await mkdtemp(join(tmpdir(), 'erfana-restore-')))
@@ -29,34 +43,28 @@ describe('restoreParentDirectory', () => {
   })
 
   it('recreates the missing folder chain of a file inside the project', async () => {
-    await restoreParentDirectory(join(project, 'docs', 'deep', 'open.md'), project)
+    await restoreParentDirectory(await resolveWrite(join(project, 'docs', 'deep', 'open.md')))
 
     expect((await stat(join(project, 'docs', 'deep'))).isDirectory()).toBe(true)
   })
 
   it('is a no-op when the folder already exists', async () => {
     await mkdir(join(project, 'docs'))
-    await expect(restoreParentDirectory(join(project, 'docs', 'open.md'), project)).resolves.toBeUndefined()
+    await expect(
+      restoreParentDirectory(await resolveWrite(join(project, 'docs', 'open.md')))
+    ).resolves.toBeUndefined()
   })
 
   it('refuses a path outside the project and creates nothing', async () => {
-    await expect(restoreParentDirectory(join(outside, 'new', 'a.md'), project)).rejects.toThrow(
-      RESTORE_OUTSIDE_PROJECT_MESSAGE
-    )
+    await expect(resolveWrite(join(outside, 'new', 'a.md'))).rejects.toThrow(OUTSIDE_PROJECT_MESSAGE)
     await expect(stat(join(outside, 'new'))).rejects.toMatchObject({ code: 'ENOENT' })
-  })
-
-  it('refuses when no project is open', async () => {
-    await expect(restoreParentDirectory(join(project, 'docs', 'a.md'), null)).rejects.toThrow(
-      'No project is open'
-    )
   })
 
   it('names the real reason when the project folder itself is gone', async () => {
     await rm(project, { recursive: true })
 
-    await expect(restoreParentDirectory(join(project, 'docs', 'a.md'), project)).rejects.toThrow(
-      RESTORE_PROJECT_GONE_MESSAGE
+    await expect(resolveWrite(join(project, 'docs', 'a.md'))).rejects.toThrow(
+      PROJECT_FOLDER_GONE_MESSAGE
     )
   })
 
@@ -66,7 +74,7 @@ describe('restoreParentDirectory', () => {
       // `/var` vs `/private/var` on macOS: same folder, different spelling
       await symlink(project, join(base, 'alias'))
 
-      await restoreParentDirectory(join(base, 'alias', 'docs', 'a.md'), project)
+      await restoreParentDirectory(await resolveWrite(join(base, 'alias', 'docs', 'a.md')))
 
       expect((await stat(join(project, 'docs'))).isDirectory()).toBe(true)
     }
@@ -75,7 +83,7 @@ describe('restoreParentDirectory', () => {
   it.runIf(process.platform === 'darwin')(
     'restores when the project path differs only in letter case (case-insensitive volume)',
     async () => {
-      await restoreParentDirectory(join(project, 'docs', 'a.md'), project.toUpperCase())
+      await restoreParentDirectory(await resolveWrite(join(project, 'docs', 'a.md'), project.toUpperCase()))
 
       expect((await stat(join(project, 'docs'))).isDirectory()).toBe(true)
     }
@@ -86,9 +94,9 @@ describe('restoreParentDirectory', () => {
     async () => {
       await symlink(outside, join(project, 'link'))
 
-      await expect(
-        restoreParentDirectory(join(project, 'link', 'new', 'a.md'), project)
-      ).rejects.toThrow(RESTORE_OUTSIDE_PROJECT_MESSAGE)
+      await expect(resolveWrite(join(project, 'link', 'new', 'a.md'))).rejects.toThrow(
+        OUTSIDE_PROJECT_MESSAGE
+      )
       await expect(stat(join(outside, 'new'))).rejects.toMatchObject({ code: 'ENOENT' })
     }
   )
@@ -115,9 +123,18 @@ describe('FileService.writeFile into a folder that is gone', () => {
     await expect(stat(join(project, 'docs'))).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
-  it('restores the file at its original path when asked to recreate the folder', async () => {
+  it('writes at the original path once the folders are restored', async () => {
     const target = join(project, 'docs', 'open.md')
-    await svc.writeFile(target, '# restored', { createParentDirs: true })
+    const resolved = await resolveConfinedPath(
+      target,
+      {
+        session: { root: project, realRoot: project, caseSensitive: true, ownerWebContentsId: null },
+        senderId: null
+      },
+      { mode: 'project', allowRoot: false }
+    )
+    await restoreParentDirectory(resolved)
+    await svc.writeFile(resolved.real, '# restored')
 
     expect(await readFile(target, 'utf-8')).toBe('# restored')
   })
