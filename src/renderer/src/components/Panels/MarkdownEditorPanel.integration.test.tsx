@@ -456,4 +456,77 @@ describe('MarkdownEditorPanel Integration', () => {
       )
     })
   })
+  describe('File load (review finding 49) and the autosave indicator timer (finding 52)', () => {
+    // Pinned on the source for the same reason as the blocks above: rendering
+    // the panel needs monaco-editor. beginLatestLoad and formatLoadError are
+    // unit-tested in markdownEditorPanel.logic.test.ts and errorUtils.test.ts.
+    const source = readFileSync(
+      join(process.cwd(), 'src/renderer/src/components/Panels/MarkdownEditorPanel.tsx'),
+      'utf8'
+    ).replace(/\r\n/g, '\n')
+    const loadFile = source.slice(
+      source.indexOf('const loadFile = useCallback'),
+      source.indexOf('}, [setIsEditorReady, showToast])')
+    )
+    const loadTry = loadFile.slice(loadFile.indexOf('try {'), loadFile.indexOf('} catch (error) {'))
+    const loadCatch = loadFile.slice(loadFile.indexOf('} catch (error) {'))
+    const unmountCleanup = source.slice(
+      source.indexOf('// Cleanup: ensure panel is not marked dirty on unmount'),
+      source.indexOf('// Debug logging')
+    )
+
+    it('the slices under test exist', () => {
+      expect(loadFile.length).toBeGreaterThan(0)
+      expect(loadTry.length).toBeGreaterThan(0)
+      expect(loadCatch.length).toBeGreaterThan(0)
+      expect(unmountCleanup.length).toBeGreaterThan(0)
+    })
+
+    it('applies a read only while it is the latest load, success or failure', () => {
+      expect(loadFile).toContain('const isLatest = beginLatestLoad(loadSeqRef)')
+      // checked right after the read, before any state is touched
+      const read = loadTry.indexOf('await fileGateway.readFile({ filePath })')
+      const check = loadTry.indexOf('if (!isLatest()) return')
+      expect(read).toBeGreaterThan(-1)
+      expect(check).toBeGreaterThan(read)
+      expect(check).toBeLessThan(loadTry.indexOf('openedGenerationRef.current = generation'))
+      expect(check).toBeLessThan(loadTry.indexOf('setCurrentFile('))
+      // a stale failure is dropped too: no toast for a file no longer asked for
+      expect(loadCatch.indexOf('if (!isLatest()) return')).toBeGreaterThan(-1)
+      expect(loadCatch.indexOf('if (!isLatest()) return')).toBeLessThan(loadCatch.indexOf('showToast('))
+    })
+
+    it('retires a load still in flight when the panel unmounts', () => {
+      expect(unmountCleanup).toContain('loadSeqRef.current += 1')
+    })
+
+    it('a failed load shows an error state and a toast, never "No file open"', () => {
+      expect(loadCatch).toContain('const message = formatLoadError(error, extractFileName(filePath))')
+      expect(loadCatch).toContain('setLoadError(message)')
+      expect(loadCatch).toMatch(/showToast\(\{ title: 'Could not open file', message, type: 'error'/)
+      // the error state is rendered before the empty state
+      expect(source).toMatch(/\) : loadError \? \(\n\s*<div className="editor-empty">\n\s*<p>\{loadError\}<\/p>/)
+      expect(source.indexOf('{loadError}')).toBeLessThan(source.indexOf('<p>No file open</p>'))
+      // a later successful load clears it
+      expect(loadTry).toContain('setLoadError(null)')
+    })
+
+    it('keeps the document text and absolute paths out of the load logs', () => {
+      expect(source).not.toContain('contentPreview')
+      expect(loadFile).not.toMatch(/content\.(substring|slice)\(/)
+      expect(loadCatch).toContain("logger.error('Error loading file', loggableError(error))")
+    })
+
+    it('keeps one pending indicator reset and clears it on unmount', () => {
+      const handleSave = source.slice(
+        source.indexOf('const handleSave = useCallback'),
+        source.indexOf('}, [currentFile, isFileDeleted, dismissConflict')
+      )
+      // no fire-and-forget timer is left in the save path
+      expect(handleSave).not.toMatch(/\n\s*setTimeout\(/)
+      expect(handleSave).toContain('if (autoSaveIndicatorTimerRef.current) clearTimeout(autoSaveIndicatorTimerRef.current)')
+      expect(handleSave).toContain('autoSaveIndicatorTimerRef.current = setTimeout(() => {')
+      expect(unmountCleanup).toContain('clearTimeout(autoSaveIndicatorTimerRef.current)')
+    })
+  })
 })

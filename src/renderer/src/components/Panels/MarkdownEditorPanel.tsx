@@ -51,6 +51,7 @@ import { DocumentStatsBar } from './DocumentStatsBar'
 // Types and pure functions
 import type { ViewMode, EditorFile } from '../Editor/MarkdownEditorPanel/types'
 import {
+  beginLatestLoad,
   calculateStats,
   extractFileName,
   getDefaultViewMode,
@@ -60,7 +61,7 @@ import {
   trackSaveInFlight,
   type SaveTrigger
 } from './markdownEditorPanel.logic'
-import { formatSaveError, loggableError } from '../../utils/errorUtils'
+import { formatLoadError, formatSaveError, loggableError } from '../../utils/errorUtils'
 import { formatTabTitle } from '../../utils/tabTitle'
 
 // Shared constants
@@ -117,6 +118,8 @@ export function MarkdownEditorPanel(
   // Core State
   // =========================================================================
   const [currentFile, setCurrentFile] = useState<EditorFile | null>(null)
+  // Why the last load failed (shown instead of "No file open"); null after a success
+  const [loadError, setLoadError] = useState<string | null>(null)
   // The project session generation the file was loaded under (undefined until a project event was seen)
   const openedGenerationRef = useRef<number | undefined>(undefined)
   const [viewMode, setViewMode] = useState<ViewMode>('preview')
@@ -149,6 +152,10 @@ export function MarkdownEditorPanel(
    * does not repeat it every few seconds. Reset when the file changes (below).
    */
   const lastSaveErrorRef = useRef<string | null>(null)
+  /** Bumped by every load and on unmount, so only the latest load applies (see beginLatestLoad) */
+  const loadSeqRef = useRef(0)
+  /** The pending "auto-saved" indicator reset, cleared on unmount and by the next autosave */
+  const autoSaveIndicatorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // =========================================================================
   // Dialog and Toast
@@ -320,8 +327,13 @@ export function MarkdownEditorPanel(
       clearDeletedState()
 
       if (isAutoSave) {
-        // Show auto-save indicator briefly
-        setTimeout(() => setIsAutoSaving(false), INDICATOR_DURATION_MS)
+        // Show auto-save indicator briefly. One pending reset at a time, so an
+        // earlier save's reset never hides this one's indicator early.
+        if (autoSaveIndicatorTimerRef.current) clearTimeout(autoSaveIndicatorTimerRef.current)
+        autoSaveIndicatorTimerRef.current = setTimeout(() => {
+          autoSaveIndicatorTimerRef.current = null
+          setIsAutoSaving(false)
+        }, INDICATOR_DURATION_MS)
       }
       return true
     } catch (error) {
@@ -507,17 +519,18 @@ export function MarkdownEditorPanel(
    */
   const loadFile = useCallback(async (filePath: string) => {
     logger.info('Loading file', { filePath })
+    // An older read that lands after this one must not replace its result
+    const isLatest = beginLatestLoad(loadSeqRef)
     setIsEditorReady(false) // Reset editor ready state when loading new file
     try {
       // The project this file is opened under; saves name it
       const generation = getLastSeenProjectGeneration()
       const content = await fileGateway.readFile({ filePath })
+      if (!isLatest()) return
       openedGenerationRef.current = generation
-      logger.info('File loaded successfully', {
-        filePath,
-        contentLength: content.length,
-        contentPreview: content.substring(0, 100)
-      })
+      // Length only: the document's text stays out of the log
+      logger.info('File loaded successfully', { filePath, contentLength: content.length })
+      setLoadError(null)
       setCurrentFile({
         path: filePath,
         content,
@@ -527,9 +540,14 @@ export function MarkdownEditorPanel(
       // Set view mode based on file type using extracted logic
       setViewMode(getDefaultViewMode(filePath))
     } catch (error) {
-      logger.error('Error loading file', error instanceof Error ? error : undefined)
+      if (!isLatest()) return
+      logger.error('Error loading file', loggableError(error))
+      // Never fail silently: without this the tab read "No file open"
+      const message = formatLoadError(error, extractFileName(filePath))
+      setLoadError(message)
+      showToast({ title: 'Could not open file', message, type: 'error', duration: 8000 })
     }
-  }, [setIsEditorReady])
+  }, [setIsEditorReady, showToast])
 
   /**
    * Handles content changes from the Monaco editor.
@@ -623,11 +641,17 @@ export function MarkdownEditorPanel(
     props.api.setTitle(title)
   }, [currentFile?.modified, currentFile?.path, isFileDeleted, props.api])
 
-  // Cleanup: ensure panel is not marked dirty on unmount
+  // Cleanup: ensure panel is not marked dirty on unmount, retire any load in
+  // flight, and drop a pending indicator reset
   useEffect(() => {
     return () => {
       if (panelIdRef.current) {
         useProjectStore.getState().setEditorDirty(panelIdRef.current, false)
+      }
+      loadSeqRef.current += 1
+      if (autoSaveIndicatorTimerRef.current) {
+        clearTimeout(autoSaveIndicatorTimerRef.current)
+        autoSaveIndicatorTimerRef.current = null
       }
     }
   }, [])
@@ -706,6 +730,11 @@ export function MarkdownEditorPanel(
             isVisible={isPanelVisible}
           />
         </EditorErrorBoundary>
+      ) : loadError ? (
+        <div className="editor-empty">
+          <p>{loadError}</p>
+          <p className="hint">Check that the file still exists and can be read, then open it again</p>
+        </div>
       ) : (
         <div className="editor-empty">
           <p>No file open</p>
