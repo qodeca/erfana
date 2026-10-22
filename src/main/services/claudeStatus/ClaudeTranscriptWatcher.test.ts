@@ -14,19 +14,24 @@ vi.mock('../LoggingService', () => ({
 
 import {
   ClaudeTranscriptWatcher,
+  isTranscriptEventName,
   shouldIgnoreTranscriptPath
 } from './ClaudeTranscriptWatcher'
 
-/** Build a fake chokidar FSWatcher that records handlers for manual triggering. */
-function makeMockWatcher() {
+type FolderListener = (eventType: string, filename: string | null) => void
+
+/** Build a fake folder watch that records its listener for manual triggering. */
+function makeMockWatcher(listener: FolderListener) {
   const handlers: Record<string, ((arg?: unknown) => void) | undefined> = {}
   const w = {
     on: vi.fn((event: string, cb: (arg?: unknown) => void) => {
       handlers[event] = cb
       return w
     }),
-    close: vi.fn().mockResolvedValue(undefined),
-    _emit: (event: string, arg?: unknown) => handlers[event]?.(arg)
+    close: vi.fn(),
+    /** A folder event, named relative to the watched folder as fs.watch does. */
+    _emit: (eventType: string, filename: string | null) => listener(eventType, filename),
+    _error: (error: unknown) => handlers.error?.(error)
   }
   return w
 }
@@ -50,8 +55,21 @@ describe('shouldIgnoreTranscriptPath', () => {
     expect(shouldIgnoreTranscriptPath('/root/ENC/session.jsonl')).toBe(false)
   })
 
-  it('allows extension-less entries (dirs) so chokidar can watch the dir', () => {
+  it('allows extension-less entries (dirs) through the path predicate', () => {
     expect(shouldIgnoreTranscriptPath('/root/ENC')).toBe(false)
+  })
+})
+
+describe('isTranscriptEventName', () => {
+  it('accepts a .jsonl name and a missing name', () => {
+    expect(isTranscriptEventName('session.jsonl')).toBe(true)
+    expect(isTranscriptEventName(null)).toBe(true)
+  })
+
+  it('rejects other names, folders and subagent paths', () => {
+    expect(isTranscriptEventName('notes.md')).toBe(false)
+    expect(isTranscriptEventName('subagents')).toBe(false)
+    expect(isTranscriptEventName('subagents/x.jsonl')).toBe(false)
   })
 })
 
@@ -63,8 +81,8 @@ describe('ClaudeTranscriptWatcher', () => {
     vi.useFakeTimers()
     vi.clearAllMocks()
     createdWatchers = []
-    watchFn = vi.fn(() => {
-      const w = makeMockWatcher()
+    watchFn = vi.fn((_dir: string, listener: FolderListener) => {
+      const w = makeMockWatcher(listener)
       createdWatchers.push(w)
       return w
     })
@@ -78,22 +96,25 @@ describe('ClaudeTranscriptWatcher', () => {
     return new ClaudeTranscriptWatcher({ watch: watchFn as never })
   }
 
-  it('creates exactly one chokidar watcher for the first consumer of a dir', () => {
+  it('creates exactly one folder watch for the first consumer of a dir', () => {
     const w = makeWatcher()
     w.watchDir('/dir/A', 'term-1')
 
     expect(watchFn).toHaveBeenCalledTimes(1)
-    expect(watchFn).toHaveBeenCalledWith(
-      '/dir/A',
-      expect.objectContaining({
-        persistent: true,
-        ignoreInitial: true,
-        usePolling: false,
-        followSymlinks: false,
-        depth: 0,
-        ignored: expect.any(Function)
-      })
-    )
+    expect(watchFn).toHaveBeenCalledWith('/dir/A', expect.any(Function))
+  })
+
+  it('opens no further watch as transcripts appear and change (one handle per folder)', () => {
+    const w = makeWatcher()
+    w.watchDir('/dir/A', 'term-1')
+    const watcher = createdWatchers[0]
+
+    for (let i = 0; i < 50; i++) {
+      watcher._emit('rename', `s${i}.jsonl`)
+      watcher._emit('change', `s${i}.jsonl`)
+    }
+
+    expect(watchFn).toHaveBeenCalledTimes(1)
   })
 
   it('does NOT create a second watcher for a second consumer of the same dir', () => {
@@ -104,14 +125,18 @@ describe('ClaudeTranscriptWatcher', () => {
     expect(watchFn).toHaveBeenCalledTimes(1)
   })
 
-  it('passes shouldIgnoreTranscriptPath as the chokidar ignored predicate', () => {
+  it('ignores events for non-transcript names', () => {
     const w = makeWatcher()
+    const onChange = vi.fn()
+    w.onChange(onChange)
     w.watchDir('/dir/A', 'term-1')
 
-    const options = watchFn.mock.calls[0][1] as { ignored: (p: string) => boolean }
-    expect(options.ignored('/dir/A/subagents/x.jsonl')).toBe(true)
-    expect(options.ignored('/dir/A/x.txt')).toBe(true)
-    expect(options.ignored('/dir/A/x.jsonl')).toBe(false)
+    const watcher = createdWatchers[0]
+    watcher._emit('change', 'x.txt')
+    watcher._emit('rename', 'subagents')
+    vi.advanceTimersByTime(250)
+
+    expect(onChange).not.toHaveBeenCalled()
   })
 
   it('closes the watcher only when the LAST consumer leaves', () => {
@@ -143,9 +168,9 @@ describe('ClaudeTranscriptWatcher', () => {
     w.watchDir('/dir/A', 'term-1')
 
     const watcher = createdWatchers[0]
-    watcher._emit('change', '/dir/A/s.jsonl')
-    watcher._emit('change', '/dir/A/s.jsonl')
-    watcher._emit('add', '/dir/A/s2.jsonl')
+    watcher._emit('change', 's.jsonl')
+    watcher._emit('change', 's.jsonl')
+    watcher._emit('rename', 's2.jsonl')
 
     // Nothing yet — still inside the coalesce window.
     expect(onChange).not.toHaveBeenCalled()
@@ -162,7 +187,7 @@ describe('ClaudeTranscriptWatcher', () => {
     w.watchDir('/dir/A', 'term-1')
 
     const watcher = createdWatchers[0]
-    watcher._emit('change', '/dir/A/s.jsonl')
+    watcher._emit('change', 's.jsonl')
     w.unwatchDir('/dir/A', 'term-1')
 
     vi.advanceTimersByTime(250)
@@ -189,5 +214,14 @@ describe('ClaudeTranscriptWatcher', () => {
     })
     const w = new ClaudeTranscriptWatcher({ watch: throwing as never })
     expect(() => w.watchDir('/dir/A', 'term-1')).not.toThrow()
+  })
+
+  it('swallows a watch error event and keeps the watch', () => {
+    const w = makeWatcher()
+    w.watchDir('/dir/A', 'term-1')
+
+    expect(() => createdWatchers[0]._error(new Error('EPERM'))).not.toThrow()
+    w.unwatchDir('/dir/A', 'term-1')
+    expect(createdWatchers[0].close).toHaveBeenCalledTimes(1)
   })
 })
