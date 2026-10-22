@@ -231,6 +231,11 @@ describe('markdown-image:read', () => {
       const started = Date.now()
       await expect(call({ filePath: fifo })).resolves.toEqual({ status: 'refused', reason: 'not-found' })
       expect(Date.now() - started).toBeLessThan(1_000)
+      // Nothing can exist below it either
+      await expect(call({ filePath: join(fifo, 'child.png') })).resolves.toEqual({
+        status: 'refused',
+        reason: 'not-found'
+      })
       // The handle was closed: the FIFO can be removed and the folder cleaned up
       rmSync(fifo)
     }
@@ -315,7 +320,9 @@ describe('markdown-image:read – Windows paths (fake file system)', () => {
         'C:\\outside': 'dir',
         'C:\\outside\\secret.png': 'file',
         'C:\\p\\junction': { link: 'C:\\outside' },
-        'C:\\p\\LINKED~1': { alias: 'C:\\outside' }
+        'C:\\p\\LINKED~1': { alias: 'C:\\outside' },
+        'C:\\p\\foo.pngx': 'file',
+        'C:\\p\\FOO~1.PNG': { alias: 'C:\\p\\foo.pngx' }
       },
       true
     )
@@ -363,6 +370,13 @@ describe('markdown-image:read – Windows paths (fake file system)', () => {
     ['an 8.3 short name leading out', 'C:\\p\\LINKED~1\\secret.png']
   ])('refuses %s as outside the project', async (_label, filePath) => {
     await expect(call({ filePath })).resolves.toEqual({ status: 'refused', reason: 'outside-project' })
+  })
+
+  it('refuses an 8.3 short name that looks like an image but names another type', async () => {
+    await expect(call({ filePath: 'C:\\p\\FOO~1.PNG' })).resolves.toEqual({
+      status: 'refused',
+      reason: 'unsupported-type'
+    })
   })
 
   it('refuses a drive-relative path as unreadable', async () => {

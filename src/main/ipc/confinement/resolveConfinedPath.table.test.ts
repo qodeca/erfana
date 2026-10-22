@@ -68,6 +68,17 @@ const sessionOf = (
 // ---------------------------------------------------------------------------
 // Rows 1-10, 13, 14, 25: a real tree
 // ---------------------------------------------------------------------------
+/** `mkfifo` is on the path (POSIX hosts only). */
+function hasMkfifo(): boolean {
+  if (process.platform === 'win32') return false
+  try {
+    execFileSync('which', ['mkfifo'], { stdio: 'ignore' })
+    return true
+  } catch {
+    return false
+  }
+}
+
 describe.skipIf(process.platform === 'win32')('resolveConfinedPath – POSIX tree', () => {
   let base: string
   let root: string
@@ -242,6 +253,18 @@ describe.skipIf(process.platform === 'win32')('resolveConfinedPath – POSIX tre
     const missing = await outcome(path.join(outside, 'no-such-file'), ctx, project)
     expect(existing).toBe('OUTSIDE_PROJECT')
     expect(missing).toBe(existing)
+  })
+
+  it.runIf(hasMkfifo())('a path below a special file in the project is not found, in project and entry modes', async () => {
+    const fifo = path.join(root, 'pipe')
+    execFileSync('mkfifo', [fifo])
+    try {
+      expect(await outcome(path.join(fifo, 'child'), ctx, project)).toBe('NOT_FOUND')
+      expect(await outcome(path.join(fifo, 'a', 'child'), ctx, project)).toBe('NOT_FOUND')
+      expect(await outcome(path.join(fifo, 'a', 'child'), ctx, { mode: 'project-entry' })).toBe('NOT_FOUND')
+    } finally {
+      rmSync(fifo)
+    }
   })
 
   it('a path below an outside file gets the outside answer, not "not found"', async () => {

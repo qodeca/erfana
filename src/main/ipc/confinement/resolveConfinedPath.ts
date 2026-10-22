@@ -226,8 +226,11 @@ async function walkToExistingAncestor(
 async function refuseTailBelowNonFolder(walk: Walk, deps: ConfinementDeps): Promise<void> {
   const { realProbe, tail, probeStats } = walk
   if (tail.length === 0) return
-  // Win32 can report a missing child of a file as ENOENT rather than ENOTDIR
-  if (probeStats?.isFile()) throw new ConfinementError('NOT_FOUND')
+  // Nothing can exist below a file or a special file (FIFO, socket, device);
+  // Win32 can also report a missing child of a file as ENOENT, not ENOTDIR
+  if (probeStats && !probeStats.isDirectory() && !probeStats.isSymbolicLink()) {
+    throw new ConfinementError('NOT_FOUND')
+  }
   if (probeStats?.isSymbolicLink()) {
     let target: ConfinementStats
     try {

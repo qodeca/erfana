@@ -135,8 +135,9 @@ e2e test `e2e/preview-images.e2e.ts` now pins the fixed behaviour).
   and one slot. Paths are case-folded on macOS and Windows. A preview holds at most 64 files and
   keeps at most 4 reads in flight, with at most one waiting per file.
 - **Memory budget:** all Markdown previews in a window, hidden ones included, share 128 MB of
-  `data:` URLs. An image that does not fit shows its alt text, and is retried on the next
-  change once other images have been released.
+  `data:` URLs, reserved before the bytes are decoded. An image that does not fit shows its
+  alt text and keeps its version, so a re-check costs one `fstat`; it is read in full again
+  as soon as other images release enough room.
 - **SVG** is always an `<img src="data:image/svg+xml;base64,…">`, never inlined into the DOM, so
   its scripts do not run and it fetches nothing.
 - **CSP:** unchanged. The page already allows `img-src data:`; no custom protocol was added.

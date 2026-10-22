@@ -352,24 +352,75 @@ describe('MarkdownImageStore – files, not spellings', () => {
 })
 
 describe('MarkdownImageStore – byte budget', () => {
-  it('shows an image that does not fit the shared budget as unavailable, and frees bytes on release', async () => {
+  /** Full reads (answers that carried bytes) of one path so far. */
+  const fullReads = async (filePath: string): Promise<number> => {
+    let count = 0
+    for (const [index, [request]] of disk.read.mock.calls.entries()) {
+      const answer = await disk.read.mock.results[index].value
+      if ((request as MarkdownImageReadRequest).filePath === filePath && answer.status === 'ok') count += 1
+    }
+    return count
+  }
+
+  it('shows an image that does not fit as unavailable, and reads it once room is released', async () => {
     budget = new ImageByteBudget(60)
     disk.write('/p/docs/a.png', 'A'.repeat(20))
     disk.write('/p/docs/b.png', 'B'.repeat(20))
     const store = makeStore()
     const offA = store.subscribe('./a.png', () => {})
+    await flush()
     store.subscribe('./b.png', () => {})
     await flush()
     // Each data URL is 22 + 20 characters: one fits, two do not
-    const views = [store.getView('./a.png'), store.getView('./b.png')].map((v) => v.status)
-    expect(views.sort()).toEqual(['ready', 'unavailable'])
+    expect(store.getView('./a.png').status).toBe('ready')
+    expect(store.getView('./b.png')).toEqual({ status: 'unavailable', reason: 'budget' })
     expect(budget.held).toBe(42)
+
+    // Releasing a.png makes room: b.png is read without waiting for a change event
+    offA()
+    await flush(MARKDOWN_IMAGE_RELEASE_GRACE_MS)
+    expect(store.getView('./b.png').status).toBe('ready')
+    expect(await fullReads('/p/docs/b.png')).toBe(2)
+  })
+
+  it('does not re-read an over-budget image on refresh: 0 full reads over 3 refreshes, 1 after a release', async () => {
+    budget = new ImageByteBudget(60)
+    disk.write('/p/docs/a.png', 'A'.repeat(20))
+    disk.write('/p/docs/b.png', 'B'.repeat(20))
+    const store = makeStore()
+    const offA = store.subscribe('./a.png', () => {})
+    await flush()
+    store.subscribe('./b.png', () => {})
+    await flush()
+    expect(await fullReads('/p/docs/b.png')).toBe(1)
+
+    for (let i = 0; i < 3; i++) {
+      directoryChanged()
+      await flush(MARKDOWN_IMAGE_SETTLE_MS)
+    }
+    expect(await fullReads('/p/docs/b.png')).toBe(1)
+    expect(decode).toHaveBeenCalledTimes(1)
+    expect(store.getView('./b.png')).toEqual({ status: 'unavailable', reason: 'budget' })
 
     offA()
     await flush(MARKDOWN_IMAGE_RELEASE_GRACE_MS)
-    directoryChanged()
-    await flush(MARKDOWN_IMAGE_SETTLE_MS)
+    expect(await fullReads('/p/docs/b.png')).toBe(2)
     expect(store.getView('./b.png').status).toBe('ready')
+  })
+
+  it('reserves before decoding, and gives the room back when the bytes do not decode', async () => {
+    budget = new ImageByteBudget(1_000)
+    disk.write('/p/docs/a.png', 'A'.repeat(20))
+    let heldDuringDecode = -1
+    decode.mockImplementationOnce(async () => {
+      heldDuringDecode = budget.held
+      throw new Error('bad')
+    })
+    const store = makeStore()
+    store.subscribe('./a.png', () => {})
+    await flush()
+    expect(heldDuringDecode).toBe(42)
+    expect(budget.held).toBe(0)
   })
 
   it('is shared: a second preview draws from the same budget', async () => {

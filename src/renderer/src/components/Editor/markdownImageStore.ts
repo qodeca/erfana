@@ -34,7 +34,9 @@
  * {@link MARKDOWN_IMAGE_MAX_CONCURRENT_READS} reads in flight and at most one
  * waiting per file; and a byte budget for the `data:` URLs shared by every
  * preview in the window, hidden ones included ({@link ImageByteBudget},
- * {@link MARKDOWN_IMAGE_BYTE_BUDGET}).
+ * {@link MARKDOWN_IMAGE_BYTE_BUDGET}). A file that does not fit keeps its
+ * version, so a re-check is one `fstat`; it is read in full again only when
+ * the budget announces a release that makes room for it.
  *
  * New bytes are decoded off the DOM before they replace what is shown, so a
  * half-written file keeps the last good image instead of a broken one.
@@ -90,12 +92,31 @@ export const LOADING_VIEW: MarkdownImageView = Object.freeze({ status: 'loading'
  */
 export class ImageByteBudget {
   private used = 0
+  private readonly releaseListeners = new Set<() => void>()
 
   constructor(private readonly limit: number) {}
 
   /** Characters held now (for tests and measurements). */
   get held(): number {
     return this.used
+  }
+
+  /** Characters still free. */
+  get remaining(): number {
+    return this.limit - this.used
+  }
+
+  /**
+   * Hear about every release, so an image waiting for room can be read once
+   * there is some – rather than on every refresh.
+   *
+   * @returns The function that stops listening
+   */
+  onRelease(listener: () => void): () => void {
+    this.releaseListeners.add(listener)
+    return () => {
+      this.releaseListeners.delete(listener)
+    }
   }
 
   /** Take `amount` if it fits; false (and nothing taken) when it does not. */
@@ -108,7 +129,9 @@ export class ImageByteBudget {
 
   /** Give back what {@link reserve} took. */
   release(amount: number): void {
+    if (amount <= 0) return
     this.used = Math.max(0, this.used - amount)
+    for (const listener of [...this.releaseListeners]) listener()
   }
 }
 
@@ -167,6 +190,8 @@ interface FileEntry {
   version?: string
   /** Budget characters this entry holds (its `data:` URL length) */
   bytes: number
+  /** `data:` URL length of the last answer that did not fit the budget; 0 otherwise */
+  wantBytes: number
   readonly spellings: Set<Spelling>
   /** Bumped per read; an answer for an older read is dropped */
   token: number
@@ -309,12 +334,25 @@ export class MarkdownImageStore {
   private attach(): void {
     const offWatcher = this.deps.onDirectoryChanged(() => this.requestRefresh())
     const offOwn = this.deps.onFileStructureChanged(() => this.requestRefresh())
+    const offBudget = this.deps.budget.onRelease(() => this.retryOverBudget())
     this.detach = () => {
       offWatcher()
       offOwn()
+      offBudget()
       this.clearSettle()
       this.pending = false
     }
+  }
+
+  /** Room was freed: read the files waiting for it that now fit. */
+  private retryOverBudget(): void {
+    for (const file of this.files.values()) {
+      if (this.isWaitingForRoom(file) && file.wantBytes <= this.deps.budget.remaining) this.load(file)
+    }
+  }
+
+  private isWaitingForRoom(file: FileEntry): boolean {
+    return isReason(file.view, 'budget')
   }
 
   /** Resolve a spelling to its file, sharing the entry with other spellings of it. */
@@ -337,7 +375,16 @@ export class MarkdownImageStore {
         if (this.files.size >= MAX_MARKDOWN_IMAGES_PER_DOCUMENT) {
           return this.setSpellingView(spelling, unavailable('limit'))
         }
-        file = { key, filePath, view: LOADING_VIEW, bytes: 0, spellings: new Set(), token: 0, queued: false }
+        file = {
+          key,
+          filePath,
+          view: LOADING_VIEW,
+          bytes: 0,
+          wantBytes: 0,
+          spellings: new Set(),
+          token: 0,
+          queued: false
+        }
         this.files.set(key, file)
       }
       file.spellings.add(spelling)
@@ -365,8 +412,10 @@ export class MarkdownImageStore {
   private dropFile(file: FileEntry): void {
     if (this.files.get(file.key) === file) this.files.delete(file.key)
     file.token += 1
-    this.deps.budget.release(file.bytes)
+    file.wantBytes = 0
+    const held = file.bytes
     file.bytes = 0
+    this.deps.budget.release(held)
   }
 
   private notify(spelling: Spelling): void {
@@ -429,42 +478,59 @@ export class MarkdownImageStore {
   }
 
   private async read(file: FileEntry, isStale: () => boolean): Promise<void> {
-    const response = await this.deps.read({ filePath: file.filePath, knownVersion: file.version })
+    // A file waiting for room is read in full only once its bytes would fit;
+    // until then a re-check is an `fstat` that answers `unchanged`
+    const fullRead = this.isWaitingForRoom(file) && file.wantBytes <= this.deps.budget.remaining
+    const knownVersion = fullRead ? undefined : file.version
+    const response = await this.deps.read({ filePath: file.filePath, knownVersion })
     if (isStale() || response.status === 'unchanged') return
 
     if (response.status === 'refused') {
       file.version = undefined
-      this.deps.budget.release(file.bytes)
-      file.bytes = 0
+      file.wantBytes = 0
+      this.giveBack(file, file.bytes)
       this.setFileView(file, unavailable(response.reason))
       return
     }
 
-    // Remembered whatever the decode says: the same bytes are not asked for again
+    // Remembered whatever happens next: the same bytes are not asked for again
     file.version = response.version
+
+    // Reserved before the decode: the size is known from the answer
+    const size = response.dataUrl.length
+    const delta = size - file.bytes
+    if (!this.deps.budget.reserve(delta)) {
+      // Over the window's budget: show the alt text and wait for room
+      file.wantBytes = size
+      this.giveBack(file, file.bytes)
+      this.setFileView(file, unavailable('budget'))
+      return
+    }
+    file.wantBytes = 0
+
     try {
       await this.deps.decode(response.dataUrl)
     } catch {
+      if (delta > 0) this.deps.budget.release(delta)
       if (isStale()) return
       // Half-written or corrupt: keep what is shown; the next change re-checks
       if (file.view.status !== 'ready') this.setFileView(file, unavailable('undecodable'))
       return
     }
-    if (isStale()) return
-
-    const size = response.dataUrl.length
-    if (!this.deps.budget.reserve(size - file.bytes)) {
-      // Over the window's budget: show the alt text, and forget the version so
-      // a later re-check reads again once room is free
-      this.deps.budget.release(file.bytes)
-      file.bytes = 0
-      file.version = undefined
-      this.setFileView(file, unavailable('budget'))
+    if (isStale()) {
+      if (delta > 0) this.deps.budget.release(delta)
       return
     }
-    if (size < file.bytes) this.deps.budget.release(file.bytes - size)
+
+    if (delta < 0) this.deps.budget.release(-delta)
     file.bytes = size
     this.setFileView(file, { status: 'ready', url: response.dataUrl })
+  }
+
+  /** Release `amount` of what `file` holds. */
+  private giveBack(file: FileEntry, amount: number): void {
+    file.bytes -= amount
+    this.deps.budget.release(amount)
   }
 
   private clearSettle(): void {

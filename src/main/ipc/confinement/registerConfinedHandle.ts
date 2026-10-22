@@ -101,6 +101,7 @@ export interface ConfinedHandleDefinition<
 }
 
 const confinedChannels = new Map<string, readonly string[]>()
+const channelDeps = new Map<string, ConfinementDeps>()
 
 /**
  * Channels registered through {@link registerConfinedHandle} in this process,
@@ -108,6 +109,15 @@ const confinedChannels = new Map<string, readonly string[]>()
  */
 export function getConfinedChannels(): ReadonlyMap<string, readonly string[]> {
   return confinedChannels
+}
+
+/**
+ * The file system and path flavour each channel checks against. Production
+ * registrations must all use {@link defaultConfinementDeps}; a unit test walks
+ * every registered channel to hold that.
+ */
+export function getConfinedChannelDeps(): ReadonlyMap<string, ConfinementDeps> {
+  return channelDeps
 }
 
 /** The paths of one call, checked in the order they were listed. */
@@ -181,6 +191,8 @@ export function registerConfinedHandle<
   }
   const allBindings = { ...definition.paths, ...optionalBindings } as Record<string, PathBinding>
   confinedChannels.set(channel, Object.keys(allBindings))
+  const deps = definition.confinementDeps ?? defaultConfinementDeps
+  channelDeps.set(channel, deps)
 
   registerHandle(channel, async (event, ...rawArgs: unknown[]) => {
     if (definition.senderGate && !definition.senderGate.allow(event)) {
@@ -209,7 +221,7 @@ export function registerConfinedHandle<
         event.sender?.id ?? null,
         {
           lexicalPrecheck: definition.lexicalPrecheck === true,
-          deps: definition.confinementDeps ?? defaultConfinementDeps
+          deps
         }
       )
       const result = await definition.handler(
