@@ -415,10 +415,13 @@ export class TerminalService extends EventEmitter {
       // Output to the renderer is batched; on POSIX the PTY is also paused while
       // the renderer is far behind. Not on Windows: node-pty 1.1.0 implements
       // pause() there by pausing the socket fed from the ConPTY output pipe, and
-      // its exit and kill clean-up (`_$onProcessExit`, `_flushDataAndCleanUp`,
-      // the conpty.dll kill path) wait for that socket to keep emitting data. A
-      // pause at the wrong moment would delay the exit the quit sequence waits
-      // for (#214, #296). Windows terminals are therefore only batched.
+      // its clean-up is driven by that socket's data events. After the shell
+      // exits it destroys the socket a fixed time after the last data event
+      // (`_$onProcessExit`, `_flushDataAndCleanUp`), which would drop output a
+      // pause still holds, and the conpty.dll kill path disposes the pipe reader
+      // only on the next data event. A pause there could lose output or hold up
+      // the exit the quit sequence waits for (#214, #296), so Windows terminals
+      // are only batched.
       const flowControl = osPlatform() !== 'win32'
       const ptyPid = ptyProcess.pid
       const output = new TerminalOutputFlow({
