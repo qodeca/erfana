@@ -65,6 +65,9 @@ export interface FolderWatchHandle {
  * Injected folder-watch signature (defaults to a non-recursive `fs.watch`). The
  * listener gets the changed entry's name, or null when the platform has none.
  */
+/** Injected `stat` (defaults to `fs.promises.stat`); only `ino` is read. */
+type StatFn = (dir: string) => Promise<{ ino: number }>
+
 type WatchFn = (
   dir: string,
   listener: (eventType: string, filename: string | null) => void
@@ -85,6 +88,10 @@ interface WatchedDir {
   consumers: Set<string>
   /** Pending coalesce timer; non-null while a burst is being collected. */
   coalesceTimer: NodeJS.Timeout | null
+  /** The folder's inode when the watch was armed; a different one means it was replaced */
+  ino?: number
+  /** When `watchDir` last checked a live watch against the folder (ms) */
+  lastCheckAt: number
 }
 
 /**
@@ -130,9 +137,11 @@ export class ClaudeTranscriptWatcher {
 
   /** Injected folder watch (real by default; mocked in tests). */
   private readonly watchFn: WatchFn
+  private readonly statFn: StatFn
 
-  constructor(opts?: { watch?: WatchFn }) {
+  constructor(opts?: { watch?: WatchFn; stat?: StatFn }) {
     this.watchFn = opts?.watch ?? watchFolder
+    this.statFn = opts?.stat ?? ((dir) => fs.promises.stat(dir))
   }
 
   /**
@@ -158,7 +167,8 @@ export class ClaudeTranscriptWatcher {
         rearmTimer: null,
         rearmDelayMs: REARM_DELAY_MS,
         consumers: new Set(),
-        coalesceTimer: null
+        coalesceTimer: null,
+        lastCheckAt: 0
       }
       this.dirs.set(dir, entry)
       entry.consumers.add(consumerId)
@@ -167,6 +177,7 @@ export class ClaudeTranscriptWatcher {
     }
     entry.consumers.add(consumerId)
     if (entry.watcher === null) this.arm(dir, entry, true)
+    else this.checkLive(dir, entry)
   }
 
   /**
@@ -238,7 +249,45 @@ export class ClaudeTranscriptWatcher {
       this.closeQuietly(watcher, dir)
       this.scheduleRearm(dir, entry)
     })
+    entry.ino = undefined
+    entry.lastCheckAt = Date.now()
+    void this.statFn(dir).then(
+      (stats) => {
+        if (entry.watcher === watcher) entry.ino = stats.ino
+      },
+      () => {}
+    )
     if (notify) this.scheduleChange(dir)
+  }
+
+  /**
+   * On macOS and Linux a deleted (or deleted and re-created) folder may leave
+   * its watch silent without an `error`. At most once per {@link REARM_DELAY_MS},
+   * a `watchDir` on a live watch compares the folder's inode with the one at
+   * arm time, off the main thread; gone or different, the watch is re-armed.
+   */
+  private checkLive(dir: string, entry: WatchedDir): void {
+    const now = Date.now()
+    if (now - entry.lastCheckAt < REARM_DELAY_MS) return
+    entry.lastCheckAt = now
+    const watcher = entry.watcher
+    void this.statFn(dir).then(
+      (stats) => {
+        if (entry.watcher !== watcher || entry.ino === undefined || stats.ino === entry.ino) return
+        this.rearmDead(dir, entry)
+      },
+      () => {
+        if (entry.watcher === watcher) this.rearmDead(dir, entry)
+      }
+    )
+  }
+
+  private rearmDead(dir: string, entry: WatchedDir): void {
+    if (this.dirs.get(dir) !== entry || entry.watcher === null) return
+    const dead = entry.watcher
+    entry.watcher = null
+    this.closeQuietly(dead, dir)
+    this.arm(dir, entry, true)
   }
 
   private scheduleRearm(dir: string, entry: WatchedDir): void {
@@ -250,6 +299,8 @@ export class ClaudeTranscriptWatcher {
       if (this.dirs.get(dir) !== entry || entry.watcher !== null) return
       this.arm(dir, entry, true)
     }, delay)
+    // A pending retry must never keep the process alive at quit
+    entry.rearmTimer.unref?.()
   }
 
   /**

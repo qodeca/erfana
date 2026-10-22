@@ -291,6 +291,71 @@ describe('ClaudeTranscriptWatcher', () => {
       expect(watchFn).toHaveBeenCalledTimes(3)
     })
 
+    it('re-arms a silent watch whose folder was replaced (inode changed), checked from watchDir', async () => {
+      let ino = 1
+      const stat = vi.fn(async () => ({ ino }))
+      const w = new ClaudeTranscriptWatcher({ watch: watchFn as never, stat })
+      const onChange = vi.fn()
+      w.onChange(onChange)
+      w.watchDir('/dir/A', 'term-1')
+      await vi.advanceTimersByTimeAsync(0)
+
+      // Within the check interval: no stat, no re-arm
+      w.watchDir('/dir/A', 'term-1')
+      expect(stat).toHaveBeenCalledTimes(1)
+
+      // Deleted and re-created: a new inode, and no `error` from the old handle
+      ino = 2
+      await vi.advanceTimersByTimeAsync(REARM_DELAY_MS)
+      w.watchDir('/dir/A', 'term-1')
+      await vi.advanceTimersByTimeAsync(0)
+
+      expect(watchFn).toHaveBeenCalledTimes(2)
+      expect(createdWatchers[0].close).toHaveBeenCalledTimes(1)
+      await vi.advanceTimersByTimeAsync(250)
+      expect(onChange).toHaveBeenCalledWith('/dir/A')
+    })
+
+    it('re-arms when the folder is gone, and keeps a healthy watch as it is', async () => {
+      let gone = false
+      const stat = vi.fn(async () => {
+        if (gone) throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+        return { ino: 7 }
+      })
+      const w = new ClaudeTranscriptWatcher({ watch: watchFn as never, stat })
+      w.watchDir('/dir/A', 'term-1')
+      await vi.advanceTimersByTimeAsync(REARM_DELAY_MS)
+
+      w.watchDir('/dir/A', 'term-1')
+      await vi.advanceTimersByTimeAsync(0)
+      expect(watchFn).toHaveBeenCalledTimes(1)
+
+      gone = true
+      await vi.advanceTimersByTimeAsync(REARM_DELAY_MS)
+      w.watchDir('/dir/A', 'term-1')
+      await vi.advanceTimersByTimeAsync(0)
+      expect(createdWatchers[0].close).toHaveBeenCalledTimes(1)
+      expect(watchFn).toHaveBeenCalledTimes(2)
+    })
+
+    it('does not keep the process alive with a pending re-arm', () => {
+      const w = makeWatcher()
+      const unref = vi.fn()
+      const realSetTimeout = globalThis.setTimeout
+      const spy = vi.spyOn(globalThis, 'setTimeout').mockImplementation(((fn: () => void, ms?: number) => {
+        const timer = realSetTimeout(fn, ms) as unknown as { unref?: () => void }
+        timer.unref = unref
+        return timer
+      }) as never)
+      try {
+        w.watchDir('/dir/A', 'term-1')
+        createdWatchers[0]._error(new Error('EPERM'))
+        expect(unref).toHaveBeenCalled()
+      } finally {
+        spy.mockRestore()
+      }
+    })
+
     it('closes nothing twice: unwatch after a dead watch closes only the live one', () => {
       const w = makeWatcher()
       w.watchDir('/dir/A', 'term-1')
