@@ -42,7 +42,7 @@ import {
   type WindowRule
 } from './ClaudeWindowDetector'
 import { friendlyModelName, sanitizeModelId } from './friendlyModelName'
-import { stickyModelKey } from './modelId'
+import { isRecognisedModelId, stickyModelKey } from './modelId'
 import { clampPercent, levelFor } from './thresholds'
 import { createProcessDetector } from './process/createProcessDetector'
 import type { IClaudeProcessDetector } from './process/types'
@@ -174,9 +174,30 @@ function hasControlChars(value: string): boolean {
   return false
 }
 
+/**
+ * Distinct unrecognised model ids logged per service before it goes quiet
+ * (#49). The ids are untrusted transcript text, so the set that dedupes them
+ * must not grow without bound.
+ */
+const MAX_LOGGED_UNRECOGNISED_IDS = 32
+
+/** A 12-digit AWS account id inside an ARN (`…:123456789012:…`). */
+const AWS_ACCOUNT_ID_RE = /:\d{12}(?=:|$)/g
+
+/**
+ * A model id fit for a log file: sanitized like the wire field, with an AWS
+ * account id masked. A Bedrock ARN carries one, and log files leave the machine
+ * in bug reports.
+ */
+function modelIdForLog(modelId: string): string {
+  return sanitizeModelId(modelId).replace(AWS_ACCOUNT_ID_RE, ':[redacted-account]')
+}
+
 export class ClaudeStatusService {
   private readonly entries = new Map<string, PanelEntry>()
   private readonly deps: ClaudeStatusDeps
+  /** Unrecognised model ids already logged, so each is logged once (#49). */
+  private readonly loggedUnrecognisedIds = new Set<string>()
 
   constructor(deps?: Partial<ClaudeStatusDeps>) {
     const watcher = deps?.watcher ?? new ClaudeTranscriptWatcher()
@@ -428,7 +449,7 @@ export class ClaudeStatusService {
         pid: entry.pid,
         candidates: candidates.length,
         chosenFile: chosenFile ? path.basename(chosenFile) : undefined,
-        modelId: sanitizeModelId(parsed.modelId),
+        modelId: modelIdForLog(parsed.modelId),
         windowSize,
         rule,
         inferred,
@@ -512,12 +533,34 @@ export class ClaudeStatusService {
     const sticky = entry.observedExtended === true
     const windowSize: 200000 | 1000000 = sticky ? 1000000 : detectedWindow
 
-    // Say so in the UI (#41 §5.4): a registry-only 1M badge is an inference.
+    // An id the parser could not read gets the safe 200k default, which is a
+    // guess about an unknown model rather than a fact about a known one (#49).
+    const recognised = isRecognisedModelId(parsed.modelId)
+    if (!recognised) this.logUnrecognisedOnce(parsed.modelId)
+
+    // Say so in the UI (#41 §5.4): a registry-only 1M badge is an inference, and
+    // so is the 200k default for an unrecognised id.
     return {
       windowSize,
-      inferred: windowSize === 1000000 && !corroborated && !sticky,
+      inferred:
+        (windowSize === 1000000 && !corroborated && !sticky) ||
+        (windowSize === 200000 && !recognised),
       rule: detail?.rule
     }
+  }
+
+  /**
+   * Log an unrecognised model id the first time this service sees it, so a
+   * meter showing `200k (inferred)` can be traced to the id that caused it
+   * without a line on every ~1.25s refresh. Bounded by
+   * {@link MAX_LOGGED_UNRECOGNISED_IDS}.
+   */
+  private logUnrecognisedOnce(modelId: string): void {
+    const key = modelIdForLog(modelId)
+    if (this.loggedUnrecognisedIds.has(key)) return
+    if (this.loggedUnrecognisedIds.size >= MAX_LOGGED_UNRECOGNISED_IDS) return
+    this.loggedUnrecognisedIds.add(key)
+    logger.warn('claudeStatus.unrecognisedModelId', { modelId: key })
   }
 
   /**

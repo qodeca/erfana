@@ -11,6 +11,7 @@
  * trim, and an oversize `<command-args>` payload.
  *
  * @see Issue #41 - Context meter reads the 200k window for Opus 5 sessions
+ * @see Issue #49 - Model ids from Bedrock, Vertex and Foundry are not recognised
  * @see docs/designs/41-model-capability-registry.md §9.1, §11, §13 (decision (e))
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -107,6 +108,43 @@ describe('/model override - accepted selections', () => {
       modelForcedExtended: true
     })
     expect(result.modelId).not.toContain('\t')
+  })
+})
+
+describe('/model override - cloud-platform ids are honoured (#49)', () => {
+  // Before #49 each of these failed the `^claude-` grammar and the selection was
+  // silently dropped, leaving the meter on the assistant turn's model. The
+  // selected id is carried in its NORMALISED form, so it fits the IPC bound and
+  // keys the sticky state like the bare id.
+  it('honours a Bedrock inference-profile id with [1m]', async () => {
+    expect(await parseWithOverride('us.anthropic.claude-opus-5[1m]')).toEqual({
+      modelId: 'claude-opus-5',
+      usedTokens: 42,
+      modelForcedExtended: true
+    })
+  })
+
+  it('honours a Bedrock ARN longer than the IPC bound', async () => {
+    const arn = 'arn:aws:bedrock:us-east-1:123456789012:inference-profile/global.anthropic.claude-sonnet-5'
+    expect(arn.length).toBeGreaterThan(64)
+    expect(await parseWithOverride(arn)).toEqual({
+      modelId: 'claude-sonnet-5',
+      usedTokens: 42,
+      modelForcedStandard: true
+    })
+  })
+
+  it('honours a Vertex @date id', async () => {
+    expect(await parseWithOverride('claude-haiku-4-5@20251001')).toEqual({
+      modelId: 'claude-haiku-4-5-20251001',
+      usedTokens: 42,
+      modelForcedStandard: true
+    })
+  })
+
+  it('still ignores an application-inference-profile ARN, which names no model', async () => {
+    const arn = 'arn:aws:bedrock:us-east-2:123456789012:application-inference-profile/opus-47-prod'
+    expect(await parseWithOverride(arn)).toEqual(FALLBACK_TURN)
   })
 })
 
