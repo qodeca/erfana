@@ -745,7 +745,7 @@ app.on('before-quit', (event): Promise<void> | undefined => {
   return runQuitSequence(
     [
       () => {
-        // Windows (#305): a detached helper that force-ends us if teardown hangs and then
+        // Windows (#305): a hidden helper that outlives us, force-ends us if teardown hangs and then
         // ends every console host, terminal shell and process they started that is still
         // running. Started FIRST so a main thread that blocks in a disposer is still
         // force-ended, and outside the dispose race so it always runs. The quit moment it

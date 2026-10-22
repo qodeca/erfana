@@ -9,8 +9,8 @@
  * end both, but a leftover keeps running after the app is gone. This cleanup does
  * not depend on either.
  *
- * It is started FIRST in the quit sequence, as one hidden, detached, absolute-path
- * PowerShell that:
+ * It is started FIRST in the quit sequence, as one hidden, absolute-path PowerShell
+ * (deliberately NOT detached, see {@link startConptyHostReaper}) that:
  * 1. while our process is still alive (at most the grace period), lists the processes
  *    every second and learns our terminal tree – console hosts that are our children,
  *    the shells we pass in, and everything below them – each by pid AND creation time,
@@ -359,8 +359,23 @@ export interface ReapOptions {
 }
 
 /**
- * Starts the helper and returns at once; it is detached, so it keeps running after
- * the app exits. Never throws, and does nothing off Windows.
+ * Starts the helper and returns at once; it is `unref`'d and keeps running after the
+ * app exits. Never throws, and does nothing off Windows.
+ *
+ * NOT `detached` (#305, Windows round 5): on Windows `detached: true` starts the child
+ * with DETACHED_PROCESS, so `powershell.exe` gets no console and exits with code 0
+ * after about 0.6 s without running `-Command` (nodejs/node#51018). Measured on
+ * Windows: 20 of 20 quits had no `helper started` line; the same spawn without
+ * `detached` ran the whole script, and kept running after its parent had exited.
+ * `windowsHide` gives it a hidden console instead.
+ *
+ * Job objects: a child that is not detached stays in every job object the app is in.
+ * If something launched Erfana inside a job that ends its processes when it closes
+ * (JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE, used by some launchers and terminals), the helper
+ * ends with the app, before its sweeps. Node exposes no CREATE_BREAKAWAY_FROM_JOB, and a
+ * native module is out of scope, so this is not worked around; it is visible in the
+ * trace: `helper started` and `learned` lines with no `app exited` / `sweep` lines
+ * after it.
  *
  * Before the start it replaces the trace file with one line from the app, so a file
  * that holds only that line means the helper never ran.
@@ -404,7 +419,8 @@ export function startConptyHostReaper(options: ReapOptions = {}): boolean {
     const child = spawnFn(
       powershellPath(),
       ['-NoProfile', '-NonInteractive', '-NoLogo', '-Command', script],
-      { stdio: 'ignore', windowsHide: true, detached: true, env: powershellEnv(process.env, trace) }
+      // No `detached` (see above): a detached powershell.exe never runs its script
+      { stdio: 'ignore', windowsHide: true, env: powershellEnv(process.env, trace) }
     )
     // No kill timer: the process is gone before one could fire. The script bounds itself
     // (grace period, query timeout, sweep count).

@@ -149,7 +149,7 @@ describe('startConptyHostReaper', () => {
     expect(spawnFn).not.toHaveBeenCalled()
   })
 
-  it('starts one hidden detached PowerShell for our pid and returns at once', () => {
+  it('starts one hidden PowerShell for our pid, not detached and unref()-ed, and returns at once', () => {
     const child = fakeChild()
     const spawnFn = vi.fn(() => child)
     const started = startConptyHostReaper({
@@ -172,7 +172,10 @@ describe('startConptyHostReaper', () => {
     expect(script).toContain('FromUnixTimeMilliseconds(99940000)')
     expect(script).toContain('FromUnixTimeMilliseconds(100000000)')
     expect(script).toContain('FromUnixTimeMilliseconds(100000250)')
-    expect(opts).toMatchObject({ windowsHide: true, detached: true, stdio: 'ignore' })
+    expect(opts).toMatchObject({ windowsHide: true, stdio: 'ignore' })
+    // a detached powershell.exe has no console and exits without running -Command
+    // (nodejs/node#51018; 20 of 20 Windows quits on d30c622e)
+    expect(opts.detached).not.toBe(true)
     expect(Object.keys(opts.env as object).sort()).toEqual(['PSModulePath', 'SystemRoot', 'windir'])
     expect(child.unref).toHaveBeenCalled()
   })
