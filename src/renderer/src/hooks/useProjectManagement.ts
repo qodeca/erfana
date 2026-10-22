@@ -362,7 +362,7 @@ export function useProjectManagement(
       logger.error(createCloseProjectErrorLog(), err instanceof Error ? err : undefined)
       showGlobalToast({
         type: 'error',
-        title: 'Close Project Failed',
+        title: 'Failed to Close Project',
         message: createCloseErrorMessage(err)
       })
     } finally {

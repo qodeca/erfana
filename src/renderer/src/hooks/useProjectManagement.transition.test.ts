@@ -129,6 +129,9 @@ describe('useProjectManagement transitions', () => {
         await result.current.handleCloseProject()
       })
       expect(mocks.settle).toHaveBeenCalledExactlyOnceWith(false)
+      expect(showGlobalToast).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'error', title: 'Failed to Close Project' })
+      )
     })
   })
 
