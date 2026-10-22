@@ -80,21 +80,20 @@
       unusable — that is why the roving pattern exists: the list holds the tab stop and moves focus
       internally with arrows.
       <br><br>
-      Erfana's file tree has <strong>none</strong> of this today, and gets the inverse instead.
-      It declares <code>role="tree"</code>, so a screen reader switches to application mode and hands
-      the arrow keys to a widget that implements none of them — a wrong role is worse than a missing
-      one. Meanwhile <code>ProjectTreeNode.tsx</code> spreads dnd-kit's drag attributes onto every row,
-      and <code>useDraggable</code> defaults to <code>tabIndex: 0</code> plus a role, so
-      <strong>every row is a tab stop</strong>: a <code>role="button"</code> nested inside a
-      <code>role="treeitem"</code>, activated by an <code>onClick</code> on a div, so Enter and Space
-      open nothing. Exactly the 400-stop tree the rule above forbids, with none of them working.
+      <strong>The file tree now follows this contract</strong> (#87, #88, #89). It uses a
+      <strong>roving tabindex</strong>, not the <code>aria-activedescendant</code> this demo uses: the row
+      that has focus carries <code>tabIndex="0"</code> and every other row <code>-1</code>. The tree is
+      virtualised, so only the rows in view are in the DOM, and roving keeps real DOM focus on a row. That
+      is what dnd-kit, focus recovery after a rename, and the ring all key off. The focused row and the row
+      being dragged are always kept mounted. Each row states <code>aria-level</code>,
+      <code>aria-posinset</code> and <code>aria-setsize</code>, because assistive tech cannot count rows
+      that are not rendered.
       <br><br>
-      This paragraph claimed the opposite until 2026-09-01 — "nothing in it is focusable". The
-      correction changes the fix, not just the fact: adopting the roving pattern means overriding
-      dnd-kit's <code>tabIndex</code> first, because it puts <code>0</code> on every row while roving
-      needs <code>0</code> on exactly one. Tracked on
-      <a href="https://github.com/qodeca/erfana/issues/88" style="color: var(--color-link)">#88</a>.
-      The file, screen and window pickers all implement the pattern correctly, so the code to copy exists.
+      Before that, the tree had the inverse. <code>ProjectTreeNode.tsx</code> spread dnd-kit's drag
+      attributes onto every row, and <code>useDraggable</code> defaults to <code>tabIndex: 0</code> plus
+      <code>role="button"</code>, so every row was a Tab stop that no key operated. The fix had to drop
+      those attributes first: they put <code>0</code> on every row, and roving needs <code>0</code> on
+      exactly one. The tree keeps only dnd-kit's pointer listeners.
     </div>
   </div>
 </div>

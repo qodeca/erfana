@@ -13,5 +13,7 @@
 - **Large folders open instantly.** The project tree now draws only the rows on screen, so expanding
   a folder with thousands of files, or scrolling a large project, no longer stalls the window; a
   click or a Git refresh also redraws only the rows that changed. While dragging, the rows inside the
-  target folder are tinted as before. A cut file or folder is now dimmed until it is pasted – the
+  target folder are tinted as before. Dropping an item next to itself (on a sibling, or on its own
+  folder) now does nothing, instead of asking to move it where it already is, and auto-scroll while
+  dragging follows the pointer. A cut file or folder is now dimmed until it is pasted – the
   dimming was designed but never reached any row below the project root. (review finding [33])
