@@ -15,6 +15,8 @@ import {
   MARKDOWN_IMAGE_MAX_CONCURRENT_READS,
   MARKDOWN_IMAGE_MAX_WAIT_MS,
   MARKDOWN_IMAGE_RELEASE_GRACE_MS,
+  MARKDOWN_IMAGE_RETRY_FIRST_MS,
+  MARKDOWN_IMAGE_RETRY_WINDOW_MS,
   MARKDOWN_IMAGE_SETTLE_MS,
   ImageByteBudget,
   MarkdownImageStore
@@ -480,5 +482,101 @@ describe('MarkdownImageStore – one read per change', () => {
     await flush()
     const asked = disk.read.mock.calls.map(([r]) => (r as MarkdownImageReadRequest).filePath)
     expect(asked.filter((p) => p.endsWith('waiting.png'))).toHaveLength(0)
+  })
+})
+
+describe('MarkdownImageStore – a shown image survives a passing failure', () => {
+  /** Make the next reads of a path answer `unreadable`, as a locked file does. */
+  function lock(path: string): () => void {
+    const real = disk.read.getMockImplementation()!
+    disk.read.mockImplementation(async (request: MarkdownImageReadRequest) =>
+      request.filePath === path ? { status: 'refused', reason: 'unreadable' } : real(request)
+    )
+    return () => disk.read.mockImplementation(real)
+  }
+
+  it('keeps the image while the file is locked, then shows the new one after the unlock without an event', async () => {
+    disk.write('/p/docs/a.png', 'A1')
+    const store = makeStore()
+    store.subscribe('./a.png', () => {})
+    await flush()
+
+    // Another program locks the file and rewrites it
+    const unlock = lock('/p/docs/a.png')
+    disk.write('/p/docs/a.png', 'A2')
+    directoryChanged()
+    await flush(MARKDOWN_IMAGE_SETTLE_MS)
+    expect(store.getView('./a.png')).toEqual({ status: 'ready', url: 'data:image/png;base64,A1' })
+
+    // Still locked at the first re-try: still the last good image
+    await flush(MARKDOWN_IMAGE_RETRY_FIRST_MS)
+    expect(store.getView('./a.png')).toEqual({ status: 'ready', url: 'data:image/png;base64,A1' })
+
+    // Unlocked with no further watcher event: the next re-try (2 s) catches it
+    unlock()
+    await flush(MARKDOWN_IMAGE_RETRY_FIRST_MS * 2)
+    expect(store.getView('./a.png')).toEqual({ status: 'ready', url: 'data:image/png;base64,A2' })
+  })
+
+  it('stops re-trying a lock that never ends after the re-try window', async () => {
+    disk.write('/p/docs/a.png', 'A1')
+    const store = makeStore()
+    store.subscribe('./a.png', () => {})
+    await flush()
+    lock('/p/docs/a.png')
+    directoryChanged()
+    await flush(MARKDOWN_IMAGE_SETTLE_MS)
+    const afterEvent = disk.read.mock.calls.length
+
+    await flush(MARKDOWN_IMAGE_RETRY_WINDOW_MS * 3)
+    // 1 s, 2 s, 4 s, 8 s fit in the window; 16 s more would pass it
+    expect(disk.read.mock.calls.length - afterEvent).toBe(4)
+    expect(store.getView('./a.png')).toEqual({ status: 'ready', url: 'data:image/png;base64,A1' })
+  })
+
+  it('shows the placeholder when the very first read is unreadable', async () => {
+    disk.write('/p/docs/a.png', 'A1')
+    lock('/p/docs/a.png')
+    const store = makeStore()
+    store.subscribe('./a.png', () => {})
+    await flush()
+    expect(store.getView('./a.png')).toEqual({ status: 'unavailable', reason: 'unreadable' })
+  })
+
+  it('keeps the image over bytes that do not decode yet, and shows them once they do', async () => {
+    disk.write('/p/docs/a.png', 'A1')
+    const store = makeStore()
+    store.subscribe('./a.png', () => {})
+    await flush()
+
+    disk.write('/p/docs/a.png', 'HALF')
+    decode.mockRejectedValueOnce(new Error('truncated'))
+    directoryChanged()
+    await flush(MARKDOWN_IMAGE_SETTLE_MS)
+    expect(store.getView('./a.png')).toEqual({ status: 'ready', url: 'data:image/png;base64,A1' })
+
+    // The writer finishes without a further event; the re-try reads it
+    disk.write('/p/docs/a.png', 'A2')
+    await flush(MARKDOWN_IMAGE_RETRY_FIRST_MS)
+    expect(store.getView('./a.png')).toEqual({ status: 'ready', url: 'data:image/png;base64,A2' })
+  })
+
+  it('still removes a shown image whose file was deleted or moved away', async () => {
+    disk.write('/p/docs/a.png', 'A1')
+    disk.write('/p/docs/b.png', 'B1')
+    const store = makeStore()
+    store.subscribe('./a.png', () => {})
+    store.subscribe('./b.png', () => {})
+    await flush()
+
+    disk.files.delete('/p/docs/a.png')
+    const real = disk.read.getMockImplementation()!
+    disk.read.mockImplementation(async (request: MarkdownImageReadRequest) =>
+      request.filePath === '/p/docs/b.png' ? { status: 'refused', reason: 'outside-project' } : real(request)
+    )
+    directoryChanged()
+    await flush(MARKDOWN_IMAGE_SETTLE_MS)
+    expect(store.getView('./a.png')).toEqual({ status: 'unavailable', reason: 'not-found' })
+    expect(store.getView('./b.png')).toEqual({ status: 'unavailable', reason: 'outside-project' })
   })
 })

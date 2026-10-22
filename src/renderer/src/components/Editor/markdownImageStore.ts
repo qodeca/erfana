@@ -39,7 +39,13 @@
  * the budget announces a release that makes room for it.
  *
  * New bytes are decoded off the DOM before they replace what is shown, so a
- * half-written file keeps the last good image instead of a broken one.
+ * half-written file keeps the last good image instead of a broken one. A
+ * shown image whose re-read fails for a passing reason (locked by another
+ * program, unreadable for a moment, not decodable yet) also stays, and is
+ * re-tried with a bounded back-off ({@link MARKDOWN_IMAGE_RETRY_FIRST_MS},
+ * doubling, for at most {@link MARKDOWN_IMAGE_RETRY_WINDOW_MS}) or at the next
+ * change event. Only a first load shows the placeholder; a file that is gone
+ * or moved out of the project is still removed.
  *
  * @module components/Editor/markdownImageStore
  */
@@ -64,6 +70,10 @@ export const MARKDOWN_IMAGE_SETTLE_MS = 300
 export const MARKDOWN_IMAGE_MAX_WAIT_MS = 2_000
 /** Image reads one preview keeps in flight at once. */
 export const MARKDOWN_IMAGE_MAX_CONCURRENT_READS = 4
+/** First wait (ms) before re-trying a shown image whose re-read failed; doubles each time. */
+export const MARKDOWN_IMAGE_RETRY_FIRST_MS = 1_000
+/** Re-tries of one failure stop once they would run past this (ms) from the first. */
+export const MARKDOWN_IMAGE_RETRY_WINDOW_MS = 30_000
 /** How long (ms) an image no element shows is kept, so a re-render does not re-read it. */
 export const MARKDOWN_IMAGE_RELEASE_GRACE_MS = 2_000
 
@@ -197,6 +207,10 @@ interface FileEntry {
   token: number
   /** A read for this file is waiting for a slot */
   queued: boolean
+  /** Bounded back-off re-try after a failed re-read of a shown image */
+  retryTimer: ReturnType<typeof setTimeout> | null
+  retryDelay: number
+  retryStartedAt: number | null
 }
 
 interface Spelling {
@@ -319,6 +333,8 @@ export class MarkdownImageStore {
 
   /** A change event: settle the burst, then re-check – or owe it while hidden. */
   requestRefresh(): void {
+    // A change event replaces any back-off: the refresh re-reads those files
+    for (const file of this.files.values()) this.clearRetry(file)
     this.pending = true
     if (!this.visible) {
       this.clearSettle()
@@ -383,7 +399,10 @@ export class MarkdownImageStore {
           wantBytes: 0,
           spellings: new Set(),
           token: 0,
-          queued: false
+          queued: false,
+          retryTimer: null,
+          retryDelay: 0,
+          retryStartedAt: null
         }
         this.files.set(key, file)
       }
@@ -410,6 +429,7 @@ export class MarkdownImageStore {
 
   /** Forget a file and give its bytes back; a read in flight for it is dropped. */
   private dropFile(file: FileEntry): void {
+    this.clearRetry(file)
     if (this.files.get(file.key) === file) this.files.delete(file.key)
     file.token += 1
     file.wantBytes = 0
@@ -471,8 +491,10 @@ export class MarkdownImageStore {
         await this.read(file, isStale)
       } catch (error) {
         logger.warn('Markdown image read failed', { error: String(error) })
+        if (isStale()) return
         // A transport failure keeps the last good image rather than blanking it
-        if (!isStale() && file.view.status !== 'ready') this.setFileView(file, unavailable('unreadable'))
+        if (file.view.status === 'ready') this.scheduleRetry(file)
+        else this.setFileView(file, unavailable('unreadable'))
       }
     })
   }
@@ -483,9 +505,22 @@ export class MarkdownImageStore {
     const fullRead = this.isWaitingForRoom(file) && file.wantBytes <= this.deps.budget.remaining
     const knownVersion = fullRead ? undefined : file.version
     const response = await this.deps.read({ filePath: file.filePath, knownVersion })
-    if (isStale() || response.status === 'unchanged') return
+    if (isStale()) return
+    if (response.status === 'unchanged') {
+      this.clearRetry(file)
+      return
+    }
+
+    // A shown image whose re-read failed for a passing reason (the file is
+    // locked or being written) keeps the last good image and re-tries; only a
+    // first load shows the placeholder. Gone or moved still removes it.
+    if (response.status === 'refused' && response.reason === 'unreadable' && file.view.status === 'ready') {
+      this.scheduleRetry(file)
+      return
+    }
 
     if (response.status === 'refused') {
+      this.clearRetry(file)
       file.version = undefined
       file.wantBytes = 0
       this.giveBack(file, file.bytes)
@@ -493,7 +528,10 @@ export class MarkdownImageStore {
       return
     }
 
-    // Remembered whatever happens next: the same bytes are not asked for again
+    // Remembered whatever happens next, so the same bytes are not asked for
+    // again – except when a shown image is kept over bytes that do not decode
+    // (half-written): then its own version stays, so the re-try reads again
+    const shownVersion = file.version
     file.version = response.version
 
     // Reserved before the decode: the size is known from the answer
@@ -513,8 +551,13 @@ export class MarkdownImageStore {
     } catch {
       if (delta > 0) this.deps.budget.release(delta)
       if (isStale()) return
-      // Half-written or corrupt: keep what is shown; the next change re-checks
-      if (file.view.status !== 'ready') this.setFileView(file, unavailable('undecodable'))
+      // Half-written or corrupt: keep what is shown and re-try
+      if (file.view.status === 'ready') {
+        file.version = shownVersion
+        this.scheduleRetry(file)
+      } else {
+        this.setFileView(file, unavailable('undecodable'))
+      }
       return
     }
     if (isStale()) {
@@ -524,7 +567,36 @@ export class MarkdownImageStore {
 
     if (delta < 0) this.deps.budget.release(-delta)
     file.bytes = size
+    this.clearRetry(file)
     this.setFileView(file, { status: 'ready', url: response.dataUrl })
+  }
+
+  /**
+   * Re-try a shown image after 1 s, 2 s, 4 s… until the next change event or
+   * {@link MARKDOWN_IMAGE_RETRY_WINDOW_MS} after the first failure, so a file
+   * that is unlocked without a further event is still caught.
+   */
+  private scheduleRetry(file: FileEntry): void {
+    if (file.retryTimer) return
+    const now = Date.now()
+    file.retryStartedAt ??= now
+    const delay = file.retryDelay > 0 ? file.retryDelay * 2 : MARKDOWN_IMAGE_RETRY_FIRST_MS
+    if (now + delay - file.retryStartedAt > MARKDOWN_IMAGE_RETRY_WINDOW_MS) {
+      this.clearRetry(file)
+      return
+    }
+    file.retryDelay = delay
+    file.retryTimer = setTimeout(() => {
+      file.retryTimer = null
+      if (this.files.get(file.key) === file) this.load(file)
+    }, delay)
+  }
+
+  private clearRetry(file: FileEntry): void {
+    if (file.retryTimer) clearTimeout(file.retryTimer)
+    file.retryTimer = null
+    file.retryDelay = 0
+    file.retryStartedAt = null
   }
 
   /** Release `amount` of what `file` holds. */
