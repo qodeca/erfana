@@ -5,8 +5,7 @@ SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 
 # Use keyboard shortcuts
 
-These are Erfana's app and panel shortcuts. The active panel matters: an editor command acts on the foreground tab, and a terminal command acts in the terminal. The project tree has no arrow-key navigation yet.
-
+These are Erfana's app and panel shortcuts. The active panel matters: an editor command acts on the foreground tab, and a terminal command acts in the terminal.
 **On this page**
 
 - [App and windows](#app-and-windows)
@@ -38,8 +37,15 @@ The View zoom commands zoom a focused HTML page first; otherwise they zoom the E
 | --- | --- | --- |
 | Import into selected folder | <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd> | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd> |
 | Cut; copy; paste selected files | <kbd>Cmd</kbd>+<kbd>X</kbd>; <kbd>Cmd</kbd>+<kbd>C</kbd>; <kbd>Cmd</kbd>+<kbd>V</kbd> | <kbd>Ctrl</kbd>+<kbd>X</kbd>; <kbd>Ctrl</kbd>+<kbd>C</kbd>; <kbd>Ctrl</kbd>+<kbd>V</kbd> |
+| Move to the previous or next row | <kbd>↑</kbd>; <kbd>↓</kbd> | Same |
+| Move to the first or last row | <kbd>Home</kbd>; <kbd>End</kbd> | Same |
+| Open a closed folder; on an open folder, move to its first item | <kbd>→</kbd> | Same |
+| Close an open folder; otherwise move to the parent folder | <kbd>←</kbd> | Same |
+| Open a file; open or close and select a folder | <kbd>Enter</kbd> | Same |
+| Jump to a row by name | Type its first letters | Same |
+| Open the row's menu | <kbd>Shift</kbd>+<kbd>F10</kbd> | <kbd>Shift</kbd>+<kbd>F10</kbd> or the <kbd>Menu</kbd> key |
 
-The tree is mouse-only for navigation. Refresh and import are ignored while typing in a text field; import also needs a selected folder.
+The whole tree is a single <kbd>Tab</kbd> stop: <kbd>Tab</kbd> enters it on the last row you used, and the next <kbd>Tab</kbd> leaves it. The arrow keys move focus without changing the selected folder; <kbd>Enter</kbd> or a click selects one. Inside the row menu the arrow keys do not work yet ([issue #90](https://github.com/qodeca/erfana/issues/90)); <kbd>Esc</kbd> closes it. Refresh and import are ignored while typing in a text field; import also needs a selected folder.
 
 ## Editor and Markdown preview
 

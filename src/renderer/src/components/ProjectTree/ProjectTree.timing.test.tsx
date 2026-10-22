@@ -21,6 +21,10 @@ import React from 'react'
 import { ProjectTree } from './ProjectTree'
 import { DialogProvider } from '../Dialog'
 import { ProjectManagementProvider } from '../../context/ProjectManagementContext'
+import { installTreeViewport } from '../../test-utils/treeViewport'
+
+// The tree is virtualised; give it a viewport so every fixture row is mounted.
+installTreeViewport()
 
 declare global {
   interface Window {

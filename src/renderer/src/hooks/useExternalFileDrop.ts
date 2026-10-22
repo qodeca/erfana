@@ -321,6 +321,14 @@ export function useExternalFileDrop(
         return path
       }
 
+      // A file row drops into its folder. The tree is a flat, virtualised
+      // list, so the folder is not an ancestor element to walk up to: the row
+      // names it in `data-parent-path`.
+      const parentPath = current.dataset?.parentPath
+      if (path && type === 'file' && parentPath) {
+        return parentPath
+      }
+
       // Also check for the root folder (project path)
       if (path && current.classList.contains('project-tree-item')) {
         // Get type from parent or data attribute
