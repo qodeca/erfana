@@ -46,7 +46,7 @@ import { loggingService, logger } from './services/LoggingService'
 import { logNodePtyBinding } from './utils/logNodePtyBinding'
 import { createQuitGuard } from './utils/quitGuard'
 import { armLastResortExit, runQuitSequence } from './utils/quitSequence'
-import { startConptyHostReaper } from './services/conptyHostReaper'
+import { QUIT_TRACE_FILE, startConptyHostReaper } from './services/conptyHostReaper'
 import { gitWatcherService } from './services/GitWatcherService'
 import { gitPollingService } from './services/GitPollingService'
 import { projectLockService } from './services/ProjectLockService'
@@ -746,11 +746,17 @@ app.on('before-quit', (event): Promise<void> | undefined => {
     [
       () => {
         // Windows (#305): a detached helper that force-ends us if teardown hangs and then
-        // ends any console host still parented to us. Started FIRST so a main thread that
-        // blocks in a disposer is still force-ended, and outside the dispose race so it
-        // always runs. The quit moment it records is the start of the shutdown.
-        const quitHelperStarted = startConptyHostReaper()
-        logger.info('App quitting, cleaning up services', { quitHelperStarted })
+        // ends every console host, terminal shell and process they started that is still
+        // running. Started FIRST so a main thread that blocks in a disposer is still
+        // force-ended, and outside the dispose race so it always runs. The quit moment it
+        // records is the start of the shutdown; no terminal is created after it. What it
+        // saw and ended is written to QUIT_TRACE_FILE in the log folder.
+        terminalService.beginShutdown()
+        const quitHelperStarted = startConptyHostReaper({
+          shellPids: terminalService.getLiveShellPids(),
+          tracePath: join(loggingService.getLogsDir(), QUIT_TRACE_FILE)
+        })
+        logger.info('App quitting, cleaning up services', { quitHelperStarted, quitTrace: QUIT_TRACE_FILE })
       },
       // Priority: lock release runs first and alone, so the next launch can open
       // the project without waiting for heartbeat staleness — but bounded, so a

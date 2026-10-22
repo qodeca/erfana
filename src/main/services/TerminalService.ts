@@ -43,6 +43,9 @@ export type TerminalCreateResult =
 export const TERMINAL_CWD_TOO_LONG_MESSAGE =
   "This folder's path is longer than Windows allows for a terminal (260 characters). Move the project to a shorter path."
 
+/** Returned by `createTerminal` once the app has started to quit (#305). */
+export const TERMINAL_SHUTTING_DOWN_MESSAGE = 'The app is closing, so no new terminal can be opened.'
+
 // Dynamic import for node-pty (optional dependency)
 type NodePtyModule = typeof import('node-pty')
 let pty: NodePtyModule | null = null
@@ -182,6 +185,10 @@ export class TerminalService extends EventEmitter {
   private pendingExits = new Set<Promise<void>>()
   /** Window-close kill batches still running on Windows; `dispose()` waits for them (#296). */
   private pendingKills = new Set<Promise<void>>()
+  /** Pids of shells whose exit node-pty has not reported yet; handed to the quit helper (#305). */
+  private liveShellPids = new Set<number>()
+  /** Set when `dispose()` starts: no terminal may be created after it (#305). */
+  private shuttingDown = false
 
   /**
    * @param fsExists - injected for `resolveWindowsShell()` testability;
@@ -278,6 +285,13 @@ export class TerminalService extends EventEmitter {
         logger.error('❌ Cannot create terminal: node-pty not available', e instanceof Error ? e : undefined)
         return { error: 'Terminal support is not available (node-pty failed to load)' }
       }
+    }
+
+    // Checked after the only await: a shell started now would never be ended, and the
+    // quit helper only knows terminals created before the quit moment (#305)
+    if (this.shuttingDown) {
+      logger.warn('Terminal not created: the app is shutting down')
+      return { error: TERMINAL_SHUTTING_DOWN_MESSAGE }
     }
 
     // node-pty's Windows kill must not fork a helper (#296); see nodePtyWindowsShim.ts
@@ -431,6 +445,8 @@ export class TerminalService extends EventEmitter {
       }
 
       this.terminals.set(terminalId, terminal)
+      const shellPid = terminal.pid
+      if (typeof shellPid === 'number' && Number.isSafeInteger(shellPid) && shellPid > 0) this.liveShellPids.add(shellPid)
 
       // Marker detection: buffer data until we see the marker from bootstrap script
       let markerBuffer = ''
@@ -543,6 +559,7 @@ export class TerminalService extends EventEmitter {
         logger.info(`🏁 Terminal ${terminalId} exited`, event)
         markExited()
         terminal.hasExited = true
+        if (terminal.pid !== undefined) this.liveShellPids.delete(terminal.pid)
         // A shell that fails during the handshake still said why: show it before the exit
         if (terminal.clearFallbackTimeout) {
           clearTimeout(terminal.clearFallbackTimeout)
@@ -790,6 +807,24 @@ export class TerminalService extends EventEmitter {
   }
 
   /**
+   * Pids of every shell started by this service whose exit has not been reported,
+   * including shells already detached by a window close (#305). Main-only: read
+   * once at quit for the quit helper (`conptyHostReaper.ts`), never sent anywhere.
+   */
+  getLiveShellPids(): number[] {
+    return [...this.liveShellPids]
+  }
+
+  /**
+   * Refuses every later `createTerminal` (#305). Called at the quit moment, before the
+   * quit helper reads {@link getLiveShellPids}, so the helper's list is complete and
+   * no console host appears after the moment it records. `dispose()` calls it too.
+   */
+  beginShutdown(): void {
+    this.shuttingDown = true
+  }
+
+  /**
    * List all terminals
    */
   listTerminals(): Array<{ id: string; title: string }> {
@@ -807,6 +842,7 @@ export class TerminalService extends EventEmitter {
    */
   async dispose(): Promise<void> {
     logger.info('🛑 Disposing TerminalService...')
+    this.beginShutdown()
     const deadline = Date.now() + TERMINAL_DISPOSE_BOUND_MS
 
     const shells = this.detachTerminals([...this.terminals.keys()])
