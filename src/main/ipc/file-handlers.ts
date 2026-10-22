@@ -32,6 +32,7 @@ import {
   type ImageReadResponse
 } from '../../shared/ipc/file-image-schema'
 import { logger } from '../services/LoggingService'
+import { withErrorCodeMarker } from '../../shared/errorCodeMarker'
 import { fileExists } from '../utils/fileUtils'
 import { redactPath, redactedLogError } from '../utils/redactUserInput'
 import { isInsideRoot } from '../utils/pathCompare'
@@ -111,7 +112,9 @@ async function openProjectByPath(
     if (result.error === 'focused_existing') {
       return result.path
     }
-    throw new Error(result.error || 'Unknown error')
+    const message = result.error || 'Unknown error'
+    // The code rides on the message, so the renderer can word the refusal (see getUserFriendlyMessage)
+    throw new Error(result.errorCode ? withErrorCodeMarker(message, result.errorCode) : message)
   }
 
   return result.path

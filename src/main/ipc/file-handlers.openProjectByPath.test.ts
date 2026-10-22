@@ -310,6 +310,20 @@ describe('file:openProjectByPath IPC handler', () => {
   })
 
   describe('Error propagation', () => {
+    it('should mark the error code on the message so the renderer can word the refusal', async () => {
+      const handler = handlers['file:openProjectByPath']
+      mockSwitchProject.mockResolvedValue({
+        success: false,
+        path: '',
+        action: 'noop',
+        error: 'Security validation failed: refused',
+        errorCode: 'PATH_SYSTEM_DIR'
+      })
+      await expect(handler({}, abs('/test'))).rejects.toThrow(
+        'Security validation failed: refused [PATH_SYSTEM_DIR]'
+      )
+    })
+
     it('should propagate projectService errors', async () => {
       const handler = handlers['file:openProjectByPath']
       mockSwitchProject.mockRejectedValue(new Error('Service error'))

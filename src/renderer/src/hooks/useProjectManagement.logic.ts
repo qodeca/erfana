@@ -8,6 +8,7 @@
  */
 
 import { getBasename } from '../utils/fileUtils'
+import { getDisplayMessage } from '../../../shared/errors'
 
 /**
  * Project change event data structure
@@ -123,10 +124,7 @@ export function createProjectClosedMessage(): string {
  * @returns Formatted error message
  */
 export function createOpenErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message
-  }
-  return String(error)
+  return getDisplayMessage(error)
 }
 
 /**
@@ -136,10 +134,7 @@ export function createOpenErrorMessage(error: unknown): string {
  * @returns Formatted error message
  */
 export function createCloseErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message
-  }
-  return String(error)
+  return getDisplayMessage(error)
 }
 
 /**
@@ -162,11 +157,8 @@ export function createLoadErrorMessage(error: unknown): string {
  * @returns Formatted error string
  */
 export function formatErrorForState(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message
-  }
-  if (typeof error === 'string') {
-    return error
+  if (error instanceof Error || typeof error === 'string') {
+    return getDisplayMessage(error)
   }
   return 'An unknown error occurred'
 }

@@ -61,6 +61,13 @@ describe('toRootRelative – host path rules', () => {
     expect(toRootRelative('/proj', '/proj-x/a')).toBeNull()
     expect(toRootRelative('/proj', '/other/a')).toBeNull()
   })
+
+  it.runIf(process.platform === 'darwin')(
+    'gives a clean relative path when the two spell an accented name differently',
+    () => {
+      expect(toRootRelative('/caf\u00e9', '/cafe\u0301/src/a.ts')).toBe('src/a.ts')
+    }
+  )
 })
 
 describe('toRootRelative – Windows path rules on any host', () => {
