@@ -145,12 +145,26 @@ test.describe('terminal output flood benchmark', () => {
         await openProject(page, projectPath)
         await terminal.open(page)
 
-        await terminal.sendCommand(page, COMMAND, false)
         await page.evaluate(installRecorder, MARKER)
+        await terminal.sendCommand(page, COMMAND, false)
+        // Count from Enter: the echo of the typed command is not part of the flood
+        await expect
+          .poll(() => page!.evaluate(() => window.__terminalBench!.chars), { intervals: [50] })
+          .toBeGreaterThanOrEqual(COMMAND.length)
+        await page.evaluate(() => {
+          const r = window.__terminalBench!
+          r.messages = 0
+          r.chars = 0
+          r.longTasks = []
+          r.start = performance.now()
+        })
         const pressedAt = Date.now()
         await page.keyboard.press('Enter')
 
-        await page.waitForFunction(markerParsed, MARKER, { polling: 100, timeout: 9 * 60_000 })
+        // `markerParsed` is async, so it is polled from here rather than with waitForFunction
+        await expect
+          .poll(() => page!.evaluate(markerParsed, MARKER), { intervals: [100], timeout: 9 * 60_000 })
+          .toBe(true)
         const parsedMs = Date.now() - pressedAt
         const rec = await page.evaluate(() => {
           const r = window.__terminalBench!
