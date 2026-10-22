@@ -180,8 +180,17 @@ export function registerFileHandlers(): void {
           // #210: a successful read of a paused root shows every change dropped
           // before it began, so the watcher need not catch up on those at resume.
           const commitRead = directoryWatcherService.beginTreeRead(dirPath.requested, sender.id)
-          const result = await fileService.readDirectory(dirPath.requested)
+          // Finding [29]: the tree on screen is what a rename-style save is judged against
+          const knownRead = directoryWatcherService.beginKnownEntriesRead(dirPath.requested)
+          let result: Awaited<ReturnType<typeof fileService.readDirectory>>
+          try {
+            result = await fileService.readDirectory(dirPath.requested)
+          } catch (error) {
+            knownRead.cancel()
+            throw error
+          }
           commitRead()
+          knownRead.commit(result)
           const durationMs = Math.round(performance.now() - start)
           logger.info('file:readDirectory IPC completed', {
             durationMs,

@@ -10,6 +10,7 @@ import type { TerminalBridge } from '../../../shared/ipc/terminal-schema'
 import { fileGateway } from './fileGateway'
 import { terminalGateway } from './terminalGateway'
 import { getDefaultProjectTreeApi } from './projectTreeApi'
+import { onFileStructureChanged } from './fileStructureSignal'
 
 // Exhaustive by construction: a method added to a contract fails to compile here
 const FILE_METHODS: Record<keyof FileBridge, true> = {
@@ -113,6 +114,47 @@ describe.each([
 
     expect(first[names[0]]).toHaveBeenCalledTimes(1)
     expect(second[names[0]]).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('fileGateway – file structure signal', () => {
+  // The methods that can add, remove or move an entry; the preview's link cache
+  // relies on hearing about every one of them (the watcher is paused for them)
+  const STRUCTURAL = [
+    'createFile',
+    'createFolder',
+    'deleteFile',
+    'deleteFolder',
+    'rename',
+    'moveItem',
+    'copyItem',
+    'copyFromExternal',
+    'moveFromExternal',
+    'moveBatchFromExternal'
+  ]
+  const names = Object.keys(FILE_METHODS).filter((name) => name !== 'onProjectChanged')
+
+  it.each(names)('%s raises the signal only if it can change the structure', async (method) => {
+    window.api = { file: fakeBridge(names) } as unknown as typeof window.api
+    const heard = vi.fn()
+    const stop = onFileStructureChanged(heard)
+    try {
+      await (fileGateway as unknown as Record<string, Anything>)[method]()
+    } finally {
+      stop()
+    }
+    expect(heard).toHaveBeenCalledTimes(STRUCTURAL.includes(method) ? 1 : 0)
+  })
+
+  it('raises the signal after a failed structural call too, and still rejects', async () => {
+    const bridge = fakeBridge(names)
+    bridge.moveItem.mockRejectedValue(new Error('disk full'))
+    window.api = { file: bridge } as unknown as typeof window.api
+    const heard = vi.fn()
+    const stop = onFileStructureChanged(heard)
+    await expect(fileGateway.moveItem({} as never)).rejects.toThrow('disk full')
+    stop()
+    expect(heard).toHaveBeenCalledTimes(1)
   })
 })
 

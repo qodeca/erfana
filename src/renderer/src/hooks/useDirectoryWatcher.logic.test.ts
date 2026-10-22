@@ -13,7 +13,10 @@ import {
   shouldHandleDirectoryChange,
   createDirectoryChangeMessage,
   createWatcherErrorMessage,
-  createDirectoryErrorMessage
+  createDirectoryErrorMessage,
+  isStructuralDirectoryChange,
+  getRefreshDelay,
+  getMaxWait
 } from './useDirectoryWatcher.logic'
 
 describe('useDirectoryWatcher.logic', () => {
@@ -158,6 +161,30 @@ describe('useDirectoryWatcher.logic', () => {
       expect(msg1).toContain('1 events')
       expect(msg2).toContain('5 events')
       expect(msg3).toContain('10 events')
+    })
+  })
+
+  describe('isStructuralDirectoryChange', () => {
+    it('is false only for an explicit non-structural, non-catch-up batch', () => {
+      expect(isStructuralDirectoryChange({ structural: false })).toBe(false)
+      expect(isStructuralDirectoryChange({ structural: true })).toBe(true)
+      expect(isStructuralDirectoryChange({})).toBe(true)
+      expect(isStructuralDirectoryChange({ structural: false, catchUp: true })).toBe(true)
+    })
+  })
+
+  describe('getRefreshDelay and getMaxWait', () => {
+    it('debounces, but never past the max wait from the burst start', () => {
+      expect(getRefreshDelay(0, 0, 250, 1000)).toBe(250)
+      expect(getRefreshDelay(0, 900, 250, 1000)).toBe(100)
+      expect(getRefreshDelay(0, 1200, 250, 1000)).toBe(0)
+    })
+
+    it('stretches the max wait to twice the read, up to the ceiling', () => {
+      expect(getMaxWait(1000, 0, 10000)).toBe(1000)
+      expect(getMaxWait(1000, 300, 10000)).toBe(1000)
+      expect(getMaxWait(1000, 3000, 10000)).toBe(6000)
+      expect(getMaxWait(1000, 30000, 10000)).toBe(10000)
     })
   })
 })

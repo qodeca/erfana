@@ -785,7 +785,7 @@ export class NativeRecursiveWatcher extends EventEmitter implements DirectoryWat
     }
     switch (event.type) {
       case 'change':
-        this.emitPath('change', rel)
+        this.emitPath('change', rel, event.symbolicLink)
         return
       case 'locked':
         this.onLocked(rel, record)
@@ -793,7 +793,7 @@ export class NativeRecursiveWatcher extends EventEmitter implements DirectoryWat
       case 'add':
         if (record && record.state !== 'rechecking') this.onListedGone(rel, 'dir', true)
         this.updateListing(rel, 'other')
-        this.emitPath('add', rel)
+        this.emitPath('add', rel, event.symbolicLink)
         return
       case 'addDir':
         this.onDirAdded(rel, record)
@@ -1001,8 +1001,18 @@ export class NativeRecursiveWatcher extends EventEmitter implements DirectoryWat
     return rel === '' ? this.realRoot : path.join(this.realRoot, ...rel.split('/'))
   }
 
-  private emitPath(type: 'add' | 'addDir' | 'unlink' | 'unlinkDir' | 'change', rel: string): void {
-    if (!this.closed) this.emit(type, this.toAbs(rel))
+  /**
+   * `symbolicLink` (from the classifier's `lstat`) goes out as a second argument,
+   * `{ symbolicLink }`, so the service can tell a file↔symlink swap from a save.
+   */
+  private emitPath(
+    type: 'add' | 'addDir' | 'unlink' | 'unlinkDir' | 'change',
+    rel: string,
+    symbolicLink?: boolean
+  ): void {
+    if (this.closed) return
+    if (symbolicLink === undefined) this.emit(type, this.toAbs(rel))
+    else this.emit(type, this.toAbs(rel), { symbolicLink })
   }
 
   private emitError(code: string, message: string): void {
