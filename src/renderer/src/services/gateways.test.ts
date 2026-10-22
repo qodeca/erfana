@@ -55,7 +55,8 @@ const TERMINAL_METHODS: Record<keyof TerminalBridge, true> = {
   onExit: true,
   onError: true,
   onClear: true,
-  markClearComplete: true
+  markClearComplete: true,
+  ackOutput: true
 }
 
 type Anything = (...args: unknown[]) => unknown

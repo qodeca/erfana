@@ -5,6 +5,9 @@ import type { ITerminalOperations } from '../interfaces/ITerminalOperations'
 import { logger } from '../utils/logger'
 import { terminalGateway } from '../services/terminalGateway'
 
+/** Shortest gap between two recorded activity timestamps for one terminal. */
+export const ACTIVITY_THROTTLE_MS = 250
+
 interface TerminalStore {
   // Active terminal ID (null if no terminal is active)
   activeTerminalId: string | null
@@ -48,9 +51,15 @@ export function createTerminalStore(
     return get().activeTerminalId
   },
 
+  // Called for every batch of output, so a flood would clone the Map and notify
+  // every subscriber hundreds of times a second. The readers compare against
+  // windows of seconds, so a timestamp up to ACTIVITY_THROTTLE_MS old is as good.
   markActivity: (id: string) => {
+    const now = Date.now()
+    const previous = get().activityById.get(id)
+    if (previous !== undefined && now >= previous && now - previous < ACTIVITY_THROTTLE_MS) return
     const map = new Map(get().activityById)
-    map.set(id, Date.now())
+    map.set(id, now)
     set({ activityById: map })
   },
 

@@ -74,7 +74,8 @@ function installApi(): void {
       onExit: vi.fn().mockReturnValue(vi.fn()),
       onError: vi.fn().mockReturnValue(vi.fn()),
       onClear: vi.fn().mockReturnValue(vi.fn()),
-      markClearComplete: vi.fn()
+      markClearComplete: vi.fn(),
+      ackOutput: vi.fn()
     },
     file: {
       getProjectPath: vi.fn().mockResolvedValue('/test/project'),
@@ -185,5 +186,30 @@ describe('TerminalPanel start-up clear handshake', () => {
     await waitFor(() => expect(window.api.terminal.onData).toHaveBeenCalled())
     expect(clearWrites()).toBe(0)
     expect(window.api.terminal.markClearComplete).not.toHaveBeenCalled()
+  })
+
+  it('acknowledges output once xterm has parsed it (flow control)', async () => {
+    let dataHandler: ((d: { terminalId: string; data: string }) => void) | null = null
+    window.api.terminal.onData.mockImplementation((cb: typeof dataHandler) => {
+      dataHandler = cb
+      return vi.fn()
+    })
+    // Hold the parse callbacks so the test decides when xterm is done
+    const parsed: Array<() => void> = []
+    mockXtermInstance.write.mockImplementation((_d: string, cb?: () => void) => {
+      if (cb) parsed.push(cb)
+    })
+    await renderPanel()
+    await waitFor(() => expect(dataHandler).not.toBeNull())
+    parsed.length = 0
+
+    const batch = 'x'.repeat(16 * 1024)
+    dataHandler!({ terminalId: TERMINAL_ID, data: batch })
+    dataHandler!({ terminalId: TERMINAL_ID, data: batch })
+    dataHandler!({ terminalId: 'some-other-terminal', data: batch })
+    expect(window.api.terminal.ackOutput).not.toHaveBeenCalled()
+
+    for (const done of parsed.splice(0)) done()
+    expect(window.api.terminal.ackOutput).toHaveBeenCalledExactlyOnceWith(TERMINAL_ID, 32 * 1024)
   })
 })

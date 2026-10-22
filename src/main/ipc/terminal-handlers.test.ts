@@ -47,6 +47,7 @@ class MockTerminalService extends EventEmitter {
   getActivity = vi.fn((): { busy: boolean; known: boolean } | null => ({ busy: true, known: true }))
   listTerminals = vi.fn((): Array<{ id: string; title: string }> => [])
   markInitializationComplete = vi.fn()
+  ackOutput = vi.fn()
   getOwner = vi.fn((id: string) => this.owners.get(id))
 }
 
@@ -123,6 +124,7 @@ describe('terminal-handlers', () => {
       }
       expect(onListeners.has('terminal:resize')).toBe(true)
       expect(onListeners.has('terminal:clearComplete')).toBe(true)
+      expect(onListeners.has('terminal:ackOutput')).toBe(true)
     })
 
     it('lists terminal:create among the channels that check a path', () => {
@@ -475,6 +477,48 @@ describe('terminal-handlers', () => {
         mockTerminalService.emit('data', { terminalId: 'terminal-1', data: 'x', webContentsId: 999 })
       }).not.toThrow()
       expect(destroyed.send).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('terminal:ackOutput (flow control)', () => {
+    const ack = (id: number, payload: unknown) => onListeners.get('terminal:ackOutput')!(event(id), payload)
+
+    it('passes an ack from the owner to the service', () => {
+      ack(OWNER, { terminalId: 'terminal-1', bytes: 32_768 })
+      expect(mockTerminalService.ackOutput).toHaveBeenCalledWith('terminal-1', 32_768)
+    })
+
+    it('ignores an ack from a window that does not own the terminal, and for an unknown id', () => {
+      ack(OTHER, { terminalId: 'terminal-1', bytes: 32_768 })
+      ack(OWNER, { terminalId: 'terminal-2', bytes: 32_768 })
+      expect(mockTerminalService.ackOutput).not.toHaveBeenCalled()
+    })
+
+    it('refuses a malformed ack', () => {
+      for (const payload of [
+        undefined,
+        null,
+        'terminal-1',
+        { terminalId: 'terminal-1' },
+        { terminalId: 'terminal-1', bytes: 0 },
+        { terminalId: 'terminal-1', bytes: -5 },
+        { terminalId: 'terminal-1', bytes: 1.5 },
+        { terminalId: 'terminal-1', bytes: Number.NaN },
+        { terminalId: 'terminal-1', bytes: Number.POSITIVE_INFINITY },
+        { terminalId: 'terminal-1', bytes: '100' },
+        { terminalId: 'terminal-1', bytes: 16 * 1024 * 1024 + 1 },
+        { terminalId: 'bogus', bytes: 10 },
+        // Strict: an extra field is refused rather than ignored
+        { terminalId: 'terminal-1', bytes: 10, webContentsId: OWNER }
+      ]) {
+        ack(OWNER, payload)
+      }
+      expect(mockTerminalService.ackOutput).not.toHaveBeenCalled()
+    })
+
+    it('accepts the largest ack', () => {
+      ack(OWNER, { terminalId: 'terminal-1', bytes: 16 * 1024 * 1024 })
+      expect(mockTerminalService.ackOutput).toHaveBeenCalledWith('terminal-1', 16 * 1024 * 1024)
     })
   })
 })

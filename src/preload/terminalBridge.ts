@@ -5,7 +5,7 @@
  * module, typed as {@link TerminalBridge} (the shared contract in
  * `terminal-schema.ts`). Channel names come from `terminal-channels.ts`.
  *
- * `resize` and `markClearComplete` are fire-and-forget `send`s; the rest of the
+ * `resize`, `markClearComplete` and `ackOutput` are fire-and-forget `send`s; the rest of the
  * requests are `invoke` round-trips. Event subscriptions return the function
  * that removes the same listener.
  */
@@ -39,5 +39,8 @@ export const terminalBridge: TerminalBridge = {
   onClear: (callback) => subscribe(TERMINAL_EVENTS.clear, callback),
   markClearComplete: (terminalId) => {
     ipcRenderer.send(TERMINAL_CHANNELS.clearComplete, { terminalId })
+  },
+  ackOutput: (terminalId, bytes) => {
+    ipcRenderer.send(TERMINAL_CHANNELS.ackOutput, { terminalId, bytes })
   }
 }

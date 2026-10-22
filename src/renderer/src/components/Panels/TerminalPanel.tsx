@@ -55,6 +55,7 @@ import { ClaudeStatusBar } from './TerminalPanel/components/ClaudeStatusBar'
 import { useClaudeStatusStore } from '../../stores/useClaudeStatusStore'
 import { useOptionalDialog } from '../Dialog/DialogContext'
 import { getRestartRisk, buildRestartConfirm } from './TerminalPanel/restartGuard'
+import { createOutputAcker } from './TerminalPanel/outputAck'
 import { ensureTerminalFontLoaded, createTerminalLinkHandler } from './TerminalPanel/terminalPanel.logic'
 import type { TerminalState } from './TerminalPanel/types'
 import { fileGateway } from '../../services/fileGateway'
@@ -834,10 +835,14 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     // - Escape sequence detection (ED 2, ED 3) BEFORE write
     // - Buffer truncation detection AFTER write
     // - Smart recovery targeting user's reading position
+    // Flow control (finding [30]): xterm reports each batch once parsed, and the
+    // acker passes the totals to main, which pauses the PTY while we lag behind.
+    const acker = createOutputAcker(terminalId, terminalGateway.ackOutput)
     const dataHandler = wrapOnDataHandler((data: { terminalId: string; data: string }) => {
       if (data.terminalId === terminalId && xtermRef.current) {
         // Write data to terminal
-        xtermRef.current.write(data.data)
+        const chars = data.data.length
+        xtermRef.current.write(data.data, () => acker.parsed(chars))
 
         // Record recent activity (ignore warmup period noise)
         if (Date.now() >= warmupUntilRef.current) {
@@ -878,6 +883,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       if (dataListeningIdRef.current === terminalId) dataListeningIdRef.current = null
       clearConfirmWaitersRef.current.delete(terminalId)
       unsubscribeData()
+      acker.flush()
       unsubscribeExit()
       unsubscribeError()
     }

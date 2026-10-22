@@ -108,6 +108,7 @@ describe('channel names', () => {
           "projectChanged": "project:changed",
         },
         "TERMINAL_CHANNELS": {
+          "ackOutput": "terminal:ackOutput",
           "clearComplete": "terminal:clearComplete",
           "create": "terminal:create",
           "getActivity": "terminal:getActivity",
@@ -292,7 +293,7 @@ describe('terminal bridge', () => {
     expect(ipc.invoke).toHaveBeenCalledWith(channel, ...wire)
   })
 
-  it('resize and markClearComplete are fire-and-forget sends', () => {
+  it('resize, markClearComplete and ackOutput are fire-and-forget sends', () => {
     terminalBridge.resize('t', 80, 24)
     expect(ipc.send).toHaveBeenLastCalledWith(TERMINAL_CHANNELS.resize, {
       terminalId: 't',
@@ -301,6 +302,8 @@ describe('terminal bridge', () => {
     })
     terminalBridge.markClearComplete('t')
     expect(ipc.send).toHaveBeenLastCalledWith(TERMINAL_CHANNELS.clearComplete, { terminalId: 't' })
+    terminalBridge.ackOutput('t', 4096)
+    expect(ipc.send).toHaveBeenLastCalledWith(TERMINAL_CHANNELS.ackOutput, { terminalId: 't', bytes: 4096 })
     expect(ipc.invoke).not.toHaveBeenCalled()
   })
 
@@ -310,6 +313,7 @@ describe('terminal bridge', () => {
     }
     terminalBridge.resize('t', 80, 24)
     terminalBridge.markClearComplete('t')
+    terminalBridge.ackOutput('t', 1)
     const sent = [
       ...ipc.invoke.mock.calls.map((call) => (call as unknown[])[0]),
       ...ipc.send.mock.calls.map((call) => (call as unknown[])[0])
