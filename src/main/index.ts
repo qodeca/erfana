@@ -753,7 +753,7 @@ app.on('before-quit', (event): Promise<void> | undefined => {
         // saw and ended is written to QUIT_TRACE_FILE in the log folder.
         terminalService.beginShutdown()
         const quitHelperStarted = startConptyHostReaper({
-          shellPids: terminalService.getLiveShellPids(),
+          shells: terminalService.getLiveShells(),
           tracePath: join(loggingService.getLogsDir(), QUIT_TRACE_FILE)
         })
         logger.info('App quitting, cleaning up services', { quitHelperStarted, quitTrace: QUIT_TRACE_FILE })

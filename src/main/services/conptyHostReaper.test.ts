@@ -13,6 +13,7 @@ import {
   powershellPath,
   QUIT_GRACE_SEC,
   QUIT_TRACE_ENV,
+  SHELL_SPAWN_TOLERANCE_MS,
   startConptyHostReaper
 } from './conptyHostReaper'
 
@@ -22,26 +23,36 @@ function fakeChild(): EventEmitter & { kill: ReturnType<typeof vi.fn>; unref: Re
 
 describe('buildReapScript', () => {
   it('matches hosts and the passed shells that are our children, inside the creation window', () => {
-    const script = buildReapScript(4242, 1_000, 2_000, [9001, 9002, 9001])
+    const script = buildReapScript(4242, 1_000, 2_000, [
+      { pid: 9001, spawnedAtMs: 1_500 },
+      { pid: 9002, spawnedAtMs: 1_600 },
+      { pid: 9001, spawnedAtMs: 1_500 }
+    ])
     expect(script).toContain('$app = 4242')
     expect(script).toContain("$hosts = @('conhost.exe', 'OpenConsole.exe')")
-    // duplicates dropped
-    expect(script).toContain('$shells = @(9001, 9002)')
+    // duplicates dropped; spawn times as .NET ticks (ms * 10000 + the Unix epoch)
+    expect(script).toContain('$shells = @{ 9001 = 621355968015000000; 9002 = 621355968016000000 }')
     expect(script).toContain('FromUnixTimeMilliseconds(1000)')
     expect(script).toContain('FromUnixTimeMilliseconds(2000)')
     // the end of the creation window is the quit moment + 250 ms, nothing more
     expect(script).toContain('FromUnixTimeMilliseconds(2250)')
-    expect(script).toContain('if ($c -lt $s.Ticks -or $c -gt $e.Ticks) { continue }')
+    expect(script).toContain('if ($pp -eq $app -and $c -le $e.Ticks) {')
     expect(script).toContain('.UtcDateTime')
     expect(script).not.toContain('LocalDateTime')
     expect(script).toContain('-OperationTimeoutSec 5')
+    // a shell counts only near its spawn time
+    expect(SHELL_SPAWN_TOLERANCE_MS).toBe(5_000)
+    expect(script).toContain('$mine = $d -le 50000000 -and $d -ge -50000000')
     // a descendant must be no older than the member it hangs below
     expect(script).toContain('$known[$pp].T -le $c')
-    expect(script).toContain('Stop-Process -Id ([int]$x.ProcessId) -Force')
+    // ended only through a handle opened at kill time, after its start time matched
+    expect(script).toContain('$h | Stop-Process -Force')
+    expect(script).not.toContain('Stop-Process -Id')
+    expect(script.indexOf('$null = $h.Handle')).toBeLessThan(script.indexOf('$st = $h.StartTime'))
   })
 
   it('has no double quotes or backslashes, so the command line needs no escaping', () => {
-    const script = buildReapScript(4242, 1_000, 2_000, [9001])
+    const script = buildReapScript(4242, 1_000, 2_000, [{ pid: 9001, spawnedAtMs: 1_500 }])
     expect(script).not.toMatch(/["\\]/)
   })
 
@@ -50,7 +61,7 @@ describe('buildReapScript', () => {
     const guard = script.indexOf("if (-not $s -or -not $q -or -not $e) { Trace 'helper stopped: dates unavailable'; exit }")
     expect(guard).toBeGreaterThan(script.indexOf('$e ='))
     expect(guard).toBeLessThan(script.indexOf('Get-Process'))
-    expect(guard).toBeLessThan(script.indexOf('$null = Tree (Snap)'))
+    expect(guard).toBeLessThan(script.indexOf('$null = Tree @(Snap)'))
     expect(guard).toBeLessThan(script.indexOf('Stop-Process'))
   })
 
@@ -58,17 +69,16 @@ describe('buildReapScript', () => {
     const script = buildReapScript(4242, 1_000, 2_000)
     expect(QUIT_GRACE_SEC).toBe(15)
     expect(script).toContain(`$until = (Get-Date).AddSeconds(${QUIT_GRACE_SEC})`)
+    expect(buildReapScript(4242, 1_000, 2_000, [], 3)).toContain('$until = (Get-Date).AddSeconds(3)')
     expect(script).toContain('$p | Wait-Process -Timeout 1')
     // the force-end uses the checked process object (no pid re-lookup), guarded by the
     // start-time check, and runs before the sweeps
     const stop = script.indexOf('$p | Stop-Process -Force')
     expect(stop).toBeGreaterThan(-1)
-    expect(script).not.toContain('Stop-Process -Id 4242')
     expect(script).toContain('if ($p.HasExited)')
-    // the process handle is held, so the wait and the end hit this exact process
-    expect(script).toContain('$null = $p.Handle')
-    expect(script.indexOf('$null = $p.Handle')).toBeLessThan(script.indexOf('Wait-Process'))
-    expect(script.indexOf('$p.StartTime.ToUniversalTime() -gt $q')).toBeLessThan(stop)
+    // the handle is held before the start time is read, so both refer to this process
+    expect(script.indexOf('$null = $p.Handle')).toBeLessThan(script.indexOf('$st = $p.StartTime'))
+    expect(script.indexOf('$st.ToUniversalTime() -gt $q')).toBeLessThan(stop)
     expect(stop).toBeLessThan(script.indexOf(`for ($i = 1; $i -le ${MAX_SWEEPS}; $i++)`))
   })
 
@@ -85,11 +95,13 @@ describe('buildReapScript', () => {
     expect(() => buildReapScript(NaN, 1, 2)).toThrow()
     expect(() => buildReapScript(1.5, 1, 2)).toThrow()
     expect(() => buildReapScript(0, 1, 2)).toThrow()
-    expect(() => buildReapScript(1, 1, 2, [0])).toThrow()
+    expect(() => buildReapScript(1, 1, 2, [{ pid: 0, spawnedAtMs: 1 }])).toThrow()
+    expect(() => buildReapScript(1, 1, 2, [{ pid: 1, spawnedAtMs: 1.5 }])).toThrow()
+    expect(() => buildReapScript(1, 1, 2, [], 0)).toThrow()
     // @ts-expect-error a string must never reach the script
     expect(() => buildReapScript("1' ; calc ; '", 1, 2)).toThrow()
     // @ts-expect-error nor as a shell pid
-    expect(() => buildReapScript(1, 1, 2, ["1' ; calc ; '"])).toThrow()
+    expect(() => buildReapScript(1, 1, 2, [{ pid: "1' ; calc ; '", spawnedAtMs: 1 }])).toThrow()
   })
 })
 
@@ -174,7 +186,12 @@ describe('startConptyHostReaper', () => {
       pid: 777,
       now: () => 100_000_000,
       uptimeSeconds: () => 60,
-      shellPids: [9001, -1, 1.5, 9002],
+      shells: [
+        { pid: 9001, spawnedAtMs: 99_000_000 },
+        { pid: -1, spawnedAtMs: 99_000_000 },
+        { pid: 9003, spawnedAtMs: 1.5 },
+        { pid: 9002, spawnedAtMs: 99_000_000 }
+      ],
       tracePath,
       spawnFn: spawnFn as unknown as typeof spawn,
       writeFileFn: writeFileFn as never,
@@ -186,7 +203,7 @@ describe('startConptyHostReaper', () => {
     // pids and counts only
     expect(text).toMatch(/^\S+ app starting quit helper app-pid=777 shells=2\n$/)
     const [, args, opts] = spawnFn.mock.calls[0] as unknown as [string, string[], { env: Record<string, string> }]
-    expect(args[args.length - 1]).toContain('$shells = @(9001, 9002)')
+    expect(args[args.length - 1]).toMatch(/\$shells = @\{ 9001 = \d+; 9002 = \d+ \}/)
     expect(opts.env[QUIT_TRACE_ENV]).toBe(tracePath)
   })
 

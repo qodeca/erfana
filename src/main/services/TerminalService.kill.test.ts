@@ -331,19 +331,37 @@ describe('TerminalService kill paths (#296)', () => {
   })
 
   describe('quit helper inputs (#305)', () => {
-    it('lists the shells still running, including ones a window close is ending', async () => {
+    it('lists the shells still running with their spawn time, including ones a window close is ending', async () => {
       const { terminalService } = await load('win32')
+      const before = Date.now()
       await create(terminalService, 'win32', 7)
       await create(terminalService, 'win32')
       await create(terminalService, 'win32')
-      expect(terminalService.getLiveShellPids()).toEqual([9000, 9001, 9002])
+      const pids = () => terminalService.getLiveShells().map((s) => s.pid)
+      expect(pids()).toEqual([9000, 9001, 9002])
+      for (const shell of terminalService.getLiveShells()) {
+        expect(shell.spawnedAtMs).toBeGreaterThanOrEqual(before)
+        expect(shell.spawnedAtMs).toBeLessThanOrEqual(Date.now())
+      }
 
       spawned[1].emit('exit', { exitCode: 0 })
       // detached from the map, but its shell has not reported an exit yet
       terminalService.cleanupForWebContentsId(7)
-      expect(terminalService.getLiveShellPids()).toEqual([9000, 9002])
+      expect(pids()).toEqual([9000, 9002])
       spawned[0].emit('exit', { exitCode: 0 })
-      expect(terminalService.getLiveShellPids()).toEqual([9002])
+      expect(pids()).toEqual([9002])
+    })
+
+    it('an old exit does not drop a newer shell that got the same pid', async () => {
+      const { terminalService } = await load('win32')
+      await create(terminalService, 'win32')
+      const first = spawned[0]
+      // the mock numbers pids by count, so the next shell gets the same pid (9000)
+      spawned.length = 0
+      await create(terminalService, 'win32')
+      expect(spawned[0].pid).toBe(first.pid)
+      first.emit('exit', { exitCode: 0 })
+      expect(terminalService.getLiveShells().map((s) => s.pid)).toEqual([9000])
     })
 
     it('creates no terminal once the shutdown has begun', async () => {
@@ -352,7 +370,7 @@ describe('TerminalService kill paths (#296)', () => {
       const result = await terminalService.createTerminal({ shell: 'C:\\Windows\\System32\\cmd.exe', cwd: 'C:\\Projects\\test' })
       expect(result).toEqual({ error: TERMINAL_SHUTTING_DOWN_MESSAGE })
       expect(mockNodePty.spawn).not.toHaveBeenCalled()
-      expect(terminalService.getLiveShellPids()).toEqual([])
+      expect(terminalService.getLiveShells()).toEqual([])
     })
 
     it('refuses a terminal requested while dispose runs', async () => {

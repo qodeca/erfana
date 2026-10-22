@@ -16,25 +16,37 @@
  *    the shells we pass in, and everything below them – each by pid AND creation time,
  *    so a process whose parent ends first is still recognised later;
  * 2. force-ends our process if it is still alive after the grace period (a worker
- *    thread stuck while the environment is torn down);
+ *    thread stuck while the environment is torn down). If our process cannot be
+ *    checked (its start time is unreadable), it is never ended: the helper waits out
+ *    the grace period instead, so nothing is ended while the app may still run;
  * 3. then sweeps: lists the processes again, ends every member of the tree that is
  *    still alive, and repeats every 500 ms until two sweeps in a row find nothing
- *    (at most {@link MAX_SWEEPS}). One listing is not enough: a failed or timed-out
- *    query, or a host still being torn down, would otherwise go unchecked.
+ *    (at most {@link MAX_SWEEPS}). One listing is not enough: a failed, partial or
+ *    timed-out query, or a host still being torn down, would otherwise go unchecked.
+ *    Each phase and each sweep has its own error handling, so one error is traced and
+ *    the next step still runs.
  *
  * It writes what it saw to {@link QUIT_TRACE_FILE} in the log folder, so a run can be
- * checked afterwards: pids, image names and parent pids only, never a command line,
- * path or window title. The last line says `result=clean leftovers=0` when nothing
- * of ours was left running.
+ * checked afterwards: pids, parent pids, PowerShell error ids, and image names only of
+ * console hosts and of the shells we passed (any other process is written as
+ * `other`); never a command line, path or window title. The last lines say
+ * `result=clean members-left=0` when nothing of ours was left running.
  *
  * Safety:
  * - Only three kinds of process are members: a console host whose parent is our pid,
- *   a shell pid we passed whose parent is our pid, and a process whose parent is a
- *   member that was created no later than it. A program opened from the app
- *   (`shell.openPath`) is our child too, but none of these, so it is never touched.
- * - A pid reused after we exit cannot match: members must have been created between
- *   our process start and the quit moment (+ 250 ms rounding), and the process
- *   force-ended must have started before the quit moment.
+ *   a shell we passed (pid AND a creation time within {@link SHELL_SPAWN_TOLERANCE_MS}
+ *   of its spawn) whose parent is our pid, and a process whose parent is a member that
+ *   was created no later than it. A program opened from the app (`shell.openPath`) is
+ *   our child too, but none of these, so it is never touched – even when it got the
+ *   pid of a shell that has ended.
+ * - Our direct children must have been created between our process start and the quit
+ *   moment (+ 250 ms rounding). A process below a member may be newer only while that
+ *   member is alive: once the member is gone, a child counts only if it was created no
+ *   later than the last listing that saw the member alive (its pid may be reused after).
+ * - A process is ended through a handle opened on it at kill time, and only after its
+ *   start time read through that handle matches the creation time recorded for the
+ *   member (1 ms tolerance). A pid reused between the listing and the kill is skipped.
+ *   Our own process is ended only if it started before the quit moment.
  * - Under Constrained Language Mode / AppLocker the date guard stops the script before
  *   anything is ended (nothing is ever ended on a guess).
  * - Quit only. On a window close the other windows' terminals are alive and their
@@ -71,7 +83,7 @@ export const QUIT_TRACE_ENV = 'ERFANA_QUIT_TRACE'
 /**
  * Rounding allowance after the quit moment, for the clock difference between Node
  * and WMI. Kept tiny: no terminal is created once the shutdown has started
- * (`TerminalService.dispose()` refuses new ones), and the script can run after we
+ * (`TerminalService.beginShutdown()` refuses new ones), and the script can run after we
  * exit, when Windows may already have reused our pid.
  */
 const CREATION_WINDOW_END_SLACK_MS = 250
@@ -79,8 +91,28 @@ const CREATION_WINDOW_END_SLACK_MS = 250
 /** Upper bound on each WMI query, so a stuck provider cannot keep the script alive. */
 const CIM_OPERATION_TIMEOUT_SEC = 5
 
-/** Most shell pids passed in; far above any real terminal count, keeps the command line short. */
-const MAX_SHELL_PIDS = 512
+/** Most shells passed in; far above any real terminal count, keeps the command line short. */
+const MAX_SHELLS = 512
+
+/**
+ * How far a shell's creation time may be from the moment node-pty returned its pid.
+ * The spawn is synchronous, so the real gap is milliseconds; a few seconds absorb a
+ * busy machine. A pid reused later by another program is far outside it.
+ */
+export const SHELL_SPAWN_TOLERANCE_MS = 5_000
+
+/** Kill-time start-time check tolerance: 1 ms in .NET ticks (WMI keeps microseconds). */
+const IDENTITY_TOLERANCE_TICKS = 10_000
+
+/** .NET ticks of the Unix epoch, to place spawn times in the script as ticks. */
+const UNIX_EPOCH_TICKS = 621_355_968_000_000_000n
+
+/** A terminal shell still running at the quit moment. */
+export interface LiveShell {
+  pid: number
+  /** `Date.now()` right after node-pty returned the pid */
+  spawnedAtMs: number
+}
 
 /** Image names of a console host; `-contains` compares case-insensitively inside the script. */
 const HOST_IMAGE_NAMES = ['conhost.exe', 'OpenConsole.exe'] as const
@@ -123,41 +155,72 @@ function assertInt(value: number, name: string): void {
  * @param parentPid - our main process pid
  * @param startMs - earliest creation time (epoch ms) a member may have: our process start
  * @param quitMs - the quit moment (epoch ms)
- * @param shellPids - pids of the terminal shells still running at the quit moment
+ * @param shells - the terminal shells still running at the quit moment
+ * @param graceSec - how long to wait for our process before force-ending it
  */
 export function buildReapScript(
   parentPid: number,
   startMs: number,
   quitMs: number,
-  shellPids: ReadonlyArray<number> = []
+  shells: ReadonlyArray<LiveShell> = [],
+  graceSec: number = QUIT_GRACE_SEC
 ): string {
   assertInt(parentPid, 'parentPid')
   assertInt(startMs, 'startMs')
   assertInt(quitMs, 'quitMs')
-  shellPids.forEach((pid) => assertInt(pid, 'shellPid'))
-  const shells = [...new Set(shellPids)].slice(0, MAX_SHELL_PIDS)
+  assertInt(graceSec, 'graceSec')
+  const byPid = new Map<number, number>()
+  for (const shell of shells) {
+    assertInt(shell.pid, 'shell pid')
+    assertInt(shell.spawnedAtMs, 'shell spawn time')
+    if (byPid.size < MAX_SHELLS) byPid.set(shell.pid, shell.spawnedAtMs)
+  }
+  const shellTable = [...byPid]
+    .map(([pid, ms]) => `${pid} = ${BigInt(ms) * 10_000n + UNIX_EPOCH_TICKS}`)
+    .join('; ')
   const endMs = quitMs + CREATION_WINDOW_END_SLACK_MS
   const hosts = HOST_IMAGE_NAMES.map((n) => `'${n}'`).join(', ')
+  const shellTol = SHELL_SPAWN_TOLERANCE_MS * 10_000
+  const idTol = IDENTITY_TOLERANCE_TICKS
   return [
     "$ErrorActionPreference = 'SilentlyContinue'",
     `$tr = $env:${QUIT_TRACE_ENV}`,
     "function Trace([string]$m) { if ($tr) { Add-Content -LiteralPath $tr -Value ((Get-Date -Format 'o') + ' ' + $m) } }",
+    "function ErrId($r) { [string]$r.FullyQualifiedErrorId }",
     `$app = ${parentPid}`,
     `$hosts = @(${hosts})`,
-    `$shells = @(${shells.join(', ')})`,
-    // pid -> creation ticks (T), image name (N) and parent pid (P) of every member seen
+    // pid -> spawn time (ticks) of each shell we passed
+    `$shells = @{${shellTable ? ` ${shellTable} ` : ''}}`,
+    // pid -> creation ticks (T), image name (N), parent pid (P) and the time of the last
+    // listing that saw it alive (L) of every member seen
     '$known = @{}',
     "Trace ('helper started pid=' + $PID + ' app-pid=' + $app + ' shells=' + $shells.Count + ' language=' + $ExecutionContext.SessionState.LanguageMode)",
     'try {',
-    `$s = [DateTimeOffset]::FromUnixTimeMilliseconds(${startMs}).UtcDateTime`,
-    `$q = [DateTimeOffset]::FromUnixTimeMilliseconds(${quitMs}).UtcDateTime`,
-    `$e = [DateTimeOffset]::FromUnixTimeMilliseconds(${endMs}).UtcDateTime`,
+    `  $s = [DateTimeOffset]::FromUnixTimeMilliseconds(${startMs}).UtcDateTime`,
+    `  $q = [DateTimeOffset]::FromUnixTimeMilliseconds(${quitMs}).UtcDateTime`,
+    `  $e = [DateTimeOffset]::FromUnixTimeMilliseconds(${endMs}).UtcDateTime`,
+    "} catch { Trace ('helper stopped: dates failed error=' + (ErrId $_)); exit }",
     // Constrained Language Mode can leave a static call returning nothing: stop rather than match everything
     "if (-not $s -or -not $q -or -not $e) { Trace 'helper stopped: dates unavailable'; exit }",
-    `function Snap { @(Get-CimInstance -Query 'SELECT ProcessId,ParentProcessId,Name,CreationDate FROM Win32_Process' -OperationTimeoutSec ${CIM_OPERATION_TIMEOUT_SEC}) }`,
+    // An empty result, or any error (a partial or timed-out list), means "unavailable"
+    "$script:snapErr = ''",
+    'function Snap {',
+    "  $script:snapErr = ''",
+    '  $err = $null',
+    `  $r = @(Get-CimInstance -Query 'SELECT ProcessId,ParentProcessId,Name,CreationDate FROM Win32_Process' -OperationTimeoutSec ${CIM_OPERATION_TIMEOUT_SEC} -ErrorVariable err -ErrorAction SilentlyContinue)`,
+    "  if ($err -and @($err).Count -gt 0) { $script:snapErr = ErrId @($err)[0]; return }",
+    // A real list always holds System and this helper, so an empty one is a failed query
+    "  if ($r.Count -eq 0) { $script:snapErr = 'empty'; return }",
+    '  $r',
+    '}',
     // Adds new members of the tree to $known (until nothing more is added), then returns
     // the processes of $list that are members
     'function Tree($list) {',
+    '  $now = (Get-Date).ToUniversalTime().Ticks',
+    '  foreach ($x in $list) {',
+    '    $id = [int]$x.ProcessId',
+    '    if ($x.CreationDate -and $known.ContainsKey($id) -and $known[$id].T -eq $x.CreationDate.ToUniversalTime().Ticks) { $known[$id].L = $now }',
+    '  }',
     '  $grew = $true',
     '  while ($grew) {',
     '    $grew = $false',
@@ -165,12 +228,18 @@ export function buildReapScript(
     '      $id = [int]$x.ProcessId',
     '      if ($id -eq $PID -or $id -eq $app -or -not $x.CreationDate) { continue }',
     '      $c = $x.CreationDate.ToUniversalTime().Ticks',
-    '      if ($c -lt $s.Ticks -or $c -gt $e.Ticks) { continue }',
+    '      if ($c -lt $s.Ticks) { continue }',
     '      if ($known.ContainsKey($id) -and $known[$id].T -eq $c) { continue }',
     '      $pp = [int]$x.ParentProcessId',
-    '      $mine = $pp -eq $app -and (($hosts -contains [string]$x.Name) -or ($shells -contains $id))',
-    '      $below = $known.ContainsKey($pp) -and $known[$pp].T -le $c',
-    '      if ($mine -or $below) { $known[$id] = @{ T = $c; N = [string]$x.Name; P = $pp }; $grew = $true }',
+    '      $mine = $false',
+    '      if ($pp -eq $app -and $c -le $e.Ticks) {',
+    '        if ($hosts -contains [string]$x.Name) { $mine = $true }',
+    `        elseif ($shells.ContainsKey($id)) { $d = $c - $shells[$id]; $mine = $d -le ${shellTol} -and $d -ge -${shellTol} }`,
+    '      }',
+    // below a member: no older than it, and created while it was last seen alive (or
+    // inside the quit window)
+    '      $below = $known.ContainsKey($pp) -and $known[$pp].T -le $c -and ($c -le $e.Ticks -or $c -le $known[$pp].L)',
+    '      if ($mine -or $below) { $known[$id] = @{ T = $c; N = [string]$x.Name; P = $pp; L = $now }; $grew = $true }',
     '    }',
     '  }',
     '  foreach ($x in $list) {',
@@ -178,51 +247,87 @@ export function buildReapScript(
     '    if ($x.CreationDate -and $known.ContainsKey($id) -and $known[$id].T -eq $x.CreationDate.ToUniversalTime().Ticks) { $x }',
     '  }',
     '}',
-    "function Fmt($items) { $t = @($items | ForEach-Object { [string]$_.ProcessId + ':' + $_.Name + '<' + $_.ParentProcessId }); if ($t.Count -eq 0) { 'none' } else { $t -join ',' } }",
-    // 1. Learn the tree while our process runs, then wait for it; end it only if it is
-    //    the same one (started before the quit moment). The checked process object is
-    //    used for the wait and the end, so a pid reused in between cannot be hit.
-    '$p = Get-Process -Id $app',
-    "if (-not $p) { Trace 'app already exited' }",
-    "elseif ($p.StartTime.ToUniversalTime() -gt $q) { Trace 'app pid reused, not waited for' }",
-    'else {',
-    // Touching Handle makes the Process object hold an OS handle to this exact process
-    '  $null = $p.Handle',
-    `  $until = (Get-Date).AddSeconds(${QUIT_GRACE_SEC})`,
-    '  while (-not $p.HasExited -and (Get-Date) -lt $until) {',
-    '    $null = Tree (Snap)',
-    '    $p | Wait-Process -Timeout 1',
-    '  }',
-    "  if ($p.HasExited) { Trace 'app exited' } else { $p | Stop-Process -Force; Trace 'app force-ended after the grace period' }",
-    '}',
-    "Trace ('learned ' + $known.Count + ': ' + (Fmt @($known.Keys | Sort-Object | ForEach-Object { @{ ProcessId = $_; Name = $known[$_].N; ParentProcessId = $known[$_].P } })))",
-    // 2. Sweep until two sweeps in a row find no member alive
-    "$quiet = 0; $result = 'gave-up'; $left = 'unknown'",
-    `for ($i = 1; $i -le ${MAX_SWEEPS}; $i++) {`,
-    // A real list always holds System and this helper, so an empty one is a failed query
-    '  $list = Snap',
-    "  if ($list.Count -eq 0) { $quiet = 0; $left = 'unknown'; Trace ('sweep ' + $i + ' process list unavailable') }",
+    // Image names only for console hosts and our shells; anything else is "other"
+    "function Label($id, $name) { if (($hosts -contains [string]$name) -or $shells.ContainsKey([int]$id)) { [string]$name } else { 'other' } }",
+    "function Fmt($items) { $t = @($items | ForEach-Object { [string]$_.ProcessId + ':' + (Label $_.ProcessId $_.Name) + '<' + $_.ParentProcessId }); if ($t.Count -eq 0) { 'none' } else { $t -join ',' } }",
+    // 1. Learn the tree while our process runs, then wait for it. It is ended only if it is
+    //    the same one (started before the quit moment), through the pinned process object.
+    `$until = (Get-Date).AddSeconds(${graceSec})`,
+    '$p = $null; $waited = $false',
+    'try {',
+    '  $p = Get-Process -Id $app -ErrorAction SilentlyContinue',
+    "  if (-not $p) { Trace 'app already exited'; $waited = $true }",
     '  else {',
-    '    $alive = @(Tree $list)',
-    '    $left = $alive.Count',
-    '    if ($alive.Count -eq 0) {',
-    '      $quiet++',
-    "      Trace ('sweep ' + $i + ' alive=none')",
-    "      if ($quiet -ge 2) { $result = 'clean'; break }",
-    '    } else {',
-    '      $quiet = 0',
-    "      Trace ('sweep ' + $i + ' alive=' + (Fmt $alive) + ' stopping')",
-    '      foreach ($x in $alive) { Stop-Process -Id ([int]$x.ProcessId) -Force }',
+    // Touching Handle first makes the Process object hold an OS handle to this exact
+    // process, so StartTime, the wait and the end all refer to it
+    '    $null = $p.Handle',
+    '    $st = $p.StartTime',
+    "    if (-not $st) { Trace 'app start time unreadable' }",
+    "    elseif ($st.ToUniversalTime() -gt $q) { Trace 'app pid reused, not waited for'; $waited = $true }",
+    '    else {',
+    '      while (-not $p.HasExited -and (Get-Date) -lt $until) {',
+    '        $null = Tree @(Snap)',
+    '        $p | Wait-Process -Timeout 1',
+    '      }',
+    "      if ($p.HasExited) { Trace 'app exited' } else { $p | Stop-Process -Force; Trace 'app force-ended after the grace period' }",
+    '      $waited = $true',
     '    }',
     '  }',
+    "} catch { Trace ('wait failed error=' + (ErrId $_)) }",
+    // The app could not be checked: never end it, and end nothing while it may still run
+    'if (-not $waited) {',
+    '  while ((Get-Date) -lt $until) {',
+    '    $gone = $false',
+    '    try { $gone = $p -and ($p.HasExited -eq $true) } catch { }',
+    '    if ($gone) { break }',
+    '    try { $null = Tree @(Snap) } catch { }',
+    '    Start-Sleep -Milliseconds 1000',
+    '  }',
+    "  Trace 'waited out the grace period'",
+    '}',
+    "try { Trace ('learned ' + $known.Count + ': ' + (Fmt @($known.Keys | Sort-Object | ForEach-Object { @{ ProcessId = $_; Name = $known[$_].N; ParentProcessId = $known[$_].P } }))) } catch { }",
+    // 2. Sweep until two sweeps in a row find no member alive. members-left = members
+    //    alive in the last list that could be read ("unknown" when it could not be).
+    "$quiet = 0; $result = 'gave-up'; $left = 'unknown'",
+    `for ($i = 1; $i -le ${MAX_SWEEPS}; $i++) {`,
+    '  try {',
+    '    $list = @(Snap)',
+    "    if ($script:snapErr) { $quiet = 0; $left = 'unknown'; Trace ('sweep ' + $i + ' process list unavailable error=' + $script:snapErr) }",
+    '    else {',
+    '      $alive = @(Tree $list)',
+    '      $left = $alive.Count',
+    '      if ($alive.Count -eq 0) {',
+    '        $quiet++',
+    "        Trace ('sweep ' + $i + ' alive=none')",
+    "        if ($quiet -ge 2) { $result = 'clean'; break }",
+    '      } else {',
+    '        $quiet = 0',
+    '        $done = @(); $skip = @()',
+    '        foreach ($x in $alive) {',
+    '          $id = [int]$x.ProcessId',
+    '          try {',
+    // Pin the process, verify it is the member through that handle, end it through it
+    '            $h = Get-Process -Id $id -ErrorAction SilentlyContinue',
+    '            if ($h) {',
+    '              $null = $h.Handle',
+    '              $st = $h.StartTime',
+    '              $d = $null',
+    '              if ($st) { $d = $st.ToUniversalTime().Ticks - $known[$id].T }',
+    `              if ($null -ne $d -and $d -le ${idTol} -and $d -ge -${idTol}) { $h | Stop-Process -Force; $done += $id } else { $skip += $id }`,
+    '            }',
+    "          } catch { $skip += $id; Trace ('sweep ' + $i + ' stop failed pid=' + $id + ' error=' + (ErrId $_)) }",
+    '        }',
+    "        Trace ('sweep ' + $i + ' alive=' + (Fmt $alive) + ' stopped=' + ($(if ($done.Count) { $done -join ',' } else { 'none' })) + ' skipped=' + ($(if ($skip.Count) { $skip -join ',' } else { 'none' })))",
+    '      }',
+    '    }',
+    "  } catch { $quiet = 0; $left = 'unknown'; Trace ('sweep ' + $i + ' failed error=' + (ErrId $_)) }",
     `  Start-Sleep -Milliseconds ${SWEEP_PAUSE_MS}`,
     '}',
-    "Trace ('helper done result=' + $result + ' leftovers=' + $left)",
-    '} finally {',
-    // Error ids only (no messages): they name the failing command, never user data
-    "  $ids = @($Error | ForEach-Object { [string]$_.FullyQualifiedErrorId } | Where-Object { $_ -notlike 'ProcessNotTerminated*' } | Select-Object -Unique)",
-    "  Trace ('helper exit errors=' + $(if ($ids.Count -eq 0) { 'none' } else { $ids -join ';' }))",
-    '}'
+    "Trace ('helper done result=' + $result + ' members-left=' + $left)",
+    // Error ids only (no messages): they name the failing command, never user data. The
+    // expected ones (a pid already gone, a wait that timed out) are left out.
+    "$ids = @($Error | ForEach-Object { [string]$_.FullyQualifiedErrorId } | Where-Object { $_ -notlike 'ProcessNotTerminated*' -and $_ -notlike 'NoProcessFoundForGivenId*' } | Select-Object -Unique)",
+    "Trace ('helper exit errors=' + $(if ($ids.Count -eq 0) { 'none' } else { $ids -join ';' }))"
   ].join('\n')
 }
 
@@ -232,8 +337,8 @@ export interface ReapOptions {
   now?: () => number
   uptimeSeconds?: () => number
   spawnFn?: typeof nodeSpawn
-  /** Terminal shells still running (`TerminalService.getLiveShellPids()`). */
-  shellPids?: ReadonlyArray<number>
+  /** Terminal shells still running (`TerminalService.getLiveShells()`). */
+  shells?: ReadonlyArray<LiveShell>
   /** Absolute path of the trace file; no trace when absent. */
   tracePath?: string
   writeFileFn?: typeof writeFileSync
@@ -256,7 +361,7 @@ export function startConptyHostReaper(options: ReapOptions = {}): boolean {
     now = Date.now,
     uptimeSeconds = process.uptime,
     spawnFn = nodeSpawn,
-    shellPids = [],
+    shells: liveShells = [],
     tracePath,
     writeFileFn = writeFileSync,
     appendFileFn = appendFileSync
@@ -278,7 +383,9 @@ export function startConptyHostReaper(options: ReapOptions = {}): boolean {
   try {
     const quitMs = Math.floor(now())
     const startMs = Math.max(1, Math.floor(quitMs - uptimeSeconds() * 1000))
-    const shells = shellPids.filter((p) => Number.isSafeInteger(p) && p > 0)
+    const shells = liveShells.filter(
+      (sh) => Number.isSafeInteger(sh.pid) && sh.pid > 0 && Number.isSafeInteger(sh.spawnedAtMs) && sh.spawnedAtMs > 0
+    )
     const script = buildReapScript(pid, startMs, quitMs, shells)
     note(`app starting quit helper app-pid=${pid} shells=${shells.length}`, true)
     const child = spawnFn(

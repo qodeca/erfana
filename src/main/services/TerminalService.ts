@@ -22,6 +22,7 @@ import {
 import { isWindowsLongPath } from './watcher/PlatformConfig'
 import { isForegroundBusy, shellProcessNames } from './terminalForeground'
 import { killProcessTrees } from './terminalTreeKill'
+import type { LiveShell } from './conptyHostReaper'
 import { installNoForkConsoleList } from './nodePtyWindowsShim'
 
 /**
@@ -185,8 +186,12 @@ export class TerminalService extends EventEmitter {
   private pendingExits = new Set<Promise<void>>()
   /** Window-close kill batches still running on Windows; `dispose()` waits for them (#296). */
   private pendingKills = new Set<Promise<void>>()
-  /** Pids of shells whose exit node-pty has not reported yet; handed to the quit helper (#305). */
-  private liveShellPids = new Set<number>()
+  /**
+   * Shells whose exit node-pty has not reported yet, by terminal id, with the moment
+   * node-pty returned the pid; handed to the quit helper (#305). Keyed by terminal, not
+   * by pid, so a later shell that got a reused pid cannot be removed by an old exit.
+   */
+  private liveShells = new Map<string, LiveShell>()
   /** Set when `dispose()` starts: no terminal may be created after it (#305). */
   private shuttingDown = false
 
@@ -446,7 +451,9 @@ export class TerminalService extends EventEmitter {
 
       this.terminals.set(terminalId, terminal)
       const shellPid = terminal.pid
-      if (typeof shellPid === 'number' && Number.isSafeInteger(shellPid) && shellPid > 0) this.liveShellPids.add(shellPid)
+      if (typeof shellPid === 'number' && Number.isSafeInteger(shellPid) && shellPid > 0) {
+        this.liveShells.set(terminalId, { pid: shellPid, spawnedAtMs: Date.now() })
+      }
 
       // Marker detection: buffer data until we see the marker from bootstrap script
       let markerBuffer = ''
@@ -559,7 +566,7 @@ export class TerminalService extends EventEmitter {
         logger.info(`🏁 Terminal ${terminalId} exited`, event)
         markExited()
         terminal.hasExited = true
-        if (terminal.pid !== undefined) this.liveShellPids.delete(terminal.pid)
+        this.liveShells.delete(terminalId)
         // A shell that fails during the handshake still said why: show it before the exit
         if (terminal.clearFallbackTimeout) {
           clearTimeout(terminal.clearFallbackTimeout)
@@ -807,17 +814,17 @@ export class TerminalService extends EventEmitter {
   }
 
   /**
-   * Pids of every shell started by this service whose exit has not been reported,
-   * including shells already detached by a window close (#305). Main-only: read
-   * once at quit for the quit helper (`conptyHostReaper.ts`), never sent anywhere.
+   * Every shell started by this service whose exit has not been reported, including
+   * shells already detached by a window close, with its spawn time (#305). Main-only:
+   * read once at quit for the quit helper (`conptyHostReaper.ts`), never sent anywhere.
    */
-  getLiveShellPids(): number[] {
-    return [...this.liveShellPids]
+  getLiveShells(): LiveShell[] {
+    return [...this.liveShells.values()]
   }
 
   /**
    * Refuses every later `createTerminal` (#305). Called at the quit moment, before the
-   * quit helper reads {@link getLiveShellPids}, so the helper's list is complete and
+   * quit helper reads {@link getLiveShells}, so the helper's list is complete and
    * no console host appears after the moment it records. `dispose()` calls it too.
    */
   beginShutdown(): void {
