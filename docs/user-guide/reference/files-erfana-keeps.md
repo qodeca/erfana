@@ -14,6 +14,7 @@ Project documents stay in the folder you open. Erfana also keeps app settings an
 - [Project settings and lock](#project-settings-and-lock)
 - [Logs](#logs)
 - [New versions](#new-versions)
+- [Install on Windows](#install-on-windows)
 
 ## Autosave
 
@@ -34,3 +35,7 @@ Project documents stay in the folder you open. Erfana also keeps app settings an
 ## New versions
 
 **What it does:** Erfana does not update itself automatically. **How to reach it:** Get new releases from [GitHub Releases](https://github.com/qodeca/erfana/releases) and install them using the release instructions.
+
+## Install on Windows
+
+**What it does:** Since v0.22.0 the Windows installer installs Erfana for all users of the PC, in `C:\Program Files\Erfana`, so it asks for administrator rights once (the Windows **User Account Control** prompt). Only an administrator can change files in that folder, which protects the app's own files. **How to reach it:** Run the setup `.exe` and select **Yes** in the prompt; uninstall from **Settings > Apps > Installed apps**, which asks again. **Upgrading from v0.21 or earlier:** the old copy in your user folder is removed and its shortcuts are replaced by new ones; your settings, projects, logs and `~/.erfana` stay. A taskbar pin to the old copy may stop working – pin Erfana again. Other Windows accounts on the same PC keep their old copy until they run the new installer.

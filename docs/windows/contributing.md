@@ -35,7 +35,7 @@ Phase umbrellas (filed post-Phase-2):
 |---|---|---|
 | Phase 3 | [#164](https://github.com/qodeca/erfana/issues/164) | Screenshot capture parity (`desktopCapturer`, area-select overlay) |
 | Phase 4 | [#165](https://github.com/qodeca/erfana/issues/165) | Local Whisper Windows binary — **shipped v0.9.4** (`110f1b9`, 2026-04-23) |
-| Phase 5 | [#166](https://github.com/qodeca/erfana/issues/166) | NSIS UX tweaks (`oneClick`, `perMachine`); auto-updater + Windows signing already shipped via #174 in v0.9.5 |
+| Phase 5 | [#166](https://github.com/qodeca/erfana/issues/166) | NSIS UX tweaks; `perMachine: true` (with `oneClick: true`) decided for v0.22.0 – [windows-installer.md](../build/windows-installer.md); auto-updater + Windows signing already shipped via #174 in v0.9.5 |
 | Phase 6 | [#167](https://github.com/qodeca/erfana/issues/167) | Polish, Windows CI guard, visual baselines |
 | Deferred | [#168](https://github.com/qodeca/erfana/issues/168) | D1–D8 deferred items from Phase 2 review |
 | Security | [#169](https://github.com/qodeca/erfana/issues/169) | Dependabot triage — production `npm audit` clean as of v0.11.2 per CHANGELOG; issue closure pending re-verification |

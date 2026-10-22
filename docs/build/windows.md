@@ -5,7 +5,7 @@
 - **Phases 0–2 + 4** (portable scripts, terminal parity, dependency detection, reserved-filename guard, local Whisper) — v0.9.3 and v0.9.4.
 - **Phase 3** (screenshot parity, issue #164) — v0.12.0.
 - **Phase 6** (polish, issue #167) — partially shipped in v0.13.0 (advisory Windows CI job, single-bridge renderer platform detection, PII log redaction, D5/D7), with further Windows-quality work through v0.14.0–v0.16.0: bundled Cascadia Mono terminal font, folder-name project-tree header, native-`git` status worker, and the Windows Claude Code context bar.
-- **Phase 5** (NSIS installer UX, issue #166) is the main phase still open.
+- **Phase 5** (NSIS installer UX, issue #166) is the main phase still open. Its install-scope part shipped in v0.22.0: the installer is per machine ([windows-installer.md](./windows-installer.md)).
 
 Issue references above are bare numbers on purpose — those issue links no longer resolve on the public repository. [`docs/windows/implementation-plan.md`](../windows/implementation-plan.md) is the canonical, dated status.
 
@@ -130,7 +130,7 @@ npm run build:win
 
 > **This does not work on a developer machine today — see [#132](https://github.com/qodeca/erfana/issues/132).** `electron-builder.yml` declares `win.azureSignOptions` unconditionally, so signing is attempted even locally and the build stops with `Error: Unable to find valid azure env field AZURE_TENANT_ID for signing`. `npm run build:unpack` (`electron-builder --dir`) fails the same way, so there is no unsigned fallback. Verified on Windows 11 Pro 26200 on 2026-09-15; inferred, but not exercised, for a Windows target cross-built from macOS or Linux. Windows installers come from `release.yml` only, which builds on `windows-latest` and supplies the Azure values at invocation — **the release path is healthy and unaffected**. Older notes describing local builds as merely "unsigned" are wrong: they cannot be produced at all. The newest artifact under `release/` is v0.9.4 from 2026-04-23, which is consistent with that.
 
-When it worked, this produced an NSIS installer in `release/{version}/`. The build runs `prebuild` (the aproba shim) and `electron-builder --win` automatically.
+When it worked, this produced an NSIS installer in `release/{version}/`. Since v0.22.0 that installer is per machine and asks for administrator rights; [windows-installer.md](./windows-installer.md#build-an-unsigned-installer-locally) has an unsigned build command inferred from electron-builder 26.16.1 that has not been run on Windows yet. The build runs `prebuild` (the aproba shim) and `electron-builder --win` automatically.
 
 > The installer produced here runs the full user-visible feature surface. Phases 1–2 + 4 (terminal parity, dependency detection, reserved-filename guard, local Whisper) shipped in v0.9.3 / v0.9.4, and Phase 3 screenshot capture shipped in v0.12.0 — no feature is gated off on Windows any more. What remains open is installer UX polish (Phase 5, issue #166). Per-feature status lives in [`implementation-plan.md`](../windows/implementation-plan.md) §"Feature status on Windows today".
 

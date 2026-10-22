@@ -121,6 +121,30 @@ nsis:
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
+  # PER-MACHINE INSTALL (v0.22.0, owner decision). Erfana installs into
+  # %ProgramFiles%\Erfana, which only an administrator can write. Erfana.exe
+  # carries the embedded ASAR integrity hash and the fuses, so it must not sit
+  # in a folder a same-user process can rewrite (the per-user default,
+  # %LOCALAPPDATA%\Programs\erfana, is such a folder).
+  # - oneClick stays true (the default, written out on purpose): the same
+  #   no-pages installer users already know, now behind one UAC prompt
+  #   (the installer manifest requests `admin`). The uninstaller asks for
+  #   elevation itself.
+  # - perMachine: true. With oneClick it means "always per-machine"; there is no
+  #   per-user/per-machine choice page.
+  # - allowToChangeInstallationDirectory / allowElevation are assisted-installer
+  #   options; electron-builder rejects the first with oneClick, and ignores the
+  #   second. Silent installs can still pass /D=<dir>.
+  # - packElevateHelper is ignored when perMachine is true; it only matters to
+  #   electron-updater, and auto-update is off (publish: null below).
+  # - The upgrade from a per-user v0.20.x/v0.21 install is electron-builder's own:
+  #   a per-machine install also runs the old per-user uninstaller from HKCU
+  #   silently with /KEEP_APP_DATA --updated. build/installer.nsh only stops that
+  #   old copy keeping its (now dangling) shortcuts. Pinned by
+  #   scripts/installer-config.test.mjs; see docs/build/windows-installer.md.
+  oneClick: true
+  perMachine: true
+  include: build/installer.nsh
 mac:
   hardenedRuntime: true
   gatekeeperAssess: false

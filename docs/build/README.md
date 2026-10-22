@@ -134,6 +134,7 @@ For detailed information on specific build aspects, see:
 - **[Dependencies](./dependencies.md)** - Exclusions, native modules, and the deliberate version pins
 - **[Troubleshooting](./troubleshooting.md)** - Common build errors and solutions
 - **[Windows build prerequisites](./windows.md)** - Setting up a Windows 11 dev box (Phase 0 of the Windows enablement roadmap)
+- **[Windows installer](./windows-installer.md)** - Per-machine NSIS install (v0.22.0), the upgrade from a per-user copy, silent install, the Windows test checklist
 - **[Release pipeline](./release.md)** - Multi-platform release workflow (`.github/workflows/release.yml`), secrets + rotation calendar, end-user verification, incident response
 - **[Whisper binaries build pipeline](./whisper-binaries.md)** - Self-hosted signed whisper.cpp build (reference pattern, separate minisign key from releases)
 

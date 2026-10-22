@@ -250,7 +250,12 @@ nsis:
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
+  oneClick: true
+  perMachine: true
+  include: build/installer.nsh
 ```
+
+The last three lines make the installer per machine (`%ProgramFiles%\Erfana`, one UAC prompt) since v0.22.0, and replace an earlier per-user copy on upgrade. Rationale, the upgrade steps and the Windows test checklist: [windows-installer.md](./windows-installer.md).
 
 Two traps live in this block, both documented inline in the YAML:
 

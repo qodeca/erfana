@@ -322,8 +322,8 @@ Phase 4's ~55 new tests span 8 files. Table below is the authoritative coverage 
 **Remaining live work in #166 (everything else shipped via #174 in v0.9.5):**
 
 1. **NSIS tweaks** — `electron-builder.yml`
-   - Consider `oneClick: false` + `allowToChangeInstallationDirectory: true` for a better first-run UX.
-   - `perMachine: false` (default) to install per-user and avoid UAC.
+   - ~~`perMachine: false` (default) to install per-user and avoid UAC.~~ **Reversed for v0.22.0 (owner decision 2026-10-22)**: `perMachine: true`, so Erfana installs into `%ProgramFiles%\Erfana` behind one UAC prompt. A per-user folder lets a same-user process rewrite `Erfana.exe`, which holds the fuses and the ASAR-integrity hash. The upgrade removes the old per-user copy (electron-builder's own HKCU uninstall step, plus `build/installer.nsh`). Detail, limits and the Windows test checklist: [`docs/build/windows-installer.md`](../build/windows-installer.md). The Windows run of that checklist is still to do.
+   - `oneClick` stays `true`: the same no-pages installer, plus the UAC prompt. `oneClick: false` + `allowToChangeInstallationDirectory: true` was considered and not taken – it adds wizard pages for a choice silent installs already have (`/D=`).
 
 **Shipped via #174 (historical reference):**
 - ~~Fix auto-updater URL~~ — `electron-builder.yml` now uses `publish: null` (auto-update is an explicit non-goal).

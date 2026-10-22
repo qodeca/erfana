@@ -462,6 +462,21 @@ npm run build:mac
 
 See [`build/architectures.md`](./build/architectures.md) for the full rationale.
 
+### Windows install location (v0.22.0)
+
+**Status**: the Windows installer is per machine since v0.22.0 (`nsis.perMachine: true`). Erfana installs into `%ProgramFiles%\Erfana`, behind one UAC prompt; up to v0.21 it installed per user into `%LOCALAPPDATA%\Programs\erfana`.
+
+**Why it matters**: `Erfana.exe` carries the Electron fuses and, with ASAR integrity on, the hash it checks `app.asar` against. Both checks run inside the program files, so they only hold while those files cannot be swapped. A per-user folder is writable by the signed-in user and by any program they run, so a same-user process could replace `Erfana.exe` or a DLL beside it and switch the checks off – the gap left open on Windows by the ASAR-integrity change. `%ProgramFiles%` is writable by administrators only, which hardens `Erfana.exe`, its DLLs, `app.asar` and `app.asar.unpacked` against a same-user process.
+
+**What it does not cover**:
+
+- An administrator, or a process already running elevated, can still change the program files. That is outside the threat model of the integrity check.
+- A per-user copy that another Windows account on the same PC still has, or one a standard user keeps after elevating with someone else's admin password, is not migrated until that account runs the v0.22.0 installer ([`build/windows-installer.md` § Limits](./build/windows-installer.md#limits)). It keeps the old exposure.
+- User data stays per user and writable by design: `%APPDATA%\Erfana` (Electron `userData`, including the downloaded Whisper binaries, which carry their own signature checks – [`windows/whisper-trust-chain.md`](./windows/whisper-trust-chain.md)) and `~/.erfana`.
+- macOS is out of scope for this change.
+
+**Binding**: `scripts/installer-config.test.mjs` pins `perMachine`, `oneClick`, the absence of assisted-only options and of `deleteAppDataOnUninstall`, the `build/installer.nsh` wiring, and the electron-builder template steps the upgrade depends on. The upgrade itself is described in [`build/windows-installer.md`](./build/windows-installer.md).
+
 ---
 
 ## IPC Security Checklist
@@ -779,7 +794,7 @@ Full verification recipes (macOS `codesign`, Windows `signtool`) are in [`build/
 
 ## Future enhancements
 
-Auto-updates via signed electron-updater (deferred — not shipped with #174 per non-goals). Encrypted storage via OS keychain. Confirmation prompts before destructive operations. SLSA Build L2 attestations — still off, pending a deliberate pipeline change rather than a plan restriction: the original blocker (attestations gated to Enterprise Cloud for private repos) expired when the repo went public on 2026-06-16. **Windows code signing is now covered by #174; #166 narrows to NSIS installer UX. Branch protection on `main` + protected `v*.*.*` tag ruleset are live as of 2026-04-25 — see [`build/release.md` § Branch protection](./build/release.md#branch-protection-phase-i--done-2026-04-25).**
+Auto-updates via signed electron-updater (deferred — not shipped with #174 per non-goals; on the per-machine Windows install it would need electron-updater's elevation helper and a UAC prompt per update, see [`build/windows-installer.md` § Auto-update](./build/windows-installer.md#auto-update)). Encrypted storage via OS keychain. Confirmation prompts before destructive operations. SLSA Build L2 attestations — still off, pending a deliberate pipeline change rather than a plan restriction: the original blocker (attestations gated to Enterprise Cloud for private repos) expired when the repo went public on 2026-06-16. **Windows code signing is now covered by #174; #166 narrows to NSIS installer UX. Branch protection on `main` + protected `v*.*.*` tag ruleset are live as of 2026-04-25 — see [`build/release.md` § Branch protection](./build/release.md#branch-protection-phase-i--done-2026-04-25).**
 
 ## References
 

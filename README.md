@@ -55,7 +55,7 @@ Everything else, with screenshots, is in the [user guide](docs/user-guide/README
 ## Get started
 
 1. Download the signed build for your OS from **[Releases](https://github.com/qodeca/erfana/releases/latest)** – [verify it](#release-verification) before installing.
-2. Install it (macOS: open the `.dmg`; Windows: run the setup `.exe`).
+2. Install it (macOS: open the `.dmg`; Windows: run the setup `.exe` and approve the administrator prompt – since v0.22.0 Erfana installs for all users in `C:\Program Files\Erfana`, and replaces an older per-user copy).
 3. Launch Erfana and open a project folder – the editor, project tree, and terminal open in context.
 
 Then follow [your first ten minutes](docs/user-guide/first-ten-minutes.md). Prefer to build from source? See [Contributing and building](#contributing-and-building).

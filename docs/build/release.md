@@ -530,7 +530,7 @@ This is A + C simultaneously. Trigger both. Additionally: open an urgent advisor
 
 ## Relationship to other workstreams
 
-- **#166** (Windows Phase 5 — distribution hygiene): this work supersedes the Windows signing + `example.com` updater-URL elements. Once this lands, narrow #166 to NSIS UX tweaks (`oneClick`, `perMachine`) or close it.
+- **#166** (Windows Phase 5 — distribution hygiene): this work supersedes the Windows signing + `example.com` updater-URL elements. Once this lands, narrow #166 to NSIS UX tweaks (`oneClick`, `perMachine`) or close it. **Update (v0.22.0)**: `perMachine: true` with `oneClick: true` shipped – see [windows-installer.md](./windows-installer.md).
 - **#165** (Phase 4 whisper): shipped in v0.9.4. Its minisign dual-pubkey trust chain is a pattern reference, not a shared keypair.
 - **`whisper-binaries.yml`**: template for keychain setup, minisign signing, and signed-artifact upload. We mine it; we do not reuse its signing key.
 
