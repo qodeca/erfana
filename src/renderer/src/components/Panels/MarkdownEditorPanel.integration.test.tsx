@@ -399,10 +399,10 @@ describe('MarkdownEditorPanel Integration', () => {
 
     it('wires each caller to its trigger: Cmd+S is user, autosave is autosave, the registry is registry', () => {
       expect(source).toContain("onSave: () => handleSave('user'),")
-      expect(source).toContain("await handleSave('autosave')")
+      expect(source).toContain("return handleSave('autosave')")
       // an autosave never overwrites a file that changed on disk
       expect(source.indexOf('if (externalChangeDetected) return')).toBeLessThan(
-        source.indexOf("await handleSave('autosave')")
+        source.indexOf("return handleSave('autosave')")
       )
       expect(source).toContain("() => handleSave('registry'), externalChangeDetected")
       expect(source.match(/handleSave\(/g)).toHaveLength(3)
@@ -456,75 +456,58 @@ describe('MarkdownEditorPanel Integration', () => {
       )
     })
   })
-  describe('File load (review finding 49) and the autosave indicator timer (finding 52)', () => {
-    // Pinned on the source for the same reason as the blocks above: rendering
-    // the panel needs monaco-editor. beginLatestLoad and formatLoadError are
-    // unit-tested in markdownEditorPanel.logic.test.ts and errorUtils.test.ts.
+  describe('File load wiring (review finding 49) and the autosave indicator timer (finding 52)', () => {
+    // Only the wiring is pinned here, on the source, for the same reason as
+    // the blocks above. The behaviour (latest read wins, failures reported,
+    // nothing sensitive logged, StrictMode) is tested with renderHook in
+    // useLatestFileLoad.test.ts, the error state in EditorLoadError.test.tsx.
     const source = readFileSync(
       join(process.cwd(), 'src/renderer/src/components/Panels/MarkdownEditorPanel.tsx'),
       'utf8'
     ).replace(/\r\n/g, '\n')
-    const loadFile = source.slice(
-      source.indexOf('const loadFile = useCallback'),
-      source.indexOf('}, [setIsEditorReady, showToast])')
-    )
-    const loadTry = loadFile.slice(loadFile.indexOf('try {'), loadFile.indexOf('} catch (error) {'))
-    const loadCatch = loadFile.slice(loadFile.indexOf('} catch (error) {'))
-    const unmountCleanup = source.slice(
-      source.indexOf('// Cleanup: ensure panel is not marked dirty on unmount'),
-      source.indexOf('// Debug logging')
-    )
+    /** The text between two markers; throws if either is missing, so a rename cannot empty a slice silently. */
+    const between = (from: string, to: string): string => {
+      const start = source.indexOf(from)
+      const end = source.indexOf(to, start)
+      expect(start, from).toBeGreaterThan(-1)
+      expect(end, to).toBeGreaterThan(-1)
+      return source.slice(start, end)
+    }
 
-    it('the slices under test exist', () => {
-      expect(loadFile.length).toBeGreaterThan(0)
-      expect(loadTry.length).toBeGreaterThan(0)
-      expect(loadCatch.length).toBeGreaterThan(0)
-      expect(unmountCleanup.length).toBeGreaterThan(0)
+    it('loads through useLatestFileLoad, once, with a toast on failure', () => {
+      const load = between('= useLatestFileLoad(props.params?.filePath, {', '\n  })\n')
+      expect(source.match(/useLatestFileLoad\(/g)).toHaveLength(1)
+      expect(load).toContain('openedGenerationRef.current = generation')
+      expect(load).toContain("showToast({ title: 'Could not open file', message, type: 'error'")
+      // no second, unguarded read anywhere in the panel
+      expect(source.match(/fileGateway\.readFile\(/g)).toHaveLength(1)
+      expect(load).toContain('fileGateway.readFile({ filePath })')
     })
 
-    it('applies a read only while it is the latest load, success or failure', () => {
-      expect(loadFile).toContain('const isLatest = beginLatestLoad(loadSeqRef)')
-      // checked right after the read, before any state is touched
-      const read = loadTry.indexOf('await fileGateway.readFile({ filePath })')
-      const check = loadTry.indexOf('if (!isLatest()) return')
-      expect(read).toBeGreaterThan(-1)
-      expect(check).toBeGreaterThan(read)
-      expect(check).toBeLessThan(loadTry.indexOf('openedGenerationRef.current = generation'))
-      expect(check).toBeLessThan(loadTry.indexOf('setCurrentFile('))
-      // a stale failure is dropped too: no toast for a file no longer asked for
-      expect(loadCatch.indexOf('if (!isLatest()) return')).toBeGreaterThan(-1)
-      expect(loadCatch.indexOf('if (!isLatest()) return')).toBeLessThan(loadCatch.indexOf('showToast('))
+    it('renders the error state with its retry before the empty state', () => {
+      const errorState = source.indexOf('<EditorLoadError message={loadError} onRetry={retryLoad} />')
+      const emptyState = source.indexOf('<p>No file open</p>')
+      expect(errorState).toBeGreaterThan(-1)
+      expect(emptyState).toBeGreaterThan(-1)
+      expect(errorState).toBeLessThan(emptyState)
+      expect(source).toContain(') : loadError ? (')
     })
 
-    it('retires a load still in flight when the panel unmounts', () => {
-      expect(unmountCleanup).toContain('loadSeqRef.current += 1')
+    it('hands autosave the save result, so a failed write backs off', () => {
+      expect(source).toContain("return handleSave('autosave')")
     })
 
-    it('a failed load shows an error state and a toast, never "No file open"', () => {
-      expect(loadCatch).toContain('const message = formatLoadError(error, extractFileName(filePath))')
-      expect(loadCatch).toContain('setLoadError(message)')
-      expect(loadCatch).toMatch(/showToast\(\{ title: 'Could not open file', message, type: 'error'/)
-      // the error state is rendered before the empty state
-      expect(source).toMatch(/\) : loadError \? \(\n\s*<div className="editor-empty">\n\s*<p>\{loadError\}<\/p>/)
-      expect(source.indexOf('{loadError}')).toBeLessThan(source.indexOf('<p>No file open</p>'))
-      // a later successful load clears it
-      expect(loadTry).toContain('setLoadError(null)')
-    })
-
-    it('keeps the document text and absolute paths out of the load logs', () => {
-      expect(source).not.toContain('contentPreview')
-      expect(loadFile).not.toMatch(/content\.(substring|slice)\(/)
-      expect(loadCatch).toContain("logger.error('Error loading file', loggableError(error))")
-    })
-
-    it('keeps one pending indicator reset and clears it on unmount', () => {
-      const handleSave = source.slice(
-        source.indexOf('const handleSave = useCallback'),
-        source.indexOf('}, [currentFile, isFileDeleted, dismissConflict')
-      )
+    it('keeps one pending indicator reset, cleared when an autosave starts and on unmount', () => {
+      const handleSave = between('const handleSave = useCallback', '}, [currentFile, isFileDeleted, dismissConflict')
+      const unmountCleanup = between('// Cleanup: ensure panel is not marked dirty on unmount', '// Debug logging')
       // no fire-and-forget timer is left in the save path
       expect(handleSave).not.toMatch(/\n\s*setTimeout\(/)
-      expect(handleSave).toContain('if (autoSaveIndicatorTimerRef.current) clearTimeout(autoSaveIndicatorTimerRef.current)')
+      const start = handleSave.indexOf('if (isAutoSave) {')
+      const clear = handleSave.indexOf('clearTimeout(autoSaveIndicatorTimerRef.current)')
+      const indicatorOn = handleSave.indexOf('setIsAutoSaving(true)')
+      expect(start).toBeGreaterThan(-1)
+      expect(clear).toBeGreaterThan(start)
+      expect(clear).toBeLessThan(indicatorOn)
       expect(handleSave).toContain('autoSaveIndicatorTimerRef.current = setTimeout(() => {')
       expect(unmountCleanup).toContain('clearTimeout(autoSaveIndicatorTimerRef.current)')
     })

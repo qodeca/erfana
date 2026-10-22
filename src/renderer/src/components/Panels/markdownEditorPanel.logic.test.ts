@@ -35,7 +35,6 @@ import {
   isMarkdownFile,
   getDefaultViewMode,
   trackSaveInFlight,
-  beginLatestLoad,
   settleSavedFile
 } from './markdownEditorPanel.logic'
 
@@ -868,40 +867,6 @@ describe('trackSaveInFlight', () => {
 
     finishNewer()
     expect(ref.current).toBeNull()
-  })
-})
-
-describe('beginLatestLoad', () => {
-  it('lets only the latest of two out-of-order loads apply (fast file switching)', async () => {
-    const ref = { current: 0 }
-    const applied: string[] = []
-    let finishOlder: (text: string) => void = () => {}
-    let finishNewer: (text: string) => void = () => {}
-    const load = async (read: Promise<string>): Promise<void> => {
-      const isLatest = beginLatestLoad(ref)
-      const text = await read
-      if (isLatest()) applied.push(text)
-    }
-
-    const older = load(new Promise((resolve) => { finishOlder = resolve }))
-    const newer = load(new Promise((resolve) => { finishNewer = resolve }))
-    // the newer read lands first, the older one last
-    finishNewer('b.md text')
-    await newer
-    finishOlder('a.md text')
-    await older
-
-    expect(applied).toEqual(['b.md text'])
-  })
-
-  it('retires every load in flight when the counter is bumped without a new load (unmount)', () => {
-    const ref = { current: 0 }
-    const isLatest = beginLatestLoad(ref)
-    expect(isLatest()).toBe(true)
-
-    ref.current += 1
-
-    expect(isLatest()).toBe(false)
   })
 })
 

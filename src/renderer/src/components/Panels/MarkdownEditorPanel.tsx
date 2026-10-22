@@ -42,16 +42,17 @@ import { useDividerPosition } from '../../hooks/useDividerPosition'
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts'
 import { useEditorSaveRegistration } from '../../hooks/useEditorSaveRegistration'
 import { useEditorReadOnlyHold } from '../../hooks/useEditorReadOnlyHold'
+import { useLatestFileLoad } from '../../hooks/useLatestFileLoad'
 
 // Extracted components
 import { MarkdownToolbar, EditorErrorBoundary } from '../Editor/MarkdownEditorPanel/components'
 import { EditorContentLayout } from './EditorContentLayout'
 import { DocumentStatsBar } from './DocumentStatsBar'
+import { EditorLoadError } from './EditorLoadError'
 
 // Types and pure functions
 import type { ViewMode, EditorFile } from '../Editor/MarkdownEditorPanel/types'
 import {
-  beginLatestLoad,
   calculateStats,
   extractFileName,
   getDefaultViewMode,
@@ -61,7 +62,7 @@ import {
   trackSaveInFlight,
   type SaveTrigger
 } from './markdownEditorPanel.logic'
-import { formatLoadError, formatSaveError, loggableError } from '../../utils/errorUtils'
+import { formatSaveError, loggableError } from '../../utils/errorUtils'
 import { formatTabTitle } from '../../utils/tabTitle'
 
 // Shared constants
@@ -118,8 +119,6 @@ export function MarkdownEditorPanel(
   // Core State
   // =========================================================================
   const [currentFile, setCurrentFile] = useState<EditorFile | null>(null)
-  // Why the last load failed (shown instead of "No file open"); null after a success
-  const [loadError, setLoadError] = useState<string | null>(null)
   // The project session generation the file was loaded under (undefined until a project event was seen)
   const openedGenerationRef = useRef<number | undefined>(undefined)
   const [viewMode, setViewMode] = useState<ViewMode>('preview')
@@ -152,8 +151,6 @@ export function MarkdownEditorPanel(
    * does not repeat it every few seconds. Reset when the file changes (below).
    */
   const lastSaveErrorRef = useRef<string | null>(null)
-  /** Bumped by every load and on unmount, so only the latest load applies (see beginLatestLoad) */
-  const loadSeqRef = useRef(0)
   /** The pending "auto-saved" indicator reset, cleared on unmount and by the next autosave */
   const autoSaveIndicatorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -271,6 +268,11 @@ export function MarkdownEditorPanel(
 
     try {
       if (isAutoSave) {
+        // A reset still pending from the last autosave must not hide this one's indicator
+        if (autoSaveIndicatorTimerRef.current) {
+          clearTimeout(autoSaveIndicatorTimerRef.current)
+          autoSaveIndicatorTimerRef.current = null
+        }
         setIsAutoSaving(true)
       }
 
@@ -327,9 +329,7 @@ export function MarkdownEditorPanel(
       clearDeletedState()
 
       if (isAutoSave) {
-        // Show auto-save indicator briefly. One pending reset at a time, so an
-        // earlier save's reset never hides this one's indicator early.
-        if (autoSaveIndicatorTimerRef.current) clearTimeout(autoSaveIndicatorTimerRef.current)
+        // Show auto-save indicator briefly (the reset is cleared on unmount)
         autoSaveIndicatorTimerRef.current = setTimeout(() => {
           autoSaveIndicatorTimerRef.current = null
           setIsAutoSaving(false)
@@ -369,7 +369,8 @@ export function MarkdownEditorPanel(
       // the user's choice in the conflict bar; an autosave would overwrite the
       // newer file and dismiss the bar.
       if (externalChangeDetected) return
-      await handleSave('autosave')
+      // `false` (a failed write) makes autosave back off until the next edit
+      return handleSave('autosave')
     },
     { delay: 2000, enabled: true, maxInterval: 30000 }
   )
@@ -513,41 +514,30 @@ export function MarkdownEditorPanel(
   // =========================================================================
 
   /**
-   * Loads a file from disk into the editor.
-   *
-   * @param filePath - Absolute path to the file to load
+   * Loads the tab's file into the editor; only the latest read applies (see
+   * useLatestFileLoad). Nothing changes `params.filePath` on a live editor
+   * panel – the openers reuse a tab without touching its params, and only
+   * preview panels call `updateParameters` – so a load runs on mount (and on
+   * "Try again"), never over a buffer holding unsaved edits.
    */
-  const loadFile = useCallback(async (filePath: string) => {
-    logger.info('Loading file', { filePath })
-    // An older read that lands after this one must not replace its result
-    const isLatest = beginLatestLoad(loadSeqRef)
-    setIsEditorReady(false) // Reset editor ready state when loading new file
-    try {
+  const { loadError, retry: retryLoad } = useLatestFileLoad(props.params?.filePath, {
+    read: async (filePath) => {
       // The project this file is opened under; saves name it
       const generation = getLastSeenProjectGeneration()
       const content = await fileGateway.readFile({ filePath })
-      if (!isLatest()) return
+      return { content, generation }
+    },
+    onStart: () => setIsEditorReady(false), // Reset editor ready state when loading new file
+    onLoaded: (filePath, { content, generation }) => {
       openedGenerationRef.current = generation
-      // Length only: the document's text stays out of the log
-      logger.info('File loaded successfully', { filePath, contentLength: content.length })
-      setLoadError(null)
-      setCurrentFile({
-        path: filePath,
-        content,
-        modified: false
-      })
-
+      setCurrentFile({ path: filePath, content, modified: false })
       // Set view mode based on file type using extracted logic
       setViewMode(getDefaultViewMode(filePath))
-    } catch (error) {
-      if (!isLatest()) return
-      logger.error('Error loading file', loggableError(error))
-      // Never fail silently: without this the tab read "No file open"
-      const message = formatLoadError(error, extractFileName(filePath))
-      setLoadError(message)
+    },
+    // Never fail silently: without this the tab read "No file open"
+    onFailed: (message) =>
       showToast({ title: 'Could not open file', message, type: 'error', duration: 8000 })
-    }
-  }, [setIsEditorReady, showToast])
+  })
 
   /**
    * Handles content changes from the Monaco editor.
@@ -616,14 +606,6 @@ export function MarkdownEditorPanel(
   // Effects
   // =========================================================================
 
-  // Load file when panel receives a file path
-  useEffect(() => {
-    const filePath = props.params?.filePath
-    if (filePath) {
-      loadFile(filePath)
-    }
-  }, [props.params?.filePath, loadFile])
-
   // Handle initial line/column positioning from terminal file links
   useEffect(() => {
     const { initialLine, initialColumn } = props.params || {}
@@ -641,14 +623,13 @@ export function MarkdownEditorPanel(
     props.api.setTitle(title)
   }, [currentFile?.modified, currentFile?.path, isFileDeleted, props.api])
 
-  // Cleanup: ensure panel is not marked dirty on unmount, retire any load in
-  // flight, and drop a pending indicator reset
+  // Cleanup: ensure panel is not marked dirty on unmount, and drop a pending
+  // indicator reset
   useEffect(() => {
     return () => {
       if (panelIdRef.current) {
         useProjectStore.getState().setEditorDirty(panelIdRef.current, false)
       }
-      loadSeqRef.current += 1
       if (autoSaveIndicatorTimerRef.current) {
         clearTimeout(autoSaveIndicatorTimerRef.current)
         autoSaveIndicatorTimerRef.current = null
@@ -731,10 +712,7 @@ export function MarkdownEditorPanel(
           />
         </EditorErrorBoundary>
       ) : loadError ? (
-        <div className="editor-empty">
-          <p>{loadError}</p>
-          <p className="hint">Check that the file still exists and can be read, then open it again</p>
-        </div>
+        <EditorLoadError message={loadError} onRetry={retryLoad} />
       ) : (
         <div className="editor-empty">
           <p>No file open</p>

@@ -651,29 +651,6 @@ export function trackSaveInFlight(ref: { current: Promise<void> | null }): () =>
   }
 }
 
-/**
- * Start a file load that only applies while it is still the latest one.
- *
- * Reads are async, so two loads can finish out of order: without this an
- * older read that lands last puts the wrong file's text on screen. Bumping
- * the ref without starting a load (on unmount) retires every load in flight.
- *
- * @param ref - The panel's load counter
- * @returns A check to call after each await; true only while no newer load
- *   (or retirement) has bumped the counter
- *
- * @example
- * ```ts
- * const isLatest = beginLatestLoad(loadSeqRef)
- * const content = await fileGateway.readFile({ filePath })
- * if (!isLatest()) return
- * ```
- */
-export function beginLatestLoad(ref: { current: number }): () => boolean {
-  const ticket = ++ref.current
-  return () => ref.current === ticket
-}
-
 /** The part of the panel's file state a finished save settles. */
 export interface SavedFileState {
   /** Document text React holds */
