@@ -130,6 +130,11 @@ export function MarkdownEditorPanel(
    * acting on keystrokes aimed at the foreground tab.
    */
   const [isActivePanel, setIsActivePanel] = useState<boolean>(() => props.api.isActive)
+  /**
+   * Whether dockview is drawing this panel. A hidden preview holds its link
+   * re-checks until it is shown again (see `linkTargetCache`).
+   */
+  const [isPanelVisible, setIsPanelVisible] = useState<boolean>(() => props.api?.isVisible ?? true)
 
   // =========================================================================
   // Refs
@@ -458,6 +463,14 @@ export function MarkdownEditorPanel(
     return () => disposable.dispose()
   }, [props.api])
 
+  useEffect(() => {
+    const api = props.api
+    if (!api?.onDidVisibilityChange) return
+    setIsPanelVisible(api.isVisible ?? true)
+    const disposable = api.onDidVisibilityChange((event) => setIsPanelVisible(event.isVisible))
+    return () => disposable.dispose()
+  }, [props.api])
+
   useKeyboardShortcuts({
     onSave: () => handleSave('user'),
     onClose: () => props.api.close(),
@@ -690,6 +703,7 @@ export function MarkdownEditorPanel(
             onOpenFile={handleOpenFile}
             onPreviewRendered={handlePreviewRendered}
             onSelectionChange={setSelectedText}
+            isVisible={isPanelVisible}
           />
         </EditorErrorBoundary>
       ) : (
