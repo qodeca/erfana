@@ -382,6 +382,47 @@ describe('useDirectoryWatcher hook', () => {
 
         expect(onRefresh).toHaveBeenCalledTimes(2)
       })
+
+      it('stretches the max wait to twice the last read on a slow project', async () => {
+        // Each tree read takes 3 s: the next forced refresh waits 6 s, not 1 s
+        const READ_MS = 3000
+        const onRefresh = vi.fn(() => new Promise<void>((resolve) => setTimeout(resolve, READ_MS)))
+        renderHook(() =>
+          useDirectoryWatcher({
+            projectPath: '/proj',
+            initialLoadComplete: true,
+            isInternalOperationRef: { current: false },
+            onRefresh,
+            onProjectDeleted: vi.fn(),
+            onError: vi.fn()
+          })
+        )
+        const callback = mockOnDirectoryChanged.mock.calls[0][0]
+
+        // First read: debounced as usual, then it runs for 3 s
+        await act(async () => {
+          callback({ eventCount: 1, summary: { add: 1 }, structural: true })
+          await vi.advanceTimersByTimeAsync(DIRECTORY_WATCHER.DEBOUNCE_DELAY + 1 + READ_MS)
+        })
+        expect(onRefresh).toHaveBeenCalledTimes(1)
+
+        // A steady stream for 5 s: still inside the 6 s max wait
+        await act(async () => {
+          for (let elapsed = 0; elapsed < 5000; elapsed += 100) {
+            callback({ eventCount: 1, summary: { add: 1 }, structural: true })
+            await vi.advanceTimersByTimeAsync(100)
+          }
+        })
+        expect(onRefresh).toHaveBeenCalledTimes(1)
+
+        await act(async () => {
+          for (let elapsed = 0; elapsed < 1100; elapsed += 100) {
+            callback({ eventCount: 1, summary: { add: 1 }, structural: true })
+            await vi.advanceTimersByTimeAsync(100)
+          }
+        })
+        expect(onRefresh).toHaveBeenCalledTimes(2)
+      })
     })
 
     it('calls onProjectDeleted when project deletion event received', () => {

@@ -30,6 +30,7 @@ import {
   shouldHandleDirectoryChange,
   isStructuralDirectoryChange,
   getRefreshDelay,
+  getMaxWait,
   createDirectoryChangeMessage,
   createWatcherErrorMessage,
   createDirectoryErrorMessage
@@ -41,7 +42,8 @@ interface UseDirectoryWatcherOptions {
   projectPath: string | null
   initialLoadComplete: boolean
   isInternalOperationRef: React.MutableRefObject<boolean>
-  onRefresh: () => void
+  /** Re-reads the tree; a returned promise lets the max wait follow how long a read takes */
+  onRefresh: () => void | Promise<void>
   onProjectDeleted: () => void
   onError: (error: string) => void
 }
@@ -68,9 +70,11 @@ export function useDirectoryWatcher({
   // Debounce timer for refresh callbacks – consumer-side throttle for
   // bursts of 'directory-watch:changed' broadcasts (multi-file edits, save
   // storms, formatters). Mirrors the useGitStatus.debouncedRefresh pattern,
-  // plus a max wait so a steady stream still refreshes about once a second.
+  // plus a max wait so a steady stream still refreshes: about once a second,
+  // or every two read-lengths on a project whose tree read takes longer.
   const refreshTimerRef = useRef<NodeJS.Timeout | null>(null)
   const burstStartedAtRef = useRef(0)
+  const lastRefreshMsRef = useRef(0)
 
   useEffect(() => {
     // Guard: Should we start the watcher?
@@ -112,11 +116,14 @@ export function useDirectoryWatcher({
         burstStartedAtRef.current,
         now,
         DIRECTORY_WATCHER.DEBOUNCE_DELAY,
-        DIRECTORY_WATCHER.MAX_WAIT
+        getMaxWait(DIRECTORY_WATCHER.MAX_WAIT, lastRefreshMsRef.current)
       )
       refreshTimerRef.current = setTimeout(() => {
         refreshTimerRef.current = null
-        onRefreshRef.current()
+        const started = Date.now()
+        void Promise.resolve(onRefreshRef.current()).finally(() => {
+          lastRefreshMsRef.current = Date.now() - started
+        })
       }, delay)
     })
 
