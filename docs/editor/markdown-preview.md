@@ -108,6 +108,43 @@ Escape does not close the viewer (`diagramViewer.logic.ts` maps it to no action)
 **Files:**
 - `src/renderer/src/components/Editor/DiagramViewer/`
 
+#### Images (#71)
+
+**Before #71** a project-relative image never rendered. The `src` was handed to the page
+unchanged, so it resolved against the app bundle, not the project: in the packaged app
+`./assets/icon.svg` became `file:///…/out/renderer/assets/icon.svg`, and both an SVG and a PNG
+showed as a broken image with `naturalWidth` 0 (checked by running the app, 2026-10-22; the
+e2e test `e2e/preview-images.e2e.ts` now pins the fixed behaviour).
+
+**Now** the `img` renderer is `MarkdownImage.tsx`, and each `src` is classified first
+(`markdownImageSource.ts`):
+
+| `src` | What happens |
+|---|---|
+| `http:` / `https:` | Passed through unchanged, as before. Nothing is fetched by the app. |
+| Relative to the document (`./a.png`, `a.png`, `../img/a.svg`) | Read by the main process over `markdown-image:read`, confined to the open project (links and junctions resolved; one that leads out is refused), and shown as a `data:` URL in an `<img>`. |
+| Absolute or rooted path, drive or UNC path, protocol-relative `//host/…`, `file:`, `data:`, any other scheme, or a relative path that climbs out of the project | Never loaded: the alt text is shown in a placeholder, with the reason as tooltip. |
+
+- **`<picture>`:** a `<source srcset>` is kept only when every candidate is `http(s)`; otherwise
+  it is dropped and the picture falls back to its `<img>`, which follows the table above.
+- **Types and caps:** PNG, JPEG, GIF, WebP, SVG only; 50 MB per image (the image viewer's
+  cap); 64 distinct images per document; 4 reads in flight per preview.
+- **SVG** is always an `<img src="data:image/svg+xml;base64,…">`, never inlined into the DOM, so
+  its scripts do not run and it fetches nothing.
+- **CSP:** unchanged. The page already allows `img-src data:`; no custom protocol was added.
+- **Refresh:** no new watch. `markdownImageStore.ts` listens to the same signals as the link
+  checks – every `directory-watch:changed` batch (content edits included) and this window's own
+  file operations – settles a burst (300 ms, at most 2 s), then asks again for every image on
+  screen *with the version it shows*. The main process answers `unchanged` after a `stat`, so
+  only changed images are re-read and re-sent. New bytes are decoded off the DOM first; a
+  half-written file keeps the last good image. The `<img>` element is updated in place.
+- **Hidden previews** (the `isVisible` prop) read nothing; they catch up once when shown.
+- **Scroll sync and export:** an arriving image reports `onRendered({ reason: 'image' })`, which
+  scroll sync treats like a drawn diagram (one debounced re-measure); a loading image counts as
+  outstanding work for `flush()`, so PDF / DOCX export waits for it.
+- **Limit:** an image in a folder the directory watcher skips (hidden, excluded or ignored by
+  version control) updates on the next project change event or when the tab is reopened.
+
 #### HTML Embedding
 Safe HTML rendering with security sanitization.
 
@@ -160,6 +197,7 @@ Attributes:
 ## Implementation
 - Component: `MarkdownPreview.tsx`
 - Mermaid: `MermaidDiagram.tsx`
+- Images: `MarkdownImage.tsx`, `markdownImageSource.ts`, `markdownImageStore.ts`; main side `src/main/ipc/markdown-image-handlers.ts`
 - Line tracking: `extractLineRange()` and `withLineRange()` in `MarkdownPreview.tsx`
 - HTML support: `sanitizationSchema`, the `rehypePlugins` list and the `components` map in `MarkdownPreview.tsx`
 

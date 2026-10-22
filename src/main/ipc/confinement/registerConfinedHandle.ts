@@ -72,6 +72,12 @@ export interface ConfinedHandleDefinition<
   senderGate?: { allow: (event: IpcMainInvokeEvent) => boolean; denied: () => TResult }
   /** For channels that answer with a result value instead of rejecting */
   onRefusal?: (error: ConfinementError, ctx: { sender: WebContents }) => TResult
+  /**
+   * Level of the "IPC path refused" log line; `warn` by default. `debug` is for
+   * a channel where a refusal is routine (a document naming a missing image
+   * is re-asked on every project change, #71).
+   */
+  refusalLogLevel?: 'warn' | 'debug'
   handler: (
     ctx: ConfinedHandlerContext,
     args: TArgs,
@@ -180,7 +186,11 @@ export function registerConfinedHandle<
     } catch (error) {
       if (error instanceof ConfinementError) {
         // The code is enough for the log; the path stays out of it
-        logger.warn('IPC path refused', { channel, code: error.code })
+        if (definition.refusalLogLevel === 'debug') {
+          logger.debug('IPC path refused', { channel, code: error.code })
+        } else {
+          logger.warn('IPC path refused', { channel, code: error.code })
+        }
         if (definition.onRefusal) return definition.onRefusal(error, { sender: event.sender })
       }
       throw error

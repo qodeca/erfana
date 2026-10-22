@@ -11,6 +11,7 @@ Preview renders GitHub-style Markdown, frontmatter, links and Mermaid diagrams b
 
 - [Markdown and frontmatter](#markdown-and-frontmatter)
 - [Links](#links)
+- [Images](#images)
 - [Mermaid diagrams](#mermaid-diagrams)
 
 ## Markdown and frontmatter
@@ -22,6 +23,10 @@ Preview renders GitHub-style Markdown, frontmatter, links and Mermaid diagrams b
 ## Links
 
 **What they do:** Heading anchors move within the document; links to project files open in Erfana; external URLs go to the operating system's browser. Unsafe destinations are blocked. **How to reach them:** Select a link in Preview. For selected preview text, the right-click menu offers **Copy selection** and prompt templates.
+
+## Images
+
+**What they do:** An image inside the project, referenced by a path relative to the document (`![logo](./assets/logo.svg)`), is shown in the preview and updates within about a second when the image file changes on disk – no need to reopen the tab. PNG, JPEG, GIF, WebP and SVG images up to 50 MB are shown, up to 64 per document. Web images (`https://…`) behave as before. An image outside the project, an absolute path or a `file:` address is not loaded: the preview shows its alt text in a box instead, and hovering the box says why. **How to reach them:** Open a Markdown file with images in Preview.
 
 ## Mermaid diagrams
 

@@ -27,6 +27,7 @@ import { registerTranscriptionHandlers } from './ipc/transcription-handlers'
 import { registerClipboardHandlers } from './ipc/clipboard-handlers'
 import { registerImageExportHandlers } from './ipc/image-export-handlers'
 import { registerBrowserHandlers } from './ipc/browser-handlers'
+import { registerMarkdownImageHandlers } from './ipc/markdown-image-handlers'
 import { registerClaudeStatusHandlers } from './ipc/claude-status-handlers'
 import { registerPreviewHandlers } from './ipc/preview-handlers'
 import { registerPreviewScheme } from './services/preview/previewScheme'
@@ -499,6 +500,8 @@ app.whenReady().then(async () => {
   registerImageExportHandlers()
   // Open in default browser (#124): sender-gated, confined to the open project.
   registerBrowserHandlers()
+  // Images referenced from Markdown (#71): sender-gated, confined to the open project.
+  registerMarkdownImageHandlers(projectService.session)
   // Per-terminal Claude Code context status bar (#216). Uses the same
   // terminalService singleton so it can look up the main-owned PTY pid + cwd.
   claudeStatusHandlers = registerClaudeStatusHandlers(terminalService)

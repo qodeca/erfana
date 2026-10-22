@@ -108,6 +108,25 @@ describe('registerConfinedHandle', () => {
     expect(logged).not.toContain(outside)
   })
 
+  it('logs a refusal at debug when the channel says refusals are routine (#71)', async () => {
+    registerConfinedHandle(
+      'test:quiet',
+      {
+        schema: z.tuple([z.string()]),
+        paths: { filePath: { arg: 0, mode: 'project' } },
+        refusalLogLevel: 'debug',
+        onRefusal: () => 'refused',
+        handler: async () => 'read'
+      },
+      session
+    )
+    await expect(call('test:quiet', path.join(outside, 'secret.md'))).resolves.toBe('refused')
+    expect(logger.warn).not.toHaveBeenCalled()
+    const logged = JSON.stringify(vi.mocked(logger.debug).mock.calls)
+    expect(logged).toContain('OUTSIDE_PROJECT')
+    expect(logged).not.toContain(outside)
+  })
+
   it('checks every listed path argument', async () => {
     const handler = vi.fn(async () => true)
     registerConfinedHandle(

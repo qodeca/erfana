@@ -292,6 +292,18 @@
   margin: 0.8em 0;
 }
 
+/* An image that is loading or not shown (#71): its alt text, in a box */
+.markdown-preview .markdown-image-placeholder {
+  display: inline-block;
+  max-width: 100%;
+  padding: var(--space-1) var(--space-2);
+  border: var(--border-width) dashed var(--color-border-default);
+  border-radius: var(--border-radius);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
 /* Scrollbar */
 .markdown-preview::-webkit-scrollbar {
   width: var(--scrollbar-width);
