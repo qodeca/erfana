@@ -12,7 +12,7 @@ vi.mock('../Toast/toastService', () => ({ showGlobalToast }))
 vi.mock('../../utils/logger', () => ({ logger }))
 
 import { EXTERNAL_MOVE_BATCH_MAX } from '../../../../shared/ipc/external-file-limits'
-import { moveExternalBatch, refuseOversizedMove, type PendingExternalMove } from './externalMoveBatch'
+import { moveExternalBatch, refuseOversizedDrop, type PendingExternalMove } from './externalMoveBatch'
 
 const moves = (...names: string[]): PendingExternalMove[] =>
   names.map((name) => ({ file: { path: `/in/${name}`, name } }))
@@ -135,19 +135,19 @@ describe('moveExternalBatch', () => {
   })
 })
 
-describe('refuseOversizedMove', () => {
+describe('refuseOversizedDrop', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
   it('lets a drop up to the limit through without a toast', () => {
-    expect(refuseOversizedMove(1)).toBe(false)
-    expect(refuseOversizedMove(EXTERNAL_MOVE_BATCH_MAX)).toBe(false)
+    expect(refuseOversizedDrop(1)).toBe(false)
+    expect(refuseOversizedDrop(EXTERNAL_MOVE_BATCH_MAX)).toBe(false)
     expect(showGlobalToast).not.toHaveBeenCalled()
   })
 
   it('refuses a larger drop with the Too many files toast', () => {
-    expect(refuseOversizedMove(EXTERNAL_MOVE_BATCH_MAX + 1)).toBe(true)
+    expect(refuseOversizedDrop(EXTERNAL_MOVE_BATCH_MAX + 1)).toBe(true)
     expect(showGlobalToast).toHaveBeenCalledTimes(1)
     expect(showGlobalToast).toHaveBeenCalledWith(
       expect.objectContaining({ title: 'Too many files', type: 'error' })

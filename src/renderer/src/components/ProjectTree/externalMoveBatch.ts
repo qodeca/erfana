@@ -23,15 +23,17 @@ export interface PendingExternalMove {
 const MOVE_CANCELLED = 'EXTERNAL_FILE_MOVE_CANCELLED'
 
 /**
- * Whether a drop is too large to move in one request. If so, says so with the
- * same "Too many files" toast the picker shows, before any file is checked, so
- * one drop is still one box.
+ * Whether a drop is too large to add. If so, says so with the same "Too many
+ * files" toast the picker shows. Called before the Move / Copy / Import choice,
+ * so the user is never asked how to add a drop that would then be refused: a
+ * move carries at most this many files in its one request, and an import takes
+ * no more either (the picker refuses the same count up front for every mode).
  */
-export function refuseOversizedMove(fileCount: number): boolean {
+export function refuseOversizedDrop(fileCount: number): boolean {
   if (fileCount <= EXTERNAL_MOVE_BATCH_MAX) return false
   showGlobalToast({
     title: 'Too many files',
-    message: `Cannot move more than ${EXTERNAL_MOVE_BATCH_MAX} files at once. Please drop fewer files.`,
+    message: `Cannot add more than ${EXTERNAL_MOVE_BATCH_MAX} files at once. Please drop fewer files.`,
     type: 'error'
   })
   return true
