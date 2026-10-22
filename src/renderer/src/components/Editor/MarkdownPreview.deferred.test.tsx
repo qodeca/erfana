@@ -255,18 +255,25 @@ describe('MarkdownPreview – link checks', () => {
   })
 
   it('never lets an older, slower link check overwrite a newer one', async () => {
-    // First check: `exists` hangs until released. Second check answers at once.
+    // First check (for notes.md): `exists` hangs until released. The second
+    // check, for the same link read from another folder, answers at once.
+    // (The same target asked twice shares one answer – see linkcache tests.)
     let releaseFirst!: (v: boolean) => void
     const exists = window.api.file.exists as ReturnType<typeof vi.fn>
     exists.mockImplementationOnce(() => new Promise<boolean>((r) => (releaseFirst = r)))
     exists.mockResolvedValue(false)
 
+    const at = (filePath: string) => (
+      <ToastProvider>
+        <MarkdownPreview content="[a](./a.md)" filePath={filePath} />
+      </ToastProvider>
+    )
     let rerender!: ReturnType<typeof render>['rerender']
     let container!: HTMLElement
     await act(async () => {
-      ;({ rerender, container } = render(ui('[a](./a.md)')))
+      ;({ rerender, container } = render(at(FILE_PATH)))
     })
-    await act(async () => rerender(ui('[a](./a.md) [b](./b.md)')))
+    await act(async () => rerender(at('/proj/sub/notes.md')))
 
     // The late answer for the first check says a.md exists; it must be ignored.
     await act(async () => releaseFirst(true))

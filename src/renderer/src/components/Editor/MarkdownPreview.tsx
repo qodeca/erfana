@@ -11,6 +11,7 @@ import {
   useEffect,
   useLayoutEffect,
   useDeferredValue,
+  useSyncExternalStore,
   createContext,
   useContext
 } from 'react'
@@ -46,6 +47,7 @@ import { notePreviewRenderStart, notePreviewRenderCommit } from '../../utils/pre
 import { useIdleDebouncedValue } from '../../hooks/useIdleDebouncedValue'
 import { rehypeCollectLinks, rehypeHeadingIds, rehypeShiftLines } from './previewRehypePlugins'
 import { PreviewWorkContext, PreviewWorkTracker } from './previewWork'
+import { LinkTargetCache } from './linkTargetCache'
 import './MarkdownPreview.css'
 import { fileGateway } from '../../services/fileGateway'
 
@@ -830,14 +832,22 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
       publishInternalLinks()
     }, [filePath, publishInternalLinks])
 
+    // Remembered `file.exists` answers. Its generation moves when a file or
+    // folder may have appeared or gone, which re-runs the link check below.
+    const [linkTargets] = useState(() => new LinkTargetCache())
+    const linkTargetsGeneration = useSyncExternalStore(linkTargets.subscribe, () => linkTargets.generation)
+
     /**
      * Resolve the document's internal links (tooltips, broken-link styling)
-     * when the set of links or the file changes.
+     * when the set of links or the file changes, or when the file structure
+     * may have changed (`linkTargetsGeneration`). Paths already checked are
+     * answered from `linkTargets`, so only new link targets cross IPC.
      *
      * A newer run supersedes an older one: the cleanup marks the older run
-     * cancelled, so a slow `file.exists` round trip can never overwrite fresher
-     * results. An outcome equal to the current one keeps the current object,
-     * so the links do not re-render for nothing.
+     * cancelled, and a run that saw the cache invalidated while it was in
+     * flight drops its answers too, so a slow `file.exists` round trip can
+     * never overwrite fresher results. An outcome equal to the current one
+     * keeps the current object, so the links do not re-render for nothing.
      */
     useEffect(() => {
       const internalLinksKey = publishedLinks.key
@@ -853,6 +863,8 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
       }
 
       let cancelled = false
+      const generation = linkTargets.generation
+      const isStale = (): boolean => cancelled || linkTargets.generation !== generation
 
       const resolveAllLinks = async () => {
         const projectRoot = await fileGateway.getProjectPath()
@@ -861,7 +873,9 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
         const resolutions = await Promise.all(
           hrefs.map(async (href) => {
             try {
-              const resolved = await resolveMarkdownLink(href, filePath, projectRoot)
+              const resolved = await resolveMarkdownLink(href, filePath, projectRoot, undefined, {
+                exists: linkTargets.exists
+              })
               return [href, resolved] as [string, ResolvedLink | null]
             } catch (error) {
               // Digest, not the href: a link names a file in the user's project
@@ -872,8 +886,10 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
             }
           })
         )
-        if (cancelled) return
+        if (isStale()) return
 
+        // Keep only the answers for this document's current links.
+        linkTargets.sweep()
         const next = new Map(resolutions)
         setResolvedLinks((prev) => (sameResolutions(prev, next) ? prev : next))
       }
@@ -882,7 +898,7 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
       return () => {
         cancelled = true
       }
-    }, [publishedLinks, filePath])
+    }, [publishedLinks, filePath, linkTargets, linkTargetsGeneration])
 
     /**
      * Handle internal markdown link clicks

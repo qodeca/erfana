@@ -169,25 +169,42 @@ export function isPathWithinProject(
   return isUnder(file, root, platform)
 }
 
+/** Answers whether an absolute path exists; see {@link ResolveLinkOptions.exists}. */
+export type FileExistsCheck = (filePath: string) => Promise<boolean>
+
+/** Optional collaborators for {@link resolveMarkdownLink}. */
+export interface ResolveLinkOptions {
+  /**
+   * Existence check to use instead of a fresh `file.exists` IPC call – the
+   * preview passes its cache (`components/Editor/linkTargetCache.ts`). A
+   * click on a link does not: opening a file always checks the disk.
+   */
+  exists?: FileExistsCheck
+}
+
+/** A fresh `file.exists` round trip. */
+const askFileExists: FileExistsCheck = (filePath) => fileGateway.exists({ filePath })
+
 /**
  * Check if a file exists using the IPC API
  *
  * @param filePath - Absolute path to check
+ * @param exists - Where to ask; a fresh IPC call by default
  * @returns Promise resolving to true if file exists, false if ENOENT
  * @throws Error for non-ENOENT errors (permission denied, IPC failure, etc.)
  */
-async function checkFileExists(filePath: string): Promise<boolean> {
+async function checkFileExists(filePath: string, exists: FileExistsCheck = askFileExists): Promise<boolean> {
   // Uses the dedicated file:exists IPC channel (fs.access, never throws), so a
   // missing target is a plain `false` with no error-log noise and no fragile
   // error-message parsing.
-  const exists = await fileGateway.exists({ filePath })
-  if (!exists) {
+  const found = await exists(filePath)
+  if (!found) {
     // Digest, not the path: it names a file in the user's project
     logger.debug('[MarkdownLinkResolver] link target missing', {
       pathDigest: stablePathDigest(filePath)
     })
   }
-  return exists
+  return found
 }
 
 /**
@@ -202,13 +219,14 @@ async function searchForFile(
   currentCandidate: string[],
   rootCandidate: string[],
   rootPath: ParsedPath,
-  platform: NodeJS.Platform
+  platform: NodeJS.Platform,
+  exists: FileExistsCheck | undefined
 ): Promise<string[]> {
   const full = (rel: string[]): string =>
     formatPath(rootPath.root, [...rootPath.segments, ...rel], platform)
   const [existsInCurrentDir, existsInProjectRoot] = await Promise.all([
-    checkFileExists(full(currentCandidate)),
-    checkFileExists(full(rootCandidate))
+    checkFileExists(full(currentCandidate), exists),
+    checkFileExists(full(rootCandidate), exists)
   ])
   if (existsInCurrentDir) return currentCandidate
   if (existsInProjectRoot) return rootCandidate
@@ -231,6 +249,7 @@ function decodeLinkPath(text: string): string {
  * @param currentFilePath - Absolute path of the current markdown file
  * @param projectRoot - Absolute path of the project root directory
  * @param platform - Platform whose path rules apply; defaults to the renderer's own
+ * @param options - Optional collaborators, see {@link ResolveLinkOptions}
  * @returns ResolvedLink object or null if the link is external, invalid or outside the project
  *
  * @example
@@ -245,7 +264,8 @@ export async function resolveMarkdownLink(
   linkHref: string,
   currentFilePath: string,
   projectRoot: string,
-  platform: NodeJS.Platform = getRendererPlatform()
+  platform: NodeJS.Platform = getRendererPlatform(),
+  options: ResolveLinkOptions = {}
 ): Promise<ResolvedLink | null> {
   // Security: Block dangerous protocols
   if (isDangerousProtocol(linkHref)) {
@@ -319,7 +339,7 @@ export async function resolveMarkdownLink(
     const inRoot = applyLink([], linkPath, platform)
     target =
       inCurrentDir && inRoot
-        ? await searchForFile(inCurrentDir, inRoot, rootPath, platform)
+        ? await searchForFile(inCurrentDir, inRoot, rootPath, platform, options.exists)
         : null
   }
 
@@ -331,7 +351,7 @@ export async function resolveMarkdownLink(
   }
 
   const filePath = formatPath(rootPath.root, [...rootPath.segments, ...target], platform)
-  const exists = await checkFileExists(filePath)
+  const exists = await checkFileExists(filePath, options.exists)
 
   return {
     filePath,

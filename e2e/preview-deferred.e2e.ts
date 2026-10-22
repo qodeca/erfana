@@ -13,6 +13,8 @@
  * @see docs/performance/2026-10-21-deferred-preview.md
  */
 
+import * as fs from 'fs'
+import * as path from 'path'
 import type { Page } from '@playwright/test'
 import { test, expect } from './fixtures/index'
 import { buildPreviewBenchDocument, PREVIEW_BENCH_OTHER } from './fixtures/previewBenchDocument'
@@ -29,7 +31,7 @@ test.use({
   testProjectFiles: {
     // ~3,000 lines: slow enough to re-render that the preview debounces.
     [LARGE]: buildPreviewBenchDocument(3000),
-    [SMALL]: '# Small\n\nShort note.\n',
+    [SMALL]: '# Small\n\nShort note.\n\nSee [later](./later.md).\n',
     'other.md': PREVIEW_BENCH_OTHER
   }
 })
@@ -131,5 +133,20 @@ test.describe('Deferred Markdown preview', () => {
     await monaco.typeWithoutWaiting(' Added live.')
 
     await expect(panel.previewPane()).toContainText('Short note. Added live.', { timeout: 5_000 })
+  })
+
+  test('a link to a file created on disk stops showing as broken', async ({
+    windowWithTestProject: page,
+    testProject
+  }) => {
+    const { panel } = await openAtEndOf(page, SMALL, 'Short note.')
+    const link = panel.previewPane().locator('a[href="./later.md"]')
+    await expect(link).toHaveClass('broken-link', { timeout: 10_000 })
+
+    // Created by another program: the directory watcher reports an `add`,
+    // which makes the preview forget its remembered link checks.
+    await fs.promises.writeFile(path.join(testProject.path, 'later.md'), '# Later\n')
+
+    await expect(link).toHaveClass('internal-link', { timeout: 10_000 })
   })
 })
