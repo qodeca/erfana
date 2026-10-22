@@ -161,6 +161,30 @@ describe('ExternalMoveConfirmer', () => {
     expect(showBox).toHaveBeenCalledTimes(1)
   })
 
+  it('a box that cannot be shown ends the whole batch, after an earlier box said Move', async () => {
+    const { confirmer, showBox, rateCap } = make()
+    // The first box is shown and answered Move; the window's box limit is used up for the second
+    rateCap.allow.mockReturnValueOnce(true).mockReturnValueOnce(false)
+    const names = Array.from({ length: 2 * MAX_FILES_PER_BOX + 1 }, (_, i) => `f${i}.md`)
+
+    const answers = await Promise.all(names.map((name) => confirmer.confirm(SENDER, file(name))))
+
+    expect(answers).toEqual(Array(names.length).fill('unavailable'))
+    expect(showBox).toHaveBeenCalledTimes(1)
+  })
+
+  it('a pick that a later box could not ask about leaves no approval behind', async () => {
+    const { confirmer, showBox, rateCap } = make()
+    rateCap.allow.mockReturnValueOnce(true).mockReturnValueOnce(false)
+    const pick = Array.from({ length: MAX_FILES_PER_BOX + 1 }, (_, i) => file(`p${i}.md`))
+
+    expect(await confirmer.confirm(SENDER, pick[0], pick)).toBe('unavailable')
+    // pick[1] was named in the first box (answered Move), but the pick as a whole was not
+    rateCap.allow.mockReturnValue(false)
+    expect(await confirmer.confirm(SENDER, pick[1], pick)).toBe('unavailable')
+    expect(showBox).toHaveBeenCalledTimes(1)
+  })
+
   it('names the whole dialog pick, and approves its other files for their own moves', async () => {
     const { confirmer, showBox, clock } = make()
     const pick = [file('a.md'), file('b.md'), file('c.md')]

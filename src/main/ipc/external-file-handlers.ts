@@ -149,7 +149,7 @@ function refusalCode(error: ConfinementError): string {
  *
  * The target folder of a copy or move is checked in the main process against
  * the open project; the request carries no project root.
- * - file:moveBatchFromExternal - Move several external files after ONE confirmation
+ * - file:moveBatchFromExternal - Move several external files after one decision
  */
 export function registerExternalFileHandlers(
   session: ProjectSession,
@@ -300,16 +300,15 @@ export function registerExternalFileHandlers(
   )
 
   /**
-   * Move several external files into the project with ONE confirmation
+   * Move several external files into the project after one decision
    *
    * The same checks as a single move, per file; the difference is that the files
-   * that can be moved ask together, so the user sees one box ("Move N files into
-   * the project?") instead of one per file. The box limits stay the confirmer's:
-   * a queue of 100 per window, a rate cap on boxes, and at most ten files named
-   * in a box. A drop of more than ten files is therefore a short SEQUENCE of
-   * boxes, but it is still one decision: Cancel in any of them closes the
-   * sequence (no further box) and moves none of the drop's files, including the
-   * ones an earlier box said Move to; only Move in every box moves them. Name
+   * that can be moved ask together ("Move N files into the project?") instead of
+   * one box per file. They are asked in a sequence of boxes, at most ten files
+   * each. The files move only if every box answers Move; Cancel, or a box that
+   * cannot be shown (hidden window, the window's box limit used up), moves none
+   * of them, including the ones an earlier box said Move to, and no further box
+   * is shown. The confirmer's queue of 100 per window still applies. Name
    * conflicts are not asked here: the renderer settles them before the request
    * (its per-file Skip leaves that one file out) and sends the answer per item.
    * The source paths are inside an array, so they are resolved here rather than

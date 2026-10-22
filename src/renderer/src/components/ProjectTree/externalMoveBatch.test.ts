@@ -11,8 +11,7 @@ const { showGlobalToast, logger } = vi.hoisted(() => ({
 vi.mock('../Toast/toastService', () => ({ showGlobalToast }))
 vi.mock('../../utils/logger', () => ({ logger }))
 
-import { EXTERNAL_MOVE_BATCH_MAX } from '../../../../shared/ipc/external-file-limits'
-import { moveExternalBatch, refuseOversizedDrop, type PendingExternalMove } from './externalMoveBatch'
+import { moveExternalBatch, type PendingExternalMove } from './externalMoveBatch'
 
 const moves = (...names: string[]): PendingExternalMove[] =>
   names.map((name) => ({ file: { path: `/in/${name}`, name } }))
@@ -79,7 +78,7 @@ describe('moveExternalBatch', () => {
       results: [
         { success: true },
         { success: false, error: 'Source file was deleted', errorCode: 'EXTERNAL_FILE_SOURCE_DELETED' },
-        { success: false, errorCode: 'EXTERNAL_FILE_MOVE_NOT_GRANTED' }
+        { success: false, errorCode: 'EXTERNAL_FILE_MOVE_FAILED' }
       ]
     })
 
@@ -133,24 +132,24 @@ describe('moveExternalBatch', () => {
     expect(showGlobalToast).toHaveBeenCalledTimes(1)
     expect(logger.error).toHaveBeenCalled()
   })
-})
 
-describe('refuseOversizedDrop', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-  })
+  it('reports a drop that could not be put to the user with one toast, not one per file', async () => {
+    const notAsked = {
+      success: false,
+      error: 'Moving needs a file chosen with the Add files dialog; copy the file instead',
+      errorCode: 'EXTERNAL_FILE_MOVE_NOT_GRANTED'
+    }
+    const api = apiAnswering({ results: [notAsked, notAsked, notAsked] })
 
-  it('lets a drop up to the limit through without a toast', () => {
-    expect(refuseOversizedDrop(1)).toBe(false)
-    expect(refuseOversizedDrop(EXTERNAL_MOVE_BATCH_MAX)).toBe(false)
-    expect(showGlobalToast).not.toHaveBeenCalled()
-  })
+    const outcome = await moveExternalBatch(api, moves('a.md', 'b.md', 'c.md'), '/proj')
 
-  it('refuses a larger drop with the Too many files toast', () => {
-    expect(refuseOversizedDrop(EXTERNAL_MOVE_BATCH_MAX + 1)).toBe(true)
+    expect(outcome).toEqual({ successCount: 0, failCount: 3 })
     expect(showGlobalToast).toHaveBeenCalledTimes(1)
-    expect(showGlobalToast).toHaveBeenCalledWith(
-      expect.objectContaining({ title: 'Too many files', type: 'error' })
-    )
+    expect(showGlobalToast).toHaveBeenCalledWith({
+      title: 'Move failed',
+      message:
+        'The confirmation box could not be shown, so none of the 3 files were moved. Try again in a minute, or copy them instead.',
+      type: 'error'
+    })
   })
 })

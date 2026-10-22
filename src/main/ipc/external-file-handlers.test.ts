@@ -705,6 +705,26 @@ describe('External File Handlers', () => {
       expect(existsSync(source)).toBe(true)
     })
 
+    it('moves nothing when a later box cannot be shown, though the first said Move', async () => {
+      // The first box is shown (answered Move); the window's box limit is used up for the second
+      const allow = vi.fn().mockReturnValueOnce(true).mockReturnValue(false)
+      const showBox = useBox(0, { rateCap: { allow } })
+      const files = [source, ...makeFiles(MAX_FILES_PER_BOX)]
+
+      const response = await invoke('file:moveBatchFromExternal', request(files))
+
+      expect(showBox).toHaveBeenCalledTimes(1)
+      expect(response.results).toHaveLength(files.length)
+      for (const result of response.results) {
+        expect(result).toMatchObject({
+          success: false,
+          errorCode: ErrorCode.EXTERNAL_FILE_MOVE_NOT_GRANTED
+        })
+      }
+      for (const file of files) expect(existsSync(file)).toBe(true)
+      expect(listDir(docs())).toEqual([])
+    })
+
     it('approves nothing for a single move after the batch was answered Move', async () => {
       const showBox = useBox(0)
       const files = [source, ...makeFiles(1)]
