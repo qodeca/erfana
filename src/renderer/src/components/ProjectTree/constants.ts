@@ -70,7 +70,12 @@ export const AUTO_EXPAND = {
  */
 export const DIRECTORY_WATCHER = {
   /** Debounce delay in ms for project tree refresh on directory changes. */
-  DEBOUNCE_DELAY: 250
+  DEBOUNCE_DELAY: 250,
+  /**
+   * Longest a steady stream of structural changes can hold the refresh back:
+   * the trailing debounce alone would wait until the stream stops.
+   */
+  MAX_WAIT: 1_000
 } as const
 
 /**

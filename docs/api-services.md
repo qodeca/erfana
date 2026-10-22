@@ -244,11 +244,14 @@ Resume watching after pause. Synchronous. Decrements the pause reference count; 
   originalEventCount: number  // raw events from the backend watcher, after the path filter
   coalescedCount: number      // events removed by the coalescer
   summary: Record<'add' | 'addDir' | 'unlink' | 'unlinkDir' | 'change', number>
+  structural: boolean         // false only for a batch of `change` events – the tree is unchanged
   catchUp?: true              // #210: only on a catch-up refresh (bridge types it `boolean`)
 }
 ```
 
-Emitted when files or folders change anywhere in the watched project tree. Main process throttles via a 75 ms collection window + 200 ms throttle (VS Code pattern); the renderer's `useDirectoryWatcher` adds a 250 ms consumer debounce so multi-file write storms collapse to a single tree re-list.
+Emitted when files or folders change anywhere in the watched project tree. Main process throttles via a 75 ms collection window + 200 ms throttle (VS Code pattern); the renderer's `useDirectoryWatcher` adds a 250 ms consumer debounce, capped at 1 s from the first event of a burst, so multi-file write storms collapse to a single tree re-list and a steady stream still refreshes about once a second.
+
+**Structural flag:** `structural` is `true` when the batch holds an `add`, `addDir`, `unlink` or `unlinkDir`, and always on a catch-up or compensating refresh and on the first batch after a buffer overflow, because what was lost cannot be known to be content-only. A batch of only content edits is `structural: false`: `useDirectoryWatcher` does not re-read the tree for it, while `useGitStatus` refreshes the badges for every batch, as before. Open editor tabs are reloaded by their own file watchers, not by this channel. Measurement: [docs/performance/watcher-structural-refresh.md](./performance/watcher-structural-refresh.md).
 
 **Event types:** `'add'`, `'addDir'`, `'unlink'`, `'unlinkDir'`, `'change'`. The `'change'` listener was added in #241 — in-place editor saves (Monaco autosave, terminal commands, external editors) now also wake the renderer. `'change'` events whose path is inside `.git/` are suppressed at the source listener (`GitWatcherService` is the canonical publisher for git internals).
 

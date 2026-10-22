@@ -52,6 +52,11 @@ interface WatchedDirectory {
    * resume and on the safety timeout – so its presence is the paused guard.
    */
   pauseEpisode?: PauseEpisode
+  /**
+   * The throttled worker dropped buffered events since the last broadcast, so
+   * the next one cannot say they were content-only and goes out structural.
+   */
+  droppedSinceBroadcast?: boolean
 }
 
 // Git index watching migrated to GitWatcherService (Issue #74)
@@ -59,6 +64,15 @@ interface WatchedDirectory {
 interface DirectoryChangeEvent {
   type: 'add' | 'addDir' | 'unlink' | 'unlinkDir' | 'change'
   path: string
+}
+
+/**
+ * Whether a delivered batch can change the project tree. Only `change` cannot:
+ * a content edit leaves names and folders as they were, so the renderer
+ * refreshes the repository status for it but does not re-read the tree.
+ */
+export function isStructuralBatch(events: readonly { type: string }[]): boolean {
+  return events.some((event) => event.type !== 'change')
 }
 
 /** Receives the absolute paths one delivered batch removed. */
@@ -341,6 +355,9 @@ export class DirectoryWatcherService {
         onWork: (events) => this.processEvents(dirPath, events),
         onOverflow: (count) => {
           this.metrics.recordBufferOverflow(count)
+          // The dropped events may have been structural
+          const entry = this.watchedDirectories.get(dirPath)
+          if (entry) entry.droppedSinceBroadcast = true
           this.safeLog(`⚠️  Buffer overflow: dropped ${count} oldest events for ${dirPath}`)
         }
       }
@@ -568,7 +585,8 @@ export class DirectoryWatcherService {
     // fs.writeFile, terminal commands, external editors). Routes through the
     // same throttle/coalesce/broadcast pipeline as structural events so the
     // renderer's git-status refresh (useGitStatus) wakes on edits, not just
-    // on create/delete/rename.
+    // on create/delete/rename. A batch of only `change` events goes out with
+    // `structural: false`, so the project tree is not re-read for it.
     //
     // Pre-flush note (lens-review Finding 6): with `awaitWriteFinish: false`
     // chokidar may surface a `change` event before the write has fully
@@ -827,6 +845,7 @@ export class DirectoryWatcherService {
    * Broadcast a zero-event change that asks the tree to re-read. `catchUp`
    * lets it through the renderer's internal-operation gate, because it
    * reports changes the pause dropped rather than the operation's own (#210).
+   * Always `structural`: what was lost cannot be known to be content-only.
    */
   private sendCompensatingRefresh(dirPath: string): void {
     this.notifyWebContents(dirPath, 'directory-watch:changed', {
@@ -835,6 +854,7 @@ export class DirectoryWatcherService {
       originalEventCount: 0,
       coalescedCount: 0,
       summary: {},
+      structural: true,
       catchUp: true
     })
   }
@@ -916,8 +936,13 @@ export class DirectoryWatcherService {
     this.metrics.recordEventsCoalesced(coalescedCount)
     this.metrics.recordEventsEmitted(coalescedEvents.length)
 
+    // A buffer overflow since the last broadcast makes this one structural
+    const dropped = watched.droppedSinceBroadcast === true
+    watched.droppedSinceBroadcast = false
+
     if (coalescedEvents.length === 0) {
       this.safeLog(`📁 All ${events.length} events coalesced away for: ${dirPath}`)
+      if (dropped) this.sendCompensatingRefresh(dirPath)
       return
     }
 
@@ -946,7 +971,8 @@ export class DirectoryWatcherService {
       eventCount: coalescedEvents.length,
       originalEventCount: events.length,
       coalescedCount,
-      summary
+      summary,
+      structural: dropped || isStructuralBatch(coalescedEvents)
     })
   }
 

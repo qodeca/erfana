@@ -42,6 +42,39 @@ export function shouldHandleDirectoryChange(
 }
 
 /**
+ * Determines if a directory change can have changed the project tree
+ *
+ * Only a batch the main process marks `structural: false` – content edits and
+ * nothing else – leaves the tree as it is. A catch-up refresh always counts,
+ * and so does an event without the flag, so an older sender still refreshes.
+ *
+ * @param data - The `directory-watch:changed` payload
+ * @returns true if the tree must be re-read, false for a content-only batch
+ */
+export function isStructuralDirectoryChange(data: { structural?: boolean; catchUp?: boolean }): boolean {
+  return data.catchUp === true || data.structural !== false
+}
+
+/**
+ * How long to wait before the debounced tree refresh fires
+ *
+ * A trailing debounce capped by a max wait: each event restarts the delay, but
+ * never past `maxWaitMs` after the first event of the burst.
+ *
+ * @param burstStartedAt - When the first event of the pending burst arrived
+ * @param now - The current time, same clock
+ * @returns Delay in ms, never negative
+ */
+export function getRefreshDelay(
+  burstStartedAt: number,
+  now: number,
+  debounceMs: number,
+  maxWaitMs: number
+): number {
+  return Math.max(0, Math.min(debounceMs, burstStartedAt + maxWaitMs - now))
+}
+
+/**
  * Creates a log message for directory changes
  *
  * @param eventCount - Number of file system events

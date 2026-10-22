@@ -128,12 +128,20 @@ const api = {
         dirPath: string
         eventCount: number
         summary: Record<string, number>
+        /** False only for a batch of content edits – the tree is unchanged */
+        structural: boolean
         catchUp?: boolean
       }) => void
     ): (() => void) => {
       const listener = (
         _event: unknown,
-        data: { dirPath: string; eventCount: number; summary: Record<string, number>; catchUp?: boolean }
+        data: {
+          dirPath: string
+          eventCount: number
+          summary: Record<string, number>
+          structural: boolean
+          catchUp?: boolean
+        }
       ) => callback(data)
       ipcRenderer.on('directory-watch:changed', listener)
       return () => {

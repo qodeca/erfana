@@ -316,9 +316,54 @@ describe('DirectoryWatcherService native backend (#211, W13)', () => {
         expect.objectContaining({
           dirPath: ROOT,
           eventCount: 5,
-          summary: { add: 1, addDir: 1, change: 1, unlink: 1, unlinkDir: 1 }
+          summary: { add: 1, addDir: 1, change: 1, unlink: 1, unlinkDir: 1 },
+          structural: true
         })
       ])
+    })
+
+    it('marks a batch of only content edits non-structural', async () => {
+      await svc.watchDirectory(ROOT, webContents)
+      const native = latestNative()
+
+      native.emit('change', inRoot('a.md'))
+      native.emit('change', inRoot('b.md'))
+      vi.advanceTimersByTime(FLUSH_MS)
+
+      expect(sent('directory-watch:changed')).toEqual([
+        expect.objectContaining({ summary: { change: 2 }, structural: false })
+      ])
+    })
+
+    it.each(['add', 'addDir', 'unlink', 'unlinkDir'])(
+      'marks a batch with one %s among content edits structural',
+      async (type) => {
+        await svc.watchDirectory(ROOT, webContents)
+        const native = latestNative()
+
+        native.emit('change', inRoot('a.md'))
+        native.emit(type, inRoot('b'))
+        vi.advanceTimersByTime(FLUSH_MS)
+
+        expect(sent('directory-watch:changed')).toEqual([expect.objectContaining({ structural: true })])
+      }
+    )
+
+    it('marks the batch after a buffer overflow structural, even if it holds only content edits', async () => {
+      await svc.watchDirectory(ROOT, webContents)
+      const native = latestNative()
+      const limit = getPlatformConfig().recommendedBufferLimit
+
+      // One past the buffer: the oldest event is dropped, and it may have been an add
+      for (let i = 0; i <= limit; i++) {
+        native.emit('change', inRoot(`f${i}.md`))
+      }
+      vi.advanceTimersByTime(FLUSH_MS)
+
+      const batches = sent('directory-watch:changed')
+      expect(svc.getStats().metrics.bufferOverflows).toBeGreaterThan(0)
+      expect(batches[0]).toEqual(expect.objectContaining({ structural: true }))
+      expect(batches.slice(1).every(b => b.structural === false)).toBe(true)
     })
 
     it('passes a native unlink straight through, without the atomic-save stat', async () => {
@@ -381,7 +426,7 @@ describe('DirectoryWatcherService native backend (#211, W13)', () => {
       expect(harness.sends).toEqual([
         {
           channel: 'directory-watch:changed',
-          payload: expect.objectContaining({ dirPath: ROOT, eventCount: 0, catchUp: true })
+          payload: expect.objectContaining({ dirPath: ROOT, eventCount: 0, structural: true, catchUp: true })
         }
       ])
       expect(svc.getStats().metrics.nativeResyncs).toBe(1)

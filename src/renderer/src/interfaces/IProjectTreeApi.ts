@@ -52,7 +52,7 @@ export interface IProjectTreeApi {
     pause(projectPath: string): Promise<{ success: boolean }>
     resume(projectPath: string): Promise<{ success: boolean }>
     onDirectoryChanged(
-      callback: (data: { eventCount: number; catchUp?: boolean }) => void
+      callback: (data: { eventCount: number; structural?: boolean; catchUp?: boolean }) => void
     ): () => void
     onProjectDeleted(callback: () => void): () => void
     onDirectoryError(callback: (data: { error: string }) => void): () => void
