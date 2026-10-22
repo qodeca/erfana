@@ -18,9 +18,15 @@
  * hundreds of handles. A folder watch reports appends to the files directly in
  * it on macOS, Linux and Windows. Events are filtered by name: anything under a
  * `subagents/` segment and any non-`.jsonl` name is dropped so sidechain or
- * excluded writes never trigger a reparse (design §10 performance). A folder
- * that does not exist yet is not watched – as before, the bar then updates on
- * terminal activity and explicit refreshes only.
+ * excluded writes never trigger a reparse (design §10 performance).
+ *
+ * A folder that does not exist yet, or whose watch died (Node closes the
+ * handle before it emits `error` – EPERM on Windows when the folder is
+ * deleted), keeps its consumers and is tried again: on the next `watchDir`
+ * (the service calls it on every refresh) and after a back-off of
+ * {@link REARM_DELAY_MS}, doubling to {@link REARM_MAX_DELAY_MS}. A watch that
+ * comes back reports one change, since transcripts may have been written
+ * while nothing listened.
  *
  * Events are coalesced per dir over a short window before the single
  * `onChange(dir)` callback fires, so a burst of writes produces one refresh.
@@ -36,6 +42,12 @@ import { logger } from '../LoggingService'
 
 /** Coalescing window for transcript-dir events (ms). */
 const COALESCE_WINDOW_MS = 250
+
+/** First delay before a missing or dead folder watch is tried again (ms). */
+export const REARM_DELAY_MS = 5_000
+
+/** Longest delay between two re-arm attempts (ms). */
+export const REARM_MAX_DELAY_MS = 60_000
 
 /** Path segment whose subtree (sidechain/subagent transcripts) is excluded. */
 const SUBAGENTS_SEGMENT = 'subagents'
@@ -63,8 +75,12 @@ const watchFolder: WatchFn = (dir, listener) =>
 
 /** Internal per-dir watcher state with its refcount set and coalesce timer. */
 interface WatchedDir {
-  /** The folder watch for this dir. */
-  watcher: FolderWatchHandle
+  /** The folder watch for this dir; null while the folder is missing or the watch died. */
+  watcher: FolderWatchHandle | null
+  /** Pending re-arm attempt, while `watcher` is null. */
+  rearmTimer: NodeJS.Timeout | null
+  /** Delay before the next re-arm attempt; doubles per failure, reset on success. */
+  rearmDelayMs: number
   /** Consumers (terminalIds) keeping this dir alive; refcount. */
   consumers: Set<string>
   /** Pending coalesce timer; non-null while a burst is being collected. */
@@ -130,48 +146,27 @@ export class ClaudeTranscriptWatcher {
   /**
    * Begin watching `dir` on behalf of `consumerId`. Refcounted by dir: the
    * folder watch is created only for the FIRST consumer; subsequent
-   * consumers of the same dir just join the set (no second watcher).
+   * consumers of the same dir just join the set (no second watcher). Calling
+   * it again for a live watch is a no-op; for a missing or dead one it tries
+   * to arm the watch again at once.
    */
   watchDir(dir: string, consumerId: string): void {
-    const existing = this.dirs.get(dir)
-    if (existing) {
-      existing.consumers.add(consumerId)
+    let entry = this.dirs.get(dir)
+    if (!entry) {
+      entry = {
+        watcher: null,
+        rearmTimer: null,
+        rearmDelayMs: REARM_DELAY_MS,
+        consumers: new Set(),
+        coalesceTimer: null
+      }
+      this.dirs.set(dir, entry)
+      entry.consumers.add(consumerId)
+      this.arm(dir, entry, false)
       return
     }
-
-    let watcher: FolderWatchHandle
-    try {
-      watcher = this.watchFn(dir, (_eventType, filename) => {
-        if (isTranscriptEventName(filename)) this.scheduleChange(dir)
-      })
-    } catch (error) {
-      // ENOENT included: a folder Claude has not created yet is not watched
-      // Never throw outward — a failed watch leaves the bar simply not updating
-      // live; an explicit refresh still works.
-      // Log only the dir basename — the full absolute path would leak host
-      // filesystem layout into log files (the transcript root is under the
-      // user's home dir).
-      logger.warn('ClaudeTranscriptWatcher: failed to create watcher', {
-        dir: path.basename(dir),
-        error: error instanceof Error ? error.message : String(error)
-      })
-      return
-    }
-
-    const entry: WatchedDir = {
-      watcher,
-      consumers: new Set([consumerId]),
-      coalesceTimer: null
-    }
-    this.dirs.set(dir, entry)
-
-    watcher.on('error', (error: unknown) => {
-      // Swallow watch errors and keep going (design §7 fail-soft).
-      logger.warn('ClaudeTranscriptWatcher: watcher error', {
-        dir: path.basename(dir),
-        error: error instanceof Error ? error.message : String(error)
-      })
-    })
+    entry.consumers.add(consumerId)
+    if (entry.watcher === null) this.arm(dir, entry, true)
   }
 
   /**
@@ -190,28 +185,71 @@ export class ClaudeTranscriptWatcher {
   }
 
   /**
-   * Close every watcher and clear all coalesce timers. Safe to call repeatedly
+   * Close every watcher and clear all timers. Safe to call repeatedly
    * (the map is emptied on the first call). Used on service dispose.
    */
   async closeAll(): Promise<void> {
     const entries = Array.from(this.dirs.entries())
     this.dirs.clear()
+    for (const [dir, entry] of entries) this.releaseEntry(dir, entry)
+  }
 
-    await Promise.all(
-      entries.map(async ([, entry]) => {
-        if (entry.coalesceTimer) {
-          clearTimeout(entry.coalesceTimer)
-          entry.coalesceTimer = null
-        }
-        try {
-          entry.watcher.close()
-        } catch (error) {
-          logger.warn('ClaudeTranscriptWatcher: error closing watcher', {
-            error: error instanceof Error ? error.message : String(error)
-          })
-        }
+  /**
+   * Try to open the folder watch. On failure – a folder Claude has not
+   * created yet (ENOENT) included – keep the entry and its consumers and try
+   * again after the back-off. `notify`: report one change once it is armed.
+   */
+  private arm(dir: string, entry: WatchedDir, notify: boolean): void {
+    if (entry.rearmTimer) {
+      clearTimeout(entry.rearmTimer)
+      entry.rearmTimer = null
+    }
+    let watcher: FolderWatchHandle
+    try {
+      watcher = this.watchFn(dir, (_eventType, filename) => {
+        if (isTranscriptEventName(filename)) this.scheduleChange(dir)
       })
-    )
+    } catch (error) {
+      // Never throw outward — the bar updates on terminal activity and explicit
+      // refreshes meanwhile. Log only the dir basename — the full absolute path
+      // would leak host filesystem layout into log files. A missing folder is
+      // the normal state before Claude's first message, so it logs at debug.
+      const code = (error as NodeJS.ErrnoException | undefined)?.code
+      const log = code === 'ENOENT' ? logger.debug : logger.warn
+      log.call(logger, 'ClaudeTranscriptWatcher: failed to create watcher', {
+        dir: path.basename(dir),
+        error: error instanceof Error ? error.message : String(error)
+      })
+      this.scheduleRearm(dir, entry)
+      return
+    }
+
+    entry.watcher = watcher
+    entry.rearmDelayMs = REARM_DELAY_MS
+    watcher.on('error', (error: unknown) => {
+      // Node has already closed the handle: drop it, keep the consumers, and
+      // try again later (design §7 fail-soft).
+      logger.warn('ClaudeTranscriptWatcher: watcher error', {
+        dir: path.basename(dir),
+        error: error instanceof Error ? error.message : String(error)
+      })
+      if (this.dirs.get(dir) !== entry || entry.watcher !== watcher) return
+      entry.watcher = null
+      this.closeQuietly(watcher, dir)
+      this.scheduleRearm(dir, entry)
+    })
+    if (notify) this.scheduleChange(dir)
+  }
+
+  private scheduleRearm(dir: string, entry: WatchedDir): void {
+    if (entry.rearmTimer) return
+    const delay = entry.rearmDelayMs
+    entry.rearmDelayMs = Math.min(delay * 2, REARM_MAX_DELAY_MS)
+    entry.rearmTimer = setTimeout(() => {
+      entry.rearmTimer = null
+      if (this.dirs.get(dir) !== entry || entry.watcher !== null) return
+      this.arm(dir, entry, true)
+    }, delay)
   }
 
   /**
@@ -238,15 +276,29 @@ export class ClaudeTranscriptWatcher {
     }, COALESCE_WINDOW_MS)
   }
 
-  /** Close one dir's watcher, clear its timer, and drop it from the map. */
+  /** Close one dir's watcher, clear its timers, and drop it from the map. */
   private closeEntry(dir: string, entry: WatchedDir): void {
+    this.dirs.delete(dir)
+    this.releaseEntry(dir, entry)
+  }
+
+  private releaseEntry(dir: string, entry: WatchedDir): void {
     if (entry.coalesceTimer) {
       clearTimeout(entry.coalesceTimer)
       entry.coalesceTimer = null
     }
-    this.dirs.delete(dir)
+    if (entry.rearmTimer) {
+      clearTimeout(entry.rearmTimer)
+      entry.rearmTimer = null
+    }
+    const watcher = entry.watcher
+    entry.watcher = null
+    if (watcher) this.closeQuietly(watcher, dir)
+  }
+
+  private closeQuietly(watcher: FolderWatchHandle, dir: string): void {
     try {
-      entry.watcher.close()
+      watcher.close()
     } catch (error) {
       logger.warn('ClaudeTranscriptWatcher: error closing watcher', {
         dir: path.basename(dir),

@@ -14,6 +14,7 @@ vi.mock('../LoggingService', () => ({
 
 import {
   ClaudeTranscriptWatcher,
+  REARM_DELAY_MS,
   isTranscriptEventName,
   shouldIgnoreTranscriptPath
 } from './ClaudeTranscriptWatcher'
@@ -216,12 +217,89 @@ describe('ClaudeTranscriptWatcher', () => {
     expect(() => w.watchDir('/dir/A', 'term-1')).not.toThrow()
   })
 
-  it('swallows a watch error event and keeps the watch', () => {
-    const w = makeWatcher()
-    w.watchDir('/dir/A', 'term-1')
+  describe('a dead or missing watch (Node closes the handle before `error`)', () => {
+    const enoent = (): never => {
+      throw Object.assign(new Error('ENOENT: no such file or directory'), { code: 'ENOENT' })
+    }
 
-    expect(() => createdWatchers[0]._error(new Error('EPERM'))).not.toThrow()
-    w.unwatchDir('/dir/A', 'term-1')
-    expect(createdWatchers[0].close).toHaveBeenCalledTimes(1)
+    it('drops the dead handle on error, keeps the consumers, and re-arms after the back-off', () => {
+      const w = makeWatcher()
+      const onChange = vi.fn()
+      w.onChange(onChange)
+      w.watchDir('/dir/A', 'term-1')
+
+      expect(() => createdWatchers[0]._error(new Error('EPERM'))).not.toThrow()
+      expect(watchFn).toHaveBeenCalledTimes(1)
+
+      vi.advanceTimersByTime(REARM_DELAY_MS)
+      expect(watchFn).toHaveBeenCalledTimes(2)
+      // The new watch reports one change: transcripts may have moved meanwhile
+      vi.advanceTimersByTime(250)
+      expect(onChange).toHaveBeenCalledWith('/dir/A')
+
+      // Events reach the consumer through the new handle
+      onChange.mockClear()
+      createdWatchers[1]._emit('change', 's.jsonl')
+      vi.advanceTimersByTime(250)
+      expect(onChange).toHaveBeenCalledTimes(1)
+    })
+
+    it('re-arms on the next watchDir without waiting for the back-off', () => {
+      const w = makeWatcher()
+      w.watchDir('/dir/A', 'term-1')
+      createdWatchers[0]._error(new Error('EPERM'))
+
+      w.watchDir('/dir/A', 'term-1')
+      expect(watchFn).toHaveBeenCalledTimes(2)
+
+      // A live watch: watchDir again is a no-op
+      w.watchDir('/dir/A', 'term-1')
+      expect(watchFn).toHaveBeenCalledTimes(2)
+    })
+
+    it('watches a folder that appears after the first watchDir', () => {
+      const w = makeWatcher()
+      const onChange = vi.fn()
+      w.onChange(onChange)
+      watchFn.mockImplementationOnce(enoent)
+
+      w.watchDir('/dir/New', 'term-1')
+      expect(createdWatchers).toHaveLength(0)
+
+      // Folder created; the service's next refresh calls watchDir again
+      w.watchDir('/dir/New', 'term-1')
+      expect(createdWatchers).toHaveLength(1)
+      vi.advanceTimersByTime(250)
+      expect(onChange).toHaveBeenCalledWith('/dir/New')
+    })
+
+    it('backs off between attempts while the folder stays missing, and stops when unwatched', () => {
+      const w = makeWatcher()
+      watchFn.mockImplementation(enoent)
+
+      w.watchDir('/dir/Gone', 'term-1')
+      vi.advanceTimersByTime(REARM_DELAY_MS)
+      expect(watchFn).toHaveBeenCalledTimes(2)
+      // Doubled: nothing at one more base delay, a third try at two
+      vi.advanceTimersByTime(REARM_DELAY_MS)
+      expect(watchFn).toHaveBeenCalledTimes(2)
+      vi.advanceTimersByTime(REARM_DELAY_MS)
+      expect(watchFn).toHaveBeenCalledTimes(3)
+
+      w.unwatchDir('/dir/Gone', 'term-1')
+      vi.advanceTimersByTime(REARM_DELAY_MS * 20)
+      expect(watchFn).toHaveBeenCalledTimes(3)
+    })
+
+    it('closes nothing twice: unwatch after a dead watch closes only the live one', () => {
+      const w = makeWatcher()
+      w.watchDir('/dir/A', 'term-1')
+      createdWatchers[0]._error(new Error('EPERM'))
+      vi.advanceTimersByTime(REARM_DELAY_MS)
+
+      w.unwatchDir('/dir/A', 'term-1')
+      expect(createdWatchers[0].close).toHaveBeenCalledTimes(1) // when it died
+      expect(createdWatchers[1].close).toHaveBeenCalledTimes(1)
+    })
   })
 })
