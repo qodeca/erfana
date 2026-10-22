@@ -83,8 +83,8 @@
 
 /* Focus state for keyboard navigation */
 .mermaid-direction-btn:focus-visible {
-  outline: 1px solid var(--color-border-focus);
-  outline-offset: 1px;
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
 }
 
 /* Expand button */
@@ -119,8 +119,8 @@
 }
 
 .mermaid-toolbar-expand-btn:focus-visible {
-  outline: 1px solid var(--color-border-focus);
-  outline-offset: 1px;
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
 }
 
 /* Light mode adjustments */

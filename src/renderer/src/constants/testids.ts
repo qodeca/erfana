@@ -688,7 +688,7 @@ export const TEST_IDS = {
   DOCUMENT_IMPORT_PHASE_TEXT: 'doc-import-phase-text',
 
   // =========================================================================
-  // Welcome Panel (5)
+  // Welcome Panel (6)
   // =========================================================================
 
   /** Open/Change project button on WelcomePanel */
@@ -701,6 +701,8 @@ export const TEST_IDS = {
   WELCOME_RECENT_PROJECT: 'welcome-recent-project',
   /** Remove recent project button - use with getDynamicTestId */
   WELCOME_RECENT_PROJECT_BTN_REMOVE: 'welcome-recent-project-btn-remove',
+  /** Keyboard "open" button of a recent project row - use with getDynamicTestId */
+  WELCOME_RECENT_PROJECT_BTN_OPEN: 'welcome-recent-project-btn-open',
 
   // =========================================================================
   // Document Stats Bar (6)

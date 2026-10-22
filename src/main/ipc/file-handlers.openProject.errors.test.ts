@@ -85,10 +85,10 @@ describe('file:openProject error hardening', () => {
     await expect(handlers['file:openProject']()).rejects.toBeInstanceOf(Error)
     // No project:changed broadcast
     expect(sends.find((s) => s.ch === 'project:changed')).toBeUndefined()
-    // Attempted rollback to old path on services
-    expect(setFileSvcPath).toHaveBeenCalledWith('/old/path')
-    expect(setFileWatchPath).toHaveBeenCalledWith('/old/path')
-    expect(setDirWatchPath).toHaveBeenCalledWith('/old/path')
+    // The session was never changed, so no service path was touched
+    expect(setFileSvcPath).not.toHaveBeenCalled()
+    expect(setFileWatchPath).not.toHaveBeenCalled()
+    expect(setDirWatchPath).not.toHaveBeenCalled()
   })
 })
 

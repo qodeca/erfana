@@ -28,6 +28,7 @@ import {
   shouldPersistTerminalWidth,
   resolvePreExpandWidth
 } from './terminalExpand'
+import { fileGateway } from '../../services/fileGateway'
 
 // ============================================================================
 // LEFT SIDEBAR PANEL - Project Panel
@@ -335,7 +336,7 @@ export function AppDockLayout() {
 
   // Listen for project change events to clear editor tabs
   useEffect(() => {
-    const unsubscribe = window.api.file.onProjectChanged(() => {
+    const unsubscribe = fileGateway.onProjectChanged(() => {
       // Close all opened editor tabs
       useProjectStore.getState().clearAllEditorTabs()
       // A fresh project always starts collapsed (no persistence of expand state).

@@ -103,16 +103,28 @@
     "match": "^\\s*--color-[\\w-]+\\s*:",
     "unit": "matches"
   },
-  "reduced-motion-gaps": {
-    "kind": "countWithout",
+  "animating-stylesheets": {
+    "kind": "count",
     "card": "system/foundations/motion.html",
-    "label": "stylesheets that animate without a reduced-motion escape",
+    "label": "renderer stylesheets that declare a keyframe animation",
     "dir": "src/renderer",
     "ext": [
       ".css"
     ],
     "match": "@keyframes",
-    "without": "prefers-reduced-motion"
+    "unit": "files"
+  },
+  "reduced-motion-entry-rules": {
+    "kind": "count",
+    "card": "system/foundations/motion.html",
+    "label": "app-wide reduced-motion blocks in the renderer entry stylesheet",
+    "dir": "src/renderer/src",
+    "ext": [
+      ".css"
+    ],
+    "includePath": "^src/renderer/src/index\\.css$",
+    "match": "@media[^{]*prefers-reduced-motion:\\s*reduce",
+    "unit": "matches"
   },
   "contrast-secondary-on-panel": {
     "kind": "contrast",
@@ -306,5 +318,47 @@
     "label": "--color-brand-violet on --color-brand-white, why violet is only a muted fill on light",
     "foreground": "--color-brand-violet",
     "background": "--color-brand-white"
+  },
+  "contrast-muted-on-panel": {
+    "kind": "contrast",
+    "card": "system/foundations/colors.html",
+    "label": "--color-text-muted on --color-bg-secondary, why muted is not a label colour",
+    "foreground": "--color-text-muted",
+    "background": "--color-bg-secondary"
+  },
+  "contrast-on-accent": {
+    "kind": "contrast",
+    "card": "system/foundations/colors.html",
+    "label": "--color-text-on-accent on --color-btn-primary-bg",
+    "foreground": "--color-text-on-accent",
+    "background": "--color-btn-primary-bg"
+  },
+  "contrast-white-on-accent": {
+    "kind": "contrast",
+    "card": "system/foundations/colors.html",
+    "label": "--color-white on --color-btn-primary-bg, the pairing #231 removed",
+    "foreground": "--color-white",
+    "background": "--color-btn-primary-bg"
+  },
+  "contrast-primary-label": {
+    "kind": "contrast",
+    "card": "system/components/button/index.html",
+    "label": "--color-btn-primary-text on --color-btn-primary-bg",
+    "foreground": "--color-btn-primary-text",
+    "background": "--color-btn-primary-bg"
+  },
+  "contrast-primary-label-hover": {
+    "kind": "contrast",
+    "card": "system/components/button/index.html",
+    "label": "--color-btn-primary-text on --color-btn-primary-hover",
+    "foreground": "--color-btn-primary-text",
+    "background": "--color-btn-primary-hover"
+  },
+  "contrast-primary-white": {
+    "kind": "contrast",
+    "card": "system/components/button/index.html",
+    "label": "--color-white on --color-btn-primary-bg, the historical label",
+    "foreground": "--color-white",
+    "background": "--color-btn-primary-bg"
   }
 }

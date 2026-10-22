@@ -81,14 +81,37 @@
         "ScreenshotOverlay documents its token bypass deliberately (issue #164 / F[36]):",
         "the overlay paints over arbitrary desktop content, so it needs fixed colours that",
         "do not follow the app theme. A file-level exemption states that once, instead of",
-        "six line-level disables that each look like an oversight."
+        "six line-level disables that each look like an oversight. Each site also carries a",
+        "`deviates:` marker and a row in the Colours card's Exceptions section.",
+        "Only colours are exempt: its corners are 0 like everywhere else, so the",
+        "border-radius rule applies to it."
       ],
       "files": [
         "src/renderer/src/components/Screenshot/ScreenshotOverlay.css"
       ],
       "rules": {
-        "color-no-hex": null,
-        "declaration-property-value-allowed-list": null
+        "color-no-hex": null
+      }
+    },
+    {
+      "//": [
+        "--shadow-focus has no remaining use in src/ (#230), so its ban follows the",
+        "migration out of design/. The four retired colours are still referenced in src/",
+        "and stay banned in design/ only until their own migration lands."
+      ],
+      "files": [
+        "src/**/*.css"
+      ],
+      "rules": {
+        "declaration-property-value-disallowed-list": {
+          "z-index": [
+            "/^[0-9]/",
+            "/^-[0-9]/"
+          ],
+          "/.*/": [
+            "/var\\(--shadow-focus\\)/"
+          ]
+        }
       }
     },
     {

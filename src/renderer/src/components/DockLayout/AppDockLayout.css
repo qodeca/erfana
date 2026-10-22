@@ -153,7 +153,7 @@
 
 .panel-content .hint {
   font-size: var(--text-sm);
-  color: var(--color-text-muted);
+  color: var(--color-text-tertiary);
   font-style: italic;
 }
 
@@ -250,9 +250,15 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+  /* A <ul> since [24]; drop the UA list styling. */
+  list-style: none;
+  margin: 0;
+  padding: 0;
 }
 
 .recent-project-item {
+  /* Containing block for the stretched .recent-project-open button. */
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-6);
@@ -268,6 +274,43 @@
 .recent-project-item:hover {
   background-color: var(--color-bg-hover-solid);
   border-color: var(--color-brand-violet);
+}
+
+/* The row's keyboard control ([24]). Stretched behind the row's content so its
+   ring outlines the whole row, while the name, path and time paint ABOVE it
+   (positioned later in DOM order) and stay selectable – text inside a <button>
+   cannot be selected, and the text-selection policy keeps these selectable.
+   The mouse still opens the row through the row's own click handler. */
+.recent-project-open {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+}
+
+/* Inset, per the decided Rows & lists card: a row ring sits inside the row, so
+   neighbouring rows and the list's edges never clip or overlap it. */
+.recent-project-open:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: calc(var(--space-1) * -1);
+}
+
+.recent-project-item.disabled .recent-project-open {
+  cursor: not-allowed;
+}
+
+.recent-project-item.opening .recent-project-open {
+  cursor: wait;
+}
+
+.recent-project-icon,
+.recent-project-info,
+.recent-project-time {
+  position: relative;
 }
 
 .recent-project-icon {
@@ -307,6 +350,7 @@
 }
 
 .recent-project-remove {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -330,6 +374,12 @@
   background-color: var(--color-btn-secondary-hover);
 }
 
+/* Reachable by Tab since [24], so it needs the ring – inset, like the row's. */
+.recent-project-remove:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: calc(var(--space-1) * -1);
+}
+
 /* todo028: CSS classes for disabled/opening states (replaced inline styles) */
 .recent-project-item.disabled {
   cursor: not-allowed;
@@ -348,6 +398,9 @@
 
 .recent-project-remove.disabled {
   opacity: 0.5;
+  /* `aria-disabled`, not `disabled`, since [24]: the button stays focusable,
+     so the cursor has to say what the attribute no longer enforces. */
+  cursor: not-allowed;
 }
 
 /* Welcome Actions Section (Import PDF button, etc.) */
@@ -364,7 +417,7 @@
   gap: var(--space-4);
   padding: var(--space-5) var(--space-10);
   background-color: var(--color-btn-primary-bg);
-  color: var(--color-white);
+  color: var(--color-btn-primary-text);
   border: none;
   border-radius: 0;
   font-size: var(--text-md);
@@ -386,12 +439,13 @@
   cursor: not-allowed;
 }
 
+/* The standard ring (design/system/foundations/focus.html). Offset outward, it
+   sits on the dark .welcome-content overlay, not on the button's own violet:
+   violet on that 78% overlay measures about 4.5:1 even with white behind it, clear
+   of the 3:1 SC 1.4.11 asks. */
 .welcome-action-button:focus-visible {
-  /* White (not the violet focus token) so the ring contrasts ≥3:1 against the
-     button's own violet fill; placed over the dark .welcome-content overlay via
-     the offset. WCAG 2.2 SC 1.4.11 / 2.4.13. */
-  outline: var(--border-width-thick) solid var(--color-white);
-  outline-offset: var(--border-width-thick);
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
 }
 
 /* Remove Dockview's default padding from welcome tab container */

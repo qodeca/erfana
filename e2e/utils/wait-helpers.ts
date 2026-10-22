@@ -7,7 +7,7 @@
  * by observing UI state changes triggered by async operations.
  */
 
-import { Locator } from '@playwright/test'
+import { expect, Locator } from '@playwright/test'
 
 /**
  * Wait for an IPC operation to complete by observing a UI state change.
@@ -41,4 +41,29 @@ export async function waitForIpcComplete(options: {
     locator.waitFor({ state: expectedState, timeout }),
     trigger()
   ])
+}
+
+/**
+ * Assert that a visible element stays visible for `forMs`, so a brief flash
+ * cannot satisfy `toBeVisible()`.
+ *
+ * Polls the locator (not one element handle, so a React re-render that swaps
+ * the node is fine). Once a sample sees it hidden, the result stays failed
+ * even if it comes back – a flip to hidden and back is the regression.
+ */
+export async function expectToStayVisible(locator: Locator, forMs = 500): Promise<void> {
+  const start = Date.now()
+  let hiddenAfterMs: number | null = null
+  await expect
+    .poll(
+      async () => {
+        if (hiddenAfterMs === null && !(await locator.isVisible())) {
+          hiddenAfterMs = Date.now() - start
+        }
+        if (hiddenAfterMs !== null) return `hidden after ${hiddenAfterMs} ms`
+        return Date.now() - start >= forMs ? 'stayed visible' : 'watching'
+      },
+      { message: `should stay visible for ${forMs} ms`, intervals: [50], timeout: forMs + 2_000 }
+    )
+    .toBe('stayed visible')
 }

@@ -160,7 +160,10 @@ describe('Context Menu Commands', () => {
       const cmd = new PasteIntoDirectoryCommand(ctx, node as FileNodeDirectory)
       await cmd.execute()
 
-      expect(ctx.api.checkConflict).toHaveBeenCalledWith('/test/project/target', 'file.md')
+      expect(ctx.api.checkConflict).toHaveBeenCalledWith({
+        targetParentPath: '/test/project/target',
+        itemName: 'file.md'
+      })
     })
 
     it('should not check conflicts when operation is copy', async () => {
@@ -397,7 +400,10 @@ describe('Context Menu Commands', () => {
       const cmd = new RenameFileCommand(ctx, node as FileNodeFile)
       await cmd.execute()
 
-      expect(ctx.api.rename).toHaveBeenCalledWith('/test/project/test.md', 'newname.md')
+      expect(ctx.api.rename).toHaveBeenCalledWith({
+        oldPath: '/test/project/test.md',
+        newName: 'newname.md'
+      })
     })
 
     it('should show success toast', async () => {
@@ -513,7 +519,7 @@ describe('Context Menu Commands', () => {
       const cmd = new DeleteFileCommand(ctx, node as FileNodeFile)
       await cmd.execute()
 
-      expect(ctx.api.deleteFile).toHaveBeenCalledWith('/test/project/test.md')
+      expect(ctx.api.deleteFile).toHaveBeenCalledWith({ filePath: '/test/project/test.md' })
     })
 
     it('should refresh tree after deletion', async () => {
@@ -598,7 +604,7 @@ describe('Context Menu Commands', () => {
       const cmd = new DeleteDirectoryCommand(ctx, node as FileNodeDirectory)
       await cmd.execute()
 
-      expect(ctx.api.deleteFolder).toHaveBeenCalledWith('/test/project/folder')
+      expect(ctx.api.deleteFolder).toHaveBeenCalledWith({ filePath: '/test/project/folder' })
     })
   })
 
@@ -657,7 +663,10 @@ describe('Context Menu Commands', () => {
       const cmd = new NewFileInDirectoryCommand(ctx, node as FileNodeDirectory)
       await cmd.execute()
 
-      expect(ctx.api.createFile).toHaveBeenCalledWith('/test/project/folder', 'file.md')
+      expect(ctx.api.createFile).toHaveBeenCalledWith({
+        dirPath: '/test/project/folder',
+        name: 'file.md'
+      })
     })
 
     it('should refresh tree after creation', async () => {
@@ -752,7 +761,10 @@ describe('Context Menu Commands', () => {
       const cmd = new NewFolderInDirectoryCommand(ctx, node as FileNodeDirectory)
       await cmd.execute()
 
-      expect(ctx.api.createFolder).toHaveBeenCalledWith('/test/project/folder', 'subfolder')
+      expect(ctx.api.createFolder).toHaveBeenCalledWith({
+        dirPath: '/test/project/folder',
+        name: 'subfolder'
+      })
     })
 
     it('should refresh tree after creation', async () => {
@@ -827,7 +839,7 @@ describe('RevealInFileManagerCommand', () => {
 
     await new RevealInFileManagerCommand(ctx, node).execute()
 
-    expect(ctx.api.revealInFileManager).toHaveBeenCalledWith('/test/project/test.md')
+    expect(ctx.api.revealInFileManager).toHaveBeenCalledWith({ filePath: '/test/project/test.md' })
     expect(ctx.toast).not.toHaveBeenCalled()
   })
 

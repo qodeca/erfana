@@ -136,7 +136,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   reads = []
   projectChangedListener = null
-  readDirectory = vi.fn((path: string) => {
+  readDirectory = vi.fn(({ dirPath: path }: { dirPath: string }) => {
     const gate = deferred<FileNode[]>()
     reads.push({ path, gate })
     return gate.promise
@@ -148,7 +148,6 @@ beforeEach(() => {
       openProject: vi.fn(async () => null),
       openProjectByPath: vi.fn(async () => null),
       closeProject: vi.fn(async () => true),
-      getLastProjectPath: vi.fn(async () => null),
       readDirectory,
       onProjectChanged: vi.fn((listener: ProjectChangedListener) => {
         projectChangedListener = listener

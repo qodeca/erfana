@@ -26,6 +26,7 @@ import { isMacOS } from '../../../../utils/platform'
 import { logger } from '../../../../utils/logger'
 import type { ScreenRecordingPermission } from '../../../../../../shared/ipc/screenshot-schema'
 import type { ScreenshotCaptureMode, DisplayInfo, WindowSource } from '../types'
+import { terminalGateway } from '../../../../services/terminalGateway'
 
 /**
  * Platform default quoting flavour, used when no terminal is active yet or
@@ -296,7 +297,7 @@ export function useScreenshotCapture(
         // mid-restart race) fall back to the platform default.
         const shellKind = shellKindRef.current ?? platformDefaultShellKind()
         const quotedPath = escapePathForShell(result.filePath, shellKind)
-        await window.api.terminal.write(currentTerminalId, quotedPath)
+        await terminalGateway.write(currentTerminalId, quotedPath)
 
         const filename = getBasename(result.filePath) || 'screenshot.png'
         showSuccessToast('Screenshot captured', filename)

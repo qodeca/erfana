@@ -15,7 +15,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, cleanup } from '@testing-library/react'
 import type { IDockviewPanelProps } from 'dockview'
 
-import type { ImageReadResponse } from '../../../../../shared/ipc/file-image-schema'
+import type { ImageReadRequest, ImageReadResponse } from '../../../../../shared/ipc/file-image-schema'
 import { ImageViewerPanel } from './ImageViewerPanel'
 import { TEST_IDS } from '../../../constants/testids'
 import { INDICATOR_DURATION_MS } from '../../../constants/fileWatch'
@@ -27,8 +27,8 @@ let mockNaturalSize = { width: 800, height: 600 }
 const mockReadBytes = vi.fn<(path: string) => Promise<string>>()
 /** Fake `window.api.file.readImage` – the bridge the viewer calls. */
 const mockReadImage =
-  vi.fn<(path: string, knownVersion?: string) => Promise<ImageReadResponse>>()
-const mockGetStats = vi.fn<(path: string) => Promise<{ size: number }>>()
+  vi.fn<(request: ImageReadRequest) => Promise<ImageReadResponse>>()
+const mockGetStats = vi.fn<(request: { filePath: string }) => Promise<{ size: number }>>()
 
 /** Version counter behind the fake disk; every read here is a genuine change. */
 let versionSeq = 0
@@ -74,8 +74,8 @@ beforeEach(() => {
 
   versionSeq = 0
   mockReadBytes.mockReset().mockResolvedValue('data:image/png;base64,AAAA')
-  mockReadImage.mockReset().mockImplementation(async (path) => {
-    const dataUrl = await mockReadBytes(path)
+  mockReadImage.mockReset().mockImplementation(async ({ filePath }) => {
+    const dataUrl = await mockReadBytes(filePath)
     versionSeq += 1
     return { status: 'ok', dataUrl, version: `v${versionSeq}` }
   })

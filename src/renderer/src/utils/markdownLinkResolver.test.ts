@@ -19,6 +19,8 @@ beforeEach(() => {
   // Setup window.api mock
   global.window = {
     api: {
+      // Pin the default platform so the POSIX cases do not depend on the host OS
+      utils: { getPlatform: () => 'darwin' },
       file: {
         exists: mockExists
       }
@@ -139,7 +141,7 @@ describe('markdownLinkResolver', () => {
     describe('Filename only', () => {
       it('should find file in current directory', async () => {
         // Only the current-directory candidate exists
-        mockExists.mockImplementation((p: string) =>
+        mockExists.mockImplementation(({ filePath: p }: { filePath: string }) =>
           Promise.resolve(p === '/Users/test/project/docs/api.md')
         )
 
@@ -150,12 +152,12 @@ describe('markdownLinkResolver', () => {
           anchor: undefined,
           exists: true
         })
-        expect(mockExists).toHaveBeenCalledWith('/Users/test/project/docs/api.md')
+        expect(mockExists).toHaveBeenCalledWith({ filePath: '/Users/test/project/docs/api.md' })
       })
 
       it('should fall back to project root if not in current directory', async () => {
         // Only the project-root candidate exists (current dir does not)
-        mockExists.mockImplementation((p: string) =>
+        mockExists.mockImplementation(({ filePath: p }: { filePath: string }) =>
           Promise.resolve(p === '/Users/test/project/README.md')
         )
 
@@ -166,8 +168,8 @@ describe('markdownLinkResolver', () => {
           anchor: undefined,
           exists: true
         })
-        expect(mockExists).toHaveBeenCalledWith('/Users/test/project/docs/README.md')
-        expect(mockExists).toHaveBeenCalledWith('/Users/test/project/README.md')
+        expect(mockExists).toHaveBeenCalledWith({ filePath: '/Users/test/project/docs/README.md' })
+        expect(mockExists).toHaveBeenCalledWith({ filePath: '/Users/test/project/README.md' })
       })
 
       it('should return current directory path if file not found anywhere', async () => {
@@ -417,6 +419,189 @@ describe('markdownLinkResolver', () => {
       )
 
       expect(tooltip).toBe('📄 ./api.md#section → /Users/test/project/docs/api.md')
+    })
+  })
+
+  describe('Windows paths (platform injected, runs on every OS)', () => {
+    const win = 'win32' as const
+    const root = 'C:\\erf\\proj'
+    const file = 'C:\\erf\\proj\\large.md'
+
+    it('resolves ./missing-1.md and reports it missing (preview-deferred e2e case)', async () => {
+      mockExists.mockResolvedValue(false)
+      const result = await resolveMarkdownLink('./missing-1.md', file, root, win)
+      expect(result).toEqual({ filePath: 'C:\\erf\\proj\\missing-1.md', anchor: undefined, exists: false })
+      expect(mockExists).toHaveBeenCalledWith({ filePath: 'C:\\erf\\proj\\missing-1.md' })
+    })
+
+    it('resolves an existing sibling and passes the native path to IPC', async () => {
+      mockExists.mockResolvedValue(true)
+      const result = await resolveMarkdownLink('./other.md', file, root, win)
+      expect(result?.exists).toBe(true)
+      expect(result?.filePath).toBe('C:\\erf\\proj\\other.md')
+    })
+
+    it('goes up with ../ inside the project and rejects escaping it', async () => {
+      mockExists.mockResolvedValue(true)
+      const nested = 'C:\\erf\\proj\\docs\\a.md'
+      expect((await resolveMarkdownLink('../x.md', nested, root, win))?.filePath).toBe('C:\\erf\\proj\\x.md')
+      expect(await resolveMarkdownLink('../../x.md', nested, root, win)).toBeNull()
+    })
+
+    it('resolves /docs/x.md from the project root', async () => {
+      mockExists.mockResolvedValue(true)
+      const result = await resolveMarkdownLink('/docs/x.md', file, root, win)
+      expect(result?.filePath).toBe('C:\\erf\\proj\\docs\\x.md')
+    })
+
+    it('finds a filename-only link in the current dir, then the project root', async () => {
+      mockExists.mockImplementation(async ({ filePath: p }: { filePath: string }) => p === 'C:\\erf\\proj\\top.md')
+      const nested = 'C:\\erf\\proj\\docs\\a.md'
+      const result = await resolveMarkdownLink('top.md', nested, root, win)
+      expect(result?.filePath).toBe('C:\\erf\\proj\\top.md')
+    })
+
+    it('accepts mixed separators and a differently-cased root, keeping the root spelling', async () => {
+      mockExists.mockResolvedValue(true)
+      const result = await resolveMarkdownLink('./sub/y.md', 'c:/erf/proj\\docs/a.md', 'C:\\ERF\\proj', win)
+      expect(result?.filePath).toBe('C:\\ERF\\proj\\docs\\sub\\y.md')
+    })
+
+    it('keeps UNC roots', async () => {
+      mockExists.mockResolvedValue(true)
+      const unc = '\\\\server\\share\\proj'
+      const result = await resolveMarkdownLink('./b.md', unc + '\\a.md', unc, win)
+      expect(result?.filePath).toBe('\\\\server\\share\\proj\\b.md')
+      expect(await resolveMarkdownLink('../../b.md', unc + '\\a.md', unc, win)).toBeNull()
+    })
+
+    it('decodes %20 and keeps the anchor', async () => {
+      mockExists.mockResolvedValue(true)
+      const result = await resolveMarkdownLink('./my%20file.md#top', file, root, win)
+      expect(result?.filePath).toBe('C:\\erf\\proj\\my file.md')
+      expect(result?.anchor).toBe('top')
+    })
+
+    it('leaves a malformed escape as written', async () => {
+      mockExists.mockResolvedValue(false)
+      const result = await resolveMarkdownLink('./100%.md', file, root, win)
+      expect(result?.filePath).toBe('C:\\erf\\proj\\100%.md')
+    })
+
+    it('rejects a sibling drive or sibling folder with a shared prefix', async () => {
+      expect(await resolveMarkdownLink('../proj2/x.md', file, root, win)).toBeNull()
+      expect(isPathWithinProject('D:\\erf\\proj\\a.md', root, win)).toBe(false)
+    })
+  })
+
+  describe('isPathWithinProject on Windows paths', () => {
+    it('ignores case and separator style on win32', () => {
+      expect(isPathWithinProject('c:/ERF/Proj/a.md', 'C:\\erf\\proj', 'win32')).toBe(true)
+      expect(isPathWithinProject('C:\\erf\\proj', 'C:\\erf\\proj\\', 'win32')).toBe(true)
+    })
+
+    it('is case-sensitive on POSIX platforms', () => {
+      expect(isPathWithinProject('/Proj/a.md', '/proj', 'linux')).toBe(false)
+    })
+
+    it('handles a drive-letter root', () => {
+      expect(isPathWithinProject('C:\\a.md', 'C:\\', 'win32')).toBe(true)
+      expect(isPathWithinProject('D:\\a.md', 'C:\\', 'win32')).toBe(false)
+    })
+
+    it('rejects relative paths', () => {
+      expect(isPathWithinProject('docs\\a.md', 'C:\\erf', 'win32')).toBe(false)
+    })
+
+    it('keeps backslash as a filename character and // as a normal path on POSIX', () => {
+      expect(isPathWithinProject('/proj/a\\b.md', '/proj', 'linux')).toBe(true)
+      expect(isPathWithinProject('C:\\proj\\a.md', '/proj', 'linux')).toBe(false)
+      expect(isPathWithinProject('//proj/a.md', '/proj', 'linux')).toBe(true)
+    })
+  })
+
+  describe('confinement – nothing outside the project reaches file:exists', () => {
+    const win = 'win32' as const
+    const root = 'C:\\erf\\proj'
+    const file = 'C:\\erf\\proj\\docs\\a.md'
+
+    it.each([
+      ['%2e%2e%2f..%2fx.md'],
+      ['..%5C..%5Cx.md'],
+      ['../../x.md'],
+      ['/../x.md'],
+      ['D:\\x.md'],
+      ['C:..\\x.md'],
+      ['C:x.md'],
+      ['foo:bar.md'],
+      ['a.md:stream']
+    ])('rejects %s on win32 without touching the disk', async (href) => {
+      mockExists.mockResolvedValue(true)
+      expect(await resolveMarkdownLink(href, file, root, win)).toBeNull()
+      expect(mockExists).not.toHaveBeenCalled()
+    })
+
+    it('refuses a link that leaves the project and comes back in', async () => {
+      mockExists.mockResolvedValue(true)
+      expect(await resolveMarkdownLink('../../proj/x.md', file, root, win)).toBeNull()
+      expect(await resolveMarkdownLink('../../../proj/x.md', file, root, win)).toBeNull()
+      expect(mockExists).not.toHaveBeenCalled()
+    })
+
+    it('rejects an encoded climb on POSIX too', async () => {
+      mockExists.mockResolvedValue(true)
+      const posixFile = '/proj/a.md'
+      expect(await resolveMarkdownLink('%2e%2e%2f..%2fx.md', posixFile, '/proj', 'darwin')).toBeNull()
+      expect(await resolveMarkdownLink('..%5C..%5Cx.md', posixFile, '/proj', 'darwin')).toBeNull()
+      expect(await resolveMarkdownLink('/../x.md', posixFile, '/proj', 'darwin')).toBeNull()
+      expect(mockExists).not.toHaveBeenCalled()
+    })
+
+    it.each([['\\\\evil\\share\\x.md'], ['//evil/share/x.md']])(
+      'keeps %s under the project root',
+      async (href) => {
+        mockExists.mockResolvedValue(true)
+        const result = await resolveMarkdownLink(href, file, root, win)
+        expect(result?.filePath).toBe('C:\\erf\\proj\\evil\\share\\x.md')
+        for (const [{ filePath: checked }] of mockExists.mock.calls) {
+          expect(checked.startsWith('C:\\erf\\proj\\')).toBe(true)
+        }
+      }
+    )
+
+    it('treats a drive-absolute link inside the project as a path', async () => {
+      mockExists.mockResolvedValue(true)
+      const result = await resolveMarkdownLink('c:\\ERF\\proj\\docs\\b.md', file, root, win)
+      expect(result?.filePath).toBe('C:\\erf\\proj\\docs\\b.md')
+    })
+
+    it('checks only in-project candidates for a filename-only link', async () => {
+      mockExists.mockResolvedValue(false)
+      await resolveMarkdownLink('n.md', file, root, win)
+      for (const [{ filePath: checked }] of mockExists.mock.calls) {
+        expect(checked.startsWith('C:\\erf\\proj\\')).toBe(true)
+      }
+      mockExists.mockClear()
+      expect(await resolveMarkdownLink('../../n.md', file, root, win)).toBeNull()
+      expect(mockExists).not.toHaveBeenCalled()
+    })
+
+    it('rejects a current file outside the project', async () => {
+      expect(await resolveMarkdownLink('./a.md', 'D:\\other\\f.md', root, win)).toBeNull()
+      expect(mockExists).not.toHaveBeenCalled()
+    })
+
+    it('logs no part of the link or the path when a link is rejected', async () => {
+      await resolveMarkdownLink('../../secret-name.md', file, root, win)
+      const logged = JSON.stringify((logger.warn as ReturnType<typeof vi.fn>).mock.calls)
+      expect(logged).not.toContain('secret-name')
+      expect(logged).not.toContain('erf')
+    })
+
+    it('decodes the anchor', async () => {
+      mockExists.mockResolvedValue(true)
+      const result = await resolveMarkdownLink('./a.md#%C3%A9t%C3%A9', file, root, win)
+      expect(result?.anchor).toBe('été')
     })
   })
 })

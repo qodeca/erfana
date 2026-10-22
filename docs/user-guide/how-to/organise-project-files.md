@@ -14,6 +14,7 @@ Use the project tree to create, move, rename, import, or delete files.
 1. Use the tree toolbar for **New markdown file**, **New folder**, **Import**, and **Refresh**.
 2. Right-click a file or folder for **Cut**, **Copy**, **Rename**, **Reveal in Finder** (Windows: **Reveal in Explorer**), and **Delete**. **Paste** appears on folders when the clipboard has items.
 3. Drag a file to a folder to move it. For a Finder or File Explorer drop, choose Move, Copy, or Import.
+4. Add at most 100 files at a time. A larger drop is refused with **Too many files** before you are asked how to add it.
 
 ![Screenshot of the project tree with git badges.](../images/organise-files/tree.png)
 ![Screenshot of the folder context menu.](../images/organise-files/folder-menu.png)

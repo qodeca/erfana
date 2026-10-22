@@ -7,7 +7,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdtempSync, rmSync, writeFileSync, symlinkSync, mkdirSync } from 'node:fs'
 import { realpath } from 'node:fs/promises'
-import { join } from 'node:path'
+import { join, parse } from 'node:path'
 import { tmpdir } from 'node:os'
 import {
   assertInsideProject,
@@ -223,4 +223,35 @@ describe('assertNoConfinementEscape', () => {
 
     await expect(assertNoConfinementEscape(link, project)).rejects.toThrow(OUTSIDE_PROJECT_MESSAGE)
   })
+})
+
+describe('isLexicallyInside – volume roots and Unicode spellings', () => {
+  it('a project at the volume root holds every path on the volume', () => {
+    // Why a volume root is refused when a project is opened (pathSecurity): as the project it
+    // would make the boundary cover everything
+    const root = parse(tmpdir()).root
+    expect(isLexicallyInside(join(root, 'anywhere', 'x.md'), root)).toBe(true)
+    expect(isLexicallyInside(root, root)).toBe(true)
+  })
+
+  it('a sibling that merely starts with the project name is outside', () => {
+    expect(isLexicallyInside(`${project}-other`, project)).toBe(false)
+  })
+
+  const composed = 'caf\u00e9'
+  const decomposed = 'cafe\u0301'
+
+  it.runIf(process.platform === 'darwin')(
+    'a normalisation variant of the project name is the same folder on macOS',
+    () => {
+      expect(isLexicallyInside(join(tmpdir(), decomposed, 'x.md'), join(tmpdir(), composed))).toBe(true)
+    }
+  )
+
+  it.skipIf(process.platform === 'darwin')(
+    'a normalisation variant of the project name is a different folder elsewhere',
+    () => {
+      expect(isLexicallyInside(join(tmpdir(), decomposed, 'x.md'), join(tmpdir(), composed))).toBe(false)
+    }
+  )
 })

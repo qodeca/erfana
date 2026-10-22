@@ -17,6 +17,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { homedir } from 'os'
+import { join, parse, posix, win32 } from 'path'
 import { ErrorCode } from '../../shared/errors'
 
 // Mock fs/promises
@@ -30,7 +31,10 @@ vi.mock('fs/promises', () => ({
 // Import after mocking
 import { lstat, readlink, access } from 'fs/promises'
 import {
+  assertAcceptableProjectRoot,
+  isFilesystemRoot,
   isSystemDirectory,
+  type SystemPathContext,
   validateProjectPath,
   validateSymlink,
   validatePath,
@@ -240,6 +244,19 @@ describe('pathSecurity', () => {
         await expect(validateProjectPath('/Users')).rejects.toMatchObject({
           code: ErrorCode.PATH_NOT_ACCESSIBLE
         })
+      })
+    })
+
+    describe('Volume roots', () => {
+      it('should reject the root of the volume the tests run on', async () => {
+        await expect(validateProjectPath(parse(process.cwd()).root)).rejects.toMatchObject({
+          code: ErrorCode.PATH_SYSTEM_DIR
+        })
+      })
+
+      it('should not reach the access check for a root', async () => {
+        await validateProjectPath(parse(process.cwd()).root).catch(() => undefined)
+        expect(mockedAccess).not.toHaveBeenCalled()
       })
     })
 
@@ -578,5 +595,129 @@ describe('pathSecurity', () => {
         expect(error).toBeInstanceOf(PathSecurityError)
       }
     })
+  })
+})
+
+describe('isFilesystemRoot', () => {
+  it.each([
+    ['a POSIX root', posix, posix.sep, true],
+    ['a folder under a POSIX root', posix, posix.join(posix.sep, 'a'), false],
+    ['a drive root', win32, 'C:\\', true],
+    ['a drive root without its separator', win32, 'C:', false],
+    ['a folder on a drive', win32, 'C:\\a', false],
+    ['a drive root spelled with a forward slash', win32, 'C:/', true],
+    ['an extended-length drive root', win32, '\\\\?\\C:\\', true],
+    ['an extended-length folder on a drive', win32, '\\\\?\\C:\\a', false],
+    ['a share root without its separator', win32, '\\\\srv\\share', true],
+    ['an extended-length share root', win32, '\\\\?\\UNC\\srv\\share\\', true],
+    ['a share root', win32, '\\\\srv\\share\\', true],
+    ['a folder on a share', win32, '\\\\srv\\share\\a', false]
+  ])('%s', (_name, flavour, value, expected) => {
+    expect(isFilesystemRoot(value, flavour)).toBe(expected)
+  })
+})
+
+describe('assertAcceptableProjectRoot', () => {
+  it('refuses the root of the volume the tests run on', () => {
+    expect(() => assertAcceptableProjectRoot(parse(process.cwd()).root)).toThrowError(
+      expect.objectContaining({ code: ErrorCode.PATH_SYSTEM_DIR })
+    )
+  })
+
+  it('refuses a system folder', () => {
+    expect(() => assertAcceptableProjectRoot(join(homedir(), '.ssh'))).toThrowError(
+      expect.objectContaining({ code: ErrorCode.PATH_SYSTEM_DIR })
+    )
+  })
+
+  it('accepts an ordinary folder', () => {
+    expect(() => assertAcceptableProjectRoot(process.cwd())).not.toThrow()
+  })
+})
+
+describe('isSystemDirectory – Windows rules on any host', () => {
+  const win: SystemPathContext = {
+    platform: 'win32',
+    flavour: win32,
+    home: 'C:\\Users\\me',
+    env: {
+      SystemRoot: 'D:\\WinNT',
+      ProgramFiles: 'D:\\Programs',
+      'ProgramFiles(x86)': 'D:\\Programs (x86)',
+      ProgramW6432: 'D:\\Programs',
+      ProgramData: 'D:\\Data'
+    }
+  }
+
+  it.each([
+    ['the system root from the environment', 'D:\\WinNT'],
+    ['a folder below it', 'D:\\WinNT\\System32'],
+    ['the same folder spelled in another case', 'd:\\winnt\\system32'],
+    ['program files', 'D:\\Programs'],
+    ['a folder in program files (x86)', 'D:\\Programs (x86)\\Vendor'],
+    ['program data', 'D:\\Data\\Vendor'],
+    ['the usual Windows folder, when the environment names another', 'C:\\Windows'],
+    ['the usual Program Files folder', 'c:\\program files\\x'],
+    ['a trailing separator', 'D:\\WinNT\\'],
+    ['a forward-slash spelling', 'D:/WinNT/System32'],
+    ['the ssh folder of the user', 'C:\\Users\\me\\.ssh'],
+    ['a folder in it, in another case', 'c:\\users\\ME\\.SSH\\keys']
+  ])('refuses %s', (_name, value) => {
+    expect(isSystemDirectory(value, win)).toBe(true)
+  })
+
+  it.each([
+    ['a folder of the user', 'C:\\Users\\me\\source'],
+    ['the home folder', 'C:\\Users\\me'],
+    ['a sibling that merely starts with a system name', 'D:\\WinNTX'],
+    ['another drive', 'E:\\work'],
+    ['a drive root', 'D:\\']
+  ])('allows %s', (_name, value) => {
+    expect(isSystemDirectory(value, win)).toBe(false)
+  })
+
+  it('ignores an environment value that is relative or a drive root', () => {
+    const odd: SystemPathContext = {
+      ...win,
+      env: { SystemRoot: 'Windows', ProgramFiles: 'E:\\', ProgramData: '' }
+    }
+    expect(isSystemDirectory('E:\\work', odd)).toBe(false)
+    expect(isSystemDirectory('E:\\', odd)).toBe(false)
+    expect(isSystemDirectory('C:\\Windows\\x', odd)).toBe(true)
+  })
+
+  it('refuses a system folder in a POSIX list only on the platforms that have them', () => {
+    expect(isSystemDirectory(posix.join(posix.sep, 'usr', 'local'), { ...win, platform: 'linux', flavour: posix })).toBe(true)
+    expect(isSystemDirectory(win32.join('C:\\', 'usr'), win)).toBe(false)
+  })
+})
+
+describe('isSystemDirectory – this machine\'s own administrative shares', () => {
+  const win: SystemPathContext = {
+    platform: 'win32',
+    flavour: win32,
+    home: 'C:\\Users\\me',
+    env: { SystemRoot: 'C:\\Windows' },
+    hostname: 'BUILD-01'
+  }
+
+  it.each([
+    '\\\\localhost\\C$\\Windows',
+    '\\\\LOCALHOST\\c$\\windows\\System32',
+    '\\\\127.0.0.1\\C$\\Windows',
+    '\\\\build-01\\C$\\Windows\\x',
+    '\\\\?\\UNC\\localhost\\C$\\Windows',
+    '//localhost/C$/Windows'
+  ])('refuses %s as the system folder it is', (value) => {
+    expect(isSystemDirectory(value, win)).toBe(true)
+  })
+
+  it.each([
+    '\\\\localhost\\C$\\Users\\me\\uncproj',
+    '\\\\localhost\\C$',
+    '\\\\otherhost\\C$\\Windows',
+    '\\\\localhost\\share\\Windows'
+  ])('allows %s', (value) => {
+    expect(isSystemDirectory(value, win)).toBe(false)
   })
 })

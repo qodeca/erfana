@@ -226,7 +226,7 @@ describe('PreviewContextMenu Component', () => {
       await user.click(askBtn)
 
       await waitFor(() => {
-        expect(mockReadFile).toHaveBeenCalledWith('/test/document.md')
+        expect(mockReadFile).toHaveBeenCalledWith({ filePath: '/test/document.md' })
       })
 
       // showPrompt should receive source lines in selectedText (2-4)

@@ -66,7 +66,7 @@ export interface UseTerminalPortalReturn {
  *   fitAddonRef,
  *   xtermRef,
  *   terminalId,
- *   resizePty: (id, cols, rows) => window.api.terminal.resize(id, cols, rows)
+ *   resizePty: (id, cols, rows) => terminalGateway.resize(id, cols, rows)
  * })
  *
  * return (

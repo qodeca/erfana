@@ -24,6 +24,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { SettingsOverlay } from './SettingsOverlay'
+import { BaseDialog } from '../Dialog/BaseDialog'
 import { useSettingsStore } from '../../stores/useSettingsStore'
 import { useGlobalSettingsStore } from '../../stores/useGlobalSettingsStore'
 import type { GlobalSettings } from '../../../../shared/ipc/global-settings-schema'
@@ -182,6 +183,23 @@ describe('SettingsOverlay', () => {
       await waitFor(() => {
         expect(useSettingsStore.getState().isOpen).toBe(false)
       })
+    })
+
+    it('stays open when Escape closes a dialog stacked on top of it (#229)', () => {
+      const dialogClose = vi.fn()
+      render(
+        <>
+          <SettingsOverlay />
+          <BaseDialog isOpen onClose={dialogClose} zIndex={10001}>
+            <button>Cancel</button>
+          </BaseDialog>
+        </>
+      )
+
+      fireEvent.keyDown(document, { key: 'Escape' })
+
+      expect(dialogClose).toHaveBeenCalledOnce()
+      expect(useSettingsStore.getState().isOpen).toBe(true)
     })
   })
 

@@ -28,6 +28,7 @@ import {
   type FileWatchSlot
 } from './fileWatchSlot'
 import { logger } from '../utils/logger'
+import { fileGateway } from '../services/fileGateway'
 
 /**
  * Why auto-refresh stopped working for a path.
@@ -211,7 +212,7 @@ export function useFileChangeSubscription(
     if (!filePath) return false
 
     try {
-      await window.api.file.getStats(filePath)
+      await fileGateway.getStats({ filePath })
     } catch {
       // Still gone – keep the deleted banner up rather than claiming recovery.
       if (isMountedRef.current) setIsFileDeleted(true)
@@ -281,8 +282,8 @@ export function useFileChangeSubscription(
       if (!isActive || data.filePath !== filePath) return
 
       // Invariant 3: never believe a delete without re-checking the disk.
-      window.api.file
-        .getStats(filePath)
+      fileGateway
+        .getStats({ filePath })
         .then(async () => {
           if (!isActive) return
           logger.info('Delete event for a file that still exists; recovering the watch', {

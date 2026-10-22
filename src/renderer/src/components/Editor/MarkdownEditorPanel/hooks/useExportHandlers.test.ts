@@ -80,6 +80,7 @@ function createMockPreviewRef(element: HTMLDivElement | null): React.RefObject<M
   return {
     current: element ? {
       scrollToAnchor: vi.fn(),
+      flush: vi.fn().mockResolvedValue(undefined),
       element
     } : null
   }
@@ -98,6 +99,54 @@ function createMockEditorFile(overrides: Partial<EditorFile> = {}): EditorFile {
 }
 
 describe('useExportHandlers', () => {
+  describe('preview flush before export', () => {
+    // The preview renders behind typing; export must not capture the preview
+    // of a moment ago. flush() brings it up to date – here it swaps the DOM.
+    function flushingRef(before: string, after: string): React.RefObject<MarkdownPreviewHandle | null> {
+      const element = createMockPreviewElement(before)
+      const flush = vi.fn(async () => {
+        element.querySelector('.markdown-preview-content')!.innerHTML = after
+      })
+      return { current: { scrollToAnchor: vi.fn(), flush, element } }
+    }
+
+    it('PDF export reads the preview only after flush() resolved', async () => {
+      const previewHandleRef = flushingRef('<p>stale</p>', '<p>fresh</p>')
+      mockExportToPdf.mockResolvedValue({ success: true, filePath: '/out/document.pdf' })
+      const { result } = renderHook(() =>
+        useExportHandlers({ currentFile: createMockEditorFile(), previewHandleRef, showToast: vi.fn() })
+      )
+
+      await act(async () => {
+        await result.current.handleExportPdf()
+      })
+
+      expect(previewHandleRef.current!.flush).toHaveBeenCalledTimes(1)
+      expect(mockExportToPdf).toHaveBeenCalledWith({ html: '<p>fresh</p>', fileName: 'document' })
+    })
+
+    it('DOCX export reads the preview only after flush() resolved', async () => {
+      const previewHandleRef = flushingRef('<p>stale</p>', '<p>fresh</p>')
+      mockConvertMermaidDiagramsToImages.mockImplementation(async (el: Element) => ({
+        html: el.innerHTML,
+        totalDiagrams: 0,
+        convertedDiagrams: 0,
+        failedDiagrams: 0
+      }))
+      mockExportToDocx.mockResolvedValue({ success: true, filePath: '/out/document.docx' })
+      const { result } = renderHook(() =>
+        useExportHandlers({ currentFile: createMockEditorFile(), previewHandleRef, showToast: vi.fn() })
+      )
+
+      await act(async () => {
+        await result.current.handleExportDocx()
+      })
+
+      expect(previewHandleRef.current!.flush).toHaveBeenCalledTimes(1)
+      expect(mockExportToDocx).toHaveBeenCalledWith({ html: '<p>fresh</p>', fileName: 'document' })
+    })
+  })
+
   describe('initial state', () => {
     it('should initialize with isExportingPdf as false', () => {
       const showToast = vi.fn()
@@ -503,7 +552,8 @@ describe('useExportHandlers', () => {
           result.current.handleExportPdf()
         })
 
-        // Only one call should have been made
+        // Only one call should have been made (once the preview flush settled)
+        await act(async () => {})
         expect(mockExportToPdf).toHaveBeenCalledTimes(1)
 
         // Complete export
@@ -1076,6 +1126,7 @@ describe('useExportHandlers', () => {
         })
 
         // Only one conversion should have been triggered
+        await act(async () => {})
         expect(mockConvertMermaidDiagramsToImages).toHaveBeenCalledTimes(1)
 
         // Complete export

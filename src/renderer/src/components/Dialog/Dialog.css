@@ -10,7 +10,7 @@
   --dialog-base-zindex: var(--z-dialog);
   --dialog-text-primary: var(--color-text-emphasis);
   --dialog-text-secondary: var(--color-gray-200);
-  --dialog-text-muted: var(--color-text-muted);
+  --dialog-text-muted: var(--color-text-tertiary);
   --dialog-btn-primary-bg: var(--color-btn-primary-bg);
   --dialog-btn-primary-hover: var(--color-btn-primary-hover);
   --dialog-btn-danger-bg: var(--color-btn-danger-bg);
@@ -147,7 +147,9 @@
 
 /* Primary button (confirm, submit).
  *
- * Foreground is --color-brand-black, NOT --color-white: the brand violet
+ * Foreground is --color-btn-primary-text (brand black), NOT --color-white,
+ * and every other violet fill in the app now uses the same token
+ * (accentFill.contrast.test.ts guards them all): the brand violet
  * (#A0A8FF) is a light tint, so white-on-violet measures 2.2:1 and fails
  * WCAG 1.4.3 (4.5:1 required for normal-size text). #161312 on the same violet
  * measures 8.4:1. This follows the precedent already in the repo —
@@ -159,7 +161,7 @@
  * is current — in practice the hover one, i.e. the same 6.85:1. Both pass. */
 .dialog-btn-primary {
   background-color: var(--dialog-btn-primary-bg);
-  color: var(--color-brand-black);
+  color: var(--color-btn-primary-text);
   box-shadow: var(--shadow-sm);
 }
 
@@ -243,11 +245,9 @@
   transition: all var(--transition-slow);
 }
 
-.dialog-input:focus {
-  outline: none;
-  border-color: var(--dialog-btn-primary-bg);
-  background-color: var(--color-bg-tertiary);
-  box-shadow: var(--shadow-focus);
+.dialog-input:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
 }
 
 .dialog-input::placeholder {
@@ -337,7 +337,7 @@
 
 .dialog-selected-text-label {
   font-size: var(--text-sm);
-  color: var(--color-text-muted);
+  color: var(--color-text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.8px;
   font-weight: var(--font-semibold);
@@ -391,7 +391,7 @@
 }
 
 .dialog-info-icon:focus-visible {
-  outline: 2px solid var(--color-border-focus);
+  outline: var(--border-width-thick) solid var(--color-border-focus);
   outline-offset: var(--space-1);
 }
 
@@ -518,11 +518,9 @@
   transition: all var(--transition-slow);
 }
 
-.dialog-rename-input:focus {
-  outline: none;
-  border-color: var(--dialog-btn-primary-bg);
-  background-color: var(--color-bg-tertiary);
-  box-shadow: var(--shadow-focus);
+.dialog-rename-input:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
 }
 
 .dialog-rename-input.error {
@@ -578,11 +576,9 @@
   background-color: var(--color-bg-tertiary);
 }
 
-.dialog-select:focus {
-  outline: none;
-  border-color: var(--color-border-focus);
-  background-color: var(--color-bg-tertiary);
-  box-shadow: var(--shadow-focus);
+.dialog-select:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
 }
 
 /* Style dropdown options */
@@ -641,10 +637,9 @@
   border-color: var(--color-border-default);
 }
 
-.dialog-drop-mode-btn:focus {
-  outline: none;
-  border-color: var(--color-border-focus);
-  box-shadow: var(--shadow-focus);
+.dialog-drop-mode-btn:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
 }
 
 /* Icon positioning in mode button */

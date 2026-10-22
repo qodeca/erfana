@@ -17,6 +17,7 @@
  * after a tree rebuild, and the `handlePaste` dependency fix that the lookup
  * change depends on.
  */
+import { isMacOS } from '../../utils/platform'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, act, fireEvent } from '@testing-library/react'
 import React from 'react'
@@ -123,7 +124,6 @@ function rebuiltTree(): FileNode[] {
 // The clipboard store is a module singleton that captures `window.api.file` on
 // first use, so the `file` object identity must stay stable across tests.
 const fileApi = {
-  getLastProjectPath: vi.fn(async () => null),
   readDirectory: vi.fn(async (_path: string) => baseTree()),
   onProjectChanged: vi.fn(),
   moveItem: vi.fn(async () => ({ path: '/moved' })),
@@ -222,6 +222,18 @@ function rowFor(path: string): HTMLElement {
   return row as HTMLElement
 }
 
+/**
+ * Click a row the way a browser does: a pointer click on a focusable row
+ * (dnd-kit gives each one `tabIndex: 0`) focuses it before `click` fires.
+ * `fireEvent.click` alone skips the focus, and since [27] the tree's clipboard
+ * shortcuts act only while focus is inside the tree.
+ */
+function clickRow(path: string): void {
+  const row = rowFor(path)
+  row.focus()
+  fireEvent.click(row)
+}
+
 function treeItemFor(path: string): HTMLElement {
   const item = document.querySelector(`[role="treeitem"][data-path="${path}"]`)
   if (!item) throw new Error(`No treeitem rendered for "${path}"`)
@@ -235,8 +247,9 @@ async function dragEnd(sourcePath: string, targetPath: string) {
   })
 }
 
+/** The platform's clipboard modifier (Cmd on macOS, Ctrl elsewhere) plus `key`. */
 function pressKey(key: string) {
-  fireEvent.keyDown(window, { key, metaKey: true })
+  fireEvent.keyDown(window, isMacOS() ? { key, metaKey: true } : { key, ctrlKey: true })
 }
 
 beforeEach(() => {
@@ -263,7 +276,7 @@ describe('ProjectTree root-inclusive lookups', () => {
   it('resolves the synthetic project root when a row is clicked', async () => {
     await renderWithProject()
 
-    fireEvent.click(rowFor(PROJECT_PATH))
+    clickRow(PROJECT_PATH)
 
     // A missed lookup would fall through to onFileSelect instead of selecting
     // the folder, so this pins that the root resolved as a directory.
@@ -276,7 +289,10 @@ describe('ProjectTree root-inclusive lookups', () => {
 
     await dragEnd(`${PROJECT_PATH}/top.md`, PROJECT_PATH)
 
-    expect(fileApi.moveItem).toHaveBeenCalledWith(`${PROJECT_PATH}/top.md`, PROJECT_PATH)
+    expect(fileApi.moveItem).toHaveBeenCalledWith({
+      sourcePath: `${PROJECT_PATH}/top.md`,
+      targetParentPath: PROJECT_PATH
+    })
   })
 
   it('resolves a nested folder as a drop target', async () => {
@@ -284,10 +300,10 @@ describe('ProjectTree root-inclusive lookups', () => {
 
     await dragEnd(`${PROJECT_PATH}/top.md`, `${PROJECT_PATH}/folder1`)
 
-    expect(fileApi.moveItem).toHaveBeenCalledWith(
-      `${PROJECT_PATH}/top.md`,
-      `${PROJECT_PATH}/folder1`
-    )
+    expect(fileApi.moveItem).toHaveBeenCalledWith({
+      sourcePath: `${PROJECT_PATH}/top.md`,
+      targetParentPath: `${PROJECT_PATH}/folder1`
+    })
   })
 
   it('resolves a nested file to its parent directory', async () => {
@@ -297,10 +313,10 @@ describe('ProjectTree root-inclusive lookups', () => {
     // tree, not just the rendered rows.
     await dragEnd(`${PROJECT_PATH}/top.md`, `${PROJECT_PATH}/folder1/child.md`)
 
-    expect(fileApi.moveItem).toHaveBeenCalledWith(
-      `${PROJECT_PATH}/top.md`,
-      `${PROJECT_PATH}/folder1`
-    )
+    expect(fileApi.moveItem).toHaveBeenCalledWith({
+      sourcePath: `${PROJECT_PATH}/top.md`,
+      targetParentPath: `${PROJECT_PATH}/folder1`
+    })
   })
 
   it('resolves a top-level file to the project root (drop parity)', async () => {
@@ -310,7 +326,10 @@ describe('ProjectTree root-inclusive lookups', () => {
     // fallback must reproduce what the prepended-root copy used to supply.
     await dragEnd(`${PROJECT_PATH}/folder1`, `${PROJECT_PATH}/top.md`)
 
-    expect(fileApi.moveItem).toHaveBeenCalledWith(`${PROJECT_PATH}/folder1`, PROJECT_PATH)
+    expect(fileApi.moveItem).toHaveBeenCalledWith({
+      sourcePath: `${PROJECT_PATH}/folder1`,
+      targetParentPath: PROJECT_PATH
+    })
   })
 
   it('reports a miss for an unknown path instead of moving anything', async () => {
@@ -331,7 +350,7 @@ describe('ProjectTree root-exclusive clipboard lookup', () => {
   it('does not resolve the synthetic root, keeping the project non-cuttable', async () => {
     await renderWithProject()
 
-    fireEvent.click(rowFor(PROJECT_PATH))
+    clickRow(PROJECT_PATH)
     expect(treeItemFor(PROJECT_PATH)).toHaveAttribute('aria-selected', 'true')
 
     pressKey('x')
@@ -343,7 +362,7 @@ describe('ProjectTree root-exclusive clipboard lookup', () => {
   it('resolves a real folder for cut', async () => {
     await renderWithProject()
 
-    fireEvent.click(rowFor(`${PROJECT_PATH}/folder1`))
+    clickRow(`${PROJECT_PATH}/folder1`)
     pressKey('x')
 
     expect(useClipboardStore.getState().itemPath).toBe(`${PROJECT_PATH}/folder1`)
@@ -355,7 +374,7 @@ describe('ProjectTree root-exclusive clipboard lookup', () => {
 
     // Only directories become the selection (`handleFileClick` opens files in
     // the editor instead), so the clipboard path always resolves a folder.
-    fireEvent.click(rowFor(`${PROJECT_PATH}/folder1`))
+    clickRow(`${PROJECT_PATH}/folder1`)
     pressKey('c')
 
     expect(useClipboardStore.getState().itemPath).toBe(`${PROJECT_PATH}/folder1`)
@@ -365,7 +384,7 @@ describe('ProjectTree root-exclusive clipboard lookup', () => {
   it('opens a file instead of selecting it (nested lookup hit)', async () => {
     await renderWithProject()
 
-    fireEvent.click(rowFor(`${PROJECT_PATH}/top.md`))
+    clickRow(`${PROJECT_PATH}/top.md`)
 
     expect(onFileSelect).toHaveBeenCalledWith(`${PROJECT_PATH}/top.md`)
     expect(treeItemFor(`${PROJECT_PATH}/top.md`)).toHaveAttribute('aria-selected', 'false')
@@ -380,7 +399,7 @@ describe('ProjectTree lookup staleness', () => {
   it('uses the rebuilt tree for the keydown handler after a refresh', async () => {
     await renderWithProject()
 
-    fireEvent.click(rowFor(`${PROJECT_PATH}/folder1`))
+    clickRow(`${PROJECT_PATH}/folder1`)
     expect(treeItemFor(`${PROJECT_PATH}/folder1`)).toHaveAttribute('aria-selected', 'true')
 
     // Rebuild the tree without a project switch: the selection survives, but
@@ -399,7 +418,7 @@ describe('ProjectTree lookup staleness', () => {
     expect(useClipboardStore.getState().hasClipboard()).toBe(false)
 
     // A node that only exists after the rebuild resolves.
-    fireEvent.click(rowFor(`${PROJECT_PATH}/folder2`))
+    clickRow(`${PROJECT_PATH}/folder2`)
     pressKey('x')
     expect(useClipboardStore.getState().itemPath).toBe(`${PROJECT_PATH}/folder2`)
   })
@@ -414,7 +433,7 @@ describe('ProjectTree paste keyboard shortcut', () => {
     const { rerender } = await renderWithProject()
 
     // Select a paste target and put a cut item on the clipboard.
-    fireEvent.click(rowFor(`${PROJECT_PATH}/folder1`))
+    clickRow(`${PROJECT_PATH}/folder1`)
     await act(async () => {
       useClipboardStore.getState().cut(`${PROJECT_PATH}/other.md`, 'other.md', 'file')
     })
@@ -458,7 +477,7 @@ describe('ProjectTree paste keyboard shortcut', () => {
   it('pastes into the selected folder when there is no conflict', async () => {
     await renderWithProject()
 
-    fireEvent.click(rowFor(`${PROJECT_PATH}/folder1`))
+    clickRow(`${PROJECT_PATH}/folder1`)
     await act(async () => {
       useClipboardStore.getState().cut(`${PROJECT_PATH}/other.md`, 'other.md', 'file')
     })
@@ -468,12 +487,11 @@ describe('ProjectTree paste keyboard shortcut', () => {
     })
 
     await waitFor(() => {
-      expect(fileApi.moveItem).toHaveBeenCalledWith(
-        `${PROJECT_PATH}/other.md`,
-        `${PROJECT_PATH}/folder1`,
-        undefined,
-        false
-      )
+      expect(fileApi.moveItem).toHaveBeenCalledWith({
+        sourcePath: `${PROJECT_PATH}/other.md`,
+        targetParentPath: `${PROJECT_PATH}/folder1`,
+        replaceExisting: false
+      })
     })
     expect(dialog.showConfirm).not.toHaveBeenCalled()
   })

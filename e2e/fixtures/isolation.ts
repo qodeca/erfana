@@ -20,6 +20,7 @@
  */
 
 import type { ElectronApplication } from '@playwright/test'
+import { execFile, type ChildProcess } from 'child_process'
 import * as fs from 'fs'
 import * as path from 'path'
 
@@ -46,6 +47,7 @@ const APP_ENV_ALLOWLIST: ReadonlySet<string> = new Set([
   'TMPDIR',
   // Display / session (Linux CI runs under xvfb)
   'DISPLAY',
+  'XAUTHORITY',
   'WAYLAND_DISPLAY',
   'XDG_RUNTIME_DIR',
   'XDG_SESSION_TYPE',
@@ -113,6 +115,8 @@ export function buildAppEnv(options: AppEnvOptions = {}): Record<string, string>
     }
   }
   env.NODE_ENV = 'development'
+  // Switches on the app's e2e test hooks (window.__erfanaTest); main ignores it in a packaged build
+  env.ERFANA_E2E_TEST_HOOKS = '1'
 
   if (options.homeDir) {
     const home = options.homeDir
@@ -138,6 +142,14 @@ export function appLogsDir(homeDir: string): string {
 const SHELL_STARTUP_FILES = ['.zshrc', '.zshenv', '.zprofile', '.bashrc', '.bash_profile']
 
 /**
+ * What a seeded startup file holds. Only `.zshrc` carries anything: zsh's
+ * PROMPT_SP prints a `%` end-of-line marker and pads to the terminal width
+ * before each prompt, and a resize during startup left that marker on its own
+ * line with the cursor at column 0 below the prompt (macOS, #288).
+ */
+const SHELL_STARTUP_CONTENT: Record<string, string> = { '.zshrc': 'unsetopt PROMPT_SP\n' }
+
+/**
  * Create a worker's sandbox home under `.e2e-temp`, with the per-user folders
  * {@link buildAppEnv} points at already in place.
  *
@@ -157,10 +169,10 @@ export async function createWorkerHome(prefix: string): Promise<string> {
   ]) {
     await fs.promises.mkdir(dir, { recursive: true })
   }
-  // Empty shell startup files: zsh offers its interactive `zsh-newuser-install`
+  // Seeded shell startup files: zsh offers its interactive `zsh-newuser-install`
   // menu when none exists in $HOME, and that menu swallows typed input.
   for (const name of SHELL_STARTUP_FILES) {
-    await fs.promises.writeFile(path.join(home, name), '', 'utf-8')
+    await fs.promises.writeFile(path.join(home, name), SHELL_STARTUP_CONTENT[name] ?? '', 'utf-8')
   }
   // A minimal identity for any VCS tool run in the terminal, so the real one is never read.
   await fs.promises.writeFile(
@@ -198,15 +210,71 @@ export async function removeDirWithRetry(dir: string): Promise<void> {
   }
 }
 
-/** Longest teardown waits for the app process to exit after `close()`. */
-const APP_EXIT_TIMEOUT_MS = 10_000
-/** Longest teardown waits for the exit after SIGKILL before moving on. */
+/**
+ * Longest teardown waits for `close()` AND the process exit together. One
+ * deadline covers both, so a `close()` that never settles is cut too (#63).
+ */
+export const APP_EXIT_TIMEOUT_MS = 15_000
+/** Longest teardown waits for the exit after the kill before moving on. */
 const APP_KILL_TIMEOUT_MS = 5_000
+
+/** Resolve with `value`, or with `'timeout'` after `ms`. */
+async function withDeadline<T>(promise: Promise<T>, ms: number): Promise<T | 'timeout'> {
+  let timer: NodeJS.Timeout | undefined
+  const timedOut = new Promise<'timeout'>((resolve) => {
+    timer = setTimeout(() => resolve('timeout'), ms)
+  })
+  try {
+    return await Promise.race([promise, timedOut])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
+/**
+ * The teardown log line for a `taskkill /PID <pid> /T /F` run.
+ *
+ * taskkill exits non-zero when ANY process of the tree could not be ended – most
+ * often a helper that had already exited by itself ("There is no running
+ * instance of the task"). That is not a failed kill: what matters is whether
+ * the app's own process was ended, which its output says by PID.
+ */
+export function describeTaskkill(pid: number, exitedNonZero: boolean, output: string): string {
+  const mainEnded = new RegExp(`The process with PID ${pid} (\\([^)]*\\) )?has been terminated`).test(output)
+  if (exitedNonZero && !mainEnded) return `taskkill /PID ${pid} /T /F failed: ${output}`
+  const partial = exitedNonZero ? '; some child processes had already exited' : ''
+  return `process tree of PID ${pid}${partial} (${output})`
+}
+
+/**
+ * Kill the app Playwright started, and only that one: found by its own PID,
+ * never by name or command-line pattern. On Windows `taskkill /T` also ends its
+ * GPU, utility and renderer children, which otherwise outlive the main process
+ * and keep the test folders locked. Elsewhere SIGKILL goes to the PID alone –
+ * never to the process group, which Playwright's child shares with the runner.
+ *
+ * @returns What was killed, for the teardown log
+ */
+async function killAppProcess(child: ChildProcess): Promise<string> {
+  const pid = child.pid
+  if (pid === undefined) return 'nothing (the app has no PID)'
+  if (process.platform === 'win32') {
+    return new Promise((resolve) => {
+      execFile('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true }, (error, stdout, stderr) => {
+        const output = `${stdout}${stderr}`.trim().replace(/\s+/g, ' ')
+        resolve(describeTaskkill(pid, error !== null, output || (error?.message ?? '')))
+      })
+    })
+  }
+  child.kill('SIGKILL')
+  return `PID ${pid} (SIGKILL)`
+}
 
 /**
  * Close the app and resolve only once its process has exited, so the folders
- * it had open can be removed. If a graceful close fails or hangs, the process
- * Playwright started (and only that one) is killed.
+ * it had open can be removed. If `close()` fails, hangs or never settles, or the
+ * process outlives the deadline, the app Playwright started (and only that one)
+ * is killed.
  */
 export async function closeAppAndWait(app: ElectronApplication): Promise<void> {
   const child = app.process()
@@ -215,27 +283,20 @@ export async function closeAppAndWait(app: ElectronApplication): Promise<void> {
       ? Promise.resolve()
       : new Promise<void>((resolve) => child.once('exit', () => resolve()))
 
-  try {
-    await app.close()
-  } catch (error) {
+  const closed = app.close().catch((error: unknown) => {
     console.warn('[fixture teardown] app.close() failed:', error)
-  }
-
-  let timer: NodeJS.Timeout | undefined
-  const timedOut = new Promise<'timeout'>((resolve) => {
-    timer = setTimeout(() => resolve('timeout'), APP_EXIT_TIMEOUT_MS)
   })
-  const outcome = await Promise.race([exited.then(() => 'exited' as const), timedOut])
-  if (timer) clearTimeout(timer)
+  const outcome = await withDeadline(
+    closed.then(() => exited).then(() => 'exited' as const),
+    APP_EXIT_TIMEOUT_MS
+  )
+  if (outcome === 'exited') return
 
-  if (outcome === 'timeout') {
-    console.warn('[fixture teardown] app did not exit in time, killing it')
-    child.kill('SIGKILL')
-    let killTimer: NodeJS.Timeout | undefined
-    const killTimedOut = new Promise<void>((resolve) => {
-      killTimer = setTimeout(resolve, APP_KILL_TIMEOUT_MS)
-    })
-    await Promise.race([exited, killTimedOut])
-    if (killTimer) clearTimeout(killTimer)
+  const killed = await killAppProcess(child)
+  console.warn(
+    `[fixture teardown] app did not close and exit within ${APP_EXIT_TIMEOUT_MS} ms; killed ${killed}`
+  )
+  if ((await withDeadline(exited, APP_KILL_TIMEOUT_MS)) === 'timeout') {
+    console.warn(`[fixture teardown] PID ${child.pid} still running ${APP_KILL_TIMEOUT_MS} ms after the kill`)
   }
 }

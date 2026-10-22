@@ -31,6 +31,7 @@ import {
 } from './utils/helpers'
 import { writeImageFixtures, IMAGE_FIXTURES } from './fixtures/images/generateImageFixtures'
 import { ImageViewerNarrowPage } from './pages/image-viewer-narrow.page'
+import { TabBarPage } from './pages/tab-bar.page'
 
 /**
  * The visual fixture set for state (f), with the image fixtures seeded into the
@@ -129,9 +130,11 @@ async function stabilizeEditor(page: import('@playwright/test').Page): Promise<v
     console.warn('stabilizeEditor: no Monaco editors found – cursor blink may not be disabled')
   }
   await clearSelection(page)
-  // Monaco rendering pipeline settle – no DOM signal for cursorBlinking change;
-  // toHaveScreenshot does two-pass stability check on top of this
-  await page.waitForTimeout(500)
+  // Monaco marks the cursor layer `cursor-solid` once the option is applied;
+  // toHaveScreenshot's two-pass stability check covers the rest of the paint.
+  if (editorCount > 0) {
+    await expect(page.locator('.monaco-editor .cursors-layer.cursor-solid').first()).toBeAttached()
+  }
 }
 
 /**
@@ -235,17 +238,15 @@ visualTest.describe('Visual regression – with project', () => {
 
     // Switch to source/editor mode (markdown defaults to preview mode)
     await byTestId(page, TEST_IDS.VIEW_MODE_BTN_EDITOR).click()
-    // View mode transition animation settle – no testid for "mode ready" state
-    await page.waitForTimeout(500)
 
     // Focus and type in Monaco to create dirty (unsaved) state
     const monacoEditor = page.locator('.monaco-editor .view-lines')
+    await expect(monacoEditor).toBeVisible()
     await monacoEditor.click()
-    // Monaco focus acquisition – needed before keyboard.type works reliably
-    await page.waitForTimeout(200)
+    await expect(page.locator('.monaco-editor.focused')).toBeVisible()
     await page.keyboard.type('x')
-    // Dirty state propagation to Zustand store – needed before quit:requested checks blockers
-    await page.waitForTimeout(500)
+    // The tab's dirty dot renders from the same store quit:requested reads
+    await expect(new TabBarPage(page).dirtyDot('README.md')).toBeVisible()
 
     // Send quit:requested IPC to renderer – dirty editor triggers confirm dialog
     // Using IPC directly avoids the main process close flow and isQuitting flag

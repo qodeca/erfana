@@ -66,13 +66,16 @@ Returns terminal metadata, or `null` if not found.
 #### `listTerminals(): Array<{ id: string; title: string }>`
 Returns metadata for all live terminals.
 
+#### `ackOutput(terminalId: string, chars: number): void`
+Flow control (`terminal:ackOutput`): the owning window has parsed `chars` more UTF-16 code units of output. On macOS and Linux the PTY is paused above 512 KiB unacknowledged and resumed below 128 KiB; a pause with no ack progress for 5 s is lifted. Windows terminals are batched, never paused. See [performance/terminal-output-batching.md](performance/terminal-output-batching.md).
+
 ---
 
 ### Events
 
 | Event | Payload | When |
 |---|---|---|
-| `'data'` | `{ terminalId: string; data: string }` | PTY output (after marker handshake + clear confirm) |
+| `'data'` | `{ terminalId: string; data: string }` | PTY output (after marker handshake + clear confirm), batched per terminal by `TerminalOutputFlow` (8 ms or 64 KiB) and always sent before that terminal's `'exit'` |
 | `'exit'` | `{ terminalId: string; exitCode: number; signal?: string }` | PTY process exit |
 | `'clearTerminal'` | `{ terminalId: string }` | Bootstrap marker detected; renderer should clear and call `markClearComplete()` |
 | `'error'` | `{ terminalId: string; error: string }` | cwd deny-list rejection (Windows), shell resolution failure, or spawn failure |
@@ -326,11 +329,11 @@ Rename a file or folder. The second argument is a **basename**, not a full path 
 
 ### IPC: `file:revealInFileManager`
 
-**Handler:** `src/main/ipc/file-handlers.ts` · **Preload:** `window.api.file.revealInFileManager(filePath)`
+**Handler:** `src/main/ipc/file-handlers.ts` · **Preload:** `window.api.file.revealInFileManager({ filePath })`
 
 Reveals a file or folder in the native OS file manager (Finder/Explorer) by calling Electron `shell.showItemInFolder`. Backs the Project Tree "Reveal in Finder/Explorer" context-menu command (file, folder, and project-root nodes).
 
-- **Arg:** absolute path (the right-clicked tree node's `path`).
+- **Request:** `{ filePath }`, the absolute path (the right-clicked tree node's `path`).
 - **Returns `Promise<string>`:** `''` on success, otherwise a human-readable error message the renderer surfaces as an error toast (`'Item no longer exists on disk'`, `'Cannot reveal items outside the project'`, `'No project is open'`, `'Invalid path'`).
 - **Security:** validates the IPC sender via the shared `isTrustedSender` (`src/main/ipc/senderValidation.ts`, also used by the clipboard handlers) and confines the path to the open project root (the root itself is allowed so the project-root node can be revealed); an untrusted sender is a silent no-op returning `''`. The path is `fs.realpath`-canonicalized before the boundary check, so an in-project symlink cannot escape the project.
 
@@ -352,6 +355,8 @@ Reveals a file or folder in the native OS file manager (Finder/Explorer) by call
 **Why `file:getStats` keeps the carve-out.** The external-file import shortcut (spec #012, `ProjectTree.handleImportShortcut`) stats the paths the user picked in the native file dialog, and those are outside the project by definition. Confining the channel would break that flow. What the weaker guard still buys is the part #70 needs: the watcher's automatic re-stat of a watched, in-project path cannot be pointed somewhere else through a symlink. The clean fix — have `file:selectExternalFiles` return sizes so `ProjectTree` stops stat-ing external paths at all, after which `getStats` can be confined like the read handlers — is recorded in [Technical Debt](./technical-debt.md).
 
 A path that simply does not exist passes both guards, so the caller's own ENOENT stays the error the renderer sees rather than this module claiming the file left the project. The same helper backs the file watcher's re-arm re-check (`watcher/atomicRearm.ts`), which re-validates after an unlink because the file was replaced by someone else in between. `file:revealInFileManager` deliberately keeps its own copy of the two-stage check: it needs the canonical path itself to hand to `shell.showItemInFolder`, and it answers with per-verdict user-facing strings instead of throwing.
+
+**Path checks in the main process (`src/main/ipc/confinement/`).** Every `file:*` channel in `file-handlers.ts` is registered through `registerConfinedHandle`: a positional `z.tuple` schema, then one `resolveConfinedPath` per path argument, then the handler. The check resolves the path against the open project's canonical root held by the project session (`ProjectService.session`), by whole path segments, with links, junctions, drive aliases, UNC shares and letter case handled. Modes: `project` (links followed; the nearest existing ancestor is what is compared), `project-entry` (the last segment is kept literal, so a link can be deleted or renamed as a link) and `external` (form checks only). Handlers act on the canonical `real` path and answer with paths built from `requested`, the spelling the renderer used. Refusals are `ConfinementError`s with a code (`OUTSIDE_PROJECT`, `ROOT_FORBIDDEN`, `NOT_FOUND`, ...) and keep the messages above; result-shaped channels (`file:revealInFileManager`, `file:validatePath`, `file:exists`) turn a refusal into their usual result value. A test over `registerFileHandlers()` fails if a `file:*` channel is neither confined nor on its explicit allow-list. `FileService` keeps no prefix guards; its only own check is the refusal to delete or move the project root. Lint bans string-prefix tests against the project root and the plain `realpathSync` in `src/main`.
 
 ---
 

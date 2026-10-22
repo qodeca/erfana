@@ -510,8 +510,8 @@ Modal dialog for media file import with transcription (OpenAI API or local whisp
 **State**: `useTranscriptionStore.ts` (Zustand) manages dialog visibility, progress, result, error
 
 **Features**:
-- Composes on BaseDialog (`closeOnEscape={false}`, `closeOnBackdrop={false}`) with custom Escape handling (cancel when transcribing, close otherwise)
-- Tab-cycling focus trap via BaseDialog's opt-in `trapFocus` prop (the dialog's own `handleFocusTrap` was removed in #42)
+- Composes on BaseDialog (`closeOnBackdrop={false}`); Escape runs the cancel-aware `onClose` (cancel when transcribing, close otherwise) and, like every dialog, reaches it only while it is the topmost overlay (#229)
+- Tab-cycling focus trap via BaseDialog's `trapFocus` prop (on by default since #91) (the dialog's own `handleFocusTrap` was removed in #42)
 - Progress bar with percentage, ETA, and chunk indicator ("chunk N of M")
 - ARIA: `role="progressbar"`, `aria-live` on phase text/error/success, `aria-describedby`
 - Cancel via footer button or Escape key

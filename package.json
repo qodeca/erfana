@@ -38,6 +38,7 @@
     "build:mac:test": "npm run build && ERFANA_TEST_BUILD=true electron-builder --mac -c.productName=\"Erfana (TEST BUILD)\" -c.directories.output=release/test/${npm_package_version}",
     "test:e2e": "electron-vite build && playwright test --project=electron",
     "test:e2e:no-build": "playwright test --project=electron",
+    "test:e2e:linux": "bash scripts/e2e-linux.sh",
     "test:e2e:headed": "electron-vite build && playwright test --project=electron --headed",
     "test:e2e:visual": "electron-vite build && playwright test --project=visual",
     "test:e2e:update-screenshots": "electron-vite build && playwright test --project=visual --update-snapshots"

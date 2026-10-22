@@ -25,8 +25,60 @@ exports[`preload surface > window.api has the expected top-level groups 1`] = `
   "settings",
   "system",
   "terminal",
+  "testHooks",
   "transcription",
   "utils",
   "whisper",
+]
+`;
+
+exports[`preload surface > window.api.file and window.api.terminal expose the expected members > file 1`] = `
+[
+  "checkConflict",
+  "closeProject",
+  "copyFromExternal",
+  "copyItem",
+  "createFile",
+  "createFolder",
+  "deleteFile",
+  "deleteFolder",
+  "exists",
+  "getProjectPath",
+  "getSession",
+  "getStats",
+  "moveBatchFromExternal",
+  "moveFromExternal",
+  "moveItem",
+  "onProjectChanged",
+  "openProject",
+  "openProjectByPath",
+  "readDirectory",
+  "readFile",
+  "readImage",
+  "rename",
+  "revealInFileManager",
+  "selectExternalFiles",
+  "validateExternal",
+  "validatePath",
+  "writeFile",
+]
+`;
+
+exports[`preload surface > window.api.file and window.api.terminal expose the expected members > terminal 1`] = `
+[
+  "ackOutput",
+  "create",
+  "getActivity",
+  "getInfo",
+  "isAvailable",
+  "kill",
+  "list",
+  "markClearComplete",
+  "onClear",
+  "onData",
+  "onError",
+  "onExit",
+  "resize",
+  "write",
 ]
 `;

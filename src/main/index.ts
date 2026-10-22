@@ -6,7 +6,7 @@ import { writeFileSync } from 'fs'
 import type { NativeDepsSmokeOutcome } from './smoke/nativeDepsSmoke'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { spawnNewInstance } from './utils/spawnNewInstance'
-import { registerFileHandlers } from './ipc/file-handlers'
+import { registerFileHandlers, projectService } from './ipc/file-handlers'
 import { registerFileWatcherHandlers } from './ipc/file-watcher-handlers'
 import { registerDirectoryWatcherHandlers } from './ipc/directory-watcher-handlers'
 import { registerSettingsHandlers } from './ipc/settings-handlers'
@@ -33,11 +33,12 @@ import { registerClaudeStatusHandlers } from './ipc/claude-status-handlers'
 import { registerPreviewHandlers } from './ipc/preview-handlers'
 import { registerPreviewScheme } from './services/preview/previewScheme'
 import { DependencyDetector, converterRegistry, getExtensionsForDependencies } from './services/import'
-import { FORCE_CRASH_ARG, LOGS_DIR_RELATIVE } from '../shared/constants'
+import { FORCE_CRASH_ARG, LOGS_DIR_RELATIVE, TEST_HOOKS_ARG } from '../shared/constants'
 import { IMPORT_CHANNELS } from '../shared/ipc/import-channels'
 import type { DependencyReadyEvent } from '../shared/ipc/import-schema'
 import { createApplicationMenu, setPreviewZoomHandler } from './menu'
 import { fileService } from './services/FileService'
+import { redactedLogError } from './utils/redactUserInput'
 import { fileWatcherService } from './services/FileWatcherService'
 import { directoryWatcherService } from './services/DirectoryWatcherService'
 import { terminalService } from './services/TerminalService'
@@ -166,10 +167,15 @@ app.commandLine.appendSwitch('ignore-gpu-blocklist')
  * `ERFANA_E2E_FORCE_CRASH` outright.
  */
 function buildAdditionalArguments(): string[] {
+  const args: string[] = []
   if (!app.isPackaged && process.env.ERFANA_E2E_FORCE_CRASH === '1') {
-    return [FORCE_CRASH_ARG]
+    args.push(FORCE_CRASH_ARG)
   }
-  return []
+  // The e2e test hooks follow the same rule: a packaged build ignores the variable
+  if (!app.isPackaged && process.env.ERFANA_E2E_TEST_HOOKS === '1') {
+    args.push(TEST_HOOKS_ARG)
+  }
+  return args
 }
 
 function createWindow(): BrowserWindow {
@@ -304,12 +310,15 @@ function createWindow(): BrowserWindow {
   mainWindow.webContents.on('destroyed', () => {
     logger.info('WebContents destroyed, cleaning up services', { webContentsId })
 
-    // CRITICAL FIX (issue #59): Clear project state in services
-    // Without this, ProjectService.isSameProject() returns true and does 'noop'
-    // when user clicks same project in new window, causing empty file tree
-    fileService.setProjectPath('')
-    fileWatcherService.setProjectPath('')
-    directoryWatcherService.setProjectPath('')
+    // CRITICAL FIX (issue #59): Close the project, which clears the session and
+    // the services that follow it. Without this, the same-project check returns
+    // true and does 'noop' when the user clicks the same project in a new
+    // window, causing an empty file tree. The lock is released too.
+    projectService
+      .close({ senderId: webContentsId, reason: 'window-destroyed' })
+      .catch((err) => {
+        logger.error('Error closing project', redactedLogError(err))
+      })
 
     // Cleanup watcher services asynchronously
     // Pattern: Fire-and-forget with error logging - cleanup must not block the destroyed event
@@ -524,7 +533,7 @@ app.whenReady().then(async () => {
   registerFileWatcherHandlers()
   registerDirectoryWatcherHandlers()
   registerSettingsHandlers()
-  registerTerminalHandlers()
+  registerTerminalHandlers(projectService.session)
   registerImportHandlers()
   registerDocumentImportHandlers()
   registerGitHandlers()
@@ -538,7 +547,7 @@ app.whenReady().then(async () => {
   registerGlobalSettingsHandlers()
   registerLoggingHandlers()
   registerProjectLockHandlers()
-  registerExternalFileHandlers()
+  registerExternalFileHandlers(projectService.session)
   registerTranscriptionHandlers()
   registerClipboardHandlers()
   registerImageExportHandlers()
@@ -555,7 +564,10 @@ app.whenReady().then(async () => {
     // Main-side teardown on project switch. Until now this seam had no
     // producer, so only the renderer's own `preview:close` tore views down
     // (sd-074b §4.9).
-    subscribeProjectChanged: (listener) => fileService.onProjectPathChanged(listener),
+    subscribeProjectChanged: (listener) =>
+      projectService.session.onChange((prev, next) =>
+        listener(prev?.root ?? null, next?.root ?? null)
+      ),
     globalSettings: globalSettingsService
   })
 
