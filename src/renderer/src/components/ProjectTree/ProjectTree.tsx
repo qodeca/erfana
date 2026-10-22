@@ -62,7 +62,8 @@ import { isTreeClipboardKeystroke, treeClipboardAction } from './treeClipboardSc
 import { isMacOS } from '../../utils/platform'
 import { useTreeFocusRecovery } from './useTreeFocusRecovery'
 import { fileGateway } from '../../services/fileGateway'
-import { moveExternalBatch, refuseOversizedMove, type PendingExternalMove } from './externalMoveBatch'
+import { moveExternalBatch, type PendingExternalMove } from './externalMoveBatch'
+import { refuseOversizedDrop } from './externalDropLimit'
 
 interface ProjectTreeProps {
   onFileSelect: (filePath: string) => void
@@ -855,6 +856,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
    * Execute external file drop operation (Spec #012)
    *
    * Handles the complete workflow for dropped external files:
+   * 0. Refuse a drop over the file limit ("Too many files"), before any question
    * 1. Show drop mode dialog (move/copy/import)
    * 2. Validate each file
    * 3. Check for conflicts and prompt resolution
@@ -875,6 +877,9 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
       fileCount: droppedFiles.length,
       targetFolder
     })
+
+    // A drop too large to add is refused before the user is asked how to add it
+    if (refuseOversizedDrop(droppedFiles.length)) return
 
     // Check if any files are importable (to conditionally show Import option)
     // Note: isSupported expects a filename/path, not just the extension
@@ -918,9 +923,6 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
       refreshGitStatus()
       return
     }
-
-    // A move is one request and one box: more files than a request carries is refused up front
-    if (mode === 'move' && refuseOversizedMove(droppedFiles.length)) return
 
     // Step 3: Validate each file and settle its name conflict. Copies run as they go;
     // moves are collected and sent together (below), so the user is asked once

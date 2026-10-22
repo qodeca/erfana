@@ -8,7 +8,9 @@
  * modal to the window owning the project. The box names each file and its
  * folder (home-relative), never a full path. Moves that arrive together, and the
  * files of one dialog pick, share a box; a box lists at most
- * {@link MAX_FILES_PER_BOX} files, and a larger batch gets further boxes.
+ * {@link MAX_FILES_PER_BOX} files, and a larger batch gets further boxes. The
+ * boxes of one batch are one decision: its files move only if every box answers
+ * Move; Cancel, or a box that cannot be shown, moves none of them.
  */
 import { lstat } from 'fs/promises'
 import { homedir } from 'os'
@@ -258,29 +260,32 @@ export class ExternalMoveConfirmerImpl implements MoveConfirmer {
       const named = [...namedSet]
       const answers = new Map<string, MoveAnswer>()
       const approvedHere: string[] = []
-      let cancelled = false
+      // The batch is one decision: it moves only if EVERY box answers Move
+      let stopped: Exclude<MoveAnswer, 'move'> | null = null
       for (let i = 0; i < named.length; i += MAX_FILES_PER_BOX) {
         const chunk = named.slice(i, i + MAX_FILES_PER_BOX)
         const answer = await this.askChunk(senderId, chunk)
+        if (answer !== 'move') {
+          // Cancel, or a box that could not be shown (hidden window, box limit
+          // used up), ends the batch: no further box is shown ...
+          stopped = answer
+          break
+        }
         for (const p of chunk) answers.set(p, answer)
-        if (answer === 'move' && epoch === this.epoch) {
+        if (epoch === this.epoch) {
           const extra = chunk.filter((p) => !waitingPaths.has(p))
           await this.approve(senderId, extra)
           approvedHere.push(...extra)
         }
-        // Cancel is for the whole drop: no further box is shown
-        if (answer === 'cancel') {
-          cancelled = true
-          break
-        }
       }
-      if (cancelled) {
+      if (stopped) {
         // ... and nothing the earlier boxes said Move to is moved either
-        answers.clear()
         const entries = this.approved.get(senderId)
         for (const p of approvedHere) entries?.delete(p)
       }
-      for (const entry of entries) entry.resolve(answers.get(entry.sourcePath) ?? 'cancel')
+      for (const entry of entries) {
+        entry.resolve(stopped ?? answers.get(entry.sourcePath) ?? 'cancel')
+      }
     } finally {
       this.open.delete(senderId)
       if (this.waiting.has(senderId)) this.schedule(senderId)

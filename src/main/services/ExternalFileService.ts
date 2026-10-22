@@ -119,10 +119,11 @@ export interface IExternalFileService {
   ): Promise<ExternalFileMoveResponse>
 
   /**
-   * Move several external files into the project after ONE confirmation: the
-   * files that can be moved at all are put to the user together, so a drop of
-   * many files shows one box, not one per file. Answers one result per item, in
-   * order; a cancelled or unavailable answer moves nothing.
+   * Move several external files into the project after one decision: the
+   * files that can be moved at all are put to the user together (boxes of at
+   * most ten files), not one box per file. Answers one result per item, in
+   * order; the files move only if every box answers Move, and a cancelled or
+   * unavailable answer moves nothing.
    */
   moveBatchFromExternal(
     items: readonly ExternalMoveItem[],

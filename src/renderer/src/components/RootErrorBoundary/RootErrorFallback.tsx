@@ -14,7 +14,7 @@
  * nothing. Were restore ever re-added,
  * restarting after a crash *caused by* a project would reopen that project and
  * crash again, in a loop. Rather than depend on the coupling, Restart calls
- * `window.api.file.closeProject()` best-effort (which forgets the saved last
+ * `fileGateway.closeProject()` best-effort (which forgets the saved last
  * project path) before
  * `relaunchApp()`. That call is BOUNDED, not merely wrapped: after a crash the
  * main process may never answer, and a rejection, a hang, and a success all have
