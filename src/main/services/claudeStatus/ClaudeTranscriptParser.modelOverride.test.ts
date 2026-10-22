@@ -142,6 +142,12 @@ describe('/model override - cloud-platform ids are honoured (#49)', () => {
     })
   })
 
+  it('rejects a stacked prefix, which parseModelId rejects too (normalise once)', async () => {
+    // Normalising the already-normalised base a second time would peel the
+    // second prefix and honour an id the shared grammar refuses.
+    expect(await parseWithOverride('us.anthropic.us.anthropic.claude-opus-5')).toEqual(FALLBACK_TURN)
+  })
+
   it('still ignores an application-inference-profile ARN, which names no model', async () => {
     const arn = 'arn:aws:bedrock:us-east-2:123456789012:application-inference-profile/opus-47-prod'
     expect(await parseWithOverride(arn)).toEqual(FALLBACK_TURN)

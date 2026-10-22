@@ -35,12 +35,12 @@ async function snapshotFor(modelId: string, usedTokens = 12_000) {
   return { h, snapshot: h.emitted.at(-1)?.payload.snapshot }
 }
 
-/** Calls to the once-per-id warning, by the id they logged. */
-function unrecognisedLogs(): unknown[] {
+/** Metadata of the once-per-id lines at one log level. */
+function unrecognisedLogs(level: 'warn' | 'debug' = 'warn'): Array<Record<string, unknown>> {
   return vi
-    .mocked(logger.warn)
+    .mocked(logger[level])
     .mock.calls.filter(([message]) => message === 'claudeStatus.unrecognisedModelId')
-    .map(([, meta]) => (meta as { modelId: unknown }).modelId)
+    .map(([, meta]) => meta as Record<string, unknown>)
 }
 
 describe('provider ids meter like their bare equivalent', () => {
@@ -114,7 +114,19 @@ describe('an unrecognised id is a guess, and says so', () => {
     expect(snapshot?.inferred).toBe(false)
   })
 
-  it('logs each unrecognised id once, not on every refresh, and masks the AWS account', async () => {
+  it.each([
+    // Intended (#49 criterion 3): the marker follows PARSE FAILURE, so plain ids
+    // the grammar cannot read are now an honest guess too.
+    ['an old-style family-last id', 'claude-3-7-sonnet-20250219'],
+    ['a bare alias', 'opus']
+  ])('marks %s inferred (%s)', async (_label, modelId) => {
+    const { snapshot } = await snapshotFor(modelId)
+    expect(snapshot?.windowSize).toBe(200_000)
+    expect(snapshot?.inferred).toBe(true)
+    expect(snapshot?.tooltip).toBe('12k / 200k (inferred)')
+  })
+
+  it('logs each unrecognised id once, not on every refresh', async () => {
     const h = makeHarness()
     h.parseTranscript.mockResolvedValue({ modelId: APP_PROFILE_ARN, usedTokens: 12_000 })
     h.service.registerPanel('t1', 4242, '/p', 7)
@@ -123,17 +135,61 @@ describe('an unrecognised id is a guess, and says so', () => {
     await flush()
     await h.service.refresh('t1')
     await flush()
-
-    const logged = unrecognisedLogs()
-    expect(logged).toHaveLength(1)
-    expect(logged[0]).not.toContain('123456789012')
-    expect(logged[0]).toContain(':[redacted-account]')
+    expect(unrecognisedLogs()).toHaveLength(1)
 
     // A second distinct id is its own line.
     h.parseTranscript.mockResolvedValue({ modelId: 'team-sonnet-prod', usedTokens: 12_000 })
     await h.service.refresh('t1')
     await flush()
     expect(unrecognisedLogs()).toHaveLength(2)
+  })
+
+  it('at warn, logs only the shape and length — never the user-chosen name', async () => {
+    const ids = [APP_PROFILE_ARN, 'arn:aws:s3:::bucket/team-model', 'team-opus-prod']
+    const h = makeHarness()
+    h.service.registerPanel('t1', 4242, '/p', 7)
+    await flush()
+    for (const modelId of ids) {
+      h.parseTranscript.mockResolvedValue({ modelId, usedTokens: 12_000 })
+      await h.service.refresh('t1')
+      await flush()
+    }
+
+    expect(unrecognisedLogs('warn')).toEqual([
+      { shape: 'arn:application-inference-profile', length: APP_PROFILE_ARN.length },
+      { shape: 'arn:other', length: ids[1].length },
+      { shape: 'custom', length: ids[2].length }
+    ])
+    const warnText = JSON.stringify(vi.mocked(logger.warn).mock.calls)
+    expect(warnText).not.toContain('opus-47-prod')
+    expect(warnText).not.toContain('team-')
+    expect(warnText).not.toContain('123456789012')
+  })
+
+  it('at debug, logs the masked id and its normalised form', async () => {
+    await snapshotFor(APP_PROFILE_ARN)
+    const [line] = unrecognisedLogs('debug')
+    // Sanitized to the 64-char wire bound first, then masked.
+    expect(line.modelId).toBe('arn:aws:bedrock:us-east-2:[redacted-account]:application-inference-pro')
+    expect(line.normalisedModelId).toBe(
+      'arn:aws:bedrock:us-east-2:[redacted-account]:application-inference-profile/opus-47-prod'
+    )
+  })
+
+  it('dedupes on the normalised id, so two profiles with a shared 64-char prefix are both logged', async () => {
+    const h = makeHarness()
+    h.service.registerPanel('t1', 4242, '/p', 7)
+    await flush()
+    for (const name of ['opus-47-prod', 'opus-47-staging']) {
+      const modelId = `arn:aws:bedrock:us-east-2:123456789012:application-inference-profile/${name}`
+      h.parseTranscript.mockResolvedValue({ modelId, usedTokens: 12_000 })
+      await h.service.refresh('t1')
+      await flush()
+    }
+    expect(unrecognisedLogs('debug').map((m) => m.normalisedModelId)).toEqual([
+      'arn:aws:bedrock:us-east-2:[redacted-account]:application-inference-profile/opus-47-prod',
+      'arn:aws:bedrock:us-east-2:[redacted-account]:application-inference-profile/opus-47-staging'
+    ])
   })
 
   it('stops logging new ids past the cap, so hostile ids cannot grow the set', async () => {

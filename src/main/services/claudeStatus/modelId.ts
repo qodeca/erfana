@@ -105,18 +105,36 @@ const MODEL_ID_RE = /^claude-([a-z]+)-(\d+)(?:-(\d+))?((?:-[a-z0-9]+)*)$/
  */
 export const MAX_PROVIDER_MODEL_ID_LENGTH = 256
 
-/** Leading segment of an AWS ARN (`arn:aws:bedrock:…/<resource-id>`). */
-const ARN_PREFIX = 'arn:'
+/**
+ * A Bedrock ARN whose resource names a model: `arn:<partition>:bedrock:<region>:
+ * <account>:inference-profile/` or `…:foundation-model/` (the account is empty
+ * for a foundation model). Only these two resource types: an
+ * `application-inference-profile/` id is a name the user chose, not a model, so
+ * it stays unreadable, and an ARN of any other service never maps. Linear: no
+ * class contains the `:` or `/` delimiters that follow it.
+ */
+const BEDROCK_MODEL_ARN_RE =
+  /^arn:aws[a-z-]*:bedrock:[a-z0-9-]*:\d*:(?:inference-profile|foundation-model)\//
 
 /** The vendor segment Bedrock puts in front of every Claude id. */
 const BEDROCK_VENDOR_PREFIX = 'anthropic.'
 
 /**
- * A Bedrock inference-profile geography (`us`, `eu`, `apac`, `jp`, `au`,
- * `global`, `us-gov`). Matched by SHAPE, not by list, so a geography AWS adds
- * later still normalises. `-` is outside the class, so the match is linear.
+ * The documented Bedrock inference-profile geographies. A list, not a shape:
+ * a shape match let `openai.anthropic.claude-…` through. A geography AWS adds
+ * later is a one-line change here.
+ * @see https://code.claude.com/docs/en/amazon-bedrock — "Valid values are `us`, `eu`, `apac`, `jp`, `au`, and `global`"; GovCloud uses `us-gov.`
+ * @see https://platform.claude.com/docs/en/build-with-claude/claude-on-amazon-bedrock-legacy — `global`, `us`, `eu`, `jp`, `apac` columns
  */
-const BEDROCK_GEO_RE = /^[a-z]+(?:-[a-z]+)?$/
+const BEDROCK_GEOGRAPHIES: ReadonlySet<string> = new Set([
+  'us',
+  'eu',
+  'apac',
+  'jp',
+  'au',
+  'global',
+  'us-gov'
+])
 
 /** Bedrock's trailing model version (`-v1:0`, `-v1`). Anchored at the end. */
 const BEDROCK_VERSION_SUFFIX_RE = /-v\d+(?::\d+)?$/
@@ -154,27 +172,30 @@ export interface ParsedModelId {
  *
  * Forms accepted, from each platform's documentation:
  *  - Bedrock ARN, `arn:aws:bedrock:<region>:<account>:inference-profile/<id>`
- *    or `…:foundation-model/<id>`: the resource id after the last `/` is kept.
- *    An application-inference-profile ARN names no model and stays unparseable.
- *  - Bedrock id, `anthropic.claude-…`, optionally behind a geography
- *    (`us.anthropic.claude-…`) and with a version suffix (`…-20251001-v1:0`,
+ *    or `…:foundation-model/<id>`: the resource id after the `/` is kept. An
+ *    application-inference-profile ARN names no model and stays unparseable.
+ *  - Bedrock id, `anthropic.claude-…`, optionally behind a documented
+ *    geography (`us.anthropic.claude-…`) and with a version suffix (`…-20251001-v1:0`,
  *    `…-v1`). The suffix is dropped only when a Bedrock prefix was, so a bare
  *    id is never reinterpreted.
  *  - Vertex, `claude-…@<yyyymmdd>`: the `@` becomes the `-` before the date.
  *  - Foundry deployments default to the bare Claude API id: nothing to do.
  *
  * Anything else is returned unchanged and judged by the grammar as before.
- * String primitives and anchored regexes without nested quantifiers only, so
- * the cost stays linear in the (already bounded) input.
+ * ONE pass, never a loop: a stacked prefix (`us.anthropic.us.anthropic.…`)
+ * stays unparseable, and every caller must normalise exactly once. String
+ * primitives and anchored regexes without nested quantifiers only, so the cost
+ * stays linear in the (already bounded) input.
  */
 function normaliseProviderId(base: string): string {
   let id = base
-  if (id.startsWith(ARN_PREFIX)) id = id.slice(id.lastIndexOf('/') + 1)
+  const arn = BEDROCK_MODEL_ARN_RE.exec(id)
+  if (arn !== null) id = id.slice(arn[0].length)
 
   const vendor = id.indexOf(BEDROCK_VENDOR_PREFIX)
   const isBedrock =
     vendor === 0 ||
-    (vendor > 1 && id[vendor - 1] === '.' && BEDROCK_GEO_RE.test(id.slice(0, vendor - 1)))
+    (vendor > 1 && id[vendor - 1] === '.' && BEDROCK_GEOGRAPHIES.has(id.slice(0, vendor - 1)))
   if (isBedrock) {
     id = id.slice(vendor + BEDROCK_VENDOR_PREFIX.length).replace(BEDROCK_VERSION_SUFFIX_RE, '')
   }

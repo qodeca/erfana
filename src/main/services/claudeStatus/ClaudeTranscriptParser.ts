@@ -271,7 +271,10 @@ function modelOverrideFromRecord(
   if (stripped === null) return undefined
   if (!stripped.variants.every(isRecognisedVariant)) return undefined
   // Accept only a full claude-* model id (reject aliases like `opus`, `default`).
-  if (parseModelId(stripped.base) === null) return undefined
+  // Parsed from `arg`, NOT from `stripped.base`: that base is already
+  // normalised, and normalising it a second time would peel a stacked prefix
+  // (`us.anthropic.us.anthropic.claude-…`) that `parseModelId` rejects (#49).
+  if (parseModelId(arg) === null) return undefined
 
   return { modelId: stripped.base, forceExtended: stripped.variants.some(isExtendedVariant) }
 }

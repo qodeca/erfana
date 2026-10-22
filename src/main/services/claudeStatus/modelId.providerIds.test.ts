@@ -71,6 +71,11 @@ const PROVIDER_IDS: ReadonlyArray<[provider: string, bare: string]> = [
     `arn:aws-us-gov:bedrock:us-gov-west-1:${ACCOUNT}:inference-profile/us-gov.anthropic.claude-opus-4-8`,
     'claude-opus-4-8'
   ],
+  // An undecomposable id behind an ARN: the label must still be the bare id.
+  [
+    `arn:aws:bedrock:us-east-1:${ACCOUNT}:inference-profile/us.anthropic.claude-mythos-preview`,
+    'claude-mythos-preview'
+  ],
   // Google Cloud's Agent Platform (Vertex AI): `@` before the pinned date.
   ['claude-haiku-4-5@20251001', 'claude-haiku-4-5-20251001'],
   ['claude-sonnet-4-5@20250929', 'claude-sonnet-4-5-20250929'],
@@ -80,17 +85,36 @@ const PROVIDER_IDS: ReadonlyArray<[provider: string, bare: string]> = [
   ['  US.Anthropic.Claude-Opus-4-8  ', 'claude-opus-4-8']
 ]
 
+/**
+ * Rows whose bare id the grammar decomposes / the registry sizes. Comparing a
+ * provider id with a bare id that is ALSO null would pass whatever the
+ * provider id did, so those comparisons run only where there is a value.
+ */
+const DECOMPOSABLE = PROVIDER_IDS.filter(([, bare]) => parseModelId(bare) !== null)
+const SIZED = PROVIDER_IDS.filter(([, bare]) => windowForModelId(bare) !== null)
+
 describe('provider ids resolve exactly like the bare id they wrap', () => {
-  it.each(PROVIDER_IDS)('%s parses like %s', (provider, bare) => {
-    expect(parseModelId(provider)).toEqual(parseModelId(bare))
+  it('the comparison sets are not vacuous', () => {
+    // Pins the filters: if the registry stops sizing these rows, say so here
+    // rather than silently comparing fewer of them.
+    expect(DECOMPOSABLE.length).toBe(PROVIDER_IDS.length - 2) // the two mythos-preview rows
+    expect(SIZED.length).toBe(PROVIDER_IDS.length - 2) // sonnet-4 and opus-4-1: no row, no heuristic
+  })
+
+  it.each(DECOMPOSABLE)('%s parses like %s', (provider, bare) => {
+    const parsed = parseModelId(provider)
+    expect(parsed).not.toBeNull()
+    expect(parsed).toEqual(parseModelId(bare))
   })
 
   it.each(PROVIDER_IDS)('%s normalises to %s', (provider, bare) => {
     expect(stripModelVariants(provider)?.base).toBe(bare)
   })
 
-  it.each(PROVIDER_IDS)('%s gets the window of %s', (provider, bare) => {
-    expect(windowForModelId(provider)).toBe(windowForModelId(bare))
+  it.each(SIZED)('%s gets the window of %s', (provider, bare) => {
+    const window = windowForModelId(provider)
+    expect(window).not.toBeNull()
+    expect(window).toBe(windowForModelId(bare))
   })
 
   it.each(PROVIDER_IDS)('%s gets the label of %s', (provider, bare) => {
@@ -127,23 +151,27 @@ describe('provider ids resolve exactly like the bare id they wrap', () => {
     expect(arn.length).toBeGreaterThan(MAX_MODEL_ID_LENGTH)
     expect(friendlyModelName(arn)).toBe('Sonnet 4.5')
   })
+
+  it('labels an undecomposable id by its normalised form, variant and casing dropped', () => {
+    // Intended (#49 review): the label of a registry-named id no longer echoes
+    // a bracket variant or the source casing.
+    expect(friendlyModelName('claude-mythos-preview[1m]')).toBe('claude-mythos-preview')
+    expect(friendlyModelName('CLAUDE-MYTHOS-PREVIEW')).toBe('claude-mythos-preview')
+  })
 })
 
 describe('ids that still cannot be read fall back safely', () => {
   const unreadable: ReadonlyArray<[label: string, id: string]> = [
-    // Documented: an application inference profile ARN names no model.
-    [
-      'an application-inference-profile ARN',
-      `arn:aws:bedrock:us-east-2:${ACCOUNT}:application-inference-profile/opus-47-prod`
-    ],
     // Documented: a Foundry deployment may carry any name.
     ['a custom Foundry deployment name', 'team-opus-prod'],
     ['another vendor on Bedrock', 'meta.llama3-70b-instruct-v1:0'],
     ['a vendor prefix behind a non-geography', 'us.east.anthropic.claude-opus-4-8'],
+    ['a vendor prefix behind an undocumented geography', 'openai.anthropic.claude-opus-5'],
     ['a Bedrock version suffix on a BARE id', 'claude-opus-4-8-v1:0'],
     ['a Vertex @ without an 8-digit date', 'claude-opus-4-8@latest'],
-    ['an ARN with no resource id', 'arn:aws:bedrock:us-east-1:123456789012:'],
-    ['a vendor prefix and nothing else', 'anthropic.']
+    ['a vendor prefix and nothing else', 'anthropic.'],
+    // The pre-#41 naming: still outside the grammar, now an honest guess.
+    ['an old-style family-last id', 'claude-3-7-sonnet-20250219']
   ]
 
   it.each(unreadable)('%s has no window opinion, a raw label and is not recognised', (_label, id) => {
@@ -151,6 +179,37 @@ describe('ids that still cannot be read fall back safely', () => {
     expect(windowForModelId(id)).toBeNull()
     expect(isRecognisedModelId(id)).toBe(false)
     expect(friendlyModelName(id)).toBe(id.slice(0, MAX_MODEL_ID_LENGTH))
+  })
+
+  const unreadableArns: ReadonlyArray<[name: string, id: string, expected: string]> = [
+    // Documented: an application inference profile ARN names no model.
+    [
+      'an application-inference-profile ARN',
+      `arn:aws:bedrock:us-east-2:${ACCOUNT}:application-inference-profile/opus-47-prod`,
+      'arn:aws:bedrock:us-east-2:[redacted-account]:application-inferen'
+    ],
+    [
+      'an ARN with no resource id',
+      `arn:aws:bedrock:us-east-1:${ACCOUNT}:`,
+      'arn:aws:bedrock:us-east-1:[redacted-account]:'
+    ],
+    // Another AWS service never maps, even when its resource looks like a model.
+    ['an S3 ARN', 'arn:aws:s3:::bucket/claude-opus-5', 'arn:aws:s3:::bucket/claude-opus-5'],
+    // A model ARN whose resource is not a Claude id labels as that resource.
+    [
+      'an inference-profile ARN naming an unknown model',
+      `arn:aws:bedrock:us-east-1:${ACCOUNT}:inference-profile/us.anthropic.claude-foo`,
+      'claude-foo'
+    ]
+  ]
+
+  it.each(unreadableArns)('%s is unread, and its label never shows the account id', (_name, id, expected) => {
+    expect(parseModelId(id)).toBeNull()
+    expect(windowForModelId(id)).toBeNull()
+    expect(isRecognisedModelId(id)).toBe(false)
+    expect(friendlyModelName(id)).toBe(expected)
+    expect(friendlyModelName(id)).not.toContain(ACCOUNT)
+    expect(friendlyModelName(id).length).toBeLessThanOrEqual(MAX_MODEL_ID_LENGTH)
   })
 
   it('a bare alias is not a recognised id (it names a family, not a window)', () => {
@@ -184,9 +243,13 @@ describe('provider normalisation keeps parsing bounded (#49, design §11)', () =
   })
 
   it('strips ONE provider prefix, never a stack of them', () => {
-    // Repeated vendor segments: normalisation is a single pass, not a loop, so a
-    // stacked prefix stays unparseable instead of being peeled to a valid id.
-    const hostile = `${'us.anthropic.'.repeat(18)}claude-opus-4-8`.slice(-MAX_PROVIDER_MODEL_ID_LENGTH)
-    expect(parseModelId(hostile)).toBeNull()
+    // Normalisation is a single pass, not a loop, so a stacked prefix stays
+    // unparseable instead of being peeled to a valid id. Kept under the IPC
+    // bound so that the length cap cannot be what rejects it.
+    const stacked = 'us.anthropic.us.anthropic.claude-opus-4-8'
+    expect(stacked.length).toBeLessThan(MAX_MODEL_ID_LENGTH)
+    expect(parseModelId(stacked)).toBeNull()
+    expect(windowForModelId(stacked)).toBeNull()
+    expect(isRecognisedModelId(stacked)).toBe(false)
   })
 })

@@ -41,8 +41,13 @@ import {
   type WindowDetection,
   type WindowRule
 } from './ClaudeWindowDetector'
-import { friendlyModelName, sanitizeModelId } from './friendlyModelName'
-import { isRecognisedModelId, stickyModelKey } from './modelId'
+import {
+  friendlyModelName,
+  maskAwsAccountId,
+  sanitizeModelId,
+  sanitizeProviderModelId
+} from './friendlyModelName'
+import { isRecognisedModelId, stickyModelKey, stripModelVariants } from './modelId'
 import { clampPercent, levelFor } from './thresholds'
 import { createProcessDetector } from './process/createProcessDetector'
 import type { IClaudeProcessDetector } from './process/types'
@@ -181,16 +186,40 @@ function hasControlChars(value: string): boolean {
  */
 const MAX_LOGGED_UNRECOGNISED_IDS = 32
 
-/** A 12-digit AWS account id inside an ARN (`…:123456789012:…`). */
-const AWS_ACCOUNT_ID_RE = /:\d{12}(?=:|$)/g
-
 /**
  * A model id fit for a log file: sanitized like the wire field, with an AWS
  * account id masked. A Bedrock ARN carries one, and log files leave the machine
  * in bug reports.
  */
 function modelIdForLog(modelId: string): string {
-  return sanitizeModelId(modelId).replace(AWS_ACCOUNT_ID_RE, ':[redacted-account]')
+  return maskAwsAccountId(sanitizeModelId(modelId))
+}
+
+/**
+ * The id the parser actually judged, for a log file: the normalised base, or —
+ * when normalisation is refused (over-long, malformed) — the sanitized id at
+ * the parser's input bound. Account-masked either way. Two different ARNs that
+ * share their first 64 characters stay distinct here.
+ */
+function normalisedModelIdForLog(modelId: string): string {
+  const wide = sanitizeProviderModelId(modelId)
+  return maskAwsAccountId(stripModelVariants(wide)?.base ?? wide)
+}
+
+/** What KIND of id the parser could not read, without any of its text. */
+type UnrecognisedIdShape = 'arn:application-inference-profile' | 'arn:other' | 'custom'
+
+/**
+ * Classify an unrecognised id for a default-level log line. A deployment or
+ * profile name is chosen by the user and can say who they are or what they
+ * work on, so the `warn` line carries only this shape and a length.
+ */
+function unrecognisedIdShape(modelId: string): UnrecognisedIdShape {
+  const value = sanitizeProviderModelId(modelId).trim().toLowerCase()
+  if (!value.startsWith('arn:')) return 'custom'
+  return value.includes(':application-inference-profile/')
+    ? 'arn:application-inference-profile'
+    : 'arn:other'
 }
 
 export class ClaudeStatusService {
@@ -450,6 +479,7 @@ export class ClaudeStatusService {
         candidates: candidates.length,
         chosenFile: chosenFile ? path.basename(chosenFile) : undefined,
         modelId: modelIdForLog(parsed.modelId),
+        normalisedModelId: normalisedModelIdForLog(parsed.modelId),
         windowSize,
         rule,
         inferred,
@@ -552,15 +582,27 @@ export class ClaudeStatusService {
   /**
    * Log an unrecognised model id the first time this service sees it, so a
    * meter showing `200k (inferred)` can be traced to the id that caused it
-   * without a line on every ~1.25s refresh. Bounded by
-   * {@link MAX_LOGGED_UNRECOGNISED_IDS}.
+   * without a line on every ~1.25s refresh. Deduped on the NORMALISED id, so
+   * two profiles whose ARNs share a 64-character prefix are both logged.
+   * Bounded by {@link MAX_LOGGED_UNRECOGNISED_IDS}.
+   *
+   * Two levels on purpose: the default-level `warn` carries only the id's shape
+   * and length, never the user-chosen name; the masked id itself goes to
+   * `debug`, which a user turns on to diagnose.
    */
   private logUnrecognisedOnce(modelId: string): void {
-    const key = modelIdForLog(modelId)
+    const key = normalisedModelIdForLog(modelId)
     if (this.loggedUnrecognisedIds.has(key)) return
     if (this.loggedUnrecognisedIds.size >= MAX_LOGGED_UNRECOGNISED_IDS) return
     this.loggedUnrecognisedIds.add(key)
-    logger.warn('claudeStatus.unrecognisedModelId', { modelId: key })
+    logger.warn('claudeStatus.unrecognisedModelId', {
+      shape: unrecognisedIdShape(modelId),
+      length: modelId.length
+    })
+    logger.debug('claudeStatus.unrecognisedModelId', {
+      modelId: modelIdForLog(modelId),
+      normalisedModelId: key
+    })
   }
 
   /**

@@ -18,11 +18,15 @@
  *     The parser normalises cloud-platform ids, so `us.anthropic.claude-opus-4-8`
  *     and `claude-haiku-4-5@20251001` label like their bare forms (#49).
  *  2. A bare family alias (`opus`) → its title-cased family (design §6.3).
- *  3. An id the registry names but cannot decompose → its normalised form, so
- *     `anthropic.claude-mythos-preview` → `claude-mythos-preview` (#49).
- *  4. Fallback: the sanitized raw id, in its ORIGINAL casing.
+ *  3. An id the registry names but cannot decompose → its NORMALISED form:
+ *     lower-cased, provider prefix and bracket variants dropped, so
+ *     `anthropic.claude-mythos-preview`, `CLAUDE-MYTHOS-PREVIEW` and
+ *     `claude-mythos-preview[1m]` all render `claude-mythos-preview` (#49).
+ *  4. An ARN that names no readable model → its model resource id when it has
+ *     one, else the ARN with the AWS account id masked (#49).
+ *  5. Fallback: the sanitized raw id, in its ORIGINAL casing.
  *
- * Steps 2–4 are OUTSIDE that guarantee, by design: an alias, an over-length
+ * Steps 2–5 are OUTSIDE that guarantee, by design: an alias, an over-length
  * id (truncated here, rejected for windowing) and `claude-mythos-preview` (a
  * window from the undecomposable map, no derived label) each resolve their label
  * and their window by different routes and may legitimately differ.
@@ -97,14 +101,12 @@ function titleCase(family: string): string {
 export function friendlyModelName(modelId: string): string {
   const clean = sanitizeModelId(modelId)
 
+  // A Bedrock ARN is longer than the display bound yet still names a model
+  // (#49), so a truncated id that fails to parse gets one more try at the
+  // parser's own input bound. Same sanitizer, so the order still holds.
+  const wide = sanitizeProviderModelId(modelId)
   let parsed = parseModelId(clean)
-  if (parsed === null) {
-    // A Bedrock ARN is longer than the display bound yet still names a model
-    // (#49), so a truncated id that fails to parse gets one more try at the
-    // parser's own input bound. Same sanitizer, so the order still holds.
-    const wide = stripUnsafe(modelId, MAX_PROVIDER_MODEL_ID_LENGTH)
-    if (wide.length > clean.length) parsed = parseModelId(wide)
-  }
+  if (parsed === null && wide.length > clean.length) parsed = parseModelId(wide)
   if (parsed !== null) {
     // An omitted minor is rendered as omitted: `claude-opus-5` is "Opus 5", not
     // "Opus 5.0" — the two are distinct published ids (AC6).
@@ -116,9 +118,39 @@ export function friendlyModelName(modelId: string): string {
   if (alias !== null) return titleCase(alias)
 
   // An id the registry names but cannot decompose (`claude-mythos-preview`)
-  // shows its normalised form, so `anthropic.claude-mythos-preview` reads the
-  // same as the bare id (#49).
-  if (isRecognisedModelId(clean)) return stripModelVariants(clean)?.base ?? clean
+  // shows its normalised form, so `anthropic.claude-mythos-preview` and its
+  // ARN read the same as the bare id (#49). Checked on `wide`: an ARN is
+  // longer than the display bound.
+  if (isRecognisedModelId(wide)) return stripModelVariants(wide)?.base ?? clean
+
+  // An ARN carries the user's AWS account id, which must not reach the status
+  // bar or its aria-label. Show the model resource id when normalisation
+  // reached one, else the ARN with the account masked.
+  if (ARN_RE.test(wide)) {
+    const base = stripModelVariants(wide)?.base
+    if (base !== undefined && base !== '' && !ARN_RE.test(base)) return base
+    return maskAwsAccountId(wide).slice(0, MAX_MODEL_ID_LENGTH)
+  }
 
   return clean
+}
+
+/** Any ARN, in any casing (`arn:aws:…`). */
+const ARN_RE = /^\s*arn:/i
+
+/** A 12-digit AWS account id inside an ARN (`…:123456789012:…`). */
+const AWS_ACCOUNT_ID_RE = /:\d{12}(?=:|$)/g
+
+/** Mask every AWS account id in `value` (`:123456789012:` → `:[redacted-account]:`). */
+export function maskAwsAccountId(value: string): string {
+  return value.replace(AWS_ACCOUNT_ID_RE, ':[redacted-account]')
+}
+
+/**
+ * {@link sanitizeModelId} at the parser's input bound rather than the IPC one,
+ * for callers that must normalise an id longer than 64 characters (a Bedrock
+ * ARN) before showing or logging any of it.
+ */
+export function sanitizeProviderModelId(modelId: string): string {
+  return stripUnsafe(modelId, MAX_PROVIDER_MODEL_ID_LENGTH)
 }
