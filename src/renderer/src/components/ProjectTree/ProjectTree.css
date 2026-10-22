@@ -138,6 +138,9 @@
   box-sizing: border-box;
   height: var(--space-14);
   padding: var(--space-2) var(--space-4);
+  /* Indent: the Rows card's 16px step per level. ProjectTreeNode sets
+     --tree-level inline; the arithmetic stays here, in tokens. */
+  padding-left: calc(var(--space-4) + var(--tree-level, 0) * var(--space-8));
   cursor: pointer;
   white-space: nowrap;
   overflow: hidden;
@@ -214,6 +217,12 @@
   vertical-align: middle;
   display: inline-flex;
   align-items: center;
+}
+
+/* Symlink marker before the name */
+.symlink-icon {
+  margin-right: var(--space-2);
+  opacity: 0.8;
 }
 
 /* Hidden files - dimmed appearance */

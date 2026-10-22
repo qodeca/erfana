@@ -27,6 +27,10 @@ import {
   useProjectManagementContextSafe
 } from '../../context/ProjectManagementContext'
 import type { FileNode } from '../../../../preload/index'
+import { installTreeViewport, treeRowCount } from '../../test-utils/treeViewport'
+
+// The tree is virtualised; give it a viewport so every fixture row is mounted.
+installTreeViewport()
 
 declare global {
   interface Window {
@@ -196,6 +200,9 @@ describe('ProjectTree initial expansion', () => {
     // Only the root is expanded – nested folders stay closed.
     expect(treeItemFor(`${PROJECT_A}/a-folder`)).toHaveAttribute('aria-expanded', 'false')
     expect(screen.queryByText('a-child.md')).not.toBeInTheDocument()
+    // The list holds root, a-top.md and a-folder only: a-child.md is absent
+    // from the data, not merely outside the virtualised range.
+    expect(treeRowCount()).toBe(3)
   })
 
   it('renders the new root expanded after a project switch remounts the tree', async () => {

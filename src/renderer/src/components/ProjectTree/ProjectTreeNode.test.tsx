@@ -348,6 +348,17 @@ describe('ProjectTreeNode – one element is the tree item (#87, #89)', () => {
     expect(wrapper.style.transform).toBe('')
   })
 
+  it('passes its depth to CSS, which draws the indent in tokens (no px in the component)', () => {
+    render(<ProjectTreeNode {...defaultProps} node={makeFileNode({ isSymlink: true })} level={3} />)
+
+    const treeitem = screen.getByRole('treeitem')
+    expect(treeitem.style.getPropertyValue('--tree-level')).toBe('3')
+    expect(treeitem.style.paddingLeft).toBe('')
+    expect(screen.getByLabelText('Symlink')).toHaveClass('symlink-icon')
+    const css = readFileSync(resolve(__dirname, './ProjectTree.css'), 'utf8')
+    expect(css).toMatch(/padding-left:\s*calc\(var\(--space-4\) \+ var\(--tree-level, 0\) \* var\(--space-8\)\)/)
+  })
+
   it('is memoised, so unchanged props skip the render', () => {
     expect(ProjectTreeNode).toHaveProperty('$$typeof', Symbol.for('react.memo'))
   })

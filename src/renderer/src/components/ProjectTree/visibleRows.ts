@@ -46,6 +46,12 @@ interface Frame {
  * deep tree off the call stack (the recursion in `flattenTree` once overflowed
  * on large projects – issue #60).
  *
+ * Extension point (lazy folders, #320): a folder whose children are not loaded
+ * yet can be handled where a frame is pushed – with a third argument carrying
+ * per-folder load status, emit a placeholder row (a `kind` field on
+ * `VisibleTreeRow`) instead of descending. Nothing else here assumes the
+ * children are present.
+ *
  * @param root - The synthetic project-root node, or null when no project is open
  * @param expanded - Paths of the expanded folders
  * @returns The rows in display order and their index by path (first path wins)

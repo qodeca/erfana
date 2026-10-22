@@ -68,9 +68,6 @@ const isSensitiveFile = (fileName: string): boolean => {
  */
 export const TREE_ROW_HEIGHT = 28
 
-/** Indentation per tree level in px (the Rows card's 16px indent step). */
-const INDENT_STEP = 16
-
 interface ProjectTreeNodeProps {
   node: FileNode
   level: number
@@ -83,6 +80,13 @@ interface ProjectTreeNodeProps {
   /** Offset from the top of the list in px (virtualised placement) */
   top: number
   isExpanded: boolean
+  /**
+   * Whether this row is THE selected row – the folder that paste, New file
+   * and Import act on (`selectedFolder`). It drives both the lime selected
+   * style and `aria-selected`, so what is announced is exactly what is drawn
+   * (APG single-select tree, selection does NOT follow focus). Opening a file
+   * does not select it; only a folder click or Enter on a folder does.
+   */
   isSelected: boolean
   /** The one row that holds the tree's Tab stop (roving tabindex) */
   isTabStop: boolean
@@ -119,10 +123,13 @@ interface ProjectTreeNodeProps {
  * each row instead of nested `role="group"` containers – which also stops an
  * expanded folder's accessible name swallowing every descendant name (#89).
  *
- * Every prop is a primitive or a stable reference, and the component is
- * memoised: a click, a focus move or a git refresh re-renders only the rows
- * whose own state changed. Before, the whole `expandedFolders` Set and the
- * selection went to every row, so any change re-rendered all of them.
+ * Every prop but `node` is a primitive or a stable callback, and the
+ * component is memoised: a click, a focus move, a drag hover or a status
+ * refresh re-renders only the rows whose own state changed. Before, the whole
+ * `expandedFolders` Set and the selection went to every row, so any change
+ * re-rendered all of them. `node` stays the same object only while the tree is
+ * unchanged: a tree refresh (a watcher event, a rename) builds fresh nodes, so
+ * every mounted row – a screenful – re-renders once after one.
  */
 function ProjectTreeNodeRow({
   node,
@@ -253,7 +260,8 @@ function ProjectTreeNodeRow({
       */}
       <div
         className={`project-tree-item ${node.type} ${isSelected ? 'selected' : ''}`}
-        style={{ paddingLeft: `${level * INDENT_STEP + 8}px` }}
+        // The indent itself is CSS (tokens); the row only says how deep it is.
+        style={{ '--tree-level': level } as React.CSSProperties}
         role="treeitem"
         aria-level={level + 1}
         aria-posinset={posInSet}
@@ -295,7 +303,7 @@ function ProjectTreeNodeRow({
           title={isSensitive ? 'Sensitive file - may contain credentials' : undefined}
         >
           {isSensitive && <AlertTriangle size={14} className="sensitive-icon" aria-label="Warning: sensitive file" />}
-          {isSymlink && <LinkIcon size={12} style={{ marginRight: 4, opacity: 0.8 }} aria-label="Symlink" />}
+          {isSymlink && <LinkIcon size={12} className="symlink-icon" aria-label="Symlink" />}
           {node.name}
         </span>
         {gitStatus && gitStatus !== 'unmodified' && (

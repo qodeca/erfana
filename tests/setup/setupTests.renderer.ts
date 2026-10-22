@@ -48,28 +48,6 @@ global.ResizeObserver = global.ResizeObserver || MockResizeObserver
 // @ts-ignore
 global.MockResizeObserver = MockResizeObserver
 
-// The project tree is virtualised (@tanstack/react-virtual): it mounts only the
-// rows that fit its scroll container's height. jsdom does no layout and reports
-// 0 for every element, which would mount no rows at all. Give the tree's
-// container a tall viewport instead – 2000px, about 70 rows, more than any
-// fixture needs – and leave every other element at jsdom's 0. Both height
-// properties are stubbed because the library reads one or the other depending
-// on its version. A test of the virtualisation itself overrides
-// `globalThis.__treeViewportHeight`.
-// @ts-ignore
-globalThis.__treeViewportHeight = 2000
-for (const [owner, property] of [[Element.prototype, 'clientHeight'], [HTMLElement.prototype, 'offsetHeight']] as const) {
-  const jsdomGetter = Object.getOwnPropertyDescriptor(owner, property)?.get
-  Object.defineProperty(HTMLElement.prototype, property, {
-    configurable: true,
-    get(this: HTMLElement) {
-      // @ts-ignore
-      if (this.classList.contains('project-tree-content')) return globalThis.__treeViewportHeight
-      return jsdomGetter?.call(this) ?? 0
-    }
-  })
-}
-
 // Quiet down noisy errors in tests if components try to access
 // unavailable Electron APIs directly (should go through preload).
 // This encourages using window.api in renderer code.

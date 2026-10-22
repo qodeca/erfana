@@ -7,6 +7,7 @@ import type { FileNode } from '../../../../preload/index'
 import type { FilterMode } from '../../types/filters'
 import { ProjectTreeNode, TREE_ROW_HEIGHT } from './ProjectTreeNode'
 import { buildVisibleRows } from './visibleRows'
+import { resolveInternalDropFolder, isSameFolderMove } from './dropTarget'
 import { resolveTreeKey, findTypeAheadMatch, isTypeAheadKey } from './treeKeyboard'
 import { isStrictDescendant } from '../../utils/fileUtils'
 import { ContextMenu, ContextMenuItem } from '../ContextMenu/ContextMenu'
@@ -38,7 +39,7 @@ import {
 import { useDragDropTree } from '../../hooks/useDragDropTree'
 import { useClipboardStore } from '../../stores/useClipboardStore'
 import { formatFileOperationError } from '../../utils/errorUtils'
-import { DRAG_DROP, AUTO_SCROLL, AUTO_EXPAND } from './constants'
+import { DRAG_DROP, AUTO_EXPAND } from './constants'
 import { withWatcherPause } from './withWatcherPause'
 import { logger } from '../../utils/logger'
 import { getLastSeenProjectGeneration } from '../../services/projectGeneration'
@@ -64,7 +65,7 @@ import type { ConflictResolution } from '../../../../shared/ipc/external-file-sc
 import { IMPORT } from '../../../../shared/constants'
 import { isTreeClipboardKeystroke, treeClipboardAction } from './treeClipboardScope'
 import { isMacOS } from '../../utils/platform'
-import { useTreeFocusRecovery } from './useTreeFocusRecovery'
+import { useTreeFocusRecovery, findTreeFocusFallback } from './useTreeFocusRecovery'
 import { fileGateway } from '../../services/fileGateway'
 import { moveExternalBatch, type PendingExternalMove } from './externalMoveBatch'
 import { refuseOversizedDrop } from './externalDropLimit'
@@ -135,6 +136,14 @@ const TYPE_AHEAD_RESET_MS = 500
 
 /** dnd-kit's screen-reader markup goes to the body, outside role="tree". */
 const TREE_DND_ACCESSIBILITY = { container: typeof document !== 'undefined' ? document.body : undefined }
+
+/** The mounted row element for `path`, if it is in range (paths compared as data, not as a selector). */
+function findMountedRow(container: HTMLElement, path: string): HTMLElement | null {
+  for (const row of container.querySelectorAll<HTMLElement>('.project-tree-item[data-path]')) {
+    if (row.dataset.path === path) return row
+  }
+  return null
+}
 
 /** The focusable tree row a keyboard or focus event came from, if any. */
 function rowFromEventTarget(target: EventTarget | null): HTMLElement | null {
@@ -225,10 +234,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
   const [activeId, setActiveId] = useState<string | null>(null)
   const [overId, setOverId] = useState<string | null>(null)
   const autoExpandTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const autoScrollIntervalRef = useRef<number | null>(null)
   const treeContainerRef = useRef<HTMLDivElement | null>(null)
-  // A rename or delete removes the focused row; keep focus in the tree.
-  useTreeFocusRecovery(treeContainerRef)
   const lastMousePositionRef = useRef<{ x: number; y: number } | null>(null)
 
   // Drag-drop hooks.
@@ -491,29 +497,61 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     rangeExtractor
   })
 
-  // A keyboard move sets the row to focus here; the layout effect below moves
-  // DOM focus once that row is rendered (it may have just scrolled into range).
+  // A keyboard move to a row that is not mounted yet parks its path here; the
+  // layout effect below focuses it once the row renders. Only then: a row that
+  // is already mounted is focused at once, so nothing is left parked to fire
+  // on some later, unrelated render.
   const pendingFocusRef = useRef<string | null>(null)
   useLayoutEffect(() => {
     const path = pendingFocusRef.current
     const container = treeContainerRef.current
     if (path === null || !container) return
-    for (const row of container.querySelectorAll<HTMLElement>('.project-tree-item[data-path]')) {
-      if (row.dataset.path === path) {
-        pendingFocusRef.current = null
-        row.focus({ preventScroll: true })
-        return
-      }
+    // Never pull focus back from outside: a pending move only completes while
+    // the keyboard is still in the tree (or focus fell to <body>, which is
+    // where a removed row leaves it).
+    const active = document.activeElement
+    if (active !== null && active !== document.body && !container.contains(active)) {
+      pendingFocusRef.current = null
+      return
+    }
+    const row = findMountedRow(container, path)
+    if (row) {
+      pendingFocusRef.current = null
+      row.focus({ preventScroll: true })
     }
   })
 
   const moveFocusTo = useCallback((index: number) => {
     const row = visibleRows[index]
-    if (!row) return
-    pendingFocusRef.current = row.node.path
+    const container = treeContainerRef.current
+    if (!row || !container) return
     virtualizer.scrollToIndex(index, { align: 'auto' })
     setFocusedPath(row.node.path)
+    const mounted = findMountedRow(container, row.node.path)
+    if (mounted) {
+      pendingFocusRef.current = null
+      mounted.focus({ preventScroll: true })
+    } else {
+      pendingFocusRef.current = row.node.path
+    }
   }, [visibleRows, virtualizer])
+
+  // Focus leaving the tree cancels a parked move (see the layout effect).
+  const handleTreeBlur = (e: React.FocusEvent<HTMLDivElement>) => {
+    const next = e.relatedTarget
+    if (next instanceof Node && e.currentTarget.contains(next)) return
+    pendingFocusRef.current = null
+  }
+
+  // A rename or delete removes the focused row; focus goes to the nearest row
+  // that still exists in the DATA – the same path, else the nearest ancestor
+  // folder, else the first row – even if that row is scrolled out of range.
+  const focusFallbackRef = useRef<(lostPath: string) => void>(() => {})
+  focusFallbackRef.current = (lostPath: string) => {
+    const index = findTreeFocusFallback(lostPath, indexByPath)
+    if (index !== null) moveFocusTo(index)
+  }
+  useTreeFocusRecovery(treeContainerRef, focusFallbackRef)
 
   // Type-ahead buffer: characters typed in quick succession form one query.
   const typeAheadRef = useRef<{ query: string; timer: ReturnType<typeof setTimeout> | null }>({ query: '', timer: null })
@@ -527,25 +565,10 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
 
   // Remaining handlers now provided by useFileOperations hook
 
-  // Auto-scroll logic
-  const startAutoScroll = (direction: 'up' | 'down') => {
-    if (autoScrollIntervalRef.current) return // Already scrolling
-
-    const container = treeContainerRef.current
-    if (!container) return
-
-    autoScrollIntervalRef.current = window.setInterval(() => {
-      const scrollAmount = direction === 'up' ? -AUTO_SCROLL.SCROLL_AMOUNT : AUTO_SCROLL.SCROLL_AMOUNT
-      container.scrollTop += scrollAmount
-    }, AUTO_SCROLL.SCROLL_INTERVAL) // ~60fps
-  }
-
-  const stopAutoScroll = () => {
-    if (autoScrollIntervalRef.current) {
-      window.clearInterval(autoScrollIntervalRef.current)
-      autoScrollIntervalRef.current = null
-    }
-  }
+  // Auto-scroll while dragging near the tree's top or bottom edge is dnd-kit's
+  // own (`DndContext` autoScroll, on by default), driven by the live pointer.
+  // The tree's former interval read `activatorEvent.clientY` – the pointer
+  // position when the drag STARTED – so it scrolled on a stale position.
 
   // Auto-expand logic
   const startAutoExpandTimer = (folderId: string) => {
@@ -596,28 +619,6 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
   const handleDragOver = (event: DragOverEvent) => {
     const newOverId = event.over?.id as string | null
 
-    // Handle auto-scroll based on pointer position
-    if (treeContainerRef.current && event.activatorEvent) {
-      const container = treeContainerRef.current
-      const rect = container.getBoundingClientRect()
-
-      // Type guard for mouse/pointer events
-      const pointerY = ('clientY' in event.activatorEvent && typeof event.activatorEvent.clientY === 'number')
-        ? event.activatorEvent.clientY
-        : 0
-
-      const distanceFromTop = pointerY - rect.top
-      const distanceFromBottom = rect.bottom - pointerY
-
-      if (distanceFromTop < AUTO_SCROLL.TRIGGER_DISTANCE_TOP && distanceFromTop > 0) {
-        startAutoScroll('up')
-      } else if (distanceFromBottom < AUTO_SCROLL.TRIGGER_DISTANCE_BOTTOM && distanceFromBottom > 0) {
-        startAutoScroll('down')
-      } else {
-        stopAutoScroll()
-      }
-    }
-
     // Handle auto-expand
     if (newOverId && newOverId !== overId) {
       // Moved to a new target
@@ -637,7 +638,6 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     const { active, over } = event
 
     // Cleanup timers and state
-    stopAutoScroll()
     cancelAutoExpandTimer()
 
     setActiveId(null)
@@ -756,6 +756,13 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
         message: 'Cannot determine target location',
         type: 'error'
       })
+      return
+    }
+
+    // Dropped next to itself (on a sibling, or on its own folder): nothing to
+    // move, so end quietly instead of asking main to move it onto itself.
+    if (isSameFolderMove(sourcePath, targetParent)) {
+      logger.info('Drag ended in the item\'s own folder - nothing to move')
       return
     }
 
@@ -1461,17 +1468,11 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
   }
 
   const virtualItems = virtualizer.getVirtualItems()
-  // Drop feedback for the folder a drag will land in. Hovering a file inside a
-  // folder lands in that folder, so the file's parent is highlighted – the
-  // nested tree got this for free, because a folder's element contained its
-  // children's; a flat list has to say it.
-  const internalDropFolder = useMemo(() => {
-    if (activeId === null || overId === null || overId === activeId) return null
-    const index = indexByPath.get(overId)
-    if (index === undefined) return null
-    const row = visibleRows[index]
-    return row.node.type === 'directory' ? row.node.path : row.parentPath
-  }, [activeId, overId, indexByPath, visibleRows])
+  // Drop feedback for the folder a drag will land in (see dropTarget.ts).
+  const internalDropFolder = useMemo(
+    () => resolveInternalDropFolder(visibleRows, indexByPath, activeId, overId),
+    [activeId, overId, indexByPath, visibleRows]
+  )
   const isCut = clipboard.operation === 'cut'
 
   return (
@@ -1612,6 +1613,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
         ref={treeContainerRef}
         onKeyDown={handleTreeKeyDown}
         onFocus={handleTreeFocus}
+        onBlur={handleTreeBlur}
       >
         <DndContext
           sensors={sensors}
@@ -1647,6 +1649,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
                     parentPath={row.parentPath}
                     top={item.start - listOffset}
                     isExpanded={row.isExpanded}
+                    // "Selected" = the paste-target folder; see the prop's doc.
                     isSelected={node.path === selectedFolder}
                     isTabStop={item.index === tabStopIndex}
                     onFileClick={handleRowClick}

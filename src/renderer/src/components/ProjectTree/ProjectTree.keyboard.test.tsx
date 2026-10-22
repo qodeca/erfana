@@ -22,6 +22,9 @@ import { ProjectManagementProvider } from '../../context/ProjectManagementContex
 import { TEST_IDS } from '../../constants/testids'
 import { useClipboardStore } from '../../stores/useClipboardStore'
 import type { FileNode } from '../../../../preload/index'
+import { installTreeViewport, treeRowCount } from '../../test-utils/treeViewport'
+
+const viewport = installTreeViewport()
 
 const ROOT = '/proj'
 
@@ -150,7 +153,6 @@ beforeEach(() => {
 
 afterEach(() => {
   portalRoot.remove()
-  ;(globalThis as any).__treeViewportHeight = 2000
 })
 
 describe('ProjectTree – one Tab stop (roving tabindex)', () => {
@@ -218,7 +220,38 @@ describe('ProjectTree – arrow keys, Home and End', () => {
 
     press('ArrowLeft')
     expect(item(`${ROOT}/docs`)).toHaveAttribute('aria-expanded', 'false')
+    // Gone from the data (5 rows: root, alpha, docs, lib, zeta), not just out of range.
+    expect(treeRowCount()).toBe(5)
     expect(screen.queryByText('beta.md')).not.toBeInTheDocument()
+  })
+})
+
+describe('ProjectTree – focus never comes back uninvited', () => {
+  afterEach(() => {
+    act(() => useClipboardStore.getState().clear())
+  })
+
+  it('a key that targets the already-focused row leaves nothing to steal focus later', async () => {
+    await renderTree(smallTree())
+    act(() => item(`${ROOT}/zeta.md`).focus())
+    // End on the last row, Home on the root, ↓ on the last row and a
+    // type-ahead hit on the same row all target the row that has focus.
+    press('End')
+    press('ArrowDown')
+    expect(document.activeElement).toBe(item(`${ROOT}/zeta.md`))
+
+    const outside = document.createElement('input')
+    document.body.appendChild(outside)
+    try {
+      act(() => outside.focus())
+      // Any later re-render of the tree – here a cut changes a row's state.
+      act(() => useClipboardStore.getState().cut(`${ROOT}/alpha.md`, 'alpha.md', 'file'))
+
+      expect(item(`${ROOT}/alpha.md`)).toHaveAttribute('data-clipboard-cut', 'true')
+      expect(document.activeElement).toBe(outside)
+    } finally {
+      outside.remove()
+    }
   })
 })
 
@@ -306,7 +339,7 @@ describe('ProjectTree – row state in a flat list', () => {
 describe('ProjectTree – virtualised rows', () => {
   it('mounts only a screenful of a 5,000-entry folder, each row stating its place', async () => {
     // 280px viewport = 10 rows of 28px.
-    ;(globalThis as any).__treeViewportHeight = 280
+    viewport.setHeight(280)
     await renderTree(bigTree(5000))
 
     act(() => item(`${ROOT}/big`).focus())
@@ -325,7 +358,7 @@ describe('ProjectTree – virtualised rows', () => {
   })
 
   it('renders and focuses the last row on End, even though it was not mounted', async () => {
-    ;(globalThis as any).__treeViewportHeight = 280
+    viewport.setHeight(280)
     await renderTree(bigTree(5000))
     act(() => item(`${ROOT}/big`).focus())
     press('ArrowRight')

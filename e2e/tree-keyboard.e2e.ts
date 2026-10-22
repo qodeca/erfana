@@ -127,6 +127,33 @@ test.describe('Project tree keyboard (#87)', () => {
     await expect(tree.contextMenu()).toHaveCount(0)
   })
 
+  test('Shift+F10 and the Menu key open one menu, at the row (no second, native one)', async ({
+    windowWithTestProject: page
+  }) => {
+    const tree = new ProjectTreePage(page)
+    await tabIntoTree(page)
+    await page.keyboard.press('End')
+    // Count native `contextmenu` events: on platforms where Chromium turns the
+    // key into one, the row's own handler would re-open the menu elsewhere.
+    await page.evaluate(() => {
+      const w = window as unknown as { __treeContextMenus: number }
+      w.__treeContextMenus = 0
+      document.addEventListener('contextmenu', () => { w.__treeContextMenus++ }, { capture: true })
+    })
+
+    for (const key of ['Shift+F10', 'ContextMenu']) {
+      const row = await page.evaluate(() => (document.activeElement as HTMLElement).getBoundingClientRect().bottom)
+      await page.keyboard.press(key)
+      await expect(tree.contextMenu()).toHaveCount(1)
+      const menuTop = await tree.contextMenu().evaluate((el) => el.getBoundingClientRect().top)
+      expect(Math.abs(menuTop - row)).toBeLessThan(40)
+      expect(await page.evaluate(() => (window as unknown as { __treeContextMenus: number }).__treeContextMenus)).toBe(0)
+      await page.keyboard.press('Escape')
+      await expect(tree.contextMenu()).toHaveCount(0)
+      await tree.fileRow('README.md').focus()
+    }
+  })
+
   test('dragging a file onto a folder still moves it', async ({ windowWithTestProject: page, testProject }) => {
     const tree = new ProjectTreePage(page)
     const source = tree.fileRow('notes.md')
@@ -166,6 +193,46 @@ test.describe('Project tree virtualisation ([33])', () => {
     await page.keyboard.press('End')
     expect(rel((await focused(page)).path, testProject.path)).toBe(`big/f${String(COUNT - 1).padStart(5, '0')}.md`)
     await expect(tree.fileRow(`big/f${String(COUNT - 1).padStart(5, '0')}.md`)).toBeInViewport()
+  })
+})
+
+test.describe('Project tree drag auto-scroll ([33] review)', () => {
+  test.use({
+    testProjectFiles: {
+      ...Object.fromEntries(Array.from({ length: 300 }, (_, i) => [`a-big/f${String(i).padStart(3, '0')}.md`, '#\n'])),
+      'z-target/keep.md': '#\n'
+    }
+  })
+
+  test('dragging to the edge scrolls the list, and a row that was not rendered takes the drop', async ({
+    windowWithTestProject: page,
+    testProject
+  }) => {
+    const tree = new ProjectTreePage(page)
+    await tree.expandTo(['a-big'])
+    await tree.waitForFile('a-big/f000.md')
+    const target = page.locator('.project-tree-item[data-type="directory"][data-path$="z-target"]')
+    await expect(target).toHaveCount(0)
+
+    const from = (await tree.fileRow('a-big/f000.md').boundingBox())!
+    const list = (await page.locator('.project-tree-content').boundingBox())!
+    await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2 + 12, { steps: 4 })
+    // Hold the pointer at the list's bottom edge; dnd-kit scrolls from the
+    // LIVE pointer position until the folder below the 300 files is in range.
+    const edgeY = list.y + list.height - 4
+    await expect(async () => {
+      await page.mouse.move(from.x + from.width / 2, edgeY, { steps: 2 })
+      await expect(target).toBeInViewport({ timeout: 250 })
+    }).toPass({ timeout: 20_000 })
+
+    const to = (await target.boundingBox())!
+    await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 6 })
+    await expect(target).toHaveAttribute('data-drop-target', 'true')
+    await page.mouse.up()
+
+    await expect.poll(async () => exists(join(testProject.path, 'z-target', 'f000.md'))).toBe(true)
   })
 })
 
